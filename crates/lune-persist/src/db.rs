@@ -1,12 +1,41 @@
 use std::path::Path;
 
+use chrono::{DateTime, Utc};
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
+use uuid::Uuid;
+
+use lune_core::asr::AsrBackendKind;
+use lune_core::session::{DictationSession, SessionStatus};
 
 use crate::error::{PersistError, PersistResult};
 use crate::models::{NewDictionaryEntry, NewSession, NewSnippet};
 use crate::schema::{dictionary, sessions, snippets};
+
+type SessionRow7 = (String, String, Option<String>, String, String, String, Option<String>);
+
+fn row_to_session(
+    (sid, s_at, e_at, sty, back, stat, trans): SessionRow7,
+) -> PersistResult<DictationSession> {
+    let id = Uuid::parse_str(&sid)
+        .map_err(|e| PersistError::Migration(format!("uuid: {e}")))?;
+    let started_at = DateTime::parse_from_rfc3339(&s_at)
+        .map_err(|e| PersistError::Migration(format!("started_at: {e}")))?
+        .with_timezone(&Utc);
+    let ended_at = e_at
+        .map(|t| {
+            DateTime::parse_from_rfc3339(&t)
+                .map(|dt| dt.with_timezone(&Utc))
+                .map_err(|e| PersistError::Migration(format!("ended_at: {e}")))
+        })
+        .transpose()?;
+    let backend: AsrBackendKind = serde_json::from_str(&back)
+        .map_err(|e| PersistError::Migration(format!("backend: {e}")))?;
+    let status: SessionStatus = serde_json::from_str(&stat)
+        .map_err(|e| PersistError::Migration(format!("status: {e}")))?;
+    Ok(DictationSession { id, started_at, ended_at, style: sty, backend, status, transcript: trans })
+}
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
@@ -186,6 +215,59 @@ impl Database {
             .execute(&mut self.conn)?;
         Ok(())
     }
+
+    pub fn list_sessions(&mut self, limit: u32) -> PersistResult<Vec<DictationSession>> {
+        use crate::schema::sessions::dsl::*;
+
+        let rows = sessions
+            .select((id, started_at, ended_at, style, backend, status, transcript))
+            .order(started_at.desc())
+            .limit(i64::from(limit))
+            .load::<SessionRow7>(&mut self.conn)?;
+
+        rows.into_iter().map(row_to_session).collect()
+    }
+
+    pub fn get_session(&mut self, session_id: Uuid) -> PersistResult<Option<DictationSession>> {
+        use crate::schema::sessions::dsl::*;
+
+        let row = sessions
+            .select((id, started_at, ended_at, style, backend, status, transcript))
+            .filter(id.eq(session_id.to_string()))
+            .first::<SessionRow7>(&mut self.conn)
+            .optional()?;
+
+        row.map(row_to_session).transpose()
+    }
+
+    pub fn update_session(&mut self, session: &DictationSession) -> PersistResult<()> {
+        use crate::schema::sessions::dsl::*;
+
+        let status_str = serde_json::to_string(&session.status)
+            .map_err(|e| PersistError::Migration(format!("status serialize: {e}")))?;
+        let ended = session.ended_at.map(|t| t.to_rfc3339());
+
+        diesel::update(sessions.filter(id.eq(session.id.to_string())))
+            .set((
+                status.eq(&status_str),
+                ended_at.eq(ended.as_deref()),
+                transcript.eq(session.transcript.as_deref()),
+            ))
+            .execute(&mut self.conn)?;
+        Ok(())
+    }
+
+    /// Delete sessions whose `started_at` is older than `days` days ago.
+    /// Returns the number of rows deleted.
+    pub fn prune_sessions(&mut self, days: u32) -> PersistResult<usize> {
+        use crate::schema::sessions::dsl::*;
+
+        // RFC3339 strings sort lexicographically, so < comparison is safe.
+        let cutoff = (Utc::now() - chrono::Duration::days(i64::from(days))).to_rfc3339();
+        let count = diesel::delete(sessions.filter(started_at.lt(&cutoff)))
+            .execute(&mut self.conn)?;
+        Ok(count)
+    }
 }
 
 #[cfg(test)]
@@ -268,6 +350,97 @@ mod tests {
         };
 
         db.insert_session(&session).unwrap();
+    }
+
+    #[test]
+    fn session_list_and_get() {
+        let mut db = Database::open_in_memory().unwrap();
+
+        let s1 = DictationSession {
+            id: Uuid::new_v4(),
+            started_at: Utc::now(),
+            ended_at: None,
+            style: "general".into(),
+            backend: AsrBackendKind::VoxtralLocal,
+            status: SessionStatus::Active,
+            transcript: None,
+        };
+        db.insert_session(&s1).unwrap();
+
+        let list = db.list_sessions(10).unwrap();
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].id, s1.id);
+
+        let fetched = db.get_session(s1.id).unwrap().unwrap();
+        assert_eq!(fetched.id, s1.id);
+        assert_eq!(fetched.style, "general");
+
+        let not_found = db.get_session(Uuid::new_v4()).unwrap();
+        assert!(not_found.is_none());
+    }
+
+    #[test]
+    fn session_update() {
+        let mut db = Database::open_in_memory().unwrap();
+
+        let mut session = DictationSession {
+            id: Uuid::new_v4(),
+            started_at: Utc::now(),
+            ended_at: None,
+            style: "general".into(),
+            backend: AsrBackendKind::VoxtralLocal,
+            status: SessionStatus::Active,
+            transcript: None,
+        };
+        db.insert_session(&session).unwrap();
+
+        session.status = SessionStatus::Completed;
+        session.ended_at = Some(Utc::now());
+        session.transcript = Some("Transcribed text.".into());
+        db.update_session(&session).unwrap();
+
+        let updated = db.get_session(session.id).unwrap().unwrap();
+        assert!(matches!(updated.status, SessionStatus::Completed));
+        assert!(updated.ended_at.is_some());
+        assert_eq!(updated.transcript.unwrap(), "Transcribed text.");
+    }
+
+    #[test]
+    fn session_prune() {
+        let mut db = Database::open_in_memory().unwrap();
+
+        // Insert a session with an old timestamp (40 days ago).
+        let old_time = Utc::now() - chrono::Duration::days(40);
+        let old_session = DictationSession {
+            id: Uuid::new_v4(),
+            started_at: old_time,
+            ended_at: None,
+            style: "general".into(),
+            backend: AsrBackendKind::VoxtralLocal,
+            status: SessionStatus::Completed,
+            transcript: None,
+        };
+        db.insert_session(&old_session).unwrap();
+
+        // Insert a recent session.
+        let new_session = DictationSession {
+            id: Uuid::new_v4(),
+            started_at: Utc::now(),
+            ended_at: None,
+            style: "general".into(),
+            backend: AsrBackendKind::VoxtralLocal,
+            status: SessionStatus::Active,
+            transcript: None,
+        };
+        db.insert_session(&new_session).unwrap();
+
+        // Prune sessions older than 30 days.
+        let pruned = db.prune_sessions(30).unwrap();
+        assert_eq!(pruned, 1);
+
+        let remaining = db.list_sessions(10).unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].id, new_session.id);
     }
 
     #[test]
