@@ -181,6 +181,10 @@ pub struct StylePreset {
 }
 
 impl StylePreset {
+    pub fn all_builtin() -> Vec<Self> {
+        vec![Self::general(), Self::email(), Self::slack(), Self::meeting_notes(), Self::code_comments()]
+    }
+
     /// Built-in "General" preset: grammar + disfluency removal.
     pub fn general() -> Self {
         Self {
@@ -197,6 +201,95 @@ impl StylePreset {
                 (
                     "the the meeting is uh scheduled for tomorrow at 3".into(),
                     "The meeting is scheduled for tomorrow at 3.".into(),
+                ),
+            ],
+        }
+    }
+
+    pub fn email() -> Self {
+        Self {
+            id: "email".into(),
+            name: "Email".into(),
+            description: "Formal email with proper greeting and sign-off".into(),
+            system_prompt: "You are a text post-processor for dictated emails. Fix grammar, \
+                remove filler words, ensure formal register. Add paragraph breaks where natural. \
+                Preserve the sender's intent exactly. Output only the cleaned text.".into(),
+            user_prompt_template: "{raw_text}".into(),
+            few_shot_pairs: vec![
+                (
+                    "hey uh just wanted to follow up on the thing we discussed last week about the project timeline".into(),
+                    "I wanted to follow up on our discussion last week regarding the project timeline.".into(),
+                ),
+                (
+                    "so um thanks for getting back to me I will uh review the document and send my feedback by friday".into(),
+                    "Thank you for getting back to me. I will review the document and send my feedback by Friday.".into(),
+                ),
+            ],
+        }
+    }
+
+    pub fn slack() -> Self {
+        Self {
+            id: "slack".into(),
+            name: "Slack".into(),
+            description: "Casual Slack message, concise and direct".into(),
+            system_prompt: "You are a text post-processor for Slack messages. Fix grammar and \
+                remove filler words, but keep the tone casual and conversational. \
+                Keep it concise. Output only the cleaned text.".into(),
+            user_prompt_template: "{raw_text}".into(),
+            few_shot_pairs: vec![
+                (
+                    "hey um can you take a look at the PR when you get a chance".into(),
+                    "hey, can you take a look at the PR when you get a chance?".into(),
+                ),
+                (
+                    "so the build is failing on main uh someone probably needs to fix that".into(),
+                    "the build is failing on main — someone needs to fix that".into(),
+                ),
+            ],
+        }
+    }
+
+    pub fn meeting_notes() -> Self {
+        Self {
+            id: "meeting_notes".into(),
+            name: "Meeting Notes".into(),
+            description: "Structured meeting notes with bullets and action items".into(),
+            system_prompt: "You are a text post-processor for meeting notes. Fix grammar and \
+                remove filler words. Format as clear bullet points. Identify action items \
+                and label them with 'Action:'. Output only the cleaned, formatted text.".into(),
+            user_prompt_template: "{raw_text}".into(),
+            few_shot_pairs: vec![
+                (
+                    "so we talked about the Q3 roadmap and uh John is going to handle the API redesign and Sarah needs to review the mockups by next Tuesday".into(),
+                    "- Discussed Q3 roadmap\n- Action: John — API redesign\n- Action: Sarah — review mockups by next Tuesday".into(),
+                ),
+                (
+                    "the main blocker is um the dependency on the auth service which is owned by the platform team".into(),
+                    "- Main blocker: dependency on the auth service (owned by Platform team)".into(),
+                ),
+            ],
+        }
+    }
+
+    pub fn code_comments() -> Self {
+        Self {
+            id: "code_comments".into(),
+            name: "Code Comments".into(),
+            description: "Technical code comments, terse and precise".into(),
+            system_prompt: "You are a text post-processor for code comments and documentation. \
+                Fix grammar, remove filler words. Keep language technical and precise. \
+                Use imperative mood for doc comments. No emojis. \
+                Output only the cleaned text.".into(),
+            user_prompt_template: "{raw_text}".into(),
+            few_shot_pairs: vec![
+                (
+                    "so this function basically um takes a slice and uh returns the sorted version without modifying the original".into(),
+                    "Returns a sorted copy of the slice without modifying the original.".into(),
+                ),
+                (
+                    "uh we need to handle the case where the cache is empty or like the key doesn't exist".into(),
+                    "Handle the case where the cache is empty or the key does not exist.".into(),
                 ),
             ],
         }
@@ -240,5 +333,31 @@ mod tests {
         let json = r#""LocalOnly""#;
         let mode: PrivacyMode = serde_json::from_str(json).unwrap();
         assert_eq!(mode, PrivacyMode::LocalOnly);
+    }
+
+    #[test]
+    fn builtin_presets_unique_ids() {
+        let presets = StylePreset::all_builtin();
+        assert_eq!(presets.len(), 5);
+        let ids: Vec<&str> = presets.iter().map(|p| p.id.as_str()).collect();
+        assert!(ids.contains(&"general"));
+        assert!(ids.contains(&"email"));
+        assert!(ids.contains(&"slack"));
+        assert!(ids.contains(&"meeting_notes"));
+        assert!(ids.contains(&"code_comments"));
+        // All IDs are unique.
+        let unique: std::collections::HashSet<&str> = ids.iter().copied().collect();
+        assert_eq!(unique.len(), presets.len());
+    }
+
+    #[test]
+    fn builtin_presets_have_few_shots() {
+        for preset in StylePreset::all_builtin() {
+            assert!(
+                !preset.few_shot_pairs.is_empty(),
+                "preset '{}' has no few-shot pairs",
+                preset.id
+            );
+        }
     }
 }
