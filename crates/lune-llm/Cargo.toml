@@ -1,0 +1,19 @@
+[package]
+name = "lune-llm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = []
+cuda = ["llama-cpp-2/cuda"]
+
+[dependencies]
+async-trait.workspace = true
+lune-core.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+llama-cpp-2.workspace = true
+encoding_rs.workspace = true
+async-openai.workspace = true
+serde_json.workspace = true
