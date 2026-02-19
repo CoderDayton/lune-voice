@@ -1,0 +1,18 @@
+[package]
+name = "lune-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+lune-core.workspace = true
+lune-audio.workspace = true
+lune-asr.workspace = true
+lune-llm.workspace = true
+lune-output.workspace = true
+lune-commands.workspace = true
+lune-dict.workspace = true
+lune-persist.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

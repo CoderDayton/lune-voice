@@ -1,0 +1,23 @@
+use lune_persist::{AppPaths, ensure_default_models};
+use tracing_subscriber::{EnvFilter, fmt};
+
+fn main() {
+    fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .json()
+        .init();
+
+    tracing::info!("lune-voice starting");
+
+    let paths = AppPaths::resolve().expect("resolve app paths");
+    paths.ensure_dirs().expect("create app directories");
+
+    let models = ensure_default_models(&paths.models_hub_dir())
+        .expect("ensure models downloaded");
+
+    tracing::info!(
+        asr_dir = %models.asr_model_dir.display(),
+        llm_path = %models.llm_model_path.display(),
+        "models ready"
+    );
+}

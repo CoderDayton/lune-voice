@@ -1,0 +1,10 @@
+[package]
+name = "lune-output"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+lune-core.workspace = true
+tokio.workspace = true
+tracing.workspace = true

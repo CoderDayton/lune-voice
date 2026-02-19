@@ -1,0 +1,9 @@
+[package]
+name = "lune-commands"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+lune-core.workspace = true
+tracing.workspace = true

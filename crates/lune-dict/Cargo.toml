@@ -1,0 +1,10 @@
+[package]
+name = "lune-dict"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+lune-core.workspace = true
+lune-persist.workspace = true
+tracing.workspace = true
