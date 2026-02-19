@@ -1,0 +1,67 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/lune-core",
+    "crates/lune-audio",
+    "crates/lune-asr",
+    "crates/lune-llm",
+    "crates/lune-output",
+    "crates/lune-commands",
+    "crates/lune-dict",
+    "crates/lune-persist",
+    "crates/lune-app",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[workspace.dependencies]
+# Internal crates
+lune-core = { path = "crates/lune-core" }
+lune-audio = { path = "crates/lune-audio" }
+lune-asr = { path = "crates/lune-asr" }
+lune-llm = { path = "crates/lune-llm" }
+lune-output = { path = "crates/lune-output" }
+lune-commands = { path = "crates/lune-commands" }
+lune-dict = { path = "crates/lune-dict" }
+lune-persist = { path = "crates/lune-persist" }
+
+# Async & runtime
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+
+# Data types
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+url = { version = "2", features = ["serde"] }
+zeroize = "1"
+diesel = { version = "2", features = ["sqlite", "returning_clauses_for_sqlite_3_35"] }
+diesel_migrations = "2"
+dirs = "6"
+cpal = "0.15"
+candle-core = "0.9"
+candle-nn = "0.9"
+candle-transformers = "0.9"
+tokenizers = "0.21"
+hf-hub = "0.4"
+safetensors = "0.5"
+rand = "0.9"
+rustfft = "6"
+llama-cpp-2 = "0.1"
+encoding_rs = "0.8"
+async-openai = { version = "0.33", features = ["chat-completion"] }
