@@ -15,14 +15,25 @@ impl SettingsStore {
         Self { path: path.into() }
     }
 
-    /// Load settings from disk. Returns defaults if file doesn't exist.
+    /// Load settings from disk. Returns defaults if file doesn't exist
+    /// or cannot be parsed (pre-release migration: old keys like `output_mode`
+    /// will fail to parse, so we fall back gracefully).
     pub fn load(&self) -> PersistResult<UserSettings> {
         if !self.path.exists() {
             return Ok(UserSettings::default());
         }
         let content = fs::read_to_string(&self.path)?;
-        let settings = toml::from_str(&content)?;
-        Ok(settings)
+        match toml::from_str(&content) {
+            Ok(settings) => Ok(settings),
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    path = %self.path.display(),
+                    "failed to parse settings, using defaults"
+                );
+                Ok(UserSettings::default())
+            }
+        }
     }
 
     /// Save settings atomically (write to temp, then rename).

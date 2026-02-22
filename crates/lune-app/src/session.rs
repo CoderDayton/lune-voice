@@ -10,7 +10,7 @@ use lune_audio::AudioCaptureService;
 use lune_commands::VoiceCommandRouter;
 use lune_core::Result;
 use lune_core::asr::{AsrBackend, AsrBackendKind, AsrSessionConfig};
-use lune_core::config::{OutputMode, StylePreset};
+use lune_core::config::StylePreset;
 use lune_core::error::Error;
 use lune_core::llm::{PostProcessInput, TextPostProcessor};
 use lune_core::session::{DictationSession, SessionEvent, SessionStatus};
@@ -25,7 +25,6 @@ pub struct SessionManagerConfig {
     pub silence_timeout: Duration,
     pub asr_config: AsrSessionConfig,
     pub style_preset: StylePreset,
-    pub output_mode: OutputMode,
     pub asr_backend_kind: AsrBackendKind,
 }
 
@@ -35,7 +34,6 @@ impl Default for SessionManagerConfig {
             silence_timeout: Duration::from_millis(500),
             asr_config: AsrSessionConfig::default(),
             style_preset: StylePreset::general(),
-            output_mode: OutputMode::LiveTyping,
             asr_backend_kind: AsrBackendKind::ParakeetTdt,
         }
     }
@@ -124,7 +122,6 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let silence_timeout = self.config.silence_timeout;
         let asr_config = self.config.asr_config.clone();
         let style_preset = self.config.style_preset.clone();
-        let output_mode = self.config.output_mode;
         let active_arc = Arc::clone(&self.active);
 
         // spawn_local: future need not be Send (holds !Send cpal::Stream).
@@ -139,7 +136,6 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             silence_timeout,
             asr_config,
             style_preset,
-            output_mode,
             event_tx,
             stop_rx,
             active_arc,
@@ -192,7 +188,6 @@ async fn run_session<A: AsrBackend + 'static>(
     silence_timeout: Duration,
     asr_config: AsrSessionConfig,
     style_preset: StylePreset,
-    output_mode: OutputMode,
     event_tx: mpsc::Sender<SessionEvent>,
     mut stop_rx: oneshot::Receiver<()>,
     active_arc: Arc<Mutex<Option<ActiveHandle>>>,
@@ -242,7 +237,7 @@ async fn run_session<A: AsrBackend + 'static>(
 
     let _ = event_tx.send(SessionEvent::Started).await;
 
-    let mut output_ctrl = TextOutputController::new(output_mode, event_tx.clone());
+    let mut output_ctrl = TextOutputController::new(event_tx.clone());
     // `accumulated` collects all finalized ASR text for the session.
     let mut session_text = String::new();
     // `utterance` collects text for the current utterance (reset on silence).

@@ -41,7 +41,8 @@ pub struct UserSettings {
     /// BCP-47 tag, e.g. "en-US"
     pub language: String,
     pub privacy_mode: PrivacyMode,
-    pub output_mode: OutputMode,
+    pub dictation_mode: DictationMode,
+    pub activation_mode: ActivationMode,
     /// None = session history disabled
     pub session_history_days: Option<u32>,
 }
@@ -63,7 +64,8 @@ impl Default for UserSettings {
             default_style: "general".into(),
             language: "en-US".into(),
             privacy_mode: PrivacyMode::LocalOnly,
-            output_mode: OutputMode::LiveTyping,
+            dictation_mode: DictationMode::default(),
+            activation_mode: ActivationMode::default(),
             session_history_days: Some(30),
         }
     }
@@ -124,13 +126,72 @@ pub enum PrivacyMode {
     AllowRemote,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[non_exhaustive]
-pub enum OutputMode {
-    /// Stream partials with correction.
-    LiveTyping,
-    /// Emit final text only when session ends.
-    TypeOnStop,
+pub enum DictationMode {
+    /// Type finalized text into focused input via wtype.
+    #[default]
+    TypeInPlace,
+    /// Copy finalized text to clipboard via wl-copy.
+    Clipboard,
+    /// Both type and copy to clipboard.
+    Both,
+}
+
+impl std::fmt::Display for DictationMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::TypeInPlace => f.write_str("TypeInPlace"),
+            Self::Clipboard => f.write_str("Clipboard"),
+            Self::Both => f.write_str("Both"),
+        }
+    }
+}
+
+impl std::str::FromStr for DictationMode {
+    type Err = String;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "TypeInPlace" => Ok(Self::TypeInPlace),
+            "Clipboard" => Ok(Self::Clipboard),
+            "Both" => Ok(Self::Both),
+            _ => Err(format!(
+                "unknown dictation mode: {s} (expected TypeInPlace|Clipboard|Both)"
+            )),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[non_exhaustive]
+pub enum ActivationMode {
+    /// Press once to start, press again to stop.
+    #[default]
+    Toggle,
+    /// Hold key to dictate, release to stop.
+    Hold,
+}
+
+impl std::fmt::Display for ActivationMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Toggle => f.write_str("Toggle"),
+            Self::Hold => f.write_str("Hold"),
+        }
+    }
+}
+
+impl std::str::FromStr for ActivationMode {
+    type Err = String;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "Toggle" => Ok(Self::Toggle),
+            "Hold" => Ok(Self::Hold),
+            _ => Err(format!(
+                "unknown activation mode: {s} (expected Toggle|Hold)"
+            )),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -314,7 +375,8 @@ mod tests {
         let parsed: UserSettings = toml::from_str(&toml_str).unwrap();
         assert_eq!(parsed.language, "en-US");
         assert_eq!(parsed.privacy_mode, PrivacyMode::LocalOnly);
-        assert_eq!(parsed.output_mode, OutputMode::LiveTyping);
+        assert_eq!(parsed.dictation_mode, DictationMode::TypeInPlace);
+        assert_eq!(parsed.activation_mode, ActivationMode::Toggle);
     }
 
     #[test]

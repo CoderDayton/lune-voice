@@ -1,7 +1,6 @@
 use tokio::sync::mpsc;
 use tracing::debug;
 
-use lune_core::config::OutputMode;
 use lune_core::session::SessionEvent;
 
 /// An action the output layer should perform.
@@ -16,35 +15,26 @@ pub enum OutputAction {
     DeleteThenType { delete_count: usize, insert: String },
 }
 
-/// Routes post-processed text to the configured output sink.
+/// Routes post-processed text to event consumers (D-Bus, delivery, logging).
 ///
-/// In `LiveTyping` mode, partials are streamed with minimal character-level
-/// corrections. In `TypeOnStop` mode, only final text is emitted.
-///
-/// For v0.1, the sink is always `NotesView` (events sent over a channel).
+/// Partials are always emitted. Delivery to the focused input or clipboard
+/// happens externally based on `DictationMode`.
 pub struct TextOutputController {
-    mode: OutputMode,
     event_tx: mpsc::Sender<SessionEvent>,
     /// Last partial text sent, for diff computation.
     last_partial: String,
 }
 
 impl TextOutputController {
-    pub fn new(mode: OutputMode, event_tx: mpsc::Sender<SessionEvent>) -> Self {
+    pub fn new(event_tx: mpsc::Sender<SessionEvent>) -> Self {
         Self {
-            mode,
             event_tx,
             last_partial: String::new(),
         }
     }
 
     /// Emit a partial (in-progress) text update.
-    ///
-    /// In `TypeOnStop` mode this is a no-op — partials are suppressed.
     pub async fn emit_partial(&mut self, text: String) {
-        if !matches!(self.mode, OutputMode::LiveTyping) {
-            return;
-        }
         let action = self.compute_action(&self.last_partial.clone(), &text);
         self.last_partial = text.clone();
         self.send_event(SessionEvent::PartialText(text), &action)
@@ -181,27 +171,18 @@ mod tests {
     // ── compute_action ────────────────────────────────────────────────────
 
     #[tokio::test]
-    async fn emit_partial_suppressed_in_type_on_stop() {
+    async fn emit_partial_sent() {
         let (tx, mut rx) = mpsc::channel(4);
-        let mut ctrl = TextOutputController::new(OutputMode::TypeOnStop, tx);
-        ctrl.emit_partial("hello".into()).await;
-        // No event should have been sent.
-        assert!(rx.try_recv().is_err());
-    }
-
-    #[tokio::test]
-    async fn emit_partial_sent_in_live_typing() {
-        let (tx, mut rx) = mpsc::channel(4);
-        let mut ctrl = TextOutputController::new(OutputMode::LiveTyping, tx);
+        let mut ctrl = TextOutputController::new(tx);
         ctrl.emit_partial("hello".into()).await;
         let event = rx.try_recv().unwrap();
         assert!(matches!(event, SessionEvent::PartialText(t) if t == "hello"));
     }
 
     #[tokio::test]
-    async fn emit_final_always_sent() {
+    async fn emit_final_sent() {
         let (tx, mut rx) = mpsc::channel(4);
-        let mut ctrl = TextOutputController::new(OutputMode::TypeOnStop, tx);
+        let mut ctrl = TextOutputController::new(tx);
         ctrl.emit_final("done".into()).await;
         let event = rx.try_recv().unwrap();
         assert!(matches!(event, SessionEvent::FinalizedText(t) if t == "done"));
@@ -210,7 +191,7 @@ mod tests {
     #[tokio::test]
     async fn reset_clears_partial() {
         let (tx, _rx) = mpsc::channel(4);
-        let mut ctrl = TextOutputController::new(OutputMode::LiveTyping, tx);
+        let mut ctrl = TextOutputController::new(tx);
         ctrl.emit_partial("partial text".into()).await;
         ctrl.reset();
         assert!(ctrl.last_partial.is_empty());

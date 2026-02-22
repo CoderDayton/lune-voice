@@ -1,29 +1,31 @@
 mod cli;
 mod dbus;
+mod delivery;
 mod events;
 mod factory;
-mod notes;
 
 use std::sync::Arc;
 
-use tokio::sync::{RwLock, mpsc};
+use tokio::sync::{RwLock, mpsc, watch};
 use tracing_subscriber::{EnvFilter, fmt};
+
+use lune_core::config::DictationMode;
 
 use lune_app::{SessionManager, SessionManagerConfig};
 
 use crate::events::{AppCommand, AppStateUpdate};
 
 fn main() {
-    let subcommand = std::env::args().nth(1);
+    let args: Vec<String> = std::env::args().skip(1).collect();
 
-    match subcommand.as_deref() {
-        Some("toggle" | "cancel" | "status" | "quit") => {
-            cli::run_cli(subcommand.as_deref().unwrap());
+    match args.first().map(|s| s.as_str()) {
+        Some("toggle" | "start" | "stop" | "cancel" | "status" | "quit" | "mode") => {
+            cli::run_cli(&args);
         }
         Some("daemon") | None => run_daemon(),
         Some(other) => {
             eprintln!("unknown subcommand: {other}");
-            eprintln!("usage: lune-voice [toggle|cancel|status|quit|daemon]");
+            eprintln!("usage: lune-voice [toggle|start|stop|cancel|status|mode|quit|daemon]");
             std::process::exit(1);
         }
     }
@@ -39,8 +41,14 @@ fn run_daemon() {
     let paths = lune_persist::AppPaths::resolve().expect("resolve app paths");
     paths.ensure_dirs().expect("create app directories");
 
-    let settings_store = lune_persist::SettingsStore::new(paths.settings_file());
-    let mut settings = settings_store.load().expect("load settings");
+    let settings_store = Arc::new(lune_persist::SettingsStore::new(paths.settings_file()));
+    let mut settings = match settings_store.load() {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::warn!(error = %e, "failed to parse settings, using defaults (pre-release migration)");
+            lune_core::config::UserSettings::default()
+        }
+    };
 
     let models =
         lune_persist::ensure_default_models(&paths.models_dir()).expect("ensure models downloaded");
@@ -57,8 +65,10 @@ fn run_daemon() {
 
     eprintln!();
     eprintln!("  Bind keyboard shortcuts in COSMIC Settings → Keyboard → Custom Shortcuts:");
-    eprintln!("    Ctrl+Space  →  lune-voice toggle");
-    eprintln!("    (optional)  Escape  →  lune-voice cancel");
+    eprintln!("    Toggle mode:  Ctrl+Space  →  lune-voice toggle");
+    eprintln!("    Hold mode:    Ctrl+Space (press)  →  lune-voice start");
+    eprintln!("                  Ctrl+Space (release) →  lune-voice stop");
+    eprintln!("    (optional)    Escape  →  lune-voice cancel");
     eprintln!();
 
     // ── Build tokio current_thread runtime ────────────────────────────────
@@ -76,7 +86,16 @@ fn run_daemon() {
     let (cmd_tx, cmd_rx) = mpsc::channel::<AppCommand>(64);
     let shared_state = Arc::new(RwLock::new("idle".to_string()));
 
-    let dbus_iface = dbus::DaemonInterface::new(cmd_tx, Arc::clone(&shared_state));
+    let (dictation_mode_tx, dictation_mode_rx) = watch::channel(settings.dictation_mode);
+    let (activation_mode_tx, activation_mode_rx) = watch::channel(settings.activation_mode);
+
+    let dbus_iface = dbus::DaemonInterface::new(
+        cmd_tx,
+        Arc::clone(&shared_state),
+        dictation_mode_tx,
+        activation_mode_tx,
+        Arc::clone(&settings_store),
+    );
 
     let dbus_conn = rt
         .block_on(async { dbus::build_connection(dbus_iface).await })
@@ -93,6 +112,8 @@ fn run_daemon() {
             cmd_rx,
             shared_state,
             &dbus_conn,
+            dictation_mode_rx,
+            activation_mode_rx,
         )
         .await;
     });
@@ -106,6 +127,8 @@ async fn run_pipeline(
     mut cmd_rx: mpsc::Receiver<AppCommand>,
     shared_state: Arc<RwLock<String>>,
     dbus_conn: &zbus::Connection,
+    dictation_mode_rx: watch::Receiver<DictationMode>,
+    _activation_mode_rx: watch::Receiver<lune_core::config::ActivationMode>,
 ) {
     // ── Build pipeline components ────────────────────────────────────────
 
@@ -146,7 +169,6 @@ async fn run_pipeline(
 
     let config = SessionManagerConfig {
         style_preset,
-        output_mode: settings.output_mode,
         asr_backend_kind: match settings.asr_backend {
             lune_core::config::AsrBackendConfig::ParakeetTdt { .. } => {
                 lune_core::asr::AsrBackendKind::ParakeetTdt
@@ -161,11 +183,6 @@ async fn run_pipeline(
 
     let manager = SessionManager::new(audio, asr, router, post_processor, dict, db, config);
 
-    // ── Terminal notes view ──────────────────────────────────────────────
-
-    let mut notes = notes::NotesView::new();
-    notes.render(&AppStateUpdate::Idle);
-
     tracing::info!("pipeline ready, waiting for commands");
 
     // ── Command loop ─────────────────────────────────────────────────────
@@ -174,65 +191,41 @@ async fn run_pipeline(
         match cmd_rx.recv().await {
             Some(AppCommand::ToggleDictation) => {
                 if manager.active_session_id().await.is_some() {
-                    tracing::info!("stopping dictation");
-                    manager.stop().await;
-                    // Idle update emitted by forwarder via SessionEvent::Stopped
+                    stop_dictation(&manager, &shared_state, dbus_conn).await;
                 } else {
-                    tracing::info!("starting dictation");
-                    let (event_tx, mut event_rx) = tokio::sync::mpsc::channel(64);
-
-                    let state_ref = Arc::clone(&shared_state);
-                    let conn_clone = dbus_conn.clone();
-                    let mut notes_fwd = notes::NotesView::new();
-                    tokio::task::spawn_local(async move {
-                        while let Some(event) = event_rx.recv().await {
-                            let update = match event {
-                                lune_core::session::SessionEvent::Started => {
-                                    AppStateUpdate::Listening
-                                }
-                                lune_core::session::SessionEvent::PartialText(t) => {
-                                    AppStateUpdate::PartialText(t)
-                                }
-                                lune_core::session::SessionEvent::FinalizedText(t) => {
-                                    AppStateUpdate::FinalText(t)
-                                }
-                                lune_core::session::SessionEvent::Error(e) => {
-                                    AppStateUpdate::Error(e)
-                                }
-                                lune_core::session::SessionEvent::Stopped => AppStateUpdate::Idle,
-                                _ => continue,
-                            };
-                            update_state(&state_ref, &mut notes_fwd, &conn_clone, update).await;
-                        }
-                    });
-
-                    match manager.start(event_tx).await {
-                        Ok(id) => {
-                            // Listening update emitted by forwarder via SessionEvent::Started
-                            tracing::info!(%id, "session started");
-                        }
-                        Err(e) => {
-                            tracing::error!(error = %e, "failed to start session");
-                            update_state(
-                                &shared_state,
-                                &mut notes,
-                                dbus_conn,
-                                AppStateUpdate::Error(e.to_string()),
-                            )
-                            .await;
-                        }
-                    }
+                    start_dictation(
+                        &manager,
+                        &shared_state,
+                        dbus_conn,
+                        dictation_mode_rx.clone(),
+                    )
+                    .await;
+                }
+            }
+            Some(AppCommand::StartDictation) => {
+                if manager.active_session_id().await.is_none() {
+                    start_dictation(
+                        &manager,
+                        &shared_state,
+                        dbus_conn,
+                        dictation_mode_rx.clone(),
+                    )
+                    .await;
+                }
+            }
+            Some(AppCommand::StopDictation) => {
+                if manager.active_session_id().await.is_some() {
+                    stop_dictation(&manager, &shared_state, dbus_conn).await;
                 }
             }
             Some(AppCommand::CancelDictation) => {
                 tracing::info!("cancelling dictation");
                 manager.cancel().await;
-                // Idle update emitted by forwarder via SessionEvent::Stopped
             }
             Some(AppCommand::Quit) => {
                 tracing::info!("quit command received");
                 manager.stop().await;
-                update_state(&shared_state, &mut notes, dbus_conn, AppStateUpdate::Idle).await;
+                update_state(&shared_state, dbus_conn, AppStateUpdate::Idle).await;
                 break;
             }
             None => {
@@ -244,22 +237,74 @@ async fn run_pipeline(
     }
 }
 
+async fn start_dictation<A: lune_core::asr::AsrBackend + 'static>(
+    manager: &SessionManager<A>,
+    shared_state: &Arc<RwLock<String>>,
+    dbus_conn: &zbus::Connection,
+    dictation_mode_rx: watch::Receiver<DictationMode>,
+) {
+    tracing::info!("starting dictation");
+    let (event_tx, mut event_rx) = tokio::sync::mpsc::channel(64);
+
+    let state_ref = Arc::clone(shared_state);
+    let conn_clone = dbus_conn.clone();
+    tokio::task::spawn_local(async move {
+        while let Some(event) = event_rx.recv().await {
+            let update = match event {
+                lune_core::session::SessionEvent::Started => AppStateUpdate::Listening,
+                lune_core::session::SessionEvent::PartialText(_) => AppStateUpdate::PartialText,
+                lune_core::session::SessionEvent::FinalizedText(t) => {
+                    // Deliver finalized text according to current dictation mode.
+                    let mode = *dictation_mode_rx.borrow();
+                    delivery::deliver(&t, mode).await;
+                    AppStateUpdate::FinalText
+                }
+                lune_core::session::SessionEvent::Error(e) => {
+                    tracing::error!(error = %e, "session error");
+                    AppStateUpdate::Error
+                }
+                lune_core::session::SessionEvent::Stopped => AppStateUpdate::Idle,
+                _ => continue,
+            };
+            update_state(&state_ref, &conn_clone, update).await;
+        }
+    });
+
+    match manager.start(event_tx).await {
+        Ok(id) => {
+            tracing::info!(%id, "session started");
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "failed to start session");
+            update_state(shared_state, dbus_conn, AppStateUpdate::Error).await;
+        }
+    }
+}
+
+async fn stop_dictation<A: lune_core::asr::AsrBackend + 'static>(
+    manager: &SessionManager<A>,
+    _shared_state: &Arc<RwLock<String>>,
+    _dbus_conn: &zbus::Connection,
+) {
+    tracing::info!("stopping dictation");
+    manager.stop().await;
+    // Idle update emitted by forwarder via SessionEvent::Stopped
+}
+
 async fn update_state(
     shared: &Arc<RwLock<String>>,
-    notes: &mut notes::NotesView,
     conn: &zbus::Connection,
     update: AppStateUpdate,
 ) {
     let state_str = match &update {
         AppStateUpdate::Idle => "idle",
         AppStateUpdate::Listening => "listening",
-        AppStateUpdate::PartialText(_) => "listening",
-        AppStateUpdate::FinalText(_) => "idle",
-        AppStateUpdate::Error(_) => "error",
+        AppStateUpdate::PartialText => "listening",
+        AppStateUpdate::FinalText => "idle",
+        AppStateUpdate::Error => "error",
     };
 
     *shared.write().await = state_str.to_string();
-    notes.render(&update);
 
     if let Err(e) = dbus::emit_state_changed(conn, state_str).await {
         tracing::warn!(error = %e, "failed to emit state_changed signal");

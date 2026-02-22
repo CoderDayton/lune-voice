@@ -8,6 +8,7 @@ use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::model::params::LlamaModelParams;
 use llama_cpp_2::model::{AddBos, LlamaModel};
 use llama_cpp_2::sampling::LlamaSampler;
+use llama_cpp_2::{LogOptions, send_logs_to_tracing};
 
 use lune_core::error::{Error, Result};
 use lune_core::llm::{PostProcessInput, PostProcessOutput, TextPostProcessor};
@@ -71,6 +72,11 @@ impl LocalLlmBackend {
         if !config.model_path.exists() {
             return Err(Error::ModelNotFound(config.model_path.clone()));
         }
+
+        // Route llama.cpp logs through tracing so they respect RUST_LOG filtering.
+        // Without this, llama.cpp dumps INFO-level messages (CPU_REPACK, async
+        // upload warnings) directly to stderr.
+        send_logs_to_tracing(LogOptions::default().with_logs_enabled(true));
 
         let backend =
             LlamaBackend::init().map_err(|e| Error::Llm(format!("llama backend init: {e}")))?;

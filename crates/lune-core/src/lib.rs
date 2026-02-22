@@ -5,7 +5,6 @@ pub mod config;
 pub mod dict;
 pub mod error;
 pub mod llm;
-pub mod output;
 pub mod session;
 
 pub use error::{Error, Result};

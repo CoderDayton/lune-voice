@@ -3,6 +3,10 @@
 pub enum AppCommand {
     /// Toggle dictation on/off.
     ToggleDictation,
+    /// Explicitly start dictation (for Hold mode key-down).
+    StartDictation,
+    /// Explicitly stop dictation (for Hold mode key-up).
+    StopDictation,
     /// Cancel the current dictation session.
     CancelDictation,
     /// Shut down the application.
@@ -17,9 +21,9 @@ pub enum AppStateUpdate {
     /// Microphone is active, listening for speech.
     Listening,
     /// Partial (in-progress) transcription text.
-    PartialText(String),
+    PartialText,
     /// Finalized transcription text.
-    FinalText(String),
+    FinalText,
     /// An error occurred in the pipeline.
-    Error(String),
+    Error,
 }
