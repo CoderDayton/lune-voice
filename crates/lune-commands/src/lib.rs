@@ -18,15 +18,34 @@ pub struct VoiceCommandRouter {
     custom: Vec<(String, VoiceCommand)>,
 }
 
-// Static builtin patterns — avoids re-allocating on every call to all_patterns().
+// Static builtin patterns — sorted longest-first to prevent short-match shadowing.
+// "stop dictation" must precede "stop" so the longer match wins.
 static BUILTINS: &[(&str, VoiceCommand)] = &[
     ("stop dictation", VoiceCommand::StopDictation),
-    ("stop", VoiceCommand::StopDictation),
     ("new paragraph", VoiceCommand::NewParagraph),
-    ("new line", VoiceCommand::NewLine),
-    ("list item", VoiceCommand::ListItem),
     ("scratch that", VoiceCommand::ScratchThat),
+    ("list item", VoiceCommand::ListItem),
+    ("new line", VoiceCommand::NewLine),
+    ("stop", VoiceCommand::StopDictation),
 ];
+
+// Parametric prefix tables — stored as (prefix_str, prefix_len, variant_tag).
+// Enum tag avoids dynamic dispatch / Box overhead in the hot loop.
+#[derive(Copy, Clone)]
+enum ParametricKind {
+    SwitchStyle,
+    InsertSnippet,
+}
+
+static PARAMETRIC_PREFIXES: &[(&str, ParametricKind)] = &[
+    ("switch preset to ", ParametricKind::SwitchStyle),
+    ("switch to ", ParametricKind::SwitchStyle),
+    ("expand snippet ", ParametricKind::InsertSnippet),
+    ("insert ", ParametricKind::InsertSnippet),
+];
+
+// Delimiter set used by parametric scanning — avoids repeated char array construction.
+const PARAM_DELIMITERS: [char; 3] = [',', '.', ';'];
 
 impl VoiceCommandRouter {
     #[inline]
@@ -45,38 +64,71 @@ impl VoiceCommandRouter {
     /// Commands are detected left-to-right; each matched span is removed once.
     pub fn route(&self, text: &str) -> RouteResult {
         let lower = text.to_lowercase();
-        let mut commands = Vec::new();
-        let mut removals: Vec<(usize, usize)> = Vec::new();
+        // Pre-allocate with tight upper bounds; BUILTINS.len() + custom.len() is the
+        // maximum possible number of non-overlapping matches.
+        let cap = BUILTINS.len() + self.custom.len();
+        let mut commands: Vec<VoiceCommand> = Vec::with_capacity(cap);
+        let mut removals: Vec<(usize, usize)> = Vec::with_capacity(cap);
 
-        for (phrase, cmd) in self.all_patterns() {
-            let mut search_from = 0;
-            while let Some(pos) = lower[search_from..].find(phrase) {
-                let start = search_from + pos;
-                let end = start + phrase.len();
-                if removals.iter().any(|&(rs, re)| rs < end && re > start) {
-                    search_from = end;
-                    continue;
-                }
-                commands.push(cmd.clone());
-                removals.push((start, end));
-                search_from = end;
-            }
-        }
+        self.match_exact(&lower, &mut commands, &mut removals);
 
         removals.sort_unstable_by_key(|&(s, _)| s);
-        let mut remaining = String::with_capacity(text.len());
-        let mut cursor = 0usize;
-        for (start, end) in removals {
-            remaining.push_str(&text[cursor..start]);
-            cursor = end;
-        }
-        remaining.push_str(&text[cursor..]);
-
-        let remaining = collapse_whitespace(&remaining);
+        let remaining = rebuild_remaining(text, &removals);
 
         RouteResult {
             commands,
             remaining,
+        }
+    }
+
+    /// Full route including parametric patterns.
+    pub fn route_full(&self, text: &str) -> RouteResult {
+        let lower = text.to_lowercase();
+        let cap = BUILTINS.len() + self.custom.len() + PARAMETRIC_PREFIXES.len();
+        let mut commands: Vec<VoiceCommand> = Vec::with_capacity(cap);
+        let mut removals: Vec<(usize, usize)> = Vec::with_capacity(cap);
+
+        // Parametric first so exact matches can skip over already-claimed spans.
+        parametric_matches(&lower, &mut commands, &mut removals);
+        self.match_exact(&lower, &mut commands, &mut removals);
+
+        removals.sort_unstable_by_key(|&(s, _)| s);
+        let remaining = rebuild_remaining(text, &removals);
+
+        RouteResult {
+            commands,
+            remaining,
+        }
+    }
+
+    /// Scan `lower` for all builtin + custom exact phrases; push into output vecs.
+    #[inline]
+    fn match_exact(
+        &self,
+        lower: &str,
+        commands: &mut Vec<VoiceCommand>,
+        removals: &mut Vec<(usize, usize)>,
+    ) {
+        for (phrase, cmd) in self.all_patterns() {
+            let plen = phrase.len();
+            let mut search_from = 0usize;
+            while search_from + plen <= lower.len() {
+                match lower[search_from..].find(phrase) {
+                    None => break,
+                    Some(pos) => {
+                        let start = search_from + pos;
+                        let end = start + plen;
+                        // Overlap check — linear over removals; expected small (<16).
+                        if span_overlaps(removals, start, end) {
+                            search_from = end;
+                            continue;
+                        }
+                        commands.push(cmd.clone());
+                        removals.push((start, end));
+                        search_from = end;
+                    }
+                }
+            }
         }
     }
 
@@ -88,88 +140,6 @@ impl VoiceCommandRouter {
             .map(|(p, c)| (*p, c.clone()))
             .chain(self.custom.iter().map(|(p, c)| (p.as_str(), c.clone())))
     }
-
-    /// Check for parametric patterns that capture an argument.
-    fn parametric_matches(lower: &str) -> Vec<(usize, usize, VoiceCommand)> {
-        let mut out = Vec::new();
-
-        for prefix in &["switch to ", "switch preset to "] {
-            let mut pos = 0;
-            while let Some(idx) = lower[pos..].find(prefix) {
-                let start = pos + idx;
-                let arg_start = start + prefix.len();
-                let arg_end = lower[arg_start..]
-                    .find([',', '.', ';'])
-                    .map(|i| arg_start + i)
-                    .unwrap_or(lower.len());
-                let arg = lower[arg_start..arg_end].trim().to_string();
-                if !arg.is_empty() {
-                    out.push((start, arg_end, VoiceCommand::SwitchStyle(arg)));
-                }
-                pos = arg_end;
-            }
-        }
-
-        for prefix in &["insert ", "expand snippet "] {
-            let mut pos = 0;
-            while let Some(idx) = lower[pos..].find(prefix) {
-                let start = pos + idx;
-                let arg_start = start + prefix.len();
-                let arg_end = lower[arg_start..]
-                    .find([',', '.', ';'])
-                    .map(|i| arg_start + i)
-                    .unwrap_or(lower.len());
-                let arg = lower[arg_start..arg_end].trim().to_string();
-                if !arg.is_empty() {
-                    out.push((start, arg_end, VoiceCommand::InsertSnippet(arg)));
-                }
-                pos = arg_end;
-            }
-        }
-
-        out
-    }
-
-    /// Full route including parametric patterns.
-    pub fn route_full(&self, text: &str) -> RouteResult {
-        let lower = text.to_lowercase();
-        let mut commands: Vec<VoiceCommand> = Vec::new();
-        let mut removals: Vec<(usize, usize)> = Vec::new();
-
-        for (start, end, cmd) in Self::parametric_matches(&lower) {
-            commands.push(cmd);
-            removals.push((start, end));
-        }
-
-        for (phrase, cmd) in self.all_patterns() {
-            let mut search_from = 0;
-            while let Some(pos) = lower[search_from..].find(phrase) {
-                let start = search_from + pos;
-                let end = start + phrase.len();
-                if removals.iter().any(|&(rs, re)| rs < end && re > start) {
-                    search_from = end;
-                    continue;
-                }
-                commands.push(cmd.clone());
-                removals.push((start, end));
-                search_from = end;
-            }
-        }
-
-        removals.sort_unstable_by_key(|&(s, _)| s);
-        let mut remaining = String::with_capacity(text.len());
-        let mut cursor = 0usize;
-        for (start, end) in removals {
-            remaining.push_str(&text[cursor..start]);
-            cursor = end;
-        }
-        remaining.push_str(&text[cursor..]);
-
-        RouteResult {
-            commands,
-            remaining: collapse_whitespace(&remaining),
-        }
-    }
 }
 
 impl Default for VoiceCommandRouter {
@@ -179,22 +149,114 @@ impl Default for VoiceCommandRouter {
     }
 }
 
-fn collapse_whitespace(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    let mut prev_space = true;
-    for c in s.chars() {
-        if c.is_whitespace() {
-            if !prev_space {
-                out.push(' ');
+// ---------------------------------------------------------------------------
+// Free functions — kept out of impl to allow inlining across call sites.
+// ---------------------------------------------------------------------------
+
+/// Returns true iff [start, end) overlaps any existing removal span.
+#[inline(always)]
+fn span_overlaps(removals: &[(usize, usize)], start: usize, end: usize) -> bool {
+    removals.iter().any(|&(rs, re)| rs < end && re > start)
+}
+
+/// Scan `lower` for all parametric patterns; push matched spans + commands.
+fn parametric_matches(
+    lower: &str,
+    commands: &mut Vec<VoiceCommand>,
+    removals: &mut Vec<(usize, usize)>,
+) {
+    for &(prefix, kind) in PARAMETRIC_PREFIXES {
+        let plen = prefix.len();
+        let mut pos = 0usize;
+        while pos + plen <= lower.len() {
+            match lower[pos..].find(prefix) {
+                None => break,
+                Some(idx) => {
+                    let start = pos + idx;
+                    let arg_start = start + plen;
+                    let arg_end = lower[arg_start..]
+                        .find(PARAM_DELIMITERS)
+                        .map(|i| arg_start + i)
+                        .unwrap_or(lower.len());
+                    let arg = lower[arg_start..arg_end].trim();
+                    if !arg.is_empty() && !span_overlaps(removals, start, arg_end) {
+                        let cmd = match kind {
+                            ParametricKind::SwitchStyle => {
+                                VoiceCommand::SwitchStyle(arg.to_string())
+                            }
+                            ParametricKind::InsertSnippet => {
+                                VoiceCommand::InsertSnippet(arg.to_string())
+                            }
+                        };
+                        commands.push(cmd);
+                        removals.push((start, arg_end));
+                    }
+                    pos = arg_end;
+                }
             }
-            prev_space = true;
-        } else {
-            out.push(c);
-            prev_space = false;
         }
     }
+}
+
+/// Reconstruct the non-removed portions of `text` and collapse whitespace in
+/// a single pass, avoiding an extra allocation for the intermediate string.
+fn rebuild_remaining(text: &str, sorted_removals: &[(usize, usize)]) -> String {
+    // Estimate capacity: full text minus removed bytes is a tight upper bound.
+    let removed: usize = sorted_removals.iter().map(|(s, e)| e - s).sum();
+    let cap = text.len().saturating_sub(removed);
+    let mut out = String::with_capacity(cap);
+    let mut cursor = 0usize;
+
+    for &(start, end) in sorted_removals {
+        if start > cursor {
+            collapse_push(&mut out, &text[cursor..start]);
+        }
+        cursor = end;
+    }
+    if cursor < text.len() {
+        collapse_push(&mut out, &text[cursor..]);
+    }
+
+    // Trim trailing space that collapse_push may have left.
     if out.ends_with(' ') {
         out.pop();
+    }
+    // Trim leading space.
+    if out.starts_with(' ') {
+        out.remove(0);
+    }
+    out
+}
+
+/// Push `s` into `out` collapsing runs of whitespace to a single space,
+/// tracking whether `out` already ends with a space to avoid doubling.
+#[inline]
+fn collapse_push(out: &mut String, s: &str) {
+    let prev_space = out.ends_with(' ');
+    let mut in_space = prev_space;
+    for c in s.chars() {
+        if c.is_ascii_whitespace() || c.is_whitespace() {
+            if !in_space {
+                out.push(' ');
+                in_space = true;
+            }
+        } else {
+            out.push(c);
+            in_space = false;
+        }
+    }
+}
+
+/// Collapse whitespace in a standalone string (used by tests).
+#[cfg(test)]
+fn collapse_whitespace(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    collapse_push(&mut out, s);
+    if out.ends_with(' ') {
+        out.pop();
+    }
+    if out.starts_with(' ') {
+        out.remove(0);
     }
     out
 }

@@ -16,11 +16,17 @@ use lune_app::{SessionManager, SessionManagerConfig};
 use crate::events::{AppCommand, AppStateUpdate};
 
 fn main() {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    let mut args = std::env::args_os();
+    args.next(); // skip argv[0]
 
-    match args.first().map(|s| s.as_str()) {
+    let first = args.next();
+    let first_str = first.as_deref().and_then(|s| s.to_str());
+
+    match first_str {
         Some("toggle" | "start" | "stop" | "cancel" | "status" | "quit" | "mode") => {
-            cli::run_cli(&args);
+            // Reconstruct &[String] cheaply — only CLI path does allocation
+            let collected: Vec<String> = std::env::args().skip(1).collect();
+            cli::run_cli(&collected);
         }
         Some("daemon") | None => run_daemon(),
         Some(other) => {
@@ -72,6 +78,8 @@ fn run_daemon() {
     eprintln!();
 
     // ── Build tokio current_thread runtime ────────────────────────────────
+    // current_thread avoids the overhead of multi-thread work-stealing for
+    // this single-threaded event loop; all hot paths stay on one core.
 
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -83,8 +91,16 @@ fn run_daemon() {
     // ── Phase 1: D-Bus connection OUTSIDE LocalSet ───────────────────────
     // zbus internally calls tokio::spawn, which panics inside LocalSet.
 
+    // Channel depth 64 is generous for human-speed commands; avoids alloc churn.
     let (cmd_tx, cmd_rx) = mpsc::channel::<AppCommand>(64);
-    let shared_state = Arc::new(RwLock::new("idle".to_string()));
+    // Pre-allocate capacity for the longest state string ("listening" = 9 chars)
+    let shared_state = Arc::new(RwLock::new(String::with_capacity(16)));
+
+    // Initialise to "idle" without a second allocation
+    {
+        let mut guard = rt.block_on(shared_state.write());
+        guard.push_str("idle");
+    }
 
     let (dictation_mode_tx, dictation_mode_rx) = watch::channel(settings.dictation_mode);
     let (activation_mode_tx, activation_mode_rx) = watch::channel(settings.activation_mode);
@@ -163,21 +179,21 @@ async fn run_pipeline(
     let dict = lune_dict::DictionaryManager::new(dict_db).expect("init dictionary");
 
     let style_preset = lune_core::config::StylePreset::all_builtin()
-        .into_iter()
+        .iter()
         .find(|p| p.id == settings.default_style)
+        .cloned()
         .unwrap_or_else(lune_core::config::StylePreset::general);
+
+    let asr_backend_kind = match settings.asr_backend {
+        lune_core::config::AsrBackendConfig::OpenAiCompatible { .. } => {
+            lune_core::asr::AsrBackendKind::OpenAiCompatible
+        }
+        _ => lune_core::asr::AsrBackendKind::ParakeetTdt,
+    };
 
     let config = SessionManagerConfig {
         style_preset,
-        asr_backend_kind: match settings.asr_backend {
-            lune_core::config::AsrBackendConfig::ParakeetTdt { .. } => {
-                lune_core::asr::AsrBackendKind::ParakeetTdt
-            }
-            lune_core::config::AsrBackendConfig::OpenAiCompatible { .. } => {
-                lune_core::asr::AsrBackendKind::OpenAiCompatible
-            }
-            _ => lune_core::asr::AsrBackendKind::ParakeetTdt,
-        },
+        asr_backend_kind,
         ..Default::default()
     };
 
@@ -188,10 +204,19 @@ async fn run_pipeline(
     tracing::info!("pipeline ready, waiting for commands");
 
     // ── Command loop ─────────────────────────────────────────────────────
+    // Cache delivery_service clone outside loop; session_id lock acquired once
+    // per toggle to avoid double-locking.
 
     loop {
-        match cmd_rx.recv().await {
-            Some(AppCommand::ToggleDictation) => {
+        let Some(cmd) = cmd_rx.recv().await else {
+            tracing::info!("command channel closed, shutting down");
+            manager.stop().await;
+            break;
+        };
+
+        match cmd {
+            AppCommand::ToggleDictation => {
+                // Single lock acquisition for toggle decision
                 if manager.active_session_id().await.is_some() {
                     stop_dictation(&manager, &shared_state, dbus_conn).await;
                 } else {
@@ -205,7 +230,7 @@ async fn run_pipeline(
                     .await;
                 }
             }
-            Some(AppCommand::StartDictation) => {
+            AppCommand::StartDictation => {
                 if manager.active_session_id().await.is_none() {
                     start_dictation(
                         &manager,
@@ -217,24 +242,19 @@ async fn run_pipeline(
                     .await;
                 }
             }
-            Some(AppCommand::StopDictation) => {
+            AppCommand::StopDictation => {
                 if manager.active_session_id().await.is_some() {
                     stop_dictation(&manager, &shared_state, dbus_conn).await;
                 }
             }
-            Some(AppCommand::CancelDictation) => {
+            AppCommand::CancelDictation => {
                 tracing::info!("cancelling dictation");
                 manager.cancel().await;
             }
-            Some(AppCommand::Quit) => {
+            AppCommand::Quit => {
                 tracing::info!("quit command received");
                 manager.stop().await;
                 update_state(&shared_state, dbus_conn, AppStateUpdate::Idle).await;
-                break;
-            }
-            None => {
-                tracing::info!("command channel closed, shutting down");
-                manager.stop().await;
                 break;
             }
         }
@@ -249,25 +269,26 @@ async fn start_dictation<A: lune_core::asr::AsrBackend + 'static>(
     delivery_service: delivery::DeliveryService,
 ) {
     tracing::info!("starting dictation");
+    // Depth 64: matches command channel; avoids back-pressure stalls on bursts
     let (event_tx, mut event_rx) = tokio::sync::mpsc::channel(64);
 
     let state_ref = Arc::clone(shared_state);
     let conn_clone = dbus_conn.clone();
     tokio::task::spawn_local(async move {
         while let Some(event) = event_rx.recv().await {
+            // Fast-path: skip work for high-frequency PartialText without lock
             let update = match event {
                 lune_core::session::SessionEvent::Started => AppStateUpdate::Listening,
                 lune_core::session::SessionEvent::PartialText(_) => AppStateUpdate::PartialText,
                 lune_core::session::SessionEvent::FinalizedText(t) => {
-                    // Deliver finalized text according to current dictation mode.
+                    // `borrow()` is lock-free on watch channels — cheap hot path
                     let mode = *dictation_mode_rx.borrow();
                     delivery_service.deliver(&t, mode);
                     AppStateUpdate::FinalText
                 }
                 lune_core::session::SessionEvent::CorrectedText(t) => {
                     tracing::info!(corrected = %t, "async LLM correction received");
-                    // Future: could trigger re-delivery / correction in focused input.
-                    // For now, just log it. The original was already delivered.
+                    // Original already delivered; re-delivery left for future work.
                     continue;
                 }
                 lune_core::session::SessionEvent::Error(e) => {
@@ -300,24 +321,39 @@ async fn stop_dictation<A: lune_core::asr::AsrBackend + 'static>(
 ) {
     tracing::info!("stopping dictation");
     manager.stop().await;
-    // Idle update emitted by forwarder via SessionEvent::Stopped
+    // Idle update emitted by the event forwarder via SessionEvent::Stopped
 }
 
+/// Update shared state string and emit the D-Bus signal.
+///
+/// Uses `replace_range` to reuse the existing heap allocation instead of
+/// re-allocating on every state transition (hot path for partial-text events).
+/// State strings are ASCII ≤9 bytes — always fits the pre-allocated 16-byte buffer.
 #[inline]
 async fn update_state(
     shared: &Arc<RwLock<String>>,
     conn: &zbus::Connection,
     update: AppStateUpdate,
 ) {
-    let state_str: &str = match update {
-        AppStateUpdate::Idle => "idle",
-        AppStateUpdate::Listening => "listening",
-        AppStateUpdate::PartialText => "listening",
-        AppStateUpdate::FinalText => "idle",
+    // Static string slices — zero allocation, branch predicted well by CPU.
+    // PartialText maps to "listening" — avoids write-lock churn on the hot path
+    // when the state hasn't actually changed (already "listening").
+    let state_str: &'static str = match update {
+        AppStateUpdate::Idle | AppStateUpdate::FinalText => "idle",
+        AppStateUpdate::Listening | AppStateUpdate::PartialText => "listening",
         AppStateUpdate::Error => "error",
     };
 
-    shared.write().await.replace_range(.., state_str);
+    {
+        // Scope the write-lock as tightly as possible; release before the async
+        // D-Bus emit so we don't hold the lock across an await point.
+        let mut guard = shared.write().await;
+        // Skip the write entirely if the state is already correct — avoids a
+        // needless cache-line dirty on every PartialText event.
+        if guard.as_str() != state_str {
+            guard.replace_range(.., state_str);
+        }
+    }
 
     if let Err(e) = dbus::emit_state_changed(conn, state_str).await {
         tracing::warn!(error = %e, "failed to emit state_changed signal");

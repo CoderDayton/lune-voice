@@ -44,6 +44,9 @@ pub struct TimedToken {
     pub end: f32,
 }
 
+// Precomputed: (encoder_stride=8 * hop=160) / sr=16000 = 0.08 seconds per encoder frame
+const STRIDE_HOP_OVER_SR: f32 = (8 * 160) as f32 / 16000.0;
+
 // ── TDT Model ────────────────────────────────────────────────────────────────
 
 pub struct TdtModel {
@@ -195,7 +198,7 @@ impl TdtModel {
                 .map_err(|e| Error::Asr(format!("frame value: {e}")))?;
             let targets_val = ort::value::Value::from_array(targets)
                 .map_err(|e| Error::Asr(format!("targets value: {e}")))?;
-            let target_len_val = ort::value::Value::from_array(Array1::from_vec(vec![1i32]))
+            let target_len_val = ort::value::Value::from_array(Array1::from_elem(1, 1i32))
                 .map_err(|e| Error::Asr(format!("target_length value: {e}")))?;
             let state_h_val = ort::value::Value::from_array(state_h.clone())
                 .map_err(|e| Error::Asr(format!("state_h value: {e}")))?;
@@ -218,37 +221,33 @@ impl TdtModel {
                 .try_extract_tensor::<f32>()
                 .map_err(|e| Error::Asr(format!("extract logits: {e}")))?;
 
+            // Single-pass: collect vocab logits + find argmax + track max simultaneously.
+            // This eliminates a separate O(vocab_size) argmax scan after extend().
             vocab_logits.clear();
-            duration_logits.clear();
-            vocab_logits.extend(logits_data.iter().copied().take(vocab_size));
-            duration_logits.extend(logits_data.iter().copied().skip(vocab_size));
+            let mut token_id = blank_id;
+            let mut max_logit = f32::NEG_INFINITY;
+            for (i, &v) in logits_data.iter().take(vocab_size).enumerate() {
+                vocab_logits.push(v);
+                // total_cmp: NaN-safe, branchless on x86 (ucomiss + cmov)
+                if v.total_cmp(&max_logit).is_gt() {
+                    max_logit = v;
+                    token_id = i;
+                }
+            }
 
-            // Argmax over vocab
-            let token_id = vocab_logits
+            // Duration argmax (small slice ~5 elements, single pass)
+            duration_logits.clear();
+            duration_logits.extend(logits_data.iter().copied().skip(vocab_size));
+            let duration_step = duration_logits
                 .iter()
                 .enumerate()
-                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                .max_by(|(_, a), (_, b)| a.total_cmp(b))
                 .map(|(idx, _)| idx)
-                .unwrap_or(blank_id);
-
-            // Argmax over duration
-            let duration_step = if !duration_logits.is_empty() {
-                duration_logits
-                    .iter()
-                    .enumerate()
-                    .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-                    .map(|(idx, _)| idx)
-                    .unwrap_or(0)
-            } else {
-                0
-            };
+                .unwrap_or(0);
 
             if token_id != blank_id {
-                // ── Confidence: softmax probability of chosen token ──
-                let max_logit = vocab_logits
-                    .iter()
-                    .copied()
-                    .fold(f32::NEG_INFINITY, f32::max);
+                // Softmax confidence: max_logit already known from single-pass above,
+                // so we only need one more O(vocab_size) pass for exp_sum.
                 let exp_sum: f32 = vocab_logits.iter().map(|&l| (l - max_logit).exp()).sum();
                 let confidence = (vocab_logits[token_id] - max_logit).exp() / exp_sum;
 
@@ -309,21 +308,20 @@ impl TdtModel {
             });
         }
 
-        let encoder_stride = 8;
-        let hop = 160;
-        let sr = 16000;
-
         let mut raw_tokens = Vec::with_capacity(decoded.len());
         let mut full_text = String::with_capacity(decoded.len() * 4);
+        // Track last char separately to avoid O(n) `chars().last()` scans.
+        let mut last_char: Option<char> = None;
 
         for (i, dt) in decoded.iter().enumerate() {
             let Some(token_text) = self.vocab.get(dt.token_id) else {
                 continue;
             };
 
-            let start = (dt.frame_index * encoder_stride * hop) as f32 / sr as f32;
+            // Precomputed constant eliminates per-token mul+div
+            let start = dt.frame_index as f32 * STRIDE_HOP_OVER_SR;
             let end = if i + 1 < decoded.len() {
-                (decoded[i + 1].frame_index * encoder_stride * hop) as f32 / sr as f32
+                decoded[i + 1].frame_index as f32 * STRIDE_HOP_OVER_SR
             } else {
                 start + 0.01
             };
@@ -342,7 +340,6 @@ impl TdtModel {
                     .rev()
                     .take_while(|c| c.is_alphabetic())
                     .count();
-                let last_char = full_text.chars().last();
                 let is_article_a = trailing_letters == 1 && last_char == Some('a');
                 if trailing_letters > 1 || is_article_a {
                     display.insert(0, ' ');
@@ -354,6 +351,8 @@ impl TdtModel {
                 continue;
             }
 
+            // Update last_char tracker from display (not token_text, which may have ▁)
+            last_char = display.chars().last();
             full_text.push_str(&display);
             raw_tokens.push(TimedToken {
                 text: display,
@@ -365,7 +364,7 @@ impl TdtModel {
         // Word grouping: merge subword tokens by ▁/space boundaries
         let words = group_by_words(&raw_tokens);
 
-        // Mean confidence
+        // Mean confidence (single pass, already O(n))
         let mean_confidence =
             decoded.iter().map(|d| d.confidence).sum::<f32>() / decoded.len() as f32;
 
@@ -384,17 +383,19 @@ fn group_by_words(tokens: &[TimedToken]) -> Vec<TimedToken> {
         return Vec::new();
     }
 
-    let mut words = Vec::new();
+    // Estimate ~1 word per 2 tokens on average; avoids most reallocations.
+    let mut words = Vec::with_capacity(tokens.len() / 2 + 1);
     let mut current_text = String::new();
-    let mut current_start = 0.0;
+    let mut current_start = 0.0f32;
     let mut last_word_lower = String::new();
 
     for (i, token) in tokens.iter().enumerate() {
         // Space-only tokens act as word separators
         if token.text.trim().is_empty() {
             if !current_text.is_empty() {
-                let lower = current_text.to_lowercase();
-                if lower != last_word_lower {
+                // Avoid to_lowercase() allocation on cache-hit (common dedup path)
+                if !current_text.eq_ignore_ascii_case(&last_word_lower) {
+                    let lower = current_text.to_lowercase();
                     words.push(TimedToken {
                         text: current_text.clone(),
                         start: current_start,
@@ -407,7 +408,7 @@ fn group_by_words(tokens: &[TimedToken]) -> Vec<TimedToken> {
             continue;
         }
 
-        // Check word boundary markers
+        // Compute trimmed once; reuse as `clean` to avoid double trim call below.
         let trimmed = token.text.trim_start_matches('▁').trim_start_matches(' ');
         let is_pure_punct =
             !token.text.is_empty() && token.text.chars().all(|c| c.is_ascii_punctuation());
@@ -421,8 +422,8 @@ fn group_by_words(tokens: &[TimedToken]) -> Vec<TimedToken> {
                 || i == 0;
 
         if starts_word && !current_text.is_empty() {
-            let lower = current_text.to_lowercase();
-            if lower != last_word_lower {
+            if !current_text.eq_ignore_ascii_case(&last_word_lower) {
+                let lower = current_text.to_lowercase();
                 words.push(TimedToken {
                     text: current_text.clone(),
                     start: current_start,
@@ -437,20 +438,17 @@ fn group_by_words(tokens: &[TimedToken]) -> Vec<TimedToken> {
             current_start = token.start;
         }
 
-        let clean = token.text.trim_start_matches('▁').trim_start_matches(' ');
-        current_text.push_str(clean);
+        // Reuse `trimmed` (already computed above) — avoids a second trim scan.
+        current_text.push_str(trimmed);
     }
 
     // Final word
-    if !current_text.is_empty() {
-        let lower = current_text.to_lowercase();
-        if lower != last_word_lower {
-            words.push(TimedToken {
-                text: current_text,
-                start: current_start,
-                end: tokens.last().unwrap().end,
-            });
-        }
+    if !current_text.is_empty() && !current_text.eq_ignore_ascii_case(&last_word_lower) {
+        words.push(TimedToken {
+            text: current_text,
+            start: current_start,
+            end: tokens.last().unwrap().end,
+        });
     }
 
     words
@@ -470,10 +468,11 @@ fn find_file(dir: &Path, candidates: &[&str], kind: &str) -> Result<PathBuf> {
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             let p = entry.path();
-            if let Some(name) = p.file_name().and_then(|s| s.to_str()) {
-                if name.starts_with(kind) && name.ends_with(".onnx") {
-                    return Ok(p);
-                }
+            if let Some(name) = p.file_name().and_then(|s| s.to_str())
+                && name.starts_with(kind)
+                && name.ends_with(".onnx")
+            {
+                return Ok(p);
             }
         }
     }
@@ -614,5 +613,12 @@ mod tests {
         assert_eq!(words.len(), 2);
         assert_eq!(words[0].text, "hello");
         assert_eq!(words[1].text, "world");
+    }
+
+    #[test]
+    fn stride_hop_constant() {
+        // Verify the precomputed constant matches the original arithmetic
+        let expected = (8usize * 160) as f32 / 16000.0;
+        assert!((STRIDE_HOP_OVER_SR - expected).abs() < f32::EPSILON);
     }
 }

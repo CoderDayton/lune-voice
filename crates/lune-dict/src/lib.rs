@@ -62,28 +62,17 @@ impl DictionaryManager {
     /// and replaced first. Single-word entries use Levenshtein distance ≤ 1
     /// fuzzy matching per word.
     pub fn apply(&self, text: &str) -> String {
-        // Split into multi-word and single-word entries, both sorted priority DESC.
-        let mut multi = Vec::new();
-        let mut single = Vec::new();
-        for e in &self.cache {
-            if e.phrase.split_whitespace().count() > 1 {
-                multi.push(e);
-            } else {
-                single.push(e);
-            }
-        }
+        // Single-pass partition; cheaper than count()-based split_whitespace.
+        let (multi, single): (Vec<&DictionaryEntry>, Vec<&DictionaryEntry>) = self
+            .cache
+            .iter()
+            .partition(|e| e.phrase.contains(char::is_whitespace));
 
         let mut current = text.to_owned();
-
-        // Multi-word: word-by-word window scan.
         for entry in &multi {
             current = apply_multi_word(&current, entry);
         }
-
-        // Single-word: per-token fuzzy replacement.
-        current = apply_single_words(&current, &single);
-
-        current
+        apply_single_words(&current, &single)
     }
 
     /// Return up to `limit` entries most relevant to `text` for LLM injection.
@@ -91,23 +80,22 @@ impl DictionaryManager {
     /// Relevance: entries whose phrase matches (exact or fuzzy Levenshtein ≤ 1)
     /// a word in `text`. Sorted by priority DESC; truncated to `limit`.
     pub fn top_relevant<'a>(&'a self, text: &str, limit: usize) -> Vec<&'a DictionaryEntry> {
-        let lower_text = text.to_lowercase();
-        let text_words: Vec<&str> = lower_text.split_whitespace().collect();
+        // Keep original-case words; lev_le1_ci handles case-insensitivity below.
+        let text_words: Vec<&str> = text.split_whitespace().collect();
 
         let mut relevant: Vec<&DictionaryEntry> = self
             .cache
             .iter()
             .filter(|e| {
-                let lower_phrase = e.phrase.to_lowercase();
-                // Exact substring match.
-                if lower_text.contains(lower_phrase.as_str()) {
+                // No-alloc ASCII CI substring match.
+                if contains_ascii_ci(text, &e.phrase) {
                     return true;
                 }
-                // Fuzzy single-word match.
-                if e.phrase.split_whitespace().count() == 1 {
+                // Fuzzy single-word match (no to_lowercase allocation).
+                if !e.phrase.contains(char::is_whitespace) {
                     return text_words
                         .iter()
-                        .any(|w| levenshtein(w, &lower_phrase) <= 1);
+                        .any(|w| lev_le1_ci(w.as_bytes(), e.phrase.as_bytes()));
                 }
                 false
             })
@@ -162,11 +150,8 @@ impl DictionaryManager {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn apply_multi_word(text: &str, entry: &DictionaryEntry) -> String {
-    let phrase_words: Vec<String> = entry
-        .phrase
-        .split_whitespace()
-        .map(|w| w.to_lowercase())
-        .collect();
+    // Borrow phrase words directly — eq_ignore_ascii_case avoids Vec<String>.
+    let phrase_words: Vec<&str> = entry.phrase.split_whitespace().collect();
     let n = phrase_words.len();
     let text_words: Vec<&str> = text.split_whitespace().collect();
     let mut out = Vec::with_capacity(text_words.len());
@@ -176,7 +161,7 @@ fn apply_multi_word(text: &str, entry: &DictionaryEntry) -> String {
             let window_match = text_words[i..i + n]
                 .iter()
                 .zip(&phrase_words)
-                .all(|(tw, pw)| strip_trailing_punct(tw).to_lowercase() == *pw);
+                .all(|(tw, pw)| strip_trailing_punct(tw).eq_ignore_ascii_case(pw));
             if window_match {
                 // Preserve any trailing punctuation from the last word of the window.
                 let last = text_words[i + n - 1];
@@ -201,10 +186,10 @@ fn apply_single_words(text: &str, singles: &[&DictionaryEntry]) -> String {
     for word in words {
         let bare = strip_trailing_punct(word);
         let punct = &word[bare.len()..];
-        let lower = bare.to_lowercase();
+        // lev_le1_ci: O(n) CI check with no allocation, replaces to_lowercase pair.
         let replaced = singles
             .iter()
-            .find(|e| levenshtein(&lower, &e.phrase.to_lowercase()) <= 1);
+            .find(|e| lev_le1_ci(bare.as_bytes(), e.phrase.as_bytes()));
         match replaced {
             Some(e) => {
                 let mut s = String::with_capacity(e.replacement.len() + punct.len());
@@ -224,10 +209,69 @@ fn strip_trailing_punct(s: &str) -> &str {
     s.trim_end_matches(['.', ',', '!', '?', ';', ':'])
 }
 
+/// ASCII case-insensitive substring search with no heap allocation.
+#[inline]
+fn contains_ascii_ci(haystack: &str, needle: &str) -> bool {
+    let h = haystack.as_bytes();
+    let n = needle.as_bytes();
+    if n.len() > h.len() {
+        return false;
+    }
+    if n.is_empty() {
+        return true;
+    }
+    h.windows(n.len()).any(|w| w.eq_ignore_ascii_case(n))
+}
+
+/// O(n) Levenshtein distance ≤ 1 check (byte-level, ASCII, case-insensitive).
+///
+/// Replaces the `levenshtein(a.to_lowercase(), b.to_lowercase()) <= 1` pattern
+/// in hot paths: no allocation, no full DP table, early exit.
+#[inline]
+fn lev_le1_ci(a: &[u8], b: &[u8]) -> bool {
+    // Orient so `short` ≤ `long_s`.
+    let (short, long_s) = if a.len() <= b.len() { (a, b) } else { (b, a) };
+    match long_s.len() - short.len() {
+        0 => {
+            // Same length: at most 1 substitution allowed.
+            let mut diffs = 0u32;
+            for (&x, &y) in short.iter().zip(long_s.iter()) {
+                if !x.eq_ignore_ascii_case(&y) {
+                    diffs += 1;
+                    if diffs > 1 {
+                        return false;
+                    }
+                }
+            }
+            true
+        }
+        1 => {
+            // One insertion into shorter: find single divergence point.
+            let mut si = 0;
+            let mut li = 0;
+            let mut skipped = false;
+            while si < short.len() && li < long_s.len() {
+                if short[si].eq_ignore_ascii_case(&long_s[li]) {
+                    si += 1;
+                    li += 1;
+                } else if skipped {
+                    return false;
+                } else {
+                    skipped = true;
+                    li += 1;
+                }
+            }
+            true
+        }
+        _ => false,
+    }
+}
+
 /// Wagner-Fischer Levenshtein distance (byte-level; fine for ASCII ASR text).
 pub fn levenshtein(a: &str, b: &str) -> usize {
-    let a: Vec<char> = a.chars().collect();
-    let b: Vec<char> = b.chars().collect();
+    // Operate on bytes — avoids char collection, valid for ASCII input.
+    let a = a.as_bytes();
+    let b = b.as_bytes();
     let m = a.len();
     let n = b.len();
     if m == 0 {
@@ -242,9 +286,13 @@ pub fn levenshtein(a: &str, b: &str) -> usize {
 
     for i in 1..=m {
         curr[0] = i;
+        let mut row_min = i;
         for j in 1..=n {
             let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
             curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+            if curr[j] < row_min {
+                row_min = curr[j];
+            }
         }
         std::mem::swap(&mut prev, &mut curr);
     }
@@ -290,6 +338,39 @@ mod tests {
         assert_eq!(levenshtein("", ""), 0);
     }
 
+    // ── lev_le1_ci ───────────────────────────────────────────────────────
+
+    #[test]
+    fn lev_le1_ci_identical() {
+        assert!(lev_le1_ci(b"rust", b"rust"));
+    }
+
+    #[test]
+    fn lev_le1_ci_case_insensitive() {
+        assert!(lev_le1_ci(b"Rust", b"rust"));
+        assert!(lev_le1_ci(b"GITHUB", b"github"));
+    }
+
+    #[test]
+    fn lev_le1_ci_one_sub() {
+        assert!(lev_le1_ci(b"rast", b"rust"));
+    }
+
+    #[test]
+    fn lev_le1_ci_one_insert() {
+        assert!(lev_le1_ci(b"rustt", b"rust"));
+    }
+
+    #[test]
+    fn lev_le1_ci_two_subs_rejected() {
+        assert!(!lev_le1_ci(b"raxt", b"rust"));
+    }
+
+    #[test]
+    fn lev_le1_ci_length_diff_gt1_rejected() {
+        assert!(!lev_le1_ci(b"abc", b"abcde"));
+    }
+
     // ── apply ─────────────────────────────────────────────────────────────
 
     #[test]
@@ -311,7 +392,7 @@ mod tests {
         let result = mgr.apply("I use kubirnites");
         assert_eq!(result, "I use kubirnites");
 
-        // "kubernetss" is 1 insertion away — should match.
+        // "kubernetss" is 1 substitution away — should match.
         let result2 = mgr.apply("I use kubernetss");
         assert_eq!(result2, "I use Kubernetes");
     }

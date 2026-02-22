@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -15,7 +16,8 @@ impl RedactedString {
         Self(s.into())
     }
 
-    #[inline]
+    /// Hot path: always inline the trivial deref.
+    #[inline(always)]
     pub fn expose(&self) -> &str {
         &self.0
     }
@@ -163,11 +165,15 @@ impl std::str::FromStr for DictationMode {
             "TypeInPlace" => Ok(Self::TypeInPlace),
             "Clipboard" => Ok(Self::Clipboard),
             "Both" => Ok(Self::Both),
-            _ => Err(format!(
-                "unknown dictation mode: {s} (expected TypeInPlace|Clipboard|Both)"
-            )),
+            _ => Err(dictation_mode_parse_err(s)),
         }
     }
+}
+
+#[cold]
+#[inline(never)]
+fn dictation_mode_parse_err(s: &str) -> String {
+    format!("unknown dictation mode: {s} (expected TypeInPlace|Clipboard|Both)")
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -197,11 +203,15 @@ impl std::str::FromStr for ActivationMode {
         match s {
             "Toggle" => Ok(Self::Toggle),
             "Hold" => Ok(Self::Hold),
-            _ => Err(format!(
-                "unknown activation mode: {s} (expected Toggle|Hold)"
-            )),
+            _ => Err(activation_mode_parse_err(s)),
         }
     }
+}
+
+#[cold]
+#[inline(never)]
+fn activation_mode_parse_err(s: &str) -> String {
+    format!("unknown activation mode: {s} (expected Toggle|Hold)")
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -251,15 +261,23 @@ pub struct StylePreset {
     pub few_shot_pairs: Vec<(String, String)>,
 }
 
+/// Singleton: builtin presets are constructed once and reused for the process lifetime.
+/// Avoids repeated string interning + Vec allocation on every `all_builtin()` call.
+static BUILTIN_PRESETS: LazyLock<[StylePreset; 5]> = LazyLock::new(|| {
+    [
+        StylePreset::general(),
+        StylePreset::email(),
+        StylePreset::slack(),
+        StylePreset::meeting_notes(),
+        StylePreset::code_comments(),
+    ]
+});
+
 impl StylePreset {
-    pub fn all_builtin() -> Vec<Self> {
-        let mut v = Vec::with_capacity(5);
-        v.push(Self::general());
-        v.push(Self::email());
-        v.push(Self::slack());
-        v.push(Self::meeting_notes());
-        v.push(Self::code_comments());
-        v
+    /// Returns a `&'static` slice; construction cost is paid exactly once.
+    #[inline]
+    pub fn all_builtin() -> &'static [StylePreset] {
+        &*BUILTIN_PRESETS
     }
 
     /// Built-in "General" preset: grammar + disfluency removal.
@@ -438,5 +456,25 @@ mod tests {
                 preset.id
             );
         }
+    }
+
+    #[test]
+    fn all_builtin_returns_same_ptr() {
+        // Verify LazyLock: two calls return pointers into the same static allocation.
+        let a = StylePreset::all_builtin().as_ptr();
+        let b = StylePreset::all_builtin().as_ptr();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn dictation_mode_fromstr_err_is_cold() {
+        let err = "bad".parse::<DictationMode>().unwrap_err();
+        assert!(err.contains("TypeInPlace|Clipboard|Both"));
+    }
+
+    #[test]
+    fn activation_mode_fromstr_err_is_cold() {
+        let err = "bad".parse::<ActivationMode>().unwrap_err();
+        assert!(err.contains("Toggle|Hold"));
     }
 }

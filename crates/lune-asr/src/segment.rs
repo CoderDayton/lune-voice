@@ -13,9 +13,11 @@ pub struct SegmentTracker {
 }
 
 impl SegmentTracker {
+    #[inline]
     pub fn new(finalize_after_ms: u64) -> Self {
         Self {
-            segments: Vec::new(),
+            // Pre-allocate for typical utterance burst (avoids realloc on first ~8 segments).
+            segments: Vec::with_capacity(8),
             next_id: 1,
             last_update: Instant::now(),
             finalize_after_ms,
@@ -23,6 +25,7 @@ impl SegmentTracker {
     }
 
     /// Push new decoded text, updating the current partial segment or creating a new one.
+    #[inline]
     pub fn push_partial(
         &mut self,
         text: String,
@@ -32,6 +35,7 @@ impl SegmentTracker {
         self.last_update = Instant::now();
 
         // Update existing partial segment or create new one.
+        // SAFETY: We immediately return after the mutation, so no aliasing issue.
         if let Some(seg) = self.segments.last_mut()
             && !seg.is_final
         {
@@ -41,20 +45,21 @@ impl SegmentTracker {
             return;
         }
 
-        // Create new partial segment.
-        let seg = AsrSegment {
-            id: self.next_id,
+        let id = self.next_id;
+        self.next_id += 1;
+        // Push constructed in-place to avoid intermediate stack copy.
+        self.segments.push(AsrSegment {
+            id,
             text,
             is_final: false,
             start_ms: timestamp_ms,
             end_ms: timestamp_ms,
             confidence,
-        };
-        self.next_id += 1;
-        self.segments.push(seg);
+        });
     }
 
     /// Finalize the current partial segment (mark as immutable).
+    #[inline]
     pub fn finalize_current(&mut self) {
         if let Some(seg) = self.segments.last_mut()
             && !seg.is_final
@@ -64,38 +69,60 @@ impl SegmentTracker {
     }
 
     /// Check if the current partial should be finalized based on silence duration.
+    ///
+    /// Fast-path: returns immediately when there is no partial or silence threshold is zero.
+    #[inline]
     pub fn check_silence_finalization(&mut self) {
-        let elapsed = self.last_update.elapsed().as_millis() as u64;
-        if elapsed >= self.finalize_after_ms {
-            self.finalize_current();
+        // Fast-path: nothing to finalize.
+        let Some(seg) = self.segments.last_mut() else {
+            return;
+        };
+        if seg.is_final {
+            return;
+        }
+
+        // Avoid elapsed() syscall when finalize_after_ms == 0.
+        if self.finalize_after_ms == 0
+            || self.last_update.elapsed().as_millis() as u64 >= self.finalize_after_ms
+        {
+            seg.is_final = true;
         }
     }
 
     /// Finalize all segments (end of session).
+    #[inline]
     pub fn finalize_all(&mut self) {
+        // Tight loop — avoid branch per element by only writing when needed.
         for seg in &mut self.segments {
+            // Branchless write is fine here; `is_final` is always set to true.
             seg.is_final = true;
         }
     }
 
     /// Drain all segments that haven't been polled yet.
     ///
-    /// Returns segments and clears the internal buffer.
+    /// Returns segments and clears the internal buffer while preserving allocation.
+    #[inline]
     pub fn drain(&mut self) -> Vec<AsrSegment> {
-        std::mem::take(&mut self.segments)
+        // Take the vec (O(1)) and replace with a fresh pre-allocated one,
+        // so the next burst doesn't pay for reallocation.
+        std::mem::replace(&mut self.segments, Vec::with_capacity(8))
     }
 
     /// Get all current segments without draining.
     #[cfg(test)]
+    #[inline]
     pub fn peek(&self) -> &[AsrSegment] {
         &self.segments
     }
 
     /// Number of segments tracked.
+    #[inline]
     pub fn len(&self) -> usize {
         self.segments.len()
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.segments.is_empty()
     }
@@ -159,6 +186,15 @@ mod tests {
     }
 
     #[test]
+    fn drain_preserves_capacity() {
+        let mut tracker = SegmentTracker::new(500);
+        tracker.push_partial("a".into(), Some(0), None);
+        let _ = tracker.drain();
+        // After drain, internal vec should still have capacity reserved.
+        assert!(tracker.segments.capacity() >= 8);
+    }
+
+    #[test]
     fn segment_ids_increment() {
         let mut tracker = SegmentTracker::new(500);
         tracker.push_partial("a".into(), Some(0), None);
@@ -175,6 +211,25 @@ mod tests {
         tracker.push_partial("hello".into(), Some(0), None);
         std::thread::sleep(std::time::Duration::from_millis(1));
         tracker.check_silence_finalization();
+        assert!(tracker.peek()[0].is_final);
+    }
+
+    #[test]
+    fn silence_finalization_noop_when_empty() {
+        let mut tracker = SegmentTracker::new(0);
+        // Should not panic on empty tracker.
+        tracker.check_silence_finalization();
+        assert!(tracker.is_empty());
+    }
+
+    #[test]
+    fn silence_finalization_noop_when_already_final() {
+        let mut tracker = SegmentTracker::new(0);
+        tracker.push_partial("hello".into(), Some(0), None);
+        tracker.finalize_current();
+        // Already final — should not panic or double-set.
+        tracker.check_silence_finalization();
+        assert_eq!(tracker.len(), 1);
         assert!(tracker.peek()[0].is_final);
     }
 }

@@ -24,8 +24,28 @@ use lune_core::llm::PostProcessInput;
 /// We start with `<think>\n</think>\n` to disable thinking mode —
 /// for text cleanup we want direct output, not chain-of-thought.
 pub fn build_chatml(input: &PostProcessInput) -> String {
-    let mut prompt = String::with_capacity(2048);
     let style = &input.style_preset;
+
+    // Estimate capacity from all input lengths to avoid reallocations.
+    let dict_len: usize = input
+        .dictionary
+        .iter()
+        .map(|e| e.phrase.len() + e.replacement.len() + 8)
+        .sum();
+    let few_shot_len: usize = style
+        .few_shot_pairs
+        .iter()
+        .map(|(u, a)| u.len() + a.len() + 80)
+        .sum();
+    let cap = 128
+        + style.system_prompt.len()
+        + dict_len
+        + input.prev_context.as_deref().map_or(0, |c| c.len() + 32)
+        + few_shot_len
+        + style.user_prompt_template.len()
+        + input.raw_text.len();
+
+    let mut prompt = String::with_capacity(cap);
 
     // System message with dictionary context.
     // /no_think disables Qwen3's chain-of-thought mode at the system level.
@@ -61,12 +81,16 @@ pub fn build_chatml(input: &PostProcessInput) -> String {
         prompt.push_str("<|im_end|>\n");
     }
 
-    // Actual user input.
-    let user_text = style
-        .user_prompt_template
-        .replace("{raw_text}", &input.raw_text);
+    // Actual user input — inline template substitution to avoid an intermediate allocation.
     prompt.push_str("<|im_start|>user\n");
-    prompt.push_str(&user_text);
+    let template = &style.user_prompt_template;
+    if let Some(idx) = template.find("{raw_text}") {
+        prompt.push_str(&template[..idx]);
+        prompt.push_str(&input.raw_text);
+        prompt.push_str(&template[idx + "{raw_text}".len()..]);
+    } else {
+        prompt.push_str(template);
+    }
     prompt.push_str("<|im_end|>\n");
 
     // Start assistant turn with thinking disabled.
@@ -78,35 +102,58 @@ pub fn build_chatml(input: &PostProcessInput) -> String {
 /// Strip any `<think>...</think>` blocks and trim the output.
 #[inline]
 pub fn strip_thinking(text: &str) -> String {
+    const OPEN: &str = "<think>";
+    const CLOSE: &str = "</think>";
+    const IM_END: &str = "<|im_end|>";
+
+    // Fast path: compliant model output with no tags at all — common case.
+    let has_open = text.contains(OPEN);
+    let has_close = text.contains(CLOSE);
+    let has_im_end = text.contains(IM_END);
+    if !has_open && !has_close && !has_im_end {
+        return text.trim().to_string();
+    }
+
+    // Allocate once at input length; result after stripping will only be smaller.
     let mut result = String::with_capacity(text.len());
     let mut remaining = text;
 
     // Strip matched <think>...</think> pairs.
-    while let Some(start) = remaining.find("<think>") {
+    while let Some(start) = remaining.find(OPEN) {
         result.push_str(&remaining[..start]);
-        if let Some(end) = remaining[start..].find("</think>") {
-            remaining = &remaining[start + end + "</think>".len()..];
+        if let Some(end) = remaining[start..].find(CLOSE) {
+            remaining = &remaining[start + end + CLOSE.len()..];
         } else {
             // Unclosed think tag — drop everything after it.
             remaining = "";
+            break;
         }
     }
     result.push_str(remaining);
 
     // Handle bare </think> without opening tag — the model continued
     // reasoning after our prefilled <think></think> and only emitted the
-    // closing tag. Drop everything before (and including) the bare closer.
-    if let Some(pos) = result.find("</think>") {
-        // drain in-place avoids a new heap allocation
-        result.drain(0..pos + "</think>".len());
+    // closing tag. Drain in-place to avoid a new heap allocation.
+    if let Some(pos) = result.find(CLOSE) {
+        result.drain(0..pos + CLOSE.len());
     }
 
     // Also strip <|im_end|> if the model emits it.
     // Check before replacing to avoid an allocation in the common case.
-    if result.contains("<|im_end|>") {
-        result = result.replace("<|im_end|>", "");
+    if result.contains(IM_END) {
+        let cleaned = result.replace(IM_END, "");
+        result = cleaned;
     }
-    result.trim().to_string()
+
+    // Trim in-place — avoids the `.trim().to_string()` double-allocation pattern.
+    let end_len = result.trim_end().len();
+    result.truncate(end_len);
+    let start_offset = result.len() - result.trim_start().len();
+    if start_offset > 0 {
+        result.drain(0..start_offset);
+    }
+
+    result
 }
 
 #[cfg(test)]

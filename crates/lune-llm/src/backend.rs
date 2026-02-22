@@ -15,6 +15,10 @@ use lune_core::llm::{PostProcessInput, PostProcessOutput, TextPostProcessor};
 
 use crate::prompt;
 
+/// Length of the longest stop sequence token (`<|im_end|>`).
+/// Used to bound the suffix window scanned for stop sequences each decode step.
+const MAX_STOP_SEQ_LEN: usize = 10;
+
 /// Configuration for the local LLM backend.
 #[derive(Debug, Clone)]
 pub struct LocalLlmConfig {
@@ -54,7 +58,9 @@ impl Default for LocalLlmConfig {
 /// grammar correction, disfluency removal, punctuation.
 pub struct LocalLlmBackend {
     inner: Arc<Mutex<LlmInner>>,
-    config: LocalLlmConfig,
+    /// Shared immutably across all `transform` calls; Arc makes the per-call
+    /// clone an atomic increment rather than a heap allocation.
+    config: Arc<LocalLlmConfig>,
 }
 
 struct LlmInner {
@@ -110,7 +116,7 @@ impl LocalLlmBackend {
 
         Ok(Self {
             inner: Arc::new(Mutex::new(LlmInner { backend, model })),
-            config,
+            config: Arc::new(config),
         })
     }
 }
@@ -149,13 +155,13 @@ fn generate_sync(
     }
 
     // Build batch with prompt tokens.
-    let batch_size = prompt_len.max(512) as usize;
+    let batch_size = (prompt_len as usize).max(512);
     let mut batch = LlamaBatch::new(batch_size, 1);
     let last_idx = prompt_len - 1;
-    for (i, token) in tokens.into_iter().enumerate() {
-        let is_last = i as i32 == last_idx;
+    // Use i32 range directly to avoid repeated `as i32` casts in the hot path.
+    for (i, token) in (0i32..prompt_len).zip(tokens) {
         batch
-            .add(token, i as i32, &[0], is_last)
+            .add(token, i, &[0], i == last_idx)
             .map_err(|e| Error::Llm(format!("batch add: {e}")))?;
     }
 
@@ -177,9 +183,8 @@ fn generate_sync(
 
     // Autoregressive decode.
     let mut decoder = encoding_rs::UTF_8.new_decoder();
-    // Pre-allocate for expected output size: max_output_tokens * ~4 bytes average UTF-8
-    let expected_output_bytes = (config.max_output_tokens as usize) * 4;
-    let mut output = String::with_capacity(expected_output_bytes);
+    // Pre-allocate for expected output size: max_output_tokens * ~4 bytes average UTF-8.
+    let mut output = String::with_capacity((config.max_output_tokens as usize) * 4);
     let mut n_cur = batch.n_tokens();
     let max_total = prompt_len + config.max_output_tokens as i32;
     let eos = inner.model.token_eos();
@@ -196,13 +201,29 @@ fn generate_sync(
             .model
             .token_to_piece(token, &mut decoder, true, None)
             .unwrap_or_default();
-        output.push_str(&piece);
 
-        // Stop on <|im_end|> or <think> in the output.
-        // <think> means the model ignored our no-think prefill and is
-        // trying to reason — halt before it wastes tokens.
-        if output.contains("<|im_end|>") || output.contains("<think>") {
-            break;
+        if !piece.is_empty() {
+            output.push_str(&piece);
+
+            // Optimised stop-sequence detection: scan only the suffix window that
+            // can possibly contain a newly-completed marker.  A marker straddling
+            // the old/new boundary requires at most (MAX_STOP_SEQ_LEN - 1) bytes
+            // of old output, so total scan is O(piece.len() + MAX_STOP_SEQ_LEN)
+            // rather than O(output.len()).
+            let win_end = output.len();
+            let win_start = win_end.saturating_sub(piece.len() + MAX_STOP_SEQ_LEN - 1);
+            // Snap backward to a valid UTF-8 char boundary (≤3 bytes for well-formed input).
+            let win_start = {
+                let mut s = win_start;
+                while s > 0 && !output.is_char_boundary(s) {
+                    s -= 1;
+                }
+                s
+            };
+            let window = &output[win_start..];
+            if window.contains("<|im_end|>") || window.contains("<think>") {
+                break;
+            }
         }
 
         batch.clear();
@@ -233,7 +254,8 @@ impl TextPostProcessor for LocalLlmBackend {
         // Run inference on a blocking thread to avoid starving the async runtime.
         // spawn_blocking (not block_in_place) is required for current_thread + LocalSet.
         let inner = Arc::clone(&self.inner);
-        let config = self.config.clone();
+        // Arc clone: O(1) atomic increment, not a heap allocation.
+        let config = Arc::clone(&self.config);
         let raw_output =
             tokio::task::spawn_blocking(move || generate_sync(&inner, &config, &prompt_text))
                 .await

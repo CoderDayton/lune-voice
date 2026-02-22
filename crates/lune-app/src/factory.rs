@@ -12,6 +12,16 @@ use lune_core::llm::TextPostProcessor;
 use lune_llm::LocalLlmBackend;
 use lune_persist::ResolvedModels;
 
+// Deduplicated, static — no heap alloc on the cold mismatch branch.
+const MISMATCH: &str = "backend/session type mismatch";
+
+// Keeps String allocation off the hot path; cold hint guides branch predictor.
+#[cold]
+#[inline(never)]
+fn mismatch_err() -> Error {
+    Error::Asr(MISMATCH.into())
+}
+
 // ── Runtime dispatch enum ────────────────────────────────────────────────────
 
 /// Runtime-dispatched ASR backend (Parakeet local or OpenAI-compatible API).
@@ -30,6 +40,7 @@ pub enum AsrSessionDispatch {
 impl AsrBackend for AsrBackendDispatch {
     type SessionHandle = AsrSessionDispatch;
 
+    #[inline]
     async fn start_session(&self, config: AsrSessionConfig) -> Result<Self::SessionHandle> {
         match self {
             Self::Parakeet(b) => Ok(AsrSessionDispatch::Parakeet(b.start_session(config).await?)),
@@ -37,27 +48,70 @@ impl AsrBackend for AsrBackendDispatch {
         }
     }
 
+    /// Hot path: called per audio frame.
+    ///
+    /// Nested match avoids constructing a temporary `(self, session)` tuple on
+    /// each call. The outer branch on `self` is the only one that varies at
+    /// steady-state; the inner `if let` is trivially predicted-taken.
+    /// The cold `mismatch_err()` call stays out of the I-cache success path.
+    #[inline]
     async fn push_audio(&self, session: &Self::SessionHandle, pcm: &[f32]) -> Result<()> {
-        match (self, session) {
-            (Self::Parakeet(b), AsrSessionDispatch::Parakeet(s)) => b.push_audio(s, pcm).await,
-            (Self::OpenAi(b), AsrSessionDispatch::OpenAi(s)) => b.push_audio(s, pcm).await,
-            _ => Err(Error::Asr("backend/session type mismatch".into())),
+        match self {
+            Self::Parakeet(b) => {
+                if let AsrSessionDispatch::Parakeet(s) = session {
+                    b.push_audio(s, pcm).await
+                } else {
+                    Err(mismatch_err())
+                }
+            }
+            Self::OpenAi(b) => {
+                if let AsrSessionDispatch::OpenAi(s) = session {
+                    b.push_audio(s, pcm).await
+                } else {
+                    Err(mismatch_err())
+                }
+            }
         }
     }
 
+    /// Hot path: polled every decode cycle.
+    #[inline]
     async fn poll_results(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>> {
-        match (self, session) {
-            (Self::Parakeet(b), AsrSessionDispatch::Parakeet(s)) => b.poll_results(s).await,
-            (Self::OpenAi(b), AsrSessionDispatch::OpenAi(s)) => b.poll_results(s).await,
-            _ => Err(Error::Asr("backend/session type mismatch".into())),
+        match self {
+            Self::Parakeet(b) => {
+                if let AsrSessionDispatch::Parakeet(s) = session {
+                    b.poll_results(s).await
+                } else {
+                    Err(mismatch_err())
+                }
+            }
+            Self::OpenAi(b) => {
+                if let AsrSessionDispatch::OpenAi(s) = session {
+                    b.poll_results(s).await
+                } else {
+                    Err(mismatch_err())
+                }
+            }
         }
     }
 
+    #[inline]
     async fn end_session(&self, session: Self::SessionHandle) -> Result<()> {
-        match (self, session) {
-            (Self::Parakeet(b), AsrSessionDispatch::Parakeet(s)) => b.end_session(s).await,
-            (Self::OpenAi(b), AsrSessionDispatch::OpenAi(s)) => b.end_session(s).await,
-            _ => Err(Error::Asr("backend/session type mismatch".into())),
+        match self {
+            Self::Parakeet(b) => {
+                if let AsrSessionDispatch::Parakeet(s) = session {
+                    b.end_session(s).await
+                } else {
+                    Err(mismatch_err())
+                }
+            }
+            Self::OpenAi(b) => {
+                if let AsrSessionDispatch::OpenAi(s) = session {
+                    b.end_session(s).await
+                } else {
+                    Err(mismatch_err())
+                }
+            }
         }
     }
 }
@@ -68,6 +122,7 @@ impl AsrBackend for AsrBackendDispatch {
 ///
 /// The default `UserSettings` ships with empty `PathBuf`s for model paths.
 /// After `ensure_default_models` resolves the actual paths, this fills them in.
+#[inline]
 pub fn patch_model_paths(settings: &mut UserSettings, resolved: &ResolvedModels) {
     if let AsrBackendConfig::ParakeetTdt { model_dir, .. } = &mut settings.asr_backend
         && model_dir.as_os_str().is_empty()
@@ -83,6 +138,11 @@ pub fn patch_model_paths(settings: &mut UserSettings, resolved: &ResolvedModels)
 }
 
 /// Construct the ASR backend from settings.
+///
+/// Cold path: called once at startup. `#[cold]` signals the linker to place
+/// this function outside hot text sections, reducing I-cache pressure at
+/// steady-state call sites that branch to factory functions.
+#[cold]
 pub fn build_asr_backend(settings: &UserSettings) -> Result<AsrBackendDispatch> {
     match &settings.asr_backend {
         AsrBackendConfig::ParakeetTdt {
@@ -117,6 +177,9 @@ pub fn build_asr_backend(settings: &UserSettings) -> Result<AsrBackendDispatch> 
 }
 
 /// Construct the LLM post-processor from settings.
+///
+/// Cold path: called once at startup.
+#[cold]
 pub fn build_post_processor(settings: &UserSettings) -> Result<Arc<dyn TextPostProcessor>> {
     match &settings.llm_backend {
         LlmBackendConfig::Local {
@@ -142,6 +205,9 @@ pub fn build_post_processor(settings: &UserSettings) -> Result<Arc<dyn TextPostP
 }
 
 /// Build a database path, creating parent dirs if needed.
+///
+/// Cold path: called once at startup.
+#[cold]
 pub fn ensure_db_path(db_path: &Path) -> Result<()> {
     if let Some(parent) = db_path.parent() {
         std::fs::create_dir_all(parent)

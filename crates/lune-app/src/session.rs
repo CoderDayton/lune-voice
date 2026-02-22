@@ -253,6 +253,13 @@ async fn run_session<A: AsrBackend + 'static>(
     // Latest confidence from finalized ASR segments.
     let mut pending_confidence: Option<f32> = None;
 
+    // Persistent buffers — reused every iteration to eliminate per-frame allocation.
+    // partial_buf: built for non-final segment display (hot path: ~50Hz).
+    let mut partial_buf = String::with_capacity(512);
+    // audio_batch: coalesces the initial frame + any immediately-queued frames
+    // into a single push_audio call, reducing await-point overhead under bursts.
+    let mut audio_batch: Vec<f32> = Vec::with_capacity(4096);
+
     // ── Main loop (3 branches: stop, LLM results, audio/silence) ─────────
     loop {
         tokio::select! {
@@ -273,8 +280,21 @@ async fn run_session<A: AsrBackend + 'static>(
                         "LLM correction accepted"
                     );
 
-                    // Update session_text with the corrected version.
-                    if let Some(pos) = session_text.rfind(&resp.original_text) {
+                    // Bound the rfind to the tail of session_text — LLM responses
+                    // arrive shortly after the utterance so it's always near the end.
+                    // Avoids O(n) scan on long sessions; window = 8× utterance len.
+                    let search_from = {
+                        let window = resp.original_text.len().saturating_mul(8).max(256);
+                        let approx = session_text.len().saturating_sub(window);
+                        // Walk back to the nearest valid UTF-8 char boundary.
+                        let mut b = approx;
+                        while b > 0 && !session_text.is_char_boundary(b) {
+                            b -= 1;
+                        }
+                        b
+                    };
+                    if let Some(rel) = session_text[search_from..].rfind(&resp.original_text) {
+                        let pos = search_from + rel;
                         session_text.replace_range(
                             pos..pos + resp.original_text.len(),
                             &resp.corrected_text,
@@ -377,16 +397,18 @@ async fn run_session<A: AsrBackend + 'static>(
 
                     // ── Audio frame received ──────────────────────────────
                     Ok(Some(frame)) => {
-                        if let Err(e) = asr.push_audio(&asr_session, &frame.samples).await {
-                            warn!(error = %e, "push_audio error");
-                            continue;
+                        // Coalesce initial frame + any immediately-available frames
+                        // into a single push_audio call. Reduces await-point count
+                        // during microphone bursts and amortises ASR call overhead.
+                        audio_batch.clear();
+                        audio_batch.extend_from_slice(&frame.samples);
+                        while let Ok(extra) = audio_rx.try_recv() {
+                            audio_batch.extend_from_slice(&extra.samples);
                         }
 
-                        while let Ok(extra) = audio_rx.try_recv() {
-                            if let Err(e) = asr.push_audio(&asr_session, &extra.samples).await {
-                                warn!(error = %e, "push_audio error (drain)");
-                                break;
-                            }
+                        if let Err(e) = asr.push_audio(&asr_session, &audio_batch).await {
+                            warn!(error = %e, "push_audio error");
+                            continue;
                         }
 
                         let segments = match asr.poll_results(&asr_session).await {
@@ -419,25 +441,21 @@ async fn run_session<A: AsrBackend + 'static>(
                                 pending_confidence = seg.confidence;
                             } else {
                                 let partial_suffix = route.remaining.trim();
-                                // Build partial by reusing session_text capacity.
-                                let partial_cap = session_text.len()
-                                    + if !utterance.is_empty() { 1 + utterance.len() } else { 0 }
-                                    + if !partial_suffix.is_empty() { 1 + partial_suffix.len() } else { 0 };
-                                let mut partial = String::with_capacity(partial_cap);
-                                partial.push_str(&session_text);
+                                // Reuse persistent buffer — eliminates per-segment
+                                // String allocation on the ~50 Hz partial path.
+                                partial_buf.clear();
+                                partial_buf.push_str(&session_text);
                                 if !utterance.is_empty() {
-                                    if !partial.is_empty() {
-                                        partial.push(' ');
+                                    if !partial_buf.is_empty() {
+                                        partial_buf.push(' ');
                                     }
-                                    partial.push_str(&utterance);
+                                    partial_buf.push_str(&utterance);
                                 }
                                 if !partial_suffix.is_empty() {
-                                    if !partial.is_empty() {
-                                        partial.push(' ');
+                                    if !partial_buf.is_empty() {
+                                        partial_buf.push(' ');
                                     }
-                                    partial.push_str(partial_suffix);
-                                }
-                                if !partial_suffix.is_empty() {
+                                    partial_buf.push_str(partial_suffix);
                                     pending_nonfinal.clear();
                                     pending_nonfinal.push_str(partial_suffix);
                                 }
@@ -445,7 +463,7 @@ async fn run_session<A: AsrBackend + 'static>(
                                 if seg.confidence.is_some() {
                                     pending_confidence = seg.confidence;
                                 }
-                                output_ctrl.emit_partial(partial).await;
+                                output_ctrl.emit_partial(partial_buf.clone()).await;
                             }
                         }
                     }

@@ -13,15 +13,10 @@ use lune_core::llm::{PostProcessInput, PostProcessOutput, TextPostProcessor};
 /// Configuration for the OpenAI-compatible LLM backend.
 #[derive(Debug, Clone)]
 pub struct OpenAiLlmConfig {
-    /// Base URL for the API (e.g. "https://api.openai.com/v1").
     pub base_url: String,
-    /// API key for authentication.
     pub api_key: String,
-    /// Model identifier (e.g. "gpt-4o-mini").
     pub model: String,
-    /// Maximum tokens to generate per request.
     pub max_tokens: u32,
-    /// Sampling temperature.
     pub temperature: f32,
 }
 
@@ -38,8 +33,6 @@ impl Default for OpenAiLlmConfig {
 }
 
 /// OpenAI-compatible LLM backend for remote text post-processing.
-///
-/// Calls `POST /v1/chat/completions` on any OpenAI-compatible endpoint.
 /// Gracefully degrades: API failures return the raw text with a warning.
 pub struct OpenAiLlmBackend {
     client: Client<OpenAIConfig>,
@@ -65,25 +58,27 @@ impl OpenAiLlmBackend {
 
 /// Build the chat message array from a `PostProcessInput`.
 ///
-/// Structure:
-/// 1. System message: style prompt + dictionary terms + preceding context
-/// 2. Few-shot pairs as user/assistant messages
-/// 3. Final user message with `{raw_text}` substituted
+/// Amortises all string allocations up-front; avoids per-entry format! calls.
 fn build_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage> {
     let style = &input.style_preset;
-    // system + 2 msgs per few-shot pair + 1 final user message
     let capacity = 1 + style.few_shot_pairs.len() * 2 + 1;
     let mut messages = Vec::with_capacity(capacity);
 
-    // System message.
-    let mut system_content = style.system_prompt.clone();
+    // ── System message ────────────────────────────────────────────────────────
+    let dict_len = input.dictionary.len();
+    let ctx_len = input
+        .prev_context
+        .as_deref()
+        .map(|c| c.len() + 22)
+        .unwrap_or(0);
 
-    if !input.dictionary.is_empty() {
-        // pre-allocate: each entry contributes roughly 20+ chars
-        system_content.reserve(
-            "\n\nDictionary terms (always use these exact spellings):".len()
-                + input.dictionary.len() * 24,
-        );
+    // Pre-size: system_prompt + dict header + entries (avg ~30 chars each) + ctx
+    let mut system_content = String::with_capacity(
+        style.system_prompt.len() + if dict_len > 0 { 55 + dict_len * 30 } else { 0 } + ctx_len,
+    );
+    system_content.push_str(&style.system_prompt);
+
+    if dict_len > 0 {
         system_content.push_str("\n\nDictionary terms (always use these exact spellings):");
         for entry in &input.dictionary {
             system_content.push_str("\n- ");
@@ -93,9 +88,7 @@ fn build_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage>
         }
     }
 
-    if let Some(ref ctx) = input.prev_context
-        && !ctx.is_empty()
-    {
+    if let Some(ctx) = input.prev_context.as_deref().filter(|c| !c.is_empty()) {
         system_content.push_str("\n\nPreceding context: ");
         system_content.push_str(ctx);
     }
@@ -108,7 +101,7 @@ fn build_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage>
             .into(),
     );
 
-    // Few-shot examples.
+    // ── Few-shot examples ─────────────────────────────────────────────────────
     for (user_ex, assistant_ex) in &style.few_shot_pairs {
         messages.push(
             ChatCompletionRequestUserMessageArgs::default()
@@ -126,10 +119,21 @@ fn build_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage>
         );
     }
 
-    // Final user message with template substitution.
-    let user_text = style
-        .user_prompt_template
-        .replace("{raw_text}", &input.raw_text);
+    // ── Final user message ────────────────────────────────────────────────────
+    // Avoid allocating a new String when the template contains exactly one
+    // `{raw_text}` placeholder — replace in-place via pre-sized buffer.
+    let tmpl = &style.user_prompt_template;
+    let user_text = if let Some(pos) = tmpl.find("{raw_text}") {
+        let raw = &input.raw_text;
+        let mut buf = String::with_capacity(tmpl.len() - 10 + raw.len());
+        buf.push_str(&tmpl[..pos]);
+        buf.push_str(raw);
+        buf.push_str(&tmpl[pos + 10..]);
+        buf
+    } else {
+        tmpl.clone()
+    };
+
     messages.push(
         ChatCompletionRequestUserMessageArgs::default()
             .content(user_text)
@@ -141,7 +145,7 @@ fn build_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage>
     messages
 }
 
-#[inline]
+#[inline(always)]
 fn fallback_output(raw_text: &str) -> PostProcessOutput {
     PostProcessOutput {
         cleaned_text: raw_text.to_owned(),
@@ -177,13 +181,15 @@ impl TextPostProcessor for OpenAiLlmBackend {
 
         match self.client.chat().create(request).await {
             Ok(response) => {
+                // Extract content without an intermediate owned String when possible.
                 let text = response
                     .choices
                     .first()
                     .and_then(|c| c.message.content.as_deref())
-                    .unwrap_or(&input.raw_text)
-                    .trim()
-                    .to_string();
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or(input.raw_text.trim())
+                    .to_owned();
 
                 tracing::debug!(output_len = text.len(), "OpenAI post-process complete");
 
@@ -226,7 +232,6 @@ mod tests {
 
         let json = serde_json::to_string(&msgs).unwrap();
         assert!(json.contains("hello um world"));
-        // System prompt from General preset
         assert!(json.contains("text post-processor"));
     }
 
@@ -261,6 +266,16 @@ mod tests {
     }
 
     #[test]
+    fn build_messages_no_raw_text_placeholder() {
+        // Template without {raw_text} — should not panic, just clone template.
+        let mut input = test_input("hello");
+        input.style_preset.user_prompt_template = "fixed prompt".into();
+        let msgs = build_messages(&input);
+        let json = serde_json::to_string(&msgs).unwrap();
+        assert!(json.contains("fixed prompt"));
+    }
+
+    #[test]
     fn config_defaults() {
         let cfg = OpenAiLlmConfig::default();
         assert_eq!(cfg.max_tokens, 512);
@@ -271,7 +286,6 @@ mod tests {
 
     #[tokio::test]
     async fn graceful_degradation() {
-        // Connect to an unreachable address — should return raw text, not error.
         let config = OpenAiLlmConfig {
             base_url: "http://127.0.0.1:1".into(),
             api_key: "test-key".into(),

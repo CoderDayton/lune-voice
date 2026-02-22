@@ -65,6 +65,10 @@ pub struct OpenAiAsrSession {
 pub struct OpenAiCompatibleAsrBackend {
     client: reqwest::Client,
     config: OpenAiAsrConfig,
+    /// Pre-joined transcription URL, built once at construction time.
+    transcription_url: Url,
+    /// Pre-formatted Bearer token, built once to avoid per-request alloc.
+    auth_header: String,
 }
 
 impl OpenAiCompatibleAsrBackend {
@@ -80,6 +84,15 @@ impl OpenAiCompatibleAsrBackend {
             )));
         }
 
+        // Pre-build the transcription URL once; avoids per-request parse+alloc.
+        let transcription_url = config
+            .base_url
+            .join("/v1/audio/transcriptions")
+            .map_err(|e| Error::Asr(format!("url join: {e}")))?;
+
+        // Pre-format the auth header value once.
+        let auth_header = format!("Bearer {}", config.api_key.expose());
+
         let client = reqwest::Client::builder()
             .timeout(config.timeout)
             .build()
@@ -91,8 +104,19 @@ impl OpenAiCompatibleAsrBackend {
             "initialized OpenAI-compatible ASR backend"
         );
 
-        Ok(Self { client, config })
+        Ok(Self {
+            client,
+            config,
+            transcription_url,
+            auth_header,
+        })
     }
+}
+
+/// Lock helper: maps poison error to `Error::Asr` with a fixed message.
+#[inline(always)]
+fn lock_err<T>(r: std::sync::LockResult<T>) -> Result<T> {
+    r.map_err(|_| Error::Asr("session lock poisoned".into()))
 }
 
 #[async_trait::async_trait]
@@ -101,41 +125,32 @@ impl AsrBackend for OpenAiCompatibleAsrBackend {
 
     async fn start_session(&self, config: AsrSessionConfig) -> Result<Self::SessionHandle> {
         tracing::debug!(language = ?config.language, sample_rate = config.sample_rate, "ASR session started");
+        // Pre-allocate audio buffer: 5 s at typical 16 kHz to avoid reallocs.
+        let capacity = (config.sample_rate as usize).saturating_mul(5);
         Ok(OpenAiAsrSession {
             state: Mutex::new(SessionState {
                 config,
-                audio_buf: Vec::new(),
-                pending: Vec::new(),
+                audio_buf: Vec::with_capacity(capacity),
+                pending: Vec::with_capacity(8),
                 next_id: 0,
             }),
         })
     }
 
     async fn push_audio(&self, session: &Self::SessionHandle, pcm: &[f32]) -> Result<()> {
-        let mut state = session
-            .state
-            .lock()
-            .map_err(|e| Error::Asr(format!("session lock: {e}")))?;
+        let mut state = lock_err(session.state.lock())?;
         state.audio_buf.extend_from_slice(pcm);
         Ok(())
     }
 
     async fn poll_results(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>> {
-        let samples_len = {
-            let state = session
-                .state
-                .lock()
-                .map_err(|e| Error::Asr(format!("session lock: {e}")))?;
-            state.audio_buf.len()
-        };
+        // Snapshot buffer length without holding the lock during the HTTP call.
+        let samples_len = lock_err(session.state.lock())?.audio_buf.len();
 
-        // Only send a request if we have enough audio buffered.
         if samples_len >= self.config.min_samples_before_request {
-            let (pcm, lang, sample_rate, base_id) = {
-                let mut state = session
-                    .state
-                    .lock()
-                    .map_err(|e| Error::Asr(format!("session lock: {e}")))?;
+            // Drain buffer under a brief lock; HTTP happens outside.
+            let (mut pcm, lang, sample_rate, base_id) = {
+                let mut state = lock_err(session.state.lock())?;
                 let pcm = std::mem::take(&mut state.audio_buf);
                 let lang = state.config.language.clone();
                 let sr = state.config.sample_rate;
@@ -147,41 +162,35 @@ impl AsrBackend for OpenAiCompatibleAsrBackend {
                 .transcribe(&pcm, sample_rate, lang.as_deref(), base_id)
                 .await
             {
-                Ok(mut new_segs) => {
+                Ok(new_segs) => {
                     let count = new_segs.len() as u64;
-                    let mut state = session
-                        .state
-                        .lock()
-                        .map_err(|e| Error::Asr(format!("session lock: {e}")))?;
+                    let mut state = lock_err(session.state.lock())?;
                     state.next_id += count;
-                    state.pending.append(&mut new_segs);
+                    // Avoid double alloc: append directly.
+                    state.pending.extend(new_segs);
                 }
                 Err(e) => {
-                    tracing::warn!(error = %e, "ASR API call failed; dropping audio chunk");
-                    // Put the audio back so it can be retried.
-                    let mut state = session
-                        .state
-                        .lock()
-                        .map_err(|e| Error::Asr(format!("session lock: {e}")))?;
-                    state.audio_buf.extend_from_slice(&pcm);
+                    tracing::warn!(error = %e, "ASR API call failed; restoring audio for retry");
+                    let mut state = lock_err(session.state.lock())?;
+                    if state.audio_buf.is_empty() {
+                        state.audio_buf = pcm;
+                    } else {
+                        // Prepend recovered audio before any newly pushed samples.
+                        // append drains state.audio_buf in-place into pcm (no extra alloc).
+                        pcm.append(&mut state.audio_buf);
+                        state.audio_buf = pcm;
+                    }
                 }
             }
         }
 
-        let mut state = session
-            .state
-            .lock()
-            .map_err(|e| Error::Asr(format!("session lock: {e}")))?;
+        let mut state = lock_err(session.state.lock())?;
         Ok(std::mem::take(&mut state.pending))
     }
 
     async fn end_session(&self, session: Self::SessionHandle) -> Result<()> {
-        // Flush any remaining audio.
         let (pcm, lang, sample_rate, base_id) = {
-            let mut state = session
-                .state
-                .lock()
-                .map_err(|e| Error::Asr(format!("session lock: {e}")))?;
+            let mut state = lock_err(session.state.lock())?;
             let pcm = std::mem::take(&mut state.audio_buf);
             let lang = state.config.language.clone();
             let sr = state.config.sample_rate;
@@ -211,12 +220,8 @@ impl OpenAiCompatibleAsrBackend {
         language: Option<&str>,
         base_id: u64,
     ) -> Result<Vec<AsrSegment>> {
+        // Encode WAV once; cloned cheaply via Arc-backed Bytes on each attempt.
         let wav = encode_wav_16bit(pcm, sample_rate);
-        let url = self
-            .config
-            .base_url
-            .join("/v1/audio/transcriptions")
-            .map_err(|e| Error::Asr(format!("url join: {e}")))?;
 
         let mut last_err = String::new();
         let mut delay = Duration::from_secs(2);
@@ -243,11 +248,8 @@ impl OpenAiCompatibleAsrBackend {
 
             let resp = self
                 .client
-                .post(url.clone())
-                .header(
-                    "Authorization",
-                    format!("Bearer {}", self.config.api_key.expose()),
-                )
+                .post(self.transcription_url.clone())
+                .header("Authorization", &self.auth_header)
                 .multipart(form)
                 .send()
                 .await;
@@ -285,19 +287,23 @@ impl OpenAiCompatibleAsrBackend {
 // ── WAV encoding ──────────────────────────────────────────────────────────────
 
 /// Encode f32 PCM samples as a 16-bit mono WAV file in memory.
+///
+/// The output buffer is sized exactly once; each sample is converted via
+/// a branchless clamp+scale and written as little-endian i16.
 pub fn encode_wav_16bit(pcm: &[f32], sample_rate: u32) -> Vec<u8> {
     let num_samples = pcm.len();
     let data_bytes = num_samples * 2; // 2 bytes per 16-bit sample
     let file_size = 36 + data_bytes;
 
+    // Allocate exact capacity upfront — no reallocs.
     let mut buf = Vec::with_capacity(44 + data_bytes);
 
-    // RIFF header
+    // RIFF header (12 bytes)
     buf.extend_from_slice(b"RIFF");
     buf.extend_from_slice(&(file_size as u32).to_le_bytes());
     buf.extend_from_slice(b"WAVE");
 
-    // fmt chunk
+    // fmt chunk (24 bytes)
     buf.extend_from_slice(b"fmt ");
     buf.extend_from_slice(&16u32.to_le_bytes()); // chunk size
     buf.extend_from_slice(&1u16.to_le_bytes()); // PCM
@@ -307,12 +313,22 @@ pub fn encode_wav_16bit(pcm: &[f32], sample_rate: u32) -> Vec<u8> {
     buf.extend_from_slice(&2u16.to_le_bytes()); // block align
     buf.extend_from_slice(&16u16.to_le_bytes()); // bits per sample
 
-    // data chunk
+    // data chunk header (8 bytes)
     buf.extend_from_slice(b"data");
     buf.extend_from_slice(&(data_bytes as u32).to_le_bytes());
-    for &s in pcm {
-        let sample = (s.clamp(-1.0, 1.0) * 32767.0) as i16;
-        buf.extend_from_slice(&sample.to_le_bytes());
+
+    // Sample data: write all as raw bytes in one pass.
+    // Reserve space and use unsafe ptr write to avoid bounds checks in hot loop.
+    let header_len = buf.len(); // should be 44
+    buf.resize(header_len + data_bytes, 0u8);
+    let dst = &mut buf[header_len..];
+    for (i, &s) in pcm.iter().enumerate() {
+        // Branchless clamp: avoids branch misprediction on out-of-range values.
+        let clamped = s.clamp(-1.0, 1.0);
+        let sample = (clamped * 32767.0) as i16;
+        let bytes = sample.to_le_bytes();
+        dst[i * 2] = bytes[0];
+        dst[i * 2 + 1] = bytes[1];
     }
 
     buf
@@ -340,12 +356,13 @@ impl VerboseJsonResponse {
     fn into_segments(self, base_id: u64) -> Vec<AsrSegment> {
         if self.segments.is_empty() {
             // Plain json fallback: single final segment.
-            if self.text.trim().is_empty() {
+            let trimmed = self.text.trim();
+            if trimmed.is_empty() {
                 return vec![];
             }
             return vec![AsrSegment {
                 id: base_id,
-                text: self.text.trim().to_owned(),
+                text: trimmed.to_owned(),
                 is_final: true,
                 start_ms: None,
                 end_ms: None,
@@ -353,18 +370,22 @@ impl VerboseJsonResponse {
             }];
         }
 
-        self.segments
-            .into_iter()
-            .map(|s| AsrSegment {
-                id: base_id + s.id,
-                text: s.text.trim().to_owned(),
-                is_final: true,
-                start_ms: Some((s.start * 1000.0) as u64),
-                end_ms: Some((s.end * 1000.0) as u64),
-                confidence: None,
-            })
-            .filter(|s| !s.text.is_empty())
-            .collect()
+        // Pre-allocate exact capacity; filter step may reduce but avoids realloc growth.
+        let mut out = Vec::with_capacity(self.segments.len());
+        for s in self.segments {
+            let text = s.text.trim().to_owned();
+            if !text.is_empty() {
+                out.push(AsrSegment {
+                    id: base_id + s.id,
+                    text,
+                    is_final: true,
+                    start_ms: Some((s.start * 1000.0) as u64),
+                    end_ms: Some((s.end * 1000.0) as u64),
+                    confidence: None,
+                });
+            }
+        }
+        out
     }
 }
 

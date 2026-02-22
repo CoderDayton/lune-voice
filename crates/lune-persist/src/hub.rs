@@ -29,6 +29,7 @@ pub struct ResolvedModels {
 
 impl ModelSpec {
     /// Parakeet TDT 0.6B v3 ASR: INT8 ONNX models and vocab.
+    #[inline]
     pub fn parakeet_tdt() -> Self {
         Self::Directory {
             repo_id: "istupakov/parakeet-tdt-0.6b-v3-onnx".into(),
@@ -39,6 +40,7 @@ impl ModelSpec {
     }
 
     /// Qwen3 LLM: single GGUF file.
+    #[inline]
     pub fn qwen3_llm() -> Self {
         Self::SingleFile {
             repo_id: "unsloth/Qwen3-0.6B-GGUF".into(),
@@ -49,8 +51,9 @@ impl ModelSpec {
 
 /// Thin wrapper around `hf_hub::api::sync::Api` with a hidden cache directory.
 ///
-/// Files are downloaded via hf_hub into `.hub-cache/`, then hardlinked (or
-/// copied as fallback) into a flat local directory under `models/`.
+/// Files are downloaded via hf_hub into `.hub-cache/`, then copied into a
+/// flat local directory under `models/`. We prefer `hard_link` first (zero
+/// copy, same inode) and fall back to `fs::copy` only on cross-device moves.
 struct ModelHub {
     api: Api,
 }
@@ -68,8 +71,9 @@ impl ModelHub {
 
     /// Download matching files from HF Hub directly into `local_dir`.
     ///
-    /// Each file is written as a real file (no symlinks). Already-present
-    /// complete files are skipped.
+    /// Uses hard links where possible (free on same filesystem, avoids data
+    /// duplication). Falls back to `fs::copy` on EXDEV. Already-complete
+    /// files are skipped via `is_file()` check.
     fn download_directory(
         &self,
         repo_id: &str,
@@ -82,6 +86,7 @@ impl ModelHub {
 
         let file_list = self.list_repo_files(&repo, repo_id)?;
 
+        // Validate required files exist in remote listing first.
         for req in required_files {
             if !file_list.iter().any(|f| f == req) {
                 return Err(PersistError::ModelDownload(format!(
@@ -90,14 +95,16 @@ impl ModelHub {
             }
         }
 
-        let to_download: Vec<&str> = file_list
-            .iter()
-            .filter(|f| {
-                required_files.iter().any(|r| *f == r)
-                    || suffix_patterns.iter().any(|s| f.ends_with(s.as_str()))
-            })
-            .map(String::as_str)
-            .collect();
+        // Build download list: required files union suffix-matched files.
+        // Pre-allocate to avoid repeated reallocation.
+        let mut to_download: Vec<&str> = Vec::with_capacity(file_list.len());
+        for f in &file_list {
+            if required_files.iter().any(|r| f == r)
+                || suffix_patterns.iter().any(|s| f.ends_with(s.as_str()))
+            {
+                to_download.push(f.as_str());
+            }
+        }
 
         if to_download.is_empty() {
             return Err(PersistError::ModelDownload(format!(
@@ -125,7 +132,9 @@ impl ModelHub {
             let real_src = hub_path.canonicalize().map_err(|e| {
                 PersistError::ModelDownload(format!("{filename}: resolve blob: {e}"))
             })?;
-            std::fs::copy(&real_src, &dst)
+            // Hard-link first (zero-copy, same inode on same fs).
+            // EXDEV (cross-device) → fall back to full copy.
+            link_or_copy(&real_src, &dst)
                 .map_err(|e| PersistError::ModelDownload(format!("{filename}: write: {e}")))?;
         }
 
@@ -147,7 +156,7 @@ impl ModelHub {
         let real_src = hub_path
             .canonicalize()
             .map_err(|e| PersistError::ModelDownload(format!("{filename}: resolve blob: {e}")))?;
-        std::fs::copy(&real_src, local_path)
+        link_or_copy(&real_src, local_path)
             .map_err(|e| PersistError::ModelDownload(format!("{filename}: write: {e}")))?;
         Ok(())
     }
@@ -161,6 +170,23 @@ impl ModelHub {
         let mut files = Vec::with_capacity(siblings.len());
         files.extend(siblings.into_iter().map(|s| s.rfilename));
         Ok(files)
+    }
+}
+
+/// Hard-link `src` → `dst`; on EXDEV fall back to byte copy.
+///
+/// Hard links are instantaneous and consume no additional disk space when
+/// source and destination are on the same filesystem (the common case when
+/// hf_hub cache lives under `models_dir`).
+#[inline]
+fn link_or_copy(src: &Path, dst: &Path) -> std::io::Result<()> {
+    match std::fs::hard_link(src, dst) {
+        Ok(()) => Ok(()),
+        Err(e) if e.raw_os_error() == Some(18) => {
+            // EXDEV: cross-device link
+            std::fs::copy(src, dst).map(|_| ())
+        }
+        Err(e) => Err(e),
     }
 }
 
@@ -181,7 +207,6 @@ pub fn ensure_default_models(models_dir: &Path) -> PersistResult<ResolvedModels>
     let hub = ModelHub::new(&hub_cache)?;
 
     let asr_model_dir = ensure_directory_model(&hub, &ModelSpec::parakeet_tdt(), models_dir)?;
-
     let llm_model_path = ensure_single_file_model(&hub, &ModelSpec::qwen3_llm(), models_dir)?;
 
     Ok(ResolvedModels {
@@ -212,10 +237,9 @@ fn ensure_directory_model(
 
     let local_dir = models_dir.join(local_name);
 
-    // Already present — verify required files exist.
     if local_dir.exists() {
-        let all_present = required_files.iter().all(|f| local_dir.join(f).is_file());
-        if all_present {
+        // Fast path: all required files present → skip download entirely.
+        if required_files.iter().all(|f| local_dir.join(f).is_file()) {
             info!(path = %local_dir.display(), "model directory already present");
             return Ok(local_dir);
         }
@@ -307,7 +331,6 @@ mod tests {
 
         let resolved = ensure_default_models(models_dir).unwrap();
 
-        // LLM file should be at models_dir/Qwen3-0.6B-Q5_K_M.gguf
         assert!(resolved.llm_model_path.exists());
         assert_eq!(
             resolved.llm_model_path.file_name().unwrap(),

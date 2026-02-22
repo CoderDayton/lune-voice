@@ -34,11 +34,23 @@ pub struct ParakeetTdtBackend {
 /// Per-session state held behind a Mutex.
 pub struct ParakeetSession {
     audio_buffer: Vec<f32>,
+    /// Pre-allocated scratch for snapshot copies — reused across inference cycles
+    /// to eliminate per-cycle heap allocation (~30ms @ 16kHz = ~480 KB/cycle).
+    /// Owned by session; lent to poll_results via mem::take, returned in phase 4.
+    audio_snapshot: Vec<f32>,
     max_context_samples: usize,
     sample_rate: u32,
     total_samples: u64,
     samples_since_inference: usize,
+    /// Pre-computed: (sample_rate * 3) / 10 — avoids per-poll division.
+    silence_threshold: usize,
     tracker: SegmentTracker,
+}
+
+#[cold]
+#[inline(never)]
+fn lock_err(context: &'static str, e: impl std::fmt::Display) -> Error {
+    Error::Asr(format!("{context}: {e}"))
 }
 
 impl ParakeetTdtBackend {
@@ -69,12 +81,17 @@ impl AsrBackend for ParakeetTdtBackend {
     async fn start_session(&self, config: AsrSessionConfig) -> Result<Self::SessionHandle> {
         let sample_rate = config.sample_rate;
         let max_context_samples = (self.config.context_secs * sample_rate as f32) as usize;
+        // 300ms threshold pre-computed once; avoids division on every poll_results call.
+        let silence_threshold = (sample_rate as usize * 3) / 10;
         let session = ParakeetSession {
             audio_buffer: Vec::with_capacity(max_context_samples),
+            // Same capacity as audio_buffer; amortizes alloc cost across all inference cycles.
+            audio_snapshot: Vec::with_capacity(max_context_samples),
             max_context_samples,
             sample_rate,
             total_samples: 0,
             samples_since_inference: 0,
+            silence_threshold,
             tracker: SegmentTracker::new(500),
         };
         tracing::info!(sample_rate, "ASR session started");
@@ -83,60 +100,87 @@ impl AsrBackend for ParakeetTdtBackend {
 
     #[inline]
     async fn push_audio(&self, session: &Self::SessionHandle, pcm: &[f32]) -> Result<()> {
-        let mut session = session
-            .lock()
-            .map_err(|e| Error::Asr(format!("session lock: {e}")))?;
+        let mut session = session.lock().map_err(|e| lock_err("session lock", e))?;
 
-        session.audio_buffer.extend_from_slice(pcm);
-        session.total_samples += pcm.len() as u64;
-        session.samples_since_inference += pcm.len();
+        let pcm_len = pcm.len();
+        let max = session.max_context_samples;
 
-        // Sliding window: drop oldest samples beyond context window.
-        if session.audio_buffer.len() > session.max_context_samples {
-            let excess = session.audio_buffer.len() - session.max_context_samples;
-            session.audio_buffer.drain(..excess);
+        if pcm_len >= max {
+            // Fast path: large chunk replaces entire context window.
+            session.audio_buffer.clear();
+            session
+                .audio_buffer
+                .extend_from_slice(&pcm[pcm_len - max..]);
+        } else {
+            let buf_len = session.audio_buffer.len();
+            let new_total = buf_len + pcm_len;
+            if new_total > max {
+                // Shift-then-append: discard oldest samples before extending.
+                // Saves `pcm_len` element-copies vs. the extend-then-shift pattern
+                // (extend-then-shift copies the new pcm_len elements twice).
+                let discard = new_total - max;
+                session.audio_buffer.copy_within(discard..buf_len, 0);
+                session.audio_buffer.truncate(buf_len - discard);
+            }
+            session.audio_buffer.extend_from_slice(pcm);
         }
+
+        session.total_samples += pcm_len as u64;
+        session.samples_since_inference += pcm_len;
 
         Ok(())
     }
 
     async fn poll_results(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>> {
-        let mut session = session
-            .lock()
-            .map_err(|e| Error::Asr(format!("session lock: {e}")))?;
+        // Phase 1: brief lock — check readiness and take pre-allocated snapshot buffer.
+        // Releasing the lock before mel extraction and inference allows push_audio
+        // to make progress concurrently (critical for real-time streaming).
+        let (mut audio_snapshot, timestamp_ms) = {
+            let mut sess = session.lock().map_err(|e| lock_err("session lock", e))?;
 
-        // Run inference after 300ms of new audio (4800 samples @ 16kHz).
-        let threshold = (session.sample_rate as usize * 3) / 10;
-        if session.samples_since_inference < threshold {
-            session.tracker.check_silence_finalization();
-            return Ok(session.tracker.drain());
-        }
+            if sess.samples_since_inference < sess.silence_threshold {
+                sess.tracker.check_silence_finalization();
+                return Ok(sess.tracker.drain());
+            }
 
-        session.samples_since_inference = 0;
+            sess.samples_since_inference = 0;
+            let ts = sess.total_samples * 1000 / sess.sample_rate as u64;
 
-        // Avoid cloning the full buffer: borrow for mel extraction.
-        let features = mel::extract_features(&session.audio_buffer);
-        let timestamp_ms = session.total_samples * 1000 / session.sample_rate as u64;
+            // Take the pre-allocated snapshot buffer out of session (zero-allocation:
+            // mem::take swaps in an empty Vec without touching the heap).
+            // We refill it and return it in phase 4 for reuse next cycle.
+            let mut snapshot = std::mem::take(&mut sess.audio_snapshot);
+            snapshot.clear();
+            snapshot.extend_from_slice(&sess.audio_buffer);
+            (snapshot, ts)
+        }; // session lock released — push_audio unblocked
 
-        // Run inference (release session lock, acquire model lock)
+        // Phase 2: mel extraction outside any lock (CPU-intensive STFT).
+        let features = mel::extract_features(&audio_snapshot);
+        // Keep audio_snapshot alive — its allocation is returned to the session in phase 4.
+
+        // Phase 3: model inference under model lock only.
         let result = {
-            let mut model = self
-                .model
-                .lock()
-                .map_err(|e| Error::Asr(format!("model lock: {e}")))?;
+            let mut model = self.model.lock().map_err(|e| lock_err("model lock", e))?;
 
             let start = std::time::Instant::now();
             let res = model.transcribe(features);
-            let elapsed = start.elapsed();
-            tracing::debug!(elapsed_ms = elapsed.as_millis(), "inference");
+            tracing::debug!(elapsed_ms = start.elapsed().as_millis(), "inference");
             res
         };
+
+        // Phase 4: re-acquire session lock to update tracker and reclaim snapshot buffer.
+        let mut sess = session.lock().map_err(|e| lock_err("session lock", e))?;
+
+        // Return the snapshot allocation so next cycle reuses it (zero-alloc steady state).
+        audio_snapshot.clear();
+        sess.audio_snapshot = audio_snapshot;
 
         match result {
             Ok(transcription) => {
                 let text = transcription.text.trim();
                 if !text.is_empty() {
-                    session.tracker.push_partial(
+                    sess.tracker.push_partial(
                         text.to_string(),
                         Some(timestamp_ms),
                         Some(transcription.confidence),
@@ -148,17 +192,16 @@ impl AsrBackend for ParakeetTdtBackend {
             }
         }
 
-        session.tracker.check_silence_finalization();
-        if session.tracker.is_empty() {
+        sess.tracker.check_silence_finalization();
+        // Avoid empty-Vec allocation on the common silence path.
+        if sess.tracker.is_empty() {
             return Ok(vec![]);
         }
-        Ok(session.tracker.drain())
+        Ok(sess.tracker.drain())
     }
 
     async fn reset_context(&self, session: &Self::SessionHandle) -> Result<()> {
-        let mut session = session
-            .lock()
-            .map_err(|e| Error::Asr(format!("session lock: {e}")))?;
+        let mut session = session.lock().map_err(|e| lock_err("session lock", e))?;
         session.audio_buffer.clear();
         session.samples_since_inference = 0;
         session.tracker.drain();
@@ -169,7 +212,7 @@ impl AsrBackend for ParakeetTdtBackend {
     async fn end_session(&self, session: Self::SessionHandle) -> Result<()> {
         let mut session = session
             .into_inner()
-            .map_err(|e| Error::Asr(format!("session lock: {e}")))?;
+            .map_err(|e| lock_err("session into_inner", e))?;
         session.tracker.finalize_all();
         tracing::info!(
             pending = session.tracker.len(),

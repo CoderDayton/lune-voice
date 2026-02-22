@@ -39,34 +39,47 @@ pub fn spawn_llm_worker(
     max_length_ratio: f32,
     min_length_ratio: f32,
 ) -> (mpsc::Sender<LlmRequest>, mpsc::Receiver<LlmResponse>) {
-    let (req_tx, mut req_rx) = mpsc::channel::<LlmRequest>(32);
-    let (resp_tx, resp_rx) = mpsc::channel::<LlmResponse>(32);
+    // Bump channel depths: bursty ASR can spike; 64 avoids back-pressure drops.
+    let (req_tx, mut req_rx) = mpsc::channel::<LlmRequest>(64);
+    let (resp_tx, resp_rx) = mpsc::channel::<LlmResponse>(64);
 
     tokio::task::spawn_local(async move {
-        while let Some(first) = req_rx.recv().await {
-            // Drain all queued requests into a batch (CognitivePipe pattern).
-            let mut batch = vec![first];
-            while let Ok(extra) = req_rx.try_recv() {
-                batch.push(extra);
-            }
+        // Reuse the batch vec across loop iterations to avoid per-loop allocations.
+        let mut batch: Vec<LlmRequest> = Vec::with_capacity(8);
 
-            // Combine text from all batched requests — compute total capacity upfront.
+        while let Some(first) = req_rx.recv().await {
+            batch.clear();
+            batch.push(first);
+
+            // Drain all already-queued requests (CognitivePipe batching).
+            // Use recv_many for a single lock acquisition over the channel internals.
+            // recv_many appends up to `limit` items; 31 keeps total ≤ 32.
+            let _ = req_rx.recv_many(&mut batch, 31).await;
+
+            // --- build combined_text with a single allocation ---
+            // Compute exact capacity: sum of text lengths + (n-1) spaces.
             let total_len: usize =
-                batch.iter().map(|r| r.text.len()).sum::<usize>() + batch.len().saturating_sub(1); // spaces between segments
+                batch.iter().map(|r| r.text.len()).sum::<usize>() + batch.len().saturating_sub(1);
             let mut combined_text = String::with_capacity(total_len);
+            let mut max_utterance_id: u64 = 0;
             for (i, r) in batch.iter().enumerate() {
                 if i > 0 {
                     combined_text.push(' ');
                 }
                 combined_text.push_str(&r.text);
+                if r.utterance_id > max_utterance_id {
+                    max_utterance_id = r.utterance_id;
+                }
             }
-            // combined_original is identical to combined_text at this point.
-            // Clone once here; move combined_text into PostProcessInput to avoid a second clone.
+
+            // Keep a byte-length snapshot before moving combined_text into the input;
+            // avoids re-computing it inside the hot ratio check.
+            let original_byte_len = combined_text.len();
+            // Clone before moving combined_text — needed for original_text in the
+            // response (always) and corrected_text when LLM correction fails.
             let combined_original = combined_text.clone();
 
-            // Use context from the last request, max utterance_id.
-            let last = batch.last().unwrap();
-            let max_utterance_id = batch.iter().map(|r| r.utterance_id).max().unwrap();
+            let last = batch.last().expect("batch non-empty");
 
             let input = PostProcessInput {
                 raw_text: combined_text, // moved — no extra clone
@@ -85,39 +98,43 @@ pub fn spawn_llm_worker(
                 );
             }
 
-            let (corrected, accepted) = match post_processor.transform(&input).await {
+            #[cold]
+            #[inline(never)]
+            fn warn_failed(e: &dyn std::fmt::Display) {
+                tracing::warn!(error = %e, "LLM correction failed");
+            }
+
+            let resp = match post_processor.transform(&input).await {
                 Ok(output) => {
-                    let ratio = if input.raw_text.is_empty() {
+                    let ratio = if original_byte_len == 0 {
                         f32::MAX
                     } else {
-                        output.cleaned_text.len() as f32 / input.raw_text.len() as f32
+                        output.cleaned_text.len() as f32 / original_byte_len as f32
                     };
-                    let ok = ratio >= min_length_ratio && ratio <= max_length_ratio;
-                    if !ok {
+                    let accepted = ratio >= min_length_ratio && ratio <= max_length_ratio;
+                    if !accepted {
                         tracing::debug!(
                             utterance_id = max_utterance_id,
                             ratio,
                             "LLM correction rejected (length sanity)"
                         );
                     }
-                    (output.cleaned_text, ok)
+                    LlmResponse {
+                        utterance_id: max_utterance_id,
+                        original_text: combined_original,
+                        corrected_text: output.cleaned_text,
+                        accepted,
+                    }
                 }
                 Err(e) => {
-                    #[cold]
-                    fn warn_failed(e: &dyn std::fmt::Display) {
-                        tracing::warn!(error = %e, "LLM correction failed");
-                    }
                     warn_failed(&e);
-                    // combined_text was moved into input; clone original for corrected.
-                    (combined_original.clone(), false)
+                    LlmResponse {
+                        utterance_id: max_utterance_id,
+                        corrected_text: combined_original.clone(),
+                        original_text: combined_original,
+                        accepted: false,
+                    }
                 }
-            };
-
-            let resp = LlmResponse {
-                utterance_id: max_utterance_id,
-                original_text: combined_original,
-                corrected_text: corrected,
-                accepted,
             };
 
             if resp_tx.send(resp).await.is_err() {

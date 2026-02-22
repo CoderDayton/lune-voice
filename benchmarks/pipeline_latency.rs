@@ -7,11 +7,9 @@
 //! Instead it directly exercises each stage in isolation and in sequence to
 //! produce accurate latency numbers.
 
-use std::sync::Mutex as StdMutex;
 use std::time::{Duration, Instant};
 
 use lune_asr::segment::SegmentTracker;
-use lune_core::asr::AsrSegment;
 
 fn main() {
     println!();
@@ -97,6 +95,7 @@ fn bench_inference_trigger() {
     ];
 
     for (threshold, label) in &thresholds {
+        #[allow(clippy::manual_div_ceil)]
         let frames_needed = (*threshold + frame_size - 1) / frame_size;
         let wait_ms = frames_needed as f64 * frame_ms;
 

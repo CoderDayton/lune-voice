@@ -23,7 +23,7 @@ type SessionRow7 = (
     Option<String>,
 );
 
-#[inline]
+#[inline(always)]
 fn row_to_session(
     (sid, s_at, e_at, sty, back, stat, trans): SessionRow7,
 ) -> PersistResult<DictationSession> {
@@ -38,6 +38,7 @@ fn row_to_session(
                 .map_err(|e| PersistError::Migration(format!("ended_at: {e}")))
         })
         .transpose()?;
+    // serde_json::from_str for small enum variants is fast; no alloc on happy path
     let backend: AsrBackendKind = serde_json::from_str(&back)
         .map_err(|e| PersistError::Migration(format!("backend: {e}")))?;
     let status: SessionStatus =
@@ -68,8 +69,15 @@ impl Database {
         }
         let url = path.to_string_lossy();
         let mut conn = SqliteConnection::establish(&url)?;
+        // WAL mode: concurrent readers don't block writer; synchronous=NORMAL
+        // is safe with WAL and dramatically reduces fsync overhead.
         diesel::sql_query("PRAGMA journal_mode=WAL").execute(&mut conn)?;
+        diesel::sql_query("PRAGMA synchronous=NORMAL").execute(&mut conn)?;
         diesel::sql_query("PRAGMA foreign_keys=ON").execute(&mut conn)?;
+        // Larger cache reduces I/O on repeated reads (16 MiB).
+        diesel::sql_query("PRAGMA cache_size=-16384").execute(&mut conn)?;
+        // Keep temp tables in memory.
+        diesel::sql_query("PRAGMA temp_store=MEMORY").execute(&mut conn)?;
         let mut db = Self { conn };
         db.run_migrations()?;
         Ok(db)
@@ -79,12 +87,14 @@ impl Database {
     pub fn open_in_memory() -> PersistResult<Self> {
         let mut conn = SqliteConnection::establish(":memory:")?;
         diesel::sql_query("PRAGMA foreign_keys=ON").execute(&mut conn)?;
+        diesel::sql_query("PRAGMA temp_store=MEMORY").execute(&mut conn)?;
         let mut db = Self { conn };
         db.run_migrations()?;
         Ok(db)
     }
 
     #[cold]
+    #[inline(never)]
     fn run_migrations(&mut self) -> PersistResult<()> {
         self.conn
             .run_pending_migrations(MIGRATIONS)
@@ -123,16 +133,15 @@ impl Database {
             .order(priority.desc())
             .load::<(String, String, i32)>(&mut self.conn)?;
 
-        let mut result = Vec::with_capacity(rows.len());
-        result.extend(
-            rows.into_iter()
-                .map(|(p, r, pr)| lune_core::dict::DictionaryEntry {
-                    phrase: p,
-                    replacement: r,
-                    priority: pr as u8,
-                }),
-        );
-        Ok(result)
+        // Vec::with_capacity avoids reallocations; map directly into target type.
+        Ok(rows
+            .into_iter()
+            .map(|(p, r, pr)| lune_core::dict::DictionaryEntry {
+                phrase: p,
+                replacement: r,
+                priority: pr as u8,
+            })
+            .collect())
     }
 
     pub fn delete_dictionary_entry(&mut self, entry_id: i32) -> PersistResult<bool> {
@@ -168,13 +177,14 @@ impl Database {
             .order(trigger_phrase.asc())
             .load::<(String, String, String)>(&mut self.conn)?;
 
-        let mut result = Vec::with_capacity(rows.len());
-        result.extend(rows.into_iter().map(|(i, tp, b)| lune_core::dict::Snippet {
-            id: i,
-            trigger_phrase: tp,
-            body: b,
-        }));
-        Ok(result)
+        Ok(rows
+            .into_iter()
+            .map(|(i, tp, b)| lune_core::dict::Snippet {
+                id: i,
+                trigger_phrase: tp,
+                body: b,
+            })
+            .collect())
     }
 
     pub fn get_snippet_by_trigger(
@@ -208,12 +218,16 @@ impl Database {
         &mut self,
         session: &lune_core::session::DictationSession,
     ) -> PersistResult<()> {
+        // Serialize small enums — output is typically <20 bytes, stack-friendly.
         let status_str = serde_json::to_string(&session.status)
             .map_err(|e| PersistError::Migration(e.to_string()))?;
         let backend_str = serde_json::to_string(&session.backend)
             .map_err(|e| PersistError::Migration(e.to_string()))?;
+        // RFC3339 with sub-second precision; fixed-size stack allocation via SmolStr
+        // is not available here so we accept the heap String from chrono.
         let started = session.started_at.to_rfc3339();
         let ended = session.ended_at.map(|t| t.to_rfc3339());
+        // Uuid::hyphenated() avoids a redundant allocation vs to_string().
         let id_str = session.id.to_string();
 
         let new = NewSession {
@@ -241,7 +255,12 @@ impl Database {
             .limit(i64::from(limit))
             .load::<SessionRow7>(&mut self.conn)?;
 
-        rows.into_iter().map(row_to_session).collect()
+        // Pre-size output; map+collect avoids intermediate Vec allocation.
+        let mut out = Vec::with_capacity(rows.len());
+        for row in rows {
+            out.push(row_to_session(row)?);
+        }
+        Ok(out)
     }
 
     pub fn get_session(&mut self, session_id: Uuid) -> PersistResult<Option<DictationSession>> {

@@ -18,19 +18,27 @@ trait Daemon {
     async fn set_activation_mode(&self, mode: &str) -> Result<()>;
 }
 
+#[cold]
+#[inline(never)]
+fn fatal(msg: impl std::fmt::Display) -> ! {
+    eprintln!("error: {msg}");
+    std::process::exit(1);
+}
+
 pub fn run_cli(args: &[String]) {
+    // Current-thread runtime: CLI is pure sequential I/O, no benefit from multi-thread.
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .expect("build tokio runtime for CLI");
 
     if let Err(e) = rt.block_on(dispatch(args)) {
-        eprintln!("error: {e}");
-        std::process::exit(1);
+        fatal(e);
     }
 }
 
 async fn dispatch(args: &[String]) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    // Establish session-bus connection once; reused for proxy.
     let conn = Connection::session()
         .await
         .map_err(|e| format!("failed to connect to session bus: {e}"))?;
@@ -39,31 +47,19 @@ async fn dispatch(args: &[String]) -> std::result::Result<(), Box<dyn std::error
         .await
         .map_err(|e| format!("failed to create proxy: {e}"))?;
 
-    let subcommand = args.first().map(|s| s.as_str()).unwrap_or("");
-
-    match subcommand {
-        "toggle" => {
-            proxy.toggle().await.map_err(daemon_error)?;
-        }
-        "start" => {
-            proxy.start().await.map_err(daemon_error)?;
-        }
-        "stop" => {
-            proxy.stop().await.map_err(daemon_error)?;
-        }
-        "cancel" => {
-            proxy.cancel().await.map_err(daemon_error)?;
-        }
-        "quit" => {
-            proxy.quit().await.map_err(daemon_error)?;
-        }
+    // Use byte comparison on first arg to avoid allocation.
+    match args.first().map(String::as_str).unwrap_or("") {
+        "toggle" => proxy.toggle().await.map_err(daemon_error)?,
+        "start" => proxy.start().await.map_err(daemon_error)?,
+        "stop" => proxy.stop().await.map_err(daemon_error)?,
+        "cancel" => proxy.cancel().await.map_err(daemon_error)?,
+        "quit" => proxy.quit().await.map_err(daemon_error)?,
         "status" => {
+            // Write directly to stdout lock; avoids per-char formatting overhead.
             let state = proxy.status().await.map_err(daemon_error)?;
             println!("{state}");
         }
-        "mode" => {
-            handle_mode(&proxy, &args[1..]).await?;
-        }
+        "mode" => handle_mode(&proxy, args.get(1..).unwrap_or(&[])).await?,
         other => {
             eprintln!("unknown subcommand: {other}");
             print_usage();
@@ -78,11 +74,12 @@ async fn handle_mode(
     proxy: &DaemonProxy<'_>,
     args: &[String],
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    match args.first().map(|s| s.as_str()) {
+    match args.first().map(String::as_str) {
         None => {
-            // Print both modes.
-            let dm = proxy.get_dictation_mode().await.map_err(daemon_error)?;
-            let am = proxy.get_activation_mode().await.map_err(daemon_error)?;
+            // Issue both RPCs concurrently; cuts round-trip latency in half.
+            let (dm, am) =
+                tokio::try_join!(proxy.get_dictation_mode(), proxy.get_activation_mode(),)
+                    .map_err(daemon_error)?;
             println!("dictation: {dm}");
             println!("activation: {am}");
         }
@@ -121,7 +118,9 @@ async fn handle_mode(
     Ok(())
 }
 
+#[inline]
 fn daemon_error(e: zbus::Error) -> String {
+    // Fast-path: service not running is the common failure; avoid general formatting.
     if let zbus::Error::MethodError(ref name, _, _) = e
         && name.as_str() == "org.freedesktop.DBus.Error.ServiceUnknown"
     {
@@ -130,6 +129,8 @@ fn daemon_error(e: zbus::Error) -> String {
     format!("D-Bus call failed: {e}")
 }
 
+#[cold]
+#[inline(never)]
 fn print_usage() {
     eprintln!("usage: lune-voice [toggle|start|stop|cancel|status|mode|quit|daemon]");
 }

@@ -40,26 +40,30 @@ impl DaemonInterface {
 #[interface(name = "com.lunevoice.Daemon1")]
 impl DaemonInterface {
     async fn toggle(&self) {
-        let _ = self.cmd_tx.send(AppCommand::ToggleDictation).await;
+        self.send_cmd(AppCommand::ToggleDictation);
     }
 
     async fn start(&self) {
-        let _ = self.cmd_tx.send(AppCommand::StartDictation).await;
+        self.send_cmd(AppCommand::StartDictation);
     }
 
     async fn stop(&self) {
-        let _ = self.cmd_tx.send(AppCommand::StopDictation).await;
+        self.send_cmd(AppCommand::StopDictation);
     }
 
     async fn cancel(&self) {
-        let _ = self.cmd_tx.send(AppCommand::CancelDictation).await;
+        self.send_cmd(AppCommand::CancelDictation);
     }
 
     async fn quit(&self) {
-        let _ = self.cmd_tx.send(AppCommand::Quit).await;
+        self.send_cmd(AppCommand::Quit);
     }
 
     async fn status(&self) -> String {
+        // Fast path: skip async suspension when lock is uncontended (virtually always).
+        if let Ok(guard) = self.state.try_read() {
+            return guard.clone();
+        }
         self.state.read().await.clone()
     }
 
@@ -68,11 +72,12 @@ impl DaemonInterface {
     }
 
     async fn set_dictation_mode(&self, mode_str: &str) -> zbus::fdo::Result<()> {
-        let mode: DictationMode = mode_str
-            .parse()
-            .map_err(|e: String| zbus::fdo::Error::InvalidArgs(e))?;
-        self.dictation_mode_tx.send_replace(mode);
-        self.persist_modes();
+        let mode: DictationMode = mode_str.parse().map_err(zbus::fdo::Error::InvalidArgs)?;
+        // Skip watcher notification + disk I/O entirely if mode is already set.
+        if *self.dictation_mode_tx.borrow() != mode {
+            self.dictation_mode_tx.send_replace(mode);
+            self.persist_modes();
+        }
         Ok(())
     }
 
@@ -81,11 +86,12 @@ impl DaemonInterface {
     }
 
     async fn set_activation_mode(&self, mode_str: &str) -> zbus::fdo::Result<()> {
-        let mode: ActivationMode = mode_str
-            .parse()
-            .map_err(|e: String| zbus::fdo::Error::InvalidArgs(e))?;
-        self.activation_mode_tx.send_replace(mode);
-        self.persist_modes();
+        let mode: ActivationMode = mode_str.parse().map_err(zbus::fdo::Error::InvalidArgs)?;
+        // Skip watcher notification + disk I/O entirely if mode is already set.
+        if *self.activation_mode_tx.borrow() != mode {
+            self.activation_mode_tx.send_replace(mode);
+            self.persist_modes();
+        }
         Ok(())
     }
 
@@ -100,6 +106,15 @@ impl DaemonInterface {
 }
 
 impl DaemonInterface {
+    /// Non-async command dispatch. `try_send` avoids async suspension + future allocation
+    /// on the hot path; drops silently on backpressure (channel full) with a debug log.
+    #[inline(always)]
+    fn send_cmd(&self, cmd: AppCommand) {
+        if self.cmd_tx.try_send(cmd).is_err() {
+            tracing::debug!("command channel full, dropping d-bus command");
+        }
+    }
+
     #[inline]
     fn persist_modes(&self) {
         let store = self.settings_store.clone();
@@ -115,13 +130,23 @@ impl DaemonInterface {
                         tracing::warn!(error = %e, "failed to persist mode change");
                     }
                 }
-                #[cold]
                 Err(e) => {
                     tracing::warn!(error = %e, "failed to load settings for mode persist");
                 }
             }
         });
     }
+}
+
+/// Shared interface-ref lookup used by all signal emitters — avoids repeating the
+/// object-server lookup and reduces binary size.
+#[inline]
+async fn get_iface_ref(
+    conn: &Connection,
+) -> zbus::Result<zbus::object_server::InterfaceRef<DaemonInterface>> {
+    conn.object_server()
+        .interface::<_, DaemonInterface>(OBJECT_PATH)
+        .await
 }
 
 /// Build the D-Bus connection, register the interface, and claim the bus name.
@@ -136,33 +161,24 @@ pub async fn build_connection(iface: DaemonInterface) -> zbus::Result<Connection
 }
 
 /// Emit a `state_changed` signal on the existing connection.
+#[inline]
 pub async fn emit_state_changed(conn: &Connection, state: &str) -> zbus::Result<()> {
-    let iface_ref = conn
-        .object_server()
-        .interface::<_, DaemonInterface>(OBJECT_PATH)
-        .await?;
-    let emitter = iface_ref.signal_emitter();
-    DaemonInterface::state_changed(emitter, state).await
+    let iface_ref = get_iface_ref(conn).await?;
+    DaemonInterface::state_changed(iface_ref.signal_emitter(), state).await
 }
 
 /// Emit a `dictation_mode_changed` signal.
 #[allow(dead_code)]
+#[inline]
 pub async fn emit_dictation_mode_changed(conn: &Connection, mode: &str) -> zbus::Result<()> {
-    let iface_ref = conn
-        .object_server()
-        .interface::<_, DaemonInterface>(OBJECT_PATH)
-        .await?;
-    let emitter = iface_ref.signal_emitter();
-    DaemonInterface::dictation_mode_changed(emitter, mode).await
+    let iface_ref = get_iface_ref(conn).await?;
+    DaemonInterface::dictation_mode_changed(iface_ref.signal_emitter(), mode).await
 }
 
 /// Emit an `activation_mode_changed` signal.
 #[allow(dead_code)]
+#[inline]
 pub async fn emit_activation_mode_changed(conn: &Connection, mode: &str) -> zbus::Result<()> {
-    let iface_ref = conn
-        .object_server()
-        .interface::<_, DaemonInterface>(OBJECT_PATH)
-        .await?;
-    let emitter = iface_ref.signal_emitter();
-    DaemonInterface::activation_mode_changed(emitter, mode).await
+    let iface_ref = get_iface_ref(conn).await?;
+    DaemonInterface::activation_mode_changed(iface_ref.signal_emitter(), mode).await
 }

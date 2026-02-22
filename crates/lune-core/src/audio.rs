@@ -11,6 +11,35 @@ pub struct AudioFrame {
     pub sample_rate: u32,
 }
 
+impl AudioFrame {
+    /// Compute RMS energy inline — avoids allocations, SIMD-friendly reduction.
+    #[inline(always)]
+    pub fn rms(&self) -> f32 {
+        let n = self.samples.len();
+        if n == 0 {
+            return 0.0;
+        }
+        // Manual reduction keeps LLVM auto-vectorizer happy on f32 slices.
+        let sum_sq: f32 = self.samples.iter().map(|&s| s * s).sum();
+        (sum_sq / n as f32).sqrt()
+    }
+
+    /// Returns true if the frame exceeds the given RMS threshold — zero-alloc VAD fast path.
+    #[inline(always)]
+    pub fn exceeds_energy(&self, threshold: f32) -> bool {
+        // Early-exit: sum squared samples until we exceed threshold² * n.
+        let limit = threshold * threshold * self.samples.len() as f32;
+        let mut acc = 0.0f32;
+        for &s in &self.samples {
+            acc += s * s;
+            if acc >= limit {
+                return true;
+            }
+        }
+        false
+    }
+}
+
 /// Configuration for audio capture.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioCaptureConfig {
@@ -60,5 +89,59 @@ mod tests {
             sample_rate: 16000,
         };
         assert_eq!(frame.samples.len(), 480);
+    }
+
+    #[test]
+    fn rms_silent_frame() {
+        let frame = AudioFrame {
+            samples: vec![0.0; 480],
+            timestamp_ms: 0,
+            sample_rate: 16000,
+        };
+        assert_eq!(frame.rms(), 0.0);
+    }
+
+    #[test]
+    fn rms_constant_frame() {
+        let frame = AudioFrame {
+            samples: vec![1.0; 100],
+            timestamp_ms: 0,
+            sample_rate: 16000,
+        };
+        assert!((frame.rms() - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn exceeds_energy_early_exit() {
+        // Frame with one loud spike — should short-circuit.
+        let mut samples = vec![0.0f32; 480];
+        samples[0] = 1.0;
+        let frame = AudioFrame {
+            samples,
+            timestamp_ms: 0,
+            sample_rate: 16000,
+        };
+        assert!(frame.exceeds_energy(0.01));
+    }
+
+    #[test]
+    fn exceeds_energy_silent() {
+        let frame = AudioFrame {
+            samples: vec![0.0; 480],
+            timestamp_ms: 0,
+            sample_rate: 16000,
+        };
+        assert!(!frame.exceeds_energy(0.01));
+    }
+
+    #[test]
+    fn rms_empty_frame() {
+        let frame = AudioFrame {
+            samples: vec![],
+            timestamp_ms: 0,
+            sample_rate: 16000,
+        };
+        assert_eq!(frame.rms(), 0.0);
+        assert!(!frame.exceeds_energy(0.01));
     }
 }
