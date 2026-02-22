@@ -23,15 +23,16 @@ fn main() {
     let first_str = first.as_deref().and_then(|s| s.to_str());
 
     match first_str {
-        Some("toggle" | "start" | "stop" | "cancel" | "status" | "quit" | "mode") => {
-            // Reconstruct &[String] cheaply — only CLI path does allocation
+        Some("toggle" | "start" | "stop" | "cancel" | "status" | "quit" | "mode" | "settings") => {
             let collected: Vec<String> = std::env::args().skip(1).collect();
             cli::run_cli(&collected);
         }
         Some("daemon") | None => run_daemon(),
         Some(other) => {
             eprintln!("unknown subcommand: {other}");
-            eprintln!("usage: lune-voice [toggle|start|stop|cancel|status|mode|quit|daemon]");
+            eprintln!(
+                "usage: lune-voice [toggle|start|stop|cancel|status|mode|settings|quit|daemon]"
+            );
             std::process::exit(1);
         }
     }
@@ -105,9 +106,12 @@ fn run_daemon() {
     let (dictation_mode_tx, dictation_mode_rx) = watch::channel(settings.dictation_mode);
     let (activation_mode_tx, activation_mode_rx) = watch::channel(settings.activation_mode);
 
+    let settings = Arc::new(RwLock::new(settings));
+
     let dbus_iface = dbus::DaemonInterface::new(
         cmd_tx,
         Arc::clone(&shared_state),
+        Arc::clone(&settings),
         dictation_mode_tx,
         activation_mode_tx,
         Arc::clone(&settings_store),
@@ -138,7 +142,7 @@ fn run_daemon() {
 }
 
 async fn run_pipeline(
-    settings: lune_core::config::UserSettings,
+    settings: Arc<RwLock<lune_core::config::UserSettings>>,
     db_path: std::path::PathBuf,
     mut cmd_rx: mpsc::Receiver<AppCommand>,
     shared_state: Arc<RwLock<String>>,
@@ -146,10 +150,13 @@ async fn run_pipeline(
     dictation_mode_rx: watch::Receiver<DictationMode>,
     _activation_mode_rx: watch::Receiver<lune_core::config::ActivationMode>,
 ) {
+    // Snapshot settings for backend construction (model loading is one-time).
+    let snap = settings.read().await.clone();
+
     // ── Build pipeline components ────────────────────────────────────────
 
     tracing::info!("building ASR backend...");
-    let asr = match factory::build_asr_backend(&settings) {
+    let asr = match factory::build_asr_backend(&snap) {
         Ok(a) => a,
         Err(e) => {
             tracing::error!(error = %e, "failed to build ASR backend");
@@ -158,7 +165,7 @@ async fn run_pipeline(
     };
 
     tracing::info!("ASR backend ready, building LLM post-processor...");
-    let post_processor = match factory::build_post_processor(&settings) {
+    let post_processor = match factory::build_post_processor(&snap) {
         Ok(p) => p,
         Err(e) => {
             tracing::error!(error = %e, "failed to build LLM post-processor");
@@ -167,24 +174,23 @@ async fn run_pipeline(
     };
 
     tracing::info!("LLM post-processor ready");
-    let audio =
-        lune_audio::AudioCaptureService::new(lune_core::audio::AudioCaptureConfig::default());
-    let router = lune_commands::VoiceCommandRouter::new();
+    let audio = Arc::new(lune_audio::AudioCaptureService::new(
+        lune_core::audio::AudioCaptureConfig::default(),
+    ));
+    let router = Arc::new(lune_commands::VoiceCommandRouter::new());
 
     tracing::info!("opening database...");
     factory::ensure_db_path(&db_path).expect("ensure DB path");
-    let db = lune_persist::Database::open(&db_path).expect("open database");
+    let db = Arc::new(tokio::sync::Mutex::new(
+        lune_persist::Database::open(&db_path).expect("open database"),
+    ));
 
     let dict_db = lune_persist::Database::open_in_memory().expect("open dict database");
-    let dict = lune_dict::DictionaryManager::new(dict_db).expect("init dictionary");
+    let dict = Arc::new(tokio::sync::Mutex::new(
+        lune_dict::DictionaryManager::new(dict_db).expect("init dictionary"),
+    ));
 
-    let style_preset = lune_core::config::StylePreset::all_builtin()
-        .iter()
-        .find(|p| p.id == settings.default_style)
-        .cloned()
-        .unwrap_or_else(lune_core::config::StylePreset::general);
-
-    let asr_backend_kind = match settings.asr_backend {
+    let asr_backend_kind = match snap.asr_backend {
         lune_core::config::AsrBackendConfig::OpenAiCompatible { .. } => {
             lune_core::asr::AsrBackendKind::OpenAiCompatible
         }
@@ -192,20 +198,26 @@ async fn run_pipeline(
     };
 
     let config = SessionManagerConfig {
-        style_preset,
         asr_backend_kind,
         ..Default::default()
     };
 
-    let manager = SessionManager::new(audio, asr, router, post_processor, dict, db, config);
+    let manager = SessionManager::new(
+        audio,
+        Arc::new(asr),
+        router,
+        post_processor,
+        dict,
+        db,
+        config,
+        Arc::clone(&settings),
+    );
 
     let delivery_service = delivery::DeliveryService::new();
 
     tracing::info!("pipeline ready, waiting for commands");
 
     // ── Command loop ─────────────────────────────────────────────────────
-    // Cache delivery_service clone outside loop; session_id lock acquired once
-    // per toggle to avoid double-locking.
 
     loop {
         let Some(cmd) = cmd_rx.recv().await else {
@@ -216,7 +228,6 @@ async fn run_pipeline(
 
         match cmd {
             AppCommand::ToggleDictation => {
-                // Single lock acquisition for toggle decision
                 if manager.active_session_id().await.is_some() {
                     stop_dictation(&manager, &shared_state, dbus_conn).await;
                 } else {

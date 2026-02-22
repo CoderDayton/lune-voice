@@ -209,6 +209,8 @@ impl TextPostProcessor for OpenAiLlmBackend {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
+
     use lune_core::config::StylePreset;
     use lune_core::dict::DictionaryEntry;
 
@@ -216,7 +218,7 @@ mod tests {
         PostProcessInput {
             raw_text: raw_text.into(),
             prev_context: None,
-            style_preset: StylePreset::general(),
+            style_preset: Arc::new(StylePreset::general()),
             app_category: None,
             dictionary: vec![],
         }
@@ -227,12 +229,12 @@ mod tests {
         let input = test_input("hello um world");
         let msgs = build_messages(&input);
 
-        // system + 2 few-shot pairs (4 msgs) + 1 final user = 6
-        assert_eq!(msgs.len(), 6);
+        // system + 3 few-shot pairs (6 msgs) + 1 final user = 8
+        assert_eq!(msgs.len(), 8);
 
         let json = serde_json::to_string(&msgs).unwrap();
         assert!(json.contains("hello um world"));
-        assert!(json.contains("text post-processor"));
+        assert!(json.contains("speech-to-text polisher"));
     }
 
     #[test]
@@ -268,8 +270,15 @@ mod tests {
     #[test]
     fn build_messages_no_raw_text_placeholder() {
         // Template without {raw_text} — should not panic, just clone template.
-        let mut input = test_input("hello");
-        input.style_preset.user_prompt_template = "fixed prompt".into();
+        let mut preset = StylePreset::general();
+        preset.user_prompt_template = "fixed prompt".into();
+        let input = PostProcessInput {
+            raw_text: "hello".into(),
+            prev_context: None,
+            style_preset: Arc::new(preset),
+            app_category: None,
+            dictionary: vec![],
+        };
         let msgs = build_messages(&input);
         let json = serde_json::to_string(&msgs).unwrap();
         assert!(json.contains("fixed prompt"));

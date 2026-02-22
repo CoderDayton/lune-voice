@@ -15,7 +15,7 @@ use lune_core::llm::{PostProcessInput, PostProcessOutput, TextPostProcessor};
 use lune_core::session::SessionEvent;
 use lune_dict::DictionaryManager;
 use lune_persist::Database;
-use tokio::sync::mpsc;
+use tokio::sync::{Mutex, RwLock, mpsc};
 
 // ── Test stubs ───────────────────────────────────────────────────────────────
 
@@ -56,15 +56,17 @@ fn make_manager() -> SessionManager<NoopAsr> {
     let dict_db = Database::open_in_memory().unwrap();
     let dict = DictionaryManager::new(dict_db).unwrap();
     let audio = AudioCaptureService::new(AudioCaptureConfig::default());
+    let settings = Arc::new(RwLock::new(lune_core::config::UserSettings::default()));
 
     SessionManager::new(
-        audio,
-        NoopAsr,
-        VoiceCommandRouter::new(),
+        Arc::new(audio),
+        Arc::new(NoopAsr),
+        Arc::new(VoiceCommandRouter::new()),
         Arc::new(EchoPostProcessor),
-        dict,
-        db,
+        Arc::new(Mutex::new(dict)),
+        Arc::new(Mutex::new(db)),
         SessionManagerConfig::default(),
+        settings,
     )
 }
 

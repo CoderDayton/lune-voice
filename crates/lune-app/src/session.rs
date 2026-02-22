@@ -9,8 +9,10 @@ use uuid::Uuid;
 use lune_audio::AudioCaptureService;
 use lune_commands::VoiceCommandRouter;
 use lune_core::Result;
+use tokio::sync::RwLock;
+
 use lune_core::asr::{AsrBackend, AsrBackendKind, AsrSessionConfig};
-use lune_core::config::StylePreset;
+use lune_core::config::{StylePreset, UserSettings, builtin_registry};
 use lune_core::error::Error;
 use lune_core::llm::TextPostProcessor;
 use lune_core::session::{DictationSession, SessionEvent, SessionStatus};
@@ -27,7 +29,6 @@ pub struct SessionManagerConfig {
     /// Silence window before finalizing an utterance (default 500 ms).
     pub silence_timeout: Duration,
     pub asr_config: AsrSessionConfig,
-    pub style_preset: StylePreset,
     pub asr_backend_kind: AsrBackendKind,
     pub confidence_config: ConfidenceRouterConfig,
 }
@@ -37,7 +38,6 @@ impl Default for SessionManagerConfig {
         Self {
             silence_timeout: Duration::from_millis(800),
             asr_config: AsrSessionConfig::default(),
-            style_preset: StylePreset::general(),
             asr_backend_kind: AsrBackendKind::ParakeetTdt,
             confidence_config: ConfidenceRouterConfig::default(),
         }
@@ -62,28 +62,32 @@ pub struct SessionManager<A: AsrBackend> {
     dict: Arc<Mutex<DictionaryManager>>,
     persist: Arc<Mutex<Database>>,
     config: SessionManagerConfig,
+    settings: Arc<RwLock<UserSettings>>,
     active: Arc<Mutex<Option<ActiveHandle>>>,
 }
 
 // SessionManager does not require A: Send because spawn_local is used.
 impl<A: AsrBackend + 'static> SessionManager<A> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
-        audio: AudioCaptureService,
-        asr: A,
-        router: VoiceCommandRouter,
+        audio: Arc<AudioCaptureService>,
+        asr: Arc<A>,
+        router: Arc<VoiceCommandRouter>,
         post_processor: Arc<dyn TextPostProcessor>,
-        dict: DictionaryManager,
-        persist: Database,
+        dict: Arc<Mutex<DictionaryManager>>,
+        persist: Arc<Mutex<Database>>,
         config: SessionManagerConfig,
+        settings: Arc<RwLock<UserSettings>>,
     ) -> Self {
         Self {
-            audio: Arc::new(audio),
-            asr: Arc::new(asr),
-            router: Arc::new(router),
+            audio,
+            asr,
+            router,
             post_processor,
-            dict: Arc::new(Mutex::new(dict)),
-            persist: Arc::new(Mutex::new(persist)),
+            dict,
+            persist,
             config,
+            settings,
             active: Arc::new(Mutex::new(None)),
         }
     }
@@ -101,13 +105,23 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let session_id = Uuid::new_v4();
         let (stop_tx, stop_rx) = oneshot::channel();
 
+        // Resolve style from current settings (reads latest value each session).
+        let current_style_id = self.settings.read().await.default_style.clone();
+        let style_preset = builtin_registry()
+            .get(&current_style_id)
+            .unwrap_or_else(|| {
+                builtin_registry()
+                    .get("general")
+                    .expect("builtin 'general' preset must exist")
+            });
+
         // Persist the initial session record.
         {
             let session = DictationSession {
                 id: session_id,
                 started_at: Utc::now(),
                 ended_at: None,
-                style: self.config.style_preset.id.clone(),
+                style: style_preset.id.clone(),
                 backend: self.config.asr_backend_kind,
                 status: SessionStatus::Active,
                 transcript: None,
@@ -137,6 +151,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             dict,
             persist,
             config,
+            style_preset,
             event_tx,
             stop_rx,
             active_arc,
@@ -189,13 +204,13 @@ async fn run_session<A: AsrBackend + 'static>(
     dict: Arc<Mutex<DictionaryManager>>,
     persist: Arc<Mutex<Database>>,
     config: SessionManagerConfig,
+    style_preset: Arc<StylePreset>,
     event_tx: mpsc::Sender<SessionEvent>,
     mut stop_rx: oneshot::Receiver<()>,
     active_arc: Arc<Mutex<Option<ActiveHandle>>>,
 ) {
     let mut status = SessionStatus::Completed;
     let silence_timeout = config.silence_timeout;
-    let style_preset = config.style_preset.clone();
 
     // ── Confidence router + LLM worker ────────────────────────────────────
     let mut confidence_router = ConfidenceRouter::new(config.confidence_config.clone());
@@ -339,7 +354,7 @@ async fn run_session<A: AsrBackend + 'static>(
                                         utterance_id: utterance_counter,
                                         text: text.clone(),
                                         context: confidence_router.context(),
-                                        style_preset: style_preset.clone(),
+                                        style_preset: Arc::clone(&style_preset),
                                         dictionary: relevant,
                                     };
                                     if let Err(e) = llm_tx.send(req).await {
@@ -378,7 +393,7 @@ async fn run_session<A: AsrBackend + 'static>(
                                         utterance_id: utterance_counter,
                                         text: text.clone(),
                                         context: confidence_router.context(),
-                                        style_preset: style_preset.clone(),
+                                        style_preset: Arc::clone(&style_preset),
                                         dictionary: relevant,
                                     };
                                     if let Err(e) = llm_tx.send(req).await {
@@ -512,7 +527,7 @@ async fn run_session<A: AsrBackend + 'static>(
             utterance_id: utterance_counter,
             text: remaining.clone(),
             context: confidence_router.context(),
-            style_preset: style_preset.clone(),
+            style_preset: Arc::clone(&style_preset),
             dictionary: relevant,
         };
         if let Err(e) = llm_tx.send(req).await {
@@ -544,7 +559,7 @@ async fn run_session<A: AsrBackend + 'static>(
             utterance_id: utterance_counter,
             text: after_dict.clone(),
             context: confidence_router.context(),
-            style_preset: style_preset.clone(),
+            style_preset: Arc::clone(&style_preset),
             dictionary: relevant,
         };
         if let Err(e) = llm_tx.send(req).await {
@@ -680,15 +695,17 @@ mod tests {
             lune_dict::DictionaryManager::new(lune_persist::Database::open_in_memory().unwrap())
                 .unwrap();
         let audio_config = lune_core::audio::AudioCaptureConfig::default();
+        let settings = Arc::new(RwLock::new(lune_core::config::UserSettings::default()));
 
         SessionManager::new(
-            AudioCaptureService::new(audio_config),
-            NoopAsr,
-            VoiceCommandRouter::new(),
+            Arc::new(AudioCaptureService::new(audio_config)),
+            Arc::new(NoopAsr),
+            Arc::new(VoiceCommandRouter::new()),
             Arc::new(EchoPostProcessor),
-            dict,
-            db,
+            Arc::new(Mutex::new(dict)),
+            Arc::new(Mutex::new(db)),
             SessionManagerConfig::default(),
+            settings,
         )
     }
 

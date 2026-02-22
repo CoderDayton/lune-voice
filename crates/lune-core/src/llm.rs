@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 
 use crate::Result;
@@ -5,12 +7,12 @@ use crate::config::StylePreset;
 use crate::dict::DictionaryEntry;
 
 /// Input to the text post-processor.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct PostProcessInput {
     pub raw_text: String,
     /// Preceding text for context.
     pub prev_context: Option<String>,
-    pub style_preset: StylePreset,
+    pub style_preset: Arc<StylePreset>,
     /// Target application category hint.
     pub app_category: Option<AppCategory>,
     pub dictionary: Vec<DictionaryEntry>,
@@ -52,18 +54,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn post_process_input_round_trip() {
+    fn post_process_input_fields() {
         let input = PostProcessInput {
             raw_text: "hello um world".into(),
             prev_context: None,
-            style_preset: StylePreset::general(),
+            style_preset: Arc::new(StylePreset::general()),
             app_category: Some(AppCategory::Email),
             dictionary: vec![],
         };
-        let json = serde_json::to_string(&input).unwrap();
-        let parsed: PostProcessInput = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed.raw_text, "hello um world");
-        assert_eq!(parsed.app_category, Some(AppCategory::Email));
+        assert_eq!(input.raw_text, "hello um world");
+        assert_eq!(input.app_category, Some(AppCategory::Email));
+        assert_eq!(input.style_preset.id, "general");
     }
 
     #[test]

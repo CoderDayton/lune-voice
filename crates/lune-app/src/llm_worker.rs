@@ -18,7 +18,7 @@ pub struct LlmRequest {
     pub utterance_id: u64,
     pub text: String,
     pub context: Option<String>,
-    pub style_preset: StylePreset,
+    pub style_preset: Arc<StylePreset>,
     pub dictionary: Vec<DictionaryEntry>,
 }
 
@@ -85,7 +85,7 @@ pub fn spawn_llm_worker(
             let input = PostProcessInput {
                 raw_text: combined_text, // moved — no extra clone
                 prev_context: last.context.clone(),
-                style_preset: last.style_preset.clone(),
+                style_preset: Arc::clone(&last.style_preset),
                 app_category: None,
                 dictionary: last.dictionary.clone(),
             };

@@ -159,6 +159,8 @@ pub fn strip_thinking(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
+
     use lune_core::config::StylePreset;
     use lune_core::dict::DictionaryEntry;
 
@@ -167,7 +169,7 @@ mod tests {
         let input = PostProcessInput {
             raw_text: "hello um world".into(),
             prev_context: None,
-            style_preset: StylePreset::general(),
+            style_preset: Arc::new(StylePreset::general()),
             app_category: None,
             dictionary: vec![],
         };
@@ -183,7 +185,7 @@ mod tests {
         let input = PostProcessInput {
             raw_text: "use the lunevoice api".into(),
             prev_context: None,
-            style_preset: StylePreset::general(),
+            style_preset: Arc::new(StylePreset::general()),
             app_category: None,
             dictionary: vec![DictionaryEntry {
                 phrase: "lunevoice".into(),
@@ -201,14 +203,14 @@ mod tests {
         let input = PostProcessInput {
             raw_text: "test".into(),
             prev_context: None,
-            style_preset: StylePreset::general(),
+            style_preset: Arc::new(StylePreset::general()),
             app_category: None,
             dictionary: vec![],
         };
         let prompt = build_chatml(&input);
-        // General preset has 2 few-shot pairs.
-        assert!(prompt.contains("so um I was thinking"));
-        assert!(prompt.contains("I was thinking that we should go to the store."));
+        // General preset has 3 few-shot pairs.
+        assert!(prompt.contains("so um I'm gonna go to the store"));
+        assert!(prompt.contains("I'm gonna go to the store and buy some more flour for the cake"));
     }
 
     #[test]
