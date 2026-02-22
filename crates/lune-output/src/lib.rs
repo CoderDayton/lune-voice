@@ -47,14 +47,16 @@ impl TextOutputController {
         }
         let action = self.compute_action(&self.last_partial.clone(), &text);
         self.last_partial = text.clone();
-        self.send_event(SessionEvent::PartialText(text), &action).await;
+        self.send_event(SessionEvent::PartialText(text), &action)
+            .await;
     }
 
     /// Emit finalized text.  Always sent regardless of mode.
     pub async fn emit_final(&mut self, text: String) {
         let action = self.compute_action(&self.last_partial.clone(), &text);
         self.last_partial.clear();
-        self.send_event(SessionEvent::FinalizedText(text), &action).await;
+        self.send_event(SessionEvent::FinalizedText(text), &action)
+            .await;
     }
 
     /// Clear in-progress state (e.g., on cancel).
@@ -74,9 +76,15 @@ impl TextOutputController {
             OutputAction::ReplaceAll(new.to_owned())
         } else if backspaces == 0 {
             // Pure append.
-            OutputAction::DeleteThenType { delete_count: 0, insert: suffix.to_owned() }
+            OutputAction::DeleteThenType {
+                delete_count: 0,
+                insert: suffix.to_owned(),
+            }
         } else {
-            OutputAction::DeleteThenType { delete_count: backspaces, insert: suffix.to_owned() }
+            OutputAction::DeleteThenType {
+                delete_count: backspaces,
+                insert: suffix.to_owned(),
+            }
         }
     }
 

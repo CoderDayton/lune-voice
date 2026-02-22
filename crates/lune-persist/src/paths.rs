@@ -58,7 +58,10 @@ mod tests {
     #[test]
     fn paths_from_dirs() {
         let paths = AppPaths::from_dirs("/tmp/config", "/tmp/data");
-        assert_eq!(paths.settings_file(), Path::new("/tmp/config/settings.toml"));
+        assert_eq!(
+            paths.settings_file(),
+            Path::new("/tmp/config/settings.toml")
+        );
         assert_eq!(paths.database_file(), Path::new("/tmp/data/lune.db"));
     }
 

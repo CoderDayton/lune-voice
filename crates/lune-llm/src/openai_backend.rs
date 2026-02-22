@@ -1,13 +1,11 @@
 use async_openai::{
+    Client,
     config::OpenAIConfig,
     types::chat::{
-        ChatCompletionRequestAssistantMessageArgs,
-        ChatCompletionRequestMessage,
-        ChatCompletionRequestSystemMessageArgs,
-        ChatCompletionRequestUserMessageArgs,
+        ChatCompletionRequestAssistantMessageArgs, ChatCompletionRequestMessage,
+        ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs,
         CreateChatCompletionRequestArgs,
     },
-    Client,
 };
 
 use lune_core::llm::{PostProcessInput, PostProcessOutput, TextPostProcessor};
@@ -145,10 +143,7 @@ fn fallback_output(raw_text: &str) -> PostProcessOutput {
 
 #[async_trait::async_trait]
 impl TextPostProcessor for OpenAiLlmBackend {
-    async fn transform(
-        &self,
-        input: &PostProcessInput,
-    ) -> lune_core::Result<PostProcessOutput> {
+    async fn transform(&self, input: &PostProcessInput) -> lune_core::Result<PostProcessOutput> {
         let messages = build_messages(input);
 
         let request = match CreateChatCompletionRequestArgs::default()

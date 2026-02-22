@@ -67,7 +67,10 @@ impl VoiceCommandRouter {
         // Collapse extra whitespace left by removed phrases.
         let remaining = collapse_whitespace(&remaining);
 
-        RouteResult { commands, remaining }
+        RouteResult {
+            commands,
+            remaining,
+        }
     }
 
     /// Iterator over all (lowercase_phrase, VoiceCommand) pairs, built-ins first.
@@ -75,19 +78,17 @@ impl VoiceCommandRouter {
         let builtins: Vec<(String, VoiceCommand)> = vec![
             // Two-word stop commands first so "stop dictation" matches before "stop".
             ("stop dictation".into(), VoiceCommand::StopDictation),
-            ("stop".into(),           VoiceCommand::StopDictation),
-            ("new paragraph".into(),  VoiceCommand::NewParagraph),
-            ("new line".into(),       VoiceCommand::NewLine),
-            ("list item".into(),      VoiceCommand::ListItem),
-            ("scratch that".into(),   VoiceCommand::ScratchThat),
+            ("stop".into(), VoiceCommand::StopDictation),
+            ("new paragraph".into(), VoiceCommand::NewParagraph),
+            ("new line".into(), VoiceCommand::NewLine),
+            ("list item".into(), VoiceCommand::ListItem),
+            ("scratch that".into(), VoiceCommand::ScratchThat),
         ];
 
         // Parametric patterns handled separately — scan for prefix match.
-        builtins.into_iter().chain(
-            self.custom
-                .iter()
-                .map(|(p, c)| (p.clone(), c.clone())),
-        )
+        builtins
+            .into_iter()
+            .chain(self.custom.iter().map(|(p, c)| (p.clone(), c.clone())))
     }
 
     /// Check for parametric patterns that capture an argument.
@@ -174,7 +175,10 @@ impl VoiceCommandRouter {
         }
         remaining.push_str(&text[cursor..]);
 
-        RouteResult { commands, remaining: collapse_whitespace(&remaining) }
+        RouteResult {
+            commands,
+            remaining: collapse_whitespace(&remaining),
+        }
     }
 }
 
@@ -259,19 +263,31 @@ mod tests {
     #[test]
     fn switch_style_command() {
         let r = router().route_full("switch to email, please clean this up");
-        assert!(r.commands.iter().any(|c| matches!(c, VoiceCommand::SwitchStyle(s) if s == "email")));
+        assert!(
+            r.commands
+                .iter()
+                .any(|c| matches!(c, VoiceCommand::SwitchStyle(s) if s == "email"))
+        );
     }
 
     #[test]
     fn insert_snippet_command() {
         let r = router().route_full("insert greeting here");
-        assert!(r.commands.iter().any(|c| matches!(c, VoiceCommand::InsertSnippet(s) if s == "greeting here")));
+        assert!(
+            r.commands
+                .iter()
+                .any(|c| matches!(c, VoiceCommand::InsertSnippet(s) if s == "greeting here"))
+        );
     }
 
     #[test]
     fn multiple_commands_in_one_utterance() {
         let r = router().route_full("new line list item fix the bug new line");
-        let new_line_count = r.commands.iter().filter(|c| **c == VoiceCommand::NewLine).count();
+        let new_line_count = r
+            .commands
+            .iter()
+            .filter(|c| **c == VoiceCommand::NewLine)
+            .count();
         assert!(new_line_count >= 1);
         assert!(r.commands.contains(&VoiceCommand::ListItem));
     }

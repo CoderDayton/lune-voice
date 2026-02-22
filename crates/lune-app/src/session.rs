@@ -2,18 +2,18 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::Utc;
-use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::sync::{Mutex, mpsc, oneshot};
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use lune_audio::AudioCaptureService;
 use lune_commands::VoiceCommandRouter;
+use lune_core::Result;
 use lune_core::asr::{AsrBackend, AsrBackendKind, AsrSessionConfig};
 use lune_core::config::{OutputMode, StylePreset};
 use lune_core::error::Error;
 use lune_core::llm::{PostProcessInput, TextPostProcessor};
 use lune_core::session::{DictationSession, SessionEvent, SessionStatus};
-use lune_core::Result;
 use lune_dict::DictionaryManager;
 use lune_output::TextOutputController;
 use lune_persist::Database;
@@ -145,7 +145,10 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             active_arc,
         ));
 
-        *lock = Some(ActiveHandle { stop_tx, session_id });
+        *lock = Some(ActiveHandle {
+            stop_tx,
+            session_id,
+        });
         info!(%session_id, "session started");
         Ok(session_id)
     }
@@ -197,8 +200,7 @@ async fn run_session<A: AsrBackend + 'static>(
     let mut status = SessionStatus::Completed;
 
     // ── Start audio capture ───────────────────────────────────────────────
-    let (audio_tx, mut audio_rx) =
-        mpsc::channel::<lune_core::audio::AudioFrame>(1024);
+    let (audio_tx, mut audio_rx) = mpsc::channel::<lune_core::audio::AudioFrame>(1024);
 
     // `cpal::Stream` inside SessionHandle is !Send; this is fine here because
     // run_session is spawned via spawn_local (LocalSet, current-thread runtime)
@@ -207,7 +209,14 @@ async fn run_session<A: AsrBackend + 'static>(
         Ok(h) => h,
         Err(e) => {
             let _ = event_tx.send(SessionEvent::Error(e.to_string())).await;
-            finalize_db(session_id, &persist, SessionStatus::Failed(e.to_string()), None, None).await;
+            finalize_db(
+                session_id,
+                &persist,
+                SessionStatus::Failed(e.to_string()),
+                None,
+                None,
+            )
+            .await;
             active_arc.lock().await.take();
             return;
         }
@@ -218,7 +227,14 @@ async fn run_session<A: AsrBackend + 'static>(
         Ok(s) => s,
         Err(e) => {
             let _ = event_tx.send(SessionEvent::Error(e.to_string())).await;
-            finalize_db(session_id, &persist, SessionStatus::Failed(e.to_string()), None, None).await;
+            finalize_db(
+                session_id,
+                &persist,
+                SessionStatus::Failed(e.to_string()),
+                None,
+                None,
+            )
+            .await;
             active_arc.lock().await.take();
             return;
         }
@@ -353,7 +369,8 @@ async fn run_session<A: AsrBackend + 'static>(
             &router,
             &event_tx,
             &mut output_ctrl,
-        ).await;
+        )
+        .await;
         if !finalized.is_empty() {
             if !session_text.is_empty() {
                 session_text.push(' ');
@@ -368,7 +385,11 @@ async fn run_session<A: AsrBackend + 'static>(
         status = SessionStatus::Failed(e.to_string());
     }
 
-    let transcript = if session_text.is_empty() { None } else { Some(session_text) };
+    let transcript = if session_text.is_empty() {
+        None
+    } else {
+        Some(session_text)
+    };
     finalize_db(session_id, &persist, status, Some(Utc::now()), transcript).await;
 
     let _ = event_tx.send(SessionEvent::Stopped).await;
@@ -486,10 +507,9 @@ mod tests {
 
     fn make_manager() -> SessionManager<NoopAsr> {
         let db = lune_persist::Database::open_in_memory().unwrap();
-        let dict = lune_dict::DictionaryManager::new(
-            lune_persist::Database::open_in_memory().unwrap(),
-        )
-        .unwrap();
+        let dict =
+            lune_dict::DictionaryManager::new(lune_persist::Database::open_in_memory().unwrap())
+                .unwrap();
         let audio_config = lune_core::audio::AudioCaptureConfig::default();
 
         SessionManager::new(
@@ -511,26 +531,30 @@ mod tests {
 
     #[tokio::test]
     async fn start_returns_session_id() {
-        local_set().run_until(async {
-            let mgr = make_manager();
-            let (tx, _rx) = mpsc::channel(16);
-            let id = mgr.start(tx).await.unwrap();
-            assert!(!id.is_nil());
-            mgr.stop().await;
-        }).await;
+        local_set()
+            .run_until(async {
+                let mgr = make_manager();
+                let (tx, _rx) = mpsc::channel(16);
+                let id = mgr.start(tx).await.unwrap();
+                assert!(!id.is_nil());
+                mgr.stop().await;
+            })
+            .await;
     }
 
     #[tokio::test]
     async fn double_start_returns_error() {
-        local_set().run_until(async {
-            let mgr = make_manager();
-            let (tx1, _rx1) = mpsc::channel(16);
-            let (tx2, _rx2) = mpsc::channel(16);
-            mgr.start(tx1).await.unwrap();
-            let result = mgr.start(tx2).await;
-            assert!(result.is_err());
-            mgr.stop().await;
-        }).await;
+        local_set()
+            .run_until(async {
+                let mgr = make_manager();
+                let (tx1, _rx1) = mpsc::channel(16);
+                let (tx2, _rx2) = mpsc::channel(16);
+                mgr.start(tx1).await.unwrap();
+                let result = mgr.start(tx2).await;
+                assert!(result.is_err());
+                mgr.stop().await;
+            })
+            .await;
     }
 
     #[tokio::test]
@@ -541,35 +565,39 @@ mod tests {
 
     #[tokio::test]
     async fn active_session_id_tracks_state() {
-        local_set().run_until(async {
-            let mgr = make_manager();
-            assert!(mgr.active_session_id().await.is_none());
+        local_set()
+            .run_until(async {
+                let mgr = make_manager();
+                assert!(mgr.active_session_id().await.is_none());
 
-            let (tx, _rx) = mpsc::channel(16);
-            let id = mgr.start(tx).await.unwrap();
-            assert_eq!(mgr.active_session_id().await, Some(id));
+                let (tx, _rx) = mpsc::channel(16);
+                let id = mgr.start(tx).await.unwrap();
+                assert_eq!(mgr.active_session_id().await, Some(id));
 
-            mgr.stop().await;
-        }).await;
+                mgr.stop().await;
+            })
+            .await;
     }
 
     #[tokio::test]
     async fn stop_clears_active() {
-        local_set().run_until(async {
-            let mgr = make_manager();
-            let (tx, mut rx) = mpsc::channel(16);
-            mgr.start(tx).await.unwrap();
-            mgr.stop().await;
+        local_set()
+            .run_until(async {
+                let mgr = make_manager();
+                let (tx, mut rx) = mpsc::channel(16);
+                mgr.start(tx).await.unwrap();
+                mgr.stop().await;
 
-            // Give the background task time to emit Stopped and clear active.
-            tokio::time::sleep(Duration::from_millis(50)).await;
+                // Give the background task time to emit Stopped and clear active.
+                tokio::time::sleep(Duration::from_millis(50)).await;
 
-            // Drain events.
-            while let Ok(ev) = rx.try_recv() {
-                // Just drain; don't assert ordering — the NoopAsr pipeline
-                // may or may not have emitted Started before stop arrived.
-                let _ = ev;
-            }
-        }).await;
+                // Drain events.
+                while let Ok(ev) = rx.try_recv() {
+                    // Just drain; don't assert ordering — the NoopAsr pipeline
+                    // may or may not have emitted Started before stop arrived.
+                    let _ = ev;
+                }
+            })
+            .await;
     }
 }

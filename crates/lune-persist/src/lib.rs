@@ -8,6 +8,6 @@ mod settings;
 
 pub use db::Database;
 pub use error::{PersistError, PersistResult};
-pub use hub::{ensure_default_models, ModelSpec, ResolvedModels};
+pub use hub::{ModelSpec, ResolvedModels, ensure_default_models};
 pub use paths::AppPaths;
 pub use settings::SettingsStore;

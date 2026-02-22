@@ -18,10 +18,7 @@ pub enum ModelSpec {
         local_name: String,
     },
     /// A single file from a repository.
-    SingleFile {
-        repo_id: String,
-        filename: String,
-    },
+    SingleFile { repo_id: String, filename: String },
 }
 
 /// Resolved paths for both default models.
@@ -104,13 +101,17 @@ impl ModelHub {
             )));
         }
 
-        info!(repo_id, count = to_download.len(), "downloading model files");
+        info!(
+            repo_id,
+            count = to_download.len(),
+            "downloading model files"
+        );
 
         let mut results = Vec::with_capacity(to_download.len());
         for filename in &to_download {
-            let path = repo.get(filename).map_err(|e| {
-                PersistError::ModelDownload(format!("{repo_id}/{filename}: {e}"))
-            })?;
+            let path = repo
+                .get(filename)
+                .map_err(|e| PersistError::ModelDownload(format!("{repo_id}/{filename}: {e}")))?;
             results.push((filename.to_string(), path));
         }
 
@@ -118,32 +119,20 @@ impl ModelHub {
     }
 
     /// Download a single file from HF Hub, returning its cached path.
-    fn download_single_file(
-        &self,
-        repo_id: &str,
-        filename: &str,
-    ) -> PersistResult<PathBuf> {
+    fn download_single_file(&self, repo_id: &str, filename: &str) -> PersistResult<PathBuf> {
         let repo = self.api.model(repo_id.to_string());
         info!(repo_id, filename, "ensuring single model file");
-        let path = repo.get(filename).map_err(|e| {
-            PersistError::ModelDownload(format!("{repo_id}/{filename}: {e}"))
-        })?;
+        let path = repo
+            .get(filename)
+            .map_err(|e| PersistError::ModelDownload(format!("{repo_id}/{filename}: {e}")))?;
         Ok(path)
     }
 
-    fn list_repo_files(
-        &self,
-        repo: &ApiRepo,
-        repo_id: &str,
-    ) -> PersistResult<Vec<String>> {
-        let info = repo.info().map_err(|e| {
-            PersistError::ModelDownload(format!("{repo_id}: repo info: {e}"))
-        })?;
-        Ok(info
-            .siblings
-            .into_iter()
-            .map(|s| s.rfilename)
-            .collect())
+    fn list_repo_files(&self, repo: &ApiRepo, repo_id: &str) -> PersistResult<Vec<String>> {
+        let info = repo
+            .info()
+            .map_err(|e| PersistError::ModelDownload(format!("{repo_id}: repo info: {e}")))?;
+        Ok(info.siblings.into_iter().map(|s| s.rfilename).collect())
     }
 }
 
@@ -175,17 +164,9 @@ pub fn ensure_default_models(models_dir: &Path) -> PersistResult<ResolvedModels>
     let hub_cache = models_dir.join(".hub-cache");
     let hub = ModelHub::new(&hub_cache)?;
 
-    let asr_model_dir = ensure_directory_model(
-        &hub,
-        &ModelSpec::parakeet_tdt_1b(),
-        models_dir,
-    )?;
+    let asr_model_dir = ensure_directory_model(&hub, &ModelSpec::parakeet_tdt_1b(), models_dir)?;
 
-    let llm_model_path = ensure_single_file_model(
-        &hub,
-        &ModelSpec::qwen3_llm(),
-        models_dir,
-    )?;
+    let llm_model_path = ensure_single_file_model(&hub, &ModelSpec::qwen3_llm(), models_dir)?;
 
     Ok(ResolvedModels {
         asr_model_dir,
@@ -206,16 +187,18 @@ fn ensure_directory_model(
             suffix_patterns,
             local_name,
         } => (repo_id, required_files, suffix_patterns, local_name),
-        _ => return Err(PersistError::ModelDownload("expected Directory spec".into())),
+        _ => {
+            return Err(PersistError::ModelDownload(
+                "expected Directory spec".into(),
+            ));
+        }
     };
 
     let local_dir = models_dir.join(local_name);
 
     // Already present — verify required files exist.
     if local_dir.exists() {
-        let all_present = required_files
-            .iter()
-            .all(|f| local_dir.join(f).exists());
+        let all_present = required_files.iter().all(|f| local_dir.join(f).exists());
         if all_present {
             info!(path = %local_dir.display(), "model directory already present");
             return Ok(local_dir);
@@ -232,9 +215,8 @@ fn ensure_directory_model(
         if dst.exists() {
             continue;
         }
-        link_or_copy(hub_path, &dst).map_err(|e| {
-            PersistError::ModelDownload(format!("link {filename} → local: {e}"))
-        })?;
+        link_or_copy(hub_path, &dst)
+            .map_err(|e| PersistError::ModelDownload(format!("link {filename} → local: {e}")))?;
     }
 
     info!(path = %local_dir.display(), "model directory ready");
@@ -249,7 +231,11 @@ fn ensure_single_file_model(
 ) -> PersistResult<PathBuf> {
     let (repo_id, filename) = match spec {
         ModelSpec::SingleFile { repo_id, filename } => (repo_id, filename),
-        _ => return Err(PersistError::ModelDownload("expected SingleFile spec".into())),
+        _ => {
+            return Err(PersistError::ModelDownload(
+                "expected SingleFile spec".into(),
+            ));
+        }
     };
 
     let local_path = models_dir.join(filename);
@@ -261,9 +247,8 @@ fn ensure_single_file_model(
 
     let hub_path = hub.download_single_file(repo_id, filename)?;
 
-    link_or_copy(&hub_path, &local_path).map_err(|e| {
-        PersistError::ModelDownload(format!("link {filename} → local: {e}"))
-    })?;
+    link_or_copy(&hub_path, &local_path)
+        .map_err(|e| PersistError::ModelDownload(format!("link {filename} → local: {e}")))?;
 
     info!(path = %local_path.display(), "model file ready");
     Ok(local_path)

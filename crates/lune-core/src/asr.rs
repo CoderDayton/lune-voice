@@ -47,26 +47,13 @@ pub enum AsrBackendKind {
 pub trait AsrBackend: Send + Sync {
     type SessionHandle: Send;
 
-    async fn start_session(
-        &self,
-        config: AsrSessionConfig,
-    ) -> Result<Self::SessionHandle>;
+    async fn start_session(&self, config: AsrSessionConfig) -> Result<Self::SessionHandle>;
 
-    async fn push_audio(
-        &self,
-        session: &Self::SessionHandle,
-        pcm: &[f32],
-    ) -> Result<()>;
+    async fn push_audio(&self, session: &Self::SessionHandle, pcm: &[f32]) -> Result<()>;
 
-    async fn poll_results(
-        &self,
-        session: &Self::SessionHandle,
-    ) -> Result<Vec<AsrSegment>>;
+    async fn poll_results(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>>;
 
-    async fn end_session(
-        &self,
-        session: Self::SessionHandle,
-    ) -> Result<()>;
+    async fn end_session(&self, session: Self::SessionHandle) -> Result<()>;
 }
 
 #[cfg(test)]

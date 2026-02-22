@@ -112,7 +112,9 @@ impl AsrBackend for OpenAiCompatibleAsrBackend {
     }
 
     async fn push_audio(&self, session: &Self::SessionHandle, pcm: &[f32]) -> Result<()> {
-        let mut state = session.state.lock()
+        let mut state = session
+            .state
+            .lock()
             .map_err(|e| Error::Asr(format!("session lock: {e}")))?;
         state.audio_buf.extend_from_slice(pcm);
         Ok(())
@@ -120,7 +122,9 @@ impl AsrBackend for OpenAiCompatibleAsrBackend {
 
     async fn poll_results(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>> {
         let samples_len = {
-            let state = session.state.lock()
+            let state = session
+                .state
+                .lock()
                 .map_err(|e| Error::Asr(format!("session lock: {e}")))?;
             state.audio_buf.len()
         };
@@ -128,7 +132,9 @@ impl AsrBackend for OpenAiCompatibleAsrBackend {
         // Only send a request if we have enough audio buffered.
         if samples_len >= self.config.min_samples_before_request {
             let (pcm, lang, sample_rate, base_id) = {
-                let mut state = session.state.lock()
+                let mut state = session
+                    .state
+                    .lock()
                     .map_err(|e| Error::Asr(format!("session lock: {e}")))?;
                 let pcm = std::mem::take(&mut state.audio_buf);
                 let lang = state.config.language.clone();
@@ -137,10 +143,15 @@ impl AsrBackend for OpenAiCompatibleAsrBackend {
                 (pcm, lang, sr, id)
             };
 
-            match self.transcribe(&pcm, sample_rate, lang.as_deref(), base_id).await {
+            match self
+                .transcribe(&pcm, sample_rate, lang.as_deref(), base_id)
+                .await
+            {
                 Ok(mut new_segs) => {
                     let count = new_segs.len() as u64;
-                    let mut state = session.state.lock()
+                    let mut state = session
+                        .state
+                        .lock()
                         .map_err(|e| Error::Asr(format!("session lock: {e}")))?;
                     state.next_id += count;
                     state.pending.append(&mut new_segs);
@@ -148,14 +159,18 @@ impl AsrBackend for OpenAiCompatibleAsrBackend {
                 Err(e) => {
                     tracing::warn!(error = %e, "ASR API call failed; dropping audio chunk");
                     // Put the audio back so it can be retried.
-                    let mut state = session.state.lock()
+                    let mut state = session
+                        .state
+                        .lock()
                         .map_err(|e| Error::Asr(format!("session lock: {e}")))?;
                     state.audio_buf.extend_from_slice(&pcm);
                 }
             }
         }
 
-        let mut state = session.state.lock()
+        let mut state = session
+            .state
+            .lock()
             .map_err(|e| Error::Asr(format!("session lock: {e}")))?;
         Ok(std::mem::take(&mut state.pending))
     }
@@ -163,7 +178,9 @@ impl AsrBackend for OpenAiCompatibleAsrBackend {
     async fn end_session(&self, session: Self::SessionHandle) -> Result<()> {
         // Flush any remaining audio.
         let (pcm, lang, sample_rate, base_id) = {
-            let mut state = session.state.lock()
+            let mut state = session
+                .state
+                .lock()
                 .map_err(|e| Error::Asr(format!("session lock: {e}")))?;
             let pcm = std::mem::take(&mut state.audio_buf);
             let lang = state.config.language.clone();
@@ -173,7 +190,10 @@ impl AsrBackend for OpenAiCompatibleAsrBackend {
         };
 
         if !pcm.is_empty() {
-            if let Err(e) = self.transcribe(&pcm, sample_rate, lang.as_deref(), base_id).await {
+            if let Err(e) = self
+                .transcribe(&pcm, sample_rate, lang.as_deref(), base_id)
+                .await
+            {
                 tracing::warn!(error = %e, "ASR flush on session end failed");
             }
         }
@@ -193,7 +213,9 @@ impl OpenAiCompatibleAsrBackend {
         base_id: u64,
     ) -> Result<Vec<AsrSegment>> {
         let wav = encode_wav_16bit(pcm, sample_rate);
-        let url = self.config.base_url
+        let url = self
+            .config
+            .base_url
             .join("/v1/audio/transcriptions")
             .map_err(|e| Error::Asr(format!("url join: {e}")))?;
 
@@ -220,9 +242,13 @@ impl OpenAiCompatibleAsrBackend {
                 form = form.text("language", lang.to_owned());
             }
 
-            let resp = self.client
+            let resp = self
+                .client
                 .post(url.clone())
-                .header("Authorization", format!("Bearer {}", self.config.api_key.expose()))
+                .header(
+                    "Authorization",
+                    format!("Bearer {}", self.config.api_key.expose()),
+                )
                 .multipart(form)
                 .send()
                 .await;
@@ -251,7 +277,9 @@ impl OpenAiCompatibleAsrBackend {
             }
         }
 
-        Err(Error::Asr(format!("ASR failed after 3 attempts: {last_err}")))
+        Err(Error::Asr(format!(
+            "ASR failed after 3 attempts: {last_err}"
+        )))
     }
 }
 
@@ -272,13 +300,13 @@ pub fn encode_wav_16bit(pcm: &[f32], sample_rate: u32) -> Vec<u8> {
 
     // fmt chunk
     buf.extend_from_slice(b"fmt ");
-    buf.extend_from_slice(&16u32.to_le_bytes());   // chunk size
-    buf.extend_from_slice(&1u16.to_le_bytes());    // PCM
-    buf.extend_from_slice(&1u16.to_le_bytes());    // mono
+    buf.extend_from_slice(&16u32.to_le_bytes()); // chunk size
+    buf.extend_from_slice(&1u16.to_le_bytes()); // PCM
+    buf.extend_from_slice(&1u16.to_le_bytes()); // mono
     buf.extend_from_slice(&sample_rate.to_le_bytes());
     buf.extend_from_slice(&(sample_rate * 2).to_le_bytes()); // byte rate
-    buf.extend_from_slice(&2u16.to_le_bytes());    // block align
-    buf.extend_from_slice(&16u16.to_le_bytes());   // bits per sample
+    buf.extend_from_slice(&2u16.to_le_bytes()); // block align
+    buf.extend_from_slice(&16u16.to_le_bytes()); // bits per sample
 
     // data chunk
     buf.extend_from_slice(b"data");
@@ -378,8 +406,18 @@ mod tests {
         let resp = VerboseJsonResponse {
             text: "Hello world.".into(),
             segments: vec![
-                VerboseSegment { id: 0, text: "Hello".into(), start: 0.0, end: 0.5 },
-                VerboseSegment { id: 1, text: "world.".into(), start: 0.5, end: 1.0 },
+                VerboseSegment {
+                    id: 0,
+                    text: "Hello".into(),
+                    start: 0.0,
+                    end: 0.5,
+                },
+                VerboseSegment {
+                    id: 1,
+                    text: "world.".into(),
+                    start: 0.5,
+                    end: 1.0,
+                },
             ],
         };
         let segs = resp.into_segments(10);

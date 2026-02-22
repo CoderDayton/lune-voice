@@ -182,7 +182,13 @@ pub struct StylePreset {
 
 impl StylePreset {
     pub fn all_builtin() -> Vec<Self> {
-        vec![Self::general(), Self::email(), Self::slack(), Self::meeting_notes(), Self::code_comments()]
+        vec![
+            Self::general(),
+            Self::email(),
+            Self::slack(),
+            Self::meeting_notes(),
+            Self::code_comments(),
+        ]
     }
 
     /// Built-in "General" preset: grammar + disfluency removal.
@@ -235,7 +241,8 @@ impl StylePreset {
             description: "Casual Slack message, concise and direct".into(),
             system_prompt: "You are a text post-processor for Slack messages. Fix grammar and \
                 remove filler words, but keep the tone casual and conversational. \
-                Keep it concise. Output only the cleaned text.".into(),
+                Keep it concise. Output only the cleaned text."
+                .into(),
             user_prompt_template: "{raw_text}".into(),
             few_shot_pairs: vec![
                 (

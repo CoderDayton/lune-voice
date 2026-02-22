@@ -25,13 +25,13 @@ pub fn run_cli(subcommand: &str) {
 }
 
 async fn dispatch(subcommand: &str) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let conn = Connection::session().await.map_err(|e| {
-        format!("failed to connect to session bus: {e}")
-    })?;
+    let conn = Connection::session()
+        .await
+        .map_err(|e| format!("failed to connect to session bus: {e}"))?;
 
-    let proxy = DaemonProxy::new(&conn).await.map_err(|e| {
-        format!("failed to create proxy: {e}")
-    })?;
+    let proxy = DaemonProxy::new(&conn)
+        .await
+        .map_err(|e| format!("failed to create proxy: {e}"))?;
 
     match subcommand {
         "toggle" => {

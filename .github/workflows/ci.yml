@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly advisory scan — every Monday 07:00 UTC.
+    - cron: '0 7 * * 1'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  # Disable incremental compilation — smaller cache, faster cold CI builds.
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  # ── Format (ubuntu only, fast gate) ───────────────────────────────────────
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  # ── Clippy ────────────────────────────────────────────────────────────────
+  clippy:
+    name: Clippy / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    if: github.event_name != 'schedule'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: clippy-${{ matrix.os }}
+
+      - name: Install Linux system deps
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libasound2-dev \
+            libdbus-1-dev \
+            libssl-dev \
+            pkg-config
+
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+
+  # ── Tests ─────────────────────────────────────────────────────────────────
+  test:
+    name: Test / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    needs: [fmt, clippy]
+    if: github.event_name != 'schedule'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: test-${{ matrix.os }}
+
+      - name: Install Linux system deps
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libasound2-dev \
+            libdbus-1-dev \
+            libssl-dev \
+            pkg-config
+
+      - run: cargo test --workspace
+
+  # ── Security audit (push/PR + weekly schedule) ────────────────────────────
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: audit
+          # Persist the cargo-audit binary across runs.
+          cache-directories: ~/.cargo/bin
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - run: cargo audit

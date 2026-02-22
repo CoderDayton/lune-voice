@@ -1,5 +1,5 @@
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -116,10 +116,7 @@ impl AudioCaptureService {
     /// Start a capture session, sending `AudioFrame`s into `tx`.
     ///
     /// Returns a `SessionHandle` — drop it (or call `.stop()`) to end capture.
-    pub fn start_session(
-        &self,
-        tx: mpsc::Sender<AudioFrame>,
-    ) -> Result<SessionHandle> {
+    pub fn start_session(&self, tx: mpsc::Sender<AudioFrame>) -> Result<SessionHandle> {
         let host = cpal::default_host();
         let device = host
             .default_input_device()
@@ -306,7 +303,9 @@ mod tests {
             vad_threshold: 0.01,
         };
         // Stereo: L=1.0, R=0.0 → mono = 0.5
-        let data: Vec<f32> = (0..960).map(|i| if i % 2 == 0 { 1.0 } else { 0.0 }).collect();
+        let data: Vec<f32> = (0..960)
+            .map(|i| if i % 2 == 0 { 1.0 } else { 0.0 })
+            .collect();
         let mono = state.to_mono_f32(&data);
         assert_eq!(mono.len(), 480);
         assert!((mono[0] - 0.5).abs() < f32::EPSILON);

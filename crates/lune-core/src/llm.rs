@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
+use crate::Result;
 use crate::config::StylePreset;
 use crate::dict::DictionaryEntry;
-use crate::Result;
 
 /// Input to the text post-processor.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,10 +44,7 @@ pub enum AppCategory {
 /// Trait for LLM-based text post-processing.
 #[async_trait::async_trait]
 pub trait TextPostProcessor: Send + Sync {
-    async fn transform(
-        &self,
-        input: &PostProcessInput,
-    ) -> Result<PostProcessOutput>;
+    async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput>;
 }
 
 #[cfg(test)]

@@ -60,11 +60,9 @@ impl ParakeetTdtBackend {
             None
         };
 
-        let model = Parakeet::from_pretrained(
-            config.model_dir.to_str().unwrap_or("."),
-            exec_config,
-        )
-        .map_err(|e| Error::Asr(format!("load parakeet model: {e}")))?;
+        let model =
+            Parakeet::from_pretrained(config.model_dir.to_str().unwrap_or("."), exec_config)
+                .map_err(|e| Error::Asr(format!("load parakeet model: {e}")))?;
 
         tracing::info!(
             model_dir = %config.model_dir.display(),

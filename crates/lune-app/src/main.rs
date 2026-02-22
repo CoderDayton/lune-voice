@@ -30,9 +30,7 @@ fn main() {
 }
 
 fn run_daemon() {
-    fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .init();
+    fmt().with_env_filter(EnvFilter::from_default_env()).init();
 
     tracing::info!("lune-voice daemon starting");
 
@@ -44,8 +42,8 @@ fn run_daemon() {
     let settings_store = lune_persist::SettingsStore::new(paths.settings_file());
     let mut settings = settings_store.load().expect("load settings");
 
-    let models = lune_persist::ensure_default_models(&paths.models_dir())
-        .expect("ensure models downloaded");
+    let models =
+        lune_persist::ensure_default_models(&paths.models_dir()).expect("ensure models downloaded");
 
     factory::patch_model_paths(&mut settings, &models);
 
@@ -80,16 +78,23 @@ fn run_daemon() {
 
     let dbus_iface = dbus::DaemonInterface::new(cmd_tx, Arc::clone(&shared_state));
 
-    let dbus_conn = rt.block_on(async {
-        dbus::build_connection(dbus_iface).await
-    }).expect("build D-Bus connection");
+    let dbus_conn = rt
+        .block_on(async { dbus::build_connection(dbus_iface).await })
+        .expect("build D-Bus connection");
 
     tracing::info!("D-Bus service registered on session bus");
 
     // ── Phase 2: pipeline inside LocalSet ────────────────────────────────
 
     local.block_on(&rt, async move {
-        run_pipeline(settings, paths.database_file(), cmd_rx, shared_state, &dbus_conn).await;
+        run_pipeline(
+            settings,
+            paths.database_file(),
+            cmd_rx,
+            shared_state,
+            &dbus_conn,
+        )
+        .await;
     });
 
     tracing::info!("lune-voice stopped");
@@ -123,9 +128,8 @@ async fn run_pipeline(
     };
 
     tracing::info!("LLM post-processor ready");
-    let audio = lune_audio::AudioCaptureService::new(
-        lune_core::audio::AudioCaptureConfig::default(),
-    );
+    let audio =
+        lune_audio::AudioCaptureService::new(lune_core::audio::AudioCaptureConfig::default());
     let router = lune_commands::VoiceCommandRouter::new();
 
     tracing::info!("opening database...");
@@ -195,9 +199,7 @@ async fn run_pipeline(
                                 lune_core::session::SessionEvent::Error(e) => {
                                     AppStateUpdate::Error(e)
                                 }
-                                lune_core::session::SessionEvent::Stopped => {
-                                    AppStateUpdate::Idle
-                                }
+                                lune_core::session::SessionEvent::Stopped => AppStateUpdate::Idle,
                                 _ => continue,
                             };
                             update_state(&state_ref, &mut notes_fwd, &conn_clone, update).await;
@@ -211,7 +213,13 @@ async fn run_pipeline(
                         }
                         Err(e) => {
                             tracing::error!(error = %e, "failed to start session");
-                            update_state(&shared_state, &mut notes, dbus_conn, AppStateUpdate::Error(e.to_string())).await;
+                            update_state(
+                                &shared_state,
+                                &mut notes,
+                                dbus_conn,
+                                AppStateUpdate::Error(e.to_string()),
+                            )
+                            .await;
                         }
                     }
                 }

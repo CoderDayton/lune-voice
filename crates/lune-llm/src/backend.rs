@@ -72,8 +72,8 @@ impl LocalLlmBackend {
             return Err(Error::ModelNotFound(config.model_path.clone()));
         }
 
-        let backend = LlamaBackend::init()
-            .map_err(|e| Error::Llm(format!("llama backend init: {e}")))?;
+        let backend =
+            LlamaBackend::init().map_err(|e| Error::Llm(format!("llama backend init: {e}")))?;
 
         let mut model_params = LlamaModelParams::default();
         if config.use_gpu {
@@ -95,7 +95,6 @@ impl LocalLlmBackend {
             config,
         })
     }
-
 }
 
 /// Run inference on a prompt string, returning the generated text.
@@ -107,21 +106,21 @@ fn generate_sync(
     config: &LocalLlmConfig,
     prompt_text: &str,
 ) -> Result<String> {
-    let inner = inner.lock()
-        .map_err(|e| Error::Llm(format!("lock: {e}")))?;
+    let inner = inner.lock().map_err(|e| Error::Llm(format!("lock: {e}")))?;
 
-    let n_ctx = NonZeroU32::new(config.n_ctx)
-        .ok_or_else(|| Error::Llm("n_ctx must be > 0".into()))?;
+    let n_ctx =
+        NonZeroU32::new(config.n_ctx).ok_or_else(|| Error::Llm("n_ctx must be > 0".into()))?;
 
-    let ctx_params = LlamaContextParams::default()
-        .with_n_ctx(Some(n_ctx));
+    let ctx_params = LlamaContextParams::default().with_n_ctx(Some(n_ctx));
 
-    let mut ctx = inner.model
+    let mut ctx = inner
+        .model
         .new_context(&inner.backend, ctx_params)
         .map_err(|e| Error::Llm(format!("create context: {e}")))?;
 
     // Tokenize prompt. Qwen3 has no BOS token.
-    let tokens = inner.model
+    let tokens = inner
+        .model
         .str_to_token(prompt_text, AddBos::Never)
         .map_err(|e| Error::Llm(format!("tokenize: {e}")))?;
 
@@ -139,7 +138,8 @@ fn generate_sync(
     let last_idx = prompt_len - 1;
     for (i, token) in tokens.into_iter().enumerate() {
         let is_last = i as i32 == last_idx;
-        batch.add(token, i as i32, &[0], is_last)
+        batch
+            .add(token, i as i32, &[0], is_last)
             .map_err(|e| Error::Llm(format!("batch add: {e}")))?;
     }
 
@@ -174,7 +174,8 @@ fn generate_sync(
             break;
         }
 
-        let piece = inner.model
+        let piece = inner
+            .model
             .token_to_piece(token, &mut decoder, true, None)
             .unwrap_or_default();
         output.push_str(&piece);
@@ -185,7 +186,8 @@ fn generate_sync(
         }
 
         batch.clear();
-        batch.add(token, n_cur, &[0], true)
+        batch
+            .add(token, n_cur, &[0], true)
             .map_err(|e| Error::Llm(format!("batch add decode: {e}")))?;
         n_cur += 1;
 
@@ -198,10 +200,7 @@ fn generate_sync(
 
 #[async_trait::async_trait]
 impl TextPostProcessor for LocalLlmBackend {
-    async fn transform(
-        &self,
-        input: &PostProcessInput,
-    ) -> Result<PostProcessOutput> {
+    async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput> {
         let prompt_text = prompt::build_chatml(input);
 
         tracing::debug!(
@@ -215,18 +214,14 @@ impl TextPostProcessor for LocalLlmBackend {
         // spawn_blocking (not block_in_place) is required for current_thread + LocalSet.
         let inner = Arc::clone(&self.inner);
         let config = self.config.clone();
-        let raw_output = tokio::task::spawn_blocking(move || {
-            generate_sync(&inner, &config, &prompt_text)
-        })
-        .await
-        .map_err(|e| Error::Llm(format!("spawn_blocking join: {e}")))??;
+        let raw_output =
+            tokio::task::spawn_blocking(move || generate_sync(&inner, &config, &prompt_text))
+                .await
+                .map_err(|e| Error::Llm(format!("spawn_blocking join: {e}")))??;
 
         let cleaned = prompt::strip_thinking(&raw_output);
 
-        tracing::debug!(
-            output_len = cleaned.len(),
-            "LLM post-process complete"
-        );
+        tracing::debug!(output_len = cleaned.len(), "LLM post-process complete");
 
         Ok(PostProcessOutput {
             cleaned_text: cleaned,

@@ -62,10 +62,7 @@ mod tests {
         store.save(&settings).unwrap();
         let reloaded = store.load().unwrap();
         assert_eq!(reloaded.language, settings.language);
-        assert_eq!(
-            reloaded.session_history_days,
-            settings.session_history_days
-        );
+        assert_eq!(reloaded.session_history_days, settings.session_history_days);
     }
 
     #[test]

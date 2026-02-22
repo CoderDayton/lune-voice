@@ -13,13 +13,20 @@ use crate::error::{PersistError, PersistResult};
 use crate::models::{NewDictionaryEntry, NewSession, NewSnippet};
 use crate::schema::{dictionary, sessions, snippets};
 
-type SessionRow7 = (String, String, Option<String>, String, String, String, Option<String>);
+type SessionRow7 = (
+    String,
+    String,
+    Option<String>,
+    String,
+    String,
+    String,
+    Option<String>,
+);
 
 fn row_to_session(
     (sid, s_at, e_at, sty, back, stat, trans): SessionRow7,
 ) -> PersistResult<DictationSession> {
-    let id = Uuid::parse_str(&sid)
-        .map_err(|e| PersistError::Migration(format!("uuid: {e}")))?;
+    let id = Uuid::parse_str(&sid).map_err(|e| PersistError::Migration(format!("uuid: {e}")))?;
     let started_at = DateTime::parse_from_rfc3339(&s_at)
         .map_err(|e| PersistError::Migration(format!("started_at: {e}")))?
         .with_timezone(&Utc);
@@ -32,9 +39,17 @@ fn row_to_session(
         .transpose()?;
     let backend: AsrBackendKind = serde_json::from_str(&back)
         .map_err(|e| PersistError::Migration(format!("backend: {e}")))?;
-    let status: SessionStatus = serde_json::from_str(&stat)
-        .map_err(|e| PersistError::Migration(format!("status: {e}")))?;
-    Ok(DictationSession { id, started_at, ended_at, style: sty, backend, status, transcript: trans })
+    let status: SessionStatus =
+        serde_json::from_str(&stat).map_err(|e| PersistError::Migration(format!("status: {e}")))?;
+    Ok(DictationSession {
+        id,
+        started_at,
+        ended_at,
+        style: sty,
+        backend,
+        status,
+        transcript: trans,
+    })
 }
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
@@ -52,10 +67,8 @@ impl Database {
         }
         let url = path.to_string_lossy();
         let mut conn = SqliteConnection::establish(&url)?;
-        diesel::sql_query("PRAGMA journal_mode=WAL")
-            .execute(&mut conn)?;
-        diesel::sql_query("PRAGMA foreign_keys=ON")
-            .execute(&mut conn)?;
+        diesel::sql_query("PRAGMA journal_mode=WAL").execute(&mut conn)?;
+        diesel::sql_query("PRAGMA foreign_keys=ON").execute(&mut conn)?;
         let mut db = Self { conn };
         db.run_migrations()?;
         Ok(db)
@@ -64,8 +77,7 @@ impl Database {
     /// Open an in-memory database (for testing).
     pub fn open_in_memory() -> PersistResult<Self> {
         let mut conn = SqliteConnection::establish(":memory:")?;
-        diesel::sql_query("PRAGMA foreign_keys=ON")
-            .execute(&mut conn)?;
+        diesel::sql_query("PRAGMA foreign_keys=ON").execute(&mut conn)?;
         let mut db = Self { conn };
         db.run_migrations()?;
         Ok(db)
@@ -264,8 +276,8 @@ impl Database {
 
         // RFC3339 strings sort lexicographically, so < comparison is safe.
         let cutoff = (Utc::now() - chrono::Duration::days(i64::from(days))).to_rfc3339();
-        let count = diesel::delete(sessions.filter(started_at.lt(&cutoff)))
-            .execute(&mut self.conn)?;
+        let count =
+            diesel::delete(sessions.filter(started_at.lt(&cutoff))).execute(&mut self.conn)?;
         Ok(count)
     }
 }

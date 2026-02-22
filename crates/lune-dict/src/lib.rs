@@ -31,10 +31,17 @@ impl DictionaryManager {
     // ── CRUD ─────────────────────────────────────────────────────────────
 
     pub fn insert(&mut self, phrase: &str, replacement: &str, priority: u8) -> PersistResult<i32> {
-        let id = self.db.insert_dictionary_entry(phrase, replacement, priority)?;
-        self.cache.push(DictionaryEntry { phrase: phrase.into(), replacement: replacement.into(), priority });
+        let id = self
+            .db
+            .insert_dictionary_entry(phrase, replacement, priority)?;
+        self.cache.push(DictionaryEntry {
+            phrase: phrase.into(),
+            replacement: replacement.into(),
+            priority,
+        });
         // Re-sort by priority DESC to maintain invariant.
-        self.cache.sort_unstable_by(|a, b| b.priority.cmp(&a.priority));
+        self.cache
+            .sort_unstable_by(|a, b| b.priority.cmp(&a.priority));
         Ok(id)
     }
 
@@ -56,8 +63,10 @@ impl DictionaryManager {
     /// fuzzy matching per word.
     pub fn apply(&self, text: &str) -> String {
         // Split into multi-word and single-word entries, both sorted priority DESC.
-        let (multi, single): (Vec<_>, Vec<_>) =
-            self.cache.iter().partition(|e| e.phrase.split_whitespace().count() > 1);
+        let (multi, single): (Vec<_>, Vec<_>) = self
+            .cache
+            .iter()
+            .partition(|e| e.phrase.split_whitespace().count() > 1);
 
         let mut current = text.to_owned();
 
@@ -175,7 +184,9 @@ fn apply_single_words(text: &str, singles: &[&DictionaryEntry]) -> String {
         let bare = strip_trailing_punct(word);
         let punct = &word[bare.len()..];
         let lower = bare.to_lowercase();
-        let replaced = singles.iter().find(|e| levenshtein(&lower, &e.phrase.to_lowercase()) <= 1);
+        let replaced = singles
+            .iter()
+            .find(|e| levenshtein(&lower, &e.phrase.to_lowercase()) <= 1);
         match replaced {
             Some(e) => out.push(format!("{}{}", e.replacement, punct)),
             None => out.push(word.to_owned()),
@@ -195,8 +206,12 @@ pub fn levenshtein(a: &str, b: &str) -> usize {
     let b: Vec<char> = b.chars().collect();
     let m = a.len();
     let n = b.len();
-    if m == 0 { return n; }
-    if n == 0 { return m; }
+    if m == 0 {
+        return n;
+    }
+    if n == 0 {
+        return m;
+    }
 
     let mut prev: Vec<usize> = (0..=n).collect();
     let mut curr = vec![0usize; n + 1];
@@ -311,9 +326,13 @@ mod tests {
     fn top_relevant_respects_limit() {
         let mut mgr = manager();
         for i in 0..15u8 {
-            mgr.insert(&format!("word{i}"), &format!("Word{i}"), i).unwrap();
+            mgr.insert(&format!("word{i}"), &format!("Word{i}"), i)
+                .unwrap();
         }
-        let text: String = (0..15).map(|i| format!("word{i}")).collect::<Vec<_>>().join(" ");
+        let text: String = (0..15)
+            .map(|i| format!("word{i}"))
+            .collect::<Vec<_>>()
+            .join(" ");
         let relevant = mgr.top_relevant(&text, 10);
         assert_eq!(relevant.len(), 10);
     }
