@@ -155,7 +155,7 @@ fn link_or_copy(src: &Path, dst: &Path) -> std::io::Result<()> {
 /// models_dir/
 ///   parakeet-tdt-1.1b/
 ///     model.onnx
-///     model.onnx_data
+///     model.onnx.data
 ///     vocab.txt
 ///   Qwen3-0.6B-Q5_K_M.gguf
 ///   .hub-cache/          (hf_hub internal cache)
@@ -271,7 +271,7 @@ mod tests {
                 assert_eq!(repo_id, "dtgagnon/parakeet-tdt-1.1b-onnx");
                 assert!(required_files.contains(&"vocab.txt".to_string()));
                 assert!(suffix_patterns.contains(&".onnx".to_string()));
-                assert!(suffix_patterns.contains(&".onnx_data".to_string()));
+                assert!(suffix_patterns.contains(&".onnx.data".to_string()));
                 assert_eq!(local_name, "parakeet-tdt-1.1b");
             }
             _ => panic!("expected Directory variant"),
