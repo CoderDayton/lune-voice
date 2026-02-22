@@ -15,9 +15,39 @@ use lune_core::llm::{PostProcessInput, PostProcessOutput, TextPostProcessor};
 
 use crate::prompt;
 
-/// Length of the longest stop sequence token (`<|im_end|>`).
+/// Length of the longest stop sequence string (`<|im_end|>` = 10 bytes).
 /// Used to bound the suffix window scanned for stop sequences each decode step.
 const MAX_STOP_SEQ_LEN: usize = 10;
+
+/// All stop sequences checked during decoding.  Order is irrelevant for
+/// correctness; we scan a small window (~20 bytes) so iteration cost is
+/// dominated by `memchr`, not sequence count.
+const STOP_SEQUENCES: &[&str] = &["<think>", "</think>", "<|im_end|>"];
+
+// Compile-time guarantee that MAX_STOP_SEQ_LEN stays in sync with STOP_SEQUENCES
+// AND that every stop sequence is pure ASCII (required by byte-level scanning).
+const _: () = {
+    let mut i = 0;
+    let mut max = 0;
+    while i < STOP_SEQUENCES.len() {
+        let bytes = STOP_SEQUENCES[i].as_bytes();
+        let len = bytes.len();
+        if len > max {
+            max = len;
+        }
+        // Assert all bytes are ASCII so byte-level memchr + starts_with is safe.
+        let mut j = 0;
+        while j < len {
+            assert!(bytes[j] < 0x80, "stop sequence contains non-ASCII byte");
+            j += 1;
+        }
+        i += 1;
+    }
+    assert!(
+        max == MAX_STOP_SEQ_LEN,
+        "MAX_STOP_SEQ_LEN does not match longest STOP_SEQUENCES entry"
+    );
+};
 
 /// Configuration for the local LLM backend.
 #[derive(Debug, Clone)]
@@ -41,11 +71,11 @@ pub struct LocalLlmConfig {
 impl Default for LocalLlmConfig {
     fn default() -> Self {
         Self {
-            model_path: PathBuf::from("models/Qwen3-0.6B-Q5_K_M.gguf"),
+            model_path: PathBuf::from("models/Qwen3-0.6B-Q4_K_M.gguf"),
             use_gpu: true,
-            n_ctx: 16384,
+            n_ctx: 4096,
             max_output_tokens: 512,
-            temperature: 0.7,
+            temperature: 0.0,
             top_p: 0.8,
             top_k: 20,
         }
@@ -121,6 +151,64 @@ impl LocalLlmBackend {
     }
 }
 
+/// Scan the tail of `output` for any stop sequence that may straddle the
+/// old/new boundary. Returns `true` (and truncates `output`) if found.
+///
+/// Operates entirely on bytes — all stop sequences are compile-time-verified
+/// ASCII, so byte comparisons are equivalent to string comparisons. This
+/// avoids `floor_char_boundary` and UTF-8 validation overhead per decode step.
+#[inline]
+fn check_stop_sequences(output: &mut String, piece_len: usize) -> bool {
+    let bytes = output.as_bytes();
+    let win_end = bytes.len();
+    let win_start = win_end.saturating_sub(piece_len + MAX_STOP_SEQ_LEN - 1);
+    let window = &bytes[win_start..];
+
+    // All stop sequences start with '<'. Find each '<' and test all sequences
+    // at that position. First match = earliest occurrence, always correct for
+    // straddling detection.
+    for lt_off in memchr::memchr_iter(b'<', window) {
+        let remaining = &window[lt_off..];
+        for seq in STOP_SEQUENCES {
+            if remaining.len() >= seq.len() && remaining[..seq.len()] == *seq.as_bytes() {
+                output.truncate(win_start + lt_off);
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Trim any partial stop sequence that straddles the output boundary when
+/// generation hits max tokens. Without this, output can end with a prefix
+/// like `<|im_en` which leaks control markup.
+///
+/// Uses a single `memrchr` for the last `<` instead of O(sequences * prefix_len)
+/// nested iteration — all stop sequences are ASCII and start with `<`, so any
+/// partial prefix must begin at the rightmost `<` in the tail.
+fn trim_partial_stop_sequences(output: &mut String) {
+    let bytes = output.as_bytes();
+    let tail_start = bytes.len().saturating_sub(MAX_STOP_SEQ_LEN);
+    let tail = &bytes[tail_start..];
+
+    // All stop sequences start with '<'; a partial prefix must begin at one.
+    let Some(lt_off) = memchr::memrchr(b'<', tail) else {
+        return;
+    };
+
+    let candidate = &bytes[tail_start + lt_off..];
+
+    // If the substring from the last '<' to the end is a strict prefix of any
+    // stop sequence, it's a dangling partial — truncate it.
+    for seq in STOP_SEQUENCES {
+        let seq_bytes = seq.as_bytes();
+        if candidate.len() < seq_bytes.len() && seq_bytes[..candidate.len()] == *candidate {
+            output.truncate(tail_start + lt_off);
+            return;
+        }
+    }
+}
+
 /// Run inference on a prompt string, returning the generated text.
 ///
 /// Free function so it can be called from `spawn_blocking` (which requires
@@ -146,20 +234,30 @@ fn generate_sync(
         .str_to_token(prompt_text, AddBos::Never)
         .map_err(|e| Error::Llm(format!("tokenize: {e}")))?;
 
-    let prompt_len = tokens.len() as i32;
-    if prompt_len as u32 >= config.n_ctx {
+    if tokens.is_empty() {
+        return Err(Error::Llm("prompt tokenized to zero tokens".into()));
+    }
+
+    // Use u32 for token counts to avoid i32 overflow on large prompts.
+    let prompt_len = u32::try_from(tokens.len())
+        .map_err(|_| Error::Llm(format!("prompt too large: {} tokens", tokens.len())))?;
+    if prompt_len >= config.n_ctx {
         return Err(Error::Llm(format!(
             "prompt ({prompt_len} tokens) exceeds context window ({})",
             config.n_ctx
         )));
     }
 
-    // Build batch with prompt tokens.
-    let batch_size = (prompt_len as usize).max(512);
-    let mut batch = LlamaBatch::new(batch_size, 1);
-    let last_idx = prompt_len - 1;
-    // Use i32 range directly to avoid repeated `as i32` casts in the hot path.
-    for (i, token) in (0i32..prompt_len).zip(tokens) {
+    // Safe cast: prompt_len < n_ctx <= u32::MAX, and n_ctx is a practical context
+    // window size (well under i32::MAX), so this won't wrap.
+    let prompt_len_i32 = i32::try_from(prompt_len)
+        .map_err(|_| Error::Llm(format!("prompt too large for i32: {prompt_len}")))?;
+
+    // Build batch sized exactly for the prompt — during autoregressive decode
+    // we clear and add 1 token, so the prefill size is always sufficient.
+    let mut batch = LlamaBatch::new(prompt_len as usize, 1);
+    let last_idx = prompt_len_i32 - 1;
+    for (i, token) in (0i32..).zip(tokens) {
         batch
             .add(token, i, &[0], i == last_idx)
             .map_err(|e| Error::Llm(format!("batch add: {e}")))?;
@@ -183,47 +281,42 @@ fn generate_sync(
 
     // Autoregressive decode.
     let mut decoder = encoding_rs::UTF_8.new_decoder();
-    // Pre-allocate for expected output size: max_output_tokens * ~4 bytes average UTF-8.
-    let mut output = String::with_capacity((config.max_output_tokens as usize) * 4);
-    let mut n_cur = batch.n_tokens();
-    let max_total = prompt_len + config.max_output_tokens as i32;
+    // Pre-allocate for expected output size: max_output_tokens * ~4 bytes avg
+    // (tokens ~ 3-4 chars, English UTF-8 ~ 1.1 bytes/char).
+    let capacity = (config.max_output_tokens as usize).saturating_mul(4);
+    let mut output = String::with_capacity(capacity);
+    let mut n_cur = prompt_len_i32;
+    // .min() guarantees value fits in i32; cast is infallible.
+    let max_output_i32 = config.max_output_tokens.min(i32::MAX as u32) as i32;
+    // Saturating add prevents i32 overflow on absurd configs.
+    let max_total = n_cur.saturating_add(max_output_i32);
     let eos = inner.model.token_eos();
 
+    // After prefill, sample from the last logit position (last_idx).
+    // After each decode step the batch has exactly 1 token so index is always 0.
+    let mut sample_idx = last_idx;
+
     while n_cur < max_total {
-        let token = sampler.sample(&ctx, batch.n_tokens() - 1);
+        let token = sampler.sample(&ctx, sample_idx);
         sampler.accept(token);
 
         if token == eos {
             break;
         }
 
-        let piece = inner
-            .model
-            .token_to_piece(token, &mut decoder, true, None)
-            .unwrap_or_default();
+        match inner.model.token_to_piece(token, &mut decoder, true, None) {
+            Ok(ref piece) if !piece.is_empty() => {
+                let piece_len = piece.len();
+                output.push_str(piece);
 
-        if !piece.is_empty() {
-            output.push_str(&piece);
-
-            // Optimised stop-sequence detection: scan only the suffix window that
-            // can possibly contain a newly-completed marker.  A marker straddling
-            // the old/new boundary requires at most (MAX_STOP_SEQ_LEN - 1) bytes
-            // of old output, so total scan is O(piece.len() + MAX_STOP_SEQ_LEN)
-            // rather than O(output.len()).
-            let win_end = output.len();
-            let win_start = win_end.saturating_sub(piece.len() + MAX_STOP_SEQ_LEN - 1);
-            // Snap backward to a valid UTF-8 char boundary (≤3 bytes for well-formed input).
-            let win_start = {
-                let mut s = win_start;
-                while s > 0 && !output.is_char_boundary(s) {
-                    s -= 1;
+                if check_stop_sequences(&mut output, piece_len) {
+                    break;
                 }
-                s
-            };
-            let window = &output[win_start..];
-            if window.contains("<|im_end|>") || window.contains("<think>") {
-                break;
             }
+            Err(e) => {
+                tracing::trace!(token = token.0, error = %e, "token decode failed");
+            }
+            _ => {} // empty token piece — skip
         }
 
         batch.clear();
@@ -231,9 +324,17 @@ fn generate_sync(
             .add(token, n_cur, &[0], true)
             .map_err(|e| Error::Llm(format!("batch add decode: {e}")))?;
         n_cur += 1;
+        // After clear+add, batch always has exactly 1 token → index 0.
+        sample_idx = 0;
 
         ctx.decode(&mut batch)
             .map_err(|e| Error::Llm(format!("decode step: {e}")))?;
+    }
+
+    // If we hit max_total without a stop sequence, trim any partial stop
+    // sequence prefix that may be dangling at the end.
+    if n_cur >= max_total {
+        trim_partial_stop_sequences(&mut output);
     }
 
     Ok(output)
@@ -279,9 +380,9 @@ mod tests {
     #[test]
     fn config_defaults() {
         let cfg = LocalLlmConfig::default();
-        assert_eq!(cfg.n_ctx, 16384);
+        assert_eq!(cfg.n_ctx, 4096);
         assert_eq!(cfg.max_output_tokens, 512);
-        assert!((cfg.temperature - 0.7).abs() < f32::EPSILON);
+        assert!((cfg.temperature - 0.0).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -292,5 +393,77 @@ mod tests {
         };
         let result = LocalLlmBackend::new(cfg);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn stop_sequence_detection() {
+        let mut s = String::from("Hello world<|im_end|>");
+        assert!(check_stop_sequences(&mut s, 10));
+        assert_eq!(s, "Hello world");
+    }
+
+    #[test]
+    fn stop_sequence_think_open() {
+        let mut s = String::from("result<think>");
+        assert!(check_stop_sequences(&mut s, 7));
+        assert_eq!(s, "result");
+    }
+
+    #[test]
+    fn stop_sequence_think_close() {
+        let mut s = String::from("leaked</think>");
+        assert!(check_stop_sequences(&mut s, 8));
+        assert_eq!(s, "leaked");
+    }
+
+    #[test]
+    fn stop_sequence_finds_earliest_match() {
+        // If a stop sequence straddles the boundary AND a second occurrence
+        // exists entirely in the new piece, `find` (forward) catches the
+        // earliest one. `rfind` would miss the straddling occurrence.
+        let mut s = String::from("text<think>more<think>");
+        // piece_len = 17 covers "nk>more<think>" plus overlap
+        assert!(check_stop_sequences(&mut s, 17));
+        assert_eq!(s, "text");
+    }
+
+    #[test]
+    fn partial_stop_sequence_trimming() {
+        let mut s = String::from("output text<|im_en");
+        trim_partial_stop_sequences(&mut s);
+        assert_eq!(s, "output text");
+    }
+
+    #[test]
+    fn partial_stop_sequence_trimming_longest_wins() {
+        // `<|im_end` is an 8-byte prefix of `<|im_end|>`.
+        // The old code matched shortest-first (`<` = 1 byte) and returned early,
+        // leaving `<|im_end` minus 1 char. Verify the longest prefix is trimmed.
+        let mut s = String::from("output text<|im_end");
+        trim_partial_stop_sequences(&mut s);
+        assert_eq!(s, "output text");
+    }
+
+    #[test]
+    fn no_partial_trim_when_clean() {
+        let mut s = String::from("clean output");
+        trim_partial_stop_sequences(&mut s);
+        assert_eq!(s, "clean output");
+    }
+
+    #[test]
+    fn stop_sequence_early_exit_no_angle_bracket() {
+        // No '<' in the window — check_stop_sequences should short-circuit.
+        let mut s = String::from("hello world");
+        assert!(!check_stop_sequences(&mut s, 5));
+        assert_eq!(s, "hello world");
+    }
+
+    #[test]
+    fn partial_trim_single_angle_bracket() {
+        // A lone '<' at the end is a 1-byte prefix of all stop sequences.
+        let mut s = String::from("output<");
+        trim_partial_stop_sequences(&mut s);
+        assert_eq!(s, "output");
     }
 }

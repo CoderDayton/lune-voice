@@ -22,5 +22,9 @@ base64 = "0.22"
 reqwest.workspace = true
 url.workspace = true
 
+[[example]]
+name = "mel_throughput"
+path = "../../benchmarks/mel_throughput.rs"
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

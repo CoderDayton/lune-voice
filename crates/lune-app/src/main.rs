@@ -286,11 +286,7 @@ async fn start_dictation<A: lune_core::asr::AsrBackend + 'static>(
                     delivery_service.deliver(&t, mode);
                     AppStateUpdate::FinalText
                 }
-                lune_core::session::SessionEvent::CorrectedText(t) => {
-                    tracing::info!(corrected = %t, "async LLM correction received");
-                    // Original already delivered; re-delivery left for future work.
-                    continue;
-                }
+
                 lune_core::session::SessionEvent::Error(e) => {
                     tracing::error!(error = %e, "session error");
                     AppStateUpdate::Error

@@ -1,7 +1,8 @@
 //! Async LLM correction worker.
 //!
-//! Runs on a dedicated channel, processing low-confidence utterances asynchronously.
-//! The main session loop delivers text immediately and doesn't block on LLM results.
+//! All finalized utterances are held until the LLM processes them — no raw text
+//! is delivered to the user. Short bursts return quickly; longer paragraphs take
+//! proportionally more time. The worker batches queued requests into a single call.
 
 use std::sync::Arc;
 

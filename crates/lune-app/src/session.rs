@@ -205,6 +205,12 @@ async fn run_session<A: AsrBackend + 'static>(
         config.confidence_config.min_length_ratio,
     );
     let mut utterance_counter: u64 = 0;
+    // Raw text waiting for LLM delivery, keyed by utterance_id.
+    // Entries are removed when the LLM responds (retain id > resp.utterance_id
+    // handles batching: the worker returns max_id of the batch).
+    // Any still-pending on stop are delivered as raw fallback.
+    let mut pending_delivery: std::collections::VecDeque<(u64, String)> =
+        std::collections::VecDeque::new();
 
     // ── Start audio capture ───────────────────────────────────────────────
     let (audio_tx, mut audio_rx) = mpsc::channel::<lune_core::audio::AudioFrame>(1024);
@@ -272,42 +278,30 @@ async fn run_session<A: AsrBackend + 'static>(
 
             // ── LLM correction results ───────────────────────────────
             Some(resp) = llm_rx.recv() => {
-                if resp.accepted && resp.corrected_text != resp.original_text {
+                // Remove all pending entries covered by this batch (worker returns
+                // max utterance_id when it batches multiple requests together).
+                pending_delivery.retain(|(id, _)| *id > resp.utterance_id);
+
+                let delivered = if resp.accepted && resp.corrected_text != resp.original_text {
                     debug!(
                         utterance_id = resp.utterance_id,
                         original = %resp.original_text,
                         corrected = %resp.corrected_text,
                         "LLM correction accepted"
                     );
-
-                    // Bound the rfind to the tail of session_text — LLM responses
-                    // arrive shortly after the utterance so it's always near the end.
-                    // Avoids O(n) scan on long sessions; window = 8× utterance len.
-                    let search_from = {
-                        let window = resp.original_text.len().saturating_mul(8).max(256);
-                        let approx = session_text.len().saturating_sub(window);
-                        // Walk back to the nearest valid UTF-8 char boundary.
-                        let mut b = approx;
-                        while b > 0 && !session_text.is_char_boundary(b) {
-                            b -= 1;
-                        }
-                        b
-                    };
-                    if let Some(rel) = session_text[search_from..].rfind(&resp.original_text) {
-                        let pos = search_from + rel;
-                        session_text.replace_range(
-                            pos..pos + resp.original_text.len(),
-                            &resp.corrected_text,
-                        );
-                    }
-
-                    let _ = event_tx
-                        .send(SessionEvent::CorrectedText(resp.corrected_text.clone()))
-                        .await;
-                    confidence_router.confirm(&resp.corrected_text);
+                    resp.corrected_text
                 } else {
-                    confidence_router.confirm(&resp.original_text);
+                    resp.original_text
+                };
+
+                output_ctrl.emit_final(delivered.clone()).await;
+                if !delivered.is_empty() {
+                    if !session_text.is_empty() {
+                        session_text.push(' ');
+                    }
+                    session_text.push_str(&delivered);
                 }
+                confidence_router.confirm(&delivered);
             }
 
             recv = tokio::time::timeout(silence_timeout, audio_rx.recv()) => {
@@ -331,35 +325,9 @@ async fn run_session<A: AsrBackend + 'static>(
                             let decision = confidence_router.route(&after_dict, pending_confidence);
                             match &decision {
                                 RouteDecision::HighConfidence { text, confidence } => {
-                                    debug!(confidence, "high confidence, skipping LLM");
-                                    output_ctrl.emit_final(text.clone()).await;
-                                    if !text.is_empty() {
-                                        if !session_text.is_empty() {
-                                            session_text.push(' ');
-                                        }
-                                        session_text.push_str(text);
-                                    }
-                                    confidence_router.confirm(text);
-                                }
-                                RouteDecision::Pending { confidence } => {
-                                    debug!(confidence, "accumulating in pending buffer");
-                                    // Text is held in the router's pending_buf.
-                                    // Emit partial showing current session state.
-                                    output_ctrl.emit_partial(session_text.clone()).await;
-                                }
-                                RouteDecision::ReadyForLlm { text, confidence } => {
-                                    debug!(confidence, "pending buffer ready, delivering + queueing LLM");
-                                    // Deliver the accumulated batch immediately.
-                                    output_ctrl.emit_final(text.clone()).await;
-                                    if !text.is_empty() {
-                                        if !session_text.is_empty() {
-                                            session_text.push(' ');
-                                        }
-                                        session_text.push_str(text);
-                                    }
-
-                                    // Queue async LLM correction for the batch.
+                                    debug!(confidence, "high confidence, queuing LLM (holding delivery)");
                                     utterance_counter += 1;
+                                    pending_delivery.push_back((utterance_counter, text.clone()));
                                     let relevant = dict
                                         .lock()
                                         .await
@@ -367,7 +335,6 @@ async fn run_session<A: AsrBackend + 'static>(
                                         .into_iter()
                                         .cloned()
                                         .collect::<Vec<_>>();
-
                                     let req = LlmRequest {
                                         utterance_id: utterance_counter,
                                         text: text.clone(),
@@ -376,7 +343,56 @@ async fn run_session<A: AsrBackend + 'static>(
                                         dictionary: relevant,
                                     };
                                     if let Err(e) = llm_tx.send(req).await {
-                                        warn!(error = %e, "failed to queue LLM request");
+                                        warn!(error = %e, "LLM unavailable, delivering raw");
+                                        pending_delivery.pop_back();
+                                        output_ctrl.emit_final(text.clone()).await;
+                                        if !text.is_empty() {
+                                            if !session_text.is_empty() {
+                                                session_text.push(' ');
+                                            }
+                                            session_text.push_str(text);
+                                        }
+                                        confidence_router.confirm(text);
+                                    } else {
+                                        output_ctrl.emit_partial(session_text.clone()).await;
+                                    }
+                                }
+                                RouteDecision::Pending { confidence } => {
+                                    debug!(confidence, "accumulating in pending buffer");
+                                    // Text is held in the router's pending_buf.
+                                    // Emit partial showing current session state.
+                                    output_ctrl.emit_partial(session_text.clone()).await;
+                                }
+                                RouteDecision::ReadyForLlm { text, confidence } => {
+                                    debug!(confidence, "pending buffer ready, queueing LLM (holding delivery)");
+                                    utterance_counter += 1;
+                                    pending_delivery.push_back((utterance_counter, text.clone()));
+                                    let relevant = dict
+                                        .lock()
+                                        .await
+                                        .top_relevant(text, 20)
+                                        .into_iter()
+                                        .cloned()
+                                        .collect::<Vec<_>>();
+                                    let req = LlmRequest {
+                                        utterance_id: utterance_counter,
+                                        text: text.clone(),
+                                        context: confidence_router.context(),
+                                        style_preset: style_preset.clone(),
+                                        dictionary: relevant,
+                                    };
+                                    if let Err(e) = llm_tx.send(req).await {
+                                        warn!(error = %e, "LLM unavailable, delivering raw");
+                                        pending_delivery.pop_back();
+                                        output_ctrl.emit_final(text.clone()).await;
+                                        if !text.is_empty() {
+                                            if !session_text.is_empty() {
+                                                session_text.push(' ');
+                                            }
+                                            session_text.push_str(text);
+                                        }
+                                    } else {
+                                        output_ctrl.emit_partial(session_text.clone()).await;
                                     }
                                 }
                             }
@@ -483,16 +499,8 @@ async fn run_session<A: AsrBackend + 'static>(
     // ── Flush pending buffer from confidence router ──────────────────────
     if let Some(remaining) = confidence_router.flush_pending() {
         debug!("flushing pending buffer on stop: {:?}", remaining);
-        output_ctrl.emit_final(remaining.clone()).await;
-        if !remaining.is_empty() {
-            if !session_text.is_empty() {
-                session_text.push(' ');
-            }
-            session_text.push_str(&remaining);
-        }
-
-        // Queue the flushed text for LLM correction.
         utterance_counter += 1;
+        pending_delivery.push_back((utterance_counter, remaining.clone()));
         let relevant = dict
             .lock()
             .await
@@ -502,27 +510,84 @@ async fn run_session<A: AsrBackend + 'static>(
             .collect::<Vec<_>>();
         let req = LlmRequest {
             utterance_id: utterance_counter,
-            text: remaining,
+            text: remaining.clone(),
             context: confidence_router.context(),
             style_preset: style_preset.clone(),
             dictionary: relevant,
         };
         if let Err(e) = llm_tx.send(req).await {
-            warn!(error = %e, "failed to queue LLM request for flushed pending");
+            warn!(error = %e, "LLM unavailable for flushed pending, delivering raw");
+            pending_delivery.pop_back();
+            output_ctrl.emit_final(remaining.clone()).await;
+            if !remaining.is_empty() {
+                if !session_text.is_empty() {
+                    session_text.push(' ');
+                }
+                session_text.push_str(&remaining);
+            }
         }
     }
 
-    // ── Finalize remaining utterance buffer (always route to LLM on stop) ─
+    // ── Finalize remaining utterance buffer (queue to LLM on stop) ──────────
     if !utterance.is_empty() {
         let after_dict = dict.lock().await.apply(&utterance);
-        output_ctrl.emit_final(after_dict.clone()).await;
-        if !after_dict.is_empty() {
+        utterance_counter += 1;
+        pending_delivery.push_back((utterance_counter, after_dict.clone()));
+        let relevant = dict
+            .lock()
+            .await
+            .top_relevant(&after_dict, 20)
+            .into_iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        let req = LlmRequest {
+            utterance_id: utterance_counter,
+            text: after_dict.clone(),
+            context: confidence_router.context(),
+            style_preset: style_preset.clone(),
+            dictionary: relevant,
+        };
+        if let Err(e) = llm_tx.send(req).await {
+            warn!(error = %e, "LLM unavailable for final utterance, delivering raw");
+            pending_delivery.pop_back();
+            output_ctrl.emit_final(after_dict.clone()).await;
+            if !after_dict.is_empty() {
+                if !session_text.is_empty() {
+                    session_text.push(' ');
+                }
+                session_text.push_str(&after_dict);
+            }
+            confidence_router.confirm(&after_dict);
+        }
+    }
+
+    // ── Drain in-flight LLM results; deliver remaining pending as raw ─────
+    // Non-blocking: picks up any LLM results that finished during teardown.
+    // For short utterances the LLM often finishes before we get here.
+    while let Ok(resp) = llm_rx.try_recv() {
+        pending_delivery.retain(|(id, _)| *id > resp.utterance_id);
+        let delivered = if resp.accepted && resp.corrected_text != resp.original_text {
+            resp.corrected_text
+        } else {
+            resp.original_text
+        };
+        output_ctrl.emit_final(delivered.clone()).await;
+        if !delivered.is_empty() {
             if !session_text.is_empty() {
                 session_text.push(' ');
             }
-            session_text.push_str(&after_dict);
+            session_text.push_str(&delivered);
         }
-        confidence_router.confirm(&after_dict);
+    }
+    // Anything still pending didn't make it through LLM — deliver raw.
+    for (_, raw) in pending_delivery.drain(..) {
+        if !raw.is_empty() {
+            output_ctrl.emit_final(raw.clone()).await;
+            if !session_text.is_empty() {
+                session_text.push(' ');
+            }
+            session_text.push_str(&raw);
+        }
     }
 
     // ── End ASR session ───────────────────────────────────────────────────

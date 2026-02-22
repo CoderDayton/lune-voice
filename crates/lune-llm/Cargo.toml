@@ -17,3 +17,4 @@ llama-cpp-2.workspace = true
 encoding_rs.workspace = true
 async-openai.workspace = true
 serde_json.workspace = true
+memchr = "2.8.0"
