@@ -6,4 +6,4 @@
 .env
 *.db
 /scripts/
-/.ralph-logs/
+.ralph-logs/
