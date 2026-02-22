@@ -10,6 +10,21 @@ use lune_core::config::{
 
 use crate::events::AppCommand;
 
+/// Lightweight BCP-47 well-formedness check (RFC 5646 §2.1).
+/// Validates structural rules only — does not consult the IANA subtag registry.
+/// Primary subtag: 2-8 ASCII alpha. Subsequent subtags: 1-8 ASCII alphanumeric.
+fn is_wellformed_bcp47(tag: &str) -> bool {
+    let mut parts = tag.split('-');
+    match parts.next() {
+        Some(p) if (2..=8).contains(&p.len()) && p.bytes().all(|b| b.is_ascii_alphabetic()) => {}
+        _ => return false,
+    }
+    parts.all(|p| {
+        let len = p.len();
+        (1..=8).contains(&len) && p.bytes().all(|b| b.is_ascii_alphanumeric())
+    })
+}
+
 const BUS_NAME: &str = "com.lunevoice.Daemon1";
 const OBJECT_PATH: &str = "/com/lunevoice/Daemon1";
 
@@ -78,12 +93,19 @@ impl DaemonInterface {
         self.dictation_mode_tx.borrow().to_string()
     }
 
-    async fn set_dictation_mode(&self, mode_str: &str) -> zbus::fdo::Result<()> {
+    async fn set_dictation_mode(
+        &self,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+        mode_str: &str,
+    ) -> zbus::fdo::Result<()> {
         let mode: DictationMode = mode_str.parse().map_err(zbus::fdo::Error::InvalidArgs)?;
         if *self.dictation_mode_tx.borrow() != mode {
             self.dictation_mode_tx.send_replace(mode);
             self.settings.write().await.dictation_mode = mode;
             self.persist_setting();
+            let mode_s = mode.to_string();
+            let _ = emitter.dictation_mode_changed(&mode_s).await;
+            let _ = emitter.settings_changed("dictation_mode").await;
         }
         Ok(())
     }
@@ -92,12 +114,19 @@ impl DaemonInterface {
         self.activation_mode_tx.borrow().to_string()
     }
 
-    async fn set_activation_mode(&self, mode_str: &str) -> zbus::fdo::Result<()> {
+    async fn set_activation_mode(
+        &self,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+        mode_str: &str,
+    ) -> zbus::fdo::Result<()> {
         let mode: ActivationMode = mode_str.parse().map_err(zbus::fdo::Error::InvalidArgs)?;
         if *self.activation_mode_tx.borrow() != mode {
             self.activation_mode_tx.send_replace(mode);
             self.settings.write().await.activation_mode = mode;
             self.persist_setting();
+            let mode_s = mode.to_string();
+            let _ = emitter.activation_mode_changed(&mode_s).await;
+            let _ = emitter.settings_changed("activation_mode").await;
         }
         Ok(())
     }
@@ -108,7 +137,11 @@ impl DaemonInterface {
         self.settings.read().await.default_style.clone()
     }
 
-    async fn set_default_style(&self, id: &str) -> zbus::fdo::Result<()> {
+    async fn set_default_style(
+        &self,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+        id: &str,
+    ) -> zbus::fdo::Result<()> {
         if builtin_registry().get(id).is_none() {
             return Err(zbus::fdo::Error::InvalidArgs(format!(
                 "unknown style preset: {id}"
@@ -122,6 +155,7 @@ impl DaemonInterface {
             s.default_style = id.into();
         }
         self.persist_setting();
+        let _ = emitter.settings_changed("default_style").await;
         Ok(())
     }
 
@@ -129,10 +163,15 @@ impl DaemonInterface {
         self.settings.read().await.language.clone()
     }
 
-    async fn set_language(&self, lang: &str) -> zbus::fdo::Result<()> {
-        if lang.is_empty() {
+    async fn set_language(
+        &self,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+        lang: &str,
+    ) -> zbus::fdo::Result<()> {
+        if !is_wellformed_bcp47(lang) {
             return Err(zbus::fdo::Error::InvalidArgs(
-                "language must be a non-empty BCP-47 tag".into(),
+                "language must be a well-formed BCP-47 tag (e.g. \"en\", \"en-US\", \"pt-BR\")"
+                    .into(),
             ));
         }
         {
@@ -143,6 +182,7 @@ impl DaemonInterface {
             s.language = lang.into();
         }
         self.persist_setting();
+        let _ = emitter.settings_changed("language").await;
         Ok(())
     }
 
@@ -152,7 +192,11 @@ impl DaemonInterface {
         self.settings.read().await.privacy_mode.to_string()
     }
 
-    async fn set_privacy_mode(&self, mode_str: &str) -> zbus::fdo::Result<()> {
+    async fn set_privacy_mode(
+        &self,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+        mode_str: &str,
+    ) -> zbus::fdo::Result<()> {
         let mode: PrivacyMode = mode_str.parse().map_err(zbus::fdo::Error::InvalidArgs)?;
         {
             let mut s = self.settings.write().await;
@@ -162,6 +206,7 @@ impl DaemonInterface {
             s.privacy_mode = mode;
         }
         self.persist_setting();
+        let _ = emitter.settings_changed("privacy_mode").await;
         Ok(())
     }
 
@@ -172,7 +217,11 @@ impl DaemonInterface {
         }
     }
 
-    async fn set_session_history_days(&self, days: i32) -> zbus::fdo::Result<()> {
+    async fn set_session_history_days(
+        &self,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+        days: i32,
+    ) -> zbus::fdo::Result<()> {
         let value = if days < 0 { None } else { Some(days as u32) };
         {
             let mut s = self.settings.write().await;
@@ -182,6 +231,7 @@ impl DaemonInterface {
             s.session_history_days = value;
         }
         self.persist_setting();
+        let _ = emitter.settings_changed("session_history_days").await;
         Ok(())
     }
 
@@ -190,11 +240,16 @@ impl DaemonInterface {
         serde_json::to_string(&h).map_err(|e| zbus::fdo::Error::Failed(e.to_string()))
     }
 
-    async fn set_hotkey(&self, json: &str) -> zbus::fdo::Result<()> {
+    async fn set_hotkey(
+        &self,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+        json: &str,
+    ) -> zbus::fdo::Result<()> {
         let hotkey: HotkeyConfig =
             serde_json::from_str(json).map_err(|e| zbus::fdo::Error::InvalidArgs(e.to_string()))?;
         self.settings.write().await.hotkey = hotkey;
         self.persist_setting();
+        let _ = emitter.settings_changed("hotkey").await;
         Ok(())
     }
 
@@ -205,12 +260,17 @@ impl DaemonInterface {
         serde_json::to_string(&cfg).map_err(|e| zbus::fdo::Error::Failed(e.to_string()))
     }
 
-    async fn set_asr_backend(&self, json: &str) -> zbus::fdo::Result<()> {
+    async fn set_asr_backend(
+        &self,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+        json: &str,
+    ) -> zbus::fdo::Result<()> {
         let cfg: AsrBackendConfig =
             serde_json::from_str(json).map_err(|e| zbus::fdo::Error::InvalidArgs(e.to_string()))?;
         self.settings.write().await.asr_backend = cfg;
         self.persist_setting();
         tracing::info!("ASR backend config updated — restart daemon to load new model");
+        let _ = emitter.settings_changed("asr_backend").await;
         Ok(())
     }
 
@@ -219,12 +279,17 @@ impl DaemonInterface {
         serde_json::to_string(&cfg).map_err(|e| zbus::fdo::Error::Failed(e.to_string()))
     }
 
-    async fn set_llm_backend(&self, json: &str) -> zbus::fdo::Result<()> {
+    async fn set_llm_backend(
+        &self,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+        json: &str,
+    ) -> zbus::fdo::Result<()> {
         let cfg: LlmBackendConfig =
             serde_json::from_str(json).map_err(|e| zbus::fdo::Error::InvalidArgs(e.to_string()))?;
         self.settings.write().await.llm_backend = cfg;
         self.persist_setting();
         tracing::info!("LLM backend config updated — restart daemon to load new model");
+        let _ = emitter.settings_changed("llm_backend").await;
         Ok(())
     }
 
@@ -325,4 +390,40 @@ pub async fn emit_activation_mode_changed(conn: &Connection, mode: &str) -> zbus
 pub async fn emit_settings_changed(conn: &Connection, key: &str) -> zbus::Result<()> {
     let iface_ref = get_iface_ref(conn).await?;
     DaemonInterface::settings_changed(iface_ref.signal_emitter(), key).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_wellformed_bcp47;
+
+    #[test]
+    fn valid_bcp47_tags() {
+        for tag in [
+            "en",
+            "en-US",
+            "en-GB",
+            "pt-BR",
+            "zh-Hans",
+            "zh-Hans-CN",
+            "sr-Latn-RS",
+        ] {
+            assert!(is_wellformed_bcp47(tag), "should accept {tag}");
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_tags() {
+        for tag in [
+            "",
+            "e",
+            "123",
+            "en-",
+            "-en",
+            "en--US",
+            "en-abcdefghi",
+            "en US",
+        ] {
+            assert!(!is_wellformed_bcp47(tag), "should reject {tag:?}");
+        }
+    }
 }
