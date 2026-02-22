@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use parakeet_rs::{Parakeet, TimestampMode, Transcriber};
+use parakeet_rs::{ParakeetTDT, TimestampMode, Transcriber};
 
 use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
 use lune_core::error::{Error, Result};
@@ -19,11 +19,11 @@ pub struct ParakeetTdtConfig {
 
 /// Local ASR backend using NVIDIA Parakeet TDT 1.1B via ONNX Runtime.
 ///
-/// `Parakeet` from parakeet-rs handles mel extraction, encoder, TDT decoder,
+/// `ParakeetTDT` from parakeet-rs handles mel extraction, encoder, TDT decoder,
 /// and tokenizer internally. We accumulate PCM in a sliding window and call
 /// `transcribe_samples` on poll.
 pub struct ParakeetTdtBackend {
-    model: Mutex<Parakeet>,
+    model: Mutex<ParakeetTDT>,
     config: ParakeetTdtConfig,
 }
 
@@ -61,7 +61,7 @@ impl ParakeetTdtBackend {
         };
 
         let model =
-            Parakeet::from_pretrained(config.model_dir.to_str().unwrap_or("."), exec_config)
+            ParakeetTDT::from_pretrained(config.model_dir.to_str().unwrap_or("."), exec_config)
                 .map_err(|e| Error::Asr(format!("load parakeet model: {e}")))?;
 
         tracing::info!(

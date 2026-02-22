@@ -33,7 +33,7 @@ impl ModelSpec {
         Self::Directory {
             repo_id: "dtgagnon/parakeet-tdt-1.1b-onnx".into(),
             required_files: vec!["vocab.txt".into()],
-            suffix_patterns: vec![".onnx".into(), ".onnx_data".into()],
+            suffix_patterns: vec![".onnx".into(), ".onnx.data".into()],
             local_name: "parakeet-tdt-1.1b".into(),
         }
     }
