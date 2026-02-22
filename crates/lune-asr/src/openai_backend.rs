@@ -2,7 +2,6 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use serde::Deserialize;
-use tokio::sync::mpsc;
 use url::Url;
 
 use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};

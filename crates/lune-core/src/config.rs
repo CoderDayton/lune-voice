@@ -49,7 +49,7 @@ pub struct UserSettings {
 impl Default for UserSettings {
     fn default() -> Self {
         Self {
-            asr_backend: AsrBackendConfig::VoxtralLocal {
+            asr_backend: AsrBackendConfig::ParakeetTdt {
                 model_dir: PathBuf::new(),
                 use_gpu: true,
                 context_secs: 30.0,
@@ -75,10 +75,10 @@ pub type StyleId = String;
 #[serde(tag = "type")]
 #[non_exhaustive]
 pub enum AsrBackendConfig {
-    VoxtralLocal {
+    ParakeetTdt {
         model_dir: PathBuf,
         use_gpu: bool,
-        /// Sliding window size in seconds.
+        /// Sliding context window size in seconds.
         context_secs: f32,
     },
     OpenAiCompatible {

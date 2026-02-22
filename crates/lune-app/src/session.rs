@@ -36,7 +36,7 @@ impl Default for SessionManagerConfig {
             asr_config: AsrSessionConfig::default(),
             style_preset: StylePreset::general(),
             output_mode: OutputMode::LiveTyping,
-            asr_backend_kind: AsrBackendKind::VoxtralLocal,
+            asr_backend_kind: AsrBackendKind::ParakeetTdt,
         }
     }
 }
@@ -198,7 +198,7 @@ async fn run_session<A: AsrBackend + 'static>(
 
     // ── Start audio capture ───────────────────────────────────────────────
     let (audio_tx, mut audio_rx) =
-        mpsc::channel::<lune_core::audio::AudioFrame>(128);
+        mpsc::channel::<lune_core::audio::AudioFrame>(1024);
 
     // `cpal::Stream` inside SessionHandle is !Send; this is fine here because
     // run_session is spawned via spawn_local (LocalSet, current-thread runtime)
@@ -280,6 +280,15 @@ async fn run_session<A: AsrBackend + 'static>(
                         if let Err(e) = asr.push_audio(&asr_session, &frame.samples).await {
                             warn!(error = %e, "push_audio error");
                             continue;
+                        }
+
+                        // Drain all buffered frames so the channel doesn't overflow
+                        // while inference (in poll_results) blocks.
+                        while let Ok(extra) = audio_rx.try_recv() {
+                            if let Err(e) = asr.push_audio(&asr_session, &extra.samples).await {
+                                warn!(error = %e, "push_audio error (drain)");
+                                break;
+                            }
                         }
 
                         let segments = match asr.poll_results(&asr_session).await {

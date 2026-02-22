@@ -344,7 +344,7 @@ mod tests {
             started_at: Utc::now(),
             ended_at: Some(Utc::now()),
             style: "general".into(),
-            backend: AsrBackendKind::VoxtralLocal,
+            backend: AsrBackendKind::ParakeetTdt,
             status: SessionStatus::Completed,
             transcript: Some("Hello world.".into()),
         };
@@ -361,7 +361,7 @@ mod tests {
             started_at: Utc::now(),
             ended_at: None,
             style: "general".into(),
-            backend: AsrBackendKind::VoxtralLocal,
+            backend: AsrBackendKind::ParakeetTdt,
             status: SessionStatus::Active,
             transcript: None,
         };
@@ -388,7 +388,7 @@ mod tests {
             started_at: Utc::now(),
             ended_at: None,
             style: "general".into(),
-            backend: AsrBackendKind::VoxtralLocal,
+            backend: AsrBackendKind::ParakeetTdt,
             status: SessionStatus::Active,
             transcript: None,
         };
@@ -416,7 +416,7 @@ mod tests {
             started_at: old_time,
             ended_at: None,
             style: "general".into(),
-            backend: AsrBackendKind::VoxtralLocal,
+            backend: AsrBackendKind::ParakeetTdt,
             status: SessionStatus::Completed,
             transcript: None,
         };
@@ -428,7 +428,7 @@ mod tests {
             started_at: Utc::now(),
             ended_at: None,
             style: "general".into(),
-            backend: AsrBackendKind::VoxtralLocal,
+            backend: AsrBackendKind::ParakeetTdt,
             status: SessionStatus::Active,
             transcript: None,
         };

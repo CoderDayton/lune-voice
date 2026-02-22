@@ -54,15 +54,10 @@ diesel = { version = "2", features = ["sqlite", "returning_clauses_for_sqlite_3_
 diesel_migrations = "2"
 dirs = "6"
 cpal = "0.15"
-candle-core = "0.9"
-candle-nn = "0.9"
-candle-transformers = "0.9"
-tokenizers = "0.21"
+parakeet-rs = "0.3"
 hf-hub = "0.4"
-safetensors = "0.5"
-rand = "0.9"
-rustfft = "6"
 llama-cpp-2 = "0.1"
 encoding_rs = "0.8"
 async-openai = { version = "0.33", features = ["chat-completion"] }
 reqwest = { version = "0.12", features = ["json", "multipart"] }
+zbus = "5"

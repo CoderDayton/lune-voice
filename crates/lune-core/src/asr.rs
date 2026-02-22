@@ -38,7 +38,7 @@ impl Default for AsrSessionConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum AsrBackendKind {
-    VoxtralLocal,
+    ParakeetTdt,
     OpenAiCompatible,
 }
 
@@ -99,9 +99,9 @@ mod tests {
 
     #[test]
     fn asr_backend_kind_round_trip() {
-        let kind = AsrBackendKind::VoxtralLocal;
+        let kind = AsrBackendKind::ParakeetTdt;
         let json = serde_json::to_string(&kind).unwrap();
         let parsed: AsrBackendKind = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed, AsrBackendKind::VoxtralLocal);
+        assert_eq!(parsed, AsrBackendKind::ParakeetTdt);
     }
 }

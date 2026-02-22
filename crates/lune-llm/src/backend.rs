@@ -1,6 +1,6 @@
 use std::num::NonZeroU32;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use llama_cpp_2::context::params::LlamaContextParams;
 use llama_cpp_2::llama_backend::LlamaBackend;
@@ -52,7 +52,7 @@ impl Default for LocalLlmConfig {
 /// Runs Qwen3-0.6B (or compatible) for text post-processing:
 /// grammar correction, disfluency removal, punctuation.
 pub struct LocalLlmBackend {
-    inner: Mutex<LlmInner>,
+    inner: Arc<Mutex<LlmInner>>,
     config: LocalLlmConfig,
 }
 
@@ -91,101 +91,109 @@ impl LocalLlmBackend {
         );
 
         Ok(Self {
-            inner: Mutex::new(LlmInner { backend, model }),
+            inner: Arc::new(Mutex::new(LlmInner { backend, model })),
             config,
         })
     }
 
-    /// Run inference on a prompt string, returning the generated text.
-    fn generate(&self, prompt_text: &str) -> Result<String> {
-        let inner = self.inner.lock()
-            .map_err(|e| Error::Llm(format!("lock: {e}")))?;
+}
 
-        let n_ctx = NonZeroU32::new(self.config.n_ctx)
-            .ok_or_else(|| Error::Llm("n_ctx must be > 0".into()))?;
+/// Run inference on a prompt string, returning the generated text.
+///
+/// Free function so it can be called from `spawn_blocking` (which requires
+/// `'static` + `Send` — the `Arc<Mutex<LlmInner>>` satisfies both).
+fn generate_sync(
+    inner: &Mutex<LlmInner>,
+    config: &LocalLlmConfig,
+    prompt_text: &str,
+) -> Result<String> {
+    let inner = inner.lock()
+        .map_err(|e| Error::Llm(format!("lock: {e}")))?;
 
-        let ctx_params = LlamaContextParams::default()
-            .with_n_ctx(Some(n_ctx));
+    let n_ctx = NonZeroU32::new(config.n_ctx)
+        .ok_or_else(|| Error::Llm("n_ctx must be > 0".into()))?;
 
-        let mut ctx = inner.model
-            .new_context(&inner.backend, ctx_params)
-            .map_err(|e| Error::Llm(format!("create context: {e}")))?;
+    let ctx_params = LlamaContextParams::default()
+        .with_n_ctx(Some(n_ctx));
 
-        // Tokenize prompt. Qwen3 has no BOS token.
-        let tokens = inner.model
-            .str_to_token(prompt_text, AddBos::Never)
-            .map_err(|e| Error::Llm(format!("tokenize: {e}")))?;
+    let mut ctx = inner.model
+        .new_context(&inner.backend, ctx_params)
+        .map_err(|e| Error::Llm(format!("create context: {e}")))?;
 
-        let prompt_len = tokens.len() as i32;
-        if prompt_len as u32 >= self.config.n_ctx {
-            return Err(Error::Llm(format!(
-                "prompt ({prompt_len} tokens) exceeds context window ({})",
-                self.config.n_ctx
-            )));
-        }
+    // Tokenize prompt. Qwen3 has no BOS token.
+    let tokens = inner.model
+        .str_to_token(prompt_text, AddBos::Never)
+        .map_err(|e| Error::Llm(format!("tokenize: {e}")))?;
 
-        // Build batch with prompt tokens.
-        let batch_size = prompt_len.max(512) as usize;
-        let mut batch = LlamaBatch::new(batch_size, 1);
-        let last_idx = prompt_len - 1;
-        for (i, token) in tokens.into_iter().enumerate() {
-            let is_last = i as i32 == last_idx;
-            batch.add(token, i as i32, &[0], is_last)
-                .map_err(|e| Error::Llm(format!("batch add: {e}")))?;
-        }
-
-        // Prefill.
-        ctx.decode(&mut batch)
-            .map_err(|e| Error::Llm(format!("decode prefill: {e}")))?;
-
-        // Set up sampler chain.
-        let mut sampler = if self.config.temperature <= 0.0 {
-            LlamaSampler::greedy()
-        } else {
-            LlamaSampler::chain_simple([
-                LlamaSampler::top_k(self.config.top_k),
-                LlamaSampler::top_p(self.config.top_p, 1),
-                LlamaSampler::temp(self.config.temperature),
-                LlamaSampler::dist(42),
-            ])
-        };
-
-        // Autoregressive decode.
-        let mut decoder = encoding_rs::UTF_8.new_decoder();
-        let mut output = String::with_capacity(512);
-        let mut n_cur = batch.n_tokens();
-        let max_total = prompt_len as i32 + self.config.max_output_tokens as i32;
-        let eos = inner.model.token_eos();
-
-        while n_cur < max_total {
-            let token = sampler.sample(&ctx, batch.n_tokens() - 1);
-            sampler.accept(token);
-
-            if token == eos {
-                break;
-            }
-
-            let piece = inner.model
-                .token_to_piece(token, &mut decoder, true, None)
-                .unwrap_or_default();
-            output.push_str(&piece);
-
-            // Stop on <|im_end|> in the output.
-            if output.contains("<|im_end|>") {
-                break;
-            }
-
-            batch.clear();
-            batch.add(token, n_cur, &[0], true)
-                .map_err(|e| Error::Llm(format!("batch add decode: {e}")))?;
-            n_cur += 1;
-
-            ctx.decode(&mut batch)
-                .map_err(|e| Error::Llm(format!("decode step: {e}")))?;
-        }
-
-        Ok(output)
+    let prompt_len = tokens.len() as i32;
+    if prompt_len as u32 >= config.n_ctx {
+        return Err(Error::Llm(format!(
+            "prompt ({prompt_len} tokens) exceeds context window ({})",
+            config.n_ctx
+        )));
     }
+
+    // Build batch with prompt tokens.
+    let batch_size = prompt_len.max(512) as usize;
+    let mut batch = LlamaBatch::new(batch_size, 1);
+    let last_idx = prompt_len - 1;
+    for (i, token) in tokens.into_iter().enumerate() {
+        let is_last = i as i32 == last_idx;
+        batch.add(token, i as i32, &[0], is_last)
+            .map_err(|e| Error::Llm(format!("batch add: {e}")))?;
+    }
+
+    // Prefill.
+    ctx.decode(&mut batch)
+        .map_err(|e| Error::Llm(format!("decode prefill: {e}")))?;
+
+    // Set up sampler chain.
+    let mut sampler = if config.temperature <= 0.0 {
+        LlamaSampler::greedy()
+    } else {
+        LlamaSampler::chain_simple([
+            LlamaSampler::top_k(config.top_k),
+            LlamaSampler::top_p(config.top_p, 1),
+            LlamaSampler::temp(config.temperature),
+            LlamaSampler::dist(42),
+        ])
+    };
+
+    // Autoregressive decode.
+    let mut decoder = encoding_rs::UTF_8.new_decoder();
+    let mut output = String::with_capacity(512);
+    let mut n_cur = batch.n_tokens();
+    let max_total = prompt_len as i32 + config.max_output_tokens as i32;
+    let eos = inner.model.token_eos();
+
+    while n_cur < max_total {
+        let token = sampler.sample(&ctx, batch.n_tokens() - 1);
+        sampler.accept(token);
+
+        if token == eos {
+            break;
+        }
+
+        let piece = inner.model
+            .token_to_piece(token, &mut decoder, true, None)
+            .unwrap_or_default();
+        output.push_str(&piece);
+
+        // Stop on <|im_end|> in the output.
+        if output.contains("<|im_end|>") {
+            break;
+        }
+
+        batch.clear();
+        batch.add(token, n_cur, &[0], true)
+            .map_err(|e| Error::Llm(format!("batch add decode: {e}")))?;
+        n_cur += 1;
+
+        ctx.decode(&mut batch)
+            .map_err(|e| Error::Llm(format!("decode step: {e}")))?;
+    }
+
+    Ok(output)
 }
 
 #[async_trait::async_trait]
@@ -203,9 +211,15 @@ impl TextPostProcessor for LocalLlmBackend {
             "LLM post-process request"
         );
 
-        // Run inference on blocking thread to avoid starving the async runtime.
-        let backend = &*self;
-        let raw_output = tokio::task::block_in_place(|| backend.generate(&prompt_text))?;
+        // Run inference on a blocking thread to avoid starving the async runtime.
+        // spawn_blocking (not block_in_place) is required for current_thread + LocalSet.
+        let inner = Arc::clone(&self.inner);
+        let config = self.config.clone();
+        let raw_output = tokio::task::spawn_blocking(move || {
+            generate_sync(&inner, &config, &prompt_text)
+        })
+        .await
+        .map_err(|e| Error::Llm(format!("spawn_blocking join: {e}")))??;
 
         let cleaned = prompt::strip_thinking(&raw_output);
 

@@ -36,15 +36,15 @@ impl AppPaths {
         self.data_dir.join("lune.db")
     }
 
-    pub fn models_hub_dir(&self) -> PathBuf {
-        self.data_dir.join("models").join("hub")
+    pub fn models_dir(&self) -> PathBuf {
+        self.data_dir.join("models")
     }
 
     /// Ensure all directories exist.
     pub fn ensure_dirs(&self) -> std::io::Result<()> {
         std::fs::create_dir_all(&self.config_dir)?;
         std::fs::create_dir_all(&self.data_dir)?;
-        std::fs::create_dir_all(self.models_hub_dir())?;
+        std::fs::create_dir_all(self.models_dir())?;
         Ok(())
     }
 }

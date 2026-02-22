@@ -50,7 +50,7 @@ mod tests {
             started_at: Utc::now(),
             ended_at: None,
             style: "general".into(),
-            backend: AsrBackendKind::VoxtralLocal,
+            backend: AsrBackendKind::ParakeetTdt,
             status: SessionStatus::Active,
             transcript: None,
         };
