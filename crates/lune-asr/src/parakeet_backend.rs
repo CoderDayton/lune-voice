@@ -1,14 +1,19 @@
+//! Local ASR backend using NVIDIA Parakeet TDT via direct ONNX Runtime inference.
+//!
+//! Replaces `parakeet-rs` wrapper to expose token-level confidence scores
+//! needed for confidence-based routing.
+
 use std::path::PathBuf;
 use std::sync::Mutex;
-
-use parakeet_rs::{ParakeetTDT, TimestampMode, Transcriber};
 
 use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
 use lune_core::error::{Error, Result};
 
+use crate::mel;
 use crate::segment::SegmentTracker;
+use crate::tdt_decoder::TdtModel;
 
-/// Configuration for the Parakeet TDT 1.1B local backend.
+/// Configuration for the Parakeet TDT local backend.
 pub struct ParakeetTdtConfig {
     /// Directory containing ONNX model files and vocab.txt.
     pub model_dir: PathBuf,
@@ -17,13 +22,12 @@ pub struct ParakeetTdtConfig {
     pub context_secs: f32,
 }
 
-/// Local ASR backend using NVIDIA Parakeet TDT 1.1B via ONNX Runtime.
+/// Local ASR backend using NVIDIA Parakeet TDT via ONNX Runtime.
 ///
-/// `ParakeetTDT` from parakeet-rs handles mel extraction, encoder, TDT decoder,
-/// and tokenizer internally. We accumulate PCM in a sliding window and call
-/// `transcribe_samples` on poll.
+/// `TdtModel` handles encoder, TDT decoder, and tokenizer directly.
+/// We accumulate PCM in a sliding window and call `transcribe` on poll.
 pub struct ParakeetTdtBackend {
-    model: Mutex<ParakeetTDT>,
+    model: Mutex<TdtModel>,
     config: ParakeetTdtConfig,
 }
 
@@ -43,31 +47,12 @@ impl ParakeetTdtBackend {
             return Err(Error::ModelNotFound(config.model_dir.clone()));
         }
 
-        let exec_config = if config.use_gpu {
-            #[cfg(feature = "cuda")]
-            {
-                Some(
-                    parakeet_rs::ExecutionConfig::new()
-                        .with_execution_provider(parakeet_rs::ExecutionProvider::Cuda),
-                )
-            }
-            #[cfg(not(feature = "cuda"))]
-            {
-                tracing::warn!("use_gpu=true but cuda feature not enabled, falling back to CPU");
-                None
-            }
-        } else {
-            None
-        };
-
-        let model =
-            ParakeetTDT::from_pretrained(config.model_dir.to_str().unwrap_or("."), exec_config)
-                .map_err(|e| Error::Asr(format!("load parakeet model: {e}")))?;
+        let model = TdtModel::new(&config.model_dir, config.use_gpu)?;
 
         tracing::info!(
             model_dir = %config.model_dir.display(),
             use_gpu = config.use_gpu,
-            "initialized Parakeet TDT 1.1B backend"
+            "initialized Parakeet TDT backend (direct ort)"
         );
 
         Ok(Self {
@@ -96,6 +81,7 @@ impl AsrBackend for ParakeetTdtBackend {
         Ok(Mutex::new(session))
     }
 
+    #[inline]
     async fn push_audio(&self, session: &Self::SessionHandle, pcm: &[f32]) -> Result<()> {
         let mut session = session
             .lock()
@@ -119,8 +105,8 @@ impl AsrBackend for ParakeetTdtBackend {
             .lock()
             .map_err(|e| Error::Asr(format!("session lock: {e}")))?;
 
-        // Only run inference when >= 1 second of new audio has accumulated.
-        let threshold = session.sample_rate as usize;
+        // Run inference after 300ms of new audio (4800 samples @ 16kHz).
+        let threshold = (session.sample_rate as usize * 3) / 10;
         if session.samples_since_inference < threshold {
             session.tracker.check_silence_finalization();
             return Ok(session.tracker.drain());
@@ -128,11 +114,11 @@ impl AsrBackend for ParakeetTdtBackend {
 
         session.samples_since_inference = 0;
 
-        let buffer = session.audio_buffer.clone();
-        let sample_rate = session.sample_rate;
-        let timestamp_ms = session.total_samples * 1000 / sample_rate as u64;
+        // Avoid cloning the full buffer: borrow for mel extraction.
+        let features = mel::extract_features(&session.audio_buffer);
+        let timestamp_ms = session.total_samples * 1000 / session.sample_rate as u64;
 
-        // Release session lock, acquire model lock for inference.
+        // Run inference (release session lock, acquire model lock)
         let result = {
             let mut model = self
                 .model
@@ -140,12 +126,7 @@ impl AsrBackend for ParakeetTdtBackend {
                 .map_err(|e| Error::Asr(format!("model lock: {e}")))?;
 
             let start = std::time::Instant::now();
-            let res = model.transcribe_samples(
-                buffer,
-                sample_rate,
-                1, // mono
-                Some(TimestampMode::Words),
-            );
+            let res = model.transcribe(features);
             let elapsed = start.elapsed();
             tracing::debug!(elapsed_ms = elapsed.as_millis(), "inference");
             res
@@ -153,13 +134,17 @@ impl AsrBackend for ParakeetTdtBackend {
 
         match result {
             Ok(transcription) => {
-                let text = transcription.text.trim().to_string();
+                let text = transcription.text.trim();
                 if !text.is_empty() {
-                    session.tracker.push_partial(text, Some(timestamp_ms));
+                    session.tracker.push_partial(
+                        text.to_string(),
+                        Some(timestamp_ms),
+                        Some(transcription.confidence),
+                    );
                 }
             }
             Err(e) => {
-                tracing::warn!(error = %e, "parakeet inference failed");
+                tracing::warn!(error = %e, "TDT inference failed");
             }
         }
 
@@ -168,6 +153,17 @@ impl AsrBackend for ParakeetTdtBackend {
             return Ok(vec![]);
         }
         Ok(session.tracker.drain())
+    }
+
+    async fn reset_context(&self, session: &Self::SessionHandle) -> Result<()> {
+        let mut session = session
+            .lock()
+            .map_err(|e| Error::Asr(format!("session lock: {e}")))?;
+        session.audio_buffer.clear();
+        session.samples_since_inference = 0;
+        session.tracker.drain();
+        tracing::debug!("ASR context reset");
+        Ok(())
     }
 
     async fn end_session(&self, session: Self::SessionHandle) -> Result<()> {

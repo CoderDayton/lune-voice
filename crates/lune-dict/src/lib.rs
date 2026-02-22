@@ -63,10 +63,15 @@ impl DictionaryManager {
     /// fuzzy matching per word.
     pub fn apply(&self, text: &str) -> String {
         // Split into multi-word and single-word entries, both sorted priority DESC.
-        let (multi, single): (Vec<_>, Vec<_>) = self
-            .cache
-            .iter()
-            .partition(|e| e.phrase.split_whitespace().count() > 1);
+        let mut multi = Vec::new();
+        let mut single = Vec::new();
+        for e in &self.cache {
+            if e.phrase.split_whitespace().count() > 1 {
+                multi.push(e);
+            } else {
+                single.push(e);
+            }
+        }
 
         let mut current = text.to_owned();
 
@@ -136,11 +141,21 @@ impl DictionaryManager {
 
     /// Export all entries as plain text (`spoken → replacement` per line).
     pub fn export_text(&self) -> String {
-        self.cache
+        let capacity = self
+            .cache
             .iter()
-            .map(|e| format!("{} → {}", e.phrase, e.replacement))
-            .collect::<Vec<_>>()
-            .join("\n")
+            .map(|e| e.phrase.len() + e.replacement.len() + 5)
+            .sum();
+        let mut out = String::with_capacity(capacity);
+        for (i, e) in self.cache.iter().enumerate() {
+            if i > 0 {
+                out.push('\n');
+            }
+            out.push_str(&e.phrase);
+            out.push_str(" → ");
+            out.push_str(&e.replacement);
+        }
+        out
     }
 }
 
@@ -166,7 +181,10 @@ fn apply_multi_word(text: &str, entry: &DictionaryEntry) -> String {
                 // Preserve any trailing punctuation from the last word of the window.
                 let last = text_words[i + n - 1];
                 let punct = &last[strip_trailing_punct(last).len()..];
-                out.push(format!("{}{}", entry.replacement, punct));
+                let mut s = String::with_capacity(entry.replacement.len() + punct.len());
+                s.push_str(&entry.replacement);
+                s.push_str(punct);
+                out.push(s);
                 i += n;
                 continue;
             }
@@ -188,7 +206,12 @@ fn apply_single_words(text: &str, singles: &[&DictionaryEntry]) -> String {
             .iter()
             .find(|e| levenshtein(&lower, &e.phrase.to_lowercase()) <= 1);
         match replaced {
-            Some(e) => out.push(format!("{}{}", e.replacement, punct)),
+            Some(e) => {
+                let mut s = String::with_capacity(e.replacement.len() + punct.len());
+                s.push_str(&e.replacement);
+                s.push_str(punct);
+                out.push(s);
+            }
             None => out.push(word.to_owned()),
         }
     }
@@ -196,6 +219,7 @@ fn apply_single_words(text: &str, singles: &[&DictionaryEntry]) -> String {
 }
 
 /// Strip trailing ASCII punctuation for comparison purposes.
+#[inline]
 fn strip_trailing_punct(s: &str) -> &str {
     s.trim_end_matches(['.', ',', '!', '?', ';', ':'])
 }

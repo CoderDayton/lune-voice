@@ -113,20 +113,33 @@ impl CallbackState {
     }
 
     /// Convert interleaved multi-channel data to mono f32.
+    #[inline]
     fn to_mono_f32(&self, data: &[f32]) -> Vec<f32> {
         if self.channels == 1 {
             data.to_vec()
         } else {
+            // Multiply by inverse to avoid per-chunk division.
+            let inv = 1.0f32 / self.channels as f32;
             data.chunks_exact(self.channels)
-                .map(|ch| ch.iter().sum::<f32>() / self.channels as f32)
+                .map(|ch| ch.iter().sum::<f32>() * inv)
                 .collect()
         }
     }
 
     /// Convert interleaved i16 multi-channel data to mono f32.
+    ///
+    /// Avoids an intermediate Vec by combining i16→f32 conversion and downmix in one pass.
+    #[inline]
     fn i16_to_mono_f32(&self, data: &[i16]) -> Vec<f32> {
-        let float_data: Vec<f32> = data.iter().map(|&s| s as f32 / i16::MAX as f32).collect();
-        self.to_mono_f32(&float_data)
+        const INV_I16_MAX: f32 = 1.0 / i16::MAX as f32;
+        if self.channels == 1 {
+            data.iter().map(|&s| s as f32 * INV_I16_MAX).collect()
+        } else {
+            let inv_channels = 1.0f32 / self.channels as f32;
+            data.chunks_exact(self.channels)
+                .map(|ch| ch.iter().map(|&s| s as f32 * INV_I16_MAX).sum::<f32>() * inv_channels)
+                .collect()
+        }
     }
 }
 
@@ -270,6 +283,7 @@ impl AudioCaptureService {
     }
 }
 
+#[cold]
 fn err_callback(err: cpal::StreamError) {
     tracing::error!(%err, "audio stream error");
 }

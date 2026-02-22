@@ -152,11 +152,15 @@ impl ModelHub {
         Ok(())
     }
 
+    #[inline]
     fn list_repo_files(&self, repo: &ApiRepo, repo_id: &str) -> PersistResult<Vec<String>> {
         let info = repo
             .info()
             .map_err(|e| PersistError::ModelDownload(format!("{repo_id}: repo info: {e}")))?;
-        Ok(info.siblings.into_iter().map(|s| s.rfilename).collect())
+        let siblings = info.siblings;
+        let mut files = Vec::with_capacity(siblings.len());
+        files.extend(siblings.into_iter().map(|s| s.rfilename));
+        Ok(files)
     }
 }
 

@@ -9,24 +9,27 @@ use lune_core::llm::PostProcessInput;
 /// <|im_start|>user
 /// {few_shot_input}<|im_end|>
 /// <|im_start|>assistant
-/// <think></think>
+/// <think>
+/// </think>
 /// {few_shot_output}<|im_end|>
 /// ...
 /// <|im_start|>user
 /// {raw_text}<|im_end|>
 /// <|im_start|>assistant
-/// <think></think>
+/// <think>
+/// </think>
 ///
 /// ```
 ///
-/// We start with `<think></think>\n` to disable thinking mode —
+/// We start with `<think>\n</think>\n` to disable thinking mode —
 /// for text cleanup we want direct output, not chain-of-thought.
 pub fn build_chatml(input: &PostProcessInput) -> String {
     let mut prompt = String::with_capacity(2048);
     let style = &input.style_preset;
 
     // System message with dictionary context.
-    prompt.push_str("<|im_start|>system\n");
+    // /no_think disables Qwen3's chain-of-thought mode at the system level.
+    prompt.push_str("<|im_start|>system\n/no_think\n");
     prompt.push_str(&style.system_prompt);
 
     if !input.dictionary.is_empty() {
@@ -53,7 +56,7 @@ pub fn build_chatml(input: &PostProcessInput) -> String {
         prompt.push_str("<|im_start|>user\n");
         prompt.push_str(user_ex);
         prompt.push_str("<|im_end|>\n");
-        prompt.push_str("<|im_start|>assistant\n<think></think>\n");
+        prompt.push_str("<|im_start|>assistant\n<think>\n</think>\n");
         prompt.push_str(assistant_ex);
         prompt.push_str("<|im_end|>\n");
     }
@@ -67,16 +70,18 @@ pub fn build_chatml(input: &PostProcessInput) -> String {
     prompt.push_str("<|im_end|>\n");
 
     // Start assistant turn with thinking disabled.
-    prompt.push_str("<|im_start|>assistant\n<think></think>\n");
+    prompt.push_str("<|im_start|>assistant\n<think>\n</think>\n");
 
     prompt
 }
 
 /// Strip any `<think>...</think>` blocks and trim the output.
+#[inline]
 pub fn strip_thinking(text: &str) -> String {
     let mut result = String::with_capacity(text.len());
     let mut remaining = text;
 
+    // Strip matched <think>...</think> pairs.
     while let Some(start) = remaining.find("<think>") {
         result.push_str(&remaining[..start]);
         if let Some(end) = remaining[start..].find("</think>") {
@@ -88,8 +93,19 @@ pub fn strip_thinking(text: &str) -> String {
     }
     result.push_str(remaining);
 
+    // Handle bare </think> without opening tag — the model continued
+    // reasoning after our prefilled <think></think> and only emitted the
+    // closing tag. Drop everything before (and including) the bare closer.
+    if let Some(pos) = result.find("</think>") {
+        // drain in-place avoids a new heap allocation
+        result.drain(0..pos + "</think>".len());
+    }
+
     // Also strip <|im_end|> if the model emits it.
-    let result = result.replace("<|im_end|>", "");
+    // Check before replacing to avoid an allocation in the common case.
+    if result.contains("<|im_end|>") {
+        result = result.replace("<|im_end|>", "");
+    }
     result.trim().to_string()
 }
 
@@ -109,10 +125,10 @@ mod tests {
             dictionary: vec![],
         };
         let prompt = build_chatml(&input);
-        assert!(prompt.starts_with("<|im_start|>system\n"));
+        assert!(prompt.starts_with("<|im_start|>system\n/no_think\n"));
         assert!(prompt.contains("<|im_end|>"));
         assert!(prompt.contains("hello um world"));
-        assert!(prompt.ends_with("<think></think>\n"));
+        assert!(prompt.ends_with("<think>\n</think>\n"));
     }
 
     #[test]
@@ -170,5 +186,12 @@ mod tests {
     fn strip_im_end() {
         let text = "Hello world.<|im_end|>";
         assert_eq!(strip_thinking(text), "Hello world.");
+    }
+
+    #[test]
+    fn strip_bare_close_think() {
+        // Model ignored prefill and produced reasoning with only a closing tag.
+        let text = "Okay, the user wrote something...\n</think>\n\nThe meeting is at 3.";
+        assert_eq!(strip_thinking(text), "The meeting is at 3.");
     }
 }

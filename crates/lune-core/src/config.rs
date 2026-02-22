@@ -10,16 +10,19 @@ use zeroize::Zeroize;
 pub struct RedactedString(String);
 
 impl RedactedString {
+    #[inline]
     pub fn new(s: impl Into<String>) -> Self {
         Self(s.into())
     }
 
+    #[inline]
     pub fn expose(&self) -> &str {
         &self.0
     }
 }
 
 impl std::fmt::Debug for RedactedString {
+    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("[REDACTED]")
     }
@@ -58,7 +61,8 @@ impl Default for UserSettings {
             llm_backend: LlmBackendConfig::Local {
                 model_path: PathBuf::new(),
                 use_gpu: true,
-                n_ctx: 2048,
+                n_ctx: 16384,
+                max_output_tokens: 512,
             },
             hotkey: HotkeyConfig::default(),
             default_style: "general".into(),
@@ -99,6 +103,8 @@ pub enum LlmBackendConfig {
         model_path: PathBuf,
         use_gpu: bool,
         n_ctx: u32,
+        /// Maximum tokens to generate per request.
+        max_output_tokens: u32,
     },
     OpenAiCompatible {
         base_url: Url,
@@ -139,6 +145,7 @@ pub enum DictationMode {
 }
 
 impl std::fmt::Display for DictationMode {
+    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::TypeInPlace => f.write_str("TypeInPlace"),
@@ -150,6 +157,7 @@ impl std::fmt::Display for DictationMode {
 
 impl std::str::FromStr for DictationMode {
     type Err = String;
+    #[inline]
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "TypeInPlace" => Ok(Self::TypeInPlace),
@@ -173,6 +181,7 @@ pub enum ActivationMode {
 }
 
 impl std::fmt::Display for ActivationMode {
+    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Toggle => f.write_str("Toggle"),
@@ -183,6 +192,7 @@ impl std::fmt::Display for ActivationMode {
 
 impl std::str::FromStr for ActivationMode {
     type Err = String;
+    #[inline]
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "Toggle" => Ok(Self::Toggle),
@@ -243,13 +253,13 @@ pub struct StylePreset {
 
 impl StylePreset {
     pub fn all_builtin() -> Vec<Self> {
-        vec![
-            Self::general(),
-            Self::email(),
-            Self::slack(),
-            Self::meeting_notes(),
-            Self::code_comments(),
-        ]
+        let mut v = Vec::with_capacity(5);
+        v.push(Self::general());
+        v.push(Self::email());
+        v.push(Self::slack());
+        v.push(Self::meeting_notes());
+        v.push(Self::code_comments());
+        v
     }
 
     /// Built-in "General" preset: grammar + disfluency removal.

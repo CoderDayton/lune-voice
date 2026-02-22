@@ -1,81 +1,121 @@
-use lune_core::config::DictationMode;
-use tokio::process::Command;
-use tracing::warn;
+use std::sync::mpsc;
 
-/// Deliver finalized text according to the active dictation mode.
-pub async fn deliver(text: &str, mode: DictationMode) {
-    match mode {
-        DictationMode::TypeInPlace => type_with_wtype(text).await,
-        DictationMode::Clipboard => copy_with_wl_copy(text).await,
-        DictationMode::Both => {
-            tokio::join!(type_with_wtype(text), copy_with_wl_copy(text));
-        }
-        _ => {
-            warn!("unknown dictation mode {mode:?}, falling back to TypeInPlace");
-            type_with_wtype(text).await;
+use lune_core::config::DictationMode;
+use tracing::{debug, warn};
+
+/// Message sent to the persistent delivery thread.
+struct DeliveryMsg {
+    text: String,
+    mode: DictationMode,
+}
+
+/// Handle to the background delivery thread.
+///
+/// Enigo and arboard are initialized once on a dedicated OS thread and reused
+/// for every delivery. This avoids per-call Wayland connection churn and memory
+/// leaks from accumulating clipboard/input contexts.
+#[derive(Clone)]
+pub struct DeliveryService {
+    tx: mpsc::SyncSender<DeliveryMsg>,
+}
+
+impl DeliveryService {
+    /// Spawn the delivery thread. Call once at startup.
+    pub fn new() -> Self {
+        let (tx, rx) = mpsc::sync_channel::<DeliveryMsg>(16);
+
+        std::thread::Builder::new()
+            .name("delivery".into())
+            .spawn(move || delivery_thread(rx))
+            .expect("spawn delivery thread");
+
+        Self { tx }
+    }
+
+    /// Queue text for delivery. Non-blocking from async context.
+    #[inline]
+    pub fn deliver(&self, text: &str, mode: DictationMode) {
+        debug!(?mode, text_len = text.len(), "delivering text");
+
+        if let Err(e) = self.tx.try_send(DeliveryMsg {
+            text: text.to_owned(),
+            mode,
+        }) {
+            warn!(error = %e, "delivery channel full or disconnected");
         }
     }
 }
 
-/// Type text into the focused input via `wtype -`.
-///
-/// Reads from stdin to safely handle multi-line text and special characters.
-async fn type_with_wtype(text: &str) {
-    let result = Command::new("wtype")
-        .arg("-")
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::piped())
-        .spawn();
+/// Long-lived thread that owns Enigo + Clipboard and processes deliveries.
+fn delivery_thread(rx: mpsc::Receiver<DeliveryMsg>) {
+    use arboard::Clipboard;
+    use enigo::{Enigo, Settings};
 
-    let mut child = match result {
-        Ok(c) => c,
+    let mut clipboard = match Clipboard::new() {
+        Ok(cb) => cb,
         Err(e) => {
-            warn!(error = %e, "failed to spawn wtype — is it installed?");
+            warn!(error = %e, "failed to init clipboard — delivery disabled");
             return;
         }
     };
 
-    // Write text to stdin then close.
-    if let Some(mut stdin) = child.stdin.take() {
-        use tokio::io::AsyncWriteExt;
-        if let Err(e) = stdin.write_all(text.as_bytes()).await {
-            warn!(error = %e, "failed to write to wtype stdin");
+    let mut enigo = match Enigo::new(&Settings::default()) {
+        Ok(e) => e,
+        Err(e) => {
+            warn!(error = %e, "failed to init enigo — delivery disabled");
             return;
         }
-        drop(stdin);
+    };
+
+    debug!("delivery thread ready");
+
+    while let Ok(msg) = rx.recv() {
+        match msg.mode {
+            DictationMode::TypeInPlace => {
+                paste_instant(&mut clipboard, &mut enigo, &msg.text);
+            }
+            DictationMode::Clipboard => {
+                clipboard_only(&mut clipboard, &msg.text);
+            }
+            DictationMode::Both => {
+                paste_instant(&mut clipboard, &mut enigo, &msg.text);
+            }
+            _ => {
+                warn!(mode = ?msg.mode, "unknown dictation mode, falling back to TypeInPlace");
+                paste_instant(&mut clipboard, &mut enigo, &msg.text);
+            }
+        }
     }
 
-    match child.wait().await {
-        Ok(status) if !status.success() => {
-            warn!(?status, "wtype exited with non-zero status");
-        }
-        Err(e) => {
-            warn!(error = %e, "failed to wait on wtype");
-        }
-        _ => {}
-    }
+    debug!("delivery thread exiting");
 }
 
-/// Copy text to the Wayland clipboard via `wl-copy -- <text>`.
-///
-/// The `--` prevents text starting with `-` from being interpreted as flags.
-async fn copy_with_wl_copy(text: &str) {
-    let result = Command::new("wl-copy")
-        .arg("--")
-        .arg(text)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::piped())
-        .status()
-        .await;
+#[inline]
+fn paste_instant(clipboard: &mut arboard::Clipboard, enigo: &mut enigo::Enigo, text: &str) {
+    use enigo::{Direction, Key, Keyboard};
 
-    match result {
-        Ok(status) if !status.success() => {
-            warn!(?status, "wl-copy exited with non-zero status");
-        }
-        Err(e) => {
-            warn!(error = %e, "failed to run wl-copy — is it installed?");
-        }
-        _ => {}
+    if let Err(e) = clipboard.set_text(text) {
+        warn!(error = %e, "failed to set clipboard");
+        return;
+    }
+
+    if let Err(e) = enigo.key(Key::Control, Direction::Press) {
+        warn!(error = %e, "failed to press Ctrl");
+        return;
+    }
+    if let Err(e) = enigo.key(Key::Unicode('v'), Direction::Click) {
+        warn!(error = %e, "failed to click V");
+    }
+    if let Err(e) = enigo.key(Key::Control, Direction::Release) {
+        warn!(error = %e, "failed to release Ctrl");
+    }
+
+    debug!("paste complete");
+}
+
+#[inline]
+fn clipboard_only(clipboard: &mut arboard::Clipboard, text: &str) {
+    if let Err(e) = clipboard.set_text(text) {
+        warn!(error = %e, "failed to set clipboard");
     }
 }

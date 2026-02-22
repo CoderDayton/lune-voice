@@ -23,6 +23,7 @@ type SessionRow7 = (
     Option<String>,
 );
 
+#[inline]
 fn row_to_session(
     (sid, s_at, e_at, sty, back, stat, trans): SessionRow7,
 ) -> PersistResult<DictationSession> {
@@ -83,6 +84,7 @@ impl Database {
         Ok(db)
     }
 
+    #[cold]
     fn run_migrations(&mut self) -> PersistResult<()> {
         self.conn
             .run_pending_migrations(MIGRATIONS)
@@ -121,14 +123,16 @@ impl Database {
             .order(priority.desc())
             .load::<(String, String, i32)>(&mut self.conn)?;
 
-        Ok(rows
-            .into_iter()
-            .map(|(p, r, pr)| lune_core::dict::DictionaryEntry {
-                phrase: p,
-                replacement: r,
-                priority: pr as u8,
-            })
-            .collect())
+        let mut result = Vec::with_capacity(rows.len());
+        result.extend(
+            rows.into_iter()
+                .map(|(p, r, pr)| lune_core::dict::DictionaryEntry {
+                    phrase: p,
+                    replacement: r,
+                    priority: pr as u8,
+                }),
+        );
+        Ok(result)
     }
 
     pub fn delete_dictionary_entry(&mut self, entry_id: i32) -> PersistResult<bool> {
@@ -164,14 +168,13 @@ impl Database {
             .order(trigger_phrase.asc())
             .load::<(String, String, String)>(&mut self.conn)?;
 
-        Ok(rows
-            .into_iter()
-            .map(|(i, tp, b)| lune_core::dict::Snippet {
-                id: i,
-                trigger_phrase: tp,
-                body: b,
-            })
-            .collect())
+        let mut result = Vec::with_capacity(rows.len());
+        result.extend(rows.into_iter().map(|(i, tp, b)| lune_core::dict::Snippet {
+            id: i,
+            trigger_phrase: tp,
+            body: b,
+        }));
+        Ok(result)
     }
 
     pub fn get_snippet_by_trigger(
@@ -211,9 +214,10 @@ impl Database {
             .map_err(|e| PersistError::Migration(e.to_string()))?;
         let started = session.started_at.to_rfc3339();
         let ended = session.ended_at.map(|t| t.to_rfc3339());
+        let id_str = session.id.to_string();
 
         let new = NewSession {
-            id: &session.id.to_string(),
+            id: &id_str,
             started_at: &started,
             ended_at: ended.as_deref(),
             style: &session.style,
@@ -243,9 +247,10 @@ impl Database {
     pub fn get_session(&mut self, session_id: Uuid) -> PersistResult<Option<DictationSession>> {
         use crate::schema::sessions::dsl::*;
 
+        let id_str = session_id.to_string();
         let row = sessions
             .select((id, started_at, ended_at, style, backend, status, transcript))
-            .filter(id.eq(session_id.to_string()))
+            .filter(id.eq(&id_str))
             .first::<SessionRow7>(&mut self.conn)
             .optional()?;
 
@@ -258,8 +263,9 @@ impl Database {
         let status_str = serde_json::to_string(&session.status)
             .map_err(|e| PersistError::Migration(format!("status serialize: {e}")))?;
         let ended = session.ended_at.map(|t| t.to_rfc3339());
+        let id_str = session.id.to_string();
 
-        diesel::update(sessions.filter(id.eq(session.id.to_string())))
+        diesel::update(sessions.filter(id.eq(&id_str)))
             .set((
                 status.eq(&status_str),
                 ended_at.eq(ended.as_deref()),

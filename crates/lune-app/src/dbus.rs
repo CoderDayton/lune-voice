@@ -19,6 +19,7 @@ pub struct DaemonInterface {
 }
 
 impl DaemonInterface {
+    #[inline]
     pub fn new(
         cmd_tx: mpsc::Sender<AppCommand>,
         state: Arc<RwLock<String>>,
@@ -99,8 +100,9 @@ impl DaemonInterface {
 }
 
 impl DaemonInterface {
+    #[inline]
     fn persist_modes(&self) {
-        let store = Arc::clone(&self.settings_store);
+        let store = self.settings_store.clone();
         let dictation = *self.dictation_mode_tx.borrow();
         let activation = *self.activation_mode_tx.borrow();
         // Fire-and-forget persist — failure is logged, not fatal.
@@ -113,6 +115,7 @@ impl DaemonInterface {
                         tracing::warn!(error = %e, "failed to persist mode change");
                     }
                 }
+                #[cold]
                 Err(e) => {
                     tracing::warn!(error = %e, "failed to load settings for mode persist");
                 }

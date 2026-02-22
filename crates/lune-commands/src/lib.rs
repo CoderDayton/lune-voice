@@ -18,12 +18,24 @@ pub struct VoiceCommandRouter {
     custom: Vec<(String, VoiceCommand)>,
 }
 
+// Static builtin patterns — avoids re-allocating on every call to all_patterns().
+static BUILTINS: &[(&str, VoiceCommand)] = &[
+    ("stop dictation", VoiceCommand::StopDictation),
+    ("stop", VoiceCommand::StopDictation),
+    ("new paragraph", VoiceCommand::NewParagraph),
+    ("new line", VoiceCommand::NewLine),
+    ("list item", VoiceCommand::ListItem),
+    ("scratch that", VoiceCommand::ScratchThat),
+];
+
 impl VoiceCommandRouter {
+    #[inline]
     pub fn new() -> Self {
         Self { custom: Vec::new() }
     }
 
     /// Add a custom phrase mapping (case-insensitive).
+    #[inline]
     pub fn add_custom(&mut self, phrase: impl Into<String>, command: VoiceCommand) {
         self.custom.push((phrase.into().to_lowercase(), command));
     }
@@ -34,16 +46,13 @@ impl VoiceCommandRouter {
     pub fn route(&self, text: &str) -> RouteResult {
         let lower = text.to_lowercase();
         let mut commands = Vec::new();
-        // Track byte ranges to remove, collected in order.
         let mut removals: Vec<(usize, usize)> = Vec::new();
 
-        // Try each pattern against the lowercased text.
         for (phrase, cmd) in self.all_patterns() {
             let mut search_from = 0;
-            while let Some(pos) = lower[search_from..].find(&phrase) {
+            while let Some(pos) = lower[search_from..].find(phrase) {
                 let start = search_from + pos;
                 let end = start + phrase.len();
-                // Skip if this range overlaps an already-matched removal.
                 if removals.iter().any(|&(rs, re)| rs < end && re > start) {
                     search_from = end;
                     continue;
@@ -54,7 +63,6 @@ impl VoiceCommandRouter {
             }
         }
 
-        // Sort removals by start position so we can build the remaining text.
         removals.sort_unstable_by_key(|&(s, _)| s);
         let mut remaining = String::with_capacity(text.len());
         let mut cursor = 0usize;
@@ -64,7 +72,6 @@ impl VoiceCommandRouter {
         }
         remaining.push_str(&text[cursor..]);
 
-        // Collapse extra whitespace left by removed phrases.
         let remaining = collapse_whitespace(&remaining);
 
         RouteResult {
@@ -74,37 +81,23 @@ impl VoiceCommandRouter {
     }
 
     /// Iterator over all (lowercase_phrase, VoiceCommand) pairs, built-ins first.
-    fn all_patterns(&self) -> impl Iterator<Item = (String, VoiceCommand)> + '_ {
-        let builtins: Vec<(String, VoiceCommand)> = vec![
-            // Two-word stop commands first so "stop dictation" matches before "stop".
-            ("stop dictation".into(), VoiceCommand::StopDictation),
-            ("stop".into(), VoiceCommand::StopDictation),
-            ("new paragraph".into(), VoiceCommand::NewParagraph),
-            ("new line".into(), VoiceCommand::NewLine),
-            ("list item".into(), VoiceCommand::ListItem),
-            ("scratch that".into(), VoiceCommand::ScratchThat),
-        ];
-
-        // Parametric patterns handled separately — scan for prefix match.
-        builtins
-            .into_iter()
-            .chain(self.custom.iter().map(|(p, c)| (p.clone(), c.clone())))
+    #[inline]
+    fn all_patterns(&self) -> impl Iterator<Item = (&str, VoiceCommand)> + '_ {
+        BUILTINS
+            .iter()
+            .map(|(p, c)| (*p, c.clone()))
+            .chain(self.custom.iter().map(|(p, c)| (p.as_str(), c.clone())))
     }
 
     /// Check for parametric patterns that capture an argument.
-    ///
-    /// Called before the main loop; returns any parametric matches so they
-    /// can be merged into the result.
     fn parametric_matches(lower: &str) -> Vec<(usize, usize, VoiceCommand)> {
         let mut out = Vec::new();
 
-        // "switch to <style>" — greedy to end-of-segment or comma/period.
         for prefix in &["switch to ", "switch preset to "] {
             let mut pos = 0;
             while let Some(idx) = lower[pos..].find(prefix) {
                 let start = pos + idx;
                 let arg_start = start + prefix.len();
-                // Argument ends at the next punctuation or end-of-string.
                 let arg_end = lower[arg_start..]
                     .find([',', '.', ';'])
                     .map(|i| arg_start + i)
@@ -117,7 +110,6 @@ impl VoiceCommandRouter {
             }
         }
 
-        // "insert <snippet>" / "expand <snippet>"
         for prefix in &["insert ", "expand snippet "] {
             let mut pos = 0;
             while let Some(idx) = lower[pos..].find(prefix) {
@@ -144,16 +136,14 @@ impl VoiceCommandRouter {
         let mut commands: Vec<VoiceCommand> = Vec::new();
         let mut removals: Vec<(usize, usize)> = Vec::new();
 
-        // Parametric matches first.
         for (start, end, cmd) in Self::parametric_matches(&lower) {
             commands.push(cmd);
             removals.push((start, end));
         }
 
-        // Exact phrase matches.
         for (phrase, cmd) in self.all_patterns() {
             let mut search_from = 0;
-            while let Some(pos) = lower[search_from..].find(&phrase) {
+            while let Some(pos) = lower[search_from..].find(phrase) {
                 let start = search_from + pos;
                 let end = start + phrase.len();
                 if removals.iter().any(|&(rs, re)| rs < end && re > start) {
@@ -183,6 +173,7 @@ impl VoiceCommandRouter {
 }
 
 impl Default for VoiceCommandRouter {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -190,7 +181,7 @@ impl Default for VoiceCommandRouter {
 
 fn collapse_whitespace(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
-    let mut prev_space = true; // treat start-of-string as space to trim leading
+    let mut prev_space = true;
     for c in s.chars() {
         if c.is_whitespace() {
             if !prev_space {
@@ -202,7 +193,6 @@ fn collapse_whitespace(s: &str) -> String {
             prev_space = false;
         }
     }
-    // Trim trailing space.
     if out.ends_with(' ') {
         out.pop();
     }
@@ -242,7 +232,6 @@ mod tests {
     fn new_paragraph_command() {
         let r = router().route_full("end of section new paragraph continue here");
         assert!(r.commands.contains(&VoiceCommand::NewParagraph));
-        // "new paragraph" matched before "new line" so "new line" remains as text
         assert!(!r.remaining.to_lowercase().contains("new paragraph"));
     }
 

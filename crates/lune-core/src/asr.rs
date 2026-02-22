@@ -11,6 +11,10 @@ pub struct AsrSegment {
     pub is_final: bool,
     pub start_ms: Option<u64>,
     pub end_ms: Option<u64>,
+    /// Mean token-level confidence from the decoder (0.0–1.0).
+    /// `None` for backends that don't expose logits (e.g. OpenAI API).
+    #[serde(default)]
+    pub confidence: Option<f32>,
 }
 
 /// Configuration for an ASR session.
@@ -54,6 +58,14 @@ pub trait AsrBackend: Send + Sync {
     async fn poll_results(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>>;
 
     async fn end_session(&self, session: Self::SessionHandle) -> Result<()>;
+
+    /// Clear the audio buffer and segment state so the next inference starts
+    /// fresh. Called after finalizing an utterance to prevent re-transcribing
+    /// already-delivered text.
+    async fn reset_context(&self, session: &Self::SessionHandle) -> Result<()> {
+        let _ = session;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -68,6 +80,7 @@ mod tests {
             is_final: true,
             start_ms: Some(0),
             end_ms: Some(1500),
+            confidence: Some(0.95),
         };
         let json = serde_json::to_string(&seg).unwrap();
         let parsed: AsrSegment = serde_json::from_str(&json).unwrap();

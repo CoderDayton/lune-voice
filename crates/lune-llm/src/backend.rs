@@ -39,7 +39,7 @@ impl Default for LocalLlmConfig {
         Self {
             model_path: PathBuf::from("models/Qwen3-0.6B-Q5_K_M.gguf"),
             use_gpu: true,
-            n_ctx: 2048,
+            n_ctx: 16384,
             max_output_tokens: 512,
             temperature: 0.7,
             top_p: 0.8,
@@ -81,18 +81,30 @@ impl LocalLlmBackend {
         let backend =
             LlamaBackend::init().map_err(|e| Error::Llm(format!("llama backend init: {e}")))?;
 
+        let gpu = config.use_gpu && backend.supports_gpu_offload();
         let mut model_params = LlamaModelParams::default();
-        if config.use_gpu {
+        if gpu {
             model_params = model_params.with_n_gpu_layers(1000);
         }
 
         let model = LlamaModel::load_from_file(&backend, &config.model_path, &model_params)
             .map_err(|e| Error::Llm(format!("load model: {e}")))?;
 
+        // Pre-warm: allocate + drop a context to force KV cache memory allocation
+        // so the first real inference call doesn't pay the cost.
+        {
+            let n_ctx = NonZeroU32::new(config.n_ctx)
+                .ok_or_else(|| Error::Llm("n_ctx must be > 0".into()))?;
+            let ctx_params = LlamaContextParams::default().with_n_ctx(Some(n_ctx));
+            let _warm = model
+                .new_context(&backend, ctx_params)
+                .map_err(|e| Error::Llm(format!("pre-warm context: {e}")))?;
+        }
+
         tracing::info!(
             model_path = %config.model_path.display(),
             n_ctx = config.n_ctx,
-            gpu = config.use_gpu,
+            gpu,
             "initialized local LLM backend"
         );
 
@@ -116,9 +128,7 @@ fn generate_sync(
 
     let n_ctx =
         NonZeroU32::new(config.n_ctx).ok_or_else(|| Error::Llm("n_ctx must be > 0".into()))?;
-
     let ctx_params = LlamaContextParams::default().with_n_ctx(Some(n_ctx));
-
     let mut ctx = inner
         .model
         .new_context(&inner.backend, ctx_params)
@@ -167,7 +177,9 @@ fn generate_sync(
 
     // Autoregressive decode.
     let mut decoder = encoding_rs::UTF_8.new_decoder();
-    let mut output = String::with_capacity(512);
+    // Pre-allocate for expected output size: max_output_tokens * ~4 bytes average UTF-8
+    let expected_output_bytes = (config.max_output_tokens as usize) * 4;
+    let mut output = String::with_capacity(expected_output_bytes);
     let mut n_cur = batch.n_tokens();
     let max_total = prompt_len + config.max_output_tokens as i32;
     let eos = inner.model.token_eos();
@@ -186,8 +198,10 @@ fn generate_sync(
             .unwrap_or_default();
         output.push_str(&piece);
 
-        // Stop on <|im_end|> in the output.
-        if output.contains("<|im_end|>") {
+        // Stop on <|im_end|> or <think> in the output.
+        // <think> means the model ignored our no-think prefill and is
+        // trying to reason — halt before it wastes tokens.
+        if output.contains("<|im_end|>") || output.contains("<think>") {
             break;
         }
 
@@ -243,7 +257,7 @@ mod tests {
     #[test]
     fn config_defaults() {
         let cfg = LocalLlmConfig::default();
-        assert_eq!(cfg.n_ctx, 2048);
+        assert_eq!(cfg.n_ctx, 16384);
         assert_eq!(cfg.max_output_tokens, 512);
         assert!((cfg.temperature - 0.7).abs() < f32::EPSILON);
     }

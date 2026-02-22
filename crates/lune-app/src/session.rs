@@ -12,11 +12,14 @@ use lune_core::Result;
 use lune_core::asr::{AsrBackend, AsrBackendKind, AsrSessionConfig};
 use lune_core::config::StylePreset;
 use lune_core::error::Error;
-use lune_core::llm::{PostProcessInput, TextPostProcessor};
+use lune_core::llm::TextPostProcessor;
 use lune_core::session::{DictationSession, SessionEvent, SessionStatus};
 use lune_dict::DictionaryManager;
 use lune_output::TextOutputController;
 use lune_persist::Database;
+
+use crate::confidence_router::{ConfidenceRouter, ConfidenceRouterConfig, RouteDecision};
+use crate::llm_worker::{self, LlmRequest};
 
 /// Configuration for the session pipeline.
 #[derive(Clone)]
@@ -26,15 +29,17 @@ pub struct SessionManagerConfig {
     pub asr_config: AsrSessionConfig,
     pub style_preset: StylePreset,
     pub asr_backend_kind: AsrBackendKind,
+    pub confidence_config: ConfidenceRouterConfig,
 }
 
 impl Default for SessionManagerConfig {
     fn default() -> Self {
         Self {
-            silence_timeout: Duration::from_millis(500),
+            silence_timeout: Duration::from_millis(800),
             asr_config: AsrSessionConfig::default(),
             style_preset: StylePreset::general(),
             asr_backend_kind: AsrBackendKind::ParakeetTdt,
+            confidence_config: ConfidenceRouterConfig::default(),
         }
     }
 }
@@ -119,9 +124,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let post_processor = Arc::clone(&self.post_processor);
         let dict = Arc::clone(&self.dict);
         let persist = Arc::clone(&self.persist);
-        let silence_timeout = self.config.silence_timeout;
-        let asr_config = self.config.asr_config.clone();
-        let style_preset = self.config.style_preset.clone();
+        let config = self.config.clone();
         let active_arc = Arc::clone(&self.active);
 
         // spawn_local: future need not be Send (holds !Send cpal::Stream).
@@ -133,9 +136,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             post_processor,
             dict,
             persist,
-            silence_timeout,
-            asr_config,
-            style_preset,
+            config,
             event_tx,
             stop_rx,
             active_arc,
@@ -159,6 +160,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
     }
 
     /// Cancel the active session (same teardown, status will be Cancelled).
+    #[inline]
     pub async fn cancel(&self) {
         // The pipeline task treats any stop signal as graceful; the caller
         // should pass a flag for cancelled status if needed. For now both
@@ -168,6 +170,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
     }
 
     /// The active session ID, or `None` if idle.
+    #[inline]
     pub async fn active_session_id(&self) -> Option<Uuid> {
         self.active.lock().await.as_ref().map(|h| h.session_id)
     }
@@ -185,21 +188,27 @@ async fn run_session<A: AsrBackend + 'static>(
     post_processor: Arc<dyn TextPostProcessor>,
     dict: Arc<Mutex<DictionaryManager>>,
     persist: Arc<Mutex<Database>>,
-    silence_timeout: Duration,
-    asr_config: AsrSessionConfig,
-    style_preset: StylePreset,
+    config: SessionManagerConfig,
     event_tx: mpsc::Sender<SessionEvent>,
     mut stop_rx: oneshot::Receiver<()>,
     active_arc: Arc<Mutex<Option<ActiveHandle>>>,
 ) {
     let mut status = SessionStatus::Completed;
+    let silence_timeout = config.silence_timeout;
+    let style_preset = config.style_preset.clone();
+
+    // ── Confidence router + LLM worker ────────────────────────────────────
+    let mut confidence_router = ConfidenceRouter::new(config.confidence_config.clone());
+    let (llm_tx, mut llm_rx) = llm_worker::spawn_llm_worker(
+        Arc::clone(&post_processor),
+        config.confidence_config.max_length_ratio,
+        config.confidence_config.min_length_ratio,
+    );
+    let mut utterance_counter: u64 = 0;
 
     // ── Start audio capture ───────────────────────────────────────────────
     let (audio_tx, mut audio_rx) = mpsc::channel::<lune_core::audio::AudioFrame>(1024);
 
-    // `cpal::Stream` inside SessionHandle is !Send; this is fine here because
-    // run_session is spawned via spawn_local (LocalSet, current-thread runtime)
-    // and therefore the future does not need to be Send.
     let _audio_handle = match audio.start_session(audio_tx) {
         Ok(h) => h,
         Err(e) => {
@@ -218,7 +227,7 @@ async fn run_session<A: AsrBackend + 'static>(
     };
 
     // ── Start ASR session ─────────────────────────────────────────────────
-    let asr_session = match asr.start_session(asr_config).await {
+    let asr_session = match asr.start_session(config.asr_config).await {
         Ok(s) => s,
         Err(e) => {
             let _ = event_tx.send(SessionEvent::Error(e.to_string())).await;
@@ -238,14 +247,13 @@ async fn run_session<A: AsrBackend + 'static>(
     let _ = event_tx.send(SessionEvent::Started).await;
 
     let mut output_ctrl = TextOutputController::new(event_tx.clone());
-    // `accumulated` collects all finalized ASR text for the session.
-    let mut session_text = String::new();
-    // `utterance` collects text for the current utterance (reset on silence).
-    let mut utterance = String::new();
+    let mut session_text = String::with_capacity(512);
+    let mut utterance = String::with_capacity(128);
+    let mut pending_nonfinal = String::with_capacity(128);
+    // Latest confidence from finalized ASR segments.
+    let mut pending_confidence: Option<f32> = None;
 
-    // ── Main loop ─────────────────────────────────────────────────────────
-    // `timeout` on recv: if no audio frame arrives within silence_timeout we
-    // treat it as end-of-utterance and finalize the buffer.
+    // ── Main loop (3 branches: stop, LLM results, audio/silence) ─────────
     loop {
         tokio::select! {
             biased;
@@ -255,28 +263,109 @@ async fn run_session<A: AsrBackend + 'static>(
                 break;
             }
 
+            // ── LLM correction results ───────────────────────────────
+            Some(resp) = llm_rx.recv() => {
+                if resp.accepted && resp.corrected_text != resp.original_text {
+                    debug!(
+                        utterance_id = resp.utterance_id,
+                        original = %resp.original_text,
+                        corrected = %resp.corrected_text,
+                        "LLM correction accepted"
+                    );
+
+                    // Update session_text with the corrected version.
+                    if let Some(pos) = session_text.rfind(&resp.original_text) {
+                        session_text.replace_range(
+                            pos..pos + resp.original_text.len(),
+                            &resp.corrected_text,
+                        );
+                    }
+
+                    let _ = event_tx
+                        .send(SessionEvent::CorrectedText(resp.corrected_text.clone()))
+                        .await;
+                    confidence_router.confirm(&resp.corrected_text);
+                } else {
+                    confidence_router.confirm(&resp.original_text);
+                }
+            }
+
             recv = tokio::time::timeout(silence_timeout, audio_rx.recv()) => {
                 match recv {
                     // ── Silence timeout ───────────────────────────────────
                     Err(_elapsed) => {
+                        if !pending_nonfinal.is_empty() {
+                            if !utterance.is_empty() {
+                                utterance.push(' ');
+                            }
+                            utterance.push_str(&pending_nonfinal);
+                            pending_nonfinal.clear();
+                        }
                         if !utterance.is_empty() {
                             debug!(%session_id, "silence timeout, finalizing utterance");
-                            let finalized = finalize_utterance(
-                                &utterance,
-                                &*post_processor,
-                                &dict,
-                                &style_preset,
-                                &router,
-                                &event_tx,
-                                &mut output_ctrl,
-                            ).await;
-                            if !finalized.is_empty() {
-                                if !session_text.is_empty() {
-                                    session_text.push(' ');
+
+                            // Apply dictionary substitutions.
+                            let after_dict = dict.lock().await.apply(&utterance);
+
+                            // Route by confidence (3-tier).
+                            let decision = confidence_router.route(&after_dict, pending_confidence);
+                            match &decision {
+                                RouteDecision::HighConfidence { text, confidence } => {
+                                    debug!(confidence, "high confidence, skipping LLM");
+                                    output_ctrl.emit_final(text.clone()).await;
+                                    if !text.is_empty() {
+                                        if !session_text.is_empty() {
+                                            session_text.push(' ');
+                                        }
+                                        session_text.push_str(text);
+                                    }
+                                    confidence_router.confirm(text);
                                 }
-                                session_text.push_str(&finalized);
+                                RouteDecision::Pending { confidence } => {
+                                    debug!(confidence, "accumulating in pending buffer");
+                                    // Text is held in the router's pending_buf.
+                                    // Emit partial showing current session state.
+                                    output_ctrl.emit_partial(session_text.clone()).await;
+                                }
+                                RouteDecision::ReadyForLlm { text, confidence } => {
+                                    debug!(confidence, "pending buffer ready, delivering + queueing LLM");
+                                    // Deliver the accumulated batch immediately.
+                                    output_ctrl.emit_final(text.clone()).await;
+                                    if !text.is_empty() {
+                                        if !session_text.is_empty() {
+                                            session_text.push(' ');
+                                        }
+                                        session_text.push_str(text);
+                                    }
+
+                                    // Queue async LLM correction for the batch.
+                                    utterance_counter += 1;
+                                    let relevant = dict
+                                        .lock()
+                                        .await
+                                        .top_relevant(text, 20)
+                                        .into_iter()
+                                        .cloned()
+                                        .collect::<Vec<_>>();
+
+                                    let req = LlmRequest {
+                                        utterance_id: utterance_counter,
+                                        text: text.clone(),
+                                        context: confidence_router.context(),
+                                        style_preset: style_preset.clone(),
+                                        dictionary: relevant,
+                                    };
+                                    if let Err(e) = llm_tx.send(req).await {
+                                        warn!(error = %e, "failed to queue LLM request");
+                                    }
+                                }
                             }
+
                             utterance.clear();
+                            pending_confidence = None;
+                            if let Err(e) = asr.reset_context(&asr_session).await {
+                                warn!(error = %e, "reset_context error");
+                            }
                         }
                     }
 
@@ -293,8 +382,6 @@ async fn run_session<A: AsrBackend + 'static>(
                             continue;
                         }
 
-                        // Drain all buffered frames so the channel doesn't overflow
-                        // while inference (in poll_results) blocks.
                         while let Ok(extra) = audio_rx.try_recv() {
                             if let Err(e) = asr.push_audio(&asr_session, &extra.samples).await {
                                 warn!(error = %e, "push_audio error (drain)");
@@ -313,7 +400,6 @@ async fn run_session<A: AsrBackend + 'static>(
                         for seg in &segments {
                             let route = router.route_full(&seg.text);
 
-                            // Emit a SessionEvent for each detected command.
                             for cmd in &route.commands {
                                 let _ = event_tx
                                     .send(SessionEvent::CommandDetected(format!("{cmd:?}")))
@@ -321,7 +407,6 @@ async fn run_session<A: AsrBackend + 'static>(
                             }
 
                             if seg.is_final {
-                                // Append the clean remainder to the utterance buffer.
                                 let text = route.remaining.trim();
                                 if !text.is_empty() {
                                     if !utterance.is_empty() {
@@ -329,10 +414,17 @@ async fn run_session<A: AsrBackend + 'static>(
                                     }
                                     utterance.push_str(text);
                                 }
+                                pending_nonfinal.clear();
+                                // Track confidence from the latest final segment.
+                                pending_confidence = seg.confidence;
                             } else {
-                                // Emit partial: session_text + current utterance + partial.
                                 let partial_suffix = route.remaining.trim();
-                                let mut partial = session_text.clone();
+                                // Build partial by reusing session_text capacity.
+                                let partial_cap = session_text.len()
+                                    + if !utterance.is_empty() { 1 + utterance.len() } else { 0 }
+                                    + if !partial_suffix.is_empty() { 1 + partial_suffix.len() } else { 0 };
+                                let mut partial = String::with_capacity(partial_cap);
+                                partial.push_str(&session_text);
                                 if !utterance.is_empty() {
                                     if !partial.is_empty() {
                                         partial.push(' ');
@@ -345,6 +437,14 @@ async fn run_session<A: AsrBackend + 'static>(
                                     }
                                     partial.push_str(partial_suffix);
                                 }
+                                if !partial_suffix.is_empty() {
+                                    pending_nonfinal.clear();
+                                    pending_nonfinal.push_str(partial_suffix);
+                                }
+                                // Track confidence from partials too.
+                                if seg.confidence.is_some() {
+                                    pending_confidence = seg.confidence;
+                                }
                                 output_ctrl.emit_partial(partial).await;
                             }
                         }
@@ -354,24 +454,57 @@ async fn run_session<A: AsrBackend + 'static>(
         }
     }
 
-    // ── Finalize remaining utterance buffer ───────────────────────────────
-    if !utterance.is_empty() {
-        let finalized = finalize_utterance(
-            &utterance,
-            &*post_processor,
-            &dict,
-            &style_preset,
-            &router,
-            &event_tx,
-            &mut output_ctrl,
-        )
-        .await;
-        if !finalized.is_empty() {
+    // ── Promote any pending non-final text ────────────────────────────────
+    if !pending_nonfinal.is_empty() {
+        if !utterance.is_empty() {
+            utterance.push(' ');
+        }
+        utterance.push_str(&pending_nonfinal);
+    }
+
+    // ── Flush pending buffer from confidence router ──────────────────────
+    if let Some(remaining) = confidence_router.flush_pending() {
+        debug!("flushing pending buffer on stop: {:?}", remaining);
+        output_ctrl.emit_final(remaining.clone()).await;
+        if !remaining.is_empty() {
             if !session_text.is_empty() {
                 session_text.push(' ');
             }
-            session_text.push_str(&finalized);
+            session_text.push_str(&remaining);
         }
+
+        // Queue the flushed text for LLM correction.
+        utterance_counter += 1;
+        let relevant = dict
+            .lock()
+            .await
+            .top_relevant(&remaining, 20)
+            .into_iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        let req = LlmRequest {
+            utterance_id: utterance_counter,
+            text: remaining,
+            context: confidence_router.context(),
+            style_preset: style_preset.clone(),
+            dictionary: relevant,
+        };
+        if let Err(e) = llm_tx.send(req).await {
+            warn!(error = %e, "failed to queue LLM request for flushed pending");
+        }
+    }
+
+    // ── Finalize remaining utterance buffer (always route to LLM on stop) ─
+    if !utterance.is_empty() {
+        let after_dict = dict.lock().await.apply(&utterance);
+        output_ctrl.emit_final(after_dict.clone()).await;
+        if !after_dict.is_empty() {
+            if !session_text.is_empty() {
+                session_text.push(' ');
+            }
+            session_text.push_str(&after_dict);
+        }
+        confidence_router.confirm(&after_dict);
     }
 
     // ── End ASR session ───────────────────────────────────────────────────
@@ -392,50 +525,8 @@ async fn run_session<A: AsrBackend + 'static>(
     info!(%session_id, "session stopped");
 }
 
-/// Post-process an utterance and emit FinalizedText; returns cleaned text.
-async fn finalize_utterance(
-    utterance: &str,
-    post_processor: &dyn TextPostProcessor,
-    dict: &Mutex<DictionaryManager>,
-    style_preset: &StylePreset,
-    _router: &VoiceCommandRouter,
-    event_tx: &mpsc::Sender<SessionEvent>,
-    output_ctrl: &mut TextOutputController,
-) -> String {
-    // Apply dictionary substitutions.
-    let after_dict = dict.lock().await.apply(utterance);
-
-    // Gather relevant dictionary entries for the LLM.
-    let relevant = dict
-        .lock()
-        .await
-        .top_relevant(&after_dict, 20)
-        .into_iter()
-        .cloned()
-        .collect::<Vec<_>>();
-
-    let input = PostProcessInput {
-        raw_text: after_dict,
-        prev_context: None,
-        style_preset: style_preset.clone(),
-        app_category: None,
-        dictionary: relevant,
-    };
-
-    let cleaned = match post_processor.transform(&input).await {
-        Ok(out) => out.cleaned_text,
-        Err(e) => {
-            warn!(error = %e, "post-processor error, using raw text");
-            let _ = event_tx.send(SessionEvent::Error(e.to_string())).await;
-            input.raw_text
-        }
-    };
-
-    output_ctrl.emit_final(cleaned.clone()).await;
-    cleaned
-}
-
 /// Persist final session state to the database.
+#[cold]
 async fn finalize_db(
     session_id: Uuid,
     persist: &Mutex<Database>,

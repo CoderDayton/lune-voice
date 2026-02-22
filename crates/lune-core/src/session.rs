@@ -34,6 +34,8 @@ pub enum SessionEvent {
     Started,
     PartialText(String),
     FinalizedText(String),
+    /// Async LLM correction for a previously-delivered low-confidence utterance.
+    CorrectedText(String),
     CommandDetected(String),
     Error(String),
     Stopped,

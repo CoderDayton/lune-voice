@@ -183,6 +183,8 @@ async fn run_pipeline(
 
     let manager = SessionManager::new(audio, asr, router, post_processor, dict, db, config);
 
+    let delivery_service = delivery::DeliveryService::new();
+
     tracing::info!("pipeline ready, waiting for commands");
 
     // ── Command loop ─────────────────────────────────────────────────────
@@ -198,6 +200,7 @@ async fn run_pipeline(
                         &shared_state,
                         dbus_conn,
                         dictation_mode_rx.clone(),
+                        delivery_service.clone(),
                     )
                     .await;
                 }
@@ -209,6 +212,7 @@ async fn run_pipeline(
                         &shared_state,
                         dbus_conn,
                         dictation_mode_rx.clone(),
+                        delivery_service.clone(),
                     )
                     .await;
                 }
@@ -242,6 +246,7 @@ async fn start_dictation<A: lune_core::asr::AsrBackend + 'static>(
     shared_state: &Arc<RwLock<String>>,
     dbus_conn: &zbus::Connection,
     dictation_mode_rx: watch::Receiver<DictationMode>,
+    delivery_service: delivery::DeliveryService,
 ) {
     tracing::info!("starting dictation");
     let (event_tx, mut event_rx) = tokio::sync::mpsc::channel(64);
@@ -256,8 +261,14 @@ async fn start_dictation<A: lune_core::asr::AsrBackend + 'static>(
                 lune_core::session::SessionEvent::FinalizedText(t) => {
                     // Deliver finalized text according to current dictation mode.
                     let mode = *dictation_mode_rx.borrow();
-                    delivery::deliver(&t, mode).await;
+                    delivery_service.deliver(&t, mode);
                     AppStateUpdate::FinalText
+                }
+                lune_core::session::SessionEvent::CorrectedText(t) => {
+                    tracing::info!(corrected = %t, "async LLM correction received");
+                    // Future: could trigger re-delivery / correction in focused input.
+                    // For now, just log it. The original was already delivered.
+                    continue;
                 }
                 lune_core::session::SessionEvent::Error(e) => {
                     tracing::error!(error = %e, "session error");
@@ -281,6 +292,7 @@ async fn start_dictation<A: lune_core::asr::AsrBackend + 'static>(
     }
 }
 
+#[cold]
 async fn stop_dictation<A: lune_core::asr::AsrBackend + 'static>(
     manager: &SessionManager<A>,
     _shared_state: &Arc<RwLock<String>>,
@@ -291,12 +303,13 @@ async fn stop_dictation<A: lune_core::asr::AsrBackend + 'static>(
     // Idle update emitted by forwarder via SessionEvent::Stopped
 }
 
+#[inline]
 async fn update_state(
     shared: &Arc<RwLock<String>>,
     conn: &zbus::Connection,
     update: AppStateUpdate,
 ) {
-    let state_str = match &update {
+    let state_str: &str = match update {
         AppStateUpdate::Idle => "idle",
         AppStateUpdate::Listening => "listening",
         AppStateUpdate::PartialText => "listening",
@@ -304,7 +317,7 @@ async fn update_state(
         AppStateUpdate::Error => "error",
     };
 
-    *shared.write().await = state_str.to_string();
+    shared.write().await.replace_range(.., state_str);
 
     if let Err(e) = dbus::emit_state_changed(conn, state_str).await {
         tracing::warn!(error = %e, "failed to emit state_changed signal");

@@ -123,11 +123,13 @@ pub fn build_post_processor(settings: &UserSettings) -> Result<Arc<dyn TextPostP
             model_path,
             use_gpu,
             n_ctx,
+            max_output_tokens,
         } => {
             let backend = LocalLlmBackend::new(lune_llm::LocalLlmConfig {
                 model_path: model_path.clone(),
                 use_gpu: *use_gpu,
                 n_ctx: *n_ctx,
+                max_output_tokens: *max_output_tokens,
                 ..Default::default()
             })?;
             Ok(Arc::new(backend))

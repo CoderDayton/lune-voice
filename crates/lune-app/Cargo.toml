@@ -10,7 +10,7 @@ path = "src/main.rs"
 
 [features]
 default = []
-cuda = ["lune-asr/cuda", "lune-llm/cuda"]
+cuda = ["lune-llm/cuda"]
 
 [dependencies]
 lune-core.workspace = true
@@ -28,3 +28,9 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 uuid.workspace = true
 zbus.workspace = true
+enigo.workspace = true
+arboard.workspace = true
+
+[[example]]
+name = "pipeline_latency"
+path = "../../benchmarks/pipeline_latency.rs"

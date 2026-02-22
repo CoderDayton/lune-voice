@@ -1,11 +1,12 @@
 /// Energy-based voice activity detection.
 ///
 /// Returns `true` if the RMS energy of the frame exceeds the threshold.
+#[inline]
 pub fn is_speech(samples: &[f32], threshold: f32) -> bool {
     if samples.is_empty() {
         return false;
     }
-    let sum_sq: f32 = samples.iter().map(|&s| s * s).sum();
+    let sum_sq: f32 = samples.iter().copied().map(|s| s * s).sum();
     let rms = (sum_sq / samples.len() as f32).sqrt();
     rms > threshold
 }

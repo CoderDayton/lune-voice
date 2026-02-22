@@ -35,15 +35,15 @@ impl TextOutputController {
 
     /// Emit a partial (in-progress) text update.
     pub async fn emit_partial(&mut self, text: String) {
-        let action = self.compute_action(&self.last_partial.clone(), &text);
-        self.last_partial = text.clone();
+        let action = self.compute_action(&self.last_partial, &text);
+        self.last_partial.clone_from(&text);
         self.send_event(SessionEvent::PartialText(text), &action)
             .await;
     }
 
     /// Emit finalized text.  Always sent regardless of mode.
     pub async fn emit_final(&mut self, text: String) {
-        let action = self.compute_action(&self.last_partial.clone(), &text);
+        let action = self.compute_action(&self.last_partial, &text);
         self.last_partial.clear();
         self.send_event(SessionEvent::FinalizedText(text), &action)
             .await;
@@ -59,6 +59,7 @@ impl TextOutputController {
     /// For NotesView the `ReplaceAll` variant is always used.
     /// For future keyboard injection, `DeleteThenType` avoids re-typing the
     /// common prefix.
+    #[inline]
     pub fn compute_action(&self, old: &str, new: &str) -> OutputAction {
         let (backspaces, suffix) = char_diff(old, new);
         if backspaces == 0 && suffix == new {
@@ -78,6 +79,7 @@ impl TextOutputController {
         }
     }
 
+    #[inline]
     async fn send_event(&self, event: SessionEvent, action: &OutputAction) {
         debug!(?action, "output action");
         // Dropping the error is intentional: if the receiver is gone the
@@ -90,6 +92,7 @@ impl TextOutputController {
 /// transitioning from `old` to `new`.
 ///
 /// Returns `(delete_count, new_suffix)` where `new_suffix` is a slice of `new`.
+#[inline]
 pub fn char_diff<'a>(old: &str, new: &'a str) -> (usize, &'a str) {
     let common = old
         .chars()

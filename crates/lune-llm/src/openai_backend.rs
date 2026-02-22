@@ -71,12 +71,19 @@ impl OpenAiLlmBackend {
 /// 3. Final user message with `{raw_text}` substituted
 fn build_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage> {
     let style = &input.style_preset;
-    let mut messages = Vec::new();
+    // system + 2 msgs per few-shot pair + 1 final user message
+    let capacity = 1 + style.few_shot_pairs.len() * 2 + 1;
+    let mut messages = Vec::with_capacity(capacity);
 
     // System message.
     let mut system_content = style.system_prompt.clone();
 
     if !input.dictionary.is_empty() {
+        // pre-allocate: each entry contributes roughly 20+ chars
+        system_content.reserve(
+            "\n\nDictionary terms (always use these exact spellings):".len()
+                + input.dictionary.len() * 24,
+        );
         system_content.push_str("\n\nDictionary terms (always use these exact spellings):");
         for entry in &input.dictionary {
             system_content.push_str("\n- ");
@@ -134,6 +141,7 @@ fn build_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage>
     messages
 }
 
+#[inline]
 fn fallback_output(raw_text: &str) -> PostProcessOutput {
     PostProcessOutput {
         cleaned_text: raw_text.to_owned(),

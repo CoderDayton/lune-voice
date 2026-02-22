@@ -23,7 +23,12 @@ impl SegmentTracker {
     }
 
     /// Push new decoded text, updating the current partial segment or creating a new one.
-    pub fn push_partial(&mut self, text: String, timestamp_ms: Option<u64>) {
+    pub fn push_partial(
+        &mut self,
+        text: String,
+        timestamp_ms: Option<u64>,
+        confidence: Option<f32>,
+    ) {
         self.last_update = Instant::now();
 
         // Update existing partial segment or create new one.
@@ -32,6 +37,7 @@ impl SegmentTracker {
         {
             seg.text = text;
             seg.end_ms = timestamp_ms;
+            seg.confidence = confidence;
             return;
         }
 
@@ -42,6 +48,7 @@ impl SegmentTracker {
             is_final: false,
             start_ms: timestamp_ms,
             end_ms: timestamp_ms,
+            confidence,
         };
         self.next_id += 1;
         self.segments.push(seg);
@@ -101,7 +108,7 @@ mod tests {
     #[test]
     fn push_partial_creates_segment() {
         let mut tracker = SegmentTracker::new(500);
-        tracker.push_partial("hello".into(), Some(0));
+        tracker.push_partial("hello".into(), Some(0), None);
         assert_eq!(tracker.len(), 1);
         assert_eq!(tracker.peek()[0].text, "hello");
         assert!(!tracker.peek()[0].is_final);
@@ -110,21 +117,22 @@ mod tests {
     #[test]
     fn push_partial_updates_existing() {
         let mut tracker = SegmentTracker::new(500);
-        tracker.push_partial("hel".into(), Some(0));
-        tracker.push_partial("hello".into(), Some(100));
+        tracker.push_partial("hel".into(), Some(0), None);
+        tracker.push_partial("hello".into(), Some(100), Some(0.9));
         // Should update, not create a new segment.
         assert_eq!(tracker.len(), 1);
         assert_eq!(tracker.peek()[0].text, "hello");
+        assert_eq!(tracker.peek()[0].confidence, Some(0.9));
     }
 
     #[test]
     fn finalize_then_new_partial() {
         let mut tracker = SegmentTracker::new(500);
-        tracker.push_partial("hello".into(), Some(0));
+        tracker.push_partial("hello".into(), Some(0), None);
         tracker.finalize_current();
         assert!(tracker.peek()[0].is_final);
 
-        tracker.push_partial("world".into(), Some(1000));
+        tracker.push_partial("world".into(), Some(1000), None);
         assert_eq!(tracker.len(), 2);
         assert_eq!(tracker.peek()[1].text, "world");
         assert!(!tracker.peek()[1].is_final);
@@ -133,9 +141,9 @@ mod tests {
     #[test]
     fn finalize_all() {
         let mut tracker = SegmentTracker::new(500);
-        tracker.push_partial("hello".into(), Some(0));
+        tracker.push_partial("hello".into(), Some(0), None);
         tracker.finalize_current();
-        tracker.push_partial("world".into(), Some(1000));
+        tracker.push_partial("world".into(), Some(1000), None);
         tracker.finalize_all();
 
         assert!(tracker.peek().iter().all(|s| s.is_final));
@@ -144,7 +152,7 @@ mod tests {
     #[test]
     fn drain_clears_buffer() {
         let mut tracker = SegmentTracker::new(500);
-        tracker.push_partial("hello".into(), Some(0));
+        tracker.push_partial("hello".into(), Some(0), None);
         let drained = tracker.drain();
         assert_eq!(drained.len(), 1);
         assert!(tracker.is_empty());
@@ -153,9 +161,9 @@ mod tests {
     #[test]
     fn segment_ids_increment() {
         let mut tracker = SegmentTracker::new(500);
-        tracker.push_partial("a".into(), Some(0));
+        tracker.push_partial("a".into(), Some(0), None);
         tracker.finalize_current();
-        tracker.push_partial("b".into(), Some(100));
+        tracker.push_partial("b".into(), Some(100), None);
 
         assert_eq!(tracker.peek()[0].id, 1);
         assert_eq!(tracker.peek()[1].id, 2);
@@ -164,7 +172,7 @@ mod tests {
     #[test]
     fn silence_finalization() {
         let mut tracker = SegmentTracker::new(0); // 0ms = immediate finalize
-        tracker.push_partial("hello".into(), Some(0));
+        tracker.push_partial("hello".into(), Some(0), None);
         std::thread::sleep(std::time::Duration::from_millis(1));
         tracker.check_silence_finalization();
         assert!(tracker.peek()[0].is_final);

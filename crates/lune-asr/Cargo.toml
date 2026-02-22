@@ -6,14 +6,16 @@ license.workspace = true
 
 [features]
 default = []
-cuda = ["parakeet-rs/cuda"]
+cuda = ["ort/cuda"]
 
 [dependencies]
 async-trait.workspace = true
 lune-core.workspace = true
 tokio.workspace = true
 tracing.workspace = true
-parakeet-rs.workspace = true
+ort.workspace = true
+ndarray.workspace = true
+rustfft.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 base64 = "0.22"
