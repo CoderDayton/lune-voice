@@ -58,10 +58,10 @@ async fn dispatch(subcommand: &str) -> std::result::Result<(), Box<dyn std::erro
 }
 
 fn daemon_error(e: zbus::Error) -> String {
-    if let zbus::Error::MethodError(ref name, _, _) = e {
-        if name.as_str() == "org.freedesktop.DBus.Error.ServiceUnknown" {
-            return "daemon not running — start with: lune-voice daemon".into();
-        }
+    if let zbus::Error::MethodError(ref name, _, _) = e
+        && name.as_str() == "org.freedesktop.DBus.Error.ServiceUnknown"
+    {
+        return "daemon not running — start with: lune-voice daemon".into();
     }
     format!("D-Bus call failed: {e}")
 }

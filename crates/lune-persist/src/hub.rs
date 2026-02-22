@@ -14,7 +14,7 @@ pub enum ModelSpec {
         required_files: Vec<String>,
         /// Suffix patterns to match (e.g. `.onnx`).
         suffix_patterns: Vec<String>,
-        /// Local directory name under `models/` (e.g. `parakeet-tdt-1.1b`).
+        /// Local directory name under `models/` (e.g. `parakeet-tdt-0.6b`).
         local_name: String,
     },
     /// A single file from a repository.
@@ -28,13 +28,13 @@ pub struct ResolvedModels {
 }
 
 impl ModelSpec {
-    /// Parakeet TDT 1.1B ASR: directory with ONNX model and vocab.
-    pub fn parakeet_tdt_1b() -> Self {
+    /// Parakeet TDT 0.6B v3 ASR: INT8 ONNX models and vocab.
+    pub fn parakeet_tdt() -> Self {
         Self::Directory {
-            repo_id: "dtgagnon/parakeet-tdt-1.1b-onnx".into(),
+            repo_id: "istupakov/parakeet-tdt-0.6b-v3-onnx".into(),
             required_files: vec!["vocab.txt".into()],
-            suffix_patterns: vec![".onnx".into(), ".onnx.data".into()],
-            local_name: "parakeet-tdt-1.1b".into(),
+            suffix_patterns: vec![".int8.onnx".into()],
+            local_name: "parakeet-tdt-0.6b".into(),
         }
     }
 
@@ -66,17 +66,29 @@ impl ModelHub {
         Ok(Self { api })
     }
 
-    /// Download files for a spec from HF Hub, returning cached paths.
+    /// Download matching files from HF Hub directly into `local_dir`.
+    ///
+    /// Each file is written as a real file (no symlinks). Already-present
+    /// complete files are skipped.
     fn download_directory(
         &self,
         repo_id: &str,
         required_files: &[String],
         suffix_patterns: &[String],
-    ) -> PersistResult<Vec<(String, PathBuf)>> {
+        local_dir: &Path,
+    ) -> PersistResult<()> {
         let repo = self.api.model(repo_id.to_string());
         info!(repo_id, "discovering repository files");
 
         let file_list = self.list_repo_files(&repo, repo_id)?;
+
+        for req in required_files {
+            if !file_list.iter().any(|f| f == req) {
+                return Err(PersistError::ModelDownload(format!(
+                    "{repo_id}: required file `{req}` not found in repository"
+                )));
+            }
+        }
 
         let to_download: Vec<&str> = file_list
             .iter()
@@ -87,19 +99,14 @@ impl ModelHub {
             .map(String::as_str)
             .collect();
 
-        for req in required_files {
-            if !file_list.iter().any(|f| f == req) {
-                return Err(PersistError::ModelDownload(format!(
-                    "{repo_id}: required file `{req}` not found in repository"
-                )));
-            }
-        }
-
         if to_download.is_empty() {
             return Err(PersistError::ModelDownload(format!(
                 "{repo_id}: no files matched filters"
             )));
         }
+
+        std::fs::create_dir_all(local_dir)
+            .map_err(|e| PersistError::ModelDownload(format!("create dir: {e}")))?;
 
         info!(
             repo_id,
@@ -107,25 +114,42 @@ impl ModelHub {
             "downloading model files"
         );
 
-        let mut results = Vec::with_capacity(to_download.len());
         for filename in &to_download {
-            let path = repo
+            let dst = local_dir.join(filename);
+            if dst.is_file() {
+                continue;
+            }
+            let hub_path = repo
                 .get(filename)
                 .map_err(|e| PersistError::ModelDownload(format!("{repo_id}/{filename}: {e}")))?;
-            results.push((filename.to_string(), path));
+            let real_src = hub_path.canonicalize().map_err(|e| {
+                PersistError::ModelDownload(format!("{filename}: resolve blob: {e}"))
+            })?;
+            std::fs::copy(&real_src, &dst)
+                .map_err(|e| PersistError::ModelDownload(format!("{filename}: write: {e}")))?;
         }
 
-        Ok(results)
+        Ok(())
     }
 
-    /// Download a single file from HF Hub, returning its cached path.
-    fn download_single_file(&self, repo_id: &str, filename: &str) -> PersistResult<PathBuf> {
+    /// Download a single file from HF Hub directly to `local_path`.
+    fn download_single_file(
+        &self,
+        repo_id: &str,
+        filename: &str,
+        local_path: &Path,
+    ) -> PersistResult<()> {
         let repo = self.api.model(repo_id.to_string());
-        info!(repo_id, filename, "ensuring single model file");
-        let path = repo
+        info!(repo_id, filename, "downloading model file");
+        let hub_path = repo
             .get(filename)
             .map_err(|e| PersistError::ModelDownload(format!("{repo_id}/{filename}: {e}")))?;
-        Ok(path)
+        let real_src = hub_path
+            .canonicalize()
+            .map_err(|e| PersistError::ModelDownload(format!("{filename}: resolve blob: {e}")))?;
+        std::fs::copy(&real_src, local_path)
+            .map_err(|e| PersistError::ModelDownload(format!("{filename}: write: {e}")))?;
+        Ok(())
     }
 
     fn list_repo_files(&self, repo: &ApiRepo, repo_id: &str) -> PersistResult<Vec<String>> {
@@ -136,35 +160,23 @@ impl ModelHub {
     }
 }
 
-/// Hardlink `src` to `dst`, falling back to copy if hardlinking fails
-/// (e.g. cross-filesystem).
-fn link_or_copy(src: &Path, dst: &Path) -> std::io::Result<()> {
-    match std::fs::hard_link(src, dst) {
-        Ok(()) => Ok(()),
-        Err(_) => {
-            std::fs::copy(src, dst)?;
-            Ok(())
-        }
-    }
-}
-
 /// Download both default models if not already present.
 ///
 /// Layout after completion:
 /// ```text
 /// models_dir/
-///   parakeet-tdt-1.1b/
-///     model.onnx
-///     model.onnx.data
+///   parakeet-tdt-0.6b/
+///     encoder-model.int8.onnx
+///     decoder_joint-model.int8.onnx
 ///     vocab.txt
-///   Qwen3-0.6B-Q5_K_M.gguf
+///   Qwen3-0.6B-Q4_K_M.gguf
 ///   .hub-cache/          (hf_hub internal cache)
 /// ```
 pub fn ensure_default_models(models_dir: &Path) -> PersistResult<ResolvedModels> {
     let hub_cache = models_dir.join(".hub-cache");
     let hub = ModelHub::new(&hub_cache)?;
 
-    let asr_model_dir = ensure_directory_model(&hub, &ModelSpec::parakeet_tdt_1b(), models_dir)?;
+    let asr_model_dir = ensure_directory_model(&hub, &ModelSpec::parakeet_tdt(), models_dir)?;
 
     let llm_model_path = ensure_single_file_model(&hub, &ModelSpec::qwen3_llm(), models_dir)?;
 
@@ -198,7 +210,7 @@ fn ensure_directory_model(
 
     // Already present — verify required files exist.
     if local_dir.exists() {
-        let all_present = required_files.iter().all(|f| local_dir.join(f).exists());
+        let all_present = required_files.iter().all(|f| local_dir.join(f).is_file());
         if all_present {
             info!(path = %local_dir.display(), "model directory already present");
             return Ok(local_dir);
@@ -206,18 +218,7 @@ fn ensure_directory_model(
         info!(path = %local_dir.display(), "model directory incomplete, re-downloading");
     }
 
-    // Download via hf_hub, then link into local_dir.
-    let downloaded = hub.download_directory(repo_id, required_files, suffix_patterns)?;
-
-    std::fs::create_dir_all(&local_dir)?;
-    for (filename, hub_path) in &downloaded {
-        let dst = local_dir.join(filename);
-        if dst.exists() {
-            continue;
-        }
-        link_or_copy(hub_path, &dst)
-            .map_err(|e| PersistError::ModelDownload(format!("link {filename} → local: {e}")))?;
-    }
+    hub.download_directory(repo_id, required_files, suffix_patterns, &local_dir)?;
 
     info!(path = %local_dir.display(), "model directory ready");
     Ok(local_dir)
@@ -240,15 +241,12 @@ fn ensure_single_file_model(
 
     let local_path = models_dir.join(filename);
 
-    if local_path.exists() {
+    if local_path.is_file() {
         info!(path = %local_path.display(), "model file already present");
         return Ok(local_path);
     }
 
-    let hub_path = hub.download_single_file(repo_id, filename)?;
-
-    link_or_copy(&hub_path, &local_path)
-        .map_err(|e| PersistError::ModelDownload(format!("link {filename} → local: {e}")))?;
+    hub.download_single_file(repo_id, filename, &local_path)?;
 
     info!(path = %local_path.display(), "model file ready");
     Ok(local_path)
@@ -260,7 +258,7 @@ mod tests {
 
     #[test]
     fn parakeet_spec_has_expected_repo() {
-        let spec = ModelSpec::parakeet_tdt_1b();
+        let spec = ModelSpec::parakeet_tdt();
         match &spec {
             ModelSpec::Directory {
                 repo_id,
@@ -268,11 +266,10 @@ mod tests {
                 suffix_patterns,
                 local_name,
             } => {
-                assert_eq!(repo_id, "dtgagnon/parakeet-tdt-1.1b-onnx");
+                assert_eq!(repo_id, "istupakov/parakeet-tdt-0.6b-v3-onnx");
                 assert!(required_files.contains(&"vocab.txt".to_string()));
-                assert!(suffix_patterns.contains(&".onnx".to_string()));
-                assert!(suffix_patterns.contains(&".onnx.data".to_string()));
-                assert_eq!(local_name, "parakeet-tdt-1.1b");
+                assert!(suffix_patterns.contains(&".int8.onnx".to_string()));
+                assert_eq!(local_name, "parakeet-tdt-0.6b");
             }
             _ => panic!("expected Directory variant"),
         }

@@ -189,13 +189,12 @@ impl AsrBackend for OpenAiCompatibleAsrBackend {
             (pcm, lang, sr, id)
         };
 
-        if !pcm.is_empty() {
-            if let Err(e) = self
+        if !pcm.is_empty()
+            && let Err(e) = self
                 .transcribe(&pcm, sample_rate, lang.as_deref(), base_id)
                 .await
-            {
-                tracing::warn!(error = %e, "ASR flush on session end failed");
-            }
+        {
+            tracing::warn!(error = %e, "ASR flush on session end failed");
         }
 
         tracing::debug!("ASR session ended");

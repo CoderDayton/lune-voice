@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -69,22 +69,16 @@ impl AsrBackend for AsrBackendDispatch {
 /// The default `UserSettings` ships with empty `PathBuf`s for model paths.
 /// After `ensure_default_models` resolves the actual paths, this fills them in.
 pub fn patch_model_paths(settings: &mut UserSettings, resolved: &ResolvedModels) {
-    match &mut settings.asr_backend {
-        AsrBackendConfig::ParakeetTdt { model_dir, .. } => {
-            if model_dir.as_os_str().is_empty() {
-                *model_dir = resolved.asr_model_dir.clone();
-            }
-        }
-        AsrBackendConfig::OpenAiCompatible { .. } | _ => {}
+    if let AsrBackendConfig::ParakeetTdt { model_dir, .. } = &mut settings.asr_backend
+        && model_dir.as_os_str().is_empty()
+    {
+        *model_dir = resolved.asr_model_dir.clone();
     }
 
-    match &mut settings.llm_backend {
-        LlmBackendConfig::Local { model_path, .. } => {
-            if model_path.as_os_str().is_empty() {
-                *model_path = resolved.llm_model_path.clone();
-            }
-        }
-        LlmBackendConfig::OpenAiCompatible { .. } | _ => {}
+    if let LlmBackendConfig::Local { model_path, .. } = &mut settings.llm_backend
+        && model_path.as_os_str().is_empty()
+    {
+        *model_path = resolved.llm_model_path.clone();
     }
 }
 
@@ -146,7 +140,7 @@ pub fn build_post_processor(settings: &UserSettings) -> Result<Arc<dyn TextPostP
 }
 
 /// Build a database path, creating parent dirs if needed.
-pub fn ensure_db_path(db_path: &PathBuf) -> Result<()> {
+pub fn ensure_db_path(db_path: &Path) -> Result<()> {
     if let Some(parent) = db_path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| Error::Config(format!("create db dir: {e}")))?;

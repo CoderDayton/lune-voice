@@ -39,11 +39,11 @@ pub fn build_chatml(input: &PostProcessInput) -> String {
         }
     }
 
-    if let Some(ref ctx) = input.prev_context {
-        if !ctx.is_empty() {
-            prompt.push_str("\n\nPreceding context: ");
-            prompt.push_str(ctx);
-        }
+    if let Some(ref ctx) = input.prev_context
+        && !ctx.is_empty()
+    {
+        prompt.push_str("\n\nPreceding context: ");
+        prompt.push_str(ctx);
     }
 
     prompt.push_str("<|im_end|>\n");

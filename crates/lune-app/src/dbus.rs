@@ -59,5 +59,5 @@ pub async fn emit_state_changed(conn: &Connection, state: &str) -> zbus::Result<
         .interface::<_, DaemonInterface>(OBJECT_PATH)
         .await?;
     let emitter = iface_ref.signal_emitter();
-    DaemonInterface::state_changed(&emitter, state).await
+    DaemonInterface::state_changed(emitter, state).await
 }

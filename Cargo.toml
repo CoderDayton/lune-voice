@@ -54,6 +54,8 @@ diesel = { version = "2", features = ["sqlite", "returning_clauses_for_sqlite_3_
 diesel_migrations = "2"
 dirs = "6"
 cpal = "0.15"
+rubato = "1"
+audioadapter-buffers = "2"
 parakeet-rs = "0.3"
 hf-hub = "0.4"
 llama-cpp-2 = "0.1"

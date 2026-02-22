@@ -197,7 +197,7 @@ fn apply_single_words(text: &str, singles: &[&DictionaryEntry]) -> String {
 
 /// Strip trailing ASCII punctuation for comparison purposes.
 fn strip_trailing_punct(s: &str) -> &str {
-    s.trim_end_matches(|c: char| matches!(c, '.' | ',' | '!' | '?' | ';' | ':'))
+    s.trim_end_matches(['.', ',', '!', '?', ';', ':'])
 }
 
 /// Wagner-Fischer Levenshtein distance (byte-level; fine for ASCII ASR text).

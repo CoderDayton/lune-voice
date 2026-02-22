@@ -86,11 +86,11 @@ fn build_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage>
         }
     }
 
-    if let Some(ref ctx) = input.prev_context {
-        if !ctx.is_empty() {
-            system_content.push_str("\n\nPreceding context: ");
-            system_content.push_str(ctx);
-        }
+    if let Some(ref ctx) = input.prev_context
+        && !ctx.is_empty()
+    {
+        system_content.push_str("\n\nPreceding context: ");
+        system_content.push_str(ctx);
     }
 
     messages.push(

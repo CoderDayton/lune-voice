@@ -106,7 +106,7 @@ impl VoiceCommandRouter {
                 let arg_start = start + prefix.len();
                 // Argument ends at the next punctuation or end-of-string.
                 let arg_end = lower[arg_start..]
-                    .find(|c: char| c == ',' || c == '.' || c == ';')
+                    .find([',', '.', ';'])
                     .map(|i| arg_start + i)
                     .unwrap_or(lower.len());
                 let arg = lower[arg_start..arg_end].trim().to_string();
@@ -124,7 +124,7 @@ impl VoiceCommandRouter {
                 let start = pos + idx;
                 let arg_start = start + prefix.len();
                 let arg_end = lower[arg_start..]
-                    .find(|c: char| c == ',' || c == '.' || c == ';')
+                    .find([',', '.', ';'])
                     .map(|i| arg_start + i)
                     .unwrap_or(lower.len());
                 let arg = lower[arg_start..arg_end].trim().to_string();

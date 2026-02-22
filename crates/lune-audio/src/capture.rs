@@ -2,8 +2,13 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
+use audioadapter_buffers::direct::SequentialSlice;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{SampleFormat, StreamConfig};
+use rubato::{
+    Async, FixedAsync, Resampler, SincInterpolationParameters, SincInterpolationType,
+    WindowFunction,
+};
 use tokio::sync::mpsc;
 
 use lune_core::audio::{AudioCaptureConfig, AudioFrame};
@@ -38,9 +43,12 @@ struct CallbackState {
     tx: mpsc::Sender<AudioFrame>,
     running: Arc<AtomicBool>,
     accum: Vec<f32>,
+    pre_resample: Vec<f32>,
+    resampler: Option<Async<f32>>,
+    resample_out_buf: Vec<f32>,
+    resample_chunk: usize,
     start_time: Instant,
     target_rate: u32,
-    device_rate: u32,
     frame_size: usize,
     channels: usize,
     vad_enabled: bool,
@@ -54,16 +62,35 @@ impl CallbackState {
             return;
         }
 
-        // Resample if device rate != target rate.
-        let resampled;
-        let samples = if self.device_rate != self.target_rate {
-            resampled = resample_nearest(mono_f32, self.device_rate, self.target_rate);
-            &resampled
-        } else {
-            mono_f32
-        };
-
-        self.accum.extend_from_slice(samples);
+        match &mut self.resampler {
+            Some(resampler) => {
+                self.pre_resample.extend_from_slice(mono_f32);
+                while self.pre_resample.len() >= self.resample_chunk {
+                    let out_frames = resampler.output_frames_next();
+                    if let (Ok(input), Ok(mut output)) = (
+                        SequentialSlice::new(
+                            &self.pre_resample[..self.resample_chunk],
+                            1,
+                            self.resample_chunk,
+                        ),
+                        SequentialSlice::new_mut(
+                            &mut self.resample_out_buf[..out_frames],
+                            1,
+                            out_frames,
+                        ),
+                    ) && let Ok((_in_len, out_len)) =
+                        resampler.process_into_buffer(&input, &mut output, None)
+                    {
+                        self.accum
+                            .extend_from_slice(&self.resample_out_buf[..out_len]);
+                    }
+                    self.pre_resample.drain(..self.resample_chunk);
+                }
+            }
+            None => {
+                self.accum.extend_from_slice(mono_f32);
+            }
+        }
 
         // Emit complete frames.
         while self.accum.len() >= self.frame_size {
@@ -150,21 +177,55 @@ impl AudioCaptureService {
 
         let frame_size = self.config.frame_size;
         let channels = device_channels as usize;
+        let target_rate = self.config.sample_rate;
+
+        let make_state = |tx, running: Arc<AtomicBool>| -> Result<CallbackState> {
+            let (resampler, resample_out_buf, resample_chunk) = if device_sample_rate != target_rate
+            {
+                let chunk_size = 1024usize;
+                let params = SincInterpolationParameters {
+                    sinc_len: 256,
+                    f_cutoff: 0.95,
+                    interpolation: SincInterpolationType::Linear,
+                    oversampling_factor: 256,
+                    window: WindowFunction::BlackmanHarris2,
+                };
+                let r = Async::<f32>::new_sinc(
+                    target_rate as f64 / device_sample_rate as f64,
+                    2.0,
+                    &params,
+                    chunk_size,
+                    1, // mono
+                    FixedAsync::Input,
+                )
+                .map_err(|e| Error::Audio(format!("create resampler: {e}")))?;
+                let max_out = r.output_frames_max();
+                let out_buf = vec![0.0f32; max_out];
+                (Some(r), out_buf, chunk_size)
+            } else {
+                (None, Vec::new(), 0)
+            };
+
+            Ok(CallbackState {
+                tx,
+                running,
+                accum: Vec::with_capacity(frame_size * 2),
+                pre_resample: Vec::with_capacity(2048),
+                resampler,
+                resample_out_buf,
+                resample_chunk,
+                start_time: Instant::now(),
+                target_rate,
+                frame_size,
+                channels,
+                vad_enabled: self.config.vad_enabled,
+                vad_threshold: self.config.vad_threshold,
+            })
+        };
 
         let stream = match device_format {
             SampleFormat::F32 => {
-                let mut state = CallbackState {
-                    tx,
-                    running: running.clone(),
-                    accum: Vec::with_capacity(frame_size * 2),
-                    start_time: Instant::now(),
-                    target_rate: self.config.sample_rate,
-                    device_rate: device_sample_rate,
-                    frame_size,
-                    channels,
-                    vad_enabled: self.config.vad_enabled,
-                    vad_threshold: self.config.vad_threshold,
-                };
+                let mut state = make_state(tx, running.clone())?;
                 device
                     .build_input_stream(
                         &stream_config,
@@ -178,18 +239,7 @@ impl AudioCaptureService {
                     .map_err(|e| Error::Audio(format!("build_input_stream f32: {e}")))?
             }
             SampleFormat::I16 => {
-                let mut state = CallbackState {
-                    tx,
-                    running: running.clone(),
-                    accum: Vec::with_capacity(frame_size * 2),
-                    start_time: Instant::now(),
-                    target_rate: self.config.sample_rate,
-                    device_rate: device_sample_rate,
-                    frame_size,
-                    channels,
-                    vad_enabled: self.config.vad_enabled,
-                    vad_threshold: self.config.vad_threshold,
-                };
+                let mut state = make_state(tx, running.clone())?;
                 device
                     .build_input_stream(
                         &stream_config,
@@ -224,16 +274,24 @@ fn err_callback(err: cpal::StreamError) {
     tracing::error!(%err, "audio stream error");
 }
 
-/// Nearest-neighbor resample from `src_rate` to `dst_rate`.
-fn resample_nearest(samples: &[f32], src_rate: u32, dst_rate: u32) -> Vec<f32> {
-    let ratio = src_rate as f64 / dst_rate as f64;
-    let out_len = (samples.len() as f64 / ratio).ceil() as usize;
-    (0..out_len)
-        .map(|i| {
-            let src_idx = ((i as f64) * ratio).min((samples.len() - 1) as f64) as usize;
-            samples[src_idx]
-        })
-        .collect()
+/// Create a `CallbackState` with no resampler (same rate) for tests.
+#[cfg(test)]
+fn test_callback_state(tx: mpsc::Sender<AudioFrame>, channels: usize) -> CallbackState {
+    CallbackState {
+        tx,
+        running: Arc::new(AtomicBool::new(true)),
+        accum: Vec::new(),
+        pre_resample: Vec::new(),
+        resampler: None,
+        resample_out_buf: Vec::new(),
+        resample_chunk: 0,
+        start_time: Instant::now(),
+        target_rate: 16000,
+        frame_size: 480,
+        channels,
+        vad_enabled: false,
+        vad_threshold: 0.01,
+    }
 }
 
 #[cfg(test)]
@@ -241,24 +299,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn resample_same_rate() {
-        let input = vec![1.0, 2.0, 3.0, 4.0];
-        let output = resample_nearest(&input, 16000, 16000);
-        assert_eq!(output.len(), input.len());
-    }
+    fn sinc_resampler_downsample() {
+        let params = SincInterpolationParameters {
+            sinc_len: 256,
+            f_cutoff: 0.95,
+            interpolation: SincInterpolationType::Linear,
+            oversampling_factor: 256,
+            window: WindowFunction::BlackmanHarris2,
+        };
+        let mut resampler =
+            Async::<f32>::new_sinc(16000.0 / 44100.0, 2.0, &params, 1024, 1, FixedAsync::Input)
+                .unwrap();
 
-    #[test]
-    fn resample_downsample() {
-        let input: Vec<f32> = (0..48000).map(|i| i as f32).collect();
-        let output = resample_nearest(&input, 48000, 16000);
-        assert_eq!(output.len(), 16000);
-    }
-
-    #[test]
-    fn resample_upsample() {
-        let input: Vec<f32> = (0..8000).map(|i| i as f32).collect();
-        let output = resample_nearest(&input, 8000, 16000);
-        assert_eq!(output.len(), 16000);
+        // 1024 samples at 44100 → ~372 samples at 16000.
+        let input_data = vec![0.0f32; 1024];
+        let input = SequentialSlice::new(&input_data, 1, 1024).unwrap();
+        let output = resampler.process(&input, 0, None).unwrap();
+        let out_data = output.take_data();
+        let expected = (1024.0_f64 * 16000.0 / 44100.0).round() as usize;
+        assert!((out_data.len() as i32 - expected as i32).unsigned_abs() <= 2);
     }
 
     #[test]
@@ -270,18 +329,7 @@ mod tests {
     #[test]
     fn callback_state_mono_passthrough() {
         let (tx, _rx) = mpsc::channel(16);
-        let state = CallbackState {
-            tx,
-            running: Arc::new(AtomicBool::new(true)),
-            accum: Vec::new(),
-            start_time: Instant::now(),
-            target_rate: 16000,
-            device_rate: 16000,
-            frame_size: 480,
-            channels: 1,
-            vad_enabled: false,
-            vad_threshold: 0.01,
-        };
+        let state = test_callback_state(tx, 1);
         let data = vec![0.5f32; 480];
         let mono = state.to_mono_f32(&data);
         assert_eq!(mono.len(), 480);
@@ -290,18 +338,7 @@ mod tests {
     #[test]
     fn callback_state_stereo_downmix() {
         let (tx, _rx) = mpsc::channel(16);
-        let state = CallbackState {
-            tx,
-            running: Arc::new(AtomicBool::new(true)),
-            accum: Vec::new(),
-            start_time: Instant::now(),
-            target_rate: 16000,
-            device_rate: 16000,
-            frame_size: 480,
-            channels: 2,
-            vad_enabled: false,
-            vad_threshold: 0.01,
-        };
+        let state = test_callback_state(tx, 2);
         // Stereo: L=1.0, R=0.0 → mono = 0.5
         let data: Vec<f32> = (0..960)
             .map(|i| if i % 2 == 0 { 1.0 } else { 0.0 })
@@ -314,18 +351,7 @@ mod tests {
     #[test]
     fn callback_state_i16_conversion() {
         let (tx, _rx) = mpsc::channel(16);
-        let state = CallbackState {
-            tx,
-            running: Arc::new(AtomicBool::new(true)),
-            accum: Vec::new(),
-            start_time: Instant::now(),
-            target_rate: 16000,
-            device_rate: 16000,
-            frame_size: 480,
-            channels: 1,
-            vad_enabled: false,
-            vad_threshold: 0.01,
-        };
+        let state = test_callback_state(tx, 1);
         let data = vec![i16::MAX; 480];
         let mono = state.i16_to_mono_f32(&data);
         assert_eq!(mono.len(), 480);
@@ -335,18 +361,7 @@ mod tests {
     #[test]
     fn callback_state_frame_emission() {
         let (tx, mut rx) = mpsc::channel(16);
-        let mut state = CallbackState {
-            tx,
-            running: Arc::new(AtomicBool::new(true)),
-            accum: Vec::new(),
-            start_time: Instant::now(),
-            target_rate: 16000,
-            device_rate: 16000,
-            frame_size: 480,
-            channels: 1,
-            vad_enabled: false,
-            vad_threshold: 0.01,
-        };
+        let mut state = test_callback_state(tx, 1);
 
         // Push exactly one frame worth of loud samples.
         let samples = vec![0.5f32; 480];
@@ -360,18 +375,8 @@ mod tests {
     #[test]
     fn callback_state_vad_filters_silence() {
         let (tx, mut rx) = mpsc::channel(16);
-        let mut state = CallbackState {
-            tx,
-            running: Arc::new(AtomicBool::new(true)),
-            accum: Vec::new(),
-            start_time: Instant::now(),
-            target_rate: 16000,
-            device_rate: 16000,
-            frame_size: 480,
-            channels: 1,
-            vad_enabled: true,
-            vad_threshold: 0.01,
-        };
+        let mut state = test_callback_state(tx, 1);
+        state.vad_enabled = true;
 
         // Push silence — should be filtered.
         let silence = vec![0.0f32; 480];

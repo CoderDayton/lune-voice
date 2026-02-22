@@ -163,7 +163,7 @@ fn generate_sync(
     let mut decoder = encoding_rs::UTF_8.new_decoder();
     let mut output = String::with_capacity(512);
     let mut n_cur = batch.n_tokens();
-    let max_total = prompt_len as i32 + config.max_output_tokens as i32;
+    let max_total = prompt_len + config.max_output_tokens as i32;
     let eos = inner.model.token_eos();
 
     while n_cur < max_total {

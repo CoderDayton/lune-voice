@@ -27,12 +27,12 @@ impl SegmentTracker {
         self.last_update = Instant::now();
 
         // Update existing partial segment or create new one.
-        if let Some(seg) = self.segments.last_mut() {
-            if !seg.is_final {
-                seg.text = text;
-                seg.end_ms = timestamp_ms;
-                return;
-            }
+        if let Some(seg) = self.segments.last_mut()
+            && !seg.is_final
+        {
+            seg.text = text;
+            seg.end_ms = timestamp_ms;
+            return;
         }
 
         // Create new partial segment.
@@ -49,10 +49,10 @@ impl SegmentTracker {
 
     /// Finalize the current partial segment (mark as immutable).
     pub fn finalize_current(&mut self) {
-        if let Some(seg) = self.segments.last_mut() {
-            if !seg.is_final {
-                seg.is_final = true;
-            }
+        if let Some(seg) = self.segments.last_mut()
+            && !seg.is_final
+        {
+            seg.is_final = true;
         }
     }
 
@@ -79,6 +79,7 @@ impl SegmentTracker {
     }
 
     /// Get all current segments without draining.
+    #[cfg(test)]
     pub fn peek(&self) -> &[AsrSegment] {
         &self.segments
     }
