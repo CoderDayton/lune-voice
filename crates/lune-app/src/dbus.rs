@@ -35,6 +35,7 @@ pub struct DaemonInterface {
     dictation_mode_tx: watch::Sender<DictationMode>,
     activation_mode_tx: watch::Sender<ActivationMode>,
     settings_store: Arc<lune_persist::SettingsStore>,
+    rt_handle: tokio::runtime::Handle,
 }
 
 impl DaemonInterface {
@@ -46,6 +47,7 @@ impl DaemonInterface {
         dictation_mode_tx: watch::Sender<DictationMode>,
         activation_mode_tx: watch::Sender<ActivationMode>,
         settings_store: Arc<lune_persist::SettingsStore>,
+        rt_handle: tokio::runtime::Handle,
     ) -> Self {
         Self {
             cmd_tx,
@@ -54,6 +56,7 @@ impl DaemonInterface {
             dictation_mode_tx,
             activation_mode_tx,
             settings_store,
+            rt_handle,
         }
     }
 }
@@ -330,7 +333,7 @@ impl DaemonInterface {
     fn persist_setting(&self) {
         let settings = Arc::clone(&self.settings);
         let store = Arc::clone(&self.settings_store);
-        tokio::task::spawn_local(async move {
+        self.rt_handle.spawn(async move {
             let snapshot = settings.read().await.clone();
             if let Err(e) = store.save(&snapshot) {
                 tracing::warn!(error = %e, "failed to persist settings");

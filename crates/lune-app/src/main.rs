@@ -115,6 +115,7 @@ fn run_daemon() {
         dictation_mode_tx,
         activation_mode_tx,
         Arc::clone(&settings_store),
+        rt.handle().clone(),
     );
 
     let dbus_conn = rt
