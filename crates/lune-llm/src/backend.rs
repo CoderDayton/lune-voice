@@ -60,12 +60,16 @@ pub struct LocalLlmConfig {
     pub n_ctx: u32,
     /// Maximum tokens to generate per request.
     pub max_output_tokens: u32,
-    /// Sampling temperature (0.7 recommended for non-thinking mode).
+    /// Sampling temperature (0.0 = greedy).
     pub temperature: f32,
     /// Top-p sampling.
     pub top_p: f32,
     /// Top-k sampling.
     pub top_k: i32,
+    /// Repetition penalty multiplier (1.0 = off, 1.1 = mild, 1.3 = strong).
+    pub repeat_penalty: f32,
+    /// Number of recent tokens to consider for repetition penalty.
+    pub repeat_last_n: i32,
 }
 
 impl Default for LocalLlmConfig {
@@ -73,11 +77,13 @@ impl Default for LocalLlmConfig {
         Self {
             model_path: PathBuf::from("models/Qwen3-0.6B-Q4_K_M.gguf"),
             use_gpu: true,
-            n_ctx: 4096,
-            max_output_tokens: 512,
+            n_ctx: 2048,
+            max_output_tokens: 256,
             temperature: 0.0,
             top_p: 0.8,
             top_k: 20,
+            repeat_penalty: 1.15,
+            repeat_last_n: 64,
         }
     }
 }
@@ -211,12 +217,17 @@ fn trim_partial_stop_sequences(output: &mut String) {
 
 /// Run inference on a prompt string, returning the generated text.
 ///
+/// When `chunk_tx` is `Some`, word-boundary chunks are emitted via the channel
+/// as tokens are decoded (streaming mode). When `None`, generation completes
+/// silently (batch mode).
+///
 /// Free function so it can be called from `spawn_blocking` (which requires
 /// `'static` + `Send` — the `Arc<Mutex<LlmInner>>` satisfies both).
 fn generate_sync(
     inner: &Mutex<LlmInner>,
     config: &LocalLlmConfig,
     prompt_text: &str,
+    chunk_tx: Option<tokio::sync::mpsc::Sender<String>>,
 ) -> Result<String> {
     let inner = inner.lock().map_err(|e| Error::Llm(format!("lock: {e}")))?;
 
@@ -250,6 +261,16 @@ fn generate_sync(
 
     // Safe cast: prompt_len < n_ctx <= u32::MAX, and n_ctx is a practical context
     // window size (well under i32::MAX), so this won't wrap.
+    let available = config.n_ctx - prompt_len;
+    if available < config.max_output_tokens {
+        tracing::warn!(
+            prompt_tokens = prompt_len,
+            available,
+            max_output = config.max_output_tokens,
+            "prompt leaves only {available} tokens for output; generation may truncate"
+        );
+    }
+
     let prompt_len_i32 = i32::try_from(prompt_len)
         .map_err(|_| Error::Llm(format!("prompt too large for i32: {prompt_len}")))?;
 
@@ -267,11 +288,15 @@ fn generate_sync(
     ctx.decode(&mut batch)
         .map_err(|e| Error::Llm(format!("decode prefill: {e}")))?;
 
-    // Set up sampler chain.
+    // Set up sampler chain — repetition penalty always applied to prevent loops.
     let mut sampler = if config.temperature <= 0.0 {
-        LlamaSampler::greedy()
+        LlamaSampler::chain_simple([
+            LlamaSampler::penalties(config.repeat_last_n, config.repeat_penalty, 0.0, 0.0),
+            LlamaSampler::greedy(),
+        ])
     } else {
         LlamaSampler::chain_simple([
+            LlamaSampler::penalties(config.repeat_last_n, config.repeat_penalty, 0.0, 0.0),
             LlamaSampler::top_k(config.top_k),
             LlamaSampler::top_p(config.top_p, 1),
             LlamaSampler::temp(config.temperature),
@@ -292,6 +317,9 @@ fn generate_sync(
     let max_total = n_cur.saturating_add(max_output_i32);
     let eos = inner.model.token_eos();
 
+    // Streaming state: bytes of `output` already sent to the channel.
+    let mut emitted_up_to: usize = 0;
+
     // After prefill, sample from the last logit position (last_idx).
     // After each decode step the batch has exactly 1 token so index is always 0.
     let mut sample_idx = last_idx;
@@ -311,6 +339,20 @@ fn generate_sync(
 
                 if check_stop_sequences(&mut output, piece_len) {
                     break;
+                }
+
+                // Streaming chunk emission (only when channel is provided).
+                if let Some(ref tx) = chunk_tx {
+                    let safe_end = output.len().saturating_sub(MAX_STOP_SEQ_LEN);
+                    if safe_end > emitted_up_to + MIN_CHUNK_BYTES {
+                        let safe_slice = &output.as_bytes()[emitted_up_to..safe_end];
+                        if let Some(ws_off) = memchr::memrchr(b' ', safe_slice) {
+                            let boundary = emitted_up_to + ws_off + 1;
+                            let chunk = output[emitted_up_to..boundary].to_string();
+                            emitted_up_to = boundary;
+                            let _ = tx.blocking_send(chunk);
+                        }
+                    }
                 }
             }
             Err(e) => {
@@ -337,8 +379,19 @@ fn generate_sync(
         trim_partial_stop_sequences(&mut output);
     }
 
+    // Final flush: emit everything remaining.
+    if let Some(ref tx) = chunk_tx
+        && emitted_up_to < output.len()
+    {
+        let _ = tx.blocking_send(output[emitted_up_to..].to_string());
+    }
+
     Ok(output)
 }
+
+/// Minimum bytes past `emitted_up_to` before emitting a chunk.
+/// Set to 1 so chunks fire at every word boundary — one word at a time.
+const MIN_CHUNK_BYTES: usize = 1;
 
 #[async_trait::async_trait]
 impl TextPostProcessor for LocalLlmBackend {
@@ -358,13 +411,49 @@ impl TextPostProcessor for LocalLlmBackend {
         // Arc clone: O(1) atomic increment, not a heap allocation.
         let config = Arc::clone(&self.config);
         let raw_output =
-            tokio::task::spawn_blocking(move || generate_sync(&inner, &config, &prompt_text))
+            tokio::task::spawn_blocking(move || generate_sync(&inner, &config, &prompt_text, None))
                 .await
                 .map_err(|e| Error::Llm(format!("spawn_blocking join: {e}")))??;
 
         let cleaned = prompt::strip_thinking(&raw_output);
 
         tracing::debug!(output_len = cleaned.len(), "LLM post-process complete");
+
+        Ok(PostProcessOutput {
+            cleaned_text: cleaned,
+            metadata: None,
+        })
+    }
+
+    async fn transform_streaming(
+        &self,
+        input: &PostProcessInput,
+        chunk_tx: tokio::sync::mpsc::Sender<String>,
+    ) -> Result<PostProcessOutput> {
+        let prompt_text = prompt::build_chatml(input);
+
+        tracing::debug!(
+            prompt_len = prompt_text.len(),
+            raw_text_len = input.raw_text.len(),
+            style = %input.style_preset.id,
+            "LLM streaming post-process request"
+        );
+
+        let inner = Arc::clone(&self.inner);
+        let config = Arc::clone(&self.config);
+
+        let output = tokio::task::spawn_blocking(move || {
+            generate_sync(&inner, &config, &prompt_text, Some(chunk_tx))
+        })
+        .await
+        .map_err(|e| Error::Llm(format!("spawn_blocking join: {e}")))??;
+
+        let cleaned = prompt::strip_thinking(&output);
+
+        tracing::debug!(
+            output_len = cleaned.len(),
+            "LLM streaming post-process complete"
+        );
 
         Ok(PostProcessOutput {
             cleaned_text: cleaned,
@@ -380,8 +469,8 @@ mod tests {
     #[test]
     fn config_defaults() {
         let cfg = LocalLlmConfig::default();
-        assert_eq!(cfg.n_ctx, 4096);
-        assert_eq!(cfg.max_output_tokens, 512);
+        assert_eq!(cfg.n_ctx, 2048);
+        assert_eq!(cfg.max_output_tokens, 256);
         assert!((cfg.temperature - 0.0).abs() < f32::EPSILON);
     }
 

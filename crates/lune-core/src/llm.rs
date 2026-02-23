@@ -47,6 +47,21 @@ pub enum AppCategory {
 #[async_trait::async_trait]
 pub trait TextPostProcessor: Send + Sync {
     async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput>;
+
+    /// Stream corrected text in chunks as they become available.
+    ///
+    /// Default implementation calls [`transform`] and sends the full result as
+    /// a single chunk.  Backends with token-level access (e.g. local LLM)
+    /// override this to emit word-boundary chunks during generation.
+    async fn transform_streaming(
+        &self,
+        input: &PostProcessInput,
+        chunk_tx: tokio::sync::mpsc::Sender<String>,
+    ) -> Result<PostProcessOutput> {
+        let output = self.transform(input).await?;
+        let _ = chunk_tx.send(output.cleaned_text.clone()).await;
+        Ok(output)
+    }
 }
 
 #[cfg(test)]

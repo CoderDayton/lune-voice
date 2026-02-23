@@ -187,13 +187,22 @@ pub fn build_post_processor(settings: &UserSettings) -> Result<Arc<dyn TextPostP
             use_gpu,
             n_ctx,
             max_output_tokens,
+            temperature,
+            top_p,
+            top_k,
+            repeat_penalty,
+            repeat_last_n,
         } => {
             let backend = LocalLlmBackend::new(lune_llm::LocalLlmConfig {
                 model_path: model_path.clone(),
                 use_gpu: *use_gpu,
                 n_ctx: *n_ctx,
                 max_output_tokens: *max_output_tokens,
-                ..Default::default()
+                temperature: *temperature,
+                top_p: *top_p,
+                top_k: *top_k,
+                repeat_penalty: *repeat_penalty,
+                repeat_last_n: *repeat_last_n,
             })?;
             Ok(Arc::new(backend))
         }

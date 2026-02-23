@@ -35,8 +35,13 @@ impl Default for UserSettings {
             llm_backend: LlmBackendConfig::Local {
                 model_path: PathBuf::new(),
                 use_gpu: true,
-                n_ctx: 4096,
-                max_output_tokens: 512,
+                n_ctx: 2048,
+                max_output_tokens: 256,
+                temperature: 0.0,
+                top_p: 0.8,
+                top_k: 20,
+                repeat_penalty: 1.15,
+                repeat_last_n: 64,
             },
             hotkey: HotkeyConfig::default(),
             default_style: "general".into(),
@@ -74,9 +79,21 @@ pub enum LlmBackendConfig {
     Local {
         model_path: PathBuf,
         use_gpu: bool,
+        #[serde(default = "default_n_ctx")]
         n_ctx: u32,
         /// Maximum tokens to generate per request.
+        #[serde(default = "default_max_output_tokens")]
         max_output_tokens: u32,
+        #[serde(default)]
+        temperature: f32,
+        #[serde(default = "default_top_p")]
+        top_p: f32,
+        #[serde(default = "default_top_k")]
+        top_k: i32,
+        #[serde(default = "default_repeat_penalty")]
+        repeat_penalty: f32,
+        #[serde(default = "default_repeat_last_n")]
+        repeat_last_n: i32,
     },
     OpenAiCompatible {
         base_url: Url,
@@ -84,6 +101,26 @@ pub enum LlmBackendConfig {
         model: String,
         max_tokens: u32,
     },
+}
+
+// Serde default functions for LlmBackendConfig::Local fields.
+fn default_n_ctx() -> u32 {
+    2048
+}
+fn default_max_output_tokens() -> u32 {
+    256
+}
+fn default_top_p() -> f32 {
+    0.8
+}
+fn default_top_k() -> i32 {
+    20
+}
+fn default_repeat_penalty() -> f32 {
+    1.15
+}
+fn default_repeat_last_n() -> i32 {
+    64
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

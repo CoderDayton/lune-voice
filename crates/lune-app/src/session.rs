@@ -20,17 +20,15 @@ use lune_dict::DictionaryManager;
 use lune_output::TextOutputController;
 use lune_persist::Database;
 
-use crate::confidence_router::{ConfidenceRouter, ConfidenceRouterConfig, RouteDecision};
 use crate::llm_worker::{self, LlmRequest};
 
 /// Configuration for the session pipeline.
 #[derive(Clone)]
 pub struct SessionManagerConfig {
-    /// Silence window before finalizing an utterance (default 500 ms).
+    /// Silence window before finalizing an utterance (default 800 ms).
     pub silence_timeout: Duration,
     pub asr_config: AsrSessionConfig,
     pub asr_backend_kind: AsrBackendKind,
-    pub confidence_config: ConfidenceRouterConfig,
 }
 
 impl Default for SessionManagerConfig {
@@ -39,7 +37,6 @@ impl Default for SessionManagerConfig {
             silence_timeout: Duration::from_millis(800),
             asr_config: AsrSessionConfig::default(),
             asr_backend_kind: AsrBackendKind::ParakeetTdt,
-            confidence_config: ConfidenceRouterConfig::default(),
         }
     }
 }
@@ -66,7 +63,6 @@ pub struct SessionManager<A: AsrBackend> {
     active: Arc<Mutex<Option<ActiveHandle>>>,
 }
 
-// SessionManager does not require A: Send because spawn_local is used.
 impl<A: AsrBackend + 'static> SessionManager<A> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -93,9 +89,6 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
     }
 
     /// Start a new session. Returns `Err` if one is already active.
-    ///
-    /// The caller receives events over `event_tx` until `SessionEvent::Stopped`
-    /// is emitted.
     pub async fn start(&self, event_tx: mpsc::Sender<SessionEvent>) -> Result<Uuid> {
         let mut lock = self.active.lock().await;
         if lock.is_some() {
@@ -105,7 +98,6 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let session_id = Uuid::new_v4();
         let (stop_tx, stop_rx) = oneshot::channel();
 
-        // Resolve style from current settings (reads latest value each session).
         let current_style_id = self.settings.read().await.default_style.clone();
         let style_preset = builtin_registry()
             .get(&current_style_id)
@@ -115,7 +107,6 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
                     .expect("builtin 'general' preset must exist")
             });
 
-        // Persist the initial session record.
         {
             let session = DictationSession {
                 id: session_id,
@@ -131,7 +122,6 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             }
         }
 
-        // Clone Arcs for the background task.
         let audio = Arc::clone(&self.audio);
         let asr = Arc::clone(&self.asr);
         let router = Arc::clone(&self.router);
@@ -141,7 +131,6 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let config = self.config.clone();
         let active_arc = Arc::clone(&self.active);
 
-        // spawn_local: future need not be Send (holds !Send cpal::Stream).
         tokio::task::spawn_local(run_session(
             session_id,
             audio,
@@ -165,7 +154,6 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         Ok(session_id)
     }
 
-    /// Gracefully stop the active session (finalizes the current buffer).
     pub async fn stop(&self) {
         let mut lock = self.active.lock().await;
         if let Some(handle) = lock.take() {
@@ -174,17 +162,11 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         }
     }
 
-    /// Cancel the active session (same teardown, status will be Cancelled).
     #[inline]
     pub async fn cancel(&self) {
-        // The pipeline task treats any stop signal as graceful; the caller
-        // should pass a flag for cancelled status if needed. For now both
-        // paths are identical — the distinction is reflected in DB status only
-        // if we add a separate cancel channel. Keep simple for v0.1.
         self.stop().await;
     }
 
-    /// The active session ID, or `None` if idle.
     #[inline]
     pub async fn active_session_id(&self) -> Option<Uuid> {
         self.active.lock().await.as_ref().map(|h| h.session_id)
@@ -194,7 +176,6 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
 // ── Pipeline task ─────────────────────────────────────────────────────────────
 
 #[allow(clippy::too_many_arguments)]
-// Note: A need not be Send because this runs inside a LocalSet.
 async fn run_session<A: AsrBackend + 'static>(
     session_id: Uuid,
     audio: Arc<AudioCaptureService>,
@@ -212,20 +193,8 @@ async fn run_session<A: AsrBackend + 'static>(
     let mut status = SessionStatus::Completed;
     let silence_timeout = config.silence_timeout;
 
-    // ── Confidence router + LLM worker ────────────────────────────────────
-    let mut confidence_router = ConfidenceRouter::new(config.confidence_config.clone());
-    let (llm_tx, mut llm_rx) = llm_worker::spawn_llm_worker(
-        Arc::clone(&post_processor),
-        config.confidence_config.max_length_ratio,
-        config.confidence_config.min_length_ratio,
-    );
-    let mut utterance_counter: u64 = 0;
-    // Raw text waiting for LLM delivery, keyed by utterance_id.
-    // Entries are removed when the LLM responds (retain id > resp.utterance_id
-    // handles batching: the worker returns max_id of the batch).
-    // Any still-pending on stop are delivered as raw fallback.
-    let mut pending_delivery: std::collections::VecDeque<(u64, String)> =
-        std::collections::VecDeque::new();
+    let (llm_tx, mut llm_rx, mut llm_stream_rx) =
+        llm_worker::spawn_llm_worker(Arc::clone(&post_processor));
 
     // ── Start audio capture ───────────────────────────────────────────────
     let (audio_tx, mut audio_rx) = mpsc::channel::<lune_core::audio::AudioFrame>(1024);
@@ -271,17 +240,15 @@ async fn run_session<A: AsrBackend + 'static>(
     let mut session_text = String::with_capacity(512);
     let mut utterance = String::with_capacity(128);
     let mut pending_nonfinal = String::with_capacity(128);
-    // Latest confidence from finalized ASR segments.
-    let mut pending_confidence: Option<f32> = None;
 
-    // Persistent buffers — reused every iteration to eliminate per-frame allocation.
-    // partial_buf: built for non-final segment display (hot path: ~50Hz).
+    // Accumulates streamed chunks; flushed to session_text on LlmResponse.
+    let mut llm_partial_buf = String::with_capacity(256);
+
+    // Reused each audio frame to avoid allocation on the ~50Hz partial path.
     let mut partial_buf = String::with_capacity(512);
-    // audio_batch: coalesces the initial frame + any immediately-queued frames
-    // into a single push_audio call, reducing await-point overhead under bursts.
     let mut audio_batch: Vec<f32> = Vec::with_capacity(4096);
 
-    // ── Main loop (3 branches: stop, LLM results, audio/silence) ─────────
+    // ── Main loop ─────────────────────────────────────────────────────────
     loop {
         tokio::select! {
             biased;
@@ -291,37 +258,26 @@ async fn run_session<A: AsrBackend + 'static>(
                 break;
             }
 
-            // ── LLM correction results ───────────────────────────────
-            Some(resp) = llm_rx.recv() => {
-                // Remove all pending entries covered by this batch (worker returns
-                // max utterance_id when it batches multiple requests together).
-                pending_delivery.retain(|(id, _)| *id > resp.utterance_id);
+            // ── LLM streaming chunks → paste immediately ──────────────
+            Some(chunk) = llm_stream_rx.recv() => {
+                llm_partial_buf.push_str(&chunk.text);
+                output_ctrl.emit_final(chunk.text).await;
+            }
 
-                let delivered = if resp.accepted && resp.corrected_text != resp.original_text {
-                    debug!(
-                        utterance_id = resp.utterance_id,
-                        original = %resp.original_text,
-                        corrected = %resp.corrected_text,
-                        "LLM correction accepted"
-                    );
-                    resp.corrected_text
-                } else {
-                    resp.original_text
-                };
-
-                output_ctrl.emit_final(delivered.clone()).await;
-                if !delivered.is_empty() {
+            // ── LLM complete → commit to transcript ──────────────────
+            Some(_resp) = llm_rx.recv() => {
+                if !llm_partial_buf.is_empty() {
                     if !session_text.is_empty() {
                         session_text.push(' ');
                     }
-                    session_text.push_str(&delivered);
+                    session_text.push_str(&llm_partial_buf);
+                    llm_partial_buf.clear();
                 }
-                confidence_router.confirm(&delivered);
             }
 
             recv = tokio::time::timeout(silence_timeout, audio_rx.recv()) => {
                 match recv {
-                    // ── Silence timeout ───────────────────────────────────
+                    // ── Silence timeout → send utterance to LLM ──────────
                     Err(_elapsed) => {
                         if !pending_nonfinal.is_empty() {
                             if !utterance.is_empty() {
@@ -333,99 +289,39 @@ async fn run_session<A: AsrBackend + 'static>(
                         if !utterance.is_empty() {
                             debug!(%session_id, "silence timeout, finalizing utterance");
 
-                            // Apply dictionary substitutions.
-                            let after_dict = dict.lock().await.apply(&utterance);
+                            let (after_dict, relevant) = {
+                                let guard = dict.lock().await;
+                                let applied = guard.apply(&utterance);
+                                let rel = guard
+                                    .top_relevant(&applied, 20)
+                                    .into_iter()
+                                    .cloned()
+                                    .collect::<Vec<_>>();
+                                (applied, rel)
+                            };
 
-                            // Route by confidence (3-tier).
-                            let decision = confidence_router.route(&after_dict, pending_confidence);
-                            match &decision {
-                                RouteDecision::HighConfidence { text, confidence } => {
-                                    debug!(confidence, "high confidence, queuing LLM (holding delivery)");
-                                    utterance_counter += 1;
-                                    pending_delivery.push_back((utterance_counter, text.clone()));
-                                    let relevant = dict
-                                        .lock()
-                                        .await
-                                        .top_relevant(text, 20)
-                                        .into_iter()
-                                        .cloned()
-                                        .collect::<Vec<_>>();
-                                    let req = LlmRequest {
-                                        utterance_id: utterance_counter,
-                                        text: text.clone(),
-                                        context: confidence_router.context(),
-                                        style_preset: Arc::clone(&style_preset),
-                                        dictionary: relevant,
-                                    };
-                                    if let Err(e) = llm_tx.send(req).await {
-                                        warn!(error = %e, "LLM unavailable, delivering raw");
-                                        pending_delivery.pop_back();
-                                        output_ctrl.emit_final(text.clone()).await;
-                                        if !text.is_empty() {
-                                            if !session_text.is_empty() {
-                                                session_text.push(' ');
-                                            }
-                                            session_text.push_str(text);
-                                        }
-                                        confidence_router.confirm(text);
-                                    }
-                                    // Partial display preserved — user sees last ASR text until LLM delivers.
-                                }
-                                RouteDecision::Pending { confidence } => {
-                                    debug!(confidence, "accumulating in pending buffer");
-                                }
-                                RouteDecision::ReadyForLlm { text, confidence } => {
-                                    debug!(confidence, "pending buffer ready, queueing LLM (holding delivery)");
-                                    utterance_counter += 1;
-                                    pending_delivery.push_back((utterance_counter, text.clone()));
-                                    let relevant = dict
-                                        .lock()
-                                        .await
-                                        .top_relevant(text, 20)
-                                        .into_iter()
-                                        .cloned()
-                                        .collect::<Vec<_>>();
-                                    let req = LlmRequest {
-                                        utterance_id: utterance_counter,
-                                        text: text.clone(),
-                                        context: confidence_router.context(),
-                                        style_preset: Arc::clone(&style_preset),
-                                        dictionary: relevant,
-                                    };
-                                    if let Err(e) = llm_tx.send(req).await {
-                                        warn!(error = %e, "LLM unavailable, delivering raw");
-                                        pending_delivery.pop_back();
-                                        output_ctrl.emit_final(text.clone()).await;
-                                        if !text.is_empty() {
-                                            if !session_text.is_empty() {
-                                                session_text.push(' ');
-                                            }
-                                            session_text.push_str(text);
-                                        }
-                                    }
-                                    // Partial display preserved — user sees last ASR text until LLM delivers.
-                                }
+                            let req = LlmRequest {
+                                text: after_dict,
+                                style_preset: Arc::clone(&style_preset),
+                                dictionary: relevant,
+                            };
+                            if let Err(e) = llm_tx.send(req).await {
+                                warn!(error = %e, "LLM worker unavailable");
                             }
 
                             utterance.clear();
-                            pending_confidence = None;
                             if let Err(e) = asr.reset_context(&asr_session).await {
                                 warn!(error = %e, "reset_context error");
                             }
                         }
                     }
 
-                    // ── Audio channel closed ──────────────────────────────
                     Ok(None) => {
                         debug!(%session_id, "audio channel closed");
                         break;
                     }
 
-                    // ── Audio frame received ──────────────────────────────
                     Ok(Some(frame)) => {
-                        // Coalesce initial frame + any immediately-available frames
-                        // into a single push_audio call. Reduces await-point count
-                        // during microphone bursts and amortises ASR call overhead.
                         audio_batch.clear();
                         audio_batch.extend_from_slice(&frame.samples);
                         while let Ok(extra) = audio_rx.try_recv() {
@@ -463,12 +359,8 @@ async fn run_session<A: AsrBackend + 'static>(
                                     utterance.push_str(text);
                                 }
                                 pending_nonfinal.clear();
-                                // Track confidence from the latest final segment.
-                                pending_confidence = seg.confidence;
                             } else {
                                 let partial_suffix = route.remaining.trim();
-                                // Reuse persistent buffer — eliminates per-segment
-                                // String allocation on the ~50 Hz partial path.
                                 partial_buf.clear();
                                 partial_buf.push_str(&session_text);
                                 if !utterance.is_empty() {
@@ -485,10 +377,6 @@ async fn run_session<A: AsrBackend + 'static>(
                                     pending_nonfinal.clear();
                                     pending_nonfinal.push_str(partial_suffix);
                                 }
-                                // Track confidence from partials too.
-                                if seg.confidence.is_some() {
-                                    pending_confidence = seg.confidence;
-                                }
                                 output_ctrl.emit_partial(partial_buf.clone()).await;
                             }
                         }
@@ -498,7 +386,8 @@ async fn run_session<A: AsrBackend + 'static>(
         }
     }
 
-    // ── Promote any pending non-final text ────────────────────────────────
+    // ── Teardown ──────────────────────────────────────────────────────────
+
     if !pending_nonfinal.is_empty() {
         if !utterance.is_empty() {
             utterance.push(' ');
@@ -506,101 +395,40 @@ async fn run_session<A: AsrBackend + 'static>(
         utterance.push_str(&pending_nonfinal);
     }
 
-    // ── Flush pending buffer from confidence router ──────────────────────
-    if let Some(remaining) = confidence_router.flush_pending() {
-        debug!("flushing pending buffer on stop: {:?}", remaining);
-        utterance_counter += 1;
-        pending_delivery.push_back((utterance_counter, remaining.clone()));
-        let relevant = dict
-            .lock()
-            .await
-            .top_relevant(&remaining, 20)
-            .into_iter()
-            .cloned()
-            .collect::<Vec<_>>();
-        let req = LlmRequest {
-            utterance_id: utterance_counter,
-            text: remaining.clone(),
-            context: confidence_router.context(),
-            style_preset: Arc::clone(&style_preset),
-            dictionary: relevant,
-        };
-        if let Err(e) = llm_tx.send(req).await {
-            warn!(error = %e, "LLM unavailable for flushed pending, delivering raw");
-            pending_delivery.pop_back();
-            output_ctrl.emit_final(remaining.clone()).await;
-            if !remaining.is_empty() {
-                if !session_text.is_empty() {
-                    session_text.push(' ');
-                }
-                session_text.push_str(&remaining);
-            }
-        }
-    }
-
-    // ── Finalize remaining utterance buffer (queue to LLM on stop) ──────────
+    // Send any remaining utterance to LLM.
     if !utterance.is_empty() {
-        let after_dict = dict.lock().await.apply(&utterance);
-        utterance_counter += 1;
-        pending_delivery.push_back((utterance_counter, after_dict.clone()));
-        let relevant = dict
-            .lock()
-            .await
-            .top_relevant(&after_dict, 20)
-            .into_iter()
-            .cloned()
-            .collect::<Vec<_>>();
+        let (after_dict, relevant) = {
+            let guard = dict.lock().await;
+            let applied = guard.apply(&utterance);
+            let rel = guard
+                .top_relevant(&applied, 20)
+                .into_iter()
+                .cloned()
+                .collect::<Vec<_>>();
+            (applied, rel)
+        };
         let req = LlmRequest {
-            utterance_id: utterance_counter,
-            text: after_dict.clone(),
-            context: confidence_router.context(),
+            text: after_dict,
             style_preset: Arc::clone(&style_preset),
             dictionary: relevant,
         };
         if let Err(e) = llm_tx.send(req).await {
-            warn!(error = %e, "LLM unavailable for final utterance, delivering raw");
-            pending_delivery.pop_back();
-            output_ctrl.emit_final(after_dict.clone()).await;
-            if !after_dict.is_empty() {
-                if !session_text.is_empty() {
-                    session_text.push(' ');
-                }
-                session_text.push_str(&after_dict);
-            }
-            confidence_router.confirm(&after_dict);
+            warn!(error = %e, "LLM unavailable for final utterance");
         }
     }
 
-    // ── Drain in-flight LLM results; deliver remaining pending as raw ─────
-    // Non-blocking: picks up any LLM results that finished during teardown.
-    // For short utterances the LLM often finishes before we get here.
-    while let Ok(resp) = llm_rx.try_recv() {
-        pending_delivery.retain(|(id, _)| *id > resp.utterance_id);
-        let delivered = if resp.accepted && resp.corrected_text != resp.original_text {
-            resp.corrected_text
-        } else {
-            resp.original_text
-        };
-        output_ctrl.emit_final(delivered.clone()).await;
-        if !delivered.is_empty() {
-            if !session_text.is_empty() {
-                session_text.push(' ');
-            }
-            session_text.push_str(&delivered);
-        }
+    // Drain any chunks that arrived during teardown.
+    while let Ok(chunk) = llm_stream_rx.try_recv() {
+        llm_partial_buf.push_str(&chunk.text);
+        output_ctrl.emit_final(chunk.text).await;
     }
-    // Anything still pending didn't make it through LLM — deliver raw.
-    for (_, raw) in pending_delivery.drain(..) {
-        if !raw.is_empty() {
-            output_ctrl.emit_final(raw.clone()).await;
-            if !session_text.is_empty() {
-                session_text.push(' ');
-            }
-            session_text.push_str(&raw);
+    if !llm_partial_buf.is_empty() {
+        if !session_text.is_empty() {
+            session_text.push(' ');
         }
+        session_text.push_str(&llm_partial_buf);
     }
 
-    // ── End ASR session ───────────────────────────────────────────────────
     if let Err(e) = asr.end_session(asr_session).await {
         warn!(error = %e, "end_session error");
         status = SessionStatus::Failed(e.to_string());
@@ -618,7 +446,6 @@ async fn run_session<A: AsrBackend + 'static>(
     info!(%session_id, "session stopped");
 }
 
-/// Persist final session state to the database.
 #[cold]
 async fn finalize_db(
     session_id: Uuid,
@@ -628,7 +455,6 @@ async fn finalize_db(
     transcript: Option<String>,
 ) {
     let mut db = persist.lock().await;
-    // Fetch existing session, update fields, write back.
     match db.get_session(session_id) {
         Ok(Some(mut s)) => {
             s.status = status;
@@ -649,8 +475,6 @@ mod tests {
     use lune_core::asr::{AsrSegment, AsrSessionConfig};
     use lune_core::llm::{PostProcessInput, PostProcessOutput};
     use tokio::sync::mpsc;
-
-    // ── Stubs ─────────────────────────────────────────────────────────────
 
     struct NoopAsr;
 
@@ -704,8 +528,6 @@ mod tests {
         )
     }
 
-    // All tests that call `start()` must run inside a LocalSet because
-    // `start()` uses `spawn_local` internally.
     fn local_set() -> tokio::task::LocalSet {
         tokio::task::LocalSet::new()
     }
@@ -741,7 +563,7 @@ mod tests {
     #[tokio::test]
     async fn stop_when_idle_is_noop() {
         let mgr = make_manager();
-        mgr.stop().await; // no spawn_local called; no LocalSet needed
+        mgr.stop().await;
     }
 
     #[tokio::test]
@@ -769,13 +591,9 @@ mod tests {
                 mgr.start(tx).await.unwrap();
                 mgr.stop().await;
 
-                // Give the background task time to emit Stopped and clear active.
                 tokio::time::sleep(Duration::from_millis(50)).await;
 
-                // Drain events.
                 while let Ok(ev) = rx.try_recv() {
-                    // Just drain; don't assert ordering — the NoopAsr pipeline
-                    // may or may not have emitted Started before stop arrived.
                     let _ = ev;
                 }
             })
