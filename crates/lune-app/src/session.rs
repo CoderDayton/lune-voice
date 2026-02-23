@@ -368,15 +368,11 @@ async fn run_session<A: AsrBackend + 'static>(
                                             session_text.push_str(text);
                                         }
                                         confidence_router.confirm(text);
-                                    } else {
-                                        output_ctrl.emit_partial(session_text.clone()).await;
                                     }
+                                    // Partial display preserved — user sees last ASR text until LLM delivers.
                                 }
                                 RouteDecision::Pending { confidence } => {
                                     debug!(confidence, "accumulating in pending buffer");
-                                    // Text is held in the router's pending_buf.
-                                    // Emit partial showing current session state.
-                                    output_ctrl.emit_partial(session_text.clone()).await;
                                 }
                                 RouteDecision::ReadyForLlm { text, confidence } => {
                                     debug!(confidence, "pending buffer ready, queueing LLM (holding delivery)");
@@ -406,9 +402,8 @@ async fn run_session<A: AsrBackend + 'static>(
                                             }
                                             session_text.push_str(text);
                                         }
-                                    } else {
-                                        output_ctrl.emit_partial(session_text.clone()).await;
                                     }
+                                    // Partial display preserved — user sees last ASR text until LLM delivers.
                                 }
                             }
 
