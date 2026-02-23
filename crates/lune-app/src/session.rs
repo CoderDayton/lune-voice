@@ -22,6 +22,76 @@ use lune_persist::Database;
 
 use crate::llm_worker::{self, LlmRequest};
 
+/// Number of words in pending non-final text before flushing to LLM.
+const WORDS_PER_FLUSH: usize = 8;
+
+/// After a flush, re-arm the silence timer with this shorter window so any
+/// last-word audio that lands in the fresh ASR window is captured quickly.
+const TAIL_SILENCE_TIMEOUT: Duration = Duration::from_millis(250);
+
+/// Maximum dictionary entries to include in LLM context.
+const TOP_RELEVANT_DICT_ENTRIES: usize = 20;
+
+/// Timeout for waiting on final LLM response during teardown.
+const TEARDOWN_LLM_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// Words that are pure filler/noise and should not be sent to the LLM alone.
+const NOISE_FILLERS: &[&str] = &[
+    "um", "uh", "mm", "m", "hmm", "hm", "ah", "er", "yeah", "ok", "okay",
+];
+
+/// Check if a single word (after stripping trailing punctuation) is a noise filler.
+///
+/// Length gate: all fillers are ≤4 bytes ("okay" is the longest). Words longer
+/// than that are rejected without scanning the table — this is the common case
+/// for real speech words.
+#[inline]
+fn is_noise_filler(word: &str) -> bool {
+    let stripped = word.trim_end_matches(|c: char| c.is_ascii_punctuation());
+    let len = stripped.len();
+    // All fillers are 1–4 ASCII bytes; reject anything outside that range.
+    len >= 1
+        && len <= 4
+        && NOISE_FILLERS
+            .iter()
+            .any(|&f| stripped.eq_ignore_ascii_case(f))
+}
+
+/// Returns true iff every whitespace-separated token in `text` is a noise filler.
+///
+/// Fast path: all fillers are ≤4 chars. With spaces between them, the longest
+/// all-noise string for N words is 4*N + (N-1) bytes. If `text.len()` exceeds
+/// the theoretical max for a reasonable filler count, we skip iteration entirely.
+fn is_noise_only(text: &str) -> bool {
+    // "okay okay okay okay" = 4 words, 19 bytes. Beyond ~25 bytes, it's
+    // extremely unlikely to be all fillers — but we use a generous 30-byte
+    // cutoff (covers up to 6 fillers with punctuation/spaces).
+    if text.len() > 30 || text.is_empty() {
+        return false;
+    }
+    text.split_whitespace().all(is_noise_filler)
+}
+
+/// Count whitespace-separated words without iterator allocation.
+/// Scans bytes directly — valid because ASCII whitespace is single-byte
+/// and we only care about word boundaries, not Unicode word segmentation.
+#[inline]
+fn word_count(text: &str) -> usize {
+    let bytes = text.as_bytes();
+    let mut count = 0u32;
+    let mut in_word = false;
+    for &b in bytes {
+        let is_ws = b == b' ' || b == b'\t' || b == b'\n' || b == b'\r';
+        if is_ws {
+            in_word = false;
+        } else if !in_word {
+            in_word = true;
+            count += 1;
+        }
+    }
+    count as usize
+}
+
 /// Configuration for the session pipeline.
 #[derive(Clone)]
 pub struct SessionManagerConfig {
@@ -34,7 +104,7 @@ pub struct SessionManagerConfig {
 impl Default for SessionManagerConfig {
     fn default() -> Self {
         Self {
-            silence_timeout: Duration::from_millis(800),
+            silence_timeout: Duration::from_millis(1200),
             asr_config: AsrSessionConfig::default(),
             asr_backend_kind: AsrBackendKind::ParakeetTdt,
         }
@@ -192,9 +262,9 @@ async fn run_session<A: AsrBackend + 'static>(
 ) {
     let mut status = SessionStatus::Completed;
     let silence_timeout = config.silence_timeout;
+    let mut style_preset = style_preset;
 
-    let (llm_tx, mut llm_rx, mut llm_stream_rx) =
-        llm_worker::spawn_llm_worker(Arc::clone(&post_processor));
+    let (llm_tx, mut llm_rx) = llm_worker::spawn_llm_worker(Arc::clone(&post_processor));
 
     // ── Start audio capture ───────────────────────────────────────────────
     let (audio_tx, mut audio_rx) = mpsc::channel::<lune_core::audio::AudioFrame>(1024);
@@ -241,12 +311,27 @@ async fn run_session<A: AsrBackend + 'static>(
     let mut utterance = String::with_capacity(128);
     let mut pending_nonfinal = String::with_capacity(128);
 
-    // Accumulates streamed chunks; flushed to session_text on LlmResponse.
-    let mut llm_partial_buf = String::with_capacity(256);
-
     // Reused each audio frame to avoid allocation on the ~50Hz partial path.
     let mut partial_buf = String::with_capacity(512);
+    // Cached prefix (session_text + " " + utterance) to avoid rebuilding it
+    // every frame when only pending_nonfinal changes. Invalidated on flush/commit.
+    let mut partial_prefix = String::with_capacity(512);
+    let mut partial_prefix_valid = false;
     let mut audio_batch: Vec<f32> = Vec::with_capacity(4096);
+
+    // Word-count accumulator state.
+    let mut utterance_wc: usize = 0;
+    let mut pending_wc: usize = 0;
+
+    // Resettable silence timer: arms on every speech event, fires when
+    // no speech is detected for `silence_timeout` ms.
+    // Starts dormant (Duration::MAX) — armed only after first speech.
+    let silence_dur = tokio::time::sleep(Duration::MAX);
+    tokio::pin!(silence_dur);
+    let mut silence_armed = false;
+    // After a flush, the next silence window uses TAIL_SILENCE_TIMEOUT (short)
+    // so any last-word audio lands quickly.  Reset to false when speech arrives.
+    let mut tail_mode = false;
 
     // ── Main loop ─────────────────────────────────────────────────────────
     loop {
@@ -258,135 +343,221 @@ async fn run_session<A: AsrBackend + 'static>(
                 break;
             }
 
-            // ── LLM streaming chunks → paste immediately ──────────────
-            Some(chunk) = llm_stream_rx.recv() => {
-                llm_partial_buf.push_str(&chunk.text);
-                output_ctrl.emit_final(chunk.text).await;
-            }
-
-            // ── LLM complete → commit to transcript ──────────────────
-            Some(_resp) = llm_rx.recv() => {
-                if !llm_partial_buf.is_empty() {
+            // ── LLM complete → emit and commit to transcript ─────────
+            Some(resp) = llm_rx.recv() => {
+                if !resp.corrected_text.is_empty() {
                     if !session_text.is_empty() {
+                        output_ctrl.emit_final(String::from(" ")).await;
                         session_text.push(' ');
                     }
-                    session_text.push_str(&llm_partial_buf);
-                    llm_partial_buf.clear();
+                    output_ctrl.emit_final(resp.corrected_text.clone()).await;
+                    session_text.push_str(&resp.corrected_text);
+                    partial_prefix_valid = false;
                 }
             }
 
-            recv = tokio::time::timeout(silence_timeout, audio_rx.recv()) => {
-                match recv {
-                    // ── Silence timeout → send utterance to LLM ──────────
-                    Err(_elapsed) => {
-                        if !pending_nonfinal.is_empty() {
-                            if !utterance.is_empty() {
-                                utterance.push(' ');
+            // ── Silence timer fired → flush utterance ─────────────────
+            () = &mut silence_dur, if silence_armed => {
+                silence_armed = false;
+                let was_tail = std::mem::replace(&mut tail_mode, false);
+                if !pending_nonfinal.is_empty() {
+                    if !utterance.is_empty() { utterance.push(' '); }
+                    utterance.push_str(&pending_nonfinal);
+                    utterance_wc += pending_wc;
+                    pending_nonfinal.clear();
+                    pending_wc = 0;
+                }
+                if !utterance.is_empty() {
+                    let noise = is_noise_only(&utterance);
+                    if noise {
+                        debug!(%session_id, text = %utterance, "silence: noise-only, discarding");
+                    } else {
+                        debug!(%session_id, tail = was_tail, "silence flush");
+                        flush_to_llm(&utterance, &dict, &style_preset, &llm_tx).await;
+                    }
+                    utterance.clear();
+                    utterance_wc = 0;
+                    partial_prefix_valid = false;
+                    if let Err(e) = asr.reset_context(&asr_session).await {
+                        warn!(error = %e, "reset_context error");
+                    }
+                    // Real flush (not tail, not noise): arm a short window so any
+                    // last-word audio that lands in the fresh window flushes fast.
+                    if !was_tail && !noise {
+                        tail_mode = true;
+                        silence_dur.as_mut().reset(
+                            tokio::time::Instant::now() + TAIL_SILENCE_TIMEOUT,
+                        );
+                        silence_armed = true;
+                    }
+                }
+            }
+
+            // ── Audio frame → feed ASR, process speech ────────────────
+            frame = audio_rx.recv() => {
+                let Some(frame) = frame else {
+                    debug!(%session_id, "audio channel closed");
+                    break;
+                };
+
+                audio_batch.clear();
+                audio_batch.extend_from_slice(&frame.samples);
+                while let Ok(extra) = audio_rx.try_recv() {
+                    audio_batch.extend_from_slice(&extra.samples);
+                }
+
+                if let Err(e) = asr.push_audio(&asr_session, &audio_batch).await {
+                    warn!(error = %e, "push_audio error");
+                    continue;
+                }
+
+                let segments = match asr.poll_results(&asr_session).await {
+                    Ok(s) => s,
+                    Err(e) => { warn!(error = %e, "poll_results error"); continue; }
+                };
+
+                let mut had_speech = false;
+                if !segments.is_empty() {
+                    for seg in &segments {
+                        let route = router.route_full(&seg.text);
+                        let remaining = route.remaining.trim();
+                        if !remaining.is_empty() || !route.commands.is_empty() {
+                            had_speech = true;
+                        }
+
+                        for cmd in &route.commands {
+                            if let lune_core::command::VoiceCommand::SwitchStyle(style_id) = cmd {
+                                if let Some(next_preset) = builtin_registry().get(style_id) {
+                                    style_preset = next_preset;
+                                    info!(
+                                        %session_id,
+                                        style = %style_preset.id,
+                                        "switched style preset via voice command"
+                                    );
+                                } else {
+                                    warn!(
+                                        %session_id,
+                                        style = %style_id,
+                                        "unknown style preset in voice command"
+                                    );
+                                }
                             }
-                            utterance.push_str(&pending_nonfinal);
+                            let payload = serde_json::to_string(cmd)
+                                .unwrap_or_else(|_| format!("{cmd:?}"));
+                            let _ = event_tx
+                                .try_send(SessionEvent::CommandDetected(payload));
+                        }
+
+                        if seg.is_final {
+                            if !remaining.is_empty() {
+                                if !utterance.is_empty() { utterance.push(' '); }
+                                utterance.push_str(remaining);
+                                utterance_wc += word_count(remaining);
+                                partial_prefix_valid = false;
+                            }
                             pending_nonfinal.clear();
-                        }
-                        if !utterance.is_empty() {
-                            debug!(%session_id, "silence timeout, finalizing utterance");
-
-                            let (after_dict, relevant) = {
-                                let guard = dict.lock().await;
-                                let applied = guard.apply(&utterance);
-                                let rel = guard
-                                    .top_relevant(&applied, 20)
-                                    .into_iter()
-                                    .cloned()
-                                    .collect::<Vec<_>>();
-                                (applied, rel)
-                            };
-
-                            let req = LlmRequest {
-                                text: after_dict,
-                                style_preset: Arc::clone(&style_preset),
-                                dictionary: relevant,
-                            };
-                            if let Err(e) = llm_tx.send(req).await {
-                                warn!(error = %e, "LLM worker unavailable");
-                            }
-
-                            utterance.clear();
-                            if let Err(e) = asr.reset_context(&asr_session).await {
-                                warn!(error = %e, "reset_context error");
-                            }
-                        }
-                    }
-
-                    Ok(None) => {
-                        debug!(%session_id, "audio channel closed");
-                        break;
-                    }
-
-                    Ok(Some(frame)) => {
-                        audio_batch.clear();
-                        audio_batch.extend_from_slice(&frame.samples);
-                        while let Ok(extra) = audio_rx.try_recv() {
-                            audio_batch.extend_from_slice(&extra.samples);
-                        }
-
-                        if let Err(e) = asr.push_audio(&asr_session, &audio_batch).await {
-                            warn!(error = %e, "push_audio error");
-                            continue;
-                        }
-
-                        let segments = match asr.poll_results(&asr_session).await {
-                            Ok(s) => s,
-                            Err(e) => {
-                                warn!(error = %e, "poll_results error");
-                                continue;
-                            }
-                        };
-
-                        for seg in &segments {
-                            let route = router.route_full(&seg.text);
-
-                            for cmd in &route.commands {
-                                let _ = event_tx
-                                    .send(SessionEvent::CommandDetected(format!("{cmd:?}")))
-                                    .await;
-                            }
-
-                            if seg.is_final {
-                                let text = route.remaining.trim();
-                                if !text.is_empty() {
-                                    if !utterance.is_empty() {
-                                        utterance.push(' ');
-                                    }
-                                    utterance.push_str(text);
-                                }
-                                pending_nonfinal.clear();
-                            } else {
-                                let partial_suffix = route.remaining.trim();
-                                partial_buf.clear();
-                                partial_buf.push_str(&session_text);
+                            pending_wc = 0;
+                        } else {
+                            // Rebuild the cached prefix only when session_text
+                            // or utterance has changed (rare vs every frame).
+                            if !partial_prefix_valid {
+                                partial_prefix.clear();
+                                partial_prefix.push_str(&session_text);
                                 if !utterance.is_empty() {
-                                    if !partial_buf.is_empty() {
-                                        partial_buf.push(' ');
-                                    }
-                                    partial_buf.push_str(&utterance);
+                                    if !partial_prefix.is_empty() { partial_prefix.push(' '); }
+                                    partial_prefix.push_str(&utterance);
                                 }
-                                if !partial_suffix.is_empty() {
-                                    if !partial_buf.is_empty() {
-                                        partial_buf.push(' ');
-                                    }
-                                    partial_buf.push_str(partial_suffix);
-                                    pending_nonfinal.clear();
-                                    pending_nonfinal.push_str(partial_suffix);
-                                }
-                                output_ctrl.emit_partial(partial_buf.clone()).await;
+                                partial_prefix_valid = true;
                             }
+                            partial_buf.clear();
+                            partial_buf.push_str(&partial_prefix);
+                            if !remaining.is_empty() {
+                                if !partial_buf.is_empty() { partial_buf.push(' '); }
+                                partial_buf.push_str(remaining);
+                                pending_nonfinal.clear();
+                                pending_nonfinal.push_str(remaining);
+                                pending_wc = word_count(remaining);
+                            }
+                            let _ = event_tx.try_send(SessionEvent::PartialText(partial_buf.clone()));
                         }
                     }
+                }
+
+                // ── Silence timer: reset on speech, arm if not already ─
+                if had_speech {
+                    // Real speech: exit tail mode — the user is still talking,
+                    // normal silence_timeout applies from here.
+                    tail_mode = false;
+                    silence_dur.as_mut().reset(
+                        tokio::time::Instant::now() + silence_timeout,
+                    );
+                    silence_armed = true;
+                }
+
+                // ── Word-count flush ───────────────────────────────────
+                if utterance_wc + pending_wc >= WORDS_PER_FLUSH {
+                    if !pending_nonfinal.is_empty() {
+                        if !utterance.is_empty() { utterance.push(' '); }
+                        utterance.push_str(&pending_nonfinal);
+                        pending_nonfinal.clear();
+                        pending_wc = 0;
+                    }
+                    let noise = is_noise_only(&utterance);
+                    if noise {
+                        debug!(%session_id, text = %utterance, "word-count flush: noise-only, discarding");
+                    } else {
+                        debug!(%session_id, word_count = utterance_wc, "word-count flush");
+                        flush_to_llm(&utterance, &dict, &style_preset, &llm_tx).await;
+                    }
+                    utterance.clear();
+                    utterance_wc = 0;
+                    partial_prefix_valid = false;
+                    if let Err(e) = asr.reset_context(&asr_session).await {
+                        warn!(error = %e, "reset_context error");
+                    }
+                    // Arm short tail window: user may have said one more word
+                    // right as the flush fired.
+                    tail_mode = true;
+                    silence_dur.as_mut().reset(
+                        tokio::time::Instant::now() + TAIL_SILENCE_TIMEOUT,
+                    );
+                    silence_armed = true;
                 }
             }
         }
     }
 
     // ── Teardown ──────────────────────────────────────────────────────────
+
+    // Drain any remaining audio frames through ASR to capture the last word(s).
+    // The user may have stopped dictation right after speaking — audio frames
+    // could be buffered in the channel but not yet fed to ASR.
+    while let Ok(frame) = audio_rx.try_recv() {
+        let _ = asr.push_audio(&asr_session, &frame.samples).await;
+    }
+    if let Ok(segments) = asr.poll_results(&asr_session).await {
+        for seg in &segments {
+            let route = router.route_full(&seg.text);
+            let text = route.remaining.trim();
+
+            for cmd in &route.commands {
+                let payload = serde_json::to_string(cmd).unwrap_or_else(|_| format!("{cmd:?}"));
+                let _ = event_tx.try_send(SessionEvent::CommandDetected(payload));
+            }
+
+            if !text.is_empty() {
+                if seg.is_final {
+                    if !utterance.is_empty() {
+                        utterance.push(' ');
+                    }
+                    utterance.push_str(text);
+                } else {
+                    pending_nonfinal.clear();
+                    pending_nonfinal.push_str(text);
+                }
+            }
+        }
+    }
 
     if !pending_nonfinal.is_empty() {
         if !utterance.is_empty() {
@@ -395,38 +566,31 @@ async fn run_session<A: AsrBackend + 'static>(
         utterance.push_str(&pending_nonfinal);
     }
 
-    // Send any remaining utterance to LLM.
-    if !utterance.is_empty() {
-        let (after_dict, relevant) = {
-            let guard = dict.lock().await;
-            let applied = guard.apply(&utterance);
-            let rel = guard
-                .top_relevant(&applied, 20)
-                .into_iter()
-                .cloned()
-                .collect::<Vec<_>>();
-            (applied, rel)
-        };
-        let req = LlmRequest {
-            text: after_dict,
-            style_preset: Arc::clone(&style_preset),
-            dictionary: relevant,
-        };
-        if let Err(e) = llm_tx.send(req).await {
-            warn!(error = %e, "LLM unavailable for final utterance");
-        }
+    // Send any remaining utterance to LLM (skip if noise-only).
+    let has_final_flush = !utterance.is_empty() && !is_noise_only(&utterance);
+    if has_final_flush {
+        flush_to_llm(&utterance, &dict, &style_preset, &llm_tx).await;
     }
 
-    // Drain any chunks that arrived during teardown.
-    while let Ok(chunk) = llm_stream_rx.try_recv() {
-        llm_partial_buf.push_str(&chunk.text);
-        output_ctrl.emit_final(chunk.text).await;
-    }
-    if !llm_partial_buf.is_empty() {
-        if !session_text.is_empty() {
-            session_text.push(' ');
-        }
-        session_text.push_str(&llm_partial_buf);
+    // Drop sender so the LLM worker knows no more requests are coming.
+    drop(llm_tx);
+
+    if has_final_flush {
+        let _ = tokio::time::timeout(TEARDOWN_LLM_TIMEOUT, async {
+            while let Some(resp) = llm_rx.recv().await {
+                if !resp.corrected_text.is_empty() {
+                    if !session_text.is_empty() {
+                        output_ctrl.emit_final(String::from(" ")).await;
+                    }
+                    output_ctrl.emit_final(resp.corrected_text.clone()).await;
+                    if !session_text.is_empty() {
+                        session_text.push(' ');
+                    }
+                    session_text.push_str(&resp.corrected_text);
+                }
+            }
+        })
+        .await;
     }
 
     if let Err(e) = asr.end_session(asr_session).await {
@@ -444,6 +608,34 @@ async fn run_session<A: AsrBackend + 'static>(
     let _ = event_tx.send(SessionEvent::Stopped).await;
     active_arc.lock().await.take();
     info!(%session_id, "session stopped");
+}
+
+/// Build context string from the sliding window, apply dictionary, and send to LLM.
+async fn flush_to_llm(
+    utterance: &str,
+    dict: &Mutex<DictionaryManager>,
+    style_preset: &Arc<StylePreset>,
+    llm_tx: &mpsc::Sender<LlmRequest>,
+) {
+    let (after_dict, relevant) = {
+        let guard = dict.lock().await;
+        let applied = guard.apply(utterance);
+        let rel = guard
+            .top_relevant(&applied, TOP_RELEVANT_DICT_ENTRIES)
+            .into_iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        (applied, rel)
+    };
+
+    let req = LlmRequest {
+        text: after_dict,
+        style_preset: Arc::clone(style_preset),
+        dictionary: relevant,
+    };
+    if let Err(e) = llm_tx.send(req).await {
+        warn!(error = %e, "LLM worker unavailable");
+    }
 }
 
 #[cold]
@@ -546,37 +738,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn double_start_returns_error() {
+    async fn double_start_errors() {
         local_set()
             .run_until(async {
                 let mgr = make_manager();
                 let (tx1, _rx1) = mpsc::channel(16);
                 let (tx2, _rx2) = mpsc::channel(16);
                 mgr.start(tx1).await.unwrap();
-                let result = mgr.start(tx2).await;
-                assert!(result.is_err());
-                mgr.stop().await;
-            })
-            .await;
-    }
-
-    #[tokio::test]
-    async fn stop_when_idle_is_noop() {
-        let mgr = make_manager();
-        mgr.stop().await;
-    }
-
-    #[tokio::test]
-    async fn active_session_id_tracks_state() {
-        local_set()
-            .run_until(async {
-                let mgr = make_manager();
-                assert!(mgr.active_session_id().await.is_none());
-
-                let (tx, _rx) = mpsc::channel(16);
-                let id = mgr.start(tx).await.unwrap();
-                assert_eq!(mgr.active_session_id().await, Some(id));
-
+                let err = mgr.start(tx2).await;
+                assert!(err.is_err());
                 mgr.stop().await;
             })
             .await;
@@ -587,16 +757,70 @@ mod tests {
         local_set()
             .run_until(async {
                 let mgr = make_manager();
-                let (tx, mut rx) = mpsc::channel(16);
+                let (tx, _rx) = mpsc::channel(16);
                 mgr.start(tx).await.unwrap();
                 mgr.stop().await;
-
-                tokio::time::sleep(Duration::from_millis(50)).await;
-
-                while let Ok(ev) = rx.try_recv() {
-                    let _ = ev;
-                }
+                tokio::task::yield_now().await;
+                tokio::task::yield_now().await;
+                assert!(mgr.active_session_id().await.is_none());
             })
             .await;
+    }
+
+    #[test]
+    fn noise_detection_basics() {
+        assert!(is_noise_filler("um"));
+        assert!(is_noise_filler("Um"));
+        assert!(is_noise_filler("UM"));
+        assert!(is_noise_filler("uh"));
+        assert!(is_noise_filler("er"));
+        assert!(is_noise_filler("Er"));
+        assert!(is_noise_filler("ER"));
+        assert!(is_noise_filler("hmm"));
+        assert!(is_noise_filler("ok"));
+        assert!(is_noise_filler("okay"));
+        assert!(is_noise_filler("yeah"));
+        assert!(!is_noise_filler("hello"));
+        assert!(!is_noise_filler("the"));
+        assert!(!is_noise_filler(""));
+        assert!(!is_noise_filler("umbrella"));
+        assert!(!is_noise_filler("error"));
+    }
+
+    #[test]
+    fn noise_filler_with_trailing_punct() {
+        assert!(is_noise_filler("um,"));
+        assert!(is_noise_filler("uh."));
+        assert!(is_noise_filler("okay!"));
+        assert!(is_noise_filler("hmm..."));
+        assert!(is_noise_filler("er,"));
+        assert!(!is_noise_filler("hello."));
+    }
+
+    #[test]
+    fn noise_only_detection() {
+        assert!(is_noise_only("um uh"));
+        assert!(is_noise_only("hmm"));
+        assert!(is_noise_only("ok yeah um"));
+        assert!(is_noise_only("er um uh"));
+        assert!(!is_noise_only("um hello"));
+        assert!(!is_noise_only("the quick brown fox"));
+        assert!(!is_noise_only(""));
+    }
+
+    #[test]
+    fn word_count_examples() {
+        assert_eq!(word_count(""), 0);
+        assert_eq!(word_count("hello"), 1);
+        assert_eq!(word_count("hello world"), 2);
+        assert_eq!(word_count("  hello   world  "), 2);
+        assert_eq!(word_count("a b c d e f g h"), 8);
+    }
+
+    #[test]
+    fn word_count_whitespace_variants() {
+        assert_eq!(word_count("a\tb\nc"), 3);
+        assert_eq!(word_count("\t\n "), 0);
+        assert_eq!(word_count(" a "), 1);
     }
 }

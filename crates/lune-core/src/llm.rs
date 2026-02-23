@@ -10,8 +10,6 @@ use crate::dict::DictionaryEntry;
 #[derive(Debug, Clone)]
 pub struct PostProcessInput {
     pub raw_text: String,
-    /// Preceding text for context.
-    pub prev_context: Option<String>,
     pub style_preset: Arc<StylePreset>,
     /// Target application category hint.
     pub app_category: Option<AppCategory>,
@@ -72,7 +70,6 @@ mod tests {
     fn post_process_input_fields() {
         let input = PostProcessInput {
             raw_text: "hello um world".into(),
-            prev_context: None,
             style_preset: Arc::new(StylePreset::general()),
             app_category: Some(AppCategory::Email),
             dictionary: vec![],

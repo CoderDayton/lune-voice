@@ -36,6 +36,7 @@ pub struct DaemonInterface {
     activation_mode_tx: watch::Sender<ActivationMode>,
     settings_store: Arc<lune_persist::SettingsStore>,
     rt_handle: tokio::runtime::Handle,
+    persist_gate: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl DaemonInterface {
@@ -57,6 +58,7 @@ impl DaemonInterface {
             activation_mode_tx,
             settings_store,
             rt_handle,
+            persist_gate: Arc::new(tokio::sync::Mutex::new(())),
         }
     }
 }
@@ -333,10 +335,14 @@ impl DaemonInterface {
     fn persist_setting(&self) {
         let settings = Arc::clone(&self.settings);
         let store = Arc::clone(&self.settings_store);
+        let persist_gate = Arc::clone(&self.persist_gate);
         self.rt_handle.spawn(async move {
             let snapshot = settings.read().await.clone();
-            if let Err(e) = store.save(&snapshot) {
-                tracing::warn!(error = %e, "failed to persist settings");
+            let _guard = persist_gate.lock().await;
+            match tokio::task::spawn_blocking(move || store.save(&snapshot)).await {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => tracing::warn!(error = %e, "failed to persist settings"),
+                Err(e) => tracing::warn!(error = %e, "settings persist task join failure"),
             }
         });
     }

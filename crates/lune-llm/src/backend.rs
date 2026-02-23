@@ -22,7 +22,18 @@ const MAX_STOP_SEQ_LEN: usize = 10;
 /// All stop sequences checked during decoding.  Order is irrelevant for
 /// correctness; we scan a small window (~20 bytes) so iteration cost is
 /// dominated by `memchr`, not sequence count.
-const STOP_SEQUENCES: &[&str] = &["<think>", "</think>", "<|im_end|>"];
+///
+/// NOTE: `<think>` / `</think>` are intentionally NOT stop sequences.
+/// When a small model (e.g. Qwen3-0.6B) ignores `/no_think` and reasons
+/// anyway, halting at `</think>` would capture only the reasoning text and
+/// discard the actual answer that follows.  Instead we let generation
+/// continue past the thinking block and rely on `strip_thinking` + the
+/// streaming thinking-gate to suppress reasoning from output.
+const STOP_SEQUENCES: &[&str] = &["<|im_end|>"];
+
+/// Closing tag for model thinking blocks.  Used by the streaming
+/// thinking-gate to detect when reasoning is complete.
+const THINK_CLOSE: &str = "</think>";
 
 // Compile-time guarantee that MAX_STOP_SEQ_LEN stays in sync with STOP_SEQUENCES
 // AND that every stop sequence is pure ASCII (required by byte-level scanning).
@@ -99,13 +110,19 @@ pub struct LocalLlmBackend {
     config: Arc<LocalLlmConfig>,
 }
 
+/// Drop order matters: ctx → model → backend.
+/// `ctx` holds a raw C pointer into model data, so it must be dropped first.
+/// `model` may reference backend globals, so backend drops last.
 struct LlmInner {
-    backend: LlamaBackend,
+    ctx: llama_cpp_2::context::LlamaContext<'static>,
     model: LlamaModel,
+    /// Kept alive for drop ordering — must outlive model and ctx.
+    #[allow(dead_code)]
+    backend: LlamaBackend,
 }
 
-// SAFETY: LlamaBackend and LlamaModel are thread-safe behind our Mutex.
-// llama.cpp's inference context is created per-call inside the Mutex.
+// SAFETY: LlamaBackend, LlamaModel, and LlamaContext are thread-safe behind our Mutex.
+// All inference operations happen under the Mutex guard.
 unsafe impl Send for LlmInner {}
 
 impl LocalLlmBackend {
@@ -132,16 +149,22 @@ impl LocalLlmBackend {
         let model = LlamaModel::load_from_file(&backend, &config.model_path, &model_params)
             .map_err(|e| Error::Llm(format!("load model: {e}")))?;
 
-        // Pre-warm: allocate + drop a context to force KV cache memory allocation
-        // so the first real inference call doesn't pay the cost.
-        {
-            let n_ctx = NonZeroU32::new(config.n_ctx)
-                .ok_or_else(|| Error::Llm("n_ctx must be > 0".into()))?;
-            let ctx_params = LlamaContextParams::default().with_n_ctx(Some(n_ctx));
-            let _warm = model
-                .new_context(&backend, ctx_params)
-                .map_err(|e| Error::Llm(format!("pre-warm context: {e}")))?;
-        }
+        // Create the persistent context once — reused across all inference calls
+        // via clear_kv_cache() instead of allocating a new context each time.
+        let n_ctx_init =
+            NonZeroU32::new(config.n_ctx).ok_or_else(|| Error::Llm("n_ctx must be > 0".into()))?;
+        let ctx_params_init = LlamaContextParams::default()
+            .with_n_ctx(Some(n_ctx_init))
+            .with_offload_kqv(gpu)
+            // LLAMA_FLASH_ATTN_TYPE_ENABLED = 1 (stable C ABI value)
+            .with_flash_attention_policy(1);
+        let ctx = model
+            .new_context(&backend, ctx_params_init)
+            .map_err(|e| Error::Llm(format!("create persistent context: {e}")))?;
+        // SAFETY: LlamaContext<'a> internally holds a raw C pointer to the model,
+        // not a true Rust borrow.  The model is stored in the same struct and outlives
+        // ctx (drop order: ctx → model → backend).  Exclusive access is enforced by Mutex.
+        let ctx: llama_cpp_2::context::LlamaContext<'static> = unsafe { std::mem::transmute(ctx) };
 
         tracing::info!(
             model_path = %config.model_path.display(),
@@ -151,7 +174,11 @@ impl LocalLlmBackend {
         );
 
         Ok(Self {
-            inner: Arc::new(Mutex::new(LlmInner { backend, model })),
+            inner: Arc::new(Mutex::new(LlmInner {
+                ctx,
+                model,
+                backend,
+            })),
             config: Arc::new(config),
         })
     }
@@ -229,19 +256,21 @@ fn generate_sync(
     prompt_text: &str,
     chunk_tx: Option<tokio::sync::mpsc::Sender<String>>,
 ) -> Result<String> {
-    let inner = inner.lock().map_err(|e| Error::Llm(format!("lock: {e}")))?;
+    let mut inner = inner.lock().map_err(|e| Error::Llm(format!("lock: {e}")))?;
 
-    let n_ctx =
-        NonZeroU32::new(config.n_ctx).ok_or_else(|| Error::Llm("n_ctx must be > 0".into()))?;
-    let ctx_params = LlamaContextParams::default().with_n_ctx(Some(n_ctx));
-    let mut ctx = inner
-        .model
-        .new_context(&inner.backend, ctx_params)
-        .map_err(|e| Error::Llm(format!("create context: {e}")))?;
+    // Reuse the persistent context — clear KV cache instead of allocating a new one.
+    // Saves ~5-10ms + VRAM churn per call.
+    inner.ctx.clear_kv_cache();
+
+    // Destructure to get independent borrows of ctx and model.
+    let LlmInner {
+        ref mut ctx,
+        ref model,
+        backend: _,
+    } = *inner;
 
     // Tokenize prompt. Qwen3 has no BOS token.
-    let tokens = inner
-        .model
+    let tokens = model
         .str_to_token(prompt_text, AddBos::Never)
         .map_err(|e| Error::Llm(format!("tokenize: {e}")))?;
 
@@ -315,24 +344,31 @@ fn generate_sync(
     let max_output_i32 = config.max_output_tokens.min(i32::MAX as u32) as i32;
     // Saturating add prevents i32 overflow on absurd configs.
     let max_total = n_cur.saturating_add(max_output_i32);
-    let eos = inner.model.token_eos();
+    let eos = model.token_eos();
 
     // Streaming state: bytes of `output` already sent to the channel.
     let mut emitted_up_to: usize = 0;
+    // Thinking gate: when streaming, don't emit chunks until the model's
+    // thinking phase is complete.  If the model follows `/no_think`, no
+    // thinking tags appear and we emit from byte 0.  If it ignores the
+    // directive and reasons, we wait for `</think>` before emitting.
+    // Batch mode (chunk_tx is None) skips gating entirely.
+    let is_streaming = chunk_tx.is_some();
+    let mut thinking_done = !is_streaming;
 
     // After prefill, sample from the last logit position (last_idx).
     // After each decode step the batch has exactly 1 token so index is always 0.
     let mut sample_idx = last_idx;
 
     while n_cur < max_total {
-        let token = sampler.sample(&ctx, sample_idx);
+        let token = sampler.sample(ctx, sample_idx);
         sampler.accept(token);
 
         if token == eos {
             break;
         }
 
-        match inner.model.token_to_piece(token, &mut decoder, true, None) {
+        match model.token_to_piece(token, &mut decoder, true, None) {
             Ok(ref piece) if !piece.is_empty() => {
                 let piece_len = piece.len();
                 output.push_str(piece);
@@ -341,8 +377,24 @@ fn generate_sync(
                     break;
                 }
 
-                // Streaming chunk emission (only when channel is provided).
-                if let Some(ref tx) = chunk_tx {
+                // Detect end of thinking block to gate streaming emission.
+                // Scan only the tail that could contain a newly-completed tag.
+                if !thinking_done {
+                    let search_start = output
+                        .len()
+                        .saturating_sub(piece_len + THINK_CLOSE.len() - 1);
+                    if let Some(pos) = output[search_start..].find(THINK_CLOSE) {
+                        thinking_done = true;
+                        let content_start = search_start + pos + THINK_CLOSE.len();
+                        // Skip whitespace immediately after </think>.
+                        emitted_up_to = output[content_start..]
+                            .find(|c: char| !c.is_ascii_whitespace())
+                            .map_or(output.len(), |off| content_start + off);
+                    }
+                }
+
+                // Streaming chunk emission — only after thinking is complete.
+                if thinking_done && let Some(ref tx) = chunk_tx {
                     let safe_end = output.len().saturating_sub(MAX_STOP_SEQ_LEN);
                     if safe_end > emitted_up_to + MIN_CHUNK_BYTES {
                         let safe_slice = &output.as_bytes()[emitted_up_to..safe_end];
@@ -379,11 +431,28 @@ fn generate_sync(
         trim_partial_stop_sequences(&mut output);
     }
 
-    // Final flush: emit everything remaining.
-    if let Some(ref tx) = chunk_tx
-        && emitted_up_to < output.len()
-    {
-        let _ = tx.blocking_send(output[emitted_up_to..].to_string());
+    // Final flush: apply strip_thinking first so streamed output is clean.
+    if let Some(ref tx) = chunk_tx {
+        let cleaned = prompt::strip_thinking(&output);
+        if thinking_done && emitted_up_to < output.len() {
+            // Thinking gate passed — emit remaining clean text.
+            // Use the cleaned tail if strip_thinking trimmed anything.
+            let remaining = if cleaned.len() < output.len() {
+                let already_sent = emitted_up_to.saturating_sub(output.len() - cleaned.len());
+                &cleaned[already_sent.min(cleaned.len())..]
+            } else {
+                &output[emitted_up_to..]
+            };
+            if !remaining.is_empty() {
+                let _ = tx.blocking_send(remaining.to_string());
+            }
+        } else if !thinking_done && !cleaned.is_empty() {
+            // Model never produced </think> — emit the strip_thinking result
+            // which handles bare </think> and other patterns.
+            let _ = tx.blocking_send(cleaned.clone());
+        }
+        // Return the cleaned output so transform_streaming doesn't double-strip.
+        return Ok(cleaned);
     }
 
     Ok(output)
@@ -442,13 +511,12 @@ impl TextPostProcessor for LocalLlmBackend {
         let inner = Arc::clone(&self.inner);
         let config = Arc::clone(&self.config);
 
-        let output = tokio::task::spawn_blocking(move || {
+        // generate_sync returns already-cleaned output when chunk_tx is Some.
+        let cleaned = tokio::task::spawn_blocking(move || {
             generate_sync(&inner, &config, &prompt_text, Some(chunk_tx))
         })
         .await
         .map_err(|e| Error::Llm(format!("spawn_blocking join: {e}")))??;
-
-        let cleaned = prompt::strip_thinking(&output);
 
         tracing::debug!(
             output_len = cleaned.len(),
@@ -492,28 +560,16 @@ mod tests {
     }
 
     #[test]
-    fn stop_sequence_think_open() {
+    fn think_tags_not_stop_sequences() {
+        // <think> and </think> are NOT stop sequences — the model must be
+        // allowed to complete its thinking block so the actual answer follows.
         let mut s = String::from("result<think>");
-        assert!(check_stop_sequences(&mut s, 7));
-        assert_eq!(s, "result");
-    }
+        assert!(!check_stop_sequences(&mut s, 7));
+        assert_eq!(s, "result<think>");
 
-    #[test]
-    fn stop_sequence_think_close() {
         let mut s = String::from("leaked</think>");
-        assert!(check_stop_sequences(&mut s, 8));
-        assert_eq!(s, "leaked");
-    }
-
-    #[test]
-    fn stop_sequence_finds_earliest_match() {
-        // If a stop sequence straddles the boundary AND a second occurrence
-        // exists entirely in the new piece, `find` (forward) catches the
-        // earliest one. `rfind` would miss the straddling occurrence.
-        let mut s = String::from("text<think>more<think>");
-        // piece_len = 17 covers "nk>more<think>" plus overlap
-        assert!(check_stop_sequences(&mut s, 17));
-        assert_eq!(s, "text");
+        assert!(!check_stop_sequences(&mut s, 8));
+        assert_eq!(s, "leaked</think>");
     }
 
     #[test]

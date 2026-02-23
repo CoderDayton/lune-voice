@@ -30,7 +30,6 @@ impl Default for UserSettings {
             asr_backend: AsrBackendConfig::ParakeetTdt {
                 model_dir: PathBuf::new(),
                 use_gpu: true,
-                context_secs: 30.0,
             },
             llm_backend: LlmBackendConfig::Local {
                 model_path: PathBuf::new(),
@@ -40,7 +39,7 @@ impl Default for UserSettings {
                 temperature: 0.0,
                 top_p: 0.8,
                 top_k: 20,
-                repeat_penalty: 1.15,
+                repeat_penalty: 1.0,
                 repeat_last_n: 64,
             },
             hotkey: HotkeyConfig::default(),
@@ -61,8 +60,6 @@ pub enum AsrBackendConfig {
     ParakeetTdt {
         model_dir: PathBuf,
         use_gpu: bool,
-        /// Sliding context window size in seconds.
-        context_secs: f32,
     },
     OpenAiCompatible {
         base_url: Url,

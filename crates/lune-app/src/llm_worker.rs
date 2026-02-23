@@ -14,12 +14,6 @@ pub struct LlmRequest {
     pub dictionary: Vec<DictionaryEntry>,
 }
 
-/// Streaming chunk emitted during LLM generation.
-#[derive(Debug)]
-pub struct LlmChunk {
-    pub text: String,
-}
-
 /// Completion signal from the LLM worker.
 #[derive(Debug)]
 pub struct LlmResponse {
@@ -35,21 +29,15 @@ const BATCH_MAX_REQUESTS: usize = 16;
 
 /// Spawn the LLM correction worker.
 ///
-/// Returns `(request_tx, response_rx, chunk_rx)`:
+/// Returns `(request_tx, response_rx)`:
 /// - Send `LlmRequest`s on `request_tx`
-/// - Receive streaming `LlmChunk`s on `chunk_rx` as the LLM generates
 /// - Receive `LlmResponse` on `response_rx` when generation completes
 pub fn spawn_llm_worker(
     post_processor: Arc<dyn TextPostProcessor>,
-) -> (
-    mpsc::Sender<LlmRequest>,
-    mpsc::Receiver<LlmResponse>,
-    mpsc::Receiver<LlmChunk>,
-) {
+) -> (mpsc::Sender<LlmRequest>, mpsc::Receiver<LlmResponse>) {
     let (req_tx, mut req_rx) = mpsc::channel::<LlmRequest>(64);
     // Response channel only needs shallow depth — one batch completes before the next starts.
     let (resp_tx, resp_rx) = mpsc::channel::<LlmResponse>(8);
-    let (stream_tx, stream_rx) = mpsc::channel::<LlmChunk>(64);
 
     tokio::task::spawn_local(async move {
         let mut batch: Vec<LlmRequest> = Vec::with_capacity(BATCH_MAX_REQUESTS);
@@ -118,45 +106,67 @@ pub fn spawn_llm_worker(
                 );
             }
 
-            // Use first request's config — all batched requests share the same style preset.
-            // Take ownership of the dictionary to avoid a clone; batch is cleared next iteration.
-            let style_preset = Arc::clone(&batch[0].style_preset);
-            let dictionary = std::mem::take(&mut batch[0].dictionary);
+            // Track raw word count before the text is consumed by PostProcessInput.
+            let raw_word_count = combined_text.split_whitespace().count();
 
+            tracing::debug!(
+                raw_word_count,
+                raw_text = %combined_text,
+                "LLM worker: sending to post-processor"
+            );
+
+            // Use first request's config — all batched requests share the same style preset.
+            let style_preset = Arc::clone(&batch[0].style_preset);
+            // Merge dictionaries from every batched request so per-utterance entries are not lost.
+            let mut dictionary = Vec::new();
+            for req in &mut batch {
+                dictionary.append(&mut req.dictionary);
+            }
             let input = PostProcessInput {
                 raw_text: combined_text,
-                prev_context: None,
                 style_preset,
                 app_category: None,
                 dictionary,
             };
 
-            let (chunk_tx, mut chunk_rx) = mpsc::channel::<String>(32);
-            let transform_fut = post_processor.transform_streaming(&input, chunk_tx);
-            tokio::pin!(transform_fut);
-
-            let transform_result = loop {
-                tokio::select! {
-                    biased;
-                    result = &mut transform_fut => {
-                        while let Ok(chunk) = chunk_rx.try_recv() {
-                            let _ = stream_tx.send(LlmChunk { text: chunk }).await;
-                        }
-                        break result;
-                    }
-                    Some(chunk) = chunk_rx.recv() => {
-                        let _ = stream_tx.send(LlmChunk { text: chunk }).await;
+            // Call transform() directly — streaming is disabled; full corrected text is
+            // delivered atomically after the hallucination guard passes, preventing partial
+            // garbage from reaching the keyboard and avoiding cursor-interleave issues.
+            let corrected_text = match post_processor.transform(&input).await {
+                Ok(output) => {
+                    let out_words = output.cleaned_text.split_whitespace().count();
+                    if out_words > raw_word_count * 2 + 5 {
+                        tracing::warn!(
+                            raw_words = raw_word_count,
+                            llm_words = out_words,
+                            "LLM output suspiciously long, discarding"
+                        );
+                        String::new()
+                    } else {
+                        output.cleaned_text
                     }
                 }
-            };
-
-            let corrected_text = match transform_result {
-                Ok(output) => output.cleaned_text,
                 Err(e) => {
                     tracing::warn!(error = %e, "LLM correction failed");
                     String::new()
                 }
             };
+
+            tracing::debug!(
+                corrected_text = %corrected_text,
+                "LLM worker: post-processor output"
+            );
+
+            // Always print raw vs corrected comparison to stderr for diagnostics.
+            let raw = &input.raw_text;
+            eprintln!("\x1b[2m[RAW]\x1b[0m {raw}");
+            if corrected_text.is_empty() {
+                eprintln!("\x1b[33m[LLM]\x1b[0m (discarded)");
+            } else if corrected_text == *raw {
+                eprintln!("\x1b[32m[LLM]\x1b[0m (unchanged)");
+            } else {
+                eprintln!("\x1b[32m[LLM]\x1b[0m {corrected_text}");
+            }
 
             if resp_tx.send(LlmResponse { corrected_text }).await.is_err() {
                 tracing::debug!("LLM response channel closed, stopping worker");
@@ -167,5 +177,81 @@ pub fn spawn_llm_worker(
         tracing::debug!("LLM worker stopped");
     });
 
-    (req_tx, resp_rx, stream_rx)
+    (req_tx, resp_rx)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    use lune_core::Result as LlmResult;
+    use lune_core::llm::PostProcessOutput;
+
+    #[derive(Default)]
+    struct RecordingPostProcessor {
+        seen_dictionaries: Mutex<Vec<Vec<DictionaryEntry>>>,
+    }
+
+    #[async_trait::async_trait]
+    impl TextPostProcessor for RecordingPostProcessor {
+        async fn transform(&self, input: &PostProcessInput) -> LlmResult<PostProcessOutput> {
+            self.seen_dictionaries
+                .lock()
+                .expect("lock seen_dictionaries")
+                .push(input.dictionary.clone());
+            Ok(PostProcessOutput {
+                cleaned_text: input.raw_text.clone(),
+                metadata: None,
+            })
+        }
+    }
+
+    fn dict_entry(phrase: &str, replacement: &str, priority: u8) -> DictionaryEntry {
+        DictionaryEntry {
+            phrase: phrase.into(),
+            replacement: replacement.into(),
+            priority,
+        }
+    }
+
+    #[tokio::test]
+    async fn batch_merges_dictionaries_from_all_requests() {
+        tokio::task::LocalSet::new()
+            .run_until(async {
+                let processor = Arc::new(RecordingPostProcessor::default());
+                let (req_tx, mut resp_rx) = spawn_llm_worker(processor.clone());
+                let style = Arc::new(StylePreset::general());
+
+                req_tx
+                    .send(LlmRequest {
+                        text: "first".into(),
+                        style_preset: Arc::clone(&style),
+                        dictionary: vec![dict_entry("alpha", "Alpha", 10)],
+                    })
+                    .await
+                    .expect("send first request");
+                req_tx
+                    .send(LlmRequest {
+                        text: "second".into(),
+                        style_preset: Arc::clone(&style),
+                        dictionary: vec![dict_entry("beta", "Beta", 9)],
+                    })
+                    .await
+                    .expect("send second request");
+
+                let _ = resp_rx.recv().await.expect("receive LLM response");
+                drop(req_tx);
+
+                let seen = processor
+                    .seen_dictionaries
+                    .lock()
+                    .expect("lock seen_dictionaries");
+                let first_batch = seen.first().expect("batch recorded");
+                assert_eq!(first_batch.len(), 2);
+                assert!(first_batch.iter().any(|e| e.phrase == "alpha"));
+                assert!(first_batch.iter().any(|e| e.phrase == "beta"));
+            })
+            .await;
+    }
 }

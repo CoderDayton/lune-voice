@@ -66,15 +66,9 @@ fn build_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage>
 
     // ── System message ────────────────────────────────────────────────────────
     let dict_len = input.dictionary.len();
-    let ctx_len = input
-        .prev_context
-        .as_deref()
-        .map(|c| c.len() + 22)
-        .unwrap_or(0);
 
-    // Pre-size: system_prompt + dict header + entries (avg ~30 chars each) + ctx
     let mut system_content = String::with_capacity(
-        style.system_prompt.len() + if dict_len > 0 { 55 + dict_len * 30 } else { 0 } + ctx_len,
+        style.system_prompt.len() + if dict_len > 0 { 55 + dict_len * 30 } else { 0 },
     );
     system_content.push_str(&style.system_prompt);
 
@@ -86,11 +80,6 @@ fn build_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage>
             system_content.push_str(" → ");
             system_content.push_str(&entry.replacement);
         }
-    }
-
-    if let Some(ctx) = input.prev_context.as_deref().filter(|c| !c.is_empty()) {
-        system_content.push_str("\n\nPreceding context: ");
-        system_content.push_str(ctx);
     }
 
     messages.push(
@@ -217,7 +206,6 @@ mod tests {
     fn test_input(raw_text: &str) -> PostProcessInput {
         PostProcessInput {
             raw_text: raw_text.into(),
-            prev_context: None,
             style_preset: Arc::new(StylePreset::general()),
             app_category: None,
             dictionary: vec![],
@@ -229,12 +217,12 @@ mod tests {
         let input = test_input("hello um world");
         let msgs = build_messages(&input);
 
-        // system + 3 few-shot pairs (6 msgs) + 1 final user = 8
-        assert_eq!(msgs.len(), 8);
+        // system + 4 few-shot pairs (8 msgs) + 1 final user = 10
+        assert_eq!(msgs.len(), 10);
 
         let json = serde_json::to_string(&msgs).unwrap();
         assert!(json.contains("hello um world"));
-        assert!(json.contains("speech-to-text polisher"));
+        assert!(json.contains("speech-to-text post-processor"));
     }
 
     #[test]
@@ -255,26 +243,12 @@ mod tests {
     }
 
     #[test]
-    fn build_messages_with_context() {
-        let input = PostProcessInput {
-            prev_context: Some("Previous sentence here.".into()),
-            ..test_input("and then this")
-        };
-        let msgs = build_messages(&input);
-
-        let json = serde_json::to_string(&msgs).unwrap();
-        assert!(json.contains("Preceding context"));
-        assert!(json.contains("Previous sentence here."));
-    }
-
-    #[test]
     fn build_messages_no_raw_text_placeholder() {
         // Template without {raw_text} — should not panic, just clone template.
         let mut preset = StylePreset::general();
         preset.user_prompt_template = "fixed prompt".into();
         let input = PostProcessInput {
             raw_text: "hello".into(),
-            prev_context: None,
             style_preset: Arc::new(preset),
             app_category: None,
             dictionary: vec![],

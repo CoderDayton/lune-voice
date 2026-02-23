@@ -40,7 +40,6 @@ pub fn build_chatml(input: &PostProcessInput) -> String {
     let cap = 128
         + style.system_prompt.len()
         + dict_len
-        + input.prev_context.as_deref().map_or(0, |c| c.len() + 32)
         + few_shot_len
         + style.user_prompt_template.len()
         + input.raw_text.len();
@@ -60,13 +59,6 @@ pub fn build_chatml(input: &PostProcessInput) -> String {
             prompt.push_str(" → ");
             prompt.push_str(&entry.replacement);
         }
-    }
-
-    if let Some(ref ctx) = input.prev_context
-        && !ctx.is_empty()
-    {
-        prompt.push_str("\n\nPreceding context: ");
-        prompt.push_str(ctx);
     }
 
     prompt.push_str("<|im_end|>\n");
@@ -168,7 +160,6 @@ mod tests {
     fn chatml_basic_structure() {
         let input = PostProcessInput {
             raw_text: "hello um world".into(),
-            prev_context: None,
             style_preset: Arc::new(StylePreset::general()),
             app_category: None,
             dictionary: vec![],
@@ -184,7 +175,6 @@ mod tests {
     fn chatml_with_dictionary() {
         let input = PostProcessInput {
             raw_text: "use the lunevoice api".into(),
-            prev_context: None,
             style_preset: Arc::new(StylePreset::general()),
             app_category: None,
             dictionary: vec![DictionaryEntry {
@@ -202,14 +192,13 @@ mod tests {
     fn chatml_includes_few_shot() {
         let input = PostProcessInput {
             raw_text: "test".into(),
-            prev_context: None,
             style_preset: Arc::new(StylePreset::general()),
             app_category: None,
             dictionary: vec![],
         };
         let prompt = build_chatml(&input);
-        // General preset has 3 few-shot pairs.
-        assert!(prompt.contains("so um I'm gonna go to the store"));
+        // General preset has 4 few-shot pairs.
+        assert!(prompt.contains("ASR: so um I'm gonna go to the store"));
         assert!(prompt.contains("I'm gonna go to the store and buy some more flour for the cake"));
     }
 

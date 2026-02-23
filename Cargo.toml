@@ -54,16 +54,17 @@ diesel = { version = "2", features = ["sqlite", "returning_clauses_for_sqlite_3_
 diesel_migrations = "2"
 dirs = "6"
 cpal = "0.15"
-rubato = "1"
+rubato = "1.0.1"
 audioadapter-buffers = "2"
 ort = { version = "2.0.0-rc.11", features = ["ndarray", "std", "download-binaries", "copy-dylibs", "tls-native"], default-features = false }
 ndarray = "0.17"
 rustfft = "6.4"
 hf-hub = "0.4"
-llama-cpp-2 = "0.1"
+llama-cpp-2 = "0.1.135"
 encoding_rs = "0.8"
 async-openai = { version = "0.33", features = ["chat-completion"] }
 reqwest = { version = "0.12", features = ["json", "multipart"] }
 zbus = "5"
 enigo = { version = "0.6", features = ["wayland"] }
 arboard = "3"
+evdev = "0.13"

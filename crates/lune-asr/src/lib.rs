@@ -1,7 +1,6 @@
 pub mod mel;
 mod openai_backend;
 mod parakeet_backend;
-pub mod segment;
 mod tdt_decoder;
 mod vocab;
 

@@ -114,6 +114,26 @@ impl AsrBackend for AsrBackendDispatch {
             }
         }
     }
+
+    #[inline]
+    async fn reset_context(&self, session: &Self::SessionHandle) -> Result<()> {
+        match self {
+            Self::Parakeet(b) => {
+                if let AsrSessionDispatch::Parakeet(s) = session {
+                    b.reset_context(s).await
+                } else {
+                    Err(mismatch_err())
+                }
+            }
+            Self::OpenAi(b) => {
+                if let AsrSessionDispatch::OpenAi(s) = session {
+                    b.reset_context(s).await
+                } else {
+                    Err(mismatch_err())
+                }
+            }
+        }
+    }
 }
 
 // ── Factory functions ────────────────────────────────────────────────────────
@@ -145,15 +165,10 @@ pub fn patch_model_paths(settings: &mut UserSettings, resolved: &ResolvedModels)
 #[cold]
 pub fn build_asr_backend(settings: &UserSettings) -> Result<AsrBackendDispatch> {
     match &settings.asr_backend {
-        AsrBackendConfig::ParakeetTdt {
-            model_dir,
-            use_gpu,
-            context_secs,
-        } => {
+        AsrBackendConfig::ParakeetTdt { model_dir, use_gpu } => {
             let backend = ParakeetTdtBackend::new(ParakeetTdtConfig {
                 model_dir: model_dir.clone(),
                 use_gpu: *use_gpu,
-                context_secs: *context_secs,
             })?;
             Ok(AsrBackendDispatch::Parakeet(backend))
         }

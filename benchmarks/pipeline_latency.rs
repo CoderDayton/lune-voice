@@ -9,8 +9,6 @@
 
 use std::time::{Duration, Instant};
 
-use lune_asr::segment::SegmentTracker;
-
 fn main() {
     println!();
     println!("╔══════════════════════════════════════════════════════════════════╗");
@@ -24,13 +22,7 @@ fn main() {
     // ── Stage 2: Inference trigger latency ───────────────────────────────────
     bench_inference_trigger();
 
-    // ── Stage 3: Segment tracker ─────────────────────────────────────────────
-    bench_segment_tracker();
-
-    // ── Stage 4: Silence timeout simulation ──────────────────────────────────
-    bench_silence_timeout();
-
-    // ── Stage 5: Full pipeline simulation ────────────────────────────────────
+    // ── Stage 3: Full pipeline simulation ────────────────────────────────────
     bench_full_pipeline_sim();
 
     // ── Summary ──────────────────────────────────────────────────────────────
@@ -120,188 +112,80 @@ fn bench_inference_trigger() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Stage 3: Segment tracker micro-benchmark
-// ═══════════════════════════════════════════════════════════════════════════════
-
-fn bench_segment_tracker() {
-    println!("── Stage 3: Segment Tracker ──────────────────────────────────────");
-
-    let iterations = 100_000u64;
-
-    // push_partial throughput (simulates ASR returning updated text).
-    let start = Instant::now();
-    let mut tracker = SegmentTracker::new(500);
-    for i in 0..iterations {
-        tracker.push_partial(format!("partial text update {i}"), Some(i * 30), None);
-    }
-    let push_elapsed = start.elapsed();
-
-    // check_silence_finalization throughput.
-    let start = Instant::now();
-    for _ in 0..iterations {
-        tracker.check_silence_finalization();
-    }
-    let check_elapsed = start.elapsed();
-
-    // drain.
-    let start = Instant::now();
-    let drained = tracker.drain();
-    let drain_elapsed = start.elapsed();
-
-    println!(
-        "  push_partial × {iterations}:               {:>6.2} ms ({:.0} ns/op)",
-        push_elapsed.as_secs_f64() * 1000.0,
-        push_elapsed.as_nanos() as f64 / iterations as f64
-    );
-    println!(
-        "  check_silence × {iterations}:              {:>6.2} ms ({:.0} ns/op)",
-        check_elapsed.as_secs_f64() * 1000.0,
-        check_elapsed.as_nanos() as f64 / iterations as f64
-    );
-    println!(
-        "  drain ({} segments):                    {:>6.3} ms",
-        drained.len(),
-        drain_elapsed.as_secs_f64() * 1000.0
-    );
-    println!();
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Stage 4: Silence timeout measurement
-// ═══════════════════════════════════════════════════════════════════════════════
-
-fn bench_silence_timeout() {
-    println!("── Stage 4: Silence Timeout ─────────────────────────────────────");
-
-    let timeouts = [500, 300, 200, 150, 100];
-
-    for timeout_ms in &timeouts {
-        let mut tracker = SegmentTracker::new(*timeout_ms);
-        tracker.push_partial("hello world".into(), Some(0), None);
-
-        // Wait for the timeout, then check.
-        std::thread::sleep(Duration::from_millis(*timeout_ms + 10));
-
-        let start = Instant::now();
-        tracker.check_silence_finalization();
-        let check_time = start.elapsed();
-
-        let segments = tracker.drain();
-        let finalized = segments.first().map(|s| s.is_final).unwrap_or(false);
-
-        println!(
-            "  Timeout {timeout_ms:>3} ms: finalized={finalized}  check_cost={:.0} ns",
-            check_time.as_nanos()
-        );
-    }
-    println!();
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Stage 5: Full pipeline simulation (no real mic, no real model)
+// Stage 3: Full pipeline simulation (no real mic, no real model)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn bench_full_pipeline_sim() {
-    println!("── Stage 5: Full Pipeline Simulation ─────────────────────────────");
-    println!("  Simulates: audio frames → ASR accumulation → inference → segment");
-    println!("             → silence timeout → finalize → delivery");
+    println!("── Stage 3: Full Pipeline Simulation ─────────────────────────────");
+    println!("  Simulates: audio chunk → infer → word accumulator → LLM flush → delivery");
     println!();
 
     let configs = [
-        ("Previous defaults", 16000, 500u64, 100u64),
-        ("Current (applied)", 4800, 200, 100),
-        ("Ultra-low", 1600, 150, 100),
+        ("8-word flush (current)", 8usize, 200u64, 80u64),
+        ("Silence-only (old)", usize::MAX, 800, 100),
     ];
 
-    for (label, trigger_threshold, silence_ms, inference_ms) in &configs {
-        let frame_size = 480usize;
+    for (label, words_per_flush, silence_ms, inference_ms) in &configs {
+        let frame_size = 5120usize; // 320ms @ 16kHz — reference chunk size
         let sample_rate = 16000usize;
-
-        // Simulate 1.5 seconds of continuous speech.
-        let speech_frames = 50; // 50 × 30ms = 1500ms
-        let speech_text = "So I was thinking we should go to the store.";
+        let speech_frames = 50; // 50 × 320ms = 16s
+        let words_per_frame = 1usize; // ~1 word per 320ms chunk
 
         let pipeline_start = Instant::now();
-
-        // Phase 1: Accumulate audio until inference triggers.
-        let mut accumulated_samples = 0usize;
+        let mut accumulated_words = 0usize;
         let mut frames_sent = 0usize;
-        let mut first_inference_at: Option<Duration> = None;
-
-        let mut tracker = SegmentTracker::new(*silence_ms);
+        let mut first_flush_at: Option<Duration> = None;
+        let mut flushes = 0u32;
 
         while frames_sent < speech_frames {
-            // Simulate frame arrival at real-time pace.
-            // In the real pipeline, frames arrive every 30ms from cpal.
-            // Here we just track the simulated time.
-            accumulated_samples += frame_size;
             frames_sent += 1;
+            accumulated_words += words_per_frame;
 
-            // Check if inference should trigger.
-            if accumulated_samples >= *trigger_threshold {
-                if first_inference_at.is_none() {
-                    let simulated_audio_time = Duration::from_millis(
+            // Simulate inference per chunk.
+            std::thread::sleep(Duration::from_millis(*inference_ms));
+
+            // Word accumulator flush condition.
+            if accumulated_words >= *words_per_flush {
+                if first_flush_at.is_none() {
+                    first_flush_at = Some(Duration::from_millis(
                         (frames_sent * frame_size * 1000 / sample_rate) as u64,
-                    );
-                    first_inference_at = Some(simulated_audio_time);
+                    ));
                 }
-
-                // Simulate inference latency.
-                std::thread::sleep(Duration::from_millis(*inference_ms));
-                accumulated_samples = 0;
-
-                // ASR returns a partial.
-                tracker.push_partial(speech_text.to_string(), Some(frames_sent as u64 * 30), None);
+                accumulated_words = 0;
+                flushes += 1;
             }
         }
 
         let speech_end =
             Duration::from_millis((frames_sent * frame_size * 1000 / sample_rate) as u64);
 
-        // Phase 2: Silence timeout.
-        std::thread::sleep(Duration::from_millis(*silence_ms + 10));
-        tracker.check_silence_finalization();
+        // Final silence flush.
+        if accumulated_words > 0 {
+            std::thread::sleep(Duration::from_millis(*silence_ms));
+            flushes += 1;
+        }
 
-        // Phase 3: Drain finalized segments.
-        let segments = tracker.drain();
-        let has_final = segments.iter().any(|s| s.is_final);
-
-        // Phase 4: Simulate delivery (clipboard + paste).
+        // Simulate Wayland key delivery.
         let delivery_start = Instant::now();
-        // arboard::Clipboard::new + set_text + enigo Ctrl+V ≈ 5ms
-        std::thread::sleep(Duration::from_millis(5));
+        std::thread::sleep(Duration::from_millis(2));
         let delivery_time = delivery_start.elapsed();
 
         let total_wall = pipeline_start.elapsed();
-
-        // Calculate simulated end-to-end latency.
-        // The user perceives: speech_end + silence_timeout + delivery.
-        let perceived_latency =
-            speech_end.as_millis() as u64 + *silence_ms + delivery_time.as_millis() as u64;
+        let after_speech_wait = silence_ms + delivery_time.as_millis() as u64;
 
         println!("  [{label}]");
+        println!("    Words-per-flush:    {words_per_flush}");
+        println!("    Silence timeout:    {silence_ms} ms");
+        println!("    Inference/chunk:    {inference_ms} ms (simulated)");
         println!(
-            "    Trigger threshold: {} samples ({:.0} ms)",
-            trigger_threshold,
-            *trigger_threshold as f64 / sample_rate as f64 * 1000.0
+            "    First flush:        {} ms",
+            first_flush_at.map(|d| d.as_millis()).unwrap_or(0)
         );
-        println!("    Silence timeout:   {silence_ms} ms");
-        println!("    Inference latency: {inference_ms} ms (simulated)");
-        println!(
-            "    First inference:   {} ms after speech start",
-            first_inference_at.map(|d| d.as_millis()).unwrap_or(0)
-        );
-        println!("    Speech duration:   {} ms", speech_end.as_millis());
-        println!("    Finalized:         {has_final}");
-        println!("    Wall clock:        {} ms", total_wall.as_millis());
+        println!("    Flush count:        {flushes}");
+        println!("    Speech duration:    {} ms", speech_end.as_millis());
+        println!("    Wall clock:         {} ms", total_wall.as_millis());
         println!("    ──────────────────────────────");
-        println!(
-            "    PERCEIVED LATENCY: {perceived_latency} ms  (speech_end + silence + delivery)"
-        );
-        println!(
-            "    After-speech wait: {} ms  (silence_timeout + delivery)",
-            *silence_ms + delivery_time.as_millis() as u64
-        );
+        println!("    AFTER-SPEECH WAIT:  {after_speech_wait} ms  (silence + delivery)");
         println!();
     }
 }

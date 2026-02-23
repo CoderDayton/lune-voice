@@ -32,6 +32,8 @@ toml.workspace = true
 zbus.workspace = true
 enigo.workspace = true
 arboard.workspace = true
+evdev.workspace = true
+
 
 [[example]]
 name = "pipeline_latency"
