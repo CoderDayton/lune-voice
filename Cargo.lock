@@ -1931,6 +1931,7 @@ dependencies = [
  "lune-core",
  "ndarray",
  "ort",
+ "qwen-asr",
  "reqwest",
  "rustfft",
  "serde",
@@ -2794,6 +2795,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "21b2ebcf727b7760c461f091f9f0f539b77b8e87f2fd88131e7f1b433b3cece4"
 dependencies = [
  "proc-macro2",
+]
+
+[[package]]
+name = "qwen-asr"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e5c5e367ee0f0e5bae3f486b654ff0a1d036434939c3d46226c0ca1288fbfdf"
+dependencies = [
+ "libc",
 ]
 
 [[package]]

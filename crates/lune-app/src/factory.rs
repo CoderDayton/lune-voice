@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use lune_asr::{
     OpenAiAsrConfig, OpenAiCompatibleAsrBackend, ParakeetTdtBackend, ParakeetTdtConfig,
+    QwenAsrBackend, QwenAsrConfig,
 };
 use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
 use lune_core::config::{AsrBackendConfig, LlmBackendConfig, UserSettings};
@@ -27,12 +28,14 @@ fn mismatch_err() -> Error {
 /// Runtime-dispatched ASR backend (Parakeet local or OpenAI-compatible API).
 pub enum AsrBackendDispatch {
     Parakeet(ParakeetTdtBackend),
+    Qwen(QwenAsrBackend),
     OpenAi(OpenAiCompatibleAsrBackend),
 }
 
 /// Runtime-dispatched ASR session handle.
 pub enum AsrSessionDispatch {
     Parakeet(<ParakeetTdtBackend as AsrBackend>::SessionHandle),
+    Qwen(<QwenAsrBackend as AsrBackend>::SessionHandle),
     OpenAi(<OpenAiCompatibleAsrBackend as AsrBackend>::SessionHandle),
 }
 
@@ -44,6 +47,7 @@ impl AsrBackend for AsrBackendDispatch {
     async fn start_session(&self, config: AsrSessionConfig) -> Result<Self::SessionHandle> {
         match self {
             Self::Parakeet(b) => Ok(AsrSessionDispatch::Parakeet(b.start_session(config).await?)),
+            Self::Qwen(b) => Ok(AsrSessionDispatch::Qwen(b.start_session(config).await?)),
             Self::OpenAi(b) => Ok(AsrSessionDispatch::OpenAi(b.start_session(config).await?)),
         }
     }
@@ -59,6 +63,13 @@ impl AsrBackend for AsrBackendDispatch {
         match self {
             Self::Parakeet(b) => {
                 if let AsrSessionDispatch::Parakeet(s) = session {
+                    b.push_audio(s, pcm).await
+                } else {
+                    Err(mismatch_err())
+                }
+            }
+            Self::Qwen(b) => {
+                if let AsrSessionDispatch::Qwen(s) = session {
                     b.push_audio(s, pcm).await
                 } else {
                     Err(mismatch_err())
@@ -85,6 +96,13 @@ impl AsrBackend for AsrBackendDispatch {
                     Err(mismatch_err())
                 }
             }
+            Self::Qwen(b) => {
+                if let AsrSessionDispatch::Qwen(s) = session {
+                    b.poll_results(s).await
+                } else {
+                    Err(mismatch_err())
+                }
+            }
             Self::OpenAi(b) => {
                 if let AsrSessionDispatch::OpenAi(s) = session {
                     b.poll_results(s).await
@@ -105,6 +123,13 @@ impl AsrBackend for AsrBackendDispatch {
                     Err(mismatch_err())
                 }
             }
+            Self::Qwen(b) => {
+                if let AsrSessionDispatch::Qwen(s) = session {
+                    b.end_session(s).await
+                } else {
+                    Err(mismatch_err())
+                }
+            }
             Self::OpenAi(b) => {
                 if let AsrSessionDispatch::OpenAi(s) = session {
                     b.end_session(s).await
@@ -120,6 +145,13 @@ impl AsrBackend for AsrBackendDispatch {
         match self {
             Self::Parakeet(b) => {
                 if let AsrSessionDispatch::Parakeet(s) = session {
+                    b.reset_context(s).await
+                } else {
+                    Err(mismatch_err())
+                }
+            }
+            Self::Qwen(b) => {
+                if let AsrSessionDispatch::Qwen(s) = session {
                     b.reset_context(s).await
                 } else {
                     Err(mismatch_err())
@@ -149,6 +181,11 @@ pub fn patch_model_paths(settings: &mut UserSettings, resolved: &ResolvedModels)
     {
         *model_dir = resolved.asr_model_dir.clone();
     }
+    if let AsrBackendConfig::QwenAsr { model_dir } = &mut settings.asr_backend
+        && model_dir.as_os_str().is_empty()
+    {
+        *model_dir = resolved.qwen_asr_model_dir.clone();
+    }
 
     if let LlmBackendConfig::Local { model_path, .. } = &mut settings.llm_backend
         && model_path.as_os_str().is_empty()
@@ -171,6 +208,13 @@ pub fn build_asr_backend(settings: &UserSettings) -> Result<AsrBackendDispatch> 
                 use_gpu: *use_gpu,
             })?;
             Ok(AsrBackendDispatch::Parakeet(backend))
+        }
+        AsrBackendConfig::QwenAsr { model_dir } => {
+            let backend = QwenAsrBackend::new(QwenAsrConfig {
+                model_dir: model_dir.clone(),
+                ..Default::default()
+            })?;
+            Ok(AsrBackendDispatch::Qwen(backend))
         }
         AsrBackendConfig::OpenAiCompatible {
             base_url,

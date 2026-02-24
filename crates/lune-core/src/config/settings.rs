@@ -27,9 +27,8 @@ pub struct UserSettings {
 impl Default for UserSettings {
     fn default() -> Self {
         Self {
-            asr_backend: AsrBackendConfig::ParakeetTdt {
+            asr_backend: AsrBackendConfig::QwenAsr {
                 model_dir: PathBuf::new(),
-                use_gpu: true,
             },
             llm_backend: LlmBackendConfig::Local {
                 model_path: PathBuf::new(),
@@ -60,6 +59,9 @@ pub enum AsrBackendConfig {
     ParakeetTdt {
         model_dir: PathBuf,
         use_gpu: bool,
+    },
+    QwenAsr {
+        model_dir: PathBuf,
     },
     OpenAiCompatible {
         base_url: Url,

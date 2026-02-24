@@ -59,13 +59,27 @@ fn run_daemon() {
         }
     };
 
-    let models =
-        lune_persist::ensure_default_models(&paths.models_dir()).expect("ensure models downloaded");
+    let models = lune_persist::ensure_default_models(&paths.models_dir(), &settings.asr_backend)
+        .expect("ensure models downloaded");
 
     factory::patch_model_paths(&mut settings, &models);
 
+    let (asr_backend_kind, selected_asr_dir) = match &settings.asr_backend {
+        lune_core::config::AsrBackendConfig::ParakeetTdt { model_dir, .. } => {
+            ("ParakeetTdt", model_dir.display().to_string())
+        }
+        lune_core::config::AsrBackendConfig::QwenAsr { model_dir } => {
+            ("QwenAsr", model_dir.display().to_string())
+        }
+        lune_core::config::AsrBackendConfig::OpenAiCompatible { .. } => {
+            ("OpenAiCompatible", "<remote>".into())
+        }
+        _ => ("Unknown", "<unknown>".into()),
+    };
+
     tracing::info!(
-        asr_dir = %models.asr_model_dir.display(),
+        asr_backend = asr_backend_kind,
+        asr_dir = %selected_asr_dir,
         llm_path = %models.llm_model_path.display(),
         "models ready"
     );
@@ -199,6 +213,9 @@ async fn run_pipeline(
     let asr_backend_kind = match snap.asr_backend {
         lune_core::config::AsrBackendConfig::OpenAiCompatible { .. } => {
             lune_core::asr::AsrBackendKind::OpenAiCompatible
+        }
+        lune_core::config::AsrBackendConfig::QwenAsr { .. } => {
+            lune_core::asr::AsrBackendKind::QwenAsr
         }
         _ => lune_core::asr::AsrBackendKind::ParakeetTdt,
     };
