@@ -59,17 +59,30 @@ fn run_daemon() {
         }
     };
 
-    let models = lune_persist::ensure_default_models(&paths.models_dir(), &settings.asr_backend)
-        .expect("ensure models downloaded");
+    let models = lune_persist::ensure_default_models(
+        &paths.models_dir(),
+        &settings.asr_backend,
+        &settings.llm_backend,
+    )
+    .expect("ensure models downloaded");
 
     factory::patch_model_paths(&mut settings, &models);
+
+    // ── Global ORT initialization ────────────────────────────────────────
+    // Must happen before any Session is created. When CUDA is available and
+    // the user wants GPU, register the CUDA EP globally so all ORT sessions
+    // (ASR encoder, ASR decoder, LLM decoder) share the same CUDA memory arena.
+    factory::init_ort_runtime(&settings);
 
     let (asr_backend_kind, selected_asr_dir) = match &settings.asr_backend {
         lune_core::config::AsrBackendConfig::ParakeetTdt { model_dir, .. } => {
             ("ParakeetTdt", model_dir.display().to_string())
         }
-        lune_core::config::AsrBackendConfig::QwenAsr { model_dir } => {
+        lune_core::config::AsrBackendConfig::QwenAsr { model_dir, .. } => {
             ("QwenAsr", model_dir.display().to_string())
+        }
+        lune_core::config::AsrBackendConfig::OrtQwenAsr { model_dir, .. } => {
+            ("OrtQwenAsr", model_dir.display().to_string())
         }
         lune_core::config::AsrBackendConfig::OpenAiCompatible { .. } => {
             ("OpenAiCompatible", "<remote>".into())
@@ -80,7 +93,7 @@ fn run_daemon() {
     tracing::info!(
         asr_backend = asr_backend_kind,
         asr_dir = %selected_asr_dir,
-        llm_path = %models.llm_model_path.display(),
+        llm_dir = %models.ort_llm_model_dir.display(),
         "models ready"
     );
 
@@ -160,6 +173,7 @@ fn run_daemon() {
     tracing::info!("lune-voice stopped");
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run_pipeline(
     settings: Arc<RwLock<lune_core::config::UserSettings>>,
     db_path: std::path::PathBuf,
@@ -194,9 +208,6 @@ async fn run_pipeline(
     };
 
     tracing::info!("LLM post-processor ready");
-    let audio = Arc::new(lune_audio::AudioCaptureService::new(
-        lune_core::audio::AudioCaptureConfig::default(),
-    ));
     let router = Arc::new(lune_commands::VoiceCommandRouter::new());
 
     tracing::info!("opening database...");
@@ -217,6 +228,9 @@ async fn run_pipeline(
         lune_core::config::AsrBackendConfig::QwenAsr { .. } => {
             lune_core::asr::AsrBackendKind::QwenAsr
         }
+        lune_core::config::AsrBackendConfig::OrtQwenAsr { .. } => {
+            lune_core::asr::AsrBackendKind::OrtQwenAsr
+        }
         _ => lune_core::asr::AsrBackendKind::ParakeetTdt,
     };
 
@@ -226,7 +240,6 @@ async fn run_pipeline(
     };
 
     let manager = SessionManager::new(
-        audio,
         Arc::new(asr),
         router,
         post_processor,

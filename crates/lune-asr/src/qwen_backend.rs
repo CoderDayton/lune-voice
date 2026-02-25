@@ -32,7 +32,7 @@ impl Default for QwenAsrConfig {
             stream_chunk_sec: 0.5,
             stream_rollback: 5,
             stream_unfixed_chunks: 2,
-            stream_max_new_tokens: 64,
+            stream_max_new_tokens: 32,
             past_text_conditioning: true,
         }
     }
@@ -196,30 +196,31 @@ impl AsrBackend for QwenAsrBackend {
             return Ok(vec![]);
         }
 
-        let start_samples = state.stream.audio_cursor();
-        let (text, end_samples) = {
-            let SessionState {
-                audio_buf, stream, ..
-            } = &mut *state;
-            let text = {
-                let mut ctx = self.ctx.lock().map_err(|e| lock_err("ctx lock", e))?;
-                transcribe::stream_push_audio(&mut ctx, audio_buf, stream, false)
-                    .ok_or_else(|| Error::Asr("qwen-asr stream decode failed".into()))?
-            };
-            (text, stream.audio_cursor())
-        };
+        let mut ctx = self.ctx.lock().map_err(|e| lock_err("ctx lock", e))?;
+
+        let sample_rate = state.config.sample_rate;
+        let SessionState {
+            ref audio_buf,
+            ref mut stream,
+            ..
+        } = *state;
+
+        let start_samples = stream.audio_cursor();
+
+        let text = transcribe::stream_push_audio(&mut ctx, audio_buf, stream, false)
+            .ok_or_else(|| Error::Asr("qwen-asr stream decode failed".into()))?;
+
+        let end_samples = stream.audio_cursor();
+        let id = state.next_id;
+        state.next_id = id.saturating_add(1);
 
         let text = text.trim();
         if text.is_empty() {
             return Ok(vec![]);
         }
 
-        let start_ms =
-            (start_samples as u64).saturating_mul(1000) / state.config.sample_rate as u64;
-        let end_ms = (end_samples as u64).saturating_mul(1000) / state.config.sample_rate as u64;
-
-        let id = state.next_id;
-        state.next_id = state.next_id.saturating_add(1);
+        let start_ms = (start_samples as u64).saturating_mul(1000) / sample_rate as u64;
+        let end_ms = (end_samples as u64).saturating_mul(1000) / sample_rate as u64;
 
         Ok(vec![AsrSegment {
             id,

@@ -18,17 +18,18 @@ pub enum ModelSpec {
         /// Local directory name under `models/` (e.g. `parakeet-tdt-0.6b`).
         local_name: String,
     },
-    /// A single file from a repository.
-    SingleFile { repo_id: String, filename: String },
 }
 
 /// Resolved local model paths.
 pub struct ResolvedModels {
     /// Parakeet TDT model directory.
     pub asr_model_dir: PathBuf,
-    /// Qwen3-ASR model directory.
+    /// Qwen3-ASR model directory (safetensors for legacy backend).
     pub qwen_asr_model_dir: PathBuf,
-    pub llm_model_path: PathBuf,
+    /// Qwen3-ASR ONNX model directory (for ORT backend).
+    pub ort_qwen_asr_model_dir: PathBuf,
+    /// LLM ONNX model directory.
+    pub ort_llm_model_dir: PathBuf,
 }
 
 impl ModelSpec {
@@ -58,12 +59,30 @@ impl ModelSpec {
         }
     }
 
-    /// Qwen3 LLM: single GGUF file.
+    /// Qwen3-ASR 0.6B ONNX: encoder, embed_tokens, decoder models + tokenizer.
     #[inline]
-    pub fn qwen3_llm() -> Self {
-        Self::SingleFile {
-            repo_id: "unsloth/Qwen3-0.6B-GGUF".into(),
-            filename: "Qwen3-0.6B-Q4_K_M.gguf".into(),
+    pub fn qwen3_asr_onnx() -> Self {
+        Self::Directory {
+            repo_id: "lune-voice/qwen3-asr-0.6b-onnx".into(),
+            required_files: vec![
+                "encoder.onnx".into(),
+                "decoder_merged.onnx".into(),
+                "embed_tokens.onnx".into(),
+                "tokenizer.json".into(),
+            ],
+            suffix_patterns: vec![".onnx".into()],
+            local_name: "qwen3-asr-0.6b-onnx".into(),
+        }
+    }
+
+    /// Qwen3 0.6B ONNX: decoder_model_merged + tokenizer (ORT LLM backend).
+    #[inline]
+    pub fn qwen3_llm_onnx() -> Self {
+        Self::Directory {
+            repo_id: "lune-voice/qwen3-0.6b-onnx".into(),
+            required_files: vec!["decoder_model_merged.onnx".into(), "tokenizer.json".into()],
+            suffix_patterns: vec![".onnx".into()],
+            local_name: "qwen3-0.6b-onnx".into(),
         }
     }
 }
@@ -160,26 +179,6 @@ impl ModelHub {
         Ok(())
     }
 
-    /// Download a single file from HF Hub directly to `local_path`.
-    fn download_single_file(
-        &self,
-        repo_id: &str,
-        filename: &str,
-        local_path: &Path,
-    ) -> PersistResult<()> {
-        let repo = self.api.model(repo_id.to_string());
-        info!(repo_id, filename, "downloading model file");
-        let hub_path = repo
-            .get(filename)
-            .map_err(|e| PersistError::ModelDownload(format!("{repo_id}/{filename}: {e}")))?;
-        let real_src = hub_path
-            .canonicalize()
-            .map_err(|e| PersistError::ModelDownload(format!("{filename}: resolve blob: {e}")))?;
-        link_or_copy(&real_src, local_path)
-            .map_err(|e| PersistError::ModelDownload(format!("{filename}: write: {e}")))?;
-        Ok(())
-    }
-
     #[inline]
     fn list_repo_files(&self, repo: &ApiRepo, repo_id: &str) -> PersistResult<Vec<String>> {
         let info = repo
@@ -230,30 +229,47 @@ fn link_or_copy(src: &Path, dst: &Path) -> std::io::Result<()> {
 pub fn ensure_default_models(
     models_dir: &Path,
     asr_backend: &AsrBackendConfig,
+    llm_backend: &lune_core::config::LlmBackendConfig,
 ) -> PersistResult<ResolvedModels> {
     let hub_cache = models_dir.join(".hub-cache");
     let hub = ModelHub::new(&hub_cache)?;
 
     let parakeet_dir = models_dir.join("parakeet-tdt-0.6b");
     let qwen_asr_dir = models_dir.join("qwen3-asr-0.6b");
-    let (asr_model_dir, qwen_asr_model_dir) = match asr_backend {
+    let ort_qwen_asr_dir = models_dir.join("qwen3-asr-0.6b-onnx");
+
+    let (asr_model_dir, qwen_asr_model_dir, ort_qwen_asr_model_dir) = match asr_backend {
         AsrBackendConfig::ParakeetTdt { .. } => (
             ensure_directory_model(&hub, &ModelSpec::parakeet_tdt(), models_dir)?,
             qwen_asr_dir,
+            ort_qwen_asr_dir,
         ),
         AsrBackendConfig::QwenAsr { .. } => (
             parakeet_dir,
             ensure_directory_model(&hub, &ModelSpec::qwen3_asr(), models_dir)?,
+            ort_qwen_asr_dir,
         ),
-        AsrBackendConfig::OpenAiCompatible { .. } => (parakeet_dir, qwen_asr_dir),
-        _ => (parakeet_dir, qwen_asr_dir),
+        AsrBackendConfig::OrtQwenAsr { .. } => (
+            parakeet_dir,
+            qwen_asr_dir,
+            ensure_directory_model(&hub, &ModelSpec::qwen3_asr_onnx(), models_dir)?,
+        ),
+        AsrBackendConfig::OpenAiCompatible { .. } => (parakeet_dir, qwen_asr_dir, ort_qwen_asr_dir),
+        _ => (parakeet_dir, qwen_asr_dir, ort_qwen_asr_dir),
     };
-    let llm_model_path = ensure_single_file_model(&hub, &ModelSpec::qwen3_llm(), models_dir)?;
+
+    let ort_llm_model_dir = match llm_backend {
+        lune_core::config::LlmBackendConfig::OrtLocal { .. } => {
+            ensure_directory_model(&hub, &ModelSpec::qwen3_llm_onnx(), models_dir)?
+        }
+        _ => models_dir.join("qwen3-0.6b-onnx"),
+    };
 
     Ok(ResolvedModels {
         asr_model_dir,
         qwen_asr_model_dir,
-        llm_model_path,
+        ort_qwen_asr_model_dir,
+        ort_llm_model_dir,
     })
 }
 
@@ -263,19 +279,12 @@ fn ensure_directory_model(
     spec: &ModelSpec,
     models_dir: &Path,
 ) -> PersistResult<PathBuf> {
-    let (repo_id, required_files, suffix_patterns, local_name) = match spec {
-        ModelSpec::Directory {
-            repo_id,
-            required_files,
-            suffix_patterns,
-            local_name,
-        } => (repo_id, required_files, suffix_patterns, local_name),
-        _ => {
-            return Err(PersistError::ModelDownload(
-                "expected Directory spec".into(),
-            ));
-        }
-    };
+    let ModelSpec::Directory {
+        repo_id,
+        required_files,
+        suffix_patterns,
+        local_name,
+    } = spec;
 
     let local_dir = models_dir.join(local_name);
 
@@ -294,34 +303,6 @@ fn ensure_directory_model(
     Ok(local_dir)
 }
 
-/// Ensure a single-file model is present at `models_dir/<filename>`.
-fn ensure_single_file_model(
-    hub: &ModelHub,
-    spec: &ModelSpec,
-    models_dir: &Path,
-) -> PersistResult<PathBuf> {
-    let (repo_id, filename) = match spec {
-        ModelSpec::SingleFile { repo_id, filename } => (repo_id, filename),
-        _ => {
-            return Err(PersistError::ModelDownload(
-                "expected SingleFile spec".into(),
-            ));
-        }
-    };
-
-    let local_path = models_dir.join(filename);
-
-    if local_path.is_file() {
-        info!(path = %local_path.display(), "model file already present");
-        return Ok(local_path);
-    }
-
-    hub.download_single_file(repo_id, filename, &local_path)?;
-
-    info!(path = %local_path.display(), "model file ready");
-    Ok(local_path)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -329,53 +310,51 @@ mod tests {
     #[test]
     fn parakeet_spec_has_expected_repo() {
         let spec = ModelSpec::parakeet_tdt();
+        let ModelSpec::Directory {
+            repo_id,
+            required_files,
+            suffix_patterns,
+            local_name,
+        } = &spec;
+        assert_eq!(repo_id, "istupakov/parakeet-tdt-0.6b-v3-onnx");
+        assert!(required_files.contains(&"vocab.txt".to_string()));
+        assert!(suffix_patterns.contains(&".int8.onnx".to_string()));
+        assert_eq!(local_name, "parakeet-tdt-0.6b");
+    }
+
+    #[test]
+    fn qwen3_llm_onnx_spec_has_expected_repo() {
+        let spec = ModelSpec::qwen3_llm_onnx();
         match &spec {
             ModelSpec::Directory {
                 repo_id,
                 required_files,
-                suffix_patterns,
                 local_name,
+                ..
             } => {
-                assert_eq!(repo_id, "istupakov/parakeet-tdt-0.6b-v3-onnx");
-                assert!(required_files.contains(&"vocab.txt".to_string()));
-                assert!(suffix_patterns.contains(&".int8.onnx".to_string()));
-                assert_eq!(local_name, "parakeet-tdt-0.6b");
+                assert_eq!(repo_id, "lune-voice/qwen3-0.6b-onnx");
+                assert!(required_files.contains(&"decoder_model_merged.onnx".to_string()));
+                assert!(required_files.contains(&"tokenizer.json".to_string()));
+                assert_eq!(local_name, "qwen3-0.6b-onnx");
             }
-            _ => panic!("expected Directory variant"),
-        }
-    }
-
-    #[test]
-    fn qwen3_spec_has_expected_repo() {
-        let spec = ModelSpec::qwen3_llm();
-        match &spec {
-            ModelSpec::SingleFile { repo_id, filename } => {
-                assert_eq!(repo_id, "unsloth/Qwen3-0.6B-GGUF");
-                assert_eq!(filename, "Qwen3-0.6B-Q4_K_M.gguf");
-            }
-            _ => panic!("expected SingleFile variant"),
         }
     }
 
     #[test]
     fn qwen_asr_spec_has_expected_repo() {
         let spec = ModelSpec::qwen3_asr();
-        match &spec {
-            ModelSpec::Directory {
-                repo_id,
-                required_files,
-                suffix_patterns,
-                local_name,
-            } => {
-                assert_eq!(repo_id, "Qwen/Qwen3-ASR-0.6B");
-                assert!(required_files.contains(&"model.safetensors".to_string()));
-                assert!(required_files.contains(&"vocab.json".to_string()));
-                assert!(required_files.contains(&"merges.txt".to_string()));
-                assert!(suffix_patterns.contains(&".safetensors".to_string()));
-                assert_eq!(local_name, "qwen3-asr-0.6b");
-            }
-            _ => panic!("expected Directory variant"),
-        }
+        let ModelSpec::Directory {
+            repo_id,
+            required_files,
+            suffix_patterns,
+            local_name,
+        } = &spec;
+        assert_eq!(repo_id, "Qwen/Qwen3-ASR-0.6B");
+        assert!(required_files.contains(&"model.safetensors".to_string()));
+        assert!(required_files.contains(&"vocab.json".to_string()));
+        assert!(required_files.contains(&"merges.txt".to_string()));
+        assert!(suffix_patterns.contains(&".safetensors".to_string()));
+        assert_eq!(local_name, "qwen3-asr-0.6b");
     }
 
     #[test]
@@ -388,24 +367,19 @@ mod tests {
 
     #[test]
     #[ignore] // Requires network — run with `cargo test -- --ignored`
-    fn integration_download_qwen3() {
+    fn integration_download_ort_llm() {
         let tmp = tempfile::tempdir().unwrap();
         let models_dir = tmp.path();
-        let asr_backend = AsrBackendConfig::QwenAsr {
-            model_dir: PathBuf::new(),
-        };
+        let defaults = lune_core::config::UserSettings::default();
+        let asr_backend = &defaults.asr_backend;
+        let llm_backend = &defaults.llm_backend;
 
-        let resolved = ensure_default_models(models_dir, &asr_backend).unwrap();
+        let resolved = ensure_default_models(models_dir, asr_backend, llm_backend).unwrap();
 
-        assert!(resolved.llm_model_path.exists());
-        assert_eq!(
-            resolved.llm_model_path.file_name().unwrap(),
-            "Qwen3-0.6B-Q4_K_M.gguf"
-        );
-        assert_eq!(resolved.llm_model_path.parent().unwrap(), models_dir);
+        assert!(resolved.ort_llm_model_dir.exists());
 
         // Second call should be instant (already present).
-        let resolved2 = ensure_default_models(models_dir, &asr_backend).unwrap();
-        assert_eq!(resolved.llm_model_path, resolved2.llm_model_path);
+        let resolved2 = ensure_default_models(models_dir, asr_backend, llm_backend).unwrap();
+        assert_eq!(resolved.ort_llm_model_dir, resolved2.ort_llm_model_dir);
     }
 }

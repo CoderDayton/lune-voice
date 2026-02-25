@@ -1,0 +1,296 @@
+//! ORT-based Qwen ASR backend.
+//!
+//! Uses three ONNX Runtime sessions (encoder, embed_tokens, decoder) to
+//! replicate the streaming ASR pipeline from the `qwen-asr` crate.
+
+use std::path::PathBuf;
+use std::sync::Mutex;
+
+use ort::session::Session;
+
+use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
+use lune_core::error::{Error, Result};
+
+use crate::ort_qwen_stream::{self, OrtStreamState, StreamConfig};
+use crate::ort_utils::build_ort_session;
+
+// ── Configuration ───────────────────────────────────────────────────────────
+
+/// Runtime configuration for the ORT Qwen ASR backend.
+#[derive(Debug, Clone)]
+pub struct OrtQwenAsrConfig {
+    /// Directory containing encoder.onnx, embed_tokens.onnx, decoder_merged.onnx, tokenizer.json.
+    pub model_dir: PathBuf,
+    /// Whether to use GPU (CUDA EP registered globally via init_ort_runtime).
+    pub use_gpu: bool,
+    /// Streaming chunk size in seconds.
+    pub stream_chunk_sec: f32,
+    /// Number of unstable tail tokens kept for rollback.
+    pub stream_rollback: i32,
+    /// Number of chunks kept "unfixed" before committing text.
+    pub stream_unfixed_chunks: i32,
+    /// Decoder cap per chunk.
+    pub stream_max_new_tokens: i32,
+    /// Whether to condition each chunk on previously committed text.
+    pub past_text_conditioning: bool,
+}
+
+impl Default for OrtQwenAsrConfig {
+    fn default() -> Self {
+        Self {
+            model_dir: PathBuf::new(),
+            use_gpu: false,
+            stream_chunk_sec: 0.5,
+            stream_rollback: 5,
+            stream_unfixed_chunks: 2,
+            stream_max_new_tokens: 32,
+            past_text_conditioning: true,
+        }
+    }
+}
+
+// ── Backend ─────────────────────────────────────────────────────────────────
+
+/// ORT-based Qwen ASR backend using three ONNX sessions.
+pub struct OrtQwenAsrBackend {
+    encoder: Mutex<Session>,
+    embed_tokens: Mutex<Session>,
+    decoder: Mutex<Session>,
+    tokenizer: tokenizers::Tokenizer,
+    config: OrtQwenAsrConfig,
+}
+
+impl OrtQwenAsrBackend {
+    pub fn new(config: OrtQwenAsrConfig) -> Result<Self> {
+        if !config.model_dir.exists() {
+            return Err(Error::ModelNotFound(config.model_dir));
+        }
+
+        let use_gpu = config.use_gpu;
+        let dir = &config.model_dir;
+
+        let encoder_path = dir.join("encoder.onnx");
+        let embed_path = dir.join("embed_tokens.onnx");
+        let decoder_path = dir.join("decoder_merged.onnx");
+        let tokenizer_path = dir.join("tokenizer.json");
+
+        let encoder = build_ort_session(&encoder_path, use_gpu)?;
+        let embed_tokens = build_ort_session(&embed_path, use_gpu)?;
+        let decoder = build_ort_session(&decoder_path, use_gpu)?;
+
+        let tokenizer = tokenizers::Tokenizer::from_file(&tokenizer_path)
+            .map_err(|e| Error::Asr(format!("tokenizer load: {e}")))?;
+
+        tracing::info!(
+            model_dir = %dir.display(),
+            chunk_sec = config.stream_chunk_sec,
+            rollback = config.stream_rollback,
+            unfixed_chunks = config.stream_unfixed_chunks,
+            max_new_tokens = config.stream_max_new_tokens,
+            past_text = config.past_text_conditioning,
+            "initialized ORT Qwen ASR backend"
+        );
+
+        Ok(Self {
+            encoder: Mutex::new(encoder),
+            embed_tokens: Mutex::new(embed_tokens),
+            decoder: Mutex::new(decoder),
+            tokenizer,
+            config,
+        })
+    }
+}
+
+// ── Session state ───────────────────────────────────────────────────────────
+
+struct SessionState {
+    config: AsrSessionConfig,
+    audio_buf: Vec<f32>,
+    stream: OrtStreamState,
+    stream_config: StreamConfig,
+    next_id: u64,
+}
+
+pub struct OrtQwenAsrSession {
+    state: Mutex<SessionState>,
+}
+
+// ── Language mapping ────────────────────────────────────────────────────────
+
+#[inline]
+#[allow(dead_code)] // Will be used when language forcing is wired up.
+fn map_language_tag(language: &str) -> Option<&'static str> {
+    let lower = language.trim().to_ascii_lowercase();
+    let base = lower.split(['-', '_']).next().unwrap_or_default();
+    match base {
+        "zh" => Some("Chinese"),
+        "en" => Some("English"),
+        "yue" => Some("Cantonese"),
+        "ar" => Some("Arabic"),
+        "de" => Some("German"),
+        "fr" => Some("French"),
+        "es" => Some("Spanish"),
+        "pt" => Some("Portuguese"),
+        "id" => Some("Indonesian"),
+        "it" => Some("Italian"),
+        "ko" => Some("Korean"),
+        "ru" => Some("Russian"),
+        "th" => Some("Thai"),
+        "vi" => Some("Vietnamese"),
+        "ja" => Some("Japanese"),
+        "tr" => Some("Turkish"),
+        "hi" => Some("Hindi"),
+        "ms" => Some("Malay"),
+        "nl" => Some("Dutch"),
+        "sv" => Some("Swedish"),
+        "da" => Some("Danish"),
+        "fi" => Some("Finnish"),
+        "pl" => Some("Polish"),
+        "cs" => Some("Czech"),
+        "fil" | "tl" => Some("Filipino"),
+        "fa" => Some("Persian"),
+        "el" => Some("Greek"),
+        "ro" => Some("Romanian"),
+        "hu" => Some("Hungarian"),
+        "mk" => Some("Macedonian"),
+        _ => None,
+    }
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+#[cold]
+#[inline(never)]
+fn lock_err(context: &'static str, e: impl std::fmt::Display) -> Error {
+    Error::Asr(format!("{context}: {e}"))
+}
+
+// ── AsrBackend implementation ───────────────────────────────────────────────
+
+#[async_trait::async_trait]
+impl AsrBackend for OrtQwenAsrBackend {
+    type SessionHandle = OrtQwenAsrSession;
+
+    async fn start_session(&self, config: AsrSessionConfig) -> Result<Self::SessionHandle> {
+        if config.sample_rate != 16_000 {
+            return Err(Error::Asr(format!(
+                "ORT Qwen ASR expects 16000 Hz mono PCM, got {} Hz",
+                config.sample_rate
+            )));
+        }
+
+        let chunk_samples = (self.config.stream_chunk_sec * config.sample_rate as f32) as usize;
+
+        let stream_config = StreamConfig {
+            chunk_samples,
+            rollback: self.config.stream_rollback.max(0) as usize,
+            unfixed_chunks: self.config.stream_unfixed_chunks,
+            max_new_tokens: self.config.stream_max_new_tokens.max(1) as usize,
+            past_text_conditioning: self.config.past_text_conditioning,
+        };
+
+        Ok(OrtQwenAsrSession {
+            state: Mutex::new(SessionState {
+                config,
+                audio_buf: Vec::with_capacity(16_000 * 8),
+                stream: OrtStreamState::new(),
+                stream_config,
+                next_id: 1,
+            }),
+        })
+    }
+
+    #[inline]
+    async fn push_audio(&self, session: &Self::SessionHandle, pcm: &[f32]) -> Result<()> {
+        let mut state = session
+            .state
+            .lock()
+            .map_err(|e| lock_err("session lock", e))?;
+        state.audio_buf.extend_from_slice(pcm);
+        Ok(())
+    }
+
+    async fn poll_results(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>> {
+        let mut state = session
+            .state
+            .lock()
+            .map_err(|e| lock_err("session lock", e))?;
+
+        if state.audio_buf.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let mut encoder = self
+            .encoder
+            .lock()
+            .map_err(|e| lock_err("encoder lock", e))?;
+        let mut embed_tokens = self
+            .embed_tokens
+            .lock()
+            .map_err(|e| lock_err("embed_tokens lock", e))?;
+        let mut decoder = self
+            .decoder
+            .lock()
+            .map_err(|e| lock_err("decoder lock", e))?;
+
+        let sample_rate = state.config.sample_rate;
+        let SessionState {
+            ref audio_buf,
+            ref mut stream,
+            ref stream_config,
+            ..
+        } = *state;
+
+        let start_samples = stream.audio_cursor();
+
+        let text = ort_qwen_stream::stream_push_audio(
+            &mut encoder,
+            &mut embed_tokens,
+            &mut decoder,
+            &self.tokenizer,
+            audio_buf,
+            stream,
+            stream_config,
+            false,
+        )?;
+
+        let end_samples = stream.audio_cursor();
+        let id = state.next_id;
+        state.next_id = id.saturating_add(1);
+
+        let text = text.trim();
+        if text.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let start_ms = (start_samples as u64).saturating_mul(1000) / sample_rate as u64;
+        let end_ms = (end_samples as u64).saturating_mul(1000) / sample_rate as u64;
+
+        Ok(vec![AsrSegment {
+            id,
+            confidence: None,
+            is_final: true,
+            start_ms: Some(start_ms),
+            end_ms: Some(end_ms),
+            text: text.to_owned(),
+        }])
+    }
+
+    async fn end_session(&self, _session: Self::SessionHandle) -> Result<()> {
+        Ok(())
+    }
+
+    async fn reset_context(&self, session: &Self::SessionHandle) -> Result<()> {
+        let mut state = session
+            .state
+            .lock()
+            .map_err(|e| lock_err("session lock", e))?;
+        state.audio_buf.clear();
+        state.stream.reset();
+        Ok(())
+    }
+
+    fn segment_capacity_hint(&self) -> usize {
+        1
+    }
+}

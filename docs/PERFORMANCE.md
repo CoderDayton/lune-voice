@@ -193,7 +193,7 @@ cargo run --example mel_throughput -p lune-asr --release
 | **Branchless triangle filters** | `mel.rs:create_mel_filterbank` | `max(0, min(lower, upper))` eliminates branches in the hot inner loop |
 | **norm_sqr() vs norm()*norm()** | `mel.rs:stft` | Eliminates a `sqrt()` call per bin per frame in the STFT power spectrum |
 | **Sequential-write transpose** | `mel.rs:extract_features` | Outer loop over time gives stride-1 writes (cache-friendly for L1) |
-| **memchr stop detection** | `backend.rs` | `memchr_iter(b'<')` + byte comparison instead of string search — all stop sequences verified ASCII at compile time |
+| **memchr stop detection** | `decode_utils.rs` | `memchr_iter(b'<')` + byte comparison instead of string search — all stop sequences verified ASCII at compile time |
 | **Single-pass argmax + logit collection** | `tdt_decoder.rs` | Combined loop finds the max logit while collecting values, avoiding a second O(vocab_size) scan |
 | **Incremental word counting** | `confidence_router.rs` | Counts only new words per accumulation, not the whole buffer |
 | **Bit-shift length check** | `confidence_router.rs` | `(corr_len << 1) >= orig_len` for the default 0.5/2.0 thresholds |
@@ -205,7 +205,7 @@ cargo run --example mel_throughput -p lune-asr --release
 |-----------|----------|--------|
 | **Split-phase locking** | `parakeet_backend.rs:poll_results` | Session lock held only during snapshot copy; released before mel extraction and inference. Allows `push_audio` to make progress concurrently |
 | **Audio frame coalescing** | `session.rs` | Initial frame + `try_recv()` batch reduces await-point count during microphone bursts |
-| **spawn_blocking for LLM** | `backend.rs` | CPU-bound inference runs on the blocking thread pool, never starving the async runtime |
+| **spawn_blocking for LLM** | `ort_backend.rs` | Inference runs on the blocking thread pool, never starving the async runtime |
 | **recv_many batch drain** | `llm_worker.rs` | Single lock acquisition to drain all queued LLM requests |
 | **State write elision** | `main.rs:update_state` | Skips the write lock when state string is already correct (avoids cache-line dirty on every PartialText) |
 
@@ -217,7 +217,7 @@ cargo run --example mel_throughput -p lune-asr --release
 |-----------|---------|--------|----------|
 | `silence_timeout` | 800ms | Time after last ASR update before finalizing | Lower = faster delivery, but may split mid-sentence pauses |
 | `context_secs` | 30.0 | ASR sliding window size | Larger = better context for long dictation, more memory |
-| `n_ctx` | 4096 | LLM context window (tokens) | Larger = handles longer prompts, more VRAM/RAM |
+| `n_ctx` | 2048 | LLM context window (tokens) | Larger = handles longer prompts, more VRAM/RAM |
 | `max_output_tokens` | 512 | Max generated tokens per LLM call | Lower = faster, but may truncate long corrections |
 | `high_threshold` | 0.82 | Confidence above which text still goes to LLM | Higher = more text gets batched for LLM context |
 | `mid_threshold` | 0.50 | Boundary between low/mid word thresholds | Adjusts accumulation aggressiveness |
@@ -278,8 +278,8 @@ RUST_LOG=lune_asr=debug,lune_llm=debug,lune_app=debug ./target/release/lune-voic
 
 Key trace points:
 - `lune_asr::parakeet_backend` — `inference` with `elapsed_ms`
-- `lune_llm::backend` — `LLM post-process request` with `prompt_len`, `raw_text_len`
-- `lune_llm::backend` — `LLM post-process complete` with `output_len`
+- `lune_llm::ort_backend` — `LLM post-process request` with `prompt_len`, `raw_text_len`
+- `lune_llm::ort_backend` — `LLM post-process complete` with `output_len`
 - `lune_app::llm_worker` — `LLM batch: combined N requests`
 
 ### Memory profiling

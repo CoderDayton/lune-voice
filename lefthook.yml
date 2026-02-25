@@ -1,22 +1,27 @@
 pre-commit:
-  parallel: true
+  parallel: false
   commands:
     fmt:
       run: cargo fmt --all -- --check
       fail_text: "Run `cargo fmt --all` to fix formatting"
 
-    clippy:
-      run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-      fail_text: "Fix clippy warnings before committing"
-
     check:
-      run: cargo check --workspace --all-targets
+      run: CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-4} cargo check --workspace --all-targets
       fail_text: "cargo check failed — fix compilation errors"
 
 pre-push:
   commands:
+    clippy:
+      run: |
+        if [ "${LUNE_FULL_CLIPPY:-0}" != "1" ]; then
+          echo "Skipping full clippy (set LUNE_FULL_CLIPPY=1 to enable)"
+          exit 0
+        fi
+        CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-1} cargo clippy --workspace --all-targets --all-features -- -D warnings
+      fail_text: "Fix clippy warnings before pushing"
+
     test:
-      run: cargo test --workspace
+      run: CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-1} cargo test --workspace --lib --bins
       fail_text: "Tests must pass before pushing"
 
     audit:

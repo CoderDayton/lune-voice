@@ -15,10 +15,7 @@ updates:
         update-types:
           - minor
     ignore:
-      # llama-cpp-2 and ort-sys link native libs — major bumps need manual
-      # validation; allow patch/minor only via groups above.
-      - dependency-name: llama-cpp-2
-        update-types: ["version-update:semver-major"]
+      # ort-sys links native libs — major bumps need manual validation.
       - dependency-name: ort
         update-types: ["version-update:semver-major"]
       - dependency-name: ort-sys

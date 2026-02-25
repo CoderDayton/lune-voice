@@ -64,6 +64,7 @@ impl Default for AsrSessionConfig {
 pub enum AsrBackendKind {
     ParakeetTdt,
     QwenAsr,
+    OrtQwenAsr,
     OpenAiCompatible,
 }
 

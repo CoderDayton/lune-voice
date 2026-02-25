@@ -11,6 +11,7 @@ use ort::session::Session;
 
 use lune_core::error::{Error, Result};
 
+use crate::ort_utils::build_ort_session;
 use crate::vocab::Vocabulary;
 
 // ── Public types ─────────────────────────────────────────────────────────────
@@ -73,8 +74,8 @@ impl TdtModel {
 
         let vocab = Vocabulary::from_file(&vocab_path)?;
 
-        let encoder = build_session(&encoder_path, use_gpu)?;
-        let decoder_joint = build_session(&decoder_path, use_gpu)?;
+        let encoder = build_ort_session(&encoder_path, use_gpu)?;
+        let decoder_joint = build_ort_session(&decoder_path, use_gpu)?;
 
         tracing::info!(
             vocab_size = vocab.size(),
@@ -344,41 +345,5 @@ fn find_file(dir: &Path, candidates: &[&str], kind: &str) -> Result<PathBuf> {
     )))
 }
 
-fn build_session(path: &Path, use_gpu: bool) -> Result<Session> {
-    use ort::session::builder::GraphOptimizationLevel;
-
-    let builder = Session::builder()
-        .map_err(|e| Error::Asr(format!("session builder: {e}")))?
-        .with_optimization_level(GraphOptimizationLevel::Level3)
-        .map_err(|e| Error::Asr(format!("optimization level: {e}")))?
-        .with_intra_threads(4)
-        .map_err(|e| Error::Asr(format!("intra threads: {e}")))?;
-
-    let builder = if use_gpu {
-        #[cfg(feature = "cuda")]
-        {
-            builder
-                .with_execution_providers([
-                    ort::ep::CUDA::default().build(),
-                    ort::ep::CPU::default().build().error_on_failure(),
-                ])
-                .map_err(|e| Error::Asr(format!("CUDA provider: {e}")))?
-        }
-        #[cfg(not(feature = "cuda"))]
-        {
-            tracing::warn!("use_gpu=true but cuda feature not enabled, falling back to CPU");
-            builder
-        }
-    } else {
-        builder
-    };
-
-    builder
-        .commit_from_file(path)
-        .map_err(|e| Error::Asr(format!("load model {}: {e}", path.display())))
-}
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-}
+mod tests {}

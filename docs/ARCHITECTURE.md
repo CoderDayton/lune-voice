@@ -28,8 +28,8 @@ Lune Voice is a privacy-first dictation daemon that converts speech to LLM-corre
 
 | Component | Model | Format | Runtime |
 |-----------|-------|--------|---------|
-| ASR | Parakeet TDT 0.6B v3 | ONNX INT8 | ONNX Runtime |
-| LLM | Qwen3 0.6B | GGUF Q4_K_M | llama.cpp |
+| ASR | Qwen3-ASR 0.6B | ONNX | ONNX Runtime |
+| LLM | Qwen3 0.6B | ONNX | ONNX Runtime |
 
 The daemon listens for D-Bus commands (toggle/start/stop/cancel) and manages a single active dictation session at a time.
 
@@ -42,7 +42,7 @@ lune-app (binary)
 ├── lune-audio       Microphone capture (cpal)
 ├── lune-asr         Speech recognition (ONNX Runtime)
 │   └── lune-core    Shared traits + types
-├── lune-llm         Text post-processing (llama.cpp)
+├── lune-llm         Text post-processing (ONNX Runtime)
 │   └── lune-core
 ├── lune-commands    Voice command detection
 ├── lune-dict        User dictionary
@@ -154,13 +154,14 @@ An async task that runs on `spawn_local` (same thread as the session loop):
 
 #### LLM Backend (`lune-llm`)
 
-**File:** `crates/lune-llm/src/backend.rs`
+**File:** `crates/lune-llm/src/ort_backend.rs`
 
-- Loads GGUF model via `llama-cpp-2` with optional GPU offload
-- Pre-warms by allocating + dropping a context on init (forces KV cache allocation)
+- Loads ONNX model via `ort` (ONNX Runtime) with optional CUDA GPU acceleration
+- Prefill + autoregressive decode with KV cache pass-through
 - Inference runs on `spawn_blocking` to avoid starving the async runtime
 - Greedy decoding (temperature 0.0) for deterministic corrections
-- Context window: 4096 tokens
+- Context window: 2048 tokens
+- Token sampling via custom `sampling.rs` (greedy, temperature, top-k, top-p, repeat penalty)
 
 **ChatML Prompt Construction** (`prompt.rs`):
 
@@ -333,7 +334,7 @@ Main Thread (tokio current_thread + LocalSet)
 └── Event forwarder (spawn_local) — routes SessionEvents to delivery
 
 spawn_blocking pool (tokio default)
-└── LLM inference (generate_sync) — CPU-bound, runs under Mutex
+└── LLM inference (generate_sync) — runs under Mutex, CUDA or CPU
 ```
 
 Why `current_thread` instead of `multi_thread`:
@@ -341,7 +342,7 @@ Why `current_thread` instead of `multi_thread`:
 - All hot paths stay on one core (cache-friendly)
 - `spawn_local` support for `!Send` futures (cpal stream)
 
-The model `Mutex` in `LocalLlmBackend` serializes inference calls. Since there's only one LLM worker, contention is impossible in practice — the Mutex exists for `Send` safety across `spawn_blocking`.
+The model `Mutex` in `OrtLlmBackend` serializes inference calls. Since there's only one LLM worker, contention is impossible in practice — the Mutex exists for `Send` safety across `spawn_blocking`.
 
 ---
 
@@ -361,7 +362,7 @@ The model `Mutex` in `LocalLlmBackend` serializes inference calls. Since there's
 │                           │       │                          │      │     │
 │                           │  ┌────▼────┐              ┌─────▼────┐ │     │
 │                           │  │Segment  │              │lune-llm  │ │     │
-│                           │  │Tracker  │              │(llama.cpp│ │     │
+│                           │  │Tracker  │              │(ORT      │ │     │
 │                           │  └─────────┘              │spawn_blk)│ │     │
 │                           │                           └─────┬────┘ │     │
 │                           │                                 │      │     │

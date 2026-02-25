@@ -18,6 +18,9 @@ pub struct LlmRequest {
 #[derive(Debug)]
 pub struct LlmResponse {
     pub corrected_text: String,
+    /// When true, this is the completion signal for the current batch.
+    /// Streaming chunks have `is_final = false`.
+    pub is_final: bool,
 }
 
 /// Maximum combined character length per batched LLM call.
@@ -129,46 +132,81 @@ pub fn spawn_llm_worker(
                 dictionary,
             };
 
-            // Call transform() directly — streaming is disabled; full corrected text is
-            // delivered atomically after the hallucination guard passes, preventing partial
-            // garbage from reaching the keyboard and avoiding cursor-interleave issues.
-            let corrected_text = match post_processor.transform(&input).await {
-                Ok(output) => {
-                    let out_words = output.cleaned_text.split_whitespace().count();
-                    if out_words > raw_word_count * 2 + 5 {
-                        tracing::warn!(
-                            raw_words = raw_word_count,
-                            llm_words = out_words,
-                            "LLM output suspiciously long, discarding"
-                        );
-                        String::new()
-                    } else {
-                        output.cleaned_text
-                    }
+            // Stream corrected text in word-boundary chunks as the LLM generates.
+            // Live hallucination guard aborts generation if output exceeds 2x input + 5 words.
+            let raw_for_log = input.raw_text.clone();
+            let (chunk_tx, mut chunk_rx) = mpsc::channel::<String>(32);
+            let pp = Arc::clone(&post_processor);
+            let inference_task =
+                tokio::task::spawn_local(
+                    async move { pp.transform_streaming(&input, chunk_tx).await },
+                );
+
+            let hallu_limit = raw_word_count * 2 + 5;
+            let mut cum_words = 0usize;
+            let mut aborted = false;
+            while let Some(chunk) = chunk_rx.recv().await {
+                cum_words += chunk.split_whitespace().count();
+                if cum_words > hallu_limit {
+                    tracing::warn!(
+                        raw_words = raw_word_count,
+                        streamed_words = cum_words,
+                        "streaming output exceeds hallucination threshold, aborting"
+                    );
+                    inference_task.abort();
+                    aborted = true;
+                    break;
                 }
-                Err(e) => {
+                if resp_tx
+                    .send(LlmResponse {
+                        corrected_text: chunk,
+                        is_final: false,
+                    })
+                    .await
+                    .is_err()
+                {
+                    inference_task.abort();
+                    aborted = true;
+                    break;
+                }
+            }
+
+            // Await inference completion (may already be done or aborted).
+            let full_text = match inference_task.await {
+                Ok(Ok(output)) => output.cleaned_text,
+                Ok(Err(e)) => {
                     tracing::warn!(error = %e, "LLM correction failed");
                     String::new()
                 }
+                Err(_) => String::new(), // JoinError from abort
             };
 
             tracing::debug!(
-                corrected_text = %corrected_text,
-                "LLM worker: post-processor output"
+                output_len = full_text.len(),
+                aborted,
+                "LLM worker: post-processor complete"
             );
 
-            // Always print raw vs corrected comparison to stderr for diagnostics.
-            let raw = &input.raw_text;
-            eprintln!("\x1b[2m[RAW]\x1b[0m {raw}");
-            if corrected_text.is_empty() {
-                eprintln!("\x1b[33m[LLM]\x1b[0m (discarded)");
-            } else if corrected_text == *raw {
+            eprintln!("\x1b[2m[RAW]\x1b[0m {raw_for_log}");
+            if aborted {
+                eprintln!("\x1b[33m[LLM]\x1b[0m (hallucination aborted)");
+            } else if full_text.is_empty() {
+                eprintln!("\x1b[33m[LLM]\x1b[0m (error)");
+            } else if full_text == raw_for_log {
                 eprintln!("\x1b[32m[LLM]\x1b[0m (unchanged)");
             } else {
-                eprintln!("\x1b[32m[LLM]\x1b[0m {corrected_text}");
+                eprintln!("\x1b[32m[LLM]\x1b[0m {full_text}");
             }
 
-            if resp_tx.send(LlmResponse { corrected_text }).await.is_err() {
+            // Completion signal so the session knows this batch is done.
+            if resp_tx
+                .send(LlmResponse {
+                    corrected_text: String::new(),
+                    is_final: true,
+                })
+                .await
+                .is_err()
+            {
                 tracing::debug!("LLM response channel closed, stopping worker");
                 break;
             }

@@ -9,10 +9,11 @@
 - [Runtime Settings](#runtime-settings)
 - [Settings File](#settings-file)
 - [ASR Backends](#asr-backends)
+  - [Qwen3-ASR (Local, default)](#qwen3-asr-local-default)
   - [Parakeet TDT (Local)](#parakeet-tdt-local)
   - [OpenAI-Compatible (Remote)](#openai-compatible-remote-asr)
 - [LLM Backends](#llm-backends)
-  - [Local (llama.cpp)](#local-llamacpp)
+  - [Local (ONNX Runtime)](#local-onnx-runtime)
   - [OpenAI-Compatible (Remote)](#openai-compatible-remote-llm)
 - [Privacy Mode](#privacy-mode)
 - [Dictation Modes](#dictation-modes)
@@ -79,17 +80,16 @@ default_style = "general"
 session_history_days = 30
 
 [asr_backend]
-type = "ParakeetTdt"
+type = "OrtQwenAsr"
 model_dir = ""          # auto-populated from model downloads
 use_gpu = true
-context_secs = 30.0
 
 [llm_backend]
-type = "Local"
-model_path = ""         # auto-populated from model downloads
+type = "OrtLocal"
+model_dir = ""          # auto-populated from model downloads
 use_gpu = true
-n_ctx = 4096
-max_output_tokens = 512
+n_ctx = 2048
+max_output_tokens = 256
 
 [hotkey]
 toggle_dictation = { modifiers = ["Ctrl"], key = "Space" }
@@ -102,9 +102,50 @@ cancel_dictation = { modifiers = [], key = "Escape" }
 
 ## ASR Backends
 
+### Qwen3-ASR (Local, default)
+
+The default backend. Runs Qwen3-ASR 0.6B locally via ONNX Runtime with streaming transcription.
+
+```toml
+[asr_backend]
+type = "OrtQwenAsr"
+model_dir = "/path/to/qwen3-asr-0.6b-onnx"
+use_gpu = true
+stream_chunk_sec = 0.5
+stream_rollback = 5
+stream_unfixed_chunks = 2
+stream_max_new_tokens = 32
+past_text_conditioning = true
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `model_dir` | path | auto | Directory containing encoder.onnx, embed_tokens.onnx, decoder_merged.onnx, and tokenizer.json |
+| `use_gpu` | bool | `true` | Enable CUDA GPU acceleration |
+| `stream_chunk_sec` | f32 | `0.5` | Streaming chunk size in seconds |
+| `stream_rollback` | i32 | `5` | Number of rollback tokens kept for boundary stability |
+| `stream_unfixed_chunks` | i32 | `2` | Number of initial unfixed chunks before stable commit |
+| `stream_max_new_tokens` | i32 | `32` | Decoder cap per stream update |
+| `past_text_conditioning` | bool | `true` | Whether stream chunks are conditioned on prior committed text |
+
+**Model files expected in `model_dir`:**
+
+| File | Purpose |
+|------|---------|
+| `encoder.onnx` | AuT audio encoder + multi-modal projector |
+| `embed_tokens.onnx` | Token embedding lookup |
+| `decoder_merged.onnx` | Qwen3 decoder with KV cache |
+| `tokenizer.json` | HuggingFace tokenizer |
+
+**Inference details:**
+
+- Input: 16 kHz mono PCM → 128-mel spectrogram (Slaney scale, reflection padding)
+- Streaming: rollback-buffered emission with degeneracy detection and periodic re-anchoring
+- Output: text with automatic speech-end detection
+
 ### Parakeet TDT (Local)
 
-The default backend. Runs NVIDIA's Parakeet TDT 0.6B model locally via ONNX Runtime.
+Alternative ASR backend using NVIDIA's Parakeet TDT 0.6B model locally via ONNX Runtime.
 
 ```toml
 [asr_backend]
@@ -166,33 +207,42 @@ streaming = "HttpPolling"
 
 ## LLM Backends
 
-### Local (llama.cpp)
+### Local (ONNX Runtime)
 
-The default backend. Runs Qwen3 0.6B (or any GGUF-compatible model) locally via llama.cpp.
+The default backend. Runs Qwen3 0.6B locally via ONNX Runtime.
 
 ```toml
 [llm_backend]
-type = "Local"
-model_path = "/path/to/Qwen3-0.6B-Q4_K_M.gguf"
+type = "OrtLocal"
+model_dir = "/path/to/qwen3-0.6b-onnx"
 use_gpu = true
-n_ctx = 4096
-max_output_tokens = 512
+n_ctx = 2048
+max_output_tokens = 256
+temperature = 0.0
+top_p = 0.8
+top_k = 20
+repeat_penalty = 1.0
+repeat_last_n = 64
 ```
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `model_path` | path | auto | Path to the GGUF model file |
-| `use_gpu` | bool | `true` | Offload all layers to GPU (if supported) |
-| `n_ctx` | u32 | `4096` | Context window size in tokens. Must be large enough for system prompt + few-shot examples + input text |
-| `max_output_tokens` | u32 | `512` | Maximum tokens to generate per request. Corrected text is usually shorter than input |
+| `model_dir` | path | auto | Directory containing decoder_model_merged.onnx and tokenizer.json |
+| `use_gpu` | bool | `true` | Enable CUDA GPU acceleration |
+| `n_ctx` | u32 | `2048` | Context window size in tokens |
+| `max_output_tokens` | u32 | `256` | Maximum tokens to generate per request |
+| `temperature` | f32 | `0.0` | Sampling temperature (0.0 = greedy) |
+| `top_p` | f32 | `0.8` | Nucleus sampling threshold |
+| `top_k` | i32 | `20` | Top-k sampling |
+| `repeat_penalty` | f32 | `1.0` | Repeat penalty factor |
+| `repeat_last_n` | i32 | `64` | Window for repeat penalty |
 
-**Internal parameters (not user-configurable):**
+**Model files expected in `model_dir`:**
 
-| Parameter | Value | Rationale |
-|-----------|-------|-----------|
-| Temperature | 0.0 | Greedy decoding — deterministic corrections with no creative variation |
-| Top-p | 0.8 | Only applies when temperature > 0 |
-| Top-k | 20 | Only applies when temperature > 0 |
+| File | Purpose |
+|------|---------|
+| `decoder_model_merged.onnx` | Qwen3 decoder with KV cache |
+| `tokenizer.json` | HuggingFace tokenizer |
 
 **Prompt format:** ChatML with `/no_think` directive to suppress chain-of-thought. See [Prompt Structure](#prompt-structure) for details.
 
@@ -505,10 +555,10 @@ conf = None        →  Treated as 0.0 (conservative batching)
 
 Models are downloaded automatically on first run from HuggingFace Hub.
 
-| Model | Repository | File | Size |
-|-------|-----------|------|------|
-| Parakeet TDT 0.6B v3 | `istupakov/parakeet-tdt-0.6b-v3-onnx` | Multiple ONNX files + vocab.txt | ~280 MB |
-| Qwen3 0.6B | `unsloth/Qwen3-0.6B-GGUF` | `Qwen3-0.6B-Q4_K_M.gguf` | ~400 MB |
+| Model | Repository | Files | Size |
+|-------|-----------|-------|------|
+| Qwen3-ASR 0.6B | `lune-voice/qwen3-asr-0.6b-onnx` | encoder.onnx, embed_tokens.onnx, decoder_merged.onnx, tokenizer.json | ~1.2 GB |
+| Qwen3 0.6B | `lune-voice/qwen3-0.6b-onnx` | decoder_model_merged.onnx, tokenizer.json | ~600 MB |
 
 Models are stored in:
 
@@ -522,12 +572,12 @@ To use a custom model, set the path directly in the config:
 
 ```toml
 [asr_backend]
-type = "ParakeetTdt"
-model_dir = "/path/to/custom/parakeet-model"
+type = "OrtQwenAsr"
+model_dir = "/path/to/custom/asr-model"
 
 [llm_backend]
-type = "Local"
-model_path = "/path/to/custom/model.gguf"
+type = "OrtLocal"
+model_dir = "/path/to/custom/llm-model"
 ```
 
 ---

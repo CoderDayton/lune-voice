@@ -12,16 +12,9 @@ use lune_core::error::{Error, Result};
 use crate::mel;
 use crate::tdt_decoder::TdtModel;
 
-/// Minimum NEW samples since last inference before running again (~200 ms at 16 kHz).
-const MIN_NEW_SAMPLES: usize = 3_200;
-
 /// Maximum sliding window length (10 seconds at 16 kHz).  Older audio is
 /// trimmed from the front so the model always sees the most recent context.
 const MAX_WINDOW_SAMPLES: usize = 160_000;
-
-/// Mean-squared energy below this threshold skips inference entirely.
-/// Applied only to the NEW audio since the last inference, not the full window.
-const ENERGY_FLOOR: f32 = 1e-4;
 
 /// Configuration for the Parakeet TDT local backend.
 pub struct ParakeetTdtConfig {
@@ -111,31 +104,18 @@ impl AsrBackend for ParakeetTdtBackend {
 
     async fn poll_results(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>> {
         // Snapshot the sliding window under a brief lock.
-        let (pcm, new_start, timestamp_ms, id) = {
+        let (pcm, timestamp_ms, id) = {
             let mut sess = session.lock().map_err(|e| lock_err("session lock", e))?;
-            let new_samples = sess
-                .pending
-                .len()
-                .saturating_sub(sess.samples_at_last_inference);
-            if !sess.has_new || new_samples < MIN_NEW_SAMPLES {
+            if !sess.has_new {
                 return Ok(vec![]);
             }
             sess.has_new = false;
             let ts = sess.total_samples * 1000 / sess.sample_rate as u64;
             let id = sess.next_id;
             sess.next_id += 1;
-            let new_start = sess.samples_at_last_inference;
             sess.samples_at_last_inference = sess.pending.len();
-            (sess.pending.clone(), new_start, ts, id)
+            (sess.pending.clone(), ts, id)
         };
-
-        // Energy gate on only the NEW audio — old silence at the window start
-        // shouldn't suppress inference when fresh speech just arrived.
-        let new_slice = &pcm[new_start..];
-        let energy = new_slice.iter().map(|s| s * s).sum::<f32>() / new_slice.len() as f32;
-        if energy < ENERGY_FLOOR {
-            return Ok(vec![]);
-        }
 
         // Mel extraction and inference on the full sliding window.
         let features = mel::extract_features(&pcm);

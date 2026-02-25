@@ -122,11 +122,11 @@ fn type_in_place(
     clipboard: &mut Option<arboard::Clipboard>,
     enigo: &mut Option<enigo::Enigo>,
 ) {
-    if let Some(t) = uinput {
-        if !UinputTyper::has_unmapped_chars(text) {
-            t.type_str(text);
-            return;
-        }
+    if let Some(t) = uinput
+        && !UinputTyper::has_unmapped_chars(text)
+    {
+        t.type_str(text);
+        return;
     }
     // Non-ASCII or uinput unavailable — clipboard paste.
     match (clipboard.as_mut(), enigo.as_mut()) {

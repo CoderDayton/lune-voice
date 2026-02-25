@@ -27,11 +27,17 @@ pub struct UserSettings {
 impl Default for UserSettings {
     fn default() -> Self {
         Self {
-            asr_backend: AsrBackendConfig::QwenAsr {
+            asr_backend: AsrBackendConfig::OrtQwenAsr {
                 model_dir: PathBuf::new(),
+                use_gpu: true,
+                stream_chunk_sec: default_qwen_stream_chunk_sec(),
+                stream_rollback: default_qwen_stream_rollback(),
+                stream_unfixed_chunks: default_qwen_stream_unfixed_chunks(),
+                stream_max_new_tokens: default_qwen_stream_max_new_tokens(),
+                past_text_conditioning: default_qwen_past_text_conditioning(),
             },
-            llm_backend: LlmBackendConfig::Local {
-                model_path: PathBuf::new(),
+            llm_backend: LlmBackendConfig::OrtLocal {
+                model_dir: PathBuf::new(),
                 use_gpu: true,
                 n_ctx: 2048,
                 max_output_tokens: 256,
@@ -62,6 +68,40 @@ pub enum AsrBackendConfig {
     },
     QwenAsr {
         model_dir: PathBuf,
+        /// Streaming chunk size in seconds for `qwen-asr`.
+        #[serde(default = "default_qwen_stream_chunk_sec")]
+        stream_chunk_sec: f32,
+        /// Number of rollback tokens kept for boundary stability.
+        #[serde(default = "default_qwen_stream_rollback")]
+        stream_rollback: i32,
+        /// Number of initial "unfixed" chunks before stable commit.
+        #[serde(default = "default_qwen_stream_unfixed_chunks")]
+        stream_unfixed_chunks: i32,
+        /// Decoder cap per stream update.
+        #[serde(default = "default_qwen_stream_max_new_tokens")]
+        stream_max_new_tokens: i32,
+        /// Whether stream chunks are conditioned on prior committed text.
+        #[serde(default = "default_qwen_past_text_conditioning")]
+        past_text_conditioning: bool,
+    },
+    OrtQwenAsr {
+        model_dir: PathBuf,
+        use_gpu: bool,
+        /// Streaming chunk size in seconds.
+        #[serde(default = "default_qwen_stream_chunk_sec")]
+        stream_chunk_sec: f32,
+        /// Number of rollback tokens kept for boundary stability.
+        #[serde(default = "default_qwen_stream_rollback")]
+        stream_rollback: i32,
+        /// Number of initial "unfixed" chunks before stable commit.
+        #[serde(default = "default_qwen_stream_unfixed_chunks")]
+        stream_unfixed_chunks: i32,
+        /// Decoder cap per stream update.
+        #[serde(default = "default_qwen_stream_max_new_tokens")]
+        stream_max_new_tokens: i32,
+        /// Whether stream chunks are conditioned on prior committed text.
+        #[serde(default = "default_qwen_past_text_conditioning")]
+        past_text_conditioning: bool,
     },
     OpenAiCompatible {
         base_url: Url,
@@ -75,12 +115,11 @@ pub enum AsrBackendConfig {
 #[serde(tag = "type")]
 #[non_exhaustive]
 pub enum LlmBackendConfig {
-    Local {
-        model_path: PathBuf,
+    OrtLocal {
+        model_dir: PathBuf,
         use_gpu: bool,
         #[serde(default = "default_n_ctx")]
         n_ctx: u32,
-        /// Maximum tokens to generate per request.
         #[serde(default = "default_max_output_tokens")]
         max_output_tokens: u32,
         #[serde(default)]
@@ -120,6 +159,26 @@ fn default_repeat_penalty() -> f32 {
 }
 fn default_repeat_last_n() -> i32 {
     64
+}
+
+fn default_qwen_stream_chunk_sec() -> f32 {
+    0.5
+}
+
+fn default_qwen_stream_rollback() -> i32 {
+    5
+}
+
+fn default_qwen_stream_unfixed_chunks() -> i32 {
+    2
+}
+
+fn default_qwen_stream_max_new_tokens() -> i32 {
+    32
+}
+
+fn default_qwen_past_text_conditioning() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
