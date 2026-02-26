@@ -14,41 +14,16 @@ use lune_core::error::{Error, Result};
 /// Build an ORT session from an ONNX model file.
 ///
 /// Applies Level3 graph optimization and 4 intra-op threads.
-/// When `use_gpu` is true and the `cuda` feature is enabled, registers the
-/// CUDA EP with CPU fallback.  Without the feature, logs a warning and
-/// falls back to CPU-only.
-///
-/// The global `ort::init()` call (if any) supplies the default EP and memory
-/// arena.  Per-session EPs registered here override the global default for
-/// this session only.
-pub fn build_ort_session(path: &Path, use_gpu: bool) -> Result<Session> {
-    let builder = Session::builder()
+/// Execution providers are inherited from the global `ort::init()` call
+/// (see `factory::init_ort_runtime`). All sessions share the same CUDA
+/// memory arena when GPU is enabled — do NOT register per-session EPs.
+pub fn build_ort_session(path: &Path, _use_gpu: bool) -> Result<Session> {
+    Session::builder()
         .map_err(|e| Error::Asr(format!("session builder: {e}")))?
         .with_optimization_level(GraphOptimizationLevel::Level3)
         .map_err(|e| Error::Asr(format!("optimization level: {e}")))?
         .with_intra_threads(4)
-        .map_err(|e| Error::Asr(format!("intra threads: {e}")))?;
-
-    let builder = if use_gpu {
-        #[cfg(feature = "cuda")]
-        {
-            builder
-                .with_execution_providers([
-                    ort::ep::CUDA::default().build(),
-                    ort::ep::CPU::default().build().error_on_failure(),
-                ])
-                .map_err(|e| Error::Asr(format!("CUDA provider: {e}")))?
-        }
-        #[cfg(not(feature = "cuda"))]
-        {
-            tracing::warn!("use_gpu=true but cuda feature not enabled, falling back to CPU");
-            builder
-        }
-    } else {
-        builder
-    };
-
-    builder
+        .map_err(|e| Error::Asr(format!("intra threads: {e}")))?
         .commit_from_file(path)
         .map_err(|e| Error::Asr(format!("load model {}: {e}", path.display())))
 }

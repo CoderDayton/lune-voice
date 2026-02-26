@@ -227,8 +227,8 @@ pub(crate) struct OrtStreamState {
     /// Accumulated result text from stable emissions.
     pub result: String,
 
-    /// Previous prefill embeddings for LCP reuse (flat f32, row-major).
-    prev_prefill_embeds: Vec<f32>,
+    /// Previous prefill embeddings for LCP reuse (flat f16, row-major).
+    prev_prefill_embeds: Vec<half::f16>,
     prev_prefill_len: usize,
 
     /// Previous tail token snapshot for stale detection.
@@ -244,8 +244,8 @@ pub(crate) struct OrtStreamState {
     kv_cache: Vec<DynValue>,
     kv_cache_seq_len: usize,
 
-    /// Cached encoder features from the most recent encoding pass.
-    enc_cache: Option<ArrayD<f32>>,
+    /// Cached encoder features from the most recent encoding pass (f16).
+    enc_cache: Option<ArrayD<half::f16>>,
     /// Audio sample position covered by `enc_cache`.
     enc_cache_audio_end: usize,
 }
@@ -368,10 +368,21 @@ pub(crate) fn stream_push_audio(
             prefill_len,
         );
 
-        // Truncate KV cache to reused prefix length.
-        let kv_cache = if reused > 0 && !state.kv_cache.is_empty() {
-            truncate_kv_cache(&state.kv_cache, state.kv_cache_seq_len, reused)?
+        // Take ownership of KV cache — avoids clone when full reuse is possible.
+        let old_kv = std::mem::take(&mut state.kv_cache);
+        let old_kv_seq = state.kv_cache_seq_len;
+        state.kv_cache_seq_len = 0;
+
+        let kv_cache = if reused > 0 && !old_kv.is_empty() {
+            if reused >= old_kv_seq {
+                // Full reuse — zero-copy ownership transfer, no extraction.
+                old_kv
+            } else {
+                // Partial reuse — truncate (CPU round-trip unavoidable without IoBinding).
+                truncate_kv_cache(old_kv, old_kv_seq, reused)?
+            }
         } else {
+            drop(old_kv); // Free old GPU tensors.
             empty_kv_cache()
         };
 
@@ -387,8 +398,10 @@ pub(crate) fn stream_push_audio(
             // possible, so we do a minimal single-token re-prefill of the last token.
             let last_embed = input_embeds.slice(s![.., prefill_len - 1..prefill_len, ..]);
             let kv_trunc = if reused > 1 {
-                truncate_kv_cache(&state.kv_cache, state.kv_cache_seq_len, reused - 1)?
+                // kv_cache is already owned; truncate it for the last-token re-prefill.
+                truncate_kv_cache(kv_cache, old_kv_seq, reused - 1)?
             } else {
+                drop(kv_cache);
                 empty_kv_cache()
             };
             decoder_prefill(
@@ -399,7 +412,7 @@ pub(crate) fn stream_push_audio(
             )?
         };
 
-        // Save prefill embeddings for next chunk's LCP comparison.
+        // Save prefill embeddings (f16) for next chunk's LCP comparison.
         let embeds_data = input_embeds.as_slice().unwrap_or(&[]);
         state.prev_prefill_embeds = embeds_data[..prefill_len * HIDDEN_DIM].to_vec();
         state.prev_prefill_len = prefill_len;
@@ -512,7 +525,7 @@ pub(crate) fn stream_push_audio(
 
 // ── Encoder ─────────────────────────────────────────────────────────────────
 
-fn run_encoder(encoder: &mut Session, mel: Array3<f32>) -> Result<ArrayD<f32>> {
+fn run_encoder(encoder: &mut Session, mel: Array3<f32>) -> Result<ArrayD<half::f16>> {
     // Model expects f16 mel input; convert at boundary.
     let mel_f16 = mel.mapv(half::f16::from_f32).into_dyn();
     let mel_val: DynValue = Value::from_array(mel_f16)
@@ -524,27 +537,28 @@ fn run_encoder(encoder: &mut Session, mel: Array3<f32>) -> Result<ArrayD<f32>> {
         .run(inputs)
         .map_err(|e| Error::Asr(format!("encoder: {e}")))?;
 
-    // Encoder outputs f16; convert back to f32 for internal processing.
+    // Keep encoder output in f16 — no dtype conversion.
     let features: ndarray::ArrayViewD<half::f16> = outputs[0]
         .try_extract_array()
         .map_err(|e| Error::Asr(format!("encoder features: {e}")))?;
 
-    Ok(features.mapv(|v| v.to_f32()))
+    Ok(features.to_owned())
 }
 
 // ── Input embeddings ────────────────────────────────────────────────────────
 
 /// Build the full input_embeds sequence for the decoder.
 ///
+/// All operations stay in f16 — no dtype conversion needed.
 /// Returns `(input_embeds [1, total_len, HIDDEN_DIM], prefill_len)`.
 fn build_input_embeds(
     embed_tokens: &mut Session,
-    enc_features: &ArrayD<f32>,
+    enc_features: &ArrayD<half::f16>,
     enc_seq_len: usize,
     _raw_tokens: &[i64],
     stable_tokens: &[i64],
     past_text_conditioning: bool,
-) -> Result<(ArrayD<f32>, usize)> {
+) -> Result<(ArrayD<half::f16>, usize)> {
     // Collect all token IDs that need embedding.
     let mut pre_tokens: Vec<i64> = Vec::with_capacity(32);
     pre_tokens.extend_from_slice(PREFIX_HEAD);
@@ -559,7 +573,7 @@ fn build_input_embeds(
         post_tokens.extend_from_slice(stable_tokens);
     }
 
-    // Get embeddings for pre and post tokens.
+    // Get embeddings for pre and post tokens (already f16).
     let pre_embeds = token_embeddings(embed_tokens, &pre_tokens)?;
     let post_embeds = token_embeddings(embed_tokens, &post_tokens)?;
 
@@ -567,8 +581,8 @@ fn build_input_embeds(
     let post_len = post_tokens.len();
     let total_len = pre_len + enc_seq_len + post_len;
 
-    // Concatenate: pre_embeds + enc_features + post_embeds → [1, total_len, HIDDEN_DIM]
-    let mut combined = vec![0.0f32; total_len * HIDDEN_DIM];
+    // Concatenate in f16: pre_embeds + enc_features + post_embeds → [1, total_len, HIDDEN_DIM]
+    let mut combined = vec![half::f16::ZERO; total_len * HIDDEN_DIM];
 
     // Copy pre_embeds [1, pre_len, HIDDEN_DIM].
     let pre_data = pre_embeds.as_slice().unwrap_or(&[]);
@@ -593,7 +607,8 @@ fn build_input_embeds(
 }
 
 /// Get token embeddings from the embed_tokens ONNX session.
-fn token_embeddings(embed_tokens: &mut Session, tokens: &[i64]) -> Result<ArrayD<f32>> {
+/// Returns f16 directly — no dtype conversion.
+fn token_embeddings(embed_tokens: &mut Session, tokens: &[i64]) -> Result<ArrayD<half::f16>> {
     let ids = Array2::from_shape_vec((1, tokens.len()), tokens.to_vec())
         .map_err(|e| Error::Asr(format!("token ids array: {e}")))?;
     let ids_val: DynValue = Value::from_array(ids)
@@ -605,22 +620,21 @@ fn token_embeddings(embed_tokens: &mut Session, tokens: &[i64]) -> Result<ArrayD
         .run(inputs)
         .map_err(|e| Error::Asr(format!("embed_tokens: {e}")))?;
 
-    // Embed_tokens outputs f16; convert to f32 for internal processing.
     let embeds: ndarray::ArrayViewD<half::f16> = outputs[0]
         .try_extract_array()
         .map_err(|e| Error::Asr(format!("token embeds: {e}")))?;
 
-    Ok(embeds.mapv(|v| v.to_f32()))
+    Ok(embeds.to_owned())
 }
 
 // ── LCP reuse ───────────────────────────────────────────────────────────────
 
-/// Compare previous and current prefill embeddings row-by-row.
+/// Compare previous and current prefill embeddings row-by-row (f16).
 /// Returns the number of reusable prefix rows.
 fn compute_lcp_reuse(
-    prev_embeds: &[f32],
+    prev_embeds: &[half::f16],
     prev_len: usize,
-    curr_embeds: &ArrayD<f32>,
+    curr_embeds: &ArrayD<half::f16>,
     curr_len: usize,
 ) -> usize {
     if prev_embeds.is_empty() || prev_len == 0 {
@@ -655,18 +669,22 @@ fn empty_kv_cache() -> Vec<DynValue> {
     kv
 }
 
-/// Truncate KV cache tensors to `target_len` along the sequence dimension.
+/// Truncate owned KV cache tensors to `target_len` along the sequence dimension.
+///
+/// Takes ownership of the input Vec so old DynValues are dropped immediately
+/// after extraction — halves peak GPU memory vs borrowing + cloning.
+/// The CPU round-trip per tensor is unavoidable without IoBinding.
 fn truncate_kv_cache(
-    kv_cache: &[DynValue],
+    kv_cache: Vec<DynValue>,
     current_len: usize,
     target_len: usize,
 ) -> Result<Vec<DynValue>> {
     if target_len >= current_len {
-        // Need to clone — can't borrow DynValue.
-        return clone_kv_cache(kv_cache);
+        // No truncation needed — return as-is (zero-copy).
+        return Ok(kv_cache);
     }
     let mut result = Vec::with_capacity(kv_cache.len());
-    for (i, kv) in kv_cache.iter().enumerate() {
+    for (i, kv) in kv_cache.into_iter().enumerate() {
         let (shape, data) = kv
             .try_extract_tensor::<half::f16>()
             .map_err(|e| Error::Asr(format!("kv extract[{i}]: {e}")))?;
@@ -675,6 +693,7 @@ fn truncate_kv_cache(
         let full = ArrayD::from_shape_vec(IxDyn(&dims), data.to_vec())
             .map_err(|e| Error::Asr(format!("kv array[{i}]: {e}")))?;
         let sliced = full.slice(s![.., .., ..target_len, ..]).to_owned();
+        // Old DynValue `kv` dropped here — frees GPU memory before new tensor.
         result.push(
             Value::from_array(sliced)
                 .map_err(|e| Error::Asr(format!("kv value[{i}]: {e}")))?
@@ -684,42 +703,22 @@ fn truncate_kv_cache(
     Ok(result)
 }
 
-/// Clone KV cache by extracting and recreating tensors.
-fn clone_kv_cache(kv_cache: &[DynValue]) -> Result<Vec<DynValue>> {
-    let mut result = Vec::with_capacity(kv_cache.len());
-    for (i, kv) in kv_cache.iter().enumerate() {
-        let (shape, data) = kv
-            .try_extract_tensor::<half::f16>()
-            .map_err(|e| Error::Asr(format!("kv clone[{i}]: {e}")))?;
-        let dims: Vec<usize> = shape.as_ref().iter().map(|&d| d as usize).collect();
-        let arr = ArrayD::from_shape_vec(IxDyn(&dims), data.to_vec())
-            .map_err(|e| Error::Asr(format!("kv clone array[{i}]: {e}")))?;
-        result.push(
-            Value::from_array(arr)
-                .map_err(|e| Error::Asr(format!("kv clone value[{i}]: {e}")))?
-                .into(),
-        );
-    }
-    Ok(result)
-}
-
 // ── Decoder prefill ─────────────────────────────────────────────────────────
 
-/// Run decoder prefill: feed input_embeds with KV cache, return updated KV + logits.
+/// Run decoder prefill: feed input_embeds (f16) with KV cache, return updated KV + logits.
 fn decoder_prefill(
     decoder: &mut Session,
-    input_embeds: ArrayD<f32>,
+    input_embeds: ArrayD<half::f16>,
     kv_cache: Vec<DynValue>,
     past_seq_len: usize,
 ) -> Result<(Vec<DynValue>, Vec<f32>)> {
     let seq_len = input_embeds.shape()[1];
     let mut inputs: Vec<(String, DynValue)> = Vec::with_capacity(3 + NUM_DECODER_LAYERS * 2);
 
-    // Decoder expects f16 inputs_embeds.
-    let embeds_f16 = input_embeds.mapv(half::f16::from_f32);
+    // input_embeds already f16 — no conversion needed.
     inputs.push((
         "inputs_embeds".to_string(),
-        Value::from_array(embeds_f16)
+        Value::from_array(input_embeds)
             .map_err(|e| Error::Asr(format!("prefill embeds: {e}")))?
             .into(),
     ));
@@ -809,17 +808,16 @@ fn autoregressive_decode(
 
         tokens.push(next_token);
 
-        // Get embedding for next token.
+        // Get embedding for next token (already f16).
         let tok_embeds = token_embeddings(embed_tokens, &[next_token])?;
 
         // Single-token decode step.
         let mut inputs: Vec<(String, DynValue)> = Vec::with_capacity(3 + NUM_DECODER_LAYERS * 2);
 
-        // Decoder expects f16 inputs_embeds.
-        let tok_f16 = tok_embeds.mapv(half::f16::from_f32);
+        // tok_embeds already f16 — no conversion needed.
         inputs.push((
             "inputs_embeds".to_string(),
-            Value::from_array(tok_f16)
+            Value::from_array(tok_embeds)
                 .map_err(|e| Error::Asr(format!("decode embed: {e}")))?
                 .into(),
         ));
@@ -956,17 +954,17 @@ mod tests {
 
     #[test]
     fn lcp_reuse_identical() {
-        let data = vec![1.0f32; 3 * HIDDEN_DIM];
+        let data = vec![half::f16::from_f32(1.0); 3 * HIDDEN_DIM];
         let arr = ArrayD::from_shape_vec(IxDyn(&[1, 3, HIDDEN_DIM]), data.clone()).unwrap();
         assert_eq!(compute_lcp_reuse(&data, 3, &arr, 3), 3);
     }
 
     #[test]
     fn lcp_reuse_partial() {
-        let prev = vec![1.0f32; 3 * HIDDEN_DIM];
+        let prev = vec![half::f16::from_f32(1.0); 3 * HIDDEN_DIM];
         let mut curr_data = prev.clone();
         // Change last row.
-        curr_data[2 * HIDDEN_DIM] = 99.0;
+        curr_data[2 * HIDDEN_DIM] = half::f16::from_f32(99.0);
         let arr = ArrayD::from_shape_vec(IxDyn(&[1, 3, HIDDEN_DIM]), curr_data).unwrap();
         assert_eq!(compute_lcp_reuse(&prev, 3, &arr, 3), 2);
     }
@@ -993,7 +991,7 @@ mod tests {
     #[test]
     fn enc_cache_cleared_on_reset() {
         let mut state = OrtStreamState::new();
-        let dummy = ArrayD::<f32>::zeros(IxDyn(&[1, 10, HIDDEN_DIM]));
+        let dummy = ArrayD::from_elem(IxDyn(&[1, 10, HIDDEN_DIM]), half::f16::ZERO);
         state.enc_cache = Some(dummy);
         state.enc_cache_audio_end = 8000;
         state.reset();

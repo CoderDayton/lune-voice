@@ -1,17 +1,16 @@
 //! ORT-based LLM backend for text post-processing.
 //!
-//! ORT-based local LLM backend using ONNX Runtime inference.
-//! Uses `decoder_model_merged.onnx` (Qwen3-0.6B exported via optimum-cli) which
-//! provides `input_ids` + `past_key_values` → `logits` + `present_key_values`.
+//! Uses two ONNX sessions exported via `torch.onnx.export`:
+//!   - `qwen3-0.6b-embed-tokens.onnx`: input_ids → embeds (FP16)
+//!   - `qwen3-0.6b-decoder.onnx`: inputs_embeds + KV cache → logits + KV cache (FP16)
 //!
-//! Advantages: shared GPU memory arena with ASR sessions,
-//! no C++ FFI compilation, unified ORT optimization pipeline.
+//! All I/O tensors (embeds, logits, KV cache) are native FP16.
 
 use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use ndarray::{Array2, Array4};
+use ndarray::{Array2, ArrayD, IxDyn};
 use ort::session::Session;
 use ort::session::builder::GraphOptimizationLevel;
 use ort::value::{DynValue, Value};
@@ -27,7 +26,7 @@ use crate::sampling;
 /// Configuration for the ORT LLM backend.
 #[derive(Debug, Clone)]
 pub struct OrtLlmConfig {
-    /// Directory containing `decoder_model_merged.onnx` and `tokenizer.json`.
+    /// Directory containing decoder + embed-tokens ONNX files and `tokenizer.json`.
     pub model_dir: PathBuf,
     /// Use GPU acceleration (requires global `ort::init()` with CUDA EP).
     pub use_gpu: bool,
@@ -70,7 +69,8 @@ pub struct OrtLlmBackend {
 }
 
 struct OrtLlmInner {
-    session: Session,
+    embed_session: Session,
+    decoder_session: Session,
     tokenizer: Tokenizer,
 }
 
@@ -78,13 +78,14 @@ struct OrtLlmInner {
 unsafe impl Send for OrtLlmInner {}
 
 impl OrtLlmBackend {
-    /// Load an ONNX model and tokenizer from `model_dir`.
+    /// Load ONNX models and tokenizer from `model_dir`.
     pub fn new(config: OrtLlmConfig) -> Result<Self> {
         if !config.model_dir.exists() {
             return Err(Error::ModelNotFound(config.model_dir.clone()));
         }
 
-        let model_path = find_onnx_model(&config.model_dir)?;
+        let embed_path = find_model(&config.model_dir, &EMBED_CANDIDATES)?;
+        let decoder_path = find_model(&config.model_dir, &DECODER_CANDIDATES)?;
         let tokenizer_path = config.model_dir.join("tokenizer.json");
 
         if !tokenizer_path.exists() {
@@ -94,117 +95,100 @@ impl OrtLlmBackend {
             )));
         }
 
-        let mut session = build_llm_session(&model_path, config.use_gpu)?;
+        let mut embed_session = build_session(&embed_path, config.use_gpu)?;
+        let mut decoder_session = build_session(&decoder_path, config.use_gpu)?;
 
         let tokenizer = Tokenizer::from_file(&tokenizer_path)
             .map_err(|e| Error::Llm(format!("tokenizer: {e}")))?;
 
-        // Warmup: run a 1-token dummy inference to prime CUDA kernels.
-        warmup_llm(&mut session)?;
+        warmup_decoder(&mut decoder_session, &mut embed_session)?;
 
         tracing::info!(
-            model = %model_path.display(),
+            embed = %embed_path.display(),
+            decoder = %decoder_path.display(),
             n_ctx = config.n_ctx,
             gpu = config.use_gpu,
             "initialized ORT LLM backend"
         );
 
         Ok(Self {
-            inner: Arc::new(Mutex::new(OrtLlmInner { session, tokenizer })),
+            inner: Arc::new(Mutex::new(OrtLlmInner {
+                embed_session,
+                decoder_session,
+                tokenizer,
+            })),
             config: Arc::new(config),
         })
     }
 }
 
-/// Find the decoder ONNX model in the model directory.
+const EMBED_CANDIDATES: [&str; 2] = ["qwen3-0.6b-embed-tokens.onnx", "embed_tokens.onnx"];
+
+const DECODER_CANDIDATES: [&str; 4] = [
+    "qwen3-0.6b-decoder.onnx",
+    "qwen3-0.6b.onnx",
+    "decoder_model_merged.onnx",
+    "model.onnx",
+];
+
+/// Find an ONNX model matching one of the candidate names.
 #[cold]
-fn find_onnx_model(dir: &PathBuf) -> Result<PathBuf> {
-    let candidates = [
-        "qwen3-0.6b.onnx",
-        "decoder_model_merged.onnx",
-        "model.onnx",
-        "decoder_model.onnx",
-    ];
-    for c in &candidates {
+fn find_model(dir: &PathBuf, candidates: &[&str]) -> Result<PathBuf> {
+    for c in candidates {
         let p = dir.join(c);
         if p.exists() {
             return Ok(p);
         }
     }
-    // Fallback: find any .onnx file
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let p = entry.path();
-            if let Some(name) = p.file_name().and_then(|s| s.to_str()) {
-                if name.ends_with(".onnx") {
-                    return Ok(p);
-                }
-            }
-        }
-    }
     Err(Error::Llm(format!(
-        "no ONNX model found in {}",
-        dir.display()
+        "no ONNX model found in {} (tried: {})",
+        dir.display(),
+        candidates.join(", ")
     )))
 }
 
-/// Build an ORT session for the LLM decoder model.
-fn build_llm_session(path: &std::path::Path, use_gpu: bool) -> Result<Session> {
-    let builder = Session::builder()
+/// Build an ORT session. EPs inherited from global `ort::init()`.
+fn build_session(path: &std::path::Path, _use_gpu: bool) -> Result<Session> {
+    Session::builder()
         .map_err(|e| Error::Llm(format!("session builder: {e}")))?
         .with_optimization_level(GraphOptimizationLevel::Level3)
         .map_err(|e| Error::Llm(format!("optimization level: {e}")))?
         .with_intra_threads(4)
-        .map_err(|e| Error::Llm(format!("intra threads: {e}")))?;
-
-    let builder = if use_gpu {
-        #[cfg(feature = "cuda")]
-        {
-            builder
-                .with_execution_providers([
-                    ort::ep::CUDA::default().build(),
-                    ort::ep::CPU::default().build().error_on_failure(),
-                ])
-                .map_err(|e| Error::Llm(format!("CUDA provider: {e}")))?
-        }
-        #[cfg(not(feature = "cuda"))]
-        {
-            tracing::warn!("use_gpu=true but cuda feature not enabled, falling back to CPU");
-            builder
-        }
-    } else {
-        builder
-    };
-
-    builder
+        .map_err(|e| Error::Llm(format!("intra threads: {e}")))?
         .commit_from_file(path)
         .map_err(|e| Error::Llm(format!("load model {}: {e}", path.display())))
 }
 
-/// Number of KV cache layers for Qwen3-0.6B (28 layers × 2 for key+value).
 const NUM_KV_LAYERS: usize = 28;
-/// Number of KV attention heads.
 const NUM_KV_HEADS: usize = 8;
-/// Dimension per KV head.
 const HEAD_DIM: usize = 128;
-
-/// Run a minimal 1-token prefill to prime CUDA JIT compilation and memory pools.
-#[cold]
-fn warmup_llm(session: &mut Session) -> Result<()> {
-    let input_ids = Array2::from_shape_vec((1, 1), vec![0i64]).unwrap();
-    let attention_mask = Array2::<i64>::ones((1, 1));
-    let position_ids = Array2::from_shape_vec((1, 1), vec![0i64]).unwrap();
-    let empty_kv = Array4::<f32>::zeros((1, NUM_KV_HEADS, 0, HEAD_DIM));
-
-    let mut inputs: Vec<(String, DynValue)> = Vec::with_capacity(3 + NUM_KV_LAYERS * 2);
-    inputs.push((
+/// Embed input_ids via the embed_tokens session.
+fn embed_tokens(session: &mut Session, token_ids: &[i64]) -> Result<DynValue> {
+    let ids = Array2::from_shape_vec((1, token_ids.len()), token_ids.to_vec())
+        .map_err(|e| Error::Llm(format!("embed input_ids: {e}")))?;
+    let inputs: Vec<(String, DynValue)> = vec![(
         "input_ids".into(),
-        Value::from_array(input_ids).unwrap().into(),
-    ));
-    inputs.push((
-        "attention_mask".into(),
-        Value::from_array(attention_mask).unwrap().into(),
-    ));
+        Value::from_array(ids)
+            .map_err(|e| Error::Llm(format!("embed value: {e}")))?
+            .into(),
+    )];
+    let mut outputs = session
+        .run(inputs)
+        .map_err(|e| Error::Llm(format!("embed_tokens: {e}")))?;
+    outputs
+        .remove("embeds")
+        .ok_or_else(|| Error::Llm("embed_tokens: missing 'embeds' output".into()))
+}
+
+/// Run a minimal warmup through both sessions.
+#[cold]
+fn warmup_decoder(decoder: &mut Session, embed: &mut Session) -> Result<()> {
+    let embeds = embed_tokens(embed, &[0i64])?;
+    let position_ids = Array2::from_shape_vec((1, 1), vec![0i64]).unwrap();
+    let empty_kv = ArrayD::from_elem(IxDyn(&[1, NUM_KV_HEADS, 0, HEAD_DIM]), half::f16::ZERO);
+
+    let mut inputs: Vec<(String, DynValue)> = Vec::with_capacity(2 + NUM_KV_LAYERS * 2);
+    inputs.push(("inputs_embeds".into(), embeds));
     inputs.push((
         "position_ids".into(),
         Value::from_array(position_ids).unwrap().into(),
@@ -218,7 +202,7 @@ fn warmup_llm(session: &mut Session) -> Result<()> {
         }
     }
 
-    let _outputs = session
+    let _outputs = decoder
         .run(inputs)
         .map_err(|e| Error::Llm(format!("warmup: {e}")))?;
 
@@ -227,8 +211,6 @@ fn warmup_llm(session: &mut Session) -> Result<()> {
 }
 
 /// Run inference synchronously, returning generated text.
-///
-/// Free function for `spawn_blocking` compatibility.
 fn generate_sync(
     inner: &Mutex<OrtLlmInner>,
     config: &OrtLlmConfig,
@@ -237,7 +219,8 @@ fn generate_sync(
 ) -> Result<String> {
     let mut guard = inner.lock().map_err(|e| Error::Llm(format!("lock: {e}")))?;
     let OrtLlmInner {
-        ref mut session,
+        ref mut embed_session,
+        ref mut decoder_session,
         ref tokenizer,
     } = *guard;
 
@@ -270,75 +253,53 @@ fn generate_sync(
     }
 
     // ── Prefill ──────────────────────────────────────────────────────────
-    // First forward pass: full prompt, no KV cache.
 
-    let input_ids = Array2::from_shape_vec((1, prompt_len), token_ids.clone())
-        .map_err(|e| Error::Llm(format!("input_ids array: {e}")))?;
+    let embeds = embed_tokens(embed_session, &token_ids)?;
 
-    let attention_mask = Array2::<i64>::ones((1, prompt_len));
-
-    // Empty KV cache tensors for prefill (seq_len=0).
-    let empty_kv = Array4::<f32>::zeros((1, NUM_KV_HEADS, 0, HEAD_DIM));
-
-    let mut kv_inputs: Vec<DynValue> = Vec::with_capacity(NUM_KV_LAYERS * 2);
-    for _ in 0..NUM_KV_LAYERS * 2 {
-        kv_inputs.push(
-            Value::from_array(empty_kv.clone())
-                .map_err(|e| Error::Llm(format!("kv tensor: {e}")))?
-                .into(),
-        );
-    }
-
-    // Position IDs for prefill: [0, 1, 2, ..., prompt_len-1].
     let position_ids = Array2::from_shape_vec((1, prompt_len), (0..prompt_len as i64).collect())
-        .map_err(|e| Error::Llm(format!("position_ids array: {e}")))?;
+        .map_err(|e| Error::Llm(format!("position_ids: {e}")))?;
 
-    // Build input map for prefill.
-    let mut inputs: Vec<(String, DynValue)> = Vec::with_capacity(3 + NUM_KV_LAYERS * 2);
-    inputs.push((
-        "input_ids".into(),
-        Value::from_array(input_ids)
-            .map_err(|e| Error::Llm(format!("input_ids value: {e}")))?
-            .into(),
-    ));
-    inputs.push((
-        "attention_mask".into(),
-        Value::from_array(attention_mask)
-            .map_err(|e| Error::Llm(format!("attention_mask value: {e}")))?
-            .into(),
-    ));
+    let empty_kv = ArrayD::from_elem(IxDyn(&[1, NUM_KV_HEADS, 0, HEAD_DIM]), half::f16::ZERO);
+
+    let mut inputs: Vec<(String, DynValue)> = Vec::with_capacity(2 + NUM_KV_LAYERS * 2);
+    inputs.push(("inputs_embeds".into(), embeds));
     inputs.push((
         "position_ids".into(),
         Value::from_array(position_ids)
-            .map_err(|e| Error::Llm(format!("position_ids value: {e}")))?
+            .map_err(|e| Error::Llm(format!("position_ids: {e}")))?
             .into(),
     ));
-
-    for (i, kv) in kv_inputs.into_iter().enumerate() {
-        let layer = i / 2;
-        let kind = if i % 2 == 0 { "key" } else { "value" };
-        inputs.push((format!("past_key_values.{layer}.{kind}"), kv));
+    for layer in 0..NUM_KV_LAYERS {
+        for kind in &["key", "value"] {
+            inputs.push((
+                format!("past_key_values.{layer}.{kind}"),
+                Value::from_array(empty_kv.clone())
+                    .map_err(|e| Error::Llm(format!("kv tensor: {e}")))?
+                    .into(),
+            ));
+        }
     }
 
     let (last_logits, mut kv_cache) = {
-        let mut outputs = session
+        let mut outputs = decoder_session
             .run(inputs)
             .map_err(|e| Error::Llm(format!("prefill: {e}")))?;
 
-        // Extract logits from prefill — last position only.
-        let logits_array: ndarray::ArrayViewD<f32> = outputs[0]
+        let logits_array: ndarray::ArrayViewD<half::f16> = outputs[0]
             .try_extract_array()
             .map_err(|e| Error::Llm(format!("extract logits: {e}")))?;
-        let logits_shape = logits_array.shape();
-        let seq_len = logits_shape[1];
+        let seq_len = logits_array.shape()[1];
 
-        let last_logits: Vec<f32> = logits_array.slice(ndarray::s![0, seq_len - 1, ..]).to_vec();
+        let last_logits: Vec<f32> = logits_array
+            .slice(ndarray::s![0, seq_len - 1, ..])
+            .iter()
+            .map(|v| v.to_f32())
+            .collect();
 
-        // Take ownership of KV cache outputs — zero-copy GPU passthrough.
         let mut kv_cache: Vec<DynValue> = Vec::with_capacity(NUM_KV_LAYERS * 2);
         for layer in 0..NUM_KV_LAYERS {
             for kind in &["key", "value"] {
-                let name = format!("present.{layer}.{kind}");
+                let name = format!("present_key_values.{layer}.{kind}");
                 kv_cache.push(
                     outputs
                         .remove(&name)
@@ -358,13 +319,13 @@ fn generate_sync(
     let mut recent_tokens: VecDeque<i64> = VecDeque::with_capacity(config.repeat_last_n as usize);
     let max_gen = config.max_output_tokens as usize;
     let mut current_logits = last_logits;
+
     let eos_id = tokenizer
         .token_to_id("<|im_end|>")
         .or_else(|| tokenizer.token_to_id("<|endoftext|>"))
-        .unwrap_or(151643) as i64; // Qwen3 default EOS
+        .unwrap_or(151643) as i64;
 
     for step in 0..max_gen {
-        // Sample next token.
         let next_token = sampling::sample_token(
             &current_logits,
             config.temperature,
@@ -374,7 +335,6 @@ fn generate_sync(
             &recent_tokens,
         );
 
-        // Track for repetition penalty.
         recent_tokens.push_back(next_token);
         if recent_tokens.len() > config.repeat_last_n as usize {
             recent_tokens.pop_front();
@@ -384,7 +344,6 @@ fn generate_sync(
             break;
         }
 
-        // Decode token to text.
         let piece = tokenizer
             .decode(&[next_token as u32], false)
             .map_err(|e| Error::Llm(format!("decode token: {e}")))?;
@@ -406,31 +365,14 @@ fn generate_sync(
 
         // ── Single-token decode step ─────────────────────────────────────
 
-        let single_id = Array2::from_shape_vec((1, 1), vec![next_token])
-            .map_err(|e| Error::Llm(format!("next id array: {e}")))?;
+        let step_embeds = embed_tokens(embed_session, &[next_token])?;
 
-        // Attention mask grows by 1 each step: prompt_len + step + 1
-        let total_seq = prompt_len + step + 1;
-        let mask = Array2::<i64>::ones((1, total_seq));
-
-        // Position ID for this decode step: prompt_len + step.
         let step_pos = Array2::from_shape_vec((1, 1), vec![(prompt_len + step) as i64])
             .map_err(|e| Error::Llm(format!("step position_ids: {e}")))?;
 
-        let mut step_inputs: Vec<(String, DynValue)> = Vec::with_capacity(3 + NUM_KV_LAYERS * 2);
+        let mut step_inputs: Vec<(String, DynValue)> = Vec::with_capacity(2 + NUM_KV_LAYERS * 2);
 
-        step_inputs.push((
-            "input_ids".into(),
-            Value::from_array(single_id)
-                .map_err(|e| Error::Llm(format!("step input_ids: {e}")))?
-                .into(),
-        ));
-        step_inputs.push((
-            "attention_mask".into(),
-            Value::from_array(mask)
-                .map_err(|e| Error::Llm(format!("step attention_mask: {e}")))?
-                .into(),
-        ));
+        step_inputs.push(("inputs_embeds".into(), step_embeds));
         step_inputs.push((
             "position_ids".into(),
             Value::from_array(step_pos)
@@ -444,22 +386,24 @@ fn generate_sync(
             step_inputs.push((format!("past_key_values.{layer}.{kind}"), kv));
         }
 
-        let mut step_outputs = session
+        let mut step_outputs = decoder_session
             .run(step_inputs)
             .map_err(|e| Error::Llm(format!("decode step {step}: {e}")))?;
 
-        // Extract logits (single position).
-        let step_logits: ndarray::ArrayViewD<f32> = step_outputs[0]
+        let step_logits: ndarray::ArrayViewD<half::f16> = step_outputs[0]
             .try_extract_array()
             .map_err(|e| Error::Llm(format!("step logits: {e}")))?;
 
-        current_logits = step_logits.slice(ndarray::s![0, 0, ..]).to_vec();
+        current_logits = step_logits
+            .slice(ndarray::s![0, 0, ..])
+            .iter()
+            .map(|v| v.to_f32())
+            .collect();
 
-        // Take ownership of KV outputs — zero-copy GPU passthrough.
         kv_cache = Vec::with_capacity(NUM_KV_LAYERS * 2);
         for layer in 0..NUM_KV_LAYERS {
             for kind in &["key", "value"] {
-                let name = format!("present.{layer}.{kind}");
+                let name = format!("present_key_values.{layer}.{kind}");
                 kv_cache.push(
                     step_outputs
                         .remove(&name)
@@ -469,12 +413,10 @@ fn generate_sync(
         }
     }
 
-    // Trim partial stop sequences on max-token exit.
     if output.len() >= capacity.saturating_sub(4) {
         trim_partial_stop_sequences(&mut output);
     }
 
-    // Final flush for streaming.
     if let Some(ref tx) = chunk_tx {
         let cleaned = streaming.flush(&output, tx, |s| prompt::strip_thinking(s));
         return Ok(cleaned);

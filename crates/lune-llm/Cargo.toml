@@ -20,3 +20,5 @@ tokenizers = { workspace = true, optional = true }
 async-openai.workspace = true
 serde_json.workspace = true
 memchr = "2.8.0"
+half = "2"
+getrandom = "0.3"

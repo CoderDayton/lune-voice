@@ -25,6 +25,25 @@ fn use_gpu() -> bool {
     DevicePolicy::Auto.use_gpu(cfg!(feature = "cuda"))
 }
 
+static ORT_INIT: OnceLock<()> = OnceLock::new();
+
+fn ensure_ort_init() {
+    ORT_INIT.get_or_init(|| {
+        #[cfg(feature = "cuda")]
+        {
+            if ort::init()
+                .with_execution_providers([ort::ep::CUDA::default().build()])
+                .commit()
+            {
+                eprintln!("[setup] ORT initialized with CUDA EP");
+                return;
+            }
+            eprintln!("[setup] CUDA init failed, falling back to CPU");
+        }
+        let _ = ort::init().commit();
+    });
+}
+
 static ASR: OnceLock<Option<Arc<OrtQwenAsrBackend>>> = OnceLock::new();
 static LLM: OnceLock<Option<Arc<OrtLlmBackend>>> = OnceLock::new();
 
@@ -38,6 +57,7 @@ fn workspace_root() -> PathBuf {
 }
 
 fn get_asr() -> Option<&'static Arc<OrtQwenAsrBackend>> {
+    ensure_ort_init();
     ASR.get_or_init(|| {
         let dir = workspace_root().join("models/qwen3-asr-0.6b-onnx");
         if !dir.exists() {
@@ -61,6 +81,7 @@ fn get_asr() -> Option<&'static Arc<OrtQwenAsrBackend>> {
 }
 
 fn get_llm() -> Option<&'static Arc<OrtLlmBackend>> {
+    ensure_ort_init();
     LLM.get_or_init(|| {
         let dir = workspace_root().join("models/qwen3-0.6b-onnx");
         if !dir.exists() {

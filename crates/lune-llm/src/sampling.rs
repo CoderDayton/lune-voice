@@ -122,19 +122,18 @@ fn argmax(items: &[(usize, f32)]) -> i64 {
 
 /// Fast, non-cryptographic random f32 in [0, 1) for sampling.
 ///
-/// Uses a thread-local xorshift64 seeded from system time.
+/// Uses a thread-local xorshift64 seeded from OS entropy via `getrandom`.
 /// Not suitable for security — only for token sampling jitter.
 fn simple_random_f32() -> f32 {
     use std::cell::Cell;
 
     thread_local! {
         static STATE: Cell<u64> = Cell::new({
-            // Seed from current time; fallback to a fixed seed.
-            let t = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map_or(0xDEAD_BEEF_CAFE_BABEu64, |d| d.as_nanos() as u64);
+            let mut buf = [0u8; 8];
+            getrandom::fill(&mut buf).expect("getrandom seed");
+            let seed = u64::from_le_bytes(buf);
             // Ensure non-zero state for xorshift.
-            if t == 0 { 1 } else { t }
+            if seed == 0 { 1 } else { seed }
         });
     }
 
