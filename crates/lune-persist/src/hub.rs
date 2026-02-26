@@ -65,9 +65,9 @@ impl ModelSpec {
         Self::Directory {
             repo_id: "lune-voice/qwen3-asr-0.6b-onnx".into(),
             required_files: vec![
-                "encoder.onnx".into(),
-                "decoder_merged.onnx".into(),
-                "embed_tokens.onnx".into(),
+                "qwen3-asr-encoder.onnx".into(),
+                "qwen3-asr-decoder.onnx".into(),
+                "qwen3-asr-embed-tokens.onnx".into(),
                 "tokenizer.json".into(),
             ],
             suffix_patterns: vec![".onnx".into()],
@@ -80,7 +80,7 @@ impl ModelSpec {
     pub fn qwen3_llm_onnx() -> Self {
         Self::Directory {
             repo_id: "lune-voice/qwen3-0.6b-onnx".into(),
-            required_files: vec!["decoder_model_merged.onnx".into(), "tokenizer.json".into()],
+            required_files: vec!["qwen3-0.6b.onnx".into(), "tokenizer.json".into()],
             suffix_patterns: vec![".onnx".into()],
             local_name: "qwen3-0.6b-onnx".into(),
         }
@@ -333,7 +333,7 @@ mod tests {
                 ..
             } => {
                 assert_eq!(repo_id, "lune-voice/qwen3-0.6b-onnx");
-                assert!(required_files.contains(&"decoder_model_merged.onnx".to_string()));
+                assert!(required_files.contains(&"qwen3-0.6b.onnx".to_string()));
                 assert!(required_files.contains(&"tokenizer.json".to_string()));
                 assert_eq!(local_name, "qwen3-0.6b-onnx");
             }

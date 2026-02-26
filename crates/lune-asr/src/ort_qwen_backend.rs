@@ -19,7 +19,7 @@ use crate::ort_utils::build_ort_session;
 /// Runtime configuration for the ORT Qwen ASR backend.
 #[derive(Debug, Clone)]
 pub struct OrtQwenAsrConfig {
-    /// Directory containing encoder.onnx, embed_tokens.onnx, decoder_merged.onnx, tokenizer.json.
+    /// Directory containing qwen3-asr-encoder.onnx, qwen3-asr-embed-tokens.onnx, qwen3-asr-decoder.onnx, tokenizer.json.
     pub model_dir: PathBuf,
     /// Whether to use GPU (CUDA EP registered globally via init_ort_runtime).
     pub use_gpu: bool,
@@ -69,9 +69,9 @@ impl OrtQwenAsrBackend {
         let use_gpu = config.use_gpu;
         let dir = &config.model_dir;
 
-        let encoder_path = dir.join("encoder.onnx");
-        let embed_path = dir.join("embed_tokens.onnx");
-        let decoder_path = dir.join("decoder_merged.onnx");
+        let encoder_path = dir.join("qwen3-asr-encoder.onnx");
+        let embed_path = dir.join("qwen3-asr-embed-tokens.onnx");
+        let decoder_path = dir.join("qwen3-asr-decoder.onnx");
         let tokenizer_path = dir.join("tokenizer.json");
 
         let encoder = build_ort_session(&encoder_path, use_gpu)?;

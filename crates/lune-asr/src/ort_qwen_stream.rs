@@ -381,7 +381,7 @@ pub(crate) fn stream_push_audio(
         let (mut current_kv, last_logits) = if delta_len > 0 {
             let delta_embeds = input_embeds.slice(s![.., delta_start..prefill_len, ..]);
             let delta_arr = delta_embeds.to_owned().into_dyn();
-            decoder_prefill(decoder, delta_arr, kv_cache)?
+            decoder_prefill(decoder, delta_arr, kv_cache, reused)?
         } else {
             // Full reuse — no prefill needed. Extract logits from cache isn't
             // possible, so we do a minimal single-token re-prefill of the last token.
@@ -391,7 +391,12 @@ pub(crate) fn stream_push_audio(
             } else {
                 empty_kv_cache()
             };
-            decoder_prefill(decoder, last_embed.to_owned().into_dyn(), kv_trunc)?
+            decoder_prefill(
+                decoder,
+                last_embed.to_owned().into_dyn(),
+                kv_trunc,
+                reused.saturating_sub(1),
+            )?
         };
 
         // Save prefill embeddings for next chunk's LCP comparison.
@@ -700,13 +705,32 @@ fn decoder_prefill(
     decoder: &mut Session,
     input_embeds: ArrayD<f32>,
     kv_cache: Vec<DynValue>,
+    past_seq_len: usize,
 ) -> Result<(Vec<DynValue>, Vec<f32>)> {
-    let mut inputs: Vec<(String, DynValue)> = Vec::with_capacity(2 + NUM_DECODER_LAYERS * 2);
+    let seq_len = input_embeds.shape()[1];
+    let mut inputs: Vec<(String, DynValue)> = Vec::with_capacity(3 + NUM_DECODER_LAYERS * 2);
 
     inputs.push((
         "inputs_embeds".to_string(),
         Value::from_array(input_embeds)
             .map_err(|e| Error::Asr(format!("prefill embeds: {e}")))?
+            .into(),
+    ));
+
+    // mRoPE position_ids: [3, 1, seq_len] — same sequential positions for all 3 dims.
+    let positions: Vec<i64> = (past_seq_len..past_seq_len + seq_len)
+        .map(|p| p as i64)
+        .collect();
+    let mut pos_data = Vec::with_capacity(3 * seq_len);
+    for _ in 0..3 {
+        pos_data.extend_from_slice(&positions);
+    }
+    let pos_ids = ndarray::Array3::<i64>::from_shape_vec((3, 1, seq_len), pos_data)
+        .map_err(|e| Error::Asr(format!("position_ids: {e}")))?;
+    inputs.push((
+        "position_ids".to_string(),
+        Value::from_array(pos_ids)
+            .map_err(|e| Error::Asr(format!("position_ids value: {e}")))?
             .into(),
     ));
 
@@ -778,13 +802,35 @@ fn autoregressive_decode(
         // Get embedding for next token.
         let tok_embeds = token_embeddings(embed_tokens, &[next_token])?;
 
+        // Determine current position from existing KV cache length.
+        let cur_pos = if kv_cache.is_empty() {
+            0usize
+        } else {
+            let (shape, _) = kv_cache[0]
+                .try_extract_tensor::<f32>()
+                .map_err(|e| Error::Asr(format!("kv pos extract: {e}")))?;
+            shape.as_ref()[2] as usize
+        };
+
         // Single-token decode step.
-        let mut inputs: Vec<(String, DynValue)> = Vec::with_capacity(2 + NUM_DECODER_LAYERS * 2);
+        let mut inputs: Vec<(String, DynValue)> = Vec::with_capacity(3 + NUM_DECODER_LAYERS * 2);
 
         inputs.push((
             "inputs_embeds".to_string(),
             Value::from_array(tok_embeds)
                 .map_err(|e| Error::Asr(format!("decode embed: {e}")))?
+                .into(),
+        ));
+
+        // mRoPE position_ids for single token: [3, 1, 1]
+        let pos_val = cur_pos as i64;
+        let step_pos =
+            ndarray::Array3::<i64>::from_shape_vec((3, 1, 1), vec![pos_val, pos_val, pos_val])
+                .map_err(|e| Error::Asr(format!("step position_ids: {e}")))?;
+        inputs.push((
+            "position_ids".to_string(),
+            Value::from_array(step_pos)
+                .map_err(|e| Error::Asr(format!("step position_ids value: {e}")))?
                 .into(),
         ));
 

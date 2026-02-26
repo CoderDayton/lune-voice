@@ -117,6 +117,7 @@ impl OrtLlmBackend {
 #[cold]
 fn find_onnx_model(dir: &PathBuf) -> Result<PathBuf> {
     let candidates = [
+        "qwen3-0.6b.onnx",
         "decoder_model_merged.onnx",
         "model.onnx",
         "decoder_model.onnx",
@@ -247,8 +248,12 @@ fn generate_sync(
         );
     }
 
+    // Position IDs for prefill: [0, 1, 2, ..., prompt_len-1].
+    let position_ids = Array2::from_shape_vec((1, prompt_len), (0..prompt_len as i64).collect())
+        .map_err(|e| Error::Llm(format!("position_ids array: {e}")))?;
+
     // Build input map for prefill.
-    let mut inputs: Vec<(String, DynValue)> = Vec::with_capacity(2 + NUM_KV_LAYERS * 2);
+    let mut inputs: Vec<(String, DynValue)> = Vec::with_capacity(3 + NUM_KV_LAYERS * 2);
     inputs.push((
         "input_ids".into(),
         Value::from_array(input_ids)
@@ -259,6 +264,12 @@ fn generate_sync(
         "attention_mask".into(),
         Value::from_array(attention_mask)
             .map_err(|e| Error::Llm(format!("attention_mask value: {e}")))?
+            .into(),
+    ));
+    inputs.push((
+        "position_ids".into(),
+        Value::from_array(position_ids)
+            .map_err(|e| Error::Llm(format!("position_ids value: {e}")))?
             .into(),
     ));
 
@@ -366,7 +377,11 @@ fn generate_sync(
         let total_seq = prompt_len + step + 1;
         let mask = Array2::<i64>::ones((1, total_seq));
 
-        let mut step_inputs: Vec<(String, DynValue)> = Vec::with_capacity(2 + NUM_KV_LAYERS * 2);
+        // Position ID for this decode step: prompt_len + step.
+        let step_pos = Array2::from_shape_vec((1, 1), vec![(prompt_len + step) as i64])
+            .map_err(|e| Error::Llm(format!("step position_ids: {e}")))?;
+
+        let mut step_inputs: Vec<(String, DynValue)> = Vec::with_capacity(3 + NUM_KV_LAYERS * 2);
 
         step_inputs.push((
             "input_ids".into(),
@@ -378,6 +393,12 @@ fn generate_sync(
             "attention_mask".into(),
             Value::from_array(mask)
                 .map_err(|e| Error::Llm(format!("step attention_mask: {e}")))?
+                .into(),
+        ));
+        step_inputs.push((
+            "position_ids".into(),
+            Value::from_array(step_pos)
+                .map_err(|e| Error::Llm(format!("step position_ids: {e}")))?
                 .into(),
         ));
 
