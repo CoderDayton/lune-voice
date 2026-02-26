@@ -236,6 +236,7 @@ async fn run_pipeline(
 
     let config = SessionManagerConfig {
         asr_backend_kind,
+        confidence_threshold: snap.confidence_threshold,
         ..Default::default()
     };
 

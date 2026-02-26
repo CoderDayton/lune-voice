@@ -44,6 +44,8 @@ const DUPLICATE_FLUSH_WINDOW: Duration = Duration::from_millis(1200);
 pub struct SessionManagerConfig {
     pub asr_config: AsrSessionConfig,
     pub asr_backend_kind: AsrBackendKind,
+    /// Confidence threshold for LLM bypass. `None` = always send to LLM.
+    pub confidence_threshold: Option<f32>,
 }
 
 impl Default for SessionManagerConfig {
@@ -51,6 +53,7 @@ impl Default for SessionManagerConfig {
         Self {
             asr_config: AsrSessionConfig::default(),
             asr_backend_kind: AsrBackendKind::ParakeetTdt,
+            confidence_threshold: Some(0.95),
         }
     }
 }
@@ -419,16 +422,44 @@ async fn run_session<A: AsrBackend + 'static>(
 
                         if seg.is_final {
                             if !remaining.is_empty() {
-                                let flushed = flush_to_llm_if_new(
-                                    remaining,
-                                    &dict,
-                                    &style_preset,
-                                    &llm_tx,
-                                    &mut last_flushed_text,
-                                    &mut last_flush_at,
-                                )
-                                .await;
-                                sent_to_llm |= flushed;
+                                // Confidence gating: high-confidence segments
+                                // bypass LLM to avoid overcorrection.
+                                let gate_pass = config
+                                    .confidence_threshold
+                                    .is_some_and(|t| seg.is_confident(t));
+
+                                if gate_pass {
+                                    let applied = {
+                                        let guard = dict.lock().await;
+                                        guard.apply(remaining)
+                                    };
+                                    debug!(
+                                        confidence = ?seg.confidence,
+                                        text = %applied,
+                                        "confidence gate: bypassing LLM"
+                                    );
+                                    eprintln!(
+                                        "\x1b[36m[GATE]\x1b[0m conf={:.3} bypass LLM: {applied}",
+                                        seg.confidence.unwrap_or(1.0)
+                                    );
+                                    commit_final_text(
+                                        &mut output_ctrl,
+                                        &mut session_text,
+                                        &applied,
+                                    )
+                                    .await;
+                                } else {
+                                    let flushed = flush_to_llm_if_new(
+                                        remaining,
+                                        &dict,
+                                        &style_preset,
+                                        &llm_tx,
+                                        &mut last_flushed_text,
+                                        &mut last_flush_at,
+                                    )
+                                    .await;
+                                    sent_to_llm |= flushed;
+                                }
                             }
                             pending_nonfinal.clear();
                         } else {
@@ -508,16 +539,28 @@ async fn run_session<A: AsrBackend + 'static>(
 
             if !text.is_empty() {
                 if seg.is_final {
-                    let flushed = flush_to_llm_if_new(
-                        text,
-                        &dict,
-                        &style_preset,
-                        &llm_tx,
-                        &mut last_flushed_text,
-                        &mut last_flush_at,
-                    )
-                    .await;
-                    sent_to_llm |= flushed;
+                    let gate_pass = config
+                        .confidence_threshold
+                        .is_some_and(|t| seg.is_confident(t));
+
+                    if gate_pass {
+                        let applied = {
+                            let guard = dict.lock().await;
+                            guard.apply(text)
+                        };
+                        commit_final_text(&mut output_ctrl, &mut session_text, &applied).await;
+                    } else {
+                        let flushed = flush_to_llm_if_new(
+                            text,
+                            &dict,
+                            &style_preset,
+                            &llm_tx,
+                            &mut last_flushed_text,
+                            &mut last_flush_at,
+                        )
+                        .await;
+                        sent_to_llm |= flushed;
+                    }
                 } else {
                     pending_nonfinal.clear();
                     pending_nonfinal.push_str(text);

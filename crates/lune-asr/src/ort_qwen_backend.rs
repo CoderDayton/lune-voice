@@ -33,6 +33,11 @@ pub struct OrtQwenAsrConfig {
     pub stream_max_new_tokens: i32,
     /// Whether to condition each chunk on previously committed text.
     pub past_text_conditioning: bool,
+    /// Maximum audio window (seconds) passed to the encoder per chunk.
+    /// Shorter windows keep encoder features short, which matters because the
+    /// model was fine-tuned on short clips — long encoder sequences push it
+    /// out-of-distribution and cause second-half hallucinations.
+    pub max_encoder_sec: f32,
 }
 
 impl Default for OrtQwenAsrConfig {
@@ -40,11 +45,18 @@ impl Default for OrtQwenAsrConfig {
         Self {
             model_dir: PathBuf::new(),
             use_gpu: false,
-            stream_chunk_sec: 0.5,
-            stream_rollback: 5,
+            // 1.0s chunks give the decoder more audio context per step, reducing
+            // early-EOS probability on unfamiliar phrases (e.g. "AN OBJECT OF WORSHIP").
+            stream_chunk_sec: 1.0,
+            // rollback=3: allows 4-token decodes to advance stable cursor.
+            // rollback=5 caused stalls whenever the decoder generated exactly 5 tokens.
+            stream_rollback: 3,
             stream_unfixed_chunks: 2,
-            stream_max_new_tokens: 32,
+            stream_max_new_tokens: 48,
             past_text_conditioning: true,
+            // 8s window: model is trained on short clips; longer windows cause
+            // second-half hallucinations despite correct first-half transcription.
+            max_encoder_sec: 8.0,
         }
     }
 }
@@ -245,12 +257,18 @@ impl AsrBackend for OrtQwenAsrBackend {
 
         let chunk_samples = (self.config.stream_chunk_sec * config.sample_rate as f32) as usize;
 
+        let max_encoder_samples = if self.config.max_encoder_sec > 0.0 {
+            Some((self.config.max_encoder_sec * config.sample_rate as f32) as usize)
+        } else {
+            None
+        };
         let stream_config = StreamConfig {
             chunk_samples,
             rollback: self.config.stream_rollback.max(0) as usize,
             unfixed_chunks: self.config.stream_unfixed_chunks,
             max_new_tokens: self.config.stream_max_new_tokens.max(1) as usize,
             past_text_conditioning: self.config.past_text_conditioning,
+            max_encoder_samples,
         };
 
         Ok(OrtQwenAsrSession {
@@ -306,6 +324,7 @@ impl AsrBackend for OrtQwenAsrBackend {
         } = *state;
 
         let start_samples = stream.audio_cursor();
+        let prev_stable_len = stream.stable_text_tokens.len();
 
         let text = ort_qwen_stream::stream_push_audio(
             &mut encoder,
@@ -318,6 +337,7 @@ impl AsrBackend for OrtQwenAsrBackend {
             false,
         )?;
 
+        let confidence = stream.confidence_since(prev_stable_len);
         let end_samples = stream.audio_cursor();
         let id = state.next_id;
         state.next_id = id.saturating_add(1);
@@ -332,7 +352,7 @@ impl AsrBackend for OrtQwenAsrBackend {
 
         Ok(vec![AsrSegment {
             id,
-            confidence: None,
+            confidence,
             is_final: true,
             start_ms: Some(start_ms),
             end_ms: Some(end_ms),

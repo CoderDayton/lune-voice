@@ -33,3 +33,4 @@ path = "../../benchmarks/mel_throughput.rs"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+hound = "3.5"

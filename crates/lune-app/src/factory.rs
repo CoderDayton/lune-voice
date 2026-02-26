@@ -322,6 +322,7 @@ pub fn build_asr_backend(settings: &UserSettings) -> Result<AsrBackendDispatch> 
             stream_unfixed_chunks,
             stream_max_new_tokens,
             past_text_conditioning,
+            max_encoder_sec,
         } => {
             let backend = OrtQwenAsrBackend::new(OrtQwenAsrConfig {
                 model_dir: model_dir.clone(),
@@ -331,6 +332,7 @@ pub fn build_asr_backend(settings: &UserSettings) -> Result<AsrBackendDispatch> 
                 stream_unfixed_chunks: *stream_unfixed_chunks,
                 stream_max_new_tokens: *stream_max_new_tokens,
                 past_text_conditioning: *past_text_conditioning,
+                max_encoder_sec: *max_encoder_sec,
             })?;
             Ok(AsrBackendDispatch::OrtQwen(backend))
         }

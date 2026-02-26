@@ -24,6 +24,11 @@ pub struct UserSettings {
     pub activation_mode: ActivationMode,
     /// None = session history disabled
     pub session_history_days: Option<u32>,
+    /// ASR confidence threshold for LLM bypass. Segments with confidence
+    /// at or above this value skip LLM post-processing entirely.
+    /// Range 0.0–1.0; `None` disables gating (all segments go to LLM).
+    #[serde(default = "default_confidence_threshold")]
+    pub confidence_threshold: Option<f32>,
 }
 
 impl Default for UserSettings {
@@ -37,6 +42,7 @@ impl Default for UserSettings {
                 stream_unfixed_chunks: default_qwen_stream_unfixed_chunks(),
                 stream_max_new_tokens: default_qwen_stream_max_new_tokens(),
                 past_text_conditioning: default_qwen_past_text_conditioning(),
+                max_encoder_sec: default_qwen_max_encoder_sec(),
             },
             llm_backend: LlmBackendConfig::OrtLocal {
                 model_dir: PathBuf::new(),
@@ -55,6 +61,7 @@ impl Default for UserSettings {
             dictation_mode: DictationMode::default(),
             activation_mode: ActivationMode::default(),
             session_history_days: Some(30),
+            confidence_threshold: default_confidence_threshold(),
         }
     }
 }
@@ -101,6 +108,9 @@ pub enum AsrBackendConfig {
         /// Whether stream chunks are conditioned on prior committed text.
         #[serde(default = "default_qwen_past_text_conditioning")]
         past_text_conditioning: bool,
+        /// Max encoder audio window in seconds (0 = no cap).
+        #[serde(default = "default_qwen_max_encoder_sec")]
+        max_encoder_sec: f32,
     },
     OpenAiCompatible {
         base_url: Url,
@@ -160,11 +170,11 @@ fn default_repeat_last_n() -> i32 {
 }
 
 fn default_qwen_stream_chunk_sec() -> f32 {
-    0.5
+    1.0
 }
 
 fn default_qwen_stream_rollback() -> i32 {
-    5
+    3
 }
 
 fn default_qwen_stream_unfixed_chunks() -> i32 {
@@ -172,11 +182,19 @@ fn default_qwen_stream_unfixed_chunks() -> i32 {
 }
 
 fn default_qwen_stream_max_new_tokens() -> i32 {
-    32
+    48
 }
 
 fn default_qwen_past_text_conditioning() -> bool {
     true
+}
+
+fn default_qwen_max_encoder_sec() -> f32 {
+    8.0
+}
+
+fn default_confidence_threshold() -> Option<f32> {
+    Some(0.95)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

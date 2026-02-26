@@ -106,7 +106,7 @@ fn get_llm() -> Option<&'static Arc<OrtLlmBackend>> {
     .as_ref()
 }
 
-// ── Audio generators ────────────────────────────────────────────────────────
+// ── Audio helpers ───────────────────────────────────────────────────────────
 
 fn silence_16khz(duration_sec: f32) -> Vec<f32> {
     vec![0.0f32; (16_000.0 * duration_sec) as usize]
@@ -122,6 +122,27 @@ fn tone_16khz(freq_hz: f32, duration_sec: f32) -> Vec<f32> {
         .collect()
 }
 
+/// Load 16 kHz mono f32 PCM from a WAV file.
+fn load_wav_f32(path: &std::path::Path) -> Vec<f32> {
+    let reader = hound::WavReader::open(path).expect("open wav");
+    let spec = reader.spec();
+    assert_eq!(spec.channels, 1, "expected mono");
+    assert_eq!(spec.sample_rate, 16_000, "expected 16 kHz");
+    match spec.sample_format {
+        hound::SampleFormat::Float => reader
+            .into_samples::<f32>()
+            .map(|s| s.expect("read sample"))
+            .collect(),
+        hound::SampleFormat::Int => {
+            let max = (1i64 << (spec.bits_per_sample - 1)) as f32;
+            reader
+                .into_samples::<i32>()
+                .map(|s| s.expect("read sample") as f32 / max)
+                .collect()
+        }
+    }
+}
+
 fn llm_input(raw_text: &str) -> PostProcessInput {
     PostProcessInput {
         raw_text: raw_text.into(),
@@ -129,6 +150,24 @@ fn llm_input(raw_text: &str) -> PostProcessInput {
         app_category: None,
         dictionary: vec![],
     }
+}
+
+use lune_core::asr::AsrSegment;
+
+/// Run ASR on audio using incremental push/poll (same cadence as the real session loop).
+async fn transcribe(asr: &OrtQwenAsrBackend, audio: &[f32]) -> Vec<AsrSegment> {
+    let handle = asr
+        .start_session(AsrSessionConfig::default())
+        .await
+        .unwrap();
+    let chunk_size = 8_000; // 0.5s — matches default stream_chunk_sec
+    let mut segments = Vec::new();
+    for chunk in audio.chunks(chunk_size) {
+        asr.push_audio(&handle, chunk).await.unwrap();
+        segments.extend(asr.poll_results(&handle).await.unwrap());
+    }
+    asr.end_session(handle).await.unwrap();
+    segments
 }
 
 // ── ASR Tests ───────────────────────────────────────────────────────────────
@@ -287,28 +326,49 @@ async fn full_pipeline_asr_to_llm() {
         None => return,
     };
 
-    // ASR pass.
-    let handle = asr
-        .start_session(AsrSessionConfig::default())
-        .await
-        .unwrap();
-    let audio = tone_16khz(440.0, 3.0);
-    asr.push_audio(&handle, &audio).await.unwrap();
+    // Use real speech if available, otherwise fall back to synthetic.
+    let wav_path = workspace_root().join("test_fixtures/librispeech_clean.wav");
+    let (audio, ground_truth) = if wav_path.exists() {
+        let gt =
+            std::fs::read_to_string(workspace_root().join("test_fixtures/librispeech_clean.txt"))
+                .unwrap_or_default();
+        (load_wav_f32(&wav_path), Some(gt))
+    } else {
+        (tone_16khz(440.0, 3.0), None)
+    };
+    let total_secs = audio.len() as f64 / 16_000.0;
 
+    // ASR pass.
     let t = Instant::now();
-    let segments = asr.poll_results(&handle).await.unwrap();
+    let segments = transcribe(asr, &audio).await;
     let asr_time = t.elapsed();
-    asr.end_session(handle).await.unwrap();
 
     let raw_text = if segments.is_empty() || segments[0].text.trim().is_empty() {
         "um so yeah the uh meeting is at three".to_string()
     } else {
         segments
-            .into_iter()
-            .map(|s| s.text)
+            .iter()
+            .map(|s| s.text.as_str())
             .collect::<Vec<_>>()
             .join(" ")
     };
+
+    // Confidence report.
+    for seg in &segments {
+        let conf = seg.confidence.unwrap_or(0.0);
+        let gate = if seg.is_confident(0.95) {
+            "BYPASS"
+        } else {
+            "LLM"
+        };
+        eprintln!(
+            "[pipeline] seg={} conf={conf:.4} {gate}: {:?}",
+            seg.id, seg.text
+        );
+    }
+    if let Some(gt) = &ground_truth {
+        eprintln!("[pipeline] truth: {gt}");
+    }
 
     // LLM pass.
     let t = Instant::now();
@@ -316,15 +376,12 @@ async fn full_pipeline_asr_to_llm() {
     let llm_time = t.elapsed();
 
     eprintln!(
-        "[pipeline] asr: {:?}, llm: {:?}, total: {:?}",
-        asr_time,
-        llm_time,
-        asr_time + llm_time
+        "[pipeline] asr={asr_time:?} ({:.1}x RT), llm={llm_time:?}, total={:?}",
+        asr_time.as_secs_f64() / total_secs,
+        asr_time + llm_time,
     );
-    eprintln!(
-        "[pipeline] input: {raw_text:?} → output: {:?}",
-        output.cleaned_text
-    );
+    eprintln!("[pipeline] raw:  {raw_text:?}");
+    eprintln!("[pipeline] llm:  {:?}", output.cleaned_text);
 
     assert!(!output.cleaned_text.is_empty());
 }

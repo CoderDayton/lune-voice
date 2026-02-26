@@ -37,6 +37,9 @@ arboard.workspace = true
 evdev.workspace = true
 
 
+[dev-dependencies]
+hound = "3.5"
+
 [[example]]
 name = "pipeline_latency"
 path = "../../benchmarks/pipeline_latency.rs"

@@ -31,7 +31,9 @@ const SAMPLE_RATE: usize = 16_000;
 
 // ── Streaming thresholds ─────────────────────────────────────────────────────
 
-const DEGEN_MAX_PERIOD: usize = 6;
+// Max repetition period to detect. Phrases like "and she was two or three princesses"
+// tokenize to ~9 tokens, so we need period detection beyond 6.
+const DEGEN_MAX_PERIOD: usize = 16;
 const DEGEN_MIN_REPEATS: usize = 4;
 const STALE_CHUNKS: i32 = 4;
 const RESET_INTERVAL_CHUNKS: i32 = 45;
@@ -222,10 +224,19 @@ pub(crate) fn compute_qwen_mel(audio: &[f32]) -> Array3<f32> {
 pub(crate) struct OrtStreamState {
     /// Raw decoded tokens from all chunks (subject to rollback).
     pub raw_tokens: Vec<i64>,
+    /// Position in `raw_tokens` up to which tokens have been emitted as stable.
+    /// Advances with each emission; resets to `raw_tokens.len()` on degen/reanchor
+    /// to skip past re-populated carry tokens.
+    raw_cursor: usize,
     /// Stable committed tokens (monotonically increasing).
     pub stable_text_tokens: Vec<i64>,
     /// Accumulated result text from stable emissions.
     pub result: String,
+
+    /// Per-token log-probabilities (parallel to `raw_tokens`).
+    raw_log_probs: Vec<f32>,
+    /// Per-token log-probabilities for stable tokens (parallel to `stable_text_tokens`).
+    stable_log_probs: Vec<f32>,
 
     /// Previous prefill embeddings for LCP reuse (flat f16, row-major).
     prev_prefill_embeds: Vec<half::f16>,
@@ -254,8 +265,11 @@ impl OrtStreamState {
     pub fn new() -> Self {
         Self {
             raw_tokens: Vec::new(),
+            raw_cursor: 0,
             stable_text_tokens: Vec::new(),
             result: String::new(),
+            raw_log_probs: Vec::new(),
+            stable_log_probs: Vec::new(),
             prev_prefill_embeds: Vec::new(),
             prev_prefill_len: 0,
             prev_tail_snapshot: Vec::new(),
@@ -277,6 +291,17 @@ impl OrtStreamState {
     pub fn audio_cursor(&self) -> usize {
         self.audio_cursor
     }
+
+    /// Geometric mean of token-level probabilities for the stable tokens
+    /// emitted since `prev_stable_len`. Returns `None` if no new tokens.
+    pub fn confidence_since(&self, prev_stable_len: usize) -> Option<f32> {
+        let new_lps = &self.stable_log_probs[prev_stable_len..];
+        if new_lps.is_empty() {
+            return None;
+        }
+        let mean_log_prob = new_lps.iter().sum::<f32>() / new_lps.len() as f32;
+        Some(mean_log_prob.exp())
+    }
 }
 
 // ── Streaming configuration ─────────────────────────────────────────────────
@@ -287,6 +312,11 @@ pub(crate) struct StreamConfig {
     pub unfixed_chunks: i32,
     pub max_new_tokens: usize,
     pub past_text_conditioning: bool,
+    /// Maximum audio samples passed to the encoder per chunk.
+    /// Shorter windows keep the encoder feature sequence short, which helps
+    /// when the model was fine-tuned on clips shorter than the full session.
+    /// `None` falls back to `MAX_ENCODER_SAMPLES` (30s).
+    pub max_encoder_samples: Option<usize>,
 }
 
 // ── Main streaming function ─────────────────────────────────────────────────
@@ -338,7 +368,8 @@ pub(crate) fn stream_push_audio(
         };
 
         let (enc_features, enc_seq_len) = if need_reencode {
-            let encode_start = chunk_end.saturating_sub(MAX_ENCODER_SAMPLES);
+            let enc_limit = cfg.max_encoder_samples.unwrap_or(MAX_ENCODER_SAMPLES);
+            let encode_start = chunk_end.saturating_sub(enc_limit);
             let mel = compute_qwen_mel(&audio_buf[encode_start..chunk_end]);
             let features = run_encoder(encoder, mel)?;
             let seq_len = features.shape()[1];
@@ -419,7 +450,7 @@ pub(crate) fn stream_push_audio(
 
         // Autoregressive decode: generate up to max_new_tokens.
         let prefill_end_pos = reused.max(delta_start + delta_len);
-        let chunk_tokens = autoregressive_decode(
+        let (chunk_tokens, chunk_log_probs) = autoregressive_decode(
             decoder,
             embed_tokens,
             tokenizer,
@@ -434,13 +465,15 @@ pub(crate) fn stream_push_audio(
         // Speech-end detection: empty decode → commit all rollback tokens.
         let is_speech_end = chunk_tokens.is_empty() && state.chunk_idx >= cfg.unfixed_chunks;
 
-        // Append decoded tokens to raw_tokens.
+        // Replace rollback zone with fresh decode.
+        // Truncating to raw_cursor discards the previous rollback zone before
+        // appending new tokens, preventing raw_tokens from accumulating duplicates
+        // across chunks (rollback tokens re-decoded from the stable boundary).
+        state.raw_tokens.truncate(state.raw_cursor);
+        state.raw_log_probs.truncate(state.raw_cursor);
         if !chunk_tokens.is_empty() {
-            // Ensure raw_tokens starts with ASR_TEXT if this is first output.
-            if state.raw_tokens.is_empty() {
-                state.raw_tokens.push(TOKEN_ASR_TEXT);
-            }
             state.raw_tokens.extend_from_slice(&chunk_tokens);
+            state.raw_log_probs.extend_from_slice(&chunk_log_probs);
         }
 
         // Degeneracy detection.
@@ -458,18 +491,25 @@ pub(crate) fn stream_push_audio(
         let is_reanchor = state.chunk_idx > 0 && state.chunk_idx % RESET_INTERVAL_CHUNKS == 0;
 
         if is_degen || is_reanchor {
-            // Reset: carry last RESET_CARRY_TOKENS stable tokens.
+            // Reset: carry last RESET_CARRY_TOKENS stable tokens into raw_tokens
+            // so the decoder sees prior context. Set raw_cursor past the carry tokens
+            // so they are not re-emitted as new stable output.
             let carry_start = state
                 .stable_text_tokens
                 .len()
                 .saturating_sub(RESET_CARRY_TOKENS);
             state.raw_tokens.clear();
+            state.raw_log_probs.clear();
             if carry_start < state.stable_text_tokens.len() {
-                state.raw_tokens.push(TOKEN_ASR_TEXT);
                 state
                     .raw_tokens
                     .extend_from_slice(&state.stable_text_tokens[carry_start..]);
+                state
+                    .raw_log_probs
+                    .extend_from_slice(&state.stable_log_probs[carry_start..]);
             }
+            // Advance cursor past carry tokens — they are already in stable_text_tokens.
+            state.raw_cursor = state.raw_tokens.len();
             state.prev_prefill_embeds.clear();
             state.prev_prefill_len = 0;
             state.kv_cache.clear();
@@ -489,15 +529,16 @@ pub(crate) fn stream_push_audio(
             state.raw_tokens.len().saturating_sub(cfg.rollback)
         };
 
-        // Emit tokens beyond current stable frontier.
-        if frontier > state.stable_text_tokens.len() {
-            // Find text tokens only (skip ASR_TEXT marker).
-            let new_tokens: Vec<i64> = state.raw_tokens[state.stable_text_tokens.len()..frontier]
-                .iter()
-                .copied()
-                .filter(|&t| t != TOKEN_ASR_TEXT)
-                .collect();
-            state.stable_text_tokens.extend_from_slice(&new_tokens);
+        // Emit tokens beyond current raw_cursor.
+        if frontier > state.raw_cursor {
+            let range = state.raw_cursor..frontier;
+            for (i, &tok) in state.raw_tokens[range.clone()].iter().enumerate() {
+                state.stable_text_tokens.push(tok);
+                state
+                    .stable_log_probs
+                    .push(state.raw_log_probs[range.start + i]);
+            }
+            state.raw_cursor = frontier;
         }
 
         state.audio_cursor = chunk_end;
@@ -569,6 +610,8 @@ fn build_input_embeds(
     post_tokens.push(TOKEN_ASR_TEXT);
 
     // Add past text tokens for conditioning.
+    // Full stable history prevents the decoder from re-transcribing already-emitted
+    // content — without it, the decoder repeats earlier audio on each chunk.
     if past_text_conditioning && !stable_tokens.is_empty() {
         post_tokens.extend_from_slice(stable_tokens);
     }
@@ -779,7 +822,7 @@ fn decoder_prefill(
 
 // ── Autoregressive decode ───────────────────────────────────────────────────
 
-/// Run autoregressive decode steps. Returns generated token IDs.
+/// Run autoregressive decode steps. Returns `(token_ids, log_probs)`.
 fn autoregressive_decode(
     decoder: &mut Session,
     embed_tokens: &mut Session,
@@ -788,25 +831,26 @@ fn autoregressive_decode(
     initial_logits: Vec<f32>,
     max_tokens: usize,
     initial_pos: usize,
-) -> Result<Vec<i64>> {
+) -> Result<(Vec<i64>, Vec<f32>)> {
     let eos_id = tokenizer
         .token_to_id("<|im_end|>")
         .or_else(|| tokenizer.token_to_id("<|endoftext|>"))
         .unwrap_or(151643) as i64;
 
     let mut tokens = Vec::with_capacity(max_tokens);
+    let mut log_probs = Vec::with_capacity(max_tokens);
     let mut current_logits = initial_logits;
     let mut cur_pos = initial_pos;
 
     for _ in 0..max_tokens {
-        // Greedy decode (temperature=0 for ASR).
-        let next_token = argmax(&current_logits);
+        let (next_token, log_prob) = argmax_with_log_prob(&current_logits);
 
         if next_token == eos_id || next_token == TOKEN_IM_END {
             break;
         }
 
         tokens.push(next_token);
+        log_probs.push(log_prob);
 
         // Get embedding for next token (already f16).
         let tok_embeds = token_embeddings(embed_tokens, &[next_token])?;
@@ -869,17 +913,28 @@ fn autoregressive_decode(
         cur_pos += 1;
     }
 
-    Ok(tokens)
+    Ok((tokens, log_probs))
 }
 
+/// Greedy argmax with log-probability of the chosen token.
+///
+/// Computes `log_softmax(logits)[argmax]` using the log-sum-exp trick.
+/// Since the chosen token is the maximum, this simplifies to
+/// `-ln(sum(exp(logits - max)))` — no extra pass needed.
 #[inline]
-fn argmax(logits: &[f32]) -> i64 {
-    logits
+fn argmax_with_log_prob(logits: &[f32]) -> (i64, f32) {
+    let (max_idx, &max_val) = logits
         .iter()
         .enumerate()
         .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-        .map(|(i, _)| i as i64)
-        .unwrap_or(0)
+        .unwrap_or((0, &0.0));
+
+    // logsumexp = max + ln(sum(exp(logits - max)))
+    // log_prob  = max - logsumexp = -ln(sum(exp(logits - max)))
+    let sum_exp: f32 = logits.iter().map(|&v| (v - max_val).exp()).sum();
+    let log_prob = -(sum_exp.ln());
+
+    (max_idx as i64, log_prob)
 }
 
 // ── Degeneracy detection ────────────────────────────────────────────────────
@@ -919,6 +974,561 @@ fn tail_repeat_blocks(tokens: &[i64], max_period: usize) -> (usize, usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── Test helpers ─────────────────────────────────────────────────────────
+
+    fn workspace_root() -> std::path::PathBuf {
+        // CARGO_MANIFEST_DIR = crates/lune-asr
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .to_path_buf()
+    }
+
+    fn model_dir() -> std::path::PathBuf {
+        workspace_root().join("models/qwen3-asr-0.6b-onnx")
+    }
+
+    fn ensure_ort() {
+        static INIT: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+        INIT.get_or_init(|| {
+            let _ = ort::init().commit();
+        });
+    }
+
+    fn load_wav_f32(path: &std::path::Path) -> Vec<f32> {
+        let reader = hound::WavReader::open(path).expect("open wav");
+        let spec = reader.spec();
+        assert_eq!(spec.channels, 1, "expected mono");
+        assert_eq!(spec.sample_rate, 16_000, "expected 16 kHz");
+        match spec.sample_format {
+            hound::SampleFormat::Float => reader
+                .into_samples::<f32>()
+                .map(|s| s.expect("read sample"))
+                .collect(),
+            hound::SampleFormat::Int => {
+                let max = (1i64 << (spec.bits_per_sample - 1)) as f32;
+                reader
+                    .into_samples::<i32>()
+                    .map(|s| s.expect("read sample") as f32 / max)
+                    .collect()
+            }
+        }
+    }
+
+    fn tone_440hz(secs: f32) -> Vec<f32> {
+        let n = (16_000.0 * secs) as usize;
+        (0..n)
+            .map(|i| (2.0 * std::f32::consts::PI * 440.0 * i as f32 / 16_000.0).sin() * 0.3)
+            .collect()
+    }
+
+    // ── Encoder tests ────────────────────────────────────────────────────────
+
+    /// Encoder output shape: [1, S, 1024]. Values must be non-trivially non-zero.
+    #[test]
+    #[ignore = "requires models/qwen3-asr-0.6b-onnx"]
+    fn encoder_output_shape_and_values() {
+        ensure_ort();
+        let dir = model_dir();
+        if !dir.exists() {
+            eprintln!("[skip] model dir not found");
+            return;
+        }
+
+        let mut encoder =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-encoder.onnx"), false)
+                .expect("load encoder");
+
+        // 1 second of 440 Hz tone
+        let audio = tone_440hz(1.0);
+        let mel = compute_qwen_mel(&audio);
+        eprintln!("[encoder] mel shape: {:?}", mel.shape());
+
+        let features = run_encoder(&mut encoder, mel).expect("encoder forward");
+        let shape = features.shape().to_vec();
+        eprintln!("[encoder] features shape: {shape:?}");
+
+        assert_eq!(shape[0], 1, "batch=1");
+        assert_eq!(shape[2], HIDDEN_DIM, "hidden_dim=1024");
+        assert!(shape[1] > 0, "enc_seq_len > 0");
+
+        let total = features.len();
+        let non_zero = features.iter().filter(|&&v| v != half::f16::ZERO).count();
+        let max_abs = features
+            .iter()
+            .map(|v| v.to_f32().abs())
+            .fold(0.0f32, f32::max);
+        eprintln!(
+            "[encoder] non-zero={non_zero}/{total} ({:.1}%), max_abs={max_abs:.4}",
+            100.0 * non_zero as f32 / total as f32
+        );
+        assert!(non_zero > total / 10, "encoder output mostly zeros");
+        assert!(max_abs > 0.0, "encoder output all zero");
+    }
+
+    // ── Decoder tests ────────────────────────────────────────────────────────
+
+    /// Single decoder step: what is the first token produced from a 1s audio clip?
+    ///
+    /// This is the key diagnostic for "zero segments" — if the first token is
+    /// EOS/im_end, the autoregressive_decode loop terminates immediately.
+    #[test]
+    #[ignore = "requires models/qwen3-asr-0.6b-onnx"]
+    fn decoder_first_token_diagnostic() {
+        ensure_ort();
+        let dir = model_dir();
+        if !dir.exists() {
+            eprintln!("[skip] model dir not found");
+            return;
+        }
+
+        let mut encoder =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-encoder.onnx"), false)
+                .expect("load encoder");
+        let mut embed_tokens =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-embed-tokens.onnx"), false)
+                .expect("load embed_tokens");
+        let mut decoder =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-decoder.onnx"), false)
+                .expect("load decoder");
+        let tokenizer =
+            tokenizers::Tokenizer::from_file(&dir.join("tokenizer.json")).expect("load tokenizer");
+
+        // 440 Hz tone — not real speech but deterministic
+        let audio = tone_440hz(1.0);
+        let mel = compute_qwen_mel(&audio);
+        let features = run_encoder(&mut encoder, mel).expect("encoder forward");
+        let enc_seq_len = features.shape()[1];
+
+        let (input_embeds, prefill_len) =
+            build_input_embeds(&mut embed_tokens, &features, enc_seq_len, &[], &[], false)
+                .expect("build_input_embeds");
+        eprintln!("[decoder] enc_seq_len={enc_seq_len}, prefill_len={prefill_len}");
+
+        let kv = empty_kv_cache();
+        let (mut new_kv, last_logits) =
+            decoder_prefill(&mut decoder, input_embeds, kv, 0).expect("decoder_prefill");
+
+        let (first_tok, lp) = argmax_with_log_prob(&last_logits);
+        let first_str = tokenizer
+            .decode(&[first_tok as u32], false)
+            .unwrap_or_default();
+        eprintln!(
+            "[decoder] first_token={first_tok} ({first_str:?}) log_prob={lp:.4} prob={:.4}",
+            lp.exp()
+        );
+
+        // Top-10 tokens
+        let mut ranked: Vec<(usize, f32)> = last_logits.iter().copied().enumerate().collect();
+        ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        eprintln!("[decoder] top-10 after prefill:");
+        for (idx, val) in ranked.iter().take(10) {
+            let s = tokenizer.decode(&[*idx as u32], false).unwrap_or_default();
+            eprintln!("  idx={idx:6} logit={val:8.3} ({s:?})");
+        }
+
+        // Check whether we immediately hit EOS
+        let eos_id = tokenizer.token_to_id("<|im_end|>").unwrap_or(151645) as i64;
+        let eot_id = tokenizer.token_to_id("<|endoftext|>").unwrap_or(151643) as i64;
+
+        if first_tok == eos_id || first_tok == eot_id || first_tok == TOKEN_IM_END {
+            eprintln!("[decoder] ⚠ FIRST TOKEN IS EOS — autoregressive_decode will return empty!");
+        }
+
+        // Full autoregressive decode (up to 32 tokens)
+        let (tokens, log_probs) = autoregressive_decode(
+            &mut decoder,
+            &mut embed_tokens,
+            &tokenizer,
+            &mut new_kv,
+            last_logits,
+            32,
+            prefill_len,
+        )
+        .expect("autoregressive_decode");
+
+        eprintln!("[decoder] generated {} tokens: {tokens:?}", tokens.len());
+        if !tokens.is_empty() {
+            let ids: Vec<u32> = tokens.iter().map(|&t| t as u32).collect();
+            let text = tokenizer.decode(&ids, true).unwrap_or_default();
+            eprintln!("[decoder] decoded: {text:?}");
+            eprintln!(
+                "[decoder] mean log_prob={:.4} (confidence={:.4})",
+                log_probs.iter().sum::<f32>() / log_probs.len() as f32,
+                (log_probs.iter().sum::<f32>() / log_probs.len() as f32).exp()
+            );
+        } else {
+            eprintln!("[decoder] ⚠ ZERO TOKENS GENERATED — first token was EOS");
+        }
+    }
+
+    /// Same as above but with real LibriSpeech audio.
+    #[test]
+    #[ignore = "requires models/qwen3-asr-0.6b-onnx and test_fixtures/librispeech_clean.wav"]
+    fn decoder_first_token_real_speech() {
+        ensure_ort();
+        let dir = model_dir();
+        let wav = workspace_root().join("test_fixtures/librispeech_clean.wav");
+        if !dir.exists() || !wav.exists() {
+            eprintln!("[skip] model or wav not found");
+            return;
+        }
+
+        let mut encoder =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-encoder.onnx"), false)
+                .expect("load encoder");
+        let mut embed_tokens =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-embed-tokens.onnx"), false)
+                .expect("load embed_tokens");
+        let mut decoder =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-decoder.onnx"), false)
+                .expect("load decoder");
+        let tokenizer =
+            tokenizers::Tokenizer::from_file(&dir.join("tokenizer.json")).expect("load tokenizer");
+
+        // First 0.5s of real speech
+        let audio = load_wav_f32(&wav);
+        let chunk = &audio[..8_000.min(audio.len())];
+        eprintln!("[real_speech] using {} samples", chunk.len());
+
+        let mel = compute_qwen_mel(chunk);
+        let features = run_encoder(&mut encoder, mel).expect("encoder forward");
+        let enc_seq_len = features.shape()[1];
+        eprintln!("[real_speech] enc_seq_len={enc_seq_len}");
+
+        let (input_embeds, prefill_len) =
+            build_input_embeds(&mut embed_tokens, &features, enc_seq_len, &[], &[], false)
+                .expect("build_input_embeds");
+
+        let kv = empty_kv_cache();
+        let (mut new_kv, last_logits) =
+            decoder_prefill(&mut decoder, input_embeds, kv, 0).expect("decoder_prefill");
+
+        let (first_tok, lp) = argmax_with_log_prob(&last_logits);
+        let first_str = tokenizer
+            .decode(&[first_tok as u32], false)
+            .unwrap_or_default();
+        eprintln!(
+            "[real_speech] first_token={first_tok} ({first_str:?}) prob={:.4}",
+            lp.exp()
+        );
+
+        let mut ranked: Vec<(usize, f32)> = last_logits.iter().copied().enumerate().collect();
+        ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        eprintln!("[real_speech] top-10 after prefill:");
+        for (idx, val) in ranked.iter().take(10) {
+            let s = tokenizer.decode(&[*idx as u32], false).unwrap_or_default();
+            eprintln!("  idx={idx:6} logit={val:8.3} ({s:?})");
+        }
+
+        let (tokens, _) = autoregressive_decode(
+            &mut decoder,
+            &mut embed_tokens,
+            &tokenizer,
+            &mut new_kv,
+            last_logits,
+            64,
+            prefill_len,
+        )
+        .expect("autoregressive_decode");
+
+        if tokens.is_empty() {
+            eprintln!("[real_speech] ⚠ ZERO TOKENS — first generated token was EOS");
+        } else {
+            let ids: Vec<u32> = tokens.iter().map(|&t| t as u32).collect();
+            let text = tokenizer.decode(&ids, true).unwrap_or_default();
+            eprintln!("[real_speech] decoded {} tokens: {text:?}", tokens.len());
+        }
+    }
+
+    // ── Stream state machine tests ───────────────────────────────────────────
+
+    /// Verify audio features affect decoder output.
+    ///
+    /// Runs decoder with real encoder features vs all-zero features.
+    /// If logits are IDENTICAL → decoder is ignoring audio (position_ids or
+    /// attention bug). If logits differ → audio is being used correctly.
+    #[test]
+    #[ignore = "requires models/qwen3-asr-0.6b-onnx"]
+    fn decoder_audio_features_affect_logits() {
+        ensure_ort();
+        let dir = model_dir();
+        if !dir.exists() {
+            eprintln!("[skip] model dir not found");
+            return;
+        }
+
+        let mut encoder =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-encoder.onnx"), false)
+                .expect("load encoder");
+        let mut embed_tokens =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-embed-tokens.onnx"), false)
+                .expect("load embed_tokens");
+        let mut decoder =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-decoder.onnx"), false)
+                .expect("load decoder");
+        let tokenizer =
+            tokenizers::Tokenizer::from_file(&dir.join("tokenizer.json")).expect("load tokenizer");
+
+        let audio = tone_440hz(1.0);
+        let mel = compute_qwen_mel(&audio);
+        let real_features = run_encoder(&mut encoder, mel).expect("encoder forward");
+        let enc_seq_len = real_features.shape()[1];
+
+        // Case A: real encoder features
+        let (emb_a, _plen_a) = build_input_embeds(
+            &mut embed_tokens,
+            &real_features,
+            enc_seq_len,
+            &[],
+            &[],
+            false,
+        )
+        .expect("build_input_embeds A");
+        let kv_a = empty_kv_cache();
+        let (_, logits_a) = decoder_prefill(&mut decoder, emb_a, kv_a, 0).expect("prefill A");
+
+        // Case B: all-zero encoder features (same shape)
+        let zero_features =
+            ArrayD::from_elem(IxDyn(&[1, enc_seq_len, HIDDEN_DIM]), half::f16::ZERO);
+        let (emb_b, _plen_b) = build_input_embeds(
+            &mut embed_tokens,
+            &zero_features,
+            enc_seq_len,
+            &[],
+            &[],
+            false,
+        )
+        .expect("build_input_embeds B");
+        let kv_b = empty_kv_cache();
+        let (_, logits_b) = decoder_prefill(&mut decoder, emb_b, kv_b, 0).expect("prefill B");
+
+        // Compare top-1 and L∞ distance
+        let (tok_a, lp_a) = argmax_with_log_prob(&logits_a);
+        let (tok_b, lp_b) = argmax_with_log_prob(&logits_b);
+        let str_a = tokenizer.decode(&[tok_a as u32], false).unwrap_or_default();
+        let str_b = tokenizer.decode(&[tok_b as u32], false).unwrap_or_default();
+
+        let max_diff: f32 = logits_a
+            .iter()
+            .zip(logits_b.iter())
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0f32, f32::max);
+        let mean_diff: f32 = logits_a
+            .iter()
+            .zip(logits_b.iter())
+            .map(|(a, b)| (a - b).abs())
+            .sum::<f32>()
+            / logits_a.len() as f32;
+
+        eprintln!("[audio_effect] enc_seq_len={enc_seq_len}");
+        eprintln!(
+            "[audio_effect] A (real):  tok={tok_a} ({str_a:?}) prob={:.4}",
+            lp_a.exp()
+        );
+        eprintln!(
+            "[audio_effect] B (zeros): tok={tok_b} ({str_b:?}) prob={:.4}",
+            lp_b.exp()
+        );
+        eprintln!("[audio_effect] logit diff: L∞={max_diff:.4} mean={mean_diff:.6}");
+
+        if tok_a == tok_b && max_diff < 1.0 {
+            eprintln!(
+                "[audio_effect] ⚠ AUDIO FEATURES HAVE NO EFFECT — decoder ignores encoder output!"
+            );
+            eprintln!(
+                "[audio_effect] Root cause: likely incorrect position_ids or missing attention to audio tokens."
+            );
+        } else {
+            eprintln!("[audio_effect] ✓ Audio features DO affect logits (expected behavior).");
+        }
+    }
+
+    /// Full streaming trace over LibriSpeech audio.
+    ///
+    /// Prints per-chunk: cursor, new raw tokens, new stable tokens, text delta.
+    /// Use this to diagnose where tokens are generated/suppressed.
+    #[test]
+    #[ignore = "requires models/qwen3-asr-0.6b-onnx and test_fixtures/librispeech_clean.wav"]
+    fn stream_full_librispeech_trace() {
+        ensure_ort();
+        let dir = model_dir();
+        let wav = workspace_root().join("test_fixtures/librispeech_clean.wav");
+        if !dir.exists() || !wav.exists() {
+            eprintln!("[skip] model or wav not found");
+            return;
+        }
+
+        let mut encoder =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-encoder.onnx"), false)
+                .expect("load encoder");
+        let mut embed_tokens =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-embed-tokens.onnx"), false)
+                .expect("load embed_tokens");
+        let mut decoder =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-decoder.onnx"), false)
+                .expect("load decoder");
+        let tokenizer =
+            tokenizers::Tokenizer::from_file(&dir.join("tokenizer.json")).expect("load tokenizer");
+
+        let audio = load_wav_f32(&wav);
+        eprintln!(
+            "[stream] audio: {} samples ({:.1}s)",
+            audio.len(),
+            audio.len() as f32 / 16_000.0
+        );
+
+        // Match current OrtQwenAsrConfig::default() parameters.
+        let chunk_sec = 1.0f32;
+        let chunk_size = (chunk_sec * 16_000.0) as usize;
+        // 8s encoder window — matches OrtQwenAsrConfig::default().max_encoder_sec=8.0
+        let max_encoder_samples: Option<usize> = Some(8 * 16_000);
+        let cfg = StreamConfig {
+            chunk_samples: chunk_size,
+            rollback: 3,
+            unfixed_chunks: 2,
+            max_new_tokens: 48,
+            past_text_conditioning: true,
+            max_encoder_samples,
+        };
+
+        let mut state = OrtStreamState::new();
+
+        for i in 0..audio.len().div_ceil(chunk_size) {
+            let buf_end = ((i + 1) * chunk_size).min(audio.len());
+            let buf = &audio[..buf_end];
+
+            let prev_raw = state.raw_tokens.len();
+            let prev_stable = state.stable_text_tokens.len();
+
+            let text = stream_push_audio(
+                &mut encoder,
+                &mut embed_tokens,
+                &mut decoder,
+                &tokenizer,
+                buf,
+                &mut state,
+                &cfg,
+                false,
+            )
+            .expect("stream_push_audio");
+
+            let new_raw = state.raw_tokens.len() as isize - prev_raw as isize;
+            let new_stable = state.stable_text_tokens.len() as isize - prev_stable as isize;
+            let cursor_sec = state.audio_cursor as f32 / 16_000.0;
+
+            // Always print first few chunks; after that only when interesting
+            if i < 6 || new_raw != 0 || !text.is_empty() {
+                eprintln!(
+                    "[chunk {:03}] cursor={:.1}s raw_Δ={:+3} stable_Δ={:+3} stale={} raw_len={} cursor={} text={:?}",
+                    i,
+                    cursor_sec,
+                    new_raw,
+                    new_stable,
+                    state.stale_count,
+                    state.raw_tokens.len(),
+                    state.raw_cursor,
+                    text
+                );
+                // Decode current raw_tokens for debugging stalls
+                if !state.raw_tokens.is_empty() {
+                    let ids: Vec<u32> = state.raw_tokens.iter().map(|&t| t as u32).collect();
+                    let raw_text = tokenizer.decode(&ids, true).unwrap_or_default();
+                    eprintln!("          raw_tokens decoded: {raw_text:?}");
+                }
+            }
+        }
+
+        eprintln!("[stream] final raw_tokens: {}", state.raw_tokens.len());
+        eprintln!(
+            "[stream] final stable_tokens: {}",
+            state.stable_text_tokens.len()
+        );
+        eprintln!("[stream] accumulated result: {:?}", state.result);
+
+        if !state.stable_text_tokens.is_empty() {
+            let ids: Vec<u32> = state.stable_text_tokens.iter().map(|&t| t as u32).collect();
+            let text = tokenizer.decode(&ids, true).unwrap_or_default();
+            eprintln!("[stream] stable text decoded: {text:?}");
+        } else {
+            eprintln!("[stream] ⚠ ZERO STABLE TOKENS — no text was committed");
+        }
+    }
+
+    /// Print model input/output names and shapes for all three sessions.
+    ///
+    /// Use this to verify ONNX export correctness — wrong names cause silent failures
+    /// where ORT silently uses zero tensors instead of erroring.
+    #[test]
+    #[ignore = "requires models/qwen3-asr-0.6b-onnx"]
+    fn model_io_names() {
+        ensure_ort();
+        let dir = model_dir();
+        if !dir.exists() {
+            eprintln!("[skip] model dir not found");
+            return;
+        }
+
+        for name in &[
+            "qwen3-asr-encoder.onnx",
+            "qwen3-asr-embed-tokens.onnx",
+            "qwen3-asr-decoder.onnx",
+        ] {
+            let session =
+                crate::ort_utils::build_ort_session(&dir.join(name), false).expect("load session");
+            eprintln!("\n=== {name} ===");
+            eprintln!("  INPUTS:");
+            for inp in session.inputs().iter() {
+                eprintln!("    {:?}  dtype={:?}", inp.name(), inp.dtype());
+            }
+            eprintln!("  OUTPUTS:");
+            for out in session.outputs().iter() {
+                eprintln!("    {:?}  dtype={:?}", out.name(), out.dtype());
+            }
+        }
+    }
+
+    /// Verify that TOKEN_ASR_TEXT (151704) exists in the tokenizer vocabulary.
+    #[test]
+    #[ignore = "requires models/qwen3-asr-0.6b-onnx"]
+    fn tokenizer_special_tokens() {
+        ensure_ort();
+        let dir = model_dir();
+        if !dir.exists() {
+            return;
+        }
+        let tok =
+            tokenizers::Tokenizer::from_file(&dir.join("tokenizer.json")).expect("load tokenizer");
+
+        let eos = tok.token_to_id("<|im_end|>");
+        let eot = tok.token_to_id("<|endoftext|>");
+        let asr_text = tok
+            .token_to_id("<|ASR_TEXT|>")
+            .or_else(|| tok.token_to_id("<asr_text>"));
+        let audio_start = tok
+            .token_to_id("<|AUDIO|>")
+            .or_else(|| tok.token_to_id("<audio>"));
+
+        eprintln!("[tok] <|im_end|>     = {eos:?}  (want 151645)");
+        eprintln!("[tok] <|endoftext|>  = {eot:?}  (want 151643)");
+        eprintln!("[tok] ASR_TEXT token = {asr_text:?} (want 151704)");
+        eprintln!("[tok] audio start    = {audio_start:?} (want 151669)");
+
+        // Decode the hardcoded token IDs to verify they're correct
+        for (name, id) in [
+            ("TOKEN_IM_START", TOKEN_IM_START),
+            ("TOKEN_IM_END", TOKEN_IM_END),
+            ("TOKEN_AUDIO_START", TOKEN_AUDIO_START),
+            ("TOKEN_AUDIO_END", TOKEN_AUDIO_END),
+            ("TOKEN_ASR_TEXT", TOKEN_ASR_TEXT),
+        ] {
+            let decoded = tok.decode(&[id as u32], false).unwrap_or_default();
+            eprintln!("[tok] {name} ({id}) → {decoded:?}");
+        }
+    }
 
     #[test]
     fn mel_empty_audio() {
@@ -997,5 +1607,160 @@ mod tests {
         state.reset();
         assert!(state.enc_cache.is_none());
         assert_eq!(state.enc_cache_audio_end, 0);
+    }
+
+    #[test]
+    fn argmax_log_prob_uniform() {
+        // Uniform logits: each token has equal probability 1/N.
+        let n = 100;
+        let logits = vec![0.0f32; n];
+        let (idx, lp) = argmax_with_log_prob(&logits);
+        assert!((0..n as i64).contains(&idx));
+        let expected_lp = -(n as f32).ln();
+        assert!(
+            (lp - expected_lp).abs() < 1e-5,
+            "got {lp}, expected {expected_lp}"
+        );
+    }
+
+    #[test]
+    fn argmax_log_prob_peaked() {
+        // One dominant logit — probability should be close to 1.0.
+        let mut logits = vec![-10.0f32; 1000];
+        logits[42] = 50.0;
+        let (idx, lp) = argmax_with_log_prob(&logits);
+        assert_eq!(idx, 42);
+        // log_prob should be very close to 0 (prob ≈ 1.0).
+        assert!(lp > -0.01, "peaked log_prob {lp} should be near 0");
+        assert!(lp <= 0.0, "log_prob {lp} should be non-positive");
+    }
+
+    #[test]
+    fn argmax_log_prob_range() {
+        // Random-ish logits — log_prob should always be in (-inf, 0].
+        let logits: Vec<f32> = (0..500).map(|i| (i as f32 * 0.73).sin() * 5.0).collect();
+        let (idx, lp) = argmax_with_log_prob(&logits);
+        assert!((0..500).contains(&(idx as usize)));
+        assert!(lp <= 0.0, "log_prob {lp} must be non-positive");
+        assert!(lp.is_finite());
+    }
+
+    #[test]
+    fn confidence_since_empty() {
+        let state = OrtStreamState::new();
+        assert_eq!(state.confidence_since(0), None);
+    }
+
+    #[test]
+    fn confidence_since_computes_geometric_mean() {
+        let mut state = OrtStreamState::new();
+        // Simulate 3 stable tokens with known log-probs.
+        state.stable_log_probs = vec![(-0.1f32), (-0.2), (-0.3)];
+        state.stable_text_tokens = vec![1, 2, 3];
+
+        // From position 0: geometric mean of all three.
+        let conf = state.confidence_since(0).unwrap();
+        let expected = ((-0.1 - 0.2 - 0.3) / 3.0f32).exp();
+        assert!(
+            (conf - expected).abs() < 1e-6,
+            "got {conf}, expected {expected}"
+        );
+
+        // From position 2: only the last token.
+        let conf2 = state.confidence_since(2).unwrap();
+        let expected2 = (-0.3f32).exp();
+        assert!((conf2 - expected2).abs() < 1e-6);
+
+        // From position 3: no new tokens.
+        assert_eq!(state.confidence_since(3), None);
+    }
+    /// Process the entire LibriSpeech WAV in one shot — no chunking.
+    ///
+    /// Encodes all audio at once, builds full input_embeds (no stable tokens),
+    /// runs a single prefill then autoregressive decode up to 200 tokens.
+    #[test]
+    #[ignore = "requires models/qwen3-asr-0.6b-onnx and test_fixtures/librispeech_clean.wav"]
+    fn batch_full_audio() {
+        ensure_ort();
+        let dir = model_dir();
+        let wav = workspace_root().join("test_fixtures/librispeech_clean.wav");
+        if !dir.exists() || !wav.exists() {
+            eprintln!("[skip] model or wav not found");
+            return;
+        }
+
+        let mut encoder =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-encoder.onnx"), false)
+                .expect("load encoder");
+        let mut embed_tokens =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-embed-tokens.onnx"), false)
+                .expect("load embed_tokens");
+        let mut decoder =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-decoder.onnx"), false)
+                .expect("load decoder");
+        let tokenizer =
+            tokenizers::Tokenizer::from_file(&dir.join("tokenizer.json")).expect("load tokenizer");
+
+        let audio = load_wav_f32(&wav);
+        eprintln!(
+            "[batch] audio: {} samples ({:.1}s)",
+            audio.len(),
+            audio.len() as f32 / 16_000.0
+        );
+
+        // Step 1: compute mel for full audio at once (no sliding window).
+        let mel = compute_qwen_mel(&audio);
+        eprintln!("[batch] mel shape: {:?}", mel.shape());
+
+        // Step 2: encode.
+        let enc_features = run_encoder(&mut encoder, mel).expect("run_encoder");
+        let enc_seq_len = enc_features.shape()[1]; // encoder output length (not mel frames)
+        eprintln!(
+            "[batch] enc_features shape: {:?}, enc_seq_len={enc_seq_len}",
+            enc_features.shape()
+        );
+
+        // Step 3: build input_embeds — first pass, no stable tokens.
+        let (input_embeds, prefill_len) = build_input_embeds(
+            &mut embed_tokens,
+            &enc_features,
+            enc_seq_len,
+            &[],
+            &[],
+            false,
+        )
+        .expect("build_input_embeds");
+        eprintln!("[batch] prefill_len: {prefill_len}");
+
+        // Step 4: prefill — past_seq_len=0, empty KV cache.
+        let kv_cache = empty_kv_cache();
+        let (mut kv_cache, last_logits) =
+            decoder_prefill(&mut decoder, input_embeds, kv_cache, 0).expect("decoder_prefill");
+        eprintln!("[batch] prefill done, kv_cache len: {}", kv_cache.len());
+
+        // Step 5: autoregressive decode up to 200 tokens.
+        let (token_ids, log_probs) = autoregressive_decode(
+            &mut decoder,
+            &mut embed_tokens,
+            &tokenizer,
+            &mut kv_cache,
+            last_logits,
+            200,
+            prefill_len,
+        )
+        .expect("autoregressive_decode");
+        eprintln!("[batch] decoded {} tokens", token_ids.len());
+
+        let avg_conf = if log_probs.is_empty() {
+            0.0f32
+        } else {
+            (log_probs.iter().sum::<f32>() / log_probs.len() as f32).exp()
+        };
+        eprintln!("[batch] avg token confidence: {avg_conf:.3}");
+
+        // Step 6: decode token IDs to text.
+        let ids_u32: Vec<u32> = token_ids.iter().map(|&t| t as u32).collect();
+        let text = tokenizer.decode(&ids_u32, true).unwrap_or_default();
+        eprintln!("[batch] full transcript: {text:?}");
     }
 }
