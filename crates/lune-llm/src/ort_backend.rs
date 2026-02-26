@@ -8,7 +8,7 @@
 
 use std::collections::VecDeque;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use ndarray::{Array2, ArrayD, IxDyn};
 use ort::session::Session;
@@ -162,6 +162,29 @@ fn build_session(path: &std::path::Path, _use_gpu: bool) -> Result<Session> {
 const NUM_KV_LAYERS: usize = 28;
 const NUM_KV_HEADS: usize = 8;
 const HEAD_DIM: usize = 128;
+
+/// Pre-computed ORT input/output key strings for LLM KV cache tensors.
+/// Eliminates format! calls on every decode step (56 keys × max_output_tokens steps).
+static LLM_KV_NAMES: OnceLock<LlmKvNames> = OnceLock::new();
+
+struct LlmKvNames {
+    input: Vec<String>,
+    output: Vec<String>,
+}
+
+fn llm_kv_names() -> &'static LlmKvNames {
+    LLM_KV_NAMES.get_or_init(|| {
+        let mut input = Vec::with_capacity(NUM_KV_LAYERS * 2);
+        let mut output = Vec::with_capacity(NUM_KV_LAYERS * 2);
+        for layer in 0..NUM_KV_LAYERS {
+            for kind in ["key", "value"] {
+                input.push(format!("past_key_values.{layer}.{kind}"));
+                output.push(format!("present_key_values.{layer}.{kind}"));
+            }
+        }
+        LlmKvNames { input, output }
+    })
+}
 /// Embed input_ids via the embed_tokens session.
 fn embed_tokens(session: &mut Session, token_ids: &[i64]) -> Result<DynValue> {
     let ids = Array2::from_shape_vec((1, token_ids.len()), token_ids.to_vec())
@@ -269,15 +292,14 @@ fn generate_sync(
             .map_err(|e| Error::Llm(format!("position_ids: {e}")))?
             .into(),
     ));
-    for layer in 0..NUM_KV_LAYERS {
-        for kind in &["key", "value"] {
-            inputs.push((
-                format!("past_key_values.{layer}.{kind}"),
-                Value::from_array(empty_kv.clone())
-                    .map_err(|e| Error::Llm(format!("kv tensor: {e}")))?
-                    .into(),
-            ));
-        }
+    let llm_names = llm_kv_names();
+    for name in &llm_names.input {
+        inputs.push((
+            name.clone(),
+            Value::from_array(empty_kv.clone())
+                .map_err(|e| Error::Llm(format!("kv tensor: {e}")))?
+                .into(),
+        ));
     }
 
     let (last_logits, mut kv_cache) = {
@@ -297,15 +319,12 @@ fn generate_sync(
             .collect();
 
         let mut kv_cache: Vec<DynValue> = Vec::with_capacity(NUM_KV_LAYERS * 2);
-        for layer in 0..NUM_KV_LAYERS {
-            for kind in &["key", "value"] {
-                let name = format!("present_key_values.{layer}.{kind}");
-                kv_cache.push(
-                    outputs
-                        .remove(&name)
-                        .ok_or_else(|| Error::Llm(format!("missing output: {name}")))?,
-                );
-            }
+        for (i, name) in llm_names.output.iter().enumerate() {
+            kv_cache.push(
+                outputs
+                    .remove(name.as_str())
+                    .ok_or_else(|| Error::Llm(format!("missing output[{i}]: {name}")))?,
+            );
         }
 
         (last_logits, kv_cache)
@@ -381,9 +400,7 @@ fn generate_sync(
         ));
 
         for (i, kv) in std::mem::take(&mut kv_cache).into_iter().enumerate() {
-            let layer = i / 2;
-            let kind = if i % 2 == 0 { "key" } else { "value" };
-            step_inputs.push((format!("past_key_values.{layer}.{kind}"), kv));
+            step_inputs.push((llm_names.input[i].clone(), kv));
         }
 
         let mut step_outputs = decoder_session
@@ -401,15 +418,12 @@ fn generate_sync(
             .collect();
 
         kv_cache = Vec::with_capacity(NUM_KV_LAYERS * 2);
-        for layer in 0..NUM_KV_LAYERS {
-            for kind in &["key", "value"] {
-                let name = format!("present_key_values.{layer}.{kind}");
-                kv_cache.push(
-                    step_outputs
-                        .remove(&name)
-                        .ok_or_else(|| Error::Llm(format!("missing output: {name}")))?,
-                );
-            }
+        for (i, name) in llm_names.output.iter().enumerate() {
+            kv_cache.push(
+                step_outputs
+                    .remove(name.as_str())
+                    .ok_or_else(|| Error::Llm(format!("missing output[{i}]: {name}")))?,
+            );
         }
     }
 

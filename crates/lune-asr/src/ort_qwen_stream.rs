@@ -4,12 +4,13 @@
 //! The encoder, embed_tokens, and decoder are ORT sessions passed by reference;
 //! this module owns only the streaming state and mel computation.
 
+use std::cell::RefCell;
 use std::sync::OnceLock;
 
 use ndarray::{Array2, Array3, ArrayD, IxDyn, s};
 use ort::session::Session;
 use ort::value::{DynValue, Value};
-use rustfft::{FftPlanner, num_complex::Complex};
+use rustfft::{Fft, FftPlanner, num_complex::Complex};
 
 use lune_core::error::{Error, Result};
 
@@ -82,6 +83,56 @@ const LOG_STEP: f64 = 0.068_751_777_420_949_12;
 
 static QWEN_MEL_FB: OnceLock<Array2<f32>> = OnceLock::new();
 static QWEN_HANN: OnceLock<Vec<f32>> = OnceLock::new();
+/// Cached FFT plan for N_FFT=400. Planning is amortized across all mel calls.
+/// Arc<dyn Fft<f32>>: Send + Sync — safe for OnceLock.
+static QWEN_FFT: OnceLock<std::sync::Arc<dyn Fft<f32> + Send + Sync>> = OnceLock::new();
+/// Pre-computed ORT input/output key strings for KV cache tensors.
+/// Eliminates ~2700 format! calls per streaming chunk (56 keys × 48 decode steps).
+static KV_NAMES: OnceLock<KvNames> = OnceLock::new();
+
+struct KvNames {
+    /// "past_key_values.{layer}.{kind}" for layer in 0..NUM_DECODER_LAYERS, kind in [key, value]
+    input: Vec<String>,
+    /// "present_key_values.{layer}.{kind}"
+    output: Vec<String>,
+}
+
+fn kv_names() -> &'static KvNames {
+    KV_NAMES.get_or_init(|| {
+        let mut input = Vec::with_capacity(NUM_DECODER_LAYERS * 2);
+        let mut output = Vec::with_capacity(NUM_DECODER_LAYERS * 2);
+        for layer in 0..NUM_DECODER_LAYERS {
+            for kind in ["key", "value"] {
+                input.push(format!("past_key_values.{layer}.{kind}"));
+                output.push(format!("present_key_values.{layer}.{kind}"));
+            }
+        }
+        KvNames { input, output }
+    })
+}
+
+/// Thread-local scratch buffers for mel spectrogram computation.
+/// Avoids 3 heap allocations per mel call (~220 KB total for 1s chunks).
+struct MelScratch {
+    padded: Vec<f32>,
+    frame: Vec<Complex<f32>>,
+    fft_scratch: Vec<Complex<f32>>,
+}
+
+thread_local! {
+    static MEL_SCRATCH: RefCell<MelScratch> = RefCell::new(MelScratch {
+        padded: Vec::new(),
+        frame: vec![Complex::new(0.0f32, 0.0f32); N_FFT],
+        fft_scratch: Vec::new(), // sized on first use after FFT plan available
+    });
+}
+
+fn qwen_fft() -> &'static std::sync::Arc<dyn Fft<f32> + Send + Sync> {
+    QWEN_FFT.get_or_init(|| {
+        let mut planner = FftPlanner::<f32>::new();
+        planner.plan_fft_forward(N_FFT)
+    })
+}
 
 #[inline(always)]
 fn hz_to_mel(hz: f64) -> f64 {
@@ -145,53 +196,71 @@ fn qwen_hann() -> &'static [f32] {
 
 /// Compute Qwen-style mel spectrogram: reflection pad, STFT, mel filterbank,
 /// log10 + clamp + normalize. Returns `[1, 128, T]`.
+///
+/// Uses thread-local scratch buffers (padded, frame, fft_scratch) and a
+/// process-global cached FFT plan to eliminate ~220 KB of heap allocations per call.
 pub(crate) fn compute_qwen_mel(audio: &[f32]) -> Array3<f32> {
     if audio.is_empty() {
         return Array3::<f32>::zeros((1, MEL_BINS, 0));
     }
 
+    let fft = qwen_fft();
+    let window = qwen_hann();
+
     let pad = N_FFT / 2; // 200
     let padded_len = pad + audio.len() + pad;
-    let mut padded = vec![0.0f32; padded_len];
-
-    // Reflection padding.
-    for i in 0..pad {
-        padded[pad - 1 - i] = audio[(i + 1).min(audio.len() - 1)];
-    }
-    padded[pad..pad + audio.len()].copy_from_slice(audio);
-    for i in 0..pad {
-        let src_idx = audio.len().saturating_sub(2).saturating_sub(i);
-        padded[pad + audio.len() + i] = audio[src_idx];
-    }
-
-    // STFT with Hann window.
-    let window = qwen_hann();
     let num_frames = (padded_len - N_FFT) / HOP_LENGTH + 1;
-    let mut power_spec = Array2::<f32>::zeros((N_FREQ, num_frames));
-
-    let mut planner = FftPlanner::<f32>::new();
-    let fft = planner.plan_fft_forward(N_FFT);
+    let scratch_len = fft.get_inplace_scratch_len();
     let zero = Complex::new(0.0f32, 0.0f32);
-    let mut frame = vec![zero; N_FFT];
-    let mut scratch = vec![zero; fft.get_inplace_scratch_len()];
 
+    let mut power_spec = Array2::<f32>::zeros((N_FREQ, num_frames));
     let spec_slice = power_spec.as_slice_mut().expect("spec contiguous");
-    for f in 0..num_frames {
-        let start = f * HOP_LENGTH;
-        frame.fill(zero);
-        let copy_len = WIN_LENGTH.min(padded_len - start);
-        for (c, (&s, &w)) in frame[..copy_len].iter_mut().zip(
-            padded[start..start + copy_len]
-                .iter()
-                .zip(window[..copy_len].iter()),
-        ) {
-            c.re = s * w;
+
+    MEL_SCRATCH.with(|cell| {
+        let mut s = cell.borrow_mut();
+
+        // Grow scratch buffers without reallocating if already large enough.
+        s.padded.resize(padded_len, 0.0f32);
+        s.padded.fill(0.0);
+        s.fft_scratch.resize(scratch_len, zero);
+
+        // Reflection padding (uses only s.padded).
+        for i in 0..pad {
+            s.padded[pad - 1 - i] = audio[(i + 1).min(audio.len() - 1)];
         }
-        fft.process_with_scratch(&mut frame, &mut scratch);
-        for k in 0..N_FREQ {
-            spec_slice[k * num_frames + f] = frame[k].norm_sqr();
+        s.padded[pad..pad + audio.len()].copy_from_slice(audio);
+        for i in 0..pad {
+            let src_idx = audio.len().saturating_sub(2).saturating_sub(i);
+            s.padded[pad + audio.len() + i] = audio[src_idx];
         }
-    }
+
+        // Destructure to get disjoint mutable borrows of separate fields.
+        // The borrow checker cannot see through DerefMut on RefMut<T> to prove
+        // s.padded, s.frame, and s.fft_scratch are non-overlapping without this.
+        let MelScratch {
+            ref padded,
+            ref mut frame,
+            ref mut fft_scratch,
+        } = *s;
+
+        // STFT with Hann window — reuse frame buffer (always N_FFT elements).
+        for f in 0..num_frames {
+            let start = f * HOP_LENGTH;
+            frame.fill(zero);
+            let copy_len = WIN_LENGTH.min(padded_len - start);
+            for (c, (&samp, &w)) in frame[..copy_len].iter_mut().zip(
+                padded[start..start + copy_len]
+                    .iter()
+                    .zip(window[..copy_len].iter()),
+            ) {
+                c.re = samp * w;
+            }
+            fft.process_with_scratch(frame, fft_scratch);
+            for k in 0..N_FREQ {
+                spec_slice[k * num_frames + f] = frame[k].norm_sqr();
+            }
+        }
+    });
 
     // Mel filterbank dot product.
     let mel_fb = qwen_mel_filterbank();
@@ -783,10 +852,9 @@ fn decoder_prefill(
             .into(),
     ));
 
+    let names = kv_names();
     for (i, kv) in kv_cache.into_iter().enumerate() {
-        let layer = i / 2;
-        let kind = if i % 2 == 0 { "key" } else { "value" };
-        inputs.push((format!("past_key_values.{layer}.{kind}"), kv));
+        inputs.push((names.input[i].clone(), kv));
     }
 
     let mut outputs = decoder
@@ -806,15 +874,12 @@ fn decoder_prefill(
 
     // Take ownership of KV cache outputs — zero-copy GPU passthrough.
     let mut new_kv = Vec::with_capacity(NUM_DECODER_LAYERS * 2);
-    for layer in 0..NUM_DECODER_LAYERS {
-        for kind in &["key", "value"] {
-            let name = format!("present_key_values.{layer}.{kind}");
-            new_kv.push(
-                outputs
-                    .remove(&name)
-                    .ok_or_else(|| Error::Asr(format!("missing output: {name}")))?,
-            );
-        }
+    for (i, name) in names.output.iter().enumerate() {
+        new_kv.push(
+            outputs
+                .remove(name.as_str())
+                .ok_or_else(|| Error::Asr(format!("missing output[{i}]: {name}")))?,
+        );
     }
 
     Ok((new_kv, last_logits))
@@ -878,10 +943,9 @@ fn autoregressive_decode(
                 .into(),
         ));
 
+        let names = kv_names();
         for (i, kv) in std::mem::take(kv_cache).into_iter().enumerate() {
-            let layer = i / 2;
-            let kind = if i % 2 == 0 { "key" } else { "value" };
-            inputs.push((format!("past_key_values.{layer}.{kind}"), kv));
+            inputs.push((names.input[i].clone(), kv));
         }
 
         let mut step_outputs = decoder
@@ -899,15 +963,12 @@ fn autoregressive_decode(
             .collect();
 
         // Take ownership of KV outputs — zero-copy GPU passthrough.
-        for layer in 0..NUM_DECODER_LAYERS {
-            for kind in &["key", "value"] {
-                let name = format!("present_key_values.{layer}.{kind}");
-                kv_cache.push(
-                    step_outputs
-                        .remove(&name)
-                        .ok_or_else(|| Error::Asr(format!("missing output: {name}")))?,
-                );
-            }
+        for (i, name) in names.output.iter().enumerate() {
+            kv_cache.push(
+                step_outputs
+                    .remove(name.as_str())
+                    .ok_or_else(|| Error::Asr(format!("missing output[{i}]: {name}")))?,
+            );
         }
 
         cur_pos += 1;

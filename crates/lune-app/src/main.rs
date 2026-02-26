@@ -1,3 +1,10 @@
+// mimalloc replaces the system allocator for better multi-threaded allocation
+// throughput. The inference pipeline spawns worker threads via ORT, and the
+// ASR streaming loop allocates/frees many small Vecs per chunk. Benchmarks on
+// allocation-heavy workloads show 5-15% throughput gain with no behaviour change.
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 mod cli;
 mod dbus;
 mod delivery;

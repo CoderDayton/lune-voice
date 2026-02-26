@@ -17,6 +17,22 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT"
 
+[profile.release]
+# thin LTO: ~80% of fat's benefit at fraction of link time; cross-crate inlining
+# unlocked across all 9 crates. codegen-units=1 removes parallelism barriers so
+# LLVM sees the full call graph. panic=abort removes unwind tables (~5% binary size).
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+opt-level = 3
+strip = "debuginfo"
+
+[profile.bench]
+# Benchmarks need debug symbols for flamegraphs; inherit release settings otherwise.
+inherits = "release"
+strip = "none"
+debug = true
+
 [workspace.dependencies]
 # Internal crates
 lune-core = { path = "crates/lune-core" }
@@ -56,6 +72,7 @@ dirs = "6"
 cpal = "0.15"
 rubato = "1.0.1"
 audioadapter-buffers = "2"
+mimalloc = { version = "0.1", default-features = false }
 ort = { version = "2.0.0-rc.11", features = ["ndarray", "std", "download-binaries", "copy-dylibs", "tls-native", "half"], default-features = false }
 ndarray = "0.17"
 rustfft = "6.4"
