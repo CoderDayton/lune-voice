@@ -74,12 +74,15 @@ impl OrtQwenAsrBackend {
         let decoder_path = dir.join("qwen3-asr-decoder.onnx");
         let tokenizer_path = dir.join("tokenizer.json");
 
-        let encoder = build_ort_session(&encoder_path, use_gpu)?;
-        let embed_tokens = build_ort_session(&embed_path, use_gpu)?;
-        let decoder = build_ort_session(&decoder_path, use_gpu)?;
+        let mut encoder = build_ort_session(&encoder_path, use_gpu)?;
+        let mut embed_tokens = build_ort_session(&embed_path, use_gpu)?;
+        let mut decoder = build_ort_session(&decoder_path, use_gpu)?;
 
         let tokenizer = tokenizers::Tokenizer::from_file(&tokenizer_path)
             .map_err(|e| Error::Asr(format!("tokenizer load: {e}")))?;
+
+        // Warmup: prime CUDA kernels for all three sessions.
+        warmup_asr(&mut encoder, &mut embed_tokens, &mut decoder)?;
 
         tracing::info!(
             model_dir = %dir.display(),
@@ -155,6 +158,67 @@ fn map_language_tag(language: &str) -> Option<&'static str> {
         "mk" => Some("Macedonian"),
         _ => None,
     }
+}
+
+// ── Warmup ──────────────────────────────────────────────────────────────────
+
+/// Run minimal dummy inference through each session to prime CUDA kernels.
+#[cold]
+fn warmup_asr(
+    encoder: &mut Session,
+    embed_tokens: &mut Session,
+    decoder: &mut Session,
+) -> Result<()> {
+    use ndarray::{Array2, Array3, ArrayD, IxDyn};
+    use ort::value::{DynValue, Value};
+    use ort_qwen_stream::{HEAD_DIM, HIDDEN_DIM, NUM_DECODER_LAYERS, NUM_KV_HEADS};
+
+    // 1) Encoder: tiny mel [1, 128, 2] — model expects f16.
+    let mel = Array3::from_elem((1, 128, 2), half::f16::ZERO);
+    let mel_val: DynValue = Value::from_array(mel.into_dyn())
+        .map_err(|e| Error::Asr(format!("warmup mel: {e}")))?
+        .into();
+    let _enc = encoder
+        .run(vec![("mel".to_string(), mel_val)])
+        .map_err(|e| Error::Asr(format!("warmup encoder: {e}")))?;
+
+    // 2) Embed_tokens: single token
+    let ids = Array2::from_shape_vec((1, 1), vec![0i64]).unwrap();
+    let ids_val: DynValue = Value::from_array(ids)
+        .map_err(|e| Error::Asr(format!("warmup ids: {e}")))?
+        .into();
+    let _emb = embed_tokens
+        .run(vec![("input_ids".to_string(), ids_val)])
+        .map_err(|e| Error::Asr(format!("warmup embed_tokens: {e}")))?;
+
+    // 3) Decoder: single-token input_embeds with empty KV cache — model expects f16.
+    let embeds = ArrayD::from_elem(IxDyn(&[1, 1, HIDDEN_DIM]), half::f16::ZERO);
+    let pos = Array3::from_shape_vec((3, 1, 1), vec![0i64, 0, 0]).unwrap();
+    let empty_kv = ArrayD::from_elem(IxDyn(&[1, NUM_KV_HEADS, 0, HEAD_DIM]), half::f16::ZERO);
+
+    let mut inputs: Vec<(String, DynValue)> = Vec::with_capacity(3 + NUM_DECODER_LAYERS * 2);
+    inputs.push((
+        "inputs_embeds".into(),
+        Value::from_array(embeds).unwrap().into(),
+    ));
+    inputs.push((
+        "position_ids".into(),
+        Value::from_array(pos).unwrap().into(),
+    ));
+    for layer in 0..NUM_DECODER_LAYERS {
+        for kind in &["key", "value"] {
+            inputs.push((
+                format!("past_key_values.{layer}.{kind}"),
+                Value::from_array(empty_kv.clone()).unwrap().into(),
+            ));
+        }
+    }
+    let _dec = decoder
+        .run(inputs)
+        .map_err(|e| Error::Asr(format!("warmup decoder: {e}")))?;
+
+    tracing::debug!("ASR warmup complete");
+    Ok(())
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────

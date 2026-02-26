@@ -16,6 +16,7 @@ lune-core.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 ort.workspace = true
+half = "2"
 ndarray.workspace = true
 rustfft.workspace = true
 serde.workspace = true

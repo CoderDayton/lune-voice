@@ -11,7 +11,7 @@ use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use ndarray::{Array2, Array4, IxDyn};
+use ndarray::{Array2, Array4};
 use ort::session::Session;
 use ort::session::builder::GraphOptimizationLevel;
 use ort::value::{DynValue, Value};
@@ -94,10 +94,13 @@ impl OrtLlmBackend {
             )));
         }
 
-        let session = build_llm_session(&model_path, config.use_gpu)?;
+        let mut session = build_llm_session(&model_path, config.use_gpu)?;
 
         let tokenizer = Tokenizer::from_file(&tokenizer_path)
             .map_err(|e| Error::Llm(format!("tokenizer: {e}")))?;
+
+        // Warmup: run a 1-token dummy inference to prime CUDA kernels.
+        warmup_llm(&mut session)?;
 
         tracing::info!(
             model = %model_path.display(),
@@ -184,6 +187,44 @@ const NUM_KV_LAYERS: usize = 28;
 const NUM_KV_HEADS: usize = 8;
 /// Dimension per KV head.
 const HEAD_DIM: usize = 128;
+
+/// Run a minimal 1-token prefill to prime CUDA JIT compilation and memory pools.
+#[cold]
+fn warmup_llm(session: &mut Session) -> Result<()> {
+    let input_ids = Array2::from_shape_vec((1, 1), vec![0i64]).unwrap();
+    let attention_mask = Array2::<i64>::ones((1, 1));
+    let position_ids = Array2::from_shape_vec((1, 1), vec![0i64]).unwrap();
+    let empty_kv = Array4::<f32>::zeros((1, NUM_KV_HEADS, 0, HEAD_DIM));
+
+    let mut inputs: Vec<(String, DynValue)> = Vec::with_capacity(3 + NUM_KV_LAYERS * 2);
+    inputs.push((
+        "input_ids".into(),
+        Value::from_array(input_ids).unwrap().into(),
+    ));
+    inputs.push((
+        "attention_mask".into(),
+        Value::from_array(attention_mask).unwrap().into(),
+    ));
+    inputs.push((
+        "position_ids".into(),
+        Value::from_array(position_ids).unwrap().into(),
+    ));
+    for layer in 0..NUM_KV_LAYERS {
+        for kind in &["key", "value"] {
+            inputs.push((
+                format!("past_key_values.{layer}.{kind}"),
+                Value::from_array(empty_kv.clone()).unwrap().into(),
+            ));
+        }
+    }
+
+    let _outputs = session
+        .run(inputs)
+        .map_err(|e| Error::Llm(format!("warmup: {e}")))?;
+
+    tracing::debug!("LLM warmup complete");
+    Ok(())
+}
 
 /// Run inference synchronously, returning generated text.
 ///
@@ -280,7 +321,7 @@ fn generate_sync(
     }
 
     let (last_logits, mut kv_cache) = {
-        let outputs = session
+        let mut outputs = session
             .run(inputs)
             .map_err(|e| Error::Llm(format!("prefill: {e}")))?;
 
@@ -293,22 +334,17 @@ fn generate_sync(
 
         let last_logits: Vec<f32> = logits_array.slice(ndarray::s![0, seq_len - 1, ..]).to_vec();
 
-        // Extract KV cache from prefill outputs.
+        // Take ownership of KV cache outputs — zero-copy GPU passthrough.
         let mut kv_cache: Vec<DynValue> = Vec::with_capacity(NUM_KV_LAYERS * 2);
-        for i in 1..outputs.len() {
-            let (shape, data) = outputs[i]
-                .try_extract_tensor::<f32>()
-                .map_err(|e| Error::Llm(format!("extract kv[{i}]: {e}")))?;
-
-            let dims: Vec<usize> = shape.as_ref().iter().map(|&d| d as usize).collect();
-            let arr = ndarray::ArrayD::from_shape_vec(IxDyn(&dims), data.to_vec())
-                .map_err(|e| Error::Llm(format!("kv array[{i}]: {e}")))?;
-
-            kv_cache.push(
-                Value::from_array(arr)
-                    .map_err(|e| Error::Llm(format!("kv value[{i}]: {e}")))?
-                    .into(),
-            );
+        for layer in 0..NUM_KV_LAYERS {
+            for kind in &["key", "value"] {
+                let name = format!("present.{layer}.{kind}");
+                kv_cache.push(
+                    outputs
+                        .remove(&name)
+                        .ok_or_else(|| Error::Llm(format!("missing output: {name}")))?,
+                );
+            }
         }
 
         (last_logits, kv_cache)
@@ -408,7 +444,7 @@ fn generate_sync(
             step_inputs.push((format!("past_key_values.{layer}.{kind}"), kv));
         }
 
-        let step_outputs = session
+        let mut step_outputs = session
             .run(step_inputs)
             .map_err(|e| Error::Llm(format!("decode step {step}: {e}")))?;
 
@@ -419,22 +455,17 @@ fn generate_sync(
 
         current_logits = step_logits.slice(ndarray::s![0, 0, ..]).to_vec();
 
-        // Update KV cache.
+        // Take ownership of KV outputs — zero-copy GPU passthrough.
         kv_cache = Vec::with_capacity(NUM_KV_LAYERS * 2);
-        for i in 1..step_outputs.len() {
-            let (shape, data) = step_outputs[i]
-                .try_extract_tensor::<f32>()
-                .map_err(|e| Error::Llm(format!("step kv[{i}]: {e}")))?;
-
-            let dims: Vec<usize> = shape.as_ref().iter().map(|&d| d as usize).collect();
-            let arr = ndarray::ArrayD::from_shape_vec(IxDyn(&dims), data.to_vec())
-                .map_err(|e| Error::Llm(format!("step kv array[{i}]: {e}")))?;
-
-            kv_cache.push(
-                Value::from_array(arr)
-                    .map_err(|e| Error::Llm(format!("step kv value[{i}]: {e}")))?
-                    .into(),
-            );
+        for layer in 0..NUM_KV_LAYERS {
+            for kind in &["key", "value"] {
+                let name = format!("present.{layer}.{kind}");
+                kv_cache.push(
+                    step_outputs
+                        .remove(&name)
+                        .ok_or_else(|| Error::Llm(format!("missing output: {name}")))?,
+                );
+            }
         }
     }
 

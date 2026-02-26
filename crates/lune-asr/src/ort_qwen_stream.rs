@@ -405,6 +405,7 @@ pub(crate) fn stream_push_audio(
         state.prev_prefill_len = prefill_len;
 
         // Autoregressive decode: generate up to max_new_tokens.
+        let prefill_end_pos = reused.max(delta_start + delta_len);
         let chunk_tokens = autoregressive_decode(
             decoder,
             embed_tokens,
@@ -412,9 +413,10 @@ pub(crate) fn stream_push_audio(
             &mut current_kv,
             last_logits,
             cfg.max_new_tokens,
+            prefill_end_pos,
         )?;
 
-        let kv_seq_after_decode = reused.max(delta_start + delta_len) + chunk_tokens.len();
+        let kv_seq_after_decode = prefill_end_pos + chunk_tokens.len();
 
         // Speech-end detection: empty decode → commit all rollback tokens.
         let is_speech_end = chunk_tokens.is_empty() && state.chunk_idx >= cfg.unfixed_chunks;
@@ -511,8 +513,9 @@ pub(crate) fn stream_push_audio(
 // ── Encoder ─────────────────────────────────────────────────────────────────
 
 fn run_encoder(encoder: &mut Session, mel: Array3<f32>) -> Result<ArrayD<f32>> {
-    let mel_dyn = mel.into_dyn();
-    let mel_val: DynValue = Value::from_array(mel_dyn)
+    // Model expects f16 mel input; convert at boundary.
+    let mel_f16 = mel.mapv(half::f16::from_f32).into_dyn();
+    let mel_val: DynValue = Value::from_array(mel_f16)
         .map_err(|e| Error::Asr(format!("mel tensor: {e}")))?
         .into();
     let inputs = vec![("mel".to_string(), mel_val)];
@@ -521,11 +524,12 @@ fn run_encoder(encoder: &mut Session, mel: Array3<f32>) -> Result<ArrayD<f32>> {
         .run(inputs)
         .map_err(|e| Error::Asr(format!("encoder: {e}")))?;
 
-    let features: ndarray::ArrayViewD<f32> = outputs[0]
+    // Encoder outputs f16; convert back to f32 for internal processing.
+    let features: ndarray::ArrayViewD<half::f16> = outputs[0]
         .try_extract_array()
         .map_err(|e| Error::Asr(format!("encoder features: {e}")))?;
 
-    Ok(features.to_owned())
+    Ok(features.mapv(|v| v.to_f32()))
 }
 
 // ── Input embeddings ────────────────────────────────────────────────────────
@@ -601,11 +605,12 @@ fn token_embeddings(embed_tokens: &mut Session, tokens: &[i64]) -> Result<ArrayD
         .run(inputs)
         .map_err(|e| Error::Asr(format!("embed_tokens: {e}")))?;
 
-    let embeds: ndarray::ArrayViewD<f32> = outputs[0]
+    // Embed_tokens outputs f16; convert to f32 for internal processing.
+    let embeds: ndarray::ArrayViewD<half::f16> = outputs[0]
         .try_extract_array()
         .map_err(|e| Error::Asr(format!("token embeds: {e}")))?;
 
-    Ok(embeds.to_owned())
+    Ok(embeds.mapv(|v| v.to_f32()))
 }
 
 // ── LCP reuse ───────────────────────────────────────────────────────────────
@@ -644,7 +649,7 @@ fn compute_lcp_reuse(
 fn empty_kv_cache() -> Vec<DynValue> {
     let mut kv = Vec::with_capacity(NUM_DECODER_LAYERS * 2);
     for _ in 0..NUM_DECODER_LAYERS * 2 {
-        let arr = ArrayD::<f32>::zeros(IxDyn(&[1, NUM_KV_HEADS, 0, HEAD_DIM]));
+        let arr = ArrayD::from_elem(IxDyn(&[1, NUM_KV_HEADS, 0, HEAD_DIM]), half::f16::ZERO);
         kv.push(Value::from_array(arr).expect("empty kv tensor").into());
     }
     kv
@@ -663,7 +668,7 @@ fn truncate_kv_cache(
     let mut result = Vec::with_capacity(kv_cache.len());
     for (i, kv) in kv_cache.iter().enumerate() {
         let (shape, data) = kv
-            .try_extract_tensor::<f32>()
+            .try_extract_tensor::<half::f16>()
             .map_err(|e| Error::Asr(format!("kv extract[{i}]: {e}")))?;
         let dims: Vec<usize> = shape.as_ref().iter().map(|&d| d as usize).collect();
         // Shape: [1, num_kv_heads, seq_len, head_dim]
@@ -684,7 +689,7 @@ fn clone_kv_cache(kv_cache: &[DynValue]) -> Result<Vec<DynValue>> {
     let mut result = Vec::with_capacity(kv_cache.len());
     for (i, kv) in kv_cache.iter().enumerate() {
         let (shape, data) = kv
-            .try_extract_tensor::<f32>()
+            .try_extract_tensor::<half::f16>()
             .map_err(|e| Error::Asr(format!("kv clone[{i}]: {e}")))?;
         let dims: Vec<usize> = shape.as_ref().iter().map(|&d| d as usize).collect();
         let arr = ArrayD::from_shape_vec(IxDyn(&dims), data.to_vec())
@@ -710,9 +715,11 @@ fn decoder_prefill(
     let seq_len = input_embeds.shape()[1];
     let mut inputs: Vec<(String, DynValue)> = Vec::with_capacity(3 + NUM_DECODER_LAYERS * 2);
 
+    // Decoder expects f16 inputs_embeds.
+    let embeds_f16 = input_embeds.mapv(half::f16::from_f32);
     inputs.push((
         "inputs_embeds".to_string(),
-        Value::from_array(input_embeds)
+        Value::from_array(embeds_f16)
             .map_err(|e| Error::Asr(format!("prefill embeds: {e}")))?
             .into(),
     ));
@@ -740,31 +747,32 @@ fn decoder_prefill(
         inputs.push((format!("past_key_values.{layer}.{kind}"), kv));
     }
 
-    let outputs = decoder
+    let mut outputs = decoder
         .run(inputs)
         .map_err(|e| Error::Asr(format!("decoder prefill: {e}")))?;
 
-    // Extract logits — last position only.
-    let logits_view: ndarray::ArrayViewD<f32> = outputs[0]
+    // Extract logits (f16) — last position only, convert to f32.
+    let logits_view: ndarray::ArrayViewD<half::f16> = outputs[0]
         .try_extract_array()
         .map_err(|e| Error::Asr(format!("prefill logits: {e}")))?;
     let seq_len = logits_view.shape()[1];
-    let last_logits = logits_view.slice(s![0, seq_len - 1, ..]).to_vec();
+    let last_logits: Vec<f32> = logits_view
+        .slice(s![0, seq_len - 1, ..])
+        .iter()
+        .map(|v| v.to_f32())
+        .collect();
 
-    // Extract updated KV cache.
+    // Take ownership of KV cache outputs — zero-copy GPU passthrough.
     let mut new_kv = Vec::with_capacity(NUM_DECODER_LAYERS * 2);
-    for i in 1..outputs.len() {
-        let (shape, data) = outputs[i]
-            .try_extract_tensor::<f32>()
-            .map_err(|e| Error::Asr(format!("prefill kv[{i}]: {e}")))?;
-        let dims: Vec<usize> = shape.as_ref().iter().map(|&d| d as usize).collect();
-        let arr = ArrayD::from_shape_vec(IxDyn(&dims), data.to_vec())
-            .map_err(|e| Error::Asr(format!("prefill kv arr[{i}]: {e}")))?;
-        new_kv.push(
-            Value::from_array(arr)
-                .map_err(|e| Error::Asr(format!("prefill kv val[{i}]: {e}")))?
-                .into(),
-        );
+    for layer in 0..NUM_DECODER_LAYERS {
+        for kind in &["key", "value"] {
+            let name = format!("present_key_values.{layer}.{kind}");
+            new_kv.push(
+                outputs
+                    .remove(&name)
+                    .ok_or_else(|| Error::Asr(format!("missing output: {name}")))?,
+            );
+        }
     }
 
     Ok((new_kv, last_logits))
@@ -780,6 +788,7 @@ fn autoregressive_decode(
     kv_cache: &mut Vec<DynValue>,
     initial_logits: Vec<f32>,
     max_tokens: usize,
+    initial_pos: usize,
 ) -> Result<Vec<i64>> {
     let eos_id = tokenizer
         .token_to_id("<|im_end|>")
@@ -788,6 +797,7 @@ fn autoregressive_decode(
 
     let mut tokens = Vec::with_capacity(max_tokens);
     let mut current_logits = initial_logits;
+    let mut cur_pos = initial_pos;
 
     for _ in 0..max_tokens {
         // Greedy decode (temperature=0 for ASR).
@@ -802,22 +812,14 @@ fn autoregressive_decode(
         // Get embedding for next token.
         let tok_embeds = token_embeddings(embed_tokens, &[next_token])?;
 
-        // Determine current position from existing KV cache length.
-        let cur_pos = if kv_cache.is_empty() {
-            0usize
-        } else {
-            let (shape, _) = kv_cache[0]
-                .try_extract_tensor::<f32>()
-                .map_err(|e| Error::Asr(format!("kv pos extract: {e}")))?;
-            shape.as_ref()[2] as usize
-        };
-
         // Single-token decode step.
         let mut inputs: Vec<(String, DynValue)> = Vec::with_capacity(3 + NUM_DECODER_LAYERS * 2);
 
+        // Decoder expects f16 inputs_embeds.
+        let tok_f16 = tok_embeds.mapv(half::f16::from_f32);
         inputs.push((
             "inputs_embeds".to_string(),
-            Value::from_array(tok_embeds)
+            Value::from_array(tok_f16)
                 .map_err(|e| Error::Asr(format!("decode embed: {e}")))?
                 .into(),
         ));
@@ -840,30 +842,33 @@ fn autoregressive_decode(
             inputs.push((format!("past_key_values.{layer}.{kind}"), kv));
         }
 
-        let step_outputs = decoder
+        let mut step_outputs = decoder
             .run(inputs)
             .map_err(|e| Error::Asr(format!("decode step: {e}")))?;
 
-        // Extract logits.
-        let logits_view: ndarray::ArrayViewD<f32> = step_outputs[0]
+        // Extract logits (f16), convert to f32.
+        let logits_view: ndarray::ArrayViewD<half::f16> = step_outputs[0]
             .try_extract_array()
             .map_err(|e| Error::Asr(format!("step logits: {e}")))?;
-        current_logits = logits_view.slice(s![0, 0, ..]).to_vec();
+        current_logits = logits_view
+            .slice(s![0, 0, ..])
+            .iter()
+            .map(|v| v.to_f32())
+            .collect();
 
-        // Extract updated KV cache.
-        for i in 1..step_outputs.len() {
-            let (shape, data) = step_outputs[i]
-                .try_extract_tensor::<f32>()
-                .map_err(|e| Error::Asr(format!("step kv[{i}]: {e}")))?;
-            let dims: Vec<usize> = shape.as_ref().iter().map(|&d| d as usize).collect();
-            let arr = ArrayD::from_shape_vec(IxDyn(&dims), data.to_vec())
-                .map_err(|e| Error::Asr(format!("step kv arr[{i}]: {e}")))?;
-            kv_cache.push(
-                Value::from_array(arr)
-                    .map_err(|e| Error::Asr(format!("step kv val[{i}]: {e}")))?
-                    .into(),
-            );
+        // Take ownership of KV outputs — zero-copy GPU passthrough.
+        for layer in 0..NUM_DECODER_LAYERS {
+            for kind in &["key", "value"] {
+                let name = format!("present_key_values.{layer}.{kind}");
+                kv_cache.push(
+                    step_outputs
+                        .remove(&name)
+                        .ok_or_else(|| Error::Asr(format!("missing output: {name}")))?,
+                );
+            }
         }
+
+        cur_pos += 1;
     }
 
     Ok(tokens)

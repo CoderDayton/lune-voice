@@ -214,19 +214,12 @@ impl AsrBackend for AsrBackendDispatch {
 /// Initialize the global ORT environment with execution providers.
 ///
 /// Must be called exactly once, before any ORT `Session` is created.
-/// When any backend requests GPU (`use_gpu: true`), registers the CUDA EP
-/// so all sessions share a single CUDA memory arena.  Falls back to CPU
-/// when the `cuda` feature is not enabled.
+/// Registers CUDA EP when `settings.device` requests GPU.
+/// All sessions share a single CUDA memory arena.  Falls back to CPU
+/// when the `cuda` feature is not enabled or CUDA init fails.
 #[cold]
 pub fn init_ort_runtime(settings: &UserSettings) {
-    let wants_gpu = match &settings.asr_backend {
-        AsrBackendConfig::ParakeetTdt { use_gpu, .. } => *use_gpu,
-        AsrBackendConfig::OrtQwenAsr { use_gpu, .. } => *use_gpu,
-        _ => false,
-    } || match &settings.llm_backend {
-        LlmBackendConfig::OrtLocal { use_gpu, .. } => *use_gpu,
-        _ => false,
-    };
+    let wants_gpu = settings.device.use_gpu(cfg!(feature = "cuda"));
 
     if wants_gpu {
         #[cfg(feature = "cuda")]
@@ -292,10 +285,10 @@ pub fn patch_model_paths(settings: &mut UserSettings, resolved: &ResolvedModels)
 #[cold]
 pub fn build_asr_backend(settings: &UserSettings) -> Result<AsrBackendDispatch> {
     match &settings.asr_backend {
-        AsrBackendConfig::ParakeetTdt { model_dir, use_gpu } => {
+        AsrBackendConfig::ParakeetTdt { model_dir } => {
             let backend = ParakeetTdtBackend::new(ParakeetTdtConfig {
                 model_dir: model_dir.clone(),
-                use_gpu: *use_gpu,
+                use_gpu: settings.device.use_gpu(cfg!(feature = "cuda")),
             })?;
             Ok(AsrBackendDispatch::Parakeet(backend))
         }
@@ -324,7 +317,6 @@ pub fn build_asr_backend(settings: &UserSettings) -> Result<AsrBackendDispatch> 
         )),
         AsrBackendConfig::OrtQwenAsr {
             model_dir,
-            use_gpu,
             stream_chunk_sec,
             stream_rollback,
             stream_unfixed_chunks,
@@ -333,7 +325,7 @@ pub fn build_asr_backend(settings: &UserSettings) -> Result<AsrBackendDispatch> 
         } => {
             let backend = OrtQwenAsrBackend::new(OrtQwenAsrConfig {
                 model_dir: model_dir.clone(),
-                use_gpu: *use_gpu,
+                use_gpu: settings.device.use_gpu(cfg!(feature = "cuda")),
                 stream_chunk_sec: *stream_chunk_sec,
                 stream_rollback: *stream_rollback,
                 stream_unfixed_chunks: *stream_unfixed_chunks,
@@ -369,7 +361,6 @@ pub fn build_post_processor(settings: &UserSettings) -> Result<Arc<dyn TextPostP
     match &settings.llm_backend {
         LlmBackendConfig::OrtLocal {
             model_dir,
-            use_gpu,
             n_ctx,
             max_output_tokens,
             temperature,
@@ -380,7 +371,7 @@ pub fn build_post_processor(settings: &UserSettings) -> Result<Arc<dyn TextPostP
         } => {
             let backend = lune_llm::OrtLlmBackend::new(lune_llm::OrtLlmConfig {
                 model_dir: model_dir.clone(),
-                use_gpu: *use_gpu,
+                use_gpu: settings.device.use_gpu(cfg!(feature = "cuda")),
                 n_ctx: *n_ctx,
                 max_output_tokens: *max_output_tokens,
                 temperature: *temperature,

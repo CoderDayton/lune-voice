@@ -11,6 +11,8 @@ use super::style::StyleId;
 /// Top-level user settings, persisted as TOML.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserSettings {
+    /// Compute device for local inference: `Cpu`, `Cuda`, or `Auto`.
+    pub device: DevicePolicy,
     pub asr_backend: AsrBackendConfig,
     pub llm_backend: LlmBackendConfig,
     pub hotkey: HotkeyConfig,
@@ -27,9 +29,9 @@ pub struct UserSettings {
 impl Default for UserSettings {
     fn default() -> Self {
         Self {
+            device: DevicePolicy::Auto,
             asr_backend: AsrBackendConfig::OrtQwenAsr {
                 model_dir: PathBuf::new(),
-                use_gpu: true,
                 stream_chunk_sec: default_qwen_stream_chunk_sec(),
                 stream_rollback: default_qwen_stream_rollback(),
                 stream_unfixed_chunks: default_qwen_stream_unfixed_chunks(),
@@ -38,7 +40,6 @@ impl Default for UserSettings {
             },
             llm_backend: LlmBackendConfig::OrtLocal {
                 model_dir: PathBuf::new(),
-                use_gpu: true,
                 n_ctx: 2048,
                 max_output_tokens: 256,
                 temperature: 0.0,
@@ -64,7 +65,6 @@ impl Default for UserSettings {
 pub enum AsrBackendConfig {
     ParakeetTdt {
         model_dir: PathBuf,
-        use_gpu: bool,
     },
     QwenAsr {
         model_dir: PathBuf,
@@ -86,7 +86,6 @@ pub enum AsrBackendConfig {
     },
     OrtQwenAsr {
         model_dir: PathBuf,
-        use_gpu: bool,
         /// Streaming chunk size in seconds.
         #[serde(default = "default_qwen_stream_chunk_sec")]
         stream_chunk_sec: f32,
@@ -117,7 +116,6 @@ pub enum AsrBackendConfig {
 pub enum LlmBackendConfig {
     OrtLocal {
         model_dir: PathBuf,
-        use_gpu: bool,
         #[serde(default = "default_n_ctx")]
         n_ctx: u32,
         #[serde(default = "default_max_output_tokens")]
@@ -186,4 +184,33 @@ fn default_qwen_past_text_conditioning() -> bool {
 pub enum StreamingMode {
     WebSocket,
     HttpPolling,
+}
+
+/// Compute device policy for local model inference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum DevicePolicy {
+    /// Force CPU-only inference.
+    Cpu,
+    /// Force CUDA GPU inference (fails if `cuda` feature not compiled).
+    Cuda,
+    /// Use CUDA when the `cuda` feature is compiled in, otherwise CPU.
+    #[default]
+    Auto,
+}
+
+impl DevicePolicy {
+    /// Resolve to a boolean for backend `use_gpu` fields.
+    ///
+    /// - `Cpu` → always false
+    /// - `Cuda` → always true
+    /// - `Auto` → delegates to `cuda_available` (caller passes compile-time flag)
+    #[inline]
+    pub fn use_gpu(self, cuda_available: bool) -> bool {
+        match self {
+            Self::Cpu => false,
+            Self::Cuda => true,
+            Self::Auto => cuda_available,
+        }
+    }
 }
