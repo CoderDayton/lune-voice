@@ -145,6 +145,7 @@ impl AsrBackend for ParakeetTdtBackend {
             start_ms: Some(timestamp_ms),
             end_ms: Some(timestamp_ms),
             confidence: Some(result.confidence),
+            min_token_confidence: None,
         }])
     }
 

@@ -29,6 +29,13 @@ pub struct UserSettings {
     /// Range 0.0–1.0; `None` disables gating (all segments go to LLM).
     #[serde(default = "default_confidence_threshold")]
     pub confidence_threshold: Option<f32>,
+    /// Minimum single-token confidence threshold. Even if the sentence-level
+    /// mean exceeds `confidence_threshold`, a segment with any token below
+    /// this value is routed to LLM for correction.
+    /// Per arXiv:2407.21414, 0.7 is optimal for catching low-quality words.
+    /// `None` disables the secondary gate.
+    #[serde(default = "default_min_token_threshold")]
+    pub min_token_threshold: Option<f32>,
 }
 
 impl Default for UserSettings {
@@ -62,6 +69,7 @@ impl Default for UserSettings {
             activation_mode: ActivationMode::default(),
             session_history_days: Some(30),
             confidence_threshold: default_confidence_threshold(),
+            min_token_threshold: default_min_token_threshold(),
         }
     }
 }
@@ -195,6 +203,10 @@ fn default_qwen_max_encoder_sec() -> f32 {
 
 fn default_confidence_threshold() -> Option<f32> {
     Some(0.95)
+}
+
+fn default_min_token_threshold() -> Option<f32> {
+    Some(0.7)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

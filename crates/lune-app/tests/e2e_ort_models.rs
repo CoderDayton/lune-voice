@@ -160,7 +160,7 @@ async fn transcribe(asr: &OrtQwenAsrBackend, audio: &[f32]) -> Vec<AsrSegment> {
         .start_session(AsrSessionConfig::default())
         .await
         .unwrap();
-    let chunk_size = 8_000; // 0.5s — matches default stream_chunk_sec
+    let chunk_size = 16_000; // 1.0s — matches default stream_chunk_sec
     let mut segments = Vec::new();
     for chunk in audio.chunks(chunk_size) {
         asr.push_audio(&handle, chunk).await.unwrap();
@@ -343,45 +343,78 @@ async fn full_pipeline_asr_to_llm() {
     let segments = transcribe(asr, &audio).await;
     let asr_time = t.elapsed();
 
-    let raw_text = if segments.is_empty() || segments[0].text.trim().is_empty() {
-        "um so yeah the uh meeting is at three".to_string()
-    } else {
-        segments
-            .iter()
-            .map(|s| s.text.as_str())
-            .collect::<Vec<_>>()
-            .join(" ")
-    };
-
-    // Confidence report.
-    for seg in &segments {
-        let conf = seg.confidence.unwrap_or(0.0);
-        let gate = if seg.is_confident(0.95) {
-            "BYPASS"
-        } else {
-            "LLM"
-        };
-        eprintln!(
-            "[pipeline] seg={} conf={conf:.4} {gate}: {:?}",
-            seg.id, seg.text
-        );
-    }
     if let Some(gt) = &ground_truth {
         eprintln!("[pipeline] truth: {gt}");
     }
 
-    // LLM pass.
-    let t = Instant::now();
-    let output = llm.transform(&llm_input(&raw_text)).await.unwrap();
-    let llm_time = t.elapsed();
+    // Two-level confidence gating (mirrors session.rs:427-462).
+    // Per arXiv:2407.21414: sentence threshold=0.95, min-token threshold=0.7.
+    let mean_threshold = 0.95;
+    let min_token_threshold = 0.7;
+    let mut session_text = String::new();
+    let mut llm_time = std::time::Duration::ZERO;
+    let mut bypassed = 0usize;
+    let mut routed = 0usize;
+
+    for seg in &segments {
+        let text = seg.text.trim();
+        if text.is_empty() {
+            continue;
+        }
+
+        if seg.is_confident_gated(mean_threshold, min_token_threshold) {
+            // High confidence → bypass LLM, use raw ASR text directly.
+            if !session_text.is_empty() {
+                session_text.push(' ');
+            }
+            session_text.push_str(text);
+            bypassed += 1;
+            eprintln!(
+                "[pipeline] conf={:.3} min_tok={:.3} BYPASS: {text:?}",
+                seg.confidence.unwrap_or(1.0),
+                seg.min_token_confidence.unwrap_or(1.0),
+            );
+        } else {
+            // Low confidence → route to LLM individually.
+            let t = Instant::now();
+            let output = llm.transform(&llm_input(text)).await.unwrap();
+            let seg_llm_time = t.elapsed();
+            llm_time += seg_llm_time;
+            let corrected = output.cleaned_text.trim();
+            if !corrected.is_empty() {
+                if !session_text.is_empty() {
+                    session_text.push(' ');
+                }
+                session_text.push_str(corrected);
+            }
+            routed += 1;
+            eprintln!(
+                "[pipeline] conf={:.3} min_tok={:.3} LLM ({seg_llm_time:?}): {text:?} → {corrected:?}",
+                seg.confidence.unwrap_or(0.0),
+                seg.min_token_confidence.unwrap_or(0.0),
+            );
+        }
+    }
+
+    let total_segs = bypassed + routed;
+    let bypass_pct = if total_segs > 0 {
+        bypassed as f64 / total_segs as f64 * 100.0
+    } else {
+        0.0
+    };
 
     eprintln!(
-        "[pipeline] asr={asr_time:?} ({:.1}x RT), llm={llm_time:?}, total={:?}",
+        "[pipeline] asr={asr_time:?} ({:.2}x RT), llm={llm_time:?}, total={:?}",
         asr_time.as_secs_f64() / total_secs,
         asr_time + llm_time,
     );
-    eprintln!("[pipeline] raw:  {raw_text:?}");
-    eprintln!("[pipeline] llm:  {:?}", output.cleaned_text);
+    eprintln!(
+        "[pipeline] gating: {bypassed}/{total_segs} bypass ({bypass_pct:.0}%), {routed} routed to LLM"
+    );
+    eprintln!("[pipeline] output: {session_text:?}");
 
-    assert!(!output.cleaned_text.is_empty());
+    assert!(
+        !session_text.is_empty() || segments.is_empty(),
+        "pipeline produced no text from non-empty segments"
+    );
 }

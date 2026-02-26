@@ -367,6 +367,7 @@ impl VerboseJsonResponse {
                 start_ms: None,
                 end_ms: None,
                 confidence: None,
+                min_token_confidence: None,
             }];
         }
 
@@ -382,6 +383,7 @@ impl VerboseJsonResponse {
                     start_ms: Some((s.start * 1000.0) as u64),
                     end_ms: Some((s.end * 1000.0) as u64),
                     confidence: None,
+                    min_token_confidence: None,
                 });
             }
         }

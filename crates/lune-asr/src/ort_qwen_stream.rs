@@ -199,7 +199,7 @@ fn qwen_hann() -> &'static [f32] {
 ///
 /// Uses thread-local scratch buffers (padded, frame, fft_scratch) and a
 /// process-global cached FFT plan to eliminate ~220 KB of heap allocations per call.
-pub(crate) fn compute_qwen_mel(audio: &[f32]) -> Array3<f32> {
+pub fn compute_qwen_mel(audio: &[f32]) -> Array3<f32> {
     if audio.is_empty() {
         return Array3::<f32>::zeros((1, MEL_BINS, 0));
     }
@@ -370,6 +370,16 @@ impl OrtStreamState {
         }
         let mean_log_prob = new_lps.iter().sum::<f32>() / new_lps.len() as f32;
         Some(mean_log_prob.exp())
+    }
+
+    /// Minimum single-token confidence (exp of min log-prob) for the stable
+    /// tokens emitted since `prev_stable_len`. Returns `None` if no new tokens.
+    pub fn min_confidence_since(&self, prev_stable_len: usize) -> Option<f32> {
+        self.stable_log_probs[prev_stable_len..]
+            .iter()
+            .copied()
+            .reduce(f32::min)
+            .map(f32::exp)
     }
 }
 
@@ -1735,6 +1745,29 @@ mod tests {
         // From position 3: no new tokens.
         assert_eq!(state.confidence_since(3), None);
     }
+
+    #[test]
+    fn min_confidence_since_returns_worst_token() {
+        let mut state = OrtStreamState::new();
+        state.stable_log_probs = vec![-0.1f32, -0.8, -0.2];
+        state.stable_text_tokens = vec![1, 2, 3];
+
+        // From position 0: minimum is the worst token (log_prob = -0.8).
+        let min_conf = state.min_confidence_since(0).unwrap();
+        let expected = (-0.8f32).exp();
+        assert!(
+            (min_conf - expected).abs() < 1e-6,
+            "got {min_conf}, expected {expected}"
+        );
+
+        // From position 2: only last token.
+        let min2 = state.min_confidence_since(2).unwrap();
+        assert!((min2 - (-0.2f32).exp()).abs() < 1e-6);
+
+        // From position 3: no new tokens.
+        assert_eq!(state.min_confidence_since(3), None);
+    }
+
     /// Process the entire LibriSpeech WAV in one shot — no chunking.
     ///
     /// Encodes all audio at once, builds full input_embeds (no stable tokens),

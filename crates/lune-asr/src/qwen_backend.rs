@@ -225,6 +225,7 @@ impl AsrBackend for QwenAsrBackend {
         Ok(vec![AsrSegment {
             id,
             confidence: None,
+            min_token_confidence: None,
             // `stream_push_audio` only emits committed/stable deltas.
             is_final: true,
             start_ms: Some(start_ms),

@@ -30,9 +30,10 @@ const MAX_SESSION_LENGTH: Duration = Duration::from_secs(60);
 const MIN_SAMPLES_BEFORE_POLL: usize = 3_200;
 
 /// Silence duration (in samples at 16 kHz) after speech that triggers a flush.
-/// 300 ms = 4_800 samples — long enough to skip inter-word pauses,
-/// short enough for responsive end-of-utterance detection.
-const SILENCE_FLUSH_SAMPLES: usize = 4_800;
+/// 200 ms = 3_200 samples — matches natural conversation turn-taking gap
+/// (Stivers et al. 2009: 208 ms mean across 10 languages). Short enough
+/// for responsive end-of-utterance detection while clearing inter-word pauses.
+const SILENCE_FLUSH_SAMPLES: usize = 3_200;
 /// Keep forwarding a short silence tail after speech so brief words can still
 /// reach backend chunking thresholds and get committed.
 const ASR_PUSH_HANGOVER_SAMPLES: usize = 8_000; // 500ms @ 16kHz
@@ -46,6 +47,8 @@ pub struct SessionManagerConfig {
     pub asr_backend_kind: AsrBackendKind,
     /// Confidence threshold for LLM bypass. `None` = always send to LLM.
     pub confidence_threshold: Option<f32>,
+    /// Min single-token confidence threshold. `None` = no word-level gate.
+    pub min_token_threshold: Option<f32>,
 }
 
 impl Default for SessionManagerConfig {
@@ -54,6 +57,7 @@ impl Default for SessionManagerConfig {
             asr_config: AsrSessionConfig::default(),
             asr_backend_kind: AsrBackendKind::ParakeetTdt,
             confidence_threshold: Some(0.95),
+            min_token_threshold: Some(0.7),
         }
     }
 }
@@ -422,11 +426,15 @@ async fn run_session<A: AsrBackend + 'static>(
 
                         if seg.is_final {
                             if !remaining.is_empty() {
-                                // Confidence gating: high-confidence segments
-                                // bypass LLM to avoid overcorrection.
+                                // Two-level confidence gating: sentence mean AND
+                                // min-token check (arXiv:2407.21414). High-confidence
+                                // segments bypass LLM to avoid overcorrection.
                                 let gate_pass = config
                                     .confidence_threshold
-                                    .is_some_and(|t| seg.is_confident(t));
+                                    .is_some_and(|t| {
+                                        let min_t = config.min_token_threshold.unwrap_or(0.0);
+                                        seg.is_confident_gated(t, min_t)
+                                    });
 
                                 if gate_pass {
                                     let applied = {

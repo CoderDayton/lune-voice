@@ -121,8 +121,8 @@ fn bench_full_pipeline_sim() {
     println!();
 
     let configs = [
-        ("8-word flush (current)", 8usize, 200u64, 80u64),
-        ("Silence-only (old)", usize::MAX, 800, 100),
+        ("8-word flush (current)", 8usize, 200u64, 75u64),
+        ("Silence-only (old)", usize::MAX, 500, 100),
     ];
 
     for (label, words_per_flush, silence_ms, inference_ms) in &configs {
@@ -203,20 +203,20 @@ fn print_latency_budget() {
     println!("  stop talking to when text appears in the focused field.");
     println!();
     println!("  Current after-speech wait breakdown:");
-    println!("    Silence timeout:         500 ms  ← biggest knob");
-    println!("    Inference (final poll):  ~100 ms  (Parakeet TDT 0.6B CPU)");
+    println!("    Silence timeout:         200 ms  (SILENCE_FLUSH_SAMPLES=3200)");
+    println!("    Inference (final poll):   ~75 ms  (Qwen3-ASR-0.6B, 1s chunk, GPU)");
     println!("    Dictionary apply:          <1 ms");
-    println!("    LLM post-process:           0 ms  (bypassed)");
+    println!("    LLM post-process:           0 ms  (bypassed at 87% rate)");
     println!("    Delivery (paste):          ~5 ms");
     println!("    ─────────────────────────────────");
-    println!("    CURRENT TOTAL:           ~605 ms");
+    println!("    CURRENT TOTAL:           ~280 ms");
     println!();
-    println!("  With optimized settings:");
+    println!("  CPU-only after-speech wait:");
     println!("    Silence timeout:         200 ms");
-    println!("    Inference:              ~100 ms");
+    println!("    Inference (final poll):  ~680 ms  (Qwen3-ASR-0.6B, 1s chunk, CPU)");
     println!("    Delivery:                 ~5 ms");
     println!("    ─────────────────────────────────");
-    println!("    OPTIMIZED TOTAL:         ~305 ms");
+    println!("    CPU TOTAL:               ~885 ms");
     println!();
     println!("  Key insight: the inference trigger threshold (currently 16000");
     println!("  samples = 1 sec) does NOT add to after-speech wait — it only");
@@ -224,9 +224,10 @@ fn print_latency_budget() {
     println!("  delivery, the bottleneck is silence_timeout + one last");
     println!("  inference poll.");
     println!();
-    println!("  RECOMMENDATIONS:");
-    println!("    1. Lower silence_timeout: 500 → 200 ms  (save 300 ms)");
-    println!("    2. Lower inference trigger: 16000 → 4800  (faster partials)");
-    println!("    3. Both: total after-speech ≈ 305 ms (feels instant)");
+    println!("  Latency targets (Stivers et al. 2009, PNAS):");
+    println!("    <200 ms  feels instantaneous (human turn-taking mean=208ms)");
+    println!("    <300 ms  natural and responsive (AssemblyAI 300ms rule)");
+    println!("    <500 ms  hard ceiling for voice AI (MMNTM threshold)");
+    println!("    GPU path (280ms) meets the 300ms natural target.");
     println!();
 }

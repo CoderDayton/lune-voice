@@ -13,6 +13,11 @@ pub struct AsrSegment {
     /// `None` for backends that don't expose logits (e.g. OpenAI API).
     #[serde(default)]
     pub confidence: Option<f32>,
+    /// Minimum single-token confidence in the segment (0.0–1.0).
+    /// Used for word-level gating: even if the mean is high, one
+    /// low-confidence token flags the segment for LLM review.
+    #[serde(default)]
+    pub min_token_confidence: Option<f32>,
     /// Immutable once true.
     pub is_final: bool,
     pub start_ms: Option<u64>,
@@ -27,6 +32,17 @@ impl AsrSegment {
     #[inline(always)]
     pub fn is_confident(&self, threshold: f32) -> bool {
         self.confidence.is_none_or(|c| c >= threshold)
+    }
+
+    /// Two-level confidence gate: sentence-level mean AND min-token check.
+    /// Per arXiv:2407.21414, sentence threshold=0.95 + word threshold=0.7
+    /// catches segments where one bad token drags overall quality down.
+    #[inline(always)]
+    pub fn is_confident_gated(&self, mean_threshold: f32, min_token_threshold: f32) -> bool {
+        self.is_confident(mean_threshold)
+            && self
+                .min_token_confidence
+                .is_none_or(|m| m >= min_token_threshold)
     }
 
     /// Duration of the segment in milliseconds, if both timestamps are known.
@@ -110,6 +126,7 @@ mod tests {
             start_ms: Some(0),
             end_ms: Some(1500),
             confidence: Some(0.95),
+            min_token_confidence: Some(0.80),
         }
     }
 
@@ -164,5 +181,26 @@ mod tests {
         let mut seg = make_segment();
         seg.start_ms = None;
         assert_eq!(seg.duration_ms(), None);
+    }
+
+    #[test]
+    fn is_confident_gated_passes_both_thresholds() {
+        let seg = make_segment(); // confidence=0.95, min_token=0.80
+        assert!(seg.is_confident_gated(0.90, 0.7));
+    }
+
+    #[test]
+    fn is_confident_gated_fails_on_low_min_token() {
+        let mut seg = make_segment();
+        seg.confidence = Some(0.98); // mean is high
+        seg.min_token_confidence = Some(0.5); // but one token is bad
+        assert!(!seg.is_confident_gated(0.95, 0.7));
+    }
+
+    #[test]
+    fn is_confident_gated_none_min_token_passes() {
+        let mut seg = make_segment();
+        seg.min_token_confidence = None; // backend doesn't expose per-token
+        assert!(seg.is_confident_gated(0.90, 0.7));
     }
 }

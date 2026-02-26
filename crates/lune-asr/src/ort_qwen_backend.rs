@@ -338,6 +338,7 @@ impl AsrBackend for OrtQwenAsrBackend {
         )?;
 
         let confidence = stream.confidence_since(prev_stable_len);
+        let min_token_confidence = stream.min_confidence_since(prev_stable_len);
         let end_samples = stream.audio_cursor();
         let id = state.next_id;
         state.next_id = id.saturating_add(1);
@@ -353,6 +354,7 @@ impl AsrBackend for OrtQwenAsrBackend {
         Ok(vec![AsrSegment {
             id,
             confidence,
+            min_token_confidence,
             is_final: true,
             start_ms: Some(start_ms),
             end_ms: Some(end_ms),
