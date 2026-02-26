@@ -1,80 +1,108 @@
-/// Energy-based voice activity detection.
-///
-/// Returns `true` if the RMS energy of the frame exceeds the threshold.
-#[inline]
-pub fn is_speech(samples: &[f32], threshold: f32) -> bool {
-    if samples.is_empty() {
-        return false;
-    }
-    // Compare squared RMS against squared threshold to avoid sqrt entirely.
-    // sum_sq / len > threshold^2  ↔  rms > threshold
-    let threshold_sq = threshold * threshold;
-    let len = samples.len();
-    let sum_sq = sum_sq_simd(samples);
-    sum_sq > threshold_sq * len as f32
+//! Voice Activity Detection powered by TEN VAD ONNX model.
+//!
+//! Replaces the previous energy-based VAD with a neural network model
+//! that provides superior speech boundary detection, especially for
+//! end-of-speech transitions (critical for LLM pipeline latency).
+//!
+//! The 306KB ONNX model is embedded in the binary — no external files needed.
+
+use ten_vad_rs::TenVad;
+use tracing::warn;
+
+/// Embedded TEN VAD ONNX model (~306KB).
+const TEN_VAD_MODEL: &[u8] = include_bytes!("../models/ten-vad.onnx");
+
+/// TEN VAD hop size: 256 samples = 16ms at 16kHz.
+const HOP_SIZE: usize = 256;
+
+/// VAD configuration
+#[derive(Debug, Clone)]
+pub struct VadConfig {
+    /// VAD score threshold (0.0–1.0). Default: 0.5
+    ///
+    /// - 0.3–0.4: Sensitive (picks up soft speech, more false positives)
+    /// - 0.5: Balanced (recommended default)
+    /// - 0.6–0.8: Conservative (only confident speech, fewer false positives)
+    pub threshold: f32,
 }
 
-/// Horizontal sum of squared samples using explicit SIMD-friendly chunking.
-/// The compiler auto-vectorises the 8-wide accumulator loop on x86-64/aarch64.
-#[inline(always)]
-fn sum_sq_simd(samples: &[f32]) -> f32 {
-    const LANES: usize = 8;
-    let mut acc = [0.0f32; LANES];
-    let chunks = samples.chunks_exact(LANES);
-    let remainder = chunks.remainder();
-    for chunk in chunks {
-        // Safety: chunks_exact guarantees len == LANES
-        for i in 0..LANES {
-            acc[i] = acc[i].mul_add(1.0, chunk[i] * chunk[i]);
+impl Default for VadConfig {
+    fn default() -> Self {
+        Self { threshold: 0.5 }
+    }
+}
+
+/// Voice Activity Detector using the TEN VAD ONNX model.
+pub struct Vad {
+    inner: TenVad,
+    threshold: f32,
+    /// Reusable buffer for f32 → i16 conversion (avoids per-call allocation).
+    i16_buf: Vec<i16>,
+}
+
+impl Vad {
+    /// Create a new TEN VAD instance with the embedded ONNX model.
+    ///
+    /// # Panics
+    /// Panics if the embedded ONNX model fails to load (should never happen
+    /// unless the binary is corrupt).
+    pub fn new(config: VadConfig, _sample_rate: u32) -> Self {
+        let inner = TenVad::new_from_bytes(TEN_VAD_MODEL, 16000)
+            .expect("failed to initialize TEN VAD from embedded model");
+        Self {
+            inner,
+            threshold: config.threshold,
+            i16_buf: Vec::with_capacity(HOP_SIZE * 20), // ~320ms at 16kHz
         }
     }
-    let mut total: f32 = acc.iter().copied().sum();
-    for &s in remainder {
-        total += s * s;
+
+    /// Process an audio chunk and return `(is_speech, energy)`.
+    ///
+    /// Internally splits the chunk into 256-sample (16ms) frames and runs each
+    /// through the TEN VAD ONNX model. Reports speech if *any* frame in the
+    /// chunk exceeds the configured threshold.
+    ///
+    /// Energy is computed as RMS of the f32 samples (diagnostic value, not used
+    /// for the speech decision).
+    pub fn process_chunk(&mut self, samples: &[f32]) -> (bool, f32) {
+        let energy = compute_rms(samples);
+
+        // Convert f32 [-1.0, 1.0] → i16 for TEN VAD.
+        self.i16_buf.clear();
+        self.i16_buf.extend(samples.iter().map(|&s| {
+            (s * i16::MAX as f32)
+                .round()
+                .clamp(i16::MIN as f32, i16::MAX as f32) as i16
+        }));
+
+        // Process complete HOP_SIZE frames through the model.
+        let mut max_score: f32 = 0.0;
+        let mut offset = 0;
+        while offset + HOP_SIZE <= self.i16_buf.len() {
+            match self
+                .inner
+                .process_frame(&self.i16_buf[offset..offset + HOP_SIZE])
+            {
+                Ok(score) => max_score = max_score.max(score),
+                Err(e) => {
+                    warn!(error = %e, "TEN VAD inference error");
+                    break;
+                }
+            }
+            offset += HOP_SIZE;
+        }
+
+        let is_speech = max_score >= self.threshold;
+        (is_speech, energy)
     }
-    total
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn silence_below_threshold() {
-        let silence = vec![0.0f32; 480];
-        assert!(!is_speech(&silence, 0.01));
+/// Compute RMS (Root Mean Square) energy of f32 PCM samples.
+#[inline]
+fn compute_rms(samples: &[f32]) -> f32 {
+    if samples.is_empty() {
+        return 0.0;
     }
-
-    #[test]
-    fn loud_signal_above_threshold() {
-        let loud = vec![0.5f32; 480];
-        assert!(is_speech(&loud, 0.01));
-    }
-
-    #[test]
-    fn quiet_signal_below_threshold() {
-        let quiet = vec![0.001f32; 480];
-        assert!(!is_speech(&quiet, 0.01));
-    }
-
-    #[test]
-    fn empty_frame() {
-        assert!(!is_speech(&[], 0.01));
-    }
-
-    #[test]
-    fn at_exact_threshold_is_not_speech() {
-        // RMS of constant 0.01 signal = 0.01, which is not > 0.01
-        let at_threshold = vec![0.01f32; 480];
-        // Due to f32 precision, sqrt(0.01^2) may equal 0.01 exactly.
-        // Use a slightly higher threshold to guarantee below.
-        assert!(!is_speech(&at_threshold, 0.011));
-    }
-
-    #[test]
-    fn non_multiple_of_lanes_remainder() {
-        // 485 = 60*8 + 5 — exercises the remainder path
-        let samples = vec![0.5f32; 485];
-        assert!(is_speech(&samples, 0.01));
-    }
+    let sum_sq: f32 = samples.iter().map(|&s| s * s).sum();
+    (sum_sq / samples.len() as f32).sqrt()
 }

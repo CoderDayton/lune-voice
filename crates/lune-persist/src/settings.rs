@@ -1,9 +1,12 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use lune_core::config::UserSettings;
 
 use crate::error::PersistResult;
+
+static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Read/write `UserSettings` as TOML with atomic writes.
 pub struct SettingsStore {
@@ -49,7 +52,9 @@ fn atomic_write(target: &Path, data: &[u8]) -> std::io::Result<()> {
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent)?;
     }
-    let tmp = target.with_extension("toml.tmp");
+    let pid = std::process::id();
+    let seq = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let tmp = target.with_extension(format!("toml.tmp.{pid}.{seq}"));
     fs::write(&tmp, data)?;
     fs::rename(&tmp, target)?;
     Ok(())
@@ -84,7 +89,41 @@ mod tests {
         atomic_write(&path, b"hello").unwrap();
         assert_eq!(fs::read_to_string(&path).unwrap(), "hello");
 
-        // Tmp file should be cleaned up
-        assert!(!path.with_extension("toml.tmp").exists());
+        // Tmp files should be cleaned up after rename.
+        let tmp_prefix = "test.toml.tmp.";
+        let leftovers = fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| {
+                entry
+                    .file_name()
+                    .to_str()
+                    .is_some_and(|name| name.starts_with(tmp_prefix))
+            })
+            .count();
+        assert_eq!(leftovers, 0);
+    }
+
+    #[test]
+    fn concurrent_save_does_not_fail() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        let store = std::sync::Arc::new(SettingsStore::new(&path));
+
+        let mut handles = Vec::new();
+        for _ in 0..8 {
+            let store = std::sync::Arc::clone(&store);
+            handles.push(std::thread::spawn(move || {
+                let settings = UserSettings::default();
+                store.save(&settings).unwrap();
+            }));
+        }
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        let persisted = store.load().unwrap();
+        assert_eq!(persisted.language, UserSettings::default().language);
     }
 }

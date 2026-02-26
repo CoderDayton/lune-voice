@@ -5,16 +5,20 @@ edition.workspace = true
 license.workspace = true
 
 [features]
-default = []
-cuda = ["llama-cpp-2/cuda"]
+default = ["ort-backend"]
+cuda = ["ort/cuda"]
+ort-backend = ["dep:ort", "dep:ndarray", "dep:tokenizers"]
 
 [dependencies]
 async-trait.workspace = true
 lune-core.workspace = true
 tokio.workspace = true
 tracing.workspace = true
-llama-cpp-2.workspace = true
-encoding_rs.workspace = true
+ort = { workspace = true, optional = true }
+ndarray = { workspace = true, optional = true }
+tokenizers = { workspace = true, optional = true }
 async-openai.workspace = true
 serde_json.workspace = true
 memchr = "2.8.0"
+half = "2"
+getrandom = "0.3"

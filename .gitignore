@@ -6,4 +6,6 @@
 .env
 *.db
 /scripts/
+
 .ralph-logs/
+models/

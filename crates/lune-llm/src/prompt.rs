@@ -40,7 +40,6 @@ pub fn build_chatml(input: &PostProcessInput) -> String {
     let cap = 128
         + style.system_prompt.len()
         + dict_len
-        + input.prev_context.as_deref().map_or(0, |c| c.len() + 32)
         + few_shot_len
         + style.user_prompt_template.len()
         + input.raw_text.len();
@@ -48,8 +47,7 @@ pub fn build_chatml(input: &PostProcessInput) -> String {
     let mut prompt = String::with_capacity(cap);
 
     // System message with dictionary context.
-    // /no_think disables Qwen3's chain-of-thought mode at the system level.
-    prompt.push_str("<|im_start|>system\n/no_think\n");
+    prompt.push_str("<|im_start|>system\n");
     prompt.push_str(&style.system_prompt);
 
     if !input.dictionary.is_empty() {
@@ -62,21 +60,14 @@ pub fn build_chatml(input: &PostProcessInput) -> String {
         }
     }
 
-    if let Some(ref ctx) = input.prev_context
-        && !ctx.is_empty()
-    {
-        prompt.push_str("\n\nPreceding context: ");
-        prompt.push_str(ctx);
-    }
-
     prompt.push_str("<|im_end|>\n");
 
     // Few-shot examples.
     for (user_ex, assistant_ex) in &style.few_shot_pairs {
         prompt.push_str("<|im_start|>user\n");
         prompt.push_str(user_ex);
-        prompt.push_str("<|im_end|>\n");
-        prompt.push_str("<|im_start|>assistant\n<think>\n</think>\n");
+        prompt.push_str("\n/no_think<|im_end|>\n");
+        prompt.push_str("<|im_start|>assistant\n<think>\n\n</think>\n\n");
         prompt.push_str(assistant_ex);
         prompt.push_str("<|im_end|>\n");
     }
@@ -91,10 +82,11 @@ pub fn build_chatml(input: &PostProcessInput) -> String {
     } else {
         prompt.push_str(template);
     }
-    prompt.push_str("<|im_end|>\n");
+    prompt.push_str("\n/no_think<|im_end|>\n");
 
     // Start assistant turn with thinking disabled.
-    prompt.push_str("<|im_start|>assistant\n<think>\n</think>\n");
+    // Double newlines inside <think> block per Qwen3 official docs.
+    prompt.push_str("<|im_start|>assistant\n<think>\n\n</think>\n\n");
 
     prompt
 }
@@ -106,43 +98,78 @@ pub fn strip_thinking(text: &str) -> String {
     const CLOSE: &str = "</think>";
     const IM_END: &str = "<|im_end|>";
 
-    // Fast path: compliant model output with no tags at all — common case.
     let has_open = text.contains(OPEN);
     let has_close = text.contains(CLOSE);
     let has_im_end = text.contains(IM_END);
-    if !has_open && !has_close && !has_im_end {
-        return text.trim().to_string();
-    }
 
     // Allocate once at input length; result after stripping will only be smaller.
     let mut result = String::with_capacity(text.len());
     let mut remaining = text;
 
-    // Strip matched <think>...</think> pairs.
-    while let Some(start) = remaining.find(OPEN) {
-        result.push_str(&remaining[..start]);
-        if let Some(end) = remaining[start..].find(CLOSE) {
-            remaining = &remaining[start + end + CLOSE.len()..];
-        } else {
-            // Unclosed think tag — drop everything after it.
-            remaining = "";
-            break;
+    if has_open || has_close || has_im_end {
+        // Strip matched <think>...</think> pairs.
+        while let Some(start) = remaining.find(OPEN) {
+            result.push_str(&remaining[..start]);
+            if let Some(end) = remaining[start..].find(CLOSE) {
+                remaining = &remaining[start + end + CLOSE.len()..];
+            } else {
+                // Unclosed think tag — drop everything after it.
+                remaining = "";
+                break;
+            }
         }
-    }
-    result.push_str(remaining);
+        result.push_str(remaining);
 
-    // Handle bare </think> without opening tag — the model continued
-    // reasoning after our prefilled <think></think> and only emitted the
-    // closing tag. Drain in-place to avoid a new heap allocation.
-    if let Some(pos) = result.find(CLOSE) {
-        result.drain(0..pos + CLOSE.len());
+        // Handle bare </think> without opening tag — the model continued
+        // reasoning after our prefilled <think></think> and only emitted the
+        // closing tag. Drain in-place to avoid a new heap allocation.
+        if let Some(pos) = result.find(CLOSE) {
+            result.drain(0..pos + CLOSE.len());
+        }
+
+        // Also strip <|im_end|> if the model emits it.
+        if result.contains(IM_END) {
+            let cleaned = result.replace(IM_END, "");
+            result = cleaned;
+        }
+    } else {
+        result.push_str(text);
     }
 
-    // Also strip <|im_end|> if the model emits it.
-    // Check before replacing to avoid an allocation in the common case.
-    if result.contains(IM_END) {
-        let cleaned = result.replace(IM_END, "");
-        result = cleaned;
+    // Strip reasoning preambles that small models emit without think tags.
+    // These start with meta-commentary instead of the cleaned transcription.
+    const REASONING_PREFIXES: &[&str] = &[
+        "Okay, ",
+        "Okay,\n",
+        "Let me ",
+        "Let's ",
+        "I need to ",
+        "I'll ",
+        "First, ",
+        "First,\n",
+        "Starting with ",
+        "Step ",
+        "Sure, ",
+        "Here's ",
+        "Here is ",
+        "The user ",
+        "Now, ",
+        "Now I ",
+        "Alright, ",
+        "So, ",
+        "So the ",
+    ];
+    let trimmed = result.trim_start();
+    if REASONING_PREFIXES.iter().any(|p| trimmed.starts_with(p)) {
+        // The model is reasoning. Look for a double-newline break after the
+        // preamble — the actual output often follows after `\n\n`.
+        if let Some(pos) = result.find("\n\n") {
+            let after = result[pos + 2..].trim();
+            // If there's substantial text after the break, use it.
+            if after.len() > 3 {
+                result = after.to_string();
+            }
+        }
     }
 
     // Trim in-place — avoids the `.trim().to_string()` double-allocation pattern.
@@ -168,23 +195,21 @@ mod tests {
     fn chatml_basic_structure() {
         let input = PostProcessInput {
             raw_text: "hello um world".into(),
-            prev_context: None,
             style_preset: Arc::new(StylePreset::general()),
             app_category: None,
             dictionary: vec![],
         };
         let prompt = build_chatml(&input);
-        assert!(prompt.starts_with("<|im_start|>system\n/no_think\n"));
+        assert!(prompt.starts_with("<|im_start|>system\n"));
         assert!(prompt.contains("<|im_end|>"));
         assert!(prompt.contains("hello um world"));
-        assert!(prompt.ends_with("<think>\n</think>\n"));
+        assert!(prompt.ends_with("<think>\n\n</think>\n\n"));
     }
 
     #[test]
     fn chatml_with_dictionary() {
         let input = PostProcessInput {
             raw_text: "use the lunevoice api".into(),
-            prev_context: None,
             style_preset: Arc::new(StylePreset::general()),
             app_category: None,
             dictionary: vec![DictionaryEntry {
@@ -202,14 +227,13 @@ mod tests {
     fn chatml_includes_few_shot() {
         let input = PostProcessInput {
             raw_text: "test".into(),
-            prev_context: None,
             style_preset: Arc::new(StylePreset::general()),
             app_category: None,
             dictionary: vec![],
         };
         let prompt = build_chatml(&input);
-        // General preset has 3 few-shot pairs.
-        assert!(prompt.contains("so um I'm gonna go to the store"));
+        // General preset has 4 few-shot pairs.
+        assert!(prompt.contains("ASR: so um I'm gonna go to the store"));
         assert!(prompt.contains("I'm gonna go to the store and buy some more flour for the cake"));
     }
 
@@ -242,5 +266,19 @@ mod tests {
         // Model ignored prefill and produced reasoning with only a closing tag.
         let text = "Okay, the user wrote something...\n</think>\n\nThe meeting is at 3.";
         assert_eq!(strip_thinking(text), "The meeting is at 3.");
+    }
+
+    #[test]
+    fn strip_reasoning_preamble() {
+        // Model reasons in plain text without think tags — common with 0.6B.
+        let text = "Okay, let's process this ASR input.\n\nThe meeting is at three.";
+        assert_eq!(strip_thinking(text), "The meeting is at three.");
+    }
+
+    #[test]
+    fn no_strip_legit_okay() {
+        // "So, " at start is a reasoning prefix but if no \n\n break, keep as-is.
+        let text = "So, the meeting is at three.";
+        assert_eq!(strip_thinking(text), "So, the meeting is at three.");
     }
 }

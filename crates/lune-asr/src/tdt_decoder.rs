@@ -11,6 +11,7 @@ use ort::session::Session;
 
 use lune_core::error::{Error, Result};
 
+use crate::ort_utils::build_ort_session;
 use crate::vocab::Vocabulary;
 
 // ── Public types ─────────────────────────────────────────────────────────────
@@ -19,33 +20,19 @@ use crate::vocab::Vocabulary;
 #[derive(Debug, Clone)]
 pub struct DecodedToken {
     pub token_id: usize,
-    pub frame_index: usize,
     #[allow(dead_code)]
     pub duration: usize,
     /// Softmax probability of the chosen token.
     pub confidence: f32,
 }
 
-/// Final transcription result with per-token and aggregate confidence.
+/// Final transcription result with aggregate confidence.
 #[derive(Debug, Clone)]
 pub struct TranscriptionResult {
     pub text: String,
-    #[allow(dead_code)]
-    pub tokens: Vec<TimedToken>,
     /// Mean token confidence across the utterance.
     pub confidence: f32,
 }
-
-/// A token with start/end timestamps (seconds).
-#[derive(Debug, Clone)]
-pub struct TimedToken {
-    pub text: String,
-    pub start: f32,
-    pub end: f32,
-}
-
-// Precomputed: (encoder_stride=8 * hop=160) / sr=16000 = 0.08 seconds per encoder frame
-const STRIDE_HOP_OVER_SR: f32 = (8 * 160) as f32 / 16000.0;
 
 // ── TDT Model ────────────────────────────────────────────────────────────────
 
@@ -87,8 +74,8 @@ impl TdtModel {
 
         let vocab = Vocabulary::from_file(&vocab_path)?;
 
-        let encoder = build_session(&encoder_path, use_gpu)?;
-        let decoder_joint = build_session(&decoder_path, use_gpu)?;
+        let encoder = build_ort_session(&encoder_path, use_gpu)?;
+        let decoder_joint = build_ort_session(&decoder_path, use_gpu)?;
 
         tracing::info!(
             vocab_size = vocab.size(),
@@ -275,7 +262,6 @@ impl TdtModel {
 
                 decoded.push(DecodedToken {
                     token_id,
-                    frame_index: t,
                     duration: duration_step,
                     confidence,
                 });
@@ -296,167 +282,44 @@ impl TdtModel {
         Ok(decoded)
     }
 
-    // ── Token-to-text (SentencePiece + digit spacing + word grouping) ────
+    // ── Token-to-text: CTC collapse → join → trim ────────────────────────
+    //
+    // The LLM handles punctuation, casing, and repetition correction.
+    // Keep this path minimal — any preprocessing here risks confusing the LLM.
 
     fn tokens_to_text(&self, decoded: &[DecodedToken]) -> Result<TranscriptionResult> {
         if decoded.is_empty() {
-            // Silence = certainty (CognitivePipe convention: no tokens → high confidence)
             return Ok(TranscriptionResult {
                 text: String::new(),
-                tokens: Vec::new(),
                 confidence: 1.0,
             });
         }
 
-        let mut raw_tokens = Vec::with_capacity(decoded.len());
-        let mut full_text = String::with_capacity(decoded.len() * 4);
-        // Track last char separately to avoid O(n) `chars().last()` scans.
-        let mut last_char: Option<char> = None;
-
-        for (i, dt) in decoded.iter().enumerate() {
+        let mut text = String::with_capacity(decoded.len() * 4);
+        for dt in decoded {
             let Some(token_text) = self.vocab.get(dt.token_id) else {
                 continue;
             };
-
-            // Precomputed constant eliminates per-token mul+div
-            let start = dt.frame_index as f32 * STRIDE_HOP_OVER_SR;
-            let end = if i + 1 < decoded.len() {
-                decoded[i + 1].frame_index as f32 * STRIDE_HOP_OVER_SR
-            } else {
-                start + 0.01
-            };
-
-            // SentencePiece: ▁ → space
-            let mut display = token_text.replace('▁', " ");
-
-            // Digit spacing heuristic: insert space before digit tokens after 2+ letters
-            // (except single uppercase like A4, B12).
-            if !full_text.is_empty()
-                && !display.starts_with(' ')
-                && display.chars().all(|c| c.is_ascii_digit())
-            {
-                let trailing_letters: usize = full_text
-                    .chars()
-                    .rev()
-                    .take_while(|c| c.is_alphabetic())
-                    .count();
-                let is_article_a = trailing_letters == 1 && last_char == Some('a');
-                if trailing_letters > 1 || is_article_a {
-                    display.insert(0, ' ');
-                }
-            }
-
-            // Skip <special> tokens (keep <unk>)
+            // Skip special tokens (blanks, padding, etc.) but keep <unk>
             if token_text.starts_with('<') && token_text.ends_with('>') && token_text != "<unk>" {
                 continue;
             }
-
-            // Update last_char tracker from display (not token_text, which may have ▁)
-            last_char = display.chars().last();
-            full_text.push_str(&display);
-            raw_tokens.push(TimedToken {
-                text: display,
-                start,
-                end,
-            });
+            text.push_str(&token_text.replace('▁', " "));
         }
 
-        // Word grouping: merge subword tokens by ▁/space boundaries
-        let words = group_by_words(&raw_tokens);
-
-        // Mean confidence (single pass, already O(n))
-        let mean_confidence =
-            decoded.iter().map(|d| d.confidence).sum::<f32>() / decoded.len() as f32;
+        let confidence = decoded.iter().map(|d| d.confidence).sum::<f32>() / decoded.len() as f32;
 
         Ok(TranscriptionResult {
-            text: full_text.trim().to_string(),
-            tokens: words,
-            confidence: mean_confidence,
+            text: text.trim().to_string(),
+            confidence,
         })
     }
-}
-
-// ── Word grouping ────────────────────────────────────────────────────────────
-
-fn group_by_words(tokens: &[TimedToken]) -> Vec<TimedToken> {
-    if tokens.is_empty() {
-        return Vec::new();
-    }
-
-    // Estimate ~1 word per 2 tokens on average; avoids most reallocations.
-    let mut words = Vec::with_capacity(tokens.len() / 2 + 1);
-    let mut current_text = String::new();
-    let mut current_start = 0.0f32;
-    let mut last_word_lower = String::new();
-
-    for (i, token) in tokens.iter().enumerate() {
-        // Space-only tokens act as word separators
-        if token.text.trim().is_empty() {
-            if !current_text.is_empty() {
-                // Avoid to_lowercase() allocation on cache-hit (common dedup path)
-                if !current_text.eq_ignore_ascii_case(&last_word_lower) {
-                    let lower = current_text.to_lowercase();
-                    words.push(TimedToken {
-                        text: current_text.clone(),
-                        start: current_start,
-                        end: if i > 0 { tokens[i - 1].end } else { token.end },
-                    });
-                    last_word_lower = lower;
-                }
-                current_text.clear();
-            }
-            continue;
-        }
-
-        // Compute trimmed once; reuse as `clean` to avoid double trim call below.
-        let trimmed = token.text.trim_start_matches('▁').trim_start_matches(' ');
-        let is_pure_punct =
-            !token.text.is_empty() && token.text.chars().all(|c| c.is_ascii_punctuation());
-        let is_contraction = trimmed.starts_with('\'');
-        let is_hyphenation = trimmed.starts_with('-');
-
-        let starts_word =
-            (token.text.starts_with('▁') || token.text.starts_with(' ') || is_pure_punct)
-                && !is_contraction
-                && !is_hyphenation
-                || i == 0;
-
-        if starts_word && !current_text.is_empty() {
-            if !current_text.eq_ignore_ascii_case(&last_word_lower) {
-                let lower = current_text.to_lowercase();
-                words.push(TimedToken {
-                    text: current_text.clone(),
-                    start: current_start,
-                    end: tokens[i - 1].end,
-                });
-                last_word_lower = lower;
-            }
-            current_text.clear();
-        }
-
-        if current_text.is_empty() {
-            current_start = token.start;
-        }
-
-        // Reuse `trimmed` (already computed above) — avoids a second trim scan.
-        current_text.push_str(trimmed);
-    }
-
-    // Final word
-    if !current_text.is_empty() && !current_text.eq_ignore_ascii_case(&last_word_lower) {
-        words.push(TimedToken {
-            text: current_text,
-            start: current_start,
-            end: tokens.last().unwrap().end,
-        });
-    }
-
-    words
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 #[cold]
+#[allow(dead_code)]
 fn find_file(dir: &Path, candidates: &[&str], kind: &str) -> Result<PathBuf> {
     for c in candidates {
         let p = dir.join(c);
@@ -482,143 +345,5 @@ fn find_file(dir: &Path, candidates: &[&str], kind: &str) -> Result<PathBuf> {
     )))
 }
 
-fn build_session(path: &Path, use_gpu: bool) -> Result<Session> {
-    use ort::session::builder::GraphOptimizationLevel;
-
-    let builder = Session::builder()
-        .map_err(|e| Error::Asr(format!("session builder: {e}")))?
-        .with_optimization_level(GraphOptimizationLevel::Level3)
-        .map_err(|e| Error::Asr(format!("optimization level: {e}")))?
-        .with_intra_threads(4)
-        .map_err(|e| Error::Asr(format!("intra threads: {e}")))?;
-
-    let builder = if use_gpu {
-        #[cfg(feature = "cuda")]
-        {
-            builder
-                .with_execution_providers([
-                    ort::ep::CUDA::default().build(),
-                    ort::ep::CPU::default().build().error_on_failure(),
-                ])
-                .map_err(|e| Error::Asr(format!("CUDA provider: {e}")))?
-        }
-        #[cfg(not(feature = "cuda"))]
-        {
-            tracing::warn!("use_gpu=true but cuda feature not enabled, falling back to CPU");
-            builder
-        }
-    } else {
-        builder
-    };
-
-    builder
-        .commit_from_file(path)
-        .map_err(|e| Error::Asr(format!("load model {}: {e}", path.display())))
-}
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn word_grouping_basic() {
-        let tokens = vec![
-            TimedToken {
-                text: " Hello".into(),
-                start: 0.0,
-                end: 0.5,
-            },
-            TimedToken {
-                text: " world".into(),
-                start: 0.5,
-                end: 1.0,
-            },
-        ];
-        let words = group_by_words(&tokens);
-        assert_eq!(words.len(), 2);
-        assert_eq!(words[0].text, "Hello");
-        assert_eq!(words[1].text, "world");
-    }
-
-    #[test]
-    fn word_grouping_hyphenated() {
-        let tokens = vec![
-            TimedToken {
-                text: " twenty".into(),
-                start: 0.0,
-                end: 0.3,
-            },
-            TimedToken {
-                text: "-two".into(),
-                start: 0.3,
-                end: 0.6,
-            },
-            TimedToken {
-                text: " apples".into(),
-                start: 0.6,
-                end: 1.0,
-            },
-        ];
-        let words = group_by_words(&tokens);
-        assert_eq!(words.len(), 2);
-        assert_eq!(words[0].text, "twenty-two");
-        assert_eq!(words[1].text, "apples");
-    }
-
-    #[test]
-    fn word_grouping_contraction() {
-        let tokens = vec![
-            TimedToken {
-                text: " they".into(),
-                start: 0.0,
-                end: 0.3,
-            },
-            TimedToken {
-                text: "'re".into(),
-                start: 0.3,
-                end: 0.5,
-            },
-            TimedToken {
-                text: " here".into(),
-                start: 0.5,
-                end: 0.8,
-            },
-        ];
-        let words = group_by_words(&tokens);
-        assert_eq!(words.len(), 2);
-        assert_eq!(words[0].text, "they're");
-        assert_eq!(words[1].text, "here");
-    }
-
-    #[test]
-    fn word_deduplication() {
-        let tokens = vec![
-            TimedToken {
-                text: " hello".into(),
-                start: 0.0,
-                end: 0.5,
-            },
-            TimedToken {
-                text: " hello".into(),
-                start: 0.5,
-                end: 1.0,
-            },
-            TimedToken {
-                text: " world".into(),
-                start: 1.0,
-                end: 1.5,
-            },
-        ];
-        let words = group_by_words(&tokens);
-        assert_eq!(words.len(), 2);
-        assert_eq!(words[0].text, "hello");
-        assert_eq!(words[1].text, "world");
-    }
-
-    #[test]
-    fn stride_hop_constant() {
-        // Verify the precomputed constant matches the original arithmetic
-        let expected = (8usize * 160) as f32 / 16000.0;
-        assert!((STRIDE_HOP_OVER_SR - expected).abs() < f32::EPSILON);
-    }
-}
+mod tests {}

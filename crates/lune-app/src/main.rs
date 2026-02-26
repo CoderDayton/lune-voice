@@ -3,12 +3,14 @@ mod dbus;
 mod delivery;
 mod events;
 mod factory;
+mod uinput_typer;
 
 use std::sync::Arc;
 
 use tokio::sync::{RwLock, mpsc, watch};
 use tracing_subscriber::{EnvFilter, fmt};
 
+use lune_core::command::VoiceCommand;
 use lune_core::config::DictationMode;
 
 use lune_app::{SessionManager, SessionManagerConfig};
@@ -57,14 +59,41 @@ fn run_daemon() {
         }
     };
 
-    let models =
-        lune_persist::ensure_default_models(&paths.models_dir()).expect("ensure models downloaded");
+    let models = lune_persist::ensure_default_models(
+        &paths.models_dir(),
+        &settings.asr_backend,
+        &settings.llm_backend,
+    )
+    .expect("ensure models downloaded");
 
     factory::patch_model_paths(&mut settings, &models);
 
+    // ── Global ORT initialization ────────────────────────────────────────
+    // Must happen before any Session is created. When CUDA is available and
+    // the user wants GPU, register the CUDA EP globally so all ORT sessions
+    // (ASR encoder, ASR decoder, LLM decoder) share the same CUDA memory arena.
+    factory::init_ort_runtime(&settings);
+
+    let (asr_backend_kind, selected_asr_dir) = match &settings.asr_backend {
+        lune_core::config::AsrBackendConfig::ParakeetTdt { model_dir, .. } => {
+            ("ParakeetTdt", model_dir.display().to_string())
+        }
+        lune_core::config::AsrBackendConfig::QwenAsr { model_dir, .. } => {
+            ("QwenAsr", model_dir.display().to_string())
+        }
+        lune_core::config::AsrBackendConfig::OrtQwenAsr { model_dir, .. } => {
+            ("OrtQwenAsr", model_dir.display().to_string())
+        }
+        lune_core::config::AsrBackendConfig::OpenAiCompatible { .. } => {
+            ("OpenAiCompatible", "<remote>".into())
+        }
+        _ => ("Unknown", "<unknown>".into()),
+    };
+
     tracing::info!(
-        asr_dir = %models.asr_model_dir.display(),
-        llm_path = %models.llm_model_path.display(),
+        asr_backend = asr_backend_kind,
+        asr_dir = %selected_asr_dir,
+        llm_dir = %models.ort_llm_model_dir.display(),
         "models ready"
     );
 
@@ -94,6 +123,7 @@ fn run_daemon() {
 
     // Channel depth 64 is generous for human-speed commands; avoids alloc churn.
     let (cmd_tx, cmd_rx) = mpsc::channel::<AppCommand>(64);
+    let pipeline_cmd_tx = cmd_tx.clone();
     // Pre-allocate capacity for the longest state string ("listening" = 9 chars)
     let shared_state = Arc::new(RwLock::new(String::with_capacity(16)));
 
@@ -130,6 +160,7 @@ fn run_daemon() {
         run_pipeline(
             settings,
             paths.database_file(),
+            pipeline_cmd_tx,
             cmd_rx,
             shared_state,
             &dbus_conn,
@@ -142,9 +173,11 @@ fn run_daemon() {
     tracing::info!("lune-voice stopped");
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run_pipeline(
     settings: Arc<RwLock<lune_core::config::UserSettings>>,
     db_path: std::path::PathBuf,
+    cmd_tx: mpsc::Sender<AppCommand>,
     mut cmd_rx: mpsc::Receiver<AppCommand>,
     shared_state: Arc<RwLock<String>>,
     dbus_conn: &zbus::Connection,
@@ -175,9 +208,6 @@ async fn run_pipeline(
     };
 
     tracing::info!("LLM post-processor ready");
-    let audio = Arc::new(lune_audio::AudioCaptureService::new(
-        lune_core::audio::AudioCaptureConfig::default(),
-    ));
     let router = Arc::new(lune_commands::VoiceCommandRouter::new());
 
     tracing::info!("opening database...");
@@ -195,6 +225,12 @@ async fn run_pipeline(
         lune_core::config::AsrBackendConfig::OpenAiCompatible { .. } => {
             lune_core::asr::AsrBackendKind::OpenAiCompatible
         }
+        lune_core::config::AsrBackendConfig::QwenAsr { .. } => {
+            lune_core::asr::AsrBackendKind::QwenAsr
+        }
+        lune_core::config::AsrBackendConfig::OrtQwenAsr { .. } => {
+            lune_core::asr::AsrBackendKind::OrtQwenAsr
+        }
         _ => lune_core::asr::AsrBackendKind::ParakeetTdt,
     };
 
@@ -204,7 +240,6 @@ async fn run_pipeline(
     };
 
     let manager = SessionManager::new(
-        audio,
         Arc::new(asr),
         router,
         post_processor,
@@ -218,13 +253,38 @@ async fn run_pipeline(
 
     tracing::info!("pipeline ready, waiting for commands");
 
+    // ── Signal handler for graceful shutdown ──────────────────────────────
+
+    let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        .expect("register SIGTERM handler");
+
     // ── Command loop ─────────────────────────────────────────────────────
 
     loop {
-        let Some(cmd) = cmd_rx.recv().await else {
-            tracing::info!("command channel closed, shutting down");
-            manager.stop().await;
-            break;
+        let cmd = tokio::select! {
+            biased;
+            _ = tokio::signal::ctrl_c() => {
+                tracing::info!("SIGINT received, shutting down");
+                manager.stop().await;
+                update_state(&shared_state, dbus_conn, AppStateUpdate::Idle).await;
+                break;
+            }
+            _ = sigterm.recv() => {
+                tracing::info!("SIGTERM received, shutting down");
+                manager.stop().await;
+                update_state(&shared_state, dbus_conn, AppStateUpdate::Idle).await;
+                break;
+            }
+            cmd = cmd_rx.recv() => {
+                match cmd {
+                    Some(c) => c,
+                    None => {
+                        tracing::info!("command channel closed, shutting down");
+                        manager.stop().await;
+                        break;
+                    }
+                }
+            }
         };
 
         match cmd {
@@ -234,6 +294,7 @@ async fn run_pipeline(
                 } else {
                     start_dictation(
                         &manager,
+                        cmd_tx.clone(),
                         &shared_state,
                         dbus_conn,
                         dictation_mode_rx.clone(),
@@ -246,6 +307,7 @@ async fn run_pipeline(
                 if manager.active_session_id().await.is_none() {
                     start_dictation(
                         &manager,
+                        cmd_tx.clone(),
                         &shared_state,
                         dbus_conn,
                         dictation_mode_rx.clone(),
@@ -275,6 +337,7 @@ async fn run_pipeline(
 
 async fn start_dictation<A: lune_core::asr::AsrBackend + 'static>(
     manager: &SessionManager<A>,
+    cmd_tx: mpsc::Sender<AppCommand>,
     shared_state: &Arc<RwLock<String>>,
     dbus_conn: &zbus::Connection,
     dictation_mode_rx: watch::Receiver<DictationMode>,
@@ -298,6 +361,11 @@ async fn start_dictation<A: lune_core::asr::AsrBackend + 'static>(
                     delivery_service.deliver(&t, mode);
                     AppStateUpdate::FinalText
                 }
+                lune_core::session::SessionEvent::CommandDetected(payload) => {
+                    let mode = *dictation_mode_rx.borrow();
+                    handle_voice_command_payload(&payload, mode, &delivery_service, &cmd_tx).await;
+                    continue;
+                }
 
                 lune_core::session::SessionEvent::Error(e) => {
                     tracing::error!(error = %e, "session error");
@@ -318,6 +386,85 @@ async fn start_dictation<A: lune_core::asr::AsrBackend + 'static>(
             tracing::error!(error = %e, "failed to start session");
             update_state(shared_state, dbus_conn, AppStateUpdate::Error).await;
         }
+    }
+}
+
+#[inline]
+async fn handle_voice_command_payload(
+    payload: &str,
+    mode: DictationMode,
+    delivery_service: &delivery::DeliveryService,
+    cmd_tx: &mpsc::Sender<AppCommand>,
+) {
+    let Some(command) = parse_voice_command_payload(payload) else {
+        tracing::warn!(payload = payload, "failed to parse voice command payload");
+        return;
+    };
+
+    match command {
+        VoiceCommand::StopDictation => {
+            if cmd_tx.send(AppCommand::StopDictation).await.is_err() {
+                tracing::warn!("failed to dispatch stop_dictation voice command");
+            }
+        }
+        VoiceCommand::NewLine => delivery_service.deliver("\n", mode),
+        VoiceCommand::NewParagraph => delivery_service.deliver("\n\n", mode),
+        VoiceCommand::ListItem => delivery_service.deliver("\n- ", mode),
+        // Handled inside the session loop so new utterances use the new preset immediately.
+        VoiceCommand::SwitchStyle(_) => {}
+        VoiceCommand::InsertSnippet(snippet) => {
+            tracing::info!(snippet, "voice command insert_snippet not yet implemented");
+        }
+        VoiceCommand::ScratchThat => {
+            tracing::info!("voice command scratch_that not yet implemented");
+        }
+        _ => {
+            tracing::info!("voice command variant not yet implemented");
+        }
+    }
+}
+
+#[inline]
+fn parse_voice_command_payload(payload: &str) -> Option<VoiceCommand> {
+    if let Ok(cmd) = serde_json::from_str::<VoiceCommand>(payload) {
+        return Some(cmd);
+    }
+
+    match payload.trim() {
+        "StopDictation" => Some(VoiceCommand::StopDictation),
+        "NewLine" => Some(VoiceCommand::NewLine),
+        "NewParagraph" => Some(VoiceCommand::NewParagraph),
+        "ListItem" => Some(VoiceCommand::ListItem),
+        "ScratchThat" => Some(VoiceCommand::ScratchThat),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_voice_command_payload;
+    use lune_core::command::VoiceCommand;
+
+    #[test]
+    fn parses_voice_command_json_payload() {
+        let payload = serde_json::to_string(&VoiceCommand::SwitchStyle("formal".into())).unwrap();
+        let parsed = parse_voice_command_payload(&payload);
+        match parsed {
+            Some(VoiceCommand::SwitchStyle(style)) => assert_eq!(style, "formal"),
+            other => panic!("unexpected parse result: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_legacy_debug_payload() {
+        assert!(matches!(
+            parse_voice_command_payload("StopDictation"),
+            Some(VoiceCommand::StopDictation)
+        ));
+        assert!(matches!(
+            parse_voice_command_payload("NewParagraph"),
+            Some(VoiceCommand::NewParagraph)
+        ));
     }
 }
 

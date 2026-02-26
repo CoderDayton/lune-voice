@@ -6,11 +6,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use lune_app::{SessionManager, SessionManagerConfig};
-use lune_audio::AudioCaptureService;
 use lune_commands::VoiceCommandRouter;
 use lune_core::Result;
 use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
-use lune_core::audio::AudioCaptureConfig;
 use lune_core::llm::{PostProcessInput, PostProcessOutput, TextPostProcessor};
 use lune_core::session::SessionEvent;
 use lune_dict::DictionaryManager;
@@ -55,11 +53,9 @@ fn make_manager() -> SessionManager<NoopAsr> {
     let db = Database::open_in_memory().unwrap();
     let dict_db = Database::open_in_memory().unwrap();
     let dict = DictionaryManager::new(dict_db).unwrap();
-    let audio = AudioCaptureService::new(AudioCaptureConfig::default());
     let settings = Arc::new(RwLock::new(lune_core::config::UserSettings::default()));
 
     SessionManager::new(
-        Arc::new(audio),
         Arc::new(NoopAsr),
         Arc::new(VoiceCommandRouter::new()),
         Arc::new(EchoPostProcessor),

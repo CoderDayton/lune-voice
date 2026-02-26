@@ -10,7 +10,8 @@ path = "src/main.rs"
 
 [features]
 default = []
-cuda = ["lune-llm/cuda"]
+cuda = ["lune-llm/cuda", "lune-asr/cuda", "ort/cuda"]
+legacy-qwen = ["lune-asr/legacy-qwen"]
 
 [dependencies]
 lune-core.workspace = true
@@ -29,9 +30,12 @@ tracing-subscriber.workspace = true
 uuid.workspace = true
 serde_json.workspace = true
 toml.workspace = true
+ort.workspace = true
 zbus.workspace = true
 enigo.workspace = true
 arboard.workspace = true
+evdev.workspace = true
+
 
 [[example]]
 name = "pipeline_latency"

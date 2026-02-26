@@ -33,7 +33,7 @@
 
 Most voice dictation tools either require a cloud subscription or produce raw transcription with no cleanup. Lune Voice does both locally:
 
-- **100% offline** — Parakeet TDT 0.6B transcribes audio; Qwen3 0.6B corrects it. Neither leaves your device.
+- **100% offline** — Qwen3-ASR 0.6B transcribes audio; Qwen3 0.6B corrects it. Both run via ONNX Runtime. Neither leaves your device.
 - **LLM-polished output** — filler words, grammar errors, and punctuation issues are fixed before text reaches you. You only ever see corrected output.
 - **Smart batching** — low-confidence fragments accumulate until there's enough context for a quality correction. Short phrases return in ~300ms; paragraphs scale proportionally.
 - **Zero configuration** — models download automatically on first run from HuggingFace. Bind a hotkey and you're done.
@@ -50,10 +50,10 @@ Microphone
 Audio Capture (cpal, 16kHz mono)
     │
     ▼
-Parakeet TDT 0.6B ── mel-spectrogram (128-mel, Slaney) ──► ONNX Runtime (INT8)
+Qwen3-ASR 0.6B ──── mel-spectrogram (128-mel, Slaney) ──► ONNX Runtime
     │                                                               │
-    │                                                        TDT decoder
-    │                                                         + confidence
+    │                                                   streaming decoder
+    │                                                     + KV cache
     ▼
 Confidence Router ── high (≥0.82): queue direct ───────────────────┐
     │                                                                │
@@ -62,7 +62,7 @@ Confidence Router ── high (≥0.82): queue direct ────────�
     └── low (<0.50):     accumulate →  8 words → batch to LLM      │
                                                     │                │
                                                     ▼                ▼
-                                              Qwen3 0.6B (Q4_K_M, llama.cpp)
+                                              Qwen3 0.6B (ONNX, ORT)
                                                     │
                                              ChatML + few-shot
                                               greedy decoding
@@ -98,14 +98,14 @@ lune-voice toggle
 
 ## Building
 
-**Prerequisites:** Rust (stable, 2024 edition), a C compiler (for llama.cpp)
+**Prerequisites:** Rust (stable, 2024 edition)
 
 ```bash
 # CPU-only
 cargo build --release -p lune-app
 
-# With CUDA GPU acceleration for ASR
-cargo build --release -p lune-app --features lune-asr/cuda
+# With CUDA GPU acceleration
+cargo build --release -p lune-app --features cuda
 
 # Run tests
 cargo test --workspace
@@ -148,15 +148,14 @@ Settings are stored as TOML at your platform's config directory.
 
 ```toml
 [asr_backend]
-type = "ParakeetTdt"
+type = "OrtQwenAsr"
 use_gpu = true
-context_secs = 30.0
 
 [llm_backend]
-type = "Local"
+type = "OrtLocal"
 use_gpu = true
-n_ctx = 4096
-max_output_tokens = 512
+n_ctx = 2048
+max_output_tokens = 256
 
 dictation_mode = "TypeInPlace"   # TypeInPlace | Clipboard | Both
 activation_mode = "Toggle"       # Toggle | Hold
@@ -186,8 +185,8 @@ Nine crates with single responsibilities:
 | Crate | Role |
 |-------|------|
 | `lune-app` | Session orchestration, confidence routing, LLM worker, D-Bus daemon |
-| `lune-asr` | Parakeet TDT backend, mel-spectrogram extraction, TDT decoder |
-| `lune-llm` | Qwen3 backend, ChatML prompting, stop-sequence detection |
+| `lune-asr` | Qwen3-ASR backend (ONNX Runtime), Parakeet TDT backend, mel-spectrogram extraction |
+| `lune-llm` | Qwen3 LLM backend (ONNX Runtime), ChatML prompting, stop-sequence detection |
 | `lune-audio` | Microphone capture (cpal) |
 | `lune-core` | Shared traits, config, error types |
 | `lune-commands` | Voice command detection |
@@ -199,8 +198,8 @@ Models downloaded automatically on first run:
 
 | Model | Format | Size |
 |-------|--------|------|
-| [Parakeet TDT 0.6B v3](https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx) | ONNX INT8 | ~280 MB |
-| [Qwen3 0.6B](https://huggingface.co/unsloth/Qwen3-0.6B-GGUF) | GGUF Q4_K_M | ~400 MB |
+| [Qwen3-ASR 0.6B](https://huggingface.co/lune-voice/qwen3-asr-0.6b-onnx) | ONNX | ~1.2 GB |
+| [Qwen3 0.6B](https://huggingface.co/lune-voice/qwen3-0.6b-onnx) | ONNX | ~600 MB |
 
 > **Deep dive:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — pipeline walkthrough, hold-delivery model, session lifecycle, D-Bus interface, threading model, data flow diagrams.
 

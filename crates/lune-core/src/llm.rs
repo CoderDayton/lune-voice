@@ -10,8 +10,6 @@ use crate::dict::DictionaryEntry;
 #[derive(Debug, Clone)]
 pub struct PostProcessInput {
     pub raw_text: String,
-    /// Preceding text for context.
-    pub prev_context: Option<String>,
     pub style_preset: Arc<StylePreset>,
     /// Target application category hint.
     pub app_category: Option<AppCategory>,
@@ -47,6 +45,21 @@ pub enum AppCategory {
 #[async_trait::async_trait]
 pub trait TextPostProcessor: Send + Sync {
     async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput>;
+
+    /// Stream corrected text in chunks as they become available.
+    ///
+    /// Default implementation calls [`transform`] and sends the full result as
+    /// a single chunk.  Backends with token-level access (e.g. local LLM)
+    /// override this to emit word-boundary chunks during generation.
+    async fn transform_streaming(
+        &self,
+        input: &PostProcessInput,
+        chunk_tx: tokio::sync::mpsc::Sender<String>,
+    ) -> Result<PostProcessOutput> {
+        let output = self.transform(input).await?;
+        let _ = chunk_tx.send(output.cleaned_text.clone()).await;
+        Ok(output)
+    }
 }
 
 #[cfg(test)]
@@ -57,7 +70,6 @@ mod tests {
     fn post_process_input_fields() {
         let input = PostProcessInput {
             raw_text: "hello um world".into(),
-            prev_context: None,
             style_preset: Arc::new(StylePreset::general()),
             app_category: Some(AppCategory::Email),
             dictionary: vec![],

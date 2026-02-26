@@ -1,467 +1,238 @@
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Instant;
-
-use audioadapter_buffers::direct::SequentialSlice;
+use crate::{AudioChunk, AudioError, ring::RingBuffer};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{SampleFormat, StreamConfig};
-use rubato::{
-    Async, FixedAsync, Resampler, SincInterpolationParameters, SincInterpolationType,
-    WindowFunction,
-};
-use tokio::sync::mpsc;
+use cpal::{BufferSize, SampleFormat, SampleRate, StreamConfig};
+use rubato::{FastFixedIn, PolynomialDegree, Resampler};
+use std::sync::Arc;
+use std::time::Instant;
+use tracing::{debug, warn};
 
-use lune_core::audio::{AudioCaptureConfig, AudioFrame};
-use lune_core::error::{Error, Result};
+/// Configuration for audio capture
+#[derive(Debug, Clone)]
+pub struct AudioConfig {
+    /// Target sample rate (Hz). Default: 16000 (optimal for ASR)
+    pub target_sample_rate: u32,
 
-use crate::vad;
-
-/// Handle to a running capture session. Drop to stop.
-pub struct SessionHandle {
-    running: Arc<AtomicBool>,
-    _stream: cpal::Stream,
-}
-
-impl SessionHandle {
-    /// Stop the capture session.
-    pub fn stop(&self) {
-        self.running.store(false, Ordering::Release);
-        if let Err(e) = self._stream.pause() {
-            tracing::warn!("failed to pause stream: {e}");
-        }
-    }
-}
-
-impl Drop for SessionHandle {
-    fn drop(&mut self) {
-        self.stop();
-    }
-}
-
-/// Shared state for the audio processing callback.
-struct CallbackState {
-    tx: mpsc::Sender<AudioFrame>,
-    running: Arc<AtomicBool>,
-    accum: Vec<f32>,
-    pre_resample: Vec<f32>,
-    resampler: Option<Async<f32>>,
-    resample_out_buf: Vec<f32>,
-    resample_chunk: usize,
-    start_time: Instant,
-    target_rate: u32,
-    frame_size: usize,
-    channels: usize,
-    vad_enabled: bool,
-    vad_threshold: f32,
-    // Cached inverse for downmix — avoids recomputing per callback.
-    inv_channels: f32,
-}
-
-impl CallbackState {
-    /// Process incoming mono f32 PCM samples.
-    #[inline]
-    fn process_samples(&mut self, mono_f32: &[f32]) {
-        if !self.running.load(Ordering::Relaxed) {
-            return;
-        }
-
-        match &mut self.resampler {
-            Some(resampler) => {
-                self.pre_resample.extend_from_slice(mono_f32);
-                while self.pre_resample.len() >= self.resample_chunk {
-                    let out_frames = resampler.output_frames_next();
-                    if let (Ok(input), Ok(mut output)) = (
-                        SequentialSlice::new(
-                            &self.pre_resample[..self.resample_chunk],
-                            1,
-                            self.resample_chunk,
-                        ),
-                        SequentialSlice::new_mut(
-                            &mut self.resample_out_buf[..out_frames],
-                            1,
-                            out_frames,
-                        ),
-                    ) && let Ok((_in_len, out_len)) =
-                        resampler.process_into_buffer(&input, &mut output, None)
-                    {
-                        self.accum
-                            .extend_from_slice(&self.resample_out_buf[..out_len]);
-                    }
-                    // Rotate instead of drain — avoids memmove for large buffers.
-                    let chunk = self.resample_chunk;
-                    self.pre_resample.copy_within(chunk.., 0);
-                    let new_len = self.pre_resample.len() - chunk;
-                    self.pre_resample.truncate(new_len);
-                }
-            }
-            None => {
-                self.accum.extend_from_slice(mono_f32);
-            }
-        }
-
-        // Emit complete frames without intermediate allocation.
-        let frame_size = self.frame_size;
-        while self.accum.len() >= frame_size {
-            // Reuse a fixed-size Vec via split_at + copy to avoid repeated alloc.
-            let frame_samples: Vec<f32> = self.accum[..frame_size].to_vec();
-
-            if self.vad_enabled && !vad::is_speech(&frame_samples, self.vad_threshold) {
-                self.accum.copy_within(frame_size.., 0);
-                let new_len = self.accum.len() - frame_size;
-                self.accum.truncate(new_len);
-                continue;
-            }
-
-            let frame = AudioFrame {
-                samples: frame_samples,
-                timestamp_ms: self.start_time.elapsed().as_millis() as u64,
-                sample_rate: self.target_rate,
-            };
-
-            // Rotate before send to keep latency minimal.
-            self.accum.copy_within(frame_size.., 0);
-            let new_len = self.accum.len() - frame_size;
-            self.accum.truncate(new_len);
-
-            if self.tx.try_send(frame).is_err() {
-                tracing::debug!("audio frame dropped (channel full)");
-            }
-        }
-    }
-
-    /// Convert interleaved multi-channel data to mono f32.
+    /// Chunk duration in milliseconds. Default: 80ms
     ///
-    /// For mono: zero-copy path returns a slice-backed vec only if truly needed;
-    /// callers that can pass `&[f32]` directly should prefer `process_samples_f32`.
-    #[inline]
-    fn to_mono_f32(&self, data: &[f32]) -> Vec<f32> {
-        if self.channels == 1 {
-            // SAFETY: plain copy, no UB.
-            data.to_vec()
-        } else {
-            let inv = self.inv_channels;
-            let n = data.len() / self.channels;
-            let mut out = Vec::with_capacity(n);
-            let ch = self.channels;
-            // Manual loop beats chunks_exact().map().collect() by ~15% on wide channels
-            // due to avoided iterator overhead and better auto-vectorisation hints.
-            let mut i = 0;
-            while i + ch <= data.len() {
-                let mut sum = 0.0f32;
-                for j in 0..ch {
-                    // SAFETY: bounds checked by while condition.
-                    sum += unsafe { *data.get_unchecked(i + j) };
-                }
-                out.push(sum * inv);
-                i += ch;
-            }
-            out
-        }
-    }
+    /// Smaller chunks reduce onset-detection latency at the cost of more
+    /// frequent ring-buffer pushes.  VAD and ASR run on the session thread,
+    /// so the audio callback stays cheap regardless of chunk size.
+    pub chunk_duration_ms: u32,
 
-    /// Convert interleaved i16 multi-channel data to mono f32 in one pass.
-    #[inline]
-    fn i16_to_mono_f32(&self, data: &[i16]) -> Vec<f32> {
-        const INV_I16_MAX: f32 = 1.0 / i16::MAX as f32;
-        let ch = self.channels;
-        if ch == 1 {
-            let mut out = Vec::with_capacity(data.len());
-            for &s in data {
-                out.push(s as f32 * INV_I16_MAX);
-            }
-            out
-        } else {
-            let inv_ch = self.inv_channels * INV_I16_MAX;
-            let n = data.len() / ch;
-            let mut out = Vec::with_capacity(n);
-            let mut i = 0;
-            while i + ch <= data.len() {
-                let mut sum = 0i32;
-                for j in 0..ch {
-                    sum += unsafe { *data.get_unchecked(i + j) } as i32;
-                }
-                out.push(sum as f32 * inv_ch);
-                i += ch;
-            }
-            out
-        }
-    }
+    /// Ring buffer capacity (number of chunks). Default: 128 (~10 seconds at 80ms)
+    pub buffer_capacity: usize,
+}
 
-    /// Hot path for f32 mono — skips the intermediate Vec entirely.
-    #[inline]
-    fn process_samples_f32_direct(&mut self, data: &[f32]) {
-        if self.channels == 1 {
-            self.process_samples(data);
-        } else {
-            let mono = self.to_mono_f32(data);
-            self.process_samples(&mono);
+impl Default for AudioConfig {
+    fn default() -> Self {
+        Self {
+            target_sample_rate: 16_000,
+            chunk_duration_ms: 80,
+            buffer_capacity: 128,
         }
-    }
-
-    /// Hot path for i16 — fused convert+process to avoid extra Vec when mono.
-    #[inline]
-    fn process_samples_i16_direct(&mut self, data: &[i16]) {
-        // Always need a conversion Vec for i16→f32; fuse with downmix.
-        let mono = self.i16_to_mono_f32(data);
-        self.process_samples(&mono);
     }
 }
 
-/// Audio capture service backed by cpal.
-pub struct AudioCaptureService {
-    config: AudioCaptureConfig,
+/// Audio capture stream with automatic resampling
+pub struct AudioStream {
+    config: AudioConfig,
+    ring: Arc<RingBuffer<AudioChunk>>,
+    _stream: cpal::Stream, // Kept alive
 }
 
-impl AudioCaptureService {
-    pub fn new(config: AudioCaptureConfig) -> Self {
-        Self { config }
-    }
-
-    /// Start a capture session, sending `AudioFrame`s into `tx`.
-    ///
-    /// Returns a `SessionHandle` — drop it (or call `.stop()`) to end capture.
-    pub fn start_session(&self, tx: mpsc::Sender<AudioFrame>) -> Result<SessionHandle> {
+impl AudioStream {
+    /// Create a new audio stream with the given configuration
+    pub fn new(config: AudioConfig) -> Result<Self, AudioError> {
         let host = cpal::default_host();
-        let device = host
-            .default_input_device()
-            .ok_or_else(|| Error::Audio("no default input device".into()))?;
+        let device = host.default_input_device().ok_or(AudioError::NoDevice)?;
 
-        let device_name = device.name().unwrap_or_else(|_| "unknown".into());
-        tracing::info!(device = %device_name, "opening audio input device");
+        let device_name = device.name().unwrap_or_else(|_| "Unknown".into());
+        debug!("Using audio device: {}", device_name);
 
-        let supported = device
+        // Query supported configs and pick the best one
+        let supported_config = device
             .default_input_config()
-            .map_err(|e| Error::Audio(format!("no supported input config: {e}")))?;
+            .map_err(|e| AudioError::StreamBuild(e.to_string()))?;
 
-        let device_channels = supported.channels();
-        let device_sample_rate = supported.sample_rate().0;
-        let device_format = supported.sample_format();
+        let native_sample_rate = supported_config.sample_rate().0;
+        let channels = supported_config.channels();
 
-        tracing::info!(
-            channels = device_channels,
-            sample_rate = device_sample_rate,
-            format = ?device_format,
-            "device default config"
+        debug!(
+            "Native format: {}Hz, {} channels, {:?}",
+            native_sample_rate,
+            channels,
+            supported_config.sample_format()
         );
 
+        // Build stream config
+        let chunk_samples = (config.target_sample_rate * config.chunk_duration_ms / 1000) as usize;
         let stream_config = StreamConfig {
-            channels: device_channels,
-            sample_rate: cpal::SampleRate(device_sample_rate),
-            buffer_size: cpal::BufferSize::Default,
+            channels,
+            sample_rate: SampleRate(native_sample_rate),
+            buffer_size: BufferSize::Default,
         };
 
-        let running = Arc::new(AtomicBool::new(true));
+        let ring = Arc::new(RingBuffer::new(config.buffer_capacity));
+        let ring_clone = Arc::clone(&ring);
 
-        let frame_size = self.config.frame_size;
-        let channels = device_channels as usize;
-        let target_rate = self.config.sample_rate;
+        let target_rate = config.target_sample_rate;
+        let start_time = Instant::now();
 
-        let make_state = |tx, running: Arc<AtomicBool>| -> Result<CallbackState> {
-            let (resampler, resample_out_buf, resample_chunk) = if device_sample_rate != target_rate
-            {
-                let chunk_size = 1024usize;
-                let params = SincInterpolationParameters {
-                    sinc_len: 256,
-                    f_cutoff: 0.95,
-                    interpolation: SincInterpolationType::Linear,
-                    oversampling_factor: 256,
-                    window: WindowFunction::BlackmanHarris2,
-                };
-                let r = Async::<f32>::new_sinc(
-                    target_rate as f64 / device_sample_rate as f64,
-                    2.0,
-                    &params,
-                    chunk_size,
-                    1, // mono
-                    FixedAsync::Input,
+        // Shared state for the audio callback
+        let mut resampler = if native_sample_rate != target_rate {
+            Some(
+                FastFixedIn::<f32>::new(
+                    target_rate as f64 / native_sample_rate as f64,
+                    1.2, // Max relative ratio deviation
+                    PolynomialDegree::Septic,
+                    chunk_samples,
+                    1, // Mono after downmix
                 )
-                .map_err(|e| Error::Audio(format!("create resampler: {e}")))?;
-                let max_out = r.output_frames_max();
-                // Pad by 8 to give SIMD writes room without bounds checks.
-                let out_buf = vec![0.0f32; max_out + 8];
-                (Some(r), out_buf, chunk_size)
-            } else {
-                (None, Vec::new(), 0)
-            };
-
-            Ok(CallbackState {
-                tx,
-                running,
-                // Pre-allocate headroom: two frames to avoid mid-burst realloc.
-                accum: Vec::with_capacity(frame_size * 2),
-                pre_resample: Vec::with_capacity(2048),
-                resampler,
-                resample_out_buf,
-                resample_chunk,
-                start_time: Instant::now(),
-                target_rate,
-                frame_size,
-                channels,
-                inv_channels: 1.0f32 / channels as f32,
-                vad_enabled: self.config.vad_enabled,
-                vad_threshold: self.config.vad_threshold,
-            })
+                .map_err(|e| AudioError::Resampler(e.to_string()))?,
+            )
+        } else {
+            None
         };
 
-        let stream = match device_format {
-            SampleFormat::F32 => {
-                let mut state = make_state(tx, running.clone())?;
-                device
-                    .build_input_stream(
-                        &stream_config,
-                        move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                            state.process_samples_f32_direct(data);
-                        },
-                        err_callback,
-                        None,
-                    )
-                    .map_err(|e| Error::Audio(format!("build_input_stream f32: {e}")))?
-            }
-            SampleFormat::I16 => {
-                let mut state = make_state(tx, running.clone())?;
-                device
-                    .build_input_stream(
-                        &stream_config,
-                        move |data: &[i16], _: &cpal::InputCallbackInfo| {
-                            state.process_samples_i16_direct(data);
-                        },
-                        err_callback,
-                        None,
-                    )
-                    .map_err(|e| Error::Audio(format!("build_input_stream i16: {e}")))?
-            }
-            fmt => {
-                return Err(Error::Audio(format!("unsupported sample format: {fmt:?}")));
+        let mut input_resample_buf = Vec::with_capacity(chunk_samples * 2);
+        let mut output_buf = Vec::with_capacity(chunk_samples * 2);
+
+        // Build the stream based on sample format
+        let stream = match supported_config.sample_format() {
+            SampleFormat::F32 => device
+                .build_input_stream(
+                    &stream_config,
+                    move |data: &[f32], _: &_| {
+                        process_audio_callback(
+                            data,
+                            channels as usize,
+                            &mut resampler,
+                            &mut input_resample_buf,
+                            &mut output_buf,
+                            chunk_samples,
+                            &ring_clone,
+                            start_time,
+                        );
+                    },
+                    |err| warn!("Audio stream error: {}", err),
+                    None,
+                )
+                .map_err(|e| AudioError::StreamBuild(e.to_string()))?,
+
+            SampleFormat::I16 => device
+                .build_input_stream(
+                    &stream_config,
+                    move |data: &[i16], _: &_| {
+                        let float_data: Vec<f32> =
+                            data.iter().map(|&s| s as f32 / 32768.0).collect();
+                        process_audio_callback(
+                            &float_data,
+                            channels as usize,
+                            &mut resampler,
+                            &mut input_resample_buf,
+                            &mut output_buf,
+                            chunk_samples,
+                            &ring_clone,
+                            start_time,
+                        );
+                    },
+                    |err| warn!("Audio stream error: {}", err),
+                    None,
+                )
+                .map_err(|e| AudioError::StreamBuild(e.to_string()))?,
+
+            format => {
+                return Err(AudioError::StreamBuild(format!(
+                    "Unsupported sample format: {:?}",
+                    format
+                )));
             }
         };
 
         stream
             .play()
-            .map_err(|e| Error::Audio(format!("stream play: {e}")))?;
+            .map_err(|e| AudioError::StreamError(e.to_string()))?;
 
-        tracing::info!("audio capture started");
+        debug!("Audio stream started successfully");
 
-        Ok(SessionHandle {
-            running,
+        Ok(Self {
+            config,
+            ring,
             _stream: stream,
         })
     }
-}
 
-#[cold]
-fn err_callback(err: cpal::StreamError) {
-    tracing::error!(%err, "audio stream error");
-}
+    /// Get the next audio chunk (async, blocks until data available)
+    pub async fn next_chunk(&self) -> Option<AudioChunk> {
+        self.ring.pop().await
+    }
 
-/// Create a `CallbackState` with no resampler (same rate) for tests.
-#[cfg(test)]
-fn test_callback_state(tx: mpsc::Sender<AudioFrame>, channels: usize) -> CallbackState {
-    CallbackState {
-        tx,
-        running: Arc::new(AtomicBool::new(true)),
-        accum: Vec::new(),
-        pre_resample: Vec::new(),
-        resampler: None,
-        resample_out_buf: Vec::new(),
-        resample_chunk: 0,
-        start_time: Instant::now(),
-        target_rate: 16000,
-        frame_size: 480,
-        channels,
-        inv_channels: 1.0f32 / channels as f32,
-        vad_enabled: false,
-        vad_threshold: 0.01,
+    /// Try to get the next chunk without blocking
+    pub fn try_next_chunk(&self) -> Option<AudioChunk> {
+        self.ring.try_pop()
+    }
+
+    /// Get current buffer fill percentage (0.0 to 1.0)
+    /// Values near 1.0 indicate backpressure (consumer is slow)
+    pub fn buffer_fill(&self) -> f32 {
+        self.ring.len() as f32 / self.config.buffer_capacity as f32
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Core audio processing callback (runs in real-time audio thread)
+#[allow(clippy::too_many_arguments)]
+fn process_audio_callback(
+    data: &[f32],
+    channels: usize,
+    resampler: &mut Option<FastFixedIn<f32>>,
+    input_resample_buf: &mut Vec<f32>,
+    output_buf: &mut Vec<f32>,
+    chunk_samples: usize,
+    ring: &RingBuffer<AudioChunk>,
+    start_time: Instant,
+) {
+    // 1. Downmix to mono (simple average)
+    let mono: Vec<f32> = if channels == 1 {
+        data.to_vec()
+    } else {
+        data.chunks_exact(channels)
+            .map(|frame| frame.iter().sum::<f32>() / channels as f32)
+            .collect()
+    };
 
-    #[test]
-    fn sinc_resampler_downsample() {
-        let params = SincInterpolationParameters {
-            sinc_len: 256,
-            f_cutoff: 0.95,
-            interpolation: SincInterpolationType::Linear,
-            oversampling_factor: 256,
-            window: WindowFunction::BlackmanHarris2,
+    // 2. Resample if needed
+    if let Some(r) = resampler {
+        input_resample_buf.extend_from_slice(&mono);
+        let required_input = r.input_frames_next();
+        while input_resample_buf.len() >= required_input {
+            let input_chunk: Vec<f32> = input_resample_buf.drain(..required_input).collect();
+            match r.process(&[input_chunk], None) {
+                Ok(output) => output_buf.extend_from_slice(&output[0]),
+                Err(e) => {
+                    warn!("Resampling error: {}", e);
+                    break;
+                }
+            }
+        }
+    } else {
+        output_buf.extend_from_slice(&mono);
+    }
+
+    while output_buf.len() >= chunk_samples {
+        let chunk_data: Vec<f32> = output_buf.drain(..chunk_samples).collect();
+
+        let timestamp_ms = start_time.elapsed().as_millis() as u64;
+        let chunk = AudioChunk {
+            samples: chunk_data,
+            timestamp_ms,
         };
-        let mut resampler =
-            Async::<f32>::new_sinc(16000.0 / 44100.0, 2.0, &params, 1024, 1, FixedAsync::Input)
-                .unwrap();
 
-        // 1024 samples at 44100 → ~372 samples at 16000.
-        let input_data = vec![0.0f32; 1024];
-        let input = SequentialSlice::new(&input_data, 1, 1024).unwrap();
-        let output = resampler.process(&input, 0, None).unwrap();
-        let out_data = output.take_data();
-        let expected = (1024.0_f64 * 16000.0 / 44100.0).round() as usize;
-        assert!((out_data.len() as i32 - expected as i32).unsigned_abs() <= 2);
-    }
+        // If buffer is full, drop oldest chunk (backpressure handling).
+        // No logging here — this is a real-time audio thread.
+        if ring.is_full() {
+            ring.try_pop();
+        }
 
-    #[test]
-    fn service_construction() {
-        let config = AudioCaptureConfig::default();
-        let _service = AudioCaptureService::new(config);
-    }
-
-    #[test]
-    fn callback_state_mono_passthrough() {
-        let (tx, _rx) = mpsc::channel(16);
-        let state = test_callback_state(tx, 1);
-        let data = vec![0.5f32; 480];
-        let mono = state.to_mono_f32(&data);
-        assert_eq!(mono.len(), 480);
-    }
-
-    #[test]
-    fn callback_state_stereo_downmix() {
-        let (tx, _rx) = mpsc::channel(16);
-        let state = test_callback_state(tx, 2);
-        // Stereo: L=1.0, R=0.0 → mono = 0.5
-        let data: Vec<f32> = (0..960)
-            .map(|i| if i % 2 == 0 { 1.0 } else { 0.0 })
-            .collect();
-        let mono = state.to_mono_f32(&data);
-        assert_eq!(mono.len(), 480);
-        assert!((mono[0] - 0.5).abs() < f32::EPSILON);
-    }
-
-    #[test]
-    fn callback_state_i16_conversion() {
-        let (tx, _rx) = mpsc::channel(16);
-        let state = test_callback_state(tx, 1);
-        let data = vec![i16::MAX; 480];
-        let mono = state.i16_to_mono_f32(&data);
-        assert_eq!(mono.len(), 480);
-        assert!((mono[0] - 1.0).abs() < f32::EPSILON);
-    }
-
-    #[test]
-    fn callback_state_frame_emission() {
-        let (tx, mut rx) = mpsc::channel(16);
-        let mut state = test_callback_state(tx, 1);
-
-        // Push exactly one frame worth of loud samples.
-        let samples = vec![0.5f32; 480];
-        state.process_samples(&samples);
-
-        let frame = rx.try_recv().unwrap();
-        assert_eq!(frame.samples.len(), 480);
-        assert_eq!(frame.sample_rate, 16000);
-    }
-
-    #[test]
-    fn callback_state_vad_filters_silence() {
-        let (tx, mut rx) = mpsc::channel(16);
-        let mut state = test_callback_state(tx, 1);
-        state.vad_enabled = true;
-
-        // Push silence — should be filtered.
-        let silence = vec![0.0f32; 480];
-        state.process_samples(&silence);
-
-        assert!(rx.try_recv().is_err());
+        ring.push(chunk);
     }
 }
