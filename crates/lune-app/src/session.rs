@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::Utc;
+use lune_asr::OrtForcedAligner;
 use tokio::sync::{Mutex, mpsc, oneshot};
 use tracing::{debug, info, warn};
 use uuid::Uuid;
@@ -51,10 +52,11 @@ const ONSET_SCAN_WINDOW: usize = 256; // 16ms @ 16kHz
 /// Suppress immediate duplicate flushes from repeated backend emits.
 const DUPLICATE_FLUSH_WINDOW: Duration = Duration::from_millis(1200);
 
-/// Maximum characters of session_text to include as LLM context.
-/// ~500 chars ≈ 125 words ≈ 5 short utterances ≈ ~170 tokens.
-/// Fits well within the 2048 n_ctx budget (system ~300 + few-shot ~400 + context ~170 + input ~100 + output ~256 = ~1226).
-const LLM_CONTEXT_MAX_CHARS: usize = 500;
+/// Number of recent committed utterances to include as LLM context.
+const CONTEXT_UTTERANCE_COUNT: usize = 5;
+/// Maximum words of context to keep (tail-trimmed). ~100 words ≈ ~130 tokens.
+/// Fits within the 2048 n_ctx budget (system ~300 + few-shot ~400 + context ~130 + input ~100 + output ~256 = ~1186).
+const CONTEXT_MAX_WORDS: usize = 100;
 
 /// >= 99% confidence: speculative paste — ~75ms (1200 samples).
 pub const SILENCE_TIER_SPECULATIVE: usize = 1_200;
@@ -130,6 +132,9 @@ pub struct SessionManager<A: AsrBackend> {
     config: SessionManagerConfig,
     settings: Arc<RwLock<UserSettings>>,
     active: Arc<Mutex<Option<ActiveHandle>>>,
+    /// Optional post-utterance forced aligner for word-order correction.
+    /// When `Some`, spawned as a blocking task after each silence flush.
+    aligner: Option<Arc<OrtForcedAligner>>,
 }
 
 impl<A: AsrBackend + 'static> SessionManager<A> {
@@ -152,7 +157,15 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             config,
             settings,
             active: Arc::new(Mutex::new(None)),
+            aligner: None,
         }
+    }
+
+    /// Attach a pre-built forced aligner to this session manager.
+    /// When set, the aligner runs after each silence flush.
+    pub fn with_aligner(mut self, aligner: OrtForcedAligner) -> Self {
+        self.aligner = Some(Arc::new(aligner));
+        self
     }
 
     /// Start a new session. Returns `Err` if one is already active.
@@ -216,6 +229,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let persist = Arc::clone(&self.persist);
         let config = self.config.clone();
         let active_arc = Arc::clone(&self.active);
+        let aligner = self.aligner.as_ref().map(Arc::clone);
 
         tokio::task::spawn_local(run_session(
             session_id,
@@ -230,6 +244,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             stop_rx,
             active_arc,
             audio_override,
+            aligner,
         ));
 
         *lock = Some(ActiveHandle {
@@ -275,6 +290,7 @@ async fn run_session<A: AsrBackend + 'static>(
     mut stop_rx: oneshot::Receiver<()>,
     active_arc: Arc<Mutex<Option<ActiveHandle>>>,
     audio_override: Option<AudioStream>,
+    aligner: Option<Arc<OrtForcedAligner>>,
 ) {
     let mut status = SessionStatus::Completed;
     let mut style_preset = style_preset;
@@ -327,6 +343,8 @@ async fn run_session<A: AsrBackend + 'static>(
 
     let mut output_ctrl = TextOutputController::new(event_tx.clone());
     let mut session_text = String::with_capacity(512);
+    let mut context_utterances: VecDeque<String> =
+        VecDeque::with_capacity(CONTEXT_UTTERANCE_COUNT + 1);
     let mut pending_nonfinal = String::with_capacity(128);
     let mut counters = SessionCounters::default();
     let mut sent_to_llm = false;
@@ -377,6 +395,14 @@ async fn run_session<A: AsrBackend + 'static>(
     let dynamic_silence_enabled = config.dynamic_silence.unwrap_or(true);
     let mut last_asr_confidence: Option<f32> = None;
 
+    // ── Forced aligner state ──────────────────────────────────────────────
+    // `utterance_audio` accumulates raw PCM pushed to ASR for the current
+    // speech segment. `utterance_committed` tracks text committed (pasted)
+    // during this utterance, in emission order. Both reset on speech start.
+    let mut utterance_audio: Vec<f32> = Vec::new();
+    let mut utterance_committed: String = String::new();
+    let (align_tx, mut align_rx) = mpsc::channel::<String>(4);
+
     // ── Main loop ─────────────────────────────────────────────────────────
     loop {
         tokio::select! {
@@ -397,17 +423,24 @@ async fn run_session<A: AsrBackend + 'static>(
                 break;
             }
 
+            // ── Forced-aligner correction ─────────────────────────
+            Some(corrected) = align_rx.recv() => {
+                debug!(%session_id, text = %corrected, "forced aligner correction");
+                let _ = event_tx.try_send(SessionEvent::CorrectedText(corrected));
+            }
+
             // ── LLM streaming chunk or completion ────────────────────
             Some(resp) = llm_rx.recv() => {
                 if !resp.corrected_text.is_empty() {
                     if llm_first_chunk {
                         // First chunk: insert separator from previous session text.
-                        commit_final_text(&mut output_ctrl, &mut session_text, &resp.corrected_text).await;
+                        commit_final_text(&mut output_ctrl, &mut session_text, &resp.corrected_text, None, &mut context_utterances).await;
                         llm_first_chunk = false;
                     } else {
                         // Subsequent streaming chunks: already word-spaced.
                         output_ctrl.emit_final(resp.corrected_text.clone()).await;
                         session_text.push_str(&resp.corrected_text);
+                        push_context_utterance(&mut context_utterances, resp.corrected_text.trim().to_owned());
                     }
                 }
                 if resp.is_final {
@@ -415,7 +448,7 @@ async fn run_session<A: AsrBackend + 'static>(
                     llm_pending = false;
                     // Drain held segments that were buffered while LLM was in-flight.
                     for held in held_commits.drain(..) {
-                        commit_final_text(&mut output_ctrl, &mut session_text, &held).await;
+                        commit_final_text(&mut output_ctrl, &mut session_text, &held, None, &mut context_utterances).await;
                     }
                 }
             }
@@ -444,6 +477,13 @@ async fn run_session<A: AsrBackend + 'static>(
                 // the lookback buffer + current batch to find the actual
                 // acoustic onset — where energy first crosses the noise floor.
                 // This corrects for TEN-VAD's 1–3 frame confirmation latency.
+                // Reset per-utterance buffers when speech starts so each flush
+                // carries only the audio + text from the current utterance.
+                if batch_has_speech && !was_speaking {
+                    utterance_audio.clear();
+                    utterance_committed.clear();
+                }
+
                 if batch_has_speech && speech_start_sample.is_none() {
                     let onset = find_speech_onset(
                         &onset_lookback,
@@ -481,6 +521,11 @@ async fn run_session<A: AsrBackend + 'static>(
                 {
                     warn!(error = %e, "push_audio error");
                     continue;
+                }
+
+                // Accumulate utterance audio for forced aligner.
+                if should_push_audio {
+                    utterance_audio.extend_from_slice(&audio_batch);
                 }
 
                 // Shared pipeline gate: only poll for audio actually sent to ASR.
@@ -591,12 +636,14 @@ async fn run_session<A: AsrBackend + 'static>(
                                                 &mut output_ctrl,
                                                 &mut session_text,
                                                 &applied,
+                                                Some(&mut utterance_committed),
+                                                &mut context_utterances,
                                             )
                                             .await;
                                         }
                                     }
                                 } else {
-                                    let ctx = build_llm_context(&session_text);
+                                    let ctx = build_llm_context(&context_utterances);
                                     let flushed = flush_to_llm_if_new(
                                         remaining,
                                         &dict,
@@ -666,6 +713,8 @@ async fn run_session<A: AsrBackend + 'static>(
                                             &mut output_ctrl,
                                             &mut session_text,
                                             &applied,
+                                            Some(&mut utterance_committed),
+                                            &mut context_utterances,
                                         )
                                         .await;
                                     }
@@ -677,7 +726,7 @@ async fn run_session<A: AsrBackend + 'static>(
                                     flush_ms = flush_threshold * 1000 / 16_000,
                                     "dynamic silence flush"
                                 );
-                                let ctx = build_llm_context(&session_text);
+                                let ctx = build_llm_context(&context_utterances);
                                 let flushed = flush_to_llm_if_new(
                                     &pending_nonfinal,
                                     &dict,
@@ -698,6 +747,30 @@ async fn run_session<A: AsrBackend + 'static>(
                                 warn!(error = %e, "reset_context error");
                             }
                         }
+                        // ── Forced aligner ──────────────────────────────
+                        // Spawn after flush so utterance_committed includes
+                        // any speculative paste from this silence boundary.
+                        if let Some(al) = &aligner {
+                            if !utterance_committed.is_empty() {
+                                let al = Arc::clone(al);
+                                let audio = utterance_audio.clone();
+                                let text = utterance_committed.clone();
+                                let tx = align_tx.clone();
+                                tokio::task::spawn_blocking(move || {
+                                    if let Ok(words) = al.align(&audio, &text) {
+                                        let reordered = words
+                                            .iter()
+                                            .map(|w| w.text.as_str())
+                                            .collect::<Vec<_>>()
+                                            .join(" ");
+                                        if reordered != text {
+                                            let _ = tx.blocking_send(reordered);
+                                        }
+                                    }
+                                });
+                            }
+                        }
+
                         // Always reset — even if nothing to flush — so VAD
                         // inference stops running on every tick after speech.
                         if let Some(start) = speech_start_sample.take() {
@@ -753,12 +826,18 @@ async fn run_session<A: AsrBackend + 'static>(
                             if llm_pending {
                                 held_commits.push(applied);
                             } else {
-                                commit_final_text(&mut output_ctrl, &mut session_text, &applied)
-                                    .await;
+                                commit_final_text(
+                                    &mut output_ctrl,
+                                    &mut session_text,
+                                    &applied,
+                                    None,
+                                    &mut context_utterances,
+                                )
+                                .await;
                             }
                         }
                     } else {
-                        let ctx = build_llm_context(&session_text);
+                        let ctx = build_llm_context(&context_utterances);
                         let flushed = flush_to_llm_if_new(
                             text,
                             &dict,
@@ -781,7 +860,7 @@ async fn run_session<A: AsrBackend + 'static>(
     }
 
     if !pending_nonfinal.is_empty() {
-        let ctx = build_llm_context(&session_text);
+        let ctx = build_llm_context(&context_utterances);
         let flushed = flush_to_llm_if_new(
             &pending_nonfinal,
             &dict,
@@ -811,19 +890,32 @@ async fn run_session<A: AsrBackend + 'static>(
                             &mut output_ctrl,
                             &mut session_text,
                             &resp.corrected_text,
+                            None,
+                            &mut context_utterances,
                         )
                         .await;
                         llm_first_chunk = false;
                     } else {
                         output_ctrl.emit_final(resp.corrected_text.clone()).await;
                         session_text.push_str(&resp.corrected_text);
+                        push_context_utterance(
+                            &mut context_utterances,
+                            resp.corrected_text.trim().to_owned(),
+                        );
                     }
                 }
                 if resp.is_final {
                     llm_first_chunk = true;
                     // Drain held segments from teardown.
                     for held in held_commits.drain(..) {
-                        commit_final_text(&mut output_ctrl, &mut session_text, &held).await;
+                        commit_final_text(
+                            &mut output_ctrl,
+                            &mut session_text,
+                            &held,
+                            None,
+                            &mut context_utterances,
+                        )
+                        .await;
                     }
                 }
             }
@@ -854,25 +946,39 @@ async fn run_session<A: AsrBackend + 'static>(
     info!(%session_id, "session stopped");
 }
 
-/// Extract a trailing context window from session_text for LLM disambiguation.
-/// Returns `None` if session_text is empty (first utterance).
-/// Truncates at the nearest word boundary to avoid splitting mid-word.
-fn build_llm_context(session_text: &str) -> Option<String> {
-    let trimmed = session_text.trim();
-    if trimmed.is_empty() {
+/// Build LLM context from recent committed utterances.
+/// Returns `None` if no utterances exist (first utterance).
+/// Joins the last `CONTEXT_UTTERANCE_COUNT` utterances, tail-trimmed to
+/// `CONTEXT_MAX_WORDS` words so the context fits the 2048 n_ctx budget.
+fn build_llm_context(utterances: &VecDeque<String>) -> Option<String> {
+    if utterances.is_empty() {
         return None;
     }
-    let ctx = if trimmed.len() <= LLM_CONTEXT_MAX_CHARS {
-        trimmed
+    let joined: String = utterances
+        .iter()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+    if joined.is_empty() {
+        return None;
+    }
+    let words: Vec<&str> = joined.split_whitespace().collect();
+    let ctx = if words.len() > CONTEXT_MAX_WORDS {
+        words[words.len() - CONTEXT_MAX_WORDS..].join(" ")
     } else {
-        let start = trimmed.len() - LLM_CONTEXT_MAX_CHARS;
-        // Find the nearest word boundary after the cut point.
-        match trimmed[start..].find(' ') {
-            Some(pos) => &trimmed[start + pos + 1..],
-            None => &trimmed[start..],
-        }
+        joined
     };
     Some(format!("Context: {ctx}\n"))
+}
+
+/// Push a committed text segment into the utterance context ring buffer.
+#[inline]
+fn push_context_utterance(utterances: &mut VecDeque<String>, text: String) {
+    if utterances.len() >= CONTEXT_UTTERANCE_COUNT {
+        utterances.pop_front();
+    }
+    utterances.push_back(text);
 }
 
 /// Detect re-transcription: returns true when `new_text` (trimmed, ≥10 chars)
@@ -954,10 +1060,15 @@ fn normalize_whitespace(text: &str) -> String {
 }
 
 /// Commit corrected text without ever emitting a standalone leading space token.
+///
+/// `utterance_committed` is an optional per-utterance accumulator for the
+/// forced aligner. Pass `Some(&mut string)` in the main loop, `None` in teardown.
 async fn commit_final_text(
     output_ctrl: &mut TextOutputController,
     session_text: &mut String,
     corrected_text: &str,
+    utterance_committed: Option<&mut String>,
+    context_utterances: &mut VecDeque<String>,
 ) {
     let trimmed = corrected_text.trim_start();
     if trimmed.is_empty() {
@@ -979,6 +1090,16 @@ async fn commit_final_text(
 
     output_ctrl.emit_final(payload.clone()).await;
     session_text.push_str(&payload);
+
+    // Track for LLM context window.
+    push_context_utterance(context_utterances, trimmed.to_owned());
+
+    if let Some(uc) = utterance_committed {
+        if !uc.is_empty() {
+            uc.push(' ');
+        }
+        uc.push_str(trimmed);
+    }
 }
 
 #[cold]
@@ -1220,9 +1341,24 @@ mod tests {
         let (tx, mut rx) = mpsc::channel(8);
         let mut output_ctrl = TextOutputController::new(tx);
         let mut session_text = String::new();
+        let mut ctx_utt = VecDeque::new();
 
-        commit_final_text(&mut output_ctrl, &mut session_text, "Hello").await;
-        commit_final_text(&mut output_ctrl, &mut session_text, "world").await;
+        commit_final_text(
+            &mut output_ctrl,
+            &mut session_text,
+            "Hello",
+            None,
+            &mut ctx_utt,
+        )
+        .await;
+        commit_final_text(
+            &mut output_ctrl,
+            &mut session_text,
+            "world",
+            None,
+            &mut ctx_utt,
+        )
+        .await;
 
         let first = rx.try_recv().expect("first final event");
         let second = rx.try_recv().expect("second final event");
@@ -1236,10 +1372,32 @@ mod tests {
         let (tx, mut rx) = mpsc::channel(8);
         let mut output_ctrl = TextOutputController::new(tx);
         let mut session_text = String::new();
+        let mut ctx_utt = VecDeque::new();
 
-        commit_final_text(&mut output_ctrl, &mut session_text, "Hello").await;
-        commit_final_text(&mut output_ctrl, &mut session_text, ", world").await;
-        commit_final_text(&mut output_ctrl, &mut session_text, ". Done").await;
+        commit_final_text(
+            &mut output_ctrl,
+            &mut session_text,
+            "Hello",
+            None,
+            &mut ctx_utt,
+        )
+        .await;
+        commit_final_text(
+            &mut output_ctrl,
+            &mut session_text,
+            ", world",
+            None,
+            &mut ctx_utt,
+        )
+        .await;
+        commit_final_text(
+            &mut output_ctrl,
+            &mut session_text,
+            ". Done",
+            None,
+            &mut ctx_utt,
+        )
+        .await;
 
         let first = rx.try_recv().expect("first");
         let second = rx.try_recv().expect("second");
@@ -1305,32 +1463,61 @@ mod tests {
 
     #[test]
     fn build_llm_context_empty_returns_none() {
-        assert!(build_llm_context("").is_none());
-        assert!(build_llm_context("   ").is_none());
+        let empty: VecDeque<String> = VecDeque::new();
+        assert!(build_llm_context(&empty).is_none());
+
+        let whitespace: VecDeque<String> = VecDeque::from(["   ".to_owned()]);
+        assert!(build_llm_context(&whitespace).is_none());
     }
 
     #[test]
     fn build_llm_context_short_text_returns_full() {
-        let ctx = build_llm_context("Hello world.").unwrap();
+        let utt = VecDeque::from(["Hello world.".to_owned()]);
+        let ctx = build_llm_context(&utt).unwrap();
         assert_eq!(ctx, "Context: Hello world.\n");
     }
 
     #[test]
-    fn build_llm_context_truncates_at_word_boundary() {
-        // Create a string longer than LLM_CONTEXT_MAX_CHARS (500).
-        let long = "word ".repeat(200); // 1000 chars
-        let ctx = build_llm_context(&long).unwrap();
+    fn build_llm_context_truncates_at_word_limit() {
+        // 200 words across 3 utterances — exceeds CONTEXT_MAX_WORDS (100).
+        let u1 = (0..80)
+            .map(|i| format!("w{i}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let u2 = (80..160)
+            .map(|i| format!("w{i}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let u3 = (160..200)
+            .map(|i| format!("w{i}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let utt = VecDeque::from([u1, u2, u3]);
+        let ctx = build_llm_context(&utt).unwrap();
         assert!(ctx.starts_with("Context: "));
         assert!(ctx.ends_with('\n'));
-        // Should be <= 500 chars of actual context + "Context: " prefix + newline.
         let inner = ctx
             .strip_prefix("Context: ")
             .unwrap()
             .strip_suffix('\n')
             .unwrap();
-        assert!(inner.len() <= LLM_CONTEXT_MAX_CHARS);
-        // Should not start with a partial word.
-        assert!(!inner.starts_with(' '));
+        let word_count = inner.split_whitespace().count();
+        assert_eq!(word_count, CONTEXT_MAX_WORDS);
+        // Should contain the tail words (w100..w199).
+        assert!(inner.contains("w100"));
+        assert!(inner.contains("w199"));
+        assert!(!inner.contains("w0 "));
+    }
+
+    #[test]
+    fn push_context_utterance_evicts_oldest() {
+        let mut utt: VecDeque<String> = VecDeque::new();
+        for i in 0..CONTEXT_UTTERANCE_COUNT + 3 {
+            push_context_utterance(&mut utt, format!("u{i}"));
+        }
+        assert_eq!(utt.len(), CONTEXT_UTTERANCE_COUNT);
+        // Oldest entries (u0, u1, u2) should be evicted.
+        assert_eq!(utt.front().unwrap(), "u3");
     }
 
     #[test]
