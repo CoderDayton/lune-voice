@@ -1,6 +1,8 @@
 pub mod mel;
 mod openai_backend;
 #[cfg(feature = "ort-qwen")]
+mod ort_forced_aligner;
+#[cfg(feature = "ort-qwen")]
 mod ort_qwen_backend;
 #[cfg(feature = "ort-qwen")]
 pub mod ort_qwen_stream;
@@ -13,6 +15,8 @@ mod vocab;
 
 pub use mel::extract_features;
 pub use openai_backend::{OpenAiAsrConfig, OpenAiCompatibleAsrBackend, encode_wav_16bit};
+#[cfg(feature = "ort-qwen")]
+pub use ort_forced_aligner::{OrtForcedAligner, WordTimestamp};
 #[cfg(feature = "ort-qwen")]
 pub use ort_qwen_backend::{OrtQwenAsrBackend, OrtQwenAsrConfig};
 #[cfg(feature = "ort-qwen")]

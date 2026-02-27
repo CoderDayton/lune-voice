@@ -48,8 +48,8 @@ const MAX_ENCODER_SAMPLES: usize = 30 * SAMPLE_RATE;
 
 const TOKEN_IM_START: i64 = 151644;
 const TOKEN_IM_END: i64 = 151645;
-const TOKEN_AUDIO_START: i64 = 151669;
-const TOKEN_AUDIO_END: i64 = 151670;
+pub(crate) const TOKEN_AUDIO_START: i64 = 151669;
+pub(crate) const TOKEN_AUDIO_END: i64 = 151670;
 const TOKEN_ASR_TEXT: i64 = 151704;
 
 /// Prefix tokens before the audio: `<|im_start|>system\n`

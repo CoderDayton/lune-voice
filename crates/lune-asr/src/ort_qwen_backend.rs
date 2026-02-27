@@ -3,14 +3,15 @@
 //! Uses three ONNX Runtime sessions (encoder, embed_tokens, decoder) to
 //! replicate the streaming ASR pipeline from the `qwen-asr` crate.
 
-use std::path::PathBuf;
-use std::sync::Mutex;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use ort::session::Session;
 
 use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
 use lune_core::error::{Error, Result};
 
+use crate::ort_forced_aligner::{FaConfig, OrtForcedAligner};
 use crate::ort_qwen_stream::{self, OrtStreamState, StreamConfig};
 use crate::ort_utils::build_ort_session;
 
@@ -65,8 +66,8 @@ impl Default for OrtQwenAsrConfig {
 
 /// ORT-based Qwen ASR backend using three ONNX sessions.
 pub struct OrtQwenAsrBackend {
-    encoder: Mutex<Session>,
-    embed_tokens: Mutex<Session>,
+    encoder: Arc<Mutex<Session>>,
+    embed_tokens: Arc<Mutex<Session>>,
     decoder: Mutex<Session>,
     tokenizer: tokenizers::Tokenizer,
     config: OrtQwenAsrConfig,
@@ -107,8 +108,8 @@ impl OrtQwenAsrBackend {
         );
 
         Ok(Self {
-            encoder: Mutex::new(encoder),
-            embed_tokens: Mutex::new(embed_tokens),
+            encoder: Arc::new(Mutex::new(encoder)),
+            embed_tokens: Arc::new(Mutex::new(embed_tokens)),
             decoder: Mutex::new(decoder),
             tokenizer,
             config,
@@ -378,5 +379,32 @@ impl AsrBackend for OrtQwenAsrBackend {
 
     fn segment_capacity_hint(&self) -> usize {
         1
+    }
+}
+
+impl OrtQwenAsrBackend {
+    /// Build an `OrtForcedAligner` that reuses this backend's encoder and
+    /// embed_tokens sessions (shared via `Arc`). Only the FA decoder is loaded
+    /// from `fa_model_dir`, which must contain:
+    ///   - `qwen3-fa-decoder.onnx` (+ `qwen3-fa-decoder.onnx_data`)
+    ///   - `fa_config.json` (`{ timestamp_token_id, timestamp_segment_ms, timestamp_classes }`)
+    pub fn make_forced_aligner(&self, fa_model_dir: &Path) -> Result<OrtForcedAligner> {
+        let decoder_path = fa_model_dir.join("qwen3-fa-decoder.onnx");
+        let config_path = fa_model_dir.join("fa_config.json");
+
+        let fa_decoder = build_ort_session(&decoder_path, self.config.use_gpu)?;
+
+        let cfg_bytes = std::fs::read(&config_path)
+            .map_err(|e| Error::Asr(format!("fa_config.json read: {e}")))?;
+        let fa_config: FaConfig = serde_json::from_slice(&cfg_bytes)
+            .map_err(|e| Error::Asr(format!("fa_config.json parse: {e}")))?;
+
+        OrtForcedAligner::new(
+            Arc::clone(&self.encoder),
+            Arc::clone(&self.embed_tokens),
+            fa_decoder,
+            self.tokenizer.clone(),
+            fa_config,
+        )
     }
 }

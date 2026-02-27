@@ -8,6 +8,14 @@ use super::modes::{ActivationMode, DictationMode, PrivacyMode};
 use super::redacted::RedactedString;
 use super::style::StyleId;
 
+/// Configuration for the optional forced-aligner pass.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AlignerConfig {
+    pub enabled: bool,
+    /// Directory containing `qwen3-fa-decoder.onnx` and `fa_config.json`.
+    pub model_dir: PathBuf,
+}
+
 /// Top-level user settings, persisted as TOML.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserSettings {
@@ -42,6 +50,11 @@ pub struct UserSettings {
     /// `None` or `Some(true)` enables; `Some(false)` disables (static 200ms).
     #[serde(default = "default_dynamic_silence")]
     pub dynamic_silence: Option<bool>,
+    /// Optional forced-aligner for post-utterance word-order correction.
+    /// When `enabled = true`, the aligner runs after each silence flush and
+    /// emits `CorrectedText` if words were pasted out of order.
+    #[serde(default)]
+    pub aligner: Option<AlignerConfig>,
 }
 
 impl Default for UserSettings {
@@ -77,6 +90,7 @@ impl Default for UserSettings {
             confidence_threshold: default_confidence_threshold(),
             min_token_threshold: default_min_token_threshold(),
             dynamic_silence: default_dynamic_silence(),
+            aligner: None,
         }
     }
 }
