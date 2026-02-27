@@ -118,6 +118,34 @@ _CALIB_TEXTS: list[str] = [
 ]
 
 
+def _wrap_inputs_with_identity(model: onnx.ModelProto) -> None:
+    """In-place: prepend Identity nodes after each graph input.
+
+    NNCF 3.x assumes every tensor consumed by a node is produced by another
+    node (i.e., present in parents_node_mapping). Graph inputs violate this,
+    causing a KeyError in _get_bias_attr. Proxying them through Identity ops
+    satisfies the invariant. ORT's graph optimizer elides these at load time.
+    """
+    import onnx.helper as oh
+
+    input_names = {inp.name for inp in model.graph.input}
+    name_remap = {name: f"_nncf_proxy_{name}" for name in input_names}
+
+    # Re-point all node inputs that currently reference a raw graph input.
+    for node in model.graph.node:
+        for i, inp in enumerate(node.input):
+            if inp in name_remap:
+                node.input[i] = name_remap[inp]
+
+    # Prepend Identity nodes: graph_input → proxy name.
+    identity_nodes = [
+        oh.make_node("Identity", inputs=[name], outputs=[proxy])
+        for name, proxy in name_remap.items()
+    ]
+    for i, id_node in enumerate(identity_nodes):
+        model.graph.node.insert(i, id_node)
+
+
 def quantize_int4_nncf(
     model_path: Path,
     embed_path: Path,
@@ -186,21 +214,57 @@ def quantize_int4_nncf(
     # Load topology only; NNCF streams weights lazily via EXTERNAL_DATA_DIR.
     onnx_model = onnx.load(str(model_path), load_external_data=False)
 
-    compressed = nncf.compress_weights(
-        onnx_model,
+    # Workaround: NNCF 3.x nncf_graph_builder._get_bias_attr crashes with a
+    # KeyError when a node's input is a raw graph input (not produced by any op).
+    # Insert no-op Identity nodes so every tensor has an entry in
+    # parents_node_mapping. ORT's graph optimizer removes these at runtime.
+    _wrap_inputs_with_identity(onnx_model)
+
+    # Find MatMul/Gemm nodes whose weight initializer has >2 dims.
+    # These are positional-encoding constants (e.g. mrope [3,1,64,1]) that are
+    # not linear-projection weights and cannot be group-quantized on any axis.
+    init_shapes = {i.name: list(i.dims) for i in onnx_model.graph.initializer}
+    skip_nodes: list[str] = []
+    for node in onnx_model.graph.node:
+        if node.op_type in ("MatMul", "Gemm"):
+            for inp in node.input:
+                if inp in init_shapes and len(init_shapes[inp]) > 2:
+                    if node.name:
+                        skip_nodes.append(node.name)
+                        print(f"  Skipping {node.name!r} (weight shape {init_shapes[inp]})")
+
+    ignored = nncf.IgnoredScope(names=skip_nodes) if skip_nodes else None
+
+    common_kwargs: dict = dict(
         mode=nncf.CompressWeightsMode.INT4_ASYM,
         ratio=1.0,
-        group_size=128,
         awq=True,
         scale_estimation=True,
+        subset_size=len(_CALIB_TEXTS),
         dataset=dataset,
+        ignored_scope=ignored,
         advanced_parameters=nncf.AdvancedCompressionParameters(
-            backend_params={BackendParameters.EXTERNAL_DATA_DIR: model_path.parent}
+            backend_params={BackendParameters.EXTERNAL_DATA_DIR: model_path.parent.resolve()}
         ),
     )
 
+    try:
+        compressed = nncf.compress_weights(onnx_model, group_size=128, **common_kwargs)
+        group_desc = "group=128"
+    except nncf.errors.UnsupportedModelError:
+        # Residual 3-D weights still incompatible with group quantization — fall
+        # back to per-channel. Also drop scale_estimation: it calls np.stack on
+        # per-sample activation stats and fails when calibration sequences have
+        # different lengths (variable-length text → variable hidden-state shapes).
+        print("  group_size=128 unsupported, retrying per-channel (no SE)...")
+        onnx_model = onnx.load(str(model_path), load_external_data=False)
+        _wrap_inputs_with_identity(onnx_model)
+        common_kwargs["scale_estimation"] = False
+        compressed = nncf.compress_weights(onnx_model, group_size=-1, **common_kwargs)
+        group_desc = "per-channel"
+
     _save_consolidated(compressed, model_path)
-    print(f"  {model_path.name}: INT4 AWQ+SE complete")
+    print(f"  {model_path.name}: INT4 AWQ+SE ({group_desc}) complete")
 
 
 # ── LLM Wrappers ─────────────────────────────────────────────────────────────
