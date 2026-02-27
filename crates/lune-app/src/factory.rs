@@ -214,9 +214,17 @@ impl AsrBackend for AsrBackendDispatch {
 /// Initialize the global ORT environment with execution providers.
 ///
 /// Must be called exactly once, before any ORT `Session` is created.
-/// Registers CUDA EP when `settings.device` requests GPU.
-/// All sessions share a single CUDA memory arena.  Falls back to CPU
-/// when the `cuda` feature is not enabled or CUDA init fails.
+/// All sessions share a single CUDA memory arena when GPU is enabled.
+///
+/// Resolution order:
+/// 1. `settings.device == Cpu` → CPU only, skip CUDA attempt.
+/// 2. `settings.device == Cuda | Auto` + cuda feature compiled in
+///    → try CUDA EP; fall back to CPU on runtime failure.
+/// 3. `settings.device == Cuda | Auto` + cuda feature NOT compiled
+///    → log warning, use CPU (handles `--no-default-features` builds).
+///
+/// The `cuda` feature is enabled by default, so `Auto` is equivalent to
+/// "try CUDA, fall back to CPU" on standard builds.
 #[cold]
 pub fn init_ort_runtime(settings: &UserSettings) {
     let wants_gpu = settings.device.use_gpu(cfg!(feature = "cuda"));
@@ -234,17 +242,19 @@ pub fn init_ort_runtime(settings: &UserSettings) {
                 tracing::warn!("ORT CUDA init failed, falling back to CPU");
             }
         }
+        // Reached only on --no-default-features builds with device != Cpu.
         #[cfg(not(feature = "cuda"))]
         {
-            tracing::info!("GPU requested but cuda feature not enabled, using CPU");
+            tracing::info!("GPU requested but cuda feature not compiled, using CPU");
         }
     }
 
-    // CPU-only fallback.
+    // CPU-only path: either device == Cpu, or CUDA init above failed.
+    // The second call to ort::init() is a no-op if already initialized.
     if ort::init().commit() {
         tracing::info!("ORT initialized (CPU only)");
     } else {
-        tracing::warn!("ORT init failed or already initialized");
+        tracing::info!("ORT already initialized (CPU fallback from failed CUDA attempt)");
     }
 }
 

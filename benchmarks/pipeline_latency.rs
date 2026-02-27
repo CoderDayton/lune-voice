@@ -1,17 +1,20 @@
-//! Pipeline latency benchmark — measures each stage of the dictation pipeline
-//! by simulating realistic audio frame arrival and ASR behavior.
+//! Pipeline latency benchmark — real ONNX inference on real WAV fixtures.
 //!
 //! Run: cargo run --release --example pipeline_latency -p lune-app
+//! GPU: cargo run --release --features cuda --example pipeline_latency -p lune-app
 //!
-//! This benchmark does NOT use SessionManager (which requires a real microphone).
-//! Instead it directly exercises each stage in isolation and in sequence to
-//! produce accurate latency numbers.
+//! All 5 stages use real model inference — no simulated data, no thread::sleep.
+//! Gracefully skips if model directories are missing.
 
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::sync::Arc;
+use std::time::Instant;
 
-use lune_asr::{OrtQwenAsrBackend, OrtQwenAsrConfig};
+use lune_asr::{OrtQwenAsrBackend, OrtQwenAsrConfig, compute_qwen_mel};
 use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
+use lune_core::config::StylePreset;
+use lune_core::llm::{PostProcessInput, TextPostProcessor};
+use lune_llm::{OrtLlmBackend, OrtLlmConfig};
 
 use lune_app::{
     SILENCE_FLUSH_SAMPLES, SILENCE_TIER_DEFAULT, SILENCE_TIER_HIGH, SILENCE_TIER_MODERATE,
@@ -20,499 +23,97 @@ use lune_app::{
 
 const SAMPLE_RATE: usize = 16_000;
 
+// ─── Data structures ────────────────────────────────────────────────────────
+
+struct Fixture {
+    name: &'static str,
+    pcm: Vec<f32>,
+    reference: String,
+    audio_secs: f64,
+}
+
+struct AsrResult {
+    segments: Vec<AsrSegment>,
+    hypothesis: String,
+    total_secs: f64,
+    chunk_latencies_ms: Vec<f64>,
+}
+
+// ─── Main ───────────────────────────────────────────────────────────────────
+
 fn main() {
     println!();
     println!("╔══════════════════════════════════════════════════════════════════╗");
-    println!("║              PIPELINE LATENCY BENCHMARK                         ║");
+    println!("║              PIPELINE LATENCY BENCHMARK (Real Inference)        ║");
     println!("╚══════════════════════════════════════════════════════════════════╝");
     println!();
 
-    // ── Stage 1: Audio frame accumulation ────────────────────────────────────
-    bench_audio_accumulation();
-
-    // ── Stage 2: Inference trigger latency ───────────────────────────────────
-    bench_inference_trigger();
-
-    // ── Stage 3: Full pipeline simulation ────────────────────────────────────
-    bench_full_pipeline_sim();
-
-    // ── Stage 4: Dynamic silence tiers ───────────────────────────────────────
-    bench_dynamic_silence();
-
-    // ── Stage 5: Output quality analysis ─────────────────────────────────────
-    let quality = bench_quality_analysis();
-
-    // ── Summary ──────────────────────────────────────────────────────────────
-    print_latency_budget();
-    print_quality_summary(&quality);
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Stage 1: How fast can we accumulate audio frames?
-// ═══════════════════════════════════════════════════════════════════════════════
-
-fn bench_audio_accumulation() {
-    println!("── Stage 1: Audio Frame Accumulation ──────────────────────────────");
-
-    let frame_size = 480; // samples per frame
-    let sample_rate = 16000;
-    let frame_ms = (frame_size as f64 / sample_rate as f64) * 1000.0;
-
-    // Simulate pushing 3 seconds of audio (100 frames).
-    let n_frames = 100;
-    let mut buffer: Vec<f32> = Vec::with_capacity(frame_size * n_frames);
-    let frame: Vec<f32> = vec![0.1; frame_size]; // dummy audio
-
-    let start = Instant::now();
-    for _ in 0..n_frames {
-        buffer.extend_from_slice(&frame);
+    // ── ORT init: try CUDA, auto-fall-back to CPU ───────────────────────────
+    let has_gpu = ort::init()
+        .with_execution_providers([ort::ep::CUDA::default().build()])
+        .commit();
+    if has_gpu {
+        println!("  [info] ORT: CUDA EP active");
+    } else {
+        let _ = ort::init().commit();
+        println!("  [info] ORT: CPU only (CUDA not available)");
     }
-    let elapsed = start.elapsed();
-
-    println!("  Frame size:          {frame_size} samples ({frame_ms:.0} ms @ {sample_rate} Hz)");
-    println!(
-        "  Frames pushed:       {n_frames} ({:.0} ms of audio)",
-        n_frames as f64 * frame_ms
-    );
-    println!(
-        "  Buffer accumulation: {:.3} ms",
-        elapsed.as_secs_f64() * 1000.0
-    );
-    println!(
-        "  Per-frame cost:      {:.0} ns",
-        elapsed.as_nanos() as f64 / n_frames as f64
-    );
-    println!();
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Stage 2: Inference trigger thresholds
-// ═══════════════════════════════════════════════════════════════════════════════
-
-fn bench_inference_trigger() {
-    println!("── Stage 2: Inference Trigger Latency ─────────────────────────────");
-
-    let frame_size = 480;
-    let sample_rate = 16000;
-    let frame_ms = (frame_size as f64 / sample_rate as f64) * 1000.0;
-
-    // Test different trigger thresholds.
-    let thresholds = [
-        (16000, "Current default (1.0 sec)"),
-        (8000, "Half (0.5 sec)"),
-        (4800, "Aggressive (0.3 sec)"),
-        (1600, "Ultra-low (0.1 sec)"),
-    ];
-
-    for (threshold, label) in &thresholds {
-        #[allow(clippy::manual_div_ceil)]
-        let frames_needed = (*threshold + frame_size - 1) / frame_size;
-        let wait_ms = frames_needed as f64 * frame_ms;
-
-        // Simulate accumulating frames until threshold.
-        let mut accumulated = 0usize;
-        let start = Instant::now();
-        let mut frames_until_trigger = 0u32;
-
-        while accumulated < *threshold {
-            accumulated += frame_size;
-            frames_until_trigger += 1;
-        }
-        let compute_time = start.elapsed();
-
-        println!("  {label}:");
-        println!("    Threshold:         {threshold} samples");
-        println!("    Frames to trigger: {frames_until_trigger}");
-        println!("    Real-time wait:    {wait_ms:.0} ms (audio must arrive)");
-        println!("    Compute overhead:  {:.0} ns", compute_time.as_nanos());
-    }
-    println!();
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Stage 3: Full pipeline simulation (no real mic, no real model)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-fn bench_full_pipeline_sim() {
-    println!("── Stage 3: Full Pipeline Simulation ─────────────────────────────");
-    println!("  Simulates: audio chunk → infer → word accumulator → LLM flush → delivery");
-    println!();
-
-    // Dynamic silence: resolve tier from confidence using the real function.
-    let configs = [
-        (
-            "High confidence (>=99%)",
-            8usize,
-            samples_to_ms(dynamic_silence_threshold(Some(0.99), true)),
-            75u64,
-        ),
-        (
-            "Good confidence (>=92%)",
-            8,
-            samples_to_ms(dynamic_silence_threshold(Some(0.95), true)),
-            75,
-        ),
-        (
-            "Moderate confidence (>=80%)",
-            8,
-            samples_to_ms(dynamic_silence_threshold(Some(0.85), true)),
-            75,
-        ),
-        (
-            "Low/unknown confidence",
-            8,
-            samples_to_ms(dynamic_silence_threshold(None, true)),
-            75,
-        ),
-        (
-            "Dynamic silence disabled",
-            8,
-            samples_to_ms(dynamic_silence_threshold(Some(0.99), false)),
-            75,
-        ),
-    ];
-
-    for (label, words_per_flush, silence_ms, inference_ms) in &configs {
-        let frame_size = 5120usize; // 320ms @ 16kHz — reference chunk size
-        let sample_rate = 16000usize;
-        let speech_frames = 50; // 50 × 320ms = 16s
-        let words_per_frame = 1usize; // ~1 word per 320ms chunk
-
-        let pipeline_start = Instant::now();
-        let mut accumulated_words = 0usize;
-        let mut frames_sent = 0usize;
-        let mut first_flush_at: Option<Duration> = None;
-        let mut flushes = 0u32;
-
-        while frames_sent < speech_frames {
-            frames_sent += 1;
-            accumulated_words += words_per_frame;
-
-            // Simulate inference per chunk.
-            std::thread::sleep(Duration::from_millis(*inference_ms));
-
-            // Word accumulator flush condition.
-            if accumulated_words >= *words_per_flush {
-                if first_flush_at.is_none() {
-                    first_flush_at = Some(Duration::from_millis(
-                        (frames_sent * frame_size * 1000 / sample_rate) as u64,
-                    ));
-                }
-                accumulated_words = 0;
-                flushes += 1;
-            }
-        }
-
-        let speech_end =
-            Duration::from_millis((frames_sent * frame_size * 1000 / sample_rate) as u64);
-
-        // Final silence flush.
-        if accumulated_words > 0 {
-            std::thread::sleep(Duration::from_millis(*silence_ms));
-            flushes += 1;
-        }
-
-        // Simulate Wayland key delivery.
-        let delivery_start = Instant::now();
-        std::thread::sleep(Duration::from_millis(2));
-        let delivery_time = delivery_start.elapsed();
-
-        let total_wall = pipeline_start.elapsed();
-        let after_speech_wait = silence_ms + delivery_time.as_millis() as u64;
-
-        println!("  [{label}]");
-        println!("    Words-per-flush:    {words_per_flush}");
-        println!("    Silence timeout:    {silence_ms} ms");
-        println!("    Inference/chunk:    {inference_ms} ms (simulated)");
-        println!(
-            "    First flush:        {} ms",
-            first_flush_at.map(|d| d.as_millis()).unwrap_or(0)
-        );
-        println!("    Flush count:        {flushes}");
-        println!("    Speech duration:    {} ms", speech_end.as_millis());
-        println!("    Wall clock:         {} ms", total_wall.as_millis());
-        println!("    ──────────────────────────────");
-        println!("    AFTER-SPEECH WAIT:  {after_speech_wait} ms  (silence + delivery)");
-        println!();
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Stage 4: Dynamic silence tiers (exercises real function)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-fn bench_dynamic_silence() {
-    println!("── Stage 4: Dynamic Silence Tiers (real function) ────────────────");
-    println!("  Exercises dynamic_silence_threshold() from lune_app::session.");
-    println!();
-    println!(
-        "  {:<22}  {:>8}  {:>10}  {:>12}  {:>12}",
-        "Confidence", "Samples", "Silence", "+ Inference", "+ Delivery"
-    );
-    println!("  {}", "─".repeat(72));
-
-    let inference_gpu_ms = 75.0f64;
-    let delivery_ms = 5.0f64;
-
-    let cases: &[(&str, Option<f32>)] = &[
-        (">=99% (speculative)", Some(0.99)),
-        (">=92% (high)", Some(0.95)),
-        (">=80% (moderate)", Some(0.85)),
-        ("<80% (default)", Some(0.5)),
-        ("None (first utterance)", None),
-    ];
-
-    for (label, conf) in cases {
-        let samples = dynamic_silence_threshold(*conf, true);
-        let silence_ms = samples_to_ms(samples) as f64;
-        let total = silence_ms + inference_gpu_ms + delivery_ms;
-        println!(
-            "  {:<22}  {:>8}  {:>8.0} ms  {:>10.0} ms  {:>10.0} ms",
-            label,
-            samples,
-            silence_ms,
-            silence_ms + inference_gpu_ms,
-            total
-        );
-    }
-
-    // Disabled path
-    let disabled_samples = dynamic_silence_threshold(Some(1.0), false);
-    let disabled_ms = samples_to_ms(disabled_samples) as f64;
-    println!(
-        "  {:<22}  {:>8}  {:>8.0} ms  {:>10.0} ms  {:>10.0} ms",
-        "Disabled (static)",
-        disabled_samples,
-        disabled_ms,
-        disabled_ms + inference_gpu_ms,
-        disabled_ms + inference_gpu_ms + delivery_ms
-    );
-
-    println!();
-    println!("  Tier constants (samples @ 16kHz):");
-    println!(
-        "    SPECULATIVE = {SILENCE_TIER_SPECULATIVE:>5}  ({:>3} ms)",
-        samples_to_ms(SILENCE_TIER_SPECULATIVE)
-    );
-    println!(
-        "    HIGH        = {SILENCE_TIER_HIGH:>5}  ({:>3} ms)",
-        samples_to_ms(SILENCE_TIER_HIGH)
-    );
-    println!(
-        "    MODERATE    = {SILENCE_TIER_MODERATE:>5}  ({:>3} ms)",
-        samples_to_ms(SILENCE_TIER_MODERATE)
-    );
-    println!(
-        "    DEFAULT     = {SILENCE_TIER_DEFAULT:>5}  ({:>3} ms)",
-        samples_to_ms(SILENCE_TIER_DEFAULT)
-    );
-    println!(
-        "    STATIC      = {SILENCE_FLUSH_SAMPLES:>5}  ({:>3} ms)  (when disabled)",
-        samples_to_ms(SILENCE_FLUSH_SAMPLES)
-    );
-    println!();
-}
-
-#[inline]
-fn samples_to_ms(samples: usize) -> u64 {
-    (samples * 1000 / SAMPLE_RATE) as u64
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Summary
-// ═══════════════════════════════════════════════════════════════════════════════
-
-fn print_latency_budget() {
-    println!("╔══════════════════════════════════════════════════════════════════╗");
-    println!("║              LATENCY BUDGET ANALYSIS                            ║");
-    println!("╚══════════════════════════════════════════════════════════════════╝");
-    println!();
-    println!("  The user cares about AFTER-SPEECH WAIT — time from when they");
-    println!("  stop talking to when text appears in the focused field.");
-    println!();
-    let inference_gpu = 75u64;
-    let inference_cpu = 680u64;
-    let delivery = 5u64;
-
-    let spec_ms = samples_to_ms(SILENCE_TIER_SPECULATIVE);
-    let high_ms = samples_to_ms(SILENCE_TIER_HIGH);
-    let mod_ms = samples_to_ms(SILENCE_TIER_MODERATE);
-    let def_ms = samples_to_ms(SILENCE_TIER_DEFAULT);
-    let static_ms = samples_to_ms(SILENCE_FLUSH_SAMPLES);
-
-    println!("  Dynamic silence after-speech wait (GPU, Qwen3-ASR-0.6B):");
-    println!();
-    println!("    Conf >=99%  (speculative, LLM bypassed):");
-    println!(
-        "      Silence:   {:>3} ms  Dictionary: <1 ms  Delivery: ~{delivery} ms",
-        spec_ms
-    );
-    println!("      TOTAL:    ~{} ms", spec_ms + delivery);
-    println!();
-    println!("    Conf >=92%  (high):");
-    println!(
-        "      Silence:   {:>3} ms  Inference: ~{inference_gpu} ms  Delivery: ~{delivery} ms",
-        high_ms
-    );
-    println!("      TOTAL:    ~{} ms", high_ms + inference_gpu + delivery);
-    println!();
-    println!("    Conf >=80%  (moderate):");
-    println!(
-        "      Silence:   {:>3} ms  Inference: ~{inference_gpu} ms  Delivery: ~{delivery} ms",
-        mod_ms
-    );
-    println!("      TOTAL:    ~{} ms", mod_ms + inference_gpu + delivery);
-    println!();
-    println!("    Conf <80%   (default/unknown):");
-    println!(
-        "      Silence:   {:>3} ms  Inference: ~{inference_gpu} ms  Delivery: ~{delivery} ms",
-        def_ms
-    );
-    println!("      TOTAL:    ~{} ms", def_ms + inference_gpu + delivery);
-    println!();
-    println!("    Disabled    (static fallback):");
-    println!(
-        "      Silence:   {:>3} ms  Inference: ~{inference_gpu} ms  Delivery: ~{delivery} ms",
-        static_ms
-    );
-    println!(
-        "      TOTAL:    ~{} ms",
-        static_ms + inference_gpu + delivery
-    );
-    println!();
-    println!("  CPU-only after-speech wait (worst case, conf <80%):");
-    println!(
-        "    Silence:     {:>3} ms  Inference: ~{inference_cpu} ms  Delivery: ~{delivery} ms",
-        def_ms
-    );
-    println!("    TOTAL:      ~{} ms", def_ms + inference_cpu + delivery);
-    println!();
-    println!("  Key insight: dynamic silence adapts the wait to ASR confidence.");
-    println!("  High-confidence segments flush in ~55ms (speculative paste),");
-    println!("  while uncertain segments get ~330ms for a safer result.");
-    println!();
-    println!("  Latency targets (Stivers et al. 2009, PNAS):");
-    println!("    <200 ms  feels instantaneous (human turn-taking mean=208ms)");
-    println!("    <300 ms  natural and responsive (AssemblyAI 300ms rule)");
-    println!("    <500 ms  hard ceiling for voice AI (MMNTM threshold)");
-    println!(
-        "    GPU >=99% ({} ms) feels instantaneous.",
-        spec_ms + delivery
-    );
-    println!(
-        "    GPU >=92% ({} ms) meets the 200ms target.",
-        high_ms + inference_gpu + delivery
-    );
-    println!(
-        "    GPU >=80% ({} ms) meets the 300ms target.",
-        mod_ms + inference_gpu + delivery
-    );
-    println!();
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Stage 5: Output quality analysis
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/// Per-fixture quality metrics collected from real ASR inference.
-struct QualityRun {
-    name: &'static str,
-    audio_secs: f64,
-    /// Absolute inference time; kept for summary table.
-    inference_secs: f64,
-    rtf: f64,
-    wer: f64,
-    cer: f64,
-    segments: Vec<AsrSegment>,
-    /// Stored for per-word alignment diffing in future extensions.
-    #[allow(dead_code)]
-    hypothesis: String,
-    #[allow(dead_code)]
-    reference: String,
-}
-
-fn bench_quality_analysis() -> Vec<QualityRun> {
-    println!("── Stage 5: Output Quality Analysis ──────────────────────────────");
-
-    // ── 5a. Synthetic WER/CER demo (no models needed) ─────────────────────
-    println!("  5a. WER/CER metric demo (pure Rust)");
-    println!();
-
-    let pairs: &[(&str, &str, &str)] = &[
-        ("hello world", "hello world", "perfect match"),
-        ("hello world", "hello wirld", "1 substitution"),
-        ("the cat sat on the mat", "cat sat mat", "3 deletions"),
-        ("a b c d e", "a b c d e f", "1 insertion"),
-        (
-            "from the respect paid her",
-            "FROM THE RESPECT PAID HER",
-            "case only",
-        ),
-    ];
-
-    println!("  {:<50}  {:>6}  {:>6}", "Pair (hyp | ref)", "WER", "CER");
-    println!("  {}", "─".repeat(66));
-    for (hyp, ref_, note) in pairs {
-        let wer = word_error_rate(hyp, ref_);
-        let cer = char_error_rate(hyp, ref_);
-        println!(
-            "  {:<50}  {:>5.1}%  {:>5.1}%  ← {note}",
-            format!("{hyp:?} | {ref_:?}"),
-            wer * 100.0,
-            cer * 100.0,
-        );
-    }
-    println!();
-
-    // ── 5b. Real ASR inference ─────────────────────────────────────────────
-    println!("  5b. Real ASR inference (requires models/qwen3-asr-0.6b-onnx)");
-    println!();
 
     let root = workspace_root();
-    let model_dir = root.join("models/qwen3-asr-0.6b-onnx");
-    if !model_dir.exists() {
-        println!("  [skip] model dir not found: {}", model_dir.display());
-        println!();
-        return vec![];
-    }
 
-    // Initialize ORT (CPU or CUDA).
-    #[cfg(feature = "cuda")]
-    {
-        if !ort::init()
-            .with_execution_providers([ort::ep::CUDA::default().build()])
-            .commit()
-        {
-            eprintln!("  [warn] ORT CUDA init failed, using CPU");
-            let _ = ort::init().commit();
-        } else {
-            println!("  [info] ORT initialized with CUDA EP");
-        }
-    }
-    #[cfg(not(feature = "cuda"))]
-    {
-        let _ = ort::init().commit();
-        println!("  [info] ORT initialized (CPU only)");
+    // ── Load ASR backend ────────────────────────────────────────────────────
+    let asr_model_dir = root.join("models/qwen3-asr-0.6b-onnx");
+    if !asr_model_dir.exists() {
+        println!(
+            "  [skip] ASR model dir not found: {}",
+            asr_model_dir.display()
+        );
+        println!("  Download models first. Exiting.");
+        return;
     }
 
     println!("  Loading ASR backend ...");
-    let load_t = Instant::now();
-    let backend = match OrtQwenAsrBackend::new(OrtQwenAsrConfig {
-        model_dir: model_dir.clone(),
-        use_gpu: cfg!(feature = "cuda"),
+    let t = Instant::now();
+    let asr = match OrtQwenAsrBackend::new(OrtQwenAsrConfig {
+        model_dir: asr_model_dir,
+        use_gpu: has_gpu,
         ..Default::default()
     }) {
         Ok(b) => b,
         Err(e) => {
             println!("  [skip] ASR backend load failed: {e}");
-            println!();
-            return vec![];
+            return;
         }
     };
-    println!("  ASR loaded in {:.1}s", load_t.elapsed().as_secs_f64());
-    println!();
+    println!("  ASR loaded in {:.1}s", t.elapsed().as_secs_f64());
 
-    let fixtures: &[(&'static str, &str, &str)] = &[
+    // ── Load LLM backend (optional — stages 1-3 still run without it) ─────
+    let llm_model_dir = root.join("models/qwen3-0.6b-onnx");
+    let llm: Option<OrtLlmBackend> = if llm_model_dir.exists() {
+        println!("  Loading LLM backend ...");
+        let t = Instant::now();
+        match OrtLlmBackend::new(OrtLlmConfig {
+            model_dir: llm_model_dir,
+            use_gpu: has_gpu,
+            ..Default::default()
+        }) {
+            Ok(b) => {
+                println!("  LLM loaded in {:.1}s", t.elapsed().as_secs_f64());
+                Some(b)
+            }
+            Err(e) => {
+                println!("  [warn] LLM backend load failed: {e}");
+                println!("  Stages 4-5 LLM portions will be skipped.");
+                None
+            }
+        }
+    } else {
+        println!("  [info] LLM model dir not found — stages 4-5 LLM portions skipped");
+        None
+    };
+
+    // ── Load fixtures ───────────────────────────────────────────────────────
+    let fixture_defs: &[(&'static str, &str, &str)] = &[
         (
             "librispeech_clean",
             "test_fixtures/librispeech_clean.wav",
@@ -525,33 +126,105 @@ fn bench_quality_analysis() -> Vec<QualityRun> {
         ),
     ];
 
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .expect("tokio runtime");
-
-    let mut results: Vec<QualityRun> = Vec::new();
-
-    for &(name, wav_rel, txt_rel) in fixtures {
+    let mut fixtures: Vec<Fixture> = Vec::new();
+    for &(name, wav_rel, txt_rel) in fixture_defs {
         let wav_path = root.join(wav_rel);
         if !wav_path.exists() {
             println!("  [skip] {name}: {} not found", wav_path.display());
             continue;
         }
-
         let pcm = load_wav_f32(&wav_path);
-        let audio_secs = pcm.len() as f64 / 16_000.0;
+        let audio_secs = pcm.len() as f64 / SAMPLE_RATE as f64;
         let reference = std::fs::read_to_string(root.join(txt_rel))
             .unwrap_or_default()
             .trim()
             .to_string();
+        println!("  Loaded {name}: {audio_secs:.1}s ({} samples)", pcm.len());
+        fixtures.push(Fixture {
+            name,
+            pcm,
+            reference,
+            audio_secs,
+        });
+    }
 
-        println!("  Fixture: {name} ({audio_secs:.1}s audio)");
+    if fixtures.is_empty() {
+        println!("  [skip] No WAV fixtures found. Exiting.");
+        return;
+    }
+    println!();
 
-        let infer_t = Instant::now();
-        let segments = rt.block_on(transcribe(&backend, &pcm));
-        let inference_secs = infer_t.elapsed().as_secs_f64();
-        let rtf = inference_secs / audio_secs;
+    // ── Run stages ──────────────────────────────────────────────────────────
+    bench_mel_extraction(&fixtures);
+    let asr_results = bench_asr_streaming(&asr, &fixtures);
+    bench_confidence_gate(&asr_results);
+    let llm_results = bench_llm_postprocess(llm.as_ref(), &asr_results, &fixtures);
+    bench_full_summary(&fixtures, &asr_results, &llm_results);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Stage 1: Mel Extraction (real PCM → real compute_qwen_mel)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn bench_mel_extraction(fixtures: &[Fixture]) {
+    println!("── Stage 1: Mel Extraction ────────────────────────────────────────");
+    println!();
+
+    let warmup_runs = 2;
+    let timed_runs = 5;
+
+    for fix in fixtures {
+        // Warmup
+        for _ in 0..warmup_runs {
+            let _ = compute_qwen_mel(&fix.pcm);
+        }
+
+        // Timed runs
+        let mut times_ms: Vec<f64> = Vec::with_capacity(timed_runs);
+        for _ in 0..timed_runs {
+            let t = Instant::now();
+            let _ = compute_qwen_mel(&fix.pcm);
+            times_ms.push(t.elapsed().as_secs_f64() * 1000.0);
+        }
+
+        let mean_ms = times_ms.iter().sum::<f64>() / times_ms.len() as f64;
+        let min_ms = times_ms.iter().cloned().fold(f64::INFINITY, f64::min);
+        let max_ms = times_ms.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let rtf = (mean_ms / 1000.0) / fix.audio_secs;
+        let throughput = fix.pcm.len() as f64 / (mean_ms / 1000.0);
+
+        println!(
+            "  {} ({:.1}s audio, {} runs):",
+            fix.name, fix.audio_secs, timed_runs
+        );
+        println!("    Latency:     {mean_ms:.3}ms mean  [{min_ms:.3} .. {max_ms:.3}]");
+        println!(
+            "    RTF:         {rtf:.6}x  ({:.0}x faster than real-time)",
+            1.0 / rtf
+        );
+        println!("    Throughput:  {throughput:.0} samples/s");
+        println!();
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Stage 2: ASR Streaming Inference (real model, per-chunk timing)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn bench_asr_streaming(asr: &OrtQwenAsrBackend, fixtures: &[Fixture]) -> Vec<AsrResult> {
+    println!("── Stage 2: ASR Streaming Inference ──────────────────────────────");
+    println!();
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("tokio runtime");
+
+    let mut results: Vec<AsrResult> = Vec::new();
+
+    for fix in fixtures {
+        let (segments, total_secs, chunk_latencies_ms) =
+            rt.block_on(transcribe_timed(asr, &fix.pcm));
 
         let hypothesis = segments
             .iter()
@@ -560,16 +233,24 @@ fn bench_quality_analysis() -> Vec<QualityRun> {
             .collect::<Vec<_>>()
             .join(" ");
 
-        let wer = if reference.is_empty() {
-            f64::NAN
+        let rtf = total_secs / fix.audio_secs;
+
+        // Per-chunk stats
+        let n = chunk_latencies_ms.len();
+        let mean_chunk = if n > 0 {
+            chunk_latencies_ms.iter().sum::<f64>() / n as f64
         } else {
-            word_error_rate(&hypothesis, &reference)
+            0.0
         };
-        let cer = if reference.is_empty() {
-            f64::NAN
-        } else {
-            char_error_rate(&hypothesis, &reference)
-        };
+        let min_chunk = chunk_latencies_ms
+            .iter()
+            .cloned()
+            .fold(f64::INFINITY, f64::min);
+        let max_chunk = chunk_latencies_ms
+            .iter()
+            .cloned()
+            .fold(f64::NEG_INFINITY, f64::max);
+        let p99_chunk = percentile(&chunk_latencies_ms, 99.0);
 
         let conf_vals: Vec<f64> = segments
             .iter()
@@ -581,96 +262,337 @@ fn bench_quality_analysis() -> Vec<QualityRun> {
             conf_vals.iter().sum::<f64>() / conf_vals.len() as f64
         };
 
+        println!("  {} ({:.1}s audio):", fix.name, fix.audio_secs);
+        println!("    Total:       {total_secs:.3}s  ({rtf:.3}x RT)");
         println!("    Segments:    {}", segments.len());
-        println!("    Inference:   {inference_secs:.3}s  ({rtf:.3}x RT)");
         println!("    Mean conf:   {mean_conf:.3}");
-        if !wer.is_nan() {
-            println!("    WER:         {:.1}%", wer * 100.0);
-            println!("    CER:         {:.1}%", cer * 100.0);
-        }
+        println!("    Chunk latency ({n} chunks):");
+        println!(
+            "      mean={mean_chunk:.1}ms  min={min_chunk:.1}ms  max={max_chunk:.1}ms  p99={p99_chunk:.1}ms"
+        );
         println!("    Hypothesis:");
         wrap_print("      ", &hypothesis, 72);
-        if !reference.is_empty() {
-            println!("    Reference:");
-            wrap_print("      ", &reference, 72);
-        }
         println!();
 
-        results.push(QualityRun {
-            name,
-            audio_secs,
-            inference_secs,
-            rtf,
-            hypothesis,
-            reference,
-            wer,
-            cer,
+        results.push(AsrResult {
             segments,
+            hypothesis,
+            total_secs,
+            chunk_latencies_ms,
         });
-    }
-
-    // ── 5c. Confidence gate threshold sweep ───────────────────────────────
-    let all_segs: Vec<&AsrSegment> = results.iter().flat_map(|r| &r.segments).collect();
-    let n_segs = all_segs.len();
-
-    if n_segs > 0 {
-        println!("  5c. Confidence gate threshold sweep ({n_segs} total segments)");
-        println!();
-        println!(
-            "  {:>12}  {:>12}  {:>10}  {:>10}",
-            "Threshold", "Bypass %", "Bypassed", "LLM-routed"
-        );
-        println!("  {}", "─".repeat(50));
-
-        for &thr in &[0.70f32, 0.80, 0.90, 0.95, 0.99] {
-            let bypassed = all_segs
-                .iter()
-                .filter(|s| s.confidence.unwrap_or(0.0) >= thr)
-                .count();
-            let bypass_pct = bypassed as f64 / n_segs as f64 * 100.0;
-            println!(
-                "  {:>11.0}%  {:>11.1}%  {:>10}  {:>10}",
-                thr * 100.0,
-                bypass_pct,
-                bypassed,
-                n_segs - bypassed,
-            );
-        }
-        println!();
     }
 
     results
 }
 
-fn print_quality_summary(results: &[QualityRun]) {
-    if results.is_empty() {
+// ═══════════════════════════════════════════════════════════════════════════════
+// Stage 3: Confidence Gate Sweep (real segment confidences)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn bench_confidence_gate(asr_results: &[AsrResult]) {
+    println!("── Stage 3: Confidence Gate Sweep ──────────────────────────────────");
+    println!();
+
+    let all_segs: Vec<&AsrSegment> = asr_results.iter().flat_map(|r| &r.segments).collect();
+    let n_segs = all_segs.len();
+
+    if n_segs == 0 {
+        println!("  No segments to analyze.");
+        println!();
         return;
     }
 
+    println!("  Total segments: {n_segs}");
+    println!();
+
+    // Threshold sweep (mean threshold, with min_token_threshold = 0.70)
+    println!(
+        "  {:>12}  {:>10}  {:>10}  {:>12}  {:>14}",
+        "Threshold", "Bypass %", "Bypassed", "LLM-routed", "Silence tier"
+    );
+    println!("  {}", "─".repeat(64));
+
+    for &thr in &[0.70f32, 0.80, 0.90, 0.95, 0.99] {
+        let bypassed = all_segs
+            .iter()
+            .filter(|s| s.is_confident_gated(thr, 0.70))
+            .count();
+        let bypass_pct = bypassed as f64 / n_segs as f64 * 100.0;
+        let silence_samples = dynamic_silence_threshold(Some(thr), true);
+        let silence_ms = samples_to_ms(silence_samples);
+
+        println!(
+            "  {:>11.0}%  {:>9.1}%  {:>10}  {:>12}  {:>12} ms",
+            thr * 100.0,
+            bypass_pct,
+            bypassed,
+            n_segs - bypassed,
+            silence_ms,
+        );
+    }
+
+    println!();
+    println!("  Silence tier constants (samples @ 16kHz):");
+    println!(
+        "    SPECULATIVE = {:>5}  ({:>3} ms)",
+        SILENCE_TIER_SPECULATIVE,
+        samples_to_ms(SILENCE_TIER_SPECULATIVE)
+    );
+    println!(
+        "    HIGH        = {:>5}  ({:>3} ms)",
+        SILENCE_TIER_HIGH,
+        samples_to_ms(SILENCE_TIER_HIGH)
+    );
+    println!(
+        "    MODERATE    = {:>5}  ({:>3} ms)",
+        SILENCE_TIER_MODERATE,
+        samples_to_ms(SILENCE_TIER_MODERATE)
+    );
+    println!(
+        "    DEFAULT     = {:>5}  ({:>3} ms)",
+        SILENCE_TIER_DEFAULT,
+        samples_to_ms(SILENCE_TIER_DEFAULT)
+    );
+    println!(
+        "    STATIC      = {:>5}  ({:>3} ms)  (when disabled)",
+        SILENCE_FLUSH_SAMPLES,
+        samples_to_ms(SILENCE_FLUSH_SAMPLES)
+    );
+    println!();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Stage 4: LLM Post-Processing (real model on low-confidence segments)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Per-fixture LLM results for summary.
+struct LlmResult {
+    /// Number of segments that failed the confidence gate.
+    #[allow(dead_code)]
+    segments_processed: usize,
+    /// Total LLM inference time for this fixture.
+    total_secs: f64,
+    /// LLM-corrected full hypothesis (gate-bypassed segments keep original text).
+    corrected_hypothesis: String,
+}
+
+fn bench_llm_postprocess(
+    llm: Option<&OrtLlmBackend>,
+    asr_results: &[AsrResult],
+    fixtures: &[Fixture],
+) -> Vec<Option<LlmResult>> {
+    println!("── Stage 4: LLM Post-Processing ──────────────────────────────────");
+    println!();
+
+    let llm = match llm {
+        Some(l) => l,
+        None => {
+            println!("  [skip] LLM backend not available.");
+            println!();
+            return asr_results.iter().map(|_| None).collect();
+        }
+    };
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("tokio runtime");
+
+    let style = Arc::new(StylePreset::general());
+    let mut results: Vec<Option<LlmResult>> = Vec::new();
+
+    for (asr_res, fix) in asr_results.iter().zip(fixtures.iter()) {
+        let low_conf_segs: Vec<&AsrSegment> = asr_res
+            .segments
+            .iter()
+            .filter(|s| !s.is_confident_gated(0.95, 0.70))
+            .collect();
+
+        if low_conf_segs.is_empty() {
+            println!("  {} — all segments bypassed gate, no LLM needed", fix.name);
+            println!();
+            results.push(Some(LlmResult {
+                segments_processed: 0,
+                total_secs: 0.0,
+                corrected_hypothesis: asr_res.hypothesis.clone(),
+            }));
+            continue;
+        }
+
+        println!(
+            "  {} — {} / {} segments below gate (mean<0.95 or min_tok<0.70):",
+            fix.name,
+            low_conf_segs.len(),
+            asr_res.segments.len()
+        );
+
+        let mut total_llm_secs = 0.0;
+        let mut corrected_parts: Vec<String> = Vec::new();
+
+        for seg in &asr_res.segments {
+            if seg.is_confident_gated(0.95, 0.70) {
+                corrected_parts.push(seg.text.trim().to_string());
+                continue;
+            }
+
+            let input = PostProcessInput {
+                raw_text: seg.text.trim().to_string(),
+                style_preset: Arc::clone(&style),
+                app_category: None,
+                dictionary: vec![],
+                context: None,
+            };
+
+            let t = Instant::now();
+            match rt.block_on(llm.transform(&input)) {
+                Ok(output) => {
+                    let llm_ms = t.elapsed().as_secs_f64() * 1000.0;
+                    total_llm_secs += t.elapsed().as_secs_f64();
+                    let conf_str = seg
+                        .confidence
+                        .map(|c| format!("{c:.3}"))
+                        .unwrap_or_else(|| "none".into());
+                    println!(
+                        "    [{llm_ms:.0}ms] conf={conf_str}  \"{}\"\n             → \"{}\"",
+                        seg.text.trim(),
+                        output.cleaned_text.trim()
+                    );
+                    corrected_parts.push(output.cleaned_text.trim().to_string());
+                }
+                Err(e) => {
+                    println!("    [error] LLM transform failed: {e}");
+                    corrected_parts.push(seg.text.trim().to_string());
+                }
+            }
+        }
+
+        let corrected_hypothesis = corrected_parts
+            .into_iter()
+            .filter(|t| !t.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        println!(
+            "    Total LLM time: {:.3}s ({} segments)",
+            total_llm_secs,
+            low_conf_segs.len()
+        );
+        println!();
+
+        results.push(Some(LlmResult {
+            segments_processed: low_conf_segs.len(),
+            total_secs: total_llm_secs,
+            corrected_hypothesis,
+        }));
+    }
+
+    results
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Stage 5: Full Pipeline Summary
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn bench_full_summary(
+    fixtures: &[Fixture],
+    asr_results: &[AsrResult],
+    llm_results: &[Option<LlmResult>],
+) {
     println!("╔══════════════════════════════════════════════════════════════════╗");
-    println!("║              QUALITY BUDGET ANALYSIS                            ║");
+    println!("║              END-TO-END PIPELINE SUMMARY                        ║");
     println!("╚══════════════════════════════════════════════════════════════════╝");
     println!();
 
+    // Summary table
     println!(
-        "  {:20}  {:>8}  {:>8}  {:>7}  {:>7}  {:>7}  {:>8}",
-        "Fixture", "Audio", "Infer", "RTF", "WER", "CER", "Segments"
+        "  {:20}  {:>8}  {:>8}  {:>8}  {:>7}  {:>7}  {:>7}  {:>8}",
+        "Fixture", "Audio", "ASR", "LLM", "Total", "RTF", "WER", "CER"
     );
-    println!("  {}", "─".repeat(73));
-    for r in results {
+    println!("  {}", "─".repeat(82));
+
+    for (i, fix) in fixtures.iter().enumerate() {
+        let asr_res = &asr_results[i];
+        let llm_res = llm_results.get(i).and_then(|r| r.as_ref());
+
+        let llm_secs = llm_res.map(|r| r.total_secs).unwrap_or(0.0);
+        let total_secs = asr_res.total_secs + llm_secs;
+        let rtf = total_secs / fix.audio_secs;
+
+        // Use LLM-corrected hypothesis if available, else raw ASR
+        let final_hyp = llm_res
+            .map(|r| r.corrected_hypothesis.as_str())
+            .unwrap_or(&asr_res.hypothesis);
+
+        let (wer, cer) = if fix.reference.is_empty() {
+            (f64::NAN, f64::NAN)
+        } else {
+            (
+                word_error_rate(final_hyp, &fix.reference),
+                char_error_rate(final_hyp, &fix.reference),
+            )
+        };
+
         println!(
-            "  {:20}  {:>6.1}s  {:>6.3}s  {:>5.3}x  {:>5.1}%  {:>5.1}%  {:>8}",
-            r.name,
-            r.audio_secs,
-            r.inference_secs,
-            r.rtf,
-            if r.wer.is_nan() { 0.0 } else { r.wer * 100.0 },
-            if r.cer.is_nan() { 0.0 } else { r.cer * 100.0 },
-            r.segments.len(),
+            "  {:20}  {:>6.1}s  {:>6.3}s  {:>6.3}s  {:>5.3}s  {:>5.3}x  {:>5.1}%  {:>5.1}%",
+            fix.name,
+            fix.audio_secs,
+            asr_res.total_secs,
+            llm_secs,
+            total_secs,
+            rtf,
+            if wer.is_nan() { 0.0 } else { wer * 100.0 },
+            if cer.is_nan() { 0.0 } else { cer * 100.0 },
         );
     }
     println!();
 
+    // Per-fixture detail
+    for (i, fix) in fixtures.iter().enumerate() {
+        let asr_res = &asr_results[i];
+        let llm_res = llm_results.get(i).and_then(|r| r.as_ref());
+
+        let final_hyp = llm_res
+            .map(|r| r.corrected_hypothesis.as_str())
+            .unwrap_or(&asr_res.hypothesis);
+
+        // After-speech latency estimate
+        let mean_conf: Option<f32> = {
+            let vals: Vec<f32> = asr_res
+                .segments
+                .iter()
+                .filter_map(|s| s.confidence)
+                .collect();
+            if vals.is_empty() {
+                None
+            } else {
+                Some(vals.iter().sum::<f32>() / vals.len() as f32)
+            }
+        };
+        let silence_samples = dynamic_silence_threshold(mean_conf, true);
+        let silence_ms = samples_to_ms(silence_samples);
+
+        // Last-chunk inference time as representative "after speech" inference cost
+        let last_chunk_ms = asr_res.chunk_latencies_ms.last().copied().unwrap_or(0.0);
+        let delivery_ms: u64 = 5; // typical uinput delivery
+        let after_speech_ms = silence_ms + last_chunk_ms as u64 + delivery_ms;
+
+        println!("  {} detail:", fix.name);
+        println!("    After-speech latency estimate:");
+        println!(
+            "      Silence: {} ms + last-chunk infer: {:.0} ms + delivery: ~{} ms = ~{} ms",
+            silence_ms, last_chunk_ms, delivery_ms, after_speech_ms
+        );
+
+        if !fix.reference.is_empty() {
+            println!("    Hypothesis:");
+            wrap_print("      ", final_hyp, 72);
+            println!("    Reference:");
+            wrap_print("      ", &fix.reference, 72);
+        }
+        println!();
+    }
+
+    // Quality context
     println!("  WER = Word Error Rate (lower is better; 0% = perfect match).");
     println!("  CER = Character Error Rate (character-level edit distance).");
     println!("  RTF = Real-Time Factor (0.10x = 10x faster than real-time).");
@@ -680,11 +602,17 @@ fn print_quality_summary(results: &[QualityRun]) {
     println!("    Qwen3-ASR-0.6B INT4 streaming: 8s encoder window, past-text conditioned");
     println!("    LLM correction reduces WER ~15-30% on low-confidence segments.");
     println!();
+    println!("  Latency targets (Stivers et al. 2009, PNAS):");
+    println!("    <200 ms  feels instantaneous (human turn-taking mean=208ms)");
+    println!("    <300 ms  natural and responsive (AssemblyAI 300ms rule)");
+    println!("    <500 ms  hard ceiling for voice AI (MMNTM threshold)");
+    println!();
 }
 
-// ── Quality helpers ──────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// Helpers (shared, canonical implementations — not duplicated)
+// ═══════════════════════════════════════════════════════════════════════════════
 
-/// Returns the workspace root (two dirs up from this crate's manifest).
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -694,8 +622,52 @@ fn workspace_root() -> PathBuf {
         .to_path_buf()
 }
 
-/// Normalise text to uppercase ASCII words for WER/CER comparison.
-/// Strips punctuation; collapses whitespace.
+/// Transcribe with per-chunk timing. Returns (segments, total_secs, chunk_latencies_ms).
+async fn transcribe_timed(
+    backend: &OrtQwenAsrBackend,
+    pcm: &[f32],
+) -> (Vec<AsrSegment>, f64, Vec<f64>) {
+    let session = backend
+        .start_session(AsrSessionConfig::default())
+        .await
+        .expect("start asr session");
+
+    let chunk_size = 16_000; // 1s @ 16 kHz
+    let mut out: Vec<AsrSegment> = Vec::new();
+    let mut chunk_latencies: Vec<f64> = Vec::new();
+    let total_start = Instant::now();
+
+    for slice in pcm.chunks(chunk_size) {
+        let chunk_start = Instant::now();
+        backend
+            .push_audio(&session, slice)
+            .await
+            .expect("push audio");
+        out.extend(backend.poll_results(&session).await.expect("poll results"));
+        chunk_latencies.push(chunk_start.elapsed().as_secs_f64() * 1000.0);
+    }
+
+    // Silence flush
+    let silence = vec![0.0f32; 8_000];
+    let chunk_start = Instant::now();
+    backend
+        .push_audio(&session, &silence)
+        .await
+        .expect("push silence");
+    out.extend(
+        backend
+            .poll_results(&session)
+            .await
+            .expect("poll results final"),
+    );
+    chunk_latencies.push(chunk_start.elapsed().as_secs_f64() * 1000.0);
+
+    let total_secs = total_start.elapsed().as_secs_f64();
+    backend.end_session(session).await.expect("end session");
+
+    (out, total_secs, chunk_latencies)
+}
+
 fn normalize_text(s: &str) -> String {
     s.chars()
         .map(|c| {
@@ -711,7 +683,6 @@ fn normalize_text(s: &str) -> String {
         .join(" ")
 }
 
-/// O(m·n) Levenshtein edit distance over arbitrary `Eq` slices.
 fn levenshtein<T: Eq>(a: &[T], b: &[T]) -> usize {
     let (m, n) = (a.len(), b.len());
     let mut dp: Vec<usize> = (0..=n).collect();
@@ -731,7 +702,6 @@ fn levenshtein<T: Eq>(a: &[T], b: &[T]) -> usize {
     dp[n]
 }
 
-/// Word Error Rate: normalise both strings, split on whitespace, Levenshtein.
 fn word_error_rate(hyp: &str, ref_: &str) -> f64 {
     let h = normalize_text(hyp);
     let r = normalize_text(ref_);
@@ -743,7 +713,6 @@ fn word_error_rate(hyp: &str, ref_: &str) -> f64 {
     levenshtein(&hw, &rw) as f64 / rw.len() as f64
 }
 
-/// Character Error Rate: normalise, Levenshtein on chars.
 fn char_error_rate(hyp: &str, ref_: &str) -> f64 {
     let h = normalize_text(hyp);
     let r = normalize_text(ref_);
@@ -755,7 +724,6 @@ fn char_error_rate(hyp: &str, ref_: &str) -> f64 {
     levenshtein(&hc, &rc) as f64 / rc.len() as f64
 }
 
-/// Load 16 kHz mono f32 PCM from a WAV file (Float or Int samples).
 fn load_wav_f32(path: &std::path::Path) -> Vec<f32> {
     let reader = hound::WavReader::open(path).expect("open wav");
     let spec = reader.spec();
@@ -776,38 +744,6 @@ fn load_wav_f32(path: &std::path::Path) -> Vec<f32> {
     }
 }
 
-/// Transcribe by pushing 1s chunks and polling after each, plus a silence flush.
-async fn transcribe(backend: &OrtQwenAsrBackend, pcm: &[f32]) -> Vec<AsrSegment> {
-    let session = backend
-        .start_session(AsrSessionConfig::default())
-        .await
-        .expect("start asr session");
-    let chunk = 16_000; // 1s @ 16 kHz
-    let mut out: Vec<AsrSegment> = Vec::new();
-    for slice in pcm.chunks(chunk) {
-        backend
-            .push_audio(&session, slice)
-            .await
-            .expect("push audio");
-        out.extend(backend.poll_results(&session).await.expect("poll results"));
-    }
-    // Half-second silence flush to commit any remaining unfixed tail.
-    let silence = vec![0.0f32; 8_000];
-    backend
-        .push_audio(&session, &silence)
-        .await
-        .expect("push silence");
-    out.extend(
-        backend
-            .poll_results(&session)
-            .await
-            .expect("poll results final"),
-    );
-    backend.end_session(session).await.expect("end session");
-    out
-}
-
-/// Print `text` wrapped at `width` chars with `prefix` on each line.
 fn wrap_print(prefix: &str, text: &str, width: usize) {
     let mut line = String::new();
     for word in text.split_whitespace() {
@@ -822,5 +758,28 @@ fn wrap_print(prefix: &str, text: &str, width: usize) {
     }
     if !line.is_empty() {
         println!("{prefix}{line}");
+    }
+}
+
+#[inline]
+fn samples_to_ms(samples: usize) -> u64 {
+    (samples * 1000 / SAMPLE_RATE) as u64
+}
+
+/// Compute the p-th percentile of a slice (linear interpolation).
+fn percentile(data: &[f64], p: f64) -> f64 {
+    if data.is_empty() {
+        return 0.0;
+    }
+    let mut sorted = data.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let rank = (p / 100.0) * (sorted.len() - 1) as f64;
+    let lo = rank.floor() as usize;
+    let hi = rank.ceil() as usize;
+    if lo == hi {
+        sorted[lo]
+    } else {
+        let frac = rank - lo as f64;
+        sorted[lo] * (1.0 - frac) + sorted[hi] * frac
     }
 }

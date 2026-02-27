@@ -242,14 +242,19 @@ pub enum StreamingMode {
 }
 
 /// Compute device policy for local model inference.
+///
+/// Serializes as lowercase TOML strings: `"auto"`, `"cuda"`, `"cpu"`.
+/// The default is `"auto"`, which tries CUDA at runtime and falls back to CPU.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum DevicePolicy {
     /// Force CPU-only inference.
     Cpu,
-    /// Force CUDA GPU inference (fails if `cuda` feature not compiled).
+    /// Prefer CUDA GPU inference. Falls back to CPU if CUDA is not available
+    /// at runtime or the `cuda` feature was not compiled in.
     Cuda,
-    /// Use CUDA when the `cuda` feature is compiled in, otherwise CPU.
+    /// Try CUDA when compiled with the `cuda` feature; fall back to CPU.
+    /// This is the recommended setting: zero-config on GPU machines, safe on CPU-only.
     #[default]
     Auto,
 }
@@ -257,9 +262,10 @@ pub enum DevicePolicy {
 impl DevicePolicy {
     /// Resolve to a boolean for backend `use_gpu` fields.
     ///
-    /// - `Cpu` → always false
-    /// - `Cuda` → always true
-    /// - `Auto` → delegates to `cuda_available` (caller passes compile-time flag)
+    /// - `Cpu` → always `false`
+    /// - `Cuda` → always `true` (runtime init still falls back if CUDA unavailable)
+    /// - `Auto` → `true` when `cuda` feature is compiled in (`cuda_available`),
+    ///   otherwise `false`. The `cuda` feature is enabled by default.
     #[inline]
     pub fn use_gpu(self, cuda_available: bool) -> bool {
         match self {

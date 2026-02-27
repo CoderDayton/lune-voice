@@ -1,0 +1,174 @@
+# lune-voice configuration
+#
+# Location: ~/.config/lune-voice/settings.toml
+# The daemon reads this at startup. Settings changed via D-Bus
+# (e.g. `lune-voice settings set dictation_mode Clipboard`) are written back here.
+#
+# In TOML, all top-level keys must appear before any [section] headers.
+
+
+# ── Compute device ────────────────────────────────────────────────────────────
+#
+# Controls which execution provider ORT uses for ASR and LLM inference.
+#
+#   "auto"  — Try CUDA at startup; fall back to CPU if unavailable. (default)
+#   "cuda"  — Prefer CUDA; still falls back gracefully if CUDA init fails.
+#   "cpu"   — Force CPU-only, even if a GPU is present.
+#
+# On machines without NVIDIA drivers, "auto" and "cuda" both behave as "cpu".
+device = "auto"
+
+# Built-in style preset applied by default.
+# Options: "general" | "coding" | "email" | "slack" | "meeting_notes" | "code_comments"
+default_style = "general"
+
+# BCP-47 language tag for ASR hint.
+language = "en-US"
+
+# Privacy policy for backend selection.
+# "LocalOnly"       — Reject any remote backend. (default)
+# "LocalPreferred"  — Use remote only if explicitly configured and consented.
+# "AllowRemote"     — Use whatever backend is configured.
+privacy_mode = "LocalOnly"
+
+# How finalized text reaches the focused window.
+# "TypeInPlace"  — Type via uinput kernel device; works in any app. (default)
+# "Clipboard"    — Copy to clipboard + Ctrl+V paste (compositor-agnostic fallback).
+# "Both"         — Type AND copy to clipboard simultaneously.
+dictation_mode = "TypeInPlace"
+
+# How the hotkey activates dictation.
+# "Toggle"  — Press once to start, press again to stop. (default)
+# "Hold"    — Hold key to dictate, release to stop.
+activation_mode = "Toggle"
+
+# Days to retain session history in the database.
+# Remove this key (or comment it out) to disable history entirely.
+session_history_days = 30
+
+# ── Confidence gating ─────────────────────────────────────────────────────────
+#
+# Two-level gate (arXiv:2407.21414): segments passing BOTH thresholds bypass
+# LLM post-processing and paste immediately (~87% bypass rate on typical speech).
+#
+# Segment bypasses LLM when:
+#   mean token confidence  ≥ confidence_threshold
+#   min  token confidence  ≥ min_token_threshold
+
+# Mean segment confidence required to skip LLM. Range 0.0–1.0.
+confidence_threshold = 0.95
+
+# Single-token confidence floor. Any token below this forces LLM routing
+# even if the sentence mean exceeds confidence_threshold.
+min_token_threshold = 0.70
+
+# Adapt the post-speech silence window to ASR confidence.
+# true  — High-confidence: flush after ~75 ms; uncertain: up to ~320 ms. (default)
+# false — Static 200 ms flush for all segments.
+dynamic_silence = true
+
+
+# ── ASR backend ───────────────────────────────────────────────────────────────
+#
+# Supported types:
+#   "OrtQwenAsr"         — Qwen3-ASR-0.6B via ONNX Runtime. (default, local)
+#   "OpenAiCompatible"   — Remote Whisper-compatible HTTP endpoint.
+#
+[asr_backend]
+type = "OrtQwenAsr"
+
+# Absolute path to the model directory containing:
+#   qwen3-asr-encoder.onnx, qwen3-asr-embed-tokens.onnx,
+#   qwen3-asr-decoder.onnx, tokenizer.json
+# Leave empty to use the auto-downloaded path from lune-persist hub.
+model_dir = ""
+
+# Audio fed to the encoder per streaming step (seconds).
+# Smaller = lower latency, more encoder calls. Range: 0.5–2.0.
+stream_chunk_sec = 1.0
+
+# Tokens discarded at chunk boundaries for word-boundary stability.
+# Higher = more stable text, slightly higher latency. Range: 0–5.
+stream_rollback = 3
+
+# Chunks treated as "unfixed" (speculative) before text is committed.
+# Set to 0 for single-pass batch mode. Range: 0–4.
+stream_unfixed_chunks = 2
+
+# Maximum new tokens the decoder may generate per streaming step.
+stream_max_new_tokens = 48
+
+# Condition each chunk on previously committed text for cross-chunk coherence.
+# Disable only if the model re-transcribes earlier audio.
+past_text_conditioning = true
+
+# Hard cap on the encoder audio window (seconds).
+# Keep ≤ 8.0 — the model was fine-tuned on short clips; longer windows cause
+# second-half hallucinations.
+max_encoder_sec = 8.0
+
+
+# ── LLM post-processor ────────────────────────────────────────────────────────
+#
+# Supported types:
+#   "OrtLocal"           — Qwen3-0.6B INT4 via ONNX Runtime. (default, local)
+#   "OpenAiCompatible"   — Remote OpenAI-compatible HTTP endpoint.
+#
+[llm_backend]
+type = "OrtLocal"
+
+# Absolute path to the model directory containing:
+#   qwen3-0.6b-decoder.onnx, qwen3-0.6b-embed-tokens.onnx, tokenizer.json
+# Leave empty to use the auto-downloaded path from lune-persist hub.
+model_dir = ""
+
+# KV-cache context window (tokens). Larger = can handle longer inputs.
+n_ctx = 2048
+
+# Maximum tokens generated per LLM call.
+max_output_tokens = 256
+
+# Sampling temperature. 0.0 = greedy (deterministic, fastest).
+temperature = 0.0
+
+# Nucleus sampling probability mass. Ignored when temperature = 0.0.
+top_p = 0.8
+
+# Top-k candidates. Ignored when temperature = 0.0.
+top_k = 20
+
+# Repetition penalty (1.0 = off). Values 1.1–1.3 reduce token loops.
+repeat_penalty = 1.15
+
+# Lookback window for repetition penalty.
+repeat_last_n = 64
+
+
+# ── Hotkeys ───────────────────────────────────────────────────────────────────
+#
+# These are NOT registered as system hotkeys by lune-voice itself.
+# Register them in your compositor pointing to `lune-voice toggle` / `lune-voice cancel`:
+#   COSMIC: Settings → Keyboard → Custom Shortcuts
+#   KDE:    System Settings → Shortcuts → Custom Shortcuts
+#
+# Valid modifiers: "Ctrl", "Shift", "Alt", "Meta"
+#
+[hotkey.toggle_dictation]
+modifiers = ["Ctrl"]
+key = "Space"
+
+[hotkey.cancel_dictation]
+modifiers = []
+key = "Escape"
+
+
+# ── Forced aligner (optional) ─────────────────────────────────────────────────
+#
+# NAR forced-aligner for post-utterance word-order correction.
+# Runs after each silence flush; emits CorrectedText if words arrived out-of-order.
+# Requires a separately exported model: `uv run python scripts/export_onnx.py --fa`
+#
+# Uncomment to enable:
+# [aligner]
+# enabled = true
+# model_dir = ""   # leave empty for ~/.local/share/lune-voice/models/qwen3-fa-0.6b-onnx/

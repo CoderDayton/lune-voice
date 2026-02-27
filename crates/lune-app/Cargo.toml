@@ -9,7 +9,7 @@ name = "lune-voice"
 path = "src/main.rs"
 
 [features]
-default = []
+default = ["cuda"]
 cuda = ["lune-llm/cuda", "lune-asr/cuda", "ort/cuda"]
 legacy-qwen = ["lune-asr/legacy-qwen"]
 
