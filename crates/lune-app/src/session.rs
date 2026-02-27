@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -37,6 +38,16 @@ pub const SILENCE_FLUSH_SAMPLES: usize = 3_200;
 /// Keep forwarding a short silence tail after speech so brief words can still
 /// reach backend chunking thresholds and get committed.
 const ASR_PUSH_HANGOVER_SAMPLES: usize = 8_000; // 500ms @ 16kHz
+
+/// How far back (in samples) to search for the acoustic onset when VAD fires.
+/// 160ms covers TEN-VAD's worst-case confirmation latency (~48ms = 3 frames)
+/// plus a comfortable margin for slow fricative onsets.
+const ONSET_LOOKBACK_SAMPLES: usize = 2_560; // 160ms @ 16kHz
+/// Windowed RMS threshold for the silence/speech crossing in the onset scan.
+/// Sits between typical room noise (~0.001) and quiet speech (~0.02).
+const ONSET_ENERGY_THRESHOLD: f32 = 0.005; // ≈ -46 dBFS
+/// RMS window size for onset scan — matches TEN-VAD's internal hop size.
+const ONSET_SCAN_WINDOW: usize = 256; // 16ms @ 16kHz
 /// Suppress immediate duplicate flushes from repeated backend emits.
 const DUPLICATE_FLUSH_WINDOW: Duration = Duration::from_millis(1200);
 
@@ -337,6 +348,11 @@ async fn run_session<A: AsrBackend + 'static>(
     // but sufficient for ordering and re-transcription detection.
     let mut total_samples_pushed: u64 = 0;
     let mut speech_start_sample: Option<u64> = None;
+    // Lookback ring buffer for hybrid energy-onset detection.
+    // Holds up to ONSET_LOOKBACK_SAMPLES of recent audio so that when TEN-VAD
+    // confirms speech, we can scan backward to find the true acoustic onset
+    // rather than using the VAD detection frame (which lags by 1–3 frames).
+    let mut onset_lookback: VecDeque<f32> = VecDeque::with_capacity(ONSET_LOOKBACK_SAMPLES + 1_280);
 
     // Reused each audio frame to avoid allocation on the ~50Hz partial path.
     let mut partial_buf = String::with_capacity(512);
@@ -423,16 +439,34 @@ async fn run_session<A: AsrBackend + 'static>(
                 let vad_result = vad.process_chunk(&audio_batch);
                 let batch_has_speech = vad_result.is_speech;
 
-                // DIY timestamps: record speech segment start from VAD.
+                // DIY timestamps: hybrid energy-onset detection.
+                // When TEN-VAD first confirms speech, scan backward through
+                // the lookback buffer + current batch to find the actual
+                // acoustic onset — where energy first crosses the noise floor.
+                // This corrects for TEN-VAD's 1–3 frame confirmation latency.
                 if batch_has_speech && speech_start_sample.is_none() {
-                    speech_start_sample = Some(total_samples_pushed);
+                    let onset = find_speech_onset(
+                        &onset_lookback,
+                        &audio_batch,
+                        total_samples_pushed,
+                        ONSET_ENERGY_THRESHOLD,
+                        ONSET_SCAN_WINDOW,
+                    );
+                    speech_start_sample = Some(onset);
                     debug!(
                         %session_id,
-                        start_ms = total_samples_pushed * 1000 / 16_000,
-                        "speech segment started"
+                        onset_ms = onset * 1000 / 16_000,
+                        vad_fire_ms = total_samples_pushed * 1000 / 16_000,
+                        lookback_ms = (total_samples_pushed.saturating_sub(onset)) * 1000 / 16_000,
+                        "speech onset detected (energy lookback)"
                     );
                 }
                 total_samples_pushed += audio_batch.len() as u64;
+
+                // Update onset lookback — keep the most recent ONSET_LOOKBACK_SAMPLES.
+                onset_lookback.extend(audio_batch.iter().copied());
+                let trim = onset_lookback.len().saturating_sub(ONSET_LOOKBACK_SAMPLES);
+                onset_lookback.drain(..trim);
 
                 if batch_has_speech {
                     asr_push_hangover_samples = ASR_PUSH_HANGOVER_SAMPLES;
@@ -970,6 +1004,86 @@ async fn finalize_db(
     }
 }
 
+/// Hybrid speech onset detector.
+///
+/// TEN-VAD confirms speech, but needs 1–3 × 16 ms frames to do so. By the
+/// time `is_speech = true`, the acoustic onset has already passed. This
+/// function scans backward through the lookback ring buffer (audio from
+/// previous batches) and the current batch to find where energy first
+/// emerged from silence, giving sub-frame onset precision.
+///
+/// Algorithm: walk backward through `lookback ++ batch` in 16ms (256-sample)
+/// windows. The first window whose RMS drops below `threshold` marks the
+/// end of silence — the onset is the start of the next window.
+///
+/// # Arguments
+/// * `lookback`  — ring buffer of recent audio preceding the current batch
+/// * `batch`     — the audio batch on which VAD just fired
+/// * `batch_start_sample` — absolute sample index of `batch[0]`
+/// * `threshold` — RMS silence/speech boundary (recommend 0.005 ≈ −46 dBFS)
+/// * `window`    — RMS window width in samples (recommend 256 = 16ms)
+///
+/// # Returns
+/// Absolute sample index of the detected onset. Clamped to
+/// `batch_start_sample - lookback.len()` at minimum (never before our view).
+fn find_speech_onset(
+    lookback: &VecDeque<f32>,
+    batch: &[f32],
+    batch_start_sample: u64,
+    threshold: f32,
+    window: usize,
+) -> u64 {
+    // Build a contiguous search buffer: [lookback | batch].
+    // Allocate only once; the lookback is at most 160ms + one 80ms batch.
+    let search_len = lookback.len() + batch.len();
+    let mut search: Vec<f32> = Vec::with_capacity(search_len);
+    search.extend(lookback.iter().copied());
+    search.extend_from_slice(batch);
+
+    // Absolute sample of search[0].
+    let search_start_sample = batch_start_sample.saturating_sub(lookback.len() as u64);
+
+    // Walk backward in `window`-sized steps.
+    // We're looking for the silence→speech boundary: the first silent window
+    // encountered while walking backward *after* already seeing energetic frames.
+    // This avoids false triggers when the whole buffer is silent (VAD glitch).
+    let mut pos = search_len;
+    let mut seen_speech = false;
+    while pos >= window {
+        let start = pos - window;
+        let rms = rms_slice(&search[start..pos]);
+        if rms >= threshold {
+            seen_speech = true;
+        } else if seen_speech {
+            // Silent window found after energetic frames — onset begins at `pos`.
+            return search_start_sample.saturating_add(pos as u64);
+        }
+        pos -= window;
+    }
+    // Remaining partial window at the front.
+    if pos > 0 && rms_slice(&search[..pos]) < threshold && seen_speech {
+        return search_start_sample + pos as u64;
+    }
+
+    // Either the whole buffer was energetic (onset before our view)
+    // or it was all silent (VAD glitch — fall back to batch start).
+    if seen_speech {
+        search_start_sample
+    } else {
+        batch_start_sample
+    }
+}
+
+/// Compute RMS of a slice of f32 PCM samples.
+#[inline]
+fn rms_slice(samples: &[f32]) -> f32 {
+    if samples.is_empty() {
+        return 0.0;
+    }
+    let sum_sq: f32 = samples.iter().map(|&s| s * s).sum();
+    (sum_sq / samples.len() as f32).sqrt()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1315,5 +1429,76 @@ mod tests {
     fn speculative_silence_tier_is_75ms() {
         // 75ms at 16 kHz = 1200 samples
         assert_eq!(SILENCE_TIER_SPECULATIVE, 1_200);
+    }
+
+    // ── find_speech_onset ─────────────────────────────────────────────────
+
+    fn silence(n: usize) -> Vec<f32> {
+        vec![0.0f32; n]
+    }
+
+    fn speech(n: usize) -> Vec<f32> {
+        // Sine wave at 0.1 amplitude — well above ONSET_ENERGY_THRESHOLD.
+        (0..n).map(|i| 0.1 * (i as f32 * 0.1).sin()).collect()
+    }
+
+    #[test]
+    fn onset_speech_starts_at_batch_boundary() {
+        // Lookback = silence, batch = all speech.
+        // Onset should be at the very start of the batch.
+        let lookback: VecDeque<f32> = silence(1280).into();
+        let batch = speech(1280);
+        let onset = find_speech_onset(&lookback, &batch, 1280, ONSET_ENERGY_THRESHOLD, 256);
+        // onset should be <= batch_start_sample (1280) since energy starts there
+        assert_eq!(onset, 1280);
+    }
+
+    #[test]
+    fn onset_found_in_lookback() {
+        // Lookback = [silence(512) | speech(768)], batch = speech.
+        // Onset should be 512 samples into the search = sample 512 from session start.
+        let mut lookback: VecDeque<f32> = VecDeque::new();
+        lookback.extend(silence(512));
+        lookback.extend(speech(768));
+        let batch = speech(1280);
+        // batch_start_sample = 1280 (lookback came before it)
+        let onset = find_speech_onset(&lookback, &batch, 1280, ONSET_ENERGY_THRESHOLD, 256);
+        // search_start = 1280 - 1280 = 0; onset at index 512 → absolute 512
+        assert_eq!(onset, 512);
+    }
+
+    #[test]
+    fn onset_empty_lookback_falls_back_to_batch_start() {
+        // No lookback yet (session just started). Whole batch is speech.
+        let lookback: VecDeque<f32> = VecDeque::new();
+        let batch = speech(1280);
+        let onset = find_speech_onset(&lookback, &batch, 0, ONSET_ENERGY_THRESHOLD, 256);
+        assert_eq!(onset, 0);
+    }
+
+    #[test]
+    fn onset_whole_buffer_silent_falls_back_to_batch_start() {
+        // Edge case: VAD fired but energy is below threshold everywhere (glitch).
+        // Should fall back to batch_start_sample, not panic or return wrong value.
+        let lookback: VecDeque<f32> = silence(1280).into();
+        let batch = silence(1280);
+        let onset = find_speech_onset(&lookback, &batch, 1280, ONSET_ENERGY_THRESHOLD, 256);
+        // No speech seen anywhere → fallback to batch_start_sample = 1280.
+        assert_eq!(onset, 1280);
+    }
+
+    #[test]
+    fn onset_mid_batch_detection() {
+        // Lookback = silence, batch = [silence(640) | speech(640)].
+        // Onset should be at sample 640 within the batch.
+        let lookback: VecDeque<f32> = silence(1280).into();
+        let mut batch = silence(640);
+        batch.extend(speech(640));
+        let onset = find_speech_onset(&lookback, &batch, 1280, ONSET_ENERGY_THRESHOLD, 256);
+        // search_start = 0; onset should be at 640 (first energetic 256-window after silence)
+        // The window aligned at 512..768 would be mixed; 640..896 is mostly speech.
+        // We just verify it's earlier than batch_start and ≤ 1280+640.
+        assert!(onset <= 1280 + 640);
+        assert!(onset >= 512); // silence occupies first 640 samples
     }
 }

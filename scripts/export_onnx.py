@@ -12,7 +12,7 @@ Usage:
     python scripts/export_onnx.py --llm --no-quantize
 
 Requirements:
-    pip install torch transformers onnx onnxruntime
+    pip install torch transformers onnx onnxruntime nncf
 """
 from __future__ import annotations
 
@@ -79,29 +79,128 @@ def _list_files(directory: Path) -> None:
 
 # ── INT4 Quantization ────────────────────────────────────────────────────────
 
+# Diverse calibration corpus covering ASR output styles: formal prose, technical
+# content, coding dictation, meeting notes, and casual speech. 32 samples drives
+# AWQ scale search and Scale Estimation without overfitting any single domain.
+_CALIB_TEXTS: list[str] = [
+    "The meeting is scheduled for Tuesday at three pm.",
+    "Please open the configuration file and save it to the downloads folder.",
+    "She finished the report ahead of schedule and her manager approved it.",
+    "The thermal dissipation is roughly 450 watts and the substrate should not degrade.",
+    "Install the dependency and then run the build command in the terminal.",
+    "The quick brown fox jumps over the lazy dog.",
+    "I wanted to follow up on our discussion last week regarding the project timeline.",
+    "The package was delayed in transit and the supplier was notified of the issue.",
+    "Let's make an async function called sync data that awaits a fetch to the API.",
+    "The city thrived for years in the shadow of those ancient walls.",
+    "Handle the case where the cache is empty or the key does not exist.",
+    "So we gotta nuke the old user profile class and replace it with a new interface.",
+    "Thank you for getting back to me. I will review the document and send my feedback by Friday.",
+    "The build is failing on main and someone needs to fix that.",
+    "Discussed Q3 roadmap. Action: John handle the API redesign by next Tuesday.",
+    "The main blocker is the dependency on the auth service owned by the platform team.",
+    "Returns a sorted copy of the slice without modifying the original.",
+    "The letter arrived on Monday after three weeks of delays.",
+    "Hey can you take a look at the PR when you get a chance?",
+    "It's totally ridiculous that the wear is this bad after a month.",
+    "From the respect paid her on all sides she seemed like a queen.",
+    "The church was built in the fourteenth century and restored in eighteen ninety.",
+    "Please confirm your attendance by responding to this email before Friday.",
+    "The server is currently processing your request. Please wait a moment.",
+    "We need to increase the timeout value and redeploy the service.",
+    "The neural network was trained on a large corpus of annotated speech data.",
+    "I'll review the pull request and merge it once the CI pipeline passes.",
+    "The quarterly earnings report will be published on the company website.",
+    "Set the environment variable before running the initialization script.",
+    "She opened the door and walked into the conference room.",
+    "The activation function introduces non-linearity into the model architecture.",
+    "After three weeks of testing we finally shipped the feature to production.",
+]
 
-def quantize_int4(model_path: Path) -> None:
-    """Apply INT4 weight-only quantization (MatMulNBits) in-place."""
-    from onnxruntime.quantization.matmul_nbits_quantizer import MatMulNBitsQuantizer
 
-    print(f"  Quantizing {model_path.name} to INT4...")
-    model = onnx.load(str(model_path), load_external_data=True)
+def quantize_int4_nncf(
+    model_path: Path,
+    embed_path: Path,
+    model_id: str,
+    num_layers: int,
+    num_kv_heads: int,
+    head_dim: int,
+) -> None:
+    """INT4 weight-only quantization via NNCF AWQ + Scale Estimation.
 
-    quantizer = MatMulNBitsQuantizer(
-        model,
-        bits=4,
-        block_size=128,
-        is_symmetric=False,
-        accuracy_level=0,
+    AWQ (Activation-Aware Weight Quantization) identifies salient weight
+    channels by observing activation distributions and rescales them before
+    quantization — this is the W4A16 analogue of SmoothQuant's outlier
+    protection. Scale Estimation then refines the per-group scales using
+    calibration statistics to further minimise reconstruction error.
+
+    Produces INT4_ASYM / MatMulNBits weights readable by OnnxRuntime.
+    """
+    import numpy as np
+    import onnxruntime as ort
+    from transformers import AutoTokenizer
+
+    import nncf
+    from nncf.onnx.quantization.backend_parameters import BackendParameters
+
+    print(f"  Quantizing {model_path.name} to INT4 (NNCF AWQ+SE)...")
+
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    embed_sess = ort.InferenceSession(
+        str(embed_path), providers=["CPUExecutionProvider"]
     )
-    quantizer.process()
 
-    qmodel = quantizer.model
-    if hasattr(qmodel, "model"):
-        qmodel = qmodel.model
+    # Detect position_ids rank from the exported graph topology.
+    # Qwen3-ASR uses 3-D mrope [3, 1, S]; Qwen3-LLM uses standard [1, S].
+    meta = onnx.load(str(model_path), load_external_data=False)
+    pos_ndim = next(
+        (
+            len(inp.type.tensor_type.shape.dim)
+            for inp in meta.graph.input
+            if inp.name == "position_ids"
+        ),
+        2,
+    )
+    del meta
 
-    _save_consolidated(qmodel, model_path)
-    print(f"  {model_path.name}: quantized to INT4")
+    def _make_sample(text: str) -> dict:
+        ids = tokenizer(text, return_tensors="np").input_ids  # [1, S]
+        embeds = embed_sess.run(["embeds"], {"input_ids": ids})[0]  # [1, S, H]
+        seq = embeds.shape[1]
+        pos = np.arange(seq, dtype=np.int64)
+        pos_ids = (
+            np.broadcast_to(pos, (3, 1, seq)).copy()  # mrope: ASR
+            if pos_ndim == 3
+            else pos.reshape(1, seq)                   # standard: LLM
+        )
+        # Empty KV cache — prefill pass exercises all MatMul layers.
+        kv_zero = np.zeros((1, num_kv_heads, 0, head_dim), dtype=np.float16)
+        sample: dict = {"inputs_embeds": embeds, "position_ids": pos_ids}
+        for i in range(num_layers):
+            sample[f"past_key_values.{i}.key"] = kv_zero
+            sample[f"past_key_values.{i}.value"] = kv_zero
+        return sample
+
+    dataset = nncf.Dataset(_CALIB_TEXTS, _make_sample)
+
+    # Load topology only; NNCF streams weights lazily via EXTERNAL_DATA_DIR.
+    onnx_model = onnx.load(str(model_path), load_external_data=False)
+
+    compressed = nncf.compress_weights(
+        onnx_model,
+        mode=nncf.CompressWeightsMode.INT4_ASYM,
+        ratio=1.0,
+        group_size=128,
+        awq=True,
+        scale_estimation=True,
+        dataset=dataset,
+        advanced_parameters=nncf.AdvancedCompressionParameters(
+            backend_params={BackendParameters.EXTERNAL_DATA_DIR: model_path.parent}
+        ),
+    )
+
+    _save_consolidated(compressed, model_path)
+    print(f"  {model_path.name}: INT4 AWQ+SE complete")
 
 
 # ── LLM Wrappers ─────────────────────────────────────────────────────────────
@@ -270,7 +369,14 @@ def export_llm(
 
     # ── 4. Quantize decoder ──────────────────────────────────────────────
     if quantize:
-        quantize_int4(output_dir / "qwen3-0.6b-decoder.onnx")
+        quantize_int4_nncf(
+            output_dir / "qwen3-0.6b-decoder.onnx",
+            output_dir / "qwen3-0.6b-embed-tokens.onnx",
+            model_id,
+            num_layers,
+            num_kv_heads,
+            head_dim,
+        )
 
     # ── 5. Cleanup stale scattered external data ─────────────────────────
     keep = {
@@ -514,7 +620,14 @@ def export_asr(
 
     # ── 5. Quantize decoder ──────────────────────────────────────────────
     if quantize:
-        quantize_int4(output_dir / "qwen3-asr-decoder.onnx")
+        quantize_int4_nncf(
+            output_dir / "qwen3-asr-decoder.onnx",
+            output_dir / "qwen3-asr-embed-tokens.onnx",
+            model_id,
+            num_layers,
+            num_kv_heads,
+            head_dim,
+        )
 
     # ── 6. Cleanup ───────────────────────────────────────────────────────
     keep = {
