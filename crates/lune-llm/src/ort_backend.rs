@@ -7,7 +7,7 @@
 //! All I/O tensors (embeds, logits, KV cache) are native FP16.
 
 use std::collections::VecDeque;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use ndarray::{Array2, ArrayD, IxDyn};
@@ -133,7 +133,7 @@ const DECODER_CANDIDATES: [&str; 4] = [
 
 /// Find an ONNX model matching one of the candidate names.
 #[cold]
-fn find_model(dir: &PathBuf, candidates: &[&str]) -> Result<PathBuf> {
+fn find_model(dir: &Path, candidates: &[&str]) -> Result<PathBuf> {
     for c in candidates {
         let p = dir.join(c);
         if p.exists() {
@@ -432,7 +432,7 @@ fn generate_sync(
     }
 
     if let Some(ref tx) = chunk_tx {
-        let cleaned = streaming.flush(&output, tx, |s| prompt::strip_thinking(s));
+        let cleaned = streaming.flush(&output, tx, prompt::strip_thinking);
         return Ok(cleaned);
     }
 

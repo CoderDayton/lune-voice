@@ -449,34 +449,6 @@ fn parse_voice_command_payload(payload: &str) -> Option<VoiceCommand> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::parse_voice_command_payload;
-    use lune_core::command::VoiceCommand;
-
-    #[test]
-    fn parses_voice_command_json_payload() {
-        let payload = serde_json::to_string(&VoiceCommand::SwitchStyle("formal".into())).unwrap();
-        let parsed = parse_voice_command_payload(&payload);
-        match parsed {
-            Some(VoiceCommand::SwitchStyle(style)) => assert_eq!(style, "formal"),
-            other => panic!("unexpected parse result: {other:?}"),
-        }
-    }
-
-    #[test]
-    fn parses_legacy_debug_payload() {
-        assert!(matches!(
-            parse_voice_command_payload("StopDictation"),
-            Some(VoiceCommand::StopDictation)
-        ));
-        assert!(matches!(
-            parse_voice_command_payload("NewParagraph"),
-            Some(VoiceCommand::NewParagraph)
-        ));
-    }
-}
-
 #[cold]
 async fn stop_dictation<A: lune_core::asr::AsrBackend + 'static>(
     manager: &SessionManager<A>,
@@ -521,5 +493,33 @@ async fn update_state(
 
     if let Err(e) = dbus::emit_state_changed(conn, state_str).await {
         tracing::warn!(error = %e, "failed to emit state_changed signal");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_voice_command_payload;
+    use lune_core::command::VoiceCommand;
+
+    #[test]
+    fn parses_voice_command_json_payload() {
+        let payload = serde_json::to_string(&VoiceCommand::SwitchStyle("formal".into())).unwrap();
+        let parsed = parse_voice_command_payload(&payload);
+        match parsed {
+            Some(VoiceCommand::SwitchStyle(style)) => assert_eq!(style, "formal"),
+            other => panic!("unexpected parse result: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_legacy_debug_payload() {
+        assert!(matches!(
+            parse_voice_command_payload("StopDictation"),
+            Some(VoiceCommand::StopDictation)
+        ));
+        assert!(matches!(
+            parse_voice_command_payload("NewParagraph"),
+            Some(VoiceCommand::NewParagraph)
+        ));
     }
 }

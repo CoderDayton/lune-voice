@@ -403,6 +403,7 @@ pub(crate) struct StreamConfig {
 /// Push audio and run one streaming decode cycle.
 ///
 /// Returns the delta text (newly committed tokens decoded to string).
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn stream_push_audio(
     encoder: &mut Session,
     embed_tokens: &mut Session,
@@ -1166,7 +1167,7 @@ mod tests {
             crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-decoder.onnx"), false)
                 .expect("load decoder");
         let tokenizer =
-            tokenizers::Tokenizer::from_file(&dir.join("tokenizer.json")).expect("load tokenizer");
+            tokenizers::Tokenizer::from_file(dir.join("tokenizer.json")).expect("load tokenizer");
 
         // 440 Hz tone — not real speech but deterministic
         let audio = tone_440hz(1.0);
@@ -1258,7 +1259,7 @@ mod tests {
             crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-decoder.onnx"), false)
                 .expect("load decoder");
         let tokenizer =
-            tokenizers::Tokenizer::from_file(&dir.join("tokenizer.json")).expect("load tokenizer");
+            tokenizers::Tokenizer::from_file(dir.join("tokenizer.json")).expect("load tokenizer");
 
         // First 0.5s of real speech
         let audio = load_wav_f32(&wav);
@@ -1342,7 +1343,7 @@ mod tests {
             crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-decoder.onnx"), false)
                 .expect("load decoder");
         let tokenizer =
-            tokenizers::Tokenizer::from_file(&dir.join("tokenizer.json")).expect("load tokenizer");
+            tokenizers::Tokenizer::from_file(dir.join("tokenizer.json")).expect("load tokenizer");
 
         let audio = tone_440hz(1.0);
         let mel = compute_qwen_mel(&audio);
@@ -1443,7 +1444,7 @@ mod tests {
             crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-decoder.onnx"), false)
                 .expect("load decoder");
         let tokenizer =
-            tokenizers::Tokenizer::from_file(&dir.join("tokenizer.json")).expect("load tokenizer");
+            tokenizers::Tokenizer::from_file(dir.join("tokenizer.json")).expect("load tokenizer");
 
         let audio = load_wav_f32(&wav);
         eprintln!(
@@ -1572,7 +1573,7 @@ mod tests {
             return;
         }
         let tok =
-            tokenizers::Tokenizer::from_file(&dir.join("tokenizer.json")).expect("load tokenizer");
+            tokenizers::Tokenizer::from_file(dir.join("tokenizer.json")).expect("load tokenizer");
 
         let eos = tok.token_to_id("<|im_end|>");
         let eot = tok.token_to_id("<|endoftext|>");
@@ -1793,7 +1794,7 @@ mod tests {
             crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-decoder.onnx"), false)
                 .expect("load decoder");
         let tokenizer =
-            tokenizers::Tokenizer::from_file(&dir.join("tokenizer.json")).expect("load tokenizer");
+            tokenizers::Tokenizer::from_file(dir.join("tokenizer.json")).expect("load tokenizer");
 
         let audio = load_wav_f32(&wav);
         eprintln!(
