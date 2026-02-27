@@ -17,6 +17,13 @@ pub struct PostProcessInput {
     /// Recent session text for cross-utterance disambiguation.
     /// Tail of `session_text` truncated to ~500 chars (~125 words, ~5 utterances).
     pub context: Option<String>,
+    /// Last ~10 words of already-committed intra-utterance text.
+    ///
+    /// When set, the ASR fragment is a continuation of an in-progress sentence.
+    /// The LLM should not capitalize the first word or add terminal punctuation
+    /// unless the fragment clearly ends a sentence.
+    /// Technique: label-context prefix (IBM Semi-AR Streaming ASR, ICASSP 2024).
+    pub prefix_context: Option<String>,
 }
 
 /// Output from the text post-processor.
@@ -77,6 +84,7 @@ mod tests {
             app_category: Some(AppCategory::Email),
             dictionary: vec![],
             context: None,
+            prefix_context: None,
         };
         assert_eq!(input.raw_text, "hello um world");
         assert_eq!(input.app_category, Some(AppCategory::Email));

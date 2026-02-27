@@ -150,6 +150,7 @@ fn llm_input(raw_text: &str) -> PostProcessInput {
         app_category: None,
         dictionary: vec![],
         context: None,
+        prefix_context: None,
     }
 }
 
@@ -331,6 +332,7 @@ async fn llm_with_context_produces_valid_output() {
         app_category: None,
         dictionary: vec![],
         context: Some(context_text.into()),
+        prefix_context: None,
     };
     let input_without_ctx = PostProcessInput {
         context: None,

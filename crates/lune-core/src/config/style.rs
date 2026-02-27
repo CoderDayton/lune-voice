@@ -17,7 +17,10 @@ and output ONLY the cleaned version. Rules:
 5. If the input is already clean, output it unchanged.
 6. Output ONLY the cleaned transcription — nothing else.
 7. When prior context is provided, reorder ASR fragments if needed so \
-the output continues naturally from it.";
+the output continues naturally from it.
+8. If a Prefix is provided, the ASR input is an intra-utterance continuation — \
+do not capitalize the first word (unless a proper noun) and do not add terminal \
+punctuation unless the fragment clearly ends a complete sentence.";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StylePreset {
@@ -104,7 +107,7 @@ impl StylePreset {
             name: "General".into(),
             description: "Clean grammar and remove disfluencies".into(),
             style_instructions: String::new(),
-            user_prompt_template: "{context}ASR: {raw_text}".into(),
+            user_prompt_template: "{context}{prefix}ASR: {raw_text}".into(),
             few_shot_pairs: vec![
                 (
                     "ASR: so um I'm gonna go to the store and buy some more flower for the cake".into(),
@@ -138,6 +141,14 @@ impl StylePreset {
                     "ASR: the city thrived for years, strong as it seemed, in the shadow of those ancient walls, and its people were known far and wide,".into(),
                     "The city thrived for years, strong as it seemed, in the shadow of those ancient walls, and its people were known far and wide.".into(),
                 ),
+                (
+                    "Prefix: they were the only persons on the road and they sauntered\nASR: leisurely along to avoid paying the price".into(),
+                    "leisurely along to avoid paying the price".into(),
+                ),
+                (
+                    "Prefix: the server started the connection\nASR: at to in the morning".into(),
+                    "at two in the morning".into(),
+                ),
             ],
         }
     }
@@ -148,7 +159,7 @@ impl StylePreset {
             name: "Vibe Coding".into(),
             description: "High-intelligence technical polishing with semantic code-element detection".into(),
             style_instructions: "Format technical entities in `backticks` / PascalCase. Correct homophones for software context (sink→async, wait→await, post→POST). Maintain developer slang.".into(),
-            user_prompt_template: "{context}ASR: {raw_text}".into(),
+            user_prompt_template: "{context}{prefix}ASR: {raw_text}".into(),
             few_shot_pairs: vec![
                 (
                     "ASR: um let's make an async funk shin called sink data that awaits a fetch to the api and then logs the status".into(),
@@ -172,7 +183,7 @@ impl StylePreset {
             name: "Email".into(),
             description: "Formal email with proper greeting and sign-off".into(),
             style_instructions: "Ensure formal register. Add paragraph breaks where natural.".into(),
-            user_prompt_template: "{context}ASR: {raw_text}".into(),
+            user_prompt_template: "{context}{prefix}ASR: {raw_text}".into(),
             few_shot_pairs: vec![
                 (
                     "ASR: hey uh just wanted to follow up on the thing we discussed last week about the project timeline".into(),
@@ -192,7 +203,7 @@ impl StylePreset {
             name: "Slack".into(),
             description: "Casual Slack message, concise and direct".into(),
             style_instructions: "Keep the tone casual and concise.".into(),
-            user_prompt_template: "{context}ASR: {raw_text}".into(),
+            user_prompt_template: "{context}{prefix}ASR: {raw_text}".into(),
             few_shot_pairs: vec![
                 (
                     "ASR: hey um can you take a look at the PR when you get a chance".into(),
@@ -213,7 +224,7 @@ impl StylePreset {
             name: "Meeting Notes".into(),
             description: "Structured meeting notes with bullets and action items".into(),
             style_instructions: "Format as clear bullet points. Label action items with 'Action:'.".into(),
-            user_prompt_template: "{context}ASR: {raw_text}".into(),
+            user_prompt_template: "{context}{prefix}ASR: {raw_text}".into(),
             few_shot_pairs: vec![
                 (
                     "ASR: so we talked about the Q3 roadmap and uh John is going to handle the API redesign and Sarah needs to review the mockups by next Tuesday".into(),
@@ -233,7 +244,7 @@ impl StylePreset {
             name: "Code Comments".into(),
             description: "Technical code comments, terse and precise".into(),
             style_instructions: "Keep language technical and precise. Use imperative mood. No emojis.".into(),
-            user_prompt_template: "{context}ASR: {raw_text}".into(),
+            user_prompt_template: "{context}{prefix}ASR: {raw_text}".into(),
             few_shot_pairs: vec![
                 (
                     "ASR: so this function basically um takes a slice and uh returns the sorted version without modifying the original".into(),

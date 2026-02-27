@@ -40,12 +40,14 @@ pub fn build_chatml(input: &PostProcessInput) -> String {
         .map(|(u, a)| u.len() + a.len() + 80)
         .sum();
     let ctx_len = input.context.as_ref().map_or(0, |c| c.len() + 20);
+    let prefix_len = input.prefix_context.as_ref().map_or(0, |p| p.len() + 10); // "Prefix: \n"
     let cap = 128
         + BASE_SYSTEM_PROMPT.len()
         + style.style_instructions.len()
         + dict_len
         + few_shot_len
         + ctx_len
+        + prefix_len
         + style.user_prompt_template.len()
         + input.raw_text.len();
 
@@ -98,13 +100,36 @@ pub fn build_chatml(input: &PostProcessInput) -> String {
         std::borrow::Cow::Borrowed(template.as_str())
     };
 
-    // Second pass: expand {raw_text} slot.
-    if let Some(idx) = after_ctx.find("{raw_text}") {
-        prompt.push_str(&after_ctx[..idx]);
-        prompt.push_str(&input.raw_text);
-        prompt.push_str(&after_ctx[idx + "{raw_text}".len()..]);
+    // Second pass: expand {prefix} slot.
+    // When prefix_context is set the fragment is an intra-utterance continuation;
+    // inject "Prefix: {text}\n" so the LLM knows not to capitalise or add punctuation.
+    let prefix_text = match &input.prefix_context {
+        Some(p) if !p.trim().is_empty() => {
+            let mut s = String::with_capacity(p.len() + 10);
+            s.push_str("Prefix: ");
+            s.push_str(p);
+            s.push('\n');
+            s
+        }
+        _ => String::new(),
+    };
+    let after_prefix = if let Some(idx) = after_ctx.find("{prefix}") {
+        let mut buf = String::with_capacity(after_ctx.len() + prefix_text.len());
+        buf.push_str(&after_ctx[..idx]);
+        buf.push_str(&prefix_text);
+        buf.push_str(&after_ctx[idx + "{prefix}".len()..]);
+        std::borrow::Cow::Owned(buf)
     } else {
-        prompt.push_str(&after_ctx);
+        after_ctx
+    };
+
+    // Third pass: expand {raw_text} slot.
+    if let Some(idx) = after_prefix.find("{raw_text}") {
+        prompt.push_str(&after_prefix[..idx]);
+        prompt.push_str(&input.raw_text);
+        prompt.push_str(&after_prefix[idx + "{raw_text}".len()..]);
+    } else {
+        prompt.push_str(&after_prefix);
     }
     prompt.push_str("\n/no_think<|im_end|>\n");
 
@@ -223,6 +248,7 @@ mod tests {
             app_category: None,
             dictionary: vec![],
             context: None,
+            prefix_context: None,
         };
         let prompt = build_chatml(&input);
         assert!(prompt.starts_with("<|im_start|>system\n"));
@@ -243,6 +269,7 @@ mod tests {
                 priority: 10,
             }],
             context: None,
+            prefix_context: None,
         };
         let prompt = build_chatml(&input);
         assert!(prompt.contains("lunevoice"));
@@ -257,6 +284,7 @@ mod tests {
             app_category: None,
             dictionary: vec![],
             context: Some("Context: I was just talking about Rust.\n".into()),
+            prefix_context: None,
         };
         let prompt = build_chatml(&input);
         assert!(prompt.contains("Context: I was just talking about Rust.\nASR: hello world"));
@@ -270,6 +298,7 @@ mod tests {
             app_category: None,
             dictionary: vec![],
             context: None,
+            prefix_context: None,
         };
         let prompt = build_chatml(&input);
         // No context → {context} expands to empty string, template starts with "ASR:"
@@ -284,11 +313,50 @@ mod tests {
             app_category: None,
             dictionary: vec![],
             context: None,
+            prefix_context: None,
         };
         let prompt = build_chatml(&input);
         // General preset has 4 few-shot pairs.
         assert!(prompt.contains("ASR: so um I'm gonna go to the store"));
         assert!(prompt.contains("I'm gonna go to the store and buy some more flour for the cake"));
+    }
+
+    #[test]
+    fn chatml_with_prefix_context() {
+        let input = PostProcessInput {
+            raw_text: "at a leisurely pace".into(),
+            style_preset: Arc::new(StylePreset::general()),
+            app_category: None,
+            dictionary: vec![],
+            context: None,
+            prefix_context: Some("they walked down the road".into()),
+        };
+        let prompt = build_chatml(&input);
+        assert!(prompt.contains("Prefix: they walked down the road\nASR: at a leisurely pace"));
+    }
+
+    #[test]
+    fn chatml_no_prefix_when_none() {
+        let input = PostProcessInput {
+            raw_text: "hello world".into(),
+            style_preset: Arc::new(StylePreset::general()),
+            app_category: None,
+            dictionary: vec![],
+            context: None,
+            prefix_context: None,
+        };
+        let prompt = build_chatml(&input);
+        // The final user turn (last <|im_start|>user block) must not inject a Prefix line.
+        // Few-shot pairs may contain "Prefix:" as teaching examples — that's expected.
+        let last_user_turn = prompt
+            .rsplit("<|im_start|>user\n")
+            .next()
+            .expect("should have user turn");
+        assert!(
+            !last_user_turn.contains("Prefix:"),
+            "final user turn should not inject Prefix: when prefix_context is None"
+        );
+        assert!(prompt.contains("ASR: hello world"));
     }
 
     #[test]

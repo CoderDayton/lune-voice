@@ -57,17 +57,22 @@ const CONTEXT_UTTERANCE_COUNT: usize = 5;
 /// Maximum words of context to keep (tail-trimmed). ~100 words ≈ ~130 tokens.
 /// Fits within the 2048 n_ctx budget (system ~300 + few-shot ~400 + context ~130 + input ~100 + output ~256 = ~1186).
 const CONTEXT_MAX_WORDS: usize = 100;
+/// Words of already-committed session text forwarded as intra-utterance prefix context
+/// to the LLM worker. Provides left-context for continuation fragment correction.
+const PREFIX_CONTEXT_WORDS: usize = 10;
 
-/// >= 99% confidence: speculative paste — ~75ms (1200 samples).
-pub const SILENCE_TIER_SPECULATIVE: usize = 1_200;
-/// >= 92% confidence: aggressive — ~80ms (1280 samples).
-pub const SILENCE_TIER_HIGH: usize = 1_280;
-/// >= 80% confidence: moderate — ~120ms (1920 samples).
-pub const SILENCE_TIER_MODERATE: usize = 1_920;
-/// < 80% or unknown: conservative — ~320ms (5120 samples).
-/// Combined with 30ms VAD hangover, effective wait is ~350ms — provides
-/// 100ms total tail protection for uncertain segments where a false flush
-/// would cause the LLM correction pass to fail.
+/// >= 99%: speculative paste — 70ms (1120 samples).
+pub const SILENCE_TIER_SPECULATIVE: usize = 1_120;
+/// >= 95%: very high confidence — 100ms (1600 samples).
+pub const SILENCE_TIER_VERY_HIGH: usize = 1_600;
+/// >= 90%: high confidence — 150ms (2400 samples).
+pub const SILENCE_TIER_HIGH: usize = 2_400;
+/// >= 80%: moderate confidence — 210ms (3360 samples).
+pub const SILENCE_TIER_MODERATE: usize = 3_360;
+/// >= 70%: low-moderate confidence — 265ms (4240 samples).
+pub const SILENCE_TIER_LOW: usize = 4_240;
+/// < 70% or unknown: conservative — 320ms (5120 samples).
+/// Combined with 30ms VAD hangover, effective wait is ~350ms.
 pub const SILENCE_TIER_DEFAULT: usize = 5_120;
 
 #[inline]
@@ -77,8 +82,10 @@ pub fn dynamic_silence_threshold(confidence: Option<f32>, enabled: bool) -> usiz
     }
     match confidence {
         Some(c) if c >= 0.99 => SILENCE_TIER_SPECULATIVE,
-        Some(c) if c >= 0.92 => SILENCE_TIER_HIGH,
+        Some(c) if c >= 0.95 => SILENCE_TIER_VERY_HIGH,
+        Some(c) if c >= 0.90 => SILENCE_TIER_HIGH,
         Some(c) if c >= 0.80 => SILENCE_TIER_MODERATE,
+        Some(c) if c >= 0.70 => SILENCE_TIER_LOW,
         _ => SILENCE_TIER_DEFAULT,
     }
 }
@@ -652,6 +659,7 @@ async fn run_session<A: AsrBackend + 'static>(
                                         &mut last_flushed_text,
                                         &mut last_flush_at,
                                         ctx,
+                                        last_n_words(&session_text, PREFIX_CONTEXT_WORDS),
                                     )
                                     .await;
                                     sent_to_llm |= flushed;
@@ -735,6 +743,7 @@ async fn run_session<A: AsrBackend + 'static>(
                                     &mut last_flushed_text,
                                     &mut last_flush_at,
                                     ctx,
+                                    last_n_words(&session_text, PREFIX_CONTEXT_WORDS),
                                 )
                                 .await;
                                 sent_to_llm |= flushed;
@@ -846,6 +855,7 @@ async fn run_session<A: AsrBackend + 'static>(
                             &mut last_flushed_text,
                             &mut last_flush_at,
                             ctx,
+                            last_n_words(&session_text, PREFIX_CONTEXT_WORDS),
                         )
                         .await;
                         sent_to_llm |= flushed;
@@ -869,6 +879,7 @@ async fn run_session<A: AsrBackend + 'static>(
             &mut last_flushed_text,
             &mut last_flush_at,
             ctx,
+            last_n_words(&session_text, PREFIX_CONTEXT_WORDS),
         )
         .await;
         pending_nonfinal.clear();
@@ -1005,6 +1016,7 @@ async fn flush_to_llm(
     style_preset: &Arc<StylePreset>,
     llm_tx: &mpsc::Sender<LlmRequest>,
     context: Option<String>,
+    prefix_context: Option<String>,
 ) {
     let (text, dictionary) = {
         let guard = dict.lock().await;
@@ -1021,6 +1033,7 @@ async fn flush_to_llm(
         style_preset: Arc::clone(style_preset),
         dictionary,
         context,
+        prefix_context,
     };
     if let Err(e) = llm_tx.send(req).await {
         warn!(error = %e, "LLM worker unavailable");
@@ -1035,6 +1048,7 @@ async fn flush_to_llm_if_new(
     last_flushed_text: &mut String,
     last_flush_at: &mut tokio::time::Instant,
     context: Option<String>,
+    prefix_context: Option<String>,
 ) -> bool {
     let normalized = normalize_whitespace(utterance);
     if normalized.is_empty() {
@@ -1048,10 +1062,29 @@ async fn flush_to_llm_if_new(
         return false;
     }
 
-    flush_to_llm(&normalized, dict, style_preset, llm_tx, context).await;
+    flush_to_llm(
+        &normalized,
+        dict,
+        style_preset,
+        llm_tx,
+        context,
+        prefix_context,
+    )
+    .await;
     *last_flushed_text = normalized;
     *last_flush_at = now;
     true
+}
+
+/// Extract the last `n` whitespace-separated words from `text`.
+/// Returns `None` when `text` is empty — no prefix context needed.
+fn last_n_words(text: &str, n: usize) -> Option<String> {
+    let words: Vec<&str> = text.split_whitespace().collect();
+    if words.is_empty() {
+        return None;
+    }
+    let start = words.len().saturating_sub(n);
+    Some(words[start..].join(" "))
 }
 
 #[inline]
@@ -1326,6 +1359,7 @@ mod tests {
             &style_preset,
             &llm_tx,
             None,
+            None,
         )
         .await;
 
@@ -1427,6 +1461,7 @@ mod tests {
             &mut last_flushed_text,
             &mut last_flush_at,
             None,
+            None,
         )
         .await;
         let second = flush_to_llm_if_new(
@@ -1436,6 +1471,7 @@ mod tests {
             &llm_tx,
             &mut last_flushed_text,
             &mut last_flush_at,
+            None,
             None,
         )
         .await;
@@ -1455,6 +1491,7 @@ mod tests {
             &llm_tx,
             &mut last_flushed_text,
             &mut last_flush_at,
+            None,
             None,
         )
         .await;
@@ -1551,13 +1588,22 @@ mod tests {
             dynamic_silence_threshold(Some(1.0), true),
             SILENCE_TIER_SPECULATIVE
         );
-        // >= 0.92 → high
+        // >= 0.95 → very_high
         assert_eq!(
-            dynamic_silence_threshold(Some(0.92), true),
-            SILENCE_TIER_HIGH
+            dynamic_silence_threshold(Some(0.95), true),
+            SILENCE_TIER_VERY_HIGH
         );
         assert_eq!(
             dynamic_silence_threshold(Some(0.98), true),
+            SILENCE_TIER_VERY_HIGH
+        );
+        // >= 0.90 → high
+        assert_eq!(
+            dynamic_silence_threshold(Some(0.90), true),
+            SILENCE_TIER_HIGH
+        );
+        assert_eq!(
+            dynamic_silence_threshold(Some(0.92), true),
             SILENCE_TIER_HIGH
         );
         // >= 0.80 → moderate
@@ -1566,12 +1612,21 @@ mod tests {
             SILENCE_TIER_MODERATE
         );
         assert_eq!(
-            dynamic_silence_threshold(Some(0.91), true),
+            dynamic_silence_threshold(Some(0.89), true),
             SILENCE_TIER_MODERATE
         );
-        // < 0.80 → default
+        // >= 0.70 → low
+        assert_eq!(
+            dynamic_silence_threshold(Some(0.70), true),
+            SILENCE_TIER_LOW
+        );
         assert_eq!(
             dynamic_silence_threshold(Some(0.79), true),
+            SILENCE_TIER_LOW
+        );
+        // < 0.70 → default
+        assert_eq!(
+            dynamic_silence_threshold(Some(0.69), true),
             SILENCE_TIER_DEFAULT
         );
         assert_eq!(
@@ -1613,9 +1668,9 @@ mod tests {
     }
 
     #[test]
-    fn speculative_silence_tier_is_75ms() {
-        // 75ms at 16 kHz = 1200 samples
-        assert_eq!(SILENCE_TIER_SPECULATIVE, 1_200);
+    fn speculative_silence_tier_is_70ms() {
+        // 70ms at 16 kHz = 1120 samples
+        assert_eq!(SILENCE_TIER_SPECULATIVE, 1_120);
     }
 
     // ── find_speech_onset ─────────────────────────────────────────────────

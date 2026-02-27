@@ -17,8 +17,9 @@ use lune_core::llm::{PostProcessInput, TextPostProcessor};
 use lune_llm::{OrtLlmBackend, OrtLlmConfig};
 
 use lune_app::{
-    SILENCE_FLUSH_SAMPLES, SILENCE_TIER_DEFAULT, SILENCE_TIER_HIGH, SILENCE_TIER_MODERATE,
-    SILENCE_TIER_SPECULATIVE, dynamic_silence_threshold,
+    SILENCE_FLUSH_SAMPLES, SILENCE_TIER_DEFAULT, SILENCE_TIER_HIGH, SILENCE_TIER_LOW,
+    SILENCE_TIER_MODERATE, SILENCE_TIER_SPECULATIVE, SILENCE_TIER_VERY_HIGH,
+    dynamic_silence_threshold,
 };
 
 const SAMPLE_RATE: usize = 16_000;
@@ -334,22 +335,32 @@ fn bench_confidence_gate(asr_results: &[AsrResult]) {
     println!();
     println!("  Silence tier constants (samples @ 16kHz):");
     println!(
-        "    SPECULATIVE = {:>5}  ({:>3} ms)",
+        "    SPECULATIVE = {:>5}  ({:>3} ms)  (>= 99%)",
         SILENCE_TIER_SPECULATIVE,
         samples_to_ms(SILENCE_TIER_SPECULATIVE)
     );
     println!(
-        "    HIGH        = {:>5}  ({:>3} ms)",
+        "    VERY_HIGH   = {:>5}  ({:>3} ms)  (>= 95%)",
+        SILENCE_TIER_VERY_HIGH,
+        samples_to_ms(SILENCE_TIER_VERY_HIGH)
+    );
+    println!(
+        "    HIGH        = {:>5}  ({:>3} ms)  (>= 90%)",
         SILENCE_TIER_HIGH,
         samples_to_ms(SILENCE_TIER_HIGH)
     );
     println!(
-        "    MODERATE    = {:>5}  ({:>3} ms)",
+        "    MODERATE    = {:>5}  ({:>3} ms)  (>= 80%)",
         SILENCE_TIER_MODERATE,
         samples_to_ms(SILENCE_TIER_MODERATE)
     );
     println!(
-        "    DEFAULT     = {:>5}  ({:>3} ms)",
+        "    LOW         = {:>5}  ({:>3} ms)  (>= 70%)",
+        SILENCE_TIER_LOW,
+        samples_to_ms(SILENCE_TIER_LOW)
+    );
+    println!(
+        "    DEFAULT     = {:>5}  ({:>3} ms)  (< 70%)",
         SILENCE_TIER_DEFAULT,
         samples_to_ms(SILENCE_TIER_DEFAULT)
     );
@@ -441,6 +452,7 @@ fn bench_llm_postprocess(
                 app_category: None,
                 dictionary: vec![],
                 context: None,
+                prefix_context: None,
             };
 
             let t = Instant::now();

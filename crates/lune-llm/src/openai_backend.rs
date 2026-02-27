@@ -221,6 +221,7 @@ mod tests {
             app_category: None,
             dictionary: vec![],
             context: None,
+            prefix_context: None,
         }
     }
 
@@ -268,6 +269,7 @@ mod tests {
             app_category: None,
             dictionary: vec![],
             context: None,
+            prefix_context: None,
         };
         let msgs = build_messages(&input);
         let json = serde_json::to_string(&msgs).unwrap();

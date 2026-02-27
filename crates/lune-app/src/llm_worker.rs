@@ -13,6 +13,8 @@ pub struct LlmRequest {
     pub style_preset: Arc<StylePreset>,
     pub dictionary: Vec<DictionaryEntry>,
     pub context: Option<String>,
+    /// Last ~10 words of already-committed text — intra-utterance continuation signal.
+    pub prefix_context: Option<String>,
 }
 
 /// Completion signal from the LLM worker.
@@ -132,6 +134,8 @@ pub fn spawn_llm_worker(
                 app_category: None,
                 dictionary,
                 context: batch[0].context.clone(),
+                // Use the first request's prefix — combined text starts from its context.
+                prefix_context: batch[0].prefix_context.clone(),
             };
 
             // Stream corrected text in word-boundary chunks as the LLM generates.
@@ -269,6 +273,7 @@ mod tests {
                         style_preset: Arc::clone(&style),
                         dictionary: vec![dict_entry("alpha", "Alpha", 10)],
                         context: None,
+                        prefix_context: None,
                     })
                     .await
                     .expect("send first request");
@@ -278,6 +283,7 @@ mod tests {
                         style_preset: Arc::clone(&style),
                         dictionary: vec![dict_entry("beta", "Beta", 9)],
                         context: None,
+                        prefix_context: None,
                     })
                     .await
                     .expect("send second request");
