@@ -14,6 +14,9 @@ pub struct PostProcessInput {
     /// Target application category hint.
     pub app_category: Option<AppCategory>,
     pub dictionary: Vec<DictionaryEntry>,
+    /// Recent session text for cross-utterance disambiguation.
+    /// Tail of `session_text` truncated to ~500 chars (~125 words, ~5 utterances).
+    pub context: Option<String>,
 }
 
 /// Output from the text post-processor.
@@ -73,6 +76,7 @@ mod tests {
             style_preset: Arc::new(StylePreset::general()),
             app_category: Some(AppCategory::Email),
             dictionary: vec![],
+            context: None,
         };
         assert_eq!(input.raw_text, "hello um world");
         assert_eq!(input.app_category, Some(AppCategory::Email));

@@ -12,6 +12,7 @@ pub struct LlmRequest {
     pub text: String,
     pub style_preset: Arc<StylePreset>,
     pub dictionary: Vec<DictionaryEntry>,
+    pub context: Option<String>,
 }
 
 /// Completion signal from the LLM worker.
@@ -130,6 +131,7 @@ pub fn spawn_llm_worker(
                 style_preset,
                 app_category: None,
                 dictionary,
+                context: batch[0].context.clone(),
             };
 
             // Stream corrected text in word-boundary chunks as the LLM generates.
@@ -266,6 +268,7 @@ mod tests {
                         text: "first".into(),
                         style_preset: Arc::clone(&style),
                         dictionary: vec![dict_entry("alpha", "Alpha", 10)],
+                        context: None,
                     })
                     .await
                     .expect("send first request");
@@ -274,6 +277,7 @@ mod tests {
                         text: "second".into(),
                         style_preset: Arc::clone(&style),
                         dictionary: vec![dict_entry("beta", "Beta", 9)],
+                        context: None,
                     })
                     .await
                     .expect("send second request");

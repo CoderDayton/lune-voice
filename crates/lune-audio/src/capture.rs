@@ -37,7 +37,8 @@ impl Default for AudioConfig {
 pub struct AudioStream {
     config: AudioConfig,
     ring: Arc<RingBuffer<AudioChunk>>,
-    _stream: cpal::Stream, // Kept alive
+    /// Kept alive to keep the cpal callback running. `None` for file-backed streams.
+    _stream: Option<cpal::Stream>,
 }
 
 impl AudioStream {
@@ -158,8 +159,34 @@ impl AudioStream {
         Ok(Self {
             config,
             ring,
-            _stream: stream,
+            _stream: Some(stream),
         })
+    }
+
+    /// Create an `AudioStream` pre-loaded with PCM samples (16 kHz mono f32).
+    ///
+    /// Chunks are pushed into the ring buffer immediately so `try_next_chunk`
+    /// drains them at the consumer's pace — no real-time audio thread involved.
+    /// Useful for integration tests and offline file processing.
+    pub fn from_samples(samples: &[f32], config: AudioConfig) -> Self {
+        let chunk_samples = (config.target_sample_rate * config.chunk_duration_ms / 1000) as usize;
+        // Auto-size buffer to fit all chunks so nothing is dropped.
+        let num_chunks = samples.len().div_ceil(chunk_samples);
+        let capacity = num_chunks.max(config.buffer_capacity);
+        let ring = Arc::new(RingBuffer::new(capacity));
+        let mut offset_ms = 0u64;
+        for chunk in samples.chunks(chunk_samples) {
+            ring.push(AudioChunk {
+                samples: chunk.to_vec(),
+                timestamp_ms: offset_ms,
+            });
+            offset_ms += u64::from(config.chunk_duration_ms);
+        }
+        Self {
+            config,
+            ring,
+            _stream: None,
+        }
     }
 
     /// Get the next audio chunk (async, blocks until data available)

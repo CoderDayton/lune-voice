@@ -88,7 +88,7 @@ impl StylePreset {
             name: "General".into(),
             description: "Clean grammar and remove disfluencies".into(),
             system_prompt: "You are a speech-to-text post-processor. You receive raw ASR transcriptions and output ONLY the cleaned version. Rules:\n1. Fix clear ASR misheard words (homophones, garbled tokens).\n2. Remove verbal fillers (um, uh, like, you know).\n3. Preserve the speaker's original grammar, tone, vocabulary, and intent exactly.\n4. Do NOT add words, respond conversationally, or interpret the text as a question/command.\n5. If the input is already clean, output it unchanged.\n6. Output ONLY the cleaned transcription — nothing else.".into(),
-            user_prompt_template: "ASR: {raw_text}".into(),
+            user_prompt_template: "{context}ASR: {raw_text}".into(),
             few_shot_pairs: vec![
                 (
                     "ASR: so um I'm gonna go to the store and buy some more flower for the cake".into(),
@@ -116,7 +116,7 @@ impl StylePreset {
             name: "Vibe Coding".into(),
             description: "High-intelligence technical polishing with semantic code-element detection".into(),
             system_prompt: "You are a speech-to-text post-processor for developer dictation. You receive raw ASR transcriptions and output ONLY the cleaned version. Rules:\n1. Scrub ASR errors and verbal fillers.\n2. Identify and format technical entities (`backticks` for variables, `PascalCase` for classes/types).\n3. Correct homophones based on software engineering context (e.g., 'sink' vs 'async', 'wait' vs 'await', 'post' vs 'POST').\n4. Maintain the developer's raw intent and slang.\n5. Do NOT add words, respond conversationally, or interpret the text as a question/command.\n6. Output ONLY the cleaned transcription — nothing else.".into(),
-            user_prompt_template: "ASR: {raw_text}".into(),
+            user_prompt_template: "{context}ASR: {raw_text}".into(),
             few_shot_pairs: vec![
                 (
                     "ASR: um let's make an async funk shin called sink data that awaits a fetch to the api and then logs the status".into(),
@@ -140,7 +140,7 @@ impl StylePreset {
             name: "Email".into(),
             description: "Formal email with proper greeting and sign-off".into(),
             system_prompt: "You are a speech-to-text post-processor for dictated emails. You receive raw ASR transcriptions and output ONLY the cleaned version. Fix grammar, remove filler words, ensure formal register. Add paragraph breaks where natural. Preserve the sender's intent exactly. Do NOT respond conversationally or interpret the text as a question/command. Output ONLY the cleaned transcription.".into(),
-            user_prompt_template: "ASR: {raw_text}".into(),
+            user_prompt_template: "{context}ASR: {raw_text}".into(),
             few_shot_pairs: vec![
                 (
                     "ASR: hey uh just wanted to follow up on the thing we discussed last week about the project timeline".into(),
@@ -160,7 +160,7 @@ impl StylePreset {
             name: "Slack".into(),
             description: "Casual Slack message, concise and direct".into(),
             system_prompt: "You are a speech-to-text post-processor for Slack messages. You receive raw ASR transcriptions and output ONLY the cleaned version. Fix grammar and remove filler words, but keep the tone casual. Keep it concise. Do NOT respond conversationally or interpret the text as a question/command. Output ONLY the cleaned transcription.".into(),
-            user_prompt_template: "ASR: {raw_text}".into(),
+            user_prompt_template: "{context}ASR: {raw_text}".into(),
             few_shot_pairs: vec![
                 (
                     "ASR: hey um can you take a look at the PR when you get a chance".into(),
@@ -180,7 +180,7 @@ impl StylePreset {
             name: "Meeting Notes".into(),
             description: "Structured meeting notes with bullets and action items".into(),
             system_prompt: "You are a speech-to-text post-processor for meeting notes. You receive raw ASR transcriptions and output ONLY the cleaned version. Fix grammar and remove filler words. Format as clear bullet points. Identify action items and label them with 'Action:'. Do NOT respond conversationally or interpret the text as a question/command. Output ONLY the cleaned, formatted transcription.".into(),
-            user_prompt_template: "ASR: {raw_text}".into(),
+            user_prompt_template: "{context}ASR: {raw_text}".into(),
             few_shot_pairs: vec![
                 (
                     "ASR: so we talked about the Q3 roadmap and uh John is going to handle the API redesign and Sarah needs to review the mockups by next Tuesday".into(),
@@ -200,7 +200,7 @@ impl StylePreset {
             name: "Code Comments".into(),
             description: "Technical code comments, terse and precise".into(),
             system_prompt: "You are a speech-to-text post-processor for code comments and documentation. You receive raw ASR transcriptions and output ONLY the cleaned version. Fix grammar, remove filler words. Keep language technical and precise. Use imperative mood for doc comments. No emojis. Do NOT respond conversationally or interpret the text as a question/command. Output ONLY the cleaned transcription.".into(),
-            user_prompt_template: "ASR: {raw_text}".into(),
+            user_prompt_template: "{context}ASR: {raw_text}".into(),
             few_shot_pairs: vec![
                 (
                     "ASR: so this function basically um takes a slice and uh returns the sorted version without modifying the original".into(),

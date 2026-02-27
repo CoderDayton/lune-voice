@@ -37,10 +37,12 @@ pub fn build_chatml(input: &PostProcessInput) -> String {
         .iter()
         .map(|(u, a)| u.len() + a.len() + 80)
         .sum();
+    let ctx_len = input.context.as_ref().map_or(0, |c| c.len() + 20);
     let cap = 128
         + style.system_prompt.len()
         + dict_len
         + few_shot_len
+        + ctx_len
         + style.user_prompt_template.len()
         + input.raw_text.len();
 
@@ -75,12 +77,26 @@ pub fn build_chatml(input: &PostProcessInput) -> String {
     // Actual user input — inline template substitution to avoid an intermediate allocation.
     prompt.push_str("<|im_start|>user\n");
     let template = &style.user_prompt_template;
-    if let Some(idx) = template.find("{raw_text}") {
-        prompt.push_str(&template[..idx]);
-        prompt.push_str(&input.raw_text);
-        prompt.push_str(&template[idx + "{raw_text}".len()..]);
+
+    // First pass: expand {context} slot.
+    let ctx_text = input.context.as_deref().unwrap_or("");
+    let after_ctx = if let Some(idx) = template.find("{context}") {
+        let mut buf = String::with_capacity(template.len() + ctx_text.len());
+        buf.push_str(&template[..idx]);
+        buf.push_str(ctx_text);
+        buf.push_str(&template[idx + "{context}".len()..]);
+        std::borrow::Cow::Owned(buf)
     } else {
-        prompt.push_str(template);
+        std::borrow::Cow::Borrowed(template.as_str())
+    };
+
+    // Second pass: expand {raw_text} slot.
+    if let Some(idx) = after_ctx.find("{raw_text}") {
+        prompt.push_str(&after_ctx[..idx]);
+        prompt.push_str(&input.raw_text);
+        prompt.push_str(&after_ctx[idx + "{raw_text}".len()..]);
+    } else {
+        prompt.push_str(&after_ctx);
     }
     prompt.push_str("\n/no_think<|im_end|>\n");
 
@@ -198,6 +214,7 @@ mod tests {
             style_preset: Arc::new(StylePreset::general()),
             app_category: None,
             dictionary: vec![],
+            context: None,
         };
         let prompt = build_chatml(&input);
         assert!(prompt.starts_with("<|im_start|>system\n"));
@@ -217,10 +234,38 @@ mod tests {
                 replacement: "Lune Voice".into(),
                 priority: 10,
             }],
+            context: None,
         };
         let prompt = build_chatml(&input);
         assert!(prompt.contains("lunevoice"));
         assert!(prompt.contains("Lune Voice"));
+    }
+
+    #[test]
+    fn chatml_with_context() {
+        let input = PostProcessInput {
+            raw_text: "hello world".into(),
+            style_preset: Arc::new(StylePreset::general()),
+            app_category: None,
+            dictionary: vec![],
+            context: Some("Context: I was just talking about Rust.\n".into()),
+        };
+        let prompt = build_chatml(&input);
+        assert!(prompt.contains("Context: I was just talking about Rust.\nASR: hello world"));
+    }
+
+    #[test]
+    fn chatml_without_context_no_prefix() {
+        let input = PostProcessInput {
+            raw_text: "hello world".into(),
+            style_preset: Arc::new(StylePreset::general()),
+            app_category: None,
+            dictionary: vec![],
+            context: None,
+        };
+        let prompt = build_chatml(&input);
+        // No context → {context} expands to empty string, template starts with "ASR:"
+        assert!(prompt.contains("<|im_start|>user\nASR: hello world\n"));
     }
 
     #[test]
@@ -230,6 +275,7 @@ mod tests {
             style_preset: Arc::new(StylePreset::general()),
             app_category: None,
             dictionary: vec![],
+            context: None,
         };
         let prompt = build_chatml(&input);
         // General preset has 4 few-shot pairs.

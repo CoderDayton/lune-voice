@@ -40,6 +40,11 @@ const ASR_PUSH_HANGOVER_SAMPLES: usize = 8_000; // 500ms @ 16kHz
 /// Suppress immediate duplicate flushes from repeated backend emits.
 const DUPLICATE_FLUSH_WINDOW: Duration = Duration::from_millis(1200);
 
+/// Maximum characters of session_text to include as LLM context.
+/// ~500 chars ≈ 125 words ≈ 5 short utterances ≈ ~170 tokens.
+/// Fits well within the 2048 n_ctx budget (system ~300 + few-shot ~400 + context ~170 + input ~100 + output ~256 = ~1226).
+const LLM_CONTEXT_MAX_CHARS: usize = 500;
+
 /// >= 99% confidence: speculative paste — ~50ms (800 samples).
 pub const SILENCE_TIER_SPECULATIVE: usize = 800;
 /// >= 92% confidence: aggressive — ~80ms (1280 samples).
@@ -141,6 +146,23 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
 
     /// Start a new session. Returns `Err` if one is already active.
     pub async fn start(&self, event_tx: mpsc::Sender<SessionEvent>) -> Result<Uuid> {
+        self.start_inner(event_tx, None).await
+    }
+
+    /// Start a session with a pre-built audio stream (e.g. from a file).
+    pub async fn start_with_audio(
+        &self,
+        event_tx: mpsc::Sender<SessionEvent>,
+        audio: AudioStream,
+    ) -> Result<Uuid> {
+        self.start_inner(event_tx, Some(audio)).await
+    }
+
+    async fn start_inner(
+        &self,
+        event_tx: mpsc::Sender<SessionEvent>,
+        audio_override: Option<AudioStream>,
+    ) -> Result<Uuid> {
         let mut lock = self.active.lock().await;
         if lock.is_some() {
             return Err(Error::Session("session already active".into()));
@@ -196,6 +218,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             event_tx,
             stop_rx,
             active_arc,
+            audio_override,
         ));
 
         *lock = Some(ActiveHandle {
@@ -240,6 +263,7 @@ async fn run_session<A: AsrBackend + 'static>(
     event_tx: mpsc::Sender<SessionEvent>,
     mut stop_rx: oneshot::Receiver<()>,
     active_arc: Arc<Mutex<Option<ActiveHandle>>>,
+    audio_override: Option<AudioStream>,
 ) {
     let mut status = SessionStatus::Completed;
     let mut style_preset = style_preset;
@@ -247,20 +271,24 @@ async fn run_session<A: AsrBackend + 'static>(
     let (llm_tx, mut llm_rx) = llm_worker::spawn_llm_worker(Arc::clone(&post_processor));
 
     // ── Start audio capture ───────────────────────────────────────────────
-    let audio_stream = match AudioStream::new(AudioConfig::default()) {
-        Ok(s) => s,
-        Err(e) => {
-            let _ = event_tx.send(SessionEvent::Error(e.to_string())).await;
-            finalize_db(
-                session_id,
-                &persist,
-                SessionStatus::Failed(e.to_string()),
-                None,
-                None,
-            )
-            .await;
-            active_arc.lock().await.take();
-            return;
+    let audio_stream = if let Some(stream) = audio_override {
+        stream
+    } else {
+        match AudioStream::new(AudioConfig::default()) {
+            Ok(s) => s,
+            Err(e) => {
+                let _ = event_tx.send(SessionEvent::Error(e.to_string())).await;
+                finalize_db(
+                    session_id,
+                    &persist,
+                    SessionStatus::Failed(e.to_string()),
+                    None,
+                    None,
+                )
+                .await;
+                active_arc.lock().await.take();
+                return;
+            }
         }
     };
 
@@ -492,6 +520,7 @@ async fn run_session<A: AsrBackend + 'static>(
                                     )
                                     .await;
                                 } else {
+                                    let ctx = build_llm_context(&session_text);
                                     let flushed = flush_to_llm_if_new(
                                         remaining,
                                         &dict,
@@ -499,6 +528,7 @@ async fn run_session<A: AsrBackend + 'static>(
                                         &llm_tx,
                                         &mut last_flushed_text,
                                         &mut last_flush_at,
+                                        ctx,
                                     )
                                     .await;
                                     sent_to_llm |= flushed;
@@ -559,6 +589,7 @@ async fn run_session<A: AsrBackend + 'static>(
                                     flush_ms = flush_threshold * 1000 / 16_000,
                                     "dynamic silence flush"
                                 );
+                                let ctx = build_llm_context(&session_text);
                                 let flushed = flush_to_llm_if_new(
                                     &pending_nonfinal,
                                     &dict,
@@ -566,6 +597,7 @@ async fn run_session<A: AsrBackend + 'static>(
                                     &llm_tx,
                                     &mut last_flushed_text,
                                     &mut last_flush_at,
+                                    ctx,
                                 )
                                 .await;
                                 sent_to_llm |= flushed;
@@ -622,6 +654,7 @@ async fn run_session<A: AsrBackend + 'static>(
                         };
                         commit_final_text(&mut output_ctrl, &mut session_text, &applied).await;
                     } else {
+                        let ctx = build_llm_context(&session_text);
                         let flushed = flush_to_llm_if_new(
                             text,
                             &dict,
@@ -629,6 +662,7 @@ async fn run_session<A: AsrBackend + 'static>(
                             &llm_tx,
                             &mut last_flushed_text,
                             &mut last_flush_at,
+                            ctx,
                         )
                         .await;
                         sent_to_llm |= flushed;
@@ -642,6 +676,7 @@ async fn run_session<A: AsrBackend + 'static>(
     }
 
     if !pending_nonfinal.is_empty() {
+        let ctx = build_llm_context(&session_text);
         let flushed = flush_to_llm_if_new(
             &pending_nonfinal,
             &dict,
@@ -649,6 +684,7 @@ async fn run_session<A: AsrBackend + 'static>(
             &llm_tx,
             &mut last_flushed_text,
             &mut last_flush_at,
+            ctx,
         )
         .await;
         pending_nonfinal.clear();
@@ -709,12 +745,34 @@ async fn run_session<A: AsrBackend + 'static>(
     info!(%session_id, "session stopped");
 }
 
+/// Extract a trailing context window from session_text for LLM disambiguation.
+/// Returns `None` if session_text is empty (first utterance).
+/// Truncates at the nearest word boundary to avoid splitting mid-word.
+fn build_llm_context(session_text: &str) -> Option<String> {
+    let trimmed = session_text.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let ctx = if trimmed.len() <= LLM_CONTEXT_MAX_CHARS {
+        trimmed
+    } else {
+        let start = trimmed.len() - LLM_CONTEXT_MAX_CHARS;
+        // Find the nearest word boundary after the cut point.
+        match trimmed[start..].find(' ') {
+            Some(pos) => &trimmed[start + pos + 1..],
+            None => &trimmed[start..],
+        }
+    };
+    Some(format!("Context: {ctx}\n"))
+}
+
 /// Forward ASR text to the LLM worker without ASR-side post-processing.
 async fn flush_to_llm(
     utterance: &str,
     dict: &Mutex<DictionaryManager>,
     style_preset: &Arc<StylePreset>,
     llm_tx: &mpsc::Sender<LlmRequest>,
+    context: Option<String>,
 ) {
     let (text, dictionary) = {
         let guard = dict.lock().await;
@@ -730,6 +788,7 @@ async fn flush_to_llm(
         text,
         style_preset: Arc::clone(style_preset),
         dictionary,
+        context,
     };
     if let Err(e) = llm_tx.send(req).await {
         warn!(error = %e, "LLM worker unavailable");
@@ -743,6 +802,7 @@ async fn flush_to_llm_if_new(
     llm_tx: &mpsc::Sender<LlmRequest>,
     last_flushed_text: &mut String,
     last_flush_at: &mut tokio::time::Instant,
+    context: Option<String>,
 ) -> bool {
     let normalized = normalize_whitespace(utterance);
     if normalized.is_empty() {
@@ -756,7 +816,7 @@ async fn flush_to_llm_if_new(
         return false;
     }
 
-    flush_to_llm(&normalized, dict, style_preset, llm_tx).await;
+    flush_to_llm(&normalized, dict, style_preset, llm_tx, context).await;
     *last_flushed_text = normalized;
     *last_flush_at = now;
     true
@@ -778,7 +838,13 @@ async fn commit_final_text(
         return;
     }
 
-    let needs_space = !session_text.is_empty();
+    // Skip the separator when the new text starts with punctuation that
+    // attaches to the preceding word (commas, periods, etc.).
+    let starts_with_punct = trimmed
+        .as_bytes()
+        .first()
+        .is_some_and(|&b| matches!(b, b',' | b'.' | b'!' | b'?' | b';' | b':' | b')' | b']'));
+    let needs_space = !session_text.is_empty() && !starts_with_punct;
     let mut payload = String::with_capacity(trimmed.len() + usize::from(needs_space));
     if needs_space {
         payload.push(' ');
@@ -927,7 +993,14 @@ mod tests {
         let (llm_tx, mut llm_rx) = mpsc::channel(1);
         let style_preset = Arc::new(StylePreset::general());
 
-        flush_to_llm("i use lune voice daily", &dict, &style_preset, &llm_tx).await;
+        flush_to_llm(
+            "i use lune voice daily",
+            &dict,
+            &style_preset,
+            &llm_tx,
+            None,
+        )
+        .await;
 
         let req = llm_rx.try_recv().expect("request should be enqueued");
         assert_eq!(req.text, "i use Lune Voice daily");
@@ -953,6 +1026,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn commit_final_text_no_space_before_punctuation() {
+        let (tx, mut rx) = mpsc::channel(8);
+        let mut output_ctrl = TextOutputController::new(tx);
+        let mut session_text = String::new();
+
+        commit_final_text(&mut output_ctrl, &mut session_text, "Hello").await;
+        commit_final_text(&mut output_ctrl, &mut session_text, ", world").await;
+        commit_final_text(&mut output_ctrl, &mut session_text, ". Done").await;
+
+        let first = rx.try_recv().expect("first");
+        let second = rx.try_recv().expect("second");
+        let third = rx.try_recv().expect("third");
+        assert!(matches!(first, SessionEvent::FinalizedText(t) if t == "Hello"));
+        assert!(matches!(second, SessionEvent::FinalizedText(t) if t == ", world"));
+        assert!(matches!(third, SessionEvent::FinalizedText(t) if t == ". Done"));
+        assert_eq!(session_text, "Hello, world. Done");
+    }
+
+    #[tokio::test]
     async fn flush_to_llm_if_new_suppresses_duplicate_within_window() {
         let dict =
             lune_dict::DictionaryManager::new(lune_persist::Database::open_in_memory().unwrap())
@@ -970,6 +1062,7 @@ mod tests {
             &llm_tx,
             &mut last_flushed_text,
             &mut last_flush_at,
+            None,
         )
         .await;
         let second = flush_to_llm_if_new(
@@ -979,6 +1072,7 @@ mod tests {
             &llm_tx,
             &mut last_flushed_text,
             &mut last_flush_at,
+            None,
         )
         .await;
 
@@ -997,9 +1091,40 @@ mod tests {
             &llm_tx,
             &mut last_flushed_text,
             &mut last_flush_at,
+            None,
         )
         .await;
         assert!(third);
+    }
+
+    #[test]
+    fn build_llm_context_empty_returns_none() {
+        assert!(build_llm_context("").is_none());
+        assert!(build_llm_context("   ").is_none());
+    }
+
+    #[test]
+    fn build_llm_context_short_text_returns_full() {
+        let ctx = build_llm_context("Hello world.").unwrap();
+        assert_eq!(ctx, "Context: Hello world.\n");
+    }
+
+    #[test]
+    fn build_llm_context_truncates_at_word_boundary() {
+        // Create a string longer than LLM_CONTEXT_MAX_CHARS (500).
+        let long = "word ".repeat(200); // 1000 chars
+        let ctx = build_llm_context(&long).unwrap();
+        assert!(ctx.starts_with("Context: "));
+        assert!(ctx.ends_with('\n'));
+        // Should be <= 500 chars of actual context + "Context: " prefix + newline.
+        let inner = ctx
+            .strip_prefix("Context: ")
+            .unwrap()
+            .strip_suffix('\n')
+            .unwrap();
+        assert!(inner.len() <= LLM_CONTEXT_MAX_CHARS);
+        // Should not start with a partial word.
+        assert!(!inner.starts_with(' '));
     }
 
     #[test]

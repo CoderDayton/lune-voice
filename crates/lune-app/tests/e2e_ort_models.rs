@@ -149,6 +149,7 @@ fn llm_input(raw_text: &str) -> PostProcessInput {
         style_preset: Arc::new(StylePreset::general()),
         app_category: None,
         dictionary: vec![],
+        context: None,
     }
 }
 
@@ -310,6 +311,155 @@ async fn llm_streaming_matches_non_streaming() {
 
     assert_eq!(direct.cleaned_text, streaming.cleaned_text);
     assert!(!chunks.is_empty());
+}
+
+/// Verify that providing prior context doesn't break LLM output and the context
+/// text appears in the generated prompt (checked via non-empty, non-hallucinated output).
+#[tokio::test]
+#[ignore = "requires models/qwen3-0.6b-onnx on disk"]
+async fn llm_with_context_produces_valid_output() {
+    let llm = match get_llm() {
+        Some(b) => b,
+        None => return,
+    };
+
+    let context_text =
+        "Context: The queen mother gave the French the most affectionate reception.\n";
+    let input_with_ctx = PostProcessInput {
+        raw_text: "she had suffered too much unhappyness in England".into(),
+        style_preset: Arc::new(StylePreset::general()),
+        app_category: None,
+        dictionary: vec![],
+        context: Some(context_text.into()),
+    };
+    let input_without_ctx = PostProcessInput {
+        context: None,
+        ..input_with_ctx.clone()
+    };
+
+    let t = Instant::now();
+    let with_ctx = llm.transform(&input_with_ctx).await.unwrap();
+    let ctx_time = t.elapsed();
+
+    let t = Instant::now();
+    let without_ctx = llm.transform(&input_without_ctx).await.unwrap();
+    let no_ctx_time = t.elapsed();
+
+    eprintln!(
+        "[llm_context] with_ctx ({ctx_time:?}): {:?}",
+        with_ctx.cleaned_text
+    );
+    eprintln!(
+        "[llm_context] without_ctx ({no_ctx_time:?}): {:?}",
+        without_ctx.cleaned_text
+    );
+
+    // Both should produce non-empty output containing key words.
+    assert!(!with_ctx.cleaned_text.is_empty());
+    assert!(!without_ctx.cleaned_text.is_empty());
+    let lower = with_ctx.cleaned_text.to_lowercase();
+    assert!(
+        lower.contains("england") || lower.contains("suffered"),
+        "context output should contain key words from input, got: {:?}",
+        with_ctx.cleaned_text
+    );
+}
+
+/// Full pipeline using the real `SessionManager` with file audio.
+///
+/// Exercises the complete path: AudioStream → VAD → ASR → confidence gate →
+/// LLM (with sliding context) → commit_final_text → session_text.
+/// The only difference from a live session is the audio source.
+#[tokio::test]
+#[ignore = "requires both model directories on disk"]
+async fn full_pipeline_real_session() {
+    use lune_app::{SessionManager, SessionManagerConfig};
+    use lune_audio::{AudioConfig, AudioStream};
+    use lune_core::asr::AsrBackendKind;
+    use lune_core::config::UserSettings;
+    use lune_core::session::SessionEvent;
+    use tokio::sync::{Mutex, RwLock, mpsc};
+
+    let asr = match get_asr() {
+        Some(b) => Arc::clone(b),
+        None => return,
+    };
+    let llm: Arc<dyn TextPostProcessor> = match get_llm() {
+        Some(b) => Arc::clone(b) as _,
+        None => return,
+    };
+
+    let wav_path = workspace_root().join("test_fixtures/librispeech_clean.wav");
+    if !wav_path.exists() {
+        eprintln!("[real_session] skipping — no wav file");
+        return;
+    }
+    let samples = load_wav_f32(&wav_path);
+    let audio_stream = AudioStream::from_samples(&samples, AudioConfig::default());
+
+    let db = lune_persist::Database::open_in_memory().unwrap();
+    let dict = lune_dict::DictionaryManager::new(lune_persist::Database::open_in_memory().unwrap())
+        .unwrap();
+    let settings = Arc::new(RwLock::new(UserSettings::default()));
+
+    let config = SessionManagerConfig {
+        asr_backend_kind: AsrBackendKind::QwenAsr,
+        ..SessionManagerConfig::default()
+    };
+
+    let mgr = SessionManager::new(
+        asr,
+        Arc::new(lune_commands::VoiceCommandRouter::new()),
+        llm,
+        Arc::new(Mutex::new(dict)),
+        Arc::new(Mutex::new(db)),
+        config,
+        settings,
+    );
+
+    let (event_tx, mut event_rx) = mpsc::channel::<SessionEvent>(256);
+
+    tokio::task::LocalSet::new()
+        .run_until(async {
+            let _id = mgr
+                .start_with_audio(event_tx, audio_stream)
+                .await
+                .expect("start session");
+
+            let mut final_text = String::new();
+            let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(120);
+
+            loop {
+                let event = tokio::time::timeout_at(deadline, event_rx.recv()).await;
+                match event {
+                    Ok(Some(SessionEvent::FinalizedText(t))) => {
+                        eprintln!("[real_session] chunk: {t:?}");
+                        final_text.push_str(&t);
+                    }
+                    Ok(Some(SessionEvent::Stopped)) => break,
+                    Ok(Some(_)) => {} // PartialText, Started, etc.
+                    Ok(None) => break,
+                    Err(_) => {
+                        eprintln!("[real_session] timeout waiting for events");
+                        mgr.stop().await;
+                        break;
+                    }
+                }
+            }
+
+            eprintln!("[real_session] output: {final_text:?}");
+
+            assert!(
+                !final_text.is_empty(),
+                "real pipeline should produce text from speech audio"
+            );
+            // Verify no stray spaces before punctuation (the commit_final_text fix).
+            assert!(
+                !final_text.contains(" ,") && !final_text.contains(" ."),
+                "should not have spaces before punctuation, got: {final_text:?}"
+            );
+        })
+        .await;
 }
 
 // ── Full Pipeline ───────────────────────────────────────────────────────────

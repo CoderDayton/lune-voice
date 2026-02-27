@@ -209,6 +209,7 @@ mod tests {
             style_preset: Arc::new(StylePreset::general()),
             app_category: None,
             dictionary: vec![],
+            context: None,
         }
     }
 
@@ -252,6 +253,7 @@ mod tests {
             style_preset: Arc::new(preset),
             app_category: None,
             dictionary: vec![],
+            context: None,
         };
         let msgs = build_messages(&input);
         let json = serde_json::to_string(&msgs).unwrap();
