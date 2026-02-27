@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/lune-audio-logo-s-512.svg" width="180" alt="Lune Voice" />
+<img src="assets/lune-audio-logo-s-512.png" width="180" alt="Lune Voice" />
 
 # Lune Voice
 
