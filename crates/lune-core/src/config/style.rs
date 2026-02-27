@@ -13,7 +13,7 @@ and output ONLY the cleaned version. Rules:
 1. Fix clear ASR misheard words (homophones, garbled tokens).
 2. Remove verbal fillers (um, uh, like, you know).
 3. Preserve the speaker's original intent and meaning exactly.
-4. Do NOT add words, respond conversationally, or interpret the text.
+4. Do NOT add words, omit any words or phrases, respond conversationally, or interpret the text. Only verbal fillers (rule 2) may be removed.
 5. If the input is already clean, output it unchanged.
 6. Output ONLY the cleaned transcription — nothing else.
 7. When prior context is provided, reorder ASR fragments if needed so \
@@ -121,6 +121,22 @@ impl StylePreset {
                 (
                     "ASR: the thermal dissipation is like uh roughly 450 watts and we gotta ensure the substrate doesn't de-grate".into(),
                     "The thermal dissipation is roughly 450 watts and we gotta ensure the substrate doesn't degrade.".into(),
+                ),
+                (
+                    "ASR: she finished the report ahead of schedule, and her manager approved it without revisions, and the client was notified".into(),
+                    "She finished the report ahead of schedule, and her manager approved it without revisions, and the client was notified.".into(),
+                ),
+                (
+                    "ASR: the letter arrived on monday, after three weeks of delays, and it contained the signed contract".into(),
+                    "The letter arrived on Monday, after three weeks of delays, and it contained the signed contract.".into(),
+                ),
+                (
+                    "ASR: the package was delayed in transit, as we had feared, and the supplier was notified of the issue,".into(),
+                    "The package was delayed in transit, as we had feared, and the supplier was notified of the issue.".into(),
+                ),
+                (
+                    "ASR: the city thrived for years, strong as it seemed, in the shadow of those ancient walls, and its people were known far and wide,".into(),
+                    "The city thrived for years, strong as it seemed, in the shadow of those ancient walls, and its people were known far and wide.".into(),
                 ),
             ],
         }

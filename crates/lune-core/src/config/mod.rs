@@ -41,7 +41,7 @@ mod tests {
         let json = serde_json::to_string(&preset).unwrap();
         let parsed: StylePreset = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.id, "general");
-        assert_eq!(parsed.few_shot_pairs.len(), 4);
+        assert!(!parsed.few_shot_pairs.is_empty());
     }
 
     #[test]

@@ -229,8 +229,11 @@ mod tests {
         let input = test_input("hello um world");
         let msgs = build_messages(&input);
 
-        // system + 4 few-shot pairs (8 msgs) + 1 final user = 10
-        assert_eq!(msgs.len(), 10);
+        // system + N few-shot pairs (2*N msgs) + 1 final user
+        let n = lune_core::config::StylePreset::general()
+            .few_shot_pairs
+            .len();
+        assert_eq!(msgs.len(), 1 + 2 * n + 1);
 
         let json = serde_json::to_string(&msgs).unwrap();
         assert!(json.contains("hello um world"));
