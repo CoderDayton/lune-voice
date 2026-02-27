@@ -118,6 +118,74 @@ _CALIB_TEXTS: list[str] = [
 ]
 
 
+def _repack_matmulnbits_zero_points(model: onnx.ModelProto) -> None:
+    """Repack MatMulNBits zero_points from byte-per-nibble to nibble-packed.
+
+    NNCF stores INT4 zero points as one uint8 byte per value (shape [N, n_groups]).
+    ORT's MatMulNBits requires two zero points packed per byte — lo nibble then hi
+    nibble — giving shape [N, ceil(n_groups/2)].  Without this, ORT raises a shape
+    mismatch error at model load time.
+    """
+    import numpy as np
+    from onnx import numpy_helper
+
+    init_idx = {init.name: i for i, init in enumerate(model.graph.initializer)}
+
+    for node in model.graph.node:
+        if node.op_type != "MatMulNBits" or len(node.input) < 4:
+            continue
+        zp_name = node.input[3]
+        if not zp_name or zp_name not in init_idx:
+            continue
+
+        attrs = {a.name: a for a in node.attribute}
+        K = attrs["K"].i
+        block_size = attrs["block_size"].i
+        n_groups = (K + block_size - 1) // block_size
+        expected_cols = (n_groups + 1) // 2  # bytes per output row after packing
+
+        init = model.graph.initializer[init_idx[zp_name]]
+        arr = numpy_helper.to_array(init)
+
+        if arr.ndim != 2 or arr.shape[-1] == expected_cols:
+            continue  # already packed or unexpected layout — leave as-is
+
+        if arr.shape[-1] == n_groups:
+            N_rows = arr.shape[0]
+            if n_groups % 2 != 0:
+                arr = np.concatenate([arr, np.zeros((N_rows, 1), dtype=arr.dtype)], axis=1)
+            lo = arr[:, 0::2].astype(np.uint8) & 0x0F
+            hi = arr[:, 1::2].astype(np.uint8) & 0x0F
+            packed = lo | (hi << 4)
+            model.graph.initializer[init_idx[zp_name]].CopyFrom(
+                numpy_helper.from_array(packed, name=zp_name)
+            )
+
+
+def _cast_matmulnbits_scales_fp16(model: onnx.ModelProto) -> None:
+    """Cast float32 scales in MatMulNBits nodes to float16 in-place.
+
+    NNCF stores quantization scales as float32 by default. ORT's MatMulNBits
+    requires the scale type (T1) to match the activation type. Since our models
+    are exported in FP16, mismatched scales cause a Type Error at load time.
+    """
+    import numpy as np
+    from onnx import numpy_helper
+
+    init_idx = {init.name: i for i, init in enumerate(model.graph.initializer)}
+
+    for node in model.graph.node:
+        if node.op_type == "MatMulNBits" and len(node.input) >= 3:
+            scale_name = node.input[2]
+            if scale_name in init_idx:
+                init = model.graph.initializer[init_idx[scale_name]]
+                if init.data_type == onnx.TensorProto.FLOAT:
+                    arr = numpy_helper.to_array(init).astype(np.float16)
+                    model.graph.initializer[init_idx[scale_name]].CopyFrom(
+                        numpy_helper.from_array(arr, name=scale_name)
+                    )
+
+
 def _wrap_inputs_with_identity(model: onnx.ModelProto) -> None:
     """In-place: prepend Identity nodes after each graph input.
 
@@ -238,6 +306,10 @@ def quantize_int4_nncf(
     common_kwargs: dict = dict(
         mode=nncf.CompressWeightsMode.INT4_ASYM,
         ratio=1.0,
+        # Keep backup layers (lm_head) at original fp16 — NNCF's int8 dequantize
+        # pattern emits float32 which causes a type mismatch with fp16 activations
+        # in ORT. BackupMode.NONE avoids the int8 path entirely.
+        backup_mode=nncf.BackupMode.NONE,
         awq=True,
         scale_estimation=True,
         subset_size=len(_CALIB_TEXTS),
@@ -262,6 +334,13 @@ def quantize_int4_nncf(
         common_kwargs["scale_estimation"] = False
         compressed = nncf.compress_weights(onnx_model, group_size=-1, **common_kwargs)
         group_desc = "per-channel"
+
+    # ORT requires MatMulNBits scale type (T1) to match activation dtype (fp16).
+    # NNCF emits scales as float32 by default — cast them to fp16 before saving.
+    _cast_matmulnbits_scales_fp16(compressed)
+    # ORT requires zero_points nibble-packed (2 INT4 per byte).
+    # NNCF stores one INT4 per byte — repack before saving.
+    _repack_matmulnbits_zero_points(compressed)
 
     _save_consolidated(compressed, model_path)
     print(f"  {model_path.name}: INT4 AWQ+SE ({group_desc}) complete")
