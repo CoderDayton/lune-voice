@@ -38,6 +38,12 @@ pub struct VadConfig {
     /// Lower than start threshold to prevent premature speech-end
     /// detection during pauses within sentences.
     pub threshold_end: f32,
+    /// Hangover duration in milliseconds. Default: 30
+    ///
+    /// After the VAD score drops below `threshold_end`, keep reporting
+    /// `is_speech = true` for this many milliseconds. Protects trailing
+    /// phonemes from being cut off before the ASR finalizes the last word.
+    pub hangover_ms: u32,
 }
 
 impl Default for VadConfig {
@@ -45,6 +51,7 @@ impl Default for VadConfig {
         Self {
             threshold: 0.7,
             threshold_end: 0.3,
+            hangover_ms: 30,
         }
     }
 }
@@ -56,6 +63,10 @@ pub struct Vad {
     threshold_end: f32,
     /// Hysteresis state: true while in a speech region.
     in_speech: bool,
+    /// Hangover: samples remaining before `in_speech` can transition to false.
+    hangover_remaining: usize,
+    /// Total hangover in samples (computed from `hangover_ms` at init).
+    hangover_total: usize,
     /// Reusable buffer for f32 → i16 conversion (avoids per-call allocation).
     i16_buf: Vec<i16>,
 }
@@ -69,11 +80,15 @@ impl Vad {
     pub fn new(config: VadConfig, _sample_rate: u32) -> Self {
         let inner = TenVad::new_from_bytes(TEN_VAD_MODEL, 16000)
             .expect("failed to initialize TEN VAD from embedded model");
+        let hangover_samples = (config.hangover_ms as usize * 16) // 16 samples per ms at 16kHz
+            .max(HOP_SIZE); // at least one frame
         Self {
             inner,
             threshold_start: config.threshold,
             threshold_end: config.threshold_end,
             in_speech: false,
+            hangover_remaining: 0,
+            hangover_total: hangover_samples,
             i16_buf: Vec::with_capacity(HOP_SIZE * 20), // ~320ms at 16kHz
         }
     }
@@ -114,11 +129,26 @@ impl Vad {
             offset += HOP_SIZE;
         }
 
-        // Hysteresis: higher threshold to enter speech, lower to exit.
-        let is_speech = if self.in_speech {
+        // Hysteresis with hangover: higher threshold to enter speech,
+        // lower to exit, plus a time-based hangover that keeps `is_speech`
+        // true for N samples after the score drops. This protects trailing
+        // phonemes from being cut off before ASR finalizes the last word.
+        let score_is_speech = if self.in_speech {
             max_score >= self.threshold_end
         } else {
             max_score >= self.threshold_start
+        };
+
+        let is_speech = if score_is_speech {
+            // Score says speech — reset hangover counter.
+            self.hangover_remaining = self.hangover_total;
+            true
+        } else if self.hangover_remaining > 0 {
+            // Score dropped but hangover is active — still report speech.
+            self.hangover_remaining = self.hangover_remaining.saturating_sub(samples.len());
+            true
+        } else {
+            false
         };
         self.in_speech = is_speech;
 

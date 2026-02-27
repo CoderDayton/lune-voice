@@ -46,8 +46,11 @@ pub const SILENCE_TIER_SPECULATIVE: usize = 800;
 pub const SILENCE_TIER_HIGH: usize = 1_280;
 /// >= 80% confidence: moderate — ~120ms (1920 samples).
 pub const SILENCE_TIER_MODERATE: usize = 1_920;
-/// < 80% or unknown: conservative — ~250ms (4000 samples).
-pub const SILENCE_TIER_DEFAULT: usize = 4_000;
+/// < 80% or unknown: conservative — ~320ms (5120 samples).
+/// Combined with 30ms VAD hangover, effective wait is ~350ms — provides
+/// 100ms total tail protection for uncertain segments where a false flush
+/// would cause the LLM correction pass to fail.
+pub const SILENCE_TIER_DEFAULT: usize = 5_120;
 
 #[inline]
 pub fn dynamic_silence_threshold(confidence: Option<f32>, enabled: bool) -> usize {
