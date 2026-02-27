@@ -34,8 +34,10 @@ ort.workspace = true
 zbus.workspace = true
 enigo.workspace = true
 arboard.workspace = true
-evdev.workspace = true
 mimalloc.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+evdev.workspace = true
 
 [dev-dependencies]
 hound = "3.5"

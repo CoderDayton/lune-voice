@@ -10,6 +10,7 @@ mod dbus;
 mod delivery;
 mod events;
 mod factory;
+#[cfg(unix)]
 mod uinput_typer;
 
 use std::sync::Arc;
@@ -264,8 +265,11 @@ async fn run_pipeline(
 
     // ── Signal handler for graceful shutdown ──────────────────────────────
 
-    let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-        .expect("register SIGTERM handler");
+    // SIGTERM: resolves on Unix when the process receives SIGTERM; on other
+    // platforms this future never resolves (pending forever), which is correct
+    // since those platforms don't have SIGTERM.
+    let sigterm = wait_for_sigterm();
+    tokio::pin!(sigterm);
 
     // ── Command loop ─────────────────────────────────────────────────────
 
@@ -278,7 +282,7 @@ async fn run_pipeline(
                 update_state(&shared_state, dbus_conn, AppStateUpdate::Idle).await;
                 break;
             }
-            _ = sigterm.recv() => {
+            _ = &mut sigterm => {
                 tracing::info!("SIGTERM received, shutting down");
                 manager.stop().await;
                 update_state(&shared_state, dbus_conn, AppStateUpdate::Idle).await;
@@ -494,6 +498,19 @@ async fn update_state(
     if let Err(e) = dbus::emit_state_changed(conn, state_str).await {
         tracing::warn!(error = %e, "failed to emit state_changed signal");
     }
+}
+
+/// Resolves when SIGTERM is received on Unix; never resolves on other platforms.
+#[cfg(unix)]
+async fn wait_for_sigterm() {
+    let mut sig = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        .expect("register SIGTERM handler");
+    sig.recv().await;
+}
+
+#[cfg(not(unix))]
+async fn wait_for_sigterm() {
+    std::future::pending::<()>().await
 }
 
 #[cfg(test)]

@@ -3,7 +3,22 @@ use std::sync::mpsc;
 use lune_core::config::DictationMode;
 use tracing::{debug, warn};
 
+#[cfg(unix)]
 use crate::uinput_typer::UinputTyper;
+
+/// Stub for non-Linux platforms where uinput is unavailable.
+#[cfg(not(unix))]
+struct UinputTyper;
+#[cfg(not(unix))]
+impl UinputTyper {
+    fn new() -> Result<Self, String> {
+        Err("uinput not supported on this platform".to_owned())
+    }
+    fn type_str(&mut self, _: &str) {}
+    fn has_unmapped_chars(_: &str) -> bool {
+        true
+    }
+}
 
 /// Message sent to the persistent delivery thread.
 struct DeliveryMsg {
