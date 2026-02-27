@@ -77,11 +77,23 @@ impl OrtForcedAligner {
     ///
     /// Returns words sorted by `start_ms`. If the returned order differs from
     /// the original word order in `text`, the caller should emit a correction.
+    ///
+    /// PCM is capped at `MAX_ALIGN_SAMPLES` (8 s) before mel extraction.
+    /// The encoder was fine-tuned on ≤ 8 s windows; longer inputs produce
+    /// garbage timestamps in the second half.
     pub fn align(&self, pcm: &[f32], text: &str) -> Result<Vec<WordTimestamp>> {
         let words: Vec<&str> = text.split_whitespace().collect();
         if words.is_empty() {
             return Ok(vec![]);
         }
+
+        // Cap to the encoder's training window — same constraint as the ASR decoder.
+        const MAX_ALIGN_SAMPLES: usize = 8 * 16_000; // 8 s @ 16 kHz
+        let pcm = if pcm.len() > MAX_ALIGN_SAMPLES {
+            &pcm[..MAX_ALIGN_SAMPLES]
+        } else {
+            pcm
+        };
 
         // ── 1. Mel → encoder → audio features [1, enc_len, HIDDEN_DIM] ──────
         let mel_f32 = compute_qwen_mel(pcm);

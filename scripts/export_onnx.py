@@ -221,6 +221,7 @@ def quantize_int4_nncf(
     num_layers: int,
     num_kv_heads: int,
     head_dim: int,
+    fa_mode: bool = False,
 ) -> None:
     """INT4 weight-only quantization via NNCF AWQ + Scale Estimation.
 
@@ -264,6 +265,11 @@ def quantize_int4_nncf(
         embeds = embed_sess.run(["embeds"], {"input_ids": ids})[0]  # [1, S, H]
         seq = embeds.shape[1]
         pos = np.arange(seq, dtype=np.int64)
+
+        if fa_mode:
+            # FA decoder: NAR, no KV cache, standard [1, S] position_ids.
+            return {"inputs_embeds": embeds, "position_ids": pos.reshape(1, seq)}
+
         pos_ids = (
             np.broadcast_to(pos, (3, 1, seq)).copy()  # mrope: ASR
             if pos_ndim == 3
@@ -790,6 +796,169 @@ def export_asr(
     _list_files(output_dir)
 
 
+# ── FA Wrapper ────────────────────────────────────────────────────────────────
+
+
+class ForcedAlignerDecoderWrapper(nn.Module):
+    """NAR forced-aligner decoder: single forward pass, no KV cache.
+
+    `thinker.lm_head` is the timestamp head (Linear(hidden_size, classify_num))
+    when `model_type` includes "forced_aligner" — the model __init__ already
+    replaces the vocabulary head with the timestamp classification head.
+    """
+
+    def __init__(self, thinker):
+        super().__init__()
+        self.text_model = thinker.model
+        # For FA checkpoints, lm_head is Linear(hidden_size, classify_num).
+        self.timestamp_head = thinker.lm_head
+
+    @torch.no_grad()
+    def forward(
+        self,
+        inputs_embeds: torch.Tensor,   # [1, S, H]  f16
+        position_ids: torch.Tensor,    # [1, S]     i64
+    ) -> torch.Tensor:                 # [1, S, classify_num]  f16
+        out = self.text_model(
+            inputs_embeds=inputs_embeds,
+            position_ids=position_ids,
+            use_cache=False,
+        )
+        return self.timestamp_head(out[0]).to(DTYPE)
+
+
+# ── FA Export ─────────────────────────────────────────────────────────────────
+
+
+def export_forcedaligner(
+    output_dir: Path,
+    asr_dir: Path,
+    model_id: str = "Qwen/Qwen3-ForcedAligner-0.6B",
+    quantize: bool = True,
+) -> None:
+    """Export Qwen3-ForcedAligner-0.6B FA decoder to ONNX (INT4).
+
+    The encoder and embed_tokens are REUSED from `asr_dir` — they share weights
+    with the ASR model. Only the NAR FA decoder (no KV cache, timestamp head) is
+    exported to `output_dir`.
+
+    Writes `fa_config.json` with timestamp_token_id, timestamp_segment_ms,
+    and timestamp_classes for the Rust `OrtForcedAligner`.
+    """
+    import json
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    print(f"[FA] Exporting {model_id} → {output_dir}")
+    print(f"[FA] Reusing encoder/embed_tokens from {asr_dir}")
+
+    from transformers import AutoProcessor
+    from qwen_asr.core.transformers_backend.modeling_qwen3_asr import (
+        Qwen3ASRForConditionalGeneration,
+    )
+
+    processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
+    full_model = Qwen3ASRForConditionalGeneration.from_pretrained(
+        model_id,
+        trust_remote_code=True,
+        dtype=DTYPE,
+        attn_implementation="eager",
+    )
+    full_model.eval()
+
+    thinker = full_model.thinker
+    text_config = thinker.config.text_config
+    num_layers = text_config.num_hidden_layers
+    num_kv_heads = getattr(text_config, "num_key_value_heads", text_config.num_attention_heads)
+    head_dim = getattr(text_config, "head_dim", text_config.hidden_size // text_config.num_attention_heads)
+    hidden_size = text_config.hidden_size
+
+    # Timestamp head output size (classify_num / num_timestamps).
+    timestamp_classes = thinker.lm_head.out_features
+    # Timestamp segment duration — each class bucket is 80 ms (1 mel frame = 10 ms,
+    # Qwen-ASR uses 8 mel frames per encoder step → 80 ms per timestamp class).
+    timestamp_segment_ms = getattr(thinker.config, "timestamp_segment_ms", 80)
+    # Timestamp token ID — the special <|ts|> token appended to each word.
+    timestamp_token_id: int | None = getattr(thinker.config, "timestamp_token_id", None)
+    if timestamp_token_id is None:
+        # Fallback: search the tokenizer vocabulary for the TS token.
+        for candidate in ("<|ts|>", "<ts>", "<|timestamp|>"):
+            tid = processor.tokenizer.convert_tokens_to_ids(candidate)
+            if tid != processor.tokenizer.unk_token_id:
+                timestamp_token_id = int(tid)
+                print(f"[FA]   Found timestamp token {candidate!r} → id={timestamp_token_id}")
+                break
+    if timestamp_token_id is None:
+        raise RuntimeError(
+            "Could not determine timestamp_token_id from model config or tokenizer. "
+            "Set thinker.config.timestamp_token_id or add the token to the vocabulary."
+        )
+
+    print(
+        f"[FA] Architecture: {num_layers}L, {hidden_size}H, "
+        f"{num_kv_heads}KV, {head_dim}D, ts_classes={timestamp_classes}"
+    )
+
+    # ── 1. Export FA decoder ─────────────────────────────────────────────
+    print("[FA]   Exporting qwen3-fa-decoder.onnx ...")
+    fa_dec = ForcedAlignerDecoderWrapper(thinker)
+    fa_dec.eval()
+
+    seq_len = 20  # typical: prefix (4) + enc (~10) + words (~6)
+    dummy_embeds = torch.randn(1, seq_len, hidden_size, dtype=DTYPE)
+    dummy_pos = torch.arange(seq_len, dtype=torch.long).unsqueeze(0)  # [1, S]
+
+    seq_dim = torch.export.Dim("seq_len", min=2, max=8192)
+    dyn_shapes = ({1: seq_dim}, {1: seq_dim})
+
+    torch.onnx.export(
+        fa_dec,
+        (dummy_embeds, dummy_pos),
+        str(output_dir / "qwen3-fa-decoder.onnx"),
+        input_names=["inputs_embeds", "position_ids"],
+        output_names=["logits"],
+        dynamic_shapes=dyn_shapes,
+    )
+    print("[FA]   qwen3-fa-decoder.onnx exported")
+
+    # ── 2. Consolidate external data ─────────────────────────────────────
+    _consolidate_external_data(output_dir, "qwen3-fa-decoder.onnx")
+
+    # ── 3. INT4 quantize decoder ─────────────────────────────────────────
+    # Reuse ASR embed_tokens for calibration (same weights, same vocabulary).
+    asr_embed_path = asr_dir / "qwen3-asr-embed-tokens.onnx"
+    if quantize:
+        quantize_int4_nncf(
+            output_dir / "qwen3-fa-decoder.onnx",
+            asr_embed_path,
+            model_id,
+            num_layers,
+            num_kv_heads,
+            head_dim,
+            fa_mode=True,
+        )
+
+    # ── 4. Cleanup ────────────────────────────────────────────────────────
+    keep = {"qwen3-fa-decoder.onnx", "qwen3-fa-decoder.onnx_data", "fa_config.json"}
+    for f in output_dir.iterdir():
+        if f.suffix in (".data", ".onnx.data") and f.name not in keep:
+            f.unlink()
+        elif f.name.startswith("onnx__"):
+            f.unlink()
+
+    # ── 5. Write fa_config.json ───────────────────────────────────────────
+    fa_config = {
+        "timestamp_token_id": timestamp_token_id,
+        "timestamp_segment_ms": timestamp_segment_ms,
+        "timestamp_classes": timestamp_classes,
+    }
+    config_path = output_dir / "fa_config.json"
+    config_path.write_text(json.dumps(fa_config, indent=2))
+    print(f"[FA]   fa_config.json: {fa_config}")
+
+    print(f"[FA] Export complete: {output_dir}")
+    _list_files(output_dir)
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 
@@ -799,6 +968,10 @@ def main() -> None:
     )
     parser.add_argument("--llm", action="store_true", help="Export Qwen3-0.6B LLM")
     parser.add_argument("--asr", action="store_true", help="Export Qwen3-ASR-0.6B")
+    parser.add_argument(
+        "--fa", action="store_true",
+        help="Export Qwen3-ForcedAligner-0.6B FA decoder (requires --asr or existing ASR dir)",
+    )
     parser.add_argument(
         "--no-quantize", action="store_true",
         help="Skip INT4 quantization (keep FP16 weights)",
@@ -815,10 +988,18 @@ def main() -> None:
         "--asr-model", default="Qwen/Qwen3-ASR-0.6B",
         help="HuggingFace model ID for ASR",
     )
+    parser.add_argument(
+        "--fa-model", default="Qwen/Qwen3-ForcedAligner-0.6B",
+        help="HuggingFace model ID for the forced aligner",
+    )
+    parser.add_argument(
+        "--asr-dir", type=Path, default=Path("models/qwen3-asr-0.6b-onnx"),
+        help="Directory of exported ASR ONNX files (encoder/embed reused by FA)",
+    )
     args = parser.parse_args()
 
-    if not args.llm and not args.asr:
-        parser.error("Specify --llm, --asr, or both")
+    if not args.llm and not args.asr and not args.fa:
+        parser.error("Specify --llm, --asr, --fa, or a combination")
 
     do_quant = not args.no_quantize
 
@@ -829,6 +1010,10 @@ def main() -> None:
     if args.asr:
         out = args.output_dir or Path("models/qwen3-asr-0.6b-onnx")
         export_asr(out, args.asr_model, quantize=do_quant)
+
+    if args.fa:
+        out = args.output_dir or Path("models/qwen3-fa-0.6b-onnx")
+        export_forcedaligner(out, args.asr_dir, args.fa_model, quantize=do_quant)
 
 
 if __name__ == "__main__":
