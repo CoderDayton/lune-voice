@@ -9,3 +9,4 @@
 
 .ralph-logs/
 models/
+test_fixtures/
