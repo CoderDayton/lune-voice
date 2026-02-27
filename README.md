@@ -31,13 +31,13 @@ Most voice tools either phone home or dump raw transcription with no cleanup. Lu
 
 ```mermaid
 flowchart TD
-    A("🎙️ Microphone") --> B["Mel Spectrogram\n128-band · 16 kHz"]
-    B --> C["Qwen3-ASR 0.6B\nStreaming ONNX Decoder"]
+    A("🎙️ Microphone") --> B["Mel Spectrogram<br/>128-band · 16 kHz"]
+    B --> C["Qwen3-ASR 0.6B<br/>Streaming ONNX Decoder"]
     C --> D{Confidence Gate}
-    D -->|"mean ≥ 0.95 · min-token ≥ 0.70\n87% of segments"| E["Dictionary Apply"]
-    D -->|"below threshold\n13% of segments"| F["Qwen3 0.6B\nLLM Correction"]
+    D -->|"mean ≥ 0.95 · min-token ≥ 0.70<br/>87% of segments"| E["Dictionary Apply"]
+    D -->|"below threshold<br/>13% of segments"| F["Qwen3 0.6B<br/>LLM Correction"]
+    F --> E
     E --> G("✅ Text → Active Window")
-    F --> G
     style A fill:#7c3aed,color:#fff,stroke:none
     style G fill:#059669,color:#fff,stroke:none
     style D fill:#d97706,color:#fff,stroke:none
