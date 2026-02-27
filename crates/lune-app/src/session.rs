@@ -33,12 +33,34 @@ const MIN_SAMPLES_BEFORE_POLL: usize = 3_200;
 /// 200 ms = 3_200 samples — matches natural conversation turn-taking gap
 /// (Stivers et al. 2009: 208 ms mean across 10 languages). Short enough
 /// for responsive end-of-utterance detection while clearing inter-word pauses.
-const SILENCE_FLUSH_SAMPLES: usize = 3_200;
+pub const SILENCE_FLUSH_SAMPLES: usize = 3_200;
 /// Keep forwarding a short silence tail after speech so brief words can still
 /// reach backend chunking thresholds and get committed.
 const ASR_PUSH_HANGOVER_SAMPLES: usize = 8_000; // 500ms @ 16kHz
 /// Suppress immediate duplicate flushes from repeated backend emits.
 const DUPLICATE_FLUSH_WINDOW: Duration = Duration::from_millis(1200);
+
+/// >= 99% confidence: speculative paste — ~50ms (800 samples).
+pub const SILENCE_TIER_SPECULATIVE: usize = 800;
+/// >= 92% confidence: aggressive — ~80ms (1280 samples).
+pub const SILENCE_TIER_HIGH: usize = 1_280;
+/// >= 80% confidence: moderate — ~120ms (1920 samples).
+pub const SILENCE_TIER_MODERATE: usize = 1_920;
+/// < 80% or unknown: conservative — ~250ms (4000 samples).
+pub const SILENCE_TIER_DEFAULT: usize = 4_000;
+
+#[inline]
+pub fn dynamic_silence_threshold(confidence: Option<f32>, enabled: bool) -> usize {
+    if !enabled {
+        return SILENCE_FLUSH_SAMPLES;
+    }
+    match confidence {
+        Some(c) if c >= 0.99 => SILENCE_TIER_SPECULATIVE,
+        Some(c) if c >= 0.92 => SILENCE_TIER_HIGH,
+        Some(c) if c >= 0.80 => SILENCE_TIER_MODERATE,
+        _ => SILENCE_TIER_DEFAULT,
+    }
+}
 
 /// Configuration for the session pipeline.
 #[derive(Clone)]
@@ -49,6 +71,8 @@ pub struct SessionManagerConfig {
     pub confidence_threshold: Option<f32>,
     /// Min single-token confidence threshold. `None` = no word-level gate.
     pub min_token_threshold: Option<f32>,
+    /// Enable confidence-weighted dynamic silence window.
+    pub dynamic_silence: Option<bool>,
 }
 
 impl Default for SessionManagerConfig {
@@ -58,6 +82,7 @@ impl Default for SessionManagerConfig {
             asr_backend_kind: AsrBackendKind::ParakeetTdt,
             confidence_threshold: Some(0.95),
             min_token_threshold: Some(0.7),
+            dynamic_silence: Some(true),
         }
     }
 }
@@ -289,6 +314,8 @@ async fn run_session<A: AsrBackend + 'static>(
     // Resetting Qwen context on every utterance causes repeated streaming
     // cold-start behavior; keep it warm within a session.
     let reset_asr_context_on_flush = !matches!(config.asr_backend_kind, AsrBackendKind::QwenAsr);
+    let dynamic_silence_enabled = config.dynamic_silence.unwrap_or(true);
+    let mut last_asr_confidence: Option<f32> = None;
 
     // ── Main loop ─────────────────────────────────────────────────────────
     loop {
@@ -344,7 +371,8 @@ async fn run_session<A: AsrBackend + 'static>(
                 }
 
                 // TEN VAD is the sole speech authority — no energy pre-gate.
-                let (batch_has_speech, _energy) = vad.process_chunk(&audio_batch);
+                let vad_result = vad.process_chunk(&audio_batch);
+                let batch_has_speech = vad_result.is_speech;
 
                 if batch_has_speech {
                     asr_push_hangover_samples = ASR_PUSH_HANGOVER_SAMPLES;
@@ -424,6 +452,10 @@ async fn run_session<A: AsrBackend + 'static>(
                                 .try_send(SessionEvent::CommandDetected(payload));
                         }
 
+                        if let Some(c) = seg.confidence {
+                            last_asr_confidence = Some(c);
+                        }
+
                         if seg.is_final {
                             if !remaining.is_empty() {
                                 // Two-level confidence gating: sentence mean AND
@@ -494,19 +526,47 @@ async fn run_session<A: AsrBackend + 'static>(
                     was_speaking = true;
                 } else if was_speaking {
                     silence_samples += audio_batch.len();
-                    if silence_samples >= SILENCE_FLUSH_SAMPLES {
+                    let flush_threshold = dynamic_silence_threshold(
+                        last_asr_confidence,
+                        dynamic_silence_enabled,
+                    );
+                    if silence_samples >= flush_threshold {
                         if !pending_nonfinal.is_empty() {
-                            debug!(%session_id, "VAD end-of-speech flush");
-                            let flushed = flush_to_llm_if_new(
-                                &pending_nonfinal,
-                                &dict,
-                                &style_preset,
-                                &llm_tx,
-                                &mut last_flushed_text,
-                                &mut last_flush_at,
-                            )
-                            .await;
-                            sent_to_llm |= flushed;
+                            let speculative = dynamic_silence_enabled
+                                && last_asr_confidence.is_some_and(|c| c >= 0.99);
+                            if speculative {
+                                // High confidence: bypass LLM, paste directly after dictionary.
+                                let applied = { dict.lock().await.apply(&pending_nonfinal) };
+                                debug!(
+                                    %session_id,
+                                    confidence = ?last_asr_confidence,
+                                    text = %applied,
+                                    "dynamic silence flush: speculative paste (>=99%)"
+                                );
+                                commit_final_text(
+                                    &mut output_ctrl,
+                                    &mut session_text,
+                                    &applied,
+                                )
+                                .await;
+                            } else {
+                                debug!(
+                                    %session_id,
+                                    confidence = ?last_asr_confidence,
+                                    flush_ms = flush_threshold * 1000 / 16_000,
+                                    "dynamic silence flush"
+                                );
+                                let flushed = flush_to_llm_if_new(
+                                    &pending_nonfinal,
+                                    &dict,
+                                    &style_preset,
+                                    &llm_tx,
+                                    &mut last_flushed_text,
+                                    &mut last_flush_at,
+                                )
+                                .await;
+                                sent_to_llm |= flushed;
+                            }
                             pending_nonfinal.clear();
                             if reset_asr_context_on_flush
                                 && let Err(e) = asr.reset_context(&asr_session).await
@@ -518,6 +578,7 @@ async fn run_session<A: AsrBackend + 'static>(
                         // inference stops running on every tick after speech.
                         was_speaking = false;
                         silence_samples = 0;
+                        last_asr_confidence = None;
                     }
                 }
             }
@@ -944,5 +1005,59 @@ mod tests {
             normalize_whitespace("  hello   world \n test\t"),
             "hello world test"
         );
+    }
+
+    #[test]
+    fn dynamic_silence_threshold_disabled_returns_static() {
+        assert_eq!(
+            dynamic_silence_threshold(Some(1.0), false),
+            SILENCE_FLUSH_SAMPLES,
+        );
+        assert_eq!(
+            dynamic_silence_threshold(None, false),
+            SILENCE_FLUSH_SAMPLES,
+        );
+    }
+
+    #[test]
+    fn dynamic_silence_threshold_tiers() {
+        // >= 0.99 → speculative
+        assert_eq!(
+            dynamic_silence_threshold(Some(0.99), true),
+            SILENCE_TIER_SPECULATIVE
+        );
+        assert_eq!(
+            dynamic_silence_threshold(Some(1.0), true),
+            SILENCE_TIER_SPECULATIVE
+        );
+        // >= 0.92 → high
+        assert_eq!(
+            dynamic_silence_threshold(Some(0.92), true),
+            SILENCE_TIER_HIGH
+        );
+        assert_eq!(
+            dynamic_silence_threshold(Some(0.98), true),
+            SILENCE_TIER_HIGH
+        );
+        // >= 0.80 → moderate
+        assert_eq!(
+            dynamic_silence_threshold(Some(0.80), true),
+            SILENCE_TIER_MODERATE
+        );
+        assert_eq!(
+            dynamic_silence_threshold(Some(0.91), true),
+            SILENCE_TIER_MODERATE
+        );
+        // < 0.80 → default
+        assert_eq!(
+            dynamic_silence_threshold(Some(0.79), true),
+            SILENCE_TIER_DEFAULT
+        );
+        assert_eq!(
+            dynamic_silence_threshold(Some(0.0), true),
+            SILENCE_TIER_DEFAULT
+        );
+        // None → default
+        assert_eq!(dynamic_silence_threshold(None, true), SILENCE_TIER_DEFAULT);
     }
 }

@@ -246,6 +246,7 @@ async fn run_pipeline(
         asr_backend_kind,
         confidence_threshold: snap.confidence_threshold,
         min_token_threshold: snap.min_token_threshold,
+        dynamic_silence: snap.dynamic_silence,
         ..Default::default()
     };
 

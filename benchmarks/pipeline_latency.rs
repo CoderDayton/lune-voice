@@ -9,6 +9,13 @@
 
 use std::time::{Duration, Instant};
 
+use lune_app::{
+    SILENCE_FLUSH_SAMPLES, SILENCE_TIER_DEFAULT, SILENCE_TIER_HIGH, SILENCE_TIER_MODERATE,
+    SILENCE_TIER_SPECULATIVE, dynamic_silence_threshold,
+};
+
+const SAMPLE_RATE: usize = 16_000;
+
 fn main() {
     println!();
     println!("╔══════════════════════════════════════════════════════════════════╗");
@@ -24,6 +31,9 @@ fn main() {
 
     // ── Stage 3: Full pipeline simulation ────────────────────────────────────
     bench_full_pipeline_sim();
+
+    // ── Stage 4: Dynamic silence tiers ───────────────────────────────────────
+    bench_dynamic_silence();
 
     // ── Summary ──────────────────────────────────────────────────────────────
     print_latency_budget();
@@ -120,9 +130,38 @@ fn bench_full_pipeline_sim() {
     println!("  Simulates: audio chunk → infer → word accumulator → LLM flush → delivery");
     println!();
 
+    // Dynamic silence: resolve tier from confidence using the real function.
     let configs = [
-        ("8-word flush (current)", 8usize, 200u64, 75u64),
-        ("Silence-only (old)", usize::MAX, 500, 100),
+        (
+            "High confidence (>=99%)",
+            8usize,
+            samples_to_ms(dynamic_silence_threshold(Some(0.99), true)),
+            75u64,
+        ),
+        (
+            "Good confidence (>=92%)",
+            8,
+            samples_to_ms(dynamic_silence_threshold(Some(0.95), true)),
+            75,
+        ),
+        (
+            "Moderate confidence (>=80%)",
+            8,
+            samples_to_ms(dynamic_silence_threshold(Some(0.85), true)),
+            75,
+        ),
+        (
+            "Low/unknown confidence",
+            8,
+            samples_to_ms(dynamic_silence_threshold(None, true)),
+            75,
+        ),
+        (
+            "Dynamic silence disabled",
+            8,
+            samples_to_ms(dynamic_silence_threshold(Some(0.99), false)),
+            75,
+        ),
     ];
 
     for (label, words_per_flush, silence_ms, inference_ms) in &configs {
@@ -191,6 +230,87 @@ fn bench_full_pipeline_sim() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Stage 4: Dynamic silence tiers (exercises real function)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn bench_dynamic_silence() {
+    println!("── Stage 4: Dynamic Silence Tiers (real function) ────────────────");
+    println!("  Exercises dynamic_silence_threshold() from lune_app::session.");
+    println!();
+    println!(
+        "  {:<22}  {:>8}  {:>10}  {:>12}  {:>12}",
+        "Confidence", "Samples", "Silence", "+ Inference", "+ Delivery"
+    );
+    println!("  {}", "─".repeat(72));
+
+    let inference_gpu_ms = 75.0f64;
+    let delivery_ms = 5.0f64;
+
+    let cases: &[(&str, Option<f32>)] = &[
+        (">=99% (speculative)", Some(0.99)),
+        (">=92% (high)", Some(0.95)),
+        (">=80% (moderate)", Some(0.85)),
+        ("<80% (default)", Some(0.5)),
+        ("None (first utterance)", None),
+    ];
+
+    for (label, conf) in cases {
+        let samples = dynamic_silence_threshold(*conf, true);
+        let silence_ms = samples_to_ms(samples) as f64;
+        let total = silence_ms + inference_gpu_ms + delivery_ms;
+        println!(
+            "  {:<22}  {:>8}  {:>8.0} ms  {:>10.0} ms  {:>10.0} ms",
+            label,
+            samples,
+            silence_ms,
+            silence_ms + inference_gpu_ms,
+            total
+        );
+    }
+
+    // Disabled path
+    let disabled_samples = dynamic_silence_threshold(Some(1.0), false);
+    let disabled_ms = samples_to_ms(disabled_samples) as f64;
+    println!(
+        "  {:<22}  {:>8}  {:>8.0} ms  {:>10.0} ms  {:>10.0} ms",
+        "Disabled (static)",
+        disabled_samples,
+        disabled_ms,
+        disabled_ms + inference_gpu_ms,
+        disabled_ms + inference_gpu_ms + delivery_ms
+    );
+
+    println!();
+    println!("  Tier constants (samples @ 16kHz):");
+    println!(
+        "    SPECULATIVE = {SILENCE_TIER_SPECULATIVE:>5}  ({:>3} ms)",
+        samples_to_ms(SILENCE_TIER_SPECULATIVE)
+    );
+    println!(
+        "    HIGH        = {SILENCE_TIER_HIGH:>5}  ({:>3} ms)",
+        samples_to_ms(SILENCE_TIER_HIGH)
+    );
+    println!(
+        "    MODERATE    = {SILENCE_TIER_MODERATE:>5}  ({:>3} ms)",
+        samples_to_ms(SILENCE_TIER_MODERATE)
+    );
+    println!(
+        "    DEFAULT     = {SILENCE_TIER_DEFAULT:>5}  ({:>3} ms)",
+        samples_to_ms(SILENCE_TIER_DEFAULT)
+    );
+    println!(
+        "    STATIC      = {SILENCE_FLUSH_SAMPLES:>5}  ({:>3} ms)  (when disabled)",
+        samples_to_ms(SILENCE_FLUSH_SAMPLES)
+    );
+    println!();
+}
+
+#[inline]
+fn samples_to_ms(samples: usize) -> u64 {
+    (samples * 1000 / SAMPLE_RATE) as u64
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Summary
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -202,32 +322,82 @@ fn print_latency_budget() {
     println!("  The user cares about AFTER-SPEECH WAIT — time from when they");
     println!("  stop talking to when text appears in the focused field.");
     println!();
-    println!("  Current after-speech wait breakdown:");
-    println!("    Silence timeout:         200 ms  (SILENCE_FLUSH_SAMPLES=3200)");
-    println!("    Inference (final poll):   ~75 ms  (Qwen3-ASR-0.6B, 1s chunk, GPU)");
-    println!("    Dictionary apply:          <1 ms");
-    println!("    LLM post-process:           0 ms  (bypassed at 87% rate)");
-    println!("    Delivery (paste):          ~5 ms");
-    println!("    ─────────────────────────────────");
-    println!("    CURRENT TOTAL:           ~280 ms");
+    let inference_gpu = 75u64;
+    let inference_cpu = 680u64;
+    let delivery = 5u64;
+
+    let spec_ms = samples_to_ms(SILENCE_TIER_SPECULATIVE);
+    let high_ms = samples_to_ms(SILENCE_TIER_HIGH);
+    let mod_ms = samples_to_ms(SILENCE_TIER_MODERATE);
+    let def_ms = samples_to_ms(SILENCE_TIER_DEFAULT);
+    let static_ms = samples_to_ms(SILENCE_FLUSH_SAMPLES);
+
+    println!("  Dynamic silence after-speech wait (GPU, Qwen3-ASR-0.6B):");
     println!();
-    println!("  CPU-only after-speech wait:");
-    println!("    Silence timeout:         200 ms");
-    println!("    Inference (final poll):  ~680 ms  (Qwen3-ASR-0.6B, 1s chunk, CPU)");
-    println!("    Delivery:                 ~5 ms");
-    println!("    ─────────────────────────────────");
-    println!("    CPU TOTAL:               ~885 ms");
+    println!("    Conf >=99%  (speculative, LLM bypassed):");
+    println!(
+        "      Silence:   {:>3} ms  Dictionary: <1 ms  Delivery: ~{delivery} ms",
+        spec_ms
+    );
+    println!("      TOTAL:    ~{} ms", spec_ms + delivery);
     println!();
-    println!("  Key insight: the inference trigger threshold (currently 16000");
-    println!("  samples = 1 sec) does NOT add to after-speech wait — it only");
-    println!("  delays when partials appear during speech. For the final");
-    println!("  delivery, the bottleneck is silence_timeout + one last");
-    println!("  inference poll.");
+    println!("    Conf >=92%  (high):");
+    println!(
+        "      Silence:   {:>3} ms  Inference: ~{inference_gpu} ms  Delivery: ~{delivery} ms",
+        high_ms
+    );
+    println!("      TOTAL:    ~{} ms", high_ms + inference_gpu + delivery);
+    println!();
+    println!("    Conf >=80%  (moderate):");
+    println!(
+        "      Silence:   {:>3} ms  Inference: ~{inference_gpu} ms  Delivery: ~{delivery} ms",
+        mod_ms
+    );
+    println!("      TOTAL:    ~{} ms", mod_ms + inference_gpu + delivery);
+    println!();
+    println!("    Conf <80%   (default/unknown):");
+    println!(
+        "      Silence:   {:>3} ms  Inference: ~{inference_gpu} ms  Delivery: ~{delivery} ms",
+        def_ms
+    );
+    println!("      TOTAL:    ~{} ms", def_ms + inference_gpu + delivery);
+    println!();
+    println!("    Disabled    (static fallback):");
+    println!(
+        "      Silence:   {:>3} ms  Inference: ~{inference_gpu} ms  Delivery: ~{delivery} ms",
+        static_ms
+    );
+    println!(
+        "      TOTAL:    ~{} ms",
+        static_ms + inference_gpu + delivery
+    );
+    println!();
+    println!("  CPU-only after-speech wait (worst case, conf <80%):");
+    println!(
+        "    Silence:     {:>3} ms  Inference: ~{inference_cpu} ms  Delivery: ~{delivery} ms",
+        def_ms
+    );
+    println!("    TOTAL:      ~{} ms", def_ms + inference_cpu + delivery);
+    println!();
+    println!("  Key insight: dynamic silence adapts the wait to ASR confidence.");
+    println!("  High-confidence segments flush in ~55ms (speculative paste),");
+    println!("  while uncertain segments get ~330ms for a safer result.");
     println!();
     println!("  Latency targets (Stivers et al. 2009, PNAS):");
     println!("    <200 ms  feels instantaneous (human turn-taking mean=208ms)");
     println!("    <300 ms  natural and responsive (AssemblyAI 300ms rule)");
     println!("    <500 ms  hard ceiling for voice AI (MMNTM threshold)");
-    println!("    GPU path (280ms) meets the 300ms natural target.");
+    println!(
+        "    GPU >=99% ({} ms) feels instantaneous.",
+        spec_ms + delivery
+    );
+    println!(
+        "    GPU >=92% ({} ms) meets the 200ms target.",
+        high_ms + inference_gpu + delivery
+    );
+    println!(
+        "    GPU >=80% ({} ms) meets the 300ms target.",
+        mod_ms + inference_gpu + delivery
+    );
     println!();
 }

@@ -36,6 +36,12 @@ pub struct UserSettings {
     /// `None` disables the secondary gate.
     #[serde(default = "default_min_token_threshold")]
     pub min_token_threshold: Option<f32>,
+    /// Enable confidence-weighted dynamic silence window.
+    /// When `Some(true)`, flush threshold adapts based on ASR confidence:
+    /// high confidence → shorter silence wait, low → longer.
+    /// `None` or `Some(true)` enables; `Some(false)` disables (static 200ms).
+    #[serde(default = "default_dynamic_silence")]
+    pub dynamic_silence: Option<bool>,
 }
 
 impl Default for UserSettings {
@@ -70,6 +76,7 @@ impl Default for UserSettings {
             session_history_days: Some(30),
             confidence_threshold: default_confidence_threshold(),
             min_token_threshold: default_min_token_threshold(),
+            dynamic_silence: default_dynamic_silence(),
         }
     }
 }
@@ -207,6 +214,10 @@ fn default_confidence_threshold() -> Option<f32> {
 
 fn default_min_token_threshold() -> Option<f32> {
     Some(0.7)
+}
+
+fn default_dynamic_silence() -> Option<bool> {
+    Some(true)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -28,7 +28,7 @@ mod ring;
 mod vad;
 
 pub use capture::{AudioConfig, AudioStream};
-pub use vad::{Vad, VadConfig};
+pub use vad::{Vad, VadConfig, VadResult};
 
 /// A chunk of resampled audio ready for downstream processing.
 #[derive(Debug, Clone)]
