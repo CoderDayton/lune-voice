@@ -389,11 +389,19 @@ async fn full_pipeline_real_session() {
         None => return,
     };
 
-    let wav_path = workspace_root().join("test_fixtures/librispeech_clean.wav");
-    if !wav_path.exists() {
+    // Prefer the 30s chapter-40744 clip; fall back to the original 23s clip.
+    let wav_path = [
+        "test_fixtures/librispeech_40744.wav",
+        "test_fixtures/librispeech_clean.wav",
+    ]
+    .iter()
+    .map(|p| workspace_root().join(p))
+    .find(|p| p.exists());
+    let Some(wav_path) = wav_path else {
         eprintln!("[real_session] skipping — no wav file");
         return;
-    }
+    };
+    eprintln!("[real_session] using {}", wav_path.display());
     let samples = load_wav_f32(&wav_path);
     let audio_stream = AudioStream::from_samples(&samples, AudioConfig::default());
 

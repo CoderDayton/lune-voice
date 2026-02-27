@@ -45,8 +45,8 @@ const DUPLICATE_FLUSH_WINDOW: Duration = Duration::from_millis(1200);
 /// Fits well within the 2048 n_ctx budget (system ~300 + few-shot ~400 + context ~170 + input ~100 + output ~256 = ~1226).
 const LLM_CONTEXT_MAX_CHARS: usize = 500;
 
-/// >= 99% confidence: speculative paste — ~50ms (800 samples).
-pub const SILENCE_TIER_SPECULATIVE: usize = 800;
+/// >= 99% confidence: speculative paste — ~75ms (1200 samples).
+pub const SILENCE_TIER_SPECULATIVE: usize = 1_200;
 /// >= 92% confidence: aggressive — ~80ms (1280 samples).
 pub const SILENCE_TIER_HIGH: usize = 1_280;
 /// >= 80% confidence: moderate — ~120ms (1920 samples).
@@ -325,6 +325,19 @@ async fn run_session<A: AsrBackend + 'static>(
     // from previous session text; subsequent chunks are typed as-is.
     let mut llm_first_chunk = true;
 
+    // ── Ordered commit buffer ────────────────────────────────────────────
+    // When an LLM request is in-flight, bypass-committed segments are held
+    // and drained only after the LLM response arrives. This prevents the
+    // confidence-gate ordering race (fast bypass overtaking slow LLM).
+    let mut llm_pending = false;
+    let mut held_commits: Vec<String> = Vec::new();
+
+    // ── DIY timestamps (VAD-level) ───────────────────────────────────────
+    // Track absolute audio position for segment-level timing. Not per-word,
+    // but sufficient for ordering and re-transcription detection.
+    let mut total_samples_pushed: u64 = 0;
+    let mut speech_start_sample: Option<u64> = None;
+
     // Reused each audio frame to avoid allocation on the ~50Hz partial path.
     let mut partial_buf = String::with_capacity(512);
     let mut audio_batch: Vec<f32> = Vec::with_capacity(4096);
@@ -383,6 +396,11 @@ async fn run_session<A: AsrBackend + 'static>(
                 }
                 if resp.is_final {
                     llm_first_chunk = true;
+                    llm_pending = false;
+                    // Drain held segments that were buffered while LLM was in-flight.
+                    for held in held_commits.drain(..) {
+                        commit_final_text(&mut output_ctrl, &mut session_text, &held).await;
+                    }
                 }
             }
 
@@ -404,6 +422,17 @@ async fn run_session<A: AsrBackend + 'static>(
                 // TEN VAD is the sole speech authority — no energy pre-gate.
                 let vad_result = vad.process_chunk(&audio_batch);
                 let batch_has_speech = vad_result.is_speech;
+
+                // DIY timestamps: record speech segment start from VAD.
+                if batch_has_speech && speech_start_sample.is_none() {
+                    speech_start_sample = Some(total_samples_pushed);
+                    debug!(
+                        %session_id,
+                        start_ms = total_samples_pushed * 1000 / 16_000,
+                        "speech segment started"
+                    );
+                }
+                total_samples_pushed += audio_batch.len() as u64;
 
                 if batch_has_speech {
                     asr_push_hangover_samples = ASR_PUSH_HANGOVER_SAMPLES;
@@ -504,21 +533,34 @@ async fn run_session<A: AsrBackend + 'static>(
                                         let guard = dict.lock().await;
                                         guard.apply(remaining)
                                     };
-                                    debug!(
-                                        confidence = ?seg.confidence,
-                                        text = %applied,
-                                        "confidence gate: bypassing LLM"
-                                    );
-                                    eprintln!(
-                                        "\x1b[36m[GATE]\x1b[0m conf={:.3} bypass LLM: {applied}",
-                                        seg.confidence.unwrap_or(1.0)
-                                    );
-                                    commit_final_text(
-                                        &mut output_ctrl,
-                                        &mut session_text,
-                                        &applied,
-                                    )
-                                    .await;
+                                    if is_retranscription(&session_text, &applied) {
+                                        debug!(
+                                            text = %applied,
+                                            "retranscription detected, skipping"
+                                        );
+                                    } else {
+                                        debug!(
+                                            confidence = ?seg.confidence,
+                                            text = %applied,
+                                            "confidence gate: bypassing LLM"
+                                        );
+                                        eprintln!(
+                                            "\x1b[36m[GATE]\x1b[0m conf={:.3} bypass LLM: {applied}",
+                                            seg.confidence.unwrap_or(1.0)
+                                        );
+                                        if llm_pending {
+                                            // Hold until pending LLM response arrives
+                                            // to preserve audio-timeline ordering.
+                                            held_commits.push(applied);
+                                        } else {
+                                            commit_final_text(
+                                                &mut output_ctrl,
+                                                &mut session_text,
+                                                &applied,
+                                            )
+                                            .await;
+                                        }
+                                    }
                                 } else {
                                     let ctx = build_llm_context(&session_text);
                                     let flushed = flush_to_llm_if_new(
@@ -532,6 +574,7 @@ async fn run_session<A: AsrBackend + 'static>(
                                     )
                                     .await;
                                     sent_to_llm |= flushed;
+                                    llm_pending |= flushed;
                                 }
                             }
                             pending_nonfinal.clear();
@@ -570,18 +613,29 @@ async fn run_session<A: AsrBackend + 'static>(
                             if speculative {
                                 // High confidence: bypass LLM, paste directly after dictionary.
                                 let applied = { dict.lock().await.apply(&pending_nonfinal) };
-                                debug!(
-                                    %session_id,
-                                    confidence = ?last_asr_confidence,
-                                    text = %applied,
-                                    "dynamic silence flush: speculative paste (>=99%)"
-                                );
-                                commit_final_text(
-                                    &mut output_ctrl,
-                                    &mut session_text,
-                                    &applied,
-                                )
-                                .await;
+                                if is_retranscription(&session_text, &applied) {
+                                    debug!(
+                                        text = %applied,
+                                        "speculative retranscription detected, skipping"
+                                    );
+                                } else {
+                                    debug!(
+                                        %session_id,
+                                        confidence = ?last_asr_confidence,
+                                        text = %applied,
+                                        "dynamic silence flush: speculative paste (>=99%)"
+                                    );
+                                    if llm_pending {
+                                        held_commits.push(applied);
+                                    } else {
+                                        commit_final_text(
+                                            &mut output_ctrl,
+                                            &mut session_text,
+                                            &applied,
+                                        )
+                                        .await;
+                                    }
+                                }
                             } else {
                                 debug!(
                                     %session_id,
@@ -601,6 +655,7 @@ async fn run_session<A: AsrBackend + 'static>(
                                 )
                                 .await;
                                 sent_to_llm |= flushed;
+                                llm_pending |= flushed;
                             }
                             pending_nonfinal.clear();
                             if reset_asr_context_on_flush
@@ -611,6 +666,14 @@ async fn run_session<A: AsrBackend + 'static>(
                         }
                         // Always reset — even if nothing to flush — so VAD
                         // inference stops running on every tick after speech.
+                        if let Some(start) = speech_start_sample.take() {
+                            debug!(
+                                %session_id,
+                                start_ms = start * 1000 / 16_000,
+                                end_ms = total_samples_pushed * 1000 / 16_000,
+                                "speech segment ended"
+                            );
+                        }
                         was_speaking = false;
                         silence_samples = 0;
                         last_asr_confidence = None;
@@ -652,7 +715,14 @@ async fn run_session<A: AsrBackend + 'static>(
                             let guard = dict.lock().await;
                             guard.apply(text)
                         };
-                        commit_final_text(&mut output_ctrl, &mut session_text, &applied).await;
+                        if !is_retranscription(&session_text, &applied) {
+                            if llm_pending {
+                                held_commits.push(applied);
+                            } else {
+                                commit_final_text(&mut output_ctrl, &mut session_text, &applied)
+                                    .await;
+                            }
+                        }
                     } else {
                         let ctx = build_llm_context(&session_text);
                         let flushed = flush_to_llm_if_new(
@@ -666,6 +736,7 @@ async fn run_session<A: AsrBackend + 'static>(
                         )
                         .await;
                         sent_to_llm |= flushed;
+                        llm_pending |= flushed;
                     }
                 } else {
                     pending_nonfinal.clear();
@@ -716,6 +787,10 @@ async fn run_session<A: AsrBackend + 'static>(
                 }
                 if resp.is_final {
                     llm_first_chunk = true;
+                    // Drain held segments from teardown.
+                    for held in held_commits.drain(..) {
+                        commit_final_text(&mut output_ctrl, &mut session_text, &held).await;
+                    }
                 }
             }
         })
@@ -764,6 +839,23 @@ fn build_llm_context(session_text: &str) -> Option<String> {
         }
     };
     Some(format!("Context: {ctx}\n"))
+}
+
+/// Detect re-transcription: returns true when `new_text` (trimmed, ≥10 chars)
+/// already appears verbatim in `session_text` (case-insensitive).
+/// Guards against the 0.6B streaming decoder re-generating content when the
+/// encoder sliding window covers already-transcribed audio.
+#[inline]
+fn is_retranscription(session_text: &str, new_text: &str) -> bool {
+    let new = new_text.trim();
+    // Too short to be a meaningful duplicate — single words like "the" would false-positive.
+    if new.len() < 10 {
+        return false;
+    }
+    // ASCII-lowercase comparison is sufficient for English ASR output.
+    session_text
+        .to_ascii_lowercase()
+        .contains(&new.to_ascii_lowercase())
 }
 
 /// Forward ASR text to the LLM worker without ASR-side post-processing.
@@ -1187,5 +1279,41 @@ mod tests {
         );
         // None → default
         assert_eq!(dynamic_silence_threshold(None, true), SILENCE_TIER_DEFAULT);
+    }
+
+    #[test]
+    fn is_retranscription_detects_duplicate() {
+        let session = "Eleven o'clock had struck it was a fine clear night";
+        assert!(is_retranscription(session, "eleven o'clock"));
+        assert!(is_retranscription(session, "Eleven o'clock"));
+        assert!(is_retranscription(session, "a fine clear night"));
+    }
+
+    #[test]
+    fn is_retranscription_ignores_short_text() {
+        let session = "Eleven o'clock had struck";
+        // Below 10-char threshold — common short phrases should not be filtered.
+        assert!(!is_retranscription(session, "the road"));
+        assert!(!is_retranscription(session, "had"));
+        assert!(!is_retranscription(session, ""));
+    }
+
+    #[test]
+    fn is_retranscription_no_false_positive_on_novel_text() {
+        let session = "Eleven o'clock had struck";
+        assert!(!is_retranscription(
+            session,
+            "they sauntered leisurely along"
+        ));
+        assert!(!is_retranscription(
+            session,
+            "the good hidalgo was far from thinking"
+        ));
+    }
+
+    #[test]
+    fn speculative_silence_tier_is_75ms() {
+        // 75ms at 16 kHz = 1200 samples
+        assert_eq!(SILENCE_TIER_SPECULATIVE, 1_200);
     }
 }
