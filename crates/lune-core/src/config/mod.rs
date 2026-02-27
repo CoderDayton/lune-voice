@@ -9,7 +9,7 @@ pub use hotkey::{HotkeyConfig, KeyCombo, Modifier};
 pub use modes::{ActivationMode, DictationMode, PrivacyMode};
 pub use redacted::RedactedString;
 pub use settings::{AsrBackendConfig, DevicePolicy, LlmBackendConfig, StreamingMode, UserSettings};
-pub use style::{StyleId, StylePreset, StyleRegistry, builtin_registry};
+pub use style::{BASE_SYSTEM_PROMPT, StyleId, StylePreset, StyleRegistry, builtin_registry};
 
 #[cfg(test)]
 mod tests {

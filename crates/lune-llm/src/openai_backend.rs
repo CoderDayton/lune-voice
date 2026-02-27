@@ -8,6 +8,7 @@ use async_openai::{
     },
 };
 
+use lune_core::config::BASE_SYSTEM_PROMPT;
 use lune_core::llm::{PostProcessInput, PostProcessOutput, TextPostProcessor};
 
 /// Configuration for the OpenAI-compatible LLM backend.
@@ -67,10 +68,20 @@ fn build_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage>
     // ── System message ────────────────────────────────────────────────────────
     let dict_len = input.dictionary.len();
 
+    let style_len = if style.style_instructions.is_empty() {
+        0
+    } else {
+        2 + style.style_instructions.len()
+    };
     let mut system_content = String::with_capacity(
-        style.system_prompt.len() + if dict_len > 0 { 55 + dict_len * 30 } else { 0 },
+        BASE_SYSTEM_PROMPT.len() + style_len + if dict_len > 0 { 55 + dict_len * 30 } else { 0 },
     );
-    system_content.push_str(&style.system_prompt);
+    system_content.push_str(BASE_SYSTEM_PROMPT);
+
+    if !style.style_instructions.is_empty() {
+        system_content.push_str("\n\n");
+        system_content.push_str(&style.style_instructions);
+    }
 
     if dict_len > 0 {
         system_content.push_str("\n\nDictionary terms (always use these exact spellings):");

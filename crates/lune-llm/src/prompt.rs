@@ -1,3 +1,4 @@
+use lune_core::config::BASE_SYSTEM_PROMPT;
 use lune_core::llm::PostProcessInput;
 
 /// Build a ChatML-formatted prompt for Qwen3 from a PostProcessInput.
@@ -5,7 +6,8 @@ use lune_core::llm::PostProcessInput;
 /// Format:
 /// ```text
 /// <|im_start|>system
-/// {system_prompt}<|im_end|>
+/// {BASE_SYSTEM_PROMPT}
+/// {style_instructions}<|im_end|>
 /// <|im_start|>user
 /// {few_shot_input}<|im_end|>
 /// <|im_start|>assistant
@@ -39,7 +41,8 @@ pub fn build_chatml(input: &PostProcessInput) -> String {
         .sum();
     let ctx_len = input.context.as_ref().map_or(0, |c| c.len() + 20);
     let cap = 128
-        + style.system_prompt.len()
+        + BASE_SYSTEM_PROMPT.len()
+        + style.style_instructions.len()
         + dict_len
         + few_shot_len
         + ctx_len
@@ -50,7 +53,12 @@ pub fn build_chatml(input: &PostProcessInput) -> String {
 
     // System message with dictionary context.
     prompt.push_str("<|im_start|>system\n");
-    prompt.push_str(&style.system_prompt);
+    prompt.push_str(BASE_SYSTEM_PROMPT);
+
+    if !style.style_instructions.is_empty() {
+        prompt.push_str("\n\n");
+        prompt.push_str(&style.style_instructions);
+    }
 
     if !input.dictionary.is_empty() {
         prompt.push_str("\n\nDictionary terms (always use these exact spellings):");
