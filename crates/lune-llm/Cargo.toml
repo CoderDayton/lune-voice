@@ -21,4 +21,4 @@ async-openai.workspace = true
 serde_json.workspace = true
 memchr = "2.8.0"
 half = "2"
-getrandom = "0.3"
+getrandom = "0.4"

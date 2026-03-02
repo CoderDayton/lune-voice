@@ -2065,7 +2065,7 @@ version = "0.1.0"
 dependencies = [
  "async-openai",
  "async-trait",
- "getrandom 0.3.4",
+ "getrandom 0.4.1",
  "half",
  "lune-core",
  "memchr",
