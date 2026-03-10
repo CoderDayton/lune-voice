@@ -11,6 +11,8 @@ mod delivery;
 mod events;
 mod factory;
 #[cfg(unix)]
+mod hotkey_listener;
+#[cfg(unix)]
 mod uinput_typer;
 
 use std::sync::Arc;
@@ -104,16 +106,6 @@ fn run_daemon() {
         "models ready"
     );
 
-    // ── Print keybinding hint on first run ────────────────────────────────
-
-    eprintln!();
-    eprintln!("  Bind keyboard shortcuts in COSMIC Settings → Keyboard → Custom Shortcuts:");
-    eprintln!("    Toggle mode:  Ctrl+Space  →  lune-voice toggle");
-    eprintln!("    Hold mode:    Ctrl+Space (press)  →  lune-voice start");
-    eprintln!("                  Ctrl+Space (release) →  lune-voice stop");
-    eprintln!("    (optional)    Escape  →  lune-voice cancel");
-    eprintln!();
-
     // ── Build tokio current_thread runtime ────────────────────────────────
     // current_thread avoids the overhead of multi-thread work-stealing for
     // this single-threaded event loop; all hot paths stay on one core.
@@ -131,6 +123,7 @@ fn run_daemon() {
     // Channel depth 64 is generous for human-speed commands; avoids alloc churn.
     let (cmd_tx, cmd_rx) = mpsc::channel::<AppCommand>(64);
     let pipeline_cmd_tx = cmd_tx.clone();
+    let hotkey_cmd_tx = cmd_tx.clone();
     // Pre-allocate capacity for the longest state string ("listening" = 9 chars)
     let shared_state = Arc::new(RwLock::new(String::with_capacity(16)));
 
@@ -142,6 +135,9 @@ fn run_daemon() {
 
     let (dictation_mode_tx, dictation_mode_rx) = watch::channel(settings.dictation_mode);
     let (activation_mode_tx, activation_mode_rx) = watch::channel(settings.activation_mode);
+
+    let hotkey_config = settings.hotkey.clone();
+    let hotkey_activation_rx = activation_mode_rx.clone();
 
     let settings = Arc::new(RwLock::new(settings));
 
@@ -160,6 +156,14 @@ fn run_daemon() {
         .expect("build D-Bus connection");
 
     tracing::info!("D-Bus service registered on session bus");
+
+    // ── Hotkey listener (evdev) ──────────────────────────────────────────
+    // Spawns OS threads that read from physical keyboards and dispatch
+    // AppCommands to the same channel as D-Bus. D-Bus CLI commands still
+    // work as a fallback (e.g. from scripts or remote control).
+
+    #[cfg(unix)]
+    let _hotkey_handle = hotkey_listener::spawn(hotkey_config, hotkey_activation_rx, hotkey_cmd_tx);
 
     // ── Phase 2: pipeline inside LocalSet ────────────────────────────────
 
