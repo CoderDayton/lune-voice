@@ -21,6 +21,9 @@ crossbeam-channel = "0.5"
 # Voice activity detection (TEN VAD ONNX model)
 ten-vad-rs = "0.1.5"
 
+# Serialization (adaptive VAD state persistence)
+serde = { workspace = true, features = ["derive"] }
+
 # Error handling
 thiserror.workspace = true
 
@@ -28,6 +31,7 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tracing-subscriber = "0.3"
 hound = "3.5"
+serde_json.workspace = true
 
 [[example]]
 name = "live_capture"

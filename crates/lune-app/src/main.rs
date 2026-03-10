@@ -167,6 +167,7 @@ fn run_daemon() {
         run_pipeline(
             settings,
             paths.database_file(),
+            paths.adaptive_vad_file(),
             pipeline_cmd_tx,
             cmd_rx,
             shared_state,
@@ -184,6 +185,7 @@ fn run_daemon() {
 async fn run_pipeline(
     settings: Arc<RwLock<lune_core::config::UserSettings>>,
     db_path: std::path::PathBuf,
+    vad_state_path: std::path::PathBuf,
     cmd_tx: mpsc::Sender<AppCommand>,
     mut cmd_rx: mpsc::Receiver<AppCommand>,
     shared_state: Arc<RwLock<String>>,
@@ -268,7 +270,8 @@ async fn run_pipeline(
         db,
         config,
         Arc::clone(&settings),
-    );
+    )
+    .with_vad_state_path(vad_state_path);
     if let Some(aligner) = aligner {
         manager = manager.with_aligner(aligner);
     }

@@ -40,6 +40,10 @@ impl AppPaths {
         self.data_dir.join("models")
     }
 
+    pub fn adaptive_vad_file(&self) -> PathBuf {
+        self.data_dir.join("adaptive_vad.json")
+    }
+
     /// Ensure all directories exist.
     pub fn ensure_dirs(&self) -> std::io::Result<()> {
         std::fs::create_dir_all(&self.config_dir)?;
@@ -70,5 +74,14 @@ mod tests {
         // Should work on any system with a home directory
         let paths = AppPaths::resolve();
         assert!(paths.is_some());
+    }
+
+    #[test]
+    fn adaptive_vad_file_path() {
+        let paths = AppPaths::from_dirs("/tmp/config", "/tmp/data");
+        assert_eq!(
+            paths.adaptive_vad_file(),
+            Path::new("/tmp/data/adaptive_vad.json")
+        );
     }
 }

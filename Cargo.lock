@@ -3469,6 +3469,8 @@ dependencies = [
  "crossbeam-channel",
  "hound",
  "rubato 0.15.0",
+ "serde",
+ "serde_json",
  "ten-vad-rs",
  "thiserror 2.0.18",
  "tokio",

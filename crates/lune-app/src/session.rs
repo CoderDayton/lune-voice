@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -70,6 +71,8 @@ pub struct SessionManager<A: AsrBackend> {
     aligner: Option<Arc<OrtForcedAligner>>,
     /// Persisted adaptive VAD state across sessions.
     adaptive_vad_state: Arc<Mutex<Option<AdaptiveVadConfig>>>,
+    /// Path to persist adaptive VAD state across app restarts.
+    vad_state_path: Option<PathBuf>,
 }
 
 impl<A: AsrBackend + 'static> SessionManager<A> {
@@ -94,6 +97,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             active: Arc::new(Mutex::new(None)),
             aligner: None,
             adaptive_vad_state: Arc::new(Mutex::new(None)),
+            vad_state_path: None,
         }
     }
 
@@ -101,6 +105,29 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
     /// When set, the aligner runs after each silence flush.
     pub fn with_aligner(mut self, aligner: Arc<OrtForcedAligner>) -> Self {
         self.aligner = Some(aligner);
+        self
+    }
+
+    /// Set the file path for persisting adaptive VAD state across restarts.
+    /// If the file exists and contains valid JSON, the state is loaded immediately.
+    pub fn with_vad_state_path(mut self, path: PathBuf) -> Self {
+        if path.exists() {
+            match std::fs::read_to_string(&path) {
+                Ok(json) => match serde_json::from_str::<AdaptiveVadConfig>(&json) {
+                    Ok(state) => {
+                        info!(state = %state.debug_state(), path = %path.display(), "loaded adaptive VAD state from disk");
+                        self.adaptive_vad_state = Arc::new(Mutex::new(Some(state)));
+                    }
+                    Err(e) => {
+                        warn!(error = %e, path = %path.display(), "corrupt adaptive VAD file, starting fresh");
+                    }
+                },
+                Err(e) => {
+                    warn!(error = %e, path = %path.display(), "failed to read adaptive VAD file");
+                }
+            }
+        }
+        self.vad_state_path = Some(path);
         self
     }
 
@@ -168,6 +195,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let aligner = self.aligner.as_ref().map(Arc::clone);
         let settings = Arc::clone(&self.settings);
         let adaptive_vad_state = Arc::clone(&self.adaptive_vad_state);
+        let vad_state_path = self.vad_state_path.clone();
 
         tokio::task::spawn_local(run_session(
             session_id,
@@ -185,6 +213,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             aligner,
             settings,
             adaptive_vad_state,
+            vad_state_path,
         ));
 
         *lock = Some(ActiveHandle {
@@ -317,6 +346,7 @@ async fn run_session<A: AsrBackend + 'static>(
     aligner: Option<Arc<OrtForcedAligner>>,
     settings: Arc<RwLock<UserSettings>>,
     adaptive_vad_state: Arc<Mutex<Option<AdaptiveVadConfig>>>,
+    vad_state_path: Option<PathBuf>,
 ) {
     let mut status = SessionStatus::Completed;
 
@@ -517,9 +547,19 @@ async fn run_session<A: AsrBackend + 'static>(
         );
     }
 
-    // Persist adaptive VAD state for the next session
+    // Persist adaptive VAD state for the next session (in-memory + disk)
     if let Some(state) = segmenter.take_adaptive() {
         debug!(%session_id, state = %state.debug_state(), "saving adaptive VAD state");
+        if let Some(ref path) = vad_state_path {
+            match serde_json::to_string(&state) {
+                Ok(json) => {
+                    if let Err(e) = std::fs::write(path, &json) {
+                        warn!(error = %e, path = %path.display(), "failed to persist adaptive VAD to disk");
+                    }
+                }
+                Err(e) => warn!(error = %e, "failed to serialize adaptive VAD state"),
+            }
+        }
         *adaptive_vad_state.lock().await = Some(state);
     }
 

@@ -14,6 +14,8 @@
 //! - `avg_prob` per segment feeds into confidence gating
 
 use std::collections::VecDeque;
+
+use serde::{Deserialize, Serialize};
 use ten_vad_rs::TenVad;
 use tracing::warn;
 
@@ -26,6 +28,7 @@ const SAMPLE_RATE: u32 = 16_000;
 ///
 /// Stores observations in insertion order (FIFO eviction of oldest).
 /// Sorts a temporary copy for percentile queries — O(n log n) but n ≤ 100.
+#[derive(Clone, Serialize, Deserialize)]
 struct RunningPercentile {
     buf: VecDeque<u32>,
     capacity: usize,
@@ -70,6 +73,9 @@ impl RunningPercentile {
 /// `sentence_close = P95(absorbed) × 1.5` — just past the longest hesitation.
 /// `hard_close = P95(completed) × 1.2` — just past the longest sentence break.
 /// EMA smoothing prevents threshold thrashing on outliers.
+///
+/// Serializable for cross-session persistence.
+#[derive(Clone, Serialize, Deserialize)]
 pub struct AdaptiveVadConfig {
     pub min_sentence_close_ms: u32,
     pub max_sentence_close_ms: u32,
@@ -666,5 +672,46 @@ mod tests {
             "adaptive segmenter should have debug state"
         );
         assert!(state.unwrap().contains("warmup: done"));
+    }
+
+    #[test]
+    fn adaptive_state_serde_roundtrip_empty() {
+        let original = AdaptiveVadConfig::new(600, 1200);
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: AdaptiveVadConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.sentence_close_ms(), original.sentence_close_ms());
+        assert_eq!(restored.hard_close_ms(), original.hard_close_ms());
+    }
+
+    #[test]
+    fn adaptive_state_serde_roundtrip_with_data() {
+        let mut original = AdaptiveVadConfig::new(600, 1200);
+        // Fill both buffers past warmup
+        for i in 0..60 {
+            original.record_absorbed_pause(200 + i * 5);
+        }
+        for i in 0..40 {
+            original.record_completed_pause(800 + i * 10);
+        }
+
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: AdaptiveVadConfig = serde_json::from_str(&json).unwrap();
+
+        // Thresholds must survive roundtrip exactly
+        assert_eq!(restored.sentence_close_ms(), original.sentence_close_ms());
+        assert_eq!(restored.hard_close_ms(), original.hard_close_ms());
+
+        // New observations should continue from restored state, not reset
+        let pre = restored.sentence_close_ms();
+        let mut restored = restored;
+        restored.record_absorbed_pause(100);
+        // Adding a short pause should nudge threshold down (or stay same)
+        assert!(restored.sentence_close_ms() <= pre + 50);
+    }
+
+    #[test]
+    fn adaptive_state_serde_corrupt_json() {
+        let result = serde_json::from_str::<AdaptiveVadConfig>("{ broken json }");
+        assert!(result.is_err());
     }
 }
