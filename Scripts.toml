@@ -1,0 +1,137 @@
+[global_env]
+RUST_BACKTRACE = "1"
+
+[scripts]
+
+[scripts.list]
+interpreter = "bash"
+command = '''
+printf "\n  %-14s %s\n" "Command" "Description"
+printf "  %-14s %s\n" "──────────────" "───────────────────────────────────────────────"
+printf "  %-14s %s\n" \
+  "check"       "Type-check all crates" \
+  "clippy"      "Lint with clippy (deny warnings)" \
+  "fmt"         "Check formatting (FIX=1 to apply)" \
+  "test"        "Run unit tests (no real models)" \
+  "test-e2e"    "Real-model integration tests (GPU=1 for CUDA)" \
+  "bench"       "Benchmark (TYPE=latency|full, GPU=1 for CUDA)" \
+  "build"       "Release build (GPU=1 for CUDA)" \
+  "vad-inspect" "VAD timeline analysis (WAV=path/to/file.wav)" \
+  "record"      "Record mic to float32 WAV (16kHz mono)" \
+  "install"     "Install systemd unit + binary" \
+  "uninstall"   "Remove systemd service + binary" \
+  "ci"          "Full CI: fmt + clippy + check + test" \
+  "clean"       "Clean build artifacts (ALL=1 includes .venv)" \
+  "export"      "Export ONNX models (MODEL=asr|llm|fa|all)"
+echo
+'''
+info = "List all available scripts"
+
+# ── Quick iteration ──────────────────────────────────────────────────────────
+
+check = { command = "cargo check --workspace", info = "Type-check all crates" }
+clippy = { command = "cargo clippy --workspace -- -D warnings", info = "Lint with clippy (deny warnings)" }
+
+[scripts.fmt]
+interpreter = "bash"
+command = '''
+if [ "$FIX" = "1" ]; then cargo fmt --all; else cargo fmt --all --check; fi
+'''
+info = "Check formatting (--env FIX=1 to apply)"
+
+# ── Testing ──────────────────────────────────────────────────────────────────
+
+test = { command = "cargo test --workspace", info = "Run unit tests (no real models)" }
+
+[scripts.test-e2e]
+interpreter = "bash"
+command = '''
+F=""; [ "$GPU" = "1" ] && F="--features cuda"
+cargo test -p lune-app $F --test e2e_ort_models -- --ignored --nocapture
+'''
+info = "Real-model integration tests (--env GPU=1 for CUDA)"
+
+# ── Benchmarks ───────────────────────────────────────────────────────────────
+
+[scripts.bench]
+interpreter = "bash"
+command = '''
+F=""; [ "$GPU" = "1" ] && F="--features cuda"
+case "${TYPE:-latency}" in
+  latency) cargo run --release $F --example pipeline_latency -p lune-app ;;
+  full)    cargo run --release $F --example pipeline_full -p lune-app ;;
+  *)       echo "TYPE must be latency or full"; exit 1 ;;
+esac
+'''
+info = "Benchmark (--env TYPE=latency|full, --env GPU=1 for CUDA)"
+
+# ── Build ────────────────────────────────────────────────────────────────────
+
+[scripts.build]
+interpreter = "bash"
+command = '''
+F=""; [ "$GPU" = "1" ] && F="--features cuda"
+cargo build --release $F
+'''
+info = "Release build (--env GPU=1 for CUDA)"
+
+# ── Tools ────────────────────────────────────────────────────────────────────
+
+[scripts.vad-inspect]
+interpreter = "bash"
+command = '''
+if [ -z "$WAV" ]; then echo "Usage: cgs run vad-inspect --env WAV=path/to/file.wav"; exit 1; fi
+cargo run --release -p lune-audio --example vad_inspect -- "$WAV"
+'''
+info = "VAD timeline analysis on a WAV file (--env WAV=path)"
+
+[scripts.record]
+command = "uv run scripts/record_mic.py"
+info = "Record mic to float32 WAV (16kHz mono)"
+requires = ["uv"]
+
+[scripts.install]
+command = "bash scripts/install.sh"
+info = "Install systemd unit + binary"
+
+[scripts.uninstall]
+command = "bash scripts/uninstall.sh"
+info = "Remove systemd service + binary"
+
+# ── CI / composite ──────────────────────────────────────────────────────────
+
+ci = { include = ["fmt", "clippy", "check", "test"], info = "Full CI: fmt + clippy + check + test" }
+
+# ── Cleanup ──────────────────────────────────────────────────────────────────
+
+[scripts.clean]
+interpreter = "bash"
+command = '''
+cargo clean
+find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null
+if [ "$ALL" = "1" ]; then
+  rm -rf .venv data/asr_correction
+  echo "cleaned target/ + __pycache__ + .venv + training data"
+else
+  echo "cleaned target/ + __pycache__"
+fi
+'''
+info = "Clean build artifacts (--env ALL=1 includes .venv + training data)"
+
+# ── ONNX model export ───────────────────────────────────────────────────────
+
+[scripts.export]
+interpreter = "bash"
+command = '''
+case "${MODEL:-all}" in
+  asr) uv run python scripts/export_onnx.py --asr ;;
+  llm) uv run python scripts/export_onnx.py --llm ;;
+  fa)  uv run python scripts/export_onnx.py --fa ;;
+  all) uv run python scripts/export_onnx.py --asr \
+    && uv run python scripts/export_onnx.py --llm \
+    && uv run python scripts/export_onnx.py --fa ;;
+  *)   echo "MODEL must be asr, llm, fa, or all"; exit 1 ;;
+esac
+'''
+info = "Export ONNX models (--env MODEL=asr|llm|fa|all, default: all)"
+requires = ["uv"]

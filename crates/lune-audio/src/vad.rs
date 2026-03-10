@@ -69,6 +69,8 @@ pub struct Vad {
     hangover_total: usize,
     /// Reusable buffer for f32 → i16 conversion (avoids per-call allocation).
     i16_buf: Vec<i16>,
+    /// Leftover samples smaller than one VAD frame, carried into the next call.
+    carry_i16: Vec<i16>,
 }
 
 impl Vad {
@@ -90,6 +92,7 @@ impl Vad {
             hangover_remaining: 0,
             hangover_total: hangover_samples,
             i16_buf: Vec::with_capacity(HOP_SIZE * 20), // ~320ms at 16kHz
+            carry_i16: Vec::with_capacity(HOP_SIZE),
         }
     }
 
@@ -106,6 +109,7 @@ impl Vad {
 
         // Convert f32 [-1.0, 1.0] → i16 for TEN VAD.
         self.i16_buf.clear();
+        self.i16_buf.extend_from_slice(&self.carry_i16);
         self.i16_buf.extend(samples.iter().map(|&s| {
             (s * i16::MAX as f32)
                 .round()
@@ -128,6 +132,8 @@ impl Vad {
             }
             offset += HOP_SIZE;
         }
+        self.carry_i16.clear();
+        self.carry_i16.extend_from_slice(&self.i16_buf[offset..]);
 
         // Hysteresis with hangover: higher threshold to enter speech,
         // lower to exit, plus a time-based hangover that keeps `is_speech`
@@ -168,4 +174,19 @@ fn compute_rms(samples: &[f32]) -> f32 {
     }
     let sum_sq: f32 = samples.iter().map(|&s| s * s).sum();
     (sum_sq / samples.len() as f32).sqrt()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn carry_over_retains_partial_frame() {
+        let mut vad = Vad::new(VadConfig::default(), 16_000);
+        let _ = vad.process_chunk(&vec![0.0f32; HOP_SIZE - 1]);
+        assert_eq!(vad.carry_i16.len(), HOP_SIZE - 1);
+
+        let _ = vad.process_chunk(&[0.0f32]);
+        assert_eq!(vad.carry_i16.len(), 0);
+    }
 }

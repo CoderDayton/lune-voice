@@ -1,406 +1,249 @@
-use lune_core::config::BASE_SYSTEM_PROMPT;
-use lune_core::llm::PostProcessInput;
+//! Prompt construction for ASR transcript correction.
+//!
+//! Provides a shared system prompt and ChatML formatting used by both
+//! the inference backend (`llamacpp_backend.rs`) and the training script
+//! (`unsloth/train.py`). The system prompt in `train.py` must be kept
+//! byte-identical to [`SYSTEM`].
 
-/// Build a ChatML-formatted prompt for Qwen3 from a PostProcessInput.
+use crate::fillers::{self, FillerError};
+
+/// System prompt for ASR transcript correction.
 ///
-/// Format:
+/// Kept minimal — no few-shot examples. The fine-tuned model learns the
+/// task from training data; the generic model handles it from instructions.
+pub const SYSTEM: &str = "You are a transcript correction tool. Your only job is to fix words marked with [?word?].\n\
+Rules:\n\
+- Output ONLY the corrected transcript.\n\
+- Copy every word NOT inside [?...?] exactly as-is.\n\
+- Replace each [?word?] with the contextually correct word, no markers.\n\
+- Delete [?um?] [?uh?] and filler variants entirely.\n\
+- Do not rephrase, summarize, or add punctuation.";
+
+/// Build a ChatML inference prompt (assistant turn left open).
+///
 /// ```text
 /// <|im_start|>system
-/// {BASE_SYSTEM_PROMPT}
-/// {style_instructions}<|im_end|>
+/// {system}<|im_end|>
 /// <|im_start|>user
-/// {few_shot_input}<|im_end|>
+/// {input}<|im_end|>
 /// <|im_start|>assistant
-/// <think>
-/// </think>
-/// {few_shot_output}<|im_end|>
-/// ...
-/// <|im_start|>user
-/// {raw_text}<|im_end|>
-/// <|im_start|>assistant
-/// <think>
-/// </think>
-///
 /// ```
-///
-/// We start with `<think>\n</think>\n` to disable thinking mode —
-/// for text cleanup we want direct output, not chain-of-thought.
-pub fn build_chatml(input: &PostProcessInput) -> String {
-    let style = &input.style_preset;
-
-    // Estimate capacity from all input lengths to avoid reallocations.
-    let dict_len: usize = input
-        .dictionary
-        .iter()
-        .map(|e| e.phrase.len() + e.replacement.len() + 8)
-        .sum();
-    let few_shot_len: usize = style
-        .few_shot_pairs
-        .iter()
-        .map(|(u, a)| u.len() + a.len() + 80)
-        .sum();
-    let ctx_len = input.context.as_ref().map_or(0, |c| c.len() + 20);
-    let prefix_len = input.prefix_context.as_ref().map_or(0, |p| p.len() + 10); // "Prefix: \n"
-    let cap = 128
-        + BASE_SYSTEM_PROMPT.len()
-        + style.style_instructions.len()
-        + dict_len
-        + few_shot_len
-        + ctx_len
-        + prefix_len
-        + style.user_prompt_template.len()
-        + input.raw_text.len();
-
-    let mut prompt = String::with_capacity(cap);
-
-    // System message with dictionary context.
-    prompt.push_str("<|im_start|>system\n");
-    prompt.push_str(BASE_SYSTEM_PROMPT);
-
-    if !style.style_instructions.is_empty() {
-        prompt.push_str("\n\n");
-        prompt.push_str(&style.style_instructions);
-    }
-
-    if !input.dictionary.is_empty() {
-        prompt.push_str("\n\nDictionary terms (always use these exact spellings):");
-        for entry in &input.dictionary {
-            prompt.push_str("\n- ");
-            prompt.push_str(&entry.phrase);
-            prompt.push_str(" → ");
-            prompt.push_str(&entry.replacement);
-        }
-    }
-
-    prompt.push_str("<|im_end|>\n");
-
-    // Few-shot examples.
-    for (user_ex, assistant_ex) in &style.few_shot_pairs {
-        prompt.push_str("<|im_start|>user\n");
-        prompt.push_str(user_ex);
-        prompt.push_str("\n/no_think<|im_end|>\n");
-        prompt.push_str("<|im_start|>assistant\n<think>\n\n</think>\n\n");
-        prompt.push_str(assistant_ex);
-        prompt.push_str("<|im_end|>\n");
-    }
-
-    // Actual user input — inline template substitution to avoid an intermediate allocation.
-    prompt.push_str("<|im_start|>user\n");
-    let template = &style.user_prompt_template;
-
-    // First pass: expand {context} slot.
-    let ctx_text = input.context.as_deref().unwrap_or("");
-    let after_ctx = if let Some(idx) = template.find("{context}") {
-        let mut buf = String::with_capacity(template.len() + ctx_text.len());
-        buf.push_str(&template[..idx]);
-        buf.push_str(ctx_text);
-        buf.push_str(&template[idx + "{context}".len()..]);
-        std::borrow::Cow::Owned(buf)
-    } else {
-        std::borrow::Cow::Borrowed(template.as_str())
-    };
-
-    // Second pass: expand {prefix} slot.
-    // When prefix_context is set the fragment is an intra-utterance continuation;
-    // inject "Prefix: {text}\n" so the LLM knows not to capitalise or add punctuation.
-    let prefix_text = match &input.prefix_context {
-        Some(p) if !p.trim().is_empty() => {
-            let mut s = String::with_capacity(p.len() + 10);
-            s.push_str("Prefix: ");
-            s.push_str(p);
-            s.push('\n');
-            s
-        }
-        _ => String::new(),
-    };
-    let after_prefix = if let Some(idx) = after_ctx.find("{prefix}") {
-        let mut buf = String::with_capacity(after_ctx.len() + prefix_text.len());
-        buf.push_str(&after_ctx[..idx]);
-        buf.push_str(&prefix_text);
-        buf.push_str(&after_ctx[idx + "{prefix}".len()..]);
-        std::borrow::Cow::Owned(buf)
-    } else {
-        after_ctx
-    };
-
-    // Third pass: expand {raw_text} slot.
-    if let Some(idx) = after_prefix.find("{raw_text}") {
-        prompt.push_str(&after_prefix[..idx]);
-        prompt.push_str(&input.raw_text);
-        prompt.push_str(&after_prefix[idx + "{raw_text}".len()..]);
-    } else {
-        prompt.push_str(&after_prefix);
-    }
-    prompt.push_str("\n/no_think<|im_end|>\n");
-
-    // Start assistant turn with thinking disabled.
-    // Double newlines inside <think> block per Qwen3 official docs.
-    prompt.push_str("<|im_start|>assistant\n<think>\n\n</think>\n\n");
-
-    prompt
+pub fn build_prompt(input: &str) -> String {
+    format!(
+        "<|im_start|>system\n{SYSTEM}<|im_end|>\n\
+         <|im_start|>user\n{input}<|im_end|>\n\
+         <|im_start|>assistant\n"
+    )
 }
 
-/// Strip any `<think>...</think>` blocks and trim the output.
-#[inline]
-pub fn strip_thinking(text: &str) -> String {
-    const OPEN: &str = "<think>";
-    const CLOSE: &str = "</think>";
-    const IM_END: &str = "<|im_end|>";
+/// Build a ChatML training row (assistant turn closed with target).
+///
+/// Used by `train.py` and for dataset verification.
+pub fn format_training_row(input: &str, target: &str) -> String {
+    format!(
+        "<|im_start|>system\n{SYSTEM}<|im_end|>\n\
+         <|im_start|>user\n{input}<|im_end|>\n\
+         <|im_start|>assistant\n{target}<|im_end|>"
+    )
+}
 
-    let has_open = text.contains(OPEN);
-    let has_close = text.contains(CLOSE);
-    let has_im_end = text.contains(IM_END);
+/// Full pre-inference pipeline: strip fillers → build prompt.
+pub fn prepare_prompt(raw: &str, lang: &str) -> Result<String, FillerError> {
+    let cleaned = fillers::remove_fillers(raw, lang)?;
+    Ok(build_prompt(&cleaned))
+}
 
-    // Allocate once at input length; result after stripping will only be smaller.
+/// Post-process model output: strip leaked special tokens + residual markers.
+///
+/// mistral.rs may or may not strip stop tokens depending on sampler config.
+/// Safer to handle explicitly.
+pub fn post_process(output: &str) -> String {
+    let s = output.trim();
+    // Strip any leaked ChatML tokens
+    let s = s.replace("<|im_end|>", "").replace("<|im_start|>", "");
+    let s = s.trim();
+    // Strip residual [?word?] / [word] markers the model failed to resolve
+    strip_markers(s)
+}
+
+/// Prompt builder with configurable system prompt and language.
+///
+/// Holds `lang` and `system` as fields for cleaner API when adding
+/// ES/FR variants with different system prompts.
+pub struct PromptBuilder {
+    pub system: String,
+    pub lang: String,
+}
+
+impl Default for PromptBuilder {
+    fn default() -> Self {
+        Self {
+            system: SYSTEM.to_string(),
+            lang: "en".to_string(),
+        }
+    }
+}
+
+impl PromptBuilder {
+    pub fn new(lang: impl Into<String>) -> Self {
+        Self {
+            system: SYSTEM.to_string(),
+            lang: lang.into(),
+        }
+    }
+
+    pub fn with_system(mut self, system: impl Into<String>) -> Self {
+        self.system = system.into();
+        self
+    }
+
+    /// Build inference prompt (assistant turn open).
+    pub fn build_prompt(&self, input: &str) -> String {
+        format!(
+            "<|im_start|>system\n{}<|im_end|>\n\
+             <|im_start|>user\n{input}<|im_end|>\n\
+             <|im_start|>assistant\n",
+            self.system
+        )
+    }
+
+    /// Build training row (assistant turn closed).
+    pub fn format_training_row(&self, input: &str, target: &str) -> String {
+        format!(
+            "<|im_start|>system\n{}<|im_end|>\n\
+             <|im_start|>user\n{input}<|im_end|>\n\
+             <|im_start|>assistant\n{target}<|im_end|>",
+            self.system
+        )
+    }
+
+    /// Strip fillers for this language, then build inference prompt.
+    pub fn prepare_prompt(&self, raw: &str) -> Result<String, FillerError> {
+        let cleaned = fillers::remove_fillers(raw, &self.lang)?;
+        Ok(self.build_prompt(&cleaned))
+    }
+}
+
+/// Strip residual `[?word?]` and `[word]` markers from LLM output.
+///
+/// The span-correction prompt asks the LLM to replace `[?word?]` with corrected
+/// text, but small models sometimes emit partially stripped markers like `[word]`
+/// or fail to strip `[?word?]` entirely.
+pub fn strip_markers(text: &str) -> String {
+    if !text.contains('[') {
+        return text.to_string();
+    }
     let mut result = String::with_capacity(text.len());
-    let mut remaining = text;
-
-    if has_open || has_close || has_im_end {
-        // Strip matched <think>...</think> pairs.
-        while let Some(start) = remaining.find(OPEN) {
-            result.push_str(&remaining[..start]);
-            if let Some(end) = remaining[start..].find(CLOSE) {
-                remaining = &remaining[start + end + CLOSE.len()..];
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '[' {
+            // Collect everything up to the closing ']'.
+            let mut inner = String::new();
+            let mut found_close = false;
+            for ic in chars.by_ref() {
+                if ic == ']' {
+                    found_close = true;
+                    break;
+                }
+                inner.push(ic);
+            }
+            if found_close {
+                // Strip [?word?] → word, [word] → word.
+                let stripped = inner.strip_prefix('?').unwrap_or(&inner);
+                let stripped = stripped.strip_suffix('?').unwrap_or(stripped);
+                result.push_str(stripped);
             } else {
-                // Unclosed think tag — drop everything after it.
-                remaining = "";
-                break;
+                // Unclosed bracket — keep as-is.
+                result.push('[');
+                result.push_str(&inner);
             }
-        }
-        result.push_str(remaining);
-
-        // Handle bare </think> without opening tag — the model continued
-        // reasoning after our prefilled <think></think> and only emitted the
-        // closing tag. Drain in-place to avoid a new heap allocation.
-        if let Some(pos) = result.find(CLOSE) {
-            result.drain(0..pos + CLOSE.len());
-        }
-
-        // Also strip <|im_end|> if the model emits it.
-        if result.contains(IM_END) {
-            let cleaned = result.replace(IM_END, "");
-            result = cleaned;
-        }
-    } else {
-        result.push_str(text);
-    }
-
-    // Strip reasoning preambles that small models emit without think tags.
-    // These start with meta-commentary instead of the cleaned transcription.
-    const REASONING_PREFIXES: &[&str] = &[
-        "Okay, ",
-        "Okay,\n",
-        "Let me ",
-        "Let's ",
-        "I need to ",
-        "I'll ",
-        "First, ",
-        "First,\n",
-        "Starting with ",
-        "Step ",
-        "Sure, ",
-        "Here's ",
-        "Here is ",
-        "The user ",
-        "Now, ",
-        "Now I ",
-        "Alright, ",
-        "So, ",
-        "So the ",
-    ];
-    let trimmed = result.trim_start();
-    if REASONING_PREFIXES.iter().any(|p| trimmed.starts_with(p)) {
-        // The model is reasoning. Look for a double-newline break after the
-        // preamble — the actual output often follows after `\n\n`.
-        if let Some(pos) = result.find("\n\n") {
-            let after = result[pos + 2..].trim();
-            // If there's substantial text after the break, use it.
-            if after.len() > 3 {
-                result = after.to_string();
-            }
+        } else {
+            result.push(c);
         }
     }
-
-    // Trim in-place — avoids the `.trim().to_string()` double-allocation pattern.
-    let end_len = result.trim_end().len();
-    result.truncate(end_len);
-    let start_offset = result.len() - result.trim_start().len();
-    if start_offset > 0 {
-        result.drain(0..start_offset);
-    }
-
     result
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Arc;
-
-    use lune_core::config::StylePreset;
-    use lune_core::dict::DictionaryEntry;
 
     #[test]
-    fn chatml_basic_structure() {
-        let input = PostProcessInput {
-            raw_text: "hello um world".into(),
-            style_preset: Arc::new(StylePreset::general()),
-            app_category: None,
-            dictionary: vec![],
-            context: None,
-            prefix_context: None,
-        };
-        let prompt = build_chatml(&input);
-        assert!(prompt.starts_with("<|im_start|>system\n"));
-        assert!(prompt.contains("<|im_end|>"));
-        assert!(prompt.contains("hello um world"));
-        assert!(prompt.ends_with("<think>\n\n</think>\n\n"));
+    fn strip_markers_question_marks() {
+        assert_eq!(strip_markers("hello [?world?] there"), "hello world there");
     }
 
     #[test]
-    fn chatml_with_dictionary() {
-        let input = PostProcessInput {
-            raw_text: "use the lunevoice api".into(),
-            style_preset: Arc::new(StylePreset::general()),
-            app_category: None,
-            dictionary: vec![DictionaryEntry {
-                phrase: "lunevoice".into(),
-                replacement: "Lune Voice".into(),
-                priority: 10,
-            }],
-            context: None,
-            prefix_context: None,
-        };
-        let prompt = build_chatml(&input);
-        assert!(prompt.contains("lunevoice"));
-        assert!(prompt.contains("Lune Voice"));
+    fn strip_markers_bare_brackets() {
+        assert_eq!(strip_markers("the [most] important"), "the most important");
     }
 
     #[test]
-    fn chatml_with_context() {
-        let input = PostProcessInput {
-            raw_text: "hello world".into(),
-            style_preset: Arc::new(StylePreset::general()),
-            app_category: None,
-            dictionary: vec![],
-            context: Some("Context: I was just talking about Rust.\n".into()),
-            prefix_context: None,
-        };
-        let prompt = build_chatml(&input);
-        assert!(prompt.contains("Context: I was just talking about Rust.\nASR: hello world"));
+    fn strip_markers_no_brackets() {
+        assert_eq!(strip_markers("hello world"), "hello world");
     }
 
     #[test]
-    fn chatml_without_context_no_prefix() {
-        let input = PostProcessInput {
-            raw_text: "hello world".into(),
-            style_preset: Arc::new(StylePreset::general()),
-            app_category: None,
-            dictionary: vec![],
-            context: None,
-            prefix_context: None,
-        };
-        let prompt = build_chatml(&input);
-        // No context → {context} expands to empty string, template starts with "ASR:"
-        assert!(prompt.contains("<|im_start|>user\nASR: hello world\n"));
+    fn strip_markers_unclosed_bracket() {
+        assert_eq!(strip_markers("hello [world"), "hello [world");
     }
 
     #[test]
-    fn chatml_includes_few_shot() {
-        let input = PostProcessInput {
-            raw_text: "test".into(),
-            style_preset: Arc::new(StylePreset::general()),
-            app_category: None,
-            dictionary: vec![],
-            context: None,
-            prefix_context: None,
-        };
-        let prompt = build_chatml(&input);
-        // General preset has 4 few-shot pairs.
-        assert!(prompt.contains("ASR: so um I'm gonna go to the store"));
-        assert!(prompt.contains("I'm gonna go to the store and buy some more flour for the cake"));
-    }
-
-    #[test]
-    fn chatml_with_prefix_context() {
-        let input = PostProcessInput {
-            raw_text: "at a leisurely pace".into(),
-            style_preset: Arc::new(StylePreset::general()),
-            app_category: None,
-            dictionary: vec![],
-            context: None,
-            prefix_context: Some("they walked down the road".into()),
-        };
-        let prompt = build_chatml(&input);
-        assert!(prompt.contains("Prefix: they walked down the road\nASR: at a leisurely pace"));
-    }
-
-    #[test]
-    fn chatml_no_prefix_when_none() {
-        let input = PostProcessInput {
-            raw_text: "hello world".into(),
-            style_preset: Arc::new(StylePreset::general()),
-            app_category: None,
-            dictionary: vec![],
-            context: None,
-            prefix_context: None,
-        };
-        let prompt = build_chatml(&input);
-        // The final user turn (last <|im_start|>user block) must not inject a Prefix line.
-        // Few-shot pairs may contain "Prefix:" as teaching examples — that's expected.
-        let last_user_turn = prompt
-            .rsplit("<|im_start|>user\n")
-            .next()
-            .expect("should have user turn");
-        assert!(
-            !last_user_turn.contains("Prefix:"),
-            "final user turn should not inject Prefix: when prefix_context is None"
+    fn strip_markers_mixed() {
+        assert_eq!(
+            strip_markers("the [?oth?] service [provided] for [?them?]"),
+            "the oth service provided for them"
         );
-        assert!(prompt.contains("ASR: hello world"));
     }
 
     #[test]
-    fn strip_thinking_basic() {
-        let text = "<think>reasoning here</think>The answer is 42.";
-        assert_eq!(strip_thinking(text), "The answer is 42.");
+    fn build_prompt_format() {
+        let p = build_prompt("the [?whether?] was nice");
+        assert!(p.starts_with("<|im_start|>system\n"));
+        assert!(p.contains("<|im_start|>user\nthe [?whether?] was nice<|im_end|>"));
+        assert!(p.ends_with("<|im_start|>assistant\n"));
     }
 
     #[test]
-    fn strip_thinking_empty() {
-        let text = "<think></think>Clean output.";
-        assert_eq!(strip_thinking(text), "Clean output.");
+    fn training_row_format() {
+        let r = format_training_row("the [?whether?] was nice", "the weather was nice");
+        assert!(r.contains("<|im_start|>user\nthe [?whether?] was nice<|im_end|>"));
+        assert!(r.contains("<|im_start|>assistant\nthe weather was nice<|im_end|>"));
     }
 
     #[test]
-    fn strip_thinking_no_tags() {
-        let text = "Just regular text.";
-        assert_eq!(strip_thinking(text), "Just regular text.");
+    fn post_process_strips_leaked_tokens() {
+        assert_eq!(
+            post_process("the weather was nice<|im_end|>"),
+            "the weather was nice"
+        );
+        assert_eq!(
+            post_process("<|im_start|>the weather was nice"),
+            "the weather was nice"
+        );
     }
 
     #[test]
-    fn strip_im_end() {
-        let text = "Hello world.<|im_end|>";
-        assert_eq!(strip_thinking(text), "Hello world.");
+    fn post_process_strips_residual_markers() {
+        assert_eq!(
+            post_process("the [?weather?] was nice"),
+            "the weather was nice"
+        );
     }
 
     #[test]
-    fn strip_bare_close_think() {
-        // Model ignored prefill and produced reasoning with only a closing tag.
-        let text = "Okay, the user wrote something...\n</think>\n\nThe meeting is at 3.";
-        assert_eq!(strip_thinking(text), "The meeting is at 3.");
+    fn prompt_builder_custom_lang() {
+        let pb = PromptBuilder::new("fr");
+        assert_eq!(pb.lang, "fr");
+        let p = pb.build_prompt("test");
+        assert!(p.contains(SYSTEM));
     }
 
     #[test]
-    fn strip_reasoning_preamble() {
-        // Model reasons in plain text without think tags — common with 0.6B.
-        let text = "Okay, let's process this ASR input.\n\nThe meeting is at three.";
-        assert_eq!(strip_thinking(text), "The meeting is at three.");
-    }
-
-    #[test]
-    fn no_strip_legit_okay() {
-        // "So, " at start is a reasoning prefix but if no \n\n break, keep as-is.
-        let text = "So, the meeting is at three.";
-        assert_eq!(strip_thinking(text), "So, the meeting is at three.");
+    fn prompt_builder_custom_system() {
+        let pb = PromptBuilder::new("en").with_system("Custom prompt.");
+        let p = pb.build_prompt("test");
+        assert!(p.contains("Custom prompt."));
+        assert!(!p.contains(SYSTEM));
     }
 }

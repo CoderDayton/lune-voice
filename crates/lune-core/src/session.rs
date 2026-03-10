@@ -62,6 +62,8 @@ pub enum SessionEvent {
     FinalizedText(String),
     /// Async LLM correction for a previously-delivered low-confidence utterance.
     CorrectedText(String),
+    /// Pipeline is processing accumulated audio (batch ASR + LLM).
+    Processing,
     CommandDetected(String),
     Error(String),
     Stopped,
@@ -77,7 +79,7 @@ impl SessionEvent {
             | Self::CorrectedText(s)
             | Self::CommandDetected(s)
             | Self::Error(s) => Some(s.as_str()),
-            Self::Started | Self::Stopped => None,
+            Self::Started | Self::Processing | Self::Stopped => None,
         }
     }
 
@@ -98,7 +100,7 @@ mod tests {
             id: Uuid::new_v4(),
             started_at: Utc::now(),
             ended_at: None,
-            style: "general".into(),
+            style: "casual".into(),
             backend: AsrBackendKind::ParakeetTdt,
             status: SessionStatus::Active,
             transcript: None,
@@ -106,7 +108,7 @@ mod tests {
         let json = serde_json::to_string(&session).unwrap();
         let parsed: DictationSession = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.id, session.id);
-        assert_eq!(parsed.style, "general");
+        assert_eq!(parsed.style, "casual");
     }
 
     #[test]
@@ -126,7 +128,7 @@ mod tests {
             id: Uuid::new_v4(),
             started_at: Utc::now(),
             ended_at: None,
-            style: "general".into(),
+            style: "casual".into(),
             backend: AsrBackendKind::ParakeetTdt,
             status: SessionStatus::Active,
             transcript: None,
@@ -145,7 +147,7 @@ mod tests {
             id: Uuid::new_v4(),
             started_at: Utc::now(),
             ended_at: None,
-            style: "general".into(),
+            style: "casual".into(),
             backend: AsrBackendKind::ParakeetTdt,
             status: SessionStatus::Active,
             transcript: None,

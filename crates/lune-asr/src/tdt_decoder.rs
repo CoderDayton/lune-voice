@@ -92,10 +92,20 @@ impl TdtModel {
     }
 
     /// Run full transcription pipeline: encode → greedy decode → token-to-text.
-    pub fn transcribe(&mut self, features: Array2<f32>) -> Result<TranscriptionResult> {
+    /// Returns the result plus raw decoded tokens for per-word confidence extraction.
+    pub fn transcribe_with_tokens(
+        &mut self,
+        features: Array2<f32>,
+    ) -> Result<(TranscriptionResult, Vec<DecodedToken>)> {
         let (encoder_out, _encoder_len) = self.run_encoder(&features)?;
         let decoded_tokens = self.greedy_decode(&encoder_out)?;
-        self.tokens_to_text(&decoded_tokens)
+        let result = self.tokens_to_text(&decoded_tokens)?;
+        Ok((result, decoded_tokens))
+    }
+
+    /// Access the vocabulary (needed for word confidence extraction).
+    pub fn vocab(&self) -> &Vocabulary {
+        &self.vocab
     }
 
     // ── Encoder ──────────────────────────────────────────────────────────

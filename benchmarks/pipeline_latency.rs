@@ -6,37 +6,30 @@
 //! All 5 stages use real model inference — no simulated data, no thread::sleep.
 //! Gracefully skips if model directories are missing.
 
-use std::path::PathBuf;
+#[allow(dead_code)]
+#[path = "bench_utils.rs"]
+mod bench_utils;
+
 use std::sync::Arc;
 use std::time::Instant;
 
-use lune_asr::{OrtQwenAsrBackend, OrtQwenAsrConfig, compute_qwen_mel};
-use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
-use lune_core::config::StylePreset;
-use lune_core::llm::{PostProcessInput, TextPostProcessor};
-use lune_llm::{OrtLlmBackend, OrtLlmConfig};
-
-use lune_app::{
-    SILENCE_FLUSH_SAMPLES, SILENCE_TIER_DEFAULT, SILENCE_TIER_HIGH, SILENCE_TIER_LOW,
-    SILENCE_TIER_MODERATE, SILENCE_TIER_SPECULATIVE, SILENCE_TIER_VERY_HIGH,
-    dynamic_silence_threshold,
+use bench_utils::{
+    Fixture, brent_minimize, char_error_rate, init_ort, load_fixtures, percentile, word_error_rate,
+    workspace_root, wrap_print,
 };
-
-const SAMPLE_RATE: usize = 16_000;
-
-// ─── Data structures ────────────────────────────────────────────────────────
-
-struct Fixture {
-    name: &'static str,
-    pcm: Vec<f32>,
-    reference: String,
-    audio_secs: f64,
-}
+use lune_asr::{AsrRegistry, compute_qwen_mel};
+use lune_audio::{VadSegmenter, VadSegmenterConfig};
+use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
+use lune_core::config::{AsrBackendConfig, DevicePolicy, StylePreset};
+use lune_core::llm::{PostProcessInput, TextPostProcessor};
+use lune_llm::{LlamaCppBackend, LlamaCppConfig};
 
 struct AsrResult {
     segments: Vec<AsrSegment>,
     hypothesis: String,
+    #[allow(dead_code)]
     total_secs: f64,
+    #[allow(dead_code)]
     chunk_latencies_ms: Vec<f64>,
 }
 
@@ -49,55 +42,73 @@ fn main() {
     println!("╚══════════════════════════════════════════════════════════════════╝");
     println!();
 
-    // ── ORT init: try CUDA, auto-fall-back to CPU ───────────────────────────
-    let has_gpu = ort::init()
-        .with_execution_providers([ort::ep::CUDA::default().build()])
-        .commit();
-    if has_gpu {
-        println!("  [info] ORT: CUDA EP active");
-    } else {
-        let _ = ort::init().commit();
-        println!("  [info] ORT: CPU only (CUDA not available)");
-    }
+    let has_gpu = init_ort();
 
     let root = workspace_root();
 
-    // ── Load ASR backend ────────────────────────────────────────────────────
-    let asr_model_dir = root.join("models/qwen3-asr-0.6b-onnx");
-    if !asr_model_dir.exists() {
-        println!(
-            "  [skip] ASR model dir not found: {}",
-            asr_model_dir.display()
-        );
-        println!("  Download models first. Exiting.");
+    // ── Load ASR backends (all available) ──────────────────────────────────
+    let device = if has_gpu {
+        DevicePolicy::Cuda
+    } else {
+        DevicePolicy::Cpu
+    };
+    let parakeet_dir = root.join("models/parakeet-tdt-0.6b");
+    let qwen_dir = root.join("models/qwen3-asr-0.6b-onnx");
+
+    let mut backends: Vec<(&str, AsrRegistry)> = Vec::new();
+
+    if parakeet_dir.exists() {
+        print!("  Loading Parakeet TDT ... ");
+        let t = Instant::now();
+        let cfg = AsrBackendConfig::ParakeetTdt {
+            model_dir: parakeet_dir,
+        };
+        match AsrRegistry::from_config(&cfg, device) {
+            Ok(b) => {
+                println!("{:.1}s", t.elapsed().as_secs_f64());
+                backends.push(("Parakeet-TDT-int8", b));
+            }
+            Err(e) => println!("[fail] {e}"),
+        }
+    }
+
+    if qwen_dir.exists() {
+        print!("  Loading OrtQwen ASR (batch) ... ");
+        let t = Instant::now();
+        let cfg = AsrBackendConfig::OrtQwenAsr {
+            model_dir: qwen_dir,
+        };
+        match AsrRegistry::from_config(&cfg, device) {
+            Ok(b) => {
+                println!("{:.1}s", t.elapsed().as_secs_f64());
+                backends.push(("OrtQwen-INT4-batch", b));
+            }
+            Err(e) => println!("[fail] {e}"),
+        }
+    }
+
+    if backends.is_empty() {
+        println!("  [skip] No ASR model dirs found. Download models first. Exiting.");
         return;
     }
 
-    println!("  Loading ASR backend ...");
-    let t = Instant::now();
-    let asr = match OrtQwenAsrBackend::new(OrtQwenAsrConfig {
-        model_dir: asr_model_dir,
-        use_gpu: has_gpu,
-        ..Default::default()
-    }) {
-        Ok(b) => b,
-        Err(e) => {
-            println!("  [skip] ASR backend load failed: {e}");
-            return;
-        }
-    };
-    println!("  ASR loaded in {:.1}s", t.elapsed().as_secs_f64());
+    // Primary backend is the first loaded (used for stages 3-6)
+    let primary_name = backends[0].0;
 
     // ── Load LLM backend (optional — stages 1-3 still run without it) ─────
-    let llm_model_dir = root.join("models/qwen3-0.6b-onnx");
-    let llm: Option<OrtLlmBackend> = if llm_model_dir.exists() {
+    let llm_model_path = root.join("models/llm-corrector-gguf/qwen2.5-1.5b-instruct.Q4_K_M.gguf");
+    let rt_llm = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("tokio runtime for LLM init");
+    let llm: Option<LlamaCppBackend> = if llm_model_path.exists() {
         println!("  Loading LLM backend ...");
         let t = Instant::now();
-        match OrtLlmBackend::new(OrtLlmConfig {
-            model_dir: llm_model_dir,
-            use_gpu: has_gpu,
+        match rt_llm.block_on(LlamaCppBackend::new(LlamaCppConfig {
+            model_path: llm_model_path,
+            n_gpu_layers: if has_gpu { 999 } else { 0 },
             ..Default::default()
-        }) {
+        })) {
             Ok(b) => {
                 println!("  LLM loaded in {:.1}s", t.elapsed().as_secs_f64());
                 Some(b)
@@ -109,58 +120,90 @@ fn main() {
             }
         }
     } else {
-        println!("  [info] LLM model dir not found — stages 4-5 LLM portions skipped");
+        println!("  [info] LLM model not found — stages 4-5 LLM portions skipped");
         None
     };
 
     // ── Load fixtures ───────────────────────────────────────────────────────
-    let fixture_defs: &[(&'static str, &str, &str)] = &[
-        (
-            "librispeech_clean",
-            "test_fixtures/librispeech_clean.wav",
-            "test_fixtures/librispeech_clean.txt",
-        ),
-        (
-            "librispeech_40744",
-            "test_fixtures/librispeech_40744.wav",
-            "test_fixtures/librispeech_40744.txt",
-        ),
-    ];
-
-    let mut fixtures: Vec<Fixture> = Vec::new();
-    for &(name, wav_rel, txt_rel) in fixture_defs {
-        let wav_path = root.join(wav_rel);
-        if !wav_path.exists() {
-            println!("  [skip] {name}: {} not found", wav_path.display());
-            continue;
-        }
-        let pcm = load_wav_f32(&wav_path);
-        let audio_secs = pcm.len() as f64 / SAMPLE_RATE as f64;
-        let reference = std::fs::read_to_string(root.join(txt_rel))
-            .unwrap_or_default()
-            .trim()
-            .to_string();
-        println!("  Loaded {name}: {audio_secs:.1}s ({} samples)", pcm.len());
-        fixtures.push(Fixture {
-            name,
-            pcm,
-            reference,
-            audio_secs,
-        });
-    }
-
+    let fixtures = load_fixtures(&root);
     if fixtures.is_empty() {
         println!("  [skip] No WAV fixtures found. Exiting.");
         return;
     }
     println!();
 
+    // ── Load FP16 decoder ASR backend (optional — Stage 7, OrtQwen only) ──
+    let fp16_model_dir = root.join("models/qwen3-asr-0.6b-onnx-fp16dec");
+    let asr_fp16: Option<AsrRegistry> = if fp16_model_dir.exists() {
+        println!("  Loading FP16-decoder ASR backend ...");
+        let t = Instant::now();
+        let fp16_config = AsrBackendConfig::OrtQwenAsr {
+            model_dir: fp16_model_dir,
+        };
+        match AsrRegistry::from_config(&fp16_config, device) {
+            Ok(b) => {
+                println!(
+                    "  FP16-decoder ASR loaded in {:.1}s",
+                    t.elapsed().as_secs_f64()
+                );
+                Some(b)
+            }
+            Err(e) => {
+                println!("  [warn] FP16-decoder ASR load failed: {e}");
+                None
+            }
+        }
+    } else {
+        println!("  [info] FP16-decoder model not found — Stage 7 will be skipped");
+        None
+    };
+
     // ── Run stages ──────────────────────────────────────────────────────────
-    bench_mel_extraction(&fixtures);
-    let asr_results = bench_asr_streaming(&asr, &fixtures);
+    // Stage 1 (mel extraction) — Qwen-specific
+    if backends.iter().any(|(_, b)| b.as_ort_qwen().is_some()) {
+        bench_mel_extraction(&fixtures);
+    } else {
+        println!("── Stage 1: Mel Extraction ── [skipped — no OrtQwen backend]");
+        println!();
+    }
+
+    // Stage 2: Run ASR on ALL backends for comparison
+    let mut primary_results: Option<Vec<AsrResult>> = None;
+    for (name, backend) in &backends {
+        println!("══ Backend: {} ══", name);
+        let is_batch = name.contains("batch");
+        let pipeline = backend.pipeline_config();
+        let vad_config = VadSegmenterConfig {
+            speech_threshold: pipeline.speech_threshold,
+            min_speech_ms: pipeline.min_speech_ms,
+            sentence_close_ms: pipeline.sentence_close_ms,
+            hard_close_ms: pipeline.hard_close_ms,
+            max_segment_ms: pipeline.max_segment_ms,
+            adaptive: pipeline.adaptive_vad,
+        };
+        if !is_batch {
+            println!("  VAD max_segment_ms: {}", vad_config.max_segment_ms);
+        } else {
+            println!("  Mode: batch + overlap stitching (no VAD segmenter)");
+        }
+        println!();
+        let results = bench_asr_streaming(backend, &fixtures, vad_config, is_batch);
+        if primary_results.is_none() {
+            primary_results = Some(results);
+        }
+    }
+    let asr_results = primary_results.unwrap();
+    println!("  (Stages 3-6 use primary backend: {})", primary_name);
+    println!();
+
+    // Stages 3-6 use primary backend results
     bench_confidence_gate(&asr_results);
-    let llm_results = bench_llm_postprocess(llm.as_ref(), &asr_results, &fixtures);
-    bench_full_summary(&fixtures, &asr_results, &llm_results);
+    bench_threshold_sweep(llm.as_ref(), &asr_results, &fixtures);
+    bench_vad_timing_sweep(&backends[0].1, &fixtures);
+    bench_adaptive_vad(&backends[0].1, &fixtures);
+    if let Some(ref fp16) = asr_fp16 {
+        bench_fp16_decoder(fp16, &asr_results, &fixtures);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -212,8 +255,13 @@ fn bench_mel_extraction(fixtures: &[Fixture]) {
 // Stage 2: ASR Streaming Inference (real model, per-chunk timing)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-fn bench_asr_streaming(asr: &OrtQwenAsrBackend, fixtures: &[Fixture]) -> Vec<AsrResult> {
-    println!("── Stage 2: ASR Streaming Inference ──────────────────────────────");
+fn bench_asr_streaming(
+    asr: &(impl AsrBackend + Sync),
+    fixtures: &[Fixture],
+    vad_config: VadSegmenterConfig,
+    use_batch: bool,
+) -> Vec<AsrResult> {
+    println!("── Stage 2: ASR Inference ────────────────────────────────────────");
     println!();
 
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -224,8 +272,15 @@ fn bench_asr_streaming(asr: &OrtQwenAsrBackend, fixtures: &[Fixture]) -> Vec<Asr
     let mut results: Vec<AsrResult> = Vec::new();
 
     for fix in fixtures {
-        let (segments, total_secs, chunk_latencies_ms) =
-            rt.block_on(transcribe_timed(asr, &fix.pcm));
+        let (segments, total_secs, chunk_latencies_ms) = if use_batch {
+            rt.block_on(transcribe_batch(asr, &fix.pcm))
+        } else {
+            rt.block_on(transcribe_timed_with_config(
+                asr,
+                &fix.pcm,
+                vad_config.clone(),
+            ))
+        };
 
         let hypothesis = segments
             .iter()
@@ -287,11 +342,11 @@ fn bench_asr_streaming(asr: &OrtQwenAsrBackend, fixtures: &[Fixture]) -> Vec<Asr
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Stage 3: Confidence Gate Sweep (real segment confidences)
+// Stage 3: Per-Word Confidence Analysis
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn bench_confidence_gate(asr_results: &[AsrResult]) {
-    println!("── Stage 3: Confidence Gate Sweep ──────────────────────────────────");
+    println!("── Stage 3: Per-Word Confidence Analysis ──────────────────────────");
     println!();
 
     let all_segs: Vec<&AsrSegment> = asr_results.iter().flat_map(|r| &r.segments).collect();
@@ -303,104 +358,151 @@ fn bench_confidence_gate(asr_results: &[AsrResult]) {
         return;
     }
 
+    // Collect all word confidences across segments.
+    let all_word_confs: Vec<f32> = all_segs
+        .iter()
+        .flat_map(|s| s.word_confidences.iter().map(|wc| wc.confidence))
+        .collect();
+    let n_words = all_word_confs.len();
+
     println!("  Total segments: {n_segs}");
+    println!("  Total words (with confidence): {n_words}");
+
+    if n_words > 0 {
+        let mut sorted = all_word_confs.clone();
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let mean = sorted.iter().sum::<f32>() / n_words as f32;
+        let min = sorted[0];
+        let max = sorted[n_words - 1];
+        let p10 = sorted[(n_words as f64 * 0.10) as usize];
+        let p25 = sorted[(n_words as f64 * 0.25) as usize];
+        let p50 = sorted[n_words / 2];
+
+        println!();
+        println!("  Word confidence distribution:");
+        println!("    mean={mean:.3}  min={min:.3}  max={max:.3}");
+        println!("    p10={p10:.3}  p25={p25:.3}  p50={p50:.3}");
+    }
     println!();
 
-    // Threshold sweep (mean threshold, with min_token_threshold = 0.70)
+    // Threshold sweep: at each level, show % words marked and % segments triggering LLM.
     println!(
-        "  {:>12}  {:>10}  {:>10}  {:>12}  {:>14}",
-        "Threshold", "Bypass %", "Bypassed", "LLM-routed", "Silence tier"
+        "  {:>12}  {:>12}  {:>12}  {:>14}",
+        "Threshold", "Words marked", "% marked", "Segs w/ marks"
     );
-    println!("  {}", "─".repeat(64));
+    println!("  {}", "─".repeat(56));
 
-    for &thr in &[0.70f32, 0.80, 0.90, 0.95, 0.99] {
-        let bypassed = all_segs
+    for &thr in &[0.70f32, 0.80, 0.85, 0.90, 0.95] {
+        let marked_words = all_word_confs.iter().filter(|&&c| c < thr).count();
+        let marked_pct = if n_words > 0 {
+            marked_words as f64 / n_words as f64 * 100.0
+        } else {
+            0.0
+        };
+        let segs_with_marks = all_segs
             .iter()
-            .filter(|s| s.is_confident_gated(thr, 0.70))
+            .filter(|s| s.has_uncertain_words(thr))
             .count();
-        let bypass_pct = bypassed as f64 / n_segs as f64 * 100.0;
-        let silence_samples = dynamic_silence_threshold(Some(thr), true);
-        let silence_ms = samples_to_ms(silence_samples);
 
         println!(
-            "  {:>11.0}%  {:>9.1}%  {:>10}  {:>12}  {:>12} ms",
+            "  {:>11.0}%  {:>12}  {:>10.1}%  {:>8} / {}",
             thr * 100.0,
-            bypass_pct,
-            bypassed,
-            n_segs - bypassed,
-            silence_ms,
+            marked_words,
+            marked_pct,
+            segs_with_marks,
+            n_segs,
         );
     }
+    println!();
 
-    println!();
-    println!("  Silence tier constants (samples @ 16kHz):");
-    println!(
-        "    SPECULATIVE = {:>5}  ({:>3} ms)  (>= 99%)",
-        SILENCE_TIER_SPECULATIVE,
-        samples_to_ms(SILENCE_TIER_SPECULATIVE)
-    );
-    println!(
-        "    VERY_HIGH   = {:>5}  ({:>3} ms)  (>= 95%)",
-        SILENCE_TIER_VERY_HIGH,
-        samples_to_ms(SILENCE_TIER_VERY_HIGH)
-    );
-    println!(
-        "    HIGH        = {:>5}  ({:>3} ms)  (>= 90%)",
-        SILENCE_TIER_HIGH,
-        samples_to_ms(SILENCE_TIER_HIGH)
-    );
-    println!(
-        "    MODERATE    = {:>5}  ({:>3} ms)  (>= 80%)",
-        SILENCE_TIER_MODERATE,
-        samples_to_ms(SILENCE_TIER_MODERATE)
-    );
-    println!(
-        "    LOW         = {:>5}  ({:>3} ms)  (>= 70%)",
-        SILENCE_TIER_LOW,
-        samples_to_ms(SILENCE_TIER_LOW)
-    );
-    println!(
-        "    DEFAULT     = {:>5}  ({:>3} ms)  (< 70%)",
-        SILENCE_TIER_DEFAULT,
-        samples_to_ms(SILENCE_TIER_DEFAULT)
-    );
-    println!(
-        "    STATIC      = {:>5}  ({:>3} ms)  (when disabled)",
-        SILENCE_FLUSH_SAMPLES,
-        samples_to_ms(SILENCE_FLUSH_SAMPLES)
-    );
-    println!();
+    // Print example prepared text for each result set.
+    for asr_res in asr_results {
+        let (prepared, has_uncertain) = lune_llm::prepare_input(&asr_res.segments, 0.85, "en");
+        if !prepared.is_empty() {
+            println!(
+                "  Prepared text (threshold=0.85, uncertain={}):",
+                has_uncertain
+            );
+            wrap_print("    ", &prepared, 72);
+            println!();
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Stage 4: LLM Post-Processing (real model on low-confidence segments)
+// Stage 4: Threshold Sweep — ASR once, LLM at each threshold, compare WER
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Per-fixture LLM results for summary.
-struct LlmResult {
-    /// Number of segments that failed the confidence gate.
-    #[allow(dead_code)]
-    segments_processed: usize,
-    /// Total LLM inference time for this fixture.
-    total_secs: f64,
-    /// LLM-corrected full hypothesis (gate-bypassed segments keep original text).
-    corrected_hypothesis: String,
+/// Per-fixture result at a given threshold.
+struct ThresholdResult {
+    threshold: f32,
+    words_marked: usize,
+    segs_with_marks: usize,
+    llm_ms: f64,
+    hypothesis: String,
+    wer: f64,
+    cer: f64,
+    bypassed: bool,
 }
 
-fn bench_llm_postprocess(
-    llm: Option<&OrtLlmBackend>,
+fn bench_threshold_sweep(
+    llm: Option<&LlamaCppBackend>,
     asr_results: &[AsrResult],
     fixtures: &[Fixture],
-) -> Vec<Option<LlmResult>> {
-    println!("── Stage 4: LLM Post-Processing ──────────────────────────────────");
+) {
+    println!("── Stage 4: Threshold Sweep (ASR once → LLM at each threshold) ──");
+    println!();
+
+    // Also compute raw ASR WER (no LLM) as baseline.
+    for (i, fix) in fixtures.iter().enumerate() {
+        let asr_res = &asr_results[i];
+        if !fix.reference.is_empty() {
+            let raw_wer = word_error_rate(&asr_res.hypothesis, &fix.reference) * 100.0;
+            let raw_cer = char_error_rate(&asr_res.hypothesis, &fix.reference) * 100.0;
+            println!(
+                "  {} — raw ASR (no LLM): WER={:.1}%  CER={:.1}%",
+                fix.name, raw_wer, raw_cer
+            );
+        }
+    }
+    println!();
+
+    // Diagnostic: per-word confidence + marked text at 0.75 threshold.
+    println!("── Pipeline Trace (per-word confidence @ 75%) ──");
+    println!();
+    for (i, fix) in fixtures.iter().enumerate() {
+        let asr_res = &asr_results[i];
+        println!("  {} — word confidences:", fix.name);
+        for seg in &asr_res.segments {
+            for wc in &seg.word_confidences {
+                let marker = if wc.confidence < 0.75 { " ◄" } else { "" };
+                print!(
+                    "    {:>6.1}%  {}{}\n",
+                    wc.confidence * 100.0,
+                    wc.word,
+                    marker
+                );
+            }
+        }
+        let (prepared, has_uncertain) = lune_llm::prepare_input(&asr_res.segments, 0.75, "en");
+        println!("  Marked input (uncertain={}):", has_uncertain);
+        wrap_print("    ", &prepared, 90);
+        println!("  Raw ASR:");
+        wrap_print("    ", &asr_res.hypothesis, 90);
+        if !fix.reference.is_empty() {
+            println!("  Reference:");
+            wrap_print("    ", &fix.reference, 90);
+        }
+        println!();
+    }
     println!();
 
     let llm = match llm {
         Some(l) => l,
         None => {
-            println!("  [skip] LLM backend not available.");
+            println!("  [skip] LLM backend not available — cannot sweep thresholds.");
             println!();
-            return asr_results.iter().map(|_| None).collect();
+            return;
         }
     };
 
@@ -409,234 +511,399 @@ fn bench_llm_postprocess(
         .build()
         .expect("tokio runtime");
 
-    let style = Arc::new(StylePreset::general());
-    let mut results: Vec<Option<LlmResult>> = Vec::new();
+    let style = Arc::new(StylePreset::casual());
+    let thresholds: &[f32] = &[0.50, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95];
 
-    for (asr_res, fix) in asr_results.iter().zip(fixtures.iter()) {
-        let low_conf_segs: Vec<&AsrSegment> = asr_res
-            .segments
-            .iter()
-            .filter(|s| !s.is_confident_gated(0.95, 0.70))
-            .collect();
+    // Collect all word confidences for distribution context.
+    let all_word_confs: Vec<f32> = asr_results
+        .iter()
+        .flat_map(|r| r.segments.iter())
+        .flat_map(|s| s.word_confidences.iter().map(|wc| wc.confidence))
+        .collect();
+    let n_words = all_word_confs.len();
 
-        if low_conf_segs.is_empty() {
-            println!("  {} — all segments bypassed gate, no LLM needed", fix.name);
-            println!();
-            results.push(Some(LlmResult {
-                segments_processed: 0,
-                total_secs: 0.0,
-                corrected_hypothesis: asr_res.hypothesis.clone(),
-            }));
-            continue;
-        }
+    // Cache LLM results by prepared text — same text at different thresholds reuses result.
+    let mut llm_cache: std::collections::HashMap<String, (String, f64)> =
+        std::collections::HashMap::new();
 
-        println!(
-            "  {} — {} / {} segments below gate (mean<0.95 or min_tok<0.70):",
-            fix.name,
-            low_conf_segs.len(),
-            asr_res.segments.len()
-        );
+    let mut all_results: Vec<Vec<ThresholdResult>> = Vec::new();
 
-        let mut total_llm_secs = 0.0;
-        let mut corrected_parts: Vec<String> = Vec::new();
+    for (i, (asr_res, fix)) in asr_results.iter().zip(fixtures.iter()).enumerate() {
+        println!("  {} — sweeping {} thresholds:", fix.name, thresholds.len());
 
-        for seg in &asr_res.segments {
-            if seg.is_confident_gated(0.95, 0.70) {
-                corrected_parts.push(seg.text.trim().to_string());
-                continue;
-            }
+        let mut fixture_results: Vec<ThresholdResult> = Vec::new();
 
-            let input = PostProcessInput {
-                raw_text: seg.text.trim().to_string(),
-                style_preset: Arc::clone(&style),
-                app_category: None,
-                dictionary: vec![],
-                context: None,
-                prefix_context: None,
+        for &thr in thresholds {
+            let (prepared, has_uncertain) = lune_llm::prepare_input(&asr_res.segments, thr, "en");
+
+            let words_marked = asr_res
+                .segments
+                .iter()
+                .flat_map(|s| &s.word_confidences)
+                .filter(|wc| wc.confidence < thr)
+                .count();
+
+            let segs_with_marks = asr_res
+                .segments
+                .iter()
+                .filter(|s| s.has_uncertain_words(thr))
+                .count();
+
+            // Run LLM per-threshold with the actual prepared text (different markings per threshold).
+            // Cache by prepared text to avoid re-running LLM when two thresholds produce identical text.
+            let (hyp, llm_ms, bypassed) = if !has_uncertain {
+                (prepared, 0.0, true)
+            } else if let Some((corrected, ms)) = llm_cache.get(&prepared) {
+                (corrected.clone(), *ms, false)
+            } else {
+                let t = Instant::now();
+                let input = PostProcessInput {
+                    raw_text: prepared.clone(),
+                    style_preset: Arc::clone(&style),
+                    app_category: None,
+                    dictionary: vec![],
+                    context: None,
+                    language: "en".into(),
+                };
+                let corrected = match rt.block_on(llm.transform(&input)) {
+                    Ok(output) => output.cleaned_text.trim().to_string(),
+                    Err(e) => {
+                        println!("    [warn] LLM failed for fixture {i} thr={thr}: {e}");
+                        prepared.clone()
+                    }
+                };
+                let ms = t.elapsed().as_secs_f64() * 1000.0;
+                println!(
+                    "    LLM [{:.0}%]: {ms:.0}ms → {:?}",
+                    thr * 100.0,
+                    &corrected[..corrected.len().min(80)]
+                );
+                llm_cache.insert(prepared, (corrected.clone(), ms));
+                (corrected, ms, false)
             };
 
-            let t = Instant::now();
-            match rt.block_on(llm.transform(&input)) {
-                Ok(output) => {
-                    let llm_ms = t.elapsed().as_secs_f64() * 1000.0;
-                    total_llm_secs += t.elapsed().as_secs_f64();
-                    let conf_str = seg
-                        .confidence
-                        .map(|c| format!("{c:.3}"))
-                        .unwrap_or_else(|| "none".into());
-                    println!(
-                        "    [{llm_ms:.0}ms] conf={conf_str}  \"{}\"\n             → \"{}\"",
-                        seg.text.trim(),
-                        output.cleaned_text.trim()
-                    );
-                    corrected_parts.push(output.cleaned_text.trim().to_string());
-                }
-                Err(e) => {
-                    println!("    [error] LLM transform failed: {e}");
-                    corrected_parts.push(seg.text.trim().to_string());
-                }
-            }
+            let (wer, cer) = if fix.reference.is_empty() {
+                (0.0, 0.0)
+            } else {
+                (
+                    word_error_rate(&hyp, &fix.reference) * 100.0,
+                    char_error_rate(&hyp, &fix.reference) * 100.0,
+                )
+            };
+
+            fixture_results.push(ThresholdResult {
+                threshold: thr,
+                words_marked,
+                segs_with_marks,
+                llm_ms,
+                hypothesis: hyp,
+                wer,
+                cer,
+                bypassed,
+            });
         }
 
-        let corrected_hypothesis = corrected_parts
-            .into_iter()
-            .filter(|t| !t.is_empty())
-            .collect::<Vec<_>>()
-            .join(" ");
+        // Print table for this fixture.
+        let fix_words: usize = asr_res
+            .segments
+            .iter()
+            .flat_map(|s| &s.word_confidences)
+            .count();
 
+        println!();
         println!(
-            "    Total LLM time: {:.3}s ({} segments)",
-            total_llm_secs,
-            low_conf_segs.len()
+            "    {:>5}  {:>7}  {:>8}  {:>7}  {:>7}  {:>7}  {}",
+            "Thr", "Marked", "Segs", "LLM ms", "WER %", "CER %", "Note"
         );
+        println!("    {}", "─".repeat(62));
+
+        for r in &fixture_results {
+            let note = if r.bypassed { "BYPASS" } else { "" };
+            println!(
+                "    {:>4.0}%  {:>3}/{:<3}  {:>4}/{:<3}  {:>7.0}  {:>6.1}  {:>6.1}  {}",
+                r.threshold * 100.0,
+                r.words_marked,
+                fix_words,
+                r.segs_with_marks,
+                asr_res.segments.len(),
+                r.llm_ms,
+                r.wer,
+                r.cer,
+                note,
+            );
+        }
         println!();
 
-        results.push(Some(LlmResult {
-            segments_processed: low_conf_segs.len(),
-            total_secs: total_llm_secs,
-            corrected_hypothesis,
-        }));
+        all_results.push(fixture_results);
     }
 
-    results
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Stage 5: Full Pipeline Summary
-// ═══════════════════════════════════════════════════════════════════════════════
-
-fn bench_full_summary(
-    fixtures: &[Fixture],
-    asr_results: &[AsrResult],
-    llm_results: &[Option<LlmResult>],
-) {
+    // ── Best threshold selection ────────────────────────────────────────────
     println!("╔══════════════════════════════════════════════════════════════════╗");
-    println!("║              END-TO-END PIPELINE SUMMARY                        ║");
+    println!("║              THRESHOLD SWEEP SUMMARY                            ║");
     println!("╚══════════════════════════════════════════════════════════════════╝");
     println!();
 
-    // Summary table
+    // For each threshold, compute average WER across fixtures.
     println!(
-        "  {:20}  {:>8}  {:>8}  {:>8}  {:>7}  {:>7}  {:>7}  {:>8}",
-        "Fixture", "Audio", "ASR", "LLM", "Total", "RTF", "WER", "CER"
+        "  {:>5}  {:>10}  {:>10}  {:>10}",
+        "Thr", "Avg WER %", "Avg CER %", "Avg LLM ms"
     );
-    println!("  {}", "─".repeat(82));
+    println!("  {}", "─".repeat(42));
 
-    for (i, fix) in fixtures.iter().enumerate() {
-        let asr_res = &asr_results[i];
-        let llm_res = llm_results.get(i).and_then(|r| r.as_ref());
+    let mut best_thr = 0.0f32;
+    let mut best_wer = f64::MAX;
 
-        let llm_secs = llm_res.map(|r| r.total_secs).unwrap_or(0.0);
-        let total_secs = asr_res.total_secs + llm_secs;
-        let rtf = total_secs / fix.audio_secs;
+    for (ti, &thr) in thresholds.iter().enumerate() {
+        let mut sum_wer = 0.0;
+        let mut sum_cer = 0.0;
+        let mut sum_llm = 0.0;
+        let mut count = 0;
 
-        // Use LLM-corrected hypothesis if available, else raw ASR
-        let final_hyp = llm_res
-            .map(|r| r.corrected_hypothesis.as_str())
-            .unwrap_or(&asr_res.hypothesis);
+        for fixture_results in &all_results {
+            if let Some(r) = fixture_results.get(ti) {
+                sum_wer += r.wer;
+                sum_cer += r.cer;
+                sum_llm += r.llm_ms;
+                count += 1;
+            }
+        }
 
-        let (wer, cer) = if fix.reference.is_empty() {
-            (f64::NAN, f64::NAN)
-        } else {
-            (
-                word_error_rate(final_hyp, &fix.reference),
-                char_error_rate(final_hyp, &fix.reference),
-            )
-        };
+        if count > 0 {
+            let avg_wer = sum_wer / count as f64;
+            let avg_cer = sum_cer / count as f64;
+            let avg_llm = sum_llm / count as f64;
 
-        println!(
-            "  {:20}  {:>6.1}s  {:>6.3}s  {:>6.3}s  {:>5.3}s  {:>5.3}x  {:>5.1}%  {:>5.1}%",
-            fix.name,
-            fix.audio_secs,
-            asr_res.total_secs,
-            llm_secs,
-            total_secs,
-            rtf,
-            if wer.is_nan() { 0.0 } else { wer * 100.0 },
-            if cer.is_nan() { 0.0 } else { cer * 100.0 },
-        );
+            let marker = if avg_wer < best_wer {
+                best_wer = avg_wer;
+                best_thr = thr;
+                " ◄ best"
+            } else {
+                ""
+            };
+
+            println!(
+                "  {:>4.0}%  {:>9.1}  {:>9.1}  {:>9.0}{}",
+                thr * 100.0,
+                avg_wer,
+                avg_cer,
+                avg_llm,
+                marker,
+            );
+        }
     }
     println!();
 
-    // Per-fixture detail
+    println!(
+        "  Recommended threshold: {:.0}% (lowest avg WER)",
+        best_thr * 100.0
+    );
+    println!("  Total words with confidence data: {n_words}");
+    println!();
+
+    // Show best hypothesis for each fixture at the recommended threshold.
     for (i, fix) in fixtures.iter().enumerate() {
-        let asr_res = &asr_results[i];
-        let llm_res = llm_results.get(i).and_then(|r| r.as_ref());
-
-        let final_hyp = llm_res
-            .map(|r| r.corrected_hypothesis.as_str())
-            .unwrap_or(&asr_res.hypothesis);
-
-        // After-speech latency estimate
-        let mean_conf: Option<f32> = {
-            let vals: Vec<f32> = asr_res
-                .segments
+        if let Some(results) = all_results.get(i) {
+            if let Some(best) = results
                 .iter()
-                .filter_map(|s| s.confidence)
-                .collect();
-            if vals.is_empty() {
-                None
-            } else {
-                Some(vals.iter().sum::<f32>() / vals.len() as f32)
+                .find(|r| (r.threshold - best_thr).abs() < 0.001)
+            {
+                println!(
+                    "  {} at {:.0}% (WER={:.1}%, CER={:.1}%):",
+                    fix.name,
+                    best_thr * 100.0,
+                    best.wer,
+                    best.cer
+                );
+                println!("    Hypothesis:");
+                wrap_print("      ", &best.hypothesis, 72);
+                if !fix.reference.is_empty() {
+                    println!("    Reference:");
+                    wrap_print("      ", &fix.reference, 72);
+                }
+                println!();
             }
-        };
-        let silence_samples = dynamic_silence_threshold(mean_conf, true);
-        let silence_ms = samples_to_ms(silence_samples);
-
-        // Last-chunk inference time as representative "after speech" inference cost
-        let last_chunk_ms = asr_res.chunk_latencies_ms.last().copied().unwrap_or(0.0);
-        let delivery_ms: u64 = 5; // typical uinput delivery
-        let after_speech_ms = silence_ms + last_chunk_ms as u64 + delivery_ms;
-
-        println!("  {} detail:", fix.name);
-        println!("    After-speech latency estimate:");
-        println!(
-            "      Silence: {} ms + last-chunk infer: {:.0} ms + delivery: ~{} ms = ~{} ms",
-            silence_ms, last_chunk_ms, delivery_ms, after_speech_ms
-        );
-
-        if !fix.reference.is_empty() {
-            println!("    Hypothesis:");
-            wrap_print("      ", final_hyp, 72);
-            println!("    Reference:");
-            wrap_print("      ", &fix.reference, 72);
         }
-        println!();
     }
 
-    // Quality context
+    // Quality context.
     println!("  WER = Word Error Rate (lower is better; 0% = perfect match).");
     println!("  CER = Character Error Rate (character-level edit distance).");
-    println!("  RTF = Real-Time Factor (0.10x = 10x faster than real-time).");
     println!();
     println!("  Quality context:");
     println!("    Industry reference WER (Whisper-large-v3, LibriSpeech clean): ~2.7%");
     println!("    Qwen3-ASR-0.6B INT4 streaming: 8s encoder window, past-text conditioned");
-    println!("    LLM correction reduces WER ~15-30% on low-confidence segments.");
-    println!();
-    println!("  Latency targets (Stivers et al. 2009, PNAS):");
-    println!("    <200 ms  feels instantaneous (human turn-taking mean=208ms)");
-    println!("    <300 ms  natural and responsive (AssemblyAI 300ms rule)");
-    println!("    <500 ms  hard ceiling for voice AI (MMNTM threshold)");
+    println!("    Per-word [?word?] marking → surgical LLM span correction on uncertain words.");
     println!();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Helpers (shared, canonical implementations — not duplicated)
+// Stage 5: VAD Timing Sweep — grid search over sentence_close × hard_close
 // ═══════════════════════════════════════════════════════════════════════════════
 
-fn workspace_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .to_path_buf()
+fn bench_vad_timing_sweep(asr: &(impl AsrBackend + Sync), fixtures: &[Fixture]) {
+    use std::cell::RefCell;
+
+    println!("── Stage 5: VAD Timing Sweep (Brent's method) ─────────────────────");
+    println!();
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("tokio runtime");
+
+    // Shared eval log — records every point Brent probes.
+    struct Probe {
+        sentence_ms: u32,
+        hard_ms: u32,
+        avg_wer: f64,
+        per_fixture: Vec<(f64, usize)>, // (wer%, n_segs) per fixture
+    }
+    let log: RefCell<Vec<Probe>> = RefCell::new(Vec::new());
+
+    // Evaluate a (sentence_close, hard_close) config → avg WER%.
+    let evaluate = |sentence_ms: u32, hard_ms: u32| -> f64 {
+        let config = VadSegmenterConfig {
+            sentence_close_ms: sentence_ms,
+            hard_close_ms: hard_ms,
+            ..Default::default()
+        };
+        let mut per_fixture = Vec::new();
+        let mut wer_sum = 0.0;
+
+        for fix in fixtures {
+            let (segments, _, _) =
+                rt.block_on(transcribe_timed_with_config(asr, &fix.pcm, config.clone()));
+            let hypothesis = segments
+                .iter()
+                .map(|s| s.text.trim())
+                .filter(|t| !t.is_empty())
+                .collect::<Vec<_>>()
+                .join(" ");
+            let n_segs = segments.len();
+            let wer = word_error_rate(&hypothesis, &fix.reference) * 100.0;
+            per_fixture.push((wer, n_segs));
+            wer_sum += wer;
+        }
+
+        let avg = wer_sum / fixtures.len().max(1) as f64;
+
+        // Live trace
+        print!("    {:>6} {:>6}", sentence_ms, hard_ms);
+        for (wer, segs) in &per_fixture {
+            print!("  {:>5.1} {:>4}", wer, segs);
+        }
+        println!("  {:>6.1}%", avg);
+
+        log.borrow_mut().push(Probe {
+            sentence_ms,
+            hard_ms,
+            avg_wer: avg,
+            per_fixture,
+        });
+        avg
+    };
+
+    // Table header.
+    let print_header = || {
+        print!("    {:>6} {:>6}", "sent", "hard");
+        for fix in fixtures {
+            let short: String = fix.name.chars().take(8).collect();
+            print!("  {:>5} {:>4}", short, "segs");
+        }
+        println!("  avg_wer");
+        print!("    {:>6} {:>6}", "──────", "──────");
+        for _ in fixtures {
+            print!("  {:>5} {:>4}", "─────", "────");
+        }
+        println!("  ───────");
+    };
+
+    // Run Brent for each hard_close ratio.
+    // Reduces the 2D problem to 1D: optimize sentence_close, hard_close = ratio × sentence_close.
+    let ratios = [2.0, 3.0];
+
+    let mut winners: Vec<(u32, u32, f64)> = Vec::new(); // (sentence_ms, hard_ms, avg_wer)
+
+    for &ratio in &ratios {
+        println!(
+            "  Brent search: sentence_close ∈ [50, 1000]ms, hard_close = {ratio:.0}× sentence"
+        );
+        print_header();
+
+        let optimal = brent_minimize(
+            |sent_f| {
+                let sent = (sent_f.round() as u32).clamp(50, 3000);
+                let hard = (sent as f64 * ratio) as u32;
+                evaluate(sent, hard)
+            },
+            50.0,
+            1000.0,
+            0.02, // ~2% relative tolerance → converges to ~20-50ms precision
+        );
+
+        let sent = (optimal.round() as u32).clamp(50, 3000);
+        let hard = (sent as f64 * ratio) as u32;
+
+        // Find the actual WER for this point (may already be in the log).
+        let wer = log
+            .borrow()
+            .iter()
+            .find(|p| p.sentence_ms == sent && p.hard_ms == hard)
+            .map(|p| p.avg_wer)
+            .unwrap_or_else(|| evaluate(sent, hard));
+
+        winners.push((sent, hard, wer));
+        println!();
+    }
+
+    // ── Results ─────────────────────────────────────────────────────────
+    // Sort all probed points by WER.
+    let mut all: Vec<_> = log.into_inner();
+    all.sort_by(|a, b| a.avg_wer.partial_cmp(&b.avg_wer).unwrap());
+
+    println!("  Top 5 across all probes ({} total evals):", all.len());
+    for (i, p) in all.iter().take(5).enumerate() {
+        print!(
+            "    {}. sent={}ms hard={}ms  avg_wer={:.1}%  |",
+            i + 1,
+            p.sentence_ms,
+            p.hard_ms,
+            p.avg_wer,
+        );
+        for (j, (wer, segs)) in p.per_fixture.iter().enumerate() {
+            if j > 0 {
+                print!(",");
+            }
+            print!(" {:.1}%/{segs}s", wer);
+        }
+        println!();
+    }
+
+    let best = &all[0];
+    println!();
+    println!(
+        "  ★ Optimal: sentence_close={}ms  hard_close={}ms  avg_wer={:.1}%",
+        best.sentence_ms, best.hard_ms, best.avg_wer,
+    );
+    println!();
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Benchmark-specific helpers
+// ═══════════════════════════════════════════════════════════════════════════════
 
 /// Transcribe with per-chunk timing. Returns (segments, total_secs, chunk_latencies_ms).
 async fn transcribe_timed(
-    backend: &OrtQwenAsrBackend,
+    backend: &(impl AsrBackend + Sync),
+    pcm: &[f32],
+) -> (Vec<AsrSegment>, f64, Vec<f64>) {
+    transcribe_timed_with_config(backend, pcm, VadSegmenterConfig::default()).await
+}
+
+/// Batch transcription: push all audio, call poll_final once.
+/// Used for overlap-stitched batch mode (no VadSegmenter).
+async fn transcribe_batch(
+    backend: &(impl AsrBackend + Sync),
     pcm: &[f32],
 ) -> (Vec<AsrSegment>, f64, Vec<f64>) {
     let session = backend
@@ -644,23 +911,73 @@ async fn transcribe_timed(
         .await
         .expect("start asr session");
 
+    let total_start = Instant::now();
+
+    // Push all audio at once
+    backend.push_audio(&session, pcm).await.expect("push audio");
+
+    // Single poll_final triggers overlap-stitched decode
+    let chunk_start = Instant::now();
+    let out = backend
+        .poll_final(&session)
+        .await
+        .expect("poll_final batch");
+    let chunk_ms = chunk_start.elapsed().as_secs_f64() * 1000.0;
+
+    let total_secs = total_start.elapsed().as_secs_f64();
+    backend.end_session(session).await.expect("end session");
+
+    (out, total_secs, vec![chunk_ms])
+}
+
+/// Like `transcribe_timed` but with a custom VAD config.
+async fn transcribe_timed_with_config(
+    backend: &(impl AsrBackend + Sync),
+    pcm: &[f32],
+    vad_config: VadSegmenterConfig,
+) -> (Vec<AsrSegment>, f64, Vec<f64>) {
+    let session = backend
+        .start_session(AsrSessionConfig::default())
+        .await
+        .expect("start asr session");
+
+    let mut segmenter = VadSegmenter::new(vad_config);
     let chunk_size = 16_000; // 1s @ 16 kHz
     let mut out: Vec<AsrSegment> = Vec::new();
     let mut chunk_latencies: Vec<f64> = Vec::new();
     let total_start = Instant::now();
 
     for slice in pcm.chunks(chunk_size) {
-        let chunk_start = Instant::now();
-        backend
-            .push_audio(&session, slice)
-            .await
-            .expect("push audio");
-        out.extend(backend.poll_results(&session).await.expect("poll results"));
-        chunk_latencies.push(chunk_start.elapsed().as_secs_f64() * 1000.0);
+        let (boundaries, in_speech) = segmenter.push(slice);
+        if in_speech {
+            let chunk_start = Instant::now();
+            backend
+                .push_audio(&session, slice)
+                .await
+                .expect("push audio");
+            out.extend(backend.poll_results(&session).await.expect("poll results"));
+            chunk_latencies.push(chunk_start.elapsed().as_secs_f64() * 1000.0);
+        }
+        // Flush ASR + reset context at segment boundaries
+        for _boundary in &boundaries {
+            let chunk_start = Instant::now();
+            out.extend(
+                backend
+                    .poll_final(&session)
+                    .await
+                    .expect("poll_final at boundary"),
+            );
+            chunk_latencies.push(chunk_start.elapsed().as_secs_f64() * 1000.0);
+            backend
+                .reset_context(&session)
+                .await
+                .expect("reset at boundary");
+        }
     }
 
-    // Silence flush
-    let silence = vec![0.0f32; 8_000];
+    // Flush remaining speech from segmenter + ASR
+    segmenter.finish();
+    let silence = vec![0.0f32; 16_000];
     let chunk_start = Instant::now();
     backend
         .push_audio(&session, &silence)
@@ -668,7 +985,7 @@ async fn transcribe_timed(
         .expect("push silence");
     out.extend(
         backend
-            .poll_results(&session)
+            .poll_final(&session)
             .await
             .expect("poll results final"),
     );
@@ -680,118 +997,150 @@ async fn transcribe_timed(
     (out, total_secs, chunk_latencies)
 }
 
-fn normalize_text(s: &str) -> String {
-    s.chars()
-        .map(|c| {
-            if c.is_ascii_alphabetic() {
-                c.to_ascii_uppercase()
-            } else {
-                ' '
-            }
-        })
-        .collect::<String>()
-        .split_whitespace()
+// ═══════════════════════════════════════════════════════════════════════════════
+// Stage 6: Adaptive VAD Validation
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn bench_adaptive_vad(asr: &(impl AsrBackend + Sync), fixtures: &[Fixture]) {
+    println!("── Stage 6: Adaptive VAD Validation ──────────────────────────────");
+    println!();
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("tokio runtime");
+
+    // Run each fixture with adaptive VAD and compare to static defaults
+    for fix in fixtures {
+        // Static baseline
+        let (static_segs, static_secs, _) = rt.block_on(transcribe_timed(asr, &fix.pcm));
+        let static_text = segments_to_text(&static_segs);
+        let static_wer = word_error_rate(&static_text, &fix.reference) * 100.0;
+
+        // Adaptive mode
+        let adaptive_config = VadSegmenterConfig::adaptive();
+        let (adaptive_segs, adaptive_secs, _) =
+            rt.block_on(transcribe_timed_with_config(asr, &fix.pcm, adaptive_config));
+        let adaptive_text = segments_to_text(&adaptive_segs);
+        let adaptive_wer = word_error_rate(&adaptive_text, &fix.reference) * 100.0;
+
+        // Get adaptive state from a fresh run to show convergence
+        let mut segmenter = VadSegmenter::new(VadSegmenterConfig::adaptive());
+        for chunk in fix.pcm.chunks(16_000) {
+            segmenter.push(chunk);
+        }
+        segmenter.finish();
+        let adaptive_state = segmenter
+            .debug_adaptive_state()
+            .unwrap_or_else(|| "N/A".into());
+
+        let delta = adaptive_wer - static_wer;
+        let arrow = if delta < -0.5 {
+            "▼ improved"
+        } else if delta > 0.5 {
+            "▲ regressed"
+        } else {
+            "≈ neutral"
+        };
+
+        println!("  {}:", fix.name);
+        println!(
+            "    Static:   WER {:.1}%  ({} segs, {:.2}s)",
+            static_wer,
+            static_segs.len(),
+            static_secs
+        );
+        println!(
+            "    Adaptive: WER {:.1}%  ({} segs, {:.2}s)  [{} Δ{:+.1}%]",
+            adaptive_wer,
+            adaptive_segs.len(),
+            adaptive_secs,
+            arrow,
+            delta
+        );
+        println!("    Learned:  {}", adaptive_state);
+        println!();
+    }
+}
+
+fn segments_to_text(segs: &[AsrSegment]) -> String {
+    segs.iter()
+        .map(|s| s.text.as_str())
         .collect::<Vec<_>>()
         .join(" ")
 }
 
-fn levenshtein<T: Eq>(a: &[T], b: &[T]) -> usize {
-    let (m, n) = (a.len(), b.len());
-    let mut dp: Vec<usize> = (0..=n).collect();
-    for i in 1..=m {
-        let mut prev = dp[0];
-        dp[0] = i;
-        for j in 1..=n {
-            let temp = dp[j];
-            dp[j] = if a[i - 1] == b[j - 1] {
-                prev
-            } else {
-                1 + prev.min(dp[j]).min(dp[j - 1])
-            };
-            prev = temp;
+// ═══════════════════════════════════════════════════════════════════════════════
+// Stage 7: FP16 Decoder vs INT4 Decoder Comparison
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn bench_fp16_decoder(
+    fp16_asr: &(impl AsrBackend + Sync),
+    int4_results: &[AsrResult],
+    fixtures: &[Fixture],
+) {
+    println!("── Stage 7: FP16 Decoder vs INT4 Decoder ─────────────────────────");
+    println!();
+    println!("  INT4 decoder: quantized weights (MatMulNBits), ~516 MB");
+    println!("  FP16 decoder: full precision, ~1137 MB");
+    println!("  Hypothesis: INT4 autoregressive error compounding degrades WER.");
+    println!();
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("tokio runtime");
+
+    for (i, fix) in fixtures.iter().enumerate() {
+        let int4_res = &int4_results[i];
+        let int4_wer = word_error_rate(&int4_res.hypothesis, &fix.reference) * 100.0;
+        let int4_cer = char_error_rate(&int4_res.hypothesis, &fix.reference) * 100.0;
+
+        // Run FP16 decoder on same audio
+        let (fp16_segs, fp16_secs, _) = rt.block_on(transcribe_timed(fp16_asr, &fix.pcm));
+        let fp16_text = fp16_segs
+            .iter()
+            .map(|s| s.text.trim())
+            .filter(|t| !t.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ");
+        let fp16_wer = word_error_rate(&fp16_text, &fix.reference) * 100.0;
+        let fp16_cer = char_error_rate(&fp16_text, &fix.reference) * 100.0;
+
+        let delta_wer = fp16_wer - int4_wer;
+        let arrow = if delta_wer < -0.5 {
+            "▼ improved"
+        } else if delta_wer > 0.5 {
+            "▲ regressed"
+        } else {
+            "≈ neutral"
+        };
+
+        println!("  {} ({:.1}s audio):", fix.name, fix.audio_secs);
+        println!(
+            "    INT4:  WER {:.1}%  CER {:.1}%  ({} segs, {:.2}s)",
+            int4_wer,
+            int4_cer,
+            int4_res.segments.len(),
+            int4_res.total_secs
+        );
+        println!(
+            "    FP16:  WER {:.1}%  CER {:.1}%  ({} segs, {:.2}s)  [{} Δ{:+.1}%]",
+            fp16_wer,
+            fp16_cer,
+            fp16_segs.len(),
+            fp16_secs,
+            arrow,
+            delta_wer
+        );
+        println!("    INT4 hypothesis:");
+        wrap_print("      ", &int4_res.hypothesis, 72);
+        println!("    FP16 hypothesis:");
+        wrap_print("      ", &fp16_text, 72);
+        if !fix.reference.is_empty() {
+            println!("    Reference:");
+            wrap_print("      ", &fix.reference, 72);
         }
-    }
-    dp[n]
-}
-
-fn word_error_rate(hyp: &str, ref_: &str) -> f64 {
-    let h = normalize_text(hyp);
-    let r = normalize_text(ref_);
-    let hw: Vec<&str> = h.split_whitespace().collect();
-    let rw: Vec<&str> = r.split_whitespace().collect();
-    if rw.is_empty() {
-        return 0.0;
-    }
-    levenshtein(&hw, &rw) as f64 / rw.len() as f64
-}
-
-fn char_error_rate(hyp: &str, ref_: &str) -> f64 {
-    let h = normalize_text(hyp);
-    let r = normalize_text(ref_);
-    let hc: Vec<char> = h.chars().collect();
-    let rc: Vec<char> = r.chars().collect();
-    if rc.is_empty() {
-        return 0.0;
-    }
-    levenshtein(&hc, &rc) as f64 / rc.len() as f64
-}
-
-fn load_wav_f32(path: &std::path::Path) -> Vec<f32> {
-    let reader = hound::WavReader::open(path).expect("open wav");
-    let spec = reader.spec();
-    assert_eq!(spec.channels, 1, "expected mono WAV");
-    assert_eq!(spec.sample_rate, 16_000, "expected 16 kHz WAV");
-    match spec.sample_format {
-        hound::SampleFormat::Float => reader
-            .into_samples::<f32>()
-            .map(|s| s.expect("read sample"))
-            .collect(),
-        hound::SampleFormat::Int => {
-            let max = (1i64 << (spec.bits_per_sample - 1)) as f32;
-            reader
-                .into_samples::<i32>()
-                .map(|s| s.expect("read sample") as f32 / max)
-                .collect()
-        }
-    }
-}
-
-fn wrap_print(prefix: &str, text: &str, width: usize) {
-    let mut line = String::new();
-    for word in text.split_whitespace() {
-        if !line.is_empty() && line.len() + 1 + word.len() > width {
-            println!("{prefix}{line}");
-            line.clear();
-        }
-        if !line.is_empty() {
-            line.push(' ');
-        }
-        line.push_str(word);
-    }
-    if !line.is_empty() {
-        println!("{prefix}{line}");
-    }
-}
-
-#[inline]
-fn samples_to_ms(samples: usize) -> u64 {
-    (samples * 1000 / SAMPLE_RATE) as u64
-}
-
-/// Compute the p-th percentile of a slice (linear interpolation).
-fn percentile(data: &[f64], p: f64) -> f64 {
-    if data.is_empty() {
-        return 0.0;
-    }
-    let mut sorted = data.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    let rank = (p / 100.0) * (sorted.len() - 1) as f64;
-    let lo = rank.floor() as usize;
-    let hi = rank.ceil() as usize;
-    if lo == hi {
-        sorted[lo]
-    } else {
-        let frac = rank - lo as f64;
-        sorted[lo] * (1.0 - frac) + sorted[hi] * frac
+        println!();
     }
 }

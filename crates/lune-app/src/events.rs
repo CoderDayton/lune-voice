@@ -20,6 +20,8 @@ pub enum AppStateUpdate {
     Idle,
     /// Microphone is active, listening for speech.
     Listening,
+    /// Pipeline is processing accumulated audio.
+    Processing,
     /// Partial (in-progress) transcription text.
     PartialText,
     /// Finalized transcription text.

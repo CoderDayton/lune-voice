@@ -11,6 +11,7 @@ use lune_core::error::{Error, Result};
 /// Token vocabulary mapping IDs → text.
 #[derive(Debug, Clone)]
 pub struct Vocabulary {
+    #[allow(dead_code)]
     /// Flat byte storage for all tokens; zero-copy slice lookups.
     token_data: Vec<u8>,
     /// (start, end) byte offsets into `token_data` per token ID.
@@ -88,5 +89,15 @@ impl Vocabulary {
     #[inline]
     pub fn size(&self) -> usize {
         self.offsets.len()
+    }
+
+    /// Create an empty vocabulary (for tests).
+    #[cfg(test)]
+    pub fn empty() -> Self {
+        Self {
+            token_data: Vec::new(),
+            offsets: Vec::new(),
+            blank_id: 0,
+        }
     }
 }

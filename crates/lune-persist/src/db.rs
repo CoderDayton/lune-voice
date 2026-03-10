@@ -380,7 +380,7 @@ mod tests {
             id: Uuid::new_v4(),
             started_at: Utc::now(),
             ended_at: Some(Utc::now()),
-            style: "general".into(),
+            style: "casual".into(),
             backend: AsrBackendKind::ParakeetTdt,
             status: SessionStatus::Completed,
             transcript: Some("Hello world.".into()),
@@ -397,7 +397,7 @@ mod tests {
             id: Uuid::new_v4(),
             started_at: Utc::now(),
             ended_at: None,
-            style: "general".into(),
+            style: "casual".into(),
             backend: AsrBackendKind::ParakeetTdt,
             status: SessionStatus::Active,
             transcript: None,
@@ -410,7 +410,7 @@ mod tests {
 
         let fetched = db.get_session(s1.id).unwrap().unwrap();
         assert_eq!(fetched.id, s1.id);
-        assert_eq!(fetched.style, "general");
+        assert_eq!(fetched.style, "casual");
 
         let not_found = db.get_session(Uuid::new_v4()).unwrap();
         assert!(not_found.is_none());
@@ -424,7 +424,7 @@ mod tests {
             id: Uuid::new_v4(),
             started_at: Utc::now(),
             ended_at: None,
-            style: "general".into(),
+            style: "casual".into(),
             backend: AsrBackendKind::ParakeetTdt,
             status: SessionStatus::Active,
             transcript: None,
@@ -452,7 +452,7 @@ mod tests {
             id: Uuid::new_v4(),
             started_at: old_time,
             ended_at: None,
-            style: "general".into(),
+            style: "casual".into(),
             backend: AsrBackendKind::ParakeetTdt,
             status: SessionStatus::Completed,
             transcript: None,
@@ -464,7 +464,7 @@ mod tests {
             id: Uuid::new_v4(),
             started_at: Utc::now(),
             ended_at: None,
-            style: "general".into(),
+            style: "casual".into(),
             backend: AsrBackendKind::ParakeetTdt,
             status: SessionStatus::Active,
             transcript: None,

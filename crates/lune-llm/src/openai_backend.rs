@@ -194,7 +194,7 @@ impl TextPostProcessor for OpenAiLlmBackend {
                 tracing::debug!(output_len = text.len(), "OpenAI post-process complete");
 
                 Ok(PostProcessOutput {
-                    cleaned_text: text,
+                    cleaned_text: crate::prompt::strip_markers(&text),
                     metadata: None,
                 })
             }
@@ -217,11 +217,11 @@ mod tests {
     fn test_input(raw_text: &str) -> PostProcessInput {
         PostProcessInput {
             raw_text: raw_text.into(),
-            style_preset: Arc::new(StylePreset::general()),
+            style_preset: Arc::new(StylePreset::casual()),
             app_category: None,
             dictionary: vec![],
             context: None,
-            prefix_context: None,
+            language: "en".into(),
         }
     }
 
@@ -231,14 +231,14 @@ mod tests {
         let msgs = build_messages(&input);
 
         // system + N few-shot pairs (2*N msgs) + 1 final user
-        let n = lune_core::config::StylePreset::general()
+        let n = lune_core::config::StylePreset::casual()
             .few_shot_pairs
             .len();
         assert_eq!(msgs.len(), 1 + 2 * n + 1);
 
         let json = serde_json::to_string(&msgs).unwrap();
         assert!(json.contains("hello um world"));
-        assert!(json.contains("speech-to-text post-processor"));
+        assert!(json.contains("post-ASR transcript correction"));
     }
 
     #[test]
@@ -261,7 +261,7 @@ mod tests {
     #[test]
     fn build_messages_no_raw_text_placeholder() {
         // Template without {raw_text} — should not panic, just clone template.
-        let mut preset = StylePreset::general();
+        let mut preset = StylePreset::casual();
         preset.user_prompt_template = "fixed prompt".into();
         let input = PostProcessInput {
             raw_text: "hello".into(),
@@ -269,7 +269,7 @@ mod tests {
             app_category: None,
             dictionary: vec![],
             context: None,
-            prefix_context: None,
+            language: "en".into(),
         };
         let msgs = build_messages(&input);
         let json = serde_json::to_string(&msgs).unwrap();

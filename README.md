@@ -22,8 +22,8 @@ Most voice tools either phone home or dump raw transcription with no cleanup. Lu
 
 - **280ms after-speech latency on GPU** — faster than your next breath. Cloud APIs average 600–1200ms.
 - **Your voice never leaves your machine** — both models run locally via ONNX Runtime. Zero network required.
-- **LLM-polished, not raw** — a 0.6B language model silently fixes filler words and grammar before text reaches you. You only ever see clean output.
-- **Zero setup** — models download automatically on first launch (~1.8GB total). Bind a hotkey and go.
+- **LLM-polished, not raw** — a local LLM surgically corrects low-confidence words before text reaches you. You only ever see clean output.
+- **Zero setup** — models download automatically on first launch (~1.5GB total). Bind a hotkey and go.
 
 ---
 
@@ -34,8 +34,8 @@ flowchart TD
     A("🎙️ Microphone") --> B["Mel Spectrogram<br/>128-band · 16 kHz"]
     B --> C["Qwen3-ASR 0.6B<br/>Streaming ONNX Decoder"]
     C --> D{Confidence Gate}
-    D -->|"mean ≥ 0.95 · min-token ≥ 0.70<br/>87% of segments"| E["Dictionary Apply"]
-    D -->|"below threshold<br/>13% of segments"| F["Qwen3 0.6B<br/>LLM Correction"]
+    D -->|"confident words<br/>~75% of segments"| E["Dictionary Apply"]
+    D -->|"uncertain [?word?] spans<br/>~25% of segments"| F["LLM Corrector<br/>Span Correction"]
     F --> E
     E --> G("✅ Text → Active Window")
     style A fill:#7c3aed,color:#fff,stroke:none
@@ -43,7 +43,7 @@ flowchart TD
     style D fill:#d97706,color:#fff,stroke:none
 ```
 
-The confidence gate is the key insight: 87% of segments are clean enough to skip the LLM entirely, delivering at mel-spectrogram speed. Only genuinely uncertain speech pays the correction cost.
+The confidence gate is the key insight: per-word confidence marking flags only uncertain spans as `[?word?]`. ~75% of segments pass through untouched; only genuinely uncertain words pay the LLM correction cost.
 
 > Deep dive: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
@@ -111,7 +111,7 @@ Escape      →  lune-voice cancel
 type = "OrtQwenAsr"
 
 [llm_backend]
-type = "OrtLocal"
+type = "LlamaCppLocal"
 
 dictation_mode   = "TypeInPlace"   # TypeInPlace | Clipboard | Both
 activation_mode  = "Toggle"        # Toggle | Hold
@@ -150,8 +150,8 @@ Nine single-responsibility Rust crates connected by async message passing — au
 Mel preprocessing consumes **<0.01%** of the inference budget. The only bottleneck is ONNX inference itself.
 
 ```bash
-cargo run --example pipeline_latency -p lune-app --release
-cargo run --example mel_throughput -p lune-asr --features ort-qwen --release
+cargo script bench           # CPU
+cargo script bench --env GPU=1  # CUDA
 ```
 
 > [docs/PERFORMANCE.md](docs/PERFORMANCE.md)

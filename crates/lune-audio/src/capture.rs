@@ -41,9 +41,34 @@ pub struct AudioStream {
     _stream: Option<cpal::Stream>,
 }
 
+fn validate_config(config: &AudioConfig) -> Result<(), AudioError> {
+    if config.target_sample_rate == 0 {
+        return Err(AudioError::StreamBuild(
+            "target_sample_rate must be greater than 0".into(),
+        ));
+    }
+    if config.chunk_duration_ms == 0 {
+        return Err(AudioError::StreamBuild(
+            "chunk_duration_ms must be greater than 0".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn convert_i16_samples(data: &[i16]) -> Vec<f32> {
+    data.iter().map(|&s| s as f32 / 32768.0).collect()
+}
+
+fn convert_u16_samples(data: &[u16]) -> Vec<f32> {
+    data.iter()
+        .map(|&s| (s as f32 - 32768.0) / 32768.0)
+        .collect()
+}
+
 impl AudioStream {
     /// Create a new audio stream with the given configuration
     pub fn new(config: AudioConfig) -> Result<Self, AudioError> {
+        validate_config(&config)?;
         let host = cpal::default_host();
         let device = host.default_input_device().ok_or(AudioError::NoDevice)?;
 
@@ -124,8 +149,28 @@ impl AudioStream {
                 .build_input_stream(
                     &stream_config,
                     move |data: &[i16], _: &_| {
-                        let float_data: Vec<f32> =
-                            data.iter().map(|&s| s as f32 / 32768.0).collect();
+                        let float_data = convert_i16_samples(data);
+                        process_audio_callback(
+                            &float_data,
+                            channels as usize,
+                            &mut resampler,
+                            &mut input_resample_buf,
+                            &mut output_buf,
+                            chunk_samples,
+                            &ring_clone,
+                            start_time,
+                        );
+                    },
+                    |err| warn!("Audio stream error: {}", err),
+                    None,
+                )
+                .map_err(|e| AudioError::StreamBuild(e.to_string()))?,
+
+            SampleFormat::U16 => device
+                .build_input_stream(
+                    &stream_config,
+                    move |data: &[u16], _: &_| {
+                        let float_data = convert_u16_samples(data);
                         process_audio_callback(
                             &float_data,
                             channels as usize,
@@ -168,7 +213,8 @@ impl AudioStream {
     /// Chunks are pushed into the ring buffer immediately so `try_next_chunk`
     /// drains them at the consumer's pace — no real-time audio thread involved.
     /// Useful for integration tests and offline file processing.
-    pub fn from_samples(samples: &[f32], config: AudioConfig) -> Self {
+    pub fn from_samples(samples: &[f32], config: AudioConfig) -> Result<Self, AudioError> {
+        validate_config(&config)?;
         let chunk_samples = (config.target_sample_rate * config.chunk_duration_ms / 1000) as usize;
         // Auto-size buffer to fit all chunks so nothing is dropped.
         let num_chunks = samples.len().div_ceil(chunk_samples);
@@ -182,11 +228,11 @@ impl AudioStream {
             });
             offset_ms += u64::from(config.chunk_duration_ms);
         }
-        Self {
+        Ok(Self {
             config,
             ring,
             _stream: None,
-        }
+        })
     }
 
     /// Get the next audio chunk (async, blocks until data available)
@@ -197,6 +243,13 @@ impl AudioStream {
     /// Try to get the next chunk without blocking
     pub fn try_next_chunk(&self) -> Option<AudioChunk> {
         self.ring.try_pop()
+    }
+
+    /// Returns `true` if this stream was created from pre-loaded samples
+    /// (no live audio thread). When the ring buffer is empty, no more audio
+    /// will ever arrive.
+    pub fn is_offline(&self) -> bool {
+        self._stream.is_none()
     }
 
     /// Get current buffer fill percentage (0.0 to 1.0)
@@ -261,5 +314,46 @@ fn process_audio_callback(
         }
 
         ring.push(chunk);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn from_samples_rejects_zero_chunk_duration() {
+        let err = AudioStream::from_samples(
+            &[0.0f32; 16],
+            AudioConfig {
+                chunk_duration_ms: 0,
+                ..AudioConfig::default()
+            },
+        )
+        .err()
+        .unwrap();
+        assert!(err.to_string().contains("chunk_duration_ms"));
+    }
+
+    #[test]
+    fn from_samples_rejects_zero_sample_rate() {
+        let err = AudioStream::from_samples(
+            &[0.0f32; 16],
+            AudioConfig {
+                target_sample_rate: 0,
+                ..AudioConfig::default()
+            },
+        )
+        .err()
+        .unwrap();
+        assert!(err.to_string().contains("target_sample_rate"));
+    }
+
+    #[test]
+    fn convert_u16_samples_centers_midpoint() {
+        let converted = convert_u16_samples(&[0, 32768, u16::MAX]);
+        assert!(converted[0] <= -1.0);
+        assert_eq!(converted[1], 0.0);
+        assert!(converted[2] > 0.99);
     }
 }

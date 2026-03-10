@@ -25,9 +25,11 @@
 
 mod capture;
 mod ring;
+mod segmenter;
 mod vad;
 
 pub use capture::{AudioConfig, AudioStream};
+pub use segmenter::{AdaptiveVadConfig, SegmentBoundary, VadSegmenter, VadSegmenterConfig};
 pub use vad::{Vad, VadConfig, VadResult};
 
 /// A chunk of resampled audio ready for downstream processing.

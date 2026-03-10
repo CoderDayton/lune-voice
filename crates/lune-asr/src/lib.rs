@@ -1,3 +1,4 @@
+mod lcs_merge;
 pub mod mel;
 mod openai_backend;
 #[cfg(feature = "ort-qwen")]
@@ -8,8 +9,7 @@ mod ort_qwen_backend;
 pub mod ort_qwen_stream;
 pub mod ort_utils;
 mod parakeet_backend;
-#[cfg(feature = "legacy-qwen")]
-mod qwen_backend;
+mod registry;
 mod tdt_decoder;
 mod vocab;
 
@@ -22,5 +22,4 @@ pub use ort_qwen_backend::{OrtQwenAsrBackend, OrtQwenAsrConfig};
 #[cfg(feature = "ort-qwen")]
 pub use ort_qwen_stream::compute_qwen_mel;
 pub use parakeet_backend::{ParakeetTdtBackend, ParakeetTdtConfig};
-#[cfg(feature = "legacy-qwen")]
-pub use qwen_backend::{QwenAsrBackend, QwenAsrConfig};
+pub use registry::{AsrRegistry, AsrSessionHandle};

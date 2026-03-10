@@ -17,13 +17,9 @@ pub struct PostProcessInput {
     /// Recent session text for cross-utterance disambiguation.
     /// Tail of `session_text` truncated to ~500 chars (~125 words, ~5 utterances).
     pub context: Option<String>,
-    /// Last ~10 words of already-committed intra-utterance text.
-    ///
-    /// When set, the ASR fragment is a continuation of an in-progress sentence.
-    /// The LLM should not capitalize the first word or add terminal punctuation
-    /// unless the fragment clearly ends a sentence.
-    /// Technique: label-context prefix (IBM Semi-AR Streaming ASR, ICASSP 2024).
-    pub prefix_context: Option<String>,
+    /// BCP-47 language code from ASR detection (e.g. "en", "eng", "fr").
+    /// Defaults to "en" if not set by the pipeline.
+    pub language: String,
 }
 
 /// Output from the text post-processor.
@@ -80,15 +76,15 @@ mod tests {
     fn post_process_input_fields() {
         let input = PostProcessInput {
             raw_text: "hello um world".into(),
-            style_preset: Arc::new(StylePreset::general()),
+            style_preset: Arc::new(StylePreset::casual()),
             app_category: Some(AppCategory::Email),
             dictionary: vec![],
             context: None,
-            prefix_context: None,
+            language: "en".into(),
         };
         assert_eq!(input.raw_text, "hello um world");
         assert_eq!(input.app_category, Some(AppCategory::Email));
-        assert_eq!(input.style_preset.id, "general");
+        assert_eq!(input.style_preset.id, "casual");
     }
 
     #[test]

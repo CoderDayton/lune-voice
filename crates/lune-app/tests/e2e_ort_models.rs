@@ -4,7 +4,7 @@
 //!
 //! Requires model directories under `models/` at the workspace root:
 //!   - models/qwen3-asr-0.6b-onnx/
-//!   - models/qwen3-0.6b-onnx/
+//!   - models/llm-corrector-gguf/
 //!
 //! Run with: `cargo test -p lune-app --test e2e_ort_models -- --ignored`
 //! GPU:     `cargo test -p lune-app --features cuda --test e2e_ort_models -- --ignored`
@@ -12,12 +12,13 @@
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 use std::time::Instant;
+use tokio::sync::OnceCell;
 
 use lune_asr::{OrtQwenAsrBackend, OrtQwenAsrConfig};
 use lune_core::asr::{AsrBackend, AsrSessionConfig};
 use lune_core::config::{DevicePolicy, StylePreset};
 use lune_core::llm::{PostProcessInput, TextPostProcessor};
-use lune_llm::{OrtLlmBackend, OrtLlmConfig};
+use lune_llm::{LlamaCppBackend, LlamaCppConfig};
 
 // ── Shared backends (loaded once) ───────────────────────────────────────────
 
@@ -45,7 +46,7 @@ fn ensure_ort_init() {
 }
 
 static ASR: OnceLock<Option<Arc<OrtQwenAsrBackend>>> = OnceLock::new();
-static LLM: OnceLock<Option<Arc<OrtLlmBackend>>> = OnceLock::new();
+static LLM: OnceCell<Option<Arc<LlamaCppBackend>>> = OnceCell::const_new();
 
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -75,26 +76,50 @@ fn get_asr() -> Option<&'static Arc<OrtQwenAsrBackend>> {
             t.elapsed(),
             use_gpu()
         );
+
+        // Attach forced aligner for timestamp-based chunk merging if model files exist.
+        let fa_dir = workspace_root().join("models/wav2vec2-fa");
+        let fa_model = fa_dir.join("model.onnx");
+        let fa_config = fa_dir.join("fa_config.json");
+        if fa_model.exists() && fa_config.exists() {
+            match backend.make_forced_aligner(&fa_dir) {
+                Ok(fa) => {
+                    let fa = Arc::new(fa);
+                    backend.attach_aligner(fa);
+                    eprintln!("[setup] FA attached for chunk merging");
+                }
+                Err(e) => {
+                    eprintln!("[setup] FA load failed (non-fatal): {e}");
+                }
+            }
+        } else {
+            eprintln!(
+                "[setup] FA model not found at {}, skipping",
+                fa_dir.display()
+            );
+        }
+
         Some(Arc::new(backend))
     })
     .as_ref()
 }
 
-fn get_llm() -> Option<&'static Arc<OrtLlmBackend>> {
-    ensure_ort_init();
-    LLM.get_or_init(|| {
-        let dir = workspace_root().join("models/qwen3-0.6b-onnx");
-        if !dir.exists() {
+async fn get_llm() -> Option<&'static Arc<LlamaCppBackend>> {
+    LLM.get_or_init(|| async {
+        let path = workspace_root()
+            .join("models/qwen2.5-1.5b-instruct-gguf/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf");
+        if !path.exists() {
             return None;
         }
         let t = Instant::now();
-        let backend = OrtLlmBackend::new(OrtLlmConfig {
-            model_dir: dir,
-            use_gpu: use_gpu(),
-            temperature: 0.0,
+        let n_gpu_layers = if use_gpu() { 1000 } else { 0 };
+        let backend = LlamaCppBackend::new(LlamaCppConfig {
+            model_path: path,
+            n_gpu_layers,
             max_output_tokens: 64,
             ..Default::default()
         })
+        .await
         .expect("LLM backend should load");
         eprintln!(
             "[setup] LLM loaded in {:?} (gpu={})",
@@ -103,6 +128,7 @@ fn get_llm() -> Option<&'static Arc<OrtLlmBackend>> {
         );
         Some(Arc::new(backend))
     })
+    .await
     .as_ref()
 }
 
@@ -146,11 +172,11 @@ fn load_wav_f32(path: &std::path::Path) -> Vec<f32> {
 fn llm_input(raw_text: &str) -> PostProcessInput {
     PostProcessInput {
         raw_text: raw_text.into(),
-        style_preset: Arc::new(StylePreset::general()),
+        style_preset: Arc::new(StylePreset::casual()),
         app_category: None,
         dictionary: vec![],
         context: None,
-        prefix_context: None,
+        language: "en".into(),
     }
 }
 
@@ -162,12 +188,18 @@ async fn transcribe(asr: &OrtQwenAsrBackend, audio: &[f32]) -> Vec<AsrSegment> {
         .start_session(AsrSessionConfig::default())
         .await
         .unwrap();
-    let chunk_size = 16_000; // 1.0s — matches default stream_chunk_sec
+    let chunk_size = 16_000; // 1.0s push cadence (batch mode — only poll_final transcribes)
     let mut segments = Vec::new();
     for chunk in audio.chunks(chunk_size) {
         asr.push_audio(&handle, chunk).await.unwrap();
         segments.extend(asr.poll_results(&handle).await.unwrap());
     }
+    // Flush tail with 1s silence (>= chunk_samples) so speech-end detection
+    // fires and commits all rollback-buffered tokens.
+    asr.push_audio(&handle, &vec![0.0f32; 16_000])
+        .await
+        .unwrap();
+    segments.extend(asr.poll_final(&handle).await.unwrap());
     asr.end_session(handle).await.unwrap();
     segments
 }
@@ -258,9 +290,9 @@ async fn asr_reset_and_reuse() {
 // ── LLM Tests ───────────────────────────────────────────────────────────────
 
 #[tokio::test]
-#[ignore = "requires models/qwen3-0.6b-onnx on disk"]
+#[ignore = "requires models/llm-corrector-gguf on disk"]
 async fn llm_cleans_disfluencies() {
-    let llm = match get_llm() {
+    let llm = match get_llm().await {
         Some(b) => b,
         None => return,
     };
@@ -274,18 +306,22 @@ async fn llm_cleans_disfluencies() {
     eprintln!("[llm_disfluency] {:?} → {:?}", elapsed, output.cleaned_text);
 
     assert!(!output.cleaned_text.is_empty());
-    assert!(output.cleaned_text.to_lowercase().contains("hello"));
+    assert!(
+        output.cleaned_text.to_lowercase().contains("hello"),
+        "output should preserve core content, got: {:?}",
+        output.cleaned_text
+    );
 }
 
 #[tokio::test]
-#[ignore = "requires models/qwen3-0.6b-onnx on disk"]
+#[ignore = "requires models/llm-corrector-gguf on disk"]
 async fn llm_streaming_matches_non_streaming() {
-    let llm = match get_llm() {
+    let llm = match get_llm().await {
         Some(b) => b,
         None => return,
     };
 
-    let input = llm_input("so like I was thinking we should probably go to the park");
+    let input = llm_input("so like I was thinkin we should probably go to the park");
 
     let t = Instant::now();
     let direct = llm.transform(&input).await.unwrap();
@@ -317,9 +353,9 @@ async fn llm_streaming_matches_non_streaming() {
 /// Verify that providing prior context doesn't break LLM output and the context
 /// text appears in the generated prompt (checked via non-empty, non-hallucinated output).
 #[tokio::test]
-#[ignore = "requires models/qwen3-0.6b-onnx on disk"]
+#[ignore = "requires models/llm-corrector-gguf on disk"]
 async fn llm_with_context_produces_valid_output() {
-    let llm = match get_llm() {
+    let llm = match get_llm().await {
         Some(b) => b,
         None => return,
     };
@@ -328,11 +364,11 @@ async fn llm_with_context_produces_valid_output() {
         "Context: The queen mother gave the French the most affectionate reception.\n";
     let input_with_ctx = PostProcessInput {
         raw_text: "she had suffered too much unhappyness in England".into(),
-        style_preset: Arc::new(StylePreset::general()),
+        style_preset: Arc::new(StylePreset::casual()),
         app_category: None,
         dictionary: vec![],
         context: Some(context_text.into()),
-        prefix_context: None,
+        language: "en".into(),
     };
     let input_without_ctx = PostProcessInput {
         context: None,
@@ -386,7 +422,7 @@ async fn full_pipeline_real_session() {
         Some(b) => Arc::clone(b),
         None => return,
     };
-    let llm: Arc<dyn TextPostProcessor> = match get_llm() {
+    let llm: Arc<dyn TextPostProcessor> = match get_llm().await {
         Some(b) => Arc::clone(b) as _,
         None => return,
     };
@@ -405,7 +441,7 @@ async fn full_pipeline_real_session() {
     };
     eprintln!("[real_session] using {}", wav_path.display());
     let samples = load_wav_f32(&wav_path);
-    let audio_stream = AudioStream::from_samples(&samples, AudioConfig::default());
+    let audio_stream = AudioStream::from_samples(&samples, AudioConfig::default()).unwrap();
 
     let db = lune_persist::Database::open_in_memory().unwrap();
     let dict = lune_dict::DictionaryManager::new(lune_persist::Database::open_in_memory().unwrap())
@@ -413,7 +449,7 @@ async fn full_pipeline_real_session() {
     let settings = Arc::new(RwLock::new(UserSettings::default()));
 
     let config = SessionManagerConfig {
-        asr_backend_kind: AsrBackendKind::QwenAsr,
+        asr_backend_kind: AsrBackendKind::OrtQwenAsr,
         ..SessionManagerConfig::default()
     };
 
@@ -481,7 +517,7 @@ async fn full_pipeline_asr_to_llm() {
         Some(b) => b,
         None => return,
     };
-    let llm = match get_llm() {
+    let llm = match get_llm().await {
         Some(b) => b,
         None => return,
     };
@@ -507,69 +543,72 @@ async fn full_pipeline_asr_to_llm() {
         eprintln!("[pipeline] truth: {gt}");
     }
 
-    // Two-level confidence gating (mirrors session.rs:427-462).
-    // Per arXiv:2407.21414: sentence threshold=0.95, min-token threshold=0.7.
-    let mean_threshold = 0.95;
-    let min_token_threshold = 0.7;
-    let mut session_text = String::new();
-    let mut llm_time = std::time::Duration::ZERO;
-    let mut bypassed = 0usize;
-    let mut routed = 0usize;
+    // Confidence gating: send segments with uncertain words to LLM for correction.
+    let word_threshold = 0.85;
 
-    for seg in &segments {
-        let text = seg.text.trim();
-        if text.is_empty() {
-            continue;
-        }
+    let non_empty: Vec<&AsrSegment> = segments
+        .iter()
+        .filter(|s| !s.text.trim().is_empty())
+        .collect();
+    let raw_text: String = non_empty
+        .iter()
+        .map(|s| s.text.trim())
+        .collect::<Vec<_>>()
+        .join(" ");
 
-        if seg.is_confident_gated(mean_threshold, min_token_threshold) {
-            // High confidence → bypass LLM, use raw ASR text directly.
-            if !session_text.is_empty() {
-                session_text.push(' ');
-            }
-            session_text.push_str(text);
-            bypassed += 1;
-            eprintln!(
-                "[pipeline] conf={:.3} min_tok={:.3} BYPASS: {text:?}",
-                seg.confidence.unwrap_or(1.0),
-                seg.min_token_confidence.unwrap_or(1.0),
-            );
-        } else {
-            // Low confidence → route to LLM individually.
-            let t = Instant::now();
-            let output = llm.transform(&llm_input(text)).await.unwrap();
-            let seg_llm_time = t.elapsed();
-            llm_time += seg_llm_time;
-            let corrected = output.cleaned_text.trim();
-            if !corrected.is_empty() {
-                if !session_text.is_empty() {
-                    session_text.push(' ');
-                }
-                session_text.push_str(corrected);
-            }
-            routed += 1;
-            eprintln!(
-                "[pipeline] conf={:.3} min_tok={:.3} LLM ({seg_llm_time:?}): {text:?} → {corrected:?}",
-                seg.confidence.unwrap_or(0.0),
-                seg.min_token_confidence.unwrap_or(0.0),
-            );
+    for seg in &non_empty {
+        eprintln!(
+            "[pipeline] conf={:.3} min_tok={:.3} words={}: {:?}",
+            seg.confidence.unwrap_or(0.0),
+            seg.min_token_confidence.unwrap_or(0.0),
+            seg.word_confidences.len(),
+            seg.text.trim(),
+        );
+        for wc in &seg.word_confidences {
+            eprintln!("  word={:?} conf={:.3}", wc.word, wc.confidence);
         }
     }
 
-    let total_segs = bypassed + routed;
-    let bypass_pct = if total_segs > 0 {
-        bypassed as f64 / total_segs as f64 * 100.0
+    // Send segments with uncertain words to LLM for correction.
+    let has_uncertain = non_empty
+        .iter()
+        .any(|s| s.has_uncertain_words(word_threshold));
+
+    let mut llm_time = std::time::Duration::ZERO;
+    let session_text = if !has_uncertain || raw_text.is_empty() {
+        eprintln!("[pipeline] no uncertain words → BYPASS LLM");
+        raw_text
     } else {
-        0.0
+        let mut corrected_parts: Vec<String> = Vec::new();
+        for seg in &non_empty {
+            let text = seg.text.trim();
+            if !seg.has_uncertain_words(word_threshold) {
+                corrected_parts.push(text.to_owned());
+                continue;
+            }
+            let t = Instant::now();
+            let output = llm.transform(&llm_input(text)).await.unwrap();
+            llm_time += t.elapsed();
+            eprintln!(
+                "[pipeline] LLM correction ({:?}): {:?} → {:?}",
+                t.elapsed(),
+                text,
+                output.cleaned_text
+            );
+            corrected_parts.push(output.cleaned_text);
+        }
+        corrected_parts.join(" ")
     };
+
+    // Remove fillers deterministically after LLM correction.
+    let session_text =
+        lune_llm::fillers::remove_fillers(&session_text, "en").unwrap_or(session_text);
+    eprintln!("[pipeline] after filler removal: {session_text:?}");
 
     eprintln!(
         "[pipeline] asr={asr_time:?} ({:.2}x RT), llm={llm_time:?}, total={:?}",
         asr_time.as_secs_f64() / total_secs,
         asr_time + llm_time,
-    );
-    eprintln!(
-        "[pipeline] gating: {bypassed}/{total_segs} bypass ({bypass_pct:.0}%), {routed} routed to LLM"
     );
     eprintln!("[pipeline] output: {session_text:?}");
 

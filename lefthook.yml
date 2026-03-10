@@ -2,8 +2,8 @@ pre-commit:
   parallel: false
   commands:
     fmt:
-      run: cargo fmt --all -- --check
-      fail_text: "Run `cargo fmt --all` to fix formatting"
+      run: cargo fmt --all
+      stage_fixed: true
 
     check:
       run: CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-4} cargo check --workspace --all-targets

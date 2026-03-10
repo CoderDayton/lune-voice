@@ -11,7 +11,7 @@ path = "src/main.rs"
 [features]
 default = ["cuda"]
 cuda = ["lune-llm/cuda", "lune-asr/cuda", "ort/cuda"]
-legacy-qwen = ["lune-asr/legacy-qwen"]
+
 
 [dependencies]
 lune-core.workspace = true
@@ -45,3 +45,8 @@ hound = "3.5"
 [[example]]
 name = "pipeline_latency"
 path = "../../benchmarks/pipeline_latency.rs"
+
+[[example]]
+name = "pipeline_full"
+path = "../../benchmarks/pipeline_full.rs"
+

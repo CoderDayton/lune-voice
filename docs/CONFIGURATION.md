@@ -13,7 +13,7 @@
   - [Parakeet TDT (Local)](#parakeet-tdt-local)
   - [OpenAI-Compatible (Remote)](#openai-compatible-remote-asr)
 - [LLM Backends](#llm-backends)
-  - [Local (ONNX Runtime)](#local-onnx-runtime)
+  - [LlamaCpp Local (default)](#llamacpp-local-default)
   - [OpenAI-Compatible (Remote)](#openai-compatible-remote-llm)
 - [Privacy Mode](#privacy-mode)
 - [Dictation Modes](#dictation-modes)
@@ -85,9 +85,9 @@ model_dir = ""          # auto-populated from model downloads
 use_gpu = true
 
 [llm_backend]
-type = "OrtLocal"
-model_dir = ""          # auto-populated from model downloads
-use_gpu = true
+type = "LlamaCppLocal"
+model_path = ""         # auto-populated from model downloads
+n_gpu_layers = 1000
 n_ctx = 2048
 max_output_tokens = 256
 
@@ -207,46 +207,27 @@ streaming = "HttpPolling"
 
 ## LLM Backends
 
-### Local (ONNX Runtime)
+### LlamaCpp Local (default)
 
-The default backend. Runs Qwen3 0.6B locally via ONNX Runtime.
+The default backend. Runs any GGUF model locally via llama.cpp for `[?word?]` span correction.
 
 ```toml
 [llm_backend]
-type = "OrtLocal"
-model_dir = "/path/to/qwen3-0.6b-onnx"
-use_gpu = true
+type = "LlamaCppLocal"
+model_path = "/path/to/model.gguf"
+n_gpu_layers = 1000
 n_ctx = 2048
 max_output_tokens = 256
-temperature = 0.0
-top_p = 0.8
-top_k = 20
-repeat_penalty = 1.0
-repeat_last_n = 64
 ```
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `model_dir` | path | auto | Directory containing decoder_model_merged.onnx and tokenizer.json |
-| `use_gpu` | bool | `true` | Enable CUDA GPU acceleration |
+| `model_path` | path | auto | Path to the `.gguf` model file |
+| `n_gpu_layers` | u32 | `1000` | GPU layers to offload (0 = CPU only, 1000 = all GPU) |
 | `n_ctx` | u32 | `2048` | Context window size in tokens |
 | `max_output_tokens` | u32 | `256` | Maximum tokens to generate per request |
-| `temperature` | f32 | `0.0` | Sampling temperature (0.0 = greedy) |
-| `top_p` | f32 | `0.8` | Nucleus sampling threshold |
-| `top_k` | i32 | `20` | Top-k sampling |
-| `repeat_penalty` | f32 | `1.0` | Repeat penalty factor |
-| `repeat_last_n` | i32 | `64` | Window for repeat penalty |
 
-**Model files expected in `model_dir`:**
-
-| File | Purpose |
-|------|---------|
-| `decoder_model_merged.onnx` | Qwen3 decoder with KV cache |
-| `tokenizer.json` | HuggingFace tokenizer |
-
-**Prompt format:** ChatML with `/no_think` directive to suppress chain-of-thought. See [Prompt Structure](#prompt-structure) for details.
-
-**Stop sequences:** `<think>`, `</think>`, `<|im_end|>` — detected via byte-level `memchr` scanning with compile-time ASCII verification.
+**Inference:** Greedy argmax decoding via llama.cpp. A fresh context is created per call (stateless). Input is raw text with `[?word?]` markers; output is corrected text.
 
 ### OpenAI-Compatible (Remote LLM)
 
@@ -558,7 +539,7 @@ Models are downloaded automatically on first run from HuggingFace Hub.
 | Model | Repository | Files | Size |
 |-------|-----------|-------|------|
 | Qwen3-ASR 0.6B | `lune-voice/qwen3-asr-0.6b-onnx` | encoder.onnx, embed_tokens.onnx, decoder_merged.onnx, tokenizer.json | ~1.2 GB |
-| Qwen3 0.6B | `lune-voice/qwen3-0.6b-onnx` | decoder_model_merged.onnx, tokenizer.json | ~600 MB |
+| LLM Corrector | `lune-voice/llm-corrector-gguf` | model.gguf | varies |
 
 Models are stored in:
 
@@ -576,8 +557,8 @@ type = "OrtQwenAsr"
 model_dir = "/path/to/custom/asr-model"
 
 [llm_backend]
-type = "OrtLocal"
-model_dir = "/path/to/custom/llm-model"
+type = "LlamaCppLocal"
+model_path = "/path/to/custom/model.gguf"
 ```
 
 ---

@@ -2,6 +2,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::Result;
 
+/// Per-word confidence derived from subword BPE token log-probabilities.
+/// Confidence = minimum exp(log_prob) across constituent subword tokens.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WordConfidence {
+    pub word: String,
+    pub confidence: f32,
+}
+
 /// A segment of recognized speech.
 ///
 /// Fields are ordered hot-first: `id`, `confidence`, `is_final` land on the
@@ -18,6 +26,10 @@ pub struct AsrSegment {
     /// low-confidence token flags the segment for LLM review.
     #[serde(default)]
     pub min_token_confidence: Option<f32>,
+    /// Per-word confidence from BPE subword aggregation (min of constituent tokens).
+    /// Empty for backends that don't expose per-token logits.
+    #[serde(default)]
+    pub word_confidences: Vec<WordConfidence>,
     /// Immutable once true.
     pub is_final: bool,
     pub start_ms: Option<u64>,
@@ -50,6 +62,34 @@ impl AsrSegment {
     pub fn duration_ms(&self) -> Option<u64> {
         self.end_ms?.checked_sub(self.start_ms?)
     }
+
+    /// Build text with low-confidence words wrapped in `[?word?]` markers.
+    /// Falls back to `self.text.clone()` when no per-word data is available.
+    pub fn mark_uncertain(&self, threshold: f32) -> String {
+        if self.word_confidences.is_empty() {
+            return self.text.clone();
+        }
+        let mut parts: Vec<String> = Vec::with_capacity(self.word_confidences.len());
+        for wc in &self.word_confidences {
+            if wc.confidence < threshold {
+                parts.push(format!("[?{}?]", wc.word));
+            } else {
+                parts.push(wc.word.clone());
+            }
+        }
+        parts.join(" ")
+    }
+
+    /// Returns `true` if any word falls below `threshold`.
+    /// Returns `false` when no per-word data is available (conservative: assume pass).
+    #[inline]
+    pub fn has_uncertain_words(&self, threshold: f32) -> bool {
+        !self.word_confidences.is_empty()
+            && self
+                .word_confidences
+                .iter()
+                .any(|wc| wc.confidence < threshold)
+    }
 }
 
 /// Configuration for an ASR session.
@@ -79,15 +119,29 @@ impl Default for AsrSessionConfig {
 #[non_exhaustive]
 pub enum AsrBackendKind {
     ParakeetTdt,
-    QwenAsr,
     OrtQwenAsr,
     OpenAiCompatible,
+}
+
+impl AsrBackendKind {
+    /// Recommended `max_segment_ms` for the VadSegmenter.
+    ///
+    /// All backends handle long audio natively (OrtQwen uses windowed
+    /// attention internally). This is a safety ceiling, not an encoder limit.
+    #[deprecated(note = "use AsrRegistry::pipeline_config().max_segment_ms instead")]
+    pub fn suggested_max_segment_ms(&self) -> u32 {
+        match self {
+            Self::OrtQwenAsr => 30_000,
+            Self::ParakeetTdt => 30_000,
+            Self::OpenAiCompatible => 30_000,
+        }
+    }
 }
 
 /// Trait for ASR backend implementations.
 #[async_trait::async_trait]
 pub trait AsrBackend: Send + Sync {
-    type SessionHandle: Send;
+    type SessionHandle: Send + Sync;
 
     async fn start_session(&self, config: AsrSessionConfig) -> Result<Self::SessionHandle>;
 
@@ -96,6 +150,13 @@ pub trait AsrBackend: Send + Sync {
     async fn poll_results(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>>;
 
     async fn end_session(&self, session: Self::SessionHandle) -> Result<()>;
+
+    /// Final poll that commits all rollback-buffered tokens.
+    /// Default: delegates to `poll_results`. Streaming backends override
+    /// to pass `finalize=true` through the decode loop.
+    async fn poll_final(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>> {
+        self.poll_results(session).await
+    }
 
     /// Clear the audio buffer and segment state so the next inference starts
     /// fresh. Called after finalizing an utterance to prevent re-transcribing
@@ -127,6 +188,7 @@ mod tests {
             end_ms: Some(1500),
             confidence: Some(0.95),
             min_token_confidence: Some(0.80),
+            word_confidences: vec![],
         }
     }
 
@@ -202,5 +264,94 @@ mod tests {
         let mut seg = make_segment();
         seg.min_token_confidence = None; // backend doesn't expose per-token
         assert!(seg.is_confident_gated(0.90, 0.7));
+    }
+
+    #[test]
+    fn mark_uncertain_empty_word_confidences_returns_text() {
+        let seg = make_segment();
+        assert_eq!(seg.mark_uncertain(0.85), "hello world");
+    }
+
+    #[test]
+    fn mark_uncertain_wraps_low_confidence_words() {
+        let mut seg = make_segment();
+        seg.word_confidences = vec![
+            WordConfidence {
+                word: "hello".into(),
+                confidence: 0.95,
+            },
+            WordConfidence {
+                word: "world".into(),
+                confidence: 0.60,
+            },
+        ];
+        assert_eq!(seg.mark_uncertain(0.85), "hello [?world?]");
+    }
+
+    #[test]
+    fn mark_uncertain_all_confident() {
+        let mut seg = make_segment();
+        seg.word_confidences = vec![
+            WordConfidence {
+                word: "hello".into(),
+                confidence: 0.95,
+            },
+            WordConfidence {
+                word: "world".into(),
+                confidence: 0.90,
+            },
+        ];
+        assert_eq!(seg.mark_uncertain(0.85), "hello world");
+    }
+
+    #[test]
+    fn has_uncertain_words_empty_returns_false() {
+        let seg = make_segment();
+        assert!(!seg.has_uncertain_words(0.85));
+    }
+
+    #[test]
+    fn has_uncertain_words_detects_low_confidence() {
+        let mut seg = make_segment();
+        seg.word_confidences = vec![
+            WordConfidence {
+                word: "hello".into(),
+                confidence: 0.95,
+            },
+            WordConfidence {
+                word: "world".into(),
+                confidence: 0.60,
+            },
+        ];
+        assert!(seg.has_uncertain_words(0.85));
+    }
+
+    #[test]
+    fn has_uncertain_words_all_above_threshold() {
+        let mut seg = make_segment();
+        seg.word_confidences = vec![
+            WordConfidence {
+                word: "hello".into(),
+                confidence: 0.95,
+            },
+            WordConfidence {
+                word: "world".into(),
+                confidence: 0.90,
+            },
+        ];
+        assert!(!seg.has_uncertain_words(0.85));
+    }
+
+    #[test]
+    fn word_confidence_serde_round_trip() {
+        let mut seg = make_segment();
+        seg.word_confidences = vec![WordConfidence {
+            word: "test".into(),
+            confidence: 0.75,
+        }];
+        let json = serde_json::to_string(&seg).unwrap();
+        let parsed: AsrSegment = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.word_confidences.len(), 1);
+        assert_eq!(parsed.word_confidences[0].word, "test");
     }
 }

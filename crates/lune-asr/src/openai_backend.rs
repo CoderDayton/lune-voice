@@ -85,10 +85,7 @@ impl OpenAiCompatibleAsrBackend {
         }
 
         // Pre-build the transcription URL once; avoids per-request parse+alloc.
-        let transcription_url = config
-            .base_url
-            .join("/v1/audio/transcriptions")
-            .map_err(|e| Error::Asr(format!("url join: {e}")))?;
+        let transcription_url = build_transcription_url(&config.base_url)?;
 
         // Pre-format the auth header value once.
         let auth_header = format!("Bearer {}", config.api_key.expose());
@@ -148,48 +145,34 @@ impl AsrBackend for OpenAiCompatibleAsrBackend {
         let samples_len = lock_err(session.state.lock())?.audio_buf.len();
 
         if samples_len >= self.config.min_samples_before_request {
-            // Drain buffer under a brief lock; HTTP happens outside.
-            let (mut pcm, lang, sample_rate, base_id) = {
-                let mut state = lock_err(session.state.lock())?;
-                let pcm = std::mem::take(&mut state.audio_buf);
-                let lang = state.config.language.clone();
-                let sr = state.config.sample_rate;
-                let id = state.next_id;
-                (pcm, lang, sr, id)
-            };
-
-            match self
-                .transcribe(&pcm, sample_rate, lang.as_deref(), base_id)
-                .await
-            {
-                Ok(new_segs) => {
-                    let count = new_segs.len() as u64;
-                    let mut state = lock_err(session.state.lock())?;
-                    state.next_id += count;
-                    // Avoid double alloc: append directly.
-                    state.pending.extend(new_segs);
-                }
-                Err(e) => {
-                    tracing::warn!(error = %e, "ASR API call failed; restoring audio for retry");
-                    let mut state = lock_err(session.state.lock())?;
-                    if state.audio_buf.is_empty() {
-                        state.audio_buf = pcm;
-                    } else {
-                        // Prepend recovered audio before any newly pushed samples.
-                        // append drains state.audio_buf in-place into pcm (no extra alloc).
-                        pcm.append(&mut state.audio_buf);
-                        state.audio_buf = pcm;
-                    }
-                }
-            }
+            self.flush_audio(session, false).await?;
         }
 
         let mut state = lock_err(session.state.lock())?;
         Ok(std::mem::take(&mut state.pending))
     }
 
+    async fn poll_final(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>> {
+        self.flush_audio(session, true).await?;
+        let mut state = lock_err(session.state.lock())?;
+        Ok(std::mem::take(&mut state.pending))
+    }
+
     async fn end_session(&self, session: Self::SessionHandle) -> Result<()> {
-        let (pcm, lang, sample_rate, base_id) = {
+        let _ = session;
+        tracing::debug!("ASR session ended");
+        Ok(())
+    }
+}
+
+impl OpenAiCompatibleAsrBackend {
+    async fn flush_audio(&self, session: &OpenAiAsrSession, force: bool) -> Result<()> {
+        let samples_len = lock_err(session.state.lock())?.audio_buf.len();
+        if samples_len == 0 || (!force && samples_len < self.config.min_samples_before_request) {
+            return Ok(());
+        }
+
+        let (mut pcm, lang, sample_rate, base_id) = {
             let mut state = lock_err(session.state.lock())?;
             let pcm = std::mem::take(&mut state.audio_buf);
             let lang = state.config.language.clone();
@@ -198,20 +181,31 @@ impl AsrBackend for OpenAiCompatibleAsrBackend {
             (pcm, lang, sr, id)
         };
 
-        if !pcm.is_empty()
-            && let Err(e) = self
-                .transcribe(&pcm, sample_rate, lang.as_deref(), base_id)
-                .await
+        match self
+            .transcribe(&pcm, sample_rate, lang.as_deref(), base_id)
+            .await
         {
-            tracing::warn!(error = %e, "ASR flush on session end failed");
+            Ok(new_segs) => {
+                let count = new_segs.len() as u64;
+                let mut state = lock_err(session.state.lock())?;
+                state.next_id += count;
+                state.pending.extend(new_segs);
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "ASR API call failed; restoring audio for retry");
+                let mut state = lock_err(session.state.lock())?;
+                if state.audio_buf.is_empty() {
+                    state.audio_buf = pcm;
+                } else {
+                    pcm.append(&mut state.audio_buf);
+                    state.audio_buf = pcm;
+                }
+            }
         }
 
-        tracing::debug!("ASR session ended");
         Ok(())
     }
-}
 
-impl OpenAiCompatibleAsrBackend {
     /// Send PCM audio to `/v1/audio/transcriptions`, retry on transient errors.
     async fn transcribe(
         &self,
@@ -282,6 +276,17 @@ impl OpenAiCompatibleAsrBackend {
             "ASR failed after 3 attempts: {last_err}"
         )))
     }
+}
+
+fn build_transcription_url(base_url: &Url) -> Result<Url> {
+    let mut url = base_url.clone();
+    let mut segments = url
+        .path_segments_mut()
+        .map_err(|_| Error::Asr("base_url cannot be a cannot-be-a-base URL".into()))?;
+    segments.push("audio");
+    segments.push("transcriptions");
+    drop(segments);
+    Ok(url)
 }
 
 // ── WAV encoding ──────────────────────────────────────────────────────────────
@@ -368,6 +373,7 @@ impl VerboseJsonResponse {
                 end_ms: None,
                 confidence: None,
                 min_token_confidence: None,
+                word_confidences: vec![],
             }];
         }
 
@@ -384,6 +390,7 @@ impl VerboseJsonResponse {
                     end_ms: Some((s.end * 1000.0) as u64),
                     confidence: None,
                     min_token_confidence: None,
+                    word_confidences: vec![],
                 });
             }
         }
@@ -485,6 +492,16 @@ mod tests {
         assert!(OpenAiCompatibleAsrBackend::new(config).is_ok());
     }
 
+    #[test]
+    fn preserves_custom_base_path_prefix() {
+        let url = build_transcription_url(&"https://example.com/proxy/openai/v1".parse().unwrap())
+            .unwrap();
+        assert_eq!(
+            url.as_str(),
+            "https://example.com/proxy/openai/v1/audio/transcriptions"
+        );
+    }
+
     #[tokio::test]
     async fn graceful_degradation_on_unreachable() {
         let config = OpenAiAsrConfig {
@@ -503,5 +520,25 @@ mod tests {
         // poll_results should not panic or propagate the error — it logs WARN.
         let segs = backend.poll_results(&session).await.unwrap();
         assert!(segs.is_empty());
+    }
+
+    #[tokio::test]
+    async fn poll_final_restores_audio_after_failed_flush() {
+        let config = OpenAiAsrConfig {
+            base_url: "http://127.0.0.1:1/v1".parse().unwrap(),
+            timeout: Duration::from_millis(100),
+            min_samples_before_request: usize::MAX,
+            ..Default::default()
+        };
+        let backend = OpenAiCompatibleAsrBackend::new(config).unwrap();
+        let session = backend
+            .start_session(AsrSessionConfig::default())
+            .await
+            .unwrap();
+
+        backend.push_audio(&session, &[0.0f32; 100]).await.unwrap();
+        let segs = backend.poll_final(&session).await.unwrap();
+        assert!(segs.is_empty());
+        assert_eq!(session.state.lock().unwrap().audio_buf.len(), 100);
     }
 }

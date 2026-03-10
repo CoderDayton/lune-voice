@@ -67,6 +67,8 @@ fn run_daemon() {
         }
     };
 
+    settings.migrate_pipeline_fields();
+
     let models = lune_persist::ensure_default_models(
         &paths.models_dir(),
         &settings.asr_backend,
@@ -86,9 +88,6 @@ fn run_daemon() {
         lune_core::config::AsrBackendConfig::ParakeetTdt { model_dir, .. } => {
             ("ParakeetTdt", model_dir.display().to_string())
         }
-        lune_core::config::AsrBackendConfig::QwenAsr { model_dir, .. } => {
-            ("QwenAsr", model_dir.display().to_string())
-        }
         lune_core::config::AsrBackendConfig::OrtQwenAsr { model_dir, .. } => {
             ("OrtQwenAsr", model_dir.display().to_string())
         }
@@ -101,7 +100,7 @@ fn run_daemon() {
     tracing::info!(
         asr_backend = asr_backend_kind,
         asr_dir = %selected_asr_dir,
-        llm_dir = %models.ort_llm_model_dir.display(),
+        llm_dir = %models.llm_model_path.display(),
         "models ready"
     );
 
@@ -207,7 +206,7 @@ async fn run_pipeline(
     };
 
     tracing::info!("ASR backend ready, building LLM post-processor...");
-    let post_processor = match factory::build_post_processor(&snap) {
+    let post_processor = match factory::build_post_processor(&snap).await {
         Ok(p) => p,
         Err(e) => {
             tracing::error!(error = %e, "failed to build LLM post-processor");
@@ -217,6 +216,28 @@ async fn run_pipeline(
 
     tracing::info!("LLM post-processor ready");
     let router = Arc::new(lune_commands::VoiceCommandRouter::new());
+
+    let aligner = match (&snap.aligner, asr.as_ort_qwen()) {
+        (Some(cfg), Some(backend)) if cfg.enabled => {
+            match backend.make_forced_aligner(&cfg.model_dir) {
+                Ok(aligner) => {
+                    let fa = std::sync::Arc::new(aligner);
+                    // Attach to ASR backend for timestamp-based chunk merging.
+                    backend.attach_aligner(std::sync::Arc::clone(&fa));
+                    Some(fa)
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, model_dir = %cfg.model_dir.display(), "failed to build forced aligner");
+                    return;
+                }
+            }
+        }
+        (Some(cfg), None) if cfg.enabled => {
+            tracing::warn!("forced aligner requires OrtQwen ASR backend; skipping");
+            None
+        }
+        _ => None,
+    };
 
     tracing::info!("opening database...");
     factory::ensure_db_path(&db_path).expect("ensure DB path");
@@ -229,28 +250,17 @@ async fn run_pipeline(
         lune_dict::DictionaryManager::new(dict_db).expect("init dictionary"),
     ));
 
-    let asr_backend_kind = match snap.asr_backend {
-        lune_core::config::AsrBackendConfig::OpenAiCompatible { .. } => {
-            lune_core::asr::AsrBackendKind::OpenAiCompatible
-        }
-        lune_core::config::AsrBackendConfig::QwenAsr { .. } => {
-            lune_core::asr::AsrBackendKind::QwenAsr
-        }
-        lune_core::config::AsrBackendConfig::OrtQwenAsr { .. } => {
-            lune_core::asr::AsrBackendKind::OrtQwenAsr
-        }
-        _ => lune_core::asr::AsrBackendKind::ParakeetTdt,
-    };
-
+    let pipeline = asr.pipeline_config().with_overrides(&snap.pipeline);
     let config = SessionManagerConfig {
-        asr_backend_kind,
-        confidence_threshold: snap.confidence_threshold,
-        min_token_threshold: snap.min_token_threshold,
-        dynamic_silence: snap.dynamic_silence,
-        ..Default::default()
+        asr_backend_kind: asr.kind(),
+        asr_config: lune_core::asr::AsrSessionConfig {
+            language: Some(snap.language.clone()),
+            ..Default::default()
+        },
+        pipeline,
     };
 
-    let manager = SessionManager::new(
+    let mut manager = SessionManager::new(
         Arc::new(asr),
         router,
         post_processor,
@@ -259,6 +269,9 @@ async fn run_pipeline(
         config,
         Arc::clone(&settings),
     );
+    if let Some(aligner) = aligner {
+        manager = manager.with_aligner(aligner);
+    }
 
     let delivery_service = delivery::DeliveryService::new();
 
@@ -368,6 +381,7 @@ async fn start_dictation<A: lune_core::asr::AsrBackend + 'static>(
             // Fast-path: skip work for high-frequency PartialText without lock
             let update = match event {
                 lune_core::session::SessionEvent::Started => AppStateUpdate::Listening,
+                lune_core::session::SessionEvent::Processing => AppStateUpdate::Processing,
                 lune_core::session::SessionEvent::PartialText(_) => AppStateUpdate::PartialText,
                 lune_core::session::SessionEvent::FinalizedText(t) => {
                     // `borrow()` is lock-free on watch channels — cheap hot path
@@ -482,6 +496,7 @@ async fn update_state(
     let state_str: &'static str = match update {
         AppStateUpdate::Idle | AppStateUpdate::FinalText => "idle",
         AppStateUpdate::Listening | AppStateUpdate::PartialText => "listening",
+        AppStateUpdate::Processing => "processing",
         AppStateUpdate::Error => "error",
     };
 

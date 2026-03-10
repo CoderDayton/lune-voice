@@ -27,7 +27,12 @@ thiserror.workspace = true
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tracing-subscriber = "0.3"
+hound = "3.5"
 
 [[example]]
 name = "live_capture"
 path = "examples/live_capture.rs"
+
+[[example]]
+name = "vad_inspect"
+path = "examples/vad_inspect.rs"

@@ -1,5 +1,6 @@
 mod hotkey;
 mod modes;
+mod pipeline;
 mod redacted;
 mod settings;
 mod style;
@@ -7,6 +8,7 @@ mod style;
 // Re-export everything so `use lune_core::config::X` paths remain valid.
 pub use hotkey::{HotkeyConfig, KeyCombo, Modifier};
 pub use modes::{ActivationMode, DictationMode, PrivacyMode};
+pub use pipeline::{PipelineConfig, PipelineOverrides};
 pub use redacted::RedactedString;
 pub use settings::{AsrBackendConfig, DevicePolicy, LlmBackendConfig, StreamingMode, UserSettings};
 pub use style::{BASE_SYSTEM_PROMPT, StyleId, StylePreset, StyleRegistry, builtin_registry};
@@ -37,10 +39,10 @@ mod tests {
 
     #[test]
     fn style_preset_serde_round_trip() {
-        let preset = StylePreset::general();
+        let preset = StylePreset::casual();
         let json = serde_json::to_string(&preset).unwrap();
         let parsed: StylePreset = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed.id, "general");
+        assert_eq!(parsed.id, "casual");
         assert!(!parsed.few_shot_pairs.is_empty());
     }
 
@@ -56,12 +58,12 @@ mod tests {
         let presets = StylePreset::all_builtin();
         assert_eq!(presets.len(), 6);
         let ids: Vec<&str> = presets.iter().map(|p| p.id.as_str()).collect();
-        assert!(ids.contains(&"general"));
-        assert!(ids.contains(&"coding"));
+        assert!(ids.contains(&"casual"));
+        assert!(ids.contains(&"professional"));
+        assert!(ids.contains(&"formal"));
         assert!(ids.contains(&"email"));
-        assert!(ids.contains(&"slack"));
-        assert!(ids.contains(&"meeting_notes"));
-        assert!(ids.contains(&"code_comments"));
+        assert!(ids.contains(&"technical"));
+        assert!(ids.contains(&"notes"));
         // All IDs are unique.
         let unique: std::collections::HashSet<&str> = ids.iter().copied().collect();
         assert_eq!(unique.len(), presets.len());
@@ -88,8 +90,8 @@ mod tests {
     #[test]
     fn registry_get_by_id() {
         let reg = builtin_registry();
-        assert!(reg.get("general").is_some());
-        assert!(reg.get("coding").is_some());
+        assert!(reg.get("casual").is_some());
+        assert!(reg.get("technical").is_some());
         assert!(reg.get("nonexistent").is_none());
     }
 

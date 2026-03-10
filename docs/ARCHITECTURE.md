@@ -28,8 +28,8 @@ Lune Voice is a privacy-first dictation daemon that converts speech to LLM-corre
 
 | Component | Model | Format | Runtime |
 |-----------|-------|--------|---------|
-| ASR | Qwen3-ASR 0.6B | ONNX | ONNX Runtime |
-| LLM | Qwen3 0.6B | ONNX | ONNX Runtime |
+| ASR | Qwen3-ASR 0.6B | ONNX INT4 | ONNX Runtime |
+| LLM | LLM Corrector | GGUF | llama.cpp |
 
 The daemon listens for D-Bus commands (toggle/start/stop/cancel) and manages a single active dictation session at a time.
 
@@ -42,7 +42,7 @@ lune-app (binary)
 ├── lune-audio       Microphone capture (cpal)
 ├── lune-asr         Speech recognition (ONNX Runtime)
 │   └── lune-core    Shared traits + types
-├── lune-llm         Text post-processing (ONNX Runtime)
+├── lune-llm         Text post-processing (llama.cpp)
 │   └── lune-core
 ├── lune-commands    Voice command detection
 ├── lune-dict        User dictionary
@@ -141,55 +141,20 @@ When `None` confidence is received (e.g., OpenAI backend), the router treats it 
 
 **Length sanity check:** LLM corrections are rejected if the output/input length ratio falls outside `[0.5, 2.0]`. Uses integer bit-shifts for the default thresholds, falling back to f32 division only for non-default ratios.
 
-### 4. LLM Worker
+### 4. LLM Post-Processing
 
-**Crate:** `lune-app` | **File:** `llm_worker.rs`
+**Crate:** `lune-llm` | **File:** `crates/lune-llm/src/llamacpp_backend.rs`
 
-An async task that runs on `spawn_local` (same thread as the session loop):
+The batch pipeline calls `TextPostProcessor::transform()` directly from `session.rs` — there is no separate LLM worker task.
 
-1. **Batch drain:** After receiving the first request, immediately drains all queued requests via `recv_many` (single lock acquisition)
-2. **Combine:** Concatenates text from all batched requests with exact-capacity pre-allocation
-3. **Transform:** Calls `TextPostProcessor::transform()` with the combined text
-4. **Respond:** Returns the `max_utterance_id` from the batch, allowing the session to clear all covered pending entries with a single `retain`
+#### llama.cpp Backend (default)
 
-#### LLM Backend (`lune-llm`)
-
-**File:** `crates/lune-llm/src/ort_backend.rs`
-
-- Loads ONNX model via `ort` (ONNX Runtime) with optional CUDA GPU acceleration
-- Prefill + autoregressive decode with KV cache pass-through
-- Inference runs on `spawn_blocking` to avoid starving the async runtime
-- Greedy decoding (temperature 0.0) for deterministic corrections
-- Context window: 2048 tokens
-- Token sampling via custom `sampling.rs` (greedy, temperature, top-k, top-p, repeat penalty)
-
-**ChatML Prompt Construction** (`prompt.rs`):
-
-```
-<|im_start|>system
-/no_think
-{system_prompt}
-{dictionary terms}
-{preceding context}<|im_end|>
-<|im_start|>user
-{few-shot input}<|im_end|>
-<|im_start|>assistant
-<think>
-</think>
-{few-shot output}<|im_end|>
-...
-<|im_start|>user
-{raw_text}<|im_end|>
-<|im_start|>assistant
-<think>
-</think>
-```
-
-The `/no_think` directive and pre-filled `<think>\n</think>\n` suppress Qwen3's chain-of-thought mode for direct output.
-
-**Stop sequence detection:** Uses `memchr::memchr_iter(b'<')` to scan only the tail window of the output buffer. All stop sequences are compile-time verified as ASCII. Partial stop sequences are trimmed via `memrchr` when generation hits max tokens.
-
-**Output cleaning:** `strip_thinking()` handles edge cases: matched `<think>...</think>` pairs, bare `</think>` tags (model ignored prefill), and stray `<|im_end|>` tokens.
+- Any GGUF model (e.g. Qwen3, Phi, Gemma) for contextual token resolution
+- Loaded once via `LlamaModel`; fresh `LlamaContext` per call (stateless)
+- Greedy decoding (deterministic)
+- Input: raw text with `[?word?]` markers for low-confidence spans
+- Output: corrected text
+- `strip_markers()` in `prompt.rs` removes any residual `[?word?]`/`[word]` from output
 
 ### 5. Text Delivery
 
@@ -325,16 +290,15 @@ Main Thread (tokio current_thread + LocalSet)
 ├── D-Bus connection (zbus) — initialized outside LocalSet
 ├── Command loop — receives AppCommand from D-Bus
 ├── Session task (spawn_local) — !Send due to cpal stream
-│   ├── Audio coalescing
-│   ├── ASR push + poll
-│   ├── Confidence routing
-│   ├── LLM request sending
-│   └── LLM response handling + delivery
-├── LLM worker (spawn_local) — batch drain + transform
+│   ├── Audio coalescing (VAD-gated)
+│   ├── ASR push + poll (streaming encoder-decoder)
+│   ├── Per-word confidence marking
+│   ├── LLM transform (llama.cpp, inline in session loop)
+│   └── Text delivery
 └── Event forwarder (spawn_local) — routes SessionEvents to delivery
 
 spawn_blocking pool (tokio default)
-└── LLM inference (generate_sync) — runs under Mutex, CUDA or CPU
+└── LLM/ASR inference — runs under Mutex, CUDA or CPU
 ```
 
 Why `current_thread` instead of `multi_thread`:
@@ -342,7 +306,7 @@ Why `current_thread` instead of `multi_thread`:
 - All hot paths stay on one core (cache-friendly)
 - `spawn_local` support for `!Send` futures (cpal stream)
 
-The model `Mutex` in `OrtLlmBackend` serializes inference calls. Since there's only one LLM worker, contention is impossible in practice — the Mutex exists for `Send` safety across `spawn_blocking`.
+ORT sessions are wrapped in `Arc<Mutex<Session>>` for `Send` safety across `spawn_blocking`. The LLM backend uses `llama-cpp-2` with per-call contexts (no shared state). Since inference is single-threaded per model, contention is impossible in practice.
 
 ---
 

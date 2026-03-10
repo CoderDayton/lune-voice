@@ -11,3 +11,13 @@
 models/
 test_fixtures/
 CLAUDE.md
+luneopt/
+data/
+flan-t5-base-asr-corrector/
+flanec-base-cd-onnx/
+qwen2.5-1.5b-instruct-gguf/
+
+# Unsloth fine-tuning artifacts
+unsloth/checkpoints/
+unsloth/qwen-asr-corrector/
+unsloth/asr_uncertainty_correction.jsonl
