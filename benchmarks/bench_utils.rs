@@ -4,6 +4,9 @@
 
 use std::path::PathBuf;
 
+use lune_core::asr::AsrBackendKind;
+use lune_core::config::AsrBackendConfig;
+
 // ─── Fixture ────────────────────────────────────────────────────────────────
 
 pub struct Fixture {
@@ -22,6 +25,161 @@ pub fn workspace_root() -> PathBuf {
         .parent()
         .unwrap()
         .to_path_buf()
+}
+
+// ─── Process memory ────────────────────────────────────────────────────────
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct MemoryUsage {
+    pub rss_mb: f64,
+    pub peak_mb: f64,
+}
+
+impl MemoryUsage {
+    pub fn display(self) -> String {
+        format!("RSS {:.0} MB  Peak {:.0} MB", self.rss_mb, self.peak_mb)
+    }
+}
+
+pub fn process_memory_usage() -> Option<MemoryUsage> {
+    let status = std::fs::read_to_string("/proc/self/status").ok()?;
+    let mut rss_kb = None;
+    let mut peak_kb = None;
+
+    for line in status.lines() {
+        if let Some(rest) = line.strip_prefix("VmRSS:") {
+            rss_kb = rest.split_whitespace().next()?.parse::<f64>().ok();
+        } else if let Some(rest) = line.strip_prefix("VmHWM:") {
+            peak_kb = rest.split_whitespace().next()?.parse::<f64>().ok();
+        }
+    }
+
+    Some(MemoryUsage {
+        rss_mb: rss_kb? / 1024.0,
+        peak_mb: peak_kb.unwrap_or(rss_kb?) / 1024.0,
+    })
+}
+
+// ─── ASR benchmark selection ────────────────────────────────────────────────
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BenchmarkAsr {
+    Parakeet,
+    Qwen,
+}
+
+impl BenchmarkAsr {
+    fn parse(raw: &str) -> Option<Self> {
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "parakeet" | "parakeet-tdt" => Some(Self::Parakeet),
+            "qwen" | "ortqwen" | "ort-qwen" | "qwen3-asr" => Some(Self::Qwen),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct BenchmarkAsrEntry {
+    pub display_name: &'static str,
+    pub backend_kind: AsrBackendKind,
+    pub config: AsrBackendConfig,
+}
+
+pub fn requested_benchmark_asr() -> Option<BenchmarkAsr> {
+    if let Ok(raw) = std::env::var("ASR") {
+        if let Some(choice) = BenchmarkAsr::parse(&raw) {
+            return Some(choice);
+        }
+        eprintln!("  [warn] Ignoring unsupported ASR={raw:?}; expected qwen or parakeet");
+    }
+
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        if let Some(value) = arg.strip_prefix("--asr=") {
+            if let Some(choice) = BenchmarkAsr::parse(value) {
+                return Some(choice);
+            }
+            eprintln!("  [warn] Ignoring unsupported --asr={value:?}; expected qwen or parakeet");
+            return None;
+        }
+        if arg == "--asr" {
+            if let Some(value) = args.next() {
+                if let Some(choice) = BenchmarkAsr::parse(&value) {
+                    return Some(choice);
+                }
+                eprintln!(
+                    "  [warn] Ignoring unsupported --asr {value:?}; expected qwen or parakeet"
+                );
+            } else {
+                eprintln!("  [warn] Ignoring bare --asr; expected qwen or parakeet");
+            }
+            return None;
+        }
+    }
+
+    None
+}
+
+pub fn benchmark_asr_entries(root: &std::path::Path) -> Vec<BenchmarkAsrEntry> {
+    let requested = requested_benchmark_asr();
+    let parakeet_dir = root.join("models/parakeet-tdt-0.6b");
+    let qwen_dir = root.join("models/qwen3-asr-0.6b-onnx");
+
+    let mut entries = Vec::new();
+
+    let push_if_selected = |entries: &mut Vec<BenchmarkAsrEntry>,
+                            choice: BenchmarkAsr,
+                            present: bool,
+                            entry: BenchmarkAsrEntry| {
+        if !present {
+            return;
+        }
+        if requested.is_none() || requested == Some(choice) {
+            entries.push(entry);
+        }
+    };
+
+    push_if_selected(
+        &mut entries,
+        BenchmarkAsr::Parakeet,
+        parakeet_dir.exists(),
+        BenchmarkAsrEntry {
+            display_name: "Parakeet-TDT-int8",
+            backend_kind: AsrBackendKind::ParakeetTdt,
+            config: AsrBackendConfig::ParakeetTdt {
+                model_dir: parakeet_dir,
+            },
+        },
+    );
+
+    push_if_selected(
+        &mut entries,
+        BenchmarkAsr::Qwen,
+        qwen_dir.exists(),
+        BenchmarkAsrEntry {
+            display_name: "OrtQwen-INT4-batch",
+            backend_kind: AsrBackendKind::OrtQwenAsr,
+            config: AsrBackendConfig::OrtQwenAsr {
+                model_dir: qwen_dir,
+            },
+        },
+    );
+
+    entries
+}
+
+pub fn benchmark_asr_entry(root: &std::path::Path) -> Result<BenchmarkAsrEntry, String> {
+    let requested = requested_benchmark_asr();
+    benchmark_asr_entries(root)
+        .into_iter()
+        .next()
+        .ok_or_else(|| match requested {
+            Some(choice) => format!(
+                "Requested ASR backend {:?} is unavailable. Expected model dir under models/.",
+                choice
+            ),
+            None => "No ASR model dir found under models/.".to_string(),
+        })
 }
 
 pub fn load_fixtures(root: &std::path::Path) -> Vec<Fixture> {

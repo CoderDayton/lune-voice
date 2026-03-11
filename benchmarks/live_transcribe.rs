@@ -18,12 +18,12 @@ mod bench_utils;
 use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Instant;
 
-use bench_utils::{init_ort, workspace_root};
+use bench_utils::{benchmark_asr_entry, init_ort, workspace_root};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{BufferSize, SampleRate, StreamConfig};
 use lune_app::{DeliveryService, SessionManager, SessionManagerConfig};
 use lune_asr::AsrRegistry;
-use lune_core::config::{AsrBackendConfig, DevicePolicy, UserSettings};
+use lune_core::config::{DevicePolicy, UserSettings};
 use lune_core::llm::TextPostProcessor;
 use lune_core::session::SessionEvent;
 use lune_llm::{LlamaCppBackend, LlamaCppConfig};
@@ -46,33 +46,18 @@ fn main() {
         DevicePolicy::Cpu
     };
 
-    // ASR=qwen or ASR=parakeet to force backend; default auto-detects (Parakeet preferred).
-    let force_asr = std::env::var("ASR").ok();
-    let parakeet_dir = root.join("models/parakeet-tdt-0.6b");
-    let qwen_dir = root.join("models/qwen3-asr-0.6b-onnx");
-
-    let asr_config = match force_asr.as_deref() {
-        Some("qwen") if qwen_dir.exists() => AsrBackendConfig::OrtQwenAsr {
-            model_dir: qwen_dir,
-        },
-        Some("parakeet") if parakeet_dir.exists() => AsrBackendConfig::ParakeetTdt {
-            model_dir: parakeet_dir,
-        },
-        _ if parakeet_dir.exists() => AsrBackendConfig::ParakeetTdt {
-            model_dir: parakeet_dir,
-        },
-        _ if qwen_dir.exists() => AsrBackendConfig::OrtQwenAsr {
-            model_dir: qwen_dir,
-        },
-        _ => {
-            eprintln!("  [skip] No ASR model found");
+    let asr_entry = match benchmark_asr_entry(&root) {
+        Ok(entry) => entry,
+        Err(msg) => {
+            eprintln!("  [skip] {msg}");
             return;
         }
     };
 
     eprint!("  Loading ASR ... ");
     let t = Instant::now();
-    let asr = Arc::new(AsrRegistry::from_config(&asr_config, device_policy).expect("load ASR"));
+    let asr =
+        Arc::new(AsrRegistry::from_config(&asr_entry.config, device_policy).expect("load ASR"));
     let backend_kind = asr.kind();
     eprintln!("{:.1}s ({:?})", t.elapsed().as_secs_f64(), backend_kind);
 
