@@ -1,20 +1,178 @@
 @import "tailwindcss";
 
+/* ── Design tokens ─────────────────────────────────────────────────────── */
 :root {
-  --color-bg: #0a0a0a;
-  --color-surface: #141414;
-  --color-surface-hover: #1e1e1e;
-  --color-border: #2a2a2a;
-  --color-text: #e5e5e5;
-  --color-text-muted: #737373;
-  --color-accent: #6366f1;
-  --color-accent-hover: #818cf8;
+  /* Backgrounds (oklch with subtle blue undertone) */
+  --bg-0: oklch(0.115 0.007 265);
+  --bg-1: oklch(0.155 0.007 265);
+  --bg-2: oklch(0.185 0.010 265);
+  --bg-3: oklch(0.210 0.008 265);
+
+  /* Text */
+  --fg:   oklch(0.97 0 0);
+  --fg-2: oklch(0.60 0 0);
+  --fg-3: oklch(0.42 0 0);
+
+  /* Borders */
+  --border:       oklch(1 0 0 / 7%);
+  --border-hover: oklch(1 0 0 / 12%);
+
+  /* Accent: violet */
+  --accent:       oklch(0.62 0.19 275);
+  --accent-light: oklch(0.72 0.16 275);
+  --accent-glow:  oklch(0.62 0.19 275 / 20%);
+
+  /* Sidebar */
+  --sidebar-w:     220px;
+  --sidebar-w-col: 64px;
+
+  /* Radius */
+  --r-sm: 6px;
+  --r:    8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+}
+
+/* ── Base ──────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
 }
 
 body {
-  margin: 0;
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg-0);
+  color: var(--fg);
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: oklch(1 0 0 / 10%); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: oklch(1 0 0 / 18%); }
+
+/* ── Card ──────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.card:hover {
+  border-color: var(--border-hover);
+  box-shadow: 0 0 0 1px oklch(0.62 0.19 275 / 15%), 0 4px 24px oklch(0 0 0 / 20%);
+}
+.card-highlight {
+  background-image: linear-gradient(to bottom, oklch(1 0 0 / 3%) 0%, transparent 40%);
+}
+
+/* ── Nav item ──────────────────────────────────────────────────────────── */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--r);
+  color: var(--fg-3);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.nav-item:hover {
+  background: oklch(1 0 0 / 5%);
+  color: var(--fg-2);
+}
+.nav-item.active {
+  background: oklch(0.62 0.19 275 / 12%);
+  color: var(--fg);
+}
+.nav-item.active .nav-icon {
+  color: var(--accent-light);
+}
+.nav-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+
+/* ── Stat card number ──────────────────────────────────────────────────── */
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* ── Dot grid background ───────────────────────────────────────────────── */
+.dot-grid {
+  background-image: radial-gradient(oklch(1 0 0 / 3.5%) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ── Ambient glow ──────────────────────────────────────────────────────── */
+.ambient-glow {
+  background: radial-gradient(ellipse 60% 40% at 10% 0%, oklch(0.62 0.19 275 / 5%), transparent 70%);
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
+/* ── Page enter animation ──────────────────────────────────────────────── */
+.page-enter {
+  animation: page-in 0.35s ease forwards;
+}
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Shimmer skeleton ──────────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, transparent 0%, oklch(1 0 0 / 5%) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+  border-radius: var(--r);
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ── Live pulse dot ────────────────────────────────────────────────────── */
+.pulse-dot::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.3;
+  animation: pulse-ring 1.8s ease-out infinite;
+}
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.3; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+/* ── Badge ─────────────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid;
 }
