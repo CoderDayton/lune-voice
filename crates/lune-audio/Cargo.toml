@@ -10,7 +10,7 @@ tokio = { workspace = true, features = ["sync", "time"] }
 tracing.workspace = true
 
 # Audio capture
-cpal = "0.15"
+cpal = "0.17"
 
 # Resampling (adaptive rate conversion)
 rubato = "0.15"
