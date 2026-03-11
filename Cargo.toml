@@ -10,6 +10,7 @@ members = [
     "crates/lune-dict",
     "crates/lune-persist",
     "crates/lune-app",
+    "ui/src-tauri",
 ]
 
 [workspace.package]
