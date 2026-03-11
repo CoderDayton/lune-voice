@@ -20,32 +20,25 @@
 
 Most voice tools either phone home or dump raw transcription with no cleanup. Lune gives you neither compromise:
 
-- **280ms after-speech latency on GPU** — faster than your next breath. Cloud APIs average 600–1200ms.
-- **Your voice never leaves your machine** — both models run locally via ONNX Runtime. Zero network required.
-- **LLM-polished, not raw** — a local LLM surgically corrects low-confidence words before text reaches you. You only ever see clean output.
-- **Zero setup** — models download automatically on first launch (~1.5GB total). Bind a hotkey and go.
+- **Fully offline** — audio stays on your machine.
+- **Fast local transcription** — optimized Rust pipeline with ONNX Runtime backends.
+- **Cleaner final text** — optional local post-processing and dictionary fixes before delivery.
+- **Desktop-first workflow** — CLI daemon plus a Tauri desktop UI.
 
 ---
 
 ## How It Works
 
-```mermaid
-flowchart TD
-    A("🎙️ Microphone") --> B["Mel Spectrogram<br/>128-band · 16 kHz"]
-    B --> C["Qwen3-ASR 0.6B<br/>Streaming ONNX Decoder"]
-    C --> D{Confidence Gate}
-    D -->|"confident words<br/>~75% of segments"| E["Dictionary Apply"]
-    D -->|"uncertain [?word?] spans<br/>~25% of segments"| F["LLM Corrector<br/>Span Correction"]
-    F --> E
-    E --> G("✅ Text → Active Window")
-    style A fill:#7c3aed,color:#fff,stroke:none
-    style G fill:#059669,color:#fff,stroke:none
-    style D fill:#d97706,color:#fff,stroke:none
-```
+- Capture microphone audio
+- Run local ASR with Qwen3-ASR or Parakeet
+- Apply dictionary and optional cleanup
+- Deliver the final text to the active app
 
-The confidence gate is the key insight: per-word confidence marking flags only uncertain spans as `[?word?]`. ~75% of segments pass through untouched; only genuinely uncertain words pay the LLM correction cost.
+Technical details live in:
 
-> Deep dive: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Configuration](docs/CONFIGURATION.md)
+- [Performance](docs/PERFORMANCE.md)
 
 ---
 
@@ -60,6 +53,23 @@ cargo build --release -p lune-app
 
 # 3. Bind a hotkey, then dictate
 lune-voice toggle
+```
+
+## Desktop UI
+
+The repository also includes a Tauri desktop shell in [`desktop-ui/`](desktop-ui).
+
+```bash
+cd desktop-ui
+bun install
+bun run dev
+```
+
+Frontend verification:
+
+```bash
+bun run test
+bun run test:visual
 ```
 
 ---
@@ -80,6 +90,14 @@ cargo test --workspace
 ```
 
 Audio capture uses `cpal` — ALSA/PipeWire on Linux, CoreAudio on macOS, WASAPI on Windows.
+
+---
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md): pipeline, session lifecycle, D-Bus surface, backend layout
+- [Configuration](docs/CONFIGURATION.md): settings, backends, hotkeys, style presets, model files
+- [Performance](docs/PERFORMANCE.md): benchmark workflow, latency breakdowns, tuning notes
 
 ---
 
@@ -106,55 +124,27 @@ Escape      →  lune-voice cancel
 
 ## Configuration
 
-```toml
-[asr_backend]
-type = "OrtQwenAsr"
-
-[llm_backend]
-type = "LlamaCppLocal"
-
-dictation_mode   = "TypeInPlace"   # TypeInPlace | Clipboard | Both
-activation_mode  = "Toggle"        # Toggle | Hold
-default_style    = "general"       # general | email | slack | meeting_notes | code_comments
-```
-
-Settings are mutable at runtime — no daemon restart required:
-
 ```bash
 lune-voice settings style email
 lune-voice settings language en-GB
 lune-voice mode dictation Clipboard
 ```
 
-> Full reference: [docs/CONFIGURATION.md](docs/CONFIGURATION.md)
+For the full settings reference, backend options, and model file layout, see [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
 ---
 
 ## Architecture
 
-Nine single-responsibility Rust crates connected by async message passing — audio capture, ASR, LLM, text delivery, dictionary, voice commands, persistence, and session orchestration.
+The core system is a small Rust workspace with separate crates for audio capture, ASR, LLM cleanup, output delivery, persistence, and orchestration.
 
-> [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ---
 
 ## Performance
 
-|                    | GPU (RTX 4090) | CPU-only   |
-|--------------------|---------------|------------|
-| ASR inference      | 0.1× RT       | 0.68× RT  |
-| After-speech wait  | ~280 ms       | ~885 ms   |
-| LLM bypass rate    | 87%           | 87%        |
-| Mel extraction     | 6,872× RT     | 6,872× RT |
-
-Mel preprocessing consumes **<0.01%** of the inference budget. The only bottleneck is ONNX inference itself.
-
-```bash
-cargo script bench           # CPU
-cargo script bench --env GPU=1  # CUDA
-```
-
-> [docs/PERFORMANCE.md](docs/PERFORMANCE.md)
+Benchmarks and profiling notes are documented in [docs/PERFORMANCE.md](docs/PERFORMANCE.md), including the example benchmark commands and backend-forcing options for Qwen and Parakeet.
 
 ---
 
@@ -164,7 +154,7 @@ cargo script bench --env GPU=1  # CUDA
 2. Ensure `cargo fmt --all` and `cargo clippy --workspace` pass
 3. Open a PR
 
-Pre-commit hooks run `fmt`, `clippy`, and `check` automatically via [lefthook](https://github.com/evilmartians/lefthook).
+Pre-commit hooks run Rust formatting, workspace `cargo check`, and the Bun desktop UI unit tests automatically via [lefthook](https://github.com/evilmartians/lefthook).
 
 ---
 

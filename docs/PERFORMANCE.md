@@ -66,6 +66,10 @@ Measures each stage of the dictation pipeline by simulating realistic audio fram
 
 ```bash
 cargo run --example pipeline_latency -p lune-app --release
+
+# Optional: force a specific backend during the benchmark run
+ASR=qwen cargo run --example pipeline_latency -p lune-app --release
+ASR=parakeet cargo run --example pipeline_latency -p lune-app --release
 ```
 
 #### What It Measures

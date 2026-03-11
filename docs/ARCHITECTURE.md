@@ -10,7 +10,7 @@
 - [Crate Dependency Graph](#crate-dependency-graph)
 - [Pipeline Walkthrough](#pipeline-walkthrough)
   - [Audio Capture](#1-audio-capture)
-  - [ASR (Parakeet TDT)](#2-asr-parakeet-tdt)
+  - [ASR](#2-asr)
   - [Confidence Router](#3-confidence-router)
   - [LLM Worker](#4-llm-worker)
   - [Text Delivery](#5-text-delivery)
@@ -24,14 +24,16 @@
 
 ## System Overview
 
-Lune Voice is a privacy-first dictation daemon that converts speech to LLM-corrected text. The pipeline runs entirely on-device using two small models:
+Lune Voice is a privacy-first dictation daemon that converts speech to corrected text and can be driven either from the CLI/D-Bus surface or the Tauri desktop UI.
 
-| Component | Model | Format | Runtime |
-|-----------|-------|--------|---------|
-| ASR | Qwen3-ASR 0.6B | ONNX INT4 | ONNX Runtime |
-| LLM | LLM Corrector | GGUF | llama.cpp |
+The runtime pipeline is split into interchangeable backends:
 
-The daemon listens for D-Bus commands (toggle/start/stop/cancel) and manages a single active dictation session at a time.
+| Component | Primary Backends | Format | Runtime |
+|-----------|------------------|--------|---------|
+| ASR | Qwen3-ASR 0.6B, Parakeet TDT 0.6B | ONNX INT4 / INT8 | ONNX Runtime |
+| LLM | Local correction model | GGUF | llama.cpp |
+
+The daemon listens for D-Bus commands (`toggle`, `start`, `stop`, `cancel`) and manages a single active dictation session at a time. Backend selection is centralized through registries so the benchmark examples, app factory, and config parsing all share the same backend definitions.
 
 ---
 
@@ -67,19 +69,30 @@ Each crate has a single responsibility. `lune-core` defines shared types and tra
 - Frames are sent over an `mpsc` channel to the session loop
 - The session loop coalesces back-to-back frames into a single batch before pushing to ASR, reducing await-point overhead during microphone bursts
 
-### 2. ASR (Parakeet TDT)
+### 2. ASR
 
-**Crate:** `lune-asr` | **Files:** `parakeet_backend.rs`, `mel.rs`, `tdt_decoder.rs`, `segment.rs`
+**Crate:** `lune-asr`
 
-The ASR pipeline has four stages:
+Lune currently ships two local ASR paths:
 
-#### 2a. Audio Accumulation
+- `ParakeetTdt` for the transducer-style Parakeet runtime
+- `OrtQwenAsr` for the exported Qwen3-ASR encoder/embed/decoder split
+
+Both backends share the same mel front-end and registry-driven selection in `registry.rs`. The benchmark examples can force either backend with `ASR=qwen|parakeet` or `-- --asr qwen|parakeet`.
+
+#### 2a. Parakeet TDT
+
+**Files:** `parakeet_backend.rs`, `mel.rs`, `tdt_decoder.rs`, `segment.rs`
+
+The Parakeet path has four stages:
+
+##### Audio Accumulation
 
 `ParakeetSession` maintains a sliding window buffer (default 30 seconds). New audio is appended; when the buffer exceeds `max_context_samples`, the oldest samples are discarded via a shift-then-append pattern that saves one copy compared to extend-then-shift.
 
 A pre-allocated `audio_snapshot` buffer is swapped in/out via `mem::take` for zero-allocation steady-state inference. The session lock is held only briefly — released before mel extraction so `push_audio` can make progress concurrently.
 
-#### 2b. Mel-Spectrogram Extraction
+##### Mel-Spectrogram Extraction
 
 Converts raw PCM → 128-mel spectrogram features. Pipeline:
 
@@ -98,7 +111,7 @@ Key implementation details:
 - **Sequential-write transpose:** Outer loop over time gives stride-1 writes (cache-friendly).
 - **Welford normalization:** Single-pass mean+variance per feature, eliminating one full strided traversal.
 
-#### 2c. TDT Greedy Decode
+##### TDT Greedy Decode
 
 The TDT (Token-and-Duration Transducer) decoder runs two ONNX models:
 
@@ -113,13 +126,25 @@ Each decode step:
 
 The decoder tracks per-token confidence which is averaged into a per-utterance confidence score used by the confidence router.
 
-#### 2d. Segment Tracking
+##### Segment Tracking
 
 `SegmentTracker` manages partial → final segment transitions:
 
 - **Partial updates:** New ASR text replaces the current partial segment (no allocation on update)
 - **Silence finalization:** If no new text arrives for `finalize_after_ms` (default 500ms), the partial is promoted to final
 - **Drain pattern:** `mem::replace` swaps the segment vec with a pre-allocated empty one, avoiding reallocation on the next burst
+
+#### 2b. Qwen3-ASR ONNX
+
+**Files:** `ort_qwen_backend.rs`, `ort_qwen_stream.rs`, `mel.rs`
+
+The Qwen path uses a three-part ONNX export produced by `scripts/export_onnx.py`:
+
+1. `qwen3-asr-encoder.onnx` for the audio tower / projector
+2. `qwen3-asr-embed-tokens.onnx` for token embeddings
+3. `qwen3-asr-decoder.onnx` for the decoder with KV cache
+
+The runtime feeds whole-clip or chunked mel features through the encoder, injects the exported prompt contract via the token embedder, and steps the decoder autoregressively while maintaining cache tensors between decode steps.
 
 ### 3. Confidence Router
 
