@@ -3468,7 +3468,7 @@ dependencies = [
  "cpal",
  "crossbeam-channel",
  "hound",
- "rubato 0.15.0",
+ "rubato 1.0.1",
  "serde",
  "serde_json",
  "ten-vad-rs",
@@ -5412,18 +5412,6 @@ checksum = "a8a1f2315036ef6b1fbacd1972e8ee7688030b0a2121edfc2a6550febd41574d"
 dependencies = [
  "hashbrown 0.16.1",
  "thiserror 2.0.18",
-]
-
-[[package]]
-name = "rubato"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5d18b486e7d29a408ef3f825bc1327d8f87af091c987ca2f5b734625940e234"
-dependencies = [
- "num-complex",
- "num-integer",
- "num-traits",
- "realfft",
 ]
 
 [[package]]
