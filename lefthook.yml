@@ -9,6 +9,10 @@ pre-commit:
       run: CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-4} cargo check --workspace --all-targets
       fail_text: "cargo check failed — fix compilation errors"
 
+    frontend-test:
+      run: cd desktop-ui && bun run test
+      fail_text: "frontend tests failed — fix desktop UI regressions"
+
 pre-push:
   commands:
     clippy:
