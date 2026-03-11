@@ -497,27 +497,31 @@ fn decoder_prefill(
 // ── Autoregressive decode ───────────────────────────────────────────────────
 
 /// Run autoregressive decode steps. Returns `(token_ids, log_probs)`.
+struct DecodeConfig {
+    max_tokens: usize,
+    initial_pos: usize,
+    use_attention_mask: bool,
+}
+
 fn autoregressive_decode(
     decoder: &mut Session,
     embed_tokens: &mut Session,
     tokenizer: &tokenizers::Tokenizer,
     kv_cache: &mut Vec<DynValue>,
     initial_logits: Vec<f32>,
-    max_tokens: usize,
-    initial_pos: usize,
-    use_attention_mask: bool,
+    config: DecodeConfig,
 ) -> Result<(Vec<i64>, Vec<f32>)> {
     let eos_id = tokenizer
         .token_to_id("<|im_end|>")
         .or_else(|| tokenizer.token_to_id("<|endoftext|>"))
         .unwrap_or(151643) as i64;
 
-    let mut tokens = Vec::with_capacity(max_tokens);
-    let mut log_probs = Vec::with_capacity(max_tokens);
+    let mut tokens = Vec::with_capacity(config.max_tokens);
+    let mut log_probs = Vec::with_capacity(config.max_tokens);
     let mut current_logits = initial_logits;
-    let mut cur_pos = initial_pos;
+    let mut cur_pos = config.initial_pos;
 
-    for _ in 0..max_tokens {
+    for _ in 0..config.max_tokens {
         let (next_token, log_prob) = argmax_with_log_prob(&current_logits);
 
         if next_token == eos_id || next_token == TOKEN_IM_END {
@@ -554,7 +558,7 @@ fn autoregressive_decode(
         ));
 
         // attention_mask: all-ones [1, past + 1] for B=1 decode step.
-        if use_attention_mask {
+        if config.use_attention_mask {
             let step_mask = ndarray::Array2::<i64>::ones((1, cur_pos + 1));
             inputs.push((
                 "attention_mask".to_string(),
@@ -685,9 +689,11 @@ pub(crate) fn transcribe_oneshot(
         tokenizer,
         &mut kv,
         last_logits,
-        512,
-        prefill_len,
-        has_attention_mask,
+        DecodeConfig {
+            max_tokens: 512,
+            initial_pos: prefill_len,
+            use_attention_mask: has_attention_mask,
+        },
     )?;
 
     // 5. Filter out special/prompt tokens before decoding to text.
@@ -914,9 +920,11 @@ mod tests {
             &tokenizer,
             &mut new_kv,
             last_logits,
-            32,
-            prefill_len,
-            true,
+            DecodeConfig {
+                max_tokens: 32,
+                initial_pos: prefill_len,
+                use_attention_mask: true,
+            },
         )
         .expect("autoregressive_decode");
 
@@ -1006,9 +1014,11 @@ mod tests {
             &tokenizer,
             &mut new_kv,
             last_logits,
-            64,
-            prefill_len,
-            true,
+            DecodeConfig {
+                max_tokens: 64,
+                initial_pos: prefill_len,
+                use_attention_mask: true,
+            },
         )
         .expect("autoregressive_decode");
 
@@ -1360,9 +1370,11 @@ mod tests {
             &tokenizer,
             &mut kv_cache,
             last_logits,
-            200,
-            prefill_len,
-            true,
+            DecodeConfig {
+                max_tokens: 200,
+                initial_pos: prefill_len,
+                use_attention_mask: true,
+            },
         )
         .expect("autoregressive_decode");
         eprintln!("[batch] decoded {} tokens", token_ids.len());
@@ -1524,9 +1536,11 @@ mod tests {
             &tokenizer,
             &mut kv_cache,
             last_logits,
-            200,
-            prefill_len,
-            has_attention_mask,
+            DecodeConfig {
+                max_tokens: 200,
+                initial_pos: prefill_len,
+                use_attention_mask: has_attention_mask,
+            },
         )
         .expect("autoregressive_decode");
 

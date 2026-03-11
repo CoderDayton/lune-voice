@@ -1,6 +1,8 @@
 import { useStore } from "@tanstack/react-store";
 import { SelectField } from "../../components/ui/field";
+import { PageIntroPanel } from "../../components/ui/page-intro-panel";
 import { Panel } from "../../components/ui/panel";
+import { StatTile } from "../../components/ui/stat-tile";
 import { Toggle } from "../../components/ui/toggle";
 import {
   saveWorkspaceSetting,
@@ -20,35 +22,31 @@ export function RecordingPage() {
 
   return (
     <div className="page-stack">
-      <Panel className="panel-pad-lg">
-        <div className="page-intro">
-          <p className="app-kicker-accent">Recording</p>
-          <h2 className="page-title mt-3">Set how Lune Voice listens and cleans up what you say.</h2>
-          <p className="body-copy mt-3">
-            This is the main setup page for voice typing. Choose the listening style, transcription quality, and cleanup level that feel best for your everyday workflow.
-          </p>
-        </div>
-      </Panel>
+      <PageIntroPanel
+        kicker="Recording"
+        title="Set how Lune Voice listens and cleans up what you say."
+        description="This is the main setup page for voice typing. Choose the listening style, transcription quality, and cleanup level that feel best for your everyday workflow."
+      />
 
-      <section className="page-grid-three">
-        <Panel className="panel-pad-md">
-          <div className="stat-label">Recording style</div>
-          <div className="stat-value mt-3">{labelForActivationMode(settings.activationMode).split(" ")[0]}</div>
-          <p className="stat-note mt-2">Choose whether recording stays on until you stop it or only while a key is held.</p>
-        </Panel>
-        <Panel className="panel-pad-md">
-          <div className="stat-label">Voice mode</div>
-          <div className="stat-value mt-3">{summarizeAsrBackend(settings.asrBackend)}</div>
-          <p className="stat-note mt-2">Pick the listening mode that best matches your device and speed preference.</p>
-        </Panel>
-        <Panel className="panel-pad-md">
-          <div className="stat-label">Smart cleanup</div>
-          <div className="stat-value mt-3">{settings.llmCorrection ? "On" : "Off"}</div>
-          <p className="stat-note mt-2">Turn on automatic cleanup for words that sound uncertain or need a second pass.</p>
-        </Panel>
+      <section className="layout-grid md:grid-cols-3">
+        <StatTile
+          label="Recording style"
+          value={labelForActivationMode(settings.activationMode).split(" ")[0]}
+          note="Choose whether recording stays on until you stop it or only while a key is held."
+        />
+        <StatTile
+          label="Voice mode"
+          value={summarizeAsrBackend(settings.asrBackend)}
+          note="Pick the listening mode that best matches your device and speed preference."
+        />
+        <StatTile
+          label="Smart cleanup"
+          value={settings.llmCorrection ? "On" : "Off"}
+          note="Turn on automatic cleanup for words that sound uncertain or need a second pass."
+        />
       </section>
 
-      <section className="page-grid-two">
+      <section className="layout-grid">
         <SettingsSection title="How recording starts" description="Choose how quickly you want to enter and leave voice typing.">
           <SettingsRow
             label="Recording mode"

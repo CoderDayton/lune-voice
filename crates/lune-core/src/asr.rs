@@ -74,7 +74,7 @@ impl AsrSegment {
         for wc in &self.word_confidences {
             // Never mark a word as uncertain if it repeats the previous word —
             // the LLM incorrectly "corrects" intentional repetitions away.
-            let is_repeat = prev_word.map_or(false, |pw| pw.eq_ignore_ascii_case(&wc.word));
+            let is_repeat = prev_word.is_some_and(|pw| pw.eq_ignore_ascii_case(&wc.word));
             if wc.confidence < threshold && !is_repeat {
                 parts.push(format!("[?{}?]", wc.word));
             } else {
@@ -110,7 +110,7 @@ impl AsrSegment {
         let mut prev_word: Option<&str> = None;
 
         for (idx, wc) in self.word_confidences.iter().enumerate() {
-            let is_repeat = prev_word.map_or(false, |pw| pw.eq_ignore_ascii_case(&wc.word));
+            let is_repeat = prev_word.is_some_and(|pw| pw.eq_ignore_ascii_case(&wc.word));
 
             let effective = contextual_threshold(&self.word_confidences, idx, base_threshold);
 

@@ -40,27 +40,29 @@ pub struct DaemonInterface {
     persist_gate: Arc<tokio::sync::Mutex<()>>,
 }
 
+pub struct DaemonInterfaceDeps {
+    pub cmd_tx: mpsc::Sender<AppCommand>,
+    pub state: Arc<RwLock<String>>,
+    pub settings: Arc<RwLock<UserSettings>>,
+    pub dictation_mode_tx: watch::Sender<DictationMode>,
+    pub activation_mode_tx: watch::Sender<ActivationMode>,
+    pub settings_store: Arc<lune_persist::SettingsStore>,
+    pub db: Arc<tokio::sync::Mutex<lune_persist::Database>>,
+    pub rt_handle: tokio::runtime::Handle,
+}
+
 impl DaemonInterface {
     #[inline]
-    pub fn new(
-        cmd_tx: mpsc::Sender<AppCommand>,
-        state: Arc<RwLock<String>>,
-        settings: Arc<RwLock<UserSettings>>,
-        dictation_mode_tx: watch::Sender<DictationMode>,
-        activation_mode_tx: watch::Sender<ActivationMode>,
-        settings_store: Arc<lune_persist::SettingsStore>,
-        db: Arc<tokio::sync::Mutex<lune_persist::Database>>,
-        rt_handle: tokio::runtime::Handle,
-    ) -> Self {
+    pub fn new(deps: DaemonInterfaceDeps) -> Self {
         Self {
-            cmd_tx,
-            state,
-            settings,
-            dictation_mode_tx,
-            activation_mode_tx,
-            settings_store,
-            db,
-            rt_handle,
+            cmd_tx: deps.cmd_tx,
+            state: deps.state,
+            settings: deps.settings,
+            dictation_mode_tx: deps.dictation_mode_tx,
+            activation_mode_tx: deps.activation_mode_tx,
+            settings_store: deps.settings_store,
+            db: deps.db,
+            rt_handle: deps.rt_handle,
             persist_gate: Arc::new(tokio::sync::Mutex::new(())),
         }
     }

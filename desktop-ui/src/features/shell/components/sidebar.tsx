@@ -3,6 +3,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { Button } from "../../../components/ui/button";
 import { Pill } from "../../../components/ui/pill";
 import { cn } from "../../../lib/cn";
+import { authActions, authStore } from "../../../store/auth-store";
 import { workspaceActions, workspaceStore } from "../../../store/workspace-store";
 import { findNavigationItem, navigationItems } from "../config/navigation";
 import { ChevronLeftIcon, ChevronRightIcon, LuneLogo } from "../config/icons";
@@ -16,6 +17,7 @@ const statusItems = [
 export function Sidebar() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const collapsed = useStore(workspaceStore, (state) => state.sidebarCollapsed);
+  const profile = useStore(authStore, (state) => state.profile);
   const current = findNavigationItem(pathname);
   const navigationGroups = [
     {
@@ -106,7 +108,9 @@ export function Sidebar() {
       <div className="mt-auto space-y-3">
         {!collapsed ? (
           <div className="sidebar-card">
-            <p className="app-kicker">Quick setup</p>
+            <p className="app-kicker">Signed in</p>
+            <h2 className="sidebar-card-title mt-2">{profile?.name ?? "Lune user"}</h2>
+            <p className="sidebar-card-copy mt-1">{profile?.email ?? "desktop@lune.local"}</p>
             <div className="sidebar-list mt-3">
               <div className="sidebar-list-row">
                 <span className="sidebar-key">Recording</span>
@@ -121,6 +125,14 @@ export function Sidebar() {
                 <span className="sidebar-value">Across apps</span>
               </div>
             </div>
+            <Button
+              type="button"
+              variant="ghost"
+              className="mt-4 w-full justify-center"
+              onClick={authActions.signOut}
+            >
+              Sign out
+            </Button>
           </div>
         ) : null}
 

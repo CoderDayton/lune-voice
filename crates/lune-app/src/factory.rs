@@ -81,10 +81,10 @@ pub fn patch_model_paths(settings: &mut UserSettings, resolved: &ResolvedModels)
         _ => {}
     }
 
-    if let (Some(aligner), Some(model_dir)) = (&mut settings.aligner, &resolved.aligner_model_dir) {
-        if aligner.model_dir.as_os_str().is_empty() {
-            aligner.model_dir = model_dir.clone();
-        }
+    if let (Some(aligner), Some(model_dir)) = (&mut settings.aligner, &resolved.aligner_model_dir)
+        && aligner.model_dir.as_os_str().is_empty()
+    {
+        aligner.model_dir = model_dir.clone();
     }
 }
 

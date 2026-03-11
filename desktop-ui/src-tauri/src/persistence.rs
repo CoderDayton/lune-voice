@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{path::PathBuf, str::FromStr};
 
 use lune_core::config::{
     ActivationMode, AsrBackendConfig, DevicePolicy, DictationMode, HotkeyConfig, KeyCombo,
@@ -13,6 +13,7 @@ use crate::dto::{
 };
 
 const HISTORY_LIMIT: u32 = 200;
+const UNKNOWN_LABEL: &str = "Unknown";
 
 pub fn load_workspace_snapshot() -> Result<WorkspaceSnapshot, String> {
     let paths = resolve_paths()?;
@@ -175,7 +176,7 @@ fn asr_backend_type(config: &AsrBackendConfig) -> &'static str {
         AsrBackendConfig::ParakeetTdt { .. } => "ParakeetTdt",
         AsrBackendConfig::OrtQwenAsr { .. } => "OrtQwenAsr",
         AsrBackendConfig::OpenAiCompatible { .. } => "OpenAiCompatible",
-        _ => "Unknown",
+        _ => UNKNOWN_LABEL,
     }
 }
 
@@ -183,7 +184,7 @@ fn llm_backend_type(config: &LlmBackendConfig) -> &'static str {
     match config {
         LlmBackendConfig::LlamaCppLocal { .. } => "LlamaCppLocal",
         LlmBackendConfig::OpenAiCompatible { .. } => "OpenAiCompatible",
-        _ => "Unknown",
+        _ => UNKNOWN_LABEL,
     }
 }
 
@@ -192,26 +193,18 @@ fn asr_backend_from_type(
     current: &AsrBackendConfig,
 ) -> Result<AsrBackendConfig, String> {
     Ok(match kind {
-        "ParakeetTdt" => match current {
-            AsrBackendConfig::ParakeetTdt { model_dir } => AsrBackendConfig::ParakeetTdt {
-                model_dir: model_dir.clone(),
-            },
-            _ => AsrBackendConfig::ParakeetTdt {
-                model_dir: std::path::PathBuf::new(),
-            },
+        "ParakeetTdt" => AsrBackendConfig::ParakeetTdt {
+            model_dir: current_parakeet_model_dir(current),
         },
-        "OrtQwenAsr" => match current {
-            AsrBackendConfig::OrtQwenAsr { model_dir } => AsrBackendConfig::OrtQwenAsr {
-                model_dir: model_dir.clone(),
-            },
-            _ => AsrBackendConfig::OrtQwenAsr {
-                model_dir: std::path::PathBuf::new(),
-            },
+        "OrtQwenAsr" => AsrBackendConfig::OrtQwenAsr {
+            model_dir: current_qwen_model_dir(current),
         },
-        "OpenAiCompatible" => match current {
-            AsrBackendConfig::OpenAiCompatible { .. } => current.clone(),
-            _ => return Err("OpenAiCompatible ASR cannot be created from this UI yet".into()),
-        },
+        "OpenAiCompatible" if matches!(current, AsrBackendConfig::OpenAiCompatible { .. }) => {
+            current.clone()
+        }
+        "OpenAiCompatible" => {
+            return Err("OpenAiCompatible ASR cannot be created from this UI yet".into());
+        }
         _ => return Err(format!("unsupported asrBackendType: {kind}")),
     })
 }
@@ -221,16 +214,32 @@ fn llm_backend_from_type(
     current: &LlmBackendConfig,
 ) -> Result<LlmBackendConfig, String> {
     Ok(match kind {
-        "LlamaCppLocal" => match current {
-            LlmBackendConfig::LlamaCppLocal { .. } => current.clone(),
-            _ => UserSettings::default().llm_backend,
-        },
-        "OpenAiCompatible" => match current {
-            LlmBackendConfig::OpenAiCompatible { .. } => current.clone(),
-            _ => return Err("OpenAiCompatible LLM cannot be created from this UI yet".into()),
-        },
+        "LlamaCppLocal" if matches!(current, LlmBackendConfig::LlamaCppLocal { .. }) => {
+            current.clone()
+        }
+        "LlamaCppLocal" => UserSettings::default().llm_backend,
+        "OpenAiCompatible" if matches!(current, LlmBackendConfig::OpenAiCompatible { .. }) => {
+            current.clone()
+        }
+        "OpenAiCompatible" => {
+            return Err("OpenAiCompatible LLM cannot be created from this UI yet".into());
+        }
         _ => return Err(format!("unsupported llmBackendType: {kind}")),
     })
+}
+
+fn current_parakeet_model_dir(current: &AsrBackendConfig) -> PathBuf {
+    match current {
+        AsrBackendConfig::ParakeetTdt { model_dir } => model_dir.clone(),
+        _ => PathBuf::new(),
+    }
+}
+
+fn current_qwen_model_dir(current: &AsrBackendConfig) -> PathBuf {
+    match current {
+        AsrBackendConfig::OrtQwenAsr { model_dir } => model_dir.clone(),
+        _ => PathBuf::new(),
+    }
 }
 
 fn parse_key_combo(raw: &str) -> Result<KeyCombo, String> {
@@ -276,7 +285,7 @@ fn modifier_label(modifier: &Modifier) -> &'static str {
         Modifier::Shift => "Shift",
         Modifier::Alt => "Alt",
         Modifier::Meta => "Meta",
-        _ => "Unknown",
+        _ => UNKNOWN_LABEL,
     }
 }
 
@@ -295,6 +304,6 @@ fn session_status_label(status: &SessionStatus) -> String {
         SessionStatus::Completed => "Completed".into(),
         SessionStatus::Failed(message) => format!("Failed: {message}"),
         SessionStatus::Cancelled => "Cancelled".into(),
-        _ => "Unknown".into(),
+        _ => UNKNOWN_LABEL.into(),
     }
 }

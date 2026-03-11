@@ -154,7 +154,7 @@ Benchmarks and profiling notes are documented in [docs/PERFORMANCE.md](docs/PERF
 2. Ensure `cargo fmt --all` and `cargo clippy --workspace` pass
 3. Open a PR
 
-Pre-commit hooks run Rust formatting, workspace `cargo check`, and the Bun desktop UI unit tests automatically via [lefthook](https://github.com/evilmartians/lefthook).
+Lefthook runs a stricter local gate automatically: pre-commit applies Rust formatting, then runs workspace `cargo check`, `cargo clippy`, Rust unit/bin tests, and the Bun desktop UI unit tests. Pre-push runs full-workspace `cargo clippy --all-features`, `cargo test --workspace`, the desktop UI production build, and optional real-model E2E tests when `LUNE_E2E_MODELS=1` is set.
 
 ---
 

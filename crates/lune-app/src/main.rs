@@ -149,16 +149,16 @@ fn run_daemon() {
         lune_persist::Database::open(&paths.database_file()).expect("open database"),
     ));
 
-    let dbus_iface = dbus::DaemonInterface::new(
+    let dbus_iface = dbus::DaemonInterface::new(dbus::DaemonInterfaceDeps {
         cmd_tx,
-        Arc::clone(&shared_state),
-        Arc::clone(&settings),
+        state: Arc::clone(&shared_state),
+        settings: Arc::clone(&settings),
         dictation_mode_tx,
         activation_mode_tx,
-        Arc::clone(&settings_store),
-        Arc::clone(&db),
-        rt.handle().clone(),
-    );
+        settings_store: Arc::clone(&settings_store),
+        db: Arc::clone(&db),
+        rt_handle: rt.handle().clone(),
+    });
 
     let dbus_conn = rt
         .block_on(async { dbus::build_connection(dbus_iface).await })

@@ -1,6 +1,8 @@
 import { useStore } from "@tanstack/react-store";
 import { SelectField } from "../../components/ui/field";
+import { PageIntroPanel } from "../../components/ui/page-intro-panel";
 import { Panel } from "../../components/ui/panel";
+import { StatTile } from "../../components/ui/stat-tile";
 import {
   saveWorkspaceSetting,
   summarizeDictationMode,
@@ -19,35 +21,31 @@ export function ShortcutsPage() {
 
   return (
     <div className="page-stack">
-      <Panel className="panel-pad-lg">
-        <div className="page-intro">
-          <p className="app-kicker-accent">Shortcuts</p>
-          <h2 className="page-title mt-3">Control recording quickly and send text where you need it.</h2>
-          <p className="body-copy mt-3">
-            Keep the keyboard side simple. This page focuses on how you start voice typing, stop it, and place the final text into the app you are using.
-          </p>
-        </div>
-      </Panel>
+      <PageIntroPanel
+        kicker="Shortcuts"
+        title="Control recording quickly and send text where you need it."
+        description="Keep the keyboard side simple. This page focuses on how you start voice typing, stop it, and place the final text into the app you are using."
+      />
 
-      <section className="page-grid-three">
-        <Panel className="panel-pad-md">
-          <div className="stat-label">Start and stop</div>
-          <div className="stat-value mt-3">{settings.hotkeyToggle}</div>
-          <p className="stat-note mt-2">The main shortcut for entering and leaving voice typing.</p>
-        </Panel>
-        <Panel className="panel-pad-md">
-          <div className="stat-label">Cancel</div>
-          <div className="stat-value mt-3">{settings.hotkeyCancel}</div>
-          <p className="stat-note mt-2">Quickly discard the current recording without sending any text.</p>
-        </Panel>
-        <Panel className="panel-pad-md">
-          <div className="stat-label">Send text</div>
-          <div className="stat-value mt-3">{summarizeDictationMode(settings.dictationMode)}</div>
-          <p className="stat-note mt-2">Choose whether Lune Voice pastes finished text or types it out like keystrokes.</p>
-        </Panel>
+      <section className="layout-grid md:grid-cols-3">
+        <StatTile
+          label="Start and stop"
+          value={settings.hotkeyToggle}
+          note="The main shortcut for entering and leaving voice typing."
+        />
+        <StatTile
+          label="Cancel"
+          value={settings.hotkeyCancel}
+          note="Quickly discard the current recording without sending any text."
+        />
+        <StatTile
+          label="Send text"
+          value={summarizeDictationMode(settings.dictationMode)}
+          note="Choose whether Lune Voice pastes finished text or types it out like keystrokes."
+        />
       </section>
 
-      <section className="page-grid-two">
+      <section className="layout-grid">
         <SettingsSection title="Keyboard controls" description="Use fast commands without opening menus in the middle of work.">
           <SettingsRow label="Start or stop recording" description="The main shortcut used for voice typing." control={<span className="app-pill font-mono">{settings.hotkeyToggle}</span>} />
           <SettingsRow label="Cancel current recording" description="Discard the current draft and return to idle." control={<span className="app-pill font-mono">{settings.hotkeyCancel}</span>} />
@@ -93,7 +91,7 @@ export function ShortcutsPage() {
 
         <Panel className="panel-pad-lg xl:col-span-2">
           <p className="app-kicker-accent">Everyday use</p>
-          <div className="tile-grid-three-wide mt-4">
+          <div className="layout-grid mt-4 md:grid-cols-3">
             <div className="stat-tile">
               <h3 className="card-title-sm">For long notes</h3>
               <p className="stat-note mt-2">Use toggle recording and paste into your current app.</p>

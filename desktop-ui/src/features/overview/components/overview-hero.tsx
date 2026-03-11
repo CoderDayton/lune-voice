@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { buttonClassName } from "../../../components/ui/button";
 import { Panel } from "../../../components/ui/panel";
 import { Pill } from "../../../components/ui/pill";
+import { StatTile } from "../../../components/ui/stat-tile";
 import {
   summarizeAsrBackend,
   summarizeDictationMode,
@@ -18,9 +19,31 @@ export function OverviewHero() {
   const averageResponseTime = historySessions.length > 0
     ? `${(historySessions.reduce((sum, item) => sum + item.seconds, 0) / historySessions.length).toFixed(2)}s`
     : "Waiting";
+  const summaryTiles = [
+    {
+      label: "Capture",
+      value: runtime.loaded ? "Connected" : "Loading",
+      note: "Tauri IPC status for the desktop backend.",
+    },
+    {
+      label: "Speech model",
+      value: speechModel,
+      note: "Matches the transcription mode selected on your recording setup page.",
+    },
+    {
+      label: "Text delivery",
+      value: deliveryMode,
+      note: "Reflects how finished text will be inserted into the app you are using.",
+    },
+    {
+      label: "Response time",
+      value: averageResponseTime,
+      note: "Average recorded session duration in the local archive.",
+    },
+  ];
 
   return (
-    <div className="page-grid-hero">
+    <div className="layout-grid xl:grid-cols-[1.35fr_0.9fr]">
       <Panel tone="hero" className="panel-pad-lg relative overflow-hidden">
         <p className="app-kicker-accent">Voice typing, simplified</p>
         <h2 className="hero-title mt-3">
@@ -51,27 +74,16 @@ export function OverviewHero() {
           <Pill>{runtime.serviceStatus}</Pill>
         </div>
 
-        <div className="hero-summary-grid mt-6">
-          <div className="stat-tile">
-            <div className="stat-label">Capture</div>
-            <div className="stat-value mt-3">{runtime.loaded ? "Connected" : "Loading"}</div>
-            <p className="stat-note mt-1">Tauri IPC status for the desktop backend.</p>
-          </div>
-          <div className="stat-tile">
-            <div className="stat-label">Speech model</div>
-            <div className="stat-value mt-3">{speechModel}</div>
-            <p className="stat-note mt-1">Matches the transcription mode selected on your recording setup page.</p>
-          </div>
-          <div className="stat-tile">
-            <div className="stat-label">Text delivery</div>
-            <div className="stat-value mt-3">{deliveryMode}</div>
-            <p className="stat-note mt-1">Reflects how finished text will be inserted into the app you are using.</p>
-          </div>
-          <div className="stat-tile">
-            <div className="stat-label">Response time</div>
-            <div className="stat-value mt-3">{averageResponseTime}</div>
-            <p className="stat-note mt-1">Average recorded session duration in the local archive.</p>
-          </div>
+        <div className="layout-grid-tight mt-6 md:grid-cols-2">
+          {summaryTiles.map((tile) => (
+            <StatTile
+              key={tile.label}
+              label={tile.label}
+              value={tile.value}
+              note={tile.note}
+              noteClassName="mt-1"
+            />
+          ))}
         </div>
       </Panel>
     </div>

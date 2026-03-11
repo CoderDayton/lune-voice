@@ -16,7 +16,7 @@ export function DictionaryForm() {
         Normalize repeated product names, acronyms, and house terminology before text is delivered.
       </p>
 
-      <div className="page-grid-two mt-6 lg:grid-cols-[1fr_auto_1fr_auto] lg:items-end">
+      <div className="layout-grid mt-6 lg:grid-cols-[1fr_auto_1fr_auto] lg:items-end">
         <div>
           <label className="field-label">Spoken phrase</label>
           <TextField value={phrase} onChange={(event) => setPhrase(event.target.value)} placeholder="e.g. github" />

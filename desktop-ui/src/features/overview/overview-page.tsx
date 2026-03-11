@@ -8,7 +8,7 @@ export function OverviewPage() {
     <div className="page-stack">
       <OverviewHero />
       <OverviewStats />
-      <section className="page-grid-main-rail">
+      <section className="layout-grid xl:grid-cols-[1.2fr_0.8fr]">
         <ActivityFeed />
         <OverviewRail />
       </section>

@@ -1,6 +1,7 @@
 import { Store } from "@tanstack/store";
 import { backendClient } from "../lib/backend/client";
 import type {
+  BackendDictionaryEntry,
   BackendHistoryEntry,
   BackendWorkspaceSnapshot,
   SessionStreamEvent,
@@ -63,35 +64,44 @@ interface WorkspaceState {
   runtime: WorkspaceRuntimeState;
 }
 
+const DEFAULT_SETTINGS: WorkspaceSettings = {
+  activationMode: "Toggle",
+  asrBackend: "OrtQwenAsr",
+  useGpu: true,
+  confidenceThreshold: "0.50",
+  llmCorrection: true,
+  llmBackend: "LlamaCppLocal",
+  dictationMode: "Clipboard",
+  stylePreset: "casual",
+  adaptiveVad: false,
+  speechThreshold: "0.50",
+  hotkeyToggle: "Ctrl+Space",
+  hotkeyCancel: "Escape",
+};
+
+const DEFAULT_RUNTIME: WorkspaceRuntimeState = {
+  ipcFlavor: "unknown",
+  serviceStatus: "Connecting",
+  activeSessionId: null,
+  liveTranscript: "",
+  loaded: false,
+  loading: false,
+  error: null,
+};
+
+const DISPLAY_BACKEND_LABELS: Record<string, string> = {
+  OrtQwenAsr: "Balanced",
+  ParakeetTdt: "Fast and light",
+};
+
 export function createInitialWorkspaceState(): WorkspaceState {
   return {
     sidebarCollapsed: false,
     historySearch: "",
     dictionaryEntries: [],
     historySessions: [],
-    settings: {
-      activationMode: "Toggle",
-      asrBackend: "OrtQwenAsr",
-      useGpu: true,
-      confidenceThreshold: "0.50",
-      llmCorrection: true,
-      llmBackend: "LlamaCppLocal",
-      dictationMode: "Clipboard",
-      stylePreset: "casual",
-      adaptiveVad: false,
-      speechThreshold: "0.50",
-      hotkeyToggle: "Ctrl+Space",
-      hotkeyCancel: "Escape",
-    },
-    runtime: {
-      ipcFlavor: "unknown",
-      serviceStatus: "Connecting",
-      activeSessionId: null,
-      liveTranscript: "",
-      loaded: false,
-      loading: false,
-      error: null,
-    },
+    settings: { ...DEFAULT_SETTINGS },
+    runtime: { ...DEFAULT_RUNTIME },
   };
 }
 
@@ -139,30 +149,12 @@ export const workspaceActions = {
   hydrate(snapshot: BackendWorkspaceSnapshot) {
     workspaceStore.setState((state) => ({
       ...state,
-      dictionaryEntries: snapshot.dictionary.map((entry) => ({
-        id: entry.id,
-        phrase: entry.phrase,
-        replacement: entry.replacement,
-        priority: entry.priority,
-      })),
+      dictionaryEntries: snapshot.dictionary.map(mapDictionaryEntry),
       historySessions: snapshot.history
         .filter((entry) => entry.transcript)
         .map(mapHistoryEntry)
         .filter((entry): entry is HistorySession => entry !== null),
-      settings: {
-        activationMode: snapshot.settings.activationMode,
-        asrBackend: snapshot.settings.asrBackendType,
-        useGpu: snapshot.settings.useGpu,
-        confidenceThreshold: formatThreshold(snapshot.settings.confidenceThreshold ?? 0.5),
-        llmCorrection: snapshot.settings.confidenceThreshold !== null,
-        llmBackend: snapshot.settings.llmBackendType,
-        dictationMode: snapshot.settings.dictationMode,
-        stylePreset: snapshot.settings.stylePreset,
-        adaptiveVad: snapshot.settings.adaptiveVad,
-        speechThreshold: formatThreshold(snapshot.settings.speechThreshold),
-        hotkeyToggle: snapshot.settings.hotkeyToggle,
-        hotkeyCancel: snapshot.settings.hotkeyCancel,
-      },
+      settings: mapWorkspaceSettings(snapshot),
       runtime: {
         ipcFlavor: snapshot.ipcFlavor,
         serviceStatus: snapshot.serviceStatus,
@@ -188,9 +180,7 @@ export async function loadWorkspaceSnapshot() {
   workspaceActions.setError(null);
 
   try {
-    const snapshot = await backendClient.loadWorkspaceSnapshot();
-    workspaceActions.hydrate(snapshot);
-    return snapshot;
+    return await hydrateFromSnapshot(() => backendClient.loadWorkspaceSnapshot());
   } catch (error) {
     workspaceActions.setLoading(false);
     workspaceActions.setError(formatError(error));
@@ -240,65 +230,42 @@ export async function addDictionaryEntry(phrase: string, replacement: string) {
     return false;
   }
 
-  try {
-    const snapshot = await backendClient.createDictionaryEntry(
-      normalizedPhrase,
-      normalizedReplacement,
-      5,
-    );
-    workspaceActions.hydrate(snapshot);
-    return true;
-  } catch (error) {
-    workspaceActions.setError(formatError(error));
-    return false;
-  }
+  return withWorkspaceError(
+    async () => {
+      await hydrateFromSnapshot(() =>
+        backendClient.createDictionaryEntry(
+          normalizedPhrase,
+          normalizedReplacement,
+          5,
+        ),
+      );
+      return true;
+    },
+    false,
+  );
 }
 
 export async function removeDictionaryEntry(id: number) {
-  try {
-    const snapshot = await backendClient.deleteDictionaryEntry(id);
-    workspaceActions.hydrate(snapshot);
-  } catch (error) {
-    workspaceActions.setError(formatError(error));
-  }
+  await withWorkspaceError(
+    () => hydrateFromSnapshot(() => backendClient.deleteDictionaryEntry(id)),
+    undefined,
+  );
 }
 
 export async function startDictation() {
-  try {
-    workspaceActions.setError(null);
-    return await backendClient.startDictation();
-  } catch (error) {
-    workspaceActions.setError(formatError(error));
-    return null;
-  }
+  return runDictationAction(() => backendClient.startDictation(), null);
 }
 
 export async function stopDictation() {
-  try {
-    workspaceActions.setError(null);
-    await backendClient.stopDictation();
-  } catch (error) {
-    workspaceActions.setError(formatError(error));
-  }
+  await runDictationAction(() => backendClient.stopDictation(), undefined);
 }
 
 export async function cancelDictation() {
-  try {
-    workspaceActions.setError(null);
-    await backendClient.cancelDictation();
-  } catch (error) {
-    workspaceActions.setError(formatError(error));
-  }
+  await runDictationAction(() => backendClient.cancelDictation(), undefined);
 }
 
 export async function toggleDictation() {
-  try {
-    workspaceActions.setError(null);
-    return await backendClient.toggleDictation();
-  } catch (error) {
-    workspaceActions.setError(formatError(error));
-    return null;
-  }
+  return runDictationAction(() => backendClient.toggleDictation(), null);
 }
 
 export function getVisibleHistorySessions(state: WorkspaceState) {
@@ -318,15 +285,7 @@ export function summarizeAsrBackend(value: AsrBackendValue) {
 }
 
 export function formatBackendLabel(value: string) {
-  if (value === "OrtQwenAsr") {
-    return "Balanced";
-  }
-
-  if (value === "ParakeetTdt") {
-    return "Fast and light";
-  }
-
-  return value;
+  return DISPLAY_BACKEND_LABELS[value] ?? value;
 }
 
 export function summarizeDictationMode(value: DictationModeValue) {
@@ -365,6 +324,32 @@ function mapHistoryEntry(entry: BackendHistoryEntry): HistorySession | null {
   };
 }
 
+function mapDictionaryEntry(entry: BackendDictionaryEntry): DictionaryEntry {
+  return {
+    id: entry.id,
+    phrase: entry.phrase,
+    replacement: entry.replacement,
+    priority: entry.priority,
+  };
+}
+
+function mapWorkspaceSettings(snapshot: BackendWorkspaceSnapshot): WorkspaceSettings {
+  return {
+    activationMode: snapshot.settings.activationMode,
+    asrBackend: snapshot.settings.asrBackendType,
+    useGpu: snapshot.settings.useGpu,
+    confidenceThreshold: formatThreshold(snapshot.settings.confidenceThreshold ?? 0.5),
+    llmCorrection: snapshot.settings.confidenceThreshold !== null,
+    llmBackend: snapshot.settings.llmBackendType,
+    dictationMode: snapshot.settings.dictationMode,
+    stylePreset: snapshot.settings.stylePreset,
+    adaptiveVad: snapshot.settings.adaptiveVad,
+    speechThreshold: formatThreshold(snapshot.settings.speechThreshold),
+    hotkeyToggle: snapshot.settings.hotkeyToggle,
+    hotkeyCancel: snapshot.settings.hotkeyCancel,
+  };
+}
+
 function countWords(text: string) {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
@@ -377,7 +362,30 @@ function formatError(error: unknown) {
   return error instanceof Error ? error.message : "Unable to reach the desktop backend.";
 }
 
-function reduceSessionEvent(runtime: WorkspaceRuntimeState, event: SessionStreamEvent): WorkspaceRuntimeState {
+async function hydrateFromSnapshot(loadSnapshot: () => Promise<BackendWorkspaceSnapshot>) {
+  const snapshot = await loadSnapshot();
+  workspaceActions.hydrate(snapshot);
+  return snapshot;
+}
+
+async function withWorkspaceError<T>(action: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await action();
+  } catch (error) {
+    workspaceActions.setError(formatError(error));
+    return fallback;
+  }
+}
+
+async function runDictationAction<T>(action: () => Promise<T>, fallback: T): Promise<T> {
+  workspaceActions.setError(null);
+  return withWorkspaceError(action, fallback);
+}
+
+function reduceSessionEvent(
+  runtime: WorkspaceRuntimeState,
+  event: SessionStreamEvent,
+): WorkspaceRuntimeState {
   switch (event.type) {
     case "serviceStatus":
       return { ...runtime, serviceStatus: event.status };

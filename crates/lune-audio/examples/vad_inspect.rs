@@ -63,15 +63,15 @@ fn speech_segments(
             }
         } else {
             silence_count += 1;
-            if let Some(start) = speech_start {
-                if silence_count >= min_silence_frames {
-                    let len = i - silence_count - start;
-                    if len >= min_speech_frames {
-                        segments.push((start * HOP_SIZE, (i - silence_count) * HOP_SIZE));
-                    }
-                    speech_start = None;
-                    silence_count = 0;
+            if let Some(start) = speech_start
+                && silence_count >= min_silence_frames
+            {
+                let len = i - silence_count - start;
+                if len >= min_speech_frames {
+                    segments.push((start * HOP_SIZE, (i - silence_count) * HOP_SIZE));
                 }
+                speech_start = None;
+                silence_count = 0;
             }
         }
     }
@@ -87,7 +87,7 @@ fn speech_segments(
 }
 
 fn print_vad_summary(timeline: &[VadFrame]) {
-    println!("{:<10} {:<8} {}", "Time(ms)", "Prob", "Speech");
+    println!("{:<10} {:<8} Speech", "Time(ms)", "Prob");
     println!("{}", "-".repeat(50));
 
     for frame in timeline.iter().step_by(10) {

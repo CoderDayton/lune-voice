@@ -91,47 +91,21 @@ impl AppRuntime {
     }
 
     pub async fn start_dictation(&self) -> Result<String, String> {
-        let reload_paths = {
-            let pipeline = self.inner.pipeline.lock().await;
-            if pipeline.active {
-                return Err("dictation session already active".into());
-            }
-            pipeline.reload_required.then(|| pipeline.paths.clone())
-        };
-
-        if let Some(paths) = reload_paths {
-            let rebuilt = build_pipeline(paths).await?;
-            let mut pipeline = self.inner.pipeline.lock().await;
-            if pipeline.active {
-                return Err("dictation session became active during reload".into());
-            }
-            *pipeline = rebuilt;
-        }
-
-        let manager = {
-            let mut pipeline = self.inner.pipeline.lock().await;
-            pipeline.active = true;
-            Arc::clone(&pipeline.manager)
-        };
+        let manager = self.prepare_manager_for_start().await?;
 
         let (event_tx, event_rx) = mpsc::channel(64);
         let session_id = match manager.start(event_tx).await {
             Ok(session_id) => session_id,
             Err(error) => {
-                let mut pipeline = self.inner.pipeline.lock().await;
-                pipeline.active = false;
-                pipeline.session_id = None;
-                drop(pipeline);
+                self.set_pipeline_session(None, false).await;
                 self.publish_status("error").await;
                 return Err(format!("start dictation: {error}"));
             }
         };
 
         let session_id = session_id.to_string();
-        {
-            let mut pipeline = self.inner.pipeline.lock().await;
-            pipeline.session_id = Some(session_id.clone());
-        }
+        self.set_pipeline_session(Some(session_id.clone()), true)
+            .await;
 
         self.push_session_event(SessionStreamEvent::SessionStarted {
             session_id: session_id.clone(),
@@ -144,28 +118,16 @@ impl AppRuntime {
     }
 
     pub async fn stop_dictation(&self) -> Result<(), String> {
-        let manager = {
-            let pipeline = self.inner.pipeline.lock().await;
-            if !pipeline.active {
-                return Ok(());
-            }
-            Arc::clone(&pipeline.manager)
-        };
-
-        manager.stop().await;
+        if let Some(manager) = self.active_manager().await {
+            manager.stop().await;
+        }
         Ok(())
     }
 
     pub async fn cancel_dictation(&self) -> Result<(), String> {
-        let manager = {
-            let pipeline = self.inner.pipeline.lock().await;
-            if !pipeline.active {
-                return Ok(());
-            }
-            Arc::clone(&pipeline.manager)
-        };
-
-        manager.cancel().await;
+        if let Some(manager) = self.active_manager().await {
+            manager.cancel().await;
+        }
         Ok(())
     }
 
@@ -242,9 +204,7 @@ impl AppRuntime {
     }
 
     async fn finish_session(&self) {
-        let mut pipeline = self.inner.pipeline.lock().await;
-        pipeline.active = false;
-        pipeline.session_id = None;
+        self.set_pipeline_session(None, false).await;
     }
 
     async fn publish_status(&self, status: &str) {
@@ -260,6 +220,40 @@ impl AppRuntime {
         if let Some(channel) = channel {
             let _ = channel.send(event);
         }
+    }
+
+    async fn active_manager(&self) -> Option<Arc<SessionManager<AsrRegistry>>> {
+        let pipeline = self.inner.pipeline.lock().await;
+        pipeline.active.then(|| Arc::clone(&pipeline.manager))
+    }
+
+    async fn prepare_manager_for_start(&self) -> Result<Arc<SessionManager<AsrRegistry>>, String> {
+        let reload_paths = {
+            let pipeline = self.inner.pipeline.lock().await;
+            if pipeline.active {
+                return Err("dictation session already active".into());
+            }
+            pipeline.reload_required.then(|| pipeline.paths.clone())
+        };
+
+        if let Some(paths) = reload_paths {
+            let rebuilt = build_pipeline(paths).await?;
+            let mut pipeline = self.inner.pipeline.lock().await;
+            if pipeline.active {
+                return Err("dictation session became active during reload".into());
+            }
+            *pipeline = rebuilt;
+        }
+
+        let mut pipeline = self.inner.pipeline.lock().await;
+        pipeline.active = true;
+        Ok(Arc::clone(&pipeline.manager))
+    }
+
+    async fn set_pipeline_session(&self, session_id: Option<String>, active: bool) {
+        let mut pipeline = self.inner.pipeline.lock().await;
+        pipeline.session_id = session_id;
+        pipeline.active = active;
     }
 }
 
@@ -367,10 +361,10 @@ fn patch_model_paths(paths: &AppPaths, settings: &mut UserSettings) -> Result<()
         _ => {}
     }
 
-    if let (Some(aligner), Some(model_dir)) = (&mut settings.aligner, resolved.aligner_model_dir) {
-        if aligner.model_dir.as_os_str().is_empty() {
-            aligner.model_dir = model_dir;
-        }
+    if let (Some(aligner), Some(model_dir)) = (&mut settings.aligner, resolved.aligner_model_dir)
+        && aligner.model_dir.as_os_str().is_empty()
+    {
+        aligner.model_dir = model_dir;
     }
 
     Ok(())

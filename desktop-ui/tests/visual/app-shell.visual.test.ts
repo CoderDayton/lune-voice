@@ -4,6 +4,7 @@ import { expectLocatorToMatchSnapshot } from "./helpers/snapshot";
 import { PREVIEW_URL, startPreviewServer, stopPreviewServer, type PreviewServer } from "./helpers/server";
 
 const VIEWPORT = { width: 1512, height: 982 };
+const AUTH_STORAGE_KEY = "lune.desktop.auth";
 const MOTION_RESET = `
   *, *::before, *::after {
     animation: none !important;
@@ -42,18 +43,30 @@ describe("desktop-ui visual snapshots", () => {
     await stopPreviewServer(previewServer);
   });
 
-  test("home page", async () => {
+  test("auth entry", async () => {
     await openRoute("/");
+    await page.locator(".auth-root").waitFor({ state: "visible" });
+    await expectLocatorToMatchSnapshot(page.locator(".auth-root"), "auth-entry");
+  });
+
+  test("home page", async () => {
+    await authenticatePreviewSession();
+    await openRoute("/");
+    await page.locator(".app-shell-root").waitFor({ state: "visible" });
     await expectLocatorToMatchSnapshot(page.locator(".app-shell-root"), "home");
   });
 
   test("dictionary page", async () => {
+    await authenticatePreviewSession();
     await openRoute("/dictionary");
+    await page.locator(".app-shell-root").waitFor({ state: "visible" });
     await expectLocatorToMatchSnapshot(page.locator(".app-shell-root"), "dictionary");
   });
 
   test("delete confirmation modal", async () => {
+    await authenticatePreviewSession();
     await openRoute("/dictionary");
+    await page.locator(".app-shell-root").waitFor({ state: "visible" });
     await page.getByRole("button", { name: "Remove" }).first().click();
     await page.getByRole("dialog").waitFor();
     await expectLocatorToMatchSnapshot(page.locator('[role="dialog"]'), "delete-confirmation-modal");
@@ -63,5 +76,10 @@ describe("desktop-ui visual snapshots", () => {
 async function openRoute(pathname: string) {
   await page.goto(new URL(pathname, PREVIEW_URL).toString(), { waitUntil: "networkidle" });
   await page.addStyleTag({ content: MOTION_RESET });
-  await page.locator(".app-shell-root").waitFor({ state: "visible" });
+}
+
+async function authenticatePreviewSession() {
+  await page.addInitScript(([storageKey, profile]) => {
+    window.localStorage.setItem(storageKey, JSON.stringify(profile));
+  }, [AUTH_STORAGE_KEY, { email: "preview@lune.local", name: "Preview user" }]);
 }
