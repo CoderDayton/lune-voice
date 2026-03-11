@@ -192,11 +192,11 @@ impl AsrRegistry {
             },
             #[cfg(feature = "ort-qwen")]
             Self::OrtQwen(_) => PipelineConfig {
-                // OrtQwen encoder uses 1-8s attention windows — segments
-                // beyond 8s degenerate. Force flush before the window limit.
-                max_segment_ms: 7_500,
-                sentence_close_ms: 600,
-                hard_close_ms: 1_200,
+                // Qwen3-ASR offline inference is whole-clip up to the export
+                // ceiling, not an 8s streaming-style decode loop.
+                max_segment_ms: 30_000,
+                sentence_close_ms: 800,
+                hard_close_ms: 2_000,
                 speech_threshold: 0.5,
                 min_speech_ms: 150,
                 adaptive_vad: false,

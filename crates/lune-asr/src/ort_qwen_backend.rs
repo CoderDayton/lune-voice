@@ -25,10 +25,15 @@ use crate::ort_utils::build_ort_session;
 /// encoder outputs via cross-attention for global coherence.
 const MAX_ENCODER_SAMPLES: usize = 60 * 16_000;
 
-/// Decoder stays grounded within 8s (matches encoder's internal attention window).
-const CHUNK_SAMPLES: usize = 8 * 16_000;
-/// Only chunk audio longer than this (oneshot is fine for short clips).
-const CHUNK_THRESHOLD: usize = 10 * 16_000;
+/// Fallback chunk size when audio exceeds the exported encoder limit.
+///
+/// The official offline Qwen3-ASR path processes normal clips as a whole and
+/// only splits very long audio at a much coarser granularity. For the ONNX
+/// split-runtime here, keep whole-clip inference up to the encoder ceiling and
+/// only fall back to chunking beyond that.
+const CHUNK_SAMPLES: usize = MAX_ENCODER_SAMPLES;
+const CHUNK_SEARCH_EXPAND_SAMPLES: usize = 5 * 16_000;
+const CHUNK_MIN_WINDOW_SAMPLES: usize = 1600; // 100 ms at 16 kHz
 
 /// Runtime configuration for the ORT Qwen ASR backend.
 #[derive(Debug, Clone)]
@@ -380,11 +385,65 @@ impl OrtQwenAsrBackend {
         let _ = self.aligner.set(fa);
     }
 
-    /// Split long audio into overlapping 8s chunks, decode each independently,
-    /// and merge using FA timestamps (preferred) or LCS fallback.
-    ///
-    /// Locks encoder/embed_tokens/decoder per-chunk so FA can re-acquire
-    /// the same Arc<Mutex> sessions between chunks.
+    fn split_audio_into_chunks<'a>(&self, pcm: &'a [f32]) -> Vec<&'a [f32]> {
+        if pcm.len() <= CHUNK_SAMPLES {
+            return vec![pcm];
+        }
+
+        let mut chunks = Vec::new();
+        let mut start = 0usize;
+
+        while pcm.len().saturating_sub(start) > CHUNK_SAMPLES {
+            let cut = start + CHUNK_SAMPLES;
+            let left = cut.saturating_sub(CHUNK_SEARCH_EXPAND_SAMPLES).max(start);
+            let right = (cut + CHUNK_SEARCH_EXPAND_SAMPLES).min(pcm.len());
+
+            let boundary = if right.saturating_sub(left) <= CHUNK_MIN_WINDOW_SAMPLES {
+                cut
+            } else {
+                let seg = &pcm[left..right];
+                let mut best_sum = seg[..CHUNK_MIN_WINDOW_SAMPLES]
+                    .iter()
+                    .map(|sample| sample.abs())
+                    .sum::<f32>();
+                let mut window_sum = best_sum;
+                let mut best_start = 0usize;
+
+                for idx in CHUNK_MIN_WINDOW_SAMPLES..seg.len() {
+                    window_sum += seg[idx].abs();
+                    window_sum -= seg[idx - CHUNK_MIN_WINDOW_SAMPLES].abs();
+                    if window_sum < best_sum {
+                        best_sum = window_sum;
+                        best_start = idx + 1 - CHUNK_MIN_WINDOW_SAMPLES;
+                    }
+                }
+
+                let window = &seg[best_start..best_start + CHUNK_MIN_WINDOW_SAMPLES];
+                let local_min = window
+                    .iter()
+                    .enumerate()
+                    .min_by(|(_, a), (_, b)| {
+                        a.abs()
+                            .partial_cmp(&b.abs())
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                    .map(|(idx, _)| idx)
+                    .unwrap_or(0);
+
+                left + best_start + local_min
+            }
+            .clamp(start + 1, pcm.len());
+
+            chunks.push(&pcm[start..boundary]);
+            start = boundary;
+        }
+
+        chunks.push(&pcm[start..]);
+        chunks
+    }
+
+    /// Split long audio only when required by the encoder export limit and
+    /// decode each chunk independently, matching upstream offline behavior.
     fn transcribe_chunked(
         &self,
         pcm: &[f32],
@@ -392,17 +451,11 @@ impl OrtQwenAsrBackend {
     ) -> Result<(String, Vec<WordConfidence>)> {
         let mut all_text = String::new();
         let mut all_word_confs: Vec<WordConfidence> = Vec::new();
-        // Accumulated token IDs from previous chunks — gives the decoder
-        // linguistic context for continuation (what was already transcribed).
-        let mut past_text_tokens: Vec<i64> = Vec::new();
-
-        let mut chunk_idx = 0usize;
+        let chunks = self.split_audio_into_chunks(pcm);
         let mut offset = 0usize;
-        while offset < pcm.len() {
-            // No overlap: past_text_tokens provides decoder context, so each
-            // chunk covers a unique audio region. Step = chunk size.
-            let end = (offset + CHUNK_SAMPLES).min(pcm.len());
-            let chunk = &pcm[offset..end];
+
+        for (chunk_idx, chunk) in chunks.iter().enumerate() {
+            let chunk = *chunk;
 
             let result = {
                 let mut enc = self
@@ -425,7 +478,6 @@ impl OrtQwenAsrBackend {
                     chunk,
                     forced_language,
                     self.has_attention_mask,
-                    &past_text_tokens,
                 )?
             }; // locks dropped here
 
@@ -433,17 +485,13 @@ impl OrtQwenAsrBackend {
             tracing::info!(
                 chunk = chunk_idx,
                 offset_s = offset as f32 / 16_000.0,
-                end_s = end as f32 / 16_000.0,
+                end_s = (offset + chunk.len()) as f32 / 16_000.0,
                 tokens = result.token_ids.len(),
                 text = %text,
                 "chunked ASR decode"
             );
 
             if !text.is_empty() {
-                // Accumulate tokens for next chunk's past_text conditioning.
-                past_text_tokens.extend_from_slice(&result.token_ids);
-
-                // Simple concatenation — each chunk produces only new text.
                 if !all_text.is_empty() {
                     all_text.push(' ');
                 }
@@ -457,12 +505,11 @@ impl OrtQwenAsrBackend {
                 all_word_confs.extend(wc);
             }
 
-            chunk_idx += 1;
-            offset = end; // step = chunk size (no overlap)
+            offset += chunk.len();
         }
 
         tracing::info!(
-            chunks = chunk_idx,
+            chunks = chunks.len(),
             total_words = all_text.split_whitespace().count(),
             text = %all_text,
             "chunked ASR merged"
@@ -498,7 +545,7 @@ impl AsrBackend for OrtQwenAsrBackend {
                         "ORT Qwen ASR does not support forced language hint `{language}`"
                     ))
                 })?;
-                Some(format!("Transcribe the {mapped} audio into text."))
+                Some(mapped.to_owned())
             }
             None => None,
         };
@@ -546,7 +593,8 @@ impl AsrBackend for OrtQwenAsrBackend {
         let total = audio.len();
         let sample_rate = state.sample_rate;
 
-        let (text, word_confidences, confidence, min_token_confidence) = if total > CHUNK_THRESHOLD
+        let (text, word_confidences, confidence, min_token_confidence) = if total
+            > MAX_ENCODER_SAMPLES
         {
             // Chunked path: locks per-chunk internally, returns merged word confidences.
             let (text, wc) = self.transcribe_chunked(audio, state.forced_language.as_deref())?;
@@ -563,7 +611,7 @@ impl AsrBackend for OrtQwenAsrBackend {
                 .min_by(|a, b| a.partial_cmp(b).unwrap());
             (text, wc, conf, min_conf)
         } else {
-            // Short audio: single-pass oneshot.
+            // Default offline path: single-pass oneshot over the whole clip.
             let result = {
                 let mut enc = self
                     .encoder
@@ -585,7 +633,6 @@ impl AsrBackend for OrtQwenAsrBackend {
                     audio,
                     state.forced_language.as_deref(),
                     self.has_attention_mask,
-                    &[],
                 )?
             };
             let wc =

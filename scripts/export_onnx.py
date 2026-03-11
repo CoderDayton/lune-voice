@@ -556,9 +556,12 @@ def export_llm(
 
 
 class EncoderWrapper(nn.Module):
-    """ONNX-friendly audio encoder wrapper.
+    """ONNX-friendly audio encoder wrapper for batch=1 unpadded mel input.
 
-    Reuses original weights through standard ops (no cu_seqlens / Flash Attention).
+    Mirrors Qwen3-ASR's chunked audio-tower path closely enough to preserve the
+    exported encoder geometry. The upstream module uses Python list splits that
+    do not survive ONNX export with dynamic mel lengths, so this wrapper keeps
+    the same math but reformulates chunking/masking with tensor ops.
     """
 
     def __init__(self, thinker):
@@ -576,19 +579,81 @@ class EncoderWrapper(nn.Module):
         self.proj1 = at.proj1
         self.act = at.act
         self.proj2 = at.proj2
+        self.n_window = int(at.n_window)
+        self.n_window_infer = int(at.n_window_infer)
+        self.chunk_size = int(at.n_window * 2)
+        self.chunk_aftercnn = self._feat_extract_output_lengths(
+            torch.tensor(self.chunk_size, dtype=torch.long)
+        ).item()
+        self.window_aftercnn = self.chunk_aftercnn * (self.n_window_infer // self.chunk_size)
+        self.max_encoder_frames = 6000
+        self.max_aftercnn = self._feat_extract_output_lengths(
+            torch.tensor(self.max_encoder_frames, dtype=torch.long)
+        ).item()
+        self.max_attention_windows = (self.max_aftercnn + self.window_aftercnn - 1) // self.window_aftercnn
+
+    def _feat_extract_output_lengths(self, lengths: torch.Tensor) -> torch.Tensor:
+        lengths = (lengths - 1) // 2 + 1
+        lengths = (lengths - 1) // 2 + 1
+        lengths = (lengths - 1) // 2 + 1
+        return lengths
 
     @torch.no_grad()
     def forward(self, mel: torch.Tensor) -> torch.Tensor:
-        x = mel.unsqueeze(1)  # [1, 1, 128, T]
+        # Runtime only uses a single unpadded utterance per encoder invocation.
+        # Keep export faithful for that path instead of pretending to support
+        # arbitrary padded batches.
+        if mel.shape[0] != 1:
+            raise ValueError("EncoderWrapper exports batch=1 only")
+
+        total_frames = mel.shape[-1]
+        feature_len = torch.ones(1, dtype=torch.long, device=mel.device) * total_frames
+        chunk_size = self.chunk_size
+        num_chunks = (total_frames + chunk_size - 1) // chunk_size
+        padded_frames = num_chunks * chunk_size
+        pad_frames = padded_frames - total_frames
+
+        padded = torch.nn.functional.pad(mel, (0, pad_frames))
+        chunks = padded.reshape(1, mel.shape[1], num_chunks, chunk_size).permute(2, 0, 1, 3).squeeze(1)
+
+        chunk_lengths = torch.full(
+            (num_chunks,),
+            chunk_size,
+            dtype=torch.long,
+            device=mel.device,
+        )
+        chunk_lengths[-1] = torch.remainder(feature_len[0] - 1, chunk_size) + 1
+
+        x = chunks.unsqueeze(1)  # [num_chunks, 1, 128, chunk_size]
         x = torch.nn.functional.gelu(self.conv2d1(x))
         x = torch.nn.functional.gelu(self.conv2d2(x))
         x = torch.nn.functional.gelu(self.conv2d3(x))
         b, c, f, t = x.size()
         x = self.conv_out(x.permute(0, 3, 1, 2).contiguous().view(b, t, c * f))
         x = x + self.pos_embed[:t, :].unsqueeze(0).to(x.dtype)
-        hidden = x.squeeze(0)
-        cu_seqlens = torch.zeros(2, dtype=torch.int32, device=mel.device)
-        cu_seqlens[1] = hidden.shape[0]
+
+        chunk_aftercnn_lengths = self._feat_extract_output_lengths(chunk_lengths)
+        valid_mask = (
+            torch.arange(t, device=mel.device).unsqueeze(0) < chunk_aftercnn_lengths.unsqueeze(1)
+        )
+        hidden = x[valid_mask]
+
+        aftercnn_len = self._feat_extract_output_lengths(feature_len)[0]
+        step_ends = (
+            torch.arange(1, self.max_attention_windows + 1, device=mel.device, dtype=torch.long)
+            * self.window_aftercnn
+        )
+        step_ends = torch.minimum(
+            step_ends,
+            aftercnn_len.expand(self.max_attention_windows),
+        )
+        cu_seqlens = torch.cat(
+            [
+                torch.zeros(1, device=mel.device, dtype=torch.long),
+                step_ends,
+            ]
+        ).to(torch.int32)
+
         for layer in self.layers:
             hidden = layer(hidden, cu_seqlens)[0]
         hidden = self.ln_post(hidden)
