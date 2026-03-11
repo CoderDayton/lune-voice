@@ -33,12 +33,12 @@ struct DeliveryMsg {
 /// Handle to the background delivery thread.
 #[derive(Clone)]
 pub struct DeliveryService {
-    tx: mpsc::SyncSender<DeliveryMsg>,
+    tx: mpsc::Sender<DeliveryMsg>,
 }
 
 impl DeliveryService {
     pub fn new(terminal_mode: TerminalMode) -> Self {
-        let (tx, rx) = mpsc::sync_channel::<DeliveryMsg>(64);
+        let (tx, rx) = mpsc::channel::<DeliveryMsg>();
         std::thread::Builder::new()
             .name("delivery".into())
             .spawn(move || delivery_thread(rx, terminal_mode))
@@ -52,11 +52,25 @@ impl DeliveryService {
             return;
         }
         debug!(?mode, text_len = text.len(), "delivering text");
-        if let Err(e) = self.tx.try_send(DeliveryMsg {
+        if let Err(e) = self.tx.send(DeliveryMsg {
             text: text.into(),
             mode,
         }) {
-            warn!(error = %e, "delivery channel full or disconnected");
+            warn!(error = %e, "delivery channel disconnected");
+        }
+    }
+
+    #[inline]
+    pub fn deliver_owned(&self, text: String, mode: DictationMode) {
+        if text.is_empty() {
+            return;
+        }
+        debug!(?mode, text_len = text.len(), "delivering text");
+        if let Err(e) = self.tx.send(DeliveryMsg {
+            text: text.into_boxed_str(),
+            mode,
+        }) {
+            warn!(error = %e, "delivery channel disconnected");
         }
     }
 }

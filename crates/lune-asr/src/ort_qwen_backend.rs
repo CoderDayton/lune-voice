@@ -120,9 +120,54 @@ impl OrtQwenAsrBackend {
 
 struct SessionState {
     audio_buf: Vec<f32>,
+    audio_start: usize,
     next_id: u64,
     sample_rate: u32,
     forced_language: Option<String>,
+}
+
+impl SessionState {
+    #[inline]
+    fn audio(&self) -> &[f32] {
+        &self.audio_buf[self.audio_start..]
+    }
+
+    #[inline]
+    fn audio_len(&self) -> usize {
+        self.audio_buf.len().saturating_sub(self.audio_start)
+    }
+
+    fn append_audio(&mut self, pcm: &[f32]) {
+        self.audio_buf.extend_from_slice(pcm);
+
+        let trim = self.audio_len().saturating_sub(MAX_ENCODER_SAMPLES);
+        if trim == 0 {
+            return;
+        }
+
+        self.audio_start += trim;
+
+        // Compact only when the dead prefix is large enough to pay for the copy.
+        if self.audio_start >= self.audio_buf.capacity() / 4 || self.audio_start >= self.audio_len()
+        {
+            self.compact();
+        }
+    }
+
+    fn clear(&mut self) {
+        self.audio_buf.clear();
+        self.audio_start = 0;
+    }
+
+    fn compact(&mut self) {
+        if self.audio_start == 0 {
+            return;
+        }
+        let len = self.audio_len();
+        self.audio_buf.copy_within(self.audio_start.., 0);
+        self.audio_buf.truncate(len);
+        self.audio_start = 0;
+    }
 }
 
 pub struct OrtQwenAsrSession {
@@ -461,6 +506,7 @@ impl AsrBackend for OrtQwenAsrBackend {
         Ok(OrtQwenAsrSession {
             state: Mutex::new(SessionState {
                 audio_buf: Vec::with_capacity(16_000 * 8),
+                audio_start: 0,
                 next_id: 1,
                 sample_rate: config.sample_rate,
                 forced_language,
@@ -474,12 +520,7 @@ impl AsrBackend for OrtQwenAsrBackend {
             .state
             .lock()
             .map_err(|e| lock_err("session lock", e))?;
-        state.audio_buf.extend_from_slice(pcm);
-        // Cap at 60s (MAX_ENCODER_SAMPLES). Trim oldest audio from front.
-        if state.audio_buf.len() > MAX_ENCODER_SAMPLES {
-            let trim = state.audio_buf.len() - MAX_ENCODER_SAMPLES;
-            state.audio_buf.drain(..trim);
-        }
+        state.append_audio(pcm);
         Ok(())
     }
 
@@ -494,21 +535,21 @@ impl AsrBackend for OrtQwenAsrBackend {
             .lock()
             .map_err(|e| lock_err("session lock", e))?;
 
-        if state.audio_buf.is_empty() {
+        if state.audio_len() == 0 {
             tracing::info!("poll_final: audio buffer empty, no segments");
             return Ok(vec![]);
         }
 
         let id = state.next_id;
         state.next_id = id.saturating_add(1);
-        let total = state.audio_buf.len();
+        let audio = state.audio();
+        let total = audio.len();
         let sample_rate = state.sample_rate;
 
         let (text, word_confidences, confidence, min_token_confidence) = if total > CHUNK_THRESHOLD
         {
             // Chunked path: locks per-chunk internally, returns merged word confidences.
-            let (text, wc) =
-                self.transcribe_chunked(&state.audio_buf, state.forced_language.as_deref())?;
+            let (text, wc) = self.transcribe_chunked(audio, state.forced_language.as_deref())?;
             // Derive segment-level confidence from per-word confidences.
             let conf = if wc.is_empty() {
                 None
@@ -541,7 +582,7 @@ impl AsrBackend for OrtQwenAsrBackend {
                     &mut emb,
                     &mut dec,
                     &self.tokenizer,
-                    &state.audio_buf,
+                    audio,
                     state.forced_language.as_deref(),
                     self.has_attention_mask,
                     &[],
@@ -589,7 +630,7 @@ impl AsrBackend for OrtQwenAsrBackend {
             .state
             .lock()
             .map_err(|e| lock_err("session lock", e))?;
-        state.audio_buf.clear();
+        state.clear();
         Ok(())
     }
 

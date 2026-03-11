@@ -1,3 +1,4 @@
+use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -288,25 +289,22 @@ fn prepare_text_for_llm(
     // Remap word confidences onto rewritten text (after command stripping / FA reorder).
     // Collect all (word_lower, confidence) pairs, match each source word to the first
     // unconsumed entry so markers survive reordering and word removal.
-    let mut conf_pool: Vec<(String, f32, bool)> = segments
-        .iter()
-        .flat_map(|seg| {
-            seg.word_confidences
-                .iter()
-                .map(|wc| (wc.word.to_lowercase(), wc.confidence, false))
-        })
-        .collect();
+    let mut conf_pool: HashMap<String, VecDeque<f32>> = HashMap::new();
+    for wc in segments.iter().flat_map(|seg| seg.word_confidences.iter()) {
+        conf_pool
+            .entry(wc.word.to_lowercase())
+            .or_default()
+            .push_back(wc.confidence);
+    }
 
     let marked: String = source_text
         .split_whitespace()
         .map(|word| {
             let lower = word.to_lowercase();
-            if let Some(entry) = conf_pool
-                .iter_mut()
-                .find(|(w, _, used)| !*used && *w == lower)
+            if let Some(confidences) = conf_pool.get_mut(&lower)
+                && let Some(confidence) = confidences.pop_front()
             {
-                entry.2 = true; // mark consumed
-                if entry.1 < threshold {
+                if confidence < threshold {
                     return format!("[?{word}?]");
                 }
             }
@@ -419,7 +417,7 @@ async fn run_session<A: AsrBackend + 'static>(
     };
     let _ = event_tx.send(SessionEvent::Started).await;
 
-    let mut all_audio: Vec<f32> = Vec::with_capacity(16_000 * 30);
+    let mut all_audio = aligner.as_ref().map(|_| Vec::with_capacity(16_000 * 30));
     let mut segments = Vec::with_capacity(asr.segment_capacity_hint());
     let mut raw_text = String::with_capacity(256);
     let mut speech_samples: usize = 0;
@@ -466,7 +464,9 @@ async fn run_session<A: AsrBackend + 'static>(
                     if in_speech {
                         speech_samples += chunk.samples.len();
                     }
-                    all_audio.extend_from_slice(&chunk.samples);
+                    if let Some(audio) = &mut all_audio {
+                        audio.extend_from_slice(&chunk.samples);
+                    }
 
                     if let Err(e) = asr.push_audio(&asr_session, &chunk.samples).await {
                         let msg = e.to_string();
@@ -479,7 +479,7 @@ async fn run_session<A: AsrBackend + 'static>(
                         Ok(new_segments) => {
                             if append_segments(&mut segments, &mut raw_text, new_segments) {
                                 saw_asr_success = true;
-                                let _ = event_tx.try_send(SessionEvent::PartialText(raw_text.clone()));
+                                let _ = event_tx.try_send(SessionEvent::PartialText);
                             }
                         }
                         Err(e) => {
@@ -600,7 +600,7 @@ async fn run_session<A: AsrBackend + 'static>(
         return;
     }
 
-    if all_audio.is_empty() || speech_samples == 0 {
+    if speech_samples == 0 {
         info!(%session_id, "no speech detected, ending session");
         finalize_db(session_id, &persist, status, Some(Utc::now()), None).await;
         let _ = event_tx.send(SessionEvent::Stopped).await;
@@ -621,9 +621,8 @@ async fn run_session<A: AsrBackend + 'static>(
         return;
     }
 
-    let aligned_text = if let Some(al) = &aligner {
+    let aligned_text = if let (Some(al), Some(audio)) = (&aligner, all_audio) {
         let al = Arc::clone(al);
-        let audio = all_audio;
         let text = raw_text.clone();
         match tokio::task::spawn_blocking(move || al.align(&audio, &text)).await {
             Ok(Ok(words)) => {

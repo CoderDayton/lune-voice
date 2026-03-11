@@ -13,8 +13,8 @@ impl TextOutputController {
     }
 
     /// Emit a partial (in-progress) text update.
-    pub async fn emit_partial(&mut self, text: String) {
-        let _ = self.event_tx.send(SessionEvent::PartialText(text)).await;
+    pub async fn emit_partial(&mut self) {
+        let _ = self.event_tx.send(SessionEvent::PartialText).await;
     }
 
     /// Emit finalized text — triggers delivery to the focused input.
@@ -31,9 +31,9 @@ mod tests {
     async fn emit_partial_sent() {
         let (tx, mut rx) = mpsc::channel(4);
         let mut ctrl = TextOutputController::new(tx);
-        ctrl.emit_partial("hello".into()).await;
+        ctrl.emit_partial().await;
         let event = rx.try_recv().unwrap();
-        assert!(matches!(event, SessionEvent::PartialText(t) if t == "hello"));
+        assert!(matches!(event, SessionEvent::PartialText));
     }
 
     #[tokio::test]

@@ -391,11 +391,11 @@ async fn start_dictation<A: lune_core::asr::AsrBackend + 'static>(
             let update = match event {
                 lune_core::session::SessionEvent::Started => AppStateUpdate::Listening,
                 lune_core::session::SessionEvent::Processing => AppStateUpdate::Processing,
-                lune_core::session::SessionEvent::PartialText(_) => AppStateUpdate::PartialText,
+                lune_core::session::SessionEvent::PartialText => AppStateUpdate::PartialText,
                 lune_core::session::SessionEvent::FinalizedText(t) => {
                     // `borrow()` is lock-free on watch channels — cheap hot path
                     let mode = *dictation_mode_rx.borrow();
-                    delivery_service.deliver(&t, mode);
+                    delivery_service.deliver_owned(t, mode);
                     AppStateUpdate::FinalText
                 }
                 lune_core::session::SessionEvent::CommandDetected(payload) => {
@@ -509,7 +509,7 @@ async fn update_state(
         AppStateUpdate::Error => "error",
     };
 
-    {
+    let changed = {
         // Scope the write-lock as tightly as possible; release before the async
         // D-Bus emit so we don't hold the lock across an await point.
         let mut guard = shared.write().await;
@@ -517,7 +517,14 @@ async fn update_state(
         // needless cache-line dirty on every PartialText event.
         if guard.as_str() != state_str {
             guard.replace_range(.., state_str);
+            true
+        } else {
+            false
         }
+    };
+
+    if !changed {
+        return;
     }
 
     if let Err(e) = dbus::emit_state_changed(conn, state_str).await {

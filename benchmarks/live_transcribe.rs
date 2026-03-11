@@ -181,9 +181,9 @@ fn main() {
                 }
                 event = event_rx.recv() => {
                     match event {
-                        Some(SessionEvent::PartialText(t)) => {
+                        Some(SessionEvent::PartialText) => {
                             // Show partial text in gray, overwrite line
-                            eprint!("\r\x1b[2K  \x1b[90m{t}\x1b[0m");
+                            eprint!("\r\x1b[2K  \x1b[90m(processing...)\x1b[0m");
                         }
                         Some(SessionEvent::FinalizedText(t)) => {
                             eprint!("\r\x1b[2K  {t}\n");
