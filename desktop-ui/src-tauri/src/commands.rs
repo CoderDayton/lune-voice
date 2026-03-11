@@ -1,4 +1,4 @@
-use tauri::{Emitter, State, ipc::Channel};
+use tauri::{State, ipc::Channel};
 
 use crate::dto::{
     CreateDictionaryEntryInput, SessionStreamEvent, WorkspaceSettingsDto, WorkspaceSnapshot,
@@ -34,7 +34,6 @@ pub async fn save_workspace_settings(
     .map_err(|e| format!("save workspace settings task failed: {e}"))??;
     runtime.mark_reload_required().await;
     snapshot.service_status = runtime.service_status().await;
-    let _ = runtime.app_handle().emit("lune://settings-changed", ());
     Ok(snapshot)
 }
 
@@ -50,7 +49,6 @@ pub async fn create_dictionary_entry(
     .map_err(|e| format!("create dictionary entry task failed: {e}"))??;
     runtime.mark_reload_required().await;
     snapshot.service_status = runtime.service_status().await;
-    let _ = runtime.app_handle().emit("lune://dictionary-changed", ());
     Ok(snapshot)
 }
 
@@ -66,7 +64,6 @@ pub async fn delete_dictionary_entry(
     .map_err(|e| format!("delete dictionary entry task failed: {e}"))??;
     runtime.mark_reload_required().await;
     snapshot.service_status = runtime.service_status().await;
-    let _ = runtime.app_handle().emit("lune://dictionary-changed", ());
     Ok(snapshot)
 }
 

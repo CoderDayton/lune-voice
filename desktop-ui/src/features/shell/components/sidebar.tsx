@@ -55,11 +55,8 @@ export function Sidebar() {
         {navigationGroups.map((group) => (
           <div key={group.label} className="space-y-1">
             {!collapsed ? <p className="app-kicker px-2">{group.label}</p> : null}
-            {group.items.map(({ to, label, caption, icon: Icon, aliases }) => {
-              const active =
-                to === "/"
-                  ? pathname === "/"
-                  : pathname.startsWith(to) || aliases?.some((alias) => pathname.startsWith(alias));
+            {group.items.map(({ to, label, caption, icon: Icon }) => {
+              const active = to === "/" ? pathname === "/" : pathname.startsWith(to);
 
               return (
                 <Link

@@ -15,7 +15,6 @@ export interface NavigationItem {
   eyebrow: string;
   description: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
-  aliases?: string[];
 }
 
 export const navigationItems: NavigationItem[] = [
@@ -54,7 +53,6 @@ export const navigationItems: NavigationItem[] = [
     eyebrow: "Recording",
     description: "Choose how Lune Voice listens, cleans up speech, and turns it into text.",
     icon: MicIcon,
-    aliases: ["/settings"],
   },
   {
     to: "/shortcuts",
@@ -69,12 +67,12 @@ export const navigationItems: NavigationItem[] = [
 
 export function findNavigationItem(pathname: string) {
   return (
-    navigationItems.find(({ to, aliases }) => {
+    navigationItems.find(({ to }) => {
       if (to === "/") {
         return pathname === "/";
       }
 
-      return pathname.startsWith(to) || aliases?.some((alias) => pathname.startsWith(alias));
+      return pathname.startsWith(to);
     }) ?? navigationItems[0]
   );
 }

@@ -25,7 +25,7 @@ export async function attachSessionStream(
 }
 
 export async function listenToWorkspaceInvalidation(
-  eventName: "lune://history-changed" | "lune://dictionary-changed" | "lune://settings-changed",
+  eventName: "lune://history-changed",
   onInvalidate: () => void,
 ) {
   if (!isTauriRuntime()) {

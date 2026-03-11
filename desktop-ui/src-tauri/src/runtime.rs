@@ -53,10 +53,6 @@ impl AppRuntime {
         self.inner.status.read().await.clone()
     }
 
-    pub fn app_handle(&self) -> &AppHandle {
-        &self.inner.app
-    }
-
     pub async fn set_session_stream(
         &self,
         channel: Channel<SessionStreamEvent>,

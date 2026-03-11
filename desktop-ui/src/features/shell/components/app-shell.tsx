@@ -20,8 +20,6 @@ export function AppShell() {
   useEffect(() => {
     let disposeSession = () => {};
     let disposeHistory = () => {};
-    let disposeDictionary = () => {};
-    let disposeSettings = () => {};
 
     void (async () => {
       disposeSession = await attachSessionStream((event) => {
@@ -30,19 +28,11 @@ export function AppShell() {
       disposeHistory = await listenToWorkspaceInvalidation("lune://history-changed", () => {
         void loadWorkspaceSnapshot();
       });
-      disposeDictionary = await listenToWorkspaceInvalidation("lune://dictionary-changed", () => {
-        void loadWorkspaceSnapshot();
-      });
-      disposeSettings = await listenToWorkspaceInvalidation("lune://settings-changed", () => {
-        void loadWorkspaceSnapshot();
-      });
     })();
 
     return () => {
       disposeSession();
       disposeHistory();
-      disposeDictionary();
-      disposeSettings();
     };
   }, []);
 

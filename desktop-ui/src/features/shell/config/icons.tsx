@@ -48,15 +48,6 @@ export function DictionaryIcon(props: IconProps) {
   );
 }
 
-export function SettingsIcon(props: IconProps) {
-  return (
-    <BaseIcon {...props}>
-      <circle cx="9" cy="9" r="2.2" />
-      <path d="M9 2.8v2M9 13.2v2M4.6 4.6l1.4 1.4M12 12l1.4 1.4M2.8 9h2M13.2 9h2M4.6 13.4 6 12M12 6l1.4-1.4" />
-    </BaseIcon>
-  );
-}
-
 export function SearchIcon(props: IconProps) {
   return (
     <BaseIcon {...props}>
