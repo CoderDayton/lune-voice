@@ -1,0 +1,5 @@
+[build]
+# Emit AVX2/AVX-512 instructions for the host CPU.
+# Vectorizes mel STFT inner loops and ASR preprocessing — 2-4x on eligible paths.
+# Not portable: binaries built here won't run on older CPUs.
+rustflags = ["-C", "target-cpu=native"]

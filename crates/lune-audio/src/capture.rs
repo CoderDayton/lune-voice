@@ -122,6 +122,9 @@ impl AudioStream {
 
         let mut input_resample_buf = Vec::with_capacity(chunk_samples * 2);
         let mut output_buf = Vec::with_capacity(chunk_samples * 2);
+        // Pre-allocated scratch buffers reused every callback — avoids per-frame heap alloc.
+        let mut mono_buf = Vec::<f32>::with_capacity(chunk_samples * 4);
+        let mut resample_input_slice = Vec::<f32>::with_capacity(chunk_samples * 2);
 
         // Build the stream based on sample format
         let stream = match supported_config.sample_format() {
@@ -134,7 +137,9 @@ impl AudioStream {
                             channels as usize,
                             &mut resampler,
                             &mut input_resample_buf,
+                            &mut resample_input_slice,
                             &mut output_buf,
+                            &mut mono_buf,
                             chunk_samples,
                             &ring_clone,
                             start_time,
@@ -155,7 +160,9 @@ impl AudioStream {
                             channels as usize,
                             &mut resampler,
                             &mut input_resample_buf,
+                            &mut resample_input_slice,
                             &mut output_buf,
+                            &mut mono_buf,
                             chunk_samples,
                             &ring_clone,
                             start_time,
@@ -176,7 +183,9 @@ impl AudioStream {
                             channels as usize,
                             &mut resampler,
                             &mut input_resample_buf,
+                            &mut resample_input_slice,
                             &mut output_buf,
+                            &mut mono_buf,
                             chunk_samples,
                             &ring_clone,
                             start_time,
@@ -266,27 +275,34 @@ fn process_audio_callback(
     channels: usize,
     resampler: &mut Option<FastFixedIn<f32>>,
     input_resample_buf: &mut Vec<f32>,
+    resample_input_slice: &mut Vec<f32>,
     output_buf: &mut Vec<f32>,
+    mono_buf: &mut Vec<f32>,
     chunk_samples: usize,
     ring: &RingBuffer<AudioChunk>,
     start_time: Instant,
 ) {
-    // 1. Downmix to mono (simple average)
-    let mono: Vec<f32> = if channels == 1 {
-        data.to_vec()
+    // 1. Downmix to mono (simple average) — reuse pre-allocated buffer, zero per-frame alloc.
+    mono_buf.clear();
+    if channels == 1 {
+        mono_buf.extend_from_slice(data);
     } else {
-        data.chunks_exact(channels)
-            .map(|frame| frame.iter().sum::<f32>() / channels as f32)
-            .collect()
-    };
+        mono_buf.extend(
+            data.chunks_exact(channels)
+                .map(|frame| frame.iter().sum::<f32>() / channels as f32),
+        );
+    }
 
     // 2. Resample if needed
     if let Some(r) = resampler {
-        input_resample_buf.extend_from_slice(&mono);
+        input_resample_buf.extend_from_slice(mono_buf);
         let required_input = r.input_frames_next();
         while input_resample_buf.len() >= required_input {
-            let input_chunk: Vec<f32> = input_resample_buf.drain(..required_input).collect();
-            match r.process(&[input_chunk], None) {
+            // Reuse resample_input_slice instead of allocating per iteration.
+            resample_input_slice.clear();
+            resample_input_slice.extend_from_slice(&input_resample_buf[..required_input]);
+            input_resample_buf.drain(..required_input);
+            match r.process(&[resample_input_slice.as_slice()], None) {
                 Ok(output) => output_buf.extend_from_slice(&output[0]),
                 Err(e) => {
                     warn!("Resampling error: {}", e);
@@ -295,7 +311,7 @@ fn process_audio_callback(
             }
         }
     } else {
-        output_buf.extend_from_slice(&mono);
+        output_buf.extend_from_slice(mono_buf);
     }
 
     while output_buf.len() >= chunk_samples {

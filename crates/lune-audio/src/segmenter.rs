@@ -16,6 +16,7 @@
 use std::collections::VecDeque;
 
 use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
 use ten_vad_rs::TenVad;
 use tracing::warn;
 
@@ -361,8 +362,8 @@ impl VadSegmenter {
     /// Returns `(boundaries, is_speech)`:
     /// - `boundaries`: completed segment boundaries (0 or more)
     /// - `is_speech`: whether audio should be routed to ASR after this push
-    pub fn push(&mut self, samples: &[f32]) -> (Vec<SegmentBoundary>, bool) {
-        let mut boundaries = Vec::new();
+    pub fn push(&mut self, samples: &[f32]) -> (SmallVec<[SegmentBoundary; 1]>, bool) {
+        let mut boundaries: SmallVec<[SegmentBoundary; 1]> = SmallVec::new();
 
         for chunk in samples.chunks(HOP_SIZE) {
             // Convert f32 → i16 for TenVad

@@ -4118,6 +4118,7 @@ dependencies = [
  "rubato 0.15.0",
  "serde",
  "serde_json",
+ "smallvec 1.15.1",
  "ten-vad-rs",
  "thiserror 2.0.18",
  "tokio",

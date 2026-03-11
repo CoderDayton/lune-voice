@@ -4,10 +4,10 @@
 //! preemphasis → STFT (Hann, RustFFT) → mel filterbank → log(x + 2^-24) → per-feature normalize.
 
 use std::f32::consts::PI;
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 use ndarray::Array2;
-use rustfft::{FftPlanner, num_complex::Complex};
+use rustfft::{Fft, FftPlanner, num_complex::Complex};
 
 // ── Preprocessor constants (TDT 128-mel) ─────────────────────────────────────
 
@@ -23,6 +23,7 @@ const LOG_GUARD: f32 = 5.960_464_5e-8; // 2^-24 precomputed
 
 static MEL_FILTERBANK: OnceLock<Array2<f32>> = OnceLock::new();
 static HANN_WINDOW: OnceLock<Vec<f32>> = OnceLock::new();
+static FFT_PLAN: OnceLock<Arc<dyn Fft<f32>>> = OnceLock::new();
 
 #[inline(always)]
 fn get_mel_filterbank() -> &'static Array2<f32> {
@@ -32,6 +33,14 @@ fn get_mel_filterbank() -> &'static Array2<f32> {
 #[inline(always)]
 fn get_hann_window() -> &'static [f32] {
     HANN_WINDOW.get_or_init(|| hann_window(WIN_LENGTH))
+}
+
+#[inline(always)]
+fn get_fft_plan() -> Arc<dyn Fft<f32>> {
+    Arc::clone(FFT_PLAN.get_or_init(|| {
+        let mut planner = FftPlanner::<f32>::new();
+        planner.plan_fft_forward(N_FFT)
+    }))
 }
 
 /// Extract mel-spectrogram features from 16 kHz mono PCM.
@@ -122,8 +131,7 @@ fn stft(audio: &[f32], n_fft: usize, hop: usize, win: usize) -> Array2<f32> {
     let freq_bins = n_fft / 2 + 1;
     let mut spec = Array2::<f32>::zeros((freq_bins, num_frames));
 
-    let mut planner = FftPlanner::<f32>::new();
-    let fft = planner.plan_fft_forward(n_fft);
+    let fft = get_fft_plan();
 
     let zero = Complex::new(0.0f32, 0.0f32);
     let mut frame = vec![zero; n_fft];
