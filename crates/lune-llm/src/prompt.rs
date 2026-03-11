@@ -172,12 +172,22 @@ fn extract_unmarked_words(input: &str) -> Vec<String> {
     result
 }
 
+/// Strip leading/trailing ASCII punctuation from a word, preserving
+/// apostrophes (for contractions like "don't", "I'm").
+#[inline]
+fn strip_word_punctuation(word: &str) -> &str {
+    word.trim_matches(|c: char| c.is_ascii_punctuation() && c != '\'')
+}
+
 /// Validate that all unmarked words from the input appear in the LLM output
-/// in order (case-insensitive).
+/// in order (case-insensitive, punctuation-normalized).
 ///
 /// This catches the most dangerous LLM failure mode: silently changing or
 /// dropping words that were NOT marked as uncertain. If the LLM was only
 /// supposed to fix `[?word?]` spans, every other word must survive.
+///
+/// Punctuation normalization prevents false negatives when the LLM adds
+/// trailing punctuation (e.g. "works" vs "works,") despite being told not to.
 ///
 /// Returns `true` if all unmarked input words appear in the output in order.
 pub fn validate_preservation(input: &str, output: &str) -> bool {
@@ -191,7 +201,8 @@ pub fn validate_preservation(input: &str, output: &str) -> bool {
 
     let output_words: Vec<String> = output
         .split_whitespace()
-        .map(|w| w.to_lowercase())
+        .map(|w| strip_word_punctuation(&w.to_lowercase()).to_string())
+        .filter(|w| !w.is_empty())
         .collect();
 
     // Greedy order-preserving subsequence match
@@ -360,6 +371,22 @@ mod tests {
         // Case changes on unmarked words are acceptable
         let input = "the [?recieve?] Button works";
         let output = "the receive button works";
+        assert!(validate_preservation(input, output));
+    }
+
+    #[test]
+    fn validate_allows_trailing_punctuation() {
+        // LLM added a comma and period — should still pass
+        let input = "the [?recieve?] button works";
+        let output = "the receive button, works.";
+        assert!(validate_preservation(input, output));
+    }
+
+    #[test]
+    fn validate_contraction_with_punctuation() {
+        // Apostrophes in contractions preserved, trailing period stripped
+        let input = "I [?dont?] know";
+        let output = "I don't know.";
         assert!(validate_preservation(input, output));
     }
 
