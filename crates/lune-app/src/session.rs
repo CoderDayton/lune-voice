@@ -1,3 +1,4 @@
+use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -275,33 +276,35 @@ fn prepare_text_for_llm(
     segment_text: &str,
     threshold: f32,
     lang_tag: &str,
+    contextual: bool,
 ) -> (String, bool) {
     if source_text == segment_text {
-        return lune_llm::prepare_input(segments, threshold, lang_tag);
+        return if contextual {
+            lune_llm::prepare_input_contextual(segments, threshold, lang_tag)
+        } else {
+            lune_llm::prepare_input(segments, threshold, lang_tag)
+        };
     }
 
     // Remap word confidences onto rewritten text (after command stripping / FA reorder).
     // Collect all (word_lower, confidence) pairs, match each source word to the first
     // unconsumed entry so markers survive reordering and word removal.
-    let mut conf_pool: Vec<(String, f32, bool)> = segments
-        .iter()
-        .flat_map(|seg| {
-            seg.word_confidences
-                .iter()
-                .map(|wc| (wc.word.to_lowercase(), wc.confidence, false))
-        })
-        .collect();
+    let mut conf_pool: HashMap<String, VecDeque<f32>> = HashMap::new();
+    for wc in segments.iter().flat_map(|seg| seg.word_confidences.iter()) {
+        conf_pool
+            .entry(wc.word.to_lowercase())
+            .or_default()
+            .push_back(wc.confidence);
+    }
 
     let marked: String = source_text
         .split_whitespace()
         .map(|word| {
             let lower = word.to_lowercase();
-            if let Some(entry) = conf_pool
-                .iter_mut()
-                .find(|(w, _, used)| !*used && *w == lower)
+            if let Some(confidences) = conf_pool.get_mut(&lower)
+                && let Some(confidence) = confidences.pop_front()
             {
-                entry.2 = true; // mark consumed
-                if entry.1 < threshold {
+                if confidence < threshold {
                     return format!("[?{word}?]");
                 }
             }
@@ -310,7 +313,10 @@ fn prepare_text_for_llm(
         .collect::<Vec<_>>()
         .join(" ");
 
-    let cleaned = match lune_llm::fillers::remove_fillers(&marked, lang_tag) {
+    // Only remove fillers that are marked uncertain ([?uh?]) — bare confident
+    // fillers are left for the LLM to handle. This prevents stripping real words
+    // that the ASR misheard as fillers (e.g. quick "you" → "uh").
+    let cleaned = match lune_llm::fillers::remove_fillers_marked_only(&marked, lang_tag) {
         Ok(text) => text,
         Err(_) => marked,
     };
@@ -411,7 +417,7 @@ async fn run_session<A: AsrBackend + 'static>(
     };
     let _ = event_tx.send(SessionEvent::Started).await;
 
-    let mut all_audio: Vec<f32> = Vec::with_capacity(16_000 * 30);
+    let mut all_audio = aligner.as_ref().map(|_| Vec::with_capacity(16_000 * 30));
     let mut segments = Vec::with_capacity(asr.segment_capacity_hint());
     let mut raw_text = String::with_capacity(256);
     let mut speech_samples: usize = 0;
@@ -458,7 +464,9 @@ async fn run_session<A: AsrBackend + 'static>(
                     if in_speech {
                         speech_samples += chunk.samples.len();
                     }
-                    all_audio.extend_from_slice(&chunk.samples);
+                    if let Some(audio) = &mut all_audio {
+                        audio.extend_from_slice(&chunk.samples);
+                    }
 
                     if let Err(e) = asr.push_audio(&asr_session, &chunk.samples).await {
                         let msg = e.to_string();
@@ -471,7 +479,7 @@ async fn run_session<A: AsrBackend + 'static>(
                         Ok(new_segments) => {
                             if append_segments(&mut segments, &mut raw_text, new_segments) {
                                 saw_asr_success = true;
-                                let _ = event_tx.try_send(SessionEvent::PartialText(raw_text.clone()));
+                                let _ = event_tx.try_send(SessionEvent::PartialText);
                             }
                         }
                         Err(e) => {
@@ -481,32 +489,17 @@ async fn run_session<A: AsrBackend + 'static>(
                         }
                     }
 
-                    // At segment boundaries, flush the current ASR buffer and
-                    // reset context. Each segment decodes independently within
-                    // the encoder's attention window (≤7.5s via max_segment_ms).
+                    // Log segment boundaries from VAD but do NOT flush ASR here.
+                    // Audio accumulates in the backend's buffer; the final poll_final
+                    // after session end handles chunked inference internally (8s
+                    // overlapping windows + LCS/FA merge for Qwen, single-pass for Parakeet).
                     for boundary in &boundaries {
                         debug!(
                             start_ms = boundary.start_ms,
                             end_ms = boundary.end_ms,
                             avg_prob = format!("{:.2}", boundary.avg_prob),
-                            "speech segment boundary — flushing ASR"
+                            "speech segment boundary (audio accumulating)"
                         );
-                        match asr.poll_final(&asr_session).await {
-                            Ok(new_segments) => {
-                                if append_segments(&mut segments, &mut raw_text, new_segments) {
-                                    saw_asr_success = true;
-                                    let _ = event_tx.try_send(SessionEvent::PartialText(raw_text.clone()));
-                                }
-                            }
-                            Err(e) => {
-                                let msg = e.to_string();
-                                warn!(error = %msg, "poll_final error at segment boundary");
-                                first_asr_error.get_or_insert(msg);
-                            }
-                        }
-                        if let Err(e) = asr.reset_context(&asr_session).await {
-                            warn!(error = %e, "reset_context error at segment boundary");
-                        }
                     }
 
                     if speech_samples >= config.pipeline.max_speech_samples {
@@ -607,7 +600,7 @@ async fn run_session<A: AsrBackend + 'static>(
         return;
     }
 
-    if all_audio.is_empty() || speech_samples == 0 {
+    if speech_samples == 0 {
         info!(%session_id, "no speech detected, ending session");
         finalize_db(session_id, &persist, status, Some(Utc::now()), None).await;
         let _ = event_tx.send(SessionEvent::Stopped).await;
@@ -628,9 +621,8 @@ async fn run_session<A: AsrBackend + 'static>(
         return;
     }
 
-    let aligned_text = if let Some(al) = &aligner {
+    let aligned_text = if let (Some(al), Some(audio)) = (&aligner, all_audio) {
         let al = Arc::clone(al);
-        let audio = all_audio;
         let text = raw_text.clone();
         match tokio::task::spawn_blocking(move || al.align(&audio, &text)).await {
             Ok(Ok(words)) => {
@@ -705,6 +697,7 @@ async fn run_session<A: AsrBackend + 'static>(
             &raw_text,
             threshold,
             lang_tag,
+            true, // use contextual confidence
         ),
         None => {
             // No confidence data (e.g. OpenAI backend) — skip LLM, pass through raw text.
@@ -1068,8 +1061,14 @@ mod tests {
             start_ms: Some(0),
             end_ms: Some(500),
         }];
-        let (prepared, has_uncertain) =
-            prepare_text_for_llm(&segments, "helo world", "helo new line world", 0.65, "en");
+        let (prepared, has_uncertain) = prepare_text_for_llm(
+            &segments,
+            "helo world",
+            "helo new line world",
+            0.65,
+            "en",
+            true,
+        );
         assert_eq!(prepared, "[?helo?] world");
         assert!(has_uncertain);
     }

@@ -31,6 +31,7 @@ trait Daemon {
     async fn get_llm_backend(&self) -> Result<String>;
     async fn set_llm_backend(&self, json: &str) -> Result<()>;
     async fn get_all_settings(&self) -> Result<String>;
+    async fn list_transcriptions(&self, limit: u32) -> Result<String>;
 }
 
 #[cold]
@@ -76,6 +77,7 @@ async fn dispatch(args: &[String]) -> std::result::Result<(), Box<dyn std::error
         }
         "mode" => handle_mode(&proxy, args.get(1..).unwrap_or(&[])).await?,
         "settings" => handle_settings(&proxy, args.get(1..).unwrap_or(&[])).await?,
+        "history" => handle_history(&proxy, args.get(1..).unwrap_or(&[])).await?,
         other => {
             eprintln!("unknown subcommand: {other}");
             print_usage();
@@ -230,6 +232,46 @@ async fn handle_settings(
     Ok(())
 }
 
+async fn handle_history(
+    proxy: &DaemonProxy<'_>,
+    args: &[String],
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let limit: u32 = args
+        .first()
+        .map(|s| s.parse::<u32>())
+        .transpose()
+        .map_err(|_| format!("invalid limit: {}", args.first().unwrap()))?
+        .unwrap_or(20);
+
+    let json = proxy
+        .list_transcriptions(limit)
+        .await
+        .map_err(daemon_error)?;
+    let sessions: Vec<lune_core::session::DictationSession> = serde_json::from_str(&json)?;
+
+    if sessions.is_empty() {
+        println!("No transcription history.");
+        return Ok(());
+    }
+
+    for s in &sessions {
+        let time = s.started_at.format("%Y-%m-%d %H:%M:%S");
+        let duration = s
+            .ended_at
+            .map(|end| {
+                let dur = end - s.started_at;
+                format!("{}s", dur.num_seconds())
+            })
+            .unwrap_or_else(|| "-".into());
+        let transcript = s.transcript.as_deref().unwrap_or("(no transcript)");
+        let status = format!("{:?}", s.status);
+
+        println!("{time}  [{status:<10}]  {duration:>5}  {transcript}");
+    }
+
+    Ok(())
+}
+
 #[inline]
 fn daemon_error(e: zbus::Error) -> String {
     // Fast-path: service not running is the common failure; avoid general formatting.
@@ -244,5 +286,7 @@ fn daemon_error(e: zbus::Error) -> String {
 #[cold]
 #[inline(never)]
 fn print_usage() {
-    eprintln!("usage: lune-voice [toggle|start|stop|cancel|status|mode|settings|quit|daemon]");
+    eprintln!(
+        "usage: lune-voice [toggle|start|stop|cancel|status|mode|settings|history|quit|daemon]"
+    );
 }

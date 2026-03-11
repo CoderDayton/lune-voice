@@ -121,6 +121,15 @@ fn run_listener(
         }
     };
 
+    // Collect all modifier keycodes used by the main combo so we can defer
+    // their press events until we know the trigger key won't follow.
+    let mut combo_modifier_codes = PressedCodes::default();
+    for m in &main_modifiers {
+        let (left, right) = modifier_keycodes(*m);
+        combo_modifier_codes.insert(left);
+        combo_modifier_codes.insert(right);
+    }
+
     let mut state = HotkeyState::new(
         main_trigger,
         main_modifiers,
@@ -131,6 +140,9 @@ fn run_listener(
     // Tracks which trigger keys had their press event consumed, so we also
     // consume the corresponding release (prevent orphan key-up reaching apps).
     let mut consumed_triggers = PressedCodes::default();
+
+    // Deferred modifier press events waiting to see if the trigger follows.
+    let mut deferred_mods: Vec<InputEvent> = Vec::new();
 
     for raw_event in event_rx {
         if raw_event.event_type() != EventType::KEY {
@@ -144,13 +156,24 @@ fn run_listener(
 
         // Auto-repeat (value=2): forward only if the key wasn't consumed.
         if value == 2 {
-            if !consumed_triggers.contains(code) {
+            if !consumed_triggers.contains(code) && !combo_modifier_codes.contains(code) {
                 forward(&mut passthrough, raw_event);
             }
             continue;
         }
 
         let pressed = value == 1;
+
+        // Defer combo modifier press events — don't forward yet.
+        if pressed && combo_modifier_codes.contains(code) {
+            deferred_mods.push(raw_event);
+            // Still update the hotkey state so handle_signal sees the modifier.
+            let signal = InputSignal { code, pressed };
+            let mode = *activation_mode_rx.borrow();
+            state.handle_signal(signal, mode);
+            continue;
+        }
+
         let signal = InputSignal { code, pressed };
         let mode = *activation_mode_rx.borrow();
         let action = state.handle_signal(signal, mode);
@@ -158,10 +181,14 @@ fn run_listener(
         if action == Action::Cancel {
             // Cancel hotkey: dispatch command but ALSO forward the key so
             // Escape (default cancel) still works normally in apps.
+            // Flush any deferred modifiers first.
+            flush_deferred(&mut passthrough, &mut deferred_mods);
             dispatch(action, &cmd_tx);
             forward(&mut passthrough, raw_event);
         } else if action != Action::None {
-            // Main hotkey combo triggered — consume the trigger key.
+            // Main hotkey combo triggered — consume the trigger key AND
+            // discard deferred modifier events (they were part of the combo).
+            deferred_mods.clear();
             if pressed {
                 consumed_triggers.insert(code);
             } else {
@@ -172,8 +199,15 @@ fn run_listener(
             // Release of a previously consumed key (e.g. Toggle mode:
             // Space release after Ctrl+Space press) — consume silently.
             consumed_triggers.remove(code);
+        } else if !pressed && combo_modifier_codes.contains(code) {
+            // Release of a combo modifier — flush its deferred press (if any)
+            // followed by the release so apps see a matched press+release.
+            flush_deferred(&mut passthrough, &mut deferred_mods);
+            forward(&mut passthrough, raw_event);
         } else {
-            // Normal key event — forward to applications.
+            // Non-combo key event — flush any deferred modifiers first
+            // (the combo won't fire) then forward this key.
+            flush_deferred(&mut passthrough, &mut deferred_mods);
             forward(&mut passthrough, raw_event);
         }
     }
@@ -193,6 +227,14 @@ fn dispatch(action: Action, cmd_tx: &mpsc::Sender<AppCommand>) {
     // try_send: non-blocking, bounded(64). At human input rates this
     // never fills up. If it does, dropping one command is acceptable.
     let _ = cmd_tx.try_send(cmd);
+}
+
+/// Flush any deferred modifier press events to the passthrough device.
+#[inline]
+fn flush_deferred(passthrough: &mut VirtualDevice, deferred: &mut Vec<InputEvent>) {
+    for event in deferred.drain(..) {
+        forward(passthrough, event);
+    }
 }
 
 /// Forward an event through the passthrough virtual device.
@@ -366,6 +408,7 @@ impl HotkeyState {
             && signal.code == self.cancel_trigger
             && self.cancel_trigger != KeyCode::KEY_RESERVED
             && self.modifiers_are_down(&self.cancel_modifiers)
+            && !self.has_extra_modifiers(&self.cancel_modifiers.clone())
         {
             return Action::Cancel;
         }
@@ -373,16 +416,19 @@ impl HotkeyState {
         // ── Main hotkey ──────────────────────────────────────────────
         let main_trigger_down = self.pressed.contains(self.main_trigger);
         let mods_down = self.modifiers_are_down(&self.main_modifiers);
+        // Don't fire if extra modifiers are held — that's a different combo
+        // (e.g. Ctrl+Shift+Space when our hotkey is Ctrl+Space).
+        let exact_mods = mods_down && !self.has_extra_modifiers(&self.main_modifiers);
 
         match mode {
             ActivationMode::Toggle => {
-                // Fire on rising edge of trigger while modifiers are held.
-                if !was_main_trigger_down && main_trigger_down && mods_down {
+                // Fire on rising edge of trigger while exact modifiers are held.
+                if !was_main_trigger_down && main_trigger_down && exact_mods {
                     return Action::Toggle;
                 }
             }
             ActivationMode::Hold => {
-                self.hold_active = main_trigger_down && mods_down;
+                self.hold_active = main_trigger_down && exact_mods;
                 if !was_hold_active && self.hold_active {
                     return Action::Start;
                 }
@@ -392,7 +438,7 @@ impl HotkeyState {
             }
             _ => {
                 // Future activation modes: treat as Toggle.
-                if !was_main_trigger_down && main_trigger_down && mods_down {
+                if !was_main_trigger_down && main_trigger_down && exact_mods {
                     return Action::Toggle;
                 }
             }
@@ -408,6 +454,27 @@ impl HotkeyState {
             let (left, right) = modifier_keycodes(*m);
             self.pressed.contains(left) || self.pressed.contains(right)
         })
+    }
+
+    /// Returns true if any modifier key is pressed that is NOT in the required set.
+    /// This prevents Ctrl+Space from firing when Ctrl+Shift+Space is pressed.
+    fn has_extra_modifiers(&self, required: &[Modifier]) -> bool {
+        const ALL_MODIFIERS: &[Modifier] = &[
+            Modifier::Ctrl,
+            Modifier::Shift,
+            Modifier::Alt,
+            Modifier::Meta,
+        ];
+        for m in ALL_MODIFIERS {
+            if required.contains(m) {
+                continue;
+            }
+            let (left, right) = modifier_keycodes(*m);
+            if self.pressed.contains(left) || self.pressed.contains(right) {
+                return true;
+            }
+        }
+        false
     }
 }
 
@@ -697,6 +764,33 @@ mod tests {
         let mut state = default_state();
 
         state.handle_signal(press(KeyCode::KEY_RIGHTCTRL), ActivationMode::Toggle);
+        assert_eq!(
+            state.handle_signal(press(KeyCode::KEY_SPACE), ActivationMode::Toggle),
+            Action::Toggle
+        );
+    }
+
+    #[test]
+    fn extra_modifier_blocks_combo() {
+        let mut state = default_state(); // Ctrl+Space
+
+        // Press Ctrl+Shift+Space — should NOT trigger our Ctrl+Space combo
+        state.handle_signal(press(KeyCode::KEY_LEFTCTRL), ActivationMode::Toggle);
+        state.handle_signal(press(KeyCode::KEY_LEFTSHIFT), ActivationMode::Toggle);
+        assert_eq!(
+            state.handle_signal(press(KeyCode::KEY_SPACE), ActivationMode::Toggle),
+            Action::None
+        );
+    }
+
+    #[test]
+    fn extra_modifier_released_then_combo_fires() {
+        let mut state = default_state(); // Ctrl+Space
+
+        // Press Ctrl+Shift, release Shift, then press Space → should fire
+        state.handle_signal(press(KeyCode::KEY_LEFTCTRL), ActivationMode::Toggle);
+        state.handle_signal(press(KeyCode::KEY_LEFTSHIFT), ActivationMode::Toggle);
+        state.handle_signal(release(KeyCode::KEY_LEFTSHIFT), ActivationMode::Toggle);
         assert_eq!(
             state.handle_signal(press(KeyCode::KEY_SPACE), ActivationMode::Toggle),
             Action::Toggle

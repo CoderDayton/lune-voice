@@ -36,22 +36,31 @@ const TOKEN_IM_START: i64 = 151644;
 const TOKEN_IM_END: i64 = 151645;
 pub(crate) const TOKEN_AUDIO_START: i64 = 151669;
 pub(crate) const TOKEN_AUDIO_END: i64 = 151670;
-const TOKEN_ASR_TEXT: i64 = 151704;
 
-/// Prefix tokens before the audio: `<|im_start|>system\n`
-const PREFIX_HEAD: &[i64] = &[TOKEN_IM_START, 8948, 198];
-/// Suffix after prefix head / before audio: `<|im_end|>\n<|im_start|>user\n<audio>`
-const PREFIX_TAIL: &[i64] = &[
+/// Prefix tokens before the audio:
+/// `<|im_start|>system\n<|im_end|>\n<|im_start|>user\n<audio_start>`
+const PREFIX_HEAD: &[i64] = &[
+    TOKEN_IM_START,
+    8948,
+    198,
     TOKEN_IM_END,
     198,
     TOKEN_IM_START,
     872,
     198,
-    TOKEN_AUDIO_START,
 ];
-/// After user content: `<|im_end|>\n<|im_start|>assistant\n`
-const SUFFIX_BASE: &[i64] = &[TOKEN_IM_END, 198, TOKEN_IM_START, 77091, 198];
-
+/// Start of the audio placeholder span.
+const PREFIX_AUDIO: &[i64] = &[TOKEN_AUDIO_START];
+/// Suffix after the audio placeholder span:
+/// `<|audio_end|><|im_end|>\n<|im_start|>assistant\n`
+const SUFFIX_BASE: &[i64] = &[
+    TOKEN_AUDIO_END,
+    TOKEN_IM_END,
+    198,
+    TOKEN_IM_START,
+    77091,
+    198,
+];
 // ── Mel spectrogram computation (Qwen ASR specific) ─────────────────────────
 
 // Slaney mel scale constants (same as mel.rs).
@@ -259,9 +268,16 @@ pub fn compute_qwen_mel(audio: &[f32]) -> Array3<f32> {
         *v = ((*v).max(clamp_min) + 4.0) / 4.0;
     }
 
-    // Reshape to [1, 128, T].
-    let n_frames = mel.shape()[1];
-    let (raw, _offset) = mel.into_raw_vec_and_offset();
+    // Match WhisperFeatureExtractor: drop the final STFT frame.
+    let n_frames = mel.shape()[1].saturating_sub(1);
+    let mel = mel.slice(s![.., ..n_frames]).to_owned();
+    let expected = MEL_BINS * n_frames;
+    let (raw, offset) = mel.into_raw_vec_and_offset();
+    let raw = match offset {
+        None | Some(0) if raw.len() == expected => raw,
+        Some(start) if start + expected <= raw.len() => raw[start..start + expected].to_vec(),
+        _ => panic!("mel reshape to [1, 128, T]: incompatible shapes"),
+    };
     // mel is [128, T] row-major. Array3 [1, 128, T] has same layout.
     Array3::from_shape_vec((1, MEL_BINS, n_frames), raw).expect("mel reshape to [1, 128, T]")
 }
@@ -299,30 +315,28 @@ fn build_input_embeds(
     tokenizer: &tokenizers::Tokenizer,
     enc_features: &ArrayD<half::f16>,
     enc_seq_len: usize,
-    _raw_tokens: &[i64],
-    stable_tokens: &[i64],
-    past_text_conditioning: bool,
     forced_language: Option<&str>,
 ) -> Result<(ArrayD<half::f16>, usize)> {
     // Collect all token IDs that need embedding.
-    // Qwen3-ASR ChatML: ...user\n[task prompt]\n<audio>[features]</audio><|im_end|>...
+    // Match the official chat template:
+    // <|im_start|>system\n{context}<|im_end|>\n
+    // <|im_start|>user\n<|audio_start|><|audio_pad|>*N<|audio_end|><|im_end|>\n
+    // <|im_start|>assistant\n
+    // Optional forced-language prefix:
+    // language English<asr_text>
     let mut pre_tokens: Vec<i64> = Vec::with_capacity(48);
     pre_tokens.extend_from_slice(PREFIX_HEAD);
-    if let Some(prompt) = forced_language {
-        pre_tokens.extend(tokenize_prompt(tokenizer, prompt)?);
-    }
-    pre_tokens.extend_from_slice(PREFIX_TAIL);
+    pre_tokens.extend_from_slice(PREFIX_AUDIO);
 
     let mut post_tokens: Vec<i64> = Vec::with_capacity(48);
-    post_tokens.push(TOKEN_AUDIO_END);
     post_tokens.extend_from_slice(SUFFIX_BASE);
-    post_tokens.push(TOKEN_ASR_TEXT);
-
-    // Add past text tokens for conditioning.
-    // Full stable history prevents the decoder from re-transcribing already-emitted
-    // content — without it, the decoder repeats earlier audio on each chunk.
-    if past_text_conditioning && !stable_tokens.is_empty() {
-        post_tokens.extend_from_slice(stable_tokens);
+    if let Some(language) = forced_language {
+        // Upstream text-only forcing appends this exact assistant prefix
+        // after the generation prompt.
+        post_tokens.extend(tokenize_prompt(
+            tokenizer,
+            &format!("language {language}<asr_text>"),
+        )?);
     }
 
     // Get embeddings for pre and post tokens (already f16).
@@ -628,7 +642,6 @@ pub(crate) fn transcribe_oneshot(
     pcm: &[f32],
     forced_language: Option<&str>,
     has_attention_mask: bool,
-    past_text_tokens: &[i64],
 ) -> Result<OneshotResult> {
     if pcm.is_empty() {
         return Ok(OneshotResult {
@@ -643,18 +656,13 @@ pub(crate) fn transcribe_oneshot(
     let features = run_encoder(encoder, mel)?;
     let enc_seq_len = features.shape()[1];
 
-    // 2. Build input_embeds with optional past_text conditioning.
-    // When past_text_tokens is non-empty, the decoder sees what was already
-    // transcribed from previous chunks — crucial for mid-sentence continuations.
-    let use_past_text = !past_text_tokens.is_empty();
+    // 2. Build input_embeds for the upstream chat template. When the language
+    // is forced, Qwen expects the assistant prefix `language X<asr_text>`.
     let (input_embeds, prefill_len) = build_input_embeds(
         embed_tokens,
         tokenizer,
         &features,
         enc_seq_len,
-        &[], // no raw_tokens
-        past_text_tokens,
-        use_past_text,
         forced_language,
     )?;
 
@@ -690,7 +698,6 @@ pub(crate) fn transcribe_oneshot(
         TOKEN_IM_END,
         TOKEN_AUDIO_START,
         TOKEN_AUDIO_END,
-        TOKEN_ASR_TEXT,
     ];
     let filtered_ids: Vec<i64> = token_ids
         .iter()
@@ -705,20 +712,20 @@ pub(crate) fn transcribe_oneshot(
         .collect();
 
     let ids_u32: Vec<u32> = filtered_ids.iter().map(|&t| t as u32).collect();
-    let mut text = tokenizer.decode(&ids_u32, true).unwrap_or_default();
+    let mut raw_text = tokenizer.decode(&ids_u32, true).unwrap_or_default();
 
     // Strip any leaked prompt fragments (e.g. "language English", "Transcribe the")
-    for pattern in &[
-        "language English",
-        "language Chinese",
-        "Transcribe the",
-        "<asr_text>",
-        "<|im_end|>",
-        "<|im_start|>",
-    ] {
-        text = text.replace(pattern, "");
+    for pattern in &["<|im_end|>", "<|im_start|>"] {
+        raw_text = raw_text.replace(pattern, "");
     }
-    let text = text.trim().to_owned();
+    let raw_text = raw_text.trim().to_owned();
+    let text = if forced_language.is_some() {
+        raw_text.clone()
+    } else if let Some((_, text)) = raw_text.split_once("<asr_text>") {
+        text.trim().to_owned()
+    } else {
+        raw_text.clone()
+    };
 
     Ok(OneshotResult {
         text,
@@ -745,6 +752,10 @@ mod tests {
 
     fn model_dir() -> std::path::PathBuf {
         workspace_root().join("models/qwen3-asr-0.6b-onnx")
+    }
+
+    fn model_dir_fp16_decoder() -> std::path::PathBuf {
+        workspace_root().join("models/qwen3-asr-0.6b-onnx-fp16dec")
     }
 
     fn ensure_ort() {
@@ -850,6 +861,10 @@ mod tests {
         let mut decoder =
             crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-decoder.onnx"), false)
                 .expect("load decoder");
+        let _has_attention_mask = decoder
+            .inputs()
+            .iter()
+            .any(|inp| inp.name() == "attention_mask");
         let tokenizer =
             tokenizers::Tokenizer::from_file(dir.join("tokenizer.json")).expect("load tokenizer");
 
@@ -859,17 +874,9 @@ mod tests {
         let features = run_encoder(&mut encoder, mel).expect("encoder forward");
         let enc_seq_len = features.shape()[1];
 
-        let (input_embeds, prefill_len) = build_input_embeds(
-            &mut embed_tokens,
-            &tokenizer,
-            &features,
-            enc_seq_len,
-            &[],
-            &[],
-            false,
-            None,
-        )
-        .expect("build_input_embeds");
+        let (input_embeds, prefill_len) =
+            build_input_embeds(&mut embed_tokens, &tokenizer, &features, enc_seq_len, None)
+                .expect("build_input_embeds");
         eprintln!("[decoder] enc_seq_len={enc_seq_len}, prefill_len={prefill_len}");
 
         let kv = empty_kv_cache();
@@ -953,6 +960,10 @@ mod tests {
         let mut decoder =
             crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-decoder.onnx"), false)
                 .expect("load decoder");
+        let _has_attention_mask = decoder
+            .inputs()
+            .iter()
+            .any(|inp| inp.name() == "attention_mask");
         let tokenizer =
             tokenizers::Tokenizer::from_file(dir.join("tokenizer.json")).expect("load tokenizer");
 
@@ -966,17 +977,9 @@ mod tests {
         let enc_seq_len = features.shape()[1];
         eprintln!("[real_speech] enc_seq_len={enc_seq_len}");
 
-        let (input_embeds, prefill_len) = build_input_embeds(
-            &mut embed_tokens,
-            &tokenizer,
-            &features,
-            enc_seq_len,
-            &[],
-            &[],
-            false,
-            None,
-        )
-        .expect("build_input_embeds");
+        let (input_embeds, prefill_len) =
+            build_input_embeds(&mut embed_tokens, &tokenizer, &features, enc_seq_len, None)
+                .expect("build_input_embeds");
 
         let kv = empty_kv_cache();
         let mask = ndarray::Array2::<i64>::ones((1, prefill_len));
@@ -1048,6 +1051,10 @@ mod tests {
         let mut decoder =
             crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-decoder.onnx"), false)
                 .expect("load decoder");
+        let _has_attention_mask = decoder
+            .inputs()
+            .iter()
+            .any(|inp| inp.name() == "attention_mask");
         let tokenizer =
             tokenizers::Tokenizer::from_file(dir.join("tokenizer.json")).expect("load tokenizer");
 
@@ -1062,9 +1069,6 @@ mod tests {
             &tokenizer,
             &real_features,
             enc_seq_len,
-            &[],
-            &[],
-            false,
             None,
         )
         .expect("build_input_embeds A");
@@ -1081,9 +1085,6 @@ mod tests {
             &tokenizer,
             &zero_features,
             enc_seq_len,
-            &[],
-            &[],
-            false,
             None,
         )
         .expect("build_input_embeds B");
@@ -1198,10 +1199,34 @@ mod tests {
             ("TOKEN_IM_END", TOKEN_IM_END),
             ("TOKEN_AUDIO_START", TOKEN_AUDIO_START),
             ("TOKEN_AUDIO_END", TOKEN_AUDIO_END),
-            ("TOKEN_ASR_TEXT", TOKEN_ASR_TEXT),
+            ("TOKEN_ASR_TEXT", 151704),
         ] {
             let decoded = tok.decode(&[id as u32], false).unwrap_or_default();
             eprintln!("[tok] {name} ({id}) → {decoded:?}");
+        }
+    }
+
+    #[test]
+    #[ignore = "requires models/qwen3-asr-0.6b-onnx"]
+    fn tokenizer_chat_template_segments() {
+        ensure_ort();
+        let dir = model_dir();
+        if !dir.exists() {
+            return;
+        }
+        let tok =
+            tokenizers::Tokenizer::from_file(dir.join("tokenizer.json")).expect("load tokenizer");
+
+        for text in [
+            "<|im_start|>system\n",
+            "<|im_end|>\n<|im_start|>user\n<|audio_start|>",
+            "<|audio_end|><|im_end|>\n<|im_start|>assistant\n",
+            "language English<asr_text>",
+        ] {
+            let enc = tok.encode(text, false).expect("encode template segment");
+            eprintln!("[tmpl] text={text:?}");
+            eprintln!("[tmpl] ids={:?}", enc.get_ids());
+            eprintln!("[tmpl] toks={:?}", enc.get_tokens());
         }
     }
 
@@ -1287,6 +1312,10 @@ mod tests {
         let mut decoder =
             crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-decoder.onnx"), false)
                 .expect("load decoder");
+        let _has_attention_mask = decoder
+            .inputs()
+            .iter()
+            .any(|inp| inp.name() == "attention_mask");
         let tokenizer =
             tokenizers::Tokenizer::from_file(dir.join("tokenizer.json")).expect("load tokenizer");
 
@@ -1315,9 +1344,6 @@ mod tests {
             &tokenizer,
             &enc_features,
             enc_seq_len,
-            &[],
-            &[],
-            false,
             None,
         )
         .expect("build_input_embeds");
@@ -1356,5 +1382,205 @@ mod tests {
         let ids_u32: Vec<u32> = token_ids.iter().map(|&t| t as u32).collect();
         let text = tokenizer.decode(&ids_u32, true).unwrap_or_default();
         eprintln!("[batch] full transcript: {text:?}");
+    }
+
+    #[test]
+    #[ignore = "requires test_fixtures/librispeech_clean.wav"]
+    fn qwen_mel_stats_librispeech() {
+        let wav = workspace_root().join("test_fixtures/librispeech_clean.wav");
+        if !wav.exists() {
+            eprintln!("[skip] wav not found");
+            return;
+        }
+
+        let audio = load_wav_f32(&wav);
+        let mel = compute_qwen_mel(&audio);
+        let data = mel.as_slice().expect("mel contiguous");
+        let min = data.iter().copied().fold(f32::INFINITY, f32::min);
+        let max = data.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let mean = data.iter().copied().sum::<f32>() / data.len() as f32;
+        eprintln!("[mel] shape: {:?}", mel.shape());
+        eprintln!("[mel] min/max/mean: {min} {max} {mean}");
+        eprintln!("[mel] first row first 8: {:?}", &data[..8.min(data.len())]);
+        let t = mel.shape()[2];
+        let mut col0 = Vec::new();
+        for bin in 0..8.min(mel.shape()[1]) {
+            col0.push(mel[[0, bin, 0]]);
+        }
+        eprintln!("[mel] col0 first 8 bins: {:?}", col0);
+        eprintln!("[mel] frames: {t}");
+    }
+
+    /// Same as `batch_full_audio`, but with the official forced-language
+    /// prefix used by the app path: `language English<asr_text>`.
+    #[test]
+    #[ignore = "requires models/qwen3-asr-0.6b-onnx and test_fixtures/librispeech_clean.wav"]
+    fn batch_full_audio_forced_english() {
+        ensure_ort();
+        let dir = model_dir();
+        let wav = workspace_root().join("test_fixtures/librispeech_clean.wav");
+        if !dir.exists() || !wav.exists() {
+            eprintln!("[skip] model or wav not found");
+            return;
+        }
+
+        let mut encoder =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-encoder.onnx"), false)
+                .expect("load encoder");
+        let mut embed_tokens =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-embed-tokens.onnx"), false)
+                .expect("load embed_tokens");
+        let mut decoder =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-decoder.onnx"), false)
+                .expect("load decoder");
+        let has_attention_mask = decoder
+            .inputs()
+            .iter()
+            .any(|inp| inp.name() == "attention_mask");
+        let tokenizer =
+            tokenizers::Tokenizer::from_file(dir.join("tokenizer.json")).expect("load tokenizer");
+
+        let audio = load_wav_f32(&wav);
+        let result = transcribe_oneshot(
+            &mut encoder,
+            &mut embed_tokens,
+            &mut decoder,
+            &tokenizer,
+            &audio,
+            Some("English"),
+            has_attention_mask,
+        )
+        .expect("transcribe_oneshot");
+
+        eprintln!("[batch forced] transcript: {:?}", result.text);
+        eprintln!("[batch forced] tokens: {}", result.token_ids.len());
+    }
+
+    /// Compare the alternate FP16-decoder export on the same forced-English path.
+    #[test]
+    #[ignore = "requires models/qwen3-asr-0.6b-onnx-fp16dec and test_fixtures/librispeech_clean.wav"]
+    fn batch_full_audio_forced_english_fp16_decoder() {
+        ensure_ort();
+        let dir = model_dir_fp16_decoder();
+        let wav = workspace_root().join("test_fixtures/librispeech_clean.wav");
+        if !dir.exists() || !wav.exists() {
+            eprintln!("[skip] fp16-decoder model or wav not found");
+            return;
+        }
+
+        let mut encoder =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-encoder.onnx"), false)
+                .expect("load encoder");
+        let mut embed_tokens =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-embed-tokens.onnx"), false)
+                .expect("load embed_tokens");
+        let mut decoder =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-decoder.onnx"), false)
+                .expect("load decoder");
+        let has_attention_mask = decoder
+            .inputs()
+            .iter()
+            .any(|inp| inp.name() == "attention_mask");
+        let tokenizer =
+            tokenizers::Tokenizer::from_file(dir.join("tokenizer.json")).expect("load tokenizer");
+
+        let audio = load_wav_f32(&wav);
+        let result = transcribe_oneshot(
+            &mut encoder,
+            &mut embed_tokens,
+            &mut decoder,
+            &tokenizer,
+            &audio,
+            Some("English"),
+            has_attention_mask,
+        )
+        .expect("transcribe_oneshot");
+
+        eprintln!("[batch forced fp16dec] transcript: {:?}", result.text);
+        eprintln!("[batch forced fp16dec] tokens: {}", result.token_ids.len());
+    }
+
+    fn resize_encoder_features_nearest(
+        features: &ArrayD<half::f16>,
+        target_len: usize,
+    ) -> ArrayD<half::f16> {
+        let src = features.as_slice().expect("encoder features contiguous");
+        let src_len = features.shape()[1];
+        let hidden = features.shape()[2];
+        let mut out = vec![half::f16::ZERO; target_len * hidden];
+        for dst_idx in 0..target_len {
+            let src_idx = dst_idx * src_len / target_len;
+            let src_row = &src[src_idx * hidden..(src_idx + 1) * hidden];
+            let dst_row = &mut out[dst_idx * hidden..(dst_idx + 1) * hidden];
+            dst_row.copy_from_slice(src_row);
+        }
+        ArrayD::from_shape_vec(IxDyn(&[1, target_len, hidden]), out).expect("resized features")
+    }
+
+    #[test]
+    #[ignore = "requires models/qwen3-asr-0.6b-onnx and test_fixtures/librispeech_clean.wav"]
+    fn batch_full_audio_forced_english_resized_to_303() {
+        ensure_ort();
+        let dir = model_dir();
+        let wav = workspace_root().join("test_fixtures/librispeech_clean.wav");
+        if !dir.exists() || !wav.exists() {
+            eprintln!("[skip] model or wav not found");
+            return;
+        }
+
+        let mut encoder =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-encoder.onnx"), false)
+                .expect("load encoder");
+        let mut embed_tokens =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-embed-tokens.onnx"), false)
+                .expect("load embed_tokens");
+        let mut decoder =
+            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-decoder.onnx"), false)
+                .expect("load decoder");
+        let has_attention_mask = decoder
+            .inputs()
+            .iter()
+            .any(|inp| inp.name() == "attention_mask");
+        let tokenizer =
+            tokenizers::Tokenizer::from_file(dir.join("tokenizer.json")).expect("load tokenizer");
+
+        let audio = load_wav_f32(&wav);
+        let mel = compute_qwen_mel(&audio);
+        let features = run_encoder(&mut encoder, mel).expect("run_encoder");
+        let resized = resize_encoder_features_nearest(&features, 303);
+        let (input_embeds, prefill_len) = build_input_embeds(
+            &mut embed_tokens,
+            &tokenizer,
+            &resized,
+            303,
+            Some("English"),
+        )
+        .expect("build_input_embeds");
+
+        let kv_cache = empty_kv_cache();
+        let mask = if has_attention_mask {
+            Some(ndarray::Array2::<i64>::ones((1, prefill_len)))
+        } else {
+            None
+        };
+        let (mut kv_cache, last_logits) =
+            decoder_prefill(&mut decoder, input_embeds, kv_cache, 0, mask)
+                .expect("decoder_prefill");
+        let (token_ids, _) = autoregressive_decode(
+            &mut decoder,
+            &mut embed_tokens,
+            &tokenizer,
+            &mut kv_cache,
+            last_logits,
+            200,
+            prefill_len,
+            has_attention_mask,
+        )
+        .expect("autoregressive_decode");
+
+        let ids_u32: Vec<u32> = token_ids.iter().map(|&t| t as u32).collect();
+        let text = tokenizer.decode(&ids_u32, true).unwrap_or_default();
+        eprintln!("[batch forced 303] transcript: {text:?}");
+        eprintln!("[batch forced 303] tokens: {}", token_ids.len());
     }
 }

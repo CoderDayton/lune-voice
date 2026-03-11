@@ -70,12 +70,56 @@ impl AsrSegment {
             return self.text.clone();
         }
         let mut parts: Vec<String> = Vec::with_capacity(self.word_confidences.len());
+        let mut prev_word: Option<&str> = None;
         for wc in &self.word_confidences {
-            if wc.confidence < threshold {
+            // Never mark a word as uncertain if it repeats the previous word —
+            // the LLM incorrectly "corrects" intentional repetitions away.
+            let is_repeat = prev_word.map_or(false, |pw| pw.eq_ignore_ascii_case(&wc.word));
+            if wc.confidence < threshold && !is_repeat {
                 parts.push(format!("[?{}?]", wc.word));
             } else {
                 parts.push(wc.word.clone());
             }
+            prev_word = Some(&wc.word);
+        }
+        parts.join(" ")
+    }
+
+    /// Contextual confidence marking — adjusts per-word thresholds based
+    /// on position and neighbor confidence.
+    ///
+    /// ASR errors are bursty: noise affects consecutive words. A word with
+    /// borderline confidence surrounded by high-confidence neighbors is
+    /// likely correct (clean acoustic region). A borderline word surrounded
+    /// by low-confidence neighbors is likely part of an error cluster.
+    ///
+    /// Adjustments:
+    /// - **Positional leniency**: first word gets -0.08 (autoregressive
+    ///   decoders are less confident at utterance start due to cold context).
+    /// - **Neighbor agreement**: avg neighbor confidence shifts threshold by
+    ///   `(avg_neighbor - 0.7) * 0.2` — strong neighbors raise the effective
+    ///   confidence (protect the word), weak neighbors lower it (flag it).
+    /// - **Repetition guard**: repeated adjacent words never marked (LLM
+    ///   would incorrectly "correct" intentional repetitions away).
+    pub fn mark_uncertain_contextual(&self, base_threshold: f32) -> String {
+        if self.word_confidences.is_empty() {
+            return self.text.clone();
+        }
+        let n = self.word_confidences.len();
+        let mut parts: Vec<String> = Vec::with_capacity(n);
+        let mut prev_word: Option<&str> = None;
+
+        for (idx, wc) in self.word_confidences.iter().enumerate() {
+            let is_repeat = prev_word.map_or(false, |pw| pw.eq_ignore_ascii_case(&wc.word));
+
+            let effective = contextual_threshold(&self.word_confidences, idx, base_threshold);
+
+            if wc.confidence < effective && !is_repeat {
+                parts.push(format!("[?{}?]", wc.word));
+            } else {
+                parts.push(wc.word.clone());
+            }
+            prev_word = Some(&wc.word);
         }
         parts.join(" ")
     }
@@ -90,6 +134,61 @@ impl AsrSegment {
                 .iter()
                 .any(|wc| wc.confidence < threshold)
     }
+}
+
+/// Compute context-adjusted confidence threshold for a word at `idx`.
+///
+/// Returns an effective threshold that is lower (more lenient) when the
+/// word's context suggests it's likely correct, and higher (stricter) when
+/// context suggests an error cluster.
+///
+/// Grounded in two observations from ASR confidence calibration literature:
+/// 1. Autoregressive decoders underestimate first-token confidence (Siu & Gish 1999)
+/// 2. ASR errors cluster in noisy acoustic regions (Jiang 2005)
+fn contextual_threshold(words: &[WordConfidence], idx: usize, base: f32) -> f32 {
+    let mut adj = 0.0f32;
+
+    // Positional leniency: first word of utterance has less decoder context,
+    // so raw confidence is systematically lower. Compensate.
+    // Single-word utterances (idx==0, len==1) get double leniency — they're
+    // both start-of-sequence and lack any neighbor context.
+    if idx == 0 {
+        adj -= 0.08;
+        if words.len() == 1 {
+            adj -= 0.04; // extra leniency for isolated words
+        }
+    }
+
+    // Last-word leniency: decoder has no right context for attention,
+    // causing a weaker but measurable confidence dip. Less severe than
+    // first-word cold start, so smaller adjustment.
+    if idx + 1 == words.len() && words.len() > 1 {
+        adj -= 0.03;
+    }
+
+    // Neighbor agreement/disagreement.
+    // Default neighbor confidence 0.5 (neutral) when at edge.
+    let left = if idx > 0 {
+        words[idx - 1].confidence
+    } else {
+        0.5
+    };
+    let right = if idx + 1 < words.len() {
+        words[idx + 1].confidence
+    } else {
+        0.5
+    };
+    let avg_neighbor = (left + right) / 2.0;
+
+    // Strong neighbors (>0.7) → negative adjustment (lower threshold, protect word)
+    // Weak neighbors (<0.7) → positive adjustment (raise threshold, flag word)
+    // Scale: ±0.2 at the extremes
+    adj -= (avg_neighbor - 0.7) * 0.2;
+
+    // Effective range for base=0.65: [0.44, 0.79].
+    // Lower bound 0.45: any word below 45% confidence is almost certainly wrong.
+    // Upper bound 0.80: prevents flagging very high-confidence words.
+    (base + adj).clamp(0.45, 0.80)
 }
 
 /// Configuration for an ASR session.
@@ -340,6 +439,170 @@ mod tests {
             },
         ];
         assert!(!seg.has_uncertain_words(0.85));
+    }
+
+    // ── Contextual confidence tests ─────────────────────────────────────
+
+    #[test]
+    fn contextual_first_word_leniency() {
+        // First word at 0.60 should NOT be marked when threshold=0.65
+        // because positional leniency lowers the effective threshold.
+        let mut seg = make_segment();
+        seg.word_confidences = vec![
+            WordConfidence {
+                word: "the".into(),
+                confidence: 0.60,
+            },
+            WordConfidence {
+                word: "meeting".into(),
+                confidence: 0.95,
+            },
+            WordConfidence {
+                word: "starts".into(),
+                confidence: 0.92,
+            },
+        ];
+        let result = seg.mark_uncertain_contextual(0.65);
+        assert_eq!(result, "the meeting starts");
+    }
+
+    #[test]
+    fn contextual_strong_neighbors_protect_word() {
+        // Middle word at 0.62 should NOT be marked when both neighbors
+        // are very confident (>0.9) — acoustic context is clean.
+        let mut seg = make_segment();
+        seg.word_confidences = vec![
+            WordConfidence {
+                word: "the".into(),
+                confidence: 0.95,
+            },
+            WordConfidence {
+                word: "weather".into(),
+                confidence: 0.62,
+            },
+            WordConfidence {
+                word: "today".into(),
+                confidence: 0.94,
+            },
+        ];
+        let result = seg.mark_uncertain_contextual(0.65);
+        assert_eq!(result, "the weather today");
+    }
+
+    #[test]
+    fn contextual_weak_neighbors_flag_word() {
+        // Middle word at 0.63 SHOULD be marked when both neighbors
+        // are also low-confidence — error cluster.
+        let mut seg = make_segment();
+        seg.word_confidences = vec![
+            WordConfidence {
+                word: "tha".into(),
+                confidence: 0.35,
+            },
+            WordConfidence {
+                word: "wether".into(),
+                confidence: 0.63,
+            },
+            WordConfidence {
+                word: "tody".into(),
+                confidence: 0.30,
+            },
+        ];
+        let result = seg.mark_uncertain_contextual(0.65);
+        // All words should be marked — error cluster
+        assert!(result.contains("[?tha?]"));
+        assert!(result.contains("[?wether?]"));
+        assert!(result.contains("[?tody?]"));
+    }
+
+    #[test]
+    fn contextual_high_confidence_never_marked() {
+        // Words with very high confidence (>0.9) should never be marked
+        // regardless of neighbor context.
+        let mut seg = make_segment();
+        seg.word_confidences = vec![
+            WordConfidence {
+                word: "bad".into(),
+                confidence: 0.20,
+            },
+            WordConfidence {
+                word: "good".into(),
+                confidence: 0.92,
+            },
+            WordConfidence {
+                word: "bad".into(),
+                confidence: 0.20,
+            },
+        ];
+        let result = seg.mark_uncertain_contextual(0.65);
+        assert_eq!(result, "[?bad?] good [?bad?]");
+    }
+
+    #[test]
+    fn contextual_falls_back_without_word_confidences() {
+        let seg = make_segment();
+        assert_eq!(seg.mark_uncertain_contextual(0.65), "hello world");
+    }
+
+    #[test]
+    fn contextual_single_word() {
+        // Single word — no neighbors to use.
+        let mut seg = make_segment();
+        seg.word_confidences = vec![WordConfidence {
+            word: "hello".into(),
+            confidence: 0.60,
+        }];
+        // First-word leniency should protect it at 0.60 vs threshold 0.65
+        let result = seg.mark_uncertain_contextual(0.65);
+        assert_eq!(result, "hello");
+    }
+
+    #[test]
+    fn contextual_last_word_leniency() {
+        // Last word at 0.63 should NOT be marked when threshold=0.65
+        // because last-word leniency lowers the effective threshold
+        // (decoder has no right context for attention).
+        let mut seg = make_segment();
+        seg.word_confidences = vec![
+            WordConfidence {
+                word: "the".into(),
+                confidence: 0.95,
+            },
+            WordConfidence {
+                word: "meeting".into(),
+                confidence: 0.95,
+            },
+            WordConfidence {
+                word: "today".into(),
+                confidence: 0.63,
+            },
+        ];
+        let result = seg.mark_uncertain_contextual(0.65);
+        assert_eq!(result, "the meeting today");
+    }
+
+    #[test]
+    fn contextual_repetition_guard_preserved() {
+        // Repeated words should not be marked even when low-confidence
+        let mut seg = make_segment();
+        seg.word_confidences = vec![
+            WordConfidence {
+                word: "very".into(),
+                confidence: 0.50,
+            },
+            WordConfidence {
+                word: "very".into(),
+                confidence: 0.50,
+            },
+            WordConfidence {
+                word: "good".into(),
+                confidence: 0.95,
+            },
+        ];
+        let result = seg.mark_uncertain_contextual(0.65);
+        // First "very" may be marked, but second "very" must NOT be (repetition guard)
+        assert!(result.contains("very good"));
+        assert!(!result.contains("[?very?] [?very?]"));
     }
 
     #[test]

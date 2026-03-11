@@ -35,6 +35,7 @@ pub struct DaemonInterface {
     dictation_mode_tx: watch::Sender<DictationMode>,
     activation_mode_tx: watch::Sender<ActivationMode>,
     settings_store: Arc<lune_persist::SettingsStore>,
+    db: Arc<tokio::sync::Mutex<lune_persist::Database>>,
     rt_handle: tokio::runtime::Handle,
     persist_gate: Arc<tokio::sync::Mutex<()>>,
 }
@@ -48,6 +49,7 @@ impl DaemonInterface {
         dictation_mode_tx: watch::Sender<DictationMode>,
         activation_mode_tx: watch::Sender<ActivationMode>,
         settings_store: Arc<lune_persist::SettingsStore>,
+        db: Arc<tokio::sync::Mutex<lune_persist::Database>>,
         rt_handle: tokio::runtime::Handle,
     ) -> Self {
         Self {
@@ -57,6 +59,7 @@ impl DaemonInterface {
             dictation_mode_tx,
             activation_mode_tx,
             settings_store,
+            db,
             rt_handle,
             persist_gate: Arc::new(tokio::sync::Mutex::new(())),
         }
@@ -296,6 +299,22 @@ impl DaemonInterface {
         tracing::info!("LLM backend config updated — restart daemon to load new model");
         let _ = emitter.settings_changed("llm_backend").await;
         Ok(())
+    }
+
+    // ── Transcription history ────────────────────────────────────────────
+
+    async fn list_transcriptions(&self, limit: u32) -> zbus::fdo::Result<String> {
+        let limit = if limit == 0 { 20 } else { limit.min(500) };
+        let db = Arc::clone(&self.db);
+        let result = tokio::task::spawn_blocking(move || {
+            let mut guard = db.blocking_lock();
+            guard.list_sessions(limit)
+        })
+        .await
+        .map_err(|e| zbus::fdo::Error::Failed(format!("task join: {e}")))?
+        .map_err(|e| zbus::fdo::Error::Failed(format!("db: {e}")))?;
+
+        serde_json::to_string(&result).map_err(|e| zbus::fdo::Error::Failed(e.to_string()))
     }
 
     // ── Read-only dump ───────────────────────────────────────────────────

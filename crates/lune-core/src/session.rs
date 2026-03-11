@@ -57,8 +57,8 @@ pub enum SessionStatus {
 #[non_exhaustive]
 pub enum SessionEvent {
     Started,
-    /// Partial in-flight transcription — clone-cheap via Arc when fanout needed.
-    PartialText(String),
+    /// Partial in-flight transcription notification.
+    PartialText,
     FinalizedText(String),
     /// Async LLM correction for a previously-delivered low-confidence utterance.
     CorrectedText(String),
@@ -74,12 +74,11 @@ impl SessionEvent {
     #[inline]
     pub fn text(&self) -> Option<&str> {
         match self {
-            Self::PartialText(s)
-            | Self::FinalizedText(s)
+            Self::FinalizedText(s)
             | Self::CorrectedText(s)
             | Self::CommandDetected(s)
             | Self::Error(s) => Some(s.as_str()),
-            Self::Started | Self::Processing | Self::Stopped => None,
+            Self::Started | Self::PartialText | Self::Processing | Self::Stopped => None,
         }
     }
 

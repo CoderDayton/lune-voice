@@ -2,6 +2,7 @@
 //!
 //! Run: cargo run --release --example pipeline_full -p lune-app
 //! GPU: cargo run --release --features cuda --example pipeline_full -p lune-app
+//! Force backend: cargo run --release --example pipeline_full -p lune-app -- --asr qwen
 //!
 //! Unlike `pipeline_latency` (which calls ASR/LLM individually), this feeds
 //! audio through `SessionManager::start_with_audio()` and measures wall-time
@@ -15,13 +16,14 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use bench_utils::{
-    Fixture, char_error_rate, init_ort, load_fixtures, word_error_rate, workspace_root, wrap_print,
+    Fixture, benchmark_asr_entry, char_error_rate, init_ort, load_fixtures, process_memory_usage,
+    word_error_rate, workspace_root, wrap_print,
 };
 use lune_app::{SessionManager, SessionManagerConfig};
 use lune_asr::AsrRegistry;
 use lune_audio::{AudioConfig, AudioStream};
 use lune_core::asr::AsrBackendKind;
-use lune_core::config::{AsrBackendConfig, DevicePolicy, UserSettings};
+use lune_core::config::{DevicePolicy, UserSettings};
 use lune_core::llm::TextPostProcessor;
 use lune_core::session::SessionEvent;
 use lune_llm::{LlamaCppBackend, LlamaCppConfig};
@@ -39,39 +41,27 @@ fn main() {
     let has_gpu = init_ort();
     let root = workspace_root();
 
-    // Load ASR (auto-detect: Parakeet → OrtQwen)
+    // Load ASR (Parakeet preferred unless ASR/--asr forces Qwen)
     let device = if has_gpu {
         DevicePolicy::Cuda
     } else {
         DevicePolicy::Cpu
     };
-    let parakeet_dir = root.join("models/parakeet-tdt-0.6b");
-    let qwen_dir = root.join("models/qwen3-asr-0.6b-onnx");
-    // Prefer Parakeet (lower WER) — fall back to OrtQwen if unavailable.
-    let (asr_config, backend_kind) = if parakeet_dir.exists() {
-        println!("  Detected Parakeet TDT model");
-        (
-            AsrBackendConfig::ParakeetTdt {
-                model_dir: parakeet_dir,
-            },
-            AsrBackendKind::ParakeetTdt,
-        )
-    } else if qwen_dir.exists() {
-        println!("  Detected Qwen3-ASR model");
-        (
-            AsrBackendConfig::OrtQwenAsr {
-                model_dir: qwen_dir,
-            },
-            AsrBackendKind::OrtQwenAsr,
-        )
-    } else {
-        println!("  [skip] No ASR model dir found. Download models first.");
-        return;
+    let asr_entry = match benchmark_asr_entry(&root) {
+        Ok(entry) => entry,
+        Err(msg) => {
+            println!("  [skip] {msg}");
+            return;
+        }
     };
+    println!("  Selected ASR backend: {}", asr_entry.display_name);
     print!("  Loading ASR backend ... ");
     let t = Instant::now();
-    let asr = Arc::new(AsrRegistry::from_config(&asr_config, device).expect("load ASR"));
+    let asr = Arc::new(AsrRegistry::from_config(&asr_entry.config, device).expect("load ASR"));
     println!("{:.1}s", t.elapsed().as_secs_f64());
+    if let Some(mem) = process_memory_usage() {
+        println!("  Memory after ASR load: {}", mem.display());
+    }
 
     // Load LLM
     let llm_model_path = root.join("models/llm-corrector-gguf/qwen2.5-1.5b-instruct.Q4_K_M.gguf");
@@ -89,6 +79,9 @@ fn main() {
     })) {
         Ok(b) => {
             println!("{:.1}s", t.elapsed().as_secs_f64());
+            if let Some(mem) = process_memory_usage() {
+                println!("  Memory after LLM load: {}", mem.display());
+            }
             Arc::new(b)
         }
         Err(e) => {
@@ -116,7 +109,7 @@ fn main() {
             fixture,
             Arc::clone(&asr),
             Arc::clone(&llm),
-            backend_kind,
+            asr_entry.backend_kind,
             asr.pipeline_config(),
         ));
 
@@ -138,6 +131,9 @@ fn main() {
                 );
                 println!("  WER:         {:.1}%", w);
                 println!("  CER:         {:.1}%", c);
+                if let Some(mem) = process_memory_usage() {
+                    println!("  Memory:      {}", mem.display());
+                }
                 println!();
 
                 println!("  Hypothesis:");

@@ -2,6 +2,7 @@
 //!
 //! Run: cargo run --release --example pipeline_latency -p lune-app
 //! GPU: cargo run --release --features cuda --example pipeline_latency -p lune-app
+//! Force backend subset: cargo run --release --example pipeline_latency -p lune-app -- --asr qwen
 //!
 //! All 5 stages use real model inference — no simulated data, no thread::sleep.
 //! Gracefully skips if model directories are missing.
@@ -14,8 +15,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use bench_utils::{
-    Fixture, brent_minimize, char_error_rate, init_ort, load_fixtures, percentile, word_error_rate,
-    workspace_root, wrap_print,
+    Fixture, benchmark_asr_entries, brent_minimize, char_error_rate, init_ort, load_fixtures,
+    percentile, process_memory_usage, word_error_rate, workspace_root, wrap_print,
 };
 use lune_asr::{AsrRegistry, compute_qwen_mel};
 use lune_audio::{VadSegmenter, VadSegmenterConfig};
@@ -52,36 +53,17 @@ fn main() {
     } else {
         DevicePolicy::Cpu
     };
-    let parakeet_dir = root.join("models/parakeet-tdt-0.6b");
-    let qwen_dir = root.join("models/qwen3-asr-0.6b-onnx");
-
     let mut backends: Vec<(&str, AsrRegistry)> = Vec::new();
-
-    if parakeet_dir.exists() {
-        print!("  Loading Parakeet TDT ... ");
+    for entry in benchmark_asr_entries(&root) {
+        print!("  Loading {} ... ", entry.display_name);
         let t = Instant::now();
-        let cfg = AsrBackendConfig::ParakeetTdt {
-            model_dir: parakeet_dir,
-        };
-        match AsrRegistry::from_config(&cfg, device) {
+        match AsrRegistry::from_config(&entry.config, device) {
             Ok(b) => {
                 println!("{:.1}s", t.elapsed().as_secs_f64());
-                backends.push(("Parakeet-TDT-int8", b));
-            }
-            Err(e) => println!("[fail] {e}"),
-        }
-    }
-
-    if qwen_dir.exists() {
-        print!("  Loading OrtQwen ASR (batch) ... ");
-        let t = Instant::now();
-        let cfg = AsrBackendConfig::OrtQwenAsr {
-            model_dir: qwen_dir,
-        };
-        match AsrRegistry::from_config(&cfg, device) {
-            Ok(b) => {
-                println!("{:.1}s", t.elapsed().as_secs_f64());
-                backends.push(("OrtQwen-INT4-batch", b));
+                if let Some(mem) = process_memory_usage() {
+                    println!("    Memory: {}", mem.display());
+                }
+                backends.push((entry.display_name, b));
             }
             Err(e) => println!("[fail] {e}"),
         }
@@ -111,6 +93,9 @@ fn main() {
         })) {
             Ok(b) => {
                 println!("  LLM loaded in {:.1}s", t.elapsed().as_secs_f64());
+                if let Some(mem) = process_memory_usage() {
+                    println!("  Memory after LLM load: {}", mem.display());
+                }
                 Some(b)
             }
             Err(e) => {
@@ -146,6 +131,9 @@ fn main() {
                     "  FP16-decoder ASR loaded in {:.1}s",
                     t.elapsed().as_secs_f64()
                 );
+                if let Some(mem) = process_memory_usage() {
+                    println!("  Memory after FP16 load: {}", mem.display());
+                }
                 Some(b)
             }
             Err(e) => {
@@ -322,6 +310,9 @@ fn bench_asr_streaming(
         println!("    Total:       {total_secs:.3}s  ({rtf:.3}x RT)");
         println!("    Segments:    {}", segments.len());
         println!("    Mean conf:   {mean_conf:.3}");
+        if let Some(mem) = process_memory_usage() {
+            println!("    Memory:      {}", mem.display());
+        }
         println!("    Chunk latency ({n} chunks):");
         println!(
             "      mean={mean_chunk:.1}ms  min={min_chunk:.1}ms  max={max_chunk:.1}ms  p99={p99_chunk:.1}ms"
@@ -731,7 +722,7 @@ fn bench_threshold_sweep(
     println!();
     println!("  Quality context:");
     println!("    Industry reference WER (Whisper-large-v3, LibriSpeech clean): ~2.7%");
-    println!("    Qwen3-ASR-0.6B INT4 streaming: 8s encoder window, past-text conditioned");
+    println!("    Qwen3-ASR-0.6B INT4 offline: whole-clip decode up to export limit");
     println!("    Per-word [?word?] marking → surgical LLM span correction on uncertain words.");
     println!();
 }

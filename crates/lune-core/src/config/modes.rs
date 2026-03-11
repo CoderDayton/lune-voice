@@ -120,3 +120,52 @@ impl std::str::FromStr for PrivacyMode {
 fn privacy_mode_parse_err(s: &str) -> String {
     format!("unknown privacy mode: {s} (expected LocalOnly|LocalPreferred|AllowRemote)")
 }
+
+/// Controls how the delivery system detects terminal windows for paste chords.
+///
+/// Terminals use Ctrl+Shift+V to paste, while other apps use Ctrl+V.
+/// On compositors that expose focused window info (Hyprland, Sway, KDE, GNOME),
+/// `Auto` detects this automatically. On COSMIC and others without such APIs,
+/// set `Terminal` if you primarily dictate into terminals.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[non_exhaustive]
+pub enum TerminalMode {
+    /// Probe compositor for focused window class. Falls back to Ctrl+V if
+    /// detection is unavailable (e.g. COSMIC without xdotool).
+    #[default]
+    Auto,
+    /// Always use Ctrl+Shift+V (force terminal paste).
+    Terminal,
+    /// Always use Ctrl+V (force normal paste).
+    Normal,
+}
+
+impl std::fmt::Display for TerminalMode {
+    #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Auto => f.write_str("Auto"),
+            Self::Terminal => f.write_str("Terminal"),
+            Self::Normal => f.write_str("Normal"),
+        }
+    }
+}
+
+impl std::str::FromStr for TerminalMode {
+    type Err = String;
+    #[inline]
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "Auto" => Ok(Self::Auto),
+            "Terminal" => Ok(Self::Terminal),
+            "Normal" => Ok(Self::Normal),
+            _ => Err(terminal_mode_parse_err(s)),
+        }
+    }
+}
+
+#[cold]
+#[inline(never)]
+fn terminal_mode_parse_err(s: &str) -> String {
+    format!("unknown terminal mode: {s} (expected Auto|Terminal|Normal)")
+}

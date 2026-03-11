@@ -10,6 +10,7 @@ members = [
     "crates/lune-dict",
     "crates/lune-persist",
     "crates/lune-app",
+    "desktop-ui/src-tauri",
 ]
 
 [workspace.package]
@@ -21,7 +22,7 @@ license = "MIT"
 # thin LTO: ~80% of fat's benefit at fraction of link time; cross-crate inlining
 # unlocked across all 9 crates. codegen-units=1 removes parallelism barriers so
 # LLVM sees the full call graph. panic=abort removes unwind tables (~5% binary size).
-lto = "thin"
+lto = "fat"
 codegen-units = 1
 panic = "abort"
 opt-level = 3
@@ -81,6 +82,5 @@ tokenizers = { version = "0.21", default-features = false, features = ["onig"] }
 async-openai = { version = "0.33", features = ["chat-completion"] }
 reqwest = { version = "0.12", features = ["json", "multipart"] }
 zbus = "5"
-enigo = { version = "0.6", features = ["wayland"] }
-arboard = "3"
 evdev = "0.13"
+smallvec = { version = "1", features = ["union"] }

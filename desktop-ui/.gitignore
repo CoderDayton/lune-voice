@@ -1,0 +1,6 @@
+node_modules/
+dist/
+src/routeTree.gen.ts
+src-tauri/target/
+src-tauri/gen/
+tests/visual/__diffs__/
