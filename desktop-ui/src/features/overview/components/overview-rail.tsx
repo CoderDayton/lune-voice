@@ -1,15 +1,44 @@
+import { useMemo } from "react";
+import { useStore } from "@tanstack/react-store";
 import { Link } from "@tanstack/react-router";
 import { buttonClassName } from "../../../components/ui/button";
 import { Panel } from "../../../components/ui/panel";
-import { overviewSignals } from "../data/overview-data";
+import {
+  summarizeAsrBackend,
+  summarizeLlmBackend,
+  workspaceStore,
+} from "../../../store/workspace-store";
 
 export function OverviewRail() {
+  const settings = useStore(workspaceStore, (state) => state.settings);
+  const runtime = useStore(workspaceStore, (state) => state.runtime);
+  const signals = useMemo(
+    () => [
+      {
+        title: "Desktop backend",
+        value: runtime.serviceStatus,
+        note: "Reads and writes now flow through the local Tauri backend.",
+      },
+      {
+        title: "ASR posture",
+        value: summarizeAsrBackend(settings.asrBackend),
+        note: "This reflects the speech backend currently saved in your desktop settings.",
+      },
+      {
+        title: "Correction chain",
+        value: settings.llmCorrection ? summarizeLlmBackend(settings.llmBackend) : "Cleanup off",
+        note: "Low-confidence words route through cleanup only when the confidence gate is enabled.",
+      },
+    ],
+    [runtime.serviceStatus, settings.asrBackend, settings.llmBackend, settings.llmCorrection],
+  );
+
   return (
     <div className="stack-section">
       <Panel className="panel-pad-lg">
         <p className="app-kicker-accent">Workspace posture</p>
         <div className="rail-list mt-4">
-          {overviewSignals.map((item) => (
+          {signals.map((item) => (
             <div key={item.title} className="rail-row">
               <div className="rail-copy">
                 <div className="supporting-label text-copy-50">{item.title}</div>

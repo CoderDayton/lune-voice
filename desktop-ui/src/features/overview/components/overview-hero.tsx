@@ -3,12 +3,21 @@ import { Link } from "@tanstack/react-router";
 import { buttonClassName } from "../../../components/ui/button";
 import { Panel } from "../../../components/ui/panel";
 import { Pill } from "../../../components/ui/pill";
-import { workspaceStore } from "../../../store/workspace-store";
+import {
+  summarizeAsrBackend,
+  summarizeDictationMode,
+  workspaceStore,
+} from "../../../store/workspace-store";
 
 export function OverviewHero() {
   const settings = useStore(workspaceStore, (state) => state.settings);
+  const runtime = useStore(workspaceStore, (state) => state.runtime);
+  const historySessions = useStore(workspaceStore, (state) => state.historySessions);
   const speechModel = summarizeAsrBackend(settings.asrBackend);
-  const deliveryMode = summarizeDeliveryMethod(settings.deliveryMethod);
+  const deliveryMode = summarizeDictationMode(settings.dictationMode);
+  const averageResponseTime = historySessions.length > 0
+    ? `${(historySessions.reduce((sum, item) => sum + item.seconds, 0) / historySessions.length).toFixed(2)}s`
+    : "Waiting";
 
   return (
     <div className="page-grid-hero">
@@ -39,14 +48,14 @@ export function OverviewHero() {
               A quick read on what is ready right now before you start dictating.
             </p>
           </div>
-          <Pill>Today 09:01</Pill>
+          <Pill>{runtime.serviceStatus}</Pill>
         </div>
 
         <div className="hero-summary-grid mt-6">
           <div className="stat-tile">
             <div className="stat-label">Capture</div>
-            <div className="stat-value mt-3">Ready</div>
-            <p className="stat-note mt-1">Ready when you press your shortcut.</p>
+            <div className="stat-value mt-3">{runtime.loaded ? "Connected" : "Loading"}</div>
+            <p className="stat-note mt-1">Tauri IPC status for the desktop backend.</p>
           </div>
           <div className="stat-tile">
             <div className="stat-label">Speech model</div>
@@ -60,27 +69,11 @@ export function OverviewHero() {
           </div>
           <div className="stat-tile">
             <div className="stat-label">Response time</div>
-            <div className="stat-value mt-3">1.52s</div>
-            <p className="stat-note mt-1">Average time from speech to finished text.</p>
+            <div className="stat-value mt-3">{averageResponseTime}</div>
+            <p className="stat-note mt-1">Average recorded session duration in the local archive.</p>
           </div>
         </div>
       </Panel>
     </div>
   );
-}
-
-function summarizeAsrBackend(value: string) {
-  return value.split(" (")[0];
-}
-
-function summarizeDeliveryMethod(value: string) {
-  if (value.startsWith("Paste")) {
-    return "Paste";
-  }
-
-  if (value.startsWith("Type")) {
-    return "Type";
-  }
-
-  return value;
 }

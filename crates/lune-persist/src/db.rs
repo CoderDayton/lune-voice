@@ -56,6 +56,14 @@ fn row_to_session(
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
+#[derive(Debug, Clone)]
+pub struct StoredDictionaryEntry {
+    pub id: i32,
+    pub phrase: String,
+    pub replacement: String,
+    pub priority: u8,
+}
+
 /// SQLite database for dictionary, snippets, session history.
 pub struct Database {
     conn: SqliteConnection,
@@ -126,17 +134,32 @@ impl Database {
     pub fn list_dictionary_entries(
         &mut self,
     ) -> PersistResult<Vec<lune_core::dict::DictionaryEntry>> {
+        Ok(self
+            .list_dictionary_entries_with_ids()?
+            .into_iter()
+            .map(|entry| lune_core::dict::DictionaryEntry {
+                phrase: entry.phrase,
+                replacement: entry.replacement,
+                priority: entry.priority,
+            })
+            .collect())
+    }
+
+    pub fn list_dictionary_entries_with_ids(
+        &mut self,
+    ) -> PersistResult<Vec<StoredDictionaryEntry>> {
         use crate::schema::dictionary::dsl::*;
 
         let rows = dictionary
-            .select((phrase, replacement, priority))
-            .order(priority.desc())
-            .load::<(String, String, i32)>(&mut self.conn)?;
+            .select((id, phrase, replacement, priority))
+            .order((priority.desc(), id.asc()))
+            .load::<(i32, String, String, i32)>(&mut self.conn)?;
 
         // Vec::with_capacity avoids reallocations; map directly into target type.
         Ok(rows
             .into_iter()
-            .map(|(p, r, pr)| lune_core::dict::DictionaryEntry {
+            .map(|(entry_id, p, r, pr)| StoredDictionaryEntry {
+                id: entry_id,
                 phrase: p,
                 replacement: r,
                 priority: pr as u8,
@@ -347,6 +370,21 @@ mod tests {
 
         let entries = db.list_dictionary_entries().unwrap();
         assert_eq!(entries.len(), 1);
+    }
+
+    #[test]
+    fn dictionary_entries_with_ids() {
+        let mut db = Database::open_in_memory().unwrap();
+
+        let rust_id = db.insert_dictionary_entry("rust lang", "Rust", 10).unwrap();
+        let git_id = db.insert_dictionary_entry("github", "GitHub", 5).unwrap();
+
+        let entries = db.list_dictionary_entries_with_ids().unwrap();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].id, rust_id);
+        assert_eq!(entries[0].phrase, "rust lang");
+        assert_eq!(entries[1].id, git_id);
+        assert_eq!(entries[1].replacement, "GitHub");
     }
 
     #[test]

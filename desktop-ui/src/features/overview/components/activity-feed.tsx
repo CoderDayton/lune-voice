@@ -1,10 +1,25 @@
+import { useStore } from "@tanstack/react-store";
 import { Link } from "@tanstack/react-router";
 import { buttonClassName } from "../../../components/ui/button";
 import { Panel } from "../../../components/ui/panel";
 import { Pill } from "../../../components/ui/pill";
-import { recentActivity } from "../data/overview-data";
+import { formatBackendLabel, workspaceStore } from "../../../store/workspace-store";
 
 export function ActivityFeed() {
+  const recentActivity = useStore(workspaceStore, (state) =>
+    state.historySessions.slice(0, 3).map((session) => ({
+      id: session.id,
+      title: session.transcript.split(".")[0] || "Recent session",
+      text: session.transcript,
+      meta: [
+        new Date(session.startedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+        `${session.words} words`,
+        `${session.seconds}s`,
+        formatBackendLabel(session.backend),
+      ],
+    })),
+  );
+
   return (
     <Panel className="panel-pad-lg">
       <div className="header-row">

@@ -4209,6 +4209,8 @@ dependencies = [
 name = "lune-ui"
 version = "0.1.0"
 dependencies = [
+ "lune-core",
+ "lune-persist",
  "serde",
  "serde_json",
  "tauri",

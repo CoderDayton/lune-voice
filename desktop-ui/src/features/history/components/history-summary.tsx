@@ -1,24 +1,25 @@
 import { useMemo } from "react";
 import { useStore } from "@tanstack/react-store";
 import { MetricCard } from "../../../components/ui/metric-card";
-import { historyGroups } from "../data/history-data";
 import { ClockIcon, MicIcon, PulseIcon, SearchIcon } from "../../shell/config/icons";
-import { workspaceStore } from "../../../store/workspace-store";
+import {
+  formatBackendLabel,
+  getVisibleHistorySessions,
+  workspaceStore,
+} from "../../../store/workspace-store";
 
 export function HistorySummary() {
-  const search = useStore(workspaceStore, (state) => state.historySearch);
+  const visible = useStore(workspaceStore, getVisibleHistorySessions);
 
   const summary = useMemo(() => {
-    const items = historyGroups.flatMap((group) => group.items);
-    const visible = items.filter((item) => !search || item.text.toLowerCase().includes(search.toLowerCase()));
     const totalWords = visible.reduce((sum, item) => sum + item.words, 0);
     const totalSeconds = visible.reduce((sum, item) => sum + item.seconds, 0);
-    const modes = new Set(visible.map((item) => item.mode));
+    const modes = new Set(visible.map((item) => item.backend));
 
     let source = "No sessions";
 
     if (modes.size === 1) {
-      source = visible[0]?.mode ?? source;
+      source = visible[0] ? formatBackendLabel(visible[0].backend) : source;
     } else if (modes.size > 1) {
       source = "Mixed";
     }
@@ -29,7 +30,7 @@ export function HistorySummary() {
       duration: `${Math.floor(totalSeconds / 60)}m ${String(totalSeconds % 60).padStart(2, "0")}s`,
       source,
     };
-  }, [search]);
+  }, [visible]);
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

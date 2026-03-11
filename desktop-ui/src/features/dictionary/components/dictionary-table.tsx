@@ -2,7 +2,7 @@ import { useStore } from "@tanstack/react-store";
 import { ModalCancel } from "../../../components/ui/modal-cancel";
 import { Panel } from "../../../components/ui/panel";
 import { Pill } from "../../../components/ui/pill";
-import { workspaceActions, workspaceStore } from "../../../store/workspace-store";
+import { removeDictionaryEntry, workspaceStore } from "../../../store/workspace-store";
 
 export function DictionaryTable() {
   const entries = useStore(workspaceStore, (state) => state.dictionaryEntries);
@@ -32,7 +32,7 @@ export function DictionaryTable() {
                 <ModalCancel
                   title="Delete this word fix?"
                   description={`Remove the saved correction for "${entry.phrase}" and "${entry.replacement}".`}
-                  onConfirm={() => workspaceActions.removeDictionaryEntry(entry.id)}
+                  onConfirm={() => void removeDictionaryEntry(entry.id)}
                 />
               </div>
             </div>

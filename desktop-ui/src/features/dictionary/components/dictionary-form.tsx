@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "../../../components/ui/button";
 import { TextField } from "../../../components/ui/field";
 import { Panel } from "../../../components/ui/panel";
-import { workspaceActions } from "../../../store/workspace-store";
+import { addDictionaryEntry } from "../../../store/workspace-store";
 
 export function DictionaryForm() {
   const [phrase, setPhrase] = useState("");
@@ -27,8 +27,8 @@ export function DictionaryForm() {
           <TextField value={replacement} onChange={(event) => setReplacement(event.target.value)} placeholder="e.g. GitHub" />
         </div>
         <Button
-          onClick={() => {
-            const added = workspaceActions.addDictionaryEntry(phrase, replacement);
+          onClick={async () => {
+            const added = await addDictionaryEntry(phrase, replacement);
 
             if (added) {
               setPhrase("");

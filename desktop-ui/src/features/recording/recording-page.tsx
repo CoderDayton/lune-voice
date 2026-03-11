@@ -2,9 +2,18 @@ import { useStore } from "@tanstack/react-store";
 import { SelectField } from "../../components/ui/field";
 import { Panel } from "../../components/ui/panel";
 import { Toggle } from "../../components/ui/toggle";
-import { workspaceActions, workspaceStore } from "../../store/workspace-store";
+import {
+  saveWorkspaceSetting,
+  summarizeAsrBackend,
+  workspaceStore,
+} from "../../store/workspace-store";
 import { SettingsRow, SettingsSection } from "../setup/components/settings-section";
-import { asrBackends, llmModels } from "../setup/data/settings-data";
+import {
+  activationModes,
+  asrBackends,
+  labelForActivationMode,
+  llmModels,
+} from "../setup/data/settings-data";
 
 export function RecordingPage() {
   const settings = useStore(workspaceStore, (state) => state.settings);
@@ -24,12 +33,12 @@ export function RecordingPage() {
       <section className="page-grid-three">
         <Panel className="panel-pad-md">
           <div className="stat-label">Recording style</div>
-          <div className="stat-value mt-3">{settings.activationMode}</div>
+          <div className="stat-value mt-3">{labelForActivationMode(settings.activationMode).split(" ")[0]}</div>
           <p className="stat-note mt-2">Choose whether recording stays on until you stop it or only while a key is held.</p>
         </Panel>
         <Panel className="panel-pad-md">
           <div className="stat-label">Voice mode</div>
-          <div className="stat-value mt-3">{settings.asrBackend.split(" ")[0]}</div>
+          <div className="stat-value mt-3">{summarizeAsrBackend(settings.asrBackend)}</div>
           <p className="stat-note mt-2">Pick the listening mode that best matches your device and speed preference.</p>
         </Panel>
         <Panel className="panel-pad-md">
@@ -47,11 +56,14 @@ export function RecordingPage() {
             control={
               <SelectField
                 value={settings.activationMode}
-                onChange={(event) => workspaceActions.updateSetting("activationMode", event.target.value)}
+                onChange={(event) => void saveWorkspaceSetting("activationMode", event.target.value as typeof settings.activationMode)}
                 className="min-w-52"
               >
-                <option value="Toggle">Toggle to start and stop</option>
-                <option value="Hold">Hold while speaking</option>
+                {activationModes.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </SelectField>
             }
           />
@@ -61,7 +73,7 @@ export function RecordingPage() {
             control={
               <Toggle
                 checked={settings.adaptiveVad}
-                onChange={() => workspaceActions.updateSetting("adaptiveVad", !settings.adaptiveVad)}
+                onChange={() => void saveWorkspaceSetting("adaptiveVad", !settings.adaptiveVad)}
               />
             }
           />
@@ -75,11 +87,13 @@ export function RecordingPage() {
             control={
               <SelectField
                 value={settings.asrBackend}
-                onChange={(event) => workspaceActions.updateSetting("asrBackend", event.target.value)}
+                onChange={(event) => void saveWorkspaceSetting("asrBackend", event.target.value as typeof settings.asrBackend)}
                 className="min-w-64"
               >
                 {asrBackends.map((option) => (
-                  <option key={option}>{option}</option>
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
                 ))}
               </SelectField>
             }
@@ -87,7 +101,7 @@ export function RecordingPage() {
           <SettingsRow
             label="Use hardware acceleration"
             description="When available, this can make transcription finish faster."
-            control={<Toggle checked={settings.useGpu} onChange={() => workspaceActions.updateSetting("useGpu", !settings.useGpu)} />}
+            control={<Toggle checked={settings.useGpu} onChange={() => void saveWorkspaceSetting("useGpu", !settings.useGpu)} />}
           />
         </SettingsSection>
 
@@ -98,7 +112,7 @@ export function RecordingPage() {
             control={
               <Toggle
                 checked={settings.llmCorrection}
-                onChange={() => workspaceActions.updateSetting("llmCorrection", !settings.llmCorrection)}
+                onChange={() => void saveWorkspaceSetting("llmCorrection", !settings.llmCorrection)}
               />
             }
           />
@@ -106,12 +120,14 @@ export function RecordingPage() {
             label="Cleanup model"
             control={
               <SelectField
-                value={settings.llmModel}
-                onChange={(event) => workspaceActions.updateSetting("llmModel", event.target.value)}
+                value={settings.llmBackend}
+                onChange={(event) => void saveWorkspaceSetting("llmBackend", event.target.value as typeof settings.llmBackend)}
                 className="min-w-64"
               >
                 {llmModels.map((option) => (
-                  <option key={option}>{option}</option>
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
                 ))}
               </SelectField>
             }
