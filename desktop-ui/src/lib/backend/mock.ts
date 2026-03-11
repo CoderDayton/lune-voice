@@ -95,6 +95,18 @@ export const mockBackendClient: BackendClient = {
 
     return structuredClone(mockSnapshot);
   },
+
+  async startDictation() {
+    return "mock-session";
+  },
+
+  async stopDictation() {},
+
+  async cancelDictation() {},
+
+  async toggleDictation() {
+    return "mock-session";
+  },
 };
 
 export function resetMockBackendClient() {

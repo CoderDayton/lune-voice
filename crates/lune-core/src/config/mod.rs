@@ -10,7 +10,9 @@ pub use hotkey::{HotkeyConfig, KeyCombo, Modifier};
 pub use modes::{ActivationMode, DictationMode, PrivacyMode, TerminalMode};
 pub use pipeline::{PipelineConfig, PipelineOverrides};
 pub use redacted::RedactedString;
-pub use settings::{AsrBackendConfig, DevicePolicy, LlmBackendConfig, StreamingMode, UserSettings};
+pub use settings::{
+    AlignerConfig, AsrBackendConfig, DevicePolicy, LlmBackendConfig, StreamingMode, UserSettings,
+};
 pub use style::{BASE_SYSTEM_PROMPT, StyleId, StylePreset, StyleRegistry, builtin_registry};
 
 #[cfg(test)]

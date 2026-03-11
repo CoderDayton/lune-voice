@@ -754,10 +754,6 @@ mod tests {
         workspace_root().join("models/qwen3-asr-0.6b-onnx")
     }
 
-    fn model_dir_fp16_decoder() -> std::path::PathBuf {
-        workspace_root().join("models/qwen3-asr-0.6b-onnx-fp16dec")
-    }
-
     fn ensure_ort() {
         static INIT: std::sync::OnceLock<()> = std::sync::OnceLock::new();
         INIT.get_or_init(|| {
@@ -1454,50 +1450,6 @@ mod tests {
 
         eprintln!("[batch forced] transcript: {:?}", result.text);
         eprintln!("[batch forced] tokens: {}", result.token_ids.len());
-    }
-
-    /// Compare the alternate FP16-decoder export on the same forced-English path.
-    #[test]
-    #[ignore = "requires models/qwen3-asr-0.6b-onnx-fp16dec and test_fixtures/librispeech_clean.wav"]
-    fn batch_full_audio_forced_english_fp16_decoder() {
-        ensure_ort();
-        let dir = model_dir_fp16_decoder();
-        let wav = workspace_root().join("test_fixtures/librispeech_clean.wav");
-        if !dir.exists() || !wav.exists() {
-            eprintln!("[skip] fp16-decoder model or wav not found");
-            return;
-        }
-
-        let mut encoder =
-            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-encoder.onnx"), false)
-                .expect("load encoder");
-        let mut embed_tokens =
-            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-embed-tokens.onnx"), false)
-                .expect("load embed_tokens");
-        let mut decoder =
-            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-decoder.onnx"), false)
-                .expect("load decoder");
-        let has_attention_mask = decoder
-            .inputs()
-            .iter()
-            .any(|inp| inp.name() == "attention_mask");
-        let tokenizer =
-            tokenizers::Tokenizer::from_file(dir.join("tokenizer.json")).expect("load tokenizer");
-
-        let audio = load_wav_f32(&wav);
-        let result = transcribe_oneshot(
-            &mut encoder,
-            &mut embed_tokens,
-            &mut decoder,
-            &tokenizer,
-            &audio,
-            Some("English"),
-            has_attention_mask,
-        )
-        .expect("transcribe_oneshot");
-
-        eprintln!("[batch forced fp16dec] transcript: {:?}", result.text);
-        eprintln!("[batch forced fp16dec] tokens: {}", result.token_ids.len());
     }
 
     fn resize_encoder_features_nearest(

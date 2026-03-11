@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2024"
 default-run = "lune-ui"
 
+[features]
+default = []
+cuda = []
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -12,8 +16,15 @@ tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+lune-app = { path = "../../crates/lune-app" }
+lune-asr = { path = "../../crates/lune-asr" }
+lune-commands = { path = "../../crates/lune-commands" }
 lune-core = { path = "../../crates/lune-core" }
+lune-dict = { path = "../../crates/lune-dict" }
+lune-llm = { path = "../../crates/lune-llm" }
 lune-persist = { path = "../../crates/lune-persist" }
+ort = { workspace = true }
+tokio = { workspace = true }
 
 [[bin]]
 name = "lune-ui"

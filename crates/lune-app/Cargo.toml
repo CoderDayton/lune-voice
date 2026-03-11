@@ -42,14 +42,13 @@ hound = "3.5"
 cpal.workspace = true
 
 [[example]]
-name = "pipeline_latency"
-path = "../../benchmarks/pipeline_latency.rs"
+name = "pipeline_stages"
+path = "../../benchmarks/pipeline_stages.rs"
 
 [[example]]
-name = "pipeline_full"
-path = "../../benchmarks/pipeline_full.rs"
+name = "pipeline_real"
+path = "../../benchmarks/pipeline_real.rs"
 
 [[example]]
 name = "live_transcribe"
 path = "../../benchmarks/live_transcribe.rs"
-

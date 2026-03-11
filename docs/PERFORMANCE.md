@@ -9,7 +9,8 @@
 - [Latency Budget](#latency-budget)
 - [Benchmarks](#benchmarks)
   - [Pipeline Latency](#pipeline-latency)
-  - [Mel-Spectrogram Throughput](#mel-spectrogram-throughput)
+  - [Full Pipeline](#full-pipeline)
+  - [Recent Benchmark Snapshot](#recent-benchmark-snapshot)
 - [Optimization Techniques](#optimization-techniques)
   - [Memory & Allocation](#memory--allocation)
   - [Compute](#compute)
@@ -21,157 +22,134 @@
 
 ## Latency Budget
 
-The user-perceived latency is the **after-speech wait** — time from when they stop talking to when corrected text appears. This is the sum of three stages:
+The user-perceived latency is the **after-speech wait**: time from when the speaker stops talking to when finished text is ready for delivery.
 
 ```
-After-speech wait = silence timeout + final inference + LLM correction + delivery
-
-Current breakdown (typical, CPU-only):
-┌─────────────────────────────────────────────────────────┐
-│ Component              │ Latency    │ % of Total        │
-├────────────────────────┼────────────┼───────────────────┤
-│ Silence timeout        │ ~800 ms    │ dominant          │
-│ Final ASR inference    │ ~100 ms    │ fixed cost        │
-│ Mel extraction         │ ~0.06 ms   │ negligible        │
-│ Dictionary apply       │ <1 ms      │ negligible        │
-│ LLM post-processing    │ 500–2000ms │ varies by length  │
-│ Text delivery (paste)  │ ~5 ms      │ negligible        │
-├────────────────────────┼────────────┼───────────────────┤
-│ TOTAL (short phrase)   │ ~1.4 s     │                   │
-│ TOTAL (paragraph)      │ ~3.0 s     │                   │
-└─────────────────────────────────────────────────────────┘
+After-speech wait = utterance finalization + ASR completion + optional LLM cleanup + delivery
 ```
+
+Current benchmarked emphasis:
+
+| Stage | Cost Profile | Notes |
+|-------|--------------|-------|
+| Mel extraction | Negligible | Single-digit milliseconds or less on real fixtures |
+| ASR inference | Primary fixed cost | Depends on backend: Parakeet vs Qwen |
+| LLM cleanup | Variable | Triggered only for lower-confidence text |
+| Delivery | Small | Usually dominated by ASR/LLM, not paste/type output |
+| Memory footprint | Important secondary constraint | Both examples now print `RSS` and `Peak` |
 
 ### What Does NOT Add to After-Speech Wait
 
-- **Inference trigger threshold** (4800 samples / 300ms): Only affects how soon partials appear _during_ speech. The final delivery fires after silence, not after a threshold.
-- **Audio accumulation**: Runs concurrently with speech. Frame coalescing adds ~100ns per frame.
-- **Mel-spectrogram extraction**: At 0.06ms per 300ms chunk, it consumes 0.02% of the inference budget.
+- **Benchmark backend selection** only changes which ASR path is exercised, not the rest of the pipeline shape.
+- **Audio accumulation** runs concurrently with speech.
+- **Mel extraction** is not the limiting factor on the current local runs.
 
 ### Bottleneck Analysis
 
-1. **Silence timeout (800ms):** The biggest knob. Lowering to 200ms saves 600ms but risks splitting mid-sentence pauses into separate utterances. The right value depends on speaking style.
-
-2. **LLM post-processing (500–2000ms):** Proportional to input length. Short phrases (3–5 words) take ~500ms. Paragraphs (50+ words) can take 2s+. This is the cost of the hold-delivery model — you trade raw-speed for clean output.
-
-3. **ASR inference (~100ms):** Fixed cost per poll. The TDT model is already INT8 quantized; further reduction requires GPU or a smaller model.
+| Rank | Bottleneck | Why it matters |
+|------|------------|----------------|
+| 1 | ASR backend choice | The largest consistent latency/quality tradeoff is Parakeet INT8 vs Qwen INT4 |
+| 2 | LLM routing threshold | Cleanup can add a few hundred milliseconds on benchmark fixtures |
+| 3 | Utterance timing / VAD | Finalization timing changes perceived responsiveness materially |
+| 4 | Memory movement | Several recent optimizations removed hot-path copies and queue churn |
 
 ---
 
 ## Benchmarks
 
-### Pipeline Latency
+### Pipeline Stages
 
-Measures each stage of the dictation pipeline by simulating realistic audio frame arrival and ASR behavior.
+Measures isolated ASR, LLM, and VAD stages on real WAV fixtures. This is the best benchmark for comparing backend speed, quality, and memory use in isolation, but it is not the full dictation pipeline.
 
 ```bash
-cargo run --example pipeline_latency -p lune-app --release
+cargo run --example pipeline_stages -p lune-app --release
 
-# Optional: force a specific backend during the benchmark run
-ASR=qwen cargo run --example pipeline_latency -p lune-app --release
-ASR=parakeet cargo run --example pipeline_latency -p lune-app --release
+# Force a backend
+ASR=qwen cargo run --release --example pipeline_stages -p lune-app
+ASR=parakeet cargo run --release --example pipeline_stages -p lune-app
+
+# Equivalent CLI flag form
+cargo run --release --example pipeline_stages -p lune-app -- --asr qwen
+cargo run --release --example pipeline_stages -p lune-app -- --asr parakeet
 ```
 
 #### What It Measures
 
 | Stage | Description |
 |-------|-------------|
-| Audio frame accumulation | `extend_from_slice` throughput for 100 frames (3s audio) |
-| Inference trigger | Frames needed to reach threshold at various settings |
-| Segment tracker | `push_partial`, `check_silence_finalization`, `drain` throughput (100K ops) |
-| Silence timeout | Finalization latency at 500/300/200/150/100ms thresholds |
-| Full pipeline simulation | End-to-end simulation: audio → ASR → segment → silence → finalize → delivery |
+| Stage 1 | Qwen mel extraction on real fixtures |
+| Stage 2 | Real ASR inference on every available backend |
+| Stage 3 | Confidence gate behavior |
+| Stage 4 | Threshold sweep for LLM cleanup routing |
+| Stage 5 | VAD timing sweep |
+| Stage 6 | Adaptive VAD sweep |
 
-#### Sample Output
+#### Output Fields
 
-```
-── Stage 1: Audio Frame Accumulation ──────────────────────────────
-  Frame size:          480 samples (30 ms @ 16000 Hz)
-  Frames pushed:       100 (3000 ms of audio)
-  Buffer accumulation: 0.005 ms
-  Per-frame cost:      51 ns
+| Field | Meaning |
+|-------|---------|
+| `RTF` | Real-time factor. Lower is faster. |
+| `WER` / `CER` | Word / character error rate against fixture references |
+| `RSS` | Current resident memory from `/proc/self/status` |
+| `Peak` | Process high-water memory mark from `/proc/self/status` |
 
-── Stage 3: Segment Tracker ──────────────────────────────────────
-  push_partial × 100000:                 7.80 ms (78 ns/op)
-  check_silence × 100000:               0.22 ms (2 ns/op)
-  drain (1 segments):                    0.000 ms
+### Real Pipeline
 
-── Stage 5: Full Pipeline Simulation ─────────────────────────────
-  [Current (applied)]
-    Trigger threshold: 4800 samples (300 ms)
-    Silence timeout:   200 ms
-    Inference latency: 100 ms (simulated)
-    First inference:   300 ms after speech start
-    Speech duration:   1500 ms
-    PERCEIVED LATENCY: 1705 ms  (speech_end + silence + delivery)
-    After-speech wait: 205 ms   (silence_timeout + delivery)
-```
-
-### Mel-Spectrogram Throughput
-
-Profiles `extract_features()` across realistic audio lengths.
+Measures the real `SessionManager` path with VAD, ASR, LLM, and final delivery events. This is the closest benchmark to actual dictation behavior.
 
 ```bash
-cargo run --example mel_throughput -p lune-asr --release
+cargo run --release --example pipeline_real -p lune-app
+
+# Force a backend
+ASR=qwen cargo run --release --example pipeline_real -p lune-app
+ASR=parakeet cargo run --release --example pipeline_real -p lune-app
+
+# Equivalent CLI flag form
+cargo run --release --example pipeline_real -p lune-app -- --asr qwen
+cargo run --release --example pipeline_real -p lune-app -- --asr parakeet
 ```
 
 #### What It Measures
 
 | Stage | Description |
 |-------|-------------|
-| OnceLock cache init | Cold vs warm call (filterbank + window construction) |
-| Latency scaling | Extraction time for 30ms – 30s audio |
-| Sustained streaming | 100 back-to-back 300ms chunks (simulates continuous inference) |
-| Percentile distribution | min/p50/p90/p99/max over 100 samples |
-| Shape & stability | Output dimensions and NaN/Inf checks |
-| Budget analysis | Where mel fits in the 300ms inference cycle |
+| Full-session wall time | End-to-end time from session start to final text event |
+| WER / CER | Quality after the real session path, not just raw ASR |
+| Memory after ASR / LLM load | Per-process model footprint before fixtures run |
+| Per-fixture memory | Current and peak memory while processing the fixture |
 
-#### Sample Output (Intel i7, CPU-only)
+### Recent Benchmark Snapshot
 
-```
-── Stage 1: Static Cache Initialization (OnceLock) ──────────────
-  Cold call (filterbank + window init):    0.361 ms
-  Warm call (OnceLock cache hit):          0.018 ms
-  One-time init overhead:                  0.343 ms
+Recent local runs on this repository produced the following comparisons.
 
-── Stage 2: Extraction Latency by Audio Length ──────────────────
-  Duration    Samples    Frames      Latency     Throughput       RTF
-  ────────────────────────────────────────────────────────────────────
-  30 ms          480        5      0.003 ms   160,000,000 S/s  0.0001x
-  300 ms        4800       31      0.058 ms    82,800,000 S/s  0.0002x
-  1000 ms      16000      101      0.190 ms    84,200,000 S/s  0.0002x
-  5000 ms      80000      501      0.942 ms    84,900,000 S/s  0.0002x
-  30000 ms    480000     3001      5.620 ms    85,400,000 S/s  0.0002x
+#### `pipeline_stages` Aggregate Winner
 
-── Stage 3: Sustained Streaming Throughput ──────────────────────
-  Chunks processed:    100
-  Audio simulated:     30000 ms (30.0 s)
-  Total wall time:     5.80 ms
-  Sustained RTF:       0.0002x  → 0.02% of 300ms budget consumed
+| Backend | Avg ASR Time | Avg RTF | Peak Memory | Notes |
+|---------|--------------|---------|-------------|-------|
+| Parakeet INT8 | `1.308s` | `0.045x` | `3186 MB` | Best overall latency/quality balance |
+| Qwen INT4 | `1.476s` | `0.051x` | `2690 MB` | Lower memory, slightly slower aggregate |
 
-── Stage 4: Latency Percentiles (300ms chunk, 100 samples) ─────
-  min=0.040  p50=0.058  p90=0.072  p99=0.120  max=0.180  (ms)
+#### `pipeline_real` Aggregate Winner
 
-  Mel extraction consumes a fraction of the 300ms inference budget.
-  The bottleneck is TDT ONNX inference, not preprocessing.
+| Backend | Avg Wall Time | Avg WER | Avg CER | Peak Memory | Notes |
+|---------|---------------|---------|---------|-------------|-------|
+| Parakeet INT8 | `1.520s` | `2.53%` | `2.2%` | `2789 MB` | Current default recommendation |
+| Qwen INT4 | `2.379s` | `3.2%` | `2.5%` | `2737 MB` | Good fallback when memory matters more |
 
-  300ms inference cycle budget:
-    Mel extraction (p50):     0.058 ms  (0.0%)
-    TDT inference (est):      100.0 ms  (33.3%)
-    Segment tracker ops:        0.002 ms  (<0.1%)
-    ────────────────────────────────────────────
-    Remaining headroom:       199.9 ms  (66.6%)
+#### Qwen INT4 Stage-2 ASR After Export Fix
 
-  Throughput upper bound (mel only, no inference):
-    17241 chunks/s  →  5172x real-time
-```
+| Fixture | Total | RTF | WER | CER |
+|---------|-------|-----|-----|-----|
+| `librispeech_clean` | `1.091s` | `0.047x` | `1.6%` | `0.3%` |
+| `librispeech_40744` | `1.755s` | `0.059x` | `4.8%` | `4.3%` |
+| `custom_recording` | `1.581s` | `0.046x` | `2.5%` | `1.1%` |
 
-#### Key Takeaways
+#### Practical Takeaway
 
-- Mel extraction is **not a bottleneck**. At 0.058ms per 300ms chunk, it's 5000× faster than real-time.
-- The OnceLock initialization cost (0.3ms) is paid exactly once per process lifetime.
-- Sustained streaming shows consistent performance with no degradation over 100 consecutive chunks.
-- p99 latency (0.12ms) is still negligible — no tail latency concern.
+| Choice | Recommended When |
+|--------|-------------------|
+| Parakeet INT8 | You want the best default speed/quality tradeoff |
+| Qwen INT4 | You want the Qwen path specifically or lower memory in the latency benchmark |
 
 ---
 
@@ -301,10 +279,16 @@ valgrind --tool=dhat ./target/release/lune-voice daemon
 ### Running benchmarks
 
 ```bash
-# Both benchmarks
-cargo run --example pipeline_latency -p lune-app --release
-cargo run --example mel_throughput -p lune-asr --release
+# Stage-oriented latency benchmark
+cargo run --release --example pipeline_stages -p lune-app
 
-# Quick smoke test (unit tests include perf-relevant assertions)
+# Real end-to-end session benchmark
+cargo run --release --example pipeline_real -p lune-app
+
+# Optional backend forcing
+ASR=qwen cargo run --release --example pipeline_stages -p lune-app
+ASR=parakeet cargo run --release --example pipeline_real -p lune-app
+
+# Quick regression pass
 cargo test --workspace --release
 ```

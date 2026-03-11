@@ -2,10 +2,12 @@
 //!
 //! Included via `#[path = "bench_utils.rs"] mod bench_utils;` from each example.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
+use lune_asr::{AsrRegistry, OrtForcedAligner};
 use lune_core::asr::AsrBackendKind;
-use lune_core::config::AsrBackendConfig;
+use lune_core::config::{AsrBackendConfig, UserSettings};
 
 // ─── Fixture ────────────────────────────────────────────────────────────────
 
@@ -180,6 +182,66 @@ pub fn benchmark_asr_entry(root: &std::path::Path) -> Result<BenchmarkAsrEntry, 
             ),
             None => "No ASR model dir found under models/.".to_string(),
         })
+}
+
+pub fn benchmark_aligner_enabled() -> bool {
+    if let Ok(raw) = std::env::var("ALIGNER") {
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "1" | "true" | "on" => return true,
+            "0" | "false" | "off" => return false,
+            _ => {
+                eprintln!("  [warn] Ignoring unsupported ALIGNER={raw:?}; expected 0/1/false/true")
+            }
+        }
+    }
+
+    UserSettings::default()
+        .aligner
+        .as_ref()
+        .map(|cfg| cfg.enabled)
+        .unwrap_or(false)
+}
+
+pub fn benchmark_aligner(asr: &AsrRegistry, root: &Path) -> Option<Arc<OrtForcedAligner>> {
+    if !benchmark_aligner_enabled() {
+        return None;
+    }
+
+    let Some(backend) = asr.as_ort_qwen() else {
+        return None;
+    };
+
+    let fa_dir = root.join("models/wav2vec2-fa");
+    let fa_model = fa_dir.join("model.onnx");
+    let fa_config = fa_dir.join("fa_config.json");
+
+    if !fa_model.exists() || !fa_config.exists() {
+        eprintln!(
+            "  [warn] ALIGNER enabled but {} is missing model.onnx/fa_config.json; skipping",
+            fa_dir.display()
+        );
+        return None;
+    }
+
+    match backend.make_forced_aligner(&fa_dir) {
+        Ok(fa) => {
+            let fa = Arc::new(fa);
+            backend.attach_aligner(Arc::clone(&fa));
+            println!("  Forced aligner: attached ({})", fa_dir.display());
+            Some(fa)
+        }
+        Err(error) => {
+            eprintln!(
+                "  [warn] forced aligner load failed at {}: {error}",
+                fa_dir.display()
+            );
+            None
+        }
+    }
+}
+
+pub fn maybe_attach_benchmark_aligner(asr: &AsrRegistry, root: &Path) {
+    let _ = benchmark_aligner(asr, root);
 }
 
 pub fn load_fixtures(root: &std::path::Path) -> Vec<Fixture> {

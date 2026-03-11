@@ -28,6 +28,22 @@ const tauriBackendClient: BackendClient = {
   deleteDictionaryEntry(id) {
     return invoke<BackendWorkspaceSnapshot>("delete_dictionary_entry", { entryId: id });
   },
+
+  startDictation() {
+    return invoke<string>("start_dictation");
+  },
+
+  stopDictation() {
+    return invoke<void>("stop_dictation");
+  },
+
+  cancelDictation() {
+    return invoke<void>("cancel_dictation");
+  },
+
+  toggleDictation() {
+    return invoke<string | null>("toggle_dictation");
+  },
 };
 
 export const backendClient = isTauriRuntime() ? tauriBackendClient : mockBackendClient;

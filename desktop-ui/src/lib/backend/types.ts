@@ -66,4 +66,19 @@ export interface BackendClient {
     priority: number,
   ): Promise<BackendWorkspaceSnapshot>;
   deleteDictionaryEntry(id: number): Promise<BackendWorkspaceSnapshot>;
+  startDictation(): Promise<string>;
+  stopDictation(): Promise<void>;
+  cancelDictation(): Promise<void>;
+  toggleDictation(): Promise<string | null>;
 }
+
+export type SessionStreamEvent =
+  | { type: "serviceStatus"; status: string }
+  | { type: "sessionStarted"; sessionId: string }
+  | { type: "partialText" }
+  | { type: "processing" }
+  | { type: "finalizedText"; text: string }
+  | { type: "correctedText"; text: string }
+  | { type: "commandDetected"; payload: string }
+  | { type: "sessionStopped" }
+  | { type: "sessionError"; message: string };

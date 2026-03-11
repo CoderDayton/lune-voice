@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceSnapshot {
     pub ipc_flavor: &'static str,
-    pub service_status: &'static str,
+    pub service_status: String,
     pub settings: WorkspaceSettingsDto,
     pub history: Vec<HistoryItemDto>,
     pub dictionary: Vec<DictionaryItemDto>,
@@ -53,4 +53,18 @@ pub struct CreateDictionaryEntryInput {
     pub phrase: String,
     pub replacement: String,
     pub priority: u8,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum SessionStreamEvent {
+    ServiceStatus { status: String },
+    SessionStarted { session_id: String },
+    PartialText,
+    Processing,
+    FinalizedText { text: String },
+    CorrectedText { text: String },
+    CommandDetected { payload: String },
+    SessionStopped,
+    SessionError { message: String },
 }

@@ -92,7 +92,7 @@ fn build_snapshot(
 
     Ok(WorkspaceSnapshot {
         ipc_flavor: "tauri",
-        service_status: "ready",
+        service_status: "ready".into(),
         settings: settings_to_dto(&settings),
         history,
         dictionary,

@@ -1,6 +1,10 @@
 import { Store } from "@tanstack/store";
 import { backendClient } from "../lib/backend/client";
-import type { BackendHistoryEntry, BackendWorkspaceSnapshot } from "../lib/backend/types";
+import type {
+  BackendHistoryEntry,
+  BackendWorkspaceSnapshot,
+  SessionStreamEvent,
+} from "../lib/backend/types";
 import type { DictionaryEntry } from "../features/dictionary/data/dictionary-data";
 import {
   labelForAsrBackend,
@@ -43,6 +47,8 @@ export interface HistorySession {
 interface WorkspaceRuntimeState {
   ipcFlavor: string;
   serviceStatus: string;
+  activeSessionId: string | null;
+  liveTranscript: string;
   loaded: boolean;
   loading: boolean;
   error: string | null;
@@ -80,6 +86,8 @@ export function createInitialWorkspaceState(): WorkspaceState {
     runtime: {
       ipcFlavor: "unknown",
       serviceStatus: "Connecting",
+      activeSessionId: null,
+      liveTranscript: "",
       loaded: false,
       loading: false,
       error: null,
@@ -158,10 +166,19 @@ export const workspaceActions = {
       runtime: {
         ipcFlavor: snapshot.ipcFlavor,
         serviceStatus: snapshot.serviceStatus,
+        activeSessionId: state.runtime.activeSessionId,
+        liveTranscript: state.runtime.liveTranscript,
         loaded: true,
         loading: false,
         error: null,
       },
+    }));
+  },
+
+  applySessionEvent(event: SessionStreamEvent) {
+    workspaceStore.setState((state) => ({
+      ...state,
+      runtime: reduceSessionEvent(state.runtime, event),
     }));
   },
 };
@@ -246,6 +263,44 @@ export async function removeDictionaryEntry(id: number) {
   }
 }
 
+export async function startDictation() {
+  try {
+    workspaceActions.setError(null);
+    return await backendClient.startDictation();
+  } catch (error) {
+    workspaceActions.setError(formatError(error));
+    return null;
+  }
+}
+
+export async function stopDictation() {
+  try {
+    workspaceActions.setError(null);
+    await backendClient.stopDictation();
+  } catch (error) {
+    workspaceActions.setError(formatError(error));
+  }
+}
+
+export async function cancelDictation() {
+  try {
+    workspaceActions.setError(null);
+    await backendClient.cancelDictation();
+  } catch (error) {
+    workspaceActions.setError(formatError(error));
+  }
+}
+
+export async function toggleDictation() {
+  try {
+    workspaceActions.setError(null);
+    return await backendClient.toggleDictation();
+  } catch (error) {
+    workspaceActions.setError(formatError(error));
+    return null;
+  }
+}
+
 export function getVisibleHistorySessions(state: WorkspaceState) {
   const query = state.historySearch.trim().toLowerCase();
 
@@ -320,4 +375,45 @@ function formatThreshold(value: number) {
 
 function formatError(error: unknown) {
   return error instanceof Error ? error.message : "Unable to reach the desktop backend.";
+}
+
+function reduceSessionEvent(runtime: WorkspaceRuntimeState, event: SessionStreamEvent): WorkspaceRuntimeState {
+  switch (event.type) {
+    case "serviceStatus":
+      return { ...runtime, serviceStatus: event.status };
+    case "sessionStarted":
+      return {
+        ...runtime,
+        activeSessionId: event.sessionId,
+        serviceStatus: "listening",
+        liveTranscript: "",
+        error: null,
+      };
+    case "processing":
+      return { ...runtime, serviceStatus: "processing" };
+    case "finalizedText":
+      return {
+        ...runtime,
+        serviceStatus: "ready",
+        liveTranscript: [runtime.liveTranscript, event.text].filter(Boolean).join(" ").trim(),
+      };
+    case "correctedText":
+      return { ...runtime, liveTranscript: event.text };
+    case "sessionStopped":
+      return {
+        ...runtime,
+        activeSessionId: null,
+        serviceStatus: runtime.serviceStatus === "error" ? "error" : "ready",
+      };
+    case "sessionError":
+      return {
+        ...runtime,
+        activeSessionId: null,
+        serviceStatus: "error",
+        error: event.message,
+      };
+    case "partialText":
+    case "commandDetected":
+      return runtime;
+  }
 }

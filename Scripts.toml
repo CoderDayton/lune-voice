@@ -57,13 +57,13 @@ info = "Real-model integration tests (--env GPU=1 for CUDA)"
 interpreter = "bash"
 command = '''
 F=""; [ "$GPU" = "1" ] && F="--features cuda"
-case "${TYPE:-latency}" in
-  latency) cargo run --release $F --example pipeline_latency -p lune-app ;;
-  full)    cargo run --release $F --example pipeline_full -p lune-app ;;
-  *)       echo "TYPE must be latency or full"; exit 1 ;;
+case "${TYPE:-real}" in
+  stages) cargo run --release $F --example pipeline_stages -p lune-app ;;
+  real)   cargo run --release $F --example pipeline_real -p lune-app ;;
+  *)      echo "TYPE must be stages or real"; exit 1 ;;
 esac
 '''
-info = "Benchmark (--env TYPE=latency|full, --env GPU=1 for CUDA)"
+info = "Benchmark (--env TYPE=stages|real, --env GPU=1 for CUDA)"
 
 # ── Build ────────────────────────────────────────────────────────────────────
 

@@ -75,6 +75,7 @@ fn run_daemon() {
         &paths.models_dir(),
         &settings.asr_backend,
         &settings.llm_backend,
+        settings.aligner.as_ref(),
     )
     .expect("ensure models downloaded");
 
@@ -241,8 +242,8 @@ async fn run_pipeline(
                     Some(fa)
                 }
                 Err(e) => {
-                    tracing::error!(error = %e, model_dir = %cfg.model_dir.display(), "failed to build forced aligner");
-                    return;
+                    tracing::warn!(error = %e, model_dir = %cfg.model_dir.display(), "failed to build forced aligner, continuing without it");
+                    None
                 }
             }
         }

@@ -162,13 +162,16 @@ modifiers = []
 key = "Escape"
 
 
-# ── Forced aligner (optional) ─────────────────────────────────────────────────
+# ── Forced aligner (enabled by default) ───────────────────────────────────────
 #
 # NAR forced-aligner for post-utterance word-order correction.
 # Runs after each silence flush; emits CorrectedText if words arrived out-of-order.
-# Requires a separately exported model: `uv run python scripts/export_onnx.py --fa`
+# Default runtime path: ~/.local/share/lune-voice/models/wav2vec2-fa/
+# TODO: temporary local-export path until the ONNX aligner bundle is uploaded
+# to Hugging Face and wired into the standard model downloader.
+# Export it with: `uv run python scripts/export_onnx.py --fa`
 #
-# Uncomment to enable:
+# Uncomment to override the default:
 # [aligner]
 # enabled = true
-# model_dir = ""   # leave empty for ~/.local/share/lune-voice/models/qwen3-fa-0.6b-onnx/
+# model_dir = "/custom/path/to/wav2vec2-fa"

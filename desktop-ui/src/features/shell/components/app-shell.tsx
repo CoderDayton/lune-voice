@@ -3,7 +3,11 @@ import { Outlet, useRouterState } from "@tanstack/react-router";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
 import { findNavigationItem } from "../config/navigation";
-import { loadWorkspaceSnapshot } from "../../../store/workspace-store";
+import { attachSessionStream, listenToWorkspaceInvalidation } from "../../../lib/backend/stream";
+import {
+  loadWorkspaceSnapshot,
+  workspaceActions,
+} from "../../../store/workspace-store";
 
 export function AppShell() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
@@ -11,6 +15,35 @@ export function AppShell() {
 
   useEffect(() => {
     void loadWorkspaceSnapshot();
+  }, []);
+
+  useEffect(() => {
+    let disposeSession = () => {};
+    let disposeHistory = () => {};
+    let disposeDictionary = () => {};
+    let disposeSettings = () => {};
+
+    void (async () => {
+      disposeSession = await attachSessionStream((event) => {
+        workspaceActions.applySessionEvent(event);
+      });
+      disposeHistory = await listenToWorkspaceInvalidation("lune://history-changed", () => {
+        void loadWorkspaceSnapshot();
+      });
+      disposeDictionary = await listenToWorkspaceInvalidation("lune://dictionary-changed", () => {
+        void loadWorkspaceSnapshot();
+      });
+      disposeSettings = await listenToWorkspaceInvalidation("lune://settings-changed", () => {
+        void loadWorkspaceSnapshot();
+      });
+    })();
+
+    return () => {
+      disposeSession();
+      disposeHistory();
+      disposeDictionary();
+      disposeSettings();
+    };
   }, []);
 
   return (

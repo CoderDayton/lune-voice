@@ -107,7 +107,10 @@ impl Default for UserSettings {
             session_history_days: Some(30),
             word_confidence_threshold: default_word_confidence_threshold(),
             max_speech_secs: default_max_speech_secs(),
-            aligner: None,
+            aligner: Some(AlignerConfig {
+                enabled: true,
+                model_dir: PathBuf::new(),
+            }),
             adaptive_vad: false,
             pipeline: PipelineOverrides::default(),
         }
