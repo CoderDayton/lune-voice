@@ -80,7 +80,7 @@ rustfft = "6.4"
 hf-hub = "0.4"
 tokenizers = { version = "0.21", default-features = false, features = ["onig"] }
 async-openai = { version = "0.33", features = ["chat-completion"] }
-reqwest = { version = "0.12", features = ["json", "multipart"] }
+reqwest = { version = "0.13", features = ["json", "multipart"] }
 zbus = "5"
 evdev = "0.13"
 smallvec = { version = "1", features = ["union"] }
