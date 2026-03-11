@@ -175,9 +175,9 @@ Delivery modes (handled in `main.rs`):
 
 | Mode | Implementation |
 |------|----------------|
-| TypeInPlace | `enigo` (cross-platform keyboard synthesis) / `wtype` (Wayland) |
-| Clipboard | `arboard` (cross-platform clipboard) |
-| Both | Both of the above |
+| TypeInPlace | Clipboard paste via uinput: `wl-copy`/`xclip` → terminal detection → Ctrl+V or Ctrl+Shift+V. Adaptive post-paste delay (EMA of clipboard RTT). Per-key fallback for paste-hostile apps. |
+| Clipboard | `wl-copy` (Wayland) / `xclip` (X11) — clipboard only, no paste chord |
+| Both | Clipboard paste (same as TypeInPlace; clipboard is set as side effect) |
 
 ---
 

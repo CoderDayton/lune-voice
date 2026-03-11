@@ -14,10 +14,10 @@ use crate::fillers::{self, FillerError};
 pub const SYSTEM: &str = "You are a transcript correction tool. Your only job is to fix words marked with [?word?].\n\
 Rules:\n\
 - Output ONLY the corrected transcript.\n\
-- Copy every word NOT inside [?...?] exactly as-is.\n\
+- Copy every unmarked word EXACTLY as-is, including profanity, slang, and repeated words.\n\
 - Replace each [?word?] with the contextually correct word, no markers.\n\
 - Delete [?um?] [?uh?] and filler variants entirely.\n\
-- Do not rephrase, summarize, or add punctuation.";
+- NEVER censor, rephrase, reorder, summarize, add punctuation, or remove words.";
 
 /// Build a ChatML inference prompt (assistant turn left open).
 ///
@@ -122,6 +122,88 @@ impl PromptBuilder {
         let cleaned = fillers::remove_fillers(raw, &self.lang)?;
         Ok(self.build_prompt(&cleaned))
     }
+}
+
+/// Extract unmarked (non-`[?..?]`) words from a marked input string.
+///
+/// Words inside `[?..?]` markers are skippable by the LLM — they can be
+/// replaced, deleted, or corrected. Unmarked words MUST be preserved.
+fn extract_unmarked_words(input: &str) -> Vec<String> {
+    let mut result = Vec::new();
+    let mut current = String::new();
+    let mut chars = input.chars();
+
+    while let Some(c) = chars.next() {
+        if c == '[' {
+            // Peek ahead: is the next char '?'?
+            let rest = chars.as_str();
+            if rest.starts_with('?') {
+                // Flush accumulated unmarked text
+                for w in current.split_whitespace() {
+                    result.push(w.to_lowercase());
+                }
+                current.clear();
+                // Skip the '?' we peeked
+                chars.next();
+                // Skip until closing ?]
+                loop {
+                    match chars.next() {
+                        Some('?') => {
+                            if chars.as_str().starts_with(']') {
+                                chars.next(); // consume ']'
+                                break;
+                            }
+                        }
+                        Some(_) => {}
+                        None => break, // unclosed marker — EOF
+                    }
+                }
+            } else {
+                current.push(c);
+            }
+        } else {
+            current.push(c);
+        }
+    }
+    // Flush remaining
+    for w in current.split_whitespace() {
+        result.push(w.to_lowercase());
+    }
+    result
+}
+
+/// Validate that all unmarked words from the input appear in the LLM output
+/// in order (case-insensitive).
+///
+/// This catches the most dangerous LLM failure mode: silently changing or
+/// dropping words that were NOT marked as uncertain. If the LLM was only
+/// supposed to fix `[?word?]` spans, every other word must survive.
+///
+/// Returns `true` if all unmarked input words appear in the output in order.
+pub fn validate_preservation(input: &str, output: &str) -> bool {
+    let unmarked = extract_unmarked_words(input);
+    if unmarked.is_empty() {
+        return true; // all words were marked — LLM can change anything
+    }
+    if output.is_empty() {
+        return false;
+    }
+
+    let output_words: Vec<String> = output
+        .split_whitespace()
+        .map(|w| w.to_lowercase())
+        .collect();
+
+    // Greedy order-preserving subsequence match
+    let mut out_idx = 0;
+    for word in &unmarked {
+        let found = output_words[out_idx..].iter().position(|w| w == word);
+        match found {
+            Some(pos) => out_idx += pos + 1,
+            None => return false,
+        }
+    }
+    true
 }
 
 /// Strip residual `[?word?]` and `[word]` markers from LLM output.
@@ -245,5 +327,78 @@ mod tests {
         let p = pb.build_prompt("test");
         assert!(p.contains("Custom prompt."));
         assert!(!p.contains(SYSTEM));
+    }
+
+    // ── Preservation validation tests ───────────────────────────────────
+
+    #[test]
+    fn validate_preserves_all_unmarked_words() {
+        // LLM correctly replaced [?recieve?] with "receive" — valid
+        let input = "the [?recieve?] button works";
+        let output = "the receive button works";
+        assert!(validate_preservation(input, output));
+    }
+
+    #[test]
+    fn validate_detects_dropped_unmarked_word() {
+        // LLM silently dropped "works" — invalid
+        let input = "the [?recieve?] button works";
+        let output = "the receive button";
+        assert!(!validate_preservation(input, output));
+    }
+
+    #[test]
+    fn validate_detects_changed_unmarked_word() {
+        // LLM changed "button" to "feature" — invalid
+        let input = "the [?recieve?] button works";
+        let output = "the receive feature works";
+        assert!(!validate_preservation(input, output));
+    }
+
+    #[test]
+    fn validate_allows_case_changes() {
+        // Case changes on unmarked words are acceptable
+        let input = "the [?recieve?] Button works";
+        let output = "the receive button works";
+        assert!(validate_preservation(input, output));
+    }
+
+    #[test]
+    fn validate_no_markers_all_preserved() {
+        // No markers at all — every word must be preserved
+        let input = "hello world";
+        let output = "hello world";
+        assert!(validate_preservation(input, output));
+    }
+
+    #[test]
+    fn validate_no_markers_word_changed() {
+        // No markers — LLM changed a word it shouldn't have
+        let input = "hello world";
+        let output = "hello earth";
+        assert!(!validate_preservation(input, output));
+    }
+
+    #[test]
+    fn validate_all_markers() {
+        // All words are marked — LLM can change everything
+        let input = "[?helo?] [?wrld?]";
+        let output = "hello world";
+        assert!(validate_preservation(input, output));
+    }
+
+    #[test]
+    fn validate_empty_output_fails() {
+        let input = "the [?recieve?] button";
+        let output = "";
+        assert!(!validate_preservation(input, output));
+    }
+
+    #[test]
+    fn validate_filler_markers_removed() {
+        // Fillers wrapped in [?..?] removed by LLM — the unmarked words must remain
+        let input = "the [?um?] meeting [?recieve?] starts";
+        let output = "the meeting receive starts";
+        assert!(validate_preservation(input, output));
     }
 }

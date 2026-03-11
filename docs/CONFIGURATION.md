@@ -281,9 +281,9 @@ dictation_mode = "TypeInPlace"
 
 | Mode | Behavior |
 |------|----------|
-| `TypeInPlace` | Types corrected text into the currently focused input field using keyboard synthesis (`enigo` / `wtype`) **(default)** |
-| `Clipboard` | Copies corrected text to the system clipboard only (via `arboard`) |
-| `Both` | Types into focused field AND copies to clipboard |
+| `TypeInPlace` | Pastes corrected text into the focused input field via clipboard + uinput paste chord (Ctrl+V or Ctrl+Shift+V for terminals). Adaptive delay, Unicode-safe. Falls back to per-key typing if clipboard tools are unavailable. **(default)** |
+| `Clipboard` | Copies corrected text to the system clipboard only (via `wl-copy` / `xclip`) |
+| `Both` | Pastes into focused field (same as TypeInPlace) AND leaves text on clipboard |
 
 Switch at runtime:
 

@@ -275,9 +275,14 @@ fn prepare_text_for_llm(
     segment_text: &str,
     threshold: f32,
     lang_tag: &str,
+    contextual: bool,
 ) -> (String, bool) {
     if source_text == segment_text {
-        return lune_llm::prepare_input(segments, threshold, lang_tag);
+        return if contextual {
+            lune_llm::prepare_input_contextual(segments, threshold, lang_tag)
+        } else {
+            lune_llm::prepare_input(segments, threshold, lang_tag)
+        };
     }
 
     // Remap word confidences onto rewritten text (after command stripping / FA reorder).
@@ -310,7 +315,10 @@ fn prepare_text_for_llm(
         .collect::<Vec<_>>()
         .join(" ");
 
-    let cleaned = match lune_llm::fillers::remove_fillers(&marked, lang_tag) {
+    // Only remove fillers that are marked uncertain ([?uh?]) — bare confident
+    // fillers are left for the LLM to handle. This prevents stripping real words
+    // that the ASR misheard as fillers (e.g. quick "you" → "uh").
+    let cleaned = match lune_llm::fillers::remove_fillers_marked_only(&marked, lang_tag) {
         Ok(text) => text,
         Err(_) => marked,
     };
@@ -481,32 +489,17 @@ async fn run_session<A: AsrBackend + 'static>(
                         }
                     }
 
-                    // At segment boundaries, flush the current ASR buffer and
-                    // reset context. Each segment decodes independently within
-                    // the encoder's attention window (≤7.5s via max_segment_ms).
+                    // Log segment boundaries from VAD but do NOT flush ASR here.
+                    // Audio accumulates in the backend's buffer; the final poll_final
+                    // after session end handles chunked inference internally (8s
+                    // overlapping windows + LCS/FA merge for Qwen, single-pass for Parakeet).
                     for boundary in &boundaries {
                         debug!(
                             start_ms = boundary.start_ms,
                             end_ms = boundary.end_ms,
                             avg_prob = format!("{:.2}", boundary.avg_prob),
-                            "speech segment boundary — flushing ASR"
+                            "speech segment boundary (audio accumulating)"
                         );
-                        match asr.poll_final(&asr_session).await {
-                            Ok(new_segments) => {
-                                if append_segments(&mut segments, &mut raw_text, new_segments) {
-                                    saw_asr_success = true;
-                                    let _ = event_tx.try_send(SessionEvent::PartialText(raw_text.clone()));
-                                }
-                            }
-                            Err(e) => {
-                                let msg = e.to_string();
-                                warn!(error = %msg, "poll_final error at segment boundary");
-                                first_asr_error.get_or_insert(msg);
-                            }
-                        }
-                        if let Err(e) = asr.reset_context(&asr_session).await {
-                            warn!(error = %e, "reset_context error at segment boundary");
-                        }
                     }
 
                     if speech_samples >= config.pipeline.max_speech_samples {
@@ -705,6 +698,7 @@ async fn run_session<A: AsrBackend + 'static>(
             &raw_text,
             threshold,
             lang_tag,
+            true, // use contextual confidence
         ),
         None => {
             // No confidence data (e.g. OpenAI backend) — skip LLM, pass through raw text.
@@ -1068,8 +1062,14 @@ mod tests {
             start_ms: Some(0),
             end_ms: Some(500),
         }];
-        let (prepared, has_uncertain) =
-            prepare_text_for_llm(&segments, "helo world", "helo new line world", 0.65, "en");
+        let (prepared, has_uncertain) = prepare_text_for_llm(
+            &segments,
+            "helo world",
+            "helo new line world",
+            0.65,
+            "en",
+            true,
+        );
         assert_eq!(prepared, "[?helo?] world");
         assert!(has_uncertain);
     }

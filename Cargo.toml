@@ -81,6 +81,4 @@ tokenizers = { version = "0.21", default-features = false, features = ["onig"] }
 async-openai = { version = "0.33", features = ["chat-completion"] }
 reqwest = { version = "0.12", features = ["json", "multipart"] }
 zbus = "5"
-enigo = { version = "0.6", features = ["wayland"] }
-arboard = "3"
 evdev = "0.13"

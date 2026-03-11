@@ -169,6 +169,21 @@ impl TextPostProcessor for LlamaCppBackend {
             });
         }
 
+        // Guard: word preservation — verify that every unmarked word from
+        // the input appears in the output in order. This catches the most
+        // dangerous failure mode: the LLM silently changing correct words.
+        if !prompt::validate_preservation(&input.raw_text, &result) {
+            tracing::warn!(
+                input = %input.raw_text,
+                output = %result,
+                "LLM preservation guard — unmarked words changed, using stripped raw text"
+            );
+            return Ok(PostProcessOutput {
+                cleaned_text: fallback,
+                metadata: None,
+            });
+        }
+
         Ok(PostProcessOutput {
             cleaned_text: result,
             metadata: None,

@@ -12,7 +12,6 @@ use ort::session::Session;
 use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig, WordConfidence};
 use lune_core::error::{Error, Result};
 
-use crate::lcs_merge::lcs_merge_words;
 use crate::ort_forced_aligner::{FaConfig, OrtForcedAligner};
 use crate::ort_qwen_stream;
 use crate::ort_utils::build_ort_session;
@@ -28,11 +27,6 @@ const MAX_ENCODER_SAMPLES: usize = 60 * 16_000;
 
 /// Decoder stays grounded within 8s (matches encoder's internal attention window).
 const CHUNK_SAMPLES: usize = 8 * 16_000;
-/// 2s overlap — at normal speech rate (~2.5 words/s) this yields ~5 shared
-/// words, well above the LCS ≥ 2 minimum for reliable stitching.
-const OVERLAP_SAMPLES: usize = 2 * 16_000;
-/// Step = chunk - overlap = 6s.
-const STEP_SAMPLES: usize = CHUNK_SAMPLES - OVERLAP_SAMPLES;
 /// Only chunk audio longer than this (oneshot is fine for short clips).
 const CHUNK_THRESHOLD: usize = 10 * 16_000;
 
@@ -334,20 +328,6 @@ fn tokens_to_word_confidences(
 
 // ── Chunked inference ───────────────────────────────────────────────────────
 
-/// A word with its confidence and timestamp (from FA or proportional estimate).
-struct TimedWord {
-    word: String,
-    confidence: f32,
-    /// Absolute start time in milliseconds from beginning of full audio.
-    abs_start_ms: u32,
-    /// Source chunk index (for overlap dedup: prefer more interior word).
-    chunk_idx: usize,
-    /// Source chunk's absolute start time in ms.
-    chunk_start_ms: u32,
-    /// Source chunk's absolute end time in ms.
-    chunk_end_ms: u32,
-}
-
 impl OrtQwenAsrBackend {
     /// Attach a forced aligner for timestamp-based chunk merging.
     /// Called after construction when the FA model is available.
@@ -365,13 +345,17 @@ impl OrtQwenAsrBackend {
         pcm: &[f32],
         forced_language: Option<&str>,
     ) -> Result<(String, Vec<WordConfidence>)> {
-        let mut chunk_results: Vec<(usize, String, ort_qwen_stream::OneshotResult)> = Vec::new();
+        let mut all_text = String::new();
+        let mut all_word_confs: Vec<WordConfidence> = Vec::new();
         // Accumulated token IDs from previous chunks — gives the decoder
         // linguistic context for continuation (what was already transcribed).
         let mut past_text_tokens: Vec<i64> = Vec::new();
 
+        let mut chunk_idx = 0usize;
         let mut offset = 0usize;
         while offset < pcm.len() {
+            // No overlap: past_text_tokens provides decoder context, so each
+            // chunk covers a unique audio region. Step = chunk size.
             let end = (offset + CHUNK_SAMPLES).min(pcm.len());
             let chunk = &pcm[offset..end];
 
@@ -398,255 +382,48 @@ impl OrtQwenAsrBackend {
                     self.has_attention_mask,
                     &past_text_tokens,
                 )?
-            }; // locks dropped here — FA can acquire them
+            }; // locks dropped here
 
             let text = result.text.trim().to_owned();
+            tracing::info!(
+                chunk = chunk_idx,
+                offset_s = offset as f32 / 16_000.0,
+                end_s = end as f32 / 16_000.0,
+                tokens = result.token_ids.len(),
+                text = %text,
+                "chunked ASR decode"
+            );
+
             if !text.is_empty() {
-                tracing::debug!(
-                    chunk = chunk_results.len(),
-                    offset_s = offset as f32 / 16_000.0,
-                    words = text.split_whitespace().count(),
-                    "chunked ASR segment"
-                );
                 // Accumulate tokens for next chunk's past_text conditioning.
                 past_text_tokens.extend_from_slice(&result.token_ids);
-                chunk_results.push((offset, text, result));
-            }
 
-            if end == pcm.len() {
-                break;
-            }
-            offset += STEP_SAMPLES;
-        }
-
-        if chunk_results.is_empty() {
-            return Ok((String::new(), vec![]));
-        }
-
-        // Single chunk — no merge needed.
-        if chunk_results.len() == 1 {
-            let (_, text, result) = chunk_results.into_iter().next().unwrap();
-            let wc =
-                tokens_to_word_confidences(&self.tokenizer, &result.token_ids, &result.log_probs);
-            return Ok((text, wc));
-        }
-
-        // Try FA-based timestamp merge, fall back to LCS.
-        if let Some(fa) = self.aligner.get() {
-            match self.merge_with_fa(fa, pcm, &chunk_results) {
-                Ok(result) => return Ok(result),
-                Err(e) => {
-                    tracing::warn!(error = %e, "FA timestamp merge failed, falling back to LCS");
+                // Simple concatenation — each chunk produces only new text.
+                if !all_text.is_empty() {
+                    all_text.push(' ');
                 }
+                all_text.push_str(&text);
+
+                let wc = tokens_to_word_confidences(
+                    &self.tokenizer,
+                    &result.token_ids,
+                    &result.log_probs,
+                );
+                all_word_confs.extend(wc);
             }
+
+            chunk_idx += 1;
+            offset = end; // step = chunk size (no overlap)
         }
 
-        // Fallback: LCS merge with per-chunk word confidences.
-        self.merge_with_lcs(&chunk_results)
-    }
+        tracing::info!(
+            chunks = chunk_idx,
+            total_words = all_text.split_whitespace().count(),
+            text = %all_text,
+            "chunked ASR merged"
+        );
 
-    /// Merge chunks using FA timestamps: align each chunk, assign absolute
-    /// timestamps, collect all words tagged by source chunk, then resolve
-    /// overlaps by keeping the word more interior to its source chunk.
-    fn merge_with_fa(
-        &self,
-        fa: &OrtForcedAligner,
-        pcm: &[f32],
-        chunks: &[(usize, String, ort_qwen_stream::OneshotResult)],
-    ) -> Result<(String, Vec<WordConfidence>)> {
-        let mut all_timed: Vec<TimedWord> = Vec::new();
-
-        for (i, (offset, text, result)) in chunks.iter().enumerate() {
-            let end = (*offset + CHUNK_SAMPLES).min(pcm.len());
-            let chunk_pcm = &pcm[*offset..end];
-            let chunk_start_ms = (*offset as u32) * 1000 / 16_000;
-            let chunk_end_ms = (end as u32) * 1000 / 16_000;
-
-            // Per-chunk word confidences from BPE tokens.
-            let bpe_confs =
-                tokens_to_word_confidences(&self.tokenizer, &result.token_ids, &result.log_probs);
-
-            // FA align for timestamps.
-            let timestamps = fa.align(chunk_pcm, text)?;
-
-            // Greedy text-match scanner: walk BPE words forward to find
-            // confidence for each FA word by text content (not position).
-            // Handles FA/BPE word count mismatches from tokenization differences.
-            let mut bpe_cursor = 0usize;
-            for wt in &timestamps {
-                let fa_word_lower = wt.text.to_ascii_lowercase();
-                let confidence = match bpe_confs[bpe_cursor..]
-                    .iter()
-                    .position(|wc| wc.word.to_ascii_lowercase() == fa_word_lower)
-                {
-                    Some(rel_idx) => {
-                        let matched = &bpe_confs[bpe_cursor + rel_idx];
-                        bpe_cursor += rel_idx + 1; // consume up to and including match
-                        matched.confidence
-                    }
-                    None => 0.5, // no BPE match — neutral confidence
-                };
-
-                all_timed.push(TimedWord {
-                    word: wt.text.clone(),
-                    confidence,
-                    abs_start_ms: chunk_start_ms + wt.start_ms,
-                    chunk_idx: i,
-                    chunk_start_ms,
-                    chunk_end_ms,
-                });
-            }
-        }
-
-        // Sort all words by timestamp.
-        all_timed.sort_by_key(|tw| tw.abs_start_ms);
-
-        // Resolve overlaps: when consecutive words from different chunks
-        // cover the same region, keep the one more interior to its source chunk.
-        // "Interiority" = min distance from either chunk edge.
-        let mut resolved: Vec<TimedWord> = Vec::with_capacity(all_timed.len());
-        let mut i = 0;
-        while i < all_timed.len() {
-            // Look ahead for words from a different chunk at similar timestamp.
-            // "Similar" = within overlap duration (2s).
-            let overlap_ms = (OVERLAP_SAMPLES as u32) * 1000 / 16_000;
-            let mut group_end = i + 1;
-            while group_end < all_timed.len()
-                && all_timed[group_end]
-                    .abs_start_ms
-                    .saturating_sub(all_timed[i].abs_start_ms)
-                    < overlap_ms
-                && all_timed[group_end]
-                    .word
-                    .eq_ignore_ascii_case(&all_timed[i].word)
-                && all_timed[group_end].chunk_idx != all_timed[i].chunk_idx
-            {
-                group_end += 1;
-            }
-
-            if group_end > i + 1 {
-                // Multiple versions of the same word from different chunks.
-                // Pick the one most interior to its source chunk.
-                let best = all_timed[i..group_end]
-                    .iter()
-                    .max_by_key(|tw| {
-                        let dist_from_start = tw.abs_start_ms.saturating_sub(tw.chunk_start_ms);
-                        let dist_from_end = tw.chunk_end_ms.saturating_sub(tw.abs_start_ms);
-                        dist_from_start.min(dist_from_end) // interiority
-                    })
-                    .unwrap();
-                resolved.push(TimedWord {
-                    word: best.word.clone(),
-                    confidence: best.confidence,
-                    abs_start_ms: best.abs_start_ms,
-                    chunk_idx: best.chunk_idx,
-                    chunk_start_ms: best.chunk_start_ms,
-                    chunk_end_ms: best.chunk_end_ms,
-                });
-                i = group_end;
-            } else {
-                // No overlap conflict — keep as-is.
-                let tw = &all_timed[i];
-                resolved.push(TimedWord {
-                    word: tw.word.clone(),
-                    confidence: tw.confidence,
-                    abs_start_ms: tw.abs_start_ms,
-                    chunk_idx: tw.chunk_idx,
-                    chunk_start_ms: tw.chunk_start_ms,
-                    chunk_end_ms: tw.chunk_end_ms,
-                });
-                i += 1;
-            }
-        }
-
-        // Safety net: adjacent dedup for any remaining artifacts.
-        resolved.dedup_by(|b, a| a.word.eq_ignore_ascii_case(&b.word));
-
-        let text = resolved
-            .iter()
-            .map(|tw| tw.word.as_str())
-            .collect::<Vec<_>>()
-            .join(" ");
-        let word_confidences = resolved
-            .into_iter()
-            .map(|tw| WordConfidence {
-                word: tw.word,
-                confidence: tw.confidence,
-            })
-            .collect();
-
-        Ok((text, word_confidences))
-    }
-
-    /// Fallback merge using LCS word-overlap stitching with per-chunk
-    /// word confidences carried through.
-    fn merge_with_lcs(
-        &self,
-        chunks: &[(usize, String, ort_qwen_stream::OneshotResult)],
-    ) -> Result<(String, Vec<WordConfidence>)> {
-        let mut merged_words: Vec<String> = Vec::new();
-        let mut merged_confs: Vec<f32> = Vec::new();
-
-        for (_, _, result) in chunks {
-            let text = result.text.trim();
-            if text.is_empty() {
-                continue;
-            }
-            let chunk_words: Vec<String> = text.split_whitespace().map(String::from).collect();
-            let chunk_wc =
-                tokens_to_word_confidences(&self.tokenizer, &result.token_ids, &result.log_probs);
-
-            // Build confidence vector aligned to chunk_words.
-            let chunk_confs: Vec<f32> = chunk_words
-                .iter()
-                .enumerate()
-                .map(|(j, _)| chunk_wc.get(j).map_or(0.5, |wc| wc.confidence))
-                .collect();
-
-            if merged_words.is_empty() {
-                merged_words = chunk_words;
-                merged_confs = chunk_confs;
-            } else {
-                let new_merged = lcs_merge_words(&merged_words, &chunk_words);
-                // Rebuild confidence: words from merged keep their conf,
-                // new words from chunk_words get chunk confidence.
-                let mut new_confs = Vec::with_capacity(new_merged.len());
-                let mut mi = 0usize; // index into old merged_words
-                let mut ci = 0usize; // index into chunk_words
-                for w in &new_merged {
-                    if mi < merged_words.len() && w.eq_ignore_ascii_case(&merged_words[mi]) {
-                        new_confs.push(merged_confs[mi]);
-                        mi += 1;
-                    } else if ci < chunk_words.len() && w.eq_ignore_ascii_case(&chunk_words[ci]) {
-                        new_confs.push(chunk_confs[ci]);
-                        ci += 1;
-                    } else {
-                        new_confs.push(0.5); // unmatched — neutral confidence
-                    }
-                }
-                merged_words = new_merged;
-                merged_confs = new_confs;
-            }
-        }
-
-        // Adjacent dedup.
-        let mut deduped_words: Vec<String> = Vec::with_capacity(merged_words.len());
-        let mut deduped_confs: Vec<f32> = Vec::with_capacity(merged_confs.len());
-        for (i, w) in merged_words.iter().enumerate() {
-            if i == 0 || !w.eq_ignore_ascii_case(&merged_words[i - 1]) {
-                deduped_words.push(w.clone());
-                deduped_confs.push(merged_confs[i]);
-            }
-        }
-
-        let text = deduped_words.join(" ");
-        let word_confidences = deduped_words
-            .into_iter()
-            .zip(deduped_confs)
-            .map(|(word, confidence)| WordConfidence { word, confidence })
-            .collect();
-
-        Ok((text, word_confidences))
+        Ok((all_text, all_word_confs))
     }
 }
 
@@ -676,14 +453,7 @@ impl AsrBackend for OrtQwenAsrBackend {
                         "ORT Qwen ASR does not support forced language hint `{language}`"
                     ))
                 })?;
-                // Skip prompt for English — model defaults to English and the prompt
-                // causes hallucination after context reset (decoder outputs the prompt
-                // text when there's no past-text context to anchor generation).
-                if mapped == "English" {
-                    None
-                } else {
-                    Some(format!("Transcribe the {mapped} audio into text."))
-                }
+                Some(format!("Transcribe the {mapped} audio into text."))
             }
             None => None,
         };
@@ -725,6 +495,7 @@ impl AsrBackend for OrtQwenAsrBackend {
             .map_err(|e| lock_err("session lock", e))?;
 
         if state.audio_buf.is_empty() {
+            tracing::info!("poll_final: audio buffer empty, no segments");
             return Ok(vec![]);
         }
 
@@ -784,6 +555,13 @@ impl AsrBackend for OrtQwenAsrBackend {
         };
 
         let text = text.trim().to_owned();
+        tracing::info!(
+            audio_samples = total,
+            audio_secs = total as f32 / 16_000.0,
+            text_len = text.len(),
+            text = %text,
+            "poll_final: transcription complete"
+        );
         if text.is_empty() {
             return Ok(vec![]);
         }

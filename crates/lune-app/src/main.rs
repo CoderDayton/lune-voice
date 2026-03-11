@@ -7,13 +7,10 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 mod cli;
 mod dbus;
-mod delivery;
 mod events;
 mod factory;
 #[cfg(unix)]
 mod hotkey_listener;
-#[cfg(unix)]
-mod uinput_typer;
 
 use std::sync::Arc;
 
@@ -23,7 +20,7 @@ use tracing_subscriber::{EnvFilter, fmt};
 use lune_core::command::VoiceCommand;
 use lune_core::config::DictationMode;
 
-use lune_app::{SessionManager, SessionManagerConfig};
+use lune_app::{DeliveryService, SessionManager, SessionManagerConfig};
 
 use crate::events::{AppCommand, AppStateUpdate};
 
@@ -35,7 +32,10 @@ fn main() {
     let first_str = first.as_deref().and_then(|s| s.to_str());
 
     match first_str {
-        Some("toggle" | "start" | "stop" | "cancel" | "status" | "quit" | "mode" | "settings") => {
+        Some(
+            "toggle" | "start" | "stop" | "cancel" | "status" | "quit" | "mode" | "settings"
+            | "history",
+        ) => {
             let collected: Vec<String> = std::env::args().skip(1).collect();
             cli::run_cli(&collected);
         }
@@ -43,7 +43,7 @@ fn main() {
         Some(other) => {
             eprintln!("unknown subcommand: {other}");
             eprintln!(
-                "usage: lune-voice [toggle|start|stop|cancel|status|mode|settings|quit|daemon]"
+                "usage: lune-voice [toggle|start|stop|cancel|status|mode|settings|history|quit|daemon]"
             );
             std::process::exit(1);
         }
@@ -141,6 +141,13 @@ fn run_daemon() {
 
     let settings = Arc::new(RwLock::new(settings));
 
+    // Open database early so DaemonInterface can serve history queries.
+    tracing::info!("opening database...");
+    factory::ensure_db_path(&paths.database_file()).expect("ensure DB path");
+    let db = Arc::new(tokio::sync::Mutex::new(
+        lune_persist::Database::open(&paths.database_file()).expect("open database"),
+    ));
+
     let dbus_iface = dbus::DaemonInterface::new(
         cmd_tx,
         Arc::clone(&shared_state),
@@ -148,6 +155,7 @@ fn run_daemon() {
         dictation_mode_tx,
         activation_mode_tx,
         Arc::clone(&settings_store),
+        Arc::clone(&db),
         rt.handle().clone(),
     );
 
@@ -170,7 +178,7 @@ fn run_daemon() {
     local.block_on(&rt, async move {
         run_pipeline(
             settings,
-            paths.database_file(),
+            db,
             paths.adaptive_vad_file(),
             pipeline_cmd_tx,
             cmd_rx,
@@ -188,7 +196,7 @@ fn run_daemon() {
 #[allow(clippy::too_many_arguments)]
 async fn run_pipeline(
     settings: Arc<RwLock<lune_core::config::UserSettings>>,
-    db_path: std::path::PathBuf,
+    db: Arc<tokio::sync::Mutex<lune_persist::Database>>,
     vad_state_path: std::path::PathBuf,
     cmd_tx: mpsc::Sender<AppCommand>,
     mut cmd_rx: mpsc::Receiver<AppCommand>,
@@ -245,12 +253,6 @@ async fn run_pipeline(
         _ => None,
     };
 
-    tracing::info!("opening database...");
-    factory::ensure_db_path(&db_path).expect("ensure DB path");
-    let db = Arc::new(tokio::sync::Mutex::new(
-        lune_persist::Database::open(&db_path).expect("open database"),
-    ));
-
     let dict_db = lune_persist::Database::open_in_memory().expect("open dict database");
     let dict = Arc::new(tokio::sync::Mutex::new(
         lune_dict::DictionaryManager::new(dict_db).expect("init dictionary"),
@@ -280,7 +282,7 @@ async fn run_pipeline(
         manager = manager.with_aligner(aligner);
     }
 
-    let delivery_service = delivery::DeliveryService::new();
+    let delivery_service = DeliveryService::new(snap.terminal_mode);
 
     tracing::info!("pipeline ready, waiting for commands");
 
@@ -375,7 +377,7 @@ async fn start_dictation<A: lune_core::asr::AsrBackend + 'static>(
     shared_state: &Arc<RwLock<String>>,
     dbus_conn: &zbus::Connection,
     dictation_mode_rx: watch::Receiver<DictationMode>,
-    delivery_service: delivery::DeliveryService,
+    delivery_service: DeliveryService,
 ) {
     tracing::info!("starting dictation");
     // Depth 64: matches command channel; avoids back-pressure stalls on bursts
@@ -428,7 +430,7 @@ async fn start_dictation<A: lune_core::asr::AsrBackend + 'static>(
 async fn handle_voice_command_payload(
     payload: &str,
     mode: DictationMode,
-    delivery_service: &delivery::DeliveryService,
+    delivery_service: &DeliveryService,
     cmd_tx: &mpsc::Sender<AppCommand>,
 ) {
     let Some(command) = parse_voice_command_payload(payload) else {

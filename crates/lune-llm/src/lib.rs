@@ -8,4 +8,4 @@ pub mod prompt;
 #[cfg(feature = "mistralrs-backend")]
 pub use llamacpp_backend::{LlamaCppBackend, LlamaCppConfig};
 pub use openai_backend::{OpenAiLlmBackend, OpenAiLlmConfig};
-pub use prepare::prepare_input;
+pub use prepare::{prepare_input, prepare_input_contextual};
