@@ -13,7 +13,7 @@ tracing.workspace = true
 cpal = "0.17"
 
 # Resampling (adaptive rate conversion)
-rubato = "0.15"
+rubato = "1.0"
 
 # Lock-free ring buffer
 crossbeam-channel = "0.5"
