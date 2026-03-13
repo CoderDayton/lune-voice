@@ -88,7 +88,7 @@ pub async fn start_dictation(runtime: State<'_, AppRuntime>) -> Result<String, S
         tauri::async_runtime::block_on(runtime.start_dictation())
     })
     .await
-    .map_err(|e| format!("start dictation task failed: {e}"))?
+    .map_err(|e| format!("start dictation task panicked: {e}"))?
 }
 
 #[tauri::command]
@@ -98,7 +98,7 @@ pub async fn stop_dictation(runtime: State<'_, AppRuntime>) -> Result<(), String
         tauri::async_runtime::block_on(runtime.stop_dictation())
     })
     .await
-    .map_err(|e| format!("stop dictation task failed: {e}"))?
+    .map_err(|e| format!("stop dictation task panicked: {e}"))?
 }
 
 #[tauri::command]
@@ -108,7 +108,7 @@ pub async fn cancel_dictation(runtime: State<'_, AppRuntime>) -> Result<(), Stri
         tauri::async_runtime::block_on(runtime.cancel_dictation())
     })
     .await
-    .map_err(|e| format!("cancel dictation task failed: {e}"))?
+    .map_err(|e| format!("cancel dictation task panicked: {e}"))?
 }
 
 #[tauri::command]
@@ -118,5 +118,5 @@ pub async fn toggle_dictation(runtime: State<'_, AppRuntime>) -> Result<Option<S
         tauri::async_runtime::block_on(runtime.toggle_dictation())
     })
     .await
-    .map_err(|e| format!("toggle dictation task failed: {e}"))?
+    .map_err(|e| format!("toggle dictation task panicked: {e}"))?
 }

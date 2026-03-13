@@ -32,6 +32,9 @@ pub fn save_workspace_settings(input: WorkspaceSettingsDto) -> Result<WorkspaceS
     build_snapshot(settings, &mut database)
 }
 
+/// Maximum length for dictionary phrase/replacement strings.
+const DICT_ENTRY_MAX_LEN: usize = 1024;
+
 pub fn create_dictionary_entry(
     input: CreateDictionaryEntryInput,
 ) -> Result<WorkspaceSnapshot, String> {
@@ -40,6 +43,19 @@ pub fn create_dictionary_entry(
     let replacement = input.replacement.trim();
     if phrase.is_empty() || replacement.is_empty() {
         return Err("phrase and replacement are required".into());
+    }
+    if phrase.len() > DICT_ENTRY_MAX_LEN || replacement.len() > DICT_ENTRY_MAX_LEN {
+        return Err(format!(
+            "dictionary entries must be at most {DICT_ENTRY_MAX_LEN} characters"
+        ));
+    }
+    // Reject control characters (except newline/tab) to prevent injection.
+    if phrase
+        .chars()
+        .chain(replacement.chars())
+        .any(|c| c.is_control() && c != '\n' && c != '\t')
+    {
+        return Err("dictionary entries must not contain control characters".into());
     }
 
     let mut database = open_database(&paths)?;
@@ -52,6 +68,9 @@ pub fn create_dictionary_entry(
 }
 
 pub fn delete_dictionary_entry(entry_id: i32) -> Result<WorkspaceSnapshot, String> {
+    if entry_id <= 0 {
+        return Err("entry_id must be a positive integer".into());
+    }
     let paths = resolve_paths()?;
     let mut database = open_database(&paths)?;
     let deleted = database
@@ -182,9 +201,9 @@ fn apply_settings_dto(
     settings: &mut UserSettings,
     input: WorkspaceSettingsDto,
 ) -> Result<(), String> {
-    settings.activation_mode = ActivationMode::from_str(&input.activation_mode)
+    settings.activation_mode = ActivationMode::from_str(input.activation_mode.trim())
         .map_err(|e| format!("activationMode: {e}"))?;
-    settings.dictation_mode = DictationMode::from_str(&input.dictation_mode)
+    settings.dictation_mode = DictationMode::from_str(input.dictation_mode.trim())
         .map_err(|e| format!("dictationMode: {e}"))?;
     settings.device = if input.use_gpu {
         DevicePolicy::Auto
@@ -195,12 +214,33 @@ fn apply_settings_dto(
         asr_backend_from_type(&input.asr_backend_type, &settings.asr_backend, &input)?;
     settings.llm_backend =
         llm_backend_from_type(&input.llm_backend_type, &settings.llm_backend, &input)?;
+
+    // Validate numeric thresholds — reject NaN/Inf/out-of-range.
+    if let Some(ct) = input.confidence_threshold
+        && (!ct.is_finite() || !(0.0..=1.0).contains(&ct))
+    {
+        return Err(format!("confidenceThreshold must be 0.0–1.0, got {ct}"));
+    }
+    if !input.speech_threshold.is_finite() || !(0.0..=1.0).contains(&input.speech_threshold) {
+        return Err(format!(
+            "speechThreshold must be 0.0–1.0, got {}",
+            input.speech_threshold
+        ));
+    }
+
     settings.pipeline.word_confidence_threshold = input.confidence_threshold;
     settings.word_confidence_threshold = input.confidence_threshold.unwrap_or(0.5);
     settings.pipeline.adaptive_vad = Some(input.adaptive_vad);
     settings.adaptive_vad = input.adaptive_vad;
     settings.pipeline.speech_threshold = Some(input.speech_threshold);
-    settings.default_style = input.style_preset;
+
+    // Validate style_preset — reject empty or excessively long values.
+    let style = input.style_preset.trim();
+    if style.is_empty() || style.len() > 128 {
+        return Err("stylePreset must be 1–128 characters".into());
+    }
+    settings.default_style = style.to_owned();
+
     settings.hotkey = HotkeyConfig {
         toggle_dictation: parse_key_combo(&input.hotkey_toggle)?,
         cancel_dictation: parse_key_combo(&input.hotkey_cancel)?,
@@ -344,14 +384,24 @@ fn current_qwen_model_dir(current: &AsrBackendConfig) -> PathBuf {
     }
 }
 
+/// Maximum number of modifier+key parts in a hotkey combo.
+const MAX_COMBO_PARTS: usize = 8;
+
 fn parse_key_combo(raw: &str) -> Result<KeyCombo, String> {
     let parts: Vec<_> = raw
         .split('+')
         .map(str::trim)
         .filter(|part| !part.is_empty())
+        .take(MAX_COMBO_PARTS)
         .collect();
     if parts.is_empty() {
         return Err("hotkey cannot be empty".into());
+    }
+
+    let key = parts[parts.len() - 1];
+    // Reject key names that are empty or unreasonably long.
+    if key.is_empty() || key.len() > 32 {
+        return Err(format!("invalid hotkey key name: {key:?}"));
     }
 
     let mut modifiers = Vec::new();
@@ -361,7 +411,7 @@ fn parse_key_combo(raw: &str) -> Result<KeyCombo, String> {
 
     Ok(KeyCombo {
         modifiers,
-        key: parts[parts.len() - 1].to_string(),
+        key: key.to_string(),
     })
 }
 

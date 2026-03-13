@@ -29,5 +29,8 @@ pub fn run() {
             commands::toggle_dictation
         ])
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .unwrap_or_else(|e| {
+            eprintln!("fatal: tauri application exited with error: {e}");
+            std::process::exit(1);
+        });
 }

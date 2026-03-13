@@ -104,7 +104,7 @@ impl AppRuntime {
     pub async fn start_dictation(&self) -> Result<String, String> {
         let manager = self.prepare_manager_for_start().await?;
 
-        let (event_tx, event_rx) = mpsc::channel(64);
+        let (event_tx, event_rx) = mpsc::channel(256);
         let session_id = match manager.start(event_tx).await {
             Ok(session_id) => session_id,
             Err(error) => {
@@ -215,7 +215,9 @@ impl AppRuntime {
                         runtime
                             .push_session_event(SessionStreamEvent::SessionStopped)
                             .await;
-                        let _ = app.emit("lune://history-changed", ());
+                        if let Err(e) = app.emit("lune://history-changed", ()) {
+                            warn!(error = %e, "failed to emit history-changed event");
+                        }
                     }
                     _ => {}
                 }
@@ -281,8 +283,10 @@ impl AppRuntime {
 
     async fn push_session_event(&self, event: SessionStreamEvent) {
         let channel = self.inner.session_stream.read().await.clone();
-        if let Some(channel) = channel {
-            let _ = channel.send(event);
+        if let Some(channel) = channel
+            && let Err(e) = channel.send(event)
+        {
+            warn!(error = %e, "session stream channel send failed — frontend may have disconnected");
         }
     }
 
