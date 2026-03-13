@@ -89,7 +89,7 @@ export function ShortcutsPage() {
               <SelectField
                 value={settings.dictationMode}
                 onChange={(event) => void saveWorkspaceSetting("dictationMode", event.target.value as typeof settings.dictationMode)}
-                className="min-w-56"
+                className="w-full sm:w-auto sm:min-w-56"
               >
                 {deliveryMethods.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -106,7 +106,7 @@ export function ShortcutsPage() {
               <SelectField
                 value={settings.stylePreset}
                 onChange={(event) => void saveWorkspaceSetting("stylePreset", event.target.value)}
-                className="min-w-52"
+                className="w-full sm:w-auto sm:min-w-52"
               >
                 {stylePresets.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -118,7 +118,7 @@ export function ShortcutsPage() {
           />
         </SettingsSection>
 
-        <Panel className="p-6 xl:col-span-2">
+        <Panel className="p-4 md:p-6">
           <p className="app-kicker-accent">Everyday use</p>
           <div className="layout-grid mt-4 md:grid-cols-3">
             <div className="card bg-base-300/50 border border-base-300/30 p-4">

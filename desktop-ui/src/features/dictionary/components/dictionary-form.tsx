@@ -9,7 +9,7 @@ export function DictionaryForm() {
   const [replacement, setReplacement] = useState("");
 
   return (
-    <Panel className="p-6">
+    <Panel className="p-4 sm:p-6">
       <p className="app-kicker-accent">Add rule</p>
       <h3 className="section-title mt-3">Teach the correction layer your vocabulary.</h3>
       <p className="body-copy-soft mt-2">

@@ -95,7 +95,7 @@ export function Modal({
         aria-modal="true"
         aria-label={ariaLabel}
         aria-labelledby={ariaLabel ? undefined : titleId}
-        className={cn("modal-box", sizeClasses[size])}
+        className={cn("modal-box mx-4 sm:mx-auto", sizeClasses[size])}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <ModalTitleIdContext.Provider value={titleId}>{children}</ModalTitleIdContext.Provider>
@@ -109,7 +109,7 @@ export function ModalHeader({ title, description, action }: ModalHeaderProps) {
   const titleId = useContext(ModalTitleIdContext);
 
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-base-300/40 pb-4">
+    <div className="flex items-start justify-between gap-3 sm:gap-4 border-b border-base-300/40 pb-4">
       <div className="min-w-0">
         <h2 id={titleId} className="text-lg font-semibold">
           {title}

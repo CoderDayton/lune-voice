@@ -21,7 +21,7 @@ export function StatTile({
   return (
     <div className={cn("stat bg-base-300/50 rounded-box border border-base-300/30 p-4", className)}>
       <div className="stat-title">{label}</div>
-      <div className={cn("stat-value text-2xl", valueClassName)}>{value}</div>
+      <div className={cn("stat-value text-xl sm:text-2xl tabular-nums", valueClassName)}>{value}</div>
       <div className={cn("stat-desc mt-1", noteClassName)}>{note}</div>
     </div>
   );

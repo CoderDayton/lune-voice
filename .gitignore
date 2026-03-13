@@ -17,6 +17,11 @@ flan-t5-base-asr-corrector/
 flanec-base-cd-onnx/
 qwen2.5-1.5b-instruct-gguf/
 
+# Root-level JS artifacts (desktop-ui has its own)
+/node_modules/
+/bun.lock
+/package.json
+
 # Unsloth fine-tuning artifacts
 unsloth/checkpoints/
 unsloth/qwen-asr-corrector/

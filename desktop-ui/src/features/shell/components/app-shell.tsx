@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Outlet, useRouterState } from "@tanstack/react-router";
 import { Sidebar } from "./sidebar";
+import { MobileNav } from "./mobile-nav";
 import { Topbar } from "./topbar";
 import { findNavigationItem } from "../config/navigation";
 import { attachSessionStream, listenToWorkspaceInvalidation } from "../../../lib/backend/stream";
@@ -41,6 +42,7 @@ export function AppShell() {
       <div className="app-shell-backdrop" />
 
       <Sidebar />
+      <MobileNav />
 
       <main className="app-main">
         <Topbar page={currentPage} />

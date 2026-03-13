@@ -55,7 +55,7 @@ export function RecordingPage() {
               <SelectField
                 value={settings.activationMode}
                 onChange={(event) => void saveWorkspaceSetting("activationMode", event.target.value as typeof settings.activationMode)}
-                className="min-w-52"
+                className="w-full sm:w-auto sm:min-w-52"
               >
                 {activationModes.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -86,7 +86,7 @@ export function RecordingPage() {
               <SelectField
                 value={settings.asrBackend}
                 onChange={(event) => void saveWorkspaceSetting("asrBackend", event.target.value as typeof settings.asrBackend)}
-                className="min-w-64"
+                className="w-full sm:w-auto sm:min-w-64"
               >
                 {asrBackends.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -105,7 +105,7 @@ export function RecordingPage() {
                   <TextField
                     value={settings.openaiAsrBaseUrl}
                     onChange={(event) => void saveWorkspaceSetting("openaiAsrBaseUrl", event.target.value)}
-                    className="min-w-64"
+                    className="w-full sm:w-auto sm:min-w-64"
                     placeholder="https://api.openai.com/v1"
                   />
                 }
@@ -118,7 +118,7 @@ export function RecordingPage() {
                     type="password"
                     value={settings.openaiAsrApiKey}
                     onChange={(event) => void saveWorkspaceSetting("openaiAsrApiKey", event.target.value)}
-                    className="min-w-64"
+                    className="w-full sm:w-auto sm:min-w-64"
                     placeholder="sk-..."
                   />
                 }
@@ -130,7 +130,7 @@ export function RecordingPage() {
                   <TextField
                     value={settings.openaiAsrModel}
                     onChange={(event) => void saveWorkspaceSetting("openaiAsrModel", event.target.value)}
-                    className="min-w-48"
+                    className="w-full sm:w-auto sm:min-w-48"
                     placeholder="whisper-1"
                   />
                 }
@@ -171,7 +171,7 @@ export function RecordingPage() {
               <SelectField
                 value={settings.llmBackend}
                 onChange={(event) => void saveWorkspaceSetting("llmBackend", event.target.value as typeof settings.llmBackend)}
-                className="min-w-64"
+                className="w-full sm:w-auto sm:min-w-64"
               >
                 {llmModels.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -190,7 +190,7 @@ export function RecordingPage() {
                   <TextField
                     value={settings.openaiLlmBaseUrl}
                     onChange={(event) => void saveWorkspaceSetting("openaiLlmBaseUrl", event.target.value)}
-                    className="min-w-64"
+                    className="w-full sm:w-auto sm:min-w-64"
                     placeholder="https://api.openai.com/v1"
                   />
                 }
@@ -203,7 +203,7 @@ export function RecordingPage() {
                     type="password"
                     value={settings.openaiLlmApiKey}
                     onChange={(event) => void saveWorkspaceSetting("openaiLlmApiKey", event.target.value)}
-                    className="min-w-64"
+                    className="w-full sm:w-auto sm:min-w-64"
                     placeholder="sk-..."
                   />
                 }
@@ -215,7 +215,7 @@ export function RecordingPage() {
                   <TextField
                     value={settings.openaiLlmModel}
                     onChange={(event) => void saveWorkspaceSetting("openaiLlmModel", event.target.value)}
-                    className="min-w-48"
+                    className="w-full sm:w-auto sm:min-w-48"
                     placeholder="gpt-4o-mini"
                   />
                 }
@@ -229,7 +229,7 @@ export function RecordingPage() {
           />
         </SettingsSection>
 
-        <Panel className="p-6">
+        <Panel className="p-4 md:p-6">
           <p className="app-kicker-accent">Good default</p>
           <h3 className="card-title-text mt-3">Recommended starting setup</h3>
           <div className="flex flex-col gap-4 mt-4">

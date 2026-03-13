@@ -207,7 +207,7 @@
 }
 
 @utility header-row {
-  @apply flex flex-col gap-4;
+  @apply flex flex-col gap-3 sm:gap-4;
 }
 
 @utility page-intro {
@@ -229,13 +229,13 @@
 }
 
 @utility page-title {
-  @apply font-bold;
-  font-size: var(--size-page-title);
+  @apply font-bold text-balance;
+  font-size: clamp(1.5rem, 4vw, var(--size-page-title));
   letter-spacing: var(--tracking-title);
 }
 
 @utility hero-title {
-  @apply font-bold;
+  @apply font-bold text-balance;
   font-size: var(--size-hero-title);
   letter-spacing: var(--tracking-hero);
   line-height: 1;
@@ -243,13 +243,13 @@
 }
 
 @utility section-title {
-  @apply font-semibold;
-  font-size: var(--text-title-xl);
+  @apply font-semibold text-balance;
+  font-size: clamp(1.15rem, 3vw, var(--text-title-xl));
   letter-spacing: var(--tracking-tight);
 }
 
 @utility card-title-text {
-  @apply font-semibold;
+  @apply font-semibold text-balance;
   font-size: var(--text-title-lg);
   letter-spacing: var(--tracking-tight);
 }
@@ -261,19 +261,19 @@
 }
 
 @utility body-copy {
-  @apply opacity-70;
+  @apply opacity-70 text-pretty;
   font-size: var(--text-body-sm);
   line-height: 1.75;
 }
 
 @utility body-copy-soft {
-  @apply opacity-50;
+  @apply opacity-50 text-pretty;
   font-size: var(--text-body-sm);
   line-height: 1.7;
 }
 
 @utility body-copy-strong {
-  @apply opacity-80;
+  @apply opacity-80 text-pretty;
   font-size: var(--text-body-sm);
   line-height: 1.8;
 }
@@ -293,12 +293,14 @@
   @apply font-display font-bold;
   font-size: var(--text-metric);
   letter-spacing: var(--tracking-display);
+  font-variant-numeric: tabular-nums;
 }
 
 @utility value-display-sm {
   @apply font-display font-semibold;
   font-size: var(--text-title-md);
   letter-spacing: var(--tracking-tight);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Topbar ─────────────────────────────────────────────────────────── */
@@ -426,7 +428,7 @@
 }
 
 @utility auth-headline {
-  @apply font-display font-semibold;
+  @apply font-display font-semibold text-balance;
   font-size: clamp(2.4rem, 5vw, 4.4rem);
   line-height: 0.96;
   letter-spacing: var(--tracking-hero);
@@ -509,11 +511,11 @@
 /* ── Session list ──────────────────────────────────────────────────── */
 
 @utility session-group-head {
-  @apply border-b border-base-300/40 bg-base-300/30 px-6 py-3;
+  @apply border-b border-base-300/40 bg-base-300/30 px-4 sm:px-6 py-3;
 }
 
 @utility session-row {
-  @apply border-b border-base-300/20 px-6 py-4 transition;
+  @apply border-b border-base-300/20 px-4 sm:px-6 py-3 sm:py-4 transition;
 }
 
 .session-row:last-child {
@@ -540,7 +542,7 @@
 }
 
 @utility detail-row {
-  @apply flex flex-col gap-2 border-b border-base-300/20 pb-4;
+  @apply flex flex-col gap-2 border-b border-base-300/20 pb-3 sm:pb-4;
 }
 
 .detail-row:last-child {

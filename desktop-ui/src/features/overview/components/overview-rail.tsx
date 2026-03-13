@@ -35,7 +35,7 @@ export function OverviewRail() {
 
   return (
     <div className="stack-section">
-      <Panel className="p-6">
+      <Panel className="p-4 sm:p-6">
         <p className="app-kicker-accent">Workspace posture</p>
         <div className="rail-list mt-4">
           {signals.map((item) => (
@@ -50,7 +50,7 @@ export function OverviewRail() {
         </div>
       </Panel>
 
-      <Panel className="p-6">
+      <Panel className="p-4 sm:p-6">
         <p className="app-kicker-accent">Next move</p>
         <h3 className="section-title mt-3">Normalize repeated corrections.</h3>
         <p className="body-copy-soft mt-2">

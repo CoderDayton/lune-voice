@@ -8,10 +8,10 @@ export function DictionaryTable() {
   const entries = useStore(workspaceStore, (state) => state.dictionaryEntries);
 
   return (
-    <Panel className="overflow-hidden p-0">
-      <div className="bg-base-300/30 border-b border-base-300/40 grid grid-cols-[1fr_1fr_auto] gap-4 px-6 py-3">
-        <span className="label-text-custom">Spoken phrase</span>
-        <span className="label-text-custom">Replacement</span>
+    <Panel className="overflow-x-auto p-0">
+      <div className="bg-base-300/30 border-b border-base-300/40 grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_1fr_auto] gap-4 px-4 sm:px-6 py-3">
+        <span className="label-text-custom">Phrase</span>
+        <span className="label-text-custom hidden sm:block">Replacement</span>
         <span className="label-text-custom text-right">Action</span>
       </div>
 
@@ -20,14 +20,15 @@ export function DictionaryTable() {
       ) : (
         <div>
           {entries.map((entry) => (
-            <div key={entry.id} className="grid grid-cols-[1fr_1fr_auto] items-center gap-4 px-6 py-3 border-b border-base-300/20 transition hover:bg-base-300/20">
+            <div key={entry.id} className="grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_1fr_auto] items-center gap-4 px-4 sm:px-6 py-3 border-b border-base-300/20 transition hover:bg-base-300/20">
               <div className="min-w-0">
-                <div className="font-mono text-sm opacity-80">{entry.phrase}</div>
+                <div className="font-mono text-sm opacity-80 truncate">{entry.phrase}</div>
+                <div className="font-mono text-sm sm:hidden mt-1">→ {entry.replacement}</div>
                 <div className="mt-2">
                   <Pill>Priority {entry.priority}</Pill>
                 </div>
               </div>
-              <div className="font-mono text-sm">{entry.replacement}</div>
+              <div className="font-mono text-sm hidden sm:block">{entry.replacement}</div>
               <div className="text-right">
                 <ModalCancel
                   title="Delete this word fix?"

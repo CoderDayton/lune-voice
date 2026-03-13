@@ -21,7 +21,7 @@ export function ActivityFeed() {
   );
 
   return (
-    <Panel className="p-6">
+    <Panel className="p-4 sm:p-6">
       <div className="header-row">
         <div>
           <h3 className="section-title">Recent activity</h3>
@@ -35,18 +35,21 @@ export function ActivityFeed() {
       </div>
 
       <div className="flex flex-col gap-4 mt-6">
-        {recentActivity.map((item) => (
-          <article key={item.id} className="card bg-base-300/50 border border-base-300/30 p-4 stack-copy">
-            <div className="flex flex-wrap gap-2">
-              {item.meta.map((entry) => (
-                <Pill key={entry}>{entry}</Pill>
-              ))}
-            </div>
-            <h4 className="font-semibold mt-4">{item.title}</h4>
-            <p className="body-copy-strong mt-2">{item.text}</p>
-            <div className="link link-secondary text-sm mt-4">Add to dictionary</div>
-          </article>
-        ))}
+        {recentActivity.length === 0 ? (
+          <p className="body-copy-soft text-center py-8">No sessions yet. Start dictating to see recent activity.</p>
+        ) : (
+          recentActivity.map((item) => (
+            <article key={item.id} className="card bg-base-300/50 border border-base-300/30 p-3 sm:p-4 stack-copy">
+              <div className="flex flex-wrap gap-2">
+                {item.meta.map((entry) => (
+                  <Pill key={entry}>{entry}</Pill>
+                ))}
+              </div>
+              <h4 className="font-semibold mt-4">{item.title}</h4>
+              <p className="body-copy-strong mt-2 line-clamp-3">{item.text}</p>
+            </article>
+          ))
+        )}
       </div>
     </Panel>
   );

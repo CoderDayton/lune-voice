@@ -107,6 +107,22 @@ export function PulseIcon(props: IconProps) {
   );
 }
 
+export function MenuIcon(props: IconProps) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M3 5h12M3 9h12M3 13h12" />
+    </BaseIcon>
+  );
+}
+
+export function CloseIcon(props: IconProps) {
+  return (
+    <BaseIcon {...props}>
+      <path d="m4.5 4.5 9 9M13.5 4.5l-9 9" />
+    </BaseIcon>
+  );
+}
+
 export function LuneLogo(props: IconProps) {
   return (
     <svg width="20" height="20" viewBox="0 0 22 22" fill="none" aria-hidden="true" {...props}>

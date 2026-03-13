@@ -32,11 +32,9 @@ export function Sidebar() {
 
   return (
     <aside
-      className="sidebar-surface relative z-10 flex shrink-0 flex-col transition-[width] duration-200"
+      className="sidebar-surface relative z-10 hidden md:flex shrink-0 flex-col gap-4 py-4 px-3 overflow-y-auto transition-[width] duration-200"
       style={{
         width: collapsed ? "var(--size-sidebar-collapsed)" : "var(--size-sidebar)",
-        gap: "1rem",
-        padding: "1rem 0.75rem",
       }}
     >
       <div className="flex items-center gap-3 px-2">
@@ -140,6 +138,7 @@ export function Sidebar() {
           type="button"
           variant="sidebar"
           onClick={workspaceActions.toggleSidebar}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed ? <ChevronRightIcon className="h-4 w-4" /> : <ChevronLeftIcon className="h-4 w-4" />}
           {!collapsed ? (

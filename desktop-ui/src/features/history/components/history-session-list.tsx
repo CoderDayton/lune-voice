@@ -28,6 +28,14 @@ export function HistorySessionList() {
     return Array.from(groups.entries()).map(([date, items]) => ({ date, items }));
   }, [visibleSessions]);
 
+  if (filteredGroups.length === 0) {
+    return (
+      <Panel className="p-10 text-center">
+        <p className="body-copy-soft">No sessions found. Start dictating to see your transcripts here.</p>
+      </Panel>
+    );
+  }
+
   return (
     <Panel className="overflow-hidden p-0">
       {filteredGroups.map((group) => (
@@ -45,7 +53,7 @@ export function HistorySessionList() {
                   <Pill>{item.seconds}s audio</Pill>
                   <Pill>{formatBackendLabel(item.backend)}</Pill>
                 </div>
-                <p className="body-copy-strong max-w-[56rem] mt-4">{item.transcript}</p>
+                <p className="body-copy-strong max-w-full sm:max-w-[56rem] mt-4 line-clamp-4">{item.transcript}</p>
               </article>
             ))}
           </div>

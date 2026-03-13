@@ -7,7 +7,7 @@ export function DictionaryRail() {
 
   return (
     <div className="stack-section">
-      <Panel className="p-5">
+      <Panel className="p-4 sm:p-5">
         <p className="app-kicker-accent">Rulebook</p>
         <h3 className="card-title-text mt-3">Keep repeated corrections out of the review loop.</h3>
         <p className="body-copy-soft mt-2">
@@ -15,7 +15,7 @@ export function DictionaryRail() {
         </p>
       </Panel>
 
-      <Panel className="p-5">
+      <Panel className="p-4 sm:p-5">
         <p className="app-kicker-accent">Current posture</p>
         <div className="flex flex-col gap-4 mt-4">
           <div className="flex items-center justify-between gap-3 text-sm">

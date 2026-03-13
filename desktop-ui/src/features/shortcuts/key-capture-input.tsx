@@ -138,7 +138,7 @@ export function KeyCaptureInput({
           "text-[var(--text-pill)]",
           "px-3 py-1.5 rounded-[var(--radius-control)]",
           listening
-            ? "border-[oklch(0.78_0.12_220_/_0.4)] bg-[oklch(0.7_0.16_268_/_0.12)] text-copy-50 ring-1 ring-[oklch(0.78_0.12_220_/_0.2)] animate-pulse"
+            ? "border-brand-400/40 bg-brand-500/12 text-copy-50 ring-1 ring-brand-400/20 animate-pulse"
             : "border-[var(--border-ghost)] bg-[var(--surface-control-strong)] text-copy-200 hover:bg-[var(--surface-control-hover)] hover:text-copy-50",
           disabled && "opacity-40 cursor-not-allowed",
         )}
@@ -154,13 +154,13 @@ export function KeyCaptureInput({
       </button>
 
       {listening && !validationError && (
-        <p className="text-copy-500 text-[0.72rem]">
+        <p className="text-copy-500 text-pill">
           Press your combo — <kbd className="font-mono">Esc</kbd> to cancel
         </p>
       )}
 
       {validationError && (
-        <p className="text-[oklch(0.82_0.1_25)] text-[0.72rem] max-w-52 sm:max-w-64 text-right">
+        <p className="text-error text-pill max-w-52 sm:max-w-64 text-right">
           {validationError}
         </p>
       )}

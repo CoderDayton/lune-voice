@@ -5,7 +5,7 @@ import { HistorySearch } from "./history-search";
 export function HistoryRail() {
   return (
     <div className="stack-section">
-      <Panel className="p-5">
+      <Panel className="p-4 sm:p-5">
         <p className="app-kicker-accent">Archive filter</p>
         <h3 className="card-title-text mt-3">Search the local transcript log.</h3>
         <p className="body-copy-soft mt-2">
@@ -16,7 +16,7 @@ export function HistoryRail() {
         </div>
       </Panel>
 
-      <Panel className="p-5">
+      <Panel className="p-4 sm:p-5">
         <p className="app-kicker-accent">Archive signals</p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Pill>Offline storage</Pill>

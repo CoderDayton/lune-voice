@@ -18,8 +18,8 @@ export function PageIntroPanel({
   children,
 }: PageIntroPanelProps) {
   return (
-    <Panel className={cn("p-6", className)}>
-      <div className="page-intro">
+    <Panel className={cn("p-4 sm:p-6", className)}>
+      <div className="page-intro sm:max-w-[var(--size-measure-wide)]">
         <p className="app-kicker-accent">{kicker}</p>
         <h2 className="page-title mt-3">{title}</h2>
         <p className="body-copy mt-3">{description}</p>

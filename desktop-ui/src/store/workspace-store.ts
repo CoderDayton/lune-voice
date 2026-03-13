@@ -66,6 +66,7 @@ interface WorkspaceRuntimeState {
 
 interface WorkspaceState {
   sidebarCollapsed: boolean;
+  mobileMenuOpen: boolean;
   historySearch: string;
   dictionaryEntries: DictionaryEntry[];
   historySessions: HistorySession[];
@@ -114,6 +115,7 @@ const DISPLAY_BACKEND_LABELS: Record<string, string> = {
 export function createInitialWorkspaceState(): WorkspaceState {
   return {
     sidebarCollapsed: false,
+    mobileMenuOpen: false,
     historySearch: "",
     dictionaryEntries: [],
     historySessions: [],
@@ -127,6 +129,14 @@ export const workspaceStore = new Store(createInitialWorkspaceState());
 export const workspaceActions = {
   toggleSidebar() {
     workspaceStore.setState((state) => ({ ...state, sidebarCollapsed: !state.sidebarCollapsed }));
+  },
+
+  toggleMobileMenu() {
+    workspaceStore.setState((state) => ({ ...state, mobileMenuOpen: !state.mobileMenuOpen }));
+  },
+
+  closeMobileMenu() {
+    workspaceStore.setState((state) => ({ ...state, mobileMenuOpen: false }));
   },
 
   setHistorySearch(value: string) {
