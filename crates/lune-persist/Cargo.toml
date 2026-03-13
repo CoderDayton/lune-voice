@@ -17,7 +17,7 @@ chrono.workspace = true
 uuid.workspace = true
 thiserror.workspace = true
 hf-hub.workspace = true
-libsqlite3-sys = { version = "0.30", features = ["bundled"] }
+libsqlite3-sys = { version = "0.35", features = ["bundled"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
