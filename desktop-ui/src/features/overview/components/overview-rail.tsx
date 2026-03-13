@@ -35,22 +35,22 @@ export function OverviewRail() {
 
   return (
     <div className="stack-section">
-      <Panel className="panel-pad-lg">
+      <Panel className="p-6">
         <p className="app-kicker-accent">Workspace posture</p>
         <div className="rail-list mt-4">
           {signals.map((item) => (
             <div key={item.title} className="rail-row">
-              <div className="rail-copy">
-                <div className="supporting-label text-copy-50">{item.title}</div>
+              <div className="stack-copy-tight">
+                <div className="supporting-label">{item.title}</div>
                 <div className="body-copy-soft mt-1">{item.note}</div>
               </div>
-              <div className="rail-value">{item.value}</div>
+              <div className="value-display-sm shrink-0 text-right">{item.value}</div>
             </div>
           ))}
         </div>
       </Panel>
 
-      <Panel className="panel-pad-lg">
+      <Panel className="p-6">
         <p className="app-kicker-accent">Next move</p>
         <h3 className="section-title mt-3">Normalize repeated corrections.</h3>
         <p className="body-copy-soft mt-2">

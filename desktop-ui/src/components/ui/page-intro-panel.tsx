@@ -18,7 +18,7 @@ export function PageIntroPanel({
   children,
 }: PageIntroPanelProps) {
   return (
-    <Panel className={cn("panel-pad-lg", className)}>
+    <Panel className={cn("p-6", className)}>
       <div className="page-intro">
         <p className="app-kicker-accent">{kicker}</p>
         <h2 className="page-title mt-3">{title}</h2>

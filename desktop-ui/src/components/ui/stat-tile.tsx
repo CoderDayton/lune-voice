@@ -19,10 +19,10 @@ export function StatTile({
   noteClassName,
 }: StatTileProps) {
   return (
-    <div className={cn("stat-tile", className)}>
-      <div className="stat-label">{label}</div>
-      <div className={cn("stat-value mt-3", valueClassName)}>{value}</div>
-      <p className={cn("stat-note mt-2", noteClassName)}>{note}</p>
+    <div className={cn("stat bg-base-300/50 rounded-box border border-base-300/30 p-4", className)}>
+      <div className="stat-title">{label}</div>
+      <div className={cn("stat-value text-2xl", valueClassName)}>{value}</div>
+      <div className={cn("stat-desc mt-1", noteClassName)}>{note}</div>
     </div>
   );
 }

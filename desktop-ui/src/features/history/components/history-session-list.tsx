@@ -33,10 +33,10 @@ export function HistorySessionList() {
       {filteredGroups.map((group) => (
         <section key={group.date}>
           <div className="session-group-head">
-            <span className="session-group-label">{group.date}</span>
+            <span className="label-text-custom">{group.date}</span>
           </div>
 
-          <div className="table-list">
+          <div>
             {group.items.map((item) => (
               <article key={item.id} className="session-row">
                 <div className="flex flex-wrap gap-2">
@@ -45,7 +45,7 @@ export function HistorySessionList() {
                   <Pill>{item.seconds}s audio</Pill>
                   <Pill>{formatBackendLabel(item.backend)}</Pill>
                 </div>
-                <p className="session-copy mt-4">{item.transcript}</p>
+                <p className="body-copy-strong max-w-[56rem] mt-4">{item.transcript}</p>
               </article>
             ))}
           </div>

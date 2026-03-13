@@ -9,9 +9,9 @@ import { findNavigationItem, navigationItems } from "../config/navigation";
 import { ChevronLeftIcon, ChevronRightIcon, LuneLogo } from "../config/icons";
 
 const statusItems = [
-  { label: "Microphone", value: "Ready", tone: "text-brand-300" },
-  { label: "Voice typing", value: "Fast + accurate", tone: "text-brand-400" },
-  { label: "Privacy", value: "On this device", tone: "text-brand-500" },
+  { label: "Microphone", value: "Ready", tone: "text-accent" },
+  { label: "Voice typing", value: "Fast + accurate", tone: "text-secondary" },
+  { label: "Privacy", value: "On this device", tone: "text-primary" },
 ];
 
 export function Sidebar() {
@@ -32,11 +32,11 @@ export function Sidebar() {
 
   return (
     <aside
-      className="surface-sidebar relative z-10 flex shrink-0 flex-col transition-[width] duration-200"
+      className="sidebar-surface relative z-10 flex shrink-0 flex-col transition-[width] duration-200"
       style={{
         width: collapsed ? "var(--size-sidebar-collapsed)" : "var(--size-sidebar)",
-        gap: "var(--space-sidebar-y)",
-        padding: "var(--space-sidebar-y) var(--space-sidebar-x)",
+        gap: "1rem",
+        padding: "1rem 0.75rem",
       }}
     >
       <div className="flex items-center gap-3 px-2">
@@ -51,7 +51,7 @@ export function Sidebar() {
         ) : null}
       </div>
 
-      <div className="sidebar-divider" />
+      <div className="divider my-0" />
 
       <nav className="flex flex-col gap-4">
         {navigationGroups.map((group) => (
@@ -67,11 +67,11 @@ export function Sidebar() {
                   className={cn(active ? "nav-link-active" : "nav-link-idle")}
                   title={collapsed ? label : undefined}
                 >
-                  <Icon className={cn("nav-icon", active ? "text-brand-400" : "text-copy-400")} />
+                  <Icon className={cn("nav-icon", active ? "text-secondary" : "opacity-50")} />
                   {!collapsed ? (
                     <div className="min-w-0">
-                      <div className="truncate supporting-label text-copy-50">{label}</div>
-                      <div className="truncate text-[var(--text-pill)] text-copy-500">{caption}</div>
+                      <div className="truncate text-sm font-medium">{label}</div>
+                      <div className="truncate text-xs opacity-50">{caption}</div>
                     </div>
                   ) : null}
                 </Link>
@@ -82,22 +82,22 @@ export function Sidebar() {
       </nav>
 
       {!collapsed ? (
-        <div className="sidebar-card">
-          <div className="sidebar-card-header">
+        <div className="card bg-base-300/50 border border-base-300/30 p-4">
+          <div className="flex items-start justify-between gap-3 mb-4">
             <div>
               <p className="app-kicker">Session posture</p>
-              <h2 className="sidebar-card-title mt-2">{current.label} is ready</h2>
-              <p className="sidebar-card-copy mt-1">
+              <h2 className="font-semibold text-sm mt-2">{current.label} is ready</h2>
+              <p className="text-xs opacity-50 mt-1">
                 Your recordings stay private on this computer, with quick cleanup before text is inserted.
               </p>
             </div>
             <Pill>Stable</Pill>
           </div>
 
-          <div className="sidebar-list">
+          <div className="flex flex-col gap-3">
             {statusItems.map((item) => (
-              <div key={item.label} className="sidebar-list-row">
-                <span className="sidebar-key">{item.label}</span>
+              <div key={item.label} className="flex items-center justify-between gap-3 text-sm">
+                <span className="opacity-50">{item.label}</span>
                 <span className={cn("font-semibold", item.tone)}>{item.value}</span>
               </div>
             ))}
@@ -107,22 +107,22 @@ export function Sidebar() {
 
       <div className="mt-auto space-y-3">
         {!collapsed ? (
-          <div className="sidebar-card">
+          <div className="card bg-base-300/50 border border-base-300/30 p-4">
             <p className="app-kicker">Signed in</p>
-            <h2 className="sidebar-card-title mt-2">{profile?.name ?? "Lune user"}</h2>
-            <p className="sidebar-card-copy mt-1">{profile?.email ?? "desktop@lune.local"}</p>
-            <div className="sidebar-list mt-3">
-              <div className="sidebar-list-row">
-                <span className="sidebar-key">Recording</span>
-                <span className="sidebar-value">Ready now</span>
+            <h2 className="font-semibold text-sm mt-2">{profile?.name ?? "Lune user"}</h2>
+            <p className="text-xs opacity-50 mt-1">{profile?.email ?? "desktop@lune.local"}</p>
+            <div className="flex flex-col gap-3 mt-3">
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="opacity-50">Recording</span>
+                <span className="font-medium opacity-80">Ready now</span>
               </div>
-              <div className="sidebar-list-row">
-                <span className="sidebar-key">Vocabulary</span>
-                <span className="sidebar-value">Saved fixes</span>
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="opacity-50">Vocabulary</span>
+                <span className="font-medium opacity-80">Saved fixes</span>
               </div>
-              <div className="sidebar-list-row">
-                <span className="sidebar-key">Shortcuts</span>
-                <span className="sidebar-value">Across apps</span>
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="opacity-50">Shortcuts</span>
+                <span className="font-medium opacity-80">Across apps</span>
               </div>
             </div>
             <Button
@@ -144,8 +144,8 @@ export function Sidebar() {
           {collapsed ? <ChevronRightIcon className="h-4 w-4" /> : <ChevronLeftIcon className="h-4 w-4" />}
           {!collapsed ? (
             <div className="text-left">
-              <div className="supporting-label text-copy-50">Collapse rail</div>
-              <div className="sidebar-card-copy">Compact the workspace chrome</div>
+              <div className="text-sm font-medium">Collapse rail</div>
+              <div className="text-xs opacity-50">Compact the workspace chrome</div>
             </div>
           ) : null}
         </Button>

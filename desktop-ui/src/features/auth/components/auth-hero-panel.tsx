@@ -8,21 +8,21 @@ const authProof = [
 
 export function AuthHeroPanel() {
   return (
-    <section className="auth-hero-panel">
-      <div className="auth-hero-copy">
-        <Pill className="auth-hero-pill">Private desktop dictation</Pill>
+    <section className="card bg-base-200/80 border border-base-300/60 surface-hero p-6 flex min-h-[38rem] flex-col justify-between overflow-hidden">
+      <div className="stack-copy max-w-[34rem]">
+        <Pill className="w-fit">Private desktop dictation</Pill>
         <h2 className="auth-headline">
           Speak naturally. Keep every correction local and every shortcut close.
         </h2>
-        <p className="body-copy-soft auth-hero-text">
+        <p className="body-copy-soft max-w-[31rem]">
           Lune Voice is built for people who want faster writing, cleaner transcripts, and a workspace that feels calm instead of technical.
         </p>
       </div>
 
-      <div className="auth-proof-grid">
+      <div className="grid gap-3 md:grid-cols-3">
         {authProof.map((item) => (
-          <div key={item.label} className="auth-proof-card">
-            <div className="stat-label">{item.label}</div>
+          <div key={item.label} className="card bg-base-300/50 border border-base-300/30 p-4 stack-copy-tight">
+            <div className="label-text-custom">{item.label}</div>
             <div className="auth-proof-value">{item.value}</div>
           </div>
         ))}

@@ -7,7 +7,7 @@ interface PillProps extends HTMLAttributes<HTMLSpanElement> {
 
 export function Pill({ children, className, ...props }: PillProps) {
   return (
-    <span className={cn("app-pill", className)} {...props}>
+    <span className={cn("badge badge-outline badge-sm", className)} {...props}>
       {children}
     </span>
   );

@@ -51,15 +51,8 @@ export function ShortcutsPage() {
       </section>
 
       {toggleCancelConflict && (
-        <div
-          className="rounded-[var(--radius-control)] border px-4 py-3 text-[0.875rem]"
-          style={{
-            borderColor: "oklch(0.62 0.19 25 / 0.4)",
-            background: "oklch(0.58 0.2 25 / 0.12)",
-            color: "oklch(0.9 0.06 25)",
-          }}
-        >
-          Toggle and cancel are bound to the same key combo. One will override the other.
+        <div role="alert" className="alert alert-warning">
+          <span>Toggle and cancel are bound to the same key combo. One will override the other.</span>
         </div>
       )}
 
@@ -85,7 +78,7 @@ export function ShortcutsPage() {
               />
             }
           />
-          <SettingsRow label="Recording style" description="This changes whether the shortcut toggles recording or only works while held." control={<span className="app-pill">{labelForActivationMode(settings.activationMode).split(" ")[0]}</span>} />
+          <SettingsRow label="Recording style" description="This changes whether the shortcut toggles recording or only works while held." control={<span className="badge badge-outline badge-sm">{labelForActivationMode(settings.activationMode).split(" ")[0]}</span>} />
         </SettingsSection>
 
         <SettingsSection title="Sending text" description="Choose how finished text is inserted into the app you are currently using.">
@@ -125,20 +118,20 @@ export function ShortcutsPage() {
           />
         </SettingsSection>
 
-        <Panel className="panel-pad-lg xl:col-span-2">
+        <Panel className="p-6 xl:col-span-2">
           <p className="app-kicker-accent">Everyday use</p>
           <div className="layout-grid mt-4 md:grid-cols-3">
-            <div className="stat-tile">
+            <div className="card bg-base-300/50 border border-base-300/30 p-4">
               <h3 className="card-title-sm">For long notes</h3>
-              <p className="stat-note mt-2">Use toggle recording and paste into your current app.</p>
+              <p className="body-copy-soft mt-2">Use toggle recording and paste into your current app.</p>
             </div>
-            <div className="stat-tile">
+            <div className="card bg-base-300/50 border border-base-300/30 p-4">
               <h3 className="card-title-sm">For quick commands</h3>
-              <p className="stat-note mt-2">Use hold-to-talk so recording starts only while the shortcut is pressed.</p>
+              <p className="body-copy-soft mt-2">Use hold-to-talk so recording starts only while the shortcut is pressed.</p>
             </div>
-            <div className="stat-tile">
+            <div className="card bg-base-300/50 border border-base-300/30 p-4">
               <h3 className="card-title-sm">For code editors</h3>
-              <p className="stat-note mt-2">Current writing style: {summarizeStylePreset(settings.stylePreset)}.</p>
+              <p className="body-copy-soft mt-2">Current writing style: {summarizeStylePreset(settings.stylePreset)}.</p>
             </div>
           </div>
         </Panel>

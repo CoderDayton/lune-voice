@@ -4,9 +4,9 @@ import { cn } from "../../lib/cn";
 type PanelTone = "default" | "soft" | "hero";
 
 const toneClasses: Record<PanelTone, string> = {
-  default: "surface-panel",
-  soft: "surface-soft",
-  hero: "surface-hero",
+  default: "card bg-base-200/80 border border-base-300/40",
+  soft: "card bg-base-300/50 border border-base-300/30",
+  hero: "card bg-base-200/80 border border-base-300/60 surface-hero",
 };
 
 interface PanelProps extends HTMLAttributes<HTMLDivElement> {

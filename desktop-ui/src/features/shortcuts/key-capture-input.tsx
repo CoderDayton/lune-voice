@@ -126,7 +126,7 @@ export function KeyCaptureInput({
     : value;
 
   return (
-    <div className={cn("flex flex-col items-end gap-1", className)}>
+    <div className={cn("flex flex-col items-end gap-1 sm:gap-1.5", className)}>
       <button
         type="button"
         onClick={handleClick}
@@ -134,23 +134,12 @@ export function KeyCaptureInput({
         aria-label={listening ? "Press keys to set hotkey" : `Current binding: ${value}. Click to change.`}
         className={cn(
           "inline-flex items-center gap-2 font-mono font-semibold border transition select-none",
-          "min-w-36 justify-center",
+          "min-w-28 sm:min-w-36 justify-center",
           "text-[var(--text-pill)]",
           "px-3 py-1.5 rounded-[var(--radius-control)]",
           listening
-            ? [
-                "border-[oklch(0.78_0.12_220_/_0.4)]",
-                "bg-[oklch(0.7_0.16_268_/_0.12)]",
-                "text-copy-50",
-                "ring-1 ring-[oklch(0.78_0.12_220_/_0.2)]",
-                "animate-pulse",
-              ]
-            : [
-                "border-[var(--border-ghost)]",
-                "bg-[var(--surface-control-strong)]",
-                "text-copy-200",
-                "hover:bg-[var(--surface-control-hover)] hover:text-copy-50",
-              ],
+            ? "border-[oklch(0.78_0.12_220_/_0.4)] bg-[oklch(0.7_0.16_268_/_0.12)] text-copy-50 ring-1 ring-[oklch(0.78_0.12_220_/_0.2)] animate-pulse"
+            : "border-[var(--border-ghost)] bg-[var(--surface-control-strong)] text-copy-200 hover:bg-[var(--surface-control-hover)] hover:text-copy-50",
           disabled && "opacity-40 cursor-not-allowed",
         )}
       >
@@ -171,7 +160,7 @@ export function KeyCaptureInput({
       )}
 
       {validationError && (
-        <p className="text-[oklch(0.82_0.1_25)] text-[0.72rem] max-w-52 text-right">
+        <p className="text-[oklch(0.82_0.1_25)] text-[0.72rem] max-w-52 sm:max-w-64 text-right">
           {validationError}
         </p>
       )}

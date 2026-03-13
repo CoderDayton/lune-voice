@@ -21,16 +21,16 @@ export function AuthInputField({
 }: AuthInputFieldProps) {
   return (
     <label className="stack-copy-tight">
-      <span className="field-label">{label}</span>
+      <span className="label-text-custom block mb-2">{label}</span>
       <TextField
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         onBlur={onBlur}
         placeholder={placeholder}
-        className={error ? "auth-field-error" : undefined}
+        className={error ? "input-error" : undefined}
       />
-      {error ? <span className="auth-field-error-copy">{error}</span> : null}
+      {error ? <span className="text-error text-xs">{error}</span> : null}
     </label>
   );
 }

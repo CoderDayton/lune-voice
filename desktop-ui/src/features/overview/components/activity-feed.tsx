@@ -21,7 +21,7 @@ export function ActivityFeed() {
   );
 
   return (
-    <Panel className="panel-pad-lg">
+    <Panel className="p-6">
       <div className="header-row">
         <div>
           <h3 className="section-title">Recent activity</h3>
@@ -34,17 +34,17 @@ export function ActivityFeed() {
         </Link>
       </div>
 
-      <div className="activity-stack">
+      <div className="flex flex-col gap-4 mt-6">
         {recentActivity.map((item) => (
-          <article key={item.id} className="activity-card">
+          <article key={item.id} className="card bg-base-300/50 border border-base-300/30 p-4 stack-copy">
             <div className="flex flex-wrap gap-2">
               {item.meta.map((entry) => (
                 <Pill key={entry}>{entry}</Pill>
               ))}
             </div>
-            <h4 className="activity-title mt-4">{item.title}</h4>
-            <p className="transcript-copy mt-2">{item.text}</p>
-            <div className="action-link mt-4">Add to dictionary</div>
+            <h4 className="font-semibold mt-4">{item.title}</h4>
+            <p className="body-copy-strong mt-2">{item.text}</p>
+            <div className="link link-secondary text-sm mt-4">Add to dictionary</div>
           </article>
         ))}
       </div>

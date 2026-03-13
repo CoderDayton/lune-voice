@@ -1,6 +1,6 @@
 import { useStore } from "@tanstack/react-store";
 import { useHotkey } from "@tanstack/react-hotkeys";
-import { Button } from "../../../components/ui/button";
+import { cn } from "../../../lib/cn";
 import { authActions, authStore, type AuthMode } from "../../../store/auth-store";
 
 const authModes: Array<{ value: AuthMode; label: string }> = [
@@ -15,17 +15,19 @@ export function AuthModeSwitch() {
   useHotkey("Alt+2", () => authActions.setMode("signup"));
 
   return (
-    <div className="auth-mode-switch">
+    <div className="join">
       {authModes.map((option) => (
-        <Button
+        <button
           key={option.value}
           type="button"
-          variant={mode === option.value ? "primary" : "ghost"}
-          className="auth-mode-button"
+          className={cn(
+            "join-item btn btn-sm min-w-24",
+            mode === option.value ? "btn-primary" : "btn-ghost",
+          )}
           onClick={() => authActions.setMode(option.value)}
         >
           {option.label}
-        </Button>
+        </button>
       ))}
     </div>
   );

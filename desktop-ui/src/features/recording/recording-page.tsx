@@ -75,7 +75,7 @@ export function RecordingPage() {
               />
             }
           />
-          <SettingsRow label="Pause sensitivity" description="Lower numbers wait longer before deciding you are done speaking." control={<span className="app-pill font-mono">{settings.speechThreshold}</span>} />
+          <SettingsRow label="Pause sensitivity" description="Lower numbers wait longer before deciding you are done speaking." control={<span className="badge badge-outline badge-sm font-mono">{settings.speechThreshold}</span>} />
         </SettingsSection>
 
         <SettingsSection title="Transcription quality" description="Control how your speech is turned into text.">
@@ -225,17 +225,17 @@ export function RecordingPage() {
           <SettingsRow
             label="Cleanup sensitivity"
             description="Words below this score are candidates for cleanup."
-            control={<span className="app-pill font-mono">{settings.confidenceThreshold}</span>}
+            control={<span className="badge badge-outline badge-sm font-mono">{settings.confidenceThreshold}</span>}
           />
         </SettingsSection>
 
-        <Panel className="panel-pad-lg">
+        <Panel className="p-6">
           <p className="app-kicker-accent">Good default</p>
-          <h3 className="card-title mt-3">Recommended starting setup</h3>
-          <div className="insight-stack mt-4">
-            <p>Use <span className="font-semibold text-copy-50">Toggle</span> if you dictate longer notes or emails.</p>
-            <p>Keep <span className="font-semibold text-copy-50">Balanced</span> selected unless your computer is memory-constrained.</p>
-            <p>Leave <span className="font-semibold text-copy-50">Smart cleanup</span> on so names and uncertain phrases get a second pass.</p>
+          <h3 className="card-title-text mt-3">Recommended starting setup</h3>
+          <div className="flex flex-col gap-4 mt-4">
+            <p>Use <span className="font-semibold">Toggle</span> if you dictate longer notes or emails.</p>
+            <p>Keep <span className="font-semibold">Balanced</span> selected unless your computer is memory-constrained.</p>
+            <p>Leave <span className="font-semibold">Smart cleanup</span> on so names and uncertain phrases get a second pass.</p>
           </div>
         </Panel>
       </section>

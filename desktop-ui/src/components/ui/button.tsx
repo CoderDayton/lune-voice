@@ -2,12 +2,12 @@ import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "reac
 import { cn } from "../../lib/cn";
 
 const buttonVariants = {
-  primary: "action-primary",
-  secondary: "action-secondary",
-  ghost: "action-ghost",
-  danger: "action-danger",
-  table: "table-action",
-  sidebar: "sidebar-button",
+  primary: "btn btn-primary",
+  secondary: "btn btn-ghost",
+  ghost: "btn btn-ghost btn-sm",
+  danger: "btn btn-error",
+  table: "btn btn-ghost btn-sm",
+  sidebar: "btn btn-ghost w-full justify-start",
 } as const;
 
 type ButtonVariant = keyof typeof buttonVariants;

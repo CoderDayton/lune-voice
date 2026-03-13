@@ -63,19 +63,19 @@ export function AuthForm() {
   }
 
   return (
-    <div className="auth-form-shell">
+    <div className="flex flex-col gap-5">
       <div className="stack-copy">
         <h1 className="auth-form-title">{copy.title}</h1>
         <p className="body-copy-soft">{copy.description}</p>
       </div>
 
-      <div className="auth-provider-stack">
+      <div className="flex flex-col gap-3">
         {Object.keys(providerProfiles).map((provider) => (
           <Button
             key={provider}
             type="button"
             variant="secondary"
-            className="auth-provider-button"
+            className="w-full justify-center"
             onClick={() => submitProvider(provider as keyof typeof providerProfiles)}
           >
             Continue with {provider}
@@ -83,14 +83,12 @@ export function AuthForm() {
         ))}
       </div>
 
-      <div className="auth-divider">
-        <span className="auth-divider-line" />
+      <div className="divider">
         <span className="auth-divider-text">or use email</span>
-        <span className="auth-divider-line" />
       </div>
 
       <form
-        className="auth-form-grid"
+        className="flex flex-col gap-4"
         onSubmit={(event) => {
           event.preventDefault();
           void form.handleSubmit();
@@ -180,21 +178,20 @@ export function AuthForm() {
       </form>
 
       <div className="auth-hotkey-row">
-        <span className="auth-hotkey-pill">Mod+Enter submit</span>
-        <span className="auth-hotkey-pill">Alt+1 log in</span>
-        <span className="auth-hotkey-pill">Alt+2 sign up</span>
+        <span className="badge badge-outline badge-sm opacity-70">Mod+Enter submit</span>
+        <span className="badge badge-outline badge-sm opacity-70">Alt+1 log in</span>
+        <span className="badge badge-outline badge-sm opacity-70">Alt+2 sign up</span>
       </div>
 
       <p className="body-copy-soft">
         {copy.support}{" "}
-        <Button
+        <button
           type="button"
-          variant="ghost"
-          className="auth-inline-link"
+          className="btn btn-ghost btn-sm inline p-0 min-h-0 font-medium"
           onClick={() => authActions.setMode(isSignup ? "login" : "signup")}
         >
           {copy.supportAction}
-        </Button>
+        </button>
       </p>
     </div>
   );

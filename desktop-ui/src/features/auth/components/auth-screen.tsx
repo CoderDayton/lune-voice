@@ -17,7 +17,7 @@ export function AuthScreen() {
     <div className="auth-root">
       <div className="auth-backdrop" />
       <div className="auth-shell">
-        <section className="auth-panel">
+        <section className="card bg-base-200/80 border border-base-300/40 p-6 flex min-h-[38rem] flex-col">
           <div className="auth-panel-head">
             <div className="auth-brand-row">
               <div className="brand-mark">
@@ -29,12 +29,11 @@ export function AuthScreen() {
               </div>
             </div>
 
-            <label className="auth-language-picker">
+            <label className="w-full max-w-40">
               <span className="sr-only">Language</span>
               <SelectField
                 value={language}
                 onChange={(event) => setLanguage(event.target.value)}
-                className="auth-language-select"
               >
                 {languageOptions.map((option) => (
                   <option key={option} value={option}>

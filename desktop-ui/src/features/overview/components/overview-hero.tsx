@@ -44,7 +44,7 @@ export function OverviewHero() {
 
   return (
     <div className="layout-grid xl:grid-cols-[1.35fr_0.9fr]">
-      <Panel tone="hero" className="panel-pad-lg relative overflow-hidden">
+      <Panel tone="hero" className="p-6 relative overflow-hidden">
         <p className="app-kicker-accent">Voice typing, simplified</p>
         <h2 className="hero-title mt-3">
           Speak naturally. Keep the final text polished.
@@ -62,7 +62,7 @@ export function OverviewHero() {
         </div>
       </Panel>
 
-      <Panel className="panel-pad-lg">
+      <Panel className="p-6">
         <div className="header-row">
           <div>
             <Pill>Session snapshot</Pill>
