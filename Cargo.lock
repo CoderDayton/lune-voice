@@ -4217,6 +4217,7 @@ dependencies = [
  "lune-llm",
  "lune-persist",
  "ort",
+ "regex",
  "serde",
  "serde_json",
  "tauri",
@@ -4224,6 +4225,7 @@ dependencies = [
  "tauri-plugin-opener",
  "tokio",
  "tracing",
+ "url",
 ]
 
 [[package]]

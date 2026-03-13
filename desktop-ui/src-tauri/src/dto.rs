@@ -10,7 +10,7 @@ pub struct WorkspaceSnapshot {
     pub dictionary: Vec<DictionaryItemDto>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceSettingsDto {
     pub activation_mode: String,
@@ -33,6 +33,24 @@ pub struct WorkspaceSettingsDto {
     pub openai_llm_base_url: Option<String>,
     pub openai_llm_api_key: Option<String>,
     pub openai_llm_model: Option<String>,
+}
+
+// Redact API keys from Debug output to prevent accidental log exposure.
+impl std::fmt::Debug for WorkspaceSettingsDto {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WorkspaceSettingsDto")
+            .field("asr_backend_type", &self.asr_backend_type)
+            .field("llm_backend_type", &self.llm_backend_type)
+            .field(
+                "openai_asr_api_key",
+                &self.openai_asr_api_key.as_ref().map(|_| "[REDACTED]"),
+            )
+            .field(
+                "openai_llm_api_key",
+                &self.openai_llm_api_key.as_ref().map(|_| "[REDACTED]"),
+            )
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]

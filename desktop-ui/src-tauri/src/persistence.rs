@@ -13,6 +13,7 @@ use crate::dto::{
 };
 
 const HISTORY_LIMIT: u32 = 200;
+const DICTIONARY_LIMIT: usize = 10_000;
 const UNKNOWN_LABEL: &str = "Unknown";
 
 pub fn load_workspace_snapshot() -> Result<WorkspaceSnapshot, String> {
@@ -103,10 +104,11 @@ fn build_snapshot(
         })
         .collect();
 
-    let dictionary = database
+    let dictionary: Vec<_> = database
         .list_dictionary_entries_with_ids()
         .map_err(|e| format!("list dictionary entries: {e}"))?
         .into_iter()
+        .take(DICTIONARY_LIMIT)
         .map(map_dictionary_entry)
         .collect();
 
@@ -310,10 +312,12 @@ fn asr_backend_from_type(
             let base_url_str = input.openai_asr_base_url.as_deref().unwrap_or(&cur_url);
             let api_key_str = input.openai_asr_api_key.as_deref().unwrap_or(&cur_key);
             let model_str = input.openai_asr_model.as_deref().unwrap_or(&cur_model);
+            let base_url: url::Url = base_url_str
+                .parse()
+                .map_err(|e| format!("invalid openaiAsrBaseUrl: {e}"))?;
+            validate_api_url(&base_url, "openaiAsrBaseUrl")?;
             AsrBackendConfig::OpenAiCompatible {
-                base_url: base_url_str
-                    .parse()
-                    .map_err(|e| format!("invalid openaiAsrBaseUrl: {e}"))?,
+                base_url,
                 api_key: RedactedString::new(api_key_str),
                 model: model_str.to_owned(),
                 streaming: StreamingMode::HttpPolling,
@@ -357,10 +361,12 @@ fn llm_backend_from_type(
             let base_url_str = input.openai_llm_base_url.as_deref().unwrap_or(&cur_url);
             let api_key_str = input.openai_llm_api_key.as_deref().unwrap_or(&cur_key);
             let model_str = input.openai_llm_model.as_deref().unwrap_or(&cur_model);
+            let base_url: url::Url = base_url_str
+                .parse()
+                .map_err(|e| format!("invalid openaiLlmBaseUrl: {e}"))?;
+            validate_api_url(&base_url, "openaiLlmBaseUrl")?;
             LlmBackendConfig::OpenAiCompatible {
-                base_url: base_url_str
-                    .parse()
-                    .map_err(|e| format!("invalid openaiLlmBaseUrl: {e}"))?,
+                base_url,
                 api_key: RedactedString::new(api_key_str),
                 model: model_str.to_owned(),
                 max_tokens: cur_max_tokens,
@@ -368,6 +374,26 @@ fn llm_backend_from_type(
         }
         _ => return Err(format!("unsupported llmBackendType: {kind}")),
     })
+}
+
+/// Validate that an API URL uses HTTPS (or is a loopback address for local dev).
+fn validate_api_url(url: &url::Url, field: &str) -> Result<(), String> {
+    match url.scheme() {
+        "https" => Ok(()),
+        "http" => {
+            let host = url.host_str().unwrap_or_default();
+            if host == "localhost" || host == "127.0.0.1" || host == "[::1]" {
+                Ok(())
+            } else {
+                Err(format!(
+                    "{field}: HTTP is only allowed for localhost; use HTTPS for remote endpoints"
+                ))
+            }
+        }
+        scheme => Err(format!(
+            "{field}: unsupported URL scheme \"{scheme}\", expected https"
+        )),
+    }
 }
 
 fn current_parakeet_model_dir(current: &AsrBackendConfig) -> PathBuf {

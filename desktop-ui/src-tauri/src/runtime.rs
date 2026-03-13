@@ -201,10 +201,14 @@ impl AppRuntime {
                     }
                     SessionEvent::Error(message) => {
                         saw_error = true;
+                        // Log full error internally; send sanitized version to frontend.
+                        warn!(error = %message, "session error");
                         runtime.finish_session().await;
                         runtime.publish_status("error").await;
                         runtime
-                            .push_session_event(SessionStreamEvent::SessionError { message })
+                            .push_session_event(SessionStreamEvent::SessionError {
+                                message: sanitize_error_for_frontend(&message),
+                            })
                             .await;
                     }
                     SessionEvent::Stopped => {
@@ -296,6 +300,7 @@ impl AppRuntime {
     }
 
     async fn prepare_manager_for_start(&self) -> Result<Arc<SessionManager<AsrRegistry>>, String> {
+        // Phase 1: Check if reload needed (short lock).
         let reload_paths = {
             let pipeline = self.inner.pipeline.lock().await;
             if pipeline.active {
@@ -304,6 +309,8 @@ impl AppRuntime {
             pipeline.reload_required.then(|| pipeline.paths.clone())
         };
 
+        // Phase 2: If reload needed, rebuild pipeline outside lock, then
+        // re-acquire and atomically swap + activate in one critical section.
         if let Some(paths) = reload_paths {
             let (rebuilt, new_settings) = build_pipeline(paths).await?;
             let mut pipeline = self.inner.pipeline.lock().await;
@@ -311,13 +318,19 @@ impl AppRuntime {
                 return Err("dictation session became active during reload".into());
             }
             *pipeline = rebuilt;
+            pipeline.active = true;
             // Propagate new settings into the shared arc so delivery uses the
             // latest dictation_mode and terminal_mode after a reload.
             let mut settings = self.inner.settings.write().await;
             *settings = new_settings.read().await.clone();
+            return Ok(Arc::clone(&pipeline.manager));
         }
 
+        // Phase 3: No reload — just activate.
         let mut pipeline = self.inner.pipeline.lock().await;
+        if pipeline.active {
+            return Err("dictation session already active".into());
+        }
         pipeline.active = true;
         Ok(Arc::clone(&pipeline.manager))
     }
@@ -517,4 +530,18 @@ async fn build_post_processor(
         }
         _ => Err("unsupported LLM backend type in desktop UI runtime".into()),
     }
+}
+
+/// Strip file paths and internal details from error messages before sending to
+/// the frontend.  Keeps the first clause (the human-readable part) and drops
+/// anything after a colon that looks like a path or stack context.
+fn sanitize_error_for_frontend(raw: &str) -> String {
+    // Truncate very long errors.
+    let capped = if raw.len() > 512 { &raw[..512] } else { raw };
+
+    // Strip absolute file paths (e.g. "/home/user/.local/share/…").
+    static PATH_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(r"(/[a-zA-Z0-9._\-]+){3,}").expect("path regex")
+    });
+    PATH_RE.replace_all(capped, "[path]").into_owned()
 }
