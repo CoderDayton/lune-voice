@@ -1,17 +1,19 @@
 use std::sync::Arc;
 
-use lune_app::{SessionManager, SessionManagerConfig};
+use lune_app::{DeliveryService, SessionManager, SessionManagerConfig};
 use lune_asr::{AsrRegistry, OrtForcedAligner};
 use lune_commands::VoiceCommandRouter;
 use lune_core::asr::AsrSessionConfig;
+use lune_core::command::VoiceCommand;
 use lune_core::config::{AsrBackendConfig, LlmBackendConfig, UserSettings};
 use lune_core::llm::TextPostProcessor;
 use lune_core::session::SessionEvent;
 use lune_dict::DictionaryManager;
-use lune_llm::{LlamaCppBackend, LlamaCppConfig};
+use lune_llm::{LlamaCppBackend, LlamaCppConfig, OpenAiLlmBackend, OpenAiLlmConfig};
 use lune_persist::{AppPaths, Database, SettingsStore, ensure_default_models};
 use tauri::{AppHandle, Emitter, ipc::Channel};
 use tokio::sync::{Mutex, RwLock, mpsc};
+use tracing::{debug, warn};
 
 use crate::dto::SessionStreamEvent;
 
@@ -24,6 +26,10 @@ struct RuntimeInner {
     pipeline: Mutex<LivePipeline>,
     status: RwLock<String>,
     session_stream: RwLock<Option<Channel<SessionStreamEvent>>>,
+    /// Shared settings — updated on reload, read for dictation_mode at delivery time.
+    settings: Arc<RwLock<UserSettings>>,
+    /// Background thread that owns the uinput/clipboard handle.
+    delivery: DeliveryService,
 }
 
 struct LivePipeline {
@@ -37,7 +43,10 @@ struct LivePipeline {
 impl AppRuntime {
     pub async fn new(app: AppHandle) -> Result<Self, String> {
         let paths = resolve_paths()?;
-        let pipeline = build_pipeline(paths.clone()).await?;
+        let (pipeline, settings) = build_pipeline(paths.clone()).await?;
+
+        let terminal_mode = settings.read().await.terminal_mode;
+        let delivery = DeliveryService::new(terminal_mode);
 
         Ok(Self {
             inner: Arc::new(RuntimeInner {
@@ -45,6 +54,8 @@ impl AppRuntime {
                 pipeline: Mutex::new(pipeline),
                 status: RwLock::new("ready".into()),
                 session_stream: RwLock::new(None),
+                settings,
+                delivery,
             }),
         })
     }
@@ -165,18 +176,27 @@ impl AppRuntime {
                             .await;
                     }
                     SessionEvent::FinalizedText(text) => {
+                        // Deliver text to the focused application before notifying the UI.
+                        let mode = runtime.inner.settings.read().await.dictation_mode;
+                        runtime.inner.delivery.deliver(&text, mode);
                         runtime
                             .push_session_event(SessionStreamEvent::FinalizedText { text })
                             .await;
                     }
                     SessionEvent::CorrectedText(text) => {
+                        // Corrected text replaces the finalized text — deliver it too.
+                        let mode = runtime.inner.settings.read().await.dictation_mode;
+                        runtime.inner.delivery.deliver(&text, mode);
                         runtime
                             .push_session_event(SessionStreamEvent::CorrectedText { text })
                             .await;
                     }
-                    SessionEvent::CommandDetected(payload) => {
+                    SessionEvent::CommandDetected(ref payload) => {
+                        runtime.handle_voice_command(payload).await;
                         runtime
-                            .push_session_event(SessionStreamEvent::CommandDetected { payload })
+                            .push_session_event(SessionStreamEvent::CommandDetected {
+                                payload: payload.clone(),
+                            })
                             .await;
                     }
                     SessionEvent::Error(message) => {
@@ -201,6 +221,50 @@ impl AppRuntime {
                 }
             }
         });
+    }
+
+    /// Dispatch a `VoiceCommand` payload string received from the pipeline.
+    ///
+    /// - `NewLine` / `NewParagraph` / `ListItem` → deliver the corresponding
+    ///   whitespace/punctuation text.
+    /// - `StopDictation` → stop the active session.
+    /// - Other commands (e.g. `SwitchStyle`, `InsertSnippet`, `ScratchThat`) →
+    ///   logged and skipped; higher-level handling belongs in the frontend or a
+    ///   future command handler.
+    async fn handle_voice_command(&self, payload: &str) {
+        let cmd: VoiceCommand = match serde_json::from_str(payload) {
+            Ok(c) => c,
+            Err(e) => {
+                warn!(error = %e, payload, "CommandDetected: failed to parse VoiceCommand JSON");
+                return;
+            }
+        };
+
+        let mode = self.inner.settings.read().await.dictation_mode;
+
+        match cmd {
+            VoiceCommand::NewLine => {
+                debug!("CommandDetected: NewLine → delivering \\n");
+                self.inner.delivery.deliver("\n", mode);
+            }
+            VoiceCommand::NewParagraph => {
+                debug!("CommandDetected: NewParagraph → delivering \\n\\n");
+                self.inner.delivery.deliver("\n\n", mode);
+            }
+            VoiceCommand::ListItem => {
+                debug!("CommandDetected: ListItem → delivering \\n- ");
+                self.inner.delivery.deliver("\n- ", mode);
+            }
+            VoiceCommand::StopDictation => {
+                debug!("CommandDetected: StopDictation → stopping session");
+                if let Some(manager) = self.active_manager().await {
+                    manager.stop().await;
+                }
+            }
+            other => {
+                debug!(cmd = ?other, "CommandDetected: no delivery action for this command");
+            }
+        }
     }
 
     async fn finish_session(&self) {
@@ -237,12 +301,16 @@ impl AppRuntime {
         };
 
         if let Some(paths) = reload_paths {
-            let rebuilt = build_pipeline(paths).await?;
+            let (rebuilt, new_settings) = build_pipeline(paths).await?;
             let mut pipeline = self.inner.pipeline.lock().await;
             if pipeline.active {
                 return Err("dictation session became active during reload".into());
             }
             *pipeline = rebuilt;
+            // Propagate new settings into the shared arc so delivery uses the
+            // latest dictation_mode and terminal_mode after a reload.
+            let mut settings = self.inner.settings.write().await;
+            *settings = new_settings.read().await.clone();
         }
 
         let mut pipeline = self.inner.pipeline.lock().await;
@@ -265,7 +333,9 @@ impl Clone for AppRuntime {
     }
 }
 
-async fn build_pipeline(paths: AppPaths) -> Result<LivePipeline, String> {
+async fn build_pipeline(
+    paths: AppPaths,
+) -> Result<(LivePipeline, Arc<RwLock<UserSettings>>), String> {
     let mut settings = load_settings(&paths)?;
     patch_model_paths(&paths, &mut settings)?;
     init_ort_runtime(&settings);
@@ -304,7 +374,7 @@ async fn build_pipeline(paths: AppPaths) -> Result<LivePipeline, String> {
         dict,
         db,
         config,
-        settings,
+        Arc::clone(&settings),
     )
     .with_vad_state_path(paths.adaptive_vad_file());
 
@@ -312,13 +382,15 @@ async fn build_pipeline(paths: AppPaths) -> Result<LivePipeline, String> {
         manager = manager.with_aligner(aligner);
     }
 
-    Ok(LivePipeline {
+    let pipeline = LivePipeline {
         paths,
         manager: Arc::new(manager),
         active: false,
         session_id: None,
         reload_required: false,
-    })
+    };
+
+    Ok((pipeline, settings))
 }
 
 fn resolve_paths() -> Result<AppPaths, String> {
@@ -424,6 +496,21 @@ async fn build_post_processor(
         .await
         .map(|backend| Arc::new(backend) as Arc<dyn TextPostProcessor>)
         .map_err(|e| format!("build llm backend: {e}")),
-        _ => Err("OpenAI LLM is not supported by the desktop UI runtime yet".into()),
+        LlmBackendConfig::OpenAiCompatible {
+            base_url,
+            api_key,
+            model,
+            max_tokens,
+        } => {
+            let backend = OpenAiLlmBackend::new(OpenAiLlmConfig {
+                base_url: base_url.to_string(),
+                api_key: api_key.expose().to_owned(),
+                model: model.clone(),
+                max_tokens: *max_tokens,
+                temperature: 0.2,
+            });
+            Ok(Arc::new(backend) as Arc<dyn TextPostProcessor>)
+        }
+        _ => Err("unsupported LLM backend type in desktop UI runtime".into()),
     }
 }

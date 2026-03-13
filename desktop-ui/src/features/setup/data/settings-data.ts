@@ -1,5 +1,5 @@
 export type ActivationModeValue = "Toggle" | "Hold";
-export type AsrBackendValue = "OrtQwenAsr" | "ParakeetTdt";
+export type AsrBackendValue = "OrtQwenAsr" | "ParakeetTdt" | "OpenAiCompatible";
 export type LlmBackendValue = "LlamaCppLocal" | "OpenAiCompatible";
 export type DictationModeValue = "TypeInPlace" | "Clipboard" | "Both";
 
@@ -16,6 +16,7 @@ export const activationModes: Option<ActivationModeValue>[] = [
 export const asrBackends: Option<AsrBackendValue>[] = [
   { value: "OrtQwenAsr", label: "Balanced (recommended)" },
   { value: "ParakeetTdt", label: "Fast and light" },
+  { value: "OpenAiCompatible", label: "Cloud API (OpenAI-compatible)" },
 ];
 
 export const llmModels: Option<LlmBackendValue>[] = [

@@ -1,5 +1,5 @@
 import { useStore } from "@tanstack/react-store";
-import { SelectField } from "../../components/ui/field";
+import { SelectField, TextField } from "../../components/ui/field";
 import { PageIntroPanel } from "../../components/ui/page-intro-panel";
 import { Panel } from "../../components/ui/panel";
 import { StatTile } from "../../components/ui/stat-tile";
@@ -96,10 +96,61 @@ export function RecordingPage() {
               </SelectField>
             }
           />
+          {settings.asrBackend === "OpenAiCompatible" && (
+            <>
+              <SettingsRow
+                label="API endpoint"
+                description="Base URL for the OpenAI-compatible transcription API."
+                control={
+                  <TextField
+                    value={settings.openaiAsrBaseUrl}
+                    onChange={(event) => void saveWorkspaceSetting("openaiAsrBaseUrl", event.target.value)}
+                    className="min-w-64"
+                    placeholder="https://api.openai.com/v1"
+                  />
+                }
+              />
+              <SettingsRow
+                label="API key"
+                description="Your API key. Stored locally and never shared."
+                control={
+                  <TextField
+                    type="password"
+                    value={settings.openaiAsrApiKey}
+                    onChange={(event) => void saveWorkspaceSetting("openaiAsrApiKey", event.target.value)}
+                    className="min-w-64"
+                    placeholder="sk-..."
+                  />
+                }
+              />
+              <SettingsRow
+                label="Model"
+                description="Transcription model name, e.g. whisper-1."
+                control={
+                  <TextField
+                    value={settings.openaiAsrModel}
+                    onChange={(event) => void saveWorkspaceSetting("openaiAsrModel", event.target.value)}
+                    className="min-w-48"
+                    placeholder="whisper-1"
+                  />
+                }
+              />
+            </>
+          )}
           <SettingsRow
             label="Use hardware acceleration"
             description="When available, this can make transcription finish faster."
             control={<Toggle checked={settings.useGpu} onChange={() => void saveWorkspaceSetting("useGpu", !settings.useGpu)} />}
+          />
+          <SettingsRow
+            label="Word-level alignment"
+            description="Use forced aligner for precise word timestamps and chunk merging."
+            control={
+              <Toggle
+                checked={settings.alignerEnabled}
+                onChange={() => void saveWorkspaceSetting("alignerEnabled", !settings.alignerEnabled)}
+              />
+            }
           />
         </SettingsSection>
 
@@ -130,6 +181,47 @@ export function RecordingPage() {
               </SelectField>
             }
           />
+          {settings.llmBackend === "OpenAiCompatible" && (
+            <>
+              <SettingsRow
+                label="API endpoint"
+                description="Base URL for the OpenAI-compatible chat completion API."
+                control={
+                  <TextField
+                    value={settings.openaiLlmBaseUrl}
+                    onChange={(event) => void saveWorkspaceSetting("openaiLlmBaseUrl", event.target.value)}
+                    className="min-w-64"
+                    placeholder="https://api.openai.com/v1"
+                  />
+                }
+              />
+              <SettingsRow
+                label="API key"
+                description="Your API key. Stored locally and never shared."
+                control={
+                  <TextField
+                    type="password"
+                    value={settings.openaiLlmApiKey}
+                    onChange={(event) => void saveWorkspaceSetting("openaiLlmApiKey", event.target.value)}
+                    className="min-w-64"
+                    placeholder="sk-..."
+                  />
+                }
+              />
+              <SettingsRow
+                label="Model"
+                description="Chat completion model name, e.g. gpt-4o-mini."
+                control={
+                  <TextField
+                    value={settings.openaiLlmModel}
+                    onChange={(event) => void saveWorkspaceSetting("openaiLlmModel", event.target.value)}
+                    className="min-w-48"
+                    placeholder="gpt-4o-mini"
+                  />
+                }
+              />
+            </>
+          )}
           <SettingsRow
             label="Cleanup sensitivity"
             description="Words below this score are candidates for cleanup."

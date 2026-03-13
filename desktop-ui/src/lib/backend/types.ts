@@ -34,6 +34,15 @@ export interface BackendWorkspaceSettings {
   stylePreset: string;
   hotkeyToggle: string;
   hotkeyCancel: string;
+  alignerEnabled: boolean;
+  // OpenAI ASR fields (present when asrBackendType == "OpenAiCompatible")
+  openaiAsrBaseUrl?: string | null;
+  openaiAsrApiKey?: string | null;
+  openaiAsrModel?: string | null;
+  // OpenAI LLM fields (present when llmBackendType == "OpenAiCompatible")
+  openaiLlmBaseUrl?: string | null;
+  openaiLlmApiKey?: string | null;
+  openaiLlmModel?: string | null;
 }
 
 export interface BackendWorkspaceSnapshot {
@@ -55,6 +64,17 @@ export interface SaveWorkspaceSettingsInput {
   adaptiveVad: boolean;
   speechThreshold: number;
   stylePreset: string;
+  hotkeyToggle: string;
+  hotkeyCancel: string;
+  alignerEnabled: boolean;
+  // OpenAI ASR fields (sent when asrBackendType == "OpenAiCompatible")
+  openaiAsrBaseUrl?: string | null;
+  openaiAsrApiKey?: string | null;
+  openaiAsrModel?: string | null;
+  // OpenAI LLM fields (sent when llmBackendType == "OpenAiCompatible")
+  openaiLlmBaseUrl?: string | null;
+  openaiLlmApiKey?: string | null;
+  openaiLlmModel?: string | null;
 }
 
 export interface BackendClient {

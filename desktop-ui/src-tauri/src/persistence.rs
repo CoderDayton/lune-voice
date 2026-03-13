@@ -1,8 +1,8 @@
 use std::{path::PathBuf, str::FromStr};
 
 use lune_core::config::{
-    ActivationMode, AsrBackendConfig, DevicePolicy, DictationMode, HotkeyConfig, KeyCombo,
-    LlmBackendConfig, Modifier, UserSettings,
+    ActivationMode, AlignerConfig, AsrBackendConfig, DevicePolicy, DictationMode, HotkeyConfig,
+    KeyCombo, LlmBackendConfig, Modifier, RedactedString, StreamingMode, UserSettings,
 };
 use lune_core::session::SessionStatus;
 use lune_persist::{AppPaths, Database, SettingsStore, StoredDictionaryEntry};
@@ -125,6 +125,34 @@ fn open_database(paths: &AppPaths) -> Result<Database, String> {
 }
 
 fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
+    let (openai_asr_base_url, openai_asr_api_key, openai_asr_model) = match &settings.asr_backend {
+        AsrBackendConfig::OpenAiCompatible {
+            base_url,
+            api_key,
+            model,
+            ..
+        } => (
+            Some(base_url.to_string()),
+            Some(api_key.expose().to_owned()),
+            Some(model.clone()),
+        ),
+        _ => (None, None, None),
+    };
+
+    let (openai_llm_base_url, openai_llm_api_key, openai_llm_model) = match &settings.llm_backend {
+        LlmBackendConfig::OpenAiCompatible {
+            base_url,
+            api_key,
+            model,
+            ..
+        } => (
+            Some(base_url.to_string()),
+            Some(api_key.expose().to_owned()),
+            Some(model.clone()),
+        ),
+        _ => (None, None, None),
+    };
+
     WorkspaceSettingsDto {
         activation_mode: settings.activation_mode.to_string(),
         dictation_mode: settings.dictation_mode.to_string(),
@@ -140,6 +168,13 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
         style_preset: settings.default_style.clone(),
         hotkey_toggle: format_key_combo(&settings.hotkey.toggle_dictation),
         hotkey_cancel: format_key_combo(&settings.hotkey.cancel_dictation),
+        aligner_enabled: settings.aligner.as_ref().is_some_and(|cfg| cfg.enabled),
+        openai_asr_base_url,
+        openai_asr_api_key,
+        openai_asr_model,
+        openai_llm_base_url,
+        openai_llm_api_key,
+        openai_llm_model,
     }
 }
 
@@ -156,8 +191,10 @@ fn apply_settings_dto(
     } else {
         DevicePolicy::Cpu
     };
-    settings.asr_backend = asr_backend_from_type(&input.asr_backend_type, &settings.asr_backend)?;
-    settings.llm_backend = llm_backend_from_type(&input.llm_backend_type, &settings.llm_backend)?;
+    settings.asr_backend =
+        asr_backend_from_type(&input.asr_backend_type, &settings.asr_backend, &input)?;
+    settings.llm_backend =
+        llm_backend_from_type(&input.llm_backend_type, &settings.llm_backend, &input)?;
     settings.pipeline.word_confidence_threshold = input.confidence_threshold;
     settings.word_confidence_threshold = input.confidence_threshold.unwrap_or(0.5);
     settings.pipeline.adaptive_vad = Some(input.adaptive_vad);
@@ -168,6 +205,17 @@ fn apply_settings_dto(
         toggle_dictation: parse_key_combo(&input.hotkey_toggle)?,
         cancel_dictation: parse_key_combo(&input.hotkey_cancel)?,
     };
+    if let Some(ref mut cfg) = settings.aligner {
+        cfg.enabled = input.aligner_enabled;
+    } else if input.aligner_enabled {
+        settings.aligner = Some(AlignerConfig {
+            enabled: true,
+            model_dir: UserSettings::default()
+                .aligner
+                .map(|c| c.model_dir)
+                .unwrap_or_default(),
+        });
+    }
     Ok(())
 }
 
@@ -191,6 +239,7 @@ fn llm_backend_type(config: &LlmBackendConfig) -> &'static str {
 fn asr_backend_from_type(
     kind: &str,
     current: &AsrBackendConfig,
+    input: &WorkspaceSettingsDto,
 ) -> Result<AsrBackendConfig, String> {
     Ok(match kind {
         "ParakeetTdt" => AsrBackendConfig::ParakeetTdt {
@@ -199,11 +248,36 @@ fn asr_backend_from_type(
         "OrtQwenAsr" => AsrBackendConfig::OrtQwenAsr {
             model_dir: current_qwen_model_dir(current),
         },
-        "OpenAiCompatible" if matches!(current, AsrBackendConfig::OpenAiCompatible { .. }) => {
-            current.clone()
-        }
         "OpenAiCompatible" => {
-            return Err("OpenAiCompatible ASR cannot be created from this UI yet".into());
+            // Prefer incoming DTO fields; fall back to current config values if already OpenAI.
+            let (cur_url, cur_key, cur_model) = match current {
+                AsrBackendConfig::OpenAiCompatible {
+                    base_url,
+                    api_key,
+                    model,
+                    ..
+                } => (
+                    base_url.to_string(),
+                    api_key.expose().to_owned(),
+                    model.clone(),
+                ),
+                _ => (
+                    "https://api.openai.com/v1".to_owned(),
+                    String::new(),
+                    "whisper-1".to_owned(),
+                ),
+            };
+            let base_url_str = input.openai_asr_base_url.as_deref().unwrap_or(&cur_url);
+            let api_key_str = input.openai_asr_api_key.as_deref().unwrap_or(&cur_key);
+            let model_str = input.openai_asr_model.as_deref().unwrap_or(&cur_model);
+            AsrBackendConfig::OpenAiCompatible {
+                base_url: base_url_str
+                    .parse()
+                    .map_err(|e| format!("invalid openaiAsrBaseUrl: {e}"))?,
+                api_key: RedactedString::new(api_key_str),
+                model: model_str.to_owned(),
+                streaming: StreamingMode::HttpPolling,
+            }
         }
         _ => return Err(format!("unsupported asrBackendType: {kind}")),
     })
@@ -212,17 +286,45 @@ fn asr_backend_from_type(
 fn llm_backend_from_type(
     kind: &str,
     current: &LlmBackendConfig,
+    input: &WorkspaceSettingsDto,
 ) -> Result<LlmBackendConfig, String> {
     Ok(match kind {
         "LlamaCppLocal" if matches!(current, LlmBackendConfig::LlamaCppLocal { .. }) => {
             current.clone()
         }
         "LlamaCppLocal" => UserSettings::default().llm_backend,
-        "OpenAiCompatible" if matches!(current, LlmBackendConfig::OpenAiCompatible { .. }) => {
-            current.clone()
-        }
         "OpenAiCompatible" => {
-            return Err("OpenAiCompatible LLM cannot be created from this UI yet".into());
+            // Prefer incoming DTO fields; fall back to current config values if already OpenAI.
+            let (cur_url, cur_key, cur_model, cur_max_tokens) = match current {
+                LlmBackendConfig::OpenAiCompatible {
+                    base_url,
+                    api_key,
+                    model,
+                    max_tokens,
+                } => (
+                    base_url.to_string(),
+                    api_key.expose().to_owned(),
+                    model.clone(),
+                    *max_tokens,
+                ),
+                _ => (
+                    "https://api.openai.com/v1".to_owned(),
+                    String::new(),
+                    "gpt-4o-mini".to_owned(),
+                    512u32,
+                ),
+            };
+            let base_url_str = input.openai_llm_base_url.as_deref().unwrap_or(&cur_url);
+            let api_key_str = input.openai_llm_api_key.as_deref().unwrap_or(&cur_key);
+            let model_str = input.openai_llm_model.as_deref().unwrap_or(&cur_model);
+            LlmBackendConfig::OpenAiCompatible {
+                base_url: base_url_str
+                    .parse()
+                    .map_err(|e| format!("invalid openaiLlmBaseUrl: {e}"))?,
+                api_key: RedactedString::new(api_key_str),
+                model: model_str.to_owned(),
+                max_tokens: cur_max_tokens,
+            }
         }
         _ => return Err(format!("unsupported llmBackendType: {kind}")),
     })

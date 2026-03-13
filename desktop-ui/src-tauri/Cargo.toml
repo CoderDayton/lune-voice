@@ -25,6 +25,7 @@ lune-llm = { path = "../../crates/lune-llm" }
 lune-persist = { path = "../../crates/lune-persist" }
 ort = { workspace = true }
 tokio = { workspace = true }
+tracing.workspace = true
 
 [[bin]]
 name = "lune-ui"

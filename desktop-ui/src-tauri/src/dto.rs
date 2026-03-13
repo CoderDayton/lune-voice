@@ -24,6 +24,15 @@ pub struct WorkspaceSettingsDto {
     pub style_preset: String,
     pub hotkey_toggle: String,
     pub hotkey_cancel: String,
+    pub aligner_enabled: bool,
+    // OpenAI ASR fields (populated when asr_backend_type == "OpenAiCompatible")
+    pub openai_asr_base_url: Option<String>,
+    pub openai_asr_api_key: Option<String>,
+    pub openai_asr_model: Option<String>,
+    // OpenAI LLM fields (populated when llm_backend_type == "OpenAiCompatible")
+    pub openai_llm_base_url: Option<String>,
+    pub openai_llm_api_key: Option<String>,
+    pub openai_llm_model: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

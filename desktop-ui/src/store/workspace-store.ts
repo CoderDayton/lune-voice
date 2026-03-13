@@ -31,6 +31,15 @@ export interface WorkspaceSettings {
   speechThreshold: string;
   hotkeyToggle: string;
   hotkeyCancel: string;
+  alignerEnabled: boolean;
+  // OpenAI ASR fields
+  openaiAsrBaseUrl: string;
+  openaiAsrApiKey: string;
+  openaiAsrModel: string;
+  // OpenAI LLM fields
+  openaiLlmBaseUrl: string;
+  openaiLlmApiKey: string;
+  openaiLlmModel: string;
 }
 
 export interface HistorySession {
@@ -77,6 +86,13 @@ const DEFAULT_SETTINGS: WorkspaceSettings = {
   speechThreshold: "0.50",
   hotkeyToggle: "Ctrl+Space",
   hotkeyCancel: "Escape",
+  alignerEnabled: true,
+  openaiAsrBaseUrl: "https://api.openai.com/v1",
+  openaiAsrApiKey: "",
+  openaiAsrModel: "whisper-1",
+  openaiLlmBaseUrl: "https://api.openai.com/v1",
+  openaiLlmApiKey: "",
+  openaiLlmModel: "gpt-4o-mini",
 };
 
 const DEFAULT_RUNTIME: WorkspaceRuntimeState = {
@@ -92,6 +108,7 @@ const DEFAULT_RUNTIME: WorkspaceRuntimeState = {
 const DISPLAY_BACKEND_LABELS: Record<string, string> = {
   OrtQwenAsr: "Balanced",
   ParakeetTdt: "Fast and light",
+  OpenAiCompatible: "Cloud API",
 };
 
 export function createInitialWorkspaceState(): WorkspaceState {
@@ -203,6 +220,15 @@ export async function persistWorkspaceSettings() {
     adaptiveVad: settings.adaptiveVad,
     speechThreshold: Number(settings.speechThreshold),
     stylePreset: settings.stylePreset,
+    hotkeyToggle: settings.hotkeyToggle,
+    hotkeyCancel: settings.hotkeyCancel,
+    alignerEnabled: settings.alignerEnabled,
+    openaiAsrBaseUrl: settings.openaiAsrBaseUrl || null,
+    openaiAsrApiKey: settings.openaiAsrApiKey || null,
+    openaiAsrModel: settings.openaiAsrModel || null,
+    openaiLlmBaseUrl: settings.openaiLlmBaseUrl || null,
+    openaiLlmApiKey: settings.openaiLlmApiKey || null,
+    openaiLlmModel: settings.openaiLlmModel || null,
   });
 
   workspaceActions.hydrate(snapshot);
@@ -347,6 +373,13 @@ function mapWorkspaceSettings(snapshot: BackendWorkspaceSnapshot): WorkspaceSett
     speechThreshold: formatThreshold(snapshot.settings.speechThreshold),
     hotkeyToggle: snapshot.settings.hotkeyToggle,
     hotkeyCancel: snapshot.settings.hotkeyCancel,
+    alignerEnabled: snapshot.settings.alignerEnabled,
+    openaiAsrBaseUrl: snapshot.settings.openaiAsrBaseUrl ?? DEFAULT_SETTINGS.openaiAsrBaseUrl,
+    openaiAsrApiKey: snapshot.settings.openaiAsrApiKey ?? DEFAULT_SETTINGS.openaiAsrApiKey,
+    openaiAsrModel: snapshot.settings.openaiAsrModel ?? DEFAULT_SETTINGS.openaiAsrModel,
+    openaiLlmBaseUrl: snapshot.settings.openaiLlmBaseUrl ?? DEFAULT_SETTINGS.openaiLlmBaseUrl,
+    openaiLlmApiKey: snapshot.settings.openaiLlmApiKey ?? DEFAULT_SETTINGS.openaiLlmApiKey,
+    openaiLlmModel: snapshot.settings.openaiLlmModel ?? DEFAULT_SETTINGS.openaiLlmModel,
   };
 }
 

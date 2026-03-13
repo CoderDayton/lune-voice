@@ -12,7 +12,7 @@ models/
 test_fixtures/
 CLAUDE.md
 luneopt/
-data/
+/data/
 flan-t5-base-asr-corrector/
 flanec-base-cd-onnx/
 qwen2.5-1.5b-instruct-gguf/

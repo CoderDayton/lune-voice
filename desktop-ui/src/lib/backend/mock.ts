@@ -18,6 +18,12 @@ function createMockSnapshot(): BackendWorkspaceSnapshot {
       stylePreset: "casual",
       hotkeyToggle: "Ctrl+Space",
       hotkeyCancel: "Escape",
+      openaiAsrBaseUrl: null,
+      openaiAsrApiKey: null,
+      openaiAsrModel: null,
+      openaiLlmBaseUrl: null,
+      openaiLlmApiKey: null,
+      openaiLlmModel: null,
     },
     history: historyGroups.flatMap((group, groupIndex) =>
       group.items.map((item, itemIndex) => ({
@@ -56,6 +62,12 @@ function applySettings(input: SaveWorkspaceSettingsInput) {
       adaptiveVad: input.adaptiveVad,
       speechThreshold: input.speechThreshold,
       stylePreset: input.stylePreset,
+      openaiAsrBaseUrl: input.openaiAsrBaseUrl ?? null,
+      openaiAsrApiKey: input.openaiAsrApiKey ?? null,
+      openaiAsrModel: input.openaiAsrModel ?? null,
+      openaiLlmBaseUrl: input.openaiLlmBaseUrl ?? null,
+      openaiLlmApiKey: input.openaiLlmApiKey ?? null,
+      openaiLlmModel: input.openaiLlmModel ?? null,
     },
   };
 }
