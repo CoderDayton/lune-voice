@@ -13,8 +13,11 @@ export function MobileNav() {
 
   return (
     <div className="fixed inset-0 z-50 md:hidden">
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        tabIndex={-1}
+        ref={(el) => el?.focus()}
         onClick={workspaceActions.closeMobileMenu}
         onKeyDown={(e) => e.key === "Escape" && workspaceActions.closeMobileMenu()}
       />

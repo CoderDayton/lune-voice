@@ -3,6 +3,7 @@ import { Outlet, useRouterState } from "@tanstack/react-router";
 import { Sidebar } from "./sidebar";
 import { MobileNav } from "./mobile-nav";
 import { Topbar } from "./topbar";
+import { ErrorToast } from "../../../components/ui/error-toast";
 import { findNavigationItem } from "../config/navigation";
 import { attachSessionStream, listenToWorkspaceInvalidation } from "../../../lib/backend/stream";
 import {
@@ -39,12 +40,16 @@ export function AppShell() {
 
   return (
     <div className="app-shell-root">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 sm:focus:top-4 sm:focus:left-4 focus:z-50 focus:btn focus:btn-primary focus:btn-sm">
+        Skip to main content
+      </a>
       <div className="app-shell-backdrop" />
 
       <Sidebar />
       <MobileNav />
+      <ErrorToast />
 
-      <main className="app-main">
+      <main id="main-content" className="app-main">
         <Topbar page={currentPage} />
 
         <div className="app-scroll">

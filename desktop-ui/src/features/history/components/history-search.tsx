@@ -12,7 +12,8 @@ export function HistorySearch() {
       <TextField
         value={search}
         onChange={(event) => workspaceActions.setHistorySearch(event.target.value)}
-        placeholder="Search transcripts"
+        aria-label="Search transcripts"
+        placeholder="Search transcripts…"
         className="field-with-icon"
       />
     </label>

@@ -8,6 +8,8 @@ interface AuthInputFieldProps {
   error: string | null;
   onChange: (value: string) => void;
   onBlur: () => void;
+  autoComplete?: string;
+  spellCheck?: boolean;
 }
 
 export function AuthInputField({
@@ -18,6 +20,8 @@ export function AuthInputField({
   error,
   onChange,
   onBlur,
+  autoComplete,
+  spellCheck,
 }: AuthInputFieldProps) {
   return (
     <label className="stack-copy-tight">
@@ -29,6 +33,8 @@ export function AuthInputField({
         onBlur={onBlur}
         placeholder={placeholder}
         className={error ? "input-error" : undefined}
+        autoComplete={autoComplete}
+        spellCheck={spellCheck}
       />
       {error ? <span className="text-error text-xs">{error}</span> : null}
     </label>

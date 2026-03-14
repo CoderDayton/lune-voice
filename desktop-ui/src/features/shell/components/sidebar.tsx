@@ -4,21 +4,50 @@ import { Button } from "../../../components/ui/button";
 import { Pill } from "../../../components/ui/pill";
 import { cn } from "../../../lib/cn";
 import { authActions, authStore } from "../../../store/auth-store";
-import { workspaceActions, workspaceStore } from "../../../store/workspace-store";
+import {
+  summarizeAsrBackend,
+  summarizeDictationMode,
+  workspaceActions,
+  workspaceStore,
+} from "../../../store/workspace-store";
 import { findNavigationItem, navigationItems } from "../config/navigation";
 import { ChevronLeftIcon, ChevronRightIcon, LuneLogo } from "../config/icons";
 
-const statusItems = [
-  { label: "Microphone", value: "Ready", tone: "text-accent" },
-  { label: "Voice typing", value: "Fast + accurate", tone: "text-secondary" },
-  { label: "Privacy", value: "On this device", tone: "text-primary" },
-];
+function useStatusItems() {
+  const runtime = useStore(workspaceStore, (state) => state.runtime);
+  const settings = useStore(workspaceStore, (state) => state.settings);
+
+  const serviceLabel =
+    runtime.serviceStatus === "ready" || runtime.serviceStatus === "Ready"
+      ? "Ready"
+      : runtime.serviceStatus === "listening"
+        ? "Listening"
+        : runtime.serviceStatus === "processing"
+          ? "Processing"
+          : runtime.serviceStatus === "error"
+            ? "Error"
+            : "Connecting";
+
+  const serviceTone =
+    runtime.serviceStatus === "error"
+      ? "text-error"
+      : runtime.serviceStatus === "listening"
+        ? "text-accent"
+        : "text-success";
+
+  return [
+    { label: "Service", value: serviceLabel, tone: serviceTone },
+    { label: "Speech model", value: summarizeAsrBackend(settings.asrBackend), tone: "text-secondary" },
+    { label: "Delivery", value: summarizeDictationMode(settings.dictationMode), tone: "text-primary" },
+  ];
+}
 
 export function Sidebar() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const collapsed = useStore(workspaceStore, (state) => state.sidebarCollapsed);
   const profile = useStore(authStore, (state) => state.profile);
   const current = findNavigationItem(pathname);
+  const statusItems = useStatusItems();
   const navigationGroups = [
     {
       label: "Use Lune",
@@ -89,7 +118,7 @@ export function Sidebar() {
                 Your recordings stay private on this computer, with quick cleanup before text is inserted.
               </p>
             </div>
-            <Pill>Stable</Pill>
+            <Pill>{statusItems[0].value}</Pill>
           </div>
 
           <div className="flex flex-col gap-3">

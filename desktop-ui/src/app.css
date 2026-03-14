@@ -108,7 +108,7 @@
   html,
   body,
   #root {
-    @apply min-h-screen;
+    @apply min-h-dvh;
   }
 
   body {
@@ -148,7 +148,7 @@
 /* ── Layout shells ─────────────────────────────────────────────────────── */
 
 @utility app-shell-root {
-  @apply relative flex min-h-screen overflow-hidden;
+  @apply relative flex min-h-dvh overflow-hidden;
 }
 
 @utility app-shell-backdrop {
@@ -376,7 +376,7 @@
 /* ── Auth page ─────────────────────────────────────────────────────── */
 
 @utility auth-root {
-  @apply relative min-h-screen overflow-hidden;
+  @apply relative min-h-dvh overflow-hidden;
 }
 
 @utility auth-backdrop {
@@ -388,7 +388,7 @@
 }
 
 @utility auth-shell {
-  @apply relative z-10 mx-auto grid min-h-screen w-full gap-4;
+  @apply relative z-10 mx-auto grid min-h-dvh w-full gap-4;
   max-width: 95rem;
   padding:
     var(--space-page-y)
@@ -611,5 +611,15 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

@@ -1,9 +1,9 @@
 import { Pill } from "../../../components/ui/pill";
 
 const authProof = [
-  { label: "People onboarded", value: "400K+" },
-  { label: "Words corrected", value: "50M+" },
-  { label: "Device-first privacy", value: "On" },
+  { label: "Audio processing", value: "On-device" },
+  { label: "Cloud dependency", value: "None" },
+  { label: "Data shared", value: "Zero" },
 ];
 
 export function AuthHeroPanel() {

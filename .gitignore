@@ -11,6 +11,7 @@
 models/
 test_fixtures/
 CLAUDE.md
+TODO.md
 luneopt/
 /data/
 flan-t5-base-asr-corrector/

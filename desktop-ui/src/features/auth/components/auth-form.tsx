@@ -11,74 +11,41 @@ interface AuthFormValues {
   password: string;
 }
 
-const providerProfiles = {
-  Google: { email: "google@lune.local", name: "Google user" },
-  Apple: { email: "apple@lune.local", name: "Apple user" },
+const providers = [
+  { key: "Google", email: "google@lune.local", name: "Google user" },
+  { key: "Apple", email: "apple@lune.local", name: "Apple user" },
+] as const;
+
+const copyByMode = {
+  signup: { title: "Create your account", description: "Set up a private desktop workspace for local voice typing, saved sessions, and vocabulary fixes.", action: "Create account", support: "Already have an account?", supportAction: "Log in" },
+  login: { title: "Welcome back", description: "Log in to your Lune Voice workspace and pick up where you left off.", action: "Log in", support: "New to Lune Voice?", supportAction: "Create an account" },
 } as const;
 
 export function AuthForm() {
   const mode = useStore(authStore, (state) => state.mode);
   const isSignup = mode === "signup";
-  const copy = isSignup
-    ? {
-        title: "Create your account",
-        description:
-          "Set up a private desktop workspace for local voice typing, saved sessions, and vocabulary fixes.",
-        action: "Create account",
-        support: "Already have an account?",
-        supportAction: "Log in",
-      }
-    : {
-        title: "Welcome back",
-        description:
-          "Log in to your Lune Voice workspace and pick up where you left off.",
-        action: "Log in",
-        support: "New to Lune Voice?",
-        supportAction: "Create an account",
-      };
+  const copy = copyByMode[mode];
 
   const form = useForm({
-    defaultValues: {
-      name: "",
-      email: "",
-      password: "",
-    } satisfies AuthFormValues,
+    defaultValues: { name: "", email: "", password: "" } satisfies AuthFormValues,
     onSubmit: ({ value }) => {
       authActions.signIn(value.email.trim(), value.name.trim() || undefined);
     },
   });
 
-  useHotkey(
-    "Mod+Enter",
-    (event) => {
-      event.preventDefault();
-      void form.handleSubmit();
-    },
-    { enabled: true, preventDefault: true },
-  );
-
-  function submitProvider(provider: keyof typeof providerProfiles) {
-    const profile = providerProfiles[provider];
-    authActions.signIn(profile.email, profile.name);
-  }
+  useHotkey("Mod+Enter", (event) => { event.preventDefault(); void form.handleSubmit(); }, { enabled: true, preventDefault: true });
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4 sm:gap-5">
       <div className="stack-copy">
         <h1 className="auth-form-title">{copy.title}</h1>
         <p className="body-copy-soft">{copy.description}</p>
       </div>
 
       <div className="flex flex-col gap-3">
-        {Object.keys(providerProfiles).map((provider) => (
-          <Button
-            key={provider}
-            type="button"
-            variant="secondary"
-            className="w-full justify-center"
-            onClick={() => submitProvider(provider as keyof typeof providerProfiles)}
-          >
-            Continue with {provider}
+        {providers.map((p) => (
+          <Button key={p.key} type="button" variant="secondary" className="w-full justify-center" onClick={() => authActions.signIn(p.email, p.name)}>
+            Continue with {p.key}
           </Button>
         ))}
       </div>
@@ -104,7 +71,8 @@ export function AuthForm() {
             {(field) => (
               <AuthInputField
                 label="Name"
-                placeholder="Your name"
+                placeholder="Your name…"
+                autoComplete="name"
                 value={field.state.value}
                 error={field.state.meta.isTouched ? (field.state.meta.errors[0] as string | undefined) ?? null : null}
                 onChange={field.handleChange}
@@ -133,6 +101,8 @@ export function AuthForm() {
               label="Email"
               type="email"
               placeholder="you@example.com"
+              autoComplete="email"
+              spellCheck={false}
               value={field.state.value}
               error={field.state.meta.isTouched ? (field.state.meta.errors[0] as string | undefined) ?? null : null}
               onChange={field.handleChange}
@@ -159,7 +129,8 @@ export function AuthForm() {
             <AuthInputField
               label="Password"
               type="password"
-              placeholder="Enter your password"
+              placeholder="Enter your password…"
+              autoComplete={isSignup ? "new-password" : "current-password"}
               value={field.state.value}
               error={field.state.meta.isTouched ? (field.state.meta.errors[0] as string | undefined) ?? null : null}
               onChange={field.handleChange}
@@ -171,7 +142,7 @@ export function AuthForm() {
         <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
           {({ canSubmit, isSubmitting }) => (
             <Button type="submit" className="w-full" disabled={!canSubmit || isSubmitting}>
-              {isSubmitting ? "Opening workspace..." : copy.action}
+              {isSubmitting ? "Opening workspace\u2026" : copy.action}
             </Button>
           )}
         </form.Subscribe>
