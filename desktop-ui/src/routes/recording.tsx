@@ -1,6 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { RecordingPage } from "../features/recording/recording-page";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/recording")({
-  component: RecordingPage,
+  beforeLoad: () => {
+    throw redirect({ to: "/settings" });
+  },
 });

@@ -123,6 +123,15 @@ export function CloseIcon(props: IconProps) {
   );
 }
 
+export function SettingsIcon(props: IconProps) {
+  return (
+    <BaseIcon {...props}>
+      <circle cx="9" cy="9" r="2.5" />
+      <path d="M9 2.5v2M9 13.5v2M2.5 9h2M13.5 9h2M4.1 4.1l1.4 1.4M12.5 12.5l1.4 1.4M4.1 13.9l1.4-1.4M12.5 5.5l1.4-1.4" />
+    </BaseIcon>
+  );
+}
+
 export function LuneLogo(props: IconProps) {
   return (
     <svg width="20" height="20" viewBox="0 0 22 22" fill="none" aria-hidden="true" {...props}>

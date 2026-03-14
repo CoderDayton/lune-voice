@@ -1,14 +1,13 @@
 import type { ComponentType, SVGProps } from "react";
 import {
-  BoltIcon,
   DictionaryIcon,
   HistoryIcon,
-  MicIcon,
   OverviewIcon,
+  SettingsIcon,
 } from "./icons";
 
 export interface NavigationItem {
-  to: "/" | "/history" | "/dictionary" | "/recording" | "/shortcuts";
+  to: "/" | "/history" | "/dictionary" | "/settings";
   section: "Use Lune" | "Set up";
   label: string;
   caption: string;
@@ -46,22 +45,13 @@ export const navigationItems: NavigationItem[] = [
     icon: DictionaryIcon,
   },
   {
-    to: "/recording",
+    to: "/settings",
     section: "Set up",
-    label: "Recording",
-    caption: "Voice typing setup",
-    eyebrow: "Recording",
-    description: "Choose how Lune Voice listens, cleans up speech, and turns it into text.",
-    icon: MicIcon,
-  },
-  {
-    to: "/shortcuts",
-    section: "Set up",
-    label: "Shortcuts",
-    caption: "Controls and sending",
-    eyebrow: "Shortcuts",
-    description: "Manage keyboard shortcuts, start and stop behavior, and how text is sent into apps.",
-    icon: BoltIcon,
+    label: "Settings",
+    caption: "Voice, shortcuts, output",
+    eyebrow: "Settings",
+    description: "Configure voice input, recognition, cleanup, keyboard shortcuts, and text delivery.",
+    icon: SettingsIcon,
   },
 ];
 

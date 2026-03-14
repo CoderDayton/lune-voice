@@ -56,8 +56,8 @@ export function OverviewHero() {
           <Link to="/history" className={buttonClassName("primary")}>
             View recent sessions
           </Link>
-          <Link to="/recording" className={buttonClassName("secondary")}>
-            Set up recording
+          <Link to="/settings" className={buttonClassName("secondary")}>
+            Open settings
           </Link>
         </div>
       </Panel>
