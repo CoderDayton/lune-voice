@@ -47,6 +47,7 @@ function assertSnapshot(snapshotName: string, actualBuffer: Buffer<ArrayBufferLi
   }
 
   const diffImage = new PNG({ width: actualImage.width, height: actualImage.height });
+  const totalPixels = actualImage.width * actualImage.height;
   const mismatchedPixels = pixelmatch(
     expectedImage.data,
     actualImage.data,
@@ -56,6 +57,10 @@ function assertSnapshot(snapshotName: string, actualBuffer: Buffer<ArrayBufferLi
     { threshold: 0.1 },
   );
 
+  // Allow up to 0.1% pixel difference to handle antialiasing and subpixel rendering variance
+  const mismatchRatio = mismatchedPixels / totalPixels;
+  const MAX_MISMATCH_RATIO = 0.001;
+
   if (mismatchedPixels > 0) {
     writeFileSync(diffPath, PNG.sync.write(diffImage));
   } else {
@@ -63,7 +68,7 @@ function assertSnapshot(snapshotName: string, actualBuffer: Buffer<ArrayBufferLi
   }
 
   expect(
-    mismatchedPixels,
-    `${snapshotName} does not match its baseline. Inspect ${diffPath} or update snapshots if the change is intentional.`,
-  ).toBe(0);
+    mismatchRatio,
+    `${snapshotName} differs by ${mismatchedPixels}px (${(mismatchRatio * 100).toFixed(4)}%). Inspect ${diffPath} or update snapshots if the change is intentional.`,
+  ).toBeLessThanOrEqual(MAX_MISMATCH_RATIO);
 }

@@ -10,7 +10,13 @@ export interface PreviewServer {
   url: string;
 }
 
+let sharedServer: PreviewServer | null = null;
+let refCount = 0;
+
 export async function startPreviewServer() {
+  refCount += 1;
+  if (sharedServer) return sharedServer;
+
   const process = Bun.spawn({
     cmd: [
       Bun.which("bun") ?? globalThis.process.execPath,
@@ -30,12 +36,18 @@ export async function startPreviewServer() {
 
   await waitForPreview(process);
 
-  return { process, url: PREVIEW_URL } satisfies PreviewServer;
+  sharedServer = { process, url: PREVIEW_URL };
+  return sharedServer;
 }
 
-export async function stopPreviewServer(server: PreviewServer) {
-  server.process.kill();
-  await server.process.exited;
+export async function stopPreviewServer(_server: PreviewServer) {
+  refCount -= 1;
+  if (refCount > 0) return;
+  if (!sharedServer) return;
+
+  sharedServer.process.kill();
+  await sharedServer.process.exited;
+  sharedServer = null;
 }
 
 async function waitForPreview(process: Bun.Subprocess<"ignore", "ignore", "pipe">) {

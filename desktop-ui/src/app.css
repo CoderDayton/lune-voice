@@ -343,7 +343,7 @@
 /* ── Nav links ─────────────────────────────────────────────────────── */
 
 @utility nav-link {
-  @apply flex items-center gap-3 rounded-btn border border-transparent px-3 py-2.5 transition;
+  @apply flex items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 transition;
   min-height: 3rem;
 }
 
