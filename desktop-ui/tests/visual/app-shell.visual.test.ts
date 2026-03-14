@@ -47,7 +47,6 @@ afterAll(async () => {
   await stopPreviewServer(previewServer);
 });
 
-// ── Helpers ──────────────────────────────────────────────────────────────
 
 async function createPage(viewport: { width: number; height: number }) {
   const context = await browser.newContext({
@@ -79,7 +78,6 @@ async function saveScreenshot(page: Page, name: string) {
   writeFileSync(join(SCREENSHOT_DIR, `${name}.png`), buffer);
 }
 
-// ── Baseline snapshot tests (wide viewport) ──────────────────────────────
 
 describe("baseline snapshots", () => {
   test("auth entry", async () => {
@@ -132,7 +130,6 @@ describe("baseline snapshots", () => {
   });
 });
 
-// ── Responsive screenshot tests ──────────────────────────────────────────
 
 describe("responsive screenshots", () => {
   // Auth screen (unauthenticated) at all viewports

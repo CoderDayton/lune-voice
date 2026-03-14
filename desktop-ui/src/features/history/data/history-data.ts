@@ -31,7 +31,7 @@ export const historyGroups: HistoryGroup[] = [
       },
       {
         time: "8:22 AM",
-        text: "In order to learn more about each of these products, you can go to the website and check each product page accordingly to learn everything that you know, need to know.",
+        text: "To learn more, visit each product page.",
         words: 32,
         seconds: 11,
         mode: "Compact",
