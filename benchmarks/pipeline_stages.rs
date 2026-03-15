@@ -218,7 +218,7 @@ fn bench_mel_extraction(fixtures: &[Fixture]) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn bench_asr_streaming(
-    asr: &(impl AsrBackend + Sync),
+    asr: &impl AsrBackend,
     fixtures: &[Fixture],
     vad_config: VadSegmenterConfig,
     use_batch: bool,
@@ -441,12 +441,7 @@ fn bench_threshold_sweep(
         for seg in &asr_res.segments {
             for wc in &seg.word_confidences {
                 let marker = if wc.confidence < 0.75 { " ◄" } else { "" };
-                print!(
-                    "    {:>6.1}%  {}{}\n",
-                    wc.confidence * 100.0,
-                    wc.word,
-                    marker
-                );
+                println!("    {:>6.1}%  {}{}", wc.confidence * 100.0, wc.word, marker);
             }
         }
         let (prepared, has_uncertain) = lune_llm::prepare_input(&asr_res.segments, 0.75, "en");
@@ -577,10 +572,10 @@ fn bench_threshold_sweep(
 
         println!();
         println!(
-            "    {:>5}  {:>7}  {:>8}  {:>7}  {:>7}  {:>7}  {}",
-            "Thr", "Marked", "Segs", "LLM ms", "WER %", "CER %", "Note"
+            "    {:>5}  {:>7}  {:>8}  {:>7}  {:>7}  {:>7}  Note",
+            "Thr", "Marked", "Segs", "LLM ms", "WER %", "CER %"
         );
-        println!("    {}", "─".repeat(62));
+        println!("{}", "─".repeat(62));
 
         for r in &fixture_results {
             let note = if r.bypassed { "BYPASS" } else { "" };
@@ -667,26 +662,25 @@ fn bench_threshold_sweep(
 
     // Show best hypothesis for each fixture at the recommended threshold.
     for (i, fix) in fixtures.iter().enumerate() {
-        if let Some(results) = all_results.get(i) {
-            if let Some(best) = results
+        if let Some(results) = all_results.get(i)
+            && let Some(best) = results
                 .iter()
                 .find(|r| (r.threshold - best_thr).abs() < 0.001)
-            {
-                println!(
-                    "  {} at {:.0}% (WER={:.1}%, CER={:.1}%):",
-                    fix.name,
-                    best_thr * 100.0,
-                    best.wer,
-                    best.cer
-                );
-                println!("    Hypothesis:");
-                wrap_print("      ", &best.hypothesis, 72);
-                if !fix.reference.is_empty() {
-                    println!("    Reference:");
-                    wrap_print("      ", &fix.reference, 72);
-                }
-                println!();
+        {
+            println!(
+                "  {} at {:.0}% (WER={:.1}%, CER={:.1}%):",
+                fix.name,
+                best_thr * 100.0,
+                best.wer,
+                best.cer
+            );
+            println!("    Hypothesis:");
+            wrap_print("      ", &best.hypothesis, 72);
+            if !fix.reference.is_empty() {
+                println!("    Reference:");
+                wrap_print("      ", &fix.reference, 72);
             }
+            println!();
         }
     }
 
@@ -705,7 +699,7 @@ fn bench_threshold_sweep(
 // Stage 5: VAD Timing Sweep — grid search over sentence_close × hard_close
 // ═══════════════════════════════════════════════════════════════════════════════
 
-fn bench_vad_timing_sweep(asr: &(impl AsrBackend + Sync), fixtures: &[Fixture]) {
+fn bench_vad_timing_sweep(asr: &impl AsrBackend, fixtures: &[Fixture]) {
     use std::cell::RefCell;
 
     println!("── Stage 5: VAD Timing Sweep (Brent's method) ─────────────────────");
@@ -859,7 +853,7 @@ fn bench_vad_timing_sweep(asr: &(impl AsrBackend + Sync), fixtures: &[Fixture]) 
 
 /// Transcribe with per-chunk timing. Returns (segments, total_secs, chunk_latencies_ms).
 async fn transcribe_timed(
-    backend: &(impl AsrBackend + Sync),
+    backend: &impl AsrBackend,
     pcm: &[f32],
 ) -> (Vec<AsrSegment>, f64, Vec<f64>) {
     transcribe_timed_with_config(backend, pcm, VadSegmenterConfig::default()).await
@@ -868,7 +862,7 @@ async fn transcribe_timed(
 /// Batch transcription: push all audio, call poll_final once.
 /// Used for overlap-stitched batch mode (no VadSegmenter).
 async fn transcribe_batch(
-    backend: &(impl AsrBackend + Sync),
+    backend: &impl AsrBackend,
     pcm: &[f32],
 ) -> (Vec<AsrSegment>, f64, Vec<f64>) {
     let session = backend
@@ -897,7 +891,7 @@ async fn transcribe_batch(
 
 /// Like `transcribe_timed` but with a custom VAD config.
 async fn transcribe_timed_with_config(
-    backend: &(impl AsrBackend + Sync),
+    backend: &impl AsrBackend,
     pcm: &[f32],
     vad_config: VadSegmenterConfig,
 ) -> (Vec<AsrSegment>, f64, Vec<f64>) {
@@ -966,7 +960,7 @@ async fn transcribe_timed_with_config(
 // Stage 6: Adaptive VAD Validation
 // ═══════════════════════════════════════════════════════════════════════════════
 
-fn bench_adaptive_vad(asr: &(impl AsrBackend + Sync), fixtures: &[Fixture]) {
+fn bench_adaptive_vad(asr: &impl AsrBackend, fixtures: &[Fixture]) {
     println!("── Stage 6: Adaptive VAD Validation ──────────────────────────────");
     println!();
 

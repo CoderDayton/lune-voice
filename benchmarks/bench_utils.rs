@@ -207,9 +207,7 @@ pub fn benchmark_aligner(asr: &AsrRegistry, root: &Path) -> Option<Arc<OrtForced
         return None;
     }
 
-    let Some(backend) = asr.as_ort_qwen() else {
-        return None;
-    };
+    let backend = asr.as_ort_qwen()?;
 
     let fa_dir = root.join("models/wav2vec2-fa");
     let fa_model = fa_dir.join("model.onnx");

@@ -993,16 +993,11 @@ mod tests {
 
     async fn collect_events(mut rx: mpsc::Receiver<SessionEvent>) -> Vec<SessionEvent> {
         let mut events = Vec::new();
-        loop {
-            match tokio::time::timeout(Duration::from_secs(5), rx.recv()).await {
-                Ok(Some(event)) => {
-                    let terminal = matches!(event, SessionEvent::Stopped);
-                    events.push(event);
-                    if terminal {
-                        break;
-                    }
-                }
-                _ => break,
+        while let Ok(Some(event)) = tokio::time::timeout(Duration::from_secs(5), rx.recv()).await {
+            let terminal = matches!(event, SessionEvent::Stopped);
+            events.push(event);
+            if terminal {
+                break;
             }
         }
         events

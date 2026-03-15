@@ -451,7 +451,7 @@ mod tests {
     #[test]
     fn tokenize_and_align_words() {
         // Test tokenization logic directly without needing a real ORT session.
-        let labels = vec![
+        let labels = [
             "-".to_string(), // 0 = blank
             "|".to_string(), // 1 = word delimiter
             "A".to_string(), // 2
@@ -473,22 +473,22 @@ mod tests {
         let delim_id = Some(1usize); // "|"
         let num_labels = 7;
 
-        let words = vec!["THE", "CAT"];
+        let words = ["THE", "CAT"];
         let mut token_ids: Vec<usize> = Vec::new();
         let mut word_boundaries: Vec<(usize, usize)> = Vec::new();
 
         for (i, word) in words.iter().enumerate() {
-            if i > 0 {
-                if let Some(d) = delim_id {
-                    token_ids.push(d);
-                }
+            if i > 0
+                && let Some(d) = delim_id
+            {
+                token_ids.push(d);
             }
             let start = token_ids.len();
             for ch in word.to_uppercase().chars() {
-                if let Some(&id) = char_to_id.get(&ch) {
-                    if id < num_labels {
-                        token_ids.push(id);
-                    }
+                if let Some(&id) = char_to_id.get(&ch)
+                    && id < num_labels
+                {
+                    token_ids.push(id);
                 }
             }
             let end = token_ids.len();
