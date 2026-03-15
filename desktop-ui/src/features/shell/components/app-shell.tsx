@@ -16,23 +16,38 @@ export function AppShell() {
   const currentPage = findNavigationItem(pathname);
 
   useEffect(() => {
-    void loadWorkspaceSnapshot();
+    loadWorkspaceSnapshot().catch((e) => {
+      workspaceActions.setError(e instanceof Error ? e.message : "Failed to load workspace");
+    });
   }, []);
 
   useEffect(() => {
     let disposeSession = () => {};
     let disposeHistory = () => {};
+    let cancelled = false;
 
-    void (async () => {
-      disposeSession = await attachSessionStream((event) => {
-        workspaceActions.applySessionEvent(event);
-      });
-      disposeHistory = await listenToWorkspaceInvalidation("lune://history-changed", () => {
-        void loadWorkspaceSnapshot();
-      });
+    (async () => {
+      try {
+        const detachSession = await attachSessionStream((event) => {
+          workspaceActions.applySessionEvent(event);
+        });
+        if (cancelled) { detachSession(); return; }
+        disposeSession = detachSession;
+
+        const detachHistory = await listenToWorkspaceInvalidation("lune://history-changed", () => {
+          loadWorkspaceSnapshot().catch((e) => {
+            workspaceActions.setError(e instanceof Error ? e.message : "Failed to reload workspace");
+          });
+        });
+        if (cancelled) { detachHistory(); return; }
+        disposeHistory = detachHistory;
+      } catch (e) {
+        console.error("[app-shell] failed to attach IPC streams", e);
+      }
     })();
 
     return () => {
+      cancelled = true;
       disposeSession();
       disposeHistory();
     };

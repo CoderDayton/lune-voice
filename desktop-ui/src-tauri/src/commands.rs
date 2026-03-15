@@ -34,14 +34,16 @@ pub async fn save_workspace_settings(
     .map_err(|e| format!("save workspace settings task failed: {e}"))??;
     runtime.mark_reload_required().await;
     // Notify pill of settings changes (activation mode, pill visibility)
-    let _ = runtime.app_handle().emit_to(
+    if let Err(e) = runtime.app_handle().emit_to(
         "pill",
         "lune://pill-settings",
         serde_json::json!({
             "activationMode": &snapshot.settings.activation_mode,
             "pillVisibility": &snapshot.settings.pill_visibility,
         }),
-    );
+    ) {
+        tracing::debug!(error = %e, "pill settings emit skipped (pill window may not exist)");
+    }
     snapshot.service_status = runtime.service_status().await;
     Ok(snapshot)
 }

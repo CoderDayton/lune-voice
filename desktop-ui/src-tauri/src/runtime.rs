@@ -288,10 +288,13 @@ impl AppRuntime {
         })
         .await;
         // Notify the pill overlay window of the status change.
-        let _ = self
+        if let Err(e) = self
             .inner
             .app
-            .emit_to("pill", "lune://pill-state", status.to_owned());
+            .emit_to("pill", "lune://pill-state", status.to_owned())
+        {
+            tracing::debug!(error = %e, "pill state emit skipped (pill window may not exist)");
+        }
     }
 
     async fn push_session_event(&self, event: SessionStreamEvent) {
