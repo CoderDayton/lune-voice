@@ -1,7 +1,9 @@
 import { useStore } from "@tanstack/react-store";
 import { workspaceActions, workspaceStore } from "../../store/workspace-store";
+import { useLingui } from "@lingui/react/macro";
 
 export function ErrorToast() {
+  const { t } = useLingui();
   const error = useStore(workspaceStore, (state) => state.runtime.error);
 
   if (!error) return null;
@@ -27,7 +29,7 @@ export function ErrorToast() {
         <button
           type="button"
           className="btn btn-ghost btn-xs"
-          aria-label="Dismiss error"
+          aria-label={t`Dismiss error`}
           onClick={() => workspaceActions.setError(null)}
         >
           ✕

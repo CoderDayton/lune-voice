@@ -6,3 +6,309 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "X-Generator: @lingui/cli\n"
 "Language: pt\n"
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Plural-Forms: \n"
+
+#: src/features/settings/settings-page.tsx:38
+msgid "Active speech recognition backend."
+msgstr ""
+
+#: src/features/settings/sections/input-section.tsx:40
+#: src/features/settings/sections/input-section.tsx:46
+msgid "Adaptive pause detection"
+msgstr ""
+
+#: src/features/dictionary/dictionary-page.tsx:14
+msgid "Add common names, acronyms, and preferred spelling so repeated corrections happen automatically."
+msgstr ""
+
+#: src/features/settings/components/openai-fields.tsx:23
+msgid "API endpoint"
+msgstr ""
+
+#: src/features/settings/components/openai-fields.tsx:35
+msgid "API key"
+msgstr ""
+
+#: src/features/dictation/audio-dots.tsx:17
+msgid "Audio activity"
+msgstr ""
+
+#: src/features/settings/sections/cleanup-section.tsx:18
+#: src/features/settings/sections/cleanup-section.tsx:24
+msgid "Automatic cleanup"
+msgstr ""
+
+#: src/features/settings/settings-page.tsx:43
+msgid "Automatic correction of uncertain words."
+msgstr ""
+
+#: src/features/settings/sections/transcription-section.tsx:19
+msgid "Balanced works well for most people. Compact uses less memory."
+msgstr ""
+
+#: src/features/settings/sections/shortcuts-section.tsx:31
+msgid "Cancel current recording"
+msgstr ""
+
+#: src/features/dictation/dictation-pill.tsx:43
+msgid "Cancel dictation"
+msgstr ""
+
+#: src/features/settings/sections/output-section.tsx:14
+msgid "Choose how finished text is inserted into the app you are currently using."
+msgstr ""
+
+#: src/features/settings/sections/input-section.tsx:21
+msgid "Choose how quickly you want to enter and leave voice typing."
+msgstr ""
+
+#: src/features/settings/sections/cleanup-section.tsx:29
+msgid "Cleanup model"
+msgstr ""
+
+#: src/features/settings/sections/cleanup-section.tsx:56
+msgid "Cleanup sensitivity"
+msgstr ""
+
+#: src/features/shell/components/mobile-nav.tsx:41
+msgid "Close navigation menu"
+msgstr ""
+
+#: src/features/history/components/history-summary.tsx:41
+msgid "Combined audio duration from the visible records."
+msgstr ""
+
+#: src/features/settings/settings-page.tsx:26
+msgid "Configure how Lune Voice listens, transcribes, cleans up text, and delivers it to the app you are using."
+msgstr ""
+
+#: src/features/settings/sections/transcription-section.tsx:16
+msgid "Control how your speech is turned into text."
+msgstr ""
+
+#: src/features/dictionary/components/dictionary-table.tsx:36
+msgid "Delete this word fix?"
+msgstr ""
+
+#: src/features/settings/sections/shortcuts-section.tsx:32
+msgid "Discard the current draft and return to idle. Click the binding to change it."
+msgstr ""
+
+#: src/components/ui/error-toast.tsx:32
+msgid "Dismiss error"
+msgstr ""
+
+#: src/features/dictionary/components/dictionary-form.tsx:24
+msgid "e.g. github…"
+msgstr ""
+
+#: src/features/dictionary/components/dictionary-form.tsx:29
+msgid "e.g. GitHub…"
+msgstr ""
+
+#: src/features/auth/components/auth-form.tsx:134
+msgid "Enter your password…"
+msgstr ""
+
+#: src/features/history/history-page.tsx:13
+msgid "Find past recordings and the text they produced."
+msgstr ""
+
+#: src/features/settings/sections/cleanup-section.tsx:16
+msgid "Give uncertain words a second look before text is sent to your app."
+msgstr ""
+
+#: src/features/settings/settings-page.tsx:48
+msgid "How finished text reaches your app."
+msgstr ""
+
+#: src/features/history/components/history-summary.tsx:42
+msgid "How the visible sessions were captured and cleaned up."
+msgstr ""
+
+#: src/features/settings/sections/shortcuts-section.tsx:19
+msgid "Keyboard controls"
+msgstr ""
+
+#: src/features/settings/sections/input-section.tsx:52
+msgid "Lower numbers wait longer before deciding you are done speaking."
+msgstr ""
+
+#: src/features/settings/sections/input-section.tsx:41
+msgid "Lune Voice learns your pause rhythm so it does not cut you off too early."
+msgstr ""
+
+#: src/features/shell/components/topbar.tsx:25
+msgid "Open navigation menu"
+msgstr ""
+
+#: src/features/settings/sections/output-section.tsx:17
+msgid "Paste is simplest. Typing keystrokes can work better in some apps."
+msgstr ""
+
+#: src/features/settings/sections/input-section.tsx:51
+msgid "Pause sensitivity"
+msgstr ""
+
+#: src/features/settings/sections/output-section.tsx:34
+msgid "Pick the tone used when final cleanup is applied."
+msgstr ""
+
+#: src/features/settings/sections/input-section.tsx:23
+msgid "Recording mode"
+msgstr ""
+
+#: src/features/settings/sections/shortcuts-section.tsx:41
+#: src/features/settings/settings-page.tsx:31
+msgid "Recording style"
+msgstr ""
+
+#: src/features/history/components/history-summary.tsx:39
+msgid "Records in the active search slice."
+msgstr ""
+
+#: src/features/dictionary/dictionary-page.tsx:13
+msgid "Save the names and phrases you want Lune Voice to get right."
+msgstr ""
+
+#: src/features/history/components/history-search.tsx:17
+msgid "Search transcripts"
+msgstr ""
+
+#: src/features/history/components/history-search.tsx:18
+msgid "Search transcripts…"
+msgstr ""
+
+#: src/features/history/history-page.tsx:14
+msgid "Search what you said, reopen recent dictation, and spot phrases that should become permanent word fixes."
+msgstr ""
+
+#: src/features/settings/sections/input-section.tsx:57
+msgid "Select the language for the Lune Voice interface."
+msgstr ""
+
+#: src/features/settings/sections/output-section.tsx:16
+msgid "Send method"
+msgstr ""
+
+#: src/features/settings/sections/cleanup-section.tsx:16
+#: src/features/settings/settings-page.tsx:41
+msgid "Smart cleanup"
+msgstr ""
+
+#: src/features/history/components/history-summary.tsx:41
+msgid "Speaking time"
+msgstr ""
+
+#: src/features/dictation/dictation-pill.tsx:23
+msgid "Start dictation"
+msgstr ""
+
+#: src/features/settings/sections/shortcuts-section.tsx:21
+msgid "Start or stop recording"
+msgstr ""
+
+#: src/features/dictation/dictation-pill.tsx:62
+msgid "Stop dictation"
+msgstr ""
+
+#: src/features/settings/settings-page.tsx:46
+msgid "Text delivery"
+msgstr ""
+
+#: src/features/settings/sections/output-section.tsx:14
+msgid "Text output"
+msgstr ""
+
+#: src/features/settings/sections/shortcuts-section.tsx:22
+msgid "The main shortcut used for voice typing. Click the binding to change it."
+msgstr ""
+
+#: src/features/settings/sections/shortcuts-section.tsx:42
+msgid "This changes whether the shortcut toggles recording or only works while held."
+msgstr ""
+
+#: src/features/settings/sections/input-section.tsx:24
+msgid "Toggle is easiest for longer dictation. Hold is better for quick bursts."
+msgstr ""
+
+#: src/features/settings/settings-page.tsx:33
+msgid "Toggle or hold-to-talk."
+msgstr ""
+
+#: src/features/history/components/history-summary.tsx:40
+msgid "Total dictated words in the active archive view."
+msgstr ""
+
+#: src/features/settings/sections/cleanup-section.tsx:19
+msgid "Use a local language model to tidy up uncertain phrases."
+msgstr ""
+
+#: src/features/settings/sections/shortcuts-section.tsx:19
+msgid "Use fast commands without opening menus in the middle of work."
+msgstr ""
+
+#: src/features/settings/sections/transcription-section.tsx:52
+msgid "Use forced aligner for precise word timestamps and chunk merging."
+msgstr ""
+
+#: src/features/settings/sections/transcription-section.tsx:46
+#: src/features/settings/sections/transcription-section.tsx:48
+msgid "Use hardware acceleration"
+msgstr ""
+
+#: src/features/history/components/history-summary.tsx:39
+msgid "Visible sessions"
+msgstr ""
+
+#: src/features/history/components/history-summary.tsx:40
+msgid "Visible words"
+msgstr ""
+
+#: src/features/settings/sections/input-section.tsx:21
+msgid "Voice input"
+msgstr ""
+
+#: src/features/settings/settings-page.tsx:25
+msgid "Voice input, recognition, output, and shortcuts in one place."
+msgstr ""
+
+#: src/features/history/components/history-summary.tsx:42
+#: src/features/settings/sections/transcription-section.tsx:18
+#: src/features/settings/settings-page.tsx:36
+msgid "Voice mode"
+msgstr ""
+
+#: src/features/settings/sections/transcription-section.tsx:47
+msgid "When available, this can make transcription finish faster."
+msgstr ""
+
+#: src/features/settings/sections/transcription-section.tsx:51
+#: src/features/settings/sections/transcription-section.tsx:57
+msgid "Word-level alignment"
+msgstr ""
+
+#: src/features/settings/sections/cleanup-section.tsx:57
+msgid "Words below this score are candidates for cleanup."
+msgstr ""
+
+#: src/features/settings/sections/output-section.tsx:33
+msgid "Writing style"
+msgstr ""
+
+#: src/features/settings/components/openai-fields.tsx:36
+msgid "Your API key. Stored locally and never shared."
+msgstr ""
+
+#: src/features/auth/components/auth-form.tsx:76
+msgid "Your name…"
+msgstr ""
+
+#: src/features/history/history-page.tsx:12
+msgid "Your sessions"
+msgstr ""

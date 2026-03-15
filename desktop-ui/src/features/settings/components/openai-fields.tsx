@@ -1,6 +1,7 @@
 import { TextField } from "../../../components/ui/field";
 import { saveWorkspaceSetting, type WorkspaceSettings } from "../../../store/workspace-store";
 import { SettingsRow } from "../../setup/components/settings-section";
+import { useLingui } from "@lingui/react/macro";
 
 type StringKeys<T> = { [K in keyof T]: T[K] extends string ? K : never }[keyof T];
 
@@ -15,10 +16,11 @@ interface Props {
 }
 
 export function OpenAiFields({ settings, baseUrlKey, apiKeyKey, modelKey, apiDescription, modelDescription, modelPlaceholder }: Props) {
+  const { t } = useLingui();
   return (
     <>
       <SettingsRow
-        label="API endpoint"
+        label={t`API endpoint`}
         description={`Base URL for the OpenAI-compatible ${apiDescription}.`}
         control={
           <TextField
@@ -30,8 +32,8 @@ export function OpenAiFields({ settings, baseUrlKey, apiKeyKey, modelKey, apiDes
         }
       />
       <SettingsRow
-        label="API key"
-        description="Your API key. Stored locally and never shared."
+        label={t`API key`}
+        description={t`Your API key. Stored locally and never shared.`}
         control={
           <TextField
             type="password"

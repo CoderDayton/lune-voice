@@ -3,8 +3,10 @@ import { ModalCancel } from "../../../components/ui/modal-cancel";
 import { Panel } from "../../../components/ui/panel";
 import { Pill } from "../../../components/ui/pill";
 import { removeDictionaryEntry, workspaceStore } from "../../../store/workspace-store";
+import { useLingui } from "@lingui/react/macro";
 
 export function DictionaryTable() {
+  const { t } = useLingui();
   const entries = useStore(workspaceStore, (state) => state.dictionaryEntries);
 
   return (
@@ -31,7 +33,7 @@ export function DictionaryTable() {
               <div className="font-mono text-sm hidden sm:block">{entry.replacement}</div>
               <div className="text-right">
                 <ModalCancel
-                  title="Delete this word fix?"
+                  title={t`Delete this word fix?`}
                   description={`Remove the saved correction for "${entry.phrase}" and "${entry.replacement}".`}
                   onConfirm={() => void removeDictionaryEntry(entry.id)}
                 />

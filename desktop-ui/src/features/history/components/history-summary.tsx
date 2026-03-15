@@ -7,8 +7,10 @@ import {
   getVisibleHistorySessions,
   workspaceStore,
 } from "../../../store/workspace-store";
+import { useLingui } from "@lingui/react/macro";
 
 export function HistorySummary() {
+  const { t } = useLingui();
   const visible = useStore(workspaceStore, getVisibleHistorySessions);
 
   const summary = useMemo(() => {
@@ -34,10 +36,10 @@ export function HistorySummary() {
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <MetricCard label="Visible sessions" value={summary.sessions} note="Records in the active search slice." icon={<SearchIcon className="h-4 w-4" />} />
-      <MetricCard label="Visible words" value={summary.words} note="Total dictated words in the active archive view." icon={<MicIcon className="h-4 w-4" />} />
-      <MetricCard label="Speaking time" value={summary.duration} note="Combined audio duration from the visible records." icon={<ClockIcon className="h-4 w-4" />} />
-      <MetricCard label="Voice mode" value={summary.source} note="How the visible sessions were captured and cleaned up." icon={<PulseIcon className="h-4 w-4" />} />
+      <MetricCard label={t`Visible sessions`} value={summary.sessions} note={t`Records in the active search slice.`} icon={<SearchIcon className="h-4 w-4" />} />
+      <MetricCard label={t`Visible words`} value={summary.words} note={t`Total dictated words in the active archive view.`} icon={<MicIcon className="h-4 w-4" />} />
+      <MetricCard label={t`Speaking time`} value={summary.duration} note={t`Combined audio duration from the visible records.`} icon={<ClockIcon className="h-4 w-4" />} />
+      <MetricCard label={t`Voice mode`} value={summary.source} note={t`How the visible sessions were captured and cleaned up.`} icon={<PulseIcon className="h-4 w-4" />} />
     </div>
   );
 }

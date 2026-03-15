@@ -2,8 +2,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { AudioDots } from "./audio-dots";
 import { MicIcon, PulseIndicator, StopIcon, XIcon } from "./pill-icons";
 import { usePillState } from "./use-pill-state";
+import { useLingui } from "@lingui/react/macro";
 
 export function DictationPill() {
+  const { t } = useLingui();
   const { mode, visible, recordingMode, audioLevel } = usePillState();
 
   if (!visible) return null;
@@ -18,7 +20,7 @@ export function DictationPill() {
             console.error("[pill] toggle_dictation failed", e),
           )
         }
-        aria-label="Start dictation"
+        aria-label={t`Start dictation`}
       >
         <MicIcon />
       </button>
@@ -38,7 +40,7 @@ export function DictationPill() {
               console.error("[pill] cancel_dictation failed", e),
             )
           }
-          aria-label="Cancel dictation"
+          aria-label={t`Cancel dictation`}
         >
           <XIcon />
         </button>
@@ -57,7 +59,7 @@ export function DictationPill() {
               console.error("[pill] stop_dictation failed", e),
             )
           }
-          aria-label="Stop dictation"
+          aria-label={t`Stop dictation`}
         >
           <StopIcon />
         </button>

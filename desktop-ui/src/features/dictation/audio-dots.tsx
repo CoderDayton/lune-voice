@@ -1,3 +1,5 @@
+import { useLingui } from "@lingui/react/macro";
+
 const DOT_COUNT = 5;
 
 // Per-dot scale offsets — center dot reacts most, edges less
@@ -8,10 +10,11 @@ interface AudioDotsProps {
 }
 
 export function AudioDots({ level }: AudioDotsProps) {
+  const { t } = useLingui();
   const hasLevel = level !== undefined && level > 0;
 
   return (
-    <div className="audio-dots" role="img" aria-label="Audio activity">
+    <div className="audio-dots" role="img" aria-label={t`Audio activity`}>
       {Array.from({ length: DOT_COUNT }, (_, i) => {
         const scale = hasLevel
           ? 1 + level * DOT_WEIGHTS[i]! * 2.0

@@ -4,6 +4,7 @@ import { useHotkey } from "@tanstack/react-hotkeys";
 import { Button } from "../../../components/ui/button";
 import { authActions, authStore } from "../../../store/auth-store";
 import { AuthInputField } from "./auth-input-field";
+import { useLingui } from "@lingui/react/macro";
 
 interface AuthFormValues {
   name: string;
@@ -22,6 +23,7 @@ const copyByMode = {
 } as const;
 
 export function AuthForm() {
+  const { t } = useLingui();
   const mode = useStore(authStore, (state) => state.mode);
   const isSignup = mode === "signup";
   const copy = copyByMode[mode];
@@ -71,7 +73,7 @@ export function AuthForm() {
             {(field) => (
               <AuthInputField
                 label="Name"
-                placeholder="Your name…"
+                placeholder={t`Your name…`}
                 autoComplete="name"
                 value={field.state.value}
                 error={field.state.meta.isTouched ? (field.state.meta.errors[0] as string | undefined) ?? null : null}
@@ -129,7 +131,7 @@ export function AuthForm() {
             <AuthInputField
               label="Password"
               type="password"
-              placeholder="Enter your password…"
+              placeholder={t`Enter your password…`}
               autoComplete={isSignup ? "new-password" : "current-password"}
               value={field.state.value}
               error={field.state.meta.isTouched ? (field.state.meta.errors[0] as string | undefined) ?? null : null}

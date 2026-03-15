@@ -4,27 +4,29 @@ import { saveWorkspaceSetting, type WorkspaceSettings } from "../../../store/wor
 import { SettingsRow, SettingsSection } from "../../setup/components/settings-section";
 import { llmModels } from "../../setup/data/settings-data";
 import { OpenAiFields } from "../components/openai-fields";
+import { useLingui } from "@lingui/react/macro";
 
 interface Props {
   settings: WorkspaceSettings;
 }
 
 export function CleanupSection({ settings }: Props) {
+  const { t } = useLingui();
   return (
-    <SettingsSection title="Smart cleanup" description="Give uncertain words a second look before text is sent to your app.">
+    <SettingsSection title={t`Smart cleanup`} description={t`Give uncertain words a second look before text is sent to your app.`}>
       <SettingsRow
-        label="Automatic cleanup"
-        description="Use a local language model to tidy up uncertain phrases."
+        label={t`Automatic cleanup`}
+        description={t`Use a local language model to tidy up uncertain phrases.`}
         control={
           <Toggle
             checked={settings.llmCorrection}
             onChange={() => void saveWorkspaceSetting("llmCorrection", !settings.llmCorrection)}
-            aria-label="Automatic cleanup"
+            aria-label={t`Automatic cleanup`}
           />
         }
       />
       <SettingsRow
-        label="Cleanup model"
+        label={t`Cleanup model`}
         control={
           <SelectField
             value={settings.llmBackend}
@@ -51,8 +53,8 @@ export function CleanupSection({ settings }: Props) {
         />
       )}
       <SettingsRow
-        label="Cleanup sensitivity"
-        description="Words below this score are candidates for cleanup."
+        label={t`Cleanup sensitivity`}
+        description={t`Words below this score are candidates for cleanup.`}
         control={<span className="badge badge-outline badge-sm font-mono">{settings.confidenceThreshold}</span>}
       />
     </SettingsSection>

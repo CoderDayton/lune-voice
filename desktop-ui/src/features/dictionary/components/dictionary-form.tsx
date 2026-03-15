@@ -3,8 +3,10 @@ import { Button } from "../../../components/ui/button";
 import { TextField } from "../../../components/ui/field";
 import { Panel } from "../../../components/ui/panel";
 import { addDictionaryEntry } from "../../../store/workspace-store";
+import { useLingui } from "@lingui/react/macro";
 
 export function DictionaryForm() {
+  const { t } = useLingui();
   const [phrase, setPhrase] = useState("");
   const [replacement, setReplacement] = useState("");
 
@@ -19,12 +21,12 @@ export function DictionaryForm() {
       <div className="layout-grid mt-6 lg:grid-cols-[1fr_auto_1fr_auto] lg:items-end">
         <div>
           <label className="label-text-custom block mb-2">Spoken phrase</label>
-          <TextField value={phrase} onChange={(event) => setPhrase(event.target.value)} placeholder="e.g. github…" />
+          <TextField value={phrase} onChange={(event) => setPhrase(event.target.value)} placeholder={t`e.g. github…`} />
         </div>
         <div className="hidden pb-3 section-title opacity-50 lg:block">→</div>
         <div>
           <label className="label-text-custom block mb-2">Replacement</label>
-          <TextField value={replacement} onChange={(event) => setReplacement(event.target.value)} placeholder="e.g. GitHub…" />
+          <TextField value={replacement} onChange={(event) => setReplacement(event.target.value)} placeholder={t`e.g. GitHub…`} />
         </div>
         <Button
           onClick={async () => {

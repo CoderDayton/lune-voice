@@ -12,38 +12,40 @@ import { TranscriptionSection } from "./sections/transcription-section";
 import { CleanupSection } from "./sections/cleanup-section";
 import { ShortcutsSection } from "./sections/shortcuts-section";
 import { OutputSection } from "./sections/output-section";
+import { useLingui } from "@lingui/react/macro";
 
 export function SettingsPage() {
+  const { t } = useLingui();
   const settings = useStore(workspaceStore, (state) => state.settings);
 
   return (
     <div className="page-stack">
       <PageIntroPanel
         kicker="Settings"
-        title="Voice input, recognition, output, and shortcuts in one place."
-        description="Configure how Lune Voice listens, transcribes, cleans up text, and delivers it to the app you are using."
+        title={t`Voice input, recognition, output, and shortcuts in one place.`}
+        description={t`Configure how Lune Voice listens, transcribes, cleans up text, and delivers it to the app you are using.`}
       />
 
       <section className="layout-grid sm:grid-cols-2 xl:grid-cols-4">
         <StatTile
-          label="Recording style"
+          label={t`Recording style`}
           value={labelForActivationMode(settings.activationMode).split(" ")[0]}
-          note="Toggle or hold-to-talk."
+          note={t`Toggle or hold-to-talk.`}
         />
         <StatTile
-          label="Voice mode"
+          label={t`Voice mode`}
           value={summarizeAsrBackend(settings.asrBackend)}
-          note="Active speech recognition backend."
+          note={t`Active speech recognition backend.`}
         />
         <StatTile
-          label="Smart cleanup"
+          label={t`Smart cleanup`}
           value={settings.llmCorrection ? "On" : "Off"}
-          note="Automatic correction of uncertain words."
+          note={t`Automatic correction of uncertain words.`}
         />
         <StatTile
-          label="Text delivery"
+          label={t`Text delivery`}
           value={summarizeDictationMode(settings.dictationMode)}
-          note="How finished text reaches your app."
+          note={t`How finished text reaches your app.`}
         />
       </section>
 

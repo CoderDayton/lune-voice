@@ -4,17 +4,19 @@ import { saveWorkspaceSetting, type WorkspaceSettings } from "../../../store/wor
 import { SettingsRow, SettingsSection } from "../../setup/components/settings-section";
 import { asrBackends } from "../../setup/data/settings-data";
 import { OpenAiFields } from "../components/openai-fields";
+import { useLingui } from "@lingui/react/macro";
 
 interface Props {
   settings: WorkspaceSettings;
 }
 
 export function TranscriptionSection({ settings }: Props) {
+  const { t } = useLingui();
   return (
-    <SettingsSection title="Recognition" description="Control how your speech is turned into text.">
+    <SettingsSection title="Recognition" description={t`Control how your speech is turned into text.`}>
       <SettingsRow
-        label="Voice mode"
-        description="Balanced works well for most people. Compact uses less memory."
+        label={t`Voice mode`}
+        description={t`Balanced works well for most people. Compact uses less memory.`}
         control={
           <SelectField
             value={settings.asrBackend}
@@ -41,18 +43,18 @@ export function TranscriptionSection({ settings }: Props) {
         />
       )}
       <SettingsRow
-        label="Use hardware acceleration"
-        description="When available, this can make transcription finish faster."
-        control={<Toggle checked={settings.useGpu} onChange={() => void saveWorkspaceSetting("useGpu", !settings.useGpu)} aria-label="Use hardware acceleration" />}
+        label={t`Use hardware acceleration`}
+        description={t`When available, this can make transcription finish faster.`}
+        control={<Toggle checked={settings.useGpu} onChange={() => void saveWorkspaceSetting("useGpu", !settings.useGpu)} aria-label={t`Use hardware acceleration`} />}
       />
       <SettingsRow
-        label="Word-level alignment"
-        description="Use forced aligner for precise word timestamps and chunk merging."
+        label={t`Word-level alignment`}
+        description={t`Use forced aligner for precise word timestamps and chunk merging.`}
         control={
           <Toggle
             checked={settings.alignerEnabled}
             onChange={() => void saveWorkspaceSetting("alignerEnabled", !settings.alignerEnabled)}
-            aria-label="Word-level alignment"
+            aria-label={t`Word-level alignment`}
           />
         }
       />

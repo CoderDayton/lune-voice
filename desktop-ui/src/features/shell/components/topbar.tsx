@@ -6,12 +6,14 @@ import {
 } from "../../../store/workspace-store";
 import type { NavigationItem } from "../config/navigation";
 import { MenuIcon } from "../config/icons";
+import { useLingui } from "@lingui/react/macro";
 
 interface TopbarProps {
   page: NavigationItem;
 }
 
 export function Topbar({ page }: TopbarProps) {
+  const { t } = useLingui();
   const runtime = useStore(workspaceStore, (state) => state.runtime);
 
   return (
@@ -20,7 +22,7 @@ export function Topbar({ page }: TopbarProps) {
         <button
           type="button"
           className="btn btn-ghost btn-sm md:hidden mt-1"
-          aria-label="Open navigation menu"
+          aria-label={t`Open navigation menu`}
           onClick={workspaceActions.toggleMobileMenu}
         >
           <MenuIcon className="size-5" />

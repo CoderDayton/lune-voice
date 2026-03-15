@@ -2,17 +2,19 @@ import { SelectField } from "../../../components/ui/field";
 import { saveWorkspaceSetting, type WorkspaceSettings } from "../../../store/workspace-store";
 import { SettingsRow, SettingsSection } from "../../setup/components/settings-section";
 import { deliveryMethods, stylePresets } from "../../setup/data/settings-data";
+import { useLingui } from "@lingui/react/macro";
 
 interface Props {
   settings: WorkspaceSettings;
 }
 
 export function OutputSection({ settings }: Props) {
+  const { t } = useLingui();
   return (
-    <SettingsSection title="Text output" description="Choose how finished text is inserted into the app you are currently using.">
+    <SettingsSection title={t`Text output`} description={t`Choose how finished text is inserted into the app you are currently using.`}>
       <SettingsRow
-        label="Send method"
-        description="Paste is simplest. Typing keystrokes can work better in some apps."
+        label={t`Send method`}
+        description={t`Paste is simplest. Typing keystrokes can work better in some apps.`}
         control={
           <SelectField
             value={settings.dictationMode}
@@ -28,8 +30,8 @@ export function OutputSection({ settings }: Props) {
         }
       />
       <SettingsRow
-        label="Writing style"
-        description="Pick the tone used when final cleanup is applied."
+        label={t`Writing style`}
+        description={t`Pick the tone used when final cleanup is applied.`}
         control={
           <SelectField
             value={settings.stylePreset}

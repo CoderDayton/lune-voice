@@ -4,8 +4,10 @@ import { cn } from "../../../lib/cn";
 import { workspaceActions, workspaceStore } from "../../../store/workspace-store";
 import { navigationItems } from "../config/navigation";
 import { CloseIcon, LuneLogo } from "../config/icons";
+import { useLingui } from "@lingui/react/macro";
 
 export function MobileNav() {
+  const { t } = useLingui();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const open = useStore(workspaceStore, (state) => state.mobileMenuOpen);
 
@@ -36,7 +38,7 @@ export function MobileNav() {
           <button
             type="button"
             className="btn btn-ghost btn-sm"
-            aria-label="Close navigation menu"
+            aria-label={t`Close navigation menu`}
             onClick={workspaceActions.closeMobileMenu}
           >
             <CloseIcon className="size-5" />
