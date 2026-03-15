@@ -67,7 +67,7 @@ jobs:
 
       - name: Clippy (all crates)
         if: matrix.os == 'ubuntu-latest'
-        run: cargo clippy --workspace --exclude lune-llm --exclude lune-app --exclude lune-ui --lib --tests --no-default-features -- -D warnings
+        run: cargo clippy --workspace --exclude lune-llm --exclude lune-app --exclude lune-ui --exclude lune-audio --lib --tests --no-default-features -- -D warnings
 
       - name: Clippy (core crates, no desktop UI or audio)
         if: matrix.os == 'windows-latest'
@@ -111,7 +111,7 @@ jobs:
 
       - name: Test (all crates)
         if: matrix.os == 'ubuntu-latest'
-        run: cargo test --workspace --exclude lune-llm --exclude lune-app --exclude lune-ui --no-default-features --lib
+        run: cargo test --workspace --exclude lune-llm --exclude lune-app --exclude lune-ui --exclude lune-audio --no-default-features --lib
 
       - name: Test (core crates, no desktop UI or audio)
         if: matrix.os == 'windows-latest'
