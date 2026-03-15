@@ -1,163 +1,98 @@
 <div align="center">
 
-<img src="assets/lune-audio-logo-s-512.png" width="180" alt="Lune Voice" />
+<img src="assets/lune-voice-logo-512.png" width="160" alt="Lune Voice" />
 
 # Lune Voice
 
-**4× faster than cloud voice dictation. Fully offline. Built in Rust.**
+**Offline voice dictation for Linux. Speak, and clean text appears in your app.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/rust-2024%20edition-orange.svg)](https://www.rust-lang.org)
-[![Platform](https://img.shields.io/badge/platform-cross--platform-lightgrey.svg)](#building)
-
-*Speak → corrected text appears in your focused window. No cloud. No API keys. No telemetry.*
+[![Rust](https://img.shields.io/badge/rust-2024-orange.svg)](https://www.rust-lang.org)
+[![Tauri](https://img.shields.io/badge/tauri-v2-blue.svg)](https://tauri.app)
 
 </div>
 
 ---
 
-## Why Lune Voice?
+Lune Voice runs a full speech-to-text pipeline on your machine — no cloud, no API keys, no telemetry. Audio goes in, corrected text comes out, delivered straight to whatever app you're focused on.
 
-Most voice tools either phone home or dump raw transcription with no cleanup. Lune gives you neither compromise:
+The pipeline: mic capture → VAD → ASR (Qwen3 or Parakeet, via ONNX Runtime) → confidence gating → optional LLM cleanup → dictionary fixes → paste into focused window. Everything runs locally. GPU optional but fast.
 
-- **Fully offline** — audio stays on your machine.
-- **Fast local transcription** — optimized Rust pipeline with ONNX Runtime backends.
-- **Cleaner final text** — optional local post-processing and dictionary fixes before delivery.
-- **Desktop-first workflow** — CLI daemon plus a Tauri desktop UI.
+## Desktop App
 
----
-
-## How It Works
-
-- Capture microphone audio
-- Run local ASR with Qwen3-ASR or Parakeet
-- Apply dictionary and optional cleanup
-- Deliver the final text to the active app
-
-Technical details live in:
-
-- [Architecture](docs/ARCHITECTURE.md)
-- [Configuration](docs/CONFIGURATION.md)
-- [Performance](docs/PERFORMANCE.md)
-
----
-
-## Quick Start
-
-```bash
-# 1. Build
-cargo build --release -p lune-app
-
-# 2. Start daemon (downloads ~1.8GB of models on first launch)
-./target/release/lune-voice daemon
-
-# 3. Bind a hotkey, then dictate
-lune-voice toggle
-```
-
-## Desktop UI
-
-The repository also includes a Tauri desktop shell in [`desktop-ui/`](desktop-ui).
+A Tauri desktop shell with a floating dictation pill, session history, custom dictionary, and hotkey configuration. Built with React, Tailwind, and DaisyUI.
 
 ```bash
 cd desktop-ui
-bun install
-bun run dev
+bun install && bun run dev
 ```
 
-Frontend verification:
+The pill overlay sits at the bottom of your screen — click to dictate, watch the audio dots react, stop or cancel with one tap. It hides when you're not using it.
+
+## CLI Daemon
+
+For a headless setup or scripting:
 
 ```bash
-bun run test
-bun run test:visual
+cargo build --release -p lune-app
+./target/release/lune-voice daemon      # downloads ~1.8 GB of models on first run
 ```
 
----
+| Command | |
+|---|---|
+| `lune-voice toggle` | Start if idle, stop if active |
+| `lune-voice start` | Begin dictation |
+| `lune-voice stop` | End and deliver text |
+| `lune-voice cancel` | Discard current session |
+| `lune-voice status` | Print daemon state |
+| `lune-voice quit` | Shut down |
+
+Bind `Ctrl+Space` to `lune-voice toggle` and `Escape` to `lune-voice cancel` for a hands-free workflow. The desktop app does this automatically via evdev.
 
 ## Building
 
-**Prerequisites:** Rust stable (2024 edition)
+Rust stable (2024 edition), Bun for the frontend.
 
 ```bash
 # CPU-only
 cargo build --release -p lune-app
 
-# With CUDA GPU acceleration
+# With CUDA
 cargo build --release -p lune-app --features cuda
 
-# Run tests
+# Desktop UI
+cd desktop-ui && bun install && bun run build
+
+# Tests
 cargo test --workspace
+bun test                    # frontend unit tests
+bun run test:visual         # Playwright visual regression
 ```
 
-Audio capture uses `cpal` — ALSA/PipeWire on Linux, CoreAudio on macOS, WASAPI on Windows.
+Audio capture uses `cpal` — PipeWire/ALSA on Linux, CoreAudio on macOS, WASAPI on Windows.
 
----
+## Project Layout
 
-## Documentation
-
-- [Architecture](docs/ARCHITECTURE.md): pipeline, session lifecycle, D-Bus surface, backend layout
-- [Configuration](docs/CONFIGURATION.md): settings, backends, hotkeys, style presets, model files
-- [Performance](docs/PERFORMANCE.md): benchmark workflow, latency breakdowns, tuning notes
-
----
-
-## Usage
-
-| Subcommand | Description |
-|------------|-------------|
-| `daemon`   | Start the background daemon |
-| `toggle`   | Start if idle, stop if active |
-| `start`    | Begin dictation |
-| `stop`     | End and deliver text |
-| `cancel`   | Discard current session |
-| `status`   | Print daemon state |
-| `settings` | View or change runtime settings |
-| `quit`     | Shut down daemon |
-
-**Recommended:**
 ```
-Ctrl+Space  →  lune-voice toggle
-Escape      →  lune-voice cancel
+crates/
+  lune-app/       Session orchestration, delivery, hotkey listener
+  lune-asr/       ASR backends (Qwen3, Parakeet, OpenAI-compatible)
+  lune-audio/     Mic capture, VAD, segmenter
+  lune-core/      Shared types, config, session model
+  lune-llm/       LLM cleanup (local GGUF or OpenAI-compatible)
+  lune-commands/  Voice command router
+  lune-dict/      Dictionary manager (fuzzy match + priority)
+  lune-output/    Text delivery (wtype/wl-copy)
+  lune-persist/   SQLite DB, settings store, model hub
+desktop-ui/       Tauri + React desktop shell
 ```
 
----
+## Docs
 
-## Configuration
-
-```bash
-lune-voice settings style email
-lune-voice settings language en-GB
-lune-voice mode dictation Clipboard
-```
-
-For the full settings reference, backend options, and model file layout, see [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
-
----
-
-## Architecture
-
-The core system is a small Rust workspace with separate crates for audio capture, ASR, LLM cleanup, output delivery, persistence, and orchestration.
-
-Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-
----
-
-## Performance
-
-Benchmarks and profiling notes are documented in [docs/PERFORMANCE.md](docs/PERFORMANCE.md), including the example benchmark commands and backend-forcing options for Qwen and Parakeet.
-
----
-
-## Contributing
-
-1. Fork → feature branch → `cargo test --workspace`
-2. Ensure `cargo fmt --all` and `cargo clippy --workspace` pass
-3. Open a PR
-
-Lefthook runs a stricter local gate automatically: pre-commit applies Rust formatting, then runs workspace `cargo check`, `cargo clippy`, Rust unit/bin tests, and the Bun desktop UI unit tests. Pre-push runs full-workspace `cargo clippy --all-features`, `cargo test --workspace`, the desktop UI production build, and optional real-model E2E tests when `LUNE_E2E_MODELS=1` is set.
-
----
+- [Architecture](docs/ARCHITECTURE.md) — pipeline, session lifecycle, D-Bus, backend layout
+- [Configuration](docs/CONFIGURATION.md) — settings, backends, hotkeys, styles, models
+- [Performance](docs/PERFORMANCE.md) — benchmarks, latency breakdowns, tuning
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT
