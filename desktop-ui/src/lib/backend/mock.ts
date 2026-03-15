@@ -51,25 +51,13 @@ let mockSnapshot: BackendWorkspaceSnapshot = createMockSnapshot();
 let nextDictionaryId = 1000;
 
 function applySettings(input: SaveWorkspaceSettingsInput) {
+  const { llmCorrection, ...fields } = input;
   mockSnapshot = {
     ...mockSnapshot,
     settings: {
       ...mockSnapshot.settings,
-      activationMode: input.activationMode,
-      dictationMode: input.dictationMode,
-      useGpu: input.useGpu,
-      asrBackendType: input.asrBackendType,
-      llmBackendType: input.llmBackendType,
-      confidenceThreshold: input.llmCorrection ? input.confidenceThreshold : null,
-      adaptiveVad: input.adaptiveVad,
-      speechThreshold: input.speechThreshold,
-      stylePreset: input.stylePreset,
-      openaiAsrBaseUrl: input.openaiAsrBaseUrl ?? null,
-      openaiAsrApiKey: input.openaiAsrApiKey ?? null,
-      openaiAsrModel: input.openaiAsrModel ?? null,
-      openaiLlmBaseUrl: input.openaiLlmBaseUrl ?? null,
-      openaiLlmApiKey: input.openaiLlmApiKey ?? null,
-      openaiLlmModel: input.openaiLlmModel ?? null,
+      ...fields,
+      confidenceThreshold: llmCorrection ? input.confidenceThreshold : null,
     },
   };
 }

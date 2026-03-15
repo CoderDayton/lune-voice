@@ -109,11 +109,6 @@ const DEFAULT_RUNTIME: WorkspaceRuntimeState = {
   error: null,
 };
 
-const DISPLAY_BACKEND_LABELS: Record<string, string> = {
-  OrtQwenAsr: "Balanced",
-  ParakeetTdt: "Fast and light",
-  OpenAiCompatible: "Cloud API",
-};
 
 export function createInitialWorkspaceState(): WorkspaceState {
   return {
@@ -325,20 +320,17 @@ export function summarizeAsrBackend(value: AsrBackendValue) {
 }
 
 export function formatBackendLabel(value: string) {
-  return DISPLAY_BACKEND_LABELS[value] ?? value;
+  return labelForAsrBackend(value as AsrBackendValue)
+    .replace(" (recommended)", "")
+    .replace(" (OpenAI-compatible)", "");
 }
 
 export function summarizeDictationMode(value: DictationModeValue) {
   return labelForDeliveryMethod(value).replace(" into app", "");
 }
 
-export function summarizeLlmBackend(value: LlmBackendValue) {
-  return labelForLlmBackend(value);
-}
-
-export function summarizeStylePreset(value: string) {
-  return labelForStylePreset(value);
-}
+export const summarizeLlmBackend = labelForLlmBackend;
+export const summarizeStylePreset = labelForStylePreset;
 
 function mapHistoryEntry(entry: BackendHistoryEntry): HistorySession | null {
   if (!entry.transcript) {
@@ -365,12 +357,7 @@ function mapHistoryEntry(entry: BackendHistoryEntry): HistorySession | null {
 }
 
 function mapDictionaryEntry(entry: BackendDictionaryEntry): DictionaryEntry {
-  return {
-    id: entry.id,
-    phrase: entry.phrase,
-    replacement: entry.replacement,
-    priority: entry.priority,
-  };
+  return entry;
 }
 
 function mapWorkspaceSettings(snapshot: BackendWorkspaceSnapshot): WorkspaceSettings {
