@@ -57,9 +57,20 @@ jobs:
             libdbus-1-dev \
             libssl-dev \
             libxkbcommon-dev \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libjavascriptcoregtk-4.1-dev \
+            libsoup-3.0-dev \
+            librsvg2-dev \
             pkg-config
 
-      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Clippy (all crates)
+        if: matrix.os == 'ubuntu-latest'
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Clippy (core crates, no desktop UI)
+        if: matrix.os == 'windows-latest'
+        run: cargo clippy --workspace --exclude lune-ui --all-targets -- -D warnings
 
   # ── Tests ─────────────────────────────────────────────────────────────────
   test:
@@ -89,9 +100,20 @@ jobs:
             libdbus-1-dev \
             libssl-dev \
             libxkbcommon-dev \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libjavascriptcoregtk-4.1-dev \
+            libsoup-3.0-dev \
+            librsvg2-dev \
             pkg-config
 
-      - run: cargo test --workspace
+      - name: Test (all crates)
+        if: matrix.os == 'ubuntu-latest'
+        run: cargo test --workspace
+
+      - name: Test (core crates, no desktop UI)
+        if: matrix.os == 'windows-latest'
+        run: cargo test --workspace --exclude lune-ui
 
   # ── Security audit (push/PR + weekly schedule) ────────────────────────────
   audit:
@@ -111,4 +133,4 @@ jobs:
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
 
-      - run: cargo audit
+      - run: cargo audit --deny vulnerabilities

@@ -6,6 +6,7 @@
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 mod cli;
+#[cfg(unix)]
 mod dbus;
 mod events;
 mod factory;
