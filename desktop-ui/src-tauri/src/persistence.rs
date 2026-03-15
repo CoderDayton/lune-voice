@@ -2,7 +2,8 @@ use std::{path::PathBuf, str::FromStr};
 
 use lune_core::config::{
     ActivationMode, AlignerConfig, AsrBackendConfig, DevicePolicy, DictationMode, HotkeyConfig,
-    KeyCombo, LlmBackendConfig, Modifier, RedactedString, StreamingMode, UserSettings,
+    KeyCombo, LlmBackendConfig, Modifier, PillVisibility, RedactedString, StreamingMode,
+    UserSettings,
 };
 use lune_core::session::SessionStatus;
 use lune_persist::{AppPaths, Database, SettingsStore, StoredDictionaryEntry};
@@ -190,6 +191,7 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
         hotkey_toggle: format_key_combo(&settings.hotkey.toggle_dictation),
         hotkey_cancel: format_key_combo(&settings.hotkey.cancel_dictation),
         aligner_enabled: settings.aligner.as_ref().is_some_and(|cfg| cfg.enabled),
+        pill_visibility: settings.pill_visibility.to_string(),
         openai_asr_base_url,
         openai_asr_api_key,
         openai_asr_model,
@@ -205,6 +207,8 @@ fn apply_settings_dto(
 ) -> Result<(), String> {
     settings.activation_mode = ActivationMode::from_str(input.activation_mode.trim())
         .map_err(|e| format!("activationMode: {e}"))?;
+    settings.pill_visibility = PillVisibility::from_str(input.pill_visibility.trim())
+        .map_err(|e| format!("pillVisibility: {e}"))?;
     settings.dictation_mode = DictationMode::from_str(input.dictation_mode.trim())
         .map_err(|e| format!("dictationMode: {e}"))?;
     settings.device = if input.use_gpu {

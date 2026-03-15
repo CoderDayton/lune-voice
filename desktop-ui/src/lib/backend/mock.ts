@@ -25,6 +25,7 @@ function createMockSnapshot(): BackendWorkspaceSnapshot {
       openaiLlmApiKey: null,
       openaiLlmModel: null,
       alignerEnabled: true,
+      pillVisibility: "Always",
     },
     history: historyGroups.flatMap((group, groupIndex) =>
       group.items.map((item, itemIndex) => ({

@@ -64,6 +64,10 @@ impl AppRuntime {
         self.inner.status.read().await.clone()
     }
 
+    pub fn app_handle(&self) -> &AppHandle {
+        &self.inner.app
+    }
+
     pub async fn set_session_stream(
         &self,
         channel: Channel<SessionStreamEvent>,
@@ -283,6 +287,11 @@ impl AppRuntime {
             status: status.to_owned(),
         })
         .await;
+        // Notify the pill overlay window of the status change.
+        let _ = self
+            .inner
+            .app
+            .emit_to("pill", "lune://pill-state", status.to_owned());
     }
 
     async fn push_session_event(&self, event: SessionStreamEvent) {

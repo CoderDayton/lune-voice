@@ -10,7 +10,7 @@ import {
   workspaceStore,
 } from "../../store/workspace-store";
 import { SettingsRow, SettingsSection } from "../setup/components/settings-section";
-import { activationModes, labelForActivationMode } from "../setup/data/settings-data";
+import { activationModes, labelForActivationMode, pillVisibilityOptions } from "../setup/data/settings-data";
 import { CleanupSection, TranscriptionSection } from "./recording-sections";
 
 export function RecordingPage() {
@@ -54,6 +54,23 @@ export function RecordingPage() {
                 className="w-full sm:w-auto sm:min-w-52"
               >
                 {activationModes.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </SelectField>
+            }
+          />
+          <SettingsRow
+            label="Dictation pill"
+            description="The floating indicator at the bottom of the screen."
+            control={
+              <SelectField
+                value={settings.pillVisibility}
+                onChange={(event) => void saveWorkspaceSetting("pillVisibility", event.target.value as typeof settings.pillVisibility)}
+                className="w-full sm:w-auto sm:min-w-52"
+              >
+                {pillVisibilityOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>

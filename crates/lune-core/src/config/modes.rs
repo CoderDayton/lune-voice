@@ -91,6 +91,48 @@ fn activation_mode_parse_err(s: &str) -> String {
     format!("unknown activation mode: {s} (expected Toggle|Hold)")
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[non_exhaustive]
+pub enum PillVisibility {
+    /// Show the pill whenever the service is ready.
+    #[default]
+    Always,
+    /// Show the pill only while actively dictating.
+    WhenDictating,
+    /// Never show the pill overlay.
+    Never,
+}
+
+impl std::fmt::Display for PillVisibility {
+    #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Always => f.write_str("Always"),
+            Self::WhenDictating => f.write_str("WhenDictating"),
+            Self::Never => f.write_str("Never"),
+        }
+    }
+}
+
+impl std::str::FromStr for PillVisibility {
+    type Err = String;
+    #[inline]
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "Always" => Ok(Self::Always),
+            "WhenDictating" => Ok(Self::WhenDictating),
+            "Never" => Ok(Self::Never),
+            _ => Err(pill_visibility_parse_err(s)),
+        }
+    }
+}
+
+#[cold]
+#[inline(never)]
+fn pill_visibility_parse_err(s: &str) -> String {
+    format!("unknown pill visibility: {s} (expected Always|WhenDictating|Never)")
+}
+
 impl std::fmt::Display for PrivacyMode {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

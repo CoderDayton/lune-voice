@@ -2,6 +2,7 @@ export type ActivationModeValue = "Toggle" | "Hold";
 export type AsrBackendValue = "OrtQwenAsr" | "ParakeetTdt" | "OpenAiCompatible";
 export type LlmBackendValue = "LlamaCppLocal" | "OpenAiCompatible";
 export type DictationModeValue = "TypeInPlace" | "Clipboard" | "Both";
+export type PillVisibilityValue = "Always" | "WhenDictating" | "Never";
 
 export interface Option<Value extends string> {
   value: Value;
@@ -11,6 +12,12 @@ export interface Option<Value extends string> {
 export const activationModes: Option<ActivationModeValue>[] = [
   { value: "Toggle", label: "Toggle to start and stop" },
   { value: "Hold", label: "Hold while speaking" },
+];
+
+export const pillVisibilityOptions: Option<PillVisibilityValue>[] = [
+  { value: "Always", label: "Always" },
+  { value: "WhenDictating", label: "When dictating" },
+  { value: "Never", label: "Never" },
 ];
 
 export const asrBackends: Option<AsrBackendValue>[] = [
@@ -54,6 +61,10 @@ export function labelForLlmBackend(value: LlmBackendValue) {
 
 export function labelForDeliveryMethod(value: DictationModeValue) {
   return labelForOption(deliveryMethods, value);
+}
+
+export function labelForPillVisibility(value: PillVisibilityValue) {
+  return labelForOption(pillVisibilityOptions, value);
 }
 
 export function labelForStylePreset(value: string) {

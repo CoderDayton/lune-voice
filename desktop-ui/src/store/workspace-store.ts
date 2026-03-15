@@ -16,6 +16,7 @@ import {
   type AsrBackendValue,
   type DictationModeValue,
   type LlmBackendValue,
+  type PillVisibilityValue,
 } from "../features/setup/data/settings-data";
 
 export interface WorkspaceSettings {
@@ -32,6 +33,7 @@ export interface WorkspaceSettings {
   hotkeyToggle: string;
   hotkeyCancel: string;
   alignerEnabled: boolean;
+  pillVisibility: PillVisibilityValue;
   // OpenAI ASR fields
   openaiAsrBaseUrl: string;
   openaiAsrApiKey: string;
@@ -88,6 +90,7 @@ const DEFAULT_SETTINGS: WorkspaceSettings = {
   hotkeyToggle: "Ctrl+Space",
   hotkeyCancel: "Escape",
   alignerEnabled: true,
+  pillVisibility: "Always",
   openaiAsrBaseUrl: "https://api.openai.com/v1",
   openaiAsrApiKey: "",
   openaiAsrModel: "whisper-1",
@@ -233,6 +236,7 @@ export async function persistWorkspaceSettings() {
     hotkeyToggle: settings.hotkeyToggle,
     hotkeyCancel: settings.hotkeyCancel,
     alignerEnabled: settings.alignerEnabled,
+    pillVisibility: settings.pillVisibility,
     openaiAsrBaseUrl: settings.openaiAsrBaseUrl || null,
     openaiAsrApiKey: settings.openaiAsrApiKey || null,
     openaiAsrModel: settings.openaiAsrModel || null,
@@ -384,6 +388,7 @@ function mapWorkspaceSettings(snapshot: BackendWorkspaceSnapshot): WorkspaceSett
     hotkeyToggle: snapshot.settings.hotkeyToggle,
     hotkeyCancel: snapshot.settings.hotkeyCancel,
     alignerEnabled: snapshot.settings.alignerEnabled,
+    pillVisibility: (snapshot.settings.pillVisibility ?? "Always") as PillVisibilityValue,
     openaiAsrBaseUrl: snapshot.settings.openaiAsrBaseUrl ?? DEFAULT_SETTINGS.openaiAsrBaseUrl,
     openaiAsrApiKey: snapshot.settings.openaiAsrApiKey ?? DEFAULT_SETTINGS.openaiAsrApiKey,
     openaiAsrModel: snapshot.settings.openaiAsrModel ?? DEFAULT_SETTINGS.openaiAsrModel,

@@ -1,6 +1,7 @@
 mod commands;
 mod dto;
 mod persistence;
+mod pill;
 mod runtime;
 
 use tauri::Manager;
@@ -26,7 +27,10 @@ pub fn run() {
             commands::start_dictation,
             commands::stop_dictation,
             commands::cancel_dictation,
-            commands::toggle_dictation
+            commands::toggle_dictation,
+            pill::show_pill_window,
+            pill::hide_pill_window,
+            pill::reposition_pill_center
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {

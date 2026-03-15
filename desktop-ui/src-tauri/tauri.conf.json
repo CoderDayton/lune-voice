@@ -17,6 +17,20 @@
         "height": 640,
         "resizable": true,
         "decorations": true
+      },
+      {
+        "label": "pill",
+        "url": "pill.html",
+        "title": "",
+        "width": 48,
+        "height": 48,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "shadow": false,
+        "skipTaskbar": true,
+        "visible": false
       }
     ],
     "security": {

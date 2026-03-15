@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use super::hotkey::HotkeyConfig;
-use super::modes::{ActivationMode, DictationMode, PrivacyMode, TerminalMode};
+use super::modes::{ActivationMode, DictationMode, PillVisibility, PrivacyMode, TerminalMode};
 use super::pipeline::PipelineOverrides;
 use super::redacted::RedactedString;
 use super::style::StyleId;
@@ -31,6 +31,9 @@ pub struct UserSettings {
     pub privacy_mode: PrivacyMode,
     pub dictation_mode: DictationMode,
     pub activation_mode: ActivationMode,
+    /// When to show the floating dictation pill overlay.
+    #[serde(default)]
+    pub pill_visibility: PillVisibility,
     /// How to detect terminal windows for paste chord selection.
     /// `Auto` probes the compositor (works on Hyprland, Sway, KDE, GNOME).
     /// Set `Terminal` on COSMIC or other compositors without focus detection.
@@ -103,6 +106,7 @@ impl Default for UserSettings {
             privacy_mode: PrivacyMode::LocalOnly,
             dictation_mode: DictationMode::default(),
             activation_mode: ActivationMode::default(),
+            pill_visibility: PillVisibility::default(),
             terminal_mode: TerminalMode::default(),
             session_history_days: Some(30),
             word_confidence_threshold: default_word_confidence_threshold(),

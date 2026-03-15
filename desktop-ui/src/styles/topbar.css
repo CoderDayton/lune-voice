@@ -1,0 +1,26 @@
+@reference "../app.css";
+
+/* ── Topbar ─────────────────────────────────────────────────────────── */
+
+@utility topbar-shell {
+  @apply flex flex-col gap-4;
+  padding:
+    var(--space-page-y)
+    var(--space-page-x-mobile)
+    0;
+}
+
+@utility topbar-copy {
+  @apply min-w-0;
+  max-width: var(--size-topbar-copy);
+}
+
+@media (min-width: 48rem) {
+  .topbar-shell {
+    @apply flex-row items-end justify-between;
+    padding:
+      1.75rem
+      var(--space-page-x-desktop)
+      0;
+  }
+}
