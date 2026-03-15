@@ -196,9 +196,14 @@ impl AppRuntime {
                             .await;
                     }
                     SessionEvent::AudioLevel(level) => {
+                        // Send to main window via session stream
                         runtime
                             .push_session_event(SessionStreamEvent::AudioLevel { level })
                             .await;
+                        // Send to pill overlay via targeted event (avoids needing
+                        // a second session stream subscription that would overwrite
+                        // the main window's channel)
+                        let _ = app.emit_to("pill", "lune://audio-level", level);
                     }
                     SessionEvent::CommandDetected(ref payload) => {
                         runtime.handle_voice_command(payload).await;

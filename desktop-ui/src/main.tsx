@@ -5,7 +5,7 @@ import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nProvider } from "@lingui/react";
 import { i18n } from "@lingui/core";
-import { activateLocale, defaultLocale } from "./i18n";
+import { activateLocale, defaultLocale, locales } from "./i18n";
 import { routeTree } from "./routeTree.gen";
 import "./app.css";
 import "./styles/shell.css";
@@ -26,7 +26,19 @@ declare module "@tanstack/react-router" {
 
 function App() {
   useEffect(() => {
-    void activateLocale(defaultLocale);
+    // Activate default locale immediately, then override with persisted preference
+    activateLocale(defaultLocale).then(async () => {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        const snapshot = await invoke<{ settings: { language: string } }>("load_workspace_snapshot");
+        const lang = snapshot.settings.language?.split(/[-_]/)[0];
+        if (lang && lang !== defaultLocale && lang in locales) {
+          await activateLocale(lang);
+        }
+      } catch {
+        // Not in Tauri or snapshot unavailable — keep default
+      }
+    });
   }, []);
 
   return (

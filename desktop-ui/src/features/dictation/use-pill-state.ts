@@ -3,8 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { attachSessionStream } from "../../lib/backend/stream";
-import type { SessionStreamEvent } from "../../lib/backend/types";
+
 
 export type PillMode = "idle" | "active" | "processing";
 type PillVis = "Always" | "WhenDictating" | "Never";
@@ -106,21 +105,22 @@ export function usePillState() {
     };
   }, []);
 
-  // Subscribe to session stream for audio levels
+  // Listen for audio levels via targeted event from Rust (not session stream,
+  // which is single-subscriber and owned by the main window)
   useEffect(() => {
-    let detach = () => {};
-    attachSessionStream((event: SessionStreamEvent) => {
-      if (event.type === "audioLevel") {
-        setAudioLevel(event.level);
-      } else if (event.type === "sessionStopped" || event.type === "sessionError") {
-        setAudioLevel(0);
-      }
-    }).then(
-      (fn) => { detach = fn; },
-      () => {},
-    );
-    return () => detach();
+    const unlistenLevel = listen<number>("lune://audio-level", (event) => {
+      setAudioLevel(event.payload);
+    });
+
+    return () => {
+      unlistenLevel.then((fn) => fn()).catch(() => {});
+    };
   }, []);
+
+  // Reset audio level when session ends (tracked via pill-state event)
+  useEffect(() => {
+    if (mode === "idle") setAudioLevel(0);
+  }, [mode]);
 
   const visible = shouldShow(pillVis, mode, serviceReady);
 
