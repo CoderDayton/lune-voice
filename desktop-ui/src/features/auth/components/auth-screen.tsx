@@ -4,6 +4,7 @@ import { authStore } from "../../../store/auth-store";
 import { activateLocale, locales, type LocaleKey } from "../../../i18n";
 import { saveWorkspaceSetting, workspaceStore } from "../../../store/workspace-store";
 import { LuneLogo } from "../../shell/config/icons";
+import { Trans } from "@lingui/react/macro";
 import { AuthForm } from "./auth-form";
 import { AuthHeroPanel } from "./auth-hero-panel";
 import { AuthModeSwitch } from "./auth-mode-switch";
@@ -28,8 +29,8 @@ export function AuthScreen() {
                 <LuneLogo className="text-white" />
               </div>
               <div className="stack-copy-tight">
-                <p className="app-kicker">Private desktop dictation</p>
-                <h1 className="brand-title">Lune Voice</h1>
+                <p className="app-kicker"><Trans>Private desktop dictation</Trans></p>
+                <h1 className="brand-title"><Trans>Lune Voice</Trans></h1>
               </div>
             </div>
 

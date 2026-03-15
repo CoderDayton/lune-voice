@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { useStore } from "@tanstack/react-store";
 import { Link } from "@tanstack/react-router";
 import { buttonClassName } from "../../../components/ui/button";
@@ -24,19 +25,19 @@ export function ActivityFeed() {
     <Panel className="p-4 sm:p-6">
       <div className="header-row">
         <div>
-          <h3 className="section-title">Recent activity</h3>
+          <h3 className="section-title"><Trans>Recent activity</Trans></h3>
           <p className="body-copy-soft mt-2">
-            Latest transcriptions from this device, with enough context to judge quality fast.
+            <Trans>Latest transcriptions from this device, with enough context to judge quality fast.</Trans>
           </p>
         </div>
         <Link to="/history" className={buttonClassName("ghost")}>
-          View full history
+          <Trans>View full history</Trans>
         </Link>
       </div>
 
       <div className="flex flex-col gap-4 mt-6">
         {recentActivity.length === 0 ? (
-          <p className="body-copy-soft text-center py-8">No sessions yet. Start dictating to see recent activity.</p>
+          <p className="body-copy-soft text-center py-8"><Trans>No sessions yet. Start dictating to see recent activity.</Trans></p>
         ) : (
           recentActivity.map((item) => (
             <article key={item.id} className="card bg-base-300/50 border border-base-300/30 p-3 sm:p-4 stack-copy">

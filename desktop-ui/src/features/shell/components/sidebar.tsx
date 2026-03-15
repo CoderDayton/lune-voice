@@ -12,6 +12,7 @@ import {
 } from "../../../store/workspace-store";
 import { findNavigationItem, navigationItems } from "../config/navigation";
 import { ChevronLeftIcon, ChevronRightIcon, LuneLogo } from "../config/icons";
+import { Trans } from "@lingui/react/macro";
 
 function useStatusItems() {
   const runtime = useStore(workspaceStore, (state) => state.runtime);
@@ -66,8 +67,8 @@ export function Sidebar() {
         </div>
         {!collapsed ? (
           <div className="min-w-0">
-            <p className="app-kicker">Desktop Dictation</p>
-            <h1 className="brand-title">Lune Voice</h1>
+            <p className="app-kicker"><Trans>Desktop Dictation</Trans></p>
+            <h1 className="brand-title"><Trans>Lune Voice</Trans></h1>
           </div>
         ) : null}
       </div>
@@ -107,9 +108,9 @@ export function Sidebar() {
           <div className="flex items-start justify-between gap-3 mb-4">
             <div>
               <p className="app-kicker">Session posture</p>
-              <h2 className="font-semibold text-sm mt-2">{current.label} is ready</h2>
+              <h2 className="font-semibold text-sm mt-2"><Trans>{current.label} is ready</Trans></h2>
               <p className="text-xs opacity-50 mt-1">
-                Your recordings stay private on this computer, with quick cleanup before text is inserted.
+                <Trans>Your recordings stay private on this computer, with quick cleanup before text is inserted.</Trans>
               </p>
             </div>
             <Pill>{statusItems[0].value}</Pill>
@@ -129,21 +130,21 @@ export function Sidebar() {
       <div className="mt-auto space-y-3">
         {!collapsed ? (
           <div className="card bg-base-300/50 border border-base-300/30 p-4">
-            <p className="app-kicker">Signed in</p>
-            <h2 className="font-semibold text-sm mt-2">{profile?.name ?? "Lune user"}</h2>
+            <p className="app-kicker"><Trans>Signed in</Trans></p>
+            <h2 className="font-semibold text-sm mt-2">{profile?.name ?? <Trans>Lune user</Trans>}</h2>
             <p className="text-xs opacity-50 mt-1">{profile?.email ?? "desktop@lune.local"}</p>
             <div className="flex flex-col gap-3 mt-3">
               <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="opacity-50">Recording</span>
-                <span className="font-medium opacity-80">Ready now</span>
+                <span className="opacity-50"><Trans>Recording</Trans></span>
+                <span className="font-medium opacity-80"><Trans>Ready now</Trans></span>
               </div>
               <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="opacity-50">Vocabulary</span>
-                <span className="font-medium opacity-80">Saved fixes</span>
+                <span className="opacity-50"><Trans>Vocabulary</Trans></span>
+                <span className="font-medium opacity-80"><Trans>Saved fixes</Trans></span>
               </div>
               <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="opacity-50">Shortcuts</span>
-                <span className="font-medium opacity-80">Across apps</span>
+                <span className="opacity-50"><Trans>Shortcuts</Trans></span>
+                <span className="font-medium opacity-80"><Trans>Across apps</Trans></span>
               </div>
             </div>
             <Button
@@ -152,7 +153,7 @@ export function Sidebar() {
               className="mt-4 w-full justify-center"
               onClick={authActions.signOut}
             >
-              Sign out
+              <Trans>Sign out</Trans>
             </Button>
           </div>
         ) : null}
@@ -166,8 +167,8 @@ export function Sidebar() {
           {collapsed ? <ChevronRightIcon className="h-4 w-4" /> : <ChevronLeftIcon className="h-4 w-4" />}
           {!collapsed ? (
             <div className="text-left">
-              <div className="text-sm font-medium">Collapse rail</div>
-              <div className="text-xs opacity-50">Compact the workspace chrome</div>
+              <div className="text-sm font-medium"><Trans>Collapse rail</Trans></div>
+              <div className="text-xs opacity-50"><Trans>Compact the workspace chrome</Trans></div>
             </div>
           ) : null}
         </Button>

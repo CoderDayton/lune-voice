@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { Pill } from "../../../components/ui/pill";
 
 const authProof = [
@@ -10,12 +11,12 @@ export function AuthHeroPanel() {
   return (
     <section className="card bg-base-200/80 border border-base-300/60 surface-hero p-4 sm:p-6 flex min-h-[24rem] lg:min-h-[38rem] flex-col justify-between overflow-hidden">
       <div className="stack-copy max-w-full sm:max-w-[34rem]">
-        <Pill className="w-fit">Private desktop dictation</Pill>
+        <Pill className="w-fit"><Trans>Private desktop dictation</Trans></Pill>
         <h2 className="auth-headline">
-          Speak naturally. Keep every correction local and every shortcut close.
+          <Trans>Speak naturally. Keep every correction local and every shortcut close.</Trans>
         </h2>
         <p className="body-copy-soft max-w-full sm:max-w-[31rem]">
-          Lune Voice is built for people who want faster writing, cleaner transcripts, and a workspace that feels calm instead of technical.
+          <Trans>Lune Voice is built for people who want faster writing, cleaner transcripts, and a workspace that feels calm instead of technical.</Trans>
         </p>
       </div>
 

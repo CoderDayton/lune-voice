@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { useStore } from "@tanstack/react-store";
 import { Link } from "@tanstack/react-router";
 import { buttonClassName } from "../../../components/ui/button";
@@ -45,19 +46,19 @@ export function OverviewHero() {
   return (
     <div className="layout-grid xl:grid-cols-[1.35fr_0.9fr]">
       <Panel tone="hero" className="p-4 sm:p-6 relative overflow-hidden">
-        <p className="app-kicker-accent">Voice typing, simplified</p>
+        <p className="app-kicker-accent"><Trans>Voice typing, simplified</Trans></p>
         <h2 className="hero-title mt-3">
-          Speak naturally. Keep the final text polished.
+          <Trans>Speak naturally. Keep the final text polished.</Trans>
         </h2>
         <p className="body-copy-strong mt-4 max-w-[var(--size-measure-wide)]">
-          Lune Voice helps you record quickly, fix common wording automatically, and send clean text wherever you are working.
+          <Trans>Lune Voice helps you record quickly, fix common wording automatically, and send clean text wherever you are working.</Trans>
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link to="/history" className={buttonClassName("primary")}>
-            View recent sessions
+            <Trans>View recent sessions</Trans>
           </Link>
           <Link to="/settings" className={buttonClassName("secondary")}>
-            Open settings
+            <Trans>Open settings</Trans>
           </Link>
         </div>
       </Panel>
@@ -65,10 +66,10 @@ export function OverviewHero() {
       <Panel className="p-4 sm:p-6">
         <div className="header-row">
           <div>
-            <Pill>Session snapshot</Pill>
-            <h3 className="section-title mt-4">Current operating picture</h3>
+            <Pill><Trans>Session snapshot</Trans></Pill>
+            <h3 className="section-title mt-4"><Trans>Current operating picture</Trans></h3>
             <p className="body-copy-soft mt-2">
-              A quick read on what is ready right now before you start dictating.
+              <Trans>A quick read on what is ready right now before you start dictating.</Trans>
             </p>
           </div>
           <Pill>{runtime.serviceStatus}</Pill>

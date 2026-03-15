@@ -2,7 +2,7 @@ import { saveWorkspaceSetting, type WorkspaceSettings } from "../../../store/wor
 import { SettingsRow, SettingsSection } from "../../setup/components/settings-section";
 import { labelForActivationMode } from "../../setup/data/settings-data";
 import { KeyCaptureInput } from "../../shortcuts/key-capture-input";
-import { useLingui } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 
 interface Props {
   settings: WorkspaceSettings;
@@ -45,8 +45,8 @@ export function ShortcutsSection({ settings }: Props) {
       </SettingsSection>
 
       {toggleCancelConflict && (
-        <div role="alert" className="alert alert-warning alert-soft">
-          <span>Toggle and cancel are bound to the same key combo. One will override the other.</span>
+        <div role="alert" className="alert alert-warning alert-soft sm:flex-row">
+          <span><Trans>Toggle and cancel are bound to the same key combo. One will override the other.</Trans></span>
         </div>
       )}
     </>

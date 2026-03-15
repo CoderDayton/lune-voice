@@ -6,7 +6,7 @@ import {
 } from "../../../store/workspace-store";
 import type { NavigationItem } from "../config/navigation";
 import { MenuIcon } from "../config/icons";
-import { useLingui } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 
 interface TopbarProps {
   page: NavigationItem;
@@ -35,7 +35,7 @@ export function Topbar({ page }: TopbarProps) {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Pill>Private on-device</Pill>
+        <Pill><Trans>Private on-device</Trans></Pill>
         <Pill>{runtime.serviceStatus}</Pill>
         <Pill>{runtime.ipcFlavor}</Pill>
       </div>

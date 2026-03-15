@@ -4,7 +4,7 @@ import { useHotkey } from "@tanstack/react-hotkeys";
 import { Button } from "../../../components/ui/button";
 import { authActions, authStore } from "../../../store/auth-store";
 import { AuthInputField } from "./auth-input-field";
-import { useLingui } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 
 interface AuthFormValues {
   name: string;
@@ -40,20 +40,20 @@ export function AuthForm() {
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
       <div className="stack-copy">
-        <h1 className="auth-form-title">{copy.title}</h1>
-        <p className="body-copy-soft">{copy.description}</p>
+        <h1 className="auth-form-title"><Trans id={copy.title}>{copy.title}</Trans></h1>
+        <p className="body-copy-soft"><Trans id={copy.description}>{copy.description}</Trans></p>
       </div>
 
       <div className="flex flex-col gap-3">
         {providers.map((p) => (
           <Button key={p.key} type="button" variant="secondary" className="w-full justify-center" onClick={() => authActions.signIn(p.email, p.name)}>
-            Continue with {p.key}
+            <Trans>Continue with {p.key}</Trans>
           </Button>
         ))}
       </div>
 
       <div className="divider">
-        <span className="auth-divider-text">or use email</span>
+        <span className="auth-divider-text"><Trans>or use email</Trans></span>
       </div>
 
       <form
@@ -144,27 +144,29 @@ export function AuthForm() {
         <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
           {({ canSubmit, isSubmitting }) => (
             <Button type="submit" className="w-full" disabled={!canSubmit || isSubmitting}>
-              {isSubmitting ? "Opening workspace\u2026" : copy.action}
+              {isSubmitting ? <Trans>Opening workspace…</Trans> : <Trans id={copy.action}>{copy.action}</Trans>}
             </Button>
           )}
         </form.Subscribe>
       </form>
 
       <div className="auth-hotkey-row">
-        <span className="badge badge-outline badge-sm opacity-70">Mod+Enter submit</span>
-        <span className="badge badge-outline badge-sm opacity-70">Alt+1 log in</span>
-        <span className="badge badge-outline badge-sm opacity-70">Alt+2 sign up</span>
+        <span className="badge badge-outline badge-sm opacity-70"><Trans>Mod+Enter submit</Trans></span>
+        <span className="badge badge-outline badge-sm opacity-70"><Trans>Alt+1 log in</Trans></span>
+        <span className="badge badge-outline badge-sm opacity-70"><Trans>Alt+2 sign up</Trans></span>
       </div>
 
       <p className="body-copy-soft">
-        {copy.support}{" "}
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm inline p-0 min-h-0 font-medium"
-          onClick={() => authActions.setMode(isSignup ? "login" : "signup")}
-        >
-          {copy.supportAction}
-        </button>
+        <Trans id={copy.support + copy.supportAction}>
+          {copy.support}{" "}
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm inline p-0 min-h-0 font-medium"
+            onClick={() => authActions.setMode(isSignup ? "login" : "signup")}
+          >
+            {copy.supportAction}
+          </button>
+        </Trans>
       </p>
     </div>
   );

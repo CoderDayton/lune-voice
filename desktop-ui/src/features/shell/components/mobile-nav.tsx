@@ -4,7 +4,7 @@ import { cn } from "../../../lib/cn";
 import { workspaceActions, workspaceStore } from "../../../store/workspace-store";
 import { navigationItems } from "../config/navigation";
 import { CloseIcon, LuneLogo } from "../config/icons";
-import { useLingui } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 
 export function MobileNav() {
   const { t } = useLingui();
@@ -31,8 +31,8 @@ export function MobileNav() {
               <LuneLogo className="text-white" />
             </div>
             <div className="min-w-0">
-              <p className="app-kicker">Desktop Dictation</p>
-              <h2 className="brand-title">Lune Voice</h2>
+              <p className="app-kicker"><Trans>Desktop Dictation</Trans></p>
+              <h2 className="brand-title"><Trans>Lune Voice</Trans></h2>
             </div>
           </div>
           <button
