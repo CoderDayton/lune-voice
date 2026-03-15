@@ -46,7 +46,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: clippy-${{ matrix.os }}
+          prefix-key: clippy-nocuda-${{ matrix.os }}
 
       - name: Install Linux system deps
         if: matrix.os == 'ubuntu-latest'
@@ -90,7 +90,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: test-${{ matrix.os }}
+          prefix-key: test-nocuda-${{ matrix.os }}
 
       - name: Install Linux system deps
         if: matrix.os == 'ubuntu-latest'
