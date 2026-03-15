@@ -5,9 +5,9 @@ import { cn } from "../../lib/cn";
 type ModalSize = "sm" | "md" | "lg";
 
 const sizeClasses: Record<ModalSize, string> = {
-  sm: "modal-panel-sm",
-  md: "modal-panel-md",
-  lg: "modal-panel-lg",
+  sm: "max-w-sm",
+  md: "max-w-lg",
+  lg: "max-w-3xl",
 };
 
 const ModalTitleIdContext = createContext<string | undefined>(undefined);
@@ -83,7 +83,7 @@ export function Modal({
 
   return createPortal(
     <div
-      className="modal-overlay"
+      className="modal modal-open"
       onMouseDown={(event) => {
         if (closeOnBackdrop && event.target === event.currentTarget) {
           onClose();
@@ -95,7 +95,7 @@ export function Modal({
         aria-modal="true"
         aria-label={ariaLabel}
         aria-labelledby={ariaLabel ? undefined : titleId}
-        className={cn("modal-panel", sizeClasses[size])}
+        className={cn("modal-box mx-4 sm:mx-auto", sizeClasses[size])}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <ModalTitleIdContext.Provider value={titleId}>{children}</ModalTitleIdContext.Provider>
@@ -109,12 +109,12 @@ export function ModalHeader({ title, description, action }: ModalHeaderProps) {
   const titleId = useContext(ModalTitleIdContext);
 
   return (
-    <div className="modal-header">
-      <div className="modal-copy">
-        <h2 id={titleId} className="modal-title">
+    <div className="flex items-start justify-between gap-3 sm:gap-4 border-b border-base-300/40 pb-4">
+      <div className="min-w-0">
+        <h2 id={titleId} className="text-lg font-semibold">
           {title}
         </h2>
-        {description ? <p className="modal-description">{description}</p> : null}
+        {description ? <p className="body-copy-soft mt-1">{description}</p> : null}
       </div>
       {action}
     </div>
@@ -122,9 +122,9 @@ export function ModalHeader({ title, description, action }: ModalHeaderProps) {
 }
 
 export function ModalBody({ children, className }: ModalBodyProps) {
-  return <div className={cn("modal-body", className)}>{children}</div>;
+  return <div className={cn("py-4", className)}>{children}</div>;
 }
 
 export function ModalFooter({ children, className }: ModalFooterProps) {
-  return <div className={cn("modal-footer", className)}>{children}</div>;
+  return <div className={cn("modal-action border-t border-base-300/40 pt-4", className)}>{children}</div>;
 }

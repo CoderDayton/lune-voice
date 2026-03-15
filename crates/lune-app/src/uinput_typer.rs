@@ -121,17 +121,17 @@ const KNOWN_TERMINALS: &[&str] = &[
 /// Detection chain: Hyprland → Sway → COSMIC → KDE (D-Bus) → GNOME (D-Bus) → xdotool → None
 fn focused_window_class() -> Option<String> {
     // Hyprland: hyprctl activewindow -j → .class
-    if std::env::var("HYPRLAND_INSTANCE_SIGNATURE").is_ok() {
-        if let Some(class) = run_json_query("hyprctl", &["activewindow", "-j"], &["class"]) {
-            return Some(class);
-        }
+    if std::env::var("HYPRLAND_INSTANCE_SIGNATURE").is_ok()
+        && let Some(class) = run_json_query("hyprctl", &["activewindow", "-j"], &["class"])
+    {
+        return Some(class);
     }
 
     // Sway: swaymsg -t get_tree → find focused node's app_id
-    if std::env::var("SWAYSOCK").is_ok() {
-        if let Some(class) = sway_focused_app_id() {
-            return Some(class);
-        }
+    if std::env::var("SWAYSOCK").is_ok()
+        && let Some(class) = sway_focused_app_id()
+    {
+        return Some(class);
     }
 
     // COSMIC: uses wlr-foreign-toplevel-management but no CLI tool exposes it.
@@ -141,35 +141,33 @@ fn focused_window_class() -> Option<String> {
     if std::env::var("XDG_CURRENT_DESKTOP")
         .map(|d| d.to_lowercase().contains("cosmic"))
         .unwrap_or(false)
+        && let Some(class) = cosmic_focused_app_id()
     {
-        if let Some(class) = cosmic_focused_app_id() {
-            return Some(class);
-        }
+        return Some(class);
         // Fall through to KDE/GNOME/xdotool chains (XWayland apps visible there)
     }
 
     // KDE Plasma: D-Bus org.kde.KWin /Scripting
-    if std::env::var("KDE_FULL_SESSION").is_ok() {
-        if let Some(class) = kde_focused_class() {
-            return Some(class);
-        }
+    if std::env::var("KDE_FULL_SESSION").is_ok()
+        && let Some(class) = kde_focused_class()
+    {
+        return Some(class);
     }
 
     // GNOME: D-Bus org.gnome.Shell eval
     if std::env::var("XDG_CURRENT_DESKTOP")
         .map(|d| d.to_lowercase().contains("gnome"))
         .unwrap_or(false)
+        && let Some(class) = gnome_focused_class()
     {
-        if let Some(class) = gnome_focused_class() {
-            return Some(class);
-        }
+        return Some(class);
     }
 
     // X11 fallback: xdotool
-    if std::env::var("DISPLAY").is_ok() {
-        if let Some(class) = xdotool_focused_class() {
-            return Some(class);
-        }
+    if std::env::var("DISPLAY").is_ok()
+        && let Some(class) = xdotool_focused_class()
+    {
+        return Some(class);
     }
 
     None
@@ -216,10 +214,11 @@ fn sway_focused_app_id() -> Option<String> {
 fn find_focused_node(node: &serde_json::Value) -> Option<String> {
     if node.get("focused").and_then(|v| v.as_bool()) == Some(true) {
         // Prefer app_id (Wayland native), fall back to window_properties.class (XWayland)
-        if let Some(app_id) = node.get("app_id").and_then(|v| v.as_str()) {
-            if !app_id.is_empty() && app_id != "null" {
-                return Some(app_id.to_owned());
-            }
+        if let Some(app_id) = node.get("app_id").and_then(|v| v.as_str())
+            && !app_id.is_empty()
+            && app_id != "null"
+        {
+            return Some(app_id.to_owned());
         }
         if let Some(class) = node
             .get("window_properties")

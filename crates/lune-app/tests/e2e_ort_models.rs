@@ -68,7 +68,6 @@ fn get_asr() -> Option<&'static Arc<OrtQwenAsrBackend>> {
         let backend = OrtQwenAsrBackend::new(OrtQwenAsrConfig {
             model_dir: dir,
             use_gpu: use_gpu(),
-            ..Default::default()
         })
         .expect("ASR backend should load");
         eprintln!(

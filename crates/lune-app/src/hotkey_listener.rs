@@ -256,7 +256,7 @@ fn enumerate_keyboards() -> Vec<Device> {
         // Skip our own uinput virtual devices (typing + passthrough).
         if dev
             .name()
-            .map_or(false, |n| n.starts_with(SELF_DEVICE_PREFIX))
+            .is_some_and(|n| n.starts_with(SELF_DEVICE_PREFIX))
         {
             debug!(path = %path.display(), name = ?dev.name(), "skipping self device");
             continue;

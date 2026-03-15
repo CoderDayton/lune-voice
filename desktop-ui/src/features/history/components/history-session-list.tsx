@@ -2,39 +2,58 @@ import { useMemo } from "react";
 import { useStore } from "@tanstack/react-store";
 import { Panel } from "../../../components/ui/panel";
 import { Pill } from "../../../components/ui/pill";
-import { historyGroups } from "../data/history-data";
-import { workspaceStore } from "../../../store/workspace-store";
+import {
+  formatBackendLabel,
+  getVisibleHistorySessions,
+  workspaceStore,
+} from "../../../store/workspace-store";
 
 export function HistorySessionList() {
-  const search = useStore(workspaceStore, (state) => state.historySearch);
+  const visibleSessions = useStore(workspaceStore, getVisibleHistorySessions);
 
   const filteredGroups = useMemo(() => {
-    return historyGroups
-      .map((group) => ({
-        ...group,
-        items: group.items.filter((item) => !search || item.text.toLowerCase().includes(search.toLowerCase())),
-      }))
-      .filter((group) => group.items.length > 0);
-  }, [search]);
+    const groups = new Map<string, typeof visibleSessions>();
+
+    for (const session of visibleSessions) {
+      const label = formatGroupLabel(session.startedAt);
+      const items = groups.get(label);
+
+      if (items) {
+        items.push(session);
+      } else {
+        groups.set(label, [session]);
+      }
+    }
+
+    return Array.from(groups.entries()).map(([date, items]) => ({ date, items }));
+  }, [visibleSessions]);
+
+  if (filteredGroups.length === 0) {
+    return (
+      <Panel className="p-10 text-center">
+        <p className="body-copy-soft">No sessions found. Start dictating to see your transcripts here.</p>
+      </Panel>
+    );
+  }
 
   return (
     <Panel className="overflow-hidden p-0">
       {filteredGroups.map((group) => (
         <section key={group.date}>
           <div className="session-group-head">
-            <span className="session-group-label">{group.date}</span>
+            <span className="label-text-custom">{group.date}</span>
           </div>
 
-          <div className="table-list">
+          <div>
             {group.items.map((item) => (
-              <article key={`${group.date}-${item.time}-${item.text}`} className="session-row">
+              <article key={item.id} className="session-row">
                 <div className="flex flex-wrap gap-2">
-                  <Pill>{item.time}</Pill>
+                  <Pill>{formatTime(item.startedAt)}</Pill>
                   <Pill>{item.words} words</Pill>
                   <Pill>{item.seconds}s audio</Pill>
-                  <Pill>{item.mode}</Pill>
+                  <Pill>{formatBackendLabel(item.backend)}</Pill>
                 </div>
-                <p className="session-copy mt-4">{item.text}</p>
+                <p className="body-copy-strong max-w-full sm:max-w-[56rem] mt-4 line-clamp-4">{item.transcript}</p>
               </article>
             ))}
           </div>
@@ -42,4 +61,25 @@ export function HistorySessionList() {
       ))}
     </Panel>
   );
+}
+
+function formatGroupLabel(value: string) {
+  const date = new Date(value);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  if (date.toDateString() === today.toDateString()) {
+    return "Today";
+  }
+
+  if (date.toDateString() === yesterday.toDateString()) {
+    return "Yesterday";
+  }
+
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function formatTime(value: string) {
+  return new Date(value).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }

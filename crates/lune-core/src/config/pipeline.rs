@@ -114,10 +114,10 @@ impl PipelineConfig {
         if !(0.0..=1.0).contains(&self.speech_threshold) {
             issues.push("speech_threshold must be in 0.0..=1.0");
         }
-        if let Some(t) = self.word_confidence_threshold {
-            if !(0.0..=1.0).contains(&t) {
-                issues.push("word_confidence_threshold must be in 0.0..=1.0");
-            }
+        if let Some(t) = self.word_confidence_threshold
+            && !(0.0..=1.0).contains(&t)
+        {
+            issues.push("word_confidence_threshold must be in 0.0..=1.0");
         }
         if self.max_speech_samples == 0 {
             issues.push("max_speech_samples must be > 0");
@@ -192,9 +192,11 @@ mod tests {
 
     #[test]
     fn validation_catches_invalid() {
-        let mut cfg = PipelineConfig::default();
-        cfg.hard_close_ms = 100; // less than sentence_close_ms
-        cfg.speech_threshold = 1.5;
+        let cfg = PipelineConfig {
+            hard_close_ms: 100, // less than sentence_close_ms
+            speech_threshold: 1.5,
+            ..PipelineConfig::default()
+        };
         let issues = cfg.validate();
         assert_eq!(issues.len(), 2);
     }

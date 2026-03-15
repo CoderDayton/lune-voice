@@ -497,27 +497,31 @@ fn decoder_prefill(
 // ── Autoregressive decode ───────────────────────────────────────────────────
 
 /// Run autoregressive decode steps. Returns `(token_ids, log_probs)`.
+struct DecodeConfig {
+    max_tokens: usize,
+    initial_pos: usize,
+    use_attention_mask: bool,
+}
+
 fn autoregressive_decode(
     decoder: &mut Session,
     embed_tokens: &mut Session,
     tokenizer: &tokenizers::Tokenizer,
     kv_cache: &mut Vec<DynValue>,
     initial_logits: Vec<f32>,
-    max_tokens: usize,
-    initial_pos: usize,
-    use_attention_mask: bool,
+    config: DecodeConfig,
 ) -> Result<(Vec<i64>, Vec<f32>)> {
     let eos_id = tokenizer
         .token_to_id("<|im_end|>")
         .or_else(|| tokenizer.token_to_id("<|endoftext|>"))
         .unwrap_or(151643) as i64;
 
-    let mut tokens = Vec::with_capacity(max_tokens);
-    let mut log_probs = Vec::with_capacity(max_tokens);
+    let mut tokens = Vec::with_capacity(config.max_tokens);
+    let mut log_probs = Vec::with_capacity(config.max_tokens);
     let mut current_logits = initial_logits;
-    let mut cur_pos = initial_pos;
+    let mut cur_pos = config.initial_pos;
 
-    for _ in 0..max_tokens {
+    for _ in 0..config.max_tokens {
         let (next_token, log_prob) = argmax_with_log_prob(&current_logits);
 
         if next_token == eos_id || next_token == TOKEN_IM_END {
@@ -554,7 +558,7 @@ fn autoregressive_decode(
         ));
 
         // attention_mask: all-ones [1, past + 1] for B=1 decode step.
-        if use_attention_mask {
+        if config.use_attention_mask {
             let step_mask = ndarray::Array2::<i64>::ones((1, cur_pos + 1));
             inputs.push((
                 "attention_mask".to_string(),
@@ -685,9 +689,11 @@ pub(crate) fn transcribe_oneshot(
         tokenizer,
         &mut kv,
         last_logits,
-        512,
-        prefill_len,
-        has_attention_mask,
+        DecodeConfig {
+            max_tokens: 512,
+            initial_pos: prefill_len,
+            use_attention_mask: has_attention_mask,
+        },
     )?;
 
     // 5. Filter out special/prompt tokens before decoding to text.
@@ -752,10 +758,6 @@ mod tests {
 
     fn model_dir() -> std::path::PathBuf {
         workspace_root().join("models/qwen3-asr-0.6b-onnx")
-    }
-
-    fn model_dir_fp16_decoder() -> std::path::PathBuf {
-        workspace_root().join("models/qwen3-asr-0.6b-onnx-fp16dec")
     }
 
     fn ensure_ort() {
@@ -918,9 +920,11 @@ mod tests {
             &tokenizer,
             &mut new_kv,
             last_logits,
-            32,
-            prefill_len,
-            true,
+            DecodeConfig {
+                max_tokens: 32,
+                initial_pos: prefill_len,
+                use_attention_mask: true,
+            },
         )
         .expect("autoregressive_decode");
 
@@ -1010,9 +1014,11 @@ mod tests {
             &tokenizer,
             &mut new_kv,
             last_logits,
-            64,
-            prefill_len,
-            true,
+            DecodeConfig {
+                max_tokens: 64,
+                initial_pos: prefill_len,
+                use_attention_mask: true,
+            },
         )
         .expect("autoregressive_decode");
 
@@ -1364,9 +1370,11 @@ mod tests {
             &tokenizer,
             &mut kv_cache,
             last_logits,
-            200,
-            prefill_len,
-            true,
+            DecodeConfig {
+                max_tokens: 200,
+                initial_pos: prefill_len,
+                use_attention_mask: true,
+            },
         )
         .expect("autoregressive_decode");
         eprintln!("[batch] decoded {} tokens", token_ids.len());
@@ -1456,50 +1464,6 @@ mod tests {
         eprintln!("[batch forced] tokens: {}", result.token_ids.len());
     }
 
-    /// Compare the alternate FP16-decoder export on the same forced-English path.
-    #[test]
-    #[ignore = "requires models/qwen3-asr-0.6b-onnx-fp16dec and test_fixtures/librispeech_clean.wav"]
-    fn batch_full_audio_forced_english_fp16_decoder() {
-        ensure_ort();
-        let dir = model_dir_fp16_decoder();
-        let wav = workspace_root().join("test_fixtures/librispeech_clean.wav");
-        if !dir.exists() || !wav.exists() {
-            eprintln!("[skip] fp16-decoder model or wav not found");
-            return;
-        }
-
-        let mut encoder =
-            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-encoder.onnx"), false)
-                .expect("load encoder");
-        let mut embed_tokens =
-            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-embed-tokens.onnx"), false)
-                .expect("load embed_tokens");
-        let mut decoder =
-            crate::ort_utils::build_ort_session(&dir.join("qwen3-asr-decoder.onnx"), false)
-                .expect("load decoder");
-        let has_attention_mask = decoder
-            .inputs()
-            .iter()
-            .any(|inp| inp.name() == "attention_mask");
-        let tokenizer =
-            tokenizers::Tokenizer::from_file(dir.join("tokenizer.json")).expect("load tokenizer");
-
-        let audio = load_wav_f32(&wav);
-        let result = transcribe_oneshot(
-            &mut encoder,
-            &mut embed_tokens,
-            &mut decoder,
-            &tokenizer,
-            &audio,
-            Some("English"),
-            has_attention_mask,
-        )
-        .expect("transcribe_oneshot");
-
-        eprintln!("[batch forced fp16dec] transcript: {:?}", result.text);
-        eprintln!("[batch forced fp16dec] tokens: {}", result.token_ids.len());
-    }
-
     fn resize_encoder_features_nearest(
         features: &ArrayD<half::f16>,
         target_len: usize,
@@ -1572,9 +1536,11 @@ mod tests {
             &tokenizer,
             &mut kv_cache,
             last_logits,
-            200,
-            prefill_len,
-            has_attention_mask,
+            DecodeConfig {
+                max_tokens: 200,
+                initial_pos: prefill_len,
+                use_attention_mask: has_attention_mask,
+            },
         )
         .expect("autoregressive_decode");
 

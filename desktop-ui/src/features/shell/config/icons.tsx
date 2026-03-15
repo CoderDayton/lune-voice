@@ -48,15 +48,6 @@ export function DictionaryIcon(props: IconProps) {
   );
 }
 
-export function SettingsIcon(props: IconProps) {
-  return (
-    <BaseIcon {...props}>
-      <circle cx="9" cy="9" r="2.2" />
-      <path d="M9 2.8v2M9 13.2v2M4.6 4.6l1.4 1.4M12 12l1.4 1.4M2.8 9h2M13.2 9h2M4.6 13.4 6 12M12 6l1.4-1.4" />
-    </BaseIcon>
-  );
-}
-
 export function SearchIcon(props: IconProps) {
   return (
     <BaseIcon {...props}>
@@ -112,6 +103,31 @@ export function PulseIcon(props: IconProps) {
   return (
     <BaseIcon {...props}>
       <path d="M2.2 9h3l1.4-3.4L9.4 12l2-4h4.4" />
+    </BaseIcon>
+  );
+}
+
+export function MenuIcon(props: IconProps) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M3 5h12M3 9h12M3 13h12" />
+    </BaseIcon>
+  );
+}
+
+export function CloseIcon(props: IconProps) {
+  return (
+    <BaseIcon {...props}>
+      <path d="m4.5 4.5 9 9M13.5 4.5l-9 9" />
+    </BaseIcon>
+  );
+}
+
+export function SettingsIcon(props: IconProps) {
+  return (
+    <BaseIcon {...props}>
+      <circle cx="9" cy="9" r="2.5" />
+      <path d="M9 2.5v2M9 13.5v2M2.5 9h2M13.5 9h2M4.1 4.1l1.4 1.4M12.5 12.5l1.4 1.4M4.1 13.9l1.4-1.4M12.5 5.5l1.4-1.4" />
     </BaseIcon>
   );
 }

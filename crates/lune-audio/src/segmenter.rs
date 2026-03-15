@@ -392,10 +392,10 @@ impl VadSegmenter {
             // Force-flush if segment exceeds max duration
             if self.state == VadState::Speech {
                 let duration = self.frame_ms().saturating_sub(self.segment_start_ms);
-                if duration >= self.config.max_segment_ms {
-                    if let Some(b) = self.flush_segment(self.frame_ms()) {
-                        boundaries.push(b);
-                    }
+                if duration >= self.config.max_segment_ms
+                    && let Some(b) = self.flush_segment(self.frame_ms())
+                {
+                    boundaries.push(b);
                 }
             }
         }

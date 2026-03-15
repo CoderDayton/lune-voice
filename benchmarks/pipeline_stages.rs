@@ -1,10 +1,11 @@
-//! Pipeline latency benchmark — real ONNX inference on real WAV fixtures.
+//! Pipeline stage benchmark — isolated measurements on real WAV fixtures.
 //!
-//! Run: cargo run --release --example pipeline_latency -p lune-app
-//! GPU: cargo run --release --features cuda --example pipeline_latency -p lune-app
-//! Force backend subset: cargo run --release --example pipeline_latency -p lune-app -- --asr qwen
+//! Run: cargo run --release --example pipeline_stages -p lune-app
+//! GPU: cargo run --release --features cuda --example pipeline_stages -p lune-app
+//! Force backend subset: cargo run --release --example pipeline_stages -p lune-app -- --asr qwen
 //!
-//! All 5 stages use real model inference — no simulated data, no thread::sleep.
+//! This is intentionally not the end-to-end dictation pipeline benchmark.
+//! It measures isolated stages with real inference so bottlenecks are easier to inspect.
 //! Gracefully skips if model directories are missing.
 
 #[allow(dead_code)]
@@ -16,12 +17,13 @@ use std::time::Instant;
 
 use bench_utils::{
     Fixture, benchmark_asr_entries, brent_minimize, char_error_rate, init_ort, load_fixtures,
-    percentile, process_memory_usage, word_error_rate, workspace_root, wrap_print,
+    maybe_attach_benchmark_aligner, percentile, process_memory_usage, word_error_rate,
+    workspace_root, wrap_print,
 };
 use lune_asr::{AsrRegistry, compute_qwen_mel};
 use lune_audio::{VadSegmenter, VadSegmenterConfig};
 use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
-use lune_core::config::{AsrBackendConfig, DevicePolicy, StylePreset};
+use lune_core::config::{DevicePolicy, StylePreset};
 use lune_core::llm::{PostProcessInput, TextPostProcessor};
 use lune_llm::{LlamaCppBackend, LlamaCppConfig};
 
@@ -39,7 +41,7 @@ struct AsrResult {
 fn main() {
     println!();
     println!("╔══════════════════════════════════════════════════════════════════╗");
-    println!("║              PIPELINE LATENCY BENCHMARK (Real Inference)        ║");
+    println!("║              PIPELINE STAGE BENCHMARK (Breakdown)               ║");
     println!("╚══════════════════════════════════════════════════════════════════╝");
     println!();
 
@@ -59,6 +61,7 @@ fn main() {
         let t = Instant::now();
         match AsrRegistry::from_config(&entry.config, device) {
             Ok(b) => {
+                maybe_attach_benchmark_aligner(&b, &root);
                 println!("{:.1}s", t.elapsed().as_secs_f64());
                 if let Some(mem) = process_memory_usage() {
                     println!("    Memory: {}", mem.display());
@@ -74,10 +77,10 @@ fn main() {
         return;
     }
 
-    // Primary backend is the first loaded (used for stages 3-6)
+    // Primary backend is the first loaded (used for later analysis stages)
     let primary_name = backends[0].0;
 
-    // ── Load LLM backend (optional — stages 1-3 still run without it) ─────
+    // ── Load LLM backend (optional — analysis stages still run without it) ──
     let llm_model_path = root.join("models/llm-corrector-gguf/qwen2.5-1.5b-instruct.Q4_K_M.gguf");
     let rt_llm = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -100,12 +103,12 @@ fn main() {
             }
             Err(e) => {
                 println!("  [warn] LLM backend load failed: {e}");
-                println!("  Stages 4-5 LLM portions will be skipped.");
+                println!("  LLM-dependent stages will be skipped.");
                 None
             }
         }
     } else {
-        println!("  [info] LLM model not found — stages 4-5 LLM portions skipped");
+        println!("  [info] LLM model not found — LLM-dependent stages skipped");
         None
     };
 
@@ -116,35 +119,6 @@ fn main() {
         return;
     }
     println!();
-
-    // ── Load FP16 decoder ASR backend (optional — Stage 7, OrtQwen only) ──
-    let fp16_model_dir = root.join("models/qwen3-asr-0.6b-onnx-fp16dec");
-    let asr_fp16: Option<AsrRegistry> = if fp16_model_dir.exists() {
-        println!("  Loading FP16-decoder ASR backend ...");
-        let t = Instant::now();
-        let fp16_config = AsrBackendConfig::OrtQwenAsr {
-            model_dir: fp16_model_dir,
-        };
-        match AsrRegistry::from_config(&fp16_config, device) {
-            Ok(b) => {
-                println!(
-                    "  FP16-decoder ASR loaded in {:.1}s",
-                    t.elapsed().as_secs_f64()
-                );
-                if let Some(mem) = process_memory_usage() {
-                    println!("  Memory after FP16 load: {}", mem.display());
-                }
-                Some(b)
-            }
-            Err(e) => {
-                println!("  [warn] FP16-decoder ASR load failed: {e}");
-                None
-            }
-        }
-    } else {
-        println!("  [info] FP16-decoder model not found — Stage 7 will be skipped");
-        None
-    };
 
     // ── Run stages ──────────────────────────────────────────────────────────
     // Stage 1 (mel extraction) — Qwen-specific
@@ -181,17 +155,17 @@ fn main() {
         }
     }
     let asr_results = primary_results.unwrap();
-    println!("  (Stages 3-6 use primary backend: {})", primary_name);
+    println!(
+        "  (Later analysis stages use primary backend: {})",
+        primary_name
+    );
     println!();
 
-    // Stages 3-6 use primary backend results
+    // Later analysis stages use primary backend results
     bench_confidence_gate(&asr_results);
     bench_threshold_sweep(llm.as_ref(), &asr_results, &fixtures);
     bench_vad_timing_sweep(&backends[0].1, &fixtures);
     bench_adaptive_vad(&backends[0].1, &fixtures);
-    if let Some(ref fp16) = asr_fp16 {
-        bench_fp16_decoder(fp16, &asr_results, &fixtures);
-    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -244,7 +218,7 @@ fn bench_mel_extraction(fixtures: &[Fixture]) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn bench_asr_streaming(
-    asr: &(impl AsrBackend + Sync),
+    asr: &impl AsrBackend,
     fixtures: &[Fixture],
     vad_config: VadSegmenterConfig,
     use_batch: bool,
@@ -467,12 +441,7 @@ fn bench_threshold_sweep(
         for seg in &asr_res.segments {
             for wc in &seg.word_confidences {
                 let marker = if wc.confidence < 0.75 { " ◄" } else { "" };
-                print!(
-                    "    {:>6.1}%  {}{}\n",
-                    wc.confidence * 100.0,
-                    wc.word,
-                    marker
-                );
+                println!("    {:>6.1}%  {}{}", wc.confidence * 100.0, wc.word, marker);
             }
         }
         let (prepared, has_uncertain) = lune_llm::prepare_input(&asr_res.segments, 0.75, "en");
@@ -603,10 +572,10 @@ fn bench_threshold_sweep(
 
         println!();
         println!(
-            "    {:>5}  {:>7}  {:>8}  {:>7}  {:>7}  {:>7}  {}",
-            "Thr", "Marked", "Segs", "LLM ms", "WER %", "CER %", "Note"
+            "    {:>5}  {:>7}  {:>8}  {:>7}  {:>7}  {:>7}  Note",
+            "Thr", "Marked", "Segs", "LLM ms", "WER %", "CER %"
         );
-        println!("    {}", "─".repeat(62));
+        println!("{}", "─".repeat(62));
 
         for r in &fixture_results {
             let note = if r.bypassed { "BYPASS" } else { "" };
@@ -693,26 +662,25 @@ fn bench_threshold_sweep(
 
     // Show best hypothesis for each fixture at the recommended threshold.
     for (i, fix) in fixtures.iter().enumerate() {
-        if let Some(results) = all_results.get(i) {
-            if let Some(best) = results
+        if let Some(results) = all_results.get(i)
+            && let Some(best) = results
                 .iter()
                 .find(|r| (r.threshold - best_thr).abs() < 0.001)
-            {
-                println!(
-                    "  {} at {:.0}% (WER={:.1}%, CER={:.1}%):",
-                    fix.name,
-                    best_thr * 100.0,
-                    best.wer,
-                    best.cer
-                );
-                println!("    Hypothesis:");
-                wrap_print("      ", &best.hypothesis, 72);
-                if !fix.reference.is_empty() {
-                    println!("    Reference:");
-                    wrap_print("      ", &fix.reference, 72);
-                }
-                println!();
+        {
+            println!(
+                "  {} at {:.0}% (WER={:.1}%, CER={:.1}%):",
+                fix.name,
+                best_thr * 100.0,
+                best.wer,
+                best.cer
+            );
+            println!("    Hypothesis:");
+            wrap_print("      ", &best.hypothesis, 72);
+            if !fix.reference.is_empty() {
+                println!("    Reference:");
+                wrap_print("      ", &fix.reference, 72);
             }
+            println!();
         }
     }
 
@@ -731,7 +699,7 @@ fn bench_threshold_sweep(
 // Stage 5: VAD Timing Sweep — grid search over sentence_close × hard_close
 // ═══════════════════════════════════════════════════════════════════════════════
 
-fn bench_vad_timing_sweep(asr: &(impl AsrBackend + Sync), fixtures: &[Fixture]) {
+fn bench_vad_timing_sweep(asr: &impl AsrBackend, fixtures: &[Fixture]) {
     use std::cell::RefCell;
 
     println!("── Stage 5: VAD Timing Sweep (Brent's method) ─────────────────────");
@@ -885,7 +853,7 @@ fn bench_vad_timing_sweep(asr: &(impl AsrBackend + Sync), fixtures: &[Fixture]) 
 
 /// Transcribe with per-chunk timing. Returns (segments, total_secs, chunk_latencies_ms).
 async fn transcribe_timed(
-    backend: &(impl AsrBackend + Sync),
+    backend: &impl AsrBackend,
     pcm: &[f32],
 ) -> (Vec<AsrSegment>, f64, Vec<f64>) {
     transcribe_timed_with_config(backend, pcm, VadSegmenterConfig::default()).await
@@ -894,7 +862,7 @@ async fn transcribe_timed(
 /// Batch transcription: push all audio, call poll_final once.
 /// Used for overlap-stitched batch mode (no VadSegmenter).
 async fn transcribe_batch(
-    backend: &(impl AsrBackend + Sync),
+    backend: &impl AsrBackend,
     pcm: &[f32],
 ) -> (Vec<AsrSegment>, f64, Vec<f64>) {
     let session = backend
@@ -923,7 +891,7 @@ async fn transcribe_batch(
 
 /// Like `transcribe_timed` but with a custom VAD config.
 async fn transcribe_timed_with_config(
-    backend: &(impl AsrBackend + Sync),
+    backend: &impl AsrBackend,
     pcm: &[f32],
     vad_config: VadSegmenterConfig,
 ) -> (Vec<AsrSegment>, f64, Vec<f64>) {
@@ -992,7 +960,7 @@ async fn transcribe_timed_with_config(
 // Stage 6: Adaptive VAD Validation
 // ═══════════════════════════════════════════════════════════════════════════════
 
-fn bench_adaptive_vad(asr: &(impl AsrBackend + Sync), fixtures: &[Fixture]) {
+fn bench_adaptive_vad(asr: &impl AsrBackend, fixtures: &[Fixture]) {
     println!("── Stage 6: Adaptive VAD Validation ──────────────────────────────");
     println!();
 
@@ -1059,79 +1027,4 @@ fn segments_to_text(segs: &[AsrSegment]) -> String {
         .map(|s| s.text.as_str())
         .collect::<Vec<_>>()
         .join(" ")
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Stage 7: FP16 Decoder vs INT4 Decoder Comparison
-// ═══════════════════════════════════════════════════════════════════════════════
-
-fn bench_fp16_decoder(
-    fp16_asr: &(impl AsrBackend + Sync),
-    int4_results: &[AsrResult],
-    fixtures: &[Fixture],
-) {
-    println!("── Stage 7: FP16 Decoder vs INT4 Decoder ─────────────────────────");
-    println!();
-    println!("  INT4 decoder: quantized weights (MatMulNBits), ~516 MB");
-    println!("  FP16 decoder: full precision, ~1137 MB");
-    println!("  Hypothesis: INT4 autoregressive error compounding degrades WER.");
-    println!();
-
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .expect("tokio runtime");
-
-    for (i, fix) in fixtures.iter().enumerate() {
-        let int4_res = &int4_results[i];
-        let int4_wer = word_error_rate(&int4_res.hypothesis, &fix.reference) * 100.0;
-        let int4_cer = char_error_rate(&int4_res.hypothesis, &fix.reference) * 100.0;
-
-        // Run FP16 decoder on same audio
-        let (fp16_segs, fp16_secs, _) = rt.block_on(transcribe_timed(fp16_asr, &fix.pcm));
-        let fp16_text = fp16_segs
-            .iter()
-            .map(|s| s.text.trim())
-            .filter(|t| !t.is_empty())
-            .collect::<Vec<_>>()
-            .join(" ");
-        let fp16_wer = word_error_rate(&fp16_text, &fix.reference) * 100.0;
-        let fp16_cer = char_error_rate(&fp16_text, &fix.reference) * 100.0;
-
-        let delta_wer = fp16_wer - int4_wer;
-        let arrow = if delta_wer < -0.5 {
-            "▼ improved"
-        } else if delta_wer > 0.5 {
-            "▲ regressed"
-        } else {
-            "≈ neutral"
-        };
-
-        println!("  {} ({:.1}s audio):", fix.name, fix.audio_secs);
-        println!(
-            "    INT4:  WER {:.1}%  CER {:.1}%  ({} segs, {:.2}s)",
-            int4_wer,
-            int4_cer,
-            int4_res.segments.len(),
-            int4_res.total_secs
-        );
-        println!(
-            "    FP16:  WER {:.1}%  CER {:.1}%  ({} segs, {:.2}s)  [{} Δ{:+.1}%]",
-            fp16_wer,
-            fp16_cer,
-            fp16_segs.len(),
-            fp16_secs,
-            arrow,
-            delta_wer
-        );
-        println!("    INT4 hypothesis:");
-        wrap_print("      ", &int4_res.hypothesis, 72);
-        println!("    FP16 hypothesis:");
-        wrap_print("      ", &fp16_text, 72);
-        if !fix.reference.is_empty() {
-            println!("    Reference:");
-            wrap_print("      ", &fix.reference, 72);
-        }
-        println!();
-    }
 }

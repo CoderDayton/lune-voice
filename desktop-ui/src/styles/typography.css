@@ -1,0 +1,89 @@
+@reference "../app.css";
+
+/* ── Typography ────────────────────────────────────────────────────────── */
+
+@utility app-kicker {
+  @apply uppercase font-semibold opacity-50;
+  font-size: var(--text-kicker);
+  letter-spacing: var(--tracking-kicker);
+}
+
+@utility app-kicker-accent {
+  @apply app-kicker text-secondary;
+  opacity: 1;
+}
+
+@utility page-title {
+  @apply font-bold text-balance;
+  font-size: clamp(1.5rem, 4vw, var(--size-page-title));
+  letter-spacing: var(--tracking-title);
+}
+
+@utility hero-title {
+  @apply font-bold text-balance;
+  font-size: var(--size-hero-title);
+  letter-spacing: var(--tracking-hero);
+  line-height: 1;
+  max-width: var(--size-measure-tight);
+}
+
+@utility section-title {
+  @apply font-semibold text-balance;
+  font-size: clamp(1.15rem, 3vw, var(--text-title-xl));
+  letter-spacing: var(--tracking-tight);
+}
+
+@utility card-title-text {
+  @apply font-semibold text-balance;
+  font-size: var(--text-title-lg);
+  letter-spacing: var(--tracking-tight);
+}
+
+@utility card-title-sm {
+  @apply font-semibold;
+  font-size: var(--text-title-md);
+  letter-spacing: var(--tracking-tight);
+}
+
+@utility body-copy {
+  @apply opacity-70 text-pretty;
+  font-size: var(--text-body-sm);
+  line-height: 1.75;
+}
+
+@utility body-copy-soft {
+  @apply opacity-50 text-pretty;
+  font-size: var(--text-body-sm);
+  line-height: 1.7;
+}
+
+@utility body-copy-strong {
+  @apply opacity-80 text-pretty;
+  font-size: var(--text-body-sm);
+  line-height: 1.8;
+}
+
+@utility label-text-custom {
+  @apply uppercase font-semibold opacity-50;
+  font-size: 0.75rem;
+  letter-spacing: var(--tracking-label);
+}
+
+@utility supporting-label {
+  @apply font-medium opacity-70;
+  font-size: var(--text-body-sm);
+}
+
+@utility value-display {
+  @apply font-display font-bold;
+  font-size: var(--text-metric);
+  letter-spacing: var(--tracking-display);
+  font-variant-numeric: tabular-nums;
+}
+
+@utility value-display-sm {
+  @apply font-display font-semibold;
+  font-size: var(--text-title-md);
+  letter-spacing: var(--tracking-tight);
+  font-variant-numeric: tabular-nums;
+}

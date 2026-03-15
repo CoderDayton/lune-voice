@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use hf_hub::api::sync::{Api, ApiBuilder, ApiRepo};
-use lune_core::config::AsrBackendConfig;
+use lune_core::config::{AlignerConfig, AsrBackendConfig};
 use tracing::info;
 
 use crate::error::{PersistError, PersistResult};
@@ -28,6 +28,8 @@ pub struct ResolvedModels {
     pub ort_qwen_asr_model_dir: PathBuf,
     /// LLM GGUF model file path.
     pub llm_model_path: PathBuf,
+    /// Optional forced-aligner model directory.
+    pub aligner_model_dir: Option<PathBuf>,
 }
 
 impl ModelSpec {
@@ -217,6 +219,7 @@ pub fn ensure_default_models(
     models_dir: &Path,
     asr_backend: &AsrBackendConfig,
     llm_backend: &lune_core::config::LlmBackendConfig,
+    aligner: Option<&AlignerConfig>,
 ) -> PersistResult<ResolvedModels> {
     let hub_cache = models_dir.join(".hub-cache");
     let hub = ModelHub::new(&hub_cache)?;
@@ -244,10 +247,13 @@ pub fn ensure_default_models(
         _ => models_dir.join("qwen2.5-1.5b-instruct-gguf/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf"),
     };
 
+    let aligner_model_dir = resolve_aligner_model_dir(models_dir, aligner);
+
     Ok(ResolvedModels {
         asr_model_dir,
         ort_qwen_asr_model_dir,
         llm_model_path,
+        aligner_model_dir,
     })
 }
 
@@ -279,6 +285,23 @@ fn ensure_directory_model(
 
     info!(path = %local_dir.display(), "model directory ready");
     Ok(local_dir)
+}
+
+/// Resolve the aligner model directory when the feature is enabled.
+///
+/// Returns the default `models_dir/wav2vec2-fa` path when enabled with
+/// an empty `model_dir`. Models are provisioned during the setup flow,
+/// so the directory is expected to exist by the time this is called.
+fn resolve_aligner_model_dir(
+    models_dir: &Path,
+    aligner: Option<&AlignerConfig>,
+) -> Option<PathBuf> {
+    match aligner {
+        Some(cfg) if cfg.enabled && cfg.model_dir.as_os_str().is_empty() => {
+            Some(models_dir.join("wav2vec2-fa"))
+        }
+        _ => None,
+    }
 }
 
 #[cfg(test)]
@@ -327,6 +350,42 @@ mod tests {
     }
 
     #[test]
+    fn aligner_resolution_disabled_is_none() {
+        let tmp = tempfile::tempdir().unwrap();
+        let disabled = AlignerConfig {
+            enabled: false,
+            model_dir: PathBuf::new(),
+        };
+
+        let resolved = resolve_aligner_model_dir(tmp.path(), Some(&disabled));
+        assert!(resolved.is_none());
+    }
+
+    #[test]
+    fn aligner_resolution_enabled_empty_uses_default_path() {
+        let tmp = tempfile::tempdir().unwrap();
+        let enabled = AlignerConfig {
+            enabled: true,
+            model_dir: PathBuf::new(),
+        };
+
+        let resolved = resolve_aligner_model_dir(tmp.path(), Some(&enabled));
+        assert_eq!(resolved, Some(tmp.path().join("wav2vec2-fa")));
+    }
+
+    #[test]
+    fn aligner_resolution_enabled_custom_path_is_noop() {
+        let tmp = tempfile::tempdir().unwrap();
+        let enabled = AlignerConfig {
+            enabled: true,
+            model_dir: PathBuf::from("/tmp/custom-fa"),
+        };
+
+        let resolved = resolve_aligner_model_dir(tmp.path(), Some(&enabled));
+        assert!(resolved.is_none());
+    }
+
+    #[test]
     #[ignore] // Requires network — run with `cargo test -- --ignored`
     fn integration_download_ort_llm() {
         let tmp = tempfile::tempdir().unwrap();
@@ -335,12 +394,24 @@ mod tests {
         let asr_backend = &defaults.asr_backend;
         let llm_backend = &defaults.llm_backend;
 
-        let resolved = ensure_default_models(models_dir, asr_backend, llm_backend).unwrap();
+        let resolved = ensure_default_models(
+            models_dir,
+            asr_backend,
+            llm_backend,
+            defaults.aligner.as_ref(),
+        )
+        .unwrap();
 
         assert!(resolved.llm_model_path.exists());
 
         // Second call should be instant (already present).
-        let resolved2 = ensure_default_models(models_dir, asr_backend, llm_backend).unwrap();
+        let resolved2 = ensure_default_models(
+            models_dir,
+            asr_backend,
+            llm_backend,
+            defaults.aligner.as_ref(),
+        )
+        .unwrap();
         assert_eq!(resolved.llm_model_path, resolved2.llm_model_path);
     }
 }

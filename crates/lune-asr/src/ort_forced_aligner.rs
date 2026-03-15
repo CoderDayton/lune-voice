@@ -44,6 +44,9 @@ pub struct WordTimestamp {
     pub end_ms: u32,
 }
 
+type TokenIds = Vec<usize>;
+type WordBoundaries = Vec<(usize, usize)>;
+
 // ── Aligner struct ────────────────────────────────────────────────────────────
 
 pub struct OrtForcedAligner {
@@ -185,7 +188,7 @@ impl OrtForcedAligner {
         &self,
         words: &[&str],
         num_labels: usize,
-    ) -> Result<(Vec<usize>, Vec<(usize, usize)>)> {
+    ) -> Result<(TokenIds, WordBoundaries)> {
         let labels = &self.fa_config.labels;
 
         // Build char → label_id map.
@@ -202,22 +205,22 @@ impl OrtForcedAligner {
             .iter()
             .position(|l| l == &self.fa_config.word_delimiter);
 
-        let mut token_ids: Vec<usize> = Vec::new();
-        let mut word_boundaries: Vec<(usize, usize)> = Vec::new();
+        let mut token_ids: TokenIds = Vec::new();
+        let mut word_boundaries: WordBoundaries = Vec::new();
 
         for (i, word) in words.iter().enumerate() {
-            if i > 0 {
-                if let Some(d) = delim_id {
-                    token_ids.push(d);
-                }
+            if i > 0
+                && let Some(d) = delim_id
+            {
+                token_ids.push(d);
             }
 
             let start = token_ids.len();
             for ch in word.to_uppercase().chars() {
-                if let Some(&id) = char_to_id.get(&ch) {
-                    if id < num_labels {
-                        token_ids.push(id);
-                    }
+                if let Some(&id) = char_to_id.get(&ch)
+                    && id < num_labels
+                {
+                    token_ids.push(id);
                 }
                 // Skip characters not in vocab (punctuation, etc.)
             }
@@ -292,8 +295,8 @@ fn viterbi_align(
 
     // DP fill.
     for t in 1..num_frames {
-        for s in 0..s_len {
-            alpha_cur[s] = f32::NEG_INFINITY;
+        for value in alpha_cur.iter_mut().take(s_len) {
+            *value = f32::NEG_INFINITY;
         }
 
         for s in 0..s_len {
@@ -448,7 +451,7 @@ mod tests {
     #[test]
     fn tokenize_and_align_words() {
         // Test tokenization logic directly without needing a real ORT session.
-        let labels = vec![
+        let labels = [
             "-".to_string(), // 0 = blank
             "|".to_string(), // 1 = word delimiter
             "A".to_string(), // 2
@@ -470,22 +473,22 @@ mod tests {
         let delim_id = Some(1usize); // "|"
         let num_labels = 7;
 
-        let words = vec!["THE", "CAT"];
+        let words = ["THE", "CAT"];
         let mut token_ids: Vec<usize> = Vec::new();
         let mut word_boundaries: Vec<(usize, usize)> = Vec::new();
 
         for (i, word) in words.iter().enumerate() {
-            if i > 0 {
-                if let Some(d) = delim_id {
-                    token_ids.push(d);
-                }
+            if i > 0
+                && let Some(d) = delim_id
+            {
+                token_ids.push(d);
             }
             let start = token_ids.len();
             for ch in word.to_uppercase().chars() {
-                if let Some(&id) = char_to_id.get(&ch) {
-                    if id < num_labels {
-                        token_ids.push(id);
-                    }
+                if let Some(&id) = char_to_id.get(&ch)
+                    && id < num_labels
+                {
+                    token_ids.push(id);
                 }
             }
             let end = token_ids.len();

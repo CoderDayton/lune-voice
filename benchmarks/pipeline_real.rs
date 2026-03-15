@@ -1,10 +1,10 @@
-//! Full pipeline benchmark — exercises the real SessionManager with VAD, ASR, LLM.
+//! Real pipeline benchmark — exercises the real SessionManager path with VAD, ASR, LLM.
 //!
-//! Run: cargo run --release --example pipeline_full -p lune-app
-//! GPU: cargo run --release --features cuda --example pipeline_full -p lune-app
-//! Force backend: cargo run --release --example pipeline_full -p lune-app -- --asr qwen
+//! Run: cargo run --release --example pipeline_real -p lune-app
+//! GPU: cargo run --release --features cuda --example pipeline_real -p lune-app
+//! Force backend: cargo run --release --example pipeline_real -p lune-app -- --asr qwen
 //!
-//! Unlike `pipeline_latency` (which calls ASR/LLM individually), this feeds
+//! Unlike `pipeline_stages` (which calls stages individually), this feeds
 //! audio through `SessionManager::start_with_audio()` and measures wall-time
 //! from start to `FinalizedText` event — the same path as real dictation.
 
@@ -16,11 +16,11 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use bench_utils::{
-    Fixture, benchmark_asr_entry, char_error_rate, init_ort, load_fixtures, process_memory_usage,
-    word_error_rate, workspace_root, wrap_print,
+    Fixture, benchmark_aligner, benchmark_asr_entry, char_error_rate, init_ort, load_fixtures,
+    process_memory_usage, word_error_rate, workspace_root, wrap_print,
 };
 use lune_app::{SessionManager, SessionManagerConfig};
-use lune_asr::AsrRegistry;
+use lune_asr::{AsrRegistry, OrtForcedAligner};
 use lune_audio::{AudioConfig, AudioStream};
 use lune_core::asr::AsrBackendKind;
 use lune_core::config::{DevicePolicy, UserSettings};
@@ -34,7 +34,7 @@ use tokio::sync::{Mutex, RwLock, mpsc};
 fn main() {
     println!();
     println!("╔══════════════════════════════════════════════════════════════════╗");
-    println!("║          FULL PIPELINE BENCHMARK (SessionManager + VAD)        ║");
+    println!("║          REAL PIPELINE BENCHMARK (SessionManager + VAD)        ║");
     println!("╚══════════════════════════════════════════════════════════════════╝");
     println!();
 
@@ -57,7 +57,9 @@ fn main() {
     println!("  Selected ASR backend: {}", asr_entry.display_name);
     print!("  Loading ASR backend ... ");
     let t = Instant::now();
-    let asr = Arc::new(AsrRegistry::from_config(&asr_entry.config, device).expect("load ASR"));
+    let asr = AsrRegistry::from_config(&asr_entry.config, device).expect("load ASR");
+    let aligner = benchmark_aligner(&asr, &root);
+    let asr = Arc::new(asr);
     println!("{:.1}s", t.elapsed().as_secs_f64());
     if let Some(mem) = process_memory_usage() {
         println!("  Memory after ASR load: {}", mem.display());
@@ -108,6 +110,7 @@ fn main() {
         let result = rt.block_on(run_full_pipeline(
             fixture,
             Arc::clone(&asr),
+            aligner.clone(),
             Arc::clone(&llm),
             asr_entry.backend_kind,
             asr.pipeline_config(),
@@ -154,6 +157,7 @@ fn main() {
 async fn run_full_pipeline(
     fixture: &Fixture,
     asr: Arc<AsrRegistry>,
+    aligner: Option<Arc<OrtForcedAligner>>,
     llm: Arc<dyn TextPostProcessor>,
     backend_kind: AsrBackendKind,
     pipeline: lune_core::config::PipelineConfig,
@@ -181,6 +185,11 @@ async fn run_full_pipeline(
         config,
         settings,
     );
+    let mgr = if let Some(aligner) = aligner {
+        mgr.with_aligner(aligner)
+    } else {
+        mgr
+    };
 
     let (event_tx, mut event_rx) = mpsc::channel::<SessionEvent>(256);
 

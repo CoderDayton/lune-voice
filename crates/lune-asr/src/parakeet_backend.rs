@@ -23,7 +23,7 @@ const CHUNK_SAMPLES: usize = 25 * 16_000;
 
 /// Overlap between consecutive chunks (1 second at 16 kHz).
 /// Matches the NeMo paper recommendation for Parakeet-TDT.
-const OVERLAP_SAMPLES: usize = 1 * 16_000;
+const OVERLAP_SAMPLES: usize = 16_000;
 
 /// Configuration for the Parakeet TDT local backend.
 pub struct ParakeetTdtConfig {
@@ -355,7 +355,7 @@ fn tokens_to_word_confidences(tokens: &[DecodedToken], vocab: &Vocabulary) -> Ve
             current_min = f32::INFINITY;
         }
 
-        current_word.push_str(&token_text.replace('▁', " ").trim_start().to_string());
+        current_word.push_str(token_text.replace('▁', " ").trim_start());
         current_min = current_min.min(dt.confidence);
     }
 

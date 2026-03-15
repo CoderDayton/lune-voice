@@ -64,6 +64,9 @@ pub enum SessionEvent {
     CorrectedText(String),
     /// Pipeline is processing accumulated audio (batch ASR + LLM).
     Processing,
+    /// RMS audio energy level, normalized to [0.0, 1.0]. Emitted at ~15 fps
+    /// while recording so the UI can show a live audio visualization.
+    AudioLevel(f32),
     CommandDetected(String),
     Error(String),
     Stopped,
@@ -78,7 +81,11 @@ impl SessionEvent {
             | Self::CorrectedText(s)
             | Self::CommandDetected(s)
             | Self::Error(s) => Some(s.as_str()),
-            Self::Started | Self::PartialText | Self::Processing | Self::Stopped => None,
+            Self::Started
+            | Self::PartialText
+            | Self::Processing
+            | Self::AudioLevel(_)
+            | Self::Stopped => None,
         }
     }
 

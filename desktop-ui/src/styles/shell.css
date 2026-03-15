@@ -1,0 +1,90 @@
+@reference "../app.css";
+
+/* ── Layout shells ─────────────────────────────────────────────────────── */
+
+@utility app-shell-root {
+  @apply relative flex min-h-dvh overflow-hidden;
+}
+
+@utility app-shell-backdrop {
+  @apply pointer-events-none fixed inset-0;
+  background-image: var(--surface-backdrop);
+}
+
+@utility app-main {
+  @apply relative z-0 flex min-w-0 flex-1 flex-col overflow-hidden;
+}
+
+@utility app-scroll {
+  @apply flex-1 overflow-y-auto;
+  padding:
+    var(--space-page-y)
+    var(--space-page-x-mobile)
+    var(--space-page-bottom);
+}
+
+@utility app-frame {
+  @apply mx-auto w-full;
+  max-width: var(--size-content-max);
+  animation: page-in 320ms ease;
+}
+
+/* ── Page layout ───────────────────────────────────────────────────────── */
+
+@utility page-stack {
+  @apply flex flex-col;
+  gap: var(--space-page-stack);
+}
+
+@utility stack-section {
+  @apply flex flex-col;
+  gap: var(--space-section-stack);
+}
+
+@utility stack-copy {
+  @apply flex flex-col;
+  gap: var(--space-copy-stack);
+}
+
+@utility stack-copy-tight {
+  @apply flex flex-col;
+  gap: var(--space-copy-tight);
+}
+
+@utility layout-grid {
+  @apply grid;
+  gap: var(--space-section-stack);
+}
+
+@utility layout-grid-tight {
+  @apply grid;
+  gap: 0.75rem;
+}
+
+@utility header-row {
+  @apply flex flex-col gap-3 sm:gap-4;
+}
+
+@utility page-intro {
+  @apply stack-copy;
+  max-width: var(--size-measure-wide);
+}
+
+@utility surface-hero {
+  background-image: var(--surface-hero);
+}
+
+/* ── Responsive ────────────────────────────────────────────────────── */
+
+@media (min-width: 48rem) {
+  .app-scroll {
+    padding:
+      var(--space-page-y)
+      var(--space-page-x-desktop)
+      var(--space-page-bottom);
+  }
+
+  .header-row {
+    @apply flex-row items-start justify-between;
+  }
+}

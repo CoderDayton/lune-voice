@@ -6,6 +6,7 @@
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 mod cli;
+#[cfg(unix)]
 mod dbus;
 mod events;
 mod factory;
@@ -75,6 +76,7 @@ fn run_daemon() {
         &paths.models_dir(),
         &settings.asr_backend,
         &settings.llm_backend,
+        settings.aligner.as_ref(),
     )
     .expect("ensure models downloaded");
 
@@ -148,16 +150,16 @@ fn run_daemon() {
         lune_persist::Database::open(&paths.database_file()).expect("open database"),
     ));
 
-    let dbus_iface = dbus::DaemonInterface::new(
+    let dbus_iface = dbus::DaemonInterface::new(dbus::DaemonInterfaceDeps {
         cmd_tx,
-        Arc::clone(&shared_state),
-        Arc::clone(&settings),
+        state: Arc::clone(&shared_state),
+        settings: Arc::clone(&settings),
         dictation_mode_tx,
         activation_mode_tx,
-        Arc::clone(&settings_store),
-        Arc::clone(&db),
-        rt.handle().clone(),
-    );
+        settings_store: Arc::clone(&settings_store),
+        db: Arc::clone(&db),
+        rt_handle: rt.handle().clone(),
+    });
 
     let dbus_conn = rt
         .block_on(async { dbus::build_connection(dbus_iface).await })
@@ -241,8 +243,8 @@ async fn run_pipeline(
                     Some(fa)
                 }
                 Err(e) => {
-                    tracing::error!(error = %e, model_dir = %cfg.model_dir.display(), "failed to build forced aligner");
-                    return;
+                    tracing::warn!(error = %e, model_dir = %cfg.model_dir.display(), "failed to build forced aligner, continuing without it");
+                    None
                 }
             }
         }

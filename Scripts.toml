@@ -9,23 +9,43 @@ command = '''
 printf "\n  %-14s %s\n" "Command" "Description"
 printf "  %-14s %s\n" "──────────────" "───────────────────────────────────────────────"
 printf "  %-14s %s\n" \
-  "check"       "Type-check all crates" \
-  "clippy"      "Lint with clippy (deny warnings)" \
-  "fmt"         "Check formatting (FIX=1 to apply)" \
-  "test"        "Run unit tests (no real models)" \
-  "test-e2e"    "Real-model integration tests (GPU=1 for CUDA)" \
-  "bench"       "Benchmark (TYPE=latency|full, GPU=1 for CUDA)" \
-  "build"       "Release build (GPU=1 for CUDA)" \
-  "vad-inspect" "VAD timeline analysis (WAV=path/to/file.wav)" \
-  "record"      "Record mic to float32 WAV (16kHz mono)" \
-  "install"     "Install systemd unit + binary" \
-  "uninstall"   "Remove systemd service + binary" \
-  "ci"          "Full CI: fmt + clippy + check + test" \
-  "clean"       "Clean build artifacts (ALL=1 includes .venv)" \
-  "export"      "Export ONNX models (MODEL=asr|llm|fa|all)"
+  "dev"          "Launch Tauri app in dev mode (hot-reload)" \
+  "ui-build"     "Production build of desktop app" \
+  "check"        "Type-check all crates" \
+  "clippy"       "Lint with clippy (deny warnings)" \
+  "fmt"          "Check formatting (FIX=1 to apply)" \
+  "test"         "Run unit tests (no real models)" \
+  "test-e2e"     "Real-model integration tests (GPU=1 for CUDA)" \
+  "bench"        "Benchmark (TYPE=stages|real, GPU=1 for CUDA)" \
+  "build"        "Release build of daemon (GPU=1 for CUDA)" \
+  "vad-inspect"  "VAD timeline analysis (WAV=path/to/file.wav)" \
+  "record"       "Record mic to float32 WAV (16kHz mono)" \
+  "install"      "Install systemd unit + binary" \
+  "uninstall"    "Remove systemd service + binary" \
+  "ci"           "Full CI: fmt + clippy + check + test" \
+  "clean"        "Clean build artifacts (ALL=1 includes .venv)" \
+  "export"       "Export ONNX models (MODEL=asr|llm|fa|all)"
 echo
 '''
 info = "List all available scripts"
+
+# ── Desktop UI ──────────────────────────────────────────────────────────────
+
+[scripts.dev]
+interpreter = "bash"
+command = '''
+cd desktop-ui && bun tauri dev
+'''
+info = "Launch Tauri app in dev mode (hot-reload)"
+requires = ["bun"]
+
+[scripts.ui-build]
+interpreter = "bash"
+command = '''
+cd desktop-ui && bun tauri build
+'''
+info = "Production build of desktop app"
+requires = ["bun"]
 
 # ── Quick iteration ──────────────────────────────────────────────────────────
 
@@ -57,13 +77,13 @@ info = "Real-model integration tests (--env GPU=1 for CUDA)"
 interpreter = "bash"
 command = '''
 F=""; [ "$GPU" = "1" ] && F="--features cuda"
-case "${TYPE:-latency}" in
-  latency) cargo run --release $F --example pipeline_latency -p lune-app ;;
-  full)    cargo run --release $F --example pipeline_full -p lune-app ;;
-  *)       echo "TYPE must be latency or full"; exit 1 ;;
+case "${TYPE:-real}" in
+  stages) cargo run --release $F --example pipeline_stages -p lune-app ;;
+  real)   cargo run --release $F --example pipeline_real -p lune-app ;;
+  *)      echo "TYPE must be stages or real"; exit 1 ;;
 esac
 '''
-info = "Benchmark (--env TYPE=latency|full, --env GPU=1 for CUDA)"
+info = "Benchmark (--env TYPE=stages|real, --env GPU=1 for CUDA)"
 
 # ── Build ────────────────────────────────────────────────────────────────────
 
