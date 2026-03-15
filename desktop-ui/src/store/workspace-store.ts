@@ -460,7 +460,7 @@ function reduceSessionEvent(
         error: event.message,
       };
     case "partialText":
-    case "audioLevel":
+    case "audioLevel": // handled by use-pill-state.ts directly, not stored in main window state
     case "commandDetected":
       return runtime;
   }

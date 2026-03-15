@@ -47,7 +47,7 @@ export function DictationPill() {
       )}
 
       <div className="pill-center">
-        {mode === "processing" ? <PulseIndicator /> : <AudioDots level={audioLevel} />}
+        {mode === "processing" ? <PulseIndicator label={t`Processing`} /> : <AudioDots level={audioLevel} />}
       </div>
 
       {isToggle && (

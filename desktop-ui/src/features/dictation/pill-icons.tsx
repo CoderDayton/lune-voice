@@ -23,6 +23,6 @@ export function StopIcon() {
   );
 }
 
-export function PulseIndicator() {
-  return <span className="pill-pulse" aria-label="Processing" />;
+export function PulseIndicator({ label }: { label: string }) {
+  return <span className="pill-pulse" aria-label={label} />;
 }

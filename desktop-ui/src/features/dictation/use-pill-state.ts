@@ -41,8 +41,8 @@ function shouldShow(vis: PillVis, mode: PillMode, serviceReady: boolean): boolea
 }
 
 interface PillSettings {
-  activationMode?: string;
-  pillVisibility?: string;
+  activationMode: string;
+  pillVisibility: string;
 }
 
 export function usePillState() {
@@ -124,7 +124,12 @@ export function usePillState() {
 
   const visible = shouldShow(pillVis, mode, serviceReady);
 
-  // Show/hide the Tauri window based on visibility
+  // Show/hide the Tauri window based on visibility.
+  // Reset shownRef on mount so HMR/remount re-syncs with Tauri window state.
+  useEffect(() => {
+    shownRef.current = false;
+  }, []);
+
   useEffect(() => {
     if (visible && !shownRef.current) {
       shownRef.current = true;

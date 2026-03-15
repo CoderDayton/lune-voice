@@ -22,8 +22,7 @@ export function AppShell() {
   }, []);
 
   useEffect(() => {
-    let disposeSession = () => {};
-    let disposeHistory = () => {};
+    const disposers: Array<() => void> = [];
     let cancelled = false;
 
     (async () => {
@@ -32,7 +31,7 @@ export function AppShell() {
           workspaceActions.applySessionEvent(event);
         });
         if (cancelled) { detachSession(); return; }
-        disposeSession = detachSession;
+        disposers.push(detachSession);
 
         const detachHistory = await listenToWorkspaceInvalidation("lune://history-changed", () => {
           loadWorkspaceSnapshot().catch((e) => {
@@ -40,7 +39,7 @@ export function AppShell() {
           });
         });
         if (cancelled) { detachHistory(); return; }
-        disposeHistory = detachHistory;
+        disposers.push(detachHistory);
       } catch (e) {
         console.error("[app-shell] failed to attach IPC streams", e);
       }
@@ -48,8 +47,7 @@ export function AppShell() {
 
     return () => {
       cancelled = true;
-      disposeSession();
-      disposeHistory();
+      for (const dispose of disposers) dispose();
     };
   }, []);
 
