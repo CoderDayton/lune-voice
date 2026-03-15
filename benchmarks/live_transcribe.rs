@@ -20,7 +20,7 @@ use std::time::Instant;
 
 use bench_utils::{benchmark_asr_entry, init_ort, workspace_root};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{BufferSize, SampleRate, StreamConfig};
+use cpal::{BufferSize, StreamConfig};
 use lune_app::{DeliveryService, SessionManager, SessionManagerConfig};
 use lune_asr::AsrRegistry;
 use lune_core::config::{DevicePolicy, UserSettings};
@@ -230,12 +230,15 @@ fn start_recording(pcm: Arc<StdMutex<Vec<f32>>>) -> Result<cpal::Stream, String>
 
     eprintln!(
         "  Mic: {}",
-        device.name().unwrap_or_else(|_| "unknown".into())
+        device
+            .description()
+            .map(|d| d.name().to_owned())
+            .unwrap_or_else(|_| "unknown".into())
     );
 
     let config = StreamConfig {
         channels: 1,
-        sample_rate: SampleRate(16_000),
+        sample_rate: 16_000,
         buffer_size: BufferSize::Default,
     };
 

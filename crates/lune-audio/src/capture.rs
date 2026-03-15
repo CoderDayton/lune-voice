@@ -1,7 +1,8 @@
 use crate::{AudioChunk, AudioError, ring::RingBuffer};
+use audioadapter_buffers::direct::SequentialSlice;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{BufferSize, SampleFormat, SampleRate, StreamConfig};
-use rubato::{FastFixedIn, PolynomialDegree, Resampler};
+use cpal::{BufferSize, SampleFormat, StreamConfig};
+use rubato::{Async, FixedAsync, PolynomialDegree, Resampler};
 use std::sync::Arc;
 use std::time::Instant;
 use tracing::{debug, warn};
@@ -72,7 +73,10 @@ impl AudioStream {
         let host = cpal::default_host();
         let device = host.default_input_device().ok_or(AudioError::NoDevice)?;
 
-        let device_name = device.name().unwrap_or_else(|_| "Unknown".into());
+        let device_name = device
+            .description()
+            .map(|d| d.name().to_owned())
+            .unwrap_or_else(|_| "Unknown".into());
         debug!("Using audio device: {}", device_name);
 
         // Query supported configs and pick the best one
@@ -80,7 +84,7 @@ impl AudioStream {
             .default_input_config()
             .map_err(|e| AudioError::StreamBuild(e.to_string()))?;
 
-        let native_sample_rate = supported_config.sample_rate().0;
+        let native_sample_rate = supported_config.sample_rate();
         let channels = supported_config.channels();
 
         debug!(
@@ -94,7 +98,7 @@ impl AudioStream {
         let chunk_samples = (config.target_sample_rate * config.chunk_duration_ms / 1000) as usize;
         let stream_config = StreamConfig {
             channels,
-            sample_rate: SampleRate(native_sample_rate),
+            sample_rate: native_sample_rate,
             buffer_size: BufferSize::Default,
         };
 
@@ -107,14 +111,17 @@ impl AudioStream {
         // Shared state for the audio callback
         let mut resampler = if native_sample_rate != target_rate {
             Some(
-                FastFixedIn::<f32>::new(
+                Async::<f32>::new_poly(
                     target_rate as f64 / native_sample_rate as f64,
                     1.2, // Max relative ratio deviation
                     PolynomialDegree::Septic,
                     chunk_samples,
                     1, // Mono after downmix
+                    FixedAsync::Input,
                 )
-                .map_err(|e| AudioError::Resampler(e.to_string()))?,
+                .map_err(|e: rubato::ResamplerConstructionError| {
+                    AudioError::Resampler(e.to_string())
+                })?,
             )
         } else {
             None
@@ -273,7 +280,7 @@ impl AudioStream {
 fn process_audio_callback(
     data: &[f32],
     channels: usize,
-    resampler: &mut Option<FastFixedIn<f32>>,
+    resampler: &mut Option<Async<f32>>,
     input_resample_buf: &mut Vec<f32>,
     resample_input_slice: &mut Vec<f32>,
     output_buf: &mut Vec<f32>,
@@ -302,8 +309,11 @@ fn process_audio_callback(
             resample_input_slice.clear();
             resample_input_slice.extend_from_slice(&input_resample_buf[..required_input]);
             input_resample_buf.drain(..required_input);
-            match r.process(&[resample_input_slice.as_slice()], None) {
-                Ok(output) => output_buf.extend_from_slice(&output[0]),
+            let frames = resample_input_slice.len();
+            let adapter = SequentialSlice::new(resample_input_slice.as_slice(), 1, frames)
+                .expect("SequentialSlice size mismatch");
+            match r.process(&adapter, 0, None) {
+                Ok(output) => output_buf.extend_from_slice(&output.take_data()),
                 Err(e) => {
                     warn!("Resampling error: {}", e);
                     break;
