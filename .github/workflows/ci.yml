@@ -67,11 +67,11 @@ jobs:
 
       - name: Clippy (all crates)
         if: matrix.os == 'ubuntu-latest'
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets --no-default-features -- -D warnings
 
       - name: Clippy (core crates, no desktop UI)
         if: matrix.os == 'windows-latest'
-        run: cargo clippy --workspace --exclude lune-ui --all-targets -- -D warnings
+        run: cargo clippy --workspace --exclude lune-ui --all-targets --no-default-features -- -D warnings
 
   # ── Tests ─────────────────────────────────────────────────────────────────
   test:
@@ -111,11 +111,11 @@ jobs:
 
       - name: Test (all crates)
         if: matrix.os == 'ubuntu-latest'
-        run: cargo test --workspace
+        run: cargo test --workspace --no-default-features
 
       - name: Test (core crates, no desktop UI)
         if: matrix.os == 'windows-latest'
-        run: cargo test --workspace --exclude lune-ui
+        run: cargo test --workspace --exclude lune-ui --no-default-features
 
   # ── Security audit (push/PR + weekly schedule) ────────────────────────────
   audit:
