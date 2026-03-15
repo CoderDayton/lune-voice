@@ -287,16 +287,11 @@ fn ensure_directory_model(
     Ok(local_dir)
 }
 
-/// Resolve the forced-aligner model directory when the feature is enabled.
+/// Resolve the aligner model directory when the feature is enabled.
 ///
-/// This is intentionally a no-op download hook for now:
-/// - `enabled = false`  -> no aligner path is resolved
-/// - custom `model_dir` -> caller-provided path is left untouched
-/// - empty `model_dir`  -> standard local default path is exposed
-///
-/// TODO: Replace the default-path branch with a real `ensure_directory_model`
-/// call once the wav2vec2 forced-aligner ONNX bundle is published to
-/// Hugging Face alongside the other exported models.
+/// Returns the default `models_dir/wav2vec2-fa` path when enabled with
+/// an empty `model_dir`. Models are provisioned during the setup flow,
+/// so the directory is expected to exist by the time this is called.
 fn resolve_aligner_model_dir(
     models_dir: &Path,
     aligner: Option<&AlignerConfig>,

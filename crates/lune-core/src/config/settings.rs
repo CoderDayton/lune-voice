@@ -112,7 +112,7 @@ impl Default for UserSettings {
             word_confidence_threshold: default_word_confidence_threshold(),
             max_speech_secs: default_max_speech_secs(),
             aligner: Some(AlignerConfig {
-                enabled: false,
+                enabled: true,
                 model_dir: PathBuf::new(),
             }),
             adaptive_vad: false,

@@ -25,7 +25,7 @@ struct RuntimeInner {
     app: AppHandle,
     pipeline: Mutex<LivePipeline>,
     status: RwLock<String>,
-    session_stream: RwLock<Option<Channel<SessionStreamEvent>>>,
+    session_streams: RwLock<Vec<Channel<SessionStreamEvent>>>,
     /// Shared settings — updated on reload, read for dictation_mode at delivery time.
     settings: Arc<RwLock<UserSettings>>,
     /// Background thread that owns the uinput/clipboard handle.
@@ -53,7 +53,7 @@ impl AppRuntime {
                 app,
                 pipeline: Mutex::new(pipeline),
                 status: RwLock::new("ready".into()),
-                session_stream: RwLock::new(None),
+                session_streams: RwLock::new(Vec::new()),
                 settings,
                 delivery,
             }),
@@ -73,8 +73,8 @@ impl AppRuntime {
         channel: Channel<SessionStreamEvent>,
     ) -> Result<(), String> {
         {
-            let mut stream = self.inner.session_stream.write().await;
-            *stream = Some(channel);
+            let mut streams = self.inner.session_streams.write().await;
+            streams.push(channel);
         }
 
         self.push_session_event(SessionStreamEvent::ServiceStatus {
@@ -96,8 +96,8 @@ impl AppRuntime {
     }
 
     pub async fn clear_session_stream(&self) {
-        let mut stream = self.inner.session_stream.write().await;
-        *stream = None;
+        let mut streams = self.inner.session_streams.write().await;
+        streams.clear();
     }
 
     pub async fn mark_reload_required(&self) {
@@ -308,11 +308,11 @@ impl AppRuntime {
     }
 
     async fn push_session_event(&self, event: SessionStreamEvent) {
-        let channel = self.inner.session_stream.read().await.clone();
-        if let Some(channel) = channel
-            && let Err(e) = channel.send(event)
-        {
-            warn!(error = %e, "session stream channel send failed — frontend may have disconnected");
+        let streams = self.inner.session_streams.read().await;
+        for channel in streams.iter() {
+            if let Err(e) = channel.send(event.clone()) {
+                warn!(error = %e, "session stream channel send failed — frontend may have disconnected");
+            }
         }
     }
 
