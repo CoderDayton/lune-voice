@@ -17,7 +17,6 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::ping,
             commands::load_workspace_snapshot,
             commands::save_workspace_settings,
             commands::create_dictionary_entry,

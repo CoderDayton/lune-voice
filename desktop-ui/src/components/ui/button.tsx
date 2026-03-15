@@ -1,4 +1,4 @@
-import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { cn } from "../../lib/cn";
 
 const buttonVariants = {
@@ -19,7 +19,6 @@ interface CommonProps {
 }
 
 type ButtonProps = CommonProps & ButtonHTMLAttributes<HTMLButtonElement>;
-type AnchorProps = CommonProps & AnchorHTMLAttributes<HTMLAnchorElement>;
 
 export function buttonClassName(variant: ButtonVariant = "primary", className?: string) {
   return cn(buttonVariants[variant], className);
@@ -33,10 +32,4 @@ export function Button({ children, className, variant = "primary", ...props }: B
   );
 }
 
-export function AnchorButton({ children, className, variant = "primary", ...props }: AnchorProps) {
-  return (
-    <a className={buttonClassName(variant, className)} {...props}>
-      {children}
-    </a>
-  );
-}
+

@@ -6,11 +6,6 @@ use crate::dto::{
 use crate::runtime::AppRuntime;
 
 #[tauri::command]
-pub fn ping() -> &'static str {
-    "pong"
-}
-
-#[tauri::command]
 pub async fn load_workspace_snapshot(
     runtime: State<'_, AppRuntime>,
 ) -> Result<WorkspaceSnapshot, String> {

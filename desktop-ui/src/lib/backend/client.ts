@@ -2,9 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { mockBackendClient } from "./mock";
 import type { BackendClient, BackendWorkspaceSnapshot } from "./types";
 
-function isTauriRuntime() {
-  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-}
+import { isTauriRuntime } from "./runtime";
 
 const tauriBackendClient: BackendClient = {
   loadWorkspaceSnapshot() {

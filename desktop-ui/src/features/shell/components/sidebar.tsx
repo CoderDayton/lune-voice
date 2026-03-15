@@ -17,16 +17,10 @@ function useStatusItems() {
   const runtime = useStore(workspaceStore, (state) => state.runtime);
   const settings = useStore(workspaceStore, (state) => state.settings);
 
-  const serviceLabel =
-    runtime.serviceStatus === "ready" || runtime.serviceStatus === "Ready"
-      ? "Ready"
-      : runtime.serviceStatus === "listening"
-        ? "Listening"
-        : runtime.serviceStatus === "processing"
-          ? "Processing"
-          : runtime.serviceStatus === "error"
-            ? "Error"
-            : "Connecting";
+  const statusLabels: Record<string, string> = {
+    ready: "Ready", listening: "Listening", processing: "Processing", error: "Error",
+  };
+  const serviceLabel = statusLabels[runtime.serviceStatus] ?? "Connecting";
 
   const serviceTone =
     runtime.serviceStatus === "error"

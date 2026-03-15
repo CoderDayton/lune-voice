@@ -1,10 +1,7 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { isTauriRuntime } from "./runtime";
 import type { SessionStreamEvent } from "./types";
-
-function isTauriRuntime() {
-  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-}
 
 export async function attachSessionStream(
   onEvent: (event: SessionStreamEvent) => void,

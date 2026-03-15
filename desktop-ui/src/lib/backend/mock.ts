@@ -5,7 +5,7 @@ import type { BackendClient, BackendWorkspaceSnapshot, SaveWorkspaceSettingsInpu
 function createMockSnapshot(): BackendWorkspaceSnapshot {
   return {
     ipcFlavor: "mock",
-    serviceStatus: "Ready",
+    serviceStatus: "ready",
     settings: {
       activationMode: "Toggle",
       dictationMode: "Clipboard",
