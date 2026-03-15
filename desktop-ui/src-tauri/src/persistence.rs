@@ -192,6 +192,7 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
         hotkey_cancel: format_key_combo(&settings.hotkey.cancel_dictation),
         aligner_enabled: settings.aligner.as_ref().is_some_and(|cfg| cfg.enabled),
         pill_visibility: settings.pill_visibility.to_string(),
+        language: settings.language.clone(),
         openai_asr_base_url,
         openai_asr_api_key,
         openai_asr_model,
@@ -262,6 +263,7 @@ fn apply_settings_dto(
                 .unwrap_or_default(),
         });
     }
+    settings.language = input.language.trim().to_owned();
     Ok(())
 }
 

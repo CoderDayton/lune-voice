@@ -34,6 +34,7 @@ export interface WorkspaceSettings {
   hotkeyCancel: string;
   alignerEnabled: boolean;
   pillVisibility: PillVisibilityValue;
+  language: string;
   // OpenAI ASR fields
   openaiAsrBaseUrl: string;
   openaiAsrApiKey: string;
@@ -91,6 +92,7 @@ const DEFAULT_SETTINGS: WorkspaceSettings = {
   hotkeyCancel: "Escape",
   alignerEnabled: true,
   pillVisibility: "Always",
+  language: "en",
   openaiAsrBaseUrl: "https://api.openai.com/v1",
   openaiAsrApiKey: "",
   openaiAsrModel: "whisper-1",
@@ -232,6 +234,7 @@ export async function persistWorkspaceSettings() {
     hotkeyCancel: settings.hotkeyCancel,
     alignerEnabled: settings.alignerEnabled,
     pillVisibility: settings.pillVisibility,
+    language: settings.language,
     openaiAsrBaseUrl: settings.openaiAsrBaseUrl || null,
     openaiAsrApiKey: settings.openaiAsrApiKey || null,
     openaiAsrModel: settings.openaiAsrModel || null,
@@ -376,6 +379,7 @@ function mapWorkspaceSettings(snapshot: BackendWorkspaceSnapshot): WorkspaceSett
     hotkeyCancel: snapshot.settings.hotkeyCancel,
     alignerEnabled: snapshot.settings.alignerEnabled,
     pillVisibility: (snapshot.settings.pillVisibility ?? "Always") as PillVisibilityValue,
+    language: snapshot.settings.language ?? "en",
     openaiAsrBaseUrl: snapshot.settings.openaiAsrBaseUrl ?? DEFAULT_SETTINGS.openaiAsrBaseUrl,
     openaiAsrApiKey: snapshot.settings.openaiAsrApiKey ?? DEFAULT_SETTINGS.openaiAsrApiKey,
     openaiAsrModel: snapshot.settings.openaiAsrModel ?? DEFAULT_SETTINGS.openaiAsrModel,

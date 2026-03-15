@@ -26,6 +26,7 @@ pub struct WorkspaceSettingsDto {
     pub hotkey_cancel: String,
     pub aligner_enabled: bool,
     pub pill_visibility: String,
+    pub language: String,
     // OpenAI ASR fields (populated when asr_backend_type == "OpenAiCompatible")
     pub openai_asr_base_url: Option<String>,
     pub openai_asr_api_key: Option<String>,

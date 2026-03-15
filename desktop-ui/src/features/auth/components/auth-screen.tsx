@@ -1,17 +1,21 @@
 import { useStore } from "@tanstack/react-store";
-import { useState } from "react";
 import { SelectField } from "../../../components/ui/field";
 import { authStore } from "../../../store/auth-store";
+import { activateLocale, locales, type LocaleKey } from "../../../i18n";
+import { saveWorkspaceSetting, workspaceStore } from "../../../store/workspace-store";
 import { LuneLogo } from "../../shell/config/icons";
 import { AuthForm } from "./auth-form";
 import { AuthHeroPanel } from "./auth-hero-panel";
 import { AuthModeSwitch } from "./auth-mode-switch";
 
-const languageOptions = ["English", "Spanish", "German"];
-
 export function AuthScreen() {
-  const [language, setLanguage] = useState(languageOptions[0]!);
   const mode = useStore(authStore, (state) => state.mode);
+  const language = useStore(workspaceStore, (state) => state.settings.language);
+
+  async function handleLanguageChange(locale: string) {
+    await activateLocale(locale);
+    void saveWorkspaceSetting("language", locale);
+  }
 
   return (
     <div className="auth-root">
@@ -33,11 +37,11 @@ export function AuthScreen() {
               <span className="sr-only">Language</span>
               <SelectField
                 value={language}
-                onChange={(event) => setLanguage(event.target.value)}
+                onChange={(event) => void handleLanguageChange(event.target.value)}
               >
-                {languageOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
+                {(Object.entries(locales) as [LocaleKey, string][]).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
                   </option>
                 ))}
               </SelectField>

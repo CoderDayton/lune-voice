@@ -36,6 +36,7 @@ export interface BackendWorkspaceSettings {
   hotkeyCancel: string;
   alignerEnabled: boolean;
   pillVisibility: string;
+  language: string;
   // OpenAI ASR fields (present when asrBackendType == "OpenAiCompatible")
   openaiAsrBaseUrl?: string | null;
   openaiAsrApiKey?: string | null;
@@ -69,6 +70,7 @@ export interface SaveWorkspaceSettingsInput {
   hotkeyCancel: string;
   alignerEnabled: boolean;
   pillVisibility: string;
+  language: string;
   // OpenAI ASR fields (sent when asrBackendType == "OpenAiCompatible")
   openaiAsrBaseUrl?: string | null;
   openaiAsrApiKey?: string | null;
