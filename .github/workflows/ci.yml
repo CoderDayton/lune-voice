@@ -14,6 +14,8 @@ env:
   RUST_BACKTRACE: 1
   # Disable incremental compilation — smaller cache, faster cold CI builds.
   CARGO_INCREMENTAL: 0
+  # Override .cargo/config.toml target-cpu=native which crashes on CI runners.
+  RUSTFLAGS: ""
 
 jobs:
   # ── Format (ubuntu only, fast gate) ───────────────────────────────────────
