@@ -1,8 +1,9 @@
-import { SelectField, TextField } from "../../../components/ui/field";
+import { SelectField } from "../../../components/ui/field";
 import { Toggle } from "../../../components/ui/toggle";
 import { saveWorkspaceSetting, type WorkspaceSettings } from "../../../store/workspace-store";
 import { SettingsRow, SettingsSection } from "../../setup/components/settings-section";
 import { llmModels } from "../../setup/data/settings-data";
+import { OpenAiFields } from "../components/openai-fields";
 
 interface Props {
   settings: WorkspaceSettings;
@@ -39,45 +40,15 @@ export function CleanupSection({ settings }: Props) {
         }
       />
       {settings.llmBackend === "OpenAiCompatible" && (
-        <>
-          <SettingsRow
-            label="API endpoint"
-            description="Base URL for the OpenAI-compatible chat completion API."
-            control={
-              <TextField
-                value={settings.openaiLlmBaseUrl}
-                onChange={(event) => void saveWorkspaceSetting("openaiLlmBaseUrl", event.target.value)}
-                className="w-full sm:w-auto sm:min-w-64"
-                placeholder="https://api.openai.com/v1…"
-              />
-            }
-          />
-          <SettingsRow
-            label="API key"
-            description="Your API key. Stored locally and never shared."
-            control={
-              <TextField
-                type="password"
-                value={settings.openaiLlmApiKey}
-                onChange={(event) => void saveWorkspaceSetting("openaiLlmApiKey", event.target.value)}
-                className="w-full sm:w-auto sm:min-w-64"
-                placeholder="sk-…"
-              />
-            }
-          />
-          <SettingsRow
-            label="Model"
-            description="Chat completion model name, e.g. gpt-4o-mini."
-            control={
-              <TextField
-                value={settings.openaiLlmModel}
-                onChange={(event) => void saveWorkspaceSetting("openaiLlmModel", event.target.value)}
-                className="w-full sm:w-auto sm:min-w-48"
-                placeholder="gpt-4o-mini…"
-              />
-            }
-          />
-        </>
+        <OpenAiFields
+          settings={settings}
+          baseUrlKey="openaiLlmBaseUrl"
+          apiKeyKey="openaiLlmApiKey"
+          modelKey="openaiLlmModel"
+          apiDescription="chat completion API"
+          modelDescription="Chat completion model name, e.g. gpt-4o-mini."
+          modelPlaceholder="gpt-4o-mini"
+        />
       )}
       <SettingsRow
         label="Cleanup sensitivity"

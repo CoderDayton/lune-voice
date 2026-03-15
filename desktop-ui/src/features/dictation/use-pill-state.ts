@@ -3,6 +3,8 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { attachSessionStream } from "../../lib/backend/stream";
+import type { SessionStreamEvent } from "../../lib/backend/types";
 
 export type PillMode = "idle" | "active" | "processing";
 type PillVis = "Always" | "WhenDictating" | "Never";
@@ -48,6 +50,7 @@ export function usePillState() {
   const [pillVis, setPillVis] = useState<PillVis>("Always");
   const [serviceReady, setServiceReady] = useState(false);
   const [recordingMode, setRecordingMode] = useState<"Toggle" | "Hold">("Toggle");
+  const [audioLevel, setAudioLevel] = useState(0);
   const shownRef = useRef(false);
 
   // On mount: check auth + load snapshot for initial readiness
@@ -103,6 +106,22 @@ export function usePillState() {
     };
   }, []);
 
+  // Subscribe to session stream for audio levels
+  useEffect(() => {
+    let detach = () => {};
+    attachSessionStream((event: SessionStreamEvent) => {
+      if (event.type === "audioLevel") {
+        setAudioLevel(event.level);
+      } else if (event.type === "sessionStopped" || event.type === "sessionError") {
+        setAudioLevel(0);
+      }
+    }).then(
+      (fn) => { detach = fn; },
+      () => {},
+    );
+    return () => detach();
+  }, []);
+
   const visible = shouldShow(pillVis, mode, serviceReady);
 
   // Show/hide the Tauri window based on visibility
@@ -132,5 +151,5 @@ export function usePillState() {
     );
   }, [mode, visible]);
 
-  return { mode, visible, recordingMode };
+  return { mode, visible, recordingMode, audioLevel };
 }

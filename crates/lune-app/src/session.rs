@@ -426,6 +426,9 @@ async fn run_session<A: AsrBackend + 'static>(
 
     let mut audio_poll_tick = tokio::time::interval(Duration::from_millis(10));
     audio_poll_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let mut next_level_emit = tokio::time::Instant::now();
+    let level_emit_interval = Duration::from_millis(67); // ~15 fps
+    let mut peak_rms: f32 = 0.0;
     let mut next_adaptive_log = if config.pipeline.adaptive_vad {
         Some(tokio::time::Instant::now() + Duration::from_secs(30))
     } else {
@@ -455,6 +458,16 @@ async fn run_session<A: AsrBackend + 'static>(
                 let mut saw_audio = false;
                 while let Some(chunk) = audio_stream.try_next_chunk() {
                     saw_audio = true;
+                    let rms = {
+                        let n = chunk.samples.len() as f32;
+                        if n > 0.0 {
+                            let sum_sq: f32 = chunk.samples.iter().map(|&s| s * s).sum();
+                            (sum_sq / n).sqrt()
+                        } else {
+                            0.0
+                        }
+                    };
+                    if rms > peak_rms { peak_rms = rms; }
                     let (boundaries, in_speech) = segmenter.push(&chunk.samples);
 
                     // Always push audio to ASR (including silence) — the encoder
@@ -509,6 +522,16 @@ async fn run_session<A: AsrBackend + 'static>(
                         );
                         break 'capture;
                     }
+                }
+
+                // Throttled audio level emission (~15 fps)
+                let now = tokio::time::Instant::now();
+                if now >= next_level_emit && peak_rms > 0.0 {
+                    // Clamp to [0, 1] — typical speech RMS is 0.01–0.15
+                    let normalized = (peak_rms * 6.0).min(1.0);
+                    let _ = event_tx.try_send(SessionEvent::AudioLevel(normalized));
+                    peak_rms = 0.0;
+                    next_level_emit = now + level_emit_interval;
                 }
 
                 // Periodic adaptive VAD debug log

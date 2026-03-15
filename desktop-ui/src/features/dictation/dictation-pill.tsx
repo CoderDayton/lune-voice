@@ -4,7 +4,7 @@ import { MicIcon, PulseIndicator, StopIcon, XIcon } from "./pill-icons";
 import { usePillState } from "./use-pill-state";
 
 export function DictationPill() {
-  const { mode, visible, recordingMode } = usePillState();
+  const { mode, visible, recordingMode, audioLevel } = usePillState();
 
   if (!visible) return null;
 
@@ -45,7 +45,7 @@ export function DictationPill() {
       )}
 
       <div className="pill-center">
-        {mode === "processing" ? <PulseIndicator /> : <AudioDots />}
+        {mode === "processing" ? <PulseIndicator /> : <AudioDots level={audioLevel} />}
       </div>
 
       {isToggle && (

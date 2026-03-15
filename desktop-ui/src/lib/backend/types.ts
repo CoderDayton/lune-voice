@@ -101,6 +101,7 @@ export type SessionStreamEvent =
   | { type: "processing" }
   | { type: "finalizedText"; text: string }
   | { type: "correctedText"; text: string }
+  | { type: "audioLevel"; level: number }
   | { type: "commandDetected"; payload: string }
   | { type: "sessionStopped" }
   | { type: "sessionError"; message: string };

@@ -58,6 +58,7 @@
 @utility audio-dot {
   @apply block rounded-full size-1.5 bg-primary;
   animation: dot-bounce 1.2s ease-in-out infinite;
+  transition: transform 60ms ease-out, opacity 60ms ease-out;
 }
 
 @keyframes dot-bounce {

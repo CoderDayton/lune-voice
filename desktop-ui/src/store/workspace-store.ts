@@ -456,6 +456,7 @@ function reduceSessionEvent(
         error: event.message,
       };
     case "partialText":
+    case "audioLevel":
     case "commandDetected":
       return runtime;
   }

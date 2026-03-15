@@ -1,8 +1,9 @@
-import { SelectField, TextField } from "../../../components/ui/field";
+import { SelectField } from "../../../components/ui/field";
 import { Toggle } from "../../../components/ui/toggle";
 import { saveWorkspaceSetting, type WorkspaceSettings } from "../../../store/workspace-store";
 import { SettingsRow, SettingsSection } from "../../setup/components/settings-section";
 import { asrBackends } from "../../setup/data/settings-data";
+import { OpenAiFields } from "../components/openai-fields";
 
 interface Props {
   settings: WorkspaceSettings;
@@ -29,45 +30,15 @@ export function TranscriptionSection({ settings }: Props) {
         }
       />
       {settings.asrBackend === "OpenAiCompatible" && (
-        <>
-          <SettingsRow
-            label="API endpoint"
-            description="Base URL for the OpenAI-compatible transcription API."
-            control={
-              <TextField
-                value={settings.openaiAsrBaseUrl}
-                onChange={(event) => void saveWorkspaceSetting("openaiAsrBaseUrl", event.target.value)}
-                className="w-full sm:w-auto sm:min-w-64"
-                placeholder="https://api.openai.com/v1…"
-              />
-            }
-          />
-          <SettingsRow
-            label="API key"
-            description="Your API key. Stored locally and never shared."
-            control={
-              <TextField
-                type="password"
-                value={settings.openaiAsrApiKey}
-                onChange={(event) => void saveWorkspaceSetting("openaiAsrApiKey", event.target.value)}
-                className="w-full sm:w-auto sm:min-w-64"
-                placeholder="sk-…"
-              />
-            }
-          />
-          <SettingsRow
-            label="Model"
-            description="Transcription model name, e.g. whisper-1."
-            control={
-              <TextField
-                value={settings.openaiAsrModel}
-                onChange={(event) => void saveWorkspaceSetting("openaiAsrModel", event.target.value)}
-                className="w-full sm:w-auto sm:min-w-48"
-                placeholder="whisper-1…"
-              />
-            }
-          />
-        </>
+        <OpenAiFields
+          settings={settings}
+          baseUrlKey="openaiAsrBaseUrl"
+          apiKeyKey="openaiAsrApiKey"
+          modelKey="openaiAsrModel"
+          apiDescription="transcription API"
+          modelDescription="Transcription model name, e.g. whisper-1."
+          modelPlaceholder="whisper-1"
+        />
       )}
       <SettingsRow
         label="Use hardware acceleration"

@@ -92,6 +92,7 @@ pub enum SessionStreamEvent {
     Processing,
     FinalizedText { text: String },
     CorrectedText { text: String },
+    AudioLevel { level: f32 },
     CommandDetected { payload: String },
     SessionStopped,
     SessionError { message: String },
