@@ -18,4 +18,4 @@ mistralrs = { version = "0.7", optional = true }
 async-openai.workspace = true
 serde_json.workspace = true
 regex = "1.11"
-once_cell = "1.20"
+once_cell = "1.21"
