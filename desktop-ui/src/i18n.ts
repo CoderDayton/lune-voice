@@ -19,7 +19,7 @@ export type LocaleKey = keyof typeof locales;
 export const defaultLocale: LocaleKey = "en";
 
 export async function activateLocale(locale: string) {
-  const { messages } = await import(`./locales/${locale}/messages.ts`);
+  const { messages } = await import(`./locales/${locale}/messages.po`);
   i18n.load(locale, messages);
   i18n.activate(locale);
 }
