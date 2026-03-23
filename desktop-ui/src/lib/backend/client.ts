@@ -44,4 +44,6 @@ const tauriBackendClient: BackendClient = {
   },
 };
 
+// Resolved at module load — safe because Tauri injects __TAURI_INTERNALS__ before scripts execute.
+// In dev mode with HMR, the module re-evaluates and picks up the correct runtime.
 export const backendClient = isTauriRuntime() ? tauriBackendClient : mockBackendClient;

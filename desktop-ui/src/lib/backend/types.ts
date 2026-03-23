@@ -3,7 +3,7 @@ import type {
   AsrBackendValue,
   DictationModeValue,
   LlmBackendValue,
-} from "../../features/setup/data/settings-data";
+} from "../../features/settings/data/settings-data";
 
 export interface BackendDictionaryEntry {
   id: number;

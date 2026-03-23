@@ -1,9 +1,9 @@
 import { useStore } from "@tanstack/react-store";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { cn } from "../../../lib/cn";
 import { workspaceActions, workspaceStore } from "../../../store/workspace-store";
 import { navigationItems } from "../config/navigation";
-import { ChevronLeftIcon, ChevronRightIcon, LuneLogo } from "../config/icons";
+import { ChevronLeftIcon, ChevronRightIcon } from "../config/icons";
+import luneLogo from "../../../assets/lune-voice-logo.png";
 import { useLingui } from "@lingui/react/macro";
 
 export function Sidebar() {
@@ -19,49 +19,46 @@ export function Sidebar() {
       }}
     >
       <div className="flex items-center gap-3 px-2">
-        <div className="brand-mark">
-          <LuneLogo className="text-white" />
+        <div className="size-10 shrink-0 select-none pointer-events-none" aria-hidden="true">
+          <div className="size-full rounded-xl overflow-hidden">
+            <img src={luneLogo} alt="" className="size-full object-cover" draggable={false} />
+          </div>
         </div>
         {!collapsed ? (
-          <span className="brand-title">{t`Lune`}</span>
+          <span className="brand-title">{t`Lune Voice`}</span>
         ) : null}
       </div>
 
-      <nav className="flex flex-col gap-1">
+      <ul className="menu menu-sm gap-1 px-0">
         {navigationItems.map(({ to, label, icon: Icon }) => {
           const active = to === "/" ? pathname === "/" : pathname.startsWith(to);
-
           return (
-            <Link
-              key={to}
-              to={to}
-              className={cn(active ? "nav-link-active" : "nav-link-idle")}
-              title={collapsed ? label : undefined}
-            >
-              <Icon className={cn("nav-icon", active ? "text-secondary" : "")} />
-              {!collapsed ? (
-                <span className="truncate text-sm font-medium">{label}</span>
-              ) : null}
-            </Link>
+            <li key={to}>
+              <Link
+                to={to}
+                className={`${active ? "menu-active" : ""}${collapsed ? " tooltip tooltip-right" : ""}`}
+                data-tip={collapsed ? label : undefined}
+              >
+                <Icon className={`nav-icon${active ? " text-secondary" : ""}`} />
+                {!collapsed ? <span className="truncate">{label}</span> : null}
+              </Link>
+            </li>
           );
         })}
-      </nav>
+      </ul>
 
-      <div className="mt-auto">
-        <button
-          type="button"
-          className={cn("nav-link-idle w-full")}
-          onClick={workspaceActions.toggleSidebar}
-          aria-label={collapsed ? t`Expand sidebar` : t`Collapse sidebar`}
-        >
-          {collapsed
-            ? <ChevronRightIcon className="nav-icon" />
-            : <ChevronLeftIcon className="nav-icon" />}
-          {!collapsed ? (
-            <span className="truncate text-sm font-medium">{t`Collapse`}</span>
-          ) : null}
-        </button>
-      </div>
+      <ul className="menu menu-sm px-0 mt-auto">
+        <li>
+          <button
+            type="button"
+            onClick={workspaceActions.toggleSidebar}
+            aria-label={collapsed ? t`Expand sidebar` : t`Collapse sidebar`}
+          >
+            {collapsed ? <ChevronRightIcon className="nav-icon" /> : <ChevronLeftIcon className="nav-icon" />}
+            {!collapsed ? <span className="truncate">{t`Collapse`}</span> : null}
+          </button>
+        </li>
+      </ul>
     </aside>
   );
 }

@@ -48,15 +48,6 @@ export function DictionaryIcon(props: IconProps) {
   );
 }
 
-export function SearchIcon(props: IconProps) {
-  return (
-    <BaseIcon {...props}>
-      <circle cx="7.5" cy="7.5" r="4.5" />
-      <path d="m11 11 4 4" />
-    </BaseIcon>
-  );
-}
-
 export function ChevronLeftIcon(props: IconProps) {
   return (
     <BaseIcon {...props}>
@@ -73,36 +64,11 @@ export function ChevronRightIcon(props: IconProps) {
   );
 }
 
-export function BoltIcon(props: IconProps) {
-  return (
-    <BaseIcon {...props}>
-      <path d="m9.6 2.5-4.2 6h2.6l-.9 7 4.4-6.3H8.8z" />
-    </BaseIcon>
-  );
-}
-
-export function ClockIcon(props: IconProps) {
-  return (
-    <BaseIcon {...props}>
-      <circle cx="9" cy="9" r="6.4" />
-      <path d="M9 5.2v4l2.4 1.6" />
-    </BaseIcon>
-  );
-}
-
 export function MicIcon(props: IconProps) {
   return (
     <BaseIcon {...props}>
       <rect x="6.3" y="2.8" width="5.4" height="8.8" rx="2.7" />
       <path d="M4.5 8.8v.5a4.5 4.5 0 0 0 9 0v-.5M9 13.8v2.2M6.8 16h4.4" />
-    </BaseIcon>
-  );
-}
-
-export function PulseIcon(props: IconProps) {
-  return (
-    <BaseIcon {...props}>
-      <path d="M2.2 9h3l1.4-3.4L9.4 12l2-4h4.4" />
     </BaseIcon>
   );
 }
@@ -129,19 +95,5 @@ export function SettingsIcon(props: IconProps) {
       <circle cx="9" cy="9" r="2.5" />
       <path d="M9 2.5v2M9 13.5v2M2.5 9h2M13.5 9h2M4.1 4.1l1.4 1.4M12.5 12.5l1.4 1.4M4.1 13.9l1.4-1.4M12.5 5.5l1.4-1.4" />
     </BaseIcon>
-  );
-}
-
-export function LuneLogo(props: IconProps) {
-  return (
-    <svg width="20" height="20" viewBox="0 0 22 22" fill="none" aria-hidden="true" {...props}>
-      <path
-        d="M4.5 16.5V5.5l6 7.5 6-7.5v11"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }

@@ -1,45 +1,63 @@
-import { useEffect } from "react";
+import { useEffect, useEffectEvent } from "react";
 import { Outlet } from "@tanstack/react-router";
 import { Sidebar } from "./sidebar";
 import { MobileNav } from "./mobile-nav";
 import { Topbar } from "./topbar";
-import { ErrorToast } from "../../../components/ui/error-toast";
+import { ErrorToast } from "../../../components/feedback";
 import { attachSessionStream, listenToWorkspaceInvalidation } from "../../../lib/backend/stream";
+import type { SessionStreamEvent } from "../../../lib/backend/types";
 import {
   loadWorkspaceSnapshot,
   workspaceActions,
+  workspaceStore,
 } from "../../../store/workspace-store";
 
 export function AppShell() {
   useEffect(() => {
+    // Skip if already hydrated by bootstrap in main.tsx
+    if (workspaceStore.state.runtime.loaded) return;
+    let cancelled = false;
     loadWorkspaceSnapshot().catch((e) => {
-      workspaceActions.setError(e instanceof Error ? e.message : "Failed to load workspace");
+      if (cancelled) return;
+      workspaceActions.setError(e instanceof Error ? e.message : String(e));
     });
+    return () => { cancelled = true; };
   }, []);
+
+  const onSessionEvent = useEffectEvent((event: SessionStreamEvent) => {
+    workspaceActions.applySessionEvent(event);
+  });
 
   useEffect(() => {
     const disposers: Array<() => void> = [];
     let cancelled = false;
 
-    (async () => {
+    async function connectSessionStream() {
       try {
-        const detachSession = await attachSessionStream((event) => {
-          workspaceActions.applySessionEvent(event);
-        });
-        if (cancelled) { detachSession(); return; }
-        disposers.push(detachSession);
+        const detach = await attachSessionStream(onSessionEvent);
+        if (cancelled) { detach(); return; }
+        disposers.push(detach);
+      } catch (e) {
+        console.error("[app-shell] session stream failed", e);
+      }
+    }
 
-        const detachHistory = await listenToWorkspaceInvalidation("lune://history-changed", () => {
+    async function connectHistoryInvalidation() {
+      try {
+        const detach = await listenToWorkspaceInvalidation("lune://history-changed", () => {
           loadWorkspaceSnapshot().catch((e) => {
             workspaceActions.setError(e instanceof Error ? e.message : "Failed to reload workspace");
           });
         });
-        if (cancelled) { detachHistory(); return; }
-        disposers.push(detachHistory);
+        if (cancelled) { detach(); return; }
+        disposers.push(detach);
       } catch (e) {
-        console.error("[app-shell] failed to attach IPC streams", e);
+        console.error("[app-shell] history invalidation failed", e);
       }
-    })();
+    }
+
+    connectSessionStream();
+    connectHistoryInvalidation();
 
     return () => {
       cancelled = true;

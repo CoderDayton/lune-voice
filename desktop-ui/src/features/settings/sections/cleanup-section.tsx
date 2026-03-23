@@ -1,16 +1,11 @@
-import { SelectField } from "../../../components/ui/field";
-import { Toggle } from "../../../components/ui/toggle";
-import { saveWorkspaceSetting, type WorkspaceSettings } from "../../../store/workspace-store";
-import { SettingsRow, SettingsSection } from "../../setup/components/settings-section";
-import { llmModels } from "../../setup/data/settings-data";
+
+import { saveWorkspaceSetting } from "../../../store/workspace-store";
+import { type SettingsProps, SettingsRow, SettingsSection } from "../components/section";
+import { llmModels } from "../data/settings-data";
 import { OpenAiFields } from "../components/openai-fields";
 import { useLingui } from "@lingui/react/macro";
 
-interface Props {
-  settings: WorkspaceSettings;
-}
-
-export function CleanupSection({ settings }: Props) {
+export function CleanupSection({ settings }: SettingsProps) {
   const { t } = useLingui();
   return (
     <SettingsSection title={t`Smart cleanup`} description={t`Give uncertain words a second look before text is sent to your app.`}>
@@ -18,7 +13,9 @@ export function CleanupSection({ settings }: Props) {
         label={t`Automatic cleanup`}
         description={t`Use a local language model to tidy up uncertain phrases.`}
         control={
-          <Toggle
+          <input
+            type="checkbox"
+            className="toggle toggle-primary"
             checked={settings.llmCorrection}
             onChange={() => void saveWorkspaceSetting("llmCorrection", !settings.llmCorrection)}
             aria-label={t`Automatic cleanup`}
@@ -28,17 +25,17 @@ export function CleanupSection({ settings }: Props) {
       <SettingsRow
         label={t`Cleanup model`}
         control={
-          <SelectField
+          <select
+            className="select w-full sm:w-auto sm:min-w-64"
             value={settings.llmBackend}
             onChange={(event) => void saveWorkspaceSetting("llmBackend", event.target.value as typeof settings.llmBackend)}
-            className="w-full sm:w-auto sm:min-w-64"
           >
             {llmModels.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
-          </SelectField>
+          </select>
         }
       />
       {settings.llmBackend === "OpenAiCompatible" && (

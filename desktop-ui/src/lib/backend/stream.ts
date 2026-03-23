@@ -3,6 +3,40 @@ import { listen } from "@tauri-apps/api/event";
 import { isTauriRuntime } from "./runtime";
 import type { SessionStreamEvent } from "./types";
 
+async function retryInvoke<T>(fn: () => Promise<T>, maxAttempts = 3, delayMs = 1000): Promise<T> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (attempt === maxAttempts) throw e;
+      await new Promise((r) => setTimeout(r, delayMs * attempt));
+    }
+  }
+  throw new Error("unreachable");
+}
+
+/**
+ * Clean up a Tauri Channel's JS-side callback from the window object.
+ * Tauri's Channel registers a callback via `transformCallback` on
+ * `window.__TAURI_INTERNALS__` but never removes it (known issue #13133).
+ * On HMR reload this causes "Couldn't find callback id" warnings.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: accessing Tauri internals
+function cleanupChannel(channel: Channel<any>) {
+  try {
+    const id = (channel as { id: number }).id;
+    // biome-ignore lint/suspicious/noExplicitAny: Tauri internal window property
+    const internals = (window as any).__TAURI_INTERNALS__ as
+      | Record<string, unknown>
+      | undefined;
+    if (internals && typeof id === "number") {
+      delete internals[`_${id}`];
+    }
+  } catch {
+    // Best-effort cleanup
+  }
+}
+
 export async function attachSessionStream(
   onEvent: (event: SessionStreamEvent) => void,
 ): Promise<() => void> {
@@ -18,12 +52,13 @@ export async function attachSessionStream(
     }
   });
 
-  await invoke("subscribe_session_stream", { channel });
+  await retryInvoke(() => invoke("subscribe_session_stream", { channel }));
 
   return () => {
     invoke("detach_session_stream").catch((e) => {
       console.warn("[stream] detach_session_stream failed", e);
     });
+    cleanupChannel(channel);
   };
 }
 

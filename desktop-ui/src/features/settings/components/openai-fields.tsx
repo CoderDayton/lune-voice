@@ -1,6 +1,6 @@
-import { TextField } from "../../../components/ui/field";
+
 import { saveWorkspaceSetting, type WorkspaceSettings } from "../../../store/workspace-store";
-import { SettingsRow } from "../../setup/components/settings-section";
+import { SettingsRow } from "./section";
 import { useLingui } from "@lingui/react/macro";
 
 type StringKeys<T> = { [K in keyof T]: T[K] extends string ? K : never }[keyof T];
@@ -23,10 +23,10 @@ export function OpenAiFields({ settings, baseUrlKey, apiKeyKey, modelKey, apiDes
         label={t`API endpoint`}
         description={`Base URL for the OpenAI-compatible ${apiDescription}.`}
         control={
-          <TextField
+          <input
+            className="input w-full sm:w-auto sm:min-w-64"
             value={settings[baseUrlKey] as string}
             onChange={(event) => void saveWorkspaceSetting(baseUrlKey, event.target.value)}
-            className="w-full sm:w-auto sm:min-w-64"
             placeholder="https://api.openai.com/v1…"
           />
         }
@@ -35,11 +35,11 @@ export function OpenAiFields({ settings, baseUrlKey, apiKeyKey, modelKey, apiDes
         label={t`API key`}
         description={t`Your API key. Stored locally and never shared.`}
         control={
-          <TextField
+          <input
             type="password"
+            className="input w-full sm:w-auto sm:min-w-64"
             value={settings[apiKeyKey] as string}
             onChange={(event) => void saveWorkspaceSetting(apiKeyKey, event.target.value)}
-            className="w-full sm:w-auto sm:min-w-64"
             placeholder="sk-…"
           />
         }
@@ -48,10 +48,10 @@ export function OpenAiFields({ settings, baseUrlKey, apiKeyKey, modelKey, apiDes
         label="Model"
         description={modelDescription}
         control={
-          <TextField
+          <input
+            className="input w-full sm:w-auto sm:min-w-48"
             value={settings[modelKey] as string}
             onChange={(event) => void saveWorkspaceSetting(modelKey, event.target.value)}
-            className="w-full sm:w-auto sm:min-w-48"
             placeholder={`${modelPlaceholder}…`}
           />
         }

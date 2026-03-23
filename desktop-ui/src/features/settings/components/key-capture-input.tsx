@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { cn } from "../../lib/cn";
+import { cn } from "../../../lib/cn";
 
 interface KeyCaptureInputProps {
   value: string;
@@ -133,19 +133,17 @@ export function KeyCaptureInput({
         disabled={disabled}
         aria-label={listening ? "Press keys to set hotkey" : `Current binding: ${value}. Click to change.`}
         className={cn(
-          "inline-flex items-center gap-2 font-mono font-semibold border transition select-none",
+          "btn btn-outline btn-sm font-mono font-semibold select-none",
           "min-w-28 sm:min-w-36 justify-center",
-          "text-[var(--text-pill)]",
-          "px-3 py-1.5 rounded-[var(--radius-control)]",
           listening
-            ? "border-brand-400/40 bg-brand-500/12 text-copy-50 ring-1 ring-brand-400/20 animate-pulse"
-            : "border-[var(--border-ghost)] bg-[var(--surface-control-strong)] text-copy-200 hover:bg-[var(--surface-control-hover)] hover:text-copy-50",
-          disabled && "opacity-40 cursor-not-allowed",
+            ? "btn-primary animate-pulse"
+            : "btn-ghost",
+          disabled && "btn-disabled",
         )}
       >
         {listening ? (
           <>
-            <span className="h-1.5 w-1.5 rounded-full bg-brand-400 shrink-0" />
+            <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
             <span>{pendingCombo ? pendingCombo.replace(/\+/g, " + ") : "Press keys…"}</span>
           </>
         ) : (
@@ -154,13 +152,13 @@ export function KeyCaptureInput({
       </button>
 
       {listening && !validationError && (
-        <p className="text-copy-500 text-pill">
-          Press your combo — <kbd className="font-mono">Esc</kbd> to cancel
+        <p className="text-xs opacity-50">
+          Press your combo — <kbd className="kbd kbd-xs">Esc</kbd> to cancel
         </p>
       )}
 
       {validationError && (
-        <p className="text-error text-pill max-w-52 sm:max-w-64 text-right">
+        <p className="text-xs text-error max-w-52 sm:max-w-64 text-right">
           {validationError}
         </p>
       )}

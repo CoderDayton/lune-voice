@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { invoke } from "@tauri-apps/api/core";
@@ -42,10 +42,12 @@ export function usePillState() {
 
   // On mount: load workspace snapshot for initial readiness
   useEffect(() => {
+    let cancelled = false;
     invoke<{ serviceStatus: string; settings: { activationMode: string; pillVisibility: string } }>(
       "load_workspace_snapshot",
     ).then(
       (snapshot) => {
+        if (cancelled) return;
         const am = snapshot.settings.activationMode;
         if (am === "Hold" || am === "Toggle") setRecordingMode(am);
         const pv = snapshot.settings.pillVisibility;
@@ -55,46 +57,46 @@ export function usePillState() {
           setMode(modeFromStatus(snapshot.serviceStatus));
         }
       },
-      (e) => console.warn("[pill] snapshot load failed, staying hidden", e),
+      (e) => {
+        if (!cancelled) console.warn("[pill] snapshot load failed, staying hidden", e);
+      },
     );
+    return () => { cancelled = true; };
   }, []);
 
-  // Listen to Rust backend events
-  useEffect(() => {
-    const unlistenState = listen<string>("lune://pill-state", (event) => {
-      if (READY_STATUSES.has(event.payload)) {
-        setServiceReady(true);
-        setMode(modeFromStatus(event.payload));
-      } else {
-        setServiceReady(false);
-        setMode("idle");
-      }
-    });
+  // Stable event handlers via useEffectEvent — no stale closure risk
+  const onPillState = useEffectEvent((status: string) => {
+    if (READY_STATUSES.has(status)) {
+      setServiceReady(true);
+      setMode(modeFromStatus(status));
+    } else {
+      setServiceReady(false);
+      setMode("idle");
+    }
+  });
 
-    const unlistenSettings = listen<PillSettings>("lune://pill-settings", (event) => {
-      const s = event.payload;
-      if (s.activationMode === "Toggle" || s.activationMode === "Hold") {
-        setRecordingMode(s.activationMode);
-      }
-      if (s.pillVisibility === "Always" || s.pillVisibility === "WhenDictating" || s.pillVisibility === "Never") {
-        setPillVis(s.pillVisibility);
-      }
-    });
+  const onPillSettings = useEffectEvent((s: PillSettings) => {
+    if (s.activationMode === "Toggle" || s.activationMode === "Hold") {
+      setRecordingMode(s.activationMode);
+    }
+    if (s.pillVisibility === "Always" || s.pillVisibility === "WhenDictating" || s.pillVisibility === "Never") {
+      setPillVis(s.pillVisibility);
+    }
+  });
+
+  const onAudioLevel = useEffectEvent((level: number) => {
+    setAudioLevel(level);
+  });
+
+  // Listen to Rust backend events — consolidated into one effect with stable handlers
+  useEffect(() => {
+    const unlistenState = listen<string>("lune://pill-state", (e) => onPillState(e.payload));
+    const unlistenSettings = listen<PillSettings>("lune://pill-settings", (e) => onPillSettings(e.payload));
+    const unlistenLevel = listen<number>("lune://audio-level", (e) => onAudioLevel(e.payload));
 
     return () => {
       unlistenState.then((fn) => fn()).catch(() => {});
       unlistenSettings.then((fn) => fn()).catch(() => {});
-    };
-  }, []);
-
-  // Listen for audio levels via targeted event from Rust (not session stream,
-  // which is single-subscriber and owned by the main window)
-  useEffect(() => {
-    const unlistenLevel = listen<number>("lune://audio-level", (event) => {
-      setAudioLevel(event.payload);
-    });
-
-    return () => {
       unlistenLevel.then((fn) => fn()).catch(() => {});
     };
   }, []);

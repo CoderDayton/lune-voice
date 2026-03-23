@@ -1,0 +1,18 @@
+[  107936ms] [ERROR] %o
+
+%s
+
+%s
+ ReferenceError: LuneLogo is not defined
+    at Sidebar (http://localhost:1420/src/features/shell/components/sidebar.tsx?t=1774249464728:24:101)
+    at Object.react_stack_bottom_frame (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=afc9c086:18509:20)
+    at renderWithHooks (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=afc9c086:5654:24)
+    at updateFunctionComponent (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=afc9c086:7475:21)
+    at beginWork (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=afc9c086:8525:20)
+    at runWithFiberInDEV (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=afc9c086:997:72)
+    at performUnitOfWork (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=afc9c086:12561:98)
+    at workLoopSync (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=afc9c086:12424:43)
+    at renderRootSync (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=afc9c086:12408:13)
+    at performWorkOnRoot (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=afc9c086:11827:37) The above error occurred in the <Sidebar> component. React will try to recreate this component tree from scratch using the error boundary you provided, CatchBoundaryImpl. @ http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=afc9c086:7000
+[  107945ms] [WARNING] Warning: The following error wasn't caught by any route! At the very least, consider setting an 'errorComponent' in your RootRoute! @ http://localhost:1420/node_modules/.vite/deps/@tanstack_react-router.js?v=afc9c086:6335
+[  107946ms] [WARNING] Warning: LuneLogo is not defined @ http://localhost:1420/node_modules/.vite/deps/@tanstack_react-router.js?v=afc9c086:6335

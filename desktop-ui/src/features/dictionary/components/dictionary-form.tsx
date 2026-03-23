@@ -1,49 +1,62 @@
-import { useState } from "react";
+import { useActionState } from "react";
 import { addDictionaryEntry } from "../../../store/workspace-store";
 import { Trans, useLingui } from "@lingui/react/macro";
 
+interface FormState {
+  phrase: string;
+  replacement: string;
+  error: string | null;
+}
+
+const initialState: FormState = { phrase: "", replacement: "", error: null };
+
 export function DictionaryForm() {
   const { t } = useLingui();
-  const [phrase, setPhrase] = useState("");
-  const [replacement, setReplacement] = useState("");
 
-  async function handleSubmit() {
-    const added = await addDictionaryEntry(phrase, replacement);
-    if (added) {
-      setPhrase("");
-      setReplacement("");
-    }
-  }
+  const [state, submitAction, isPending] = useActionState(
+    async (_prev: FormState, formData: FormData) => {
+      const phrase = (formData.get("phrase") as string) ?? "";
+      const replacement = (formData.get("replacement") as string) ?? "";
+      const added = await addDictionaryEntry(phrase, replacement);
+      if (added) return initialState;
+      return { phrase, replacement, error: "Failed to add entry" };
+    },
+    initialState,
+  );
 
   return (
-    <fieldset className="fieldset bg-base-200 border-base-300 rounded-box border p-4">
-      <legend className="fieldset-legend"><Trans>Add correction rule</Trans></legend>
-      <div className="flex flex-col sm:flex-row gap-3 items-end">
-        <label className="form-control flex-1">
-          <div className="label"><span className="label-text"><Trans>Spoken phrase</Trans></span></div>
-          <input
-            type="text"
-            className="input w-full"
-            value={phrase}
-            onChange={(e) => setPhrase(e.target.value)}
-            placeholder={t`e.g. github…`}
-          />
-        </label>
-        <span className="hidden sm:block pb-3 opacity-30 text-lg">→</span>
-        <label className="form-control flex-1">
-          <div className="label"><span className="label-text"><Trans>Replacement</Trans></span></div>
-          <input
-            type="text"
-            className="input w-full"
-            value={replacement}
-            onChange={(e) => setReplacement(e.target.value)}
-            placeholder={t`e.g. GitHub…`}
-          />
-        </label>
-        <button type="button" className="btn btn-primary" onClick={handleSubmit}>
-          <Trans>Add</Trans>
-        </button>
-      </div>
-    </fieldset>
+    <form action={submitAction}>
+      <section className="card bg-base-200 border border-base-300/30 rounded-box p-5 sm:p-6">
+        <h3 className="text-lg font-semibold tracking-tight mb-4"><Trans>Add correction rule</Trans></h3>
+        <fieldset className="flex flex-col sm:flex-row gap-3 items-end" disabled={isPending}>
+          <label className="form-control flex-1">
+            <div className="label"><span className="label-text"><Trans>Spoken phrase</Trans></span></div>
+            <input
+              type="text"
+              name="phrase"
+              className="input w-full"
+              defaultValue={state.phrase}
+              key={state === initialState ? "reset-phrase" : undefined}
+              placeholder={t`e.g. github…`}
+            />
+          </label>
+          <span className="hidden sm:block pb-3 opacity-30 text-lg">→</span>
+          <label className="form-control flex-1">
+            <div className="label"><span className="label-text"><Trans>Replacement</Trans></span></div>
+            <input
+              type="text"
+              name="replacement"
+              className="input w-full"
+              defaultValue={state.replacement}
+              key={state === initialState ? "reset-replacement" : undefined}
+              placeholder={t`e.g. GitHub…`}
+            />
+          </label>
+          <button type="submit" className="btn btn-primary" disabled={isPending}>
+            {isPending ? <span className="loading loading-spinner loading-sm" /> : <Trans>Add</Trans>}
+          </button>
+        </fieldset>
+      </section>
+    </form>
   );
 }

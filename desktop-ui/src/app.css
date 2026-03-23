@@ -1,33 +1,39 @@
 @import "tailwindcss";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource-variable/manrope";
 @plugin "daisyui";
+
+/* ── Lune theme: warm, soft, inviting dark ─────────────────────────── */
 
 @plugin "daisyui/theme" {
   name: "lune";
   default: true;
   color-scheme: dark;
-  --color-base-100: oklch(0.12 0.01 260);
-  --color-base-200: oklch(0.15 0.013 260);
-  --color-base-300: oklch(0.18 0.014 260);
-  --color-base-content: oklch(0.98 0.004 260);
-  --color-primary: oklch(0.7 0.16 268);
-  --color-primary-content: oklch(0.98 0.01 268);
-  --color-secondary: oklch(0.78 0.12 220);
-  --color-secondary-content: oklch(0.98 0.01 220);
-  --color-accent: oklch(0.84 0.1 100);
-  --color-accent-content: oklch(0.2 0.05 100);
-  --color-neutral: oklch(0.2 0.014 260);
-  --color-neutral-content: oklch(0.84 0.008 260);
-  --color-info: oklch(0.72 0.15 220);
-  --color-info-content: oklch(0.98 0.01 220);
-  --color-success: oklch(0.7 0.16 150);
-  --color-success-content: oklch(0.98 0.01 150);
-  --color-warning: oklch(0.8 0.15 80);
-  --color-warning-content: oklch(0.2 0.05 80);
-  --color-error: oklch(0.62 0.19 25);
-  --color-error-content: oklch(0.98 0.01 25);
-  --radius-selector: 1rem;
+  --color-base-100: oklch(0.16 0.012 270);
+  --color-base-200: oklch(0.19 0.014 268);
+  --color-base-300: oklch(0.23 0.016 265);
+  --color-base-content: oklch(0.93 0.008 265);
+  --color-primary: oklch(0.68 0.14 280);
+  --color-primary-content: oklch(0.98 0.005 280);
+  --color-secondary: oklch(0.72 0.1 230);
+  --color-secondary-content: oklch(0.98 0.005 230);
+  --color-accent: oklch(0.78 0.1 160);
+  --color-accent-content: oklch(0.2 0.04 160);
+  --color-neutral: oklch(0.22 0.012 268);
+  --color-neutral-content: oklch(0.82 0.008 268);
+  --color-info: oklch(0.7 0.12 230);
+  --color-info-content: oklch(0.98 0.005 230);
+  --color-success: oklch(0.68 0.14 155);
+  --color-success-content: oklch(0.98 0.005 155);
+  --color-warning: oklch(0.78 0.13 75);
+  --color-warning-content: oklch(0.22 0.04 75);
+  --color-error: oklch(0.65 0.18 18);
+  --color-error-content: oklch(0.98 0.005 18);
+  --radius-selector: 0.75rem;
   --radius-field: 0.75rem;
-  --radius-box: 1.25rem;
+  --radius-box: 1rem;
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
   --border: 1px;
@@ -39,34 +45,36 @@
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Manrope", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
 
-  --color-brand-500: oklch(0.7 0.16 268);
-  --color-brand-400: oklch(0.78 0.12 220);
-  --color-brand-300: oklch(0.84 0.1 100);
+  --color-brand-500: oklch(0.68 0.14 280);
+  --color-brand-400: oklch(0.72 0.1 230);
+  --color-brand-300: oklch(0.78 0.1 160);
 }
 
 :root {
-  --size-sidebar: 17rem;
-  --size-sidebar-collapsed: 5.5rem;
-  --size-content-max: 92rem;
-  --size-brand-mark: 2.75rem;
+  --size-sidebar: 16rem;
+  --size-sidebar-collapsed: 5rem;
+  --size-content-max: 56rem;
+  --size-brand-mark: 2.5rem;
   --size-nav-icon: 1.125rem;
-  --size-page-title: 2.1rem;
 
-  --space-page-stack: 1.25rem;
-  --space-page-x-mobile: 1.25rem;
-  --space-page-x-desktop: 2rem;
-  --space-page-y: 1.25rem;
-  --space-page-bottom: 2.5rem;
+  --space-page-stack: 1.5rem;
+  --space-page-x-mobile: 1.5rem;
+  --space-page-x-desktop: 2.5rem;
+  --space-page-y: 1.5rem;
+  --space-page-bottom: 3rem;
 
   --surface-body:
-    linear-gradient(180deg, oklch(0.13 0.01 260), oklch(0.1 0.01 260));
+    linear-gradient(170deg, oklch(0.17 0.014 272), oklch(0.13 0.01 268));
   --surface-backdrop:
-    radial-gradient(circle at 20% 10%, oklch(0.7 0.16 268 / 0.08), transparent 40%);
+    radial-gradient(ellipse at 15% 5%, oklch(0.68 0.14 280 / 0.06), transparent 50%),
+    radial-gradient(ellipse at 85% 90%, oklch(0.72 0.1 230 / 0.04), transparent 50%);
   --surface-brand:
-    linear-gradient(145deg, oklch(0.78 0.12 220), oklch(0.7 0.16 268));
-  --surface-nav-active: oklch(0.7 0.16 268 / 0.12);
+    linear-gradient(135deg, oklch(0.72 0.1 230), oklch(0.68 0.14 280));
+  --surface-nav-active: oklch(0.68 0.14 280 / 0.1);
 
-  --shadow-brand: 0 16px 30px oklch(0.7 0.16 268 / 0.24);
+  --shadow-soft: 0 1px 3px oklch(0 0 0 / 0.15), 0 4px 12px oklch(0 0 0 / 0.1);
+  --shadow-card: 0 2px 8px oklch(0 0 0 / 0.12), 0 1px 2px oklch(0 0 0 / 0.08);
+  --shadow-brand: 0 8px 24px oklch(0.68 0.14 280 / 0.2);
 }
 
 /* ── Base ──────────────────────────────────────────────────────────── */
@@ -103,9 +111,10 @@
     @apply font-display;
   }
 
+  /* Warm, subtle scrollbar */
   ::-webkit-scrollbar {
-    width: 0.55rem;
-    height: 0.55rem;
+    width: 6px;
+    height: 6px;
   }
 
   ::-webkit-scrollbar-track {
@@ -113,15 +122,62 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: oklch(1 0 0 / 0.12);
+    background: oklch(1 0 0 / 0.08);
     border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(1 0 0 / 0.15);
+  }
+
+  /* Soft elevation — only on cards/stats, not every table */
+  .card,
+  .stats {
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Only transition properties that actually animate */
+  .btn {
+    transition: background-color 150ms ease, border-color 150ms ease, opacity 150ms ease;
+  }
+
+  /* UI chrome should not be selectable — only content text */
+  .sidebar-surface,
+  .brand-title,
+  .stat-title,
+  .stat-desc,
+  .badge,
+  .btn,
+  .label-text,
+  .fieldset-legend,
+  .status {
+    user-select: none;
+  }
+
+  /* Warmer alert */
+  .alert {
+    @apply border-base-300/30 bg-base-200/60;
+  }
+
+  /* Softer list rows */
+  .list-row {
+    transition: background 150ms ease;
+  }
+
+  .list-row:hover {
+    background: oklch(1 0 0 / 0.03);
+  }
+
+  /* Warm table hover */
+  .table tr.hover:hover td {
+    background: oklch(1 0 0 / 0.03);
   }
 }
 
 @keyframes page-in {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(6px);
   }
 
   to {
@@ -143,7 +199,7 @@
 /* ── Shell layout ──────────────────────────────────────────────────── */
 
 @utility app-shell-root {
-  @apply relative flex min-h-dvh overflow-hidden;
+  @apply relative flex h-dvh overflow-hidden;
 }
 
 @utility app-shell-backdrop {
@@ -166,7 +222,7 @@
 @utility app-frame {
   @apply mx-auto w-full;
   max-width: var(--size-content-max);
-  animation: page-in 320ms ease;
+  animation: page-in 280ms ease;
 }
 
 @utility page-stack {
@@ -183,72 +239,26 @@
   }
 }
 
-/* ── Topbar ────────────────────────────────────────────────────────── */
-
-@utility topbar-shell {
-  @apply flex items-center gap-4;
-  padding:
-    var(--space-page-y)
-    var(--space-page-x-mobile)
-    0;
-}
-
-@media (min-width: 48rem) {
-  .topbar-shell {
-    padding:
-      1.75rem
-      var(--space-page-x-desktop)
-      0;
-  }
-}
-
 /* ── Sidebar ───────────────────────────────────────────────────────── */
 
 @utility sidebar-surface {
-  @apply border-r border-base-300/40;
-  background: oklch(0.13 0.012 260 / 0.97);
+  @apply border-r border-base-300/20;
+  background: oklch(0.155 0.013 270 / 0.98);
 }
 
 @utility brand-mark {
   @apply flex items-center justify-center text-white;
   width: var(--size-brand-mark);
   height: var(--size-brand-mark);
-  border-radius: 1rem;
+  border-radius: 0.875rem;
   background: var(--surface-brand);
   box-shadow: var(--shadow-brand);
 }
 
 @utility brand-title {
   @apply truncate font-bold;
-  font-size: 1.125rem;
-  letter-spacing: -0.04em;
-}
-
-@utility page-title {
-  @apply font-bold text-balance;
-  font-size: clamp(1.5rem, 4vw, var(--size-page-title));
-  letter-spacing: -0.04em;
-}
-
-/* ── Nav links ─────────────────────────────────────────────────────── */
-
-@utility nav-link {
-  @apply flex items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 transition;
-  min-height: 3rem;
-}
-
-@utility nav-link-active {
-  @apply nav-link border-primary/20;
-  background: var(--surface-nav-active);
-  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.08);
-}
-
-@utility nav-link-idle {
-  @apply nav-link opacity-60;
-}
-
-.nav-link-idle:hover {
-  @apply opacity-100 bg-base-300/40;
+  font-size: 1.1rem;
+  letter-spacing: -0.03em;
 }
 
 @utility nav-icon {
@@ -258,27 +268,29 @@
 }
 
 /* ── Dictation pill ────────────────────────────────────────────────── */
-
 @utility pill-idle {
   @apply flex items-center justify-center rounded-full
-         border border-primary/30 cursor-pointer transition
-         size-12 bg-base-200/90 text-base-content
-         shadow-lg;
+         border border-primary/25 cursor-pointer
+         size-12 bg-base-200/95 text-base-content;
+  box-shadow: var(--shadow-soft);
+  transition: background-color 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
 }
 
 .pill-idle:hover {
-  @apply border-primary/60 bg-base-300/95 shadow-primary/20;
+  @apply border-primary/50 bg-base-300/95;
+  box-shadow: 0 4px 16px oklch(0.68 0.14 280 / 0.2);
 }
 
 @utility pill-active {
   @apply flex items-center gap-3 rounded-full
-         border border-primary/30 px-4 h-12
-         bg-base-200/90 shadow-lg;
+         border border-primary/25 px-4 h-12
+         bg-base-200/95;
+  box-shadow: var(--shadow-soft);
   animation: pill-expand 200ms ease;
 }
 
 @utility pill-processing {
-  @apply border-warning/30;
+  @apply border-warning/25;
 }
 
 @utility pill-center {
@@ -286,8 +298,9 @@
 }
 
 @utility pill-btn {
-  @apply flex items-center justify-center rounded-full transition
-         size-7 text-base-content/70;
+  @apply flex items-center justify-center rounded-full
+         size-7 text-base-content/60;
+  transition: color 150ms ease, background-color 150ms ease;
 }
 
 .pill-btn:hover {
@@ -295,11 +308,11 @@
 }
 
 .pill-btn-cancel:hover {
-  @apply bg-error/20;
+  @apply bg-error/15;
 }
 
 .pill-btn-stop:hover {
-  @apply bg-error/20;
+  @apply bg-error/15;
 }
 
 @utility audio-dots {
@@ -315,11 +328,11 @@
 @keyframes dot-bounce {
   0%, 80%, 100% {
     transform: scaleY(1);
-    opacity: 0.4;
+    opacity: 0.35;
   }
   40% {
-    transform: scaleY(2.2);
-    opacity: 1;
+    transform: scaleY(2);
+    opacity: 0.9;
   }
 }
 
@@ -330,12 +343,12 @@
 
 @keyframes pulse-glow {
   0%, 100% {
-    opacity: 0.4;
-    transform: scale(0.75);
+    opacity: 0.35;
+    transform: scale(0.8);
   }
   50% {
-    opacity: 1;
-    transform: scale(1.25);
+    opacity: 0.9;
+    transform: scale(1.2);
   }
 }
 

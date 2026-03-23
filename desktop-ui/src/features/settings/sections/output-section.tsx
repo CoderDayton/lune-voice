@@ -1,14 +1,10 @@
-import { SelectField } from "../../../components/ui/field";
-import { saveWorkspaceSetting, type WorkspaceSettings } from "../../../store/workspace-store";
-import { SettingsRow, SettingsSection } from "../../setup/components/settings-section";
-import { deliveryMethods, stylePresets } from "../../setup/data/settings-data";
+
+import { saveWorkspaceSetting } from "../../../store/workspace-store";
+import { type SettingsProps, SettingsRow, SettingsSection } from "../components/section";
+import { deliveryMethods, stylePresets } from "../data/settings-data";
 import { useLingui } from "@lingui/react/macro";
 
-interface Props {
-  settings: WorkspaceSettings;
-}
-
-export function OutputSection({ settings }: Props) {
+export function OutputSection({ settings }: SettingsProps) {
   const { t } = useLingui();
   return (
     <SettingsSection title={t`Text output`} description={t`Choose how finished text is inserted into the app you are currently using.`}>
@@ -16,34 +12,34 @@ export function OutputSection({ settings }: Props) {
         label={t`Send method`}
         description={t`Paste is simplest. Typing keystrokes can work better in some apps.`}
         control={
-          <SelectField
+          <select
+            className="select w-full sm:w-auto sm:min-w-56"
             value={settings.dictationMode}
             onChange={(event) => void saveWorkspaceSetting("dictationMode", event.target.value as typeof settings.dictationMode)}
-            className="w-full sm:w-auto sm:min-w-56"
           >
             {deliveryMethods.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
-          </SelectField>
+          </select>
         }
       />
       <SettingsRow
         label={t`Writing style`}
         description={t`Pick the tone used when final cleanup is applied.`}
         control={
-          <SelectField
+          <select
+            className="select w-full sm:w-auto sm:min-w-52"
             value={settings.stylePreset}
             onChange={(event) => void saveWorkspaceSetting("stylePreset", event.target.value)}
-            className="w-full sm:w-auto sm:min-w-52"
           >
             {stylePresets.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
-          </SelectField>
+          </select>
         }
       />
     </SettingsSection>

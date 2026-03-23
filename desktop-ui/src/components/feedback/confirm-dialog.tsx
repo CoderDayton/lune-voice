@@ -1,7 +1,7 @@
-import { useRef } from "react";
+import { useState } from "react";
 import { useLingui } from "@lingui/react/macro";
 
-interface ModalCancelProps {
+interface ConfirmDialogProps {
   title: string;
   description: string;
   triggerLabel?: string;
@@ -10,28 +10,34 @@ interface ModalCancelProps {
   onConfirm: () => void;
 }
 
-export function ModalCancel({
+export function ConfirmDialog({
   title,
   description,
   triggerLabel,
   confirmLabel,
   cancelLabel,
   onConfirm,
-}: ModalCancelProps) {
+}: ConfirmDialogProps) {
   const { t } = useLingui();
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [dialog, setDialog] = useState<HTMLDialogElement | null>(null);
 
   return (
     <>
       <button
         type="button"
         className="btn btn-ghost btn-sm"
-        onClick={() => dialogRef.current?.showModal()}
+        onClick={() => dialog?.showModal()}
       >
         {triggerLabel ?? t`Remove`}
       </button>
 
-      <dialog ref={dialogRef} className="modal">
+      <dialog
+        ref={(el) => {
+          setDialog(el);
+          return () => setDialog(null);
+        }}
+        className="modal"
+      >
         <div className="modal-box">
           <h3 className="text-lg font-bold">{title}</h3>
           <p className="py-4 text-sm opacity-70">{description}</p>
@@ -44,7 +50,7 @@ export function ModalCancel({
               className="btn btn-error"
               onClick={() => {
                 onConfirm();
-                dialogRef.current?.close();
+                dialog?.close();
               }}
             >
               {confirmLabel ?? t`Delete`}

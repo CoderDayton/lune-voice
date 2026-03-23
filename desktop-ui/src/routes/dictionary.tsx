@@ -1,6 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { DictionaryPage } from "../features/dictionary/dictionary-page";
+import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/dictionary")({
-  component: DictionaryPage,
+  component: lazyRouteComponent(() => import("../features/dictionary/dictionary-page"), "DictionaryPage"),
 });

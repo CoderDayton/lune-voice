@@ -10,8 +10,8 @@ export function Topbar() {
   const page = findNavigationItem(pathname);
 
   return (
-    <header className="topbar-shell">
-      <div className="flex items-center gap-3">
+    <div className="navbar px-4 sm:px-6">
+      <div className="navbar-start">
         <button
           type="button"
           className="btn btn-ghost btn-sm md:hidden"
@@ -20,8 +20,8 @@ export function Topbar() {
         >
           <MenuIcon className="size-5" />
         </button>
-        <h1 className="page-title">{page.label}</h1>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight select-none">{page.label}</h1>
       </div>
-    </header>
+    </div>
   );
 }

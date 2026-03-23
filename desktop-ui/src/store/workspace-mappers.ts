@@ -1,0 +1,98 @@
+import type { BackendDictionaryEntry, BackendHistoryEntry, BackendWorkspaceSnapshot, SaveWorkspaceSettingsInput } from "../lib/backend/types";
+import type { DictionaryEntry } from "../features/dictionary/data/dictionary-data";
+import { asrBackends, deliveryMethods, labelFor, type AsrBackendValue, type DictationModeValue, type PillVisibilityValue } from "../features/settings/data/settings-data";
+import { DEFAULT_SETTINGS, type HistorySession, type WorkspaceSettings } from "./workspace-types";
+
+export function mapHistoryEntry(entry: BackendHistoryEntry): HistorySession | null {
+  if (!entry.transcript) return null;
+
+  const startedAt = new Date(entry.startedAt);
+  const endedAt = entry.endedAt ? new Date(entry.endedAt) : null;
+  const seconds = endedAt
+    ? Math.max(1, Math.round((endedAt.getTime() - startedAt.getTime()) / 1000))
+    : 0;
+
+  return {
+    id: entry.id,
+    startedAt: entry.startedAt,
+    endedAt: entry.endedAt,
+    transcript: entry.transcript,
+    backend: entry.backend,
+    style: entry.style,
+    status: entry.status,
+    words: countWords(entry.transcript),
+    seconds,
+  };
+}
+
+export function mapDictionaryEntry(entry: BackendDictionaryEntry): DictionaryEntry {
+  return entry;
+}
+
+export function mapWorkspaceSettings(snapshot: BackendWorkspaceSnapshot): WorkspaceSettings {
+  return {
+    activationMode: snapshot.settings.activationMode,
+    asrBackend: snapshot.settings.asrBackendType,
+    useGpu: snapshot.settings.useGpu,
+    confidenceThreshold: formatThreshold(snapshot.settings.confidenceThreshold ?? 0.5),
+    llmCorrection: snapshot.settings.confidenceThreshold !== null,
+    llmBackend: snapshot.settings.llmBackendType,
+    dictationMode: snapshot.settings.dictationMode,
+    stylePreset: snapshot.settings.stylePreset,
+    adaptiveVad: snapshot.settings.adaptiveVad,
+    speechThreshold: formatThreshold(snapshot.settings.speechThreshold),
+    hotkeyToggle: snapshot.settings.hotkeyToggle,
+    hotkeyCancel: snapshot.settings.hotkeyCancel,
+    alignerEnabled: snapshot.settings.alignerEnabled,
+    pillVisibility: (snapshot.settings.pillVisibility ?? "Always") as PillVisibilityValue,
+    language: snapshot.settings.language ?? "en",
+    openaiAsrBaseUrl: snapshot.settings.openaiAsrBaseUrl ?? DEFAULT_SETTINGS.openaiAsrBaseUrl,
+    openaiAsrApiKey: snapshot.settings.openaiAsrApiKey ?? DEFAULT_SETTINGS.openaiAsrApiKey,
+    openaiAsrModel: snapshot.settings.openaiAsrModel ?? DEFAULT_SETTINGS.openaiAsrModel,
+    openaiLlmBaseUrl: snapshot.settings.openaiLlmBaseUrl ?? DEFAULT_SETTINGS.openaiLlmBaseUrl,
+    openaiLlmApiKey: snapshot.settings.openaiLlmApiKey ?? DEFAULT_SETTINGS.openaiLlmApiKey,
+    openaiLlmModel: snapshot.settings.openaiLlmModel ?? DEFAULT_SETTINGS.openaiLlmModel,
+  };
+}
+
+export function summarizeAsrBackend(value: AsrBackendValue) {
+  return labelFor(asrBackends, value).replace(" (recommended)", "");
+}
+
+export function summarizeDictationMode(value: DictationModeValue) {
+  return labelFor(deliveryMethods, value).replace(" into app", "");
+}
+
+function countWords(text: string) {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function formatThreshold(value: number) {
+  return value.toFixed(2);
+}
+
+export function settingsToSaveInput(settings: WorkspaceSettings): SaveWorkspaceSettingsInput {
+  return {
+    activationMode: settings.activationMode,
+    dictationMode: settings.dictationMode,
+    useGpu: settings.useGpu,
+    asrBackendType: settings.asrBackend,
+    llmBackendType: settings.llmBackend,
+    llmCorrection: settings.llmCorrection,
+    confidenceThreshold: settings.llmCorrection ? Number(settings.confidenceThreshold) : null,
+    adaptiveVad: settings.adaptiveVad,
+    speechThreshold: Number(settings.speechThreshold),
+    stylePreset: settings.stylePreset,
+    hotkeyToggle: settings.hotkeyToggle,
+    hotkeyCancel: settings.hotkeyCancel,
+    alignerEnabled: settings.alignerEnabled,
+    pillVisibility: settings.pillVisibility,
+    language: settings.language,
+    openaiAsrBaseUrl: settings.openaiAsrBaseUrl || null,
+    openaiAsrApiKey: settings.openaiAsrApiKey || null,
+    openaiAsrModel: settings.openaiAsrModel || null,
+    openaiLlmBaseUrl: settings.openaiLlmBaseUrl || null,
+    openaiLlmApiKey: settings.openaiLlmApiKey || null,
+    openaiLlmModel: settings.openaiLlmModel || null,
+  };
+}

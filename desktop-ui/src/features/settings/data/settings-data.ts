@@ -43,30 +43,7 @@ export const stylePresets: Option<string>[] = [
   { value: "technical", label: "Code" },
 ];
 
-function labelForOption<Value extends string>(options: Option<Value>[], value: Value) {
-  return options.find((option) => option.value === value)?.label ?? value;
-}
 
-export function labelForActivationMode(value: ActivationModeValue) {
-  return labelForOption(activationModes, value);
-}
-
-export function labelForAsrBackend(value: AsrBackendValue) {
-  return labelForOption(asrBackends, value);
-}
-
-export function labelForLlmBackend(value: LlmBackendValue) {
-  return labelForOption(llmModels, value);
-}
-
-export function labelForDeliveryMethod(value: DictationModeValue) {
-  return labelForOption(deliveryMethods, value);
-}
-
-export function labelForPillVisibility(value: PillVisibilityValue) {
-  return labelForOption(pillVisibilityOptions, value);
-}
-
-export function labelForStylePreset(value: string) {
-  return labelForOption(stylePresets, value);
+export function labelFor<V extends string>(options: Option<V>[], value: V): string {
+  return options.find((o) => o.value === value)?.label ?? value;
 }

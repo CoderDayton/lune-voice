@@ -1,17 +1,23 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { resetMockBackendClient } from "../../src/lib/backend/mock";
 import {
   addDictionaryEntry,
-  createInitialWorkspaceState,
   loadWorkspaceSnapshot,
   removeDictionaryEntry,
   workspaceStore,
 } from "../../src/store/workspace-store";
+import { DEFAULT_RUNTIME, DEFAULT_SETTINGS } from "../../src/store/workspace-types";
 
 describe("workspace store", () => {
   beforeEach(async () => {
-    resetMockBackendClient();
-    workspaceStore.setState(() => createInitialWorkspaceState());
+    workspaceStore.setState(() => ({
+      sidebarCollapsed: false,
+      mobileMenuOpen: false,
+      historySearch: "",
+      dictionaryEntries: [],
+      historySessions: [],
+      settings: { ...DEFAULT_SETTINGS },
+      runtime: { ...DEFAULT_RUNTIME },
+    }));
     await loadWorkspaceSnapshot();
   });
 

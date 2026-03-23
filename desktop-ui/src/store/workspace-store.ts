@@ -1,181 +1,75 @@
 import { Store } from "@tanstack/store";
 import { backendClient } from "../lib/backend/client";
-import type {
-  BackendDictionaryEntry,
-  BackendHistoryEntry,
-  BackendWorkspaceSnapshot,
-  SessionStreamEvent,
-} from "../lib/backend/types";
-import type { DictionaryEntry } from "../features/dictionary/data/dictionary-data";
+import type { BackendWorkspaceSnapshot, SessionStreamEvent } from "../lib/backend/types";
 import {
-  labelForAsrBackend,
-  labelForDeliveryMethod,
-  labelForLlmBackend,
-  labelForStylePreset,
-  type ActivationModeValue,
-  type AsrBackendValue,
-  type DictationModeValue,
-  type LlmBackendValue,
-  type PillVisibilityValue,
-} from "../features/setup/data/settings-data";
+  DEFAULT_RUNTIME,
+  DEFAULT_SETTINGS,
+  type HistorySession,
+  type WorkspaceRuntimeState,
+  type WorkspaceSettings,
+  type WorkspaceState,
+} from "./workspace-types";
+import { mapDictionaryEntry, mapHistoryEntry, mapWorkspaceSettings, settingsToSaveInput } from "./workspace-mappers";
 
-export interface WorkspaceSettings {
-  activationMode: ActivationModeValue;
-  asrBackend: AsrBackendValue;
-  useGpu: boolean;
-  confidenceThreshold: string;
-  llmCorrection: boolean;
-  llmBackend: LlmBackendValue;
-  dictationMode: DictationModeValue;
-  stylePreset: string;
-  adaptiveVad: boolean;
-  speechThreshold: string;
-  hotkeyToggle: string;
-  hotkeyCancel: string;
-  alignerEnabled: boolean;
-  pillVisibility: PillVisibilityValue;
-  language: string;
-  // OpenAI ASR fields
-  openaiAsrBaseUrl: string;
-  openaiAsrApiKey: string;
-  openaiAsrModel: string;
-  // OpenAI LLM fields
-  openaiLlmBaseUrl: string;
-  openaiLlmApiKey: string;
-  openaiLlmModel: string;
-}
+// Re-export types and selectors for consumers
+export type { HistorySession, WorkspaceSettings, WorkspaceState } from "./workspace-types";
+export { summarizeAsrBackend, summarizeDictationMode } from "./workspace-mappers";
 
-export interface HistorySession {
-  id: string;
-  startedAt: string;
-  endedAt: string | null;
-  transcript: string;
-  backend: string;
-  style: string;
-  status: string;
-  words: number;
-  seconds: number;
-}
+// ── Store ─────────────────────────────────────────────────────────────
 
-interface WorkspaceRuntimeState {
-  ipcFlavor: string;
-  serviceStatus: string;
-  activeSessionId: string | null;
-  liveTranscript: string;
-  loaded: boolean;
-  loading: boolean;
-  error: string | null;
-}
+export const workspaceStore = new Store<WorkspaceState>({
+  sidebarCollapsed: false,
+  mobileMenuOpen: false,
+  historySearch: "",
+  dictionaryEntries: [],
+  historySessions: [],
+  settings: { ...DEFAULT_SETTINGS },
+  runtime: { ...DEFAULT_RUNTIME },
+});
 
-interface WorkspaceState {
-  sidebarCollapsed: boolean;
-  mobileMenuOpen: boolean;
-  historySearch: string;
-  dictionaryEntries: DictionaryEntry[];
-  historySessions: HistorySession[];
-  settings: WorkspaceSettings;
-  runtime: WorkspaceRuntimeState;
-}
-
-const DEFAULT_SETTINGS: WorkspaceSettings = {
-  activationMode: "Toggle",
-  asrBackend: "OrtQwenAsr",
-  useGpu: true,
-  confidenceThreshold: "0.50",
-  llmCorrection: true,
-  llmBackend: "LlamaCppLocal",
-  dictationMode: "Clipboard",
-  stylePreset: "casual",
-  adaptiveVad: false,
-  speechThreshold: "0.50",
-  hotkeyToggle: "Ctrl+Space",
-  hotkeyCancel: "Escape",
-  alignerEnabled: true,
-  pillVisibility: "Always",
-  language: "en",
-  openaiAsrBaseUrl: "https://api.openai.com/v1",
-  openaiAsrApiKey: "",
-  openaiAsrModel: "whisper-1",
-  openaiLlmBaseUrl: "https://api.openai.com/v1",
-  openaiLlmApiKey: "",
-  openaiLlmModel: "gpt-4o-mini",
-};
-
-const DEFAULT_RUNTIME: WorkspaceRuntimeState = {
-  ipcFlavor: "unknown",
-  serviceStatus: "Connecting",
-  activeSessionId: null,
-  liveTranscript: "",
-  loaded: false,
-  loading: false,
-  error: null,
-};
-
-
-export function createInitialWorkspaceState(): WorkspaceState {
-  return {
-    sidebarCollapsed: false,
-    mobileMenuOpen: false,
-    historySearch: "",
-    dictionaryEntries: [],
-    historySessions: [],
-    settings: { ...DEFAULT_SETTINGS },
-    runtime: { ...DEFAULT_RUNTIME },
-  };
-}
-
-export const workspaceStore = new Store(createInitialWorkspaceState());
+// ── Actions ───────────────────────────────────────────────────────────
 
 export const workspaceActions = {
   toggleSidebar() {
-    workspaceStore.setState((state) => ({ ...state, sidebarCollapsed: !state.sidebarCollapsed }));
+    workspaceStore.setState((s) => ({ ...s, sidebarCollapsed: !s.sidebarCollapsed }));
   },
 
   toggleMobileMenu() {
-    workspaceStore.setState((state) => ({ ...state, mobileMenuOpen: !state.mobileMenuOpen }));
+    workspaceStore.setState((s) => ({ ...s, mobileMenuOpen: !s.mobileMenuOpen }));
   },
 
   closeMobileMenu() {
-    workspaceStore.setState((state) => ({ ...state, mobileMenuOpen: false }));
+    workspaceStore.setState((s) => ({ ...s, mobileMenuOpen: false }));
   },
 
   setHistorySearch(value: string) {
-    workspaceStore.setState((state) => ({ ...state, historySearch: value }));
+    workspaceStore.setState((s) => ({ ...s, historySearch: value }));
   },
 
   updateSetting<Key extends keyof WorkspaceSettings>(key: Key, value: WorkspaceSettings[Key]) {
-    workspaceStore.setState((state) => ({
-      ...state,
-      settings: {
-        ...state.settings,
-        [key]: value,
-      },
+    workspaceStore.setState((s) => ({
+      ...s,
+      settings: { ...s.settings, [key]: value },
     }));
   },
 
   setLoading(loading: boolean) {
-    workspaceStore.setState((state) => ({
-      ...state,
-      runtime: {
-        ...state.runtime,
-        loading,
-      },
+    workspaceStore.setState((s) => ({
+      ...s,
+      runtime: { ...s.runtime, loading },
     }));
   },
 
   setError(error: string | null) {
-    workspaceStore.setState((state) => ({
-      ...state,
-      runtime: {
-        ...state.runtime,
-        error,
-      },
+    workspaceStore.setState((s) => ({
+      ...s,
+      runtime: { ...s.runtime, error },
     }));
   },
 
   hydrate(snapshot: BackendWorkspaceSnapshot) {
-    workspaceStore.setState((state) => ({
-      ...state,
+    workspaceStore.setState((s) => ({
+      ...s,
       dictionaryEntries: snapshot.dictionary.map(mapDictionaryEntry),
       historySessions: snapshot.history
         .filter((entry) => entry.transcript)
@@ -185,8 +79,8 @@ export const workspaceActions = {
       runtime: {
         ipcFlavor: snapshot.ipcFlavor,
         serviceStatus: snapshot.serviceStatus,
-        activeSessionId: state.runtime.activeSessionId,
-        liveTranscript: state.runtime.liveTranscript,
+        activeSessionId: s.runtime.activeSessionId,
+        liveTranscript: s.runtime.liveTranscript,
         loaded: true,
         loading: false,
         error: null,
@@ -195,19 +89,23 @@ export const workspaceActions = {
   },
 
   applySessionEvent(event: SessionStreamEvent) {
-    workspaceStore.setState((state) => ({
-      ...state,
-      runtime: reduceSessionEvent(state.runtime, event),
-    }));
+    workspaceStore.setState((s) => {
+      const runtime = reduceSessionEvent(s.runtime, event);
+      if (runtime === s.runtime) return s;
+      return { ...s, runtime };
+    });
   },
 };
+
+// ── Async operations ──────────────────────────────────────────────────
 
 export async function loadWorkspaceSnapshot() {
   workspaceActions.setLoading(true);
   workspaceActions.setError(null);
-
   try {
-    return await hydrateFromSnapshot(() => backendClient.loadWorkspaceSnapshot());
+    const snapshot = await backendClient.loadWorkspaceSnapshot();
+    workspaceActions.hydrate(snapshot);
+    return snapshot;
   } catch (error) {
     workspaceActions.setLoading(false);
     workspaceActions.setError(formatError(error));
@@ -215,210 +113,74 @@ export async function loadWorkspaceSnapshot() {
   }
 }
 
-export async function persistWorkspaceSettings() {
-  const { settings } = workspaceStore.state;
-  workspaceActions.setError(null);
-
-  const snapshot = await backendClient.saveWorkspaceSettings({
-    activationMode: settings.activationMode,
-    dictationMode: settings.dictationMode,
-    useGpu: settings.useGpu,
-    asrBackendType: settings.asrBackend,
-    llmBackendType: settings.llmBackend,
-    llmCorrection: settings.llmCorrection,
-    confidenceThreshold: settings.llmCorrection ? Number(settings.confidenceThreshold) : null,
-    adaptiveVad: settings.adaptiveVad,
-    speechThreshold: Number(settings.speechThreshold),
-    stylePreset: settings.stylePreset,
-    hotkeyToggle: settings.hotkeyToggle,
-    hotkeyCancel: settings.hotkeyCancel,
-    alignerEnabled: settings.alignerEnabled,
-    pillVisibility: settings.pillVisibility,
-    language: settings.language,
-    openaiAsrBaseUrl: settings.openaiAsrBaseUrl || null,
-    openaiAsrApiKey: settings.openaiAsrApiKey || null,
-    openaiAsrModel: settings.openaiAsrModel || null,
-    openaiLlmBaseUrl: settings.openaiLlmBaseUrl || null,
-    openaiLlmApiKey: settings.openaiLlmApiKey || null,
-    openaiLlmModel: settings.openaiLlmModel || null,
-  });
-
-  workspaceActions.hydrate(snapshot);
-  return snapshot;
-}
-
 export async function saveWorkspaceSetting<Key extends keyof WorkspaceSettings>(
   key: Key,
   value: WorkspaceSettings[Key],
 ) {
   workspaceActions.updateSetting(key, value);
-
   try {
-    await persistWorkspaceSettings();
+    const snapshot = await backendClient.saveWorkspaceSettings(
+      settingsToSaveInput(workspaceStore.state.settings),
+    );
+    workspaceActions.hydrate(snapshot);
   } catch (error) {
     workspaceActions.setError(formatError(error));
   }
 }
 
 export async function addDictionaryEntry(phrase: string, replacement: string) {
-  const normalizedPhrase = phrase.trim();
-  const normalizedReplacement = replacement.trim();
-
-  if (!normalizedPhrase || !normalizedReplacement) {
+  const p = phrase.trim();
+  const r = replacement.trim();
+  if (!p || !r) return false;
+  try {
+    const snapshot = await backendClient.createDictionaryEntry(p, r, 5);
+    workspaceActions.hydrate(snapshot);
+    return true;
+  } catch (error) {
+    workspaceActions.setError(formatError(error));
     return false;
   }
-
-  return withWorkspaceError(
-    async () => {
-      await hydrateFromSnapshot(() =>
-        backendClient.createDictionaryEntry(
-          normalizedPhrase,
-          normalizedReplacement,
-          5,
-        ),
-      );
-      return true;
-    },
-    false,
-  );
 }
 
 export async function removeDictionaryEntry(id: number) {
-  await withWorkspaceError(
-    () => hydrateFromSnapshot(() => backendClient.deleteDictionaryEntry(id)),
-    undefined,
-  );
+  try {
+    const snapshot = await backendClient.deleteDictionaryEntry(id);
+    workspaceActions.hydrate(snapshot);
+  } catch (error) {
+    workspaceActions.setError(formatError(error));
+  }
 }
 
-export async function startDictation() {
-  return runDictationAction(() => backendClient.startDictation(), null);
+async function dictationAction<T>(action: () => Promise<T>, fallback: T): Promise<T> {
+  workspaceActions.setError(null);
+  try { return await action(); }
+  catch (error) { workspaceActions.setError(formatError(error)); return fallback; }
 }
 
-export async function stopDictation() {
-  await runDictationAction(() => backendClient.stopDictation(), undefined);
-}
+export const startDictation = () => dictationAction(backendClient.startDictation, null);
+export const stopDictation = () => dictationAction(backendClient.stopDictation, undefined);
+export const cancelDictation = () => dictationAction(backendClient.cancelDictation, undefined);
+export const toggleDictation = () => dictationAction(backendClient.toggleDictation, null);
 
-export async function cancelDictation() {
-  await runDictationAction(() => backendClient.cancelDictation(), undefined);
-}
+// ── Selectors ─────────────────────────────────────────────────────────
 
-export async function toggleDictation() {
-  return runDictationAction(() => backendClient.toggleDictation(), null);
-}
+let _visibleCache: { sessions: HistorySession[]; query: string; result: HistorySession[] } | null = null;
 
 export function getVisibleHistorySessions(state: WorkspaceState) {
   const query = state.historySearch.trim().toLowerCase();
-
-  if (!query) {
-    return state.historySessions;
+  if (!query) return state.historySessions;
+  if (_visibleCache && _visibleCache.sessions === state.historySessions && _visibleCache.query === query) {
+    return _visibleCache.result;
   }
-
-  return state.historySessions.filter((session) =>
-    session.transcript.toLowerCase().includes(query),
-  );
+  const result = state.historySessions.filter((s) => s.transcript.toLowerCase().includes(query));
+  _visibleCache = { sessions: state.historySessions, query, result };
+  return result;
 }
 
-export function summarizeAsrBackend(value: AsrBackendValue) {
-  return labelForAsrBackend(value).replace(" (recommended)", "");
-}
-
-export function formatBackendLabel(value: string) {
-  return labelForAsrBackend(value as AsrBackendValue)
-    .replace(" (recommended)", "")
-    .replace(" (OpenAI-compatible)", "");
-}
-
-export function summarizeDictationMode(value: DictationModeValue) {
-  return labelForDeliveryMethod(value).replace(" into app", "");
-}
-
-export const summarizeLlmBackend = labelForLlmBackend;
-export const summarizeStylePreset = labelForStylePreset;
-
-function mapHistoryEntry(entry: BackendHistoryEntry): HistorySession | null {
-  if (!entry.transcript) {
-    return null;
-  }
-
-  const startedAt = new Date(entry.startedAt);
-  const endedAt = entry.endedAt ? new Date(entry.endedAt) : null;
-  const seconds = endedAt
-    ? Math.max(1, Math.round((endedAt.getTime() - startedAt.getTime()) / 1000))
-    : 0;
-
-  return {
-    id: entry.id,
-    startedAt: entry.startedAt,
-    endedAt: entry.endedAt,
-    transcript: entry.transcript,
-    backend: entry.backend,
-    style: entry.style,
-    status: entry.status,
-    words: countWords(entry.transcript),
-    seconds,
-  };
-}
-
-function mapDictionaryEntry(entry: BackendDictionaryEntry): DictionaryEntry {
-  return entry;
-}
-
-function mapWorkspaceSettings(snapshot: BackendWorkspaceSnapshot): WorkspaceSettings {
-  return {
-    activationMode: snapshot.settings.activationMode,
-    asrBackend: snapshot.settings.asrBackendType,
-    useGpu: snapshot.settings.useGpu,
-    confidenceThreshold: formatThreshold(snapshot.settings.confidenceThreshold ?? 0.5),
-    llmCorrection: snapshot.settings.confidenceThreshold !== null,
-    llmBackend: snapshot.settings.llmBackendType,
-    dictationMode: snapshot.settings.dictationMode,
-    stylePreset: snapshot.settings.stylePreset,
-    adaptiveVad: snapshot.settings.adaptiveVad,
-    speechThreshold: formatThreshold(snapshot.settings.speechThreshold),
-    hotkeyToggle: snapshot.settings.hotkeyToggle,
-    hotkeyCancel: snapshot.settings.hotkeyCancel,
-    alignerEnabled: snapshot.settings.alignerEnabled,
-    pillVisibility: (snapshot.settings.pillVisibility ?? "Always") as PillVisibilityValue,
-    language: snapshot.settings.language ?? "en",
-    openaiAsrBaseUrl: snapshot.settings.openaiAsrBaseUrl ?? DEFAULT_SETTINGS.openaiAsrBaseUrl,
-    openaiAsrApiKey: snapshot.settings.openaiAsrApiKey ?? DEFAULT_SETTINGS.openaiAsrApiKey,
-    openaiAsrModel: snapshot.settings.openaiAsrModel ?? DEFAULT_SETTINGS.openaiAsrModel,
-    openaiLlmBaseUrl: snapshot.settings.openaiLlmBaseUrl ?? DEFAULT_SETTINGS.openaiLlmBaseUrl,
-    openaiLlmApiKey: snapshot.settings.openaiLlmApiKey ?? DEFAULT_SETTINGS.openaiLlmApiKey,
-    openaiLlmModel: snapshot.settings.openaiLlmModel ?? DEFAULT_SETTINGS.openaiLlmModel,
-  };
-}
-
-function countWords(text: string) {
-  return text.trim().split(/\s+/).filter(Boolean).length;
-}
-
-function formatThreshold(value: number) {
-  return value.toFixed(2);
-}
+// ── Internal helpers ──────────────────────────────────────────────────
 
 function formatError(error: unknown) {
   return error instanceof Error ? error.message : "Unable to reach the desktop backend.";
-}
-
-async function hydrateFromSnapshot(loadSnapshot: () => Promise<BackendWorkspaceSnapshot>) {
-  const snapshot = await loadSnapshot();
-  workspaceActions.hydrate(snapshot);
-  return snapshot;
-}
-
-async function withWorkspaceError<T>(action: () => Promise<T>, fallback: T): Promise<T> {
-  try {
-    return await action();
-  } catch (error) {
-    workspaceActions.setError(formatError(error));
-    return fallback;
-  }
-}
-
-async function runDictationAction<T>(action: () => Promise<T>, fallback: T): Promise<T> {
-  workspaceActions.setError(null);
-  return withWorkspaceError(action, fallback);
 }
 
 function reduceSessionEvent(
@@ -460,7 +222,7 @@ function reduceSessionEvent(
         error: event.message,
       };
     case "partialText":
-    case "audioLevel": // handled by use-pill-state.ts directly, not stored in main window state
+    case "audioLevel":
     case "commandDetected":
       return runtime;
   }

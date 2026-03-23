@@ -1,14 +1,10 @@
-import { saveWorkspaceSetting, type WorkspaceSettings } from "../../../store/workspace-store";
-import { SettingsRow, SettingsSection } from "../../setup/components/settings-section";
-import { labelForActivationMode } from "../../setup/data/settings-data";
-import { KeyCaptureInput } from "../../shortcuts/key-capture-input";
+import { saveWorkspaceSetting } from "../../../store/workspace-store";
+import { type SettingsProps, SettingsRow, SettingsSection } from "../components/section";
+import { activationModes, labelFor } from "../data/settings-data";
+import { KeyCaptureInput } from "../components/key-capture-input";
 import { Trans, useLingui } from "@lingui/react/macro";
 
-interface Props {
-  settings: WorkspaceSettings;
-}
-
-export function ShortcutsSection({ settings }: Props) {
+export function ShortcutsSection({ settings }: SettingsProps) {
   const { t } = useLingui();
   const toggleCancelConflict =
     settings.hotkeyToggle.trim().toLowerCase() ===
@@ -40,7 +36,7 @@ export function ShortcutsSection({ settings }: Props) {
         <SettingsRow
           label={t`Recording style`}
           description={t`This changes whether the shortcut toggles recording or only works while held.`}
-          control={<span className="badge badge-outline badge-sm">{labelForActivationMode(settings.activationMode).split(" ")[0]}</span>}
+          control={<span className="badge badge-outline badge-sm">{labelFor(activationModes, settings.activationMode).split(" ")[0]}</span>}
         />
       </SettingsSection>
 

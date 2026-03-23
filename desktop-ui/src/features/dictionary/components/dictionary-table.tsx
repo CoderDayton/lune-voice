@@ -1,5 +1,5 @@
 import { useStore } from "@tanstack/react-store";
-import { ModalCancel } from "../../../components/ui/modal-cancel";
+import { ConfirmDialog } from "../../../components/feedback";
 import { removeDictionaryEntry, workspaceStore } from "../../../store/workspace-store";
 import { Trans, useLingui } from "@lingui/react/macro";
 
@@ -31,7 +31,7 @@ export function DictionaryTable() {
               <td className="font-mono text-sm">{entry.phrase}</td>
               <td className="font-mono text-sm">{entry.replacement}</td>
               <td className="text-right">
-                <ModalCancel
+                <ConfirmDialog
                   title={t`Delete this word fix?`}
                   description={`Remove the saved correction for "${entry.phrase}" → "${entry.replacement}".`}
                   onConfirm={() => void removeDictionaryEntry(entry.id)}

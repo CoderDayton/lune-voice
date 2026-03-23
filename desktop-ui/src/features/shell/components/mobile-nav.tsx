@@ -1,9 +1,9 @@
 import { useStore } from "@tanstack/react-store";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { cn } from "../../../lib/cn";
 import { workspaceActions, workspaceStore } from "../../../store/workspace-store";
 import { navigationItems } from "../config/navigation";
-import { CloseIcon, LuneLogo } from "../config/icons";
+import { CloseIcon } from "../config/icons";
+import luneLogo from "../../../assets/lune-voice-logo.png";
 import { useLingui } from "@lingui/react/macro";
 
 export function MobileNav() {
@@ -15,11 +15,10 @@ export function MobileNav() {
 
   return (
     <div className="fixed inset-0 z-50 md:hidden">
-      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        tabIndex={-1}
-        ref={(el) => el?.focus()}
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/60 appearance-none border-none cursor-default"
+        aria-label={t`Close navigation`}
         onClick={workspaceActions.closeMobileMenu}
         onKeyDown={(e) => e.key === "Escape" && workspaceActions.closeMobileMenu()}
       />
@@ -27,10 +26,12 @@ export function MobileNav() {
       <nav className="sidebar-surface absolute inset-y-0 left-0 flex w-64 flex-col gap-6 py-4 px-3 overflow-y-auto">
         <div className="flex items-center justify-between px-2">
           <div className="flex items-center gap-3">
-            <div className="brand-mark">
-              <LuneLogo className="text-white" />
+            <div className="size-10 shrink-0 select-none pointer-events-none" aria-hidden="true">
+              <div className="size-full rounded-xl overflow-hidden">
+                <img src={luneLogo} alt="" className="size-full object-cover" draggable={false} />
+              </div>
             </div>
-            <span className="brand-title">{t`Lune`}</span>
+            <span className="brand-title">{t`Lune Voice`}</span>
           </div>
           <button
             type="button"
@@ -42,23 +43,23 @@ export function MobileNav() {
           </button>
         </div>
 
-        <div className="flex flex-col gap-1">
+        <ul className="menu gap-1 px-0">
           {navigationItems.map(({ to, label, icon: Icon }) => {
             const active = to === "/" ? pathname === "/" : pathname.startsWith(to);
-
             return (
-              <Link
-                key={to}
-                to={to}
-                className={cn(active ? "nav-link-active" : "nav-link-idle")}
-                onClick={workspaceActions.closeMobileMenu}
-              >
-                <Icon className={cn("nav-icon", active ? "text-secondary" : "")} />
-                <span className="truncate text-sm font-medium">{label}</span>
-              </Link>
+              <li key={to}>
+                <Link
+                  to={to}
+                  className={active ? "menu-active" : ""}
+                  onClick={workspaceActions.closeMobileMenu}
+                >
+                  <Icon className={`nav-icon${active ? " text-secondary" : ""}`} />
+                  <span className="truncate">{label}</span>
+                </Link>
+              </li>
             );
           })}
-        </div>
+        </ul>
       </nav>
     </div>
   );
