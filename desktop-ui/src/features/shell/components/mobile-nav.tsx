@@ -4,7 +4,7 @@ import { cn } from "../../../lib/cn";
 import { workspaceActions, workspaceStore } from "../../../store/workspace-store";
 import { navigationItems } from "../config/navigation";
 import { CloseIcon, LuneLogo } from "../config/icons";
-import { Trans, useLingui } from "@lingui/react/macro";
+import { useLingui } from "@lingui/react/macro";
 
 export function MobileNav() {
   const { t } = useLingui();
@@ -24,16 +24,13 @@ export function MobileNav() {
         onKeyDown={(e) => e.key === "Escape" && workspaceActions.closeMobileMenu()}
       />
 
-      <nav className="sidebar-surface absolute inset-y-0 left-0 flex w-72 flex-col gap-4 py-4 px-3 overflow-y-auto">
+      <nav className="sidebar-surface absolute inset-y-0 left-0 flex w-64 flex-col gap-6 py-4 px-3 overflow-y-auto">
         <div className="flex items-center justify-between px-2">
           <div className="flex items-center gap-3">
             <div className="brand-mark">
               <LuneLogo className="text-white" />
             </div>
-            <div className="min-w-0">
-              <p className="app-kicker"><Trans>Desktop Dictation</Trans></p>
-              <h2 className="brand-title"><Trans>Lune Voice</Trans></h2>
-            </div>
+            <span className="brand-title">{t`Lune`}</span>
           </div>
           <button
             type="button"
@@ -45,10 +42,8 @@ export function MobileNav() {
           </button>
         </div>
 
-        <div className="divider my-0" />
-
         <div className="flex flex-col gap-1">
-          {navigationItems.map(({ to, label, caption, icon: Icon }) => {
+          {navigationItems.map(({ to, label, icon: Icon }) => {
             const active = to === "/" ? pathname === "/" : pathname.startsWith(to);
 
             return (
@@ -58,11 +53,8 @@ export function MobileNav() {
                 className={cn(active ? "nav-link-active" : "nav-link-idle")}
                 onClick={workspaceActions.closeMobileMenu}
               >
-                <Icon className={cn("nav-icon", active ? "text-secondary" : "opacity-50")} />
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium">{label}</div>
-                  <div className="truncate text-xs opacity-50">{caption}</div>
-                </div>
+                <Icon className={cn("nav-icon", active ? "text-secondary" : "")} />
+                <span className="truncate text-sm font-medium">{label}</span>
               </Link>
             );
           })}

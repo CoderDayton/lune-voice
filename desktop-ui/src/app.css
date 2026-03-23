@@ -42,22 +42,6 @@
   --color-brand-500: oklch(0.7 0.16 268);
   --color-brand-400: oklch(0.78 0.12 220);
   --color-brand-300: oklch(0.84 0.1 100);
-
-  --text-kicker: 0.68rem;
-  --text-pill: 0.72rem;
-  --text-body-sm: 0.875rem;
-  --text-title-sm: 1rem;
-  --text-title-md: 1.125rem;
-  --text-title-lg: 1.25rem;
-  --text-title-xl: 1.5rem;
-  --text-metric: 2rem;
-
-  --tracking-kicker: 0.22em;
-  --tracking-label: 0.18em;
-  --tracking-tight: -0.03em;
-  --tracking-title: -0.04em;
-  --tracking-display: -0.05em;
-  --tracking-hero: -0.06em;
 }
 
 :root {
@@ -66,37 +50,26 @@
   --size-content-max: 92rem;
   --size-brand-mark: 2.75rem;
   --size-nav-icon: 1.125rem;
-  --size-hero-title: clamp(2.3rem, 5vw, 3rem);
   --size-page-title: 2.1rem;
-  --size-topbar-copy: 42rem;
-  --size-measure-wide: 40rem;
-  --size-measure-tight: 11ch;
 
   --space-page-stack: 1.25rem;
-  --space-section-stack: 1rem;
-  --space-copy-stack: 0.75rem;
-  --space-copy-tight: 0.5rem;
   --space-page-x-mobile: 1.25rem;
   --space-page-x-desktop: 2rem;
   --space-page-y: 1.25rem;
   --space-page-bottom: 2.5rem;
 
   --surface-body:
-    radial-gradient(circle at 0% 0%, oklch(0.7 0.16 268 / 0.12), transparent 28%),
-    radial-gradient(circle at 100% 0%, oklch(0.78 0.12 220 / 0.09), transparent 26%),
     linear-gradient(180deg, oklch(0.13 0.01 260), oklch(0.1 0.01 260));
   --surface-backdrop:
-    radial-gradient(circle at 12% 10%, oklch(0.7 0.16 268 / 0.13), transparent 30%),
-    radial-gradient(circle at 88% 0%, oklch(0.78 0.12 220 / 0.08), transparent 28%);
-  --surface-hero:
-    radial-gradient(circle at 100% 0%, oklch(0.78 0.12 220 / 0.16), transparent 34%),
-    linear-gradient(135deg, oklch(0.7 0.16 268 / 0.18), transparent 44%);
+    radial-gradient(circle at 20% 10%, oklch(0.7 0.16 268 / 0.08), transparent 40%);
   --surface-brand:
     linear-gradient(145deg, oklch(0.78 0.12 220), oklch(0.7 0.16 268));
   --surface-nav-active: oklch(0.7 0.16 268 / 0.12);
 
   --shadow-brand: 0 16px 30px oklch(0.7 0.16 268 / 0.24);
 }
+
+/* ── Base ──────────────────────────────────────────────────────────── */
 
 @layer base {
   *,
@@ -164,5 +137,215 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Shell layout ──────────────────────────────────────────────────── */
+
+@utility app-shell-root {
+  @apply relative flex min-h-dvh overflow-hidden;
+}
+
+@utility app-shell-backdrop {
+  @apply pointer-events-none fixed inset-0;
+  background-image: var(--surface-backdrop);
+}
+
+@utility app-main {
+  @apply relative z-0 flex min-w-0 flex-1 flex-col overflow-hidden;
+}
+
+@utility app-scroll {
+  @apply flex-1 overflow-y-auto;
+  padding:
+    var(--space-page-y)
+    var(--space-page-x-mobile)
+    var(--space-page-bottom);
+}
+
+@utility app-frame {
+  @apply mx-auto w-full;
+  max-width: var(--size-content-max);
+  animation: page-in 320ms ease;
+}
+
+@utility page-stack {
+  @apply flex flex-col;
+  gap: var(--space-page-stack);
+}
+
+@media (min-width: 48rem) {
+  .app-scroll {
+    padding:
+      var(--space-page-y)
+      var(--space-page-x-desktop)
+      var(--space-page-bottom);
+  }
+}
+
+/* ── Topbar ────────────────────────────────────────────────────────── */
+
+@utility topbar-shell {
+  @apply flex items-center gap-4;
+  padding:
+    var(--space-page-y)
+    var(--space-page-x-mobile)
+    0;
+}
+
+@media (min-width: 48rem) {
+  .topbar-shell {
+    padding:
+      1.75rem
+      var(--space-page-x-desktop)
+      0;
+  }
+}
+
+/* ── Sidebar ───────────────────────────────────────────────────────── */
+
+@utility sidebar-surface {
+  @apply border-r border-base-300/40;
+  background: oklch(0.13 0.012 260 / 0.97);
+}
+
+@utility brand-mark {
+  @apply flex items-center justify-center text-white;
+  width: var(--size-brand-mark);
+  height: var(--size-brand-mark);
+  border-radius: 1rem;
+  background: var(--surface-brand);
+  box-shadow: var(--shadow-brand);
+}
+
+@utility brand-title {
+  @apply truncate font-bold;
+  font-size: 1.125rem;
+  letter-spacing: -0.04em;
+}
+
+@utility page-title {
+  @apply font-bold text-balance;
+  font-size: clamp(1.5rem, 4vw, var(--size-page-title));
+  letter-spacing: -0.04em;
+}
+
+/* ── Nav links ─────────────────────────────────────────────────────── */
+
+@utility nav-link {
+  @apply flex items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 transition;
+  min-height: 3rem;
+}
+
+@utility nav-link-active {
+  @apply nav-link border-primary/20;
+  background: var(--surface-nav-active);
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.08);
+}
+
+@utility nav-link-idle {
+  @apply nav-link opacity-60;
+}
+
+.nav-link-idle:hover {
+  @apply opacity-100 bg-base-300/40;
+}
+
+@utility nav-icon {
+  flex-shrink: 0;
+  width: var(--size-nav-icon);
+  height: var(--size-nav-icon);
+}
+
+/* ── Dictation pill ────────────────────────────────────────────────── */
+
+@utility pill-idle {
+  @apply flex items-center justify-center rounded-full
+         border border-primary/30 cursor-pointer transition
+         size-12 bg-base-200/90 text-base-content
+         shadow-lg;
+}
+
+.pill-idle:hover {
+  @apply border-primary/60 bg-base-300/95 shadow-primary/20;
+}
+
+@utility pill-active {
+  @apply flex items-center gap-3 rounded-full
+         border border-primary/30 px-4 h-12
+         bg-base-200/90 shadow-lg;
+  animation: pill-expand 200ms ease;
+}
+
+@utility pill-processing {
+  @apply border-warning/30;
+}
+
+@utility pill-center {
+  @apply flex flex-1 items-center justify-center;
+}
+
+@utility pill-btn {
+  @apply flex items-center justify-center rounded-full transition
+         size-7 text-base-content/70;
+}
+
+.pill-btn:hover {
+  @apply text-base-content;
+}
+
+.pill-btn-cancel:hover {
+  @apply bg-error/20;
+}
+
+.pill-btn-stop:hover {
+  @apply bg-error/20;
+}
+
+@utility audio-dots {
+  @apply flex items-center gap-1;
+}
+
+@utility audio-dot {
+  @apply block rounded-full size-1.5 bg-primary;
+  animation: dot-bounce 1.2s ease-in-out infinite;
+  transition: transform 60ms ease-out, opacity 60ms ease-out;
+}
+
+@keyframes dot-bounce {
+  0%, 80%, 100% {
+    transform: scaleY(1);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scaleY(2.2);
+    opacity: 1;
+  }
+}
+
+@utility pill-pulse {
+  @apply block rounded-full size-2.5 bg-warning;
+  animation: pulse-glow 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(0.75);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+}
+
+@keyframes pill-expand {
+  from {
+    opacity: 0.5;
+    transform: scaleX(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
   }
 }

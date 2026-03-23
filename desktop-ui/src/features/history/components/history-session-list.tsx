@@ -1,65 +1,60 @@
 import { useMemo } from "react";
 import { useStore } from "@tanstack/react-store";
-import { Panel } from "../../../components/ui/panel";
-import { Pill } from "../../../components/ui/pill";
+import { useLingui } from "@lingui/react/macro";
 import {
-  formatBackendLabel,
   getVisibleHistorySessions,
   workspaceStore,
 } from "../../../store/workspace-store";
 
 export function HistorySessionList() {
+  const { t } = useLingui();
   const visibleSessions = useStore(workspaceStore, getVisibleHistorySessions);
 
-  const filteredGroups = useMemo(() => {
-    const groups = new Map<string, typeof visibleSessions>();
-
+  const groups = useMemo(() => {
+    const map = new Map<string, typeof visibleSessions>();
     for (const session of visibleSessions) {
       const label = formatGroupLabel(session.startedAt);
-      const items = groups.get(label);
-
-      if (items) {
-        items.push(session);
-      } else {
-        groups.set(label, [session]);
-      }
+      const items = map.get(label);
+      if (items) items.push(session);
+      else map.set(label, [session]);
     }
-
-    return Array.from(groups.entries()).map(([date, items]) => ({ date, items }));
+    return Array.from(map.entries()).map(([date, items]) => ({ date, items }));
   }, [visibleSessions]);
 
-  if (filteredGroups.length === 0) {
+  if (groups.length === 0) {
     return (
-      <Panel className="p-10 text-center">
-        <p className="body-copy-soft">No sessions found. Start dictating to see your transcripts here.</p>
-      </Panel>
+      <div className="alert">
+        <span>{t`No sessions found. Start dictating to see your transcripts here.`}</span>
+      </div>
     );
   }
 
   return (
-    <Panel className="overflow-hidden p-0">
-      {filteredGroups.map((group) => (
-        <section key={group.date}>
-          <div className="session-group-head">
-            <span className="label-text-custom">{group.date}</span>
-          </div>
-
-          <div>
+    <div className="flex flex-col gap-4">
+      {groups.map((group) => (
+        <div key={group.date}>
+          <h3 className="text-xs font-semibold uppercase tracking-wider opacity-50 mb-2 px-1">
+            {group.date}
+          </h3>
+          <ul className="list bg-base-200 rounded-box">
             {group.items.map((item) => (
-              <article key={item.id} className="session-row">
-                <div className="flex flex-wrap gap-2">
-                  <Pill>{formatTime(item.startedAt)}</Pill>
-                  <Pill>{item.words} words</Pill>
-                  <Pill>{item.seconds}s audio</Pill>
-                  <Pill>{formatBackendLabel(item.backend)}</Pill>
+              <li key={item.id} className="list-row">
+                <div className="text-xs tabular-nums opacity-40">
+                  {formatTime(item.startedAt)}
                 </div>
-                <p className="body-copy-strong max-w-full sm:max-w-[56rem] mt-4 line-clamp-4">{item.transcript}</p>
-              </article>
+                <div>
+                  <p className="text-sm line-clamp-2 sm:line-clamp-3">{item.transcript}</p>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    <span className="badge badge-sm badge-ghost">{item.words} {t`words`}</span>
+                    <span className="badge badge-sm badge-ghost">{item.seconds}{t`s`}</span>
+                  </div>
+                </div>
+              </li>
             ))}
-          </div>
-        </section>
+          </ul>
+        </div>
       ))}
-    </Panel>
+    </div>
   );
 }
 
@@ -68,15 +63,8 @@ function formatGroupLabel(value: string) {
   const today = new Date();
   const yesterday = new Date();
   yesterday.setDate(today.getDate() - 1);
-
-  if (date.toDateString() === today.toDateString()) {
-    return "Today";
-  }
-
-  if (date.toDateString() === yesterday.toDateString()) {
-    return "Yesterday";
-  }
-
+  if (date.toDateString() === today.toDateString()) return "Today";
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 

@@ -1,4 +1,4 @@
-import { historyGroups } from "../../features/history/data/history-data";
+
 import { initialDictionaryEntries } from "../../features/dictionary/data/dictionary-data";
 import type { BackendClient, BackendWorkspaceSnapshot, SaveWorkspaceSettingsInput } from "./types";
 
@@ -28,17 +28,7 @@ function createMockSnapshot(): BackendWorkspaceSnapshot {
       pillVisibility: "Always",
       language: "en",
     },
-    history: historyGroups.flatMap((group, groupIndex) =>
-      group.items.map((item, itemIndex) => ({
-        id: `${group.date}-${item.time}-${itemIndex}`,
-        startedAt: new Date(Date.now() - (groupIndex * 5 + itemIndex) * 3_600_000).toISOString(),
-        endedAt: new Date(Date.now() - (groupIndex * 5 + itemIndex) * 3_600_000 + item.seconds * 1_000).toISOString(),
-        transcript: item.text,
-        backend: item.mode,
-        style: "casual",
-        status: "Completed",
-      })),
-    ),
+    history: [],
     dictionary: initialDictionaryEntries.map((entry, index) => ({
       id: index + 1,
       phrase: entry.phrase,

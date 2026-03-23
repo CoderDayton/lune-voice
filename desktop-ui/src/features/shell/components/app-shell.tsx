@@ -1,10 +1,9 @@
 import { useEffect } from "react";
-import { Outlet, useRouterState } from "@tanstack/react-router";
+import { Outlet } from "@tanstack/react-router";
 import { Sidebar } from "./sidebar";
 import { MobileNav } from "./mobile-nav";
 import { Topbar } from "./topbar";
 import { ErrorToast } from "../../../components/ui/error-toast";
-import { findNavigationItem } from "../config/navigation";
 import { attachSessionStream, listenToWorkspaceInvalidation } from "../../../lib/backend/stream";
 import {
   loadWorkspaceSnapshot,
@@ -12,9 +11,6 @@ import {
 } from "../../../store/workspace-store";
 
 export function AppShell() {
-  const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const currentPage = findNavigationItem(pathname);
-
   useEffect(() => {
     loadWorkspaceSnapshot().catch((e) => {
       workspaceActions.setError(e instanceof Error ? e.message : "Failed to load workspace");
@@ -63,7 +59,7 @@ export function AppShell() {
       <ErrorToast />
 
       <main id="main-content" className="app-main">
-        <Topbar page={currentPage} />
+        <Topbar />
 
         <div className="app-scroll">
           <div className="app-frame">

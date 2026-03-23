@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { Panel } from "../../../components/ui/panel";
 
 interface SettingsSectionProps {
   title: string;
@@ -15,22 +14,20 @@ interface SettingsRowProps {
 
 export function SettingsSection({ title, description, children }: SettingsSectionProps) {
   return (
-    <Panel className="p-6">
-      <div className="stack-copy mb-5">
-        <h3 className="card-title-text">{title}</h3>
-        <p className="body-copy-soft">{description}</p>
-      </div>
-      <div className="stack-section">{children}</div>
-    </Panel>
+    <fieldset className="fieldset bg-base-200 border-base-300 rounded-box border p-4 sm:p-6">
+      <legend className="fieldset-legend">{title}</legend>
+      <p className="text-sm opacity-50 mb-4">{description}</p>
+      <div className="flex flex-col gap-4">{children}</div>
+    </fieldset>
   );
 }
 
 export function SettingsRow({ label, description, control }: SettingsRowProps) {
   return (
-    <div className="detail-row sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between py-2 border-b border-base-300/20 last:border-b-0">
       <div className="min-w-0">
-        <div className="supporting-label">{label}</div>
-        {description ? <div className="body-copy-soft mt-1">{description}</div> : null}
+        <div className="text-sm font-medium">{label}</div>
+        {description ? <div className="text-xs opacity-50 mt-0.5">{description}</div> : null}
       </div>
       <div className="shrink-0">{control}</div>
     </div>

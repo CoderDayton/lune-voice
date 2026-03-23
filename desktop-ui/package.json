@@ -36,6 +36,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.4",
+    "daisyui": "^5.5.19",
     "pixelmatch": "^7.1.0",
     "playwright": "^1.58.2",
     "pngjs": "^7.0.0",

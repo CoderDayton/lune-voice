@@ -13,19 +13,7 @@ const PILL_IDLE_H = 48;
 const PILL_ACTIVE_W = 260;
 const PILL_ACTIVE_H = 56;
 
-const AUTH_STORAGE_KEY = "lune.desktop.auth";
 const READY_STATUSES = new Set(["ready", "listening", "processing"]);
-
-function isAuthenticated(): boolean {
-  try {
-    const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
-    if (!raw) return false;
-    const parsed = JSON.parse(raw);
-    return Boolean(parsed?.email && parsed?.name);
-  } catch {
-    return false;
-  }
-}
 
 function modeFromStatus(status: string): PillMode {
   if (status === "listening") return "active";
@@ -52,10 +40,8 @@ export function usePillState() {
   const [audioLevel, setAudioLevel] = useState(0);
   const shownRef = useRef(false);
 
-  // On mount: check auth + load snapshot for initial readiness
+  // On mount: load workspace snapshot for initial readiness
   useEffect(() => {
-    if (!isAuthenticated()) return;
-
     invoke<{ serviceStatus: string; settings: { activationMode: string; pillVisibility: string } }>(
       "load_workspace_snapshot",
     ).then(
@@ -76,10 +62,6 @@ export function usePillState() {
   // Listen to Rust backend events
   useEffect(() => {
     const unlistenState = listen<string>("lune://pill-state", (event) => {
-      if (!isAuthenticated()) {
-        setServiceReady(false);
-        return;
-      }
       if (READY_STATUSES.has(event.payload)) {
         setServiceReady(true);
         setMode(modeFromStatus(event.payload));

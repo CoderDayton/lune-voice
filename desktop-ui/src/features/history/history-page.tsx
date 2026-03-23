@@ -1,25 +1,24 @@
-import { PageIntroPanel } from "../../components/ui/page-intro-panel";
-import { HistoryRail } from "./components/history-rail";
+import { useStore } from "@tanstack/react-store";
+import { HistorySearch } from "./components/history-search";
 import { HistorySessionList } from "./components/history-session-list";
-import { HistorySummary } from "./components/history-summary";
+import { getVisibleHistorySessions, workspaceStore } from "../../store/workspace-store";
 import { useLingui } from "@lingui/react/macro";
 
 export function HistoryPage() {
   const { t } = useLingui();
+  const count = useStore(workspaceStore, (s) => getVisibleHistorySessions(s).length);
+
   return (
     <div className="page-stack">
-      <PageIntroPanel
-        kicker={t`Your sessions`}
-        title={t`Find past recordings and the text they produced.`}
-        description={t`Search what you said, reopen recent dictation, and spot phrases that should become permanent word fixes.`}
-      />
-
-      <HistorySummary />
-
-      <section className="layout-grid xl:grid-cols-[1.18fr_0.82fr]">
-        <HistorySessionList />
-        <HistoryRail />
-      </section>
+      <div className="flex items-center gap-4">
+        <div className="flex-1">
+          <HistorySearch />
+        </div>
+        <span className="text-sm opacity-50 tabular-nums shrink-0">
+          {count} {t`sessions`}
+        </span>
+      </div>
+      <HistorySessionList />
     </div>
   );
 }

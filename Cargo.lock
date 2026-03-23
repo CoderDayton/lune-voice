@@ -4123,6 +4123,7 @@ dependencies = [
 name = "lune-audio"
 version = "0.1.0"
 dependencies = [
+ "audioadapter-buffers",
  "cpal",
  "crossbeam-channel",
  "hound",
