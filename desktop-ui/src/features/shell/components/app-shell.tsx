@@ -4,6 +4,7 @@ import { Sidebar } from "./sidebar";
 import { MobileNav } from "./mobile-nav";
 import { Topbar } from "./topbar";
 import { ErrorToast } from "../../../components/feedback";
+import { useAppShortcuts } from "../hooks/use-app-shortcuts";
 import { attachSessionStream, listenToWorkspaceInvalidation } from "../../../lib/backend/stream";
 import type { SessionStreamEvent } from "../../../lib/backend/types";
 import {
@@ -13,6 +14,8 @@ import {
 } from "../../../store/workspace-store";
 
 export function AppShell() {
+  useAppShortcuts();
+
   useEffect(() => {
     // Skip if already hydrated by bootstrap in main.tsx
     if (workspaceStore.state.runtime.loaded) return;

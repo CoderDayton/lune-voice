@@ -16,6 +16,8 @@ export function OverviewPage() {
   const dictationMode = useStore(workspaceStore, (s) => s.settings.dictationMode);
   const sessions = useStore(workspaceStore, (s) => s.historySessions);
 
+  const liveTranscript = useStore(workspaceStore, (s) => s.runtime.liveTranscript);
+  const isActive = serviceStatus === "listening" || serviceStatus === "processing";
   const isConnected = serviceStatus === "ready" || serviceStatus === "listening";
   const isLoading = serviceStatus === "Connecting" || loading;
 
@@ -65,6 +67,20 @@ export function OverviewPage() {
         </div>
       )}
 
+      {isActive && (
+        <div className="card bg-primary/5 border border-primary/15 rounded-box p-4 sm:p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="loading loading-dots loading-xs text-primary" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-primary/70 select-none">
+              {serviceStatus === "processing" ? t`Processing` : t`Listening`}
+            </span>
+          </div>
+          <p className="text-sm sm:text-base leading-relaxed min-h-[2rem]">
+            {liveTranscript || <span className="opacity-30 italic">{t`Waiting for speech…`}</span>}
+          </p>
+        </div>
+      )}
+
       <div>
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-xs font-semibold uppercase tracking-wider opacity-50">{t`Recent`}</h2>
@@ -72,11 +88,20 @@ export function OverviewPage() {
             <Link to="/history" className="link link-primary text-xs">{t`View all`}</Link>
           )}
         </div>
-        {recentSessions.length === 0 ? (
-          <div className="alert">
-            <span>{t`No sessions yet. Press Ctrl+Space to start dictating.`}</span>
+        {recentSessions.length === 0 && !isActive ? (
+          <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center">
+            <div className="size-16 sm:size-20 rounded-full bg-primary/8 flex items-center justify-center mb-4">
+              <svg className="size-8 sm:size-10 text-primary/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="7" y="3" width="10" height="14" rx="5" />
+                <path d="M5 10v1a7 7 0 0 0 14 0v-1M12 17v4M9 21h6" />
+              </svg>
+            </div>
+            <p className="text-sm font-medium opacity-70">{t`No sessions yet`}</p>
+            <p className="text-xs opacity-40 mt-1">
+              {t`Press`} <kbd className="kbd kbd-xs">{t`Ctrl`}</kbd> + <kbd className="kbd kbd-xs">{t`Space`}</kbd> {t`to start dictating`}
+            </p>
           </div>
-        ) : (
+        ) : recentSessions.length === 0 && isActive ? null : (
           <ul className="list bg-base-200 rounded-box">
             {recentSessions.map((session) => (
               <li key={session.id} className="list-row">
