@@ -29,6 +29,13 @@ tracing.workspace = true
 regex = "1.12.3"
 url.workspace = true
 
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+gtk-layer-shell = { version = "0.8", features = ["v0_6"] }
+
 [[bin]]
 name = "lune-ui"
 path = "src/main.rs"
+
+[dev-dependencies]
+tempfile = "3.27.0"

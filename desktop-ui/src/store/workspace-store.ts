@@ -79,8 +79,12 @@ export const workspaceActions = {
       runtime: {
         ipcFlavor: snapshot.ipcFlavor,
         serviceStatus: snapshot.serviceStatus,
-        activeSessionId: s.runtime.activeSessionId,
-        liveTranscript: s.runtime.liveTranscript,
+        activeSessionId: isActiveServiceStatus(snapshot.serviceStatus)
+          ? s.runtime.activeSessionId
+          : null,
+        liveTranscript: isActiveServiceStatus(snapshot.serviceStatus)
+          ? s.runtime.liveTranscript
+          : "",
         loaded: true,
         loading: false,
         error: null,
@@ -116,15 +120,24 @@ export async function loadWorkspaceSnapshot() {
 export async function saveWorkspaceSetting<Key extends keyof WorkspaceSettings>(
   key: Key,
   value: WorkspaceSettings[Key],
-) {
+): Promise<boolean> {
+  const previousSettings = workspaceStore.state.settings;
   workspaceActions.updateSetting(key, value);
   try {
     const snapshot = await backendClient.saveWorkspaceSettings(
       settingsToSaveInput(workspaceStore.state.settings),
     );
     workspaceActions.hydrate(snapshot);
+    return true;
   } catch (error) {
+    try {
+      const snapshot = await backendClient.loadWorkspaceSnapshot();
+      workspaceActions.hydrate(snapshot);
+    } catch {
+      workspaceStore.setState((s) => ({ ...s, settings: previousSettings }));
+    }
     workspaceActions.setError(formatError(error));
+    return false;
   }
 }
 
@@ -204,7 +217,7 @@ function reduceSessionEvent(
       return {
         ...runtime,
         serviceStatus: "ready",
-        liveTranscript: [runtime.liveTranscript, event.text].filter(Boolean).join(" ").trim(),
+        liveTranscript: event.text,
       };
     case "correctedText":
       return { ...runtime, liveTranscript: event.text };
@@ -226,4 +239,8 @@ function reduceSessionEvent(
     case "commandDetected":
       return runtime;
   }
+}
+
+function isActiveServiceStatus(status: string) {
+  return status === "listening" || status === "processing";
 }

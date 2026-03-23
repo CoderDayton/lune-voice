@@ -8,8 +8,13 @@ import { useLingui } from "@lingui/react/macro";
 export function InputSection({ settings }: SettingsProps) {
   const { t } = useLingui();
   async function handleLanguageChange(locale: string) {
-    await activateLocale(locale);
-    void saveWorkspaceSetting("language", locale);
+    const previousLocale = settings.language as LocaleKey;
+    const saved = await saveWorkspaceSetting("language", locale);
+    if (saved) {
+      await activateLocale(locale);
+    } else {
+      await activateLocale(previousLocale);
+    }
   }
 
   return (

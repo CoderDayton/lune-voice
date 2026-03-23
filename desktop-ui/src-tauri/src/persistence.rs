@@ -3,7 +3,7 @@ use std::{path::PathBuf, str::FromStr};
 use lune_core::config::{
     ActivationMode, AlignerConfig, AsrBackendConfig, DevicePolicy, DictationMode, HotkeyConfig,
     KeyCombo, LlmBackendConfig, Modifier, PillVisibility, RedactedString, StreamingMode,
-    UserSettings,
+    UserSettings, builtin_registry,
 };
 use lune_core::session::SessionStatus;
 use lune_persist::{AppPaths, Database, SettingsStore, StoredDictionaryEntry};
@@ -17,6 +17,18 @@ const HISTORY_LIMIT: u32 = 200;
 const DICTIONARY_LIMIT: usize = 10_000;
 const UNKNOWN_LABEL: &str = "Unknown";
 
+fn is_wellformed_bcp47(tag: &str) -> bool {
+    let mut parts = tag.split('-');
+    match parts.next() {
+        Some(p) if (2..=8).contains(&p.len()) && p.bytes().all(|b| b.is_ascii_alphabetic()) => {}
+        _ => return false,
+    }
+    parts.all(|p| {
+        let len = p.len();
+        (1..=8).contains(&len) && p.bytes().all(|b| b.is_ascii_alphanumeric())
+    })
+}
+
 pub fn load_workspace_snapshot() -> Result<WorkspaceSnapshot, String> {
     let paths = resolve_paths()?;
     let settings = load_settings(&paths)?;
@@ -28,9 +40,8 @@ pub fn save_workspace_settings(input: WorkspaceSettingsDto) -> Result<WorkspaceS
     let paths = resolve_paths()?;
     let mut settings = load_settings(&paths)?;
     apply_settings_dto(&mut settings, input)?;
-    save_settings(&paths, &settings)?;
-
     let mut database = open_database(&paths)?;
+    save_settings(&paths, &settings)?;
     build_snapshot(settings, &mut database)
 }
 
@@ -132,7 +143,9 @@ fn resolve_paths() -> Result<AppPaths, String> {
 
 fn load_settings(paths: &AppPaths) -> Result<UserSettings, String> {
     let store = SettingsStore::new(paths.settings_file());
-    store.load().map_err(|e| format!("load settings: {e}"))
+    let mut settings = store.load().map_err(|e| format!("load settings: {e}"))?;
+    settings.migrate_pipeline_fields();
+    Ok(settings)
 }
 
 fn save_settings(paths: &AppPaths, settings: &UserSettings) -> Result<(), String> {
@@ -246,6 +259,9 @@ fn apply_settings_dto(
     if style.is_empty() || style.len() > 128 {
         return Err("stylePreset must be 1–128 characters".into());
     }
+    if builtin_registry().get(style).is_none() {
+        return Err(format!("unknown stylePreset: {style}"));
+    }
     settings.default_style = style.to_owned();
 
     settings.hotkey = HotkeyConfig {
@@ -263,7 +279,13 @@ fn apply_settings_dto(
                 .unwrap_or_default(),
         });
     }
-    settings.language = input.language.trim().to_owned();
+    let language = input.language.trim();
+    if !is_wellformed_bcp47(language) {
+        return Err(
+            "language must be a well-formed BCP-47 tag (e.g. \"en\", \"en-US\", \"pt-BR\")".into(),
+        );
+    }
+    settings.language = language.to_owned();
     Ok(())
 }
 
@@ -489,5 +511,41 @@ fn session_status_label(status: &SessionStatus) -> String {
         SessionStatus::Failed(message) => format!("Failed: {message}"),
         SessionStatus::Cancelled => "Cancelled".into(),
         _ => UNKNOWN_LABEL.into(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn load_settings_migrates_legacy_pipeline_fields() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = AppPaths::from_dirs(dir.path().join("config"), dir.path().join("data"));
+
+        let mut legacy = UserSettings::default();
+        legacy.pipeline = Default::default();
+        legacy.word_confidence_threshold = 0.77;
+        legacy.max_speech_secs = 42;
+        legacy.adaptive_vad = true;
+        save_settings(&paths, &legacy).unwrap();
+
+        let loaded = load_settings(&paths).unwrap();
+        assert_eq!(loaded.pipeline.word_confidence_threshold, Some(0.77));
+        assert_eq!(loaded.pipeline.max_speech_secs, Some(42));
+        assert_eq!(loaded.pipeline.adaptive_vad, Some(true));
+    }
+
+    #[test]
+    fn apply_settings_rejects_invalid_style_and_language() {
+        let mut settings = UserSettings::default();
+        let mut input = settings_to_dto(&settings);
+
+        input.style_preset = "not-a-style".into();
+        assert!(apply_settings_dto(&mut settings, input.clone()).is_err());
+
+        input.style_preset = "casual".into();
+        input.language = "bad tag".into();
+        assert!(apply_settings_dto(&mut settings, input).is_err());
     }
 }

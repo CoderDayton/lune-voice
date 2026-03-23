@@ -303,13 +303,13 @@ async fn run_pipeline(
             biased;
             _ = tokio::signal::ctrl_c() => {
                 tracing::info!("SIGINT received, shutting down");
-                manager.stop().await;
+                manager.stop_and_wait().await;
                 update_state(&shared_state, dbus_conn, AppStateUpdate::Idle).await;
                 break;
             }
             _ = &mut sigterm => {
                 tracing::info!("SIGTERM received, shutting down");
-                manager.stop().await;
+                manager.stop_and_wait().await;
                 update_state(&shared_state, dbus_conn, AppStateUpdate::Idle).await;
                 break;
             }
@@ -318,7 +318,7 @@ async fn run_pipeline(
                     Some(c) => c,
                     None => {
                         tracing::info!("command channel closed, shutting down");
-                        manager.stop().await;
+                        manager.stop_and_wait().await;
                         break;
                     }
                 }
@@ -365,7 +365,7 @@ async fn run_pipeline(
             }
             AppCommand::Quit => {
                 tracing::info!("quit command received");
-                manager.stop().await;
+                manager.stop_and_wait().await;
                 update_state(&shared_state, dbus_conn, AppStateUpdate::Idle).await;
                 break;
             }

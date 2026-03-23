@@ -25,7 +25,7 @@ struct RuntimeInner {
     app: AppHandle,
     pipeline: Mutex<LivePipeline>,
     status: RwLock<String>,
-    session_streams: RwLock<Vec<Channel<SessionStreamEvent>>>,
+    session_stream: RwLock<Option<Channel<SessionStreamEvent>>>,
     /// Shared settings — updated on reload, read for dictation_mode at delivery time.
     settings: Arc<RwLock<UserSettings>>,
     /// Background thread that owns the uinput/clipboard handle.
@@ -53,7 +53,7 @@ impl AppRuntime {
                 app,
                 pipeline: Mutex::new(pipeline),
                 status: RwLock::new("ready".into()),
-                session_streams: RwLock::new(Vec::new()),
+                session_stream: RwLock::new(None),
                 settings,
                 delivery,
             }),
@@ -73,8 +73,8 @@ impl AppRuntime {
         channel: Channel<SessionStreamEvent>,
     ) -> Result<(), String> {
         {
-            let mut streams = self.inner.session_streams.write().await;
-            streams.push(channel);
+            let mut slot = self.inner.session_stream.write().await;
+            *slot = Some(channel);
         }
 
         self.push_session_event(SessionStreamEvent::ServiceStatus {
@@ -96,8 +96,8 @@ impl AppRuntime {
     }
 
     pub async fn clear_session_stream(&self) {
-        let mut streams = self.inner.session_streams.write().await;
-        streams.clear();
+        let mut slot = self.inner.session_stream.write().await;
+        *slot = None;
     }
 
     pub async fn mark_reload_required(&self) {
@@ -188,9 +188,8 @@ impl AppRuntime {
                             .await;
                     }
                     SessionEvent::CorrectedText(text) => {
-                        // Corrected text replaces the finalized text — deliver it too.
-                        let mode = runtime.inner.settings.read().await.dictation_mode;
-                        runtime.inner.delivery.deliver(&text, mode);
+                        // Corrected text is a UI signal; the finalized text event
+                        // remains the authoritative delivery payload.
                         runtime
                             .push_session_event(SessionStreamEvent::CorrectedText { text })
                             .await;
@@ -308,11 +307,27 @@ impl AppRuntime {
     }
 
     async fn push_session_event(&self, event: SessionStreamEvent) {
-        let streams = self.inner.session_streams.read().await;
-        for channel in streams.iter() {
-            if let Err(e) = channel.send(event.clone()) {
-                warn!(error = %e, "session stream channel send failed — frontend may have disconnected");
+        let failed = {
+            let slot = self.inner.session_stream.read().await;
+            match slot.as_ref() {
+                Some(channel) => {
+                    if let Err(e) = channel.send(event) {
+                        warn!(
+                            error = %e,
+                            "session stream channel send failed — frontend may have disconnected"
+                        );
+                        true
+                    } else {
+                        false
+                    }
+                }
+                None => false,
             }
+        };
+
+        if failed {
+            let mut slot = self.inner.session_stream.write().await;
+            *slot = None;
         }
     }
 
@@ -441,9 +456,11 @@ fn resolve_paths() -> Result<AppPaths, String> {
 }
 
 fn load_settings(paths: &AppPaths) -> Result<UserSettings, String> {
-    SettingsStore::new(paths.settings_file())
+    let mut settings = SettingsStore::new(paths.settings_file())
         .load()
-        .map_err(|e| format!("load settings: {e}"))
+        .map_err(|e| format!("load settings: {e}"))?;
+    settings.migrate_pipeline_fields();
+    Ok(settings)
 }
 
 fn patch_model_paths(paths: &AppPaths, settings: &mut UserSettings) -> Result<(), String> {
@@ -559,11 +576,15 @@ async fn build_post_processor(
 /// anything after a colon that looks like a path or stack context.
 fn sanitize_error_for_frontend(raw: &str) -> String {
     // Truncate very long errors.
-    let capped = if raw.len() > 512 { &raw[..512] } else { raw };
+    let capped = if raw.chars().count() > 512 {
+        raw.chars().take(512).collect::<String>()
+    } else {
+        raw.to_owned()
+    };
 
     // Strip absolute file paths (e.g. "/home/user/.local/share/…").
     static PATH_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
         regex::Regex::new(r"(/[a-zA-Z0-9._\-]+){3,}").expect("path regex")
     });
-    PATH_RE.replace_all(capped, "[path]").into_owned()
+    PATH_RE.replace_all(&capped, "[path]").into_owned()
 }

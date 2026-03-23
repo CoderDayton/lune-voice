@@ -98,6 +98,16 @@ fn run_listener(
         "keyboard devices opened for hotkey detection"
     );
 
+    // Build the passthrough device before any reader thread can grab a real
+    // keyboard. If this fails, we bail out without intercepting input.
+    let mut passthrough = match build_passthrough_device() {
+        Ok(dev) => dev,
+        Err(e) => {
+            warn!(error = %e, "failed to create passthrough device; hotkey grab disabled");
+            return;
+        }
+    };
+
     // Fan-in channel: each reader thread sends raw events here.
     let (event_tx, event_rx) = std_mpsc::channel::<InputEvent>();
 
@@ -111,15 +121,6 @@ fn run_listener(
     }
     // Drop our sender so the channel closes when all readers exit.
     drop(event_tx);
-
-    // Build the passthrough virtual device for re-injecting non-hotkey events.
-    let mut passthrough = match build_passthrough_device() {
-        Ok(dev) => dev,
-        Err(e) => {
-            warn!(error = %e, "failed to create passthrough device; hotkey grab disabled");
-            return;
-        }
-    };
 
     // Collect all modifier keycodes used by the main combo so we can defer
     // their press events until we know the trigger key won't follow.

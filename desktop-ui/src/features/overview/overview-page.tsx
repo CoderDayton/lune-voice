@@ -18,7 +18,10 @@ export function OverviewPage() {
 
   const liveTranscript = useStore(workspaceStore, (s) => s.runtime.liveTranscript);
   const isActive = serviceStatus === "listening" || serviceStatus === "processing";
-  const isConnected = serviceStatus === "ready" || serviceStatus === "listening";
+  const isConnected =
+    serviceStatus === "ready" ||
+    serviceStatus === "listening" ||
+    serviceStatus === "processing";
   const isLoading = serviceStatus === "Connecting" || loading;
 
   const stats = useMemo(() => {

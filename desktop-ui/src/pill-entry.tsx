@@ -15,7 +15,7 @@ function PillApp() {
   );
 }
 
-activateLocale(defaultLocale).then(() => {
+activateLocale(defaultLocale).catch(() => {}).then(() => {
   ReactDOM.createRoot(document.getElementById("pill-root")!).render(
     <PillApp />,
   );

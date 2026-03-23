@@ -59,7 +59,8 @@ function App() {
   );
 }
 
-// Wait for both default locale AND bootstrap before mounting — prevents locale flash
-Promise.all([activateLocale(defaultLocale), bootstrap()]).then(() => {
+// Wait for both default locale AND bootstrap before mounting — prevents locale flash.
+// Always mount even if bootstrap fails — app-shell will retry the snapshot load.
+Promise.all([activateLocale(defaultLocale), bootstrap()]).catch(() => {}).then(() => {
   ReactDOM.createRoot(document.getElementById("root")!).render(<App />);
 });

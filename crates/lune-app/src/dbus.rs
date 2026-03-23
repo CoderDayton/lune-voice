@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use tokio::sync::{RwLock, mpsc, watch};
 use zbus::{Connection, connection::Builder, interface, object_server::SignalEmitter};
@@ -38,6 +39,7 @@ pub struct DaemonInterface {
     db: Arc<tokio::sync::Mutex<lune_persist::Database>>,
     rt_handle: tokio::runtime::Handle,
     persist_gate: Arc<tokio::sync::Mutex<()>>,
+    persist_seq: Arc<AtomicU64>,
 }
 
 pub struct DaemonInterfaceDeps {
@@ -64,6 +66,7 @@ impl DaemonInterface {
             db: deps.db,
             rt_handle: deps.rt_handle,
             persist_gate: Arc::new(tokio::sync::Mutex::new(())),
+            persist_seq: Arc::new(AtomicU64::new(0)),
         }
     }
 }
@@ -357,9 +360,14 @@ impl DaemonInterface {
         let settings = Arc::clone(&self.settings);
         let store = Arc::clone(&self.settings_store);
         let persist_gate = Arc::clone(&self.persist_gate);
+        let persist_seq = Arc::clone(&self.persist_seq);
+        let seq = persist_seq.fetch_add(1, Ordering::AcqRel) + 1;
         self.rt_handle.spawn(async move {
-            let snapshot = settings.read().await.clone();
             let _guard = persist_gate.lock().await;
+            if seq != persist_seq.load(Ordering::Acquire) {
+                return;
+            }
+            let snapshot = settings.read().await.clone();
             match tokio::task::spawn_blocking(move || store.save(&snapshot)).await {
                 Ok(Ok(())) => {}
                 Ok(Err(e)) => tracing::warn!(error = %e, "failed to persist settings"),
@@ -424,7 +432,12 @@ pub async fn emit_settings_changed(conn: &Connection, key: &str) -> zbus::Result
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+    use std::time::Duration;
+
     use super::is_wellformed_bcp47;
+    use super::*;
+    use tokio::sync::{RwLock, mpsc, watch};
 
     #[test]
     fn valid_bcp47_tags() {
@@ -455,5 +468,42 @@ mod tests {
         ] {
             assert!(!is_wellformed_bcp47(tag), "should reject {tag:?}");
         }
+    }
+
+    #[tokio::test]
+    async fn persist_setting_writes_latest_snapshot() {
+        let dir = tempfile::tempdir().unwrap();
+        let settings_path = dir.path().join("settings.toml");
+        let store = Arc::new(lune_persist::SettingsStore::new(&settings_path));
+        let settings = Arc::new(RwLock::new(UserSettings::default()));
+        let state = Arc::new(RwLock::new(String::from("idle")));
+        let (cmd_tx, _cmd_rx) = mpsc::channel(4);
+        let (dictation_mode_tx, _dictation_mode_rx) = watch::channel(DictationMode::default());
+        let (activation_mode_tx, _activation_mode_rx) = watch::channel(ActivationMode::default());
+        let db = Arc::new(tokio::sync::Mutex::new(
+            lune_persist::Database::open_in_memory().unwrap(),
+        ));
+
+        let iface = DaemonInterface::new(DaemonInterfaceDeps {
+            cmd_tx,
+            state,
+            settings: Arc::clone(&settings),
+            dictation_mode_tx,
+            activation_mode_tx,
+            settings_store: Arc::clone(&store),
+            db,
+            rt_handle: tokio::runtime::Handle::current(),
+        });
+
+        let gate = iface.persist_gate.lock().await;
+        iface.persist_setting();
+        settings.write().await.language = "fr-FR".into();
+        iface.persist_setting();
+        drop(gate);
+
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        let persisted = store.load().unwrap();
+        assert_eq!(persisted.language, "fr-FR");
     }
 }

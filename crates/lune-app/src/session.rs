@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use chrono::Utc;
 use lune_asr::OrtForcedAligner;
+use tokio::sync::Notify;
 use tokio::sync::{Mutex, RwLock, mpsc};
 use tracing::{debug, info, warn};
 use uuid::Uuid;
@@ -67,6 +68,7 @@ pub struct SessionManager<A: AsrBackend> {
     config: SessionManagerConfig,
     settings: Arc<RwLock<UserSettings>>,
     active: Arc<Mutex<Option<ActiveHandle>>>,
+    idle_notify: Arc<Notify>,
     /// Optional post-utterance forced aligner for word-order correction.
     /// When `Some`, spawned as a blocking task after each silence flush.
     aligner: Option<Arc<OrtForcedAligner>>,
@@ -96,6 +98,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             config,
             settings,
             active: Arc::new(Mutex::new(None)),
+            idle_notify: Arc::new(Notify::new()),
             aligner: None,
             adaptive_vad_state: Arc::new(Mutex::new(None)),
             vad_state_path: None,
@@ -193,6 +196,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let persist = Arc::clone(&self.persist);
         let config = self.config.clone();
         let active_arc = Arc::clone(&self.active);
+        let idle_notify = Arc::clone(&self.idle_notify);
         let aligner = self.aligner.as_ref().map(Arc::clone);
         let settings = Arc::clone(&self.settings);
         let adaptive_vad_state = Arc::clone(&self.adaptive_vad_state);
@@ -210,6 +214,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             event_tx,
             control_rx,
             active_arc,
+            idle_notify,
             audio_override,
             aligner,
             settings,
@@ -230,6 +235,27 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         if let Some(handle) = lock.as_ref() {
             debug!(session_id = %handle.session_id, "sending stop signal");
             let _ = handle.control_tx.send(SessionControl::Stop);
+        }
+    }
+
+    pub async fn stop_and_wait(&self) {
+        let notified = {
+            let lock = self.active.lock().await;
+            match lock.as_ref() {
+                Some(handle) => {
+                    debug!(
+                        session_id = %handle.session_id,
+                        "sending stop signal and waiting for session shutdown"
+                    );
+                    let _ = handle.control_tx.send(SessionControl::Stop);
+                    Some(self.idle_notify.notified())
+                }
+                None => None,
+            }
+        };
+
+        if let Some(notified) = notified {
+            notified.await;
         }
     }
 
@@ -334,6 +360,12 @@ fn drain_processing_controls(
     }
 }
 
+#[inline]
+async fn clear_active(active_arc: &Arc<Mutex<Option<ActiveHandle>>>, idle_notify: &Notify) {
+    active_arc.lock().await.take();
+    idle_notify.notify_waiters();
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn run_session<A: AsrBackend + 'static>(
     session_id: Uuid,
@@ -347,6 +379,7 @@ async fn run_session<A: AsrBackend + 'static>(
     event_tx: mpsc::Sender<SessionEvent>,
     mut control_rx: mpsc::UnboundedReceiver<SessionControl>,
     active_arc: Arc<Mutex<Option<ActiveHandle>>>,
+    idle_notify: Arc<Notify>,
     audio_override: Option<AudioStream>,
     aligner: Option<Arc<OrtForcedAligner>>,
     settings: Arc<RwLock<UserSettings>>,
@@ -371,7 +404,7 @@ async fn run_session<A: AsrBackend + 'static>(
                     None,
                 )
                 .await;
-                active_arc.lock().await.take();
+                clear_active(&active_arc, &idle_notify).await;
                 return;
             }
         }
@@ -389,7 +422,7 @@ async fn run_session<A: AsrBackend + 'static>(
                 None,
             )
             .await;
-            active_arc.lock().await.take();
+            clear_active(&active_arc, &idle_notify).await;
             return;
         }
     };
@@ -618,15 +651,20 @@ async fn run_session<A: AsrBackend + 'static>(
         )
         .await;
         let _ = event_tx.send(SessionEvent::Stopped).await;
-        active_arc.lock().await.take();
+        clear_active(&active_arc, &idle_notify).await;
         return;
     }
 
     if speech_samples == 0 {
-        info!(%session_id, "no speech detected, ending session");
+        if let Some(error) = first_asr_error.take().filter(|_| !saw_asr_success) {
+            status = SessionStatus::Failed(error.clone());
+            let _ = event_tx.send(SessionEvent::Error(error)).await;
+        } else {
+            info!(%session_id, "no speech detected, ending session");
+        }
         finalize_db(session_id, &persist, status, Some(Utc::now()), None).await;
         let _ = event_tx.send(SessionEvent::Stopped).await;
-        active_arc.lock().await.take();
+        clear_active(&active_arc, &idle_notify).await;
         return;
     }
 
@@ -639,7 +677,7 @@ async fn run_session<A: AsrBackend + 'static>(
         }
         finalize_db(session_id, &persist, status, Some(Utc::now()), None).await;
         let _ = event_tx.send(SessionEvent::Stopped).await;
-        active_arc.lock().await.take();
+        clear_active(&active_arc, &idle_notify).await;
         return;
     }
 
@@ -697,7 +735,7 @@ async fn run_session<A: AsrBackend + 'static>(
         info!(%session_id, "all text was voice commands");
         finalize_db(session_id, &persist, status, Some(Utc::now()), None).await;
         let _ = event_tx.send(SessionEvent::Stopped).await;
-        active_arc.lock().await.take();
+        clear_active(&active_arc, &idle_notify).await;
         return;
     }
 
@@ -774,7 +812,7 @@ async fn run_session<A: AsrBackend + 'static>(
         )
         .await;
         let _ = event_tx.send(SessionEvent::Stopped).await;
-        active_arc.lock().await.take();
+        clear_active(&active_arc, &idle_notify).await;
         return;
     }
 
@@ -795,7 +833,7 @@ async fn run_session<A: AsrBackend + 'static>(
     finalize_db(session_id, &persist, status, Some(Utc::now()), transcript).await;
 
     let _ = event_tx.send(SessionEvent::Stopped).await;
-    active_arc.lock().await.take();
+    clear_active(&active_arc, &idle_notify).await;
     info!(%session_id, "session stopped");
 }
 
@@ -931,6 +969,11 @@ mod tests {
         AudioStream::from_samples(&speech_samples(), AudioConfig::default()).unwrap()
     }
 
+    fn silent_stream(duration_secs: usize) -> AudioStream {
+        let samples = vec![0.0f32; 16_000 * duration_secs];
+        AudioStream::from_samples(&samples, AudioConfig::default()).unwrap()
+    }
+
     fn make_segment(text: &str, uncertain: bool) -> AsrSegment {
         AsrSegment {
             id: 1,
@@ -1046,6 +1089,24 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn stop_and_wait_finalizes_session() {
+        local_set()
+            .run_until(async {
+                let (mgr, db) = make_manager(scripted_asr(vec![]), Arc::new(EchoPostProcessor));
+                let (tx, _rx) = mpsc::channel(16);
+                let session_id = mgr.start_with_audio(tx, speech_stream()).await.unwrap();
+
+                mgr.stop_and_wait().await;
+
+                assert!(mgr.active_session_id().await.is_none());
+                let session = db.lock().await.get_session(session_id).unwrap().unwrap();
+                assert!(session.ended_at.is_some());
+                assert!(matches!(session.status, SessionStatus::Completed));
+            })
+            .await;
+    }
+
+    #[tokio::test]
     async fn rewritten_text_uses_source_text_for_llm() {
         // Segment text has "new line" voice command; source_text has it stripped.
         // Word confidences match the segment text — "helo" is low-conf (ASR error).
@@ -1134,6 +1195,31 @@ mod tests {
                         .iter()
                         .any(|event| matches!(event, SessionEvent::FinalizedText(_)))
                 );
+
+                let session = db.lock().await.get_session(session_id).unwrap().unwrap();
+                assert!(
+                    matches!(session.status, SessionStatus::Failed(ref msg) if msg.contains("boom"))
+                );
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn asr_errors_without_detected_speech_still_fail_session() {
+        local_set()
+            .run_until(async {
+                let responses = vec![
+                    Err(CoreError::Asr("boom".into())),
+                    Err(CoreError::Asr("boom".into())),
+                ];
+                let (mgr, db) = make_manager(scripted_asr(responses), Arc::new(EchoPostProcessor));
+                let (tx, rx) = mpsc::channel(32);
+                let session_id = mgr.start_with_audio(tx, silent_stream(1)).await.unwrap();
+
+                let events = collect_events(rx).await;
+                assert!(events.iter().any(
+                    |event| matches!(event, SessionEvent::Error(msg) if msg.contains("boom"))
+                ));
 
                 let session = db.lock().await.get_session(session_id).unwrap().unwrap();
                 assert!(
