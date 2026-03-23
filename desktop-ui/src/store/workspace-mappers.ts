@@ -34,6 +34,7 @@ export function mapWorkspaceSettings(snapshot: BackendWorkspaceSnapshot): Worksp
     activationMode: snapshot.settings.activationMode,
     asrBackend: snapshot.settings.asrBackendType,
     useGpu: snapshot.settings.useGpu,
+    devicePolicy: snapshot.settings.devicePolicy,
     confidenceThreshold: formatThreshold(snapshot.settings.confidenceThreshold ?? 0.5),
     llmCorrection: snapshot.settings.confidenceThreshold !== null,
     llmBackend: snapshot.settings.llmBackendType,
@@ -47,10 +48,10 @@ export function mapWorkspaceSettings(snapshot: BackendWorkspaceSnapshot): Worksp
     pillVisibility: (snapshot.settings.pillVisibility ?? "Always") as PillVisibilityValue,
     language: snapshot.settings.language ?? "en",
     openaiAsrBaseUrl: snapshot.settings.openaiAsrBaseUrl ?? DEFAULT_SETTINGS.openaiAsrBaseUrl,
-    openaiAsrApiKey: snapshot.settings.openaiAsrApiKey ?? DEFAULT_SETTINGS.openaiAsrApiKey,
+    openaiAsrApiKey: DEFAULT_SETTINGS.openaiAsrApiKey,
     openaiAsrModel: snapshot.settings.openaiAsrModel ?? DEFAULT_SETTINGS.openaiAsrModel,
     openaiLlmBaseUrl: snapshot.settings.openaiLlmBaseUrl ?? DEFAULT_SETTINGS.openaiLlmBaseUrl,
-    openaiLlmApiKey: snapshot.settings.openaiLlmApiKey ?? DEFAULT_SETTINGS.openaiLlmApiKey,
+    openaiLlmApiKey: DEFAULT_SETTINGS.openaiLlmApiKey,
     openaiLlmModel: snapshot.settings.openaiLlmModel ?? DEFAULT_SETTINGS.openaiLlmModel,
   };
 }
@@ -76,6 +77,7 @@ export function settingsToSaveInput(settings: WorkspaceSettings): SaveWorkspaceS
     activationMode: settings.activationMode,
     dictationMode: settings.dictationMode,
     useGpu: settings.useGpu,
+    devicePolicy: settings.devicePolicy,
     asrBackendType: settings.asrBackend,
     llmBackendType: settings.llmBackend,
     llmCorrection: settings.llmCorrection,

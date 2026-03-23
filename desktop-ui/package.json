@@ -9,6 +9,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "bun test tests/unit src",
+    "test:e2e:tauri": "bun run tauri build --debug --no-bundle && bun test tests/e2e/tauri-smoke.test.ts",
     "test:visual": "bun run build && bun test tests/visual",
     "test:visual:update": "bun run build && UPDATE_VISUAL_SNAPSHOTS=1 bun test tests/visual",
     "tauri": "tauri"

@@ -109,7 +109,7 @@ fn run_listener(
     };
 
     // Fan-in channel: each reader thread sends raw events here.
-    let (event_tx, event_rx) = std_mpsc::channel::<InputEvent>();
+    let (event_tx, event_rx) = std_mpsc::channel::<(InputEvent, bool)>();
 
     for dev in keyboards {
         let tx = event_tx.clone();
@@ -145,25 +145,42 @@ fn run_listener(
     // Deferred modifier press events waiting to see if the trigger follows.
     let mut deferred_mods: Vec<InputEvent> = Vec::new();
 
-    for raw_event in event_rx {
+    for (raw_event, grabbed) in event_rx {
         if raw_event.event_type() != EventType::KEY {
-            // Non-KEY events (SYN, MSC, LED): always forward.
-            forward(&mut passthrough, raw_event);
+            // Non-KEY events (SYN, MSC, LED): forward only for grabbed
+            // devices. Ungrabbed devices already reach the focused app.
+            if grabbed {
+                forward(&mut passthrough, raw_event);
+            }
             continue;
         }
 
         let code = KeyCode(raw_event.code());
         let value = raw_event.value();
 
-        // Auto-repeat (value=2): forward only if the key wasn't consumed.
+        // Auto-repeat (value=2): forward only if the key wasn't consumed and
+        // the device is grabbed.
         if value == 2 {
-            if !consumed_triggers.contains(code) && !combo_modifier_codes.contains(code) {
+            if grabbed && !consumed_triggers.contains(code) && !combo_modifier_codes.contains(code)
+            {
                 forward(&mut passthrough, raw_event);
             }
             continue;
         }
 
         let pressed = value == 1;
+
+        if !grabbed {
+            // Ungrabbed devices already deliver their native events to the app.
+            // Keep the state machine hotkey detection, but do not reinject.
+            let signal = InputSignal { code, pressed };
+            let mode = *activation_mode_rx.borrow();
+            let action = state.handle_signal(signal, mode);
+            if action != Action::None {
+                dispatch(action, &cmd_tx);
+            }
+            continue;
+        }
 
         // Defer combo modifier press events — don't forward yet.
         if pressed && combo_modifier_codes.contains(code) {
@@ -287,25 +304,34 @@ fn enumerate_keyboards() -> Vec<Device> {
 
 /// Blocking event reader for a single device. Grabs the device exclusively
 /// so hotkey events don't leak to the focused application.
-fn read_device(mut dev: Device, tx: std_mpsc::Sender<InputEvent>) {
+fn read_device(mut dev: Device, tx: std_mpsc::Sender<(InputEvent, bool)>) {
     let name = dev.name().unwrap_or("unknown").to_string();
 
     // Grab the device so key events don't reach the compositor directly.
-    // If grab fails, we still read events but they'll also reach the app.
-    match dev.grab() {
-        Ok(()) => info!(name, "grabbed keyboard device"),
-        Err(e) => warn!(
-            error = %e,
-            name,
-            "failed to grab keyboard; hotkey will pass through to apps"
-        ),
-    }
+    // If grab fails, we still read events for hotkey detection, but the
+    // physical device continues to deliver native input to the focused app.
+    // We do not reinject those events through the passthrough device, or they
+    // would be duplicated.
+    let grabbed = match dev.grab() {
+        Ok(()) => {
+            info!(name, "grabbed keyboard device");
+            true
+        }
+        Err(e) => {
+            warn!(
+                error = %e,
+                name,
+                "failed to grab keyboard; hotkey detection will be observe-only"
+            );
+            false
+        }
+    };
 
     loop {
         match dev.fetch_events() {
             Ok(events) => {
                 for ev in events {
-                    if tx.send(ev).is_err() {
+                    if tx.send((ev, grabbed)).is_err() {
                         return; // Consumer dropped — shutting down.
                     }
                 }
@@ -586,6 +612,10 @@ fn key_name_to_code(name: &str) -> Option<KeyCode> {
 
         _ => return None,
     })
+}
+
+pub(crate) fn is_supported_hotkey_key(name: &str) -> bool {
+    key_name_to_code(name).is_some()
 }
 
 // ─── Pressed-key bitset ──────────────────────────────────────────────────────

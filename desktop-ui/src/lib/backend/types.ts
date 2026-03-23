@@ -26,6 +26,7 @@ export interface BackendWorkspaceSettings {
   activationMode: ActivationModeValue;
   dictationMode: DictationModeValue;
   useGpu: boolean;
+  devicePolicy: "Cpu" | "Cuda" | "Auto";
   asrBackendType: AsrBackendValue;
   llmBackendType: LlmBackendValue;
   confidenceThreshold: number | null;
@@ -39,11 +40,9 @@ export interface BackendWorkspaceSettings {
   language: string;
   // OpenAI ASR fields (present when asrBackendType == "OpenAiCompatible")
   openaiAsrBaseUrl?: string | null;
-  openaiAsrApiKey?: string | null;
   openaiAsrModel?: string | null;
   // OpenAI LLM fields (present when llmBackendType == "OpenAiCompatible")
   openaiLlmBaseUrl?: string | null;
-  openaiLlmApiKey?: string | null;
   openaiLlmModel?: string | null;
 }
 
@@ -55,10 +54,17 @@ export interface BackendWorkspaceSnapshot {
   dictionary: BackendDictionaryEntry[];
 }
 
+export interface BackendPillSnapshot {
+  serviceStatus: string;
+  activationMode: ActivationModeValue;
+  pillVisibility: string;
+}
+
 export interface SaveWorkspaceSettingsInput {
   activationMode: ActivationModeValue;
   dictationMode: DictationModeValue;
   useGpu: boolean;
+  devicePolicy: "Cpu" | "Cuda" | "Auto";
   asrBackendType: AsrBackendValue;
   llmBackendType: LlmBackendValue;
   llmCorrection: boolean;

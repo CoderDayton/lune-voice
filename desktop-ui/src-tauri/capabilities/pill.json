@@ -5,6 +5,6 @@
   "windows": ["pill"],
   "permissions": [
     "core:event:default",
-    "core:app:default"
+    "core:window:default"
   ]
 }

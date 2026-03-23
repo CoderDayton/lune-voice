@@ -160,38 +160,25 @@ fn open_database(paths: &AppPaths) -> Result<Database, String> {
 }
 
 fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
-    let (openai_asr_base_url, openai_asr_api_key, openai_asr_model) = match &settings.asr_backend {
+    let (openai_asr_base_url, openai_asr_model) = match &settings.asr_backend {
         AsrBackendConfig::OpenAiCompatible {
-            base_url,
-            api_key,
-            model,
-            ..
-        } => (
-            Some(base_url.to_string()),
-            Some(api_key.expose().to_owned()),
-            Some(model.clone()),
-        ),
-        _ => (None, None, None),
+            base_url, model, ..
+        } => (Some(base_url.to_string()), Some(model.clone())),
+        _ => (None, None),
     };
 
-    let (openai_llm_base_url, openai_llm_api_key, openai_llm_model) = match &settings.llm_backend {
+    let (openai_llm_base_url, openai_llm_model) = match &settings.llm_backend {
         LlmBackendConfig::OpenAiCompatible {
-            base_url,
-            api_key,
-            model,
-            ..
-        } => (
-            Some(base_url.to_string()),
-            Some(api_key.expose().to_owned()),
-            Some(model.clone()),
-        ),
-        _ => (None, None, None),
+            base_url, model, ..
+        } => (Some(base_url.to_string()), Some(model.clone())),
+        _ => (None, None),
     };
 
     WorkspaceSettingsDto {
         activation_mode: settings.activation_mode.to_string(),
         dictation_mode: settings.dictation_mode.to_string(),
         use_gpu: !matches!(settings.device, DevicePolicy::Cpu),
+        device_policy: device_policy_label(settings.device).to_owned(),
         asr_backend_type: asr_backend_type(&settings.asr_backend).to_owned(),
         llm_backend_type: llm_backend_type(&settings.llm_backend).to_owned(),
         confidence_threshold: settings.pipeline.word_confidence_threshold,
@@ -207,10 +194,10 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
         pill_visibility: settings.pill_visibility.to_string(),
         language: settings.language.clone(),
         openai_asr_base_url,
-        openai_asr_api_key,
+        openai_asr_api_key: None,
         openai_asr_model,
         openai_llm_base_url,
-        openai_llm_api_key,
+        openai_llm_api_key: None,
         openai_llm_model,
     }
 }
@@ -225,11 +212,7 @@ fn apply_settings_dto(
         .map_err(|e| format!("pillVisibility: {e}"))?;
     settings.dictation_mode = DictationMode::from_str(input.dictation_mode.trim())
         .map_err(|e| format!("dictationMode: {e}"))?;
-    settings.device = if input.use_gpu {
-        DevicePolicy::Auto
-    } else {
-        DevicePolicy::Cpu
-    };
+    settings.device = resolve_device_policy(input.use_gpu, input.device_policy.trim())?;
     settings.asr_backend =
         asr_backend_from_type(&input.asr_backend_type, &settings.asr_backend, &input)?;
     settings.llm_backend =
@@ -295,6 +278,27 @@ fn asr_backend_type(config: &AsrBackendConfig) -> &'static str {
         AsrBackendConfig::OrtQwenAsr { .. } => "OrtQwenAsr",
         AsrBackendConfig::OpenAiCompatible { .. } => "OpenAiCompatible",
         _ => UNKNOWN_LABEL,
+    }
+}
+
+fn device_policy_label(policy: DevicePolicy) -> &'static str {
+    match policy {
+        DevicePolicy::Cpu => "Cpu",
+        DevicePolicy::Cuda => "Cuda",
+        DevicePolicy::Auto => "Auto",
+    }
+}
+
+fn resolve_device_policy(use_gpu: bool, raw_policy: &str) -> Result<DevicePolicy, String> {
+    if !use_gpu {
+        return Ok(DevicePolicy::Cpu);
+    }
+
+    match raw_policy {
+        "Cuda" => Ok(DevicePolicy::Cuda),
+        "Auto" | "" => Ok(DevicePolicy::Auto),
+        "Cpu" => Ok(DevicePolicy::Auto),
+        other => Err(format!("unsupported devicePolicy: {other}")),
     }
 }
 
@@ -410,7 +414,7 @@ fn validate_api_url(url: &url::Url, field: &str) -> Result<(), String> {
         "https" => Ok(()),
         "http" => {
             let host = url.host_str().unwrap_or_default();
-            if host == "localhost" || host == "127.0.0.1" || host == "[::1]" {
+            if host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "[::1]" {
                 Ok(())
             } else {
                 Err(format!(
@@ -442,16 +446,21 @@ fn current_qwen_model_dir(current: &AsrBackendConfig) -> PathBuf {
 const MAX_COMBO_PARTS: usize = 8;
 
 fn parse_key_combo(raw: &str) -> Result<KeyCombo, String> {
-    let parts: Vec<_> = raw
+    let raw_parts: Vec<_> = raw
         .split('+')
         .map(str::trim)
         .filter(|part| !part.is_empty())
-        .take(MAX_COMBO_PARTS)
         .collect();
-    if parts.is_empty() {
+    if raw_parts.is_empty() {
         return Err("hotkey cannot be empty".into());
     }
+    if raw_parts.len() > MAX_COMBO_PARTS {
+        return Err(format!(
+            "hotkey cannot contain more than {MAX_COMBO_PARTS} parts"
+        ));
+    }
 
+    let parts = raw_parts;
     let key = parts[parts.len() - 1];
     // Reject key names that are empty or unreasonably long.
     if key.is_empty() || key.len() > 32 {
@@ -459,8 +468,13 @@ fn parse_key_combo(raw: &str) -> Result<KeyCombo, String> {
     }
 
     let mut modifiers = Vec::new();
+    let mut seen_modifiers = std::collections::HashSet::new();
     for modifier in &parts[..parts.len() - 1] {
-        modifiers.push(parse_modifier(modifier)?);
+        let parsed = parse_modifier(modifier)?;
+        if !seen_modifiers.insert(modifier.to_ascii_lowercase()) {
+            return Err(format!("duplicate hotkey modifier: {modifier}"));
+        }
+        modifiers.push(parsed);
     }
 
     Ok(KeyCombo {
@@ -547,5 +561,52 @@ mod tests {
         input.style_preset = "casual".into();
         input.language = "bad tag".into();
         assert!(apply_settings_dto(&mut settings, input).is_err());
+    }
+
+    #[test]
+    fn device_policy_round_trips_cuda_without_downgrade() {
+        let mut settings = UserSettings {
+            device: DevicePolicy::Cuda,
+            ..UserSettings::default()
+        };
+        let input = settings_to_dto(&settings);
+
+        apply_settings_dto(&mut settings, input).unwrap();
+        assert!(matches!(settings.device, DevicePolicy::Cuda));
+    }
+
+    #[test]
+    fn settings_to_dto_redacts_openai_api_keys() {
+        let settings = UserSettings {
+            asr_backend: AsrBackendConfig::OpenAiCompatible {
+                base_url: "https://api.openai.com/v1".parse().unwrap(),
+                api_key: RedactedString::new("secret-asr"),
+                model: "whisper-1".into(),
+                streaming: StreamingMode::HttpPolling,
+            },
+            llm_backend: LlmBackendConfig::OpenAiCompatible {
+                base_url: "https://api.openai.com/v1".parse().unwrap(),
+                api_key: RedactedString::new("secret-llm"),
+                model: "gpt-4o-mini".into(),
+                max_tokens: 128,
+            },
+            ..UserSettings::default()
+        };
+
+        let dto = settings_to_dto(&settings);
+        assert!(dto.openai_asr_api_key.is_none());
+        assert!(dto.openai_llm_api_key.is_none());
+    }
+
+    #[test]
+    fn parse_key_combo_rejects_duplicate_modifiers_and_overflow() {
+        assert!(parse_key_combo("Ctrl+Ctrl+Space").is_err());
+        assert!(parse_key_combo("Ctrl+Alt+Shift+Meta+Fn+Hyper+Super+Caps+A").is_err());
+    }
+
+    #[test]
+    fn validate_api_url_allows_ipv6_loopback_http() {
+        let url = url::Url::parse("http://[::1]:8080/v1").unwrap();
+        assert!(validate_api_url(&url, "openaiAsrBaseUrl").is_ok());
     }
 }

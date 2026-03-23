@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use lune_app::{DeliveryService, SessionManager, SessionManagerConfig};
 use lune_asr::{AsrRegistry, OrtForcedAligner};
@@ -25,7 +26,8 @@ struct RuntimeInner {
     app: AppHandle,
     pipeline: Mutex<LivePipeline>,
     status: RwLock<String>,
-    session_stream: RwLock<Option<Channel<SessionStreamEvent>>>,
+    session_stream: RwLock<Option<SessionStreamSlot>>,
+    session_stream_seq: AtomicU64,
     /// Shared settings — updated on reload, read for dictation_mode at delivery time.
     settings: Arc<RwLock<UserSettings>>,
     /// Background thread that owns the uinput/clipboard handle.
@@ -38,6 +40,11 @@ struct LivePipeline {
     active: bool,
     session_id: Option<String>,
     reload_required: bool,
+}
+
+struct SessionStreamSlot {
+    id: u64,
+    channel: Channel<SessionStreamEvent>,
 }
 
 impl AppRuntime {
@@ -54,6 +61,7 @@ impl AppRuntime {
                 pipeline: Mutex::new(pipeline),
                 status: RwLock::new("ready".into()),
                 session_stream: RwLock::new(None),
+                session_stream_seq: AtomicU64::new(0),
                 settings,
                 delivery,
             }),
@@ -71,10 +79,15 @@ impl AppRuntime {
     pub async fn set_session_stream(
         &self,
         channel: Channel<SessionStreamEvent>,
-    ) -> Result<(), String> {
+    ) -> Result<u64, String> {
+        let id = self
+            .inner
+            .session_stream_seq
+            .fetch_add(1, Ordering::Relaxed)
+            + 1;
         {
             let mut slot = self.inner.session_stream.write().await;
-            *slot = Some(channel);
+            *slot = Some(SessionStreamSlot { id, channel });
         }
 
         self.push_session_event(SessionStreamEvent::ServiceStatus {
@@ -92,12 +105,17 @@ impl AppRuntime {
                 .await;
         }
 
-        Ok(())
+        Ok(id)
     }
 
-    pub async fn clear_session_stream(&self) {
+    pub async fn clear_session_stream(&self, subscription_id: u64) {
         let mut slot = self.inner.session_stream.write().await;
-        *slot = None;
+        if slot
+            .as_ref()
+            .is_some_and(|current| current.id == subscription_id)
+        {
+            *slot = None;
+        }
     }
 
     pub async fn mark_reload_required(&self) {
@@ -310,24 +328,26 @@ impl AppRuntime {
         let failed = {
             let slot = self.inner.session_stream.read().await;
             match slot.as_ref() {
-                Some(channel) => {
-                    if let Err(e) = channel.send(event) {
+                Some(slot) => {
+                    if let Err(e) = slot.channel.send(event) {
                         warn!(
                             error = %e,
                             "session stream channel send failed — frontend may have disconnected"
                         );
-                        true
+                        Some(slot.id)
                     } else {
-                        false
+                        None
                     }
                 }
-                None => false,
+                None => None,
             }
         };
 
-        if failed {
+        if let Some(id) = failed {
             let mut slot = self.inner.session_stream.write().await;
-            *slot = None;
+            if slot.as_ref().is_some_and(|current| current.id == id) {
+                *slot = None;
+            }
         }
     }
 
@@ -587,4 +607,16 @@ fn sanitize_error_for_frontend(raw: &str) -> String {
         regex::Regex::new(r"(/[a-zA-Z0-9._\-]+){3,}").expect("path regex")
     });
     PATH_RE.replace_all(&capped, "[path]").into_owned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sanitize_error_for_frontend;
+
+    #[test]
+    fn sanitize_error_handles_non_ascii_without_panicking() {
+        let raw = format!("é{}", "/tmp/example/path/segment".repeat(80));
+        let sanitized = sanitize_error_for_frontend(&raw);
+        assert!(!sanitized.is_empty());
+    }
 }

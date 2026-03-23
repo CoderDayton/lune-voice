@@ -52,10 +52,18 @@ export async function attachSessionStream(
     }
   });
 
-  await retryInvoke(() => invoke("subscribe_session_stream", { channel }));
+  let subscriptionId = 0;
+  try {
+    subscriptionId = await retryInvoke(() =>
+      invoke<number>("subscribe_session_stream", { channel }),
+    );
+  } catch (error) {
+    cleanupChannel(channel);
+    throw error;
+  }
 
   return () => {
-    invoke("detach_session_stream").catch((e) => {
+    invoke("detach_session_stream", { subscriptionId }).catch((e) => {
       console.warn("[stream] detach_session_stream failed", e);
     });
     cleanupChannel(channel);

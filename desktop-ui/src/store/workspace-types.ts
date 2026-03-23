@@ -11,6 +11,7 @@ export interface WorkspaceSettings {
   activationMode: ActivationModeValue;
   asrBackend: AsrBackendValue;
   useGpu: boolean;
+  devicePolicy: "Cpu" | "Cuda" | "Auto";
   confidenceThreshold: string;
   llmCorrection: boolean;
   llmBackend: LlmBackendValue;
@@ -67,6 +68,7 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   activationMode: "Toggle",
   asrBackend: "OrtQwenAsr",
   useGpu: true,
+  devicePolicy: "Auto",
   confidenceThreshold: "0.50",
   llmCorrection: true,
   llmBackend: "LlamaCppLocal",

@@ -3,6 +3,8 @@ mod dto;
 mod persistence;
 mod pill;
 mod runtime;
+#[cfg(test)]
+mod tauri_integration_tests;
 
 use tauri::Manager;
 
@@ -18,6 +20,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::load_workspace_snapshot,
+            commands::load_pill_snapshot,
             commands::save_workspace_settings,
             commands::create_dictionary_entry,
             commands::delete_dictionary_entry,

@@ -10,6 +10,7 @@ use lune_core::config::{
 };
 
 use crate::events::AppCommand;
+use crate::hotkey_listener::is_supported_hotkey_key;
 
 /// Lightweight BCP-47 well-formedness check (RFC 5646 §2.1).
 /// Validates structural rules only — does not consult the IANA subtag registry.
@@ -24,6 +25,45 @@ fn is_wellformed_bcp47(tag: &str) -> bool {
         let len = p.len();
         (1..=8).contains(&len) && p.bytes().all(|b| b.is_ascii_alphanumeric())
     })
+}
+
+fn normalize_hotkey_combo(combo: &lune_core::config::KeyCombo) -> (Vec<u8>, String) {
+    let mut modifiers = combo
+        .modifiers
+        .iter()
+        .map(|modifier| match modifier {
+            lune_core::config::Modifier::Ctrl => 0,
+            lune_core::config::Modifier::Shift => 1,
+            lune_core::config::Modifier::Alt => 2,
+            lune_core::config::Modifier::Meta => 3,
+            _ => 255,
+        })
+        .collect::<Vec<_>>();
+    modifiers.sort_unstable();
+    modifiers.dedup();
+    (modifiers, combo.key.to_ascii_lowercase())
+}
+
+fn validate_hotkey_config(hotkey: &HotkeyConfig) -> Result<(), String> {
+    for (field, combo) in [
+        ("toggleDictation", &hotkey.toggle_dictation),
+        ("cancelDictation", &hotkey.cancel_dictation),
+    ] {
+        if combo.key.trim().is_empty() {
+            return Err(format!("{field}.key cannot be empty"));
+        }
+        if !is_supported_hotkey_key(&combo.key) {
+            return Err(format!("{field}.key is not supported: {}", combo.key));
+        }
+    }
+
+    if normalize_hotkey_combo(&hotkey.toggle_dictation)
+        == normalize_hotkey_combo(&hotkey.cancel_dictation)
+    {
+        return Err("toggle and cancel hotkeys must be different".into());
+    }
+
+    Ok(())
 }
 
 const BUS_NAME: &str = "com.lunevoice.Daemon1";
@@ -260,6 +300,7 @@ impl DaemonInterface {
     ) -> zbus::fdo::Result<()> {
         let hotkey: HotkeyConfig =
             serde_json::from_str(json).map_err(|e| zbus::fdo::Error::InvalidArgs(e.to_string()))?;
+        validate_hotkey_config(&hotkey).map_err(zbus::fdo::Error::InvalidArgs)?;
         self.settings.write().await.hotkey = hotkey;
         self.persist_setting();
         let _ = emitter.settings_changed("hotkey").await;
@@ -436,6 +477,7 @@ mod tests {
     use std::time::Duration;
 
     use super::is_wellformed_bcp47;
+    use super::validate_hotkey_config;
     use super::*;
     use tokio::sync::{RwLock, mpsc, watch};
 
@@ -505,5 +547,35 @@ mod tests {
 
         let persisted = store.load().unwrap();
         assert_eq!(persisted.language, "fr-FR");
+    }
+
+    #[test]
+    fn validate_hotkey_config_accepts_default() {
+        assert!(validate_hotkey_config(&HotkeyConfig::default()).is_ok());
+    }
+
+    #[test]
+    fn validate_hotkey_config_rejects_duplicate_combos() {
+        let mut hotkey = HotkeyConfig::default();
+        hotkey.cancel_dictation = hotkey.toggle_dictation.clone();
+        let err = validate_hotkey_config(&hotkey).unwrap_err();
+        assert!(err.contains("must be different"));
+    }
+
+    #[test]
+    fn validate_hotkey_config_rejects_unknown_key() {
+        let hotkey = HotkeyConfig {
+            toggle_dictation: lune_core::config::KeyCombo {
+                modifiers: vec![lune_core::config::Modifier::Ctrl],
+                key: "NoSuchKey".into(),
+            },
+            cancel_dictation: lune_core::config::KeyCombo {
+                modifiers: vec![],
+                key: "Escape".into(),
+            },
+        };
+
+        let err = validate_hotkey_config(&hotkey).unwrap_err();
+        assert!(err.contains("not supported"));
     }
 }

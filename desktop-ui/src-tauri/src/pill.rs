@@ -1,49 +1,88 @@
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, WebviewWindow};
+
+use crate::commands::require_window_access;
+
+#[cfg(target_os = "linux")]
+static LAYER_SHELL_CONFIGURED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
 
 #[tauri::command]
-pub async fn show_pill_window(app: AppHandle) -> Result<(), String> {
-    let pill = app
-        .get_webview_window("pill")
-        .ok_or_else(|| "pill window not found".to_string())?;
+pub async fn show_pill_window(window: WebviewWindow, app: AppHandle) -> Result<(), String> {
+    require_window_access(&window, &["pill"])?;
+    run_pill_window_on_main_thread(&app, move |pill| {
+        #[cfg(target_os = "linux")]
+        {
+            if LAYER_SHELL_CONFIGURED.get().is_none() {
+                configure_linux_pill(&pill)?;
+                let _ = LAYER_SHELL_CONFIGURED.set(());
+            }
+        }
 
-    #[cfg(target_os = "linux")]
-    configure_linux_pill(&pill)?;
-
-    #[cfg(not(target_os = "linux"))]
-    reposition_standard(&pill)?;
-
-    pill.show().map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn hide_pill_window(app: AppHandle) -> Result<(), String> {
-    let pill = app
-        .get_webview_window("pill")
-        .ok_or_else(|| "pill window not found".to_string())?;
-    pill.hide().map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn reposition_pill_center(app: AppHandle) -> Result<(), String> {
-    let pill = app
-        .get_webview_window("pill")
-        .ok_or_else(|| "pill window not found".to_string())?;
-
-    #[cfg(target_os = "linux")]
-    {
-        // On Wayland layer shell, repositioning is handled by anchors — no-op.
-        // On X11, fall back to standard positioning.
-        if !is_wayland() {
+        #[cfg(not(target_os = "linux"))]
+        {
+            // TODO(macos): Use NSPanel with floatingPanel + NSNonactivatingPanelMask
+            // for proper overlay behavior. Standard always_on_top shows in Mission Control.
             reposition_standard(&pill)?;
         }
-    }
 
-    #[cfg(not(target_os = "linux"))]
-    reposition_standard(&pill)?;
+        pill.show().map_err(|e| e.to_string())?;
+        Ok(())
+    })
+    .await
+}
 
-    Ok(())
+#[tauri::command]
+pub async fn hide_pill_window(window: WebviewWindow, app: AppHandle) -> Result<(), String> {
+    require_window_access(&window, &["pill"])?;
+    run_pill_window_on_main_thread(&app, move |pill| {
+        pill.hide().map_err(|e| e.to_string())?;
+        Ok(())
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn reposition_pill_center(window: WebviewWindow, app: AppHandle) -> Result<(), String> {
+    require_window_access(&window, &["pill"])?;
+    run_pill_window_on_main_thread(&app, move |pill| {
+        #[cfg(target_os = "linux")]
+        {
+            // On Wayland layer shell, repositioning is handled by anchors — no-op.
+            // On X11, fall back to standard positioning.
+            if !is_wayland() {
+                reposition_standard(&pill)?;
+            }
+        }
+
+        #[cfg(not(target_os = "linux"))]
+        reposition_standard(&pill)?;
+
+        Ok(())
+    })
+    .await
+}
+
+async fn run_pill_window_on_main_thread<F>(app: &AppHandle, task: F) -> Result<(), String>
+where
+    F: FnOnce(tauri::WebviewWindow) -> Result<(), String> + Send + 'static,
+{
+    let app = app.clone();
+    let app_for_task = app.clone();
+    let (tx, rx) = tokio::sync::oneshot::channel();
+
+    app.run_on_main_thread(move || {
+        let result = (|| {
+            let pill = app_for_task
+                .get_webview_window("pill")
+                .ok_or_else(|| "pill window not found".to_string())?;
+            task(pill)
+        })();
+
+        let _ = tx.send(result);
+    })
+    .map_err(|e| e.to_string())?;
+
+    rx.await
+        .map_err(|_| "pill main-thread task did not complete".to_string())?
 }
 
 /// Standard window positioning (works on X11, Windows, macOS).
@@ -91,26 +130,23 @@ fn configure_linux_pill(pill: &tauri::WebviewWindow) -> Result<(), String> {
     let app_window = pill.gtk_window().map_err(|e| e.to_string())?;
     let gtk_window: gtk::Window = app_window.upcast();
 
-    // Only init layer shell once.
-    if !gtk_window.is_layer_window() {
-        gtk_window.init_layer_shell();
-        gtk_window.set_layer(gtk_layer_shell::Layer::Overlay);
-        gtk_window.set_namespace("lune-voice-pill");
+    gtk_window.init_layer_shell();
+    gtk_window.set_layer(gtk_layer_shell::Layer::Overlay);
+    gtk_window.set_namespace("lune-voice-pill");
 
-        // Don't take keyboard focus — pill has click buttons only.
-        gtk_window.set_keyboard_mode(gtk_layer_shell::KeyboardMode::None);
+    // Don't take keyboard focus — pill has click buttons only.
+    gtk_window.set_keyboard_mode(gtk_layer_shell::KeyboardMode::None);
 
-        // Anchor bottom only → compositor centers horizontally.
-        gtk_window.set_anchor(gtk_layer_shell::Edge::Bottom, true);
-        gtk_window.set_anchor(gtk_layer_shell::Edge::Left, false);
-        gtk_window.set_anchor(gtk_layer_shell::Edge::Right, false);
-        gtk_window.set_anchor(gtk_layer_shell::Edge::Top, false);
+    // Anchor bottom only → compositor centers horizontally.
+    gtk_window.set_anchor(gtk_layer_shell::Edge::Bottom, true);
+    gtk_window.set_anchor(gtk_layer_shell::Edge::Left, false);
+    gtk_window.set_anchor(gtk_layer_shell::Edge::Right, false);
+    gtk_window.set_anchor(gtk_layer_shell::Edge::Top, false);
 
-        gtk_window.set_layer_shell_margin(gtk_layer_shell::Edge::Bottom, 40);
+    gtk_window.set_layer_shell_margin(gtk_layer_shell::Edge::Bottom, 40);
 
-        // -1 = don't reserve exclusive space (don't push other windows).
-        gtk_window.set_exclusive_zone(-1);
-    }
+    // -1 = don't reserve exclusive space (don't push other windows).
+    gtk_window.set_exclusive_zone(-1);
 
     Ok(())
 }

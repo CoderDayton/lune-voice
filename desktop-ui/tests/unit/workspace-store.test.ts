@@ -19,6 +19,7 @@ function makeSnapshot(overrides: Partial<BackendWorkspaceSnapshot> = {}): Backen
       activationMode: "Toggle",
       dictationMode: "Clipboard",
       useGpu: true,
+      devicePolicy: "Auto",
       asrBackendType: "OrtQwenAsr",
       llmBackendType: "LlamaCppLocal",
       confidenceThreshold: 0.5,
@@ -31,10 +32,8 @@ function makeSnapshot(overrides: Partial<BackendWorkspaceSnapshot> = {}): Backen
       pillVisibility: "Always",
       language: "en",
       openaiAsrBaseUrl: null,
-      openaiAsrApiKey: null,
       openaiAsrModel: null,
       openaiLlmBaseUrl: null,
-      openaiLlmApiKey: null,
       openaiLlmModel: null,
     },
     history: [],
@@ -126,5 +125,38 @@ describe("workspace store", () => {
 
     expect(workspaceStore.state.settings.dictationMode).toBe("Clipboard");
     expect(workspaceStore.state.runtime.error).toContain("backend rejected change");
+  });
+
+  test("hydrate keeps OpenAI api keys out of store state", () => {
+    const snapshotSettings = makeSnapshot().settings;
+    workspaceActions.hydrate(
+      makeSnapshot({
+        settings: {
+          ...snapshotSettings,
+          openaiAsrApiKey: "secret-asr",
+          openaiLlmApiKey: "secret-llm",
+        },
+      }),
+    );
+
+    expect(workspaceStore.state.settings.openaiAsrApiKey).toBe("");
+    expect(workspaceStore.state.settings.openaiLlmApiKey).toBe("");
+  });
+
+  test("finalized text appends to live transcript", () => {
+    workspaceActions.applySessionEvent({
+      type: "sessionStarted",
+      sessionId: "session-123",
+    });
+    workspaceActions.applySessionEvent({
+      type: "finalizedText",
+      text: "hello",
+    });
+    workspaceActions.applySessionEvent({
+      type: "finalizedText",
+      text: "world",
+    });
+
+    expect(workspaceStore.state.runtime.liveTranscript).toBe("hello world");
   });
 });

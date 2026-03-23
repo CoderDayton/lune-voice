@@ -10,12 +10,21 @@ pub struct WorkspaceSnapshot {
     pub dictionary: Vec<DictionaryItemDto>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PillSnapshotDto {
+    pub service_status: String,
+    pub activation_mode: String,
+    pub pill_visibility: String,
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceSettingsDto {
     pub activation_mode: String,
     pub dictation_mode: String,
     pub use_gpu: bool,
+    pub device_policy: String,
     pub asr_backend_type: String,
     pub llm_backend_type: String,
     pub confidence_threshold: Option<f32>,

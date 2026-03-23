@@ -33,7 +33,7 @@ export function OpenAiFields({ settings, baseUrlKey, apiKeyKey, modelKey, apiDes
       />
       <SettingsRow
         label={t`API key`}
-        description={t`Your API key. Stored locally and never shared.`}
+        description={t`Your API key. Leave it blank to keep the saved key.`}
         control={
           <input
             type="password"

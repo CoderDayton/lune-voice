@@ -217,7 +217,9 @@ function reduceSessionEvent(
       return {
         ...runtime,
         serviceStatus: "ready",
-        liveTranscript: event.text,
+        liveTranscript: runtime.liveTranscript
+          ? `${runtime.liveTranscript} ${event.text}`
+          : event.text,
       };
     case "correctedText":
       return { ...runtime, liveTranscript: event.text };

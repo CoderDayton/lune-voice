@@ -19,6 +19,7 @@ function createMockSnapshot(): BackendWorkspaceSnapshot {
       activationMode: "Toggle",
       dictationMode: "Clipboard",
       useGpu: true,
+      devicePolicy: "Auto",
       asrBackendType: "OrtQwenAsr",
       llmBackendType: "LlamaCppLocal",
       confidenceThreshold: 0.5,
@@ -27,15 +28,13 @@ function createMockSnapshot(): BackendWorkspaceSnapshot {
       stylePreset: "casual",
       hotkeyToggle: "Ctrl+Space",
       hotkeyCancel: "Escape",
-      openaiAsrBaseUrl: null,
-      openaiAsrApiKey: null,
-      openaiAsrModel: null,
-      openaiLlmBaseUrl: null,
-      openaiLlmApiKey: null,
-      openaiLlmModel: null,
       alignerEnabled: true,
       pillVisibility: "Always",
       language: "en",
+      openaiAsrBaseUrl: null,
+      openaiAsrModel: null,
+      openaiLlmBaseUrl: null,
+      openaiLlmModel: null,
     },
     history: [],
     dictionary: initialDictionaryEntries.map((entry, index) => ({
@@ -51,12 +50,13 @@ let mockSnapshot: BackendWorkspaceSnapshot = createMockSnapshot();
 let nextDictionaryId = 1000;
 
 function applySettings(input: SaveWorkspaceSettingsInput) {
-  const { llmCorrection, ...fields } = input;
+  const { llmCorrection, openaiAsrApiKey: _openaiAsrApiKey, openaiLlmApiKey: _openaiLlmApiKey, ...fields } = input;
   mockSnapshot = {
     ...mockSnapshot,
     settings: {
       ...mockSnapshot.settings,
       ...fields,
+      devicePolicy: fields.useGpu ? fields.devicePolicy : "Cpu",
       confidenceThreshold: llmCorrection ? input.confidenceThreshold : null,
     },
   };
@@ -110,4 +110,3 @@ export const mockBackendClient: BackendClient = {
     return "mock-session";
   },
 };
-

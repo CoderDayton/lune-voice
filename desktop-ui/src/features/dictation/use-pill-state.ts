@@ -3,6 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import type { BackendPillSnapshot } from "../../lib/backend/types";
 
 
 export type PillMode = "idle" | "active" | "processing";
@@ -43,14 +44,12 @@ export function usePillState() {
   // On mount: load workspace snapshot for initial readiness
   useEffect(() => {
     let cancelled = false;
-    invoke<{ serviceStatus: string; settings: { activationMode: string; pillVisibility: string } }>(
-      "load_workspace_snapshot",
-    ).then(
+    invoke<BackendPillSnapshot>("load_pill_snapshot").then(
       (snapshot) => {
         if (cancelled) return;
-        const am = snapshot.settings.activationMode;
+        const am = snapshot.activationMode;
         if (am === "Hold" || am === "Toggle") setRecordingMode(am);
-        const pv = snapshot.settings.pillVisibility;
+        const pv = snapshot.pillVisibility;
         if (pv === "Always" || pv === "WhenDictating" || pv === "Never") setPillVis(pv);
         if (READY_STATUSES.has(snapshot.serviceStatus)) {
           setServiceReady(true);
