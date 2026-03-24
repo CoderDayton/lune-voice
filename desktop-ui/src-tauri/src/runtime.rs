@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use lune_app::{DeliveryService, SessionManager, SessionManagerConfig};
+use lune_app::{AppCommand, DeliveryService, SessionManager, SessionManagerConfig};
 use lune_asr::{AsrRegistry, OrtForcedAligner};
 use lune_commands::VoiceCommandRouter;
 use lune_core::asr::AsrSessionConfig;
@@ -14,6 +14,8 @@ use lune_llm::{LlamaCppBackend, LlamaCppConfig, OpenAiLlmBackend, OpenAiLlmConfi
 use lune_persist::{AppPaths, Database, SettingsStore, ensure_default_models};
 use tauri::{AppHandle, Emitter, ipc::Channel};
 use tokio::sync::{Mutex, RwLock, mpsc};
+#[cfg(unix)]
+use tracing::info;
 use tracing::{debug, warn};
 
 use crate::dto::SessionStreamEvent;
@@ -32,6 +34,16 @@ struct RuntimeInner {
     settings: Arc<RwLock<UserSettings>>,
     /// Background thread that owns the uinput/clipboard handle.
     delivery: DeliveryService,
+    /// Watch sender for activation mode — kept alive so the hotkey listener
+    /// receives runtime changes when the user toggles Toggle↔Hold in settings.
+    #[cfg(unix)]
+    activation_mode_tx: tokio::sync::watch::Sender<lune_core::config::ActivationMode>,
+    /// Hotkey command sender — dropping this signals the command loop to exit.
+    #[cfg(unix)]
+    _hotkey_cmd_tx: Option<mpsc::Sender<AppCommand>>,
+    /// Hotkey listener thread handle — joined on shutdown for clean cleanup.
+    #[cfg(unix)]
+    _hotkey_thread: Option<std::thread::JoinHandle<()>>,
 }
 
 struct LivePipeline {
@@ -55,17 +67,86 @@ impl AppRuntime {
         let terminal_mode = settings.read().await.terminal_mode;
         let delivery = DeliveryService::new(terminal_mode);
 
-        Ok(Self {
+        // ── Hotkey listener (evdev) ──────────────────────────────────────
+        // Create channels and spawn the listener before building RuntimeInner
+        // so the handle and sender can be stored for clean shutdown.
+        #[cfg(unix)]
+        let (activation_mode_tx, hotkey_cmd_tx, hotkey_thread, hotkey_cmd_rx) = {
+            let mode = settings.read().await.activation_mode;
+            let (am_tx, am_rx) = tokio::sync::watch::channel(mode);
+            let hotkey_config = settings.read().await.hotkey.clone();
+            let (cmd_tx, cmd_rx) = mpsc::channel::<AppCommand>(64);
+
+            let handle = lune_app::hotkey_listener::spawn(hotkey_config, am_rx, cmd_tx.clone());
+
+            match &handle {
+                Some(_) => info!("hotkey listener started (evdev)"),
+                None => warn!("hotkey listener failed to start — global shortcuts disabled"),
+            }
+
+            (am_tx, Some(cmd_tx), handle, Some(cmd_rx))
+        };
+
+        let runtime = Self {
             inner: Arc::new(RuntimeInner {
                 app,
                 pipeline: Mutex::new(pipeline),
                 status: RwLock::new("ready".into()),
                 session_stream: RwLock::new(None),
                 session_stream_seq: AtomicU64::new(0),
-                settings,
+                settings: Arc::clone(&settings),
                 delivery,
+                #[cfg(unix)]
+                activation_mode_tx,
+                #[cfg(unix)]
+                _hotkey_cmd_tx: hotkey_cmd_tx,
+                #[cfg(unix)]
+                _hotkey_thread: hotkey_thread,
             }),
-        })
+        };
+
+        // Spawn the async command forwarder if the listener started.
+        #[cfg(unix)]
+        if let Some(cmd_rx) = hotkey_cmd_rx
+            && runtime.inner._hotkey_thread.is_some()
+        {
+            let rt = runtime.clone();
+            tauri::async_runtime::spawn(async move {
+                Self::run_hotkey_command_loop(rt, cmd_rx).await;
+            });
+        }
+
+        Ok(runtime)
+    }
+
+    /// Receive hotkey commands and dispatch to dictation methods.
+    #[cfg(unix)]
+    async fn run_hotkey_command_loop(runtime: AppRuntime, mut cmd_rx: mpsc::Receiver<AppCommand>) {
+        while let Some(cmd) = cmd_rx.recv().await {
+            let result = match cmd {
+                AppCommand::ToggleDictation => {
+                    debug!("hotkey: toggle dictation");
+                    runtime.toggle_dictation().await.map(|_| ())
+                }
+                AppCommand::StartDictation => {
+                    debug!("hotkey: start dictation");
+                    runtime.start_dictation().await.map(|_| ())
+                }
+                AppCommand::StopDictation => {
+                    debug!("hotkey: stop dictation");
+                    runtime.stop_dictation().await
+                }
+                AppCommand::CancelDictation => {
+                    debug!("hotkey: cancel dictation");
+                    runtime.cancel_dictation().await
+                }
+                AppCommand::Quit => break,
+            };
+            if let Err(e) = result {
+                warn!(error = %e, "hotkey command failed");
+            }
+        }
+        info!("hotkey command loop exited");
     }
 
     pub async fn service_status(&self) -> String {
@@ -119,8 +200,18 @@ impl AppRuntime {
     }
 
     pub async fn mark_reload_required(&self) {
-        let mut pipeline = self.inner.pipeline.lock().await;
-        pipeline.reload_required = true;
+        {
+            let mut pipeline = self.inner.pipeline.lock().await;
+            pipeline.reload_required = true;
+        }
+
+        // Propagate activation mode to the hotkey listener so Toggle↔Hold
+        // changes take effect without restarting the app.
+        #[cfg(unix)]
+        {
+            let mode = self.inner.settings.read().await.activation_mode;
+            let _ = self.inner.activation_mode_tx.send(mode);
+        }
     }
 
     pub async fn start_dictation(&self) -> Result<String, String> {
@@ -378,8 +469,14 @@ impl AppRuntime {
             pipeline.active = true;
             // Propagate new settings into the shared arc so delivery uses the
             // latest dictation_mode and terminal_mode after a reload.
+            let new_settings_val = new_settings.read().await.clone();
+            #[cfg(unix)]
+            let _ = self
+                .inner
+                .activation_mode_tx
+                .send(new_settings_val.activation_mode);
             let mut settings = self.inner.settings.write().await;
-            *settings = new_settings.read().await.clone();
+            *settings = new_settings_val;
             return Ok(Arc::clone(&pipeline.manager));
         }
 
