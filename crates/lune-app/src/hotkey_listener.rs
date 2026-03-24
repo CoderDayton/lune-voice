@@ -614,7 +614,7 @@ fn key_name_to_code(name: &str) -> Option<KeyCode> {
     })
 }
 
-pub(crate) fn is_supported_hotkey_key(name: &str) -> bool {
+pub fn is_supported_hotkey_key(name: &str) -> bool {
     key_name_to_code(name).is_some()
 }
 
