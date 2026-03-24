@@ -35,6 +35,11 @@ describe("tauri smoke", () => {
 
     driverProcess = spawn(resolveDriverBinary(), [], {
       stdio: ["ignore", "inherit", "inherit"],
+      env: {
+        ...process.env,
+        // Allow WebKitWebDriver to run without a compositor (headless-friendly).
+        WEBKIT_DISABLE_COMPOSITING_MODE: "1",
+      },
     });
 
     driverProcess.once("error", (error) => {
@@ -131,6 +136,10 @@ async function createSession() {
           browserName: "wry",
           "tauri:options": {
             application: APP_BINARY,
+          },
+          "webkitgtk:browserOptions": {
+            // Run without a visible window when possible.
+            args: ["--headless"],
           },
         },
       },
