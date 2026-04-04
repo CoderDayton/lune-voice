@@ -333,12 +333,7 @@ fn process_audio_callback(
             timestamp_ms,
         };
 
-        // If buffer is full, drop oldest chunk (backpressure handling).
-        // No logging here — this is a real-time audio thread.
-        if ring.is_full() {
-            ring.try_pop();
-        }
-
+        // RingBuffer.push handles eviction atomically — no TOCTOU race.
         ring.push(chunk);
     }
 }

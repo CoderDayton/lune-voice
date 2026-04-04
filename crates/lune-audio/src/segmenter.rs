@@ -326,7 +326,8 @@ impl VadSegmenter {
     }
 
     fn new_inner(config: VadSegmenterConfig, adaptive: Option<AdaptiveVadConfig>) -> Self {
-        let vad = TenVad::new_from_bytes(TEN_VAD_MODEL, SAMPLE_RATE).expect("TEN VAD init failed");
+        let vad = TenVad::new_from_bytes(TEN_VAD_MODEL, SAMPLE_RATE)
+            .expect("TEN VAD init failed — embedded model is corrupt");
 
         let ms_per_frame = (HOP_SIZE as f32 / SAMPLE_RATE as f32 * 1000.0) as u32;
         let sentence_close_frames =

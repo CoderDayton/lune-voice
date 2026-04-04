@@ -56,4 +56,7 @@ pub enum AudioError {
 
     #[error("Resampler error: {0}")]
     Resampler(String),
+
+    #[error("VAD initialization error: {0}")]
+    Vad(String),
 }

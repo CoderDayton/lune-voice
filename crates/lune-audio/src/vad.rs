@@ -75,16 +75,14 @@ pub struct Vad {
 
 impl Vad {
     /// Create a new TEN VAD instance with the embedded ONNX model.
-    ///
-    /// # Panics
-    /// Panics if the embedded ONNX model fails to load (should never happen
-    /// unless the binary is corrupt).
-    pub fn new(config: VadConfig, _sample_rate: u32) -> Self {
+    /// Creates a new VAD instance. Returns `Err` if the embedded ONNX model
+    /// fails to load (should only happen on a corrupt binary).
+    pub fn new(config: VadConfig, _sample_rate: u32) -> Result<Self, crate::AudioError> {
         let inner = TenVad::new_from_bytes(TEN_VAD_MODEL, 16000)
-            .expect("failed to initialize TEN VAD from embedded model");
+            .map_err(|e| crate::AudioError::Vad(format!("TEN VAD init failed: {e}")))?;
         let hangover_samples = (config.hangover_ms as usize * 16) // 16 samples per ms at 16kHz
             .max(HOP_SIZE); // at least one frame
-        Self {
+        Ok(Self {
             inner,
             threshold_start: config.threshold,
             threshold_end: config.threshold_end,
@@ -93,7 +91,7 @@ impl Vad {
             hangover_total: hangover_samples,
             i16_buf: Vec::with_capacity(HOP_SIZE * 20), // ~320ms at 16kHz
             carry_i16: Vec::with_capacity(HOP_SIZE),
-        }
+        })
     }
 
     /// Process an audio chunk and return a [`VadResult`] with hysteresis.
@@ -182,7 +180,7 @@ mod tests {
 
     #[test]
     fn carry_over_retains_partial_frame() {
-        let mut vad = Vad::new(VadConfig::default(), 16_000);
+        let mut vad = Vad::new(VadConfig::default(), 16_000).unwrap();
         let _ = vad.process_chunk(&vec![0.0f32; HOP_SIZE - 1]);
         assert_eq!(vad.carry_i16.len(), HOP_SIZE - 1);
 
