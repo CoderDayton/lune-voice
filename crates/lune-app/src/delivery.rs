@@ -1,28 +1,10 @@
 use std::sync::mpsc;
 
 use lune_core::config::{DictationMode, TerminalMode};
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 #[cfg(unix)]
 use crate::uinput_typer::{self, UinputTyper};
-
-/// Stub for non-Linux platforms where uinput is unavailable.
-#[cfg(not(unix))]
-mod uinput_typer {
-    pub fn set_clipboard(_: &str) -> Result<(), String> {
-        Err("not supported on this platform".to_owned())
-    }
-}
-#[cfg(not(unix))]
-struct UinputTyper;
-#[cfg(not(unix))]
-impl UinputTyper {
-    fn with_terminal_mode(_: TerminalMode) -> Result<Self, String> {
-        Err("uinput not supported on this platform".to_owned())
-    }
-    fn warm_up(&self) {}
-    fn type_str(&mut self, _: &str) {}
-}
 
 /// Message sent to the persistent delivery thread.
 struct DeliveryMsg {
@@ -75,43 +57,130 @@ impl DeliveryService {
     }
 }
 
+// ─── Platform-specific delivery ──────────────────────────────────────────────
+
 fn delivery_thread(rx: mpsc::Receiver<DeliveryMsg>, terminal_mode: TerminalMode) {
-    let mut typer = match UinputTyper::with_terminal_mode(terminal_mode) {
-        Ok(t) => {
-            debug!("delivery: uinput clipboard-paste active");
-            t.warm_up();
-            t
-        }
+    let mut driver = match PlatformDriver::new(terminal_mode) {
+        Ok(d) => d,
         Err(e) => {
-            warn!(error = %e, "uinput unavailable — delivery disabled");
+            warn!(error = %e, "text delivery unavailable on this platform");
             return;
         }
     };
 
-    debug!("delivery thread ready");
+    info!(platform = driver.platform_name(), "delivery thread ready");
 
     while let Ok(msg) = rx.recv() {
         let text: &str = &msg.text;
-
         match msg.mode {
-            DictationMode::TypeInPlace => {
-                typer.type_str(text);
-            }
-            DictationMode::Clipboard => {
-                if let Err(e) = uinput_typer::set_clipboard(text) {
-                    warn!(error = %e, "clipboard-only delivery failed");
-                }
-            }
-            DictationMode::Both => {
-                // type_str already sets clipboard as a side effect
-                typer.type_str(text);
-            }
-            _ => {
-                warn!(mode = ?msg.mode, "unknown dictation mode, falling back to TypeInPlace");
-                typer.type_str(text);
-            }
+            DictationMode::TypeInPlace => driver.type_text(text),
+            DictationMode::Clipboard => driver.clipboard_only(text),
+            DictationMode::Both => driver.type_text(text),
+            _ => driver.type_text(text),
         }
     }
 
     debug!("delivery thread exiting");
+}
+
+// ─── Linux: uinput (existing battle-tested path) ─────────────────────────────
+
+#[cfg(unix)]
+struct PlatformDriver {
+    typer: UinputTyper,
+}
+
+#[cfg(unix)]
+impl PlatformDriver {
+    fn new(terminal_mode: TerminalMode) -> Result<Self, String> {
+        let typer = UinputTyper::with_terminal_mode(terminal_mode)?;
+        typer.warm_up();
+        debug!("delivery: uinput clipboard-paste active");
+        Ok(Self { typer })
+    }
+
+    fn platform_name(&self) -> &'static str {
+        "linux-uinput"
+    }
+
+    fn type_text(&mut self, text: &str) {
+        self.typer.type_str(text);
+    }
+
+    fn clipboard_only(&mut self, text: &str) {
+        if let Err(e) = uinput_typer::set_clipboard(text) {
+            warn!(error = %e, "clipboard-only delivery failed");
+        }
+    }
+}
+
+// ─── macOS / Windows: arboard + enigo ────────────────────────────────────────
+
+#[cfg(not(unix))]
+struct PlatformDriver {
+    clipboard: arboard::Clipboard,
+    enigo: enigo::Enigo,
+}
+
+#[cfg(not(unix))]
+impl PlatformDriver {
+    fn new(_terminal_mode: TerminalMode) -> Result<Self, String> {
+        let clipboard =
+            arboard::Clipboard::new().map_err(|e| format!("clipboard init failed: {e}"))?;
+        let enigo = enigo::Enigo::new(&enigo::Settings::default())
+            .map_err(|e| format!("enigo init failed: {e}"))?;
+        Ok(Self { clipboard, enigo })
+    }
+
+    fn platform_name(&self) -> &'static str {
+        if cfg!(target_os = "macos") {
+            "macos-arboard-enigo"
+        } else {
+            "windows-arboard-enigo"
+        }
+    }
+
+    fn type_text(&mut self, text: &str) {
+        // Set clipboard, then emit paste keystroke
+        if let Err(e) = self.clipboard.set_text(text) {
+            warn!(error = %e, "clipboard set failed, falling back to per-key typing");
+            self.type_keys(text);
+            return;
+        }
+
+        // Small delay for clipboard to settle
+        std::thread::sleep(std::time::Duration::from_millis(30));
+
+        self.emit_paste();
+    }
+
+    fn clipboard_only(&mut self, text: &str) {
+        if let Err(e) = self.clipboard.set_text(text) {
+            warn!(error = %e, "clipboard set failed");
+        }
+    }
+
+    fn emit_paste(&mut self) {
+        use enigo::{Direction, Key, Keyboard};
+
+        // macOS: Cmd+V, Windows: Ctrl+V
+        let modifier = if cfg!(target_os = "macos") {
+            Key::Meta
+        } else {
+            Key::Control
+        };
+
+        let _ = self.enigo.key(modifier, Direction::Press);
+        let _ = self.enigo.key(Key::Unicode('v'), Direction::Click);
+        let _ = self.enigo.key(modifier, Direction::Release);
+    }
+
+    fn type_keys(&mut self, text: &str) {
+        use enigo::Keyboard;
+
+        // Fallback: type each character directly
+        if let Err(e) = self.enigo.text(text) {
+            warn!(error = %e, "per-key typing failed");
+        }
+    }
 }

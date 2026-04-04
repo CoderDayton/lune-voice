@@ -64,6 +64,10 @@ tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 
 # Data types
 uuid = { version = "1", features = ["v4", "serde"] }
+
+# Cross-platform I/O
+arboard = "3.6"
+enigo = "0.6.1"
 chrono = { version = "0.4", features = ["serde"] }
 url = { version = "2", features = ["serde"] }
 zeroize = "1"

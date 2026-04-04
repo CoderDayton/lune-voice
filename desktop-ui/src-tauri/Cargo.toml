@@ -5,8 +5,8 @@ edition = "2024"
 default-run = "lune-ui"
 
 [features]
-default = []
-cuda = []
+default = ["cuda"]
+cuda = ["lune-app/cuda", "ort/cuda"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

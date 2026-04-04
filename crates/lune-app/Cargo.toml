@@ -32,6 +32,8 @@ serde_json.workspace = true
 toml.workspace = true
 ort.workspace = true
 mimalloc.workspace = true
+arboard.workspace = true
+enigo.workspace = true
 
 [target.'cfg(unix)'.dependencies]
 evdev.workspace = true
