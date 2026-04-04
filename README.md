@@ -66,7 +66,6 @@ cd desktop-ui && bun install && bun run build
 # Tests
 cargo test --workspace
 bun test                    # frontend unit tests
-bun run test:visual         # Playwright visual regression
 ```
 
 Audio capture uses `cpal` — PipeWire/ALSA on Linux, CoreAudio on macOS, WASAPI on Windows.

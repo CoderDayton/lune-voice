@@ -3,6 +3,7 @@ import { type SettingsProps, SettingsRow, SettingsSection } from "../components/
 import { activationModes, labelFor } from "../data/settings-data";
 import { KeyCaptureInput } from "../components/key-capture-input";
 import { Trans, useLingui } from "@lingui/react/macro";
+import { Keyboard } from "lucide-react";
 
 export function ShortcutsSection({ settings }: SettingsProps) {
   const { t } = useLingui();
@@ -12,7 +13,7 @@ export function ShortcutsSection({ settings }: SettingsProps) {
 
   return (
     <>
-      <SettingsSection title={t`Keyboard controls`} description={t`Use fast commands without opening menus in the middle of work.`}>
+      <SettingsSection title={t`Keyboard controls`} description={t`Use fast commands without opening menus in the middle of work.`} icon={Keyboard}>
         <SettingsRow
           label={t`Start or stop recording`}
           description={t`The main shortcut used for voice typing. Click the binding to change it.`}

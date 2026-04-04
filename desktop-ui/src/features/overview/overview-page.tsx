@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useStore } from "@tanstack/react-store";
 import { Link } from "@tanstack/react-router";
 import { useLingui } from "@lingui/react/macro";
+import { Clock, Hash, MessageSquareText, Mic } from "lucide-react";
 import {
   summarizeAsrBackend,
   summarizeDictationMode,
@@ -42,82 +43,101 @@ export function OverviewPage() {
 
   return (
     <div className="page-stack">
-      <div className="flex items-center gap-3 text-sm">
-        <span className={`status ${isLoading ? "status-warning" : isConnected ? "status-success" : "status-error"}`} />
-        <span className="opacity-70">
-          {isLoading ? t`Connecting` : isConnected ? t`Ready` : t`Disconnected`}
-        </span>
-        <span className="opacity-30">·</span>
-        <span className="opacity-50">{summarizeAsrBackend(asrBackend)}</span>
-        <span className="opacity-30">·</span>
-        <span className="opacity-50">{summarizeDictationMode(dictationMode)}</span>
-      </div>
-
-      {stats.count > 0 && (
-        <div className="stats stats-vertical sm:stats-horizontal bg-base-200 w-full">
-          <div className="stat">
-            <div className="stat-title">{t`Words`}</div>
-            <div className="stat-value text-xl">{stats.totalWords.toLocaleString()}</div>
-          </div>
-          <div className="stat">
-            <div className="stat-title">{t`Minutes`}</div>
-            <div className="stat-value text-xl">{stats.totalMinutes}</div>
-          </div>
-          <div className="stat">
-            <div className="stat-title">{t`Sessions`}</div>
-            <div className="stat-value text-xl">{stats.count}</div>
-          </div>
-        </div>
-      )}
-
-      {isActive && (
-        <div className="card bg-primary/5 border border-primary/15 rounded-box p-4 sm:p-5">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="loading loading-dots loading-xs text-primary" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-primary/70 select-none">
-              {serviceStatus === "processing" ? t`Processing` : t`Listening`}
+      <section className="card border border-base-content/[0.06] bg-base-200/40">
+        <div className="card-body gap-5">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <span className={`badge badge-lg gap-2 border-none px-3 ${isLoading ? "badge-warning text-warning-content" : isConnected ? "badge-success text-success-content" : "badge-error text-error-content"}`}>
+              <span className={`status ${isLoading ? "status-warning" : isConnected ? "status-success" : "status-error"}`} />
+              {isLoading ? t`Connecting` : isConnected ? t`Ready` : t`Disconnected`}
             </span>
+            <span className="text-base-content/45">{summarizeAsrBackend(asrBackend)}</span>
+            <span className="hidden text-base-content/25 sm:inline">•</span>
+            <span className="text-base-content/45">{summarizeDictationMode(dictationMode)}</span>
           </div>
-          <p className="text-sm sm:text-base leading-relaxed min-h-[2rem]">
-            {liveTranscript || <span className="opacity-30 italic">{t`Waiting for speech…`}</span>}
-          </p>
-        </div>
-      )}
 
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wider opacity-50">{t`Recent`}</h2>
-          {stats.count > 5 && (
-            <Link to="/history" className="link link-primary text-xs">{t`View all`}</Link>
+          {stats.count > 0 ? (
+            <div className="stats stats-vertical w-full overflow-hidden rounded-xl border border-base-content/[0.06] bg-base-100/30 sm:stats-horizontal">
+              <div className="stat">
+                <div className="stat-figure text-primary/30"><Hash size={22} strokeWidth={1.5} /></div>
+                <div className="stat-title">{t`Words`}</div>
+                <div className="stat-value text-3xl">{stats.totalWords.toLocaleString()}</div>
+              </div>
+              <div className="stat">
+                <div className="stat-figure text-secondary/30"><Clock size={22} strokeWidth={1.5} /></div>
+                <div className="stat-title">{t`Minutes`}</div>
+                <div className="stat-value text-3xl">{stats.totalMinutes}</div>
+              </div>
+              <div className="stat">
+                <div className="stat-figure text-accent/30"><MessageSquareText size={22} strokeWidth={1.5} /></div>
+                <div className="stat-title">{t`Sessions`}</div>
+                <div className="stat-value text-3xl">{stats.count}</div>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-base-content/[0.08] bg-base-100/20 px-5 py-6 text-sm text-base-content/50">
+              {t`Your session summary will appear here once you start dictating.`}
+            </div>
           )}
         </div>
-        {recentSessions.length === 0 && !isActive ? (
-          <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center">
-            <div className="size-16 sm:size-20 rounded-full bg-primary/8 flex items-center justify-center mb-4">
-              <svg className="size-8 sm:size-10 text-primary/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="7" y="3" width="10" height="14" rx="5" />
-                <path d="M5 10v1a7 7 0 0 0 14 0v-1M12 17v4M9 21h6" />
-              </svg>
+      </section>
+
+      {isActive && (
+        <div className="card border border-primary/15 bg-primary/5" role="region" aria-live="polite" aria-label={t`Live dictation`}>
+          <div className="card-body p-4 sm:p-5">
+            <div className="mb-2 flex items-center gap-2">
+              <span className="loading loading-dots loading-xs text-primary" aria-hidden="true" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-primary/70 select-none">
+                {serviceStatus === "processing" ? t`Processing` : t`Listening`}
+              </span>
             </div>
-            <p className="text-sm font-medium opacity-70">{t`No sessions yet`}</p>
-            <p className="text-xs opacity-40 mt-1">
-              {t`Press`} <kbd className="kbd kbd-xs">{t`Ctrl`}</kbd> + <kbd className="kbd kbd-xs">{t`Space`}</kbd> {t`to start dictating`}
+            <p className="min-h-[2rem] text-sm leading-relaxed sm:text-base">
+              {liveTranscript || <span className="italic opacity-30">{t`Waiting for speech…`}</span>}
             </p>
           </div>
-        ) : recentSessions.length === 0 && isActive ? null : (
-          <ul className="list bg-base-200 rounded-box">
-            {recentSessions.map((session) => (
-              <li key={session.id} className="list-row">
-                <div className="text-xs opacity-40 tabular-nums">{session.time}</div>
-                <div>
-                  <div className="text-sm truncate">{session.transcript || t`Empty session`}</div>
-                  <div className="text-xs opacity-40">{session.words} {t`words`} · {session.seconds}{t`s`}</div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+        </div>
+      )}
+
+      <section className="card border border-base-content/[0.06] bg-base-200/40">
+        <div className="card-body p-0">
+          <div className="flex items-center justify-between px-5 pb-3 pt-5">
+            <div>
+              <h2 className="section-label">{t`Recent`}</h2>
+              <p className="mt-1 text-sm text-base-content/50">{t`Recent activity`}</p>
+            </div>
+          {stats.count > 5 && (
+              <Link to="/history" className="btn btn-ghost btn-sm normal-case">{t`View all`}</Link>
+          )}
+          </div>
+          {recentSessions.length === 0 && !isActive ? (
+            <div className="flex flex-col items-center justify-center px-5 py-14 text-center sm:py-16">
+              <div className="mb-4 flex size-16 items-center justify-center rounded-full bg-primary/8 sm:size-20">
+                <Mic className="size-8 text-primary/40 sm:size-10" strokeWidth={1.2} />
+              </div>
+              <p className="text-sm font-medium opacity-70">{t`No sessions yet`}</p>
+              <p className="mt-1 text-xs opacity-40">
+                {t`Press`} <kbd className="kbd kbd-xs">{t`Ctrl`}</kbd> + <kbd className="kbd kbd-xs">{t`Space`}</kbd> {t`to start dictating`}
+              </p>
+            </div>
+          ) : recentSessions.length === 0 && isActive ? null : (
+            <div className="divide-y divide-base-content/[0.06]">
+              {recentSessions.map((session) => (
+                <article key={session.id} className="px-5 py-4">
+                  <div className="pt-1 text-xs tabular-nums text-base-content/40">{session.time}</div>
+                  <div className="min-w-0">
+                    <p className="text-sm leading-6 break-words text-base-content/92">
+                      {session.transcript || t`Empty session`}
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-base-content/50">
+                      <span className="badge badge-ghost badge-sm">{session.words} {t`words`}</span>
+                      <span>{session.seconds}{t`s`}</span>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }

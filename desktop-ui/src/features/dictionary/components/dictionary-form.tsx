@@ -26,7 +26,7 @@ export function DictionaryForm() {
 
   return (
     <form action={submitAction}>
-      <section className="card bg-base-200 border border-base-300/30 rounded-box p-5 sm:p-6">
+      <section className="card border border-base-content/[0.06] bg-base-200/40 rounded-box p-5 sm:p-6">
         <h3 className="text-lg font-semibold tracking-tight mb-4"><Trans>Add correction rule</Trans></h3>
         <fieldset className="flex flex-col sm:flex-row gap-3 items-end" disabled={isPending}>
           <label className="form-control flex-1">
@@ -38,6 +38,8 @@ export function DictionaryForm() {
               defaultValue={state.phrase}
               key={state === initialState ? "reset-phrase" : undefined}
               placeholder={t`e.g. github…`}
+              required
+              aria-required="true"
             />
           </label>
           <span className="hidden sm:block pb-3 opacity-30 text-lg">→</span>
@@ -50,6 +52,8 @@ export function DictionaryForm() {
               defaultValue={state.replacement}
               key={state === initialState ? "reset-replacement" : undefined}
               placeholder={t`e.g. GitHub…`}
+              required
+              aria-required="true"
             />
           </label>
           <button type="submit" className="btn btn-primary" disabled={isPending}>

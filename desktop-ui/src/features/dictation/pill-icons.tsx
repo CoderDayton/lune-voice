@@ -1,28 +1,56 @@
-export function MicIcon() {
+/** Pill overlay icons — stroke-based, 24×24 viewBox, inherits currentColor. */
+
+interface IconProps {
+  className?: string;
+}
+
+function PillSvg({ className = "size-5", children }: IconProps & { children: React.ReactNode }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-5">
-      <path d="M8.25 4.5a3.75 3.75 0 1 1 7.5 0v8.25a3.75 3.75 0 1 1-7.5 0V4.5Z" />
-      <path d="M6 10.5a.75.75 0 0 1 .75.75v1.5a5.25 5.25 0 1 0 10.5 0v-1.5a.75.75 0 0 1 1.5 0v1.5a6.751 6.751 0 0 1-6 6.709v2.291h3a.75.75 0 0 1 0 1.5h-7.5a.75.75 0 0 1 0-1.5h3v-2.291a6.751 6.751 0 0 1-6-6.709v-1.5A.75.75 0 0 1 6 10.5Z" />
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+      focusable="false"
+    >
+      {children}
     </svg>
   );
 }
 
-export function XIcon() {
+export function MicIcon({ className }: IconProps = {}) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="size-4">
-      <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
-    </svg>
+    <PillSvg className={className ?? "size-5"}>
+      <rect x="9" y="2" width="6" height="11" rx="3" />
+      <path d="M5 10v1a7 7 0 0 0 14 0v-1" />
+      <line x1="12" y1="18" x2="12" y2="22" />
+      <line x1="9" y1="22" x2="15" y2="22" />
+    </PillSvg>
   );
 }
 
-export function StopIcon() {
+export function XIcon({ className }: IconProps = {}) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="size-4">
-      <rect x="5" y="5" width="10" height="10" rx="1" />
-    </svg>
+    <PillSvg className={className ?? "size-4"}>
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </PillSvg>
+  );
+}
+
+export function StopIcon({ className }: IconProps = {}) {
+  return (
+    <PillSvg className={className ?? "size-4"}>
+      <rect x="6" y="6" width="12" height="12" rx="1" />
+    </PillSvg>
   );
 }
 
 export function PulseIndicator({ label }: { label: string }) {
-  return <span className="pill-pulse" aria-label={label} />;
+  return <span className="pill-pulse" role="img" aria-label={label} />;
 }

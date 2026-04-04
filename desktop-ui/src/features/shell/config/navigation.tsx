@@ -1,37 +1,32 @@
-import type { ComponentType, SVGProps } from "react";
-import {
-  DictionaryIcon,
-  HistoryIcon,
-  OverviewIcon,
-  SettingsIcon,
-} from "./icons";
+import type { LucideIcon } from "lucide-react";
+import { House, Clock, BookText, Settings } from "lucide-react";
 
 export interface NavigationItem {
   to: "/" | "/history" | "/dictionary" | "/settings";
   label: string;
-  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  icon: LucideIcon;
 }
 
 export const navigationItems: NavigationItem[] = [
   {
     to: "/",
     label: "Home",
-    icon: OverviewIcon,
+    icon: House,
   },
   {
     to: "/history",
     label: "Sessions",
-    icon: HistoryIcon,
+    icon: Clock,
   },
   {
     to: "/dictionary",
     label: "Vocabulary",
-    icon: DictionaryIcon,
+    icon: BookText,
   },
   {
     to: "/settings",
     label: "Settings",
-    icon: SettingsIcon,
+    icon: Settings,
   },
 ];
 

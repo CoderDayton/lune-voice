@@ -2,6 +2,7 @@ import { useStore } from "@tanstack/react-store";
 import { ConfirmDialog } from "../../../components/feedback";
 import { removeDictionaryEntry, workspaceStore } from "../../../store/workspace-store";
 import { Trans, useLingui } from "@lingui/react/macro";
+import { BookOpen } from "lucide-react";
 
 export function DictionaryTable() {
   const { t } = useLingui();
@@ -10,13 +11,14 @@ export function DictionaryTable() {
   if (entries.length === 0) {
     return (
       <div className="alert">
+        <BookOpen size={18} strokeWidth={1.5} className="opacity-50" />
         <span><Trans>No entries yet. Add your first correction rule above.</Trans></span>
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-box border border-base-300">
+    <div className="overflow-x-auto rounded-box border border-base-content/[0.06] bg-base-200/40">
       <table className="table">
         <thead>
           <tr>

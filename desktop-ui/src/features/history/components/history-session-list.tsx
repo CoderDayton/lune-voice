@@ -13,19 +13,18 @@ interface SessionRowProps {
 
 const SessionRow = memo(function SessionRow({ item }: SessionRowProps) {
   const { t } = useLingui();
-  const time = useMemo(
-    () => new Date(item.startedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
-    [item.startedAt],
-  );
+  const time = new Date(item.startedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
   return (
     <li className="list-row">
-      <div className="text-xs tabular-nums opacity-40">{time}</div>
-      <div>
-        <p className="text-sm line-clamp-2 sm:line-clamp-3">{item.transcript}</p>
-        <div className="flex flex-wrap gap-2 mt-1">
-          <span className="badge badge-sm badge-ghost">{item.words} {t`words`}</span>
-          <span className="badge badge-sm badge-ghost">{item.seconds}{t`s`}</span>
+      <div className="list-col-grow min-w-0">
+        <p className="text-sm line-clamp-2 sm:line-clamp-3">{item.transcript || t`Empty session`}</p>
+        <div className="text-xs opacity-40 mt-0.5">
+          <span className="tabular-nums">{time}</span>
+          <span className="mx-1">·</span>
+          {item.words} {t`words`}
+          <span className="mx-1">·</span>
+          {item.seconds}{t`s`}
         </div>
       </div>
     </li>
@@ -59,10 +58,10 @@ export function HistorySessionList() {
     <div className="flex flex-col gap-4">
       {groups.map((group) => (
         <div key={group.date}>
-          <h3 className="text-xs font-semibold uppercase tracking-wider opacity-50 mb-2 px-1">
+          <h3 className="sticky top-0 z-10 text-xs font-semibold uppercase tracking-wider opacity-50 mb-2 px-1 py-1 backdrop-blur-sm">
             {group.date}
           </h3>
-          <ul className="list bg-base-200 rounded-box">
+          <ul className="list rounded-box border border-base-content/[0.06] bg-base-200/40">
             {group.items.map((item) => (
               <SessionRow key={item.id} item={item} />
             ))}

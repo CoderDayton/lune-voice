@@ -3,11 +3,12 @@ import { saveWorkspaceSetting } from "../../../store/workspace-store";
 import { type SettingsProps, SettingsRow, SettingsSection } from "../components/section";
 import { deliveryMethods, stylePresets } from "../data/settings-data";
 import { useLingui } from "@lingui/react/macro";
+import { TextCursorInput } from "lucide-react";
 
 export function OutputSection({ settings }: SettingsProps) {
   const { t } = useLingui();
   return (
-    <SettingsSection title={t`Text output`} description={t`Choose how finished text is inserted into the app you are currently using.`}>
+    <SettingsSection title={t`Text output`} description={t`Choose how finished text is inserted into the app you are currently using.`} icon={TextCursorInput}>
       <SettingsRow
         label={t`Send method`}
         description={t`Paste is simplest. Typing keystrokes can work better in some apps.`}

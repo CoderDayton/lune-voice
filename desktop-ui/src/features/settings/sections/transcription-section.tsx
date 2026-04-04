@@ -4,11 +4,12 @@ import { type SettingsProps, SettingsRow, SettingsSection } from "../components/
 import { asrBackends } from "../data/settings-data";
 import { OpenAiFields } from "../components/openai-fields";
 import { useLingui } from "@lingui/react/macro";
+import { AudioWaveform } from "lucide-react";
 
 export function TranscriptionSection({ settings }: SettingsProps) {
   const { t } = useLingui();
   return (
-    <SettingsSection title="Recognition" description={t`Control how your speech is turned into text.`}>
+    <SettingsSection title="Recognition" description={t`Control how your speech is turned into text.`} icon={AudioWaveform}>
       <SettingsRow
         label={t`Voice mode`}
         description={t`Balanced works well for most people. Compact uses less memory.`}

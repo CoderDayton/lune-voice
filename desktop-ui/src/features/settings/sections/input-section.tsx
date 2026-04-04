@@ -4,6 +4,7 @@ import { saveWorkspaceSetting } from "../../../store/workspace-store";
 import { type SettingsProps, SettingsRow, SettingsSection } from "../components/section";
 import { activationModes } from "../data/settings-data";
 import { useLingui } from "@lingui/react/macro";
+import { Mic } from "lucide-react";
 
 export function InputSection({ settings }: SettingsProps) {
   const { t } = useLingui();
@@ -18,7 +19,7 @@ export function InputSection({ settings }: SettingsProps) {
   }
 
   return (
-    <SettingsSection title={t`Voice input`} description={t`Choose how quickly you want to enter and leave voice typing.`}>
+    <SettingsSection title={t`Voice input`} description={t`Choose how quickly you want to enter and leave voice typing.`} icon={Mic}>
       <SettingsRow
         label={t`Recording mode`}
         description={t`Toggle is easiest for longer dictation. Hold is better for quick bursts.`}

@@ -4,11 +4,12 @@ import { type SettingsProps, SettingsRow, SettingsSection } from "../components/
 import { llmModels } from "../data/settings-data";
 import { OpenAiFields } from "../components/openai-fields";
 import { useLingui } from "@lingui/react/macro";
+import { Sparkles } from "lucide-react";
 
 export function CleanupSection({ settings }: SettingsProps) {
   const { t } = useLingui();
   return (
-    <SettingsSection title={t`Smart cleanup`} description={t`Give uncertain words a second look before text is sent to your app.`}>
+    <SettingsSection title={t`Smart cleanup`} description={t`Give uncertain words a second look before text is sent to your app.`} icon={Sparkles}>
       <SettingsRow
         label={t`Automatic cleanup`}
         description={t`Use a local language model to tidy up uncertain phrases.`}

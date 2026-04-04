@@ -3,12 +3,10 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import type { PillVisibilityValue } from "../../features/settings/data/settings-data";
 import { backendClient } from "../../lib/backend/client";
 
-
 export type PillMode = "idle" | "active" | "processing";
-import type { PillVisibilityValue } from "../../features/settings/data/settings-data";
-
 type PillVis = PillVisibilityValue;
 
 const PILL_IDLE_W = 48;
