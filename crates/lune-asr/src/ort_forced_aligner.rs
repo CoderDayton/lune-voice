@@ -157,6 +157,13 @@ impl OrtForcedAligner {
             .map_err(|e| Error::Asr(format!("fa output extract: {e}")))?;
         let logits = logits.view();
         // Shape: [1, T, C]
+        if logits.ndim() != 3 {
+            return Err(Error::Asr(format!(
+                "expected 3D FA output, got {}D {:?}",
+                logits.ndim(),
+                logits.shape()
+            )));
+        }
         let t = logits.shape()[1];
         let c = logits.shape()[2];
 

@@ -27,7 +27,11 @@ pub fn run() {
             let menu = Menu::with_items(app, &[&show_i, &toggle_i, &sep, &quit_i])?;
 
             TrayIconBuilder::new()
-                .icon(app.default_window_icon().cloned().unwrap())
+                .icon(
+                    app.default_window_icon()
+                        .cloned()
+                        .ok_or("no default window icon — check tauri.conf.json icons")?,
+                )
                 .tooltip("Lune Voice")
                 .menu(&menu)
                 .show_menu_on_left_click(false)

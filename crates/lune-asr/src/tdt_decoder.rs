@@ -252,17 +252,17 @@ impl TdtModel {
                 // per-step Vec + Array3 allocations (~20KB/step saved).
                 if let Ok((_shape, h_data)) = outputs["output_states_1"].try_extract_tensor::<f32>()
                 {
-                    state_h
-                        .as_slice_mut()
-                        .expect("state_h contiguous")
-                        .copy_from_slice(h_data);
+                    let dst = state_h.as_slice_mut().expect("state_h contiguous");
+                    if h_data.len() == dst.len() {
+                        dst.copy_from_slice(h_data);
+                    }
                 }
                 if let Ok((_shape, c_data)) = outputs["output_states_2"].try_extract_tensor::<f32>()
                 {
-                    state_c
-                        .as_slice_mut()
-                        .expect("state_c contiguous")
-                        .copy_from_slice(c_data);
+                    let dst = state_c.as_slice_mut().expect("state_c contiguous");
+                    if c_data.len() == dst.len() {
+                        dst.copy_from_slice(c_data);
+                    }
                 }
 
                 decoded.push(DecodedToken {
