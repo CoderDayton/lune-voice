@@ -27,3 +27,4 @@ qwen2.5-1.5b-instruct-gguf/
 unsloth/checkpoints/
 unsloth/qwen-asr-corrector/
 unsloth/asr_uncertainty_correction.jsonl
+.playwright-mcp/

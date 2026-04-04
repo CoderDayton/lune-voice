@@ -1,4 +1,0 @@
-[   24494ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:1420/src/features/shell/components/sidebar.tsx?t=1774249522801:0
-[   24494ms] [ERROR] [vite] Failed to reload /src/features/shell/components/sidebar.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:1420/@vite/client:808
-[   29921ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:1420/src/features/shell/components/mobile-nav.tsx?t=1774249528232:0
-[   29921ms] [ERROR] [vite] Failed to reload /src/features/shell/components/mobile-nav.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:1420/@vite/client:808
