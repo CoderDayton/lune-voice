@@ -617,7 +617,8 @@ async fn run_session<A: AsrBackend + 'static>(
         }
     } else {
         let _ = event_tx.send(SessionEvent::Processing).await;
-        if let Err(e) = asr.push_audio(&asr_session, &[0.0f32; 16_000]).await {
+        let silence_flush = vec![0.0f32; 16_000];
+        if let Err(e) = asr.push_audio(&asr_session, &silence_flush).await {
             let msg = e.to_string();
             warn!(error = %msg, "push_audio (silence flush) error");
             first_asr_error.get_or_insert(msg);

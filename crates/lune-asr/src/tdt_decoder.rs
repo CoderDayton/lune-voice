@@ -248,26 +248,21 @@ impl TdtModel {
                 let exp_sum: f32 = vocab_logits.iter().map(|&l| (l - max_logit).exp()).sum();
                 let confidence = (vocab_logits[token_id] - max_logit).exp() / exp_sum;
 
-                // Update LSTM states
-                if let Ok((h_shape, h_data)) =
-                    outputs["output_states_1"].try_extract_tensor::<f32>()
+                // Update LSTM states — copy into existing buffers to avoid
+                // per-step Vec + Array3 allocations (~20KB/step saved).
+                if let Ok((_shape, h_data)) = outputs["output_states_1"].try_extract_tensor::<f32>()
                 {
-                    let d = h_shape.as_ref();
-                    state_h = Array3::from_shape_vec(
-                        (d[0] as usize, d[1] as usize, d[2] as usize),
-                        h_data.to_vec(),
-                    )
-                    .map_err(|e| Error::Asr(format!("update state_h: {e}")))?;
+                    state_h
+                        .as_slice_mut()
+                        .expect("state_h contiguous")
+                        .copy_from_slice(h_data);
                 }
-                if let Ok((c_shape, c_data)) =
-                    outputs["output_states_2"].try_extract_tensor::<f32>()
+                if let Ok((_shape, c_data)) = outputs["output_states_2"].try_extract_tensor::<f32>()
                 {
-                    let d = c_shape.as_ref();
-                    state_c = Array3::from_shape_vec(
-                        (d[0] as usize, d[1] as usize, d[2] as usize),
-                        c_data.to_vec(),
-                    )
-                    .map_err(|e| Error::Asr(format!("update state_c: {e}")))?;
+                    state_c
+                        .as_slice_mut()
+                        .expect("state_c contiguous")
+                        .copy_from_slice(c_data);
                 }
 
                 decoded.push(DecodedToken {

@@ -4219,7 +4219,6 @@ dependencies = [
  "async-trait",
  "lune-core",
  "mistralrs",
- "once_cell",
  "regex",
  "serde_json",
  "tokio",

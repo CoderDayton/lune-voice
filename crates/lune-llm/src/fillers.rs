@@ -3,9 +3,9 @@
 //! Handles elongated forms ("Uhmmmm", "euhhhhh", "mmmm") and both bare
 //! and `[?..?]`-wrapped fillers. Language-specific patterns for EN, ES, FR.
 
-use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 // ─── Filler Patterns Per Language ────────────────────────────────────────────
 
@@ -65,7 +65,7 @@ static FR_PATTERNS: &[&str] = &[
     r"e+h+",     // eh, ehh
 ];
 
-static FILLERS: Lazy<HashMap<&'static str, LangFillers>> = Lazy::new(|| {
+static FILLERS: LazyLock<HashMap<&'static str, LangFillers>> = LazyLock::new(|| {
     let mut m = HashMap::new();
     m.insert("en", build_patterns(EN_PATTERNS));
     m.insert("es", build_patterns(ES_PATTERNS));
@@ -75,10 +75,11 @@ static FILLERS: Lazy<HashMap<&'static str, LangFillers>> = Lazy::new(|| {
 
 // ─── Post-Removal Cleanup Regexes ─────────────────────────────────────────────
 
-static ORPHAN_PUNCT: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s*,\s*,").unwrap());
-static LEADING_PUNCT: Lazy<Regex> = Lazy::new(|| Regex::new(r"^\s*[,،]\s*").unwrap());
-static MULTI_SPACE: Lazy<Regex> = Lazy::new(|| Regex::new(r"  +").unwrap());
-static SPACE_BEFORE_PUNCT: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s+([,.!?;:])").unwrap());
+static ORPHAN_PUNCT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s*,\s*,").unwrap());
+static LEADING_PUNCT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\s*[,،]\s*").unwrap());
+static MULTI_SPACE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"  +").unwrap());
+static SPACE_BEFORE_PUNCT: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\s+([,.!?;:])").unwrap());
 
 fn clean_after_removal(text: &str) -> String {
     let s = ORPHAN_PUNCT.replace_all(text, ",");

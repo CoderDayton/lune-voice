@@ -66,17 +66,17 @@ pub fn init_ort_runtime(settings: &UserSettings) {
 pub fn patch_model_paths(settings: &mut UserSettings, resolved: &ResolvedModels) {
     match &mut settings.asr_backend {
         AsrBackendConfig::ParakeetTdt { model_dir, .. } if model_dir.as_os_str().is_empty() => {
-            *model_dir = resolved.asr_model_dir.clone();
+            resolved.asr_model_dir.clone_into(model_dir);
         }
         AsrBackendConfig::OrtQwenAsr { model_dir, .. } if model_dir.as_os_str().is_empty() => {
-            *model_dir = resolved.ort_qwen_asr_model_dir.clone();
+            resolved.ort_qwen_asr_model_dir.clone_into(model_dir);
         }
         _ => {}
     }
 
     match &mut settings.llm_backend {
         LlmBackendConfig::LlamaCppLocal { model_path, .. } if model_path.as_os_str().is_empty() => {
-            *model_path = resolved.llm_model_path.clone();
+            resolved.llm_model_path.clone_into(model_path);
         }
         _ => {}
     }
@@ -84,7 +84,7 @@ pub fn patch_model_paths(settings: &mut UserSettings, resolved: &ResolvedModels)
     if let (Some(aligner), Some(model_dir)) = (&mut settings.aligner, &resolved.aligner_model_dir)
         && aligner.model_dir.as_os_str().is_empty()
     {
-        aligner.model_dir = model_dir.clone();
+        model_dir.clone_into(&mut aligner.model_dir);
     }
 }
 

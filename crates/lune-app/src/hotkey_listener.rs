@@ -114,10 +114,12 @@ fn run_listener(
     for dev in keyboards {
         let tx = event_tx.clone();
         let name = dev.name().unwrap_or("unknown").to_string();
-        std::thread::Builder::new()
+        if let Err(e) = std::thread::Builder::new()
             .name(format!("evdev-{name}"))
             .spawn(move || read_device(dev, tx))
-            .expect("spawn evdev reader thread");
+        {
+            warn!(error = %e, device = %name, "failed to spawn evdev reader thread");
+        }
     }
     // Drop our sender so the channel closes when all readers exit.
     drop(event_tx);
@@ -348,9 +350,9 @@ fn read_device(mut dev: Device, tx: std_mpsc::Sender<(InputEvent, bool)>) {
 
 /// Build a uinput virtual keyboard for re-injecting non-hotkey events.
 fn build_passthrough_device() -> Result<VirtualDevice, String> {
+    const KEY_CODE_MAX: u16 = 768;
     let mut keys = AttributeSet::<KeyCode>::new();
-    // Register all standard keycodes (0..768 covers KEY_MAX).
-    for i in 1u16..768 {
+    for i in 1u16..KEY_CODE_MAX {
         keys.insert(KeyCode(i));
     }
 
@@ -435,7 +437,7 @@ impl HotkeyState {
             && signal.code == self.cancel_trigger
             && self.cancel_trigger != KeyCode::KEY_RESERVED
             && self.modifiers_are_down(&self.cancel_modifiers)
-            && !self.has_extra_modifiers(&self.cancel_modifiers.clone())
+            && !self.has_extra_modifiers(&self.cancel_modifiers)
         {
             return Action::Cancel;
         }
