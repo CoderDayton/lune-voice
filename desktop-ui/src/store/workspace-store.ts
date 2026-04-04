@@ -170,10 +170,10 @@ async function dictationAction<T>(action: () => Promise<T>, fallback: T): Promis
   catch (error) { workspaceActions.setError(formatError(error)); return fallback; }
 }
 
-export const startDictation = () => dictationAction(backendClient.startDictation, null);
-export const stopDictation = () => dictationAction(backendClient.stopDictation, undefined);
-export const cancelDictation = () => dictationAction(backendClient.cancelDictation, undefined);
-export const toggleDictation = () => dictationAction(backendClient.toggleDictation, null);
+export const startDictation = () => dictationAction(() => backendClient.startDictation(), null);
+export const stopDictation = () => dictationAction(() => backendClient.stopDictation(), undefined);
+export const cancelDictation = () => dictationAction(() => backendClient.cancelDictation(), undefined);
+export const toggleDictation = () => dictationAction(() => backendClient.toggleDictation(), null);
 
 // ── Selectors ─────────────────────────────────────────────────────────
 

@@ -25,7 +25,7 @@ export function DictationPill() {
             <button
               type="button"
               className="pill-idle"
-              onClick={() => fire(backendClient.toggleDictation, "toggle")}
+              onClick={() => fire(() => backendClient.toggleDictation(), "toggle")}
               aria-label={t`Start dictation`}
             >
               <MicIcon />
@@ -41,7 +41,7 @@ export function DictationPill() {
                 <button
                   type="button"
                   className="pill-btn pill-btn-cancel"
-                  onClick={() => fire(backendClient.cancelDictation, "cancel")}
+                  onClick={() => fire(() => backendClient.cancelDictation(), "cancel")}
                   aria-label={t`Cancel dictation`}
                 >
                   <XIcon />
@@ -60,7 +60,7 @@ export function DictationPill() {
                 <button
                   type="button"
                   className="pill-btn pill-btn-stop"
-                  onClick={() => fire(backendClient.stopDictation, "stop")}
+                  onClick={() => fire(() => backendClient.stopDictation(), "stop")}
                   aria-label={t`Stop dictation`}
                 >
                   <StopIcon />

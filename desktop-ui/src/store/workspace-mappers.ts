@@ -90,10 +90,10 @@ export function settingsToSaveInput(settings: WorkspaceSettings): SaveWorkspaceS
     pillVisibility: settings.pillVisibility,
     language: settings.language,
     openaiAsrBaseUrl: settings.openaiAsrBaseUrl || null,
-    openaiAsrApiKey: settings.openaiAsrApiKey || null,
+    openaiAsrApiKey: settings.openaiAsrApiKey && !settings.openaiAsrApiKey.startsWith("•") ? settings.openaiAsrApiKey : null,
     openaiAsrModel: settings.openaiAsrModel || null,
     openaiLlmBaseUrl: settings.openaiLlmBaseUrl || null,
-    openaiLlmApiKey: settings.openaiLlmApiKey || null,
+    openaiLlmApiKey: settings.openaiLlmApiKey && !settings.openaiLlmApiKey.startsWith("•") ? settings.openaiLlmApiKey : null,
     openaiLlmModel: settings.openaiLlmModel || null,
   };
 }

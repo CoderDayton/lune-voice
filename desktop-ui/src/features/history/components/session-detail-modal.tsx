@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Clock, Hash, Mic, Palette, CircleCheck, CircleX, Copy, Check } from "lucide-react";
 import type { HistorySession } from "../../../store/workspace-store";
 import { useLingui } from "@lingui/react/macro";
@@ -29,6 +29,8 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
   const { t } = useLingui();
   const [dialog, setDialog] = useState<HTMLDialogElement | null>(null);
   const [copied, setCopied] = useState(false);
+  const titleId = useId();
+  const transcriptId = useId();
 
   const startDate = new Date(session.startedAt);
   const date = startDate.toLocaleDateString(undefined, {
@@ -61,7 +63,7 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
     }
     dialog.addEventListener("keydown", onKeyDown);
     return () => dialog.removeEventListener("keydown", onKeyDown);
-  });
+  }, [dialog, session.transcript]);
 
   return (
     <>
@@ -73,14 +75,14 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
           return () => setDialog(null);
         }}
         className="modal backdrop-blur-sm"
-        aria-labelledby="session-detail-title"
-        aria-describedby="session-detail-transcript"
+        aria-labelledby={titleId}
+        aria-describedby={transcriptId}
       >
         <div className="modal-box max-w-lg p-0 overflow-hidden border border-surface-border sm:max-w-xl">
           {/* Header */}
           <div className="flex items-center justify-between px-5 pt-5 pb-3 sm:px-6 sm:pt-6">
             <div>
-              <h3 id="session-detail-title" className="text-base font-semibold tracking-tight">
+              <h3 id={titleId} className="text-base font-semibold tracking-tight">
                 {date}
               </h3>
               <p className="text-xs text-base-content/40 mt-0.5 tabular-nums">{time} · {relative}</p>
@@ -105,12 +107,12 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
           <div className="px-5 pb-4 sm:px-6">
             {session.transcript ? (
               <div className="rounded-lg border border-surface-border bg-surface-inset p-4">
-                <p id="session-detail-transcript" className="text-sm leading-relaxed text-base-content/90 whitespace-pre-wrap break-words sm:text-base">
+                <p id={transcriptId} className="text-sm leading-relaxed text-base-content/90 whitespace-pre-wrap break-words sm:text-base">
                   {session.transcript}
                 </p>
               </div>
             ) : (
-              <p id="session-detail-transcript" className="text-sm italic text-base-content/40">{t`No transcript`}</p>
+              <p id={transcriptId} className="text-sm italic text-base-content/40">{t`No transcript`}</p>
             )}
           </div>
 

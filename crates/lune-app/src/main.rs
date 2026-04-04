@@ -181,6 +181,7 @@ fn run_daemon() {
         run_pipeline(
             settings,
             db,
+            paths.database_file(),
             paths.adaptive_vad_file(),
             pipeline_cmd_tx,
             cmd_rx,
@@ -199,6 +200,7 @@ fn run_daemon() {
 async fn run_pipeline(
     settings: Arc<RwLock<lune_core::config::UserSettings>>,
     db: Arc<tokio::sync::Mutex<lune_persist::Database>>,
+    db_path: std::path::PathBuf,
     vad_state_path: std::path::PathBuf,
     cmd_tx: mpsc::Sender<AppCommand>,
     mut cmd_rx: mpsc::Receiver<AppCommand>,
@@ -255,7 +257,7 @@ async fn run_pipeline(
         _ => None,
     };
 
-    let dict_db = lune_persist::Database::open_in_memory().expect("open dict database");
+    let dict_db = lune_persist::Database::open(&db_path).expect("open dict database");
     let dict = Arc::new(tokio::sync::Mutex::new(
         lune_dict::DictionaryManager::new(dict_db).expect("init dictionary"),
     ));
@@ -396,6 +398,13 @@ async fn start_dictation<A: lune_core::asr::AsrBackend + 'static>(
                 lune_core::session::SessionEvent::PartialText => AppStateUpdate::PartialText,
                 lune_core::session::SessionEvent::FinalizedText(t) => {
                     // `borrow()` is lock-free on watch channels — cheap hot path
+                    let mode = *dictation_mode_rx.borrow();
+                    delivery_service.deliver_owned(t, mode);
+                    AppStateUpdate::FinalText
+                }
+                lune_core::session::SessionEvent::CorrectedText(t) => {
+                    // LLM-corrected or dictionary-applied final text.
+                    // Deliver as replacement for progressively-emitted segments.
                     let mode = *dictation_mode_rx.borrow();
                     delivery_service.deliver_owned(t, mode);
                     AppStateUpdate::FinalText

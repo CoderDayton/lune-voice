@@ -247,8 +247,14 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
                         session_id = %handle.session_id,
                         "sending stop signal and waiting for session shutdown"
                     );
+                    // Register the Notified future BEFORE sending Stop to avoid
+                    // a TOCTOU race where notify_waiters fires between lock release
+                    // and the first poll of the Notified future.
+                    let notified = self.idle_notify.notified();
+                    let mut boxed = Box::pin(notified);
+                    boxed.as_mut().enable();
                     let _ = handle.control_tx.send(SessionControl::Stop);
-                    Some(self.idle_notify.notified())
+                    Some(boxed)
                 }
                 None => None,
             }
@@ -457,6 +463,9 @@ async fn run_session<A: AsrBackend + 'static>(
     let mut saw_asr_success = false;
     let mut cancelled = false;
 
+    let llm_enabled = config.pipeline.word_confidence_threshold.is_some();
+    let flush_silence = vec![0.0f32; 16_000];
+    let mut progressively_delivered = false;
     let mut audio_poll_tick = tokio::time::interval(Duration::from_millis(10));
     audio_poll_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let mut next_level_emit = tokio::time::Instant::now();
@@ -510,7 +519,11 @@ async fn run_session<A: AsrBackend + 'static>(
                         speech_samples += chunk.samples.len();
                     }
                     if let Some(audio) = &mut all_audio {
-                        audio.extend_from_slice(&chunk.samples);
+                        // Cap at max_speech_samples to prevent unbounded growth
+                        // during mostly-silent sessions with aligner enabled.
+                        if audio.len() < config.pipeline.max_speech_samples {
+                            audio.extend_from_slice(&chunk.samples);
+                        }
                     }
 
                     if let Err(e) = asr.push_audio(&asr_session, &chunk.samples).await {
@@ -534,17 +547,47 @@ async fn run_session<A: AsrBackend + 'static>(
                         }
                     }
 
-                    // Log segment boundaries from VAD but do NOT flush ASR here.
-                    // Audio accumulates in the backend's buffer; the final poll_final
-                    // after session end handles chunked inference internally (8s
-                    // overlapping windows + LCS/FA merge for Qwen, single-pass for Parakeet).
-                    for boundary in &boundaries {
-                        debug!(
-                            start_ms = boundary.start_ms,
-                            end_ms = boundary.end_ms,
-                            avg_prob = format!("{:.2}", boundary.avg_prob),
-                            "speech segment boundary (audio accumulating)"
-                        );
+                    // Progressive inference: flush ASR at each VAD segment boundary.
+                    // When LLM correction is off, emit text immediately per-sentence.
+                    // When LLM is on, still flush per-segment (reduces final poll_final
+                    // work) but hold text until LLM processes the full transcript.
+                    if !boundaries.is_empty() {
+                        for boundary in &boundaries {
+                            debug!(
+                                start_ms = boundary.start_ms,
+                                end_ms = boundary.end_ms,
+                                avg_prob = format!("{:.2}", boundary.avg_prob),
+                                "speech segment boundary → flushing ASR"
+                            );
+                        }
+
+                        let prev_text_len = raw_text.len();
+                        let _ = asr.push_audio(&asr_session, &flush_silence).await;
+                        match asr.poll_final(&asr_session).await {
+                            Ok(new_segments) => {
+                                if append_segments(&mut segments, &mut raw_text, new_segments) {
+                                    saw_asr_success = true;
+                                    // Deliver only the NEW text from this segment
+                                    if !llm_enabled {
+                                        let new_text = raw_text[prev_text_len..].trim_start();
+                                        if !new_text.is_empty() {
+                                            let _ = event_tx.try_send(
+                                                SessionEvent::FinalizedText(new_text.to_owned()),
+                                            );
+                                            progressively_delivered = true;
+                                        }
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                let msg = e.to_string();
+                                warn!(error = %msg, "poll_final error at segment boundary");
+                                first_asr_error.get_or_insert(msg);
+                            }
+                        }
+                        if let Err(e) = asr.reset_context(&asr_session).await {
+                            warn!(error = %e, "reset_context error at segment boundary");
+                        }
                     }
 
                     if speech_samples >= config.pipeline.max_speech_samples {
@@ -822,9 +865,18 @@ async fn run_session<A: AsrBackend + 'static>(
         guard.apply(&post_llm_text)
     };
 
-    let _ = event_tx
-        .send(SessionEvent::FinalizedText(final_text.clone()))
-        .await;
+    // When we already delivered text progressively per-segment (LLM off),
+    // don't re-paste — emit CorrectedText as a UI signal with the
+    // dictionary-applied version. Otherwise emit FinalizedText to deliver.
+    if progressively_delivered {
+        let _ = event_tx
+            .send(SessionEvent::CorrectedText(final_text.clone()))
+            .await;
+    } else {
+        let _ = event_tx
+            .send(SessionEvent::FinalizedText(final_text.clone()))
+            .await;
+    }
 
     let transcript = if final_text.is_empty() {
         None
