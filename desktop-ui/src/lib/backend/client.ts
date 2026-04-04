@@ -1,12 +1,16 @@
 import { invoke } from "@tauri-apps/api/core";
 import { mockBackendClient } from "./mock";
-import type { BackendClient, BackendWorkspaceSnapshot } from "./types";
+import type { BackendClient, BackendPillSnapshot, BackendWorkspaceSnapshot } from "./types";
 
 import { isTauriRuntime } from "./runtime";
 
 const tauriBackendClient: BackendClient = {
   loadWorkspaceSnapshot() {
     return invoke<BackendWorkspaceSnapshot>("load_workspace_snapshot");
+  },
+
+  loadPillSnapshot() {
+    return invoke<BackendPillSnapshot>("load_pill_snapshot");
   },
 
   saveWorkspaceSettings(input) {

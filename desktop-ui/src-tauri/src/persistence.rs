@@ -1,4 +1,4 @@
-use std::{path::PathBuf, str::FromStr};
+use std::path::PathBuf;
 
 use lune_core::config::{
     ActivationMode, AlignerConfig, AsrBackendConfig, DevicePolicy, DictationMode, HotkeyConfig,
@@ -9,8 +9,9 @@ use lune_core::session::SessionStatus;
 use lune_persist::{AppPaths, Database, SettingsStore, StoredDictionaryEntry};
 
 use crate::dto::{
-    CreateDictionaryEntryInput, DictionaryItemDto, HistoryItemDto, WorkspaceSettingsDto,
-    WorkspaceSnapshot,
+    ActivationModeDto, AsrBackendTypeDto, CreateDictionaryEntryInput, DevicePolicyDto,
+    DictationModeDto, DictionaryItemDto, HistoryItemDto, LlmBackendTypeDto, PillVisibilityDto,
+    SaveWorkspaceSettingsInput, WorkspaceSettingsDto, WorkspaceSnapshot,
 };
 
 const HISTORY_LIMIT: u32 = 200;
@@ -36,7 +37,9 @@ pub fn load_workspace_snapshot() -> Result<WorkspaceSnapshot, String> {
     build_snapshot(settings, &mut database)
 }
 
-pub fn save_workspace_settings(input: WorkspaceSettingsDto) -> Result<WorkspaceSnapshot, String> {
+pub fn save_workspace_settings(
+    input: SaveWorkspaceSettingsInput,
+) -> Result<WorkspaceSnapshot, String> {
     let paths = resolve_paths()?;
     let mut settings = load_settings(&paths)?;
     apply_settings_dto(&mut settings, input)?;
@@ -160,27 +163,43 @@ fn open_database(paths: &AppPaths) -> Result<Database, String> {
 }
 
 fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
-    let (openai_asr_base_url, openai_asr_model) = match &settings.asr_backend {
-        AsrBackendConfig::OpenAiCompatible {
-            base_url, model, ..
-        } => (Some(base_url.to_string()), Some(model.clone())),
-        _ => (None, None),
-    };
+    let (openai_asr_base_url, openai_asr_model, openai_asr_api_key_set) =
+        match &settings.asr_backend {
+            AsrBackendConfig::OpenAiCompatible {
+                base_url,
+                model,
+                api_key,
+                ..
+            } => (
+                Some(base_url.to_string()),
+                Some(model.clone()),
+                !api_key.expose().is_empty(),
+            ),
+            _ => (None, None, false),
+        };
 
-    let (openai_llm_base_url, openai_llm_model) = match &settings.llm_backend {
-        LlmBackendConfig::OpenAiCompatible {
-            base_url, model, ..
-        } => (Some(base_url.to_string()), Some(model.clone())),
-        _ => (None, None),
-    };
+    let (openai_llm_base_url, openai_llm_model, openai_llm_api_key_set) =
+        match &settings.llm_backend {
+            LlmBackendConfig::OpenAiCompatible {
+                base_url,
+                model,
+                api_key,
+                ..
+            } => (
+                Some(base_url.to_string()),
+                Some(model.clone()),
+                !api_key.expose().is_empty(),
+            ),
+            _ => (None, None, false),
+        };
 
     WorkspaceSettingsDto {
-        activation_mode: settings.activation_mode.to_string(),
-        dictation_mode: settings.dictation_mode.to_string(),
+        activation_mode: activation_mode_to_dto(settings.activation_mode),
+        dictation_mode: dictation_mode_to_dto(settings.dictation_mode),
         use_gpu: !matches!(settings.device, DevicePolicy::Cpu),
-        device_policy: device_policy_label(settings.device).to_owned(),
-        asr_backend_type: asr_backend_type(&settings.asr_backend).to_owned(),
-        llm_backend_type: llm_backend_type(&settings.llm_backend).to_owned(),
+        device_policy: device_policy_to_dto(settings.device),
+        asr_backend_type: asr_backend_type_to_dto(&settings.asr_backend),
+        llm_backend_type: llm_backend_type_to_dto(&settings.llm_backend),
         confidence_threshold: settings.pipeline.word_confidence_threshold,
         adaptive_vad: settings
             .pipeline
@@ -191,32 +210,29 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
         hotkey_toggle: format_key_combo(&settings.hotkey.toggle_dictation),
         hotkey_cancel: format_key_combo(&settings.hotkey.cancel_dictation),
         aligner_enabled: settings.aligner.as_ref().is_some_and(|cfg| cfg.enabled),
-        pill_visibility: settings.pill_visibility.to_string(),
+        pill_visibility: pill_visibility_to_dto(settings.pill_visibility),
         language: settings.language.clone(),
         openai_asr_base_url,
-        openai_asr_api_key: None,
         openai_asr_model,
+        openai_asr_api_key_set,
         openai_llm_base_url,
-        openai_llm_api_key: None,
         openai_llm_model,
+        openai_llm_api_key_set,
     }
 }
 
 fn apply_settings_dto(
     settings: &mut UserSettings,
-    input: WorkspaceSettingsDto,
+    input: SaveWorkspaceSettingsInput,
 ) -> Result<(), String> {
-    settings.activation_mode = ActivationMode::from_str(input.activation_mode.trim())
-        .map_err(|e| format!("activationMode: {e}"))?;
-    settings.pill_visibility = PillVisibility::from_str(input.pill_visibility.trim())
-        .map_err(|e| format!("pillVisibility: {e}"))?;
-    settings.dictation_mode = DictationMode::from_str(input.dictation_mode.trim())
-        .map_err(|e| format!("dictationMode: {e}"))?;
-    settings.device = resolve_device_policy(input.use_gpu, input.device_policy.trim())?;
+    settings.activation_mode = activation_mode_from_dto(input.activation_mode);
+    settings.pill_visibility = pill_visibility_from_dto(input.pill_visibility);
+    settings.dictation_mode = dictation_mode_from_dto(input.dictation_mode);
+    settings.device = resolve_device_policy(input.use_gpu, input.device_policy);
     settings.asr_backend =
-        asr_backend_from_type(&input.asr_backend_type, &settings.asr_backend, &input)?;
+        asr_backend_from_type(input.asr_backend_type, &settings.asr_backend, &input)?;
     settings.llm_backend =
-        llm_backend_from_type(&input.llm_backend_type, &settings.llm_backend, &input)?;
+        llm_backend_from_type(input.llm_backend_type, &settings.llm_backend, &input)?;
 
     // Validate numeric thresholds — reject NaN/Inf/out-of-range.
     if let Some(ct) = input.confidence_threshold
@@ -272,57 +288,105 @@ fn apply_settings_dto(
     Ok(())
 }
 
-fn asr_backend_type(config: &AsrBackendConfig) -> &'static str {
-    match config {
-        AsrBackendConfig::ParakeetTdt { .. } => "ParakeetTdt",
-        AsrBackendConfig::OrtQwenAsr { .. } => "OrtQwenAsr",
-        AsrBackendConfig::OpenAiCompatible { .. } => "OpenAiCompatible",
-        _ => UNKNOWN_LABEL,
+// ── DTO ↔ Core conversions ──────────────────────────────────────────────
+
+fn activation_mode_to_dto(mode: ActivationMode) -> ActivationModeDto {
+    match mode {
+        ActivationMode::Toggle => ActivationModeDto::Toggle,
+        ActivationMode::Hold => ActivationModeDto::Hold,
+        _ => ActivationModeDto::Toggle,
     }
 }
 
-fn device_policy_label(policy: DevicePolicy) -> &'static str {
+fn activation_mode_from_dto(dto: ActivationModeDto) -> ActivationMode {
+    match dto {
+        ActivationModeDto::Toggle => ActivationMode::Toggle,
+        ActivationModeDto::Hold => ActivationMode::Hold,
+    }
+}
+
+fn dictation_mode_to_dto(mode: DictationMode) -> DictationModeDto {
+    match mode {
+        DictationMode::TypeInPlace => DictationModeDto::TypeInPlace,
+        DictationMode::Clipboard => DictationModeDto::Clipboard,
+        DictationMode::Both => DictationModeDto::Both,
+        _ => DictationModeDto::Clipboard,
+    }
+}
+
+fn dictation_mode_from_dto(dto: DictationModeDto) -> DictationMode {
+    match dto {
+        DictationModeDto::TypeInPlace => DictationMode::TypeInPlace,
+        DictationModeDto::Clipboard => DictationMode::Clipboard,
+        DictationModeDto::Both => DictationMode::Both,
+    }
+}
+
+fn device_policy_to_dto(policy: DevicePolicy) -> DevicePolicyDto {
     match policy {
-        DevicePolicy::Cpu => "Cpu",
-        DevicePolicy::Cuda => "Cuda",
-        DevicePolicy::Auto => "Auto",
+        DevicePolicy::Cpu => DevicePolicyDto::Cpu,
+        DevicePolicy::Cuda => DevicePolicyDto::Cuda,
+        DevicePolicy::Auto => DevicePolicyDto::Auto,
     }
 }
 
-fn resolve_device_policy(use_gpu: bool, raw_policy: &str) -> Result<DevicePolicy, String> {
+fn resolve_device_policy(use_gpu: bool, policy: DevicePolicyDto) -> DevicePolicy {
     if !use_gpu {
-        return Ok(DevicePolicy::Cpu);
+        return DevicePolicy::Cpu;
     }
-
-    match raw_policy {
-        "Cuda" => Ok(DevicePolicy::Cuda),
-        "Auto" | "" => Ok(DevicePolicy::Auto),
-        "Cpu" => Ok(DevicePolicy::Auto),
-        other => Err(format!("unsupported devicePolicy: {other}")),
+    match policy {
+        DevicePolicyDto::Cuda => DevicePolicy::Cuda,
+        DevicePolicyDto::Auto | DevicePolicyDto::Cpu => DevicePolicy::Auto,
     }
 }
 
-fn llm_backend_type(config: &LlmBackendConfig) -> &'static str {
+fn asr_backend_type_to_dto(config: &AsrBackendConfig) -> AsrBackendTypeDto {
     match config {
-        LlmBackendConfig::LlamaCppLocal { .. } => "LlamaCppLocal",
-        LlmBackendConfig::OpenAiCompatible { .. } => "OpenAiCompatible",
-        _ => UNKNOWN_LABEL,
+        AsrBackendConfig::ParakeetTdt { .. } => AsrBackendTypeDto::ParakeetTdt,
+        AsrBackendConfig::OrtQwenAsr { .. } => AsrBackendTypeDto::OrtQwenAsr,
+        AsrBackendConfig::OpenAiCompatible { .. } => AsrBackendTypeDto::OpenAiCompatible,
+        _ => AsrBackendTypeDto::OrtQwenAsr,
+    }
+}
+
+fn llm_backend_type_to_dto(config: &LlmBackendConfig) -> LlmBackendTypeDto {
+    match config {
+        LlmBackendConfig::LlamaCppLocal { .. } => LlmBackendTypeDto::LlamaCppLocal,
+        LlmBackendConfig::OpenAiCompatible { .. } => LlmBackendTypeDto::OpenAiCompatible,
+        _ => LlmBackendTypeDto::LlamaCppLocal,
+    }
+}
+
+fn pill_visibility_to_dto(vis: PillVisibility) -> PillVisibilityDto {
+    match vis {
+        PillVisibility::Always => PillVisibilityDto::Always,
+        PillVisibility::WhenDictating => PillVisibilityDto::WhenDictating,
+        PillVisibility::Never => PillVisibilityDto::Never,
+        _ => PillVisibilityDto::Always,
+    }
+}
+
+fn pill_visibility_from_dto(dto: PillVisibilityDto) -> PillVisibility {
+    match dto {
+        PillVisibilityDto::Always => PillVisibility::Always,
+        PillVisibilityDto::WhenDictating => PillVisibility::WhenDictating,
+        PillVisibilityDto::Never => PillVisibility::Never,
     }
 }
 
 fn asr_backend_from_type(
-    kind: &str,
+    kind: AsrBackendTypeDto,
     current: &AsrBackendConfig,
-    input: &WorkspaceSettingsDto,
+    input: &SaveWorkspaceSettingsInput,
 ) -> Result<AsrBackendConfig, String> {
     Ok(match kind {
-        "ParakeetTdt" => AsrBackendConfig::ParakeetTdt {
+        AsrBackendTypeDto::ParakeetTdt => AsrBackendConfig::ParakeetTdt {
             model_dir: current_parakeet_model_dir(current),
         },
-        "OrtQwenAsr" => AsrBackendConfig::OrtQwenAsr {
+        AsrBackendTypeDto::OrtQwenAsr => AsrBackendConfig::OrtQwenAsr {
             model_dir: current_qwen_model_dir(current),
         },
-        "OpenAiCompatible" => {
+        AsrBackendTypeDto::OpenAiCompatible => {
             // Prefer incoming DTO fields; fall back to current config values if already OpenAI.
             let (cur_url, cur_key, cur_model) = match current {
                 AsrBackendConfig::OpenAiCompatible {
@@ -355,21 +419,22 @@ fn asr_backend_from_type(
                 streaming: StreamingMode::HttpPolling,
             }
         }
-        _ => return Err(format!("unsupported asrBackendType: {kind}")),
     })
 }
 
 fn llm_backend_from_type(
-    kind: &str,
+    kind: LlmBackendTypeDto,
     current: &LlmBackendConfig,
-    input: &WorkspaceSettingsDto,
+    input: &SaveWorkspaceSettingsInput,
 ) -> Result<LlmBackendConfig, String> {
     Ok(match kind {
-        "LlamaCppLocal" if matches!(current, LlmBackendConfig::LlamaCppLocal { .. }) => {
+        LlmBackendTypeDto::LlamaCppLocal
+            if matches!(current, LlmBackendConfig::LlamaCppLocal { .. }) =>
+        {
             current.clone()
         }
-        "LlamaCppLocal" => UserSettings::default().llm_backend,
-        "OpenAiCompatible" => {
+        LlmBackendTypeDto::LlamaCppLocal => UserSettings::default().llm_backend,
+        LlmBackendTypeDto::OpenAiCompatible => {
             // Prefer incoming DTO fields; fall back to current config values if already OpenAI.
             let (cur_url, cur_key, cur_model, cur_max_tokens) = match current {
                 LlmBackendConfig::OpenAiCompatible {
@@ -404,7 +469,6 @@ fn llm_backend_from_type(
                 max_tokens: cur_max_tokens,
             }
         }
-        _ => return Err(format!("unsupported llmBackendType: {kind}")),
     })
 }
 
@@ -550,15 +614,43 @@ mod tests {
         assert_eq!(loaded.pipeline.adaptive_vad, Some(true));
     }
 
+    /// Build a `SaveWorkspaceSettingsInput` from defaults for test convenience.
+    fn default_save_input() -> SaveWorkspaceSettingsInput {
+        let dto = settings_to_dto(&UserSettings::default());
+        SaveWorkspaceSettingsInput {
+            activation_mode: dto.activation_mode,
+            dictation_mode: dto.dictation_mode,
+            use_gpu: dto.use_gpu,
+            device_policy: dto.device_policy,
+            asr_backend_type: dto.asr_backend_type,
+            llm_backend_type: dto.llm_backend_type,
+            confidence_threshold: dto.confidence_threshold,
+            adaptive_vad: dto.adaptive_vad,
+            speech_threshold: dto.speech_threshold,
+            style_preset: dto.style_preset,
+            hotkey_toggle: dto.hotkey_toggle,
+            hotkey_cancel: dto.hotkey_cancel,
+            aligner_enabled: dto.aligner_enabled,
+            pill_visibility: dto.pill_visibility,
+            language: dto.language,
+            openai_asr_base_url: dto.openai_asr_base_url,
+            openai_asr_api_key: None,
+            openai_asr_model: dto.openai_asr_model,
+            openai_llm_base_url: dto.openai_llm_base_url,
+            openai_llm_api_key: None,
+            openai_llm_model: dto.openai_llm_model,
+        }
+    }
+
     #[test]
     fn apply_settings_rejects_invalid_style_and_language() {
         let mut settings = UserSettings::default();
-        let mut input = settings_to_dto(&settings);
 
+        let mut input = default_save_input();
         input.style_preset = "not-a-style".into();
-        assert!(apply_settings_dto(&mut settings, input.clone()).is_err());
+        assert!(apply_settings_dto(&mut settings, input).is_err());
 
-        input.style_preset = "casual".into();
+        let mut input = default_save_input();
         input.language = "bad tag".into();
         assert!(apply_settings_dto(&mut settings, input).is_err());
     }
@@ -569,14 +661,16 @@ mod tests {
             device: DevicePolicy::Cuda,
             ..UserSettings::default()
         };
-        let input = settings_to_dto(&settings);
+        let mut input = default_save_input();
+        input.use_gpu = true;
+        input.device_policy = DevicePolicyDto::Cuda;
 
         apply_settings_dto(&mut settings, input).unwrap();
         assert!(matches!(settings.device, DevicePolicy::Cuda));
     }
 
     #[test]
-    fn settings_to_dto_redacts_openai_api_keys() {
+    fn settings_to_dto_does_not_expose_api_keys() {
         let settings = UserSettings {
             asr_backend: AsrBackendConfig::OpenAiCompatible {
                 base_url: "https://api.openai.com/v1".parse().unwrap(),
@@ -594,8 +688,13 @@ mod tests {
         };
 
         let dto = settings_to_dto(&settings);
-        assert!(dto.openai_asr_api_key.is_none());
-        assert!(dto.openai_llm_api_key.is_none());
+        // Keys are not in the read DTO — only the boolean flags.
+        assert!(dto.openai_asr_api_key_set);
+        assert!(dto.openai_llm_api_key_set);
+        // Verify the serialized JSON contains no actual key values.
+        let json = serde_json::to_string(&dto).unwrap();
+        assert!(!json.contains("secret-asr"));
+        assert!(!json.contains("secret-llm"));
     }
 
     #[test]

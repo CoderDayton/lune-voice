@@ -1,7 +1,7 @@
 use tauri::{Emitter, Runtime, State, WebviewWindow, ipc::Channel};
 
 use crate::dto::{
-    CreateDictionaryEntryInput, PillSnapshotDto, SessionStreamEvent, WorkspaceSettingsDto,
+    CreateDictionaryEntryInput, PillSnapshotDto, SaveWorkspaceSettingsInput, SessionStreamEvent,
     WorkspaceSnapshot,
 };
 use crate::runtime::AppRuntime;
@@ -57,7 +57,7 @@ pub async fn load_pill_snapshot(
 pub async fn save_workspace_settings(
     window: WebviewWindow,
     runtime: State<'_, AppRuntime>,
-    input: WorkspaceSettingsDto,
+    input: SaveWorkspaceSettingsInput,
 ) -> Result<WorkspaceSnapshot, String> {
     require_window_access(&window, &["main"])?;
     let mut snapshot = tauri::async_runtime::spawn_blocking(move || {

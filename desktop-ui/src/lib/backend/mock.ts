@@ -1,6 +1,6 @@
 
 import type { DictionaryEntry } from "../../features/dictionary/data/dictionary-data";
-import type { BackendClient, BackendWorkspaceSnapshot, SaveWorkspaceSettingsInput } from "./types";
+import type { BackendClient, BackendPillSnapshot, BackendWorkspaceSnapshot, SaveWorkspaceSettingsInput } from "./types";
 
 const initialDictionaryEntries: DictionaryEntry[] = [
   { id: 1, phrase: "github", replacement: "GitHub", priority: 5 },
@@ -33,10 +33,49 @@ function createMockSnapshot(): BackendWorkspaceSnapshot {
       language: "en",
       openaiAsrBaseUrl: null,
       openaiAsrModel: null,
+      openaiAsrApiKeySet: false,
       openaiLlmBaseUrl: null,
       openaiLlmModel: null,
+      openaiLlmApiKeySet: false,
     },
-    history: [],
+    history: [
+      {
+        id: "s1",
+        startedAt: new Date(Date.now() - 60_000).toISOString(),
+        endedAt: new Date(Date.now() - 38_000).toISOString(),
+        transcript: "Uh yeah it is working right now but obviously this isn't a very good approach. In particular, the way the data flows through the system needs significant improvement.",
+        backend: "OrtQwenAsr",
+        style: "casual",
+        status: "completed",
+      },
+      {
+        id: "s2",
+        startedAt: new Date(Date.now() - 300_000).toISOString(),
+        endedAt: new Date(Date.now() - 298_000).toISOString(),
+        transcript: "Will this work now?",
+        backend: "OrtQwenAsr",
+        style: "casual",
+        status: "completed",
+      },
+      {
+        id: "s3",
+        startedAt: new Date(Date.now() - 600_000).toISOString(),
+        endedAt: new Date(Date.now() - 598_000).toISOString(),
+        transcript: "Oh that was exactly right.",
+        backend: "OrtQwenAsr",
+        style: "casual",
+        status: "completed",
+      },
+      {
+        id: "s4",
+        startedAt: new Date(Date.now() - 900_000).toISOString(),
+        endedAt: new Date(Date.now() - 894_000).toISOString(),
+        transcript: "This really needs some quality control. It doesn't understand my voice very well.",
+        backend: "OrtQwenAsr",
+        style: "casual",
+        status: "completed",
+      },
+    ],
     dictionary: initialDictionaryEntries.map((entry, index) => ({
       id: index + 1,
       phrase: entry.phrase,
@@ -50,14 +89,15 @@ let mockSnapshot: BackendWorkspaceSnapshot = createMockSnapshot();
 let nextDictionaryId = 1000;
 
 function applySettings(input: SaveWorkspaceSettingsInput) {
-  const { llmCorrection, openaiAsrApiKey: _openaiAsrApiKey, openaiLlmApiKey: _openaiLlmApiKey, ...fields } = input;
+  const { openaiAsrApiKey: _openaiAsrApiKey, openaiLlmApiKey: _openaiLlmApiKey, ...fields } = input;
   mockSnapshot = {
     ...mockSnapshot,
     settings: {
       ...mockSnapshot.settings,
       ...fields,
       devicePolicy: fields.useGpu ? fields.devicePolicy : "Cpu",
-      confidenceThreshold: llmCorrection ? input.confidenceThreshold : null,
+      openaiAsrApiKeySet: !!_openaiAsrApiKey,
+      openaiLlmApiKeySet: !!_openaiLlmApiKey,
     },
   };
 }
@@ -65,6 +105,14 @@ function applySettings(input: SaveWorkspaceSettingsInput) {
 export const mockBackendClient: BackendClient = {
   async loadWorkspaceSnapshot() {
     return structuredClone(mockSnapshot);
+  },
+
+  async loadPillSnapshot(): Promise<BackendPillSnapshot> {
+    return {
+      serviceStatus: mockSnapshot.serviceStatus,
+      activationMode: mockSnapshot.settings.activationMode,
+      pillVisibility: mockSnapshot.settings.pillVisibility,
+    };
   },
 
   async saveWorkspaceSettings(input) {

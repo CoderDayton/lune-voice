@@ -9,7 +9,7 @@ use tauri::{
 };
 
 use crate::commands;
-use crate::dto::PillSnapshotDto;
+use crate::dto::{ActivationModeDto, PillSnapshotDto, PillVisibilityDto};
 
 #[tauri::command]
 fn test_main_only(window: WebviewWindow<MockRuntime>) -> Result<&'static str, String> {
@@ -28,8 +28,8 @@ fn test_load_pill_snapshot(window: WebviewWindow<MockRuntime>) -> Result<PillSna
     commands::require_window_access(&window, &["pill"])?;
     Ok(PillSnapshotDto {
         service_status: "ready".into(),
-        activation_mode: "Toggle".into(),
-        pill_visibility: "Always".into(),
+        activation_mode: ActivationModeDto::Toggle,
+        pill_visibility: PillVisibilityDto::Always,
     })
 }
 
@@ -122,8 +122,8 @@ fn invokes_structured_pill_snapshot_command_through_tauri_ipc() {
     let snapshot = invoke_command::<PillSnapshotDto>(&pill, "test_load_pill_snapshot")
         .expect("pill snapshot invoke should succeed");
     assert_eq!(snapshot.service_status, "ready");
-    assert_eq!(snapshot.activation_mode, "Toggle");
-    assert_eq!(snapshot.pill_visibility, "Always");
+    assert_eq!(snapshot.activation_mode, ActivationModeDto::Toggle);
+    assert_eq!(snapshot.pill_visibility, PillVisibilityDto::Always);
 
     assert_eq!(
         invoke_command::<PillSnapshotDto>(&main, "test_load_pill_snapshot"),

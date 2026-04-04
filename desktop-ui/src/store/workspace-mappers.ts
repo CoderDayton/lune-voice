@@ -1,6 +1,6 @@
 import type { BackendDictionaryEntry, BackendHistoryEntry, BackendWorkspaceSnapshot, SaveWorkspaceSettingsInput } from "../lib/backend/types";
 import type { DictionaryEntry } from "../features/dictionary/data/dictionary-data";
-import { asrBackends, deliveryMethods, labelFor, type AsrBackendValue, type DictationModeValue, type PillVisibilityValue } from "../features/settings/data/settings-data";
+import { asrBackends, deliveryMethods, labelFor, type AsrBackendValue, type DictationModeValue } from "../features/settings/data/settings-data";
 import { DEFAULT_SETTINGS, type HistorySession, type WorkspaceSettings } from "./workspace-types";
 
 export function mapHistoryEntry(entry: BackendHistoryEntry): HistorySession | null {
@@ -45,13 +45,13 @@ export function mapWorkspaceSettings(snapshot: BackendWorkspaceSnapshot): Worksp
     hotkeyToggle: snapshot.settings.hotkeyToggle,
     hotkeyCancel: snapshot.settings.hotkeyCancel,
     alignerEnabled: snapshot.settings.alignerEnabled,
-    pillVisibility: (snapshot.settings.pillVisibility ?? "Always") as PillVisibilityValue,
+    pillVisibility: snapshot.settings.pillVisibility ?? "Always",
     language: snapshot.settings.language ?? "en",
     openaiAsrBaseUrl: snapshot.settings.openaiAsrBaseUrl ?? DEFAULT_SETTINGS.openaiAsrBaseUrl,
-    openaiAsrApiKey: DEFAULT_SETTINGS.openaiAsrApiKey,
+    openaiAsrApiKey: snapshot.settings.openaiAsrApiKeySet ? "••••••••" : DEFAULT_SETTINGS.openaiAsrApiKey,
     openaiAsrModel: snapshot.settings.openaiAsrModel ?? DEFAULT_SETTINGS.openaiAsrModel,
     openaiLlmBaseUrl: snapshot.settings.openaiLlmBaseUrl ?? DEFAULT_SETTINGS.openaiLlmBaseUrl,
-    openaiLlmApiKey: DEFAULT_SETTINGS.openaiLlmApiKey,
+    openaiLlmApiKey: snapshot.settings.openaiLlmApiKeySet ? "••••••••" : DEFAULT_SETTINGS.openaiLlmApiKey,
     openaiLlmModel: snapshot.settings.openaiLlmModel ?? DEFAULT_SETTINGS.openaiLlmModel,
   };
 }
@@ -80,7 +80,6 @@ export function settingsToSaveInput(settings: WorkspaceSettings): SaveWorkspaceS
     devicePolicy: settings.devicePolicy,
     asrBackendType: settings.asrBackend,
     llmBackendType: settings.llmBackend,
-    llmCorrection: settings.llmCorrection,
     confidenceThreshold: settings.llmCorrection ? Number(settings.confidenceThreshold) : null,
     adaptiveVad: settings.adaptiveVad,
     speechThreshold: Number(settings.speechThreshold),

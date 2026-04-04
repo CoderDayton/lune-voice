@@ -1,5 +1,49 @@
 use serde::{Deserialize, Serialize};
 
+// ── DTO enums ────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ActivationModeDto {
+    Toggle,
+    Hold,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DictationModeDto {
+    TypeInPlace,
+    Clipboard,
+    Both,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DevicePolicyDto {
+    Cpu,
+    Cuda,
+    Auto,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AsrBackendTypeDto {
+    OrtQwenAsr,
+    ParakeetTdt,
+    OpenAiCompatible,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LlmBackendTypeDto {
+    LlamaCppLocal,
+    OpenAiCompatible,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PillVisibilityDto {
+    Always,
+    WhenDictating,
+    Never,
+}
+
+// ── Read DTOs (Serialize → frontend) ─────────────────────────────────────
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceSnapshot {
@@ -10,23 +54,15 @@ pub struct WorkspaceSnapshot {
     pub dictionary: Vec<DictionaryItemDto>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct PillSnapshotDto {
-    pub service_status: String,
-    pub activation_mode: String,
-    pub pill_visibility: String,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceSettingsDto {
-    pub activation_mode: String,
-    pub dictation_mode: String,
+    pub activation_mode: ActivationModeDto,
+    pub dictation_mode: DictationModeDto,
     pub use_gpu: bool,
-    pub device_policy: String,
-    pub asr_backend_type: String,
-    pub llm_backend_type: String,
+    pub device_policy: DevicePolicyDto,
+    pub asr_backend_type: AsrBackendTypeDto,
+    pub llm_backend_type: LlmBackendTypeDto,
     pub confidence_threshold: Option<f32>,
     pub adaptive_vad: bool,
     pub speech_threshold: f32,
@@ -34,34 +70,24 @@ pub struct WorkspaceSettingsDto {
     pub hotkey_toggle: String,
     pub hotkey_cancel: String,
     pub aligner_enabled: bool,
-    pub pill_visibility: String,
+    pub pill_visibility: PillVisibilityDto,
     pub language: String,
-    // OpenAI ASR fields (populated when asr_backend_type == "OpenAiCompatible")
+    // OpenAI ASR fields (populated when asr_backend_type == OpenAiCompatible)
     pub openai_asr_base_url: Option<String>,
-    pub openai_asr_api_key: Option<String>,
     pub openai_asr_model: Option<String>,
-    // OpenAI LLM fields (populated when llm_backend_type == "OpenAiCompatible")
+    pub openai_asr_api_key_set: bool,
+    // OpenAI LLM fields (populated when llm_backend_type == OpenAiCompatible)
     pub openai_llm_base_url: Option<String>,
-    pub openai_llm_api_key: Option<String>,
     pub openai_llm_model: Option<String>,
+    pub openai_llm_api_key_set: bool,
 }
 
-// Redact API keys from Debug output to prevent accidental log exposure.
-impl std::fmt::Debug for WorkspaceSettingsDto {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("WorkspaceSettingsDto")
-            .field("asr_backend_type", &self.asr_backend_type)
-            .field("llm_backend_type", &self.llm_backend_type)
-            .field(
-                "openai_asr_api_key",
-                &self.openai_asr_api_key.as_ref().map(|_| "[REDACTED]"),
-            )
-            .field(
-                "openai_llm_api_key",
-                &self.openai_llm_api_key.as_ref().map(|_| "[REDACTED]"),
-            )
-            .finish_non_exhaustive()
-    }
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PillSnapshotDto {
+    pub service_status: String,
+    pub activation_mode: ActivationModeDto,
+    pub pill_visibility: PillVisibilityDto,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -85,6 +111,36 @@ pub struct DictionaryItemDto {
     pub priority: u8,
 }
 
+// ── Write DTOs (Deserialize ← frontend) ──────────────────────────────────
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SaveWorkspaceSettingsInput {
+    pub activation_mode: ActivationModeDto,
+    pub dictation_mode: DictationModeDto,
+    pub use_gpu: bool,
+    pub device_policy: DevicePolicyDto,
+    pub asr_backend_type: AsrBackendTypeDto,
+    pub llm_backend_type: LlmBackendTypeDto,
+    pub confidence_threshold: Option<f32>,
+    pub adaptive_vad: bool,
+    pub speech_threshold: f32,
+    pub style_preset: String,
+    pub hotkey_toggle: String,
+    pub hotkey_cancel: String,
+    pub aligner_enabled: bool,
+    pub pill_visibility: PillVisibilityDto,
+    pub language: String,
+    // OpenAI ASR fields (sent when asr_backend_type == OpenAiCompatible)
+    pub openai_asr_base_url: Option<String>,
+    pub openai_asr_api_key: Option<String>,
+    pub openai_asr_model: Option<String>,
+    // OpenAI LLM fields (sent when llm_backend_type == OpenAiCompatible)
+    pub openai_llm_base_url: Option<String>,
+    pub openai_llm_api_key: Option<String>,
+    pub openai_llm_model: Option<String>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateDictionaryEntryInput {
@@ -92,6 +148,8 @@ pub struct CreateDictionaryEntryInput {
     pub replacement: String,
     pub priority: u8,
 }
+
+// ── Stream events ────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]

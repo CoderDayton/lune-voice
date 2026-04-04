@@ -3,6 +3,7 @@ import type {
   AsrBackendValue,
   DictationModeValue,
   LlmBackendValue,
+  PillVisibilityValue,
 } from "../../features/settings/data/settings-data";
 
 export interface BackendDictionaryEntry {
@@ -36,14 +37,16 @@ export interface BackendWorkspaceSettings {
   hotkeyToggle: string;
   hotkeyCancel: string;
   alignerEnabled: boolean;
-  pillVisibility: string;
+  pillVisibility: PillVisibilityValue;
   language: string;
   // OpenAI ASR fields (present when asrBackendType == "OpenAiCompatible")
   openaiAsrBaseUrl?: string | null;
   openaiAsrModel?: string | null;
+  openaiAsrApiKeySet: boolean;
   // OpenAI LLM fields (present when llmBackendType == "OpenAiCompatible")
   openaiLlmBaseUrl?: string | null;
   openaiLlmModel?: string | null;
+  openaiLlmApiKeySet: boolean;
 }
 
 export interface BackendWorkspaceSnapshot {
@@ -57,7 +60,7 @@ export interface BackendWorkspaceSnapshot {
 export interface BackendPillSnapshot {
   serviceStatus: string;
   activationMode: ActivationModeValue;
-  pillVisibility: string;
+  pillVisibility: PillVisibilityValue;
 }
 
 export interface SaveWorkspaceSettingsInput {
@@ -67,7 +70,6 @@ export interface SaveWorkspaceSettingsInput {
   devicePolicy: "Cpu" | "Cuda" | "Auto";
   asrBackendType: AsrBackendValue;
   llmBackendType: LlmBackendValue;
-  llmCorrection: boolean;
   confidenceThreshold: number | null;
   adaptiveVad: boolean;
   speechThreshold: number;
@@ -75,7 +77,7 @@ export interface SaveWorkspaceSettingsInput {
   hotkeyToggle: string;
   hotkeyCancel: string;
   alignerEnabled: boolean;
-  pillVisibility: string;
+  pillVisibility: PillVisibilityValue;
   language: string;
   // OpenAI ASR fields (sent when asrBackendType == "OpenAiCompatible")
   openaiAsrBaseUrl?: string | null;
@@ -89,6 +91,7 @@ export interface SaveWorkspaceSettingsInput {
 
 export interface BackendClient {
   loadWorkspaceSnapshot(): Promise<BackendWorkspaceSnapshot>;
+  loadPillSnapshot(): Promise<BackendPillSnapshot>;
   saveWorkspaceSettings(input: SaveWorkspaceSettingsInput): Promise<BackendWorkspaceSnapshot>;
   createDictionaryEntry(
     phrase: string,

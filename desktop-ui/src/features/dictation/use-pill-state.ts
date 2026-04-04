@@ -3,11 +3,13 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { BackendPillSnapshot } from "../../lib/backend/types";
+import { backendClient } from "../../lib/backend/client";
 
 
 export type PillMode = "idle" | "active" | "processing";
-type PillVis = "Always" | "WhenDictating" | "Never";
+import type { PillVisibilityValue } from "../../features/settings/data/settings-data";
+
+type PillVis = PillVisibilityValue;
 
 const PILL_IDLE_W = 48;
 const PILL_IDLE_H = 48;
@@ -33,6 +35,8 @@ interface PillSettings {
   pillVisibility: string;
 }
 
+const PILL_VIS_VALUES = new Set<string>(["Always", "WhenDictating", "Never"]);
+
 export function usePillState() {
   const [mode, setMode] = useState<PillMode>("idle");
   const [pillVis, setPillVis] = useState<PillVis>("Always");
@@ -44,13 +48,11 @@ export function usePillState() {
   // On mount: load workspace snapshot for initial readiness
   useEffect(() => {
     let cancelled = false;
-    invoke<BackendPillSnapshot>("load_pill_snapshot").then(
+    backendClient.loadPillSnapshot().then(
       (snapshot) => {
         if (cancelled) return;
-        const am = snapshot.activationMode;
-        if (am === "Hold" || am === "Toggle") setRecordingMode(am);
-        const pv = snapshot.pillVisibility;
-        if (pv === "Always" || pv === "WhenDictating" || pv === "Never") setPillVis(pv);
+        setRecordingMode(snapshot.activationMode);
+        setPillVis(snapshot.pillVisibility);
         if (READY_STATUSES.has(snapshot.serviceStatus)) {
           setServiceReady(true);
           setMode(modeFromStatus(snapshot.serviceStatus));
@@ -78,8 +80,8 @@ export function usePillState() {
     if (s.activationMode === "Toggle" || s.activationMode === "Hold") {
       setRecordingMode(s.activationMode);
     }
-    if (s.pillVisibility === "Always" || s.pillVisibility === "WhenDictating" || s.pillVisibility === "Never") {
-      setPillVis(s.pillVisibility);
+    if (PILL_VIS_VALUES.has(s.pillVisibility)) {
+      setPillVis(s.pillVisibility as PillVis);
     }
   });
 
