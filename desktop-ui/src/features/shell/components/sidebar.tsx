@@ -1,6 +1,6 @@
 import { useStore } from "@tanstack/react-store";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ChevronsLeft, ChevronsRight } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { workspaceStore } from "../../../store/workspace-store";
 import { navigationItems } from "../config/navigation";
 import { SidebarQuickStart, SidebarTodayStats } from "./sidebar-widgets";
@@ -18,7 +18,7 @@ export function SidebarContent() {
 
   return (
     <>
-      {/* Brand */}
+      {/* Brand + collapse toggle */}
       <div className="flex w-full items-center gap-3 px-4 py-5 select-none is-drawer-close:justify-center is-drawer-close:px-2 sm:gap-3.5 sm:px-5 sm:py-6">
         <div className="relative shrink-0">
           <div className="size-10 rounded-xl ring-1 ring-white/10 overflow-hidden">
@@ -35,6 +35,13 @@ export function SidebarContent() {
             <span className="font-light text-base-content/60"> Voice</span>
           </span>
         </div>
+        <label
+          htmlFor={DRAWER_ID}
+          className="ml-auto cursor-pointer text-base-content/50 transition-colors hover:text-base-content/90 is-drawer-close:hidden"
+          aria-label={t`Collapse sidebar`}
+        >
+          <PanelLeftClose size={20} strokeWidth={2} />
+        </label>
       </div>
 
       {/* Navigation */}
@@ -48,7 +55,7 @@ export function SidebarContent() {
                 <Link
                   to={to}
                   aria-current={active ? "page" : undefined}
-                  className={`group relative flex w-full items-center gap-3.5 rounded-xl px-3.5 py-4 text-[0.9rem] transition-colors is-drawer-close:tooltip is-drawer-close:tooltip-right is-drawer-close:justify-center ${active ? "bg-primary/10 text-primary font-medium" : "text-base-content/55 hover:bg-base-content/[0.04] hover:text-base-content/90"}`}
+                  className={`group relative flex w-full items-center gap-3.5 rounded-xl px-3.5 py-4 text-[0.9rem] transition-colors is-drawer-close:tooltip is-drawer-close:tooltip-right is-drawer-close:justify-center ${active ? "bg-primary/10 text-primary font-medium" : "text-base-content/55 hover:bg-surface-hover hover:text-base-content/90"}`}
                   data-tip={label}
                 >
                   {active ? (
@@ -69,24 +76,20 @@ export function SidebarContent() {
 
       <div className="flex-1" />
 
+      {/* Expand button — bottom center, only when collapsed */}
+      <div className="is-drawer-open:hidden flex justify-center mb-6">
+        <label
+          htmlFor={DRAWER_ID}
+          className="cursor-pointer text-base-content/50 transition-colors hover:text-base-content/90"
+          aria-label={t`Expand sidebar`}
+        >
+          <PanelLeftOpen size={26} strokeWidth={2} />
+        </label>
+      </div>
+
       <div className="is-drawer-close:hidden">
         <SidebarQuickStart />
         <SidebarTodayStats />
-      </div>
-
-      {/* Footer */}
-      <div className="mx-3.5 border-t border-base-content/5" />
-      <div className="flex items-center gap-1 px-3 py-3">
-        <label
-          htmlFor={DRAWER_ID}
-          className="flex cursor-pointer items-center gap-3.5 rounded-xl px-3.5 py-3 text-sm transition-colors text-base-content/40 hover:bg-base-content/[0.04] hover:text-base-content/70 is-drawer-close:w-full is-drawer-close:justify-center"
-          aria-label={t`Toggle sidebar`}
-        >
-          <ChevronsLeft size={20} strokeWidth={1.5} className="is-drawer-close:hidden" />
-          <ChevronsRight size={20} strokeWidth={1.5} className="is-drawer-open:hidden" />
-          <span className="truncate is-drawer-close:hidden">{t`Collapse`}</span>
-        </label>
-        <span className="ml-auto pr-1 text-xs tabular-nums text-base-content/20 select-none is-drawer-close:hidden">v0.1</span>
       </div>
     </>
   );

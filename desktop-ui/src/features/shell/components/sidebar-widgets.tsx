@@ -46,7 +46,7 @@ export function SidebarTodayStats() {
   if (todayStats.count === 0) return null;
 
   return (
-    <div className="mx-3.5 mb-3 rounded-xl border border-base-content/[0.05] bg-base-content/[0.02] px-4 py-3">
+    <div className="mx-3.5 mb-3 rounded-xl border border-surface-border bg-surface-hover px-4 py-3">
       <p className="text-xs font-medium uppercase tracking-widest text-base-content/30">{t`Today`}</p>
       <p className="mt-1 text-sm text-base-content/55 tabular-nums">
         {todayStats.count} {todayStats.count === 1 ? t`session` : t`sessions`}

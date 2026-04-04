@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useStore } from "@tanstack/react-store";
 import { Link } from "@tanstack/react-router";
+import { SessionDetailModal } from "../history/components/session-detail-modal";
 import { useLingui } from "@lingui/react/macro";
 import { Clock, Hash, MessageSquareText, Mic } from "lucide-react";
 import {
@@ -30,19 +31,11 @@ export function OverviewPage() {
     return { totalWords, totalMinutes: Math.round(totalSeconds / 60), count: sessions.length };
   }, [sessions]);
 
-  const recentSessions = useMemo(() =>
-    sessions.slice(0, 5).map((s) => ({
-      id: s.id,
-      time: new Date(s.startedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
-      transcript: s.transcript,
-      words: s.words,
-      seconds: s.seconds,
-    })),
-  [sessions]);
+  const recentSessions = useMemo(() => sessions.slice(0, 5), [sessions]);
 
   return (
     <div className="page-stack">
-      <section className="card border border-base-content/[0.06] bg-base-200/40">
+      <section className="card border border-surface-border bg-surface-card">
         <div className="card-body gap-5">
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <span className={`badge badge-lg gap-2 border-none px-3 ${isLoading ? "badge-warning text-warning-content" : isConnected ? "badge-success text-success-content" : "badge-error text-error-content"}`}>
@@ -55,7 +48,7 @@ export function OverviewPage() {
           </div>
 
           {stats.count > 0 ? (
-            <div className="stats stats-vertical w-full overflow-hidden rounded-xl border border-base-content/[0.06] bg-base-100/30 sm:stats-horizontal">
+            <div className="stats stats-vertical w-full overflow-hidden rounded-xl border border-surface-border bg-surface-card sm:stats-horizontal">
               <div className="stat">
                 <div className="stat-figure text-primary/30"><Hash size={22} strokeWidth={1.5} /></div>
                 <div className="stat-title">{t`Words`}</div>
@@ -73,14 +66,14 @@ export function OverviewPage() {
               </div>
             </div>
           ) : (
-            <div className="rounded-xl border border-dashed border-base-content/[0.08] bg-base-100/20 px-5 py-6 text-sm text-base-content/50">
+            <div className="rounded-xl border border-dashed border-surface-border bg-surface-inset px-5 py-6 text-sm text-base-content/50">
               {t`Your session summary will appear here once you start dictating.`}
             </div>
           )}
         </div>
       </section>
 
-      <section className="card border border-base-content/[0.06] bg-base-200/40">
+      <section className="card border border-surface-border bg-surface-card">
         <div className="card-body p-0">
           <div className="flex items-center justify-between px-5 pb-3 pt-5">
             <div>
@@ -102,21 +95,28 @@ export function OverviewPage() {
               </p>
             </div>
           ) : recentSessions.length === 0 && isActive ? null : (
-            <div className="divide-y divide-base-content/[0.06]">
-              {recentSessions.map((session) => (
-                <Link key={session.id} to="/history" className="block px-5 py-4 transition-colors hover:bg-surface-hover">
-                  <div className="pt-1 text-xs tabular-nums text-base-content/40">{session.time}</div>
-                  <div className="min-w-0">
-                    <p className="text-sm leading-6 break-words text-base-content/92">
-                      {session.transcript || t`Empty session`}
-                    </p>
-                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-base-content/50">
-                      <span className="badge badge-ghost badge-sm">{session.words} {t`words`}</span>
-                      <span>{session.seconds}{t`s`}</span>
-                    </div>
-                  </div>
-                </Link>
-              ))}
+            <div className="divide-y divide-surface-border">
+              {recentSessions.map((session) => {
+                const time = new Date(session.startedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+                return (
+                  <SessionDetailModal key={session.id} session={session}>
+                    {(open) => (
+                      <article className="block px-5 py-4 cursor-pointer transition-colors hover:bg-surface-hover" onClick={open}>
+                        <div className="pt-1 text-xs tabular-nums text-base-content/40">{time}</div>
+                        <div className="min-w-0">
+                          <p className="text-sm leading-6 break-words text-base-content/92">
+                            {session.transcript || t`Empty session`}
+                          </p>
+                          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-base-content/50">
+                            <span className="badge badge-ghost badge-sm">{session.words} {t`words`}</span>
+                            <span>{session.seconds}{t`s`}</span>
+                          </div>
+                        </div>
+                      </article>
+                    )}
+                  </SessionDetailModal>
+                );
+              })}
             </div>
           )}
         </div>

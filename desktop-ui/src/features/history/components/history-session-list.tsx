@@ -6,6 +6,7 @@ import {
   workspaceStore,
 } from "../../../store/workspace-store";
 import type { HistorySession } from "../../../store/workspace-store";
+import { SessionDetailModal } from "./session-detail-modal";
 
 interface SessionRowProps {
   item: HistorySession;
@@ -16,18 +17,22 @@ const SessionRow = memo(function SessionRow({ item }: SessionRowProps) {
   const time = new Date(item.startedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
   return (
-    <li className="list-row">
-      <div className="list-col-grow min-w-0">
-        <p className="text-sm line-clamp-2 sm:line-clamp-3">{item.transcript || t`Empty session`}</p>
-        <div className="text-xs opacity-40 mt-0.5">
-          <span className="tabular-nums">{time}</span>
-          <span className="mx-1">·</span>
-          {item.words} {t`words`}
-          <span className="mx-1">·</span>
-          {item.seconds}{t`s`}
-        </div>
-      </div>
-    </li>
+    <SessionDetailModal session={item}>
+      {(open) => (
+        <li className="list-row cursor-pointer" onClick={open}>
+          <div className="list-col-grow min-w-0">
+            <p className="text-sm line-clamp-2 sm:line-clamp-3">{item.transcript || t`Empty session`}</p>
+            <div className="text-xs opacity-40 mt-0.5">
+              <span className="tabular-nums">{time}</span>
+              <span className="mx-1">·</span>
+              {item.words} {t`words`}
+              <span className="mx-1">·</span>
+              {item.seconds}{t`s`}
+            </div>
+          </div>
+        </li>
+      )}
+    </SessionDetailModal>
   );
 });
 
@@ -70,7 +75,7 @@ export function HistorySessionList() {
           <h3 className="sticky top-0 z-10 text-xs font-semibold uppercase tracking-wider opacity-50 mb-2 px-1 py-1 backdrop-blur-sm">
             {group.date}
           </h3>
-          <ul className="list rounded-box border border-base-content/[0.06] bg-base-200/40">
+          <ul className="list rounded-box border border-surface-border bg-surface-card">
             {group.items.map((item) => (
               <SessionRow key={item.id} item={item} />
             ))}

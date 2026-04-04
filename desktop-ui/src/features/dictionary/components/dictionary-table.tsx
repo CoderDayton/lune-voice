@@ -18,7 +18,7 @@ export function DictionaryTable() {
   }
 
   return (
-    <div className="overflow-x-auto rounded-box border border-base-content/[0.06] bg-base-200/40">
+    <div className="overflow-x-auto rounded-box border border-surface-border bg-surface-card">
       <table className="table">
         <thead>
           <tr>

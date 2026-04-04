@@ -50,7 +50,7 @@ export function AppShell() {
     <div className="app-shell-root drawer lg:drawer-open fixed inset-0">
       <input ref={drawerRef} id={DRAWER_ID} type="checkbox" className="drawer-toggle" defaultChecked={typeof window !== "undefined" && window.innerWidth >= 1024} />
 
-      {/* Main content */}
+      {/* Main content — must come before drawer-side per DaisyUI spec */}
       <div className="drawer-content flex flex-col min-h-0">
         <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 sm:focus:top-4 sm:focus:left-4 focus:z-50 focus:btn focus:btn-primary focus:btn-sm">
           Skip to main content

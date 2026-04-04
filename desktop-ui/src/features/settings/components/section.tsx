@@ -20,7 +20,7 @@ interface SettingsRowProps {
 
 export function SettingsSection({ title, description, icon: Icon, children }: SettingsSectionProps) {
   return (
-    <section className="card border border-base-content/[0.06] bg-base-200/40 rounded-box">
+    <section className="card border border-surface-border bg-surface-card rounded-box">
       <div className="p-5 sm:p-6 pb-0 sm:pb-0">
         <div className="flex items-center gap-3">
           {Icon && (
@@ -41,7 +41,7 @@ export function SettingsSection({ title, description, icon: Icon, children }: Se
 
 export function SettingsRow({ label, description, control }: SettingsRowProps) {
   return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between py-3 border-b border-base-content/[0.05] last:border-b-0">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between py-3 border-b border-surface-border last:border-b-0">
       <div className="min-w-0">
         <div className="text-sm font-medium">{label}</div>
         {description ? <div className="text-xs opacity-45 mt-0.5 max-w-md">{description}</div> : null}

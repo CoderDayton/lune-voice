@@ -60,6 +60,7 @@
   --color-surface-nav-active: oklch(0.68 0.14 280 / 0.1);
   --color-surface-hover: oklch(1 0 0 / 0.03);
   --color-surface-border: oklch(0.93 0.008 265 / 0.06);
+  --color-surface-inset: oklch(0.16 0.012 270 / 0.4);
 
   /* Shadows — usable as shadow-soft, shadow-card, shadow-elevated, shadow-glow */
   --shadow-soft: 0 1px 3px oklch(0 0 0 / 0.12), 0 4px 12px oklch(0 0 0 / 0.08);
@@ -280,7 +281,7 @@
 /* ── Shell layout ──────────────────────────────────────────────────── */
 
 @utility app-shell-root {
-  @apply relative flex h-dvh overflow-hidden;
+  @apply relative h-dvh overflow-hidden;
 }
 
 @utility app-shell-backdrop {

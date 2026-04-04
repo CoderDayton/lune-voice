@@ -9,10 +9,10 @@ import { backendClient } from "../../lib/backend/client";
 export type PillMode = "idle" | "active" | "processing";
 type PillVis = PillVisibilityValue;
 
-const PILL_IDLE_W = 48;
-const PILL_IDLE_H = 48;
-const PILL_ACTIVE_W = 260;
-const PILL_ACTIVE_H = 56;
+// Fixed window size for all modes — avoids compositor ghost artifacts
+// on transparent Wayland windows during resize (wry #1667, tauri #14924).
+const PILL_W = 260;
+const PILL_H = 56;
 
 const READY_STATUSES = new Set(["ready", "listening", "processing"]);
 
@@ -127,16 +127,35 @@ export function usePillState() {
     }
   }, [visible]);
 
-  // Resize + reposition when mode changes (only while visible)
+  // Set fixed window size on first show and reposition
   useEffect(() => {
     if (!visible) return;
     const win = getCurrentWindow();
-    const w = mode === "idle" ? PILL_IDLE_W : PILL_ACTIVE_W;
-    const h = mode === "idle" ? PILL_IDLE_H : PILL_ACTIVE_H;
-    win.setSize(new LogicalSize(w, h)).then(
+    win.setSize(new LogicalSize(PILL_W, PILL_H)).then(
       () => invoke("reposition_pill_center").catch(() => {}),
       (e) => console.warn("[pill] setSize failed", e),
     );
+  }, [visible]);
+
+  // Hide pill briefly during mode transitions to let the webview render
+  // the new content before the compositor shows the window. Prevents
+  // ghost artifacts on transparent Wayland windows (wry #1667).
+  const prevModeRef = useRef(mode);
+  useEffect(() => {
+    if (!visible || !shownRef.current) {
+      prevModeRef.current = mode;
+      return;
+    }
+    const prev = prevModeRef.current;
+    prevModeRef.current = mode;
+    // Only hide/show when crossing idle↔active boundary
+    if ((prev === "idle") === (mode === "idle")) return;
+
+    invoke("hide_pill_window").catch(() => {});
+    const timer = setTimeout(() => {
+      invoke("show_pill_window").catch(() => {});
+    }, 60);
+    return () => clearTimeout(timer);
   }, [mode, visible]);
 
   return { mode, visible, recordingMode, audioLevel };

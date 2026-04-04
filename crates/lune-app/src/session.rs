@@ -202,7 +202,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let adaptive_vad_state = Arc::clone(&self.adaptive_vad_state);
         let vad_state_path = self.vad_state_path.clone();
 
-        tokio::task::spawn_local(run_session(
+        tokio::task::spawn(run_session(
             session_id,
             asr,
             router,

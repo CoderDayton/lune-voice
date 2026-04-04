@@ -1,0 +1,166 @@
+import { useEffect, useState } from "react";
+import { Clock, Hash, Mic, Palette, CircleCheck, CircleX, Copy, Check } from "lucide-react";
+import type { HistorySession } from "../../../store/workspace-store";
+import { useLingui } from "@lingui/react/macro";
+
+interface SessionDetailModalProps {
+  session: HistorySession;
+  children: (open: () => void) => React.ReactNode;
+}
+
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+export function SessionDetailModal({ session, children }: SessionDetailModalProps) {
+  const { t } = useLingui();
+  const [dialog, setDialog] = useState<HTMLDialogElement | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const startDate = new Date(session.startedAt);
+  const date = startDate.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+  const time = startDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const relative = relativeTime(session.startedAt);
+
+  const isCompleted = session.status === "Completed";
+  const isFailed = session.status.startsWith("Failed");
+
+  function handleCopy() {
+    if (!session.transcript) return;
+    navigator.clipboard.writeText(session.transcript).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
+  }
+
+  // Ctrl+C copies full transcript when modal is open and no text is selected
+  useEffect(() => {
+    if (!dialog) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "c" && (e.ctrlKey || e.metaKey) && !window.getSelection()?.toString()) {
+        e.preventDefault();
+        handleCopy();
+      }
+    }
+    dialog.addEventListener("keydown", onKeyDown);
+    return () => dialog.removeEventListener("keydown", onKeyDown);
+  });
+
+  return (
+    <>
+      {children(() => dialog?.showModal())}
+
+      <dialog
+        ref={(el) => {
+          setDialog(el);
+          return () => setDialog(null);
+        }}
+        className="modal backdrop-blur-sm"
+        aria-labelledby="session-detail-title"
+        aria-describedby="session-detail-transcript"
+      >
+        <div className="modal-box max-w-lg p-0 overflow-hidden border border-surface-border sm:max-w-xl">
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 pt-5 pb-3 sm:px-6 sm:pt-6">
+            <div>
+              <h3 id="session-detail-title" className="text-base font-semibold tracking-tight">
+                {date}
+              </h3>
+              <p className="text-xs text-base-content/40 mt-0.5 tabular-nums">{time} · {relative}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {session.transcript && (
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className="btn btn-ghost btn-sm btn-circle"
+                  aria-label={t`Copy transcript`}
+                >
+                  {copied
+                    ? <Check size={15} strokeWidth={2.5} className="text-success" />
+                    : <Copy size={15} strokeWidth={1.8} />}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Transcript */}
+          <div className="px-5 pb-4 sm:px-6">
+            {session.transcript ? (
+              <div className="rounded-lg border border-surface-border bg-surface-inset p-4">
+                <p id="session-detail-transcript" className="text-sm leading-relaxed text-base-content/90 whitespace-pre-wrap break-words sm:text-base">
+                  {session.transcript}
+                </p>
+              </div>
+            ) : (
+              <p id="session-detail-transcript" className="text-sm italic text-base-content/40">{t`No transcript`}</p>
+            )}
+          </div>
+
+          {/* Metadata grid */}
+          <div className="border-t border-surface-border bg-surface-inset px-5 py-4 sm:px-6">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <MetaItem icon={Hash} label={t`Words`} value={String(session.words)} />
+              <MetaItem icon={Clock} label={t`Duration`} value={formatDuration(session.seconds)} />
+              <MetaItem icon={Mic} label={t`Engine`} value={formatBackend(session.backend)} />
+              <MetaItem icon={Palette} label={t`Style`} value={session.style} />
+            </div>
+            <div className="mt-3 flex items-center gap-2 text-xs text-base-content/40">
+              {isCompleted ? (
+                <><CircleCheck size={13} strokeWidth={2} className="text-success/60" /> <span>{t`Completed`}</span></>
+              ) : isFailed ? (
+                <><CircleX size={13} strokeWidth={2} className="text-error/60" /> <span>{session.status}</span></>
+              ) : (
+                <span>{session.status}</span>
+              )}
+            </div>
+          </div>
+
+          {/* Close action */}
+          <div className="modal-action px-5 pb-4 pt-0 sm:px-6">
+            <form method="dialog">
+              <button type="submit" className="btn btn-ghost btn-sm text-base-content/50">{t`Close`}</button>
+            </form>
+          </div>
+        </div>
+        <form method="dialog" className="modal-backdrop"><button type="submit">close</button></form>
+      </dialog>
+    </>
+  );
+}
+
+function MetaItem({ icon: Icon, label, value }: { icon: typeof Clock; label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <Icon size={14} strokeWidth={1.6} className="text-base-content/30 shrink-0" />
+      <div className="min-w-0">
+        <p className="text-[0.65rem] uppercase tracking-wider text-base-content/35">{label}</p>
+        <p className="text-sm font-medium truncate">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function formatBackend(backend: string): string {
+  if (backend.includes("Parakeet")) return "Parakeet";
+  if (backend.includes("OrtQwen")) return "Balanced";
+  if (backend.includes("OpenAi")) return "Cloud";
+  return backend;
+}
