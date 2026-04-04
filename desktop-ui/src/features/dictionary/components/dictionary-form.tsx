@@ -1,4 +1,5 @@
 import { useActionState } from "react";
+import { Check } from "lucide-react";
 import { addDictionaryEntry } from "../../../store/workspace-store";
 import { Trans, useLingui } from "@lingui/react/macro";
 
@@ -6,9 +7,10 @@ interface FormState {
   phrase: string;
   replacement: string;
   error: string | null;
+  success: boolean;
 }
 
-const initialState: FormState = { phrase: "", replacement: "", error: null };
+const initialState: FormState = { phrase: "", replacement: "", error: null, success: false };
 
 export function DictionaryForm() {
   const { t } = useLingui();
@@ -18,8 +20,8 @@ export function DictionaryForm() {
       const phrase = (formData.get("phrase") as string) ?? "";
       const replacement = (formData.get("replacement") as string) ?? "";
       const added = await addDictionaryEntry(phrase, replacement);
-      if (added) return initialState;
-      return { phrase, replacement, error: "Failed to add entry" };
+      if (added) return { ...initialState, success: true };
+      return { phrase, replacement, error: "Failed to add entry. Please try again.", success: false };
     },
     initialState,
   );
@@ -36,7 +38,7 @@ export function DictionaryForm() {
               name="phrase"
               className="input w-full"
               defaultValue={state.phrase}
-              key={state === initialState ? "reset-phrase" : undefined}
+              key={state.success ? `reset-phrase-${Date.now()}` : undefined}
               placeholder={t`e.g. github…`}
               required
               aria-required="true"
@@ -50,16 +52,25 @@ export function DictionaryForm() {
               name="replacement"
               className="input w-full"
               defaultValue={state.replacement}
-              key={state === initialState ? "reset-replacement" : undefined}
+              key={state.success ? `reset-replacement-${Date.now()}` : undefined}
               placeholder={t`e.g. GitHub…`}
               required
               aria-required="true"
             />
           </label>
-          <button type="submit" className="btn btn-primary" disabled={isPending}>
-            {isPending ? <span className="loading loading-spinner loading-sm" /> : <Trans>Add</Trans>}
+          <button type="submit" className="btn btn-primary w-full sm:w-auto" disabled={isPending}>
+            {isPending ? (
+              <span className="loading loading-spinner loading-sm" />
+            ) : state.success ? (
+              <><Check size={16} strokeWidth={2.5} /> <Trans>Added</Trans></>
+            ) : (
+              <Trans>Add</Trans>
+            )}
           </button>
         </fieldset>
+        {state.error && (
+          <p role="alert" className="mt-3 text-sm text-error">{state.error}</p>
+        )}
       </section>
     </form>
   );

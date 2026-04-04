@@ -17,7 +17,6 @@ export function OverviewPage() {
   const dictationMode = useStore(workspaceStore, (s) => s.settings.dictationMode);
   const sessions = useStore(workspaceStore, (s) => s.historySessions);
 
-  const liveTranscript = useStore(workspaceStore, (s) => s.runtime.liveTranscript);
   const isActive = serviceStatus === "listening" || serviceStatus === "processing";
   const isConnected =
     serviceStatus === "ready" ||
@@ -81,28 +80,12 @@ export function OverviewPage() {
         </div>
       </section>
 
-      {isActive && (
-        <div className="card border border-primary/15 bg-primary/5" role="region" aria-live="polite" aria-label={t`Live dictation`}>
-          <div className="card-body p-4 sm:p-5">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="loading loading-dots loading-xs text-primary" aria-hidden="true" />
-              <span className="text-xs font-semibold uppercase tracking-wider text-primary/70 select-none">
-                {serviceStatus === "processing" ? t`Processing` : t`Listening`}
-              </span>
-            </div>
-            <p className="min-h-[2rem] text-sm leading-relaxed sm:text-base">
-              {liveTranscript || <span className="italic opacity-30">{t`Waiting for speech…`}</span>}
-            </p>
-          </div>
-        </div>
-      )}
-
       <section className="card border border-base-content/[0.06] bg-base-200/40">
         <div className="card-body p-0">
           <div className="flex items-center justify-between px-5 pb-3 pt-5">
             <div>
               <h2 className="section-label">{t`Recent`}</h2>
-              <p className="mt-1 text-sm text-base-content/50">{t`Recent activity`}</p>
+              <p className="mt-1 text-sm text-base-content/50">{stats.count} {stats.count === 1 ? t`session` : t`sessions`}</p>
             </div>
           {stats.count > 5 && (
               <Link to="/history" className="btn btn-ghost btn-sm normal-case">{t`View all`}</Link>
@@ -121,7 +104,7 @@ export function OverviewPage() {
           ) : recentSessions.length === 0 && isActive ? null : (
             <div className="divide-y divide-base-content/[0.06]">
               {recentSessions.map((session) => (
-                <article key={session.id} className="px-5 py-4">
+                <Link key={session.id} to="/history" className="block px-5 py-4 transition-colors hover:bg-surface-hover">
                   <div className="pt-1 text-xs tabular-nums text-base-content/40">{session.time}</div>
                   <div className="min-w-0">
                     <p className="text-sm leading-6 break-words text-base-content/92">
@@ -132,7 +115,7 @@ export function OverviewPage() {
                       <span>{session.seconds}{t`s`}</span>
                     </div>
                   </div>
-                </article>
+                </Link>
               ))}
             </div>
           )}

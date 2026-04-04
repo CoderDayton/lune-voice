@@ -34,6 +34,8 @@ const SessionRow = memo(function SessionRow({ item }: SessionRowProps) {
 export function HistorySessionList() {
   const { t } = useLingui();
   const visibleSessions = useStore(workspaceStore, getVisibleHistorySessions);
+  const allSessions = useStore(workspaceStore, (s) => s.historySessions);
+  const searchQuery = useStore(workspaceStore, (s) => s.historySearch);
 
   const groups = useMemo(() => {
     const map = new Map<string, typeof visibleSessions>();
@@ -47,9 +49,16 @@ export function HistorySessionList() {
   }, [visibleSessions]);
 
   if (groups.length === 0) {
+    const hasSearch = searchQuery.trim().length > 0;
     return (
       <div className="alert">
-        <span>{t`No sessions found. Start dictating to see your transcripts here.`}</span>
+        <span>
+          {hasSearch
+            ? t`No sessions match "${searchQuery.trim()}". Try a different search.`
+            : allSessions.length === 0
+              ? t`No sessions yet. Start dictating to see your transcripts here.`
+              : t`No sessions found.`}
+        </span>
       </div>
     );
   }

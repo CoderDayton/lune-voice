@@ -1,6 +1,5 @@
 import { useEffect, useEffectEvent, useRef } from "react";
-import { Outlet } from "@tanstack/react-router";
-import { useRouterState } from "@tanstack/react-router";
+import { Outlet, useRouterState } from "@tanstack/react-router";
 import { Menu } from "lucide-react";
 import { SidebarContent } from "./sidebar";
 import { ErrorToast } from "../../../components/feedback";

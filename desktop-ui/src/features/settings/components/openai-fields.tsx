@@ -37,6 +37,7 @@ export function OpenAiFields({ settings, baseUrlKey, apiKeyKey, modelKey, apiDes
         control={
           <input
             type="password"
+            autoComplete="off"
             className="input w-full sm:w-auto sm:min-w-64"
             value={settings[apiKeyKey] as string}
             onChange={(event) => void saveWorkspaceSetting(apiKeyKey, event.target.value)}

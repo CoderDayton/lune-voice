@@ -132,6 +132,8 @@ export function KeyCaptureInput({
         onClick={handleClick}
         disabled={disabled}
         aria-label={listening ? "Press keys to set hotkey" : `Current binding: ${value}. Click to change.`}
+        aria-invalid={validationError ? "true" : undefined}
+        aria-describedby={validationError ? "key-capture-error" : undefined}
         className={cn(
           "btn btn-outline btn-sm font-mono font-semibold select-none",
           "min-w-28 sm:min-w-36 justify-center",
@@ -158,7 +160,7 @@ export function KeyCaptureInput({
       )}
 
       {validationError && (
-        <p className="text-xs text-error max-w-52 sm:max-w-64 text-right">
+        <p id="key-capture-error" className="text-xs text-error max-w-52 sm:max-w-64 text-right">
           {validationError}
         </p>
       )}

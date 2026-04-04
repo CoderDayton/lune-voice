@@ -26,6 +26,7 @@ export function ConfirmDialog({
       <button
         type="button"
         className="btn btn-ghost btn-sm"
+        aria-haspopup="dialog"
         onClick={() => dialog?.showModal()}
       >
         {triggerLabel ?? t`Remove`}
@@ -37,9 +38,10 @@ export function ConfirmDialog({
           return () => setDialog(null);
         }}
         className="modal"
+        aria-labelledby="confirm-dialog-title"
       >
         <div className="modal-box">
-          <h3 className="text-lg font-bold">{title}</h3>
+          <h3 id="confirm-dialog-title" className="text-lg font-bold">{title}</h3>
           <p className="py-4 text-sm opacity-70">{description}</p>
           <div className="modal-action">
             <form method="dialog">
