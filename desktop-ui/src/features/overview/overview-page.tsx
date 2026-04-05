@@ -46,7 +46,7 @@ export function OverviewPage() {
           </div>
 
           {stats.count > 0 ? (
-            <div className="stats stats-vertical w-full overflow-hidden rounded-xl border border-surface-border bg-surface-card sm:stats-horizontal">
+            <div className="stats stats-vertical w-full overflow-hidden rounded-box border border-surface-border bg-surface-card sm:stats-horizontal">
               <div className="stat">
                 <div className="stat-figure text-primary/30"><Hash size={22} strokeWidth={1.5} /></div>
                 <div className="stat-title">{t`Words`}</div>
@@ -64,7 +64,7 @@ export function OverviewPage() {
               </div>
             </div>
           ) : (
-            <div className="rounded-xl border border-dashed border-surface-border bg-surface-inset px-5 py-6 text-sm text-content-muted">
+            <div className="rounded-box border border-dashed border-surface-border bg-surface-inset px-5 py-6 text-sm text-content-muted">
               {t`Your session summary will appear here once you start dictating.`}
             </div>
           )}

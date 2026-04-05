@@ -16,7 +16,7 @@ function ThemeSwatch({ theme, active, onSelect }: { theme: string; active: boole
       type="button"
       data-theme={theme}
       onClick={onSelect}
-      className={`group relative flex flex-col gap-1.5 rounded-lg border-2 p-2 sm:p-3 transition-all text-left ${
+      className={`group relative flex flex-col gap-1.5 rounded-field border-2 p-2 sm:p-3 transition-all text-left ${
         active
           ? "border-primary ring-2 ring-primary/20"
           : "border-base-300/50 hover:border-base-content/20"
@@ -35,7 +35,7 @@ function ThemeSwatch({ theme, active, onSelect }: { theme: string; active: boole
         {SWATCH_COLORS.map((color) => (
           <div
             key={color}
-            className="size-4 sm:size-5 rounded-md"
+            className="size-4 sm:size-5 rounded-selector"
             style={{ backgroundColor: `var(--color-${color})` }}
           />
         ))}
@@ -91,7 +91,7 @@ export function ThemePicker() {
                 <button
                   type="button"
                   onClick={() => handleSelect("system")}
-                  className={`flex flex-col gap-1.5 rounded-lg border-2 p-2 sm:p-3 transition-all text-left ${
+                  className={`flex flex-col gap-1.5 rounded-field border-2 p-2 sm:p-3 transition-all text-left ${
                     current === "system"
                       ? "border-primary ring-2 ring-primary/20"
                       : "border-base-300/50 hover:border-base-content/20"
@@ -104,10 +104,10 @@ export function ThemePicker() {
                   )}
                   <span className="text-xs font-medium">{t`System`}</span>
                   <div className="flex gap-1">
-                    <div className="size-4 sm:size-5 rounded-md bg-base-300/50 border border-base-300" />
-                    <div className="size-4 sm:size-5 rounded-md bg-base-300/50 border border-base-300" />
-                    <div className="size-4 sm:size-5 rounded-md bg-base-300/50 border border-base-300" />
-                    <div className="size-4 sm:size-5 rounded-md bg-base-300/50 border border-base-300" />
+                    <div className="size-4 sm:size-5 rounded-selector bg-base-300/50 border border-base-300" />
+                    <div className="size-4 sm:size-5 rounded-selector bg-base-300/50 border border-base-300" />
+                    <div className="size-4 sm:size-5 rounded-selector bg-base-300/50 border border-base-300" />
+                    <div className="size-4 sm:size-5 rounded-selector bg-base-300/50 border border-base-300" />
                   </div>
                 </button>
               </div>

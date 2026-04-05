@@ -127,7 +127,7 @@ export function ModelSetup({ children }: { children: React.ReactNode }) {
             return (
               <div key={model.localName} className="card card-border bg-base-200 card-sm">
                 <div className="card-body flex-row items-center gap-2 sm:gap-3">
-                  <div className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${model.ready ? "bg-success/10" : isActive ? "bg-primary/10" : "bg-base-300"}`}>
+                  <div className={`flex size-10 shrink-0 items-center justify-center rounded-field ${model.ready ? "bg-success/10" : isActive ? "bg-primary/10" : "bg-base-300"}`}>
                     {model.ready ? (
                       <Check size={18} strokeWidth={2.5} className="text-success" />
                     ) : isActive ? (

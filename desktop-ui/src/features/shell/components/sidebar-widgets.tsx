@@ -14,7 +14,7 @@ export function SidebarQuickStart() {
       <button
         type="button"
         onClick={() => { import("@tauri-apps/api/core").then(m => m.invoke("toggle_dictation")).catch(() => {}); }}
-        className={`group flex w-full items-center gap-3 rounded-xl border px-3.5 py-3 transition-all sm:gap-3.5 sm:px-4 sm:py-3.5 ${
+        className={`group flex w-full items-center gap-3 rounded-field border px-3.5 py-3 transition-all sm:gap-3.5 sm:px-4 sm:py-3.5 ${
           isActive
             ? "border-error/30 bg-error/[0.08] hover:bg-error/[0.12] hover:border-error/40"
             : "border-primary/15 bg-primary/[0.06] hover:bg-primary/[0.1] hover:border-primary/25"
@@ -63,7 +63,7 @@ export function SidebarTodayStats() {
   };
 
   return (
-    <div className="mx-3.5 mb-3 rounded-xl border border-surface-border bg-surface-hover px-4 py-3">
+    <div className="mx-3.5 mb-3 rounded-box border border-surface-border bg-surface-hover px-4 py-3">
       <p className="text-xs font-medium uppercase tracking-widest text-content-dim">{t`Today`}</p>
       <p className="mt-1 text-sm text-content-muted tabular-nums">
         {todayStats.count} {todayStats.count === 1 ? t`session` : t`sessions`}
