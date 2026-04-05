@@ -1,32 +1,32 @@
 import { useEffect, useState } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { SettingsRow, SettingsSection } from "../components/section";
+import { ThemePicker } from "../components/theme-picker";
 import { useLingui } from "@lingui/react/macro";
 import {
-  type ThemePreference,
   getThemePreference,
+  isDarkTheme,
   setThemePreference,
+  themeLabel,
   watchSystemTheme,
 } from "../../../lib/theme";
 
-const themeOptions: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
-  { value: "dark", label: "Dark", icon: Moon },
-  { value: "light", label: "Light", icon: Sun },
-  { value: "system", label: "System", icon: Monitor },
-];
-
 export function AppearanceSection() {
   const { t } = useLingui();
-  const [theme, setTheme] = useState<ThemePreference>(getThemePreference);
+  const [theme, setTheme] = useState(getThemePreference);
 
   useEffect(() => {
     return watchSystemTheme(() => setTheme(getThemePreference()));
   }, []);
 
-  function handleChange(value: string) {
-    const pref = value as ThemePreference;
-    setThemePreference(pref);
-    setTheme(pref);
+  const currentLabel = theme === "system" ? t`System` : themeLabel(theme);
+  const CurrentIcon = theme === "system" ? Monitor : isDarkTheme(theme) ? Moon : Sun;
+
+  // Quick toggle: lune dark ↔ lune light
+  function toggleQuick() {
+    const next = isDarkTheme(theme) || theme === "system" ? "lune-light" : "lune";
+    setThemePreference(next);
+    setTheme(next);
   }
 
   return (
@@ -37,22 +37,18 @@ export function AppearanceSection() {
     >
       <SettingsRow
         label={t`Theme`}
-        description={t`Dark and light modes. System follows your OS preference.`}
+        description={currentLabel}
         control={
-          <div className="join join-vertical sm:join-horizontal">
-            {themeOptions.map(({ value, label, icon: Icon }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => handleChange(value)}
-                className={`join-item btn btn-sm gap-1.5 ${
-                  theme === value ? "btn-active btn-primary" : "btn-ghost"
-                }`}
-              >
-                <Icon size={14} strokeWidth={theme === value ? 2 : 1.5} />
-                {label}
-              </button>
-            ))}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <button
+              type="button"
+              onClick={toggleQuick}
+              className="btn btn-sm btn-ghost btn-circle"
+              aria-label={t`Toggle dark/light`}
+            >
+              <CurrentIcon size={16} strokeWidth={1.8} />
+            </button>
+            <ThemePicker />
           </div>
         }
       />
