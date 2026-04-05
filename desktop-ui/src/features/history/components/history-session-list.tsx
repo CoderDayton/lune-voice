@@ -1,4 +1,4 @@
-import { memo, useMemo } from "react";
+import { memo } from "react";
 import { useStore } from "@tanstack/react-store";
 import { useLingui } from "@lingui/react/macro";
 import {
@@ -42,16 +42,14 @@ export function HistorySessionList() {
   const allSessions = useStore(workspaceStore, (s) => s.historySessions);
   const searchQuery = useStore(workspaceStore, (s) => s.historySearch);
 
-  const groups = useMemo(() => {
-    const map = new Map<string, typeof visibleSessions>();
-    for (const session of visibleSessions) {
-      const label = formatGroupLabel(session.startedAt);
-      const items = map.get(label);
-      if (items) items.push(session);
-      else map.set(label, [session]);
-    }
-    return Array.from(map.entries()).map(([date, items]) => ({ date, items }));
-  }, [visibleSessions]);
+  const groupMap = new Map<string, typeof visibleSessions>();
+  for (const session of visibleSessions) {
+    const label = formatGroupLabel(session.startedAt);
+    const items = groupMap.get(label);
+    if (items) items.push(session);
+    else groupMap.set(label, [session]);
+  }
+  const groups = Array.from(groupMap.entries()).map(([date, items]) => ({ date, items }));
 
   if (groups.length === 0) {
     const hasSearch = searchQuery.trim().length > 0;

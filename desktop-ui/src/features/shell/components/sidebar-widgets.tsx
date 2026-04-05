@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+
 import { useStore } from "@tanstack/react-store";
 import { Mic, Square } from "lucide-react";
 import { workspaceStore } from "../../../store/workspace-store";
@@ -55,14 +55,12 @@ export function SidebarTodayStats() {
   const { t } = useLingui();
   const sessions = useStore(workspaceStore, (s) => s.historySessions);
 
-  const todayStats = useMemo(() => {
-    const today = new Date().toDateString();
-    const todaySessions = sessions.filter((s) => new Date(s.startedAt).toDateString() === today);
-    return {
-      count: todaySessions.length,
-      words: todaySessions.reduce((sum, s) => sum + s.words, 0),
-    };
-  }, [sessions]);
+  const today = new Date().toDateString();
+  const todaySessions = sessions.filter((s) => new Date(s.startedAt).toDateString() === today);
+  const todayStats = {
+    count: todaySessions.length,
+    words: todaySessions.reduce((sum, s) => sum + s.words, 0),
+  };
 
   return (
     <div className="mx-3.5 mb-3 rounded-xl border border-surface-border bg-surface-hover px-4 py-3">

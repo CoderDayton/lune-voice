@@ -41,7 +41,7 @@ export function SettingsSection({ title, description, icon: Icon, children }: Se
 
 export function SettingsRow({ label, description, control }: SettingsRowProps) {
   return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between py-3 border-b border-surface-border last:border-b-0">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between py-3 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-surface-border">
       <div className="min-w-0">
         <div className="text-sm font-medium">{label}</div>
         {description ? <div className="text-xs text-content-subtle mt-0.5 max-w-md">{description}</div> : null}

@@ -39,16 +39,14 @@ export function AppearanceSection() {
         label={t`Theme`}
         description={t`Dark and light modes. System follows your OS preference.`}
         control={
-          <div className="flex gap-1 rounded-xl border border-surface-border bg-surface-inset p-1">
+          <div className="join join-vertical sm:join-horizontal">
             {themeOptions.map(({ value, label, icon: Icon }) => (
               <button
                 key={value}
                 type="button"
                 onClick={() => handleChange(value)}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-                  theme === value
-                    ? "bg-surface-elevated text-content-strong shadow-sm"
-                    : "text-content-subtle hover:text-content-muted"
+                className={`join-item btn btn-sm gap-1.5 ${
+                  theme === value ? "btn-active btn-primary" : "btn-ghost"
                 }`}
               >
                 <Icon size={14} strokeWidth={theme === value ? 2 : 1.5} />

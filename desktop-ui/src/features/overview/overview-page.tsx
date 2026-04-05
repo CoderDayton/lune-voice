@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { useStore } from "@tanstack/react-store";
 import { Link } from "@tanstack/react-router";
 import { SessionDetailModal } from "../history/components/session-detail-modal";
@@ -27,13 +26,11 @@ export function OverviewPage() {
     serviceStatus === "processing";
   const isLoading = serviceStatus === "Connecting" || loading;
 
-  const stats = useMemo(() => {
-    const totalWords = sessions.reduce((sum, s) => sum + s.words, 0);
-    const totalSeconds = sessions.reduce((sum, s) => sum + s.seconds, 0);
-    return { totalWords, totalMinutes: Math.round(totalSeconds / 60), count: sessions.length };
-  }, [sessions]);
+  const totalWords = sessions.reduce((sum, s) => sum + s.words, 0);
+  const totalSeconds = sessions.reduce((sum, s) => sum + s.seconds, 0);
+  const stats = { totalWords, totalMinutes: Math.round(totalSeconds / 60), count: sessions.length };
 
-  const recentSessions = useMemo(() => sessions.slice(0, 5), [sessions]);
+  const recentSessions = sessions.slice(0, 5);
 
   return (
     <ModelSetup>
