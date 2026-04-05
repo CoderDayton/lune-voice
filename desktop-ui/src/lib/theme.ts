@@ -24,14 +24,15 @@ export function applyTheme(pref: ThemePreference) {
   document.documentElement.setAttribute("data-theme", resolved === "light" ? LIGHT_THEME : DARK_THEME);
 }
 
-/** Detect OS color scheme preference. */
+/** Detect OS color scheme preference. Defaults to dark if OS doesn't report. */
 function getSystemTheme(): "dark" | "light" {
-  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  if (window.matchMedia("(prefers-color-scheme: light)").matches) return "light";
+  return "dark"; // default to dark — matches app's default theme
 }
 
 /** Listen for OS theme changes when preference is "system". */
 export function watchSystemTheme(onUpdate: () => void): () => void {
-  const mq = window.matchMedia("(prefers-color-scheme: light)");
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
   const handler = () => {
     if (getThemePreference() === "system") {
       applyTheme("system");

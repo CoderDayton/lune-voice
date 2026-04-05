@@ -97,18 +97,18 @@
 
 /* Light theme */
 [data-theme="lune-light"] {
-  --content-strong: oklch(0.15 0.012 265);
-  --content-default: oklch(0.15 0.012 265 / 0.85);
-  --content-muted: oklch(0.15 0.012 265 / 0.55);
-  --content-subtle: oklch(0.15 0.012 265 / 0.40);
-  --content-dim: oklch(0.15 0.012 265 / 0.25);
-  --surface-card: oklch(1 0 0 / 0.6);
-  --surface-elevated: oklch(1 0 0 / 0.8);
-  --surface-glass: oklch(0.98 0.005 265 / 0.92);
-  --surface-nav-active: oklch(0.55 0.18 280 / 0.08);
-  --surface-hover: oklch(0 0 0 / 0.03);
-  --surface-border: oklch(0.15 0.012 265 / 0.08);
-  --surface-inset: oklch(0.95 0.006 265 / 0.5);
+  --content-strong: oklch(0.18 0.015 265);
+  --content-default: oklch(0.25 0.012 265);
+  --content-muted: oklch(0.40 0.010 265);
+  --content-subtle: oklch(0.55 0.008 265);
+  --content-dim: oklch(0.70 0.006 265);
+  --surface-card: oklch(1 0 0 / 0.85);
+  --surface-elevated: oklch(1 0 0 / 0.95);
+  --surface-glass: oklch(0.99 0.003 265 / 0.95);
+  --surface-nav-active: oklch(0.55 0.18 280 / 0.10);
+  --surface-hover: oklch(0 0 0 / 0.04);
+  --surface-border: oklch(0.20 0.010 265 / 0.12);
+  --surface-inset: oklch(0.94 0.005 265 / 0.8);
 }
 
 /* ── Design tokens (Tailwind v4 @theme) ────────────────────────────── */
@@ -184,6 +184,14 @@
     linear-gradient(135deg, oklch(0.72 0.1 230), oklch(0.68 0.14 280));
 }
 
+[data-theme="lune-light"] {
+  --surface-body:
+    linear-gradient(170deg, oklch(0.96 0.004 265), oklch(0.93 0.006 268));
+  --surface-backdrop:
+    radial-gradient(ellipse at 15% 5%, oklch(0.55 0.18 280 / 0.04), transparent 50%),
+    radial-gradient(ellipse at 85% 90%, oklch(0.55 0.14 230 / 0.03), transparent 50%);
+}
+
 /* ── Base ──────────────────────────────────────────────────────────── */
 
 @layer base {
@@ -244,12 +252,12 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: oklch(1 0 0 / 0.08);
+    background: oklch(0.5 0 0 / 0.15);
     border-radius: 999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: oklch(1 0 0 / 0.15);
+    background: oklch(0.5 0 0 / 0.25);
   }
 
   /* Card elevation + hover glow */
@@ -304,7 +312,7 @@
   }
 
   .stats .stat:hover {
-    background: oklch(1 0 0 / 0.02);
+    background: var(--surface-hover);
   }
 
   /* Softer list rows */
@@ -313,12 +321,12 @@
   }
 
   .list-row:hover {
-    background: oklch(1 0 0 / 0.03);
+    background: var(--surface-hover);
   }
 
   /* Warm table hover */
   .table tr.hover:hover td {
-    background: oklch(1 0 0 / 0.03);
+    background: var(--surface-hover);
   }
 }
 
@@ -427,9 +435,9 @@
   @apply rounded-lg;
   background: linear-gradient(
     90deg,
-    oklch(1 0 0 / 0.03) 0%,
-    oklch(1 0 0 / 0.06) 40%,
-    oklch(1 0 0 / 0.03) 80%
+    var(--surface-hover) 0%,
+    var(--surface-border) 40%,
+    var(--surface-hover) 80%
   );
   background-size: 200% 100%;
   animation: shimmer 1.8s ease-in-out infinite;

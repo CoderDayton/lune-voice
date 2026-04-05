@@ -716,10 +716,19 @@ async fn run_session<A: AsrBackend + 'static>(
         if let Some(error) = first_asr_error.take().filter(|_| !saw_asr_success) {
             status = SessionStatus::Failed(error.clone());
             let _ = event_tx.send(SessionEvent::Error(error)).await;
+            finalize_db(session_id, &persist, status, Some(Utc::now()), None).await;
         } else {
-            info!(%session_id, "ASR produced no segments");
+            // No speech detected — treat as cancelled (don't pollute history)
+            info!(%session_id, "no speech detected, discarding empty session");
+            finalize_db(
+                session_id,
+                &persist,
+                SessionStatus::Cancelled,
+                Some(Utc::now()),
+                None,
+            )
+            .await;
         }
-        finalize_db(session_id, &persist, status, Some(Utc::now()), None).await;
         let _ = event_tx.send(SessionEvent::Stopped).await;
         clear_active(&active_arc, &idle_notify).await;
         return;
