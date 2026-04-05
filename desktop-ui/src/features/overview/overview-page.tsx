@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useStore } from "@tanstack/react-store";
 import { Link } from "@tanstack/react-router";
 import { SessionDetailModal } from "../history/components/session-detail-modal";
+import { ModelSetup } from "./components/model-setup";
 import { useLingui } from "@lingui/react/macro";
 import { Clock, Hash, MessageSquareText, Mic } from "lucide-react";
 import { StatusBadge, InfoBadge } from "../../components/ui/status-badge";
@@ -35,6 +36,7 @@ export function OverviewPage() {
   const recentSessions = useMemo(() => sessions.slice(0, 5), [sessions]);
 
   return (
+    <ModelSetup>
     <div className="page-stack">
       <section className="card border border-surface-border bg-surface-card">
         <div className="card-body gap-5">
@@ -121,5 +123,6 @@ export function OverviewPage() {
         </div>
       </section>
     </div>
+    </ModelSetup>
   );
 }
