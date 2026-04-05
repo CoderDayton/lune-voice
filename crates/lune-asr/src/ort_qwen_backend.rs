@@ -684,6 +684,10 @@ impl AsrBackend for OrtQwenAsrBackend {
     fn segment_capacity_hint(&self) -> usize {
         1
     }
+
+    fn supports_streaming(&self) -> bool {
+        true
+    }
 }
 
 impl OrtQwenAsrBackend {

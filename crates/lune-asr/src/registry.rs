@@ -115,6 +115,15 @@ impl AsrBackend for AsrRegistry {
     async fn reset_context(&self, session: &Self::SessionHandle) -> Result<()> {
         dispatch_ref!(self, session, reset_context)
     }
+
+    fn supports_streaming(&self) -> bool {
+        match self {
+            Self::Parakeet(_) => false,
+            #[cfg(feature = "ort-qwen")]
+            Self::OrtQwen(_) => true,
+            Self::OpenAi(_) => false,
+        }
+    }
 }
 
 // ── Constructor ─────────────────────────────────────────────────────────────

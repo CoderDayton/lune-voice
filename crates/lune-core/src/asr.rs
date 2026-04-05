@@ -273,6 +273,17 @@ pub trait AsrBackend: Send + Sync {
     fn segment_capacity_hint(&self) -> usize {
         4
     }
+
+    /// Whether this backend supports streaming (partial results during audio
+    /// push). When true, `poll_results` returns incremental text. When false,
+    /// all transcription happens in `poll_final` (batch mode).
+    ///
+    /// The session loop uses this to decide whether to deliver text
+    /// progressively or wait for the final batch result.
+    #[inline]
+    fn supports_streaming(&self) -> bool {
+        false
+    }
 }
 
 #[cfg(test)]

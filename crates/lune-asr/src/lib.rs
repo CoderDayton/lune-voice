@@ -1,3 +1,4 @@
+pub mod confidence;
 mod lcs_merge;
 pub mod mel;
 mod openai_backend;
