@@ -1,5 +1,6 @@
 import { useStore } from "@tanstack/react-store";
 import { workspaceStore } from "../../store/workspace-store";
+import { AppearanceSection } from "./sections/appearance-section";
 import { InputSection } from "./sections/input-section";
 import { TranscriptionSection } from "./sections/transcription-section";
 import { CleanupSection } from "./sections/cleanup-section";
@@ -11,6 +12,7 @@ export function SettingsPage() {
 
   return (
     <div className="page-stack">
+      <AppearanceSection />
       <InputSection settings={settings} />
       <TranscriptionSection settings={settings} />
       <CleanupSection settings={settings} />

@@ -9,7 +9,11 @@ import { routeTree } from "./routeTree.gen";
 import { backendClient } from "./lib/backend/client";
 import { workspaceActions } from "./store/workspace-store";
 import { ErrorBoundary } from "./components/feedback";
+import { applyTheme, getThemePreference } from "./lib/theme";
 import "./app.css";
+
+// Apply saved theme before first paint to avoid flash
+applyTheme(getThemePreference());
 
 const queryClient = new QueryClient();
 const router = createRouter({
