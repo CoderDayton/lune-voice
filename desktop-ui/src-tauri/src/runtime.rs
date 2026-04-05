@@ -272,6 +272,7 @@ impl AppRuntime {
 
         tauri::async_runtime::spawn(async move {
             let mut saw_error = false;
+            let mut saw_text = false;
             while let Some(event) = event_rx.recv().await {
                 match event {
                     SessionEvent::Started => {
@@ -289,7 +290,7 @@ impl AppRuntime {
                             .await;
                     }
                     SessionEvent::FinalizedText(text) => {
-                        // Deliver text to the focused application before notifying the UI.
+                        saw_text = true;
                         let mode = runtime.inner.settings.read().await.dictation_mode;
                         runtime.inner.delivery.deliver(&text, mode);
                         runtime
@@ -341,7 +342,9 @@ impl AppRuntime {
                         runtime
                             .push_session_event(SessionStreamEvent::SessionStopped)
                             .await;
-                        if let Err(e) = app.emit("lune://history-changed", ()) {
+                        // Only reload history if the session produced text —
+                        // empty/cancelled sessions shouldn't trigger UI churn
+                        if saw_text && let Err(e) = app.emit("lune://history-changed", ()) {
                             warn!(error = %e, "failed to emit history-changed event");
                         }
                     }
