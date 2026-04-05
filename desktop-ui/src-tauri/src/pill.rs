@@ -70,12 +70,10 @@ where
     let (tx, rx) = tokio::sync::oneshot::channel();
 
     app.run_on_main_thread(move || {
-        let result = (|| {
-            let pill = app_for_task
-                .get_webview_window("pill")
-                .ok_or_else(|| "pill window not found".to_string())?;
-            task(pill)
-        })();
+        let result = match app_for_task.get_webview_window("pill") {
+            Some(pill) => task(pill),
+            None => Ok(()), // Pill window not created — silently skip
+        };
 
         let _ = tx.send(result);
     })

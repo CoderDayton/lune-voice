@@ -11,8 +11,8 @@ export function TranscriptionSection({ settings }: SettingsProps) {
   return (
     <SettingsSection title="Recognition" description={t`Control how your speech is turned into text.`} icon={AudioWaveform}>
       <SettingsRow
-        label={t`Voice mode`}
-        description={t`Balanced works well for most people. Compact uses less memory.`}
+        label={t`Voice model`}
+        description={t`Qwen3 is more accurate. Parakeet is faster and uses less memory.`}
         control={
           <select
             className="select w-full sm:w-auto sm:min-w-64"

@@ -4,7 +4,7 @@ use lune_core::config::{DictationMode, TerminalMode};
 use tracing::{debug, info, warn};
 
 #[cfg(unix)]
-use crate::uinput_typer::{self, UinputTyper};
+use crate::uinput_typer::UinputTyper;
 
 /// Message sent to the persistent delivery thread.
 struct DeliveryMsg {
@@ -73,9 +73,8 @@ fn delivery_thread(rx: mpsc::Receiver<DeliveryMsg>, terminal_mode: TerminalMode)
     while let Ok(msg) = rx.recv() {
         let text: &str = &msg.text;
         match msg.mode {
-            DictationMode::TypeInPlace => driver.type_text(text),
-            DictationMode::Clipboard => driver.clipboard_only(text),
-            DictationMode::Both => driver.type_text(text),
+            DictationMode::Clipboard | DictationMode::Both => driver.type_text(text),
+            DictationMode::TypeInPlace => driver.type_keys(text),
             _ => driver.type_text(text),
         }
     }
@@ -107,10 +106,8 @@ impl PlatformDriver {
         self.typer.type_str(text);
     }
 
-    fn clipboard_only(&mut self, text: &str) {
-        if let Err(e) = uinput_typer::set_clipboard(text) {
-            warn!(error = %e, "clipboard-only delivery failed");
-        }
+    fn type_keys(&mut self, text: &str) {
+        self.typer.type_str_keys(text);
     }
 }
 
@@ -152,12 +149,6 @@ impl PlatformDriver {
         std::thread::sleep(std::time::Duration::from_millis(30));
 
         self.emit_paste();
-    }
-
-    fn clipboard_only(&mut self, text: &str) {
-        if let Err(e) = self.clipboard.set_text(text) {
-            warn!(error = %e, "clipboard set failed");
-        }
     }
 
     fn emit_paste(&mut self) {

@@ -21,8 +21,8 @@ export const pillVisibilityOptions: Option<PillVisibilityValue>[] = [
 ];
 
 export const asrBackends: Option<AsrBackendValue>[] = [
-  { value: "OrtQwenAsr", label: "Balanced (recommended)" },
-  { value: "ParakeetTdt", label: "Fast and light" },
+  { value: "OrtQwenAsr", label: "Qwen3 ASR 0.6B (recommended)" },
+  { value: "ParakeetTdt", label: "Parakeet TDT 0.6B (fast)" },
   { value: "OpenAiCompatible", label: "Cloud API (OpenAI-compatible)" },
 ];
 
