@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { Download, Check, Loader2, AlertCircle } from "lucide-react";
+import { Download, Check, CircleAlert, Cpu, Sparkles } from "lucide-react";
 import { useLingui } from "@lingui/react/macro";
 import { isTauriRuntime } from "../../../lib/backend/runtime";
 
@@ -20,78 +20,44 @@ interface DownloadProgress {
   done: boolean;
 }
 
-type SetupPhase = "checking" | "ready" | "needs_models" | "downloading" | "error";
+type Phase = "checking" | "ready" | "setup" | "downloading" | "error";
 
 export function ModelSetup({ children }: { children: React.ReactNode }) {
   const { t } = useLingui();
-  const [phase, setPhase] = useState<SetupPhase>("checking");
+  const [phase, setPhase] = useState<Phase>("checking");
   const [models, setModels] = useState<ModelStatus[]>([]);
   const [progress, setProgress] = useState<DownloadProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [downloadingModel, setDownloadingModel] = useState<string | null>(null);
+  const [activeModel, setActiveModel] = useState<string | null>(null);
 
-  // Check model status on mount
   useEffect(() => {
-    if (!isTauriRuntime()) {
-      setPhase("ready");
-      return;
-    }
-
+    if (!isTauriRuntime()) { setPhase("ready"); return; }
     invoke<ModelStatus[]>("check_model_status")
-      .then((statuses) => {
-        setModels(statuses);
-        const allReady = statuses.every((m) => m.ready);
-        setPhase(allReady ? "ready" : "needs_models");
-      })
-      .catch(() => setPhase("ready")); // If check fails, let the app try anyway
+      .then((s) => { setModels(s); setPhase(s.every((m) => m.ready) ? "ready" : "setup"); })
+      .catch(() => setPhase("ready"));
   }, []);
 
-  // Listen for download progress
   useEffect(() => {
     if (!isTauriRuntime()) return;
     const unlisten = listen<DownloadProgress>("lune://download-progress", (e) => {
       setProgress(e.payload);
       if (e.payload.done) {
-        setModels((prev) =>
-          prev.map((m) =>
-            m.localName === downloadingModel ? { ...m, ready: true } : m,
-          ),
-        );
-        setDownloadingModel(null);
-        // Check if all models are now ready
+        setModels((prev) => prev.map((m) => m.localName === activeModel ? { ...m, ready: true } : m));
+        setActiveModel(null);
         setTimeout(() => {
-          invoke<ModelStatus[]>("check_model_status").then((statuses) => {
-            setModels(statuses);
-            if (statuses.every((m) => m.ready)) {
-              setPhase("ready");
-            } else {
-              setPhase("needs_models");
-            }
+          invoke<ModelStatus[]>("check_model_status").then((s) => {
+            setModels(s);
+            setPhase(s.every((m) => m.ready) ? "ready" : "setup");
           });
-        }, 500);
+        }, 400);
       }
     });
     return () => { unlisten.then((fn) => fn()); };
-  }, [downloadingModel]);
+  }, [activeModel]);
 
-  async function handleDownload(localName: string) {
-    setDownloadingModel(localName);
-    setPhase("downloading");
-    setError(null);
-    setProgress(null);
-    try {
-      await invoke("download_model_cmd", { localName });
-    } catch (e) {
-      setError(String(e));
-      setPhase("error");
-      setDownloadingModel(null);
-    }
-  }
-
-  async function handleDownloadAll() {
-    const missing = models.filter((m) => !m.ready);
-    for (const model of missing) {
-      setDownloadingModel(model.localName);
+  async function downloadAll() {
+    for (const model of models.filter((m) => !m.ready)) {
+      setActiveModel(model.localName);
       setPhase("downloading");
       setError(null);
       setProgress(null);
@@ -100,7 +66,7 @@ export function ModelSetup({ children }: { children: React.ReactNode }) {
       } catch (e) {
         setError(String(e));
         setPhase("error");
-        setDownloadingModel(null);
+        setActiveModel(null);
         return;
       }
     }
@@ -108,135 +74,119 @@ export function ModelSetup({ children }: { children: React.ReactNode }) {
   }
 
   if (phase === "ready") return <>{children}</>;
+
   if (phase === "checking") {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center">
-        <Loader2 size={24} className="animate-spin text-primary mb-4" />
-        <p className="text-sm text-content-muted">{t`Checking models…`}</p>
+      <div className="hero min-h-[60vh]">
+        <div className="hero-content text-center">
+          <span className="loading loading-spinner loading-lg text-primary" />
+        </div>
       </div>
     );
   }
 
   const missing = models.filter((m) => !m.ready);
+  const pct = progress && progress.fileCount > 0
+    ? Math.round(((progress.fileIndex + 1) / progress.fileCount) * 100)
+    : 0;
 
   return (
-    <div className="page-stack">
-      <section className="card border border-surface-border bg-surface-card">
-        <div className="card-body items-center text-center gap-6 py-12 sm:py-16">
-          {/* Icon */}
-          <div className="flex size-16 items-center justify-center rounded-2xl bg-primary/10 sm:size-20">
-            {phase === "downloading" ? (
-              <Loader2 size={32} className="animate-spin text-primary" strokeWidth={1.5} />
-            ) : phase === "error" ? (
-              <AlertCircle size={32} className="text-error" strokeWidth={1.5} />
-            ) : (
-              <Download size={32} className="text-primary" strokeWidth={1.5} />
-            )}
-          </div>
+    <div className="hero min-h-[60vh]">
+      <div className="hero-content flex-col gap-6 sm:gap-8 max-w-sm sm:max-w-lg w-full px-4 sm:px-0">
 
-          {/* Title */}
-          <div>
-            <h2 className="text-xl font-bold tracking-tight sm:text-2xl">
-              {phase === "downloading"
-                ? t`Downloading models`
-                : phase === "error"
-                  ? t`Download failed`
-                  : t`Set up voice models`}
-            </h2>
-            <p className="mt-2 max-w-md text-sm text-content-muted">
-              {phase === "downloading"
-                ? t`This may take a few minutes depending on your connection. Models are stored locally and only downloaded once.`
-                : phase === "error"
-                  ? error
-                  : t`Lune Voice needs to download speech recognition models to work offline. Everything runs locally on your machine.`}
-            </p>
+        {/* Header */}
+        <div className="text-center">
+          <div className="mb-5 flex justify-center">
+            <div className="radial-progress text-primary" style={{ "--value": phase === "downloading" ? pct : 0, "--size": "5rem", "--thickness": "4px" } as React.CSSProperties} role="progressbar" aria-valuenow={pct}>
+              {phase === "downloading" ? (
+                <span className="text-lg font-bold tabular-nums">{pct}%</span>
+              ) : phase === "error" ? (
+                <CircleAlert size={28} strokeWidth={1.5} className="text-error" />
+              ) : (
+                <Sparkles size={28} strokeWidth={1.5} className="text-primary" />
+              )}
+            </div>
           </div>
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
+            {phase === "downloading" ? t`Downloading` : phase === "error" ? t`Download failed` : t`Welcome to Lune Voice`}
+          </h2>
+          <p className="mt-2 text-content-muted text-xs sm:text-sm max-w-xs sm:max-w-sm mx-auto">
+            {phase === "downloading"
+              ? t`Models are stored locally and only downloaded once.`
+              : phase === "error"
+                ? error
+                : t`Download the AI models that power offline voice recognition. Everything runs on your machine — no cloud, no accounts.`}
+          </p>
+        </div>
 
-          {/* Model list */}
-          <div className="w-full max-w-sm space-y-2">
-            {models.map((model) => (
-              <div
-                key={model.localName}
-                className="flex items-center justify-between rounded-xl border border-surface-border bg-surface-inset px-4 py-3"
-              >
-                <div className="text-left">
-                  <p className="text-sm font-medium">{model.name}</p>
-                  <p className="text-xs text-content-subtle">{model.repoId}</p>
-                </div>
-                <div className="shrink-0">
-                  {model.ready ? (
-                    <Check size={18} className="text-success" strokeWidth={2.5} />
-                  ) : downloadingModel === model.localName && progress ? (
-                    <span className="text-xs tabular-nums text-primary font-medium">
-                      {progress.fileIndex + 1}/{progress.fileCount}
-                    </span>
-                  ) : downloadingModel === model.localName ? (
-                    <Loader2 size={16} className="animate-spin text-primary" />
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleDownload(model.localName)}
-                      className="btn btn-ghost btn-xs text-primary"
-                      disabled={phase === "downloading"}
-                    >
-                      {t`Download`}
-                    </button>
-                  )}
+        {/* Model cards */}
+        <div className="w-full space-y-2">
+          {models.map((model) => {
+            const isActive = activeModel === model.localName;
+            const Icon = model.localName.includes("llm") ? Sparkles : Cpu;
+            return (
+              <div key={model.localName} className="card card-border bg-base-200 card-sm">
+                <div className="card-body flex-row items-center gap-2 sm:gap-3">
+                  <div className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${model.ready ? "bg-success/10" : isActive ? "bg-primary/10" : "bg-base-300"}`}>
+                    {model.ready ? (
+                      <Check size={18} strokeWidth={2.5} className="text-success" />
+                    ) : isActive ? (
+                      <span className="loading loading-spinner loading-sm text-primary" />
+                    ) : (
+                      <Icon size={18} strokeWidth={1.5} className="text-content-subtle" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm">{model.name}</p>
+                    {isActive && progress ? (
+                      <div className="mt-1">
+                        <progress className="progress progress-primary h-1.5 w-full" value={progress.fileIndex + 1} max={progress.fileCount} />
+                        <p className="text-xs text-content-dim mt-0.5 truncate">{progress.fileName}</p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-content-subtle truncate">{model.repoId}</p>
+                    )}
+                  </div>
+                  <div className="shrink-0">
+                    {model.ready ? (
+                      <div className="badge badge-soft badge-success badge-sm">{t`Ready`}</div>
+                    ) : isActive ? (
+                      <span className="text-xs tabular-nums text-primary font-medium">{progress ? `${progress.fileIndex + 1}/${progress.fileCount}` : "…"}</span>
+                    ) : null}
+                  </div>
                 </div>
               </div>
-            ))}
+            );
+          })}
+        </div>
+
+        {/* Error alert */}
+        {phase === "error" && (
+          <div role="alert" className="alert alert-error alert-soft">
+            <CircleAlert size={16} />
+            <span className="text-sm">{t`Check your internet connection and try again.`}</span>
           </div>
+        )}
 
-          {/* Progress bar */}
-          {phase === "downloading" && progress && progress.fileCount > 0 && (
-            <div className="w-full max-w-sm">
-              <progress
-                className="progress progress-primary w-full"
-                value={progress.fileIndex + 1}
-                max={progress.fileCount}
-              />
-              <p className="mt-1.5 text-xs text-content-subtle truncate">
-                {progress.fileName || t`Preparing…`}
-              </p>
-            </div>
-          )}
-
-          {/* Actions */}
-          {phase === "needs_models" && missing.length > 0 && (
-            <button
-              type="button"
-              onClick={handleDownloadAll}
-              className="btn btn-primary"
-            >
+        {/* Actions */}
+        <div className="flex flex-col items-center gap-2 sm:gap-3 w-full">
+          {(phase === "setup" || phase === "error") && (
+            <button type="button" onClick={downloadAll} className="btn btn-primary btn-wide">
               <Download size={16} strokeWidth={2} />
-              {missing.length === 1
-                ? t`Download model`
-                : t`Download all models`}
+              {missing.length === 1 ? t`Download model` : t`Download ${missing.length} models`}
             </button>
           )}
-
-          {phase === "error" && (
-            <button
-              type="button"
-              onClick={() => setPhase("needs_models")}
-              className="btn btn-ghost"
-            >
-              {t`Try again`}
-            </button>
-          )}
-
-          {/* Skip option */}
           {phase !== "downloading" && (
-            <button
-              type="button"
-              onClick={() => setPhase("ready")}
-              className="text-xs text-content-dim hover:text-content-subtle transition-colors"
-            >
+            <button type="button" onClick={() => setPhase("ready")} className="btn btn-ghost btn-sm text-content-dim">
               {t`Skip for now`}
             </button>
           )}
+          {phase === "downloading" && (
+            <p className="text-xs text-content-dim animate-pulse">{t`Please don't close the app during download`}</p>
+          )}
         </div>
-      </section>
+
+      </div>
     </div>
   );
 }
