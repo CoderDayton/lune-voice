@@ -26,7 +26,7 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="flex items-center justify-center h-dvh p-4 sm:p-8">
           <div role="alert" className="card bg-base-200 border border-error/20 max-w-sm sm:max-w-md w-full p-4 sm:p-6">
             <h2 className="text-base sm:text-lg font-semibold text-error">Something went wrong</h2>
-            <p className="text-sm opacity-60 mt-2">{this.state.error.message}</p>
+            <p className="text-sm text-content-muted mt-2">{this.state.error.message}</p>
             <button
               type="button"
               className="btn btn-sm btn-ghost mt-4"

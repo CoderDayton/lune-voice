@@ -53,6 +53,13 @@
   --color-brand-400: oklch(0.72 0.1 230);
   --color-brand-300: oklch(0.78 0.1 160);
 
+  /* Text hierarchy — usable as text-content-*, e.g. text-content-muted */
+  --color-content-strong: oklch(0.93 0.008 265);
+  --color-content-DEFAULT: oklch(0.93 0.008 265 / 0.85);
+  --color-content-muted: oklch(0.93 0.008 265 / 0.60);
+  --color-content-subtle: oklch(0.93 0.008 265 / 0.45);
+  --color-content-dim: oklch(0.93 0.008 265 / 0.30);
+
   /* Tinted surfaces — usable as bg-surface-*, border-surface-* */
   --color-surface-card: oklch(0.19 0.014 268 / 0.4);
   --color-surface-elevated: oklch(0.22 0.015 268 / 0.6);
@@ -61,6 +68,16 @@
   --color-surface-hover: oklch(1 0 0 / 0.03);
   --color-surface-border: oklch(0.93 0.008 265 / 0.06);
   --color-surface-inset: oklch(0.16 0.012 270 / 0.4);
+
+  /* Spacing scale — usable as p-space-xs, gap-space-md, etc. */
+  --spacing-space-xs: 0.25rem;
+  --spacing-space-sm: 0.5rem;
+  --spacing-space-md: 1rem;
+  --spacing-space-lg: 1.5rem;
+  --spacing-space-xl: 2rem;
+  --spacing-space-2xl: 3rem;
+  --spacing-space-section: 1.5rem;
+  --spacing-space-page: 2.5rem;
 
   /* Shadows — usable as shadow-soft, shadow-card, shadow-elevated, shadow-glow */
   --shadow-soft: 0 1px 3px oklch(0 0 0 / 0.12), 0 4px 12px oklch(0 0 0 / 0.08);

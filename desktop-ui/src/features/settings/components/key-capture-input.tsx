@@ -102,7 +102,7 @@ export function KeyCaptureInput({
       </button>
 
       {listening && !validationError && (
-        <p className="text-xs opacity-50">
+        <p className="text-xs text-content-subtle">
           Press your combo — <kbd className="kbd kbd-xs">Esc</kbd> to cancel
         </p>
       )}

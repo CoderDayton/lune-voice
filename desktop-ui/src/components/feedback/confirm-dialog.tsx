@@ -43,7 +43,7 @@ export function ConfirmDialog({
       >
         <div className="modal-box">
           <h3 id={titleId} className="text-lg font-bold">{title}</h3>
-          <p className="py-4 text-sm opacity-70">{description}</p>
+          <p className="py-4 text-sm text-content-muted">{description}</p>
           <div className="modal-action">
             <form method="dialog">
               <button type="submit" className="btn btn-ghost">{cancelLabel ?? t`Cancel`}</button>

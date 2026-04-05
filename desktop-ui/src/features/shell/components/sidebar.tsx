@@ -32,12 +32,12 @@ export function SidebarContent() {
         <div className="min-w-0 flex-1 is-drawer-close:hidden">
           <span className="block text-lg leading-tight tracking-tight">
             <span className="font-bold">Lune</span>
-            <span className="font-light text-base-content/60"> Voice</span>
+            <span className="font-light text-content-muted"> Voice</span>
           </span>
         </div>
         <label
           htmlFor={DRAWER_ID}
-          className="ml-auto cursor-pointer text-base-content/50 transition-colors hover:text-base-content/90 is-drawer-close:hidden"
+          className="ml-auto cursor-pointer text-content-muted transition-colors hover:text-content is-drawer-close:hidden"
           aria-label={t`Collapse sidebar`}
         >
           <PanelLeftClose size={20} strokeWidth={2} />
@@ -55,7 +55,7 @@ export function SidebarContent() {
                 <Link
                   to={to}
                   aria-current={active ? "page" : undefined}
-                  className={`group relative flex w-full items-center gap-3.5 rounded-xl px-3.5 py-4 text-[0.9rem] transition-colors is-drawer-close:tooltip is-drawer-close:tooltip-right is-drawer-close:justify-center ${active ? "bg-primary/10 text-primary font-medium" : "text-base-content/55 hover:bg-surface-hover hover:text-base-content/90"}`}
+                  className={`group relative flex w-full items-center gap-3.5 rounded-xl px-3.5 py-4 text-[0.9rem] transition-colors is-drawer-close:tooltip is-drawer-close:tooltip-right is-drawer-close:justify-center ${active ? "bg-primary/10 text-primary font-medium" : "text-content-muted hover:bg-surface-hover hover:text-content"}`}
                   data-tip={label}
                 >
                   {active ? (
@@ -64,7 +64,7 @@ export function SidebarContent() {
                   <Icon
                     size={20}
                     strokeWidth={active ? 2.2 : 1.6}
-                    className={active ? "text-primary" : "text-base-content/45 group-hover:text-base-content/70"}
+                    className={active ? "text-primary" : "text-content-subtle group-hover:text-content-muted"}
                   />
                   <span className="truncate is-drawer-close:hidden">{label}</span>
                 </Link>
@@ -80,7 +80,7 @@ export function SidebarContent() {
       <div className="is-drawer-open:hidden flex justify-center mb-6">
         <label
           htmlFor={DRAWER_ID}
-          className="cursor-pointer text-base-content/50 transition-colors hover:text-base-content/90"
+          className="cursor-pointer text-content-muted transition-colors hover:text-content"
           aria-label={t`Expand sidebar`}
         >
           <PanelLeftOpen size={26} strokeWidth={2} />

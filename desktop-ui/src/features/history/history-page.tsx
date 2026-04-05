@@ -20,7 +20,7 @@ export function HistoryPage() {
         <div className="flex-1">
           <HistorySearch />
         </div>
-        <span className="text-sm opacity-50 tabular-nums shrink-0">
+        <span className="text-sm text-content-subtle tabular-nums shrink-0">
           {count} {t`sessions`}
         </span>
       </div>

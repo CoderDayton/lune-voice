@@ -18,8 +18,8 @@ export function SidebarQuickStart() {
           <Mic size={18} strokeWidth={2} className="text-primary" />
         </div>
         <div className="min-w-0 text-left">
-          <span className="block text-sm font-medium text-base-content/80">{t`Start dictating`}</span>
-          <span className="flex items-center gap-1 text-xs text-base-content/35">
+          <span className="block text-sm font-medium text-content">{t`Start dictating`}</span>
+          <span className="flex items-center gap-1 text-xs text-content-dim">
             <kbd className="kbd kbd-xs">Ctrl</kbd>
             <span>+</span>
             <kbd className="kbd kbd-xs">Space</kbd>
@@ -47,10 +47,10 @@ export function SidebarTodayStats() {
 
   return (
     <div className="mx-3.5 mb-3 rounded-xl border border-surface-border bg-surface-hover px-4 py-3">
-      <p className="text-xs font-medium uppercase tracking-widest text-base-content/30">{t`Today`}</p>
-      <p className="mt-1 text-sm text-base-content/55 tabular-nums">
+      <p className="text-xs font-medium uppercase tracking-widest text-content-dim">{t`Today`}</p>
+      <p className="mt-1 text-sm text-content-muted tabular-nums">
         {todayStats.count} {todayStats.count === 1 ? t`session` : t`sessions`}
-        <span className="mx-1.5 text-base-content/20">·</span>
+        <span className="mx-1.5 text-content-dim">·</span>
         {todayStats.words.toLocaleString()} {t`words`}
       </p>
     </div>

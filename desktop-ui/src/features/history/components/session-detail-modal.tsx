@@ -85,7 +85,7 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
               <h3 id={titleId} className="text-base font-semibold tracking-tight">
                 {date}
               </h3>
-              <p className="text-xs text-base-content/40 mt-0.5 tabular-nums">{time} · {relative}</p>
+              <p className="text-xs text-content-subtle mt-0.5 tabular-nums">{time} · {relative}</p>
             </div>
             <div className="flex items-center gap-2">
               {session.transcript && (
@@ -107,12 +107,12 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
           <div className="px-5 pb-4 sm:px-6">
             {session.transcript ? (
               <div className="rounded-lg border border-surface-border bg-surface-inset p-4">
-                <p id={transcriptId} className="text-sm leading-relaxed text-base-content/90 whitespace-pre-wrap break-words sm:text-base">
+                <p id={transcriptId} className="text-sm leading-relaxed text-content whitespace-pre-wrap break-words sm:text-base">
                   {session.transcript}
                 </p>
               </div>
             ) : (
-              <p id={transcriptId} className="text-sm italic text-base-content/40">{t`No transcript`}</p>
+              <p id={transcriptId} className="text-sm italic text-content-subtle">{t`No transcript`}</p>
             )}
           </div>
 
@@ -124,7 +124,7 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
               <MetaItem icon={Mic} label={t`Engine`} value={formatBackend(session.backend)} />
               <MetaItem icon={Palette} label={t`Style`} value={session.style} />
             </div>
-            <div className="mt-3 flex items-center gap-2 text-xs text-base-content/40">
+            <div className="mt-3 flex items-center gap-2 text-xs text-content-subtle">
               {isCompleted ? (
                 <><CircleCheck size={13} strokeWidth={2} className="text-success/60" /> <span>{t`Completed`}</span></>
               ) : isFailed ? (
@@ -138,7 +138,7 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
           {/* Close action */}
           <div className="modal-action px-5 pb-4 pt-0 sm:px-6">
             <form method="dialog">
-              <button type="submit" className="btn btn-ghost btn-sm text-base-content/50">{t`Close`}</button>
+              <button type="submit" className="btn btn-ghost btn-sm text-content-muted">{t`Close`}</button>
             </form>
           </div>
         </div>
@@ -151,9 +151,9 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
 function MetaItem({ icon: Icon, label, value }: { icon: typeof Clock; label: string; value: string }) {
   return (
     <div className="flex items-center gap-2">
-      <Icon size={14} strokeWidth={1.6} className="text-base-content/30 shrink-0" />
+      <Icon size={14} strokeWidth={1.6} className="text-content-dim shrink-0" />
       <div className="min-w-0">
-        <p className="text-[0.65rem] uppercase tracking-wider text-base-content/35">{label}</p>
+        <p className="text-[0.65rem] uppercase tracking-wider text-content-dim">{label}</p>
         <p className="text-sm font-medium truncate">{value}</p>
       </div>
     </div>

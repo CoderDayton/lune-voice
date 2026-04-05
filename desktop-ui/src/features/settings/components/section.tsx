@@ -30,7 +30,7 @@ export function SettingsSection({ title, description, icon: Icon, children }: Se
           )}
           <div>
             <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
-            <p className="text-sm opacity-50 mt-0.5">{description}</p>
+            <p className="text-sm text-content-subtle mt-0.5">{description}</p>
           </div>
         </div>
       </div>
@@ -44,7 +44,7 @@ export function SettingsRow({ label, description, control }: SettingsRowProps) {
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between py-3 border-b border-surface-border last:border-b-0">
       <div className="min-w-0">
         <div className="text-sm font-medium">{label}</div>
-        {description ? <div className="text-xs opacity-45 mt-0.5 max-w-md">{description}</div> : null}
+        {description ? <div className="text-xs text-content-subtle mt-0.5 max-w-md">{description}</div> : null}
       </div>
       <div className="shrink-0">{control}</div>
     </div>

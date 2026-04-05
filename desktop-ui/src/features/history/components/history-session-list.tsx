@@ -22,7 +22,7 @@ const SessionRow = memo(function SessionRow({ item }: SessionRowProps) {
         <li className="list-row cursor-pointer" onClick={open}>
           <div className="list-col-grow min-w-0">
             <p className="text-sm line-clamp-2 sm:line-clamp-3">{item.transcript || t`Empty session`}</p>
-            <div className="text-xs opacity-40 mt-0.5">
+            <div className="text-xs text-content-subtle mt-0.5">
               <span className="tabular-nums">{time}</span>
               <span className="mx-1">·</span>
               {item.words} {t`words`}
@@ -72,7 +72,7 @@ export function HistorySessionList() {
     <div className="flex flex-col gap-4">
       {groups.map((group) => (
         <div key={group.date}>
-          <h3 className="sticky top-0 z-10 text-xs font-semibold uppercase tracking-wider opacity-50 mb-2 px-1 py-1 backdrop-blur-sm">
+          <h3 className="sticky top-0 z-10 text-xs font-semibold uppercase tracking-wider text-content-subtle mb-2 px-1 py-1 backdrop-blur-sm">
             {group.date}
           </h3>
           <ul className="list rounded-box border border-surface-border bg-surface-card">

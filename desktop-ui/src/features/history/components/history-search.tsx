@@ -9,7 +9,7 @@ export function HistorySearch() {
 
   return (
     <label className="input w-full">
-      <Search size={16} strokeWidth={2} className="opacity-40" />
+      <Search size={16} strokeWidth={2} className="text-content-subtle" />
       <input
         type="search"
         value={search}

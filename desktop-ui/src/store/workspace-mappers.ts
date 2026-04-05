@@ -57,7 +57,7 @@ export function mapWorkspaceSettings(snapshot: BackendWorkspaceSnapshot): Worksp
 }
 
 export function summarizeAsrBackend(value: AsrBackendValue) {
-  return labelFor(asrBackends, value).replace(" (recommended)", "");
+  return labelFor(asrBackends, value).replace(" (recommended)", "").replace(" (fast)", "");
 }
 
 export function summarizeDictationMode(value: DictationModeValue) {

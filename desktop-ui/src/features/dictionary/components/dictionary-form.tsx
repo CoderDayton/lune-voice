@@ -44,7 +44,7 @@ export function DictionaryForm() {
               aria-required="true"
             />
           </label>
-          <span className="hidden sm:block pb-3 opacity-30 text-lg">→</span>
+          <span className="hidden sm:block pb-3 text-content-dim text-lg">→</span>
           <label className="form-control flex-1">
             <div className="label"><span className="label-text"><Trans>Replacement</Trans></span></div>
             <input

@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { SessionDetailModal } from "../history/components/session-detail-modal";
 import { useLingui } from "@lingui/react/macro";
 import { Clock, Hash, MessageSquareText, Mic } from "lucide-react";
+import { StatusBadge, InfoBadge } from "../../components/ui/status-badge";
 import {
   summarizeAsrBackend,
   summarizeDictationMode,
@@ -37,14 +38,12 @@ export function OverviewPage() {
     <div className="page-stack">
       <section className="card border border-surface-border bg-surface-card">
         <div className="card-body gap-5">
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            <span className={`badge badge-lg gap-2 border-none px-3 ${isLoading ? "badge-warning text-warning-content" : isConnected ? "badge-success text-success-content" : "badge-error text-error-content"}`}>
-              <span className={`status ${isLoading ? "status-warning" : isConnected ? "status-success" : "status-error"}`} />
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <StatusBadge variant={isLoading ? "warning" : isConnected ? "success" : "error"}>
               {isLoading ? t`Connecting` : isConnected ? t`Ready` : t`Disconnected`}
-            </span>
-            <span className="text-base-content/45">{summarizeAsrBackend(asrBackend)}</span>
-            <span className="hidden text-base-content/25 sm:inline">•</span>
-            <span className="text-base-content/45">{summarizeDictationMode(dictationMode)}</span>
+            </StatusBadge>
+            <InfoBadge>{summarizeAsrBackend(asrBackend)}</InfoBadge>
+            <InfoBadge>{summarizeDictationMode(dictationMode)}</InfoBadge>
           </div>
 
           {stats.count > 0 ? (
@@ -66,7 +65,7 @@ export function OverviewPage() {
               </div>
             </div>
           ) : (
-            <div className="rounded-xl border border-dashed border-surface-border bg-surface-inset px-5 py-6 text-sm text-base-content/50">
+            <div className="rounded-xl border border-dashed border-surface-border bg-surface-inset px-5 py-6 text-sm text-content-muted">
               {t`Your session summary will appear here once you start dictating.`}
             </div>
           )}
@@ -78,7 +77,7 @@ export function OverviewPage() {
           <div className="flex items-center justify-between px-5 pb-3 pt-5">
             <div>
               <h2 className="section-label">{t`Recent`}</h2>
-              <p className="mt-1 text-sm text-base-content/50">{stats.count} {stats.count === 1 ? t`session` : t`sessions`}</p>
+              <p className="mt-1 text-sm text-content-muted">{stats.count} {stats.count === 1 ? t`session` : t`sessions`}</p>
             </div>
           {stats.count > 5 && (
               <Link to="/history" className="btn btn-ghost btn-sm normal-case">{t`View all`}</Link>
@@ -89,8 +88,8 @@ export function OverviewPage() {
               <div className="mb-4 flex size-16 items-center justify-center rounded-full bg-primary/8 sm:size-20">
                 <Mic className="size-8 text-primary/40 sm:size-10" strokeWidth={1.2} />
               </div>
-              <p className="text-sm font-medium opacity-70">{t`No sessions yet`}</p>
-              <p className="mt-1 text-xs opacity-40">
+              <p className="text-sm font-medium text-content-muted">{t`No sessions yet`}</p>
+              <p className="mt-1 text-xs text-content-subtle">
                 {t`Press`} <kbd className="kbd kbd-xs">{t`Ctrl`}</kbd> + <kbd className="kbd kbd-xs">{t`Space`}</kbd> {t`to start dictating`}
               </p>
             </div>
@@ -102,12 +101,12 @@ export function OverviewPage() {
                   <SessionDetailModal key={session.id} session={session}>
                     {(open) => (
                       <article className="block px-5 py-4 cursor-pointer transition-colors hover:bg-surface-hover" onClick={open}>
-                        <div className="pt-1 text-xs tabular-nums text-base-content/40">{time}</div>
+                        <div className="pt-1 text-xs tabular-nums text-content-subtle">{time}</div>
                         <div className="min-w-0">
-                          <p className="text-sm leading-6 break-words text-base-content/92">
+                          <p className="text-sm leading-6 break-words text-content">
                             {session.transcript || t`Empty session`}
                           </p>
-                          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-base-content/50">
+                          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-content-muted">
                             <span className="badge badge-ghost badge-sm">{session.words} {t`words`}</span>
                             <span>{session.seconds}{t`s`}</span>
                           </div>
