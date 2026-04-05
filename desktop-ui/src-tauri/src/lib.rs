@@ -99,7 +99,9 @@ pub fn run() {
             commands::toggle_dictation,
             pill::show_pill_window,
             pill::hide_pill_window,
-            pill::reposition_pill_center
+            pill::reposition_pill_center,
+            commands::check_model_status,
+            commands::download_model_cmd
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {

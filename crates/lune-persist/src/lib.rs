@@ -8,6 +8,9 @@ mod settings;
 
 pub use db::{Database, StoredDictionaryEntry};
 pub use error::{PersistError, PersistResult};
-pub use hub::{ModelSpec, ResolvedModels, ensure_default_models};
+pub use hub::{
+    DownloadProgress, ModelSpec, ModelStatus, ResolvedModels, check_model_status, download_model,
+    ensure_default_models,
+};
 pub use paths::AppPaths;
 pub use settings::SettingsStore;

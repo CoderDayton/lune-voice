@@ -20,6 +20,30 @@ pub enum ModelSpec {
     },
 }
 
+/// Status of a single model: present locally or needs download.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ModelStatus {
+    /// Human-readable name (e.g. "Qwen3 ASR 0.6B")
+    pub name: String,
+    /// HuggingFace repo ID
+    pub repo_id: String,
+    /// Local directory name
+    pub local_name: String,
+    /// Whether the model is fully present locally
+    pub ready: bool,
+}
+
+/// Progress update during model download.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadProgress {
+    pub model_name: String,
+    pub file_name: String,
+    pub file_index: usize,
+    pub file_count: usize,
+    pub done: bool,
+}
+
 /// Resolved local model paths.
 pub struct ResolvedModels {
     /// Parakeet TDT model directory.
@@ -74,6 +98,136 @@ impl ModelSpec {
             local_name: "qwen2.5-1.5b-instruct-gguf".into(),
         }
     }
+
+    /// Human-readable display name for this model.
+    pub fn display_name(&self) -> &str {
+        match self {
+            Self::Directory { local_name, .. } => match local_name.as_str() {
+                "parakeet-tdt-0.6b" => "Parakeet TDT 0.6B",
+                "qwen3-asr-0.6b-onnx" => "Qwen3 ASR 0.6B",
+                "qwen2.5-1.5b-instruct-gguf" => "Qwen2.5 1.5B LLM",
+                _ => local_name,
+            },
+        }
+    }
+
+    /// Check if this model is fully present locally (no download needed).
+    pub fn is_ready(&self, models_dir: &Path) -> bool {
+        match self {
+            Self::Directory {
+                required_files,
+                local_name,
+                ..
+            } => {
+                let dir = models_dir.join(local_name);
+                dir.exists() && required_files.iter().all(|f| dir.join(f).is_file())
+            }
+        }
+    }
+
+    fn repo_id(&self) -> &str {
+        match self {
+            Self::Directory { repo_id, .. } => repo_id,
+        }
+    }
+
+    fn local_name(&self) -> &str {
+        match self {
+            Self::Directory { local_name, .. } => local_name,
+        }
+    }
+}
+
+/// Check which models are needed for the current config. Returns status of each.
+/// Does NOT download anything.
+pub fn check_model_status(
+    models_dir: &Path,
+    asr_backend: &AsrBackendConfig,
+    llm_backend: &lune_core::config::LlmBackendConfig,
+) -> Vec<ModelStatus> {
+    let mut statuses = Vec::new();
+
+    let asr_spec = match asr_backend {
+        AsrBackendConfig::ParakeetTdt { .. } => Some(ModelSpec::parakeet_tdt()),
+        AsrBackendConfig::OrtQwenAsr { .. } => Some(ModelSpec::qwen3_asr_onnx()),
+        _ => None,
+    };
+
+    if let Some(spec) = &asr_spec {
+        statuses.push(ModelStatus {
+            name: spec.display_name().to_string(),
+            repo_id: spec.repo_id().to_string(),
+            local_name: spec.local_name().to_string(),
+            ready: spec.is_ready(models_dir),
+        });
+    }
+
+    if matches!(
+        llm_backend,
+        lune_core::config::LlmBackendConfig::LlamaCppLocal { .. }
+    ) {
+        let spec = ModelSpec::llm_corrector();
+        statuses.push(ModelStatus {
+            name: spec.display_name().to_string(),
+            repo_id: spec.repo_id().to_string(),
+            local_name: spec.local_name().to_string(),
+            ready: spec.is_ready(models_dir),
+        });
+    }
+
+    statuses
+}
+
+/// Download a single model by local_name. Calls `on_progress` for each file.
+/// Blocking — run on a background thread.
+pub fn download_model(
+    models_dir: &Path,
+    local_name: &str,
+    on_progress: impl Fn(DownloadProgress),
+) -> PersistResult<PathBuf> {
+    let spec = match local_name {
+        "parakeet-tdt-0.6b" => ModelSpec::parakeet_tdt(),
+        "qwen3-asr-0.6b-onnx" => ModelSpec::qwen3_asr_onnx(),
+        "qwen2.5-1.5b-instruct-gguf" => ModelSpec::llm_corrector(),
+        _ => {
+            return Err(PersistError::ModelDownload(format!(
+                "unknown model: {local_name}"
+            )));
+        }
+    };
+
+    let hub_cache = models_dir.join(".hub-cache");
+    let hub = ModelHub::new(&hub_cache)?;
+
+    let name = spec.display_name().to_string();
+    on_progress(DownloadProgress {
+        model_name: name.clone(),
+        file_name: String::new(),
+        file_index: 0,
+        file_count: 0,
+        done: false,
+    });
+
+    let path =
+        ensure_directory_model_with_progress(&hub, &spec, models_dir, |file, idx, total| {
+            on_progress(DownloadProgress {
+                model_name: name.clone(),
+                file_name: file.to_string(),
+                file_index: idx,
+                file_count: total,
+                done: false,
+            });
+        })?;
+
+    on_progress(DownloadProgress {
+        model_name: name,
+        file_name: String::new(),
+        file_index: 0,
+        file_count: 0,
+        done: true,
+    });
+
+    Ok(path)
 }
 
 /// Thin wrapper around `hf_hub::api::sync::Api` with a hidden cache directory.
@@ -282,6 +436,61 @@ fn ensure_directory_model(
     }
 
     hub.download_directory(repo_id, required_files, suffix_patterns, &local_dir)?;
+
+    info!(path = %local_dir.display(), "model directory ready");
+    Ok(local_dir)
+}
+
+/// Like `ensure_directory_model` but calls `on_file` for each file downloaded.
+fn ensure_directory_model_with_progress(
+    hub: &ModelHub,
+    spec: &ModelSpec,
+    models_dir: &Path,
+    on_file: impl Fn(&str, usize, usize),
+) -> PersistResult<PathBuf> {
+    let ModelSpec::Directory {
+        repo_id,
+        required_files,
+        suffix_patterns,
+        local_name,
+    } = spec;
+
+    let local_dir = models_dir.join(local_name);
+
+    if local_dir.exists() && required_files.iter().all(|f| local_dir.join(f).is_file()) {
+        info!(path = %local_dir.display(), "model directory already present");
+        return Ok(local_dir);
+    }
+
+    // Determine which files to download
+    let repo = hub.api.repo(hf_hub::Repo::model(repo_id.clone()));
+    let all_files = hub.list_repo_files(&repo, repo_id)?;
+    let files_to_download: Vec<&str> = all_files
+        .iter()
+        .filter(|f| {
+            required_files.contains(f)
+                || suffix_patterns.iter().any(|pat| f.ends_with(pat.as_str()))
+        })
+        .map(String::as_str)
+        .collect();
+
+    let total = files_to_download.len();
+    std::fs::create_dir_all(&local_dir)
+        .map_err(|e| PersistError::ModelDownload(format!("create dir: {e}")))?;
+
+    for (idx, filename) in files_to_download.iter().enumerate() {
+        on_file(filename, idx, total);
+
+        let hub_path = repo
+            .get(filename)
+            .map_err(|e| PersistError::ModelDownload(format!("{repo_id}/{filename}: {e}")))?;
+        let real_src = hub_path
+            .canonicalize()
+            .map_err(|e| PersistError::ModelDownload(format!("{filename}: resolve: {e}")))?;
+        let dst = local_dir.join(filename);
+        link_or_copy(&real_src, &dst)
+            .map_err(|e| PersistError::ModelDownload(format!("{filename}: write: {e}")))?;
+    }
 
     info!(path = %local_dir.display(), "model directory ready");
     Ok(local_dir)

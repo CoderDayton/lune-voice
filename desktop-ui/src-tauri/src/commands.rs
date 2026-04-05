@@ -172,6 +172,45 @@ pub async fn toggle_dictation(
     runtime.inner().clone().toggle_dictation().await
 }
 
+#[tauri::command]
+pub async fn check_model_status(
+    window: WebviewWindow,
+) -> Result<Vec<lune_persist::ModelStatus>, String> {
+    require_window_access(&window, &["main"])?;
+    tauri::async_runtime::spawn_blocking(|| {
+        let paths = lune_persist::AppPaths::resolve().ok_or("resolve paths")?;
+        let store = lune_persist::SettingsStore::new(paths.settings_file());
+        let settings = store.load().map_err(|e| format!("load settings: {e}"))?;
+        Ok(lune_persist::check_model_status(
+            &paths.models_dir(),
+            &settings.asr_backend,
+            &settings.llm_backend,
+        ))
+    })
+    .await
+    .map_err(|e| format!("check model status: {e}"))?
+}
+
+#[tauri::command]
+pub async fn download_model_cmd(
+    window: WebviewWindow,
+    app: tauri::AppHandle,
+    local_name: String,
+) -> Result<(), String> {
+    require_window_access(&window, &["main"])?;
+    let app_handle = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let paths = lune_persist::AppPaths::resolve().ok_or("resolve paths")?;
+        lune_persist::download_model(&paths.models_dir(), &local_name, |progress| {
+            let _ = app_handle.emit("lune://download-progress", &progress);
+        })
+        .map_err(|e| format!("download failed: {e}"))?;
+        Ok::<_, String>(())
+    })
+    .await
+    .map_err(|e| format!("download task: {e}"))?
+}
+
 #[cfg(test)]
 mod tests {
     use super::require_window_access_for_label;
