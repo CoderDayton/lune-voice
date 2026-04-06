@@ -59,7 +59,7 @@ export function ThemePicker() {
     <>
       <button
         type="button"
-        className="btn btn-sm btn-ghost gap-1.5"
+        className="btn btn-sm btn-soft btn-primary gap-1.5"
         aria-haspopup="dialog"
         onClick={() => dialog?.showModal()}
       >

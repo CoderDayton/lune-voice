@@ -101,7 +101,8 @@ pub fn run() {
             pill::hide_pill_window,
             pill::reposition_pill_center,
             commands::check_model_status,
-            commands::download_model_cmd
+            commands::download_model_cmd,
+            commands::initialize_pipeline
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {

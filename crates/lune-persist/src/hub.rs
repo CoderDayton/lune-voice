@@ -496,6 +496,44 @@ fn ensure_directory_model_with_progress(
     Ok(local_dir)
 }
 
+/// Fill in empty model paths with their expected local locations.
+///
+/// Does **not** download anything or touch the network — just resolves
+/// where each model *would* live under `models_dir/`. Safe to call at
+/// startup even when models have not been downloaded yet.
+pub fn resolve_local_model_paths(
+    models_dir: &Path,
+    settings: &mut lune_core::config::UserSettings,
+) {
+    use lune_core::config::{AsrBackendConfig, LlmBackendConfig};
+
+    match &mut settings.asr_backend {
+        AsrBackendConfig::ParakeetTdt { model_dir } if model_dir.as_os_str().is_empty() => {
+            *model_dir = models_dir.join("parakeet-tdt-0.6b");
+        }
+        AsrBackendConfig::OrtQwenAsr { model_dir } if model_dir.as_os_str().is_empty() => {
+            *model_dir = models_dir.join("qwen3-asr-0.6b-onnx");
+        }
+        _ => {}
+    }
+
+    match &mut settings.llm_backend {
+        LlmBackendConfig::LlamaCppLocal { model_path, .. } if model_path.as_os_str().is_empty() => {
+            *model_path = models_dir
+                .join("qwen2.5-1.5b-instruct-gguf")
+                .join("Qwen2.5-1.5B-Instruct-Q4_K_M.gguf");
+        }
+        _ => {}
+    }
+
+    if let Some(aligner) = &mut settings.aligner
+        && aligner.enabled
+        && aligner.model_dir.as_os_str().is_empty()
+    {
+        aligner.model_dir = models_dir.join("wav2vec2-fa");
+    }
+}
+
 /// Resolve the aligner model directory when the feature is enabled.
 ///
 /// Returns the default `models_dir/wav2vec2-fa` path when enabled with

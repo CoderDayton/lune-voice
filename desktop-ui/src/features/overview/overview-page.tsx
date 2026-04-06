@@ -25,6 +25,7 @@ export function OverviewPage() {
     serviceStatus === "listening" ||
     serviceStatus === "processing";
   const isLoading = serviceStatus === "Connecting" || loading;
+  const showSkeleton = loading && sessions.length === 0;
 
   const totalWords = sessions.reduce((sum, s) => sum + s.words, 0);
   const totalSeconds = sessions.reduce((sum, s) => sum + s.seconds, 0);
@@ -45,7 +46,16 @@ export function OverviewPage() {
             <InfoBadge>{summarizeDictationMode(dictationMode)}</InfoBadge>
           </div>
 
-          {stats.count > 0 ? (
+          {showSkeleton ? (
+            <div className="stats stats-vertical w-full overflow-hidden rounded-box border border-surface-border bg-surface-card sm:stats-horizontal">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="stat">
+                  <div className="stat-title"><span className="skeleton h-3 w-12" /></div>
+                  <div className="stat-value"><span className="skeleton h-8 w-20 mt-1" /></div>
+                </div>
+              ))}
+            </div>
+          ) : stats.count > 0 ? (
             <div className="stats stats-vertical w-full overflow-hidden rounded-box border border-surface-border bg-surface-card sm:stats-horizontal">
               <div className="stat">
                 <div className="stat-figure text-primary/30"><Hash size={22} strokeWidth={1.5} /></div>
@@ -82,7 +92,18 @@ export function OverviewPage() {
               <Link to="/history" className="btn btn-ghost btn-sm normal-case">{t`View all`}</Link>
           )}
           </div>
-          {recentSessions.length === 0 && !isActive ? (
+          {showSkeleton ? (
+            <div className="divide-y divide-surface-border">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="px-5 py-4 flex flex-col gap-2">
+                  <span className="skeleton h-3 w-16" />
+                  <span className="skeleton h-4 w-full" />
+                  <span className="skeleton h-4 w-3/4" />
+                  <span className="skeleton h-3 w-24 mt-1" />
+                </div>
+              ))}
+            </div>
+          ) : recentSessions.length === 0 && !isActive ? (
             <div className="flex flex-col items-center justify-center px-5 py-14 text-center sm:py-16">
               <div className="mb-4 flex size-16 items-center justify-center rounded-full bg-primary/8 sm:size-20">
                 <Mic className="size-8 text-primary/40 sm:size-10" strokeWidth={1.2} />

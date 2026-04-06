@@ -13,18 +13,18 @@
   name: "lune";
   default: true;
   color-scheme: dark;
-  --color-base-100: oklch(0.16 0.012 270);
-  --color-base-200: oklch(0.19 0.014 268);
-  --color-base-300: oklch(0.23 0.016 265);
-  --color-base-content: oklch(0.93 0.008 265);
-  --color-primary: oklch(0.68 0.14 280);
-  --color-primary-content: oklch(0.98 0.005 280);
-  --color-secondary: oklch(0.72 0.1 230);
+  --color-base-100: oklch(0.15 0.012 270);
+  --color-base-200: oklch(0.19 0.012 270);
+  --color-base-300: oklch(0.24 0.012 270);
+  --color-base-content: oklch(0.93 0.006 270);
+  --color-primary: oklch(0.65 0.25 270);
+  --color-primary-content: oklch(0.98 0.005 270);
+  --color-secondary: oklch(0.70 0.18 230);
   --color-secondary-content: oklch(0.98 0.005 230);
-  --color-accent: oklch(0.78 0.1 160);
-  --color-accent-content: oklch(0.2 0.04 160);
-  --color-neutral: oklch(0.22 0.012 268);
-  --color-neutral-content: oklch(0.82 0.008 268);
+  --color-accent: oklch(0.75 0.16 60);
+  --color-accent-content: oklch(0.18 0.04 60);
+  --color-neutral: oklch(0.24 0.012 270);
+  --color-neutral-content: oklch(0.88 0.008 270);
   --color-info: oklch(0.7 0.12 230);
   --color-info-content: oklch(0.98 0.005 230);
   --color-success: oklch(0.68 0.14 155);
@@ -81,24 +81,24 @@
 
 /* ── Theme-adaptive token values ───────────────────────────────────── */
 
-/* Dark theme (default) */
-:root, [data-theme="lune"] {
-  --content-strong: oklch(0.93 0.008 265);
-  --content-default: oklch(0.93 0.008 265 / 0.85);
-  --content-muted: oklch(0.93 0.008 265 / 0.60);
-  --content-subtle: oklch(0.93 0.008 265 / 0.45);
-  --content-dim: oklch(0.93 0.008 265 / 0.30);
-  --surface-card: oklch(0.19 0.014 268 / 0.4);
-  --surface-elevated: oklch(0.22 0.015 268 / 0.6);
-  --surface-glass: oklch(0.16 0.012 270 / 0.88);
-  --surface-nav-active: oklch(0.68 0.14 280 / 0.1);
-  --surface-hover: oklch(1 0 0 / 0.03);
-  --surface-border: oklch(0.93 0.008 265 / 0.06);
-  --surface-inset: oklch(0.16 0.012 270 / 0.4);
+/* Dark scheme tokens (default) — applies to lune + all dark DaisyUI themes */
+:root, [data-color-scheme="dark"] {
+  --content-strong: oklch(0.94 0.006 270);
+  --content-default: oklch(0.86 0.006 270);
+  --content-muted: oklch(0.68 0.008 270);
+  --content-subtle: oklch(0.52 0.008 270);
+  --content-dim: oklch(0.38 0.008 270);
+  --surface-card: oklch(0.21 0.012 270 / 0.60);
+  --surface-elevated: oklch(0.25 0.012 270 / 0.75);
+  --surface-glass: oklch(0.18 0.012 270 / 0.92);
+  --surface-nav-active: oklch(0.65 0.25 270 / 0.12);
+  --surface-hover: oklch(1 0 0 / 0.05);
+  --surface-border: oklch(0.90 0.008 270 / 0.12);
+  --surface-inset: oklch(0.13 0.012 270 / 0.55);
 }
 
-/* Light theme */
-[data-theme="lune-light"] {
+/* Light scheme tokens — applies to lune-light + all light DaisyUI themes */
+[data-color-scheme="light"] {
   --content-strong: oklch(0.18 0.015 265);
   --content-default: oklch(0.25 0.012 265);
   --content-muted: oklch(0.40 0.010 265);
@@ -178,15 +178,15 @@
   --space-page-bottom: 3rem;
 
   --surface-body:
-    linear-gradient(170deg, oklch(0.17 0.014 272), oklch(0.13 0.01 268));
+    linear-gradient(170deg, oklch(0.16 0.014 272), oklch(0.12 0.010 268));
   --surface-backdrop:
-    radial-gradient(ellipse at 15% 5%, oklch(0.68 0.14 280 / 0.06), transparent 50%),
-    radial-gradient(ellipse at 85% 90%, oklch(0.72 0.1 230 / 0.04), transparent 50%);
+    radial-gradient(ellipse at 15% 5%, oklch(0.68 0.14 280 / 0.07), transparent 50%),
+    radial-gradient(ellipse at 85% 90%, oklch(0.72 0.1 230 / 0.05), transparent 50%);
   --surface-brand:
     linear-gradient(135deg, oklch(0.72 0.1 230), oklch(0.68 0.14 280));
 }
 
-[data-theme="lune-light"] {
+[data-color-scheme="light"] {
   --surface-body:
     linear-gradient(170deg, oklch(0.96 0.004 265), oklch(0.93 0.006 268));
   --surface-backdrop:
@@ -372,6 +372,26 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ── btn-soft fix: DaisyUI mixes only 8% of color into base-100,
+   invisible on dark themes. Override to 30% for a visible tint.
+   Must be unlayered to beat DaisyUI's @layer daisyui.l1 specificity. */
+.btn-soft:not(
+  .btn-active, :hover, :active:focus, :focus-visible,
+  input:checked:not(.filter .btn),
+  :disabled, [disabled], .btn-disabled
+) {
+  --btn-bg: color-mix(
+    in oklab,
+    var(--btn-color, var(--color-base-content)) 30%,
+    var(--color-base-100)
+  );
+  --btn-border: color-mix(
+    in oklab,
+    var(--btn-color, var(--color-base-content)) 35%,
+    var(--color-base-100)
+  );
 }
 
 /* ── Shell layout ──────────────────────────────────────────────────── */

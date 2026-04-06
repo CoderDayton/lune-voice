@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Monitor, Moon, Sun } from "lucide-react";
-import { SettingsRow, SettingsSection } from "../components/section";
+import { Monitor, Moon, Palette, Sun } from "lucide-react";
+import { SettingsSection } from "../components/section";
 import { ThemePicker } from "../components/theme-picker";
 import { useLingui } from "@lingui/react/macro";
 import {
@@ -20,38 +20,64 @@ export function AppearanceSection() {
   }, []);
 
   const currentLabel = theme === "system" ? t`System` : themeLabel(theme);
-  const CurrentIcon = theme === "system" ? Monitor : isDarkTheme(theme) ? Moon : Sun;
+  const dark = isDarkTheme(theme) || theme === "system";
 
-  // Quick toggle: lune dark ↔ lune light
-  function toggleQuick() {
-    const next = isDarkTheme(theme) || theme === "system" ? "lune-light" : "lune";
+  function selectMode(mode: "dark" | "light" | "system") {
+    const next = mode === "dark" ? "lune" : mode === "light" ? "lune-light" : "system";
     setThemePreference(next);
     setTheme(next);
   }
+
+  const activeMode = theme === "system" ? "system" : dark ? "dark" : "light";
 
   return (
     <SettingsSection
       title={t`Appearance`}
       description={t`Choose how Lune Voice looks.`}
-      icon={Sun}
+      icon={Palette}
     >
-      <SettingsRow
-        label={t`Theme`}
-        description={currentLabel}
-        control={
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <button
-              type="button"
-              onClick={toggleQuick}
-              className="btn btn-sm btn-ghost btn-circle"
-              aria-label={t`Toggle dark/light`}
-            >
-              <CurrentIcon size={16} strokeWidth={1.8} />
-            </button>
+      {/* Mode selector — large, clear buttons */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">{t`Mode`}</span>
+          <div className="grid grid-cols-3 gap-2">
+            {([["dark", Moon, t`Dark`], ["light", Sun, t`Light`], ["system", Monitor, t`System`]] as const).map(([mode, Icon, label]) => {
+              const active = activeMode === mode;
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => selectMode(mode)}
+                  className={`flex flex-col items-center gap-1 rounded-box border-2 px-3 py-2 transition-all ${
+                    active
+                      ? "border-primary bg-primary/8 text-primary"
+                      : "border-surface-border bg-base-200/30 text-content-muted hover:border-base-300 hover:text-content-default"
+                  }`}
+                >
+                  <Icon size={20} strokeWidth={1.6} />
+                  <span className="text-xs font-medium">{label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Theme picker — full-width browse button */}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">{t`Theme`}</span>
+          <div className="flex items-center justify-between rounded-field border border-surface-border bg-base-200/40 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <div className="flex gap-1">
+                <div className="size-4 rounded-full bg-primary" />
+                <div className="size-4 rounded-full bg-secondary" />
+                <div className="size-4 rounded-full bg-accent" />
+              </div>
+              <span className="text-sm text-content-muted">{currentLabel}</span>
+            </div>
             <ThemePicker />
           </div>
-        }
-      />
+        </div>
+      </div>
     </SettingsSection>
   );
 }

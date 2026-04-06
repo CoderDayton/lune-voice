@@ -10,7 +10,7 @@ export function DictionaryTable() {
 
   if (entries.length === 0) {
     return (
-      <div className="alert">
+      <div role="alert" className="alert alert-info alert-soft">
         <BookOpen size={18} strokeWidth={1.5} className="text-content-subtle" />
         <span><Trans>No entries yet. Add your first correction rule above.</Trans></span>
       </div>

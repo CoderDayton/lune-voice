@@ -211,6 +211,16 @@ pub async fn download_model_cmd(
     .map_err(|e| format!("download task: {e}"))?
 }
 
+#[tauri::command]
+pub async fn initialize_pipeline(
+    window: WebviewWindow,
+    runtime: State<'_, AppRuntime>,
+) -> Result<(), String> {
+    require_window_access(&window, &["main"])?;
+    runtime.mark_reload_required().await;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::require_window_access_for_label;

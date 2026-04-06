@@ -47,7 +47,11 @@ export function ModelSetup({ children }: { children: React.ReactNode }) {
         setTimeout(() => {
           invoke<ModelStatus[]>("check_model_status").then((s) => {
             setModels(s);
-            setPhase(s.every((m) => m.ready) ? "ready" : "setup");
+            const allReady = s.every((m) => m.ready);
+            setPhase(allReady ? "ready" : "setup");
+            // Signal pipeline rebuild when all models are ready (handles
+            // partial download + retry scenarios where downloadAll isn't called)
+            if (allReady) invoke("initialize_pipeline").catch(() => {});
           });
         }, 400);
       }
@@ -70,6 +74,8 @@ export function ModelSetup({ children }: { children: React.ReactNode }) {
         return;
       }
     }
+    // Signal that models are ready — pipeline will rebuild on next dictation start
+    try { await invoke("initialize_pipeline"); } catch { /* non-fatal */ }
     setPhase("ready");
   }
 
@@ -118,6 +124,13 @@ export function ModelSetup({ children }: { children: React.ReactNode }) {
                 : t`Download the AI models that power offline voice recognition. Everything runs on your machine — no cloud, no accounts.`}
           </p>
         </div>
+
+        {/* Steps indicator */}
+        <ul className="steps steps-horizontal w-full text-xs">
+          <li className="step step-primary">{t`Check`}</li>
+          <li className={`step ${phase === "downloading" || phase === "error" ? "step-primary" : ""}`}>{t`Download`}</li>
+          <li className="step">{t`Ready`}</li>
+        </ul>
 
         {/* Model cards */}
         <div className="w-full space-y-2">

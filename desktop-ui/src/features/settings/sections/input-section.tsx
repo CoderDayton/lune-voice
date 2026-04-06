@@ -8,6 +8,8 @@ import { Mic } from "lucide-react";
 
 export function InputSection({ settings }: SettingsProps) {
   const { t } = useLingui();
+  const isParakeet = settings.asrBackend === "ParakeetTdt";
+
   async function handleLanguageChange(locale: string) {
     const previousLocale = settings.language as LocaleKey;
     const saved = await saveWorkspaceSetting("language", locale);
@@ -52,24 +54,44 @@ export function InputSection({ settings }: SettingsProps) {
       />
       <SettingsRow
         label={t`Pause sensitivity`}
-        description={t`Lower numbers wait longer before deciding you are done speaking.`}
-        control={<span className="badge badge-outline badge-sm font-mono">{settings.speechThreshold}</span>}
+        description={t`How quickly Lune decides you're done speaking.`}
+        control={
+          <div className="flex items-center gap-3">
+            <input
+              type="range"
+              className="range range-primary range-xs w-28 sm:w-36"
+              min={0.2}
+              max={0.9}
+              step={0.05}
+              value={settings.speechThreshold}
+              onChange={(e) => void saveWorkspaceSetting("speechThreshold", e.target.value)}
+              aria-label={t`Pause sensitivity`}
+            />
+            <span className="text-xs tabular-nums text-content-muted w-8 text-right">
+              {Number(settings.speechThreshold) < 0.35 ? t`Slow` : Number(settings.speechThreshold) > 0.65 ? t`Fast` : t`Mid`}
+            </span>
+          </div>
+        }
       />
       <SettingsRow
-        label="Language"
-        description={t`Select the language for the Lune Voice interface.`}
+        label={t`Language`}
+        description={isParakeet ? t`English only — Parakeet ASR does not support other languages.` : t`Select the language for voice recognition.`}
         control={
-          <select
-            className="select w-full sm:w-auto sm:min-w-52"
-            value={settings.language}
-            onChange={(event) => void handleLanguageChange(event.target.value)}
-          >
-            {(Object.entries(locales) as [LocaleKey, string][]).map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </select>
+          isParakeet ? (
+            <span className="badge badge-outline badge-sm">{t`English`}</span>
+          ) : (
+            <select
+              className="select w-full sm:w-auto sm:min-w-52"
+              value={settings.language}
+              onChange={(event) => void handleLanguageChange(event.target.value)}
+            >
+              {(Object.entries(locales) as [LocaleKey, string][]).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          )
         }
       />
     </SettingsSection>

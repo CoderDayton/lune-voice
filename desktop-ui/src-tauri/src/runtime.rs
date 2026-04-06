@@ -6,12 +6,12 @@ use lune_asr::{AsrRegistry, OrtForcedAligner};
 use lune_commands::VoiceCommandRouter;
 use lune_core::asr::AsrSessionConfig;
 use lune_core::command::VoiceCommand;
-use lune_core::config::{AsrBackendConfig, LlmBackendConfig, UserSettings};
+use lune_core::config::{LlmBackendConfig, UserSettings};
 use lune_core::llm::TextPostProcessor;
 use lune_core::session::SessionEvent;
 use lune_dict::DictionaryManager;
 use lune_llm::{LlamaCppBackend, LlamaCppConfig, OpenAiLlmBackend, OpenAiLlmConfig};
-use lune_persist::{AppPaths, Database, SettingsStore, ensure_default_models};
+use lune_persist::{AppPaths, Database, SettingsStore, resolve_local_model_paths};
 use tauri::{AppHandle, Emitter, ipc::Channel};
 use tokio::sync::{Mutex, RwLock, mpsc};
 #[cfg(unix)]
@@ -48,7 +48,7 @@ struct RuntimeInner {
 
 struct LivePipeline {
     paths: AppPaths,
-    manager: Arc<SessionManager<AsrRegistry>>,
+    manager: Option<Arc<SessionManager<AsrRegistry>>>,
     active: bool,
     session_id: Option<String>,
     reload_required: bool,
@@ -62,7 +62,36 @@ struct SessionStreamSlot {
 impl AppRuntime {
     pub async fn new(app: AppHandle) -> Result<Self, String> {
         let paths = resolve_paths()?;
-        let (pipeline, settings) = build_pipeline(paths.clone()).await?;
+        let mut settings = load_settings(&paths)?;
+        resolve_local_model_paths(&paths.models_dir(), &mut settings);
+        init_ort_runtime(&settings);
+
+        // Check model readiness *before* attempting pipeline build.
+        // If models are present, build errors are fatal (e.g. corrupt DB,
+        // bad config). If models are absent, boot with an empty pipeline
+        // and let the user download via the setup UI.
+        let models_ready = lune_persist::check_model_status(
+            &paths.models_dir(),
+            &settings.asr_backend,
+            &settings.llm_backend,
+        )
+        .iter()
+        .all(|s| s.ready);
+
+        let (pipeline, settings) = if models_ready {
+            build_pipeline(paths.clone(), settings).await?
+        } else {
+            info!("models not yet downloaded — deferring pipeline build");
+            let settings = Arc::new(RwLock::new(settings));
+            let pipeline = LivePipeline {
+                paths,
+                manager: None,
+                active: false,
+                session_id: None,
+                reload_required: true,
+            };
+            (pipeline, settings)
+        };
 
         let terminal_mode = settings.read().await.terminal_mode;
         let delivery = DeliveryService::new(terminal_mode);
@@ -447,7 +476,11 @@ impl AppRuntime {
 
     async fn active_manager(&self) -> Option<Arc<SessionManager<AsrRegistry>>> {
         let pipeline = self.inner.pipeline.lock().await;
-        pipeline.active.then(|| Arc::clone(&pipeline.manager))
+        if pipeline.active {
+            pipeline.manager.as_ref().map(Arc::clone)
+        } else {
+            None
+        }
     }
 
     async fn prepare_manager_for_start(&self) -> Result<Arc<SessionManager<AsrRegistry>>, String> {
@@ -457,13 +490,22 @@ impl AppRuntime {
             if pipeline.active {
                 return Err("dictation session already active".into());
             }
-            pipeline.reload_required.then(|| pipeline.paths.clone())
+            // Rebuild when settings changed OR pipeline was never built (models were missing at boot)
+            if pipeline.reload_required || pipeline.manager.is_none() {
+                Some(pipeline.paths.clone())
+            } else {
+                None
+            }
         };
 
         // Phase 2: If reload needed, rebuild pipeline outside lock, then
         // re-acquire and atomically swap + activate in one critical section.
         if let Some(paths) = reload_paths {
-            let (rebuilt, new_settings) = build_pipeline(paths).await?;
+            let mut settings = load_settings(&paths)?;
+            resolve_local_model_paths(&paths.models_dir(), &mut settings);
+            let (rebuilt, new_settings) = build_pipeline(paths, settings)
+                .await
+                .map_err(|e| format!("Pipeline build failed: {e}"))?;
             let mut pipeline = self.inner.pipeline.lock().await;
             if pipeline.active {
                 return Err("dictation session became active during reload".into());
@@ -480,7 +522,11 @@ impl AppRuntime {
                 .send(new_settings_val.activation_mode);
             let mut settings = self.inner.settings.write().await;
             *settings = new_settings_val;
-            return Ok(Arc::clone(&pipeline.manager));
+            let mgr = pipeline
+                .manager
+                .as_ref()
+                .expect("build_pipeline succeeded but manager is None");
+            return Ok(Arc::clone(mgr));
         }
 
         // Phase 3: No reload — just activate.
@@ -488,8 +534,16 @@ impl AppRuntime {
         if pipeline.active {
             return Err("dictation session already active".into());
         }
+        if pipeline.manager.is_none() {
+            return Err("Models not downloaded. Please complete model setup first.".into());
+        }
         pipeline.active = true;
-        Ok(Arc::clone(&pipeline.manager))
+        Ok(Arc::clone(
+            pipeline
+                .manager
+                .as_ref()
+                .expect("manager confirmed Some at line above"),
+        ))
     }
 
     async fn set_pipeline_session(&self, session_id: Option<String>, active: bool) {
@@ -509,11 +563,8 @@ impl Clone for AppRuntime {
 
 async fn build_pipeline(
     paths: AppPaths,
+    settings: UserSettings,
 ) -> Result<(LivePipeline, Arc<RwLock<UserSettings>>), String> {
-    let mut settings = load_settings(&paths)?;
-    patch_model_paths(&paths, &mut settings)?;
-    init_ort_runtime(&settings);
-
     let asr = AsrRegistry::from_config(&settings.asr_backend, settings.device)
         .map_err(|e| format!("build asr backend: {e}"))?;
     let aligner = build_aligner(&asr, &settings)?;
@@ -558,7 +609,7 @@ async fn build_pipeline(
 
     let pipeline = LivePipeline {
         paths,
-        manager: Arc::new(manager),
+        manager: Some(Arc::new(manager)),
         active: false,
         session_id: None,
         reload_required: false,
@@ -581,41 +632,6 @@ fn load_settings(paths: &AppPaths) -> Result<UserSettings, String> {
         .map_err(|e| format!("load settings: {e}"))?;
     settings.migrate_pipeline_fields();
     Ok(settings)
-}
-
-fn patch_model_paths(paths: &AppPaths, settings: &mut UserSettings) -> Result<(), String> {
-    let resolved = ensure_default_models(
-        &paths.models_dir(),
-        &settings.asr_backend,
-        &settings.llm_backend,
-        settings.aligner.as_ref(),
-    )
-    .map_err(|e| format!("resolve models: {e}"))?;
-
-    match &mut settings.asr_backend {
-        AsrBackendConfig::ParakeetTdt { model_dir } if model_dir.as_os_str().is_empty() => {
-            *model_dir = resolved.asr_model_dir;
-        }
-        AsrBackendConfig::OrtQwenAsr { model_dir } if model_dir.as_os_str().is_empty() => {
-            *model_dir = resolved.ort_qwen_asr_model_dir;
-        }
-        _ => {}
-    }
-
-    match &mut settings.llm_backend {
-        LlmBackendConfig::LlamaCppLocal { model_path, .. } if model_path.as_os_str().is_empty() => {
-            *model_path = resolved.llm_model_path;
-        }
-        _ => {}
-    }
-
-    if let (Some(aligner), Some(model_dir)) = (&mut settings.aligner, resolved.aligner_model_dir)
-        && aligner.model_dir.as_os_str().is_empty()
-    {
-        aligner.model_dir = model_dir;
-    }
-
-    Ok(())
 }
 
 fn init_ort_runtime(settings: &UserSettings) {

@@ -54,7 +54,7 @@ export function HistorySessionList() {
   if (groups.length === 0) {
     const hasSearch = searchQuery.trim().length > 0;
     return (
-      <div className="alert">
+      <div role="alert" className="alert alert-info alert-soft">
         <span>
           {hasSearch
             ? t`No sessions match "${searchQuery.trim()}". Try a different search.`

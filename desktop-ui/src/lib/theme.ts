@@ -43,6 +43,11 @@ export function setThemePreference(pref: ThemePreference) {
 export function applyTheme(pref: ThemePreference) {
   const resolved = pref === "system" ? getSystemTheme() : pref;
   document.documentElement.setAttribute("data-theme", resolved);
+  // Propagate light/dark scheme so CSS design tokens auto-switch for all themes
+  document.documentElement.setAttribute(
+    "data-color-scheme",
+    isDarkTheme(resolved) ? "dark" : "light",
+  );
 }
 
 function getSystemTheme(): string {
