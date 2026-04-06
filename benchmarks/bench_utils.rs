@@ -418,16 +418,29 @@ pub fn init_ort() -> bool {
         println!("  [info] ORT: CPU only (FORCE_CPU=1)");
         return false;
     }
-    let ok = ort::init()
-        .with_execution_providers([ort::ep::CUDA::default().build()])
-        .commit();
-    if ok {
-        println!("  [info] ORT: CUDA EP active");
+    // CPU-only global init. ASR sessions register their own CUDA EP
+    // via build_ort_session — keeps VAD on CPU automatically.
+    let _ = ort::init().commit();
+
+    #[cfg(feature = "cuda")]
+    let has_gpu = {
+        use ort::ep::ExecutionProvider;
+        let ok = (|| -> std::result::Result<(), Box<dyn std::error::Error>> {
+            let mut b = ort::session::Session::builder()?;
+            ort::ep::CUDA::default().register(&mut b)?;
+            Ok(())
+        })();
+        ok.is_ok()
+    };
+    #[cfg(not(feature = "cuda"))]
+    let has_gpu = false;
+
+    if has_gpu {
+        println!("  [info] ORT: CPU global, CUDA per-session for ASR");
     } else {
-        let _ = ort::init().commit();
-        println!("  [info] ORT: CPU only (CUDA not available)");
+        println!("  [info] ORT: CPU only");
     }
-    ok
+    has_gpu
 }
 
 // ─── Brent's method — 1D minimizer ─────────────────────────────────────────

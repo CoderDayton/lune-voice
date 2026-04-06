@@ -5,8 +5,8 @@
 //!
 //! Key properties:
 //! - `max_segment_ms` (30000) force-flushes at the 60s encoder input limit
-//! - Tiered silence: `sentence_close_ms` (600) for sentence boundaries,
-//!   `hard_close_ms` (1200) for topic breaks. Pauses < sentence_close_ms
+//! - Tiered silence: `sentence_close_ms` (776) for sentence boundaries,
+//!   `hard_close_ms` (1552) for topic breaks. Pauses < sentence_close_ms
 //!   are absorbed to keep segments intact across natural hesitations.
 //! - Optional adaptive mode: learns thresholds from the speaker's own
 //!   pause rhythm (absorbed vs completed pauses). P95-based with EMA.
@@ -225,8 +225,8 @@ impl Default for VadSegmenterConfig {
         Self {
             speech_threshold: 0.5,
             min_speech_ms: 150,
-            sentence_close_ms: 600,
-            hard_close_ms: 1_200,
+            sentence_close_ms: 776,
+            hard_close_ms: 1_552,
             max_segment_ms: 30_000,
             adaptive: false,
         }
@@ -326,6 +326,8 @@ impl VadSegmenter {
     }
 
     fn new_inner(config: VadSegmenterConfig, adaptive: Option<AdaptiveVadConfig>) -> Self {
+        // Stays on CPU because ORT global init is CPU-only; CUDA EP is only
+        // registered per-session for ASR models via build_ort_session.
         let vad = TenVad::new_from_bytes(TEN_VAD_MODEL, SAMPLE_RATE)
             .expect("TEN VAD init failed — embedded model is corrupt");
 

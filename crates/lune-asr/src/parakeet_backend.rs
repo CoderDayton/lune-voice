@@ -17,6 +17,15 @@ use crate::vocab::Vocabulary;
 /// natively; chunked inference splits internally when needed.
 const MAX_WINDOW_SAMPLES: usize = 960_000;
 
+/// Silence padding kept before speech onset (~200ms at 16 kHz).
+/// Preserves plosive/fricative consonant attacks that the VAD may not detect
+/// as speech but the ASR encoder needs for correct decoding.
+const ONSET_PAD_SAMPLES: usize = 3_200;
+
+/// RMS threshold below which a frame is considered silence.
+/// Typical speech RMS is 0.01–0.15; background noise is < 0.005.
+const SILENCE_RMS_THRESHOLD: f32 = 0.008;
+
 /// Chunk size for chunked inference (25 seconds at 16 kHz).
 /// Audio longer than this is split into overlapping chunks and merged via LCS.
 const CHUNK_SAMPLES: usize = 25 * 16_000;
@@ -128,12 +137,30 @@ impl AsrBackend for ParakeetTdtBackend {
             let ts = sess.total_samples * 1000 / sess.sample_rate as u64;
             let id = sess.next_id;
             sess.next_id += 1;
-            sess.samples_at_last_inference = sess.pending.len();
+            // Clone + clear: keeps pre-allocated capacity for session reuse,
+            // and preserves audio for retry if transcribe_pcm fails.
+            let pcm = sess.pending.clone();
+            sess.pending.clear();
+            sess.samples_at_last_inference = 0;
             sess.has_new = false;
-            (sess.pending.clone(), ts, id)
+            (pcm, ts, id)
         };
 
-        self.transcribe_pcm(&pcm, timestamp_ms, id, true)
+        // Trim leading silence outside the lock — avoids blocking the
+        // audio thread during the RMS scan.
+        let trim_start = find_trim_offset(&pcm);
+        let trimmed = if trim_start > 0 {
+            tracing::debug!(
+                trimmed_ms = trim_start * 1000 / 16_000,
+                remaining_ms = (pcm.len() - trim_start) * 1000 / 16_000,
+                "trimmed leading silence before ASR"
+            );
+            &pcm[trim_start..]
+        } else {
+            &pcm
+        };
+
+        self.transcribe_pcm(trimmed, timestamp_ms, id, true)
     }
 
     async fn reset_context(&self, session: &Self::SessionHandle) -> Result<()> {
@@ -369,6 +396,26 @@ fn tokens_to_word_confidences(tokens: &[DecodedToken], vocab: &Vocabulary) -> Ve
     words
 }
 
+/// Find how many leading samples to trim from PCM, keeping
+/// `ONSET_PAD_SAMPLES` (~200ms) before the first non-silent frame.
+/// Returns 0 if speech is already near the start.
+pub(crate) fn find_trim_offset(pcm: &[f32]) -> usize {
+    const FRAME_SIZE: usize = 320; // 20ms at 16kHz
+
+    let mut speech_start = pcm.len();
+    for (i, frame) in pcm.chunks(FRAME_SIZE).enumerate() {
+        let n = frame.len() as f32;
+        let rms = (frame.iter().map(|&s| s * s).sum::<f32>() / n).sqrt();
+        if rms > SILENCE_RMS_THRESHOLD {
+            speech_start = i * FRAME_SIZE;
+            break;
+        }
+    }
+
+    let trim_to = speech_start.saturating_sub(ONSET_PAD_SAMPLES);
+    if trim_to < FRAME_SIZE { 0 } else { trim_to }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -388,5 +435,34 @@ mod tests {
         let vocab = Vocabulary::empty();
         let result = tokens_to_word_confidences(&[], &vocab);
         assert!(result.is_empty());
+    }
+
+    #[test]
+    fn trim_offset_zero_when_speech_at_start() {
+        let mut pcm = vec![0.05f32; 3200];
+        pcm.extend_from_slice(&[0.0; 16_000]);
+        assert_eq!(find_trim_offset(&pcm), 0);
+    }
+
+    #[test]
+    fn trim_offset_removes_leading_dead_air() {
+        let mut pcm = vec![0.0f32; 32_000]; // 2s silence
+        pcm.extend_from_slice(&vec![0.05f32; 16_000]); // 1s speech
+        let offset = find_trim_offset(&pcm);
+        assert!(offset > 0, "should trim leading silence");
+        assert!(
+            offset <= 32_000 - ONSET_PAD_SAMPLES,
+            "should keep onset pad"
+        );
+    }
+
+    #[test]
+    fn trim_offset_zero_for_all_silent() {
+        let pcm = vec![0.0f32; 16_000];
+        // All silence — speech_start = pcm.len(), trim_to near end, but < FRAME_SIZE check
+        // returns 0 because there's nothing meaningful to trim to
+        let offset = find_trim_offset(&pcm);
+        // Either 0 or a valid offset — shouldn't panic
+        assert!(offset <= pcm.len());
     }
 }

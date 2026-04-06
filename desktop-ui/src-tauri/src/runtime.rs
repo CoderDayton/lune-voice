@@ -64,7 +64,7 @@ impl AppRuntime {
         let paths = resolve_paths()?;
         let mut settings = load_settings(&paths)?;
         resolve_local_model_paths(&paths.models_dir(), &mut settings);
-        init_ort_runtime(&settings);
+        init_ort_runtime();
 
         // Check model readiness *before* attempting pipeline build.
         // If models are present, build errors are fatal (e.g. corrupt DB,
@@ -634,21 +634,10 @@ fn load_settings(paths: &AppPaths) -> Result<UserSettings, String> {
     Ok(settings)
 }
 
-fn init_ort_runtime(settings: &UserSettings) {
-    let wants_gpu = settings.device.use_gpu(cfg!(feature = "cuda"));
-
-    if wants_gpu {
-        #[cfg(feature = "cuda")]
-        {
-            if ort::init()
-                .with_execution_providers([ort::ep::CUDA::default().build()])
-                .commit()
-            {
-                return;
-            }
-        }
-    }
-
+fn init_ort_runtime() {
+    // CPU-only global init. CUDA EP is registered per-session by
+    // build_ort_session in lune-asr — keeps VAD and other lightweight
+    // ORT consumers on CPU automatically.
     let _ = ort::init().commit();
 }
 

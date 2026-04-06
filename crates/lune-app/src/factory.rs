@@ -24,35 +24,14 @@ use lune_persist::ResolvedModels;
 /// The `cuda` feature is enabled by default, so `Auto` is equivalent to
 /// "try CUDA, fall back to CPU" on standard builds.
 #[cold]
-pub fn init_ort_runtime(settings: &UserSettings) {
-    let wants_gpu = settings.device.use_gpu(cfg!(feature = "cuda"));
-
-    if wants_gpu {
-        #[cfg(feature = "cuda")]
-        {
-            if ort::init()
-                .with_execution_providers([ort::ep::CUDA::default().build()])
-                .commit()
-            {
-                tracing::info!("ORT initialized with CUDA EP");
-                return;
-            } else {
-                tracing::warn!("ORT CUDA init failed, falling back to CPU");
-            }
-        }
-        // Reached only on --no-default-features builds with device != Cpu.
-        #[cfg(not(feature = "cuda"))]
-        {
-            tracing::info!("GPU requested but cuda feature not compiled, using CPU");
-        }
-    }
-
-    // CPU-only path: either device == Cpu, or CUDA init above failed.
-    // The second call to ort::init() is a no-op if already initialized.
+pub fn init_ort_runtime() {
+    // CPU-only global init. CUDA EP is registered per-session by
+    // `build_ort_session` for ASR models — keeps VAD and forced
+    // aligner on CPU automatically.
     if ort::init().commit() {
-        tracing::info!("ORT initialized (CPU only)");
+        tracing::info!("ORT initialized (CPU global, CUDA per-session for ASR)");
     } else {
-        tracing::info!("ORT already initialized (CPU fallback from failed CUDA attempt)");
+        tracing::info!("ORT already initialized");
     }
 }
 

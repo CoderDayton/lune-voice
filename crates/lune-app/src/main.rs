@@ -82,11 +82,10 @@ fn run_daemon() {
 
     factory::patch_model_paths(&mut settings, &models);
 
-    // ── Global ORT initialization ────────────────────────────────────────
-    // Must happen before any Session is created. When CUDA is available and
-    // the user wants GPU, register the CUDA EP globally so all ORT sessions
-    // (ASR encoder, ASR decoder, LLM decoder) share the same CUDA memory arena.
-    factory::init_ort_runtime(&settings);
+    // ── Global ORT initialization (CPU only) ─────────────────────────────
+    // CUDA EP is registered per-session by build_ort_session for ASR models.
+    // This keeps VAD and forced aligner on CPU automatically.
+    factory::init_ort_runtime();
 
     let (asr_backend_kind, selected_asr_dir) = match &settings.asr_backend {
         lune_core::config::AsrBackendConfig::ParakeetTdt { model_dir, .. } => {

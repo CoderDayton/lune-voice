@@ -130,8 +130,8 @@ impl Default for PipelineConfig {
     fn default() -> Self {
         Self {
             max_segment_ms: 30_000,
-            sentence_close_ms: 600,
-            hard_close_ms: 1_200,
+            sentence_close_ms: 776,
+            hard_close_ms: 1_552,
             speech_threshold: 0.5,
             min_speech_ms: 150,
             adaptive_vad: false,
@@ -179,7 +179,7 @@ mod tests {
         assert_eq!(merged.sentence_close_ms, 800);
         assert_eq!(merged.max_speech_samples, 120 * 16_000);
         // Unchanged fields
-        assert_eq!(merged.hard_close_ms, 1_200);
+        assert_eq!(merged.hard_close_ms, 1_552);
         assert_eq!(merged.max_segment_ms, 30_000);
     }
 

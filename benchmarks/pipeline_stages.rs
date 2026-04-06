@@ -166,6 +166,9 @@ fn main() {
     bench_threshold_sweep(llm.as_ref(), &asr_results, &fixtures);
     bench_vad_timing_sweep(&backends[0].1, &fixtures);
     bench_adaptive_vad(&backends[0].1, &fixtures);
+
+    // Short utterance & onset accuracy
+    bench_short_utterances(&backends[0].1, &fixtures);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -234,7 +237,7 @@ fn bench_asr_streaming(
     let mut results: Vec<AsrResult> = Vec::new();
 
     for fix in fixtures {
-        let (segments, total_secs, chunk_latencies_ms) = if use_batch {
+        let result = if use_batch {
             rt.block_on(transcribe_batch(asr, &fix.pcm))
         } else {
             rt.block_on(transcribe_timed_with_config(
@@ -242,6 +245,13 @@ fn bench_asr_streaming(
                 &fix.pcm,
                 vad_config.clone(),
             ))
+        };
+        let (segments, total_secs, chunk_latencies_ms) = match result {
+            Ok(r) => r,
+            Err(e) => {
+                println!("    [error] ASR failed: {e}");
+                continue;
+            }
         };
 
         let hypothesis = segments
@@ -731,7 +741,13 @@ fn bench_vad_timing_sweep(asr: &impl AsrBackend, fixtures: &[Fixture]) {
 
         for fix in fixtures {
             let (segments, _, _) =
-                rt.block_on(transcribe_timed_with_config(asr, &fix.pcm, config.clone()));
+                match rt.block_on(transcribe_timed_with_config(asr, &fix.pcm, config.clone())) {
+                    Ok(r) => r,
+                    Err(e) => {
+                        println!("      [error] {e}");
+                        continue;
+                    }
+                };
             let hypothesis = segments
                 .iter()
                 .map(|s| s.text.trim())
@@ -855,7 +871,7 @@ fn bench_vad_timing_sweep(asr: &impl AsrBackend, fixtures: &[Fixture]) {
 async fn transcribe_timed(
     backend: &impl AsrBackend,
     pcm: &[f32],
-) -> (Vec<AsrSegment>, f64, Vec<f64>) {
+) -> lune_core::error::Result<(Vec<AsrSegment>, f64, Vec<f64>)> {
     transcribe_timed_with_config(backend, pcm, VadSegmenterConfig::default()).await
 }
 
@@ -864,41 +880,30 @@ async fn transcribe_timed(
 async fn transcribe_batch(
     backend: &impl AsrBackend,
     pcm: &[f32],
-) -> (Vec<AsrSegment>, f64, Vec<f64>) {
-    let session = backend
-        .start_session(AsrSessionConfig::default())
-        .await
-        .expect("start asr session");
+) -> lune_core::error::Result<(Vec<AsrSegment>, f64, Vec<f64>)> {
+    let session = backend.start_session(AsrSessionConfig::default()).await?;
 
     let total_start = Instant::now();
+    backend.push_audio(&session, pcm).await?;
 
-    // Push all audio at once
-    backend.push_audio(&session, pcm).await.expect("push audio");
-
-    // Single poll_final triggers overlap-stitched decode
     let chunk_start = Instant::now();
-    let out = backend
-        .poll_final(&session)
-        .await
-        .expect("poll_final batch");
+    let out = backend.poll_final(&session).await?;
     let chunk_ms = chunk_start.elapsed().as_secs_f64() * 1000.0;
 
     let total_secs = total_start.elapsed().as_secs_f64();
-    backend.end_session(session).await.expect("end session");
+    backend.end_session(session).await?;
 
-    (out, total_secs, vec![chunk_ms])
+    Ok((out, total_secs, vec![chunk_ms]))
 }
 
 /// Like `transcribe_timed` but with a custom VAD config.
+/// Returns `Err` on ASR failures (e.g. GPU OOM) so callers can skip gracefully.
 async fn transcribe_timed_with_config(
     backend: &impl AsrBackend,
     pcm: &[f32],
     vad_config: VadSegmenterConfig,
-) -> (Vec<AsrSegment>, f64, Vec<f64>) {
-    let session = backend
-        .start_session(AsrSessionConfig::default())
-        .await
-        .expect("start asr session");
+) -> lune_core::error::Result<(Vec<AsrSegment>, f64, Vec<f64>)> {
+    let session = backend.start_session(AsrSessionConfig::default()).await?;
 
     let mut segmenter = VadSegmenter::new(vad_config);
     let chunk_size = 16_000; // 1s @ 16 kHz
@@ -910,27 +915,15 @@ async fn transcribe_timed_with_config(
         let (boundaries, in_speech) = segmenter.push(slice);
         if in_speech {
             let chunk_start = Instant::now();
-            backend
-                .push_audio(&session, slice)
-                .await
-                .expect("push audio");
-            out.extend(backend.poll_results(&session).await.expect("poll results"));
+            backend.push_audio(&session, slice).await?;
+            out.extend(backend.poll_results(&session).await?);
             chunk_latencies.push(chunk_start.elapsed().as_secs_f64() * 1000.0);
         }
-        // Flush ASR + reset context at segment boundaries
         for _boundary in &boundaries {
             let chunk_start = Instant::now();
-            out.extend(
-                backend
-                    .poll_final(&session)
-                    .await
-                    .expect("poll_final at boundary"),
-            );
+            out.extend(backend.poll_final(&session).await?);
             chunk_latencies.push(chunk_start.elapsed().as_secs_f64() * 1000.0);
-            backend
-                .reset_context(&session)
-                .await
-                .expect("reset at boundary");
+            backend.reset_context(&session).await?;
         }
     }
 
@@ -938,22 +931,14 @@ async fn transcribe_timed_with_config(
     segmenter.finish();
     let silence = vec![0.0f32; 16_000];
     let chunk_start = Instant::now();
-    backend
-        .push_audio(&session, &silence)
-        .await
-        .expect("push silence");
-    out.extend(
-        backend
-            .poll_final(&session)
-            .await
-            .expect("poll results final"),
-    );
+    backend.push_audio(&session, &silence).await?;
+    out.extend(backend.poll_final(&session).await?);
     chunk_latencies.push(chunk_start.elapsed().as_secs_f64() * 1000.0);
 
     let total_secs = total_start.elapsed().as_secs_f64();
-    backend.end_session(session).await.expect("end session");
+    backend.end_session(session).await?;
 
-    (out, total_secs, chunk_latencies)
+    Ok((out, total_secs, chunk_latencies))
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -972,14 +957,28 @@ fn bench_adaptive_vad(asr: &impl AsrBackend, fixtures: &[Fixture]) {
     // Run each fixture with adaptive VAD and compare to static defaults
     for fix in fixtures {
         // Static baseline
-        let (static_segs, static_secs, _) = rt.block_on(transcribe_timed(asr, &fix.pcm));
+        let static_result = rt.block_on(transcribe_timed(asr, &fix.pcm));
+        let (static_segs, static_secs, _) = match static_result {
+            Ok(r) => r,
+            Err(e) => {
+                println!("  {} — static ASR failed: {e}", fix.name);
+                continue;
+            }
+        };
         let static_text = segments_to_text(&static_segs);
         let static_wer = word_error_rate(&static_text, &fix.reference) * 100.0;
 
         // Adaptive mode
         let adaptive_config = VadSegmenterConfig::adaptive();
-        let (adaptive_segs, adaptive_secs, _) =
+        let adaptive_result =
             rt.block_on(transcribe_timed_with_config(asr, &fix.pcm, adaptive_config));
+        let (adaptive_segs, adaptive_secs, _) = match adaptive_result {
+            Ok(r) => r,
+            Err(e) => {
+                println!("  {} — adaptive ASR failed: {e}", fix.name);
+                continue;
+            }
+        };
         let adaptive_text = segments_to_text(&adaptive_segs);
         let adaptive_wer = word_error_rate(&adaptive_text, &fix.reference) * 100.0;
 
@@ -1027,4 +1026,147 @@ fn segments_to_text(segs: &[AsrSegment]) -> String {
         .map(|s| s.text.as_str())
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Stage: Short Utterance & Onset Accuracy
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// Tests how well the pipeline handles:
+// 1. Short utterances extracted from longer fixtures (simulating 1-3 word input)
+// 2. Leading silence of varying lengths before speech onset
+// 3. First-word accuracy specifically
+
+fn bench_short_utterances(backend: &AsrRegistry, fixtures: &[Fixture]) {
+    println!("── Stage: Short Utterance & Onset Analysis ────────────────────────");
+    println!();
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("tokio runtime");
+
+    // Extract the first ~1 second of speech from each fixture as a "short utterance"
+    // by finding the first non-silent region
+    for fix in fixtures {
+        let onset = find_speech_onset(&fix.pcm);
+        if onset >= fix.pcm.len() {
+            println!("  {} — no speech detected, skipping", fix.name);
+            continue;
+        }
+
+        // Extract first ~1.5 seconds of speech from onset
+        let short_end = (onset + 24_000).min(fix.pcm.len()); // 1.5s
+        let short_pcm = &fix.pcm[onset..short_end];
+        let short_secs = short_pcm.len() as f64 / 16_000.0;
+
+        // Get reference text (first 4 words)
+        let ref_words: Vec<&str> = fix.reference.split_whitespace().take(4).collect();
+        let ref_short = ref_words.join(" ");
+
+        println!("  {} — onset analysis:", fix.name);
+        println!("    Speech onset: {:.0}ms into audio", onset as f64 / 16.0);
+        println!(
+            "    Short clip: {:.2}s ({} samples)",
+            short_secs,
+            short_pcm.len()
+        );
+        println!("    Reference (first words): \"{}\"", ref_short);
+        println!();
+
+        // Test with varying amounts of leading silence prepended
+        let trailing_silence = vec![0.0f32; 16_000];
+        let silence_amounts = [0, 1600, 3200, 8_000, 16_000, 32_000]; // 0, 100ms, 200ms, 500ms, 1s, 2s
+
+        println!("    Leading silence sweep (same speech, different lead-in):");
+        println!(
+            "    {:>8}  {:>8}  {:>6}  {}",
+            "silence", "latency", "WER", "hypothesis"
+        );
+        println!(
+            "    {:>8}  {:>8}  {:>6}  {}",
+            "--------", "--------", "------", "----------"
+        );
+
+        for &silence_samples in &silence_amounts {
+            let silence_ms = silence_samples * 1000 / 16_000;
+
+            // Build test audio: silence + short speech + 1s trailing silence
+            let mut test_pcm = vec![0.0f32; silence_samples];
+            test_pcm.extend_from_slice(short_pcm);
+            test_pcm.extend_from_slice(&trailing_silence);
+
+            let config = AsrSessionConfig {
+                language: Some("en-US".to_string()),
+                ..Default::default()
+            };
+
+            let t = Instant::now();
+            let hypothesis = rt.block_on(async {
+                let session = backend.start_session(config).await?;
+                backend.push_audio(&session, &test_pcm).await?;
+                let segs = backend.poll_final(&session).await?;
+                backend.end_session(session).await?;
+                Ok::<_, lune_core::error::Error>(segments_to_text(&segs))
+            });
+
+            let elapsed_ms = t.elapsed().as_secs_f64() * 1000.0;
+
+            match hypothesis {
+                Ok(hyp) => {
+                    let hyp_trimmed = hyp.trim().to_lowercase();
+                    let ref_lower = ref_short.to_lowercase();
+                    let wer = word_error_rate(&ref_lower, &hyp_trimmed);
+
+                    // Check first word specifically
+                    let first_ref = ref_words
+                        .first()
+                        .map(|w| w.to_lowercase())
+                        .unwrap_or_default();
+                    let first_hyp = hyp_trimmed
+                        .split_whitespace()
+                        .next()
+                        .unwrap_or("")
+                        .to_string();
+                    let first_ok = first_ref == first_hyp;
+
+                    println!(
+                        "    {:>5}ms  {:>6.1}ms  {:>5.1}%  \"{}\" {}",
+                        silence_ms,
+                        elapsed_ms,
+                        wer,
+                        hyp_trimmed,
+                        if first_ok { "✓" } else { "✗ first word" }
+                    );
+                }
+                Err(e) => {
+                    println!(
+                        "    {:>5}ms  {:>6.1}ms  {:>5}  [error: {}]",
+                        silence_ms, elapsed_ms, "—", e
+                    );
+                }
+            }
+        }
+        println!();
+    }
+}
+
+/// Find the sample index where speech begins (first frame with RMS > threshold).
+/// Uses the same constants as `parakeet_backend::find_trim_offset`.
+fn find_speech_onset(pcm: &[f32]) -> usize {
+    const FRAME: usize = 320;
+    const THRESHOLD: f32 = 0.008;
+    for (i, frame) in pcm.chunks(FRAME).enumerate() {
+        let rms = frame_rms(frame);
+        if rms > THRESHOLD {
+            return i * FRAME;
+        }
+    }
+    pcm.len()
+}
+
+#[inline]
+fn frame_rms(frame: &[f32]) -> f32 {
+    let n = frame.len() as f32;
+    (frame.iter().map(|&s| s * s).sum::<f32>() / n).sqrt()
 }
