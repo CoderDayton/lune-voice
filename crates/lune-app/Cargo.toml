@@ -55,3 +55,7 @@ path = "../../benchmarks/pipeline_real.rs"
 [[example]]
 name = "live_transcribe"
 path = "../../benchmarks/live_transcribe.rs"
+
+[[example]]
+name = "calibrate_confidence"
+path = "../../benchmarks/calibrate_confidence.rs"

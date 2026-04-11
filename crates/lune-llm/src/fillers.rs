@@ -18,9 +18,21 @@ struct LangFillers {
 }
 
 fn build_patterns(raw_patterns: &[&str]) -> LangFillers {
+    // Match both annotation formats:
+    //   `[?filler?]`         — legacy uncertainty marker
+    //   `{filler|alternate}` — runner-up marker (Parakeet TDT alternates)
+    //
+    // The runner-up branch matches when the *guess* slot is a filler,
+    // regardless of what the alternate slot contains. A filler with a
+    // plausible runner-up is still a filler and should be deleted.
     let marked_parts: Vec<String> = raw_patterns
         .iter()
-        .map(|p| format!(r"\[\?(?:{p})\?\]"))
+        .flat_map(|p| {
+            [
+                format!(r"\[\?(?:{p})\?\]"),
+                format!(r"\{{(?:{p})\|[^}}]*\}}"),
+            ]
+        })
         .collect();
 
     let marked_combined = format!("(?i)(?:{})", marked_parts.join("|"));
@@ -264,5 +276,47 @@ mod tests {
     fn en_mixed_marked_and_bare() {
         let r = remove_fillers("[?um?] so the summer um festival was ahh amazing", "en").unwrap();
         assert_eq!(r, "so the summer festival was amazing");
+    }
+
+    // ── Runner-up `{filler|alt}` marker removal ─────────────────────────
+
+    #[test]
+    fn en_runner_up_filler_stripped() {
+        // Parakeet TDT may emit `{um|and}` when the filler is uncertain and
+        // the runner-up token happens to be a real word. The marker must
+        // still be deleted — a filler with an alternate is still a filler.
+        let r = remove_fillers("{um|and} the meeting starts", "en").unwrap();
+        assert_eq!(r, "the meeting starts");
+    }
+
+    #[test]
+    fn en_runner_up_filler_stripped_marked_only() {
+        let r = remove_fillers_marked_only("this {uh|a} sounds {um|and} right", "en").unwrap();
+        assert_eq!(r, "this sounds right");
+    }
+
+    #[test]
+    fn en_runner_up_real_word_preserved() {
+        // `{summer|summit}` has a real-word guess, not a filler — do NOT strip.
+        let r = remove_fillers("the {summer|summit} festival", "en").unwrap();
+        assert_eq!(r, "the {summer|summit} festival");
+    }
+
+    #[test]
+    fn en_runner_up_filler_elongated() {
+        let r = remove_fillers("{Uhmmmm|and} the results", "en").unwrap();
+        assert_eq!(r, "the results");
+    }
+
+    #[test]
+    fn es_runner_up_filler() {
+        let r = remove_fillers("{eh|y} no sé", "es").unwrap();
+        assert_eq!(r, "no sé");
+    }
+
+    #[test]
+    fn fr_runner_up_filler() {
+        let r = remove_fillers("{euh|et} je ne sais pas", "fr").unwrap();
+        assert_eq!(r, "je ne sais pas");
     }
 }

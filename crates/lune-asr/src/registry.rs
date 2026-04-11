@@ -197,6 +197,9 @@ impl AsrRegistry {
                 min_speech_ms: 150,
                 adaptive_vad: false,
                 word_confidence_threshold: Some(0.65),
+                // Parakeet exposes per-token logits → skip-when-clean
+                // bypass enabled at 0.92 calibrated probability.
+                llm_skip_threshold: Some(0.92),
                 max_speech_samples: 60 * 16_000,
             },
             #[cfg(feature = "ort-qwen")]
@@ -210,6 +213,8 @@ impl AsrRegistry {
                 min_speech_ms: 150,
                 adaptive_vad: false,
                 word_confidence_threshold: Some(0.65),
+                // OrtQwen exposes per-word log-probs → skip-when-clean enabled.
+                llm_skip_threshold: Some(0.92),
                 max_speech_samples: 60 * 16_000,
             },
             Self::OpenAi(_) => PipelineConfig {
@@ -219,8 +224,10 @@ impl AsrRegistry {
                 speech_threshold: 0.5,
                 min_speech_ms: 200,
                 adaptive_vad: false,
-                // No per-token log-probs from remote API — disable confidence gating.
+                // No per-token log-probs from remote API — disable both
+                // marking and skip-when-clean gating.
                 word_confidence_threshold: None,
+                llm_skip_threshold: None,
                 max_speech_samples: 120 * 16_000,
             },
         }

@@ -1,12 +1,44 @@
 //! Input preparation for contextual token resolution.
 //!
 //! Combines per-word confidence marking with filler removal to produce
-//! clean text with `[?word?]` markers on uncertain tokens — ready for
-//! LLM-based contextual resolution.
+//! clean text with uncertainty annotations (`[?word?]` or `{guess|alternate}`)
+//! — ready for LLM-based contextual resolution.
 
 use lune_core::asr::AsrSegment;
 
 use crate::fillers;
+
+/// Returns `true` when `text` contains any uncertainty annotation
+/// emitted by `mark_uncertain`: either a legacy `[?word?]` marker or a
+/// runner-up `{guess|alternate}` marker. The `{...|...}` check is strict
+/// (requires both braces and a pipe inside) to avoid false positives on
+/// unrelated punctuation.
+#[inline]
+pub fn has_uncertainty_markers(text: &str) -> bool {
+    if text.contains("[?") {
+        return true;
+    }
+    let mut chars = text.chars();
+    while let Some(c) = chars.next() {
+        if c != '{' {
+            continue;
+        }
+        let mut has_pipe = false;
+        for ic in chars.by_ref() {
+            match ic {
+                '}' => {
+                    if has_pipe {
+                        return true;
+                    }
+                    break;
+                }
+                '|' => has_pipe = true,
+                _ => {}
+            }
+        }
+    }
+    false
+}
 
 /// Prepare ASR segments for contextual token resolution.
 ///
@@ -57,7 +89,7 @@ pub fn prepare_input(segments: &[AsrSegment], threshold: f32, lang: &str) -> (St
     };
 
     // 3. Check if any uncertain markers remain (fillers may have consumed some)
-    let has_uncertain = cleaned.contains("[?");
+    let has_uncertain = has_uncertainty_markers(&cleaned);
 
     (cleaned, has_uncertain)
 }
@@ -92,7 +124,7 @@ pub fn prepare_input_contextual(
         Err(_) => marked,
     };
 
-    let has_uncertain = cleaned.contains("[?");
+    let has_uncertain = has_uncertainty_markers(&cleaned);
     (cleaned, has_uncertain)
 }
 
@@ -112,10 +144,7 @@ mod tests {
             end_ms: None,
             word_confidences: wcs
                 .into_iter()
-                .map(|(w, c)| WordConfidence {
-                    word: w.into(),
-                    confidence: c,
-                })
+                .map(|(w, c)| WordConfidence::new(w.to_string(), c))
                 .collect(),
         }
     }
@@ -281,5 +310,45 @@ mod tests {
         assert!(text.contains("[?tha?]"));
         assert!(text.contains("[?recieve?]"));
         assert!(has_uncertain);
+    }
+
+    // ── has_uncertainty_markers helper ──────────────────────────────────
+
+    #[test]
+    fn detects_legacy_bracket_marker() {
+        assert!(has_uncertainty_markers("the [?fox?] jumped"));
+    }
+
+    #[test]
+    fn detects_runner_up_brace_marker() {
+        assert!(has_uncertainty_markers("the {fox|box} jumped"));
+    }
+
+    #[test]
+    fn detects_both_formats_in_same_string() {
+        assert!(has_uncertainty_markers("the {fox|box} and the [?cat?]"));
+    }
+
+    #[test]
+    fn ignores_lone_brace_without_pipe() {
+        // A bare `{word}` without a pipe is not a runner-up marker —
+        // `strip_markers` still strips it, but it is not "uncertain" for
+        // the purpose of deciding whether to call the LLM.
+        assert!(!has_uncertainty_markers("the {only} option"));
+    }
+
+    #[test]
+    fn ignores_lone_brace_with_no_close() {
+        assert!(!has_uncertainty_markers("set x = {foo |"));
+    }
+
+    #[test]
+    fn ignores_plain_text() {
+        assert!(!has_uncertainty_markers("hello world"));
+    }
+
+    #[test]
+    fn ignores_pipe_outside_braces() {
+        assert!(!has_uncertainty_markers("echo a | b"));
     }
 }

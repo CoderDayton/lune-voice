@@ -4,10 +4,31 @@ use crate::Result;
 
 /// Per-word confidence derived from subword BPE token log-probabilities.
 /// Confidence = minimum exp(log_prob) across constituent subword tokens.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// `alternate` is an optional single runner-up word produced by backends that
+/// can cheaply expose one (e.g. Parakeet TDT via min-confidence subword swap).
+/// Backends without this capability (`OrtQwen`, `OpenAi`) leave it as `None`
+/// and the legacy `[?word?]` marker is emitted by `mark_uncertain` instead.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct WordConfidence {
     pub word: String,
     pub confidence: f32,
+    #[serde(default)]
+    pub alternate: Option<String>,
+}
+
+impl WordConfidence {
+    /// Convenience constructor for the common "no alternate" case. Prefer
+    /// this over struct-literal syntax at call sites that do not populate
+    /// the runner-up field.
+    #[inline]
+    pub fn new(word: impl Into<String>, confidence: f32) -> Self {
+        Self {
+            word: word.into(),
+            confidence,
+            alternate: None,
+        }
+    }
 }
 
 /// A segment of recognized speech.
@@ -40,6 +61,13 @@ pub struct AsrSegment {
 impl AsrSegment {
     /// Returns `true` when confidence meets or exceeds `threshold`, or when
     /// confidence is unavailable (conservative: assume pass).
+    ///
+    /// After the session layer applies the isotonic calibrator, the `confidence`
+    /// field carries `P(correct | raw softmax)` rather than the raw softmax
+    /// probability. Thresholds passed to this method should be interpreted on
+    /// the calibrated scale (i.e. as a minimum acceptance probability), not on
+    /// raw softmax magnitudes.
+    ///
     /// Inline so routing hot-loops don't pay a call frame.
     #[inline(always)]
     pub fn is_confident(&self, threshold: f32) -> bool {
@@ -49,6 +77,10 @@ impl AsrSegment {
     /// Two-level confidence gate: sentence-level mean AND min-token check.
     /// Per arXiv:2407.21414, sentence threshold=0.95 + word threshold=0.7
     /// catches segments where one bad token drags overall quality down.
+    ///
+    /// Both `mean_threshold` and `min_token_threshold` are compared against
+    /// calibrated `P(correct)` values once `SessionManager` has run the
+    /// isotonic calibrator — update tuned thresholds accordingly.
     #[inline(always)]
     pub fn is_confident_gated(&self, mean_threshold: f32, min_token_threshold: f32) -> bool {
         self.is_confident(mean_threshold)
@@ -57,13 +89,50 @@ impl AsrSegment {
                 .is_none_or(|m| m >= min_token_threshold)
     }
 
+    /// Minimum per-word confidence across this segment, or `None` when
+    /// per-word data is not available. After session-layer calibration,
+    /// this is `min P(correct | raw)` — the single weakest word.
+    #[inline]
+    pub fn min_word_confidence(&self) -> Option<f32> {
+        self.word_confidences
+            .iter()
+            .map(|w| w.confidence)
+            .reduce(f32::min)
+    }
+
+    /// Returns `true` when every word in the segment meets or exceeds
+    /// `skip_threshold`, signalling that the transcript is clean enough to
+    /// bypass LLM correction entirely. Conservative: if `word_confidences`
+    /// is empty, returns `false` so the caller falls back to the regular
+    /// path (we never skip LLM on unknown evidence).
+    #[inline]
+    pub fn is_clean_for_llm(&self, skip_threshold: f32) -> bool {
+        if self.word_confidences.is_empty() {
+            return false;
+        }
+        self.word_confidences
+            .iter()
+            .all(|w| w.confidence >= skip_threshold)
+    }
+
     /// Duration of the segment in milliseconds, if both timestamps are known.
     #[inline]
     pub fn duration_ms(&self) -> Option<u64> {
         self.end_ms?.checked_sub(self.start_ms?)
     }
 
-    /// Build text with low-confidence words wrapped in `[?word?]` markers.
+    /// Build text with low-confidence words annotated for the LLM corrector.
+    ///
+    /// Emission rules per word:
+    /// - confidence ≥ `threshold` → bare word (no annotation)
+    /// - confidence < `threshold` + `Some(alternate)` + `alternate != word` →
+    ///   `{word|alternate}` (runner-up channel, backends that support it)
+    /// - confidence < `threshold` + `None`/identical alternate → `[?word?]`
+    ///   (legacy marker, works for every backend)
+    ///
+    /// Repeated adjacent words never get annotated — the LLM incorrectly
+    /// "corrects" intentional repetitions away.
+    ///
     /// Falls back to `self.text.clone()` when no per-word data is available.
     pub fn mark_uncertain(&self, threshold: f32) -> String {
         if self.word_confidences.is_empty() {
@@ -72,11 +141,9 @@ impl AsrSegment {
         let mut parts: Vec<String> = Vec::with_capacity(self.word_confidences.len());
         let mut prev_word: Option<&str> = None;
         for wc in &self.word_confidences {
-            // Never mark a word as uncertain if it repeats the previous word —
-            // the LLM incorrectly "corrects" intentional repetitions away.
             let is_repeat = prev_word.is_some_and(|pw| pw.eq_ignore_ascii_case(&wc.word));
             if wc.confidence < threshold && !is_repeat {
-                parts.push(format!("[?{}?]", wc.word));
+                parts.push(format_uncertain(&wc.word, wc.alternate.as_deref()));
             } else {
                 parts.push(wc.word.clone());
             }
@@ -115,7 +182,7 @@ impl AsrSegment {
             let effective = contextual_threshold(&self.word_confidences, idx, base_threshold);
 
             if wc.confidence < effective && !is_repeat {
-                parts.push(format!("[?{}?]", wc.word));
+                parts.push(format_uncertain(&wc.word, wc.alternate.as_deref()));
             } else {
                 parts.push(wc.word.clone());
             }
@@ -133,6 +200,20 @@ impl AsrSegment {
                 .word_confidences
                 .iter()
                 .any(|wc| wc.confidence < threshold)
+    }
+}
+
+/// Format a below-threshold word as either `{word|alternate}` (runner-up
+/// channel) or legacy `[?word?]` marker, following the rules documented on
+/// `AsrSegment::mark_uncertain`. Extracted so the contextual and flat marking
+/// paths stay in sync.
+#[inline]
+fn format_uncertain(word: &str, alternate: Option<&str>) -> String {
+    match alternate {
+        Some(alt) if !alt.is_empty() && !alt.eq_ignore_ascii_case(word) => {
+            format!("{{{word}|{alt}}}")
+        }
+        _ => format!("[?{word}?]"),
     }
 }
 
@@ -387,14 +468,8 @@ mod tests {
     fn mark_uncertain_wraps_low_confidence_words() {
         let mut seg = make_segment();
         seg.word_confidences = vec![
-            WordConfidence {
-                word: "hello".into(),
-                confidence: 0.95,
-            },
-            WordConfidence {
-                word: "world".into(),
-                confidence: 0.60,
-            },
+            WordConfidence::new("hello", 0.95),
+            WordConfidence::new("world", 0.60),
         ];
         assert_eq!(seg.mark_uncertain(0.85), "hello [?world?]");
     }
@@ -403,16 +478,61 @@ mod tests {
     fn mark_uncertain_all_confident() {
         let mut seg = make_segment();
         seg.word_confidences = vec![
-            WordConfidence {
-                word: "hello".into(),
-                confidence: 0.95,
-            },
-            WordConfidence {
-                word: "world".into(),
-                confidence: 0.90,
-            },
+            WordConfidence::new("hello", 0.95),
+            WordConfidence::new("world", 0.90),
         ];
         assert_eq!(seg.mark_uncertain(0.85), "hello world");
+    }
+
+    #[test]
+    fn mark_uncertain_emits_alternate_when_below_threshold() {
+        // Runner-up alternate present + below threshold → {best|alt}.
+        let mut seg = make_segment();
+        seg.word_confidences = vec![
+            WordConfidence::new("the", 0.95),
+            WordConfidence {
+                word: "fox".into(),
+                confidence: 0.40,
+                alternate: Some("box".into()),
+            },
+        ];
+        assert_eq!(seg.mark_uncertain(0.85), "the {fox|box}");
+    }
+
+    #[test]
+    fn mark_uncertain_alternate_collapses_when_identical() {
+        // alt == best (case-insensitive) → fall back to legacy [?word?].
+        let mut seg = make_segment();
+        seg.word_confidences = vec![WordConfidence {
+            word: "fox".into(),
+            confidence: 0.40,
+            alternate: Some("Fox".into()),
+        }];
+        assert_eq!(seg.mark_uncertain(0.85), "[?fox?]");
+    }
+
+    #[test]
+    fn mark_uncertain_alternate_collapses_when_empty_string() {
+        // alt is Some("") → treat as None, emit legacy marker.
+        let mut seg = make_segment();
+        seg.word_confidences = vec![WordConfidence {
+            word: "fox".into(),
+            confidence: 0.40,
+            alternate: Some(String::new()),
+        }];
+        assert_eq!(seg.mark_uncertain(0.85), "[?fox?]");
+    }
+
+    #[test]
+    fn mark_uncertain_alternate_ignored_when_above_threshold() {
+        // High-confidence word keeps its alternate hidden — no annotation.
+        let mut seg = make_segment();
+        seg.word_confidences = vec![WordConfidence {
+            word: "fox".into(),
+            confidence: 0.99,
+            alternate: Some("box".into()),
+        }];
+        assert_eq!(seg.mark_uncertain(0.85), "fox");
     }
 
     #[test]
@@ -425,14 +545,8 @@ mod tests {
     fn has_uncertain_words_detects_low_confidence() {
         let mut seg = make_segment();
         seg.word_confidences = vec![
-            WordConfidence {
-                word: "hello".into(),
-                confidence: 0.95,
-            },
-            WordConfidence {
-                word: "world".into(),
-                confidence: 0.60,
-            },
+            WordConfidence::new("hello", 0.95),
+            WordConfidence::new("world", 0.60),
         ];
         assert!(seg.has_uncertain_words(0.85));
     }
@@ -441,14 +555,8 @@ mod tests {
     fn has_uncertain_words_all_above_threshold() {
         let mut seg = make_segment();
         seg.word_confidences = vec![
-            WordConfidence {
-                word: "hello".into(),
-                confidence: 0.95,
-            },
-            WordConfidence {
-                word: "world".into(),
-                confidence: 0.90,
-            },
+            WordConfidence::new("hello", 0.95),
+            WordConfidence::new("world", 0.90),
         ];
         assert!(!seg.has_uncertain_words(0.85));
     }
@@ -461,18 +569,9 @@ mod tests {
         // because positional leniency lowers the effective threshold.
         let mut seg = make_segment();
         seg.word_confidences = vec![
-            WordConfidence {
-                word: "the".into(),
-                confidence: 0.60,
-            },
-            WordConfidence {
-                word: "meeting".into(),
-                confidence: 0.95,
-            },
-            WordConfidence {
-                word: "starts".into(),
-                confidence: 0.92,
-            },
+            WordConfidence::new("the", 0.60),
+            WordConfidence::new("meeting", 0.95),
+            WordConfidence::new("starts", 0.92),
         ];
         let result = seg.mark_uncertain_contextual(0.65);
         assert_eq!(result, "the meeting starts");
@@ -484,18 +583,9 @@ mod tests {
         // are very confident (>0.9) — acoustic context is clean.
         let mut seg = make_segment();
         seg.word_confidences = vec![
-            WordConfidence {
-                word: "the".into(),
-                confidence: 0.95,
-            },
-            WordConfidence {
-                word: "weather".into(),
-                confidence: 0.62,
-            },
-            WordConfidence {
-                word: "today".into(),
-                confidence: 0.94,
-            },
+            WordConfidence::new("the", 0.95),
+            WordConfidence::new("weather", 0.62),
+            WordConfidence::new("today", 0.94),
         ];
         let result = seg.mark_uncertain_contextual(0.65);
         assert_eq!(result, "the weather today");
@@ -507,18 +597,9 @@ mod tests {
         // are also low-confidence — error cluster.
         let mut seg = make_segment();
         seg.word_confidences = vec![
-            WordConfidence {
-                word: "tha".into(),
-                confidence: 0.35,
-            },
-            WordConfidence {
-                word: "wether".into(),
-                confidence: 0.63,
-            },
-            WordConfidence {
-                word: "tody".into(),
-                confidence: 0.30,
-            },
+            WordConfidence::new("tha", 0.35),
+            WordConfidence::new("wether", 0.63),
+            WordConfidence::new("tody", 0.30),
         ];
         let result = seg.mark_uncertain_contextual(0.65);
         // All words should be marked — error cluster
@@ -533,18 +614,9 @@ mod tests {
         // regardless of neighbor context.
         let mut seg = make_segment();
         seg.word_confidences = vec![
-            WordConfidence {
-                word: "bad".into(),
-                confidence: 0.20,
-            },
-            WordConfidence {
-                word: "good".into(),
-                confidence: 0.92,
-            },
-            WordConfidence {
-                word: "bad".into(),
-                confidence: 0.20,
-            },
+            WordConfidence::new("bad", 0.20),
+            WordConfidence::new("good", 0.92),
+            WordConfidence::new("bad", 0.20),
         ];
         let result = seg.mark_uncertain_contextual(0.65);
         assert_eq!(result, "[?bad?] good [?bad?]");
@@ -560,10 +632,7 @@ mod tests {
     fn contextual_single_word() {
         // Single word — no neighbors to use.
         let mut seg = make_segment();
-        seg.word_confidences = vec![WordConfidence {
-            word: "hello".into(),
-            confidence: 0.60,
-        }];
+        seg.word_confidences = vec![WordConfidence::new("hello", 0.60)];
         // First-word leniency should protect it at 0.60 vs threshold 0.65
         let result = seg.mark_uncertain_contextual(0.65);
         assert_eq!(result, "hello");
@@ -576,18 +645,9 @@ mod tests {
         // (decoder has no right context for attention).
         let mut seg = make_segment();
         seg.word_confidences = vec![
-            WordConfidence {
-                word: "the".into(),
-                confidence: 0.95,
-            },
-            WordConfidence {
-                word: "meeting".into(),
-                confidence: 0.95,
-            },
-            WordConfidence {
-                word: "today".into(),
-                confidence: 0.63,
-            },
+            WordConfidence::new("the", 0.95),
+            WordConfidence::new("meeting", 0.95),
+            WordConfidence::new("today", 0.63),
         ];
         let result = seg.mark_uncertain_contextual(0.65);
         assert_eq!(result, "the meeting today");
@@ -598,18 +658,9 @@ mod tests {
         // Repeated words should not be marked even when low-confidence
         let mut seg = make_segment();
         seg.word_confidences = vec![
-            WordConfidence {
-                word: "very".into(),
-                confidence: 0.50,
-            },
-            WordConfidence {
-                word: "very".into(),
-                confidence: 0.50,
-            },
-            WordConfidence {
-                word: "good".into(),
-                confidence: 0.95,
-            },
+            WordConfidence::new("very", 0.50),
+            WordConfidence::new("very", 0.50),
+            WordConfidence::new("good", 0.95),
         ];
         let result = seg.mark_uncertain_contextual(0.65);
         // First "very" may be marked, but second "very" must NOT be (repetition guard)
@@ -618,15 +669,100 @@ mod tests {
     }
 
     #[test]
+    fn contextual_emits_alternate_when_available() {
+        // Contextual path must use the same {best|alt} format as the flat path.
+        let mut seg = make_segment();
+        seg.word_confidences = vec![
+            WordConfidence::new("the", 0.20),
+            WordConfidence {
+                word: "fox".into(),
+                confidence: 0.30,
+                alternate: Some("box".into()),
+            },
+            WordConfidence::new("jumps", 0.25),
+        ];
+        let result = seg.mark_uncertain_contextual(0.65);
+        // "fox" should be marked with its alternate, not the legacy marker
+        assert!(result.contains("{fox|box}"));
+    }
+
+    #[test]
     fn word_confidence_serde_round_trip() {
         let mut seg = make_segment();
         seg.word_confidences = vec![WordConfidence {
             word: "test".into(),
             confidence: 0.75,
+            alternate: Some("taste".into()),
         }];
         let json = serde_json::to_string(&seg).unwrap();
         let parsed: AsrSegment = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.word_confidences.len(), 1);
         assert_eq!(parsed.word_confidences[0].word, "test");
+        assert_eq!(
+            parsed.word_confidences[0].alternate.as_deref(),
+            Some("taste")
+        );
+    }
+
+    #[test]
+    fn min_word_confidence_empty_returns_none() {
+        let seg = make_segment();
+        assert!(seg.min_word_confidence().is_none());
+    }
+
+    #[test]
+    fn min_word_confidence_returns_lowest() {
+        let mut seg = make_segment();
+        seg.word_confidences = vec![
+            WordConfidence::new("a", 0.9),
+            WordConfidence::new("b", 0.3),
+            WordConfidence::new("c", 0.7),
+        ];
+        assert_eq!(seg.min_word_confidence(), Some(0.3));
+    }
+
+    #[test]
+    fn is_clean_for_llm_empty_returns_false() {
+        // Conservative: no per-word data → don't skip, defer to LLM.
+        let seg = make_segment();
+        assert!(!seg.is_clean_for_llm(0.92));
+    }
+
+    #[test]
+    fn is_clean_for_llm_all_above_skip_threshold() {
+        let mut seg = make_segment();
+        seg.word_confidences = vec![
+            WordConfidence::new("a", 0.95),
+            WordConfidence::new("b", 0.93),
+            WordConfidence::new("c", 0.99),
+        ];
+        assert!(seg.is_clean_for_llm(0.92));
+    }
+
+    #[test]
+    fn is_clean_for_llm_one_below_skip_threshold() {
+        let mut seg = make_segment();
+        seg.word_confidences = vec![
+            WordConfidence::new("a", 0.95),
+            WordConfidence::new("b", 0.70), // below skip
+            WordConfidence::new("c", 0.99),
+        ];
+        assert!(!seg.is_clean_for_llm(0.92));
+    }
+
+    #[test]
+    fn is_clean_for_llm_exactly_at_threshold() {
+        let mut seg = make_segment();
+        seg.word_confidences = vec![WordConfidence::new("a", 0.92)];
+        assert!(seg.is_clean_for_llm(0.92));
+    }
+
+    #[test]
+    fn word_confidence_serde_missing_alternate_defaults_to_none() {
+        // Serde must accept old records without the alternate field.
+        let json = r#"{"id":1,"confidence":0.9,"min_token_confidence":null,"word_confidences":[{"word":"hi","confidence":0.9}],"is_final":true,"start_ms":null,"end_ms":null,"text":"hi"}"#;
+        let parsed: AsrSegment = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed.word_confidences.len(), 1);
+        assert!(parsed.word_confidences[0].alternate.is_none());
     }
 }

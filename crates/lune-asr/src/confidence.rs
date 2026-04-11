@@ -56,10 +56,10 @@ pub fn extract_word_confidences(
         };
 
         if is_boundary && !current_word.is_empty() {
-            words.push(WordConfidence {
-                word: std::mem::take(&mut current_word),
-                confidence: current_min_conf,
-            });
+            words.push(WordConfidence::new(
+                std::mem::take(&mut current_word),
+                current_min_conf,
+            ));
             current_min_conf = f32::INFINITY;
         }
 
@@ -77,10 +77,7 @@ pub fn extract_word_confidences(
 
     // Flush last word
     if !current_word.is_empty() {
-        words.push(WordConfidence {
-            word: current_word,
-            confidence: current_min_conf,
-        });
+        words.push(WordConfidence::new(current_word, current_min_conf));
     }
 
     words

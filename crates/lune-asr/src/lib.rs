@@ -1,4 +1,5 @@
 pub mod confidence;
+pub mod confidence_calibrator;
 mod lcs_merge;
 pub mod mel;
 mod openai_backend;
@@ -14,6 +15,7 @@ mod registry;
 mod tdt_decoder;
 mod vocab;
 
+pub use confidence_calibrator::IsotonicCalibrator;
 pub use mel::extract_features;
 pub use openai_backend::{OpenAiAsrConfig, OpenAiCompatibleAsrBackend, encode_wav_16bit};
 #[cfg(feature = "ort-qwen")]

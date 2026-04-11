@@ -11,12 +11,15 @@ use crate::fillers::{self, FillerError};
 ///
 /// Kept minimal — no few-shot examples. The fine-tuned model learns the
 /// task from training data; the generic model handles it from instructions.
-pub const SYSTEM: &str = "You are a transcript correction tool. Your only job is to fix words marked with [?word?].\n\
+pub const SYSTEM: &str = "You are a transcript correction tool. Your only job is to fix words annotated as uncertain.\n\
+Annotation formats:\n\
+- {guess|alternate}: `guess` is the ASR's top pick, `alternate` is its runner-up. Pick whichever fits the sentence better, or substitute a word that does if neither fits.\n\
+- [?word?]: the ASR is uncertain but has no specific alternative. Correct it from context.\n\
 Rules:\n\
 - Output ONLY the corrected transcript.\n\
-- Copy every unmarked word EXACTLY as-is, including profanity, slang, and repeated words.\n\
-- Replace each [?word?] with the contextually correct word, no markers.\n\
-- Delete [?um?] [?uh?] and filler variants entirely.\n\
+- Copy every unannotated word EXACTLY as-is, including profanity, slang, and repeated words.\n\
+- Prefer preserving unannotated words unless the sentence is clearly broken.\n\
+- Delete [?um?] [?uh?] {um|...} {uh|...} and filler variants entirely.\n\
 - NEVER censor, rephrase, reorder, summarize, add punctuation, or remove words.";
 
 /// Build a ChatML inference prompt (assistant turn left open).
@@ -124,10 +127,11 @@ impl PromptBuilder {
     }
 }
 
-/// Extract unmarked (non-`[?..?]`) words from a marked input string.
+/// Extract unmarked words from a marked input string.
 ///
-/// Words inside `[?..?]` markers are skippable by the LLM — they can be
-/// replaced, deleted, or corrected. Unmarked words MUST be preserved.
+/// Words inside annotation markers (`[?..?]` or `{guess|alternate}`) are
+/// skippable by the LLM — they can be replaced, deleted, or corrected.
+/// Unmarked words MUST be preserved.
 fn extract_unmarked_words(input: &str) -> Vec<String> {
     let mut result = Vec::new();
     let mut current = String::new();
@@ -135,24 +139,16 @@ fn extract_unmarked_words(input: &str) -> Vec<String> {
 
     while let Some(c) = chars.next() {
         if c == '[' {
-            // Peek ahead: is the next char '?'?
+            // `[?word?]` legacy marker. Anything inside counts as annotated.
             let rest = chars.as_str();
             if rest.starts_with('?') {
-                // Flush accumulated unmarked text
-                for w in current.split_whitespace() {
-                    result.push(w.to_lowercase());
-                }
-                current.clear();
-                // Skip the '?' we peeked
-                chars.next();
-                // Skip until closing ?]
+                flush_words(&mut current, &mut result);
+                chars.next(); // consume the '?'
                 loop {
                     match chars.next() {
-                        Some('?') => {
-                            if chars.as_str().starts_with(']') {
-                                chars.next(); // consume ']'
-                                break;
-                            }
+                        Some('?') if chars.as_str().starts_with(']') => {
+                            chars.next(); // consume ']'
+                            break;
                         }
                         Some(_) => {}
                         None => break, // unclosed marker — EOF
@@ -161,15 +157,30 @@ fn extract_unmarked_words(input: &str) -> Vec<String> {
             } else {
                 current.push(c);
             }
+        } else if c == '{' {
+            // `{guess|alternate}` runner-up marker. Everything inside is
+            // skippable — the LLM may return any of the listed words or
+            // substitute a different one entirely.
+            flush_words(&mut current, &mut result);
+            for ic in chars.by_ref() {
+                if ic == '}' {
+                    break;
+                }
+            }
         } else {
             current.push(c);
         }
     }
-    // Flush remaining
-    for w in current.split_whitespace() {
-        result.push(w.to_lowercase());
-    }
+    flush_words(&mut current, &mut result);
     result
+}
+
+#[inline]
+fn flush_words(buf: &mut String, out: &mut Vec<String>) {
+    for w in buf.split_whitespace() {
+        out.push(w.to_lowercase());
+    }
+    buf.clear();
 }
 
 /// Strip leading/trailing ASCII punctuation from a word, preserving
@@ -217,13 +228,17 @@ pub fn validate_preservation(input: &str, output: &str) -> bool {
     true
 }
 
-/// Strip residual `[?word?]` and `[word]` markers from LLM output.
+/// Strip residual annotation markers from LLM output.
 ///
-/// The span-correction prompt asks the LLM to replace `[?word?]` with corrected
-/// text, but small models sometimes emit partially stripped markers like `[word]`
-/// or fail to strip `[?word?]` entirely.
+/// Handles three formats the correction prompt may leak through:
+/// - `[?word?]` — legacy uncertainty marker, strips to `word`
+/// - `[word]`   — partial strip by a small model, recovers `word`
+/// - `{guess|alternate}` — runner-up marker, strips to `guess` (first option)
+///
+/// Unclosed brackets/braces are preserved verbatim so stripping is
+/// lossless on partial LLM output.
 pub fn strip_markers(text: &str) -> String {
-    if !text.contains('[') {
+    if !text.contains('[') && !text.contains('{') {
         return text.to_string();
     }
     let mut result = String::with_capacity(text.len());
@@ -248,6 +263,26 @@ pub fn strip_markers(text: &str) -> String {
             } else {
                 // Unclosed bracket — keep as-is.
                 result.push('[');
+                result.push_str(&inner);
+            }
+        } else if c == '{' {
+            // `{guess|alternate}` → `guess`. Collect everything up to the
+            // closing brace, then split on the first `|` and keep the first
+            // option. Unclosed braces preserve the original source verbatim.
+            let mut inner = String::new();
+            let mut found_close = false;
+            for ic in chars.by_ref() {
+                if ic == '}' {
+                    found_close = true;
+                    break;
+                }
+                inner.push(ic);
+            }
+            if found_close {
+                let guess = inner.split('|').next().unwrap_or(&inner);
+                result.push_str(guess.trim());
+            } else {
+                result.push('{');
                 result.push_str(&inner);
             }
         } else {
@@ -427,5 +462,63 @@ mod tests {
         let input = "the [?um?] meeting [?recieve?] starts";
         let output = "the meeting receive starts";
         assert!(validate_preservation(input, output));
+    }
+
+    // ── Runner-up `{guess|alternate}` format tests ──────────────────────
+
+    #[test]
+    fn strip_markers_runner_up_picks_first_word() {
+        assert_eq!(strip_markers("the {fox|box} jumped"), "the fox jumped");
+    }
+
+    #[test]
+    fn strip_markers_runner_up_mixed_with_legacy() {
+        // A single segment may carry both formats when some words had no
+        // meaningful runner-up alternate on Parakeet.
+        assert_eq!(
+            strip_markers("the {fox|box} [?and?] the [?dog?]"),
+            "the fox and the dog"
+        );
+    }
+
+    #[test]
+    fn strip_markers_unclosed_brace_preserved() {
+        assert_eq!(strip_markers("the {fox|box"), "the {fox|box");
+    }
+
+    #[test]
+    fn strip_markers_brace_without_pipe() {
+        // Defensive: `{word}` with no pipe — still strips to `word`.
+        assert_eq!(strip_markers("the {fox} jumped"), "the fox jumped");
+    }
+
+    #[test]
+    fn strip_markers_no_brackets_or_braces() {
+        assert_eq!(strip_markers("hello world"), "hello world");
+    }
+
+    #[test]
+    fn validate_preservation_runner_up_marker_skippable() {
+        // The word inside `{..|..}` is annotated, so the LLM may replace it.
+        let input = "the {fox|box} jumped";
+        let output = "the cat jumped";
+        assert!(validate_preservation(input, output));
+    }
+
+    #[test]
+    fn validate_preservation_runner_up_unmarked_word_dropped() {
+        // Unmarked "jumped" must survive even when a runner-up marker
+        // sits next to it.
+        let input = "the {fox|box} jumped";
+        let output = "the cat";
+        assert!(!validate_preservation(input, output));
+    }
+
+    #[test]
+    fn post_process_strips_runner_up_markers() {
+        assert_eq!(
+            post_process("the {weather|whether} was nice"),
+            "the weather was nice"
+        );
     }
 }

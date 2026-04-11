@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::Utc;
-use lune_asr::OrtForcedAligner;
+use lune_asr::{IsotonicCalibrator, OrtForcedAligner};
 use tokio::sync::Notify;
 use tokio::sync::{Mutex, RwLock, mpsc};
 use tracing::{debug, info, warn};
@@ -76,6 +76,10 @@ pub struct SessionManager<A: AsrBackend> {
     adaptive_vad_state: Arc<Mutex<Option<AdaptiveVadConfig>>>,
     /// Path to persist adaptive VAD state across app restarts.
     vad_state_path: Option<PathBuf>,
+    /// Isotonic calibrator applied to per-word ASR confidences before the
+    /// LLM gate. Defaults to identity so behaviour matches the raw-threshold
+    /// path when no calibration data is available.
+    calibrator: Arc<IsotonicCalibrator>,
 }
 
 impl<A: AsrBackend + 'static> SessionManager<A> {
@@ -102,7 +106,51 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             aligner: None,
             adaptive_vad_state: Arc::new(Mutex::new(None)),
             vad_state_path: None,
+            calibrator: Arc::new(IsotonicCalibrator::identity()),
         }
+    }
+
+    /// Attach an isotonic confidence calibrator. Loaded at session start and
+    /// applied to every segment before the LLM gate — downstream code
+    /// continues to compare `wc.confidence < threshold`, but `wc.confidence`
+    /// is now `P(correct | raw)` instead of raw softmax output.
+    pub fn with_calibrator(mut self, calibrator: Arc<IsotonicCalibrator>) -> Self {
+        info!(
+            breakpoints = calibrator.breakpoint_count(),
+            "calibrator attached to session manager"
+        );
+        self.calibrator = calibrator;
+        self
+    }
+
+    /// Load a calibrator from disk, or use identity if the file is missing
+    /// or corrupt. Mirrors `with_vad_state_path` semantics: non-fatal on any
+    /// failure — we never block a dictation session because the calibrator
+    /// failed to load.
+    pub fn with_calibrator_path(mut self, path: PathBuf) -> Self {
+        if path.exists() {
+            match std::fs::read_to_string(&path) {
+                Ok(json) => match serde_json::from_str::<IsotonicCalibrator>(&json) {
+                    Ok(cal) => {
+                        info!(
+                            path = %path.display(),
+                            breakpoints = cal.breakpoint_count(),
+                            "loaded isotonic calibrator from disk"
+                        );
+                        self.calibrator = Arc::new(cal);
+                    }
+                    Err(e) => {
+                        warn!(error = %e, path = %path.display(),
+                              "corrupt calibrator file, falling back to identity");
+                    }
+                },
+                Err(e) => {
+                    warn!(error = %e, path = %path.display(),
+                          "failed to read calibrator file, using identity");
+                }
+            }
+        }
+        self
     }
 
     /// Attach a pre-built forced aligner to this session manager.
@@ -201,6 +249,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let settings = Arc::clone(&self.settings);
         let adaptive_vad_state = Arc::clone(&self.adaptive_vad_state);
         let vad_state_path = self.vad_state_path.clone();
+        let calibrator = Arc::clone(&self.calibrator);
 
         tokio::task::spawn(run_session(
             session_id,
@@ -220,6 +269,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             settings,
             adaptive_vad_state,
             vad_state_path,
+            calibrator,
         ));
 
         *lock = Some(ActiveHandle {
@@ -286,9 +336,25 @@ fn append_segments(
     all_segments: &mut Vec<AsrSegment>,
     joined_text: &mut String,
     new_segments: Vec<AsrSegment>,
+    calibrator: &IsotonicCalibrator,
 ) -> bool {
     let mut appended = false;
-    for seg in new_segments {
+    for mut seg in new_segments {
+        // Remap raw softmax confidences into calibrated P(correct | raw).
+        // Downstream gate comparisons (`wc.confidence < threshold`) continue
+        // to work unchanged — the scale of `wc.confidence` has moved from
+        // raw softmax space to probability-of-correctness space. For the
+        // identity calibrator this is a no-op.
+        for wc in &mut seg.word_confidences {
+            wc.confidence = calibrator.calibrate(wc.confidence);
+        }
+        if let Some(min) = seg.min_token_confidence.as_mut() {
+            *min = calibrator.calibrate(*min);
+        }
+        if let Some(conf) = seg.confidence.as_mut() {
+            *conf = calibrator.calibrate(*conf);
+        }
+
         let trimmed = seg.text.trim();
         if !trimmed.is_empty() {
             if !joined_text.is_empty() {
@@ -351,7 +417,7 @@ fn prepare_text_for_llm(
         Ok(text) => text,
         Err(_) => marked,
     };
-    let has_uncertain = cleaned.contains("[?");
+    let has_uncertain = lune_llm::has_uncertainty_markers(&cleaned);
     (cleaned, has_uncertain)
 }
 
@@ -391,6 +457,7 @@ async fn run_session<A: AsrBackend + 'static>(
     settings: Arc<RwLock<UserSettings>>,
     adaptive_vad_state: Arc<Mutex<Option<AdaptiveVadConfig>>>,
     vad_state_path: Option<PathBuf>,
+    calibrator: Arc<IsotonicCalibrator>,
 ) {
     let mut status = SessionStatus::Completed;
 
@@ -535,7 +602,7 @@ async fn run_session<A: AsrBackend + 'static>(
 
                     match asr.poll_results(&asr_session).await {
                         Ok(new_segments) => {
-                            if append_segments(&mut segments, &mut raw_text, new_segments) {
+                            if append_segments(&mut segments, &mut raw_text, new_segments, &calibrator) {
                                 saw_asr_success = true;
                                 let _ = event_tx.try_send(SessionEvent::PartialText);
                             }
@@ -565,7 +632,7 @@ async fn run_session<A: AsrBackend + 'static>(
                         let _ = asr.push_audio(&asr_session, &flush_silence).await;
                         match asr.poll_final(&asr_session).await {
                             Ok(new_segments) => {
-                                if append_segments(&mut segments, &mut raw_text, new_segments) {
+                                if append_segments(&mut segments, &mut raw_text, new_segments, &calibrator) {
                                     saw_asr_success = true;
                                     // Deliver only the NEW text from this segment
                                     if !llm_enabled {
@@ -668,7 +735,7 @@ async fn run_session<A: AsrBackend + 'static>(
         }
         match asr.poll_final(&asr_session).await {
             Ok(new_segments) => {
-                if append_segments(&mut segments, &mut raw_text, new_segments) {
+                if append_segments(&mut segments, &mut raw_text, new_segments, &calibrator) {
                     saw_asr_success = true;
                 }
             }
@@ -803,18 +870,39 @@ async fn run_session<A: AsrBackend + 'static>(
 
     let lang = settings.read().await.language.clone();
     let lang_tag = lang.split(['-', '_']).next().unwrap_or("en");
-    let (prepared, has_uncertain) = match config.pipeline.word_confidence_threshold {
-        Some(threshold) => prepare_text_for_llm(
-            &segments,
-            &text_after_commands,
-            &raw_text,
-            threshold,
-            lang_tag,
-            true, // use contextual confidence
-        ),
-        None => {
-            // No confidence data (e.g. OpenAI backend) — skip LLM, pass through raw text.
-            (text_after_commands.clone(), false)
+
+    // Skip-when-clean LLM bypass (arXiv:2509.25048 — confidence-guided
+    // correction). When every word in every segment has calibrated
+    // `P(correct)` at or above the configured skip threshold, the LLM
+    // correction pass is skipped entirely and the raw segment text passes
+    // through untouched. Protects clean audio from overcorrection, which is
+    // the dominant failure mode on noisy inputs when the LLM lacks a
+    // confidence signal.
+    let skip_clean = config.pipeline.llm_skip_threshold.is_some_and(|skip| {
+        !segments.is_empty() && segments.iter().all(|s| s.is_clean_for_llm(skip))
+    });
+
+    let (prepared, has_uncertain) = if skip_clean {
+        debug!(
+            %session_id,
+            threshold = config.pipeline.llm_skip_threshold.unwrap_or(1.0),
+            "[LLM] skip-when-clean: all words above threshold, bypassing correction"
+        );
+        (text_after_commands.clone(), false)
+    } else {
+        match config.pipeline.word_confidence_threshold {
+            Some(threshold) => prepare_text_for_llm(
+                &segments,
+                &text_after_commands,
+                &raw_text,
+                threshold,
+                lang_tag,
+                true, // use contextual confidence
+            ),
+            None => {
+                // No confidence data (e.g. OpenAI backend) — skip LLM, pass through raw text.
+                (text_after_commands.clone(), false)
+            }
         }
     };
 
@@ -1044,14 +1132,8 @@ mod tests {
             min_token_confidence: Some(if uncertain { 0.4 } else { 0.9 }),
             word_confidences: if uncertain {
                 vec![
-                    WordConfidence {
-                        word: "helo".into(),
-                        confidence: 0.4,
-                    },
-                    WordConfidence {
-                        word: "world".into(),
-                        confidence: 0.95,
-                    },
+                    WordConfidence::new("helo", 0.4),
+                    WordConfidence::new("world", 0.95),
                 ]
             } else {
                 vec![]
@@ -1178,22 +1260,10 @@ mod tests {
             confidence: Some(0.5),
             min_token_confidence: Some(0.4),
             word_confidences: vec![
-                WordConfidence {
-                    word: "helo".into(),
-                    confidence: 0.4,
-                },
-                WordConfidence {
-                    word: "new".into(),
-                    confidence: 0.95,
-                },
-                WordConfidence {
-                    word: "line".into(),
-                    confidence: 0.95,
-                },
-                WordConfidence {
-                    word: "world".into(),
-                    confidence: 0.95,
-                },
+                WordConfidence::new("helo", 0.4),
+                WordConfidence::new("new", 0.95),
+                WordConfidence::new("line", 0.95),
+                WordConfidence::new("world", 0.95),
             ],
             is_final: true,
             start_ms: Some(0),

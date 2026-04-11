@@ -11,7 +11,7 @@ use lune_core::error::{Error, Result};
 
 use crate::mel;
 use crate::tdt_decoder::{DecodedToken, TdtModel};
-use crate::vocab::Vocabulary;
+use crate::vocab::{Vocabulary, is_special_token};
 
 /// Maximum audio buffer (60 seconds at 16 kHz). Parakeet handles long audio
 /// natively; chunked inference splits internally when needed.
@@ -233,12 +233,16 @@ impl ParakeetTdtBackend {
         }])
     }
 
-    /// Chunked inference with overlap + LCS merge for long audio.
+    /// Chunked inference with overlap + confidence-preserving LCS merge.
     ///
-    /// Splits audio into overlapping chunks (CHUNK_SAMPLES with OVERLAP_SAMPLES
-    /// overlap), transcribes each independently, and merges transcripts using
-    /// Longest Common Subsequence at overlap boundaries.
+    /// Splits audio into overlapping chunks (`CHUNK_SAMPLES` with
+    /// `OVERLAP_SAMPLES` overlap), transcribes each independently, and merges
+    /// per-chunk `WordConfidence` sequences via LCS at the overlap region.
     /// Reference: Parakeet-TDT-0.6B-v3 paper (arXiv:2509.14128), §6.4.1.
+    ///
+    /// Unlike a naive merge, per-word confidence is threaded through the
+    /// stitch so the downstream LLM correction gate sees real per-word
+    /// signal on long utterances (>25s) — not a collapsed scalar average.
     fn transcribe_chunked(
         &self,
         pcm: &[f32],
@@ -247,12 +251,9 @@ impl ParakeetTdtBackend {
         is_final: bool,
     ) -> Result<Vec<AsrSegment>> {
         let step = CHUNK_SAMPLES - OVERLAP_SAMPLES;
-        let mut chunk_texts: Vec<Vec<String>> = Vec::new();
-        let mut total_confidence = 0.0f32;
-        let mut total_tokens = 0usize;
-        let mut min_conf = f32::INFINITY;
+        let mut chunk_word_confs: Vec<Vec<WordConfidence>> = Vec::new();
 
-        // Transcribe each overlapping chunk
+        // Transcribe each overlapping chunk.
         let mut offset = 0;
         while offset < pcm.len() {
             let end = (offset + CHUNK_SAMPLES).min(pcm.len());
@@ -266,26 +267,33 @@ impl ParakeetTdtBackend {
                 tracing::debug!(
                     elapsed_ms = start.elapsed().as_millis(),
                     chunk_ms = chunk.len() * 1000 / 16000,
-                    chunk_idx = chunk_texts.len(),
+                    chunk_idx = chunk_word_confs.len(),
                     "chunked inference"
                 );
                 res
             }?;
 
-            if !decoded_tokens.is_empty() {
-                total_confidence += result.confidence * decoded_tokens.len() as f32;
-                total_tokens += decoded_tokens.len();
-                if let Some(mc) = decoded_tokens.iter().map(|t| t.confidence).reduce(f32::min) {
-                    min_conf = min_conf.min(mc);
-                }
-            }
+            // Aggregate per-chunk per-word confidences from raw decoded tokens.
+            // This preserves the min-aggregated signal the LLM gate depends on.
+            let words_with_conf = tokens_to_word_confidences(&decoded_tokens, &self.vocab);
 
-            let words: Vec<String> = result
-                .text
-                .split_whitespace()
-                .map(|w| w.to_string())
-                .collect();
-            chunk_texts.push(words);
+            // Defensive fallback: if token→word aggregation yields nothing but
+            // the decoder still produced text (e.g. special-token edge case),
+            // split the text and tag each word with the segment-level confidence
+            // so no words are silently dropped from the merge.
+            let words_with_conf = if words_with_conf.is_empty() {
+                result
+                    .text
+                    .split_whitespace()
+                    .map(|w| WordConfidence::new(w, result.confidence))
+                    .collect()
+            } else {
+                words_with_conf
+            };
+
+            if !words_with_conf.is_empty() {
+                chunk_word_confs.push(words_with_conf);
+            }
 
             if end >= pcm.len() {
                 break;
@@ -293,37 +301,39 @@ impl ParakeetTdtBackend {
             offset += step;
         }
 
-        // Merge chunk transcripts via LCS at overlap boundaries
-        let merged_words = if chunk_texts.is_empty() {
-            Vec::new()
-        } else {
-            let mut merged = chunk_texts[0].clone();
-            for next_chunk in &chunk_texts[1..] {
-                merged = lcs_merge_words(&merged, next_chunk);
+        // Stitch chunks via confidence-preserving LCS merge. Pairwise fold
+        // over ≤4 chunks for a 60s hard cap, so this is O(k·overlap²) with
+        // k ≤ 4 and overlap = 8 words — ~256 comparisons total.
+        let merged: Vec<WordConfidence> = {
+            let mut iter = chunk_word_confs.into_iter();
+            match iter.next() {
+                None => Vec::new(),
+                Some(mut m) => {
+                    for next in iter {
+                        m = lcs_merge_words(&m, &next);
+                    }
+                    m
+                }
             }
-            merged
         };
 
-        let text = merged_words.join(" ");
+        if merged.is_empty() {
+            return Ok(vec![]);
+        }
+
+        // Recompute segment-level summaries from the merged (deduped) sequence.
+        // Using pre-merge running sums would double-count the overlap region.
+        let text = merged
+            .iter()
+            .map(|w| w.word.as_str())
+            .collect::<Vec<_>>()
+            .join(" ");
         if text.is_empty() {
             return Ok(vec![]);
         }
 
-        let avg_confidence = if total_tokens > 0 {
-            total_confidence / total_tokens as f32
-        } else {
-            0.0
-        };
-
-        // Rebuild word confidences from merged text (approximate — use avg confidence
-        // for words that came from LCS merge since we don't track per-chunk word confs)
-        let word_confidences: Vec<WordConfidence> = merged_words
-            .iter()
-            .map(|w| WordConfidence {
-                word: w.clone(),
-                confidence: avg_confidence,
-            })
-            .collect();
+        let avg_confidence = merged.iter().map(|w| w.confidence).sum::<f32>() / merged.len() as f32;
+        let min_token_confidence = merged.iter().map(|w| w.confidence).reduce(f32::min);
 
         Ok(vec![AsrSegment {
             id,
@@ -332,12 +342,8 @@ impl ParakeetTdtBackend {
             start_ms: Some(timestamp_ms),
             end_ms: Some(timestamp_ms),
             confidence: Some(avg_confidence),
-            min_token_confidence: if min_conf.is_finite() {
-                Some(min_conf)
-            } else {
-                None
-            },
-            word_confidences,
+            min_token_confidence,
+            word_confidences: merged,
         }])
     }
 }
@@ -352,14 +358,89 @@ use crate::lcs_merge::lcs_merge_words;
 ///
 /// Word boundary: token text starts with `▁` (SentencePiece word-initial marker).
 /// Per-word confidence = minimum across constituent tokens (conservative).
+///
+/// When the decoder emitted a runner-up token at a given step (via the
+/// `DecodedToken.runner_up` field), this aggregator also produces a
+/// **word-level alternate** by swapping the single lowest-confidence
+/// subword in the word with its runner-up. Rationale: if one subword is
+/// wrong, it's overwhelmingly likely to be the least confident one.
+///
+/// The alternate is suppressed (set to `None`) whenever:
+/// - no runner-up was recorded at the min-confidence position, or
+/// - the runner-up piece detokenizes to an empty string, or
+/// - the rebuilt alternate string equals the original word (case-insensitive).
 fn tokens_to_word_confidences(tokens: &[DecodedToken], vocab: &Vocabulary) -> Vec<WordConfidence> {
     if tokens.is_empty() {
         return vec![];
     }
 
+    struct WordBuilder {
+        pieces: Vec<String>,
+        min_conf: f32,
+        min_idx: usize,
+        min_runner_up: Option<String>,
+    }
+
+    impl WordBuilder {
+        fn new() -> Self {
+            Self {
+                pieces: Vec::new(),
+                min_conf: f32::INFINITY,
+                min_idx: 0,
+                min_runner_up: None,
+            }
+        }
+
+        fn is_empty(&self) -> bool {
+            self.pieces.is_empty()
+        }
+
+        fn push(&mut self, piece: String, conf: f32, runner_up: Option<String>) {
+            if conf < self.min_conf {
+                self.min_conf = conf;
+                self.min_idx = self.pieces.len();
+                self.min_runner_up = runner_up;
+            }
+            self.pieces.push(piece);
+        }
+
+        fn finish(self) -> Option<WordConfidence> {
+            let word: String = self.pieces.concat().trim().to_string();
+            if word.is_empty() {
+                return None;
+            }
+
+            let alternate = self
+                .min_runner_up
+                .as_ref()
+                .filter(|p| !p.trim().is_empty())
+                .and_then(|alt_piece| {
+                    let mut alt_pieces = self.pieces.clone();
+                    // Defensive bounds check — min_idx was tracked as a
+                    // push-count so it is always in range, but a future
+                    // refactor could break this invariant.
+                    if self.min_idx >= alt_pieces.len() {
+                        return None;
+                    }
+                    alt_pieces[self.min_idx] = alt_piece.clone();
+                    let alt_word: String = alt_pieces.concat().trim().to_string();
+                    if alt_word.is_empty() || alt_word.eq_ignore_ascii_case(&word) {
+                        None
+                    } else {
+                        Some(alt_word)
+                    }
+                });
+
+            Some(WordConfidence {
+                word,
+                confidence: self.min_conf,
+                alternate,
+            })
+        }
+    }
+
     let mut words: Vec<WordConfidence> = Vec::new();
-    let mut current_word = String::new();
-    let mut current_min = f32::INFINITY;
+    let mut current = WordBuilder::new();
 
     for (i, dt) in tokens.iter().enumerate() {
         let token_text = match vocab.get(dt.token_id) {
@@ -367,30 +448,38 @@ fn tokens_to_word_confidences(tokens: &[DecodedToken], vocab: &Vocabulary) -> Ve
             None => continue,
         };
 
-        // Skip special tokens
-        if token_text.starts_with('<') && token_text.ends_with('>') && token_text != "<unk>" {
+        // Skip special tokens (blank, padding, BOS/EOS, etc.) — keep <unk>.
+        if is_special_token(token_text) {
             continue;
         }
 
         let is_boundary = i == 0 || token_text.starts_with('▁');
 
-        if is_boundary && !current_word.is_empty() {
-            words.push(WordConfidence {
-                word: std::mem::take(&mut current_word),
-                confidence: current_min,
-            });
-            current_min = f32::INFINITY;
+        if is_boundary
+            && !current.is_empty()
+            && let Some(w) = std::mem::replace(&mut current, WordBuilder::new()).finish()
+        {
+            words.push(w);
         }
 
-        current_word.push_str(token_text.replace('▁', " ").trim_start());
-        current_min = current_min.min(dt.confidence);
+        let best_piece = token_text.replace('▁', " ").trim_start().to_string();
+
+        // Resolve the runner-up piece for this step. Skip special-token
+        // runner-ups and anything that detokenizes to empty.
+        let runner_up_piece = dt
+            .runner_up
+            .and_then(|rid| vocab.get(rid))
+            .filter(|t| !is_special_token(t))
+            .map(|t| t.replace('▁', " ").trim_start().to_string())
+            .filter(|p| !p.is_empty());
+
+        current.push(best_piece, dt.confidence, runner_up_piece);
     }
 
-    if !current_word.is_empty() {
-        words.push(WordConfidence {
-            word: current_word,
-            confidence: current_min,
-        });
+    if !current.is_empty()
+        && let Some(w) = current.finish()
+    {
+        words.push(w);
     }
 
     words

@@ -280,7 +280,16 @@ async fn run_pipeline(
         config,
         Arc::clone(&settings),
     )
-    .with_vad_state_path(vad_state_path);
+    .with_vad_state_path(vad_state_path.clone());
+
+    // Load isotonic confidence calibrator from the app data dir, if one has
+    // been fit via the `calibrate_confidence` benchmark. Co-located with the
+    // adaptive VAD state file. Missing/corrupt files fall back to identity
+    // (behaviour unchanged from raw).
+    if let Some(parent) = vad_state_path.parent() {
+        manager = manager.with_calibrator_path(parent.join("calibrator.json"));
+    }
+
     if let Some(aligner) = aligner {
         manager = manager.with_aligner(aligner);
     }

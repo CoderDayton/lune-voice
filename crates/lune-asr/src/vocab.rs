@@ -101,3 +101,43 @@ impl Vocabulary {
         }
     }
 }
+
+/// Returns `true` when `token_text` is a special token wrapped in angle
+/// brackets (e.g. `<pad>`, `<s>`, `</s>`) that should be skipped during
+/// text reconstruction. `<unk>` is **not** considered special — it
+/// carries vocabulary-content meaning and must survive into output.
+///
+/// Centralised here so every backend uses the same definition instead of
+/// open-coding the same check in decode loops.
+#[inline]
+pub fn is_special_token(token_text: &str) -> bool {
+    token_text.starts_with('<') && token_text.ends_with('>') && token_text != "<unk>"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_special_token;
+
+    #[test]
+    fn detects_pad_bos_eos() {
+        assert!(is_special_token("<pad>"));
+        assert!(is_special_token("<s>"));
+        assert!(is_special_token("</s>"));
+        assert!(is_special_token("<|endoftext|>"));
+    }
+
+    #[test]
+    fn unk_is_not_special() {
+        // <unk> carries content and must survive into the transcript.
+        assert!(!is_special_token("<unk>"));
+    }
+
+    #[test]
+    fn regular_tokens_not_special() {
+        assert!(!is_special_token("hello"));
+        assert!(!is_special_token("▁the"));
+        assert!(!is_special_token(""));
+        assert!(!is_special_token("<"));
+        assert!(!is_special_token(">"));
+    }
+}

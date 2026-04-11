@@ -60,6 +60,22 @@ pub struct PipelineConfig {
     /// OpenAI-compatible).
     pub word_confidence_threshold: Option<f32>,
 
+    /// Skip-when-clean LLM bypass threshold (calibrated `P(correct)` scale).
+    ///
+    /// When every word in a segment has calibrated confidence at or above
+    /// this value, the LLM correction pass is skipped entirely — the raw
+    /// segment text is passed through untouched. This is a separate, stricter
+    /// gate than `word_confidence_threshold`: it protects clean segments from
+    /// over-correction (the dominant failure mode on noisy audio per
+    /// arXiv:2509.25048) while letting the marking gate continue to operate
+    /// at a lower threshold for borderline words.
+    ///
+    /// `None` disables the bypass — all segments go through the normal
+    /// marking / LLM pipeline. Default is `Some(0.92)` for backends that
+    /// expose per-word confidence, `None` for those that don't.
+    #[serde(default)]
+    pub llm_skip_threshold: Option<f32>,
+
     // ── Session limits ─────────────────────────────────────────────────
     /// Maximum speech-time samples before auto-ending session.
     ///
@@ -96,6 +112,9 @@ impl PipelineConfig {
         if let Some(v) = overrides.word_confidence_threshold {
             self.word_confidence_threshold = Some(v);
         }
+        if let Some(v) = overrides.llm_skip_threshold {
+            self.llm_skip_threshold = Some(v);
+        }
         if let Some(v) = overrides.max_speech_secs {
             self.max_speech_samples = (v as usize) * 16_000;
         }
@@ -119,6 +138,16 @@ impl PipelineConfig {
         {
             issues.push("word_confidence_threshold must be in 0.0..=1.0");
         }
+        if let Some(t) = self.llm_skip_threshold
+            && !(0.0..=1.0).contains(&t)
+        {
+            issues.push("llm_skip_threshold must be in 0.0..=1.0");
+        }
+        if let (Some(mark), Some(skip)) = (self.word_confidence_threshold, self.llm_skip_threshold)
+            && skip < mark
+        {
+            issues.push("llm_skip_threshold must be >= word_confidence_threshold");
+        }
         if self.max_speech_samples == 0 {
             issues.push("max_speech_samples must be > 0");
         }
@@ -136,6 +165,7 @@ impl Default for PipelineConfig {
             min_speech_ms: 150,
             adaptive_vad: false,
             word_confidence_threshold: Some(0.65),
+            llm_skip_threshold: Some(0.92),
             max_speech_samples: 60 * 16_000,
         }
     }
@@ -154,6 +184,7 @@ pub struct PipelineOverrides {
     pub min_speech_ms: Option<u32>,
     pub adaptive_vad: Option<bool>,
     pub word_confidence_threshold: Option<f32>,
+    pub llm_skip_threshold: Option<f32>,
     /// Convenience alias: converted to `max_speech_samples` at merge time.
     pub max_speech_secs: Option<u32>,
 }
@@ -199,6 +230,55 @@ mod tests {
         };
         let issues = cfg.validate();
         assert_eq!(issues.len(), 2);
+    }
+
+    #[test]
+    fn llm_skip_threshold_out_of_range_flagged() {
+        let cfg = PipelineConfig {
+            llm_skip_threshold: Some(1.5),
+            ..PipelineConfig::default()
+        };
+        let issues = cfg.validate();
+        assert!(
+            issues.iter().any(|i| i.contains("llm_skip_threshold")),
+            "expected range violation, got {issues:?}"
+        );
+    }
+
+    #[test]
+    fn llm_skip_threshold_must_be_at_least_mark_threshold() {
+        // skip < mark is a semantic inversion — clean bypass must be stricter
+        // than (or equal to) the marking gate.
+        let cfg = PipelineConfig {
+            word_confidence_threshold: Some(0.65),
+            llm_skip_threshold: Some(0.50),
+            ..PipelineConfig::default()
+        };
+        let issues = cfg.validate();
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.contains("llm_skip_threshold must be >=")),
+            "expected ordering violation, got {issues:?}"
+        );
+    }
+
+    #[test]
+    fn llm_skip_threshold_override_applies() {
+        let base = PipelineConfig::default();
+        let overrides = PipelineOverrides {
+            llm_skip_threshold: Some(0.98),
+            ..Default::default()
+        };
+        let merged = base.with_overrides(&overrides);
+        assert_eq!(merged.llm_skip_threshold, Some(0.98));
+    }
+
+    #[test]
+    fn default_has_skip_threshold_at_0_92() {
+        let cfg = PipelineConfig::default();
+        assert_eq!(cfg.llm_skip_threshold, Some(0.92));
+        assert!(cfg.validate().is_empty(), "default must validate");
     }
 
     #[test]

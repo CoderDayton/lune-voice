@@ -12,11 +12,17 @@ use ort::session::Session;
 use lune_core::error::{Error, Result};
 
 use crate::ort_utils::build_ort_session;
-use crate::vocab::Vocabulary;
+use crate::vocab::{Vocabulary, is_special_token};
 
 // ── Public types ─────────────────────────────────────────────────────────────
 
 /// A decoded token with timing and confidence.
+///
+/// `runner_up` is the second-best token at this decode step. Populated in
+/// the single-pass argmax loop at zero extra inference cost and consumed by
+/// `parakeet_backend::tokens_to_word_confidences` to produce a word-level
+/// alternate for the LLM corrector. `None` when the runner-up was blank or
+/// unreadable.
 #[derive(Debug, Clone)]
 pub struct DecodedToken {
     pub token_id: usize,
@@ -24,6 +30,10 @@ pub struct DecodedToken {
     pub duration: usize,
     /// Softmax probability of the chosen token.
     pub confidence: f32,
+    /// Second-best token id at the same decode step, when available.
+    /// Excludes the blank token — runner-up=blank is treated as "no
+    /// alternate" since it carries no word content.
+    pub runner_up: Option<usize>,
 }
 
 /// Final transcription result with aggregate confidence.
@@ -218,17 +228,27 @@ impl TdtModel {
                 .try_extract_tensor::<f32>()
                 .map_err(|e| Error::Asr(format!("extract logits: {e}")))?;
 
-            // Single-pass: collect vocab logits + find argmax + track max simultaneously.
-            // This eliminates a separate O(vocab_size) argmax scan after extend().
+            // Single-pass: collect vocab logits, track top-1 AND top-2
+            // simultaneously. Adds one comparison per vocab entry — no new
+            // allocations, no ORT calls, no DynTensor clones. Runner-up is
+            // extracted from the already-materialised CPU slice.
             vocab_logits.clear();
             let mut token_id = blank_id;
             let mut max_logit = f32::NEG_INFINITY;
+            let mut runner_up_id: Option<usize> = None;
+            let mut runner_up_logit = f32::NEG_INFINITY;
             for (i, &v) in logits_data.iter().take(vocab_size).enumerate() {
                 vocab_logits.push(v);
                 // total_cmp: NaN-safe, branchless on x86 (ucomiss + cmov)
                 if v.total_cmp(&max_logit).is_gt() {
+                    // New top-1: the previous top-1 becomes the runner-up.
+                    runner_up_logit = max_logit;
+                    runner_up_id = Some(token_id);
                     max_logit = v;
                     token_id = i;
+                } else if v.total_cmp(&runner_up_logit).is_gt() {
+                    runner_up_logit = v;
+                    runner_up_id = Some(i);
                 }
             }
 
@@ -247,6 +267,13 @@ impl TdtModel {
                 // so we only need one more O(vocab_size) pass for exp_sum.
                 let exp_sum: f32 = vocab_logits.iter().map(|&l| (l - max_logit).exp()).sum();
                 let confidence = (vocab_logits[token_id] - max_logit).exp() / exp_sum;
+
+                // Suppress runner-up when it is the blank token — blank as
+                // runner-up carries no word content. Defensive: also drop it
+                // when the runner-up somehow collides with the chosen token
+                // (shouldn't happen given the argmax branch above, but f32
+                // equality is brittle).
+                let runner_up = runner_up_id.filter(|&r| r != blank_id && r != token_id);
 
                 // Update LSTM states — copy into existing buffers to avoid
                 // per-step Vec + Array3 allocations (~20KB/step saved).
@@ -269,6 +296,7 @@ impl TdtModel {
                     token_id,
                     duration: duration_step,
                     confidence,
+                    runner_up,
                 });
                 last_token = token_id as i32;
                 emitted_tokens += 1;
@@ -305,8 +333,8 @@ impl TdtModel {
             let Some(token_text) = self.vocab.get(dt.token_id) else {
                 continue;
             };
-            // Skip special tokens (blanks, padding, etc.) but keep <unk>
-            if token_text.starts_with('<') && token_text.ends_with('>') && token_text != "<unk>" {
+            // Skip special tokens (blanks, padding, etc.) but keep <unk>.
+            if is_special_token(token_text) {
                 continue;
             }
             text.push_str(&token_text.replace('▁', " "));

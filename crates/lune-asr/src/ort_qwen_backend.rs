@@ -347,10 +347,10 @@ fn tokens_to_word_confidences(
 
         if is_boundary && !current_word.is_empty() {
             // Push previous word.
-            words.push(WordConfidence {
-                word: std::mem::take(&mut current_word),
-                confidence: current_min_prob.exp(),
-            });
+            words.push(WordConfidence::new(
+                std::mem::take(&mut current_word),
+                current_min_prob.exp(),
+            ));
             current_min_prob = f32::INFINITY;
         }
 
@@ -367,10 +367,7 @@ fn tokens_to_word_confidences(
 
     // Push final word.
     if !current_word.is_empty() {
-        words.push(WordConfidence {
-            word: current_word,
-            confidence: current_min_prob.exp(),
-        });
+        words.push(WordConfidence::new(current_word, current_min_prob.exp()));
     }
 
     words
