@@ -317,6 +317,21 @@ impl AsrBackendKind {
             Self::OpenAiCompatible => 30_000,
         }
     }
+
+    /// Short stable identifier used for per-backend filenames like
+    /// `calibrator_{slug}.json`. Must stay lowercase, ASCII, no spaces.
+    ///
+    /// These strings are part of the on-disk layout — renaming them will
+    /// orphan existing calibrator files. Add new variants rather than
+    /// changing existing slugs.
+    #[inline]
+    pub fn slug(&self) -> &'static str {
+        match self {
+            Self::ParakeetTdt => "parakeet",
+            Self::OrtQwenAsr => "qwen",
+            Self::OpenAiCompatible => "openai",
+        }
+    }
 }
 
 /// Trait for ASR backend implementations.

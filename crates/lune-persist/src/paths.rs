@@ -44,6 +44,27 @@ impl AppPaths {
         self.data_dir.join("adaptive_vad.json")
     }
 
+    /// Path to the isotonic confidence calibrator for a given ASR backend.
+    ///
+    /// Each backend has its own raw-softmax distribution, so a single shared
+    /// calibrator trained on one backend would produce wrong probabilities
+    /// on another. Storing per-backend files (`calibrator_{slug}.json`) lets
+    /// `SessionManager` pick the right curve at startup based on which
+    /// backend is active.
+    ///
+    /// `slug` should come from `AsrBackendKind::slug()` to keep the file
+    /// naming consistent with the rest of the codebase.
+    pub fn calibrator_file(&self, slug: &str) -> PathBuf {
+        self.data_dir.join(format!("calibrator_{slug}.json"))
+    }
+
+    /// Legacy unprefixed calibrator path for backward compatibility with
+    /// the first branch that shipped this feature. Prefer
+    /// [`calibrator_file`](Self::calibrator_file) for new code.
+    pub fn legacy_calibrator_file(&self) -> PathBuf {
+        self.data_dir.join("calibrator.json")
+    }
+
     /// Ensure all directories exist.
     pub fn ensure_dirs(&self) -> std::io::Result<()> {
         std::fs::create_dir_all(&self.config_dir)?;
@@ -82,6 +103,28 @@ mod tests {
         assert_eq!(
             paths.adaptive_vad_file(),
             Path::new("/tmp/data/adaptive_vad.json")
+        );
+    }
+
+    #[test]
+    fn calibrator_file_per_backend_slug() {
+        let paths = AppPaths::from_dirs("/tmp/config", "/tmp/data");
+        assert_eq!(
+            paths.calibrator_file("parakeet"),
+            Path::new("/tmp/data/calibrator_parakeet.json")
+        );
+        assert_eq!(
+            paths.calibrator_file("qwen"),
+            Path::new("/tmp/data/calibrator_qwen.json")
+        );
+    }
+
+    #[test]
+    fn legacy_calibrator_file_unchanged() {
+        let paths = AppPaths::from_dirs("/tmp/config", "/tmp/data");
+        assert_eq!(
+            paths.legacy_calibrator_file(),
+            Path::new("/tmp/data/calibrator.json")
         );
     }
 }

@@ -196,10 +196,15 @@ impl AsrRegistry {
                 speech_threshold: 0.5,
                 min_speech_ms: 150,
                 adaptive_vad: false,
-                word_confidence_threshold: Some(0.65),
-                // Parakeet exposes per-token logits → skip-when-clean
-                // bypass enabled at 0.92 calibrated probability.
-                llm_skip_threshold: Some(0.92),
+                // Thresholds are interpreted on the CALIBRATED probability
+                // scale (P(correct | raw)) after SessionManager runs the
+                // isotonic calibrator. Parakeet's raw softmax concentrates
+                // 86% of tokens in the [0.9, 1.0) bin, so anything below
+                // 0.65 raw is effectively unreachable — 0.85 / 0.95 on the
+                // calibrated scale surfaces the bins where acoustic errors
+                // actually live (raw 0.5–0.8 → calibrated 0.70–0.94).
+                word_confidence_threshold: Some(0.85),
+                llm_skip_threshold: Some(0.95),
                 max_speech_samples: 60 * 16_000,
             },
             #[cfg(feature = "ort-qwen")]
@@ -212,9 +217,12 @@ impl AsrRegistry {
                 speech_threshold: 0.5,
                 min_speech_ms: 150,
                 adaptive_vad: false,
-                word_confidence_threshold: Some(0.65),
-                // OrtQwen exposes per-word log-probs → skip-when-clean enabled.
-                llm_skip_threshold: Some(0.92),
+                // Qwen is even more concentrated in [0.9, 1.0) (93% of
+                // tokens per fixture calibration data). Same calibrated
+                // thresholds as Parakeet — raising them gets the LLM
+                // corrector off the sidelines on genuinely noisy audio.
+                word_confidence_threshold: Some(0.85),
+                llm_skip_threshold: Some(0.95),
                 max_speech_samples: 60 * 16_000,
             },
             Self::OpenAi(_) => PipelineConfig {

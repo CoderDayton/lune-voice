@@ -262,8 +262,9 @@ async fn run_pipeline(
     ));
 
     let pipeline = asr.pipeline_config().with_overrides(&snap.pipeline);
+    let asr_kind = asr.kind();
     let config = SessionManagerConfig {
-        asr_backend_kind: asr.kind(),
+        asr_backend_kind: asr_kind,
         asr_config: lune_core::asr::AsrSessionConfig {
             language: Some(snap.language.clone()),
             ..Default::default()
@@ -282,12 +283,34 @@ async fn run_pipeline(
     )
     .with_vad_state_path(vad_state_path.clone());
 
-    // Load isotonic confidence calibrator from the app data dir, if one has
-    // been fit via the `calibrate_confidence` benchmark. Co-located with the
-    // adaptive VAD state file. Missing/corrupt files fall back to identity
-    // (behaviour unchanged from raw).
-    if let Some(parent) = vad_state_path.parent() {
-        manager = manager.with_calibrator_path(parent.join("calibrator.json"));
+    // Load the isotonic confidence calibrator for the active ASR backend.
+    //
+    // Each backend has its own raw-softmax distribution (Parakeet clusters
+    // in [0.9, 1.0); Qwen even more so) so a shared calibrator would be
+    // wrong for the non-chosen backend. Prefer the per-backend file
+    // `calibrator_{slug}.json`; fall back to the legacy unprefixed
+    // `calibrator.json` for installations created before this change.
+    //
+    // Missing/corrupt files at both locations fall through to identity
+    // (behaviour unchanged from raw softmax).
+    if let Some(data_dir) = vad_state_path.parent() {
+        let kind_slug = asr_kind.slug();
+        let per_backend_path = data_dir.join(format!("calibrator_{kind_slug}.json"));
+        let legacy_path = data_dir.join("calibrator.json");
+        let calibrator_path = if per_backend_path.exists() {
+            per_backend_path
+        } else if legacy_path.exists() {
+            tracing::warn!(
+                path = %legacy_path.display(),
+                backend = kind_slug,
+                "using legacy unprefixed calibrator.json; retrain via \
+                 `calibrate_confidence` to produce a per-backend file"
+            );
+            legacy_path
+        } else {
+            per_backend_path // non-existent — falls back to identity
+        };
+        manager = manager.with_calibrator_path(calibrator_path);
     }
 
     if let Some(aligner) = aligner {

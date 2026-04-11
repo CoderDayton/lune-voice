@@ -164,8 +164,12 @@ impl Default for PipelineConfig {
             speech_threshold: 0.5,
             min_speech_ms: 150,
             adaptive_vad: false,
-            word_confidence_threshold: Some(0.65),
-            llm_skip_threshold: Some(0.92),
+            // Thresholds are on the calibrated P(correct) scale after the
+            // session layer runs the isotonic calibrator. See the per-backend
+            // overrides in `lune_asr::AsrRegistry::pipeline_config` for the
+            // reasoning behind these values.
+            word_confidence_threshold: Some(0.85),
+            llm_skip_threshold: Some(0.95),
             max_speech_samples: 60 * 16_000,
         }
     }
@@ -275,9 +279,11 @@ mod tests {
     }
 
     #[test]
-    fn default_has_skip_threshold_at_0_92() {
+    fn default_has_skip_threshold_at_0_95() {
+        // Matches the per-backend registry overrides for Parakeet/OrtQwen.
         let cfg = PipelineConfig::default();
-        assert_eq!(cfg.llm_skip_threshold, Some(0.92));
+        assert_eq!(cfg.llm_skip_threshold, Some(0.95));
+        assert_eq!(cfg.word_confidence_threshold, Some(0.85));
         assert!(cfg.validate().is_empty(), "default must validate");
     }
 

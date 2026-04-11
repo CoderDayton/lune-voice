@@ -11,7 +11,12 @@
 //!
 //! Optional env vars:
 //!   ASR=parakeet|qwen          select backend (default: parakeet)
-//!   LUNE_CALIBRATOR_OUT=/path  override output path (default: app data dir)
+//!   LUNE_CALIBRATOR_OUT=/path  override output path. By default writes to
+//!                               `<data_dir>/calibrator_<slug>.json` where
+//!                               slug is the active backend's `slug()` — so
+//!                               running this example twice (once per backend)
+//!                               produces two independent calibrator files
+//!                               that `SessionManager` picks automatically.
 
 #[allow(dead_code)]
 #[path = "bench_utils.rs"]
@@ -127,7 +132,7 @@ fn main() {
     print_reliability(&all_samples, &calibrator);
 
     // ── Save to disk ────────────────────────────────────────────────────
-    let out_path = resolve_output_path();
+    let out_path = resolve_output_path(asr_entry.backend_kind.slug());
     match save_calibrator(&calibrator, &out_path) {
         Ok(()) => {
             println!();
@@ -263,7 +268,7 @@ fn print_reliability(samples: &[(f32, bool)], calibrator: &IsotonicCalibrator) {
 
 // ─── Output path resolution ─────────────────────────────────────────────────
 
-fn resolve_output_path() -> PathBuf {
+fn resolve_output_path(slug: &str) -> PathBuf {
     if let Ok(override_path) = std::env::var("LUNE_CALIBRATOR_OUT") {
         return PathBuf::from(override_path);
     }
@@ -276,7 +281,11 @@ fn resolve_output_path() -> PathBuf {
                 .map(|h| PathBuf::from(h).join(".local/share"))
         })
         .unwrap_or_else(|| PathBuf::from("."));
-    data_dir.join("lune-voice").join("calibrator.json")
+    // Per-backend file so the two families don't collide. Matches the
+    // layout expected by `AppPaths::calibrator_file(slug)`.
+    data_dir
+        .join("lune-voice")
+        .join(format!("calibrator_{slug}.json"))
 }
 
 fn save_calibrator(cal: &IsotonicCalibrator, path: &PathBuf) -> std::io::Result<()> {

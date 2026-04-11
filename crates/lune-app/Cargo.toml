@@ -59,3 +59,7 @@ path = "../../benchmarks/live_transcribe.rs"
 [[example]]
 name = "calibrate_confidence"
 path = "../../benchmarks/calibrate_confidence.rs"
+
+[[example]]
+name = "noisify_fixtures"
+path = "../../benchmarks/noisify_fixtures.rs"

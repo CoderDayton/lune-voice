@@ -203,16 +203,29 @@ async fn run_full_pipeline(
     // Optional isotonic calibrator load for ablation runs.
     //
     // - `LUNE_CALIBRATOR=0`      identity (ablation A/B baseline)
-    // - `LUNE_CALIBRATOR=1`      default path `~/.local/share/lune-voice/calibrator.json`
+    // - `LUNE_CALIBRATOR=1`      per-backend default path
+    //                             `~/.local/share/lune-voice/calibrator_<slug>.json`
+    //                             with legacy `calibrator.json` fallback
     // - `LUNE_CALIBRATOR=<path>` explicit path
     let mgr = match std::env::var("LUNE_CALIBRATOR") {
         Ok(v) if v == "0" => mgr,
         Ok(v) if v == "1" => {
-            let path = std::env::var("HOME")
-                .map(|h| {
-                    std::path::PathBuf::from(h).join(".local/share/lune-voice/calibrator.json")
-                })
+            let data_dir = std::env::var("HOME")
+                .map(|h| std::path::PathBuf::from(h).join(".local/share/lune-voice"))
                 .unwrap_or_default();
+            let per_backend = data_dir.join(format!("calibrator_{}.json", backend_kind.slug()));
+            let legacy = data_dir.join("calibrator.json");
+            let path = if per_backend.exists() {
+                per_backend
+            } else if legacy.exists() {
+                println!(
+                    "  [info] using legacy calibrator.json; retrain calibrate_confidence to produce calibrator_{}.json",
+                    backend_kind.slug()
+                );
+                legacy
+            } else {
+                per_backend
+            };
             if path.exists() {
                 match std::fs::read_to_string(&path) {
                     Ok(json) => match serde_json::from_str::<IsotonicCalibrator>(&json) {
