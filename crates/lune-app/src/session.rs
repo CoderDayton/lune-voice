@@ -338,6 +338,17 @@ fn append_segments(
     new_segments: Vec<AsrSegment>,
     calibrator: &IsotonicCalibrator,
 ) -> bool {
+    // Benchmark-only knobs for ablation runs. Not part of user-facing config.
+    //
+    // - `LUNE_CALIBRATOR=0`  skip calibrator remap (equivalent to identity)
+    // - `LUNE_RUNNER_UP=0`   clear `alternate` fields so `mark_uncertain`
+    //                        falls back to legacy `[?word?]` markers
+    //
+    // Read once per call; env lookups are cheap and this path runs at
+    // segment boundary (O(segments_per_utterance) calls per session).
+    let skip_calibration = std::env::var("LUNE_CALIBRATOR").is_ok_and(|v| v == "0");
+    let strip_runner_up = std::env::var("LUNE_RUNNER_UP").is_ok_and(|v| v == "0");
+
     let mut appended = false;
     for mut seg in new_segments {
         // Remap raw softmax confidences into calibrated P(correct | raw).
@@ -345,14 +356,21 @@ fn append_segments(
         // to work unchanged — the scale of `wc.confidence` has moved from
         // raw softmax space to probability-of-correctness space. For the
         // identity calibrator this is a no-op.
-        for wc in &mut seg.word_confidences {
-            wc.confidence = calibrator.calibrate(wc.confidence);
+        if !skip_calibration {
+            for wc in &mut seg.word_confidences {
+                wc.confidence = calibrator.calibrate(wc.confidence);
+            }
+            if let Some(min) = seg.min_token_confidence.as_mut() {
+                *min = calibrator.calibrate(*min);
+            }
+            if let Some(conf) = seg.confidence.as_mut() {
+                *conf = calibrator.calibrate(*conf);
+            }
         }
-        if let Some(min) = seg.min_token_confidence.as_mut() {
-            *min = calibrator.calibrate(*min);
-        }
-        if let Some(conf) = seg.confidence.as_mut() {
-            *conf = calibrator.calibrate(*conf);
+        if strip_runner_up {
+            for wc in &mut seg.word_confidences {
+                wc.alternate = None;
+            }
         }
 
         let trimmed = seg.text.trim();

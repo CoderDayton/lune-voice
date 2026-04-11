@@ -20,7 +20,7 @@ use bench_utils::{
     process_memory_usage, word_error_rate, workspace_root, wrap_print,
 };
 use lune_app::{SessionManager, SessionManagerConfig};
-use lune_asr::{AsrRegistry, OrtForcedAligner};
+use lune_asr::{AsrRegistry, IsotonicCalibrator, OrtForcedAligner};
 use lune_audio::{AudioConfig, AudioStream};
 use lune_core::asr::AsrBackendKind;
 use lune_core::config::{DevicePolicy, UserSettings};
@@ -107,13 +107,28 @@ fn main() {
         println!("── {} ({:.1}s audio) ──", fixture.name, fixture.audio_secs);
         println!();
 
+        // Optional marking/skip threshold overrides for ablation runs.
+        let mut pipeline = asr.pipeline_config();
+        if let Ok(v) = std::env::var("LUNE_MARK_THRESHOLD")
+            && let Ok(f) = v.parse::<f32>()
+        {
+            pipeline.word_confidence_threshold = Some(f);
+        }
+        if let Ok(v) = std::env::var("LUNE_SKIP_THRESHOLD") {
+            if v == "off" {
+                pipeline.llm_skip_threshold = None;
+            } else if let Ok(f) = v.parse::<f32>() {
+                pipeline.llm_skip_threshold = Some(f);
+            }
+        }
+
         let result = rt.block_on(run_full_pipeline(
             fixture,
             Arc::clone(&asr),
             aligner.clone(),
             Arc::clone(&llm),
             asr_entry.backend_kind,
-            asr.pipeline_config(),
+            pipeline,
         ));
 
         match result {
@@ -185,6 +200,67 @@ async fn run_full_pipeline(
         config,
         settings,
     );
+    // Optional isotonic calibrator load for ablation runs.
+    //
+    // - `LUNE_CALIBRATOR=0`      identity (ablation A/B baseline)
+    // - `LUNE_CALIBRATOR=1`      default path `~/.local/share/lune-voice/calibrator.json`
+    // - `LUNE_CALIBRATOR=<path>` explicit path
+    let mgr = match std::env::var("LUNE_CALIBRATOR") {
+        Ok(v) if v == "0" => mgr,
+        Ok(v) if v == "1" => {
+            let path = std::env::var("HOME")
+                .map(|h| {
+                    std::path::PathBuf::from(h).join(".local/share/lune-voice/calibrator.json")
+                })
+                .unwrap_or_default();
+            if path.exists() {
+                match std::fs::read_to_string(&path) {
+                    Ok(json) => match serde_json::from_str::<IsotonicCalibrator>(&json) {
+                        Ok(cal) => {
+                            println!(
+                                "  Calibrator loaded: {} ({} breakpoints)",
+                                path.display(),
+                                cal.breakpoint_count()
+                            );
+                            mgr.with_calibrator(Arc::new(cal))
+                        }
+                        Err(e) => {
+                            println!("  [warn] calibrator parse failed: {e}");
+                            mgr
+                        }
+                    },
+                    Err(e) => {
+                        println!("  [warn] calibrator read failed: {e}");
+                        mgr
+                    }
+                }
+            } else {
+                println!("  [warn] calibrator not found at {}", path.display());
+                mgr
+            }
+        }
+        Ok(path) => {
+            let p = std::path::PathBuf::from(&path);
+            match std::fs::read_to_string(&p)
+                .ok()
+                .and_then(|j| serde_json::from_str::<IsotonicCalibrator>(&j).ok())
+            {
+                Some(cal) => {
+                    println!(
+                        "  Calibrator loaded: {} ({} breakpoints)",
+                        p.display(),
+                        cal.breakpoint_count()
+                    );
+                    mgr.with_calibrator(Arc::new(cal))
+                }
+                None => {
+                    println!("  [warn] could not load calibrator from {path}");
+                    mgr
+                }
+            }
+        }
+        Err(_) => mgr, // default: no calibrator (identity)
+    };
     let mgr = if let Some(aligner) = aligner {
         mgr.with_aligner(aligner)
     } else {
