@@ -130,8 +130,8 @@ command = '''
 cargo clean
 find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null
 if [ "$ALL" = "1" ]; then
-  rm -rf .venv data/asr_correction
-  echo "cleaned target/ + __pycache__ + .venv + training data"
+  rm -rf .venv
+  echo "cleaned target/ + __pycache__ + .venv"
 else
   echo "cleaned target/ + __pycache__"
 fi
@@ -145,13 +145,11 @@ interpreter = "bash"
 command = '''
 case "${MODEL:-all}" in
   asr) uv run python scripts/export_onnx.py --asr ;;
-  llm) uv run python scripts/export_onnx.py --llm ;;
   fa)  uv run python scripts/export_onnx.py --fa ;;
   all) uv run python scripts/export_onnx.py --asr \
-    && uv run python scripts/export_onnx.py --llm \
     && uv run python scripts/export_onnx.py --fa ;;
-  *)   echo "MODEL must be asr, llm, fa, or all"; exit 1 ;;
+  *)   echo "MODEL must be asr, fa, or all"; exit 1 ;;
 esac
 '''
-info = "Export ONNX models (--env MODEL=asr|llm|fa|all, default: all)"
+info = "Export ONNX models (--env MODEL=asr|fa|all, default: all)"
 requires = ["uv"]

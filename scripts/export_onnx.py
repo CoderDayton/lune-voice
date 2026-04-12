@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Custom ONNX exporter for Qwen3-0.6B and Qwen3-ASR-0.6B.
+"""Custom ONNX exporter for Qwen3-ASR-0.6B and the wav2vec2 forced aligner.
 
 Bypasses optimum-cli entirely. Uses torch.onnx.export with manual wrappers
-that correctly handle Qwen3's architecture (GQA, q_norm/k_norm, RoPE, SwiGLU,
-tied embeddings) and produce clean FP16 graphs with proper KV cache I/O.
+that correctly handle Qwen3-ASR's architecture (GQA, q_norm/k_norm, RoPE,
+SwiGLU, tied embeddings) and produce clean FP16 graphs with proper KV cache
+I/O.
 
 Usage:
-    python scripts/export_onnx.py --llm --output-dir models/qwen3-0.6b-onnx
     python scripts/export_onnx.py --asr --output-dir models/qwen3-asr-0.6b-onnx
-    python scripts/export_onnx.py --llm --asr
-    python scripts/export_onnx.py --llm --no-quantize
+    python scripts/export_onnx.py --fa
+    python scripts/export_onnx.py --asr --no-quantize
 
 Requirements:
     pip install torch transformers onnx onnxruntime nncf
@@ -357,199 +357,6 @@ def quantize_int4_nncf(
     _save_consolidated(compressed, model_path)
     print(f"  {model_path.name}: INT4 AWQ+SE ({group_desc}) complete")
 
-
-# ── LLM Wrappers ─────────────────────────────────────────────────────────────
-
-
-class Qwen3EmbedTokensWrapper(nn.Module):
-    """Token embedding lookup (separate ONNX file for flexibility)."""
-
-    def __init__(self, model):
-        super().__init__()
-        self.embed_tokens = model.model.embed_tokens
-
-    @torch.no_grad()
-    def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
-        return self.embed_tokens(input_ids).to(DTYPE)
-
-
-class Qwen3DecoderWrapper(nn.Module):
-    """Qwen3 decoder with KV cache, using the model's own forward path.
-
-    This preserves q_norm/k_norm, RoPE, GQA, and SwiGLU exactly as
-    implemented in transformers, avoiding manual reimplementation bugs.
-    """
-
-    def __init__(self, model, num_layers: int, num_kv_heads: int, head_dim: int):
-        super().__init__()
-        self.text_model = model.model
-        self.lm_head = model.lm_head
-        self.num_layers = num_layers
-        self.num_kv_heads = num_kv_heads
-        self.head_dim = head_dim
-
-    @torch.no_grad()
-    def forward(
-        self,
-        inputs_embeds: torch.Tensor,       # [B, L, H]
-        position_ids: torch.Tensor,         # [B, L]
-        past_key_values_flat: list[torch.Tensor],
-    ):
-        from transformers import DynamicCache
-
-        past = DynamicCache()
-        for i in range(self.num_layers):
-            past.update(
-                past_key_values_flat[i * 2],
-                past_key_values_flat[i * 2 + 1],
-                i,
-            )
-
-        outputs = self.text_model(
-            inputs_embeds=inputs_embeds,
-            position_ids=position_ids,
-            past_key_values=past,
-            use_cache=True,
-        )
-
-        logits = self.lm_head(outputs[0])
-
-        new_cache = outputs.past_key_values
-        flat_present: list[torch.Tensor] = []
-        for i in range(self.num_layers):
-            k, v = new_cache[i]
-            flat_present.append(k)
-            flat_present.append(v)
-
-        return (logits, flat_present)
-
-
-# ── LLM Export ────────────────────────────────────────────────────────────────
-
-
-def export_llm(
-    output_dir: Path,
-    model_id: str = "Qwen/Qwen3-0.6B",
-    quantize: bool = True,
-) -> None:
-    """Export Qwen3-0.6B to ONNX via direct torch.onnx.export."""
-    from transformers import AutoModelForCausalLM, AutoTokenizer
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-    print(f"[LLM] Exporting {model_id} → {output_dir}")
-
-    model = AutoModelForCausalLM.from_pretrained(
-        model_id,
-        torch_dtype=DTYPE,
-        attn_implementation="eager",  # no flash-attn / SDPA for tracing
-    )
-    model.eval()
-
-    cfg = model.config
-    num_layers = cfg.num_hidden_layers       # 28
-    num_kv_heads = cfg.num_key_value_heads   # 8
-    head_dim = cfg.head_dim                  # 128
-    hidden_size = cfg.hidden_size            # 1024
-    vocab_size = cfg.vocab_size              # 151936
-
-    print(
-        f"[LLM] Architecture: {num_layers}L, {hidden_size}H, "
-        f"{num_kv_heads}KV, {head_dim}D, vocab={vocab_size}, tied={cfg.tie_word_embeddings}"
-    )
-
-    # ── 1. Export embed_tokens ───────────────────────────────────────────
-    print("[LLM]   Exporting qwen3-0.6b-embed-tokens.onnx ...")
-    embed_wrapper = Qwen3EmbedTokensWrapper(model)
-    embed_wrapper.eval()
-
-    dummy_ids = torch.tensor([[151644, 8948, 198]], dtype=torch.long)
-    seq_dim = torch.export.Dim("seq_len", min=1, max=4096)
-
-    torch.onnx.export(
-        embed_wrapper,
-        (dummy_ids,),
-        str(output_dir / "qwen3-0.6b-embed-tokens.onnx"),
-        input_names=["input_ids"],
-        output_names=["embeds"],
-        dynamic_shapes=({1: seq_dim},),
-    )
-    print("[LLM]   qwen3-0.6b-embed-tokens.onnx exported")
-
-    # ── 2. Export decoder ────────────────────────────────────────────────
-    print("[LLM]   Exporting qwen3-0.6b-decoder.onnx ...")
-    dec_wrapper = Qwen3DecoderWrapper(model, num_layers, num_kv_heads, head_dim)
-    dec_wrapper.eval()
-
-    seq_len = 4
-    past_len = 0
-    dummy_embeds = torch.randn(1, seq_len, hidden_size, dtype=DTYPE)
-    dummy_position_ids = torch.arange(past_len, past_len + seq_len).unsqueeze(0)  # [1, L]
-
-    dummy_past = []
-    for _ in range(num_layers):
-        dummy_past.append(torch.zeros(1, num_kv_heads, past_len, head_dim, dtype=DTYPE))  # key
-        dummy_past.append(torch.zeros(1, num_kv_heads, past_len, head_dim, dtype=DTYPE))  # value
-
-    input_names = ["inputs_embeds", "position_ids"]
-    output_names = ["logits"]
-    for i in range(num_layers):
-        input_names.append(f"past_key_values.{i}.key")
-        input_names.append(f"past_key_values.{i}.value")
-        output_names.append(f"present_key_values.{i}.key")
-        output_names.append(f"present_key_values.{i}.value")
-
-    seq_dim_d = torch.export.Dim("seq_len", min=1, max=4096)
-    past_dim = torch.export.Dim("past_seq_len", min=0, max=8192)
-
-    past_dyn = [{2: past_dim} for _ in range(num_layers * 2)]
-    dyn_shapes = (
-        {1: seq_dim_d},       # inputs_embeds
-        {1: seq_dim_d},       # position_ids
-        past_dyn,             # past KV
-    )
-
-    torch.onnx.export(
-        dec_wrapper,
-        (dummy_embeds, dummy_position_ids, dummy_past),
-        str(output_dir / "qwen3-0.6b-decoder.onnx"),
-        input_names=input_names,
-        output_names=output_names,
-        dynamic_shapes=dyn_shapes,
-    )
-    print("[LLM]   qwen3-0.6b-decoder.onnx exported")
-
-    # ── 3. Consolidate external data ─────────────────────────────────────
-    for name in ["qwen3-0.6b-embed-tokens.onnx", "qwen3-0.6b-decoder.onnx"]:
-        _consolidate_external_data(output_dir, name)
-
-    # ── 4. Quantize decoder ──────────────────────────────────────────────
-    if quantize:
-        quantize_int4_nncf(
-            output_dir / "qwen3-0.6b-decoder.onnx",
-            output_dir / "qwen3-0.6b-embed-tokens.onnx",
-            model_id,
-            num_layers,
-            num_kv_heads,
-            head_dim,
-        )
-
-    # ── 5. Cleanup stale scattered external data ─────────────────────────
-    keep = {
-        "qwen3-0.6b-embed-tokens.onnx", "qwen3-0.6b-embed-tokens.onnx_data",
-        "qwen3-0.6b-decoder.onnx", "qwen3-0.6b-decoder.onnx_data",
-    }
-    for f in output_dir.iterdir():
-        if f.suffix == ".data" and f.name not in keep:
-            f.unlink()
-        elif f.name.startswith("onnx__"):
-            f.unlink()
-
-    # ── 6. Save tokenizer ────────────────────────────────────────────────
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
-    tokenizer.save_pretrained(str(output_dir))
-
-    print(f"[LLM] Export complete: {output_dir}")
-    _list_files(output_dir)
 
 
 # ── ASR Wrappers ──────────────────────────────────────────────────────────────
@@ -1003,7 +810,6 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Export Qwen3 models to ONNX format"
     )
-    parser.add_argument("--llm", action="store_true", help="Export Qwen3-0.6B LLM")
     parser.add_argument("--asr", action="store_true", help="Export Qwen3-ASR-0.6B")
     parser.add_argument(
         "--fa", action="store_true",
@@ -1024,10 +830,6 @@ def main() -> None:
         help="Output directory (default: models/<model-name>-onnx)",
     )
     parser.add_argument(
-        "--llm-model", default="Qwen/Qwen3-0.6B",
-        help="HuggingFace model ID for LLM",
-    )
-    parser.add_argument(
         "--asr-model", default="Qwen/Qwen3-ASR-0.6B",
         help="HuggingFace model ID for ASR",
     )
@@ -1041,15 +843,11 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    if not args.llm and not args.asr and not args.fa:
-        parser.error("Specify --llm, --asr, --fa, or a combination")
+    if not args.asr and not args.fa:
+        parser.error("Specify --asr, --fa, or both")
 
     do_quant = not args.no_quantize
     fp16_decoder = args.fp16_decoder
-
-    if args.llm:
-        out = args.output_dir or Path("models/qwen3-0.6b-onnx")
-        export_llm(out, args.llm_model, quantize=do_quant)
 
     if args.asr:
         out = args.output_dir or Path("models/qwen3-asr-0.6b-onnx")
