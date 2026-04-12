@@ -56,11 +56,6 @@ session_history_days = 30
 [asr_backend]
 type = "ParakeetTdt"
 
-# Absolute path to the model directory containing:
-#   encoder-model.int8.onnx, decoder_joint-model.int8.onnx, vocab.txt
-# Leave empty to use the auto-downloaded path from lune-persist hub.
-model_dir = ""
-
 
 # ── Hotkeys ───────────────────────────────────────────────────────────────────
 #

@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -78,9 +76,7 @@ impl Default for UserSettings {
     fn default() -> Self {
         Self {
             device: DevicePolicy::Auto,
-            asr_backend: AsrBackendConfig::ParakeetTdt {
-                model_dir: PathBuf::from("models/parakeet-tdt-0.6b"),
-            },
+            asr_backend: AsrBackendConfig::ParakeetTdt {},
             llm_backend: LlmBackendConfig::Disabled,
             hotkey: HotkeyConfig::default(),
             default_style: "casual".into(),
@@ -103,9 +99,7 @@ impl Default for UserSettings {
 #[serde(tag = "type")]
 #[non_exhaustive]
 pub enum AsrBackendConfig {
-    ParakeetTdt {
-        model_dir: PathBuf,
-    },
+    ParakeetTdt {},
     OpenAiCompatible {
         base_url: Url,
         api_key: RedactedString,

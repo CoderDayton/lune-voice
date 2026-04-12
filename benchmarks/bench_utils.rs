@@ -124,9 +124,7 @@ pub fn benchmark_asr_entries(root: &std::path::Path) -> Vec<BenchmarkAsrEntry> {
         entries.push(BenchmarkAsrEntry {
             display_name: "Parakeet-TDT-int8",
             backend_kind: AsrBackendKind::ParakeetTdt,
-            config: AsrBackendConfig::ParakeetTdt {
-                model_dir: parakeet_dir,
-            },
+            config: AsrBackendConfig::ParakeetTdt {},
         });
     }
     entries

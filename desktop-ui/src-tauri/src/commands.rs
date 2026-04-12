@@ -201,11 +201,19 @@ pub async fn download_model_cmd(
     let app_handle = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let paths = lune_persist::AppPaths::resolve().ok_or("resolve paths")?;
-        lune_persist::download_model(&paths.models_dir(), &local_name, |progress| {
+        tracing::info!(local_name, "starting model download");
+        match lune_persist::download_model(&paths.models_dir(), &local_name, |progress| {
             let _ = app_handle.emit("lune://download-progress", &progress);
-        })
-        .map_err(|e| format!("download failed: {e}"))?;
-        Ok::<_, String>(())
+        }) {
+            Ok(_) => {
+                tracing::info!(local_name, "download complete");
+                Ok(())
+            }
+            Err(e) => {
+                tracing::error!(local_name, error = %e, "download failed");
+                Err(format!("download failed: {e}"))
+            }
+        }
     })
     .await
     .map_err(|e| format!("download task: {e}"))?

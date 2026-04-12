@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use lune_core::config::{
     ActivationMode, AsrBackendConfig, DevicePolicy, DictationMode, HotkeyConfig, KeyCombo,
     Modifier, PillVisibility, RedactedString, StreamingMode, UserSettings, builtin_registry,
@@ -337,9 +335,7 @@ fn asr_backend_from_type(
     input: &SaveWorkspaceSettingsInput,
 ) -> Result<AsrBackendConfig, String> {
     Ok(match kind {
-        AsrBackendTypeDto::ParakeetTdt => AsrBackendConfig::ParakeetTdt {
-            model_dir: current_parakeet_model_dir(current),
-        },
+        AsrBackendTypeDto::ParakeetTdt => AsrBackendConfig::ParakeetTdt {},
         AsrBackendTypeDto::OpenAiCompatible => {
             // Prefer incoming DTO fields; fall back to current config values if already OpenAI.
             let (cur_url, cur_key, cur_model) = match current {
@@ -393,13 +389,6 @@ fn validate_api_url(url: &url::Url, field: &str) -> Result<(), String> {
         scheme => Err(format!(
             "{field}: unsupported URL scheme \"{scheme}\", expected https"
         )),
-    }
-}
-
-fn current_parakeet_model_dir(current: &AsrBackendConfig) -> PathBuf {
-    match current {
-        AsrBackendConfig::ParakeetTdt { model_dir } => model_dir.clone(),
-        _ => PathBuf::new(),
     }
 }
 

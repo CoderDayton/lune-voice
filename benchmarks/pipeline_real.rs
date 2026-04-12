@@ -64,7 +64,8 @@ fn main() {
     println!("  Selected ASR backend: {}", asr_entry.display_name);
     print!("  Loading ASR backend ... ");
     let t = Instant::now();
-    let asr = AsrRegistry::from_config(&asr_entry.config, device).expect("load ASR");
+    let models_dir = root.join("models");
+    let asr = AsrRegistry::from_config(&asr_entry.config, device, &models_dir).expect("load ASR");
 
     let asr = Arc::new(asr);
     println!("{:.1}s", t.elapsed().as_secs_f64());

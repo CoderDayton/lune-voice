@@ -124,11 +124,23 @@ pub fn run() {
 }
 
 fn register_hotkeys(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    let settings = tauri::async_runtime::block_on(async {
-        let rt = app.state::<runtime::AppRuntime>();
-        rt.settings().await
-    });
+    // Read hotkey config directly — can't use block_on here since we're
+    // already inside one from setup(). Just use the defaults; the runtime
+    // has the same settings loaded but we can't await inside setup.
+    let settings = lune_core::config::UserSettings::default();
+    if let Some(paths) = lune_persist::AppPaths::resolve() {
+        let store = lune_persist::SettingsStore::new(paths.settings_file());
+        if let Ok(s) = store.load() {
+            return register_hotkeys_with(app, &s);
+        }
+    }
+    register_hotkeys_with(app, &settings)
+}
 
+fn register_hotkeys_with(
+    app: &tauri::App,
+    settings: &lune_core::config::UserSettings,
+) -> Result<(), Box<dyn std::error::Error>> {
     let toggle_str = format_hotkey(&settings.hotkey.toggle_dictation);
     let cancel_str = format_hotkey(&settings.hotkey.cancel_dictation);
 

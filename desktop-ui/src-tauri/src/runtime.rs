@@ -11,7 +11,7 @@ use lune_core::llm::TextPostProcessor;
 use lune_core::session::SessionEvent;
 use lune_dict::DictionaryManager;
 use lune_llm::{NullPostProcessor, OpenAiLlmBackend, OpenAiLlmConfig};
-use lune_persist::{AppPaths, Database, SettingsStore, resolve_local_model_paths};
+use lune_persist::{AppPaths, Database, SettingsStore};
 use tauri::{AppHandle, Emitter, ipc::Channel};
 use tokio::sync::{Mutex, RwLock, mpsc};
 #[cfg(unix)]
@@ -52,8 +52,7 @@ struct SessionStreamSlot {
 impl AppRuntime {
     pub async fn new(app: AppHandle) -> Result<Self, String> {
         let paths = resolve_paths()?;
-        let mut settings = load_settings(&paths)?;
-        resolve_local_model_paths(&paths.models_dir(), &mut settings);
+        let settings = load_settings(&paths)?;
         init_ort_runtime();
 
         // Check model readiness *before* attempting pipeline build.
@@ -99,10 +98,6 @@ impl AppRuntime {
         };
 
         Ok(runtime)
-    }
-
-    pub async fn settings(&self) -> UserSettings {
-        self.inner.settings.read().await.clone()
     }
 
     pub async fn service_status(&self) -> String {
@@ -420,8 +415,7 @@ impl AppRuntime {
         // Phase 2: If reload needed, rebuild pipeline outside lock, then
         // re-acquire and atomically swap + activate in one critical section.
         if let Some(paths) = reload_paths {
-            let mut settings = load_settings(&paths)?;
-            resolve_local_model_paths(&paths.models_dir(), &mut settings);
+            let settings = load_settings(&paths)?;
             let (rebuilt, new_settings) = build_pipeline(paths, settings)
                 .await
                 .map_err(|e| format!("Pipeline build failed: {e}"))?;
@@ -479,7 +473,7 @@ async fn build_pipeline(
     paths: AppPaths,
     settings: UserSettings,
 ) -> Result<(LivePipeline, Arc<RwLock<UserSettings>>), String> {
-    let asr = AsrRegistry::from_config(&settings.asr_backend, settings.device)
+    let asr = AsrRegistry::from_config(&settings.asr_backend, settings.device, &paths.models_dir())
         .map_err(|e| format!("build asr backend: {e}"))?;
     let post_processor = build_post_processor(&settings).await?;
     let router = Arc::new(VoiceCommandRouter::new());

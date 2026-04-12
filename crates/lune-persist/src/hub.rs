@@ -67,11 +67,22 @@ impl ModelSpec {
         }
     }
 
+    /// Nemotron reranker 1B: cross-encoder for n-best hypothesis rescoring.
+    #[inline]
+    pub fn nemotron_reranker() -> Self {
+        Self::Directory {
+            repo_id: "cstr/llama-nemotron-rerank-1b-v2-ONNX".into(),
+            required_files: vec!["tokenizer.json".into(), "model_int4_full.onnx".into()],
+            suffix_patterns: vec![],
+            local_name: "nemotron-rerank-1b".into(),
+        }
+    }
+
     /// Llama-3.2-1B-Instruct Q4F16: style LLM for transcript reformatting.
     #[inline]
     pub fn style_llm() -> Self {
         Self::Directory {
-            repo_id: "onnx-community/Llama-3.2-1B-Instruct-q4f16".into(),
+            repo_id: "onnx-community/Llama-3.2-1B-Instruct-ONNX".into(),
             required_files: vec![
                 "tokenizer.json".into(),
                 "onnx/model_q4f16.onnx".into(),
@@ -87,6 +98,7 @@ impl ModelSpec {
         match self {
             Self::Directory { local_name, .. } => match local_name.as_str() {
                 "parakeet-tdt-0.6b" => "Parakeet TDT 0.6B",
+                "nemotron-rerank-1b" => "Nemotron Reranker 1B",
                 "llama-3.2-1b-instruct-q4f16" => "Llama 3.2 1B Style LLM",
                 _ => local_name,
             },
@@ -102,7 +114,11 @@ impl ModelSpec {
                 ..
             } => {
                 let dir = models_dir.join(local_name);
-                dir.exists() && required_files.iter().all(|f| dir.join(f).is_file())
+                dir.exists()
+                    && required_files.iter().all(|f| {
+                        let flat = Path::new(f).file_name().unwrap_or(f.as_ref());
+                        dir.join(flat).is_file()
+                    })
             }
         }
     }
@@ -143,7 +159,16 @@ pub fn check_model_status(
         });
     }
 
-    // Style LLM is always needed for transcript reformatting.
+    // Nemotron reranker for n-best hypothesis correction.
+    let reranker_spec = ModelSpec::nemotron_reranker();
+    statuses.push(ModelStatus {
+        name: reranker_spec.display_name().to_string(),
+        repo_id: reranker_spec.repo_id().to_string(),
+        local_name: reranker_spec.local_name().to_string(),
+        ready: reranker_spec.is_ready(models_dir),
+    });
+
+    // Style LLM for transcript reformatting.
     let style_spec = ModelSpec::style_llm();
     statuses.push(ModelStatus {
         name: style_spec.display_name().to_string(),
@@ -164,6 +189,7 @@ pub fn download_model(
 ) -> PersistResult<PathBuf> {
     let spec = match local_name {
         "parakeet-tdt-0.6b" => ModelSpec::parakeet_tdt(),
+        "nemotron-rerank-1b" => ModelSpec::nemotron_reranker(),
         "llama-3.2-1b-instruct-q4f16" => ModelSpec::style_llm(),
         _ => {
             return Err(PersistError::ModelDownload(format!(
@@ -226,78 +252,6 @@ impl ModelHub {
         Ok(Self { api })
     }
 
-    /// Download matching files from HF Hub directly into `local_dir`.
-    ///
-    /// Uses hard links where possible (free on same filesystem, avoids data
-    /// duplication). Falls back to `fs::copy` on EXDEV. Already-complete
-    /// files are skipped via `is_file()` check.
-    fn download_directory(
-        &self,
-        repo_id: &str,
-        required_files: &[String],
-        suffix_patterns: &[String],
-        local_dir: &Path,
-    ) -> PersistResult<()> {
-        let repo = self.api.model(repo_id.to_string());
-        info!(repo_id, "discovering repository files");
-
-        let file_list = self.list_repo_files(&repo, repo_id)?;
-
-        // Validate required files exist in remote listing first.
-        for req in required_files {
-            if !file_list.iter().any(|f| f == req) {
-                return Err(PersistError::ModelDownload(format!(
-                    "{repo_id}: required file `{req}` not found in repository"
-                )));
-            }
-        }
-
-        // Build download list: required files union suffix-matched files.
-        // Pre-allocate to avoid repeated reallocation.
-        let mut to_download: Vec<&str> = Vec::with_capacity(file_list.len());
-        for f in &file_list {
-            if required_files.iter().any(|r| f == r)
-                || suffix_patterns.iter().any(|s| f.ends_with(s.as_str()))
-            {
-                to_download.push(f.as_str());
-            }
-        }
-
-        if to_download.is_empty() {
-            return Err(PersistError::ModelDownload(format!(
-                "{repo_id}: no files matched filters"
-            )));
-        }
-
-        std::fs::create_dir_all(local_dir)
-            .map_err(|e| PersistError::ModelDownload(format!("create dir: {e}")))?;
-
-        info!(
-            repo_id,
-            count = to_download.len(),
-            "downloading model files"
-        );
-
-        for filename in &to_download {
-            let dst = local_dir.join(filename);
-            if dst.is_file() {
-                continue;
-            }
-            let hub_path = repo
-                .get(filename)
-                .map_err(|e| PersistError::ModelDownload(format!("{repo_id}/{filename}: {e}")))?;
-            let real_src = hub_path.canonicalize().map_err(|e| {
-                PersistError::ModelDownload(format!("{filename}: resolve blob: {e}"))
-            })?;
-            // Hard-link first (zero-copy, same inode on same fs).
-            // EXDEV (cross-device) → fall back to full copy.
-            link_or_copy(&real_src, &dst)
-                .map_err(|e| PersistError::ModelDownload(format!("{filename}: write: {e}")))?;
-        }
-
-        Ok(())
-    }
-
     #[inline]
     fn list_repo_files(&self, repo: &ApiRepo, repo_id: &str) -> PersistResult<Vec<String>> {
         let info = repo
@@ -325,6 +279,35 @@ fn link_or_copy(src: &Path, dst: &Path) -> std::io::Result<()> {
         }
         Err(e) => Err(e),
     }
+}
+
+/// Direct HTTPS download from HuggingFace CDN. Fallback for Xet-backed
+/// repos where the `hf_hub` crate's `repo.get()` fails.
+///
+/// Uses the resolve endpoint which redirects to the actual blob URL.
+/// Streams to a temp file, then renames atomically to avoid partial files.
+/// Reads `HF_TOKEN` from env for gated/private repos.
+fn download_file_direct(repo_id: &str, filename: &str, dst: &Path) -> PersistResult<()> {
+    let url = format!("https://huggingface.co/{repo_id}/resolve/main/{filename}");
+    let mut req = ureq::get(&url);
+    if let Ok(token) = std::env::var("HF_TOKEN") {
+        req = req.header("Authorization", &format!("Bearer {token}"));
+    }
+    let resp = req
+        .call()
+        .map_err(|e| PersistError::ModelDownload(format!("{repo_id}/{filename}: HTTP: {e}")))?;
+
+    let tmp = dst.with_extension("dl.tmp");
+    {
+        let mut file = std::fs::File::create(&tmp)
+            .map_err(|e| PersistError::ModelDownload(format!("create tmp: {e}")))?;
+        std::io::copy(&mut resp.into_body().as_reader(), &mut file)
+            .map_err(|e| PersistError::ModelDownload(format!("{filename}: stream: {e}")))?;
+    }
+    std::fs::rename(&tmp, dst)
+        .map_err(|e| PersistError::ModelDownload(format!("{filename}: rename: {e}")))?;
+    info!(repo_id, filename, "direct download complete");
+    Ok(())
 }
 
 /// Download default models if not already present.
@@ -363,28 +346,7 @@ fn ensure_directory_model(
     spec: &ModelSpec,
     models_dir: &Path,
 ) -> PersistResult<PathBuf> {
-    let ModelSpec::Directory {
-        repo_id,
-        required_files,
-        suffix_patterns,
-        local_name,
-    } = spec;
-
-    let local_dir = models_dir.join(local_name);
-
-    if local_dir.exists() {
-        // Fast path: all required files present → skip download entirely.
-        if required_files.iter().all(|f| local_dir.join(f).is_file()) {
-            info!(path = %local_dir.display(), "model directory already present");
-            return Ok(local_dir);
-        }
-        info!(path = %local_dir.display(), "model directory incomplete, re-downloading");
-    }
-
-    hub.download_directory(repo_id, required_files, suffix_patterns, &local_dir)?;
-
-    info!(path = %local_dir.display(), "model directory ready");
-    Ok(local_dir)
+    ensure_directory_model_with_progress(hub, spec, models_dir, |_, _, _| {})
 }
 
 /// Like `ensure_directory_model` but calls `on_file` for each file downloaded.
@@ -425,40 +387,31 @@ fn ensure_directory_model_with_progress(
         .map_err(|e| PersistError::ModelDownload(format!("create dir: {e}")))?;
 
     for (idx, filename) in files_to_download.iter().enumerate() {
+        // Flatten nested paths: "onnx/model.onnx" → "model.onnx" locally
+        let local_name = Path::new(filename).file_name().unwrap_or(filename.as_ref());
+        let dst = local_dir.join(local_name);
+        if dst.is_file() && dst.metadata().map(|m| m.len() > 0).unwrap_or(false) {
+            on_file(filename, idx, total);
+            continue;
+        }
         on_file(filename, idx, total);
 
-        let hub_path = repo
+        // Try hf_hub cache; fall back to direct HTTPS for Xet-backed repos
+        let ok = repo
             .get(filename)
-            .map_err(|e| PersistError::ModelDownload(format!("{repo_id}/{filename}: {e}")))?;
-        let real_src = hub_path
-            .canonicalize()
-            .map_err(|e| PersistError::ModelDownload(format!("{filename}: resolve: {e}")))?;
-        let dst = local_dir.join(filename);
-        link_or_copy(&real_src, &dst)
-            .map_err(|e| PersistError::ModelDownload(format!("{filename}: write: {e}")))?;
+            .ok()
+            .and_then(|p| p.canonicalize().ok())
+            .filter(|src| src.metadata().map(|m| m.len() > 0).unwrap_or(false))
+            .and_then(|src| link_or_copy(&src, &dst).ok())
+            .is_some();
+        if !ok {
+            let _ = std::fs::remove_file(&dst);
+            download_file_direct(repo_id, filename, &dst)?;
+        }
     }
 
     info!(path = %local_dir.display(), "model directory ready");
     Ok(local_dir)
-}
-
-/// Fill in empty model paths with their expected local locations.
-///
-/// Does **not** download anything or touch the network — just resolves
-/// where each model *would* live under `models_dir/`. Safe to call at
-/// startup even when models have not been downloaded yet.
-pub fn resolve_local_model_paths(
-    models_dir: &Path,
-    settings: &mut lune_core::config::UserSettings,
-) {
-    use lune_core::config::AsrBackendConfig;
-
-    match &mut settings.asr_backend {
-        AsrBackendConfig::ParakeetTdt { model_dir } if model_dir.as_os_str().is_empty() => {
-            *model_dir = models_dir.join("parakeet-tdt-0.6b");
-        }
-        _ => {}
-    }
 }
 
 #[cfg(test)]

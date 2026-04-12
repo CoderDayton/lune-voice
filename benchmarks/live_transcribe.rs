@@ -56,8 +56,10 @@ fn main() {
 
     eprint!("  Loading ASR ... ");
     let t = Instant::now();
-    let asr =
-        Arc::new(AsrRegistry::from_config(&asr_entry.config, device_policy).expect("load ASR"));
+    let models_dir = root.join("models");
+    let asr = Arc::new(
+        AsrRegistry::from_config(&asr_entry.config, device_policy, &models_dir).expect("load ASR"),
+    );
     let backend_kind = asr.kind();
     eprintln!("{:.1}s ({:?})", t.elapsed().as_secs_f64(), backend_kind);
 

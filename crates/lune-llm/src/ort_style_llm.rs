@@ -197,15 +197,13 @@ fn argmax_last(value: &DynValue) -> Result<u32> {
 }
 
 fn find_model(dir: &Path) -> Result<PathBuf> {
-    let onnx_dir = dir.join("onnx");
-    let search = if onnx_dir.is_dir() { &onnx_dir } else { dir };
     for name in [
         "model_q4f16.onnx",
         "model_q4.onnx",
         "model_fp16.onnx",
         "model.onnx",
     ] {
-        let p = search.join(name);
+        let p = dir.join(name);
         if p.exists() {
             return Ok(p);
         }

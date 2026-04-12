@@ -4,6 +4,7 @@
 //! implements [`AsrBackend`]. Construct one via [`AsrRegistry::from_config`]
 //! using the user's [`AsrBackendConfig`] and [`DevicePolicy`].
 
+use std::path::Path;
 use std::time::Duration;
 
 use lune_core::asr::{AsrBackend, AsrBackendKind, AsrSegment, AsrSessionConfig};
@@ -113,13 +114,17 @@ impl AsrRegistry {
     ///
     /// Cold path: called once at startup.
     #[cold]
-    pub fn from_config(config: &AsrBackendConfig, device: DevicePolicy) -> Result<Self> {
+    pub fn from_config(
+        config: &AsrBackendConfig,
+        device: DevicePolicy,
+        models_dir: &Path,
+    ) -> Result<Self> {
         let use_gpu = device.use_gpu(cfg!(feature = "cuda"));
 
         match config {
-            AsrBackendConfig::ParakeetTdt { model_dir } => {
+            AsrBackendConfig::ParakeetTdt { .. } => {
                 let backend = ParakeetTdtBackend::new(ParakeetTdtConfig {
-                    model_dir: model_dir.clone(),
+                    model_dir: models_dir.join("parakeet-tdt-0.6b"),
                     use_gpu,
                 })?;
                 Ok(Self::Parakeet(backend))
