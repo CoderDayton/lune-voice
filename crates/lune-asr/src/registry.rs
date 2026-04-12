@@ -205,6 +205,10 @@ impl AsrRegistry {
                 // actually live (raw 0.5–0.8 → calibrated 0.70–0.94).
                 word_confidence_threshold: Some(0.85),
                 llm_skip_threshold: Some(0.95),
+                // Skip LLM on broken transcripts too — overcorrection on
+                // min_token_confidence < 0.30 (calibrated) hurts WER more
+                // than it helps, per arXiv:2509.25048.
+                llm_skip_noisy_threshold: Some(0.30),
                 max_speech_samples: 60 * 16_000,
             },
             #[cfg(feature = "ort-qwen")]
@@ -223,6 +227,7 @@ impl AsrRegistry {
                 // corrector off the sidelines on genuinely noisy audio.
                 word_confidence_threshold: Some(0.85),
                 llm_skip_threshold: Some(0.95),
+                llm_skip_noisy_threshold: Some(0.30),
                 max_speech_samples: 60 * 16_000,
             },
             Self::OpenAi(_) => PipelineConfig {
@@ -232,10 +237,11 @@ impl AsrRegistry {
                 speech_threshold: 0.5,
                 min_speech_ms: 200,
                 adaptive_vad: false,
-                // No per-token log-probs from remote API — disable both
-                // marking and skip-when-clean gating.
+                // No per-token log-probs from remote API — disable all
+                // confidence-based gating.
                 word_confidence_threshold: None,
                 llm_skip_threshold: None,
+                llm_skip_noisy_threshold: None,
                 max_speech_samples: 120 * 16_000,
             },
         }

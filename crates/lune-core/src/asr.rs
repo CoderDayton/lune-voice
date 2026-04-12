@@ -2,23 +2,28 @@ use serde::{Deserialize, Serialize};
 
 use crate::Result;
 
-/// Per-word confidence derived from subword BPE token log-probabilities.
-/// Confidence = minimum exp(log_prob) across constituent subword tokens.
+/// Per-word confidence with optional runner-up alternates.
 ///
-/// `alternate` is an optional single runner-up word produced by backends that
-/// can cheaply expose one (e.g. Parakeet TDT via min-confidence subword swap).
-/// Backends without this capability (`OrtQwen`, `OpenAi`) leave it as `None`
-/// and the legacy `[?word?]` marker is emitted by `mark_uncertain` instead.
+/// `alternates` is a (possibly empty) ordered list of runner-up words
+/// produced by backends that expose top-K decoding (e.g. Parakeet TDT via
+/// subword swap). Each entry differs from `word` by exactly one subword.
+/// Backends without top-K capability (`OrtQwen`, `OpenAi`) leave the vec
+/// empty and the legacy `[?word?]` marker is emitted by `mark_uncertain`.
+///
+/// Confidence is on the calibrated `P(correct | raw)` scale after the
+/// session layer runs the isotonic calibrator. Raw per-token confidence
+/// comes from Tsallis entropy (α = 0.5) over the full vocab distribution,
+/// not softmax-of-argmax — see `tdt_decoder::greedy_decode`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct WordConfidence {
     pub word: String,
     pub confidence: f32,
     #[serde(default)]
-    pub alternate: Option<String>,
+    pub alternates: Vec<String>,
 }
 
 impl WordConfidence {
-    /// Convenience constructor for the common "no alternate" case. Prefer
+    /// Convenience constructor for the common "no alternates" case. Prefer
     /// this over struct-literal syntax at call sites that do not populate
     /// the runner-up field.
     #[inline]
@@ -26,7 +31,7 @@ impl WordConfidence {
         Self {
             word: word.into(),
             confidence,
-            alternate: None,
+            alternates: Vec::new(),
         }
     }
 }
@@ -115,6 +120,30 @@ impl AsrSegment {
             .all(|w| w.confidence >= skip_threshold)
     }
 
+    /// Returns `true` when the segment's minimum token confidence falls
+    /// below `broken_threshold`, signalling that the audio was too degraded
+    /// for the LLM corrector to help — invoking it on broken transcripts
+    /// triggers the overcorrection failure mode (arXiv:2509.25048 Fig 3).
+    ///
+    /// This is the symmetric lower bound of `is_clean_for_llm`: together
+    /// they form an adaptive, bimodal LLM gate that skips correction on
+    /// both ends of the quality spectrum and runs only in the mid-range
+    /// where the LLM has a fighting chance.
+    ///
+    /// Reads `min_token_confidence` when present, otherwise falls back to
+    /// the minimum over `word_confidences`. If neither is available,
+    /// returns `false` (never skip on absent evidence).
+    #[inline]
+    pub fn is_broken_for_llm(&self, broken_threshold: f32) -> bool {
+        let min = self
+            .min_token_confidence
+            .or_else(|| self.min_word_confidence());
+        match min {
+            Some(m) => m < broken_threshold,
+            None => false,
+        }
+    }
+
     /// Duration of the segment in milliseconds, if both timestamps are known.
     #[inline]
     pub fn duration_ms(&self) -> Option<u64> {
@@ -143,7 +172,7 @@ impl AsrSegment {
         for wc in &self.word_confidences {
             let is_repeat = prev_word.is_some_and(|pw| pw.eq_ignore_ascii_case(&wc.word));
             if wc.confidence < threshold && !is_repeat {
-                parts.push(format_uncertain(&wc.word, wc.alternate.as_deref()));
+                parts.push(format_uncertain(&wc.word, &wc.alternates));
             } else {
                 parts.push(wc.word.clone());
             }
@@ -182,7 +211,7 @@ impl AsrSegment {
             let effective = contextual_threshold(&self.word_confidences, idx, base_threshold);
 
             if wc.confidence < effective && !is_repeat {
-                parts.push(format_uncertain(&wc.word, wc.alternate.as_deref()));
+                parts.push(format_uncertain(&wc.word, &wc.alternates));
             } else {
                 parts.push(wc.word.clone());
             }
@@ -203,17 +232,24 @@ impl AsrSegment {
     }
 }
 
-/// Format a below-threshold word as either `{word|alternate}` (runner-up
-/// channel) or legacy `[?word?]` marker, following the rules documented on
-/// `AsrSegment::mark_uncertain`. Extracted so the contextual and flat marking
-/// paths stay in sync.
+/// Format a below-threshold word as either `{word|alt1|alt2|...}`
+/// (runner-up channel) or legacy `[?word?]` marker. Filters out alternates
+/// that are empty or case-insensitively identical to the best guess so the
+/// small corrector doesn't waste attention on degenerate choices.
+///
+/// Extracted so the contextual and flat marking paths stay in sync.
 #[inline]
-fn format_uncertain(word: &str, alternate: Option<&str>) -> String {
-    match alternate {
-        Some(alt) if !alt.is_empty() && !alt.eq_ignore_ascii_case(word) => {
-            format!("{{{word}|{alt}}}")
-        }
-        _ => format!("[?{word}?]"),
+fn format_uncertain(word: &str, alternates: &[String]) -> String {
+    let useful: Vec<&str> = alternates
+        .iter()
+        .map(String::as_str)
+        .filter(|alt| !alt.is_empty() && !alt.eq_ignore_ascii_case(word))
+        .collect();
+    if useful.is_empty() {
+        format!("[?{word}?]")
+    } else {
+        let joined = useful.join("|");
+        format!("{{{word}|{joined}}}")
     }
 }
 
@@ -508,7 +544,7 @@ mod tests {
             WordConfidence {
                 word: "fox".into(),
                 confidence: 0.40,
-                alternate: Some("box".into()),
+                alternates: vec!["box".into()],
             },
         ];
         assert_eq!(seg.mark_uncertain(0.85), "the {fox|box}");
@@ -521,19 +557,37 @@ mod tests {
         seg.word_confidences = vec![WordConfidence {
             word: "fox".into(),
             confidence: 0.40,
-            alternate: Some("Fox".into()),
+            alternates: vec!["Fox".into()],
         }];
         assert_eq!(seg.mark_uncertain(0.85), "[?fox?]");
     }
 
     #[test]
+    fn mark_uncertain_emits_multi_alternate_format() {
+        // Multiple alternates → `{best|a|b|c}` format, filtered of
+        // degenerate (empty/identical) entries.
+        let mut seg = make_segment();
+        seg.word_confidences = vec![WordConfidence {
+            word: "weather".into(),
+            confidence: 0.40,
+            alternates: vec![
+                "whether".into(),
+                "Weather".into(), // case-identical, must be filtered
+                "wether".into(),
+            ],
+        }];
+        assert_eq!(seg.mark_uncertain(0.85), "{weather|whether|wether}");
+    }
+
+    #[test]
     fn mark_uncertain_alternate_collapses_when_empty_string() {
-        // alt is Some("") → treat as None, emit legacy marker.
+        // Empty-string alternate is filtered; with no useful alternates,
+        // format falls back to legacy marker.
         let mut seg = make_segment();
         seg.word_confidences = vec![WordConfidence {
             word: "fox".into(),
             confidence: 0.40,
-            alternate: Some(String::new()),
+            alternates: vec![String::new()],
         }];
         assert_eq!(seg.mark_uncertain(0.85), "[?fox?]");
     }
@@ -545,7 +599,7 @@ mod tests {
         seg.word_confidences = vec![WordConfidence {
             word: "fox".into(),
             confidence: 0.99,
-            alternate: Some("box".into()),
+            alternates: vec!["box".into()],
         }];
         assert_eq!(seg.mark_uncertain(0.85), "fox");
     }
@@ -692,7 +746,7 @@ mod tests {
             WordConfidence {
                 word: "fox".into(),
                 confidence: 0.30,
-                alternate: Some("box".into()),
+                alternates: vec!["box".into()],
             },
             WordConfidence::new("jumps", 0.25),
         ];
@@ -707,15 +761,15 @@ mod tests {
         seg.word_confidences = vec![WordConfidence {
             word: "test".into(),
             confidence: 0.75,
-            alternate: Some("taste".into()),
+            alternates: vec!["taste".into(), "text".into()],
         }];
         let json = serde_json::to_string(&seg).unwrap();
         let parsed: AsrSegment = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.word_confidences.len(), 1);
         assert_eq!(parsed.word_confidences[0].word, "test");
         assert_eq!(
-            parsed.word_confidences[0].alternate.as_deref(),
-            Some("taste")
+            parsed.word_confidences[0].alternates,
+            vec!["taste".to_string(), "text".to_string()]
         );
     }
 
@@ -773,11 +827,43 @@ mod tests {
     }
 
     #[test]
-    fn word_confidence_serde_missing_alternate_defaults_to_none() {
-        // Serde must accept old records without the alternate field.
+    fn word_confidence_serde_missing_alternates_defaults_to_empty() {
+        // Serde must accept old records without the alternates field.
         let json = r#"{"id":1,"confidence":0.9,"min_token_confidence":null,"word_confidences":[{"word":"hi","confidence":0.9}],"is_final":true,"start_ms":null,"end_ms":null,"text":"hi"}"#;
         let parsed: AsrSegment = serde_json::from_str(json).unwrap();
         assert_eq!(parsed.word_confidences.len(), 1);
-        assert!(parsed.word_confidences[0].alternate.is_none());
+        assert!(parsed.word_confidences[0].alternates.is_empty());
+    }
+
+    // ── is_broken_for_llm (bimodal gate lower bound) ────────────────────
+
+    #[test]
+    fn is_broken_for_llm_uses_min_token_confidence_when_present() {
+        let mut seg = make_segment();
+        seg.min_token_confidence = Some(0.20);
+        assert!(seg.is_broken_for_llm(0.30));
+        assert!(!seg.is_broken_for_llm(0.15));
+    }
+
+    #[test]
+    fn is_broken_for_llm_falls_back_to_word_confidences() {
+        let mut seg = make_segment();
+        seg.min_token_confidence = None;
+        seg.word_confidences = vec![
+            WordConfidence::new("a", 0.90),
+            WordConfidence::new("b", 0.15), // weakest
+            WordConfidence::new("c", 0.80),
+        ];
+        assert!(seg.is_broken_for_llm(0.30));
+    }
+
+    #[test]
+    fn is_broken_for_llm_returns_false_with_no_signal() {
+        // No min_token_confidence, empty word_confidences → conservative
+        // "don't skip" behaviour.
+        let mut seg = make_segment();
+        seg.min_token_confidence = None;
+        seg.word_confidences = vec![];
+        assert!(!seg.is_broken_for_llm(0.30));
     }
 }

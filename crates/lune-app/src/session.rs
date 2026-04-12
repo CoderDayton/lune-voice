@@ -369,7 +369,7 @@ fn append_segments(
         }
         if strip_runner_up {
             for wc in &mut seg.word_confidences {
-                wc.alternate = None;
+                wc.alternates.clear();
             }
         }
 
@@ -889,22 +889,36 @@ async fn run_session<A: AsrBackend + 'static>(
     let lang = settings.read().await.language.clone();
     let lang_tag = lang.split(['-', '_']).next().unwrap_or("en");
 
-    // Skip-when-clean LLM bypass (arXiv:2509.25048 — confidence-guided
-    // correction). When every word in every segment has calibrated
-    // `P(correct)` at or above the configured skip threshold, the LLM
-    // correction pass is skipped entirely and the raw segment text passes
-    // through untouched. Protects clean audio from overcorrection, which is
-    // the dominant failure mode on noisy inputs when the LLM lacks a
-    // confidence signal.
+    // Bimodal adaptive LLM gate (arXiv:2509.25048 — confidence-guided
+    // correction). The LLM correction pass runs only when the segment
+    // lands in the productive middle band: not so clean that correction
+    // is wasted work, not so broken that the corrector will overcorrect.
+    //
+    // - skip-when-clean: every word ≥ llm_skip_threshold → bypass
+    // - skip-when-broken: any segment's min_token_confidence below
+    //                      llm_skip_noisy_threshold → bypass
+    //
+    // The gate is "adaptive" in that the decision is driven by live,
+    // per-segment metrics (every utterance is classified individually
+    // from its own calibrated confidence distribution) rather than a
+    // static cutoff applied to the prepared prompt.
     let skip_clean = config.pipeline.llm_skip_threshold.is_some_and(|skip| {
         !segments.is_empty() && segments.iter().all(|s| s.is_clean_for_llm(skip))
     });
+    let skip_broken = config
+        .pipeline
+        .llm_skip_noisy_threshold
+        .is_some_and(|broken| {
+            !segments.is_empty() && segments.iter().any(|s| s.is_broken_for_llm(broken))
+        });
 
-    let (prepared, has_uncertain) = if skip_clean {
+    let (prepared, has_uncertain) = if skip_clean || skip_broken {
         debug!(
             %session_id,
-            threshold = config.pipeline.llm_skip_threshold.unwrap_or(1.0),
-            "[LLM] skip-when-clean: all words above threshold, bypassing correction"
+            reason = if skip_clean { "clean" } else { "broken" },
+            clean = config.pipeline.llm_skip_threshold.unwrap_or(1.0),
+            broken = config.pipeline.llm_skip_noisy_threshold.unwrap_or(0.0),
+            "[LLM] bimodal gate: bypassing correction"
         );
         (text_after_commands.clone(), false)
     } else {

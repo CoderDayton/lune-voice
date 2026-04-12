@@ -16,24 +16,34 @@ use crate::vocab::{Vocabulary, is_special_token};
 
 // ── Public types ─────────────────────────────────────────────────────────────
 
+/// Top-K runner-up budget emitted per decode step. K=3 means the decoder
+/// tracks the best token plus up to 2 alternates per position; downstream
+/// `parakeet_backend::tokens_to_word_confidences` uses these to produce
+/// up to `TOP_K - 1` word-level alternates for the LLM corrector.
+pub const TOP_K: usize = 3;
+
 /// A decoded token with timing and confidence.
 ///
-/// `runner_up` is the second-best token at this decode step. Populated in
-/// the single-pass argmax loop at zero extra inference cost and consumed by
-/// `parakeet_backend::tokens_to_word_confidences` to produce a word-level
-/// alternate for the LLM corrector. `None` when the runner-up was blank or
-/// unreadable.
+/// `runner_ups` holds up to `TOP_K - 1` alternate token ids at this step,
+/// sorted by descending log-probability (first entry = strongest runner).
+/// Populated in the single-pass top-K loop at zero extra inference cost.
+/// Blank-token runners are suppressed at emit time so downstream code can
+/// treat every entry as real word content.
+///
+/// `confidence` is the **Tsallis entropy** (α = 0.5) of the full vocab
+/// distribution at this step — not `softmax(argmax)`. For uniform
+/// distributions the value is 0 (maximum uncertainty), for perfectly
+/// peaked distributions it is 1 (maximum confidence). The entropy scale
+/// is more discriminative than softmax-of-argmax because it uses the
+/// entire distribution rather than a single token's mass, per Laptev &
+/// Ginsburg (arXiv:2212.08882).
 #[derive(Debug, Clone)]
 pub struct DecodedToken {
     pub token_id: usize,
     #[allow(dead_code)]
     pub duration: usize,
-    /// Softmax probability of the chosen token.
     pub confidence: f32,
-    /// Second-best token id at the same decode step, when available.
-    /// Excludes the blank token — runner-up=blank is treated as "no
-    /// alternate" since it carries no word content.
-    pub runner_up: Option<usize>,
+    pub runner_ups: Vec<usize>,
 }
 
 /// Final transcription result with aggregate confidence.
@@ -228,29 +238,28 @@ impl TdtModel {
                 .try_extract_tensor::<f32>()
                 .map_err(|e| Error::Asr(format!("extract logits: {e}")))?;
 
-            // Single-pass: collect vocab logits, track top-1 AND top-2
-            // simultaneously. Adds one comparison per vocab entry — no new
-            // allocations, no ORT calls, no DynTensor clones. Runner-up is
-            // extracted from the already-materialised CPU slice.
+            // Single-pass: collect vocab logits and track the top-K tokens
+            // as a small ordered array. Adds (TOP_K - 1) comparisons per
+            // vocab entry — still O(V) with a tiny constant, no new
+            // allocations past the fixed-size scratch below, no ORT calls,
+            // no DynTensor clones. The top array is kept sorted by
+            // descending logit, so insertion is O(TOP_K).
             vocab_logits.clear();
-            let mut token_id = blank_id;
-            let mut max_logit = f32::NEG_INFINITY;
-            let mut runner_up_id: Option<usize> = None;
-            let mut runner_up_logit = f32::NEG_INFINITY;
+            let mut top: [(f32, usize); TOP_K] = [(f32::NEG_INFINITY, blank_id); TOP_K];
             for (i, &v) in logits_data.iter().take(vocab_size).enumerate() {
                 vocab_logits.push(v);
-                // total_cmp: NaN-safe, branchless on x86 (ucomiss + cmov)
-                if v.total_cmp(&max_logit).is_gt() {
-                    // New top-1: the previous top-1 becomes the runner-up.
-                    runner_up_logit = max_logit;
-                    runner_up_id = Some(token_id);
-                    max_logit = v;
-                    token_id = i;
-                } else if v.total_cmp(&runner_up_logit).is_gt() {
-                    runner_up_logit = v;
-                    runner_up_id = Some(i);
+                // Insertion sort into `top` — NaN-safe via total_cmp.
+                if v.total_cmp(&top[TOP_K - 1].0).is_gt() {
+                    top[TOP_K - 1] = (v, i);
+                    let mut k = TOP_K - 1;
+                    while k > 0 && top[k].0.total_cmp(&top[k - 1].0).is_gt() {
+                        top.swap(k - 1, k);
+                        k -= 1;
+                    }
                 }
             }
+            let token_id = top[0].1;
+            let max_logit = top[0].0;
 
             // Duration argmax (small slice ~5 elements, single pass)
             duration_logits.clear();
@@ -263,17 +272,44 @@ impl TdtModel {
                 .unwrap_or(0);
 
             if token_id != blank_id {
-                // Softmax confidence: max_logit already known from single-pass above,
-                // so we only need one more O(vocab_size) pass for exp_sum.
-                let exp_sum: f32 = vocab_logits.iter().map(|&l| (l - max_logit).exp()).sum();
-                let confidence = (vocab_logits[token_id] - max_logit).exp() / exp_sum;
+                // Tsallis entropy confidence (α = 0.5) over the full vocab
+                // distribution. Mathematically:
+                //
+                //     F_ts(p) = (V^(1-α) - Σ p_v^α) / (V^(1-α) - 1)
+                //
+                // For α = 0.5 this simplifies to:
+                //
+                //     Σ p_v^0.5 = (Σ exp((l_v - l_max)/2)) / sqrt(Z)
+                //
+                // where Z = Σ exp(l_v - l_max). We compute Z and the
+                // half-exponent sum in a single pass, then normalise.
+                //
+                // Bounds: uniform distribution → 0, peaked distribution → 1.
+                let mut z = 0.0f32;
+                let mut half_sum = 0.0f32;
+                for &l in &vocab_logits {
+                    let shifted = l - max_logit;
+                    let e = shifted.exp();
+                    z += e;
+                    half_sum += (shifted * 0.5).exp();
+                }
+                let sum_p_alpha = if z > 0.0 { half_sum / z.sqrt() } else { 1.0 };
+                let v_sqrt = (vocab_size as f32).sqrt();
+                let confidence = if v_sqrt > 1.0 {
+                    ((v_sqrt - sum_p_alpha) / (v_sqrt - 1.0)).clamp(0.0, 1.0)
+                } else {
+                    1.0
+                };
 
-                // Suppress runner-up when it is the blank token — blank as
-                // runner-up carries no word content. Defensive: also drop it
-                // when the runner-up somehow collides with the chosen token
-                // (shouldn't happen given the argmax branch above, but f32
-                // equality is brittle).
-                let runner_up = runner_up_id.filter(|&r| r != blank_id && r != token_id);
+                // Collect up to TOP_K - 1 runner-ups, filtering out blank
+                // and any that collide with the chosen token. Order is
+                // preserved so the strongest runner is first.
+                let mut runner_ups: Vec<usize> = Vec::with_capacity(TOP_K - 1);
+                for &(_, id) in &top[1..] {
+                    if id != blank_id && id != token_id {
+                        runner_ups.push(id);
+                    }
+                }
 
                 // Update LSTM states — copy into existing buffers to avoid
                 // per-step Vec + Array3 allocations (~20KB/step saved).
@@ -296,7 +332,7 @@ impl TdtModel {
                     token_id,
                     duration: duration_step,
                     confidence,
-                    runner_up,
+                    runner_ups,
                 });
                 last_token = token_id as i32;
                 emitted_tokens += 1;

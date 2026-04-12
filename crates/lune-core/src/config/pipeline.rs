@@ -71,10 +71,30 @@ pub struct PipelineConfig {
     /// at a lower threshold for borderline words.
     ///
     /// `None` disables the bypass — all segments go through the normal
-    /// marking / LLM pipeline. Default is `Some(0.92)` for backends that
+    /// marking / LLM pipeline. Default is `Some(0.95)` for backends that
     /// expose per-word confidence, `None` for those that don't.
     #[serde(default)]
     pub llm_skip_threshold: Option<f32>,
+
+    /// Skip-when-broken LLM bypass threshold (calibrated `P(correct)` scale).
+    ///
+    /// Symmetric lower bound of `llm_skip_threshold`: when the weakest
+    /// token in a segment falls below this value, the transcript is
+    /// considered too degraded for the LLM corrector to help and the
+    /// correction pass is skipped. The paper (arXiv:2509.25048 Fig 3)
+    /// shows that naive correction on broken transcripts routinely
+    /// degrades WER — this gate is the defensive counterpart to
+    /// skip-when-clean.
+    ///
+    /// Together with `llm_skip_threshold`, this forms an adaptive,
+    /// bimodal invocation gate: the LLM runs only when
+    /// `broken ≤ min_token_confidence < clean`. The decision adapts
+    /// per-segment to observed confidence metrics, not a static bar.
+    ///
+    /// `None` disables the lower bound. Default `Some(0.30)` for
+    /// confidence-exposing backends.
+    #[serde(default)]
+    pub llm_skip_noisy_threshold: Option<f32>,
 
     // ── Session limits ─────────────────────────────────────────────────
     /// Maximum speech-time samples before auto-ending session.
@@ -115,6 +135,9 @@ impl PipelineConfig {
         if let Some(v) = overrides.llm_skip_threshold {
             self.llm_skip_threshold = Some(v);
         }
+        if let Some(v) = overrides.llm_skip_noisy_threshold {
+            self.llm_skip_noisy_threshold = Some(v);
+        }
         if let Some(v) = overrides.max_speech_secs {
             self.max_speech_samples = (v as usize) * 16_000;
         }
@@ -143,6 +166,17 @@ impl PipelineConfig {
         {
             issues.push("llm_skip_threshold must be in 0.0..=1.0");
         }
+        if let Some(t) = self.llm_skip_noisy_threshold
+            && !(0.0..=1.0).contains(&t)
+        {
+            issues.push("llm_skip_noisy_threshold must be in 0.0..=1.0");
+        }
+        if let (Some(clean), Some(broken)) =
+            (self.llm_skip_threshold, self.llm_skip_noisy_threshold)
+            && broken >= clean
+        {
+            issues.push("llm_skip_noisy_threshold must be < llm_skip_threshold");
+        }
         if let (Some(mark), Some(skip)) = (self.word_confidence_threshold, self.llm_skip_threshold)
             && skip < mark
         {
@@ -170,6 +204,7 @@ impl Default for PipelineConfig {
             // reasoning behind these values.
             word_confidence_threshold: Some(0.85),
             llm_skip_threshold: Some(0.95),
+            llm_skip_noisy_threshold: Some(0.30),
             max_speech_samples: 60 * 16_000,
         }
     }
@@ -189,6 +224,7 @@ pub struct PipelineOverrides {
     pub adaptive_vad: Option<bool>,
     pub word_confidence_threshold: Option<f32>,
     pub llm_skip_threshold: Option<f32>,
+    pub llm_skip_noisy_threshold: Option<f32>,
     /// Convenience alias: converted to `max_speech_samples` at merge time.
     pub max_speech_secs: Option<u32>,
 }

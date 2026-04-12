@@ -13,14 +13,21 @@ use crate::fillers::{self, FillerError};
 /// task from training data; the generic model handles it from instructions.
 pub const SYSTEM: &str = "You are a transcript correction tool. Your only job is to fix words annotated as uncertain.\n\
 Annotation formats:\n\
-- {guess|alternate}: `guess` is the ASR's top pick, `alternate` is its runner-up. Pick whichever fits the sentence better, or substitute a word that does if neither fits.\n\
+- {guess|alt1|alt2}: ASR's top pick is `guess`, followed by 1-2 runner-up candidates. Pick whichever fits the sentence best, or substitute a different word if none fit.\n\
 - [?word?]: the ASR is uncertain but has no specific alternative. Correct it from context.\n\
 Rules:\n\
 - Output ONLY the corrected transcript.\n\
 - Copy every unannotated word EXACTLY as-is, including profanity, slang, and repeated words.\n\
 - Prefer preserving unannotated words unless the sentence is clearly broken.\n\
 - Delete [?um?] [?uh?] {um|...} {uh|...} and filler variants entirely.\n\
-- NEVER censor, rephrase, reorder, summarize, add punctuation, or remove words.";
+- NEVER censor, rephrase, reorder, summarize, add punctuation, or remove words.\n\
+Examples:\n\
+Input:  the {fox|box|ox} jumped over the lazy dog\n\
+Output: the fox jumped over the lazy dog\n\
+Input:  it was a {whether|weather} report\n\
+Output: it was a weather report\n\
+Input:  I need to [?recieve?] the package\n\
+Output: I need to receive the package";
 
 /// Build a ChatML inference prompt (assistant turn left open).
 ///

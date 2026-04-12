@@ -354,87 +354,119 @@ use crate::lcs_merge::lcs_merge_words;
 
 // ── Per-word confidence from TDT tokens ─────────────────────────────────────
 
+/// Maximum word-level alternates emitted per `WordConfidence`. Equals
+/// `TOP_K - 1` from `tdt_decoder::TOP_K` — one slot per distinct runner-up
+/// position the swap algorithm selects.
+const MAX_ALTERNATES_PER_WORD: usize = 2;
+
 /// Aggregate TDT decoded tokens into per-word confidence values.
 ///
 /// Word boundary: token text starts with `▁` (SentencePiece word-initial marker).
 /// Per-word confidence = minimum across constituent tokens (conservative).
 ///
-/// When the decoder emitted a runner-up token at a given step (via the
-/// `DecodedToken.runner_up` field), this aggregator also produces a
-/// **word-level alternate** by swapping the single lowest-confidence
-/// subword in the word with its runner-up. Rationale: if one subword is
-/// wrong, it's overwhelmingly likely to be the least confident one.
+/// When the decoder emitted runner-up tokens at each step (via the
+/// `DecodedToken.runner_ups` list), this aggregator produces **up to
+/// `MAX_ALTERNATES_PER_WORD` word-level alternates** by picking the
+/// `MAX_ALTERNATES_PER_WORD` lowest-confidence subword positions in the
+/// word and, for each, swapping that single subword with its strongest
+/// runner-up. Rationale: if a word is wrong, the error is almost
+/// certainly at one of the least-confident subwords; surfacing the top
+/// few candidates gives the LLM multiple informed choices.
 ///
-/// The alternate is suppressed (set to `None`) whenever:
-/// - no runner-up was recorded at the min-confidence position, or
-/// - the runner-up piece detokenizes to an empty string, or
-/// - the rebuilt alternate string equals the original word (case-insensitive).
+/// Each candidate alternate is run through `is_plausible_word` so BPE-splice
+/// garbage never reaches the prompt. An alternate is dropped when:
+/// - its piece detokenizes to empty, or
+/// - the rebuilt string equals `word` (case-insensitive), or
+/// - the rebuilt string fails the word-shape sanity check.
 fn tokens_to_word_confidences(tokens: &[DecodedToken], vocab: &Vocabulary) -> Vec<WordConfidence> {
     if tokens.is_empty() {
         return vec![];
     }
 
+    struct Subword {
+        piece: String,
+        conf: f32,
+        runner_up_pieces: Vec<String>,
+    }
+
     struct WordBuilder {
-        pieces: Vec<String>,
-        min_conf: f32,
-        min_idx: usize,
-        min_runner_up: Option<String>,
+        subwords: Vec<Subword>,
     }
 
     impl WordBuilder {
         fn new() -> Self {
             Self {
-                pieces: Vec::new(),
-                min_conf: f32::INFINITY,
-                min_idx: 0,
-                min_runner_up: None,
+                subwords: Vec::new(),
             }
         }
 
         fn is_empty(&self) -> bool {
-            self.pieces.is_empty()
+            self.subwords.is_empty()
         }
 
-        fn push(&mut self, piece: String, conf: f32, runner_up: Option<String>) {
-            if conf < self.min_conf {
-                self.min_conf = conf;
-                self.min_idx = self.pieces.len();
-                self.min_runner_up = runner_up;
-            }
-            self.pieces.push(piece);
+        fn push(&mut self, piece: String, conf: f32, runner_up_pieces: Vec<String>) {
+            self.subwords.push(Subword {
+                piece,
+                conf,
+                runner_up_pieces,
+            });
         }
 
         fn finish(self) -> Option<WordConfidence> {
-            let word: String = self.pieces.concat().trim().to_string();
+            if self.subwords.is_empty() {
+                return None;
+            }
+
+            let pieces: Vec<String> = self.subwords.iter().map(|s| s.piece.clone()).collect();
+            let word: String = pieces.concat().trim().to_string();
             if word.is_empty() {
                 return None;
             }
 
-            let alternate = self
-                .min_runner_up
-                .as_ref()
-                .filter(|p| !p.trim().is_empty())
-                .and_then(|alt_piece| {
-                    let mut alt_pieces = self.pieces.clone();
-                    // Defensive bounds check — min_idx was tracked as a
-                    // push-count so it is always in range, but a future
-                    // refactor could break this invariant.
-                    if self.min_idx >= alt_pieces.len() {
-                        return None;
+            let min_conf = self
+                .subwords
+                .iter()
+                .map(|s| s.conf)
+                .fold(f32::INFINITY, f32::min);
+
+            // Rank subword positions by confidence ascending. The weakest
+            // K positions become the anchors for the K-1 alternates we
+            // try to emit.
+            let mut ranking: Vec<usize> = (0..self.subwords.len()).collect();
+            ranking.sort_by(|&a, &b| self.subwords[a].conf.total_cmp(&self.subwords[b].conf));
+
+            let mut alternates: Vec<String> = Vec::with_capacity(MAX_ALTERNATES_PER_WORD);
+            'outer: for &weak_idx in ranking.iter() {
+                if alternates.len() >= MAX_ALTERNATES_PER_WORD {
+                    break;
+                }
+                for alt_piece in &self.subwords[weak_idx].runner_up_pieces {
+                    if alt_piece.trim().is_empty() {
+                        continue;
                     }
-                    alt_pieces[self.min_idx] = alt_piece.clone();
-                    let alt_word: String = alt_pieces.concat().trim().to_string();
-                    if alt_word.is_empty() || alt_word.eq_ignore_ascii_case(&word) {
-                        None
-                    } else {
-                        Some(alt_word)
+                    let mut candidate_pieces = pieces.clone();
+                    candidate_pieces[weak_idx] = alt_piece.clone();
+                    let candidate: String = candidate_pieces.concat().trim().to_string();
+                    if candidate.is_empty()
+                        || candidate.eq_ignore_ascii_case(&word)
+                        || alternates
+                            .iter()
+                            .any(|a| a.eq_ignore_ascii_case(&candidate))
+                        || !is_plausible_word(&candidate)
+                    {
+                        continue;
                     }
-                });
+                    alternates.push(candidate);
+                    if alternates.len() >= MAX_ALTERNATES_PER_WORD {
+                        break 'outer;
+                    }
+                }
+            }
 
             Some(WordConfidence {
                 word,
-                confidence: self.min_conf,
-                alternate,
+                confidence: min_conf,
+                alternates,
             })
         }
     }
@@ -464,16 +496,18 @@ fn tokens_to_word_confidences(tokens: &[DecodedToken], vocab: &Vocabulary) -> Ve
 
         let best_piece = token_text.replace('▁', " ").trim_start().to_string();
 
-        // Resolve the runner-up piece for this step. Skip special-token
-        // runner-ups and anything that detokenizes to empty.
-        let runner_up_piece = dt
-            .runner_up
-            .and_then(|rid| vocab.get(rid))
+        // Resolve all runner-up pieces for this step. Special-token or
+        // empty runners are filtered out at this stage.
+        let runner_up_pieces: Vec<String> = dt
+            .runner_ups
+            .iter()
+            .filter_map(|&rid| vocab.get(rid))
             .filter(|t| !is_special_token(t))
             .map(|t| t.replace('▁', " ").trim_start().to_string())
-            .filter(|p| !p.is_empty());
+            .filter(|p| !p.is_empty())
+            .collect();
 
-        current.push(best_piece, dt.confidence, runner_up_piece);
+        current.push(best_piece, dt.confidence, runner_up_pieces);
     }
 
     if !current.is_empty()
@@ -483,6 +517,37 @@ fn tokens_to_word_confidences(tokens: &[DecodedToken], vocab: &Vocabulary) -> Ve
     }
 
     words
+}
+
+/// Cheap word-shape sanity check. Returns `true` when `s` plausibly
+/// resembles an English word — used to filter BPE-splice garbage out of
+/// the runner-up alternate channel before it reaches the LLM prompt.
+///
+/// Rules (all must hold):
+/// - length 1..=16 characters
+/// - at least one ASCII vowel (a, e, i, o, u, y)
+/// - every character is an ASCII letter or apostrophe (to keep "don't")
+///
+/// This is deliberately coarse — it will accept rare words, reject rare
+/// non-English words, and has no semantic knowledge. It's a guard against
+/// the most common failure mode (consonant clusters from BPE splicing)
+/// not a dictionary lookup.
+fn is_plausible_word(s: &str) -> bool {
+    let trimmed = s.trim();
+    if trimmed.is_empty() || trimmed.len() > 16 {
+        return false;
+    }
+    let mut has_vowel = false;
+    for c in trimmed.chars() {
+        if !(c.is_ascii_alphabetic() || c == '\'') {
+            return false;
+        }
+        let lower = c.to_ascii_lowercase();
+        if matches!(lower, 'a' | 'e' | 'i' | 'o' | 'u' | 'y') {
+            has_vowel = true;
+        }
+    }
+    has_vowel
 }
 
 /// Find how many leading samples to trim from PCM, keeping
