@@ -222,6 +222,7 @@ mod tests {
             dictionary: vec![],
             context: None,
             language: "en".into(),
+            hypotheses: Vec::new(),
         }
     }
 
@@ -270,6 +271,7 @@ mod tests {
             dictionary: vec![],
             context: None,
             language: "en".into(),
+            hypotheses: Vec::new(),
         };
         let msgs = build_messages(&input);
         let json = serde_json::to_string(&msgs).unwrap();

@@ -176,6 +176,7 @@ fn llm_input(raw_text: &str) -> PostProcessInput {
         dictionary: vec![],
         context: None,
         language: "en".into(),
+        hypotheses: Vec::new(),
     }
 }
 
@@ -368,6 +369,7 @@ async fn llm_with_context_produces_valid_output() {
         dictionary: vec![],
         context: Some(context_text.into()),
         language: "en".into(),
+        hypotheses: Vec::new(),
     };
     let input_without_ctx = PostProcessInput {
         context: None,

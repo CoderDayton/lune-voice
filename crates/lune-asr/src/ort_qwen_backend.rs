@@ -658,6 +658,7 @@ impl AsrBackend for OrtQwenAsrBackend {
             confidence,
             min_token_confidence,
             word_confidences,
+            hypotheses: Vec::new(),
             is_final: true,
             start_ms: Some(0),
             end_ms: Some(end_ms),

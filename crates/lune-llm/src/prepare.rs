@@ -146,6 +146,7 @@ mod tests {
                 .into_iter()
                 .map(|(w, c)| WordConfidence::new(w.to_string(), c))
                 .collect(),
+            hypotheses: Vec::new(),
         }
     }
 
@@ -235,6 +236,7 @@ mod tests {
             start_ms: None,
             end_ms: None,
             word_confidences: vec![],
+            hypotheses: Vec::new(),
         }];
         let (text, has_uncertain) = prepare_input(&segments, 0.65, "en");
         assert_eq!(text, "hello world");

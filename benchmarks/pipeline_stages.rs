@@ -534,6 +534,7 @@ fn bench_threshold_sweep(
                     dictionary: vec![],
                     context: None,
                     language: "en".into(),
+                    hypotheses: Vec::new(),
                 };
                 let corrected = match rt.block_on(llm.transform(&input)) {
                     Ok(output) => output.cleaned_text.trim().to_string(),

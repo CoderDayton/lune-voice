@@ -373,6 +373,17 @@ fn append_segments(
             }
         }
 
+        // Build the N-best sentence hypotheses on the post-calibration
+        // confidence scale so ranking uses P(correct|raw) — the real
+        // likelihood order. If calibration is skipped (identity), the
+        // ranking still works since relative ordering is preserved.
+        //
+        // Threshold matches the marking threshold so only genuinely
+        // uncertain words contribute alternate hypotheses.
+        let mark_threshold = 0.85;
+        let k_max = 5;
+        seg.build_hypotheses(mark_threshold, k_max);
+
         let trimmed = seg.text.trim();
         if !trimmed.is_empty() {
             if !joined_text.is_empty() {
@@ -437,6 +448,66 @@ fn prepare_text_for_llm(
     };
     let has_uncertain = lune_llm::has_uncertainty_markers(&cleaned);
     (cleaned, has_uncertain)
+}
+
+/// Fold every segment's pre-built N-best hypothesis list into a single
+/// aggregate hypothesis list for the whole utterance.
+///
+/// Strategy: cartesian product of per-segment hypotheses is prohibitively
+/// large (for 3 segments × 5 hypotheses each, 125 combinations). Instead,
+/// enumerate "swap one segment at a time" — the aggregate list contains
+/// the joined argmax plus one aggregate per segment where that segment
+/// contributes an alternate and all others stay at their argmax. This
+/// is the same Hamming-≤1 principle the per-segment builder uses, applied
+/// at the utterance level.
+///
+/// Deduplicates case-insensitively and caps at 5 entries total to keep
+/// the prompt compact.
+fn collect_nbest(segments: &[AsrSegment]) -> Vec<String> {
+    // Must have at least one segment with ≥2 hypotheses for n-best to
+    // be meaningful. Otherwise return empty and let the caller fall
+    // through to the marker path.
+    let any_multi = segments.iter().any(|s| s.hypotheses.len() >= 2);
+    if !any_multi {
+        return Vec::new();
+    }
+
+    // Utterance-level argmax = each segment's argmax joined.
+    let argmaxes: Vec<&str> = segments
+        .iter()
+        .map(|s| {
+            s.hypotheses
+                .first()
+                .map(String::as_str)
+                .unwrap_or(s.text.as_str())
+        })
+        .collect();
+    let argmax_sentence = argmaxes.join(" ");
+
+    let mut result: Vec<String> = vec![argmax_sentence.clone()];
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    seen.insert(argmax_sentence.to_ascii_lowercase());
+
+    // One aggregate per (segment, alternate) combination, in segment order.
+    for (seg_idx, seg) in segments.iter().enumerate() {
+        for alt in seg.hypotheses.iter().skip(1) {
+            if result.len() >= 5 {
+                break;
+            }
+            let mut pieces: Vec<&str> = argmaxes.clone();
+            pieces[seg_idx] = alt.as_str();
+            let aggregate = pieces.join(" ");
+            let key = aggregate.to_ascii_lowercase();
+            if seen.insert(key) {
+                result.push(aggregate);
+            }
+        }
+        if result.len() >= 5 {
+            break;
+        }
+    }
+
+    result
 }
 
 fn drain_processing_controls(
@@ -946,7 +1017,27 @@ async fn run_session<A: AsrBackend + 'static>(
         info!(%session_id, "[LLM] no change");
         prepared
     } else {
-        info!(%session_id, "[LLM] input: {prepared}");
+        // Collect the aggregate N-best hypothesis list across segments.
+        // When ≥2 distinct hypotheses exist, the backend routes to the
+        // ProGRes-style rescoring path (strictly additive, worst-case
+        // returns the argmax). Otherwise we fall through to the existing
+        // marker correction path on `raw_text`.
+        let nbest_enabled = std::env::var("LUNE_NBEST").is_ok_and(|v| v != "0");
+        let hypotheses: Vec<String> = if nbest_enabled {
+            collect_nbest(&segments)
+        } else {
+            Vec::new()
+        };
+        if !hypotheses.is_empty() {
+            info!(
+                %session_id,
+                count = hypotheses.len(),
+                "[LLM] n-best input: {:?}",
+                hypotheses
+            );
+        } else {
+            info!(%session_id, "[LLM] marker input: {prepared}");
+        }
         let input = lune_core::llm::PostProcessInput {
             raw_text: prepared.clone(),
             style_preset: Arc::clone(&style_preset),
@@ -954,6 +1045,7 @@ async fn run_session<A: AsrBackend + 'static>(
             dictionary: dictionary_entries.clone(),
             context: None,
             language: lang_tag.into(),
+            hypotheses,
         };
 
         match post_processor.transform(&input).await {
@@ -1170,6 +1262,7 @@ mod tests {
             } else {
                 vec![]
             },
+            hypotheses: Vec::new(),
             is_final: true,
             start_ms: Some(0),
             end_ms: Some(500),
@@ -1297,6 +1390,7 @@ mod tests {
                 WordConfidence::new("line", 0.95),
                 WordConfidence::new("world", 0.95),
             ],
+            hypotheses: Vec::new(),
             is_final: true,
             start_ms: Some(0),
             end_ms: Some(500),

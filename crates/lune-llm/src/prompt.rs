@@ -29,6 +29,129 @@ Output: it was a weather report\n\
 Input:  I need to [?recieve?] the package\n\
 Output: I need to receive the package";
 
+/// System prompt for **N-best hypothesis rescoring** — the ProGRes-style
+/// path (arXiv:2409.00217) used when the ASR backend exposes multiple
+/// full-sentence candidates.
+///
+/// The LLM's task is constrained to "pick the most fluent candidate from
+/// the numbered list and wrap it in angle brackets". This is strictly
+/// easier for a small instruction-tuned corrector than free-form marker
+/// correction because:
+///
+/// 1. Each candidate is a complete, grammatical sentence the model
+///    already knows how to reason about. No novel marker syntax.
+/// 2. The task reduces to multi-choice selection, which stock Qwen-1.5B
+///    handles reliably without fine-tuning.
+/// 3. Output validation is trivial: parse for `<...>`, match against the
+///    candidate list, fall back to candidate 1 (the argmax) on any
+///    parse or match failure. The corrector is strictly additive —
+///    output can never regress below the argmax.
+pub const N_BEST_SYSTEM: &str = "You are an ASR hypothesis rescorer. You will be given a numbered list of transcription candidates from a speech recognizer, ordered from most to least confident (candidate 1 is the most likely). Your job:\n\
+1. Default to candidate 1. Only pick a different candidate if candidate 1 contains a word that is clearly wrong in context (e.g. a homophone mistake, a nonsense word, or a grammar break). Minor phrasing differences do NOT justify switching.\n\
+2. Copy your chosen candidate verbatim — do not add, remove, or reorder words.\n\
+3. Wrap your choice in angle brackets like <your choice here>.\n\
+4. Do not add explanation, commentary, or justification.";
+
+/// Build a ChatML inference prompt for the N-best rescoring path.
+///
+/// Renders the candidate list in the ProGRes format: a leading header
+/// line, one candidate per line prefixed with its 1-based rank, and an
+/// open `<` to bias the sampler toward the delimiter convention. Returns
+/// the prompt plus the bracketed-answer prefix so `post_process_n_best`
+/// can extract the completion.
+pub fn build_n_best_prompt(hypotheses: &[String]) -> String {
+    let mut body = String::with_capacity(256 + hypotheses.len() * 64);
+    body.push_str("Transcription candidates in order of ASR confidence:\n");
+    for (i, hyp) in hypotheses.iter().enumerate() {
+        body.push_str(&format!("{}. {}\n", i + 1, hyp));
+    }
+    body.push_str("\nMost fluent candidate:");
+    format!(
+        "<|im_start|>system\n{N_BEST_SYSTEM}<|im_end|>\n\
+         <|im_start|>user\n{body}<|im_end|>\n\
+         <|im_start|>assistant\n"
+    )
+}
+
+/// Post-process LLM output from the N-best rescoring path.
+///
+/// Algorithm (strictly fallback-safe — can never regress below argmax):
+/// 1. Parse for `<...>` content; if found, trim and compare against each
+///    hypothesis case-insensitively. Match → return that hypothesis.
+/// 2. No brackets: scan each line of the output, trim, and compare.
+///    Match → return that hypothesis.
+/// 3. Trim leaked ChatML tokens and compare the whole cleaned output.
+/// 4. No match → return `hypotheses[0]` (the argmax).
+///
+/// This guarantees the corrector is **strictly additive**: the output
+/// is always a verbatim hypothesis from the list, so the best-case is
+/// beam-quality and the worst-case is argmax.
+pub fn post_process_n_best(raw: &str, hypotheses: &[String]) -> String {
+    debug_assert!(!hypotheses.is_empty(), "n-best list must be non-empty");
+    let cleaned = raw
+        .replace("<|im_end|>", "")
+        .replace("<|im_start|>", "")
+        .trim()
+        .to_string();
+
+    // 1. Bracketed answer.
+    if let Some(start) = cleaned.find('<')
+        && let Some(end) = cleaned[start + 1..].find('>')
+    {
+        let inside = cleaned[start + 1..start + 1 + end].trim();
+        if let Some(matched) = match_hypothesis(inside, hypotheses) {
+            return matched;
+        }
+    }
+
+    // 2. Line-by-line scan (handles models that forget the brackets).
+    for line in cleaned.lines() {
+        // Strip leading "N.", "N)", or bullet characters the model may
+        // have copied from the prompt format.
+        let trimmed = line
+            .trim_start_matches(|c: char| c.is_ascii_digit() || c == '.' || c == ')' || c == ' ')
+            .trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if let Some(matched) = match_hypothesis(trimmed, hypotheses) {
+            return matched;
+        }
+    }
+
+    // 3. Whole-output match.
+    if let Some(matched) = match_hypothesis(cleaned.trim(), hypotheses) {
+        return matched;
+    }
+
+    // 4. Fallback: argmax.
+    hypotheses[0].clone()
+}
+
+/// Case-insensitive punctuation-tolerant hypothesis lookup. Normalises
+/// both sides by lowercasing and stripping leading/trailing ASCII
+/// punctuation so `<fox jumped.>` still matches `fox jumped`.
+fn match_hypothesis(candidate: &str, hypotheses: &[String]) -> Option<String> {
+    let normalized = normalize_for_match(candidate);
+    if normalized.is_empty() {
+        return None;
+    }
+    hypotheses
+        .iter()
+        .find(|h| normalize_for_match(h) == normalized)
+        .cloned()
+}
+
+#[inline]
+fn normalize_for_match(s: &str) -> String {
+    s.trim()
+        .trim_matches(|c: char| c.is_ascii_punctuation())
+        .to_ascii_lowercase()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Build a ChatML inference prompt (assistant turn left open).
 ///
 /// ```text
@@ -527,5 +650,113 @@ mod tests {
             post_process("the {weather|whether} was nice"),
             "the weather was nice"
         );
+    }
+
+    // ── N-best rescoring path ───────────────────────────────────────────
+
+    fn sample_hypotheses() -> Vec<String> {
+        vec![
+            "the quick brown fox jumped".into(),
+            "the quick brown box jumped".into(),
+            "the quick brown ox jumped".into(),
+        ]
+    }
+
+    #[test]
+    fn build_n_best_prompt_renders_numbered_list() {
+        let p = build_n_best_prompt(&sample_hypotheses());
+        assert!(p.contains("1. the quick brown fox jumped"));
+        assert!(p.contains("2. the quick brown box jumped"));
+        assert!(p.contains("3. the quick brown ox jumped"));
+        assert!(p.contains("Most fluent candidate:"));
+        assert!(p.starts_with("<|im_start|>system\n"));
+        assert!(p.ends_with("<|im_start|>assistant\n"));
+    }
+
+    #[test]
+    fn post_process_n_best_bracketed_answer() {
+        let hyps = sample_hypotheses();
+        let raw = "<the quick brown box jumped>";
+        assert_eq!(
+            post_process_n_best(raw, &hyps),
+            "the quick brown box jumped"
+        );
+    }
+
+    #[test]
+    fn post_process_n_best_bracketed_with_whitespace() {
+        let hyps = sample_hypotheses();
+        let raw = "  <  the quick brown ox jumped  >  ";
+        assert_eq!(post_process_n_best(raw, &hyps), "the quick brown ox jumped");
+    }
+
+    #[test]
+    fn post_process_n_best_trailing_punctuation_tolerated() {
+        let hyps = sample_hypotheses();
+        let raw = "<the quick brown fox jumped.>";
+        assert_eq!(
+            post_process_n_best(raw, &hyps),
+            "the quick brown fox jumped"
+        );
+    }
+
+    #[test]
+    fn post_process_n_best_unbracketed_line_match() {
+        // LLM forgot the brackets — line-scan fallback picks it up.
+        let hyps = sample_hypotheses();
+        let raw = "the quick brown box jumped";
+        assert_eq!(
+            post_process_n_best(raw, &hyps),
+            "the quick brown box jumped"
+        );
+    }
+
+    #[test]
+    fn post_process_n_best_numbered_prefix_stripped() {
+        // LLM echoed "2. ..." from the prompt — still parse it.
+        let hyps = sample_hypotheses();
+        let raw = "2. the quick brown box jumped";
+        assert_eq!(
+            post_process_n_best(raw, &hyps),
+            "the quick brown box jumped"
+        );
+    }
+
+    #[test]
+    fn post_process_n_best_case_insensitive_match() {
+        let hyps = sample_hypotheses();
+        let raw = "<THE QUICK BROWN OX JUMPED>";
+        assert_eq!(post_process_n_best(raw, &hyps), "the quick brown ox jumped");
+    }
+
+    #[test]
+    fn post_process_n_best_unknown_output_falls_back_to_argmax() {
+        // LLM produced a sentence not in the list — fall back to hypothesis[0].
+        let hyps = sample_hypotheses();
+        let raw = "<the slow brown fox ambled>";
+        assert_eq!(post_process_n_best(raw, &hyps), hyps[0]);
+    }
+
+    #[test]
+    fn post_process_n_best_empty_output_falls_back_to_argmax() {
+        let hyps = sample_hypotheses();
+        assert_eq!(post_process_n_best("", &hyps), hyps[0]);
+    }
+
+    #[test]
+    fn post_process_n_best_strips_leaked_chatml_tokens() {
+        let hyps = sample_hypotheses();
+        let raw = "<|im_start|><the quick brown box jumped><|im_end|>";
+        assert_eq!(
+            post_process_n_best(raw, &hyps),
+            "the quick brown box jumped"
+        );
+    }
+
+    #[test]
+    fn post_process_n_best_garbage_falls_back() {
+        let hyps = sample_hypotheses();
+        let raw = "I'm not sure, could be any of them.";
+        assert_eq!(post_process_n_best(raw, &hyps), hyps[0]);
     }
 }

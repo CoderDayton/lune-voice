@@ -230,6 +230,7 @@ impl ParakeetTdtBackend {
             confidence: Some(result.confidence),
             min_token_confidence,
             word_confidences,
+            hypotheses: Vec::new(),
         }])
     }
 
@@ -344,6 +345,7 @@ impl ParakeetTdtBackend {
             confidence: Some(avg_confidence),
             min_token_confidence,
             word_confidences: merged,
+            hypotheses: Vec::new(),
         }])
     }
 }
