@@ -29,12 +29,6 @@ pub enum AsrBackendTypeDto {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum LlmBackendTypeDto {
-    LlamaCppLocal,
-    OpenAiCompatible,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PillVisibilityDto {
     Always,
     WhenDictating,
@@ -61,24 +55,18 @@ pub struct WorkspaceSettingsDto {
     pub use_gpu: bool,
     pub device_policy: DevicePolicyDto,
     pub asr_backend_type: AsrBackendTypeDto,
-    pub llm_backend_type: LlmBackendTypeDto,
     pub confidence_threshold: Option<f32>,
     pub adaptive_vad: bool,
     pub speech_threshold: f32,
     pub style_preset: String,
     pub hotkey_toggle: String,
     pub hotkey_cancel: String,
-    pub aligner_enabled: bool,
     pub pill_visibility: PillVisibilityDto,
     pub language: String,
     // OpenAI ASR fields (populated when asr_backend_type == OpenAiCompatible)
     pub openai_asr_base_url: Option<String>,
     pub openai_asr_model: Option<String>,
     pub openai_asr_api_key_set: bool,
-    // OpenAI LLM fields (populated when llm_backend_type == OpenAiCompatible)
-    pub openai_llm_base_url: Option<String>,
-    pub openai_llm_model: Option<String>,
-    pub openai_llm_api_key_set: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -120,24 +108,18 @@ pub struct SaveWorkspaceSettingsInput {
     pub use_gpu: bool,
     pub device_policy: DevicePolicyDto,
     pub asr_backend_type: AsrBackendTypeDto,
-    pub llm_backend_type: LlmBackendTypeDto,
     pub confidence_threshold: Option<f32>,
     pub adaptive_vad: bool,
     pub speech_threshold: f32,
     pub style_preset: String,
     pub hotkey_toggle: String,
     pub hotkey_cancel: String,
-    pub aligner_enabled: bool,
     pub pill_visibility: PillVisibilityDto,
     pub language: String,
     // OpenAI ASR fields (sent when asr_backend_type == OpenAiCompatible)
     pub openai_asr_base_url: Option<String>,
     pub openai_asr_api_key: Option<String>,
     pub openai_asr_model: Option<String>,
-    // OpenAI LLM fields (sent when llm_backend_type == OpenAiCompatible)
-    pub openai_llm_base_url: Option<String>,
-    pub openai_llm_api_key: Option<String>,
-    pub openai_llm_model: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

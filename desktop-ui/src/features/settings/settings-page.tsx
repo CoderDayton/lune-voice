@@ -3,7 +3,6 @@ import { workspaceStore } from "../../store/workspace-store";
 import { AppearanceSection } from "./sections/appearance-section";
 import { InputSection } from "./sections/input-section";
 import { TranscriptionSection } from "./sections/transcription-section";
-import { CleanupSection } from "./sections/cleanup-section";
 import { ShortcutsSection } from "./sections/shortcuts-section";
 import { OutputSection } from "./sections/output-section";
 
@@ -15,7 +14,6 @@ export function SettingsPage() {
       <AppearanceSection />
       <InputSection settings={settings} />
       <TranscriptionSection settings={settings} />
-      <CleanupSection settings={settings} />
       <OutputSection settings={settings} />
       <ShortcutsSection settings={settings} />
     </div>

@@ -9,7 +9,7 @@
 
 # ── Compute device ────────────────────────────────────────────────────────────
 #
-# Controls which execution provider ORT uses for ASR and LLM inference.
+# Controls which execution provider ORT uses for ASR inference.
 #
 #   "auto"  — Try CUDA at startup; fall back to CPU if unavailable. (default)
 #   "cuda"  — Prefer CUDA; still falls back gracefully if CUDA init fails.
@@ -22,7 +22,7 @@ device = "auto"
 # Options: "general" | "coding" | "email" | "slack" | "meeting_notes" | "code_comments"
 default_style = "general"
 
-# BCP-47 language tag for ASR hint.
+# BCP-47 language tag (hint only — Parakeet v3 auto-detects language).
 language = "en-US"
 
 # Privacy policy for backend selection.
@@ -46,27 +46,6 @@ activation_mode = "Toggle"
 # Remove this key (or comment it out) to disable history entirely.
 session_history_days = 30
 
-# ── Confidence gating ─────────────────────────────────────────────────────────
-#
-# Two-level gate (arXiv:2407.21414): segments passing BOTH thresholds bypass
-# LLM post-processing and paste immediately (~87% bypass rate on typical speech).
-#
-# Segment bypasses LLM when:
-#   mean token confidence  ≥ confidence_threshold
-#   min  token confidence  ≥ min_token_threshold
-
-# Mean segment confidence required to skip LLM. Range 0.0–1.0.
-confidence_threshold = 0.95
-
-# Single-token confidence floor. Any token below this forces LLM routing
-# even if the sentence mean exceeds confidence_threshold.
-min_token_threshold = 0.70
-
-# Adapt the post-speech silence window to ASR confidence.
-# true  — High-confidence: flush after ~75 ms; uncertain: up to ~320 ms. (default)
-# false — Static 200 ms flush for all segments.
-dynamic_silence = true
-
 
 # ── ASR backend ───────────────────────────────────────────────────────────────
 #
@@ -81,21 +60,6 @@ type = "ParakeetTdt"
 #   encoder-model.int8.onnx, decoder_joint-model.int8.onnx, vocab.txt
 # Leave empty to use the auto-downloaded path from lune-persist hub.
 model_dir = ""
-
-# Sampling temperature. 0.0 = greedy (deterministic, fastest).
-temperature = 0.0
-
-# Nucleus sampling probability mass. Ignored when temperature = 0.0.
-top_p = 0.8
-
-# Top-k candidates. Ignored when temperature = 0.0.
-top_k = 20
-
-# Repetition penalty (1.0 = off). Values 1.1–1.3 reduce token loops.
-repeat_penalty = 1.15
-
-# Lookback window for repetition penalty.
-repeat_last_n = 64
 
 
 # ── Hotkeys ───────────────────────────────────────────────────────────────────
@@ -114,18 +78,3 @@ key = "Space"
 [hotkey.cancel_dictation]
 modifiers = []
 key = "Escape"
-
-
-# ── Forced aligner (enabled by default) ───────────────────────────────────────
-#
-# NAR forced-aligner for post-utterance word-order correction.
-# Runs after each silence flush; emits CorrectedText if words arrived out-of-order.
-# Default runtime path: ~/.local/share/lune-voice/models/wav2vec2-fa/
-# TODO: temporary local-export path until the ONNX aligner bundle is uploaded
-# to Hugging Face and wired into the standard model downloader.
-# Export it with: `uv run python scripts/export_onnx.py --fa`
-#
-# Uncomment to override the default:
-# [aligner]
-# enabled = true
-# model_dir = "/custom/path/to/wav2vec2-fa"

@@ -72,19 +72,14 @@ fn run_daemon() {
 
     settings.migrate_pipeline_fields();
 
-    let models = lune_persist::ensure_default_models(
-        &paths.models_dir(),
-        &settings.asr_backend,
-        &settings.llm_backend,
-        settings.aligner.as_ref(),
-    )
-    .expect("ensure models downloaded");
+    let models = lune_persist::ensure_default_models(&paths.models_dir(), &settings.asr_backend)
+        .expect("ensure models downloaded");
 
     factory::patch_model_paths(&mut settings, &models);
 
     // ── Global ORT initialization (CPU only) ─────────────────────────────
     // CUDA EP is registered per-session by build_ort_session for ASR models.
-    // This keeps VAD and forced aligner on CPU automatically.
+    // This keeps VAD on CPU automatically.
     factory::init_ort_runtime();
 
     let (asr_backend_kind, selected_asr_dir) = match &settings.asr_backend {
@@ -101,7 +96,6 @@ fn run_daemon() {
     tracing::info!(
         asr_backend = asr_backend_kind,
         asr_dir = %selected_asr_dir,
-        llm_dir = %models.llm_model_path.display(),
         "models ready"
     );
 
@@ -232,10 +226,6 @@ async fn run_pipeline(
     tracing::info!("LLM post-processor ready");
     let router = Arc::new(lune_commands::VoiceCommandRouter::new());
 
-    // Forced aligner was OrtQwen-specific and has been removed.
-    // Parakeet provides native timestamps without a separate aligner.
-    let aligner: Option<std::sync::Arc<lune_asr::OrtForcedAligner>> = None;
-
     let dict_db = lune_persist::Database::open(&db_path).expect("open dict database");
     let dict = Arc::new(tokio::sync::Mutex::new(
         lune_dict::DictionaryManager::new(dict_db).expect("init dictionary"),
@@ -269,10 +259,6 @@ async fn run_pipeline(
         let kind_slug = asr_kind.slug();
         let calibrator_path = data_dir.join(format!("calibrator_{kind_slug}.json"));
         manager = manager.with_calibrator_path(calibrator_path);
-    }
-
-    if let Some(aligner) = aligner {
-        manager = manager.with_aligner(aligner);
     }
 
     // Load the Nemotron cross-encoder reranker for n-best rescoring.

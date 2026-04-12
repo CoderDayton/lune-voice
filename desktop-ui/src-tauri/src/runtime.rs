@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use lune_app::{AppCommand, DeliveryService, SessionManager, SessionManagerConfig};
-use lune_asr::{AsrRegistry, OrtForcedAligner};
+use lune_asr::AsrRegistry;
 use lune_commands::VoiceCommandRouter;
 use lune_core::asr::AsrSessionConfig;
 use lune_core::command::VoiceCommand;
@@ -567,7 +567,6 @@ async fn build_pipeline(
 ) -> Result<(LivePipeline, Arc<RwLock<UserSettings>>), String> {
     let asr = AsrRegistry::from_config(&settings.asr_backend, settings.device)
         .map_err(|e| format!("build asr backend: {e}"))?;
-    let aligner = build_aligner(&asr, &settings)?;
     let post_processor = build_post_processor(&settings).await?;
     let router = Arc::new(VoiceCommandRouter::new());
     let dict = Arc::new(Mutex::new(
@@ -592,7 +591,7 @@ async fn build_pipeline(
             .with_overrides(&settings.read().await.pipeline),
     };
 
-    let mut manager = SessionManager::new(
+    let manager = SessionManager::new(
         Arc::new(asr),
         router,
         post_processor,
@@ -602,10 +601,6 @@ async fn build_pipeline(
         Arc::clone(&settings),
     )
     .with_vad_state_path(paths.adaptive_vad_file());
-
-    if let Some(aligner) = aligner {
-        manager = manager.with_aligner(aligner);
-    }
 
     let pipeline = LivePipeline {
         paths,
@@ -641,24 +636,10 @@ fn init_ort_runtime() {
     let _ = ort::init().commit();
 }
 
-fn build_aligner(
-    _asr: &AsrRegistry,
-    _settings: &UserSettings,
-) -> Result<Option<Arc<OrtForcedAligner>>, String> {
-    // Forced aligner was OrtQwen-specific. Parakeet provides native timestamps.
-    Ok(None)
-}
-
 async fn build_post_processor(
     settings: &UserSettings,
 ) -> Result<Arc<dyn TextPostProcessor>, String> {
     match &settings.llm_backend {
-        // Local LLM-based correction is gone — the Nemotron cross-encoder
-        // reranker handles all local correction at the session-manager
-        // layer. Return a passthrough so the trait slot is filled.
-        LlmBackendConfig::LlamaCppLocal { .. } => {
-            Ok(Arc::new(NullPostProcessor::new()) as Arc<dyn TextPostProcessor>)
-        }
         LlmBackendConfig::OpenAiCompatible {
             base_url,
             api_key,
@@ -674,7 +655,10 @@ async fn build_post_processor(
             });
             Ok(Arc::new(backend) as Arc<dyn TextPostProcessor>)
         }
-        _ => Err("unsupported LLM backend type in desktop UI runtime".into()),
+        // Default: no remote LLM configured — use passthrough. The Nemotron
+        // cross-encoder reranker handles all local correction at the
+        // session-manager layer.
+        _ => Ok(Arc::new(NullPostProcessor::new()) as Arc<dyn TextPostProcessor>),
     }
 }
 

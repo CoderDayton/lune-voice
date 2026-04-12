@@ -1,6 +1,6 @@
 export type ActivationModeValue = "Toggle" | "Hold";
 export type AsrBackendValue = "ParakeetTdt" | "OpenAiCompatible";
-export type LlmBackendValue = "LlamaCppLocal" | "OpenAiCompatible"; // LlamaCppLocal is a no-op passthrough; kept for config compat
+
 export type DictationModeValue = "TypeInPlace" | "Clipboard" | "Both";
 export type PillVisibilityValue = "Always" | "WhenDictating" | "Never";
 
@@ -25,10 +25,7 @@ export const asrBackends: Option<AsrBackendValue>[] = [
   { value: "OpenAiCompatible", label: "Cloud API (OpenAI-compatible)" },
 ];
 
-export const llmModels: Option<LlmBackendValue>[] = [
-  { value: "LlamaCppLocal", label: "Smart cleanup (local)" },
-  { value: "OpenAiCompatible", label: "Smart cleanup (online)" },
-];
+
 
 export const deliveryMethods: Option<DictationModeValue>[] = [
   { value: "Clipboard", label: "Paste into app" },

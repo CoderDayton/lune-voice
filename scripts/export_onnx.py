@@ -727,10 +727,12 @@ def export_asr(
     _list_files(output_dir)
 
 
-# ── FA Export (wav2vec2 CTC) ──────────────────────────────────────────────────
+# ── FA Export (removed) ───────────────────────────────────────────────────────
+# Forced aligner (wav2vec2 CTC) was removed — Parakeet v3 provides native
+# word-level timestamps. Keeping this comment as a tombstone.
 
 
-def export_forcedaligner(
+def _export_forcedaligner_removed(
     output_dir: Path,
     asr_dir: Path,
     model_id: str = "WAV2VEC2_ASR_BASE_960H",
@@ -812,10 +814,6 @@ def main() -> None:
     )
     parser.add_argument("--asr", action="store_true", help="Export Qwen3-ASR-0.6B")
     parser.add_argument(
-        "--fa", action="store_true",
-        help="Export wav2vec2 CTC forced aligner (single ONNX, 360MB)",
-    )
-    parser.add_argument(
         "--no-quantize", action="store_true",
         help="Skip INT4 quantization (keep FP16 weights)",
     )
@@ -833,18 +831,10 @@ def main() -> None:
         "--asr-model", default="Qwen/Qwen3-ASR-0.6B",
         help="HuggingFace model ID for ASR",
     )
-    parser.add_argument(
-        "--fa-model", default="WAV2VEC2_ASR_BASE_960H",
-        help="torchaudio pipeline name for the forced aligner",
-    )
-    parser.add_argument(
-        "--asr-dir", type=Path, default=Path("models/qwen3-asr-0.6b-onnx"),
-        help="Directory of exported ASR ONNX files (encoder/embed reused by FA)",
-    )
     args = parser.parse_args()
 
-    if not args.asr and not args.fa:
-        parser.error("Specify --asr, --fa, or both")
+    if not args.asr:
+        parser.error("Specify --asr")
 
     do_quant = not args.no_quantize
     fp16_decoder = args.fp16_decoder
@@ -852,10 +842,6 @@ def main() -> None:
     if args.asr:
         out = args.output_dir or Path("models/qwen3-asr-0.6b-onnx")
         export_asr(out, args.asr_model, quantize=do_quant and not fp16_decoder)
-
-    if args.fa:
-        out = args.output_dir or Path("models/wav2vec2-fa")
-        export_forcedaligner(out, args.asr_dir, args.fa_model)
 
 
 if __name__ == "__main__":

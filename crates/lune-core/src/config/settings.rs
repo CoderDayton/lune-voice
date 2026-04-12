@@ -9,14 +9,6 @@ use super::pipeline::PipelineOverrides;
 use super::redacted::RedactedString;
 use super::style::StyleId;
 
-/// Configuration for the optional forced-aligner pass.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AlignerConfig {
-    pub enabled: bool,
-    /// Directory containing `model.onnx` and `fa_config.json`.
-    pub model_dir: PathBuf,
-}
-
 /// Top-level user settings, persisted as TOML.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserSettings {
@@ -50,11 +42,6 @@ pub struct UserSettings {
     /// **Deprecated**: use `pipeline.max_speech_secs` instead.
     #[serde(default = "default_max_speech_secs")]
     pub max_speech_secs: u32,
-    /// Optional forced-aligner for post-utterance word-order correction.
-    /// When `enabled = true`, the aligner runs after each silence flush and
-    /// emits `CorrectedText` if words were pasted out of order.
-    #[serde(default)]
-    pub aligner: Option<AlignerConfig>,
     /// Enable adaptive VAD silence thresholds.
     /// **Deprecated**: use `pipeline.adaptive_vad` instead.
     #[serde(default)]
@@ -94,12 +81,7 @@ impl Default for UserSettings {
             asr_backend: AsrBackendConfig::ParakeetTdt {
                 model_dir: PathBuf::from("models/parakeet-tdt-0.6b"),
             },
-            llm_backend: LlmBackendConfig::LlamaCppLocal {
-                model_path: PathBuf::new(),
-                n_gpu_layers: default_n_gpu_layers(),
-                n_ctx: default_n_ctx(),
-                max_output_tokens: default_llm_max_output_tokens(),
-            },
+            llm_backend: LlmBackendConfig::Disabled,
             hotkey: HotkeyConfig::default(),
             default_style: "casual".into(),
             language: "en-US".into(),
@@ -111,10 +93,6 @@ impl Default for UserSettings {
             session_history_days: Some(30),
             word_confidence_threshold: default_word_confidence_threshold(),
             max_speech_secs: default_max_speech_secs(),
-            aligner: Some(AlignerConfig {
-                enabled: true,
-                model_dir: PathBuf::new(),
-            }),
             adaptive_vad: false,
             pipeline: PipelineOverrides::default(),
         }
@@ -140,31 +118,14 @@ pub enum AsrBackendConfig {
 #[serde(tag = "type")]
 #[non_exhaustive]
 pub enum LlmBackendConfig {
-    LlamaCppLocal {
-        model_path: PathBuf,
-        #[serde(default = "default_n_gpu_layers")]
-        n_gpu_layers: u32,
-        #[serde(default = "default_n_ctx")]
-        n_ctx: u32,
-        #[serde(default = "default_llm_max_output_tokens")]
-        max_output_tokens: u32,
-    },
     OpenAiCompatible {
         base_url: Url,
         api_key: RedactedString,
         model: String,
         max_tokens: u32,
     },
-}
-
-fn default_n_gpu_layers() -> u32 {
-    1000
-}
-fn default_n_ctx() -> u32 {
-    2048
-}
-fn default_llm_max_output_tokens() -> u32 {
-    256
+    #[serde(other)]
+    Disabled,
 }
 
 fn default_word_confidence_threshold() -> f32 {

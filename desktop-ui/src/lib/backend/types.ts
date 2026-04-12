@@ -2,7 +2,6 @@ import type {
   ActivationModeValue,
   AsrBackendValue,
   DictationModeValue,
-  LlmBackendValue,
   PillVisibilityValue,
 } from "../../features/settings/data/settings-data";
 
@@ -29,24 +28,18 @@ export interface BackendWorkspaceSettings {
   useGpu: boolean;
   devicePolicy: "Cpu" | "Cuda" | "Auto";
   asrBackendType: AsrBackendValue;
-  llmBackendType: LlmBackendValue;
   confidenceThreshold: number | null;
   adaptiveVad: boolean;
   speechThreshold: number;
   stylePreset: string;
   hotkeyToggle: string;
   hotkeyCancel: string;
-  alignerEnabled: boolean;
   pillVisibility: PillVisibilityValue;
   language: string;
   // OpenAI ASR fields (present when asrBackendType == "OpenAiCompatible")
   openaiAsrBaseUrl?: string | null;
   openaiAsrModel?: string | null;
   openaiAsrApiKeySet: boolean;
-  // OpenAI LLM fields (present when llmBackendType == "OpenAiCompatible")
-  openaiLlmBaseUrl?: string | null;
-  openaiLlmModel?: string | null;
-  openaiLlmApiKeySet: boolean;
 }
 
 export interface BackendWorkspaceSnapshot {
@@ -69,7 +62,7 @@ export interface SaveWorkspaceSettingsInput {
   useGpu: boolean;
   devicePolicy: "Cpu" | "Cuda" | "Auto";
   asrBackendType: AsrBackendValue;
-  llmBackendType: LlmBackendValue;
+  llmBackendType: string;
   confidenceThreshold: number | null;
   adaptiveVad: boolean;
   speechThreshold: number;
@@ -83,10 +76,6 @@ export interface SaveWorkspaceSettingsInput {
   openaiAsrBaseUrl?: string | null;
   openaiAsrApiKey?: string | null;
   openaiAsrModel?: string | null;
-  // OpenAI LLM fields (sent when llmBackendType == "OpenAiCompatible")
-  openaiLlmBaseUrl?: string | null;
-  openaiLlmApiKey?: string | null;
-  openaiLlmModel?: string | null;
 }
 
 export interface BackendClient {

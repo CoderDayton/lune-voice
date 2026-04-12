@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::Utc;
-use lune_asr::{IsotonicCalibrator, NemotronReranker, OrtForcedAligner};
+use lune_asr::{IsotonicCalibrator, NemotronReranker};
 use tokio::sync::Notify;
 use tokio::sync::{Mutex, RwLock, mpsc};
 use tracing::{debug, info, warn};
@@ -69,9 +69,6 @@ pub struct SessionManager<A: AsrBackend> {
     settings: Arc<RwLock<UserSettings>>,
     active: Arc<Mutex<Option<ActiveHandle>>>,
     idle_notify: Arc<Notify>,
-    /// Optional post-utterance forced aligner for word-order correction.
-    /// When `Some`, spawned as a blocking task after each silence flush.
-    aligner: Option<Arc<OrtForcedAligner>>,
     /// Persisted adaptive VAD state across sessions.
     adaptive_vad_state: Arc<Mutex<Option<AdaptiveVadConfig>>>,
     /// Path to persist adaptive VAD state across app restarts.
@@ -108,7 +105,6 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             settings,
             active: Arc::new(Mutex::new(None)),
             idle_notify: Arc::new(Notify::new()),
-            aligner: None,
             adaptive_vad_state: Arc::new(Mutex::new(None)),
             vad_state_path: None,
             calibrator: Arc::new(IsotonicCalibrator::identity()),
@@ -167,13 +163,6 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
                 }
             }
         }
-        self
-    }
-
-    /// Attach a pre-built forced aligner to this session manager.
-    /// When set, the aligner runs after each silence flush.
-    pub fn with_aligner(mut self, aligner: Arc<OrtForcedAligner>) -> Self {
-        self.aligner = Some(aligner);
         self
     }
 
@@ -262,7 +251,6 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let config = self.config.clone();
         let active_arc = Arc::clone(&self.active);
         let idle_notify = Arc::clone(&self.idle_notify);
-        let aligner = self.aligner.as_ref().map(Arc::clone);
         let settings = Arc::clone(&self.settings);
         let adaptive_vad_state = Arc::clone(&self.adaptive_vad_state);
         let vad_state_path = self.vad_state_path.clone();
@@ -283,7 +271,6 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             active_arc,
             idle_notify,
             audio_override,
-            aligner,
             settings,
             adaptive_vad_state,
             vad_state_path,
@@ -543,7 +530,6 @@ async fn run_session<A: AsrBackend + 'static>(
     active_arc: Arc<Mutex<Option<ActiveHandle>>>,
     idle_notify: Arc<Notify>,
     audio_override: Option<AudioStream>,
-    aligner: Option<Arc<OrtForcedAligner>>,
     settings: Arc<RwLock<UserSettings>>,
     adaptive_vad_state: Arc<Mutex<Option<AdaptiveVadConfig>>>,
     vad_state_path: Option<PathBuf>,
@@ -613,7 +599,6 @@ async fn run_session<A: AsrBackend + 'static>(
     };
     let _ = event_tx.send(SessionEvent::Started).await;
 
-    let mut all_audio = aligner.as_ref().map(|_| Vec::with_capacity(16_000 * 30));
     let mut segments = Vec::with_capacity(asr.segment_capacity_hint());
     let mut raw_text = String::with_capacity(256);
     let mut speech_samples: usize = 0;
@@ -675,13 +660,6 @@ async fn run_session<A: AsrBackend + 'static>(
                     // VAD is used only for speech-time accounting and session limits.
                     if in_speech {
                         speech_samples += chunk.samples.len();
-                    }
-                    if let Some(audio) = &mut all_audio {
-                        // Cap at max_speech_samples to prevent unbounded growth
-                        // during mostly-silent sessions with aligner enabled.
-                        if audio.len() < config.pipeline.max_speech_samples {
-                            audio.extend_from_slice(&chunk.samples);
-                        }
                     }
 
                     if let Err(e) = asr.push_audio(&asr_session, &chunk.samples).await {
@@ -897,36 +875,7 @@ async fn run_session<A: AsrBackend + 'static>(
         return;
     }
 
-    let aligned_text = if let (Some(al), Some(audio)) = (&aligner, all_audio) {
-        let al = Arc::clone(al);
-        let text = raw_text.clone();
-        match tokio::task::spawn_blocking(move || al.align(&audio, &text)).await {
-            Ok(Ok(words)) => {
-                let reordered = words
-                    .iter()
-                    .map(|w| w.text.as_str())
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                if reordered != raw_text {
-                    debug!(%session_id, "forced aligner reordered text");
-                    let _ = event_tx.try_send(SessionEvent::CorrectedText(reordered.clone()));
-                    reordered
-                } else {
-                    raw_text.clone()
-                }
-            }
-            Ok(Err(e)) => {
-                warn!(error = %e, "forced aligner failed, using raw text");
-                raw_text.clone()
-            }
-            Err(e) => {
-                warn!(error = %e, "forced aligner task join error");
-                raw_text.clone()
-            }
-        }
-    } else {
-        raw_text.clone()
-    };
+    let aligned_text = raw_text.clone();
 
     info!(%session_id, "[ASR] {aligned_text}");
 

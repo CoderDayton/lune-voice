@@ -142,14 +142,6 @@ info = "Clean build artifacts (--env ALL=1 includes .venv + training data)"
 
 [scripts.export]
 interpreter = "bash"
-command = '''
-case "${MODEL:-all}" in
-  asr) uv run python scripts/export_onnx.py --asr ;;
-  fa)  uv run python scripts/export_onnx.py --fa ;;
-  all) uv run python scripts/export_onnx.py --asr \
-    && uv run python scripts/export_onnx.py --fa ;;
-  *)   echo "MODEL must be asr, fa, or all"; exit 1 ;;
-esac
-'''
-info = "Export ONNX models (--env MODEL=asr|fa|all, default: all)"
+command = "uv run python scripts/export_onnx.py --asr"
+info = "Export Parakeet ASR ONNX model"
 requires = ["uv"]

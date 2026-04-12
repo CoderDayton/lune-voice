@@ -38,9 +38,10 @@ fn row_to_session(
                 .map_err(|e| PersistError::Migration(format!("ended_at: {e}")))
         })
         .transpose()?;
-    // serde_json::from_str for small enum variants is fast; no alloc on happy path
-    let backend: AsrBackendKind = serde_json::from_str(&back)
-        .map_err(|e| PersistError::Migration(format!("backend: {e}")))?;
+    // Fall back to ParakeetTdt for sessions recorded with a since-removed
+    // backend (e.g. OrtQwenAsr) so history still loads after backend removal.
+    let backend: AsrBackendKind =
+        serde_json::from_str(&back).unwrap_or(AsrBackendKind::ParakeetTdt);
     let status: SessionStatus =
         serde_json::from_str(&stat).map_err(|e| PersistError::Migration(format!("status: {e}")))?;
     Ok(DictationSession {

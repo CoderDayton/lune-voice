@@ -21,22 +21,17 @@ function createMockSnapshot(): BackendWorkspaceSnapshot {
       useGpu: true,
       devicePolicy: "Auto",
       asrBackendType: "ParakeetTdt",
-      llmBackendType: "LlamaCppLocal",
       confidenceThreshold: 0.5,
       adaptiveVad: false,
       speechThreshold: 0.5,
       stylePreset: "casual",
       hotkeyToggle: "Ctrl+Space",
       hotkeyCancel: "Escape",
-      alignerEnabled: true,
       pillVisibility: "Always",
       language: "en",
       openaiAsrBaseUrl: null,
       openaiAsrModel: null,
       openaiAsrApiKeySet: false,
-      openaiLlmBaseUrl: null,
-      openaiLlmModel: null,
-      openaiLlmApiKeySet: false,
     },
     history: [
       {
@@ -89,7 +84,7 @@ let mockSnapshot: BackendWorkspaceSnapshot = createMockSnapshot();
 let nextDictionaryId = 1000;
 
 function applySettings(input: SaveWorkspaceSettingsInput) {
-  const { openaiAsrApiKey: _openaiAsrApiKey, openaiLlmApiKey: _openaiLlmApiKey, ...fields } = input;
+  const { openaiAsrApiKey: _openaiAsrApiKey, ...fields } = input;
   mockSnapshot = {
     ...mockSnapshot,
     settings: {
@@ -97,7 +92,6 @@ function applySettings(input: SaveWorkspaceSettingsInput) {
       ...fields,
       devicePolicy: fields.useGpu ? fields.devicePolicy : "Cpu",
       openaiAsrApiKeySet: !!_openaiAsrApiKey,
-      openaiLlmApiKeySet: !!_openaiLlmApiKey,
     },
   };
 }

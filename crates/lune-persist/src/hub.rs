@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use hf_hub::api::sync::{Api, ApiBuilder, ApiRepo};
-use lune_core::config::{AlignerConfig, AsrBackendConfig};
+use lune_core::config::AsrBackendConfig;
 use tracing::info;
 
 use crate::error::{PersistError, PersistResult};
@@ -22,6 +22,7 @@ pub enum ModelSpec {
 
 /// Status of a single model: present locally or needs download.
 #[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ModelStatus {
     /// Human-readable name (e.g. "Qwen3 ASR 0.6B")
     pub name: String,
@@ -48,10 +49,6 @@ pub struct DownloadProgress {
 pub struct ResolvedModels {
     /// Parakeet TDT model directory.
     pub asr_model_dir: PathBuf,
-    /// LLM GGUF model file path.
-    pub llm_model_path: PathBuf,
-    /// Optional forced-aligner model directory.
-    pub aligner_model_dir: Option<PathBuf>,
 }
 
 impl ModelSpec {
@@ -70,23 +67,11 @@ impl ModelSpec {
         }
     }
 
-    /// LLM corrector GGUF model (Qwen2.5-1.5B-Instruct Q4_K_M).
-    #[inline]
-    pub fn llm_corrector() -> Self {
-        Self::Directory {
-            repo_id: "bartowski/Qwen2.5-1.5B-Instruct-GGUF".into(),
-            required_files: vec!["Qwen2.5-1.5B-Instruct-Q4_K_M.gguf".into()],
-            suffix_patterns: vec!["Q4_K_M.gguf".into()],
-            local_name: "qwen2.5-1.5b-instruct-gguf".into(),
-        }
-    }
-
     /// Human-readable display name for this model.
     pub fn display_name(&self) -> &str {
         match self {
             Self::Directory { local_name, .. } => match local_name.as_str() {
                 "parakeet-tdt-0.6b" => "Parakeet TDT 0.6B",
-                "qwen2.5-1.5b-instruct-gguf" => "Qwen2.5 1.5B LLM",
                 _ => local_name,
             },
         }
@@ -124,7 +109,7 @@ impl ModelSpec {
 pub fn check_model_status(
     models_dir: &Path,
     asr_backend: &AsrBackendConfig,
-    llm_backend: &lune_core::config::LlmBackendConfig,
+    _llm_backend: &lune_core::config::LlmBackendConfig,
 ) -> Vec<ModelStatus> {
     let mut statuses = Vec::new();
 
@@ -134,19 +119,6 @@ pub fn check_model_status(
     };
 
     if let Some(spec) = &asr_spec {
-        statuses.push(ModelStatus {
-            name: spec.display_name().to_string(),
-            repo_id: spec.repo_id().to_string(),
-            local_name: spec.local_name().to_string(),
-            ready: spec.is_ready(models_dir),
-        });
-    }
-
-    if matches!(
-        llm_backend,
-        lune_core::config::LlmBackendConfig::LlamaCppLocal { .. }
-    ) {
-        let spec = ModelSpec::llm_corrector();
         statuses.push(ModelStatus {
             name: spec.display_name().to_string(),
             repo_id: spec.repo_id().to_string(),
@@ -167,7 +139,6 @@ pub fn download_model(
 ) -> PersistResult<PathBuf> {
     let spec = match local_name {
         "parakeet-tdt-0.6b" => ModelSpec::parakeet_tdt(),
-        "qwen2.5-1.5b-instruct-gguf" => ModelSpec::llm_corrector(),
         _ => {
             return Err(PersistError::ModelDownload(format!(
                 "unknown model: {local_name}"
@@ -351,29 +322,13 @@ fn link_or_copy(src: &Path, dst: &Path) -> std::io::Result<()> {
 pub fn ensure_default_models(
     models_dir: &Path,
     _asr_backend: &AsrBackendConfig,
-    llm_backend: &lune_core::config::LlmBackendConfig,
-    aligner: Option<&AlignerConfig>,
 ) -> PersistResult<ResolvedModels> {
     let hub_cache = models_dir.join(".hub-cache");
     let hub = ModelHub::new(&hub_cache)?;
 
     let asr_model_dir = ensure_directory_model(&hub, &ModelSpec::parakeet_tdt(), models_dir)?;
 
-    let llm_model_path = match llm_backend {
-        lune_core::config::LlmBackendConfig::LlamaCppLocal { .. } => {
-            let dir = ensure_directory_model(&hub, &ModelSpec::llm_corrector(), models_dir)?;
-            dir.join("Qwen2.5-1.5B-Instruct-Q4_K_M.gguf")
-        }
-        _ => models_dir.join("qwen2.5-1.5b-instruct-gguf/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf"),
-    };
-
-    let aligner_model_dir = resolve_aligner_model_dir(models_dir, aligner);
-
-    Ok(ResolvedModels {
-        asr_model_dir,
-        llm_model_path,
-        aligner_model_dir,
-    })
+    Ok(ResolvedModels { asr_model_dir })
 }
 
 /// Ensure a directory-type model is present at `models_dir/<local_name>/`.
@@ -470,45 +425,13 @@ pub fn resolve_local_model_paths(
     models_dir: &Path,
     settings: &mut lune_core::config::UserSettings,
 ) {
-    use lune_core::config::{AsrBackendConfig, LlmBackendConfig};
+    use lune_core::config::AsrBackendConfig;
 
     match &mut settings.asr_backend {
         AsrBackendConfig::ParakeetTdt { model_dir } if model_dir.as_os_str().is_empty() => {
             *model_dir = models_dir.join("parakeet-tdt-0.6b");
         }
         _ => {}
-    }
-
-    match &mut settings.llm_backend {
-        LlmBackendConfig::LlamaCppLocal { model_path, .. } if model_path.as_os_str().is_empty() => {
-            *model_path = models_dir
-                .join("qwen2.5-1.5b-instruct-gguf")
-                .join("Qwen2.5-1.5B-Instruct-Q4_K_M.gguf");
-        }
-        _ => {}
-    }
-    if let Some(mut aligner_cfg) = settings.aligner.take() {
-        if aligner_cfg.enabled && aligner_cfg.model_dir.as_os_str().is_empty() {
-            aligner_cfg.model_dir = models_dir.join("wav2vec2-fa");
-        }
-        settings.aligner = Some(aligner_cfg);
-    }
-}
-
-/// Resolve the aligner model directory when the feature is enabled.
-///
-/// Returns the default `models_dir/wav2vec2-fa` path when enabled with
-/// an empty `model_dir`. Models are provisioned during the setup flow,
-/// so the directory is expected to exist by the time this is called.
-fn resolve_aligner_model_dir(
-    models_dir: &Path,
-    aligner: Option<&AlignerConfig>,
-) -> Option<PathBuf> {
-    match aligner {
-        Some(cfg) if cfg.enabled && cfg.model_dir.as_os_str().is_empty() => {
-            Some(models_dir.join("wav2vec2-fa"))
-        }
-        _ => None,
     }
 }
 
@@ -533,23 +456,6 @@ mod tests {
     }
 
     #[test]
-    fn llm_corrector_spec_has_expected_repo() {
-        let spec = ModelSpec::llm_corrector();
-        match &spec {
-            ModelSpec::Directory {
-                repo_id,
-                required_files,
-                local_name,
-                ..
-            } => {
-                assert_eq!(repo_id, "bartowski/Qwen2.5-1.5B-Instruct-GGUF");
-                assert!(required_files.contains(&"Qwen2.5-1.5B-Instruct-Q4_K_M.gguf".to_string()));
-                assert_eq!(local_name, "qwen2.5-1.5b-instruct-gguf");
-            }
-        }
-    }
-
-    #[test]
     fn hub_constructs_with_valid_dir() {
         let tmp = tempfile::tempdir().unwrap();
         let hub_cache = tmp.path().join(".hub-cache");
@@ -558,68 +464,17 @@ mod tests {
     }
 
     #[test]
-    fn aligner_resolution_disabled_is_none() {
-        let tmp = tempfile::tempdir().unwrap();
-        let disabled = AlignerConfig {
-            enabled: false,
-            model_dir: PathBuf::new(),
-        };
-
-        let resolved = resolve_aligner_model_dir(tmp.path(), Some(&disabled));
-        assert!(resolved.is_none());
-    }
-
-    #[test]
-    fn aligner_resolution_enabled_empty_uses_default_path() {
-        let tmp = tempfile::tempdir().unwrap();
-        let enabled = AlignerConfig {
-            enabled: true,
-            model_dir: PathBuf::new(),
-        };
-
-        let resolved = resolve_aligner_model_dir(tmp.path(), Some(&enabled));
-        assert_eq!(resolved, Some(tmp.path().join("wav2vec2-fa")));
-    }
-
-    #[test]
-    fn aligner_resolution_enabled_custom_path_is_noop() {
-        let tmp = tempfile::tempdir().unwrap();
-        let enabled = AlignerConfig {
-            enabled: true,
-            model_dir: PathBuf::from("/tmp/custom-fa"),
-        };
-
-        let resolved = resolve_aligner_model_dir(tmp.path(), Some(&enabled));
-        assert!(resolved.is_none());
-    }
-
-    #[test]
     #[ignore] // Requires network — run with `cargo test -- --ignored`
-    fn integration_download_ort_llm() {
+    fn integration_download_parakeet() {
         let tmp = tempfile::tempdir().unwrap();
         let models_dir = tmp.path();
         let defaults = lune_core::config::UserSettings::default();
-        let asr_backend = &defaults.asr_backend;
-        let llm_backend = &defaults.llm_backend;
 
-        let resolved = ensure_default_models(
-            models_dir,
-            asr_backend,
-            llm_backend,
-            defaults.aligner.as_ref(),
-        )
-        .unwrap();
-
-        assert!(resolved.llm_model_path.exists());
+        let resolved = ensure_default_models(models_dir, &defaults.asr_backend).unwrap();
+        assert!(resolved.asr_model_dir.exists());
 
         // Second call should be instant (already present).
-        let resolved2 = ensure_default_models(
-            models_dir,
-            asr_backend,
-            llm_backend,
-            defaults.aligner.as_ref(),
-        )
-        .unwrap();
-        assert_eq!(resolved.llm_model_path, resolved2.llm_model_path);
+        let resolved2 = ensure_default_models(models_dir, &defaults.asr_backend).unwrap();
+        assert_eq!(resolved.asr_model_dir, resolved2.asr_model_dir);
     }
 }

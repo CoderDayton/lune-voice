@@ -1,16 +1,15 @@
 use std::path::PathBuf;
 
 use lune_core::config::{
-    ActivationMode, AlignerConfig, AsrBackendConfig, DevicePolicy, DictationMode, HotkeyConfig,
-    KeyCombo, LlmBackendConfig, Modifier, PillVisibility, RedactedString, StreamingMode,
-    UserSettings, builtin_registry,
+    ActivationMode, AsrBackendConfig, DevicePolicy, DictationMode, HotkeyConfig, KeyCombo,
+    Modifier, PillVisibility, RedactedString, StreamingMode, UserSettings, builtin_registry,
 };
 use lune_core::session::SessionStatus;
 use lune_persist::{AppPaths, Database, SettingsStore, StoredDictionaryEntry};
 
 use crate::dto::{
     ActivationModeDto, AsrBackendTypeDto, CreateDictionaryEntryInput, DevicePolicyDto,
-    DictationModeDto, DictionaryItemDto, HistoryItemDto, LlmBackendTypeDto, PillVisibilityDto,
+    DictationModeDto, DictionaryItemDto, HistoryItemDto, PillVisibilityDto,
     SaveWorkspaceSettingsInput, WorkspaceSettingsDto, WorkspaceSnapshot,
 };
 
@@ -178,28 +177,12 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
             _ => (None, None, false),
         };
 
-    let (openai_llm_base_url, openai_llm_model, openai_llm_api_key_set) =
-        match &settings.llm_backend {
-            LlmBackendConfig::OpenAiCompatible {
-                base_url,
-                model,
-                api_key,
-                ..
-            } => (
-                Some(base_url.to_string()),
-                Some(model.clone()),
-                !api_key.expose().is_empty(),
-            ),
-            _ => (None, None, false),
-        };
-
     WorkspaceSettingsDto {
         activation_mode: activation_mode_to_dto(settings.activation_mode),
         dictation_mode: dictation_mode_to_dto(settings.dictation_mode),
         use_gpu: !matches!(settings.device, DevicePolicy::Cpu),
         device_policy: device_policy_to_dto(settings.device),
         asr_backend_type: asr_backend_type_to_dto(&settings.asr_backend),
-        llm_backend_type: llm_backend_type_to_dto(&settings.llm_backend),
         confidence_threshold: settings.pipeline.word_confidence_threshold,
         adaptive_vad: settings
             .pipeline
@@ -209,15 +192,11 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
         style_preset: settings.default_style.clone(),
         hotkey_toggle: format_key_combo(&settings.hotkey.toggle_dictation),
         hotkey_cancel: format_key_combo(&settings.hotkey.cancel_dictation),
-        aligner_enabled: settings.aligner.as_ref().is_some_and(|cfg| cfg.enabled),
         pill_visibility: pill_visibility_to_dto(settings.pill_visibility),
         language: settings.language.clone(),
         openai_asr_base_url,
         openai_asr_model,
         openai_asr_api_key_set,
-        openai_llm_base_url,
-        openai_llm_model,
-        openai_llm_api_key_set,
     }
 }
 
@@ -231,8 +210,6 @@ fn apply_settings_dto(
     settings.device = resolve_device_policy(input.use_gpu, input.device_policy);
     settings.asr_backend =
         asr_backend_from_type(input.asr_backend_type, &settings.asr_backend, &input)?;
-    settings.llm_backend =
-        llm_backend_from_type(input.llm_backend_type, &settings.llm_backend, &input)?;
 
     // Validate numeric thresholds — reject NaN/Inf/out-of-range.
     if let Some(ct) = input.confidence_threshold
@@ -267,17 +244,6 @@ fn apply_settings_dto(
         toggle_dictation: parse_key_combo(&input.hotkey_toggle)?,
         cancel_dictation: parse_key_combo(&input.hotkey_cancel)?,
     };
-    if let Some(ref mut cfg) = settings.aligner {
-        cfg.enabled = input.aligner_enabled;
-    } else if input.aligner_enabled {
-        settings.aligner = Some(AlignerConfig {
-            enabled: true,
-            model_dir: UserSettings::default()
-                .aligner
-                .map(|c| c.model_dir)
-                .unwrap_or_default(),
-        });
-    }
     let language = input.language.trim();
     if !is_wellformed_bcp47(language) {
         return Err(
@@ -348,14 +314,6 @@ fn asr_backend_type_to_dto(config: &AsrBackendConfig) -> AsrBackendTypeDto {
     }
 }
 
-fn llm_backend_type_to_dto(config: &LlmBackendConfig) -> LlmBackendTypeDto {
-    match config {
-        LlmBackendConfig::LlamaCppLocal { .. } => LlmBackendTypeDto::LlamaCppLocal,
-        LlmBackendConfig::OpenAiCompatible { .. } => LlmBackendTypeDto::OpenAiCompatible,
-        _ => LlmBackendTypeDto::LlamaCppLocal,
-    }
-}
-
 fn pill_visibility_to_dto(vis: PillVisibility) -> PillVisibilityDto {
     match vis {
         PillVisibility::Always => PillVisibilityDto::Always,
@@ -413,56 +371,6 @@ fn asr_backend_from_type(
                 api_key: RedactedString::new(api_key_str),
                 model: model_str.to_owned(),
                 streaming: StreamingMode::HttpPolling,
-            }
-        }
-    })
-}
-
-fn llm_backend_from_type(
-    kind: LlmBackendTypeDto,
-    current: &LlmBackendConfig,
-    input: &SaveWorkspaceSettingsInput,
-) -> Result<LlmBackendConfig, String> {
-    Ok(match kind {
-        LlmBackendTypeDto::LlamaCppLocal
-            if matches!(current, LlmBackendConfig::LlamaCppLocal { .. }) =>
-        {
-            current.clone()
-        }
-        LlmBackendTypeDto::LlamaCppLocal => UserSettings::default().llm_backend,
-        LlmBackendTypeDto::OpenAiCompatible => {
-            // Prefer incoming DTO fields; fall back to current config values if already OpenAI.
-            let (cur_url, cur_key, cur_model, cur_max_tokens) = match current {
-                LlmBackendConfig::OpenAiCompatible {
-                    base_url,
-                    api_key,
-                    model,
-                    max_tokens,
-                } => (
-                    base_url.to_string(),
-                    api_key.expose().to_owned(),
-                    model.clone(),
-                    *max_tokens,
-                ),
-                _ => (
-                    "https://api.openai.com/v1".to_owned(),
-                    String::new(),
-                    "gpt-4o-mini".to_owned(),
-                    512u32,
-                ),
-            };
-            let base_url_str = input.openai_llm_base_url.as_deref().unwrap_or(&cur_url);
-            let api_key_str = input.openai_llm_api_key.as_deref().unwrap_or(&cur_key);
-            let model_str = input.openai_llm_model.as_deref().unwrap_or(&cur_model);
-            let base_url: url::Url = base_url_str
-                .parse()
-                .map_err(|e| format!("invalid openaiLlmBaseUrl: {e}"))?;
-            validate_api_url(&base_url, "openaiLlmBaseUrl")?;
-            LlmBackendConfig::OpenAiCompatible {
-                base_url,
-                api_key: RedactedString::new(api_key_str),
-                model: model_str.to_owned(),
-                max_tokens: cur_max_tokens,
             }
         }
     })
@@ -612,22 +520,17 @@ mod tests {
             use_gpu: dto.use_gpu,
             device_policy: dto.device_policy,
             asr_backend_type: dto.asr_backend_type,
-            llm_backend_type: dto.llm_backend_type,
             confidence_threshold: dto.confidence_threshold,
             adaptive_vad: dto.adaptive_vad,
             speech_threshold: dto.speech_threshold,
             style_preset: dto.style_preset,
             hotkey_toggle: dto.hotkey_toggle,
             hotkey_cancel: dto.hotkey_cancel,
-            aligner_enabled: dto.aligner_enabled,
             pill_visibility: dto.pill_visibility,
             language: dto.language,
             openai_asr_base_url: dto.openai_asr_base_url,
             openai_asr_api_key: None,
             openai_asr_model: dto.openai_asr_model,
-            openai_llm_base_url: dto.openai_llm_base_url,
-            openai_llm_api_key: None,
-            openai_llm_model: dto.openai_llm_model,
         }
     }
 
@@ -667,23 +570,13 @@ mod tests {
                 model: "whisper-1".into(),
                 streaming: StreamingMode::HttpPolling,
             },
-            llm_backend: LlmBackendConfig::OpenAiCompatible {
-                base_url: "https://api.openai.com/v1".parse().unwrap(),
-                api_key: RedactedString::new("secret-llm"),
-                model: "gpt-4o-mini".into(),
-                max_tokens: 128,
-            },
             ..UserSettings::default()
         };
 
         let dto = settings_to_dto(&settings);
-        // Keys are not in the read DTO — only the boolean flags.
         assert!(dto.openai_asr_api_key_set);
-        assert!(dto.openai_llm_api_key_set);
-        // Verify the serialized JSON contains no actual key values.
         let json = serde_json::to_string(&dto).unwrap();
         assert!(!json.contains("secret-asr"));
-        assert!(!json.contains("secret-llm"));
     }
 
     #[test]

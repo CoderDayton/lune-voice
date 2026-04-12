@@ -16,13 +16,11 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use bench_utils::{
-    Fixture, benchmark_aligner, benchmark_asr_entry, char_error_rate, init_ort, load_fixtures,
-    process_memory_usage, word_error_rate, workspace_root, wrap_print,
+    Fixture, benchmark_asr_entry, char_error_rate, init_ort, load_fixtures, process_memory_usage,
+    word_error_rate, workspace_root, wrap_print,
 };
 use lune_app::{SessionManager, SessionManagerConfig};
-use lune_asr::{
-    AsrRegistry, IsotonicCalibrator, NemotronReranker, NemotronRerankerConfig, OrtForcedAligner,
-};
+use lune_asr::{AsrRegistry, IsotonicCalibrator, NemotronReranker, NemotronRerankerConfig};
 use lune_audio::{AudioConfig, AudioStream};
 use lune_core::asr::AsrBackendKind;
 use lune_core::config::{DevicePolicy, UserSettings};
@@ -67,7 +65,7 @@ fn main() {
     print!("  Loading ASR backend ... ");
     let t = Instant::now();
     let asr = AsrRegistry::from_config(&asr_entry.config, device).expect("load ASR");
-    let aligner = benchmark_aligner(&asr, &root);
+
     let asr = Arc::new(asr);
     println!("{:.1}s", t.elapsed().as_secs_f64());
     if let Some(mem) = process_memory_usage() {
@@ -126,7 +124,6 @@ fn main() {
         let result = rt.block_on(run_full_pipeline(
             fixture,
             Arc::clone(&asr),
-            aligner.clone(),
             Arc::clone(&llm),
             asr_entry.backend_kind,
             pipeline,
@@ -173,7 +170,7 @@ fn main() {
 async fn run_full_pipeline(
     fixture: &Fixture,
     asr: Arc<AsrRegistry>,
-    aligner: Option<Arc<OrtForcedAligner>>,
+
     llm: Arc<dyn TextPostProcessor>,
     backend_kind: AsrBackendKind,
     pipeline: lune_core::config::PipelineConfig,
@@ -239,11 +236,6 @@ async fn run_full_pipeline(
         }
     } else {
         println!("  [info] no calibrator on disk, using identity");
-        mgr
-    };
-    let mgr = if let Some(aligner) = aligner {
-        mgr.with_aligner(aligner)
-    } else {
         mgr
     };
 

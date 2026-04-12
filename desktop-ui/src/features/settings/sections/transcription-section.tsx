@@ -43,19 +43,6 @@ export function TranscriptionSection({ settings }: SettingsProps) {
         description={t`When available, this can make transcription finish faster.`}
         control={<input type="checkbox" className="toggle toggle-primary" checked={settings.useGpu} onChange={() => void saveWorkspaceSetting("useGpu", !settings.useGpu)} aria-label={t`Use hardware acceleration`} />}
       />
-      <SettingsRow
-        label={t`Word-level alignment`}
-        description={t`Use forced aligner for precise word timestamps and chunk merging.`}
-        control={
-          <input
-            type="checkbox"
-            className="toggle toggle-primary"
-            checked={settings.alignerEnabled}
-            onChange={() => void saveWorkspaceSetting("alignerEnabled", !settings.alignerEnabled)}
-            aria-label={t`Word-level alignment`}
-          />
-        }
-      />
     </SettingsSection>
   );
 }

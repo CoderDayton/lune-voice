@@ -2,12 +2,10 @@
 //!
 //! Included via `#[path = "bench_utils.rs"] mod bench_utils;` from each example.
 
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::path::PathBuf;
 
-use lune_asr::{AsrRegistry, OrtForcedAligner};
 use lune_core::asr::AsrBackendKind;
-use lune_core::config::{AsrBackendConfig, UserSettings};
+use lune_core::config::AsrBackendConfig;
 
 // ─── Fixture ────────────────────────────────────────────────────────────────
 
@@ -146,30 +144,6 @@ pub fn benchmark_asr_entry(root: &std::path::Path) -> Result<BenchmarkAsrEntry, 
             ),
             None => "No ASR model dir found under models/.".to_string(),
         })
-}
-
-pub fn benchmark_aligner_enabled() -> bool {
-    if let Ok(raw) = std::env::var("ALIGNER") {
-        match raw.trim().to_ascii_lowercase().as_str() {
-            "1" | "true" | "on" => return true,
-            "0" | "false" | "off" => return false,
-            _ => {
-                eprintln!("  [warn] Ignoring unsupported ALIGNER={raw:?}; expected 0/1/false/true")
-            }
-        }
-    }
-
-    UserSettings::default()
-        .aligner
-        .as_ref()
-        .map(|cfg| cfg.enabled)
-        .unwrap_or(false)
-}
-
-pub fn benchmark_aligner(_asr: &AsrRegistry, _root: &Path) -> Option<Arc<OrtForcedAligner>> {
-    // Forced aligner was OrtQwen-specific. With Parakeet as the sole
-    // backend, native timestamps are used instead.
-    None
 }
 
 /// Names that must come first when present, in this order. Everything else

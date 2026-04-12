@@ -134,13 +134,11 @@ describe("workspace store", () => {
         settings: {
           ...snapshotSettings,
           openaiAsrApiKey: "secret-asr",
-          openaiLlmApiKey: "secret-llm",
         },
       }),
     );
 
     expect(workspaceStore.state.settings.openaiAsrApiKey).toBe("");
-    expect(workspaceStore.state.settings.openaiLlmApiKey).toBe("");
   });
 
   test("finalized text appends to live transcript", () => {

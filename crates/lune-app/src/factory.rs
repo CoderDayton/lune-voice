@@ -50,18 +50,6 @@ pub fn patch_model_paths(settings: &mut UserSettings, resolved: &ResolvedModels)
 
         _ => {}
     }
-
-    // LLM backend paths no longer carry a local model file — the local
-    // correction path is the Nemotron reranker, loaded directly from the
-    // app data dir at session-manager construction time. Remote-only
-    // backends (OpenAI) don't need path patching here.
-    let _ = &resolved.llm_model_path;
-
-    if let (Some(aligner), Some(model_dir)) = (&mut settings.aligner, &resolved.aligner_model_dir)
-        && aligner.model_dir.as_os_str().is_empty()
-    {
-        model_dir.clone_into(&mut aligner.model_dir);
-    }
 }
 
 /// Construct the ASR backend from settings via [`AsrRegistry`].
