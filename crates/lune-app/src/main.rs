@@ -317,6 +317,45 @@ async fn run_pipeline(
         manager = manager.with_aligner(aligner);
     }
 
+    // Load the Nemotron cross-encoder reranker for n-best rescoring.
+    // Always-on when the model is available — there is no fallback
+    // generative path, so this is the only correction the local pipeline
+    // does. Missing model degrades to "no correction" (raw argmax).
+    //
+    // Lookup order:
+    // 1. `<data_dir>/models/nemotron-rerank-1b/`  (production install)
+    // 2. `./models/nemotron-rerank-1b/`           (dev/checkout layout)
+    let reranker_dir = vad_state_path
+        .parent()
+        .map(|p| p.join("models").join("nemotron-rerank-1b"));
+    let fallback_dir = std::path::PathBuf::from("models/nemotron-rerank-1b");
+    let dir = match reranker_dir {
+        Some(p) if p.join("tokenizer.json").exists() => Some(p),
+        _ if fallback_dir.join("tokenizer.json").exists() => Some(fallback_dir),
+        _ => None,
+    };
+    if let Some(dir) = dir {
+        match lune_asr::NemotronReranker::new(lune_asr::NemotronRerankerConfig {
+            model_dir: dir.clone(),
+            use_gpu: true,
+        }) {
+            Ok(rr) => {
+                tracing::info!(path = %dir.display(), "nemotron reranker loaded");
+                manager = manager.with_reranker(Arc::new(rr));
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, path = %dir.display(),
+                    "failed to load nemotron reranker, correction disabled");
+            }
+        }
+    } else {
+        tracing::warn!(
+            "nemotron reranker model not found; correction disabled. \
+             Place the model at ~/.local/share/lune-voice/models/nemotron-rerank-1b/ \
+             or in ./models/nemotron-rerank-1b/"
+        );
+    }
+
     let delivery_service = DeliveryService::new(snap.terminal_mode);
 
     tracing::info!("pipeline ready, waiting for commands");

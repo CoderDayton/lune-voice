@@ -10,7 +10,7 @@ use lune_core::config::{LlmBackendConfig, UserSettings};
 use lune_core::llm::TextPostProcessor;
 use lune_core::session::SessionEvent;
 use lune_dict::DictionaryManager;
-use lune_llm::{LlamaCppBackend, LlamaCppConfig, OpenAiLlmBackend, OpenAiLlmConfig};
+use lune_llm::{NullPostProcessor, OpenAiLlmBackend, OpenAiLlmConfig};
 use lune_persist::{AppPaths, Database, SettingsStore, resolve_local_model_paths};
 use tauri::{AppHandle, Emitter, ipc::Channel};
 use tokio::sync::{Mutex, RwLock, mpsc};
@@ -662,21 +662,12 @@ async fn build_post_processor(
     settings: &UserSettings,
 ) -> Result<Arc<dyn TextPostProcessor>, String> {
     match &settings.llm_backend {
-        LlmBackendConfig::LlamaCppLocal {
-            model_path,
-            n_gpu_layers,
-            n_ctx,
-            max_output_tokens,
-        } => LlamaCppBackend::new(LlamaCppConfig {
-            model_path: model_path.clone(),
-            n_gpu_layers: *n_gpu_layers,
-            n_ctx: *n_ctx,
-            n_threads: 4,
-            max_output_tokens: *max_output_tokens,
-        })
-        .await
-        .map(|backend| Arc::new(backend) as Arc<dyn TextPostProcessor>)
-        .map_err(|e| format!("build llm backend: {e}")),
+        // Local LLM-based correction is gone — the Nemotron cross-encoder
+        // reranker handles all local correction at the session-manager
+        // layer. Return a passthrough so the trait slot is filled.
+        LlmBackendConfig::LlamaCppLocal { .. } => {
+            Ok(Arc::new(NullPostProcessor::new()) as Arc<dyn TextPostProcessor>)
+        }
         LlmBackendConfig::OpenAiCompatible {
             base_url,
             api_key,

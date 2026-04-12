@@ -26,7 +26,7 @@ use lune_asr::AsrRegistry;
 use lune_core::config::{DevicePolicy, UserSettings};
 use lune_core::llm::TextPostProcessor;
 use lune_core::session::SessionEvent;
-use lune_llm::{LlamaCppBackend, LlamaCppConfig};
+use lune_llm::NullPostProcessor;
 use tokio::sync::{Mutex, RwLock, mpsc};
 
 fn main() {
@@ -61,31 +61,11 @@ fn main() {
     let backend_kind = asr.kind();
     eprintln!("{:.1}s ({:?})", t.elapsed().as_secs_f64(), backend_kind);
 
-    // ── Load LLM ─────────────────────────────────────────────────────────
-
-    let llm_path = root.join("models/llm-corrector-gguf/qwen2.5-1.5b-instruct.Q4_K_M.gguf");
-    if !llm_path.exists() {
-        eprintln!("  [skip] LLM not found: {}", llm_path.display());
-        return;
-    }
-
-    eprint!("  Loading LLM ... ");
-    let t = Instant::now();
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let llm: Arc<dyn TextPostProcessor> = match rt.block_on(LlamaCppBackend::new(LlamaCppConfig {
-        model_path: llm_path,
-        n_gpu_layers: if has_gpu { 999 } else { 0 },
-        ..Default::default()
-    })) {
-        Ok(b) => {
-            eprintln!("{:.1}s", t.elapsed().as_secs_f64());
-            Arc::new(b)
-        }
-        Err(e) => {
-            eprintln!("[error] {e}");
-            return;
-        }
-    };
+    // ── Local correction is now via the Nemotron reranker ───────────────
+    // Attached on SessionManager separately. Post-processor slot just
+    // needs a passthrough.
+    let llm: Arc<dyn TextPostProcessor> = Arc::new(NullPostProcessor::new());
+    let _ = has_gpu; // consumed by ASR loading above
 
     // ── Start mic recording (separate cpal stream for WAV output) ────────
 

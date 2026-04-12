@@ -5,16 +5,14 @@ edition.workspace = true
 license.workspace = true
 
 [features]
-default = ["mistralrs-backend"]
-cuda = ["mistralrs/cuda"]
-mistralrs-backend = ["dep:mistralrs"]
+default = []
+cuda = []
 
 [dependencies]
 async-trait.workspace = true
 lune-core.workspace = true
 tokio.workspace = true
 tracing.workspace = true
-mistralrs = { version = "0.7", optional = true }
 async-openai.workspace = true
 serde_json.workspace = true
 regex = "1.11"

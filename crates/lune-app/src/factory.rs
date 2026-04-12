@@ -2,7 +2,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use lune_asr::AsrRegistry;
-use lune_core::config::{AsrBackendConfig, LlmBackendConfig, UserSettings};
+use lune_core::config::{AsrBackendConfig, UserSettings};
 use lune_core::error::{Error, Result};
 use lune_core::llm::TextPostProcessor;
 use lune_persist::ResolvedModels;
@@ -53,12 +53,11 @@ pub fn patch_model_paths(settings: &mut UserSettings, resolved: &ResolvedModels)
         _ => {}
     }
 
-    match &mut settings.llm_backend {
-        LlmBackendConfig::LlamaCppLocal { model_path, .. } if model_path.as_os_str().is_empty() => {
-            resolved.llm_model_path.clone_into(model_path);
-        }
-        _ => {}
-    }
+    // LLM backend paths no longer carry a local model file — the local
+    // correction path is the Nemotron reranker, loaded directly from the
+    // app data dir at session-manager construction time. Remote-only
+    // backends (OpenAI) don't need path patching here.
+    let _ = &resolved.llm_model_path;
 
     if let (Some(aligner), Some(model_dir)) = (&mut settings.aligner, &resolved.aligner_model_dir)
         && aligner.model_dir.as_os_str().is_empty()
@@ -75,33 +74,18 @@ pub fn build_asr_backend(settings: &UserSettings) -> Result<AsrRegistry> {
     AsrRegistry::from_config(&settings.asr_backend, settings.device)
 }
 
-/// Construct the LLM post-processor from settings.
+/// Construct the post-processor for the session pipeline.
 ///
-/// Cold path: called once at startup. Async because mistralrs model loading is async.
+/// All local correction now flows through the Nemotron cross-encoder
+/// reranker, which is wired separately via `SessionManager::with_reranker`.
+/// This function returns a `NullPostProcessor` (passthrough) so the
+/// session's `TextPostProcessor` slot is filled — the trait stays for
+/// the OpenAI remote correction path, which is not yet wired in v0.1.
+///
+/// Cold path: called once at startup.
 #[cold]
-pub async fn build_post_processor(settings: &UserSettings) -> Result<Arc<dyn TextPostProcessor>> {
-    match &settings.llm_backend {
-        LlmBackendConfig::LlamaCppLocal {
-            model_path,
-            n_gpu_layers,
-            n_ctx,
-            max_output_tokens,
-        } => {
-            let backend = lune_llm::LlamaCppBackend::new(lune_llm::LlamaCppConfig {
-                model_path: model_path.clone(),
-                n_gpu_layers: *n_gpu_layers,
-                n_ctx: *n_ctx,
-                n_threads: 4,
-                max_output_tokens: *max_output_tokens,
-            })
-            .await?;
-            Ok(Arc::new(backend))
-        }
-        LlmBackendConfig::OpenAiCompatible { .. } => {
-            Err(Error::Config("OpenAI LLM not yet supported in v0.1".into()))
-        }
-        _ => Err(Error::Config("unknown LLM backend type".into())),
-    }
+pub async fn build_post_processor(_settings: &UserSettings) -> Result<Arc<dyn TextPostProcessor>> {
+    Ok(Arc::new(lune_llm::NullPostProcessor::new()))
 }
 
 /// Build a database path, creating parent dirs if needed.

@@ -28,7 +28,7 @@ use lune_core::asr::AsrBackendKind;
 use lune_core::config::{DevicePolicy, UserSettings};
 use lune_core::llm::TextPostProcessor;
 use lune_core::session::SessionEvent;
-use lune_llm::{LlamaCppBackend, LlamaCppConfig};
+use lune_llm::NullPostProcessor;
 use tokio::sync::{Mutex, RwLock, mpsc};
 
 // ─── Main ───────────────────────────────────────────────────────────────────
@@ -67,32 +67,11 @@ fn main() {
         println!("  Memory after ASR load: {}", mem.display());
     }
 
-    // Load LLM
-    let llm_model_path = root.join("models/llm-corrector-gguf/qwen2.5-1.5b-instruct.Q4_K_M.gguf");
-    if !llm_model_path.exists() {
-        println!("  [skip] LLM model not found: {}", llm_model_path.display());
-        return;
-    }
-    print!("  Loading LLM backend ... ");
-    let t = Instant::now();
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let llm: Arc<dyn TextPostProcessor> = match rt.block_on(LlamaCppBackend::new(LlamaCppConfig {
-        model_path: llm_model_path,
-        n_gpu_layers: if has_gpu { 999 } else { 0 },
-        ..Default::default()
-    })) {
-        Ok(b) => {
-            println!("{:.1}s", t.elapsed().as_secs_f64());
-            if let Some(mem) = process_memory_usage() {
-                println!("  Memory after LLM load: {}", mem.display());
-            }
-            Arc::new(b)
-        }
-        Err(e) => {
-            println!("  [error] LLM load failed: {e}");
-            return;
-        }
-    };
+    // Local correction now flows through the Nemotron reranker, attached
+    // separately on the SessionManager. The post-processor slot just needs
+    // a passthrough.
+    let llm: Arc<dyn TextPostProcessor> = Arc::new(NullPostProcessor::new());
+    let _ = has_gpu; // still consumed by ASR loading above
 
     // Load fixtures
     let fixtures = load_fixtures(&root);
@@ -202,79 +181,45 @@ async fn run_full_pipeline(
         config,
         settings,
     );
-    // Optional isotonic calibrator load for ablation runs.
-    //
-    // - `LUNE_CALIBRATOR=0`      identity (ablation A/B baseline)
-    // - `LUNE_CALIBRATOR=1`      per-backend default path
-    //                             `~/.local/share/lune-voice/calibrator_<slug>.json`
-    //                             with legacy `calibrator.json` fallback
-    // - `LUNE_CALIBRATOR=<path>` explicit path
-    let mgr = match std::env::var("LUNE_CALIBRATOR") {
-        Ok(v) if v == "0" => mgr,
-        Ok(v) if v == "1" => {
-            let data_dir = std::env::var("HOME")
-                .map(|h| std::path::PathBuf::from(h).join(".local/share/lune-voice"))
-                .unwrap_or_default();
-            let per_backend = data_dir.join(format!("calibrator_{}.json", backend_kind.slug()));
-            let legacy = data_dir.join("calibrator.json");
-            let path = if per_backend.exists() {
-                per_backend
-            } else if legacy.exists() {
+    // Always-on calibrator load: per-backend file with legacy fallback.
+    // Missing files degrade silently to identity (no remap).
+    let data_dir = std::env::var("HOME")
+        .map(|h| std::path::PathBuf::from(h).join(".local/share/lune-voice"))
+        .unwrap_or_default();
+    let per_backend_cal = data_dir.join(format!("calibrator_{}.json", backend_kind.slug()));
+    let legacy_cal = data_dir.join("calibrator.json");
+    let cal_path = if per_backend_cal.exists() {
+        Some(per_backend_cal)
+    } else if legacy_cal.exists() {
+        println!(
+            "  [info] using legacy calibrator.json; retrain calibrate_confidence to produce calibrator_{}.json",
+            backend_kind.slug()
+        );
+        Some(legacy_cal)
+    } else {
+        None
+    };
+    let mgr = if let Some(path) = cal_path {
+        match std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|j| serde_json::from_str::<IsotonicCalibrator>(&j).ok())
+        {
+            Some(cal) => {
                 println!(
-                    "  [info] using legacy calibrator.json; retrain calibrate_confidence to produce calibrator_{}.json",
-                    backend_kind.slug()
+                    "  Calibrator loaded: {} ({} breakpoints)",
+                    path.display(),
+                    cal.breakpoint_count()
                 );
-                legacy
-            } else {
-                per_backend
-            };
-            if path.exists() {
-                match std::fs::read_to_string(&path) {
-                    Ok(json) => match serde_json::from_str::<IsotonicCalibrator>(&json) {
-                        Ok(cal) => {
-                            println!(
-                                "  Calibrator loaded: {} ({} breakpoints)",
-                                path.display(),
-                                cal.breakpoint_count()
-                            );
-                            mgr.with_calibrator(Arc::new(cal))
-                        }
-                        Err(e) => {
-                            println!("  [warn] calibrator parse failed: {e}");
-                            mgr
-                        }
-                    },
-                    Err(e) => {
-                        println!("  [warn] calibrator read failed: {e}");
-                        mgr
-                    }
-                }
-            } else {
-                println!("  [warn] calibrator not found at {}", path.display());
+                mgr.with_calibrator(Arc::new(cal))
+            }
+            None => {
+                println!("  [warn] calibrator parse failed at {}", path.display());
                 mgr
             }
         }
-        Ok(path) => {
-            let p = std::path::PathBuf::from(&path);
-            match std::fs::read_to_string(&p)
-                .ok()
-                .and_then(|j| serde_json::from_str::<IsotonicCalibrator>(&j).ok())
-            {
-                Some(cal) => {
-                    println!(
-                        "  Calibrator loaded: {} ({} breakpoints)",
-                        p.display(),
-                        cal.breakpoint_count()
-                    );
-                    mgr.with_calibrator(Arc::new(cal))
-                }
-                None => {
-                    println!("  [warn] could not load calibrator from {path}");
-                    mgr
-                }
-            }
-        }
-        Err(_) => mgr, // default: no calibrator (identity)
+    } else {
+        println!("  [info] no calibrator on disk, using identity");
+        mgr
     };
     let mgr = if let Some(aligner) = aligner {
         mgr.with_aligner(aligner)
@@ -282,20 +227,10 @@ async fn run_full_pipeline(
         mgr
     };
 
-    // Optional Nemotron reranker load.
-    //
-    // - `LUNE_RERANKER=0`        reranker off (default, generative LLM path)
-    // - `LUNE_RERANKER=1`        load from models/nemotron-rerank-1b/
-    // - `LUNE_RERANKER=<path>`   explicit model directory
-    let mgr = match std::env::var("LUNE_RERANKER") {
-        Ok(v) if v == "1" || v == "nemotron" => {
-            let path = std::path::PathBuf::from("models/nemotron-rerank-1b");
-            try_attach_reranker(mgr, path)
-        }
-        Ok(v) if v == "0" || v.is_empty() => mgr,
-        Ok(path) => try_attach_reranker(mgr, std::path::PathBuf::from(path)),
-        Err(_) => mgr,
-    };
+    // Always-on Nemotron reranker load. Looks in `./models/nemotron-rerank-1b/`
+    // by default. The reranker is the production correction path; if the
+    // model isn't present, the benchmark falls through to bare argmax.
+    let mgr = try_attach_reranker(mgr, std::path::PathBuf::from("models/nemotron-rerank-1b"));
 
     let (event_tx, mut event_rx) = mpsc::channel::<SessionEvent>(256);
 

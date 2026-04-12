@@ -45,10 +45,6 @@ cpal.workspace = true
 tempfile = "3.27.0"
 
 [[example]]
-name = "pipeline_stages"
-path = "../../benchmarks/pipeline_stages.rs"
-
-[[example]]
 name = "pipeline_real"
 path = "../../benchmarks/pipeline_real.rs"
 
