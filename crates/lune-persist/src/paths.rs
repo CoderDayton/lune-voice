@@ -113,10 +113,6 @@ mod tests {
             paths.calibrator_file("parakeet"),
             Path::new("/tmp/data/calibrator_parakeet.json")
         );
-        assert_eq!(
-            paths.calibrator_file("qwen"),
-            Path::new("/tmp/data/calibrator_qwen.json")
-        );
     }
 
     #[test]

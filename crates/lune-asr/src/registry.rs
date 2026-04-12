@@ -11,8 +11,6 @@ use lune_core::config::{AsrBackendConfig, DevicePolicy, PipelineConfig};
 use lune_core::error::{Error, Result};
 
 use crate::{OpenAiAsrConfig, OpenAiCompatibleAsrBackend, ParakeetTdtBackend, ParakeetTdtConfig};
-#[cfg(feature = "ort-qwen")]
-use crate::{OrtQwenAsrBackend, OrtQwenAsrConfig};
 
 // ── Dispatch helpers ────────────────────────────────────────────────────────
 
@@ -32,11 +30,6 @@ macro_rules! dispatch_ref {
                 AsrSessionHandle::Parakeet(s) => b.$method(s $(, $arg)*).await,
                 _ => Err(mismatch_err()),
             },
-            #[cfg(feature = "ort-qwen")]
-            AsrRegistry::OrtQwen(b) => match $session {
-                AsrSessionHandle::OrtQwen(s) => b.$method(s $(, $arg)*).await,
-                _ => Err(mismatch_err()),
-            },
             AsrRegistry::OpenAi(b) => match $session {
                 AsrSessionHandle::OpenAi(s) => b.$method(s $(, $arg)*).await,
                 _ => Err(mismatch_err()),
@@ -51,8 +44,6 @@ macro_rules! dispatch_ref {
 #[allow(clippy::large_enum_variant)]
 pub enum AsrRegistry {
     Parakeet(ParakeetTdtBackend),
-    #[cfg(feature = "ort-qwen")]
-    OrtQwen(OrtQwenAsrBackend),
     OpenAi(OpenAiCompatibleAsrBackend),
 }
 
@@ -60,8 +51,6 @@ pub enum AsrRegistry {
 #[allow(clippy::large_enum_variant)]
 pub enum AsrSessionHandle {
     Parakeet(<ParakeetTdtBackend as AsrBackend>::SessionHandle),
-    #[cfg(feature = "ort-qwen")]
-    OrtQwen(<OrtQwenAsrBackend as AsrBackend>::SessionHandle),
     OpenAi(<OpenAiCompatibleAsrBackend as AsrBackend>::SessionHandle),
 }
 
@@ -74,8 +63,6 @@ impl AsrBackend for AsrRegistry {
     async fn start_session(&self, config: AsrSessionConfig) -> Result<Self::SessionHandle> {
         match self {
             Self::Parakeet(b) => Ok(AsrSessionHandle::Parakeet(b.start_session(config).await?)),
-            #[cfg(feature = "ort-qwen")]
-            Self::OrtQwen(b) => Ok(AsrSessionHandle::OrtQwen(b.start_session(config).await?)),
             Self::OpenAi(b) => Ok(AsrSessionHandle::OpenAi(b.start_session(config).await?)),
         }
     }
@@ -100,11 +87,6 @@ impl AsrBackend for AsrRegistry {
                 AsrSessionHandle::Parakeet(s) => b.end_session(s).await,
                 _ => Err(mismatch_err()),
             },
-            #[cfg(feature = "ort-qwen")]
-            Self::OrtQwen(b) => match session {
-                AsrSessionHandle::OrtQwen(s) => b.end_session(s).await,
-                _ => Err(mismatch_err()),
-            },
             Self::OpenAi(b) => match session {
                 AsrSessionHandle::OpenAi(s) => b.end_session(s).await,
                 _ => Err(mismatch_err()),
@@ -119,8 +101,6 @@ impl AsrBackend for AsrRegistry {
     fn supports_streaming(&self) -> bool {
         match self {
             Self::Parakeet(_) => false,
-            #[cfg(feature = "ort-qwen")]
-            Self::OrtQwen(_) => true,
             Self::OpenAi(_) => false,
         }
     }
@@ -143,14 +123,6 @@ impl AsrRegistry {
                     use_gpu,
                 })?;
                 Ok(Self::Parakeet(backend))
-            }
-            #[cfg(feature = "ort-qwen")]
-            AsrBackendConfig::OrtQwenAsr { model_dir } => {
-                let backend = OrtQwenAsrBackend::new(OrtQwenAsrConfig {
-                    model_dir: model_dir.clone(),
-                    use_gpu,
-                })?;
-                Ok(Self::OrtQwen(backend))
             }
             AsrBackendConfig::OpenAiCompatible {
                 base_url,
@@ -176,8 +148,6 @@ impl AsrRegistry {
     pub fn kind(&self) -> AsrBackendKind {
         match self {
             Self::Parakeet(_) => AsrBackendKind::ParakeetTdt,
-            #[cfg(feature = "ort-qwen")]
-            Self::OrtQwen(_) => AsrBackendKind::OrtQwenAsr,
             Self::OpenAi(_) => AsrBackendKind::OpenAiCompatible,
         }
     }
@@ -211,25 +181,6 @@ impl AsrRegistry {
                 llm_skip_noisy_threshold: Some(0.30),
                 max_speech_samples: 60 * 16_000,
             },
-            #[cfg(feature = "ort-qwen")]
-            Self::OrtQwen(_) => PipelineConfig {
-                // Qwen3-ASR offline inference is whole-clip up to the export
-                // ceiling, not an 8s streaming-style decode loop.
-                max_segment_ms: 30_000,
-                sentence_close_ms: 800,
-                hard_close_ms: 2_000,
-                speech_threshold: 0.5,
-                min_speech_ms: 150,
-                adaptive_vad: false,
-                // Qwen is even more concentrated in [0.9, 1.0) (93% of
-                // tokens per fixture calibration data). Same calibrated
-                // thresholds as Parakeet — raising them gets the LLM
-                // corrector off the sidelines on genuinely noisy audio.
-                word_confidence_threshold: Some(0.85),
-                llm_skip_threshold: Some(0.95),
-                llm_skip_noisy_threshold: Some(0.30),
-                max_speech_samples: 60 * 16_000,
-            },
             Self::OpenAi(_) => PipelineConfig {
                 max_segment_ms: 30_000,
                 sentence_close_ms: 800,
@@ -247,11 +198,10 @@ impl AsrRegistry {
         }
     }
 
-    /// Returns `true` if this registry holds an OrtQwen backend.
-    #[cfg(feature = "ort-qwen")]
-    pub fn as_ort_qwen(&self) -> Option<&OrtQwenAsrBackend> {
+    /// Returns a reference to the Parakeet backend if this registry contains one.
+    pub fn as_parakeet(&self) -> Option<&ParakeetTdtBackend> {
         match self {
-            Self::OrtQwen(b) => Some(b),
+            Self::Parakeet(b) => Some(b),
             _ => None,
         }
     }

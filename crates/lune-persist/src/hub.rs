@@ -48,8 +48,6 @@ pub struct DownloadProgress {
 pub struct ResolvedModels {
     /// Parakeet TDT model directory.
     pub asr_model_dir: PathBuf,
-    /// Qwen3-ASR ONNX model directory (for ORT backend).
-    pub ort_qwen_asr_model_dir: PathBuf,
     /// LLM GGUF model file path.
     pub llm_model_path: PathBuf,
     /// Optional forced-aligner model directory.
@@ -72,22 +70,6 @@ impl ModelSpec {
         }
     }
 
-    /// Qwen3-ASR 0.6B ONNX: encoder, embed_tokens, decoder models + tokenizer.
-    #[inline]
-    pub fn qwen3_asr_onnx() -> Self {
-        Self::Directory {
-            repo_id: "lune-voice/qwen3-asr-0.6b-onnx".into(),
-            required_files: vec![
-                "qwen3-asr-encoder.onnx".into(),
-                "qwen3-asr-decoder.onnx".into(),
-                "qwen3-asr-embed-tokens.onnx".into(),
-                "tokenizer.json".into(),
-            ],
-            suffix_patterns: vec![".onnx".into()],
-            local_name: "qwen3-asr-0.6b-onnx".into(),
-        }
-    }
-
     /// LLM corrector GGUF model (Qwen2.5-1.5B-Instruct Q4_K_M).
     #[inline]
     pub fn llm_corrector() -> Self {
@@ -104,7 +86,6 @@ impl ModelSpec {
         match self {
             Self::Directory { local_name, .. } => match local_name.as_str() {
                 "parakeet-tdt-0.6b" => "Parakeet TDT 0.6B",
-                "qwen3-asr-0.6b-onnx" => "Qwen3 ASR 0.6B",
                 "qwen2.5-1.5b-instruct-gguf" => "Qwen2.5 1.5B LLM",
                 _ => local_name,
             },
@@ -149,7 +130,6 @@ pub fn check_model_status(
 
     let asr_spec = match asr_backend {
         AsrBackendConfig::ParakeetTdt { .. } => Some(ModelSpec::parakeet_tdt()),
-        AsrBackendConfig::OrtQwenAsr { .. } => Some(ModelSpec::qwen3_asr_onnx()),
         _ => None,
     };
 
@@ -187,7 +167,6 @@ pub fn download_model(
 ) -> PersistResult<PathBuf> {
     let spec = match local_name {
         "parakeet-tdt-0.6b" => ModelSpec::parakeet_tdt(),
-        "qwen3-asr-0.6b-onnx" => ModelSpec::qwen3_asr_onnx(),
         "qwen2.5-1.5b-instruct-gguf" => ModelSpec::llm_corrector(),
         _ => {
             return Err(PersistError::ModelDownload(format!(
@@ -371,27 +350,14 @@ fn link_or_copy(src: &Path, dst: &Path) -> std::io::Result<()> {
 /// ```
 pub fn ensure_default_models(
     models_dir: &Path,
-    asr_backend: &AsrBackendConfig,
+    _asr_backend: &AsrBackendConfig,
     llm_backend: &lune_core::config::LlmBackendConfig,
     aligner: Option<&AlignerConfig>,
 ) -> PersistResult<ResolvedModels> {
     let hub_cache = models_dir.join(".hub-cache");
     let hub = ModelHub::new(&hub_cache)?;
 
-    let parakeet_dir = models_dir.join("parakeet-tdt-0.6b");
-    let ort_qwen_asr_dir = models_dir.join("qwen3-asr-0.6b-onnx");
-
-    let (asr_model_dir, ort_qwen_asr_model_dir) = match asr_backend {
-        AsrBackendConfig::ParakeetTdt { .. } => (
-            ensure_directory_model(&hub, &ModelSpec::parakeet_tdt(), models_dir)?,
-            ort_qwen_asr_dir,
-        ),
-        AsrBackendConfig::OrtQwenAsr { .. } => (
-            parakeet_dir,
-            ensure_directory_model(&hub, &ModelSpec::qwen3_asr_onnx(), models_dir)?,
-        ),
-        _ => (parakeet_dir, ort_qwen_asr_dir),
-    };
+    let asr_model_dir = ensure_directory_model(&hub, &ModelSpec::parakeet_tdt(), models_dir)?;
 
     let llm_model_path = match llm_backend {
         lune_core::config::LlmBackendConfig::LlamaCppLocal { .. } => {
@@ -405,7 +371,6 @@ pub fn ensure_default_models(
 
     Ok(ResolvedModels {
         asr_model_dir,
-        ort_qwen_asr_model_dir,
         llm_model_path,
         aligner_model_dir,
     })
@@ -511,9 +476,6 @@ pub fn resolve_local_model_paths(
         AsrBackendConfig::ParakeetTdt { model_dir } if model_dir.as_os_str().is_empty() => {
             *model_dir = models_dir.join("parakeet-tdt-0.6b");
         }
-        AsrBackendConfig::OrtQwenAsr { model_dir } if model_dir.as_os_str().is_empty() => {
-            *model_dir = models_dir.join("qwen3-asr-0.6b-onnx");
-        }
         _ => {}
     }
 
@@ -525,12 +487,11 @@ pub fn resolve_local_model_paths(
         }
         _ => {}
     }
-
-    if let Some(aligner) = &mut settings.aligner
-        && aligner.enabled
-        && aligner.model_dir.as_os_str().is_empty()
-    {
-        aligner.model_dir = models_dir.join("wav2vec2-fa");
+    if let Some(mut aligner_cfg) = settings.aligner.take() {
+        if aligner_cfg.enabled && aligner_cfg.model_dir.as_os_str().is_empty() {
+            aligner_cfg.model_dir = models_dir.join("wav2vec2-fa");
+        }
+        settings.aligner = Some(aligner_cfg);
     }
 }
 

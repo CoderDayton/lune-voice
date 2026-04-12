@@ -642,20 +642,11 @@ fn init_ort_runtime() {
 }
 
 fn build_aligner(
-    asr: &AsrRegistry,
-    settings: &UserSettings,
+    _asr: &AsrRegistry,
+    _settings: &UserSettings,
 ) -> Result<Option<Arc<OrtForcedAligner>>, String> {
-    match (&settings.aligner, asr.as_ort_qwen()) {
-        (Some(cfg), Some(backend)) if cfg.enabled => backend
-            .make_forced_aligner(&cfg.model_dir)
-            .map(|aligner| {
-                let aligner = Arc::new(aligner);
-                backend.attach_aligner(Arc::clone(&aligner));
-                Some(aligner)
-            })
-            .map_err(|e| format!("build forced aligner: {e}")),
-        _ => Ok(None),
-    }
+    // Forced aligner was OrtQwen-specific. Parakeet provides native timestamps.
+    Ok(None)
 }
 
 async fn build_post_processor(

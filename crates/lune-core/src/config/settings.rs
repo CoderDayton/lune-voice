@@ -91,8 +91,8 @@ impl Default for UserSettings {
     fn default() -> Self {
         Self {
             device: DevicePolicy::Auto,
-            asr_backend: AsrBackendConfig::OrtQwenAsr {
-                model_dir: PathBuf::new(),
+            asr_backend: AsrBackendConfig::ParakeetTdt {
+                model_dir: PathBuf::from("models/parakeet-tdt-0.6b"),
             },
             llm_backend: LlmBackendConfig::LlamaCppLocal {
                 model_path: PathBuf::new(),
@@ -126,9 +126,6 @@ impl Default for UserSettings {
 #[non_exhaustive]
 pub enum AsrBackendConfig {
     ParakeetTdt {
-        model_dir: PathBuf,
-    },
-    OrtQwenAsr {
         model_dir: PathBuf,
     },
     OpenAiCompatible {

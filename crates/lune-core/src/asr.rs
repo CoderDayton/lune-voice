@@ -7,7 +7,7 @@ use crate::Result;
 /// `alternates` is a (possibly empty) ordered list of runner-up words
 /// produced by backends that expose top-K decoding (e.g. Parakeet TDT via
 /// subword swap). Each entry differs from `word` by exactly one subword.
-/// Backends without top-K capability (`OrtQwen`, `OpenAi`) leave the vec
+/// Backends without top-K capability (`OpenAi`) leave the vec
 /// empty and the legacy `[?word?]` marker is emitted by `mark_uncertain`.
 ///
 /// Confidence is on the calibrated `P(correct | raw)` scale after the
@@ -467,20 +467,17 @@ impl Default for AsrSessionConfig {
 #[non_exhaustive]
 pub enum AsrBackendKind {
     ParakeetTdt,
-    #[serde(alias = "QwenAsr")]
-    OrtQwenAsr,
     OpenAiCompatible,
 }
 
 impl AsrBackendKind {
     /// Recommended `max_segment_ms` for the VadSegmenter.
     ///
-    /// All backends handle long audio natively (OrtQwen uses windowed
-    /// attention internally). This is a safety ceiling, not an encoder limit.
+    /// All backends handle long audio natively. This is a safety ceiling,
+    /// not an encoder limit.
     #[deprecated(note = "use AsrRegistry::pipeline_config().max_segment_ms instead")]
     pub fn suggested_max_segment_ms(&self) -> u32 {
         match self {
-            Self::OrtQwenAsr => 30_000,
             Self::ParakeetTdt => 30_000,
             Self::OpenAiCompatible => 30_000,
         }
@@ -496,7 +493,6 @@ impl AsrBackendKind {
     pub fn slug(&self) -> &'static str {
         match self {
             Self::ParakeetTdt => "parakeet",
-            Self::OrtQwenAsr => "qwen",
             Self::OpenAiCompatible => "openai",
         }
     }

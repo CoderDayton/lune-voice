@@ -38,7 +38,7 @@ impl Default for SessionManagerConfig {
     fn default() -> Self {
         Self {
             asr_config: AsrSessionConfig::default(),
-            asr_backend_kind: AsrBackendKind::OrtQwenAsr,
+            asr_backend_kind: AsrBackendKind::ParakeetTdt,
             pipeline: PipelineConfig::default(),
         }
     }

@@ -47,9 +47,7 @@ pub fn patch_model_paths(settings: &mut UserSettings, resolved: &ResolvedModels)
         AsrBackendConfig::ParakeetTdt { model_dir, .. } if model_dir.as_os_str().is_empty() => {
             resolved.asr_model_dir.clone_into(model_dir);
         }
-        AsrBackendConfig::OrtQwenAsr { model_dir, .. } if model_dir.as_os_str().is_empty() => {
-            resolved.ort_qwen_asr_model_dir.clone_into(model_dir);
-        }
+
         _ => {}
     }
 

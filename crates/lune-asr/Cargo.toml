@@ -5,9 +5,8 @@ edition.workspace = true
 license.workspace = true
 
 [features]
-default = ["ort-qwen"]
+default = []
 cuda = ["ort/cuda"]
-ort-qwen = []
 
 [dependencies]
 async-trait.workspace = true

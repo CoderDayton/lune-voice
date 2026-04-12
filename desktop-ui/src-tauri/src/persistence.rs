@@ -343,9 +343,8 @@ fn resolve_device_policy(use_gpu: bool, policy: DevicePolicyDto) -> DevicePolicy
 fn asr_backend_type_to_dto(config: &AsrBackendConfig) -> AsrBackendTypeDto {
     match config {
         AsrBackendConfig::ParakeetTdt { .. } => AsrBackendTypeDto::ParakeetTdt,
-        AsrBackendConfig::OrtQwenAsr { .. } => AsrBackendTypeDto::OrtQwenAsr,
         AsrBackendConfig::OpenAiCompatible { .. } => AsrBackendTypeDto::OpenAiCompatible,
-        _ => AsrBackendTypeDto::OrtQwenAsr,
+        _ => AsrBackendTypeDto::ParakeetTdt,
     }
 }
 
@@ -382,9 +381,6 @@ fn asr_backend_from_type(
     Ok(match kind {
         AsrBackendTypeDto::ParakeetTdt => AsrBackendConfig::ParakeetTdt {
             model_dir: current_parakeet_model_dir(current),
-        },
-        AsrBackendTypeDto::OrtQwenAsr => AsrBackendConfig::OrtQwenAsr {
-            model_dir: current_qwen_model_dir(current),
         },
         AsrBackendTypeDto::OpenAiCompatible => {
             // Prefer incoming DTO fields; fall back to current config values if already OpenAI.
@@ -495,13 +491,6 @@ fn validate_api_url(url: &url::Url, field: &str) -> Result<(), String> {
 fn current_parakeet_model_dir(current: &AsrBackendConfig) -> PathBuf {
     match current {
         AsrBackendConfig::ParakeetTdt { model_dir } => model_dir.clone(),
-        _ => PathBuf::new(),
-    }
-}
-
-fn current_qwen_model_dir(current: &AsrBackendConfig) -> PathBuf {
-    match current {
-        AsrBackendConfig::OrtQwenAsr { model_dir } => model_dir.clone(),
         _ => PathBuf::new(),
     }
 }

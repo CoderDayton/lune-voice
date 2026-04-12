@@ -1,6 +1,6 @@
 //! LCS-based overlap stitching for chunked ASR transcripts.
 //!
-//! Shared between OrtQwen and Parakeet backends for merging overlapping
+//! Used by the Parakeet backend for merging overlapping
 //! audio chunk transcriptions at word boundaries.
 //!
 //! Operates on [`WordConfidence`] pairs rather than bare strings so that

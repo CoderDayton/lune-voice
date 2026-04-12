@@ -71,62 +71,16 @@ dynamic_silence = true
 # ── ASR backend ───────────────────────────────────────────────────────────────
 #
 # Supported types:
-#   "OrtQwenAsr"         — Qwen3-ASR-0.6B via ONNX Runtime. (default, local)
+#   "ParakeetTdt"        — Parakeet-TDT-0.6B-v3 via ONNX Runtime. (default, local)
 #   "OpenAiCompatible"   — Remote Whisper-compatible HTTP endpoint.
 #
 [asr_backend]
-type = "OrtQwenAsr"
+type = "ParakeetTdt"
 
 # Absolute path to the model directory containing:
-#   qwen3-asr-encoder.onnx, qwen3-asr-embed-tokens.onnx,
-#   qwen3-asr-decoder.onnx, tokenizer.json
+#   encoder-model.int8.onnx, decoder_joint-model.int8.onnx, vocab.txt
 # Leave empty to use the auto-downloaded path from lune-persist hub.
 model_dir = ""
-
-# Audio fed to the encoder per streaming step (seconds).
-# Smaller = lower latency, more encoder calls. Range: 0.5–2.0.
-stream_chunk_sec = 1.0
-
-# Tokens discarded at chunk boundaries for word-boundary stability.
-# Higher = more stable text, slightly higher latency. Range: 0–5.
-stream_rollback = 3
-
-# Chunks treated as "unfixed" (speculative) before text is committed.
-# Set to 0 for single-pass batch mode. Range: 0–4.
-stream_unfixed_chunks = 2
-
-# Maximum new tokens the decoder may generate per streaming step.
-stream_max_new_tokens = 48
-
-# Condition each chunk on previously committed text for cross-chunk coherence.
-# Disable only if the model re-transcribes earlier audio.
-past_text_conditioning = true
-
-# Hard cap on the encoder audio window (seconds).
-# Keep ≤ 8.0 — the model was fine-tuned on short clips; longer windows cause
-# second-half hallucinations.
-max_encoder_sec = 8.0
-
-
-# ── LLM post-processor ────────────────────────────────────────────────────────
-#
-# Supported types:
-#   "OrtLocal"           — Qwen3-0.6B INT4 via ONNX Runtime. (default, local)
-#   "OpenAiCompatible"   — Remote OpenAI-compatible HTTP endpoint.
-#
-[llm_backend]
-type = "OrtLocal"
-
-# Absolute path to the model directory containing:
-#   qwen3-0.6b-decoder.onnx, qwen3-0.6b-embed-tokens.onnx, tokenizer.json
-# Leave empty to use the auto-downloaded path from lune-persist hub.
-model_dir = ""
-
-# KV-cache context window (tokens). Larger = can handle longer inputs.
-n_ctx = 2048
-
-# Maximum tokens generated per LLM call.
-max_output_tokens = 256
 
 # Sampling temperature. 0.0 = greedy (deterministic, fastest).
 temperature = 0.0

@@ -2,7 +2,7 @@
 //!
 //! Run: cargo run --release --example pipeline_real -p lune-app
 //! GPU: cargo run --release --features cuda --example pipeline_real -p lune-app
-//! Force backend: cargo run --release --example pipeline_real -p lune-app -- --asr qwen
+//! Force backend: cargo run --release --example pipeline_real -p lune-app -- --asr parakeet
 //!
 //! Unlike `pipeline_stages` (which calls stages individually), this feeds
 //! audio through `SessionManager::start_with_audio()` and measures wall-time

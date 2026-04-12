@@ -91,9 +91,7 @@ fn run_daemon() {
         lune_core::config::AsrBackendConfig::ParakeetTdt { model_dir, .. } => {
             ("ParakeetTdt", model_dir.display().to_string())
         }
-        lune_core::config::AsrBackendConfig::OrtQwenAsr { model_dir, .. } => {
-            ("OrtQwenAsr", model_dir.display().to_string())
-        }
+
         lune_core::config::AsrBackendConfig::OpenAiCompatible { .. } => {
             ("OpenAiCompatible", "<remote>".into())
         }
@@ -234,27 +232,9 @@ async fn run_pipeline(
     tracing::info!("LLM post-processor ready");
     let router = Arc::new(lune_commands::VoiceCommandRouter::new());
 
-    let aligner = match (&snap.aligner, asr.as_ort_qwen()) {
-        (Some(cfg), Some(backend)) if cfg.enabled => {
-            match backend.make_forced_aligner(&cfg.model_dir) {
-                Ok(aligner) => {
-                    let fa = std::sync::Arc::new(aligner);
-                    // Attach to ASR backend for timestamp-based chunk merging.
-                    backend.attach_aligner(std::sync::Arc::clone(&fa));
-                    Some(fa)
-                }
-                Err(e) => {
-                    tracing::warn!(error = %e, model_dir = %cfg.model_dir.display(), "failed to build forced aligner, continuing without it");
-                    None
-                }
-            }
-        }
-        (Some(cfg), None) if cfg.enabled => {
-            tracing::warn!("forced aligner requires OrtQwen ASR backend; skipping");
-            None
-        }
-        _ => None,
-    };
+    // Forced aligner was OrtQwen-specific and has been removed.
+    // Parakeet provides native timestamps without a separate aligner.
+    let aligner: Option<std::sync::Arc<lune_asr::OrtForcedAligner>> = None;
 
     let dict_db = lune_persist::Database::open(&db_path).expect("open dict database");
     let dict = Arc::new(tokio::sync::Mutex::new(
@@ -283,33 +263,11 @@ async fn run_pipeline(
     )
     .with_vad_state_path(vad_state_path.clone());
 
-    // Load the isotonic confidence calibrator for the active ASR backend.
-    //
-    // Each backend has its own raw-softmax distribution (Parakeet clusters
-    // in [0.9, 1.0); Qwen even more so) so a shared calibrator would be
-    // wrong for the non-chosen backend. Prefer the per-backend file
-    // `calibrator_{slug}.json`; fall back to the legacy unprefixed
-    // `calibrator.json` for installations created before this change.
-    //
-    // Missing/corrupt files at both locations fall through to identity
-    // (behaviour unchanged from raw softmax).
+    // Load the per-backend confidence calibrator if available.
+    // Missing/corrupt files fall through to identity (raw softmax).
     if let Some(data_dir) = vad_state_path.parent() {
         let kind_slug = asr_kind.slug();
-        let per_backend_path = data_dir.join(format!("calibrator_{kind_slug}.json"));
-        let legacy_path = data_dir.join("calibrator.json");
-        let calibrator_path = if per_backend_path.exists() {
-            per_backend_path
-        } else if legacy_path.exists() {
-            tracing::warn!(
-                path = %legacy_path.display(),
-                backend = kind_slug,
-                "using legacy unprefixed calibrator.json; retrain via \
-                 `calibrate_confidence` to produce a per-backend file"
-            );
-            legacy_path
-        } else {
-            per_backend_path // non-existent — falls back to identity
-        };
+        let calibrator_path = data_dir.join(format!("calibrator_{kind_slug}.json"));
         manager = manager.with_calibrator_path(calibrator_path);
     }
 

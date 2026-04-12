@@ -316,7 +316,7 @@ mod tests {
 
     #[test]
     fn default_has_skip_threshold_at_0_95() {
-        // Matches the per-backend registry overrides for Parakeet/OrtQwen.
+        // Matches the per-backend registry overrides for Parakeet.
         let cfg = PipelineConfig::default();
         assert_eq!(cfg.llm_skip_threshold, Some(0.95));
         assert_eq!(cfg.word_confidence_threshold, Some(0.85));

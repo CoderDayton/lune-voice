@@ -67,14 +67,12 @@ pub fn process_memory_usage() -> Option<MemoryUsage> {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BenchmarkAsr {
     Parakeet,
-    Qwen,
 }
 
 impl BenchmarkAsr {
     fn parse(raw: &str) -> Option<Self> {
         match raw.trim().to_ascii_lowercase().as_str() {
             "parakeet" | "parakeet-tdt" => Some(Self::Parakeet),
-            "qwen" | "ortqwen" | "ort-qwen" | "qwen3-asr" => Some(Self::Qwen),
             _ => None,
         }
     }
@@ -92,7 +90,7 @@ pub fn requested_benchmark_asr() -> Option<BenchmarkAsr> {
         if let Some(choice) = BenchmarkAsr::parse(&raw) {
             return Some(choice);
         }
-        eprintln!("  [warn] Ignoring unsupported ASR={raw:?}; expected qwen or parakeet");
+        eprintln!("  [warn] Ignoring unsupported ASR={raw:?}; expected parakeet");
     }
 
     let mut args = std::env::args().skip(1);
@@ -101,7 +99,7 @@ pub fn requested_benchmark_asr() -> Option<BenchmarkAsr> {
             if let Some(choice) = BenchmarkAsr::parse(value) {
                 return Some(choice);
             }
-            eprintln!("  [warn] Ignoring unsupported --asr={value:?}; expected qwen or parakeet");
+            eprintln!("  [warn] Ignoring unsupported --asr={value:?}; expected parakeet");
             return None;
         }
         if arg == "--asr" {
@@ -109,11 +107,9 @@ pub fn requested_benchmark_asr() -> Option<BenchmarkAsr> {
                 if let Some(choice) = BenchmarkAsr::parse(&value) {
                     return Some(choice);
                 }
-                eprintln!(
-                    "  [warn] Ignoring unsupported --asr {value:?}; expected qwen or parakeet"
-                );
+                eprintln!("  [warn] Ignoring unsupported --asr {value:?}; expected parakeet");
             } else {
-                eprintln!("  [warn] Ignoring bare --asr; expected qwen or parakeet");
+                eprintln!("  [warn] Ignoring bare --asr; expected parakeet");
             }
             return None;
         }
@@ -123,50 +119,18 @@ pub fn requested_benchmark_asr() -> Option<BenchmarkAsr> {
 }
 
 pub fn benchmark_asr_entries(root: &std::path::Path) -> Vec<BenchmarkAsrEntry> {
-    let requested = requested_benchmark_asr();
     let parakeet_dir = root.join("models/parakeet-tdt-0.6b");
-    let qwen_dir = root.join("models/qwen3-asr-0.6b-onnx");
 
     let mut entries = Vec::new();
-
-    let push_if_selected = |entries: &mut Vec<BenchmarkAsrEntry>,
-                            choice: BenchmarkAsr,
-                            present: bool,
-                            entry: BenchmarkAsrEntry| {
-        if !present {
-            return;
-        }
-        if requested.is_none() || requested == Some(choice) {
-            entries.push(entry);
-        }
-    };
-
-    push_if_selected(
-        &mut entries,
-        BenchmarkAsr::Parakeet,
-        parakeet_dir.exists(),
-        BenchmarkAsrEntry {
+    if parakeet_dir.exists() {
+        entries.push(BenchmarkAsrEntry {
             display_name: "Parakeet-TDT-int8",
             backend_kind: AsrBackendKind::ParakeetTdt,
             config: AsrBackendConfig::ParakeetTdt {
                 model_dir: parakeet_dir,
             },
-        },
-    );
-
-    push_if_selected(
-        &mut entries,
-        BenchmarkAsr::Qwen,
-        qwen_dir.exists(),
-        BenchmarkAsrEntry {
-            display_name: "OrtQwen-INT4-batch",
-            backend_kind: AsrBackendKind::OrtQwenAsr,
-            config: AsrBackendConfig::OrtQwenAsr {
-                model_dir: qwen_dir,
-            },
-        },
-    );
-
+        });
+    }
     entries
 }
 
@@ -202,44 +166,10 @@ pub fn benchmark_aligner_enabled() -> bool {
         .unwrap_or(false)
 }
 
-pub fn benchmark_aligner(asr: &AsrRegistry, root: &Path) -> Option<Arc<OrtForcedAligner>> {
-    if !benchmark_aligner_enabled() {
-        return None;
-    }
-
-    let backend = asr.as_ort_qwen()?;
-
-    let fa_dir = root.join("models/wav2vec2-fa");
-    let fa_model = fa_dir.join("model.onnx");
-    let fa_config = fa_dir.join("fa_config.json");
-
-    if !fa_model.exists() || !fa_config.exists() {
-        eprintln!(
-            "  [warn] ALIGNER enabled but {} is missing model.onnx/fa_config.json; skipping",
-            fa_dir.display()
-        );
-        return None;
-    }
-
-    match backend.make_forced_aligner(&fa_dir) {
-        Ok(fa) => {
-            let fa = Arc::new(fa);
-            backend.attach_aligner(Arc::clone(&fa));
-            println!("  Forced aligner: attached ({})", fa_dir.display());
-            Some(fa)
-        }
-        Err(error) => {
-            eprintln!(
-                "  [warn] forced aligner load failed at {}: {error}",
-                fa_dir.display()
-            );
-            None
-        }
-    }
-}
-
-pub fn maybe_attach_benchmark_aligner(asr: &AsrRegistry, root: &Path) {
-    let _ = benchmark_aligner(asr, root);
+pub fn benchmark_aligner(_asr: &AsrRegistry, _root: &Path) -> Option<Arc<OrtForcedAligner>> {
+    // Forced aligner was OrtQwen-specific. With Parakeet as the sole
+    // backend, native timestamps are used instead.
+    None
 }
 
 /// Names that must come first when present, in this order. Everything else
