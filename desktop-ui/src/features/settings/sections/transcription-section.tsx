@@ -12,7 +12,7 @@ export function TranscriptionSection({ settings }: SettingsProps) {
     <SettingsSection title="Recognition" description={t`Control how your speech is turned into text.`} icon={AudioWaveform}>
       <SettingsRow
         label={t`Voice model`}
-        description={t`Qwen3 is more accurate. Parakeet is faster and uses less memory.`}
+        description={t`Parakeet TDT v3 runs locally with automatic language detection (25 languages).`}
         control={
           <select
             className="select w-full sm:w-auto sm:min-w-64"

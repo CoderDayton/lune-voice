@@ -66,7 +66,7 @@ export interface WorkspaceState {
 
 export const DEFAULT_SETTINGS: WorkspaceSettings = {
   activationMode: "Toggle",
-  asrBackend: "OrtQwenAsr",
+  asrBackend: "ParakeetTdt",
   useGpu: true,
   devicePolicy: "Auto",
   confidenceThreshold: "0.50",

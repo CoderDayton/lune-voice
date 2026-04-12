@@ -75,10 +75,10 @@ export function InputSection({ settings }: SettingsProps) {
       />
       <SettingsRow
         label={t`Language`}
-        description={isParakeet ? t`English only — Parakeet ASR does not support other languages.` : t`Select the language for voice recognition.`}
+        description={isParakeet ? t`Parakeet v3 detects language automatically (25 European languages).` : t`Select the language for voice recognition.`}
         control={
           isParakeet ? (
-            <span className="badge badge-outline badge-sm">{t`English`}</span>
+            <span className="badge badge-outline badge-sm">{t`Auto-detect`}</span>
           ) : (
             <select
               className="select w-full sm:w-auto sm:min-w-52"

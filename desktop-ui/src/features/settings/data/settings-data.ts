@@ -1,6 +1,6 @@
 export type ActivationModeValue = "Toggle" | "Hold";
-export type AsrBackendValue = "OrtQwenAsr" | "ParakeetTdt" | "OpenAiCompatible";
-export type LlmBackendValue = "LlamaCppLocal" | "OpenAiCompatible";
+export type AsrBackendValue = "ParakeetTdt" | "OpenAiCompatible";
+export type LlmBackendValue = "LlamaCppLocal" | "OpenAiCompatible"; // LlamaCppLocal is a no-op passthrough; kept for config compat
 export type DictationModeValue = "TypeInPlace" | "Clipboard" | "Both";
 export type PillVisibilityValue = "Always" | "WhenDictating" | "Never";
 
@@ -21,8 +21,7 @@ export const pillVisibilityOptions: Option<PillVisibilityValue>[] = [
 ];
 
 export const asrBackends: Option<AsrBackendValue>[] = [
-  { value: "OrtQwenAsr", label: "Qwen3 ASR 0.6B (recommended)" },
-  { value: "ParakeetTdt", label: "Parakeet TDT 0.6B (fast)" },
+  { value: "ParakeetTdt", label: "Parakeet TDT v3 (local, multilingual)" },
   { value: "OpenAiCompatible", label: "Cloud API (OpenAI-compatible)" },
 ];
 
