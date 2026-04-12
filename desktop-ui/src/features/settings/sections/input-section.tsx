@@ -73,13 +73,11 @@ export function InputSection({ settings }: SettingsProps) {
           </div>
         }
       />
-      <SettingsRow
-        label={t`Language`}
-        description={isParakeet ? t`Parakeet v3 detects language automatically (25 European languages).` : t`Select the language for voice recognition.`}
-        control={
-          isParakeet ? (
-            <span className="badge badge-outline badge-sm">{t`Auto-detect`}</span>
-          ) : (
+      {!isParakeet && (
+        <SettingsRow
+          label={t`Language`}
+          description={t`Select the language for voice recognition.`}
+          control={
             <select
               className="select w-full sm:w-auto sm:min-w-52"
               value={settings.language}
@@ -91,9 +89,9 @@ export function InputSection({ settings }: SettingsProps) {
                 </option>
               ))}
             </select>
-          )
-        }
-      />
+          }
+        />
+      )}
     </SettingsSection>
   );
 }
