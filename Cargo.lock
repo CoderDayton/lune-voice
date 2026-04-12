@@ -3022,6 +3022,7 @@ dependencies = [
  "lune-core",
  "regex",
  "serde_json",
+ "text-processing-rs",
  "tokio",
  "tracing",
 ]
@@ -5941,6 +5942,15 @@ dependencies = [
  "futf",
  "mac",
  "utf-8",
+]
+
+[[package]]
+name = "text-processing-rs"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4c08f01a1e322ef3d9c19bf844ec052b0a2622acd08abe4d692782ce71e3e28a"
+dependencies = [
+ "lazy_static",
 ]
 
 [[package]]

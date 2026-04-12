@@ -729,8 +729,13 @@ async fn run_session<A: AsrBackend + 'static>(
                                     if !llm_enabled {
                                         let new_text = raw_text[prev_text_len..].trim_start();
                                         if !new_text.is_empty() {
+                                            let delivered = if config.pipeline.itn_enabled {
+                                                lune_llm::itn::normalize(new_text)
+                                            } else {
+                                                new_text.to_owned()
+                                            };
                                             let _ = event_tx.try_send(
-                                                SessionEvent::FinalizedText(new_text.to_owned()),
+                                                SessionEvent::FinalizedText(delivered),
                                             );
                                             progressively_delivered = true;
                                         }
@@ -1152,7 +1157,14 @@ async fn run_session<A: AsrBackend + 'static>(
 
     let final_text = {
         let guard = dict.lock().await;
-        guard.apply(&post_llm_text)
+        let dict_applied = guard.apply(&post_llm_text);
+        // Inverse Text Normalization: convert spoken-form numbers, dates,
+        // currency etc. to written form ("two hundred" → "200").
+        if config.pipeline.itn_enabled {
+            lune_llm::itn::normalize(&dict_applied)
+        } else {
+            dict_applied
+        }
     };
 
     // When we already delivered text progressively per-segment (LLM off),

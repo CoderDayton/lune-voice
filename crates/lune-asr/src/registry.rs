@@ -166,6 +166,7 @@ impl AsrRegistry {
                 speech_threshold: 0.5,
                 min_speech_ms: 150,
                 adaptive_vad: false,
+                itn_enabled: true,
                 // Thresholds are interpreted on the CALIBRATED probability
                 // scale (P(correct | raw)) after SessionManager runs the
                 // isotonic calibrator. Parakeet's raw softmax concentrates
@@ -188,6 +189,7 @@ impl AsrRegistry {
                 speech_threshold: 0.5,
                 min_speech_ms: 200,
                 adaptive_vad: false,
+                itn_enabled: true,
                 // No per-token log-probs from remote API — disable all
                 // confidence-based gating.
                 word_confidence_threshold: None,

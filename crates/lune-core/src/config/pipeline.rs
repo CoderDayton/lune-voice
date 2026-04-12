@@ -102,6 +102,20 @@ pub struct PipelineConfig {
     /// Only VAD-detected speech counts — silence/thinking pauses are
     /// excluded. At 16 kHz, 960_000 = 60 seconds.
     pub max_speech_samples: usize,
+
+    // ── Post-processing ───────────────────────────────────────────────
+    /// Enable Inverse Text Normalization (ITN) on the final transcript.
+    ///
+    /// Converts spoken-form numbers, dates, and currency to written form
+    /// ("two hundred" → "200", "january fifth" → "January 5"). Enabled
+    /// by default for production use; disable in benchmarks where the
+    /// reference text uses spelled-out numbers.
+    #[serde(default = "default_itn_enabled")]
+    pub itn_enabled: bool,
+}
+
+fn default_itn_enabled() -> bool {
+    true
 }
 
 impl PipelineConfig {
@@ -206,6 +220,7 @@ impl Default for PipelineConfig {
             llm_skip_threshold: Some(0.95),
             llm_skip_noisy_threshold: Some(0.30),
             max_speech_samples: 60 * 16_000,
+            itn_enabled: true,
         }
     }
 }

@@ -104,7 +104,12 @@ fn main() {
         println!();
 
         // Optional marking/skip threshold overrides for ablation runs.
+        // ITN is disabled by default in benchmarks because reference texts
+        // use spelled-out numbers. Set LUNE_ITN=1 to enable.
         let mut pipeline = asr.pipeline_config();
+        pipeline.itn_enabled = std::env::var("LUNE_ITN")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
         if let Ok(v) = std::env::var("LUNE_MARK_THRESHOLD")
             && let Ok(f) = v.parse::<f32>()
         {
