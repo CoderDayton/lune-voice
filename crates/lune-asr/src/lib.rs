@@ -2,6 +2,7 @@ pub mod confidence;
 pub mod confidence_calibrator;
 mod lcs_merge;
 pub mod mel;
+mod nemotron_reranker;
 mod openai_backend;
 #[cfg(feature = "ort-qwen")]
 mod ort_forced_aligner;
@@ -17,6 +18,7 @@ mod vocab;
 
 pub use confidence_calibrator::IsotonicCalibrator;
 pub use mel::extract_features;
+pub use nemotron_reranker::{NemotronReranker, NemotronRerankerConfig};
 pub use openai_backend::{OpenAiAsrConfig, OpenAiCompatibleAsrBackend, encode_wav_16bit};
 #[cfg(feature = "ort-qwen")]
 pub use ort_forced_aligner::{OrtForcedAligner, WordTimestamp};

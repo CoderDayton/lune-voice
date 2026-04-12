@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::Utc;
-use lune_asr::{IsotonicCalibrator, OrtForcedAligner};
+use lune_asr::{IsotonicCalibrator, NemotronReranker, OrtForcedAligner};
 use tokio::sync::Notify;
 use tokio::sync::{Mutex, RwLock, mpsc};
 use tracing::{debug, info, warn};
@@ -80,6 +80,11 @@ pub struct SessionManager<A: AsrBackend> {
     /// LLM gate. Defaults to identity so behaviour matches the raw-threshold
     /// path when no calibration data is available.
     calibrator: Arc<IsotonicCalibrator>,
+    /// Optional Nemotron cross-encoder reranker. When present, the n-best
+    /// rescoring path bypasses the generative LLM and directly scores all
+    /// hypotheses in a single forward pass, returning the top-1 verbatim.
+    /// Absent = current generative path.
+    reranker: Option<Arc<NemotronReranker>>,
 }
 
 impl<A: AsrBackend + 'static> SessionManager<A> {
@@ -107,7 +112,19 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             adaptive_vad_state: Arc::new(Mutex::new(None)),
             vad_state_path: None,
             calibrator: Arc::new(IsotonicCalibrator::identity()),
+            reranker: None,
         }
+    }
+
+    /// Attach a Nemotron cross-encoder reranker. When set, the n-best
+    /// rescoring path uses it instead of the generative LLM: all
+    /// candidate hypotheses are scored in a single forward pass and
+    /// the top-1 is returned verbatim. Strictly additive — the output
+    /// is always one of the input hypotheses.
+    pub fn with_reranker(mut self, reranker: Arc<NemotronReranker>) -> Self {
+        info!("nemotron reranker attached to session manager");
+        self.reranker = Some(reranker);
+        self
     }
 
     /// Attach an isotonic confidence calibrator. Loaded at session start and
@@ -250,6 +267,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let adaptive_vad_state = Arc::clone(&self.adaptive_vad_state);
         let vad_state_path = self.vad_state_path.clone();
         let calibrator = Arc::clone(&self.calibrator);
+        let reranker = self.reranker.clone();
 
         tokio::task::spawn(run_session(
             session_id,
@@ -270,6 +288,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             adaptive_vad_state,
             vad_state_path,
             calibrator,
+            reranker,
         ));
 
         *lock = Some(ActiveHandle {
@@ -547,6 +566,7 @@ async fn run_session<A: AsrBackend + 'static>(
     adaptive_vad_state: Arc<Mutex<Option<AdaptiveVadConfig>>>,
     vad_state_path: Option<PathBuf>,
     calibrator: Arc<IsotonicCalibrator>,
+    reranker: Option<Arc<NemotronReranker>>,
 ) {
     let mut status = SessionStatus::Completed;
 
@@ -1018,9 +1038,9 @@ async fn run_session<A: AsrBackend + 'static>(
         prepared
     } else {
         // Collect the aggregate N-best hypothesis list across segments.
-        // When ≥2 distinct hypotheses exist, the backend routes to the
-        // ProGRes-style rescoring path (strictly additive, worst-case
-        // returns the argmax). Otherwise we fall through to the existing
+        // When ≥2 distinct hypotheses exist, route to either the Nemotron
+        // reranker (if attached) or the generative LLM's n-best rescoring
+        // path (ProGRes-style). Otherwise fall through to the existing
         // marker correction path on `raw_text`.
         let nbest_enabled = std::env::var("LUNE_NBEST").is_ok_and(|v| v != "0");
         let hypotheses: Vec<String> = if nbest_enabled {
@@ -1028,10 +1048,73 @@ async fn run_session<A: AsrBackend + 'static>(
         } else {
             Vec::new()
         };
+
+        // Fast path: Nemotron reranker. When present and we have ≥2
+        // hypotheses, score all candidates in a single forward pass and
+        // return the top-1 verbatim — no generation, no parsing, no
+        // fallback layers. Strictly additive: output is always one of
+        // the input hypotheses, so worst case is the argmax.
+        //
+        // Conservative switch guard: the reranker was trained on Q&A
+        // retrieval (NQ/HotpotQA/FiQA/etc.) and is somewhat out-of-
+        // distribution for ASR fluency scoring. On our fixtures with
+        // `LUNE_RERANKER_MARGIN=0` it regresses several noisy segments
+        // by picking plausible-but-wrong alternates. We require the
+        // winning alternate to beat the argmax by at least `margin`
+        // logits before we accept the swap — on the sanity check a
+        // truly relevant match scored +31 over irrelevant, so a margin
+        // around 5.0 reliably separates "confident swap" from noise.
+        let reranker_margin: f32 = std::env::var("LUNE_RERANKER_MARGIN")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(5.0);
+        let reranker_choice = if let (Some(rr), true) = (reranker.as_ref(), hypotheses.len() >= 2) {
+            let query = "most fluent and contextually plausible transcription";
+            match rr.score(query, &hypotheses) {
+                Ok(scores) => {
+                    let argmax_score = scores.first().copied().unwrap_or(0.0);
+                    let (best_idx, best_score) = scores
+                        .iter()
+                        .enumerate()
+                        .max_by(|(_, a), (_, b)| a.total_cmp(b))
+                        .map(|(i, &s)| (i, s))
+                        .unwrap_or((0, argmax_score));
+                    // Only accept the swap when the margin is decisive.
+                    // Below threshold, fall back to argmax (hypothesis 0)
+                    // so the reranker is strictly non-regressive.
+                    let chosen_idx =
+                        if best_idx == 0 || (best_score - argmax_score) >= reranker_margin {
+                            best_idx
+                        } else {
+                            0
+                        };
+                    info!(
+                        %session_id,
+                        count = hypotheses.len(),
+                        best_idx,
+                        chosen_idx,
+                        argmax_score,
+                        best_score,
+                        margin_required = reranker_margin,
+                        margin_observed = best_score - argmax_score,
+                        "[reranker] scored candidates"
+                    );
+                    Some(hypotheses[chosen_idx].clone())
+                }
+                Err(e) => {
+                    warn!(error = %e, "reranker failed, falling back to LLM path");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         if !hypotheses.is_empty() {
             info!(
                 %session_id,
                 count = hypotheses.len(),
+                reranker_used = reranker_choice.is_some(),
                 "[LLM] n-best input: {:?}",
                 hypotheses
             );
@@ -1048,20 +1131,29 @@ async fn run_session<A: AsrBackend + 'static>(
             hypotheses,
         };
 
-        match post_processor.transform(&input).await {
-            Ok(output) => {
-                drain_processing_controls(&mut control_rx, &mut cancelled);
-                if cancelled {
-                    info!(%session_id, "session cancelled during LLM processing");
-                    String::new()
-                } else {
-                    info!(%session_id, "[LLM] {}", output.cleaned_text);
-                    output.cleaned_text
+        // If the reranker already picked a winner, short-circuit the
+        // generative LLM entirely. The reranker output is verbatim one
+        // of the hypotheses, so no further correction, parsing, or
+        // validation is needed.
+        if let Some(chosen) = reranker_choice {
+            info!(%session_id, "[reranker] chosen: {chosen}");
+            chosen
+        } else {
+            match post_processor.transform(&input).await {
+                Ok(output) => {
+                    drain_processing_controls(&mut control_rx, &mut cancelled);
+                    if cancelled {
+                        info!(%session_id, "session cancelled during LLM processing");
+                        String::new()
+                    } else {
+                        info!(%session_id, "[LLM] {}", output.cleaned_text);
+                        output.cleaned_text
+                    }
                 }
-            }
-            Err(e) => {
-                warn!(error = %e, "LLM correction failed, using prepared text");
-                prepared
+                Err(e) => {
+                    warn!(error = %e, "LLM correction failed, using prepared text");
+                    prepared
+                }
             }
         }
     };

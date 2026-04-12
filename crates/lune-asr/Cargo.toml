@@ -7,7 +7,7 @@ license.workspace = true
 [features]
 default = ["ort-qwen"]
 cuda = ["ort/cuda"]
-ort-qwen = ["dep:tokenizers"]
+ort-qwen = []
 
 [dependencies]
 async-trait.workspace = true
@@ -23,7 +23,10 @@ serde_json.workspace = true
 base64 = "0.22"
 reqwest.workspace = true
 url.workspace = true
-tokenizers = { workspace = true, optional = true }
+# tokenizers is used unconditionally by the Nemotron reranker and
+# optionally by the OrtQwen ASR path — dropped to an unconditional dep so
+# both paths can share the same BPE loader.
+tokenizers = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

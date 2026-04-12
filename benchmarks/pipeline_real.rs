@@ -20,7 +20,9 @@ use bench_utils::{
     process_memory_usage, word_error_rate, workspace_root, wrap_print,
 };
 use lune_app::{SessionManager, SessionManagerConfig};
-use lune_asr::{AsrRegistry, IsotonicCalibrator, OrtForcedAligner};
+use lune_asr::{
+    AsrRegistry, IsotonicCalibrator, NemotronReranker, NemotronRerankerConfig, OrtForcedAligner,
+};
 use lune_audio::{AudioConfig, AudioStream};
 use lune_core::asr::AsrBackendKind;
 use lune_core::config::{DevicePolicy, UserSettings};
@@ -280,6 +282,21 @@ async fn run_full_pipeline(
         mgr
     };
 
+    // Optional Nemotron reranker load.
+    //
+    // - `LUNE_RERANKER=0`        reranker off (default, generative LLM path)
+    // - `LUNE_RERANKER=1`        load from models/nemotron-rerank-1b/
+    // - `LUNE_RERANKER=<path>`   explicit model directory
+    let mgr = match std::env::var("LUNE_RERANKER") {
+        Ok(v) if v == "1" || v == "nemotron" => {
+            let path = std::path::PathBuf::from("models/nemotron-rerank-1b");
+            try_attach_reranker(mgr, path)
+        }
+        Ok(v) if v == "0" || v.is_empty() => mgr,
+        Ok(path) => try_attach_reranker(mgr, std::path::PathBuf::from(path)),
+        Err(_) => mgr,
+    };
+
     let (event_tx, mut event_rx) = mpsc::channel::<SessionEvent>(256);
 
     let start = Instant::now();
@@ -322,4 +339,35 @@ async fn run_full_pipeline(
             }
         })
         .await
+}
+
+/// Load a Nemotron reranker from `model_dir` and attach it to `mgr`. On
+/// any failure (missing model, ort error) we log a warning and return
+/// `mgr` unchanged so the benchmark still runs through the generative
+/// path. Prefers GPU but falls back to CPU if CUDA is unavailable.
+fn try_attach_reranker<A: lune_core::asr::AsrBackend + 'static>(
+    mgr: SessionManager<A>,
+    model_dir: std::path::PathBuf,
+) -> SessionManager<A> {
+    if !model_dir.join("tokenizer.json").exists() {
+        println!(
+            "  [warn] reranker model not found at {}",
+            model_dir.display()
+        );
+        return mgr;
+    }
+    let config = NemotronRerankerConfig {
+        model_dir: model_dir.clone(),
+        use_gpu: true,
+    };
+    match NemotronReranker::new(config) {
+        Ok(rr) => {
+            println!("  Reranker loaded: {}", model_dir.display());
+            mgr.with_reranker(Arc::new(rr))
+        }
+        Err(e) => {
+            println!("  [warn] reranker load failed: {e}");
+            mgr
+        }
+    }
 }
