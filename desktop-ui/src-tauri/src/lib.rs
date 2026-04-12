@@ -9,23 +9,27 @@ mod tauri_integration_tests;
 use tauri::Manager;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            // Focus the existing window when a second instance is launched.
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.unminimize();
                 let _ = w.show();
                 let _ = w.set_focus();
             }
         }))
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let runtime =
                 tauri::async_runtime::block_on(runtime::AppRuntime::new(app.handle().clone()))
                     .map_err(|error| -> Box<dyn std::error::Error> { error.into() })?;
             app.manage(runtime);
+
+            // ── Global hotkeys ─────────────────────────────────────────────
+            register_hotkeys(app)?;
 
             // ── System tray ──────────────────────────────────────────────
             let show_i = MenuItem::with_id(app, "show", "Open Lune Voice", true, None::<&str>)?;
@@ -117,4 +121,62 @@ pub fn run() {
             eprintln!("fatal: tauri application exited with error: {e}");
             std::process::exit(1);
         });
+}
+
+fn register_hotkeys(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let settings = tauri::async_runtime::block_on(async {
+        let rt = app.state::<runtime::AppRuntime>();
+        rt.settings().await
+    });
+
+    let toggle_str = format_hotkey(&settings.hotkey.toggle_dictation);
+    let cancel_str = format_hotkey(&settings.hotkey.cancel_dictation);
+
+    let toggle: Shortcut = toggle_str
+        .parse()
+        .map_err(|e| format!("parse toggle hotkey: {e}"))?;
+    let cancel: Shortcut = cancel_str
+        .parse()
+        .map_err(|e| format!("parse cancel hotkey: {e}"))?;
+
+    app.global_shortcut()
+        .on_shortcut(toggle, move |app, _shortcut, event| {
+            if event.state == ShortcutState::Pressed {
+                let rt = app.state::<runtime::AppRuntime>();
+                let rt = rt.inner().clone();
+                tauri::async_runtime::spawn(async move {
+                    let _ = rt.toggle_dictation().await;
+                });
+            }
+        })?;
+
+    app.global_shortcut()
+        .on_shortcut(cancel, move |app, _shortcut, event| {
+            if event.state == ShortcutState::Pressed {
+                let rt = app.state::<runtime::AppRuntime>();
+                let rt = rt.inner().clone();
+                tauri::async_runtime::spawn(async move {
+                    let _ = rt.cancel_dictation().await;
+                });
+            }
+        })?;
+
+    tracing::info!(toggle = %toggle_str, cancel = %cancel_str, "global hotkeys registered");
+    Ok(())
+}
+
+fn format_hotkey(combo: &lune_core::config::KeyCombo) -> String {
+    let mut parts: Vec<&str> = combo
+        .modifiers
+        .iter()
+        .map(|m| match m {
+            lune_core::config::Modifier::Ctrl => "ctrl",
+            lune_core::config::Modifier::Shift => "shift",
+            lune_core::config::Modifier::Alt => "alt",
+            lune_core::config::Modifier::Meta => "super",
+            _ => "unknown",
+        })
+        .collect();
+    parts.push(&combo.key);
+    parts.join("+")
 }

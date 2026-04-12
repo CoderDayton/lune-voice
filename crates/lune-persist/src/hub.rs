@@ -67,11 +67,27 @@ impl ModelSpec {
         }
     }
 
+    /// Llama-3.2-1B-Instruct Q4F16: style LLM for transcript reformatting.
+    #[inline]
+    pub fn style_llm() -> Self {
+        Self::Directory {
+            repo_id: "onnx-community/Llama-3.2-1B-Instruct-q4f16".into(),
+            required_files: vec![
+                "tokenizer.json".into(),
+                "onnx/model_q4f16.onnx".into(),
+                "onnx/model_q4f16.onnx_data".into(),
+            ],
+            suffix_patterns: vec![],
+            local_name: "llama-3.2-1b-instruct-q4f16".into(),
+        }
+    }
+
     /// Human-readable display name for this model.
     pub fn display_name(&self) -> &str {
         match self {
             Self::Directory { local_name, .. } => match local_name.as_str() {
                 "parakeet-tdt-0.6b" => "Parakeet TDT 0.6B",
+                "llama-3.2-1b-instruct-q4f16" => "Llama 3.2 1B Style LLM",
                 _ => local_name,
             },
         }
@@ -127,6 +143,15 @@ pub fn check_model_status(
         });
     }
 
+    // Style LLM is always needed for transcript reformatting.
+    let style_spec = ModelSpec::style_llm();
+    statuses.push(ModelStatus {
+        name: style_spec.display_name().to_string(),
+        repo_id: style_spec.repo_id().to_string(),
+        local_name: style_spec.local_name().to_string(),
+        ready: style_spec.is_ready(models_dir),
+    });
+
     statuses
 }
 
@@ -139,6 +164,7 @@ pub fn download_model(
 ) -> PersistResult<PathBuf> {
     let spec = match local_name {
         "parakeet-tdt-0.6b" => ModelSpec::parakeet_tdt(),
+        "llama-3.2-1b-instruct-q4f16" => ModelSpec::style_llm(),
         _ => {
             return Err(PersistError::ModelDownload(format!(
                 "unknown model: {local_name}"

@@ -17,3 +17,6 @@ async-openai.workspace = true
 serde_json.workspace = true
 regex = "1.11"
 text-processing-rs = "0.1.0"
+ort.workspace = true
+ndarray.workspace = true
+tokenizers.workspace = true

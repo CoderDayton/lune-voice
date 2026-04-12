@@ -82,6 +82,11 @@ pub struct SessionManager<A: AsrBackend> {
     /// hypotheses in a single forward pass, returning the top-1 verbatim.
     /// Absent = current generative path.
     reranker: Option<Arc<NemotronReranker>>,
+    /// Optional ONNX style LLM for transcript reformatting. When present,
+    /// the active style preset's system prompt is applied via the LLM
+    /// after correction and dictionary. Replaces ITN when active (the LLM
+    /// handles number formatting as part of its style application).
+    style_llm: Option<Arc<lune_llm::ort_style_llm::OrtStyleLlm>>,
 }
 
 impl<A: AsrBackend + 'static> SessionManager<A> {
@@ -109,7 +114,15 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             vad_state_path: None,
             calibrator: Arc::new(IsotonicCalibrator::identity()),
             reranker: None,
+            style_llm: None,
         }
+    }
+
+    /// Attach an ONNX style LLM for transcript reformatting.
+    pub fn with_style_llm(mut self, llm: Arc<lune_llm::ort_style_llm::OrtStyleLlm>) -> Self {
+        info!("style LLM attached to session manager");
+        self.style_llm = Some(llm);
+        self
     }
 
     /// Attach a Nemotron cross-encoder reranker. When set, the n-best
@@ -256,6 +269,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let vad_state_path = self.vad_state_path.clone();
         let calibrator = Arc::clone(&self.calibrator);
         let reranker = self.reranker.clone();
+        let style_llm = self.style_llm.clone();
 
         tokio::task::spawn(run_session(
             session_id,
@@ -276,6 +290,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             vad_state_path,
             calibrator,
             reranker,
+            style_llm,
         ));
 
         *lock = Some(ActiveHandle {
@@ -535,6 +550,7 @@ async fn run_session<A: AsrBackend + 'static>(
     vad_state_path: Option<PathBuf>,
     calibrator: Arc<IsotonicCalibrator>,
     reranker: Option<Arc<NemotronReranker>>,
+    style_llm: Option<Arc<lune_llm::ort_style_llm::OrtStyleLlm>>,
 ) {
     let mut status = SessionStatus::Completed;
 
@@ -1107,9 +1123,25 @@ async fn run_session<A: AsrBackend + 'static>(
     let final_text = {
         let guard = dict.lock().await;
         let dict_applied = guard.apply(&post_llm_text);
-        // Inverse Text Normalization: convert spoken-form numbers, dates,
-        // currency etc. to written form ("two hundred" → "200").
-        if config.pipeline.itn_enabled {
+        drop(guard);
+
+        // Style LLM reformats the transcript using the active style preset.
+        // When present, it subsumes ITN (the LLM handles number formatting
+        // as part of its style application).
+        if let Some(ref llm) = style_llm {
+            let prompt = &style_preset.style_instructions;
+            match llm.apply_style(prompt, &dict_applied) {
+                Ok(styled) if !styled.is_empty() => styled,
+                Ok(_) => {
+                    warn!("style LLM returned empty, falling back to ITN");
+                    lune_llm::itn::normalize(&dict_applied)
+                }
+                Err(e) => {
+                    warn!(error = %e, "style LLM failed, falling back to ITN");
+                    lune_llm::itn::normalize(&dict_applied)
+                }
+            }
+        } else if config.pipeline.itn_enabled {
             lune_llm::itn::normalize(&dict_applied)
         } else {
             dict_applied

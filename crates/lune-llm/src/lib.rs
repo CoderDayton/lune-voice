@@ -2,6 +2,7 @@ pub mod fillers;
 pub mod itn;
 mod null_backend;
 mod openai_backend;
+pub mod ort_style_llm;
 pub mod prepare;
 pub mod prompt;
 

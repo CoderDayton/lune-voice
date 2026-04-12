@@ -1,8 +1,8 @@
 //! Shared ORT model loading and session construction.
 //!
 //! `OrtModelLoader` centralizes model directory resolution, GPU policy,
-//! and session creation so both Parakeet and Qwen backends share a single
-//! code path. CUDA EP is registered per-session when `use_gpu` is true.
+//! and session creation so both Parakeet and Nemotron backends share a
+//! single code path. CUDA EP is registered per-session when `use_gpu` is true.
 
 use std::path::{Path, PathBuf};
 
@@ -12,9 +12,6 @@ use ort::session::builder::GraphOptimizationLevel;
 use lune_core::error::{Error, Result};
 
 /// Shared ORT model loading context.
-///
-/// Owns the model directory and GPU preference. Both ASR backends
-/// construct from this, ensuring consistent session configuration.
 #[derive(Debug, Clone)]
 pub struct OrtModelLoader {
     pub model_dir: PathBuf,
@@ -32,7 +29,7 @@ impl OrtModelLoader {
         build_ort_session(&path, self.use_gpu)
     }
 
-    /// Build an ORT session from an arbitrary path (e.g. forced aligner).
+    /// Build an ORT session from an arbitrary path.
     pub fn load_path(&self, path: &Path) -> Result<Session> {
         build_ort_session(path, self.use_gpu)
     }
@@ -45,11 +42,10 @@ impl OrtModelLoader {
                 return Ok(p);
             }
         }
-        // Fallback: glob for `{kind}*.onnx`
         if let Ok(entries) = std::fs::read_dir(&self.model_dir) {
             for entry in entries.flatten() {
                 let p = entry.path();
-                if let Some(name) = p.file_name().and_then(|s| s.to_str())
+                if let Some(name) = p.file_name().and_then(|n| n.to_str())
                     && name.starts_with(kind)
                     && name.ends_with(".onnx")
                 {
@@ -73,16 +69,9 @@ impl OrtModelLoader {
 /// Build an ORT session from an ONNX model file.
 ///
 /// Applies Level3 graph optimization and 4 intra-op threads.
-/// When `use_gpu` is true, registers a per-session CUDA EP with:
-/// - `SameAsRequested` arena to avoid over-allocating VRAM
-/// - cuDNN max workspace for better conv kernel selection
-/// - TF32 math on Ampere+ GPUs (~2× matmul throughput)
-///
-/// Saves the graph-optimized model to `<path>.opt` on first load
-/// so subsequent starts skip re-optimization.
+/// When `use_gpu` is true, registers a per-session CUDA EP.
+/// Saves the graph-optimized model to `<path>.opt` on first load.
 pub fn build_ort_session(path: &Path, use_gpu: bool) -> Result<Session> {
-    // Cache the graph-optimized model next to the original to skip
-    // re-optimization on subsequent loads (~100-200ms saved on startup).
     let opt_path = path.with_extension("onnx.opt");
 
     let mut builder = Session::builder()
@@ -90,25 +79,20 @@ pub fn build_ort_session(path: &Path, use_gpu: bool) -> Result<Session> {
         .with_optimization_level(GraphOptimizationLevel::Level3)
         .map_err(|e| Error::Asr(format!("optimization level: {e}")))?
         .with_intra_threads(4)
-        .map_err(|e| Error::Asr(format!("intra threads: {e}")))?;
-
-    // Save optimized graph to disk so subsequent loads skip re-optimization.
-    builder = builder
+        .map_err(|e| Error::Asr(format!("intra threads: {e}")))?
         .with_optimized_model_path(&opt_path)
         .map_err(|e| Error::Asr(format!("optimized model path: {e}")))?;
 
     #[cfg(feature = "cuda")]
-    let builder = if use_gpu {
-        builder
+    if use_gpu {
+        builder = builder
             .with_execution_providers([ort::ep::CUDA::default()
                 .with_arena_extend_strategy(ort::ep::ArenaExtendStrategy::SameAsRequested)
                 .with_conv_max_workspace(true)
                 .with_tf32(true)
                 .build()])
-            .map_err(|e| Error::Asr(format!("CUDA EP: {e}")))?
-    } else {
-        builder
-    };
+            .map_err(|e| Error::Asr(format!("CUDA EP: {e}")))?;
+    }
 
     #[cfg(not(feature = "cuda"))]
     let _ = use_gpu;
