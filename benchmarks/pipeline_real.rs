@@ -34,6 +34,13 @@ use tokio::sync::{Mutex, RwLock, mpsc};
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 fn main() {
+    // Honor RUST_LOG when set so sweep/debug runs can introspect the
+    // n-best/reranker path. No-op when RUST_LOG is unset.
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_writer(std::io::stderr)
+        .try_init();
+
     println!();
     println!("╔══════════════════════════════════════════════════════════════════╗");
     println!("║          REAL PIPELINE BENCHMARK (SessionManager + VAD)        ║");
@@ -80,10 +87,18 @@ fn main() {
         return;
     }
 
-    // Run full pipeline for each fixture
+    // Run full pipeline for each fixture. Optional fixture filter via
+    // `LUNE_BENCH_FIXTURE=<substring>` for sweep scripts that want a
+    // single fixture.
     let rt = tokio::runtime::Runtime::new().unwrap();
+    let fixture_filter = std::env::var("LUNE_BENCH_FIXTURE").ok();
 
     for fixture in &fixtures {
+        if let Some(ref needle) = fixture_filter
+            && !fixture.name.contains(needle.as_str())
+        {
+            continue;
+        }
         println!();
         println!("── {} ({:.1}s audio) ──", fixture.name, fixture.audio_secs);
         println!();
