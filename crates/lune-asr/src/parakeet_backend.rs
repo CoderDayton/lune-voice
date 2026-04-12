@@ -26,9 +26,11 @@ const ONSET_PAD_SAMPLES: usize = 3_200;
 /// Typical speech RMS is 0.01–0.15; background noise is < 0.005.
 const SILENCE_RMS_THRESHOLD: f32 = 0.008;
 
-/// Chunk size for chunked inference (25 seconds at 16 kHz).
-/// Audio longer than this is split into overlapping chunks and merged via LCS.
-const CHUNK_SAMPLES: usize = 25 * 16_000;
+/// Chunk size for chunked inference (~6.7 minutes at 16 kHz).
+/// Parakeet-TDT handles up to ~400s of audio in a single full-attention
+/// pass without the NeMo framework. Chunking is only a fallback for
+/// unusually long recordings; normal dictation always runs single-pass.
+const CHUNK_SAMPLES: usize = 400 * 16_000;
 
 /// Overlap between consecutive chunks (1 second at 16 kHz).
 /// Matches the NeMo paper recommendation for Parakeet-TDT.
