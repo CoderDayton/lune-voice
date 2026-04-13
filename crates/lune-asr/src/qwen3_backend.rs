@@ -81,7 +81,6 @@ pub struct Qwen3AsrBackend {
 
 pub struct Qwen3Session {
     pending: Vec<f32>,
-    has_new: bool,
     total_samples: u64,
     sample_rate: u32,
     next_id: u64,
@@ -238,7 +237,6 @@ impl AsrBackend for Qwen3AsrBackend {
         });
         let session = Qwen3Session {
             pending: Vec::with_capacity(MAX_WINDOW_SAMPLES),
-            has_new: false,
             total_samples: 0,
             sample_rate: config.sample_rate,
             next_id: 1,
@@ -259,7 +257,6 @@ impl AsrBackend for Qwen3AsrBackend {
             let trim = sess.pending.len() - MAX_WINDOW_SAMPLES;
             sess.pending.drain(..trim);
         }
-        sess.has_new = true;
         Ok(())
     }
 
@@ -279,7 +276,6 @@ impl AsrBackend for Qwen3AsrBackend {
             let pcm = sess.pending.clone();
             let lang = sess.language.clone();
             sess.pending.clear();
-            sess.has_new = false;
             (pcm, ts, id, lang)
         };
 
@@ -294,7 +290,6 @@ impl AsrBackend for Qwen3AsrBackend {
     async fn reset_context(&self, session: &Self::SessionHandle) -> Result<()> {
         let mut sess = session.lock().map_err(|e| lock_err("session", e))?;
         sess.pending.clear();
-        sess.has_new = false;
         Ok(())
     }
 
@@ -315,14 +310,60 @@ fn extract_f16_array(value: &ort::value::Value) -> Result<ArrayD<f16>> {
         .map_err(|e| Error::Asr(format!("array reshape: {e}")))
 }
 
-/// Extract FP16 logits, convert to f32 for argmax math.
-fn extract_logits_f32(value: &ort::value::Value) -> Result<(Vec<usize>, Vec<f32>)> {
+/// Fused argmax + softmax confidence directly on f16 logits tensor.
+/// Avoids allocating a full f32 copy (~600KB per step). Operates on the
+/// last `vocab_size` elements of the last position in the logits tensor.
+fn argmax_on_logits(
+    value: &ort::value::Value,
+    vocab_size: usize,
+    boost: &std::collections::HashMap<i64, f32>,
+) -> Result<(i64, f32)> {
     let (shape, data) = value
         .try_extract_tensor::<f16>()
         .map_err(|e| Error::Asr(format!("extract logits: {e}")))?;
-    let dims: Vec<usize> = shape.iter().map(|&d| d as usize).collect();
-    let f32_data: Vec<f32> = data.iter().map(|x| x.to_f32()).collect();
-    Ok((dims, f32_data))
+    // Last position's logits: last `vocab_size` elements.
+    let total = shape.iter().map(|&d| d as usize).product::<usize>();
+    let start = total.saturating_sub(vocab_size);
+    let logits = &data[start..];
+
+    if boost.is_empty() {
+        // Fast path: single pass argmax + LSE on f16 → f32.
+        let mut max_idx = 0usize;
+        let mut max_val = f32::NEG_INFINITY;
+        for (i, &v) in logits.iter().enumerate() {
+            let f = v.to_f32();
+            if f > max_val {
+                max_val = f;
+                max_idx = i;
+            }
+        }
+        let lse: f32 = logits
+            .iter()
+            .map(|&x| (x.to_f32() - max_val).exp())
+            .sum::<f32>()
+            .ln()
+            + max_val;
+        Ok((max_idx as i64, (max_val - lse).exp()))
+    } else {
+        // Boosted path: need unboosted max for confidence.
+        let mut max_idx = 0usize;
+        let mut max_val = f32::NEG_INFINITY;
+        for (i, &v) in logits.iter().enumerate() {
+            let boosted = v.to_f32() + boost.get(&(i as i64)).copied().unwrap_or(0.0);
+            if boosted > max_val {
+                max_val = boosted;
+                max_idx = i;
+            }
+        }
+        let raw_max = logits[max_idx].to_f32();
+        let lse: f32 = logits
+            .iter()
+            .map(|&x| (x.to_f32() - raw_max).exp())
+            .sum::<f32>()
+            .ln()
+            + raw_max;
+        Ok((max_idx as i64, (raw_max - lse).exp()))
+    }
 }
 
 /// Build mRoPE position_ids `[3, 1, seq_len]` — all 3 dims identical for audio-only.
@@ -491,10 +532,7 @@ impl Qwen3AsrBackend {
                 .run(dec_inputs)
                 .map_err(|e| Error::Asr(format!("decoder prefill: {e}")))?;
 
-            let (ls, ld) = extract_logits_f32(&out["logits"])?;
-            let vocab = ls[2];
-            let off = (seq_len - 1) * vocab;
-            let (tok, conf) = argmax_with_conf(&ld[off..off + vocab], &boost);
+            let (tok, conf) = argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost)?;
 
             // Extract per-layer KV cache
             let mut cache: Vec<ArrayD<f16>> = Vec::with_capacity(NUM_LAYERS * 2);
@@ -508,9 +546,8 @@ impl Qwen3AsrBackend {
         let mut tokens: Vec<(i64, f32)> = vec![(first_token, first_conf)];
         let mut pos = seq_len;
 
-        // Pre-allocate reusable buffers for the decode loop.
+        // Pre-allocate reusable position array for the decode loop.
         let mut pos_arr = Array3::<i64>::zeros((3, 1, 1));
-        let boost_empty = boost.is_empty();
 
         // 6. Autoregressive greedy decode loop
         loop {
@@ -551,12 +588,9 @@ impl Qwen3AsrBackend {
                 pos_arr.fill(pos as i64);
 
                 let total_len = pos + 1;
-                let dims = emb.shape().to_vec();
-                let emb_3d = emb
-                    .into_shape_with_order(IxDyn(&[dims[0], dims[1], dims[2]]))
-                    .map_err(|e| Error::Asr(format!("emb reshape: {e}")))?;
+                // emb is already [1, 1, D] from embed_tokens — no reshape needed.
                 let mut dec_inputs = ort::inputs!(
-                    "inputs_embeds" => Value::from_array(emb_3d)
+                    "inputs_embeds" => Value::from_array(emb)
                         .map_err(|e| Error::Asr(format!("emb val: {e}")))?,
                     "position_ids" => Value::from_array(pos_arr.clone())
                         .map_err(|e| Error::Asr(format!("pos val: {e}")))?,
@@ -587,14 +621,7 @@ impl Qwen3AsrBackend {
                     .run(dec_inputs)
                     .map_err(|e| Error::Asr(format!("decoder step: {e}")))?;
 
-                let (_, ld) = extract_logits_f32(&out["logits"])?;
-                let n = ld.len();
-                let logit_slice = &ld[n.saturating_sub(VOCAB_SIZE)..];
-                let result = if boost_empty {
-                    argmax_with_conf_nobias(logit_slice)
-                } else {
-                    argmax_with_conf(logit_slice, &boost)
-                };
+                let result = argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost)?;
 
                 for i in 0..NUM_LAYERS {
                     kv_cache[i * 2] = extract_f16_array(&out[present_kv_name(i, true)])?;
@@ -708,47 +735,6 @@ impl Qwen3AsrBackend {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-
-/// Argmax with softmax confidence — no bias (hot path when boost map is empty).
-fn argmax_with_conf_nobias(logits: &[f32]) -> (i64, f32) {
-    let mut max_idx = 0usize;
-    let mut max_val = f32::NEG_INFINITY;
-    for (i, &v) in logits.iter().enumerate() {
-        if v > max_val {
-            max_val = v;
-            max_idx = i;
-        }
-    }
-    let lse: f32 = logits
-        .iter()
-        .map(|&x| (x - max_val).exp())
-        .sum::<f32>()
-        .ln()
-        + max_val;
-    (max_idx as i64, (max_val - lse).exp())
-}
-
-/// Argmax with softmax confidence + additive logit bias from boost_map.
-fn argmax_with_conf(logits: &[f32], boost: &std::collections::HashMap<i64, f32>) -> (i64, f32) {
-    let mut max_idx = 0usize;
-    let mut max_val = f32::NEG_INFINITY;
-    for (i, &v) in logits.iter().enumerate() {
-        let boosted = v + boost.get(&(i as i64)).copied().unwrap_or(0.0);
-        if boosted > max_val {
-            max_val = boosted;
-            max_idx = i;
-        }
-    }
-    // Confidence from unboosted logits (reflects true model certainty).
-    let raw_max = logits[max_idx];
-    let lse: f32 = logits
-        .iter()
-        .map(|&x| (x - raw_max).exp())
-        .sum::<f32>()
-        .ln()
-        + raw_max;
-    (max_idx as i64, (raw_max - lse).exp())
-}
 
 /// Trim leading silence, keeping a small onset pad before speech.
 fn trim_leading_silence(pcm: &[f32]) -> &[f32] {
