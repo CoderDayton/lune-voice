@@ -13,6 +13,7 @@ pub struct UserSettings {
     /// Compute device for local inference: `Cpu`, `Cuda`, or `Auto`.
     pub device: DevicePolicy,
     pub asr_backend: AsrBackendConfig,
+    #[serde(default)]
     pub llm_backend: LlmBackendConfig,
     pub hotkey: HotkeyConfig,
     pub default_style: StyleId,
@@ -112,6 +113,8 @@ pub enum AsrBackendConfig {
 #[serde(tag = "type")]
 #[non_exhaustive]
 pub enum LlmBackendConfig {
+    /// Use the local ONNX style LLM (Llama 3.2 1B) if downloaded.
+    Local {},
     OpenAiCompatible {
         base_url: Url,
         api_key: RedactedString,
@@ -120,6 +123,12 @@ pub enum LlmBackendConfig {
     },
     #[serde(other)]
     Disabled,
+}
+
+impl Default for LlmBackendConfig {
+    fn default() -> Self {
+        Self::Local {}
+    }
 }
 
 fn default_word_confidence_threshold() -> f32 {

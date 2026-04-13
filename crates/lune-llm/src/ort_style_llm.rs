@@ -14,6 +14,7 @@ use tokenizers::Tokenizer;
 use tracing::info;
 
 use lune_core::error::{Error, Result};
+use lune_core::llm::{PostProcessInput, PostProcessOutput, TextPostProcessor};
 
 const NUM_LAYERS: usize = 16;
 const NUM_KV_HEADS: usize = 8;
@@ -150,6 +151,24 @@ impl OrtStyleLlm {
         }
 
         Ok(generated)
+    }
+}
+
+#[async_trait::async_trait]
+impl TextPostProcessor for OrtStyleLlm {
+    async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput> {
+        let system_prompt = &input.style_preset.style_instructions;
+        let text = self.apply_style(system_prompt, &input.raw_text)?;
+        let text = if text.is_empty() {
+            // Fallback to ITN if LLM returns empty
+            crate::itn::normalize(&input.raw_text)
+        } else {
+            text
+        };
+        Ok(PostProcessOutput {
+            cleaned_text: text,
+            metadata: None,
+        })
     }
 }
 

@@ -475,7 +475,7 @@ async fn build_pipeline(
 ) -> Result<(LivePipeline, Arc<RwLock<UserSettings>>), String> {
     let asr = AsrRegistry::from_config(&settings.asr_backend, settings.device, &paths.models_dir())
         .map_err(|e| format!("build asr backend: {e}"))?;
-    let post_processor = build_post_processor(&settings).await?;
+    let post_processor = build_post_processor(&settings, &paths.models_dir()).await?;
     let router = Arc::new(VoiceCommandRouter::new());
     let dict = Arc::new(Mutex::new(
         DictionaryManager::new(
@@ -509,27 +509,6 @@ async fn build_pipeline(
         Arc::clone(&settings),
     )
     .with_vad_state_path(paths.adaptive_vad_file());
-
-    // Load style LLM if downloaded.
-    let models_dir = paths.models_dir();
-    let style_dir = models_dir.join("llama-3.2-1b-instruct-q4f16");
-    let manager = if style_dir.join("tokenizer.json").exists() {
-        match lune_llm::ort_style_llm::OrtStyleLlm::new(
-            lune_llm::ort_style_llm::OrtStyleLlmConfig {
-                model_dir: style_dir,
-                use_gpu: true,
-                max_new_tokens: 128,
-            },
-        ) {
-            Ok(llm) => manager.with_style_llm(std::sync::Arc::new(llm)),
-            Err(e) => {
-                tracing::warn!(error = %e, "style LLM load failed");
-                manager
-            }
-        }
-    } else {
-        manager
-    };
 
     let pipeline = LivePipeline {
         paths,
@@ -567,8 +546,30 @@ fn init_ort_runtime() {
 
 async fn build_post_processor(
     settings: &UserSettings,
+    models_dir: &std::path::Path,
 ) -> Result<Arc<dyn TextPostProcessor>, String> {
     match &settings.llm_backend {
+        LlmBackendConfig::Local { .. } => {
+            let style_dir = models_dir.join("llama-3.2-1b-instruct-q4f16");
+            if style_dir.join("tokenizer.json").exists() {
+                match lune_llm::ort_style_llm::OrtStyleLlm::new(
+                    lune_llm::ort_style_llm::OrtStyleLlmConfig {
+                        model_dir: style_dir,
+                        use_gpu: true,
+                        max_new_tokens: 128,
+                    },
+                ) {
+                    Ok(llm) => Ok(Arc::new(llm) as Arc<dyn TextPostProcessor>),
+                    Err(e) => {
+                        tracing::warn!(error = %e, "style LLM load failed, using passthrough");
+                        Ok(Arc::new(NullPostProcessor::new()) as Arc<dyn TextPostProcessor>)
+                    }
+                }
+            } else {
+                tracing::info!("style LLM not downloaded yet, using passthrough");
+                Ok(Arc::new(NullPostProcessor::new()) as Arc<dyn TextPostProcessor>)
+            }
+        }
         LlmBackendConfig::OpenAiCompatible {
             base_url,
             api_key,
@@ -584,9 +585,6 @@ async fn build_post_processor(
             });
             Ok(Arc::new(backend) as Arc<dyn TextPostProcessor>)
         }
-        // Default: no remote LLM configured — use passthrough. The Nemotron
-        // cross-encoder reranker handles all local correction at the
-        // session-manager layer.
         _ => Ok(Arc::new(NullPostProcessor::new()) as Arc<dyn TextPostProcessor>),
     }
 }

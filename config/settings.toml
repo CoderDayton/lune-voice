@@ -1,8 +1,6 @@
 # lune-voice configuration
 #
 # Location: ~/.config/lune-voice/settings.toml
-# The daemon reads this at startup. Settings changed via D-Bus
-# (e.g. `lune-voice settings set dictation_mode Clipboard`) are written back here.
 #
 # In TOML, all top-level keys must appear before any [section] headers.
 
@@ -53,6 +51,16 @@ session_history_days = 30
 #   "ParakeetTdt"        — Parakeet-TDT-0.6B-v3 via ONNX Runtime. (default, local)
 #   "OpenAiCompatible"   — Remote Whisper-compatible HTTP endpoint.
 #
+# ── LLM backend ──────────────────────────────────────────────────────────────
+#
+# Supported types:
+#   "Local"              — Llama 3.2 1B ONNX style LLM (auto-downloaded). (default)
+#   "OpenAiCompatible"   — Remote OpenAI-compatible endpoint.
+#   "Disabled"           — No LLM post-processing (ITN only).
+#
+[llm_backend]
+type = "Local"
+
 [asr_backend]
 type = "ParakeetTdt"
 

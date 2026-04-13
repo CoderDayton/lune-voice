@@ -1,5 +1,7 @@
 mod commands;
 mod dto;
+#[cfg(target_os = "linux")]
+mod hotkey_linux;
 mod persistence;
 mod pill;
 mod runtime;
@@ -9,6 +11,7 @@ mod tauri_integration_tests;
 use tauri::Manager;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+#[cfg(not(target_os = "linux"))]
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 pub fn run() {
@@ -29,6 +32,11 @@ pub fn run() {
             app.manage(runtime);
 
             // ── Global hotkeys ─────────────────────────────────────────────
+            // Linux: evdev grab works on both X11 and Wayland.
+            // Other platforms: tauri-plugin-global-shortcut.
+            #[cfg(target_os = "linux")]
+            spawn_evdev_hotkeys(app)?;
+            #[cfg(not(target_os = "linux"))]
             register_hotkeys(app)?;
 
             // ── System tray ──────────────────────────────────────────────
@@ -123,6 +131,7 @@ pub fn run() {
         });
 }
 
+#[cfg(not(target_os = "linux"))]
 fn register_hotkeys(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // Read hotkey config directly — can't use block_on here since we're
     // already inside one from setup(). Just use the defaults; the runtime
@@ -137,6 +146,7 @@ fn register_hotkeys(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> 
     register_hotkeys_with(app, &settings)
 }
 
+#[cfg(not(target_os = "linux"))]
 fn register_hotkeys_with(
     app: &tauri::App,
     settings: &lune_core::config::UserSettings,
@@ -177,6 +187,7 @@ fn register_hotkeys_with(
     Ok(())
 }
 
+#[cfg(not(target_os = "linux"))]
 fn format_hotkey(combo: &lune_core::config::KeyCombo) -> String {
     let mut parts: Vec<&str> = combo
         .modifiers
@@ -191,4 +202,61 @@ fn format_hotkey(combo: &lune_core::config::KeyCombo) -> String {
         .collect();
     parts.push(&combo.key);
     parts.join("+")
+}
+
+#[cfg(target_os = "linux")]
+fn spawn_evdev_hotkeys(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let settings = {
+        let mut s = lune_core::config::UserSettings::default();
+        if let Some(paths) = lune_persist::AppPaths::resolve() {
+            let store = lune_persist::SettingsStore::new(paths.settings_file());
+            if let Ok(loaded) = store.load() {
+                s = loaded;
+            }
+        }
+        s
+    };
+
+    let (tx, mut rx) = tokio::sync::mpsc::channel(64);
+
+    tracing::info!(
+        toggle = ?settings.hotkey.toggle_dictation,
+        cancel = ?settings.hotkey.cancel_dictation,
+        mode = ?settings.activation_mode,
+        "spawning evdev hotkey listener"
+    );
+
+    match hotkey_linux::spawn(settings.hotkey, settings.activation_mode, tx) {
+        Some(_handle) => {
+            // Thread handle intentionally leaked — runs for app lifetime.
+            tracing::info!("evdev hotkey listener thread started");
+        }
+        None => {
+            tracing::warn!("evdev hotkey listener failed to start (unknown key name in config?)");
+            return Ok(());
+        }
+    }
+
+    let rt = app.state::<runtime::AppRuntime>().inner().clone();
+    tauri::async_runtime::spawn(async move {
+        while let Some(action) = rx.recv().await {
+            match action {
+                hotkey_linux::HotkeyAction::Toggle => {
+                    let _ = rt.toggle_dictation().await;
+                }
+                hotkey_linux::HotkeyAction::Start => {
+                    let _ = rt.start_dictation().await;
+                }
+                hotkey_linux::HotkeyAction::Stop => {
+                    let _ = rt.stop_dictation().await;
+                }
+                hotkey_linux::HotkeyAction::Cancel => {
+                    let _ = rt.cancel_dictation().await;
+                }
+            }
+        }
+    });
+
+    tracing::info!("evdev hotkey listener spawned");
+    Ok(())
 }
