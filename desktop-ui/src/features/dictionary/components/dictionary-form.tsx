@@ -1,4 +1,4 @@
-import { useActionState } from "react";
+import { useActionState, useRef } from "react";
 import { Check } from "lucide-react";
 import { addDictionaryEntry } from "../../../store/workspace-store";
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -14,13 +14,14 @@ const initialState: FormState = { phrase: "", replacement: "", error: null, succ
 
 export function DictionaryForm() {
   const { t } = useLingui();
+  const resetCounter = useRef(0);
 
   const [state, submitAction, isPending] = useActionState(
     async (_prev: FormState, formData: FormData) => {
       const phrase = (formData.get("phrase") as string) ?? "";
       const replacement = (formData.get("replacement") as string) ?? "";
       const added = await addDictionaryEntry(phrase, replacement);
-      if (added) return { ...initialState, success: true };
+      if (added) { resetCounter.current++; return { ...initialState, success: true }; }
       return { phrase, replacement, error: "Failed to add entry. Please try again.", success: false };
     },
     initialState,
@@ -38,7 +39,7 @@ export function DictionaryForm() {
               name="phrase"
               className="input w-full"
               defaultValue={state.phrase}
-              key={state.success ? `reset-phrase-${Date.now()}` : undefined}
+              key={state.success ? `reset-phrase-${resetCounter.current}` : undefined}
               placeholder={t`e.g. github…`}
               required
               aria-required="true"
@@ -52,7 +53,7 @@ export function DictionaryForm() {
               name="replacement"
               className="input w-full"
               defaultValue={state.replacement}
-              key={state.success ? `reset-replacement-${Date.now()}` : undefined}
+              key={state.success ? `reset-replacement-${resetCounter.current}` : undefined}
               placeholder={t`e.g. GitHub…`}
               required
               aria-required="true"

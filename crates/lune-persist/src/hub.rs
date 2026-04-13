@@ -180,6 +180,19 @@ pub fn check_model_status(
     statuses
 }
 
+/// Delete a downloaded model by local_name. Returns Ok(true) if removed,
+/// Ok(false) if it wasn't present.
+pub fn delete_model(models_dir: &Path, local_name: &str) -> PersistResult<bool> {
+    let dir = models_dir.join(local_name);
+    if dir.is_dir() {
+        std::fs::remove_dir_all(&dir)?;
+        info!(local_name, "model deleted");
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
 /// Download a single model by local_name. Calls `on_progress` for each file.
 /// Blocking — run on a background thread.
 pub fn download_model(

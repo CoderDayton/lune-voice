@@ -16,19 +16,19 @@ function ThemeSwatch({ theme, active, onSelect }: { theme: string; active: boole
       type="button"
       data-theme={theme}
       onClick={onSelect}
-      className={`group relative flex flex-col gap-1.5 rounded-field border-2 p-2 sm:p-3 transition-all text-left ${
+      className={`group relative flex flex-col gap-1.5 rounded-field border-2 text-base-content p-2 sm:p-3 transition-all text-left ${
         active
           ? "border-primary ring-2 ring-primary/20"
           : "border-base-300/50 hover:border-base-content/20"
       }`}
-      style={{ backgroundColor: "var(--color-base-100)", color: "var(--color-base-content)" }}
+      style={{ background: "var(--color-base-100)" }}
     >
       {active && (
         <div className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-primary text-primary-content">
           <Check size={12} strokeWidth={3} />
         </div>
       )}
-      <span className="text-xs font-medium truncate" style={{ color: "var(--color-base-content)" }}>
+      <span className="text-xs font-medium truncate">
         {themeLabel(theme)}
       </span>
       <div className="flex gap-1">

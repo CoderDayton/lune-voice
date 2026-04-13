@@ -1,6 +1,7 @@
 
-import { saveWorkspaceSetting, type WorkspaceSettings } from "../../../store/workspace-store";
+import { type WorkspaceSettings } from "../../../store/workspace-store";
 import { SettingsRow } from "./section";
+import { useDebouncedSetting } from "../hooks/use-debounced-setting";
 import { useLingui } from "@lingui/react/macro";
 
 type StringKeys<T> = { [K in keyof T]: T[K] extends string ? K : never }[keyof T];
@@ -17,6 +18,10 @@ interface Props {
 
 export function OpenAiFields({ settings, baseUrlKey, apiKeyKey, modelKey, apiDescription, modelDescription, modelPlaceholder }: Props) {
   const { t } = useLingui();
+  const [baseUrl, setBaseUrl] = useDebouncedSetting(baseUrlKey, settings[baseUrlKey] as string);
+  const [apiKey, setApiKey] = useDebouncedSetting(apiKeyKey, settings[apiKeyKey] as string);
+  const [model, setModel] = useDebouncedSetting(modelKey, settings[modelKey] as string);
+
   return (
     <>
       <SettingsRow
@@ -25,8 +30,8 @@ export function OpenAiFields({ settings, baseUrlKey, apiKeyKey, modelKey, apiDes
         control={
           <input
             className="input w-full sm:w-auto sm:min-w-64"
-            value={settings[baseUrlKey] as string}
-            onChange={(event) => void saveWorkspaceSetting(baseUrlKey, event.target.value)}
+            value={baseUrl}
+            onChange={(event) => setBaseUrl(event.target.value)}
             placeholder="https://api.openai.com/v1…"
           />
         }
@@ -39,8 +44,8 @@ export function OpenAiFields({ settings, baseUrlKey, apiKeyKey, modelKey, apiDes
             type="password"
             autoComplete="off"
             className="input w-full sm:w-auto sm:min-w-64"
-            value={settings[apiKeyKey] as string}
-            onChange={(event) => void saveWorkspaceSetting(apiKeyKey, event.target.value)}
+            value={apiKey}
+            onChange={(event) => setApiKey(event.target.value)}
             placeholder="sk-…"
           />
         }
@@ -51,8 +56,8 @@ export function OpenAiFields({ settings, baseUrlKey, apiKeyKey, modelKey, apiDes
         control={
           <input
             className="input w-full sm:w-auto sm:min-w-48"
-            value={settings[modelKey] as string}
-            onChange={(event) => void saveWorkspaceSetting(modelKey, event.target.value)}
+            value={model}
+            onChange={(event) => setModel(event.target.value)}
             placeholder={`${modelPlaceholder}…`}
           />
         }

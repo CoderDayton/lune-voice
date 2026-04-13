@@ -8,15 +8,16 @@ use std::path::Path;
 
 use lune_core::error::{Error, Result};
 
-/// Token vocabulary mapping IDs → text.
+/// Token vocabulary mapping IDs → text, with sorted token list for tokenization.
 #[derive(Debug, Clone)]
 pub struct Vocabulary {
-    #[allow(dead_code)]
     /// Flat byte storage for all tokens; zero-copy slice lookups.
     token_data: Vec<u8>,
     /// (start, end) byte offsets into `token_data` per token ID.
     offsets: Vec<(u32, u32)>,
     pub blank_id: usize,
+    /// Tokens sorted by descending byte length for maximal-munch tokenization.
+    sorted_tokens: Vec<(String, usize)>,
 }
 
 impl Vocabulary {
@@ -71,10 +72,28 @@ impl Vocabulary {
         token_data.shrink_to_fit();
         offsets.shrink_to_fit();
 
+        // Build sorted token list for tokenization.
+        let mut sorted_tokens = Vec::with_capacity(offsets.len());
+        for (id, &(start, end)) in offsets.iter().enumerate() {
+            if start == end {
+                continue;
+            }
+            if let Ok(text) = std::str::from_utf8(&token_data[start as usize..end as usize]) {
+                if is_special_token(text) {
+                    continue;
+                }
+                let lower = text.to_lowercase();
+                sorted_tokens.push((lower, id));
+            }
+        }
+        // Sort by descending length for maximal-munch.
+        sorted_tokens.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+
         Ok(Self {
             token_data,
             offsets,
             blank_id,
+            sorted_tokens,
         })
     }
 
@@ -91,6 +110,39 @@ impl Vocabulary {
         self.offsets.len()
     }
 
+    /// Tokenize a phrase into token IDs using left-to-right maximal munch.
+    /// Returns empty if no in-vocab tokens match.
+    pub fn tokenize_greedy(&self, text: &str) -> Vec<usize> {
+        if text.is_empty() {
+            return Vec::new();
+        }
+
+        // Normalize: lowercase, prepend ▁ for word-initial position.
+        let normalized = format!("▁{}", text.to_lowercase().replace(' ', " ▁"));
+        let bytes = normalized.as_str();
+        let mut pos = 0;
+        let mut ids = Vec::new();
+
+        while pos < bytes.len() {
+            let remaining = &bytes[pos..];
+            let mut matched = false;
+            for (token, id) in &self.sorted_tokens {
+                if remaining.starts_with(token.as_str()) {
+                    ids.push(*id);
+                    pos += token.len();
+                    matched = true;
+                    break;
+                }
+            }
+            if !matched {
+                // Skip one UTF-8 character (OOV).
+                let c = remaining.chars().next().unwrap();
+                pos += c.len_utf8();
+            }
+        }
+        ids
+    }
+
     /// Create an empty vocabulary (for tests).
     #[cfg(test)]
     pub fn empty() -> Self {
@@ -98,6 +150,7 @@ impl Vocabulary {
             token_data: Vec::new(),
             offsets: Vec::new(),
             blank_id: 0,
+            sorted_tokens: Vec::new(),
         }
     }
 }

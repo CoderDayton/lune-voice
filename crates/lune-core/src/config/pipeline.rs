@@ -112,10 +112,26 @@ pub struct PipelineConfig {
     /// reference text uses spelled-out numbers.
     #[serde(default = "default_itn_enabled")]
     pub itn_enabled: bool,
+
+    // ── Word boosting ─────────────────────────────────────────────────
+    /// Boost dictionary replacement tokens in the ASR decoder logits.
+    #[serde(default = "default_word_boost_enabled")]
+    pub word_boost_enabled: bool,
+    /// Additive logit bias for boosted tokens (NVIDIA recommends 0.5–2.0).
+    #[serde(default = "default_word_boost_score")]
+    pub word_boost_score: f32,
 }
 
 fn default_itn_enabled() -> bool {
+    false
+}
+
+fn default_word_boost_enabled() -> bool {
     true
+}
+
+fn default_word_boost_score() -> f32 {
+    1.0
 }
 
 impl PipelineConfig {
@@ -154,6 +170,12 @@ impl PipelineConfig {
         }
         if let Some(v) = overrides.max_speech_secs {
             self.max_speech_samples = (v as usize) * 16_000;
+        }
+        if let Some(v) = overrides.word_boost_enabled {
+            self.word_boost_enabled = v;
+        }
+        if let Some(v) = overrides.word_boost_score {
+            self.word_boost_score = v;
         }
         self
     }
@@ -220,7 +242,9 @@ impl Default for PipelineConfig {
             llm_skip_threshold: Some(0.95),
             llm_skip_noisy_threshold: Some(0.30),
             max_speech_samples: 60 * 16_000,
-            itn_enabled: true,
+            itn_enabled: false,
+            word_boost_enabled: true,
+            word_boost_score: 1.0,
         }
     }
 }
@@ -242,6 +266,8 @@ pub struct PipelineOverrides {
     pub llm_skip_noisy_threshold: Option<f32>,
     /// Convenience alias: converted to `max_speech_samples` at merge time.
     pub max_speech_secs: Option<u32>,
+    pub word_boost_enabled: Option<bool>,
+    pub word_boost_score: Option<f32>,
 }
 
 #[cfg(test)]

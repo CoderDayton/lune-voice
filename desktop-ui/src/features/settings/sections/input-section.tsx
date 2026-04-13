@@ -3,12 +3,14 @@ import { activateLocale, locales, type LocaleKey } from "../../../i18n";
 import { saveWorkspaceSetting } from "../../../store/workspace-store";
 import { type SettingsProps, SettingsRow, SettingsSection } from "../components/section";
 import { activationModes } from "../data/settings-data";
+import { useDebouncedSetting } from "../hooks/use-debounced-setting";
 import { useLingui } from "@lingui/react/macro";
 import { Mic } from "lucide-react";
 
 export function InputSection({ settings }: SettingsProps) {
   const { t } = useLingui();
   const isParakeet = settings.asrBackend === "ParakeetTdt";
+  const [threshold, setThreshold] = useDebouncedSetting("speechThreshold", settings.speechThreshold);
 
   async function handleLanguageChange(locale: string) {
     const previousLocale = settings.language as LocaleKey;
@@ -63,12 +65,12 @@ export function InputSection({ settings }: SettingsProps) {
               min={0.2}
               max={0.9}
               step={0.05}
-              value={settings.speechThreshold}
-              onChange={(e) => void saveWorkspaceSetting("speechThreshold", e.target.value)}
+              value={threshold}
+              onChange={(e) => setThreshold(e.target.value)}
               aria-label={t`Pause sensitivity`}
             />
             <span className="text-xs tabular-nums text-content-muted w-8 text-right">
-              {Number(settings.speechThreshold) < 0.35 ? t`Slow` : Number(settings.speechThreshold) > 0.65 ? t`Fast` : t`Mid`}
+              {Number(threshold) < 0.35 ? t`Slow` : Number(threshold) > 0.65 ? t`Fast` : t`Mid`}
             </span>
           </div>
         }

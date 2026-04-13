@@ -62,14 +62,12 @@ export interface SaveWorkspaceSettingsInput {
   useGpu: boolean;
   devicePolicy: "Cpu" | "Cuda" | "Auto";
   asrBackendType: AsrBackendValue;
-  llmBackendType: string;
   confidenceThreshold: number | null;
   adaptiveVad: boolean;
   speechThreshold: number;
   stylePreset: string;
   hotkeyToggle: string;
   hotkeyCancel: string;
-  alignerEnabled: boolean;
   pillVisibility: PillVisibilityValue;
   language: string;
   // OpenAI ASR fields (sent when asrBackendType == "OpenAiCompatible")

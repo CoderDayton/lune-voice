@@ -220,6 +220,19 @@ pub async fn download_model_cmd(
 }
 
 #[tauri::command]
+pub async fn delete_model_cmd(window: WebviewWindow, local_name: String) -> Result<(), String> {
+    require_window_access(&window, &["main"])?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let paths = lune_persist::AppPaths::resolve().ok_or("resolve paths")?;
+        lune_persist::delete_model(&paths.models_dir(), &local_name)
+            .map_err(|e| format!("delete model: {e}"))?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| format!("delete model task: {e}"))?
+}
+
+#[tauri::command]
 pub async fn initialize_pipeline(
     window: WebviewWindow,
     runtime: State<'_, AppRuntime>,

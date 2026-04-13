@@ -486,6 +486,21 @@ async fn build_pipeline(
     let db = Arc::new(Mutex::new(
         Database::open(&paths.database_file()).map_err(|e| format!("open session db: {e}"))?,
     ));
+    // Wire dictionary replacement strings into the ASR decoder as boost phrases.
+    {
+        let pipeline = asr.pipeline_config().with_overrides(&settings.pipeline);
+        if pipeline.word_boost_enabled {
+            let phrases: Vec<String> = dict
+                .lock()
+                .await
+                .entries()
+                .iter()
+                .map(|e| e.replacement.clone())
+                .collect();
+            asr.set_boost_phrases(&phrases, pipeline.word_boost_score);
+        }
+    }
+
     let settings = Arc::new(RwLock::new(settings.clone()));
 
     let config = SessionManagerConfig {

@@ -1,7 +1,7 @@
 
 import { saveWorkspaceSetting } from "../../../store/workspace-store";
 import { type SettingsProps, SettingsRow, SettingsSection } from "../components/section";
-import { deliveryMethods, stylePresets } from "../data/settings-data";
+import { deliveryMethods } from "../data/settings-data";
 import { useLingui } from "@lingui/react/macro";
 import { TextCursorInput } from "lucide-react";
 
@@ -19,23 +19,6 @@ export function OutputSection({ settings }: SettingsProps) {
             onChange={(event) => void saveWorkspaceSetting("dictationMode", event.target.value as typeof settings.dictationMode)}
           >
             {deliveryMethods.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        }
-      />
-      <SettingsRow
-        label={t`Writing style`}
-        description={t`Pick the tone used when final cleanup is applied.`}
-        control={
-          <select
-            className="select w-full sm:w-auto sm:min-w-52"
-            value={settings.stylePreset}
-            onChange={(event) => void saveWorkspaceSetting("stylePreset", event.target.value)}
-          >
-            {stylePresets.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>

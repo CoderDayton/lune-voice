@@ -172,6 +172,8 @@ impl AsrRegistry {
                 min_speech_ms: 150,
                 adaptive_vad: false,
                 itn_enabled: true,
+                word_boost_enabled: true,
+                word_boost_score: 1.0,
                 // Thresholds are interpreted on the CALIBRATED probability
                 // scale (P(correct | raw)) after SessionManager runs the
                 // isotonic calibrator. Parakeet's raw softmax concentrates
@@ -195,6 +197,8 @@ impl AsrRegistry {
                 min_speech_ms: 200,
                 adaptive_vad: false,
                 itn_enabled: true,
+                word_boost_enabled: false,
+                word_boost_score: 1.0,
                 // No per-token log-probs from remote API — disable all
                 // confidence-based gating.
                 word_confidence_threshold: None,
@@ -202,6 +206,15 @@ impl AsrRegistry {
                 llm_skip_noisy_threshold: None,
                 max_speech_samples: 120 * 16_000,
             },
+        }
+    }
+
+    /// Set word boost phrases on the underlying ASR backend.
+    /// No-op for backends that don't support token-level boosting.
+    pub fn set_boost_phrases(&self, phrases: &[String], score: f32) {
+        match self {
+            Self::Parakeet(b) => b.set_boost_phrases(phrases, score),
+            Self::OpenAi(_) => {}
         }
     }
 

@@ -10,7 +10,7 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(async () => ({
   plugins: [
     tanstackRouter({ target: "react", autoCodeSplitting: true }),
-    react({ babel: { plugins: ["@lingui/babel-plugin-lingui-macro"] } }),
+    react({ babel: { plugins: ["babel-plugin-react-compiler", "@lingui/babel-plugin-lingui-macro"] } }),
     lingui(),
     tailwindcss(),
   ],
@@ -31,7 +31,7 @@ export default defineConfig(async () => ({
       "react-dom",
       "@tanstack/react-router",
       "@tanstack/react-store",
-      "@tanstack/react-query",
+
       "@tanstack/react-hotkeys",
       "@lingui/core",
       "@lingui/react",

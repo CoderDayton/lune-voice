@@ -707,11 +707,7 @@ async fn run_session<A: AsrBackend + 'static>(
                                     if !llm_enabled {
                                         let new_text = raw_text[prev_text_len..].trim_start();
                                         if !new_text.is_empty() {
-                                            let delivered = if config.pipeline.itn_enabled {
-                                                lune_llm::itn::normalize(new_text)
-                                            } else {
-                                                new_text.to_owned()
-                                            };
+                                            let delivered = new_text.to_owned();
                                             let _ = event_tx.try_send(
                                                 SessionEvent::FinalizedText(delivered),
                                             );
@@ -1109,14 +1105,7 @@ async fn run_session<A: AsrBackend + 'static>(
         let dict_applied = guard.apply(&post_llm_text);
         drop(guard);
 
-        // ITN for number/date formatting when no LLM post-processor is active.
-        // When a style LLM is the post_processor, it already handled formatting
-        // in the transform() call above.
-        if config.pipeline.itn_enabled {
-            lune_llm::itn::normalize(&dict_applied)
-        } else {
-            dict_applied
-        }
+        dict_applied
     };
 
     // When we already delivered text progressively per-segment (LLM off),

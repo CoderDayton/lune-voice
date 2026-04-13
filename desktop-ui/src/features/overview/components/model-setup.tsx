@@ -74,30 +74,34 @@ export function ModelSetup({ children }: { children: React.ReactNode }) {
     const unlisten = listen<DownloadProgress>("lune://download-progress", (e) => {
       setProgress(e.payload);
       if (e.payload.done) {
-        setModels((prev) => prev.map((m) => m.localName === activeModel ? { ...m, ready: true } : m));
-        setActiveModel(null);
+        setActiveModel((prev) => {
+          setModels((models) => models.map((m) => m.localName === prev ? { ...m, ready: true } : m));
+          return null;
+        });
         setTimeout(() => {
           invoke<ModelStatus[]>("check_model_status").then((s) => {
             setModels(s);
-            const next = s.find((m) => selected.has(m.localName) && !m.ready);
-            if (next) {
-              // Chain to next pending model
-              setActiveModel(next.localName);
-              setProgress(null);
-              invoke("download_model_cmd", { localName: next.localName }).catch((e) => {
-                setError(String(e)); setPhase("error"); setActiveModel(null);
-              });
-            } else {
-              setPhase("complete");
-              localStorage.setItem("lune-setup-complete", "1");
-              invoke("initialize_pipeline").catch(() => {});
-            }
+            setSelected((sel) => {
+              const next = s.find((m) => sel.has(m.localName) && !m.ready);
+              if (next) {
+                setActiveModel(next.localName);
+                setProgress(null);
+                invoke("download_model_cmd", { localName: next.localName }).catch((e) => {
+                  setError(String(e)); setPhase("error"); setActiveModel(null);
+                });
+              } else {
+                setPhase("complete");
+                localStorage.setItem("lune-setup-complete", "1");
+                invoke("initialize_pipeline").catch(() => {});
+              }
+              return sel;
+            });
           });
         }, 400);
       }
     });
     return () => { unlisten.then((fn) => fn()); };
-  }, [activeModel, selected]);
+  }, []);
 
   function toggle(localName: string) {
     if (MODEL_META[localName]?.required) return;

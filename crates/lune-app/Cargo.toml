@@ -28,6 +28,9 @@ ort.workspace = true
 arboard.workspace = true
 enigo.workspace = true
 
+[target.'cfg(unix)'.dependencies]
+evdev = "0.13"
+
 [dev-dependencies]
 hound = "3.5"
 cpal.workspace = true

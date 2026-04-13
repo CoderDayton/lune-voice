@@ -1,18 +1,12 @@
 import { useStore } from "@tanstack/react-store";
 import { HistorySearch } from "./components/history-search";
 import { HistorySessionList } from "./components/history-session-list";
-import { workspaceStore } from "../../store/workspace-store";
+import { getVisibleSessionCount, workspaceStore } from "../../store/workspace-store";
 import { useLingui } from "@lingui/react/macro";
-
-function selectSessionCount(s: { historySessions: { id: string }[]; historySearch: string }) {
-  const query = s.historySearch.trim().toLowerCase();
-  if (!query) return s.historySessions.length;
-  return s.historySessions.filter((sess) => "transcript" in sess && String((sess as { transcript: string }).transcript).toLowerCase().includes(query)).length;
-}
 
 export function HistoryPage() {
   const { t } = useLingui();
-  const count = useStore(workspaceStore, selectSessionCount);
+  const count = useStore(workspaceStore, getVisibleSessionCount);
 
   return (
     <div className="page-stack">

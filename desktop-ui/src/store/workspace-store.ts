@@ -190,6 +190,52 @@ export function getVisibleHistorySessions(state: WorkspaceState) {
   return result;
 }
 
+export function getVisibleSessionCount(state: WorkspaceState) {
+  return getVisibleHistorySessions(state).length;
+}
+
+// Memoized aggregate stats — recomputed only when historySessions reference changes.
+export interface SessionStats {
+  totalWords: number;
+  totalMinutes: number;
+  count: number;
+}
+
+let _statsCache: { sessions: HistorySession[]; result: SessionStats } | null = null;
+
+export function getSessionStats(state: WorkspaceState): SessionStats {
+  const sessions = state.historySessions;
+  if (_statsCache && _statsCache.sessions === sessions) return _statsCache.result;
+  let words = 0;
+  let seconds = 0;
+  for (const s of sessions) { words += s.words; seconds += s.seconds; }
+  const result = { totalWords: words, totalMinutes: Math.round(seconds / 60), count: sessions.length };
+  _statsCache = { sessions, result };
+  return result;
+}
+
+// Memoized today-stats — recomputed only when historySessions reference or date changes.
+export interface TodayStats {
+  count: number;
+  words: number;
+}
+
+let _todayCache: { sessions: HistorySession[]; date: string; result: TodayStats } | null = null;
+
+export function getTodayStats(state: WorkspaceState): TodayStats {
+  const sessions = state.historySessions;
+  const today = new Date().toDateString();
+  if (_todayCache && _todayCache.sessions === sessions && _todayCache.date === today) return _todayCache.result;
+  let count = 0;
+  let words = 0;
+  for (const s of sessions) {
+    if (new Date(s.startedAt).toDateString() === today) { count++; words += s.words; }
+  }
+  const result = { count, words };
+  _todayCache = { sessions, date: today, result };
+  return result;
+}
+
 // ── Internal helpers ──────────────────────────────────────────────────
 
 function formatError(error: unknown) {

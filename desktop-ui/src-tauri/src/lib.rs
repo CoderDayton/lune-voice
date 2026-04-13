@@ -122,6 +122,7 @@ pub fn run() {
             pill::reposition_pill_center,
             commands::check_model_status,
             commands::download_model_cmd,
+            commands::delete_model_cmd,
             commands::initialize_pipeline
         ])
         .run(tauri::generate_context!())

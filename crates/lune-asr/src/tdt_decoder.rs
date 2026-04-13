@@ -60,6 +60,8 @@ pub struct TdtModel {
     encoder: Session,
     decoder_joint: Session,
     vocab: Vocabulary,
+    /// Token ID → additive logit bias for word boosting. Empty = no boost.
+    boost_map: std::collections::HashMap<usize, f32>,
 }
 
 impl TdtModel {
@@ -108,7 +110,36 @@ impl TdtModel {
             encoder,
             decoder_joint,
             vocab,
+            boost_map: std::collections::HashMap::new(),
         })
+    }
+
+    /// Build the word boost map from phrase strings. Each phrase is tokenized
+    /// via maximal-munch and all constituent token IDs receive the given
+    /// additive logit bias. Uses `or_insert` to prevent runaway bias on
+    /// shared subword tokens.
+    pub fn set_boost_map(&mut self, phrases: &[String], score: f32) {
+        self.boost_map.clear();
+        let mut skipped = 0usize;
+        for phrase in phrases {
+            let ids = self.vocab.tokenize_greedy(phrase);
+            if ids.is_empty() {
+                skipped += 1;
+                continue;
+            }
+            for id in ids {
+                self.boost_map.entry(id).or_insert(score);
+            }
+        }
+        if skipped > 0 {
+            tracing::warn!(skipped, "some boost phrases had no in-vocab tokens");
+        }
+        tracing::info!(
+            boosted_tokens = self.boost_map.len(),
+            phrases = phrases.len(),
+            score,
+            "word boost map built"
+        );
     }
 
     /// Run full transcription pipeline: encode → greedy decode → token-to-text.
@@ -246,7 +277,8 @@ impl TdtModel {
             // descending logit, so insertion is O(TOP_K).
             vocab_logits.clear();
             let mut top: [(f32, usize); TOP_K] = [(f32::NEG_INFINITY, blank_id); TOP_K];
-            for (i, &v) in logits_data.iter().take(vocab_size).enumerate() {
+            for (i, &raw) in logits_data.iter().take(vocab_size).enumerate() {
+                let v = raw + self.boost_map.get(&i).copied().unwrap_or(0.0);
                 vocab_logits.push(v);
                 // Insertion sort into `top` — NaN-safe via total_cmp.
                 if v.total_cmp(&top[TOP_K - 1].0).is_gt() {

@@ -1,8 +1,8 @@
 import type { LucideIcon } from "lucide-react";
-import { House, Clock, BookText, Settings } from "lucide-react";
+import { House, Clock, BookText, Paintbrush, Settings } from "lucide-react";
 
 export interface NavigationItem {
-  to: "/" | "/history" | "/dictionary" | "/settings";
+  to: "/" | "/history" | "/dictionary" | "/styles" | "/settings";
   label: string;
   icon: LucideIcon;
 }
@@ -22,6 +22,11 @@ export const navigationItems: NavigationItem[] = [
     to: "/dictionary",
     label: "Vocabulary",
     icon: BookText,
+  },
+  {
+    to: "/styles",
+    label: "Styles",
+    icon: Paintbrush,
   },
   {
     to: "/settings",

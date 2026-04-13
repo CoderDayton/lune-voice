@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Clock, Hash, Mic, Palette, CircleCheck, CircleX, Copy, Check } from "lucide-react";
 import type { HistorySession } from "../../../store/workspace-store";
 import { useLingui } from "@lingui/react/macro";
@@ -27,7 +27,7 @@ function relativeTime(iso: string): string {
 
 export function SessionDetailModal({ session, children }: SessionDetailModalProps) {
   const { t } = useLingui();
-  const [dialog, setDialog] = useState<HTMLDialogElement | null>(null);
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
   const [copied, setCopied] = useState(false);
   const titleId = useId();
   const transcriptId = useId();
@@ -54,6 +54,7 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
 
   // Ctrl+C copies full transcript when modal is open and no text is selected
   useEffect(() => {
+    const dialog = dialogRef.current;
     if (!dialog) return;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "c" && (e.ctrlKey || e.metaKey) && !window.getSelection()?.toString()) {
@@ -63,17 +64,14 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
     }
     dialog.addEventListener("keydown", onKeyDown);
     return () => dialog.removeEventListener("keydown", onKeyDown);
-  }, [dialog, session.transcript]);
+  });
 
   return (
     <>
-      {children(() => dialog?.showModal())}
+      {children(() => dialogRef.current?.showModal())}
 
       <dialog
-        ref={(el) => {
-          setDialog(el);
-          return () => setDialog(null);
-        }}
+        ref={dialogRef}
         className="modal backdrop-blur-sm"
         aria-labelledby={titleId}
         aria-describedby={transcriptId}

@@ -6,6 +6,7 @@ import { useLingui } from "@lingui/react/macro";
 import { Clock, Hash, MessageSquareText, Mic } from "lucide-react";
 import { StatusBadge, InfoBadge } from "../../components/ui/status-badge";
 import {
+  getSessionStats,
   summarizeAsrBackend,
   summarizeDictationMode,
   workspaceStore,
@@ -17,7 +18,8 @@ export function OverviewPage() {
   const loading = useStore(workspaceStore, (s) => s.runtime.loading);
   const asrBackend = useStore(workspaceStore, (s) => s.settings.asrBackend);
   const dictationMode = useStore(workspaceStore, (s) => s.settings.dictationMode);
-  const sessions = useStore(workspaceStore, (s) => s.historySessions);
+  const stats = useStore(workspaceStore, getSessionStats);
+  const recentSessions = useStore(workspaceStore, (s) => s.historySessions.slice(0, 5));
 
   const isActive = serviceStatus === "listening" || serviceStatus === "processing";
   const isConnected =
@@ -25,13 +27,7 @@ export function OverviewPage() {
     serviceStatus === "listening" ||
     serviceStatus === "processing";
   const isLoading = serviceStatus === "Connecting" || loading;
-  const showSkeleton = loading && sessions.length === 0;
-
-  const totalWords = sessions.reduce((sum, s) => sum + s.words, 0);
-  const totalSeconds = sessions.reduce((sum, s) => sum + s.seconds, 0);
-  const stats = { totalWords, totalMinutes: Math.round(totalSeconds / 60), count: sessions.length };
-
-  const recentSessions = sessions.slice(0, 5);
+  const showSkeleton = loading && stats.count === 0;
 
   return (
     <ModelSetup>

@@ -3024,6 +3024,7 @@ dependencies = [
  "chrono",
  "cpal",
  "enigo",
+ "evdev",
  "hound",
  "lune-asr",
  "lune-audio",

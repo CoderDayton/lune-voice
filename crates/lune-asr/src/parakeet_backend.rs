@@ -90,6 +90,18 @@ impl ParakeetTdtBackend {
             vocab,
         })
     }
+
+    /// Set word boost phrases. Tokenizes each phrase and builds a logit
+    /// bias map inside the decoder. No-op if phrases is empty.
+    pub fn set_boost_phrases(&self, phrases: &[String], score: f32) {
+        if phrases.is_empty() {
+            return;
+        }
+        match self.model.lock() {
+            Ok(mut model) => model.set_boost_map(phrases, score),
+            Err(e) => tracing::warn!(error = %e, "failed to lock model for boost map"),
+        }
+    }
 }
 
 #[async_trait::async_trait]

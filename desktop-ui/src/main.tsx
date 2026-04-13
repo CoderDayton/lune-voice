@@ -1,7 +1,6 @@
 import { HotkeysProvider } from "@tanstack/react-hotkeys";
 import ReactDOM from "react-dom/client";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nProvider } from "@lingui/react";
 import { i18n } from "@lingui/core";
 import { activateLocale, defaultLocale, locales } from "./i18n";
@@ -15,10 +14,8 @@ import "./app.css";
 // Apply saved theme before first paint to avoid flash
 applyTheme(getThemePreference());
 
-const queryClient = new QueryClient();
 const router = createRouter({
   routeTree,
-  context: { queryClient },
   defaultPendingComponent: () => (
     <div className="flex items-center justify-center p-8 sm:p-12">
       <span className="loading loading-spinner loading-md text-primary" />
@@ -53,11 +50,9 @@ function App() {
   return (
     <ErrorBoundary>
       <I18nProvider i18n={i18n}>
-        <QueryClientProvider client={queryClient}>
-          <HotkeysProvider>
-            <RouterProvider router={router} />
-          </HotkeysProvider>
-        </QueryClientProvider>
+        <HotkeysProvider>
+          <RouterProvider router={router} />
+        </HotkeysProvider>
       </I18nProvider>
     </ErrorBoundary>
   );

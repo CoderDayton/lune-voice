@@ -1,7 +1,7 @@
 
 import { useStore } from "@tanstack/react-store";
 import { Mic, Square } from "lucide-react";
-import { workspaceStore } from "../../../store/workspace-store";
+import { getTodayStats, workspaceStore } from "../../../store/workspace-store";
 import { useLingui } from "@lingui/react/macro";
 
 export function SidebarQuickStart() {
@@ -53,14 +53,7 @@ export function SidebarQuickStart() {
 
 export function SidebarTodayStats() {
   const { t } = useLingui();
-  const sessions = useStore(workspaceStore, (s) => s.historySessions);
-
-  const today = new Date().toDateString();
-  const todaySessions = sessions.filter((s) => new Date(s.startedAt).toDateString() === today);
-  const todayStats = {
-    count: todaySessions.length,
-    words: todaySessions.reduce((sum, s) => sum + s.words, 0),
-  };
+  const todayStats = useStore(workspaceStore, getTodayStats);
 
   return (
     <div className="mx-3.5 mb-3 rounded-box border border-surface-border bg-surface-hover px-4 py-3">

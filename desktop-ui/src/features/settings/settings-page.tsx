@@ -5,6 +5,7 @@ import { InputSection } from "./sections/input-section";
 import { TranscriptionSection } from "./sections/transcription-section";
 import { ShortcutsSection } from "./sections/shortcuts-section";
 import { OutputSection } from "./sections/output-section";
+import { ModelsSection } from "./sections/models-section";
 
 export function SettingsPage() {
   const settings = useStore(workspaceStore, (s) => s.settings);
@@ -15,6 +16,7 @@ export function SettingsPage() {
       <InputSection settings={settings} />
       <TranscriptionSection settings={settings} />
       <OutputSection settings={settings} />
+      <ModelsSection />
       <ShortcutsSection settings={settings} />
     </div>
   );

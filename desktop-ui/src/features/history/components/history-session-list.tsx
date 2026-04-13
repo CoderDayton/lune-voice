@@ -39,12 +39,23 @@ const SessionRow = memo(function SessionRow({ item }: SessionRowProps) {
 export function HistorySessionList() {
   const { t } = useLingui();
   const visibleSessions = useStore(workspaceStore, getVisibleHistorySessions);
-  const allSessions = useStore(workspaceStore, (s) => s.historySessions);
+  const totalCount = useStore(workspaceStore, (s) => s.historySessions.length);
   const searchQuery = useStore(workspaceStore, (s) => s.historySearch);
 
-  const groupMap = new Map<string, typeof visibleSessions>();
+  const today = new Date();
+  const todayStr = today.toDateString();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  const yesterdayStr = yesterday.toDateString();
+
+  const groupMap = new Map<string, HistorySession[]>();
   for (const session of visibleSessions) {
-    const label = formatGroupLabel(session.startedAt);
+    const dateStr = new Date(session.startedAt).toDateString();
+    let label: string;
+    if (dateStr === todayStr) label = "Today";
+    else if (dateStr === yesterdayStr) label = "Yesterday";
+    else label = new Date(session.startedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
     const items = groupMap.get(label);
     if (items) items.push(session);
     else groupMap.set(label, [session]);
@@ -58,7 +69,7 @@ export function HistorySessionList() {
         <span>
           {hasSearch
             ? t`No sessions match "${searchQuery.trim()}". Try a different search.`
-            : allSessions.length === 0
+            : totalCount === 0
               ? t`No sessions yet. Start dictating to see your transcripts here.`
               : t`No sessions found.`}
         </span>
@@ -82,14 +93,4 @@ export function HistorySessionList() {
       ))}
     </div>
   );
-}
-
-function formatGroupLabel(value: string) {
-  const date = new Date(value);
-  const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(today.getDate() - 1);
-  if (date.toDateString() === today.toDateString()) return "Today";
-  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
