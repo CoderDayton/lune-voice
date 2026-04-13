@@ -67,6 +67,22 @@ impl ModelSpec {
         }
     }
 
+    /// Qwen3-ASR 0.6B: encoder-decoder ONNX ASR model (custom export).
+    #[inline]
+    pub fn qwen3_asr() -> Self {
+        Self::Directory {
+            repo_id: "Qwen/Qwen3-ASR-0.6B".into(),
+            required_files: vec![
+                "tokenizer.json".into(),
+                "qwen3-asr-encoder.onnx".into(),
+                "qwen3-asr-embed-tokens.onnx".into(),
+                "qwen3-asr-decoder.onnx".into(),
+            ],
+            suffix_patterns: vec![".onnx_data".into()],
+            local_name: "qwen3-asr-0.6b-onnx".into(),
+        }
+    }
+
     /// Nemotron reranker 1B: cross-encoder for n-best hypothesis rescoring.
     #[inline]
     pub fn nemotron_reranker() -> Self {
@@ -147,6 +163,7 @@ pub fn check_model_status(
 
     let asr_spec = match asr_backend {
         AsrBackendConfig::ParakeetTdt { .. } => Some(ModelSpec::parakeet_tdt()),
+        AsrBackendConfig::Qwen3Asr { .. } => Some(ModelSpec::qwen3_asr()),
         _ => None,
     };
 

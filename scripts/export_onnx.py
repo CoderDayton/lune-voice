@@ -79,42 +79,93 @@ def _list_files(directory: Path) -> None:
 
 # ── INT4 Quantization ────────────────────────────────────────────────────────
 
-# Diverse calibration corpus covering ASR output styles: formal prose, technical
-# content, coding dictation, meeting notes, and casual speech. 32 samples drives
-# AWQ scale search and Scale Estimation without overfitting any single domain.
+# Multilingual calibration corpus for AWQ + Scale Estimation.  Covers English
+# (dominant use-case: dictation, technical, casual) plus representative samples
+# from all 30 Qwen3-ASR supported languages so INT4 quantization preserves
+# language-specific decoder pathways.  ~64 samples balances coverage vs cost.
 _CALIB_TEXTS: list[str] = [
+    # ── English (16 samples: formal, technical, casual, dictation) ──────────
     "The meeting is scheduled for Tuesday at three pm.",
-    "Please open the configuration file and save it to the downloads folder.",
     "She finished the report ahead of schedule and her manager approved it.",
-    "The thermal dissipation is roughly 450 watts and the substrate should not degrade.",
     "Install the dependency and then run the build command in the terminal.",
     "The quick brown fox jumps over the lazy dog.",
     "I wanted to follow up on our discussion last week regarding the project timeline.",
-    "The package was delayed in transit and the supplier was notified of the issue.",
     "Let's make an async function called sync data that awaits a fetch to the API.",
-    "The city thrived for years in the shadow of those ancient walls.",
     "Handle the case where the cache is empty or the key does not exist.",
     "So we gotta nuke the old user profile class and replace it with a new interface.",
     "Thank you for getting back to me. I will review the document and send my feedback by Friday.",
-    "The build is failing on main and someone needs to fix that.",
-    "Discussed Q3 roadmap. Action: John handle the API redesign by next Tuesday.",
     "The main blocker is the dependency on the auth service owned by the platform team.",
-    "Returns a sorted copy of the slice without modifying the original.",
-    "The letter arrived on Monday after three weeks of delays.",
-    "Hey can you take a look at the PR when you get a chance?",
-    "It's totally ridiculous that the wear is this bad after a month.",
     "From the respect paid her on all sides she seemed like a queen.",
     "The church was built in the fourteenth century and restored in eighteen ninety.",
-    "Please confirm your attendance by responding to this email before Friday.",
-    "The server is currently processing your request. Please wait a moment.",
-    "We need to increase the timeout value and redeploy the service.",
     "The neural network was trained on a large corpus of annotated speech data.",
-    "I'll review the pull request and merge it once the CI pipeline passes.",
-    "The quarterly earnings report will be published on the company website.",
-    "Set the environment variable before running the initialization script.",
-    "She opened the door and walked into the conference room.",
-    "The activation function introduces non-linearity into the model architecture.",
     "After three weeks of testing we finally shipped the feature to production.",
+    "Hey can you take a look at the PR when you get a chance?",
+    "The quarterly earnings report will be published on the company website.",
+    # ── Chinese ─────────────────────────────────────────────────────────────
+    "今天的会议讨论了季度业绩报告的初步结果和下一步计划。",
+    "她打开窗户，清晨的阳光洒进了整个房间。",
+    # ── Cantonese ───────────────────────────────────────────────────────────
+    "今日嘅會議傾咗好多關於項目進度嘅嘢。",
+    # ── French ──────────────────────────────────────────────────────────────
+    "Je souhaite rappeler que ces droits étaient intégrés dans la réforme de deux mille huit.",
+    "La prochaine réunion est prévue pour mardi à quinze heures.",
+    # ── German ──────────────────────────────────────────────────────────────
+    "Es antwortet auf die Notwendigkeit, Filmförderung als Motor des interkulturellen Dialogs einzusetzen.",
+    "Die Sitzung wurde auf nächsten Donnerstag verschoben.",
+    # ── Spanish ─────────────────────────────────────────────────────────────
+    "Quiero comenzar mis palabras haciendo referencia a la huelga general en defensa de la educación pública.",
+    "El informe trimestral será publicado en el sitio web de la empresa.",
+    # ── Portuguese ──────────────────────────────────────────────────────────
+    "A reunião foi adiada para a próxima semana por motivos de agenda.",
+    # ── Italian ─────────────────────────────────────────────────────────────
+    "Il G8 e il G20 hanno confermato il nostro indirizzo sull'abolizione del segreto bancario.",
+    "La riunione è stata rinviata a giovedì prossimo.",
+    # ── Japanese ────────────────────────────────────────────────────────────
+    "本日の会議では四半期業績レポートの初期結果について議論しました。",
+    "彼女は窓を開けて、朝の光が部屋全体に差し込んだ。",
+    # ── Korean ──────────────────────────────────────────────────────────────
+    "오늘 회의에서 분기별 실적 보고서의 초기 결과를 논의했습니다.",
+    # ── Russian ─────────────────────────────────────────────────────────────
+    "Заседание было перенесено на следующий четверг из-за расписания.",
+    "Квартальный отчёт будет опубликован на сайте компании.",
+    # ── Arabic ──────────────────────────────────────────────────────────────
+    "تم تأجيل الاجتماع إلى يوم الخميس القادم بسبب ظروف الجدول الزمني.",
+    # ── Thai ────────────────────────────────────────────────────────────────
+    "การประชุมวันนี้ได้หารือเกี่ยวกับผลการดำเนินงานประจำไตรมาส",
+    # ── Vietnamese ──────────────────────────────────────────────────────────
+    "Cuộc họp hôm nay đã thảo luận về kết quả hoạt động hàng quý.",
+    # ── Indonesian ──────────────────────────────────────────────────────────
+    "Rapat hari ini membahas hasil kinerja kuartal dan rencana selanjutnya.",
+    # ── Turkish ─────────────────────────────────────────────────────────────
+    "Toplantı gelecek perşembe gününe ertelendi.",
+    # ── Hindi ───────────────────────────────────────────────────────────────
+    "आज की बैठक में तिमाही प्रदर्शन रिपोर्ट के प्रारंभिक परिणामों पर चर्चा हुई।",
+    # ── Malay ───────────────────────────────────────────────────────────────
+    "Mesyuarat hari ini membincangkan keputusan prestasi suku tahunan.",
+    # ── Dutch ───────────────────────────────────────────────────────────────
+    "De vergadering is verplaatst naar volgende donderdag.",
+    # ── Swedish ─────────────────────────────────────────────────────────────
+    "Mötet har flyttats till nästa torsdag på grund av schemat.",
+    # ── Danish ──────────────────────────────────────────────────────────────
+    "Mødet er udsat til næste torsdag.",
+    # ── Finnish ─────────────────────────────────────────────────────────────
+    "Kokous siirrettiin ensi torstaille aikataulusyistä.",
+    # ── Polish ──────────────────────────────────────────────────────────────
+    "Spotkanie zostało przeniesione na przyszły czwartek z powodu harmonogramu.",
+    # ── Czech ───────────────────────────────────────────────────────────────
+    "Schůzka byla přesunuta na příští čtvrtek kvůli rozvrhu.",
+    # ── Greek ───────────────────────────────────────────────────────────────
+    "Η συνεδρίαση αναβλήθηκε για την επόμενη Πέμπτη.",
+    # ── Romanian ────────────────────────────────────────────────────────────
+    "Ședința a fost amânată pentru joi viitoare din cauza programului.",
+    # ── Hungarian ───────────────────────────────────────────────────────────
+    "Az ülést a jövő csütörtökre halasztották az időbeosztás miatt.",
+    # ── Persian ─────────────────────────────────────────────────────────────
+    "جلسه به پنجشنبه آینده موکول شد.",
+    # ── Filipino ────────────────────────────────────────────────────────────
+    "Ang pulong ay inilipat sa susunod na Huwebes dahil sa iskedyul.",
+    # ── Macedonian ──────────────────────────────────────────────────────────
+    "Состанокот беше одложен за следниот четврток поради распоредот.",
 ]
 
 
@@ -607,7 +658,10 @@ def export_asr(
     print("[ASR]   Exporting qwen3-asr-encoder.onnx ...")
     enc = EncoderWrapper(thinker)
     enc.eval()
-    dummy_mel = torch.randn(1, 128, 200, dtype=DTYPE)
+    # Use a multi-chunk dummy (500 frames = 3 chunks of 200) so torch.export
+    # traces the chunking/reshape/windowing logic with symbolic shapes rather
+    # than baking in num_chunks=1 from a single-chunk dummy.
+    dummy_mel = torch.randn(1, 128, 500, dtype=DTYPE)
     mel_dim = torch.export.Dim("mel_frames", min=2, max=6000)
 
     torch.onnx.export(

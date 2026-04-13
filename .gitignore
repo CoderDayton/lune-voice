@@ -29,3 +29,4 @@ unsloth/qwen-asr-corrector/
 unsloth/asr_uncertainty_correction.jsonl
 .playwright-mcp/
 docs/daisyui-llms.txt
+confusion_bank.json

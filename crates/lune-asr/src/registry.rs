@@ -11,7 +11,10 @@ use lune_core::asr::{AsrBackend, AsrBackendKind, AsrSegment, AsrSessionConfig};
 use lune_core::config::{AsrBackendConfig, DevicePolicy, PipelineConfig};
 use lune_core::error::{Error, Result};
 
-use crate::{OpenAiAsrConfig, OpenAiCompatibleAsrBackend, ParakeetTdtBackend, ParakeetTdtConfig};
+use crate::{
+    OpenAiAsrConfig, OpenAiCompatibleAsrBackend, ParakeetTdtBackend, ParakeetTdtConfig,
+    Qwen3AsrBackend, Qwen3AsrConfig,
+};
 
 // ── Dispatch helpers ────────────────────────────────────────────────────────
 
@@ -31,6 +34,10 @@ macro_rules! dispatch_ref {
                 AsrSessionHandle::Parakeet(s) => b.$method(s $(, $arg)*).await,
                 _ => Err(mismatch_err()),
             },
+            AsrRegistry::Qwen3(b) => match $session {
+                AsrSessionHandle::Qwen3(s) => b.$method(s $(, $arg)*).await,
+                _ => Err(mismatch_err()),
+            },
             AsrRegistry::OpenAi(b) => match $session {
                 AsrSessionHandle::OpenAi(s) => b.$method(s $(, $arg)*).await,
                 _ => Err(mismatch_err()),
@@ -45,6 +52,7 @@ macro_rules! dispatch_ref {
 #[allow(clippy::large_enum_variant)]
 pub enum AsrRegistry {
     Parakeet(ParakeetTdtBackend),
+    Qwen3(Qwen3AsrBackend),
     OpenAi(OpenAiCompatibleAsrBackend),
 }
 
@@ -52,6 +60,7 @@ pub enum AsrRegistry {
 #[allow(clippy::large_enum_variant)]
 pub enum AsrSessionHandle {
     Parakeet(<ParakeetTdtBackend as AsrBackend>::SessionHandle),
+    Qwen3(<Qwen3AsrBackend as AsrBackend>::SessionHandle),
     OpenAi(<OpenAiCompatibleAsrBackend as AsrBackend>::SessionHandle),
 }
 
@@ -64,6 +73,7 @@ impl AsrBackend for AsrRegistry {
     async fn start_session(&self, config: AsrSessionConfig) -> Result<Self::SessionHandle> {
         match self {
             Self::Parakeet(b) => Ok(AsrSessionHandle::Parakeet(b.start_session(config).await?)),
+            Self::Qwen3(b) => Ok(AsrSessionHandle::Qwen3(b.start_session(config).await?)),
             Self::OpenAi(b) => Ok(AsrSessionHandle::OpenAi(b.start_session(config).await?)),
         }
     }
@@ -88,6 +98,10 @@ impl AsrBackend for AsrRegistry {
                 AsrSessionHandle::Parakeet(s) => b.end_session(s).await,
                 _ => Err(mismatch_err()),
             },
+            Self::Qwen3(b) => match session {
+                AsrSessionHandle::Qwen3(s) => b.end_session(s).await,
+                _ => Err(mismatch_err()),
+            },
             Self::OpenAi(b) => match session {
                 AsrSessionHandle::OpenAi(s) => b.end_session(s).await,
                 _ => Err(mismatch_err()),
@@ -102,6 +116,7 @@ impl AsrBackend for AsrRegistry {
     fn supports_streaming(&self) -> bool {
         match self {
             Self::Parakeet(_) => false,
+            Self::Qwen3(_) => false,
             Self::OpenAi(_) => false,
         }
     }
@@ -129,6 +144,13 @@ impl AsrRegistry {
                 })?;
                 Ok(Self::Parakeet(backend))
             }
+            AsrBackendConfig::Qwen3Asr { .. } => {
+                let backend = Qwen3AsrBackend::new(Qwen3AsrConfig {
+                    model_dir: models_dir.join("qwen3-asr-0.6b-onnx"),
+                    use_gpu,
+                })?;
+                Ok(Self::Qwen3(backend))
+            }
             AsrBackendConfig::OpenAiCompatible {
                 base_url,
                 api_key,
@@ -153,6 +175,7 @@ impl AsrRegistry {
     pub fn kind(&self) -> AsrBackendKind {
         match self {
             Self::Parakeet(_) => AsrBackendKind::ParakeetTdt,
+            Self::Qwen3(_) => AsrBackendKind::Qwen3Asr,
             Self::OpenAi(_) => AsrBackendKind::OpenAiCompatible,
         }
     }
@@ -189,6 +212,25 @@ impl AsrRegistry {
                 llm_skip_noisy_threshold: Some(0.30),
                 max_speech_samples: 60 * 16_000,
             },
+            Self::Qwen3(_) => PipelineConfig {
+                // Qwen3 is a batch decoder — one complete utterance per decode.
+                // Flushing is controlled by the dictation toggle/hold release,
+                // not by silence. Set silence thresholds extremely high so the
+                // VAD never triggers a mid-utterance flush.
+                max_segment_ms: 300_000,
+                sentence_close_ms: 300_000,
+                hard_close_ms: 300_000,
+                speech_threshold: 0.5,
+                min_speech_ms: 200,
+                adaptive_vad: false,
+                itn_enabled: true,
+                word_boost_enabled: false,
+                word_boost_score: 1.0,
+                word_confidence_threshold: Some(0.85),
+                llm_skip_threshold: Some(0.95),
+                llm_skip_noisy_threshold: Some(0.30),
+                max_speech_samples: 300 * 16_000,
+            },
             Self::OpenAi(_) => PipelineConfig {
                 max_segment_ms: 30_000,
                 sentence_close_ms: 800,
@@ -214,6 +256,7 @@ impl AsrRegistry {
     pub fn set_boost_phrases(&self, phrases: &[String], score: f32) {
         match self {
             Self::Parakeet(b) => b.set_boost_phrases(phrases, score),
+            Self::Qwen3(b) => b.set_boost_phrases(phrases, score),
             Self::OpenAi(_) => {}
         }
     }

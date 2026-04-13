@@ -25,6 +25,7 @@ pub enum DevicePolicyDto {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AsrBackendTypeDto {
     ParakeetTdt,
+    Qwen3Asr,
     OpenAiCompatible,
 }
 

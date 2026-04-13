@@ -467,6 +467,7 @@ impl Default for AsrSessionConfig {
 #[non_exhaustive]
 pub enum AsrBackendKind {
     ParakeetTdt,
+    Qwen3Asr,
     OpenAiCompatible,
 }
 
@@ -479,6 +480,7 @@ impl AsrBackendKind {
     pub fn suggested_max_segment_ms(&self) -> u32 {
         match self {
             Self::ParakeetTdt => 30_000,
+            Self::Qwen3Asr => 30_000,
             Self::OpenAiCompatible => 30_000,
         }
     }
@@ -493,6 +495,7 @@ impl AsrBackendKind {
     pub fn slug(&self) -> &'static str {
         match self {
             Self::ParakeetTdt => "parakeet",
+            Self::Qwen3Asr => "qwen3asr",
             Self::OpenAiCompatible => "openai",
         }
     }

@@ -101,6 +101,7 @@ impl Default for UserSettings {
 #[non_exhaustive]
 pub enum AsrBackendConfig {
     ParakeetTdt {},
+    Qwen3Asr {},
     OpenAiCompatible {
         base_url: Url,
         api_key: RedactedString,

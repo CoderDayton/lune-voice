@@ -65,12 +65,14 @@ pub fn process_memory_usage() -> Option<MemoryUsage> {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BenchmarkAsr {
     Parakeet,
+    Qwen3,
 }
 
 impl BenchmarkAsr {
     fn parse(raw: &str) -> Option<Self> {
         match raw.trim().to_ascii_lowercase().as_str() {
             "parakeet" | "parakeet-tdt" => Some(Self::Parakeet),
+            "qwen3" | "qwen3-asr" | "qwen" => Some(Self::Qwen3),
             _ => None,
         }
     }
@@ -88,7 +90,7 @@ pub fn requested_benchmark_asr() -> Option<BenchmarkAsr> {
         if let Some(choice) = BenchmarkAsr::parse(&raw) {
             return Some(choice);
         }
-        eprintln!("  [warn] Ignoring unsupported ASR={raw:?}; expected parakeet");
+        eprintln!("  [warn] Ignoring unsupported ASR={raw:?}; expected parakeet|qwen3");
     }
 
     let mut args = std::env::args().skip(1);
@@ -97,7 +99,7 @@ pub fn requested_benchmark_asr() -> Option<BenchmarkAsr> {
             if let Some(choice) = BenchmarkAsr::parse(value) {
                 return Some(choice);
             }
-            eprintln!("  [warn] Ignoring unsupported --asr={value:?}; expected parakeet");
+            eprintln!("  [warn] Ignoring unsupported --asr={value:?}; expected parakeet|qwen3");
             return None;
         }
         if arg == "--asr" {
@@ -105,9 +107,9 @@ pub fn requested_benchmark_asr() -> Option<BenchmarkAsr> {
                 if let Some(choice) = BenchmarkAsr::parse(&value) {
                     return Some(choice);
                 }
-                eprintln!("  [warn] Ignoring unsupported --asr {value:?}; expected parakeet");
+                eprintln!("  [warn] Ignoring unsupported --asr {value:?}; expected parakeet|qwen3");
             } else {
-                eprintln!("  [warn] Ignoring bare --asr; expected parakeet");
+                eprintln!("  [warn] Ignoring bare --asr; expected parakeet|qwen3");
             }
             return None;
         }
@@ -117,16 +119,27 @@ pub fn requested_benchmark_asr() -> Option<BenchmarkAsr> {
 }
 
 pub fn benchmark_asr_entries(root: &std::path::Path) -> Vec<BenchmarkAsrEntry> {
-    let parakeet_dir = root.join("models/parakeet-tdt-0.6b");
-
+    let requested = requested_benchmark_asr();
     let mut entries = Vec::new();
-    if parakeet_dir.exists() {
+
+    let parakeet_dir = root.join("models/parakeet-tdt-0.6b");
+    if parakeet_dir.exists() && !matches!(requested, Some(BenchmarkAsr::Qwen3)) {
         entries.push(BenchmarkAsrEntry {
             display_name: "Parakeet-TDT-int8",
             backend_kind: AsrBackendKind::ParakeetTdt,
             config: AsrBackendConfig::ParakeetTdt {},
         });
     }
+
+    let qwen3_dir = root.join("models/qwen3-asr-0.6b-onnx");
+    if qwen3_dir.exists() && !matches!(requested, Some(BenchmarkAsr::Parakeet)) {
+        entries.push(BenchmarkAsrEntry {
+            display_name: "Qwen3-ASR-0.6B-int4",
+            backend_kind: AsrBackendKind::Qwen3Asr,
+            config: AsrBackendConfig::Qwen3Asr {},
+        });
+    }
+
     entries
 }
 

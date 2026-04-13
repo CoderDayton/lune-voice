@@ -1,5 +1,5 @@
 export type ActivationModeValue = "Toggle" | "Hold";
-export type AsrBackendValue = "ParakeetTdt" | "OpenAiCompatible";
+export type AsrBackendValue = "ParakeetTdt" | "Qwen3Asr" | "OpenAiCompatible";
 
 export type DictationModeValue = "TypeInPlace" | "Clipboard" | "Both";
 export type PillVisibilityValue = "Always" | "WhenDictating" | "Never";
@@ -21,7 +21,8 @@ export const pillVisibilityOptions: Option<PillVisibilityValue>[] = [
 ];
 
 export const asrBackends: Option<AsrBackendValue>[] = [
-  { value: "ParakeetTdt", label: "Parakeet TDT v3 (local, multilingual)" },
+  { value: "ParakeetTdt", label: "Parakeet TDT v3 (local)" },
+  { value: "Qwen3Asr", label: "Qwen3-ASR 0.6B (local)" },
   { value: "OpenAiCompatible", label: "Cloud API (OpenAI-compatible)" },
 ];
 

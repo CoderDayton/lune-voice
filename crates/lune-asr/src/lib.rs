@@ -6,13 +6,16 @@ mod nemotron_reranker;
 mod openai_backend;
 pub mod ort_utils;
 mod parakeet_backend;
+mod qwen3_backend;
 mod registry;
 mod tdt_decoder;
 mod vocab;
+pub mod whisper_mel;
 
 pub use confidence_calibrator::IsotonicCalibrator;
 pub use mel::extract_features;
 pub use nemotron_reranker::{NemotronReranker, NemotronRerankerConfig};
 pub use openai_backend::{OpenAiAsrConfig, OpenAiCompatibleAsrBackend, encode_wav_16bit};
 pub use parakeet_backend::{ParakeetTdtBackend, ParakeetTdtConfig};
+pub use qwen3_backend::{Qwen3AsrBackend, Qwen3AsrConfig};
 pub use registry::{AsrRegistry, AsrSessionHandle};

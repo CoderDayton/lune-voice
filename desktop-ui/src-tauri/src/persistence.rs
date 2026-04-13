@@ -307,6 +307,7 @@ fn resolve_device_policy(use_gpu: bool, policy: DevicePolicyDto) -> DevicePolicy
 fn asr_backend_type_to_dto(config: &AsrBackendConfig) -> AsrBackendTypeDto {
     match config {
         AsrBackendConfig::ParakeetTdt { .. } => AsrBackendTypeDto::ParakeetTdt,
+        AsrBackendConfig::Qwen3Asr { .. } => AsrBackendTypeDto::Qwen3Asr,
         AsrBackendConfig::OpenAiCompatible { .. } => AsrBackendTypeDto::OpenAiCompatible,
         _ => AsrBackendTypeDto::ParakeetTdt,
     }
@@ -336,6 +337,7 @@ fn asr_backend_from_type(
 ) -> Result<AsrBackendConfig, String> {
     Ok(match kind {
         AsrBackendTypeDto::ParakeetTdt => AsrBackendConfig::ParakeetTdt {},
+        AsrBackendTypeDto::Qwen3Asr => AsrBackendConfig::Qwen3Asr {},
         AsrBackendTypeDto::OpenAiCompatible => {
             // Prefer incoming DTO fields; fall back to current config values if already OpenAI.
             let (cur_url, cur_key, cur_model) = match current {

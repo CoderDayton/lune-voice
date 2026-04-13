@@ -51,3 +51,7 @@ path = "../../benchmarks/calibrate_confidence.rs"
 [[example]]
 name = "noisify_fixtures"
 path = "../../benchmarks/noisify_fixtures.rs"
+
+[[example]]
+name = "confusion_mine"
+path = "../../benchmarks/confusion_mine.rs"
