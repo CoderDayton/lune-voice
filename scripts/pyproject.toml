@@ -1,0 +1,13 @@
+[project]
+name = "scripts"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.13"
+dependencies = [
+    "onnx>=1.21.0",
+    "onnxruntime>=1.25.0",
+    "onnxscript>=0.7.0",
+    "qwen-asr>=0.0.6",
+    "torch>=2.11.0",
+    "transformers>=4.57.6",
+]
