@@ -11,8 +11,8 @@ use ort::session::Session;
 
 use lune_core::error::{Error, Result};
 
+use crate::decode::vocab::{Vocabulary, is_special_token};
 use crate::ort_utils::build_ort_session;
-use crate::vocab::{Vocabulary, is_special_token};
 
 // ── Public types ─────────────────────────────────────────────────────────────
 

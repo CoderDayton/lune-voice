@@ -345,8 +345,8 @@ fn main() {
 
     // Write JSON report
     let json_str = serde_json::to_string_pretty(&report).expect("serialize");
-    let out_path = root.join("confusion_bank.json");
-    std::fs::write(&out_path, &json_str).expect("write confusion_bank.json");
+    let out_path = root.join("benchmarks").join("confusion_bank.json");
+    std::fs::write(&out_path, &json_str).expect("write benchmarks/confusion_bank.json");
 
     let n_pairs = confusion_pairs.len();
     println!();

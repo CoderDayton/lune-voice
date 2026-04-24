@@ -9,6 +9,8 @@ use std::sync::{Arc, OnceLock};
 use ndarray::Array2;
 use rustfft::{Fft, FftPlanner, num_complex::Complex};
 
+pub mod whisper;
+
 // ── Preprocessor constants (TDT 128-mel) ─────────────────────────────────────
 
 const N_FFT: usize = 512;

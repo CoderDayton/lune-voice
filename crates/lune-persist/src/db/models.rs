@@ -1,6 +1,6 @@
 use diesel::prelude::*;
 
-use crate::schema::{dictionary, sessions, snippets};
+use super::schema::{dictionary, sessions, snippets};
 
 // ── Dictionary ───────────────────────────────────────────────────────────────
 

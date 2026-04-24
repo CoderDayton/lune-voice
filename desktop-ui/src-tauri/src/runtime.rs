@@ -567,8 +567,8 @@ async fn build_post_processor(
         LlmBackendConfig::Local { .. } => {
             let style_dir = models_dir.join("llama-3.2-1b-instruct-q4f16");
             if style_dir.join("tokenizer.json").exists() {
-                match lune_llm::ort_style_llm::OrtStyleLlm::new(
-                    lune_llm::ort_style_llm::OrtStyleLlmConfig {
+                match lune_llm::backend::ort_style::OrtStyleLlm::new(
+                    lune_llm::backend::ort_style::OrtStyleLlmConfig {
                         model_dir: style_dir,
                         use_gpu: true,
                         max_new_tokens: 128,

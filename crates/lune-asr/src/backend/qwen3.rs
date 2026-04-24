@@ -16,8 +16,8 @@ use tokenizers::Tokenizer;
 use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig, WordConfidence};
 use lune_core::error::{Error, Result};
 
+use crate::mel::whisper;
 use crate::ort_utils::OrtModelLoader;
-use crate::whisper_mel;
 
 // ── Model constants ─────────────────────────────────────────────────────────
 
@@ -71,7 +71,7 @@ struct Qwen3Models {
 
 pub struct Qwen3AsrBackend {
     models: Mutex<Qwen3Models>,
-    mel: whisper_mel::WhisperMelF16,
+    mel: whisper::WhisperMelF16,
     tokenizer: Tokenizer,
     boost_map: Mutex<std::collections::HashMap<i64, f32>>,
     /// Per-session context phrases injected into the system prompt.
@@ -112,7 +112,7 @@ impl Qwen3AsrBackend {
                 embed_tokens,
                 decoder,
             }),
-            mel: whisper_mel::WhisperMelF16::new_qwen(),
+            mel: whisper::WhisperMelF16::new_qwen(),
             tokenizer,
             boost_map: Mutex::new(std::collections::HashMap::new()),
             context_phrases: Mutex::new(Vec::new()),

@@ -9,9 +9,9 @@ use std::sync::Mutex;
 use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig, WordConfidence};
 use lune_core::error::{Error, Result};
 
+use crate::decode::tdt::{DecodedToken, TdtModel};
+use crate::decode::vocab::{Vocabulary, is_special_token};
 use crate::mel;
-use crate::tdt_decoder::{DecodedToken, TdtModel};
-use crate::vocab::{Vocabulary, is_special_token};
 
 /// Maximum audio buffer (60 seconds at 16 kHz). Parakeet handles long audio
 /// natively; chunked inference splits internally when needed.
@@ -366,7 +366,7 @@ impl ParakeetTdtBackend {
 
 // ── LCS merge for overlapping chunk transcripts ────────────────────────────
 
-use crate::lcs_merge::lcs_merge_words;
+use crate::decode::lcs::lcs_merge_words;
 
 // ── Per-word confidence from TDT tokens ─────────────────────────────────────
 

@@ -10,6 +10,10 @@
 //!
 //! Both produce identical `Vec<WordConfidence>` output.
 
+pub mod calibrator;
+
+pub use calibrator::IsotonicCalibrator;
+
 use lune_core::asr::WordConfidence;
 
 /// A decoded token with its confidence score and text.

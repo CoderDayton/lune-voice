@@ -1,9 +1,7 @@
 mod db;
 mod error;
 pub mod hub;
-mod models;
 mod paths;
-mod schema;
 mod settings;
 
 pub use db::{Database, StoredDictionaryEntry};

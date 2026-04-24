@@ -1,3 +1,6 @@
+pub mod models;
+pub mod schema;
+
 use std::path::Path;
 
 use chrono::{DateTime, Utc};
@@ -9,9 +12,9 @@ use uuid::Uuid;
 use lune_core::asr::AsrBackendKind;
 use lune_core::session::{DictationSession, SessionStatus};
 
+use self::models::{NewDictionaryEntry, NewSession, NewSnippet};
+use self::schema::{dictionary, sessions, snippets};
 use crate::error::{PersistError, PersistResult};
-use crate::models::{NewDictionaryEntry, NewSession, NewSnippet};
-use crate::schema::{dictionary, sessions, snippets};
 
 type SessionRow7 = (
     String,
@@ -149,7 +152,7 @@ impl Database {
     pub fn list_dictionary_entries_with_ids(
         &mut self,
     ) -> PersistResult<Vec<StoredDictionaryEntry>> {
-        use crate::schema::dictionary::dsl::*;
+        use self::schema::dictionary::dsl::*;
 
         let rows = dictionary
             .select((id, phrase, replacement, priority))
@@ -194,7 +197,7 @@ impl Database {
     }
 
     pub fn list_snippets(&mut self) -> PersistResult<Vec<lune_core::dict::Snippet>> {
-        use crate::schema::snippets::dsl::*;
+        use self::schema::snippets::dsl::*;
 
         let rows = snippets
             .select((id, trigger_phrase, body))
@@ -215,7 +218,7 @@ impl Database {
         &mut self,
         trigger: &str,
     ) -> PersistResult<Option<lune_core::dict::Snippet>> {
-        use crate::schema::snippets::dsl::*;
+        use self::schema::snippets::dsl::*;
 
         let row = snippets
             .select((id, trigger_phrase, body))
@@ -271,7 +274,7 @@ impl Database {
     }
 
     pub fn list_sessions(&mut self, limit: u32) -> PersistResult<Vec<DictationSession>> {
-        use crate::schema::sessions::dsl::*;
+        use self::schema::sessions::dsl::*;
 
         let rows = sessions
             .select((id, started_at, ended_at, style, backend, status, transcript))
@@ -288,7 +291,7 @@ impl Database {
     }
 
     pub fn get_session(&mut self, session_id: Uuid) -> PersistResult<Option<DictationSession>> {
-        use crate::schema::sessions::dsl::*;
+        use self::schema::sessions::dsl::*;
 
         let id_str = session_id.to_string();
         let row = sessions
@@ -301,7 +304,7 @@ impl Database {
     }
 
     pub fn update_session(&mut self, session: &DictationSession) -> PersistResult<()> {
-        use crate::schema::sessions::dsl::*;
+        use self::schema::sessions::dsl::*;
 
         let status_str = serde_json::to_string(&session.status)
             .map_err(|e| PersistError::Migration(format!("status serialize: {e}")))?;
@@ -321,7 +324,7 @@ impl Database {
     /// Delete sessions whose `started_at` is older than `days` days ago.
     /// Returns the number of rows deleted.
     pub fn prune_sessions(&mut self, days: u32) -> PersistResult<usize> {
-        use crate::schema::sessions::dsl::*;
+        use self::schema::sessions::dsl::*;
 
         // RFC3339 strings sort lexicographically, so < comparison is safe.
         let cutoff = (Utc::now() - chrono::Duration::days(i64::from(days))).to_rfc3339();
