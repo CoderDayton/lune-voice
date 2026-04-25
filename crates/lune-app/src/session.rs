@@ -1,4 +1,3 @@
-use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -38,7 +37,7 @@ impl Default for SessionManagerConfig {
     fn default() -> Self {
         Self {
             asr_config: AsrSessionConfig::default(),
-            asr_backend_kind: AsrBackendKind::ParakeetTdt,
+            asr_backend_kind: AsrBackendKind::Qwen3Asr,
             pipeline: PipelineConfig::default(),
         }
     }
@@ -383,59 +382,6 @@ fn append_segments(
         all_segments.push(seg);
     }
     appended
-}
-
-fn prepare_text_for_llm(
-    segments: &[AsrSegment],
-    source_text: &str,
-    segment_text: &str,
-    threshold: f32,
-    lang_tag: &str,
-    contextual: bool,
-) -> (String, bool) {
-    if source_text == segment_text {
-        return if contextual {
-            lune_llm::prepare_input_contextual(segments, threshold, lang_tag)
-        } else {
-            lune_llm::prepare_input(segments, threshold, lang_tag)
-        };
-    }
-
-    // Remap word confidences onto rewritten text (after command stripping / FA reorder).
-    // Collect all (word_lower, confidence) pairs, match each source word to the first
-    // unconsumed entry so markers survive reordering and word removal.
-    let mut conf_pool: HashMap<String, VecDeque<f32>> = HashMap::new();
-    for wc in segments.iter().flat_map(|seg| seg.word_confidences.iter()) {
-        conf_pool
-            .entry(wc.word.to_lowercase())
-            .or_default()
-            .push_back(wc.confidence);
-    }
-
-    let marked: String = source_text
-        .split_whitespace()
-        .map(|word| {
-            let lower = word.to_lowercase();
-            if let Some(confidences) = conf_pool.get_mut(&lower)
-                && let Some(confidence) = confidences.pop_front()
-                && confidence < threshold
-            {
-                return format!("[?{word}?]");
-            }
-            word.to_owned()
-        })
-        .collect::<Vec<_>>()
-        .join(" ");
-
-    // Only remove fillers that are marked uncertain ([?uh?]) — bare confident
-    // fillers are left for the LLM to handle. This prevents stripping real words
-    // that the ASR misheard as fillers (e.g. quick "you" → "uh").
-    let cleaned = match lune_llm::fillers::remove_fillers_marked_only(&marked, lang_tag) {
-        Ok(text) => text,
-        Err(_) => marked,
-    };
-    let has_uncertain = lune_llm::has_uncertainty_markers(&cleaned);
-    (cleaned, has_uncertain)
 }
 
 /// Fold every segment's pre-built N-best hypothesis list into a single
@@ -912,19 +858,81 @@ async fn run_session<A: AsrBackend + 'static>(
     let lang = settings.read().await.language.clone();
     let lang_tag = lang.split(['-', '_']).next().unwrap_or("en");
 
-    // Bimodal adaptive LLM gate (arXiv:2509.25048 — confidence-guided
-    // correction). The LLM correction pass runs only when the segment
-    // lands in the productive middle band: not so clean that correction
-    // is wasted work, not so broken that the corrector will overcorrect.
+    // ── Step 1: Reranker ──────────────────────────────────────────────
+    // Run FIRST on raw ASR output (before any text processing). When ≥2
+    // distinct hypotheses exist and the reranker is present, score all
+    // candidates in a single forward pass and return the top-1 verbatim.
+    // Strictly additive: worst case is the argmax.
+    let hypotheses: Vec<String> = collect_nbest(&segments);
+    let reranker_margin: f32 = std::env::var("LUNE_RERANKER_MARGIN")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(5.0);
+    let reranker_choice = if let (Some(rr), true) = (reranker.as_ref(), hypotheses.len() >= 2) {
+        let query = "most fluent and contextually plausible transcription";
+        match rr.score(query, &hypotheses) {
+            Ok(scores) => {
+                let argmax_score = scores.first().copied().unwrap_or(0.0);
+                let (best_idx, best_score) = scores
+                    .iter()
+                    .enumerate()
+                    .max_by(|(_, a), (_, b)| a.total_cmp(b))
+                    .map(|(i, &s)| (i, s))
+                    .unwrap_or((0, argmax_score));
+                let chosen_idx = if best_idx == 0 || (best_score - argmax_score) >= reranker_margin
+                {
+                    best_idx
+                } else {
+                    0
+                };
+                info!(
+                    %session_id,
+                    count = hypotheses.len(),
+                    best_idx,
+                    chosen_idx,
+                    argmax_score,
+                    best_score,
+                    margin_required = reranker_margin,
+                    margin_observed = best_score - argmax_score,
+                    "[reranker] scored candidates"
+                );
+                Some(hypotheses[chosen_idx].clone())
+            }
+            Err(e) => {
+                warn!(error = %e, "reranker failed, falling back to LLM path");
+                None
+            }
+        }
+    } else {
+        None
+    };
+    if let Some(ref chosen) = reranker_choice {
+        info!(%session_id, "[reranker] chosen: {chosen}");
+    }
+    // Apply reranker winner to text_after_commands if it won.
+    let text_after_commands = if let Some(ref chosen) = reranker_choice {
+        chosen.clone()
+    } else {
+        text_after_commands
+    };
+
+    // ── Step 2: Dictionary ────────────────────────────────────────────
+    // Apply dictionary corrections to the (possibly reranked) text before
+    // the bimodal gate and LLM.
+    let text_after_dict = {
+        let guard = dict.lock().await;
+        guard.apply(&text_after_commands)
+    };
+
+    // ── Step 3: Bimodal skip ──────────────────────────────────────────
+    // Adaptive LLM gate (arXiv:2509.25048 — confidence-guided correction).
+    // The LLM correction pass runs only when the segment lands in the
+    // productive middle band: not so clean that correction is wasted work,
+    // not so broken that the corrector will overcorrect.
     //
     // - skip-when-clean: every word ≥ llm_skip_threshold → bypass
     // - skip-when-broken: any segment's min_token_confidence below
     //                      llm_skip_noisy_threshold → bypass
-    //
-    // The gate is "adaptive" in that the decision is driven by live,
-    // per-segment metrics (every utterance is classified individually
-    // from its own calibrated confidence distribution) rather than a
-    // static cutoff applied to the prepared prompt.
     let skip_clean = config.pipeline.llm_skip_threshold.is_some_and(|skip| {
         !segments.is_empty() && segments.iter().all(|s| s.is_clean_for_llm(skip))
     });
@@ -935,7 +943,11 @@ async fn run_session<A: AsrBackend + 'static>(
             !segments.is_empty() && segments.iter().any(|s| s.is_broken_for_llm(broken))
         });
 
-    let (prepared, has_uncertain) = if skip_clean || skip_broken {
+    drain_processing_controls(&mut control_rx, &mut cancelled);
+    let post_llm_text = if cancelled {
+        info!(%session_id, "session cancelled during processing, skipping LLM");
+        String::new()
+    } else if skip_clean || skip_broken {
         debug!(
             %session_id,
             reason = if skip_clean { "clean" } else { "broken" },
@@ -943,113 +955,23 @@ async fn run_session<A: AsrBackend + 'static>(
             broken = config.pipeline.llm_skip_noisy_threshold.unwrap_or(0.0),
             "[LLM] bimodal gate: bypassing correction"
         );
-        (text_after_commands.clone(), false)
+        text_after_dict.clone()
     } else {
-        match config.pipeline.word_confidence_threshold {
-            Some(threshold) => prepare_text_for_llm(
-                &segments,
-                &text_after_commands,
-                &raw_text,
-                threshold,
-                lang_tag,
-                true, // use contextual confidence
-            ),
-            None => {
-                // No confidence data (e.g. OpenAI backend) — skip LLM, pass through raw text.
-                (text_after_commands.clone(), false)
-            }
-        }
-    };
-
-    drain_processing_controls(&mut control_rx, &mut cancelled);
-    let post_llm_text = if cancelled {
-        info!(%session_id, "session cancelled during processing, skipping LLM");
-        String::new()
-    } else if !has_uncertain {
-        info!(%session_id, "[LLM] no change");
-        prepared
-    } else {
-        // Collect the aggregate N-best hypothesis list across segments.
-        // When ≥2 distinct hypotheses exist, route to the Nemotron
-        // reranker (if attached) or fall through to the generative LLM's
-        // n-best rescoring path. Otherwise use the existing marker
-        // correction path on `raw_text`.
-        let hypotheses: Vec<String> = collect_nbest(&segments);
-
-        // Fast path: Nemotron reranker. When present and we have ≥2
-        // hypotheses, score all candidates in a single forward pass and
-        // return the top-1 verbatim — no generation, no parsing, no
-        // fallback layers. Strictly additive: output is always one of
-        // the input hypotheses, so worst case is the argmax.
-        //
-        // Conservative switch guard: the reranker was trained on Q&A
-        // retrieval (NQ/HotpotQA/FiQA/etc.) and is somewhat out-of-
-        // distribution for ASR fluency scoring. On our fixtures with
-        // `LUNE_RERANKER_MARGIN=0` it regresses several noisy segments
-        // by picking plausible-but-wrong alternates. We require the
-        // winning alternate to beat the argmax by at least `margin`
-        // logits before we accept the swap — on the sanity check a
-        // truly relevant match scored +31 over irrelevant, so a margin
-        // around 5.0 reliably separates "confident swap" from noise.
-        let reranker_margin: f32 = std::env::var("LUNE_RERANKER_MARGIN")
-            .ok()
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(5.0);
-        let reranker_choice = if let (Some(rr), true) = (reranker.as_ref(), hypotheses.len() >= 2) {
-            let query = "most fluent and contextually plausible transcription";
-            match rr.score(query, &hypotheses) {
-                Ok(scores) => {
-                    let argmax_score = scores.first().copied().unwrap_or(0.0);
-                    let (best_idx, best_score) = scores
-                        .iter()
-                        .enumerate()
-                        .max_by(|(_, a), (_, b)| a.total_cmp(b))
-                        .map(|(i, &s)| (i, s))
-                        .unwrap_or((0, argmax_score));
-                    // Only accept the swap when the margin is decisive.
-                    // Below threshold, fall back to argmax (hypothesis 0)
-                    // so the reranker is strictly non-regressive.
-                    let chosen_idx =
-                        if best_idx == 0 || (best_score - argmax_score) >= reranker_margin {
-                            best_idx
-                        } else {
-                            0
-                        };
-                    info!(
-                        %session_id,
-                        count = hypotheses.len(),
-                        best_idx,
-                        chosen_idx,
-                        argmax_score,
-                        best_score,
-                        margin_required = reranker_margin,
-                        margin_observed = best_score - argmax_score,
-                        "[reranker] scored candidates"
-                    );
-                    Some(hypotheses[chosen_idx].clone())
-                }
-                Err(e) => {
-                    warn!(error = %e, "reranker failed, falling back to LLM path");
-                    None
-                }
-            }
-        } else {
-            None
-        };
-
+        // ── Step 4: LLM ───────────────────────────────────────────────
+        // Pass the clean text (after reranker + dictionary) directly —
+        // no [?word?] markers. The LLM does context-based correction
+        // and style formatting.
         if !hypotheses.is_empty() {
             info!(
                 %session_id,
                 count = hypotheses.len(),
-                reranker_used = reranker_choice.is_some(),
-                "[LLM] n-best input: {:?}",
+                "[LLM] n-best hypotheses: {:?}",
                 hypotheses
             );
-        } else {
-            info!(%session_id, "[LLM] marker input: {prepared}");
         }
+        info!(%session_id, "[LLM] input: {text_after_dict}");
         let input = lune_core::llm::PostProcessInput {
-            raw_text: prepared.clone(),
+            raw_text: text_after_dict.clone(),
             style_preset: Arc::clone(&style_preset),
             app_category: None,
             dictionary: dictionary_entries.clone(),
@@ -1057,30 +979,20 @@ async fn run_session<A: AsrBackend + 'static>(
             language: lang_tag.into(),
             hypotheses,
         };
-
-        // If the reranker already picked a winner, short-circuit the
-        // generative LLM entirely. The reranker output is verbatim one
-        // of the hypotheses, so no further correction, parsing, or
-        // validation is needed.
-        if let Some(chosen) = reranker_choice {
-            info!(%session_id, "[reranker] chosen: {chosen}");
-            chosen
-        } else {
-            match post_processor.transform(&input).await {
-                Ok(output) => {
-                    drain_processing_controls(&mut control_rx, &mut cancelled);
-                    if cancelled {
-                        info!(%session_id, "session cancelled during LLM processing");
-                        String::new()
-                    } else {
-                        info!(%session_id, "[LLM] {}", output.cleaned_text);
-                        output.cleaned_text
-                    }
+        match post_processor.transform(&input).await {
+            Ok(output) => {
+                drain_processing_controls(&mut control_rx, &mut cancelled);
+                if cancelled {
+                    info!(%session_id, "session cancelled during LLM processing");
+                    String::new()
+                } else {
+                    info!(%session_id, "[LLM] {}", output.cleaned_text);
+                    output.cleaned_text
                 }
-                Err(e) => {
-                    warn!(error = %e, "LLM correction failed, using prepared text");
-                    prepared
-                }
+            }
+            Err(e) => {
+                warn!(error = %e, "LLM correction failed, using text as-is");
+                text_after_dict.clone()
             }
         }
     };
@@ -1100,13 +1012,7 @@ async fn run_session<A: AsrBackend + 'static>(
         return;
     }
 
-    let final_text = {
-        let guard = dict.lock().await;
-        let dict_applied = guard.apply(&post_llm_text);
-        drop(guard);
-
-        dict_applied
-    };
+    let final_text = post_llm_text;
 
     // When we already delivered text progressively per-segment (LLM off),
     // don't re-paste — emit CorrectedText as a UI signal with the
@@ -1395,38 +1301,6 @@ mod tests {
                 assert!(matches!(session.status, SessionStatus::Completed));
             })
             .await;
-    }
-
-    #[tokio::test]
-    async fn rewritten_text_uses_source_text_for_llm() {
-        // Segment text has "new line" voice command; source_text has it stripped.
-        // Word confidences match the segment text — "helo" is low-conf (ASR error).
-        let segments = vec![AsrSegment {
-            id: 1,
-            text: "helo new line world".into(),
-            confidence: Some(0.5),
-            min_token_confidence: Some(0.4),
-            word_confidences: vec![
-                WordConfidence::new("helo", 0.4),
-                WordConfidence::new("new", 0.95),
-                WordConfidence::new("line", 0.95),
-                WordConfidence::new("world", 0.95),
-            ],
-            hypotheses: Vec::new(),
-            is_final: true,
-            start_ms: Some(0),
-            end_ms: Some(500),
-        }];
-        let (prepared, has_uncertain) = prepare_text_for_llm(
-            &segments,
-            "helo world",
-            "helo new line world",
-            0.65,
-            "en",
-            true,
-        );
-        assert_eq!(prepared, "[?helo?] world");
-        assert!(has_uncertain);
     }
 
     #[tokio::test]

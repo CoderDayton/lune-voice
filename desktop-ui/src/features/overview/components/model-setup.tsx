@@ -26,7 +26,7 @@ type Phase = "checking" | "ready" | "setup" | "downloading" | "complete" | "erro
 const MODEL_META: Record<string, { description: string; required: boolean; icon: typeof Mic }> = {
   "parakeet-tdt-0.6b": { description: "Speech recognition — converts voice to text. 25 languages with auto-detection.", required: true, icon: Mic },
   "nemotron-rerank-1b": { description: "Accuracy booster — rescores candidates to pick the most fluent transcription.", required: true, icon: Shield },
-  "llama-3.2-1b-instruct-q4f16": { description: "Style formatting — reformats transcripts (casual, professional, code).", required: false, icon: Wand2 },
+  "qwen3-0.6b": { description: "Style & correction — fixes grammar and reformats transcripts.", required: false, icon: Wand2 },
 };
 
 export function ModelSetup({ children }: { children: React.ReactNode }) {

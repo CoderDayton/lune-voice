@@ -94,18 +94,14 @@ impl ModelSpec {
         }
     }
 
-    /// Llama-3.2-1B-Instruct Q4F16: style LLM for transcript reformatting.
+    /// Qwen3-0.6B FP16: style/correction LLM for transcript cleanup.
     #[inline]
     pub fn style_llm() -> Self {
         Self::Directory {
-            repo_id: "onnx-community/Llama-3.2-1B-Instruct-ONNX".into(),
-            required_files: vec![
-                "tokenizer.json".into(),
-                "onnx/model_q4f16.onnx".into(),
-                "onnx/model_q4f16.onnx_data".into(),
-            ],
+            repo_id: "onnx-community/Qwen3-0.6B-ONNX".into(),
+            required_files: vec!["tokenizer.json".into(), "onnx/model_fp16.onnx".into()],
             suffix_patterns: vec![],
-            local_name: "llama-3.2-1b-instruct-q4f16".into(),
+            local_name: "qwen3-0.6b".into(),
         }
     }
 
@@ -115,7 +111,7 @@ impl ModelSpec {
             Self::Directory { local_name, .. } => match local_name.as_str() {
                 "parakeet-tdt-0.6b" => "Parakeet TDT 0.6B",
                 "nemotron-rerank-1b" => "Nemotron Reranker 1B",
-                "llama-3.2-1b-instruct-q4f16" => "Llama 3.2 1B Style LLM",
+                "qwen3-0.6b" => "Qwen3 0.6B Style LLM",
                 _ => local_name,
             },
         }
@@ -130,11 +126,7 @@ impl ModelSpec {
                 ..
             } => {
                 let dir = models_dir.join(local_name);
-                dir.exists()
-                    && required_files.iter().all(|f| {
-                        let flat = Path::new(f).file_name().unwrap_or(f.as_ref());
-                        dir.join(flat).is_file()
-                    })
+                dir.exists() && required_files.iter().all(|f| dir.join(f).is_file())
             }
         }
     }
@@ -156,18 +148,12 @@ impl ModelSpec {
 /// Does NOT download anything.
 pub fn check_model_status(
     models_dir: &Path,
-    asr_backend: &AsrBackendConfig,
+    _asr_backend: &AsrBackendConfig,
     _llm_backend: &lune_core::config::LlmBackendConfig,
 ) -> Vec<ModelStatus> {
     let mut statuses = Vec::new();
 
-    let asr_spec = match asr_backend {
-        AsrBackendConfig::ParakeetTdt { .. } => Some(ModelSpec::parakeet_tdt()),
-        AsrBackendConfig::Qwen3Asr { .. } => Some(ModelSpec::qwen3_asr()),
-        _ => None,
-    };
-
-    if let Some(spec) = &asr_spec {
+    for spec in [ModelSpec::parakeet_tdt(), ModelSpec::qwen3_asr()] {
         statuses.push(ModelStatus {
             name: spec.display_name().to_string(),
             repo_id: spec.repo_id().to_string(),
@@ -220,7 +206,7 @@ pub fn download_model(
     let spec = match local_name {
         "parakeet-tdt-0.6b" => ModelSpec::parakeet_tdt(),
         "nemotron-rerank-1b" => ModelSpec::nemotron_reranker(),
-        "llama-3.2-1b-instruct-q4f16" => ModelSpec::style_llm(),
+        "qwen3-0.6b" => ModelSpec::style_llm(),
         _ => {
             return Err(PersistError::ModelDownload(format!(
                 "unknown model: {local_name}"

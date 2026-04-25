@@ -309,7 +309,7 @@ fn asr_backend_type_to_dto(config: &AsrBackendConfig) -> AsrBackendTypeDto {
         AsrBackendConfig::ParakeetTdt { .. } => AsrBackendTypeDto::ParakeetTdt,
         AsrBackendConfig::Qwen3Asr { .. } => AsrBackendTypeDto::Qwen3Asr,
         AsrBackendConfig::OpenAiCompatible { .. } => AsrBackendTypeDto::OpenAiCompatible,
-        _ => AsrBackendTypeDto::ParakeetTdt,
+        _ => AsrBackendTypeDto::Qwen3Asr,
     }
 }
 

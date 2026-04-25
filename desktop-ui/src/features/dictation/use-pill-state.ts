@@ -137,26 +137,8 @@ export function usePillState() {
     );
   }, [visible]);
 
-  // Hide pill briefly during mode transitions to let the webview render
-  // the new content before the compositor shows the window. Prevents
-  // ghost artifacts on transparent Wayland windows (wry #1667).
-  const prevModeRef = useRef(mode);
-  useEffect(() => {
-    if (!visible || !shownRef.current) {
-      prevModeRef.current = mode;
-      return;
-    }
-    const prev = prevModeRef.current;
-    prevModeRef.current = mode;
-    // Only hide/show when crossing idle↔active boundary
-    if ((prev === "idle") === (mode === "idle")) return;
-
-    invoke("hide_pill_window").catch(() => {});
-    const timer = setTimeout(() => {
-      invoke("show_pill_window").catch(() => {});
-    }, 60);
-    return () => clearTimeout(timer);
-  }, [mode, visible]);
+  // Pill show/hide is now driven directly from Rust via publish_status →
+  // show_pill_direct/hide_pill_direct, so no frontend hide/show cycle needed.
 
   return { mode, visible, recordingMode, audioLevel };
 }

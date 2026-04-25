@@ -42,13 +42,12 @@ const AUDIO_END: i64 = 151_670; // <|audio_end|>
 /// Base system prompt — language-neutral, minimal. Language is controlled
 /// via the `language X` suffix parameter, not the system prompt.
 const SYSTEM_PROMPT: &str = "\
-You are an automatic speech recognition system.\n\
-Task: transcribe the spoken audio exactly as spoken.\n\
-Do not translate.\n\
-Preserve the spoken language.\n\
-Output only the transcript text.\n\
-Use normal punctuation and capitalization when confident.\n\
-Do not add explanations, labels, notes, or metadata.";
+You are an ASR engine. \
+Transcribe the spoken audio exactly in the spoken language. \
+Do not translate. \
+Output only the transcript text. \
+Do not add words not clearly present. \
+If no speech, return empty string.";
 
 /// Maximum audio buffer (5 min at 16 kHz).
 const MAX_WINDOW_SAMPLES: usize = 300 * 16_000;
@@ -673,17 +672,30 @@ impl Qwen3AsrBackend {
     /// Skips metadata tokens (everything up to and including `<asr_text>`),
     /// then aggregates BPE subwords into words using space-boundary detection.
     fn decode_output(&self, tokens: &[(i64, f32)]) -> (String, Vec<WordConfidence>) {
-        // Find content start: skip tokens up to <asr_text>
+        // Find content start: skip tokens up to and including <asr_text>.
+        // Also skip any IM_START/IM_END/NEWLINE metadata tokens that the
+        // model may echo before the actual transcript.
         let content_start = tokens
             .iter()
             .position(|(id, _)| *id == ASR_TEXT_ID)
             .map(|i| i + 1)
             .unwrap_or(0);
 
+        let is_meta = |id: i64| -> bool {
+            EOS_IDS.contains(&id)
+                || id == IM_START
+                || id == IM_END
+                || id == NEWLINE
+                || id == ASR_TEXT_ID
+                || id == AUDIO_START
+                || id == AUDIO_END
+        };
+
         let content: Vec<(i64, f32)> = tokens[content_start..]
             .iter()
-            .filter(|(id, _)| !EOS_IDS.contains(id))
             .copied()
+            .skip_while(|(id, _)| is_meta(*id))
+            .filter(|(id, _)| !is_meta(*id))
             .collect();
 
         if content.is_empty() {
@@ -692,12 +704,22 @@ impl Qwen3AsrBackend {
 
         // Decode full text
         let token_ids: Vec<u32> = content.iter().map(|(id, _)| *id as u32).collect();
-        let text = self
+        let mut text = self
             .tokenizer
             .decode(&token_ids, true)
             .unwrap_or_default()
             .trim()
             .to_string();
+        // Safety net: strip echoed system prompt fragments the model may
+        // regurgitate before the actual transcript.
+        for prefix in [
+            SYSTEM_PROMPT,
+            "You are an automatic speech recognition system",
+        ] {
+            if let Some(rest) = text.strip_prefix(prefix) {
+                text = rest.trim_start_matches(['.', '\n', ' ']).to_string();
+            }
+        }
 
         // Build per-word confidences via O(1) token lookup (not decode).
         // BPE pieces starting with space (' ' or 'Ġ') mark word boundaries.

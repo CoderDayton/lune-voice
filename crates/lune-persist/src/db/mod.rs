@@ -41,10 +41,9 @@ fn row_to_session(
                 .map_err(|e| PersistError::Migration(format!("ended_at: {e}")))
         })
         .transpose()?;
-    // Fall back to ParakeetTdt for sessions recorded with a since-removed
-    // backend (e.g. OrtQwenAsr) so history still loads after backend removal.
-    let backend: AsrBackendKind =
-        serde_json::from_str(&back).unwrap_or(AsrBackendKind::ParakeetTdt);
+    // Fall back to Qwen3Asr for sessions recorded with a since-removed
+    // backend so history still loads after backend removal.
+    let backend: AsrBackendKind = serde_json::from_str(&back).unwrap_or(AsrBackendKind::Qwen3Asr);
     let status: SessionStatus =
         serde_json::from_str(&stat).map_err(|e| PersistError::Migration(format!("status: {e}")))?;
     Ok(DictationSession {
@@ -423,7 +422,7 @@ mod tests {
             started_at: Utc::now(),
             ended_at: Some(Utc::now()),
             style: "casual".into(),
-            backend: AsrBackendKind::ParakeetTdt,
+            backend: AsrBackendKind::Qwen3Asr,
             status: SessionStatus::Completed,
             transcript: Some("Hello world.".into()),
         };
@@ -440,7 +439,7 @@ mod tests {
             started_at: Utc::now(),
             ended_at: None,
             style: "casual".into(),
-            backend: AsrBackendKind::ParakeetTdt,
+            backend: AsrBackendKind::Qwen3Asr,
             status: SessionStatus::Active,
             transcript: None,
         };
@@ -467,7 +466,7 @@ mod tests {
             started_at: Utc::now(),
             ended_at: None,
             style: "casual".into(),
-            backend: AsrBackendKind::ParakeetTdt,
+            backend: AsrBackendKind::Qwen3Asr,
             status: SessionStatus::Active,
             transcript: None,
         };
@@ -495,7 +494,7 @@ mod tests {
             started_at: old_time,
             ended_at: None,
             style: "casual".into(),
-            backend: AsrBackendKind::ParakeetTdt,
+            backend: AsrBackendKind::Qwen3Asr,
             status: SessionStatus::Completed,
             transcript: None,
         };
@@ -507,7 +506,7 @@ mod tests {
             started_at: Utc::now(),
             ended_at: None,
             style: "casual".into(),
-            backend: AsrBackendKind::ParakeetTdt,
+            backend: AsrBackendKind::Qwen3Asr,
             status: SessionStatus::Active,
             transcript: None,
         };

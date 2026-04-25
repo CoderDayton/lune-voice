@@ -6,7 +6,7 @@ use lune_asr::AsrRegistry;
 use lune_commands::VoiceCommandRouter;
 use lune_core::asr::AsrSessionConfig;
 use lune_core::command::VoiceCommand;
-use lune_core::config::{LlmBackendConfig, UserSettings};
+use lune_core::config::{LlmBackendConfig, PillVisibility, UserSettings};
 use lune_core::llm::TextPostProcessor;
 use lune_core::session::SessionEvent;
 use lune_dict::DictionaryManager;
@@ -59,13 +59,20 @@ impl AppRuntime {
         // If models are present, build errors are fatal (e.g. corrupt DB,
         // bad config). If models are absent, boot with an empty pipeline
         // and let the user download via the setup UI.
-        let models_ready = lune_persist::check_model_status(
-            &paths.models_dir(),
-            &settings.asr_backend,
-            &settings.llm_backend,
-        )
-        .iter()
-        .all(|s| s.ready);
+        // Only require the active ASR backend to be ready at boot.
+        // Optional models (reranker, style LLM) load opportunistically.
+        let asr_spec = match &settings.asr_backend {
+            lune_core::config::AsrBackendConfig::ParakeetTdt { .. } => {
+                Some(lune_persist::ModelSpec::parakeet_tdt())
+            }
+            lune_core::config::AsrBackendConfig::Qwen3Asr { .. } => {
+                Some(lune_persist::ModelSpec::qwen3_asr())
+            }
+            _ => None,
+        };
+        let models_ready = asr_spec
+            .as_ref()
+            .is_some_and(|s| s.is_ready(&paths.models_dir()));
 
         let (pipeline, settings) = if models_ready {
             build_pipeline(paths.clone(), settings).await?
@@ -158,7 +165,17 @@ impl AppRuntime {
     }
 
     pub async fn start_dictation(&self) -> Result<String, String> {
-        let manager = self.prepare_manager_for_start().await?;
+        // Optimistic UI: tell the pill we're listening before doing session work.
+        // Reverted on failure so the pill doesn't stick in "listening" state.
+        self.publish_status("listening").await;
+
+        let manager = match self.prepare_manager_for_start().await {
+            Ok(m) => m,
+            Err(e) => {
+                self.publish_status("ready").await;
+                return Err(e);
+            }
+        };
 
         let (event_tx, event_rx) = mpsc::channel(256);
         let session_id = match manager.start(event_tx).await {
@@ -178,7 +195,6 @@ impl AppRuntime {
             session_id: session_id.clone(),
         })
         .await;
-        self.publish_status("listening").await;
         self.spawn_event_forwarder(event_rx);
 
         Ok(session_id)
@@ -359,6 +375,18 @@ impl AppRuntime {
         {
             tracing::debug!(error = %e, "pill state emit skipped (pill window may not exist)");
         }
+        // Direct pill show/hide bypasses the frontend IPC roundtrip so the
+        // window reacts in the same main-thread tick as the status emission.
+        let vis = self.inner.settings.read().await.pill_visibility;
+        match status {
+            "listening" | "processing" if vis != PillVisibility::Never => {
+                crate::pill::show_pill_direct(&self.inner.app);
+            }
+            "ready" | "error" if vis == PillVisibility::WhenDictating => {
+                crate::pill::hide_pill_direct(&self.inner.app);
+            }
+            _ => {}
+        }
     }
 
     async fn push_session_event(&self, event: SessionStreamEvent) {
@@ -525,6 +553,25 @@ async fn build_pipeline(
     )
     .with_vad_state_path(paths.adaptive_vad_file());
 
+    let reranker_dir = paths.models_dir().join("nemotron-rerank-1b");
+    let manager = if reranker_dir.join("tokenizer.json").exists() {
+        match lune_asr::NemotronReranker::new(lune_asr::NemotronRerankerConfig {
+            model_dir: reranker_dir,
+            use_gpu: settings.read().await.device.use_gpu(cfg!(feature = "cuda")),
+        }) {
+            Ok(rr) => {
+                tracing::info!("nemotron reranker loaded");
+                manager.with_reranker(Arc::new(rr))
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "nemotron reranker load failed, continuing without");
+                manager
+            }
+        }
+    } else {
+        manager
+    };
+
     let pipeline = LivePipeline {
         paths,
         manager: Some(Arc::new(manager)),
@@ -565,12 +612,12 @@ async fn build_post_processor(
 ) -> Result<Arc<dyn TextPostProcessor>, String> {
     match &settings.llm_backend {
         LlmBackendConfig::Local { .. } => {
-            let style_dir = models_dir.join("llama-3.2-1b-instruct-q4f16");
+            let style_dir = models_dir.join("qwen3-0.6b");
             if style_dir.join("tokenizer.json").exists() {
                 match lune_llm::backend::ort_style::OrtStyleLlm::new(
                     lune_llm::backend::ort_style::OrtStyleLlmConfig {
                         model_dir: style_dir,
-                        use_gpu: true,
+                        use_gpu: settings.device.use_gpu(cfg!(feature = "cuda")),
                         max_new_tokens: 128,
                     },
                 ) {

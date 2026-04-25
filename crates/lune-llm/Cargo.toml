@@ -6,7 +6,7 @@ license.workspace = true
 
 [features]
 default = []
-cuda = []
+cuda = ["ort/cuda"]
 
 [dependencies]
 async-trait.workspace = true
@@ -17,6 +17,7 @@ async-openai.workspace = true
 serde_json.workspace = true
 regex = "1.11"
 text-processing-rs = "0.1.0"
+half = { version = "2", features = ["num-traits"] }
 ort.workspace = true
 ndarray.workspace = true
 tokenizers.workspace = true

@@ -61,9 +61,9 @@ mod tests {
         assert!(ids.contains(&"casual"));
         assert!(ids.contains(&"professional"));
         assert!(ids.contains(&"formal"));
-        assert!(ids.contains(&"email"));
+        assert!(ids.contains(&"minimal"));
         assert!(ids.contains(&"technical"));
-        assert!(ids.contains(&"notes"));
+        assert!(ids.contains(&"writing"));
         // All IDs are unique.
         let unique: std::collections::HashSet<&str> = ids.iter().copied().collect();
         assert_eq!(unique.len(), presets.len());

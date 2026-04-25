@@ -5,27 +5,22 @@ use serde::{Deserialize, Serialize};
 
 pub type StyleId = String;
 
-/// Universal rules shared by every style preset. Assembled once in the system
-/// message; individual presets only carry style-specific additions.
-///
-/// Span-correction mode: uncertain words are marked with `[?word?]`. The LLM
-/// fixes only flagged words and preserves all unmarked text verbatim.
+/// Universal rules shared by every style preset.
 pub const BASE_SYSTEM_PROMPT: &str = "\
-You are a post-ASR transcript correction engine.
-You receive a transcript where uncertain words are wrapped in [?word?] markers.
-Rules:
-1. Replace each [?word?] with the correct word based on context. Most flagged words are already correct — output them unchanged if they fit.
-2. Fix word boundary errors adjacent to markers (e.g. [?leisure?] ly → leisurely).
-3. Remove filler words: um, uh, like, you know.
-4. Keep ALL unmarked words exactly as-is. Never reorder, merge, or restructure sentences.
-5. Output ONLY the corrected transcript — no markers, no explanation, no extra text.";
+You correct dictation transcripts. \
+Fix only clear speech recognition errors: wrong tense, nonsense words, and misheard terms. \
+Do not change names, technical terms, or words that are already correct. \
+Do not rephrase, summarize, remove or explain. \
+Correct improperly placed periods, commas and capitalization. \
+Output only the corrected text. \
+/no_think";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StylePreset {
     pub id: StyleId,
     pub name: String,
     pub description: String,
-    /// Style-specific additions appended after [`BASE_SYSTEM_PROMPT`].
+    /// Style-specific instructions passed in the user prompt.
     /// Empty string means the base prompt is sufficient on its own.
     pub style_instructions: String,
     /// Template with `{raw_text}` slot.
@@ -71,9 +66,9 @@ static REGISTRY: LazyLock<StyleRegistry> = LazyLock::new(|| {
         StylePreset::casual(),
         StylePreset::professional(),
         StylePreset::formal(),
-        StylePreset::email(),
+        StylePreset::minimal(),
         StylePreset::technical(),
-        StylePreset::notes(),
+        StylePreset::writing(),
     ];
     let mut presets = HashMap::with_capacity(builtins.len());
     let mut ordered = Vec::with_capacity(builtins.len());
@@ -99,25 +94,26 @@ impl StylePreset {
     }
 
     /// Default preset: everyday speech with minimal formatting.
+    /// Casual — texting, messaging, chat. Lowercase, contractions, minimal punctuation.
     pub fn casual() -> Self {
         Self {
             id: "casual".into(),
             name: "Casual".into(),
-            description: "Everyday speech — messaging, texting, chat".into(),
-            style_instructions: "Capitalize sentence-initial words. Retain contractions and informal tone.".into(),
+            description: "Texting, messaging, chat".into(),
+            style_instructions: "Lowercase everything except proper nouns. Use contractions. Minimal punctuation — skip periods at end of single sentences.".into(),
             user_prompt_template: "{raw_text}".into(),
             few_shot_pairs: vec![
                 (
-                    "I'm gonna go to the store and buy some more [?flower?] for the cake".into(),
-                    "I'm gonna go to the store and buy some more flour for the cake.".into(),
+                    "I am going to the store do you want anything".into(),
+                    "i'm going to the store do you want anything".into(),
                 ),
                 (
-                    "hey can you take a look at this when you get a chance".into(),
-                    "Hey, can you take a look at this when you get a chance?".into(),
+                    "That is really cool I can not believe it worked".into(),
+                    "that's really cool i can't believe it worked".into(),
                 ),
                 (
-                    "it's totally [?ridiculus?] that the [?where?] is this bad after a month just fix the darn thing".into(),
-                    "It's totally ridiculous that the wear is this bad after a month, just fix the darn thing.".into(),
+                    "Hey are you coming to Sarah's party tonight or not".into(),
+                    "hey are you coming to sarah's party tonight or not".into(),
                 ),
             ],
         }
@@ -133,15 +129,15 @@ impl StylePreset {
             user_prompt_template: "{raw_text}".into(),
             few_shot_pairs: vec![
                 (
-                    "I wanted to follow up on the [?thing?] we discussed last week about the project timeline".into(),
+                    "I wanted to follow up on the thing we discussed last week about project timeline".into(),
                     "I wanted to follow up on what we discussed last week about the project timeline.".into(),
                 ),
                 (
-                    "the main blocker is the dependency on the [?oth?] service which is owned by the platform team".into(),
-                    "The main blocker is the dependency on the auth service, which is owned by the Platform team.".into(),
+                    "the main blocker is dependency on oth service which is owned by platform team".into(),
+                    "The main blocker is a dependency on the auth service, which is owned by the Platform team.".into(),
                 ),
                 (
-                    "she finished the report ahead of schedule and her manager approved it without revisions and the client was notified".into(),
+                    "she finished report ahead of schedule and her manager approved it without revisions and client was notified".into(),
                     "She finished the report ahead of schedule, and her manager approved it without revisions. The client was notified.".into(),
                 ),
             ],
@@ -158,33 +154,38 @@ impl StylePreset {
             user_prompt_template: "{raw_text}".into(),
             few_shot_pairs: vec![
                 (
-                    "I wanted to follow up on the [?thing?] we discussed last week about the project timeline".into(),
+                    "I wanted to follow up on the thing we discussed last week about project timeline".into(),
                     "I would like to follow up on our discussion last week regarding the project timeline.".into(),
                 ),
                 (
-                    "thanks for getting back to me I will review the document and send my [?feed back?] by friday".into(),
+                    "thanks for getting back to me I will review document and send my feed back by friday".into(),
                     "Thank you for your response. I will review the document and provide my feedback by Friday.".into(),
                 ),
             ],
         }
     }
 
-    /// Email and letter formatting with paragraph structure.
-    pub fn email() -> Self {
+    /// Minimal — fix only clearly wrong words, preserve everything else verbatim.
+    pub fn minimal() -> Self {
         Self {
-            id: "email".into(),
-            name: "Email".into(),
-            description: "Email and letter formatting".into(),
-            style_instructions: "Apply formal register. Expand all contractions. Insert paragraph breaks at natural sentence boundaries.".into(),
+            id: "minimal".into(),
+            name: "Minimal".into(),
+            description: "Fix errors only — no style changes".into(),
+            style_instructions:
+                "Only fix clearly wrong words. Do not add, remove, or rephrase anything.".into(),
             user_prompt_template: "{raw_text}".into(),
             few_shot_pairs: vec![
                 (
-                    "I wanted to let you know the [?quarterly?] report is ready for review and I've attached the updated figures".into(),
-                    "I wanted to let you know that the quarterly report is ready for review. I have attached the updated figures.".into(),
+                    "I was going to the store and I seen a dog".into(),
+                    "I was going to the store and I saw a dog.".into(),
                 ),
                 (
-                    "thanks for getting back to me so quickly I appreciate it and I'll have the [?revisions?] done by end of day friday".into(),
-                    "Thank you for your prompt response. I will have the revisions completed by end of day Friday.".into(),
+                    "she don't even know what happened its crazy".into(),
+                    "She don't even know what happened, it's crazy.".into(),
+                ),
+                (
+                    "the whether is nice today I think we should go outside".into(),
+                    "The weather is nice today, I think we should go outside.".into(),
                 ),
             ],
         }
@@ -196,41 +197,41 @@ impl StylePreset {
             id: "technical".into(),
             name: "Technical".into(),
             description: "Code and developer communication".into(),
-            style_instructions: "Wrap code identifiers in backticks. Apply PascalCase or snake_case as context dictates. Resolve software homophones: sink→sync, wait→await, bull→bool, funk shin→function. Retain developer jargon.".into(),
+            style_instructions: "Wrap code identifiers in backticks. Apply PascalCase or snake_case as context dictates. Retain developer jargon.".into(),
             user_prompt_template: "{raw_text}".into(),
             few_shot_pairs: vec![
                 (
-                    "let's make an async [?funk shin?] called [?sink?] data that awaits a fetch to the api and then logs the status".into(),
-                    "Let's make an `async` function called `sync_data` that `await`s a fetch to the API and then logs the status.".into(),
+                    "let's make an async funk shin called sink data that awaits fetch to api and then logs status".into(),
+                    "Let's make an `async` function called `sync_data` that `await`s fetch to API and then logs status.".into(),
                 ),
                 (
-                    "so we gotta nuke the old user profile class and replace it with a new interface called [?I user repo?] that has a get by id method".into(),
+                    "so we gotta nuke the old user profile class and replace it with a new interface called I user repo that has a get by id method".into(),
                     "So we gotta nuke the old `UserProfile` class and replace it with a new interface called `IUserRepo` that has a `get_by_id` method.".into(),
                 ),
                 (
-                    "if the [?bullion?] is true then we just push to the state array and trigger a re render".into(),
-                    "If the boolean is true then we just push to the `state` array and trigger a re-render.".into(),
+                    "if the bullion is true then we push to the state array and trigger a re render".into(),
+                    "If the boolean is true then we push to the `state` array and trigger a re-render.".into(),
                 ),
             ],
         }
     }
 
-    /// Structured notes with bullet points and action items.
-    pub fn notes() -> Self {
+    /// Long-form writing — articles, docs, blog posts, essays.
+    pub fn writing() -> Self {
         Self {
-            id: "notes".into(),
-            name: "Notes".into(),
-            description: "Structured notes with bullets and action items".into(),
-            style_instructions: "Reformat output as bullet points. Prefix each action item with 'Action:'. Omit filler sentences.".into(),
+            id: "writing".into(),
+            name: "Writing".into(),
+            description: "Long-form content — articles, docs, essays".into(),
+            style_instructions: "Use complete sentences with proper grammar and punctuation. Break long run-on sentences into shorter ones. Keep the author's voice.".into(),
             user_prompt_template: "{raw_text}".into(),
             few_shot_pairs: vec![
                 (
-                    "we talked about the Q3 [?road map?] and John is going to handle the API redesign and Sarah needs to review the mockups by next Tuesday".into(),
-                    "- Discussed Q3 roadmap\n- Action: John — API redesign\n- Action: Sarah — review mockups by next Tuesday".into(),
+                    "so the main idea here is that we need to rethink how we approach testing because right now its kind of a mess and nobody really knows what's covered".into(),
+                    "The main idea here is that we need to rethink how we approach testing. Right now it's kind of a mess, and nobody really knows what's covered.".into(),
                 ),
                 (
-                    "the main blocker is the dependency on the [?oth?] service which is owned by the platform team".into(),
-                    "- Main blocker: dependency on the auth service (owned by Platform team)".into(),
+                    "the problem with the current approach is that it scales poorly and once you hit about ten thousand users things start to break down".into(),
+                    "The problem with the current approach is that it scales poorly. Once you hit about ten thousand users, things start to break down.".into(),
                 ),
             ],
         }

@@ -77,7 +77,7 @@ impl Default for UserSettings {
     fn default() -> Self {
         Self {
             device: DevicePolicy::Auto,
-            asr_backend: AsrBackendConfig::ParakeetTdt {},
+            asr_backend: AsrBackendConfig::Qwen3Asr {},
             llm_backend: LlmBackendConfig::Disabled,
             hotkey: HotkeyConfig::default(),
             default_style: "casual".into(),

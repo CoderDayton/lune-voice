@@ -239,7 +239,7 @@ mod tests {
 
         let json = serde_json::to_string(&msgs).unwrap();
         assert!(json.contains("hello um world"));
-        assert!(json.contains("post-ASR transcript correction"));
+        assert!(json.contains("You correct dictation transcripts"));
     }
 
     #[test]

@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { useStore } from "@tanstack/react-store";
 import { SettingsSection } from "../components/section";
 import { useLingui } from "@lingui/react/macro";
-import { HardDrive, Download, Trash2, Loader2, CheckCircle2, AlertTriangle, Info } from "lucide-react";
+import { HardDrive, Download, Trash2, Loader2, AlertTriangle, Info, Zap, Circle } from "lucide-react";
+import { workspaceStore } from "../../../store/workspace-store";
 
 interface ModelStatus {
   name: string;
@@ -28,30 +30,61 @@ interface ModelMeta {
 
 const MODEL_META: Record<string, ModelMeta> = {
   "parakeet-tdt-0.6b": {
-    description: "Core speech-to-text engine. Converts voice to text across 25 languages with automatic detection.",
-    required: true,
-    deleteWarning: "Speech recognition will stop working. You won't be able to dictate until this model is re-downloaded.",
+    description: "Speech-to-text engine (Parakeet TDT). Batch ASR across 25 languages.",
+    required: false,
+    deleteWarning: "Parakeet ASR backend will be unavailable. Switch to Qwen3 first if it's your active backend.",
+  },
+  "qwen3-asr-0.6b-onnx": {
+    description: "Speech-to-text engine (Qwen3 ASR). Encoder-decoder ONNX model with SmoothQuant.",
+    required: false,
+    deleteWarning: "Qwen3 ASR backend will be unavailable. Switch to Parakeet first if it's your active backend.",
   },
   "nemotron-rerank-1b": {
-    description: "Accuracy booster. Rescores transcription candidates to pick the most fluent result.",
+    description: "Accuracy booster. Rescores transcription candidates to pick most fluent result.",
     required: true,
     deleteWarning: "Transcription accuracy will drop significantly. The reranker corrects common misrecognitions.",
   },
-  "llama-3.2-1b-instruct-q4f16": {
-    description: "Style formatter. Reformats transcripts into casual, professional, or technical tone.",
+  "qwen3-0.6b": {
+    description: "Style & correction LLM. Fixes grammar and reformats transcripts.",
     required: false,
-    deleteWarning: "Style formatting will be disabled. Transcripts will use basic text normalization only.",
+    deleteWarning: "Style formatting and grammar correction will be disabled.",
   },
 };
 
+const ASR_MODEL_MAP: Record<string, string> = {
+  ParakeetTdt: "parakeet-tdt-0.6b",
+  Qwen3Asr: "qwen3-asr-0.6b-onnx",
+};
+
+function getModelState(localName: string, ready: boolean, activeAsrModel: string | undefined): "active" | "downloaded" | "missing" {
+  if (!ready) return "missing";
+  if (localName === activeAsrModel) return "active";
+  if (localName === "nemotron-rerank-1b" || localName === "qwen3-0.6b") return "active";
+  return "downloaded";
+}
+
+function StatusBadge({ state }: { state: "active" | "downloaded" | "missing" }) {
+  switch (state) {
+    case "active":
+      return <span className="badge badge-sm badge-success gap-1"><Zap className="size-3" />Active</span>;
+    case "downloaded":
+      return <span className="badge badge-sm badge-ghost gap-1"><Circle className="size-3" />Idle</span>;
+    case "missing":
+      return <span className="badge badge-sm badge-warning gap-1"><AlertTriangle className="size-3" />Not installed</span>;
+  }
+}
+
 export function ModelsSection() {
   const { t } = useLingui();
+  const asrBackend = useStore(workspaceStore, (s) => s.settings.asrBackend);
+  const activeAsrModel = ASR_MODEL_MAP[asrBackend];
+
   const [models, setModels] = useState<ModelStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [progress, setProgress] = useState<DownloadProgress | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<ModelStatus | null>(null);
-  const dialogRef = useRef<HTMLDialogElement | null>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
 
   function refresh() {
     invoke<ModelStatus[]>("check_model_status")
@@ -102,111 +135,97 @@ export function ModelsSection() {
 
   return (
     <>
-    <SettingsSection
-      title={t`Models`}
-      description={t`Download or remove local AI models. Models are stored on disk and used for speech recognition and text processing.`}
-      icon={HardDrive}
-    >
-      <div className="flex flex-col gap-1">
-        {models.map((model) => {
-          const meta = MODEL_META[model.localName];
-          const isDownloading = downloading === model.localName;
-          const progressText = progress && isDownloading
-            ? `${progress.fileName} (${progress.fileIndex + 1}/${progress.fileCount})`
-            : null;
+      <SettingsSection title={t`Models`} description={t`Manage local model files`} icon={HardDrive}>
+        <div className="flex flex-col gap-3">
+          {models.map((model) => {
+            const meta = MODEL_META[model.localName];
+            const isDownloading = downloading === model.localName;
+            const state = getModelState(model.localName, model.ready, activeAsrModel);
+            const progressText = progress && isDownloading
+              ? `${progress.fileName} (${progress.fileIndex + 1}/${progress.fileCount})`
+              : null;
 
-          return (
-            <div
-              key={model.localName}
-              className="flex items-start justify-between gap-4 py-3 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-surface-border"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-medium">{model.name}</span>
-                  {model.ready && (
-                    <CheckCircle2 size={14} className="text-success shrink-0" />
-                  )}
-                  {meta?.required && (
-                    <div className="tooltip tooltip-top" data-tip="This model is required for core functionality">
-                      <span className="badge badge-warning badge-xs gap-1 font-medium">
-                        Required
-                      </span>
+            return (
+              <div key={model.localName} className="card card-border bg-base-200/50 card-sm">
+                <div className="card-body gap-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{model.name}</span>
+                      <StatusBadge state={state} />
                     </div>
+                    <div className="flex gap-1">
+                      {model.ready ? (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-xs text-error"
+                          onClick={() => handleDeleteClick(model)}
+                        >
+                          <Trash2 className="size-3.5" />
+                          {t`Delete`}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-xs text-primary"
+                          onClick={() => handleDownload(model.localName)}
+                          disabled={!!downloading}
+                        >
+                          {isDownloading ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            <Download className="size-3.5" />
+                          )}
+                          {isDownloading ? t`Downloading…` : t`Download`}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {meta && (
+                    <p className="text-xs text-base-content/60">{meta.description}</p>
+                  )}
+                  {progressText && (
+                    <p className="text-xs text-info">{progressText}</p>
                   )}
                 </div>
-                <p className="text-xs text-content-subtle mt-0.5">
-                  {isDownloading && progressText
-                    ? progressText
-                    : meta?.description ?? model.repoId}
-                </p>
               </div>
-              <div className="shrink-0 pt-0.5">
-                {model.ready ? (
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm text-error"
-                    onClick={() => handleDeleteClick(model)}
-                    disabled={isDownloading}
-                  >
-                    <Trash2 size={14} />
-                    {t`Delete`}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    onClick={() => handleDownload(model.localName)}
-                    disabled={!!downloading}
-                  >
-                    {isDownloading ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <Download size={14} />
-                    )}
-                    {isDownloading ? t`Downloading…` : t`Download`}
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </SettingsSection>
+            );
+          })}
+        </div>
+      </SettingsSection>
 
-    <dialog ref={dialogRef} className="modal backdrop-blur-sm" onClose={() => setConfirmDelete(null)}>
-      {confirmDelete && (() => {
-        const meta = MODEL_META[confirmDelete.localName];
-        return (
-          <div className="modal-box max-w-sm border border-surface-border">
-            <div className="flex items-start gap-3">
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-error/10 mt-0.5">
-                <AlertTriangle size={18} className="text-error" />
-              </div>
-              <div>
-                <h3 className="text-base font-semibold">{t`Delete ${confirmDelete.name}?`}</h3>
-                <p className="text-sm text-content-muted mt-2">{meta?.deleteWarning}</p>
-                {meta?.required && (
-                  <div className="flex items-start gap-2 mt-3 rounded-lg bg-warning/8 border border-warning/20 p-3">
-                    <Info size={14} className="text-warning shrink-0 mt-0.5" />
-                    <p className="text-xs text-warning">{t`This is a required model. Dictation will not work without it.`}</p>
+      <dialog ref={dialogRef} className="modal">
+        <div className="modal-box">
+          {confirmDelete && (() => {
+            const meta = MODEL_META[confirmDelete.localName];
+            return (
+              <>
+                <h3 className="font-bold text-lg">{t`Delete ${confirmDelete.name}?`}</h3>
+                {meta && (
+                  <div className="alert alert-warning mt-4 text-sm">
+                    <AlertTriangle className="size-4" />
+                    <span>{meta.deleteWarning}</span>
                   </div>
                 )}
-              </div>
-            </div>
-            <div className="modal-action">
-              <form method="dialog">
-                <button type="submit" className="btn btn-ghost btn-sm">{t`Cancel`}</button>
-              </form>
-              <button type="button" className="btn btn-error btn-sm" onClick={handleDeleteConfirm}>
-                <Trash2 size={14} />
-                {t`Delete model`}
-              </button>
-            </div>
-          </div>
-        );
-      })()}
-      <form method="dialog" className="modal-backdrop"><button type="submit">close</button></form>
-    </dialog>
+                {meta?.required && (
+                  <div className="alert alert-error mt-2 text-sm">
+                    <Info className="size-4" />
+                    <span>{t`This is a required model. Dictation will not work without it.`}</span>
+                  </div>
+                )}
+                <div className="modal-action">
+                  <button type="button" className="btn" onClick={() => dialogRef.current?.close()}>
+                    {t`Cancel`}
+                  </button>
+                  <button type="button" className="btn btn-error" onClick={handleDeleteConfirm}>
+                    {t`Delete model`}
+                  </button>
+                </div>
+              </>
+            );
+          })()}
+          <form method="dialog"><button type="submit" className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="close">✕</button></form>
+        </div>
+      </dialog>
     </>
   );
 }

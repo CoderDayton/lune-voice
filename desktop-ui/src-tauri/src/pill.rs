@@ -83,6 +83,32 @@ where
         .map_err(|_| "pill main-thread task did not complete".to_string())?
 }
 
+/// Show the pill window directly from Rust — bypasses the frontend IPC roundtrip
+/// so the hotkey response appears instant.
+pub fn show_pill_direct(app: &AppHandle) {
+    let outer = app.clone();
+    let inner = app.clone();
+    let _ = outer.run_on_main_thread(move || {
+        if let Some(pill) = inner.get_webview_window("pill") {
+            #[cfg(target_os = "linux")]
+            if LAYER_SHELL_CONFIGURED.get().is_none() && configure_linux_pill(&pill).is_ok() {
+                let _ = LAYER_SHELL_CONFIGURED.set(());
+            }
+            let _ = pill.show();
+        }
+    });
+}
+
+pub fn hide_pill_direct(app: &AppHandle) {
+    let outer = app.clone();
+    let inner = app.clone();
+    let _ = outer.run_on_main_thread(move || {
+        if let Some(pill) = inner.get_webview_window("pill") {
+            let _ = pill.hide();
+        }
+    });
+}
+
 /// Standard window positioning (works on X11, Windows, macOS).
 fn reposition_standard(pill: &tauri::WebviewWindow) -> Result<(), String> {
     let monitor = pill
