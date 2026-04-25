@@ -10,7 +10,7 @@
 //! GPU: `cargo run --release --features cuda --example calibrate_confidence -p lune-app`
 //!
 //! Optional env vars:
-//!   ASR=parakeet|qwen          select backend (default: parakeet)
+//!   ASR=parakeet|qwen          select backend (default: qwen)
 //!   LUNE_CALIBRATOR_OUT=/path  override output path. By default writes to
 //!                               `<data_dir>/calibrator_<slug>.json` where
 //!                               slug is the active backend's `slug()` — so

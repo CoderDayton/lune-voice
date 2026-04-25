@@ -48,7 +48,7 @@ fn main() {
     let has_gpu = init_ort();
     let root = workspace_root();
 
-    // Load ASR (Parakeet preferred unless ASR/--asr forces Qwen)
+    // Load ASR (Qwen preferred unless ASR/--asr forces Parakeet)
     let device = if has_gpu {
         DevicePolicy::Cuda
     } else {

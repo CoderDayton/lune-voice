@@ -122,21 +122,21 @@ pub fn benchmark_asr_entries(root: &std::path::Path) -> Vec<BenchmarkAsrEntry> {
     let requested = requested_benchmark_asr();
     let mut entries = Vec::new();
 
-    let parakeet_dir = root.join("models/parakeet-tdt-0.6b");
-    if parakeet_dir.exists() && !matches!(requested, Some(BenchmarkAsr::Qwen3)) {
-        entries.push(BenchmarkAsrEntry {
-            display_name: "Parakeet-TDT-int8",
-            backend_kind: AsrBackendKind::ParakeetTdt,
-            config: AsrBackendConfig::ParakeetTdt {},
-        });
-    }
-
     let qwen3_dir = root.join("models/qwen3-asr-0.6b-onnx");
     if qwen3_dir.exists() && !matches!(requested, Some(BenchmarkAsr::Parakeet)) {
         entries.push(BenchmarkAsrEntry {
             display_name: "Qwen3-ASR-0.6B-int4",
             backend_kind: AsrBackendKind::Qwen3Asr,
             config: AsrBackendConfig::Qwen3Asr {},
+        });
+    }
+
+    let parakeet_dir = root.join("models/parakeet-tdt-0.6b");
+    if parakeet_dir.exists() && !matches!(requested, Some(BenchmarkAsr::Qwen3)) {
+        entries.push(BenchmarkAsrEntry {
+            display_name: "Parakeet-TDT-int8",
+            backend_kind: AsrBackendKind::ParakeetTdt,
+            config: AsrBackendConfig::ParakeetTdt {},
         });
     }
 
