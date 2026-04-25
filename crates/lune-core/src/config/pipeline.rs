@@ -120,6 +120,13 @@ pub struct PipelineConfig {
     /// Additive logit bias for boosted tokens (NVIDIA recommends 0.5–2.0).
     #[serde(default = "default_word_boost_score")]
     pub word_boost_score: f32,
+
+    // ── Reranker ──────────────────────────────────────────────────────
+    /// Minimum score margin (reranker best − argmax) required to override
+    /// the greedy ASR top-1. Prevents the reranker from switching to a
+    /// marginally-better hypothesis that may be a false positive.
+    #[serde(default = "default_reranker_margin")]
+    pub reranker_margin: f32,
 }
 
 fn default_itn_enabled() -> bool {
@@ -132,6 +139,10 @@ fn default_word_boost_enabled() -> bool {
 
 fn default_word_boost_score() -> f32 {
     1.0
+}
+
+fn default_reranker_margin() -> f32 {
+    5.0
 }
 
 impl PipelineConfig {
@@ -176,6 +187,9 @@ impl PipelineConfig {
         }
         if let Some(v) = overrides.word_boost_score {
             self.word_boost_score = v;
+        }
+        if let Some(v) = overrides.reranker_margin {
+            self.reranker_margin = v;
         }
         self
     }
@@ -245,6 +259,7 @@ impl Default for PipelineConfig {
             itn_enabled: false,
             word_boost_enabled: true,
             word_boost_score: 1.0,
+            reranker_margin: 5.0,
         }
     }
 }
@@ -268,6 +283,7 @@ pub struct PipelineOverrides {
     pub max_speech_secs: Option<u32>,
     pub word_boost_enabled: Option<bool>,
     pub word_boost_score: Option<f32>,
+    pub reranker_margin: Option<f32>,
 }
 
 #[cfg(test)]

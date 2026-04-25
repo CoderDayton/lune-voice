@@ -487,6 +487,21 @@
   background: transparent;
 }
 
+.pill-shell {
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.pill-root:not([data-visible]) .pill-shell {
+  opacity: 0;
+  transform: translateY(8px) scale(0.95);
+  pointer-events: none;
+}
+
+.pill-cancelled .pill-active {
+  @apply border-error/40;
+  animation: pill-cancel-flash 280ms ease;
+}
+
 @utility pill-shell {
   @apply inline-flex items-center justify-center rounded-full p-2;
   background: radial-gradient(circle at center, oklch(0.68 0.14 280 / 0.24), transparent 62%);
@@ -510,6 +525,12 @@
 
 @utility pill-processing {
   @apply border-warning/25;
+}
+
+@keyframes pill-cancel-flash {
+  0%   { opacity: 1; }
+  40%  { opacity: 0.5; border-color: oklch(0.64 0.2 25 / 0.6); }
+  100% { opacity: 0; transform: translateY(4px) scale(0.97); }
 }
 
 @utility pill-center {

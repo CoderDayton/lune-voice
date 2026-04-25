@@ -4,12 +4,17 @@ use lune_core::config::{DictationMode, TerminalMode};
 use tracing::{debug, info, warn};
 
 #[cfg(unix)]
+use crate::uinput_typer::WindowTarget;
+
+#[cfg(unix)]
 use crate::uinput_typer::UinputTyper;
 
 /// Message sent to the persistent delivery thread.
 struct DeliveryMsg {
     text: Box<str>,
     mode: DictationMode,
+    #[cfg(unix)]
+    target: Option<WindowTarget>,
 }
 
 /// Handle to the background delivery thread.
@@ -37,6 +42,23 @@ impl DeliveryService {
         if let Err(e) = self.tx.send(DeliveryMsg {
             text: text.into(),
             mode,
+            #[cfg(unix)]
+            target: None,
+        }) {
+            warn!(error = %e, "delivery channel disconnected");
+        }
+    }
+
+    #[cfg(unix)]
+    pub fn deliver_to(&self, text: &str, mode: DictationMode, target: &WindowTarget) {
+        if text.is_empty() {
+            return;
+        }
+        debug!(?mode, text_len = text.len(), "delivering text to target");
+        if let Err(e) = self.tx.send(DeliveryMsg {
+            text: text.into(),
+            mode,
+            target: Some(target.clone()),
         }) {
             warn!(error = %e, "delivery channel disconnected");
         }
@@ -51,6 +73,8 @@ impl DeliveryService {
         if let Err(e) = self.tx.send(DeliveryMsg {
             text: text.into_boxed_str(),
             mode,
+            #[cfg(unix)]
+            target: None,
         }) {
             warn!(error = %e, "delivery channel disconnected");
         }
@@ -72,11 +96,25 @@ fn delivery_thread(rx: mpsc::Receiver<DeliveryMsg>, terminal_mode: TerminalMode)
 
     while let Ok(msg) = rx.recv() {
         let text: &str = &msg.text;
+        #[cfg(unix)]
+        let has_target = msg.target.is_some();
+        #[cfg(not(unix))]
+        let has_target = false;
+
         match msg.mode {
-            DictationMode::Clipboard | DictationMode::Both => driver.type_text(text),
             DictationMode::TypeInPlace => driver.type_keys(text),
-            _ => driver.type_text(text),
+            _ => {
+                #[cfg(unix)]
+                if let Some(ref target) = msg.target {
+                    driver.type_text_to(text, target);
+                } else {
+                    driver.type_text(text);
+                }
+                #[cfg(not(unix))]
+                driver.type_text(text);
+            }
         }
+        let _ = has_target;
     }
 
     debug!("delivery thread exiting");
@@ -104,6 +142,10 @@ impl PlatformDriver {
 
     fn type_text(&mut self, text: &str) {
         self.typer.type_str(text);
+    }
+
+    fn type_text_to(&mut self, text: &str, target: &crate::uinput_typer::WindowTarget) {
+        self.typer.type_str_to(text, target);
     }
 
     fn type_keys(&mut self, text: &str) {

@@ -20,6 +20,22 @@ use evdev::{AttributeSet, EventType, InputEvent, KeyCode, uinput::VirtualDevice}
 use lune_core::config::TerminalMode;
 use tracing::{debug, info, warn};
 
+// ─── Window target (focus lock) ──────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct WindowTarget {
+    pub class: Option<String>,
+    pub is_terminal: bool,
+    pub focus_token: Option<FocusToken>,
+}
+
+#[derive(Debug, Clone)]
+pub enum FocusToken {
+    HyprlandAddress(String),
+    SwayConId(i64),
+    X11WindowId(String),
+}
+
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 
 const UDEV_RULE: &str =
@@ -182,6 +198,140 @@ fn focused_is_terminal() -> bool {
     let is_term = KNOWN_TERMINALS.iter().any(|t| lower.contains(t));
     info!(class = %class, is_term, "focused window detected");
     is_term
+}
+
+fn is_terminal_class(class: &str) -> bool {
+    let lower = class.to_lowercase();
+    KNOWN_TERMINALS.iter().any(|t| lower.contains(t))
+}
+
+pub fn capture_focus_target() -> WindowTarget {
+    if std::env::var("HYPRLAND_INSTANCE_SIGNATURE").is_ok()
+        && let Some((class, addr)) = hyprland_active_info()
+    {
+        let is_terminal = is_terminal_class(&class);
+        return WindowTarget {
+            class: Some(class),
+            is_terminal,
+            focus_token: Some(FocusToken::HyprlandAddress(addr)),
+        };
+    }
+
+    if std::env::var("SWAYSOCK").is_ok()
+        && let Some((class, con_id)) = sway_focused_with_id()
+    {
+        let is_terminal = is_terminal_class(&class);
+        return WindowTarget {
+            class: Some(class),
+            is_terminal,
+            focus_token: Some(FocusToken::SwayConId(con_id)),
+        };
+    }
+
+    if std::env::var("DISPLAY").is_ok()
+        && let Some(wid) = xdotool_active_id()
+    {
+        let class = xdotool_focused_class();
+        let is_terminal = class.as_ref().is_some_and(|c| is_terminal_class(c));
+        return WindowTarget {
+            class,
+            is_terminal,
+            focus_token: Some(FocusToken::X11WindowId(wid)),
+        };
+    }
+
+    let class = focused_window_class();
+    let is_terminal = class.as_ref().is_some_and(|c| is_terminal_class(c));
+    WindowTarget {
+        class,
+        is_terminal,
+        focus_token: None,
+    }
+}
+
+fn hyprland_active_info() -> Option<(String, String)> {
+    let output = Command::new("hyprctl")
+        .args(["activewindow", "-j"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let val: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
+    let class = val.get("class")?.as_str()?.to_owned();
+    let addr = val.get("address")?.as_str()?.to_owned();
+    Some((class, addr))
+}
+
+fn sway_focused_with_id() -> Option<(String, i64)> {
+    let output = Command::new("swaymsg")
+        .args(["-t", "get_tree"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let tree: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
+    find_focused_with_id(&tree)
+}
+
+fn find_focused_with_id(node: &serde_json::Value) -> Option<(String, i64)> {
+    if node.get("focused").and_then(|v| v.as_bool()) == Some(true) {
+        let con_id = node.get("id").and_then(|v| v.as_i64())?;
+        let class = node
+            .get("app_id")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty() && *s != "null")
+            .or_else(|| {
+                node.get("window_properties")
+                    .and_then(|wp| wp.get("class"))
+                    .and_then(|v| v.as_str())
+            })?
+            .to_owned();
+        return Some((class, con_id));
+    }
+    for key in &["nodes", "floating_nodes"] {
+        if let Some(children) = node.get(key).and_then(|v| v.as_array()) {
+            for child in children {
+                if let Some(found) = find_focused_with_id(child) {
+                    return Some(found);
+                }
+            }
+        }
+    }
+    None
+}
+
+fn xdotool_active_id() -> Option<String> {
+    let output = Command::new("xdotool")
+        .arg("getactivewindow")
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let id = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    if id.is_empty() { None } else { Some(id) }
+}
+
+fn restore_focus(token: &FocusToken) -> bool {
+    match token {
+        FocusToken::HyprlandAddress(addr) => Command::new("hyprctl")
+            .args(["dispatch", "focuswindow", &format!("address:{addr}")])
+            .status()
+            .ok()
+            .is_some_and(|s| s.success()),
+        FocusToken::SwayConId(id) => Command::new("swaymsg")
+            .arg(format!("[con_id={id}] focus"))
+            .status()
+            .ok()
+            .is_some_and(|s| s.success()),
+        FocusToken::X11WindowId(wid) => Command::new("xdotool")
+            .args(["windowactivate", "--sync", wid])
+            .status()
+            .ok()
+            .is_some_and(|s| s.success()),
+    }
 }
 
 /// Run a command, parse stdout as JSON, extract a string field.
@@ -644,6 +794,36 @@ impl UinputTyper {
         self.emit_paste(is_terminal);
 
         // Wait for target app to read the clipboard
+        std::thread::sleep(self.paste_delay.delay());
+    }
+
+    pub fn type_str_to(&mut self, text: &str, target: &WindowTarget) {
+        if let Some(ref token) = target.focus_token {
+            if !restore_focus(token) {
+                warn!("could not restore focus to original window");
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+
+        let rtt_start = Instant::now();
+        if let Err(e) = set_clipboard(text) {
+            warn!(error = %e, "clipboard set failed, falling back to per-key typing");
+            self.type_str_keys(text);
+            return;
+        }
+        self.paste_delay.record_rtt(rtt_start.elapsed());
+
+        let chord = if target.is_terminal {
+            "Ctrl+Shift+V"
+        } else {
+            "Ctrl+V"
+        };
+        info!(
+            chord,
+            post_paste_ms = self.paste_delay.current_ms,
+            "emitting paste to target"
+        );
+        self.emit_paste(target.is_terminal);
         std::thread::sleep(self.paste_delay.delay());
     }
 

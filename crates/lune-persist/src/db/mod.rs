@@ -80,15 +80,13 @@ impl Database {
         }
         let url = path.to_string_lossy();
         let mut conn = SqliteConnection::establish(&url)?;
-        // WAL mode: concurrent readers don't block writer; synchronous=NORMAL
-        // is safe with WAL and dramatically reduces fsync overhead.
         diesel::sql_query("PRAGMA journal_mode=WAL").execute(&mut conn)?;
         diesel::sql_query("PRAGMA synchronous=NORMAL").execute(&mut conn)?;
-        diesel::sql_query("PRAGMA foreign_keys=ON").execute(&mut conn)?;
-        // Larger cache reduces I/O on repeated reads (16 MiB).
+        diesel::sql_query("PRAGMA busy_timeout=5000").execute(&mut conn)?;
         diesel::sql_query("PRAGMA cache_size=-16384").execute(&mut conn)?;
-        // Keep temp tables in memory.
         diesel::sql_query("PRAGMA temp_store=MEMORY").execute(&mut conn)?;
+        diesel::sql_query("PRAGMA mmap_size=268435456").execute(&mut conn)?;
+        diesel::sql_query("PRAGMA wal_autocheckpoint=1000").execute(&mut conn)?;
         let mut db = Self { conn };
         db.run_migrations()?;
         Ok(db)
@@ -97,8 +95,8 @@ impl Database {
     /// Open an in-memory database (for testing).
     pub fn open_in_memory() -> PersistResult<Self> {
         let mut conn = SqliteConnection::establish(":memory:")?;
-        diesel::sql_query("PRAGMA foreign_keys=ON").execute(&mut conn)?;
         diesel::sql_query("PRAGMA temp_store=MEMORY").execute(&mut conn)?;
+        diesel::sql_query("PRAGMA busy_timeout=5000").execute(&mut conn)?;
         let mut db = Self { conn };
         db.run_migrations()?;
         Ok(db)

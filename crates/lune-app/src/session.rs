@@ -554,6 +554,7 @@ async fn run_session<A: AsrBackend + 'static>(
 
     let llm_enabled = config.pipeline.word_confidence_threshold.is_some();
     let flush_silence = vec![0.0f32; 16_000];
+    let silence_flush = &flush_silence;
     let mut progressively_delivered = false;
     let mut audio_poll_tick = tokio::time::interval(Duration::from_millis(10));
     audio_poll_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -743,8 +744,7 @@ async fn run_session<A: AsrBackend + 'static>(
         }
     } else {
         let _ = event_tx.send(SessionEvent::Processing).await;
-        let silence_flush = vec![0.0f32; 16_000];
-        if let Err(e) = asr.push_audio(&asr_session, &silence_flush).await {
+        if let Err(e) = asr.push_audio(&asr_session, silence_flush).await {
             let msg = e.to_string();
             warn!(error = %msg, "push_audio (silence flush) error");
             first_asr_error.get_or_insert(msg);
@@ -782,36 +782,17 @@ async fn run_session<A: AsrBackend + 'static>(
         return;
     }
 
-    if speech_samples == 0 {
+    if speech_samples == 0 || segments.is_empty() || raw_text.is_empty() {
         if let Some(error) = first_asr_error.take().filter(|_| !saw_asr_success) {
             status = SessionStatus::Failed(error.clone());
             let _ = event_tx.send(SessionEvent::Error(error)).await;
+        } else if speech_samples > 0 {
+            info!(%session_id, "speech detected but ASR produced no output, discarding");
+            status = SessionStatus::Cancelled;
         } else {
             info!(%session_id, "no speech detected, ending session");
         }
         finalize_db(session_id, &persist, status, Some(Utc::now()), None).await;
-        let _ = event_tx.send(SessionEvent::Stopped).await;
-        clear_active(&active_arc, &idle_notify).await;
-        return;
-    }
-
-    if segments.is_empty() || raw_text.is_empty() {
-        if let Some(error) = first_asr_error.take().filter(|_| !saw_asr_success) {
-            status = SessionStatus::Failed(error.clone());
-            let _ = event_tx.send(SessionEvent::Error(error)).await;
-            finalize_db(session_id, &persist, status, Some(Utc::now()), None).await;
-        } else {
-            // No speech detected — treat as cancelled (don't pollute history)
-            info!(%session_id, "no speech detected, discarding empty session");
-            finalize_db(
-                session_id,
-                &persist,
-                SessionStatus::Cancelled,
-                Some(Utc::now()),
-                None,
-            )
-            .await;
-        }
         let _ = event_tx.send(SessionEvent::Stopped).await;
         clear_active(&active_arc, &idle_notify).await;
         return;
@@ -846,28 +827,13 @@ async fn run_session<A: AsrBackend + 'static>(
         return;
     }
 
-    let dictionary_entries = {
-        let guard = dict.lock().await;
-        guard
-            .top_relevant(&text_after_commands, 20)
-            .into_iter()
-            .cloned()
-            .collect::<Vec<_>>()
-    };
-
     let lang = settings.read().await.language.clone();
     let lang_tag = lang.split(['-', '_']).next().unwrap_or("en");
+    let pipeline_t0 = tokio::time::Instant::now();
 
     // ── Step 1: Reranker ──────────────────────────────────────────────
-    // Run FIRST on raw ASR output (before any text processing). When ≥2
-    // distinct hypotheses exist and the reranker is present, score all
-    // candidates in a single forward pass and return the top-1 verbatim.
-    // Strictly additive: worst case is the argmax.
     let hypotheses: Vec<String> = collect_nbest(&segments);
-    let reranker_margin: f32 = std::env::var("LUNE_RERANKER_MARGIN")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(5.0);
+    let reranker_margin = config.pipeline.reranker_margin;
     let reranker_choice = if let (Some(rr), true) = (reranker.as_ref(), hypotheses.len() >= 2) {
         let query = "most fluent and contextually plausible transcription";
         match rr.score(query, &hypotheses) {
@@ -894,6 +860,7 @@ async fn run_session<A: AsrBackend + 'static>(
                     best_score,
                     margin_required = reranker_margin,
                     margin_observed = best_score - argmax_score,
+                    reranker_ms = pipeline_t0.elapsed().as_millis() as u64,
                     "[reranker] scored candidates"
                 );
                 Some(hypotheses[chosen_idx].clone())
@@ -909,30 +876,25 @@ async fn run_session<A: AsrBackend + 'static>(
     if let Some(ref chosen) = reranker_choice {
         info!(%session_id, "[reranker] chosen: {chosen}");
     }
-    // Apply reranker winner to text_after_commands if it won.
-    let text_after_commands = if let Some(ref chosen) = reranker_choice {
-        chosen.clone()
-    } else {
-        text_after_commands
+    let text_after_commands = match reranker_choice {
+        Some(chosen) => chosen,
+        None => text_after_commands,
     };
 
     // ── Step 2: Dictionary ────────────────────────────────────────────
-    // Apply dictionary corrections to the (possibly reranked) text before
-    // the bimodal gate and LLM.
-    let text_after_dict = {
+    // Single lock: fetch relevant entries + apply corrections together.
+    let (dictionary_entries, text_after_dict) = {
         let guard = dict.lock().await;
-        guard.apply(&text_after_commands)
+        let entries = guard
+            .top_relevant(&text_after_commands, 20)
+            .into_iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        let applied = guard.apply(&text_after_commands);
+        (entries, applied)
     };
 
     // ── Step 3: Bimodal skip ──────────────────────────────────────────
-    // Adaptive LLM gate (arXiv:2509.25048 — confidence-guided correction).
-    // The LLM correction pass runs only when the segment lands in the
-    // productive middle band: not so clean that correction is wasted work,
-    // not so broken that the corrector will overcorrect.
-    //
-    // - skip-when-clean: every word ≥ llm_skip_threshold → bypass
-    // - skip-when-broken: any segment's min_token_confidence below
-    //                      llm_skip_noisy_threshold → bypass
     let skip_clean = config.pipeline.llm_skip_threshold.is_some_and(|skip| {
         !segments.is_empty() && segments.iter().all(|s| s.is_clean_for_llm(skip))
     });
@@ -955,12 +917,9 @@ async fn run_session<A: AsrBackend + 'static>(
             broken = config.pipeline.llm_skip_noisy_threshold.unwrap_or(0.0),
             "[LLM] bimodal gate: bypassing correction"
         );
-        text_after_dict.clone()
+        text_after_dict
     } else {
         // ── Step 4: LLM ───────────────────────────────────────────────
-        // Pass the clean text (after reranker + dictionary) directly —
-        // no [?word?] markers. The LLM does context-based correction
-        // and style formatting.
         if !hypotheses.is_empty() {
             info!(
                 %session_id,
@@ -970,6 +929,7 @@ async fn run_session<A: AsrBackend + 'static>(
             );
         }
         info!(%session_id, "[LLM] input: {text_after_dict}");
+        let llm_t0 = tokio::time::Instant::now();
         let input = lune_core::llm::PostProcessInput {
             raw_text: text_after_dict.clone(),
             style_preset: Arc::clone(&style_preset),
@@ -981,18 +941,18 @@ async fn run_session<A: AsrBackend + 'static>(
         };
         match post_processor.transform(&input).await {
             Ok(output) => {
+                info!(%session_id, llm_ms = llm_t0.elapsed().as_millis() as u64, "[LLM] {}", output.cleaned_text);
                 drain_processing_controls(&mut control_rx, &mut cancelled);
                 if cancelled {
                     info!(%session_id, "session cancelled during LLM processing");
                     String::new()
                 } else {
-                    info!(%session_id, "[LLM] {}", output.cleaned_text);
                     output.cleaned_text
                 }
             }
             Err(e) => {
-                warn!(error = %e, "LLM correction failed, using text as-is");
-                text_after_dict.clone()
+                warn!(error = %e, llm_ms = llm_t0.elapsed().as_millis() as u64, "LLM correction failed, using text as-is");
+                text_after_dict
             }
         }
     };
@@ -1013,6 +973,7 @@ async fn run_session<A: AsrBackend + 'static>(
     }
 
     let final_text = post_llm_text;
+    info!(%session_id, pipeline_ms = pipeline_t0.elapsed().as_millis() as u64, "post-processing complete");
 
     // When we already delivered text progressively per-segment (LLM off),
     // don't re-paste — emit CorrectedText as a UI signal with the

@@ -2,6 +2,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use lune_app::{DeliveryService, SessionManager, SessionManagerConfig};
+#[cfg(unix)]
+use lune_app::{WindowTarget, capture_focus_target};
 use lune_asr::AsrRegistry;
 use lune_commands::VoiceCommandRouter;
 use lune_core::asr::AsrSessionConfig;
@@ -42,6 +44,8 @@ struct LivePipeline {
     active: bool,
     session_id: Option<String>,
     reload_required: bool,
+    #[cfg(unix)]
+    focus_target: Option<WindowTarget>,
 }
 
 struct SessionStreamSlot {
@@ -85,6 +89,8 @@ impl AppRuntime {
                 active: false,
                 session_id: None,
                 reload_required: true,
+                #[cfg(unix)]
+                focus_target: None,
             };
             (pipeline, settings)
         };
@@ -164,10 +170,37 @@ impl AppRuntime {
         }
     }
 
+    pub async fn eager_rebuild(&self) -> Result<(), String> {
+        let paths = {
+            let pipeline = self.inner.pipeline.lock().await;
+            if pipeline.active {
+                return Ok(());
+            }
+            pipeline.paths.clone()
+        };
+        let settings = load_settings(&paths)?;
+        let (rebuilt, new_settings) = build_pipeline(paths, settings)
+            .await
+            .map_err(|e| format!("eager rebuild: {e}"))?;
+        let mut pipeline = self.inner.pipeline.lock().await;
+        if !pipeline.active {
+            *pipeline = rebuilt;
+            let new_settings_val = new_settings.read().await.clone();
+            *self.inner.settings.write().await = new_settings_val;
+            tracing::info!("pipeline pre-warmed");
+        }
+        Ok(())
+    }
+
     pub async fn start_dictation(&self) -> Result<String, String> {
         // Optimistic UI: tell the pill we're listening before doing session work.
         // Reverted on failure so the pill doesn't stick in "listening" state.
         self.publish_status("listening").await;
+
+        #[cfg(unix)]
+        let focus_target = capture_focus_target();
+        #[cfg(unix)]
+        debug!(?focus_target, "captured focus target for session");
 
         let manager = match self.prepare_manager_for_start().await {
             Ok(m) => m,
@@ -195,6 +228,11 @@ impl AppRuntime {
             session_id: session_id.clone(),
         })
         .await;
+        #[cfg(unix)]
+        {
+            self.inner.pipeline.lock().await.focus_target = Some(focus_target);
+        }
+
         self.spawn_event_forwarder(event_rx);
 
         Ok(session_id)
@@ -251,6 +289,16 @@ impl AppRuntime {
                     SessionEvent::FinalizedText(text) => {
                         saw_text = true;
                         let mode = runtime.inner.settings.read().await.dictation_mode;
+                        #[cfg(unix)]
+                        {
+                            let target = runtime.inner.pipeline.lock().await.focus_target.clone();
+                            if let Some(ref t) = target {
+                                runtime.inner.delivery.deliver_to(&text, mode, t);
+                            } else {
+                                runtime.inner.delivery.deliver(&text, mode);
+                            }
+                        }
+                        #[cfg(not(unix))]
                         runtime.inner.delivery.deliver(&text, mode);
                         runtime
                             .push_session_event(SessionStreamEvent::FinalizedText { text })
@@ -332,17 +380,41 @@ impl AppRuntime {
 
         let mode = self.inner.settings.read().await.dictation_mode;
 
+        #[cfg(unix)]
+        let focus_target = self.inner.pipeline.lock().await.focus_target.clone();
+
         match cmd {
             VoiceCommand::NewLine => {
                 debug!("CommandDetected: NewLine → delivering \\n");
+                #[cfg(unix)]
+                if let Some(ref t) = focus_target {
+                    self.inner.delivery.deliver_to("\n", mode, t);
+                } else {
+                    self.inner.delivery.deliver("\n", mode);
+                }
+                #[cfg(not(unix))]
                 self.inner.delivery.deliver("\n", mode);
             }
             VoiceCommand::NewParagraph => {
                 debug!("CommandDetected: NewParagraph → delivering \\n\\n");
+                #[cfg(unix)]
+                if let Some(ref t) = focus_target {
+                    self.inner.delivery.deliver_to("\n\n", mode, t);
+                } else {
+                    self.inner.delivery.deliver("\n\n", mode);
+                }
+                #[cfg(not(unix))]
                 self.inner.delivery.deliver("\n\n", mode);
             }
             VoiceCommand::ListItem => {
                 debug!("CommandDetected: ListItem → delivering \\n- ");
+                #[cfg(unix)]
+                if let Some(ref t) = focus_target {
+                    self.inner.delivery.deliver_to("\n- ", mode, t);
+                } else {
+                    self.inner.delivery.deliver("\n- ", mode);
+                }
+                #[cfg(not(unix))]
                 self.inner.delivery.deliver("\n- ", mode);
             }
             VoiceCommand::StopDictation => {
@@ -578,6 +650,8 @@ async fn build_pipeline(
         active: false,
         session_id: None,
         reload_required: false,
+        #[cfg(unix)]
+        focus_target: None,
     };
 
     Ok((pipeline, settings))

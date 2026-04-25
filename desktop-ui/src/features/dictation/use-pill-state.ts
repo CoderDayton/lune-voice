@@ -41,6 +41,7 @@ export function usePillState() {
   const [serviceReady, setServiceReady] = useState(false);
   const [recordingMode, setRecordingMode] = useState<"Toggle" | "Hold">("Toggle");
   const [audioLevel, setAudioLevel] = useState(0);
+  const smoothedRef = useRef(0);
   const shownRef = useRef(false);
 
   // On mount: load workspace snapshot for initial readiness
@@ -84,7 +85,9 @@ export function usePillState() {
   });
 
   const onAudioLevel = useEffectEvent((level: number) => {
-    setAudioLevel(level);
+    const alpha = level > smoothedRef.current ? 0.35 : 0.15;
+    smoothedRef.current += alpha * (level - smoothedRef.current);
+    setAudioLevel(smoothedRef.current);
   });
 
   // Listen to Rust backend events — consolidated into one effect with stable handlers
@@ -102,7 +105,7 @@ export function usePillState() {
 
   // Reset audio level when session ends (tracked via pill-state event)
   useEffect(() => {
-    if (mode === "idle") setAudioLevel(0);
+    if (mode === "idle") { setAudioLevel(0); smoothedRef.current = 0; }
   }, [mode]);
 
   const visible = shouldShow(pillVis, mode, serviceReady);

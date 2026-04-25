@@ -238,8 +238,7 @@ pub async fn initialize_pipeline(
     runtime: State<'_, AppRuntime>,
 ) -> Result<(), String> {
     require_window_access(&window, &["main"])?;
-    runtime.mark_reload_required().await;
-    Ok(())
+    runtime.eager_rebuild().await
 }
 
 #[cfg(test)]
