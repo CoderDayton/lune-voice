@@ -19,7 +19,10 @@ activateLocale(defaultLocale).catch(() => {}).then(() => {
   document.documentElement.classList.add("pill-window");
   document.body.classList.add("pill-window");
 
-  ReactDOM.createRoot(document.getElementById("pill-root")!).render(
-    <PillApp />,
-  );
+  const root = document.getElementById("pill-root");
+  if (!root) {
+    console.error("[pill] root element not found");
+    return;
+  }
+  ReactDOM.createRoot(root).render(<PillApp />);
 });

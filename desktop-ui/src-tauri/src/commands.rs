@@ -21,6 +21,18 @@ fn require_window_access_for_label(label: &str, allowed: &[&str]) -> Result<(), 
     }
 }
 
+fn validate_local_name(local_name: &str) -> Result<(), String> {
+    if local_name.contains('/')
+        || local_name.contains('\\')
+        || local_name.contains("..")
+        || local_name.contains('\0')
+    {
+        Err("invalid model name: path fragments are not allowed".into())
+    } else {
+        Ok(())
+    }
+}
+
 #[tauri::command]
 pub async fn load_workspace_snapshot(
     window: WebviewWindow,
@@ -178,7 +190,7 @@ pub async fn check_model_status(
 ) -> Result<Vec<lune_persist::ModelStatus>, String> {
     require_window_access(&window, &["main"])?;
     tauri::async_runtime::spawn_blocking(|| {
-        let paths = lune_persist::AppPaths::resolve().ok_or("resolve paths")?;
+        let paths = lune_persist::AppPaths::resolve().ok_or("resolve application paths")?;
         let store = lune_persist::SettingsStore::new(paths.settings_file());
         let settings = store.load().map_err(|e| format!("load settings: {e}"))?;
         Ok(lune_persist::check_model_status(
@@ -198,9 +210,10 @@ pub async fn download_model_cmd(
     local_name: String,
 ) -> Result<(), String> {
     require_window_access(&window, &["main"])?;
+    validate_local_name(&local_name)?;
     let app_handle = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let paths = lune_persist::AppPaths::resolve().ok_or("resolve paths")?;
+        let paths = lune_persist::AppPaths::resolve().ok_or("resolve application paths")?;
         tracing::info!(local_name, "starting model download");
         match lune_persist::download_model(&paths.models_dir(), &local_name, |progress| {
             let _ = app_handle.emit("lune://download-progress", &progress);
@@ -222,8 +235,9 @@ pub async fn download_model_cmd(
 #[tauri::command]
 pub async fn delete_model_cmd(window: WebviewWindow, local_name: String) -> Result<(), String> {
     require_window_access(&window, &["main"])?;
+    validate_local_name(&local_name)?;
     tauri::async_runtime::spawn_blocking(move || {
-        let paths = lune_persist::AppPaths::resolve().ok_or("resolve paths")?;
+        let paths = lune_persist::AppPaths::resolve().ok_or("resolve application paths")?;
         lune_persist::delete_model(&paths.models_dir(), &local_name)
             .map_err(|e| format!("delete model: {e}"))?;
         Ok(())
@@ -243,11 +257,20 @@ pub async fn initialize_pipeline(
 
 #[cfg(test)]
 mod tests {
-    use super::require_window_access_for_label;
+    use super::{require_window_access_for_label, validate_local_name};
 
     #[test]
     fn require_window_access_rejects_unlisted_labels() {
         assert!(require_window_access_for_label("settings", &["main", "pill"]).is_err());
         assert!(require_window_access_for_label("pill", &["main", "pill"]).is_ok());
+    }
+
+    #[test]
+    fn validate_local_name_rejects_path_fragments() {
+        assert!(validate_local_name("whisper-small").is_ok());
+        assert!(validate_local_name("../whisper-small").is_err());
+        assert!(validate_local_name("models/whisper-small").is_err());
+        assert!(validate_local_name("models\\whisper-small").is_err());
+        assert!(validate_local_name("whisper\0small").is_err());
     }
 }

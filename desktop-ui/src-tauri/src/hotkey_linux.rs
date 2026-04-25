@@ -31,8 +31,13 @@ pub fn spawn(
     tx: mpsc::Sender<HotkeyAction>,
 ) -> Option<std::thread::JoinHandle<()>> {
     let main_trigger = key_name_to_code(&config.toggle_dictation.key)?;
-    let cancel_trigger =
-        key_name_to_code(&config.cancel_dictation.key).unwrap_or(KeyCode::KEY_RESERVED);
+    let cancel_trigger = key_name_to_code(&config.cancel_dictation.key).unwrap_or_else(|| {
+        warn!(
+            key = %config.cancel_dictation.key,
+            "unknown cancel hotkey key; cancel hotkey disabled"
+        );
+        KeyCode::KEY_RESERVED
+    });
 
     let main_mods = config.toggle_dictation.modifiers;
     let cancel_mods = config.cancel_dictation.modifiers;
@@ -49,7 +54,8 @@ pub fn spawn(
                 tx,
             );
         })
-        .expect("spawn hotkey listener thread");
+        .map_err(|e| warn!(error = %e, "failed to spawn hotkey listener thread"))
+        .ok()?;
 
     Some(handle)
 }

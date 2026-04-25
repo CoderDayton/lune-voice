@@ -15,6 +15,18 @@ async function retryInvoke<T>(fn: () => Promise<T>, maxAttempts = 3, delayMs = 1
   throw new Error("unreachable");
 }
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId);
+  });
+}
+
 /**
  * Clean up a Tauri Channel's JS-side callback from the window object.
  * Tauri's Channel registers a callback via `transformCallback` on
@@ -55,7 +67,11 @@ export async function attachSessionStream(
   let subscriptionId = 0;
   try {
     subscriptionId = await retryInvoke(() =>
-      invoke<number>("subscribe_session_stream", { channel }),
+      withTimeout(
+        invoke<number>("subscribe_session_stream", { channel }),
+        10_000,
+        "subscribe_session_stream",
+      ),
     );
   } catch (error) {
     cleanupChannel(channel);

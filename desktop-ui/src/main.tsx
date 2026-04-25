@@ -41,7 +41,8 @@ async function bootstrap() {
     if (lang && lang !== defaultLocale && lang in locales) {
       await activateLocale(lang);
     }
-  } catch {
+  } catch (error) {
+    console.warn("[bootstrap] workspace snapshot unavailable", error);
     // Not in Tauri or snapshot unavailable — app-shell will retry
   }
 }
@@ -60,6 +61,13 @@ function App() {
 
 // Wait for both default locale AND bootstrap before mounting — prevents locale flash.
 // Always mount even if bootstrap fails — app-shell will retry the snapshot load.
-Promise.all([activateLocale(defaultLocale), bootstrap()]).catch(() => {}).then(() => {
-  ReactDOM.createRoot(document.getElementById("root")!).render(<App />);
+Promise.all([activateLocale(defaultLocale), bootstrap()]).catch((error) => {
+  console.warn("[bootstrap] locale or workspace bootstrap failed", error);
+}).then(() => {
+  const root = document.getElementById("root");
+  if (!root) {
+    console.error("[bootstrap] root element not found");
+    return;
+  }
+  ReactDOM.createRoot(root).render(<App />);
 });

@@ -133,7 +133,8 @@ export async function saveWorkspaceSetting<Key extends keyof WorkspaceSettings>(
     try {
       const snapshot = await backendClient.loadWorkspaceSnapshot();
       workspaceActions.hydrate(snapshot);
-    } catch {
+    } catch (reloadError) {
+      console.warn("[workspace] failed to reload snapshot after save failure", reloadError);
       workspaceStore.setState((s) => ({ ...s, settings: previousSettings }));
     }
     workspaceActions.setError(formatError(error));
