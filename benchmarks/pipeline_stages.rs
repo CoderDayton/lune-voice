@@ -1,7 +1,7 @@
 //! Per-stage pipeline latency benchmark.
 //!
 //! Measures each pipeline stage independently: ASR load, session create,
-//! push_audio, poll_final, reranker, confidence calibration.
+//! push_audio, poll_final, confidence calibration.
 //! Supports cross-backend comparison when both models are present.
 //!
 //! Run:  cargo run --release --example pipeline_stages -p lune-app
@@ -18,7 +18,7 @@ use bench_utils::{
     Fixture, benchmark_asr_entries, char_error_rate, init_ort, load_fixtures, percentile,
     process_memory_usage, word_error_rate, workspace_root,
 };
-use lune_asr::{AsrRegistry, IsotonicCalibrator, NemotronReranker, NemotronRerankerConfig};
+use lune_asr::{AsrRegistry, IsotonicCalibrator};
 use lune_core::asr::{AsrBackend, AsrSessionConfig};
 use lune_core::config::DevicePolicy;
 
@@ -28,7 +28,6 @@ struct StageTiming {
     session_create_ms: f64,
     push_audio_ms: f64,
     poll_final_ms: f64,
-    reranker_ms: Option<f64>,
     calibration_ms: f64,
     total_ms: f64,
     wer: f64,
@@ -46,7 +45,6 @@ fn run_backend(
     device: DevicePolicy,
     models_dir: &std::path::Path,
     fixtures: &[Fixture],
-    reranker: Option<&NemotronReranker>,
     calibrator: &IsotonicCalibrator,
     rt: &tokio::runtime::Runtime,
 ) -> BackendReport {
@@ -100,22 +98,7 @@ fn run_backend(
             .collect::<Vec<_>>()
             .join(" ");
 
-        // Stage 4: reranker (if available)
-        let (reranker_ms, text_after_rerank) = if let Some(rr) = reranker {
-            let docs: Vec<String> = segments.iter().map(|s| s.text.clone()).collect();
-            if docs.len() > 1 {
-                let t0 = Instant::now();
-                let _scores = rr.score(&raw_text, &docs);
-                let ms = t0.elapsed().as_secs_f64() * 1000.0;
-                (Some(ms), raw_text.clone())
-            } else {
-                (Some(0.0), raw_text.clone())
-            }
-        } else {
-            (None, raw_text.clone())
-        };
-
-        // Stage 5: confidence calibration
+        // Stage 4: confidence calibration
         let t0 = Instant::now();
         for seg in &segments {
             for wc in &seg.word_confidences {
@@ -125,8 +108,8 @@ fn run_backend(
         let calibration_ms = t0.elapsed().as_secs_f64() * 1000.0;
 
         let total_ms = total_t0.elapsed().as_secs_f64() * 1000.0;
-        let wer = word_error_rate(&text_after_rerank, &fixture.reference);
-        let cer = char_error_rate(&text_after_rerank, &fixture.reference);
+        let wer = word_error_rate(&raw_text, &fixture.reference);
+        let cer = char_error_rate(&raw_text, &fixture.reference);
 
         timings.push(StageTiming {
             fixture: fixture.name,
@@ -134,7 +117,6 @@ fn run_backend(
             session_create_ms,
             push_audio_ms,
             poll_final_ms,
-            reranker_ms,
             calibration_ms,
             total_ms,
             wer,
@@ -152,23 +134,19 @@ fn run_backend(
 fn print_report(report: &BackendReport) {
     println!("\n  ┌─ {} ─ Load: {:.0}ms ─┐", report.name, report.load_ms);
     println!(
-        "  {:20} {:>7} {:>8} {:>8} {:>8} {:>8} {:>7} {:>8} {:>6} {:>6}",
-        "Fixture", "Audio", "SessCr", "Push", "Poll", "Rerank", "Calib", "Total", "WER%", "CER%"
+        "  {:20} {:>7} {:>8} {:>8} {:>8} {:>7} {:>8} {:>6} {:>6}",
+        "Fixture", "Audio", "SessCr", "Push", "Poll", "Calib", "Total", "WER%", "CER%"
     );
     println!("  {}", "─".repeat(105));
 
     for t in &report.timings {
-        let rr = t
-            .reranker_ms
-            .map_or("  ─".to_string(), |ms| format!("{ms:7.1}"));
         println!(
-            "  {:20} {:6.1}s {:7.1} {:7.1} {:7.1} {:>8} {:6.1} {:7.1} {:5.1} {:5.1}",
+            "  {:20} {:6.1}s {:7.1} {:7.1} {:7.1} {:6.1} {:7.1} {:5.1} {:5.1}",
             t.fixture,
             t.audio_secs,
             t.session_create_ms,
             t.push_audio_ms,
             t.poll_final_ms,
-            rr,
             t.calibration_ms,
             t.total_ms,
             t.wer * 100.0,
@@ -208,9 +186,8 @@ fn print_report(report: &BackendReport) {
         let total_poll: f64 = report.timings.iter().map(|t| t.poll_final_ms).sum();
         let total_push: f64 = report.timings.iter().map(|t| t.push_audio_ms).sum();
         let total_sess: f64 = report.timings.iter().map(|t| t.session_create_ms).sum();
-        let total_rr: f64 = report.timings.iter().filter_map(|t| t.reranker_ms).sum();
         let total_cal: f64 = report.timings.iter().map(|t| t.calibration_ms).sum();
-        let grand: f64 = total_poll + total_push + total_sess + total_rr + total_cal;
+        let grand: f64 = total_poll + total_push + total_sess + total_cal;
 
         if grand > 0.0 {
             println!("\n  Time distribution:");
@@ -220,13 +197,10 @@ fn print_report(report: &BackendReport) {
                 total_push / grand * 100.0,
                 total_sess / grand * 100.0,
             );
-            if total_rr > 0.0 {
-                println!(
-                    "    Reranker:            {:5.1}%  |  Calibration:  {:5.1}%",
-                    total_rr / grand * 100.0,
-                    total_cal / grand * 100.0,
-                );
-            }
+            println!(
+                "    Calibration:         {:5.1}%",
+                total_cal / grand * 100.0
+            );
         }
     }
 }
@@ -335,29 +309,6 @@ fn main() {
         return;
     }
 
-    // Load reranker if available
-    let reranker_dir = models_dir.join("nemotron-rerank-1b");
-    let reranker = if reranker_dir.join("tokenizer.json").is_file() {
-        print!("  Loading reranker ... ");
-        let t = Instant::now();
-        match NemotronReranker::new(NemotronRerankerConfig {
-            model_dir: reranker_dir,
-            use_gpu: has_gpu,
-        }) {
-            Ok(rr) => {
-                println!("{:.0}ms", t.elapsed().as_secs_f64() * 1000.0);
-                Some(rr)
-            }
-            Err(e) => {
-                println!("failed: {e}");
-                None
-            }
-        }
-    } else {
-        println!("  Reranker: not found (skipping)");
-        None
-    };
-
     // Load calibrator (best-effort)
     let calibrator = {
         let slug = entries[0].backend_kind.slug();
@@ -375,15 +326,7 @@ fn main() {
     let mut reports = Vec::new();
 
     for entry in &entries {
-        let report = run_backend(
-            entry,
-            device,
-            &models_dir,
-            &fixtures,
-            reranker.as_ref(),
-            &calibrator,
-            &rt,
-        );
+        let report = run_backend(entry, device, &models_dir, &fixtures, &calibrator, &rt);
         print_report(&report);
         reports.push(report);
     }

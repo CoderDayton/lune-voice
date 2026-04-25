@@ -2,7 +2,6 @@ pub mod backend;
 pub mod confidence;
 pub mod decode;
 pub mod mel;
-mod nemotron_reranker;
 pub mod ort_utils;
 
 pub use backend::{
@@ -11,4 +10,3 @@ pub use backend::{
 };
 pub use confidence::IsotonicCalibrator;
 pub use mel::extract_features;
-pub use nemotron_reranker::{NemotronReranker, NemotronRerankerConfig};

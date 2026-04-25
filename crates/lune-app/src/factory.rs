@@ -62,11 +62,8 @@ pub fn build_asr_backend(settings: &UserSettings) -> Result<AsrRegistry> {
 
 /// Construct the post-processor for the session pipeline.
 ///
-/// All local correction now flows through the Nemotron cross-encoder
-/// reranker, which is wired separately via `SessionManager::with_reranker`.
-/// This function returns a `NullPostProcessor` (passthrough) so the
-/// session's `TextPostProcessor` slot is filled — the trait stays for
-/// the OpenAI remote correction path, which is not yet wired in v0.1.
+/// Returns a `NullPostProcessor` (passthrough) unless a remote LLM
+/// correction backend is wired in.
 ///
 /// Cold path: called once at startup.
 #[cold]

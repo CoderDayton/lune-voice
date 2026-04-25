@@ -1,8 +1,8 @@
 //! Shared ORT model loading and session construction.
 //!
 //! `OrtModelLoader` centralizes model directory resolution, GPU policy,
-//! and session creation so both Parakeet and Nemotron backends share a
-//! single code path. CUDA EP is registered per-session when `use_gpu` is true.
+//! and session creation for ORT-backed ASR. CUDA EP is registered per-session
+//! when `use_gpu` is true.
 
 use std::path::{Path, PathBuf};
 

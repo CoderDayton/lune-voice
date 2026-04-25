@@ -63,9 +63,8 @@ fn main() {
     let backend_kind = asr.kind();
     eprintln!("{:.1}s ({:?})", t.elapsed().as_secs_f64(), backend_kind);
 
-    // ── Local correction is now via the Nemotron reranker ───────────────
-    // Attached on SessionManager separately. Post-processor slot just
-    // needs a passthrough.
+    // ── Post-processing slot ────────────────────────────────────────────
+    // Passthrough unless a correction backend is wired in.
     let llm: Arc<dyn TextPostProcessor> = Arc::new(NullPostProcessor::new());
     let _ = has_gpu; // consumed by ASR loading above
 

@@ -20,7 +20,7 @@ use bench_utils::{
     word_error_rate, workspace_root, wrap_print,
 };
 use lune_app::{SessionManager, SessionManagerConfig};
-use lune_asr::{AsrRegistry, IsotonicCalibrator, NemotronReranker, NemotronRerankerConfig};
+use lune_asr::{AsrRegistry, IsotonicCalibrator};
 use lune_audio::{AudioConfig, AudioStream};
 use lune_core::asr::AsrBackendKind;
 use lune_core::config::{DevicePolicy, UserSettings};
@@ -33,7 +33,7 @@ use tokio::sync::{Mutex, RwLock, mpsc};
 
 fn main() {
     // Honor RUST_LOG when set so sweep/debug runs can introspect the
-    // n-best/reranker path. No-op when RUST_LOG is unset.
+    // correction path. No-op when RUST_LOG is unset.
     let _ = tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .with_writer(std::io::stderr)
@@ -73,9 +73,8 @@ fn main() {
         println!("  Memory after ASR load: {}", mem.display());
     }
 
-    // Local correction now flows through the Nemotron reranker, attached
-    // separately on the SessionManager. The post-processor slot just needs
-    // a passthrough.
+    // The post-processor slot uses passthrough unless a correction backend is
+    // wired into this benchmark.
     let llm: Arc<dyn TextPostProcessor> = Arc::new(NullPostProcessor::new());
     let _ = has_gpu; // still consumed by ASR loading above
 
@@ -240,11 +239,6 @@ async fn run_full_pipeline(
         mgr
     };
 
-    // Always-on Nemotron reranker load. Looks in `./models/nemotron-rerank-1b/`
-    // by default. The reranker is the production correction path; if the
-    // model isn't present, the benchmark falls through to bare argmax.
-    let mgr = try_attach_reranker(mgr, std::path::PathBuf::from("models/nemotron-rerank-1b"));
-
     let (event_tx, mut event_rx) = mpsc::channel::<SessionEvent>(256);
 
     let start = Instant::now();
@@ -287,35 +281,4 @@ async fn run_full_pipeline(
             }
         })
         .await
-}
-
-/// Load a Nemotron reranker from `model_dir` and attach it to `mgr`. On
-/// any failure (missing model, ort error) we log a warning and return
-/// `mgr` unchanged so the benchmark still runs through the generative
-/// path. Prefers GPU but falls back to CPU if CUDA is unavailable.
-fn try_attach_reranker<A: lune_core::asr::AsrBackend + 'static>(
-    mgr: SessionManager<A>,
-    model_dir: std::path::PathBuf,
-) -> SessionManager<A> {
-    if !model_dir.join("tokenizer.json").exists() {
-        println!(
-            "  [warn] reranker model not found at {}",
-            model_dir.display()
-        );
-        return mgr;
-    }
-    let config = NemotronRerankerConfig {
-        model_dir: model_dir.clone(),
-        use_gpu: true,
-    };
-    match NemotronReranker::new(config) {
-        Ok(rr) => {
-            println!("  Reranker loaded: {}", model_dir.display());
-            mgr.with_reranker(Arc::new(rr))
-        }
-        Err(e) => {
-            println!("  [warn] reranker load failed: {e}");
-            mgr
-        }
-    }
 }

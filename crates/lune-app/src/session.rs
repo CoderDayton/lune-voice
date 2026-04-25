@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::Utc;
-use lune_asr::{IsotonicCalibrator, NemotronReranker};
+use lune_asr::IsotonicCalibrator;
 use tokio::sync::Notify;
 use tokio::sync::{Mutex, RwLock, mpsc};
 use tracing::{debug, info, warn};
@@ -76,11 +76,6 @@ pub struct SessionManager<A: AsrBackend> {
     /// LLM gate. Defaults to identity so behaviour matches the raw-threshold
     /// path when no calibration data is available.
     calibrator: Arc<IsotonicCalibrator>,
-    /// Optional Nemotron cross-encoder reranker. When present, the n-best
-    /// rescoring path bypasses the generative LLM and directly scores all
-    /// hypotheses in a single forward pass, returning the top-1 verbatim.
-    /// Absent = current generative path.
-    reranker: Option<Arc<NemotronReranker>>,
 }
 
 impl<A: AsrBackend + 'static> SessionManager<A> {
@@ -107,19 +102,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             adaptive_vad_state: Arc::new(Mutex::new(None)),
             vad_state_path: None,
             calibrator: Arc::new(IsotonicCalibrator::identity()),
-            reranker: None,
         }
-    }
-
-    /// Attach a Nemotron cross-encoder reranker. When set, the n-best
-    /// rescoring path uses it instead of the generative LLM: all
-    /// candidate hypotheses are scored in a single forward pass and
-    /// the top-1 is returned verbatim. Strictly additive — the output
-    /// is always one of the input hypotheses.
-    pub fn with_reranker(mut self, reranker: Arc<NemotronReranker>) -> Self {
-        info!("nemotron reranker attached to session manager");
-        self.reranker = Some(reranker);
-        self
     }
 
     /// Attach an isotonic confidence calibrator. Loaded at session start and
@@ -251,7 +234,6 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let adaptive_vad_state = Arc::clone(&self.adaptive_vad_state);
         let vad_state_path = self.vad_state_path.clone();
         let calibrator = Arc::clone(&self.calibrator);
-        let reranker = self.reranker.clone();
 
         tokio::task::spawn(run_session(
             session_id,
@@ -271,7 +253,6 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             adaptive_vad_state,
             vad_state_path,
             calibrator,
-            reranker,
         ));
 
         *lock = Some(ActiveHandle {
@@ -483,7 +464,6 @@ async fn run_session<A: AsrBackend + 'static>(
     adaptive_vad_state: Arc<Mutex<Option<AdaptiveVadConfig>>>,
     vad_state_path: Option<PathBuf>,
     calibrator: Arc<IsotonicCalibrator>,
-    reranker: Option<Arc<NemotronReranker>>,
 ) {
     let mut status = SessionStatus::Completed;
 
@@ -834,57 +814,9 @@ async fn run_session<A: AsrBackend + 'static>(
     let lang_tag = lang.split(['-', '_']).next().unwrap_or("en");
     let pipeline_t0 = tokio::time::Instant::now();
 
-    // ── Step 1: Reranker ──────────────────────────────────────────────
     let hypotheses: Vec<String> = collect_nbest(&segments);
-    let reranker_margin = config.pipeline.reranker_margin;
-    let reranker_choice = if let (Some(rr), true) = (reranker.as_ref(), hypotheses.len() >= 2) {
-        let query = "most fluent and contextually plausible transcription";
-        match rr.score(query, &hypotheses) {
-            Ok(scores) => {
-                let argmax_score = scores.first().copied().unwrap_or(0.0);
-                let (best_idx, best_score) = scores
-                    .iter()
-                    .enumerate()
-                    .max_by(|(_, a), (_, b)| a.total_cmp(b))
-                    .map(|(i, &s)| (i, s))
-                    .unwrap_or((0, argmax_score));
-                let chosen_idx = if best_idx == 0 || (best_score - argmax_score) >= reranker_margin
-                {
-                    best_idx
-                } else {
-                    0
-                };
-                info!(
-                    %session_id,
-                    count = hypotheses.len(),
-                    best_idx,
-                    chosen_idx,
-                    argmax_score,
-                    best_score,
-                    margin_required = reranker_margin,
-                    margin_observed = best_score - argmax_score,
-                    reranker_ms = pipeline_t0.elapsed().as_millis() as u64,
-                    "[reranker] scored candidates"
-                );
-                Some(hypotheses[chosen_idx].clone())
-            }
-            Err(e) => {
-                warn!(error = %e, "reranker failed, falling back to LLM path");
-                None
-            }
-        }
-    } else {
-        None
-    };
-    if let Some(ref chosen) = reranker_choice {
-        info!(%session_id, "[reranker] chosen: {chosen}");
-    }
-    let text_after_commands = match reranker_choice {
-        Some(chosen) => chosen,
-        None => text_after_commands,
-    };
 
-    // ── Step 2: Dictionary ────────────────────────────────────────────
+    // ── Step 1: Dictionary ────────────────────────────────────────────
     // Single lock: fetch relevant entries + apply corrections together.
     let (dictionary_entries, text_after_dict) = {
         let guard = dict.lock().await;
@@ -897,7 +829,7 @@ async fn run_session<A: AsrBackend + 'static>(
         (entries, applied)
     };
 
-    // ── Step 3: Bimodal skip ──────────────────────────────────────────
+    // ── Step 2: Bimodal skip ──────────────────────────────────────────
     let skip_clean = config.pipeline.llm_skip_threshold.is_some_and(|skip| {
         !segments.is_empty() && segments.iter().all(|s| s.is_clean_for_llm(skip))
     });
@@ -922,7 +854,7 @@ async fn run_session<A: AsrBackend + 'static>(
         );
         text_after_dict
     } else {
-        // ── Step 4: LLM ───────────────────────────────────────────────
+        // ── Step 3: LLM ───────────────────────────────────────────────
         if !hypotheses.is_empty() {
             info!(
                 %session_id,

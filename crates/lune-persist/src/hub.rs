@@ -83,17 +83,6 @@ impl ModelSpec {
         }
     }
 
-    /// Nemotron reranker 1B: cross-encoder for n-best hypothesis rescoring.
-    #[inline]
-    pub fn nemotron_reranker() -> Self {
-        Self::Directory {
-            repo_id: "cstr/llama-nemotron-rerank-1b-v2-ONNX".into(),
-            required_files: vec!["tokenizer.json".into(), "model_int4_full.onnx".into()],
-            suffix_patterns: vec![],
-            local_name: "nemotron-rerank-1b".into(),
-        }
-    }
-
     /// Qwen3-0.6B FP16: style/correction LLM for transcript cleanup.
     #[inline]
     pub fn style_llm() -> Self {
@@ -110,7 +99,6 @@ impl ModelSpec {
         match self {
             Self::Directory { local_name, .. } => match local_name.as_str() {
                 "parakeet-tdt-0.6b" => "Parakeet TDT 0.6B",
-                "nemotron-rerank-1b" => "Nemotron Reranker 1B",
                 "qwen3-0.6b" => "Qwen3 0.6B Style LLM",
                 _ => local_name,
             },
@@ -162,15 +150,6 @@ pub fn check_model_status(
         });
     }
 
-    // Nemotron reranker for n-best hypothesis correction.
-    let reranker_spec = ModelSpec::nemotron_reranker();
-    statuses.push(ModelStatus {
-        name: reranker_spec.display_name().to_string(),
-        repo_id: reranker_spec.repo_id().to_string(),
-        local_name: reranker_spec.local_name().to_string(),
-        ready: reranker_spec.is_ready(models_dir),
-    });
-
     // Style LLM for transcript reformatting.
     let style_spec = ModelSpec::style_llm();
     statuses.push(ModelStatus {
@@ -185,12 +164,7 @@ pub fn check_model_status(
 
 /// Delete a downloaded model by local_name. Returns Ok(true) if removed,
 /// Ok(false) if it wasn't present.
-const KNOWN_MODEL_NAMES: &[&str] = &[
-    "parakeet-tdt-0.6b",
-    "qwen3-asr-0.6b-onnx",
-    "nemotron-rerank-1b",
-    "qwen3-0.6b",
-];
+const KNOWN_MODEL_NAMES: &[&str] = &["parakeet-tdt-0.6b", "qwen3-asr-0.6b-onnx", "qwen3-0.6b"];
 
 pub fn delete_model(models_dir: &Path, local_name: &str) -> PersistResult<bool> {
     if !KNOWN_MODEL_NAMES.contains(&local_name) {
@@ -217,7 +191,6 @@ pub fn download_model(
 ) -> PersistResult<PathBuf> {
     let spec = match local_name {
         "parakeet-tdt-0.6b" => ModelSpec::parakeet_tdt(),
-        "nemotron-rerank-1b" => ModelSpec::nemotron_reranker(),
         "qwen3-0.6b" => ModelSpec::style_llm(),
         _ => {
             return Err(PersistError::ModelDownload(format!(

@@ -211,7 +211,6 @@ impl AsrRegistry {
                 // than it helps, per arXiv:2509.25048.
                 llm_skip_noisy_threshold: Some(0.30),
                 max_speech_samples: 60 * 16_000,
-                reranker_margin: 5.0,
             },
             Self::Qwen3(_) => PipelineConfig {
                 // Qwen3 is a batch decoder — one complete utterance per decode.
@@ -231,7 +230,6 @@ impl AsrRegistry {
                 llm_skip_threshold: Some(0.95),
                 llm_skip_noisy_threshold: Some(0.30),
                 max_speech_samples: 300 * 16_000,
-                reranker_margin: 5.0,
             },
             Self::OpenAi(_) => PipelineConfig {
                 max_segment_ms: 30_000,
@@ -249,7 +247,6 @@ impl AsrRegistry {
                 llm_skip_threshold: None,
                 llm_skip_noisy_threshold: None,
                 max_speech_samples: 120 * 16_000,
-                reranker_margin: 5.0,
             },
         }
     }

@@ -39,11 +39,6 @@ const MODEL_META: Record<string, ModelMeta> = {
     required: false,
     deleteWarning: "Qwen3 ASR backend will be unavailable. Switch to Parakeet first if it's your active backend.",
   },
-  "nemotron-rerank-1b": {
-    description: "Accuracy booster. Rescores transcription candidates to pick most fluent result.",
-    required: true,
-    deleteWarning: "Transcription accuracy will drop significantly. The reranker corrects common misrecognitions.",
-  },
   "qwen3-0.6b": {
     description: "Style & correction LLM. Fixes grammar and reformats transcripts.",
     required: false,
@@ -59,7 +54,7 @@ const ASR_MODEL_MAP: Record<string, string> = {
 function getModelState(localName: string, ready: boolean, activeAsrModel: string | undefined): "active" | "downloaded" | "missing" {
   if (!ready) return "missing";
   if (localName === activeAsrModel) return "active";
-  if (localName === "nemotron-rerank-1b" || localName === "qwen3-0.6b") return "active";
+  if (localName === "qwen3-0.6b") return "active";
   return "downloaded";
 }
 

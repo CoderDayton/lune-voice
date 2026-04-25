@@ -59,7 +59,3 @@ path = "../../benchmarks/confusion_mine.rs"
 [[example]]
 name = "pipeline_stages"
 path = "../../benchmarks/pipeline_stages.rs"
-
-[[example]]
-name = "rerank_ablation"
-path = "../../benchmarks/rerank_ablation.rs"

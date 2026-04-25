@@ -1,10 +1,8 @@
 //! Residual annotation marker stripping for ASR transcript output.
 //!
-//! After Stage 2 dropped the local generative LLM correction path, the
-//! reranker is the only correction stage. The marker formats are still
-//! emitted by `prepare_input` (and thus may appear in OpenAI remote-LLM
-//! output) so we keep a single utility — [`strip_markers`] — that
-//! reduces them back to bare words.
+//! Marker formats may appear in local passthrough or remote-LLM output,
+//! so keep one utility — [`strip_markers`] — that reduces them back to
+//! bare words.
 
 /// Strip residual annotation markers from text.
 ///

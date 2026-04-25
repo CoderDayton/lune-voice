@@ -1,10 +1,7 @@
 //! No-op text post-processor.
 //!
 //! Returns the raw input text unchanged. Used as the default
-//! `TextPostProcessor` when no remote LLM correction is configured —
-//! all local correction now goes through the Nemotron cross-encoder
-//! reranker, which is wired separately on `SessionManager` and bypasses
-//! this trait entirely. The trait stays for the OpenAI remote path.
+//! `TextPostProcessor` when no LLM correction backend is configured.
 
 use lune_core::Result;
 use lune_core::llm::{PostProcessInput, PostProcessOutput, TextPostProcessor};
@@ -25,9 +22,7 @@ impl NullPostProcessor {
 impl TextPostProcessor for NullPostProcessor {
     async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput> {
         // Strip any residual annotation markers the upstream marking
-        // pass may have emitted, then return the cleaned text. The
-        // reranker handles all real correction at the session layer;
-        // this trait is only invoked as a passthrough now.
+        // pass may have emitted, then return the cleaned text.
         let cleaned = crate::prompt::strip_markers(&input.raw_text);
         Ok(PostProcessOutput {
             cleaned_text: cleaned,

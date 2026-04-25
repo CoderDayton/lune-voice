@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { Download, CircleAlert, ArrowRight, Mic, Shield, Wand2 } from "lucide-react";
+import { Download, CircleAlert, ArrowRight, Mic, Wand2 } from "lucide-react";
 import { useLingui } from "@lingui/react/macro";
 import { isTauriRuntime } from "../../../lib/backend/runtime";
 import { ModelCard } from "./model-card";
@@ -25,7 +25,6 @@ type Phase = "checking" | "ready" | "setup" | "downloading" | "complete" | "erro
 
 const MODEL_META: Record<string, { description: string; required: boolean; icon: typeof Mic }> = {
   "parakeet-tdt-0.6b": { description: "Speech recognition — converts voice to text. 25 languages with auto-detection.", required: true, icon: Mic },
-  "nemotron-rerank-1b": { description: "Accuracy booster — rescores candidates to pick the most fluent transcription.", required: true, icon: Shield },
   "qwen3-0.6b": { description: "Style & correction — fixes grammar and reformats transcripts.", required: false, icon: Wand2 },
 };
 

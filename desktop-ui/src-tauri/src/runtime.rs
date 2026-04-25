@@ -64,7 +64,7 @@ impl AppRuntime {
         // bad config). If models are absent, boot with an empty pipeline
         // and let the user download via the setup UI.
         // Only require the active ASR backend to be ready at boot.
-        // Optional models (reranker, style LLM) load opportunistically.
+        // Optional style LLM loads opportunistically.
         let asr_spec = match &settings.asr_backend {
             lune_core::config::AsrBackendConfig::ParakeetTdt { .. } => {
                 Some(lune_persist::ModelSpec::parakeet_tdt())
@@ -623,25 +623,6 @@ async fn build_pipeline(
         Arc::clone(&settings),
     )
     .with_vad_state_path(paths.adaptive_vad_file());
-
-    let reranker_dir = paths.models_dir().join("nemotron-rerank-1b");
-    let manager = if reranker_dir.join("tokenizer.json").exists() {
-        match lune_asr::NemotronReranker::new(lune_asr::NemotronRerankerConfig {
-            model_dir: reranker_dir,
-            use_gpu: settings.read().await.device.use_gpu(cfg!(feature = "cuda")),
-        }) {
-            Ok(rr) => {
-                tracing::info!("nemotron reranker loaded");
-                manager.with_reranker(Arc::new(rr))
-            }
-            Err(e) => {
-                tracing::warn!(error = %e, "nemotron reranker load failed, continuing without");
-                manager
-            }
-        }
-    } else {
-        manager
-    };
 
     let pipeline = LivePipeline {
         paths,
