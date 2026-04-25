@@ -221,11 +221,8 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         };
         let style_preset = builtin_registry()
             .get(&current_style_id)
-            .unwrap_or_else(|| {
-                builtin_registry()
-                    .get("casual")
-                    .expect("builtin 'casual' preset must exist")
-            });
+            .or_else(|| builtin_registry().get("casual"))
+            .ok_or_else(|| Error::Config("no usable style preset found".into()))?;
 
         {
             let session = DictationSession {
@@ -337,6 +334,8 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
 
 // ── Pipeline task ─────────────────────────────────────────────────────────────
 
+const MAX_SEGMENTS: usize = 500;
+
 fn append_segments(
     all_segments: &mut Vec<AsrSegment>,
     joined_text: &mut String,
@@ -378,6 +377,10 @@ fn append_segments(
             }
             joined_text.push_str(trimmed);
             appended = true;
+        }
+        if all_segments.len() >= MAX_SEGMENTS {
+            warn!("segment limit ({MAX_SEGMENTS}) reached, dropping oldest");
+            all_segments.remove(0);
         }
         all_segments.push(seg);
     }
@@ -800,7 +803,7 @@ async fn run_session<A: AsrBackend + 'static>(
 
     let aligned_text = raw_text.clone();
 
-    info!(%session_id, "[ASR] {aligned_text}");
+    debug!(%session_id, "[ASR] output ready, len={}", aligned_text.len());
 
     let route = router.route_full(&aligned_text);
     let mut style_preset = style_preset;
@@ -941,7 +944,7 @@ async fn run_session<A: AsrBackend + 'static>(
         };
         match post_processor.transform(&input).await {
             Ok(output) => {
-                info!(%session_id, llm_ms = llm_t0.elapsed().as_millis() as u64, "[LLM] {}", output.cleaned_text);
+                debug!(%session_id, llm_ms = llm_t0.elapsed().as_millis() as u64, "[LLM] output ready, len={}", output.cleaned_text.len());
                 drain_processing_controls(&mut control_rx, &mut cancelled);
                 if cancelled {
                     info!(%session_id, "session cancelled during LLM processing");

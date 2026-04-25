@@ -50,20 +50,30 @@ fn ensure_kernel_access() -> Result<(), String> {
 
     info!("first-time setup: requesting uinput access via pkexec");
 
-    let script = format!(
-        "echo '{}' > {} && udevadm control --reload-rules && udevadm trigger",
-        UDEV_RULE, UDEV_RULE_PATH
-    );
-
-    let status = Command::new("pkexec")
-        .arg("sh")
-        .arg("-c")
-        .arg(&script)
-        .status()
+    use std::io::Write;
+    let mut child = Command::new("pkexec")
+        .args(["tee", UDEV_RULE_PATH])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::null())
+        .spawn()
         .map_err(|e| format!("pkexec spawn failed: {e}"))?;
-
+    if let Some(ref mut stdin) = child.stdin {
+        let _ = stdin.write_all(UDEV_RULE.as_bytes());
+    }
+    let status = child
+        .wait()
+        .map_err(|e| format!("pkexec wait failed: {e}"))?;
     if !status.success() {
         return Err("pkexec authentication cancelled or failed".into());
+    }
+
+    let reload = Command::new("pkexec")
+        .args(["udevadm", "control", "--reload-rules"])
+        .status();
+    let trigger = Command::new("pkexec").args(["udevadm", "trigger"]).status();
+    if reload.map(|s| !s.success()).unwrap_or(true) || trigger.map(|s| !s.success()).unwrap_or(true)
+    {
+        warn!("udevadm reload/trigger may have failed — rule may require reboot");
     }
 
     // Give udevd 500ms to apply the new ACL.
@@ -195,14 +205,14 @@ fn focused_is_terminal() -> bool {
         return false;
     };
     let lower = class.to_lowercase();
-    let is_term = KNOWN_TERMINALS.iter().any(|t| lower.contains(t));
+    let is_term = KNOWN_TERMINALS.iter().any(|t| lower == *t);
     info!(class = %class, is_term, "focused window detected");
     is_term
 }
 
 fn is_terminal_class(class: &str) -> bool {
     let lower = class.to_lowercase();
-    KNOWN_TERMINALS.iter().any(|t| lower.contains(t))
+    KNOWN_TERMINALS.iter().any(|t| lower == *t)
 }
 
 pub fn capture_focus_target() -> WindowTarget {
@@ -259,8 +269,11 @@ fn hyprland_active_info() -> Option<(String, String)> {
     }
     let val: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
     let class = val.get("class")?.as_str()?.to_owned();
-    let addr = val.get("address")?.as_str()?.to_owned();
-    Some((class, addr))
+    let addr = val.get("address")?.as_str()?;
+    if !addr.starts_with("0x") || !addr[2..].chars().all(|c| c.is_ascii_hexdigit()) {
+        return None;
+    }
+    Some((class, addr.to_owned()))
 }
 
 fn sway_focused_with_id() -> Option<(String, i64)> {
@@ -311,7 +324,11 @@ fn xdotool_active_id() -> Option<String> {
         return None;
     }
     let id = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-    if id.is_empty() { None } else { Some(id) }
+    if id.is_empty() || !id.chars().all(|c| c.is_ascii_digit()) {
+        None
+    } else {
+        Some(id)
+    }
 }
 
 fn restore_focus(token: &FocusToken) -> bool {

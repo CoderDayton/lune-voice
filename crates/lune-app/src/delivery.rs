@@ -24,13 +24,13 @@ pub struct DeliveryService {
 }
 
 impl DeliveryService {
-    pub fn new(terminal_mode: TerminalMode) -> Self {
+    pub fn new(terminal_mode: TerminalMode) -> Result<Self, String> {
         let (tx, rx) = mpsc::channel::<DeliveryMsg>();
         std::thread::Builder::new()
             .name("delivery".into())
             .spawn(move || delivery_thread(rx, terminal_mode))
-            .expect("spawn delivery thread");
-        Self { tx }
+            .map_err(|e| format!("spawn delivery thread: {e}"))?;
+        Ok(Self { tx })
     }
 
     #[inline]

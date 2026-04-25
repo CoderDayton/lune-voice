@@ -185,7 +185,19 @@ pub fn check_model_status(
 
 /// Delete a downloaded model by local_name. Returns Ok(true) if removed,
 /// Ok(false) if it wasn't present.
+const KNOWN_MODEL_NAMES: &[&str] = &[
+    "parakeet-tdt-0.6b",
+    "qwen3-asr-0.6b-onnx",
+    "nemotron-rerank-1b",
+    "qwen3-0.6b",
+];
+
 pub fn delete_model(models_dir: &Path, local_name: &str) -> PersistResult<bool> {
+    if !KNOWN_MODEL_NAMES.contains(&local_name) {
+        return Err(PersistError::ModelDownload(format!(
+            "unknown model name: {local_name}"
+        )));
+    }
     let dir = models_dir.join(local_name);
     if dir.is_dir() {
         std::fs::remove_dir_all(&dir)?;
@@ -309,9 +321,9 @@ fn download_file_direct(repo_id: &str, filename: &str, dst: &Path) -> PersistRes
     if let Ok(token) = std::env::var("HF_TOKEN") {
         req = req.header("Authorization", &format!("Bearer {token}"));
     }
-    let resp = req
-        .call()
-        .map_err(|e| PersistError::ModelDownload(format!("{repo_id}/{filename}: HTTP: {e}")))?;
+    let resp = req.call().map_err(|_| {
+        PersistError::ModelDownload(format!("{repo_id}/{filename}: HTTP request failed"))
+    })?;
 
     let tmp = dst.with_extension("dl.tmp");
     {
@@ -404,7 +416,9 @@ fn ensure_directory_model_with_progress(
 
     for (idx, filename) in files_to_download.iter().enumerate() {
         // Flatten nested paths: "onnx/model.onnx" → "model.onnx" locally
-        let local_name = Path::new(filename).file_name().unwrap_or(filename.as_ref());
+        let local_name = Path::new(filename)
+            .file_name()
+            .ok_or_else(|| PersistError::ModelDownload(format!("invalid filename: {filename}")))?;
         let dst = local_dir.join(local_name);
         if dst.is_file() && dst.metadata().map(|m| m.len() > 0).unwrap_or(false) {
             on_file(filename, idx, total);

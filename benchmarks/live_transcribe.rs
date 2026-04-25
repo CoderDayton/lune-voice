@@ -92,9 +92,16 @@ fn main() {
 
     let deliver = std::env::var("DELIVER").as_deref() != Ok("0");
     let delivery = if deliver {
-        let svc = DeliveryService::new(lune_core::config::TerminalMode::Auto);
-        eprintln!("  Delivery: clipboard paste into focused window");
-        Some(svc)
+        match DeliveryService::new(lune_core::config::TerminalMode::Auto) {
+            Ok(svc) => {
+                eprintln!("  Delivery: clipboard paste into focused window");
+                Some(svc)
+            }
+            Err(e) => {
+                eprintln!("  Delivery: failed to start ({e}), disabled");
+                None
+            }
+        }
     } else {
         eprintln!("  Delivery: disabled (DELIVER=0)");
         None

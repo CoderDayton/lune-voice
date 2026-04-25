@@ -96,7 +96,7 @@ impl AppRuntime {
         };
 
         let terminal_mode = settings.read().await.terminal_mode;
-        let delivery = DeliveryService::new(terminal_mode);
+        let delivery = DeliveryService::new(terminal_mode)?;
 
         let runtime = Self {
             inner: Arc::new(RuntimeInner {
@@ -533,7 +533,7 @@ impl AppRuntime {
             let mgr = pipeline
                 .manager
                 .as_ref()
-                .expect("build_pipeline succeeded but manager is None");
+                .ok_or("build_pipeline succeeded but manager is None")?;
             return Ok(Arc::clone(mgr));
         }
 
@@ -546,12 +546,11 @@ impl AppRuntime {
             return Err("Models not downloaded. Please complete model setup first.".into());
         }
         pipeline.active = true;
-        Ok(Arc::clone(
-            pipeline
-                .manager
-                .as_ref()
-                .expect("manager confirmed Some at line above"),
-        ))
+        let mgr = pipeline
+            .manager
+            .as_ref()
+            .ok_or("pipeline manager is None")?;
+        Ok(Arc::clone(mgr))
     }
 
     async fn set_pipeline_session(&self, session_id: Option<String>, active: bool) {
