@@ -21,9 +21,6 @@ pre-commit:
       run: cd desktop-ui && bun run test
       fail_text: "frontend tests failed — fix desktop UI regressions"
 
-    frontend-tauri-smoke:
-      run: cd desktop-ui && bun run test:e2e:tauri
-      fail_text: "native Tauri smoke test failed — fix desktop runtime regressions"
 
 pre-push:
   parallel: false

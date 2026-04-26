@@ -84,9 +84,6 @@ pub struct Qwen3Session {
     total_samples: u64,
     sample_rate: u32,
     next_id: u64,
-    /// Language hint for this session. Some("English") forces English,
-    /// None lets the model auto-detect.
-    language: Option<String>,
 }
 
 // ── Constructor ─────────────────────────────────────────────────────────────
@@ -214,36 +211,11 @@ impl AsrBackend for Qwen3AsrBackend {
     type SessionHandle = Mutex<Qwen3Session>;
 
     async fn start_session(&self, config: AsrSessionConfig) -> Result<Self::SessionHandle> {
-        // Map BCP-47 prefix → Qwen3 canonical language name. None → auto-detect.
-        const LANG_MAP: &[(&str, &str)] = &[
-            ("en", "English"),
-            ("fr", "French"),
-            ("de", "German"),
-            ("es", "Spanish"),
-            ("it", "Italian"),
-            ("zh", "Chinese"),
-            ("cn", "Chinese"),
-            ("ja", "Japanese"),
-            ("ko", "Korean"),
-            ("pt", "Portuguese"),
-            ("ru", "Russian"),
-        ];
-        let language: Option<String> = config.language.as_deref().and_then(|l| {
-            let lower = l.to_ascii_lowercase();
-            if lower == "auto" {
-                return None;
-            }
-            LANG_MAP
-                .iter()
-                .find(|(prefix, _)| lower.starts_with(prefix))
-                .map(|(_, name)| name.to_string())
-        });
         let session = Qwen3Session {
             pending: Vec::with_capacity(MAX_WINDOW_SAMPLES),
             total_samples: 0,
             sample_rate: config.sample_rate,
             next_id: 1,
-            language,
         };
         tracing::info!(
             sample_rate = config.sample_rate,
@@ -268,7 +240,7 @@ impl AsrBackend for Qwen3AsrBackend {
     }
 
     async fn poll_final(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>> {
-        let (pcm, ts_ms, id, language) = {
+        let (pcm, ts_ms, id) = {
             let mut sess = session.lock().map_err(|e| lock_err("session", e))?;
             if sess.pending.is_empty() {
                 return Ok(vec![]);
@@ -277,9 +249,8 @@ impl AsrBackend for Qwen3AsrBackend {
             let id = sess.next_id;
             sess.next_id += 1;
             let pcm = sess.pending.clone();
-            let lang = sess.language.clone();
             sess.pending.clear();
-            (pcm, ts, id, lang)
+            (pcm, ts, id)
         };
 
         let trimmed = trim_leading_silence(&pcm);
@@ -287,7 +258,7 @@ impl AsrBackend for Qwen3AsrBackend {
             return Ok(vec![]);
         }
 
-        self.transcribe_pcm(trimmed, ts_ms, id, language.as_deref())
+        self.transcribe_pcm(trimmed, ts_ms, id, None)
     }
 
     async fn reset_context(&self, session: &Self::SessionHandle) -> Result<()> {

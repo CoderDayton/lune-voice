@@ -26,7 +26,7 @@ use lune_core::asr::AsrBackendKind;
 use lune_core::config::{DevicePolicy, UserSettings};
 use lune_core::llm::TextPostProcessor;
 use lune_core::session::SessionEvent;
-use lune_llm::NullPostProcessor;
+use lune_llm::{NullPostProcessor, OrtStyleLlm, OrtStyleLlmConfig};
 use tokio::sync::{Mutex, RwLock, mpsc};
 
 // ─── Main ───────────────────────────────────────────────────────────────────
@@ -54,7 +54,7 @@ fn main() {
     } else {
         DevicePolicy::Cpu
     };
-    let asr_entry = match benchmark_asr_entry(&root) {
+    let asr_entry = match benchmark_asr_entry() {
         Ok(entry) => entry,
         Err(msg) => {
             println!("  [skip] {msg}");
@@ -64,7 +64,7 @@ fn main() {
     println!("  Selected ASR backend: {}", asr_entry.display_name);
     print!("  Loading ASR backend ... ");
     let t = Instant::now();
-    let models_dir = root.join("models");
+    let models_dir = bench_utils::models_dir();
     let asr = AsrRegistry::from_config(&asr_entry.config, device, &models_dir).expect("load ASR");
 
     let asr = Arc::new(asr);
@@ -73,10 +73,39 @@ fn main() {
         println!("  Memory after ASR load: {}", mem.display());
     }
 
-    // The post-processor slot uses passthrough unless a correction backend is
-    // wired into this benchmark.
-    let llm: Arc<dyn TextPostProcessor> = Arc::new(NullPostProcessor::new());
-    let _ = has_gpu; // still consumed by ASR loading above
+    let llm_off = std::env::var("LUNE_LLM")
+        .map(|v| v == "off" || v == "0")
+        .unwrap_or(false);
+    let llm_dir = models_dir.join("qwen3-0.6b");
+    let llm: Arc<dyn TextPostProcessor> = if !llm_off && llm_dir.join("tokenizer.json").exists() {
+        print!("  Loading LLM backend...");
+        let lt = Instant::now();
+        match OrtStyleLlm::new(OrtStyleLlmConfig {
+            model_dir: llm_dir,
+            use_gpu: has_gpu,
+            ..Default::default()
+        }) {
+            Ok(llm) => {
+                println!("{:.1}s", lt.elapsed().as_secs_f64());
+                if let Some(mem) = process_memory_usage() {
+                    println!("  Memory after LLM load: {}", mem.display());
+                }
+                Arc::new(llm)
+            }
+            Err(e) => {
+                println!("failed: {e}");
+                println!("  Falling back to passthrough (no LLM correction)");
+                Arc::new(NullPostProcessor::new())
+            }
+        }
+    } else {
+        if llm_off {
+            println!("  LLM: disabled (LUNE_LLM=off)");
+        } else {
+            println!("  LLM: passthrough (no model at {})", llm_dir.display());
+        }
+        Arc::new(NullPostProcessor::new())
+    };
 
     // Load fixtures
     let fixtures = load_fixtures(&root);

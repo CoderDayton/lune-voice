@@ -109,6 +109,10 @@ mod tests {
     #[test]
     fn calibrator_file_per_backend_slug() {
         let paths = AppPaths::from_dirs("/tmp/config", "/tmp/data");
+        assert_eq!(
+            paths.calibrator_file("backend_slug"),
+            Path::new("/tmp/data/calibrator_backend_slug.json")
+        );
     }
 
     #[test]

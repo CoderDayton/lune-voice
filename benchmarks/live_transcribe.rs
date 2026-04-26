@@ -46,7 +46,7 @@ fn main() {
         DevicePolicy::Cpu
     };
 
-    let asr_entry = match benchmark_asr_entry(&root) {
+    let asr_entry = match benchmark_asr_entry() {
         Ok(entry) => entry,
         Err(msg) => {
             eprintln!("  [skip] {msg}");
@@ -56,7 +56,7 @@ fn main() {
 
     eprint!("  Loading ASR ... ");
     let t = Instant::now();
-    let models_dir = root.join("models");
+    let models_dir = bench_utils::models_dir();
     let asr = Arc::new(
         AsrRegistry::from_config(&asr_entry.config, device_policy, &models_dir).expect("load ASR"),
     );

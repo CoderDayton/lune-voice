@@ -296,15 +296,26 @@ fn append_segments(
             continue;
         }
 
+        let mut worst_in_sent: Option<(f32, String)> = None;
         for word in trimmed.split_whitespace() {
             let w = word.trim_matches(|c: char| c.is_ascii_punctuation());
+            let ends_sentence = word.ends_with('.') || word.ends_with('?') || word.ends_with('!');
             if !w.is_empty() {
                 let score = lune_asr::confidence::lexical::word_confidence_for_lang(w, lang);
-                if score < LEXICAL_FIX_THRESHOLD {
-                    debug!(word = w, score, lang, "fix_word flagged");
-                    fix_words.push(w.to_string());
+                if score < LEXICAL_FIX_THRESHOLD
+                    && worst_in_sent.as_ref().is_none_or(|(s, _)| score < *s)
+                {
+                    worst_in_sent = Some((score, w.to_string()));
                 }
             }
+            if ends_sentence && let Some((score, w)) = worst_in_sent.take() {
+                debug!(word = %w, score, lang, "fix_word flagged");
+                fix_words.push(w);
+            }
+        }
+        if let Some((score, w)) = worst_in_sent {
+            debug!(word = %w, score, lang, "fix_word flagged");
+            fix_words.push(w);
         }
 
         if !joined_text.is_empty() {

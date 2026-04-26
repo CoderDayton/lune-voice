@@ -138,7 +138,7 @@ fn main() {
         DevicePolicy::Cpu
     };
 
-    let asr_entry = match bench_utils::benchmark_asr_entry(&root) {
+    let asr_entry = match bench_utils::benchmark_asr_entry() {
         Ok(e) => e,
         Err(msg) => {
             eprintln!("  [skip] {msg}");
@@ -149,7 +149,7 @@ fn main() {
 
     print!("  Loading ASR ... ");
     let t = Instant::now();
-    let models_dir = root.join("models");
+    let models_dir = bench_utils::models_dir();
     let asr = AsrRegistry::from_config(&asr_entry.config, device, &models_dir).expect("load ASR");
     println!("{:.1}s", t.elapsed().as_secs_f64());
 

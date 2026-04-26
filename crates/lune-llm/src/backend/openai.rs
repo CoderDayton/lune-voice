@@ -8,7 +8,7 @@ use async_openai::{
     },
 };
 
-use lune_core::config::BASE_SYSTEM_PROMPT;
+use lune_core::config::base_system_prompt;
 use lune_core::llm::{PostProcessInput, PostProcessOutput, TextPostProcessor};
 
 /// Configuration for the OpenAI-compatible LLM backend.
@@ -73,25 +73,15 @@ fn build_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage>
     } else {
         2 + style.style_instructions.len()
     };
-    let mut system_content = String::with_capacity(
-        BASE_SYSTEM_PROMPT.len() + style_len + if dict_len > 0 { 55 + dict_len * 30 } else { 0 },
-    );
-    let lang_str = if input.language == "en" || input.language.is_empty() {
-        String::new()
-    } else {
-        format!(" in {}", language_name(&input.language))
-    };
     let fix_words_str = if input.fix_words.is_empty() {
         String::new()
     } else {
-        format!(
-            " These words are likely ASR errors — fix or remove them: {}",
-            input.fix_words.join(", ")
-        )
+        format!("\nFix these words: {}", input.fix_words.join(", "))
     };
-    let base = BASE_SYSTEM_PROMPT
-        .replace("{language}", &lang_str)
-        .replace("{fix_words}", &fix_words_str);
+    let base = base_system_prompt(&input.language, &fix_words_str);
+    let mut system_content = String::with_capacity(
+        base.len() + style_len + if dict_len > 0 { 55 + dict_len * 30 } else { 0 },
+    );
     system_content.push_str(&base);
 
     if !style.style_instructions.is_empty() {
@@ -222,21 +212,6 @@ impl TextPostProcessor for OpenAiLlmBackend {
     }
 }
 
-fn language_name(code: &str) -> &'static str {
-    match code {
-        "fr" => "French",
-        "de" => "German",
-        "es" => "Spanish",
-        "it" => "Italian",
-        "pt" => "Portuguese",
-        "ru" => "Russian",
-        "zh" => "Chinese",
-        "ja" => "Japanese",
-        "ko" => "Korean",
-        _ => "English",
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -270,7 +245,7 @@ mod tests {
 
         let json = serde_json::to_string(&msgs).unwrap();
         assert!(json.contains("hello um world"));
-        assert!(json.contains("Correct dictation transcripts"));
+        assert!(json.contains("ASR text correction model"));
     }
 
     #[test]

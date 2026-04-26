@@ -6,7 +6,30 @@ use serde::{Deserialize, Serialize};
 pub type StyleId = String;
 
 /// Universal rules shared by every style preset.
-pub const BASE_SYSTEM_PROMPT: &str = "Correct dictation transcripts{language}. Fix clear ASR errors: wrong tense, nonsense words, misheard terms. Preserve names, technical terms, correct words, language and tone. No rephrasing, summarizing, removing or explaining. Fix periods, commas and capitalization. Output corrected text only.{fix_words}\n\n/no_think";
+pub fn base_system_prompt(language: &str, fix_words: &str) -> String {
+    let lang_tag = match language {
+        "fr" => "French",
+        "de" => "German",
+        "es" => "Spanish",
+        "it" => "Italian",
+        "pt" => "Portuguese",
+        "zh" => "Chinese",
+        "cn" => "Chinese",
+        "ja" => "Japanese",
+        "ru" => "Russian",
+        "ko" => "Korean",
+        _ => "English",
+    };
+
+    format!(
+        "You are an ASR text correction model for {lang_tag}. \
+        Correct only obvious ASR errors, grammar, capitalization, and punctuation. \
+        Preserve the original wording and word order as much as possible. \
+        Do not summarize. Do not explain. Do not add commentary. \
+        {fix_words}. \
+        Output only the corrected text."
+    )
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StylePreset {

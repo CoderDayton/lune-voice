@@ -287,9 +287,9 @@ fn main() {
     } else {
         DevicePolicy::Cpu
     };
-    let models_dir = root.join("models");
+    let models_dir = bench_utils::models_dir();
 
-    let entries = benchmark_asr_entries(&root);
+    let entries = benchmark_asr_entries();
     if entries.is_empty() {
         eprintln!("  [skip] No ASR model dirs found under models/");
         return;

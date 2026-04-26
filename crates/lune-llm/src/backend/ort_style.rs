@@ -18,7 +18,7 @@ use tracing::info;
 use lune_core::error::{Error, Result};
 use lune_core::llm::{PostProcessInput, PostProcessOutput, TextPostProcessor};
 
-const DEFAULT_MAX_TOKENS: usize = 128;
+const DEFAULT_MAX_TOKENS: usize = 256;
 
 pub struct OrtStyleLlmConfig {
     pub model_dir: PathBuf,
@@ -210,6 +210,12 @@ impl OrtStyleLlm {
         })
     }
 
+    pub fn user_prompt(transcript: &str) -> String {
+        format!(
+            "Correct this ASR transcript. Output corrected text only.\n\n{transcript}\n\n/no_think",
+        )
+    }
+
     pub fn apply_style_with_fix_words(
         &self,
         _system_prompt: &str,
@@ -217,34 +223,26 @@ impl OrtStyleLlm {
         fix_words: &[String],
         language: &str,
     ) -> Result<String> {
-        let lang_str = if language == "en" || language.is_empty() {
-            String::new()
-        } else {
-            format!(" in {}", language_name(language))
-        };
         let fix_str = if fix_words.is_empty() {
             String::new()
         } else {
-            format!(
-                " These words are likely ASR errors — fix or remove them: {}",
-                fix_words.join(", ")
-            )
+            format!("Correct these words: {}", fix_words.join(", "))
         };
-        let base = lune_core::config::BASE_SYSTEM_PROMPT
-            .replace("{language}", &lang_str)
-            .replace("{fix_words}", &fix_str);
+        let base = lune_core::config::base_system_prompt(language, &fix_str);
+        let user_prompt = Self::user_prompt(transcript);
         let prompt = match self.params.chat_format {
             ChatFormat::ChatML => format!(
                 "<|im_start|>system\n\
                  {base}<|im_end|>\n\
                  <|im_start|>user\n\
-                 {transcript}<|im_end|>\n\
-                 <|im_start|>assistant\n"
+                 {user_prompt}<|im_end|>\n\
+                 <|im_start|>assistant\n\
+                 <think>\n\n</think>\n\n"
             ),
             ChatFormat::Llama => format!(
                 "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n\
                  {base}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n\
-                 {transcript}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+                 {user_prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
             ),
         };
         let enc = self
@@ -284,7 +282,7 @@ impl OrtStyleLlm {
         let mut kv: Vec<DynValue> = outputs.into_iter().skip(1).map(|(_, v)| v).collect();
 
         // ── Decode ──────────────────────────────────────────────────────
-        let max = self.max_new_tokens.min(n * 2);
+        let max = self.max_new_tokens.min(n);
         for _ in 1..max {
             let tok = *generated.last().unwrap() as i64;
             let total = n + generated.len();
@@ -306,21 +304,6 @@ impl OrtStyleLlm {
         }
 
         Ok(generated)
-    }
-}
-
-fn language_name(code: &str) -> &'static str {
-    match code {
-        "fr" => "French",
-        "de" => "German",
-        "es" => "Spanish",
-        "it" => "Italian",
-        "pt" => "Portuguese",
-        "ru" => "Russian",
-        "zh" => "Chinese",
-        "ja" => "Japanese",
-        "ko" => "Korean",
-        _ => "English",
     }
 }
 

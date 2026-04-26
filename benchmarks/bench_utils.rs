@@ -6,6 +6,11 @@ use std::path::PathBuf;
 
 use lune_core::asr::AsrBackendKind;
 use lune_core::config::AsrBackendConfig;
+use lune_persist::AppPaths;
+
+pub fn models_dir() -> PathBuf {
+    AppPaths::resolve().expect("resolve XDG paths").models_dir()
+}
 
 // ─── Fixture ────────────────────────────────────────────────────────────────
 
@@ -116,11 +121,11 @@ pub fn requested_benchmark_asr() -> Option<BenchmarkAsr> {
     None
 }
 
-pub fn benchmark_asr_entries(root: &std::path::Path) -> Vec<BenchmarkAsrEntry> {
-    let requested = requested_benchmark_asr();
+pub fn benchmark_asr_entries() -> Vec<BenchmarkAsrEntry> {
+    let _requested = requested_benchmark_asr();
     let mut entries = Vec::new();
 
-    let qwen3_dir = root.join("models/qwen3-asr-0.6b-onnx");
+    let qwen3_dir = models_dir().join("qwen3-asr-0.6b-onnx");
     if qwen3_dir.exists() {
         entries.push(BenchmarkAsrEntry {
             display_name: "Qwen3-ASR-0.6B-int4",
@@ -132,17 +137,18 @@ pub fn benchmark_asr_entries(root: &std::path::Path) -> Vec<BenchmarkAsrEntry> {
     entries
 }
 
-pub fn benchmark_asr_entry(root: &std::path::Path) -> Result<BenchmarkAsrEntry, String> {
+pub fn benchmark_asr_entry() -> Result<BenchmarkAsrEntry, String> {
     let requested = requested_benchmark_asr();
-    benchmark_asr_entries(root)
+    benchmark_asr_entries()
         .into_iter()
         .next()
         .ok_or_else(|| match requested {
             Some(choice) => format!(
-                "Requested ASR backend {:?} is unavailable. Expected model dir under models/.",
-                choice
+                "Requested ASR backend {:?} is unavailable. Expected model in {:?}.",
+                choice,
+                models_dir()
             ),
-            None => "No ASR model dir found under models/.".to_string(),
+            None => format!("No ASR model dir found under {:?}.", models_dir()),
         })
 }
 
@@ -246,18 +252,7 @@ pub fn load_wav_f32(path: &std::path::Path) -> Vec<f32> {
 
 /// Strip punctuation, uppercase, collapse whitespace.
 pub fn normalize_text(s: &str) -> String {
-    s.chars()
-        .map(|c| {
-            if c.is_ascii_alphabetic() {
-                c.to_ascii_uppercase()
-            } else {
-                ' '
-            }
-        })
-        .collect::<String>()
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
+    s.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 pub fn levenshtein<T: Eq>(a: &[T], b: &[T]) -> usize {
