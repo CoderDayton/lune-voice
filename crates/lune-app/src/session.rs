@@ -3,7 +3,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::Utc;
-use lune_asr::IsotonicCalibrator;
 use tokio::sync::Notify;
 use tokio::sync::{Mutex, RwLock, mpsc};
 use tracing::{debug, info, warn};
@@ -72,10 +71,6 @@ pub struct SessionManager<A: AsrBackend> {
     adaptive_vad_state: Arc<Mutex<Option<AdaptiveVadConfig>>>,
     /// Path to persist adaptive VAD state across app restarts.
     vad_state_path: Option<PathBuf>,
-    /// Isotonic calibrator applied to per-word ASR confidences before the
-    /// LLM gate. Defaults to identity so behaviour matches the raw-threshold
-    /// path when no calibration data is available.
-    calibrator: Arc<IsotonicCalibrator>,
 }
 
 impl<A: AsrBackend + 'static> SessionManager<A> {
@@ -101,51 +96,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             idle_notify: Arc::new(Notify::new()),
             adaptive_vad_state: Arc::new(Mutex::new(None)),
             vad_state_path: None,
-            calibrator: Arc::new(IsotonicCalibrator::identity()),
         }
-    }
-
-    /// Attach an isotonic confidence calibrator. Loaded at session start and
-    /// applied to every segment before the LLM gate — downstream code
-    /// continues to compare `wc.confidence < threshold`, but `wc.confidence`
-    /// is now `P(correct | raw)` instead of raw softmax output.
-    pub fn with_calibrator(mut self, calibrator: Arc<IsotonicCalibrator>) -> Self {
-        info!(
-            breakpoints = calibrator.breakpoint_count(),
-            "calibrator attached to session manager"
-        );
-        self.calibrator = calibrator;
-        self
-    }
-
-    /// Load a calibrator from disk, or use identity if the file is missing
-    /// or corrupt. Mirrors `with_vad_state_path` semantics: non-fatal on any
-    /// failure — we never block a dictation session because the calibrator
-    /// failed to load.
-    pub fn with_calibrator_path(mut self, path: PathBuf) -> Self {
-        if path.exists() {
-            match std::fs::read_to_string(&path) {
-                Ok(json) => match serde_json::from_str::<IsotonicCalibrator>(&json) {
-                    Ok(cal) => {
-                        info!(
-                            path = %path.display(),
-                            breakpoints = cal.breakpoint_count(),
-                            "loaded isotonic calibrator from disk"
-                        );
-                        self.calibrator = Arc::new(cal);
-                    }
-                    Err(e) => {
-                        warn!(error = %e, path = %path.display(),
-                              "corrupt calibrator file, falling back to identity");
-                    }
-                },
-                Err(e) => {
-                    warn!(error = %e, path = %path.display(),
-                          "failed to read calibrator file, using identity");
-                }
-            }
-        }
-        self
     }
 
     /// Set the file path for persisting adaptive VAD state across restarts.
@@ -233,7 +184,6 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let settings = Arc::clone(&self.settings);
         let adaptive_vad_state = Arc::clone(&self.adaptive_vad_state);
         let vad_state_path = self.vad_state_path.clone();
-        let calibrator = Arc::clone(&self.calibrator);
 
         tokio::task::spawn(run_session(
             session_id,
@@ -252,7 +202,6 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             settings,
             adaptive_vad_state,
             vad_state_path,
-            calibrator,
         ));
 
         *lock = Some(ActiveHandle {
@@ -317,48 +266,53 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
 
 const MAX_SEGMENTS: usize = 500;
 
+const LEXICAL_DROP_THRESHOLD: f32 = 0.15;
+const LEXICAL_FIX_THRESHOLD: f32 = 0.45;
+
 fn append_segments(
     all_segments: &mut Vec<AsrSegment>,
     joined_text: &mut String,
+    fix_words: &mut Vec<String>,
     new_segments: Vec<AsrSegment>,
-    calibrator: &IsotonicCalibrator,
 ) -> bool {
     let mut appended = false;
-    for mut seg in new_segments {
-        // Remap raw softmax confidences into calibrated P(correct | raw).
-        // Downstream gate comparisons (`wc.confidence < threshold`) continue
-        // to work unchanged — the scale of `wc.confidence` has moved from
-        // raw softmax space to probability-of-correctness space. For the
-        // identity calibrator this is a no-op.
-        for wc in &mut seg.word_confidences {
-            wc.confidence = calibrator.calibrate(wc.confidence);
-        }
-        if let Some(min) = seg.min_token_confidence.as_mut() {
-            *min = calibrator.calibrate(*min);
-        }
-        if let Some(conf) = seg.confidence.as_mut() {
-            *conf = calibrator.calibrate(*conf);
-        }
-
-        // Build the N-best sentence hypotheses on the post-calibration
-        // confidence scale so ranking uses P(correct|raw) — the real
-        // likelihood order. If calibration is skipped (identity), the
-        // ranking still works since relative ordering is preserved.
-        //
-        // Threshold matches the marking threshold so only genuinely
-        // uncertain words contribute alternate hypotheses.
-        let mark_threshold = 0.85;
-        let k_max = 5;
-        seg.build_hypotheses(mark_threshold, k_max);
-
+    for seg in new_segments {
         let trimmed = seg.text.trim();
-        if !trimmed.is_empty() {
-            if !joined_text.is_empty() {
-                joined_text.push(' ');
-            }
-            joined_text.push_str(trimmed);
-            appended = true;
+        if trimmed.is_empty() {
+            all_segments.push(seg);
+            continue;
         }
+
+        let lang = lune_asr::confidence::lexical::detect_lang(trimmed);
+
+        let seg_score =
+            lune_asr::confidence::lexical::segment_lexical_confidence_for_lang(trimmed, lang);
+        if seg_score < LEXICAL_DROP_THRESHOLD {
+            warn!(
+                score = seg_score,
+                text = trimmed,
+                "dropping garbage segment"
+            );
+            continue;
+        }
+
+        for word in trimmed.split_whitespace() {
+            let w = word.trim_matches(|c: char| c.is_ascii_punctuation());
+            if !w.is_empty() {
+                let score = lune_asr::confidence::lexical::word_confidence_for_lang(w, lang);
+                if score < LEXICAL_FIX_THRESHOLD {
+                    debug!(word = w, score, lang, "fix_word flagged");
+                    fix_words.push(w.to_string());
+                }
+            }
+        }
+
+        if !joined_text.is_empty() {
+            joined_text.push(' ');
+        }
+        joined_text.push_str(trimmed);
+        appended = true;
+
         if all_segments.len() >= MAX_SEGMENTS {
             warn!("segment limit ({MAX_SEGMENTS}) reached, dropping oldest");
             all_segments.remove(0);
@@ -366,66 +320,6 @@ fn append_segments(
         all_segments.push(seg);
     }
     appended
-}
-
-/// Fold every segment's pre-built N-best hypothesis list into a single
-/// aggregate hypothesis list for the whole utterance.
-///
-/// Strategy: cartesian product of per-segment hypotheses is prohibitively
-/// large (for 3 segments × 5 hypotheses each, 125 combinations). Instead,
-/// enumerate "swap one segment at a time" — the aggregate list contains
-/// the joined argmax plus one aggregate per segment where that segment
-/// contributes an alternate and all others stay at their argmax. This
-/// is the same Hamming-≤1 principle the per-segment builder uses, applied
-/// at the utterance level.
-///
-/// Deduplicates case-insensitively and caps at 5 entries total to keep
-/// the prompt compact.
-fn collect_nbest(segments: &[AsrSegment]) -> Vec<String> {
-    // Must have at least one segment with ≥2 hypotheses for n-best to
-    // be meaningful. Otherwise return empty and let the caller fall
-    // through to the marker path.
-    let any_multi = segments.iter().any(|s| s.hypotheses.len() >= 2);
-    if !any_multi {
-        return Vec::new();
-    }
-
-    // Utterance-level argmax = each segment's argmax joined.
-    let argmaxes: Vec<&str> = segments
-        .iter()
-        .map(|s| {
-            s.hypotheses
-                .first()
-                .map(String::as_str)
-                .unwrap_or(s.text.as_str())
-        })
-        .collect();
-    let argmax_sentence = argmaxes.join(" ");
-
-    let mut result: Vec<String> = vec![argmax_sentence.clone()];
-    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-    seen.insert(argmax_sentence.to_ascii_lowercase());
-
-    // One aggregate per (segment, alternate) combination, in segment order.
-    for (seg_idx, seg) in segments.iter().enumerate() {
-        for alt in seg.hypotheses.iter().skip(1) {
-            if result.len() >= 5 {
-                break;
-            }
-            let mut pieces: Vec<&str> = argmaxes.clone();
-            pieces[seg_idx] = alt.as_str();
-            let aggregate = pieces.join(" ");
-            let key = aggregate.to_ascii_lowercase();
-            if seen.insert(key) {
-                result.push(aggregate);
-            }
-        }
-        if result.len() >= 5 {
-            break;
-        }
-    }
-
-    result
 }
 
 fn drain_processing_controls(
@@ -460,10 +354,9 @@ async fn run_session<A: AsrBackend + 'static>(
     active_arc: Arc<Mutex<Option<ActiveHandle>>>,
     idle_notify: Arc<Notify>,
     audio_override: Option<AudioStream>,
-    settings: Arc<RwLock<UserSettings>>,
+    _settings: Arc<RwLock<UserSettings>>,
     adaptive_vad_state: Arc<Mutex<Option<AdaptiveVadConfig>>>,
     vad_state_path: Option<PathBuf>,
-    calibrator: Arc<IsotonicCalibrator>,
 ) {
     let mut status = SessionStatus::Completed;
 
@@ -477,7 +370,7 @@ async fn run_session<A: AsrBackend + 'static>(
                 let _ = event_tx.send(SessionEvent::Error(e.to_string())).await;
                 finalize_db(
                     session_id,
-                    &persist,
+                    Arc::clone(&persist),
                     SessionStatus::Failed(e.to_string()),
                     None,
                     None,
@@ -495,7 +388,7 @@ async fn run_session<A: AsrBackend + 'static>(
             let _ = event_tx.send(SessionEvent::Error(e.to_string())).await;
             finalize_db(
                 session_id,
-                &persist,
+                Arc::clone(&persist),
                 SessionStatus::Failed(e.to_string()),
                 None,
                 None,
@@ -530,6 +423,7 @@ async fn run_session<A: AsrBackend + 'static>(
 
     let mut segments = Vec::with_capacity(asr.segment_capacity_hint());
     let mut raw_text = String::with_capacity(256);
+    let mut fix_words: Vec<String> = Vec::new();
     let mut speech_samples: usize = 0;
     let mut first_asr_error: Option<String> = None;
     let mut saw_asr_success = false;
@@ -601,7 +495,7 @@ async fn run_session<A: AsrBackend + 'static>(
 
                     match asr.poll_results(&asr_session).await {
                         Ok(new_segments) => {
-                            if append_segments(&mut segments, &mut raw_text, new_segments, &calibrator) {
+                            if append_segments(&mut segments, &mut raw_text, &mut fix_words, new_segments) {
                                 saw_asr_success = true;
                                 let _ = event_tx.try_send(SessionEvent::PartialText);
                             }
@@ -631,7 +525,7 @@ async fn run_session<A: AsrBackend + 'static>(
                         let _ = asr.push_audio(&asr_session, &flush_silence).await;
                         match asr.poll_final(&asr_session).await {
                             Ok(new_segments) => {
-                                if append_segments(&mut segments, &mut raw_text, new_segments, &calibrator) {
+                                if append_segments(&mut segments, &mut raw_text, &mut fix_words, new_segments) {
                                     saw_asr_success = true;
                                     // Deliver only the NEW text from this segment
                                     if !llm_enabled {
@@ -705,20 +599,21 @@ async fn run_session<A: AsrBackend + 'static>(
         );
     }
 
-    // Persist adaptive VAD state for the next session (in-memory + disk)
+    if !cancelled {
+        let _ = event_tx.send(SessionEvent::Processing).await;
+    }
+
+    // Persist adaptive VAD state for the next session without blocking the
+    // final ASR → LLM → delivery path on disk I/O.
     if let Some(state) = segmenter.take_adaptive() {
         debug!(%session_id, state = %state.debug_state(), "saving adaptive VAD state");
-        if let Some(ref path) = vad_state_path {
-            match serde_json::to_string(&state) {
-                Ok(json) => {
-                    if let Err(e) = std::fs::write(path, &json) {
-                        warn!(error = %e, path = %path.display(), "failed to persist adaptive VAD to disk");
-                    }
-                }
-                Err(e) => warn!(error = %e, "failed to serialize adaptive VAD state"),
-            }
-        }
-        *adaptive_vad_state.lock().await = Some(state);
+        persist_adaptive_vad_state(
+            session_id,
+            state,
+            Arc::clone(&adaptive_vad_state),
+            vad_state_path.clone(),
+        )
+        .await;
     }
 
     if cancelled {
@@ -726,7 +621,6 @@ async fn run_session<A: AsrBackend + 'static>(
             warn!(error = %e, "reset_context error during cancel");
         }
     } else {
-        let _ = event_tx.send(SessionEvent::Processing).await;
         if let Err(e) = asr.push_audio(&asr_session, silence_flush).await {
             let msg = e.to_string();
             warn!(error = %msg, "push_audio (silence flush) error");
@@ -734,7 +628,7 @@ async fn run_session<A: AsrBackend + 'static>(
         }
         match asr.poll_final(&asr_session).await {
             Ok(new_segments) => {
-                if append_segments(&mut segments, &mut raw_text, new_segments, &calibrator) {
+                if append_segments(&mut segments, &mut raw_text, &mut fix_words, new_segments) {
                     saw_asr_success = true;
                 }
             }
@@ -754,7 +648,7 @@ async fn run_session<A: AsrBackend + 'static>(
     if cancelled {
         finalize_db(
             session_id,
-            &persist,
+            Arc::clone(&persist),
             SessionStatus::Cancelled,
             Some(Utc::now()),
             None,
@@ -775,7 +669,14 @@ async fn run_session<A: AsrBackend + 'static>(
         } else {
             info!(%session_id, "no speech detected, ending session");
         }
-        finalize_db(session_id, &persist, status, Some(Utc::now()), None).await;
+        finalize_db(
+            session_id,
+            Arc::clone(&persist),
+            status,
+            Some(Utc::now()),
+            None,
+        )
+        .await;
         let _ = event_tx.send(SessionEvent::Stopped).await;
         clear_active(&active_arc, &idle_notify).await;
         return;
@@ -804,17 +705,21 @@ async fn run_session<A: AsrBackend + 'static>(
     let text_after_commands = route.remaining.trim().to_owned();
     if text_after_commands.is_empty() {
         info!(%session_id, "all text was voice commands");
-        finalize_db(session_id, &persist, status, Some(Utc::now()), None).await;
+        finalize_db(
+            session_id,
+            Arc::clone(&persist),
+            status,
+            Some(Utc::now()),
+            None,
+        )
+        .await;
         let _ = event_tx.send(SessionEvent::Stopped).await;
         clear_active(&active_arc, &idle_notify).await;
         return;
     }
 
-    let lang = settings.read().await.language.clone();
-    let lang_tag = lang.split(['-', '_']).next().unwrap_or("en");
+    let lang_tag = lune_asr::confidence::lexical::detect_lang(&text_after_commands);
     let pipeline_t0 = tokio::time::Instant::now();
-
-    let hypotheses: Vec<String> = collect_nbest(&segments);
 
     // ── Step 1: Dictionary ────────────────────────────────────────────
     // Single lock: fetch relevant entries + apply corrections together.
@@ -829,40 +734,11 @@ async fn run_session<A: AsrBackend + 'static>(
         (entries, applied)
     };
 
-    // ── Step 2: Bimodal skip ──────────────────────────────────────────
-    let skip_clean = config.pipeline.llm_skip_threshold.is_some_and(|skip| {
-        !segments.is_empty() && segments.iter().all(|s| s.is_clean_for_llm(skip))
-    });
-    let skip_broken = config
-        .pipeline
-        .llm_skip_noisy_threshold
-        .is_some_and(|broken| {
-            !segments.is_empty() && segments.iter().any(|s| s.is_broken_for_llm(broken))
-        });
-
     drain_processing_controls(&mut control_rx, &mut cancelled);
     let post_llm_text = if cancelled {
         info!(%session_id, "session cancelled during processing, skipping LLM");
         String::new()
-    } else if skip_clean || skip_broken {
-        debug!(
-            %session_id,
-            reason = if skip_clean { "clean" } else { "broken" },
-            clean = config.pipeline.llm_skip_threshold.unwrap_or(1.0),
-            broken = config.pipeline.llm_skip_noisy_threshold.unwrap_or(0.0),
-            "[LLM] bimodal gate: bypassing correction"
-        );
-        text_after_dict
     } else {
-        // ── Step 3: LLM ───────────────────────────────────────────────
-        if !hypotheses.is_empty() {
-            info!(
-                %session_id,
-                count = hypotheses.len(),
-                "[LLM] n-best hypotheses: {:?}",
-                hypotheses
-            );
-        }
         info!(%session_id, "[LLM] input: {text_after_dict}");
         let llm_t0 = tokio::time::Instant::now();
         let input = lune_core::llm::PostProcessInput {
@@ -872,8 +748,11 @@ async fn run_session<A: AsrBackend + 'static>(
             dictionary: dictionary_entries.clone(),
             context: None,
             language: lang_tag.into(),
-            hypotheses,
+            fix_words: fix_words.clone(),
         };
+        if !fix_words.is_empty() {
+            info!(%session_id, fix_words = ?fix_words, "sending fix_words to LLM");
+        }
         match post_processor.transform(&input).await {
             Ok(output) => {
                 debug!(%session_id, llm_ms = llm_t0.elapsed().as_millis() as u64, "[LLM] output ready, len={}", output.cleaned_text.len());
@@ -896,7 +775,7 @@ async fn run_session<A: AsrBackend + 'static>(
     if cancelled {
         finalize_db(
             session_id,
-            &persist,
+            Arc::clone(&persist),
             SessionStatus::Cancelled,
             Some(Utc::now()),
             None,
@@ -928,7 +807,10 @@ async fn run_session<A: AsrBackend + 'static>(
     } else {
         Some(final_text)
     };
-    finalize_db(session_id, &persist, status, Some(Utc::now()), transcript).await;
+    let ended_at = Some(Utc::now());
+    tokio::spawn(async move {
+        finalize_db(session_id, persist, status, ended_at, transcript).await;
+    });
 
     let _ = event_tx.send(SessionEvent::Stopped).await;
     clear_active(&active_arc, &idle_notify).await;
@@ -938,7 +820,7 @@ async fn run_session<A: AsrBackend + 'static>(
 #[cold]
 async fn finalize_db(
     session_id: Uuid,
-    persist: &Mutex<Database>,
+    persist: Arc<Mutex<Database>>,
     status: SessionStatus,
     ended_at: Option<chrono::DateTime<Utc>>,
     transcript: Option<String>,
@@ -958,6 +840,28 @@ async fn finalize_db(
     }
 }
 
+async fn persist_adaptive_vad_state(
+    session_id: Uuid,
+    state: AdaptiveVadConfig,
+    adaptive_vad_state: Arc<Mutex<Option<AdaptiveVadConfig>>>,
+    vad_state_path: Option<PathBuf>,
+) {
+    *adaptive_vad_state.lock().await = Some(state.clone());
+
+    if let Some(path) = vad_state_path {
+        tokio::spawn(async move {
+            match serde_json::to_string(&state) {
+                Ok(json) => {
+                    if let Err(e) = tokio::fs::write(&path, json).await {
+                        warn!(error = %e, path = %path.display(), "failed to persist adaptive VAD to disk");
+                    }
+                }
+                Err(e) => warn!(error = %e, %session_id, "failed to serialize adaptive VAD state"),
+            }
+        });
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -966,7 +870,7 @@ mod tests {
     use std::time::Duration;
 
     use lune_audio::AudioStream;
-    use lune_core::asr::{AsrSegment, AsrSessionConfig, WordConfidence};
+    use lune_core::asr::{AsrSegment, AsrSessionConfig};
     use lune_core::error::Error as CoreError;
     use lune_core::llm::{PostProcessInput, PostProcessOutput};
     use tokio::sync::{Notify, mpsc};
@@ -1076,17 +980,9 @@ mod tests {
         AsrSegment {
             id: 1,
             text: text.into(),
-            confidence: Some(if uncertain { 0.5 } else { 0.95 }),
-            min_token_confidence: Some(if uncertain { 0.4 } else { 0.9 }),
-            word_confidences: if uncertain {
-                vec![
-                    WordConfidence::new("helo", 0.4),
-                    WordConfidence::new("world", 0.95),
-                ]
-            } else {
-                vec![]
-            },
-            hypotheses: Vec::new(),
+            confidence: Some(if uncertain { 0.6 } else { 0.95 }),
+            min_token_confidence: Some(if uncertain { 0.55 } else { 0.9 }),
+
             is_final: true,
             start_ms: Some(0),
             end_ms: Some(500),

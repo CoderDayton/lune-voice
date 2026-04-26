@@ -13,7 +13,7 @@ use ort::session::Session;
 use ort::value::Value;
 use tokenizers::Tokenizer;
 
-use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig, WordConfidence};
+use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
 use lune_core::error::{Error, Result};
 
 use crate::mel::whisper;
@@ -47,6 +47,7 @@ Transcribe the spoken audio exactly in the spoken language. \
 Do not translate. \
 Output only the transcript text. \
 Do not add words not clearly present. \
+Write unintelligible speech as approximate phonetic text. \
 If no speech, return empty string.";
 
 /// Maximum audio buffer (5 min at 16 kHz).
@@ -227,8 +228,11 @@ impl AsrBackend for Qwen3AsrBackend {
             ("pt", "Portuguese"),
             ("ru", "Russian"),
         ];
-        let language = config.language.as_deref().and_then(|l| {
+        let language: Option<String> = config.language.as_deref().and_then(|l| {
             let lower = l.to_ascii_lowercase();
+            if lower == "auto" {
+                return None;
+            }
             LANG_MAP
                 .iter()
                 .find(|(prefix, _)| lower.starts_with(prefix))
@@ -325,6 +329,16 @@ fn argmax_on_logits(
     let start = total.saturating_sub(vocab_size);
     let logits = &data[start..];
 
+    if logits.is_empty() {
+        return Err(Error::Asr("empty logits tensor".into()));
+    }
+    if logits.len() != vocab_size {
+        return Err(Error::Asr(format!(
+            "logits slice {} != vocab {vocab_size}",
+            logits.len()
+        )));
+    }
+
     if boost.is_empty() {
         // Fast path: single pass argmax + LSE on f16 → f32.
         let mut max_idx = 0usize;
@@ -336,31 +350,31 @@ fn argmax_on_logits(
                 max_idx = i;
             }
         }
-        let lse: f32 = logits
-            .iter()
-            .map(|&x| (x.to_f32() - max_val).exp())
-            .sum::<f32>()
-            .ln()
-            + max_val;
+        let sum_exp: f32 = logits.iter().map(|&x| (x.to_f32() - max_val).exp()).sum();
+        if !sum_exp.is_normal() {
+            return Ok((max_idx as i64, 0.0));
+        }
+        let lse = sum_exp.ln() + max_val;
         Ok((max_idx as i64, (max_val - lse).exp()))
     } else {
-        // Boosted path: need unboosted max for confidence.
+        // Boosted path: track unboosted raw value inline for confidence.
         let mut max_idx = 0usize;
-        let mut max_val = f32::NEG_INFINITY;
+        let mut max_boosted = f32::NEG_INFINITY;
+        let mut raw_max = f32::NEG_INFINITY;
         for (i, &v) in logits.iter().enumerate() {
-            let boosted = v.to_f32() + boost.get(&(i as i64)).copied().unwrap_or(0.0);
-            if boosted > max_val {
-                max_val = boosted;
+            let raw = v.to_f32();
+            let boosted = raw + boost.get(&(i as i64)).copied().unwrap_or(0.0);
+            if boosted > max_boosted {
+                max_boosted = boosted;
                 max_idx = i;
+                raw_max = raw;
             }
         }
-        let raw_max = logits[max_idx].to_f32();
-        let lse: f32 = logits
-            .iter()
-            .map(|&x| (x.to_f32() - raw_max).exp())
-            .sum::<f32>()
-            .ln()
-            + raw_max;
+        let sum_exp: f32 = logits.iter().map(|&x| (x.to_f32() - raw_max).exp()).sum();
+        if !sum_exp.is_normal() {
+            return Ok((max_idx as i64, 0.0));
+        }
+        let lse = sum_exp.ln() + raw_max;
         Ok((max_idx as i64, (raw_max - lse).exp()))
     }
 }
@@ -642,17 +656,10 @@ impl Qwen3AsrBackend {
             "Qwen3 inference"
         );
         // 7. Decode tokens → text, parse output, build segment
-        let (text, word_confs) = self.decode_output(&tokens);
+        let (text, mean_conf, min_conf) = self.decode_output(&tokens);
         if text.is_empty() {
             return Ok(vec![]);
         }
-
-        let mean_conf = if word_confs.is_empty() {
-            None
-        } else {
-            Some(word_confs.iter().map(|w| w.confidence).sum::<f32>() / word_confs.len() as f32)
-        };
-        let min_conf = word_confs.iter().map(|w| w.confidence).reduce(f32::min);
 
         Ok(vec![AsrSegment {
             id,
@@ -662,19 +669,10 @@ impl Qwen3AsrBackend {
             end_ms: Some(timestamp_ms),
             confidence: mean_conf,
             min_token_confidence: min_conf,
-            word_confidences: word_confs,
-            hypotheses: vec![],
         }])
     }
 
-    /// Decode generated tokens to text and per-word confidences.
-    ///
-    /// Skips metadata tokens (everything up to and including `<asr_text>`),
-    /// then aggregates BPE subwords into words using space-boundary detection.
-    fn decode_output(&self, tokens: &[(i64, f32)]) -> (String, Vec<WordConfidence>) {
-        // Find content start: skip tokens up to and including <asr_text>.
-        // Also skip any IM_START/IM_END/NEWLINE metadata tokens that the
-        // model may echo before the actual transcript.
+    fn decode_output(&self, tokens: &[(i64, f32)]) -> (String, Option<f32>, Option<f32>) {
         let content_start = tokens
             .iter()
             .position(|(id, _)| *id == ASR_TEXT_ID)
@@ -699,10 +697,9 @@ impl Qwen3AsrBackend {
             .collect();
 
         if content.is_empty() {
-            return (String::new(), vec![]);
+            return (String::new(), None, None);
         }
 
-        // Decode full text
         let token_ids: Vec<u32> = content.iter().map(|(id, _)| *id as u32).collect();
         let mut text = self
             .tokenizer
@@ -710,8 +707,6 @@ impl Qwen3AsrBackend {
             .unwrap_or_default()
             .trim()
             .to_string();
-        // Safety net: strip echoed system prompt fragments the model may
-        // regurgitate before the actual transcript.
         for prefix in [
             SYSTEM_PROMPT,
             "You are an automatic speech recognition system",
@@ -721,38 +716,11 @@ impl Qwen3AsrBackend {
             }
         }
 
-        // Build per-word confidences via O(1) token lookup (not decode).
-        // BPE pieces starting with space (' ' or 'Ġ') mark word boundaries.
-        let mut words: Vec<WordConfidence> = Vec::new();
-        let mut current_word = String::new();
-        let mut current_conf = f32::INFINITY;
+        let confs: Vec<f32> = content.iter().map(|(_, c)| *c).collect();
+        let mean = Some(confs.iter().sum::<f32>() / confs.len() as f32);
+        let min = confs.iter().copied().reduce(f32::min);
 
-        for &(token_id, conf) in &content {
-            let piece = self
-                .tokenizer
-                .id_to_token(token_id as u32)
-                .unwrap_or_default();
-            // BPE uses 'Ġ' (U+0120) as space prefix; normalize to actual space.
-            let is_word_start = piece.starts_with('Ġ') || piece.starts_with(' ');
-            if is_word_start && !current_word.is_empty() {
-                words.push(WordConfidence::new(
-                    std::mem::take(&mut current_word),
-                    current_conf,
-                ));
-                let clean = piece.trim_start_matches('Ġ').trim_start();
-                current_word = clean.to_string();
-                current_conf = conf;
-            } else {
-                let clean = piece.trim_start_matches('Ġ');
-                current_word.push_str(clean);
-                current_conf = current_conf.min(conf);
-            }
-        }
-        if !current_word.is_empty() {
-            words.push(WordConfidence::new(current_word, current_conf));
-        }
-
-        (text, words)
+        (text, mean, min)
     }
 }
 

@@ -915,7 +915,6 @@ def export_asr(
         input_names.append(f"past_key_values.{i}.value")
         output_names.append(f"present_key_values.{i}.key")
         output_names.append(f"present_key_values.{i}.value")
-
     # NOTE: Qwen3 decoder + DynamicCache is incompatible with torch.export
     # (dynamo path). Use legacy opset export with dynamic_axes instead.
     dynamic_axes: dict[str, dict[int, str]] = {

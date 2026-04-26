@@ -28,11 +28,24 @@ pub fn init_ort_runtime() {
     // CPU-only global init. CUDA EP is registered per-session by
     // `build_ort_session` for ASR models — keeps VAD and forced
     // aligner on CPU automatically.
-    if ort::init().commit() {
+    if ort::init().with_logger(quiet_ort_logger()).commit() {
         tracing::info!("ORT initialized (CPU global, CUDA per-session for ASR)");
     } else {
         tracing::info!("ORT already initialized");
     }
+}
+
+fn quiet_ort_logger() -> ort::logging::LoggerFunction {
+    Arc::new(|level, _category, id, location, message| {
+        if level >= ort::logging::LogLevel::Error {
+            tracing::error!(
+                target: "ort::logging",
+                ort_id = %id,
+                ort_location = %location,
+                "{message}"
+            );
+        }
+    })
 }
 
 // ── Factory functions ────────────────────────────────────────────────────────
@@ -43,13 +56,7 @@ pub fn init_ort_runtime() {
 /// After `ensure_default_models` resolves the actual paths, this fills them in.
 #[inline]
 pub fn patch_model_paths(settings: &mut UserSettings, resolved: &ResolvedModels) {
-    match &mut settings.asr_backend {
-        AsrBackendConfig::ParakeetTdt { model_dir, .. } if model_dir.as_os_str().is_empty() => {
-            resolved.asr_model_dir.clone_into(model_dir);
-        }
-
-        _ => {}
-    }
+    let _ = (settings, resolved);
 }
 
 /// Construct the ASR backend from settings via [`AsrRegistry`].

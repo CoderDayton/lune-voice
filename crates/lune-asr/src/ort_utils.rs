@@ -5,11 +5,26 @@
 //! when `use_gpu` is true.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
+use ort::logging::{LogLevel, LoggerFunction};
 use ort::session::Session;
 use ort::session::builder::GraphOptimizationLevel;
 
 use lune_core::error::{Error, Result};
+
+fn quiet_ort_logger() -> LoggerFunction {
+    Arc::new(|level, _category, id, location, message| {
+        if level >= LogLevel::Error {
+            tracing::error!(
+                target: "ort::logging",
+                ort_id = %id,
+                ort_location = %location,
+                "{message}"
+            );
+        }
+    })
+}
 
 /// Shared ORT model loading context.
 #[derive(Debug, Clone)]
@@ -76,6 +91,10 @@ pub fn build_ort_session(path: &Path, use_gpu: bool) -> Result<Session> {
 
     let mut builder = Session::builder()
         .map_err(|e| Error::Asr(format!("session builder: {e}")))?
+        .with_logger(quiet_ort_logger())
+        .map_err(|e| Error::Asr(format!("logger: {e}")))?
+        .with_log_level(LogLevel::Error)
+        .map_err(|e| Error::Asr(format!("log level: {e}")))?
         .with_optimization_level(GraphOptimizationLevel::Level3)
         .map_err(|e| Error::Asr(format!("optimization level: {e}")))?
         .with_intra_threads(4)

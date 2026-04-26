@@ -42,11 +42,11 @@ fn align_words<'a>(
 
     // Full DP matrix for backtrace
     let mut dp = vec![vec![0usize; n + 1]; m + 1];
-    for i in 0..=m {
-        dp[i][0] = i;
+    for (i, row) in dp.iter_mut().enumerate().take(m + 1) {
+        row[0] = i;
     }
-    for j in 0..=n {
-        dp[0][j] = j;
+    for (j, cell) in dp[0].iter_mut().enumerate().take(n + 1) {
+        *cell = j;
     }
     for i in 1..=m {
         for j in 1..=n {
@@ -171,10 +171,10 @@ fn main() {
     let mut total_del = 0usize;
 
     for fixture in &fixtures {
-        if let Some(ref needle) = fixture_filter {
-            if !fixture.name.contains(needle.as_str()) {
-                continue;
-            }
+        if let Some(ref needle) = fixture_filter
+            && !fixture.name.contains(needle.as_str())
+        {
+            continue;
         }
 
         println!();

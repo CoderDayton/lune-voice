@@ -76,7 +76,23 @@ fn build_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage>
     let mut system_content = String::with_capacity(
         BASE_SYSTEM_PROMPT.len() + style_len + if dict_len > 0 { 55 + dict_len * 30 } else { 0 },
     );
-    system_content.push_str(BASE_SYSTEM_PROMPT);
+    let lang_str = if input.language == "en" || input.language.is_empty() {
+        String::new()
+    } else {
+        format!(" in {}", language_name(&input.language))
+    };
+    let fix_words_str = if input.fix_words.is_empty() {
+        String::new()
+    } else {
+        format!(
+            " These words are likely ASR errors — fix or remove them: {}",
+            input.fix_words.join(", ")
+        )
+    };
+    let base = BASE_SYSTEM_PROMPT
+        .replace("{language}", &lang_str)
+        .replace("{fix_words}", &fix_words_str);
+    system_content.push_str(&base);
 
     if !style.style_instructions.is_empty() {
         system_content.push_str("\n\n");
@@ -206,6 +222,21 @@ impl TextPostProcessor for OpenAiLlmBackend {
     }
 }
 
+fn language_name(code: &str) -> &'static str {
+    match code {
+        "fr" => "French",
+        "de" => "German",
+        "es" => "Spanish",
+        "it" => "Italian",
+        "pt" => "Portuguese",
+        "ru" => "Russian",
+        "zh" => "Chinese",
+        "ja" => "Japanese",
+        "ko" => "Korean",
+        _ => "English",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -222,7 +253,7 @@ mod tests {
             dictionary: vec![],
             context: None,
             language: "en".into(),
-            hypotheses: Vec::new(),
+            fix_words: Vec::new(),
         }
     }
 
@@ -239,7 +270,7 @@ mod tests {
 
         let json = serde_json::to_string(&msgs).unwrap();
         assert!(json.contains("hello um world"));
-        assert!(json.contains("You correct dictation transcripts"));
+        assert!(json.contains("Correct dictation transcripts"));
     }
 
     #[test]
@@ -271,7 +302,7 @@ mod tests {
             dictionary: vec![],
             context: None,
             language: "en".into(),
-            hypotheses: Vec::new(),
+            fix_words: Vec::new(),
         };
         let msgs = build_messages(&input);
         let json = serde_json::to_string(&msgs).unwrap();

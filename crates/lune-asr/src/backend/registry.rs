@@ -11,10 +11,7 @@ use lune_core::asr::{AsrBackend, AsrBackendKind, AsrSegment, AsrSessionConfig};
 use lune_core::config::{AsrBackendConfig, DevicePolicy, PipelineConfig};
 use lune_core::error::{Error, Result};
 
-use crate::{
-    OpenAiAsrConfig, OpenAiCompatibleAsrBackend, ParakeetTdtBackend, ParakeetTdtConfig,
-    Qwen3AsrBackend, Qwen3AsrConfig,
-};
+use crate::{OpenAiAsrConfig, OpenAiCompatibleAsrBackend, Qwen3AsrBackend, Qwen3AsrConfig};
 
 // ── Dispatch helpers ────────────────────────────────────────────────────────
 
@@ -30,10 +27,6 @@ fn mismatch_err() -> Error {
 macro_rules! dispatch_ref {
     ($self:ident, $session:ident, $method:ident $(, $arg:expr)*) => {
         match $self {
-            AsrRegistry::Parakeet(b) => match $session {
-                AsrSessionHandle::Parakeet(s) => b.$method(s $(, $arg)*).await,
-                _ => Err(mismatch_err()),
-            },
             AsrRegistry::Qwen3(b) => match $session {
                 AsrSessionHandle::Qwen3(s) => b.$method(s $(, $arg)*).await,
                 _ => Err(mismatch_err()),
@@ -51,7 +44,6 @@ macro_rules! dispatch_ref {
 /// Runtime-dispatched ASR backend. Construct via [`AsrRegistry::from_config`].
 #[allow(clippy::large_enum_variant)]
 pub enum AsrRegistry {
-    Parakeet(ParakeetTdtBackend),
     Qwen3(Qwen3AsrBackend),
     OpenAi(OpenAiCompatibleAsrBackend),
 }
@@ -59,7 +51,6 @@ pub enum AsrRegistry {
 /// Runtime-dispatched ASR session handle.
 #[allow(clippy::large_enum_variant)]
 pub enum AsrSessionHandle {
-    Parakeet(<ParakeetTdtBackend as AsrBackend>::SessionHandle),
     Qwen3(<Qwen3AsrBackend as AsrBackend>::SessionHandle),
     OpenAi(<OpenAiCompatibleAsrBackend as AsrBackend>::SessionHandle),
 }
@@ -72,7 +63,6 @@ impl AsrBackend for AsrRegistry {
 
     async fn start_session(&self, config: AsrSessionConfig) -> Result<Self::SessionHandle> {
         match self {
-            Self::Parakeet(b) => Ok(AsrSessionHandle::Parakeet(b.start_session(config).await?)),
             Self::Qwen3(b) => Ok(AsrSessionHandle::Qwen3(b.start_session(config).await?)),
             Self::OpenAi(b) => Ok(AsrSessionHandle::OpenAi(b.start_session(config).await?)),
         }
@@ -94,10 +84,6 @@ impl AsrBackend for AsrRegistry {
 
     async fn end_session(&self, session: Self::SessionHandle) -> Result<()> {
         match self {
-            Self::Parakeet(b) => match session {
-                AsrSessionHandle::Parakeet(s) => b.end_session(s).await,
-                _ => Err(mismatch_err()),
-            },
             Self::Qwen3(b) => match session {
                 AsrSessionHandle::Qwen3(s) => b.end_session(s).await,
                 _ => Err(mismatch_err()),
@@ -115,7 +101,6 @@ impl AsrBackend for AsrRegistry {
 
     fn supports_streaming(&self) -> bool {
         match self {
-            Self::Parakeet(_) => false,
             Self::Qwen3(_) => false,
             Self::OpenAi(_) => false,
         }
@@ -137,13 +122,6 @@ impl AsrRegistry {
         let use_gpu = device.use_gpu(cfg!(feature = "cuda"));
 
         match config {
-            AsrBackendConfig::ParakeetTdt { .. } => {
-                let backend = ParakeetTdtBackend::new(ParakeetTdtConfig {
-                    model_dir: models_dir.join("parakeet-tdt-0.6b"),
-                    use_gpu,
-                })?;
-                Ok(Self::Parakeet(backend))
-            }
             AsrBackendConfig::Qwen3Asr { .. } => {
                 let backend = Qwen3AsrBackend::new(Qwen3AsrConfig {
                     model_dir: models_dir.join("qwen3-asr-0.6b-onnx"),
@@ -174,7 +152,6 @@ impl AsrRegistry {
     /// Returns the backend kind for this registry entry.
     pub fn kind(&self) -> AsrBackendKind {
         match self {
-            Self::Parakeet(_) => AsrBackendKind::ParakeetTdt,
             Self::Qwen3(_) => AsrBackendKind::Qwen3Asr,
             Self::OpenAi(_) => AsrBackendKind::OpenAiCompatible,
         }
@@ -187,31 +164,6 @@ impl AsrRegistry {
     /// on top via [`PipelineConfig::with_overrides`].
     pub fn pipeline_config(&self) -> PipelineConfig {
         match self {
-            Self::Parakeet(_) => PipelineConfig {
-                max_segment_ms: 30_000,
-                sentence_close_ms: 776,
-                hard_close_ms: 1_552,
-                speech_threshold: 0.5,
-                min_speech_ms: 150,
-                adaptive_vad: false,
-                itn_enabled: true,
-                word_boost_enabled: true,
-                word_boost_score: 1.0,
-                // Thresholds are interpreted on the CALIBRATED probability
-                // scale (P(correct | raw)) after SessionManager runs the
-                // isotonic calibrator. Parakeet's raw softmax concentrates
-                // 86% of tokens in the [0.9, 1.0) bin, so anything below
-                // 0.65 raw is effectively unreachable — 0.85 / 0.95 on the
-                // calibrated scale surfaces the bins where acoustic errors
-                // actually live (raw 0.5–0.8 → calibrated 0.70–0.94).
-                word_confidence_threshold: Some(0.85),
-                llm_skip_threshold: Some(0.95),
-                // Skip LLM on broken transcripts too — overcorrection on
-                // min_token_confidence < 0.30 (calibrated) hurts WER more
-                // than it helps, per arXiv:2509.25048.
-                llm_skip_noisy_threshold: Some(0.30),
-                max_speech_samples: 60 * 16_000,
-            },
             Self::Qwen3(_) => PipelineConfig {
                 // Qwen3 is a batch decoder — one complete utterance per decode.
                 // Flushing is controlled by the dictation toggle/hold release,
@@ -255,17 +207,8 @@ impl AsrRegistry {
     /// No-op for backends that don't support token-level boosting.
     pub fn set_boost_phrases(&self, phrases: &[String], score: f32) {
         match self {
-            Self::Parakeet(b) => b.set_boost_phrases(phrases, score),
             Self::Qwen3(b) => b.set_boost_phrases(phrases, score),
             Self::OpenAi(_) => {}
-        }
-    }
-
-    /// Returns a reference to the Parakeet backend if this registry contains one.
-    pub fn as_parakeet(&self) -> Option<&ParakeetTdtBackend> {
-        match self {
-            Self::Parakeet(b) => Some(b),
-            _ => None,
         }
     }
 }

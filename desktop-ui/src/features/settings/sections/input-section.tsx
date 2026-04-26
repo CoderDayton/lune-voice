@@ -1,5 +1,4 @@
 
-import { activateLocale, locales, type LocaleKey } from "../../../i18n";
 import { saveWorkspaceSetting } from "../../../store/workspace-store";
 import { type SettingsProps, SettingsRow, SettingsSection } from "../components/section";
 import { activationModes } from "../data/settings-data";
@@ -9,18 +8,7 @@ import { Mic } from "lucide-react";
 
 export function InputSection({ settings }: SettingsProps) {
   const { t } = useLingui();
-  const isParakeet = settings.asrBackend === "ParakeetTdt";
   const [threshold, setThreshold] = useDebouncedSetting("speechThreshold", settings.speechThreshold);
-
-  async function handleLanguageChange(locale: string) {
-    const previousLocale = settings.language as LocaleKey;
-    const saved = await saveWorkspaceSetting("language", locale);
-    if (saved) {
-      await activateLocale(locale);
-    } else {
-      await activateLocale(previousLocale);
-    }
-  }
 
   return (
     <SettingsSection title={t`Voice input`} description={t`Choose how quickly you want to enter and leave voice typing.`} icon={Mic}>
@@ -75,25 +63,6 @@ export function InputSection({ settings }: SettingsProps) {
           </div>
         }
       />
-      {!isParakeet && (
-        <SettingsRow
-          label={t`Language`}
-          description={t`Select the language for voice recognition.`}
-          control={
-            <select
-              className="select w-full sm:w-auto sm:min-w-52"
-              value={settings.language}
-              onChange={(event) => void handleLanguageChange(event.target.value)}
-            >
-              {(Object.entries(locales) as [LocaleKey, string][]).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          }
-        />
-      )}
     </SettingsSection>
   );
 }

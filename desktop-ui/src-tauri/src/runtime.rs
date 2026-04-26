@@ -66,9 +66,6 @@ impl AppRuntime {
         // Only require the active ASR backend to be ready at boot.
         // Optional style LLM loads opportunistically.
         let asr_spec = match &settings.asr_backend {
-            lune_core::config::AsrBackendConfig::ParakeetTdt { .. } => {
-                Some(lune_persist::ModelSpec::parakeet_tdt())
-            }
             lune_core::config::AsrBackendConfig::Qwen3Asr { .. } => {
                 Some(lune_persist::ModelSpec::qwen3_asr())
             }
@@ -657,7 +654,20 @@ fn init_ort_runtime() {
     // CPU-only global init. CUDA EP is registered per-session by
     // build_ort_session in lune-asr — keeps VAD and other lightweight
     // ORT consumers on CPU automatically.
-    let _ = ort::init().commit();
+    let _ = ort::init().with_logger(quiet_ort_logger()).commit();
+}
+
+fn quiet_ort_logger() -> ort::logging::LoggerFunction {
+    Arc::new(|level, _category, id, location, message| {
+        if level >= ort::logging::LogLevel::Error {
+            tracing::error!(
+                target: "ort::logging",
+                ort_id = %id,
+                ort_location = %location,
+                "{message}"
+            );
+        }
+    })
 }
 
 async fn build_post_processor(

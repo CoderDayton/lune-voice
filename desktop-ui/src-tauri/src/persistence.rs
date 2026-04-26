@@ -306,7 +306,6 @@ fn resolve_device_policy(use_gpu: bool, policy: DevicePolicyDto) -> DevicePolicy
 
 fn asr_backend_type_to_dto(config: &AsrBackendConfig) -> AsrBackendTypeDto {
     match config {
-        AsrBackendConfig::ParakeetTdt { .. } => AsrBackendTypeDto::ParakeetTdt,
         AsrBackendConfig::Qwen3Asr { .. } => AsrBackendTypeDto::Qwen3Asr,
         AsrBackendConfig::OpenAiCompatible { .. } => AsrBackendTypeDto::OpenAiCompatible,
         _ => AsrBackendTypeDto::Qwen3Asr,
@@ -336,7 +335,6 @@ fn asr_backend_from_type(
     input: &SaveWorkspaceSettingsInput,
 ) -> Result<AsrBackendConfig, String> {
     Ok(match kind {
-        AsrBackendTypeDto::ParakeetTdt => AsrBackendConfig::ParakeetTdt {},
         AsrBackendTypeDto::Qwen3Asr => AsrBackendConfig::Qwen3Asr {},
         AsrBackendTypeDto::OpenAiCompatible => {
             // Prefer incoming DTO fields; fall back to current config values if already OpenAI.
@@ -489,11 +487,13 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let paths = AppPaths::from_dirs(dir.path().join("config"), dir.path().join("data"));
 
-        let mut legacy = UserSettings::default();
-        legacy.pipeline = Default::default();
-        legacy.word_confidence_threshold = 0.77;
-        legacy.max_speech_secs = 42;
-        legacy.adaptive_vad = true;
+        let legacy = UserSettings {
+            pipeline: Default::default(),
+            word_confidence_threshold: 0.77,
+            max_speech_secs: 42,
+            adaptive_vad: true,
+            ..UserSettings::default()
+        };
         save_settings(&paths, &legacy).unwrap();
 
         let loaded = load_settings(&paths).unwrap();

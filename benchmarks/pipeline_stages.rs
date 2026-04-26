@@ -18,7 +18,7 @@ use bench_utils::{
     Fixture, benchmark_asr_entries, char_error_rate, init_ort, load_fixtures, percentile,
     process_memory_usage, word_error_rate, workspace_root,
 };
-use lune_asr::{AsrRegistry, IsotonicCalibrator};
+use lune_asr::AsrRegistry;
 use lune_core::asr::{AsrBackend, AsrSessionConfig};
 use lune_core::config::DevicePolicy;
 
@@ -45,7 +45,6 @@ fn run_backend(
     device: DevicePolicy,
     models_dir: &std::path::Path,
     fixtures: &[Fixture],
-    calibrator: &IsotonicCalibrator,
     rt: &tokio::runtime::Runtime,
 ) -> BackendReport {
     println!("\n  ── {} ──", entry.display_name);
@@ -62,10 +61,10 @@ fn run_backend(
     let mut timings = Vec::new();
 
     for fixture in fixtures {
-        if let Some(ref needle) = fixture_filter {
-            if !fixture.name.contains(needle.as_str()) {
-                continue;
-            }
+        if let Some(ref needle) = fixture_filter
+            && !fixture.name.contains(needle.as_str())
+        {
+            continue;
         }
 
         let total_t0 = Instant::now();
@@ -98,14 +97,7 @@ fn run_backend(
             .collect::<Vec<_>>()
             .join(" ");
 
-        // Stage 4: confidence calibration
-        let t0 = Instant::now();
-        for seg in &segments {
-            for wc in &seg.word_confidences {
-                let _ = calibrator.calibrate(wc.confidence);
-            }
-        }
-        let calibration_ms = t0.elapsed().as_secs_f64() * 1000.0;
+        let calibration_ms = 0.0_f64;
 
         let total_ms = total_t0.elapsed().as_secs_f64() * 1000.0;
         let wer = word_error_rate(&raw_text, &fixture.reference);
@@ -309,24 +301,11 @@ fn main() {
         return;
     }
 
-    // Load calibrator (best-effort)
-    let calibrator = {
-        let slug = entries[0].backend_kind.slug();
-        let data_dir = std::env::var("HOME")
-            .map(|h| std::path::PathBuf::from(h).join(".local/share/lune-voice"))
-            .unwrap_or_default();
-        let path = data_dir.join(format!("calibrator_{slug}.json"));
-        std::fs::read_to_string(&path)
-            .ok()
-            .and_then(|j| serde_json::from_str::<IsotonicCalibrator>(&j).ok())
-            .unwrap_or_else(IsotonicCalibrator::identity)
-    };
-
     let rt = tokio::runtime::Runtime::new().unwrap();
     let mut reports = Vec::new();
 
     for entry in &entries {
-        let report = run_backend(entry, device, &models_dir, &fixtures, &calibrator, &rt);
+        let report = run_backend(entry, device, &models_dir, &fixtures, &rt);
         print_report(&report);
         reports.push(report);
     }

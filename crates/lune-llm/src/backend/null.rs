@@ -47,7 +47,7 @@ mod tests {
             dictionary: vec![],
             context: None,
             language: "en".into(),
-            hypotheses: Vec::new(),
+            fix_words: Vec::new(),
         };
         let out = processor.transform(&input).await.unwrap();
         assert_eq!(out.cleaned_text, "hello world");
@@ -63,7 +63,7 @@ mod tests {
             dictionary: vec![],
             context: None,
             language: "en".into(),
-            hypotheses: Vec::new(),
+            fix_words: Vec::new(),
         };
         let out = processor.transform(&input).await.unwrap();
         assert_eq!(out.cleaned_text, "the weather was nice");

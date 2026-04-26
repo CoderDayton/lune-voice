@@ -4,10 +4,11 @@
 //! by probing the session's input metadata at load time.
 
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use half::f16;
 use ndarray::{Array2, Array4};
+use ort::logging::{LogLevel, LoggerFunction};
 use ort::session::Session;
 use ort::session::builder::GraphOptimizationLevel;
 use ort::value::{DynValue, Value};
@@ -60,6 +61,19 @@ pub struct OrtStyleLlm {
 
 fn e(msg: impl std::fmt::Display) -> Error {
     Error::Config(msg.to_string())
+}
+
+fn quiet_ort_logger() -> LoggerFunction {
+    Arc::new(|level, _category, id, location, message| {
+        if level >= LogLevel::Error {
+            tracing::error!(
+                target: "ort::logging",
+                ort_id = %id,
+                ort_location = %location,
+                "{message}"
+            );
+        }
+    })
 }
 
 fn dyn_i64(arr: Array2<i64>) -> Result<DynValue> {
@@ -163,6 +177,10 @@ impl OrtStyleLlm {
 
         let mut builder = Session::builder()
             .map_err(e)?
+            .with_logger(quiet_ort_logger())
+            .map_err(e)?
+            .with_log_level(LogLevel::Error)
+            .map_err(e)?
             .with_optimization_level(GraphOptimizationLevel::Level3)
             .map_err(e)?
             .with_intra_threads(4)
@@ -192,8 +210,29 @@ impl OrtStyleLlm {
         })
     }
 
-    pub fn apply_style(&self, _system_prompt: &str, transcript: &str) -> Result<String> {
-        let base = lune_core::config::BASE_SYSTEM_PROMPT;
+    pub fn apply_style_with_fix_words(
+        &self,
+        _system_prompt: &str,
+        transcript: &str,
+        fix_words: &[String],
+        language: &str,
+    ) -> Result<String> {
+        let lang_str = if language == "en" || language.is_empty() {
+            String::new()
+        } else {
+            format!(" in {}", language_name(language))
+        };
+        let fix_str = if fix_words.is_empty() {
+            String::new()
+        } else {
+            format!(
+                " These words are likely ASR errors — fix or remove them: {}",
+                fix_words.join(", ")
+            )
+        };
+        let base = lune_core::config::BASE_SYSTEM_PROMPT
+            .replace("{language}", &lang_str)
+            .replace("{fix_words}", &fix_str);
         let prompt = match self.params.chat_format {
             ChatFormat::ChatML => format!(
                 "<|im_start|>system\n\
@@ -270,11 +309,31 @@ impl OrtStyleLlm {
     }
 }
 
+fn language_name(code: &str) -> &'static str {
+    match code {
+        "fr" => "French",
+        "de" => "German",
+        "es" => "Spanish",
+        "it" => "Italian",
+        "pt" => "Portuguese",
+        "ru" => "Russian",
+        "zh" => "Chinese",
+        "ja" => "Japanese",
+        "ko" => "Korean",
+        _ => "English",
+    }
+}
+
 #[async_trait::async_trait]
 impl TextPostProcessor for OrtStyleLlm {
     async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput> {
         let system_prompt = &input.style_preset.style_instructions;
-        let text = self.apply_style(system_prompt, &input.raw_text)?;
+        let text = self.apply_style_with_fix_words(
+            system_prompt,
+            &input.raw_text,
+            &input.fix_words,
+            &input.language,
+        )?;
         let text = if text.is_empty() {
             crate::itn::normalize(&input.raw_text)
         } else {

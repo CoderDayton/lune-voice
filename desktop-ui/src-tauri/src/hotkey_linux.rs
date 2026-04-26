@@ -232,7 +232,7 @@ fn read_device(mut dev: Device, tx: std_mpsc::Sender<(InputEvent, bool)>) {
             true
         }
         Err(e) => {
-            warn!(error = %e, name, "grab failed; observe-only");
+            debug!(error = %e, name, "grab failed; observe-only");
             false
         }
     };

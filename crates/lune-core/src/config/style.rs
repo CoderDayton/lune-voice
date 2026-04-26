@@ -6,14 +6,7 @@ use serde::{Deserialize, Serialize};
 pub type StyleId = String;
 
 /// Universal rules shared by every style preset.
-pub const BASE_SYSTEM_PROMPT: &str = "\
-You correct dictation transcripts. \
-Fix only clear speech recognition errors: wrong tense, nonsense words, and misheard terms. \
-Do not change names, technical terms, or words that are already correct. \
-Do not rephrase, summarize, remove or explain. \
-Correct improperly placed periods, commas and capitalization. \
-Output only the corrected text. \
-/no_think";
+pub const BASE_SYSTEM_PROMPT: &str = "Correct dictation transcripts{language}. Fix clear ASR errors: wrong tense, nonsense words, misheard terms. Preserve names, technical terms, correct words, language and tone. No rephrasing, summarizing, removing or explaining. Fix periods, commas and capitalization. Output corrected text only.{fix_words}\n\n/no_think";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StylePreset {
@@ -63,10 +56,10 @@ impl StyleRegistry {
 
 static REGISTRY: LazyLock<StyleRegistry> = LazyLock::new(|| {
     let builtins = [
+        StylePreset::minimal(),
         StylePreset::casual(),
         StylePreset::professional(),
         StylePreset::formal(),
-        StylePreset::minimal(),
         StylePreset::technical(),
         StylePreset::writing(),
     ];

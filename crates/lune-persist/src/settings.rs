@@ -72,7 +72,7 @@ mod tests {
 
         // Defaults when file missing
         let settings = store.load().unwrap();
-        assert_eq!(settings.language, "en-US");
+        assert_eq!(settings.language, "auto");
 
         // Save and reload
         store.save(&settings).unwrap();

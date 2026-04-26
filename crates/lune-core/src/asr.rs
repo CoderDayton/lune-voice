@@ -2,40 +2,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::Result;
 
-/// Per-word confidence with optional runner-up alternates.
-///
-/// `alternates` is a (possibly empty) ordered list of runner-up words
-/// produced by backends that expose top-K decoding (e.g. Parakeet TDT via
-/// subword swap). Each entry differs from `word` by exactly one subword.
-/// Backends without top-K capability (`OpenAi`) leave the vec
-/// empty and the legacy `[?word?]` marker is emitted by `mark_uncertain`.
-///
-/// Confidence is on the calibrated `P(correct | raw)` scale after the
-/// session layer runs the isotonic calibrator. Raw per-token confidence
-/// comes from Tsallis entropy (α = 0.5) over the full vocab distribution,
-/// not softmax-of-argmax — see `tdt_decoder::greedy_decode`.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct WordConfidence {
-    pub word: String,
-    pub confidence: f32,
-    #[serde(default)]
-    pub alternates: Vec<String>,
-}
-
-impl WordConfidence {
-    /// Convenience constructor for the common "no alternates" case. Prefer
-    /// this over struct-literal syntax at call sites that do not populate
-    /// the runner-up field.
-    #[inline]
-    pub fn new(word: impl Into<String>, confidence: f32) -> Self {
-        Self {
-            word: word.into(),
-            confidence,
-            alternates: Vec::new(),
-        }
-    }
-}
-
 /// A segment of recognized speech.
 ///
 /// Fields are ordered hot-first: `id`, `confidence`, `is_final` land on the
@@ -52,22 +18,7 @@ pub struct AsrSegment {
     /// low-confidence token flags the segment for LLM review.
     #[serde(default)]
     pub min_token_confidence: Option<f32>,
-    /// Per-word confidence from BPE subword aggregation (min of constituent tokens).
-    /// Empty for backends that don't expose per-token logits.
-    #[serde(default)]
-    pub word_confidences: Vec<WordConfidence>,
-    /// Ordered N-best list of full-sentence hypotheses for this segment.
-    ///
-    /// First element (when present) is always the argmax transcript;
-    /// subsequent elements are alternate transcriptions derived from the
-    /// runner-up tokens via single- or double-word substitution. Empty
-    /// when the backend can't produce alternates or `build_hypotheses`
-    /// hasn't been called yet.
-    ///
-    /// Consumed by the n-best LLM rescoring path in `lune-llm` — the
-    /// corrector picks one of these hypotheses as the final transcript.
-    #[serde(default)]
-    pub hypotheses: Vec<String>,
+
     /// Immutable once true.
     pub is_final: bool,
     pub start_ms: Option<u64>,
@@ -106,80 +57,15 @@ impl AsrSegment {
                 .is_none_or(|m| m >= min_token_threshold)
     }
 
-    /// Minimum per-word confidence across this segment, or `None` when
-    /// per-word data is not available. After session-layer calibration,
-    /// this is `min P(correct | raw)` — the single weakest word.
-    #[inline]
-    pub fn min_word_confidence(&self) -> Option<f32> {
-        self.word_confidences
-            .iter()
-            .map(|w| w.confidence)
-            .reduce(f32::min)
-    }
-
-    /// Returns `true` when every word in the segment meets or exceeds
-    /// `skip_threshold`, signalling that the transcript is clean enough to
-    /// bypass LLM correction entirely. Conservative: if `word_confidences`
-    /// is empty, returns `false` so the caller falls back to the regular
-    /// path (we never skip LLM on unknown evidence).
-    #[inline]
-    pub fn is_clean_for_llm(&self, skip_threshold: f32) -> bool {
-        if self.word_confidences.is_empty() {
-            return false;
-        }
-        self.word_confidences
-            .iter()
-            .all(|w| w.confidence >= skip_threshold)
-    }
-
-    /// Populate `self.hypotheses` with a ranked N-best list derived from
-    /// `word_confidences` and their per-word `alternates`.
-    ///
-    /// Algorithm:
-    /// 1. Hypothesis 0 is always the argmax sentence
-    ///    `word_confidences[*].word` joined with spaces.
-    /// 2. For every word at position `i` with `confidence < threshold` and
-    ///    at least one alternate, generate single-swap candidates:
-    ///    `argmax with word[i] replaced by each alternate[j]`. These are
-    ///    the positions where the decoder's raw posterior disagrees with
-    ///    the argmax most sharply — the most likely sites of an error.
-    /// 3. Rank single-swap candidates by `1 - confidence[i]` descending
-    ///    (weakest position first), then by alternate index ascending
-    ///    (strongest alternate first).
-    /// 4. Append one **double-swap** candidate at the two weakest positions
-    ///    simultaneously. Covers the Hamming-distance-2 error cases that
-    ///    single-swap cannot reach (≈20 % of errored sentences under the
-    ///    assumption of per-word error rate ~0.1).
-    /// 5. Deduplicate case-insensitively, preserve argmax at index 0, and
-    ///    truncate to `k_max` entries.
-    ///
-    /// This is a post-hoc approximation of beam search that captures most
-    /// Hamming-≤1 errors and a fraction of Hamming-2 errors, with zero
-    /// extra decoder-inference cost. See `build_hypotheses_tests` for
-    /// worked examples.
-    pub fn build_hypotheses(&mut self, threshold: f32, k_max: usize) {
-        self.hypotheses = compute_hypotheses(&self.word_confidences, threshold, k_max);
-    }
-
     /// Returns `true` when the segment's minimum token confidence falls
     /// below `broken_threshold`, signalling that the audio was too degraded
     /// for the LLM corrector to help — invoking it on broken transcripts
     /// triggers the overcorrection failure mode (arXiv:2509.25048 Fig 3).
     ///
-    /// This is the symmetric lower bound of `is_clean_for_llm`: together
-    /// they form an adaptive, bimodal LLM gate that skips correction on
-    /// both ends of the quality spectrum and runs only in the mid-range
-    /// where the LLM has a fighting chance.
-    ///
-    /// Reads `min_token_confidence` when present, otherwise falls back to
-    /// the minimum over `word_confidences`. If neither is available,
-    /// returns `false` (never skip on absent evidence).
+    /// Returns `false` when `min_token_confidence` is absent.
     #[inline]
     pub fn is_broken_for_llm(&self, broken_threshold: f32) -> bool {
-        let min = self
-            .min_token_confidence
-            .or_else(|| self.min_word_confidence());
-        match min {
+        match self.min_token_confidence {
             Some(m) => m < broken_threshold,
             None => false,
         }
@@ -190,97 +76,6 @@ impl AsrSegment {
     pub fn duration_ms(&self) -> Option<u64> {
         self.end_ms?.checked_sub(self.start_ms?)
     }
-}
-
-/// Pure helper for [`AsrSegment::build_hypotheses`]. Separated so the
-/// ranking logic can be exercised by unit tests without constructing a
-/// full `AsrSegment`, and so the algorithm is testable end-to-end with
-/// synthetic `WordConfidence` inputs.
-pub(crate) fn compute_hypotheses(
-    words: &[WordConfidence],
-    threshold: f32,
-    k_max: usize,
-) -> Vec<String> {
-    if k_max == 0 || words.is_empty() {
-        return Vec::new();
-    }
-
-    let argmax: Vec<&str> = words.iter().map(|w| w.word.as_str()).collect();
-    let argmax_sentence = argmax.join(" ");
-    if k_max == 1 {
-        return vec![argmax_sentence];
-    }
-
-    // Single-swap candidates: one per (uncertain position, alternate).
-    // Score = (1 - confidence[i]) so weakest positions rank highest.
-    // For ties (same position, multiple alternates) we emit the strongest
-    // alternate first by preserving the slice order from `alternates`.
-    let mut candidates: Vec<(f32, usize, String)> = Vec::new();
-    let mut uncertain_positions: Vec<(usize, f32)> = Vec::new();
-    for (i, wc) in words.iter().enumerate() {
-        if wc.confidence >= threshold || wc.alternates.is_empty() {
-            continue;
-        }
-        uncertain_positions.push((i, wc.confidence));
-        let position_score = (1.0 - wc.confidence).clamp(0.0, 1.0);
-        for (alt_idx, alt) in wc.alternates.iter().enumerate() {
-            if alt.is_empty() || alt.eq_ignore_ascii_case(&wc.word) {
-                continue;
-            }
-            // Penalise weaker alternates at the same position so alt[0]
-            // outranks alt[1] at the same site.
-            let score = position_score - (alt_idx as f32) * 0.05;
-            let mut pieces: Vec<String> = argmax.iter().map(|s| s.to_string()).collect();
-            pieces[i] = alt.clone();
-            candidates.push((score, i, pieces.join(" ")));
-        }
-    }
-
-    // Sort by score descending (strongest candidate first).
-    candidates.sort_by(|a, b| b.0.total_cmp(&a.0));
-
-    // Assemble: argmax first, then single-swaps in order, deduped.
-    let mut result: Vec<String> = vec![argmax_sentence.clone()];
-    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-    seen.insert(argmax_sentence.to_ascii_lowercase());
-    for (_, _, sentence) in &candidates {
-        if result.len() >= k_max {
-            break;
-        }
-        let key = sentence.to_ascii_lowercase();
-        if seen.insert(key) {
-            result.push(sentence.clone());
-        }
-    }
-
-    // Double-swap: combine the strongest alternate at the two weakest
-    // positions (if any) to catch Hamming-distance-2 error patterns.
-    // Weight is multiplicative in error probability: two independent
-    // errors at 10 % each give a joint probability of 1 %, so this path
-    // matters less often but is the only way to reach joint corrections.
-    if result.len() < k_max && uncertain_positions.len() >= 2 {
-        uncertain_positions.sort_by(|a, b| a.1.total_cmp(&b.1));
-        let (i0, _) = uncertain_positions[0];
-        let (i1, _) = uncertain_positions[1];
-        if i0 != i1
-            && let (Some(alt0), Some(alt1)) =
-                (words[i0].alternates.first(), words[i1].alternates.first())
-            && !alt0.is_empty()
-            && !alt1.is_empty()
-        {
-            let mut pieces: Vec<String> = argmax.iter().map(|s| s.to_string()).collect();
-            pieces[i0] = alt0.clone();
-            pieces[i1] = alt1.clone();
-            let double = pieces.join(" ");
-            let key = double.to_ascii_lowercase();
-            if seen.insert(key) {
-                result.push(double);
-            }
-        }
-    }
-
-    result.truncate(k_max);
-    result
 }
 
 /// Configuration for an ASR session.
@@ -300,7 +95,7 @@ impl Default for AsrSessionConfig {
         Self {
             sample_rate: 16_000,
             frame_size: 480,
-            language: Some("en-US".into()),
+            language: None,
             model_hint: None,
         }
     }
@@ -309,7 +104,6 @@ impl Default for AsrSessionConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum AsrBackendKind {
-    ParakeetTdt,
     Qwen3Asr,
     OpenAiCompatible,
 }
@@ -322,7 +116,6 @@ impl AsrBackendKind {
     #[deprecated(note = "use AsrRegistry::pipeline_config().max_segment_ms instead")]
     pub fn suggested_max_segment_ms(&self) -> u32 {
         match self {
-            Self::ParakeetTdt => 30_000,
             Self::Qwen3Asr => 30_000,
             Self::OpenAiCompatible => 30_000,
         }
@@ -337,7 +130,6 @@ impl AsrBackendKind {
     #[inline]
     pub fn slug(&self) -> &'static str {
         match self {
-            Self::ParakeetTdt => "parakeet",
             Self::Qwen3Asr => "qwen3asr",
             Self::OpenAiCompatible => "openai",
         }
@@ -405,8 +197,6 @@ mod tests {
             end_ms: Some(1500),
             confidence: Some(0.95),
             min_token_confidence: Some(0.80),
-            word_confidences: vec![],
-            hypotheses: vec![],
         }
     }
 
@@ -425,15 +215,15 @@ mod tests {
         let config = AsrSessionConfig::default();
         assert_eq!(config.sample_rate, 16000);
         assert_eq!(config.frame_size, 480);
-        assert_eq!(config.language, Some("en-US".into()));
+        assert_eq!(config.language, None);
     }
 
     #[test]
     fn asr_backend_kind_round_trip() {
-        let kind = AsrBackendKind::ParakeetTdt;
+        let kind = AsrBackendKind::Qwen3Asr;
         let json = serde_json::to_string(&kind).unwrap();
         let parsed: AsrBackendKind = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed, AsrBackendKind::ParakeetTdt);
+        assert_eq!(parsed, AsrBackendKind::Qwen3Asr);
     }
 
     #[test]
@@ -485,228 +275,10 @@ mod tests {
     }
 
     #[test]
-    fn word_confidence_serde_round_trip() {
-        let mut seg = make_segment();
-        seg.word_confidences = vec![WordConfidence {
-            word: "test".into(),
-            confidence: 0.75,
-            alternates: vec!["taste".into(), "text".into()],
-        }];
-        let json = serde_json::to_string(&seg).unwrap();
-        let parsed: AsrSegment = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed.word_confidences.len(), 1);
-        assert_eq!(parsed.word_confidences[0].word, "test");
-        assert_eq!(
-            parsed.word_confidences[0].alternates,
-            vec!["taste".to_string(), "text".to_string()]
-        );
-    }
-
-    #[test]
-    fn min_word_confidence_empty_returns_none() {
-        let seg = make_segment();
-        assert!(seg.min_word_confidence().is_none());
-    }
-
-    #[test]
-    fn min_word_confidence_returns_lowest() {
-        let mut seg = make_segment();
-        seg.word_confidences = vec![
-            WordConfidence::new("a", 0.9),
-            WordConfidence::new("b", 0.3),
-            WordConfidence::new("c", 0.7),
-        ];
-        assert_eq!(seg.min_word_confidence(), Some(0.3));
-    }
-
-    #[test]
-    fn is_clean_for_llm_empty_returns_false() {
-        // Conservative: no per-word data → don't skip, defer to LLM.
-        let seg = make_segment();
-        assert!(!seg.is_clean_for_llm(0.92));
-    }
-
-    #[test]
-    fn is_clean_for_llm_all_above_skip_threshold() {
-        let mut seg = make_segment();
-        seg.word_confidences = vec![
-            WordConfidence::new("a", 0.95),
-            WordConfidence::new("b", 0.93),
-            WordConfidence::new("c", 0.99),
-        ];
-        assert!(seg.is_clean_for_llm(0.92));
-    }
-
-    #[test]
-    fn is_clean_for_llm_one_below_skip_threshold() {
-        let mut seg = make_segment();
-        seg.word_confidences = vec![
-            WordConfidence::new("a", 0.95),
-            WordConfidence::new("b", 0.70), // below skip
-            WordConfidence::new("c", 0.99),
-        ];
-        assert!(!seg.is_clean_for_llm(0.92));
-    }
-
-    #[test]
-    fn is_clean_for_llm_exactly_at_threshold() {
-        let mut seg = make_segment();
-        seg.word_confidences = vec![WordConfidence::new("a", 0.92)];
-        assert!(seg.is_clean_for_llm(0.92));
-    }
-
-    #[test]
-    fn word_confidence_serde_missing_alternates_defaults_to_empty() {
-        // Serde must accept old records without the alternates field.
-        let json = r#"{"id":1,"confidence":0.9,"min_token_confidence":null,"word_confidences":[{"word":"hi","confidence":0.9}],"is_final":true,"start_ms":null,"end_ms":null,"text":"hi"}"#;
-        let parsed: AsrSegment = serde_json::from_str(json).unwrap();
-        assert_eq!(parsed.word_confidences.len(), 1);
-        assert!(parsed.word_confidences[0].alternates.is_empty());
-    }
-
-    // ── is_broken_for_llm (bimodal gate lower bound) ────────────────────
-
-    #[test]
     fn is_broken_for_llm_uses_min_token_confidence_when_present() {
         let mut seg = make_segment();
         seg.min_token_confidence = Some(0.20);
         assert!(seg.is_broken_for_llm(0.30));
         assert!(!seg.is_broken_for_llm(0.15));
-    }
-
-    #[test]
-    fn is_broken_for_llm_falls_back_to_word_confidences() {
-        let mut seg = make_segment();
-        seg.min_token_confidence = None;
-        seg.word_confidences = vec![
-            WordConfidence::new("a", 0.90),
-            WordConfidence::new("b", 0.15), // weakest
-            WordConfidence::new("c", 0.80),
-        ];
-        assert!(seg.is_broken_for_llm(0.30));
-    }
-
-    #[test]
-    fn is_broken_for_llm_returns_false_with_no_signal() {
-        // No min_token_confidence, empty word_confidences → conservative
-        // "don't skip" behaviour.
-        let mut seg = make_segment();
-        seg.min_token_confidence = None;
-        seg.word_confidences = vec![];
-        assert!(!seg.is_broken_for_llm(0.30));
-    }
-
-    // ── compute_hypotheses (sentence-level N-best) ──────────────────────
-
-    fn wc_with_alts(word: &str, confidence: f32, alts: &[&str]) -> WordConfidence {
-        WordConfidence {
-            word: word.into(),
-            confidence,
-            alternates: alts.iter().map(|s| s.to_string()).collect(),
-        }
-    }
-
-    #[test]
-    fn compute_hypotheses_empty_input() {
-        let result = compute_hypotheses(&[], 0.85, 5);
-        assert!(result.is_empty());
-    }
-
-    #[test]
-    fn compute_hypotheses_returns_argmax_when_all_confident() {
-        let words = vec![
-            WordConfidence::new("the", 0.99),
-            WordConfidence::new("fox", 0.98),
-            WordConfidence::new("jumped", 0.97),
-        ];
-        let result = compute_hypotheses(&words, 0.85, 5);
-        assert_eq!(result, vec!["the fox jumped".to_string()]);
-    }
-
-    #[test]
-    fn compute_hypotheses_single_swap_at_weak_position() {
-        let words = vec![
-            WordConfidence::new("the", 0.99),
-            wc_with_alts("fox", 0.40, &["box", "ox"]),
-            WordConfidence::new("jumped", 0.97),
-        ];
-        let result = compute_hypotheses(&words, 0.85, 5);
-        assert_eq!(result[0], "the fox jumped");
-        assert_eq!(result[1], "the box jumped");
-        assert_eq!(result[2], "the ox jumped");
-    }
-
-    #[test]
-    fn compute_hypotheses_weakest_position_ranked_first() {
-        let words = vec![
-            wc_with_alts("big", 0.70, &["pig"]),
-            WordConfidence::new("the", 0.99),
-            wc_with_alts("fox", 0.30, &["box"]),
-            WordConfidence::new("jumped", 0.97),
-        ];
-        let result = compute_hypotheses(&words, 0.85, 5);
-        assert_eq!(result[0], "big the fox jumped");
-        assert_eq!(result[1], "big the box jumped");
-        assert_eq!(result[2], "pig the fox jumped");
-    }
-
-    #[test]
-    fn compute_hypotheses_double_swap_at_two_weakest() {
-        let words = vec![
-            wc_with_alts("big", 0.30, &["pig"]),
-            WordConfidence::new("the", 0.99),
-            wc_with_alts("fox", 0.35, &["box"]),
-        ];
-        let result = compute_hypotheses(&words, 0.85, 5);
-        assert!(result.contains(&"big the fox".to_string()));
-        assert!(result.contains(&"pig the box".to_string()));
-    }
-
-    #[test]
-    fn compute_hypotheses_dedupe_when_alt_equals_best_word() {
-        let words = vec![wc_with_alts("fox", 0.40, &["fox"])];
-        let result = compute_hypotheses(&words, 0.85, 5);
-        assert_eq!(result, vec!["fox".to_string()]);
-    }
-
-    #[test]
-    fn compute_hypotheses_respects_k_max() {
-        let words = vec![
-            wc_with_alts("a", 0.30, &["1", "2", "3"]),
-            wc_with_alts("b", 0.35, &["4", "5"]),
-            wc_with_alts("c", 0.40, &["6"]),
-        ];
-        let result = compute_hypotheses(&words, 0.85, 3);
-        assert_eq!(result.len(), 3);
-        assert_eq!(result[0], "a b c");
-    }
-
-    #[test]
-    fn compute_hypotheses_k_max_zero_returns_empty() {
-        let words = vec![WordConfidence::new("hi", 0.9)];
-        assert!(compute_hypotheses(&words, 0.85, 0).is_empty());
-    }
-
-    #[test]
-    fn compute_hypotheses_k_max_one_returns_argmax_only() {
-        let words = vec![
-            wc_with_alts("the", 0.30, &["a"]),
-            WordConfidence::new("fox", 0.99),
-        ];
-        let result = compute_hypotheses(&words, 0.85, 1);
-        assert_eq!(result, vec!["the fox".to_string()]);
-    }
-
-    #[test]
-    fn build_hypotheses_writes_to_segment() {
-        let mut seg = make_segment();
-        seg.word_confidences = vec![
-            WordConfidence::new("hello", 0.99),
-            wc_with_alts("world", 0.30, &["word"]),
-        ];
-        seg.build_hypotheses(0.85, 5);
-        assert_eq!(seg.hypotheses.len(), 2);
-        assert_eq!(seg.hypotheses[0], "hello world");
-        assert_eq!(seg.hypotheses[1], "hello word");
     }
 }

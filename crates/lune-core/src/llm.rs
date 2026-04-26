@@ -20,16 +20,11 @@ pub struct PostProcessInput {
     /// BCP-47 language code from ASR detection (e.g. "en", "eng", "fr").
     /// Defaults to "en" if not set by the pipeline.
     pub language: String,
-    /// Ordered N-best list of full-sentence transcription candidates from
-    /// the ASR backend. When this list has ≥2 entries, backends route to
-    /// the constrained rescoring path (ProGRes-style) and pick the best
-    /// candidate verbatim. Output is strictly additive — worst case the
-    /// backend returns `hypotheses[0]` (the argmax) and never regresses.
-    ///
-    /// When empty (default), backends use the free-form marker-correction
-    /// path on `raw_text`.
-    #[allow(clippy::struct_field_names)]
-    pub hypotheses: Vec<String>,
+
+    /// Words identified as likely ASR errors by lexical confidence.
+    /// Appended to the LLM prompt as "fix words: w1, w2" so the model
+    /// knows exactly which words to correct.
+    pub fix_words: Vec<String>,
 }
 
 /// Output from the text post-processor.
@@ -91,7 +86,7 @@ mod tests {
             dictionary: vec![],
             context: None,
             language: "en".into(),
-            hypotheses: Vec::new(),
+            fix_words: Vec::new(),
         };
         assert_eq!(input.raw_text, "hello um world");
         assert_eq!(input.app_category, Some(AppCategory::Email));

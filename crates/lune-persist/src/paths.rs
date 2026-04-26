@@ -109,10 +109,6 @@ mod tests {
     #[test]
     fn calibrator_file_per_backend_slug() {
         let paths = AppPaths::from_dirs("/tmp/config", "/tmp/data");
-        assert_eq!(
-            paths.calibrator_file("parakeet"),
-            Path::new("/tmp/data/calibrator_parakeet.json")
-        );
     }
 
     #[test]

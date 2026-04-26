@@ -22,7 +22,7 @@ mod tests {
         let settings = UserSettings::default();
         let toml_str = toml::to_string_pretty(&settings).unwrap();
         let parsed: UserSettings = toml::from_str(&toml_str).unwrap();
-        assert_eq!(parsed.language, "en-US");
+        assert_eq!(parsed.language, "auto");
         assert_eq!(parsed.privacy_mode, PrivacyMode::LocalOnly);
         assert_eq!(parsed.dictation_mode, DictationMode::TypeInPlace);
         assert_eq!(parsed.activation_mode, ActivationMode::Toggle);

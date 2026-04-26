@@ -81,7 +81,7 @@ impl Default for UserSettings {
             llm_backend: LlmBackendConfig::Disabled,
             hotkey: HotkeyConfig::default(),
             default_style: "casual".into(),
-            language: "en-US".into(),
+            language: "auto".into(),
             privacy_mode: PrivacyMode::LocalOnly,
             dictation_mode: DictationMode::default(),
             activation_mode: ActivationMode::default(),
@@ -100,7 +100,6 @@ impl Default for UserSettings {
 #[serde(tag = "type")]
 #[non_exhaustive]
 pub enum AsrBackendConfig {
-    ParakeetTdt {},
     Qwen3Asr {},
     OpenAiCompatible {
         base_url: Url,

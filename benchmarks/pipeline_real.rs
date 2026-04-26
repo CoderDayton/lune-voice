@@ -2,7 +2,7 @@
 //!
 //! Run: cargo run --release --example pipeline_real -p lune-app
 //! GPU: cargo run --release --features cuda --example pipeline_real -p lune-app
-//! Force backend: cargo run --release --example pipeline_real -p lune-app -- --asr parakeet
+//! Force backend: cargo run --release --example pipeline_real -p lune-app -- --asr qwen3
 //!
 //! Unlike `pipeline_stages` (which calls stages individually), this feeds
 //! audio through `SessionManager::start_with_audio()` and measures wall-time
@@ -20,7 +20,7 @@ use bench_utils::{
     word_error_rate, workspace_root, wrap_print,
 };
 use lune_app::{SessionManager, SessionManagerConfig};
-use lune_asr::{AsrRegistry, IsotonicCalibrator};
+use lune_asr::AsrRegistry;
 use lune_audio::{AudioConfig, AudioStream};
 use lune_core::asr::AsrBackendKind;
 use lune_core::config::{DevicePolicy, UserSettings};
@@ -48,7 +48,7 @@ fn main() {
     let has_gpu = init_ort();
     let root = workspace_root();
 
-    // Load ASR (Qwen preferred unless ASR/--asr forces Parakeet)
+    // Load ASR (Qwen preferred unless ASR/--asr forces Qwen3)
     let device = if has_gpu {
         DevicePolicy::Cuda
     } else {
@@ -167,6 +167,20 @@ fn main() {
     println!();
 }
 
+fn language_from_fixture(name: &str) -> &str {
+    if name.contains("french") {
+        "fr"
+    } else if name.contains("german") {
+        "de"
+    } else if name.contains("italian") {
+        "it"
+    } else if name.contains("spanish") {
+        "es"
+    } else {
+        "en"
+    }
+}
+
 async fn run_full_pipeline(
     fixture: &Fixture,
     asr: Arc<AsrRegistry>,
@@ -187,7 +201,9 @@ async fn run_full_pipeline(
         ..Default::default()
     };
 
-    let settings = Arc::new(RwLock::new(UserSettings::default()));
+    let mut user_settings = UserSettings::default();
+    user_settings.language = language_from_fixture(&fixture.name).into();
+    let settings = Arc::new(RwLock::new(user_settings));
 
     let mgr = SessionManager::new(
         asr,
@@ -198,47 +214,6 @@ async fn run_full_pipeline(
         config,
         settings,
     );
-    // Always-on calibrator load: per-backend file with legacy fallback.
-    // Missing files degrade silently to identity (no remap).
-    let data_dir = std::env::var("HOME")
-        .map(|h| std::path::PathBuf::from(h).join(".local/share/lune-voice"))
-        .unwrap_or_default();
-    let per_backend_cal = data_dir.join(format!("calibrator_{}.json", backend_kind.slug()));
-    let legacy_cal = data_dir.join("calibrator.json");
-    let cal_path = if per_backend_cal.exists() {
-        Some(per_backend_cal)
-    } else if legacy_cal.exists() {
-        println!(
-            "  [info] using legacy calibrator.json; retrain calibrate_confidence to produce calibrator_{}.json",
-            backend_kind.slug()
-        );
-        Some(legacy_cal)
-    } else {
-        None
-    };
-    let mgr = if let Some(path) = cal_path {
-        match std::fs::read_to_string(&path)
-            .ok()
-            .and_then(|j| serde_json::from_str::<IsotonicCalibrator>(&j).ok())
-        {
-            Some(cal) => {
-                println!(
-                    "  Calibrator loaded: {} ({} breakpoints)",
-                    path.display(),
-                    cal.breakpoint_count()
-                );
-                mgr.with_calibrator(Arc::new(cal))
-            }
-            None => {
-                println!("  [warn] calibrator parse failed at {}", path.display());
-                mgr
-            }
-        }
-    } else {
-        println!("  [info] no calibrator on disk, using identity");
-        mgr
-    };
-
     let (event_tx, mut event_rx) = mpsc::channel::<SessionEvent>(256);
 
     let start = Instant::now();
