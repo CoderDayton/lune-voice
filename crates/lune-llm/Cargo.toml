@@ -14,7 +14,7 @@ async-trait.workspace = true
 lune-core.workspace = true
 tokio.workspace = true
 tracing.workspace = true
-mistralrs = { version = "0.7", optional = true }
+mistralrs = { version = "0.8", optional = true }
 async-openai.workspace = true
 serde_json.workspace = true
 regex = "1.11"
