@@ -3,7 +3,7 @@ mod modes;
 mod pipeline;
 mod redacted;
 mod settings;
-mod style;
+mod style_llm;
 
 // Re-export everything so `use lune_core::config::X` paths remain valid.
 pub use hotkey::{HotkeyConfig, KeyCombo, Modifier};
@@ -11,7 +11,7 @@ pub use modes::{ActivationMode, DictationMode, PillVisibility, PrivacyMode, Term
 pub use pipeline::{PipelineConfig, PipelineOverrides};
 pub use redacted::RedactedString;
 pub use settings::{AsrBackendConfig, DevicePolicy, LlmBackendConfig, StreamingMode, UserSettings};
-pub use style::{StyleId, StylePreset, StyleRegistry, base_system_prompt, builtin_registry};
+pub use style_llm::{BASE_SYSTEM_PROMPT, StyleId, StylePreset, StyleRegistry, builtin_registry};
 
 #[cfg(test)]
 mod tests {

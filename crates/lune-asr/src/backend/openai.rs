@@ -373,6 +373,7 @@ impl VerboseJsonResponse {
                 end_ms: None,
                 confidence: None,
                 min_token_confidence: None,
+                word_confidences: vec![],
             }];
         }
 
@@ -389,6 +390,7 @@ impl VerboseJsonResponse {
                     end_ms: Some((s.end * 1000.0) as u64),
                     confidence: None,
                     min_token_confidence: None,
+                    word_confidences: vec![],
                 });
             }
         }

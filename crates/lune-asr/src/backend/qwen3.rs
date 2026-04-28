@@ -46,9 +46,7 @@ You are an ASR engine. \
 Transcribe the spoken audio exactly in the spoken language. \
 Do not translate. \
 Output only the transcript text. \
-Do not add words not clearly present. \
-Write unintelligible speech as approximate phonetic text. \
-If no speech, return empty string.";
+Do not add words not clearly present.";
 
 /// Maximum audio buffer (5 min at 16 kHz).
 const MAX_WINDOW_SAMPLES: usize = 300 * 16_000;
@@ -284,14 +282,15 @@ fn extract_f16_array(value: &ort::value::Value) -> Result<ArrayD<f16>> {
         .map_err(|e| Error::Asr(format!("array reshape: {e}")))
 }
 
-/// Fused argmax + softmax confidence directly on f16 logits tensor.
-/// Avoids allocating a full f32 copy (~600KB per step). Operates on the
-/// last `vocab_size` elements of the last position in the logits tensor.
+const MABLE_TOP_K: usize = 16;
+
+/// Fused argmax + softmax confidence + top-k logit extraction on f16 logits tensor.
+/// Returns (token_id, softmax_confidence, top_k_logits_as_f64).
 fn argmax_on_logits(
     value: &ort::value::Value,
     vocab_size: usize,
     boost: &std::collections::HashMap<i64, f32>,
-) -> Result<(i64, f32)> {
+) -> Result<(i64, f32, Vec<f64>)> {
     let (shape, data) = value
         .try_extract_tensor::<f16>()
         .map_err(|e| Error::Asr(format!("extract logits: {e}")))?;
@@ -310,8 +309,13 @@ fn argmax_on_logits(
         )));
     }
 
+    // Top-k min-heap: (value, index), sorted ascending so heap[0] is the min.
+    let mut heap = [(f32::NEG_INFINITY, 0usize); MABLE_TOP_K];
+    let mut heap_min = f32::NEG_INFINITY;
+    let mut heap_min_pos = 0usize;
+
     if boost.is_empty() {
-        // Fast path: single pass argmax + LSE on f16 → f32.
+        // Fast path: single pass argmax + LSE + top-k on f16 → f32.
         let mut max_idx = 0usize;
         let mut max_val = f32::NEG_INFINITY;
         for (i, &v) in logits.iter().enumerate() {
@@ -320,13 +324,25 @@ fn argmax_on_logits(
                 max_val = f;
                 max_idx = i;
             }
+            if f > heap_min {
+                heap[heap_min_pos] = (f, i);
+                heap_min = f32::INFINITY;
+                for (j, &(val, _)) in heap.iter().enumerate() {
+                    if val < heap_min {
+                        heap_min = val;
+                        heap_min_pos = j;
+                    }
+                }
+            }
         }
         let sum_exp: f32 = logits.iter().map(|&x| (x.to_f32() - max_val).exp()).sum();
         if !sum_exp.is_normal() {
-            return Ok((max_idx as i64, 0.0));
+            let top_k = heap.iter().map(|(v, _)| *v as f64).collect();
+            return Ok((max_idx as i64, 0.0, top_k));
         }
         let lse = sum_exp.ln() + max_val;
-        Ok((max_idx as i64, (max_val - lse).exp()))
+        let top_k = heap.iter().map(|(v, _)| *v as f64).collect();
+        Ok((max_idx as i64, (max_val - lse).exp(), top_k))
     } else {
         // Boosted path: track unboosted raw value inline for confidence.
         let mut max_idx = 0usize;
@@ -340,13 +356,25 @@ fn argmax_on_logits(
                 max_idx = i;
                 raw_max = raw;
             }
+            if raw > heap_min {
+                heap[heap_min_pos] = (raw, i);
+                heap_min = f32::INFINITY;
+                for (j, &(val, _)) in heap.iter().enumerate() {
+                    if val < heap_min {
+                        heap_min = val;
+                        heap_min_pos = j;
+                    }
+                }
+            }
         }
         let sum_exp: f32 = logits.iter().map(|&x| (x.to_f32() - raw_max).exp()).sum();
         if !sum_exp.is_normal() {
-            return Ok((max_idx as i64, 0.0));
+            let top_k = heap.iter().map(|(v, _)| *v as f64).collect();
+            return Ok((max_idx as i64, 0.0, top_k));
         }
         let lse = sum_exp.ln() + raw_max;
-        Ok((max_idx as i64, (raw_max - lse).exp()))
+        let top_k = heap.iter().map(|(v, _)| *v as f64).collect();
+        Ok((max_idx as i64, (raw_max - lse).exp(), top_k))
     }
 }
 
@@ -500,7 +528,7 @@ impl Qwen3AsrBackend {
         };
 
         // 5. Prefill: run decoder with full embeddings + empty KV cache
-        let (first_token, first_conf, mut kv_cache) = {
+        let (first_token, first_conf, first_logits, mut kv_cache) = {
             let mut dec_inputs = ort::inputs!(
                 "inputs_embeds" => Value::from_array(embeds)
                     .map_err(|e| Error::Asr(format!("embeds val: {e}")))?,
@@ -516,7 +544,7 @@ impl Qwen3AsrBackend {
                 .run(dec_inputs)
                 .map_err(|e| Error::Asr(format!("decoder prefill: {e}")))?;
 
-            let (tok, conf) = argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost)?;
+            let (tok, conf, logits_k) = argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost)?;
 
             // Extract per-layer KV cache
             let mut cache: Vec<ArrayD<f16>> = Vec::with_capacity(NUM_LAYERS * 2);
@@ -524,10 +552,10 @@ impl Qwen3AsrBackend {
                 cache.push(extract_f16_array(&out[present_kv_name(i, true)])?);
                 cache.push(extract_f16_array(&out[present_kv_name(i, false)])?);
             }
-            (tok, conf, cache)
+            (tok, conf, logits_k, cache)
         };
 
-        let mut tokens: Vec<(i64, f32)> = vec![(first_token, first_conf)];
+        let mut tokens: Vec<(i64, f32, Vec<f64>)> = vec![(first_token, first_conf, first_logits)];
         let mut pos = seq_len;
 
         // Pre-allocate reusable position array for the decode loop.
@@ -556,7 +584,7 @@ impl Qwen3AsrBackend {
                 }
             }
 
-            let (tok, conf) = {
+            let (tok, conf, logits_k) = {
                 // Embed single token (FP16 native, scoped to drop before decoder)
                 let emb = {
                     let id_val = Value::from_array(Array2::from_elem((1, 1), last_tok))
@@ -613,7 +641,7 @@ impl Qwen3AsrBackend {
                 }
                 result
             };
-            tokens.push((tok, conf));
+            tokens.push((tok, conf, logits_k));
             pos += 1;
         }
 
@@ -627,7 +655,7 @@ impl Qwen3AsrBackend {
             "Qwen3 inference"
         );
         // 7. Decode tokens → text, parse output, build segment
-        let (text, mean_conf, min_conf) = self.decode_output(&tokens);
+        let (text, mean_conf, min_conf, word_confidences) = self.decode_output(&tokens);
         if text.is_empty() {
             return Ok(vec![]);
         }
@@ -640,13 +668,24 @@ impl Qwen3AsrBackend {
             end_ms: Some(timestamp_ms),
             confidence: mean_conf,
             min_token_confidence: min_conf,
+            word_confidences,
         }])
     }
 
-    fn decode_output(&self, tokens: &[(i64, f32)]) -> (String, Option<f32>, Option<f32>) {
+    fn decode_output(
+        &self,
+        tokens: &[(i64, f32, Vec<f64>)],
+    ) -> (
+        String,
+        Option<f32>,
+        Option<f32>,
+        Vec<lune_core::asr::WordConfidence>,
+    ) {
+        use lune_core::mable_wc::{self, TokenSpan};
+
         let content_start = tokens
             .iter()
-            .position(|(id, _)| *id == ASR_TEXT_ID)
+            .position(|(id, _, _)| *id == ASR_TEXT_ID)
             .map(|i| i + 1)
             .unwrap_or(0);
 
@@ -660,18 +699,17 @@ impl Qwen3AsrBackend {
                 || id == AUDIO_END
         };
 
-        let content: Vec<(i64, f32)> = tokens[content_start..]
+        let content: Vec<&(i64, f32, Vec<f64>)> = tokens[content_start..]
             .iter()
-            .copied()
-            .skip_while(|(id, _)| is_meta(*id))
-            .filter(|(id, _)| !is_meta(*id))
+            .skip_while(|(id, _, _)| is_meta(*id))
+            .filter(|(id, _, _)| !is_meta(*id))
             .collect();
 
         if content.is_empty() {
-            return (String::new(), None, None);
+            return (String::new(), None, None, Vec::new());
         }
 
-        let token_ids: Vec<u32> = content.iter().map(|(id, _)| *id as u32).collect();
+        let token_ids: Vec<u32> = content.iter().map(|(id, _, _)| *id as u32).collect();
         let mut text = self
             .tokenizer
             .decode(&token_ids, true)
@@ -687,11 +725,91 @@ impl Qwen3AsrBackend {
             }
         }
 
-        let confs: Vec<f32> = content.iter().map(|(_, c)| *c).collect();
+        let confs: Vec<f32> = content.iter().map(|(_, c, _)| *c).collect();
         let mean = Some(confs.iter().sum::<f32>() / confs.len() as f32);
         let min = confs.iter().copied().reduce(f32::min);
 
-        (text, mean, min)
+        // Build words + token spans for MABLE.
+        let mut words: Vec<String> = Vec::new();
+        let mut spans: Vec<TokenSpan> = Vec::new();
+        let mut current_word = String::new();
+        let mut span_start = 0usize;
+
+        for (tok_idx, &(id, _, _)) in content.iter().enumerate() {
+            let piece = self
+                .tokenizer
+                .decode(&[*id as u32], false)
+                .unwrap_or_default();
+            if piece.is_empty() {
+                continue;
+            }
+            let starts_new_word = piece.starts_with(' ') || piece.starts_with('\u{2581}');
+            if starts_new_word && !current_word.is_empty() {
+                let w: String = current_word
+                    .trim()
+                    .chars()
+                    .filter(|c| !c.is_ascii_punctuation())
+                    .collect();
+                if !w.is_empty() {
+                    words.push(w);
+                    spans.push(TokenSpan::new(span_start, tok_idx));
+                }
+                current_word.clear();
+                span_start = tok_idx;
+            }
+            let trimmed = piece.trim_start();
+            current_word.push_str(trimmed);
+        }
+        if !current_word.is_empty() {
+            let w: String = current_word
+                .trim()
+                .chars()
+                .filter(|c| !c.is_ascii_punctuation())
+                .collect();
+            if !w.is_empty() {
+                words.push(w);
+                spans.push(TokenSpan::new(span_start, content.len()));
+            }
+        }
+
+        let herc_tokens: Vec<mable_wc::TokenInput> = content
+            .iter()
+            .map(|&&(_, conf, ref lk)| mable_wc::TokenInput {
+                confidence: conf,
+                top_k_logits: lk.clone(),
+            })
+            .collect();
+
+        let herc_wcs = mable_wc::estimate(
+            &words,
+            &herc_tokens,
+            &spans,
+            mable_wc::HercConfig::default(),
+        );
+
+        use crate::confidence::common_words::COMMON_WORDS;
+        use std::collections::HashSet;
+        use std::sync::LazyLock;
+        static CW: LazyLock<HashSet<&str>> =
+            LazyLock::new(|| COMMON_WORDS.iter().copied().collect());
+        const UNCOMMON_BOOST: f32 = 0.15;
+
+        let word_confidences: Vec<lune_core::asr::WordConfidence> = herc_wcs
+            .into_iter()
+            .map(|wc| {
+                let mut fs = wc.fix_score as f32;
+                if fs > 0.10 && !CW.contains(wc.word.to_lowercase().as_str()) {
+                    fs = (fs + UNCOMMON_BOOST).min(1.0);
+                }
+                lune_core::asr::WordConfidence {
+                    word: wc.word,
+                    confidence: wc.confidence as f32,
+                    fix_score: fs,
+                }
+            })
+            .collect();
+
+        (text, mean, min, word_confidences)
     }
 }
 

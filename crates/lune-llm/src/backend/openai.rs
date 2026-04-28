@@ -2,14 +2,15 @@ use async_openai::{
     Client,
     config::OpenAIConfig,
     types::chat::{
-        ChatCompletionRequestAssistantMessageArgs, ChatCompletionRequestMessage,
-        ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs,
-        CreateChatCompletionRequestArgs,
+        ChatCompletionRequestMessage, ChatCompletionRequestSystemMessageArgs,
+        ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs,
     },
 };
 
-use lune_core::config::base_system_prompt;
-use lune_core::llm::{PostProcessInput, PostProcessOutput, TextPostProcessor};
+use lune_core::{
+    config::BASE_SYSTEM_PROMPT,
+    llm::{PostProcessInput, PostProcessOutput, TextPostProcessor},
+};
 
 /// Configuration for the OpenAI-compatible LLM backend.
 #[derive(Debug, Clone)]
@@ -59,37 +60,13 @@ impl OpenAiLlmBackend {
 
 /// Build the chat message array from a `PostProcessInput`.
 ///
-/// Amortises all string allocations up-front; avoids per-entry format! calls.
+/// Mirrors the ORT backend prompt structure: system = BASE_SYSTEM_PROMPT,
+/// user = structured prompt via `OrtStyleLlm::user_prompt()`.
 fn build_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage> {
-    let style = &input.style_preset;
-    let capacity = 1 + style.few_shot_pairs.len() * 2 + 1;
-    let mut messages = Vec::with_capacity(capacity);
+    let mut messages = Vec::with_capacity(2);
 
-    // ── System message ────────────────────────────────────────────────────────
-    let dict_len = input.dictionary.len();
-
-    let style_len = if style.style_instructions.is_empty() {
-        0
-    } else {
-        2 + style.style_instructions.len()
-    };
-    let fix_words_str = if input.fix_words.is_empty() {
-        String::new()
-    } else {
-        format!("\nFix these words: {}", input.fix_words.join(", "))
-    };
-    let base = base_system_prompt(&input.language, &fix_words_str);
-    let mut system_content = String::with_capacity(
-        base.len() + style_len + if dict_len > 0 { 55 + dict_len * 30 } else { 0 },
-    );
-    system_content.push_str(&base);
-
-    if !style.style_instructions.is_empty() {
-        system_content.push_str("\n\n");
-        system_content.push_str(&style.style_instructions);
-    }
-
-    if dict_len > 0 {
+    let mut system_content = BASE_SYSTEM_PROMPT.to_owned();
+    if !input.dictionary.is_empty() {
         system_content.push_str("\n\nDictionary terms (always use these exact spellings):");
         for entry in &input.dictionary {
             system_content.push_str("\n- ");
@@ -107,38 +84,11 @@ fn build_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage>
             .into(),
     );
 
-    // ── Few-shot examples ─────────────────────────────────────────────────────
-    for (user_ex, assistant_ex) in &style.few_shot_pairs {
-        messages.push(
-            ChatCompletionRequestUserMessageArgs::default()
-                .content(user_ex.clone())
-                .build()
-                .expect("user few-shot build")
-                .into(),
-        );
-        messages.push(
-            ChatCompletionRequestAssistantMessageArgs::default()
-                .content(assistant_ex.clone())
-                .build()
-                .expect("assistant few-shot build")
-                .into(),
-        );
-    }
-
-    // ── Final user message ────────────────────────────────────────────────────
-    // Avoid allocating a new String when the template contains exactly one
-    // `{raw_text}` placeholder — replace in-place via pre-sized buffer.
-    let tmpl = &style.user_prompt_template;
-    let user_text = if let Some(pos) = tmpl.find("{raw_text}") {
-        let raw = &input.raw_text;
-        let mut buf = String::with_capacity(tmpl.len() - 10 + raw.len());
-        buf.push_str(&tmpl[..pos]);
-        buf.push_str(raw);
-        buf.push_str(&tmpl[pos + 10..]);
-        buf
-    } else {
-        tmpl.clone()
-    };
+    let user_text = super::ort_llm::OrtStyleLlm::user_prompt(
+        &input.raw_text,
+        &input.language,
+        &input.style_preset.style_instructions,
+    );
 
     messages.push(
         ChatCompletionRequestUserMessageArgs::default()
@@ -228,7 +178,6 @@ mod tests {
             dictionary: vec![],
             context: None,
             language: "en".into(),
-            fix_words: Vec::new(),
         }
     }
 
@@ -237,15 +186,11 @@ mod tests {
         let input = test_input("hello um world");
         let msgs = build_messages(&input);
 
-        // system + N few-shot pairs (2*N msgs) + 1 final user
-        let n = lune_core::config::StylePreset::casual()
-            .few_shot_pairs
-            .len();
-        assert_eq!(msgs.len(), 1 + 2 * n + 1);
+        assert_eq!(msgs.len(), 2);
 
         let json = serde_json::to_string(&msgs).unwrap();
         assert!(json.contains("hello um world"));
-        assert!(json.contains("ASR text correction model"));
+        assert!(json.contains("ASR transcript correction"));
     }
 
     #[test]
@@ -266,22 +211,12 @@ mod tests {
     }
 
     #[test]
-    fn build_messages_no_raw_text_placeholder() {
-        // Template without {raw_text} — should not panic, just clone template.
-        let mut preset = StylePreset::casual();
-        preset.user_prompt_template = "fixed prompt".into();
-        let input = PostProcessInput {
-            raw_text: "hello".into(),
-            style_preset: Arc::new(preset),
-            app_category: None,
-            dictionary: vec![],
-            context: None,
-            language: "en".into(),
-            fix_words: Vec::new(),
-        };
+    fn build_messages_includes_transcript() {
+        let input = test_input("hello world");
         let msgs = build_messages(&input);
         let json = serde_json::to_string(&msgs).unwrap();
-        assert!(json.contains("fixed prompt"));
+        assert!(json.contains("hello world"));
+        assert!(json.contains("Transcript:"));
     }
 
     #[test]

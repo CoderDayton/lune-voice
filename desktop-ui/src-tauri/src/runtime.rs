@@ -676,13 +676,14 @@ async fn build_post_processor(
 ) -> Result<Arc<dyn TextPostProcessor>, String> {
     match &settings.llm_backend {
         LlmBackendConfig::Local { .. } => {
-            let style_dir = models_dir.join("qwen3-0.6b");
+            let style_dir = models_dir.join(lune_core::models::DIR_STYLE_LLM);
             if style_dir.join("tokenizer.json").exists() {
-                match lune_llm::backend::ort_style::OrtStyleLlm::new(
-                    lune_llm::backend::ort_style::OrtStyleLlmConfig {
+                match lune_llm::backend::ort_llm::OrtStyleLlm::new(
+                    lune_llm::backend::ort_llm::OrtStyleLlmConfig {
                         model_dir: style_dir,
                         use_gpu: settings.device.use_gpu(cfg!(feature = "cuda")),
                         max_new_tokens: 128,
+                        ..Default::default()
                     },
                 ) {
                     Ok(llm) => Ok(Arc::new(llm) as Arc<dyn TextPostProcessor>),

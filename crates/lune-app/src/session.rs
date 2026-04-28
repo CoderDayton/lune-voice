@@ -155,7 +155,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         };
         let style_preset = builtin_registry()
             .get(&current_style_id)
-            .or_else(|| builtin_registry().get("casual"))
+            .or_else(|| builtin_registry().get("minimal"))
             .ok_or_else(|| Error::Config("no usable style preset found".into()))?;
 
         {
@@ -266,13 +266,10 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
 
 const MAX_SEGMENTS: usize = 500;
 
-const LEXICAL_DROP_THRESHOLD: f32 = 0.15;
-const LEXICAL_FIX_THRESHOLD: f32 = 0.45;
-
+const GARBAGE_DROP_THRESHOLD: f32 = 0.25;
 fn append_segments(
     all_segments: &mut Vec<AsrSegment>,
     joined_text: &mut String,
-    fix_words: &mut Vec<String>,
     new_segments: Vec<AsrSegment>,
 ) -> bool {
     let mut appended = false;
@@ -283,39 +280,15 @@ fn append_segments(
             continue;
         }
 
-        let lang = lune_asr::confidence::lexical::detect_lang(trimmed);
-
-        let seg_score =
-            lune_asr::confidence::lexical::segment_lexical_confidence_for_lang(trimmed, lang);
-        if seg_score < LEXICAL_DROP_THRESHOLD {
+        if let Some(conf) = seg.confidence
+            && conf < GARBAGE_DROP_THRESHOLD
+        {
             warn!(
-                score = seg_score,
+                confidence = conf,
                 text = trimmed,
                 "dropping garbage segment"
             );
             continue;
-        }
-
-        let mut worst_in_sent: Option<(f32, String)> = None;
-        for word in trimmed.split_whitespace() {
-            let w = word.trim_matches(|c: char| c.is_ascii_punctuation());
-            let ends_sentence = word.ends_with('.') || word.ends_with('?') || word.ends_with('!');
-            if !w.is_empty() {
-                let score = lune_asr::confidence::lexical::word_confidence_for_lang(w, lang);
-                if score < LEXICAL_FIX_THRESHOLD
-                    && worst_in_sent.as_ref().is_none_or(|(s, _)| score < *s)
-                {
-                    worst_in_sent = Some((score, w.to_string()));
-                }
-            }
-            if ends_sentence && let Some((score, w)) = worst_in_sent.take() {
-                debug!(word = %w, score, lang, "fix_word flagged");
-                fix_words.push(w);
-            }
-        }
-        if let Some((score, w)) = worst_in_sent {
-            debug!(word = %w, score, lang, "fix_word flagged");
-            fix_words.push(w);
         }
 
         if !joined_text.is_empty() {
@@ -434,7 +407,7 @@ async fn run_session<A: AsrBackend + 'static>(
 
     let mut segments = Vec::with_capacity(asr.segment_capacity_hint());
     let mut raw_text = String::with_capacity(256);
-    let mut fix_words: Vec<String> = Vec::new();
+
     let mut speech_samples: usize = 0;
     let mut first_asr_error: Option<String> = None;
     let mut saw_asr_success = false;
@@ -506,7 +479,7 @@ async fn run_session<A: AsrBackend + 'static>(
 
                     match asr.poll_results(&asr_session).await {
                         Ok(new_segments) => {
-                            if append_segments(&mut segments, &mut raw_text, &mut fix_words, new_segments) {
+                            if append_segments(&mut segments, &mut raw_text, new_segments) {
                                 saw_asr_success = true;
                                 let _ = event_tx.try_send(SessionEvent::PartialText);
                             }
@@ -536,7 +509,7 @@ async fn run_session<A: AsrBackend + 'static>(
                         let _ = asr.push_audio(&asr_session, &flush_silence).await;
                         match asr.poll_final(&asr_session).await {
                             Ok(new_segments) => {
-                                if append_segments(&mut segments, &mut raw_text, &mut fix_words, new_segments) {
+                                if append_segments(&mut segments, &mut raw_text, new_segments) {
                                     saw_asr_success = true;
                                     // Deliver only the NEW text from this segment
                                     if !llm_enabled {
@@ -639,7 +612,7 @@ async fn run_session<A: AsrBackend + 'static>(
         }
         match asr.poll_final(&asr_session).await {
             Ok(new_segments) => {
-                if append_segments(&mut segments, &mut raw_text, &mut fix_words, new_segments) {
+                if append_segments(&mut segments, &mut raw_text, new_segments) {
                     saw_asr_success = true;
                 }
             }
@@ -759,11 +732,7 @@ async fn run_session<A: AsrBackend + 'static>(
             dictionary: dictionary_entries.clone(),
             context: None,
             language: lang_tag.into(),
-            fix_words: fix_words.clone(),
         };
-        if !fix_words.is_empty() {
-            info!(%session_id, fix_words = ?fix_words, "sending fix_words to LLM");
-        }
         match post_processor.transform(&input).await {
             Ok(output) => {
                 debug!(%session_id, llm_ms = llm_t0.elapsed().as_millis() as u64, "[LLM] output ready, len={}", output.cleaned_text.len());
@@ -994,6 +963,7 @@ mod tests {
             confidence: Some(if uncertain { 0.6 } else { 0.95 }),
             min_token_confidence: Some(if uncertain { 0.55 } else { 0.9 }),
 
+            word_confidences: vec![],
             is_final: true,
             start_ms: Some(0),
             end_ms: Some(500),

@@ -78,7 +78,7 @@ cpal = "0.17"
 rubato = "1.0.1"
 audioadapter-buffers = "2"
 mimalloc = { version = "0.1", default-features = false }
-ort = { version = "2.0.0-rc.11", features = ["ndarray", "std", "download-binaries", "copy-dylibs", "tls-native", "half"], default-features = false }
+ort = { version = "2.0.0-rc.12", features = ["ndarray", "std", "download-binaries", "copy-dylibs", "tls-native", "half"], default-features = false }
 ndarray = "0.17"
 rustfft = "6.4"
 hf-hub = "0.5"

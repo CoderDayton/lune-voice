@@ -6,30 +6,23 @@ use serde::{Deserialize, Serialize};
 pub type StyleId = String;
 
 /// Universal rules shared by every style preset.
-pub fn base_system_prompt(language: &str, fix_words: &str) -> String {
-    let lang_tag = match language {
-        "fr" => "French",
-        "de" => "German",
-        "es" => "Spanish",
-        "it" => "Italian",
-        "pt" => "Portuguese",
-        "zh" => "Chinese",
-        "cn" => "Chinese",
-        "ja" => "Japanese",
-        "ru" => "Russian",
-        "ko" => "Korean",
-        _ => "English",
-    };
+pub const BASE_SYSTEM_PROMPT: &str =
+"You are an ASR transcript correction engine.
 
-    format!(
-        "You are an ASR text correction model for {lang_tag}. \
-        Correct only obvious ASR errors, grammar, capitalization, and punctuation. \
-        Preserve the original wording and word order as much as possible. \
-        Do not summarize. Do not explain. Do not add commentary. \
-        {fix_words}. \
-        Output only the corrected text."
-    )
-}
+Your task is to correct transcription errors in the provided text while preserving the speaker's original meaning, wording, order, and tone.
+
+Rules:
+- Output only the corrected transcript.
+- Do not answer the user or continue the conversation.
+- Do not add commentary, labels, explanations, or quotation marks.
+- Do not summarize, expand, or rewrite for style beyond the requested formatting.
+- Fix punctuation, capitalization, spacing, grammar, and obvious homophone or word-boundary mistakes.
+- ASR mishears words into phonetically similar but wrong words (e.g. \"rabbis\" for \"radios\", \"bred\" for \"bread\"). Detect and correct these using context.
+- Words flagged as misheard are acoustically uncertain. For each, find the phonetically similar word that fits the surrounding context and replace it.
+- Keep disfluencies, slang, and informal speech unless the requested style says to normalize them.
+- Preserve proper nouns unless the correction is highly confident.
+- If the input is already correct, return it unchanged.
+";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StylePreset {

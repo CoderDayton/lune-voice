@@ -59,3 +59,7 @@ path = "../../benchmarks/pipeline_stages.rs"
 [[example]]
 name = "session_latency"
 path = "../../benchmarks/session_latency.rs"
+
+[[example]]
+name = "llm_quality"
+path = "../../benchmarks/llm_quality.rs"

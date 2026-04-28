@@ -4,6 +4,8 @@ use hf_hub::api::sync::{Api, ApiBuilder, ApiRepo};
 use lune_core::config::AsrBackendConfig;
 use tracing::info;
 
+use lune_core::models as model_dirs;
+
 use crate::error::{PersistError, PersistResult};
 
 /// What to download from a HuggingFace repository.
@@ -47,8 +49,8 @@ pub struct DownloadProgress {
 
 /// Resolved local model paths.
 pub struct ResolvedModels {
-    /// Parakeet TDT model directory.
     pub asr_model_dir: PathBuf,
+    pub style_llm_dir: PathBuf,
 }
 
 impl ModelSpec {
@@ -63,7 +65,7 @@ impl ModelSpec {
                 "decoder_joint-model.int8.onnx".into(),
             ],
             suffix_patterns: vec![],
-            local_name: "parakeet-tdt-0.6b".into(),
+            local_name: model_dirs::DIR_PARAKEET.into(),
         }
     }
 
@@ -79,18 +81,18 @@ impl ModelSpec {
                 "qwen3-asr-decoder.onnx".into(),
             ],
             suffix_patterns: vec![".onnx_data".into()],
-            local_name: "qwen3-asr-0.6b-onnx".into(),
+            local_name: model_dirs::DIR_QWEN3_ASR.into(),
         }
     }
 
-    /// Qwen3-0.6B FP16: style/correction LLM for transcript cleanup.
+    /// Qwen3.5-0.8B Text Q4F16: style/correction LLM for transcript cleanup.
     #[inline]
     pub fn style_llm() -> Self {
         Self::Directory {
-            repo_id: "onnx-community/Qwen3-0.6B-ONNX".into(),
-            required_files: vec!["tokenizer.json".into(), "onnx/model_fp16.onnx".into()],
+            repo_id: "onnx-community/Qwen2.5-1.5B-Instruct".into(),
+            required_files: vec!["tokenizer.json".into(), "onnx/model_q4f16.onnx".into()],
             suffix_patterns: vec![],
-            local_name: "qwen3-0.6b".into(),
+            local_name: model_dirs::DIR_STYLE_LLM.into(),
         }
     }
 
@@ -98,8 +100,8 @@ impl ModelSpec {
     pub fn display_name(&self) -> &str {
         match self {
             Self::Directory { local_name, .. } => match local_name.as_str() {
-                "parakeet-tdt-0.6b" => "Parakeet TDT 0.6B",
-                "qwen3-0.6b" => "Qwen3 0.6B Style LLM",
+                model_dirs::DIR_PARAKEET => "Parakeet TDT 0.6B",
+                model_dirs::DIR_STYLE_LLM => "Qwen2.5 1.5B Instruct",
                 _ => local_name,
             },
         }
@@ -164,7 +166,11 @@ pub fn check_model_status(
 
 /// Delete a downloaded model by local_name. Returns Ok(true) if removed,
 /// Ok(false) if it wasn't present.
-const KNOWN_MODEL_NAMES: &[&str] = &["parakeet-tdt-0.6b", "qwen3-asr-0.6b-onnx", "qwen3-0.6b"];
+const KNOWN_MODEL_NAMES: &[&str] = &[
+    model_dirs::DIR_PARAKEET,
+    model_dirs::DIR_QWEN3_ASR,
+    model_dirs::DIR_STYLE_LLM,
+];
 
 pub fn delete_model(models_dir: &Path, local_name: &str) -> PersistResult<bool> {
     if !KNOWN_MODEL_NAMES.contains(&local_name) {
@@ -190,8 +196,8 @@ pub fn download_model(
     on_progress: impl Fn(DownloadProgress),
 ) -> PersistResult<PathBuf> {
     let spec = match local_name {
-        "parakeet-tdt-0.6b" => ModelSpec::parakeet_tdt(),
-        "qwen3-0.6b" => ModelSpec::style_llm(),
+        model_dirs::DIR_PARAKEET => ModelSpec::parakeet_tdt(),
+        model_dirs::DIR_STYLE_LLM => ModelSpec::style_llm(),
         _ => {
             return Err(PersistError::ModelDownload(format!(
                 "unknown model: {local_name}"
@@ -337,8 +343,12 @@ pub fn ensure_default_models(
     let hub = ModelHub::new(&hub_cache)?;
 
     let asr_model_dir = ensure_directory_model(&hub, &ModelSpec::parakeet_tdt(), models_dir)?;
+    let style_llm_dir = ensure_directory_model(&hub, &ModelSpec::style_llm(), models_dir)?;
 
-    Ok(ResolvedModels { asr_model_dir })
+    Ok(ResolvedModels {
+        asr_model_dir,
+        style_llm_dir,
+    })
 }
 
 /// Ensure a directory-type model is present at `models_dir/<local_name>/`.

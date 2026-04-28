@@ -76,7 +76,7 @@ fn main() {
     let llm_off = std::env::var("LUNE_LLM")
         .map(|v| v == "off" || v == "0")
         .unwrap_or(false);
-    let llm_dir = models_dir.join("qwen3-0.6b");
+    let llm_dir = models_dir.join(lune_core::models::DIR_STYLE_LLM);
     let llm: Arc<dyn TextPostProcessor> = if !llm_off && llm_dir.join("tokenizer.json").exists() {
         print!("  Loading LLM backend...");
         let lt = Instant::now();

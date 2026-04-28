@@ -20,11 +20,6 @@ pub struct PostProcessInput {
     /// BCP-47 language code from ASR detection (e.g. "en", "eng", "fr").
     /// Defaults to "en" if not set by the pipeline.
     pub language: String,
-
-    /// Words identified as likely ASR errors by lexical confidence.
-    /// Appended to the LLM prompt as "fix words: w1, w2" so the model
-    /// knows exactly which words to correct.
-    pub fix_words: Vec<String>,
 }
 
 /// Output from the text post-processor.
@@ -86,7 +81,6 @@ mod tests {
             dictionary: vec![],
             context: None,
             language: "en".into(),
-            fix_words: Vec::new(),
         };
         assert_eq!(input.raw_text, "hello um world");
         assert_eq!(input.app_category, Some(AppCategory::Email));

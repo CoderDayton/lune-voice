@@ -24,6 +24,8 @@ pub struct OrtStyleLlmConfig {
     pub model_dir: PathBuf,
     pub use_gpu: bool,
     pub max_new_tokens: usize,
+    pub temperature: f32,
+    pub top_p: f32,
 }
 
 impl Default for OrtStyleLlmConfig {
@@ -32,6 +34,8 @@ impl Default for OrtStyleLlmConfig {
             model_dir: PathBuf::new(),
             use_gpu: true,
             max_new_tokens: DEFAULT_MAX_TOKENS,
+            temperature: 0.20,
+            top_p: 0.95,
         }
     }
 }
@@ -54,9 +58,11 @@ struct ModelParams {
 
 pub struct OrtStyleLlm {
     session: Mutex<Session>,
+    embed_session: Option<Mutex<Session>>,
     tokenizer: Tokenizer,
     max_new_tokens: usize,
     params: ModelParams,
+    sampling_params: super::sampler::SamplingParams,
 }
 
 fn e(msg: impl std::fmt::Display) -> Error {
@@ -172,77 +178,110 @@ fn probe_model_params(session: &Session, tokenizer: &Tokenizer) -> ModelParams {
 
 impl OrtStyleLlm {
     pub fn new(config: OrtStyleLlmConfig) -> Result<Self> {
-        let model_path = find_model(&config.model_dir)?;
-        let opt_path = model_path.with_extension("onnx.opt");
+        let files = find_model(&config.model_dir)?;
 
-        let mut builder = Session::builder()
-            .map_err(e)?
-            .with_logger(quiet_ort_logger())
-            .map_err(e)?
-            .with_log_level(LogLevel::Error)
-            .map_err(e)?
-            .with_optimization_level(GraphOptimizationLevel::Level3)
-            .map_err(e)?
-            .with_intra_threads(4)
-            .map_err(e)?;
-
-        if config.use_gpu {
-            builder = builder
-                .with_execution_providers([ort::ep::CUDA::default().build()])
+        let make_builder = |gpu: bool, path: &Path| -> Result<Session> {
+            let opt_path = path.with_extension("onnx.opt");
+            let mut b = Session::builder()
+                .map_err(e)?
+                .with_logger(quiet_ort_logger())
+                .map_err(e)?
+                .with_log_level(LogLevel::Error)
+                .map_err(e)?
+                .with_optimization_level(GraphOptimizationLevel::Level3)
+                .map_err(e)?
+                .with_intra_threads(4)
                 .map_err(e)?;
-        } else {
-            builder = builder.with_optimized_model_path(&opt_path).map_err(e)?;
-        }
+            if gpu {
+                b = b
+                    .with_execution_providers([ort::ep::CUDA::default().build()])
+                    .map_err(e)?;
+            } else {
+                b = b.with_optimized_model_path(&opt_path).map_err(e)?;
+            }
+            b.commit_from_file(path).map_err(e)
+        };
 
-        let session = builder.commit_from_file(&model_path).map_err(e)?;
+        let session = make_builder(config.use_gpu, &files.decoder)?;
+        let embed_session = files
+            .embed_tokens
+            .as_ref()
+            .map(|p| make_builder(config.use_gpu, p))
+            .transpose()?;
 
         let tokenizer = Tokenizer::from_file(config.model_dir.join("tokenizer.json"))
             .map_err(|e| Error::Config(format!("tokenizer: {e}")))?;
 
         let params = probe_model_params(&session, &tokenizer);
 
-        info!(model = %model_path.display(), "style LLM loaded");
+        let sampling_params = super::sampler::SamplingParams {
+            temperature: config.temperature,
+            top_p: config.top_p,
+            eos_token_id: params.eos_ids.first().copied(),
+            stop_token_ids: params.eos_ids.clone().into_boxed_slice(),
+            ..Default::default()
+        };
+
+        info!(model = %files.decoder.display(), split = embed_session.is_some(), "style LLM loaded");
         Ok(Self {
             session: Mutex::new(session),
+            embed_session: embed_session.map(Mutex::new),
             tokenizer,
             max_new_tokens: config.max_new_tokens,
             params,
+            sampling_params,
         })
     }
 
-    pub fn user_prompt(transcript: &str) -> String {
+    pub fn user_prompt(transcript: &str, language: &str, style_instructions: &str) -> String {
+        let lang_tag = match language {
+            "fr" => "French",
+            "de" => "German",
+            "es" => "Spanish",
+            "it" => "Italian",
+            "pt" => "Portuguese",
+            "zh" => "Chinese",
+            "cn" => "Chinese",
+            "ja" => "Japanese",
+            "ru" => "Russian",
+            "ko" => "Korean",
+            _ => "English",
+        };
+
+        let style_line = if style_instructions.is_empty() {
+            String::new()
+        } else {
+            format!("Style: {style_instructions}\n")
+        };
+
         format!(
-            "Correct this ASR transcript. Output corrected text only.\n\n{transcript}\n\n/no_think",
+            "Language: {lang_tag}\n\
+            {style_line}\
+            Transcript:\n\
+            {transcript}"
         )
     }
 
-    pub fn apply_style_with_fix_words(
+    pub fn apply_style(
         &self,
-        _system_prompt: &str,
         transcript: &str,
-        fix_words: &[String],
         language: &str,
+        style: &lune_core::config::StylePreset,
     ) -> Result<String> {
-        let fix_str = if fix_words.is_empty() {
-            String::new()
-        } else {
-            format!("Correct these words: {}", fix_words.join(", "))
-        };
-        let base = lune_core::config::base_system_prompt(language, &fix_str);
-        let user_prompt = Self::user_prompt(transcript);
+        let base = lune_core::config::BASE_SYSTEM_PROMPT;
+
+        let user_text = Self::user_prompt(transcript, language, &style.style_instructions);
+
         let prompt = match self.params.chat_format {
             ChatFormat::ChatML => format!(
-                "<|im_start|>system\n\
-                 {base}<|im_end|>\n\
-                 <|im_start|>user\n\
-                 {user_prompt}<|im_end|>\n\
-                 <|im_start|>assistant\n\
-                 <think>\n\n</think>\n\n"
+                "<|im_start|>system\n{base}<|im_end|>\n\
+                 <|im_start|>user\n{user_text}<|im_end|>\n\
+                 <|im_start|>assistant\n"
             ),
             ChatFormat::Llama => format!(
                 "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n\
                  {base}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n\
-                 {user_prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+                 {user_text}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
             ),
         };
         let enc = self
@@ -259,13 +298,37 @@ impl OrtStyleLlm {
         Ok(text.to_string())
     }
 
+    fn embed_ids(&self, ids: &[i64]) -> Result<Option<DynValue>> {
+        let embed = match &self.embed_session {
+            Some(s) => s,
+            None => return Ok(None),
+        };
+        let mut sess = embed.lock().map_err(e)?;
+        let input_ids = Array2::from_shape_vec((1, ids.len()), ids.to_vec()).map_err(e)?;
+        let inputs: Inputs = vec![("input_ids".into(), dyn_i64(input_ids)?)];
+        let outputs = sess.run(inputs).map_err(e)?;
+        Ok(Some(outputs.into_iter().next().unwrap().1))
+    }
+
     fn generate(&self, prompt_ids: &[i64]) -> Result<Vec<u32>> {
+        use super::sampler::{DecodeState, SamplerWorkspace, sample_last_token};
+
         let p = &self.params;
         let mut session = self.session.lock().map_err(e)?;
         let n = prompt_ids.len();
+        let split = self.embed_session.is_some();
+
+        let mut state = DecodeState::default();
+        let mut ws = SamplerWorkspace::default();
+        let mut rng = rand::rng();
 
         // ── Prefill ─────────────────────────────────────────────────────
-        let mut inputs = build_inputs(prompt_ids, n, p.has_position_ids)?;
+        let mut inputs = if split {
+            let embeds = self.embed_ids(prompt_ids)?.unwrap();
+            build_embeds_inputs(embeds, n, p.has_position_ids)?
+        } else {
+            build_inputs(prompt_ids, n, p.has_position_ids)?
+        };
         for i in 0..p.num_layers {
             let (k, v) = empty_kv(p.num_kv_heads, p.head_dim, p.kv_is_f16)?;
             inputs.push((format!("past_key_values.{i}.key").into(), k));
@@ -273,21 +336,32 @@ impl OrtStyleLlm {
         }
 
         let outputs = session.run(inputs).map_err(e)?;
-        let first = argmax_last(&outputs[0])?;
-        if p.eos_ids.contains(&first) {
+        let first = sample_last_token(
+            &outputs[0],
+            &self.sampling_params,
+            &state,
+            &mut ws,
+            &mut rng,
+        )?;
+        if state.should_stop(first, &self.sampling_params) {
             return Ok(vec![]);
         }
+        state.push(first);
 
-        let mut generated = vec![first];
         let mut kv: Vec<DynValue> = outputs.into_iter().skip(1).map(|(_, v)| v).collect();
 
         // ── Decode ──────────────────────────────────────────────────────
         let max = self.max_new_tokens.min(n);
         for _ in 1..max {
-            let tok = *generated.last().unwrap() as i64;
-            let total = n + generated.len();
+            let tok = *state.generated.last().unwrap() as i64;
+            let total = n + state.generated.len();
 
-            let mut inputs = build_decode_inputs(tok, total, p.has_position_ids)?;
+            let mut inputs = if split {
+                let embeds = self.embed_ids(&[tok])?.unwrap();
+                build_embeds_decode_inputs(embeds, total, p.has_position_ids)?
+            } else {
+                build_decode_inputs(tok, total, p.has_position_ids)?
+            };
             for (i, v) in kv.drain(..).enumerate() {
                 let layer = i / 2;
                 let kind = if i % 2 == 0 { "key" } else { "value" };
@@ -295,33 +369,29 @@ impl OrtStyleLlm {
             }
 
             let outputs = session.run(inputs).map_err(e)?;
-            let next = argmax_last(&outputs[0])?;
-            if p.eos_ids.contains(&next) {
+            let next = sample_last_token(
+                &outputs[0],
+                &self.sampling_params,
+                &state,
+                &mut ws,
+                &mut rng,
+            )?;
+            if state.should_stop(next, &self.sampling_params) {
                 break;
             }
-            generated.push(next);
+            state.push(next);
             kv = outputs.into_iter().skip(1).map(|(_, v)| v).collect();
         }
 
-        Ok(generated)
+        Ok(state.generated)
     }
 }
 
 #[async_trait::async_trait]
 impl TextPostProcessor for OrtStyleLlm {
     async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput> {
-        let system_prompt = &input.style_preset.style_instructions;
-        let text = self.apply_style_with_fix_words(
-            system_prompt,
-            &input.raw_text,
-            &input.fix_words,
-            &input.language,
-        )?;
-        let text = if text.is_empty() {
-            crate::itn::normalize(&input.raw_text)
-        } else {
-            text
-        };
+        let text = self.apply_style(&input.raw_text, &input.language, &input.style_preset)?;
+
         let text = crate::prompt::strip_markers(&text);
         Ok(PostProcessOutput {
             cleaned_text: text,
@@ -346,6 +416,40 @@ fn build_inputs(ids: &[i64], seq_len: usize, position_ids: bool) -> Result<Input
     Ok(out)
 }
 
+fn build_embeds_inputs(
+    embeds: DynValue,
+    seq_len: usize,
+    position_ids: bool,
+) -> Result<Inputs<'static>> {
+    let mask = Array2::<i64>::ones((1, seq_len));
+    let mut out = vec![
+        ("inputs_embeds".into(), embeds),
+        ("attention_mask".into(), dyn_i64(mask)?),
+    ];
+    if position_ids {
+        let pos = Array2::from_shape_vec((1, seq_len), (0..seq_len as i64).collect()).map_err(e)?;
+        out.push(("position_ids".into(), dyn_i64(pos)?));
+    }
+    Ok(out)
+}
+
+fn build_embeds_decode_inputs(
+    embeds: DynValue,
+    total_len: usize,
+    position_ids: bool,
+) -> Result<Inputs<'static>> {
+    let mask = Array2::<i64>::ones((1, total_len));
+    let mut out = vec![
+        ("inputs_embeds".into(), embeds),
+        ("attention_mask".into(), dyn_i64(mask)?),
+    ];
+    if position_ids {
+        let pos = Array2::from_shape_vec((1, 1), vec![(total_len - 1) as i64]).map_err(e)?;
+        out.push(("position_ids".into(), dyn_i64(pos)?));
+    }
+    Ok(out)
+}
+
 fn build_decode_inputs(
     token: i64,
     total_len: usize,
@@ -364,48 +468,57 @@ fn build_decode_inputs(
     Ok(out)
 }
 
-fn argmax_last(value: &DynValue) -> Result<u32> {
-    if let Ok((shape, data)) = value.try_extract_tensor::<f32>() {
-        return argmax_slice(shape.as_ref(), data);
-    }
-    let (shape, data) = value.try_extract_tensor::<f16>().map_err(e)?;
-    let f32_data: Vec<f32> = data.iter().map(|v| v.to_f32()).collect();
-    argmax_slice(shape.as_ref(), &f32_data)
+struct ModelFiles {
+    decoder: PathBuf,
+    embed_tokens: Option<PathBuf>,
 }
 
-fn argmax_slice(shape: &[i64], data: &[f32]) -> Result<u32> {
-    let vocab = shape[2] as usize;
-    let last_pos = shape[1] as usize - 1;
-    let offset = last_pos * vocab;
-    let slice = &data[offset..offset + vocab];
-    let mut best_id = 0u32;
-    let mut best_val = f32::NEG_INFINITY;
-    for (i, &val) in slice.iter().enumerate() {
-        if val > best_val {
-            best_val = val;
-            best_id = i as u32;
-        }
-    }
-    Ok(best_id)
-}
+fn find_model(dir: &Path) -> Result<ModelFiles> {
+    let quant_priority = ["q4f16", "int8", "fp16", "q4", "quantized", ""];
 
-fn find_model(dir: &Path) -> Result<PathBuf> {
-    for name in [
-        "model_int8.onnx",
-        "model_q4f16.onnx",
-        "model_fp16.onnx",
-        "model_q4.onnx",
-        "model.onnx",
-    ] {
-        let p = dir.join(name);
-        if p.exists() {
-            return Ok(p);
-        }
-        let nested = dir.join("onnx").join(name);
-        if nested.exists() {
-            return Ok(nested);
+    for q in &quant_priority {
+        let suffix = if q.is_empty() {
+            String::new()
+        } else {
+            format!("_{q}")
+        };
+        for base in [dir.join("onnx"), dir.to_path_buf()] {
+            let decoder = base.join(format!("decoder_model_merged{suffix}.onnx"));
+            let embed = base.join(format!("embed_tokens{suffix}.onnx"));
+            if decoder.exists() && embed.exists() {
+                return Ok(ModelFiles {
+                    decoder,
+                    embed_tokens: Some(embed),
+                });
+            }
         }
     }
+
+    for q in &quant_priority {
+        let suffix = if q.is_empty() {
+            String::new()
+        } else {
+            format!("_{q}")
+        };
+        {
+            let name = format!("model{suffix}.onnx");
+            let p = dir.join(&name);
+            if p.exists() {
+                return Ok(ModelFiles {
+                    decoder: p,
+                    embed_tokens: None,
+                });
+            }
+            let nested = dir.join("onnx").join(&name);
+            if nested.exists() {
+                return Ok(ModelFiles {
+                    decoder: nested,
+                    embed_tokens: None,
+                });
+            }
+        }
+    }
+
     Err(Error::Config(format!("no ONNX model in {}", dir.display())))
 }
 

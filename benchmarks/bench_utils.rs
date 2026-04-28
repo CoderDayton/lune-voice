@@ -125,7 +125,7 @@ pub fn benchmark_asr_entries() -> Vec<BenchmarkAsrEntry> {
     let _requested = requested_benchmark_asr();
     let mut entries = Vec::new();
 
-    let qwen3_dir = models_dir().join("qwen3-asr-0.6b-onnx");
+    let qwen3_dir = models_dir().join(lune_core::models::DIR_QWEN3_ASR);
     if qwen3_dir.exists() {
         entries.push(BenchmarkAsrEntry {
             display_name: "Qwen3-ASR-0.6B-int4",

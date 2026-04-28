@@ -61,10 +61,11 @@ case "${TYPE:-real}" in
   real)      cargo run --release --example pipeline_real -p lune-app ;;
   latency)   cargo run --release --example session_latency -p lune-app ;;
   confusion) cargo run --release --example confusion_mine -p lune-app ;;
-  *)         echo "TYPE must be stages|real|latency|confusion"; exit 1 ;;
+  llm)       cargo run --release --example llm_quality -p lune-app ;;
+  *)         echo "TYPE must be stages|real|latency|confusion|llm"; exit 1 ;;
 esac
 '''
-info = "Benchmark (--env TYPE=stages|real|latency|confusion)"
+info = "Benchmark (--env TYPE=stages|real|latency|confusion|llm)"
 
 # ── Build ────────────────────────────────────────────────────────────────────
 

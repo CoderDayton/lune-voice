@@ -5,7 +5,7 @@ use super::hotkey::HotkeyConfig;
 use super::modes::{ActivationMode, DictationMode, PillVisibility, PrivacyMode, TerminalMode};
 use super::pipeline::PipelineOverrides;
 use super::redacted::RedactedString;
-use super::style::StyleId;
+use super::style_llm::StyleId;
 
 /// Top-level user settings, persisted as TOML.
 #[derive(Debug, Clone, Serialize, Deserialize)]

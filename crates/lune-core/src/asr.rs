@@ -7,19 +7,23 @@ use crate::Result;
 /// Fields are ordered hot-first: `id`, `confidence`, `is_final` land on the
 /// same cache line so routing decisions don't pay for a `text` load.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WordConfidence {
+    pub word: String,
+    pub confidence: f32,
+    #[serde(default)]
+    pub fix_score: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AsrSegment {
     pub id: u64,
-    /// Mean token-level confidence from the decoder (0.0–1.0).
-    /// `None` for backends that don't expose logits (e.g. OpenAI API).
     #[serde(default)]
     pub confidence: Option<f32>,
-    /// Minimum single-token confidence in the segment (0.0–1.0).
-    /// Used for word-level gating: even if the mean is high, one
-    /// low-confidence token flags the segment for LLM review.
     #[serde(default)]
     pub min_token_confidence: Option<f32>,
+    #[serde(default)]
+    pub word_confidences: Vec<WordConfidence>,
 
-    /// Immutable once true.
     pub is_final: bool,
     pub start_ms: Option<u64>,
     pub end_ms: Option<u64>,
@@ -197,6 +201,7 @@ mod tests {
             end_ms: Some(1500),
             confidence: Some(0.95),
             min_token_confidence: Some(0.80),
+            word_confidences: vec![],
         }
     }
 

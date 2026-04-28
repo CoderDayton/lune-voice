@@ -27,3 +27,4 @@ tokenizers.workspace = true
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 hound = "3.5"
+lune-llm = { path = "../lune-llm" }
