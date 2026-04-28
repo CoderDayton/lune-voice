@@ -618,8 +618,7 @@ async fn build_pipeline(
         db,
         config,
         Arc::clone(&settings),
-    )
-    .with_vad_state_path(paths.adaptive_vad_file());
+    );
 
     let pipeline = LivePipeline {
         paths,

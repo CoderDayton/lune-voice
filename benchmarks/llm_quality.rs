@@ -69,37 +69,61 @@ fn main() {
             .unwrap_or_default();
 
         let llm_delta = time_with_llm - time_no_llm;
+        let bypassed = text_no_llm == text_with_llm && llm_delta.abs() < 0.05;
 
         let wer_raw = word_error_rate(&text_no_llm, &fixture.reference) * 100.0;
         let cer_raw = char_error_rate(&text_no_llm, &fixture.reference) * 100.0;
-        let wer_llm = word_error_rate(&text_with_llm, &fixture.reference) * 100.0;
-        let cer_llm = char_error_rate(&text_with_llm, &fixture.reference) * 100.0;
 
-        println!();
-        println!("  {:>20}  {:>10}  {:>10}", "", "No LLM", "With LLM");
-        println!("  {:>20}  {:>10.1}%  {:>10.1}%", "WER", wer_raw, wer_llm);
-        println!("  {:>20}  {:>10.1}%  {:>10.1}%", "CER", cer_raw, cer_llm);
-        println!(
-            "  {:>20}  {:>10.3}s  {:>10.3}s",
-            "Wall time", time_no_llm, time_with_llm
-        );
-        println!("  {:>20}  {:>10.3}s", "LLM delta", llm_delta);
-        println!();
-        println!("  ASR only:");
-        wrap_print("    ", &text_no_llm, 72);
-        println!("  ASR + LLM:");
-        wrap_print("    ", &text_with_llm, 72);
-        println!("  Reference:");
-        wrap_print("    ", &fixture.reference, 72);
+        if bypassed {
+            println!();
+            println!("  [BYPASS] ASR confidence high — LLM skipped");
+            println!("  {:>20}  {:>10.1}%", "WER", wer_raw);
+            println!("  {:>20}  {:>10.1}%", "CER", cer_raw);
+            println!();
+            wrap_print("    ", &text_no_llm, 72);
+            println!("  Reference:");
+            wrap_print("    ", &fixture.reference, 72);
 
-        results.push(FixtureResult {
-            name: fixture.name,
-            wer_raw,
-            wer_llm,
-            cer_raw,
-            cer_llm,
-            llm_delta,
-        });
+            results.push(FixtureResult {
+                name: fixture.name,
+                wer_raw,
+                wer_llm: wer_raw,
+                cer_raw,
+                cer_llm: cer_raw,
+                llm_delta: 0.0,
+                bypassed: true,
+            });
+        } else {
+            let wer_llm = word_error_rate(&text_with_llm, &fixture.reference) * 100.0;
+            let cer_llm = char_error_rate(&text_with_llm, &fixture.reference) * 100.0;
+
+            println!();
+            println!("  {:>20}  {:>10}  {:>10}", "", "No LLM", "With LLM");
+            println!("  {:>20}  {:>10.1}%  {:>10.1}%", "WER", wer_raw, wer_llm);
+            println!("  {:>20}  {:>10.1}%  {:>10.1}%", "CER", cer_raw, cer_llm);
+            println!(
+                "  {:>20}  {:>10.3}s  {:>10.3}s",
+                "Wall time", time_no_llm, time_with_llm
+            );
+            println!("  {:>20}  {:>10.3}s", "LLM delta", llm_delta);
+            println!();
+            println!("  ASR only:");
+            wrap_print("    ", &text_no_llm, 72);
+            println!("  ASR + LLM:");
+            wrap_print("    ", &text_with_llm, 72);
+            println!("  Reference:");
+            wrap_print("    ", &fixture.reference, 72);
+
+            results.push(FixtureResult {
+                name: fixture.name,
+                wer_raw,
+                wer_llm,
+                cer_raw,
+                cer_llm,
+                llm_delta,
+                bypassed: false,
+            });
+        }
     }
 
     if results.len() > 1 {
@@ -115,14 +139,31 @@ fn main() {
             "───────", "───────", "───────", "───────", "───────", "────────"
         );
         for r in &results {
-            println!(
-                "  {:20}  {:>7.1}%  {:>7.1}%  {:>7.1}%  {:>7.1}%  {:>9.3}",
-                r.name, r.wer_raw, r.wer_llm, r.cer_raw, r.cer_llm, r.llm_delta
-            );
+            if r.bypassed {
+                println!(
+                    "  {:20}  {:>7.1}%  {:>8}  {:>7.1}%  {:>8}  {:>9}",
+                    r.name, r.wer_raw, "BYPASS", r.cer_raw, "BYPASS", "—"
+                );
+            } else {
+                println!(
+                    "  {:20}  {:>7.1}%  {:>7.1}%  {:>7.1}%  {:>7.1}%  {:>9.3}",
+                    r.name, r.wer_raw, r.wer_llm, r.cer_raw, r.cer_llm, r.llm_delta
+                );
+            }
         }
-        let avg_delta = results.iter().map(|r| r.llm_delta).sum::<f64>() / results.len() as f64;
+        let llm_results: Vec<_> = results.iter().filter(|r| !r.bypassed).collect();
+        let n_llm = llm_results.len() as f64;
+        let avg_delta = if n_llm > 0.0 {
+            llm_results.iter().map(|r| r.llm_delta).sum::<f64>() / n_llm
+        } else {
+            0.0
+        };
         let avg_wer_raw = results.iter().map(|r| r.wer_raw).sum::<f64>() / results.len() as f64;
-        let avg_wer_llm = results.iter().map(|r| r.wer_llm).sum::<f64>() / results.len() as f64;
+        let avg_wer_llm = if n_llm > 0.0 {
+            llm_results.iter().map(|r| r.wer_llm).sum::<f64>() / n_llm
+        } else {
+            avg_wer_raw
+        };
         println!();
         println!(
             "  Avg WER: {:.1}% → {:.1}%  |  Avg LLM Δ: {:.3}s",
@@ -140,6 +181,7 @@ struct FixtureResult {
     cer_raw: f64,
     cer_llm: f64,
     llm_delta: f64,
+    bypassed: bool,
 }
 
 async fn run_pipeline(

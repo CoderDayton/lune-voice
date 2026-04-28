@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -8,7 +7,7 @@ use tokio::sync::{Mutex, RwLock, mpsc};
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-use lune_audio::{AdaptiveVadConfig, AudioConfig, AudioStream, VadSegmenter, VadSegmenterConfig};
+use lune_audio::{AudioConfig, AudioStream, Vad, VadConfig};
 use lune_commands::VoiceCommandRouter;
 use lune_core::Result;
 use lune_core::asr::{AsrBackend, AsrBackendKind, AsrSegment, AsrSessionConfig};
@@ -67,10 +66,6 @@ pub struct SessionManager<A: AsrBackend> {
     settings: Arc<RwLock<UserSettings>>,
     active: Arc<Mutex<Option<ActiveHandle>>>,
     idle_notify: Arc<Notify>,
-    /// Persisted adaptive VAD state across sessions.
-    adaptive_vad_state: Arc<Mutex<Option<AdaptiveVadConfig>>>,
-    /// Path to persist adaptive VAD state across app restarts.
-    vad_state_path: Option<PathBuf>,
 }
 
 impl<A: AsrBackend + 'static> SessionManager<A> {
@@ -94,32 +89,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             settings,
             active: Arc::new(Mutex::new(None)),
             idle_notify: Arc::new(Notify::new()),
-            adaptive_vad_state: Arc::new(Mutex::new(None)),
-            vad_state_path: None,
         }
-    }
-
-    /// Set the file path for persisting adaptive VAD state across restarts.
-    /// If the file exists and contains valid JSON, the state is loaded immediately.
-    pub fn with_vad_state_path(mut self, path: PathBuf) -> Self {
-        if path.exists() {
-            match std::fs::read_to_string(&path) {
-                Ok(json) => match serde_json::from_str::<AdaptiveVadConfig>(&json) {
-                    Ok(state) => {
-                        info!(state = %state.debug_state(), path = %path.display(), "loaded adaptive VAD state from disk");
-                        self.adaptive_vad_state = Arc::new(Mutex::new(Some(state)));
-                    }
-                    Err(e) => {
-                        warn!(error = %e, path = %path.display(), "corrupt adaptive VAD file, starting fresh");
-                    }
-                },
-                Err(e) => {
-                    warn!(error = %e, path = %path.display(), "failed to read adaptive VAD file");
-                }
-            }
-        }
-        self.vad_state_path = Some(path);
-        self
     }
 
     /// Start a new session. Returns `Err` if one is already active.
@@ -182,9 +152,6 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let active_arc = Arc::clone(&self.active);
         let idle_notify = Arc::clone(&self.idle_notify);
         let settings = Arc::clone(&self.settings);
-        let adaptive_vad_state = Arc::clone(&self.adaptive_vad_state);
-        let vad_state_path = self.vad_state_path.clone();
-
         tokio::task::spawn(run_session(
             session_id,
             asr,
@@ -200,8 +167,6 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             idle_notify,
             audio_override,
             settings,
-            adaptive_vad_state,
-            vad_state_path,
         ));
 
         *lock = Some(ActiveHandle {
@@ -339,8 +304,6 @@ async fn run_session<A: AsrBackend + 'static>(
     idle_notify: Arc<Notify>,
     audio_override: Option<AudioStream>,
     _settings: Arc<RwLock<UserSettings>>,
-    adaptive_vad_state: Arc<Mutex<Option<AdaptiveVadConfig>>>,
-    vad_state_path: Option<PathBuf>,
 ) {
     let mut status = SessionStatus::Completed;
 
@@ -383,26 +346,14 @@ async fn run_session<A: AsrBackend + 'static>(
         }
     };
 
-    let vad_config = VadSegmenterConfig {
-        speech_threshold: config.pipeline.speech_threshold,
-        min_speech_ms: config.pipeline.min_speech_ms,
-        sentence_close_ms: config.pipeline.sentence_close_ms,
-        hard_close_ms: config.pipeline.hard_close_ms,
-        max_segment_ms: config.pipeline.max_segment_ms,
-        adaptive: config.pipeline.adaptive_vad,
-    };
-    let mut segmenter = if config.pipeline.adaptive_vad {
-        // Restore learned state from previous session if available
-        let prev_state = adaptive_vad_state.lock().await.take();
-        if let Some(state) = prev_state {
-            debug!(%session_id, state = %state.debug_state(), "restoring adaptive VAD state");
-            VadSegmenter::new_with_adaptive(vad_config, state)
-        } else {
-            VadSegmenter::new(vad_config)
-        }
-    } else {
-        VadSegmenter::new(vad_config)
-    };
+    let mut vad = Vad::new(
+        VadConfig {
+            threshold: config.pipeline.speech_threshold,
+            ..VadConfig::default()
+        },
+        16_000,
+    )
+    .expect("VAD init");
     let _ = event_tx.send(SessionEvent::Started).await;
 
     let mut segments = Vec::with_capacity(asr.segment_capacity_hint());
@@ -413,21 +364,11 @@ async fn run_session<A: AsrBackend + 'static>(
     let mut saw_asr_success = false;
     let mut cancelled = false;
 
-    let llm_enabled = config.pipeline.word_confidence_threshold.is_some();
-    let flush_silence = vec![0.0f32; 16_000];
-    let silence_flush = &flush_silence;
-    let mut progressively_delivered = false;
     let mut audio_poll_tick = tokio::time::interval(Duration::from_millis(10));
     audio_poll_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let mut next_level_emit = tokio::time::Instant::now();
     let level_emit_interval = Duration::from_millis(67); // ~15 fps
     let mut peak_rms: f32 = 0.0;
-    let mut next_adaptive_log = if config.pipeline.adaptive_vad {
-        Some(tokio::time::Instant::now() + Duration::from_secs(30))
-    } else {
-        None
-    };
-
     'capture: loop {
         tokio::select! {
             biased;
@@ -461,12 +402,8 @@ async fn run_session<A: AsrBackend + 'static>(
                         }
                     };
                     if rms > peak_rms { peak_rms = rms; }
-                    let (boundaries, in_speech) = segmenter.push(&chunk.samples);
-
-                    // Always push audio to ASR (including silence) — the encoder
-                    // expects continuous audio with natural pause structure.
-                    // VAD is used only for speech-time accounting and session limits.
-                    if in_speech {
+                    let vad_result = vad.process_chunk(&chunk.samples);
+                    if vad_result.is_speech {
                         speech_samples += chunk.samples.len();
                     }
 
@@ -491,50 +428,6 @@ async fn run_session<A: AsrBackend + 'static>(
                         }
                     }
 
-                    // Progressive inference: flush ASR at each VAD segment boundary.
-                    // When LLM correction is off, emit text immediately per-sentence.
-                    // When LLM is on, still flush per-segment (reduces final poll_final
-                    // work) but hold text until LLM processes the full transcript.
-                    if !boundaries.is_empty() {
-                        for boundary in &boundaries {
-                            debug!(
-                                start_ms = boundary.start_ms,
-                                end_ms = boundary.end_ms,
-                                avg_prob = format!("{:.2}", boundary.avg_prob),
-                                "speech segment boundary → flushing ASR"
-                            );
-                        }
-
-                        let prev_text_len = raw_text.len();
-                        let _ = asr.push_audio(&asr_session, &flush_silence).await;
-                        match asr.poll_final(&asr_session).await {
-                            Ok(new_segments) => {
-                                if append_segments(&mut segments, &mut raw_text, new_segments) {
-                                    saw_asr_success = true;
-                                    // Deliver only the NEW text from this segment
-                                    if !llm_enabled {
-                                        let new_text = raw_text[prev_text_len..].trim_start();
-                                        if !new_text.is_empty() {
-                                            let delivered = new_text.to_owned();
-                                            let _ = event_tx.try_send(
-                                                SessionEvent::FinalizedText(delivered),
-                                            );
-                                            progressively_delivered = true;
-                                        }
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                let msg = e.to_string();
-                                warn!(error = %msg, "poll_final error at segment boundary");
-                                first_asr_error.get_or_insert(msg);
-                            }
-                        }
-                        if let Err(e) = asr.reset_context(&asr_session).await {
-                            warn!(error = %e, "reset_context error at segment boundary");
-                        }
-                    }
-
                     if speech_samples >= config.pipeline.max_speech_samples {
                         info!(
                             %session_id,
@@ -555,16 +448,6 @@ async fn run_session<A: AsrBackend + 'static>(
                     next_level_emit = now + level_emit_interval;
                 }
 
-                // Periodic adaptive VAD debug log
-                if let Some(ref mut deadline) = next_adaptive_log
-                    && tokio::time::Instant::now() >= *deadline
-                {
-                    if let Some(state) = segmenter.debug_adaptive_state() {
-                        debug!(%session_id, adaptive_vad = %state, "adaptive VAD state");
-                    }
-                    *deadline = tokio::time::Instant::now() + Duration::from_secs(30);
-                }
-
                 if !saw_audio && audio_stream.is_offline() {
                     debug!(%session_id, "offline audio exhausted");
                     break 'capture;
@@ -573,31 +456,8 @@ async fn run_session<A: AsrBackend + 'static>(
         }
     }
 
-    // Flush any remaining speech from the segmenter
-    if let Some(boundary) = segmenter.finish() {
-        debug!(
-            start_ms = boundary.start_ms,
-            end_ms = boundary.end_ms,
-            avg_prob = format!("{:.2}", boundary.avg_prob),
-            "final speech segment boundary"
-        );
-    }
-
     if !cancelled {
         let _ = event_tx.send(SessionEvent::Processing).await;
-    }
-
-    // Persist adaptive VAD state for the next session without blocking the
-    // final ASR → LLM → delivery path on disk I/O.
-    if let Some(state) = segmenter.take_adaptive() {
-        debug!(%session_id, state = %state.debug_state(), "saving adaptive VAD state");
-        persist_adaptive_vad_state(
-            session_id,
-            state,
-            Arc::clone(&adaptive_vad_state),
-            vad_state_path.clone(),
-        )
-        .await;
     }
 
     if cancelled {
@@ -605,7 +465,8 @@ async fn run_session<A: AsrBackend + 'static>(
             warn!(error = %e, "reset_context error during cancel");
         }
     } else {
-        if let Err(e) = asr.push_audio(&asr_session, silence_flush).await {
+        let flush_silence = vec![0.0f32; 16_000];
+        if let Err(e) = asr.push_audio(&asr_session, &flush_silence).await {
             let msg = e.to_string();
             warn!(error = %msg, "push_audio (silence flush) error");
             first_asr_error.get_or_insert(msg);
@@ -783,18 +644,9 @@ async fn run_session<A: AsrBackend + 'static>(
     let final_text = post_llm_text;
     info!(%session_id, pipeline_ms = pipeline_t0.elapsed().as_millis() as u64, "post-processing complete");
 
-    // When we already delivered text progressively per-segment (LLM off),
-    // don't re-paste — emit CorrectedText as a UI signal with the
-    // dictionary-applied version. Otherwise emit FinalizedText to deliver.
-    if progressively_delivered {
-        let _ = event_tx
-            .send(SessionEvent::CorrectedText(final_text.clone()))
-            .await;
-    } else {
-        let _ = event_tx
-            .send(SessionEvent::FinalizedText(final_text.clone()))
-            .await;
-    }
+    let _ = event_tx
+        .send(SessionEvent::FinalizedText(final_text.clone()))
+        .await;
 
     let transcript = if final_text.is_empty() {
         None
@@ -831,28 +683,6 @@ async fn finalize_db(
         }
         Ok(None) => warn!(%session_id, "session not found in DB during finalize"),
         Err(e) => warn!(error = %e, %session_id, "DB error during finalize"),
-    }
-}
-
-async fn persist_adaptive_vad_state(
-    session_id: Uuid,
-    state: AdaptiveVadConfig,
-    adaptive_vad_state: Arc<Mutex<Option<AdaptiveVadConfig>>>,
-    vad_state_path: Option<PathBuf>,
-) {
-    *adaptive_vad_state.lock().await = Some(state.clone());
-
-    if let Some(path) = vad_state_path {
-        tokio::spawn(async move {
-            match serde_json::to_string(&state) {
-                Ok(json) => {
-                    if let Err(e) = tokio::fs::write(&path, json).await {
-                        warn!(error = %e, path = %path.display(), "failed to persist adaptive VAD to disk");
-                    }
-                }
-                Err(e) => warn!(error = %e, %session_id, "failed to serialize adaptive VAD state"),
-            }
-        });
     }
 }
 
