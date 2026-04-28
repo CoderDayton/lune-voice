@@ -7,108 +7,42 @@
 #[path = "bench_utils.rs"]
 mod bench_utils;
 
-use std::sync::Arc;
 use std::time::Instant;
 
-use bench_utils::{
-    benchmark_asr_entry, init_ort, load_fixtures, process_memory_usage, workspace_root, wrap_print,
-};
-use lune_app::{SessionManager, SessionManagerConfig};
-use lune_asr::AsrRegistry;
+use bench_utils::{BenchmarkHarness, process_memory_usage, wrap_print};
 use lune_audio::{AudioConfig, AudioStream};
-use lune_core::config::{DevicePolicy, UserSettings};
-use lune_core::llm::TextPostProcessor;
 use lune_core::session::SessionEvent;
-use lune_llm::NullPostProcessor;
-use tokio::sync::{Mutex, RwLock, mpsc};
+use tokio::sync::mpsc;
 
 fn main() {
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .with_writer(std::io::stderr)
-        .try_init();
-
     println!();
     println!("╔══════════════════════════════════════════════════════════════════╗");
     println!("║           SESSION LATENCY — per-event timing breakdown         ║");
     println!("╚══════════════════════════════════════════════════════════════════╝");
     println!();
 
-    let has_gpu = init_ort();
-    let root = workspace_root();
+    let harness = BenchmarkHarness::builder().with_tracing().build();
 
-    let device = if has_gpu {
-        DevicePolicy::Cuda
-    } else {
-        DevicePolicy::Cpu
-    };
-    let asr_entry = match benchmark_asr_entry() {
-        Ok(entry) => entry,
-        Err(msg) => {
-            println!("  [skip] {msg}");
-            return;
-        }
-    };
-    println!("  ASR backend: {}", asr_entry.display_name);
-    print!("  Loading ... ");
-    let t = Instant::now();
-    let models_dir = bench_utils::models_dir();
-    let asr = Arc::new(
-        AsrRegistry::from_config(&asr_entry.config, device, &models_dir).expect("load ASR"),
-    );
-    println!("{:.1}s", t.elapsed().as_secs_f64());
-
-    let llm: Arc<dyn TextPostProcessor> = Arc::new(NullPostProcessor::new());
-
-    let fixtures = load_fixtures(&root);
-    if fixtures.is_empty() {
+    if harness.fixtures.is_empty() {
         println!("  [skip] No WAV fixtures found");
         return;
     }
 
-    let fixture_filter = std::env::var("LUNE_BENCH_FIXTURE").ok();
-    let rt = tokio::runtime::Runtime::new().unwrap();
-
-    for fixture in &fixtures {
-        if let Some(ref needle) = fixture_filter
-            && !fixture.name.contains(needle.as_str())
-        {
-            continue;
-        }
-
+    for fixture in &harness.fixtures {
         println!();
         println!("── {} ({:.1}s audio) ──", fixture.name, fixture.audio_secs);
         println!();
 
         let audio_stream = AudioStream::from_samples(&fixture.pcm, AudioConfig::default()).unwrap();
-        let db = lune_persist::Database::open_in_memory().unwrap();
-        let dict =
-            lune_dict::DictionaryManager::new(lune_persist::Database::open_in_memory().unwrap())
-                .unwrap();
 
-        let mut pipeline = asr.pipeline_config();
+        let mut pipeline = harness.asr.pipeline_config();
         pipeline.itn_enabled = false;
 
-        let config = SessionManagerConfig {
-            asr_backend_kind: asr_entry.backend_kind,
-            pipeline,
-            ..Default::default()
-        };
-        let settings = Arc::new(RwLock::new(UserSettings::default()));
-
-        let mgr = SessionManager::new(
-            Arc::clone(&asr),
-            Arc::new(lune_commands::VoiceCommandRouter::new()),
-            Arc::clone(&llm),
-            Arc::new(Mutex::new(dict)),
-            Arc::new(Mutex::new(db)),
-            config,
-            settings,
-        );
+        let mgr = harness.session_manager(pipeline);
 
         let (event_tx, mut event_rx) = mpsc::channel::<SessionEvent>(256);
 
-        let events = rt.block_on(async {
+        let (events, final_text) = harness.rt.block_on(async {
             let t0 = Instant::now();
 
             let _id = mgr
@@ -153,8 +87,6 @@ fn main() {
             }
             (events, final_text)
         });
-
-        let (events, final_text) = events;
 
         println!("  {:.<30} {:>10}", "Event", "Time (ms)");
         println!("  {}", "─".repeat(42));

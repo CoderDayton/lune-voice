@@ -15,8 +15,8 @@ mod bench_utils;
 use std::time::Instant;
 
 use bench_utils::{
-    Fixture, benchmark_asr_entries, char_error_rate, init_ort, load_fixtures, percentile,
-    process_memory_usage, word_error_rate, workspace_root,
+    BenchmarkHarness, Fixture, benchmark_asr_entries, char_error_rate, percentile,
+    process_memory_usage, word_error_rate,
 };
 use lune_asr::AsrRegistry;
 use lune_core::asr::{AsrBackend, AsrSessionConfig};
@@ -52,21 +52,14 @@ fn run_backend(
     let load_t0 = Instant::now();
     let asr = AsrRegistry::from_config(&entry.config, device, models_dir).expect("load ASR");
     let load_ms = load_t0.elapsed().as_secs_f64() * 1000.0;
-    println!("    Model load: {load_ms:.0}ms");
+    println!("  Model load: {load_ms:.0}ms");
     if let Some(mem) = process_memory_usage() {
-        println!("    Memory after load: {}", mem.display());
+        println!("  Memory after load: {}", mem.display());
     }
 
-    let fixture_filter = std::env::var("LUNE_BENCH_FIXTURE").ok();
     let mut timings = Vec::new();
 
     for fixture in fixtures {
-        if let Some(ref needle) = fixture_filter
-            && !fixture.name.contains(needle.as_str())
-        {
-            continue;
-        }
-
         let total_t0 = Instant::now();
 
         // Stage 1: session create
@@ -126,14 +119,14 @@ fn run_backend(
 fn print_report(report: &BackendReport) {
     println!("\n  ┌─ {} ─ Load: {:.0}ms ─┐", report.name, report.load_ms);
     println!(
-        "  {:20} {:>7} {:>8} {:>8} {:>8} {:>7} {:>8} {:>6} {:>6}",
+        "{:20}{:>7}{:>8}{:>8}{:>8}{:>7}{:>8}{:>6}{:>6}",
         "Fixture", "Audio", "SessCr", "Push", "Poll", "Calib", "Total", "WER%", "CER%"
     );
-    println!("  {}", "─".repeat(105));
+    println!("{}", "─".repeat(105));
 
     for t in &report.timings {
         println!(
-            "  {:20} {:6.1}s {:7.1} {:7.1} {:7.1} {:6.1} {:7.1} {:5.1} {:5.1}",
+            "{:20}{:6.1}s{:7.1}{:7.1}{:7.1}{:6.1}{:7.1}{:5.1}{:5.1}",
             t.fixture,
             t.audio_secs,
             t.session_create_ms,
@@ -156,16 +149,16 @@ fn print_report(report: &BackendReport) {
             .map(|t| (t.total_ms / 1000.0) / t.audio_secs)
             .collect();
 
-        println!("  {}", "─".repeat(105));
+        println!("{}", "─".repeat(105));
         println!(
-            "  Poll P50: {:.1}ms  P95: {:.1}ms  |  Total P50: {:.1}ms  P95: {:.1}ms",
+            "  Poll P50: {:.1}ms  P95: {:.1}ms;  Total P50: {:.1}ms  P95: {:.1}ms",
             percentile(&polls, 50.0),
             percentile(&polls, 95.0),
             percentile(&totals, 50.0),
             percentile(&totals, 95.0),
         );
         println!(
-            "  WER  P50: {:.1}%   P95: {:.1}%   |  RTF P50: {:.4}  P95: {:.4}",
+            "  WER P50: {:.1}%  P95: {:.1}%;  RTF P50: {:.4}  P95: {:.4}",
             percentile(&wers, 50.0),
             percentile(&wers, 95.0),
             percentile(&rtfs, 50.0),
@@ -184,15 +177,12 @@ fn print_report(report: &BackendReport) {
         if grand > 0.0 {
             println!("\n  Time distribution:");
             println!(
-                "    Poll(encode+decode): {:5.1}%  |  Push(buffer): {:5.1}%  |  Session: {:5.1}%",
+                "    Poll (encode+decode): {:5.1}%  Push (buffer): {:5.1}%  Session: {:5.1}%",
                 total_poll / grand * 100.0,
                 total_push / grand * 100.0,
                 total_sess / grand * 100.0,
             );
-            println!(
-                "    Calibration:         {:5.1}%",
-                total_cal / grand * 100.0
-            );
+            println!("    Calibration: {:5.1}%", total_cal / grand * 100.0);
         }
     }
 }
@@ -201,15 +191,12 @@ fn print_comparison(reports: &[BackendReport]) {
     if reports.len() < 2 {
         return;
     }
-    println!("\n  ╔══════════════════════════════════════════════════════════════════╗");
-    println!("  ║                   CROSS-BACKEND COMPARISON                     ║");
-    println!("  ╚══════════════════════════════════════════════════════════════════╝");
-
+    println!("\n  ══ Backend Comparison ══");
     println!(
-        "\n  {:20} {:>12} {:>12} {:>12} {:>12}",
+        "{:20}{:>12}{:>12}{:>12}{:>12}",
         "", "Load(ms)", "Poll P50", "WER P50", "RTF P50"
     );
-    println!("  {}", "─".repeat(70));
+    println!("{}", "─".repeat(70));
 
     for r in reports {
         let polls: Vec<f64> = r.timings.iter().map(|t| t.poll_final_ms).collect();
@@ -220,7 +207,7 @@ fn print_comparison(reports: &[BackendReport]) {
             .map(|t| (t.total_ms / 1000.0) / t.audio_secs)
             .collect();
         println!(
-            "  {:20} {:11.0} {:11.1} {:10.1}% {:11.4}",
+            "{:20}{:11.0}{:11.1}{:10.1}%{:11.4}",
             r.name,
             r.load_ms,
             percentile(&polls, 50.0),
@@ -269,43 +256,43 @@ fn print_comparison(reports: &[BackendReport]) {
 }
 
 fn main() {
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .with_writer(std::io::stderr)
-        .try_init();
-
     println!();
     println!("╔══════════════════════════════════════════════════════════════════╗");
-    println!("║                   PIPELINE STAGE LATENCY                        ║");
+    println!("║              PIPELINE STAGE LATENCY                             ║");
     println!("╚══════════════════════════════════════════════════════════════════╝");
     println!();
 
-    let has_gpu = init_ort();
-    let root = workspace_root();
-    let device = if has_gpu {
-        DevicePolicy::Cuda
-    } else {
-        DevicePolicy::Cpu
-    };
-    let models_dir = bench_utils::models_dir();
+    let harness = BenchmarkHarness::builder().with_tracing().build();
 
+    // benchmark_asr_entries() returns all available backends for comparison.
+    // The harness already loaded the first one; for multi-backend runs we load
+    // additional entries using harness.rt, harness.models_dir, harness.has_gpu.
     let entries = benchmark_asr_entries();
     if entries.is_empty() {
         eprintln!("  [skip] No ASR model dirs found under models/");
         return;
     }
 
-    let fixtures = load_fixtures(&root);
-    if fixtures.is_empty() {
+    if harness.fixtures.is_empty() {
         eprintln!("  [skip] No fixtures found in test_fixtures/");
         return;
     }
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let mut reports = Vec::new();
+    let device = if harness.has_gpu {
+        DevicePolicy::Cuda
+    } else {
+        DevicePolicy::Cpu
+    };
 
+    let mut reports = Vec::new();
     for entry in &entries {
-        let report = run_backend(entry, device, &models_dir, &fixtures, &rt);
+        let report = run_backend(
+            entry,
+            device,
+            &harness.models_dir,
+            &harness.fixtures,
+            &harness.rt,
+        );
         print_report(&report);
         reports.push(report);
     }

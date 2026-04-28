@@ -16,116 +16,41 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use bench_utils::{
-    Fixture, benchmark_asr_entry, char_error_rate, init_ort, load_fixtures, process_memory_usage,
-    word_error_rate, workspace_root, wrap_print,
+    BenchmarkHarness, Fixture, char_error_rate, process_memory_usage, word_error_rate, wrap_print,
 };
-use lune_app::{SessionManager, SessionManagerConfig};
+use lune_app::SessionManager;
 use lune_asr::AsrRegistry;
 use lune_audio::{AudioConfig, AudioStream};
-use lune_core::asr::AsrBackendKind;
-use lune_core::config::{DevicePolicy, UserSettings};
+use lune_core::config::UserSettings;
 use lune_core::llm::TextPostProcessor;
 use lune_core::session::SessionEvent;
-use lune_llm::{NullPostProcessor, OrtStyleLlm, OrtStyleLlmConfig};
 use tokio::sync::{Mutex, RwLock, mpsc};
 
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 fn main() {
-    // Honor RUST_LOG when set so sweep/debug runs can introspect the
-    // correction path. No-op when RUST_LOG is unset.
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .with_writer(std::io::stderr)
-        .try_init();
-
     println!();
     println!("╔══════════════════════════════════════════════════════════════════╗");
     println!("║          REAL PIPELINE BENCHMARK (SessionManager + VAD)        ║");
     println!("╚══════════════════════════════════════════════════════════════════╝");
     println!();
 
-    let has_gpu = init_ort();
-    let root = workspace_root();
+    let harness = BenchmarkHarness::builder()
+        .with_tracing()
+        .with_llm()
+        .build();
 
-    // Load ASR (Qwen preferred unless ASR/--asr forces Qwen3)
-    let device = if has_gpu {
-        DevicePolicy::Cuda
-    } else {
-        DevicePolicy::Cpu
-    };
-    let asr_entry = match benchmark_asr_entry() {
-        Ok(entry) => entry,
-        Err(msg) => {
-            println!("  [skip] {msg}");
-            return;
-        }
-    };
-    println!("  Selected ASR backend: {}", asr_entry.display_name);
-    print!("  Loading ASR backend ... ");
-    let t = Instant::now();
-    let models_dir = bench_utils::models_dir();
-    let asr = AsrRegistry::from_config(&asr_entry.config, device, &models_dir).expect("load ASR");
-
-    let asr = Arc::new(asr);
-    println!("{:.1}s", t.elapsed().as_secs_f64());
+    println!("  Selected ASR backend: {:?}", harness.asr.kind());
     if let Some(mem) = process_memory_usage() {
-        println!("  Memory after ASR load: {}", mem.display());
+        println!("  Memory after load: {}", mem.display());
     }
 
-    let llm_off = std::env::var("LUNE_LLM")
-        .map(|v| v == "off" || v == "0")
-        .unwrap_or(false);
-    let llm_dir = models_dir.join(lune_core::models::DIR_STYLE_LLM);
-    let llm: Arc<dyn TextPostProcessor> = if !llm_off && llm_dir.join("tokenizer.json").exists() {
-        print!("  Loading LLM backend...");
-        let lt = Instant::now();
-        match OrtStyleLlm::new(OrtStyleLlmConfig {
-            model_dir: llm_dir,
-            use_gpu: has_gpu,
-            ..Default::default()
-        }) {
-            Ok(llm) => {
-                println!("{:.1}s", lt.elapsed().as_secs_f64());
-                if let Some(mem) = process_memory_usage() {
-                    println!("  Memory after LLM load: {}", mem.display());
-                }
-                Arc::new(llm)
-            }
-            Err(e) => {
-                println!("failed: {e}");
-                println!("  Falling back to passthrough (no LLM correction)");
-                Arc::new(NullPostProcessor::new())
-            }
-        }
-    } else {
-        if llm_off {
-            println!("  LLM: disabled (LUNE_LLM=off)");
-        } else {
-            println!("  LLM: passthrough (no model at {})", llm_dir.display());
-        }
-        Arc::new(NullPostProcessor::new())
-    };
-
-    // Load fixtures
-    let fixtures = load_fixtures(&root);
-    if fixtures.is_empty() {
+    if harness.fixtures.is_empty() {
         println!("  [skip] No WAV fixtures found");
         return;
     }
 
-    // Run full pipeline for each fixture. Optional fixture filter via
-    // `LUNE_BENCH_FIXTURE=<substring>` for sweep scripts that want a
-    // single fixture.
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let fixture_filter = std::env::var("LUNE_BENCH_FIXTURE").ok();
-
-    for fixture in &fixtures {
-        if let Some(ref needle) = fixture_filter
-            && !fixture.name.contains(needle.as_str())
-        {
-            continue;
-        }
+    for fixture in &harness.fixtures {
         println!();
         println!("── {} ({:.1}s audio) ──", fixture.name, fixture.audio_secs);
         println!();
@@ -133,7 +58,7 @@ fn main() {
         // Optional marking/skip threshold overrides for ablation runs.
         // ITN is disabled by default in benchmarks because reference texts
         // use spelled-out numbers. Set LUNE_ITN=1 to enable.
-        let mut pipeline = asr.pipeline_config();
+        let mut pipeline = harness.asr.pipeline_config();
         pipeline.itn_enabled = std::env::var("LUNE_ITN")
             .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
             .unwrap_or(false);
@@ -150,11 +75,10 @@ fn main() {
             }
         }
 
-        let result = rt.block_on(run_full_pipeline(
+        let result = harness.rt.block_on(run_full_pipeline(
             fixture,
-            Arc::clone(&asr),
-            Arc::clone(&llm),
-            asr_entry.backend_kind,
+            Arc::clone(&harness.asr),
+            Arc::clone(&harness.llm),
             pipeline,
         ));
 
@@ -196,26 +120,10 @@ fn main() {
     println!();
 }
 
-fn language_from_fixture(name: &str) -> &str {
-    if name.contains("french") {
-        "fr"
-    } else if name.contains("german") {
-        "de"
-    } else if name.contains("italian") {
-        "it"
-    } else if name.contains("spanish") {
-        "es"
-    } else {
-        "en"
-    }
-}
-
 async fn run_full_pipeline(
     fixture: &Fixture,
     asr: Arc<AsrRegistry>,
-
     llm: Arc<dyn TextPostProcessor>,
-    backend_kind: AsrBackendKind,
     pipeline: lune_core::config::PipelineConfig,
 ) -> Option<(String, f64)> {
     let audio_stream = AudioStream::from_samples(&fixture.pcm, AudioConfig::default()).unwrap();
@@ -224,14 +132,14 @@ async fn run_full_pipeline(
     let dict = lune_dict::DictionaryManager::new(lune_persist::Database::open_in_memory().unwrap())
         .unwrap();
 
-    let config = SessionManagerConfig {
-        asr_backend_kind: backend_kind,
+    let config = lune_app::SessionManagerConfig {
+        asr_backend_kind: asr.kind(),
         pipeline,
         ..Default::default()
     };
 
     let mut user_settings = UserSettings::default();
-    user_settings.language = language_from_fixture(&fixture.name).into();
+    user_settings.language = BenchmarkHarness::language_for_fixture(&fixture.name).into();
     let settings = Arc::new(RwLock::new(user_settings));
 
     let mgr = SessionManager::new(

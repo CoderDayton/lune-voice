@@ -12,121 +12,58 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use bench_utils::{
-    Fixture, benchmark_asr_entry, char_error_rate, init_ort, load_fixtures, process_memory_usage,
-    word_error_rate, workspace_root, wrap_print,
+    BenchmarkHarness, Fixture, char_error_rate, process_memory_usage, word_error_rate, wrap_print,
 };
-use lune_app::{SessionManager, SessionManagerConfig};
-use lune_asr::AsrRegistry;
-use lune_audio::{AudioConfig, AudioStream};
-use lune_core::asr::AsrBackendKind;
-use lune_core::config::{DevicePolicy, UserSettings};
 use lune_core::llm::TextPostProcessor;
 use lune_core::session::SessionEvent;
-use lune_llm::{NullPostProcessor, OrtStyleLlm, OrtStyleLlmConfig};
-use tokio::sync::{Mutex, RwLock, mpsc};
+use lune_llm::NullPostProcessor;
+use tokio::sync::mpsc;
 
 fn main() {
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .with_writer(std::io::stderr)
-        .try_init();
-
     println!();
     println!("╔══════════════════════════════════════════════════════════════════╗");
     println!("║              LLM QUALITY BENCHMARK (A/B pipeline)              ║");
     println!("╚══════════════════════════════════════════════════════════════════╝");
     println!();
 
-    let has_gpu = init_ort();
-    let root = workspace_root();
-    let device = if has_gpu {
-        DevicePolicy::Cuda
-    } else {
-        DevicePolicy::Cpu
-    };
-    let models_dir = bench_utils::models_dir();
+    let harness = BenchmarkHarness::builder()
+        .with_tracing()
+        .with_llm()
+        .build();
 
-    let asr_entry = match benchmark_asr_entry() {
-        Ok(e) => e,
-        Err(msg) => {
-            println!("[skip] {msg}");
-            return;
-        }
-    };
-    println!("  ASR backend: {}", asr_entry.display_name);
-
-    print!("  Loading ASR...");
-    let t = Instant::now();
-    let asr = Arc::new(
-        AsrRegistry::from_config(&asr_entry.config, device, &models_dir).expect("load ASR"),
-    );
-    println!(" {:.1}s", t.elapsed().as_secs_f64());
-
-    let llm_dir = models_dir.join(lune_core::models::DIR_STYLE_LLM);
-    if !llm_dir.join("tokenizer.json").exists() {
-        println!("[skip] No LLM model at {}", llm_dir.display());
-        return;
-    }
-    print!("  Loading LLM...");
-    let lt = Instant::now();
-    let llm: Arc<dyn TextPostProcessor> = match OrtStyleLlm::new(OrtStyleLlmConfig {
-        model_dir: llm_dir,
-        use_gpu: has_gpu,
-        ..Default::default()
-    }) {
-        Ok(llm) => {
-            println!(" {:.1}s", lt.elapsed().as_secs_f64());
-            Arc::new(llm)
-        }
-        Err(e) => {
-            println!(" failed: {e}");
-            return;
-        }
-    };
     if let Some(mem) = process_memory_usage() {
         println!("  Memory after load: {}", mem.display());
     }
-
-    let fixtures = load_fixtures(&root);
-    if fixtures.is_empty() {
+    if harness.fixtures.is_empty() {
         println!("[skip] No WAV fixtures found");
         return;
     }
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let fixture_filter = std::env::var("LUNE_BENCH_FIXTURE").ok();
     let null_llm: Arc<dyn TextPostProcessor> = Arc::new(NullPostProcessor::new());
-
     let mut results: Vec<FixtureResult> = Vec::new();
 
-    for fixture in &fixtures {
-        if let Some(ref needle) = fixture_filter
-            && !fixture.name.contains(needle.as_str())
-        {
-            continue;
-        }
-
+    for fixture in &harness.fixtures {
         println!();
         println!("── {} ({:.1}s audio) ──", fixture.name, fixture.audio_secs);
 
-        let pipeline = asr.pipeline_config();
+        let pipeline = harness.asr.pipeline_config();
 
-        let (text_no_llm, time_no_llm) = rt
+        let (text_no_llm, time_no_llm) = harness
+            .rt
             .block_on(run_pipeline(
                 fixture,
-                Arc::clone(&asr),
+                &harness,
                 Arc::clone(&null_llm),
-                asr_entry.backend_kind,
                 pipeline.clone(),
             ))
             .unwrap_or_default();
 
-        let (text_with_llm, time_with_llm) = rt
+        let (text_with_llm, time_with_llm) = harness
+            .rt
             .block_on(run_pipeline(
                 fixture,
-                Arc::clone(&asr),
-                Arc::clone(&llm),
-                asr_entry.backend_kind,
+                &harness,
+                Arc::clone(&harness.llm),
                 pipeline,
             ))
             .unwrap_or_default();
@@ -205,44 +142,35 @@ struct FixtureResult {
     llm_delta: f64,
 }
 
-fn language_from_fixture(name: &str) -> &str {
-    if name.contains("french") {
-        "fr"
-    } else if name.contains("german") {
-        "de"
-    } else if name.contains("italian") {
-        "it"
-    } else if name.contains("spanish") {
-        "es"
-    } else {
-        "en"
-    }
-}
-
 async fn run_pipeline(
     fixture: &Fixture,
-    asr: Arc<AsrRegistry>,
+    harness: &BenchmarkHarness,
     llm: Arc<dyn TextPostProcessor>,
-    backend_kind: AsrBackendKind,
     pipeline: lune_core::config::PipelineConfig,
 ) -> Option<(String, f64)> {
-    let audio_stream = AudioStream::from_samples(&fixture.pcm, AudioConfig::default()).unwrap();
+    use lune_app::SessionManagerConfig;
+    use lune_core::config::UserSettings;
+    use tokio::sync::{Mutex, RwLock};
+
+    let audio_stream =
+        lune_audio::AudioStream::from_samples(&fixture.pcm, lune_audio::AudioConfig::default())
+            .unwrap();
     let db = lune_persist::Database::open_in_memory().unwrap();
     let dict = lune_dict::DictionaryManager::new(lune_persist::Database::open_in_memory().unwrap())
         .unwrap();
 
     let config = SessionManagerConfig {
-        asr_backend_kind: backend_kind,
+        asr_backend_kind: harness.asr.kind(),
         pipeline,
         ..Default::default()
     };
 
     let mut user_settings = UserSettings::default();
-    user_settings.language = language_from_fixture(fixture.name).into();
+    user_settings.language = BenchmarkHarness::language_for_fixture(fixture.name).into();
     let settings = Arc::new(RwLock::new(user_settings));
 
-    let mgr = SessionManager::new(
-        asr,
+    let mgr = lune_app::SessionManager::new(
+        Arc::clone(&harness.asr),
         Arc::new(lune_commands::VoiceCommandRouter::new()),
         llm,
         Arc::new(Mutex::new(dict)),

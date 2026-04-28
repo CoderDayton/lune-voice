@@ -3,9 +3,11 @@
 //! Included via `#[path = "bench_utils.rs"] mod bench_utils;` from each example.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use lune_core::asr::AsrBackendKind;
-use lune_core::config::AsrBackendConfig;
+use lune_core::config::{AsrBackendConfig, DevicePolicy, UserSettings};
+use lune_core::llm::TextPostProcessor;
 use lune_persist::AppPaths;
 
 pub fn models_dir() -> PathBuf {
@@ -463,4 +465,181 @@ where
         }
     }
     x
+}
+
+// ─── BenchmarkHarness ────────────────────────────────────────────────────────
+
+/// Consolidated setup for benchmark binaries.
+///
+/// Build via [`BenchmarkHarness::builder()`]. Owns the tokio runtime, loaded
+/// ASR and LLM backends, and the pre-filtered fixture list. All fields are
+/// `pub` for direct use in benchmark code.
+pub struct BenchmarkHarness {
+    pub rt: tokio::runtime::Runtime,
+    pub asr: Arc<lune_asr::AsrRegistry>,
+    pub llm: Arc<dyn TextPostProcessor>,
+    pub fixtures: Vec<Fixture>,
+    pub has_gpu: bool,
+    pub models_dir: PathBuf,
+}
+
+impl BenchmarkHarness {
+    pub fn builder() -> HarnessBuilder {
+        HarnessBuilder::default()
+    }
+
+    /// Create a fresh `SessionManager` backed by an in-memory DB.
+    ///
+    /// Call once per fixture run; each call gets its own isolated DB and
+    /// dictionary so runs don't bleed state.
+    pub fn session_manager(
+        &self,
+        pipeline: lune_core::config::PipelineConfig,
+    ) -> lune_app::SessionManager<lune_asr::AsrRegistry> {
+        use std::sync::Arc;
+        use tokio::sync::{Mutex, RwLock};
+
+        let db = lune_persist::Database::open_in_memory().expect("in-memory DB");
+        let dict = lune_dict::DictionaryManager::new(
+            lune_persist::Database::open_in_memory().expect("in-memory DB for dict"),
+        )
+        .expect("DictionaryManager");
+
+        let config = lune_app::SessionManagerConfig {
+            asr_backend_kind: self.asr.kind(),
+            pipeline,
+            ..Default::default()
+        };
+
+        lune_app::SessionManager::new(
+            Arc::clone(&self.asr),
+            Arc::new(lune_commands::VoiceCommandRouter::new()),
+            Arc::clone(&self.llm),
+            Arc::new(Mutex::new(dict)),
+            Arc::new(Mutex::new(db)),
+            config,
+            Arc::new(RwLock::new(UserSettings::default())),
+        )
+    }
+
+    /// Map a fixture name to a BCP-47 language tag.
+    ///
+    /// Checks for language keywords in the fixture name; defaults to `"en"`.
+    pub fn language_for_fixture(name: &str) -> &'static str {
+        if name.contains("french") {
+            "fr"
+        } else if name.contains("german") {
+            "de"
+        } else if name.contains("spanish") {
+            "es"
+        } else if name.contains("italian") {
+            "it"
+        } else {
+            "en"
+        }
+    }
+}
+
+/// Builder for [`BenchmarkHarness`].
+pub struct HarnessBuilder {
+    with_llm: bool,
+    with_tracing: bool,
+}
+
+impl Default for HarnessBuilder {
+    fn default() -> Self {
+        Self {
+            with_llm: false,
+            with_tracing: false,
+        }
+    }
+}
+
+impl HarnessBuilder {
+    /// Load ORT-style LLM (falls back to `NullPostProcessor` on error or
+    /// missing model). Without this the harness uses `NullPostProcessor`.
+    pub fn with_llm(mut self) -> Self {
+        self.with_llm = true;
+        self
+    }
+
+    /// Init a `tracing_subscriber` with `RUST_LOG` env filter.
+    pub fn with_tracing(mut self) -> Self {
+        self.with_tracing = true;
+        self
+    }
+
+    /// Consume the builder and construct the harness.
+    ///
+    /// Panics (with a descriptive message) if required models are missing.
+    pub fn build(self) -> BenchmarkHarness {
+        if self.with_tracing {
+            let _ = tracing_subscriber::fmt()
+                .with_env_filter(
+                    tracing_subscriber::EnvFilter::try_from_default_env()
+                        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("warn")),
+                )
+                .try_init();
+        }
+
+        let has_gpu = init_ort();
+        let device = if has_gpu {
+            DevicePolicy::Cuda
+        } else {
+            DevicePolicy::Cpu
+        };
+
+        let models_dir = models_dir();
+
+        // ASR
+        let asr_entry = benchmark_asr_entry().unwrap_or_else(|msg| {
+            panic!("BenchmarkHarness: cannot load ASR — {msg}");
+        });
+        let asr = lune_asr::AsrRegistry::from_config(&asr_entry.config, device, &models_dir)
+            .unwrap_or_else(|e| panic!("BenchmarkHarness: ASR load failed — {e}"));
+        let asr = Arc::new(asr);
+
+        // LLM
+        let llm: Arc<dyn TextPostProcessor> = if self.with_llm {
+            let llm_dir = models_dir.join(lune_core::models::DIR_STYLE_LLM);
+            let llm_off = std::env::var("LUNE_LLM")
+                .map(|v| v == "off" || v == "0")
+                .unwrap_or(false);
+            if !llm_off && llm_dir.join("tokenizer.json").exists() {
+                match lune_llm::OrtStyleLlm::new(lune_llm::OrtStyleLlmConfig {
+                    model_dir: llm_dir,
+                    use_gpu: has_gpu,
+                    ..Default::default()
+                }) {
+                    Ok(llm) => Arc::new(llm),
+                    Err(e) => {
+                        eprintln!("[warn] LLM load failed ({e}), using NullPostProcessor");
+                        Arc::new(lune_llm::NullPostProcessor::new())
+                    }
+                }
+            } else {
+                Arc::new(lune_llm::NullPostProcessor::new())
+            }
+        } else {
+            Arc::new(lune_llm::NullPostProcessor::new())
+        };
+
+        // Fixtures
+        let root = workspace_root();
+        let mut fixtures = load_fixtures(&root);
+        if let Ok(needle) = std::env::var("LUNE_BENCH_FIXTURE") {
+            fixtures.retain(|f| f.name.contains(needle.as_str()));
+        }
+
+        let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+
+        BenchmarkHarness {
+            rt,
+            asr,
+            llm,
+            fixtures,
+            has_gpu,
+            models_dir,
+        }
+    }
 }

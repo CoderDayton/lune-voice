@@ -45,7 +45,6 @@ const SYSTEM_PROMPT: &str = "\
 You are an ASR engine. \
 Transcribe the spoken audio exactly in the spoken language. \
 Do not translate. \
-Output only the transcript text. \
 Do not add words not clearly present.";
 
 /// Maximum audio buffer (5 min at 16 kHz).

@@ -144,12 +144,17 @@ fn main() {
             let results = backend.poll_final(&session).await.unwrap();
             backend.end_session(session).await.unwrap();
             if results.is_empty() {
-                return (String::new(), vec![]);
+                return (String::new(), None, vec![]);
             }
-            (results[0].text.clone(), results[0].word_confidences.clone())
+            let seg = &results[0];
+            (
+                seg.text.clone(),
+                seg.confidence,
+                seg.word_confidences.clone(),
+            )
         });
 
-        let (asr_text, wcs) = word_confs;
+        let (asr_text, seg_conf, wcs) = word_confs;
         if asr_text.is_empty() {
             continue;
         }
@@ -160,18 +165,30 @@ fn main() {
             .map(|wc| wc.word.clone())
             .collect();
 
-        let llm_output = rt.block_on(async {
-            use lune_core::llm::PostProcessInput;
-            let input = PostProcessInput {
-                raw_text: asr_text.clone(),
-                style_preset: Arc::clone(&style),
-                app_category: None,
-                dictionary: vec![],
-                context: None,
-                language: "en".into(),
-            };
-            llm.transform(&input).await.unwrap().cleaned_text
-        });
+        const BYPASS_CONFIDENCE: f32 = 0.92;
+        let needs_llm = seg_conf.is_none_or(|c| c < BYPASS_CONFIDENCE)
+            || wcs.iter().any(|wc| wc.fix_score >= 0.50);
+
+        let llm_output = if needs_llm {
+            rt.block_on(async {
+                use lune_core::llm::PostProcessInput;
+                let input = PostProcessInput {
+                    raw_text: asr_text.clone(),
+                    style_preset: Arc::clone(&style),
+                    app_category: None,
+                    dictionary: vec![],
+                    context: None,
+                    language: "en".into(),
+                };
+                llm.transform(&input).await.unwrap().cleaned_text
+            })
+        } else {
+            println!(
+                "  [BYPASS] confidence={:.2}, no flagged words",
+                seg_conf.unwrap_or(0.0)
+            );
+            asr_text.clone()
+        };
         if !fix_words.is_empty() {
             println!("  fix_words: {:?}", fix_words);
         }

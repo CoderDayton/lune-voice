@@ -718,10 +718,24 @@ async fn run_session<A: AsrBackend + 'static>(
         (entries, applied)
     };
 
+    // ── LLM bypass: skip if ASR is confident and no words are flagged ──
+    const BYPASS_CONFIDENCE: f32 = 0.92;
+    const BYPASS_FIX_SCORE: f32 = 0.50;
+    let needs_llm = segments.iter().any(|seg| {
+        seg.confidence.is_none_or(|c| c < BYPASS_CONFIDENCE)
+            || seg
+                .word_confidences
+                .iter()
+                .any(|wc| wc.fix_score >= BYPASS_FIX_SCORE)
+    });
+
     drain_processing_controls(&mut control_rx, &mut cancelled);
     let post_llm_text = if cancelled {
         info!(%session_id, "session cancelled during processing, skipping LLM");
         String::new()
+    } else if !needs_llm {
+        info!(%session_id, "ASR confidence high, no corruption markers — bypassing LLM");
+        text_after_dict.clone()
     } else {
         info!(%session_id, "[LLM] input: {text_after_dict}");
         let llm_t0 = tokio::time::Instant::now();

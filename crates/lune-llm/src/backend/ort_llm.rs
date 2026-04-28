@@ -18,7 +18,7 @@ use tracing::info;
 use lune_core::error::{Error, Result};
 use lune_core::llm::{PostProcessInput, PostProcessOutput, TextPostProcessor};
 
-const DEFAULT_MAX_TOKENS: usize = 256;
+const DEFAULT_MAX_TOKENS: usize = 512;
 
 pub struct OrtStyleLlmConfig {
     pub model_dir: PathBuf,
@@ -34,8 +34,8 @@ impl Default for OrtStyleLlmConfig {
             model_dir: PathBuf::new(),
             use_gpu: true,
             max_new_tokens: DEFAULT_MAX_TOKENS,
-            temperature: 0.20,
-            top_p: 0.95,
+            temperature: 0.1,
+            top_p: 1.0,
         }
     }
 }
@@ -240,25 +240,48 @@ impl OrtStyleLlm {
             "es" => "Spanish",
             "it" => "Italian",
             "pt" => "Portuguese",
-            "zh" => "Chinese",
-            "cn" => "Chinese",
+            "zh" | "cn" => "Chinese",
             "ja" => "Japanese",
             "ru" => "Russian",
             "ko" => "Korean",
             _ => "English",
         };
 
-        let style_line = if style_instructions.is_empty() {
+        #[allow(unused)]
+        let style_str = if style_instructions.is_empty() {
             String::new()
         } else {
-            format!("Style: {style_instructions}\n")
+            format!("\nStyle instructions:\n{style_instructions}\n")
         };
 
         format!(
-            "Language: {lang_tag}\n\
-            {style_line}\
+            "\
+            Language: {lang_tag}\n\
+            \n\
+            Correction mode: STRICT_ASR_MINIMAL_EDIT\n\
+            \n\
+            Allowed edits:\n\
+            - punctuation\n\
+            - casing\n\
+            - obvious acoustic substitutions\n\
+            - obvious broken function words\n\
+            - obvious malformed fixed phrases\n\
+            \n\
+            Forbidden edits:\n\
+            - paraphrasing\n\
+            - grammar modernization\n\
+            - style improvement\n\
+            - entity guessing\n\
+            - removing repetitions\n\
+            - changing valid tense/mood\n\
+            - changing valid dialogue fragments\n\
+            - inventing missing content\n\
+            \n\
+            If uncertain, leave the text unchanged.\n\
+            \n\
             Transcript:\n\
-            {transcript}"
+            {transcript}
+            "
         )
     }
 

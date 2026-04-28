@@ -1,24 +1,21 @@
 //! Confusion mining — decode fixtures, word-align against references, extract
-//! substitution pairs where the model picked the wrong BPE path.
+//! substitution pairs where model picked wrong BPE path.
 //!
-//! Run:  cargo run --release --example confusion_mine -p lune-app
-//! GPU:  cargo run --release --features cuda --example confusion_mine -p lune-app
-//! Filter: LUNE_BENCH_FIXTURE=librispeech_40744 cargo run ...
+//! Run:   cargo run --release --example confusion_mine -p lune-app
+//! GPU:   cargo run --release --features cuda --example confusion_mine -p lune-app
+//! Filter: LUNE_BENCH_FIXTURE=librispeech_40744 cargo run...
 //!
-//! Output: prints a JSON report to stdout and writes `confusion_bank.json`
-//! to the workspace root (gitignored).
+//! Output: prints JSON report to stdout and writes `confusion_bank.json`
+//! to workspace root (gitignored).
 
 #[allow(dead_code)]
 #[path = "bench_utils.rs"]
 mod bench_utils;
 
 use std::collections::HashMap;
-use std::time::Instant;
 
-use bench_utils::{init_ort, load_fixtures, normalize_text, workspace_root};
-use lune_asr::AsrRegistry;
+use bench_utils::{BenchmarkHarness, normalize_text, workspace_root};
 use lune_core::asr::{AsrBackend, AsrSessionConfig};
-use lune_core::config::DevicePolicy;
 use serde_json::json;
 
 // ─── Alignment types ────────────────────────────────────────────────────────
@@ -32,7 +29,7 @@ enum EditOp {
 }
 
 /// Word-level Levenshtein alignment with backtrace.
-/// Returns a vec of (op, ref_word_or_none, hyp_word_or_none).
+/// Returns vec of (op, ref_word_or_none, hyp_word_or_none).
 fn align_words<'a>(
     ref_words: &'a [&str],
     hyp_words: &'a [&str],
@@ -119,50 +116,39 @@ struct FixtureDetail {
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 fn main() {
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .with_writer(std::io::stderr)
-        .try_init();
-
     println!();
     println!("╔══════════════════════════════════════════════════════════════════╗");
-    println!("║                    CONFUSION MINING                             ║");
+    println!("║                      CONFUSION MINING                           ║");
     println!("╚══════════════════════════════════════════════════════════════════╝");
     println!();
 
-    let has_gpu = init_ort();
-    let root = workspace_root();
-    let device = if has_gpu {
-        DevicePolicy::Cuda
-    } else {
-        DevicePolicy::Cpu
-    };
+    let harness =
+        match std::panic::catch_unwind(|| BenchmarkHarness::builder().with_tracing().build()) {
+            Ok(h) => h,
+            Err(_) => {
+                eprintln!("[skip] Could not build harness (missing models?)");
+                return;
+            }
+        };
 
-    let asr_entry = match bench_utils::benchmark_asr_entry() {
-        Ok(e) => e,
-        Err(msg) => {
-            eprintln!("  [skip] {msg}");
-            return;
-        }
-    };
-    println!("  Backend: {}", asr_entry.display_name);
-
-    print!("  Loading ASR ... ");
-    let t = Instant::now();
-    let models_dir = bench_utils::models_dir();
-    let asr = AsrRegistry::from_config(&asr_entry.config, device, &models_dir).expect("load ASR");
-    println!("{:.1}s", t.elapsed().as_secs_f64());
-
-    let fixtures = load_fixtures(&root);
-    if fixtures.is_empty() {
-        eprintln!("  [skip] No fixtures");
+    if harness.fixtures.is_empty() {
+        eprintln!("[skip] No fixtures");
         return;
     }
 
-    let fixture_filter = std::env::var("LUNE_BENCH_FIXTURE").ok();
-    let rt = tokio::runtime::Runtime::new().unwrap();
+    // Display name for the JSON report — resolve from bench_utils helper.
+    let backend_name = match bench_utils::benchmark_asr_entry() {
+        Ok(e) => e.display_name,
+        Err(msg) => {
+            eprintln!("[skip] {msg}");
+            return;
+        }
+    };
+    println!("  Backend: {backend_name}");
 
-    let mut all_fixture_details = Vec::new();
+    let root = workspace_root();
+
+    let mut all_fixture_details: Vec<FixtureDetail> = Vec::new();
     // Key: (normalized_ref, normalized_hyp) -> (count, fixture_names)
     let mut pair_counts: HashMap<(String, String), (usize, Vec<String>)> = HashMap::new();
     let mut total_ref_words = 0usize;
@@ -170,20 +156,16 @@ fn main() {
     let mut total_ins = 0usize;
     let mut total_del = 0usize;
 
-    for fixture in &fixtures {
-        if let Some(ref needle) = fixture_filter
-            && !fixture.name.contains(needle.as_str())
-        {
-            continue;
-        }
-
+    for fixture in &harness.fixtures {
         println!();
         println!("── {} ({:.1}s) ──", fixture.name, fixture.audio_secs);
 
-        // Raw ASR decode — no VAD, no LLM, just the model output.
+        // Raw ASR decode — no VAD, no LLM, model output.
         // Detect language from fixture name for proper multilingual support.
         let lang = language_from_fixture(fixture.name);
-        let hyp = rt.block_on(decode_raw(&asr, &fixture.pcm, lang));
+        let hyp = harness
+            .rt
+            .block_on(decode_raw(&harness.asr, &fixture.pcm, lang));
         let hyp = match hyp {
             Some(t) => t,
             None => {
@@ -263,7 +245,7 @@ fn main() {
         } else {
             0.0
         };
-        println!("  Words: {n_ref}  S:{fx_subs} I:{fx_ins} D:{fx_del}  WER:{wer:.1}%");
+        println!("  Words: {n_ref}  S:{fx_subs}  I:{fx_ins}  D:{fx_del}  WER:{wer:.1}%");
 
         total_ref_words += n_ref;
         total_subs += fx_subs;
@@ -332,7 +314,7 @@ fn main() {
         .collect();
 
     let report = json!({
-        "backend": asr_entry.display_name,
+        "backend": backend_name,
         "total_fixtures": all_fixture_details.len(),
         "total_ref_words": total_ref_words,
         "total_substitutions": total_subs,
@@ -362,7 +344,11 @@ fn main() {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-async fn decode_raw(asr: &AsrRegistry, pcm: &[f32], language: Option<&str>) -> Option<String> {
+async fn decode_raw(
+    asr: &lune_asr::AsrRegistry,
+    pcm: &[f32],
+    language: Option<&str>,
+) -> Option<String> {
     let config = AsrSessionConfig {
         language: language.map(|s| s.to_string()),
         ..Default::default()
