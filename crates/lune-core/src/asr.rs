@@ -113,7 +113,7 @@ pub enum AsrBackendKind {
 }
 
 impl AsrBackendKind {
-    /// Recommended `max_segment_ms` for the VadSegmenter.
+    /// Recommended `max_segment_ms` for the pipeline.
     ///
     /// All backends handle long audio natively. This is a safety ceiling,
     /// not an encoder limit.

@@ -19,14 +19,11 @@ audioadapter-buffers = "2.0"
 # Lock-free ring buffer
 crossbeam-channel = "0.5"
 
-# Voice activity detection (TEN VAD ONNX model)
-ten-vad-rs = "0.1.6"
+# Voice activity detection (pure Rust)
+earshot = "1.1"
 
 # Serialization (adaptive VAD state persistence)
 serde = { workspace = true, features = ["derive"] }
-
-# Zero-alloc segment boundary list (almost always 0 or 1 per push)
-smallvec = { workspace = true }
 
 # Error handling
 thiserror.workspace = true

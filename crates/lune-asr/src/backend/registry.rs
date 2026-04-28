@@ -182,7 +182,6 @@ impl AsrRegistry {
                 llm_skip_threshold: Some(0.95),
                 llm_skip_noisy_threshold: Some(0.30),
                 max_speech_samples: 300 * 16_000,
-                disable_segmenter: false,
             },
             Self::OpenAi(_) => PipelineConfig {
                 max_segment_ms: 30_000,
@@ -200,7 +199,6 @@ impl AsrRegistry {
                 llm_skip_threshold: None,
                 llm_skip_noisy_threshold: None,
                 max_speech_samples: 120 * 16_000,
-                disable_segmenter: false,
             },
         }
     }

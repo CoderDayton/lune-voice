@@ -120,13 +120,6 @@ pub struct PipelineConfig {
     /// Additive logit bias for boosted tokens (NVIDIA recommends 0.5–2.0).
     #[serde(default = "default_word_boost_score")]
     pub word_boost_score: f32,
-
-    /// Disable VAD-based segment boundary flushing.
-    ///
-    /// When true, all audio is pushed to ASR without intermediate flushes
-    /// and transcribed in one `poll_final` at end-of-session.
-    #[serde(default)]
-    pub disable_segmenter: bool,
 }
 
 fn default_itn_enabled() -> bool {
@@ -252,7 +245,6 @@ impl Default for PipelineConfig {
             itn_enabled: false,
             word_boost_enabled: true,
             word_boost_score: 1.0,
-            disable_segmenter: false,
         }
     }
 }

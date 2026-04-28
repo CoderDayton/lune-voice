@@ -1,11 +1,10 @@
-//! VAD timeline inspection for a WAV file.
+//! VAD timeline inspection for WAV file.
 //!
-//! Usage: cargo run --example vad_inspect -p lune-audio -- <path/to/file.wav>
+//! Usage: cargo run --example vad_inspect -p lune-audio -- <path.wav>
 
+use earshot::Detector;
 use std::path::PathBuf;
-use ten_vad_rs::TenVad;
 
-const TEN_VAD_MODEL: &[u8] = include_bytes!("../models/ten-vad.onnx");
 const HOP_SIZE: usize = 256;
 const SAMPLE_RATE: u32 = 16_000;
 const SPEECH_THRESHOLD: f32 = 0.5;
@@ -17,27 +16,23 @@ struct VadFrame {
     is_speech: bool,
 }
 
-fn vad_timeline(samples: &[i16]) -> Vec<VadFrame> {
-    let mut vad =
-        TenVad::new_from_bytes(TEN_VAD_MODEL, SAMPLE_RATE).expect("failed to init TEN VAD");
-
+fn vad_timeline(samples: &[f32]) -> Vec<VadFrame> {
+    let mut detector = Detector::default();
     let ms_per_frame = (HOP_SIZE as f32 / SAMPLE_RATE as f32 * 1000.0) as u32;
 
     samples
         .chunks(HOP_SIZE)
         .enumerate()
         .filter_map(|(i, chunk)| {
-            let mut frame = vec![0i16; HOP_SIZE];
-            frame[..chunk.len()].copy_from_slice(chunk);
-
-            match vad.process_frame(&frame) {
-                Ok(prob) => Some(VadFrame {
-                    start_ms: i as u32 * ms_per_frame,
-                    prob,
-                    is_speech: prob >= SPEECH_THRESHOLD,
-                }),
-                Err(_) => None,
+            if chunk.len() < HOP_SIZE {
+                return None;
             }
+            let prob = detector.predict_f32(chunk);
+            Some(VadFrame {
+                start_ms: i as u32 * ms_per_frame,
+                prob,
+                is_speech: prob >= SPEECH_THRESHOLD,
+            })
         })
         .collect()
 }
@@ -87,23 +82,19 @@ fn speech_segments(
 }
 
 fn print_vad_summary(timeline: &[VadFrame]) {
-    println!("{:<10} {:<8} Speech", "Time(ms)", "Prob");
-    println!("{}", "-".repeat(50));
-
-    for frame in timeline.iter().step_by(10) {
-        let bar_len = (frame.prob * 20.0) as usize;
-        let bar = "█".repeat(bar_len) + &"░".repeat(20 - bar_len);
+    println!("{:<10} {:<10} {}", "Time(ms)", "Prob", "Speech");
+    println!("{}", "-".repeat(35));
+    for frame in timeline {
         println!(
-            "{:<10} {:<8.3} {} {}",
+            "{:<10} {:<10.4} {}",
             frame.start_ms,
             frame.prob,
-            bar,
-            if frame.is_speech { "SPEECH" } else { "silence" }
+            if frame.is_speech { "▓▓" } else { "░░" }
         );
     }
 }
 
-fn load_wav_i16(path: &PathBuf) -> Vec<i16> {
+fn load_wav_f32(path: &std::path::Path) -> Vec<f32> {
     let mut reader = hound::WavReader::open(path).expect("failed to open WAV");
     let spec = reader.spec();
     assert_eq!(spec.sample_rate, 16_000, "WAV must be 16kHz");
@@ -112,11 +103,11 @@ fn load_wav_i16(path: &PathBuf) -> Vec<i16> {
     match spec.sample_format {
         hound::SampleFormat::Int => reader
             .samples::<i16>()
-            .map(|s| s.expect("read sample"))
+            .map(|s| s.expect("read sample") as f32 / 32768.0)
             .collect(),
         hound::SampleFormat::Float => reader
             .samples::<f32>()
-            .map(|s| (s.expect("read sample") * 32767.0) as i16)
+            .map(|s| s.expect("read sample"))
             .collect(),
     }
 }
@@ -126,7 +117,6 @@ fn main() {
         .nth(1)
         .map(PathBuf::from)
         .unwrap_or_else(|| {
-            // default to workspace test_fixtures
             let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .parent()
                 .unwrap()
@@ -137,9 +127,9 @@ fn main() {
         });
 
     println!("VAD inspection: {}", path.display());
-    let samples = load_wav_i16(&path);
+    let samples = load_wav_f32(&path);
     let duration_s = samples.len() as f32 / SAMPLE_RATE as f32;
-    println!("  {:.1}s  ({} samples)\n", duration_s, samples.len());
+    println!("{:.1}s ({} samples)\n", duration_s, samples.len());
 
     let timeline = vad_timeline(&samples);
 
@@ -154,11 +144,11 @@ fn main() {
         let end_s = *end as f32 / SAMPLE_RATE as f32;
         let dur_s = end_s - start_s;
         total_speech_s += dur_s;
-        println!("  [{i}] {:.2}s – {:.2}s  ({:.2}s)", start_s, end_s, dur_s);
+        println!("[{i}] {:.2}s – {:.2}s ({:.2}s)", start_s, end_s, dur_s);
     }
     println!();
     println!(
-        "  Total speech: {:.2}s / {:.1}s  ({:.0}%)",
+        "  Total speech: {:.2}s / {:.1}s ({:.0}%)",
         total_speech_s,
         duration_s,
         total_speech_s / duration_s * 100.0
