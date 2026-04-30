@@ -23,11 +23,11 @@ pub struct SamplingParams {
 impl Default for SamplingParams {
     fn default() -> Self {
         Self {
-            temperature: 0.1,
+            temperature: 0.0,
             top_p: 1.0,
             top_k: 1,
             min_p: 0.0,
-            repetition_penalty: 1.0,
+            repetition_penalty: 1.02,
             frequency_penalty: 0.0,
             presence_penalty: 0.0,
             eos_token_id: None,

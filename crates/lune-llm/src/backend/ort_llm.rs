@@ -34,7 +34,7 @@ impl Default for OrtStyleLlmConfig {
             model_dir: PathBuf::new(),
             use_gpu: true,
             max_new_tokens: DEFAULT_MAX_TOKENS,
-            temperature: 0.1,
+            temperature: 0.0,
             top_p: 1.0,
         }
     }
@@ -235,11 +235,22 @@ impl OrtStyleLlm {
 
     pub fn user_prompt(
         transcript: &str,
-        _language: &str,
+        language: &str,
         _style_instructions: &str,
         _correction_spans: &[CorrectionSpan],
     ) -> String {
-        format!("Transcript:\n{transcript}")
+        format!(
+            "\
+Minimally correct this ASR transcript.\n\n\
+Expected language: {language}\n\
+Rules:\n\
+- Fix only punctuation, capitalization, misspellings, and repeated words.\n\
+- Do not delete any words or content.\n\
+- Do not translate or change the language.\n\
+- Preserve all names and proper nouns.\n\
+- Return corrected text only.\n\n\
+Transcript:\n{transcript}"
+        )
     }
 
     pub fn apply_style(

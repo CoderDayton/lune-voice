@@ -69,14 +69,14 @@ fn main() {
             .unwrap_or_default();
 
         let llm_delta = time_with_llm - time_no_llm;
-        let bypassed = text_no_llm == text_with_llm && llm_delta.abs() < 0.05;
+        let bypassed = text_no_llm == text_with_llm;
 
         let wer_raw = word_error_rate(&text_no_llm, &fixture.reference) * 100.0;
         let cer_raw = char_error_rate(&text_no_llm, &fixture.reference) * 100.0;
 
         if bypassed {
             println!();
-            println!("  [BYPASS] ASR confidence high — LLM skipped");
+            println!("  [SAME] LLM made no changes (Δ {:.1}s)", llm_delta);
             println!("  {:>20}  {:>10.1}%", "WER", wer_raw);
             println!("  {:>20}  {:>10.1}%", "CER", cer_raw);
             println!();
@@ -158,17 +158,24 @@ fn main() {
         } else {
             0.0
         };
-        let avg_wer_raw = results.iter().map(|r| r.wer_raw).sum::<f64>() / results.len() as f64;
-        let avg_wer_llm = if n_llm > 0.0 {
-            llm_results.iter().map(|r| r.wer_llm).sum::<f64>() / n_llm
+        let n = results.len() as f64;
+        let avg_wer_raw = results.iter().map(|r| r.wer_raw).sum::<f64>() / n;
+        let avg_wer_pipeline = results.iter().map(|r| r.wer_llm).sum::<f64>() / n;
+        let avg_wer_llm_only = if n_llm > 0.0 {
+            let raw_llm = llm_results.iter().map(|r| r.wer_raw).sum::<f64>() / n_llm;
+            let post_llm = llm_results.iter().map(|r| r.wer_llm).sum::<f64>() / n_llm;
+            format!("  LLM-only: {:.1}% → {:.1}%", raw_llm, post_llm)
         } else {
-            avg_wer_raw
+            String::new()
         };
         println!();
         println!(
             "  Avg WER: {:.1}% → {:.1}%  |  Avg LLM Δ: {:.3}s",
-            avg_wer_raw, avg_wer_llm, avg_delta
+            avg_wer_raw, avg_wer_pipeline, avg_delta
         );
+        if !avg_wer_llm_only.is_empty() {
+            println!("{avg_wer_llm_only}");
+        }
     }
 
     println!();

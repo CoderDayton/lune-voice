@@ -42,11 +42,13 @@ const AUDIO_END: i64 = 151_670; // <|audio_end|>
 
 /// Base system prompt — language-neutral, minimal. Language is controlled
 /// via the `language X` suffix parameter, not the system prompt.
-const SYSTEM_PROMPT: &str = "\
-You are an ASR engine. \
-Transcribe the spoken audio exactly in the spoken language. \
-Do not translate. \
-Do not add words not clearly present.";
+const SYSTEM_PROMPT: &str = r#"You are an ASR engine.
+Transcribe the audio verbatim in the original spoken language.
+Do not translate.
+Do not summarize, interpret, or answer.
+Do not add words that are not clearly present.
+If speech is unclear, preserve only what is intelligible.
+Output only the transcript text."#;
 
 /// Maximum audio buffer (5 min at 16 kHz).
 const MAX_WINDOW_SAMPLES: usize = 300 * 16_000;

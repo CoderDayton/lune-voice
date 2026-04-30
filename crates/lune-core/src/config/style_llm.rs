@@ -7,10 +7,14 @@ pub type StyleId = String;
 
 /// Universal rules shared by every ASR correction pass.
 pub const BASE_SYSTEM_PROMPT: &str = "\
-Fix ASR errors in the transcript. Add missing words, fix misspellings, \
-and correct punctuation. Preserve the speaker's phrasing. \
-Return only the corrected text.\
-";
+You fix ASR transcript errors with minimal edits.\n\
+Fix only: punctuation, capitalization, misspellings, missing small function words, and repeated consecutive words.\n\
+Do not translate or change the language.\n\
+Never delete any words, phrases, or sentences.\n\
+Never substitute, rephrase, or rewrite content.\n\
+Preserve all names, proper nouns, and non-English text exactly.\n\
+When uncertain, keep the original.\n\
+Output only the corrected text.";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StylePreset {
