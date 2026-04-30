@@ -14,6 +14,7 @@ pub const HOP_LENGTH: usize = 160;
 pub const WIN_LENGTH: usize = 400;
 pub const N_MELS: usize = 128;
 const EPSILON: f32 = 1e-10;
+const INV4_LOG10E: f32 = 0.25 * std::f32::consts::LOG10_E;
 
 #[derive(Clone, Debug)]
 pub struct MelSpecF16 {
@@ -39,7 +40,8 @@ pub struct WhisperMelF16 {
     win_length: usize,
     n_mels: usize,
     window_f32: Vec<f32>,
-    mel_filters_f32: Vec<f32>, // [n_mels][n_fft/2+1]
+    mel_filters_f32: Vec<f32>,       // [n_mels][n_fft/2+1]
+    mel_ranges: Vec<(usize, usize)>, // (start_bin, end_bin) per mel band
     fft: Arc<dyn Fft<f32>>,
 }
 
@@ -62,6 +64,19 @@ impl WhisperMelF16 {
         let fft = planner.plan_fft_forward(n_fft);
         let window_f32 = hann_window(win_length);
         let mel_filters_f32 = build_slaney_mel_filterbank(sample_rate, n_fft, n_mels);
+        let n_bins = n_fft / 2 + 1;
+        let mel_ranges = (0..n_mels)
+            .map(|m| {
+                let row = &mel_filters_f32[m * n_bins..(m + 1) * n_bins];
+                let lo = row.iter().position(|&v| v > 0.0).unwrap_or(0);
+                let hi = row
+                    .iter()
+                    .rposition(|&v| v > 0.0)
+                    .map(|p| p + 1)
+                    .unwrap_or(0);
+                (lo, hi)
+            })
+            .collect();
 
         Self {
             n_fft,
@@ -70,30 +85,43 @@ impl WhisperMelF16 {
             n_mels,
             window_f32,
             mel_filters_f32,
+            mel_ranges,
             fft,
         }
     }
 
     /// Extract mel spectrogram from f32 PCM. Returns FP16 mel-major.
     pub fn extract_from_f32(&self, pcm: &[f32]) -> MelSpecF16 {
+        self.extract_from_f32_padded(pcm, 0)
+    }
+
+    /// Extract mel, then pad output to at least `min_frames` with the silence
+    /// floor value. Avoids computing FFT on zero-padded silence.
+    pub fn extract_from_f32_padded(&self, pcm: &[f32], min_frames: usize) -> MelSpecF16 {
         let padded = reflect_pad_center(pcm, self.n_fft / 2);
-        // Whisper drops the last STFT frame: `log_spec[:, :-1]`
         let n_frames = num_frames(padded.len(), self.win_length, self.hop_length) - 1;
         let n_bins = self.n_fft / 2 + 1;
 
         let mut power = vec![0.0f32; n_bins * n_frames];
         let mut fft_in = vec![Complex::new(0.0f32, 0.0); self.n_fft];
-        let win_offset = (self.n_fft - self.win_length) / 2;
+        let full_cover = self.n_fft == self.win_length;
 
         for frame_idx in 0..n_frames {
             let start = frame_idx * self.hop_length;
             let frame = &padded[start..start + self.win_length];
 
-            for x in &mut fft_in {
-                *x = Complex::new(0.0, 0.0);
+            if !full_cover {
+                for x in &mut fft_in {
+                    *x = Complex::new(0.0, 0.0);
+                }
             }
+            let win_offset = if full_cover {
+                0
+            } else {
+                (self.n_fft - self.win_length) / 2
+            };
             for i in 0..self.win_length {
-                fft_in[win_offset + i].re = frame[i] * self.window_f32[i];
+                fft_in[win_offset + i] = Complex::new(frame[i] * self.window_f32[i], 0.0);
             }
 
             self.fft.process(&mut fft_in);
@@ -105,17 +133,18 @@ impl WhisperMelF16 {
             }
         }
 
-        // Mel filterbank
+        // Mel filterbank — iterate only non-zero filter bins per band.
         let mut mel_f32 = vec![0.0f32; self.n_mels * n_frames];
         for m in 0..self.n_mels {
-            let filter = &self.mel_filters_f32[m * n_bins..(m + 1) * n_bins];
+            let (lo, hi) = self.mel_ranges[m];
+            let filter = &self.mel_filters_f32[m * n_bins + lo..m * n_bins + hi];
             let mel_row = &mut mel_f32[m * n_frames..(m + 1) * n_frames];
 
             for t in 0..n_frames {
-                let spec = &power[t * n_bins..(t + 1) * n_bins];
+                let spec = &power[t * n_bins + lo..t * n_bins + hi];
                 let mut acc = 0.0f32;
-                for k in 0..n_bins {
-                    acc += filter[k] * spec[k];
+                for k in 0..filter.len() {
+                    acc = filter[k].mul_add(spec[k], acc);
                 }
                 mel_row[t] = acc.max(EPSILON);
             }
@@ -123,10 +152,31 @@ impl WhisperMelF16 {
 
         whisper_log_normalize(&mut mel_f32);
 
-        MelSpecF16 {
-            n_mels: self.n_mels,
-            n_frames,
-            data: mel_f32.into_iter().map(f16::from_f32).collect(),
+        let out_frames = n_frames.max(min_frames);
+        if out_frames == n_frames {
+            MelSpecF16 {
+                n_mels: self.n_mels,
+                n_frames,
+                data: mel_f32.into_iter().map(f16::from_f32).collect(),
+            }
+        } else {
+            // Silence floor: log10(EPSILON) clamped to (peak - 8), then scaled.
+            // The peak comes from real audio, so the floor is already in mel_f32
+            // as the minimum value after normalization.
+            let floor_val = mel_f32.iter().copied().fold(f32::INFINITY, f32::min);
+            let floor_f16 = f16::from_f32(floor_val);
+            let pad_frames = out_frames - n_frames;
+            let mut data = Vec::with_capacity(self.n_mels * out_frames);
+            for m in 0..self.n_mels {
+                let row = &mel_f32[m * n_frames..(m + 1) * n_frames];
+                data.extend(row.iter().map(|&v| f16::from_f32(v)));
+                data.extend(std::iter::repeat_n(floor_f16, pad_frames));
+            }
+            MelSpecF16 {
+                n_mels: self.n_mels,
+                n_frames: out_frames,
+                data,
+            }
         }
     }
 
@@ -214,16 +264,23 @@ fn reflect_get(x: &[f32], idx: isize) -> f32 {
 }
 
 fn whisper_log_normalize(mel: &mut [f32]) {
+    // Fuse log10 + peak-find into one pass.
+    let mut peak = f32::NEG_INFINITY;
     for v in mel.iter_mut() {
-        *v = v.max(EPSILON).log10();
+        let ln_v = v.max(EPSILON).ln();
+        // log10(x) / 4 + 1  =  ln(x) * (log10(e) / 4) + 1
+        let scaled = ln_v.mul_add(INV4_LOG10E, 1.0);
+        *v = scaled;
+        if scaled > peak {
+            peak = scaled;
+        }
     }
-    let peak = mel.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-    let floor = peak - 8.0;
+    // floor = (peak_log10 - 8) / 4 + 1 = peak_scaled - 2
+    let floor = peak - 2.0;
     for v in mel.iter_mut() {
         if *v < floor {
             *v = floor;
         }
-        *v = (*v + 4.0) / 4.0;
     }
 }
 

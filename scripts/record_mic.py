@@ -20,7 +20,8 @@ import numpy as np
 
 def main():
     parser = argparse.ArgumentParser(description="Record mic to WAV")
-    parser.add_argument("output", nargs="?", default="test_fixtures/recording.wav")
+    default_out = f"test_fixtures/recording_{int(__import__('time').time())}.wav"
+    parser.add_argument("output", nargs="?", default=default_out)
     parser.add_argument("--seconds", "-s", type=float, default=60,
                         help="Max recording length (default: 60s, Ctrl+C to stop early)")
     args = parser.parse_args()

@@ -547,16 +547,14 @@ impl Qwen3AsrBackend {
             .unwrap_or_else(|e| e.into_inner())
             .clone();
 
-        // 1. Mel spectrogram [1, 128, T] — FP16 native, variable length.
-        //    Pad PCM with a short tail of silence so the mel's dynamic-range
-        //    normalization includes a proper floor region (matching Whisper's
-        //    behaviour where silence has mel-floor values, not zeros).
-        const MEL_TAIL_PAD: usize = 16_000; // 1s synthetic mel-floor context
-        let padded_len = pcm.len() + MEL_TAIL_PAD;
-        let mut pcm_padded = vec![0.0f32; padded_len];
-        pcm_padded[..pcm.len()].copy_from_slice(pcm);
+        // 1. Mel spectrogram [1, 128, T] — FP16 native.
+        //    Pad mel output to 3000 frames (30s) matching the reference
+        //    WhisperFeatureExtractor. The encoder's chunked attention windows
+        //    were trained on this geometry. Pads at mel level to avoid
+        //    computing FFT on silence.
+        const MEL_MIN_FRAMES: usize = 3000;
         let mel_t0 = std::time::Instant::now();
-        let spec = self.mel.extract_from_f32(&pcm_padded);
+        let spec = self.mel.extract_from_f32_padded(pcm, MEL_MIN_FRAMES);
         let mel_3d = ndarray::Array3::from_shape_vec((1, spec.n_mels, spec.n_frames), spec.data)
             .map_err(|e| Error::Asr(format!("mel reshape: {e}")))?;
         let mel_val =
