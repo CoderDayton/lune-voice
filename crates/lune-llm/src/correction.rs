@@ -32,8 +32,8 @@ pub fn apply_model_edits(input: &PostProcessInput, model_text: &str) -> String {
 
     let mut offset: isize = 0;
     let mut last_original_end = 0usize;
-    for edit in edits {
-        if !valid_edit(&edit, tokens.len(), &marked, last_original_end) {
+    for edit in &edits {
+        if !valid_edit(edit, tokens.len(), &marked, last_original_end) {
             continue;
         }
 
@@ -50,6 +50,12 @@ pub fn apply_model_edits(input: &PostProcessInput, model_text: &str) -> String {
         let start = shifted_index(edit.start_word, offset, tokens.len());
         let end = shifted_index(edit.end_word, offset, tokens.len());
         if start >= end || end > tokens.len() {
+            continue;
+        }
+
+        let original = tokens[start..end].join(" ");
+        let proposed = replacement.join(" ");
+        if !phonetically_plausible(&original, &proposed) {
             continue;
         }
 
@@ -100,6 +106,42 @@ fn valid_edit(
 
 fn shifted_index(original: usize, offset: isize, max: usize) -> usize {
     original.saturating_add_signed(offset).min(max)
+}
+
+fn phonetically_plausible(original: &str, proposed: &str) -> bool {
+    let a = original.to_lowercase();
+    let b = proposed.to_lowercase();
+    if a == b {
+        return false;
+    }
+    let a = a.trim_matches(|c: char| c.is_ascii_punctuation());
+    let b = b.trim_matches(|c: char| c.is_ascii_punctuation());
+    if a == b {
+        return false;
+    }
+    let max_len = a.len().max(b.len());
+    if max_len == 0 {
+        return false;
+    }
+    let dist = edit_distance(a.as_bytes(), b.as_bytes());
+    let ratio = dist as f32 / max_len as f32;
+    ratio <= 0.6
+}
+
+fn edit_distance(a: &[u8], b: &[u8]) -> usize {
+    let m = a.len();
+    let n = b.len();
+    let mut prev = (0..=n).collect::<Vec<_>>();
+    let mut curr = vec![0; n + 1];
+    for i in 1..=m {
+        curr[0] = i;
+        for j in 1..=n {
+            let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[n]
 }
 
 #[cfg(test)]
@@ -153,5 +195,35 @@ mod tests {
     fn invalid_json_returns_input() {
         let input = input("the meeting had poorly numbered today");
         assert_eq!(apply_model_edits(&input, "rewrite it"), input.raw_text);
+    }
+
+    #[test]
+    fn rejects_identity_edit() {
+        let input = input("the meeting had poorly numbered today");
+        let out = apply_model_edits(
+            &input,
+            r#"[{"start_word":3,"end_word":4,"replacement":"poorly"}]"#,
+        );
+        assert_eq!(out, input.raw_text);
+    }
+
+    #[test]
+    fn rejects_phonetically_distant_edit() {
+        let input = input("the meeting had poorly numbered today");
+        let out = apply_model_edits(
+            &input,
+            r#"[{"start_word":3,"end_word":5,"replacement":"xyz elephant"}]"#,
+        );
+        assert_eq!(out, input.raw_text);
+    }
+
+    #[test]
+    fn accepts_phonetically_similar_edit() {
+        let input = input("the meeting had poorly numbered today");
+        let out = apply_model_edits(
+            &input,
+            r#"[{"start_word":3,"end_word":5,"replacement":"poorly number"}]"#,
+        );
+        assert_eq!(out, "the meeting had poorly number today");
     }
 }

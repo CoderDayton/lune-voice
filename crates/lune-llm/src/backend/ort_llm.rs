@@ -20,6 +20,38 @@ use lune_core::llm::{CorrectionSpan, PostProcessInput, PostProcessOutput, TextPo
 
 const DEFAULT_MAX_TOKENS: usize = 512;
 
+/// Compact few-shot examples teaching the JSON-edit correction format.
+/// Each pair: (user transcript snippet, assistant JSON response).
+pub(crate) const CORRECTION_FEW_SHOT: &[(&str, &str)] = &[
+    (
+        "Suspicious word indices:\n\
+         - 5..6: \"their\" confidence=0.32 fix_score=0.85\n\n\
+         Transcript:\n<transcript>\n\
+         we need to fix their code before the release\n\
+         </transcript>",
+        "[{\"start_word\":5,\"end_word\":6,\"replacement\":\"the\"}]",
+    ),
+    (
+        "Suspicious word indices:\n\
+         - 2..3: \"a\" confidence=0.28 fix_score=0.90\n\
+         - 3..4: \"parent\" confidence=0.25 fix_score=0.92\n\
+         - 4..5: \"lee\" confidence=0.22 fix_score=0.95\n\n\
+         Transcript:\n<transcript>\n\
+         it was a parent lee not working as expected\n\
+         </transcript>",
+        "[{\"start_word\":2,\"end_word\":5,\"replacement\":\"apparently\"}]",
+    ),
+    (
+        "Suspicious word indices:\n\
+         - 1..2: \"gonna\" confidence=0.40 fix_score=0.55\n\
+         - 5..6: \"meeting\" confidence=0.38 fix_score=0.52\n\n\
+         Transcript:\n<transcript>\n\
+         I'm gonna be late to the meeting\n\
+         </transcript>",
+        "[]",
+    ),
+];
+
 pub struct OrtStyleLlmConfig {
     pub model_dir: PathBuf,
     pub use_gpu: bool,
@@ -270,6 +302,7 @@ impl OrtStyleLlm {
             \n\
             Edit standard:\n\
             - Make the smallest possible change.\n\
+            - Replacements must sound like the original word (phonetic similarity).\n\
             - Correct only words or punctuation that are clearly wrong from context.\n\
             - Keep valid sentence fragments and spoken phrasing.\n\
             - Keep the transcript in {lang_tag}; do not translate.\n\
@@ -318,16 +351,40 @@ impl OrtStyleLlm {
         );
 
         let prompt = match self.params.chat_format {
-            ChatFormat::ChatML => format!(
-                "<|im_start|>system\n{base}<|im_end|>\n\
-                 <|im_start|>user\n{user_text}<|im_end|>\n\
-                 <|im_start|>assistant\n"
-            ),
-            ChatFormat::Llama => format!(
-                "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n\
-                 {base}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n\
-                 {user_text}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
-            ),
+            ChatFormat::ChatML => {
+                let mut p = format!("<|im_start|>system\n{base}<|im_end|>\n");
+                for (user, assistant) in CORRECTION_FEW_SHOT {
+                    p.push_str(&format!(
+                        "<|im_start|>user\n{user}<|im_end|>\n\
+                         <|im_start|>assistant\n{assistant}<|im_end|>\n"
+                    ));
+                }
+                p.push_str(&format!(
+                    "<|im_start|>user\n{user_text}<|im_end|>\n\
+                     <|im_start|>assistant\n"
+                ));
+                p
+            }
+            ChatFormat::Llama => {
+                let mut p = format!(
+                    "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n\
+                     {base}<|eot_id|>"
+                );
+                for (user, assistant) in CORRECTION_FEW_SHOT {
+                    p.push_str(&format!(
+                        "<|start_header_id|>user<|end_header_id|>\n\n\
+                         {user}<|eot_id|>\
+                         <|start_header_id|>assistant<|end_header_id|>\n\n\
+                         {assistant}<|eot_id|>"
+                    ));
+                }
+                p.push_str(&format!(
+                    "<|start_header_id|>user<|end_header_id|>\n\n\
+                     {user_text}<|eot_id|>\
+                     <|start_header_id|>assistant<|end_header_id|>\n\n"
+                ));
+                p
+            }
         };
         let enc = self
             .tokenizer
@@ -442,8 +499,8 @@ impl TextPostProcessor for OrtStyleLlm {
             &input.correction_spans,
         )?;
 
-        let text = crate::prompt::strip_markers(&text);
         let text = crate::correction::apply_model_edits(input, &text);
+        let text = crate::prompt::strip_markers(&text);
         Ok(PostProcessOutput {
             cleaned_text: text,
             metadata: None,
