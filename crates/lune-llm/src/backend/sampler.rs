@@ -105,6 +105,14 @@ pub fn sample_last_token(
     ws: &mut SamplerWorkspace,
     rng: &mut impl Rng,
 ) -> Result<u32> {
+    if params.top_k == 1 && penalties_are_identity(params) {
+        if let Ok((shape, data)) = value.try_extract_tensor::<f32>() {
+            return argmax_last_logits_f32(shape.as_ref(), data);
+        }
+        let (shape, data) = value.try_extract_tensor::<f16>().map_err(e)?;
+        return argmax_last_logits_f16(shape.as_ref(), data);
+    }
+
     if let Ok((shape, data)) = value.try_extract_tensor::<f32>() {
         copy_last_logits_f32(shape.as_ref(), data, &mut ws.last_logits)?;
         return sample_from_logits(
@@ -129,7 +137,13 @@ pub fn sample_last_token(
     )
 }
 
-fn copy_last_logits_f32(shape: &[i64], data: &[f32], out: &mut Vec<f32>) -> Result<()> {
+fn penalties_are_identity(params: &SamplingParams) -> bool {
+    (params.repetition_penalty - 1.0).abs() < f32::EPSILON
+        && params.frequency_penalty == 0.0
+        && params.presence_penalty == 0.0
+}
+
+fn last_logits_range(shape: &[i64], data_len: usize) -> Result<std::ops::Range<usize>> {
     if shape.len() != 3 {
         return Err(e(format!(
             "expected logits shape [batch, seq, vocab], got {shape:?}"
@@ -142,27 +156,54 @@ fn copy_last_logits_f32(shape: &[i64], data: &[f32], out: &mut Vec<f32>) -> Resu
         return Err(e(format!("unsupported logits shape {shape:?}")));
     }
     let offset = (seq - 1) * vocab;
+    if offset + vocab > data_len {
+        return Err(e(format!(
+            "logits data shorter than shape: len={data_len}, shape={shape:?}"
+        )));
+    }
+    Ok(offset..offset + vocab)
+}
+
+fn argmax_last_logits_f32(shape: &[i64], data: &[f32]) -> Result<u32> {
+    let range = last_logits_range(shape, data.len())?;
+    Ok(argmax_finite(&data[range]) as u32)
+}
+
+fn argmax_last_logits_f16(shape: &[i64], data: &[f16]) -> Result<u32> {
+    let range = last_logits_range(shape, data.len())?;
+    let logits = &data[range];
+    let mut best_finite_i: Option<usize> = None;
+    let mut best_finite_v = f32::NEG_INFINITY;
+    let mut best_i = 0usize;
+    let mut best_v = f32::NEG_INFINITY;
+
+    for (i, &v) in logits.iter().enumerate() {
+        let f = v.to_f32();
+        if f > best_v {
+            best_v = f;
+            best_i = i;
+        }
+        if f.is_finite() && f > best_finite_v {
+            best_finite_v = f;
+            best_finite_i = Some(i);
+        }
+    }
+
+    Ok(best_finite_i.unwrap_or(best_i) as u32)
+}
+
+fn copy_last_logits_f32(shape: &[i64], data: &[f32], out: &mut Vec<f32>) -> Result<()> {
+    let range = last_logits_range(shape, data.len())?;
     out.clear();
-    out.extend_from_slice(&data[offset..offset + vocab]);
+    out.extend_from_slice(&data[range]);
     Ok(())
 }
 
 fn copy_last_logits_f16(shape: &[i64], data: &[f16], out: &mut Vec<f32>) -> Result<()> {
-    if shape.len() != 3 {
-        return Err(e(format!(
-            "expected logits shape [batch, seq, vocab], got {shape:?}"
-        )));
-    }
-    let batch = shape[0] as usize;
-    let seq = shape[1] as usize;
-    let vocab = shape[2] as usize;
-    if batch != 1 || seq == 0 || vocab == 0 {
-        return Err(e(format!("unsupported logits shape {shape:?}")));
-    }
-    let offset = (seq - 1) * vocab;
+    let range = last_logits_range(shape, data.len())?;
     out.clear();
-    out.reserve(vocab);
-    out.extend(data[offset..offset + vocab].iter().map(|x| x.to_f32()));
+    out.reserve(range.len());
+    out.extend(data[range].iter().map(|x| x.to_f32()));
     Ok(())
 }
 
@@ -358,4 +399,16 @@ fn argmax(logits: &[f32]) -> usize {
         }
     }
     best_i
+}
+
+fn argmax_finite(logits: &[f32]) -> usize {
+    let mut best_finite_i: Option<usize> = None;
+    let mut best_finite_v = f32::NEG_INFINITY;
+    for (i, &v) in logits.iter().enumerate() {
+        if v.is_finite() && v > best_finite_v {
+            best_finite_v = v;
+            best_finite_i = Some(i);
+        }
+    }
+    best_finite_i.unwrap_or_else(|| argmax(logits))
 }

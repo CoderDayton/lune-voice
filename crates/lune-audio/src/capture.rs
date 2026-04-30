@@ -56,14 +56,16 @@ fn validate_config(config: &AudioConfig) -> Result<(), AudioError> {
     Ok(())
 }
 
-fn convert_i16_samples(data: &[i16]) -> Vec<f32> {
-    data.iter().map(|&s| s as f32 / 32768.0).collect()
+fn convert_i16_samples_into(data: &[i16], out: &mut Vec<f32>) {
+    out.clear();
+    out.reserve(data.len());
+    out.extend(data.iter().map(|&s| s as f32 / 32768.0));
 }
 
-fn convert_u16_samples(data: &[u16]) -> Vec<f32> {
-    data.iter()
-        .map(|&s| (s as f32 - 32768.0) / 32768.0)
-        .collect()
+fn convert_u16_samples_into(data: &[u16], out: &mut Vec<f32>) {
+    out.clear();
+    out.reserve(data.len());
+    out.extend(data.iter().map(|&s| (s as f32 - 32768.0) / 32768.0));
 }
 
 impl AudioStream {
@@ -157,51 +159,57 @@ impl AudioStream {
                 )
                 .map_err(|e| AudioError::StreamBuild(e.to_string()))?,
 
-            SampleFormat::I16 => device
-                .build_input_stream(
-                    &stream_config,
-                    move |data: &[i16], _: &_| {
-                        let float_data = convert_i16_samples(data);
-                        process_audio_callback(
-                            &float_data,
-                            channels as usize,
-                            &mut resampler,
-                            &mut input_resample_buf,
-                            &mut resample_input_slice,
-                            &mut output_buf,
-                            &mut mono_buf,
-                            chunk_samples,
-                            &ring_clone,
-                            start_time,
-                        );
-                    },
-                    |err| warn!("Audio stream error: {}", err),
-                    None,
-                )
-                .map_err(|e| AudioError::StreamBuild(e.to_string()))?,
+            SampleFormat::I16 => {
+                let mut sample_buf = Vec::<f32>::with_capacity(chunk_samples * 4);
+                device
+                    .build_input_stream(
+                        &stream_config,
+                        move |data: &[i16], _: &_| {
+                            convert_i16_samples_into(data, &mut sample_buf);
+                            process_audio_callback(
+                                &sample_buf,
+                                channels as usize,
+                                &mut resampler,
+                                &mut input_resample_buf,
+                                &mut resample_input_slice,
+                                &mut output_buf,
+                                &mut mono_buf,
+                                chunk_samples,
+                                &ring_clone,
+                                start_time,
+                            );
+                        },
+                        |err| warn!("Audio stream error: {}", err),
+                        None,
+                    )
+                    .map_err(|e| AudioError::StreamBuild(e.to_string()))?
+            }
 
-            SampleFormat::U16 => device
-                .build_input_stream(
-                    &stream_config,
-                    move |data: &[u16], _: &_| {
-                        let float_data = convert_u16_samples(data);
-                        process_audio_callback(
-                            &float_data,
-                            channels as usize,
-                            &mut resampler,
-                            &mut input_resample_buf,
-                            &mut resample_input_slice,
-                            &mut output_buf,
-                            &mut mono_buf,
-                            chunk_samples,
-                            &ring_clone,
-                            start_time,
-                        );
-                    },
-                    |err| warn!("Audio stream error: {}", err),
-                    None,
-                )
-                .map_err(|e| AudioError::StreamBuild(e.to_string()))?,
+            SampleFormat::U16 => {
+                let mut sample_buf = Vec::<f32>::with_capacity(chunk_samples * 4);
+                device
+                    .build_input_stream(
+                        &stream_config,
+                        move |data: &[u16], _: &_| {
+                            convert_u16_samples_into(data, &mut sample_buf);
+                            process_audio_callback(
+                                &sample_buf,
+                                channels as usize,
+                                &mut resampler,
+                                &mut input_resample_buf,
+                                &mut resample_input_slice,
+                                &mut output_buf,
+                                &mut mono_buf,
+                                chunk_samples,
+                                &ring_clone,
+                                start_time,
+                            );
+                        },
+                        |err| warn!("Audio stream error: {}", err),
+                        None,
+                    )
+                    .map_err(|e| AudioError::StreamBuild(e.to_string()))?
+            }
 
             format => {
                 return Err(AudioError::StreamBuild(format!(
@@ -372,8 +380,18 @@ mod tests {
 
     #[test]
     fn convert_u16_samples_centers_midpoint() {
-        let converted = convert_u16_samples(&[0, 32768, u16::MAX]);
+        let mut converted = Vec::new();
+        convert_u16_samples_into(&[0, 32768, u16::MAX], &mut converted);
         assert!(converted[0] <= -1.0);
+        assert_eq!(converted[1], 0.0);
+        assert!(converted[2] > 0.99);
+    }
+
+    #[test]
+    fn convert_i16_samples_scales_signed_range() {
+        let mut converted = Vec::new();
+        convert_i16_samples_into(&[i16::MIN, 0, i16::MAX], &mut converted);
+        assert_eq!(converted[0], -1.0);
         assert_eq!(converted[1], 0.0);
         assert!(converted[2] > 0.99);
     }

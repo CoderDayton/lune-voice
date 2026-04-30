@@ -9,8 +9,9 @@ use std::sync::Mutex;
 
 use half::f16;
 use ndarray::{Array2, Array3, ArrayD, IxDyn};
+use ort::memory::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType};
 use ort::session::Session;
-use ort::value::Value;
+use ort::value::{DynValue, Value};
 use tokenizers::Tokenizer;
 
 use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
@@ -60,6 +61,19 @@ pub struct Qwen3AsrConfig {
     pub use_gpu: bool,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Qwen3AsrProfile {
+    pub audio_ms: usize,
+    pub total_ms: f64,
+    pub mel_ms: f64,
+    pub encoder_ms: f64,
+    pub prompt_ms: f64,
+    pub prefill_ms: f64,
+    pub decode_ms: f64,
+    pub decode_steps: usize,
+    pub decoder_io_binding: bool,
+}
+
 struct Qwen3Models {
     encoder: Session,
     embed_tokens: Session,
@@ -70,6 +84,9 @@ pub struct Qwen3AsrBackend {
     models: Mutex<Qwen3Models>,
     mel: whisper::WhisperMelF16,
     tokenizer: Tokenizer,
+    use_gpu: bool,
+    decoder_io_binding: bool,
+    last_profile: Mutex<Option<Qwen3AsrProfile>>,
     boost_map: Mutex<std::collections::HashMap<i64, f32>>,
     /// Per-session context phrases injected into the system prompt.
     /// e.g. ["Toledans", "Rodolfo"] → "Preferred terms: Toledans, Rodolfo"
@@ -87,6 +104,13 @@ pub struct Qwen3Session {
 
 impl Qwen3AsrBackend {
     pub fn new(config: Qwen3AsrConfig) -> Result<Self> {
+        Self::new_with_decoder_io_binding(config, true)
+    }
+
+    pub fn new_with_decoder_io_binding(
+        config: Qwen3AsrConfig,
+        decoder_io_binding: bool,
+    ) -> Result<Self> {
         let loader = OrtModelLoader::new(config.model_dir.clone(), config.use_gpu);
 
         let encoder = loader.load_first(&["qwen3-asr-encoder.onnx"], "qwen3-asr-encoder")?;
@@ -108,9 +132,16 @@ impl Qwen3AsrBackend {
             }),
             mel: whisper::WhisperMelF16::new_qwen(),
             tokenizer,
+            use_gpu: config.use_gpu,
+            decoder_io_binding,
+            last_profile: Mutex::new(None),
             boost_map: Mutex::new(std::collections::HashMap::new()),
             context_phrases: Mutex::new(Vec::new()),
         })
+    }
+
+    pub fn last_profile(&self) -> Option<Qwen3AsrProfile> {
+        self.last_profile.lock().ok().and_then(|p| *p)
     }
 
     /// Set word boost phrases — dual-layer: system prompt context + logit bias.
@@ -412,6 +443,20 @@ fn append_empty_kv(inputs: &mut Vec<OrtInput<'_>>) -> Result<()> {
     Ok(())
 }
 
+fn append_cached_kv(inputs: &mut Vec<OrtInput<'_>>, kv_cache: Vec<ArrayD<f16>>) -> Result<()> {
+    for (i, arr) in kv_cache.into_iter().enumerate() {
+        let layer = i / 2;
+        let is_key = i % 2 == 0;
+        inputs.push((
+            std::borrow::Cow::Borrowed(kv_name(layer, is_key)),
+            Value::from_array(arr)
+                .map_err(|e| Error::Asr(format!("cached kv layer {layer}: {e}")))?
+                .into(),
+        ));
+    }
+    Ok(())
+}
+
 /// Static KV cache tensor names: [past_k, past_v, present_k, present_v] × NUM_LAYERS.
 /// Initialized once, safe `&'static str` references via OnceLock.
 fn kv_cache_names() -> &'static [String] {
@@ -440,6 +485,52 @@ fn present_kv_name(layer: usize, is_key: bool) -> &'static str {
     unsafe { &*(kv_cache_names()[idx].as_str() as *const str) }
 }
 
+fn memory_info(
+    device: AllocationDevice,
+    memory_type: MemoryType,
+    context: &str,
+) -> Result<MemoryInfo> {
+    MemoryInfo::new(device, 0, AllocatorType::Device, memory_type)
+        .map_err(|e| Error::Asr(format!("{context} memory info: {e}")))
+}
+
+fn bind_decoder_outputs_to_device(
+    binding: &mut ort::session::IoBinding,
+    use_gpu: bool,
+) -> Result<()> {
+    let logits_mem = memory_info(AllocationDevice::CPU, MemoryType::Default, "logits")?;
+    binding
+        .bind_output_to_device("logits", &logits_mem)
+        .map_err(|e| Error::Asr(format!("bind logits output: {e}")))?;
+
+    #[cfg(feature = "cuda")]
+    let kv_mem = if use_gpu {
+        memory_info(AllocationDevice::CUDA, MemoryType::Default, "kv")?
+    } else {
+        memory_info(AllocationDevice::CPU, MemoryType::Default, "kv")?
+    };
+    #[cfg(not(feature = "cuda"))]
+    let kv_mem = {
+        let _ = use_gpu;
+        memory_info(AllocationDevice::CPU, MemoryType::Default, "kv")?
+    };
+
+    for i in 0..NUM_LAYERS {
+        binding
+            .bind_output_to_device(present_kv_name(i, true), &kv_mem)
+            .map_err(|e| Error::Asr(format!("bind present key layer {i}: {e}")))?;
+        binding
+            .bind_output_to_device(present_kv_name(i, false), &kv_mem)
+            .map_err(|e| Error::Asr(format!("bind present value layer {i}: {e}")))?;
+    }
+    Ok(())
+}
+
+enum DecodeKvCache {
+    Bound(Vec<DynValue>),
+    Cpu(Vec<ArrayD<f16>>),
+}
+
 impl Qwen3AsrBackend {
     fn transcribe_pcm(
         &self,
@@ -463,15 +554,18 @@ impl Qwen3AsrBackend {
         let padded_len = pcm.len() + TAIL_PAD;
         let mut pcm_padded = vec![0.0f32; padded_len];
         pcm_padded[..pcm.len()].copy_from_slice(pcm);
+        let mel_t0 = std::time::Instant::now();
         let spec = self.mel.extract_from_f32(&pcm_padded);
         let mel_3d = ndarray::Array3::from_shape_vec((1, spec.n_mels, spec.n_frames), spec.data)
             .map_err(|e| Error::Asr(format!("mel reshape: {e}")))?;
         let mel_val =
             Value::from_array(mel_3d).map_err(|e| Error::Asr(format!("mel value: {e}")))?;
+        let mel_ms = mel_t0.elapsed().as_secs_f64() * 1000.0;
 
         let mut models = self.models.lock().map_err(|e| lock_err("models", e))?;
 
         // 2. Encoder → audio features [1, N, D] (FP16 native)
+        let encoder_t0 = std::time::Instant::now();
         let audio_feat = {
             let out = models
                 .encoder
@@ -479,10 +573,12 @@ impl Qwen3AsrBackend {
                 .map_err(|e| Error::Asr(format!("encoder: {e}")))?;
             extract_f16_array(&out[0])?
         };
+        let encoder_ms = encoder_t0.elapsed().as_secs_f64() * 1000.0;
         let n_audio = audio_feat.shape()[1];
         let hidden_size = audio_feat.shape()[2];
 
         // 3. Build prompt token IDs (dynamic system prompt + context)
+        let prompt_t0 = std::time::Instant::now();
         let (prefix_ids, suffix_ids) = self.build_prompt_ids(language);
         let mut input_ids: Vec<i64> =
             Vec::with_capacity(prefix_ids.len() + n_audio + suffix_ids.len());
@@ -524,42 +620,79 @@ impl Qwen3AsrBackend {
             }
             arr
         };
+        let prompt_ms = prompt_t0.elapsed().as_secs_f64() * 1000.0;
 
         // 5. Prefill: run decoder with full embeddings + empty KV cache
-        let (first_token, first_conf, first_logits, mut kv_cache) = {
-            let mut dec_inputs = ort::inputs!(
-                "inputs_embeds" => Value::from_array(embeds)
-                    .map_err(|e| Error::Asr(format!("embeds val: {e}")))?,
-                "position_ids" => Value::from_array(mrope_position_ids(seq_len))
-                    .map_err(|e| Error::Asr(format!("pos val: {e}")))?,
-                "attention_mask" => Value::from_array(Array2::<i64>::ones((1, seq_len)))
-                    .map_err(|e| Error::Asr(format!("mask val: {e}")))?
-            );
-            append_empty_kv(&mut dec_inputs)?;
+        let prefill_t0 = std::time::Instant::now();
+        let (first_token, first_conf, first_logits, mut kv_cache) =
+            {
+                let mut dec_inputs = ort::inputs!(
+                    "inputs_embeds" => Value::from_array(embeds)
+                        .map_err(|e| Error::Asr(format!("embeds val: {e}")))?,
+                    "position_ids" => Value::from_array(mrope_position_ids(seq_len))
+                        .map_err(|e| Error::Asr(format!("pos val: {e}")))?,
+                    "attention_mask" => Value::from_array(Array2::<i64>::ones((1, seq_len)))
+                        .map_err(|e| Error::Asr(format!("mask val: {e}")))?
+                );
+                append_empty_kv(&mut dec_inputs)?;
 
-            let out = models
-                .decoder
-                .run(dec_inputs)
-                .map_err(|e| Error::Asr(format!("decoder prefill: {e}")))?;
+                let mut out = models
+                    .decoder
+                    .run(dec_inputs)
+                    .map_err(|e| Error::Asr(format!("decoder prefill: {e}")))?;
 
-            let (tok, conf, logits_k) = argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost)?;
+                let (tok, conf, logits_k) = argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost)?;
 
-            // Extract per-layer KV cache
-            let mut cache: Vec<ArrayD<f16>> = Vec::with_capacity(NUM_LAYERS * 2);
-            for i in 0..NUM_LAYERS {
-                cache.push(extract_f16_array(&out[present_kv_name(i, true)])?);
-                cache.push(extract_f16_array(&out[present_kv_name(i, false)])?);
-            }
-            (tok, conf, logits_k, cache)
-        };
+                // Extract per-layer KV cache
+                let cache =
+                    if self.decoder_io_binding {
+                        let mut cache: Vec<DynValue> = Vec::with_capacity(NUM_LAYERS * 2);
+                        for i in 0..NUM_LAYERS {
+                            cache.push(out.remove(present_kv_name(i, true)).ok_or_else(|| {
+                                Error::Asr(format!("missing present key layer {i}"))
+                            })?);
+                            cache.push(out.remove(present_kv_name(i, false)).ok_or_else(|| {
+                                Error::Asr(format!("missing present value layer {i}"))
+                            })?);
+                        }
+                        DecodeKvCache::Bound(cache)
+                    } else {
+                        let mut cache: Vec<ArrayD<f16>> = Vec::with_capacity(NUM_LAYERS * 2);
+                        for i in 0..NUM_LAYERS {
+                            let key = out.remove(present_kv_name(i, true)).ok_or_else(|| {
+                                Error::Asr(format!("missing present key layer {i}"))
+                            })?;
+                            let value = out.remove(present_kv_name(i, false)).ok_or_else(|| {
+                                Error::Asr(format!("missing present value layer {i}"))
+                            })?;
+                            cache.push(extract_f16_array(&key)?);
+                            cache.push(extract_f16_array(&value)?);
+                        }
+                        DecodeKvCache::Cpu(cache)
+                    };
+                (tok, conf, logits_k, cache)
+            };
+        let prefill_ms = prefill_t0.elapsed().as_secs_f64() * 1000.0;
 
         let mut tokens: Vec<(i64, f32, Vec<f64>)> = vec![(first_token, first_conf, first_logits)];
         let mut pos = seq_len;
+        let mut decode_steps = 0usize;
 
         // Pre-allocate reusable position array for the decode loop.
         let mut pos_arr = Array3::<i64>::zeros((3, 1, 1));
+        let mut decoder_binding = if self.decoder_io_binding {
+            Some(
+                models
+                    .decoder
+                    .create_binding()
+                    .map_err(|e| Error::Asr(format!("decoder binding: {e}")))?,
+            )
+        } else {
+            None
+        };
 
         // 6. Autoregressive greedy decode loop
+        let decode_t0 = std::time::Instant::now();
         loop {
             let last_tok = tokens.last().unwrap().0;
             if EOS_IDS.contains(&last_tok) || tokens.len() >= MAX_NEW_TOKENS {
@@ -598,57 +731,118 @@ impl Qwen3AsrBackend {
                 pos_arr.fill(pos as i64);
 
                 let total_len = pos + 1;
-                // emb is already [1, 1, D] from embed_tokens — no reshape needed.
-                let mut dec_inputs = ort::inputs!(
-                    "inputs_embeds" => Value::from_array(emb)
-                        .map_err(|e| Error::Asr(format!("emb val: {e}")))?,
-                    "position_ids" => Value::from_array(pos_arr.clone())
-                        .map_err(|e| Error::Asr(format!("pos val: {e}")))?,
-                    "attention_mask" => Value::from_array(Array2::<i64>::ones((1, total_len)))
-                        .map_err(|e| Error::Asr(format!("mask val: {e}")))?
-                );
-                // Move KV cache into ORT (no clone — saves ~44 MB/step).
-                // Arrays are replaced with new present values after the run.
-                for i in 0..NUM_LAYERS {
-                    let k = std::mem::take(&mut kv_cache[i * 2]);
-                    let v = std::mem::take(&mut kv_cache[i * 2 + 1]);
-                    dec_inputs.push((
-                        std::borrow::Cow::Borrowed(kv_name(i, true)),
-                        Value::from_array(k)
-                            .map_err(|e| Error::Asr(format!("k{i} val: {e}")))?
-                            .into(),
-                    ));
-                    dec_inputs.push((
-                        std::borrow::Cow::Borrowed(kv_name(i, false)),
-                        Value::from_array(v)
-                            .map_err(|e| Error::Asr(format!("v{i} val: {e}")))?
-                            .into(),
-                    ));
+                let emb_val =
+                    Value::from_array(emb).map_err(|e| Error::Asr(format!("emb val: {e}")))?;
+                let pos_val = Value::from_array(pos_arr.clone())
+                    .map_err(|e| Error::Asr(format!("pos val: {e}")))?;
+                let mask_val = Value::from_array(Array2::<i64>::ones((1, total_len)))
+                    .map_err(|e| Error::Asr(format!("mask val: {e}")))?;
+
+                match &mut kv_cache {
+                    DecodeKvCache::Bound(cache) => {
+                        let binding = decoder_binding
+                            .as_mut()
+                            .ok_or_else(|| Error::Asr("missing decoder binding".into()))?;
+                        binding.clear();
+                        binding
+                            .bind_input("inputs_embeds", &emb_val)
+                            .map_err(|e| Error::Asr(format!("bind embeds: {e}")))?;
+                        binding
+                            .bind_input("position_ids", &pos_val)
+                            .map_err(|e| Error::Asr(format!("bind position_ids: {e}")))?;
+                        binding
+                            .bind_input("attention_mask", &mask_val)
+                            .map_err(|e| Error::Asr(format!("bind attention_mask: {e}")))?;
+                        // Move ORT-owned KV values directly into the next decoder run.
+                        // Present KV outputs are bound to device memory below.
+                        for (i, v) in cache.drain(..).enumerate() {
+                            let layer = i / 2;
+                            let is_key = i % 2 == 0;
+                            binding
+                                .bind_input(kv_name(layer, is_key), &v)
+                                .map_err(|e| Error::Asr(format!("bind kv layer {layer}: {e}")))?;
+                        }
+                        bind_decoder_outputs_to_device(binding, self.use_gpu)?;
+
+                        let mut out = models
+                            .decoder
+                            .run_binding(binding)
+                            .map_err(|e| Error::Asr(format!("decoder step: {e}")))?;
+
+                        let result = argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost)?;
+
+                        for i in 0..NUM_LAYERS {
+                            cache.push(out.remove(present_kv_name(i, true)).ok_or_else(|| {
+                                Error::Asr(format!("missing present key layer {i}"))
+                            })?);
+                            cache.push(out.remove(present_kv_name(i, false)).ok_or_else(|| {
+                                Error::Asr(format!("missing present value layer {i}"))
+                            })?);
+                        }
+                        result
+                    }
+                    DecodeKvCache::Cpu(cache) => {
+                        let mut dec_inputs = ort::inputs!(
+                            "inputs_embeds" => emb_val,
+                            "position_ids" => pos_val,
+                            "attention_mask" => mask_val
+                        );
+                        append_cached_kv(&mut dec_inputs, std::mem::take(cache))?;
+
+                        let mut out = models
+                            .decoder
+                            .run(dec_inputs)
+                            .map_err(|e| Error::Asr(format!("decoder step: {e}")))?;
+
+                        let result = argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost)?;
+
+                        for i in 0..NUM_LAYERS {
+                            let key = out.remove(present_kv_name(i, true)).ok_or_else(|| {
+                                Error::Asr(format!("missing present key layer {i}"))
+                            })?;
+                            let value = out.remove(present_kv_name(i, false)).ok_or_else(|| {
+                                Error::Asr(format!("missing present value layer {i}"))
+                            })?;
+                            cache.push(extract_f16_array(&key)?);
+                            cache.push(extract_f16_array(&value)?);
+                        }
+                        result
+                    }
                 }
-
-                let out = models
-                    .decoder
-                    .run(dec_inputs)
-                    .map_err(|e| Error::Asr(format!("decoder step: {e}")))?;
-
-                let result = argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost)?;
-
-                for i in 0..NUM_LAYERS {
-                    kv_cache[i * 2] = extract_f16_array(&out[present_kv_name(i, true)])?;
-                    kv_cache[i * 2 + 1] = extract_f16_array(&out[present_kv_name(i, false)])?;
-                }
-                result
             };
             tokens.push((tok, conf, logits_k));
+            decode_steps += 1;
             pos += 1;
         }
+        let decode_ms = decode_t0.elapsed().as_secs_f64() * 1000.0;
 
         drop(models);
 
         let elapsed = start.elapsed();
+        let profile = Qwen3AsrProfile {
+            audio_ms: pcm.len() * 1000 / 16_000,
+            total_ms: elapsed.as_secs_f64() * 1000.0,
+            mel_ms,
+            encoder_ms,
+            prompt_ms,
+            prefill_ms,
+            decode_ms,
+            decode_steps,
+            decoder_io_binding: self.decoder_io_binding,
+        };
+        if let Ok(mut last_profile) = self.last_profile.lock() {
+            *last_profile = Some(profile);
+        }
         tracing::debug!(
-            elapsed_ms = elapsed.as_millis(),
-            audio_ms = pcm.len() * 1000 / 16_000,
+            elapsed_ms = profile.total_ms,
+            audio_ms = profile.audio_ms,
+            mel_ms = profile.mel_ms,
+            encoder_ms = profile.encoder_ms,
+            prompt_ms = profile.prompt_ms,
+            prefill_ms = profile.prefill_ms,
+            decode_ms = profile.decode_ms,
+            decode_steps = profile.decode_steps,
+            decoder_io_binding = profile.decoder_io_binding,
             tokens = tokens.len(),
             "Qwen3 inference"
         );
