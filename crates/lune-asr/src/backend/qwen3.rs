@@ -50,8 +50,9 @@ Do not add words not clearly present.";
 
 /// Maximum audio buffer (5 min at 16 kHz).
 const MAX_WINDOW_SAMPLES: usize = 300 * 16_000;
-/// Silence onset padding (~200 ms at 16 kHz).
-const ONSET_PAD_SAMPLES: usize = 3_200;
+/// Real-audio context retained around detected speech (~200 ms at 16 kHz).
+const SPEECH_EDGE_PAD_SAMPLES: usize = 3_200;
+const SILENCE_FRAME_SAMPLES: usize = 160;
 const SILENCE_RMS_THRESHOLD: f32 = 0.008;
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -280,7 +281,7 @@ impl AsrBackend for Qwen3AsrBackend {
             (pcm, ts, id)
         };
 
-        let trimmed = trim_leading_silence(&pcm);
+        let trimmed = trim_edge_silence(&pcm);
         if trimmed.is_empty() {
             return Ok(vec![]);
         }
@@ -550,8 +551,8 @@ impl Qwen3AsrBackend {
         //    Pad PCM with a short tail of silence so the mel's dynamic-range
         //    normalization includes a proper floor region (matching Whisper's
         //    behaviour where silence has mel-floor values, not zeros).
-        const TAIL_PAD: usize = 16_000; // 1s of silence context
-        let padded_len = pcm.len() + TAIL_PAD;
+        const MEL_TAIL_PAD: usize = 16_000; // 1s synthetic mel-floor context
+        let padded_len = pcm.len() + MEL_TAIL_PAD;
         let mut pcm_padded = vec![0.0f32; padded_len];
         pcm_padded[..pcm.len()].copy_from_slice(pcm);
         let mel_t0 = std::time::Instant::now();
@@ -1007,21 +1008,86 @@ impl Qwen3AsrBackend {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-/// Trim leading silence, keeping a small onset pad before speech.
-fn trim_leading_silence(pcm: &[f32]) -> &[f32] {
-    const FRAME: usize = 160;
-    let mut speech_start = 0;
-    for (i, chunk) in pcm.chunks(FRAME).enumerate() {
-        let rms = (chunk.iter().map(|s| s * s).sum::<f32>() / chunk.len() as f32).sqrt();
-        if rms > SILENCE_RMS_THRESHOLD {
-            speech_start = i * FRAME;
-            break;
+/// Trim real silence from both edges, preserving a small pad around speech.
+fn trim_edge_silence(pcm: &[f32]) -> &[f32] {
+    let mut first_speech = None;
+    let mut last_speech_end = 0usize;
+
+    for (i, chunk) in pcm.chunks(SILENCE_FRAME_SAMPLES).enumerate() {
+        if frame_has_speech(chunk) {
+            let start = i * SILENCE_FRAME_SAMPLES;
+            first_speech.get_or_insert(start);
+            last_speech_end = start + chunk.len();
         }
     }
-    let offset = speech_start.saturating_sub(ONSET_PAD_SAMPLES);
-    &pcm[offset..]
+
+    let Some(first_speech) = first_speech else {
+        return &pcm[0..0];
+    };
+
+    let start = first_speech.saturating_sub(SPEECH_EDGE_PAD_SAMPLES);
+    let end = last_speech_end
+        .saturating_add(SPEECH_EDGE_PAD_SAMPLES)
+        .min(pcm.len());
+    &pcm[start..end]
+}
+
+fn frame_has_speech(frame: &[f32]) -> bool {
+    let rms = (frame.iter().map(|s| s * s).sum::<f32>() / frame.len() as f32).sqrt();
+    rms > SILENCE_RMS_THRESHOLD
 }
 
 fn lock_err<T>(what: &str, e: std::sync::PoisonError<T>) -> Error {
     Error::Asr(format!("{what} lock poisoned: {e}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn trim_edge_silence_rejects_empty_audio() {
+        assert!(trim_edge_silence(&[]).is_empty());
+    }
+
+    #[test]
+    fn trim_edge_silence_rejects_all_silence() {
+        let pcm = vec![0.0; SILENCE_FRAME_SAMPLES * 20];
+        assert!(trim_edge_silence(&pcm).is_empty());
+    }
+
+    #[test]
+    fn trim_edge_silence_preserves_short_audio_with_immediate_speech() {
+        let mut pcm = vec![0.02; SILENCE_FRAME_SAMPLES];
+        pcm.extend(std::iter::repeat_n(0.0, SILENCE_FRAME_SAMPLES));
+        assert_eq!(trim_edge_silence(&pcm).len(), pcm.len());
+    }
+
+    #[test]
+    fn trim_edge_silence_trims_both_edges_with_context() {
+        let leading = SPEECH_EDGE_PAD_SAMPLES * 2;
+        let speech = SILENCE_FRAME_SAMPLES * 3;
+        let trailing = SPEECH_EDGE_PAD_SAMPLES * 2;
+
+        let mut pcm = vec![0.0; leading];
+        pcm.extend(std::iter::repeat_n(0.02, speech));
+        pcm.extend(std::iter::repeat_n(0.0, trailing));
+
+        let trimmed = trim_edge_silence(&pcm);
+        assert_eq!(
+            trimmed.len(),
+            SPEECH_EDGE_PAD_SAMPLES + speech + SPEECH_EDGE_PAD_SAMPLES
+        );
+        assert!(trimmed[..SPEECH_EDGE_PAD_SAMPLES].iter().all(|&s| s == 0.0));
+        assert!(
+            trimmed[SPEECH_EDGE_PAD_SAMPLES..SPEECH_EDGE_PAD_SAMPLES + speech]
+                .iter()
+                .all(|&s| s == 0.02)
+        );
+        assert!(
+            trimmed[SPEECH_EDGE_PAD_SAMPLES + speech..]
+                .iter()
+                .all(|&s| s == 0.0)
+        );
+    }
 }
