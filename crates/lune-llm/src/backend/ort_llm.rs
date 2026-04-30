@@ -233,7 +233,7 @@ impl OrtStyleLlm {
         })
     }
 
-    pub fn user_prompt(transcript: &str, language: &str, style_instructions: &str) -> String {
+    pub fn user_prompt(transcript: &str, language: &str, _style_instructions: &str) -> String {
         let lang_tag = match language {
             "fr" => "French",
             "de" => "German",
@@ -247,40 +247,39 @@ impl OrtStyleLlm {
             _ => "English",
         };
 
-        #[allow(unused)]
-        let style_str = if style_instructions.is_empty() {
-            String::new()
-        } else {
-            format!("\nStyle instructions:\n{style_instructions}\n")
-        };
-
         format!(
             "\
             Language: {lang_tag}\n\
             \n\
-            Correction mode: STRICT_ASR_MINIMAL_EDIT\n\
+            Task: repair ASR transcript errors only.\n\
+            Do not apply style instructions in this pass.\n\
             \n\
-            Allowed edits:\n\
-            - punctuation\n\
-            - casing\n\
-            - obvious acoustic substitutions\n\
-            - obvious broken function words\n\
-            - obvious malformed fixed phrases\n\
+            Edit standard:\n\
+            - Make the smallest possible change.\n\
+            - Correct only words or punctuation that are clearly wrong from context.\n\
+            - Keep valid sentence fragments and spoken phrasing.\n\
+            - Keep the transcript in {lang_tag}; do not translate.\n\
             \n\
             Forbidden edits:\n\
             - paraphrasing\n\
-            - grammar modernization\n\
+            - summarizing\n\
+            - completing unfinished thoughts\n\
+            - grammar cleanup unless the word is clearly an ASR error\n\
             - style improvement\n\
             - entity guessing\n\
             - removing repetitions\n\
+            - removing filler words\n\
             - changing valid tense/mood\n\
             - changing valid dialogue fragments\n\
             - inventing missing content\n\
             \n\
-            If uncertain, leave the text unchanged.\n\
+            If a correction is not certain, copy that part exactly.\n\
+            If the transcript already looks valid, return it unchanged.\n\
             \n\
             Transcript:\n\
-            {transcript}
+            <transcript>\n\
+            {transcript}\n\
+            </transcript>
             "
         )
     }
@@ -552,5 +551,26 @@ fn strip_think_tags(text: &str) -> &str {
         ""
     } else {
         text
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::OrtStyleLlm;
+
+    #[test]
+    fn user_prompt_is_correction_only_without_style_instructions() {
+        let prompt = OrtStyleLlm::user_prompt(
+            "das ist ein test",
+            "de",
+            "Use title case and rewrite professionally.",
+        );
+
+        assert!(prompt.contains("Language: German"));
+        assert!(prompt.contains("Task: repair ASR transcript errors only."));
+        assert!(prompt.contains("Do not apply style instructions in this pass."));
+        assert!(prompt.contains("<transcript>\ndas ist ein test\n</transcript>"));
+        assert!(!prompt.contains("Use title case"));
+        assert!(!prompt.contains("rewrite professionally"));
     }
 }
