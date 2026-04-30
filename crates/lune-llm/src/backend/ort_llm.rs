@@ -16,7 +16,7 @@ use tokenizers::Tokenizer;
 use tracing::info;
 
 use lune_core::error::{Error, Result};
-use lune_core::llm::{PostProcessInput, PostProcessOutput, TextPostProcessor};
+use lune_core::llm::{CorrectionSpan, PostProcessInput, PostProcessOutput, TextPostProcessor};
 
 const DEFAULT_MAX_TOKENS: usize = 512;
 
@@ -233,7 +233,12 @@ impl OrtStyleLlm {
         })
     }
 
-    pub fn user_prompt(transcript: &str, language: &str, _style_instructions: &str) -> String {
+    pub fn user_prompt(
+        transcript: &str,
+        language: &str,
+        _style_instructions: &str,
+        correction_spans: &[CorrectionSpan],
+    ) -> String {
         let lang_tag = match language {
             "fr" => "French",
             "de" => "German",
@@ -247,12 +252,21 @@ impl OrtStyleLlm {
             _ => "English",
         };
 
+        let suspicious = correction_spans_prompt(correction_spans);
+
         format!(
             "\
             Language: {lang_tag}\n\
             \n\
-            Task: repair ASR transcript errors only.\n\
+            Task: propose minimal ASR transcript repairs as JSON edits.\n\
             Do not apply style instructions in this pass.\n\
+            \n\
+            Output format:\n\
+            - Return only a JSON array.\n\
+            - Use [] when no correction is certain.\n\
+            - Each edit must be {{\"start_word\":number,\"end_word\":number,\"replacement\":\"text\"}}.\n\
+            - start_word is inclusive; end_word is exclusive.\n\
+            - Edit only suspicious word indices listed below.\n\
             \n\
             Edit standard:\n\
             - Make the smallest possible change.\n\
@@ -276,6 +290,9 @@ impl OrtStyleLlm {
             If a correction is not certain, copy that part exactly.\n\
             If the transcript already looks valid, return it unchanged.\n\
             \n\
+            Suspicious word indices:\n\
+            {suspicious}\n\
+            \n\
             Transcript:\n\
             <transcript>\n\
             {transcript}\n\
@@ -289,10 +306,16 @@ impl OrtStyleLlm {
         transcript: &str,
         language: &str,
         style: &lune_core::config::StylePreset,
+        correction_spans: &[CorrectionSpan],
     ) -> Result<String> {
         let base = lune_core::config::BASE_SYSTEM_PROMPT;
 
-        let user_text = Self::user_prompt(transcript, language, &style.style_instructions);
+        let user_text = Self::user_prompt(
+            transcript,
+            language,
+            &style.style_instructions,
+            correction_spans,
+        );
 
         let prompt = match self.params.chat_format {
             ChatFormat::ChatML => format!(
@@ -412,14 +435,38 @@ impl OrtStyleLlm {
 #[async_trait::async_trait]
 impl TextPostProcessor for OrtStyleLlm {
     async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput> {
-        let text = self.apply_style(&input.raw_text, &input.language, &input.style_preset)?;
+        let text = self.apply_style(
+            &input.raw_text,
+            &input.language,
+            &input.style_preset,
+            &input.correction_spans,
+        )?;
 
         let text = crate::prompt::strip_markers(&text);
+        let text = crate::correction::apply_model_edits(input, &text);
         Ok(PostProcessOutput {
             cleaned_text: text,
             metadata: None,
         })
     }
+}
+
+fn correction_spans_prompt(spans: &[CorrectionSpan]) -> String {
+    if spans.is_empty() {
+        return "none; return []".into();
+    }
+
+    spans
+        .iter()
+        .take(16)
+        .map(|span| {
+            format!(
+                "- {}..{}: {:?} confidence={:.2} fix_score={:.2}",
+                span.start_word, span.end_word, span.text, span.confidence, span.fix_score
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 type Inputs<'a> = Vec<(std::borrow::Cow<'a, str>, DynValue)>;
@@ -564,11 +611,13 @@ mod tests {
             "das ist ein test",
             "de",
             "Use title case and rewrite professionally.",
+            &[],
         );
 
         assert!(prompt.contains("Language: German"));
-        assert!(prompt.contains("Task: repair ASR transcript errors only."));
+        assert!(prompt.contains("Task: propose minimal ASR transcript repairs as JSON edits."));
         assert!(prompt.contains("Do not apply style instructions in this pass."));
+        assert!(prompt.contains("none; return []"));
         assert!(prompt.contains("<transcript>\ndas ist ein test\n</transcript>"));
         assert!(!prompt.contains("Use title case"));
         assert!(!prompt.contains("rewrite professionally"));

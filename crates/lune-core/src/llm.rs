@@ -6,6 +6,16 @@ use crate::Result;
 use crate::config::StylePreset;
 use crate::dict::DictionaryEntry;
 
+/// A word or short span that the ASR layer considers worth inspecting.
+#[derive(Debug, Clone)]
+pub struct CorrectionSpan {
+    pub start_word: usize,
+    pub end_word: usize,
+    pub text: String,
+    pub confidence: f32,
+    pub fix_score: f32,
+}
+
 /// Input to the text post-processor.
 #[derive(Debug, Clone)]
 pub struct PostProcessInput {
@@ -14,6 +24,8 @@ pub struct PostProcessInput {
     /// Target application category hint.
     pub app_category: Option<AppCategory>,
     pub dictionary: Vec<DictionaryEntry>,
+    /// Suspicious word spans the LLM may edit. Unmarked text should be copied.
+    pub correction_spans: Vec<CorrectionSpan>,
     /// Recent session text for cross-utterance disambiguation.
     /// Tail of `session_text` truncated to ~500 chars (~125 words, ~5 utterances).
     pub context: Option<String>,
@@ -79,10 +91,18 @@ mod tests {
             style_preset: Arc::new(StylePreset::casual()),
             app_category: Some(AppCategory::Email),
             dictionary: vec![],
+            correction_spans: vec![CorrectionSpan {
+                start_word: 1,
+                end_word: 2,
+                text: "um".into(),
+                confidence: 0.4,
+                fix_score: 0.8,
+            }],
             context: None,
             language: "en".into(),
         };
         assert_eq!(input.raw_text, "hello um world");
+        assert_eq!(input.correction_spans[0].text, "um");
         assert_eq!(input.app_category, Some(AppCategory::Email));
         assert_eq!(input.style_preset.id, "casual");
     }

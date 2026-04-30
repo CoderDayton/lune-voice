@@ -13,7 +13,7 @@ use lune_core::Result;
 use lune_core::asr::{AsrBackend, AsrBackendKind, AsrSegment, AsrSessionConfig};
 use lune_core::config::{PipelineConfig, StylePreset, UserSettings, builtin_registry};
 use lune_core::error::Error;
-use lune_core::llm::TextPostProcessor;
+use lune_core::llm::{CorrectionSpan, TextPostProcessor};
 use lune_core::session::{DictationSession, SessionEvent, SessionStatus};
 use lune_dict::DictionaryManager;
 use lune_persist::Database;
@@ -269,6 +269,60 @@ fn append_segments(
         all_segments.push(seg);
     }
     appended
+}
+
+fn correction_spans_for_text(
+    text: &str,
+    segments: &[AsrSegment],
+    fix_threshold: f32,
+) -> Vec<CorrectionSpan> {
+    let words = indexed_words(text);
+    let mut spans = Vec::new();
+    let mut search_from = 0usize;
+
+    for wc in segments
+        .iter()
+        .flat_map(|seg| seg.word_confidences.iter())
+        .filter(|wc| wc.fix_score >= fix_threshold && !wc.word.is_empty())
+    {
+        let needle = normalize_word(&wc.word);
+        if needle.is_empty() {
+            continue;
+        }
+        if let Some((idx, _, raw)) = words
+            .iter()
+            .skip(search_from)
+            .find(|(_, normalized, _)| *normalized == needle)
+        {
+            spans.push(CorrectionSpan {
+                start_word: *idx,
+                end_word: idx + 1,
+                text: raw.clone(),
+                confidence: wc.confidence,
+                fix_score: wc.fix_score,
+            });
+            search_from = idx + 1;
+        }
+    }
+
+    spans
+}
+
+fn indexed_words(text: &str) -> Vec<(usize, String, String)> {
+    text.split_whitespace()
+        .enumerate()
+        .filter_map(|(idx, raw)| {
+            let normalized = normalize_word(raw);
+            (!normalized.is_empty()).then(|| (idx, normalized, raw.to_owned()))
+        })
+        .collect()
+}
+
+fn normalize_word(word: &str) -> String {
+    word.chars()
+        .filter(|c| c.is_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect()
 }
 
 fn drain_processing_controls(
@@ -536,6 +590,8 @@ async fn run_session<A: AsrBackend + 'static>(
 
     let lang_tag = lune_asr::confidence::lexical::detect_lang(&text_after_commands);
     let pipeline_t0 = tokio::time::Instant::now();
+    const BYPASS_CONFIDENCE: f32 = 0.92;
+    const BYPASS_FIX_SCORE: f32 = 0.50;
 
     // ── Step 1: Dictionary ────────────────────────────────────────────
     // Single lock: fetch relevant entries + apply corrections together.
@@ -549,17 +605,17 @@ async fn run_session<A: AsrBackend + 'static>(
         let applied = guard.apply(&text_after_commands);
         (entries, applied)
     };
+    let correction_spans = correction_spans_for_text(&text_after_dict, &segments, BYPASS_FIX_SCORE);
 
     // ── LLM bypass: skip if ASR is confident and no words are flagged ──
-    const BYPASS_CONFIDENCE: f32 = 0.92;
-    const BYPASS_FIX_SCORE: f32 = 0.50;
-    let needs_llm = segments.iter().any(|seg| {
-        seg.confidence.is_none_or(|c| c < BYPASS_CONFIDENCE)
-            || seg
-                .word_confidences
-                .iter()
-                .any(|wc| wc.fix_score >= BYPASS_FIX_SCORE)
-    });
+    let needs_llm = !correction_spans.is_empty()
+        && segments.iter().any(|seg| {
+            seg.confidence.is_none_or(|c| c < BYPASS_CONFIDENCE)
+                || seg
+                    .word_confidences
+                    .iter()
+                    .any(|wc| wc.fix_score >= BYPASS_FIX_SCORE)
+        });
 
     drain_processing_controls(&mut control_rx, &mut cancelled);
     let post_llm_text = if cancelled {
@@ -576,6 +632,7 @@ async fn run_session<A: AsrBackend + 'static>(
             style_preset: Arc::clone(&style_preset),
             app_category: None,
             dictionary: dictionary_entries.clone(),
+            correction_spans,
             context: None,
             language: lang_tag.into(),
         };
@@ -665,7 +722,7 @@ mod tests {
     use std::time::Duration;
 
     use lune_audio::AudioStream;
-    use lune_core::asr::{AsrSegment, AsrSessionConfig};
+    use lune_core::asr::{AsrSegment, AsrSessionConfig, WordConfidence};
     use lune_core::error::Error as CoreError;
     use lune_core::llm::{PostProcessInput, PostProcessOutput};
     use tokio::sync::{Notify, mpsc};
@@ -783,6 +840,44 @@ mod tests {
             start_ms: Some(0),
             end_ms: Some(500),
         }
+    }
+
+    #[test]
+    fn correction_spans_align_flagged_words() {
+        let mut segment = make_segment("the quarterly numbers were final", true);
+        segment.word_confidences = vec![
+            WordConfidence {
+                word: "quarterly".into(),
+                confidence: 0.2,
+                fix_score: 0.8,
+            },
+            WordConfidence {
+                word: "numbers".into(),
+                confidence: 0.3,
+                fix_score: 0.2,
+            },
+        ];
+
+        let spans = correction_spans_for_text("the quarterly numbers were final", &[segment], 0.50);
+
+        assert_eq!(spans.len(), 1);
+        assert_eq!(spans[0].start_word, 1);
+        assert_eq!(spans[0].end_word, 2);
+        assert_eq!(spans[0].text, "quarterly");
+    }
+
+    #[test]
+    fn correction_spans_ignore_words_changed_by_dictionary() {
+        let mut segment = make_segment("use lunevoice today", true);
+        segment.word_confidences = vec![WordConfidence {
+            word: "lunevoice".into(),
+            confidence: 0.2,
+            fix_score: 0.9,
+        }];
+
+        let spans = correction_spans_for_text("use Lune Voice today", &[segment], 0.50);
+
+        assert!(spans.is_empty());
     }
 
     fn scripted_asr(responses: Vec<Result<Vec<AsrSegment>>>) -> ScriptedAsr {
@@ -981,7 +1076,13 @@ mod tests {
                     entered: Arc::clone(&entered),
                     release: Arc::clone(&release),
                 });
-                let responses = vec![Ok(vec![make_segment("helo world", true)])];
+                let mut segment = make_segment("helo world", true);
+                segment.word_confidences = vec![WordConfidence {
+                    word: "helo".into(),
+                    confidence: 0.2,
+                    fix_score: 0.9,
+                }];
+                let responses = vec![Ok(vec![segment])];
                 let (mgr, db) = make_manager(scripted_asr(responses), post);
                 let (tx, rx) = mpsc::channel(32);
                 let session_id = mgr.start_with_audio(tx, speech_stream()).await.unwrap();

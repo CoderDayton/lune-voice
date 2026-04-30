@@ -88,6 +88,7 @@ fn build_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage>
         &input.raw_text,
         &input.language,
         &input.style_preset.style_instructions,
+        &input.correction_spans,
     );
 
     messages.push(
@@ -147,10 +148,16 @@ impl TextPostProcessor for OpenAiLlmBackend {
                     .unwrap_or(input.raw_text.trim())
                     .to_owned();
 
-                tracing::debug!(output_len = text.len(), "OpenAI post-process complete");
+                let stripped = crate::prompt::strip_markers(&text);
+                let cleaned_text = crate::correction::apply_model_edits(input, &stripped);
+
+                tracing::debug!(
+                    output_len = cleaned_text.len(),
+                    "OpenAI post-process complete"
+                );
 
                 Ok(PostProcessOutput {
-                    cleaned_text: crate::prompt::strip_markers(&text),
+                    cleaned_text,
                     metadata: None,
                 })
             }
@@ -176,6 +183,7 @@ mod tests {
             style_preset: Arc::new(StylePreset::casual()),
             app_category: None,
             dictionary: vec![],
+            correction_spans: vec![],
             context: None,
             language: "en".into(),
         }

@@ -3105,6 +3105,7 @@ dependencies = [
  "ort",
  "rand 0.9.3",
  "regex",
+ "serde",
  "serde_json",
  "text-processing-rs",
  "tokenizers",
