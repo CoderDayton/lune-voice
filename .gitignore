@@ -14,6 +14,7 @@ CLAUDE.md
 TODO.md
 luneopt/
 /data/
+corpora/
 flan-t5-base-asr-corrector/
 flanec-base-cd-onnx/
 qwen2.5-1.5b-instruct-gguf/
