@@ -8,7 +8,7 @@ use lune_persist::{AppPaths, Database, SettingsStore, StoredDictionaryEntry};
 use crate::dto::{
     ActivationModeDto, AsrBackendTypeDto, CreateDictionaryEntryInput, DevicePolicyDto,
     DictationModeDto, DictionaryItemDto, HistoryItemDto, PillVisibilityDto,
-    SaveWorkspaceSettingsInput, WorkspaceSettingsDto, WorkspaceSnapshot,
+    SaveWorkspaceSettingsInput, StylePresetDto, WorkspaceSettingsDto, WorkspaceSnapshot,
 };
 
 const HISTORY_LIMIT: u32 = 200;
@@ -124,12 +124,23 @@ fn build_snapshot(
         .map(map_dictionary_entry)
         .collect();
 
+    let style_presets = builtin_registry()
+        .all()
+        .iter()
+        .map(|p| StylePresetDto {
+            id: p.id.clone(),
+            name: p.name.clone(),
+            description: p.description.clone(),
+        })
+        .collect();
+
     Ok(WorkspaceSnapshot {
         ipc_flavor: "tauri",
         service_status: "ready".into(),
         settings: settings_to_dto(&settings),
         history,
         dictionary,
+        style_presets,
     })
 }
 

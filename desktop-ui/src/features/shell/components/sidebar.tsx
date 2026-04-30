@@ -3,7 +3,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { workspaceStore } from "../../../store/workspace-store";
 import { navigationItems } from "../config/navigation";
-import { SidebarQuickStart, SidebarTodayStats } from "./sidebar-widgets";
+import { SidebarQuickStart, SidebarTodayStats, SidebarTodayStatsSkeleton } from "./sidebar-widgets";
 import { DRAWER_ID } from "./app-shell";
 import luneLogo from "../../../assets/lune-voice-logo.png";
 import { useLingui } from "@lingui/react/macro";
@@ -12,6 +12,7 @@ export function SidebarContent() {
   const { t } = useLingui();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const serviceStatus = useStore(workspaceStore, (s) => s.runtime.serviceStatus);
+  const loaded = useStore(workspaceStore, (s) => s.runtime.loaded);
 
   const isActive = serviceStatus === "listening" || serviceStatus === "processing";
   const isConnected = serviceStatus === "ready" || isActive;
@@ -89,7 +90,7 @@ export function SidebarContent() {
 
       <div className="is-drawer-close:hidden">
         <SidebarQuickStart />
-        <SidebarTodayStats />
+        {loaded ? <SidebarTodayStats /> : <SidebarTodayStatsSkeleton />}
       </div>
     </>
   );

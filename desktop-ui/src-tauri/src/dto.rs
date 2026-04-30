@@ -39,12 +39,21 @@ pub enum PillVisibilityDto {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct StylePresetDto {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkspaceSnapshot {
     pub ipc_flavor: &'static str,
     pub service_status: String,
     pub settings: WorkspaceSettingsDto,
     pub history: Vec<HistoryItemDto>,
     pub dictionary: Vec<DictionaryItemDto>,
+    pub style_presets: Vec<StylePresetDto>,
 }
 
 #[derive(Debug, Clone, Serialize)]

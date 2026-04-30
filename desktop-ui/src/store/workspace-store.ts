@@ -12,7 +12,7 @@ import {
 import { mapDictionaryEntry, mapHistoryEntry, mapWorkspaceSettings, settingsToSaveInput } from "./workspace-mappers";
 
 // Re-export types and selectors for consumers
-export type { HistorySession, WorkspaceSettings, WorkspaceState } from "./workspace-types";
+export type { HistorySession, StylePreset, WorkspaceSettings, WorkspaceState } from "./workspace-types";
 export { summarizeAsrBackend, summarizeDictationMode } from "./workspace-mappers";
 
 // ── Store ─────────────────────────────────────────────────────────────
@@ -23,6 +23,7 @@ export const workspaceStore = new Store<WorkspaceState>({
   historySearch: "",
   dictionaryEntries: [],
   historySessions: [],
+  stylePresets: [],
   settings: { ...DEFAULT_SETTINGS },
   runtime: { ...DEFAULT_RUNTIME },
 });
@@ -71,6 +72,7 @@ export const workspaceActions = {
     workspaceStore.setState((s) => ({
       ...s,
       dictionaryEntries: snapshot.dictionary.map(mapDictionaryEntry),
+      stylePresets: snapshot.stylePresets ?? [],
       historySessions: snapshot.history
         .filter((entry) => entry.transcript)
         .map(mapHistoryEntry)

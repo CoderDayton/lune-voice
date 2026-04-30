@@ -47,19 +47,26 @@ export interface WorkspaceRuntimeState {
   error: string | null;
 }
 
+export interface StylePreset {
+  id: string;
+  name: string;
+  description: string;
+}
+
 export interface WorkspaceState {
   sidebarCollapsed: boolean;
   mobileMenuOpen: boolean;
   historySearch: string;
   dictionaryEntries: DictionaryEntry[];
   historySessions: HistorySession[];
+  stylePresets: StylePreset[];
   settings: WorkspaceSettings;
   runtime: WorkspaceRuntimeState;
 }
 
 export const DEFAULT_SETTINGS: WorkspaceSettings = {
   activationMode: "Toggle",
-  asrBackend: "ParakeetTdt",
+  asrBackend: "Qwen3Asr",
   useGpu: true,
   devicePolicy: "Auto",
   confidenceThreshold: "0.50",

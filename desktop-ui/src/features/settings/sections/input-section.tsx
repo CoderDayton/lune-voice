@@ -29,19 +29,7 @@ export function InputSection({ settings }: SettingsProps) {
           </select>
         }
       />
-      <SettingsRow
-        label={t`Adaptive pause detection`}
-        description={t`Lune Voice learns your pause rhythm so it does not cut you off too early.`}
-        control={
-          <input
-            type="checkbox"
-            className="toggle toggle-primary"
-            checked={settings.adaptiveVad}
-            onChange={() => void saveWorkspaceSetting("adaptiveVad", !settings.adaptiveVad)}
-            aria-label={t`Adaptive pause detection`}
-          />
-        }
-      />
+
       <SettingsRow
         label={t`Pause sensitivity`}
         description={t`How quickly Lune decides you're done speaking.`}

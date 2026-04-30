@@ -1,12 +1,13 @@
 import { useStore } from "@tanstack/react-store";
 import { workspaceStore, saveWorkspaceSetting } from "../../store/workspace-store";
-import { stylePresets } from "../settings/data/settings-data";
 import { Paintbrush, Check } from "lucide-react";
 import { useLingui } from "@lingui/react/macro";
 
 export function StylesPage() {
   const { t } = useLingui();
   const activePreset = useStore(workspaceStore, (s) => s.settings.stylePreset);
+  const presets = useStore(workspaceStore, (s) => s.stylePresets);
+  const loading = useStore(workspaceStore, (s) => s.runtime.loading);
 
   return (
     <div className="page-stack">
@@ -23,43 +24,38 @@ export function StylesPage() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {stylePresets.map((preset) => {
-          const isActive = activePreset === preset.value;
-          return (
-            <button
-              key={preset.value}
-              type="button"
-              className={`card border rounded-box p-5 text-left transition-colors cursor-pointer ${
-                isActive
-                  ? "border-primary bg-primary/5"
-                  : "border-surface-border bg-surface-card hover:border-primary/40"
-              }`}
-              onClick={() => void saveWorkspaceSetting("stylePreset", preset.value)}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-medium">{preset.label}</span>
-                {isActive && <Check size={16} className="text-primary" />}
+        {loading && presets.length === 0
+          ? [0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="card border rounded-box p-5 border-surface-border bg-surface-card"
+              >
+                <div className="skeleton h-5 w-24 mb-2" />
+                <div className="skeleton h-3 w-full" />
               </div>
-              <p className="text-xs text-content-subtle">
-                {styleDescription(preset.value)}
-              </p>
-            </button>
-          );
-        })}
+            ))
+          : presets.map((preset) => {
+              const isActive = activePreset === preset.id;
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  className={`card border rounded-box p-5 text-left transition-colors cursor-pointer ${
+                    isActive
+                      ? "border-primary bg-primary/5"
+                      : "border-surface-border bg-surface-card hover:border-primary/40"
+                  }`}
+                  onClick={() => void saveWorkspaceSetting("stylePreset", preset.id)}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium">{preset.name}</span>
+                    {isActive && <Check size={16} className="text-primary" />}
+                  </div>
+                  <p className="text-xs text-content-subtle">{preset.description}</p>
+                </button>
+              );
+            })}
       </div>
     </div>
   );
-}
-
-function styleDescription(value: string): string {
-  switch (value) {
-    case "casual":
-      return "Relaxed, conversational tone. Contractions and everyday language.";
-    case "professional":
-      return "Polished and clear. Suitable for emails, documents, and meetings.";
-    case "technical":
-      return "Precise formatting for code discussions, technical docs, and engineering notes.";
-    default:
-      return "";
-  }
 }

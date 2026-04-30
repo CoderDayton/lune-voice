@@ -12,6 +12,8 @@ interface ModelStatus {
   repoId: string;
   localName: string;
   ready: boolean;
+  description: string;
+  required: boolean;
 }
 
 interface DownloadProgress {
@@ -22,36 +24,15 @@ interface DownloadProgress {
   done: boolean;
 }
 
-interface ModelMeta {
-  description: string;
-  required: boolean;
-  deleteWarning: string;
-}
-
-const MODEL_META: Record<string, ModelMeta> = {
-  "parakeet-tdt-0.6b": {
-    description: "Speech-to-text engine (Parakeet TDT). Batch ASR across 25 languages.",
-    required: false,
-    deleteWarning: "Parakeet ASR backend will be unavailable. Switch to Qwen3 first if it's your active backend.",
-  },
-  "qwen3-asr-0.6b-onnx": {
-    description: "Speech-to-text engine (Qwen3 ASR). Encoder-decoder ONNX model with SmoothQuant.",
-    required: false,
-    deleteWarning: "Qwen3 ASR backend will be unavailable. Switch to Parakeet first if it's your active backend.",
-  },
-  "qwen3-0.6b": {
-    description: "Style & correction LLM. Fixes grammar and reformats transcripts.",
-    required: false,
-    deleteWarning: "Style formatting and grammar correction will be disabled.",
-  },
-};
-
 const ASR_MODEL_MAP: Record<string, string> = {
-  ParakeetTdt: "parakeet-tdt-0.6b",
   Qwen3Asr: "qwen3-asr-0.6b-onnx",
 };
 
-function getModelState(localName: string, ready: boolean, activeAsrModel: string | undefined): "active" | "downloaded" | "missing" {
+function getModelState(
+  localName: string,
+  ready: boolean,
+  activeAsrModel: string | undefined,
+): "active" | "downloaded" | "missing" {
   if (!ready) return "missing";
   if (localName === activeAsrModel) return "active";
   if (localName === "qwen3-0.6b") return "active";
@@ -61,11 +42,26 @@ function getModelState(localName: string, ready: boolean, activeAsrModel: string
 function StatusBadge({ state }: { state: "active" | "downloaded" | "missing" }) {
   switch (state) {
     case "active":
-      return <span className="badge badge-sm badge-success gap-1"><Zap className="size-3" />Active</span>;
+      return (
+        <span className="badge badge-success badge-sm gap-1">
+          <Zap size={10} />
+          Active
+        </span>
+      );
     case "downloaded":
-      return <span className="badge badge-sm badge-ghost gap-1"><Circle className="size-3" />Idle</span>;
+      return (
+        <span className="badge badge-ghost badge-sm gap-1">
+          <Circle size={10} />
+          Idle
+        </span>
+      );
     case "missing":
-      return <span className="badge badge-sm badge-warning gap-1"><AlertTriangle className="size-3" />Not installed</span>;
+      return (
+        <span className="badge badge-error badge-sm gap-1">
+          <Circle size={10} />
+          Not installed
+        </span>
+      );
   }
 }
 
@@ -126,100 +122,133 @@ export function ModelsSection() {
       .catch((e) => console.error("delete_model_cmd:", e));
   }
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <SettingsSection title={t`Models`} description={t`Manage AI models stored on your device.`} icon={HardDrive}>
+        {[0, 1].map((i) => (
+          <div key={i} className="flex items-center gap-3 py-3">
+            <div className="skeleton size-8 sm:size-10 rounded-field shrink-0" />
+            <div className="flex-1 space-y-2">
+              <div className="skeleton h-4 w-24 sm:w-32" />
+              <div className="skeleton h-3 w-40 sm:w-56" />
+            </div>
+            <div className="skeleton h-8 w-20 sm:w-24 rounded-field" />
+          </div>
+        ))}
+      </SettingsSection>
+    );
+  }
 
   return (
     <>
-      <SettingsSection title={t`Models`} description={t`Manage local model files`} icon={HardDrive}>
-        <div className="flex flex-col gap-3">
-          {models.map((model) => {
-            const meta = MODEL_META[model.localName];
-            const isDownloading = downloading === model.localName;
-            const state = getModelState(model.localName, model.ready, activeAsrModel);
-            const progressText = progress && isDownloading
+      <SettingsSection
+        icon={HardDrive}
+        title={t`Models`}
+        description={t`AI models stored on your device.`}
+      >
+        {models.map((model) => {
+          const isDownloading = downloading === model.localName;
+          const state = getModelState(model.localName, model.ready, activeAsrModel);
+          const progressText =
+            progress && isDownloading
               ? `${progress.fileName} (${progress.fileIndex + 1}/${progress.fileCount})`
               : null;
 
-            return (
-              <div key={model.localName} className="card card-border bg-base-200/50 card-sm">
-                <div className="card-body gap-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{model.name}</span>
-                      <StatusBadge state={state} />
-                    </div>
-                    <div className="flex gap-1">
-                      {model.ready ? (
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-xs text-error"
-                          onClick={() => handleDeleteClick(model)}
-                        >
-                          <Trash2 className="size-3.5" />
-                          {t`Delete`}
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-xs text-primary"
-                          onClick={() => handleDownload(model.localName)}
-                          disabled={!!downloading}
-                        >
-                          {isDownloading ? (
-                            <Loader2 className="size-3.5 animate-spin" />
-                          ) : (
-                            <Download className="size-3.5" />
-                          )}
-                          {isDownloading ? t`Downloading…` : t`Download`}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  {meta && (
-                    <p className="text-xs text-base-content/60">{meta.description}</p>
-                  )}
-                  {progressText && (
-                    <p className="text-xs text-info">{progressText}</p>
-                  )}
+          return (
+            <div key={model.localName} className="flex flex-col gap-2 py-3 border-b border-surface-border last:border-0 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <StatusBadge state={state} />
+                  <span className="font-medium text-sm">{model.name}</span>
                 </div>
+                {model.ready ? (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs text-error"
+                    onClick={() => handleDeleteClick(model)}
+                  >
+                    <Trash2 size={13} />
+                    {t`Delete`}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-xs"
+                    onClick={() => handleDownload(model.localName)}
+                    disabled={!!downloading}
+                  >
+                    {isDownloading ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <Download size={13} />
+                    )}
+                    {isDownloading ? t`Downloading…` : t`Download`}
+                  </button>
+                )}
               </div>
-            );
-          })}
-        </div>
+              {model.description && (
+                <p className="text-xs text-content-subtle flex gap-1.5 items-start">
+                  <Info size={12} className="mt-0.5 shrink-0" />
+                  {model.description}
+                </p>
+              )}
+              {progressText && (
+                <p className="text-xs text-content-subtle">{progressText}</p>
+              )}
+            </div>
+          );
+        })}
       </SettingsSection>
 
       <dialog ref={dialogRef} className="modal">
         <div className="modal-box">
-          {confirmDelete && (() => {
-            const meta = MODEL_META[confirmDelete.localName];
-            return (
-              <>
-                <h3 className="font-bold text-lg">{t`Delete ${confirmDelete.name}?`}</h3>
-                {meta && (
-                  <div className="alert alert-warning mt-4 text-sm">
-                    <AlertTriangle className="size-4" />
-                    <span>{meta.deleteWarning}</span>
+          {confirmDelete &&
+            (() => {
+              return (
+                <>
+                  <h3 className="font-bold text-lg">{t`Delete ${confirmDelete.name}?`}</h3>
+                  {confirmDelete.description && (
+                    <p className="py-2 text-sm text-content-subtle flex gap-2 items-start">
+                      <AlertTriangle size={14} className="mt-0.5 shrink-0 text-warning" />
+                      {confirmDelete.description}
+                    </p>
+                  )}
+                  {confirmDelete.required && (
+                    <p className="py-2 text-sm text-error flex gap-2 items-start">
+                      <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                      {t`This is a required model. Dictation will not work without it.`}
+                    </p>
+                  )}
+                  <div className="modal-action">
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => dialogRef.current?.close()}
+                    >
+                      {t`Cancel`}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-error"
+                      onClick={handleDeleteConfirm}
+                    >
+                      {t`Delete model`}
+                    </button>
                   </div>
-                )}
-                {meta?.required && (
-                  <div className="alert alert-error mt-2 text-sm">
-                    <Info className="size-4" />
-                    <span>{t`This is a required model. Dictation will not work without it.`}</span>
-                  </div>
-                )}
-                <div className="modal-action">
-                  <button type="button" className="btn" onClick={() => dialogRef.current?.close()}>
-                    {t`Cancel`}
-                  </button>
-                  <button type="button" className="btn btn-error" onClick={handleDeleteConfirm}>
-                    {t`Delete model`}
-                  </button>
-                </div>
-              </>
-            );
-          })()}
-          <form method="dialog"><button type="submit" className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="close">✕</button></form>
+                </>
+              );
+            })()}
+          <button
+            type="button"
+            className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
+            onClick={() => dialogRef.current?.close()}
+          >
+            ✕
+          </button>
         </div>
+        <form method="dialog" className="modal-backdrop">
+          <button type="submit">close</button>
+        </form>
       </dialog>
     </>
   );

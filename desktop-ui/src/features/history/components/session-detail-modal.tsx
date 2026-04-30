@@ -159,7 +159,7 @@ function MetaItem({ icon: Icon, label, value }: { icon: typeof Clock; label: str
 }
 
 function formatBackend(backend: string): string {
-  if (backend.includes("Parakeet")) return "Parakeet";
+  if (backend.includes("Qwen3") || backend.includes("qwen3")) return "Qwen3-ASR";
   if (backend.includes("OpenAi")) return "Cloud";
   return backend;
 }

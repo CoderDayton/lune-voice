@@ -51,6 +51,15 @@ export function SidebarQuickStart() {
   );
 }
 
+export function SidebarTodayStatsSkeleton() {
+  return (
+    <div className="px-3 py-2 sm:px-4">
+      <div className="skeleton h-3 w-12 mb-1.5" />
+      <div className="skeleton h-3 w-28 sm:w-36" />
+    </div>
+  );
+}
+
 export function SidebarTodayStats() {
   const { t } = useLingui();
   const todayStats = useStore(workspaceStore, getTodayStats);

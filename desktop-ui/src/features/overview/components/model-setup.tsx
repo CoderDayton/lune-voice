@@ -11,6 +11,8 @@ interface ModelStatus {
   repoId: string;
   localName: string;
   ready: boolean;
+  description: string;
+  required: boolean;
 }
 
 export interface DownloadProgress {
@@ -23,10 +25,9 @@ export interface DownloadProgress {
 
 type Phase = "checking" | "ready" | "setup" | "downloading" | "complete" | "error";
 
-const MODEL_META: Record<string, { description: string; required: boolean; icon: typeof Mic }> = {
-  "parakeet-tdt-0.6b": { description: "Speech recognition — converts voice to text. 25 languages with auto-detection.", required: true, icon: Mic },
-  "qwen3-0.6b": { description: "Style & correction — fixes grammar and reformats transcripts.", required: false, icon: Wand2 },
-};
+function modelIcon(localName: string) {
+  return localName.includes("asr") ? Mic : Wand2;
+}
 
 export function ModelSetup({ children }: { children: React.ReactNode }) {
   const { t } = useLingui();
@@ -43,23 +44,19 @@ export function ModelSetup({ children }: { children: React.ReactNode }) {
     invoke<ModelStatus[]>("check_model_status")
       .then((s) => {
         setModels(s);
-        const requiredReady = s
-          .filter((m) => MODEL_META[m.localName]?.required)
-          .every((m) => m.ready);
+        const requiredReady = s.filter((m) => m.required).every((m) => m.ready);
         if (setupDone) setPhase("ready");
         else if (requiredReady) {
-          // Required models present but user hasn't entered app yet — show
-          // complete screen so they can still optionally download the LLM.
           const init = new Set<string>();
           for (const m of s) {
-            if (m.ready || MODEL_META[m.localName]?.required) init.add(m.localName);
+            if (m.ready || m.required) init.add(m.localName);
           }
           setSelected(init);
           setPhase("complete");
         } else {
           const init = new Set<string>();
           for (const m of s) {
-            if (m.ready || MODEL_META[m.localName]?.required) init.add(m.localName);
+            if (m.ready || m.required) init.add(m.localName);
           }
           setSelected(init);
           setPhase("setup");
@@ -103,7 +100,8 @@ export function ModelSetup({ children }: { children: React.ReactNode }) {
   }, []);
 
   function toggle(localName: string) {
-    if (MODEL_META[localName]?.required) return;
+    const model = models.find((m) => m.localName === localName);
+    if (model?.required) return;
     setSelected((prev) => { const n = new Set(prev); n.has(localName) ? n.delete(localName) : n.add(localName); return n; });
   }
 
@@ -112,8 +110,6 @@ export function ModelSetup({ children }: { children: React.ReactNode }) {
     if (pending.length === 0) return;
     const first = pending[0];
     setActiveModel(first.localName); setPhase("downloading"); setError(null); setProgress(null);
-    // Fire-and-forget — progress events drive the UI, not the invoke Promise.
-    // This prevents HMR reloads from orphaning the callback and showing false errors.
     invoke("download_model_cmd", { localName: first.localName }).catch((e) => {
       setError(String(e)); setPhase("error"); setActiveModel(null);
     });
@@ -122,46 +118,50 @@ export function ModelSetup({ children }: { children: React.ReactNode }) {
   if (phase === "ready") return <>{children}</>;
   if (phase === "checking") {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-base-100">
-        <span className="loading loading-spinner loading-lg text-primary" />
+      <div className="flex min-h-screen items-center justify-center">
+        <span className="loading loading-spinner loading-lg" />
       </div>
     );
   }
 
-  const reqOk = models.filter((m) => MODEL_META[m.localName]?.required).every((m) => selected.has(m.localName));
+  const reqOk = models.filter((m) => m.required).every((m) => selected.has(m.localName));
   const toGet = models.filter((m) => selected.has(m.localName) && !m.ready);
   const pct = progress?.fileCount ? Math.round(((progress.fileIndex + 1) / progress.fileCount) * 100) : 0;
-  const title = phase === "complete" ? t`You're all set!` : phase === "downloading" ? t`Downloading models` : phase === "error" ? t`Download failed` : t`Welcome to Lune Voice`;
-  const subtitle = phase === "complete" ? t`All models are ready. Everything runs locally on your machine.`
+  const title =
+    phase === "complete" ? t`You're all set!`
+    : phase === "downloading" ? t`Downloading models`
+    : phase === "error" ? t`Download failed`
+    : t`Welcome to Lune Voice`;
+  const subtitle =
+    phase === "complete" ? t`All models are ready. Everything runs locally on your machine.`
     : phase === "downloading" ? t`This only happens once. Models are stored locally.`
     : phase === "error" ? error
     : t`Select the AI models to download. Everything runs offline — no cloud, no accounts.`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-base-100 p-4 sm:p-8">
-      <div className="flex flex-col items-center gap-4 sm:gap-6 max-w-sm sm:max-w-lg w-full">
+    <div className="flex min-h-screen items-center justify-center p-4 sm:p-8">
+      <div className="w-full max-w-lg flex flex-col gap-6">
         <div className="text-center">
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight">{title}</h2>
-          <p className="mt-2 text-content-muted text-xs sm:text-sm max-w-xs sm:max-w-sm mx-auto">{subtitle}</p>
+          <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+          <p className="text-sm text-content-subtle mt-2">{subtitle}</p>
         </div>
 
-        <div className="w-full space-y-2">
+        <div className="flex flex-col gap-3">
           {models.map((m) => {
-            const meta = MODEL_META[m.localName];
             return (
               <ModelCard
                 key={m.localName}
                 name={m.name}
                 localName={m.localName}
-                description={meta?.description ?? m.repoId}
-                required={meta?.required ?? false}
-                icon={meta?.icon ?? Mic}
+                description={m.description}
+                required={m.required}
+                icon={modelIcon(m.localName)}
                 ready={m.ready}
                 selected={selected.has(m.localName)}
                 active={activeModel === m.localName}
-                canToggle={(phase === "setup" || phase === "complete") && !meta?.required && !m.ready}
+                canToggle={!m.required && phase !== "downloading"}
                 progress={activeModel === m.localName ? progress : null}
-                pct={pct}
+                pct={activeModel === m.localName ? pct : 0}
                 onToggle={() => toggle(m.localName)}
               />
             );
@@ -169,32 +169,45 @@ export function ModelSetup({ children }: { children: React.ReactNode }) {
         </div>
 
         {phase === "error" && (
-          <div role="alert" className="alert alert-error alert-soft">
+          <div className="alert alert-error">
             <CircleAlert size={16} />
-            <span className="text-sm">{error ?? t`Check your connection and try again.`}</span>
+            <span>{error ?? t`Check your connection and try again.`}</span>
           </div>
         )}
 
-        <div className="flex flex-col items-center gap-2 w-full">
+        <div className="flex flex-col items-center gap-2">
           {phase === "complete" && toGet.length > 0 ? (
-            <button type="button" onClick={downloadSelected} className="btn btn-primary btn-wide">
-              <Download size={16} strokeWidth={2} />
+            <button type="button" className="btn btn-primary btn-wide" onClick={downloadSelected}>
+              <Download size={16} />
               {t`Download ${toGet.length} optional model${toGet.length !== 1 ? "s" : ""}`}
             </button>
           ) : phase === "complete" ? (
-            <button type="button" onClick={() => { localStorage.setItem("lune-setup-complete", "1"); setPhase("ready"); }} className="btn btn-success btn-wide">
-              <ArrowRight size={16} strokeWidth={2} />{t`Enter Lune Voice`}
+            <button
+              type="button"
+              className="btn btn-success btn-wide"
+              onClick={() => { localStorage.setItem("lune-setup-complete", "1"); setPhase("ready"); }}
+            >
+              <ArrowRight size={16} />
+              {t`Enter Lune Voice`}
             </button>
           ) : (phase === "setup" || phase === "error") ? (
-            <button type="button" onClick={downloadSelected} disabled={!reqOk || toGet.length === 0} className="btn btn-primary btn-wide">
-              <Download size={16} strokeWidth={2} />
+            <button
+              type="button"
+              className="btn btn-primary btn-wide"
+              disabled={!reqOk}
+              onClick={downloadSelected}
+            >
               {!reqOk ? t`Select required models` : t`Download ${toGet.length} model${toGet.length !== 1 ? "s" : ""}`}
             </button>
           ) : null}
           {phase === "downloading" ? (
-            <p className="text-xs text-content-dim animate-pulse">{t`Please don't close the app during download`}</p>
+            <p className="text-xs text-content-subtle">{t`Please don't close the app during download`}</p>
           ) : (
-            <button type="button" onClick={() => { localStorage.setItem("lune-setup-complete", "1"); setPhase("ready"); }} className="btn btn-ghost btn-sm text-content-dim">
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm text-content-dim"
+              onClick={() => { localStorage.setItem("lune-setup-complete", "1"); setPhase("ready"); }}
+            >
               {t`Skip for now`}
             </button>
           )}

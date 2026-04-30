@@ -34,6 +34,10 @@ pub struct ModelStatus {
     pub local_name: String,
     /// Whether the model is fully present locally
     pub ready: bool,
+    /// Human-readable description of what this model does
+    pub description: String,
+    /// Whether the pipeline requires this model to function
+    pub required: bool,
 }
 
 /// Progress update during model download.
@@ -143,22 +147,25 @@ pub fn check_model_status(
 ) -> Vec<ModelStatus> {
     let mut statuses = Vec::new();
 
-    for spec in [ModelSpec::parakeet_tdt(), ModelSpec::qwen3_asr()] {
-        statuses.push(ModelStatus {
-            name: spec.display_name().to_string(),
-            repo_id: spec.repo_id().to_string(),
-            local_name: spec.local_name().to_string(),
-            ready: spec.is_ready(models_dir),
-        });
-    }
+    let asr_spec = ModelSpec::qwen3_asr();
+    statuses.push(ModelStatus {
+        name: asr_spec.display_name().to_string(),
+        repo_id: asr_spec.repo_id().to_string(),
+        local_name: asr_spec.local_name().to_string(),
+        ready: asr_spec.is_ready(models_dir),
+        description: "Speech-to-text engine. Encoder-decoder ONNX model with SmoothQuant."
+            .to_string(),
+        required: true,
+    });
 
-    // Style LLM for transcript reformatting.
     let style_spec = ModelSpec::style_llm();
     statuses.push(ModelStatus {
         name: style_spec.display_name().to_string(),
         repo_id: style_spec.repo_id().to_string(),
         local_name: style_spec.local_name().to_string(),
         ready: style_spec.is_ready(models_dir),
+        description: "Style & correction LLM. Fixes grammar and reformats transcripts.".to_string(),
+        required: false,
     });
 
     statuses

@@ -42,12 +42,19 @@ export interface BackendWorkspaceSettings {
   openaiAsrApiKeySet: boolean;
 }
 
+export interface BackendStylePreset {
+  id: string;
+  name: string;
+  description: string;
+}
+
 export interface BackendWorkspaceSnapshot {
   ipcFlavor: string;
   serviceStatus: string;
   settings: BackendWorkspaceSettings;
   history: BackendHistoryEntry[];
   dictionary: BackendDictionaryEntry[];
+  stylePresets: BackendStylePreset[];
 }
 
 export interface BackendPillSnapshot {
