@@ -2,9 +2,8 @@ use async_openai::{
     Client,
     config::OpenAIConfig,
     types::chat::{
-        ChatCompletionRequestAssistantMessageArgs, ChatCompletionRequestMessage,
-        ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs,
-        CreateChatCompletionRequestArgs,
+        ChatCompletionRequestMessage, ChatCompletionRequestSystemMessageArgs,
+        ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs,
     },
 };
 
@@ -64,12 +63,11 @@ impl OpenAiLlmBackend {
 /// Mirrors the ORT backend prompt structure: system = BASE_SYSTEM_PROMPT,
 /// user = structured prompt via `OrtStyleLlm::user_prompt()`.
 fn build_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage> {
-    let few_shot = super::ort_llm::CORRECTION_FEW_SHOT;
-    let mut messages = Vec::with_capacity(2 + few_shot.len() * 2);
+    let mut messages = Vec::with_capacity(2);
 
     let mut system_content = BASE_SYSTEM_PROMPT.to_owned();
     if !input.dictionary.is_empty() {
-        system_content.push_str("\n\nDictionary terms (always use these exact spellings):");
+        system_content.push_str("\nDictionary terms (use these exact spellings):");
         for entry in &input.dictionary {
             system_content.push_str("\n- ");
             system_content.push_str(&entry.phrase);
@@ -85,23 +83,6 @@ fn build_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage>
             .expect("system message build")
             .into(),
     );
-
-    for (user, assistant) in few_shot {
-        messages.push(
-            ChatCompletionRequestUserMessageArgs::default()
-                .content(*user)
-                .build()
-                .expect("few-shot user build")
-                .into(),
-        );
-        messages.push(
-            ChatCompletionRequestAssistantMessageArgs::default()
-                .content(*assistant)
-                .build()
-                .expect("few-shot assistant build")
-                .into(),
-        );
-    }
 
     let user_text = super::ort_llm::OrtStyleLlm::user_prompt(
         &input.raw_text,
@@ -167,8 +148,7 @@ impl TextPostProcessor for OpenAiLlmBackend {
                     .unwrap_or(input.raw_text.trim())
                     .to_owned();
 
-                let stripped = crate::prompt::strip_markers(&text);
-                let cleaned_text = crate::correction::apply_model_edits(input, &stripped);
+                let cleaned_text = crate::prompt::strip_markers(&text);
 
                 tracing::debug!(
                     output_len = cleaned_text.len(),
@@ -190,7 +170,6 @@ impl TextPostProcessor for OpenAiLlmBackend {
 
 #[cfg(test)]
 mod tests {
-    use super::super::ort_llm::CORRECTION_FEW_SHOT;
     use super::*;
     use std::sync::Arc;
 
@@ -214,11 +193,11 @@ mod tests {
         let input = test_input("hello um world");
         let msgs = build_messages(&input);
 
-        assert_eq!(msgs.len(), 2 + CORRECTION_FEW_SHOT.len() * 2);
+        assert_eq!(msgs.len(), 2);
 
         let json = serde_json::to_string(&msgs).unwrap();
         assert!(json.contains("hello um world"));
-        assert!(json.contains("ASR transcript repair"));
+        assert!(json.contains("Transcript:"));
     }
 
     #[test]

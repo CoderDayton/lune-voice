@@ -590,8 +590,8 @@ async fn run_session<A: AsrBackend + 'static>(
 
     let lang_tag = lune_asr::confidence::lexical::detect_lang(&text_after_commands);
     let pipeline_t0 = tokio::time::Instant::now();
-    const BYPASS_CONFIDENCE: f32 = 0.85;
-    const BYPASS_FIX_SCORE: f32 = 0.35;
+    const BYPASS_CONFIDENCE: f32 = 0.60;
+    const BYPASS_FIX_SCORE: f32 = 0.70;
 
     // ── Step 1: Dictionary ────────────────────────────────────────────
     // Single lock: fetch relevant entries + apply corrections together.

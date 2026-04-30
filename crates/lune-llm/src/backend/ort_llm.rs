@@ -20,38 +20,6 @@ use lune_core::llm::{CorrectionSpan, PostProcessInput, PostProcessOutput, TextPo
 
 const DEFAULT_MAX_TOKENS: usize = 512;
 
-/// Compact few-shot examples teaching the JSON-edit correction format.
-/// Each pair: (user transcript snippet, assistant JSON response).
-pub(crate) const CORRECTION_FEW_SHOT: &[(&str, &str)] = &[
-    (
-        "Suspicious word indices:\n\
-         - 5..6: \"their\" confidence=0.32 fix_score=0.85\n\n\
-         Transcript:\n<transcript>\n\
-         we need to fix their code before the release\n\
-         </transcript>",
-        "[{\"start_word\":5,\"end_word\":6,\"replacement\":\"the\"}]",
-    ),
-    (
-        "Suspicious word indices:\n\
-         - 2..3: \"a\" confidence=0.28 fix_score=0.90\n\
-         - 3..4: \"parent\" confidence=0.25 fix_score=0.92\n\
-         - 4..5: \"lee\" confidence=0.22 fix_score=0.95\n\n\
-         Transcript:\n<transcript>\n\
-         it was a parent lee not working as expected\n\
-         </transcript>",
-        "[{\"start_word\":2,\"end_word\":5,\"replacement\":\"apparently\"}]",
-    ),
-    (
-        "Suspicious word indices:\n\
-         - 1..2: \"gonna\" confidence=0.40 fix_score=0.55\n\
-         - 5..6: \"meeting\" confidence=0.38 fix_score=0.52\n\n\
-         Transcript:\n<transcript>\n\
-         I'm gonna be late to the meeting\n\
-         </transcript>",
-        "[]",
-    ),
-];
-
 pub struct OrtStyleLlmConfig {
     pub model_dir: PathBuf,
     pub use_gpu: bool,
@@ -267,71 +235,11 @@ impl OrtStyleLlm {
 
     pub fn user_prompt(
         transcript: &str,
-        language: &str,
+        _language: &str,
         _style_instructions: &str,
-        correction_spans: &[CorrectionSpan],
+        _correction_spans: &[CorrectionSpan],
     ) -> String {
-        let lang_tag = match language {
-            "fr" => "French",
-            "de" => "German",
-            "es" => "Spanish",
-            "it" => "Italian",
-            "pt" => "Portuguese",
-            "zh" | "cn" => "Chinese",
-            "ja" => "Japanese",
-            "ru" => "Russian",
-            "ko" => "Korean",
-            _ => "English",
-        };
-
-        let suspicious = correction_spans_prompt(correction_spans);
-
-        format!(
-            "\
-            Language: {lang_tag}\n\
-            \n\
-            Task: propose minimal ASR transcript repairs as JSON edits.\n\
-            Do not apply style instructions in this pass.\n\
-            \n\
-            Output format:\n\
-            - Return only a JSON array.\n\
-            - Use [] when no correction is certain.\n\
-            - Each edit must be {{\"start_word\":number,\"end_word\":number,\"replacement\":\"text\"}}.\n\
-            - start_word is inclusive; end_word is exclusive.\n\
-            - Edit only suspicious word indices listed below.\n\
-            \n\
-            Edit standard:\n\
-            - Make the smallest possible change.\n\
-            - Replacements must sound like the original word (phonetic similarity).\n\
-            - Correct only words or punctuation that are clearly wrong from context.\n\
-            - Keep valid sentence fragments and spoken phrasing.\n\
-            - Keep the transcript in {lang_tag}; do not translate.\n\
-            \n\
-            Forbidden edits:\n\
-            - paraphrasing\n\
-            - summarizing\n\
-            - completing unfinished thoughts\n\
-            - grammar cleanup unless the word is clearly an ASR error\n\
-            - style improvement\n\
-            - entity guessing\n\
-            - removing repetitions\n\
-            - removing filler words\n\
-            - changing valid tense/mood\n\
-            - changing valid dialogue fragments\n\
-            - inventing missing content\n\
-            \n\
-            If a correction is not certain, copy that part exactly.\n\
-            If the transcript already looks valid, return it unchanged.\n\
-            \n\
-            Suspicious word indices:\n\
-            {suspicious}\n\
-            \n\
-            Transcript:\n\
-            <transcript>\n\
-            {transcript}\n\
-            </transcript>
-            "
-        )
+        format!("Transcript:\n{transcript}")
     }
 
     pub fn apply_style(
@@ -352,38 +260,20 @@ impl OrtStyleLlm {
 
         let prompt = match self.params.chat_format {
             ChatFormat::ChatML => {
-                let mut p = format!("<|im_start|>system\n{base}<|im_end|>\n");
-                for (user, assistant) in CORRECTION_FEW_SHOT {
-                    p.push_str(&format!(
-                        "<|im_start|>user\n{user}<|im_end|>\n\
-                         <|im_start|>assistant\n{assistant}<|im_end|>\n"
-                    ));
-                }
-                p.push_str(&format!(
-                    "<|im_start|>user\n{user_text}<|im_end|>\n\
+                format!(
+                    "<|im_start|>system\n{base}<|im_end|>\n\
+                     <|im_start|>user\n{user_text}<|im_end|>\n\
                      <|im_start|>assistant\n"
-                ));
-                p
+                )
             }
             ChatFormat::Llama => {
-                let mut p = format!(
+                format!(
                     "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n\
-                     {base}<|eot_id|>"
-                );
-                for (user, assistant) in CORRECTION_FEW_SHOT {
-                    p.push_str(&format!(
-                        "<|start_header_id|>user<|end_header_id|>\n\n\
-                         {user}<|eot_id|>\
-                         <|start_header_id|>assistant<|end_header_id|>\n\n\
-                         {assistant}<|eot_id|>"
-                    ));
-                }
-                p.push_str(&format!(
-                    "<|start_header_id|>user<|end_header_id|>\n\n\
+                     {base}<|eot_id|>\
+                     <|start_header_id|>user<|end_header_id|>\n\n\
                      {user_text}<|eot_id|>\
                      <|start_header_id|>assistant<|end_header_id|>\n\n"
-                ));
-                p
+                )
             }
         };
         let enc = self
@@ -499,31 +389,12 @@ impl TextPostProcessor for OrtStyleLlm {
             &input.correction_spans,
         )?;
 
-        let text = crate::correction::apply_model_edits(input, &text);
         let text = crate::prompt::strip_markers(&text);
         Ok(PostProcessOutput {
             cleaned_text: text,
             metadata: None,
         })
     }
-}
-
-fn correction_spans_prompt(spans: &[CorrectionSpan]) -> String {
-    if spans.is_empty() {
-        return "none; return []".into();
-    }
-
-    spans
-        .iter()
-        .take(16)
-        .map(|span| {
-            format!(
-                "- {}..{}: {:?} confidence={:.2} fix_score={:.2}",
-                span.start_word, span.end_word, span.text, span.confidence, span.fix_score
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
 }
 
 type Inputs<'a> = Vec<(std::borrow::Cow<'a, str>, DynValue)>;
@@ -663,20 +534,10 @@ mod tests {
     use super::OrtStyleLlm;
 
     #[test]
-    fn user_prompt_is_correction_only_without_style_instructions() {
-        let prompt = OrtStyleLlm::user_prompt(
-            "das ist ein test",
-            "de",
-            "Use title case and rewrite professionally.",
-            &[],
-        );
+    fn user_prompt_contains_transcript() {
+        let prompt = OrtStyleLlm::user_prompt("das ist ein test", "de", "", &[]);
 
-        assert!(prompt.contains("Language: German"));
-        assert!(prompt.contains("Task: propose minimal ASR transcript repairs as JSON edits."));
-        assert!(prompt.contains("Do not apply style instructions in this pass."));
-        assert!(prompt.contains("none; return []"));
-        assert!(prompt.contains("<transcript>\ndas ist ein test\n</transcript>"));
-        assert!(!prompt.contains("Use title case"));
-        assert!(!prompt.contains("rewrite professionally"));
+        assert!(prompt.contains("das ist ein test"));
+        assert!(prompt.contains("Transcript:"));
     }
 }

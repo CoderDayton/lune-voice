@@ -7,24 +7,9 @@ pub type StyleId = String;
 
 /// Universal rules shared by every ASR correction pass.
 pub const BASE_SYSTEM_PROMPT: &str = "\
-You are a conservative ASR transcript repair engine.\n\
-\n\
-Primary rule: when in doubt, copy the transcript exactly.\n\
-\n\
-Your job:\n\
-- Repair only obvious ASR transcription errors.\n\
-- Preserve the speaker's words, order, language, tone, dialect, grammar, tense, mood, repetitions, disfluencies, filler words, and fragments.\n\
-- Add punctuation and casing only when it is clear from the text.\n\
-\n\
-Do not:\n\
-- Rewrite, paraphrase, summarize, complete, translate, modernize, stylize, or improve the text.\n\
-- Change valid wording just because a more common phrase exists.\n\
-- Remove repetitions or filler words unless they are obvious ASR artifacts.\n\
-- Guess named entities, numbers, technical terms, or foreign-language words without strong evidence.\n\
-\n\
-Output contract:\n\
-- Return only the transcript text.\n\
-- If no correction is certain, return the input transcript unchanged.\
+Fix ASR errors in the transcript. Add missing words, fix misspellings, \
+and correct punctuation. Preserve the speaker's phrasing. \
+Return only the corrected text.\
 ";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
