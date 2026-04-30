@@ -245,8 +245,7 @@ impl AsrBackend for Qwen3AsrBackend {
             let ts = sess.total_samples * 1000 / sess.sample_rate as u64;
             let id = sess.next_id;
             sess.next_id += 1;
-            let pcm = sess.pending.clone();
-            sess.pending.clear();
+            let pcm = std::mem::take(&mut sess.pending);
             (pcm, ts, id)
         };
 

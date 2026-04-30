@@ -374,7 +374,7 @@ impl OrtStyleLlm {
         let mut kv: Vec<DynValue> = outputs.into_iter().skip(1).map(|(_, v)| v).collect();
 
         // ── Decode ──────────────────────────────────────────────────────
-        let max = self.max_new_tokens.min(n);
+        let max = self.max_new_tokens;
         for _ in 1..max {
             let tok = *state.generated.last().unwrap() as i64;
             let total = n + state.generated.len();

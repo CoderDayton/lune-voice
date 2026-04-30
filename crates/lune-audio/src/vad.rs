@@ -65,20 +65,31 @@ impl Vad {
     pub fn process_chunk(&mut self, samples: &[f32]) -> VadResult {
         let energy = compute_rms(samples);
 
-        let mut all: Vec<f32> = Vec::with_capacity(self.carry.len() + samples.len());
-        all.extend_from_slice(&self.carry);
-        all.extend_from_slice(samples);
-
         let mut max_score: f32 = 0.0;
         let mut offset = 0;
-        while offset + HOP_SIZE <= all.len() {
-            let frame = &all[offset..offset + HOP_SIZE];
+
+        if !self.carry.is_empty() {
+            let needed = HOP_SIZE - self.carry.len();
+            if samples.len() >= needed {
+                self.carry.extend_from_slice(&samples[..needed]);
+                max_score = max_score.max(self.inner.predict_f32(&self.carry));
+                self.carry.clear();
+                offset = needed;
+            } else {
+                self.carry.extend_from_slice(samples);
+            }
+        }
+
+        while offset + HOP_SIZE <= samples.len() {
+            let frame = &samples[offset..offset + HOP_SIZE];
             let score = self.inner.predict_f32(frame);
             max_score = max_score.max(score);
             offset += HOP_SIZE;
         }
-        self.carry.clear();
-        self.carry.extend_from_slice(&all[offset..]);
+
+        if offset < samples.len() && self.carry.is_empty() {
+            self.carry.extend_from_slice(&samples[offset..]);
+        }
 
         let score_is_speech = if self.in_speech {
             max_score >= self.threshold_end

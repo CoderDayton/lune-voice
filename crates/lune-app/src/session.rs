@@ -392,17 +392,8 @@ async fn run_session<A: AsrBackend + 'static>(
                 let mut saw_audio = false;
                 while let Some(chunk) = audio_stream.try_next_chunk() {
                     saw_audio = true;
-                    let rms = {
-                        let n = chunk.samples.len() as f32;
-                        if n > 0.0 {
-                            let sum_sq: f32 = chunk.samples.iter().map(|&s| s * s).sum();
-                            (sum_sq / n).sqrt()
-                        } else {
-                            0.0
-                        }
-                    };
-                    if rms > peak_rms { peak_rms = rms; }
                     let vad_result = vad.process_chunk(&chunk.samples);
+                    if vad_result.energy > peak_rms { peak_rms = vad_result.energy; }
                     if vad_result.is_speech {
                         speech_samples += chunk.samples.len();
                     }
@@ -412,20 +403,6 @@ async fn run_session<A: AsrBackend + 'static>(
                         warn!(error = %msg, "push_audio error during streaming ASR");
                         first_asr_error.get_or_insert(msg);
                         continue;
-                    }
-
-                    match asr.poll_results(&asr_session).await {
-                        Ok(new_segments) => {
-                            if append_segments(&mut segments, &mut raw_text, new_segments) {
-                                saw_asr_success = true;
-                                let _ = event_tx.try_send(SessionEvent::PartialText);
-                            }
-                        }
-                        Err(e) => {
-                            let msg = e.to_string();
-                            warn!(error = %msg, "poll_results error during streaming ASR");
-                            first_asr_error.get_or_insert(msg);
-                        }
                     }
 
                     if speech_samples >= config.pipeline.max_speech_samples {
@@ -465,12 +442,6 @@ async fn run_session<A: AsrBackend + 'static>(
             warn!(error = %e, "reset_context error during cancel");
         }
     } else {
-        let flush_silence = vec![0.0f32; 16_000];
-        if let Err(e) = asr.push_audio(&asr_session, &flush_silence).await {
-            let msg = e.to_string();
-            warn!(error = %msg, "push_audio (silence flush) error");
-            first_asr_error.get_or_insert(msg);
-        }
         match asr.poll_final(&asr_session).await {
             Ok(new_segments) => {
                 if append_segments(&mut segments, &mut raw_text, new_segments) {
