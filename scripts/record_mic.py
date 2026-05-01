@@ -5,7 +5,7 @@
 # ///
 """Record default mic to a 16kHz mono float32 WAV file.
 
-Usage: uv run scripts/record_mic.py [output.wav] [--seconds N]
+Usage: uv run scripts/record_mic.py [--output-file FILE] [--seconds N]
   Press Ctrl+C to stop early.
 """
 import argparse
@@ -20,15 +20,15 @@ import numpy as np
 
 def main():
     parser = argparse.ArgumentParser(description="Record mic to WAV")
-    default_out = f"test_fixtures/recording_{int(__import__('time').time())}.wav"
-    parser.add_argument("output", nargs="?", default=default_out)
-    parser.add_argument("--seconds", "-s", type=float, default=60,
+    default_out = f"recording_{int(__import__('time').time())}.wav"
+    parser.add_argument("--output-file", "-o", default=default_out)
+    parser.add_argument("--seconds", "-s", type=float, default=120,
                         help="Max recording length (default: 60s, Ctrl+C to stop early)")
     args = parser.parse_args()
 
     sr = 16000
     channels = 1
-    print(f"Recording to {args.output} (16kHz mono float32, max {args.seconds}s)")
+    print(f"Recording to {args.output_file} (16kHz mono float32, max {args.seconds}s)")
     print("Press Ctrl+C to stop.\n")
 
     frames = []
@@ -60,12 +60,12 @@ def main():
         stream.stop()
         stream.close()
 
-    print(f"\n\nStopped. Writing {elapsed:.1f}s to {args.output}")
+    print(f"\n\nStopped. Writing {elapsed:.1f}s to {args.output_file}")
 
     audio = np.concatenate(frames) if frames else np.array([], dtype=np.float32)
 
     # Write float32 WAV (format code 3 = IEEE float)
-    with wave.open(args.output, "wb") as wf:
+    with wave.open(args.output_file, "wb") as wf:
         wf.setnchannels(1)
         wf.setsampwidth(4)
         wf.setframerate(sr)
@@ -73,7 +73,7 @@ def main():
         wf.writeframes(b"")  # init headers
 
     # Rewrite with correct float32 format tag
-    with open(args.output, "rb") as f:
+    with open(args.output_file, "rb") as f:
         data = bytearray(f.read())
 
     raw = audio.astype(np.float32).tobytes()
@@ -95,7 +95,7 @@ def main():
     out += struct.pack("<I", len(raw))
     out += raw
 
-    with open(args.output, "wb") as f:
+    with open(args.output_file, "wb") as f:
         f.write(out)
 
     print(f"Done: {len(audio)} samples, {len(audio)/sr:.1f}s")

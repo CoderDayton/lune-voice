@@ -1,0 +1,1 @@
+Launch Lune Voice and set the hotkey to Super H. Then open Firefox, navigate to Google Docs, and test the dictation in a new document.

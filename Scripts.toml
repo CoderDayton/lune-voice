@@ -62,10 +62,11 @@ case "${TYPE:-real}" in
   latency)   cargo run --release --example session_latency -p lune-app ;;
   confusion) cargo run --release --example confusion_mine -p lune-app ;;
   llm)       cargo run --release --example llm_quality -p lune-app ;;
-  *)         echo "TYPE must be stages|real|latency|confusion|llm"; exit 1 ;;
+  domain)    cargo run --release --features cuda --example bench_domain -p lune-app ;;
+  *)         echo "TYPE must be stages|real|latency|confusion|llm|domain"; exit 1 ;;
 esac
 '''
-info = "Benchmark (--env TYPE=stages|real|latency|confusion|llm)"
+info = "Benchmark (--env TYPE=stages|real|latency|confusion|llm|domain)"
 
 # ── Build ────────────────────────────────────────────────────────────────────
 

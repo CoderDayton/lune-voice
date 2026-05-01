@@ -544,6 +544,7 @@ impl BenchmarkHarness {
 pub struct HarnessBuilder {
     with_llm: bool,
     with_tracing: bool,
+    skip_fixtures: bool,
 }
 
 impl Default for HarnessBuilder {
@@ -551,6 +552,7 @@ impl Default for HarnessBuilder {
         Self {
             with_llm: false,
             with_tracing: false,
+            skip_fixtures: false,
         }
     }
 }
@@ -566,6 +568,11 @@ impl HarnessBuilder {
     /// Init a `tracing_subscriber` with `RUST_LOG` env filter.
     pub fn with_tracing(mut self) -> Self {
         self.with_tracing = true;
+        self
+    }
+
+    pub fn skip_fixtures(mut self) -> Self {
+        self.skip_fixtures = true;
         self
     }
 
@@ -625,11 +632,16 @@ impl HarnessBuilder {
         };
 
         // Fixtures
-        let root = workspace_root();
-        let mut fixtures = load_fixtures(&root);
-        if let Ok(needle) = std::env::var("LUNE_BENCH_FIXTURE") {
-            fixtures.retain(|f| f.name.contains(needle.as_str()));
-        }
+        let fixtures = if self.skip_fixtures {
+            Vec::new()
+        } else {
+            let root = workspace_root();
+            let mut fx = load_fixtures(&root);
+            if let Ok(needle) = std::env::var("LUNE_BENCH_FIXTURE") {
+                fx.retain(|f| f.name.contains(needle.as_str()));
+            }
+            fx
+        };
 
         let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
 

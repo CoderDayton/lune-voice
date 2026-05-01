@@ -1,0 +1,1 @@
+Open Visual Studio Code and create a new TypeScript file. Import the React component from the shared library and make sure ESLint doesn't flag any warnings before you push to GitHub.

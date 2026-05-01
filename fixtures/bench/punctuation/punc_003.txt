@@ -1,0 +1,1 @@
+Step 1: Clone the repository. Step 2: Run the install script. Step 3: Open the config file (it's located at ~/.config/lune/settings.toml) and set the API key. That's it, you should be up and running.
