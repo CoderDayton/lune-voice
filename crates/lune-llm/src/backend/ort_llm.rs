@@ -244,6 +244,7 @@ impl OrtStyleLlm {
 Minimally correct this ASR transcript.\n\n\
 Expected language: {language}\n\
 Rules:\n\
+- Think throughly before fixing any errors.\n\
 - Fix only punctuation, capitalization, misspellings, and repeated words.\n\
 - Do not delete any words or content.\n\
 - Do not translate or change the language.\n\

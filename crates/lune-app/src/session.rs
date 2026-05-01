@@ -423,6 +423,8 @@ async fn run_session<A: AsrBackend + 'static>(
     let mut next_level_emit = tokio::time::Instant::now();
     let level_emit_interval = Duration::from_millis(67); // ~15 fps
     let mut peak_rms: f32 = 0.0;
+    let mut prev_chunk: Option<Vec<f32>> = None;
+    let mut was_speech = false;
     'capture: loop {
         tokio::select! {
             biased;
@@ -448,9 +450,20 @@ async fn run_session<A: AsrBackend + 'static>(
                     saw_audio = true;
                     let vad_result = vad.process_chunk(&chunk.samples);
                     if vad_result.energy > peak_rms { peak_rms = vad_result.energy; }
-                    if vad_result.is_speech {
-                        speech_samples += chunk.samples.len();
+                    if !vad_result.is_speech {
+                        prev_chunk = Some(chunk.samples);
+                        was_speech = false;
+                        continue;
                     }
+
+                    if !was_speech
+                        && let Some(pre) = prev_chunk.take()
+                    {
+                        let _ = asr.push_audio(&asr_session, &pre).await;
+                    }
+                    was_speech = true;
+                    prev_chunk = None;
+                    speech_samples += chunk.samples.len();
 
                     if let Err(e) = asr.push_audio(&asr_session, &chunk.samples).await {
                         let msg = e.to_string();
