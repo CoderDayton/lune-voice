@@ -3091,6 +3091,7 @@ dependencies = [
  "lune-core",
  "lune-persist",
  "tracing",
+ "wordnik_list",
 ]
 
 [[package]]
@@ -7756,6 +7757,12 @@ dependencies = [
  "unicode-xid",
  "wasmparser",
 ]
+
+[[package]]
+name = "wordnik_list"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47a23a78ae285a80cea7a00f24befde6b9f65db8d7beefc7343c8fbe6ee29b71"
 
 [[package]]
 name = "writeable"

@@ -8,3 +8,5 @@ license.workspace = true
 lune-core.workspace = true
 lune-persist.workspace = true
 tracing.workspace = true
+wordnik_list = "0.2"
+

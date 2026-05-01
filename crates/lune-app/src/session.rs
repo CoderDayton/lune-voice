@@ -1,4 +1,5 @@
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
+
 use std::time::Duration;
 
 use chrono::Utc;
@@ -16,6 +17,9 @@ use lune_core::error::Error;
 use lune_core::llm::{CorrectionSpan, TextPostProcessor};
 use lune_core::session::{DictationSession, SessionEvent, SessionStatus};
 use lune_dict::DictionaryManager;
+use lune_dict::corrector::HeuristicCorrector;
+
+static HEURISTIC: LazyLock<HeuristicCorrector> = LazyLock::new(HeuristicCorrector::new);
 use lune_persist::Database;
 
 /// Configuration for the session pipeline.
@@ -601,34 +605,58 @@ async fn run_session<A: AsrBackend + 'static>(
         return;
     }
 
-    let lang_tag = lune_asr::confidence::lexical::detect_lang(&text_after_commands);
     let pipeline_t0 = tokio::time::Instant::now();
     const BYPASS_CONFIDENCE: f32 = 0.60;
     const BYPASS_FIX_SCORE: f32 = 0.60;
 
-    // ── Step 1: Dictionary ────────────────────────────────────────────
-    // Single lock: fetch relevant entries + apply corrections together.
-    let (dictionary_entries, text_after_dict) = {
+    // ── Step 1: Dictionary scan + Heuristic correction ─────────────────
+    let (dictionary_entries, dict_replacements) = {
         let guard = dict.lock().await;
         let entries = guard
             .top_relevant(&text_after_commands, 20)
             .into_iter()
             .cloned()
             .collect::<Vec<_>>();
-        let applied = guard.apply(&text_after_commands);
-        (entries, applied)
+        let replacements = guard.scan(&text_after_commands);
+        (entries, replacements)
     };
-    let correction_spans = correction_spans_for_text(&text_after_dict, &segments, BYPASS_FIX_SCORE);
+    let mut word_fix_scores: Vec<(String, f32)> = segments
+        .iter()
+        .flat_map(|s| s.word_confidences.iter())
+        .map(|wc| (wc.word.clone(), wc.fix_score))
+        .collect();
+    for (phrase, _) in &dict_replacements {
+        if !word_fix_scores
+            .iter()
+            .any(|(w, _)| w.eq_ignore_ascii_case(phrase))
+        {
+            word_fix_scores.push((phrase.clone(), 1.0));
+        }
+    }
+    let heuristic = HEURISTIC.correct(
+        &text_after_commands,
+        &word_fix_scores,
+        &dict_replacements,
+        "en",
+    );
+    let text_after_heuristic = heuristic.corrected_text;
 
-    // ── LLM bypass: skip if ASR is confident and no words are flagged ──
-    let needs_llm = !correction_spans.is_empty()
-        && segments.iter().any(|seg| {
-            seg.confidence.is_none_or(|c| c < BYPASS_CONFIDENCE)
-                || seg
-                    .word_confidences
-                    .iter()
-                    .any(|wc| wc.fix_score >= BYPASS_FIX_SCORE)
-        });
+    let correction_spans =
+        correction_spans_for_text(&text_after_heuristic, &segments, BYPASS_FIX_SCORE);
+
+    // ── LLM bypass: multi-signal gate ──────────────────────────────────
+    let has_unresolved = !heuristic.unresolved_words.is_empty();
+    let has_correction_spans = !correction_spans.is_empty();
+    let asr_uncertain = segments
+        .iter()
+        .any(|seg| seg.confidence.is_none_or(|c| c < BYPASS_CONFIDENCE));
+    let has_flagged_words = segments.iter().any(|seg| {
+        seg.word_confidences
+            .iter()
+            .any(|wc| wc.fix_score >= BYPASS_FIX_SCORE)
+    });
+
+    let needs_llm = has_unresolved || (has_correction_spans && asr_uncertain && has_flagged_words);
 
     drain_processing_controls(&mut control_rx, &mut cancelled);
     let post_llm_text = if cancelled {
@@ -636,18 +664,18 @@ async fn run_session<A: AsrBackend + 'static>(
         String::new()
     } else if !needs_llm {
         info!(%session_id, "ASR confidence high, no corruption markers — bypassing LLM");
-        text_after_dict.clone()
+        text_after_heuristic.clone()
     } else {
-        info!(%session_id, "[LLM] input: {text_after_dict}");
+        info!(%session_id, "[LLM] input: {text_after_heuristic}");
         let llm_t0 = tokio::time::Instant::now();
         let input = lune_core::llm::PostProcessInput {
-            raw_text: text_after_dict.clone(),
+            raw_text: text_after_heuristic.clone(),
             style_preset: Arc::clone(&style_preset),
             app_category: None,
             dictionary: dictionary_entries.clone(),
             correction_spans,
             context: None,
-            language: lang_tag.into(),
+            language: "en".into(),
         };
         match post_processor.transform(&input).await {
             Ok(output) => {
@@ -662,7 +690,7 @@ async fn run_session<A: AsrBackend + 'static>(
             }
             Err(e) => {
                 warn!(error = %e, llm_ms = llm_t0.elapsed().as_millis() as u64, "LLM correction failed, using text as-is");
-                text_after_dict
+                text_after_heuristic
             }
         }
     };
@@ -1089,9 +1117,9 @@ mod tests {
                     entered: Arc::clone(&entered),
                     release: Arc::clone(&release),
                 });
-                let mut segment = make_segment("helo world", true);
+                let mut segment = make_segment("qxvtm world", true);
                 segment.word_confidences = vec![WordConfidence {
-                    word: "helo".into(),
+                    word: "qxvtm".into(),
                     confidence: 0.2,
                     fix_score: 0.9,
                 }];

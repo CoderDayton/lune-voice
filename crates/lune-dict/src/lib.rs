@@ -1,3 +1,8 @@
+pub mod bigrams;
+pub mod core_dict;
+pub mod corrector;
+pub mod scorer;
+
 use lune_core::dict::DictionaryEntry;
 use lune_persist::{Database, PersistResult};
 
@@ -73,6 +78,48 @@ impl DictionaryManager {
             current = apply_multi_word(&current, entry);
         }
         apply_single_words(&current, &single)
+    }
+
+    pub fn scan(&self, text: &str) -> Vec<(String, String)> {
+        let (multi, single): (Vec<&DictionaryEntry>, Vec<&DictionaryEntry>) = self
+            .cache
+            .iter()
+            .partition(|e| e.phrase.contains(char::is_whitespace));
+
+        let mut replacements = Vec::new();
+
+        for entry in &multi {
+            let phrase_words: Vec<&str> = entry.phrase.split_whitespace().collect();
+            let n = phrase_words.len();
+            let text_words: Vec<&str> = text.split_whitespace().collect();
+            let mut i = 0;
+            while i + n <= text_words.len() {
+                let window_match = text_words[i..i + n]
+                    .iter()
+                    .zip(&phrase_words)
+                    .all(|(tw, pw)| strip_trailing_punct(tw).eq_ignore_ascii_case(pw));
+                if window_match {
+                    let matched: String = text_words[i..i + n].join(" ");
+                    replacements.push((matched, entry.replacement.clone()));
+                    i += n;
+                } else {
+                    i += 1;
+                }
+            }
+        }
+
+        let text_words: Vec<&str> = text.split_whitespace().collect();
+        for word in &text_words {
+            let bare = strip_trailing_punct(word);
+            if let Some(entry) = single
+                .iter()
+                .find(|e| lev_le1_ci(bare.as_bytes(), e.phrase.as_bytes()))
+            {
+                replacements.push((bare.to_owned(), entry.replacement.clone()));
+            }
+        }
+
+        replacements
     }
 
     /// Return up to `limit` entries most relevant to `text` for LLM injection.

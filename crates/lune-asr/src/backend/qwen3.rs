@@ -40,15 +40,7 @@ const NEWLINE: i64 = 198; // \n
 const AUDIO_START: i64 = 151_669; // <|audio_start|>
 const AUDIO_END: i64 = 151_670; // <|audio_end|>
 
-/// Base system prompt — language-neutral, minimal. Language is controlled
-/// via the `language X` suffix parameter, not the system prompt.
-const SYSTEM_PROMPT: &str = r#"You are an ASR engine.
-Transcribe the audio verbatim in the original spoken language.
-Do not translate.
-Do not summarize, interpret, or answer.
-Do not add words that are not clearly present.
-If speech is unclear, preserve only what is intelligible.
-Output only the transcript text."#;
+const SYSTEM_PROMPT: &str = "";
 
 /// Maximum audio buffer (5 min at 16 kHz).
 const MAX_WINDOW_SAMPLES: usize = 300 * 16_000;
@@ -219,13 +211,11 @@ impl Qwen3AsrBackend {
         // 77091 = "assistant"
 
         if let Some(lang) = language {
-            // Tokenize "language English" (or whatever)
             let lang_text = format!("language {lang}");
             if let Ok(enc) = self.tokenizer.encode(lang_text.as_str(), false) {
                 suffix.extend(enc.get_ids().iter().map(|&id| id as i64));
             }
         }
-        suffix.push(ASR_TEXT_ID);
 
         (prefix, suffix)
     }
@@ -904,10 +894,7 @@ impl Qwen3AsrBackend {
             .unwrap_or_default()
             .trim()
             .to_string();
-        for prefix in [
-            SYSTEM_PROMPT,
-            "You are an automatic speech recognition system",
-        ] {
+        for prefix in ["You are an automatic speech recognition system"] {
             if let Some(rest) = text.strip_prefix(prefix) {
                 text = rest.trim_start_matches(['.', '\n', ' ']).to_string();
             }
