@@ -1,45 +1,41 @@
+# Format: Word | Alias1 | Alias2 (all forms are recognized)
 Adobe
 Airbnb
 Airtable
-Anthropic
+Anthropic | Claude
 Apple
 Asana
-Atlassian
-Bitbucket
+Atlassian | Jira | Confluence | Bitbucket
 Brave
 Canva
-ChatGPT
+ChatGPT | OpenAI | GPT
 Cisco
-Claude
 Cloudflare
 Coinbase
-Confluence
 Copilot
 Datadog
 DigitalOcean
 Discord
 Dropbox
 DuckDuckGo
-Elastic
+Elastic | Elasticsearch
+Facebook | Meta
 Figma
-Firefox
-GitHub
+Firefox | Mozilla
+GitHub | Git
 GitLab
-Gmail
+Gmail | Google | Alphabet
 Grafana
 Grammarly
 HubSpot
 Instagram
-IntelliJ
-Jira
-Kubernetes
+IntelliJ | JetBrains
 LangChain
 Linear
 LinkedIn
 Loom
 Mailchimp
-Meta
-Microsoft
+Microsoft | Windows | Azure | Bing
 Miro
 MongoDB
 Netflix
@@ -47,7 +43,6 @@ Netlify
 Notion
 Nvidia
 Obsidian
-OpenAI
 Oracle
 PagerDuty
 PayPal
@@ -67,13 +62,14 @@ Supabase
 Tauri
 Telegram
 Tesla
-TikTok
+TikTok | ByteDance
 Todoist
 Trello
 Twilio
-Twitch
+Twitch | Amazon
+Twitter | X
 Uber
-Ubuntu
+Ubuntu | Canonical
 Vercel
 WhatsApp
 YouTube

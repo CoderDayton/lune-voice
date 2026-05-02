@@ -34,18 +34,25 @@ fn main() {
         let content = std::fs::read_to_string(&path).expect("read vocab file");
         let mut count = 0u32;
         for line in content.lines() {
-            let word = line.trim();
-            if word.is_empty() || word.starts_with('#') {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
                 continue;
             }
-            vocab.words.entry(word.to_owned()).or_insert(cat_id);
-            let lower = word.to_ascii_lowercase();
-            if lower != word {
-                vocab.words.entry(lower).or_insert(cat_id);
+            // Support aliases: "Google | Alphabet" adds both forms
+            let forms: Vec<&str> = line.split('|').map(|s| s.trim()).collect();
+            for word in &forms {
+                if word.is_empty() {
+                    continue;
+                }
+                vocab.words.entry(word.to_string()).or_insert(cat_id);
+                let lower = word.to_ascii_lowercase();
+                if lower != *word {
+                    vocab.words.entry(lower).or_insert(cat_id);
+                }
             }
             count += 1;
         }
-        println!("  {category}: {count} words");
+        println!("  {category}: {count} entries");
     }
 
     let bytes = bincode::serde::encode_to_vec(&vocab, bincode::config::standard()).expect("encode");
