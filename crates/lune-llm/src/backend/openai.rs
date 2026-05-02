@@ -229,6 +229,29 @@ mod tests {
     }
 
     #[test]
+    fn build_messages_include_editable_spans() {
+        let input = PostProcessInput {
+            correction_spans: vec![lune_core::llm::CorrectionSpan {
+                start_word: 5,
+                end_word: 10,
+                text: "discuss interesting their OAuth deployment".into(),
+                confidence: 0.18,
+                word_error_risk: 0.82,
+            }],
+            ..test_input(
+                "call with Jennifer Martinez to discuss interesting their OAuth deployment on AWS",
+            )
+        };
+        let msgs = build_messages(&input);
+        let json = serde_json::to_string(&msgs).unwrap();
+
+        assert!(json.contains("Editable spans"));
+        assert!(json.contains("#5..10"));
+        assert!(json.contains("discuss interesting their OAuth deployment"));
+        assert!(json.contains("Copy everything else exactly"));
+    }
+
+    #[test]
     fn config_defaults() {
         let cfg = OpenAiLlmConfig::default();
         assert_eq!(cfg.max_tokens, 512);

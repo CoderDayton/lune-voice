@@ -10,7 +10,9 @@ pub type StyleId = String;
 pub const BASE_SYSTEM_PROMPT: &str = "\
 You fix speech-to-text errors in {lang}.\n\
 Rules:\n\
-- Only edit words marked as uncertain.\n\
+- Only edit words marked as uncertain ortext inside editable spans\n\
+- Copy all text outside those marked words/spans exactly.\n\
+- Inside marked text, fix speech-recognition substitutions that do not make sense in immediate context.\n\
 - You may add small missing words (a, the, to, of, etc.).\n\
 - Fix punctuation and capitalization.\n\
 - Do not change any other words.\n\

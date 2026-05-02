@@ -308,10 +308,23 @@ const INS_COST: f32 = 0.80;
 const TRANS_COST: f32 = 0.25;
 
 pub fn wed(a: &str, b: &str) -> f32 {
+    wed_inner(a, b, f32::INFINITY).unwrap_or(f32::INFINITY)
+}
+
+pub fn wed_with_limit(a: &str, b: &str, max_score: f32) -> Option<f32> {
+    wed_inner(a, b, max_score)
+}
+
+fn wed_inner(a: &str, b: &str, max_score: f32) -> Option<f32> {
     let a_chars: Vec<char> = a.chars().collect();
     let b_chars: Vec<char> = b.chars().collect();
     let m = a_chars.len();
     let n = b_chars.len();
+    let raw_limit = max_score + 0.35;
+
+    if (m.abs_diff(n) as f32) * DEL_COST > raw_limit {
+        return None;
+    }
 
     let mut prev_prev = vec![0.0f32; n + 1];
     let mut prev = vec![0.0f32; n + 1];
@@ -323,6 +336,7 @@ pub fn wed(a: &str, b: &str) -> f32 {
 
     for i in 1..=m {
         curr[0] = i as f32 * DEL_COST;
+        let mut row_min = curr[0];
         for j in 1..=n {
             let sub = prev[j - 1] + ALPHABET.sub_cost(a_chars[i - 1], b_chars[j - 1]);
             let del = prev[j] + DEL_COST;
@@ -338,6 +352,10 @@ pub fn wed(a: &str, b: &str) -> f32 {
             }
 
             curr[j] = best;
+            row_min = row_min.min(best);
+        }
+        if row_min > raw_limit {
+            return None;
         }
         prev_prev.copy_from_slice(&prev);
         std::mem::swap(&mut prev, &mut curr);
@@ -346,10 +364,15 @@ pub fn wed(a: &str, b: &str) -> f32 {
     let raw = prev[n];
     let pk_a = phonetic_key(a);
     let pk_b = phonetic_key(b);
-    if pk_a == pk_b {
+    let score = if pk_a == pk_b {
         (raw - 0.35).max(0.0)
     } else {
         raw
+    };
+    if score <= max_score {
+        Some(score)
+    } else {
+        None
     }
 }
 
@@ -365,6 +388,29 @@ mod tests {
             d1 < d2,
             "teh→the ({d1}) should be cheaper than teh→ten ({d2})"
         );
+    }
+
+    #[test]
+    fn limited_wed_matches_full_score_for_close_candidates() {
+        for (a, b) in [
+            ("teh", "the"),
+            ("brwon", "brown"),
+            ("hllo", "hello"),
+            ("fone", "phone"),
+            ("conection", "connection"),
+        ] {
+            assert_eq!(wed_with_limit(a, b, 2.5).unwrap(), wed(a, b));
+        }
+    }
+
+    #[test]
+    fn limited_wed_rejects_distant_candidates() {
+        assert!(wed_with_limit("teh", "algorithm", 2.5).is_none());
+    }
+
+    #[test]
+    fn limited_wed_rejects_length_gap_before_dp() {
+        assert!(wed_with_limit("a", "encyclopedia", 2.5).is_none());
     }
 
     #[test]

@@ -27,8 +27,8 @@ pub fn has_dict(language: &str) -> bool {
 //
 const ERROR_PRECISION: f32 = core::f32::consts::LN_2 / 1.5;
 
-// Phonetic match: equivalent to reducing WED by 0.5
-const PHONETIC_WED_EQUIV: f32 = 0.5;
+// Phonetic match: equivalent to reducing WED by 1.0
+const PHONETIC_WED_EQUIV: f32 = 1.0;
 // Subsequence match: equivalent to reducing WED by 0.6
 const SUBSEQ_WED_EQUIV: f32 = 0.6;
 // Shorter candidate penalty: equivalent to increasing WED by 0.2
@@ -225,13 +225,22 @@ impl HeuristicCorrector {
         let hi = word.chars().count() + 2;
 
         for cand in CandidateSource::new(lexicon, word, lo, hi) {
-            let cand_lower = cand.canonical.to_ascii_lowercase();
-            let wed = scorer::wed(word, &cand_lower);
-            if wed > MAX_WED {
+            let cand_lower;
+            let candidate = if cand.is_lowercase {
+                cand.canonical
+            } else {
+                cand_lower = cand.canonical.to_ascii_lowercase();
+                &cand_lower
+            };
+
+            if !cand.is_curated && !plausible_candidate(word, candidate) {
                 continue;
             }
-            let score =
-                self.noisy_channel_score(word, &cand_lower, prev, next, wed, cand.freq_score);
+
+            let Some(wed) = scorer::wed_with_limit(word, candidate, MAX_WED) else {
+                continue;
+            };
+            let score = self.noisy_channel_score(word, candidate, prev, next, wed, cand.freq_score);
             if best.as_ref().is_none_or(|(_, bs, _)| score > *bs) {
                 best = Some((cand.canonical.to_owned(), score, wed > DISTANT_WED));
             }
@@ -346,6 +355,42 @@ fn is_subsequence(needle: &str, haystack: &str) -> bool {
     true
 }
 
+fn plausible_candidate(word: &str, candidate: &str) -> bool {
+    if word.len().abs_diff(candidate.len()) > 2 {
+        return false;
+    }
+
+    let word_first = word.as_bytes().first().copied();
+    let cand_first = candidate.as_bytes().first().copied();
+    let word_last = word.as_bytes().last().copied();
+    let cand_last = candidate.as_bytes().last().copied();
+    let matching_edge = word_first == cand_first || word_last == cand_last;
+
+    let common = ascii_letter_intersection(word, candidate);
+    let min_len = word.len().min(candidate.len());
+    let overlap_floor = min_len.saturating_sub(if min_len <= 5 { 1 } else { 2 });
+
+    common >= overlap_floor && (matching_edge || common == min_len)
+}
+
+fn ascii_letter_intersection(a: &str, b: &str) -> usize {
+    let mut a_counts = [0u8; 26];
+    let mut b_counts = [0u8; 26];
+
+    for byte in a.bytes().filter(u8::is_ascii_lowercase) {
+        a_counts[(byte - b'a') as usize] = a_counts[(byte - b'a') as usize].saturating_add(1);
+    }
+    for byte in b.bytes().filter(u8::is_ascii_lowercase) {
+        b_counts[(byte - b'a') as usize] = b_counts[(byte - b'a') as usize].saturating_add(1);
+    }
+
+    a_counts
+        .iter()
+        .zip(b_counts)
+        .map(|(a, b)| (*a).min(b) as usize)
+        .sum()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -355,6 +400,28 @@ mod tests {
         let c = HeuristicCorrector::new();
         let result = c.correct("teh quick brwon fox", &[], &[], "en");
         assert_eq!(result.corrected_text, "the quick brown fox");
+    }
+
+    #[test]
+    fn corrects_prefilter_edge_cases() {
+        let c = HeuristicCorrector::new();
+
+        assert_eq!(
+            c.correct("hllo world", &[], &[], "en").corrected_text,
+            "hello world"
+        );
+        assert_eq!(
+            c.correct("fone call", &[], &[], "en").corrected_text,
+            "phone call"
+        );
+        assert_eq!(
+            c.correct("weahter report", &[], &[], "en").corrected_text,
+            "weather report"
+        );
+        assert_eq!(
+            c.correct("conection failed", &[], &[], "en").corrected_text,
+            "connection failed"
+        );
     }
 
     #[test]
@@ -426,6 +493,14 @@ mod tests {
     }
 
     #[test]
+    fn non_english_typo_still_corrects_after_prefilter() {
+        let c = HeuristicCorrector::new();
+        let result = c.correct("bonjor le monde", &[], &[], "fr");
+
+        assert_eq!(result.corrected_text, "bonjour le monde");
+    }
+
+    #[test]
     fn unresolved_words_reported() {
         let c = HeuristicCorrector::new();
         let risks = vec![("xyzqqq".to_string(), 0.9)];
@@ -466,6 +541,58 @@ mod tests {
         assert!(!is_subsequence("adc", "abc"));
         assert!(is_subsequence("", "anything"));
         assert!(!is_subsequence("x", ""));
+    }
+
+    #[test]
+    fn candidate_prefilter_keeps_common_error_shapes() {
+        for (word, candidate) in [
+            ("teh", "the"),
+            ("brwon", "brown"),
+            ("hllo", "hello"),
+            ("conection", "connection"),
+            ("fone", "phone"),
+            ("adress", "address"),
+            ("recieve", "receive"),
+            ("seperate", "separate"),
+        ] {
+            assert!(
+                plausible_candidate(word, candidate),
+                "{word} should keep {candidate}"
+            );
+        }
+        assert!(!plausible_candidate("teh", "algorithm"));
+    }
+
+    #[test]
+    fn candidate_prefilter_rejects_low_overlap_words() {
+        for (word, candidate) in [
+            ("teh", "algorithm"),
+            ("brwon", "yellow"),
+            ("conection", "framework"),
+            ("fone", "data"),
+        ] {
+            assert!(
+                !plausible_candidate(word, candidate),
+                "{word} should reject {candidate}"
+            );
+        }
+    }
+
+    #[test]
+    fn ascii_letter_intersection_counts_duplicate_letters() {
+        assert_eq!(ascii_letter_intersection("letter", "teller"), 5);
+        assert_eq!(ascii_letter_intersection("letter", "later"), 4);
+        assert_eq!(ascii_letter_intersection("aaa", "aab"), 2);
+    }
+
+    #[test]
+    fn flagged_curated_vocab_passes_through_without_correction() {
+        let c = HeuristicCorrector::new();
+        let risks = vec![("WebSocket".to_string(), 0.95)];
+        let result = c.correct("WebSocket failed", &risks, &[], "en");
+
+        assert_eq!(result.corrected_text, "WebSocket failed");
+        assert!(result.all_resolved);
     }
 
     #[test]

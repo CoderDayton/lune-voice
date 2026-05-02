@@ -237,21 +237,41 @@ impl OrtStyleLlm {
         transcript: &str,
         language: &str,
         _style_instructions: &str,
-        _correction_spans: &[CorrectionSpan],
+        correction_spans: &[CorrectionSpan],
         uncertain_words: &[(String, usize)],
     ) -> String {
-        if uncertain_words.is_empty() {
-            format!("Correct this {language} transcript:\n{transcript}")
-        } else {
+        let mut instructions = String::new();
+        if !correction_spans.is_empty() {
+            let spans: Vec<String> = correction_spans
+                .iter()
+                .map(|span| {
+                    format!(
+                        "#{}..{} \"{}\" risk={:.2}",
+                        span.start_word, span.end_word, span.text, span.word_error_risk
+                    )
+                })
+                .collect();
+            instructions.push_str("Editable spans (0-indexed, end exclusive): [");
+            instructions.push_str(&spans.join(", "));
+            instructions.push_str("]\n");
+        }
+        if !uncertain_words.is_empty() {
             let words: Vec<String> = uncertain_words
                 .iter()
                 .map(|(w, pos)| format!("{w} (#{pos})"))
                 .collect();
             let hint = words.join(", ");
-            format!(
-                "Uncertain words (name and 0-indexed position): [{hint}]\nCorrect this {language} transcript:\n{transcript}"
-            )
+            instructions.push_str("Uncertain words (name and 0-indexed position): [");
+            instructions.push_str(&hint);
+            instructions.push_str("]\n");
         }
+        if !instructions.is_empty() {
+            instructions.push_str("Only change text inside editable spans or listed uncertain words. Copy everything else exactly.\n");
+        }
+        instructions.push_str(&format!(
+            "Correct this {language} transcript:\n{transcript}"
+        ));
+        instructions
     }
 
     pub fn apply_style(
@@ -396,7 +416,7 @@ impl OrtStyleLlm {
 #[async_trait::async_trait]
 impl TextPostProcessor for OrtStyleLlm {
     async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput> {
-        let text = self.apply_style(
+        let mut text = self.apply_style(
             &input.raw_text,
             &input.language,
             &input.style_preset,
@@ -404,7 +424,9 @@ impl TextPostProcessor for OrtStyleLlm {
             &input.uncertain_words,
         )?;
 
-        let text = crate::prompt::strip_markers(&text);
+        text = crate::prompt::strip_markers(&text);
+        text = crate::prompt::fix_all_number_spaces(&text);
+
         Ok(PostProcessOutput {
             cleaned_text: text,
             metadata: None,
@@ -546,7 +568,29 @@ fn strip_think_tags(text: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use super::OrtStyleLlm;
+    use super::*;
+
+    #[test]
+    fn user_prompt_lists_editable_spans_and_copy_constraint() {
+        let prompt = OrtStyleLlm::user_prompt(
+            "call with Jennifer Martinez to discuss interesting their OAuth deployment on AWS",
+            "en",
+            "",
+            &[CorrectionSpan {
+                start_word: 5,
+                end_word: 10,
+                text: "discuss interesting their OAuth deployment".into(),
+                confidence: 0.18,
+                word_error_risk: 0.82,
+            }],
+            &[],
+        );
+
+        assert!(prompt.contains("Editable spans"));
+        assert!(prompt.contains("#5..10"));
+        assert!(prompt.contains("Copy everything else exactly"));
+        assert!(prompt.contains("Correct this en transcript:"));
+    }
 
     #[test]
     fn user_prompt_contains_transcript() {

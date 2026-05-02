@@ -5,6 +5,8 @@ use crate::lexicon::Lexicon;
 pub struct CandidateEntry<'a> {
     pub canonical: &'a str,
     pub freq_score: f32,
+    pub is_curated: bool,
+    pub is_lowercase: bool,
 }
 
 pub struct CandidateSource<'a> {
@@ -57,6 +59,8 @@ impl<'a> Iterator for CandidateSource<'a> {
         let entry = CandidateEntry {
             canonical: self.entries[self.pos].canonical,
             freq_score: self.entries[self.pos].freq_score,
+            is_curated: self.entries[self.pos].is_curated,
+            is_lowercase: self.entries[self.pos].is_lowercase,
         };
         self.pos += 1;
         Some(entry)
@@ -77,6 +81,8 @@ fn push_lowercase_candidate<'a>(
     entries.push(CandidateEntry {
         canonical: candidate,
         freq_score,
+        is_curated: false,
+        is_lowercase: true,
     });
 }
 
@@ -88,6 +94,7 @@ fn push_or_replace_candidate<'a>(
     freq_score: f32,
 ) {
     let candidate_lower = candidate.to_lowercase();
+    let is_lowercase = candidate == candidate_lower;
     if candidate_lower == original_lower {
         return;
     }
@@ -99,6 +106,8 @@ fn push_or_replace_candidate<'a>(
         entries[idx] = CandidateEntry {
             canonical: candidate,
             freq_score,
+            is_curated: true,
+            is_lowercase,
         };
         return;
     }
@@ -108,6 +117,8 @@ fn push_or_replace_candidate<'a>(
     entries.push(CandidateEntry {
         canonical: candidate,
         freq_score,
+        is_curated: true,
+        is_lowercase,
     });
 }
 
@@ -123,7 +134,7 @@ mod tests {
         assert!(
             candidates
                 .iter()
-                .any(|entry| entry.canonical == "WebSocket")
+                .any(|entry| entry.canonical == "WebSocket" && entry.is_curated)
         );
         assert!(
             !candidates
@@ -141,7 +152,20 @@ mod tests {
         assert!(
             candidates
                 .iter()
-                .any(|entry| entry.canonical.eq_ignore_ascii_case("Roblox"))
+                .any(|entry| entry.canonical.eq_ignore_ascii_case("Roblox") && entry.is_curated)
         );
+    }
+
+    #[test]
+    fn primary_candidates_are_marked_lowercase_not_curated() {
+        let lexicon = Lexicon::for_lang("en");
+        let candidates: Vec<_> = CandidateSource::new(&lexicon, "teh", 2, 4).collect();
+        let the = candidates
+            .iter()
+            .find(|entry| entry.canonical == "the")
+            .expect("wordnik candidate");
+
+        assert!(!the.is_curated);
+        assert!(the.is_lowercase);
     }
 }

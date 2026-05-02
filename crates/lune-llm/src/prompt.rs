@@ -62,6 +62,41 @@ pub fn strip_markers(text: &str) -> String {
     result
 }
 
+/// Collapses unnecessary spaces within numeric values like thousands separators.
+///
+/// Removes spaces that appear between a number and the digits that follow
+/// optional comma spacing, e.g. `2, 000` -> `2,000`, `2 , 100` -> `2,100`.
+///
+/// Spaces are preserved elsewhere in the text (e.g. `2 apples` remains unchanged),
+/// and only when a digit is eventually followed by those spaces and another digit.
+pub fn fix_all_number_spaces(input: &str) -> String {
+    let mut result = String::with_capacity(input.len());
+    let chars: Vec<char> = input.chars().collect();
+    let mut i = 0;
+
+    while i < chars.len() {
+        // Detect a digit followed by a comma
+        if i + 1 < chars.len() && chars[i].is_ascii_digit() && chars[i + 1] == ',' {
+            // Look ahead to see if there is a digit eventually following spaces
+            let mut j = i + 2;
+            while j < chars.len() && chars[j] == ' ' {
+                j += 1;
+            }
+
+            // If we found a digit after those spaces, collapse them
+            if j < chars.len() && chars[j].is_ascii_digit() {
+                result.push(chars[i]);
+                result.push(',');
+                i = j; // Jump past the comma and all spaces
+                continue;
+            }
+        }
+        result.push(chars[i]);
+        i += 1;
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
