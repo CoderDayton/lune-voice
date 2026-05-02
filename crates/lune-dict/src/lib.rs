@@ -1,6 +1,7 @@
 pub mod core_dict;
 pub mod corrector;
 pub mod scorer;
+pub mod vocab;
 
 use lune_core::dict::DictionaryEntry;
 use lune_persist::{Database, PersistResult};

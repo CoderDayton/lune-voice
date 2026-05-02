@@ -383,7 +383,7 @@ impl FrequencyLookup {
     }
 
     pub fn is_known(word: &str) -> bool {
-        Self::freq(word) > 0
+        Self::freq(word) > 0 || crate::vocab::bundled().is_known(word)
     }
 }
 

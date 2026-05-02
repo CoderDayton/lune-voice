@@ -5,9 +5,11 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+bincode = { version = "2", features = ["serde"] }
 lune-core.workspace = true
 lune-ngram.workspace = true
 lune-persist.workspace = true
+serde = { version = "1", features = ["derive"] }
 tracing.workspace = true
 wordnik_list = "0.2"
 

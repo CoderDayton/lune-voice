@@ -3108,9 +3108,11 @@ dependencies = [
 name = "lune-dict"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "lune-core",
  "lune-ngram",
  "lune-persist",
+ "serde",
  "tracing",
  "wordnik_list",
 ]

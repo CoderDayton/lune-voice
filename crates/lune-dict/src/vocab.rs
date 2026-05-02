@@ -1,0 +1,71 @@
+use std::collections::HashMap;
+use std::sync::LazyLock;
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SupplementalVocab {
+    pub categories: Vec<String>,
+    pub words: HashMap<String, u8>,
+}
+
+impl SupplementalVocab {
+    pub fn is_known(&self, word: &str) -> bool {
+        self.words.contains_key(word)
+    }
+
+    pub fn category_of(&self, word: &str) -> Option<&str> {
+        self.words
+            .get(word)
+            .and_then(|&id| self.categories.get(id as usize))
+            .map(|s| s.as_str())
+    }
+
+    pub fn category_count(&self) -> usize {
+        self.categories.len()
+    }
+
+    pub fn word_count(&self) -> usize {
+        self.words.len()
+    }
+}
+
+static BUNDLED: LazyLock<SupplementalVocab> = LazyLock::new(|| {
+    let bytes = include_bytes!("../data/supplemental_vocab.bin");
+    if bytes.is_empty() {
+        return SupplementalVocab {
+            categories: Vec::new(),
+            words: HashMap::new(),
+        };
+    }
+    let (vocab, _): (SupplementalVocab, usize) =
+        bincode::serde::decode_from_slice(bytes, bincode::config::standard())
+            .expect("decode supplemental vocab");
+    vocab
+});
+
+pub fn bundled() -> &'static SupplementalVocab {
+    &BUNDLED
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bundled_vocab_loads() {
+        let v = bundled();
+        assert!(v.word_count() > 100);
+        assert!(v.category_count() >= 4);
+    }
+
+    #[test]
+    fn lookup_by_category() {
+        let v = bundled();
+        assert!(v.is_known("WebSocket"));
+        assert!(v.is_known("websocket"));
+        assert_eq!(v.category_of("Roblox"), Some("gaming"));
+        assert_eq!(v.category_of("Lune"), Some("personal"));
+        assert!(!v.is_known("xyznonexistent"));
+    }
+}
