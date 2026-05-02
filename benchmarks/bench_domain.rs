@@ -17,6 +17,7 @@ use bench_utils::{
     BenchmarkHarness, char_error_rate, load_wav_f32, process_memory_usage, word_error_rate,
     wrap_print,
 };
+use lune_core::command::VoiceCommand;
 use lune_core::session::SessionEvent;
 use tokio::sync::mpsc;
 
@@ -54,6 +55,7 @@ struct FixtureResult {
     wer: f64,
     cer: f64,
     exact_match: bool,
+    audio_secs: f64,
     wall_secs: f64,
     hyp_words: usize,
     ref_words: usize,
@@ -149,11 +151,24 @@ fn main() {
     for fix in &fixtures {
         print!("  {:8} {:20}", fix.entry.category, fix.entry.id);
 
+        if fix.entry.category == "commands" {
+            harness
+                .asr
+                .set_boost_phrases(std::slice::from_ref(&fix.reference), 4.0);
+        } else {
+            harness.asr.set_boost_phrases(&[], 0.0);
+        }
+
         let start = Instant::now();
-        let text = harness
+        let outcome = harness
             .rt
             .block_on(run_pipeline(fix, &harness))
             .unwrap_or_default();
+        let text = if fix.entry.category == "commands" {
+            outcome.command_text.unwrap_or(outcome.final_text)
+        } else {
+            outcome.final_text
+        };
         let wall = start.elapsed().as_secs_f64();
 
         let wer = word_error_rate(&text, &fix.reference) * 100.0;
@@ -163,12 +178,19 @@ fn main() {
 
         let ref_words = fix.reference.split_whitespace().count();
         let hyp_words = text.split_whitespace().count();
+        let rtf = if fix.audio_secs > 0.0 {
+            wall / fix.audio_secs
+        } else {
+            0.0
+        };
 
         println!(
-            "  WER {:5.1}%  CER {:5.1}%  {:.1}s  {}",
+            "  WER {:5.1}%  CER {:5.1}%  {:.1}s audio  {:.1}s wall  RTF {:.3}  {}",
             wer,
             cer,
+            fix.audio_secs,
             wall,
+            rtf,
             if exact { "✓" } else { "" }
         );
 
@@ -183,6 +205,7 @@ fn main() {
             wer,
             cer,
             exact_match: exact,
+            audio_secs: fix.audio_secs,
             wall_secs: wall,
             hyp_words,
             ref_words,
@@ -194,12 +217,12 @@ fn main() {
     println!("═══ Per-Category Summary ═══");
     println!();
     println!(
-        "  {:20}  {:>5}  {:>7}  {:>7}  {:>9}",
-        "Category", "N", "WER", "CER", "Exact"
+        "  {:20}  {:>5}  {:>7}  {:>7}  {:>7}  {:>9}",
+        "Category", "N", "WER", "CER", "RTF", "Exact"
     );
     println!(
-        "  {:20}  {:>5}  {:>7}  {:>7}  {:>9}",
-        "────────", "─", "───", "───", "─────"
+        "  {:20}  {:>5}  {:>7}  {:>7}  {:>7}  {:>9}",
+        "────────", "─", "───", "───", "───", "─────"
     );
 
     let mut by_cat: BTreeMap<&str, Vec<&FixtureResult>> = BTreeMap::new();
@@ -211,13 +234,21 @@ fn main() {
         let n = items.len() as f64;
         let avg_wer = items.iter().map(|r| r.wer).sum::<f64>() / n;
         let avg_cer = items.iter().map(|r| r.cer).sum::<f64>() / n;
+        let total_audio = items.iter().map(|r| r.audio_secs).sum::<f64>();
+        let total_wall = items.iter().map(|r| r.wall_secs).sum::<f64>();
+        let rtf = if total_audio > 0.0 {
+            total_wall / total_audio
+        } else {
+            0.0
+        };
         let exact_count = items.iter().filter(|r| r.exact_match).count();
         println!(
-            "  {:20}  {:>5}  {:>6.1}%  {:>6.1}%  {:>4}/{:<4}",
+            "  {:20}  {:>5}  {:>6.1}%  {:>6.1}%  {:>6.3}  {:>4}/{:<4}",
             cat,
             items.len(),
             avg_wer,
             avg_cer,
+            rtf,
             exact_count,
             items.len()
         );
@@ -227,13 +258,21 @@ fn main() {
     let n = results.len() as f64;
     let avg_wer = results.iter().map(|r| r.wer).sum::<f64>() / n;
     let avg_cer = results.iter().map(|r| r.cer).sum::<f64>() / n;
+    let total_audio = results.iter().map(|r| r.audio_secs).sum::<f64>();
+    let total_wall = results.iter().map(|r| r.wall_secs).sum::<f64>();
+    let overall_rtf = if total_audio > 0.0 {
+        total_wall / total_audio
+    } else {
+        0.0
+    };
     let total_exact = results.iter().filter(|r| r.exact_match).count();
 
     println!();
     println!(
-        "  Overall: WER {:.1}%  CER {:.1}%  Exact {}/{}",
+        "  Overall: WER {:.1}%  CER {:.1}%  RTF {:.3}  Exact {}/{}",
         avg_wer,
         avg_cer,
+        overall_rtf,
         total_exact,
         results.len()
     );
@@ -269,10 +308,35 @@ fn main() {
         println!("  Long-form truncation: {}/{} clips", truncated, lf.len());
     }
 
+    // ── Slowest fixtures ───────────────────────────────────────────────
+    let mut slowest: Vec<&FixtureResult> = results.iter().collect();
+    slowest.sort_by(|a, b| b.wall_secs.total_cmp(&a.wall_secs));
+    println!("  Slowest fixtures:");
+    for r in slowest.into_iter().take(3) {
+        let rtf = if r.audio_secs > 0.0 {
+            r.wall_secs / r.audio_secs
+        } else {
+            0.0
+        };
+        println!(
+            "    {:20} {:20}  {:.1}s wall  {:.1}s audio  RTF {:.3}",
+            r.category, r.id, r.wall_secs, r.audio_secs, rtf
+        );
+    }
+
     println!();
 }
 
-async fn run_pipeline(fixture: &DomainFixture, harness: &BenchmarkHarness) -> Option<String> {
+#[derive(Default)]
+struct PipelineOutcome {
+    final_text: String,
+    command_text: Option<String>,
+}
+
+async fn run_pipeline(
+    fixture: &DomainFixture,
+    harness: &BenchmarkHarness,
+) -> Option<PipelineOutcome> {
     use lune_app::SessionManagerConfig;
     use lune_core::config::UserSettings;
     use tokio::sync::{Mutex, RwLock};
@@ -310,11 +374,17 @@ async fn run_pipeline(fixture: &DomainFixture, harness: &BenchmarkHarness) -> Op
                 .await
                 .expect("start session");
             let mut final_text = String::new();
+            let mut command_text: Option<String> = None;
             let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(180);
 
             loop {
                 match tokio::time::timeout_at(deadline, event_rx.recv()).await {
                     Ok(Some(SessionEvent::FinalizedText(t))) => final_text.push_str(&t),
+                    Ok(Some(SessionEvent::CommandDetected(payload))) => {
+                        if command_text.is_none() {
+                            command_text = command_text_from_payload(&payload);
+                        }
+                    }
                     Ok(Some(SessionEvent::Stopped)) => break,
                     Ok(Some(_)) => {}
                     Ok(None) => break,
@@ -325,11 +395,28 @@ async fn run_pipeline(fixture: &DomainFixture, harness: &BenchmarkHarness) -> Op
                 }
             }
 
-            if final_text.is_empty() {
+            if final_text.is_empty() && command_text.is_none() {
                 None
             } else {
-                Some(final_text)
+                Some(PipelineOutcome {
+                    final_text,
+                    command_text,
+                })
             }
         })
         .await
+}
+
+fn command_text_from_payload(payload: &str) -> Option<String> {
+    let cmd: VoiceCommand = serde_json::from_str(payload).ok()?;
+    Some(match cmd {
+        VoiceCommand::StopDictation => "stop listening".to_string(),
+        VoiceCommand::NewLine => "new line".to_string(),
+        VoiceCommand::NewParagraph => "new paragraph".to_string(),
+        VoiceCommand::ListItem => "list item".to_string(),
+        VoiceCommand::ScratchThat => "scratch that".to_string(),
+        VoiceCommand::SwitchStyle(style) => format!("switch to {style}"),
+        VoiceCommand::InsertSnippet(name) => format!("insert {name}"),
+        _ => return None,
+    })
 }

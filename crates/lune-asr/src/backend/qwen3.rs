@@ -445,6 +445,28 @@ fn append_cached_kv(inputs: &mut Vec<OrtInput<'_>>, kv_cache: Vec<ArrayD<f16>>) 
     Ok(())
 }
 
+fn bind_empty_kv(binding: &mut ort::session::IoBinding) -> Result<()> {
+    for i in 0..NUM_LAYERS {
+        let k = Value::from_array(ndarray::ArrayD::from_elem(
+            IxDyn(&[1, NUM_KV_HEADS, 0, HEAD_DIM]),
+            f16::ZERO,
+        ))
+        .map_err(|e| Error::Asr(format!("empty k{i}: {e}")))?;
+        let v = Value::from_array(ndarray::ArrayD::from_elem(
+            IxDyn(&[1, NUM_KV_HEADS, 0, HEAD_DIM]),
+            f16::ZERO,
+        ))
+        .map_err(|e| Error::Asr(format!("empty v{i}: {e}")))?;
+        binding
+            .bind_input(kv_name(i, true), &k)
+            .map_err(|e| Error::Asr(format!("bind empty key layer {i}: {e}")))?;
+        binding
+            .bind_input(kv_name(i, false), &v)
+            .map_err(|e| Error::Asr(format!("bind empty value layer {i}: {e}")))?;
+    }
+    Ok(())
+}
+
 /// Static KV cache tensor names: [past_k, past_v, present_k, present_v] × NUM_LAYERS.
 /// Initialized once, safe `&'static str` references via OnceLock.
 fn kv_cache_names() -> &'static [String] {
@@ -610,15 +632,55 @@ impl Qwen3AsrBackend {
 
         // 5. Prefill: run decoder with full embeddings + empty KV cache
         let prefill_t0 = std::time::Instant::now();
-        let (first_token, first_conf, first_logits, mut kv_cache) =
-            {
+        let (first_token, first_conf, first_logits, mut kv_cache) = {
+            let embeds_val =
+                Value::from_array(embeds).map_err(|e| Error::Asr(format!("embeds val: {e}")))?;
+            let pos_val = Value::from_array(mrope_position_ids(seq_len))
+                .map_err(|e| Error::Asr(format!("pos val: {e}")))?;
+            let mask_val = Value::from_array(Array2::<i64>::ones((1, seq_len)))
+                .map_err(|e| Error::Asr(format!("mask val: {e}")))?;
+
+            if self.decoder_io_binding {
+                let mut binding = models
+                    .decoder
+                    .create_binding()
+                    .map_err(|e| Error::Asr(format!("decoder prefill binding: {e}")))?;
+                binding
+                    .bind_input("inputs_embeds", &embeds_val)
+                    .map_err(|e| Error::Asr(format!("bind prefill embeds: {e}")))?;
+                binding
+                    .bind_input("position_ids", &pos_val)
+                    .map_err(|e| Error::Asr(format!("bind prefill position_ids: {e}")))?;
+                binding
+                    .bind_input("attention_mask", &mask_val)
+                    .map_err(|e| Error::Asr(format!("bind prefill attention_mask: {e}")))?;
+                bind_empty_kv(&mut binding)?;
+                bind_decoder_outputs_to_device(&mut binding, self.use_gpu)?;
+
+                let mut out = models
+                    .decoder
+                    .run_binding(&binding)
+                    .map_err(|e| Error::Asr(format!("decoder prefill: {e}")))?;
+                let (tok, conf, logits_k) = argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost)?;
+
+                let mut cache: Vec<DynValue> = Vec::with_capacity(NUM_LAYERS * 2);
+                for i in 0..NUM_LAYERS {
+                    cache.push(
+                        out.remove(present_kv_name(i, true))
+                            .ok_or_else(|| Error::Asr(format!("missing present key layer {i}")))?,
+                    );
+                    cache.push(
+                        out.remove(present_kv_name(i, false)).ok_or_else(|| {
+                            Error::Asr(format!("missing present value layer {i}"))
+                        })?,
+                    );
+                }
+                (tok, conf, logits_k, DecodeKvCache::Bound(cache))
+            } else {
                 let mut dec_inputs = ort::inputs!(
-                    "inputs_embeds" => Value::from_array(embeds)
-                        .map_err(|e| Error::Asr(format!("embeds val: {e}")))?,
-                    "position_ids" => Value::from_array(mrope_position_ids(seq_len))
-                        .map_err(|e| Error::Asr(format!("pos val: {e}")))?,
-                    "attention_mask" => Value::from_array(Array2::<i64>::ones((1, seq_len)))
-                        .map_err(|e| Error::Asr(format!("mask val: {e}")))?
+                    "inputs_embeds" => embeds_val,
+                    "position_ids" => pos_val,
+                    "attention_mask" => mask_val
                 );
                 append_empty_kv(&mut dec_inputs)?;
 
@@ -626,38 +688,22 @@ impl Qwen3AsrBackend {
                     .decoder
                     .run(dec_inputs)
                     .map_err(|e| Error::Asr(format!("decoder prefill: {e}")))?;
-
                 let (tok, conf, logits_k) = argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost)?;
 
-                // Extract per-layer KV cache
-                let cache =
-                    if self.decoder_io_binding {
-                        let mut cache: Vec<DynValue> = Vec::with_capacity(NUM_LAYERS * 2);
-                        for i in 0..NUM_LAYERS {
-                            cache.push(out.remove(present_kv_name(i, true)).ok_or_else(|| {
-                                Error::Asr(format!("missing present key layer {i}"))
-                            })?);
-                            cache.push(out.remove(present_kv_name(i, false)).ok_or_else(|| {
-                                Error::Asr(format!("missing present value layer {i}"))
-                            })?);
-                        }
-                        DecodeKvCache::Bound(cache)
-                    } else {
-                        let mut cache: Vec<ArrayD<f16>> = Vec::with_capacity(NUM_LAYERS * 2);
-                        for i in 0..NUM_LAYERS {
-                            let key = out.remove(present_kv_name(i, true)).ok_or_else(|| {
-                                Error::Asr(format!("missing present key layer {i}"))
-                            })?;
-                            let value = out.remove(present_kv_name(i, false)).ok_or_else(|| {
-                                Error::Asr(format!("missing present value layer {i}"))
-                            })?;
-                            cache.push(extract_f16_array(&key)?);
-                            cache.push(extract_f16_array(&value)?);
-                        }
-                        DecodeKvCache::Cpu(cache)
-                    };
-                (tok, conf, logits_k, cache)
-            };
+                let mut cache: Vec<ArrayD<f16>> = Vec::with_capacity(NUM_LAYERS * 2);
+                for i in 0..NUM_LAYERS {
+                    let key = out
+                        .remove(present_kv_name(i, true))
+                        .ok_or_else(|| Error::Asr(format!("missing present key layer {i}")))?;
+                    let value = out
+                        .remove(present_kv_name(i, false))
+                        .ok_or_else(|| Error::Asr(format!("missing present value layer {i}")))?;
+                    cache.push(extract_f16_array(&key)?);
+                    cache.push(extract_f16_array(&value)?);
+                }
+                (tok, conf, logits_k, DecodeKvCache::Cpu(cache))
+            }
+        };
         let prefill_ms = prefill_t0.elapsed().as_secs_f64() * 1000.0;
 
         let mut tokens: Vec<(i64, f32, Vec<f64>)> = vec![(first_token, first_conf, first_logits)];

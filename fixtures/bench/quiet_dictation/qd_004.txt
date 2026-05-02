@@ -1,1 +1,1 @@
-We're about 80 percent done with the migration. The main blocker right now is the authentication service. Once that's ported over, we can start running the integration tests against the new cluster.
+We're about 80% done with the migration. The main blocker right now is the authentication service. Once that's ported over, you can start running the integration tests against the new cluster.

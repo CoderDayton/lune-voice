@@ -259,9 +259,17 @@ pub fn load_wav_f32(path: &std::path::Path) -> Vec<f32> {
 
 // ─── Text metrics ───────────────────────────────────────────────────────────
 
-/// Strip punctuation, uppercase, collapse whitespace.
+/// Lowercase, strip punctuation, collapse whitespace.
 pub fn normalize_text(s: &str) -> String {
-    s.split_whitespace().collect::<Vec<_>>().join(" ")
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        if ch.is_alphanumeric() {
+            out.extend(ch.to_lowercase());
+        } else {
+            out.push(' ');
+        }
+    }
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 pub fn levenshtein<T: Eq>(a: &[T], b: &[T]) -> usize {

@@ -21,6 +21,7 @@ pub struct VoiceCommandRouter {
 // Static builtin patterns — sorted longest-first to prevent short-match shadowing.
 // "stop dictation" must precede "stop" so the longer match wins.
 static BUILTINS: &[(&str, VoiceCommand)] = &[
+    ("stop listening", VoiceCommand::StopDictation),
     ("stop dictation", VoiceCommand::StopDictation),
     ("new paragraph", VoiceCommand::NewParagraph),
     ("scratch that", VoiceCommand::ScratchThat),
