@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
-use crate::freq;
-
 // ── AlphabetMap ──────────────────────────────────────────────────────────
 
 struct AlphabetMap {
@@ -355,64 +353,6 @@ pub fn wed(a: &str, b: &str) -> f32 {
     }
 }
 
-// ── FrequencyLookup ─────────────────────────────────────────────────────
-
-pub use freq::{
-    SUPPORTED as supported_languages, dict_for, has_dict as has_freq_dict, is_english, warm,
-};
-
-pub struct FrequencyLookup;
-
-impl FrequencyLookup {
-    #[inline]
-    pub fn warm() {
-        freq::warm();
-    }
-
-    #[inline]
-    pub fn freq(word: &str) -> u32 {
-        Self::freq_lang(word, "en")
-    }
-
-    #[inline]
-    pub fn freq_lang(word: &str, lang: &str) -> u32 {
-        let lower = word.to_lowercase();
-        freq::dict_for(lang).get(&lower).unwrap_or(0)
-    }
-
-    #[inline]
-    pub fn freq_score(word: &str) -> f32 {
-        Self::freq_score_lang(word, "en")
-    }
-
-    #[inline]
-    pub fn freq_score_lang(word: &str, lang: &str) -> f32 {
-        let f = Self::freq_lang(word, lang);
-        if f == 0 {
-            return 0.0;
-        }
-        ((f as f32).ln() / 17.8).clamp(0.0, 1.0)
-    }
-
-    #[inline]
-    pub fn is_known(word: &str) -> bool {
-        Self::is_known_lang(word, "en")
-    }
-
-    #[inline]
-    pub fn is_known_lang(word: &str, lang: &str) -> bool {
-        Self::freq_lang(word, lang) > 0 || crate::vocab::bundled().is_known(word)
-    }
-
-    pub const CONFIDENT_FREQ: u32 = 5000;
-
-    #[inline]
-    pub fn is_confident(word: &str, lang: &str) -> bool {
-        Self::freq_lang(word, lang) >= Self::CONFIDENT_FREQ
-            || crate::vocab::bundled().is_known(word)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -431,12 +371,5 @@ mod tests {
     fn phonetic_key_works() {
         assert_eq!(phonetic_key("phone"), phonetic_key("fone"));
         assert_eq!(phonetic_key("knight"), phonetic_key("nit"));
-    }
-
-    #[test]
-    fn freq_lookup_tiers() {
-        assert!(FrequencyLookup::freq("the") > 0);
-        assert!(FrequencyLookup::freq("the") > FrequencyLookup::freq("algorithm"));
-        assert!(FrequencyLookup::is_known("hello"));
     }
 }

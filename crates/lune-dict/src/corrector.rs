@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 use lune_ngram::NGramModel;
 
-use crate::scorer::{self, FrequencyLookup};
+use crate::candidate_source::CandidateSource;
+use crate::lexicon::{Lexicon, WordSource};
+use crate::scorer;
 
 pub fn has_dict(language: &str) -> bool {
     crate::freq::has_dict(language)
@@ -99,6 +101,7 @@ impl HeuristicCorrector {
             };
         }
 
+        let lexicon = Lexicon::for_lang(lang);
         let words: Vec<&str> = text.split_whitespace().collect();
         let mut result_words: Vec<String> = Vec::with_capacity(words.len());
         let mut unresolved = Vec::new();
@@ -111,8 +114,10 @@ impl HeuristicCorrector {
             }
 
             let lower = stripped.to_ascii_lowercase();
-            let is_unknown = !FrequencyLookup::is_confident(&lower, lang)
-                && !crate::vocab::bundled().is_known(stripped);
+            let lexicon_info = lexicon.lookup(stripped);
+            let is_unknown = !lexicon_info.as_ref().is_some_and(|info| {
+                info.freq >= Lexicon::CONFIDENT_FREQ || info.source == WordSource::Vocab
+            });
             let risk_score = word_risk_scores
                 .iter()
                 .find(|(w, _)| w.eq_ignore_ascii_case(stripped))
@@ -132,7 +137,10 @@ impl HeuristicCorrector {
                 result_words.push(word.to_owned());
                 continue;
             }
-            if crate::vocab::bundled().is_known(stripped) {
+            if lexicon_info
+                .as_ref()
+                .is_some_and(|info| info.source == WordSource::Vocab)
+            {
                 result_words.push(word.to_owned());
                 continue;
             }
@@ -161,7 +169,7 @@ impl HeuristicCorrector {
             let next_end = (i + 3).min(words.len());
             let next: Vec<&str> = words[i + 1..next_end].to_vec();
 
-            let best = self.best_candidate(&lower, &prev, &next, lang);
+            let best = self.best_candidate(&lower, &prev, &next, &lexicon);
             if let Some((ref candidate, base_score, is_distant)) = best {
                 // Never correct garbage into a distant guess — leave for LLM
                 if !is_distant {
@@ -206,7 +214,7 @@ impl HeuristicCorrector {
         word: &str,
         prev: &[&str],
         next: &[&str],
-        lang: &str,
+        lexicon: &Lexicon,
     ) -> Option<(String, f32, bool)> {
         if word.len() < 2 {
             return None;
@@ -216,66 +224,16 @@ impl HeuristicCorrector {
         let lo = word.chars().count().saturating_sub(1);
         let hi = word.chars().count() + 2;
 
-        let dict = crate::freq::dict_for(lang);
-
-        // Primary candidates: freq map (all languages) + wordnik (English)
-        if crate::freq::is_english(lang) {
-            for bucket_len in lo..hi {
-                for cand in wordnik_list::word_iterator_by_len(bucket_len) {
-                    if cand == word {
-                        continue;
-                    }
-                    let wed = scorer::wed(word, cand);
-                    if wed > MAX_WED {
-                        continue;
-                    }
-                    let score = self.noisy_channel_score(word, cand, prev, next, wed, lang);
-                    if best.as_ref().is_none_or(|(_, bs, _)| score > *bs) {
-                        best = Some((cand.to_owned(), score, wed > DISTANT_WED));
-                    }
-                }
-            }
-        } else {
-            for cand in dict.candidates_iter(lo, hi) {
-                if cand == word {
-                    continue;
-                }
-                let wed = scorer::wed(word, cand);
-                if wed > MAX_WED {
-                    continue;
-                }
-                let score = self.noisy_channel_score(word, cand, prev, next, wed, lang);
-                if best.as_ref().is_none_or(|(_, bs, _)| score > *bs) {
-                    best = Some((cand.to_owned(), score, wed > DISTANT_WED));
-                }
-            }
-        }
-
-        // Supplemental vocab (proper nouns, tech terms) — preserves canonical casing
-        for cand in crate::vocab::bundled().candidates_by_len(lo, hi) {
-            let cand_lower = cand.to_ascii_lowercase();
-            if cand_lower == word {
-                continue;
-            }
+        for cand in CandidateSource::new(lexicon, word, lo, hi) {
+            let cand_lower = cand.canonical.to_ascii_lowercase();
             let wed = scorer::wed(word, &cand_lower);
             if wed > MAX_WED {
                 continue;
             }
-            // Vocab words get a frequency floor since they're curated known-good
-            let freq_override = dict.get(&cand_lower).unwrap_or(10_000);
-            let freq_score = ((freq_override as f32).ln() / 17.8).clamp(0.0, 1.0);
-            let ngram_ctx = self.ngram_context_score(&cand_lower, prev, next);
-            let lang_model = 0.35 * freq_score + 0.65 * ngram_ctx;
-            let mut log_error = -ERROR_PRECISION * wed;
-            if scorer::phonetic_key(word) == scorer::phonetic_key(&cand_lower) {
-                log_error += ERROR_PRECISION * PHONETIC_WED_EQUIV;
-            }
-            let error_model = log_error.exp();
-            const P: f32 = 2.0;
-            let score = (0.40 * (error_model + 1e-6).powf(P) + 0.60 * (lang_model + 1e-6).powf(P))
-                .powf(1.0 / P);
+            let score =
+                self.noisy_channel_score(word, &cand_lower, prev, next, wed, cand.freq_score);
             if best.as_ref().is_none_or(|(_, bs, _)| score > *bs) {
-                best = Some((cand.to_owned(), score, wed > DISTANT_WED));
+                best = Some((cand.canonical.to_owned(), score, wed > DISTANT_WED));
             }
         }
 
@@ -289,7 +247,7 @@ impl HeuristicCorrector {
         prev: &[&str],
         next: &[&str],
         wed: f32,
-        lang: &str,
+        freq_score: f32,
     ) -> f32 {
         // ── Error model: P(obs | cor) ──
         let mut log_error = -ERROR_PRECISION * wed;
@@ -307,7 +265,6 @@ impl HeuristicCorrector {
         let error_model = log_error.exp();
 
         // ── Language model: P(cor | context) via n-gram ──
-        let freq_score = FrequencyLookup::freq_score_lang(candidate, lang);
         let ngram_context = self.ngram_context_score(candidate, prev, next);
         const FREQ_WEIGHT: f32 = 0.35;
         const NGRAM_WEIGHT: f32 = 0.65;

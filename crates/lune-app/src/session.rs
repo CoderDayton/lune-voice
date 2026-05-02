@@ -861,7 +861,7 @@ mod tests {
         asr: A,
         post_processor: Arc<dyn TextPostProcessor>,
     ) -> (SessionManager<A>, Arc<Mutex<Database>>) {
-        lune_dict::scorer::FrequencyLookup::warm();
+        lune_dict::lexicon::warm();
         let db = lune_persist::Database::open_in_memory().unwrap();
         let dict =
             lune_dict::DictionaryManager::new(lune_persist::Database::open_in_memory().unwrap())
