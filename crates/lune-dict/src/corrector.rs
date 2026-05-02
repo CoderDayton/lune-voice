@@ -105,7 +105,7 @@ impl HeuristicCorrector {
 
         for (i, &word) in words.iter().enumerate() {
             let stripped = strip_punctuation(word);
-            if stripped.is_empty() {
+            if stripped.is_empty() || stripped.chars().any(|c| c.is_ascii_digit()) {
                 result_words.push(word.to_owned());
                 continue;
             }
