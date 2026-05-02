@@ -132,6 +132,10 @@ impl HeuristicCorrector {
                 result_words.push(word.to_owned());
                 continue;
             }
+            if crate::vocab::bundled().is_known(stripped) {
+                result_words.push(word.to_owned());
+                continue;
+            }
 
             let looks_proper = stripped.starts_with(|c: char| c.is_ascii_uppercase())
                 || (stripped.len() >= 2 && stripped.chars().all(|c| c.is_ascii_uppercase()));
