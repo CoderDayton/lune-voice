@@ -1,4 +1,8 @@
-use crate::scorer::{self, BigramModel, FrequencyLookup};
+use std::sync::Arc;
+
+use lune_ngram::NGramModel;
+
+use crate::scorer::{self, FrequencyLookup};
 
 pub fn has_dict(language: &str) -> bool {
     language.is_empty() || language.starts_with("en")
@@ -28,14 +32,6 @@ const SUBSEQ_WED_EQUIV: f32 = 0.6;
 // Shorter candidate penalty: equivalent to increasing WED by 0.2
 const SHORTER_WED_EQUIV: f32 = 0.2;
 
-// Jelinek-Mercer interpolation (Jelinek & Mercer, 1980)
-const UNIGRAM_LAMBDA: f32 = 0.75;
-const BIGRAM_LAMBDA: f32 = 1.0 - UNIGRAM_LAMBDA;
-
-// OOV discount: P(OOV) / P(in-vocab) ≈ 1/20 → ln(1/20) ≈ −3.0 in log-odds.
-// Mapped to score space as multiplicative factor.
-const OOV_DISCOUNT: f32 = 0.05;
-
 // Max WED: candidates beyond this distance have P(obs|cor) < exp(−α·2.5) ≈ 0.32.
 // Diminishing returns beyond this point.
 const MAX_WED: f32 = 2.5;
@@ -55,6 +51,7 @@ const HWCE_FLAG_THRESHOLD: f32 = 0.40;
 // WED boundary between "close" and "distant" candidates
 const DISTANT_WED: f32 = 1.5;
 
+#[derive(Debug)]
 pub struct WordScore {
     pub word: String,
     pub candidate_score: f32,
@@ -67,7 +64,7 @@ pub struct CorrectionResult {
 }
 
 pub struct HeuristicCorrector {
-    bigrams: BigramModel,
+    ngram: Arc<NGramModel>,
 }
 
 impl Default for HeuristicCorrector {
@@ -77,10 +74,14 @@ impl Default for HeuristicCorrector {
 }
 
 impl HeuristicCorrector {
+    pub fn from_ngram(ngram: Arc<NGramModel>) -> Self {
+        Self { ngram }
+    }
+
     pub fn new() -> Self {
-        Self {
-            bigrams: BigramModel::new(),
-        }
+        Self::from_ngram(Arc::new(
+            NGramModel::load_bundled().expect("bundled ngram model"),
+        ))
     }
 
     pub fn correct(
@@ -147,7 +148,7 @@ impl HeuristicCorrector {
             let unknown_only = is_unknown && !flagged;
             // Risk-proportional boost: scale excess risk into candidate score space
             let risk_boost = if both {
-                (risk_score - HWCE_FLAG_THRESHOLD).max(0.0) * UNIGRAM_LAMBDA
+                (risk_score - HWCE_FLAG_THRESHOLD).max(0.0) * 0.75
             } else {
                 0.0
             };
@@ -220,7 +221,6 @@ impl HeuristicCorrector {
         best
     }
 
-    // P(correction | observation, context) via noisy channel decomposition.
     fn noisy_channel_score(
         &self,
         original: &str,
@@ -230,10 +230,8 @@ impl HeuristicCorrector {
         wed: f32,
     ) -> f32 {
         // ── Error model: P(obs | cor) ──
-        // Base: exponential decay with weighted edit distance
         let mut log_error = -ERROR_PRECISION * wed;
 
-        // Feature adjustments as WED-equivalent shifts
         if scorer::phonetic_key(original) == scorer::phonetic_key(candidate) {
             log_error += ERROR_PRECISION * PHONETIC_WED_EQUIV;
         }
@@ -246,36 +244,39 @@ impl HeuristicCorrector {
 
         let error_model = log_error.exp();
 
-        // ── Language model: P(cor | context) ──
-        // Jelinek-Mercer interpolation of unigram and bigram
+        // ── Language model: P(cor | context) via n-gram ──
         let freq_score = FrequencyLookup::freq_score(candidate);
-        let context_score = self.bigrams.context_score_wide(candidate, prev, next);
-        let lang_model = if FrequencyLookup::freq(candidate) == 0 {
-            context_score * OOV_DISCOUNT
-        } else {
-            UNIGRAM_LAMBDA * freq_score + BIGRAM_LAMBDA * context_score
-        };
+        let ngram_context = self.ngram_context_score(candidate, prev, next);
+        const FREQ_WEIGHT: f32 = 0.35;
+        const NGRAM_WEIGHT: f32 = 0.65;
+        let lang_model = FREQ_WEIGHT * freq_score + NGRAM_WEIGHT * ngram_context;
 
-        // ── Posterior: weighted Hölder (power) mean M_p ──
-        //
-        // M_p(a,b; w₁,w₂) = (w₁·a^p + w₂·b^p)^(1/p)
-        //
-        // p controls interpolation behavior:
-        //   p =  1 → arithmetic mean (linear blend)
-        //   p →  0 → geometric mean (log-space average)
-        //   p = −1 → harmonic mean (penalizes weak signals)
-        //
-        // We use p = 2 (quadratic/RMS mean): super-linear, so a strong
-        // signal in either channel can compensate for a weaker one.
-        // This reflects that ASR corrections often have strong error
-        // model evidence (close distance + phonetic match) even when
-        // the candidate has low corpus frequency.
+        // ── Posterior: Hölder mean (p=2) ──
         const P: f32 = 2.0;
         const W_ERROR: f32 = 0.40;
         const W_LANG: f32 = 1.0 - W_ERROR;
         let a = (error_model + 1e-6).powf(P);
         let b = (lang_model + 1e-6).powf(P);
         (W_ERROR * a + W_LANG * b).powf(1.0 / P)
+    }
+
+    fn ngram_context_score(&self, candidate: &str, prev: &[&str], next: &[&str]) -> f32 {
+        let prefix: Vec<String> = prev
+            .iter()
+            .rev()
+            .take(2)
+            .rev()
+            .map(|w| w.to_string())
+            .collect();
+        let forward = self.ngram.interpolated_prob(&prefix, candidate);
+        let backward = next
+            .first()
+            .map(|n| self.ngram.interpolated_prob(&[candidate.to_string()], n))
+            .unwrap_or(1.0);
+        // Map log-prob product to [0,1] via calibrated sigmoid
+        let combined = (forward * backward.sqrt()).ln();
+        let sigmoid = 1.0 / (1.0 + (-0.15 * (combined + 5.0)).exp());
+        sigmoid as f32
     }
 }
 
@@ -460,5 +461,34 @@ mod tests {
         let c = HeuristicCorrector::new();
         let result = c.correct("hllo world", &[], &[], "en");
         assert_eq!(result.corrected_text, "hello world");
+    }
+
+    #[test]
+    fn ngram_context_boosts_contextual_candidate() {
+        use lune_ngram::{NGramModel, ScoringConfig};
+        use std::sync::Arc;
+
+        let mut model = NGramModel::new(ScoringConfig::trigram_default()).unwrap();
+        model.train_sentences([
+            "the weather is nice today",
+            "the weather is warm today",
+            "check the weather forecast",
+            "the weather report said rain",
+        ]);
+        let c = HeuristicCorrector::from_ngram(Arc::new(model));
+        // "weahter" is OOV, triggers candidate search
+        let result = c.correct("the weahter is nice", &[], &[], "en");
+        assert_eq!(result.corrected_text, "the weather is nice");
+    }
+
+    #[test]
+    fn from_ngram_constructor_works() {
+        use lune_ngram::{NGramModel, ScoringConfig};
+        use std::sync::Arc;
+
+        let model = NGramModel::new(ScoringConfig::trigram_default()).unwrap();
+        let c = HeuristicCorrector::from_ngram(Arc::new(model));
+        let result = c.correct("teh quick", &[], &[], "en");
+        assert_eq!(result.corrected_text, "the quick");
     }
 }

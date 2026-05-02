@@ -132,6 +132,7 @@ fn main() {
             llm,
             Arc::new(Mutex::new(dict)),
             Arc::new(Mutex::new(db)),
+            Arc::new(lune_dict::corrector::HeuristicCorrector::new()),
             config,
             settings,
         );

@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 lune-core.workspace = true
+lune-ngram.workspace = true
 lune-persist.workspace = true
 tracing.workspace = true
 wordnik_list = "0.2"

@@ -1,4 +1,4 @@
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 
 use std::time::Duration;
 
@@ -14,12 +14,10 @@ use lune_core::Result;
 use lune_core::asr::{AsrBackend, AsrBackendKind, AsrSegment, AsrSessionConfig};
 use lune_core::config::{PipelineConfig, StylePreset, UserSettings, builtin_registry};
 use lune_core::error::Error;
-use lune_core::llm::{CorrectionSpan, TextPostProcessor};
+use lune_core::llm::TextPostProcessor;
 use lune_core::session::{DictationSession, SessionEvent, SessionStatus};
 use lune_dict::DictionaryManager;
 use lune_dict::corrector::HeuristicCorrector;
-
-static HEURISTIC: LazyLock<HeuristicCorrector> = LazyLock::new(HeuristicCorrector::new);
 use lune_persist::Database;
 
 /// Configuration for the session pipeline.
@@ -66,6 +64,7 @@ pub struct SessionManager<A: AsrBackend> {
     post_processor: Arc<dyn TextPostProcessor>,
     dict: Arc<Mutex<DictionaryManager>>,
     persist: Arc<Mutex<Database>>,
+    heuristic: Arc<HeuristicCorrector>,
     config: SessionManagerConfig,
     settings: Arc<RwLock<UserSettings>>,
     active: Arc<Mutex<Option<ActiveHandle>>>,
@@ -80,6 +79,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         post_processor: Arc<dyn TextPostProcessor>,
         dict: Arc<Mutex<DictionaryManager>>,
         persist: Arc<Mutex<Database>>,
+        heuristic: Arc<HeuristicCorrector>,
         config: SessionManagerConfig,
         settings: Arc<RwLock<UserSettings>>,
     ) -> Self {
@@ -89,6 +89,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             post_processor,
             dict,
             persist,
+            heuristic,
             config,
             settings,
             active: Arc::new(Mutex::new(None)),
@@ -156,6 +157,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let active_arc = Arc::clone(&self.active);
         let idle_notify = Arc::clone(&self.idle_notify);
         let settings = Arc::clone(&self.settings);
+        let heuristic = Arc::clone(&self.heuristic);
         tokio::task::spawn(run_session(
             session_id,
             asr,
@@ -163,6 +165,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             post_processor,
             dict,
             persist,
+            heuristic,
             config,
             style_preset,
             event_tx,
@@ -275,60 +278,6 @@ fn append_segments(
     appended
 }
 
-fn correction_spans_for_text(
-    text: &str,
-    segments: &[AsrSegment],
-    risk_threshold: f32,
-) -> Vec<CorrectionSpan> {
-    let words = indexed_words(text);
-    let mut spans = Vec::new();
-    let mut search_from = 0usize;
-
-    for wc in segments
-        .iter()
-        .flat_map(|seg| seg.word_confidences.iter())
-        .filter(|wc| wc.word_error_risk >= risk_threshold && !wc.word.is_empty())
-    {
-        let needle = normalize_word(&wc.word);
-        if needle.is_empty() {
-            continue;
-        }
-        if let Some((idx, _, raw)) = words
-            .iter()
-            .skip(search_from)
-            .find(|(_, normalized, _)| *normalized == needle)
-        {
-            spans.push(CorrectionSpan {
-                start_word: *idx,
-                end_word: idx + 1,
-                text: raw.clone(),
-                confidence: wc.confidence,
-                word_error_risk: wc.word_error_risk,
-            });
-            search_from = idx + 1;
-        }
-    }
-
-    spans
-}
-
-fn indexed_words(text: &str) -> Vec<(usize, String, String)> {
-    text.split_whitespace()
-        .enumerate()
-        .filter_map(|(idx, raw)| {
-            let normalized = normalize_word(raw);
-            (!normalized.is_empty()).then(|| (idx, normalized, raw.to_owned()))
-        })
-        .collect()
-}
-
-fn normalize_word(word: &str) -> String {
-    word.chars()
-        .filter(|c| c.is_alphanumeric())
-        .flat_map(char::to_lowercase)
-        .collect()
-}
-
 fn drain_processing_controls(
     control_rx: &mut mpsc::UnboundedReceiver<SessionControl>,
     cancelled: &mut bool,
@@ -354,6 +303,7 @@ async fn run_session<A: AsrBackend + 'static>(
     post_processor: Arc<dyn TextPostProcessor>,
     dict: Arc<Mutex<DictionaryManager>>,
     persist: Arc<Mutex<Database>>,
+    heuristic: Arc<HeuristicCorrector>,
     config: SessionManagerConfig,
     style_preset: Arc<StylePreset>,
     event_tx: mpsc::Sender<SessionEvent>,
@@ -606,8 +556,6 @@ async fn run_session<A: AsrBackend + 'static>(
     }
 
     let pipeline_t0 = tokio::time::Instant::now();
-    const BYPASS_RISK: f32 = 0.60;
-
     // ── Step 1: Dictionary scan + Heuristic correction ─────────────────
     let (dictionary_entries, dict_replacements) = {
         let guard = dict.lock().await;
@@ -637,66 +585,42 @@ async fn run_session<A: AsrBackend + 'static>(
         .first()
         .and_then(|s| s.detected_language.as_deref())
         .unwrap_or("en");
-    let heuristic = HEURISTIC.correct(
+    let heuristic_result = heuristic.correct(
         &text_after_commands,
         &word_risk_scores,
         &dict_replacements,
         detected_lang,
     );
-    let text_after_heuristic = heuristic.corrected_text;
+    let text_after_heuristic = heuristic_result.corrected_text;
 
-    let correction_spans = correction_spans_for_text(&text_after_heuristic, &segments, BYPASS_RISK);
-
-    // ── LLM bypass: score-based gate ────────────────────────────────────
-    // Use the stronger signal: either HWCE risk or corrector candidate score.
-    const UNCERTAIN_THRESHOLD: f32 = 0.45;
-
-    let has_unresolved = !heuristic.unresolved_words.is_empty();
-    let has_correction_spans = !correction_spans.is_empty();
-
-    let uncertain_words: Vec<String> = if !has_unresolved && !has_correction_spans {
-        Vec::new()
+    // ── LLM bypass gate ─────────────────────────────────────────────────
+    let needs_llm = if !lune_dict::corrector::has_dict(detected_lang) {
+        word_risk_scores.iter().any(|(_, r)| *r >= 0.65)
     } else {
-        let mut words = Vec::new();
-        for ws in &heuristic.unresolved_words {
-            let risk = word_risk_scores
-                .iter()
-                .find(|(k, _)| k.eq_ignore_ascii_case(&ws.word))
-                .map(|(_, s)| *s)
-                .unwrap_or(0.0);
-            let score = risk.max(ws.candidate_score);
-            if score >= UNCERTAIN_THRESHOLD {
-                words.push(ws.word.clone());
-            }
-        }
-        for span in &correction_spans {
-            let risk = span.word_error_risk;
-            let cand = heuristic
-                .unresolved_words
-                .iter()
-                .find(|ws| ws.word.eq_ignore_ascii_case(&span.text))
-                .map(|ws| ws.candidate_score)
-                .unwrap_or(0.0);
-            let score = risk.max(cand);
-            if score >= UNCERTAIN_THRESHOLD
-                && !words.iter().any(|w| w.eq_ignore_ascii_case(&span.text))
-            {
-                words.push(span.text.clone());
-            }
-        }
-        words
+        !heuristic_result.unresolved_words.is_empty()
     };
-    let needs_llm = !uncertain_words.is_empty();
 
+    let uncertain_words: Vec<String> = heuristic_result
+        .unresolved_words
+        .iter()
+        .map(|ws| ws.word.clone())
+        .collect();
+
+    info!(%session_id, "[ASR] raw: {raw_text}");
     info!(
         %session_id,
         lang = detected_lang,
-        unresolved = heuristic.unresolved_words.len(),
-        spans = correction_spans.len(),
-        ?uncertain_words,
+        unresolved = heuristic_result.unresolved_words.len(),
         needs_llm,
         "bypass gate"
     );
+
+    let _ = event_tx
+        .send(SessionEvent::GateDecision {
+            used_llm: needs_llm,
+            unresolved: uncertain_words.clone(),
+        })
+        .await;
 
     drain_processing_controls(&mut control_rx, &mut cancelled);
     let post_llm_text = if cancelled {
@@ -713,7 +637,7 @@ async fn run_session<A: AsrBackend + 'static>(
             style_preset: Arc::clone(&style_preset),
             app_category: None,
             dictionary: dictionary_entries.clone(),
-            correction_spans,
+            correction_spans: vec![],
             context: None,
             language: detected_lang.into(),
             uncertain_words,
@@ -925,44 +849,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn correction_spans_align_flagged_words() {
-        let mut segment = make_segment("the quarterly numbers were final", true);
-        segment.word_confidences = vec![
-            WordConfidence {
-                word: "quarterly".into(),
-                confidence: 0.2,
-                word_error_risk: 0.8,
-            },
-            WordConfidence {
-                word: "numbers".into(),
-                confidence: 0.3,
-                word_error_risk: 0.2,
-            },
-        ];
-
-        let spans = correction_spans_for_text("the quarterly numbers were final", &[segment], 0.50);
-
-        assert_eq!(spans.len(), 1);
-        assert_eq!(spans[0].start_word, 1);
-        assert_eq!(spans[0].end_word, 2);
-        assert_eq!(spans[0].text, "quarterly");
-    }
-
-    #[test]
-    fn correction_spans_ignore_words_changed_by_dictionary() {
-        let mut segment = make_segment("use lunevoice today", true);
-        segment.word_confidences = vec![WordConfidence {
-            word: "lunevoice".into(),
-            confidence: 0.2,
-            word_error_risk: 0.9,
-        }];
-
-        let spans = correction_spans_for_text("use Lune Voice today", &[segment], 0.50);
-
-        assert!(spans.is_empty());
-    }
-
     fn scripted_asr(responses: Vec<Result<Vec<AsrSegment>>>) -> ScriptedAsr {
         ScriptedAsr {
             responses: Mutex::new(VecDeque::from(responses)),
@@ -987,6 +873,7 @@ mod tests {
             post_processor,
             Arc::new(Mutex::new(dict)),
             Arc::clone(&db),
+            Arc::new(HeuristicCorrector::new()),
             SessionManagerConfig::default(),
             settings,
         );

@@ -1,4 +1,3 @@
-pub mod bigrams;
 pub mod core_dict;
 pub mod corrector;
 pub mod scorer;

@@ -610,12 +610,31 @@ async fn build_pipeline(
             .with_overrides(&settings.read().await.pipeline),
     };
 
+    let heuristic = {
+        let mut ngram = lune_ngram::NGramModel::load_bundled().unwrap_or_else(|e| {
+            tracing::warn!("Failed to load bundled ngram model: {e}, using empty");
+            lune_ngram::NGramModel::new(lune_ngram::ScoringConfig::trigram_default()).unwrap()
+        });
+        if let Ok(sessions) = db.lock().await.list_sessions(500) {
+            let transcripts: Vec<&str> = sessions
+                .iter()
+                .filter(|s| matches!(s.status, lune_core::session::SessionStatus::Completed))
+                .filter_map(|s| s.transcript.as_deref())
+                .collect();
+            ngram.train_sentences(transcripts);
+        }
+        Arc::new(lune_dict::corrector::HeuristicCorrector::from_ngram(
+            Arc::new(ngram),
+        ))
+    };
+
     let manager = SessionManager::new(
         Arc::new(asr),
         router,
         post_processor,
         dict,
         db,
+        heuristic,
         config,
         Arc::clone(&settings),
     );

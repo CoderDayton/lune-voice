@@ -68,6 +68,11 @@ pub enum SessionEvent {
     /// while recording so the UI can show a live audio visualization.
     AudioLevel(f32),
     CommandDetected(String),
+    /// Gate decision: true = LLM was used, false = bypassed.
+    GateDecision {
+        used_llm: bool,
+        unresolved: Vec<String>,
+    },
     Error(String),
     Stopped,
 }
@@ -85,6 +90,7 @@ impl SessionEvent {
             | Self::PartialText
             | Self::Processing
             | Self::AudioLevel(_)
+            | Self::GateDecision { .. }
             | Self::Stopped => None,
         }
     }

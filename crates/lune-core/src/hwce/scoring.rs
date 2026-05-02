@@ -149,8 +149,6 @@ fn score_features(f: &WordConfidenceFeatures, c: &Config) -> f32 {
     sigmoid(c.scale * (raw - c.midpoint))
 }
 
-// Gaussian deviation from median English word length (μ=5, σ=3).
-// risk = 1 − exp(−(len − μ)² / 2σ²), clamped for very short fragments.
 fn length_risk(len: u8) -> f32 {
     const MU: f32 = 5.0;
     const SIGMA: f32 = 3.0;
