@@ -32,7 +32,8 @@ pub struct PostProcessInput {
     /// BCP-47 language code from ASR detection (e.g. "en", "eng", "fr").
     /// Defaults to "en" if not set by the pipeline.
     pub language: String,
-    pub uncertain_words: Vec<String>,
+    /// Words flagged as likely incorrect, with their word-index position in the text.
+    pub uncertain_words: Vec<(String, usize)>,
 }
 
 /// Output from the text post-processor.

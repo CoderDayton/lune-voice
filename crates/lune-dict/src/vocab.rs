@@ -28,6 +28,16 @@ impl SupplementalVocab {
     pub fn word_count(&self) -> usize {
         self.words.len()
     }
+
+    pub fn candidates_by_len(&self, lo: usize, hi: usize) -> impl Iterator<Item = &str> {
+        self.words
+            .keys()
+            .filter(move |w| {
+                let len = w.len();
+                len >= lo && len < hi
+            })
+            .map(|s| s.as_str())
+    }
 }
 
 static BUNDLED: LazyLock<SupplementalVocab> = LazyLock::new(|| {

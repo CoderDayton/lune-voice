@@ -72,7 +72,7 @@ pub enum SessionEvent {
     GateDecision {
         used_llm: bool,
         lang: String,
-        unresolved: Vec<String>,
+        unresolved: Vec<(String, usize)>,
     },
     Error(String),
     Stopped,

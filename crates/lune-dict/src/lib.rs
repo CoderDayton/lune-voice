@@ -1,5 +1,5 @@
-pub mod core_dict;
 pub mod corrector;
+pub mod freq;
 pub mod scorer;
 pub mod vocab;
 

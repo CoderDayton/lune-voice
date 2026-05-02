@@ -5,10 +5,7 @@ use lune_ngram::NGramModel;
 use crate::scorer::{self, FrequencyLookup};
 
 pub fn has_dict(language: &str) -> bool {
-    language.is_empty()
-        || language.starts_with("en")
-        || language.starts_with("En")
-        || language.eq_ignore_ascii_case("english")
+    crate::freq::has_dict(language)
 }
 
 // ── Noisy Channel Model (Shannon, 1948) ─────────────────────────────────────
@@ -45,7 +42,6 @@ const MAX_WED: f32 = 2.5;
 //   Distant candidates (WED > 1.5): C_fp/C_fn ≈ 2.3 → threshold = 2.3/3.3 ≈ 0.70
 //   Unknown-only (no HWCE flag): moderate → 0.50
 const CLOSE_THRESHOLD: f32 = 0.55;
-const DISTANT_THRESHOLD: f32 = 0.70;
 const UNKNOWN_ONLY_THRESHOLD: f32 = 0.50;
 
 // HWCE flag threshold: words with risk above this are considered uncertain
@@ -57,6 +53,7 @@ const DISTANT_WED: f32 = 1.5;
 #[derive(Debug)]
 pub struct WordScore {
     pub word: String,
+    pub position: usize,
     pub candidate_score: f32,
 }
 
@@ -114,7 +111,8 @@ impl HeuristicCorrector {
             }
 
             let lower = stripped.to_ascii_lowercase();
-            let is_unknown = !FrequencyLookup::is_known(&lower);
+            let is_unknown = !FrequencyLookup::is_confident(&lower, lang)
+                && !crate::vocab::bundled().is_known(stripped);
             let risk_score = word_risk_scores
                 .iter()
                 .find(|(w, _)| w.eq_ignore_ascii_case(stripped))
@@ -159,29 +157,35 @@ impl HeuristicCorrector {
             let next_end = (i + 3).min(words.len());
             let next: Vec<&str> = words[i + 1..next_end].to_vec();
 
-            let best = self.best_candidate(&lower, &prev, &next);
+            let best = self.best_candidate(&lower, &prev, &next, lang);
             if let Some((ref candidate, base_score, is_distant)) = best {
-                let score = base_score + risk_boost;
-                let threshold = if is_distant {
-                    DISTANT_THRESHOLD
-                } else if unknown_only {
-                    UNKNOWN_ONLY_THRESHOLD
-                } else {
-                    CLOSE_THRESHOLD
-                };
+                // Never correct garbage into a distant guess — leave for LLM
+                if !is_distant {
+                    let score = base_score + risk_boost;
+                    let threshold = if unknown_only {
+                        UNKNOWN_ONLY_THRESHOLD
+                    } else {
+                        CLOSE_THRESHOLD
+                    };
 
-                if score >= threshold {
-                    let corrected = preserve_casing(stripped, candidate);
-                    result_words.push(restore_punctuation(word, &corrected));
-                    continue;
+                    if score >= threshold {
+                        let corrected = preserve_casing(stripped, candidate);
+                        result_words.push(restore_punctuation(word, &corrected));
+                        continue;
+                    }
                 }
             }
 
-            let cand_score = best.map(|(_, s, _)| s + risk_boost).unwrap_or(0.0);
-            unresolved.push(WordScore {
-                word: stripped.to_owned(),
-                candidate_score: cand_score,
-            });
+            // Only mark as unresolved if HWCE flagged it — unflagged unknown words
+            // are likely valid words not in our corpus, so just pass through.
+            if flagged {
+                let cand_score = best.map(|(_, s, _)| s + risk_boost).unwrap_or(0.0);
+                unresolved.push(WordScore {
+                    word: stripped.to_owned(),
+                    position: i,
+                    candidate_score: cand_score,
+                });
+            }
             result_words.push(word.to_owned());
         }
 
@@ -198,25 +202,76 @@ impl HeuristicCorrector {
         word: &str,
         prev: &[&str],
         next: &[&str],
+        lang: &str,
     ) -> Option<(String, f32, bool)> {
         if word.len() < 2 {
             return None;
         }
 
         let mut best: Option<(String, f32, bool)> = None;
-        let lo = word.len().saturating_sub(1);
-        let hi = word.len() + 2;
+        let lo = word.chars().count().saturating_sub(1);
+        let hi = word.chars().count() + 2;
 
-        for bucket_len in lo..hi {
-            for cand in wordnik_list::word_iterator_by_len(bucket_len) {
+        let dict = crate::freq::dict_for(lang);
+
+        // Primary candidates: freq map (all languages) + wordnik (English)
+        if crate::freq::is_english(lang) {
+            for bucket_len in lo..hi {
+                for cand in wordnik_list::word_iterator_by_len(bucket_len) {
+                    if cand == word {
+                        continue;
+                    }
+                    let wed = scorer::wed(word, cand);
+                    if wed > MAX_WED {
+                        continue;
+                    }
+                    let score = self.noisy_channel_score(word, cand, prev, next, wed, lang);
+                    if best.as_ref().is_none_or(|(_, bs, _)| score > *bs) {
+                        best = Some((cand.to_owned(), score, wed > DISTANT_WED));
+                    }
+                }
+            }
+        } else {
+            for cand in dict.candidates_iter(lo, hi) {
+                if cand == word {
+                    continue;
+                }
                 let wed = scorer::wed(word, cand);
                 if wed > MAX_WED {
                     continue;
                 }
-                let score = self.noisy_channel_score(word, cand, prev, next, wed);
+                let score = self.noisy_channel_score(word, cand, prev, next, wed, lang);
                 if best.as_ref().is_none_or(|(_, bs, _)| score > *bs) {
                     best = Some((cand.to_owned(), score, wed > DISTANT_WED));
                 }
+            }
+        }
+
+        // Supplemental vocab (proper nouns, tech terms) — preserves canonical casing
+        for cand in crate::vocab::bundled().candidates_by_len(lo, hi) {
+            let cand_lower = cand.to_ascii_lowercase();
+            if cand_lower == word {
+                continue;
+            }
+            let wed = scorer::wed(word, &cand_lower);
+            if wed > MAX_WED {
+                continue;
+            }
+            // Vocab words get a frequency floor since they're curated known-good
+            let freq_override = dict.get(&cand_lower).unwrap_or(10_000);
+            let freq_score = ((freq_override as f32).ln() / 17.8).clamp(0.0, 1.0);
+            let ngram_ctx = self.ngram_context_score(&cand_lower, prev, next);
+            let lang_model = 0.35 * freq_score + 0.65 * ngram_ctx;
+            let mut log_error = -ERROR_PRECISION * wed;
+            if scorer::phonetic_key(word) == scorer::phonetic_key(&cand_lower) {
+                log_error += ERROR_PRECISION * PHONETIC_WED_EQUIV;
+            }
+            let error_model = log_error.exp();
+            const P: f32 = 2.0;
+            let score = (0.40 * (error_model + 1e-6).powf(P) + 0.60 * (lang_model + 1e-6).powf(P))
+                .powf(1.0 / P);
+            if best.as_ref().is_none_or(|(_, bs, _)| score > *bs) {
+                best = Some((cand.to_owned(), score, wed > DISTANT_WED));
             }
         }
 
@@ -230,6 +285,7 @@ impl HeuristicCorrector {
         prev: &[&str],
         next: &[&str],
         wed: f32,
+        lang: &str,
     ) -> f32 {
         // ── Error model: P(obs | cor) ──
         let mut log_error = -ERROR_PRECISION * wed;
@@ -247,7 +303,7 @@ impl HeuristicCorrector {
         let error_model = log_error.exp();
 
         // ── Language model: P(cor | context) via n-gram ──
-        let freq_score = FrequencyLookup::freq_score(candidate);
+        let freq_score = FrequencyLookup::freq_score_lang(candidate, lang);
         let ngram_context = self.ngram_context_score(candidate, prev, next);
         const FREQ_WEIGHT: f32 = 0.35;
         const NGRAM_WEIGHT: f32 = 0.65;
@@ -393,7 +449,15 @@ mod tests {
     }
 
     #[test]
-    fn non_english_bypasses_corrector() {
+    fn unsupported_lang_bypasses_corrector() {
+        let c = HeuristicCorrector::new();
+        let result = c.correct("jambo dunia", &[], &[], "swahili");
+        assert_eq!(result.corrected_text, "jambo dunia");
+        assert!(result.all_resolved);
+    }
+
+    #[test]
+    fn french_known_words_pass_through() {
         let c = HeuristicCorrector::new();
         let result = c.correct("bonjour le monde", &[], &[], "fr");
         assert_eq!(result.corrected_text, "bonjour le monde");
@@ -403,7 +467,8 @@ mod tests {
     #[test]
     fn unresolved_words_reported() {
         let c = HeuristicCorrector::new();
-        let result = c.correct("the xyzqqq fox", &[], &[], "en");
+        let risks = vec![("xyzqqq".to_string(), 0.9)];
+        let result = c.correct("the xyzqqq fox", &risks, &[], "en");
         assert!(!result.unresolved_words.is_empty());
         assert!(result.unresolved_words.iter().any(|ws| ws.word == "xyzqqq"));
     }
@@ -448,8 +513,10 @@ mod tests {
         assert!(has_dict("eng"));
         assert!(has_dict("English"));
         assert!(has_dict(""));
-        assert!(!has_dict("fr"));
-        assert!(!has_dict("de"));
+        assert!(has_dict("fr"));
+        assert!(has_dict("de"));
+        assert!(has_dict("Japanese"));
+        assert!(!has_dict("swahili"));
     }
 
     #[test]

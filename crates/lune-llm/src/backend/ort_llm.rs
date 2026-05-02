@@ -238,13 +238,19 @@ impl OrtStyleLlm {
         language: &str,
         _style_instructions: &str,
         _correction_spans: &[CorrectionSpan],
-        uncertain_words: &[String],
+        uncertain_words: &[(String, usize)],
     ) -> String {
         if uncertain_words.is_empty() {
             format!("Correct this {language} transcript:\n{transcript}")
         } else {
-            let words = uncertain_words.join(", ");
-            format!("Uncertain words: {words}\nCorrect this {language} transcript:\n{transcript}")
+            let words: Vec<String> = uncertain_words
+                .iter()
+                .map(|(w, pos)| format!("{w} (#{pos})"))
+                .collect();
+            let hint = words.join(", ");
+            format!(
+                "Uncertain words (name and 0-indexed position): [{hint}]\nCorrect this {language} transcript:\n{transcript}"
+            )
         }
     }
 
@@ -254,7 +260,7 @@ impl OrtStyleLlm {
         language: &str,
         style: &lune_core::config::StylePreset,
         correction_spans: &[CorrectionSpan],
-        uncertain_words: &[String],
+        uncertain_words: &[(String, usize)],
     ) -> Result<String> {
         let system = lune_core::config::BASE_SYSTEM_PROMPT.replace("{lang}", language);
 

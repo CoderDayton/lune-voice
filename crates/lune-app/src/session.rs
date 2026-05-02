@@ -600,10 +600,10 @@ async fn run_session<A: AsrBackend + 'static>(
         !heuristic_result.unresolved_words.is_empty()
     };
 
-    let uncertain_words: Vec<String> = heuristic_result
+    let uncertain_words: Vec<(String, usize)> = heuristic_result
         .unresolved_words
         .iter()
-        .map(|ws| ws.word.clone())
+        .map(|ws| (ws.word.clone(), ws.position))
         .collect();
 
     info!(%session_id, "[ASR] raw: {raw_text}");
@@ -861,6 +861,7 @@ mod tests {
         asr: A,
         post_processor: Arc<dyn TextPostProcessor>,
     ) -> (SessionManager<A>, Arc<Mutex<Database>>) {
+        lune_dict::scorer::FrequencyLookup::warm();
         let db = lune_persist::Database::open_in_memory().unwrap();
         let dict =
             lune_dict::DictionaryManager::new(lune_persist::Database::open_in_memory().unwrap())

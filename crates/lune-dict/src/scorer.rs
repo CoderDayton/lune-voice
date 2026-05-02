@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
-use crate::core_dict::CORE_DICT;
+use crate::freq;
 
 // ── AlphabetMap ──────────────────────────────────────────────────────────
 
@@ -357,33 +357,59 @@ pub fn wed(a: &str, b: &str) -> f32 {
 
 // ── FrequencyLookup ─────────────────────────────────────────────────────
 
-static CORE_MAP: LazyLock<HashMap<&'static str, u32>> =
-    LazyLock::new(|| CORE_DICT.iter().copied().collect());
+pub use freq::{
+    SUPPORTED as supported_languages, dict_for, has_dict as has_freq_dict, is_english, warm,
+};
 
 pub struct FrequencyLookup;
 
 impl FrequencyLookup {
-    pub fn freq(word: &str) -> u32 {
-        let lower = word.to_ascii_lowercase();
-        if let Some(&f) = CORE_MAP.get(lower.as_str()) {
-            return f;
-        }
-        if wordnik_list::word_exists(&lower) {
-            return 10;
-        }
-        0
+    #[inline]
+    pub fn warm() {
+        freq::warm();
     }
 
+    #[inline]
+    pub fn freq(word: &str) -> u32 {
+        Self::freq_lang(word, "en")
+    }
+
+    #[inline]
+    pub fn freq_lang(word: &str, lang: &str) -> u32 {
+        let lower = word.to_lowercase();
+        freq::dict_for(lang).get(&lower).unwrap_or(0)
+    }
+
+    #[inline]
     pub fn freq_score(word: &str) -> f32 {
-        let f = Self::freq(word);
+        Self::freq_score_lang(word, "en")
+    }
+
+    #[inline]
+    pub fn freq_score_lang(word: &str, lang: &str) -> f32 {
+        let f = Self::freq_lang(word, lang);
         if f == 0 {
             return 0.0;
         }
-        ((f as f32).ln() / 11.52).clamp(0.0, 1.0)
+        ((f as f32).ln() / 17.8).clamp(0.0, 1.0)
     }
 
+    #[inline]
     pub fn is_known(word: &str) -> bool {
-        Self::freq(word) > 0 || crate::vocab::bundled().is_known(word)
+        Self::is_known_lang(word, "en")
+    }
+
+    #[inline]
+    pub fn is_known_lang(word: &str, lang: &str) -> bool {
+        Self::freq_lang(word, lang) > 0 || crate::vocab::bundled().is_known(word)
+    }
+
+    pub const CONFIDENT_FREQ: u32 = 5000;
+
+    #[inline]
+    pub fn is_confident(word: &str, lang: &str) -> bool {
+        Self::freq_lang(word, lang) >= Self::CONFIDENT_FREQ
+            || crate::vocab::bundled().is_known(word)
     }
 }
 
