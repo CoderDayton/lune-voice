@@ -2,6 +2,9 @@ use lune_ngram::{NGramModel, ScoringConfig};
 use std::path::Path;
 
 const SEED_SENTENCES: &[&str] = &[
+    "launch lune voice and set the hotkey",
+    "open lune voice settings and check the config",
+    "use lune voice to dictate text into any app",
     "hello world how are you doing today",
     "hello everyone welcome to the presentation",
     "say hello to our new team member",

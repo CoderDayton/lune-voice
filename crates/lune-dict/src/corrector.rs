@@ -5,7 +5,10 @@ use lune_ngram::NGramModel;
 use crate::scorer::{self, FrequencyLookup};
 
 pub fn has_dict(language: &str) -> bool {
-    language.is_empty() || language.starts_with("en")
+    language.is_empty()
+        || language.starts_with("en")
+        || language.starts_with("En")
+        || language.eq_ignore_ascii_case("english")
 }
 
 // ── Noisy Channel Model (Shannon, 1948) ─────────────────────────────────────
@@ -134,12 +137,11 @@ impl HeuristicCorrector {
 
             let looks_proper = stripped.starts_with(|c: char| c.is_ascii_uppercase())
                 || (stripped.len() >= 2 && stripped.chars().all(|c| c.is_ascii_uppercase()));
+            let is_camel_case = stripped.chars().any(|c| c.is_ascii_uppercase())
+                && stripped.chars().any(|c| c.is_ascii_lowercase())
+                && stripped.chars().filter(|c| c.is_ascii_uppercase()).count() >= 2;
 
-            if is_unknown && !flagged && looks_proper {
-                unresolved.push(WordScore {
-                    word: stripped.to_owned(),
-                    candidate_score: 0.0,
-                });
+            if is_unknown && (looks_proper || is_camel_case) && risk_score < 0.80 {
                 result_words.push(word.to_owned());
                 continue;
             }
@@ -444,6 +446,7 @@ mod tests {
     fn has_dict_checks() {
         assert!(has_dict("en"));
         assert!(has_dict("eng"));
+        assert!(has_dict("English"));
         assert!(has_dict(""));
         assert!(!has_dict("fr"));
         assert!(!has_dict("de"));
@@ -490,5 +493,25 @@ mod tests {
         let c = HeuristicCorrector::from_ngram(Arc::new(model));
         let result = c.correct("teh quick", &[], &[], "en");
         assert_eq!(result.corrected_text, "the quick");
+    }
+
+    #[test]
+    fn qd_002_no_false_positives() {
+        let c = HeuristicCorrector::new();
+        let text = "The memory leak was traced back to the event listener on the WebSocket connection. It wasn't being cleaned up when the component unmounted. I pushed a fix to the dev branch and it looks stable now.";
+        let result = c.correct(text, &[], &[], "en");
+        eprintln!(
+            "unresolved: {:?}",
+            result
+                .unresolved_words
+                .iter()
+                .map(|w| &w.word)
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            result.unresolved_words.is_empty(),
+            "unexpected unresolved: {:?}",
+            result.unresolved_words
+        );
     }
 }

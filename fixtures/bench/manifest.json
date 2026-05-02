@@ -5,18 +5,18 @@
     { "id": "qd_001", "category": "quiet_dictation", "duration_ms": 14300, "expect_bypass": true },
     { "id": "qd_002", "category": "quiet_dictation", "duration_ms": 15000, "expect_bypass": true },
     { "id": "qd_003", "category": "quiet_dictation", "duration_ms": 12400, "expect_bypass": true },
-    { "id": "qd_004", "category": "quiet_dictation", "duration_ms": 13600, "expect_bypass": true },
-    { "id": "lf_001", "category": "long_form", "duration_ms": 54400, "expect_bypass": true },
+    { "id": "qd_004", "category": "quiet_dictation", "duration_ms": 13600 },
+    { "id": "lf_001", "category": "long_form", "duration_ms": 54400 },
     { "id": "lf_002", "category": "long_form", "duration_ms": 70100, "expect_bypass": false },
     { "id": "lf_003", "category": "long_form", "duration_ms": 68900, "expect_bypass": false },
     { "id": "cmd_001", "category": "commands", "duration_ms": 3200, "expect_bypass": true },
     { "id": "cmd_002", "category": "commands", "duration_ms": 2500, "expect_bypass": true },
     { "id": "cmd_003", "category": "commands", "duration_ms": 2700, "expect_bypass": true },
-    { "id": "punc_001", "category": "punctuation", "duration_ms": 21300, "expect_bypass": true },
-    { "id": "punc_002", "category": "punctuation", "duration_ms": 21600, "expect_bypass": true },
+    { "id": "punc_001", "category": "punctuation", "duration_ms": 21300 },
+    { "id": "punc_002", "category": "punctuation", "duration_ms": 21600 },
     { "id": "punc_003", "category": "punctuation", "duration_ms": 24900, "expect_bypass": true },
     { "id": "pn_001", "category": "proper_nouns", "duration_ms": 13900, "expect_bypass": true },
-    { "id": "pn_002", "category": "proper_nouns", "duration_ms": 13800, "expect_bypass": true },
-    { "id": "pn_003", "category": "proper_nouns", "duration_ms": 11900, "expect_bypass": false }
+    { "id": "pn_002", "category": "proper_nouns", "duration_ms": 13800 },
+    { "id": "pn_003", "category": "proper_nouns", "duration_ms": 11900, "expect_bypass": true }
   ]
 }

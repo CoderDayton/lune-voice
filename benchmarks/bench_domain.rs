@@ -436,6 +436,7 @@ async fn run_pipeline(
                     }
                     Ok(Some(SessionEvent::GateDecision {
                         used_llm: u,
+                        lang: _,
                         unresolved: w,
                     })) => {
                         used_llm = u;

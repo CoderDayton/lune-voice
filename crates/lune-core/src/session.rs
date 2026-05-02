@@ -71,6 +71,7 @@ pub enum SessionEvent {
     /// Gate decision: true = LLM was used, false = bypassed.
     GateDecision {
         used_llm: bool,
+        lang: String,
         unresolved: Vec<String>,
     },
     Error(String),

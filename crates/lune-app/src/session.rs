@@ -618,6 +618,7 @@ async fn run_session<A: AsrBackend + 'static>(
     let _ = event_tx
         .send(SessionEvent::GateDecision {
             used_llm: needs_llm,
+            lang: detected_lang.to_owned(),
             unresolved: uncertain_words.clone(),
         })
         .await;
