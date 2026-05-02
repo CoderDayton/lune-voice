@@ -1,0 +1,999 @@
+Accelerate
+Activation Quantization
+Actix
+AdaLoRA
+AdamW
+Adapter
+Adapter Fusion
+Adapter Model
+Adept AI | Adept
+AGIEval
+AI21 Labs
+Aider
+AIME
+Airflow
+Albumentations
+Alembic
+Algolia
+ALiBi
+all-MiniLM-L6-v2 | all MiniLM L6 v2
+AllenNLP
+Alpaca
+AlpacaEval
+AlphaCode
+AlphaCode 2 | AlphaCode 2
+AlphaFold
+AlphaFold 2
+AlphaFold 3
+AlphaGeometry
+AlphaGo
+AlphaTensor
+AlphaZero
+Altair
+Amazon AGI
+Amazon Bedrock | Bedrock
+Amazon CodeWhisperer | CodeWhisperer
+Amazon Q
+Amazon SageMaker | SageMaker
+Angular
+Annoy
+Ansible
+Anthropic
+Anthropic API
+Anyscale
+Apache Pulsar | Pulsar
+Apple Machine Learning | Apple ML
+APPS
+ARC Challenge | ARC-C
+ARC Easy | ARC-E
+Arctic
+Arena Elo
+Arrow | Apache Arrow
+AssemblyAI
+Astro
+Attention
+AudioCraft
+AudioLM
+AutoGen
+AutoGPTQ
+Autoregressive Model
+AWQ
+AWQ Quantization
+AWS
+Ax Platform | Ax
+Axum
+Azure
+Azure OpenAI Service | Azure OpenAI
+Babel
+Baichuan
+Bard | Google Bard
+Bark
+Base Model
+Baseten
+Bash
+Bazel
+Beam Search
+Beautiful Soup | bs4
+BentoML
+BF16 | bfloat16
+BFCL | Berkeley Function Calling Leaderboard
+BGE Base
+BGE Large
+BGE M3
+BGE Small
+BGE | BAAI General Embedding
+bge-reranker | BGE Reranker
+Bi Encoder
+BIG-bench Hard | BBH
+Big-Bench | BIG-bench
+BigQuery
+BioASQ
+Biome
+Bitbucket
+BitsAndBytes | bitsandbytes
+Black
+BLIP
+BLIP-2 | BLIP 2
+BM25
+Bokeh
+BookCorpus
+BoolQ
+Bootstrap
+BPE | Byte Pair Encoding
+Braintrust
+Bruno
+Buck
+Bun
+Burn
+Byte Pair Encoding | BPE
+C
+C# | C Sharp
+C++ | C Plus Plus
+C4 | Colossal Clean Crawled Corpus
+Calibration
+candle | Hugging Face Candle
+Cargo
+Cassandra
+CatBoost
+Causal Language Model | CLM
+Celery
+Cerebras
+CEval
+Chainlit
+Chakra UI
+Character AI | Character.AI
+Chat Model
+Chat Template
+Chatbot Arena
+ChatGLM
+ChatGPT
+Chroma | ChromaDB
+ckpt | checkpoint
+Claude
+Claude 2
+Claude 3
+Claude 3 Haiku
+Claude 3 Opus
+Claude 3 Sonnet
+Claude 3.5 Haiku | Claude 3 point 5 Haiku
+Claude 3.5 Sonnet | Claude 3 point 5 Sonnet
+Claude 3.7 Sonnet | Claude 3 point 7 Sonnet
+Claude Code
+Claude Desktop
+Claude Haiku
+Claude Opus
+Claude Sonnet
+ClearML
+ClickHouse
+CLion
+CLIP
+Cloudflare
+Cloudflare Tunnel
+CMake
+CMMLU
+CNN | Convolutional Neural Network
+COCO
+Code Llama
+Codeforces
+CodeGeeX
+CodeGemma
+CodeGen
+Codeium
+CodeQwen
+Codestral
+CodeT5
+CodeT5 Plus | CodeT5+
+Cog
+Cohere
+Cohere API
+Cohere Command
+Cohere Embed
+Cohere Rerank
+ColBERT
+ColBERTv2 | ColBERT v2
+Colossal-AI | Colossal AI
+Comet ML
+Command A
+Command R
+Command R Plus | Command R+
+Common Crawl
+CommonsenseQA
+Conda
+Consistency Model
+Constrained Decoding
+Context Window
+Continue
+Contriever
+ControlNet
+ConvNeXt
+Copilot Chat
+Coqui TTS
+Core ML
+Core ML Model | mlmodel
+CoreWeave
+Cosine Scheduler
+Crates.io | crates io
+CrewAI
+Cross Encoder
+Cross-Attention
+Cross-Encoder
+CSS
+CUDA
+cuDNN
+Cursor
+Cursor Composer
+Cypress
+Dagster
+DALL-E 2 | Dall E 2
+DALL-E 3 | Dall E 3
+DALL-E | Dall E
+Dart
+Dask
+Databricks
+Databricks Mosaic AI | MosaicML
+Datadog
+Dataset Card
+Datasets | Hugging Face Datasets
+DBRX
+dbt | Data Build Tool
+DDP | Distributed Data Parallel
+Decoder
+Decoder-Only
+DeepEval
+DeepFace
+Deepgram
+DeepSeek
+DeepSeek Coder
+DeepSeek Coder V2
+DeepSeek R1 | DeepSeek R one
+DeepSeek V2 | DeepSeek V two
+DeepSeek V3 | DeepSeek V three
+DeepSpeed
+Delta Lake
+Demucs
+Deno
+Detectron2 | Detectron 2
+Devbox
+Developer Message
+Devin
+Diesel
+Diffusers | Hugging Face Diffusers
+Diffusion Model
+DigitalOcean
+DINOv2 | DINO v2
+Direct Preference Optimization | DPO
+direnv
+Discord
+Distil-Whisper | Distil Whisper
+Distillation
+Django
+Docker
+Docker Compose
+Dolly
+DoRA
+DPR | Dense Passage Retrieval
+DreamBooth
+DROP
+DS-1000
+DSPy
+DuckDB
+Dust
+DVC | Data Version Control
+DynamoDB
+E5
+E5 Large
+EAGLE
+EfficientNet
+Elastic | Elasticsearch
+Electron
+EleutherAI Eval Harness
+ElevenLabs
+Elixir
+Emacs
+Embedding Model
+Encoder
+Encoder-Decoder
+Ensembling
+Entropy
+Equinox
+Erlang
+ERNIE
+ERNIE 4.0 | Ernie 4.0
+ERNIE Bot | Ernie Bot
+esbuild
+ESLint
+ESRGAN
+ExLlama
+ExLlamaV2 | ExLlama v2
+Expert Choice
+F# | F Sharp
+FaceNet
+Fairseq
+FAISS
+Falcon
+Falcon 180B
+Falcon 40B
+Falcon 7B
+FastAPI
+FastText
+FineWeb
+FineWeb-Edu
+Firebase
+Fireworks AI
+Fish Shell | fish
+Flamingo
+FlashAttention
+FlashAttention 2
+FlashAttention 3
+Flask
+Flax
+Florence
+Florence-2 | Florence 2
+Flow Matching
+Flux Pro | FLUX Pro
+Flux Schnell | FLUX Schnell
+Flux | FLUX
+Fly.io | Fly
+Forgejo
+FP16 | float16
+FP32 | float32
+FP8 | float8
+Framer Motion
+Frequency Penalty
+FSDP | Fully Sharded Data Parallel
+Function Calling
+Fuyu
+GAIA
+GAN | Generative Adversarial Network
+GCP | Google Cloud
+GeGLU
+GELU
+Gemini
+Gemini API
+Gemini Code Assist
+Gemini Flash
+Gemini Nano
+Gemini Pro
+Gemini Ultra
+Gemma
+Gemma 2
+Gemma 3
+Gensim
+GFPGAN
+ggml
+GGUF
+gguf | GGUF
+Git
+Gitea
+GitHub
+GitHub Copilot
+GitLab
+Glean
+GLM
+GLM-4 | GLM 4
+GLUE
+Go | Golang
+Google AI
+Google AI Studio | AI Studio
+Google DeepMind | DeepMind
+Google Research
+Google Vertex AI | Vertex AI
+Goose
+GPQA
+GPT
+GPT-2 | GPT 2
+GPT-3 | GPT 3
+GPT-3.5 | GPT 3.5
+GPT-4 | GPT 4
+GPT-4.1 | GPT 4.1
+GPT-4o | GPT 4o
+GPT-5 | GPT 5
+GPTQ
+GPTQ Quantization
+Gradient Accumulation
+Gradient Checkpointing
+Gradio
+Gradle
+Grafana
+Grammar Sampling
+Granite
+GraphQL
+GraphRAG | Graph RAG
+Greedy Decoding
+Grok | xAI Grok
+Grok-1 | Grok 1
+Grok-2 | Grok 2
+Grok-3 | Grok 3
+Groq
+Groq API
+GroqCloud
+Grounding DINO
+gRPC
+GRPO | Group Relative Policy Optimization
+GRU
+GSM8K
+Guidance
+Guild AI
+Gunicorn
+Haiku
+Harvey AI | Harvey
+Haskell
+Haystack
+Hebbia
+Helicone
+HellaSwag
+HELM
+Heroku
+HNSW
+HNSWlib
+Horovod
+HotpotQA
+HTML
+httpx
+Hudi | Apache Hudi
+Hugging Face
+Hugging Face Hub | HF Hub
+HumanEval
+Hybrid Search
+HyDE | Hypothetical Document Embeddings
+Hyper
+Hyperopt
+IA3
+IBM Granite
+Iceberg | Apache Iceberg
+IDEFICS
+IFEval
+Imagen
+Imagen 2
+Imagen 3
+ImageNet
+Inflection AI
+Insomnia
+Instruct Model
+Instruction Tuning
+Instructor
+INT4 | int4
+INT8 | int8
+IntelliJ IDEA
+InternLM
+IP-Adapter | IP Adapter
+IPO | Identity Preference Optimization
+IVF Index | Inverted File Index
+Jamba
+Jamba Instruct
+Jasper
+Java
+JavaScript
+JAX
+Jest
+Jina Embeddings
+Jina Reranker
+Jinja Template | Jinja
+Jira
+JSON
+JSON Mode
+Jsonformer
+Julia
+Jupyter
+JupyterLab
+Jurassic
+Jurassic-2 | Jurassic 2
+Kafka
+Keras
+Keyword Search
+Knowledge Distillation
+Kosmos
+Kosmos-2 | Kosmos 2
+Kotlin
+KServe
+KTO | Kahneman-Tversky Optimization
+Kubeflow
+Kubernetes | K8s
+Kustomize
+KV Cache
+KV Cache Quantization
+Labelbox
+LAION
+LAION-5B | LAION 5B
+Lambda Labs | Lambda
+LaMDA | Lambda
+LanceDB
+LangChain
+LangFuse
+LangGraph
+LangServe
+LangSmith
+Latent Diffusion
+LayerNorm
+Le Chat | Mistral Le Chat
+LightGBM
+Linear
+Lion Optimizer | Lion
+LiteLLM
+LiveCodeBench
+Llama 2 | LLaMA 2
+Llama 3 | LLaMA 3
+Llama 3.1 | LLaMA 3.1
+Llama 3.2 | LLaMA 3.2
+Llama 3.3 | LLaMA 3.3
+Llama | LLaMA
+llama-cpp-python | llama cpp python
+llama-cpp-rs | llama cpp rs
+llama.cpp server
+llama.cpp | llama cpp
+llamafile
+LlamaIndex
+LLaVA | Llava
+LLaVA-NeXT | Llava Next
+LM Studio
+lm-evaluation-harness | LM Eval Harness
+LMQL
+LMSYS Arena | Chatbot Arena
+LocalAI
+Logprob | Log Probability
+LoRA
+LoRA Adapter | Adapter
+LoRA | Low-Rank Adaptation
+LSTM
+Lua
+Luma Dream Machine | Dream Machine
+Magicoder
+Make
+Make-A-Video | Make A Video
+Mamba
+MariaDB
+MarianNMT
+Markdown
+Mask R-CNN | Mask RCNN
+Masked Language Model | MLM
+Material UI | MUI
+MATH
+MATLAB
+Matplotlib
+Maturin
+Maven
+MBPP
+MedMCQA
+MedQA
+Medusa
+Megatron-LM | Megatron LM
+MergeKit
+Meta AI | Facebook AI
+Meta Llama
+Metaflow
+Metal Performance Shaders | MPS
+Microsoft AI
+Midjourney
+Midjourney V6 | Midjourney 6
+Milvus
+MiniCPM
+MiniGPT-4 | Mini GPT 4
+MiniLM
+Ministral
+MiniWoB
+Mistral
+Mistral 7B | Mistral Seven B
+Mistral AI | Mistral
+Mistral API
+Mistral Large
+Mistral Small
+Mixed Precision
+Mixtral
+Mixtral 8x22B | Mixtral eight by twenty two B
+Mixtral 8x7B | Mixtral eight by seven B
+MLC LLM
+MLflow
+MLIR
+MLP | Multilayer Perceptron
+MLX
+MMLU
+MMLU Pro
+MMMU
+Mocha
+Modal
+Model Card
+Model Soups
+MoE | Mixture of Experts
+MongoDB
+MosaicML
+MPNet
+MT-Bench
+Muon Optimizer | Muon
+MusicGen
+MusicLM
+MuZero
+Mypy
+MySQL
+MythoMax
+NATS
+Natural Questions | NQ
+NCCL
+Nemotron
+Neon
+Neovim
+Neptune
+Netlify
+New Relic
+Next.js | NextJS
+NF4
+ngrok
+Ninja
+Nix
+NixOS
+NLTK
+Node.js | Node
+Nomic AI
+Notebook
+Notion
+Nous Hermes 2
+Nous Hermes 3
+Nous Hermes | Hermes
+NousResearch
+npm
+NumPy
+Nuxt
+NVIDIA AI | Nvidia AI
+o1
+o1-mini | o1 mini
+o3
+o3-mini | o3 mini
+o4-mini | o4 mini
+OCaml
+OctoAI
+Ollama
+OLMo
+OLMoE
+ONNX
+ONNX Runtime Server
+ONNX Runtime | ORT
+OpenAI
+OpenAI API
+OpenAI compatible API
+OpenAI Embeddings
+OpenAI Evals
+OpenAPI
+OpenBookQA
+OpenChat
+OpenCLIP
+OpenCode | opencode
+OpenCoder
+OpenCV
+OpenDevin
+OpenELM
+OpenHermes
+OpenNMT
+OpenRouter
+OpenSearch
+OpenTelemetry | OTel
+OpenVINO
+OpenWebText
+Optimum
+Optuna
+Oracle Cloud | OCI
+Orca
+ORPO
+ort | ONNX Runtime Rust
+OSCAR
+Outlines
+P-Tuning
+PagedAttention
+PagerDuty
+PaliGemma
+PaLM 2 | Palm 2
+PaLM | Pathways Language Model
+Pandas
+Pants
+Parquet
+Parti
+PEFT
+Perl
+Perplexity
+Phi
+Phi-2 | Phi 2
+Phi-3 Mini | Phi 3 Mini
+Phi-3 | Phi 3
+Phi-4 | Phi 4
+Phind CodeLlama | Phind Code Llama
+Phoenix | Arize Phoenix
+PHP
+Pika
+Pika Labs
+Pile
+Pile of Law
+Pillow | PIL
+Pinecone
+pip
+PIQA
+Pixi
+Pixtral
+PlanetScale
+Playwright
+Plotly
+pnpm
+Podman
+Poetry
+Polars
+PostgreSQL | Postgres
+Postman
+PowerShell
+PPO | Proximal Policy Optimization
+PQ | Product Quantization
+Predibase
+Prefect
+Prefix Tuning
+Presence Penalty
+Prettier
+Prometheus
+Prompt
+Prompt Tuning
+Promptfoo
+PromptLayer
+Protocol Buffers | Protobuf
+Pruning
+PubMedQA
+Pulumi
+PyCharm
+Pydantic
+PydanticAI | Pydantic AI
+PyO3
+PyPI
+Pyright
+Pytest
+Python
+PyTorch
+PyTorch Checkpoint | pt file
+Qdrant
+QLoRA
+Qwen
+Qwen ASR
+Qwen Audio
+Qwen Coder
+Qwen VL
+Qwen2 | Qwen 2
+Qwen2.5 | Qwen 2.5
+Qwen3 | Qwen 3
+QwQ
+R
+RabbitMQ
+Radix UI
+RAG | Retrieval Augmented Generation
+Ragas
+Railway
+Ray
+Ray Serve
+Ray Train
+Ray Tune
+React
+React Native
+Real-ESRGAN | Real ESRGAN
+Reasoning Model
+Reciprocal Rank Fusion | RRF
+Rectified Flow
+RecurrentGemma
+Redis
+RedPajama
+RedPajama Dataset
+Redshift
+RefinedWeb
+ReFT | Representation Finetuning
+Reka AI
+ReLU
+Remix
+Render
+Repetition Penalty
+Replicate
+Replit Agent
+Requests
+Reqwest
+Reranker
+ResNet
+REST
+Rev AI
+RLAIF | Reinforcement Learning from AI Feedback
+RLHF | Reinforcement Learning from Human Feedback
+RMSNorm
+RNN | Recurrent Neural Network
+Rocket
+ROCm
+Rollup
+ROOTS
+RoPE | Rotary Position Embedding
+rsLoRA
+Ruby
+Ruff
+Runway
+Runway Gen-1 | Gen 1
+Runway Gen-2 | Gen 2
+Runway Gen-3 | Gen 3
+Rust
+RVC | Retrieval-based Voice Conversion
+Rye
+Safetensors
+SafeTensors | safetensors
+SAM 2 | Segment Anything 2
+SAM | Segment Anything Model
+SantaCoder
+SavedModel
+Scala
+Scale AI
+ScaNN
+Scikit-learn | sklearn
+SciPy
+SDXL | Stable Diffusion XL
+Seaborn
+Seamless Communication
+SeamlessM4T
+SeaORM
+Segment Anything
+Self-Attention
+Semantic Kernel
+Semantic Search
+Sentence Transformers
+Sentence-BERT | SBERT
+SentencePiece
+SentencePiece Model | spm
+Sentry
+Serde
+SGD | Stochastic Gradient Descent
+SGLang
+shadcn/ui | shadcn UI
+SigLIP
+SIQA
+Slack
+SmolLM
+SmolVLM
+SmoothQuant
+Snowflake
+Snowflake Arctic
+Solar
+SolidJS
+Sora
+Sourcegraph Cody | Cody
+Space | Hugging Face Space
+spaCy
+Spark
+Sparsity
+Speculative Decoding
+Speechmatics
+SPLADE
+SQL
+SQLAlchemy
+SQLite
+SQLx
+SQuAD
+SQuAD 2.0 | SQuAD v2
+Stability AI
+Stable Cascade
+Stable Diffusion
+Stable Diffusion 3
+Stable Diffusion XL | SDXL
+Stable Video Diffusion
+StableLM
+Stanza
+StarCoder
+StarCoder2 | StarCoder 2
+Starlette
+Starling
+Statsmodels
+Storybook
+Streamlit
+Structured Outputs
+Structured Sparsity
+Supabase
+SuperGLUE
+Supervised Fine-Tuning | SFT
+Svelte
+SvelteKit
+Swagger
+SWC
+SWE-agent | SWE agent
+SWE-bench Verified | SWE Bench Verified
+SWE-bench | SWE Bench
+Swift
+SwiGLU
+Swin Transformer
+Switch Transformer
+System Prompt
+Tabnine
+Tailwind CSS | Tailwind
+Tauri
+Temperature
+TensorFlow
+TensorRT
+TensorRT-LLM
+Terraform
+Text Generation Inference
+text-embedding-3-large | embedding 3 large
+text-embedding-3-small | embedding 3 small
+text-embedding-ada-002 | ada 002
+Textual Inversion
+TFLite | TensorFlow Lite
+TGI | Text Generation Inference
+The Pile
+Three.js | ThreeJS
+tiktoken
+Together AI
+Together Inference
+Token Budget
+Token Limit
+Tokenizer
+Tokenizer JSON
+tokenizers
+Tokenizers | Hugging Face Tokenizers
+tokenmonster
+Tokio
+TOML
+Tool Call
+ToolBench
+ToolLLM
+Top-k Sampling | Top K
+Top-p Sampling | Nucleus Sampling
+TorchAudio
+TorchText
+TorchVision
+Tortoise TTS
+tract
+Transformer
+Transformers | Hugging Face Transformers
+Triton Inference Server | NVIDIA Triton
+TriviaQA
+TRL | Transformer Reinforcement Learning
+TruLens
+TruthfulQA
+ts-node
+tsx
+Turso
+TVM | Apache TVM
+TypeScript
+TypeScript Compiler | tsc
+Typesense
+U-Net | UNet
+Unigram Tokenizer
+uv
+Uvicorn
+VAE | Variational Autoencoder
+Valkey
+VALL-E X | Vall E X
+VALL-E | Vall E
+Vector Search
+Vercel
+Vercel AI SDK | AI SDK
+Vertex AI API
+Vespa
+Vicuna
+VideoPoet
+Vim
+Vision Transformer | ViT
+Visual Studio
+Vite
+Vitest
+vLLM
+Voyage AI
+Voyage Embeddings
+VQAv2
+VS Code | Visual Studio Code
+Vue
+Warmup
+Weaviate
+WebArena
+Webpack
+WebStorm
+Weight Quantization
+Weights & Biases | wandb
+Whisper
+Whisper API
+Whisper Base
+Whisper Large
+Whisper Large V2 | Whisper Large Version 2
+Whisper Large V3 | Whisper Large Version 3
+Whisper Medium
+Whisper Small
+Whisper Tiny
+Whisper.cpp | whisper cpp
+Wikitext
+Wikitext-103 | WikiText 103
+WikiText-2 | WikiText 2
+Windsurf | Codeium
+Winogrande
+WizardCoder
+WizardLM
+WordPiece
+Writer
+xAI | X AI
+XGBoost
+XLA
+XML
+XTTS
+YAML
+YaRN
+Yi
+Yi Coder
+Yi Large
+YOLO
+YOLOv10 | YOLO v10
+YOLOv5 | YOLO v5
+YOLOv8 | YOLO v8
+Zed
+Zephyr
+Zilliz
+Zsh

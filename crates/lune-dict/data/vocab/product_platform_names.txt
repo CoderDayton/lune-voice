@@ -1,0 +1,624 @@
+4chan
+7-Zip | Seven Zip
+Actix Web | Actix
+Adobe Acrobat | Acrobat
+Adobe After Effects | After Effects
+Adobe Animate
+Adobe Audition | Audition
+Adobe Express
+Adobe Illustrator | Illustrator
+Adobe Lightroom | Lightroom
+Adobe XD
+Affinity Designer
+Affinity Photo
+Affinity Publisher
+AirPods
+Airtable
+AirTag
+Alacritty
+Alexa Skills
+Alexa | Amazon Alexa
+Algolia Search | Algolia
+Alibaba Cloud | Aliyun
+AliExpress
+Alipay
+Alpine Linux | Alpine
+Amazon Alexa | Alexa
+Amazon Appstore
+Amazon Aurora | Aurora
+Amazon Bedrock | Bedrock
+Amazon Chime
+Amazon CloudFront | CloudFront
+Amazon CloudWatch | CloudWatch
+Amazon DynamoDB | DynamoDB
+Amazon EBS | EBS
+Amazon EC2 | EC2
+Amazon Echo | Echo
+Amazon ECS | ECS
+Amazon EKS | EKS
+Amazon ElastiCache | ElastiCache
+Amazon EventBridge | EventBridge
+Amazon Fire Tablet | Fire Tablet
+Amazon Fire TV | Fire TV
+Amazon Kindle | Kindle
+Amazon Kinesis | Kinesis
+Amazon Luna | Luna
+Amazon Music
+Amazon Prime Video | Prime Video
+Amazon Prime | Prime
+Amazon RDS | RDS
+Amazon Redshift | Redshift
+Amazon Route 53 | Route 53
+Amazon S3 | S3
+Amazon SageMaker | SageMaker
+Amazon SNS | SNS
+Amazon SQS | SQS
+Amazon Web Services | AWS
+Amazon WorkSpaces
+Anaconda
+Android
+Android Auto
+Android Studio
+Android Wear | Wear OS
+Angular
+Anki
+Ansible
+Apache Airflow | Airflow
+Apache Cassandra | Cassandra
+Apache Cordova | Cordova
+Apache Flink | Flink
+Apache Hadoop | Hadoop
+Apache HTTP Server | Apache
+Apache JMeter | JMeter
+Apache Kafka | Kafka
+Apache Maven | Maven
+Apache Spark | Spark
+Apache Tomcat | Tomcat
+App Store | Apple App Store
+Apple Arcade
+Apple CarPlay | CarPlay
+Apple Fitness Plus | Apple Fitness+
+Apple Intelligence
+Apple Music
+Apple News
+Apple Pay
+Apple Podcasts
+Apple TV
+Apple TV Plus | Apple TV+
+AppSheet
+Arc Browser | Arc
+Arch Linux | Arch
+Arduino
+Argo CD | ArgoCD
+Audible
+Auth0
+AutoCAD
+AutoHotkey
+Avalanche | AVAX
+AWS Lambda | Lambda
+AWS Marketplace
+AWS | Amazon Web Services
+Azure Active Directory | Microsoft Entra ID
+Azure AI
+Azure Blob Storage
+Azure Cosmos DB | Cosmos DB
+Azure DevOps
+Azure Functions
+Azure Kubernetes Service | AKS
+Azure OpenAI Service | Azure OpenAI
+Azure SQL Database
+Azure | Microsoft Azure
+Babel
+Backbone.js | Backbone
+Bandcamp
+Basecamp
+Bash
+Battle.net | Blizzard Battle.net
+Behance
+BeReal
+BigQuery | Google BigQuery
+Bing
+Bing Chat | Microsoft Copilot
+Bitbucket
+Bitcoin | BTC
+Bitdefender
+Bitly
+Blender
+Bluesky
+BlueStacks
+Bootstrap
+Box Drive
+Box Notes
+Braintree
+Brave Browser | Brave
+BTC | Bitcoin
+Buffer
+Bun
+Calendly
+Canva
+CapCut
+Cash App
+CentOS
+Chatfuel
+ChatGPT
+Chime
+Chrome Web Store
+Chrome | Google Chrome
+Chromebook
+Chromecast
+Cinema 4D
+CircleCI
+Citrix Workspace
+Claude
+ClickUp
+Cloud Run | Google Cloud Run
+Cloudflare DNS
+Cloudflare Pages
+Cloudflare Workers
+Cloudinary
+CodePen
+CodeSandbox
+Coinbase Wallet
+Conda
+Confluence
+Constant Contact
+Copilot | Microsoft Copilot
+Corel Painter
+CorelDRAW
+Coursera
+cPanel
+Creative Cloud | Adobe Creative Cloud
+Cron
+Cursor
+Cypress
+DALL-E | Dall E
+Dashlane
+Databricks Lakehouse | Lakehouse
+DataDog APM | Datadog APM
+dbt | Data Build Tool
+Debezium
+Debian
+Deezer
+Deno
+Dependabot
+DigitalOcean Droplets | Droplets
+DigitalOcean Spaces | Spaces
+Discord
+Discord Nitro | Nitro
+Disney Plus | Disney+
+Django
+Docker
+Docker Compose
+Docker Desktop
+Docker Hub
+DocuSign eSignature | DocuSign
+DoorDash
+Dropbox
+Dropbox Paper
+Drupal
+DuckDB
+Duolingo
+Eclipse
+Edge | Microsoft Edge
+Elastic Stack | ELK Stack
+ElasticSearch | Elasticsearch
+Electron
+Elm
+Emacs
+Ethereum | ETH
+Eventbrite
+Excel | Microsoft Excel
+Expo
+Express.js | Express
+Facebook
+Facebook Ads | Meta Ads
+Facebook Messenger | Messenger
+FaceTime
+FastAPI
+Fediverse
+Fedora
+Figma
+FileZilla
+Final Cut Pro
+Firebase
+Firefox | Mozilla Firefox
+Fitbit
+Fivetran
+Flask
+Flutter
+FlutterFlow
+Fortnite
+Framer
+FreeBSD
+FreshBooks
+Galaxy Store | Samsung Galaxy Store
+Garmin Connect
+Garmin Pay
+GCP | Google Cloud Platform
+Gemini | Google Gemini
+Ghost
+GIMP
+Git
+GitHub
+GitHub Actions
+GitHub Codespaces | Codespaces
+GitHub Copilot
+GitHub Enterprise
+GitHub Issues
+GitHub Pages
+GitHub Sponsors
+GitHub Universe
+GitKraken
+GitLab
+GitLab CI
+Gmail | Google Mail
+Go | Golang
+GoFundMe
+Google Ads
+Google Ads Manager
+Google AdSense | AdSense
+Google Analytics
+Google Assistant
+Google Bard | Bard
+Google BigQuery | BigQuery
+Google Calendar
+Google Chat
+Google Chrome | Chrome
+Google Classroom
+Google Cloud | Google Cloud Platform | GCP
+Google Colab | Colab
+Google Data Studio | Looker Studio
+Google Docs
+Google Domains
+Google Drive
+Google Earth
+Google Fi
+Google Gemini | Gemini
+Google Home
+Google Keep
+Google Kubernetes Engine | GKE
+Google Lens
+Google Maps
+Google Meet
+Google Nest | Nest
+Google Pay
+Google Photos
+Google Play | Google Play Store
+Google Podcasts
+Google Search
+Google Sheets
+Google Slides
+Google Tag Manager
+Google Translate
+Google Trends
+Google Voice
+Google Workspace | G Suite
+GoTo Meeting
+Gradle
+Grafana
+Grammarly
+Graphite
+GraphQL
+Gravatar
+Grubhub
+Hacker News
+Hadoop | Apache Hadoop
+HashiCorp Terraform | Terraform
+HBO Max | Max
+Heroku
+Heroku Postgres
+Hinge
+Home Assistant
+Hootsuite
+Hotmail | Outlook.com
+HubSpot CRM
+Hulu
+iCloud Drive
+iCloud Keychain
+iCloud | Apple iCloud
+If This Then That | IFTTT
+iMessage
+Indeed
+InDesign | Adobe InDesign
+Instacart
+Instagram
+IntelliJ IDEA
+IntelliJ Platform
+iOS
+iPadOS
+iPhone
+iTunes
+Jekyll
+Jenkins
+JetBrains Fleet | Fleet
+JetBrains Rider | Rider
+Jira
+Jira Service Management
+Jupyter Notebook | Jupyter
+Kafka | Apache Kafka
+Kaggle
+Kali Linux | Kali
+Khan Academy
+Kickstarter
+Kindle | Amazon Kindle
+Kotlin
+Krita
+Kubernetes | K8s
+Laravel
+League of Legends
+Linear
+LinkedIn
+Linode | Akamai Connected Cloud
+Linux
+Logic Pro
+Logstash
+Looker
+Looker Studio | Google Data Studio
+Loom
+Magento | Adobe Commerce
+Mailchimp
+Make | Integromat
+MariaDB
+Markdown
+MasterClass
+Mastodon
+Matlab | MATLAB
+Matplotlib
+Max | HBO Max
+Medium
+Mercurial
+Messenger | Facebook Messenger
+Meta Ads | Facebook Ads
+Meta Quest | Oculus Quest
+Microsoft 365 | Office 365
+Microsoft Access | Access
+Microsoft Azure | Azure
+Microsoft Bing | Bing
+Microsoft Copilot | Copilot
+Microsoft Edge | Edge
+Microsoft Entra ID | Azure Active Directory
+Microsoft Excel | Excel
+Microsoft Loop | Loop
+Microsoft OneDrive | OneDrive
+Microsoft OneNote | OneNote
+Microsoft Outlook | Outlook
+Microsoft Power BI | Power BI
+Microsoft PowerPoint | PowerPoint
+Microsoft SharePoint | SharePoint
+Microsoft Teams | Teams
+Microsoft To Do | To Do
+Microsoft Visio | Visio
+Microsoft Windows | Windows
+Microsoft Word | Word
+Minecraft
+Minecraft Bedrock Edition | Bedrock Edition
+Minecraft Java Edition | Java Edition
+Minikube
+Mint
+Miro
+Miro Boards | Miro
+Mixpanel
+MobX
+Monday.com
+MongoDB
+Moodle
+Mozilla Firefox | Firefox
+MySQL
+Namecheap
+Neo4j
+Neovim
+Nest | Google Nest
+NestJS
+NetBeans
+Netflix
+Netlify
+New Relic
+Next.js | NextJS
+Nextcloud
+Nginx
+Nintendo eShop | eShop
+NixOS
+Node.js | Node
+NordVPN
+Notepad++
+Notion
+npm | Node Package Manager
+NumPy
+Nuxt
+Nvidia CUDA | CUDA
+OBS Studio | OBS
+Office 365 | Microsoft 365
+Okta Verify
+OneDrive | Microsoft OneDrive
+OneNote | Microsoft OneNote
+OpenAI API
+OpenAPI | Swagger
+OpenCV
+OpenGL
+OpenShift
+OpenStreetMap
+OpenVPN
+Opera Browser | Opera
+Oracle Cloud | OCI
+Oracle Database
+Outlook | Microsoft Outlook
+Overwatch
+Pandas
+Pandora
+Patreon
+PayPal
+PayPal Venmo | Venmo
+Perforce
+Perplexity
+Photos | Apple Photos
+Photoshop | Adobe Photoshop
+Pinboard
+Pinterest
+PlanetScale
+PlayStation Network | PSN
+Playwright
+Podman
+Pokémon Go | Pokemon Go
+PostgreSQL | Postgres
+PostHog
+Postman
+Power BI | Microsoft Power BI
+PowerPoint | Microsoft PowerPoint
+Premiere Pro | Adobe Premiere Pro
+Prettier
+Prime Video | Amazon Prime Video
+Prisma
+Pro Tools
+Procreate
+Prometheus
+Proton Mail | ProtonMail
+Proton VPN
+Pulumi
+PyCharm
+PyPI | Python Package Index
+Python
+PyTorch
+QuickBooks
+Quora
+R
+Raycast
+React
+Reddit
+Redis
+Redux
+Reels | Instagram Reels
+Remix
+Render
+Replit
+Retool
+Ring
+RingCentral
+Roblox
+Rocky Linux
+Roku
+Rollup
+Ruby on Rails | Rails
+RubyGems
+Rust
+SageMaker | Amazon SageMaker
+Salesforce CRM | Salesforce
+Salesforce Marketing Cloud
+Salesforce Service Cloud
+Samsung Pay
+Samsung SmartThings | SmartThings
+Sanity
+SAP HANA | HANA
+Sass
+Scala
+Scikit-learn | sklearn
+SendGrid
+Sentry
+Shopify
+Shopify Plus
+Signal
+Signal Desktop
+Sketch
+SketchUp
+Slack
+Snapchat
+Snowflake
+Solana | SOL
+SonarQube
+SoundCloud
+Splunk Enterprise | Splunk
+Spotify
+Spring Boot
+SQLite
+Square Payments | Square
+Squarespace
+Stack Overflow
+Steam
+Storybook
+Strapi
+Stripe
+Stripe Atlas
+Stripe Checkout
+Substack
+Subversion | SVN
+Svelte
+Swift
+Tableau
+TablePlus
+Tailwind CSS | Tailwind
+Tailwind UI
+Tauri
+Telegram
+TensorBoard
+TensorFlow
+Terraform | HashiCorp Terraform
+TextMate
+Threads | Instagram Threads
+TikTok
+TikTok Shop
+Tinder
+Todoist
+Travis CI
+Trello
+Twilio SendGrid | SendGrid
+Twitch
+Twitter | X
+TypeScript
+Uber
+Uber Eats
+Ubuntu
+Udemy
+Unity Engine | Unity
+Unreal Editor
+Unreal Engine
+Upwork
+Vagrant
+Vercel
+Vim
+Vimeo
+VirtualBox
+Visual Studio
+Visual Studio Code | VS Code
+Vite
+Vivaldi Browser | Vivaldi
+VMware vSphere | vSphere
+Vue.js | Vue
+Vulkan
+Walmart Plus | Walmart+
+WebAssembly | WASM
+Webex
+Webflow
+Webpack
+WeChat
+Weebly
+WhatsApp
+Windows Subsystem for Linux | WSL
+Windows | Microsoft Windows
+Windsurf | Codeium
+WinRAR
+Wireshark
+Wix
+WooCommerce
+Word | Microsoft Word
+WordPress
+Xamarin
+Xbox Game Pass | Game Pass
+Xbox Live
+Xbox | Microsoft Xbox
+Xcode
+Xero
+Yahoo Mail
+Yammer | Viva Engage
+Yelp
+YouTube Kids
+YouTube Music
+YouTube Shorts | Shorts
+YouTube TV
+YouTube | You Tube
+Zapier
+Zapier Interfaces
+Zelle
+Zendesk
+Zoom
+Zoom Phone
+ZoomInfo
+Zotero
