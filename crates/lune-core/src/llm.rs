@@ -13,7 +13,7 @@ pub struct CorrectionSpan {
     pub end_word: usize,
     pub text: String,
     pub confidence: f32,
-    pub fix_score: f32,
+    pub word_error_risk: f32,
 }
 
 /// Input to the text post-processor.
@@ -32,6 +32,7 @@ pub struct PostProcessInput {
     /// BCP-47 language code from ASR detection (e.g. "en", "eng", "fr").
     /// Defaults to "en" if not set by the pipeline.
     pub language: String,
+    pub uncertain_words: Vec<String>,
 }
 
 /// Output from the text post-processor.
@@ -96,10 +97,11 @@ mod tests {
                 end_word: 2,
                 text: "um".into(),
                 confidence: 0.4,
-                fix_score: 0.8,
+                word_error_risk: 0.8,
             }],
             context: None,
             language: "en".into(),
+            uncertain_words: Vec::new(),
         };
         assert_eq!(input.raw_text, "hello um world");
         assert_eq!(input.correction_spans[0].text, "um");

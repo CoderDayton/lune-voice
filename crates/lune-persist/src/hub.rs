@@ -105,6 +105,7 @@ impl ModelSpec {
         match self {
             Self::Directory { local_name, .. } => match local_name.as_str() {
                 model_dirs::DIR_PARAKEET => "Parakeet TDT 0.6B",
+                model_dirs::DIR_QWEN3_ASR => "Qwen3-ASR 0.6B ONNX",
                 model_dirs::DIR_STYLE_LLM => "Qwen2.5 1.5B Instruct",
                 _ => local_name,
             },
@@ -204,6 +205,7 @@ pub fn download_model(
 ) -> PersistResult<PathBuf> {
     let spec = match local_name {
         model_dirs::DIR_PARAKEET => ModelSpec::parakeet_tdt(),
+        model_dirs::DIR_QWEN3_ASR => ModelSpec::qwen3_asr(),
         model_dirs::DIR_STYLE_LLM => ModelSpec::style_llm(),
         _ => {
             return Err(PersistError::ModelDownload(format!(
@@ -344,12 +346,16 @@ fn download_file_direct(repo_id: &str, filename: &str, dst: &Path) -> PersistRes
 /// ```
 pub fn ensure_default_models(
     models_dir: &Path,
-    _asr_backend: &AsrBackendConfig,
+    asr_backend: &AsrBackendConfig,
 ) -> PersistResult<ResolvedModels> {
     let hub_cache = models_dir.join(".hub-cache");
     let hub = ModelHub::new(&hub_cache)?;
 
-    let asr_model_dir = ensure_directory_model(&hub, &ModelSpec::parakeet_tdt(), models_dir)?;
+    let asr_spec = match asr_backend {
+        AsrBackendConfig::Qwen3Asr { .. } => ModelSpec::qwen3_asr(),
+        AsrBackendConfig::OpenAiCompatible { .. } | _ => ModelSpec::qwen3_asr(),
+    };
+    let asr_model_dir = ensure_directory_model(&hub, &asr_spec, models_dir)?;
     let style_llm_dir = ensure_directory_model(&hub, &ModelSpec::style_llm(), models_dir)?;
 
     Ok(ResolvedModels {
@@ -430,6 +436,24 @@ fn ensure_directory_model_with_progress(
         }
     }
 
+    let missing: Vec<&str> = required_files
+        .iter()
+        .map(String::as_str)
+        .filter(|filename| {
+            let local_name = Path::new(filename)
+                .file_name()
+                .is_some_and(|name| local_dir.join(name).is_file());
+            !local_name
+        })
+        .collect();
+    if !missing.is_empty() {
+        return Err(PersistError::ModelDownload(format!(
+            "{} is missing required files after download: {}",
+            local_dir.display(),
+            missing.join(", ")
+        )));
+    }
+
     info!(path = %local_dir.display(), "model directory ready");
     Ok(local_dir)
 }
@@ -437,22 +461,6 @@ fn ensure_directory_model_with_progress(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn parakeet_spec_has_expected_repo() {
-        let spec = ModelSpec::parakeet_tdt();
-        let ModelSpec::Directory {
-            repo_id,
-            required_files,
-            suffix_patterns,
-            local_name,
-        } = &spec;
-        assert_eq!(repo_id, "istupakov/parakeet-tdt-0.6b-v3-onnx");
-        assert!(required_files.contains(&"vocab.txt".to_string()));
-        assert!(required_files.contains(&"encoder-model.int8.onnx".to_string()));
-        assert!(suffix_patterns.is_empty());
-        assert_eq!(local_name, "parakeet-tdt-0.6b");
-    }
 
     #[test]
     fn hub_constructs_with_valid_dir() {

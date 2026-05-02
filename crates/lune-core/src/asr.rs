@@ -11,7 +11,7 @@ pub struct WordConfidence {
     pub word: String,
     pub confidence: f32,
     #[serde(default)]
-    pub fix_score: f32,
+    pub word_error_risk: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,6 +28,8 @@ pub struct AsrSegment {
     pub start_ms: Option<u64>,
     pub end_ms: Option<u64>,
     pub text: String,
+    #[serde(default)]
+    pub detected_language: Option<String>,
 }
 
 impl AsrSegment {
@@ -202,6 +204,7 @@ mod tests {
             confidence: Some(0.95),
             min_token_confidence: Some(0.80),
             word_confidences: vec![],
+            detected_language: None,
         }
     }
 

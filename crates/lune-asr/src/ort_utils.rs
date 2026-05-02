@@ -79,6 +79,18 @@ impl OrtModelLoader {
         let path = self.find(candidates, kind)?;
         build_ort_session(&path, self.use_gpu)
     }
+
+    /// Build ORT session with pre-loaded external data shared across sessions.
+    pub fn load_first_with_external_data(
+        &self,
+        candidates: &[&str],
+        kind: &str,
+        ext_filename: &str,
+        ext_data: std::borrow::Cow<'static, [u8]>,
+    ) -> Result<Session> {
+        let path = self.find(candidates, kind)?;
+        build_ort_session_with_external_data(&path, self.use_gpu, ext_filename, ext_data)
+    }
 }
 
 /// Build an ORT session from an ONNX model file.
@@ -107,7 +119,48 @@ pub fn build_ort_session(path: &Path, use_gpu: bool) -> Result<Session> {
         builder = builder
             .with_execution_providers([ort::ep::CUDA::default()
                 .with_arena_extend_strategy(ort::ep::ArenaExtendStrategy::SameAsRequested)
-                .with_conv_max_workspace(true)
+                .with_tf32(true)
+                .build()])
+            .map_err(|e| Error::Asr(format!("CUDA EP: {e}")))?;
+    }
+
+    #[cfg(not(feature = "cuda"))]
+    let _ = use_gpu;
+
+    builder
+        .commit_from_file(path)
+        .map_err(|e| Error::Asr(format!("load model {}: {e}", path.display())))
+}
+
+/// Build ORT session with external data pre-loaded in memory (shared across sessions).
+pub fn build_ort_session_with_external_data(
+    path: &Path,
+    use_gpu: bool,
+    ext_filename: &str,
+    ext_data: std::borrow::Cow<'static, [u8]>,
+) -> Result<Session> {
+    let opt_path = path.with_extension("onnx.opt");
+
+    let mut builder = Session::builder()
+        .map_err(|e| Error::Asr(format!("session builder: {e}")))?
+        .with_logger(quiet_ort_logger())
+        .map_err(|e| Error::Asr(format!("logger: {e}")))?
+        .with_log_level(LogLevel::Error)
+        .map_err(|e| Error::Asr(format!("log level: {e}")))?
+        .with_optimization_level(GraphOptimizationLevel::Level3)
+        .map_err(|e| Error::Asr(format!("optimization level: {e}")))?
+        .with_intra_threads(4)
+        .map_err(|e| Error::Asr(format!("intra threads: {e}")))?
+        .with_optimized_model_path(&opt_path)
+        .map_err(|e| Error::Asr(format!("optimized model path: {e}")))?
+        .with_external_initializer_file_in_memory(ext_filename, ext_data)
+        .map_err(|e| Error::Asr(format!("external data: {e}")))?;
+
+    #[cfg(feature = "cuda")]
+    if use_gpu {
+        builder = builder
+            .with_execution_providers([ort::ep::CUDA::default()
+                .with_arena_extend_strategy(ort::ep::ArenaExtendStrategy::SameAsRequested)
                 .with_tf32(true)
                 .build()])
             .map_err(|e| Error::Asr(format!("CUDA EP: {e}")))?;

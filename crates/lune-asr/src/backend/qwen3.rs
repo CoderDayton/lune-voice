@@ -833,7 +833,8 @@ impl Qwen3AsrBackend {
             "Qwen3 inference"
         );
         // 7. Decode tokens → text, parse output, build segment
-        let (text, mean_conf, min_conf, word_confidences) = self.decode_output(&tokens);
+        let (text, detected_language, mean_conf, min_conf, word_confidences) =
+            self.decode_output(&tokens);
         if text.is_empty() {
             return Ok(vec![]);
         }
@@ -847,6 +848,7 @@ impl Qwen3AsrBackend {
             confidence: mean_conf,
             min_token_confidence: min_conf,
             word_confidences,
+            detected_language,
         }])
     }
 
@@ -855,11 +857,12 @@ impl Qwen3AsrBackend {
         tokens: &[(i64, f32, Vec<f64>)],
     ) -> (
         String,
+        Option<String>,
         Option<f32>,
         Option<f32>,
         Vec<lune_core::asr::WordConfidence>,
     ) {
-        use lune_core::mable_wc::{self, TokenSpan};
+        use lune_core::hwce::TokenSpan;
 
         let content_start = tokens
             .iter()
@@ -877,6 +880,25 @@ impl Qwen3AsrBackend {
                 || id == AUDIO_END
         };
 
+        let raw_token_ids: Vec<u32> = tokens
+            .iter()
+            .map(|(id, _, _)| *id)
+            .filter(|&id| {
+                !EOS_IDS.contains(&id)
+                    && id != IM_START
+                    && id != IM_END
+                    && id != NEWLINE
+                    && id != AUDIO_START
+                    && id != AUDIO_END
+            })
+            .map(|id| id as u32)
+            .collect();
+        let raw_text = self
+            .tokenizer
+            .decode(&raw_token_ids, true)
+            .unwrap_or_default();
+        let (detected_language, parsed_text) = parse_auto_asr_output(&raw_text);
+
         let content: Vec<&(i64, f32, Vec<f64>)> = tokens[content_start..]
             .iter()
             .skip_while(|(id, _, _)| is_meta(*id))
@@ -884,7 +906,7 @@ impl Qwen3AsrBackend {
             .collect();
 
         if content.is_empty() {
-            return (String::new(), None, None, Vec::new());
+            return (parsed_text, detected_language, None, None, Vec::new());
         }
 
         let token_ids: Vec<u32> = content.iter().map(|(id, _, _)| *id as u32).collect();
@@ -894,6 +916,9 @@ impl Qwen3AsrBackend {
             .unwrap_or_default()
             .trim()
             .to_string();
+        if !parsed_text.is_empty() {
+            text = parsed_text;
+        }
         for prefix in ["You are an automatic speech recognition system"] {
             if let Some(rest) = text.strip_prefix(prefix) {
                 text = rest.trim_start_matches(['.', '\n', ' ']).to_string();
@@ -947,52 +972,95 @@ impl Qwen3AsrBackend {
             }
         }
 
-        let herc_tokens: Vec<mable_wc::TokenInput> = content
+        let hwce_tokens: Vec<lune_core::hwce::TokenInput> = content
             .iter()
-            .map(|&&(_, conf, ref lk)| mable_wc::TokenInput {
+            .map(|&&(id, conf, ref lk)| lune_core::hwce::TokenInput {
+                token_id: id as u32,
                 confidence: conf,
                 top_k_logits: lk.clone(),
             })
             .collect();
 
-        let herc_wcs = mable_wc::estimate(
+        let hwce_results = lune_core::hwce::estimate(
             &words,
-            &herc_tokens,
+            &hwce_tokens,
             &spans,
-            mable_wc::HercConfig::default(),
+            lune_core::hwce::Config::default(),
         );
 
-        use crate::confidence::common_words::COMMON_WORDS;
-        use std::collections::HashSet;
-        use std::sync::LazyLock;
-        static CW: LazyLock<HashSet<&str>> =
-            LazyLock::new(|| COMMON_WORDS.iter().copied().collect());
-        const UNCOMMON_BOOST: f32 = 0.15;
-
-        let word_confidences: Vec<lune_core::asr::WordConfidence> = herc_wcs
+        let word_confidences: Vec<lune_core::asr::WordConfidence> = hwce_results
             .into_iter()
-            .map(|wc| {
-                let mut fs = wc.fix_score as f32;
-                if fs > 0.10 && !CW.contains(wc.word.to_lowercase().as_str()) {
-                    fs = (fs + UNCOMMON_BOOST).min(1.0);
-                }
-                lune_core::asr::WordConfidence {
-                    word: wc.word,
-                    confidence: wc.confidence as f32,
-                    fix_score: fs,
-                }
+            .map(|wr| lune_core::asr::WordConfidence {
+                word: wr.word,
+                confidence: 1.0 - wr.word_error_risk,
+                word_error_risk: wr.word_error_risk,
             })
             .collect();
 
-        (text, mean, min, word_confidences)
+        (text, detected_language, mean, min, word_confidences)
     }
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
+
+fn parse_auto_asr_output(raw: &str) -> (Option<String>, String) {
+    let raw = raw.trim();
+    let Some(rest) = raw.strip_prefix("language ") else {
+        return (None, raw.to_string());
+    };
+
+    if let Some(asr_pos) = rest.find("<asr_text>") {
+        let lang = rest[..asr_pos].trim();
+        let text = rest[asr_pos + "<asr_text>".len()..].trim();
+        return (non_empty_string(lang), text.to_string());
+    }
+
+    let mut lang_end = 0;
+    for (i, c) in rest.char_indices() {
+        if c.is_whitespace() || !c.is_alphabetic() {
+            lang_end = i;
+            break;
+        }
+        lang_end = i + c.len_utf8();
+    }
+
+    if lang_end == 0 {
+        return (None, raw.to_string());
+    }
+
+    let lang = &rest[..lang_end];
+    let text = rest[lang_end..].trim();
+    (non_empty_string(lang), text.to_string())
+}
+
+fn non_empty_string(value: &str) -> Option<String> {
+    let value = value.trim();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value.to_string())
+    }
+}
 
 fn lock_err<T>(what: &str, e: std::sync::PoisonError<T>) -> Error {
     Error::Asr(format!("{what} lock poisoned: {e}"))
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::parse_auto_asr_output;
+
+    #[test]
+    fn parse_auto_output_with_asr_text_marker() {
+        let (lang, text) = parse_auto_asr_output("language English<asr_text>Hello world.");
+        assert_eq!(lang.as_deref(), Some("English"));
+        assert_eq!(text, "Hello world.");
+    }
+
+    #[test]
+    fn parse_auto_output_without_marker() {
+        let (lang, text) = parse_auto_asr_output("language French Bonjour tout le monde.");
+        assert_eq!(lang.as_deref(), Some("French"));
+        assert_eq!(text, "Bonjour tout le monde.");
+    }
+}

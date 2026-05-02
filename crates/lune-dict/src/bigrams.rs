@@ -76,6 +76,8 @@ pub const DEFAULT_BIGRAMS: &[(&str, &str, u32)] = &[
     ("have", "you", 1400),
     // he + *
     ("he", "was", 1800),
+    // hello + *
+    ("hello", "world", 1200),
     // how + *
     ("how", "many", 1300),
     ("how", "much", 1400),

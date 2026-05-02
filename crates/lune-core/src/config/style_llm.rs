@@ -6,15 +6,15 @@ use serde::{Deserialize, Serialize};
 pub type StyleId = String;
 
 /// Universal rules shared by every ASR correction pass.
+/// Language placeholder `{lang}` is replaced at prompt-build time.
 pub const BASE_SYSTEM_PROMPT: &str = "\
-You fix ASR transcript errors with minimal edits.\n\
-Fix only: punctuation, capitalization, misspellings, missing small function words, and repeated consecutive words.\n\
-Do not translate or change the language.\n\
-Never delete any words, phrases, or sentences.\n\
-Never substitute, rephrase, or rewrite content.\n\
-Preserve all names, proper nouns, and non-English text exactly.\n\
-When uncertain, keep the original.\n\
-Output only the corrected text.";
+You fix speech-to-text errors in {lang}.\n\
+Rules:\n\
+- Only edit words marked as uncertain.\n\
+- You may add small missing words (a, the, to, of, etc.).\n\
+- Fix punctuation and capitalization.\n\
+- Do not change any other words.\n\
+Output corrected text only.";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StylePreset {

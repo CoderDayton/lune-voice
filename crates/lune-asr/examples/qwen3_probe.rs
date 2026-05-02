@@ -161,13 +161,13 @@ fn main() {
 
         let fix_words: Vec<String> = wcs
             .iter()
-            .filter(|wc| wc.fix_score >= 0.50 && !wc.word.is_empty())
+            .filter(|wc| wc.word_error_risk >= 0.50 && !wc.word.is_empty())
             .map(|wc| wc.word.clone())
             .collect();
 
         const BYPASS_CONFIDENCE: f32 = 0.92;
         let needs_llm = seg_conf.is_none_or(|c| c < BYPASS_CONFIDENCE)
-            || wcs.iter().any(|wc| wc.fix_score >= 0.50);
+            || wcs.iter().any(|wc| wc.word_error_risk >= 0.50);
 
         let llm_output = if needs_llm {
             rt.block_on(async {
@@ -180,6 +180,7 @@ fn main() {
                     correction_spans: vec![],
                     context: None,
                     language: "en".into(),
+                    uncertain_words: Vec::new(),
                 };
                 llm.transform(&input).await.unwrap().cleaned_text
             })
@@ -224,25 +225,30 @@ fn main() {
             let is_changed = changed_set.contains(&stripped);
             let status = if is_changed {
                 "CHANGED"
-            } else if wc.fix_score >= 0.30 {
+            } else if wc.word_error_risk >= 0.30 {
                 "FLAG"
             } else {
                 ""
             };
-            if wc.fix_score >= 0.10 || is_changed {
+            if wc.word_error_risk >= 0.10 || is_changed {
                 println!(
                     "  {:>20} {:>6.2} {:>6.2} {:>7}",
-                    wc.word, wc.confidence, wc.fix_score, status
+                    wc.word, wc.confidence, wc.word_error_risk, status
                 );
             }
             // Always collect for sweep
-            all_words.push((wc.word.clone(), wc.confidence, wc.fix_score, is_changed));
+            all_words.push((
+                wc.word.clone(),
+                wc.confidence,
+                wc.word_error_risk,
+                is_changed,
+            ));
         }
         println!();
     }
 
     println!("═══ Threshold Sweep (LLM-validated) ═══\n");
-    println!("\n── fix_score sweep (flag if fix_score >= thresh) ──\n");
+    println!("\n── word_error_risk sweep (flag if word_error_risk >= thresh) ──\n");
     println!(
         "{:>6} {:>6} {:>6} {:>6} {:>6} {:>8} {:>8}",
         "Thresh", "TP", "FP", "FN", "TN", "Prec", "F1"
@@ -254,8 +260,8 @@ fn main() {
     let mut t = 0.30f32;
     while t <= 0.95 {
         let (mut tp, mut fp, mut r#fn, mut tn) = (0u32, 0u32, 0u32, 0u32);
-        for (_, _, fix_score, changed) in &all_words {
-            let flagged = *fix_score >= t;
+        for (_, _, word_error_risk, changed) in &all_words {
+            let flagged = *word_error_risk >= t;
             match (flagged, changed) {
                 (true, true) => tp += 1,
                 (true, false) => fp += 1,
@@ -305,14 +311,14 @@ fn main() {
     changed_fs.sort_by(|a, b| a.total_cmp(b));
     unchanged_fs.sort_by(|a, b| a.total_cmp(b));
     println!(
-        "\nUnchanged fix_scores ({}): min={:.3} p5={:.3} median={:.3}",
+        "\nUnchanged word_error_risks ({}): min={:.3} p5={:.3} median={:.3}",
         unchanged_fs.len(),
         unchanged_fs.first().copied().unwrap_or(0.0),
         percentile(&unchanged_fs, 5.0),
         percentile(&unchanged_fs, 50.0)
     );
     println!(
-        "Changed fix_scores   ({}): max={:.3} p95={:.3} median={:.3}",
+        "Changed word_error_risks   ({}): max={:.3} p95={:.3} median={:.3}",
         changed_fs.len(),
         changed_fs.last().copied().unwrap_or(0.0),
         percentile(&changed_fs, 95.0),

@@ -278,7 +278,7 @@ fn append_segments(
 fn correction_spans_for_text(
     text: &str,
     segments: &[AsrSegment],
-    fix_threshold: f32,
+    risk_threshold: f32,
 ) -> Vec<CorrectionSpan> {
     let words = indexed_words(text);
     let mut spans = Vec::new();
@@ -287,7 +287,7 @@ fn correction_spans_for_text(
     for wc in segments
         .iter()
         .flat_map(|seg| seg.word_confidences.iter())
-        .filter(|wc| wc.fix_score >= fix_threshold && !wc.word.is_empty())
+        .filter(|wc| wc.word_error_risk >= risk_threshold && !wc.word.is_empty())
     {
         let needle = normalize_word(&wc.word);
         if needle.is_empty() {
@@ -303,7 +303,7 @@ fn correction_spans_for_text(
                 end_word: idx + 1,
                 text: raw.clone(),
                 confidence: wc.confidence,
-                fix_score: wc.fix_score,
+                word_error_risk: wc.word_error_risk,
             });
             search_from = idx + 1;
         }
@@ -606,8 +606,7 @@ async fn run_session<A: AsrBackend + 'static>(
     }
 
     let pipeline_t0 = tokio::time::Instant::now();
-    const BYPASS_CONFIDENCE: f32 = 0.60;
-    const BYPASS_FIX_SCORE: f32 = 0.60;
+    const BYPASS_RISK: f32 = 0.60;
 
     // ── Step 1: Dictionary scan + Heuristic correction ─────────────────
     let (dictionary_entries, dict_replacements) = {
@@ -620,43 +619,84 @@ async fn run_session<A: AsrBackend + 'static>(
         let replacements = guard.scan(&text_after_commands);
         (entries, replacements)
     };
-    let mut word_fix_scores: Vec<(String, f32)> = segments
+    let mut word_risk_scores: Vec<(String, f32)> = segments
         .iter()
         .flat_map(|s| s.word_confidences.iter())
-        .map(|wc| (wc.word.clone(), wc.fix_score))
+        .map(|wc| (wc.word.clone(), wc.word_error_risk))
         .collect();
     for (phrase, _) in &dict_replacements {
-        if !word_fix_scores
+        if !word_risk_scores
             .iter()
             .any(|(w, _)| w.eq_ignore_ascii_case(phrase))
         {
-            word_fix_scores.push((phrase.clone(), 1.0));
+            word_risk_scores.push((phrase.clone(), 1.0));
         }
     }
+
+    let detected_lang = segments
+        .first()
+        .and_then(|s| s.detected_language.as_deref())
+        .unwrap_or("en");
     let heuristic = HEURISTIC.correct(
         &text_after_commands,
-        &word_fix_scores,
+        &word_risk_scores,
         &dict_replacements,
-        "en",
+        detected_lang,
     );
     let text_after_heuristic = heuristic.corrected_text;
 
-    let correction_spans =
-        correction_spans_for_text(&text_after_heuristic, &segments, BYPASS_FIX_SCORE);
+    let correction_spans = correction_spans_for_text(&text_after_heuristic, &segments, BYPASS_RISK);
 
-    // ── LLM bypass: multi-signal gate ──────────────────────────────────
+    // ── LLM bypass: score-based gate ────────────────────────────────────
+    // Use the stronger signal: either HWCE risk or corrector candidate score.
+    const UNCERTAIN_THRESHOLD: f32 = 0.45;
+
     let has_unresolved = !heuristic.unresolved_words.is_empty();
     let has_correction_spans = !correction_spans.is_empty();
-    let asr_uncertain = segments
-        .iter()
-        .any(|seg| seg.confidence.is_none_or(|c| c < BYPASS_CONFIDENCE));
-    let has_flagged_words = segments.iter().any(|seg| {
-        seg.word_confidences
-            .iter()
-            .any(|wc| wc.fix_score >= BYPASS_FIX_SCORE)
-    });
 
-    let needs_llm = has_unresolved || (has_correction_spans && asr_uncertain && has_flagged_words);
+    let uncertain_words: Vec<String> = if !has_unresolved && !has_correction_spans {
+        Vec::new()
+    } else {
+        let mut words = Vec::new();
+        for ws in &heuristic.unresolved_words {
+            let risk = word_risk_scores
+                .iter()
+                .find(|(k, _)| k.eq_ignore_ascii_case(&ws.word))
+                .map(|(_, s)| *s)
+                .unwrap_or(0.0);
+            let score = risk.max(ws.candidate_score);
+            if score >= UNCERTAIN_THRESHOLD {
+                words.push(ws.word.clone());
+            }
+        }
+        for span in &correction_spans {
+            let risk = span.word_error_risk;
+            let cand = heuristic
+                .unresolved_words
+                .iter()
+                .find(|ws| ws.word.eq_ignore_ascii_case(&span.text))
+                .map(|ws| ws.candidate_score)
+                .unwrap_or(0.0);
+            let score = risk.max(cand);
+            if score >= UNCERTAIN_THRESHOLD
+                && !words.iter().any(|w| w.eq_ignore_ascii_case(&span.text))
+            {
+                words.push(span.text.clone());
+            }
+        }
+        words
+    };
+    let needs_llm = !uncertain_words.is_empty();
+
+    info!(
+        %session_id,
+        lang = detected_lang,
+        unresolved = heuristic.unresolved_words.len(),
+        spans = correction_spans.len(),
+        ?uncertain_words,
+        needs_llm,
+        "bypass gate"
+    );
 
     drain_processing_controls(&mut control_rx, &mut cancelled);
     let post_llm_text = if cancelled {
@@ -675,7 +715,8 @@ async fn run_session<A: AsrBackend + 'static>(
             dictionary: dictionary_entries.clone(),
             correction_spans,
             context: None,
-            language: "en".into(),
+            language: detected_lang.into(),
+            uncertain_words,
         };
         match post_processor.transform(&input).await {
             Ok(output) => {
@@ -880,6 +921,7 @@ mod tests {
             is_final: true,
             start_ms: Some(0),
             end_ms: Some(500),
+            detected_language: None,
         }
     }
 
@@ -890,12 +932,12 @@ mod tests {
             WordConfidence {
                 word: "quarterly".into(),
                 confidence: 0.2,
-                fix_score: 0.8,
+                word_error_risk: 0.8,
             },
             WordConfidence {
                 word: "numbers".into(),
                 confidence: 0.3,
-                fix_score: 0.2,
+                word_error_risk: 0.2,
             },
         ];
 
@@ -913,7 +955,7 @@ mod tests {
         segment.word_confidences = vec![WordConfidence {
             word: "lunevoice".into(),
             confidence: 0.2,
-            fix_score: 0.9,
+            word_error_risk: 0.9,
         }];
 
         let spans = correction_spans_for_text("use Lune Voice today", &[segment], 0.50);
@@ -1121,7 +1163,7 @@ mod tests {
                 segment.word_confidences = vec![WordConfidence {
                     word: "qxvtm".into(),
                     confidence: 0.2,
-                    fix_score: 0.9,
+                    word_error_risk: 0.9,
                 }];
                 let responses = vec![Ok(vec![segment])];
                 let (mgr, db) = make_manager(scripted_asr(responses), post);

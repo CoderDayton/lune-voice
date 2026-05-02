@@ -374,6 +374,7 @@ impl VerboseJsonResponse {
                 confidence: None,
                 min_token_confidence: None,
                 word_confidences: vec![],
+                detected_language: None,
             }];
         }
 
@@ -391,6 +392,7 @@ impl VerboseJsonResponse {
                     confidence: None,
                     min_token_confidence: None,
                     word_confidences: vec![],
+                    detected_language: None,
                 });
             }
         }

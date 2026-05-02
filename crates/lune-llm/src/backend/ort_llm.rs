@@ -238,20 +238,14 @@ impl OrtStyleLlm {
         language: &str,
         _style_instructions: &str,
         _correction_spans: &[CorrectionSpan],
+        uncertain_words: &[String],
     ) -> String {
-        format!(
-            "\
-Minimally correct this ASR transcript.\n\n\
-Expected language: {language}\n\
-Rules:\n\
-- Think throughly before fixing any errors.\n\
-- Fix only punctuation, capitalization, misspellings, and repeated words.\n\
-- Do not delete any words or content.\n\
-- Do not translate or change the language.\n\
-- Preserve all names and proper nouns.\n\
-- Return corrected text only.\n\n\
-Transcript:\n{transcript}"
-        )
+        if uncertain_words.is_empty() {
+            format!("Correct this {language} transcript:\n{transcript}")
+        } else {
+            let words = uncertain_words.join(", ");
+            format!("Uncertain words: {words}\nCorrect this {language} transcript:\n{transcript}")
+        }
     }
 
     pub fn apply_style(
@@ -260,20 +254,22 @@ Transcript:\n{transcript}"
         language: &str,
         style: &lune_core::config::StylePreset,
         correction_spans: &[CorrectionSpan],
+        uncertain_words: &[String],
     ) -> Result<String> {
-        let base = lune_core::config::BASE_SYSTEM_PROMPT;
+        let system = lune_core::config::BASE_SYSTEM_PROMPT.replace("{lang}", language);
 
         let user_text = Self::user_prompt(
             transcript,
             language,
             &style.style_instructions,
             correction_spans,
+            uncertain_words,
         );
 
         let prompt = match self.params.chat_format {
             ChatFormat::ChatML => {
                 format!(
-                    "<|im_start|>system\n{base}<|im_end|>\n\
+                    "<|im_start|>system\n{system}<|im_end|>\n\
                      <|im_start|>user\n{user_text}<|im_end|>\n\
                      <|im_start|>assistant\n"
                 )
@@ -281,7 +277,7 @@ Transcript:\n{transcript}"
             ChatFormat::Llama => {
                 format!(
                     "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n\
-                     {base}<|eot_id|>\
+                     {system}<|eot_id|>\
                      <|start_header_id|>user<|end_header_id|>\n\n\
                      {user_text}<|eot_id|>\
                      <|start_header_id|>assistant<|end_header_id|>\n\n"
@@ -399,6 +395,7 @@ impl TextPostProcessor for OrtStyleLlm {
             &input.language,
             &input.style_preset,
             &input.correction_spans,
+            &input.uncertain_words,
         )?;
 
         let text = crate::prompt::strip_markers(&text);
@@ -547,9 +544,9 @@ mod tests {
 
     #[test]
     fn user_prompt_contains_transcript() {
-        let prompt = OrtStyleLlm::user_prompt("das ist ein test", "de", "", &[]);
+        let prompt = OrtStyleLlm::user_prompt("das ist ein test", "de", "", &[], &[]);
 
         assert!(prompt.contains("das ist ein test"));
-        assert!(prompt.contains("Transcript:"));
+        assert!(prompt.contains("transcript:"));
     }
 }

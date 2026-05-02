@@ -65,7 +65,7 @@ impl OpenAiLlmBackend {
 fn build_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage> {
     let mut messages = Vec::with_capacity(2);
 
-    let mut system_content = BASE_SYSTEM_PROMPT.to_owned();
+    let mut system_content = BASE_SYSTEM_PROMPT.replace("{lang}", &input.language);
     if !input.dictionary.is_empty() {
         system_content.push_str("\nDictionary terms (use these exact spellings):");
         for entry in &input.dictionary {
@@ -89,6 +89,7 @@ fn build_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage>
         &input.language,
         &input.style_preset.style_instructions,
         &input.correction_spans,
+        &input.uncertain_words,
     );
 
     messages.push(
@@ -185,6 +186,7 @@ mod tests {
             correction_spans: vec![],
             context: None,
             language: "en".into(),
+            uncertain_words: Vec::new(),
         }
     }
 
@@ -197,7 +199,7 @@ mod tests {
 
         let json = serde_json::to_string(&msgs).unwrap();
         assert!(json.contains("hello um world"));
-        assert!(json.contains("Transcript:"));
+        assert!(json.contains("transcript:"));
     }
 
     #[test]
@@ -223,7 +225,7 @@ mod tests {
         let msgs = build_messages(&input);
         let json = serde_json::to_string(&msgs).unwrap();
         assert!(json.contains("hello world"));
-        assert!(json.contains("Transcript:"));
+        assert!(json.contains("transcript:"));
     }
 
     #[test]

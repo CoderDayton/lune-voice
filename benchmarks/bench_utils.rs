@@ -128,7 +128,11 @@ pub fn benchmark_asr_entries() -> Vec<BenchmarkAsrEntry> {
     let mut entries = Vec::new();
 
     let qwen3_dir = models_dir().join(lune_core::models::DIR_QWEN3_ASR);
-    if qwen3_dir.exists() {
+    if qwen3_dir.join("tokenizer.json").is_file()
+        && qwen3_dir.join("qwen3-asr-encoder.onnx").is_file()
+        && qwen3_dir.join("qwen3-asr-embed-tokens.onnx").is_file()
+        && qwen3_dir.join("qwen3-asr-decoder.onnx").is_file()
+    {
         entries.push(BenchmarkAsrEntry {
             display_name: "Qwen3-ASR-0.6B-int4",
             backend_kind: AsrBackendKind::Qwen3Asr,
@@ -146,11 +150,14 @@ pub fn benchmark_asr_entry() -> Result<BenchmarkAsrEntry, String> {
         .next()
         .ok_or_else(|| match requested {
             Some(choice) => format!(
-                "Requested ASR backend {:?} is unavailable. Expected model in {:?}.",
+                "Requested ASR backend {:?} is unavailable. Expected qwen3-asr-encoder.onnx, qwen3-asr-embed-tokens.onnx, qwen3-asr-decoder.onnx, and tokenizer.json under {:?}.",
                 choice,
-                models_dir()
+                models_dir().join(lune_core::models::DIR_QWEN3_ASR)
             ),
-            None => format!("No ASR model dir found under {:?}.", models_dir()),
+            None => format!(
+                "No complete Qwen3-ASR ONNX model found under {:?}.",
+                models_dir().join(lune_core::models::DIR_QWEN3_ASR)
+            ),
         })
 }
 
@@ -534,6 +541,10 @@ impl BenchmarkHarness {
             "es"
         } else if name.contains("italian") {
             "it"
+        } else if name.contains("dutch") {
+            "nl"
+        } else if name.contains("portuguese") {
+            "pt"
         } else {
             "en"
         }

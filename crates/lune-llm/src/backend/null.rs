@@ -48,6 +48,7 @@ mod tests {
             correction_spans: vec![],
             context: None,
             language: "en".into(),
+            uncertain_words: Vec::new(),
         };
         let out = processor.transform(&input).await.unwrap();
         assert_eq!(out.cleaned_text, "hello world");
@@ -64,6 +65,7 @@ mod tests {
             correction_spans: vec![],
             context: None,
             language: "en".into(),
+            uncertain_words: Vec::new(),
         };
         let out = processor.transform(&input).await.unwrap();
         assert_eq!(out.cleaned_text, "the weather was nice");
