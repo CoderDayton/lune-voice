@@ -24,11 +24,11 @@ fn word_diff(asr_text: &str, llm_text: &str) -> Vec<(String, bool)> {
     let n = asr_words.len();
     let m = llm_words.len();
     let mut dp = vec![vec![0u32; m + 1]; n + 1];
-    for i in 0..=n {
-        dp[i][0] = i as u32;
+    for (i, row) in dp.iter_mut().enumerate().take(n + 1) {
+        row[0] = i as u32;
     }
-    for j in 0..=m {
-        dp[0][j] = j as u32;
+    for (j, col) in dp[0].iter_mut().enumerate().take(m + 1) {
+        *col = j as u32;
     }
     for i in 1..=n {
         for j in 1..=m {

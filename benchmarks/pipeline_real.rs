@@ -138,8 +138,10 @@ async fn run_full_pipeline(
         ..Default::default()
     };
 
-    let mut user_settings = UserSettings::default();
-    user_settings.language = BenchmarkHarness::language_for_fixture(&fixture.name).into();
+    let user_settings = UserSettings {
+        language: BenchmarkHarness::language_for_fixture(fixture.name).into(),
+        ..Default::default()
+    };
     let settings = Arc::new(RwLock::new(user_settings));
 
     let mgr = SessionManager::new(

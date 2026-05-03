@@ -561,20 +561,11 @@ impl BenchmarkHarness {
 }
 
 /// Builder for [`BenchmarkHarness`].
+#[derive(Default)]
 pub struct HarnessBuilder {
     with_llm: bool,
     with_tracing: bool,
     skip_fixtures: bool,
-}
-
-impl Default for HarnessBuilder {
-    fn default() -> Self {
-        Self {
-            with_llm: false,
-            with_tracing: false,
-            skip_fixtures: false,
-        }
-    }
 }
 
 impl HarnessBuilder {

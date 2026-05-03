@@ -82,7 +82,7 @@ fn speech_segments(
 }
 
 fn print_vad_summary(timeline: &[VadFrame]) {
-    println!("{:<10} {:<10} {}", "Time(ms)", "Prob", "Speech");
+    println!("{:<10} {:<10} {:<10}", "Time(ms)", "Prob", "Speech");
     println!("{}", "-".repeat(35));
     for frame in timeline {
         println!(
