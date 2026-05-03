@@ -180,23 +180,28 @@ impl OrtStyleLlm {
     pub fn new(config: OrtStyleLlmConfig) -> Result<Self> {
         let files = find_model(&config.model_dir)?;
 
+        let logger = quiet_ort_logger();
+        let intra_threads = std::thread::available_parallelism()
+            .map(|n| n.get().clamp(2, 8))
+            .unwrap_or(4);
+
         let make_builder = |gpu: bool, path: &Path| -> Result<Session> {
-            let opt_path = path.with_extension("onnx.opt");
             let mut b = Session::builder()
                 .map_err(e)?
-                .with_logger(quiet_ort_logger())
+                .with_logger(logger.clone())
                 .map_err(e)?
                 .with_log_level(LogLevel::Error)
                 .map_err(e)?
                 .with_optimization_level(GraphOptimizationLevel::Level3)
                 .map_err(e)?
-                .with_intra_threads(4)
+                .with_intra_threads(intra_threads)
                 .map_err(e)?;
             if gpu {
                 b = b
                     .with_execution_providers([ort::ep::CUDA::default().build()])
                     .map_err(e)?;
             } else {
+                let opt_path = path.with_extension("onnx.opt");
                 b = b.with_optimized_model_path(&opt_path).map_err(e)?;
             }
             b.commit_from_file(path).map_err(e)
@@ -240,8 +245,9 @@ impl OrtStyleLlm {
         correction_spans: &[CorrectionSpan],
         uncertain_words: &[(String, usize)],
     ) -> String {
-        let mut instructions = String::new();
-        if !correction_spans.is_empty() {
+        let spans_part = if correction_spans.is_empty() {
+            String::new()
+        } else {
             let spans: Vec<String> = correction_spans
                 .iter()
                 .map(|span| {
@@ -251,27 +257,34 @@ impl OrtStyleLlm {
                     )
                 })
                 .collect();
-            instructions.push_str("Editable spans (0-indexed, end exclusive): [");
-            instructions.push_str(&spans.join(", "));
-            instructions.push_str("]\n");
-        }
-        if !uncertain_words.is_empty() {
+            format!(
+                "Editable spans (0-indexed, end exclusive): [{spans}]",
+                spans = spans.join(", ")
+            )
+        };
+
+        let uncertain_part = if uncertain_words.is_empty() {
+            String::new()
+        } else {
             let words: Vec<String> = uncertain_words
                 .iter()
                 .map(|(w, pos)| format!("{w} (#{pos})"))
                 .collect();
-            let hint = words.join(", ");
-            instructions.push_str("Uncertain words (name and 0-indexed position): [");
-            instructions.push_str(&hint);
-            instructions.push_str("]\n");
-        }
-        if !instructions.is_empty() {
-            instructions.push_str("Only change text inside editable spans or listed uncertain words. Copy everything else exactly.\n");
-        }
-        instructions.push_str(&format!(
-            "Correct this {language} transcript:\n{transcript}"
-        ));
-        instructions
+            format!(
+                "Uncertain words (name and 0-indexed position): [{words}]",
+                words = words.join(", ")
+            )
+        };
+
+        let constraint = if spans_part.is_empty() && uncertain_part.is_empty() {
+            String::new()
+        } else {
+            "Only change text inside editable spans or listed uncertain words. Copy everything else exactly.".into()
+        };
+
+        format!(
+            "{spans_part}\n{uncertain_part}\n{constraint}\nCorrect this {language} transcript:\n{transcript}"
+        )
     }
 
     pub fn apply_style(
@@ -566,6 +579,8 @@ fn strip_think_tags(text: &str) -> &str {
 mod tests {
     use super::*;
 
+    // ── user_prompt ──────────────────────────────────────────────────────
+
     #[test]
     fn user_prompt_lists_editable_spans_and_copy_constraint() {
         let prompt = OrtStyleLlm::user_prompt(
@@ -594,5 +609,144 @@ mod tests {
 
         assert!(prompt.contains("das ist ein test"));
         assert!(prompt.contains("transcript:"));
+    }
+
+    #[test]
+    fn user_prompt_uncertain_words_only() {
+        let prompt = OrtStyleLlm::user_prompt(
+            "hello world foo bar",
+            "en",
+            "",
+            &[],
+            &[("foo".into(), 2), ("bar".into(), 3)],
+        );
+
+        assert!(prompt.contains("Uncertain words"));
+        assert!(prompt.contains("foo (#2)"));
+        assert!(prompt.contains("bar (#3)"));
+        assert!(prompt.contains("Copy everything else exactly"));
+        assert!(!prompt.contains("Editable spans"));
+    }
+
+    #[test]
+    fn user_prompt_spans_and_uncertain_together() {
+        let prompt = OrtStyleLlm::user_prompt(
+            "the quick brown fox",
+            "en",
+            "",
+            &[CorrectionSpan {
+                start_word: 1,
+                end_word: 3,
+                text: "quick brown".into(),
+                confidence: 0.5,
+                word_error_risk: 0.5,
+            }],
+            &[("fox".into(), 3)],
+        );
+
+        assert!(prompt.contains("Editable spans"));
+        assert!(prompt.contains("#1..3"));
+        assert!(prompt.contains("Uncertain words"));
+        assert!(prompt.contains("fox (#3)"));
+        assert!(prompt.contains("Copy everything else exactly"));
+    }
+
+    #[test]
+    fn user_prompt_multiple_spans() {
+        let prompt = OrtStyleLlm::user_prompt(
+            "one two three four five",
+            "en",
+            "",
+            &[
+                CorrectionSpan {
+                    start_word: 0,
+                    end_word: 2,
+                    text: "one two".into(),
+                    confidence: 0.3,
+                    word_error_risk: 0.7,
+                },
+                CorrectionSpan {
+                    start_word: 3,
+                    end_word: 5,
+                    text: "four five".into(),
+                    confidence: 0.4,
+                    word_error_risk: 0.6,
+                },
+            ],
+            &[],
+        );
+
+        assert!(prompt.contains("#0..2"));
+        assert!(prompt.contains("#3..5"));
+        assert!(prompt.contains("one two"));
+        assert!(prompt.contains("four five"));
+    }
+
+    #[test]
+    fn user_prompt_empty_no_constraint() {
+        let prompt = OrtStyleLlm::user_prompt("hello", "en", "", &[], &[]);
+
+        assert!(!prompt.contains("Editable spans"));
+        assert!(!prompt.contains("Uncertain words"));
+        assert!(!prompt.contains("Copy everything else exactly"));
+        assert!(prompt.contains("Correct this en transcript:"));
+        assert!(prompt.contains("hello"));
+    }
+
+    #[test]
+    fn user_prompt_span_risk_format() {
+        let prompt = OrtStyleLlm::user_prompt(
+            "test",
+            "en",
+            "",
+            &[CorrectionSpan {
+                start_word: 0,
+                end_word: 1,
+                text: "test".into(),
+                confidence: 0.25,
+                word_error_risk: 0.75,
+            }],
+            &[],
+        );
+
+        assert!(prompt.contains(r#"risk=0.75"#));
+    }
+
+    // ── strip_think_tags ─────────────────────────────────────────────────
+
+    const THINK_OPEN: &str = "<think>";
+    const THINK_CLOSE: &str = "</think>";
+
+    #[test]
+    fn strip_think_tags_no_tags_returns_as_is() {
+        assert_eq!(strip_think_tags("hello world"), "hello world");
+    }
+
+    #[test]
+    fn strip_think_tags_removes_thinking_block() {
+        let input = format!("{THINK_OPEN}thinking here{THINK_CLOSE} result");
+        assert_eq!(strip_think_tags(&input), "result");
+    }
+
+    #[test]
+    fn strip_think_tags_opening_only_returns_empty() {
+        assert_eq!(strip_think_tags(&format!("{THINK_OPEN}some thinking")), "");
+    }
+
+    #[test]
+    fn strip_think_tags_leading_then_content() {
+        let input = format!("{THINK_OPEN}{THINK_CLOSE}answer");
+        assert_eq!(strip_think_tags(&input), "answer");
+    }
+
+    #[test]
+    fn strip_think_tags_empty_string() {
+        assert_eq!(strip_think_tags(""), "");
+    }
+
+    #[test]
+    fn strip_think_tags_tag_in_middle() {
+        let input = format!("before {THINK_CLOSE}after");
+        assert_eq!(strip_think_tags(&input), "after");
     }
 }
