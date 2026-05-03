@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
 
 use lune_app::{DeliveryService, SessionManager, SessionManagerConfig};
 #[cfg(unix)]
@@ -8,8 +9,8 @@ use lune_asr::AsrRegistry;
 use lune_commands::VoiceCommandRouter;
 use lune_core::asr::AsrSessionConfig;
 use lune_core::command::VoiceCommand;
-use lune_core::config::{LlmBackendConfig, PillVisibility, UserSettings};
-use lune_core::llm::TextPostProcessor;
+use lune_core::config::{ActivationMode, LlmBackendConfig, PillVisibility, UserSettings};
+use lune_core::llm::{PostProcessInput, PostProcessOutput, TextPostProcessor};
 use lune_core::session::SessionEvent;
 use lune_dict::DictionaryManager;
 use lune_llm::{NullPostProcessor, OpenAiLlmBackend, OpenAiLlmConfig};
@@ -21,6 +22,9 @@ use tracing::info;
 use tracing::{debug, warn};
 
 use crate::dto::SessionStreamEvent;
+
+const LOCAL_LLM_IDLE_TTL: Duration = Duration::from_secs(150);
+const HOLD_WARMUP_GRACE: Duration = Duration::from_millis(250);
 
 pub struct AppRuntime {
     inner: Arc<RuntimeInner>,
@@ -41,6 +45,7 @@ struct RuntimeInner {
 struct LivePipeline {
     paths: AppPaths,
     manager: Option<Arc<SessionManager<AsrRegistry>>>,
+    local_llm: Option<Arc<LazyLocalLlm>>,
     active: bool,
     session_id: Option<String>,
     reload_required: bool,
@@ -83,6 +88,7 @@ impl AppRuntime {
             let pipeline = LivePipeline {
                 paths,
                 manager: None,
+                local_llm: None,
                 active: false,
                 session_id: None,
                 reload_required: true,
@@ -206,7 +212,6 @@ impl AppRuntime {
                 return Err(e);
             }
         };
-
         let (event_tx, event_rx) = mpsc::channel(256);
         let session_id = match manager.start(event_tx).await {
             Ok(session_id) => session_id,
@@ -220,6 +225,7 @@ impl AppRuntime {
         let session_id = session_id.to_string();
         self.set_pipeline_session(Some(session_id.clone()), true)
             .await;
+        self.schedule_local_llm_warmup().await;
 
         self.push_session_event(SessionStreamEvent::SessionStarted {
             session_id: session_id.clone(),
@@ -427,6 +433,7 @@ impl AppRuntime {
     }
 
     async fn finish_session(&self) {
+        self.schedule_local_llm_unload().await;
         self.set_pipeline_session(None, false).await;
     }
 
@@ -555,6 +562,41 @@ impl AppRuntime {
         pipeline.session_id = session_id;
         pipeline.active = active;
     }
+
+    async fn schedule_local_llm_warmup(&self) {
+        let (local_llm, activation_mode) = {
+            let pipeline = self.inner.pipeline.lock().await;
+            let settings = self.inner.settings.read().await;
+            (pipeline.local_llm.clone(), settings.activation_mode)
+        };
+        let Some(local_llm) = local_llm else {
+            return;
+        };
+        local_llm.cancel_scheduled_unload();
+
+        let runtime = self.clone();
+        tauri::async_runtime::spawn(async move {
+            if activation_mode == ActivationMode::Hold {
+                // Avoid loading a multi-GB local LLM for accidental key taps.
+                tokio::time::sleep(HOLD_WARMUP_GRACE).await;
+                let active = runtime.inner.pipeline.lock().await.active;
+                if !active {
+                    return;
+                }
+            }
+            local_llm.warm_up().await;
+        });
+    }
+
+    async fn schedule_local_llm_unload(&self) {
+        let local_llm = {
+            let pipeline = self.inner.pipeline.lock().await;
+            pipeline.local_llm.clone()
+        };
+        if let Some(local_llm) = local_llm {
+            local_llm.schedule_unload_after(LOCAL_LLM_IDLE_TTL).await;
+        }
+    }
 }
 
 impl Clone for AppRuntime {
@@ -571,7 +613,7 @@ async fn build_pipeline(
 ) -> Result<(LivePipeline, Arc<RwLock<UserSettings>>), String> {
     let asr = AsrRegistry::from_config(&settings.asr_backend, settings.device, &paths.models_dir())
         .map_err(|e| format!("build asr backend: {e}"))?;
-    let post_processor = build_post_processor(&settings, &paths.models_dir()).await?;
+    let (post_processor, local_llm) = build_post_processor(&settings, &paths.models_dir()).await?;
     let router = Arc::new(VoiceCommandRouter::new());
     let dict = Arc::new(Mutex::new(
         DictionaryManager::new(
@@ -642,6 +684,7 @@ async fn build_pipeline(
     let pipeline = LivePipeline {
         paths,
         manager: Some(Arc::new(manager)),
+        local_llm,
         active: false,
         session_id: None,
         reload_required: false,
@@ -691,28 +734,23 @@ fn quiet_ort_logger() -> ort::logging::LoggerFunction {
 async fn build_post_processor(
     settings: &UserSettings,
     models_dir: &std::path::Path,
-) -> Result<Arc<dyn TextPostProcessor>, String> {
+) -> Result<(Arc<dyn TextPostProcessor>, Option<Arc<LazyLocalLlm>>), String> {
     match &settings.llm_backend {
         LlmBackendConfig::Local { .. } => {
             let style_dir = models_dir.join(lune_core::models::DIR_STYLE_LLM);
             if style_dir.join("tokenizer.json").exists() {
-                match lune_llm::backend::ort_llm::OrtStyleLlm::new(
-                    lune_llm::backend::ort_llm::OrtStyleLlmConfig {
-                        model_dir: style_dir,
-                        use_gpu: settings.device.use_gpu(cfg!(feature = "cuda")),
-                        max_new_tokens: 128,
-                        ..Default::default()
-                    },
-                ) {
-                    Ok(llm) => Ok(Arc::new(llm) as Arc<dyn TextPostProcessor>),
-                    Err(e) => {
-                        tracing::warn!(error = %e, "style LLM load failed, using passthrough");
-                        Ok(Arc::new(NullPostProcessor::new()) as Arc<dyn TextPostProcessor>)
-                    }
-                }
+                let llm = Arc::new(LazyLocalLlm::new(
+                    style_dir,
+                    settings.device.use_gpu(cfg!(feature = "cuda")),
+                    128,
+                ));
+                Ok((llm.clone() as Arc<dyn TextPostProcessor>, Some(llm)))
             } else {
                 tracing::info!("style LLM not downloaded yet, using passthrough");
-                Ok(Arc::new(NullPostProcessor::new()) as Arc<dyn TextPostProcessor>)
+                Ok((
+                    Arc::new(NullPostProcessor::new()) as Arc<dyn TextPostProcessor>,
+                    None,
+                ))
             }
         }
         LlmBackendConfig::OpenAiCompatible {
@@ -728,9 +766,146 @@ async fn build_post_processor(
                 max_tokens: *max_tokens,
                 temperature: 0.2,
             });
-            Ok(Arc::new(backend) as Arc<dyn TextPostProcessor>)
+            Ok((Arc::new(backend) as Arc<dyn TextPostProcessor>, None))
         }
-        _ => Ok(Arc::new(NullPostProcessor::new()) as Arc<dyn TextPostProcessor>),
+        _ => Ok((
+            Arc::new(NullPostProcessor::new()) as Arc<dyn TextPostProcessor>,
+            None,
+        )),
+    }
+}
+
+struct LazyLocalLlm {
+    model_dir: std::path::PathBuf,
+    use_gpu: bool,
+    max_new_tokens: usize,
+    generation: AtomicU64,
+    unload_epoch: AtomicU64,
+    state: Mutex<LazyLlmState>,
+}
+
+enum LazyLlmState {
+    Empty,
+    Loading(u64),
+    Ready(Arc<lune_llm::backend::ort_llm::OrtStyleLlm>),
+}
+
+impl LazyLocalLlm {
+    fn new(model_dir: std::path::PathBuf, use_gpu: bool, max_new_tokens: usize) -> Self {
+        Self {
+            model_dir,
+            use_gpu,
+            max_new_tokens,
+            generation: AtomicU64::new(0),
+            unload_epoch: AtomicU64::new(0),
+            state: Mutex::new(LazyLlmState::Empty),
+        }
+    }
+
+    async fn warm_up(&self) {
+        let generation = self.generation.load(Ordering::SeqCst);
+        {
+            let mut state = self.state.lock().await;
+            match *state {
+                LazyLlmState::Ready(_) | LazyLlmState::Loading(_) => return,
+                LazyLlmState::Empty => *state = LazyLlmState::Loading(generation),
+            }
+        }
+
+        let model_dir = self.model_dir.clone();
+        let use_gpu = self.use_gpu;
+        let max_new_tokens = self.max_new_tokens;
+        let loaded = tokio::task::spawn_blocking(move || {
+            lune_llm::backend::ort_llm::OrtStyleLlm::new(
+                lune_llm::backend::ort_llm::OrtStyleLlmConfig {
+                    model_dir,
+                    use_gpu,
+                    max_new_tokens,
+                    ..Default::default()
+                },
+            )
+            .map(Arc::new)
+            .map_err(|e| e.to_string())
+        })
+        .await;
+
+        let mut state = self.state.lock().await;
+        let still_current = self.generation.load(Ordering::SeqCst) == generation
+            && matches!(*state, LazyLlmState::Loading(g) if g == generation);
+        if !still_current {
+            *state = LazyLlmState::Empty;
+            return;
+        }
+
+        match loaded {
+            Ok(Ok(llm)) => {
+                tracing::info!("local style LLM warmed");
+                *state = LazyLlmState::Ready(llm);
+            }
+            Ok(Err(error)) => {
+                tracing::warn!(%error, "local style LLM warm-up failed, using passthrough");
+                *state = LazyLlmState::Empty;
+            }
+            Err(error) => {
+                tracing::warn!(%error, "local style LLM warm-up task failed, using passthrough");
+                *state = LazyLlmState::Empty;
+            }
+        }
+    }
+
+    async fn unload(&self) {
+        self.generation.fetch_add(1, Ordering::SeqCst);
+        let mut state = self.state.lock().await;
+        if matches!(&*state, LazyLlmState::Ready(_) | LazyLlmState::Loading(_)) {
+            tracing::info!("local style LLM unloaded");
+        }
+        *state = LazyLlmState::Empty;
+    }
+
+    fn cancel_scheduled_unload(&self) {
+        self.unload_epoch.fetch_add(1, Ordering::SeqCst);
+    }
+
+    async fn schedule_unload_after(self: Arc<Self>, ttl: Duration) {
+        let should_schedule = {
+            let state = self.state.lock().await;
+            matches!(&*state, LazyLlmState::Ready(_) | LazyLlmState::Loading(_))
+        };
+        if !should_schedule {
+            return;
+        }
+
+        let epoch = self.unload_epoch.fetch_add(1, Ordering::SeqCst) + 1;
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(ttl).await;
+            if self.unload_epoch.load(Ordering::SeqCst) == epoch {
+                self.unload().await;
+            }
+        });
+    }
+}
+
+#[async_trait::async_trait]
+impl TextPostProcessor for LazyLocalLlm {
+    async fn transform(&self, input: &PostProcessInput) -> lune_core::Result<PostProcessOutput> {
+        let llm = {
+            let state = self.state.lock().await;
+            match &*state {
+                LazyLlmState::Ready(llm) => Some(Arc::clone(llm)),
+                LazyLlmState::Empty | LazyLlmState::Loading(_) => None,
+            }
+        };
+
+        match llm {
+            Some(llm) => llm.transform(input).await,
+            None => {
+                tracing::info!("local style LLM not ready, using passthrough");
+                Ok(PostProcessOutput {
+                    cleaned_text: input.raw_text.clone(),
+                    metadata: None,
+                })
+            }
+        }
     }
 }
 
@@ -754,12 +929,78 @@ fn sanitize_error_for_frontend(raw: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::sanitize_error_for_frontend;
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    use lune_core::config::StylePreset;
+    use lune_core::llm::{PostProcessInput, TextPostProcessor};
+
+    use super::{LazyLocalLlm, sanitize_error_for_frontend};
 
     #[test]
     fn sanitize_error_handles_non_ascii_without_panicking() {
         let raw = format!("é{}", "/tmp/example/path/segment".repeat(80));
         let sanitized = sanitize_error_for_frontend(&raw);
         assert!(!sanitized.is_empty());
+    }
+
+    #[tokio::test]
+    async fn lazy_local_llm_passes_through_when_not_warmed() {
+        let llm = LazyLocalLlm::new(std::path::PathBuf::from("/missing/model"), false, 8);
+        let input = PostProcessInput {
+            raw_text: "keep this text".into(),
+            style_preset: Arc::new(StylePreset::minimal()),
+            app_category: None,
+            dictionary: vec![],
+            correction_spans: vec![],
+            context: None,
+            language: "en".into(),
+            uncertain_words: vec![],
+        };
+
+        let output = llm.transform(&input).await.unwrap();
+
+        assert_eq!(output.cleaned_text, "keep this text");
+    }
+
+    #[tokio::test]
+    async fn lazy_local_llm_ttl_unloads_in_flight_warmup() {
+        let llm = Arc::new(LazyLocalLlm::new(
+            std::path::PathBuf::from("/missing/model"),
+            false,
+            8,
+        ));
+        *llm.state.lock().await = super::LazyLlmState::Loading(0);
+
+        Arc::clone(&llm)
+            .schedule_unload_after(Duration::from_millis(1))
+            .await;
+        tokio::time::sleep(Duration::from_millis(20)).await;
+
+        assert!(matches!(
+            *llm.state.lock().await,
+            super::LazyLlmState::Empty
+        ));
+    }
+
+    #[tokio::test]
+    async fn lazy_local_llm_ttl_can_be_cancelled() {
+        let llm = Arc::new(LazyLocalLlm::new(
+            std::path::PathBuf::from("/missing/model"),
+            false,
+            8,
+        ));
+        *llm.state.lock().await = super::LazyLlmState::Loading(0);
+
+        Arc::clone(&llm)
+            .schedule_unload_after(Duration::from_millis(1))
+            .await;
+        llm.cancel_scheduled_unload();
+        tokio::time::sleep(Duration::from_millis(20)).await;
+
+        assert!(matches!(
+            *llm.state.lock().await,
+            super::LazyLlmState::Loading(_)
+        ));
     }
 }

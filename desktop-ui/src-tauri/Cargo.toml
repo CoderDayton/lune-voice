@@ -12,6 +12,7 @@ cuda = ["lune-app/cuda", "ort/cuda"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+async-trait.workspace = true
 tauri = { version = "2", features = ["test", "tray-icon"] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
