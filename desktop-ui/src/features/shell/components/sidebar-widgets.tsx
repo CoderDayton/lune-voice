@@ -19,7 +19,7 @@ export function SidebarQuickStart() {
         type="button"
         onClick={() => void toggleDictation()}
         disabled={isConnecting}
-        className={`group flex w-full items-center gap-3 rounded-field border px-3.5 py-3 transition-all sm:gap-3.5 sm:px-4 sm:py-3.5 ${
+        className={`group flex w-full items-center gap-3 rounded-field border px-3.5 py-3 shadow-card transition-all sm:gap-3.5 sm:px-4 sm:py-3.5 ${
           isActive
             ? "border-error/30 bg-error/[0.08] hover:bg-error/[0.12] hover:border-error/40"
             : "border-primary/15 bg-primary/[0.06] hover:bg-primary/[0.1] hover:border-primary/25 disabled:cursor-not-allowed disabled:opacity-60"
@@ -65,8 +65,8 @@ export function SidebarQuickStart() {
 export function SidebarTodayStatsSkeleton() {
   return (
     <div className="px-3 py-2 sm:px-4">
-      <div className="skeleton h-3 w-12 mb-1.5" />
-      <div className="skeleton h-3 w-28 sm:w-36" />
+      <div className="skeleton-shimmer h-3 w-12 mb-1.5" />
+      <div className="skeleton-shimmer h-3 w-28 sm:w-36" />
     </div>
   );
 }
@@ -76,7 +76,7 @@ export function SidebarTodayStats() {
   const todayStats = useStore(workspaceStore, getTodayStats);
 
   return (
-    <div className="mx-3.5 mb-3 rounded-box border border-surface-border bg-surface-hover px-4 py-3">
+    <div className="mx-3.5 mb-3 rounded-box border border-surface-border bg-surface-elevated px-4 py-3 shadow-card">
       <p className="text-xs font-medium uppercase tracking-widest text-content-dim">{t`Today`}</p>
       <p className="mt-1 text-sm text-content-muted tabular-nums">
         {todayStats.count} {todayStats.count === 1 ? t`session` : t`sessions`}

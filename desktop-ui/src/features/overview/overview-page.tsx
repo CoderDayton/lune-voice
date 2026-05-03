@@ -18,6 +18,7 @@ export function OverviewPage() {
   const loading = useStore(workspaceStore, (s) => s.runtime.loading);
   const asrBackend = useStore(workspaceStore, (s) => s.settings.asrBackend);
   const dictationMode = useStore(workspaceStore, (s) => s.settings.dictationMode);
+  const hotkeyToggle = useStore(workspaceStore, (s) => s.settings.hotkeyToggle);
   const stats = useStore(workspaceStore, getSessionStats);
   const recentSessions = useStore(workspaceStore, (s) => s.historySessions.slice(0, 5));
 
@@ -31,112 +32,131 @@ export function OverviewPage() {
 
   return (
     <ModelSetup>
-    <div className="page-stack">
-      <section className="card border border-surface-border bg-surface-card">
-        <div className="card-body gap-5">
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <StatusBadge variant={isLoading ? "warning" : isConnected ? "success" : "error"}>
-              {isLoading ? t`Connecting` : isConnected ? t`Ready` : t`Disconnected`}
-            </StatusBadge>
-            <InfoBadge>{summarizeAsrBackend(asrBackend)}</InfoBadge>
-            <InfoBadge>{summarizeDictationMode(dictationMode)}</InfoBadge>
-          </div>
+      <div className="page-stack">
+        <section className="panel-surface">
+          <div className="card-body gap-5 p-5 sm:p-6">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <StatusBadge variant={isLoading ? "warning" : isConnected ? "success" : "error"}>
+                {isLoading ? t`Connecting` : isConnected ? t`Ready` : t`Disconnected`}
+              </StatusBadge>
+              <InfoBadge>{summarizeAsrBackend(asrBackend)}</InfoBadge>
+              <InfoBadge>{summarizeDictationMode(dictationMode)}</InfoBadge>
+            </div>
 
-          {showSkeleton ? (
-            <div className="stats stats-vertical w-full overflow-hidden rounded-box border border-surface-border bg-surface-card sm:stats-horizontal">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="stat">
-                  <div className="stat-title"><span className="skeleton h-3 w-12" /></div>
-                  <div className="stat-value"><span className="skeleton h-8 w-20 mt-1" /></div>
+            {showSkeleton ? (
+              <div className="grid gap-3 sm:grid-cols-3">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="metric-card">
+                    <span className="skeleton-shimmer h-3 w-12" />
+                    <span className="skeleton-shimmer mt-3 h-8 w-20" />
+                  </div>
+                ))}
+              </div>
+            ) : stats.count > 0 ? (
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="metric-card">
+                  <div className="mb-4 flex items-center justify-between text-content-subtle">
+                    <span className="section-label">{t`Words`}</span>
+                    <Hash size={20} strokeWidth={1.5} className="text-primary/55" />
+                  </div>
+                  <div className="text-3xl font-semibold tracking-tight tabular-nums">
+                    {stats.totalWords.toLocaleString()}
+                  </div>
                 </div>
-              ))}
-            </div>
-          ) : stats.count > 0 ? (
-            <div className="stats stats-vertical w-full overflow-hidden rounded-box border border-surface-border bg-surface-card sm:stats-horizontal">
-              <div className="stat">
-                <div className="stat-figure text-primary/30"><Hash size={22} strokeWidth={1.5} /></div>
-                <div className="stat-title">{t`Words`}</div>
-                <div className="stat-value text-3xl">{stats.totalWords.toLocaleString()}</div>
+                <div className="metric-card">
+                  <div className="mb-4 flex items-center justify-between text-content-subtle">
+                    <span className="section-label">{t`Minutes`}</span>
+                    <Clock size={20} strokeWidth={1.5} className="text-secondary/55" />
+                  </div>
+                  <div className="text-3xl font-semibold tracking-tight tabular-nums">
+                    {stats.totalMinutes}
+                  </div>
+                </div>
+                <div className="metric-card">
+                  <div className="mb-4 flex items-center justify-between text-content-subtle">
+                    <span className="section-label">{t`Sessions`}</span>
+                    <MessageSquareText size={20} strokeWidth={1.5} className="text-accent/60" />
+                  </div>
+                  <div className="text-3xl font-semibold tracking-tight tabular-nums">
+                    {stats.count}
+                  </div>
+                </div>
               </div>
-              <div className="stat">
-                <div className="stat-figure text-secondary/30"><Clock size={22} strokeWidth={1.5} /></div>
-                <div className="stat-title">{t`Minutes`}</div>
-                <div className="stat-value text-3xl">{stats.totalMinutes}</div>
+            ) : (
+              <div className="rounded-box border border-dashed border-surface-border bg-surface-inset px-5 py-6 text-sm text-content-muted">
+                {t`Your session summary will appear here once you start dictating.`}
               </div>
-              <div className="stat">
-                <div className="stat-figure text-accent/30"><MessageSquareText size={22} strokeWidth={1.5} /></div>
-                <div className="stat-title">{t`Sessions`}</div>
-                <div className="stat-value text-3xl">{stats.count}</div>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-box border border-dashed border-surface-border bg-surface-inset px-5 py-6 text-sm text-content-muted">
-              {t`Your session summary will appear here once you start dictating.`}
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="card border border-surface-border bg-surface-card">
-        <div className="card-body p-0">
-          <div className="flex items-center justify-between px-5 pb-3 pt-5">
-            <div>
-              <h2 className="section-label">{t`Recent`}</h2>
-              <p className="mt-1 text-sm text-content-muted">{stats.count} {stats.count === 1 ? t`session` : t`sessions`}</p>
-            </div>
-          {stats.count > 5 && (
-              <Link to="/history" className="btn btn-ghost btn-sm normal-case">{t`View all`}</Link>
-          )}
+            )}
           </div>
-          {showSkeleton ? (
-            <div className="divide-y divide-surface-border">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="px-5 py-4 flex flex-col gap-2">
-                  <span className="skeleton h-3 w-16" />
-                  <span className="skeleton h-4 w-full" />
-                  <span className="skeleton h-4 w-3/4" />
-                  <span className="skeleton h-3 w-24 mt-1" />
-                </div>
-              ))}
-            </div>
-          ) : recentSessions.length === 0 && !isActive ? (
-            <div className="flex flex-col items-center justify-center px-5 py-14 text-center sm:py-16">
-              <div className="mb-4 flex size-16 items-center justify-center rounded-full bg-primary/8 sm:size-20">
-                <Mic className="size-8 text-primary/40 sm:size-10" strokeWidth={1.2} />
+        </section>
+
+        <section className="panel-surface overflow-hidden">
+          <div className="card-body p-0">
+            <div className="flex items-center justify-between px-5 pb-3 pt-5">
+              <div>
+                <h2 className="section-label">{t`Recent`}</h2>
+                <p className="mt-1 text-sm text-content-muted">
+                  {stats.count} {stats.count === 1 ? t`session` : t`sessions`}
+                </p>
               </div>
-              <p className="text-sm font-medium text-content-muted">{t`No sessions yet`}</p>
-              <p className="mt-1 text-xs text-content-subtle">
-                {t`Press`} <kbd className="kbd kbd-xs">{t`Ctrl`}</kbd> + <kbd className="kbd kbd-xs">{t`Space`}</kbd> {t`to start dictating`}
-              </p>
+              {stats.count > 5 && (
+                <Link to="/history" className="btn btn-ghost btn-sm normal-case">
+                  {t`View all`}
+                </Link>
+              )}
             </div>
-          ) : recentSessions.length === 0 && isActive ? null : (
-            <div className="divide-y divide-surface-border">
-              {recentSessions.map((session) => {
-                const time = new Date(session.startedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-                return (
-                  <SessionDetailModal key={session.id} session={session}>
-                    {(open) => (
-                      <article className="block px-5 py-4 cursor-pointer transition-colors hover:bg-surface-hover" onClick={open}>
-                        <div className="pt-1 text-xs tabular-nums text-content-subtle">{time}</div>
-                        <div className="min-w-0">
-                          <p className="text-sm leading-6 break-words text-content">
-                            {session.transcript || t`Empty session`}
-                          </p>
-                          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-content-muted">
-                            <span className="badge badge-ghost badge-sm">{session.words} {t`words`}</span>
-                            <span>{session.seconds}{t`s`}</span>
+            {showSkeleton ? (
+              <div className="divide-y divide-surface-border">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="px-5 py-4 flex flex-col gap-2">
+                    <span className="skeleton-shimmer h-3 w-16" />
+                    <span className="skeleton-shimmer h-4 w-full" />
+                    <span className="skeleton-shimmer h-4 w-3/4" />
+                    <span className="skeleton-shimmer h-3 w-24 mt-1" />
+                  </div>
+                ))}
+              </div>
+            ) : recentSessions.length === 0 && !isActive ? (
+              <div className="flex flex-col items-center justify-center px-5 py-14 text-center sm:py-16">
+                <div className="token-icon mb-4 size-16 rounded-full sm:size-20">
+                  <Mic className="size-8 sm:size-10" strokeWidth={1.2} />
+                </div>
+                <p className="text-sm font-medium text-content-muted">{t`No sessions yet`}</p>
+                <p className="mt-1 text-xs text-content-subtle">
+                  {t`Press`} <kbd className="kbd kbd-xs">{hotkeyToggle || t`your hotkey`}</kbd> {t`to start dictating`}
+                </p>
+              </div>
+            ) : recentSessions.length === 0 && isActive ? null : (
+              <div className="divide-y divide-surface-border">
+                {recentSessions.map((session) => {
+                  const time = new Date(session.startedAt).toLocaleTimeString([], {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  });
+                  return (
+                    <SessionDetailModal key={session.id} session={session}>
+                      {(open) => (
+                        <article className="interactive-row block px-5 py-4" onClick={open}>
+                          <div className="pt-1 text-xs tabular-nums text-content-subtle">{time}</div>
+                          <div className="min-w-0">
+                            <p className="text-sm leading-6 break-words text-content">
+                              {session.transcript || t`Empty session`}
+                            </p>
+                            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-content-muted">
+                              <span className="badge badge-ghost badge-sm">{session.words} {t`words`}</span>
+                              <span>{session.seconds}{t`s`}</span>
+                            </div>
                           </div>
-                        </div>
-                      </article>
-                    )}
-                  </SessionDetailModal>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </section>
-    </div>
+                        </article>
+                      )}
+                    </SessionDetailModal>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
     </ModelSetup>
   );
 }

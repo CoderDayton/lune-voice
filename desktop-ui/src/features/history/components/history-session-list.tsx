@@ -19,7 +19,7 @@ const SessionRow = memo(function SessionRow({ item }: SessionRowProps) {
   return (
     <SessionDetailModal session={item}>
       {(open) => (
-        <li className="list-row cursor-pointer" onClick={open}>
+        <li className="list-row interactive-row" onClick={open}>
           <div className="list-col-grow min-w-0">
             <p className="text-sm line-clamp-2 sm:line-clamp-3">{item.transcript || t`Empty session`}</p>
             <div className="text-xs text-content-subtle mt-0.5">
@@ -65,7 +65,7 @@ export function HistorySessionList() {
   if (groups.length === 0) {
     const hasSearch = searchQuery.trim().length > 0;
     return (
-      <div role="alert" className="alert alert-info alert-soft">
+      <div role="alert" className="alert alert-info alert-soft panel-surface">
         <span>
           {hasSearch
             ? t`No sessions match "${searchQuery.trim()}". Try a different search.`
@@ -84,7 +84,7 @@ export function HistorySessionList() {
           <h3 className="sticky top-0 z-10 text-xs font-semibold uppercase tracking-wider text-content-subtle mb-2 px-1 py-1 backdrop-blur-sm">
             {group.date}
           </h3>
-          <ul className="list rounded-box border border-surface-border bg-surface-card">
+          <ul className="list panel-surface overflow-hidden">
             {group.items.map((item) => (
               <SessionRow key={item.id} item={item} />
             ))}

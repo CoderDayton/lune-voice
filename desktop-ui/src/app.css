@@ -7,26 +7,26 @@
   themes: light, dark, cupcake, bumblebee, emerald, corporate, synthwave, retro, cyberpunk, valentine, halloween, garden, forest, aqua, lofi, pastel, fantasy, wireframe, black, luxury, dracula, cmyk, autumn, business, acid, lemonade, night, coffee, winter, dim, nord, sunset, caramellatte, abyss, silk;
 }
 
-/* ── Lune theme: warm, soft, inviting dark ─────────────────────────── */
+/* ── Lune theme: local audio console dark ──────────────────────────── */
 
 @plugin "daisyui/theme" {
   name: "lune";
   default: true;
   color-scheme: dark;
-  --color-base-100: oklch(0.15 0.012 270);
-  --color-base-200: oklch(0.19 0.012 270);
-  --color-base-300: oklch(0.24 0.012 270);
-  --color-base-content: oklch(0.93 0.006 270);
-  --color-primary: oklch(0.65 0.25 270);
-  --color-primary-content: oklch(0.98 0.005 270);
-  --color-secondary: oklch(0.70 0.18 230);
-  --color-secondary-content: oklch(0.98 0.005 230);
-  --color-accent: oklch(0.75 0.16 60);
-  --color-accent-content: oklch(0.18 0.04 60);
-  --color-neutral: oklch(0.24 0.012 270);
-  --color-neutral-content: oklch(0.88 0.008 270);
-  --color-info: oklch(0.7 0.12 230);
-  --color-info-content: oklch(0.98 0.005 230);
+  --color-base-100: oklch(0.145 0.013 238);
+  --color-base-200: oklch(0.185 0.014 238);
+  --color-base-300: oklch(0.24 0.016 238);
+  --color-base-content: oklch(0.93 0.007 238);
+  --color-primary: oklch(0.74 0.018 245);
+  --color-primary-content: oklch(0.13 0.010 245);
+  --color-secondary: oklch(0.62 0.025 250);
+  --color-secondary-content: oklch(0.12 0.010 250);
+  --color-accent: oklch(0.68 0.035 70);
+  --color-accent-content: oklch(0.16 0.020 70);
+  --color-neutral: oklch(0.24 0.014 238);
+  --color-neutral-content: oklch(0.88 0.008 238);
+  --color-info: oklch(0.7 0.12 225);
+  --color-info-content: oklch(0.12 0.02 225);
   --color-success: oklch(0.68 0.14 155);
   --color-success-content: oklch(0.98 0.005 155);
   --color-warning: oklch(0.78 0.13 75);
@@ -35,7 +35,7 @@
   --color-error-content: oklch(0.98 0.005 18);
   --radius-selector: 0.75rem;
   --radius-field: 0.75rem;
-  --radius-box: 1.25rem;
+  --radius-box: 0.95rem;
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
   --border: 1px;
@@ -49,20 +49,20 @@
   name: "lune-light";
   default: false;
   color-scheme: light;
-  --color-base-100: oklch(0.98 0.005 265);
-  --color-base-200: oklch(0.95 0.006 265);
-  --color-base-300: oklch(0.91 0.008 265);
-  --color-base-content: oklch(0.22 0.012 265);
-  --color-primary: oklch(0.55 0.18 280);
-  --color-primary-content: oklch(0.98 0.005 280);
-  --color-secondary: oklch(0.55 0.14 230);
-  --color-secondary-content: oklch(0.98 0.005 230);
-  --color-accent: oklch(0.55 0.14 160);
-  --color-accent-content: oklch(0.98 0.005 160);
-  --color-neutral: oklch(0.88 0.006 265);
-  --color-neutral-content: oklch(0.30 0.012 265);
-  --color-info: oklch(0.55 0.14 230);
-  --color-info-content: oklch(0.98 0.005 230);
+  --color-base-100: oklch(0.985 0.006 225);
+  --color-base-200: oklch(0.955 0.008 225);
+  --color-base-300: oklch(0.91 0.010 225);
+  --color-base-content: oklch(0.20 0.016 235);
+  --color-primary: oklch(0.42 0.020 245);
+  --color-primary-content: oklch(0.98 0.005 245);
+  --color-secondary: oklch(0.50 0.024 250);
+  --color-secondary-content: oklch(0.98 0.005 250);
+  --color-accent: oklch(0.50 0.040 70);
+  --color-accent-content: oklch(0.98 0.005 70);
+  --color-neutral: oklch(0.88 0.008 225);
+  --color-neutral-content: oklch(0.28 0.014 235);
+  --color-info: oklch(0.55 0.14 225);
+  --color-info-content: oklch(0.98 0.005 225);
   --color-success: oklch(0.52 0.16 155);
   --color-success-content: oklch(0.98 0.005 155);
   --color-warning: oklch(0.68 0.16 75);
@@ -71,7 +71,7 @@
   --color-error-content: oklch(0.98 0.005 18);
   --radius-selector: 0.75rem;
   --radius-field: 0.75rem;
-  --radius-box: 1.25rem;
+  --radius-box: 0.95rem;
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
   --border: 1px;
@@ -83,18 +83,23 @@
 
 /* Dark scheme tokens (default) — applies to lune + all dark DaisyUI themes */
 :root, [data-color-scheme="dark"] {
-  --content-strong: oklch(0.94 0.006 270);
-  --content-default: oklch(0.86 0.006 270);
-  --content-muted: oklch(0.68 0.008 270);
-  --content-subtle: oklch(0.52 0.008 270);
-  --content-dim: oklch(0.38 0.008 270);
-  --surface-card: oklch(0.21 0.012 270 / 0.60);
-  --surface-elevated: oklch(0.25 0.012 270 / 0.75);
-  --surface-glass: oklch(0.18 0.012 270 / 0.92);
-  --surface-nav-active: oklch(0.65 0.25 270 / 0.12);
+  --content-strong: oklch(0.94 0.007 238);
+  --content-default: oklch(0.86 0.007 238);
+  --content-muted: oklch(0.68 0.009 238);
+  --content-subtle: oklch(0.53 0.009 238);
+  --content-dim: oklch(0.40 0.009 238);
+  --surface-card: oklch(0.205 0.013 238 / 0.70);
+  --surface-elevated: oklch(0.245 0.015 238 / 0.86);
+  --surface-glass: oklch(0.18 0.014 238 / 0.90);
+  --surface-panel: oklch(0.19 0.014 238 / 0.78);
+  --surface-field: oklch(0.16 0.012 238 / 0.88);
+  --surface-wash: oklch(0.74 0.018 245 / 0.10);
+  --surface-nav-active: oklch(0.74 0.018 245 / 0.14);
   --surface-hover: oklch(1 0 0 / 0.05);
-  --surface-border: oklch(0.90 0.008 270 / 0.12);
-  --surface-inset: oklch(0.13 0.012 270 / 0.55);
+  --surface-border: oklch(0.90 0.008 238 / 0.12);
+  --surface-border-strong: oklch(0.90 0.008 238 / 0.20);
+  --surface-inset: oklch(0.13 0.012 238 / 0.62);
+  --ring-focus: oklch(0.74 0.018 245 / 0.45);
 }
 
 /* Light scheme tokens — applies to lune-light + all light DaisyUI themes */
@@ -104,13 +109,18 @@
   --content-muted: oklch(0.40 0.010 265);
   --content-subtle: oklch(0.55 0.008 265);
   --content-dim: oklch(0.70 0.006 265);
-  --surface-card: oklch(1 0 0 / 0.85);
-  --surface-elevated: oklch(1 0 0 / 0.95);
-  --surface-glass: oklch(0.99 0.003 265 / 0.95);
-  --surface-nav-active: oklch(0.55 0.18 280 / 0.10);
+  --surface-card: oklch(1 0 0 / 0.88);
+  --surface-elevated: oklch(1 0 0 / 0.96);
+  --surface-glass: oklch(0.99 0.004 225 / 0.94);
+  --surface-panel: oklch(1 0 0 / 0.82);
+  --surface-field: oklch(0.97 0.006 225 / 0.92);
+  --surface-wash: oklch(0.42 0.020 245 / 0.09);
+  --surface-nav-active: oklch(0.42 0.020 245 / 0.11);
   --surface-hover: oklch(0 0 0 / 0.04);
   --surface-border: oklch(0.20 0.010 265 / 0.12);
+  --surface-border-strong: oklch(0.20 0.010 265 / 0.20);
   --surface-inset: oklch(0.94 0.005 265 / 0.8);
+  --ring-focus: oklch(0.42 0.020 245 / 0.36);
 }
 
 /* ── Design tokens (Tailwind v4 @theme) ────────────────────────────── */
@@ -121,9 +131,9 @@
   --font-display: "Manrope", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
 
   /* Brand palette — usable as bg-brand-500, text-brand-400, etc. */
-  --color-brand-500: oklch(0.68 0.14 280);
-  --color-brand-400: oklch(0.72 0.1 230);
-  --color-brand-300: oklch(0.78 0.1 160);
+  --color-brand-500: oklch(0.54 0.018 245);
+  --color-brand-400: oklch(0.68 0.018 245);
+  --color-brand-300: oklch(0.78 0.014 245);
 
   /* Text + surface tokens — theme-adaptive values set in :root / [data-theme] */
   --color-content-strong: var(--content-strong);
@@ -134,9 +144,13 @@
   --color-surface-card: var(--surface-card);
   --color-surface-elevated: var(--surface-elevated);
   --color-surface-glass: var(--surface-glass);
+  --color-surface-panel: var(--surface-panel);
+  --color-surface-field: var(--surface-field);
+  --color-surface-wash: var(--surface-wash);
   --color-surface-nav-active: var(--surface-nav-active);
   --color-surface-hover: var(--surface-hover);
   --color-surface-border: var(--surface-border);
+  --color-surface-border-strong: var(--surface-border-strong);
   --color-surface-inset: var(--surface-inset);
 
   /* Spacing scale — usable as p-space-xs, gap-space-md, etc. */
@@ -151,9 +165,10 @@
 
   /* Shadows — usable as shadow-soft, shadow-card, shadow-elevated, shadow-glow */
   --shadow-soft: 0 1px 3px oklch(0 0 0 / 0.12), 0 4px 12px oklch(0 0 0 / 0.08);
-  --shadow-card: 0 1px 3px oklch(0 0 0 / 0.08), 0 2px 8px oklch(0 0 0 / 0.06);
-  --shadow-elevated: 0 4px 16px oklch(0 0 0 / 0.15), 0 1px 4px oklch(0 0 0 / 0.08);
-  --shadow-glow: 0 0 0 1px oklch(0.68 0.14 280 / 0.12), 0 4px 20px oklch(0.68 0.14 280 / 0.08);
+  --shadow-card: 0 1px 2px oklch(0 0 0 / 0.10), 0 8px 24px oklch(0 0 0 / 0.08);
+  --shadow-elevated: 0 18px 48px oklch(0 0 0 / 0.18), 0 2px 8px oklch(0 0 0 / 0.10);
+  --shadow-glow: 0 0 0 1px oklch(0.74 0.018 245 / 0.20), 0 10px 28px oklch(0.20 0.010 245 / 0.18);
+  --shadow-focus: 0 0 0 3px var(--ring-focus);
 
   /* Animations — usable as animate-page-in, animate-shimmer, etc. */
   --animate-page-in: page-in 280ms ease;
@@ -171,27 +186,31 @@
   --size-sidebar-collapsed: 5rem;
   --size-nav-icon: 1.125rem;
 
-  --space-page-stack: 1.5rem;
+  --space-page-stack: 1.75rem;
   --space-page-x-mobile: 1.5rem;
   --space-page-x-desktop: 2.5rem;
   --space-page-y: 1.5rem;
   --space-page-bottom: 3rem;
 
   --surface-body:
-    linear-gradient(170deg, oklch(0.16 0.014 272), oklch(0.12 0.010 268));
+    linear-gradient(170deg, oklch(0.155 0.014 238), oklch(0.115 0.010 238));
   --surface-backdrop:
-    radial-gradient(ellipse at 15% 5%, oklch(0.68 0.14 280 / 0.07), transparent 50%),
-    radial-gradient(ellipse at 85% 90%, oklch(0.72 0.1 230 / 0.05), transparent 50%);
+    linear-gradient(135deg, oklch(0.74 0.018 245 / 0.08), transparent 42%),
+    linear-gradient(320deg, oklch(0.68 0.035 70 / 0.035), transparent 48%);
+  --surface-grid:
+    radial-gradient(circle, oklch(0.95 0.004 238 / 0.045) 1px, transparent 1px);
   --surface-brand:
-    linear-gradient(135deg, oklch(0.72 0.1 230), oklch(0.68 0.14 280));
+    linear-gradient(135deg, oklch(0.74 0.018 245), oklch(0.46 0.012 245));
 }
 
 [data-color-scheme="light"] {
   --surface-body:
-    linear-gradient(170deg, oklch(0.96 0.004 265), oklch(0.93 0.006 268));
+    linear-gradient(170deg, oklch(0.965 0.006 225), oklch(0.93 0.010 225));
   --surface-backdrop:
-    radial-gradient(ellipse at 15% 5%, oklch(0.55 0.18 280 / 0.04), transparent 50%),
-    radial-gradient(ellipse at 85% 90%, oklch(0.55 0.14 230 / 0.03), transparent 50%);
+    linear-gradient(135deg, oklch(0.42 0.020 245 / 0.055), transparent 42%),
+    linear-gradient(320deg, oklch(0.50 0.040 70 / 0.035), transparent 48%);
+  --surface-grid:
+    radial-gradient(circle, oklch(0.20 0.010 265 / 0.04) 1px, transparent 1px);
 }
 
 /* ── Base ──────────────────────────────────────────────────────────── */
@@ -215,7 +234,8 @@
 
   body:not(.pill-window) {
     background: var(--color-base-100);
-    background-image: var(--surface-body);
+    background-image: var(--surface-grid), var(--surface-body);
+    background-size: 24px 24px, auto;
   }
 
   html.pill-window,
@@ -262,13 +282,15 @@
     background: oklch(0.5 0 0 / 0.25);
   }
 
-  /* Card elevation + hover glow */
+  /* Card elevation */
   .card {
     box-shadow: var(--shadow-card);
     transition: box-shadow 200ms ease, border-color 200ms ease;
   }
 
-  .card:hover {
+  .interactive-card:hover,
+  .card:has(a:hover, button:hover):hover {
+    border-color: var(--surface-border-strong);
     box-shadow: var(--shadow-glow);
   }
 
@@ -286,8 +308,15 @@
   .select:focus,
   .toggle:focus-visible,
   .btn:focus-visible {
-    outline: 2px solid oklch(0.68 0.14 280 / 0.4);
+    outline: 2px solid var(--ring-focus);
     outline-offset: 2px;
+  }
+
+  .input,
+  .select,
+  .textarea {
+    background: var(--surface-field);
+    border-color: var(--surface-border);
   }
 
   /* UI chrome should not be selectable — only content text */
@@ -419,6 +448,8 @@
 
 @utility app-frame {
   @apply w-full animate-page-in;
+  max-width: 76rem;
+  margin-inline: auto;
 }
 
 @utility page-stack {
@@ -438,7 +469,8 @@
 /* ── Sidebar ───────────────────────────────────────────────────────── */
 
 @utility sidebar-surface {
-  @apply border-r border-surface-border bg-base-200;
+  @apply border-r border-surface-border bg-surface-glass backdrop-blur-xl;
+  box-shadow: inset -1px 0 0 oklch(1 0 0 / 0.025);
 }
 
 @utility brand-title {
@@ -451,10 +483,47 @@
   @apply text-xs font-semibold uppercase tracking-[0.2em] text-base-content/40 select-none;
 }
 
+@utility panel-surface {
+  @apply rounded-box border border-surface-border bg-surface-panel shadow-card;
+}
+
+@utility toolbar-surface {
+  @apply rounded-box border border-surface-border bg-surface-elevated p-3 shadow-card;
+}
+
+@utility token-icon {
+  @apply flex shrink-0 items-center justify-center rounded-lg border border-surface-border bg-surface-wash text-primary;
+}
+
+@utility metric-card {
+  @apply rounded-box border border-surface-border bg-surface-elevated p-4;
+}
+
+@utility interactive-row {
+  @apply cursor-pointer transition-[background,border-color,transform] duration-150;
+}
+
+.interactive-row:hover {
+  background: var(--surface-hover);
+  border-color: var(--surface-border-strong);
+}
+
+.interactive-row:active {
+  transform: scale(0.995);
+}
+
+@utility settings-row {
+  @apply flex flex-col gap-2 rounded-lg px-3 py-3 transition-colors sm:flex-row sm:items-center sm:justify-between;
+}
+
+.settings-row:hover {
+  background: var(--surface-hover);
+}
+
 /* ── Skeleton loading ──────────────────────────────────────────────── */
 
 @utility skeleton-shimmer {
-  @apply rounded-lg;
+  @apply block rounded-lg;
   background: linear-gradient(
     90deg,
     var(--surface-hover) 0%,
@@ -504,7 +573,7 @@
 
 @utility pill-shell {
   @apply inline-flex items-center justify-center rounded-full p-2;
-  background: radial-gradient(circle at center, oklch(0.68 0.14 280 / 0.24), transparent 62%);
+  background: radial-gradient(circle at center, oklch(0.74 0.018 245 / 0.24), transparent 62%);
 }
 
 @utility pill-idle {
@@ -514,7 +583,7 @@
 
 .pill-idle:hover {
   @apply border-primary/55;
-  background: oklch(0.16 0.012 270 / 0.95);
+  background: oklch(0.16 0.014 238 / 0.95);
   box-shadow: var(--shadow-glow);
 }
 

@@ -22,7 +22,7 @@ export function SidebarContent() {
       {/* Brand + collapse toggle */}
       <div className="flex w-full items-center gap-3 px-4 py-5 select-none is-drawer-close:justify-center is-drawer-close:px-2 sm:gap-3.5 sm:px-5 sm:py-6">
         <div className="relative shrink-0">
-          <div className="size-10 rounded-field ring-1 ring-white/10 overflow-hidden">
+          <div className="size-10 rounded-field ring-1 ring-surface-border-strong overflow-hidden shadow-card">
             <img src={luneLogo} alt="" className="size-full object-cover pointer-events-none" draggable={false} />
           </div>
           <span
@@ -56,7 +56,7 @@ export function SidebarContent() {
                 <Link
                   to={to}
                   aria-current={active ? "page" : undefined}
-                  className={`group relative flex w-full items-center gap-3.5 rounded-field px-3.5 py-4 text-[0.9rem] transition-colors is-drawer-close:tooltip is-drawer-close:tooltip-right is-drawer-close:justify-center ${active ? "bg-primary/10 text-primary font-medium" : "text-content-muted hover:bg-surface-hover hover:text-content"}`}
+                  className={`group relative flex w-full items-center gap-3.5 rounded-field px-3.5 py-4 text-[0.9rem] transition-colors is-drawer-close:tooltip is-drawer-close:tooltip-right is-drawer-close:justify-center ${active ? "bg-surface-nav-active text-primary font-medium shadow-card" : "text-content-muted hover:bg-surface-hover hover:text-content"}`}
                   data-tip={label}
                 >
                   {active ? (
