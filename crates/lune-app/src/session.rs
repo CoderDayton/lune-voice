@@ -1,5 +1,4 @@
 use std::sync::Arc;
-
 use std::time::Duration;
 
 use chrono::Utc;
@@ -158,7 +157,10 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let idle_notify = Arc::clone(&self.idle_notify);
         let settings = Arc::clone(&self.settings);
         let heuristic = Arc::clone(&self.heuristic);
-        tokio::task::spawn(run_session(
+        let active_arc_guard = Arc::clone(&active_arc);
+        let idle_notify_guard = Arc::clone(&idle_notify);
+        let event_tx_guard = event_tx.clone();
+        let handle = tokio::task::spawn(run_session(
             session_id,
             asr,
             router,
@@ -175,6 +177,15 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             audio_override,
             settings,
         ));
+        tokio::task::spawn(async move {
+            if handle.await.is_err() {
+                tracing::error!(%session_id, "session task panicked — forcing cleanup");
+                let _ = event_tx_guard
+                    .send(SessionEvent::Error("internal session panic".into()))
+                    .await;
+                clear_active(&active_arc_guard, &idle_notify_guard).await;
+            }
+        });
 
         *lock = Some(ActiveHandle {
             control_tx,
@@ -369,6 +380,9 @@ async fn run_session<A: AsrBackend + 'static>(
     let mut saw_asr_success = false;
     let mut cancelled = false;
 
+    let session_deadline = tokio::time::Instant::now()
+        + Duration::from_secs((config.pipeline.max_speech_samples / 16_000) as u64 * 3);
+
     let mut audio_poll_tick = tokio::time::interval(Duration::from_millis(10));
     audio_poll_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let mut next_level_emit = tokio::time::Instant::now();
@@ -376,6 +390,8 @@ async fn run_session<A: AsrBackend + 'static>(
     let mut peak_rms: f32 = 0.0;
     let mut prev_chunk: Option<Vec<f32>> = None;
     let mut was_speech = false;
+    let mut last_audio_at = tokio::time::Instant::now();
+    let audio_starvation_limit = Duration::from_secs(5);
     'capture: loop {
         tokio::select! {
             biased;
@@ -393,6 +409,11 @@ async fn run_session<A: AsrBackend + 'static>(
                     }
                     None => break 'capture,
                 }
+            }
+
+            _ = tokio::time::sleep_until(session_deadline) => {
+                warn!(%session_id, "session wall-clock deadline reached, forcing stop");
+                break 'capture;
             }
 
             _ = audio_poll_tick.tick() => {
@@ -441,6 +462,17 @@ async fn run_session<A: AsrBackend + 'static>(
                     let _ = event_tx.try_send(SessionEvent::AudioLevel(normalized));
                     peak_rms = 0.0;
                     next_level_emit = now + level_emit_interval;
+                }
+
+                if saw_audio {
+                    last_audio_at = tokio::time::Instant::now();
+                } else if !audio_stream.is_offline()
+                    && last_audio_at.elapsed() > audio_starvation_limit
+                {
+                    warn!(%session_id, "no audio received for 5s — mic may have disconnected");
+                    let _ = event_tx.send(SessionEvent::Error("audio device stopped responding".into())).await;
+                    status = SessionStatus::Failed("audio starvation".into());
+                    break 'capture;
                 }
 
                 if !saw_audio && audio_stream.is_offline() {

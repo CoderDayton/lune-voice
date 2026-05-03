@@ -2,6 +2,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
+use tokio::time::Instant;
+
 use lune_app::{DeliveryService, SessionManager, SessionManagerConfig};
 #[cfg(unix)]
 use lune_app::{WindowTarget, capture_focus_target};
@@ -25,6 +27,7 @@ use crate::dto::SessionStreamEvent;
 
 const LOCAL_LLM_IDLE_TTL: Duration = Duration::from_secs(150);
 const HOLD_WARMUP_GRACE: Duration = Duration::from_millis(250);
+const ACTION_DEBOUNCE: Duration = Duration::from_millis(150);
 
 pub struct AppRuntime {
     inner: Arc<RuntimeInner>,
@@ -40,6 +43,8 @@ struct RuntimeInner {
     settings: Arc<RwLock<UserSettings>>,
     /// Background thread that owns the uinput/clipboard handle.
     delivery: DeliveryService,
+    /// Debounce guard: timestamp of last successful toggle/start/stop action.
+    last_action_at: Mutex<Instant>,
 }
 
 struct LivePipeline {
@@ -110,6 +115,7 @@ impl AppRuntime {
                 session_stream_seq: AtomicU64::new(0),
                 settings: Arc::clone(&settings),
                 delivery,
+                last_action_at: Mutex::new(Instant::now() - ACTION_DEBOUNCE),
             }),
         };
 
@@ -196,6 +202,20 @@ impl AppRuntime {
     }
 
     pub async fn start_dictation(&self) -> Result<String, String> {
+        if !self.inner.delivery.is_alive() {
+            return Err("text delivery service is unavailable — cannot start dictation".into());
+        }
+
+        if !self.inner.delivery.is_alive() {
+            return Err("text delivery service is unavailable — cannot start dictation".into());
+        }
+
+        if self.inner.session_stream.read().await.is_none() {
+            warn!(
+                "starting dictation with no IPC stream subscriber — UI will not reflect session state"
+            );
+        }
+
         // Optimistic UI: tell the pill we're listening before doing session work.
         // Reverted on failure so the pill doesn't stick in "listening" state.
         self.publish_status("listening").await;
@@ -248,6 +268,13 @@ impl AppRuntime {
         Ok(())
     }
 
+    pub async fn stop_and_wait_dictation(&self) -> Result<(), String> {
+        if let Some(manager) = self.active_manager().await {
+            manager.stop_and_wait().await;
+        }
+        Ok(())
+    }
+
     pub async fn cancel_dictation(&self) -> Result<(), String> {
         if let Some(manager) = self.active_manager().await {
             manager.cancel().await;
@@ -256,6 +283,15 @@ impl AppRuntime {
     }
 
     pub async fn toggle_dictation(&self) -> Result<Option<String>, String> {
+        {
+            let mut last = self.inner.last_action_at.lock().await;
+            if last.elapsed() < ACTION_DEBOUNCE {
+                debug!("toggle_dictation debounced");
+                return Ok(None);
+            }
+            *last = Instant::now();
+        }
+
         let is_active = self.inner.pipeline.lock().await.active;
 
         if is_active {
@@ -292,17 +328,28 @@ impl AppRuntime {
                     SessionEvent::FinalizedText(text) => {
                         saw_text = true;
                         let mode = runtime.inner.settings.read().await.dictation_mode;
+                        let delivered;
                         #[cfg(unix)]
                         {
                             let target = runtime.inner.pipeline.lock().await.focus_target.clone();
-                            if let Some(ref t) = target {
-                                runtime.inner.delivery.deliver_to(&text, mode, t);
+                            delivered = if let Some(ref t) = target {
+                                runtime.inner.delivery.deliver_to(&text, mode, t)
                             } else {
-                                runtime.inner.delivery.deliver(&text, mode);
-                            }
+                                runtime.inner.delivery.deliver(&text, mode)
+                            };
                         }
                         #[cfg(not(unix))]
-                        runtime.inner.delivery.deliver(&text, mode);
+                        {
+                            delivered = runtime.inner.delivery.deliver(&text, mode);
+                        }
+                        if !delivered {
+                            runtime
+                                .push_session_event(SessionStreamEvent::SessionError {
+                                    message: "Text delivery failed — output service is unavailable"
+                                        .into(),
+                                })
+                                .await;
+                        }
                         runtime
                             .push_session_event(SessionStreamEvent::FinalizedText { text })
                             .await;

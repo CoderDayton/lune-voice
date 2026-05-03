@@ -3,6 +3,8 @@ import { attachSessionStream, listenToWorkspaceInvalidation } from "../../lib/ba
 import { loadWorkspaceSnapshot } from "../../store/workspace-store";
 
 const DEFAULT_RETRY_DELAY_MS = 5000;
+const HEALTH_CHECK_INTERVAL_MS = 15_000;
+const SESSION_STREAM_SILENCE_LIMIT_MS = 30_000;
 
 export type WorkspaceBridgeDeps = {
   onSessionEvent: (event: SessionStreamEvent) => void;
@@ -58,20 +60,6 @@ export function startWorkspaceBridge(deps: WorkspaceBridgeDeps) {
     return snapshotSyncInFlight;
   }
 
-  async function connectSessionStream() {
-    try {
-      const detach = await attachSessionStreamFn(onSessionEvent);
-      if (cancelled) {
-        detach();
-        return;
-      }
-      disposers.push(detach);
-    } catch (error) {
-      onConnectionError?.("session", error);
-      if (!cancelled) scheduleRetry(connectSessionStream);
-    }
-  }
-
   async function connectHistoryInvalidation() {
     try {
       const detach = await listenToWorkspaceInvalidationFn("lune://history-changed", () => {
@@ -89,15 +77,55 @@ export function startWorkspaceBridge(deps: WorkspaceBridgeDeps) {
     }
   }
 
+  // Track last event from session stream to detect silence (backend crash/hang).
+  let lastStreamEventAt = Date.now();
+  const originalOnSessionEvent = onSessionEvent;
+  const wrappedOnSessionEvent = (event: SessionStreamEvent) => {
+    lastStreamEventAt = Date.now();
+    originalOnSessionEvent(event);
+  };
+
+  async function connectSessionStreamWrapped() {
+    try {
+      const detach = await attachSessionStreamFn(wrappedOnSessionEvent);
+      if (cancelled) {
+        detach();
+        return;
+      }
+      lastStreamEventAt = Date.now();
+      disposers.push(detach);
+    } catch (error) {
+      onConnectionError?.("session", error);
+      if (!cancelled) scheduleRetry(connectSessionStreamWrapped);
+    }
+  }
+
+  // Periodic health check: if stream has been silent too long while we think
+  // a session is active, reconcile by reloading the workspace snapshot.
+  // Also detects backend crash/restart where the stream just stops.
+  const healthInterval = setInterval(() => {
+    if (cancelled) return;
+    const silenceMs = Date.now() - lastStreamEventAt;
+    if (silenceMs > SESSION_STREAM_SILENCE_LIMIT_MS) {
+      console.warn(
+        `[workspace-bridge] session stream silent for ${Math.round(silenceMs / 1000)}s — reconciling state`,
+      );
+      lastStreamEventAt = Date.now(); // prevent repeated triggers
+      void requestSnapshotSync();
+    }
+  }, HEALTH_CHECK_INTERVAL_MS);
+
   void (async () => {
-    await Promise.all([connectSessionStream(), connectHistoryInvalidation()]);
+    await Promise.all([connectSessionStreamWrapped(), connectHistoryInvalidation()]);
   })();
 
   return () => {
     cancelled = true;
+    clearInterval(healthInterval);
     for (const timer of timers) clearTimeoutFn(timer);
     timers.clear();
     for (const dispose of disposers) dispose();
     disposers.length = 0;
   };
 }
+

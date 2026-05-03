@@ -33,9 +33,9 @@ impl DeliveryService {
         Ok(Self { tx })
     }
 
-    pub fn deliver(&self, text: &str, mode: DictationMode) {
+    pub fn deliver(&self, text: &str, mode: DictationMode) -> bool {
         if text.is_empty() {
-            return;
+            return true;
         }
         debug!(?mode, text_len = text.len(), "delivering text");
         if let Err(e) = self.tx.send(DeliveryMsg {
@@ -44,14 +44,16 @@ impl DeliveryService {
             #[cfg(unix)]
             target: None,
         }) {
-            warn!(error = %e, "delivery channel disconnected");
+            warn!(error = %e, "delivery thread dead — text will not be typed");
+            return false;
         }
+        true
     }
 
     #[cfg(unix)]
-    pub fn deliver_to(&self, text: &str, mode: DictationMode, target: &WindowTarget) {
+    pub fn deliver_to(&self, text: &str, mode: DictationMode, target: &WindowTarget) -> bool {
         if text.is_empty() {
-            return;
+            return true;
         }
         debug!(?mode, text_len = text.len(), "delivering text to target");
         if let Err(e) = self.tx.send(DeliveryMsg {
@@ -59,12 +61,28 @@ impl DeliveryService {
             mode,
             target: Some(target.clone()),
         }) {
-            warn!(error = %e, "delivery channel disconnected");
+            warn!(error = %e, "delivery thread dead — text will not be typed");
+            return false;
         }
+        true
     }
 
-    pub fn deliver_owned(&self, text: String, mode: DictationMode) {
-        self.deliver(&text, mode);
+    pub fn deliver_owned(&self, text: String, mode: DictationMode) -> bool {
+        self.deliver(&text, mode)
+    }
+
+    pub fn is_alive(&self) -> bool {
+        // A zero-capacity test: if the receiver is dropped, send returns Err.
+        // We send empty text which `deliver()` guards against, but the thread
+        // harmlessly ignores if it somehow arrives.
+        self.tx
+            .send(DeliveryMsg {
+                text: "".into(),
+                mode: DictationMode::TypeInPlace,
+                #[cfg(unix)]
+                target: None,
+            })
+            .is_ok()
     }
 }
 

@@ -249,13 +249,14 @@ fn spawn_evdev_hotkeys(app: &tauri::App) -> Result<(), Box<dyn std::error::Error
                     let _ = rt.start_dictation().await;
                 }
                 hotkey_linux::HotkeyAction::Stop => {
-                    let _ = rt.stop_dictation().await;
+                    let _ = rt.stop_and_wait_dictation().await;
                 }
                 hotkey_linux::HotkeyAction::Cancel => {
                     let _ = rt.cancel_dictation().await;
                 }
             }
         }
+        tracing::error!("hotkey channel closed — evdev listener has exited, hotkeys are dead");
     });
 
     tracing::info!("evdev hotkey listener spawned");

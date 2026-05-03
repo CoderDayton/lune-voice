@@ -30,6 +30,8 @@ export const workspaceStore = new Store<WorkspaceState>({
 
 // ── Actions ───────────────────────────────────────────────────────────
 
+let errorDismissTimer: ReturnType<typeof setTimeout> | null = null;
+
 export const workspaceActions = {
   toggleSidebar() {
     workspaceStore.setState((s) => ({ ...s, sidebarCollapsed: !s.sidebarCollapsed }));
@@ -62,10 +64,22 @@ export const workspaceActions = {
   },
 
   setError(error: string | null) {
+    if (errorDismissTimer) {
+      clearTimeout(errorDismissTimer);
+      errorDismissTimer = null;
+    }
     workspaceStore.setState((s) => ({
       ...s,
       runtime: { ...s.runtime, error },
     }));
+    if (error) {
+      errorDismissTimer = setTimeout(() => {
+        errorDismissTimer = null;
+        workspaceStore.setState((s) =>
+          s.runtime.error === error ? { ...s, runtime: { ...s.runtime, error: null } } : s,
+        );
+      }, 8_000);
+    }
   },
 
   hydrate(snapshot: BackendWorkspaceSnapshot) {
@@ -101,8 +115,50 @@ export const workspaceActions = {
       if (runtime === s.runtime) return s;
       return { ...s, runtime };
     });
+
+    // Session timeout watchdog: if we enter an active state, schedule a
+    // forced reconciliation in case the backend never sends sessionStopped.
+    if (event.type === "sessionStarted") {
+      startSessionTimeoutWatchdog();
+    } else if (event.type === "sessionStopped" || event.type === "sessionError") {
+      clearSessionTimeoutWatchdog();
+    }
   },
 };
+
+// ── Session timeout watchdog ──────────────────────────────────────────
+// If a session is active for over 3 minutes without completing (backend
+// hang, missed event, etc.), force-reconcile by reloading the snapshot.
+const SESSION_TIMEOUT_MS = 180_000;
+let sessionTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
+
+function startSessionTimeoutWatchdog() {
+  clearSessionTimeoutWatchdog();
+  sessionTimeoutTimer = setTimeout(() => {
+    sessionTimeoutTimer = null;
+    const { runtime } = workspaceStore.state;
+    if (runtime.activeSessionId) {
+      console.warn("[workspace] session timeout — forcing state reconciliation");
+      workspaceStore.setState((s) => ({
+        ...s,
+        runtime: {
+          ...s.runtime,
+          activeSessionId: null,
+          serviceStatus: "ready",
+          audioLevel: 0,
+          error: "Session timed out — backend may be unresponsive",
+        },
+      }));
+    }
+  }, SESSION_TIMEOUT_MS);
+}
+
+function clearSessionTimeoutWatchdog() {
+  if (sessionTimeoutTimer) {
+    clearTimeout(sessionTimeoutTimer);
+    sessionTimeoutTimer = null;
+  }
+}
 
 // ── Async operations ──────────────────────────────────────────────────
 

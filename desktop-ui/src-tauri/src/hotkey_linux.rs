@@ -184,8 +184,8 @@ fn run_listener(
 
 fn dispatch(action: HotkeyAction, tx: &mpsc::Sender<HotkeyAction>) {
     info!(?action, "hotkey dispatched");
-    if let Err(e) = tx.try_send(action) {
-        warn!(error = %e, "hotkey channel send failed");
+    if let Err(e) = tx.blocking_send(action) {
+        warn!(error = %e, "hotkey channel send failed — receiver dropped");
     }
 }
 
