@@ -1,97 +1,97 @@
 <div align="center">
 
-<img src="assets/lune-voice-logo-512.png" width="160" alt="Lune Voice" />
-
 # Lune Voice
 
-**Local voice dictation for Linux. Speak once; clean text lands in the app you were using.**
+**Your voice, your machine, your text.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/rust-2024-orange.svg)](https://www.rust-lang.org)
-[![Tauri](https://img.shields.io/badge/tauri-v2-blue.svg)](https://tauri.app)
+Offline dictation that actually understands what you meant to say.
+
+[Get Lune Voice](https://lunevoice.com) · [Docs](docs/)
 
 </div>
 
 ---
 
-Lune Voice runs a full speech-to-text pipeline on your machine — no cloud, no API keys, no telemetry. Audio goes in, corrected text comes out, delivered straight to whatever app you're focused on.
+Most dictation tools send your audio to someone else's server. Lune Voice doesn't. It runs entirely on your hardware — no cloud, no subscriptions, no data leaving your machine. Buy it once, own it forever.
 
-The pipeline is direct: mic capture -> VAD -> Qwen3-ASR -> dictionary scan -> heuristic correction -> optional LLM pass -> delivery. The desktop UI and CLI both control the same runtime.
+You press a hotkey. You talk. Clean, formatted text lands wherever your cursor is — your editor, your email, your chat window. That's it. No accounts, no internet required after setup.
 
-## Desktop App
+<br>
 
-A Tauri desktop shell provides the main controls: a floating dictation pill, a sidebar start/stop button, session history, custom dictionary, model setup, and hotkey configuration. It uses typed Tauri commands for control and a session stream for live status and audio level.
+## How It Works
 
-```bash
-cd desktop-ui
-bun install && bun run dev
-```
-
-The pill overlay sits at the bottom of the screen. It mirrors the backend state, reacts to audio level events, and can stop or cancel the active session without owning the main app window.
-
-## CLI Daemon
-
-For a headless setup or scripting:
-
-```bash
-cargo build --release -p lune-app
-./target/release/lune-voice daemon      # downloads ~1.8 GB of models on first run
-```
-
-| Command | |
-|---|---|
-| `lune-voice toggle` | Start if idle, stop if active |
-| `lune-voice start` | Begin dictation |
-| `lune-voice stop` | End and deliver text |
-| `lune-voice cancel` | Discard current session |
-| `lune-voice status` | Print daemon state |
-| `lune-voice quit` | Shut down |
-
-Bind `Ctrl+Space` to `lune-voice toggle` and `Escape` to `lune-voice cancel` for a hands-free workflow. The desktop app does this automatically via evdev.
-
-## Building
-
-Rust stable (2024 edition), Bun for the frontend.
-
-```bash
-# CPU-only
-cargo build --release -p lune-app
-
-# With CUDA
-cargo build --release -p lune-app --features cuda
-
-# Desktop UI
-cd desktop-ui && bun install && bun run build
-
-# Tests
-cargo test --workspace
-bun test                    # frontend unit tests
-```
-
-Audio capture uses `cpal` - PipeWire/ALSA on Linux, CoreAudio on macOS, WASAPI on Windows.
-
-## Project Layout
+Speech flows through a pipeline that gets smarter at each stage:
 
 ```
-crates/
-  lune-app/       Session orchestration, delivery, hotkey listener
-  lune-asr/       ASR backends (Qwen3, OpenAI-compatible)
-  lune-audio/     Mic capture, VAD, segmenter
-  lune-core/      Shared types, config, session model
-  lune-llm/       Text cleanup (local ONNX style model or OpenAI-compatible)
-  lune-commands/  Voice command router
-  lune-dict/      Dictionary manager (fuzzy match + priority)
-  lune-output/    Text delivery (wtype/wl-copy)
-  lune-persist/   SQLite DB, settings store, model hub
-desktop-ui/       Tauri + React desktop shell
+Mic → VAD → Qwen3-ASR → Dictionary → Correction → LLM Style Pass → Paste
 ```
 
-## Docs
+Raw transcription is rarely ready to use. Lune runs it through your custom dictionary to fix names and jargon, applies heuristic correction for common mistakes, then hands it to a local LLM that reformats the result to match a style you pick — casual, email, technical, or one you define yourself.
 
-- [Architecture](docs/ARCHITECTURE.md) - pipeline, session lifecycle, desktop bridge, D-Bus
-- [Configuration](docs/CONFIGURATION.md) - settings, backends, hotkeys, styles, models
-- [Performance](docs/PERFORMANCE.md) - benchmarks, latency breakdowns, tuning
+First launch downloads ~1.8 GB of models to your machine. After that, the entire pipeline is air-gapped.
+
+<br>
+
+## What Makes It Worth It
+
+**A dictation pill that stays out of your way** — A floating overlay shows live audio levels and session state. Stop or cancel without ever leaving the app you're working in.
+
+**Style presets that match how you write** — "Email" adds greetings and tightens prose. "Technical" preserves jargon. Roll your own with custom prompts and few-shot examples that teach the LLM your voice.
+
+**A dictionary that learns your world** — Names, acronyms, slang — anything the ASR has never heard. Entries are fuzzy-matched and priority-ranked, so corrections land even when pronunciation is rough.
+
+**Voice commands that feel natural** — "New line." "Scratch that." "Stop dictation." Say them mid-sentence. Add your own phrase mappings for anything you say often.
+
+**Hold or toggle — your call** — Hold-to-talk for quick bursts, toggle for long-form dictation. Global hotkeys work everywhere.
+
+**Session history you can search** — Every dictation is logged with its transcript, timing, and style. Go back and find that thing you said yesterday.
+
+<br>
+
+## Pricing
+
+Buy once. Use forever. No subscriptions.
+
+| | Devices | Price |
+|---|---|---|
+| **Personal** | 1 | $10 |
+| **Power User** | 3 | $25 |
+| **Small Business** | 10 | $80 |
+
+Each license key activates on the number of devices in your tier. Need more seats later? Just grab another key at the current price.
+
+A one-time activation ping confirms your key — after that, everything runs offline.
+
+<br>
+
+## Privacy, for Real
+
+This isn't a marketing claim with asterisks. The dictation pipeline has zero network calls. Your audio never leaves your sound card. Your transcripts never leave your disk. The only time the app talks to the internet is model download and license activation — both happen once.
+
+There is no telemetry. There are no analytics. There is nothing to opt out of because there is nothing to opt into.
+
+<br>
+
+## Getting Started
+
+After purchasing, download the app and enter your license key. Lune Voice will activate, download models, and you're ready to go.
+
+System requirements:
+- **OS:** Linux (X11 or Wayland)
+- **GPU:** Recommended for best latency (CUDA supported). CPU-only works but is slower.
+- **Disk:** ~2 GB for models
+- **Internet:** Required once for activation and model download
+
+<br>
+
+## Documentation
+
+- **[Architecture](docs/ARCHITECTURE.md)** — pipeline internals, session lifecycle, threading model
+- **[Configuration](docs/CONFIGURATION.md)** — settings, backends, hotkeys, style presets
+- **[Performance](docs/PERFORMANCE.md)** — benchmarks, latency breakdowns, tuning
+
+<br>
 
 ## License
 
-MIT
+Lune Voice is proprietary software. See [LICENSE](LICENSE) for terms.

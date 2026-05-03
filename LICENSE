@@ -1,0 +1,35 @@
+Lune Voice — Proprietary Software License
+
+Copyright (c) 2026 Lune Voice. All rights reserved.
+
+This software and its associated documentation ("Software") are the
+proprietary property of Lune Voice. The Software is licensed, not sold.
+
+By purchasing and activating a license key, you are granted a perpetual,
+non-exclusive, non-transferable right to use the Software on the number
+of devices specified by your license tier:
+
+  - Personal (1 device)
+  - Power User (3 devices)
+  - Small Business (10 devices)
+
+You may NOT:
+
+  1. Copy, redistribute, sublicense, or share the Software or your
+     license key with any third party.
+  2. Reverse engineer, decompile, or disassemble the Software.
+  3. Remove or alter any proprietary notices or labels on the Software.
+  4. Use one license key on more devices than your tier permits.
+
+The Software performs all core functions locally on your hardware. A
+one-time internet connection is required for license activation and
+initial model download. No audio, transcription, or usage data is
+collected or transmitted at any time.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM THE USE OF THE SOFTWARE.
+
+For licensing inquiries: support@lunevoice.com
