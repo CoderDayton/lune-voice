@@ -169,11 +169,11 @@ impl HeuristicCorrector {
                 0.0
             };
 
-            let prev: Vec<&str> = words[i.saturating_sub(2)..i].to_vec();
+            let prev = &words[i.saturating_sub(2)..i];
             let next_end = (i + 3).min(words.len());
-            let next: Vec<&str> = words[i + 1..next_end].to_vec();
+            let next = &words[i + 1..next_end];
 
-            let best = self.best_candidate(&lower, &prev, &next, &lexicon);
+            let best = self.best_candidate(&lower, prev, next, &lexicon);
             if let Some((ref candidate, base_score, is_distant)) = best {
                 // Never correct garbage into a distant guess — leave for LLM
                 if !is_distant {
@@ -294,13 +294,7 @@ impl HeuristicCorrector {
     }
 
     fn ngram_context_score(&self, candidate: &str, prev: &[&str], next: &[&str]) -> f32 {
-        let prefix: Vec<String> = prev
-            .iter()
-            .rev()
-            .take(2)
-            .rev()
-            .map(|w| w.to_string())
-            .collect();
+        let prefix: Vec<String> = prev.iter().map(|w| w.to_string()).collect();
         let forward = self.ngram.interpolated_prob(&prefix, candidate);
         let backward = next
             .first()

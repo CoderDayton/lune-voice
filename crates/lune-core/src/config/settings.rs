@@ -171,7 +171,6 @@ impl DevicePolicy {
     /// - `Cuda` → always `true` (runtime init still falls back if CUDA unavailable)
     /// - `Auto` → `true` when `cuda` feature is compiled in (`cuda_available`),
     ///   otherwise `false`. The `cuda` feature is enabled by default.
-    #[inline]
     pub fn use_gpu(self, cuda_available: bool) -> bool {
         match self {
             Self::Cpu => false,

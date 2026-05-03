@@ -19,12 +19,10 @@ pub struct DictationSession {
 }
 
 impl DictationSession {
-    #[inline]
     pub fn is_active(&self) -> bool {
         matches!(self.status, SessionStatus::Active)
     }
 
-    #[inline]
     pub fn is_terminal(&self) -> bool {
         matches!(
             self.status,
@@ -33,7 +31,6 @@ impl DictationSession {
     }
 
     /// Duration in milliseconds, if ended.
-    #[inline]
     pub fn duration_ms(&self) -> Option<i64> {
         self.ended_at
             .map(|end| (end - self.started_at).num_milliseconds())
@@ -80,7 +77,6 @@ pub enum SessionEvent {
 
 impl SessionEvent {
     /// Returns the text payload if this event carries one, avoiding a match at call sites.
-    #[inline]
     pub fn text(&self) -> Option<&str> {
         match self {
             Self::FinalizedText(s)
@@ -97,7 +93,6 @@ impl SessionEvent {
     }
 
     /// True iff this event marks the logical end of a session.
-    #[inline]
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Stopped | Self::Error(_))
     }

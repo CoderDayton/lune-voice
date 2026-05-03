@@ -98,14 +98,12 @@ impl Vocabulary {
     }
 
     /// Look up token text by ID — zero-copy slice into flat byte buffer.
-    #[inline]
     pub fn get(&self, id: usize) -> Option<&str> {
         let &(start, end) = self.offsets.get(id)?;
         std::str::from_utf8(&self.token_data[start as usize..end as usize]).ok()
     }
 
     /// Number of tokens (including blank).
-    #[inline]
     pub fn size(&self) -> usize {
         self.offsets.len()
     }
@@ -119,12 +117,11 @@ impl Vocabulary {
 
         // Normalize: lowercase, prepend ▁ for word-initial position.
         let normalized = format!("▁{}", text.to_lowercase().replace(' ', " ▁"));
-        let bytes = normalized.as_str();
         let mut pos = 0;
         let mut ids = Vec::new();
 
-        while pos < bytes.len() {
-            let remaining = &bytes[pos..];
+        while pos < normalized.len() {
+            let remaining = &normalized[pos..];
             let mut matched = false;
             for (token, id) in &self.sorted_tokens {
                 if remaining.starts_with(token.as_str()) {
@@ -162,7 +159,6 @@ impl Vocabulary {
 ///
 /// Centralised here so every backend uses the same definition instead of
 /// open-coding the same check in decode loops.
-#[inline]
 pub fn is_special_token(token_text: &str) -> bool {
     token_text.starts_with('<') && token_text.ends_with('>') && token_text != "<unk>"
 }

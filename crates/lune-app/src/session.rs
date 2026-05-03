@@ -219,7 +219,6 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         }
     }
 
-    #[inline]
     pub async fn cancel(&self) {
         let lock = self.active.lock().await;
         if let Some(handle) = lock.as_ref() {
@@ -228,7 +227,6 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         }
     }
 
-    #[inline]
     pub async fn active_session_id(&self) -> Option<Uuid> {
         self.active.lock().await.as_ref().map(|h| h.session_id)
     }
@@ -289,7 +287,6 @@ fn drain_processing_controls(
     }
 }
 
-#[inline]
 async fn clear_active(active_arc: &Arc<Mutex<Option<ActiveHandle>>>, idle_notify: &Notify) {
     active_arc.lock().await.take();
     idle_notify.notify_waiters();
@@ -519,11 +516,9 @@ async fn run_session<A: AsrBackend + 'static>(
         return;
     }
 
-    let aligned_text = raw_text.clone();
+    debug!(%session_id, "[ASR] output ready, len={}", raw_text.len());
 
-    debug!(%session_id, "[ASR] output ready, len={}", aligned_text.len());
-
-    let route = router.route_full(&aligned_text);
+    let route = router.route_full(&raw_text);
     let mut style_preset = style_preset;
     for cmd in &route.commands {
         if let lune_core::command::VoiceCommand::SwitchStyle(style_id) = cmd
@@ -693,17 +688,16 @@ async fn run_session<A: AsrBackend + 'static>(
         return;
     }
 
-    let final_text = post_llm_text;
     info!(%session_id, pipeline_ms = pipeline_t0.elapsed().as_millis() as u64, "post-processing complete");
 
     let _ = event_tx
-        .send(SessionEvent::FinalizedText(final_text.clone()))
+        .send(SessionEvent::FinalizedText(post_llm_text.clone()))
         .await;
 
-    let transcript = if final_text.is_empty() {
+    let transcript = if post_llm_text.is_empty() {
         None
     } else {
-        Some(final_text)
+        Some(post_llm_text)
     };
     let ended_at = Some(Utc::now());
     tokio::spawn(async move {

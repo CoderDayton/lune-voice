@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::lexicon::Lexicon;
 
+#[derive(Clone, Copy)]
 pub struct CandidateEntry<'a> {
     pub canonical: &'a str,
     pub freq_score: f32,
@@ -53,15 +54,7 @@ impl<'a> Iterator for CandidateSource<'a> {
     type Item = CandidateEntry<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.pos >= self.entries.len() {
-            return None;
-        }
-        let entry = CandidateEntry {
-            canonical: self.entries[self.pos].canonical,
-            freq_score: self.entries[self.pos].freq_score,
-            is_curated: self.entries[self.pos].is_curated,
-            is_lowercase: self.entries[self.pos].is_lowercase,
-        };
+        let entry = *self.entries.get(self.pos)?;
         self.pos += 1;
         Some(entry)
     }

@@ -33,7 +33,6 @@ impl DeliveryService {
         Ok(Self { tx })
     }
 
-    #[inline]
     pub fn deliver(&self, text: &str, mode: DictationMode) {
         if text.is_empty() {
             return;
@@ -64,20 +63,8 @@ impl DeliveryService {
         }
     }
 
-    #[inline]
     pub fn deliver_owned(&self, text: String, mode: DictationMode) {
-        if text.is_empty() {
-            return;
-        }
-        debug!(?mode, text_len = text.len(), "delivering text");
-        if let Err(e) = self.tx.send(DeliveryMsg {
-            text: text.into_boxed_str(),
-            mode,
-            #[cfg(unix)]
-            target: None,
-        }) {
-            warn!(error = %e, "delivery channel disconnected");
-        }
+        self.deliver(&text, mode);
     }
 }
 

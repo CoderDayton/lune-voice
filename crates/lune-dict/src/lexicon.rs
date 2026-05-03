@@ -129,11 +129,8 @@ struct VocabIndex {
 
 impl VocabIndex {
     fn build() -> Self {
-        let mut words: Vec<&str> = vocab::bundled().words.keys().map(String::as_str).collect();
-        words.sort_unstable();
-
         let mut canonical_by_lower: HashMap<Box<str>, Box<str>> = HashMap::new();
-        for word in words {
+        for word in vocab::bundled().words.keys().map(String::as_str) {
             let lower = word.to_ascii_lowercase();
             let canonical = word.into();
             match canonical_by_lower.get(lower.as_str()) {

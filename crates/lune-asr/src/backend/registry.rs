@@ -68,12 +68,10 @@ impl AsrBackend for AsrRegistry {
         }
     }
 
-    #[inline]
     async fn push_audio(&self, session: &Self::SessionHandle, pcm: &[f32]) -> Result<()> {
         dispatch_ref!(self, session, push_audio, pcm)
     }
 
-    #[inline]
     async fn poll_results(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>> {
         dispatch_ref!(self, session, poll_results)
     }

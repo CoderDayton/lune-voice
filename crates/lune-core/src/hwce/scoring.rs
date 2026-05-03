@@ -70,7 +70,6 @@ pub struct TokenSpan {
 }
 
 impl TokenSpan {
-    #[inline]
     pub const fn new(start: usize, end: usize) -> Self {
         Self { start, end }
     }

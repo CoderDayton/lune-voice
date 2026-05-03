@@ -24,7 +24,6 @@ pub enum DictationMode {
 }
 
 impl std::fmt::Display for DictationMode {
-    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::TypeInPlace => f.write_str("TypeInPlace"),
@@ -36,7 +35,6 @@ impl std::fmt::Display for DictationMode {
 
 impl std::str::FromStr for DictationMode {
     type Err = String;
-    #[inline]
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "TypeInPlace" => Ok(Self::TypeInPlace),
@@ -64,7 +62,6 @@ pub enum ActivationMode {
 }
 
 impl std::fmt::Display for ActivationMode {
-    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Toggle => f.write_str("Toggle"),
@@ -75,7 +72,6 @@ impl std::fmt::Display for ActivationMode {
 
 impl std::str::FromStr for ActivationMode {
     type Err = String;
-    #[inline]
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "Toggle" => Ok(Self::Toggle),
@@ -104,7 +100,6 @@ pub enum PillVisibility {
 }
 
 impl std::fmt::Display for PillVisibility {
-    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Always => f.write_str("Always"),
@@ -116,7 +111,6 @@ impl std::fmt::Display for PillVisibility {
 
 impl std::str::FromStr for PillVisibility {
     type Err = String;
-    #[inline]
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "Always" => Ok(Self::Always),
@@ -134,7 +128,6 @@ fn pill_visibility_parse_err(s: &str) -> String {
 }
 
 impl std::fmt::Display for PrivacyMode {
-    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::LocalOnly => f.write_str("LocalOnly"),
@@ -146,7 +139,6 @@ impl std::fmt::Display for PrivacyMode {
 
 impl std::str::FromStr for PrivacyMode {
     type Err = String;
-    #[inline]
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "LocalOnly" => Ok(Self::LocalOnly),
@@ -183,7 +175,6 @@ pub enum TerminalMode {
 }
 
 impl std::fmt::Display for TerminalMode {
-    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Auto => f.write_str("Auto"),
@@ -195,7 +186,6 @@ impl std::fmt::Display for TerminalMode {
 
 impl std::str::FromStr for TerminalMode {
     type Err = String;
-    #[inline]
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "Auto" => Ok(Self::Auto),

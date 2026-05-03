@@ -135,7 +135,6 @@ where
 // ─── NGramModel training helper (Wordnik) ─────────────────────────────────────
 
 impl NGramModel {
-    /// Convenience: build and train a model from Wordnik in one call.
     pub async fn from_wordnik<I, S>(
         api_key: &str,
         seed_words: I,
@@ -146,15 +145,7 @@ impl NGramModel {
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
     {
-        let mut model = Self::new(config)?;
-        let corpus = fetch_wordnik_corpus(api_key, seed_words, corpus_config).await?;
-
-        if corpus.sentences.is_empty() {
-            return Err("Wordnik returned no usable example sentences".into());
-        }
-
-        model.train_sentences(&corpus.sentences);
-        Ok((model, corpus))
+        Self::from_wordnik_seed_words(api_key, seed_words, config, corpus_config).await
     }
 }
 

@@ -49,48 +49,40 @@ static PARAMETRIC_PREFIXES: &[(&str, ParametricKind)] = &[
 const PARAM_DELIMITERS: [char; 3] = [',', '.', ';'];
 
 impl VoiceCommandRouter {
-    #[inline]
     pub fn new() -> Self {
         Self { custom: Vec::new() }
     }
 
-    /// Add a custom phrase mapping (case-insensitive).
-    #[inline]
     pub fn add_custom(&mut self, phrase: impl Into<String>, command: VoiceCommand) {
         self.custom.push((phrase.into().to_lowercase(), command));
     }
 
     /// Route `text`, returning detected commands and the remaining text.
-    ///
     /// Commands are detected left-to-right; each matched span is removed once.
     pub fn route(&self, text: &str) -> RouteResult {
-        let lower = text.to_lowercase();
-        // Pre-allocate with tight upper bounds; BUILTINS.len() + custom.len() is the
-        // maximum possible number of non-overlapping matches.
-        let cap = BUILTINS.len() + self.custom.len();
-        let mut commands: Vec<VoiceCommand> = Vec::with_capacity(cap);
-        let mut removals: Vec<(usize, usize)> = Vec::with_capacity(cap);
-
-        self.match_exact(&lower, &mut commands, &mut removals);
-
-        removals.sort_unstable_by_key(|&(s, _)| s);
-        let remaining = rebuild_remaining(text, &removals);
-
-        RouteResult {
-            commands,
-            remaining,
-        }
+        self.route_inner(text, false)
     }
 
     /// Full route including parametric patterns.
     pub fn route_full(&self, text: &str) -> RouteResult {
+        self.route_inner(text, true)
+    }
+
+    fn route_inner(&self, text: &str, parametric: bool) -> RouteResult {
         let lower = text.to_lowercase();
-        let cap = BUILTINS.len() + self.custom.len() + PARAMETRIC_PREFIXES.len();
+        let cap = BUILTINS.len()
+            + self.custom.len()
+            + if parametric {
+                PARAMETRIC_PREFIXES.len()
+            } else {
+                0
+            };
         let mut commands: Vec<VoiceCommand> = Vec::with_capacity(cap);
         let mut removals: Vec<(usize, usize)> = Vec::with_capacity(cap);
 
-        // Parametric first so exact matches can skip over already-claimed spans.
-        parametric_matches(&lower, &mut commands, &mut removals);
+        if parametric {
+            parametric_matches(&lower, &mut commands, &mut removals);
+        }
         self.match_exact(&lower, &mut commands, &mut removals);
 
         removals.sort_unstable_by_key(|&(s, _)| s);
@@ -102,8 +94,6 @@ impl VoiceCommandRouter {
         }
     }
 
-    /// Scan `lower` for all builtin + custom exact phrases; push into output vecs.
-    #[inline]
     fn match_exact(
         &self,
         lower: &str,
@@ -133,8 +123,6 @@ impl VoiceCommandRouter {
         }
     }
 
-    /// Iterator over all (lowercase_phrase, VoiceCommand) pairs, built-ins first.
-    #[inline]
     fn all_patterns(&self) -> impl Iterator<Item = (&str, VoiceCommand)> + '_ {
         BUILTINS
             .iter()
@@ -144,7 +132,6 @@ impl VoiceCommandRouter {
 }
 
 impl Default for VoiceCommandRouter {
-    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -236,7 +223,7 @@ fn collapse_push(out: &mut String, s: &str) {
     let prev_space = out.ends_with(' ');
     let mut in_space = prev_space;
     for c in s.chars() {
-        if c.is_ascii_whitespace() || c.is_whitespace() {
+        if c.is_whitespace() {
             if !in_space {
                 out.push(' ');
                 in_space = true;

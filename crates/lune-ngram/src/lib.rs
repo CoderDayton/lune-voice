@@ -546,18 +546,7 @@ impl NGramModel {
     }
 
     pub fn score_phrase_avg_logprob(&self, phrase: &str) -> f64 {
-        let tokens = tokenize(phrase);
-        if tokens.is_empty() {
-            return f64::NEG_INFINITY;
-        }
-
-        let mut context = Vec::new();
-        let mut log_prob = 0.0;
-        for token in &tokens {
-            log_prob += self.interpolated_prob(&context, token).ln();
-            context.push(token.clone());
-        }
-        log_prob / tokens.len() as f64
+        self.score_candidate("", phrase).avg_log_prob
     }
 
     // ─── Private helpers ──────────────────────────────────────────────────────
@@ -683,13 +672,17 @@ fn last_two_or_start(prefix: &[String]) -> [String; 2] {
 }
 
 fn minmax_normalize(values: &[f64]) -> Vec<f64> {
-    let finite: Vec<f64> = values.iter().copied().filter(|v| v.is_finite()).collect();
-    if finite.is_empty() {
+    let mut min = f64::INFINITY;
+    let mut max = f64::NEG_INFINITY;
+    for &v in values {
+        if v.is_finite() {
+            min = min.min(v);
+            max = max.max(v);
+        }
+    }
+    if !min.is_finite() {
         return vec![0.0; values.len()];
     }
-
-    let min = finite.iter().copied().fold(f64::INFINITY, f64::min);
-    let max = finite.iter().copied().fold(f64::NEG_INFINITY, f64::max);
     let span = max - min;
 
     values

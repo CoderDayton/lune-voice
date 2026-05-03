@@ -82,7 +82,6 @@ pub struct CandidateIter<'a> {
 impl<'a> Iterator for CandidateIter<'a> {
     type Item = &'a str;
 
-    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             if self.bucket >= self.hi || self.bucket >= MAX_WORD_LEN {
@@ -118,7 +117,6 @@ freq_dict!(PT_FREQ, "../data/pt_freq.bin");
 freq_dict!(RU_FREQ, "../data/ru_freq.bin");
 freq_dict!(ZH_FREQ, "../data/zh_freq.bin");
 
-#[inline]
 pub fn dict_for(lang: &str) -> &'static FreqDict {
     let bytes = lang.as_bytes();
     match bytes.first().map(|b| b.to_ascii_lowercase()) {

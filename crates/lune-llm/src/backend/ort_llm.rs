@@ -508,16 +508,19 @@ struct ModelFiles {
 
 fn find_model(dir: &Path) -> Result<ModelFiles> {
     let quant_priority = ["q4f16", "int8", "fp16", "q4", "quantized", ""];
-
-    for q in &quant_priority {
-        let suffix = if q.is_empty() {
+    let suffix = |q: &&str| -> String {
+        if q.is_empty() {
             String::new()
         } else {
             format!("_{q}")
-        };
+        }
+    };
+
+    for q in &quant_priority {
+        let s = suffix(q);
         for base in [dir.join("onnx"), dir.to_path_buf()] {
-            let decoder = base.join(format!("decoder_model_merged{suffix}.onnx"));
-            let embed = base.join(format!("embed_tokens{suffix}.onnx"));
+            let decoder = base.join(format!("decoder_model_merged{s}.onnx"));
+            let embed = base.join(format!("embed_tokens{s}.onnx"));
             if decoder.exists() && embed.exists() {
                 return Ok(ModelFiles {
                     decoder,
@@ -528,27 +531,21 @@ fn find_model(dir: &Path) -> Result<ModelFiles> {
     }
 
     for q in &quant_priority {
-        let suffix = if q.is_empty() {
-            String::new()
-        } else {
-            format!("_{q}")
-        };
-        {
-            let name = format!("model{suffix}.onnx");
-            let p = dir.join(&name);
-            if p.exists() {
-                return Ok(ModelFiles {
-                    decoder: p,
-                    embed_tokens: None,
-                });
-            }
-            let nested = dir.join("onnx").join(&name);
-            if nested.exists() {
-                return Ok(ModelFiles {
-                    decoder: nested,
-                    embed_tokens: None,
-                });
-            }
+        let s = suffix(q);
+        let name = format!("model{s}.onnx");
+        let p = dir.join(&name);
+        if p.exists() {
+            return Ok(ModelFiles {
+                decoder: p,
+                embed_tokens: None,
+            });
+        }
+        let nested = dir.join("onnx").join(&name);
+        if nested.exists() {
+            return Ok(ModelFiles {
+                decoder: nested,
+                embed_tokens: None,
+            });
         }
     }
 

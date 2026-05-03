@@ -1,7 +1,6 @@
 use super::gms_tables::GmsLanguage;
 
 impl GmsLanguage {
-    #[inline]
     pub const fn code(self) -> &'static str {
         match self {
             Self::English => "en",
@@ -17,7 +16,6 @@ impl GmsLanguage {
         }
     }
 
-    #[inline]
     pub const fn qwen_prompt_hint(self) -> &'static str {
         match self {
             Self::English => "Transcribe the speech in English.",
@@ -43,7 +41,6 @@ pub struct DetectedAsrLanguage {
 }
 
 impl DetectedAsrLanguage {
-    #[inline]
     pub const fn from_gms(gms: GmsLanguage) -> Self {
         Self {
             gms,
@@ -70,7 +67,6 @@ pub fn detect_gms_language(text: &str) -> GmsLanguage {
     stats.finish()
 }
 
-#[inline]
 pub fn normalize_gms_language_code(code: &str) -> Option<&'static str> {
     match code.trim().to_ascii_lowercase().as_str() {
         "en" | "eng" | "english" => Some("en"),

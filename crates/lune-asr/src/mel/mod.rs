@@ -93,7 +93,6 @@ pub fn extract_features(audio: &[f32]) -> Array2<f32> {
 
 // ── Pre-emphasis ─────────────────────────────────────────────────────────────
 
-#[inline]
 fn apply_preemphasis(audio: &[f32], coef: f32) -> Vec<f32> {
     if audio.is_empty() {
         return Vec::new();
@@ -113,7 +112,6 @@ fn apply_preemphasis(audio: &[f32], coef: f32) -> Vec<f32> {
 
 // ── STFT ─────────────────────────────────────────────────────────────────────
 
-#[inline]
 fn hann_window(len: usize) -> Vec<f32> {
     let scale = 2.0 * PI / (len as f32 - 1.0);
     (0..len)

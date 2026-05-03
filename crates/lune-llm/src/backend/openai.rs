@@ -103,7 +103,6 @@ fn build_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage>
     messages
 }
 
-#[inline(always)]
 fn fallback_output(raw_text: &str) -> PostProcessOutput {
     PostProcessOutput {
         cleaned_text: raw_text.to_owned(),

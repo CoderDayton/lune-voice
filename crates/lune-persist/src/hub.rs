@@ -58,8 +58,6 @@ pub struct ResolvedModels {
 }
 
 impl ModelSpec {
-    /// Parakeet TDT 0.6B v3 ASR: INT8 ONNX models and vocab.
-    #[inline]
     pub fn parakeet_tdt() -> Self {
         Self::Directory {
             repo_id: "istupakov/parakeet-tdt-0.6b-v3-onnx".into(),
@@ -73,8 +71,6 @@ impl ModelSpec {
         }
     }
 
-    /// Qwen3-ASR 0.6B: encoder-decoder ONNX ASR model (custom export).
-    #[inline]
     pub fn qwen3_asr() -> Self {
         Self::Directory {
             repo_id: "Qwen/Qwen3-ASR-0.6B".into(),
@@ -89,8 +85,6 @@ impl ModelSpec {
         }
     }
 
-    /// Qwen3.5-0.8B Text Q4F16: style/correction LLM for transcript cleanup.
-    #[inline]
     pub fn style_llm() -> Self {
         Self::Directory {
             repo_id: "onnx-community/Qwen2.5-1.5B-Instruct".into(),
@@ -268,7 +262,6 @@ impl ModelHub {
         Ok(Self { api })
     }
 
-    #[inline]
     fn list_repo_files(&self, repo: &ApiRepo, repo_id: &str) -> PersistResult<Vec<String>> {
         let info = repo
             .info()

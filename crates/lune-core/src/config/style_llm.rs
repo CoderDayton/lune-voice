@@ -42,7 +42,6 @@ pub struct StyleRegistry {
 
 impl StyleRegistry {
     /// Look up a preset by ID. Returns `Arc::clone` (atomic increment, no deep copy).
-    #[inline]
     pub fn get(&self, id: &str) -> Option<Arc<StylePreset>> {
         self.presets.get(id).cloned()
     }
@@ -84,14 +83,12 @@ static REGISTRY: LazyLock<StyleRegistry> = LazyLock::new(|| {
 });
 
 /// Returns the singleton builtin style registry.
-#[inline]
 pub fn builtin_registry() -> &'static StyleRegistry {
     &REGISTRY
 }
 
 impl StylePreset {
     /// Backward-compat shim: returns all builtin presets as a static slice of Arcs.
-    #[inline]
     pub fn all_builtin() -> &'static [Arc<StylePreset>] {
         builtin_registry().all()
     }

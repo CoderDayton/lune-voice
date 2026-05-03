@@ -7,7 +7,6 @@ use zeroize::Zeroize;
 pub struct RedactedString(String);
 
 impl RedactedString {
-    #[inline]
     pub fn new(s: impl Into<String>) -> Self {
         Self(s.into())
     }
@@ -20,7 +19,6 @@ impl RedactedString {
 }
 
 impl std::fmt::Debug for RedactedString {
-    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("[REDACTED]")
     }

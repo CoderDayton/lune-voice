@@ -11,16 +11,14 @@ impl AlphabetMap {
     fn build() -> Self {
         let mut costs = HashMap::new();
         let mut insert = |a: char, b: char, cost: f32| {
-            let key_ab = (a, b);
-            let key_ba = (b, a);
-            let e = costs.entry(key_ab).or_insert(cost);
-            if cost < *e {
-                *e = cost;
-            }
-            let e = costs.entry(key_ba).or_insert(cost);
-            if cost < *e {
-                *e = cost;
-            }
+            costs
+                .entry((a, b))
+                .and_modify(|e: &mut f32| *e = e.min(cost))
+                .or_insert(cost);
+            costs
+                .entry((b, a))
+                .and_modify(|e: &mut f32| *e = e.min(cost))
+                .or_insert(cost);
         };
 
         // Axis 1: QWERTY proximity

@@ -69,16 +69,12 @@ impl AsrSegment {
     /// triggers the overcorrection failure mode (arXiv:2509.25048 Fig 3).
     ///
     /// Returns `false` when `min_token_confidence` is absent.
-    #[inline]
     pub fn is_broken_for_llm(&self, broken_threshold: f32) -> bool {
-        match self.min_token_confidence {
-            Some(m) => m < broken_threshold,
-            None => false,
-        }
+        self.min_token_confidence
+            .is_some_and(|m| m < broken_threshold)
     }
 
     /// Duration of the segment in milliseconds, if both timestamps are known.
-    #[inline]
     pub fn duration_ms(&self) -> Option<u64> {
         self.end_ms?.checked_sub(self.start_ms?)
     }
@@ -96,7 +92,6 @@ pub struct AsrSessionConfig {
 }
 
 impl Default for AsrSessionConfig {
-    #[inline]
     fn default() -> Self {
         Self {
             sample_rate: 16_000,
@@ -121,10 +116,7 @@ impl AsrBackendKind {
     /// not an encoder limit.
     #[deprecated(note = "use AsrRegistry::pipeline_config().max_segment_ms instead")]
     pub fn suggested_max_segment_ms(&self) -> u32 {
-        match self {
-            Self::Qwen3Asr => 30_000,
-            Self::OpenAiCompatible => 30_000,
-        }
+        30_000
     }
 
     /// Short stable identifier used for per-backend filenames like
@@ -133,7 +125,6 @@ impl AsrBackendKind {
     /// These strings are part of the on-disk layout — renaming them will
     /// orphan existing calibrator files. Add new variants rather than
     /// changing existing slugs.
-    #[inline]
     pub fn slug(&self) -> &'static str {
         match self {
             Self::Qwen3Asr => "qwen3asr",
@@ -165,7 +156,6 @@ pub trait AsrBackend: Send + Sync {
     /// Clear the audio buffer and segment state so the next inference starts
     /// fresh. Called after finalizing an utterance to prevent re-transcribing
     /// already-delivered text.
-    #[inline]
     async fn reset_context(&self, session: &Self::SessionHandle) -> Result<()> {
         let _ = session;
         Ok(())
@@ -173,7 +163,6 @@ pub trait AsrBackend: Send + Sync {
 
     /// Optional hint: expected maximum number of segments per `poll_results`
     /// call. Callers may use this to pre-allocate buffers.
-    #[inline]
     fn segment_capacity_hint(&self) -> usize {
         4
     }
@@ -184,7 +173,6 @@ pub trait AsrBackend: Send + Sync {
     ///
     /// The session loop uses this to decide whether to deliver text
     /// progressively or wait for the final batch result.
-    #[inline]
     fn supports_streaming(&self) -> bool {
         false
     }

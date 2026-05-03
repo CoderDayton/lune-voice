@@ -26,7 +26,6 @@ type SessionRow7 = (
     Option<String>,
 );
 
-#[inline(always)]
 fn row_to_session(
     (sid, s_at, e_at, sty, back, stat, trans): SessionRow7,
 ) -> PersistResult<DictationSession> {
@@ -156,7 +155,6 @@ impl Database {
             .order((priority.desc(), id.asc()))
             .load::<(i32, String, String, i32)>(&mut self.conn)?;
 
-        // Vec::with_capacity avoids reallocations; map directly into target type.
         Ok(rows
             .into_iter()
             .map(|(entry_id, p, r, pr)| StoredDictionaryEntry {

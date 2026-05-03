@@ -54,7 +54,6 @@ fn quiet_ort_logger() -> ort::logging::LoggerFunction {
 ///
 /// The default `UserSettings` ships with empty `PathBuf`s for model paths.
 /// After `ensure_default_models` resolves the actual paths, this fills them in.
-#[inline]
 pub fn patch_model_paths(settings: &mut UserSettings, resolved: &ResolvedModels) {
     let _ = (settings, resolved);
 }

@@ -58,13 +58,11 @@ fn validate_config(config: &AudioConfig) -> Result<(), AudioError> {
 
 fn convert_i16_samples_into(data: &[i16], out: &mut Vec<f32>) {
     out.clear();
-    out.reserve(data.len());
     out.extend(data.iter().map(|&s| s as f32 / 32768.0));
 }
 
 fn convert_u16_samples_into(data: &[u16], out: &mut Vec<f32>) {
     out.clear();
-    out.reserve(data.len());
     out.extend(data.iter().map(|&s| (s as f32 - 32768.0) / 32768.0));
 }
 

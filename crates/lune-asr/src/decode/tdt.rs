@@ -420,7 +420,6 @@ impl TdtModel {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 #[cold]
-#[allow(dead_code)]
 fn find_file(dir: &Path, candidates: &[&str], kind: &str) -> Result<PathBuf> {
     for c in candidates {
         let p = dir.join(c);
