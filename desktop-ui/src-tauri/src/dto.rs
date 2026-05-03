@@ -144,14 +144,52 @@ pub struct CreateDictionaryEntryInput {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum SessionStreamEvent {
-    ServiceStatus { status: String },
-    SessionStarted { session_id: String },
+    ServiceStatus {
+        status: String,
+    },
+    SessionStarted {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+    },
     PartialText,
     Processing,
-    FinalizedText { text: String },
-    CorrectedText { text: String },
-    AudioLevel { level: f32 },
-    CommandDetected { payload: String },
+    FinalizedText {
+        text: String,
+    },
+    CorrectedText {
+        text: String,
+    },
+    AudioLevel {
+        level: f32,
+    },
+    CommandDetected {
+        payload: String,
+    },
     SessionStopped,
-    SessionError { message: String },
+    SessionError {
+        message: String,
+    },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SessionStreamEvent;
+
+    #[test]
+    fn session_stream_events_match_frontend_shape() {
+        let started = serde_json::to_value(SessionStreamEvent::SessionStarted {
+            session_id: "session-1".into(),
+        })
+        .unwrap();
+        assert_eq!(started["type"], "sessionStarted");
+        assert_eq!(started["sessionId"], "session-1");
+        assert!(started.get("session_id").is_none());
+
+        let status = serde_json::to_value(SessionStreamEvent::ServiceStatus {
+            status: "ready".into(),
+        })
+        .unwrap();
+        assert_eq!(status["type"], "serviceStatus");
+        assert_eq!(status["status"], "ready");
+    }
 }

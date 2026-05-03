@@ -592,7 +592,7 @@ async fn run_session<A: AsrBackend + 'static>(
         detected_lang,
     );
     let text_after_heuristic = heuristic_result.corrected_text;
-    let word_risk_positions = align_word_risk_positions(&text_after_heuristic, &word_risk_scores);
+    let word_risk_positions = heuristic_result.word_risk_positions;
     let correction_spans = build_correction_spans(
         &text_after_heuristic,
         &word_risk_positions,
@@ -639,6 +639,7 @@ async fn run_session<A: AsrBackend + 'static>(
     } else {
         info!(%session_id, "[LLM] input: {text_after_heuristic}");
         let llm_t0 = tokio::time::Instant::now();
+        let timeout_secs = config.pipeline.llm_timeout_secs;
         let input = lune_core::llm::PostProcessInput {
             raw_text: text_after_heuristic.clone(),
             style_preset: Arc::clone(&style_preset),
@@ -649,19 +650,29 @@ async fn run_session<A: AsrBackend + 'static>(
             language: detected_lang.into(),
             uncertain_words,
         };
-        match post_processor.transform(&input).await {
-            Ok(output) => {
+        let llm_result = if timeout_secs > 0 {
+            tokio::time::timeout(
+                Duration::from_secs(timeout_secs as u64),
+                post_processor.transform(&input),
+            )
+            .await
+        } else {
+            Ok(post_processor.transform(&input).await)
+        };
+        match llm_result {
+            Ok(Ok(output)) => {
                 debug!(%session_id, llm_ms = llm_t0.elapsed().as_millis() as u64, "[LLM] output ready, len={}", output.cleaned_text.len());
-                drain_processing_controls(&mut control_rx, &mut cancelled);
-                if cancelled {
-                    info!(%session_id, "session cancelled during LLM processing");
-                    String::new()
-                } else {
-                    output.cleaned_text
-                }
+                output.cleaned_text
             }
-            Err(e) => {
+            Ok(Err(e)) => {
                 warn!(error = %e, llm_ms = llm_t0.elapsed().as_millis() as u64, "LLM correction failed, using text as-is");
+                text_after_heuristic
+            }
+            Err(_) => {
+                warn!(
+                    llm_ms = llm_t0.elapsed().as_millis() as u64,
+                    timeout_secs, "LLM timeout ({timeout_secs}s) exceeded, using text as-is"
+                );
                 text_after_heuristic
             }
         }
@@ -727,9 +738,7 @@ async fn finalize_db(
     }
 }
 
-const LLM_SPAN_RISK_THRESHOLD: f32 = 0.40;
-const LLM_SPAN_CONTEXT_BEFORE: usize = 1;
-const LLM_SPAN_CONTEXT_AFTER: usize = 3;
+const LLM_SPAN_RISK_THRESHOLD: f32 = 0.65;
 
 fn build_correction_spans(
     text: &str,
@@ -764,8 +773,8 @@ fn build_correction_spans(
         if idx >= words.len() {
             continue;
         }
-        let start = idx.saturating_sub(LLM_SPAN_CONTEXT_BEFORE);
-        let end = (idx + LLM_SPAN_CONTEXT_AFTER + 1).min(words.len());
+        let start = idx.saturating_sub(1);
+        let end = (idx + 3 + 1).min(words.len());
 
         match merged.last_mut() {
             Some((_, prev_end, prev_risk)) if start <= *prev_end => {
@@ -786,35 +795,6 @@ fn build_correction_spans(
             word_error_risk: risk,
         })
         .collect()
-}
-
-fn align_word_risk_positions(text: &str, word_risk_scores: &[(String, f32)]) -> Vec<(usize, f32)> {
-    let words: Vec<&str> = text.split_whitespace().collect();
-    let mut out = Vec::new();
-    let mut cursor = 0usize;
-
-    for (risk_word, risk) in word_risk_scores {
-        let risk_word = strip_ascii_punctuation(risk_word);
-        if risk_word.is_empty() {
-            continue;
-        }
-
-        if let Some(offset) = words[cursor..]
-            .iter()
-            .position(|word| strip_ascii_punctuation(word).eq_ignore_ascii_case(risk_word))
-        {
-            let idx = cursor + offset;
-            out.push((idx, *risk));
-            cursor = (idx + 1).min(words.len());
-        }
-    }
-
-    out
-}
-
-fn strip_ascii_punctuation(word: &str) -> &str {
-    word.trim_start_matches(|c: char| c.is_ascii_punctuation())
-        .trim_end_matches(|c: char| c.is_ascii_punctuation())
 }
 
 #[cfg(test)]
@@ -999,10 +979,9 @@ mod tests {
 
     #[test]
     fn correction_spans_expand_around_risky_known_words() {
-        let risks = vec![("interesting".to_string(), 0.82)];
         let text =
             "call with Jennifer Martinez to discuss interesting their OAuth deployment on AWS";
-        let positions = align_word_risk_positions(text, &risks);
+        let positions = vec![(6, 0.82)];
         let spans = build_correction_spans(text, &positions, &[]);
 
         assert_eq!(spans.len(), 1);
@@ -1014,13 +993,9 @@ mod tests {
 
     #[test]
     fn correction_spans_merge_overlapping_windows() {
-        let risks = vec![
-            ("interesting".to_string(), 0.82),
-            ("OAuth".to_string(), 0.70),
-        ];
         let text =
             "call with Jennifer Martinez to discuss interesting their OAuth deployment on AWS";
-        let positions = align_word_risk_positions(text, &risks);
+        let positions = vec![(6, 0.82), (8, 0.70)];
         let spans = build_correction_spans(text, &positions, &[]);
 
         assert_eq!(spans.len(), 1);
@@ -1032,15 +1007,43 @@ mod tests {
     }
 
     #[test]
-    fn correction_span_alignment_handles_duplicate_words_by_position() {
-        let risks = vec![("the".to_string(), 0.10), ("the".to_string(), 0.85)];
-        let text = "the build fixed the deployment";
-        let positions = align_word_risk_positions(text, &risks);
+    fn correction_spans_merge_adjacent_windows() {
+        let text = "one two three four five six seven eight nine ten";
+        let positions = vec![(1, 0.82), (5, 0.70)];
         let spans = build_correction_spans(text, &positions, &[]);
 
-        assert_eq!(positions, vec![(0, 0.10), (3, 0.85)]);
+        assert_eq!(spans.len(), 1);
+        assert_eq!(
+            spans[0].text,
+            "one two three four five six seven eight nine"
+        );
+        assert!((spans[0].word_error_risk - 0.82).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn correction_span_alignment_handles_duplicate_words_by_position() {
+        let text = "the build fixed the deployment";
+        let positions = vec![(0, 0.10), (3, 0.85)];
+        let spans = build_correction_spans(text, &positions, &[]);
+
         assert_eq!(spans.len(), 1);
         assert_eq!(spans[0].text, "fixed the deployment");
+    }
+
+    #[test]
+    fn correction_spans_use_heuristic_corrected_text_for_risky_words() {
+        let corrector = HeuristicCorrector::new();
+        let risks = vec![("teh".to_string(), 0.80)];
+        let result = corrector.correct("teh quick brown fox", &risks, &[], "en");
+        let spans = build_correction_spans(
+            &result.corrected_text,
+            &result.word_risk_positions,
+            &result.unresolved_words,
+        );
+
+        assert_eq!(result.corrected_text, "the quick brown fox");
+        assert_eq!(spans.len(), 1);
+        assert_eq!(spans[0].text, "the quick brown fox");
     }
 
     async fn collect_events(mut rx: mpsc::Receiver<SessionEvent>) -> Vec<SessionEvent> {

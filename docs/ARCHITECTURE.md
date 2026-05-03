@@ -1,6 +1,6 @@
 # Architecture
 
-> Deep dive into Lune Voice internals. For a quick overview, see the [README](../README.md).
+Lune Voice has one dictation pipeline and two control surfaces. The CLI talks to the daemon through D-Bus. The desktop app talks to the same runtime through Tauri commands and a typed session stream.
 
 ---
 
@@ -11,11 +11,11 @@
 - [Pipeline Walkthrough](#pipeline-walkthrough)
   - [Audio Capture](#1-audio-capture)
   - [ASR](#2-asr)
-  - [Confidence Router](#3-confidence-router)
-  - [LLM Worker](#4-llm-worker)
+  - [Correction and LLM Gate](#3-correction-and-llm-gate)
+  - [LLM Post-Processing](#4-llm-post-processing)
   - [Text Delivery](#5-text-delivery)
 - [Session Lifecycle](#session-lifecycle)
-- [Hold-Delivery Model](#hold-delivery-model)
+- [Desktop Bridge](#desktop-bridge)
 - [D-Bus Interface](#d-bus-interface)
 - [Threading Model](#threading-model)
 - [Data Flow Diagram](#data-flow-diagram)
@@ -24,16 +24,16 @@
 
 ## System Overview
 
-Lune Voice is a privacy-first dictation daemon that converts speech to corrected text and can be driven either from the CLI/D-Bus surface or the Tauri desktop UI.
+Lune Voice turns microphone audio into corrected text, then delivers that text to the focused app. The runtime keeps one active session at a time. Everything else exists to feed that session, configure it, or show its state.
 
 The runtime pipeline is split into interchangeable backends:
 
 | Component | Primary Backends | Format | Runtime |
 |-----------|------------------|--------|---------|
-| ASR | Qwen3-ASR 0.6B, Parakeet TDT 0.6B | ONNX INT4 / INT8 | ONNX Runtime |
-| LLM | Local correction model | GGUF | llama.cpp |
+| ASR | Qwen3-ASR 0.6B, OpenAI-compatible remote ASR | ONNX / remote API | ONNX Runtime / HTTP |
+| LLM | Local style model, OpenAI-compatible remote LLM, disabled passthrough | ONNX / remote API | ONNX Runtime / HTTP |
 
-The daemon listens for D-Bus commands (`toggle`, `start`, `stop`, `cancel`) and manages a single active dictation session at a time. Backend selection is centralized through registries so the benchmark examples, app factory, and config parsing all share the same backend definitions.
+Backend selection is centralized through registries and DTO mappers. The desktop UI never builds model paths or backend structs itself; it sends typed settings and receives snapshots.
 
 ---
 
@@ -41,17 +41,17 @@ The daemon listens for D-Bus commands (`toggle`, `start`, `stop`, `cancel`) and 
 
 ```
 lune-app (binary)
-├── lune-audio       Microphone capture (cpal)
-├── lune-asr         Speech recognition (ONNX Runtime)
-│   └── lune-core    Shared traits + types
-├── lune-llm         Text post-processing (llama.cpp)
-│   └── lune-core
-├── lune-commands    Voice command detection
-├── lune-dict        User dictionary
-├── lune-output      Text delivery controller
-│   └── lune-core
-└── lune-persist     Settings, DB (SQLite), model downloads
-    └── lune-core
+|-- lune-audio       Microphone capture (cpal)
+|-- lune-asr         Speech recognition (ONNX Runtime)
+|   `-- lune-core    Shared traits + types
+|-- lune-llm         Text post-processing (local ONNX or OpenAI-compatible)
+|   `-- lune-core
+|-- lune-commands    Voice command detection
+|-- lune-dict        User dictionary
+|-- lune-output      Text delivery controller
+|   `-- lune-core
+`-- lune-persist     Settings, DB (SQLite), model downloads
+    `-- lune-core
 ```
 
 Each crate has a single responsibility. `lune-core` defines shared types and traits but contains no runtime logic. All inter-crate communication flows through trait objects and channels.
@@ -73,70 +73,11 @@ Each crate has a single responsibility. `lune-core` defines shared types and tra
 
 **Crate:** `lune-asr`
 
-Lune currently ships two local ASR paths:
+The active ASR choices are local Qwen3-ASR and OpenAI-compatible remote ASR. Both feed the same `AsrBackend` trait, so the session code does not branch on backend type.
 
-- `ParakeetTdt` for the transducer-style Parakeet runtime
-- `OrtQwenAsr` for the exported Qwen3-ASR encoder/embed/decoder split
+#### 2a. Qwen3-ASR ONNX
 
-Both backends share the same mel front-end and registry-driven selection in `registry.rs`. The benchmark examples can force either backend with `ASR=qwen|parakeet` or `-- --asr qwen|parakeet`.
-
-#### 2a. Parakeet TDT
-
-**Files:** `parakeet_backend.rs`, `mel.rs`, `tdt_decoder.rs`, `segment.rs`
-
-The Parakeet path has four stages:
-
-##### Audio Accumulation
-
-`ParakeetSession` maintains a sliding window buffer (default 30 seconds). New audio is appended; when the buffer exceeds `max_context_samples`, the oldest samples are discarded via a shift-then-append pattern that saves one copy compared to extend-then-shift.
-
-A pre-allocated `audio_snapshot` buffer is swapped in/out via `mem::take` for zero-allocation steady-state inference. The session lock is held only briefly — released before mel extraction so `push_audio` can make progress concurrently.
-
-##### Mel-Spectrogram Extraction
-
-Converts raw PCM → 128-mel spectrogram features. Pipeline:
-
-```
-preemphasis (y[i] = x[i] - 0.97*x[i-1])
-  → STFT (512-pt Hann window, 160-sample hop, RustFFT)
-    → mel filterbank (128 bands, Slaney scale, librosa-compatible)
-      → log(x + 2^-24) guard
-        → per-feature normalization (Welford's online algorithm)
-```
-
-Key implementation details:
-
-- **Static caches:** `MEL_FILTERBANK` and `HANN_WINDOW` are computed once per process via `OnceLock`. Cold init costs ~0.3ms; subsequent calls are free.
-- **Branchless triangle filters:** `max(0, min(lower, upper))` avoids branches in the filterbank inner loop.
-- **Sequential-write transpose:** Outer loop over time gives stride-1 writes (cache-friendly).
-- **Welford normalization:** Single-pass mean+variance per feature, eliminating one full strided traversal.
-
-##### TDT Greedy Decode
-
-The TDT (Token-and-Duration Transducer) decoder runs two ONNX models:
-
-1. **Encoder:** Takes mel features `(1, 128, T)` → hidden states `(1, T', D)` with 8× stride
-2. **Decoder-Joint:** Greedy autoregressive decode with LSTM states `(2, 1, 640)`
-
-Each decode step:
-- Feeds one encoder frame + last token + LSTM states to the joint network
-- Extracts vocab logits and duration logits (5 possible frame advances)
-- Computes softmax confidence from the argmax token's probability
-- Advances the frame pointer by the predicted duration
-
-The decoder tracks per-token confidence which is averaged into a per-utterance confidence score used by the confidence router.
-
-##### Segment Tracking
-
-`SegmentTracker` manages partial → final segment transitions:
-
-- **Partial updates:** New ASR text replaces the current partial segment (no allocation on update)
-- **Silence finalization:** If no new text arrives for `finalize_after_ms` (default 500ms), the partial is promoted to final
-- **Drain pattern:** `mem::replace` swaps the segment vec with a pre-allocated empty one, avoiding reallocation on the next burst
-
-#### 2b. Qwen3-ASR ONNX
-
-**Files:** `ort_qwen_backend.rs`, `ort_qwen_stream.rs`, `mel.rs`
+**Files:** `backend/qwen3.rs`, `decode/`, `mel.rs`
 
 The Qwen path uses a three-part ONNX export produced by `scripts/export_onnx.py`:
 
@@ -146,40 +87,56 @@ The Qwen path uses a three-part ONNX export produced by `scripts/export_onnx.py`
 
 The runtime feeds whole-clip or chunked mel features through the encoder, injects the exported prompt contract via the token embedder, and steps the decoder autoregressively while maintaining cache tensors between decode steps.
 
-### 3. Confidence Router
+The decoder also emits word confidence data when available. Session correction uses those word risks to decide which spans should be sent to the LLM.
 
-**Crate:** `lune-app` | **File:** `confidence_router.rs`
+#### 2b. OpenAI-Compatible ASR
 
-Routes finalized ASR segments based on per-utterance confidence:
+Remote ASR is useful when the user explicitly allows remote processing. It returns transcript text through the same segment type, but it may not include per-word confidence. Missing confidence is treated conservatively by the LLM gate.
 
-```
-confidence ≥ 0.82  →  HighConfidence  →  queue to LLM immediately
-confidence 0.50–0.82  →  Mid  →  accumulate until 12 words, then batch
-confidence < 0.50  →  Low  →  accumulate until 8 words, then batch
-```
+### 3. Correction and LLM Gate
 
-The router maintains a `pending_buf` (pre-allocated 128 bytes) with incrementally-tracked word count. Words are counted via a branchless state machine on bytes — ASCII whitespace detection is correct for multi-byte UTF-8 because non-ASCII bytes are never ASCII whitespace.
+**Crates:** `lune-app`, `lune-dict`
+**Files:** `crates/lune-app/src/session.rs`, `crates/lune-dict/src/corrector.rs`
 
-When `None` confidence is received (e.g., OpenAI backend), the router treats it as 0.0 (low) for conservative batching.
+The session first gives cheap deterministic code the chance to fix the transcript. The LLM only receives text when the remaining risk justifies it.
 
-**Context window:** The last 3 confirmed utterances are kept as context for LLM prompts, built with exact-capacity pre-allocation.
+The sequence is:
 
-**Length sanity check:** LLM corrections are rejected if the output/input length ratio falls outside `[0.5, 2.0]`. Uses integer bit-shifts for the default thresholds, falling back to f32 division only for non-default ratios.
+1. Voice commands are stripped from the ASR text.
+2. The dictionary manager scans the remaining text.
+3. `HeuristicCorrector` applies dictionary replacements and spelling fixes.
+4. The corrector returns `word_risk_positions`, mapped to the corrected word positions.
+5. `build_correction_spans` expands high-risk words into short editable spans.
+6. The bypass gate decides whether to call the LLM.
+
+The risk mapping lives in the corrector because that is the only point where original ASR words and corrected words are still paired. This keeps scores attached when `teh` becomes `the`, and it keeps duplicate words ordered by position instead of by string match.
+
+The LLM gate uses two signals:
+
+| Signal | Effect |
+|--------|--------|
+| `unresolved_words` | Heuristic could not safely fix a flagged word |
+| `correction_spans` | A word risk crossed the LLM span threshold |
+
+Unsupported dictionaries are handled conservatively. If the language has no bundled dictionary, high ASR risk can still force LLM review.
 
 ### 4. LLM Post-Processing
 
-**Crate:** `lune-llm` | **File:** `crates/lune-llm/src/llamacpp_backend.rs`
+**Crate:** `lune-llm`
 
-The batch pipeline calls `TextPostProcessor::transform()` directly from `session.rs` — there is no separate LLM worker task.
+The session calls `TextPostProcessor::transform()` inline. There is no LLM worker queue in the current desktop runtime.
 
-#### llama.cpp Backend (default)
+`PostProcessInput` carries structured data:
 
-- Any GGUF model (e.g. Qwen3, Phi, Gemma) for contextual token resolution
-- Loaded once via `LlamaModel`; fresh `LlamaContext` per call (stateless)
-- Greedy decoding (deterministic)
-- Input: raw text with `[?word?]` markers for low-confidence spans
-- Output: corrected text
-- `strip_markers()` in `prompt.rs` removes any residual `[?word?]`/`[word]` from output
+| Field | Meaning |
+|-------|---------|
+| `raw_text` | Heuristic-corrected transcript |
+| `dictionary` | Relevant user dictionary entries |
+| `correction_spans` | Editable ranges around high-risk words |
+| `uncertain_words` | Words the heuristic left unresolved |
+| `style_preset` | Output style contract |
+
+Local LLM mode uses the ONNX style model when it is downloaded. If it is missing or fails to load, the runtime uses `NullPostProcessor` and returns the corrected text unchanged. Remote LLM mode uses an OpenAI-compatible chat API.
 
 ### 5. Text Delivery
 
@@ -187,12 +144,12 @@ The batch pipeline calls `TextPostProcessor::transform()` directly from `session
 
 `TextOutputController` emits two event types:
 
-- `PartialText(String)` — in-progress text for live preview
-- `FinalizedText(String)` — corrected text for delivery
+- `PartialText(String)` - in-progress text for live preview
+- `FinalizedText(String)` - corrected text for delivery
 
 The controller computes minimal edit actions via `char_diff()`:
 
-- **ASCII fast path:** Byte comparison (~3× faster than char iteration)
+- **ASCII fast path:** Byte comparison (~3x faster than char iteration)
 - **Unicode path:** Single combined pass to find the common-prefix byte offset in both strings
 - Returns `(delete_count, new_suffix)` for incremental editing
 
@@ -200,8 +157,8 @@ Delivery modes (handled in `main.rs`):
 
 | Mode | Implementation |
 |------|----------------|
-| TypeInPlace | Clipboard paste via uinput: `wl-copy`/`xclip` → terminal detection → Ctrl+V or Ctrl+Shift+V. Adaptive post-paste delay (EMA of clipboard RTT). Per-key fallback for paste-hostile apps. |
-| Clipboard | `wl-copy` (Wayland) / `xclip` (X11) — clipboard only, no paste chord |
+| TypeInPlace | Clipboard paste via uinput: `wl-copy`/`xclip` -> terminal detection -> Ctrl+V or Ctrl+Shift+V. Adaptive post-paste delay (EMA of clipboard RTT). Per-key fallback for paste-hostile apps. |
+| Clipboard | `wl-copy` (Wayland) / `xclip` (X11) - clipboard only, no paste chord |
 | Both | Clipboard paste (same as TypeInPlace; clipboard is set as side effect) |
 
 ---
@@ -209,56 +166,77 @@ Delivery modes (handled in `main.rs`):
 ## Session Lifecycle
 
 ```
-                          ┌─────────┐
-                          │  Idle   │
-                          └────┬────┘
-                               │ start()
-                          ┌────▼────┐
-                          │ Active  │ ← audio flowing, ASR running
-                          └────┬────┘
-                               │ stop() / cancel() / audio closed
-                          ┌────▼────┐
-                          │Teardown │ ← flush pending, drain LLM, finalize DB
-                          └────┬────┘
-                               │
-                          ┌────▼────┐
-                          │ Stopped │ → SessionEvent::Stopped emitted
-                          └─────────┘
+Idle
+  |
+  | start()
+  v
+Active      audio flowing, ASR running
+  |
+  | stop() / cancel() / audio closed
+  v
+Teardown    poll final ASR, correct, finalize DB
+  |
+  v
+Stopped     SessionEvent::Stopped emitted
 ```
 
 Only one session may be active at a time (enforced by `Arc<Mutex<Option<ActiveHandle>>>`). The session task runs on `spawn_local` because it holds a `!Send` cpal audio stream.
 
 **Teardown sequence:**
 
-1. Promote any pending non-final text to the utterance buffer
-2. Flush the confidence router's pending buffer → queue to LLM
-3. Finalize the remaining utterance buffer → queue to LLM
-4. Non-blocking `try_recv` loop to catch any LLM results that finished during teardown
-5. Deliver any remaining pending entries as raw fallback
-6. End the ASR session
-7. Persist final session state to SQLite
+1. Stop or cancel drains recording control messages.
+2. Final ASR segments are polled unless the session was cancelled.
+3. Empty sessions finish without transcript output.
+4. Voice commands are routed before correction.
+5. Dictionary and heuristic correction run.
+6. LLM post-processing runs only when the gate asks for it.
+7. Final text is emitted, delivered, and persisted.
+
+Cancellation is checked before LLM work and again before final output. A cancellation during LLM work marks the session cancelled and skips `FinalizedText`.
 
 ---
 
-## Hold-Delivery Model
+## Desktop Bridge
 
-This is the core architectural decision: **no raw ASR text is ever shown to the user.**
+The desktop app does not scrape logs or poll for session state. It uses typed Tauri commands for control and a `Channel<SessionStreamEvent>` for live runtime events.
 
+### Commands
+
+| Command | Window access | Result |
+|---------|---------------|--------|
+| `load_workspace_snapshot` | `main` | Settings, history, dictionary, style presets, service status |
+| `save_workspace_settings` | `main` | Updated workspace snapshot |
+| `create_dictionary_entry` / `delete_dictionary_entry` | `main` | Updated workspace snapshot |
+| `subscribe_session_stream` / `detach_session_stream` | `main` | Live session event subscription |
+| `start_dictation` / `stop_dictation` / `cancel_dictation` / `toggle_dictation` | `main`, `pill` | Session control |
+| `load_pill_snapshot` | `pill` | Minimal state for the overlay |
+| `show_pill_window` / `hide_pill_window` / `reposition_pill_center` | `pill` | Overlay window control |
+
+The main window can start and stop dictation because its sidebar has a first-class dictation control. Pill-only commands stay pill-only.
+
+### Session Stream
+
+The stream uses a tagged enum serialized in camel case:
+
+```json
+{ "type": "sessionStarted", "sessionId": "..." }
+{ "type": "audioLevel", "level": 0.42 }
+{ "type": "finalizedText", "text": "..." }
 ```
-ASR finalizes utterance
-  → text queued in pending_delivery: VecDeque<(u64, String)>
-    → LlmRequest sent to worker channel
-      → LLM processes (batching queued requests)
-        → LlmResponse received
-          → pending_delivery.retain(|(id, _)| *id > resp.utterance_id)
-            → corrected text delivered via emit_final()
-```
 
-**Batching interaction:** The LLM worker returns the `max_utterance_id` from the batch. A single `retain` call clears all pending entries with `id <= max_id`, correctly handling both single and batched responses.
+The frontend store treats this stream as the source of truth for live runtime state. Workspace snapshots remain the source of truth for persisted data. When a completed session writes text, the backend emits `lune://history-changed`; the bridge reloads the snapshot once and updates history.
 
-**Fallback path:** If `llm_tx.send()` fails (worker channel closed), the raw ASR text is delivered immediately and the pending entry is removed. This prevents text from being silently dropped.
+### Pill Events
 
-**Stop-flow:** During teardown, `try_recv` catches any LLM results that finished. Anything still in `pending_delivery` after draining is delivered as raw fallback — the user always gets their text.
+The pill receives targeted events so it can react without owning the main session channel:
+
+| Event | Payload |
+|-------|---------|
+| `lune://pill-state` | `"ready"`, `"listening"`, `"processing"`, or `"error"` |
+| `lune://audio-level` | Float in `[0, 1]` |
+| `lune://pill-settings` | Activation mode and pill visibility |
+
+Rust also shows or hides the pill directly on status changes. That avoids a frontend roundtrip for the common start/stop path.
 
 ---
 
@@ -291,9 +269,9 @@ ASR finalizes utterance
 | `Get/SetHotkey` | JSON string of `HotkeyConfig` | Persist only (external DE bindings) |
 | `Get/SetAsrBackend` | JSON string of `AsrBackendConfig` | Daemon restart required |
 | `Get/SetLlmBackend` | JSON string of `LlmBackendConfig` | Daemon restart required |
-| `GetAllSettings` | TOML string (read-only dump) | — |
+| `GetAllSettings` | TOML string (read-only dump) | - |
 
-All setters persist changes to disk immediately via fire-and-forget `spawn_local`. Settings are stored in `Arc<RwLock<UserSettings>>` — the runtime source of truth.
+All setters persist changes to disk immediately via fire-and-forget `spawn_local`. Settings are stored in `Arc<RwLock<UserSettings>>` - the runtime source of truth.
 
 ### Signals
 
@@ -312,18 +290,18 @@ CLI subcommands (`lune-voice toggle`, `lune-voice settings style email`, etc.) a
 
 ```
 Main Thread (tokio current_thread + LocalSet)
-├── D-Bus connection (zbus) — initialized outside LocalSet
-├── Command loop — receives AppCommand from D-Bus
-├── Session task (spawn_local) — !Send due to cpal stream
-│   ├── Audio coalescing (VAD-gated)
-│   ├── ASR push + poll (streaming encoder-decoder)
-│   ├── Per-word confidence marking
-│   ├── LLM transform (llama.cpp, inline in session loop)
-│   └── Text delivery
-└── Event forwarder (spawn_local) — routes SessionEvents to delivery
+|-- D-Bus connection (zbus) - initialized outside LocalSet
+|-- Command loop - receives AppCommand from D-Bus
+|-- Session task (spawn_local) - !Send due to cpal stream
+|   |-- Audio coalescing (VAD-gated)
+|   |-- ASR push + poll (streaming encoder-decoder)
+|   |-- Per-word confidence marking
+|   |-- LLM transform (inline in session loop)
+|   `-- Text delivery
+`-- Event forwarder (spawn_local) - routes SessionEvents to delivery
 
 spawn_blocking pool (tokio default)
-└── LLM/ASR inference — runs under Mutex, CUDA or CPU
+`-- ASR / local LLM inference - runs under Mutex, CUDA or CPU
 ```
 
 Why `current_thread` instead of `multi_thread`:
@@ -331,49 +309,40 @@ Why `current_thread` instead of `multi_thread`:
 - All hot paths stay on one core (cache-friendly)
 - `spawn_local` support for `!Send` futures (cpal stream)
 
-ORT sessions are wrapped in `Arc<Mutex<Session>>` for `Send` safety across `spawn_blocking`. The LLM backend uses `llama-cpp-2` with per-call contexts (no shared state). Since inference is single-threaded per model, contention is impossible in practice.
+ORT sessions are wrapped in `Arc<Mutex<Session>>` for `Send` safety across `spawn_blocking`. Session control stays on the async side; model execution moves to the blocking pool.
 
 ---
 
 ## Data Flow Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           lune-app (daemon)                                 │
-│                                                                             │
-│  ┌──────────┐    mpsc     ┌───────────────────────────────────────────┐     │
-│  │ lune-    │ ─────────►  │            Session Task                   │     │
-│  │ audio    │  AudioFrame │                                           │     │
-│  │ (cpal)   │             │  ┌─────────┐  ┌──────────┐  ┌─────────┐ │     │
-│  └──────────┘             │  │ ASR     │→ │Confidence│→ │ LLM     │ │     │
-│                           │  │push+poll│  │ Router   │  │ Worker  │ │     │
-│                           │  └─────────┘  └──────────┘  └────┬────┘ │     │
-│                           │       │                          │      │     │
-│                           │  ┌────▼────┐              ┌─────▼────┐ │     │
-│                           │  │Segment  │              │lune-llm  │ │     │
-│                           │  │Tracker  │              │(ORT      │ │     │
-│                           │  └─────────┘              │spawn_blk)│ │     │
-│                           │                           └─────┬────┘ │     │
-│                           │                                 │      │     │
-│                           │  ┌──────────────────────────────▼────┐ │     │
-│                           │  │     pending_delivery: VecDeque    │ │     │
-│                           │  │     (utterance_id, raw_text)      │ │     │
-│                           │  └──────────────┬───────────────────┘ │     │
-│                           │                 │ LLM response        │     │
-│                           │           ┌─────▼─────┐              │     │
-│                           │           │  Output    │              │     │
-│                           │           │ Controller │              │     │
-│                           │           └─────┬──────┘              │     │
-│                           └─────────────────┼─────────────────────┘     │
-│                                             │                           │
-│  ┌──────────┐    mpsc     ┌────────────────▼───────────────────┐       │
-│  │  D-Bus   │◄──────────  │       Event Forwarder              │       │
-│  │Interface │  SessionEvt │  FinalizedText → DeliveryService   │       │
-│  └──────────┘             └────────────────────────────────────┘       │
-│                                                                         │
-│  ┌──────────┐                                                           │
-│  │lune-     │  SQLite — session history, settings                       │
-│  │persist   │  HuggingFace — model downloads                            │
-│  └──────────┘                                                           │
-└─────────────────────────────────────────────────────────────────────────────┘
+                 lune-app runtime
+
+lune-audio (cpal)
+  |
+  | AudioFrame over mpsc
+  v
+Session task
+  |
+  |-- ASR push + poll
+  |-- HeuristicCorrector
+  |-- correction spans + word risks
+  |-- LLM gate
+  |-- TextPostProcessor or passthrough
+  `-- FinalizedText
+        |
+        v
+Event forwarder
+  |
+  |-- delivery service
+  |-- Tauri session stream
+  `-- history-changed event
+
+D-Bus / Tauri UI
+  |
+  `-- start, stop, cancel, settings
+
+lune-persist
+  |
+  `-- SQLite history, settings, model downloads
 ```

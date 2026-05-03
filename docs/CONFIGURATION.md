@@ -1,6 +1,6 @@
 # Configuration
 
-> Complete reference for all settings, backends, style presets, and runtime modes. For a quick overview, see the [README](../README.md).
+Lune Voice stores user settings as TOML, exposes the same settings through the desktop UI, and applies most changes without restarting the app.
 
 ---
 
@@ -10,10 +10,10 @@
 - [Settings File](#settings-file)
 - [ASR Backends](#asr-backends)
   - [Qwen3-ASR (Local, default)](#qwen3-asr-local-default)
-  - [Parakeet TDT (Local)](#parakeet-tdt-local)
   - [OpenAI-Compatible (Remote)](#openai-compatible-remote-asr)
 - [LLM Backends](#llm-backends)
-  - [LlamaCpp Local (default)](#llamacpp-local-default)
+  - [Local Style LLM](#local-style-llm)
+  - [Disabled](#disabled-llm)
   - [OpenAI-Compatible (Remote)](#openai-compatible-remote-llm)
 - [Privacy Mode](#privacy-mode)
 - [Dictation Modes](#dictation-modes)
@@ -25,7 +25,7 @@
   - [Few-Shot Examples](#few-shot-examples)
 - [User Dictionary](#user-dictionary)
 - [Session History](#session-history)
-- [Confidence Router](#confidence-router)
+- [LLM Review Gate](#llm-review-gate)
 - [Model Management](#model-management)
 - [Environment Variables](#environment-variables)
 
@@ -33,7 +33,7 @@
 
 ## Runtime Settings
 
-All settings are mutable at runtime via D-Bus — no daemon restart required for most changes. The CLI provides a convenient interface:
+Most settings apply through the runtime settings channel or on the next dictation session. Backend changes are persisted immediately and the desktop runtime rebuilds the pipeline before the next start when needed.
 
 ```bash
 lune-voice settings                     # dump all settings as TOML
@@ -51,9 +51,9 @@ Settings mutability tiers:
 | **Hot** | Immediately (watch channel) | `dictation_mode`, `activation_mode` |
 | **Warm** | Next session start | `default_style`, `language` |
 | **Cold** | Persist only | `privacy_mode`, `session_history_days`, `hotkey` |
-| **Restart** | Daemon restart | `asr_backend`, `llm_backend` |
+| **Reload** | Before next session | `asr_backend`, `llm_backend`, `device` |
 
-All changes are persisted to disk immediately. D-Bus signals (`SettingsChanged`, `DictationModeChanged`, `ActivationModeChanged`) are emitted on every change for UI integration.
+All changes are persisted to disk immediately. The desktop app reloads a workspace snapshot after save, so the UI reflects the stored settings rather than a local guess.
 
 ---
 
@@ -67,36 +67,31 @@ Settings are persisted as TOML. Location depends on platform:
 | macOS | `~/Library/Application Support/lune-voice/settings.toml` |
 | Windows | `%APPDATA%\lune-voice\settings.toml` |
 
-If the file doesn't exist or fails to parse, defaults are used and a warning is logged. The daemon never crashes on invalid settings — it falls back gracefully.
+If the file doesn't exist or fails to parse, defaults are used and a warning is logged. The daemon never crashes on invalid settings - it falls back gracefully.
 
 ### Full Default Configuration
 
 ```toml
 language = "en-US"
+device = "auto"
 privacy_mode = "LocalOnly"
 dictation_mode = "TypeInPlace"
 activation_mode = "Toggle"
-default_style = "general"
+default_style = "casual"
 session_history_days = 30
 
 [asr_backend]
-type = "OrtQwenAsr"
-model_dir = ""          # auto-populated from model downloads
-use_gpu = true
+type = "Qwen3Asr"
 
 [llm_backend]
-type = "LlamaCppLocal"
-model_path = ""         # auto-populated from model downloads
-n_gpu_layers = 1000
-n_ctx = 2048
-max_output_tokens = 256
+type = "Local"
 
 [hotkey]
 toggle_dictation = { modifiers = ["Ctrl"], key = "Space" }
 cancel_dictation = { modifiers = [], key = "Escape" }
 ```
 
-> Model paths are auto-populated on first run after models are downloaded from HuggingFace. You generally don't need to set them manually.
+Model files live under the app model directory. The settings file stores backend choice and policy, not resolved model paths.
 
 ---
 
@@ -108,25 +103,10 @@ The default backend. Runs Qwen3-ASR 0.6B locally via ONNX Runtime with streaming
 
 ```toml
 [asr_backend]
-type = "OrtQwenAsr"
-model_dir = "/path/to/qwen3-asr-0.6b-onnx"
-use_gpu = true
-stream_chunk_sec = 0.5
-stream_rollback = 5
-stream_unfixed_chunks = 2
-stream_max_new_tokens = 32
-past_text_conditioning = true
+type = "Qwen3Asr"
 ```
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `model_dir` | path | auto | Directory containing encoder.onnx, embed_tokens.onnx, decoder_merged.onnx, and tokenizer.json |
-| `use_gpu` | bool | `true` | Enable CUDA GPU acceleration |
-| `stream_chunk_sec` | f32 | `0.5` | Streaming chunk size in seconds |
-| `stream_rollback` | i32 | `5` | Number of rollback tokens kept for boundary stability |
-| `stream_unfixed_chunks` | i32 | `2` | Number of initial unfixed chunks before stable commit |
-| `stream_max_new_tokens` | i32 | `32` | Decoder cap per stream update |
-| `past_text_conditioning` | bool | `true` | Whether stream chunks are conditioned on prior committed text |
+Qwen3-ASR has no backend-specific TOML fields. Device choice comes from the top-level `device` field. Model files are resolved from the app model directory.
 
 **Model files expected in `model_dir`:**
 
@@ -141,45 +121,9 @@ These files are generated by [`scripts/export_onnx.py`](../scripts/export_onnx.p
 
 **Inference details:**
 
-- Input: 16 kHz mono PCM → 128-mel spectrogram (Slaney scale, reflection padding)
+- Input: 16 kHz mono PCM -> 128-mel spectrogram (Slaney scale, reflection padding)
 - Streaming: rollback-buffered emission with degeneracy detection and periodic re-anchoring
 - Output: text with automatic speech-end detection
-
-### Parakeet TDT (Local)
-
-Alternative ASR backend using NVIDIA's Parakeet TDT 0.6B model locally via ONNX Runtime.
-
-```toml
-[asr_backend]
-type = "ParakeetTdt"
-model_dir = "/path/to/parakeet-tdt-0.6b-v3-onnx"
-use_gpu = true
-context_secs = 30.0
-```
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `model_dir` | path | auto | Directory containing ONNX model files and `vocab.txt` |
-| `use_gpu` | bool | `true` | Enable CUDA GPU acceleration (requires `--features lune-asr/cuda` at build time) |
-| `context_secs` | f32 | `30.0` | Sliding context window in seconds. Longer = better context for extended dictation, but more memory |
-
-**Model files expected in `model_dir`:**
-
-| File | Purpose |
-|------|---------|
-| `encoder-model.onnx` or `encoder-model.int8.onnx` | Encoder network |
-| `decoder_joint-model.onnx` or `decoder_joint-model.int8.onnx` | Decoder-joint network |
-| `vocab.txt` | SentencePiece vocabulary |
-| `*.onnx.data` | External weight data (if model uses external format) |
-
-The backend searches for files in priority order and falls back to glob matching (`encoder*.onnx`).
-
-**Inference details:**
-
-- Input: 16 kHz mono PCM → 128-mel spectrogram (Slaney scale)
-- Encoder stride: 8× (1280 samples per output frame)
-- Inference trigger: fires after 300ms (4800 samples) of accumulated audio
-- Output: text with per-token confidence scores (softmax probability)
 
 ### OpenAI-Compatible (Remote ASR)
 
@@ -196,40 +140,38 @@ streaming = "HttpPolling"
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `base_url` | URL | — | API base URL |
-| `api_key` | string | — | API key (stored in settings file; redacted in logs, zeroized on drop) |
-| `model` | string | — | Model identifier |
-| `streaming` | enum | — | `"WebSocket"` or `"HttpPolling"` |
+| `base_url` | URL | - | API base URL |
+| `api_key` | string | - | API key (stored in settings file; redacted in logs, zeroized on drop) |
+| `model` | string | - | Model identifier |
+| `streaming` | enum | - | `"WebSocket"` or `"HttpPolling"` |
 
 > **Privacy note:** Remote backends send audio data to external servers. Requires `privacy_mode = "AllowRemote"`.
 
-> **Confidence:** Remote backends don't expose per-token confidence. The confidence router treats `None` confidence as 0.0 (low), causing all text to accumulate before LLM dispatch.
+> **Confidence:** Remote backends do not expose per-token confidence. Lune treats missing confidence conservatively when deciding whether the LLM should review the text.
 
 ---
 
 ## LLM Backends
 
-### LlamaCpp Local (default)
+### Local Style LLM
 
-The default backend. Runs any GGUF model locally via llama.cpp for `[?word?]` span correction.
+Runs the bundled local style model when it has been downloaded. If the model files are missing or fail to load, Lune uses passthrough mode for that session.
 
 ```toml
 [llm_backend]
-type = "LlamaCppLocal"
-model_path = "/path/to/model.gguf"
-n_gpu_layers = 1000
-n_ctx = 2048
-max_output_tokens = 256
+type = "Local"
 ```
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `model_path` | path | auto | Path to the `.gguf` model file |
-| `n_gpu_layers` | u32 | `1000` | GPU layers to offload (0 = CPU only, 1000 = all GPU) |
-| `n_ctx` | u32 | `2048` | Context window size in tokens |
-| `max_output_tokens` | u32 | `256` | Maximum tokens to generate per request |
+The local backend receives raw corrected text plus structured spans. It does not rely on inline marker syntax.
 
-**Inference:** Greedy argmax decoding via llama.cpp. A fresh context is created per call (stateless). Input is raw text with `[?word?]` markers; output is corrected text.
+### Disabled LLM
+
+Disables LLM post-processing. Dictionary replacements and heuristic corrections still run.
+
+```toml
+[llm_backend]
+type = "Disabled"
+```
 
 ### OpenAI-Compatible (Remote LLM)
 
@@ -246,10 +188,10 @@ max_tokens = 512
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `base_url` | URL | — | API base URL |
-| `api_key` | string | — | API key (redacted in logs, zeroized on drop) |
-| `model` | string | — | Model identifier |
-| `max_tokens` | u32 | — | Maximum output tokens |
+| `base_url` | URL | - | API base URL |
+| `api_key` | string | - | API key (redacted in logs, zeroized on drop) |
+| `model` | string | - | Model identifier |
+| `max_tokens` | u32 | - | Maximum output tokens |
 
 > Requires `privacy_mode = "AllowRemote"` or `"LocalPreferred"`.
 
@@ -267,7 +209,7 @@ privacy_mode = "LocalOnly"
 |------|----------|
 | `LocalOnly` | Reject any remote backend usage. Only local models allowed. **(default)** |
 | `LocalPreferred` | Use local backends when available; allow remote if explicitly configured and consented |
-| `AllowRemote` | Use whatever is configured — no restrictions |
+| `AllowRemote` | Use whatever is configured - no restrictions |
 
 The daemon enforces privacy mode at startup. If a remote backend is configured but privacy mode is `LocalOnly`, the daemon will refuse to start and log an error.
 
@@ -318,7 +260,7 @@ lune-voice mode activation Hold
 
 | Mode | Press | Release |
 |------|-------|---------|
-| Toggle | `lune-voice toggle` | — |
+| Toggle | `lune-voice toggle` | - |
 | Hold | `lune-voice start` | `lune-voice stop` |
 
 ---
@@ -342,7 +284,7 @@ The daemon itself does not capture global hotkeys. Instead, bind your OS keyboar
 
 **COSMIC / GNOME:**
 ```
-Settings → Keyboard → Custom Shortcuts
+Settings -> Keyboard -> Custom Shortcuts
   Name: Lune Toggle
   Command: lune-voice toggle
   Shortcut: Ctrl+Space
@@ -350,8 +292,8 @@ Settings → Keyboard → Custom Shortcuts
 
 **KDE:**
 ```
-System Settings → Shortcuts → Custom Shortcuts
-  Add → Command/URL
+System Settings -> Shortcuts -> Custom Shortcuts
+  Add -> Command/URL
   Trigger: Ctrl+Space
   Action: lune-voice toggle
 ```
@@ -406,7 +348,7 @@ The final prompt is assembled as ChatML:
 {system_prompt}
 
 Dictionary terms (always use these exact spellings):
-- lunevoice → Lune Voice
+- lunevoice -> Lune Voice
 - ...
 
 Preceding context: {previous utterances}<|im_end|>
@@ -449,8 +391,8 @@ Output: "I wanted to follow up on our discussion last week regarding the project
 ```
 Input:  "so we talked about the Q3 roadmap and uh John is going to handle the API redesign and Sarah needs to review the mockups by next Tuesday"
 Output: "- Discussed Q3 roadmap
-         - Action: John — API redesign
-         - Action: Sarah — review mockups by next Tuesday"
+         - Action: John - API redesign
+         - Action: Sarah - review mockups by next Tuesday"
 ```
 
 ---
@@ -493,7 +435,7 @@ Each session record contains:
 | `started_at` | datetime | Session start timestamp |
 | `ended_at` | datetime | Session end timestamp (null if crashed) |
 | `style` | string | Style preset ID used |
-| `backend` | enum | ASR backend type (ParakeetTdt / OpenAiCompatible) |
+| `backend` | enum | ASR backend type (`Qwen3Asr` / `OpenAiCompatible`) |
 | `status` | enum | Completed / Failed(reason) |
 | `transcript` | string | Final corrected transcript (null if empty) |
 
@@ -507,30 +449,23 @@ Database location:
 
 ---
 
-## Confidence Router
+## LLM Review Gate
 
-The confidence router controls how ASR output is batched before LLM processing. These settings are internal (not exposed in the TOML file) but can be modified in code.
+Lune decides whether to call the LLM after dictionary and heuristic correction. The gate uses word risk, unresolved words, and correction spans; it does not batch utterances through a separate confidence router.
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `high_threshold` | 0.82 | Confidence above which text is queued to LLM immediately (single utterance) |
-| `mid_threshold` | 0.50 | Boundary between low and mid word-count thresholds |
-| `low_word_threshold` | 8 | Words to accumulate before dispatching low-confidence text |
-| `mid_word_threshold` | 12 | Words to accumulate before dispatching mid-confidence text |
-| `context_window_size` | 3 | Number of recent confirmed utterances kept as LLM context |
-| `max_length_ratio` | 2.0 | Reject LLM correction if output/input length ratio exceeds this |
-| `min_length_ratio` | 0.5 | Reject LLM correction if output/input length ratio is below this |
+| `word_confidence_threshold` | `0.65` | Per-word threshold used for LLM review |
+| `llm_skip_noisy_threshold` | `0.30` | Skip LLM when the transcript is too degraded to be useful |
+| `llm_timeout_secs` | `30` | Fall back to heuristic text if post-processing takes too long |
 
-**Routing logic:**
+The gate sends structured data to the LLM:
 
-```
-confidence ≥ 0.82  →  Queue to LLM immediately (single utterance)
-0.50 ≤ conf < 0.82 →  Accumulate until 12 words, then batch to LLM
-conf < 0.50        →  Accumulate until 8 words, then batch to LLM
-conf = None        →  Treated as 0.0 (conservative batching)
-```
-
-**Length sanity check:** After the LLM returns a correction, the ratio `len(corrected) / len(original)` is checked. If outside `[0.5, 2.0]`, the correction is rejected and the original text is delivered instead.
+| Data | Meaning |
+|------|---------|
+| `correction_spans` | Short editable ranges around high-risk words |
+| `uncertain_words` | Words the heuristic left unresolved |
+| `dictionary` | Relevant user dictionary entries |
 
 ---
 
@@ -541,7 +476,7 @@ Models are downloaded automatically on first run from HuggingFace Hub.
 | Model | Repository | Files | Size |
 |-------|-----------|-------|------|
 | Qwen3-ASR 0.6B | `lune-voice/qwen3-asr-0.6b-onnx` | encoder.onnx, embed_tokens.onnx, decoder_merged.onnx, tokenizer.json | ~1.2 GB |
-| LLM Corrector | `lune-voice/llm-corrector-gguf` | model.gguf | varies |
+| Style LLM | `lune-voice/style-llm-onnx` | ONNX model files, tokenizer.json | varies |
 
 Models are stored in:
 
@@ -551,16 +486,15 @@ Models are stored in:
 | macOS | `~/Library/Application Support/lune-voice/models/` |
 | Windows | `%APPDATA%\lune-voice\models\` |
 
-To use a custom model, set the path directly in the config:
+Custom model paths are not part of the current public settings surface. Put downloaded model files under the app model directory, or use an OpenAI-compatible backend:
 
 ```toml
-[asr_backend]
-type = "OrtQwenAsr"
-model_dir = "/path/to/custom/asr-model"
-
 [llm_backend]
-type = "LlamaCppLocal"
-model_path = "/path/to/custom/model.gguf"
+type = "OpenAiCompatible"
+base_url = "https://api.openai.com/v1"
+api_key = "sk-..."
+model = "gpt-4o-mini"
+max_tokens = 512
 ```
 
 ---

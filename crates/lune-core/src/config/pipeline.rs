@@ -51,7 +51,7 @@ pub struct PipelineConfig {
     pub adaptive_vad: bool,
 
     // ── Confidence gating ──────────────────────────────────────────────
-    /// Per-word confidence threshold for `[?word?]` marking and LLM gating.
+    /// Per-word confidence threshold for correction spans and LLM gating.
     ///
     /// Words below this trigger LLM correction. When all words are above
     /// threshold, LLM is bypassed entirely. `None` means confidence
@@ -113,6 +113,13 @@ pub struct PipelineConfig {
     #[serde(default = "default_itn_enabled")]
     pub itn_enabled: bool,
 
+    /// Timeout for LLM post-processing (seconds).
+    ///
+    /// If the LLM call exceeds this timeout, the raw ASR text is used
+    /// instead. A value of 0 disables the timeout. Default is 30 seconds.
+    #[serde(default = "default_llm_timeout_secs")]
+    pub llm_timeout_secs: u32,
+
     // ── Word boosting ─────────────────────────────────────────────────
     /// Boost dictionary replacement tokens in the ASR decoder logits.
     #[serde(default = "default_word_boost_enabled")]
@@ -124,6 +131,10 @@ pub struct PipelineConfig {
 
 fn default_itn_enabled() -> bool {
     false
+}
+
+fn default_llm_timeout_secs() -> u32 {
+    30
 }
 
 fn default_word_boost_enabled() -> bool {
@@ -170,6 +181,9 @@ impl PipelineConfig {
         }
         if let Some(v) = overrides.max_speech_secs {
             self.max_speech_samples = (v as usize) * 16_000;
+        }
+        if let Some(v) = overrides.llm_timeout_secs {
+            self.llm_timeout_secs = v;
         }
         if let Some(v) = overrides.word_boost_enabled {
             self.word_boost_enabled = v;
@@ -221,6 +235,9 @@ impl PipelineConfig {
         if self.max_speech_samples == 0 {
             issues.push("max_speech_samples must be > 0");
         }
+        if self.llm_timeout_secs > 300 {
+            issues.push("llm_timeout_secs must be <= 300");
+        }
         issues
     }
 }
@@ -243,6 +260,7 @@ impl Default for PipelineConfig {
             llm_skip_noisy_threshold: Some(0.30),
             max_speech_samples: 60 * 16_000,
             itn_enabled: false,
+            llm_timeout_secs: 30,
             word_boost_enabled: true,
             word_boost_score: 1.0,
         }
@@ -266,6 +284,8 @@ pub struct PipelineOverrides {
     pub llm_skip_noisy_threshold: Option<f32>,
     /// Convenience alias: converted to `max_speech_samples` at merge time.
     pub max_speech_secs: Option<u32>,
+    /// Override LLM timeout in seconds.
+    pub llm_timeout_secs: Option<u32>,
     pub word_boost_enabled: Option<bool>,
     pub word_boost_score: Option<f32>,
 }

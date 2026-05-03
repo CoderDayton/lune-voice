@@ -153,7 +153,7 @@ pub async fn start_dictation(
     window: WebviewWindow,
     runtime: State<'_, AppRuntime>,
 ) -> Result<String, String> {
-    require_window_access(&window, &["pill"])?;
+    require_window_access(&window, &["main", "pill"])?;
     runtime.inner().clone().start_dictation().await
 }
 
@@ -162,7 +162,7 @@ pub async fn stop_dictation(
     window: WebviewWindow,
     runtime: State<'_, AppRuntime>,
 ) -> Result<(), String> {
-    require_window_access(&window, &["pill"])?;
+    require_window_access(&window, &["main", "pill"])?;
     runtime.inner().clone().stop_dictation().await
 }
 
@@ -171,7 +171,7 @@ pub async fn cancel_dictation(
     window: WebviewWindow,
     runtime: State<'_, AppRuntime>,
 ) -> Result<(), String> {
-    require_window_access(&window, &["pill"])?;
+    require_window_access(&window, &["main", "pill"])?;
     runtime.inner().clone().cancel_dictation().await
 }
 
@@ -180,7 +180,7 @@ pub async fn toggle_dictation(
     window: WebviewWindow,
     runtime: State<'_, AppRuntime>,
 ) -> Result<Option<String>, String> {
-    require_window_access(&window, &["pill"])?;
+    require_window_access(&window, &["main", "pill"])?;
     runtime.inner().clone().toggle_dictation().await
 }
 
@@ -262,6 +262,7 @@ mod tests {
     #[test]
     fn require_window_access_rejects_unlisted_labels() {
         assert!(require_window_access_for_label("settings", &["main", "pill"]).is_err());
+        assert!(require_window_access_for_label("main", &["main", "pill"]).is_ok());
         assert!(require_window_access_for_label("pill", &["main", "pill"]).is_ok());
     }
 

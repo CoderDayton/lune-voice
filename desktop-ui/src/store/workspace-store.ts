@@ -87,6 +87,7 @@ export const workspaceActions = {
         liveTranscript: isActiveServiceStatus(snapshot.serviceStatus)
           ? s.runtime.liveTranscript
           : "",
+        audioLevel: isActiveServiceStatus(snapshot.serviceStatus) ? s.runtime.audioLevel : 0,
         loaded: true,
         loading: false,
         error: null,
@@ -169,14 +170,43 @@ export async function removeDictionaryEntry(id: number) {
 
 async function dictationAction<T>(action: () => Promise<T>, fallback: T): Promise<T> {
   workspaceActions.setError(null);
-  try { return await action(); }
-  catch (error) { workspaceActions.setError(formatError(error)); return fallback; }
+  try {
+    return await action();
+  } catch (error) {
+    workspaceActions.setError(formatError(error));
+    return fallback;
+  }
 }
 
-export const startDictation = () => dictationAction(() => backendClient.startDictation(), null);
-export const stopDictation = () => dictationAction(() => backendClient.stopDictation(), undefined);
-export const cancelDictation = () => dictationAction(() => backendClient.cancelDictation(), undefined);
-export const toggleDictation = () => dictationAction(() => backendClient.toggleDictation(), null);
+export async function startDictation() {
+  const sessionId = await dictationAction(() => backendClient.startDictation(), null);
+  if (sessionId) {
+    workspaceActions.applySessionEvent({ type: "sessionStarted", sessionId });
+  }
+  return sessionId;
+}
+
+export async function stopDictation() {
+  await dictationAction(() => backendClient.stopDictation(), undefined);
+}
+
+export async function cancelDictation() {
+  await dictationAction(() => backendClient.cancelDictation(), undefined);
+}
+
+export async function toggleDictation() {
+  workspaceActions.setError(null);
+  try {
+    const sessionId = await backendClient.toggleDictation();
+    workspaceActions.applySessionEvent(
+      sessionId ? { type: "sessionStarted", sessionId } : { type: "sessionStopped" },
+    );
+    return sessionId;
+  } catch (error) {
+    workspaceActions.setError(formatError(error));
+    return null;
+  }
+}
 
 // ── Selectors ─────────────────────────────────────────────────────────
 
@@ -258,10 +288,11 @@ function reduceSessionEvent(
         activeSessionId: event.sessionId,
         serviceStatus: "listening",
         liveTranscript: "",
+        audioLevel: 0,
         error: null,
       };
     case "processing":
-      return { ...runtime, serviceStatus: "processing" };
+      return { ...runtime, serviceStatus: "processing", audioLevel: 0 };
     case "finalizedText":
       return {
         ...runtime,
@@ -277,16 +308,19 @@ function reduceSessionEvent(
         ...runtime,
         activeSessionId: null,
         serviceStatus: runtime.serviceStatus === "error" ? "error" : "ready",
+        audioLevel: 0,
       };
     case "sessionError":
       return {
         ...runtime,
         activeSessionId: null,
         serviceStatus: "error",
+        audioLevel: 0,
         error: event.message,
       };
-    case "partialText":
     case "audioLevel":
+      return { ...runtime, audioLevel: Math.max(0, Math.min(1, event.level)) };
+    case "partialText":
     case "commandDetected":
       return runtime;
   }

@@ -149,15 +149,10 @@ impl TextPostProcessor for OpenAiLlmBackend {
                     .unwrap_or(input.raw_text.trim())
                     .to_owned();
 
-                let cleaned_text = crate::prompt::strip_markers(&text);
-
-                tracing::debug!(
-                    output_len = cleaned_text.len(),
-                    "OpenAI post-process complete"
-                );
+                tracing::debug!(output_len = text.len(), "OpenAI post-process complete");
 
                 Ok(PostProcessOutput {
-                    cleaned_text,
+                    cleaned_text: text,
                     metadata: None,
                 })
             }

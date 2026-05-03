@@ -61,6 +61,7 @@ pub struct WordScore {
 
 pub struct CorrectionResult {
     pub corrected_text: String,
+    pub word_risk_positions: Vec<(usize, f32)>,
     pub unresolved_words: Vec<WordScore>,
     pub all_resolved: bool,
 }
@@ -93,16 +94,19 @@ impl HeuristicCorrector {
         dict_replacements: &[(String, String)],
         lang: &str,
     ) -> CorrectionResult {
+        let words: Vec<&str> = text.split_whitespace().collect();
+        let word_risk_positions = align_word_risk_positions(&words, word_risk_scores);
+
         if !has_dict(lang) {
             return CorrectionResult {
                 corrected_text: text.to_owned(),
+                word_risk_positions,
                 unresolved_words: Vec::new(),
                 all_resolved: true,
             };
         }
 
         let lexicon = Lexicon::for_lang(lang);
-        let words: Vec<&str> = text.split_whitespace().collect();
         let mut result_words: Vec<String> = Vec::with_capacity(words.len());
         let mut unresolved = Vec::new();
 
@@ -118,10 +122,10 @@ impl HeuristicCorrector {
             let is_unknown = !lexicon_info.as_ref().is_some_and(|info| {
                 info.freq >= Lexicon::CONFIDENT_FREQ || info.source == WordSource::Vocab
             });
-            let risk_score = word_risk_scores
+            let risk_score = word_risk_positions
                 .iter()
-                .find(|(w, _)| w.eq_ignore_ascii_case(stripped))
-                .map(|(_, s)| *s)
+                .find(|(position, _)| *position == i)
+                .map(|(_, risk)| *risk)
                 .unwrap_or(0.0);
             let flagged = risk_score >= HWCE_FLAG_THRESHOLD;
 
@@ -204,6 +208,7 @@ impl HeuristicCorrector {
         let all_resolved = unresolved.is_empty();
         CorrectionResult {
             corrected_text: result_words.join(" "),
+            word_risk_positions,
             unresolved_words: unresolved,
             all_resolved,
         }
@@ -311,6 +316,32 @@ impl HeuristicCorrector {
 fn strip_punctuation(word: &str) -> &str {
     let s = word.trim_start_matches(|c: char| c.is_ascii_punctuation());
     s.trim_end_matches(|c: char| c.is_ascii_punctuation())
+}
+
+fn align_word_risk_positions(
+    words: &[&str],
+    word_risk_scores: &[(String, f32)],
+) -> Vec<(usize, f32)> {
+    let mut out = Vec::new();
+    let mut cursor = 0usize;
+
+    for (risk_word, risk) in word_risk_scores {
+        let risk_word = strip_punctuation(risk_word);
+        if risk_word.is_empty() {
+            continue;
+        }
+
+        if let Some(offset) = words[cursor..]
+            .iter()
+            .position(|word| strip_punctuation(word).eq_ignore_ascii_case(risk_word))
+        {
+            let idx = cursor + offset;
+            out.push((idx, *risk));
+            cursor = (idx + 1).min(words.len());
+        }
+    }
+
+    out
 }
 
 fn restore_punctuation(original: &str, corrected: &str) -> String {
@@ -452,6 +483,25 @@ mod tests {
         let scores = vec![("teh".into(), 0.80)];
         let result = c.correct("teh quick", &scores, &[], "en");
         assert_eq!(result.corrected_text, "the quick");
+    }
+
+    #[test]
+    fn word_risk_positions_survive_heuristic_correction() {
+        let c = HeuristicCorrector::new();
+        let scores = vec![("teh".into(), 0.80)];
+        let result = c.correct("teh quick", &scores, &[], "en");
+
+        assert_eq!(result.corrected_text, "the quick");
+        assert_eq!(result.word_risk_positions, vec![(0, 0.80)]);
+    }
+
+    #[test]
+    fn word_risk_positions_handle_duplicate_words_by_order() {
+        let c = HeuristicCorrector::new();
+        let scores = vec![("the".into(), 0.10), ("the".into(), 0.85)];
+        let result = c.correct("the build fixed the deployment", &scores, &[], "en");
+
+        assert_eq!(result.word_risk_positions, vec![(0, 0.10), (3, 0.85)]);
     }
 
     #[test]

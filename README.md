@@ -4,7 +4,7 @@
 
 # Lune Voice
 
-**Offline voice dictation for Linux. Speak, and clean text appears in your app.**
+**Local voice dictation for Linux. Speak once; clean text lands in the app you were using.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-2024-orange.svg)](https://www.rust-lang.org)
@@ -16,18 +16,18 @@
 
 Lune Voice runs a full speech-to-text pipeline on your machine — no cloud, no API keys, no telemetry. Audio goes in, corrected text comes out, delivered straight to whatever app you're focused on.
 
-The pipeline: mic capture → VAD → ASR (Qwen3 or Parakeet, via ONNX Runtime) → confidence gating → optional LLM cleanup → dictionary fixes → paste into focused window. Everything runs locally. GPU optional but fast.
+The pipeline is direct: mic capture -> VAD -> Qwen3-ASR -> dictionary scan -> heuristic correction -> optional LLM pass -> delivery. The desktop UI and CLI both control the same runtime.
 
 ## Desktop App
 
-A Tauri desktop shell with a floating dictation pill, session history, custom dictionary, and hotkey configuration. Built with React, Tailwind, and DaisyUI.
+A Tauri desktop shell provides the main controls: a floating dictation pill, a sidebar start/stop button, session history, custom dictionary, model setup, and hotkey configuration. It uses typed Tauri commands for control and a session stream for live status and audio level.
 
 ```bash
 cd desktop-ui
 bun install && bun run dev
 ```
 
-The pill overlay sits at the bottom of your screen — click to dictate, watch the audio dots react, stop or cancel with one tap. It hides when you're not using it.
+The pill overlay sits at the bottom of the screen. It mirrors the backend state, reacts to audio level events, and can stop or cancel the active session without owning the main app window.
 
 ## CLI Daemon
 
@@ -68,17 +68,17 @@ cargo test --workspace
 bun test                    # frontend unit tests
 ```
 
-Audio capture uses `cpal` — PipeWire/ALSA on Linux, CoreAudio on macOS, WASAPI on Windows.
+Audio capture uses `cpal` - PipeWire/ALSA on Linux, CoreAudio on macOS, WASAPI on Windows.
 
 ## Project Layout
 
 ```
 crates/
   lune-app/       Session orchestration, delivery, hotkey listener
-  lune-asr/       ASR backends (Qwen3, Parakeet, OpenAI-compatible)
+  lune-asr/       ASR backends (Qwen3, OpenAI-compatible)
   lune-audio/     Mic capture, VAD, segmenter
   lune-core/      Shared types, config, session model
-  lune-llm/       LLM cleanup (local GGUF or OpenAI-compatible)
+  lune-llm/       Text cleanup (local ONNX style model or OpenAI-compatible)
   lune-commands/  Voice command router
   lune-dict/      Dictionary manager (fuzzy match + priority)
   lune-output/    Text delivery (wtype/wl-copy)
@@ -88,9 +88,9 @@ desktop-ui/       Tauri + React desktop shell
 
 ## Docs
 
-- [Architecture](docs/ARCHITECTURE.md) — pipeline, session lifecycle, D-Bus, backend layout
-- [Configuration](docs/CONFIGURATION.md) — settings, backends, hotkeys, styles, models
-- [Performance](docs/PERFORMANCE.md) — benchmarks, latency breakdowns, tuning
+- [Architecture](docs/ARCHITECTURE.md) - pipeline, session lifecycle, desktop bridge, D-Bus
+- [Configuration](docs/CONFIGURATION.md) - settings, backends, hotkeys, styles, models
+- [Performance](docs/PERFORMANCE.md) - benchmarks, latency breakdowns, tuning
 
 ## License
 

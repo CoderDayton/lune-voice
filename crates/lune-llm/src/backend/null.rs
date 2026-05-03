@@ -6,9 +6,7 @@
 use lune_core::Result;
 use lune_core::llm::{PostProcessInput, PostProcessOutput, TextPostProcessor};
 
-/// Returns the input transcript verbatim, with `[?word?]` markers
-/// stripped if any leak through. Strictly additive: never modifies
-/// content, only removes residual annotation syntax.
+/// Returns the input transcript verbatim.
 #[derive(Debug, Default)]
 pub struct NullPostProcessor;
 
@@ -21,11 +19,8 @@ impl NullPostProcessor {
 #[async_trait::async_trait]
 impl TextPostProcessor for NullPostProcessor {
     async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput> {
-        // Strip any residual annotation markers the upstream marking
-        // pass may have emitted, then return the cleaned text.
-        let cleaned = crate::prompt::strip_markers(&input.raw_text);
         Ok(PostProcessOutput {
-            cleaned_text: cleaned,
+            cleaned_text: input.raw_text.clone(),
             metadata: None,
         })
     }
@@ -52,22 +47,5 @@ mod tests {
         };
         let out = processor.transform(&input).await.unwrap();
         assert_eq!(out.cleaned_text, "hello world");
-    }
-
-    #[tokio::test]
-    async fn passthrough_strips_residual_markers() {
-        let processor = NullPostProcessor::new();
-        let input = PostProcessInput {
-            raw_text: "the [?weather?] was nice".into(),
-            style_preset: Arc::new(StylePreset::casual()),
-            app_category: None,
-            dictionary: vec![],
-            correction_spans: vec![],
-            context: None,
-            language: "en".into(),
-            uncertain_words: Vec::new(),
-        };
-        let out = processor.transform(&input).await.unwrap();
-        assert_eq!(out.cleaned_text, "the weather was nice");
     }
 }

@@ -137,10 +137,16 @@ pub fn sample_last_token(
     )
 }
 
+/// Returns true if all penalties are effectively identity (no practical effect).
+///
+/// Uses a relative tolerance appropriate for logit-space differences.
+/// A penalty effect < 1e-4 in logit space is essentially invisible to the model.
 fn penalties_are_identity(params: &SamplingParams) -> bool {
-    (params.repetition_penalty - 1.0).abs() < f32::EPSILON
-        && params.frequency_penalty == 0.0
-        && params.presence_penalty == 0.0
+    const TOL: f32 = 1e-4;
+    // repetition_penalty == 1.0 means no scaling
+    (params.repetition_penalty - 1.0).abs() < TOL
+        && params.frequency_penalty.abs() < TOL
+        && params.presence_penalty.abs() < TOL
 }
 
 fn last_logits_range(shape: &[i64], data_len: usize) -> Result<std::ops::Range<usize>> {
@@ -255,17 +261,21 @@ fn sample_from_logits(
         }
     }
 
-    Ok(kept.last().unwrap().id)
+    // Fallback: CDF may not sum to 1.0 due to floating point. Return highest-probability.
+    kept.first()
+        .map(|c| c.id)
+        .ok_or_else(|| Error::Llm("sampler: no valid candidates after filtering".into()))
 }
 
 fn apply_penalties(logits: &mut [f32], state: &DecodeState, params: &SamplingParams) {
+    // Early return if penalties are identity (no practical effect)
+    if penalties_are_identity(params) {
+        return;
+    }
+
     let rep = params.repetition_penalty;
     let freq = params.frequency_penalty;
     let pres = params.presence_penalty;
-
-    if (rep - 1.0).abs() < f32::EPSILON && freq == 0.0 && pres == 0.0 {
-        return;
-    }
 
     for (&token_id, &count) in &state.token_counts {
         let idx = token_id as usize;

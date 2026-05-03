@@ -424,7 +424,6 @@ impl TextPostProcessor for OrtStyleLlm {
             &input.uncertain_words,
         )?;
 
-        text = crate::prompt::strip_markers(&text);
         text = crate::prompt::fix_all_number_spaces(&text);
 
         Ok(PostProcessOutput {

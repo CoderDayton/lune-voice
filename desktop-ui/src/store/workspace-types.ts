@@ -42,6 +42,7 @@ export interface WorkspaceRuntimeState {
   serviceStatus: string;
   activeSessionId: string | null;
   liveTranscript: string;
+  audioLevel: number;
   loaded: boolean;
   loading: boolean;
   error: string | null;
@@ -88,6 +89,7 @@ export const DEFAULT_RUNTIME: WorkspaceRuntimeState = {
   serviceStatus: "Connecting",
   activeSessionId: null,
   liveTranscript: "",
+  audioLevel: 0,
   loaded: false,
   loading: false,
   error: null,
