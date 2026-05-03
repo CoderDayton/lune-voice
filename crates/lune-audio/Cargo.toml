@@ -13,7 +13,7 @@ tracing.workspace = true
 cpal = "0.17"
 
 # Resampling (adaptive rate conversion)
-rubato = "1.0"
+rubato = "2.0"
 audioadapter-buffers = "2.0"
 
 # Lock-free ring buffer
