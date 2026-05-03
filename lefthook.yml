@@ -48,8 +48,8 @@ pre-push:
 
     audit:
       run: |
-        if cargo audit --version &>/dev/null 2>&1; then
-          cargo audit
+        if cargo audit --version >/dev/null 2>&1; then
+          cargo audit 2>&1 | tail -5
         else
           echo "cargo-audit not installed, skipping (install: cargo install cargo-audit)"
         fi
