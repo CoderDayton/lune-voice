@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useStore } from "@tanstack/react-store";
 import { SettingsSection } from "../components/section";
 import { useLingui } from "@lingui/react/macro";
 import { HardDrive, Download, Trash2, Loader2, AlertTriangle, Info, Zap, Circle } from "lucide-react";
-import { workspaceStore } from "../../../store/workspace-store";
 
 interface ModelStatus {
   name: string;
@@ -24,18 +22,12 @@ interface DownloadProgress {
   done: boolean;
 }
 
-const ASR_MODEL_MAP: Record<string, string> = {
-  Qwen3Asr: "qwen3-asr-0.6b-onnx",
-};
-
 function getModelState(
-  localName: string,
+  model: ModelStatus,
   ready: boolean,
-  activeAsrModel: string | undefined,
 ): "active" | "downloaded" | "missing" {
   if (!ready) return "missing";
-  if (localName === activeAsrModel) return "active";
-  if (localName === "qwen3-0.6b") return "active";
+  if (model.required) return "active";
   return "downloaded";
 }
 
@@ -67,8 +59,6 @@ function StatusBadge({ state }: { state: "active" | "downloaded" | "missing" }) 
 
 export function ModelsSection() {
   const { t } = useLingui();
-  const asrBackend = useStore(workspaceStore, (s) => s.settings.asrBackend);
-  const activeAsrModel = ASR_MODEL_MAP[asrBackend];
 
   const [models, setModels] = useState<ModelStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -148,7 +138,7 @@ export function ModelsSection() {
       >
         {models.map((model) => {
           const isDownloading = downloading === model.localName;
-          const state = getModelState(model.localName, model.ready, activeAsrModel);
+          const state = getModelState(model, model.ready);
           const progressText =
             progress && isDownloading
               ? `${progress.fileName} (${progress.fileIndex + 1}/${progress.fileCount})`

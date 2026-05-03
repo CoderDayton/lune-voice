@@ -69,21 +69,7 @@ impl AppRuntime {
         let settings = load_settings(&paths)?;
         init_ort_runtime();
 
-        // Check model readiness *before* attempting pipeline build.
-        // If models are present, build errors are fatal (e.g. corrupt DB,
-        // bad config). If models are absent, boot with an empty pipeline
-        // and let the user download via the setup UI.
-        // Only require the active ASR backend to be ready at boot.
-        // Optional style LLM loads opportunistically.
-        let asr_spec = match &settings.asr_backend {
-            lune_core::config::AsrBackendConfig::Qwen3Asr { .. } => {
-                Some(lune_persist::ModelSpec::qwen3_asr())
-            }
-            _ => None,
-        };
-        let models_ready = asr_spec
-            .as_ref()
-            .is_some_and(|s| s.is_ready(&paths.models_dir()));
+        let models_ready = lune_persist::has_required_models(&paths.models_dir());
 
         let (pipeline, settings) = if models_ready {
             build_pipeline(paths.clone(), settings).await?

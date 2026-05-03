@@ -207,20 +207,22 @@ pub async fn check_model_status(
 pub async fn download_model_cmd(
     window: WebviewWindow,
     app: tauri::AppHandle,
+    runtime: State<'_, AppRuntime>,
     local_name: String,
 ) -> Result<(), String> {
     require_window_access(&window, &["main"])?;
     validate_local_name(&local_name)?;
     let app_handle = app.clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let models_dir = tauri::async_runtime::spawn_blocking(move || {
         let paths = lune_persist::AppPaths::resolve().ok_or("resolve application paths")?;
+        let models_dir = paths.models_dir();
         tracing::info!(local_name, "starting model download");
-        match lune_persist::download_model(&paths.models_dir(), &local_name, |progress| {
+        match lune_persist::download_model(&models_dir, &local_name, |progress| {
             let _ = app_handle.emit("lune://download-progress", &progress);
         }) {
             Ok(_) => {
                 tracing::info!(local_name, "download complete");
-                Ok(())
+                Ok(models_dir)
             }
             Err(e) => {
                 tracing::error!(local_name, error = %e, "download failed");
@@ -229,7 +231,12 @@ pub async fn download_model_cmd(
         }
     })
     .await
-    .map_err(|e| format!("download task: {e}"))?
+    .map_err(|e| format!("download task: {e}"))??;
+
+    if lune_persist::has_required_models(&models_dir) {
+        runtime.eager_rebuild().await.ok();
+    }
+    Ok(())
 }
 
 #[tauri::command]

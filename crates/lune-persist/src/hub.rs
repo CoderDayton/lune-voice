@@ -19,6 +19,10 @@ pub enum ModelSpec {
         suffix_patterns: Vec<String>,
         /// Local directory name under `models/` (e.g. `parakeet-tdt-0.6b`).
         local_name: String,
+        /// Human-readable description of this model's role.
+        description: &'static str,
+        /// Whether the core pipeline requires this model.
+        required: bool,
     },
 }
 
@@ -68,6 +72,8 @@ impl ModelSpec {
             ],
             suffix_patterns: vec![],
             local_name: model_dirs::DIR_PARAKEET.into(),
+            description: "Speech-to-text engine. CTC-based ONNX model.",
+            required: true,
         }
     }
 
@@ -82,15 +88,19 @@ impl ModelSpec {
             ],
             suffix_patterns: vec![".onnx_data".into()],
             local_name: model_dirs::DIR_QWEN3_ASR.into(),
+            description: "Speech-to-text engine. Encoder-decoder ONNX model with SmoothQuant.",
+            required: true,
         }
     }
 
     pub fn style_llm() -> Self {
         Self::Directory {
-            repo_id: "onnx-community/Qwen2.5-1.5B-Instruct".into(),
+            repo_id: "onnx-community/Qwen3-0.6B-ONNX".into(),
             required_files: vec!["tokenizer.json".into(), "onnx/model_q4f16.onnx".into()],
             suffix_patterns: vec![],
             local_name: model_dirs::DIR_STYLE_LLM.into(),
+            description: "Style & correction LLM. Fixes grammar and reformats transcripts.",
+            required: false,
         }
     }
 
@@ -100,7 +110,7 @@ impl ModelSpec {
             Self::Directory { local_name, .. } => match local_name.as_str() {
                 model_dirs::DIR_PARAKEET => "Parakeet TDT 0.6B",
                 model_dirs::DIR_QWEN3_ASR => "Qwen3-ASR 0.6B ONNX",
-                model_dirs::DIR_STYLE_LLM => "Qwen2.5 1.5B Instruct",
+                model_dirs::DIR_STYLE_LLM => "Qwen3 0.6B ONNX",
                 _ => local_name,
             },
         }
@@ -126,11 +136,46 @@ impl ModelSpec {
         }
     }
 
-    fn local_name(&self) -> &str {
+    pub fn local_name(&self) -> &str {
         match self {
             Self::Directory { local_name, .. } => local_name,
         }
     }
+
+    fn description(&self) -> &str {
+        match self {
+            Self::Directory { description, .. } => description,
+        }
+    }
+
+    fn required(&self) -> bool {
+        match self {
+            Self::Directory { required, .. } => *required,
+        }
+    }
+
+    pub fn all() -> Vec<Self> {
+        vec![Self::qwen3_asr(), Self::style_llm()]
+    }
+
+    fn to_status(&self, models_dir: &Path) -> ModelStatus {
+        ModelStatus {
+            name: self.display_name().to_string(),
+            repo_id: self.repo_id().to_string(),
+            local_name: self.local_name().to_string(),
+            ready: self.is_ready(models_dir),
+            description: self.description().to_string(),
+            required: self.required(),
+        }
+    }
+}
+
+/// Returns true if every model marked `required` is fully present locally.
+pub fn has_required_models(models_dir: &Path) -> bool {
+    ModelSpec::all()
+        .iter()
+        .filter(|s| s.required())
+        .all(|s| s.is_ready(models_dir))
 }
 
 /// Check which models are needed for the current config. Returns status of each.
@@ -140,42 +185,17 @@ pub fn check_model_status(
     _asr_backend: &AsrBackendConfig,
     _llm_backend: &lune_core::config::LlmBackendConfig,
 ) -> Vec<ModelStatus> {
-    let mut statuses = Vec::new();
-
-    let asr_spec = ModelSpec::qwen3_asr();
-    statuses.push(ModelStatus {
-        name: asr_spec.display_name().to_string(),
-        repo_id: asr_spec.repo_id().to_string(),
-        local_name: asr_spec.local_name().to_string(),
-        ready: asr_spec.is_ready(models_dir),
-        description: "Speech-to-text engine. Encoder-decoder ONNX model with SmoothQuant."
-            .to_string(),
-        required: true,
-    });
-
-    let style_spec = ModelSpec::style_llm();
-    statuses.push(ModelStatus {
-        name: style_spec.display_name().to_string(),
-        repo_id: style_spec.repo_id().to_string(),
-        local_name: style_spec.local_name().to_string(),
-        ready: style_spec.is_ready(models_dir),
-        description: "Style & correction LLM. Fixes grammar and reformats transcripts.".to_string(),
-        required: false,
-    });
-
-    statuses
+    ModelSpec::all()
+        .iter()
+        .map(|spec| spec.to_status(models_dir))
+        .collect()
 }
 
 /// Delete a downloaded model by local_name. Returns Ok(true) if removed,
 /// Ok(false) if it wasn't present.
-const KNOWN_MODEL_NAMES: &[&str] = &[
-    model_dirs::DIR_PARAKEET,
-    model_dirs::DIR_QWEN3_ASR,
-    model_dirs::DIR_STYLE_LLM,
-];
-
 pub fn delete_model(models_dir: &Path, local_name: &str) -> PersistResult<bool> {
-    if !KNOWN_MODEL_NAMES.contains(&local_name) {
+    let known = ModelSpec::all();
+    if !known.iter().any(|s| s.local_name() == local_name) {
         return Err(PersistError::ModelDownload(format!(
             "unknown model name: {local_name}"
         )));
@@ -197,16 +217,10 @@ pub fn download_model(
     local_name: &str,
     on_progress: impl Fn(DownloadProgress),
 ) -> PersistResult<PathBuf> {
-    let spec = match local_name {
-        model_dirs::DIR_PARAKEET => ModelSpec::parakeet_tdt(),
-        model_dirs::DIR_QWEN3_ASR => ModelSpec::qwen3_asr(),
-        model_dirs::DIR_STYLE_LLM => ModelSpec::style_llm(),
-        _ => {
-            return Err(PersistError::ModelDownload(format!(
-                "unknown model: {local_name}"
-            )));
-        }
-    };
+    let spec = ModelSpec::all()
+        .into_iter()
+        .find(|s| s.local_name() == local_name)
+        .ok_or_else(|| PersistError::ModelDownload(format!("unknown model: {local_name}")))?;
 
     let hub_cache = models_dir.join(".hub-cache");
     let hub = ModelHub::new(&hub_cache)?;
@@ -378,6 +392,7 @@ fn ensure_directory_model_with_progress(
         required_files,
         suffix_patterns,
         local_name,
+        ..
     } = spec;
 
     let local_dir = models_dir.join(local_name);

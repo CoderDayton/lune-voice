@@ -88,7 +88,6 @@ export function ModelSetup({ children }: { children: React.ReactNode }) {
               } else {
                 setPhase("complete");
                 localStorage.setItem("lune-setup-complete", "1");
-                invoke("initialize_pipeline").catch(() => {});
               }
               return sel;
             });
