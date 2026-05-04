@@ -139,6 +139,16 @@ export const mockBackendClient: BackendClient = {
     return structuredClone(mockSnapshot);
   },
 
+  async updateDictionaryEntry(id, phrase, replacement, priority) {
+    mockSnapshot = {
+      ...mockSnapshot,
+      dictionary: mockSnapshot.dictionary.map((entry) =>
+        entry.id === id ? { ...entry, phrase, replacement, priority } : entry,
+      ),
+    };
+    return structuredClone(mockSnapshot);
+  },
+
   async deleteDictionaryEntry(id) {
     mockSnapshot = {
       ...mockSnapshot,

@@ -201,12 +201,31 @@ export async function saveWorkspaceSetting<Key extends keyof WorkspaceSettings>(
   }
 }
 
-export async function addDictionaryEntry(phrase: string, replacement: string) {
+export async function addDictionaryEntry(phrase: string, replacement: string, priority = 5) {
   const p = phrase.trim();
   const r = replacement.trim();
   if (!p || !r) return false;
   try {
-    const snapshot = await backendClient.createDictionaryEntry(p, r, 5);
+    const snapshot = await backendClient.createDictionaryEntry(p, r, priority);
+    workspaceActions.hydrate(snapshot);
+    return true;
+  } catch (error) {
+    workspaceActions.setError(formatError(error));
+    return false;
+  }
+}
+
+export async function updateDictionaryEntry(
+  id: number,
+  phrase: string,
+  replacement: string,
+  priority: number,
+) {
+  const p = phrase.trim();
+  const r = replacement.trim();
+  if (!p || !r) return false;
+  try {
+    const snapshot = await backendClient.updateDictionaryEntry(id, p, r, priority);
     workspaceActions.hydrate(snapshot);
     return true;
   } catch (error) {

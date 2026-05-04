@@ -2,7 +2,7 @@ use tauri::{Emitter, Runtime, State, WebviewWindow, ipc::Channel};
 
 use crate::dto::{
     CreateDictionaryEntryInput, PillSnapshotDto, SaveWorkspaceSettingsInput, SessionStreamEvent,
-    WorkspaceSnapshot,
+    UpdateDictionaryEntryInput, WorkspaceSnapshot,
 };
 use crate::runtime::AppRuntime;
 
@@ -122,6 +122,23 @@ pub async fn delete_dictionary_entry(
     })
     .await
     .map_err(|e| format!("delete dictionary entry task failed: {e}"))??;
+    runtime.mark_reload_required().await;
+    snapshot.service_status = runtime.service_status().await;
+    Ok(snapshot)
+}
+
+#[tauri::command]
+pub async fn update_dictionary_entry(
+    window: WebviewWindow,
+    runtime: State<'_, AppRuntime>,
+    input: UpdateDictionaryEntryInput,
+) -> Result<WorkspaceSnapshot, String> {
+    require_window_access(&window, &["main"])?;
+    let mut snapshot = tauri::async_runtime::spawn_blocking(move || {
+        crate::persistence::update_dictionary_entry(input)
+    })
+    .await
+    .map_err(|e| format!("update dictionary entry task failed: {e}"))??;
     runtime.mark_reload_required().await;
     snapshot.service_status = runtime.service_status().await;
     Ok(snapshot)

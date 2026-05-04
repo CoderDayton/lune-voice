@@ -92,6 +92,12 @@ export interface BackendClient {
     replacement: string,
     priority: number,
   ): Promise<BackendWorkspaceSnapshot>;
+  updateDictionaryEntry(
+    id: number,
+    phrase: string,
+    replacement: string,
+    priority: number,
+  ): Promise<BackendWorkspaceSnapshot>;
   deleteDictionaryEntry(id: number): Promise<BackendWorkspaceSnapshot>;
   startDictation(): Promise<string>;
   stopDictation(): Promise<void>;

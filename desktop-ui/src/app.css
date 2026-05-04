@@ -487,7 +487,9 @@
   @apply rounded-box border border-surface-border bg-surface-panel shadow-card;
 }
 
-@utility toolbar-surface {\n  @apply rounded-box border-surface-border bg-surface-elevated p-4 shadow-card;\n}
+@utility toolbar-surface {
+  @apply rounded-box border border-surface-border bg-surface-elevated p-4 shadow-card;
+}
 
 @utility token-icon {
   @apply flex shrink-0 items-center justify-center rounded-lg border border-surface-border bg-surface-wash text-primary;
@@ -495,7 +497,6 @@
 
 @utility metric-card {
   @apply rounded-box border border-surface-border bg-surface-elevated p-4;
-@utility metric-card {\n  @apply rounded-box border-surface-border bg-surface-elevated p-5;\n}
   @apply cursor-pointer transition-[background,border-color,transform] duration-150;
 }
 
@@ -512,7 +513,9 @@
   @apply flex flex-col gap-2 rounded-lg px-3 py-3 transition-colors sm:flex-row sm:items-center sm:justify-between;
 }
 
-@utility settings-row {\n  @apply flex-col gap-3 rounded-lg px-4 py-4 transition-colors sm:flex-row sm:items-center sm:justify-between;\n}
+@utility settings-row {
+  @apply flex-col gap-3 rounded-lg px-4 py-4 transition-colors sm:flex-row sm:items-center sm:justify-between;
+}
 
 /* ── Skeleton loading ──────────────────────────────────────────────── */
 

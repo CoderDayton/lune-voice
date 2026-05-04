@@ -8,7 +8,8 @@ use lune_persist::{AppPaths, Database, SettingsStore, StoredDictionaryEntry};
 use crate::dto::{
     ActivationModeDto, AsrBackendTypeDto, CreateDictionaryEntryInput, DevicePolicyDto,
     DictationModeDto, DictionaryItemDto, HistoryItemDto, PillVisibilityDto,
-    SaveWorkspaceSettingsInput, StylePresetDto, WorkspaceSettingsDto, WorkspaceSnapshot,
+    SaveWorkspaceSettingsInput, StylePresetDto, UpdateDictionaryEntryInput, WorkspaceSettingsDto,
+    WorkspaceSnapshot,
 };
 
 const HISTORY_LIMIT: u32 = 200;
@@ -91,6 +92,43 @@ pub fn delete_dictionary_entry(entry_id: i32) -> Result<WorkspaceSnapshot, Strin
         .map_err(|e| format!("delete dictionary entry: {e}"))?;
     if !deleted {
         return Err(format!("dictionary entry not found: {entry_id}"));
+    }
+
+    let settings = load_settings(&paths)?;
+    build_snapshot(settings, &mut database)
+}
+
+pub fn update_dictionary_entry(
+    input: UpdateDictionaryEntryInput,
+) -> Result<WorkspaceSnapshot, String> {
+    if input.id <= 0 {
+        return Err("entry id must be a positive integer".into());
+    }
+    let paths = resolve_paths()?;
+    let phrase = input.phrase.trim();
+    let replacement = input.replacement.trim();
+    if phrase.is_empty() || replacement.is_empty() {
+        return Err("phrase and replacement are required".into());
+    }
+    if phrase.len() > DICT_ENTRY_MAX_LEN || replacement.len() > DICT_ENTRY_MAX_LEN {
+        return Err(format!(
+            "dictionary entries must be at most {DICT_ENTRY_MAX_LEN} characters"
+        ));
+    }
+    if phrase
+        .chars()
+        .chain(replacement.chars())
+        .any(|c| c.is_control() && c != '\n' && c != '\t')
+    {
+        return Err("dictionary entries must not contain control characters".into());
+    }
+
+    let mut database = open_database(&paths)?;
+    let updated = database
+        .update_dictionary_entry(input.id, phrase, replacement, input.priority)
+        .map_err(|e| format!("update dictionary entry: {e}"))?;
+    if !updated {
+        return Err(format!("dictionary entry not found: {}", input.id));
     }
 
     let settings = load_settings(&paths)?;

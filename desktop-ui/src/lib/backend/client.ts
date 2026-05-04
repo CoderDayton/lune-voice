@@ -27,6 +27,12 @@ const tauriBackendClient: BackendClient = {
     });
   },
 
+  updateDictionaryEntry(id, phrase, replacement, priority) {
+    return invoke<BackendWorkspaceSnapshot>("update_dictionary_entry", {
+      input: { id, phrase, replacement, priority },
+    });
+  },
+
   deleteDictionaryEntry(id) {
     return invoke<BackendWorkspaceSnapshot>("delete_dictionary_entry", { entryId: id });
   },

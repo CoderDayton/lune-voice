@@ -175,6 +175,26 @@ impl Database {
         Ok(count > 0)
     }
 
+    pub fn update_dictionary_entry(
+        &mut self,
+        entry_id: i32,
+        phrase: &str,
+        replacement: &str,
+        priority: u8,
+    ) -> PersistResult<bool> {
+        use self::schema::dictionary;
+        let priority_val = i32::from(priority);
+        let count = diesel::update(dictionary::table.filter(dictionary::id.eq(entry_id)))
+            .set((
+                dictionary::phrase.eq(phrase),
+                dictionary::replacement.eq(replacement),
+                dictionary::priority.eq(priority_val),
+                dictionary::updated_at.eq(Utc::now().to_rfc3339()),
+            ))
+            .execute(&mut self.conn)?;
+        Ok(count > 0)
+    }
+
     // ── Snippet CRUD ─────────────────────────────────────────────────────
 
     pub fn insert_snippet(

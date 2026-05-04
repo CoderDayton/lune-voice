@@ -139,6 +139,15 @@ pub struct CreateDictionaryEntryInput {
     pub priority: u8,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateDictionaryEntryInput {
+    pub id: i32,
+    pub phrase: String,
+    pub replacement: String,
+    pub priority: u8,
+}
+
 // ── Stream events ────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize)]

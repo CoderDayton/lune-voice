@@ -111,6 +111,7 @@ pub fn run() {
             commands::save_workspace_settings,
             commands::create_dictionary_entry,
             commands::delete_dictionary_entry,
+            commands::update_dictionary_entry,
             commands::subscribe_session_stream,
             commands::detach_session_stream,
             commands::start_dictation,
