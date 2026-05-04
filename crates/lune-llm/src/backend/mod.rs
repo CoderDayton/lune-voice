@@ -1,5 +1,6 @@
 //! LLM backend implementations.
 
+pub mod kv_cache;
 pub mod null;
 pub mod openai;
 pub mod ort_llm;

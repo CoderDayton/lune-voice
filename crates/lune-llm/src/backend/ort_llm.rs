@@ -66,6 +66,8 @@ pub struct OrtStyleLlm {
     max_new_tokens: usize,
     params: ModelParams,
     sampling_params: super::sampler::SamplingParams,
+    kv_cache: std::sync::Mutex<super::kv_cache::KvCache>,
+    cached_prefix_hash: std::sync::Mutex<u64>,
 }
 
 fn e(msg: impl std::fmt::Display) -> Error {
@@ -260,6 +262,14 @@ impl OrtStyleLlm {
             ..Default::default()
         };
 
+        let kv_cache = super::kv_cache::KvCache::new(super::kv_cache::KvCacheConfig {
+            num_layers: params.num_layers,
+            num_kv_heads: params.num_kv_heads,
+            head_dim: params.head_dim,
+            is_f16: params.kv_is_f16,
+            ..Default::default()
+        });
+
         info!(model = %files.decoder.display(), split = embed_session.is_some(), "style LLM loaded");
         Ok(Self {
             session: Mutex::new(session),
@@ -268,6 +278,8 @@ impl OrtStyleLlm {
             max_new_tokens: config.max_new_tokens,
             params,
             sampling_params,
+            kv_cache: std::sync::Mutex::new(kv_cache),
+            cached_prefix_hash: std::sync::Mutex::new(0),
         })
     }
 
@@ -286,11 +298,24 @@ impl OrtStyleLlm {
         _style: &lune_core::config::StylePreset,
         uncertain_words: &[(String, usize)],
     ) -> Result<String> {
+        use std::hash::{Hash, Hasher};
         let system = lune_core::config::BASE_SYSTEM_PROMPT.replace("{lang}", language);
         let user_text = Self::user_prompt(transcript, language, uncertain_words);
 
-        let ids = self.build_chat_ids(&system, &user_text)?;
-        let out = self.generate(&ids)?;
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        system.hash(&mut hasher);
+        let sys_hash = hasher.finish();
+
+        {
+            let mut prev = self.cached_prefix_hash.lock().map_err(e)?;
+            if *prev != sys_hash {
+                self.kv_cache.lock().map_err(e)?.clear_prefix();
+                *prev = sys_hash;
+            }
+        }
+
+        let (ids, sys_prefix_len) = self.build_chat_ids(&system, &user_text)?;
+        let out = self.generate(&ids, sys_prefix_len)?;
         let text = self
             .tokenizer
             .decode(&out, true)
@@ -307,7 +332,8 @@ impl OrtStyleLlm {
         Ok(enc.get_ids().iter().map(|&id| id as i64).collect())
     }
 
-    fn build_chat_ids(&self, system: &str, user_text: &str) -> Result<Vec<i64>> {
+    /// Returns `(token_ids, system_prefix_len)`.
+    fn build_chat_ids(&self, system: &str, user_text: &str) -> Result<(Vec<i64>, usize)> {
         match (&self.params.chat_format, &self.params.chat_tokens) {
             (ChatFormat::ChatML, Some(ct)) => {
                 let sys_ids = self.tokenize_text(system)?;
@@ -321,6 +347,7 @@ impl OrtStyleLlm {
                 ids.extend(sys_ids);
                 ids.push(ct.im_end);
                 ids.push(ct.newline);
+                let sys_prefix_len = ids.len();
                 ids.push(ct.im_start);
                 ids.extend(self.tokenize_text("user")?);
                 ids.push(ct.newline);
@@ -330,18 +357,24 @@ impl OrtStyleLlm {
                 ids.push(ct.im_start);
                 ids.extend(self.tokenize_text("assistant")?);
                 ids.push(ct.newline);
-                Ok(ids)
+                Ok((ids, sys_prefix_len))
             }
             _ => {
-                // Fallback: encode the whole string (Llama or missing chat tokens)
-                let prompt = format!(
+                let sys_prompt = format!(
                     "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n\
-                     {system}<|eot_id|>\
-                     <|start_header_id|>user<|end_header_id|>\n\n\
+                     {system}<|eot_id|>"
+                );
+                let sys_ids = self.tokenize_text(&sys_prompt)?;
+                let sys_prefix_len = sys_ids.len();
+                let user_prompt = format!(
+                    "<|start_header_id|>user<|end_header_id|>\n\n\
                      {user_text}<|eot_id|>\
                      <|start_header_id|>assistant<|end_header_id|>\n\n"
                 );
-                self.tokenize_text(&prompt)
+                let user_ids = self.tokenize_text(&user_prompt)?;
+                let mut ids = sys_ids;
+                ids.extend(user_ids);
+                Ok((ids, sys_prefix_len))
             }
         }
     }
@@ -358,30 +391,71 @@ impl OrtStyleLlm {
         Ok(Some(outputs.into_iter().next().unwrap().1))
     }
 
-    fn generate(&self, prompt_ids: &[i64]) -> Result<Vec<u32>> {
+    fn generate(&self, prompt_ids: &[i64], sys_prefix_len: usize) -> Result<Vec<u32>> {
         use super::sampler::{DecodeState, SamplerWorkspace, sample_last_token};
 
         let p = &self.params;
         let mut session = self.session.lock().map_err(e)?;
-        let n = prompt_ids.len();
         let split = self.embed_session.is_some();
 
         let mut state = DecodeState::default();
         let mut ws = SamplerWorkspace::default();
         let mut rng = rand::rng();
-
-        // ── Prefill ─────────────────────────────────────────────────────
-        let mut inputs = if split {
-            let embeds = self.embed_ids(prompt_ids)?.unwrap();
-            build_embeds_inputs(embeds, n, p.has_position_ids)?
-        } else {
-            build_inputs(prompt_ids, n, p.has_position_ids)?
-        };
         let names = llm_kv_names(p.num_layers);
-        for i in 0..p.num_layers {
-            let (k, v) = empty_kv(p.num_kv_heads, p.head_dim, p.kv_is_f16)?;
-            inputs.push((std::borrow::Cow::Borrowed(names[i * 2].as_str()), k));
-            inputs.push((std::borrow::Cow::Borrowed(names[i * 2 + 1].as_str()), v));
+
+        // ── Acquire or build prefix KV ──────────────────────────────────
+        let mut cache = self.kv_cache.lock().map_err(e)?;
+        let prefix_seq_len;
+
+        if !cache.has_prefix() && sys_prefix_len > 0 {
+            // First call: prefill system prefix alone to build the frozen cache.
+            let prefix_ids = &prompt_ids[..sys_prefix_len];
+            let pn = prefix_ids.len();
+            let mut inputs = if split {
+                let embeds = self.embed_ids(prefix_ids)?.unwrap();
+                build_embeds_inputs(embeds, pn, p.has_position_ids)?
+            } else {
+                build_inputs(prefix_ids, pn, p.has_position_ids)?
+            };
+            for i in 0..p.num_layers {
+                let (k, v) = empty_kv(p.num_kv_heads, p.head_dim, p.kv_is_f16)?;
+                inputs.push((std::borrow::Cow::Borrowed(names[i * 2].as_str()), k));
+                inputs.push((std::borrow::Cow::Borrowed(names[i * 2 + 1].as_str()), v));
+            }
+            let outputs = session.run(inputs).map_err(e)?;
+            let raw_kv: Vec<DynValue> = outputs.into_iter().skip(1).map(|(_, v)| v).collect();
+            cache.freeze_prefix(raw_kv)?;
+        }
+
+        // ── Prefill user portion with cached prefix KV ──────────────────
+        let has_prefix = cache.has_prefix();
+        let (prefill_ids, initial_kv) = if has_prefix && sys_prefix_len > 0 {
+            let cached_kv = cache.prefix_kv()?;
+            prefix_seq_len = cache.prefix_len();
+            (&prompt_ids[sys_prefix_len..], cached_kv)
+        } else {
+            prefix_seq_len = 0;
+            let mut empty = Vec::with_capacity(p.num_layers * 2);
+            for _ in 0..p.num_layers {
+                let (k, v) = empty_kv(p.num_kv_heads, p.head_dim, p.kv_is_f16)?;
+                empty.push(k);
+                empty.push(v);
+            }
+            (prompt_ids, empty)
+        };
+        drop(cache);
+
+        let user_len = prefill_ids.len();
+        let total_prefill = prefix_seq_len + user_len;
+
+        let mut inputs = if split {
+            let embeds = self.embed_ids(prefill_ids)?.unwrap();
+            build_embeds_inputs_with_past(embeds, user_len, prefix_seq_len, p.has_position_ids)?
+        } else {
+            build_inputs_with_past(prefill_ids, user_len, prefix_seq_len, p.has_position_ids)?
+        };
+        for (i, kv_val) in initial_kv.into_iter().enumerate() {
+            inputs.push((std::borrow::Cow::Borrowed(names[i].as_str()), kv_val));
         }
 
         let outputs = session.run(inputs).map_err(e)?;
@@ -403,7 +477,7 @@ impl OrtStyleLlm {
         let max = self.max_new_tokens;
         for _ in 1..max {
             let tok = *state.generated.last().unwrap() as i64;
-            let total = n + state.generated.len();
+            let total = total_prefill + state.generated.len();
 
             let mut inputs = if split {
                 let embeds = self.embed_ids(&[tok])?.unwrap();
@@ -758,6 +832,45 @@ fn build_decode_inputs(
     ];
     if position_ids {
         let pos = Array2::from_shape_vec((1, 1), vec![(total_len - 1) as i64]).map_err(e)?;
+        out.push(("position_ids".into(), dyn_i64(pos)?));
+    }
+    Ok(out)
+}
+
+fn build_inputs_with_past(
+    ids: &[i64],
+    seq_len: usize,
+    past_len: usize,
+    position_ids: bool,
+) -> Result<Inputs<'static>> {
+    let input_ids = Array2::from_shape_vec((1, seq_len), ids.to_vec()).map_err(e)?;
+    let mask = Array2::<i64>::ones((1, past_len + seq_len));
+    let mut out = vec![
+        ("input_ids".into(), dyn_i64(input_ids)?),
+        ("attention_mask".into(), dyn_i64(mask)?),
+    ];
+    if position_ids {
+        let pos: Vec<i64> = (past_len..past_len + seq_len).map(|i| i as i64).collect();
+        let pos = Array2::from_shape_vec((1, seq_len), pos).map_err(e)?;
+        out.push(("position_ids".into(), dyn_i64(pos)?));
+    }
+    Ok(out)
+}
+
+fn build_embeds_inputs_with_past(
+    embeds: DynValue,
+    seq_len: usize,
+    past_len: usize,
+    position_ids: bool,
+) -> Result<Inputs<'static>> {
+    let mask = Array2::<i64>::ones((1, past_len + seq_len));
+    let mut out = vec![
+        ("inputs_embeds".into(), embeds),
+        ("attention_mask".into(), dyn_i64(mask)?),
+    ];
+    if position_ids {
+        let pos: Vec<i64> = (past_len..past_len + seq_len).map(|i| i as i64).collect();
+        let pos = Array2::from_shape_vec((1, seq_len), pos).map_err(e)?;
         out.push(("position_ids".into(), dyn_i64(pos)?));
     }
     Ok(out)
