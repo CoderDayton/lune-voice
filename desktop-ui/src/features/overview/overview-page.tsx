@@ -35,7 +35,7 @@ export function OverviewPage() {
       <div className="page-stack">
         <section className="panel-surface">
           <div className="card-body gap-5 p-5 sm:p-6">
-            <div className="flex flex-wrap items-center gap-2 text-sm">
+            <div className="flex flex-wrap items-center gap-3 text-base">
               <StatusBadge variant={isLoading ? "warning" : isConnected ? "success" : "error"}>
                 {isLoading ? t`Connecting` : isConnected ? t`Ready` : t`Disconnected`}
               </StatusBadge>
@@ -95,7 +95,7 @@ export function OverviewPage() {
             <div className="flex items-center justify-between px-5 pb-3 pt-5">
               <div>
                 <h2 className="section-label">{t`Recent`}</h2>
-                <p className="mt-1 text-sm text-content-muted">
+                <p className="mt-1 text-base text-content-muted">
                   {stats.count} {stats.count === 1 ? t`session` : t`sessions`}
                 </p>
               </div>
@@ -108,7 +108,7 @@ export function OverviewPage() {
             {showSkeleton ? (
               <div className="divide-y divide-surface-border">
                 {[0, 1, 2].map((i) => (
-                  <div key={i} className="px-5 py-4 flex flex-col gap-2">
+                  <div key={i} className="px-5 py-4 flex flex-col gap-3">
                     <span className="skeleton-shimmer h-3 w-16" />
                     <span className="skeleton-shimmer h-4 w-full" />
                     <span className="skeleton-shimmer h-4 w-3/4" />
@@ -119,10 +119,10 @@ export function OverviewPage() {
             ) : recentSessions.length === 0 && !isActive ? (
               <div className="flex flex-col items-center justify-center px-5 py-14 text-center sm:py-16">
                 <div className="token-icon mb-4 size-16 rounded-full sm:size-20">
-                  <Mic className="size-8 sm:size-10" strokeWidth={1.2} />
+                  <Mic className="size-9 sm:size-11" strokeWidth={1.2} />
                 </div>
                 <p className="text-sm font-medium text-content-muted">{t`No sessions yet`}</p>
-                <p className="mt-1 text-xs text-content-subtle">
+                <p className="mt-1 text-sm text-content-subtle">
                   {t`Press`} <kbd className="kbd kbd-xs">{hotkeyToggle || t`your hotkey`}</kbd> {t`to start dictating`}
                 </p>
               </div>
@@ -137,12 +137,12 @@ export function OverviewPage() {
                     <SessionDetailModal key={session.id} session={session}>
                       {(open) => (
                         <article className="interactive-row block px-5 py-4" onClick={open}>
-                          <div className="pt-1 text-xs tabular-nums text-content-subtle">{time}</div>
+                          <div className="pt-1 text-sm tabular-nums text-content-subtle">{time}</div>
                           <div className="min-w-0">
-                            <p className="text-sm leading-6 break-words text-content">
+                            <p className="text-base leading-6 break-words text-content">
                               {session.transcript || t`Empty session`}
                             </p>
-                            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-content-muted">
+                            <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-content-muted">
                               <span className="badge badge-ghost badge-sm">{session.words} {t`words`}</span>
                               <span>{session.seconds}{t`s`}</span>
                             </div>

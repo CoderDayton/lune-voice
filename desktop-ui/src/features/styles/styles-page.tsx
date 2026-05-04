@@ -11,19 +11,19 @@ export function StylesPage() {
 
   return (
     <div className="page-stack">
-      <div className="flex items-center gap-3 mb-2">
+      <div className="flex items-center gap-4 mb-2">
         <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/8">
           <Paintbrush size={18} strokeWidth={1.8} className="text-primary/60" />
         </div>
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">{t`Writing styles`}</h2>
+          <h2 className="text-xl font-semibold tracking-tight">{t`Writing styles`}</h2>
           <p className="text-sm text-content-subtle mt-0.5">
             {t`Choose the tone and formatting applied to your transcriptions.`}
           </p>
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {loading && presets.length === 0
           ? [0, 1, 2].map((i) => (
               <div
@@ -51,7 +51,7 @@ export function StylesPage() {
                     <span className="font-medium">{preset.name}</span>
                     {isActive && <Check size={16} className="text-primary" />}
                   </div>
-                  <p className="text-xs text-content-subtle">{preset.description}</p>
+                  <p className="text-sm text-content-subtle">{preset.description}</p>
                 </button>
               );
             })}

@@ -252,7 +252,9 @@ fn spawn_evdev_hotkeys(app: &tauri::App) -> Result<(), Box<dyn std::error::Error
                     let _ = rt.stop_and_wait_dictation().await;
                 }
                 hotkey_linux::HotkeyAction::Cancel => {
-                    let _ = rt.cancel_dictation().await;
+                    if rt.is_active().await {
+                        let _ = rt.cancel_dictation().await;
+                    }
                 }
             }
         }

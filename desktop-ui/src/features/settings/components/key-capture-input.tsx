@@ -102,13 +102,13 @@ export function KeyCaptureInput({
       </button>
 
       {listening && !validationError && (
-        <p className="text-xs text-content-subtle">
-          Press your combo — <kbd className="kbd kbd-xs">Esc</kbd> to cancel
+        <p className="text-sm text-content-subtle">
+          Press your combo — <kbd className="kbd kbd-sm">Esc</kbd> to cancel
         </p>
       )}
 
       {validationError && (
-        <p id="key-capture-error" className="text-xs text-error max-w-52 sm:max-w-64 text-right">
+        <p id="key-capture-error" className="text-sm text-error max-w-52 sm:max-w-64 text-right">
           {validationError}
         </p>
       )}

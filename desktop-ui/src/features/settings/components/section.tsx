@@ -29,8 +29,8 @@ export function SettingsSection({ title, description, icon: Icon, children }: Se
             </div>
           )}
           <div>
-            <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
-            <p className="text-sm text-content-subtle mt-0.5">{description}</p>
+            <h3 className="text-xl font-semibold tracking-tight">{title}</h3>
+            <p className="text-base text-content-subtle mt-0.5">{description}</p>
           </div>
         </div>
       </div>
@@ -43,8 +43,8 @@ export function SettingsRow({ label, description, control }: SettingsRowProps) {
   return (
     <div className="settings-row">
       <div className="min-w-0">
-        <div className="text-sm font-medium">{label}</div>
-        {description ? <div className="text-xs text-content-subtle mt-0.5 max-w-md">{description}</div> : null}
+        <div className="text-base font-medium">{label}</div>
+        {description ? <div className="text-sm text-content-subtle mt-0.5 max-w-md">{description}</div> : null}
       </div>
       <div className="shrink-0">{control}</div>
     </div>

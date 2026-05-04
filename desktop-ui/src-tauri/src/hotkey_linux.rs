@@ -279,7 +279,6 @@ struct HotkeyState {
     cancel_trigger: KeyCode,
     cancel_mods: Vec<Modifier>,
     hold_active: bool,
-    toggle_active: bool,
 }
 
 impl HotkeyState {
@@ -296,7 +295,6 @@ impl HotkeyState {
             cancel_trigger,
             cancel_mods,
             hold_active: false,
-            toggle_active: false,
         }
     }
 
@@ -324,9 +322,7 @@ impl HotkeyState {
             && self.mods_down(&self.cancel_mods)
             && !self.extra_mods(&self.cancel_mods)
             && mode == ActivationMode::Toggle
-            && self.toggle_active
         {
-            self.toggle_active = false;
             return Some(HotkeyAction::Cancel);
         }
 
@@ -337,7 +333,6 @@ impl HotkeyState {
         match mode {
             ActivationMode::Toggle => {
                 if !was_trigger && trigger && exact {
-                    self.toggle_active = !self.toggle_active;
                     return Some(HotkeyAction::Toggle);
                 }
             }

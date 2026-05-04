@@ -42,7 +42,7 @@ export function ConfirmDialog({
         aria-labelledby={titleId}
       >
         <div className="modal-box">
-          <h3 id={titleId} className="text-lg font-bold">{title}</h3>
+          <h3 id={titleId} className="text-xl font-bold">{title}</h3>
           <p className="py-4 text-sm text-content-muted">{description}</p>
           <div className="modal-action">
             <form method="dialog">

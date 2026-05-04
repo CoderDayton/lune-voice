@@ -16,7 +16,7 @@ export function ErrorToast() {
         <span className="text-sm">{error}</span>
         <button
           type="button"
-          className="btn btn-ghost btn-xs btn-circle"
+          className="btn btn-ghost btn-sm btn-circle"
           aria-label={t`Dismiss error`}
           onClick={() => workspaceActions.setError(null)}
         >

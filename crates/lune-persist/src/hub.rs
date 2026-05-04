@@ -96,7 +96,7 @@ impl ModelSpec {
     pub fn style_llm() -> Self {
         Self::Directory {
             repo_id: "onnx-community/Qwen3-0.6B-ONNX".into(),
-            required_files: vec!["tokenizer.json".into(), "onnx/model_q4f16.onnx".into()],
+            required_files: vec!["tokenizer.json".into(), "model_q4f16.onnx".into()],
             suffix_patterns: vec![],
             local_name: model_dirs::DIR_STYLE_LLM.into(),
             description: "Style & correction LLM. Fixes grammar and reformats transcripts.",

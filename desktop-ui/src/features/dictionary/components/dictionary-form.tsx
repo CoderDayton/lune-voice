@@ -30,7 +30,7 @@ export function DictionaryForm() {
   return (
     <form action={submitAction}>
       <section className="card border border-surface-border bg-surface-card rounded-box p-5 sm:p-6">
-        <h3 className="text-lg font-semibold tracking-tight mb-4"><Trans>Add correction rule</Trans></h3>
+        <h3 className="text-xl font-semibold tracking-tight mb-4"><Trans>Add correction rule</Trans></h3>
         <fieldset className="flex flex-col sm:flex-row gap-3 items-end" disabled={isPending}>
           <label className="form-control flex-1">
             <div className="label"><span className="label-text"><Trans>Spoken phrase</Trans></span></div>

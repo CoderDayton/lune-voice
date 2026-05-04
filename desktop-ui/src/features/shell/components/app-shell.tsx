@@ -68,7 +68,7 @@ export function AppShell() {
         <main id="main-content" className="flex-1 overflow-y-auto">
           <div className="app-scroll">
             <div className="app-frame">
-              <h1 className="mb-6 text-2xl font-bold tracking-tight text-balance select-none sm:text-3xl">
+              <h1 className="mb-6 text-3xl font-bold tracking-tight text-balance select-none sm:text-3xl">
                 {page.label}
               </h1>
               <Outlet />

@@ -154,7 +154,7 @@ export function ModelsSection() {
                 {model.ready ? (
                   <button
                     type="button"
-                    className="btn btn-ghost btn-xs text-error"
+                    className="btn btn-ghost btn-sm text-error"
                     onClick={() => handleDeleteClick(model)}
                   >
                     <Trash2 size={13} />
@@ -163,7 +163,7 @@ export function ModelsSection() {
                 ) : (
                   <button
                     type="button"
-                    className="btn btn-primary btn-xs"
+                    className="btn btn-primary btn-sm whitespace-nowrap"
                     onClick={() => handleDownload(model.localName)}
                     disabled={!!downloading}
                   >
@@ -177,13 +177,13 @@ export function ModelsSection() {
                 )}
               </div>
               {model.description && (
-                <p className="text-xs text-content-subtle flex gap-1.5 items-start">
+                <p className="text-sm text-content-subtle flex gap-1.5 items-start">
                   <Info size={12} className="mt-0.5 shrink-0" />
                   {model.description}
                 </p>
               )}
               {progressText && (
-                <p className="text-xs text-content-subtle">{progressText}</p>
+                <p className="text-sm text-content-subtle">{progressText}</p>
               )}
             </div>
           );

@@ -34,8 +34,8 @@ export function ModelCard({
         : "bg-base-200 opacity-60"
       }`}
     >
-      <div className="card-body flex-row items-center gap-2 sm:gap-3">
-        <div className={`flex size-8 sm:size-9 shrink-0 items-center justify-center rounded-field ${
+      <div className="card-body flex-row items-center gap-3 sm:gap-4">
+        <div className={`flex size-9 sm:size-10 shrink-0 items-center justify-center rounded-field ${
           ready ? "bg-success/15"
           : active ? "bg-primary/15"
           : selected ? "bg-primary/10"
@@ -54,9 +54,9 @@ export function ModelCard({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <p className="font-medium text-xs sm:text-sm">{name}</p>
+            <p className="font-medium text-sm sm:text-base">{name}</p>
             {required && (
-              <span className="badge badge-xs badge-outline text-content-dim">{t`Required`}</span>
+              <span className="badge badge-sm badge-outline text-content-dim">{t`Required`}</span>
             )}
           </div>
           {active && progress ? (
@@ -65,7 +65,7 @@ export function ModelCard({
               <p className="text-xs text-content-dim mt-0.5 truncate">{progress.fileName}</p>
             </div>
           ) : (
-            <p className="text-xs text-content-subtle mt-0.5 hidden sm:block">{description}</p>
+            <p className="text-base text-content-subtle mt-0.5 hidden sm:block">{description}</p>
           )}
         </div>
 

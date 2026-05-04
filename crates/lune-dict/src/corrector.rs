@@ -44,6 +44,7 @@ const MAX_WED: f32 = 2.5;
 //   Distant candidates (WED > 1.5): C_fp/C_fn ≈ 2.3 → threshold = 2.3/3.3 ≈ 0.70
 //   Unknown-only (no HWCE flag): moderate → 0.50
 const CLOSE_THRESHOLD: f32 = 0.55;
+const KNOWN_WORD_THRESHOLD: f32 = 0.72;
 const UNKNOWN_ONLY_THRESHOLD: f32 = 0.50;
 
 // HWCE flag threshold: words with risk above this are considered uncertain
@@ -162,6 +163,7 @@ impl HeuristicCorrector {
 
             let both = is_unknown && flagged;
             let unknown_only = is_unknown && !flagged;
+            let known_but_flagged = !is_unknown && flagged;
             // Risk-proportional boost: scale excess risk into candidate score space
             let risk_boost = if both {
                 (risk_score - HWCE_FLAG_THRESHOLD).max(0.0) * 0.75
@@ -178,7 +180,9 @@ impl HeuristicCorrector {
                 // Never correct garbage into a distant guess — leave for LLM
                 if !is_distant {
                     let score = base_score + risk_boost;
-                    let threshold = if unknown_only {
+                    let threshold = if known_but_flagged {
+                        KNOWN_WORD_THRESHOLD
+                    } else if unknown_only {
                         UNKNOWN_ONLY_THRESHOLD
                     } else {
                         CLOSE_THRESHOLD
@@ -238,7 +242,7 @@ impl HeuristicCorrector {
                 &cand_lower
             };
 
-            if !cand.is_curated && !plausible_candidate(word, candidate) {
+            if !plausible_candidate(word, candidate) {
                 continue;
             }
 
@@ -280,8 +284,8 @@ impl HeuristicCorrector {
 
         // ── Language model: P(cor | context) via n-gram ──
         let ngram_context = self.ngram_context_score(candidate, prev, next);
-        const FREQ_WEIGHT: f32 = 0.35;
-        const NGRAM_WEIGHT: f32 = 0.65;
+        const FREQ_WEIGHT: f32 = 0.50;
+        const NGRAM_WEIGHT: f32 = 0.50;
         let lang_model = FREQ_WEIGHT * freq_score + NGRAM_WEIGHT * ngram_context;
 
         // ── Posterior: Hölder mean (p=2) ──
@@ -381,7 +385,13 @@ fn is_subsequence(needle: &str, haystack: &str) -> bool {
 }
 
 fn plausible_candidate(word: &str, candidate: &str) -> bool {
-    if word.len().abs_diff(candidate.len()) > 2 {
+    let len_diff = word.len().abs_diff(candidate.len());
+    if len_diff > 2 {
+        return false;
+    }
+    // Very short words (≤3 chars) need exact length match to avoid
+    // spurious expansions like "so" → "sso", "the" → "thee".
+    if word.len() <= 3 && len_diff > 0 {
         return false;
     }
 

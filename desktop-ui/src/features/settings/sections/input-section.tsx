@@ -17,7 +17,7 @@ export function InputSection({ settings }: SettingsProps) {
         description={t`Toggle is easiest for longer dictation. Hold is better for quick bursts.`}
         control={
           <select
-            className="select w-full sm:w-auto sm:min-w-52"
+            className="select w-full sm:w-auto sm:min-w-56"
             value={settings.activationMode}
             onChange={(event) => void saveWorkspaceSetting("activationMode", event.target.value as typeof settings.activationMode)}
           >
@@ -37,7 +37,7 @@ export function InputSection({ settings }: SettingsProps) {
           <div className="flex items-center gap-3">
             <input
               type="range"
-              className="range range-primary range-xs w-28 sm:w-36"
+              className="range range-primary range-sm w-28 sm:w-36"
               min={0.2}
               max={0.9}
               step={0.05}
@@ -45,7 +45,7 @@ export function InputSection({ settings }: SettingsProps) {
               onChange={(e) => setThreshold(e.target.value)}
               aria-label={t`Pause sensitivity`}
             />
-            <span className="text-xs tabular-nums text-content-muted w-8 text-right">
+            <span className="text-sm tabular-nums text-content-muted w-8 text-right">
               {Number(threshold) < 0.35 ? t`Slow` : Number(threshold) > 0.65 ? t`Fast` : t`Mid`}
             </span>
           </div>

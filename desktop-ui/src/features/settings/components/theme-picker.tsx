@@ -84,7 +84,7 @@ function ThemeSwatch({ theme, active, onSelect }: { theme: string; active: boole
           <Check size={12} strokeWidth={3} />
         </div>
       )}
-      <span className="text-xs font-medium truncate">
+      <span className="text-sm font-medium truncate">
         {themeLabel(theme)}
       </span>
       <div className="flex gap-1">
@@ -141,8 +141,8 @@ export function ThemePicker() {
           <div className="overflow-y-auto max-h-[70vh] px-4 py-4 sm:px-6 sm:py-5 space-y-5 sm:space-y-6">
             {/* Custom */}
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-content-subtle mb-2 sm:mb-3">{t`Lune`}</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
+              <p className="text-sm font-semibold uppercase tracking-wider text-content-subtle mb-2 sm:mb-3">{t`Lune`}</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
                 {THEME_GROUPS.custom.map((t) => (
                   <ThemeSwatch key={t} theme={t} active={current === t} onSelect={() => handleSelect(t)} />
                 ))}
@@ -162,7 +162,7 @@ export function ThemePicker() {
                       <Check size={12} strokeWidth={3} />
                     </div>
                   )}
-                  <span className="text-xs font-medium">{t`System`}</span>
+                  <span className="text-sm font-medium">{t`System`}</span>
                   <div className="flex gap-1">
                     {["oklch(0.74 0.018 245)", "oklch(0.62 0.025 250)", "oklch(0.68 0.035 70)", "oklch(0.88 0.008 225)"].map((color) => (
                       <div
@@ -178,8 +178,8 @@ export function ThemePicker() {
 
             {/* Light themes */}
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-content-subtle mb-2 sm:mb-3">{t`Light`}</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
+              <p className="text-sm font-semibold uppercase tracking-wider text-content-subtle mb-2 sm:mb-3">{t`Light`}</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
                 {THEME_GROUPS.light.map((t) => (
                   <ThemeSwatch key={t} theme={t} active={current === t} onSelect={() => handleSelect(t)} />
                 ))}
@@ -188,8 +188,8 @@ export function ThemePicker() {
 
             {/* Dark themes */}
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-content-subtle mb-2 sm:mb-3">{t`Dark`}</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
+              <p className="text-sm font-semibold uppercase tracking-wider text-content-subtle mb-2 sm:mb-3">{t`Dark`}</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
                 {THEME_GROUPS.dark.map((t) => (
                   <ThemeSwatch key={t} theme={t} active={current === t} onSelect={() => handleSelect(t)} />
                 ))}

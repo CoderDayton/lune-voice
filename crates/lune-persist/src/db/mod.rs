@@ -104,10 +104,13 @@ impl Database {
     #[cold]
     #[inline(never)]
     fn run_migrations(&mut self) -> PersistResult<()> {
-        self.conn
+        let applied = self
+            .conn
             .run_pending_migrations(MIGRATIONS)
             .map_err(|e| PersistError::Migration(e.to_string()))?;
-        tracing::info!("database migrations applied");
+        if !applied.is_empty() {
+            tracing::info!(count = applied.len(), "database migrations applied");
+        }
         Ok(())
     }
 

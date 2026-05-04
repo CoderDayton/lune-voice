@@ -42,6 +42,9 @@ impl<'a> CandidateSource<'a> {
         }
 
         for candidate in crate::lexicon::vocab_candidates_by_len(lo, hi) {
+            if !viable_vocab_candidate(&lower, candidate) {
+                continue;
+            }
             let freq_score = lexicon.candidate_freq_score(candidate);
             push_or_replace_candidate(&mut entries, &mut seen, &lower, candidate, freq_score);
         }
@@ -58,6 +61,17 @@ impl<'a> Iterator for CandidateSource<'a> {
         self.pos += 1;
         Some(entry)
     }
+}
+
+fn viable_vocab_candidate(original_lower: &str, candidate: &str) -> bool {
+    let is_acronym = candidate.len() >= 2 && candidate.chars().all(|c| c.is_ascii_uppercase());
+    if is_acronym && original_lower.chars().all(|c| c.is_ascii_lowercase()) {
+        return false;
+    }
+    if original_lower.len() <= 3 && candidate.len() != original_lower.len() {
+        return false;
+    }
+    true
 }
 
 fn push_lowercase_candidate<'a>(

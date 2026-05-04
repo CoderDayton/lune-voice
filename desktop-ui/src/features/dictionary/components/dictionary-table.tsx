@@ -30,8 +30,8 @@ export function DictionaryTable() {
         <tbody>
           {entries.map((entry) => (
             <tr key={entry.id} className="hover">
-              <td className="font-mono text-sm">{entry.phrase}</td>
-              <td className="font-mono text-sm">{entry.replacement}</td>
+              <td className="font-mono text-base">{entry.phrase}</td>
+              <td className="font-mono text-base">{entry.replacement}</td>
               <td className="text-right">
                 <ConfirmDialog
                   title={t`Delete this word fix?`}

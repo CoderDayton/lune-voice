@@ -27,7 +27,8 @@ use crate::dto::SessionStreamEvent;
 
 const LOCAL_LLM_IDLE_TTL: Duration = Duration::from_secs(150);
 const HOLD_WARMUP_GRACE: Duration = Duration::from_millis(250);
-const ACTION_DEBOUNCE: Duration = Duration::from_millis(150);
+const TOGGLE_DEBOUNCE: Duration = Duration::from_millis(150);
+const CANCEL_DEBOUNCE: Duration = Duration::from_millis(80);
 
 pub struct AppRuntime {
     inner: Arc<RuntimeInner>,
@@ -43,8 +44,10 @@ struct RuntimeInner {
     settings: Arc<RwLock<UserSettings>>,
     /// Background thread that owns the uinput/clipboard handle.
     delivery: DeliveryService,
-    /// Debounce guard: timestamp of last successful toggle/start/stop action.
-    last_action_at: Mutex<Instant>,
+    /// Debounce guard: timestamp of last toggle/start/stop action.
+    last_toggle_at: Mutex<Instant>,
+    /// Separate debounce for cancel so it isn't blocked by a recent toggle.
+    last_cancel_at: Mutex<Instant>,
 }
 
 struct LivePipeline {
@@ -101,7 +104,8 @@ impl AppRuntime {
                 session_stream_seq: AtomicU64::new(0),
                 settings: Arc::clone(&settings),
                 delivery,
-                last_action_at: Mutex::new(Instant::now() - ACTION_DEBOUNCE),
+                last_toggle_at: Mutex::new(Instant::now() - TOGGLE_DEBOUNCE),
+                last_cancel_at: Mutex::new(Instant::now() - CANCEL_DEBOUNCE),
             }),
         };
 
@@ -261,7 +265,19 @@ impl AppRuntime {
         Ok(())
     }
 
+    pub async fn is_active(&self) -> bool {
+        self.inner.pipeline.lock().await.active
+    }
+
     pub async fn cancel_dictation(&self) -> Result<(), String> {
+        {
+            let mut last = self.inner.last_cancel_at.lock().await;
+            if last.elapsed() < CANCEL_DEBOUNCE {
+                debug!("cancel_dictation debounced");
+                return Ok(());
+            }
+            *last = Instant::now();
+        }
         if let Some(manager) = self.active_manager().await {
             manager.cancel().await;
         }
@@ -270,8 +286,8 @@ impl AppRuntime {
 
     pub async fn toggle_dictation(&self) -> Result<Option<String>, String> {
         {
-            let mut last = self.inner.last_action_at.lock().await;
-            if last.elapsed() < ACTION_DEBOUNCE {
+            let mut last = self.inner.last_toggle_at.lock().await;
+            if last.elapsed() < TOGGLE_DEBOUNCE {
                 debug!("toggle_dictation debounced");
                 return Ok(None);
             }
