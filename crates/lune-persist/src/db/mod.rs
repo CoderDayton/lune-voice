@@ -339,6 +339,13 @@ impl Database {
         Ok(())
     }
 
+    pub fn delete_session(&mut self, session_id: &str) -> PersistResult<bool> {
+        use self::schema::sessions::dsl::*;
+
+        let count = diesel::delete(sessions.filter(id.eq(session_id))).execute(&mut self.conn)?;
+        Ok(count > 0)
+    }
+
     /// Delete sessions whose `started_at` is older than `days` days ago.
     /// Returns the number of rows deleted.
     pub fn prune_sessions(&mut self, days: u32) -> PersistResult<usize> {
@@ -538,6 +545,71 @@ mod tests {
         let remaining = db.list_sessions(10).unwrap();
         assert_eq!(remaining.len(), 1);
         assert_eq!(remaining[0].id, new_session.id);
+    }
+
+    #[test]
+    fn session_delete() {
+        let mut db = Database::open_in_memory().unwrap();
+
+        let s1 = DictationSession {
+            id: Uuid::new_v4(),
+            started_at: Utc::now(),
+            ended_at: Some(Utc::now()),
+            style: "casual".into(),
+            backend: AsrBackendKind::Qwen3Asr,
+            status: SessionStatus::Completed,
+            transcript: Some("First session.".into()),
+        };
+        let s2 = DictationSession {
+            id: Uuid::new_v4(),
+            started_at: Utc::now(),
+            ended_at: Some(Utc::now()),
+            style: "formal".into(),
+            backend: AsrBackendKind::Qwen3Asr,
+            status: SessionStatus::Completed,
+            transcript: Some("Second session.".into()),
+        };
+        db.insert_session(&s1).unwrap();
+        db.insert_session(&s2).unwrap();
+        assert_eq!(db.list_sessions(10).unwrap().len(), 2);
+
+        let deleted = db.delete_session(&s1.id.to_string()).unwrap();
+        assert!(deleted);
+
+        let remaining = db.list_sessions(10).unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].id, s2.id);
+
+        // Verify it's really gone
+        assert!(db.get_session(s1.id).unwrap().is_none());
+    }
+
+    #[test]
+    fn session_delete_nonexistent_returns_false() {
+        let mut db = Database::open_in_memory().unwrap();
+
+        let deleted = db.delete_session(&Uuid::new_v4().to_string()).unwrap();
+        assert!(!deleted);
+    }
+
+    #[test]
+    fn session_delete_idempotent() {
+        let mut db = Database::open_in_memory().unwrap();
+
+        let session = DictationSession {
+            id: Uuid::new_v4(),
+            started_at: Utc::now(),
+            ended_at: None,
+            style: "casual".into(),
+            backend: AsrBackendKind::Qwen3Asr,
+            status: SessionStatus::Active,
+            transcript: None,
+        };
+        db.insert_session(&session).unwrap();
+
+        let id_str = session.id.to_string();
+        assert!(db.delete_session(&id_str).unwrap());
+        assert!(!db.delete_session(&id_str).unwrap());
     }
 
     #[test]

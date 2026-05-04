@@ -36,6 +36,10 @@ const tauriBackendClient: BackendClient = {
     return invoke<BackendWorkspaceSnapshot>('delete_dictionary_entry', { entryId: id });
   },
 
+  deleteSession(sessionId) {
+    return invoke<BackendWorkspaceSnapshot>('delete_session', { sessionId });
+  },
+
   startDictation() {
     return invoke<string>('start_dictation');
   },

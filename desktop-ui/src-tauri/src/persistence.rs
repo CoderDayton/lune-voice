@@ -81,6 +81,23 @@ pub fn create_dictionary_entry(
     build_snapshot(settings, &mut database)
 }
 
+pub fn delete_session(session_id: String) -> Result<WorkspaceSnapshot, String> {
+    if session_id.is_empty() {
+        return Err("session_id must not be empty".into());
+    }
+    let paths = resolve_paths()?;
+    let mut database = open_database(&paths)?;
+    let deleted = database
+        .delete_session(&session_id)
+        .map_err(|e| format!("delete session: {e}"))?;
+    if !deleted {
+        return Err(format!("session not found: {session_id}"));
+    }
+
+    let settings = load_settings(&paths)?;
+    build_snapshot(settings, &mut database)
+}
+
 pub fn delete_dictionary_entry(entry_id: i32) -> Result<WorkspaceSnapshot, String> {
     if entry_id <= 0 {
         return Err("entry_id must be a positive integer".into());
@@ -678,5 +695,12 @@ mod tests {
     fn validate_api_url_allows_ipv6_loopback_http() {
         let url = url::Url::parse("http://[::1]:8080/v1").unwrap();
         assert!(validate_api_url(&url, "openaiAsrBaseUrl").is_ok());
+    }
+
+    #[test]
+    fn delete_session_rejects_empty_id() {
+        let result = delete_session(String::new());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("must not be empty"));
     }
 }

@@ -244,6 +244,15 @@ export async function updateDictionaryEntry(
   }
 }
 
+export async function removeHistorySession(sessionId: string) {
+  try {
+    const snapshot = await backendClient.deleteSession(sessionId);
+    workspaceActions.hydrate(snapshot);
+  } catch (error) {
+    workspaceActions.setError(formatError(error));
+  }
+}
+
 export async function removeDictionaryEntry(id: number) {
   try {
     const snapshot = await backendClient.deleteDictionaryEntry(id);

@@ -1,7 +1,8 @@
 import { useLingui } from '@lingui/react/macro';
 import { Check, CircleCheck, CircleX, Clock, Copy, Hash, Mic, Palette } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
-import type { HistorySession } from '../../../store/workspace-store';
+import { ConfirmDialog } from '../../../components/feedback/confirm-dialog';
+import { type HistorySession, removeHistorySession } from '../../../store/workspace-store';
 
 interface SessionDetailModalProps {
   session: HistorySession;
@@ -152,8 +153,17 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
             </div>
           </div>
 
-          {/* Close action */}
-          <div className="modal-action px-5 pb-4 pt-0 sm:px-6">
+          {/* Actions */}
+          <div className="modal-action px-5 pb-4 pt-0 sm:px-6 justify-between">
+            <ConfirmDialog
+              title={t`Delete session?`}
+              description={t`This will permanently remove this dictation session and its transcript.`}
+              triggerLabel={t`Delete`}
+              onConfirm={() => {
+                dialogRef.current?.close();
+                removeHistorySession(session.id);
+              }}
+            />
             <form method="dialog">
               <button
                 type="submit"

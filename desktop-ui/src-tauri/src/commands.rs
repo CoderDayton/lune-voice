@@ -111,6 +111,22 @@ pub async fn create_dictionary_entry(
 }
 
 #[tauri::command]
+pub async fn delete_session(
+    window: WebviewWindow,
+    runtime: State<'_, AppRuntime>,
+    session_id: String,
+) -> Result<WorkspaceSnapshot, String> {
+    require_window_access(&window, &["main"])?;
+    let mut snapshot = tauri::async_runtime::spawn_blocking(move || {
+        crate::persistence::delete_session(session_id)
+    })
+    .await
+    .map_err(|e| format!("delete session task failed: {e}"))??;
+    snapshot.service_status = runtime.service_status().await;
+    Ok(snapshot)
+}
+
+#[tauri::command]
 pub async fn delete_dictionary_entry(
     window: WebviewWindow,
     runtime: State<'_, AppRuntime>,

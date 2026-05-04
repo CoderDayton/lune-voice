@@ -101,6 +101,7 @@ export interface BackendClient {
     priority: number,
   ): Promise<BackendWorkspaceSnapshot>;
   deleteDictionaryEntry(id: number): Promise<BackendWorkspaceSnapshot>;
+  deleteSession(sessionId: string): Promise<BackendWorkspaceSnapshot>;
   startDictation(): Promise<string>;
   stopDictation(): Promise<void>;
   cancelDictation(): Promise<void>;

@@ -165,6 +165,15 @@ export const mockBackendClient: BackendClient = {
     return structuredClone(mockSnapshot);
   },
 
+  async deleteSession(sessionId) {
+    mockSnapshot = {
+      ...mockSnapshot,
+      history: mockSnapshot.history.filter((entry) => entry.id !== sessionId),
+    };
+
+    return structuredClone(mockSnapshot);
+  },
+
   async startDictation() {
     return 'mock-session';
   },
