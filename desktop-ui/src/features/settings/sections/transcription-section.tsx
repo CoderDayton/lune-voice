@@ -1,15 +1,18 @@
-
-import { saveWorkspaceSetting } from "../../../store/workspace-store";
-import { type SettingsProps, SettingsRow, SettingsSection } from "../components/section";
-import { asrBackends } from "../data/settings-data";
-import { OpenAiFields } from "../components/openai-fields";
-import { useLingui } from "@lingui/react/macro";
-import { AudioWaveform } from "lucide-react";
+import { useLingui } from '@lingui/react/macro';
+import { AudioWaveform } from 'lucide-react';
+import { saveWorkspaceSetting } from '../../../store/workspace-store';
+import { OpenAiFields } from '../components/openai-fields';
+import { type SettingsProps, SettingsRow, SettingsSection } from '../components/section';
+import { asrBackends } from '../data/settings-data';
 
 export function TranscriptionSection({ settings }: SettingsProps) {
   const { t } = useLingui();
   return (
-    <SettingsSection title="Recognition" description={t`Control how your speech is turned into text.`} icon={AudioWaveform}>
+    <SettingsSection
+      title="Recognition"
+      description={t`Control how your speech is turned into text.`}
+      icon={AudioWaveform}
+    >
       <SettingsRow
         label={t`Voice model`}
         description={t`Qwen3-ASR runs locally with automatic language detection.`}
@@ -17,7 +20,12 @@ export function TranscriptionSection({ settings }: SettingsProps) {
           <select
             className="select w-full sm:w-auto sm:min-w-64"
             value={settings.asrBackend}
-            onChange={(event) => void saveWorkspaceSetting("asrBackend", event.target.value as typeof settings.asrBackend)}
+            onChange={(event) =>
+              void saveWorkspaceSetting(
+                'asrBackend',
+                event.target.value as typeof settings.asrBackend,
+              )
+            }
           >
             {asrBackends.map((option) => (
               <option key={option.value} value={option.value}>
@@ -27,7 +35,7 @@ export function TranscriptionSection({ settings }: SettingsProps) {
           </select>
         }
       />
-      {settings.asrBackend === "OpenAiCompatible" && (
+      {settings.asrBackend === 'OpenAiCompatible' && (
         <OpenAiFields
           settings={settings}
           baseUrlKey="openaiAsrBaseUrl"
@@ -41,7 +49,15 @@ export function TranscriptionSection({ settings }: SettingsProps) {
       <SettingsRow
         label={t`Use hardware acceleration`}
         description={t`When available, this can make transcription finish faster.`}
-        control={<input type="checkbox" className="toggle toggle-primary" checked={settings.useGpu} onChange={() => void saveWorkspaceSetting("useGpu", !settings.useGpu)} aria-label={t`Use hardware acceleration`} />}
+        control={
+          <input
+            type="checkbox"
+            className="toggle toggle-primary"
+            checked={settings.useGpu}
+            onChange={() => void saveWorkspaceSetting('useGpu', !settings.useGpu)}
+            aria-label={t`Use hardware acceleration`}
+          />
+        }
       />
     </SettingsSection>
   );

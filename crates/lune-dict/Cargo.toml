@@ -13,4 +13,8 @@ serde = { version = "1", features = ["derive"] }
 tracing.workspace = true
 wordnik_list = "0.2"
 
+[[bench]]
+name = "corrector_bench"
+harness = false
+
 

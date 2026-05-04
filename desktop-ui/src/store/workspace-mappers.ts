@@ -1,7 +1,18 @@
-import type { BackendDictionaryEntry, BackendHistoryEntry, BackendWorkspaceSnapshot, SaveWorkspaceSettingsInput } from "../lib/backend/types";
-import type { DictionaryEntry } from "../features/dictionary/data/dictionary-data";
-import { asrBackends, deliveryMethods, labelFor, type AsrBackendValue, type DictationModeValue } from "../features/settings/data/settings-data";
-import { DEFAULT_SETTINGS, type HistorySession, type WorkspaceSettings } from "./workspace-types";
+import type { DictionaryEntry } from '../features/dictionary/data/dictionary-data';
+import {
+  type AsrBackendValue,
+  asrBackends,
+  type DictationModeValue,
+  deliveryMethods,
+  labelFor,
+} from '../features/settings/data/settings-data';
+import type {
+  BackendDictionaryEntry,
+  BackendHistoryEntry,
+  BackendWorkspaceSnapshot,
+  SaveWorkspaceSettingsInput,
+} from '../lib/backend/types';
+import { DEFAULT_SETTINGS, type HistorySession, type WorkspaceSettings } from './workspace-types';
 
 export function mapHistoryEntry(entry: BackendHistoryEntry): HistorySession | null {
   if (!entry.transcript) return null;
@@ -42,20 +53,22 @@ export function mapWorkspaceSettings(snapshot: BackendWorkspaceSnapshot): Worksp
     speechThreshold: formatThreshold(snapshot.settings.speechThreshold),
     hotkeyToggle: snapshot.settings.hotkeyToggle,
     hotkeyCancel: snapshot.settings.hotkeyCancel,
-    pillVisibility: snapshot.settings.pillVisibility ?? "Always",
-    language: snapshot.settings.language ?? "en",
+    pillVisibility: snapshot.settings.pillVisibility ?? 'Always',
+    language: snapshot.settings.language ?? 'en',
     openaiAsrBaseUrl: snapshot.settings.openaiAsrBaseUrl ?? DEFAULT_SETTINGS.openaiAsrBaseUrl,
-    openaiAsrApiKey: snapshot.settings.openaiAsrApiKeySet ? "••••••••" : DEFAULT_SETTINGS.openaiAsrApiKey,
+    openaiAsrApiKey: snapshot.settings.openaiAsrApiKeySet
+      ? '••••••••'
+      : DEFAULT_SETTINGS.openaiAsrApiKey,
     openaiAsrModel: snapshot.settings.openaiAsrModel ?? DEFAULT_SETTINGS.openaiAsrModel,
   };
 }
 
 export function summarizeAsrBackend(value: AsrBackendValue) {
-  return labelFor(asrBackends, value).replace(" (recommended)", "").replace(" (fast)", "");
+  return labelFor(asrBackends, value).replace(' (recommended)', '').replace(' (fast)', '');
 }
 
 export function summarizeDictationMode(value: DictationModeValue) {
-  return labelFor(deliveryMethods, value).replace(" into app", "");
+  return labelFor(deliveryMethods, value).replace(' into app', '');
 }
 
 function countWords(text: string) {
@@ -82,7 +95,10 @@ export function settingsToSaveInput(settings: WorkspaceSettings): SaveWorkspaceS
     pillVisibility: settings.pillVisibility,
     language: settings.language,
     openaiAsrBaseUrl: settings.openaiAsrBaseUrl || null,
-    openaiAsrApiKey: settings.openaiAsrApiKey && !settings.openaiAsrApiKey.startsWith("•") ? settings.openaiAsrApiKey : null,
+    openaiAsrApiKey:
+      settings.openaiAsrApiKey && !settings.openaiAsrApiKey.startsWith('•')
+        ? settings.openaiAsrApiKey
+        : null,
     openaiAsrModel: settings.openaiAsrModel || null,
   };
 }

@@ -1,8 +1,7 @@
-
-import { type WorkspaceSettings } from "../../../store/workspace-store";
-import { SettingsRow } from "./section";
-import { useDebouncedSetting } from "../hooks/use-debounced-setting";
-import { useLingui } from "@lingui/react/macro";
+import { useLingui } from '@lingui/react/macro';
+import type { WorkspaceSettings } from '../../../store/workspace-store';
+import { useDebouncedSetting } from '../hooks/use-debounced-setting';
+import { SettingsRow } from './section';
 
 type StringKeys<T> = { [K in keyof T]: T[K] extends string ? K : never }[keyof T];
 
@@ -16,7 +15,15 @@ interface Props {
   modelPlaceholder: string;
 }
 
-export function OpenAiFields({ settings, baseUrlKey, apiKeyKey, modelKey, apiDescription, modelDescription, modelPlaceholder }: Props) {
+export function OpenAiFields({
+  settings,
+  baseUrlKey,
+  apiKeyKey,
+  modelKey,
+  apiDescription,
+  modelDescription,
+  modelPlaceholder,
+}: Props) {
   const { t } = useLingui();
   const [baseUrl, setBaseUrl] = useDebouncedSetting(baseUrlKey, settings[baseUrlKey] as string);
   const [apiKey, setApiKey] = useDebouncedSetting(apiKeyKey, settings[apiKeyKey] as string);

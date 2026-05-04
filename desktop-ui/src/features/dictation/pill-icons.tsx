@@ -4,7 +4,7 @@ interface IconProps {
   className?: string;
 }
 
-function PillSvg({ className = "size-5", children }: IconProps & { children: React.ReactNode }) {
+function PillSvg({ className = 'size-5', children }: IconProps & { children: React.ReactNode }) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -25,7 +25,7 @@ function PillSvg({ className = "size-5", children }: IconProps & { children: Rea
 
 export function MicIcon({ className }: IconProps = {}) {
   return (
-    <PillSvg className={className ?? "size-5"}>
+    <PillSvg className={className ?? 'size-5'}>
       <rect x="9" y="2" width="6" height="11" rx="3" />
       <path d="M5 10v1a7 7 0 0 0 14 0v-1" />
       <line x1="12" y1="18" x2="12" y2="22" />
@@ -36,7 +36,7 @@ export function MicIcon({ className }: IconProps = {}) {
 
 export function XIcon({ className }: IconProps = {}) {
   return (
-    <PillSvg className={className ?? "size-4"}>
+    <PillSvg className={className ?? 'size-4'}>
       <line x1="18" y1="6" x2="6" y2="18" />
       <line x1="6" y1="6" x2="18" y2="18" />
     </PillSvg>
@@ -45,7 +45,7 @@ export function XIcon({ className }: IconProps = {}) {
 
 export function StopIcon({ className }: IconProps = {}) {
   return (
-    <PillSvg className={className ?? "size-4"}>
+    <PillSvg className={className ?? 'size-4'}>
       <rect x="6" y="6" width="12" height="12" rx="1" />
     </PillSvg>
   );

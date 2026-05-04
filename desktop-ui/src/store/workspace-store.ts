@@ -1,6 +1,12 @@
-import { Store } from "@tanstack/store";
-import { backendClient } from "../lib/backend/client";
-import type { BackendWorkspaceSnapshot, SessionStreamEvent } from "../lib/backend/types";
+import { Store } from '@tanstack/store';
+import { backendClient } from '../lib/backend/client';
+import type { BackendWorkspaceSnapshot, SessionStreamEvent } from '../lib/backend/types';
+import {
+  mapDictionaryEntry,
+  mapHistoryEntry,
+  mapWorkspaceSettings,
+  settingsToSaveInput,
+} from './workspace-mappers';
 import {
   DEFAULT_RUNTIME,
   DEFAULT_SETTINGS,
@@ -8,19 +14,23 @@ import {
   type WorkspaceRuntimeState,
   type WorkspaceSettings,
   type WorkspaceState,
-} from "./workspace-types";
-import { mapDictionaryEntry, mapHistoryEntry, mapWorkspaceSettings, settingsToSaveInput } from "./workspace-mappers";
+} from './workspace-types';
 
+export { summarizeAsrBackend, summarizeDictationMode } from './workspace-mappers';
 // Re-export types and selectors for consumers
-export type { HistorySession, StylePreset, WorkspaceSettings, WorkspaceState } from "./workspace-types";
-export { summarizeAsrBackend, summarizeDictationMode } from "./workspace-mappers";
+export type {
+  HistorySession,
+  StylePreset,
+  WorkspaceSettings,
+  WorkspaceState,
+} from './workspace-types';
 
 // ── Store ─────────────────────────────────────────────────────────────
 
 export const workspaceStore = new Store<WorkspaceState>({
   sidebarCollapsed: false,
   mobileMenuOpen: false,
-  historySearch: "",
+  historySearch: '',
   dictionaryEntries: [],
   historySessions: [],
   stylePresets: [],
@@ -100,7 +110,7 @@ export const workspaceActions = {
           : null,
         liveTranscript: isActiveServiceStatus(snapshot.serviceStatus)
           ? s.runtime.liveTranscript
-          : "",
+          : '',
         audioLevel: isActiveServiceStatus(snapshot.serviceStatus) ? s.runtime.audioLevel : 0,
         loaded: true,
         loading: false,
@@ -118,9 +128,9 @@ export const workspaceActions = {
 
     // Session timeout watchdog: if we enter an active state, schedule a
     // forced reconciliation in case the backend never sends sessionStopped.
-    if (event.type === "sessionStarted") {
+    if (event.type === 'sessionStarted') {
       startSessionTimeoutWatchdog();
-    } else if (event.type === "sessionStopped" || event.type === "sessionError") {
+    } else if (event.type === 'sessionStopped' || event.type === 'sessionError') {
       clearSessionTimeoutWatchdog();
     }
   },
@@ -138,15 +148,15 @@ function startSessionTimeoutWatchdog() {
     sessionTimeoutTimer = null;
     const { runtime } = workspaceStore.state;
     if (runtime.activeSessionId) {
-      console.warn("[workspace] session timeout — forcing state reconciliation");
+      console.warn('[workspace] session timeout — forcing state reconciliation');
       workspaceStore.setState((s) => ({
         ...s,
         runtime: {
           ...s.runtime,
           activeSessionId: null,
-          serviceStatus: "ready",
+          serviceStatus: 'ready',
           audioLevel: 0,
-          error: "Session timed out — backend may be unresponsive",
+          error: 'Session timed out — backend may be unresponsive',
         },
       }));
     }
@@ -193,7 +203,7 @@ export async function saveWorkspaceSetting<Key extends keyof WorkspaceSettings>(
       const snapshot = await backendClient.loadWorkspaceSnapshot();
       workspaceActions.hydrate(snapshot);
     } catch (reloadError) {
-      console.warn("[workspace] failed to reload snapshot after save failure", reloadError);
+      console.warn('[workspace] failed to reload snapshot after save failure', reloadError);
       workspaceStore.setState((s) => ({ ...s, settings: previousSettings }));
     }
     workspaceActions.setError(formatError(error));
@@ -256,7 +266,7 @@ async function dictationAction<T>(action: () => Promise<T>, fallback: T): Promis
 export async function startDictation() {
   const sessionId = await dictationAction(() => backendClient.startDictation(), null);
   if (sessionId) {
-    workspaceActions.applySessionEvent({ type: "sessionStarted", sessionId });
+    workspaceActions.applySessionEvent({ type: 'sessionStarted', sessionId });
   }
   return sessionId;
 }
@@ -274,7 +284,7 @@ export async function toggleDictation() {
   try {
     const sessionId = await backendClient.toggleDictation();
     workspaceActions.applySessionEvent(
-      sessionId ? { type: "sessionStarted", sessionId } : { type: "sessionStopped" },
+      sessionId ? { type: 'sessionStarted', sessionId } : { type: 'sessionStopped' },
     );
     return sessionId;
   } catch (error) {
@@ -285,12 +295,17 @@ export async function toggleDictation() {
 
 // ── Selectors ─────────────────────────────────────────────────────────
 
-let _visibleCache: { sessions: HistorySession[]; query: string; result: HistorySession[] } | null = null;
+let _visibleCache: { sessions: HistorySession[]; query: string; result: HistorySession[] } | null =
+  null;
 
 export function getVisibleHistorySessions(state: WorkspaceState) {
   const query = state.historySearch.trim().toLowerCase();
   if (!query) return state.historySessions;
-  if (_visibleCache && _visibleCache.sessions === state.historySessions && _visibleCache.query === query) {
+  if (
+    _visibleCache &&
+    _visibleCache.sessions === state.historySessions &&
+    _visibleCache.query === query
+  ) {
     return _visibleCache.result;
   }
   const result = state.historySessions.filter((s) => s.transcript.toLowerCase().includes(query));
@@ -316,8 +331,15 @@ export function getSessionStats(state: WorkspaceState): SessionStats {
   if (_statsCache && _statsCache.sessions === sessions) return _statsCache.result;
   let words = 0;
   let seconds = 0;
-  for (const s of sessions) { words += s.words; seconds += s.seconds; }
-  const result = { totalWords: words, totalMinutes: Math.round(seconds / 60), count: sessions.length };
+  for (const s of sessions) {
+    words += s.words;
+    seconds += s.seconds;
+  }
+  const result = {
+    totalWords: words,
+    totalMinutes: Math.round(seconds / 60),
+    count: sessions.length,
+  };
   _statsCache = { sessions, result };
   return result;
 }
@@ -333,11 +355,15 @@ let _todayCache: { sessions: HistorySession[]; date: string; result: TodayStats 
 export function getTodayStats(state: WorkspaceState): TodayStats {
   const sessions = state.historySessions;
   const today = new Date().toDateString();
-  if (_todayCache && _todayCache.sessions === sessions && _todayCache.date === today) return _todayCache.result;
+  if (_todayCache && _todayCache.sessions === sessions && _todayCache.date === today)
+    return _todayCache.result;
   let count = 0;
   let words = 0;
   for (const s of sessions) {
-    if (new Date(s.startedAt).toDateString() === today) { count++; words += s.words; }
+    if (new Date(s.startedAt).toDateString() === today) {
+      count++;
+      words += s.words;
+    }
   }
   const result = { count, words };
   _todayCache = { sessions, date: today, result };
@@ -347,7 +373,7 @@ export function getTodayStats(state: WorkspaceState): TodayStats {
 // ── Internal helpers ──────────────────────────────────────────────────
 
 function formatError(error: unknown) {
-  return error instanceof Error ? error.message : "Unable to reach the desktop backend.";
+  return error instanceof Error ? error.message : 'Unable to reach the desktop backend.';
 }
 
 function reduceSessionEvent(
@@ -355,52 +381,52 @@ function reduceSessionEvent(
   event: SessionStreamEvent,
 ): WorkspaceRuntimeState {
   switch (event.type) {
-    case "serviceStatus":
+    case 'serviceStatus':
       return { ...runtime, serviceStatus: event.status };
-    case "sessionStarted":
+    case 'sessionStarted':
       return {
         ...runtime,
         activeSessionId: event.sessionId,
-        serviceStatus: "listening",
-        liveTranscript: "",
+        serviceStatus: 'listening',
+        liveTranscript: '',
         audioLevel: 0,
         error: null,
       };
-    case "processing":
-      return { ...runtime, serviceStatus: "processing", audioLevel: 0 };
-    case "finalizedText":
+    case 'processing':
+      return { ...runtime, serviceStatus: 'processing', audioLevel: 0 };
+    case 'finalizedText':
       return {
         ...runtime,
-        serviceStatus: "ready",
+        serviceStatus: 'ready',
         liveTranscript: runtime.liveTranscript
           ? `${runtime.liveTranscript} ${event.text}`
           : event.text,
       };
-    case "correctedText":
+    case 'correctedText':
       return { ...runtime, liveTranscript: event.text };
-    case "sessionStopped":
+    case 'sessionStopped':
       return {
         ...runtime,
         activeSessionId: null,
-        serviceStatus: runtime.serviceStatus === "error" ? "error" : "ready",
+        serviceStatus: runtime.serviceStatus === 'error' ? 'error' : 'ready',
         audioLevel: 0,
       };
-    case "sessionError":
+    case 'sessionError':
       return {
         ...runtime,
         activeSessionId: null,
-        serviceStatus: "error",
+        serviceStatus: 'error',
         audioLevel: 0,
         error: event.message,
       };
-    case "audioLevel":
+    case 'audioLevel':
       return { ...runtime, audioLevel: Math.max(0, Math.min(1, event.level)) };
-    case "partialText":
-    case "commandDetected":
+    case 'partialText':
+    case 'commandDetected':
       return runtime;
   }
 }
 
 function isActiveServiceStatus(status: string) {
-  return status === "listening" || status === "processing";
+  return status === 'listening' || status === 'processing';
 }

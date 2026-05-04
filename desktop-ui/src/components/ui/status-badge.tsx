@@ -1,12 +1,12 @@
-import type { ReactNode } from "react";
+import type { ReactNode } from 'react';
 
-type StatusVariant = "success" | "warning" | "error" | "info";
+type StatusVariant = 'success' | 'warning' | 'error' | 'info';
 
 const DOT_STYLES: Record<StatusVariant, string> = {
-  success: "status-success",
-  warning: "status-warning",
-  error: "status-error",
-  info: "status-info",
+  success: 'status-success',
+  warning: 'status-warning',
+  error: 'status-error',
+  info: 'status-info',
 };
 
 interface StatusBadgeProps {

@@ -1,15 +1,15 @@
-import { useEffect, useState } from "react";
-import { Monitor, Moon, Palette, Sun } from "lucide-react";
-import { SettingsSection } from "../components/section";
-import { ThemePicker } from "../components/theme-picker";
-import { useLingui } from "@lingui/react/macro";
+import { useLingui } from '@lingui/react/macro';
+import { Monitor, Moon, Palette, Sun } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import {
   getThemePreference,
   isDarkTheme,
   setThemePreference,
   themeLabel,
   watchSystemTheme,
-} from "../../../lib/theme";
+} from '../../../lib/theme';
+import { SettingsSection } from '../components/section';
+import { ThemePicker } from '../components/theme-picker';
 
 export function AppearanceSection() {
   const { t } = useLingui();
@@ -19,16 +19,16 @@ export function AppearanceSection() {
     return watchSystemTheme(() => setTheme(getThemePreference()));
   }, []);
 
-  const currentLabel = theme === "system" ? t`System` : themeLabel(theme);
-  const dark = isDarkTheme(theme) || theme === "system";
+  const currentLabel = theme === 'system' ? t`System` : themeLabel(theme);
+  const dark = isDarkTheme(theme) || theme === 'system';
 
-  function selectMode(mode: "dark" | "light" | "system") {
-    const next = mode === "dark" ? "lune" : mode === "light" ? "lune-light" : "system";
+  function selectMode(mode: 'dark' | 'light' | 'system') {
+    const next = mode === 'dark' ? 'lune' : mode === 'light' ? 'lune-light' : 'system';
     setThemePreference(next);
     setTheme(next);
   }
 
-  const activeMode = theme === "system" ? "system" : dark ? "dark" : "light";
+  const activeMode = theme === 'system' ? 'system' : dark ? 'dark' : 'light';
 
   return (
     <SettingsSection
@@ -41,7 +41,13 @@ export function AppearanceSection() {
         <div className="flex flex-col gap-1.5">
           <span className="text-sm font-medium">{t`Mode`}</span>
           <div className="grid grid-cols-3 gap-2">
-            {([["dark", Moon, t`Dark`], ["light", Sun, t`Light`], ["system", Monitor, t`System`]] as const).map(([mode, Icon, label]) => {
+            {(
+              [
+                ['dark', Moon, t`Dark`],
+                ['light', Sun, t`Light`],
+                ['system', Monitor, t`System`],
+              ] as const
+            ).map(([mode, Icon, label]) => {
               const active = activeMode === mode;
               return (
                 <button
@@ -50,8 +56,8 @@ export function AppearanceSection() {
                   onClick={() => selectMode(mode)}
                   className={`flex flex-col items-center gap-1 rounded-box border-2 px-3 py-2 transition-all ${
                     active
-                      ? "border-primary bg-primary/8 text-primary"
-                      : "border-surface-border bg-base-200/30 text-content-muted hover:border-base-300 hover:text-content-default"
+                      ? 'border-primary bg-primary/8 text-primary'
+                      : 'border-surface-border bg-base-200/30 text-content-muted hover:border-base-300 hover:text-content-default'
                   }`}
                 >
                   <Icon size={20} strokeWidth={1.6} />

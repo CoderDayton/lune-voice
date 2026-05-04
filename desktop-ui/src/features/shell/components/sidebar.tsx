@@ -1,12 +1,12 @@
-import { useStore } from "@tanstack/react-store";
-import { Link, useRouterState } from "@tanstack/react-router";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { workspaceStore } from "../../../store/workspace-store";
-import { navigationItems } from "../config/navigation";
-import { SidebarQuickStart, SidebarTodayStats, SidebarTodayStatsSkeleton } from "./sidebar-widgets";
-import { DRAWER_ID } from "./app-shell";
-import luneLogo from "../../../assets/lune-voice-logo.png";
-import { useLingui } from "@lingui/react/macro";
+import { useLingui } from '@lingui/react/macro';
+import { Link, useRouterState } from '@tanstack/react-router';
+import { useStore } from '@tanstack/react-store';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import luneLogo from '../../../assets/lune-voice-logo.png';
+import { workspaceStore } from '../../../store/workspace-store';
+import { navigationItems } from '../config/navigation';
+import { DRAWER_ID } from './app-shell';
+import { SidebarQuickStart, SidebarTodayStats, SidebarTodayStatsSkeleton } from './sidebar-widgets';
 
 export function SidebarContent() {
   const { t } = useLingui();
@@ -14,8 +14,8 @@ export function SidebarContent() {
   const serviceStatus = useStore(workspaceStore, (s) => s.runtime.serviceStatus);
   const loaded = useStore(workspaceStore, (s) => s.runtime.loaded);
 
-  const isActive = serviceStatus === "listening" || serviceStatus === "processing";
-  const isConnected = serviceStatus === "ready" || isActive;
+  const isActive = serviceStatus === 'listening' || serviceStatus === 'processing';
+  const isConnected = serviceStatus === 'ready' || isActive;
 
   return (
     <>
@@ -23,10 +23,15 @@ export function SidebarContent() {
       <div className="flex w-full items-center gap-3 px-4 py-5 select-none is-drawer-close:justify-center is-drawer-close:px-2 sm:gap-3.5 sm:px-5 sm:py-6">
         <div className="relative shrink-0">
           <div className="size-10 rounded-field ring-1 ring-surface-border-strong overflow-hidden shadow-card">
-            <img src={luneLogo} alt="" className="size-full object-cover pointer-events-none" draggable={false} />
+            <img
+              src={luneLogo}
+              alt=""
+              className="size-full object-cover pointer-events-none"
+              draggable={false}
+            />
           </div>
           <span
-            className={`absolute -bottom-0.5 -right-0.5 block size-2.5 rounded-full ring-2 ring-base-100 ${isActive ? "bg-success status-pulse" : isConnected ? "bg-success/50" : "bg-base-content/20"}`}
+            className={`absolute -bottom-0.5 -right-0.5 block size-2.5 rounded-full ring-2 ring-base-100 ${isActive ? 'bg-success status-pulse' : isConnected ? 'bg-success/50' : 'bg-base-content/20'}`}
             aria-hidden="true"
           />
         </div>
@@ -50,13 +55,13 @@ export function SidebarContent() {
         <p className="section-label mb-3 px-3.5 is-drawer-close:hidden">{t`Navigate`}</p>
         <ul className="flex flex-col gap-1">
           {navigationItems.map(({ to, label, icon: Icon }) => {
-            const active = to === "/" ? pathname === "/" : pathname.startsWith(to);
+            const active = to === '/' ? pathname === '/' : pathname.startsWith(to);
             return (
               <li key={to}>
                 <Link
                   to={to}
-                  aria-current={active ? "page" : undefined}
-                  className={`group relative flex w-full items-center gap-3.5 rounded-field px-3.5 py-4 text-[0.9rem] transition-colors is-drawer-close:tooltip is-drawer-close:tooltip-right is-drawer-close:justify-center ${active ? "bg-surface-nav-active text-primary font-medium shadow-card" : "text-content-muted hover:bg-surface-hover hover:text-content"}`}
+                  aria-current={active ? 'page' : undefined}
+                  className={`group relative flex w-full items-center gap-3.5 rounded-field px-3.5 py-4 text-[0.9rem] transition-colors is-drawer-close:tooltip is-drawer-close:tooltip-right is-drawer-close:justify-center ${active ? 'bg-surface-nav-active text-primary font-medium shadow-card' : 'text-content-muted hover:bg-surface-hover hover:text-content'}`}
                   data-tip={label}
                 >
                   {active ? (
@@ -65,7 +70,9 @@ export function SidebarContent() {
                   <Icon
                     size={20}
                     strokeWidth={active ? 2.2 : 1.6}
-                    className={active ? "text-primary" : "text-content-subtle group-hover:text-content-muted"}
+                    className={
+                      active ? 'text-primary' : 'text-content-subtle group-hover:text-content-muted'
+                    }
                   />
                   <span className="truncate is-drawer-close:hidden">{label}</span>
                 </Link>

@@ -17,7 +17,7 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-license = "MIT"
+license = "LicenseRef-Proprietary"
 
 [profile.release]
 # thin LTO: ~80% of fat's benefit at fraction of link time; cross-crate inlining

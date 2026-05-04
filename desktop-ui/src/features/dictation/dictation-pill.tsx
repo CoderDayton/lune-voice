@@ -1,9 +1,9 @@
-import { useCallback, useRef } from "react";
-import { backendClient } from "../../lib/backend/client";
-import { AudioDots } from "./audio-dots";
-import { MicIcon, PulseIndicator, StopIcon, XIcon } from "./pill-icons";
-import { usePillState } from "./use-pill-state";
-import { useLingui } from "@lingui/react/macro";
+import { useLingui } from '@lingui/react/macro';
+import { useCallback, useRef } from 'react';
+import { backendClient } from '../../lib/backend/client';
+import { AudioDots } from './audio-dots';
+import { MicIcon, PulseIndicator, StopIcon, XIcon } from './pill-icons';
+import { usePillState } from './use-pill-state';
 
 const PILL_DEBOUNCE_MS = 200;
 
@@ -24,17 +24,19 @@ export function DictationPill() {
     fire(fn, tag);
   }, []);
 
-  const isToggle = recordingMode === "Toggle";
-  const isIdle = mode === "idle";
-  const isProcessing = mode === "processing";
+  const isToggle = recordingMode === 'Toggle';
+  const isIdle = mode === 'idle';
+  const isProcessing = mode === 'processing';
 
   const handleCancel = () => {
     cancelRef.current = true;
-    debouncedFire(() => backendClient.cancelDictation(), "cancel");
-    setTimeout(() => { cancelRef.current = false; }, 300);
+    debouncedFire(() => backendClient.cancelDictation(), 'cancel');
+    setTimeout(() => {
+      cancelRef.current = false;
+    }, 300);
   };
 
-  const rootClass = `pill-root${cancelRef.current ? " pill-cancelled" : ""}`;
+  const rootClass = `pill-root${cancelRef.current ? ' pill-cancelled' : ''}`;
 
   return (
     <div className={rootClass} data-visible={visible || undefined}>
@@ -43,14 +45,14 @@ export function DictationPill() {
           <button
             type="button"
             className="pill-idle"
-            onClick={() => debouncedFire(() => backendClient.toggleDictation(), "toggle")}
+            onClick={() => debouncedFire(() => backendClient.toggleDictation(), 'toggle')}
             aria-label={t`Start dictation`}
           >
             <MicIcon />
           </button>
         ) : (
           <div
-            className={`pill-active${isProcessing ? " pill-processing" : ""}`}
+            className={`pill-active${isProcessing ? ' pill-processing' : ''}`}
             role="status"
             aria-live="polite"
             aria-label={isProcessing ? t`Processing` : t`Listening`}
@@ -78,7 +80,7 @@ export function DictationPill() {
               <button
                 type="button"
                 className="pill-btn pill-btn-stop"
-                onClick={() => debouncedFire(() => backendClient.stopDictation(), "stop")}
+                onClick={() => debouncedFire(() => backendClient.stopDictation(), 'stop')}
                 aria-label={t`Stop dictation`}
               >
                 <StopIcon />

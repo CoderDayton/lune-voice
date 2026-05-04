@@ -1,16 +1,16 @@
-import type { DictionaryEntry } from "../features/dictionary/data/dictionary-data";
+import type { DictionaryEntry } from '../features/dictionary/data/dictionary-data';
 import type {
   ActivationModeValue,
   AsrBackendValue,
   DictationModeValue,
   PillVisibilityValue,
-} from "../features/settings/data/settings-data";
+} from '../features/settings/data/settings-data';
 
 export interface WorkspaceSettings {
   activationMode: ActivationModeValue;
   asrBackend: AsrBackendValue;
   useGpu: boolean;
-  devicePolicy: "Cpu" | "Cuda" | "Auto";
+  devicePolicy: 'Cpu' | 'Cuda' | 'Auto';
   confidenceThreshold: string;
   dictationMode: DictationModeValue;
   stylePreset: string;
@@ -66,29 +66,29 @@ export interface WorkspaceState {
 }
 
 export const DEFAULT_SETTINGS: WorkspaceSettings = {
-  activationMode: "Toggle",
-  asrBackend: "Qwen3Asr",
+  activationMode: 'Toggle',
+  asrBackend: 'Qwen3Asr',
   useGpu: true,
-  devicePolicy: "Auto",
-  confidenceThreshold: "0.50",
-  dictationMode: "Clipboard",
-  stylePreset: "casual",
+  devicePolicy: 'Auto',
+  confidenceThreshold: '0.50',
+  dictationMode: 'Clipboard',
+  stylePreset: 'casual',
   adaptiveVad: false,
-  speechThreshold: "0.50",
-  hotkeyToggle: "Ctrl+Space",
-  hotkeyCancel: "Escape",
-  pillVisibility: "Always",
-  language: "en",
-  openaiAsrBaseUrl: "https://api.openai.com/v1",
-  openaiAsrApiKey: "",
-  openaiAsrModel: "whisper-1",
+  speechThreshold: '0.50',
+  hotkeyToggle: 'Ctrl+Space',
+  hotkeyCancel: 'Escape',
+  pillVisibility: 'Always',
+  language: 'en',
+  openaiAsrBaseUrl: 'https://api.openai.com/v1',
+  openaiAsrApiKey: '',
+  openaiAsrModel: 'whisper-1',
 };
 
 export const DEFAULT_RUNTIME: WorkspaceRuntimeState = {
-  ipcFlavor: "unknown",
-  serviceStatus: "Connecting",
+  ipcFlavor: 'unknown',
+  serviceStatus: 'Connecting',
   activeSessionId: null,
-  liveTranscript: "",
+  liveTranscript: '',
   audioLevel: 0,
   loaded: false,
   loading: false,

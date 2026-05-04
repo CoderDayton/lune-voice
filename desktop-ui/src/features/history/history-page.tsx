@@ -1,8 +1,8 @@
-import { useStore } from "@tanstack/react-store";
-import { HistorySearch } from "./components/history-search";
-import { HistorySessionList } from "./components/history-session-list";
-import { getVisibleSessionCount, workspaceStore } from "../../store/workspace-store";
-import { useLingui } from "@lingui/react/macro";
+import { useLingui } from '@lingui/react/macro';
+import { useStore } from '@tanstack/react-store';
+import { getVisibleSessionCount, workspaceStore } from '../../store/workspace-store';
+import { HistorySearch } from './components/history-search';
+import { HistorySessionList } from './components/history-session-list';
 
 export function HistoryPage() {
   const { t } = useLingui();
@@ -20,10 +20,7 @@ export function HistoryPage() {
         </div>
         <div className="flex flex-col gap-2">
           {[0, 1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="panel-surface flex flex-col gap-2 p-4"
-            >
+            <div key={i} className="panel-surface flex flex-col gap-2 p-4">
               <div className="flex justify-between items-center">
                 <div className="skeleton-shimmer h-4 w-48" />
                 <div className="skeleton-shimmer h-3 w-16" />

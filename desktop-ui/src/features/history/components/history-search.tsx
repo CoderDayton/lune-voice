@@ -1,7 +1,7 @@
-import { useStore } from "@tanstack/react-store";
-import { Search } from "lucide-react";
-import { workspaceActions, workspaceStore } from "../../../store/workspace-store";
-import { useLingui } from "@lingui/react/macro";
+import { useLingui } from '@lingui/react/macro';
+import { useStore } from '@tanstack/react-store';
+import { Search } from 'lucide-react';
+import { workspaceActions, workspaceStore } from '../../../store/workspace-store';
 
 export function HistorySearch() {
   const { t } = useLingui();

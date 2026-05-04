@@ -3,7 +3,7 @@ import type {
   AsrBackendValue,
   DictationModeValue,
   PillVisibilityValue,
-} from "../../features/settings/data/settings-data";
+} from '../../features/settings/data/settings-data';
 
 export interface BackendDictionaryEntry {
   id: number;
@@ -26,7 +26,7 @@ export interface BackendWorkspaceSettings {
   activationMode: ActivationModeValue;
   dictationMode: DictationModeValue;
   useGpu: boolean;
-  devicePolicy: "Cpu" | "Cuda" | "Auto";
+  devicePolicy: 'Cpu' | 'Cuda' | 'Auto';
   asrBackendType: AsrBackendValue;
   confidenceThreshold: number | null;
   adaptiveVad: boolean;
@@ -67,7 +67,7 @@ export interface SaveWorkspaceSettingsInput {
   activationMode: ActivationModeValue;
   dictationMode: DictationModeValue;
   useGpu: boolean;
-  devicePolicy: "Cpu" | "Cuda" | "Auto";
+  devicePolicy: 'Cpu' | 'Cuda' | 'Auto';
   asrBackendType: AsrBackendValue;
   confidenceThreshold: number | null;
   adaptiveVad: boolean;
@@ -106,13 +106,13 @@ export interface BackendClient {
 }
 
 export type SessionStreamEvent =
-  | { type: "serviceStatus"; status: string }
-  | { type: "sessionStarted"; sessionId: string }
-  | { type: "partialText" }
-  | { type: "processing" }
-  | { type: "finalizedText"; text: string }
-  | { type: "correctedText"; text: string }
-  | { type: "audioLevel"; level: number }
-  | { type: "commandDetected"; payload: string }
-  | { type: "sessionStopped" }
-  | { type: "sessionError"; message: string };
+  | { type: 'serviceStatus'; status: string }
+  | { type: 'sessionStarted'; sessionId: string }
+  | { type: 'partialText' }
+  | { type: 'processing' }
+  | { type: 'finalizedText'; text: string }
+  | { type: 'correctedText'; text: string }
+  | { type: 'audioLevel'; level: number }
+  | { type: 'commandDetected'; payload: string }
+  | { type: 'sessionStopped' }
+  | { type: 'sessionError'; message: string };

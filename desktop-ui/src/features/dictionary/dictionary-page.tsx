@@ -1,7 +1,7 @@
-import { useStore } from "@tanstack/react-store";
-import { workspaceStore } from "../../store/workspace-store";
-import { DictionaryForm } from "./components/dictionary-form";
-import { DictionaryTable } from "./components/dictionary-table";
+import { useStore } from '@tanstack/react-store';
+import { workspaceStore } from '../../store/workspace-store';
+import { DictionaryForm } from './components/dictionary-form';
+import { DictionaryTable } from './components/dictionary-table';
 
 export function DictionaryPage() {
   const loaded = useStore(workspaceStore, (s) => s.runtime.loaded);

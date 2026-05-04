@@ -28,3 +28,7 @@ tokenizers.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 hound = "3.5"
 lune-llm = { path = "../lune-llm" }
+
+[[bench]]
+name = "qwen3_kv_bench"
+harness = false

@@ -495,6 +495,7 @@ fn kv_name(layer: usize, is_key: bool) -> &'static str {
 
 fn present_kv_name(layer: usize, is_key: bool) -> &'static str {
     let idx = layer * 4 + if is_key { 2 } else { 3 };
+    // SAFETY: kv_cache_names() returns &'static [String], element .as_str() is 'static.
     unsafe { &*(kv_cache_names()[idx].as_str() as *const str) }
 }
 

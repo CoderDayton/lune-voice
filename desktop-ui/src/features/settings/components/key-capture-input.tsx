@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import { cn } from "../../../lib/cn";
-import { buildCombo, validateCombo } from "./hotkey-utils";
+import { useEffect, useRef, useState } from 'react';
+import { cn } from '../../../lib/cn';
+import { buildCombo, validateCombo } from './hotkey-utils';
 
 interface KeyCaptureInputProps {
   value: string;
@@ -34,7 +34,7 @@ export function KeyCaptureInput({
       event.preventDefault();
       event.stopPropagation();
 
-      if (event.key === "Escape") {
+      if (event.key === 'Escape') {
         // Cancel: restore previous value without persisting.
         setPendingCombo(null);
         setValidationError(null);
@@ -58,8 +58,8 @@ export function KeyCaptureInput({
       onChange(combo);
     }
 
-    window.addEventListener("keydown", handleKeyDown, { capture: true });
-    return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
   }, [listening, onChange]);
 
   function handleClick() {
@@ -69,35 +69,33 @@ export function KeyCaptureInput({
     setListening(true);
   }
 
-  const displayValue = listening
-    ? (pendingCombo ?? "…")
-    : value;
+  const displayValue = listening ? (pendingCombo ?? '…') : value;
 
   return (
-    <div className={cn("flex flex-col items-end gap-1 sm:gap-1.5", className)}>
+    <div className={cn('flex flex-col items-end gap-1 sm:gap-1.5', className)}>
       <button
         type="button"
         onClick={handleClick}
         disabled={disabled}
-        aria-label={listening ? "Press keys to set hotkey" : `Current binding: ${value}. Click to change.`}
-        aria-invalid={validationError ? "true" : undefined}
-        aria-describedby={validationError ? "key-capture-error" : undefined}
+        aria-label={
+          listening ? 'Press keys to set hotkey' : `Current binding: ${value}. Click to change.`
+        }
+        aria-invalid={validationError ? 'true' : undefined}
+        aria-describedby={validationError ? 'key-capture-error' : undefined}
         className={cn(
-          "btn btn-outline btn-sm font-mono font-semibold select-none",
-          "min-w-28 sm:min-w-36 justify-center",
-          listening
-            ? "btn-primary animate-pulse"
-            : "btn-ghost",
-          disabled && "btn-disabled",
+          'btn btn-outline btn-sm font-mono font-semibold select-none',
+          'min-w-28 sm:min-w-36 justify-center',
+          listening ? 'btn-primary animate-pulse' : 'btn-ghost',
+          disabled && 'btn-disabled',
         )}
       >
         {listening ? (
           <>
             <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
-            <span>{pendingCombo ? pendingCombo.replace(/\+/g, " + ") : "Press keys…"}</span>
+            <span>{pendingCombo ? pendingCombo.replace(/\+/g, ' + ') : 'Press keys…'}</span>
           </>
         ) : (
-          <span>{displayValue.replace(/\+/g, " + ")}</span>
+          <span>{displayValue.replace(/\+/g, ' + ')}</span>
         )}
       </button>
 

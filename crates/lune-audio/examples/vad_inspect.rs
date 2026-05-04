@@ -123,7 +123,7 @@ fn main() {
                 .parent()
                 .unwrap()
                 .to_path_buf();
-            root.join("test_fixtures/custom_recording.wav")
+            root.join("fixtures/audio/custom_recording.wav")
         });
 
     println!("VAD inspection: {}", path.display());

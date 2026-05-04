@@ -168,7 +168,7 @@ const PRIORITY_FIXTURE_NAMES: &[&str] =
     &["librispeech_clean", "librispeech_40744", "custom_recording"];
 
 pub fn load_fixtures(root: &std::path::Path) -> Vec<Fixture> {
-    let fixtures_dir = root.join("test_fixtures");
+    let fixtures_dir = root.join("fixtures/audio");
     let Ok(entries) = std::fs::read_dir(&fixtures_dir) else {
         return Vec::new();
     };

@@ -1,7 +1,7 @@
-import { useEffect, useId, useRef, useState } from "react";
-import { Clock, Hash, Mic, Palette, CircleCheck, CircleX, Copy, Check } from "lucide-react";
-import type { HistorySession } from "../../../store/workspace-store";
-import { useLingui } from "@lingui/react/macro";
+import { useLingui } from '@lingui/react/macro';
+import { Check, CircleCheck, CircleX, Clock, Copy, Hash, Mic, Palette } from 'lucide-react';
+import { useEffect, useId, useRef, useState } from 'react';
+import type { HistorySession } from '../../../store/workspace-store';
 
 interface SessionDetailModalProps {
   session: HistorySession;
@@ -11,13 +11,13 @@ interface SessionDetailModalProps {
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
+  return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return "Just now";
+  if (mins < 1) return 'Just now';
   if (mins < 60) return `${mins}m ago`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h ago`;
@@ -34,22 +34,25 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
 
   const startDate = new Date(session.startedAt);
   const date = startDate.toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
   });
-  const time = startDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const time = startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   const relative = relativeTime(session.startedAt);
 
-  const isCompleted = session.status === "Completed";
-  const isFailed = session.status.startsWith("Failed");
+  const isCompleted = session.status === 'Completed';
+  const isFailed = session.status.startsWith('Failed');
 
   function handleCopy() {
     if (!session.transcript) return;
-    navigator.clipboard.writeText(session.transcript).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }).catch(() => {});
+    navigator.clipboard
+      .writeText(session.transcript)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => {});
   }
 
   // Ctrl+C copies full transcript when modal is open and no text is selected
@@ -57,13 +60,13 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
     const dialog = dialogRef.current;
     if (!dialog) return;
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "c" && (e.ctrlKey || e.metaKey) && !window.getSelection()?.toString()) {
+      if (e.key === 'c' && (e.ctrlKey || e.metaKey) && !window.getSelection()?.toString()) {
         e.preventDefault();
         handleCopy();
       }
     }
-    dialog.addEventListener("keydown", onKeyDown);
-    return () => dialog.removeEventListener("keydown", onKeyDown);
+    dialog.addEventListener('keydown', onKeyDown);
+    return () => dialog.removeEventListener('keydown', onKeyDown);
   });
 
   return (
@@ -83,7 +86,9 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
               <h3 id={titleId} className="text-base font-semibold tracking-tight">
                 {date}
               </h3>
-              <p className="text-sm text-content-subtle mt-0.5 tabular-nums">{time} · {relative}</p>
+              <p className="text-sm text-content-subtle mt-0.5 tabular-nums">
+                {time} · {relative}
+              </p>
             </div>
             <div className="flex items-center gap-3">
               {session.transcript && (
@@ -93,9 +98,11 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
                   className="btn btn-ghost btn-sm btn-circle"
                   aria-label={t`Copy transcript`}
                 >
-                  {copied
-                    ? <Check size={15} strokeWidth={2.5} className="text-success" />
-                    : <Copy size={15} strokeWidth={1.8} />}
+                  {copied ? (
+                    <Check size={15} strokeWidth={2.5} className="text-success" />
+                  ) : (
+                    <Copy size={15} strokeWidth={1.8} />
+                  )}
                 </button>
               )}
             </div>
@@ -105,12 +112,18 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
           <div className="px-5 pb-4 sm:px-6">
             {session.transcript ? (
               <div className="rounded-lg border border-surface-border bg-surface-inset p-5">
-                <p id={transcriptId} className="text-base leading-relaxed text-content whitespace-pre-wrap break-words sm:text-lg">
+                <p
+                  id={transcriptId}
+                  className="text-base leading-relaxed text-content whitespace-pre-wrap break-words sm:text-lg"
+                >
                   {session.transcript}
                 </p>
               </div>
             ) : (
-              <p id={transcriptId} className="text-sm italic text-content-subtle">{t`No transcript`}</p>
+              <p
+                id={transcriptId}
+                className="text-sm italic text-content-subtle"
+              >{t`No transcript`}</p>
             )}
           </div>
 
@@ -124,9 +137,15 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
             </div>
             <div className="mt-3 flex items-center gap-3 text-sm text-content-subtle">
               {isCompleted ? (
-                <><CircleCheck size={13} strokeWidth={2} className="text-success/60" /> <span>{t`Completed`}</span></>
+                <>
+                  <CircleCheck size={13} strokeWidth={2} className="text-success/60" />{' '}
+                  <span>{t`Completed`}</span>
+                </>
               ) : isFailed ? (
-                <><CircleX size={13} strokeWidth={2} className="text-error/60" /> <span>{session.status}</span></>
+                <>
+                  <CircleX size={13} strokeWidth={2} className="text-error/60" />{' '}
+                  <span>{session.status}</span>
+                </>
               ) : (
                 <span>{session.status}</span>
               )}
@@ -136,17 +155,30 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
           {/* Close action */}
           <div className="modal-action px-5 pb-4 pt-0 sm:px-6">
             <form method="dialog">
-              <button type="submit" className="btn btn-ghost btn-sm text-content-muted">{t`Close`}</button>
+              <button
+                type="submit"
+                className="btn btn-ghost btn-sm text-content-muted"
+              >{t`Close`}</button>
             </form>
           </div>
         </div>
-        <form method="dialog" className="modal-backdrop"><button type="submit">close</button></form>
+        <form method="dialog" className="modal-backdrop">
+          <button type="submit">close</button>
+        </form>
       </dialog>
     </>
   );
 }
 
-function MetaItem({ icon: Icon, label, value }: { icon: typeof Clock; label: string; value: string }) {
+function MetaItem({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof Clock;
+  label: string;
+  value: string;
+}) {
   return (
     <div className="flex items-center gap-3">
       <Icon size={14} strokeWidth={1.6} className="text-content-dim shrink-0" />
@@ -159,7 +191,7 @@ function MetaItem({ icon: Icon, label, value }: { icon: typeof Clock; label: str
 }
 
 function formatBackend(backend: string): string {
-  if (backend.includes("Qwen3") || backend.includes("qwen3")) return "Qwen3-ASR";
-  if (backend.includes("OpenAi")) return "Cloud";
+  if (backend.includes('Qwen3') || backend.includes('qwen3')) return 'Qwen3-ASR';
+  if (backend.includes('OpenAi')) return 'Cloud';
   return backend;
 }

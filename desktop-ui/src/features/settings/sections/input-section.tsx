@@ -1,17 +1,23 @@
-
-import { saveWorkspaceSetting } from "../../../store/workspace-store";
-import { type SettingsProps, SettingsRow, SettingsSection } from "../components/section";
-import { activationModes } from "../data/settings-data";
-import { useDebouncedSetting } from "../hooks/use-debounced-setting";
-import { useLingui } from "@lingui/react/macro";
-import { Mic } from "lucide-react";
+import { useLingui } from '@lingui/react/macro';
+import { Mic } from 'lucide-react';
+import { saveWorkspaceSetting } from '../../../store/workspace-store';
+import { type SettingsProps, SettingsRow, SettingsSection } from '../components/section';
+import { activationModes } from '../data/settings-data';
+import { useDebouncedSetting } from '../hooks/use-debounced-setting';
 
 export function InputSection({ settings }: SettingsProps) {
   const { t } = useLingui();
-  const [threshold, setThreshold] = useDebouncedSetting("speechThreshold", settings.speechThreshold);
+  const [threshold, setThreshold] = useDebouncedSetting(
+    'speechThreshold',
+    settings.speechThreshold,
+  );
 
   return (
-    <SettingsSection title={t`Voice input`} description={t`Choose how quickly you want to enter and leave voice typing.`} icon={Mic}>
+    <SettingsSection
+      title={t`Voice input`}
+      description={t`Choose how quickly you want to enter and leave voice typing.`}
+      icon={Mic}
+    >
       <SettingsRow
         label={t`Recording mode`}
         description={t`Toggle is easiest for longer dictation. Hold is better for quick bursts.`}
@@ -19,7 +25,12 @@ export function InputSection({ settings }: SettingsProps) {
           <select
             className="select w-full sm:w-auto sm:min-w-56"
             value={settings.activationMode}
-            onChange={(event) => void saveWorkspaceSetting("activationMode", event.target.value as typeof settings.activationMode)}
+            onChange={(event) =>
+              void saveWorkspaceSetting(
+                'activationMode',
+                event.target.value as typeof settings.activationMode,
+              )
+            }
           >
             {activationModes.map((option) => (
               <option key={option.value} value={option.value}>

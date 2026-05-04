@@ -274,7 +274,7 @@ fn main() {
     }
 
     if harness.fixtures.is_empty() {
-        eprintln!("  [skip] No fixtures found in test_fixtures/");
+        eprintln!("  [skip] No fixtures found in fixtures/audio/");
         return;
     }
 

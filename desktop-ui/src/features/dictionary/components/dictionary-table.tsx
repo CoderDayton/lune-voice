@@ -1,23 +1,17 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { useStore } from "@tanstack/react-store";
-import { ConfirmDialog } from "../../../components/feedback";
+import { Trans, useLingui } from '@lingui/react/macro';
+import { useStore } from '@tanstack/react-store';
+import { BookOpen, Check, Pencil, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ConfirmDialog } from '../../../components/feedback';
 import {
   removeDictionaryEntry,
   updateDictionaryEntry,
   workspaceStore,
-} from "../../../store/workspace-store";
-import { Trans, useLingui } from "@lingui/react/macro";
-import { BookOpen, Check, X, Pencil } from "lucide-react";
-import type { DictionaryEntry } from "../data/dictionary-data";
-import { PriorityBadge, PriorityPicker } from "./priority-picker";
+} from '../../../store/workspace-store';
+import type { DictionaryEntry } from '../data/dictionary-data';
+import { PriorityBadge, PriorityPicker } from './priority-picker';
 
-function EditRow({
-  entry,
-  onDone,
-}: {
-  entry: DictionaryEntry;
-  onDone: () => void;
-}) {
+function EditRow({ entry, onDone }: { entry: DictionaryEntry; onDone: () => void }) {
   const { t } = useLingui();
   const [phrase, setPhrase] = useState(entry.phrase);
   const [replacement, setReplacement] = useState(entry.replacement);
@@ -31,29 +25,22 @@ function EditRow({
   }, []);
 
   const dirty =
-    phrase !== entry.phrase ||
-    replacement !== entry.replacement ||
-    priority !== entry.priority;
+    phrase !== entry.phrase || replacement !== entry.replacement || priority !== entry.priority;
 
   const save = useCallback(async () => {
     if (!dirty || !phrase.trim() || !replacement.trim()) return;
     setSaving(true);
-    const ok = await updateDictionaryEntry(
-      entry.id,
-      phrase,
-      replacement,
-      priority,
-    );
+    const ok = await updateDictionaryEntry(entry.id, phrase, replacement, priority);
     setSaving(false);
     if (ok) onDone();
   }, [dirty, phrase, replacement, priority, entry.id, onDone]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === "Enter") {
+      if (e.key === 'Enter') {
         e.preventDefault();
         void save();
-      } else if (e.key === "Escape") {
+      } else if (e.key === 'Escape') {
         onDone();
       }
     },
@@ -112,11 +99,7 @@ function EditRow({
             disabled={saving || !dirty || !phrase.trim() || !replacement.trim()}
             aria-label={t`Save`}
           >
-            {saving ? (
-              <span className="loading loading-spinner loading-xs" />
-            ) : (
-              <Check size={15} />
-            )}
+            {saving ? <span className="loading loading-spinner loading-xs" /> : <Check size={15} />}
           </button>
         </div>
       </td>
@@ -124,26 +107,16 @@ function EditRow({
   );
 }
 
-function ViewRow({
-  entry,
-  onEdit,
-}: {
-  entry: DictionaryEntry;
-  onEdit: () => void;
-}) {
+function ViewRow({ entry, onEdit }: { entry: DictionaryEntry; onEdit: () => void }) {
   const { t } = useLingui();
 
   return (
     <tr className="hover group">
       <td>
         <div className="font-mono text-base">{entry.phrase}</div>
-        <div className="sm:hidden text-xs text-content-dim mt-0.5">
-          → {entry.replacement}
-        </div>
+        <div className="sm:hidden text-xs text-content-dim mt-0.5">→ {entry.replacement}</div>
       </td>
-      <td className="hidden sm:table-cell font-mono text-base">
-        {entry.replacement}
-      </td>
+      <td className="hidden sm:table-cell font-mono text-base">{entry.replacement}</td>
       <td className="hidden sm:table-cell">
         <PriorityBadge value={entry.priority} />
       </td>
@@ -178,11 +151,7 @@ export function DictionaryTable() {
   if (entries.length === 0) {
     return (
       <div role="alert" className="alert alert-info alert-soft">
-        <BookOpen
-          size={18}
-          strokeWidth={1.5}
-          className="text-content-subtle"
-        />
+        <BookOpen size={18} strokeWidth={1.5} className="text-content-subtle" />
         <span>
           <Trans>No entries yet. Add your first correction rule above.</Trans>
         </span>
@@ -212,17 +181,9 @@ export function DictionaryTable() {
         <tbody>
           {entries.map((entry) =>
             editingId === entry.id ? (
-              <EditRow
-                key={entry.id}
-                entry={entry}
-                onDone={() => setEditingId(null)}
-              />
+              <EditRow key={entry.id} entry={entry} onDone={() => setEditingId(null)} />
             ) : (
-              <ViewRow
-                key={entry.id}
-                entry={entry}
-                onEdit={() => setEditingId(entry.id)}
-              />
+              <ViewRow key={entry.id} entry={entry} onEdit={() => setEditingId(entry.id)} />
             ),
           )}
         </tbody>

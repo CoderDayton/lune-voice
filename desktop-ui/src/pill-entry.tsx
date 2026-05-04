@@ -1,11 +1,9 @@
-
-import ReactDOM from "react-dom/client";
-import { I18nProvider } from "@lingui/react";
-import { i18n } from "@lingui/core";
-import { activateLocale, defaultLocale } from "./i18n";
-import { DictationPill } from "./features/dictation/dictation-pill";
-import "./app.css";
-
+import { i18n } from '@lingui/core';
+import { I18nProvider } from '@lingui/react';
+import ReactDOM from 'react-dom/client';
+import { DictationPill } from './features/dictation/dictation-pill';
+import { activateLocale, defaultLocale } from './i18n';
+import './app.css';
 
 function PillApp() {
   return (
@@ -15,14 +13,16 @@ function PillApp() {
   );
 }
 
-activateLocale(defaultLocale).catch(() => {}).then(() => {
-  document.documentElement.classList.add("pill-window");
-  document.body.classList.add("pill-window");
+activateLocale(defaultLocale)
+  .catch(() => {})
+  .then(() => {
+    document.documentElement.classList.add('pill-window');
+    document.body.classList.add('pill-window');
 
-  const root = document.getElementById("pill-root");
-  if (!root) {
-    console.error("[pill] root element not found");
-    return;
-  }
-  ReactDOM.createRoot(root).render(<PillApp />);
-});
+    const root = document.getElementById('pill-root');
+    if (!root) {
+      console.error('[pill] root element not found');
+      return;
+    }
+    ReactDOM.createRoot(root).render(<PillApp />);
+  });

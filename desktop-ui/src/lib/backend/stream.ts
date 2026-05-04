@@ -1,7 +1,7 @@
-import { Channel, invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import { isTauriRuntime } from "./runtime";
-import type { SessionStreamEvent } from "./types";
+import { Channel, invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import { isTauriRuntime } from './runtime';
+import type { SessionStreamEvent } from './types';
 
 async function retryInvoke<T>(fn: () => Promise<T>, maxAttempts = 3, delayMs = 1000): Promise<T> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -12,7 +12,7 @@ async function retryInvoke<T>(fn: () => Promise<T>, maxAttempts = 3, delayMs = 1
       await new Promise((r) => setTimeout(r, delayMs * attempt));
     }
   }
-  throw new Error("unreachable");
+  throw new Error('unreachable');
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
@@ -38,10 +38,8 @@ function cleanupChannel(channel: Channel<any>) {
   try {
     const id = (channel as { id: number }).id;
     // biome-ignore lint/suspicious/noExplicitAny: Tauri internal window property
-    const internals = (window as any).__TAURI_INTERNALS__ as
-      | Record<string, unknown>
-      | undefined;
-    if (internals && typeof id === "number") {
+    const internals = (window as any).__TAURI_INTERNALS__ as Record<string, unknown> | undefined;
+    if (internals && typeof id === 'number') {
       delete internals[`_${id}`];
     }
   } catch {
@@ -60,7 +58,7 @@ export async function attachSessionStream(
     try {
       onEvent(event);
     } catch (e) {
-      console.error("[stream] session event handler threw", e);
+      console.error('[stream] session event handler threw', e);
     }
   });
 
@@ -68,9 +66,9 @@ export async function attachSessionStream(
   try {
     subscriptionId = await retryInvoke(() =>
       withTimeout(
-        invoke<number>("subscribe_session_stream", { channel }),
+        invoke<number>('subscribe_session_stream', { channel }),
         10_000,
-        "subscribe_session_stream",
+        'subscribe_session_stream',
       ),
     );
   } catch (error) {
@@ -79,15 +77,15 @@ export async function attachSessionStream(
   }
 
   return () => {
-    invoke("detach_session_stream", { subscriptionId }).catch((e) => {
-      console.warn("[stream] detach_session_stream failed", e);
+    invoke('detach_session_stream', { subscriptionId }).catch((e) => {
+      console.warn('[stream] detach_session_stream failed', e);
     });
     cleanupChannel(channel);
   };
 }
 
 export async function listenToWorkspaceInvalidation(
-  eventName: "lune://history-changed",
+  eventName: 'lune://history-changed',
   onInvalidate: () => void,
 ): Promise<() => void> {
   if (!isTauriRuntime()) {

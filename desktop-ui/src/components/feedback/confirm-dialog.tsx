@@ -1,5 +1,5 @@
-import { useId, useState } from "react";
-import { useLingui } from "@lingui/react/macro";
+import { useLingui } from '@lingui/react/macro';
+import { useId, useState } from 'react';
 
 interface ConfirmDialogProps {
   title: string;
@@ -42,11 +42,15 @@ export function ConfirmDialog({
         aria-labelledby={titleId}
       >
         <div className="modal-box">
-          <h3 id={titleId} className="text-xl font-bold">{title}</h3>
+          <h3 id={titleId} className="text-xl font-bold">
+            {title}
+          </h3>
           <p className="py-4 text-sm text-content-muted">{description}</p>
           <div className="modal-action">
             <form method="dialog">
-              <button type="submit" className="btn btn-ghost">{cancelLabel ?? t`Cancel`}</button>
+              <button type="submit" className="btn btn-ghost">
+                {cancelLabel ?? t`Cancel`}
+              </button>
             </form>
             <button
               type="button"
@@ -60,7 +64,9 @@ export function ConfirmDialog({
             </button>
           </div>
         </div>
-        <form method="dialog" className="modal-backdrop"><button type="submit">close</button></form>
+        <form method="dialog" className="modal-backdrop">
+          <button type="submit">close</button>
+        </form>
       </dialog>
     </>
   );

@@ -1,4 +1,4 @@
-import { useLingui } from "@lingui/react/macro";
+import { useLingui } from '@lingui/react/macro';
 
 const DOT_COUNT = 5;
 
@@ -16,9 +16,7 @@ export function AudioDots({ level }: AudioDotsProps) {
   return (
     <div className="audio-dots" role="img" aria-label={t`Audio activity`}>
       {Array.from({ length: DOT_COUNT }, (_, i) => {
-        const scale = hasLevel
-          ? 1 + level * DOT_WEIGHTS[i]! * 2.0
-          : undefined;
+        const scale = hasLevel ? 1 + level * DOT_WEIGHTS[i]! * 2.0 : undefined;
 
         return (
           <span

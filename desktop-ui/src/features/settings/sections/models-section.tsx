@@ -1,9 +1,18 @@
-import { useEffect, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import { SettingsSection } from "../components/section";
-import { useLingui } from "@lingui/react/macro";
-import { HardDrive, Download, Trash2, Loader2, AlertTriangle, Info, Zap, Circle } from "lucide-react";
+import { useLingui } from '@lingui/react/macro';
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import {
+  AlertTriangle,
+  Circle,
+  Download,
+  HardDrive,
+  Info,
+  Loader2,
+  Trash2,
+  Zap,
+} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { SettingsSection } from '../components/section';
 
 interface ModelStatus {
   name: string;
@@ -22,32 +31,29 @@ interface DownloadProgress {
   done: boolean;
 }
 
-function getModelState(
-  model: ModelStatus,
-  ready: boolean,
-): "active" | "downloaded" | "missing" {
-  if (!ready) return "missing";
-  if (model.required) return "active";
-  return "downloaded";
+function getModelState(model: ModelStatus, ready: boolean): 'active' | 'downloaded' | 'missing' {
+  if (!ready) return 'missing';
+  if (model.required) return 'active';
+  return 'downloaded';
 }
 
-function StatusBadge({ state }: { state: "active" | "downloaded" | "missing" }) {
+function StatusBadge({ state }: { state: 'active' | 'downloaded' | 'missing' }) {
   switch (state) {
-    case "active":
+    case 'active':
       return (
         <span className="badge badge-success badge-sm gap-1">
           <Zap size={10} />
           Active
         </span>
       );
-    case "downloaded":
+    case 'downloaded':
       return (
         <span className="badge badge-ghost badge-sm gap-1">
           <Circle size={10} />
           Idle
         </span>
       );
-    case "missing":
+    case 'missing':
       return (
         <span className="badge badge-error badge-sm gap-1">
           <Circle size={10} />
@@ -68,16 +74,18 @@ export function ModelsSection() {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   function refresh() {
-    invoke<ModelStatus[]>("check_model_status")
+    invoke<ModelStatus[]>('check_model_status')
       .then(setModels)
-      .catch((e) => console.error("check_model_status:", e))
+      .catch((e) => console.error('check_model_status:', e))
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    refresh();
+  }, []);
 
   useEffect(() => {
-    const unlisten = listen<DownloadProgress>("lune://download-progress", (event) => {
+    const unlisten = listen<DownloadProgress>('lune://download-progress', (event) => {
       setProgress(event.payload);
       if (event.payload.done) {
         setDownloading(null);
@@ -85,13 +93,15 @@ export function ModelsSection() {
         refresh();
       }
     });
-    return () => { void unlisten.then((f) => f()); };
+    return () => {
+      void unlisten.then((f) => f());
+    };
   }, []);
 
   function handleDownload(localName: string) {
     setDownloading(localName);
-    invoke("download_model_cmd", { localName }).catch((e) => {
-      console.error("download_model_cmd:", e);
+    invoke('download_model_cmd', { localName }).catch((e) => {
+      console.error('download_model_cmd:', e);
       setDownloading(null);
       setProgress(null);
     });
@@ -107,14 +117,18 @@ export function ModelsSection() {
     const localName = confirmDelete.localName;
     dialogRef.current?.close();
     setConfirmDelete(null);
-    invoke("delete_model_cmd", { localName })
+    invoke('delete_model_cmd', { localName })
       .then(() => refresh())
-      .catch((e) => console.error("delete_model_cmd:", e));
+      .catch((e) => console.error('delete_model_cmd:', e));
   }
 
   if (loading) {
     return (
-      <SettingsSection title={t`Models`} description={t`Manage AI models stored on your device.`} icon={HardDrive}>
+      <SettingsSection
+        title={t`Models`}
+        description={t`Manage AI models stored on your device.`}
+        icon={HardDrive}
+      >
         {[0, 1].map((i) => (
           <div key={i} className="flex items-center gap-3 py-3">
             <div className="skeleton size-8 sm:size-10 rounded-field shrink-0" />
@@ -145,7 +159,10 @@ export function ModelsSection() {
               : null;
 
           return (
-            <div key={model.localName} className="flex flex-col gap-2 py-3 border-b border-surface-border last:border-0 sm:flex-row sm:items-start sm:justify-between">
+            <div
+              key={model.localName}
+              className="flex flex-col gap-2 py-3 border-b border-surface-border last:border-0 sm:flex-row sm:items-start sm:justify-between"
+            >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <StatusBadge state={state} />
@@ -182,9 +199,7 @@ export function ModelsSection() {
                   {model.description}
                 </p>
               )}
-              {progressText && (
-                <p className="text-sm text-content-subtle">{progressText}</p>
-              )}
+              {progressText && <p className="text-sm text-content-subtle">{progressText}</p>}
             </div>
           );
         })}
@@ -217,11 +232,7 @@ export function ModelsSection() {
                     >
                       {t`Cancel`}
                     </button>
-                    <button
-                      type="button"
-                      className="btn btn-error"
-                      onClick={handleDeleteConfirm}
-                    >
+                    <button type="button" className="btn btn-error" onClick={handleDeleteConfirm}>
                       {t`Delete model`}
                     </button>
                   </div>

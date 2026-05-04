@@ -189,8 +189,8 @@ fn main() {
     let pcm = pcm_buffer.lock().unwrap();
     let audio_secs = pcm.len() as f64 / 16_000.0;
 
-    let wav_path = root.join("test_fixtures/live_recording.wav");
-    let txt_path = root.join("test_fixtures/live_recording.txt");
+    let wav_path = root.join("fixtures/audio/live_recording.wav");
+    let txt_path = root.join("fixtures/audio/live_recording.txt");
 
     save_wav_f32(&pcm, &wav_path);
     std::fs::write(&txt_path, &transcript).expect("write transcript");

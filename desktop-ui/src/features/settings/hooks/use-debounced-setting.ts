@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from "react";
-import { saveWorkspaceSetting, type WorkspaceSettings } from "../../../store/workspace-store";
+import { useCallback, useRef, useState } from 'react';
+import { saveWorkspaceSetting, type WorkspaceSettings } from '../../../store/workspace-store';
 
 /**
  * Local state + debounced IPC save for text inputs and sliders.

@@ -1,12 +1,9 @@
-import { memo } from "react";
-import { useStore } from "@tanstack/react-store";
-import { useLingui } from "@lingui/react/macro";
-import {
-  getVisibleHistorySessions,
-  workspaceStore,
-} from "../../../store/workspace-store";
-import type { HistorySession } from "../../../store/workspace-store";
-import { SessionDetailModal } from "./session-detail-modal";
+import { useLingui } from '@lingui/react/macro';
+import { useStore } from '@tanstack/react-store';
+import { memo } from 'react';
+import type { HistorySession } from '../../../store/workspace-store';
+import { getVisibleHistorySessions, workspaceStore } from '../../../store/workspace-store';
+import { SessionDetailModal } from './session-detail-modal';
 
 interface SessionRowProps {
   item: HistorySession;
@@ -14,20 +11,26 @@ interface SessionRowProps {
 
 const SessionRow = memo(function SessionRow({ item }: SessionRowProps) {
   const { t } = useLingui();
-  const time = new Date(item.startedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const time = new Date(item.startedAt).toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 
   return (
     <SessionDetailModal session={item}>
       {(open) => (
         <li className="list-row interactive-row" onClick={open}>
           <div className="list-col-grow min-w-0">
-            <p className="text-base line-clamp-2 sm:line-clamp-3">{item.transcript || t`Empty session`}</p>
+            <p className="text-base line-clamp-2 sm:line-clamp-3">
+              {item.transcript || t`Empty session`}
+            </p>
             <div className="text-sm text-content-subtle mt-0.5">
               <span className="tabular-nums">{time}</span>
               <span className="mx-1">·</span>
               {item.words} {t`words`}
               <span className="mx-1">·</span>
-              {item.seconds}{t`s`}
+              {item.seconds}
+              {t`s`}
             </div>
           </div>
         </li>
@@ -52,9 +55,13 @@ export function HistorySessionList() {
   for (const session of visibleSessions) {
     const dateStr = new Date(session.startedAt).toDateString();
     let label: string;
-    if (dateStr === todayStr) label = "Today";
-    else if (dateStr === yesterdayStr) label = "Yesterday";
-    else label = new Date(session.startedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    if (dateStr === todayStr) label = 'Today';
+    else if (dateStr === yesterdayStr) label = 'Yesterday';
+    else
+      label = new Date(session.startedAt).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+      });
 
     const items = groupMap.get(label);
     if (items) items.push(session);

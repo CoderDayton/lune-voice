@@ -1,7 +1,7 @@
-import { useStore } from "@tanstack/react-store";
-import { workspaceStore, saveWorkspaceSetting } from "../../store/workspace-store";
-import { Paintbrush, Check } from "lucide-react";
-import { useLingui } from "@lingui/react/macro";
+import { useLingui } from '@lingui/react/macro';
+import { useStore } from '@tanstack/react-store';
+import { Check, Paintbrush } from 'lucide-react';
+import { saveWorkspaceSetting, workspaceStore } from '../../store/workspace-store';
 
 export function StylesPage() {
   const { t } = useLingui();
@@ -42,10 +42,10 @@ export function StylesPage() {
                   type="button"
                   className={`card border rounded-box p-5 text-left transition-colors cursor-pointer ${
                     isActive
-                      ? "border-primary bg-primary/5"
-                      : "border-surface-border bg-surface-card hover:border-primary/40"
+                      ? 'border-primary bg-primary/5'
+                      : 'border-surface-border bg-surface-card hover:border-primary/40'
                   }`}
-                  onClick={() => void saveWorkspaceSetting("stylePreset", preset.id)}
+                  onClick={() => void saveWorkspaceSetting('stylePreset', preset.id)}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-medium">{preset.name}</span>

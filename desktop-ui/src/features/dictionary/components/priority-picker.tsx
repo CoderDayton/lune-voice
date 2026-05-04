@@ -1,9 +1,9 @@
-import { useLingui } from "@lingui/react/macro";
+import { useLingui } from '@lingui/react/macro';
 
 const PRIORITY_LEVELS = [
-  { value: 1, label: "Low", badge: "badge-ghost" },
-  { value: 5, label: "Med", badge: "badge-info badge-soft" },
-  { value: 9, label: "High", badge: "badge-warning badge-soft" },
+  { value: 1, label: 'Low', badge: 'badge-ghost' },
+  { value: 5, label: 'Med', badge: 'badge-info badge-soft' },
+  { value: 9, label: 'High', badge: 'badge-warning badge-soft' },
 ] as const;
 
 function closestLevel(value: number) {
@@ -14,11 +14,7 @@ function closestLevel(value: number) {
 
 export function PriorityBadge({ value }: { value: number }) {
   const level = closestLevel(value);
-  return (
-    <span className={`badge badge-sm ${level.badge} select-none`}>
-      {level.label}
-    </span>
-  );
+  return <span className={`badge badge-sm ${level.badge} select-none`}>{level.label}</span>;
 }
 
 export function PriorityPicker({
@@ -39,7 +35,7 @@ export function PriorityPicker({
             key={level.value}
             type="button"
             aria-pressed={active}
-            className={`join-item btn btn-xs ${active ? "btn-primary" : "btn-ghost"}`}
+            className={`join-item btn btn-xs ${active ? 'btn-primary' : 'btn-ghost'}`}
             onClick={() => onChange(level.value)}
           >
             {level.label}

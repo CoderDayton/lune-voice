@@ -1,7 +1,7 @@
-import { useStore } from "@tanstack/react-store";
-import { CircleX, X } from "lucide-react";
-import { workspaceActions, workspaceStore } from "../../store/workspace-store";
-import { useLingui } from "@lingui/react/macro";
+import { useLingui } from '@lingui/react/macro';
+import { useStore } from '@tanstack/react-store';
+import { CircleX, X } from 'lucide-react';
+import { workspaceActions, workspaceStore } from '../../store/workspace-store';
 
 export function ErrorToast() {
   const { t } = useLingui();
@@ -11,7 +11,11 @@ export function ErrorToast() {
 
   return (
     <div className="toast toast-end toast-bottom z-50 pointer-events-none">
-      <div role="alert" aria-live="assertive" className="alert alert-error alert-soft pointer-events-auto max-w-sm shadow-lg">
+      <div
+        role="alert"
+        aria-live="assertive"
+        className="alert alert-error alert-soft pointer-events-auto max-w-sm shadow-lg"
+      >
         <CircleX size={18} strokeWidth={2} className="shrink-0" />
         <span className="text-sm">{error}</span>
         <button

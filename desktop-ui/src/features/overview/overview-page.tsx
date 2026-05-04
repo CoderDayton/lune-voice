@@ -1,16 +1,16 @@
-import { useStore } from "@tanstack/react-store";
-import { Link } from "@tanstack/react-router";
-import { SessionDetailModal } from "../history/components/session-detail-modal";
-import { ModelSetup } from "./components/model-setup";
-import { useLingui } from "@lingui/react/macro";
-import { Clock, Hash, MessageSquareText, Mic } from "lucide-react";
-import { StatusBadge, InfoBadge } from "../../components/ui/status-badge";
+import { useLingui } from '@lingui/react/macro';
+import { Link } from '@tanstack/react-router';
+import { useStore } from '@tanstack/react-store';
+import { Clock, Hash, MessageSquareText, Mic } from 'lucide-react';
+import { InfoBadge, StatusBadge } from '../../components/ui/status-badge';
 import {
   getSessionStats,
   summarizeAsrBackend,
   summarizeDictationMode,
   workspaceStore,
-} from "../../store/workspace-store";
+} from '../../store/workspace-store';
+import { SessionDetailModal } from '../history/components/session-detail-modal';
+import { ModelSetup } from './components/model-setup';
 
 export function OverviewPage() {
   const { t } = useLingui();
@@ -22,12 +22,10 @@ export function OverviewPage() {
   const stats = useStore(workspaceStore, getSessionStats);
   const recentSessions = useStore(workspaceStore, (s) => s.historySessions.slice(0, 5));
 
-  const isActive = serviceStatus === "listening" || serviceStatus === "processing";
+  const isActive = serviceStatus === 'listening' || serviceStatus === 'processing';
   const isConnected =
-    serviceStatus === "ready" ||
-    serviceStatus === "listening" ||
-    serviceStatus === "processing";
-  const isLoading = serviceStatus === "Connecting" || loading;
+    serviceStatus === 'ready' || serviceStatus === 'listening' || serviceStatus === 'processing';
+  const isLoading = serviceStatus === 'Connecting' || loading;
   const showSkeleton = loading && stats.count === 0;
 
   return (
@@ -36,7 +34,7 @@ export function OverviewPage() {
         <section className="panel-surface">
           <div className="card-body gap-5 p-5 sm:p-6">
             <div className="flex flex-wrap items-center gap-3 text-base">
-              <StatusBadge variant={isLoading ? "warning" : isConnected ? "success" : "error"}>
+              <StatusBadge variant={isLoading ? 'warning' : isConnected ? 'success' : 'error'}>
                 {isLoading ? t`Connecting` : isConnected ? t`Ready` : t`Disconnected`}
               </StatusBadge>
               <InfoBadge>{summarizeAsrBackend(asrBackend)}</InfoBadge>
@@ -123,28 +121,36 @@ export function OverviewPage() {
                 </div>
                 <p className="text-sm font-medium text-content-muted">{t`No sessions yet`}</p>
                 <p className="mt-1 text-sm text-content-subtle">
-                  {t`Press`} <kbd className="kbd kbd-xs">{hotkeyToggle || t`your hotkey`}</kbd> {t`to start dictating`}
+                  {t`Press`} <kbd className="kbd kbd-xs">{hotkeyToggle || t`your hotkey`}</kbd>{' '}
+                  {t`to start dictating`}
                 </p>
               </div>
             ) : recentSessions.length === 0 && isActive ? null : (
               <div className="divide-y divide-surface-border">
                 {recentSessions.map((session) => {
                   const time = new Date(session.startedAt).toLocaleTimeString([], {
-                    hour: "numeric",
-                    minute: "2-digit",
+                    hour: 'numeric',
+                    minute: '2-digit',
                   });
                   return (
                     <SessionDetailModal key={session.id} session={session}>
                       {(open) => (
                         <article className="interactive-row block px-5 py-4" onClick={open}>
-                          <div className="pt-1 text-sm tabular-nums text-content-subtle">{time}</div>
+                          <div className="pt-1 text-sm tabular-nums text-content-subtle">
+                            {time}
+                          </div>
                           <div className="min-w-0">
                             <p className="text-base leading-6 break-words text-content">
                               {session.transcript || t`Empty session`}
                             </p>
                             <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-content-muted">
-                              <span className="badge badge-ghost badge-sm">{session.words} {t`words`}</span>
-                              <span>{session.seconds}{t`s`}</span>
+                              <span className="badge badge-ghost badge-sm">
+                                {session.words} {t`words`}
+                              </span>
+                              <span>
+                                {session.seconds}
+                                {t`s`}
+                              </span>
                             </div>
                           </div>
                         </article>

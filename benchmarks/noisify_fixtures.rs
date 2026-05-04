@@ -1,8 +1,8 @@
 //! Generate noisy variants of the clean fixtures for LLM-correction
 //! stress-testing.
 //!
-//! Reads `test_fixtures/librispeech_clean.wav` and
-//! `test_fixtures/custom_recording.wav`, adds reproducible Gaussian noise
+//! Reads `fixtures/audio/librispeech_clean.wav` and
+//! `fixtures/audio/custom_recording.wav`, adds reproducible Gaussian noise
 //! at multiple SNR levels, and writes `<name>_noise_snr<db>.wav` + a
 //! matching `.txt` reference (identical to the source transcript, since
 //! noise doesn't change the ground truth).
@@ -30,7 +30,7 @@ use bench_utils::workspace_root;
 /// signal and noise have equal RMS power.
 const SNR_LEVELS_DB: &[i32] = &[10, 5, 0];
 
-/// Base fixtures to noisify. Each must exist in `test_fixtures/` as both
+/// Base fixtures to noisify. Each must exist in `fixtures/audio/` as both
 /// `<name>.wav` and `<name>.txt`.
 const BASE_FIXTURES: &[&str] = &["librispeech_clean", "custom_recording"];
 
@@ -42,7 +42,7 @@ fn main() {
     println!();
 
     let root = workspace_root();
-    let fixtures_dir = root.join("test_fixtures");
+    let fixtures_dir = root.join("fixtures/audio");
 
     for name in BASE_FIXTURES {
         let wav_path = fixtures_dir.join(format!("{name}.wav"));

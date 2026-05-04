@@ -28,7 +28,7 @@ fn main() {
     let root = workspace_root();
     let fixtures = load_fixtures(&root);
     if fixtures.is_empty() {
-        eprintln!("[skip] no WAV fixtures found in test_fixtures/");
+        eprintln!("[skip] no WAV fixtures found in fixtures/audio/");
         return;
     }
 
@@ -166,7 +166,7 @@ fn workspace_root() -> PathBuf {
 }
 
 fn load_fixtures(root: &Path) -> Vec<Fixture> {
-    let fixtures_dir = root.join("test_fixtures");
+    let fixtures_dir = root.join("fixtures/audio");
     let Ok(entries) = std::fs::read_dir(&fixtures_dir) else {
         return Vec::new();
     };

@@ -1,11 +1,11 @@
-import { useStore } from "@tanstack/react-store";
-import { workspaceStore } from "../../store/workspace-store";
-import { AppearanceSection } from "./sections/appearance-section";
-import { InputSection } from "./sections/input-section";
-import { TranscriptionSection } from "./sections/transcription-section";
-import { ShortcutsSection } from "./sections/shortcuts-section";
-import { OutputSection } from "./sections/output-section";
-import { ModelsSection } from "./sections/models-section";
+import { useStore } from '@tanstack/react-store';
+import { workspaceStore } from '../../store/workspace-store';
+import { AppearanceSection } from './sections/appearance-section';
+import { InputSection } from './sections/input-section';
+import { ModelsSection } from './sections/models-section';
+import { OutputSection } from './sections/output-section';
+import { ShortcutsSection } from './sections/shortcuts-section';
+import { TranscriptionSection } from './sections/transcription-section';
 
 export function SettingsPage() {
   const settings = useStore(workspaceStore, (s) => s.settings);
@@ -15,7 +15,10 @@ export function SettingsPage() {
     return (
       <div className="page-stack">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="card border rounded-box p-6 border-surface-border bg-surface-card">
+          <div
+            key={i}
+            className="card border rounded-box p-6 border-surface-border bg-surface-card"
+          >
             <div className="skeleton h-5 w-32 mb-3" />
             <div className="skeleton h-3 w-48 mb-4" />
             <div className="space-y-4">

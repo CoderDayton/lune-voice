@@ -1,12 +1,12 @@
-import { useEffect, useEffectEvent, useRef, useState } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { LogicalSize } from "@tauri-apps/api/dpi";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import type { PillVisibilityValue } from "../../features/settings/data/settings-data";
-import { backendClient } from "../../lib/backend/client";
+import { invoke } from '@tauri-apps/api/core';
+import { LogicalSize } from '@tauri-apps/api/dpi';
+import { listen } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import type { PillVisibilityValue } from '../../features/settings/data/settings-data';
+import { backendClient } from '../../lib/backend/client';
 
-export type PillMode = "idle" | "active" | "processing";
+export type PillMode = 'idle' | 'active' | 'processing';
 type PillVis = PillVisibilityValue;
 
 // Fixed window size for all modes — avoids compositor ghost artifacts
@@ -14,17 +14,17 @@ type PillVis = PillVisibilityValue;
 const PILL_W = 260;
 const PILL_H = 56;
 
-const READY_STATUSES = new Set(["ready", "listening", "processing"]);
+const READY_STATUSES = new Set(['ready', 'listening', 'processing']);
 
 function modeFromStatus(status: string): PillMode {
-  if (status === "listening") return "active";
-  if (status === "processing") return "processing";
-  return "idle";
+  if (status === 'listening') return 'active';
+  if (status === 'processing') return 'processing';
+  return 'idle';
 }
 
 function shouldShow(vis: PillVis, mode: PillMode, serviceReady: boolean): boolean {
-  if (vis === "Never" || !serviceReady) return false;
-  if (vis === "WhenDictating") return mode !== "idle";
+  if (vis === 'Never' || !serviceReady) return false;
+  if (vis === 'WhenDictating') return mode !== 'idle';
   return true;
 }
 
@@ -33,13 +33,13 @@ interface PillSettings {
   pillVisibility: string;
 }
 
-const PILL_VIS_VALUES = new Set<string>(["Always", "WhenDictating", "Never"]);
+const PILL_VIS_VALUES = new Set<string>(['Always', 'WhenDictating', 'Never']);
 
 export function usePillState() {
-  const [mode, setMode] = useState<PillMode>("idle");
-  const [pillVis, setPillVis] = useState<PillVis>("Always");
+  const [mode, setMode] = useState<PillMode>('idle');
+  const [pillVis, setPillVis] = useState<PillVis>('Always');
   const [serviceReady, setServiceReady] = useState(false);
-  const [recordingMode, setRecordingMode] = useState<"Toggle" | "Hold">("Toggle");
+  const [recordingMode, setRecordingMode] = useState<'Toggle' | 'Hold'>('Toggle');
   const [audioLevel, setAudioLevel] = useState(0);
   const smoothedRef = useRef(0);
   const shownRef = useRef(false);
@@ -58,10 +58,12 @@ export function usePillState() {
         }
       },
       (e) => {
-        if (!cancelled) console.warn("[pill] snapshot load failed, staying hidden", e);
+        if (!cancelled) console.warn('[pill] snapshot load failed, staying hidden', e);
       },
     );
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Stable event handlers via useEffectEvent — no stale closure risk
@@ -71,12 +73,12 @@ export function usePillState() {
       setMode(modeFromStatus(status));
     } else {
       setServiceReady(false);
-      setMode("idle");
+      setMode('idle');
     }
   });
 
   const onPillSettings = useEffectEvent((s: PillSettings) => {
-    if (s.activationMode === "Toggle" || s.activationMode === "Hold") {
+    if (s.activationMode === 'Toggle' || s.activationMode === 'Hold') {
       setRecordingMode(s.activationMode);
     }
     if (PILL_VIS_VALUES.has(s.pillVisibility)) {
@@ -92,9 +94,11 @@ export function usePillState() {
 
   // Listen to Rust backend events — consolidated into one effect with stable handlers
   useEffect(() => {
-    const unlistenState = listen<string>("lune://pill-state", (e) => onPillState(e.payload));
-    const unlistenSettings = listen<PillSettings>("lune://pill-settings", (e) => onPillSettings(e.payload));
-    const unlistenLevel = listen<number>("lune://audio-level", (e) => onAudioLevel(e.payload));
+    const unlistenState = listen<string>('lune://pill-state', (e) => onPillState(e.payload));
+    const unlistenSettings = listen<PillSettings>('lune://pill-settings', (e) =>
+      onPillSettings(e.payload),
+    );
+    const unlistenLevel = listen<number>('lune://audio-level', (e) => onAudioLevel(e.payload));
 
     return () => {
       unlistenState.then((fn) => fn()).catch(() => {});
@@ -105,7 +109,10 @@ export function usePillState() {
 
   // Reset audio level when session ends (tracked via pill-state event)
   useEffect(() => {
-    if (mode === "idle") { setAudioLevel(0); smoothedRef.current = 0; }
+    if (mode === 'idle') {
+      setAudioLevel(0);
+      smoothedRef.current = 0;
+    }
   }, [mode]);
 
   const visible = shouldShow(pillVis, mode, serviceReady);
@@ -119,14 +126,10 @@ export function usePillState() {
   useEffect(() => {
     if (visible && !shownRef.current) {
       shownRef.current = true;
-      invoke("show_pill_window").catch((e) =>
-        console.warn("[pill] show_pill_window failed", e),
-      );
+      invoke('show_pill_window').catch((e) => console.warn('[pill] show_pill_window failed', e));
     } else if (!visible && shownRef.current) {
       shownRef.current = false;
-      invoke("hide_pill_window").catch((e) =>
-        console.warn("[pill] hide_pill_window failed", e),
-      );
+      invoke('hide_pill_window').catch((e) => console.warn('[pill] hide_pill_window failed', e));
     }
   }, [visible]);
 
@@ -135,8 +138,8 @@ export function usePillState() {
     if (!visible) return;
     const win = getCurrentWindow();
     win.setSize(new LogicalSize(PILL_W, PILL_H)).then(
-      () => invoke("reposition_pill_center").catch(() => {}),
-      (e) => console.warn("[pill] setSize failed", e),
+      () => invoke('reposition_pill_center').catch(() => {}),
+      (e) => console.warn('[pill] setSize failed', e),
     );
   }, [visible]);
 

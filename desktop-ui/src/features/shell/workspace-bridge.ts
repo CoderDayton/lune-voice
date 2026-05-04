@@ -1,6 +1,6 @@
-import type { SessionStreamEvent } from "../../lib/backend/types";
-import { attachSessionStream, listenToWorkspaceInvalidation } from "../../lib/backend/stream";
-import { loadWorkspaceSnapshot } from "../../store/workspace-store";
+import { attachSessionStream, listenToWorkspaceInvalidation } from '../../lib/backend/stream';
+import type { SessionStreamEvent } from '../../lib/backend/types';
+import { loadWorkspaceSnapshot } from '../../store/workspace-store';
 
 const DEFAULT_RETRY_DELAY_MS = 5000;
 const HEALTH_CHECK_INTERVAL_MS = 15_000;
@@ -9,7 +9,7 @@ const SESSION_STREAM_SILENCE_LIMIT_MS = 30_000;
 export type WorkspaceBridgeDeps = {
   onSessionEvent: (event: SessionStreamEvent) => void;
   onSnapshotError: (error: unknown) => void;
-  onConnectionError?: (scope: "session" | "history", error: unknown) => void;
+  onConnectionError?: (scope: 'session' | 'history', error: unknown) => void;
   attachSessionStream?: typeof attachSessionStream;
   listenToWorkspaceInvalidation?: typeof listenToWorkspaceInvalidation;
   loadWorkspaceSnapshot?: typeof loadWorkspaceSnapshot;
@@ -62,7 +62,7 @@ export function startWorkspaceBridge(deps: WorkspaceBridgeDeps) {
 
   async function connectHistoryInvalidation() {
     try {
-      const detach = await listenToWorkspaceInvalidationFn("lune://history-changed", () => {
+      const detach = await listenToWorkspaceInvalidationFn('lune://history-changed', () => {
         void requestSnapshotSync();
       });
       if (cancelled) {
@@ -72,7 +72,7 @@ export function startWorkspaceBridge(deps: WorkspaceBridgeDeps) {
       disposers.push(detach);
       void requestSnapshotSync();
     } catch (error) {
-      onConnectionError?.("history", error);
+      onConnectionError?.('history', error);
       if (!cancelled) scheduleRetry(connectHistoryInvalidation);
     }
   }
@@ -95,7 +95,7 @@ export function startWorkspaceBridge(deps: WorkspaceBridgeDeps) {
       lastStreamEventAt = Date.now();
       disposers.push(detach);
     } catch (error) {
-      onConnectionError?.("session", error);
+      onConnectionError?.('session', error);
       if (!cancelled) scheduleRetry(connectSessionStreamWrapped);
     }
   }
@@ -128,4 +128,3 @@ export function startWorkspaceBridge(deps: WorkspaceBridgeDeps) {
     disposers.length = 0;
   };
 }
-

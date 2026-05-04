@@ -1,5 +1,5 @@
-import type { ComponentType, ReactNode } from "react";
-import type { WorkspaceSettings } from "../../../store/workspace-store";
+import type { ComponentType, ReactNode } from 'react';
+import type { WorkspaceSettings } from '../../../store/workspace-store';
 
 export interface SettingsProps {
   settings: WorkspaceSettings;
@@ -18,7 +18,12 @@ interface SettingsRowProps {
   control: ReactNode;
 }
 
-export function SettingsSection({ title, description, icon: Icon, children }: SettingsSectionProps) {
+export function SettingsSection({
+  title,
+  description,
+  icon: Icon,
+  children,
+}: SettingsSectionProps) {
   return (
     <section className="panel-surface">
       <div className="p-5 sm:p-6 pb-0 sm:pb-0">
@@ -44,7 +49,9 @@ export function SettingsRow({ label, description, control }: SettingsRowProps) {
     <div className="settings-row">
       <div className="min-w-0">
         <div className="text-base font-medium">{label}</div>
-        {description ? <div className="text-sm text-content-subtle mt-0.5 max-w-md">{description}</div> : null}
+        {description ? (
+          <div className="text-sm text-content-subtle mt-0.5 max-w-md">{description}</div>
+        ) : null}
       </div>
       <div className="shrink-0">{control}</div>
     </div>

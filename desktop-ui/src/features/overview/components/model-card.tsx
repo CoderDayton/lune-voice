@@ -1,6 +1,6 @@
-import { Check, type LucideIcon } from "lucide-react";
-import { useLingui } from "@lingui/react/macro";
-import type { DownloadProgress } from "./model-setup";
+import { useLingui } from '@lingui/react/macro';
+import { Check, type LucideIcon } from 'lucide-react';
+import type { DownloadProgress } from './model-setup';
 
 interface ModelCardProps {
   name: string;
@@ -18,8 +18,17 @@ interface ModelCardProps {
 }
 
 export function ModelCard({
-  name, description, required, icon: Icon, ready, selected,
-  active, canToggle, progress, pct, onToggle,
+  name,
+  description,
+  required,
+  icon: Icon,
+  ready,
+  selected,
+  active,
+  canToggle,
+  progress,
+  pct,
+  onToggle,
 }: ModelCardProps) {
   const { t } = useLingui();
 
@@ -29,18 +38,25 @@ export function ModelCard({
       disabled={!canToggle}
       onClick={canToggle ? onToggle : undefined}
       className={`card card-border card-sm w-full text-left transition-colors ${
-        ready ? "border-success/30 bg-success/5"
-        : selected ? "border-primary/40 bg-primary/5"
-        : "bg-base-200 opacity-60"
+        ready
+          ? 'border-success/30 bg-success/5'
+          : selected
+            ? 'border-primary/40 bg-primary/5'
+            : 'bg-base-200 opacity-60'
       }`}
     >
       <div className="card-body flex-row items-center gap-3 sm:gap-4">
-        <div className={`flex size-9 sm:size-10 shrink-0 items-center justify-center rounded-field ${
-          ready ? "bg-success/15"
-          : active ? "bg-primary/15"
-          : selected ? "bg-primary/10"
-          : "bg-base-300"
-        }`}>
+        <div
+          className={`flex size-9 sm:size-10 shrink-0 items-center justify-center rounded-field ${
+            ready
+              ? 'bg-success/15'
+              : active
+                ? 'bg-primary/15'
+                : selected
+                  ? 'bg-primary/10'
+                  : 'bg-base-300'
+          }`}
+        >
           {ready ? (
             <Check size={16} strokeWidth={2.5} className="text-success" />
           ) : active ? (
@@ -61,7 +77,11 @@ export function ModelCard({
           </div>
           {active && progress ? (
             <div className="mt-1">
-              <progress className="progress progress-primary h-1.5 w-full" value={progress.fileIndex + 1} max={progress.fileCount} />
+              <progress
+                className="progress progress-primary h-1.5 w-full"
+                value={progress.fileIndex + 1}
+                max={progress.fileCount}
+              />
               <p className="text-xs text-content-dim mt-0.5 truncate">{progress.fileName}</p>
             </div>
           ) : (

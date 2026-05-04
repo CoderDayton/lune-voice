@@ -362,14 +362,28 @@ async fn run_session<A: AsrBackend + 'static>(
         }
     };
 
-    let mut vad = Vad::new(
+    let mut vad = match Vad::new(
         VadConfig {
             threshold: config.pipeline.speech_threshold,
             ..VadConfig::default()
         },
         16_000,
-    )
-    .expect("VAD init");
+    ) {
+        Ok(v) => v,
+        Err(e) => {
+            let _ = event_tx.send(SessionEvent::Error(e.to_string())).await;
+            finalize_db(
+                session_id,
+                Arc::clone(&persist),
+                SessionStatus::Failed(e.to_string()),
+                None,
+                None,
+            )
+            .await;
+            clear_active(&active_arc, &idle_notify).await;
+            return;
+        }
+    };
     let _ = event_tx.send(SessionEvent::Started).await;
 
     let mut segments = Vec::with_capacity(asr.segment_capacity_hint());
@@ -854,7 +868,7 @@ mod tests {
     }
 
     fn speech_samples() -> Vec<f32> {
-        let wav = workspace_root().join("test_fixtures/librispeech_clean.wav");
+        let wav = workspace_root().join("fixtures/audio/librispeech_clean.wav");
         let reader = hound::WavReader::open(wav).expect("open speech fixture");
         let spec = reader.spec();
         match spec.sample_format {

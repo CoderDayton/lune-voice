@@ -1,24 +1,23 @@
-import { invoke } from "@tauri-apps/api/core";
-import { mockBackendClient } from "./mock";
-import type { BackendClient, BackendPillSnapshot, BackendWorkspaceSnapshot } from "./types";
-
-import { isTauriRuntime } from "./runtime";
+import { invoke } from '@tauri-apps/api/core';
+import { mockBackendClient } from './mock';
+import { isTauriRuntime } from './runtime';
+import type { BackendClient, BackendPillSnapshot, BackendWorkspaceSnapshot } from './types';
 
 const tauriBackendClient: BackendClient = {
   loadWorkspaceSnapshot() {
-    return invoke<BackendWorkspaceSnapshot>("load_workspace_snapshot");
+    return invoke<BackendWorkspaceSnapshot>('load_workspace_snapshot');
   },
 
   loadPillSnapshot() {
-    return invoke<BackendPillSnapshot>("load_pill_snapshot");
+    return invoke<BackendPillSnapshot>('load_pill_snapshot');
   },
 
   saveWorkspaceSettings(input) {
-    return invoke<BackendWorkspaceSnapshot>("save_workspace_settings", { input });
+    return invoke<BackendWorkspaceSnapshot>('save_workspace_settings', { input });
   },
 
   createDictionaryEntry(phrase, replacement, priority) {
-    return invoke<BackendWorkspaceSnapshot>("create_dictionary_entry", {
+    return invoke<BackendWorkspaceSnapshot>('create_dictionary_entry', {
       input: {
         phrase,
         replacement,
@@ -28,29 +27,29 @@ const tauriBackendClient: BackendClient = {
   },
 
   updateDictionaryEntry(id, phrase, replacement, priority) {
-    return invoke<BackendWorkspaceSnapshot>("update_dictionary_entry", {
+    return invoke<BackendWorkspaceSnapshot>('update_dictionary_entry', {
       input: { id, phrase, replacement, priority },
     });
   },
 
   deleteDictionaryEntry(id) {
-    return invoke<BackendWorkspaceSnapshot>("delete_dictionary_entry", { entryId: id });
+    return invoke<BackendWorkspaceSnapshot>('delete_dictionary_entry', { entryId: id });
   },
 
   startDictation() {
-    return invoke<string>("start_dictation");
+    return invoke<string>('start_dictation');
   },
 
   stopDictation() {
-    return invoke<void>("stop_dictation");
+    return invoke<void>('stop_dictation');
   },
 
   cancelDictation() {
-    return invoke<void>("cancel_dictation");
+    return invoke<void>('cancel_dictation');
   },
 
   toggleDictation() {
-    return invoke<string | null>("toggle_dictation");
+    return invoke<string | null>('toggle_dictation');
   },
 };
 

@@ -1,0 +1,38 @@
+# Changelog
+
+All notable changes to Lune Voice are documented in this file.
+
+Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [Unreleased]
+
+### Added
+- Dictionary inline editing and priority control in the UI
+- Correction spans for targeted LLM text editing
+- 10-language corpus frequency maps for spell correction
+- Categorized supplemental vocabulary with bincode embedding
+- N-gram language model replacing the old bigram model
+- Domain benchmark suite and RTF metrics
+- `cargo-deny` configuration for license/advisory auditing
+- Content Security Policy for Tauri webview
+- `rustfmt.toml` and `clippy.toml` for consistent tooling
+
+### Changed
+- Style LLM swapped to Qwen3-0.6B with dynamic model registry
+- Corrector restructured as LLM intelligence feed with token-level validator
+- Benchmarks moved from `examples/` to `benches/` with `harness = false`
+- License field updated from MIT to LicenseRef-Proprietary (LICENSE file already proprietary)
+- ORT session builder optimized with refactored build_instructions
+- Local LLM kept warm briefly after dictation to reduce cold-start latency
+
+### Fixed
+- VAD init failure now propagates gracefully instead of panicking
+- Hotkey toggle, session, and IPC pipeline hardened against races and silent failures
+- Qwen3 ASR model readiness and language parsing
+- Gate false positives via case-insensitive lang detection and proper noun bypass
+- Words containing digits skipped in spell corrector
+- Clippy warnings in examples and benchmarks
+
+### Security
+- Updated rustls-webpki to 0.103.13
+- Added SAFETY comments to all unsafe blocks

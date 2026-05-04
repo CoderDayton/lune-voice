@@ -1,15 +1,15 @@
-import { useEffect, useEffectEvent, useRef } from "react";
-import { Outlet, useRouterState } from "@tanstack/react-router";
-import { Menu } from "lucide-react";
-import { SidebarContent } from "./sidebar";
-import { ErrorToast } from "../../../components/feedback";
-import { useAppShortcuts } from "../hooks/use-app-shortcuts";
-import { findNavigationItem } from "../config/navigation";
-import type { SessionStreamEvent } from "../../../lib/backend/types";
-import { workspaceActions } from "../../../store/workspace-store";
-import { startWorkspaceBridge } from "../workspace-bridge";
+import { Outlet, useRouterState } from '@tanstack/react-router';
+import { Menu } from 'lucide-react';
+import { useEffect, useEffectEvent, useRef } from 'react';
+import { ErrorToast } from '../../../components/feedback';
+import type { SessionStreamEvent } from '../../../lib/backend/types';
+import { workspaceActions } from '../../../store/workspace-store';
+import { findNavigationItem } from '../config/navigation';
+import { useAppShortcuts } from '../hooks/use-app-shortcuts';
+import { startWorkspaceBridge } from '../workspace-bridge';
+import { SidebarContent } from './sidebar';
 
-export const DRAWER_ID = "app-drawer";
+export const DRAWER_ID = 'app-drawer';
 
 export function AppShell() {
   useAppShortcuts();
@@ -24,12 +24,12 @@ export function AppShell() {
 
   // Auto-close drawer overlay when crossing the lg breakpoint
   useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1024px)");
+    const mq = window.matchMedia('(min-width: 1024px)');
     const handle = (e: MediaQueryListEvent) => {
       if (drawerRef.current) drawerRef.current.checked = e.matches;
     };
-    mq.addEventListener("change", handle);
-    return () => mq.removeEventListener("change", handle);
+    mq.addEventListener('change', handle);
+    return () => mq.removeEventListener('change', handle);
   }, []);
 
   useEffect(() => {
@@ -37,7 +37,7 @@ export function AppShell() {
       onSessionEvent,
       onSnapshotError: (error) => {
         workspaceActions.setError(
-          error instanceof Error ? error.message : "Failed to reload workspace",
+          error instanceof Error ? error.message : 'Failed to reload workspace',
         );
       },
       onConnectionError: (scope, error) => {
@@ -48,11 +48,20 @@ export function AppShell() {
 
   return (
     <div className="app-shell-root drawer lg:drawer-open fixed inset-0">
-      <input ref={drawerRef} id={DRAWER_ID} type="checkbox" className="drawer-toggle" defaultChecked={typeof window !== "undefined" && window.innerWidth >= 1024} />
+      <input
+        ref={drawerRef}
+        id={DRAWER_ID}
+        type="checkbox"
+        className="drawer-toggle"
+        defaultChecked={typeof window !== 'undefined' && window.innerWidth >= 1024}
+      />
 
       {/* Main content — must come before drawer-side per DaisyUI spec */}
       <div className="drawer-content flex flex-col min-h-0">
-        <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 sm:focus:top-4 sm:focus:left-4 focus:z-50 focus:btn focus:btn-primary focus:btn-sm">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 sm:focus:top-4 sm:focus:left-4 focus:z-50 focus:btn focus:btn-primary focus:btn-sm"
+        >
           Skip to main content
         </a>
         <div className="app-shell-backdrop" />

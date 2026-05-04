@@ -1,4 +1,4 @@
-import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;
@@ -17,25 +17,32 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("[ErrorBoundary]", error, info.componentStack);
+    console.error('[ErrorBoundary]', error, info.componentStack);
   }
 
   render() {
     if (this.state.error) {
-      return this.props.fallback ?? (
-        <div className="flex items-center justify-center h-dvh p-4 sm:p-8">
-          <div role="alert" className="card bg-base-200 border border-error/20 max-w-sm sm:max-w-md w-full p-4 sm:p-6">
-            <h2 className="text-base sm:text-lg font-semibold text-error">Something went wrong</h2>
-            <p className="text-sm text-content-muted mt-2">{this.state.error.message}</p>
-            <button
-              type="button"
-              className="btn btn-sm btn-ghost mt-4"
-              onClick={() => this.setState({ error: null })}
+      return (
+        this.props.fallback ?? (
+          <div className="flex items-center justify-center h-dvh p-4 sm:p-8">
+            <div
+              role="alert"
+              className="card bg-base-200 border border-error/20 max-w-sm sm:max-w-md w-full p-4 sm:p-6"
             >
-              Try again
-            </button>
+              <h2 className="text-base sm:text-lg font-semibold text-error">
+                Something went wrong
+              </h2>
+              <p className="text-sm text-content-muted mt-2">{this.state.error.message}</p>
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost mt-4"
+                onClick={() => this.setState({ error: null })}
+              >
+                Try again
+              </button>
+            </div>
           </div>
-        </div>
+        )
       );
     }
     return this.props.children;

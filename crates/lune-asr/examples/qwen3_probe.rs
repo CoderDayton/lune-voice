@@ -99,7 +99,7 @@ fn main() {
     .expect("load LLM");
     let llm: Arc<dyn lune_core::llm::TextPostProcessor> = Arc::new(llm);
 
-    let fixtures_dir = root.join("test_fixtures");
+    let fixtures_dir = root.join("fixtures/audio");
     let mut fixtures: Vec<(String, Vec<f32>)> = Vec::new();
     for entry in std::fs::read_dir(&fixtures_dir)
         .expect("read fixtures")

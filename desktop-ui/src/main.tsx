@@ -1,15 +1,15 @@
-import { HotkeysProvider } from "@tanstack/react-hotkeys";
-import ReactDOM from "react-dom/client";
-import { RouterProvider, createRouter } from "@tanstack/react-router";
-import { I18nProvider } from "@lingui/react";
-import { i18n } from "@lingui/core";
-import { activateLocale, defaultLocale, locales } from "./i18n";
-import { routeTree } from "./routeTree.gen";
-import { backendClient } from "./lib/backend/client";
-import { workspaceActions } from "./store/workspace-store";
-import { ErrorBoundary } from "./components/feedback";
-import { applyTheme, getThemePreference } from "./lib/theme";
-import "./app.css";
+import { i18n } from '@lingui/core';
+import { I18nProvider } from '@lingui/react';
+import { HotkeysProvider } from '@tanstack/react-hotkeys';
+import { createRouter, RouterProvider } from '@tanstack/react-router';
+import ReactDOM from 'react-dom/client';
+import { ErrorBoundary } from './components/feedback';
+import { activateLocale, defaultLocale, locales } from './i18n';
+import { backendClient } from './lib/backend/client';
+import { applyTheme, getThemePreference } from './lib/theme';
+import { routeTree } from './routeTree.gen';
+import { workspaceActions } from './store/workspace-store';
+import './app.css';
 
 // Apply saved theme before first paint to avoid flash
 applyTheme(getThemePreference());
@@ -23,7 +23,7 @@ const router = createRouter({
   ),
 });
 
-declare module "@tanstack/react-router" {
+declare module '@tanstack/react-router' {
   interface Register {
     router: typeof router;
   }
@@ -42,7 +42,7 @@ async function bootstrap() {
       await activateLocale(lang);
     }
   } catch (error) {
-    console.warn("[bootstrap] workspace snapshot unavailable", error);
+    console.warn('[bootstrap] workspace snapshot unavailable', error);
     // Not in Tauri or snapshot unavailable — app-shell will retry
   }
 }
@@ -61,13 +61,15 @@ function App() {
 
 // Wait for both default locale AND bootstrap before mounting — prevents locale flash.
 // Always mount even if bootstrap fails — app-shell will retry the snapshot load.
-Promise.all([activateLocale(defaultLocale), bootstrap()]).catch((error) => {
-  console.warn("[bootstrap] locale or workspace bootstrap failed", error);
-}).then(() => {
-  const root = document.getElementById("root");
-  if (!root) {
-    console.error("[bootstrap] root element not found");
-    return;
-  }
-  ReactDOM.createRoot(root).render(<App />);
-});
+Promise.all([activateLocale(defaultLocale), bootstrap()])
+  .catch((error) => {
+    console.warn('[bootstrap] locale or workspace bootstrap failed', error);
+  })
+  .then(() => {
+    const root = document.getElementById('root');
+    if (!root) {
+      console.error('[bootstrap] root element not found');
+      return;
+    }
+    ReactDOM.createRoot(root).render(<App />);
+  });
