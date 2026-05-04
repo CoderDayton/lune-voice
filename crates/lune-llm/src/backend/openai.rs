@@ -87,8 +87,6 @@ fn build_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage>
     let user_text = super::ort_llm::OrtStyleLlm::user_prompt(
         &input.raw_text,
         &input.language,
-        &input.style_preset.style_instructions,
-        &input.correction_spans,
         &input.uncertain_words,
     );
 
@@ -177,7 +175,6 @@ mod tests {
             style_preset: Arc::new(StylePreset::casual()),
             app_category: None,
             dictionary: vec![],
-            correction_spans: vec![],
             context: None,
             language: "en".into(),
             uncertain_words: Vec::new(),
@@ -193,7 +190,6 @@ mod tests {
 
         let json = serde_json::to_string(&msgs).unwrap();
         assert!(json.contains("hello um world"));
-        assert!(json.contains("transcript:"));
     }
 
     #[test]
@@ -219,19 +215,12 @@ mod tests {
         let msgs = build_messages(&input);
         let json = serde_json::to_string(&msgs).unwrap();
         assert!(json.contains("hello world"));
-        assert!(json.contains("transcript:"));
     }
 
     #[test]
-    fn build_messages_include_editable_spans() {
+    fn build_messages_with_uncertain_words() {
         let input = PostProcessInput {
-            correction_spans: vec![lune_core::llm::CorrectionSpan {
-                start_word: 5,
-                end_word: 10,
-                text: "discuss interesting their OAuth deployment".into(),
-                confidence: 0.18,
-                word_error_risk: 0.82,
-            }],
+            uncertain_words: vec![("brought".into(), 6)],
             ..test_input(
                 "call with Jennifer Martinez to discuss interesting their OAuth deployment on AWS",
             )
@@ -239,10 +228,8 @@ mod tests {
         let msgs = build_messages(&input);
         let json = serde_json::to_string(&msgs).unwrap();
 
-        assert!(json.contains("Editable spans"));
-        assert!(json.contains("#5..10"));
-        assert!(json.contains("discuss interesting their OAuth deployment"));
-        assert!(json.contains("Copy everything else exactly"));
+        assert!(json.contains("call with Jennifer Martinez"));
+        assert!(json.contains("/no_think"));
     }
 
     #[test]

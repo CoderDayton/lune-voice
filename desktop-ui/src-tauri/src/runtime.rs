@@ -870,7 +870,6 @@ impl LazyLocalLlm {
                     model_dir,
                     use_gpu,
                     max_new_tokens,
-                    ..Default::default()
                 },
             )
             .map(Arc::new)
@@ -1001,7 +1000,6 @@ mod tests {
             style_preset: Arc::new(StylePreset::minimal()),
             app_category: None,
             dictionary: vec![],
-            correction_spans: vec![],
             context: None,
             language: "en".into(),
             uncertain_words: vec![],

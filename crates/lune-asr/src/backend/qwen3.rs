@@ -177,7 +177,6 @@ impl Qwen3AsrBackend {
             .unwrap_or_else(|e| e.into_inner());
 
         // Build system prompt text — always include base prompt.
-        // Language is controlled via suffix, not the system prompt.
         let sys_text = if ctx.is_empty() {
             SYSTEM_PROMPT.to_string()
         } else {

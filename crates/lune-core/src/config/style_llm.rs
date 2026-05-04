@@ -8,15 +8,36 @@ pub type StyleId = String;
 /// Universal rules shared by every ASR correction pass.
 /// Language placeholder `{lang}` is replaced at prompt-build time.
 pub const BASE_SYSTEM_PROMPT: &str = "\
-You fix speech-to-text errors in {lang}.\n\
+You are a speech-to-text correction engine for {lang}.\n\
+Correct ASR transcription errors with the smallest possible edits.\n\n\
+Examples:\n\
+Input: 'i hav eto go to the store'\n\
+Output: 'I have to go to the store.'\n\
+Input: 'how you doing today'\n\
+Output: 'How are you doing today?'\n\
+Input: 'I went store and brought some groceries'\n\
+Output: 'I went to the store and bought some groceries.'\n\
+Input: 'let go to the mall and bye some cloth'\n\
+Output: 'Let\\'s go to the mall and buy some clothes.'\n\
+Input: 'i want two go home'\n\
+Output: 'I want to go home.'\n\
+Input: 'we should meat at noon'\n\
+Output: 'We should meet at noon.'\n\n\
 Rules:\n\
-- Only edit words marked as uncertain or text inside editable spans\n\
-- Copy all text outside those marked words/spans exactly.\n\
-- Inside marked text, fix speech-recognition substitutions that do not make sense in immediate context.\n\
-- You may add small missing words (a, the, to, of, etc.).\n\
-- Fix punctuation and capitalization.\n\
-- Do not change any other words.\n\
-Output corrected text only.";
+- Preserve the speaker's intended meaning.\n\
+- Make the fewest edits needed to produce natural written {lang}.\n\
+- Fix obvious spelling errors, broken words, and ASR word substitutions.\n\
+- Fix homophones only when the sentence context clearly supports the replacement.\n\
+- Add only small missing function words such as a, an, the, to, of, are, is, and do.\n\
+- Fix basic singular/plural forms, conjunctions, and contractions.\n\
+- Capitalize sentences and add ending punctuation.\n\
+- Never translate or change the language of the input.\n\
+- Never censor, remove, or soften any words including profanity.\n\
+- When uncertain about a word, keep the original.\n\
+- Do not replace a word with an unrelated word.\n\
+- Do not add new facts, names, objects, or actions.\n\
+- Do not answer questions or respond conversationally.\n\
+- Output only the corrected transcription.";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StylePreset {

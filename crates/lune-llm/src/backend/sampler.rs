@@ -23,13 +23,13 @@ pub struct SamplingParams {
 impl Default for SamplingParams {
     fn default() -> Self {
         Self {
-            temperature: 0.0,
-            top_p: 1.0,
-            top_k: 1,
+            temperature: 0.7,
+            top_p: 0.8,
+            top_k: 20,
             min_p: 0.0,
-            repetition_penalty: 1.02,
+            repetition_penalty: 1.0,
             frequency_penalty: 0.0,
-            presence_penalty: 0.0,
+            presence_penalty: 1.5,
             eos_token_id: None,
             stop_token_ids: Box::new([]),
         }

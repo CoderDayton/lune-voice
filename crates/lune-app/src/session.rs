@@ -13,7 +13,7 @@ use lune_core::Result;
 use lune_core::asr::{AsrBackend, AsrBackendKind, AsrSegment, AsrSessionConfig};
 use lune_core::config::{PipelineConfig, StylePreset, UserSettings, builtin_registry};
 use lune_core::error::Error;
-use lune_core::llm::{CorrectionSpan, TextPostProcessor};
+use lune_core::llm::TextPostProcessor;
 use lune_core::session::{DictationSession, SessionEvent, SessionStatus};
 use lune_dict::DictionaryManager;
 use lune_dict::corrector::HeuristicCorrector;
@@ -619,25 +619,14 @@ async fn run_session<A: AsrBackend + 'static>(
         detected_lang,
     );
     let text_after_heuristic = heuristic_result.corrected_text;
-    let word_risk_positions = heuristic_result.word_risk_positions;
-    let correction_spans = build_correction_spans(
-        &text_after_heuristic,
-        &word_risk_positions,
-        &heuristic_result.unresolved_words,
-    );
-
-    // ── LLM bypass gate ─────────────────────────────────────────────────
-    let needs_llm = if !lune_dict::corrector::has_dict(detected_lang) {
-        word_risk_scores.iter().any(|(_, r)| *r >= 0.65) || !correction_spans.is_empty()
-    } else {
-        !heuristic_result.unresolved_words.is_empty() || !correction_spans.is_empty()
-    };
 
     let uncertain_words: Vec<(String, usize)> = heuristic_result
         .unresolved_words
         .iter()
         .map(|ws| (ws.word.clone(), ws.position))
         .collect();
+
+    let needs_llm = word_risk_scores.iter().any(|(_, r)| *r >= 0.3);
 
     info!(%session_id, "[ASR] raw: {raw_text}");
     info!(
@@ -661,7 +650,7 @@ async fn run_session<A: AsrBackend + 'static>(
         info!(%session_id, "session cancelled during processing, skipping LLM");
         String::new()
     } else if !needs_llm {
-        info!(%session_id, "ASR confidence high, no corruption markers — bypassing LLM");
+        info!(%session_id, "ASR confidence high — bypassing LLM");
         text_after_heuristic.clone()
     } else {
         info!(%session_id, "[LLM] input: {text_after_heuristic}");
@@ -672,7 +661,6 @@ async fn run_session<A: AsrBackend + 'static>(
             style_preset: Arc::clone(&style_preset),
             app_category: None,
             dictionary: dictionary_entries.clone(),
-            correction_spans,
             context: None,
             language: detected_lang.into(),
             uncertain_words,
@@ -762,65 +750,6 @@ async fn finalize_db(
         Ok(None) => warn!(%session_id, "session not found in DB during finalize"),
         Err(e) => warn!(error = %e, %session_id, "DB error during finalize"),
     }
-}
-
-const LLM_SPAN_RISK_THRESHOLD: f32 = 0.65;
-
-fn build_correction_spans(
-    text: &str,
-    word_risk_positions: &[(usize, f32)],
-    unresolved_words: &[lune_dict::corrector::WordScore],
-) -> Vec<CorrectionSpan> {
-    let words: Vec<&str> = text.split_whitespace().collect();
-    if words.is_empty() {
-        return Vec::new();
-    }
-
-    let mut targets: Vec<(usize, f32)> = Vec::new();
-    for &(idx, risk) in word_risk_positions {
-        if risk >= LLM_SPAN_RISK_THRESHOLD {
-            targets.push((idx, risk));
-        }
-    }
-
-    for word in unresolved_words {
-        targets.push((
-            word.position,
-            word.candidate_score.max(LLM_SPAN_RISK_THRESHOLD),
-        ));
-    }
-    if targets.is_empty() {
-        return Vec::new();
-    }
-
-    targets.sort_unstable_by_key(|(idx, _)| *idx);
-    let mut merged: Vec<(usize, usize, f32)> = Vec::new();
-    for (idx, risk) in targets {
-        if idx >= words.len() {
-            continue;
-        }
-        let start = idx.saturating_sub(1);
-        let end = (idx + 3 + 1).min(words.len());
-
-        match merged.last_mut() {
-            Some((_, prev_end, prev_risk)) if start <= *prev_end => {
-                *prev_end = (*prev_end).max(end);
-                *prev_risk = (*prev_risk).max(risk);
-            }
-            _ => merged.push((start, end, risk)),
-        }
-    }
-
-    merged
-        .into_iter()
-        .map(|(start, end, risk)| CorrectionSpan {
-            start_word: start,
-            end_word: end,
-            text: words[start..end].join(" "),
-            confidence: (1.0 - risk).clamp(0.0, 1.0),
-            word_error_risk: risk,
-        })
-        .collect()
 }
 
 #[cfg(test)]
@@ -1001,75 +930,6 @@ mod tests {
 
     fn local_set() -> tokio::task::LocalSet {
         tokio::task::LocalSet::new()
-    }
-
-    #[test]
-    fn correction_spans_expand_around_risky_known_words() {
-        let text =
-            "call with Jennifer Martinez to discuss interesting their OAuth deployment on AWS";
-        let positions = vec![(6, 0.82)];
-        let spans = build_correction_spans(text, &positions, &[]);
-
-        assert_eq!(spans.len(), 1);
-        assert_eq!(spans[0].start_word, 5);
-        assert_eq!(spans[0].end_word, 10);
-        assert_eq!(spans[0].text, "discuss interesting their OAuth deployment");
-        assert!((spans[0].word_error_risk - 0.82).abs() < f32::EPSILON);
-    }
-
-    #[test]
-    fn correction_spans_merge_overlapping_windows() {
-        let text =
-            "call with Jennifer Martinez to discuss interesting their OAuth deployment on AWS";
-        let positions = vec![(6, 0.82), (8, 0.70)];
-        let spans = build_correction_spans(text, &positions, &[]);
-
-        assert_eq!(spans.len(), 1);
-        assert_eq!(
-            spans[0].text,
-            "discuss interesting their OAuth deployment on AWS"
-        );
-        assert!((spans[0].word_error_risk - 0.82).abs() < f32::EPSILON);
-    }
-
-    #[test]
-    fn correction_spans_merge_adjacent_windows() {
-        let text = "one two three four five six seven eight nine ten";
-        let positions = vec![(1, 0.82), (5, 0.70)];
-        let spans = build_correction_spans(text, &positions, &[]);
-
-        assert_eq!(spans.len(), 1);
-        assert_eq!(
-            spans[0].text,
-            "one two three four five six seven eight nine"
-        );
-        assert!((spans[0].word_error_risk - 0.82).abs() < f32::EPSILON);
-    }
-
-    #[test]
-    fn correction_span_alignment_handles_duplicate_words_by_position() {
-        let text = "the build fixed the deployment";
-        let positions = vec![(0, 0.10), (3, 0.85)];
-        let spans = build_correction_spans(text, &positions, &[]);
-
-        assert_eq!(spans.len(), 1);
-        assert_eq!(spans[0].text, "fixed the deployment");
-    }
-
-    #[test]
-    fn correction_spans_use_heuristic_corrected_text_for_risky_words() {
-        let corrector = HeuristicCorrector::new();
-        let risks = vec![("teh".to_string(), 0.80)];
-        let result = corrector.correct("teh quick brown fox", &risks, &[], "en");
-        let spans = build_correction_spans(
-            &result.corrected_text,
-            &result.word_risk_positions,
-            &result.unresolved_words,
-        );
-
-        assert_eq!(result.corrected_text, "the quick brown fox");
-        assert_eq!(spans.len(), 1);
-        assert_eq!(spans[0].text, "the quick brown fox");
     }
 
     async fn collect_events(mut rx: mpsc::Receiver<SessionEvent>) -> Vec<SessionEvent> {
@@ -1266,7 +1126,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn risky_known_word_reaches_llm_as_editable_span() {
+    async fn risky_known_word_reaches_llm_as_uncertain() {
         local_set()
             .run_until(async {
                 let seen = Arc::new(Mutex::new(None));
@@ -1294,11 +1154,6 @@ mod tests {
                 )));
 
                 let input = seen.lock().await.clone().expect("LLM input captured");
-                assert_eq!(input.correction_spans.len(), 1);
-                assert_eq!(
-                    input.correction_spans[0].text,
-                    "discuss interesting their OAuth deployment"
-                );
                 assert!(input
                     .uncertain_words
                     .iter()

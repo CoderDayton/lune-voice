@@ -23,3 +23,7 @@ ort.workspace = true
 ndarray.workspace = true
 tokenizers.workspace = true
 rand = "0.9"
+
+[dev-dependencies]
+tracing-subscriber = "0.3"
+tracing = { workspace = true }

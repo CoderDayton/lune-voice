@@ -5,7 +5,6 @@ use crate::freq::{self, FreqDict};
 use crate::vocab;
 
 const VOCAB_FREQ_FLOOR: u32 = 10_000;
-const MAX_VOCAB_WORD_LEN: usize = 64;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct WordInfo {
@@ -55,8 +54,13 @@ impl Lexicon {
     pub fn lookup(&self, word: &str) -> Option<WordInfo> {
         let lower = word.to_lowercase();
         if let Some(freq) = self.dict.get(&lower) {
+            let canonical = VOCAB_INDEX
+                .canonical_by_lower
+                .get(lower.as_str())
+                .cloned()
+                .unwrap_or_else(|| lower.into_boxed_str());
             return Some(WordInfo {
-                canonical: lower.into_boxed_str(),
+                canonical,
                 freq,
                 freq_score: freq_score(freq),
                 source: WordSource::FreqMap,
@@ -84,21 +88,6 @@ impl Lexicon {
         None
     }
 
-    pub(crate) fn candidate_freq_score(&self, word: &str) -> f32 {
-        let lower = word.to_lowercase();
-        self.candidate_freq_score_for_lowercase(&lower)
-    }
-
-    pub(crate) fn candidate_freq_score_for_lowercase(&self, lower: &str) -> f32 {
-        if let Some(freq) = self.dict.get(lower) {
-            return freq_score(freq);
-        }
-        if VOCAB_INDEX.canonical_by_lower.contains_key(lower) {
-            return freq_score(VOCAB_FREQ_FLOOR);
-        }
-        0.0
-    }
-
     #[inline]
     pub fn is_known(&self, word: &str) -> bool {
         self.lookup(word).is_some()
@@ -118,13 +107,8 @@ pub fn freq_score(freq: u32) -> f32 {
     ((freq as f32).ln() / 17.8).clamp(0.0, 1.0)
 }
 
-pub(crate) fn vocab_candidates_by_len(lo: usize, hi: usize) -> impl Iterator<Item = &'static str> {
-    VOCAB_INDEX.candidates_by_len(lo, hi)
-}
-
 struct VocabIndex {
     canonical_by_lower: HashMap<Box<str>, Box<str>>,
-    by_len: [Vec<Box<str>>; MAX_VOCAB_WORD_LEN],
 }
 
 impl VocabIndex {
@@ -141,29 +125,7 @@ impl VocabIndex {
             }
         }
 
-        let mut by_len: [Vec<Box<str>>; MAX_VOCAB_WORD_LEN] = std::array::from_fn(|_| Vec::new());
-        for canonical in canonical_by_lower.values() {
-            let len = canonical.len().min(MAX_VOCAB_WORD_LEN - 1);
-            by_len[len].push(canonical.clone());
-        }
-        for bucket in &mut by_len {
-            bucket.sort_unstable();
-        }
-
-        Self {
-            canonical_by_lower,
-            by_len,
-        }
-    }
-
-    fn candidates_by_len(
-        &'static self,
-        lo: usize,
-        hi: usize,
-    ) -> impl Iterator<Item = &'static str> {
-        let start = lo.min(MAX_VOCAB_WORD_LEN);
-        let end = hi.min(MAX_VOCAB_WORD_LEN);
-        (start..end).flat_map(move |len| self.by_len[len].iter().map(Box::as_ref))
+        Self { canonical_by_lower }
     }
 }
 
@@ -198,14 +160,6 @@ mod tests {
         assert_eq!(info.source, WordSource::Vocab);
         assert_eq!(info.canonical.as_ref(), "WebSocket");
         assert!(lexicon.is_confident("websocket"));
-    }
-
-    #[test]
-    fn vocab_candidates_are_bucketed_by_canonical_length() {
-        let candidates: Vec<_> = vocab_candidates_by_len(9, 10).collect();
-
-        assert!(candidates.contains(&"WebSocket"));
-        assert!(!candidates.contains(&"websocket"));
     }
 
     #[test]

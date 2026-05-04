@@ -16,7 +16,7 @@ use tokenizers::Tokenizer;
 use tracing::info;
 
 use lune_core::error::{Error, Result};
-use lune_core::llm::{CorrectionSpan, PostProcessInput, PostProcessOutput, TextPostProcessor};
+use lune_core::llm::{PostProcessInput, PostProcessOutput, TextPostProcessor};
 
 const DEFAULT_MAX_TOKENS: usize = 512;
 
@@ -24,8 +24,6 @@ pub struct OrtStyleLlmConfig {
     pub model_dir: PathBuf,
     pub use_gpu: bool,
     pub max_new_tokens: usize,
-    pub temperature: f32,
-    pub top_p: f32,
 }
 
 impl Default for OrtStyleLlmConfig {
@@ -34,8 +32,6 @@ impl Default for OrtStyleLlmConfig {
             model_dir: PathBuf::new(),
             use_gpu: true,
             max_new_tokens: DEFAULT_MAX_TOKENS,
-            temperature: 0.0,
-            top_p: 1.0,
         }
     }
 }
@@ -46,6 +42,12 @@ enum ChatFormat {
     ChatML, // <|im_start|>role\n...<|im_end|>
 }
 
+struct ChatTokenIds {
+    im_start: i64,
+    im_end: i64,
+    newline: i64,
+}
+
 struct ModelParams {
     num_layers: usize,
     num_kv_heads: usize,
@@ -54,6 +56,7 @@ struct ModelParams {
     kv_is_f16: bool,
     eos_ids: Vec<u32>,
     chat_format: ChatFormat,
+    chat_tokens: Option<ChatTokenIds>,
 }
 
 pub struct OrtStyleLlm {
@@ -148,10 +151,25 @@ fn probe_model_params(session: &Session, tokenizer: &Tokenizer) -> ModelParams {
         eos_ids.push(2);
     }
 
-    let chat_format = if vocab.contains_key("<|im_start|>") {
-        ChatFormat::ChatML
+    let chat_tokens = if let (Some(&im_start), Some(&im_end)) =
+        (vocab.get("<|im_start|>"), vocab.get("<|im_end|>"))
+    {
+        let newline = vocab.get("\n").copied().unwrap_or(198) as i64;
+        Some(ChatTokenIds {
+            im_start: im_start as i64,
+            im_end: im_end as i64,
+            newline,
+        })
     } else {
+        None
+    };
+
+    let chat_format = if chat_tokens.is_some() {
+        ChatFormat::ChatML
+    } else if vocab.contains_key("<|begin_of_text|>") {
         ChatFormat::Llama
+    } else {
+        ChatFormat::ChatML
     };
 
     info!(
@@ -173,6 +191,7 @@ fn probe_model_params(session: &Session, tokenizer: &Tokenizer) -> ModelParams {
         kv_is_f16,
         eos_ids,
         chat_format,
+        chat_tokens,
     }
 }
 
@@ -220,8 +239,6 @@ impl OrtStyleLlm {
         let params = probe_model_params(&session, &tokenizer);
 
         let sampling_params = super::sampler::SamplingParams {
-            temperature: config.temperature,
-            top_p: config.top_p,
             eos_token_id: params.eos_ids.first().copied(),
             stop_token_ids: params.eos_ids.clone().into_boxed_slice(),
             ..Default::default()
@@ -241,93 +258,22 @@ impl OrtStyleLlm {
     pub fn user_prompt(
         transcript: &str,
         language: &str,
-        _style_instructions: &str,
-        correction_spans: &[CorrectionSpan],
-        uncertain_words: &[(String, usize)],
+        _uncertain_words: &[(String, usize)],
     ) -> String {
-        let spans_part = if correction_spans.is_empty() {
-            String::new()
-        } else {
-            let spans: Vec<String> = correction_spans
-                .iter()
-                .map(|span| {
-                    format!(
-                        "#{}..{} \"{}\" risk={:.2}",
-                        span.start_word, span.end_word, span.text, span.word_error_risk
-                    )
-                })
-                .collect();
-            format!(
-                "Editable spans (0-indexed, end exclusive): [{spans}]",
-                spans = spans.join(", ")
-            )
-        };
-
-        let uncertain_part = if uncertain_words.is_empty() {
-            String::new()
-        } else {
-            let words: Vec<String> = uncertain_words
-                .iter()
-                .map(|(w, pos)| format!("{w} (#{pos})"))
-                .collect();
-            format!(
-                "Uncertain words (name and 0-indexed position): [{words}]",
-                words = words.join(", ")
-            )
-        };
-
-        let constraint = if spans_part.is_empty() && uncertain_part.is_empty() {
-            String::new()
-        } else {
-            "Only change text inside editable spans or listed uncertain words. Copy everything else exactly.".into()
-        };
-
-        format!(
-            "{spans_part}\n{uncertain_part}\n{constraint}\nCorrect this {language} transcript:\n{transcript}"
-        )
+        format!("Correct the following {language} transcript:\n{transcript}\n\n/no_think")
     }
 
     pub fn apply_style(
         &self,
         transcript: &str,
         language: &str,
-        style: &lune_core::config::StylePreset,
-        correction_spans: &[CorrectionSpan],
+        _style: &lune_core::config::StylePreset,
         uncertain_words: &[(String, usize)],
     ) -> Result<String> {
         let system = lune_core::config::BASE_SYSTEM_PROMPT.replace("{lang}", language);
+        let user_text = Self::user_prompt(transcript, language, uncertain_words);
 
-        let user_text = Self::user_prompt(
-            transcript,
-            language,
-            &style.style_instructions,
-            correction_spans,
-            uncertain_words,
-        );
-
-        let prompt = match self.params.chat_format {
-            ChatFormat::ChatML => {
-                format!(
-                    "<|im_start|>system\n{system}<|im_end|>\n\
-                     <|im_start|>user\n{user_text}<|im_end|>\n\
-                     <|im_start|>assistant\n"
-                )
-            }
-            ChatFormat::Llama => {
-                format!(
-                    "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n\
-                     {system}<|eot_id|>\
-                     <|start_header_id|>user<|end_header_id|>\n\n\
-                     {user_text}<|eot_id|>\
-                     <|start_header_id|>assistant<|end_header_id|>\n\n"
-                )
-            }
-        };
-        let enc = self
-            .tokenizer
-            .encode(prompt.as_str(), false)
-            .map_err(|err| Error::Config(format!("tokenize: {err}")))?;
-        let ids: Vec<i64> = enc.get_ids().iter().map(|&id| id as i64).collect();
+        let ids = self.build_chat_ids(&system, &user_text)?;
         let out = self.generate(&ids)?;
         let text = self
             .tokenizer
@@ -335,6 +281,53 @@ impl OrtStyleLlm {
             .map_err(|err| Error::Config(format!("detokenize: {err}")))?;
         let text = strip_think_tags(text.trim());
         Ok(text.to_string())
+    }
+
+    fn tokenize_text(&self, text: &str) -> Result<Vec<i64>> {
+        let enc = self
+            .tokenizer
+            .encode(text, false)
+            .map_err(|err| Error::Config(format!("tokenize: {err}")))?;
+        Ok(enc.get_ids().iter().map(|&id| id as i64).collect())
+    }
+
+    fn build_chat_ids(&self, system: &str, user_text: &str) -> Result<Vec<i64>> {
+        match (&self.params.chat_format, &self.params.chat_tokens) {
+            (ChatFormat::ChatML, Some(ct)) => {
+                let sys_ids = self.tokenize_text(system)?;
+                let user_ids = self.tokenize_text(user_text)?;
+
+                // <|im_start|>system\n{sys}<|im_end|>\n<|im_start|>user\n{user}<|im_end|>\n<|im_start|>assistant\n
+                let mut ids = Vec::with_capacity(10 + sys_ids.len() + user_ids.len());
+                ids.push(ct.im_start);
+                ids.extend(self.tokenize_text("system")?);
+                ids.push(ct.newline);
+                ids.extend(sys_ids);
+                ids.push(ct.im_end);
+                ids.push(ct.newline);
+                ids.push(ct.im_start);
+                ids.extend(self.tokenize_text("user")?);
+                ids.push(ct.newline);
+                ids.extend(user_ids);
+                ids.push(ct.im_end);
+                ids.push(ct.newline);
+                ids.push(ct.im_start);
+                ids.extend(self.tokenize_text("assistant")?);
+                ids.push(ct.newline);
+                Ok(ids)
+            }
+            _ => {
+                // Fallback: encode the whole string (Llama or missing chat tokens)
+                let prompt = format!(
+                    "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n\
+                     {system}<|eot_id|>\
+                     <|start_header_id|>user<|end_header_id|>\n\n\
+                     {user_text}<|eot_id|>\
+                     <|start_header_id|>assistant<|end_header_id|>\n\n"
+                );
+                self.tokenize_text(&prompt)
+            }
+        }
     }
 
     fn embed_ids(&self, ids: &[i64]) -> Result<Option<DynValue>> {
@@ -426,6 +419,237 @@ impl OrtStyleLlm {
     }
 }
 
+/// Function words the LLM may legitimately insert into ASR output.
+const SAFE_INSERTIONS: &[&str] = &[
+    "a", "an", "the", "to", "of", "in", "on", "at", "for", "from", "with", "by", "as", "is", "are",
+    "am", "was", "were", "be", "been", "being", "do", "does", "did", "has", "have", "had", "will",
+    "would", "could", "should", "can", "may", "might", "shall", "and", "but", "or", "so", "if",
+    "that", "not", "no", "i", "it", "he", "she", "we", "they", "me", "him", "her", "us", "them",
+    "you", "my", "your", "his", "its", "our", "their", "this",
+];
+
+/// Known ASR homophones / confusion pairs the validator may accept.
+const ALLOWED_SUBS: &[(&str, &str)] = &[
+    ("bye", "buy"),
+    ("buy", "by"),
+    ("by", "buy"),
+    ("two", "to"),
+    ("too", "to"),
+    ("to", "too"),
+    ("to", "two"),
+    ("meat", "meet"),
+    ("meet", "meat"),
+    ("there", "their"),
+    ("their", "there"),
+    ("theyre", "they're"),
+    ("they're", "there"),
+    ("they're", "their"),
+    ("hear", "here"),
+    ("here", "hear"),
+    ("right", "write"),
+    ("write", "right"),
+    ("no", "know"),
+    ("know", "no"),
+    ("let", "let's"),
+    ("lets", "let's"),
+    ("cloth", "clothes"),
+    ("clothe", "clothes"),
+    ("brought", "bought"),
+    ("bough", "bought"),
+    ("weather", "whether"),
+    ("whether", "weather"),
+    ("brake", "break"),
+    ("break", "brake"),
+    ("peace", "piece"),
+    ("piece", "peace"),
+    ("bare", "bear"),
+    ("bear", "bare"),
+    ("where", "wear"),
+    ("wear", "where"),
+    ("wont", "won't"),
+    ("dont", "don't"),
+    ("cant", "can't"),
+    ("im", "i'm"),
+    ("ive", "i've"),
+    ("youre", "you're"),
+    ("were", "we're"),
+    ("hes", "he's"),
+    ("shes", "she's"),
+    ("your", "you're"),
+    ("its", "it's"),
+    ("would", "wood"),
+    ("wood", "would"),
+    ("wait", "weight"),
+    ("weight", "wait"),
+    ("seen", "scene"),
+    ("scene", "seen"),
+    ("week", "weak"),
+    ("weak", "week"),
+    ("threw", "through"),
+    ("through", "threw"),
+    ("whole", "hole"),
+    ("hole", "whole"),
+    ("waste", "waist"),
+    ("waist", "waste"),
+    ("led", "lead"),
+    ("lead", "led"),
+    ("course", "coarse"),
+    ("coarse", "course"),
+];
+
+fn norm_word(w: &str) -> String {
+    w.chars()
+        .filter(|c| c.is_alphanumeric())
+        .collect::<String>()
+        .to_lowercase()
+}
+
+fn is_allowed_sub(from: &str, to: &str) -> bool {
+    ALLOWED_SUBS.iter().any(|(a, b)| from == *a && to == *b)
+}
+
+fn levenshtein(a: &str, b: &str) -> usize {
+    let a: Vec<char> = a.chars().collect();
+    let b: Vec<char> = b.chars().collect();
+    let mut costs: Vec<usize> = (0..=b.len()).collect();
+    for (i, ca) in a.iter().enumerate() {
+        let mut last = i;
+        costs[0] = i + 1;
+        for (j, cb) in b.iter().enumerate() {
+            let old = costs[j + 1];
+            costs[j + 1] = if ca == cb {
+                last
+            } else {
+                1 + last.min(costs[j]).min(costs[j + 1])
+            };
+            last = old;
+        }
+    }
+    costs[b.len()]
+}
+
+fn looks_like_spelling_repair(from: &str, to: &str) -> bool {
+    let max_len = from.len().max(to.len());
+    let dist = levenshtein(from, to);
+    max_len >= 4 && (dist <= 1 || (dist <= 2 && max_len >= 7))
+}
+
+fn contains_forbidden_output(text: &str) -> bool {
+    let lower = text.to_lowercase();
+    [
+        "here is",
+        "corrected transcript",
+        "the corrected",
+        "i changed",
+        "i fixed",
+        "input:",
+        "output:",
+        "possibly misheard",
+    ]
+    .iter()
+    .any(|m| lower.contains(m))
+}
+
+/// Token-level validator: align input/output words via LCS, accept safe
+/// edits (case, punctuation, function-word insertions, known substitutions,
+/// spelling repairs), reject everything else.
+fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> String {
+    let inp: Vec<&str> = input.split_whitespace().collect();
+    let out: Vec<&str> = llm_output.split_whitespace().collect();
+
+    if inp.is_empty() {
+        return llm_output.to_string();
+    }
+    if out.is_empty() {
+        return input.to_string();
+    }
+
+    let m = inp.len();
+    let n = out.len();
+
+    // LCS table — words match when their normalized forms are equal.
+    let mut dp = vec![vec![0u16; n + 1]; m + 1];
+    for i in 1..=m {
+        for j in 1..=n {
+            dp[i][j] = if norm_word(inp[i - 1]) == norm_word(out[j - 1]) {
+                dp[i - 1][j - 1] + 1
+            } else {
+                dp[i - 1][j].max(dp[i][j - 1])
+            };
+        }
+    }
+
+    // If fewer than 40% of input words survived, the output is suspect
+    // (translation, heavy censoring, hallucination) — fall back entirely.
+    let lcs_len = dp[m][n] as usize;
+    if lcs_len * 100 / m.max(1) < 40 {
+        return input.to_string();
+    }
+
+    // Backtrack into an alignment (reversed, then flipped).
+    #[derive(Debug)]
+    enum Op<'a> {
+        Match(&'a str, &'a str),
+        Insert(&'a str),
+        Delete(&'a str),
+    }
+
+    let mut ops: Vec<Op<'_>> = Vec::with_capacity(m + n);
+    let (mut i, mut j) = (m, n);
+    while i > 0 || j > 0 {
+        if i > 0 && j > 0 && norm_word(inp[i - 1]) == norm_word(out[j - 1]) {
+            ops.push(Op::Match(inp[i - 1], out[j - 1]));
+            i -= 1;
+            j -= 1;
+        } else if j > 0 && (i == 0 || dp[i][j - 1] >= dp[i - 1][j]) {
+            ops.push(Op::Insert(out[j - 1]));
+            j -= 1;
+        } else {
+            ops.push(Op::Delete(inp[i - 1]));
+            i -= 1;
+        }
+    }
+    ops.reverse();
+
+    let is_en =
+        lang.eq_ignore_ascii_case("en") || lang.starts_with("en-") || lang.starts_with("en_");
+
+    let mut result: Vec<&str> = Vec::with_capacity(ops.len());
+    let mut idx = 0;
+    while idx < ops.len() {
+        match &ops[idx] {
+            Op::Match(_inp_w, out_w) => {
+                result.push(out_w);
+                idx += 1;
+            }
+            Op::Delete(inp_w) => {
+                // Check if next op is Insert (potential replacement).
+                if let Some(Op::Insert(out_w)) = ops.get(idx + 1) {
+                    let from = norm_word(inp_w);
+                    let to = norm_word(out_w);
+                    if is_en
+                        && (is_allowed_sub(&from, &to) || looks_like_spelling_repair(&from, &to))
+                    {
+                        result.push(out_w);
+                        idx += 2;
+                        continue;
+                    }
+                }
+                result.push(inp_w);
+                idx += 1;
+            }
+            Op::Insert(w) => {
+                if is_en && SAFE_INSERTIONS.contains(&norm_word(w).as_str()) {
+                    result.push(w);
+                }
+                idx += 1;
+            }
+        }
+    }
+
+    result.join(" ")
+}
+
 #[async_trait::async_trait]
 impl TextPostProcessor for OrtStyleLlm {
     async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput> {
@@ -433,11 +657,20 @@ impl TextPostProcessor for OrtStyleLlm {
             &input.raw_text,
             &input.language,
             &input.style_preset,
-            &input.correction_spans,
             &input.uncertain_words,
         )?;
 
         text = crate::prompt::fix_all_number_spaces(&text);
+
+        if contains_forbidden_output(&text) {
+            tracing::warn!(output = %text, "LLM produced meta-text, falling back");
+            return Ok(PostProcessOutput {
+                cleaned_text: input.raw_text.clone(),
+                metadata: None,
+            });
+        }
+
+        text = validate_and_merge(&input.raw_text, &text, &input.language);
 
         Ok(PostProcessOutput {
             cleaned_text: text,
@@ -582,134 +815,29 @@ mod tests {
     // ── user_prompt ──────────────────────────────────────────────────────
 
     #[test]
-    fn user_prompt_lists_editable_spans_and_copy_constraint() {
-        let prompt = OrtStyleLlm::user_prompt(
-            "call with Jennifer Martinez to discuss interesting their OAuth deployment on AWS",
-            "en",
-            "",
-            &[CorrectionSpan {
-                start_word: 5,
-                end_word: 10,
-                text: "discuss interesting their OAuth deployment".into(),
-                confidence: 0.18,
-                word_error_risk: 0.82,
-            }],
-            &[],
-        );
-
-        assert!(prompt.contains("Editable spans"));
-        assert!(prompt.contains("#5..10"));
-        assert!(prompt.contains("Copy everything else exactly"));
-        assert!(prompt.contains("Correct this en transcript:"));
+    fn user_prompt_appends_no_think() {
+        let prompt = OrtStyleLlm::user_prompt("hello world", "en", &[]);
+        assert!(prompt.contains("hello world"));
+        assert!(prompt.contains("en"));
+        assert!(prompt.ends_with("/no_think"));
     }
 
     #[test]
-    fn user_prompt_contains_transcript() {
-        let prompt = OrtStyleLlm::user_prompt("das ist ein test", "de", "", &[], &[]);
-
+    fn user_prompt_preserves_transcript() {
+        let prompt = OrtStyleLlm::user_prompt("das ist ein test", "de", &[]);
         assert!(prompt.contains("das ist ein test"));
-        assert!(prompt.contains("transcript:"));
+        assert!(prompt.contains("de"));
+        assert!(prompt.ends_with("/no_think"));
     }
 
     #[test]
-    fn user_prompt_uncertain_words_only() {
-        let prompt = OrtStyleLlm::user_prompt(
-            "hello world foo bar",
-            "en",
-            "",
-            &[],
-            &[("foo".into(), 2), ("bar".into(), 3)],
-        );
-
-        assert!(prompt.contains("Uncertain words"));
-        assert!(prompt.contains("foo (#2)"));
-        assert!(prompt.contains("bar (#3)"));
-        assert!(prompt.contains("Copy everything else exactly"));
-        assert!(!prompt.contains("Editable spans"));
-    }
-
-    #[test]
-    fn user_prompt_spans_and_uncertain_together() {
-        let prompt = OrtStyleLlm::user_prompt(
-            "the quick brown fox",
-            "en",
-            "",
-            &[CorrectionSpan {
-                start_word: 1,
-                end_word: 3,
-                text: "quick brown".into(),
-                confidence: 0.5,
-                word_error_risk: 0.5,
-            }],
-            &[("fox".into(), 3)],
-        );
-
-        assert!(prompt.contains("Editable spans"));
-        assert!(prompt.contains("#1..3"));
-        assert!(prompt.contains("Uncertain words"));
-        assert!(prompt.contains("fox (#3)"));
-        assert!(prompt.contains("Copy everything else exactly"));
-    }
-
-    #[test]
-    fn user_prompt_multiple_spans() {
-        let prompt = OrtStyleLlm::user_prompt(
-            "one two three four five",
-            "en",
-            "",
-            &[
-                CorrectionSpan {
-                    start_word: 0,
-                    end_word: 2,
-                    text: "one two".into(),
-                    confidence: 0.3,
-                    word_error_risk: 0.7,
-                },
-                CorrectionSpan {
-                    start_word: 3,
-                    end_word: 5,
-                    text: "four five".into(),
-                    confidence: 0.4,
-                    word_error_risk: 0.6,
-                },
-            ],
-            &[],
-        );
-
-        assert!(prompt.contains("#0..2"));
-        assert!(prompt.contains("#3..5"));
-        assert!(prompt.contains("one two"));
-        assert!(prompt.contains("four five"));
-    }
-
-    #[test]
-    fn user_prompt_empty_no_constraint() {
-        let prompt = OrtStyleLlm::user_prompt("hello", "en", "", &[], &[]);
-
-        assert!(!prompt.contains("Editable spans"));
-        assert!(!prompt.contains("Uncertain words"));
-        assert!(!prompt.contains("Copy everything else exactly"));
-        assert!(prompt.contains("Correct this en transcript:"));
-        assert!(prompt.contains("hello"));
-    }
-
-    #[test]
-    fn user_prompt_span_risk_format() {
-        let prompt = OrtStyleLlm::user_prompt(
-            "test",
-            "en",
-            "",
-            &[CorrectionSpan {
-                start_word: 0,
-                end_word: 1,
-                text: "test".into(),
-                confidence: 0.25,
-                word_error_risk: 0.75,
-            }],
-            &[],
-        );
-
-        assert!(prompt.contains(r#"risk=0.75"#));
+    fn user_prompt_ignores_uncertain_words() {
+        let uncertain = vec![("brought".into(), 6usize), ("wrld".into(), 1usize)];
+        let prompt =
+            OrtStyleLlm::user_prompt("I went the store and brought some wrld", "en", &uncertain);
+        assert!(prompt.contains("I went the store"));
+        assert!(prompt.ends_with("/no_think"));
+        assert!(!prompt.contains("misheard"));
     }
 
     // ── strip_think_tags ─────────────────────────────────────────────────
@@ -748,5 +876,143 @@ mod tests {
     fn strip_think_tags_tag_in_middle() {
         let input = format!("before {THINK_CLOSE}after");
         assert_eq!(strip_think_tags(&input), "after");
+    }
+
+    // ── validate_and_merge ───────────────────────────────────────────────
+
+    #[test]
+    fn merge_accepts_case_and_punctuation() {
+        assert_eq!(
+            validate_and_merge("how are you doing today", "How are you doing today?", "en"),
+            "How are you doing today?"
+        );
+    }
+
+    #[test]
+    fn merge_accepts_function_word_insertion() {
+        assert_eq!(
+            validate_and_merge("i went store", "I went to the store.", "en"),
+            "I went to the store."
+        );
+    }
+
+    #[test]
+    fn merge_rejects_translation() {
+        assert_eq!(
+            validate_and_merge("je suis allé au magasin", "I went to the store", "fr"),
+            "je suis allé au magasin"
+        );
+    }
+
+    #[test]
+    fn merge_rejects_censoring() {
+        let merged = validate_and_merge("what the fuck is going on", "what is going on", "en");
+        assert!(
+            merged.contains("fuck"),
+            "censored word must survive: {merged}"
+        );
+    }
+
+    #[test]
+    fn merge_accepts_allowed_substitution() {
+        assert_eq!(
+            validate_and_merge("i brought some groceries", "I bought some groceries.", "en"),
+            "I bought some groceries."
+        );
+    }
+
+    #[test]
+    fn merge_accepts_homophone_fix() {
+        assert_eq!(
+            validate_and_merge("we should meat at noon", "We should meet at noon.", "en"),
+            "We should meet at noon."
+        );
+    }
+
+    #[test]
+    fn merge_rejects_unrelated_replacement() {
+        assert_eq!(
+            validate_and_merge("the cat sat on the mat", "The dog sat on the mat.", "en"),
+            "The cat sat on the mat."
+        );
+    }
+
+    #[test]
+    fn merge_accepts_spelling_repair() {
+        assert_eq!(
+            validate_and_merge("i went to the storee", "I went to the store.", "en"),
+            "I went to the store."
+        );
+    }
+
+    #[test]
+    fn merge_keeps_identical() {
+        assert_eq!(
+            validate_and_merge("Hello world", "Hello world", "en"),
+            "Hello world"
+        );
+    }
+
+    #[test]
+    fn merge_empty_input_returns_llm() {
+        assert_eq!(validate_and_merge("", "Hello.", "en"), "Hello.");
+    }
+
+    #[test]
+    fn merge_empty_llm_returns_input() {
+        assert_eq!(validate_and_merge("hello world", "", "en"), "hello world");
+    }
+
+    #[test]
+    fn merge_rejects_hallucinated_content() {
+        let merged = validate_and_merge("hello world", "Hello world, this is extra content.", "en");
+        assert!(
+            !merged.contains("extra"),
+            "hallucinated content must be dropped: {merged}"
+        );
+    }
+
+    #[test]
+    fn merge_handles_contraction_fix() {
+        assert_eq!(
+            validate_and_merge("dont worry about it", "Don't worry about it.", "en"),
+            "Don't worry about it."
+        );
+    }
+
+    #[test]
+    fn merge_blocks_insertion_for_non_english() {
+        assert_eq!(
+            validate_and_merge("la découverte du paquet", "la a découverte du paquet", "fr"),
+            "la découverte du paquet"
+        );
+    }
+
+    // ── forbidden output ────────────────────────────────────────────────
+
+    #[test]
+    fn forbidden_output_catches_meta_text() {
+        assert!(contains_forbidden_output(
+            "Here is the corrected transcript: Hello."
+        ));
+        assert!(contains_forbidden_output("I fixed the spelling errors."));
+        assert!(!contains_forbidden_output("Hello world."));
+    }
+
+    // ── helpers ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn levenshtein_basic() {
+        assert_eq!(levenshtein("kitten", "sitting"), 3);
+        assert_eq!(levenshtein("store", "storee"), 1);
+        assert_eq!(levenshtein("hello", "hello"), 0);
+    }
+
+    #[test]
+    fn spelling_repair_accepts_close_words() {
+        assert!(looks_like_spelling_repair("storee", "store"));
+        assert!(looks_like_spelling_repair("grocerys", "groceries"));
+        assert!(!looks_like_spelling_repair("cat", "dog"));
+        assert!(!looks_like_spelling_repair("ab", "cd"));
     }
 }

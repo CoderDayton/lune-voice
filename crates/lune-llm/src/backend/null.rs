@@ -40,7 +40,6 @@ mod tests {
             style_preset: Arc::new(StylePreset::casual()),
             app_category: None,
             dictionary: vec![],
-            correction_spans: vec![],
             context: None,
             language: "en".into(),
             uncertain_words: Vec::new(),

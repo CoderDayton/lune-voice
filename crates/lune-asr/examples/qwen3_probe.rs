@@ -177,7 +177,6 @@ fn main() {
                     style_preset: Arc::clone(&style),
                     app_category: None,
                     dictionary: vec![],
-                    correction_spans: vec![],
                     context: None,
                     language: "en".into(),
                     uncertain_words: Vec::new(),

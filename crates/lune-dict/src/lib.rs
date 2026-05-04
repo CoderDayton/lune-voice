@@ -1,8 +1,6 @@
-pub mod candidate_source;
 pub mod corrector;
 pub mod freq;
 pub mod lexicon;
-pub mod scorer;
 pub mod vocab;
 
 use lune_core::dict::DictionaryEntry;
