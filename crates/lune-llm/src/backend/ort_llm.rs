@@ -95,6 +95,22 @@ fn dyn_f32_4(arr: Array4<f32>) -> Result<DynValue> {
     Value::from_array(arr).map(|v| v.into_dyn()).map_err(e)
 }
 
+fn llm_kv_names(num_layers: usize) -> &'static [String] {
+    use std::sync::OnceLock;
+    // Max 64 layers covers all current LLM architectures.
+    const MAX_LAYERS: usize = 64;
+    static NAMES: OnceLock<Vec<String>> = OnceLock::new();
+    let all = NAMES.get_or_init(|| {
+        let mut v = Vec::with_capacity(MAX_LAYERS * 2);
+        for i in 0..MAX_LAYERS {
+            v.push(format!("past_key_values.{i}.key"));
+            v.push(format!("past_key_values.{i}.value"));
+        }
+        v
+    });
+    &all[..num_layers * 2]
+}
+
 fn empty_kv(heads: usize, dim: usize, is_f16: bool) -> Result<(DynValue, DynValue)> {
     if is_f16 {
         let z = Array4::<f16>::zeros((1, heads, 0, dim));
@@ -361,10 +377,11 @@ impl OrtStyleLlm {
         } else {
             build_inputs(prompt_ids, n, p.has_position_ids)?
         };
+        let names = llm_kv_names(p.num_layers);
         for i in 0..p.num_layers {
             let (k, v) = empty_kv(p.num_kv_heads, p.head_dim, p.kv_is_f16)?;
-            inputs.push((format!("past_key_values.{i}.key").into(), k));
-            inputs.push((format!("past_key_values.{i}.value").into(), v));
+            inputs.push((std::borrow::Cow::Borrowed(names[i * 2].as_str()), k));
+            inputs.push((std::borrow::Cow::Borrowed(names[i * 2 + 1].as_str()), v));
         }
 
         let outputs = session.run(inputs).map_err(e)?;
@@ -394,10 +411,9 @@ impl OrtStyleLlm {
             } else {
                 build_decode_inputs(tok, total, p.has_position_ids)?
             };
+            let names = llm_kv_names(p.num_layers);
             for (i, v) in kv.drain(..).enumerate() {
-                let layer = i / 2;
-                let kind = if i % 2 == 0 { "key" } else { "value" };
-                inputs.push((format!("past_key_values.{layer}.{kind}").into(), v));
+                inputs.push((std::borrow::Cow::Borrowed(names[i].as_str()), v));
             }
 
             let outputs = session.run(inputs).map_err(e)?;

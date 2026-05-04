@@ -331,7 +331,8 @@ fn process_audio_callback(
     }
 
     while output_buf.len() >= chunk_samples {
-        let chunk_data: Vec<f32> = output_buf.drain(..chunk_samples).collect();
+        let mut chunk_data = Vec::with_capacity(chunk_samples);
+        chunk_data.extend(output_buf.drain(..chunk_samples));
 
         let timestamp_ms = start_time.elapsed().as_millis() as u64;
         let chunk = AudioChunk {

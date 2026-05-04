@@ -177,8 +177,31 @@ fn argmax_last_logits_f32(shape: &[i64], data: &[f32]) -> Result<u32> {
 
 fn argmax_last_logits_f16(shape: &[i64], data: &[f16]) -> Result<u32> {
     let range = last_logits_range(shape, data.len())?;
-    let converted: Vec<f32> = data[range].iter().map(|x| x.to_f32()).collect();
-    Ok(argmax_finite(&converted) as u32)
+    let slice = &data[range];
+    let mut best_idx = 0usize;
+    let mut best_val = f32::NEG_INFINITY;
+    let mut any_finite = false;
+    for (i, &v) in slice.iter().enumerate() {
+        let f = v.to_f32();
+        if f.is_finite() && f > best_val {
+            best_val = f;
+            best_idx = i;
+            any_finite = true;
+        }
+    }
+    if !any_finite {
+        let mut max_idx = 0usize;
+        let mut max_val = f32::NEG_INFINITY;
+        for (i, &v) in slice.iter().enumerate() {
+            let f = v.to_f32();
+            if f > max_val {
+                max_val = f;
+                max_idx = i;
+            }
+        }
+        return Ok(max_idx as u32);
+    }
+    Ok(best_idx as u32)
 }
 
 fn copy_last_logits_f32(shape: &[i64], data: &[f32], out: &mut Vec<f32>) -> Result<()> {

@@ -331,15 +331,18 @@ fn argmax_on_logits(
     let mut heap_min_pos = 0usize;
 
     if boost.is_empty() {
-        // Fast path: single pass argmax + LSE + top-k on f16 → f32.
+        // Single-pass: argmax + top-k + LSE fused (one f16→f32 conversion per element).
         let mut max_idx = 0usize;
         let mut max_val = f32::NEG_INFINITY;
+        let mut sum_exp = 0.0f32;
         for (i, &v) in logits.iter().enumerate() {
             let f = v.to_f32();
             if f > max_val {
+                sum_exp *= (max_val - f).exp();
                 max_val = f;
                 max_idx = i;
             }
+            sum_exp += (f - max_val).exp();
             if f > heap_min {
                 heap[heap_min_pos] = (f, i);
                 heap_min = f32::INFINITY;
@@ -351,27 +354,30 @@ fn argmax_on_logits(
                 }
             }
         }
-        let sum_exp: f32 = logits.iter().map(|&x| (x.to_f32() - max_val).exp()).sum();
+        let top_k = heap.iter().map(|(v, _)| *v as f64).collect();
         if !sum_exp.is_normal() {
-            let top_k = heap.iter().map(|(v, _)| *v as f64).collect();
             return Ok((max_idx as i64, 0.0, top_k));
         }
         let lse = sum_exp.ln() + max_val;
-        let top_k = heap.iter().map(|(v, _)| *v as f64).collect();
         Ok((max_idx as i64, (max_val - lse).exp(), top_k))
     } else {
-        // Boosted path: track unboosted raw value inline for confidence.
+        // Boosted single-pass: fused argmax + LSE over raw logits.
         let mut max_idx = 0usize;
         let mut max_boosted = f32::NEG_INFINITY;
         let mut raw_max = f32::NEG_INFINITY;
+        let mut sum_exp = 0.0f32;
         for (i, &v) in logits.iter().enumerate() {
             let raw = v.to_f32();
             let boosted = raw + boost.get(&(i as i64)).copied().unwrap_or(0.0);
             if boosted > max_boosted {
                 max_boosted = boosted;
                 max_idx = i;
+            }
+            if raw > raw_max {
+                sum_exp *= (raw_max - raw).exp();
                 raw_max = raw;
             }
+            sum_exp += (raw - raw_max).exp();
             if raw > heap_min {
                 heap[heap_min_pos] = (raw, i);
                 heap_min = f32::INFINITY;
@@ -383,13 +389,11 @@ fn argmax_on_logits(
                 }
             }
         }
-        let sum_exp: f32 = logits.iter().map(|&x| (x.to_f32() - raw_max).exp()).sum();
+        let top_k = heap.iter().map(|(v, _)| *v as f64).collect();
         if !sum_exp.is_normal() {
-            let top_k = heap.iter().map(|(v, _)| *v as f64).collect();
             return Ok((max_idx as i64, 0.0, top_k));
         }
         let lse = sum_exp.ln() + raw_max;
-        let top_k = heap.iter().map(|(v, _)| *v as f64).collect();
         Ok((max_idx as i64, (raw_max - lse).exp(), top_k))
     }
 }
