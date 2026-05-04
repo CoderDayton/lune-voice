@@ -36,6 +36,7 @@ export interface BackendWorkspaceSettings {
   hotkeyCancel: string;
   pillVisibility: PillVisibilityValue;
   language: string;
+  dictationLanguage: string;
   // OpenAI ASR fields (present when asrBackendType == "OpenAiCompatible")
   openaiAsrBaseUrl?: string | null;
   openaiAsrModel?: string | null;
@@ -77,6 +78,7 @@ export interface SaveWorkspaceSettingsInput {
   hotkeyCancel: string;
   pillVisibility: PillVisibilityValue;
   language: string;
+  dictationLanguage: string;
   // OpenAI ASR fields (sent when asrBackendType == "OpenAiCompatible")
   openaiAsrBaseUrl?: string | null;
   openaiAsrApiKey?: string | null;

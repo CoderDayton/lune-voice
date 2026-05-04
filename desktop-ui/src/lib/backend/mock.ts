@@ -33,6 +33,7 @@ function createMockSnapshot(): BackendWorkspaceSnapshot {
       hotkeyCancel: 'Escape',
       pillVisibility: 'Always',
       language: 'en',
+      dictationLanguage: 'auto',
       openaiAsrBaseUrl: null,
       openaiAsrModel: null,
       openaiAsrApiKeySet: false,

@@ -16,11 +16,12 @@ export function AudioDots({ level }: AudioDotsProps) {
   return (
     <div className="audio-dots" role="img" aria-label={t`Audio activity`}>
       {Array.from({ length: DOT_COUNT }, (_, i) => {
-        const scale = hasLevel ? 1 + level * DOT_WEIGHTS[i]! * 2.0 : undefined;
+        const weight = DOT_WEIGHTS[i] ?? 0;
+        const scale = hasLevel ? 1 + level * weight * 2.0 : undefined;
 
         return (
           <span
-            key={i}
+            key={`dot-${String(i)}`}
             className="audio-dot"
             style={
               hasLevel

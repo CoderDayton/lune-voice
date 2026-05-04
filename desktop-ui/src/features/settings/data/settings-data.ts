@@ -31,6 +31,33 @@ export const deliveryMethods: Option<DictationModeValue>[] = [
   { value: 'Both', label: 'Paste and type' },
 ];
 
+export type DictationLanguageValue =
+  | 'auto'
+  | 'en'
+  | 'de'
+  | 'es'
+  | 'fr'
+  | 'it'
+  | 'ja'
+  | 'ko'
+  | 'pt'
+  | 'ru'
+  | 'zh';
+
+export const dictationLanguages: Option<DictationLanguageValue>[] = [
+  { value: 'auto', label: 'Auto-detect' },
+  { value: 'en', label: 'English' },
+  { value: 'de', label: 'Deutsch' },
+  { value: 'es', label: 'Español' },
+  { value: 'fr', label: 'Français' },
+  { value: 'it', label: 'Italiano' },
+  { value: 'ja', label: '日本語' },
+  { value: 'ko', label: '한국어' },
+  { value: 'pt', label: 'Português' },
+  { value: 'ru', label: 'Русский' },
+  { value: 'zh', label: '中文' },
+];
+
 export function labelFor<V extends string>(options: Option<V>[], value: V): string {
   return options.find((o) => o.value === value)?.label ?? value;
 }

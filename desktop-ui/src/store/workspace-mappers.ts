@@ -55,6 +55,7 @@ export function mapWorkspaceSettings(snapshot: BackendWorkspaceSnapshot): Worksp
     hotkeyCancel: snapshot.settings.hotkeyCancel,
     pillVisibility: snapshot.settings.pillVisibility ?? 'Always',
     language: snapshot.settings.language ?? 'en',
+    dictationLanguage: snapshot.settings.dictationLanguage ?? 'auto',
     openaiAsrBaseUrl: snapshot.settings.openaiAsrBaseUrl ?? DEFAULT_SETTINGS.openaiAsrBaseUrl,
     openaiAsrApiKey: snapshot.settings.openaiAsrApiKeySet
       ? '••••••••'
@@ -94,6 +95,7 @@ export function settingsToSaveInput(settings: WorkspaceSettings): SaveWorkspaceS
     hotkeyCancel: settings.hotkeyCancel,
     pillVisibility: settings.pillVisibility,
     language: settings.language,
+    dictationLanguage: settings.dictationLanguage,
     openaiAsrBaseUrl: settings.openaiAsrBaseUrl || null,
     openaiAsrApiKey:
       settings.openaiAsrApiKey && !settings.openaiAsrApiKey.startsWith('•')

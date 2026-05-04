@@ -11,7 +11,7 @@ import {
   Trash2,
   Zap,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { SettingsSection } from '../components/section';
 
 interface ModelStatus {
@@ -73,16 +73,16 @@ export function ModelsSection() {
   const [confirmDelete, setConfirmDelete] = useState<ModelStatus | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
 
-  function refresh() {
+  const refresh = useCallback(() => {
     invoke<ModelStatus[]>('check_model_status')
       .then(setModels)
       .catch((e) => console.error('check_model_status:', e))
       .finally(() => setLoading(false));
-  }
+  }, []);
 
   useEffect(() => {
     refresh();
-  }, []);
+  }, [refresh]);
 
   useEffect(() => {
     const unlisten = listen<DownloadProgress>('lune://download-progress', (event) => {
@@ -96,7 +96,7 @@ export function ModelsSection() {
     return () => {
       void unlisten.then((f) => f());
     };
-  }, []);
+  }, [refresh]);
 
   function handleDownload(localName: string) {
     setDownloading(localName);

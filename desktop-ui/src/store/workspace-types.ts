@@ -20,6 +20,7 @@ export interface WorkspaceSettings {
   hotkeyCancel: string;
   pillVisibility: PillVisibilityValue;
   language: string;
+  dictationLanguage: string;
   openaiAsrBaseUrl: string;
   openaiAsrApiKey: string;
   openaiAsrModel: string;
@@ -79,6 +80,7 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   hotkeyCancel: 'Escape',
   pillVisibility: 'Always',
   language: 'en',
+  dictationLanguage: 'auto',
   openaiAsrBaseUrl: 'https://api.openai.com/v1',
   openaiAsrApiKey: '',
   openaiAsrModel: 'whisper-1',

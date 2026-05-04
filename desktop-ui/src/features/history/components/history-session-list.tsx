@@ -19,7 +19,13 @@ const SessionRow = memo(function SessionRow({ item }: SessionRowProps) {
   return (
     <SessionDetailModal session={item}>
       {(open) => (
-        <li className="list-row interactive-row" onClick={open}>
+        <li
+          className="list-row interactive-row"
+          onClick={open}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') open();
+          }}
+        >
           <div className="list-col-grow min-w-0">
             <p className="text-base line-clamp-2 sm:line-clamp-3">
               {item.transcript || t`Empty session`}

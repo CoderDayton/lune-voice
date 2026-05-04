@@ -135,7 +135,13 @@ export function OverviewPage() {
                   return (
                     <SessionDetailModal key={session.id} session={session}>
                       {(open) => (
-                        <article className="interactive-row block px-5 py-4" onClick={open}>
+                        <article
+                          className="interactive-row block px-5 py-4"
+                          onClick={open}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') open();
+                          }}
+                        >
                           <div className="pt-1 text-sm tabular-nums text-content-subtle">
                             {time}
                           </div>

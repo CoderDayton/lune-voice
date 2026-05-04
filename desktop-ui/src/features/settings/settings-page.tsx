@@ -39,7 +39,7 @@ export function SettingsPage() {
 
   return (
     <div className="page-stack">
-      <AppearanceSection />
+      <AppearanceSection settings={settings} />
       <InputSection settings={settings} />
       <TranscriptionSection settings={settings} />
       <OutputSection settings={settings} />

@@ -3,7 +3,7 @@ import { AudioWaveform } from 'lucide-react';
 import { saveWorkspaceSetting } from '../../../store/workspace-store';
 import { OpenAiFields } from '../components/openai-fields';
 import { type SettingsProps, SettingsRow, SettingsSection } from '../components/section';
-import { asrBackends } from '../data/settings-data';
+import { asrBackends, dictationLanguages } from '../data/settings-data';
 
 export function TranscriptionSection({ settings }: SettingsProps) {
   const { t } = useLingui();
@@ -46,6 +46,28 @@ export function TranscriptionSection({ settings }: SettingsProps) {
           modelPlaceholder="whisper-1"
         />
       )}
+      <SettingsRow
+        label={t`Dictation language`}
+        description={t`Set the language you speak. Auto uses detection from speech.`}
+        control={
+          <select
+            className="select w-full sm:w-auto sm:min-w-56"
+            value={settings.dictationLanguage}
+            onChange={(event) =>
+              void saveWorkspaceSetting(
+                'dictationLanguage',
+                event.target.value as typeof settings.dictationLanguage,
+              )
+            }
+          >
+            {dictationLanguages.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        }
+      />
       <SettingsRow
         label={t`Use hardware acceleration`}
         description={t`When available, this can make transcription finish faster.`}

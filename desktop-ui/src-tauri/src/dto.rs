@@ -72,6 +72,7 @@ pub struct WorkspaceSettingsDto {
     pub hotkey_cancel: String,
     pub pill_visibility: PillVisibilityDto,
     pub language: String,
+    pub dictation_language: String,
     // OpenAI ASR fields (populated when asr_backend_type == OpenAiCompatible)
     pub openai_asr_base_url: Option<String>,
     pub openai_asr_model: Option<String>,
@@ -125,6 +126,7 @@ pub struct SaveWorkspaceSettingsInput {
     pub hotkey_cancel: String,
     pub pill_visibility: PillVisibilityDto,
     pub language: String,
+    pub dictation_language: String,
     // OpenAI ASR fields (sent when asr_backend_type == OpenAiCompatible)
     pub openai_asr_base_url: Option<String>,
     pub openai_asr_api_key: Option<String>,

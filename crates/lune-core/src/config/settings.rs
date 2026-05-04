@@ -19,6 +19,9 @@ pub struct UserSettings {
     pub default_style: StyleId,
     /// BCP-47 tag, e.g. "en-US"
     pub language: String,
+    /// Dictation language for ASR/correction. "auto" = detect from speech.
+    #[serde(default = "default_dictation_language")]
+    pub dictation_language: String,
     pub privacy_mode: PrivacyMode,
     pub dictation_mode: DictationMode,
     pub activation_mode: ActivationMode,
@@ -82,6 +85,7 @@ impl Default for UserSettings {
             hotkey: HotkeyConfig::default(),
             default_style: "casual".into(),
             language: "auto".into(),
+            dictation_language: default_dictation_language(),
             privacy_mode: PrivacyMode::LocalOnly,
             dictation_mode: DictationMode::default(),
             activation_mode: ActivationMode::default(),
@@ -129,6 +133,10 @@ impl Default for LlmBackendConfig {
     fn default() -> Self {
         Self::Local {}
     }
+}
+
+fn default_dictation_language() -> String {
+    "auto".into()
 }
 
 fn default_word_confidence_threshold() -> f32 {

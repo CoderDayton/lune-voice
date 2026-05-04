@@ -241,6 +241,7 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
         hotkey_cancel: format_key_combo(&settings.hotkey.cancel_dictation),
         pill_visibility: pill_visibility_to_dto(settings.pill_visibility),
         language: settings.language.clone(),
+        dictation_language: settings.dictation_language.clone(),
         openai_asr_base_url,
         openai_asr_model,
         openai_asr_api_key_set,
@@ -298,6 +299,15 @@ fn apply_settings_dto(
         );
     }
     settings.language = language.to_owned();
+
+    let dictation_language = input.dictation_language.trim();
+    if dictation_language != "auto" && !is_wellformed_bcp47(dictation_language) {
+        return Err(
+            "dictationLanguage must be \"auto\" or a well-formed BCP-47 tag (e.g. \"en\", \"de\")"
+                .into(),
+        );
+    }
+    settings.dictation_language = dictation_language.to_owned();
     Ok(())
 }
 
@@ -568,6 +578,7 @@ mod tests {
             hotkey_cancel: dto.hotkey_cancel,
             pill_visibility: dto.pill_visibility,
             language: dto.language,
+            dictation_language: dto.dictation_language,
             openai_asr_base_url: dto.openai_asr_base_url,
             openai_asr_api_key: None,
             openai_asr_model: dto.openai_asr_model,
@@ -585,6 +596,44 @@ mod tests {
         let mut input = default_save_input();
         input.language = "bad tag".into();
         assert!(apply_settings_dto(&mut settings, input).is_err());
+    }
+
+    #[test]
+    fn dictation_language_accepts_auto_and_bcp47() {
+        let mut settings = UserSettings::default();
+
+        let mut input = default_save_input();
+        input.dictation_language = "auto".into();
+        apply_settings_dto(&mut settings, input).unwrap();
+        assert_eq!(settings.dictation_language, "auto");
+
+        let mut input = default_save_input();
+        input.dictation_language = "en".into();
+        apply_settings_dto(&mut settings, input).unwrap();
+        assert_eq!(settings.dictation_language, "en");
+
+        let mut input = default_save_input();
+        input.dictation_language = "zh".into();
+        apply_settings_dto(&mut settings, input).unwrap();
+        assert_eq!(settings.dictation_language, "zh");
+    }
+
+    #[test]
+    fn dictation_language_rejects_invalid_tag() {
+        let mut settings = UserSettings::default();
+
+        let mut input = default_save_input();
+        input.dictation_language = "not valid".into();
+        assert!(apply_settings_dto(&mut settings, input).is_err());
+    }
+
+    #[test]
+    fn dictation_language_round_trips_through_dto() {
+        let mut settings = UserSettings::default();
+        settings.dictation_language = "de".into();
+
+        let dto = settings_to_dto(&settings);
+        assert_eq!(dto.dictation_language, "de");
     }
 
     #[test]
