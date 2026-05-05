@@ -8,7 +8,26 @@ pub fn has_dict(language: &str) -> bool {
     crate::freq::has_dict(language)
 }
 
-const HWCE_FLAG_THRESHOLD: f32 = 0.40;
+/// Risk score (Heuristic Word Confidence Estimate) at which a word is treated
+/// as "uncertain" — surfaced to the LLM via `unresolved_words` and used as the
+/// gate for invoking the LLM at all (see [`LLM_GATE_RISK`]).
+pub const HWCE_FLAG_THRESHOLD: f32 = 0.40;
+
+/// Risk score that triggers the LLM correction pass. Aliased to
+/// [`HWCE_FLAG_THRESHOLD`] so a session can never reach the LLM without at
+/// least one word also qualifying as a hint — keeps `needs_llm=true` and
+/// `unresolved_words` consistent.
+pub const LLM_GATE_RISK: f32 = HWCE_FLAG_THRESHOLD;
+
+/// Maximum risk at which a known high-frequency word is allowed to pass
+/// through unchanged. Above this, the word is sent to the LLM as uncertain
+/// even if the lexicon recognizes it.
+pub const CANONICAL_OVERRIDE_RISK_CEIL: f32 = 0.75;
+
+/// Maximum risk at which an unknown but proper-shaped token (capitalized
+/// word, acronym, CamelCase) is preserved verbatim. Above this, the word is
+/// flagged regardless of shape.
+pub const PROPER_NOUN_RISK_CEIL: f32 = 0.80;
 
 #[derive(Debug)]
 pub struct WordScore {
@@ -29,6 +48,10 @@ pub struct CorrectionResult {
     pub word_risk_positions: Vec<(usize, f32)>,
     pub unresolved_words: Vec<WordScore>,
     pub all_resolved: bool,
+    /// Risk-score entries that did not align to any text token. Non-zero
+    /// indicates ASR word boundaries diverged from `split_whitespace`
+    /// (punctuation splits, contractions, duplicate-without-match).
+    pub dropped_risk_entries: usize,
 }
 
 /// Process a single word during correction.
@@ -75,9 +98,13 @@ fn process_single_word(
         };
     }
 
-    // Apply canonical casing from the vocab (e.g. "github" → "GitHub")
+    // Apply canonical casing from the vocab (e.g. "github" → "GitHub").
+    // Only override when the canonical itself carries uppercase information —
+    // otherwise we'd flatten correct sentence-initial capitalization (e.g.
+    // "All" → "all") because freq-dict canonicals fall back to lowercase.
     if let Some(info) = lexicon_info.as_ref() {
-        if info.canonical.as_ref() != stripped {
+        let canonical_has_upper = info.canonical.chars().any(|c| c.is_ascii_uppercase());
+        if canonical_has_upper && info.canonical.as_ref() != stripped {
             return ProcessedWord {
                 corrected_word: restore_punctuation(word, &info.canonical),
                 unresolved: None,
@@ -85,7 +112,9 @@ fn process_single_word(
         }
 
         let is_high_freq = info.freq >= Lexicon::CONFIDENT_FREQ;
-        if info.source == WordSource::Vocab || (is_high_freq && risk_score < 0.75) {
+        if info.source == WordSource::Vocab
+            || (is_high_freq && risk_score < CANONICAL_OVERRIDE_RISK_CEIL)
+        {
             return ProcessedWord {
                 corrected_word: word.to_owned(),
                 unresolved: None,
@@ -96,11 +125,18 @@ fn process_single_word(
     // Proper nouns and acronyms pass through unless very high risk
     let looks_proper = stripped.starts_with(|c: char| c.is_ascii_uppercase())
         || (stripped.len() >= 2 && stripped.chars().all(|c| c.is_ascii_uppercase()));
-    let is_camel_case = stripped.chars().any(|c| c.is_ascii_uppercase())
-        && stripped.chars().any(|c| c.is_ascii_lowercase())
-        && stripped.chars().filter(|c| c.is_ascii_uppercase()).count() >= 2;
+    // Mixed-case identifier: any uppercase + any lowercase, length >= 3.
+    // Looser than "≥2 uppercase" so leading-lowercase forms like "iPhone",
+    // "eBay", "macOS" are recognized as proper-shaped tokens.
+    let is_camel_case = stripped.len() >= 3
+        && stripped.chars().any(|c| c.is_ascii_uppercase())
+        && stripped.chars().any(|c| c.is_ascii_lowercase());
 
-    if is_unknown && (looks_proper || is_camel_case) && risk_score < 0.80 {
+    // Proper-shaped tokens are preserved verbatim under the risk ceiling
+    // regardless of dictionary membership: a known word that *also* looks
+    // like a proper noun (e.g. brand names or sentence-initial capitals)
+    // shouldn't be rewritten by the heuristic at moderate risk.
+    if (looks_proper || is_camel_case) && risk_score < PROPER_NOUN_RISK_CEIL {
         return ProcessedWord {
             corrected_word: word.to_owned(),
             unresolved: None,
@@ -154,7 +190,9 @@ impl HeuristicCorrector {
         lang: &str,
     ) -> CorrectionResult {
         let words: Vec<&str> = text.split_whitespace().collect();
-        let word_risk_positions = align_word_risk_positions(&words, word_risk_scores);
+        let aligned = align_word_risk_positions(&words, word_risk_scores);
+        let word_risk_positions = aligned.positions;
+        let dropped_risk_entries = aligned.dropped;
 
         if !has_dict(lang) {
             return CorrectionResult {
@@ -162,6 +200,7 @@ impl HeuristicCorrector {
                 word_risk_positions,
                 unresolved_words: Vec::new(),
                 all_resolved: true,
+                dropped_risk_entries,
             };
         }
 
@@ -199,6 +238,7 @@ impl HeuristicCorrector {
             word_risk_positions,
             unresolved_words: unresolved,
             all_resolved,
+            dropped_risk_entries,
         }
     }
 }
@@ -208,11 +248,16 @@ fn strip_punctuation(word: &str) -> &str {
     s.trim_end_matches(|c: char| c.is_ascii_punctuation())
 }
 
-fn align_word_risk_positions(
-    words: &[&str],
-    word_risk_scores: &[(String, f32)],
-) -> Vec<(usize, f32)> {
+/// Aligned positions plus a count of risk entries that could not be matched
+/// to any remaining text token.
+struct AlignedRisks {
+    positions: Vec<(usize, f32)>,
+    dropped: usize,
+}
+
+fn align_word_risk_positions(words: &[&str], word_risk_scores: &[(String, f32)]) -> AlignedRisks {
     let mut out = Vec::new();
+    let mut dropped = 0usize;
     let mut cursor = 0usize;
 
     for (risk_word, risk) in word_risk_scores {
@@ -228,10 +273,15 @@ fn align_word_risk_positions(
             let idx = cursor + offset;
             out.push((idx, *risk));
             cursor = (idx + 1).min(words.len());
+        } else {
+            dropped += 1;
         }
     }
 
-    out
+    AlignedRisks {
+        positions: out,
+        dropped,
+    }
 }
 
 fn restore_punctuation(original: &str, corrected: &str) -> String {
@@ -338,6 +388,71 @@ mod tests {
         let risks = vec![("WebSocket".to_string(), 0.95)];
         let result = c.correct("WebSocket failed", &risks, &[], "en");
         assert_eq!(result.corrected_text, "WebSocket failed");
+    }
+
+    #[test]
+    fn llm_gate_risk_matches_flag_threshold() {
+        // Invariant: if the session-level gate fires, at least one word must
+        // also qualify as uncertain — otherwise the LLM gets no hint.
+        assert!((LLM_GATE_RISK - HWCE_FLAG_THRESHOLD).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn sub_gate_risk_does_not_fire_llm() {
+        // A risk just under the gate must neither flag the word nor trigger
+        // a needs_llm decision (the session uses LLM_GATE_RISK).
+        let c = HeuristicCorrector::new();
+        let just_under = LLM_GATE_RISK - 0.05;
+        let risks = vec![("the".to_string(), just_under)];
+        let result = c.correct("the quick brown fox", &risks, &[], "en");
+        assert!(result.unresolved_words.is_empty());
+        assert!(!risks.iter().any(|(_, r)| *r >= LLM_GATE_RISK));
+    }
+
+    #[test]
+    fn camel_case_leading_lowercase_preserved() {
+        // "iPhone" has only one uppercase char — under the old (≥2 upper)
+        // predicate it would not have been recognized as a proper-shaped
+        // token and could be marked unresolved.
+        let c = HeuristicCorrector::new();
+        let risks = vec![("iPhone".to_string(), 0.7)];
+        let result = c.correct("the iPhone is new", &risks, &[], "en");
+        assert!(result.corrected_text.contains("iPhone"));
+        assert!(
+            !result.unresolved_words.iter().any(|w| w.word == "iPhone"),
+            "iPhone should not be flagged as unresolved at moderate risk"
+        );
+    }
+
+    #[test]
+    fn dropped_risks_counted() {
+        // Risk word that doesn't appear in the text should be reported.
+        let c = HeuristicCorrector::new();
+        let risks = vec![("the".to_string(), 0.1), ("nonexistent".to_string(), 0.5)];
+        let result = c.correct("the quick fox", &risks, &[], "en");
+        assert_eq!(result.dropped_risk_entries, 1);
+    }
+
+    #[test]
+    fn no_dropped_risks_on_full_match() {
+        let c = HeuristicCorrector::new();
+        let risks = vec![("the".to_string(), 0.1), ("fox".to_string(), 0.2)];
+        let result = c.correct("the quick fox", &risks, &[], "en");
+        assert_eq!(result.dropped_risk_entries, 0);
+    }
+
+    #[test]
+    fn flagged_sentence_initial_capital_preserved() {
+        let c = HeuristicCorrector::new();
+        // High risk on "All" used to force-lowercase it via the canonical
+        // override because freq-dict canonicals fall back to lowercase.
+        let risks = vec![("All".to_string(), 0.85)];
+        let result = c.correct("All I'm doing is trash work.", &risks, &[], "en");
+        assert!(
+            result.corrected_text.starts_with("All "),
+            "expected leading 'All' preserved, got {:?}",
+            result.corrected_text
+        );
     }
 
     #[test]

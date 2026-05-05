@@ -662,13 +662,16 @@ async fn run_session<A: AsrBackend + 'static>(
         .map(|ws| (ws.word.clone(), ws.position))
         .collect();
 
-    let needs_llm = word_risk_scores.iter().any(|(_, r)| *r >= 0.3);
+    let needs_llm = word_risk_scores
+        .iter()
+        .any(|(_, r)| *r >= lune_dict::corrector::LLM_GATE_RISK);
 
     info!(%session_id, "[ASR] raw: {raw_text}");
     info!(
         %session_id,
         lang = detected_lang,
         unresolved = heuristic_result.unresolved_words.len(),
+        dropped_risks = heuristic_result.dropped_risk_entries,
         needs_llm,
         "bypass gate"
     );
