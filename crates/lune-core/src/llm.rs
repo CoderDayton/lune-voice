@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::Result;
@@ -49,8 +50,17 @@ pub enum AppCategory {
     Terminal,
 }
 
+/// Simple completion service: system prompt + user message → response text.
+///
+/// Intended for application-level tasks (e.g. generating few-shot examples)
+/// that need a raw LLM call without the full post-processing pipeline.
+#[async_trait]
+pub trait LlmService: Send + Sync {
+    async fn complete(&self, system: &str, user: &str) -> Result<String>;
+}
+
 /// Trait for LLM-based text post-processing.
-#[async_trait::async_trait]
+#[async_trait]
 pub trait TextPostProcessor: Send + Sync {
     async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput>;
 

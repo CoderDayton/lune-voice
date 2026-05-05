@@ -1,15 +1,16 @@
 use lune_core::config::{
     ActivationMode, AsrBackendConfig, DevicePolicy, DictationMode, HotkeyConfig, KeyCombo,
-    Modifier, PillVisibility, RedactedString, StreamingMode, UserSettings, builtin_registry,
+    Modifier, PillVisibility, RedactedString, StreamingMode, StylePreset, UserSettings,
+    builtin_registry,
 };
 use lune_core::session::SessionStatus;
 use lune_persist::{AppPaths, Database, SettingsStore, StoredDictionaryEntry};
 
 use crate::dto::{
-    ActivationModeDto, AsrBackendTypeDto, CreateDictionaryEntryInput, DevicePolicyDto,
-    DictationModeDto, DictionaryItemDto, HistoryItemDto, PillVisibilityDto,
-    SaveWorkspaceSettingsInput, StylePresetDto, UpdateDictionaryEntryInput, WorkspaceSettingsDto,
-    WorkspaceSnapshot,
+    ActivationModeDto, AsrBackendTypeDto, CreateCustomStyleInput, CreateDictionaryEntryInput,
+    DevicePolicyDto, DictationModeDto, DictionaryItemDto, HistoryItemDto, PillVisibilityDto,
+    SaveWorkspaceSettingsInput, StylePresetDto, UpdateCustomStyleInput, UpdateDictionaryEntryInput,
+    WorkspaceSettingsDto, WorkspaceSnapshot,
 };
 
 const HISTORY_LIMIT: u32 = 200;
@@ -152,6 +153,118 @@ pub fn update_dictionary_entry(
     build_snapshot(settings, &mut database)
 }
 
+// ── Custom style presets ─────────────────────────────────────────────────
+
+const CUSTOM_STYLE_MAX: usize = 50;
+const STYLE_NAME_MAX_LEN: usize = 64;
+const STYLE_DESC_MAX_LEN: usize = 256;
+const STYLE_INSTRUCTIONS_MAX_LEN: usize = 2048;
+
+fn validate_style_fields(name: &str, description: &str, instructions: &str) -> Result<(), String> {
+    if name.is_empty() || name.len() > STYLE_NAME_MAX_LEN {
+        return Err(format!("name must be 1–{STYLE_NAME_MAX_LEN} characters"));
+    }
+    if description.len() > STYLE_DESC_MAX_LEN {
+        return Err(format!(
+            "description must be at most {STYLE_DESC_MAX_LEN} characters"
+        ));
+    }
+    if instructions.is_empty() || instructions.len() > STYLE_INSTRUCTIONS_MAX_LEN {
+        return Err(format!(
+            "instructions must be 1–{STYLE_INSTRUCTIONS_MAX_LEN} characters"
+        ));
+    }
+    if name
+        .chars()
+        .chain(description.chars())
+        .chain(instructions.chars())
+        .any(|c| c.is_control() && c != '\n' && c != '\t')
+    {
+        return Err("style fields must not contain control characters".into());
+    }
+    Ok(())
+}
+
+pub fn create_custom_style(input: CreateCustomStyleInput) -> Result<WorkspaceSnapshot, String> {
+    let paths = resolve_paths()?;
+    let mut settings = load_settings(&paths)?;
+    let name = input.name.trim().to_owned();
+    let description = input.description.trim().to_owned();
+    let instructions = input.instructions.trim().to_owned();
+    validate_style_fields(&name, &description, &instructions)?;
+    if settings.custom_styles.len() >= CUSTOM_STYLE_MAX {
+        return Err(format!(
+            "maximum of {CUSTOM_STYLE_MAX} custom styles reached"
+        ));
+    }
+    let id = format!("custom-{}", uuid::Uuid::new_v4().as_hyphenated());
+    settings.custom_styles.push(StylePreset {
+        id,
+        name,
+        description,
+        style_instructions: instructions,
+        user_prompt_template: "{raw_text}".into(),
+        few_shot_pairs: Vec::new(),
+    });
+    save_settings(&paths, &settings)?;
+    let mut database = open_database(&paths)?;
+    build_snapshot(settings, &mut database)
+}
+
+pub fn update_custom_style(input: UpdateCustomStyleInput) -> Result<WorkspaceSnapshot, String> {
+    let paths = resolve_paths()?;
+    let mut settings = load_settings(&paths)?;
+    let name = input.name.trim().to_owned();
+    let description = input.description.trim().to_owned();
+    let instructions = input.instructions.trim().to_owned();
+    validate_style_fields(&name, &description, &instructions)?;
+    let idx = settings
+        .custom_styles
+        .iter()
+        .position(|s| s.id == input.id)
+        .ok_or_else(|| format!("custom style not found: {}", input.id))?;
+    settings.custom_styles[idx].name = name;
+    settings.custom_styles[idx].description = description;
+    settings.custom_styles[idx].style_instructions = instructions;
+    save_settings(&paths, &settings)?;
+    let mut database = open_database(&paths)?;
+    build_snapshot(settings, &mut database)
+}
+
+pub fn delete_custom_style(style_id: String) -> Result<WorkspaceSnapshot, String> {
+    let paths = resolve_paths()?;
+    let mut settings = load_settings(&paths)?;
+    let idx = settings
+        .custom_styles
+        .iter()
+        .position(|s| s.id == style_id)
+        .ok_or_else(|| format!("custom style not found: {style_id}"))?;
+    settings.custom_styles.remove(idx);
+    if settings.default_style == style_id {
+        settings.default_style = "casual".into();
+    }
+    save_settings(&paths, &settings)?;
+    let mut database = open_database(&paths)?;
+    build_snapshot(settings, &mut database)
+}
+
+pub fn save_style_few_shot_pairs(
+    style_id: &str,
+    pairs: Vec<(String, String)>,
+) -> Result<WorkspaceSnapshot, String> {
+    let paths = resolve_paths()?;
+    let mut settings = load_settings(&paths)?;
+    let idx = settings
+        .custom_styles
+        .iter()
+        .position(|s| s.id == style_id)
+        .ok_or_else(|| format!("custom style not found: {style_id}"))?;
+    settings.custom_styles[idx].few_shot_pairs = pairs;
+    save_settings(&paths, &settings)?;
+    let mut database = open_database(&paths)?;
+    build_snapshot(settings, &mut database)
+}
+
 fn build_snapshot(
     settings: UserSettings,
     database: &mut Database,
@@ -179,15 +292,26 @@ fn build_snapshot(
         .map(map_dictionary_entry)
         .collect();
 
-    let style_presets = builtin_registry()
+    let mut style_presets: Vec<StylePresetDto> = builtin_registry()
         .all()
         .iter()
         .map(|p| StylePresetDto {
             id: p.id.clone(),
             name: p.name.clone(),
             description: p.description.clone(),
+            is_builtin: true,
+            instructions: p.style_instructions.clone(),
         })
         .collect();
+    for custom in &settings.custom_styles {
+        style_presets.push(StylePresetDto {
+            id: custom.id.clone(),
+            name: custom.name.clone(),
+            description: custom.description.clone(),
+            is_builtin: false,
+            instructions: custom.style_instructions.clone(),
+        });
+    }
 
     Ok(WorkspaceSnapshot {
         ipc_flavor: "tauri",
@@ -300,7 +424,9 @@ fn apply_settings_dto(
     if style.is_empty() || style.len() > 128 {
         return Err("stylePreset must be 1–128 characters".into());
     }
-    if builtin_registry().get(style).is_none() {
+    let is_known = builtin_registry().get(style).is_some()
+        || settings.custom_styles.iter().any(|s| s.id == style);
+    if !is_known {
         return Err(format!("unknown stylePreset: {style}"));
     }
     settings.default_style = style.to_owned();

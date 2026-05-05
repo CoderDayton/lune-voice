@@ -1,7 +1,8 @@
 use tauri::{Emitter, Runtime, State, WebviewWindow, ipc::Channel};
 
 use crate::dto::{
-    CreateDictionaryEntryInput, PillSnapshotDto, SaveWorkspaceSettingsInput, SessionStreamEvent,
+    CreateCustomStyleInput, CreateDictionaryEntryInput, PillSnapshotDto,
+    SaveWorkspaceSettingsInput, SessionStreamEvent, UpdateCustomStyleInput,
     UpdateDictionaryEntryInput, WorkspaceSnapshot,
 };
 use crate::runtime::AppRuntime;
@@ -155,6 +156,94 @@ pub async fn update_dictionary_entry(
     })
     .await
     .map_err(|e| format!("update dictionary entry task failed: {e}"))??;
+    runtime.mark_reload_required().await;
+    snapshot.service_status = runtime.service_status().await;
+    Ok(snapshot)
+}
+
+#[tauri::command]
+pub async fn create_custom_style(
+    window: WebviewWindow,
+    runtime: State<'_, AppRuntime>,
+    input: CreateCustomStyleInput,
+) -> Result<WorkspaceSnapshot, String> {
+    require_window_access(&window, &["main"])?;
+    let mut snapshot = tauri::async_runtime::spawn_blocking(move || {
+        crate::persistence::create_custom_style(input)
+    })
+    .await
+    .map_err(|e| format!("task failed: {e}"))??;
+    runtime.mark_reload_required().await;
+    snapshot.service_status = runtime.service_status().await;
+    Ok(snapshot)
+}
+
+#[tauri::command]
+pub async fn update_custom_style(
+    window: WebviewWindow,
+    runtime: State<'_, AppRuntime>,
+    input: UpdateCustomStyleInput,
+) -> Result<WorkspaceSnapshot, String> {
+    require_window_access(&window, &["main"])?;
+    let mut snapshot = tauri::async_runtime::spawn_blocking(move || {
+        crate::persistence::update_custom_style(input)
+    })
+    .await
+    .map_err(|e| format!("task failed: {e}"))??;
+    runtime.mark_reload_required().await;
+    snapshot.service_status = runtime.service_status().await;
+    Ok(snapshot)
+}
+
+#[tauri::command]
+pub async fn delete_custom_style(
+    window: WebviewWindow,
+    runtime: State<'_, AppRuntime>,
+    style_id: String,
+) -> Result<WorkspaceSnapshot, String> {
+    require_window_access(&window, &["main"])?;
+    let mut snapshot = tauri::async_runtime::spawn_blocking(move || {
+        crate::persistence::delete_custom_style(style_id)
+    })
+    .await
+    .map_err(|e| format!("task failed: {e}"))??;
+    runtime.mark_reload_required().await;
+    snapshot.service_status = runtime.service_status().await;
+    Ok(snapshot)
+}
+
+#[tauri::command]
+pub async fn generate_style_examples(
+    window: WebviewWindow,
+    runtime: State<'_, AppRuntime>,
+    style_id: String,
+) -> Result<WorkspaceSnapshot, String> {
+    require_window_access(&window, &["main"])?;
+    let llm = runtime.llm_service().await;
+    let (name, instructions) = tauri::async_runtime::spawn_blocking({
+        let sid = style_id.clone();
+        move || {
+            let paths = lune_persist::AppPaths::resolve().ok_or("failed to resolve paths")?;
+            let settings = lune_persist::SettingsStore::new(paths.settings_file())
+                .load()
+                .map_err(|e| format!("load settings: {e}"))?;
+            settings
+                .custom_styles
+                .iter()
+                .find(|s| s.id == sid)
+                .map(|s| (s.name.clone(), s.style_instructions.clone()))
+                .ok_or_else(|| format!("custom style not found: {sid}"))
+        }
+    })
+    .await
+    .map_err(|e| format!("task failed: {e}"))??;
+    let pairs =
+        lune_llm::few_shot::generate_few_shot_examples(llm.as_ref(), &name, &instructions).await?;
+    let mut snapshot = tauri::async_runtime::spawn_blocking(move || {
+        crate::persistence::save_style_few_shot_pairs(&style_id, pairs)
+    })
+    .await
+    .map_err(|e| format!("task failed: {e}"))??;
     runtime.mark_reload_required().await;
     snapshot.service_status = runtime.service_status().await;
     Ok(snapshot)

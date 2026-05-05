@@ -85,18 +85,55 @@ function createMockSnapshot(): BackendWorkspaceSnapshot {
       priority: entry.priority,
     })),
     stylePresets: [
-      { id: 'minimal', name: 'Minimal', description: 'Fix errors only. No style changes.' },
-      { id: 'casual', name: 'Casual', description: 'Relaxed, conversational tone.' },
-      { id: 'professional', name: 'Professional', description: 'Polished and clear.' },
-      { id: 'formal', name: 'Formal', description: 'Official correspondence.' },
-      { id: 'technical', name: 'Technical', description: 'Code and engineering.' },
-      { id: 'writing', name: 'Writing', description: 'Long-form content.' },
+      {
+        id: 'minimal',
+        name: 'Minimal',
+        description: 'Fix errors only. No style changes.',
+        isBuiltin: true,
+        instructions: '',
+      },
+      {
+        id: 'casual',
+        name: 'Casual',
+        description: 'Relaxed, conversational tone.',
+        isBuiltin: true,
+        instructions: '',
+      },
+      {
+        id: 'professional',
+        name: 'Professional',
+        description: 'Polished and clear.',
+        isBuiltin: true,
+        instructions: '',
+      },
+      {
+        id: 'formal',
+        name: 'Formal',
+        description: 'Official correspondence.',
+        isBuiltin: true,
+        instructions: '',
+      },
+      {
+        id: 'technical',
+        name: 'Technical',
+        description: 'Code and engineering.',
+        isBuiltin: true,
+        instructions: '',
+      },
+      {
+        id: 'writing',
+        name: 'Writing',
+        description: 'Long-form content.',
+        isBuiltin: true,
+        instructions: '',
+      },
     ],
   };
 }
 
 let mockSnapshot: BackendWorkspaceSnapshot = createMockSnapshot();
 let nextDictionaryId = 1000;
+let nextStyleId = 1000;
 
 function applySettings(input: SaveWorkspaceSettingsInput) {
   const { openaiAsrApiKey: _openaiAsrApiKey, ...fields } = input;
@@ -170,7 +207,40 @@ export const mockBackendClient: BackendClient = {
       ...mockSnapshot,
       history: mockSnapshot.history.filter((entry) => entry.id !== sessionId),
     };
+    return structuredClone(mockSnapshot);
+  },
 
+  async createCustomStyle(name, description, instructions) {
+    mockSnapshot = {
+      ...mockSnapshot,
+      stylePresets: [
+        ...mockSnapshot.stylePresets,
+        { id: `custom-${nextStyleId++}`, name, description, instructions, isBuiltin: false },
+      ],
+    };
+    return structuredClone(mockSnapshot);
+  },
+  async updateCustomStyle(id, name, description, instructions) {
+    mockSnapshot = {
+      ...mockSnapshot,
+      stylePresets: mockSnapshot.stylePresets.map((p) =>
+        p.id === id ? { ...p, name, description, instructions } : p,
+      ),
+    };
+    return structuredClone(mockSnapshot);
+  },
+  async deleteCustomStyle(styleId) {
+    const wasActive = mockSnapshot.settings.stylePreset === styleId;
+    mockSnapshot = {
+      ...mockSnapshot,
+      stylePresets: mockSnapshot.stylePresets.filter((p) => p.id !== styleId),
+      settings: wasActive
+        ? { ...mockSnapshot.settings, stylePreset: 'casual' }
+        : mockSnapshot.settings,
+    };
+    return structuredClone(mockSnapshot);
+  },
+  async generateStyleExamples(_styleId) {
     return structuredClone(mockSnapshot);
   },
 

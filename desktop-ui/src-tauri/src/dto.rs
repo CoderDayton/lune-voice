@@ -43,6 +43,8 @@ pub struct StylePresetDto {
     pub id: String,
     pub name: String,
     pub description: String,
+    pub is_builtin: bool,
+    pub instructions: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -148,6 +150,23 @@ pub struct UpdateDictionaryEntryInput {
     pub phrase: String,
     pub replacement: String,
     pub priority: u8,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CreateCustomStyleInput {
+    pub name: String,
+    pub description: String,
+    pub instructions: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct UpdateCustomStyleInput {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub instructions: String,
 }
 
 // ── Stream events ────────────────────────────────────────────────────────

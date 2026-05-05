@@ -12,7 +12,7 @@ use lune_commands::VoiceCommandRouter;
 use lune_core::asr::AsrSessionConfig;
 use lune_core::command::VoiceCommand;
 use lune_core::config::{ActivationMode, LlmBackendConfig, PillVisibility, UserSettings};
-use lune_core::llm::{PostProcessInput, PostProcessOutput, TextPostProcessor};
+use lune_core::llm::LlmService;
 use lune_core::session::SessionEvent;
 use lune_dict::DictionaryManager;
 use lune_llm::{NullPostProcessor, OpenAiLlmBackend, OpenAiLlmConfig};
@@ -42,6 +42,8 @@ struct RuntimeInner {
     session_stream_seq: AtomicU64,
     /// Shared settings — updated on reload, read for dictation_mode at delivery time.
     settings: Arc<RwLock<UserSettings>>,
+    /// Shared LLM service — used by dictation pipeline and on-demand tasks.
+    llm_service: RwLock<Arc<dyn LlmService>>,
     /// Background thread that owns the uinput/clipboard handle.
     delivery: DeliveryService,
     /// Debounce guard: timestamp of last toggle/start/stop action.
@@ -74,11 +76,12 @@ impl AppRuntime {
 
         let models_ready = lune_persist::has_required_models(&paths.models_dir());
 
-        let (pipeline, settings) = if models_ready {
+        let (pipeline, llm_service, settings) = if models_ready {
             build_pipeline(paths.clone(), settings).await?
         } else {
             info!("models not yet downloaded — deferring pipeline build");
             let settings = Arc::new(RwLock::new(settings));
+            let null_svc: Arc<dyn LlmService> = Arc::new(NullPostProcessor::new());
             let pipeline = LivePipeline {
                 paths,
                 manager: None,
@@ -89,7 +92,7 @@ impl AppRuntime {
                 #[cfg(unix)]
                 focus_target: None,
             };
-            (pipeline, settings)
+            (pipeline, null_svc, settings)
         };
 
         let terminal_mode = settings.read().await.terminal_mode;
@@ -103,6 +106,7 @@ impl AppRuntime {
                 session_stream: RwLock::new(None),
                 session_stream_seq: AtomicU64::new(0),
                 settings: Arc::clone(&settings),
+                llm_service: RwLock::new(llm_service),
                 delivery,
                 last_toggle_at: Mutex::new(Instant::now() - TOGGLE_DEBOUNCE),
                 last_cancel_at: Mutex::new(Instant::now() - CANCEL_DEBOUNCE),
@@ -118,6 +122,10 @@ impl AppRuntime {
 
     pub fn app_handle(&self) -> &AppHandle {
         &self.inner.app
+    }
+
+    pub async fn llm_service(&self) -> Arc<dyn LlmService> {
+        Arc::clone(&*self.inner.llm_service.read().await)
     }
 
     pub async fn set_session_stream(
@@ -178,12 +186,13 @@ impl AppRuntime {
             pipeline.paths.clone()
         };
         let settings = load_settings(&paths)?;
-        let (rebuilt, new_settings) = build_pipeline(paths, settings)
+        let (rebuilt, new_llm_service, new_settings) = build_pipeline(paths, settings)
             .await
             .map_err(|e| format!("eager rebuild: {e}"))?;
         let mut pipeline = self.inner.pipeline.lock().await;
         if !pipeline.active {
             *pipeline = rebuilt;
+            *self.inner.llm_service.write().await = new_llm_service;
             let new_settings_val = new_settings.read().await.clone();
             *self.inner.settings.write().await = new_settings_val;
             tracing::info!("pipeline pre-warmed");
@@ -569,7 +578,7 @@ impl AppRuntime {
         // re-acquire and atomically swap + activate in one critical section.
         if let Some(paths) = reload_paths {
             let settings = load_settings(&paths)?;
-            let (rebuilt, new_settings) = build_pipeline(paths, settings)
+            let (rebuilt, new_llm_service, new_settings) = build_pipeline(paths, settings)
                 .await
                 .map_err(|e| format!("Pipeline build failed: {e}"))?;
             let mut pipeline = self.inner.pipeline.lock().await;
@@ -578,8 +587,7 @@ impl AppRuntime {
             }
             *pipeline = rebuilt;
             pipeline.active = true;
-            // Propagate new settings into the shared arc so delivery uses the
-            // latest dictation_mode and terminal_mode after a reload.
+            *self.inner.llm_service.write().await = new_llm_service;
             let new_settings_val = new_settings.read().await.clone();
             let mut settings = self.inner.settings.write().await;
             *settings = new_settings_val;
@@ -659,10 +667,11 @@ impl Clone for AppRuntime {
 async fn build_pipeline(
     paths: AppPaths,
     settings: UserSettings,
-) -> Result<(LivePipeline, Arc<RwLock<UserSettings>>), String> {
+) -> Result<(LivePipeline, Arc<dyn LlmService>, Arc<RwLock<UserSettings>>), String> {
     let asr = AsrRegistry::from_config(&settings.asr_backend, settings.device, &paths.models_dir())
         .map_err(|e| format!("build asr backend: {e}"))?;
-    let (post_processor, local_llm) = build_post_processor(&settings, &paths.models_dir()).await?;
+    let (llm_service, local_llm) = build_llm_service(&settings, &paths.models_dir()).await?;
+    let post_processor = Arc::new(lune_llm::CorrectionPipeline::new(Arc::clone(&llm_service)));
     let router = Arc::new(VoiceCommandRouter::new());
     let dict = Arc::new(Mutex::new(
         DictionaryManager::new(
@@ -741,7 +750,7 @@ async fn build_pipeline(
         focus_target: None,
     };
 
-    Ok((pipeline, settings))
+    Ok((pipeline, llm_service, settings))
 }
 
 fn resolve_paths() -> Result<AppPaths, String> {
@@ -780,10 +789,10 @@ fn quiet_ort_logger() -> ort::logging::LoggerFunction {
     })
 }
 
-async fn build_post_processor(
+async fn build_llm_service(
     settings: &UserSettings,
     models_dir: &std::path::Path,
-) -> Result<(Arc<dyn TextPostProcessor>, Option<Arc<LazyLocalLlm>>), String> {
+) -> Result<(Arc<dyn LlmService>, Option<Arc<LazyLocalLlm>>), String> {
     match &settings.llm_backend {
         LlmBackendConfig::Local { .. } => {
             let style_dir = models_dir.join(lune_core::models::DIR_STYLE_LLM);
@@ -793,11 +802,11 @@ async fn build_post_processor(
                     settings.device.use_gpu(cfg!(feature = "cuda")),
                     128,
                 ));
-                Ok((llm.clone() as Arc<dyn TextPostProcessor>, Some(llm)))
+                Ok((llm.clone() as Arc<dyn LlmService>, Some(llm)))
             } else {
                 tracing::info!("style LLM not downloaded yet, using passthrough");
                 Ok((
-                    Arc::new(NullPostProcessor::new()) as Arc<dyn TextPostProcessor>,
+                    Arc::new(NullPostProcessor::new()) as Arc<dyn LlmService>,
                     None,
                 ))
             }
@@ -808,17 +817,17 @@ async fn build_post_processor(
             model,
             max_tokens,
         } => {
-            let backend = OpenAiLlmBackend::new(OpenAiLlmConfig {
+            let backend = Arc::new(OpenAiLlmBackend::new(OpenAiLlmConfig {
                 base_url: base_url.to_string(),
                 api_key: api_key.expose().to_owned(),
                 model: model.clone(),
                 max_tokens: *max_tokens,
                 temperature: 0.2,
-            });
-            Ok((Arc::new(backend) as Arc<dyn TextPostProcessor>, None))
+            }));
+            Ok((backend as Arc<dyn LlmService>, None))
         }
         _ => Ok((
-            Arc::new(NullPostProcessor::new()) as Arc<dyn TextPostProcessor>,
+            Arc::new(NullPostProcessor::new()) as Arc<dyn LlmService>,
             None,
         )),
     }
@@ -934,8 +943,8 @@ impl LazyLocalLlm {
 }
 
 #[async_trait::async_trait]
-impl TextPostProcessor for LazyLocalLlm {
-    async fn transform(&self, input: &PostProcessInput) -> lune_core::Result<PostProcessOutput> {
+impl LlmService for LazyLocalLlm {
+    async fn complete(&self, system: &str, user: &str) -> lune_core::Result<String> {
         let llm = {
             let state = self.state.lock().await;
             match &*state {
@@ -943,16 +952,9 @@ impl TextPostProcessor for LazyLocalLlm {
                 LazyLlmState::Empty | LazyLlmState::Loading(_) => None,
             }
         };
-
         match llm {
-            Some(llm) => llm.transform(input).await,
-            None => {
-                tracing::info!("local style LLM not ready, using passthrough");
-                Ok(PostProcessOutput {
-                    cleaned_text: input.raw_text.clone(),
-                    metadata: None,
-                })
-            }
+            Some(llm) => llm.complete(system, user).await,
+            None => Err(lune_core::Error::Llm("local LLM not ready".into())),
         }
     }
 }
@@ -980,8 +982,7 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
 
-    use lune_core::config::StylePreset;
-    use lune_core::llm::{PostProcessInput, TextPostProcessor};
+    use lune_core::llm::LlmService;
 
     use super::{LazyLocalLlm, sanitize_error_for_frontend};
 
@@ -993,21 +994,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn lazy_local_llm_passes_through_when_not_warmed() {
+    async fn lazy_local_llm_errors_when_not_warmed() {
         let llm = LazyLocalLlm::new(std::path::PathBuf::from("/missing/model"), false, 8);
-        let input = PostProcessInput {
-            raw_text: "keep this text".into(),
-            style_preset: Arc::new(StylePreset::minimal()),
-            app_category: None,
-            dictionary: vec![],
-            context: None,
-            language: "en".into(),
-            uncertain_words: vec![],
-        };
-
-        let output = llm.transform(&input).await.unwrap();
-
-        assert_eq!(output.cleaned_text, "keep this text");
+        let result = llm.complete("system", "user").await;
+        assert!(result.is_err());
     }
 
     #[tokio::test]

@@ -5,7 +5,7 @@ use super::hotkey::HotkeyConfig;
 use super::modes::{ActivationMode, DictationMode, PillVisibility, PrivacyMode, TerminalMode};
 use super::pipeline::PipelineOverrides;
 use super::redacted::RedactedString;
-use super::style_llm::StyleId;
+use super::style_llm::{StyleId, StylePreset};
 
 /// Top-level user settings, persisted as TOML.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -17,6 +17,8 @@ pub struct UserSettings {
     pub llm_backend: LlmBackendConfig,
     pub hotkey: HotkeyConfig,
     pub default_style: StyleId,
+    #[serde(default)]
+    pub custom_styles: Vec<StylePreset>,
     /// BCP-47 tag, e.g. "en-US"
     pub language: String,
     /// Dictation language for ASR/correction. "auto" = detect from speech.
@@ -84,6 +86,7 @@ impl Default for UserSettings {
             llm_backend: LlmBackendConfig::Disabled,
             hotkey: HotkeyConfig::default(),
             default_style: "casual".into(),
+            custom_styles: Vec::new(),
             language: "auto".into(),
             dictation_language: default_dictation_language(),
             privacy_mode: PrivacyMode::LocalOnly,

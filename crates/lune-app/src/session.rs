@@ -123,12 +123,21 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let session_id = Uuid::new_v4();
         let (control_tx, control_rx) = mpsc::unbounded_channel();
 
-        let current_style_id = {
+        let (current_style_id, custom_styles) = {
             let settings = self.settings.read().await;
-            settings.default_style.clone()
+            (
+                settings.default_style.clone(),
+                settings.custom_styles.clone(),
+            )
         };
         let style_preset = builtin_registry()
             .get(&current_style_id)
+            .or_else(|| {
+                custom_styles
+                    .iter()
+                    .find(|s| s.id == current_style_id)
+                    .map(|s| Arc::new(s.clone()))
+            })
             .or_else(|| builtin_registry().get("minimal"))
             .ok_or_else(|| Error::Config("no usable style preset found".into()))?;
 
@@ -567,15 +576,23 @@ async fn run_session<A: AsrBackend + 'static>(
     let route = router.route_full(&raw_text);
     let mut style_preset = style_preset;
     for cmd in &route.commands {
-        if let lune_core::command::VoiceCommand::SwitchStyle(style_id) = cmd
-            && let Some(next_preset) = builtin_registry().get(style_id)
-        {
-            style_preset = next_preset;
-            info!(
-                %session_id,
-                style = %style_preset.id,
-                "switched style preset via voice command"
-            );
+        if let lune_core::command::VoiceCommand::SwitchStyle(style_id) = cmd {
+            let next_preset = builtin_registry().get(style_id).or_else(|| {
+                _settings.try_read().ok().and_then(|s| {
+                    s.custom_styles
+                        .iter()
+                        .find(|cs| cs.id.as_str() == style_id.as_str())
+                        .map(|cs| Arc::new(cs.clone()))
+                })
+            });
+            if let Some(next_preset) = next_preset {
+                style_preset = next_preset;
+                info!(
+                    %session_id,
+                    style = %style_preset.id,
+                    "switched style preset via voice command"
+                );
+            }
         }
         let payload = serde_json::to_string(cmd).unwrap_or_else(|_| format!("{cmd:?}"));
         let _ = event_tx.try_send(SessionEvent::CommandDetected(payload));

@@ -262,6 +262,70 @@ export async function removeDictionaryEntry(id: number) {
   }
 }
 
+export async function createCustomStyle(
+  name: string,
+  description: string,
+  instructions: string,
+): Promise<boolean> {
+  if (!name.trim()) return false;
+  try {
+    const snapshot = await backendClient.createCustomStyle(
+      name.trim(),
+      description.trim(),
+      instructions.trim(),
+    );
+    workspaceActions.hydrate(snapshot);
+    return true;
+  } catch (error) {
+    workspaceActions.setError(formatError(error));
+    return false;
+  }
+}
+
+export async function updateCustomStyle(
+  id: string,
+  name: string,
+  description: string,
+  instructions: string,
+): Promise<boolean> {
+  if (!name.trim()) return false;
+  try {
+    const snapshot = await backendClient.updateCustomStyle(
+      id,
+      name.trim(),
+      description.trim(),
+      instructions.trim(),
+    );
+    workspaceActions.hydrate(snapshot);
+    return true;
+  } catch (error) {
+    workspaceActions.setError(formatError(error));
+    return false;
+  }
+}
+
+export async function deleteCustomStyle(styleId: string): Promise<boolean> {
+  try {
+    const snapshot = await backendClient.deleteCustomStyle(styleId);
+    workspaceActions.hydrate(snapshot);
+    return true;
+  } catch (error) {
+    workspaceActions.setError(formatError(error));
+    return false;
+  }
+}
+
+export async function generateStyleExamples(styleId: string): Promise<boolean> {
+  try {
+    const snapshot = await backendClient.generateStyleExamples(styleId);
+    workspaceActions.hydrate(snapshot);
+    return true;
+  } catch (error) {
+    workspaceActions.setError(formatError(error));
+    return false;
+  }
+}
+
 async function dictationAction<T>(action: () => Promise<T>, fallback: T): Promise<T> {
   workspaceActions.setError(null);
   try {

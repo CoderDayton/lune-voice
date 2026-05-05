@@ -58,6 +58,48 @@ impl OpenAiLlmBackend {
     }
 }
 
+#[async_trait::async_trait]
+impl lune_core::llm::LlmService for OpenAiLlmBackend {
+    async fn complete(&self, system: &str, user: &str) -> lune_core::Result<String> {
+        let mut messages: Vec<ChatCompletionRequestMessage> = Vec::with_capacity(2);
+        if !system.is_empty() {
+            messages.push(
+                ChatCompletionRequestSystemMessageArgs::default()
+                    .content(system)
+                    .build()
+                    .expect("system message")
+                    .into(),
+            );
+        }
+        messages.push(
+            ChatCompletionRequestUserMessageArgs::default()
+                .content(user)
+                .build()
+                .expect("user message")
+                .into(),
+        );
+        let request = CreateChatCompletionRequestArgs::default()
+            .model(&self.config.model)
+            .max_tokens(self.config.max_tokens)
+            .temperature(self.config.temperature)
+            .messages(messages)
+            .build()
+            .map_err(|e| lune_core::Error::Llm(format!("build request: {e}")))?;
+        let response = self
+            .client
+            .chat()
+            .create(request)
+            .await
+            .map_err(|e| lune_core::Error::Llm(format!("API call: {e}")))?;
+        response
+            .choices
+            .first()
+            .and_then(|c| c.message.content.as_deref())
+            .map(|s| s.trim().to_owned())
+            .ok_or_else(|| lune_core::Error::Llm("empty response".into()))
+    }
+}
+
 /// Build correction-pass messages: system = BASE_SYSTEM_PROMPT, user = transcript.
 fn build_correction_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage> {
     let mut messages = Vec::with_capacity(2);

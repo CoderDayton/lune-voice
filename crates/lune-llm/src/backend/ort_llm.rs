@@ -758,6 +758,19 @@ fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> String {
 }
 
 #[async_trait::async_trait]
+impl lune_core::llm::LlmService for OrtStyleLlm {
+    async fn complete(&self, system: &str, user: &str) -> Result<String> {
+        let (ids, _sys_prefix_len) = self.build_chat_ids(system, user)?;
+        let out_ids = self.generate(&ids, 0)?;
+        let text = self
+            .tokenizer
+            .decode(&out_ids, true)
+            .map_err(|e| Error::Llm(format!("decode: {e}")))?;
+        Ok(strip_think_tags(&text).trim().to_owned())
+    }
+}
+
+#[async_trait::async_trait]
 impl TextPostProcessor for OrtStyleLlm {
     async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput> {
         // Pass 1: correction only (uses cached system-prompt prefix).

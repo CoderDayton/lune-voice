@@ -26,6 +26,7 @@ lune-ngram = { path = "../../crates/lune-ngram" }
 lune-llm = { path = "../../crates/lune-llm" }
 lune-persist = { path = "../../crates/lune-persist" }
 ort = { workspace = true }
+uuid.workspace = true
 tokio = { workspace = true }
 tracing.workspace = true
 tracing-subscriber.workspace = true

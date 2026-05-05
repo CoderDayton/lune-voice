@@ -40,6 +40,22 @@ const tauriBackendClient: BackendClient = {
     return invoke<BackendWorkspaceSnapshot>('delete_session', { sessionId });
   },
 
+  createCustomStyle(name, description, instructions) {
+    return invoke<BackendWorkspaceSnapshot>('create_custom_style', {
+      input: { name, description, instructions },
+    });
+  },
+  updateCustomStyle(id, name, description, instructions) {
+    return invoke<BackendWorkspaceSnapshot>('update_custom_style', {
+      input: { id, name, description, instructions },
+    });
+  },
+  deleteCustomStyle(styleId) {
+    return invoke<BackendWorkspaceSnapshot>('delete_custom_style', { styleId });
+  },
+  generateStyleExamples(styleId) {
+    return invoke<BackendWorkspaceSnapshot>('generate_style_examples', { styleId });
+  },
   startDictation() {
     return invoke<string>('start_dictation');
   },

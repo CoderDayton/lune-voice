@@ -53,6 +53,8 @@ export interface StylePreset {
   id: string;
   name: string;
   description: string;
+  isBuiltin: boolean;
+  instructions: string;
 }
 
 export interface WorkspaceState {

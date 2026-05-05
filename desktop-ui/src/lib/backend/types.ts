@@ -47,6 +47,8 @@ export interface BackendStylePreset {
   id: string;
   name: string;
   description: string;
+  isBuiltin: boolean;
+  instructions: string;
 }
 
 export interface BackendWorkspaceSnapshot {
@@ -102,6 +104,19 @@ export interface BackendClient {
   ): Promise<BackendWorkspaceSnapshot>;
   deleteDictionaryEntry(id: number): Promise<BackendWorkspaceSnapshot>;
   deleteSession(sessionId: string): Promise<BackendWorkspaceSnapshot>;
+  createCustomStyle(
+    name: string,
+    description: string,
+    instructions: string,
+  ): Promise<BackendWorkspaceSnapshot>;
+  updateCustomStyle(
+    id: string,
+    name: string,
+    description: string,
+    instructions: string,
+  ): Promise<BackendWorkspaceSnapshot>;
+  deleteCustomStyle(styleId: string): Promise<BackendWorkspaceSnapshot>;
+  generateStyleExamples(styleId: string): Promise<BackendWorkspaceSnapshot>;
   startDictation(): Promise<string>;
   stopDictation(): Promise<void>;
   cancelDictation(): Promise<void>;

@@ -4,7 +4,7 @@
 //! `TextPostProcessor` when no LLM correction backend is configured.
 
 use lune_core::Result;
-use lune_core::llm::{PostProcessInput, PostProcessOutput, TextPostProcessor};
+use lune_core::llm::{LlmService, PostProcessInput, PostProcessOutput, TextPostProcessor};
 
 /// Returns the input transcript verbatim.
 #[derive(Debug, Default)]
@@ -23,6 +23,13 @@ impl TextPostProcessor for NullPostProcessor {
             cleaned_text: input.raw_text.clone(),
             metadata: None,
         })
+    }
+}
+
+#[async_trait::async_trait]
+impl LlmService for NullPostProcessor {
+    async fn complete(&self, _system: &str, _user: &str) -> Result<String> {
+        Err(lune_core::Error::Llm("LLM backend is disabled".into()))
     }
 }
 
