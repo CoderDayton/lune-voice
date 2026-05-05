@@ -300,7 +300,7 @@ fn build_snapshot(
             name: p.name.clone(),
             description: p.description.clone(),
             is_builtin: true,
-            instructions: p.style_instructions.clone(),
+            instructions: String::new(),
         })
         .collect();
     for custom in &settings.custom_styles {

@@ -577,14 +577,24 @@ async fn run_session<A: AsrBackend + 'static>(
     let mut style_preset = style_preset;
     for cmd in &route.commands {
         if let lune_core::command::VoiceCommand::SwitchStyle(style_id) = cmd {
-            let next_preset = builtin_registry().get(style_id).or_else(|| {
-                _settings.try_read().ok().and_then(|s| {
-                    s.custom_styles
-                        .iter()
-                        .find(|cs| cs.id.as_str() == style_id.as_str())
-                        .map(|cs| Arc::new(cs.clone()))
-                })
-            });
+            let next_preset =
+                builtin_registry()
+                    .get(style_id)
+                    .or_else(|| match _settings.try_read() {
+                        Ok(s) => s
+                            .custom_styles
+                            .iter()
+                            .find(|cs| cs.id.as_str() == style_id.as_str())
+                            .map(|cs| Arc::new(cs.clone())),
+                        Err(_) => {
+                            tracing::warn!(
+                                %session_id,
+                                style = %style_id,
+                                "settings locked during style switch, skipping custom lookup"
+                            );
+                            None
+                        }
+                    });
             if let Some(next_preset) = next_preset {
                 style_preset = next_preset;
                 info!(

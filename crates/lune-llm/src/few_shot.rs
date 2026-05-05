@@ -1,10 +1,11 @@
 use lune_core::llm::LlmService;
+use lune_core::{Error, Result};
 
 pub async fn generate_few_shot_examples(
     llm: &dyn LlmService,
     style_name: &str,
     style_instructions: &str,
-) -> Result<Vec<(String, String)>, String> {
+) -> Result<Vec<(String, String)>> {
     let system = "You generate example input/output pairs for a text styling preset. \
         Each example shows raw speech-to-text input and the correctly styled output. \
         Return exactly 3 examples as a JSON array: [[\"input\", \"output\"], ...]";
@@ -19,20 +20,13 @@ pub async fn generate_few_shot_examples(
          Return ONLY a JSON array: [[\"input1\", \"output1\"], [\"input2\", \"output2\"], [\"input3\", \"output3\"]]"
     );
 
-    let response = llm
-        .complete(system, &user)
-        .await
-        .map_err(|e| format!("LLM generation failed: {e}"))?;
+    let response = llm.complete(system, &user).await?;
 
-    let json_str = response
-        .trim()
-        .trim_start_matches("```json")
-        .trim_start_matches("```")
-        .trim_end_matches("```")
-        .trim();
+    let json_str = extract_json_array(&response)
+        .ok_or_else(|| Error::Llm("no JSON array found in LLM response".into()))?;
 
-    let pairs: Vec<Vec<String>> =
-        serde_json::from_str(json_str).map_err(|e| format!("failed to parse response: {e}"))?;
+    let pairs: Vec<Vec<String>> = serde_json::from_str(json_str)
+        .map_err(|e| Error::Llm(format!("failed to parse few-shot response: {e}")))?;
 
     let result: Vec<(String, String)> = pairs
         .into_iter()
@@ -47,8 +41,18 @@ pub async fn generate_few_shot_examples(
         .collect();
 
     if result.is_empty() {
-        return Err("LLM returned no valid examples".into());
+        return Err(Error::Llm("LLM returned no valid examples".into()));
     }
 
     Ok(result)
+}
+
+fn extract_json_array(text: &str) -> Option<&str> {
+    let start = text.find('[')?;
+    let end = text.rfind(']')?;
+    if end > start {
+        Some(&text[start..=end])
+    } else {
+        None
+    }
 }

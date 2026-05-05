@@ -237,8 +237,9 @@ pub async fn generate_style_examples(
     })
     .await
     .map_err(|e| format!("task failed: {e}"))??;
-    let pairs =
-        lune_llm::few_shot::generate_few_shot_examples(llm.as_ref(), &name, &instructions).await?;
+    let pairs = lune_llm::few_shot::generate_few_shot_examples(llm.as_ref(), &name, &instructions)
+        .await
+        .map_err(|e| e.to_string())?;
     let mut snapshot = tauri::async_runtime::spawn_blocking(move || {
         crate::persistence::save_style_few_shot_pairs(&style_id, pairs)
     })
