@@ -5,7 +5,6 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-use lune_core::config::StylePreset;
 use lune_llm::backend::ort_llm::{OrtStyleLlm, OrtStyleLlmConfig};
 
 fn model_dir() -> Option<PathBuf> {
@@ -25,11 +24,10 @@ fn make_llm() -> OrtStyleLlm {
 }
 
 fn run(llm: &OrtStyleLlm, input: &str) -> (String, std::time::Duration) {
-    let style = StylePreset::minimal();
     let t0 = Instant::now();
     let result = llm
-        .apply_style(input, "en", &style, &[])
-        .expect("apply_style failed");
+        .apply_correction(input, "en", &[])
+        .expect("apply_correction failed");
     (result, t0.elapsed())
 }
 
@@ -88,23 +86,22 @@ fn cache_invalidation_on_language_change() {
         .try_init();
 
     let llm = make_llm();
-    let style = StylePreset::minimal();
 
     // English — builds cache.
     let r1 = llm
-        .apply_style("hello wrld", "en", &style, &[])
+        .apply_correction("hello wrld", "en", &[])
         .expect("en failed");
     println!("EN: {r1}");
 
     // French — different system prompt, cache should be invalidated.
     let r2 = llm
-        .apply_style("bonjur le monde", "fr", &style, &[])
+        .apply_correction("bonjur le monde", "fr", &[])
         .expect("fr failed");
     println!("FR: {r2}");
 
     // Back to English — should rebuild cache.
     let r3 = llm
-        .apply_style("how are you doing today", "en", &style, &[])
+        .apply_correction("how are you doing today", "en", &[])
         .expect("en2 failed");
     println!("EN2: {r3}");
 

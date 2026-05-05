@@ -291,11 +291,10 @@ impl OrtStyleLlm {
         format!("Correct the following {language} transcript:\n{transcript}\n\n/no_think")
     }
 
-    pub fn apply_style(
+    pub fn apply_correction(
         &self,
         transcript: &str,
         language: &str,
-        _style: &lune_core::config::StylePreset,
         uncertain_words: &[(String, usize)],
     ) -> Result<String> {
         use std::hash::{Hash, Hasher};
@@ -316,6 +315,24 @@ impl OrtStyleLlm {
 
         let (ids, sys_prefix_len) = self.build_chat_ids(&system, &user_text)?;
         let out = self.generate(&ids, sys_prefix_len)?;
+        let text = self
+            .tokenizer
+            .decode(&out, true)
+            .map_err(|err| Error::Config(format!("detokenize: {err}")))?;
+        let text = strip_think_tags(text.trim());
+        Ok(text.to_string())
+    }
+
+    /// Run a styling-only pass with no system prompt (sys_prefix_len=0).
+    /// Keeps the correction KV cache untouched.
+    pub fn apply_styling(
+        &self,
+        corrected_text: &str,
+        style: &lune_core::config::StylePreset,
+    ) -> Result<String> {
+        let user_text = style.build_styling_prompt(corrected_text);
+        let (ids, _sys_prefix_len) = self.build_chat_ids("", &user_text)?;
+        let out = self.generate(&ids, 0)?;
         let text = self
             .tokenizer
             .decode(&out, true)
@@ -743,12 +760,9 @@ fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> String {
 #[async_trait::async_trait]
 impl TextPostProcessor for OrtStyleLlm {
     async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput> {
-        let mut text = self.apply_style(
-            &input.raw_text,
-            &input.language,
-            &input.style_preset,
-            &input.uncertain_words,
-        )?;
+        // Pass 1: correction only (uses cached system-prompt prefix).
+        let mut text =
+            self.apply_correction(&input.raw_text, &input.language, &input.uncertain_words)?;
 
         text = crate::prompt::fix_all_number_spaces(&text);
 
@@ -761,6 +775,25 @@ impl TextPostProcessor for OrtStyleLlm {
         }
 
         text = validate_and_merge(&input.raw_text, &text, &input.language);
+
+        // Pass 2: styling (no system prompt, no prefix cache interaction).
+        if input.style_preset.needs_styling() {
+            tracing::debug!(style = %input.style_preset.id, "running styling pass");
+            match self.apply_styling(&text, &input.style_preset) {
+                Ok(styled) => {
+                    if !styled.is_empty() && !contains_forbidden_output(&styled) {
+                        text = styled;
+                    } else {
+                        tracing::warn!(
+                            "styling pass produced empty or forbidden output, keeping corrected text"
+                        );
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "styling pass failed, keeping corrected text");
+                }
+            }
+        }
 
         Ok(PostProcessOutput {
             cleaned_text: text,

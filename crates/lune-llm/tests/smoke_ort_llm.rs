@@ -3,7 +3,6 @@
 
 use std::path::PathBuf;
 
-use lune_core::config::StylePreset;
 use lune_llm::backend::ort_llm::{OrtStyleLlm, OrtStyleLlmConfig};
 
 fn model_dir() -> Option<PathBuf> {
@@ -23,10 +22,9 @@ fn make_llm() -> OrtStyleLlm {
 }
 
 fn run_case(llm: &OrtStyleLlm, input: &str, uncertain: &[(String, usize)]) -> String {
-    let style = StylePreset::minimal();
     let result = llm
-        .apply_style(input, "en", &style, uncertain)
-        .expect("apply_style failed");
+        .apply_correction(input, "en", uncertain)
+        .expect("apply_correction failed");
     println!("INPUT:  {input}");
     if !uncertain.is_empty() {
         let words: Vec<&str> = uncertain.iter().map(|(w, _)| w.as_str()).collect();

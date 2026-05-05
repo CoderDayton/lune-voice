@@ -114,6 +114,36 @@ impl StylePreset {
         builtin_registry().all()
     }
 
+    /// Whether this preset requires a separate styling pass.
+    /// "minimal" only corrects errors — no restyling needed.
+    pub fn needs_styling(&self) -> bool {
+        self.id != "minimal"
+    }
+
+    /// Build a self-contained user prompt for the styling-only pass.
+    /// No system prompt needed — everything is in the user message.
+    pub fn build_styling_prompt(&self, corrected_text: &str) -> String {
+        use std::fmt::Write;
+        let mut prompt = String::with_capacity(512);
+        let _ = writeln!(
+            prompt,
+            "Rewrite the transcription with the following style. Output only the rewritten text."
+        );
+        let _ = writeln!(prompt, "\nStyle: {}", self.name);
+        let _ = writeln!(prompt, "Rules: {}", self.style_instructions);
+        if !self.few_shot_pairs.is_empty() {
+            let _ = writeln!(prompt, "\nExamples:");
+            for (input, output) in &self.few_shot_pairs {
+                let _ = writeln!(prompt, "Input: \"{input}\"");
+                let _ = writeln!(prompt, "Output: \"{output}\"");
+            }
+        }
+        let _ = writeln!(prompt, "\nTranscript:");
+        let _ = writeln!(prompt, "{corrected_text}");
+        prompt.push_str("\n/no_think");
+        prompt
+    }
+
     /// Default preset: everyday speech with minimal formatting.
     /// Casual — texting, messaging, chat. Lowercase, contractions, minimal punctuation.
     pub fn casual() -> Self {
@@ -121,20 +151,20 @@ impl StylePreset {
             id: "casual".into(),
             name: "Casual".into(),
             description: "Texting, messaging, chat".into(),
-            style_instructions: "Lowercase everything except proper nouns. Use contractions. Minimal punctuation — skip periods at end of single sentences.".into(),
+            style_instructions: "Replace every colon with a comma. Replace every semicolon with a period. Remove all quotation marks. Remove exclamation marks and dashes. Lowercase everything except proper nouns. Use contractions.".into(),
             user_prompt_template: "{raw_text}".into(),
             few_shot_pairs: vec![
                 (
-                    "I am going to the store do you want anything".into(),
-                    "i'm going to the store do you want anything".into(),
+                    "She said: \"I will be there\"; however, I do not think she meant it.".into(),
+                    "she said she'd be there, but i don't think she meant it.".into(),
                 ),
                 (
-                    "That is really cool I can not believe it worked".into(),
-                    "that's really cool i can't believe it worked".into(),
+                    "The plan was simple: cut costs; raise prices; hire fewer people.".into(),
+                    "the plan was simple, cut costs, raise prices, hire fewer people.".into(),
                 ),
                 (
-                    "Hey are you coming to Sarah's party tonight or not".into(),
-                    "hey are you coming to sarah's party tonight or not".into(),
+                    "He asked: \"Are you coming?\" I replied -- \"Yes!\"".into(),
+                    "he asked if i was coming. i said yes.".into(),
                 ),
             ],
         }
@@ -146,20 +176,20 @@ impl StylePreset {
             id: "professional".into(),
             name: "Professional".into(),
             description: "Clear workplace communication".into(),
-            style_instructions: "Apply standard grammar and capitalization. Capitalize proper nouns. Write clear, direct sentences.".into(),
+            style_instructions: "Use standard capitalization and grammar. Break run-on sentences. Keep it direct and clear. Do not use contractions.".into(),
             user_prompt_template: "{raw_text}".into(),
             few_shot_pairs: vec![
                 (
-                    "I wanted to follow up on the thing we discussed last week about project timeline".into(),
-                    "I wanted to follow up on what we discussed last week about the project timeline.".into(),
+                    "so yeah the project's on track and we'll hit the deadline, Sarah's team is handling the backend.".into(),
+                    "The project is on track, and we will hit the deadline. Sarah's team is handling the backend.".into(),
                 ),
                 (
-                    "the main blocker is dependency on oth service which is owned by platform team".into(),
-                    "The main blocker is a dependency on the auth service, which is owned by the Platform team.".into(),
+                    "i talked to the client and they're fine with the delay but they want weekly updates going forward.".into(),
+                    "I spoke with the client, and they are fine with the delay. They want weekly updates going forward.".into(),
                 ),
                 (
-                    "she finished report ahead of schedule and her manager approved it without revisions and client was notified".into(),
-                    "She finished the report ahead of schedule, and her manager approved it without revisions. The client was notified.".into(),
+                    "the deploy broke last night, it was a config issue, Mike fixed it around 2 AM.".into(),
+                    "The deploy broke last night due to a configuration issue. Mike fixed it around 2 AM.".into(),
                 ),
             ],
         }
@@ -171,16 +201,20 @@ impl StylePreset {
             id: "formal".into(),
             name: "Formal".into(),
             description: "Official correspondence and documents".into(),
-            style_instructions: "Apply formal register. Expand all contractions. Write complete sentences with proper capitalization.".into(),
+            style_instructions: "Use formal register. Expand all contractions. Replace casual words with formal equivalents. Write complete, structured sentences.".into(),
             user_prompt_template: "{raw_text}".into(),
             few_shot_pairs: vec![
                 (
-                    "I wanted to follow up on the thing we discussed last week about project timeline".into(),
-                    "I would like to follow up on our discussion last week regarding the project timeline.".into(),
+                    "Thanks for getting back to me. I'll review the document and send my feedback by Friday.".into(),
+                    "Thank you for your response. I will review the document and provide my feedback by Friday.".into(),
                 ),
                 (
-                    "thanks for getting back to me I will review document and send my feed back by friday".into(),
-                    "Thank you for your response. I will review the document and provide my feedback by Friday.".into(),
+                    "We can't do the meeting on Monday, let's push it to Wednesday.".into(),
+                    "We are unable to accommodate the meeting on Monday. I would suggest rescheduling to Wednesday.".into(),
+                ),
+                (
+                    "Just wanted to check in on the project. How's it going?".into(),
+                    "I am writing to inquire about the current status of the project.".into(),
                 ),
             ],
         }
@@ -218,20 +252,20 @@ impl StylePreset {
             id: "technical".into(),
             name: "Technical".into(),
             description: "Code and developer communication".into(),
-            style_instructions: "Wrap code identifiers in backticks. Apply PascalCase or snake_case as context dictates. Retain developer jargon.".into(),
+            style_instructions: "Wrap code identifiers, function names, types, and keywords in backticks. Apply PascalCase or snake_case as context dictates. Keep technical jargon.".into(),
             user_prompt_template: "{raw_text}".into(),
             few_shot_pairs: vec![
                 (
-                    "let's make an async funk shin called sink data that awaits fetch to api and then logs status".into(),
+                    "Let's make an async function called sync data that awaits fetch to API and then logs status.".into(),
                     "Let's make an `async` function called `sync_data` that `await`s fetch to API and then logs status.".into(),
                 ),
                 (
-                    "so we gotta nuke the old user profile class and replace it with a new interface called I user repo that has a get by id method".into(),
-                    "So we gotta nuke the old `UserProfile` class and replace it with a new interface called `IUserRepo` that has a `get_by_id` method.".into(),
+                    "The user profile class needs a get by ID method that returns an optional user.".into(),
+                    "The `UserProfile` class needs a `get_by_id` method that returns an `Optional<User>`.".into(),
                 ),
                 (
-                    "if the bullion is true then we push to the state array and trigger a re render".into(),
-                    "If the boolean is true then we push to the `state` array and trigger a re-render.".into(),
+                    "If the boolean is true then we push to the state array and trigger a re-render.".into(),
+                    "If the `boolean` is `true` then we push to the `state` array and trigger a re-render.".into(),
                 ),
             ],
         }
@@ -243,16 +277,16 @@ impl StylePreset {
             id: "writing".into(),
             name: "Writing".into(),
             description: "Long-form content — articles, docs, essays".into(),
-            style_instructions: "Use complete sentences with proper grammar and punctuation. Break long run-on sentences into shorter ones. Keep the author's voice.".into(),
+            style_instructions: "Write polished prose. Break run-on sentences. Vary sentence length. Remove filler words like 'so', 'just', 'basically', 'like'. Keep the author's voice.".into(),
             user_prompt_template: "{raw_text}".into(),
             few_shot_pairs: vec![
                 (
-                    "so the main idea here is that we need to rethink how we approach testing because right now its kind of a mess and nobody really knows what's covered".into(),
-                    "The main idea here is that we need to rethink how we approach testing. Right now it's kind of a mess, and nobody really knows what's covered.".into(),
+                    "So the main idea is that we need to rethink testing because right now it's kind of a mess and nobody really knows what's covered.".into(),
+                    "We need to rethink our approach to testing. Right now it's a mess, and nobody knows what's covered.".into(),
                 ),
                 (
-                    "the problem with the current approach is that it scales poorly and once you hit about ten thousand users things start to break down".into(),
-                    "The problem with the current approach is that it scales poorly. Once you hit about ten thousand users, things start to break down.".into(),
+                    "Basically the problem is that it just scales poorly and once you hit about ten thousand users things start to break down.".into(),
+                    "The problem is that it scales poorly. Once you hit ten thousand users, things start to break down.".into(),
                 ),
             ],
         }

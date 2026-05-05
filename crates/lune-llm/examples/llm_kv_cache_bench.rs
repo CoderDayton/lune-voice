@@ -1,7 +1,7 @@
 //! LLM KV cache prefix benchmark.
 //!
 //! Compares cold (no cache) vs warm (cached prefix) latency over repeated
-//! apply_style calls with the same system prompt.
+//! apply_correction calls with the same system prompt.
 //!
 //! GPU: cargo run --release --features cuda --example llm_kv_cache_bench -p lune-llm
 //! CPU: cargo run --release --example llm_kv_cache_bench -p lune-llm
@@ -9,7 +9,6 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-use lune_core::config::StylePreset;
 use lune_llm::backend::ort_llm::{OrtStyleLlm, OrtStyleLlmConfig};
 
 const INPUTS: &[&str] = &[
@@ -52,8 +51,6 @@ fn main() {
     })
     .expect("failed to load model");
 
-    let style = StylePreset::minimal();
-
     // ── Run all inputs, collect per-call timings ────────────────────────
     let mut timings_ms: Vec<f64> = Vec::with_capacity(INPUTS.len());
     let mut outputs: Vec<String> = Vec::with_capacity(INPUTS.len());
@@ -61,8 +58,8 @@ fn main() {
     for (i, input) in INPUTS.iter().enumerate() {
         let t0 = Instant::now();
         let result = llm
-            .apply_style(input, "en", &style, &[])
-            .expect("apply_style failed");
+            .apply_correction(input, "en", &[])
+            .expect("apply_correction failed");
         let ms = t0.elapsed().as_secs_f64() * 1000.0;
         timings_ms.push(ms);
         outputs.push(result);
