@@ -56,6 +56,14 @@ fn row_to_session(
     })
 }
 
+fn row_to_snippet((i, tp, b): (String, String, String)) -> lune_core::dict::Snippet {
+    lune_core::dict::Snippet {
+        id: i,
+        trigger_phrase: tp,
+        body: b,
+    }
+}
+
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
 #[derive(Debug, Clone)]
@@ -222,14 +230,7 @@ impl Database {
             .order(trigger_phrase.asc())
             .load::<(String, String, String)>(&mut self.conn)?;
 
-        Ok(rows
-            .into_iter()
-            .map(|(i, tp, b)| lune_core::dict::Snippet {
-                id: i,
-                trigger_phrase: tp,
-                body: b,
-            })
-            .collect())
+        Ok(rows.into_iter().map(row_to_snippet).collect())
     }
 
     pub fn get_snippet_by_trigger(
@@ -244,11 +245,7 @@ impl Database {
             .first::<(String, String, String)>(&mut self.conn)
             .optional()?;
 
-        Ok(row.map(|(i, tp, b)| lune_core::dict::Snippet {
-            id: i,
-            trigger_phrase: tp,
-            body: b,
-        }))
+        Ok(row.map(row_to_snippet))
     }
 
     pub fn delete_snippet(&mut self, snippet_id: &str) -> PersistResult<bool> {

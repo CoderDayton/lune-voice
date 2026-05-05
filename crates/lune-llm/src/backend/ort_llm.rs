@@ -817,6 +817,13 @@ impl TextPostProcessor for OrtStyleLlm {
 
 type Inputs<'a> = Vec<(std::borrow::Cow<'a, str>, DynValue)>;
 
+fn push_position_ids(out: &mut Inputs<'static>, positions: Vec<i64>) -> Result<()> {
+    let len = positions.len();
+    let pos = Array2::from_shape_vec((1, len), positions).map_err(e)?;
+    out.push(("position_ids".into(), dyn_i64(pos)?));
+    Ok(())
+}
+
 fn build_inputs(ids: &[i64], seq_len: usize, position_ids: bool) -> Result<Inputs<'static>> {
     let input_ids = Array2::from_shape_vec((1, seq_len), ids.to_vec()).map_err(e)?;
     let mask = Array2::<i64>::ones((1, seq_len));
@@ -825,8 +832,7 @@ fn build_inputs(ids: &[i64], seq_len: usize, position_ids: bool) -> Result<Input
         ("attention_mask".into(), dyn_i64(mask)?),
     ];
     if position_ids {
-        let pos = Array2::from_shape_vec((1, seq_len), (0..seq_len as i64).collect()).map_err(e)?;
-        out.push(("position_ids".into(), dyn_i64(pos)?));
+        push_position_ids(&mut out, (0..seq_len as i64).collect())?;
     }
     Ok(out)
 }
@@ -842,8 +848,7 @@ fn build_embeds_inputs(
         ("attention_mask".into(), dyn_i64(mask)?),
     ];
     if position_ids {
-        let pos = Array2::from_shape_vec((1, seq_len), (0..seq_len as i64).collect()).map_err(e)?;
-        out.push(("position_ids".into(), dyn_i64(pos)?));
+        push_position_ids(&mut out, (0..seq_len as i64).collect())?;
     }
     Ok(out)
 }
@@ -859,8 +864,7 @@ fn build_embeds_decode_inputs(
         ("attention_mask".into(), dyn_i64(mask)?),
     ];
     if position_ids {
-        let pos = Array2::from_shape_vec((1, 1), vec![(total_len - 1) as i64]).map_err(e)?;
-        out.push(("position_ids".into(), dyn_i64(pos)?));
+        push_position_ids(&mut out, vec![(total_len - 1) as i64])?;
     }
     Ok(out)
 }
@@ -877,8 +881,7 @@ fn build_decode_inputs(
         ("attention_mask".into(), dyn_i64(mask)?),
     ];
     if position_ids {
-        let pos = Array2::from_shape_vec((1, 1), vec![(total_len - 1) as i64]).map_err(e)?;
-        out.push(("position_ids".into(), dyn_i64(pos)?));
+        push_position_ids(&mut out, vec![(total_len - 1) as i64])?;
     }
     Ok(out)
 }
@@ -896,9 +899,10 @@ fn build_inputs_with_past(
         ("attention_mask".into(), dyn_i64(mask)?),
     ];
     if position_ids {
-        let pos: Vec<i64> = (past_len..past_len + seq_len).map(|i| i as i64).collect();
-        let pos = Array2::from_shape_vec((1, seq_len), pos).map_err(e)?;
-        out.push(("position_ids".into(), dyn_i64(pos)?));
+        push_position_ids(
+            &mut out,
+            (past_len..past_len + seq_len).map(|i| i as i64).collect(),
+        )?;
     }
     Ok(out)
 }
@@ -915,9 +919,10 @@ fn build_embeds_inputs_with_past(
         ("attention_mask".into(), dyn_i64(mask)?),
     ];
     if position_ids {
-        let pos: Vec<i64> = (past_len..past_len + seq_len).map(|i| i as i64).collect();
-        let pos = Array2::from_shape_vec((1, seq_len), pos).map_err(e)?;
-        out.push(("position_ids".into(), dyn_i64(pos)?));
+        push_position_ids(
+            &mut out,
+            (past_len..past_len + seq_len).map(|i| i as i64).collect(),
+        )?;
     }
     Ok(out)
 }

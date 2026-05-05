@@ -8,7 +8,7 @@ use rustfft::num_complex::Complex;
 use rustfft::{Fft, FftPlanner};
 use std::sync::Arc;
 
-pub const SAMPLE_RATE: usize = 16_000;
+pub use lune_core::audio::SAMPLE_RATE;
 pub const N_FFT: usize = 400;
 pub const HOP_LENGTH: usize = 160;
 pub const WIN_LENGTH: usize = 400;

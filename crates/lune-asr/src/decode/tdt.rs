@@ -12,7 +12,7 @@ use ort::session::Session;
 use lune_core::error::{Error, Result};
 
 use crate::decode::vocab::{Vocabulary, is_special_token};
-use crate::ort_utils::build_ort_session;
+use crate::ort_utils::{OrtContext, build_ort_session};
 
 // ── Public types ─────────────────────────────────────────────────────────────
 
@@ -169,15 +169,14 @@ impl TdtModel {
         let input = features
             .t()
             .to_shape((1, feature_size, time_steps))
-            .map_err(|e| Error::Asr(format!("reshape encoder input: {e}")))?
+            .ctx("reshape encoder input")?
             .to_owned();
 
         let input_length = Array1::from_vec(vec![time_steps as i64]);
 
-        let input_value = ort::value::Value::from_array(input)
-            .map_err(|e| Error::Asr(format!("encoder input value: {e}")))?;
-        let length_value = ort::value::Value::from_array(input_length)
-            .map_err(|e| Error::Asr(format!("encoder length value: {e}")))?;
+        let input_value = ort::value::Value::from_array(input).ctx("encoder input value")?;
+        let length_value =
+            ort::value::Value::from_array(input_length).ctx("encoder length value")?;
 
         let outputs = self
             .encoder
@@ -185,15 +184,15 @@ impl TdtModel {
                 "audio_signal" => input_value,
                 "length" => length_value
             ))
-            .map_err(|e| Error::Asr(format!("encoder run: {e}")))?;
+            .ctx("encoder run")?;
 
         let (shape, data) = outputs["outputs"]
             .try_extract_tensor::<f32>()
-            .map_err(|e| Error::Asr(format!("extract encoder output: {e}")))?;
+            .ctx("extract encoder output")?;
 
         let (_, lens_data) = outputs["encoded_lengths"]
             .try_extract_tensor::<i64>()
-            .map_err(|e| Error::Asr(format!("extract encoder lengths: {e}")))?;
+            .ctx("extract encoder lengths")?;
 
         let dims = shape.as_ref();
         if dims.len() != 3 {
@@ -203,8 +202,7 @@ impl TdtModel {
         }
 
         let (b, t, d) = (dims[0] as usize, dims[1] as usize, dims[2] as usize);
-        let arr = Array3::from_shape_vec((b, t, d), data.to_vec())
-            .map_err(|e| Error::Asr(format!("encoder array: {e}")))?;
+        let arr = Array3::from_shape_vec((b, t, d), data.to_vec()).ctx("encoder array")?;
 
         Ok((arr, lens_data[0]))
     }
@@ -236,22 +234,19 @@ impl TdtModel {
             let frame = encoder_out.slice(s![0, .., t]).to_owned();
             let frame_3d = frame
                 .to_shape((1, encoder_dim, 1))
-                .map_err(|e| Error::Asr(format!("reshape frame: {e}")))?
+                .ctx("reshape frame")?
                 .to_owned();
 
-            let targets = Array2::from_shape_vec((1, 1), vec![last_token])
-                .map_err(|e| Error::Asr(format!("targets: {e}")))?;
+            let targets = Array2::from_shape_vec((1, 1), vec![last_token]).ctx("targets")?;
 
-            let frame_val = ort::value::Value::from_array(frame_3d)
-                .map_err(|e| Error::Asr(format!("frame value: {e}")))?;
-            let targets_val = ort::value::Value::from_array(targets)
-                .map_err(|e| Error::Asr(format!("targets value: {e}")))?;
+            let frame_val = ort::value::Value::from_array(frame_3d).ctx("frame value")?;
+            let targets_val = ort::value::Value::from_array(targets).ctx("targets value")?;
             let target_len_val = ort::value::Value::from_array(Array1::from_elem(1, 1i32))
-                .map_err(|e| Error::Asr(format!("target_length value: {e}")))?;
-            let state_h_val = ort::value::Value::from_array(state_h.clone())
-                .map_err(|e| Error::Asr(format!("state_h value: {e}")))?;
-            let state_c_val = ort::value::Value::from_array(state_c.clone())
-                .map_err(|e| Error::Asr(format!("state_c value: {e}")))?;
+                .ctx("target_length value")?;
+            let state_h_val =
+                ort::value::Value::from_array(state_h.clone()).ctx("state_h value")?;
+            let state_c_val =
+                ort::value::Value::from_array(state_c.clone()).ctx("state_c value")?;
 
             let outputs = self
                 .decoder_joint
@@ -262,12 +257,12 @@ impl TdtModel {
                     "input_states_1" => state_h_val,
                     "input_states_2" => state_c_val
                 ))
-                .map_err(|e| Error::Asr(format!("decoder run: {e}")))?;
+                .ctx("decoder run")?;
 
             // Extract logits: first vocab_size = token logits, last 5 = duration logits
             let (_, logits_data) = outputs["outputs"]
                 .try_extract_tensor::<f32>()
-                .map_err(|e| Error::Asr(format!("extract logits: {e}")))?;
+                .ctx("extract logits")?;
 
             // Single-pass: collect vocab logits and track the top-K tokens
             // as a small ordered array. Adds (TOP_K - 1) comparisons per

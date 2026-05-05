@@ -14,14 +14,19 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 #[cfg(not(target_os = "linux"))]
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
+/// Show, unminimize, and focus the main application window.
+fn show_main_window(app: &tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Some(w) = app.get_webview_window("main") {
-                let _ = w.unminimize();
-                let _ = w.show();
-                let _ = w.set_focus();
-            }
+            show_main_window(app);
         }))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
@@ -59,11 +64,7 @@ pub fn run() {
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "show" => {
-                        if let Some(w) = app.get_webview_window("main") {
-                            let _ = w.unminimize();
-                            let _ = w.show();
-                            let _ = w.set_focus();
-                        }
+                        show_main_window(app);
                     }
                     "toggle" => {
                         let rt = app.state::<runtime::AppRuntime>();
@@ -85,11 +86,7 @@ pub fn run() {
                     } = event
                     {
                         let app = tray.app_handle();
-                        if let Some(w) = app.get_webview_window("main") {
-                            let _ = w.unminimize();
-                            let _ = w.show();
-                            let _ = w.set_focus();
-                        }
+                        show_main_window(app);
                     }
                 })
                 .build(app)?;

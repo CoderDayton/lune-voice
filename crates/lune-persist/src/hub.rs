@@ -106,52 +106,44 @@ impl ModelSpec {
 
     /// Human-readable display name for this model.
     pub fn display_name(&self) -> &str {
-        match self {
-            Self::Directory { local_name, .. } => match local_name.as_str() {
-                model_dirs::DIR_PARAKEET => "Parakeet TDT 0.6B",
-                model_dirs::DIR_QWEN3_ASR => "Qwen3-ASR 0.6B ONNX",
-                model_dirs::DIR_STYLE_LLM => "Qwen3 0.6B ONNX",
-                _ => local_name,
-            },
+        let Self::Directory { local_name, .. } = self;
+        match local_name.as_str() {
+            model_dirs::DIR_PARAKEET => "Parakeet TDT 0.6B",
+            model_dirs::DIR_QWEN3_ASR => "Qwen3-ASR 0.6B ONNX",
+            model_dirs::DIR_STYLE_LLM => "Qwen3 0.6B ONNX",
+            _ => local_name,
         }
     }
 
     /// Check if this model is fully present locally (no download needed).
     pub fn is_ready(&self, models_dir: &Path) -> bool {
-        match self {
-            Self::Directory {
-                required_files,
-                local_name,
-                ..
-            } => {
-                let dir = models_dir.join(local_name);
-                dir.exists() && required_files.iter().all(|f| dir.join(f).is_file())
-            }
-        }
+        let Self::Directory {
+            required_files,
+            local_name,
+            ..
+        } = self;
+        let dir = models_dir.join(local_name);
+        dir.exists() && required_files.iter().all(|f| dir.join(f).is_file())
     }
 
     fn repo_id(&self) -> &str {
-        match self {
-            Self::Directory { repo_id, .. } => repo_id,
-        }
+        let Self::Directory { repo_id, .. } = self;
+        repo_id
     }
 
     pub fn local_name(&self) -> &str {
-        match self {
-            Self::Directory { local_name, .. } => local_name,
-        }
+        let Self::Directory { local_name, .. } = self;
+        local_name
     }
 
     fn description(&self) -> &str {
-        match self {
-            Self::Directory { description, .. } => description,
-        }
+        let Self::Directory { description, .. } = self;
+        description
     }
 
     fn required(&self) -> bool {
-        match self {
-            Self::Directory { required, .. } => *required,
-        }
+        let Self::Directory { required, .. } = self;
+        *required
     }
 
     pub fn all() -> Vec<Self> {

@@ -1,5 +1,5 @@
 pub mod backend;
-pub mod confidence;
+
 pub mod decode;
 pub mod mel;
 pub mod ort_utils;

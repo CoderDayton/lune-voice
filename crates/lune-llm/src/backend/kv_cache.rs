@@ -211,6 +211,62 @@ fn to_dyn_value(data: &[f32], shape: [usize; 4], is_f16: bool) -> Result<DynValu
     }
 }
 
+// ── Score / gather helpers ───────────────────────────────────────────────
+
+/// Accumulate per-token key L2-norm scores across all layers and heads.
+///
+/// When `factors` is `Some`, each layer's contribution is scaled by
+/// `factors[li]` before accumulation (used for the normalised re-score pass).
+/// `scores` must be pre-zeroed by the caller.
+#[allow(clippy::too_many_arguments)]
+fn accumulate_scores(
+    layer_data: &[(Vec<f32>, Vec<f32>, usize)],
+    scores: &mut [f32],
+    layer_norms: &mut [f32],
+    h: usize,
+    d: usize,
+    seq_len: usize,
+    sink: usize,
+    factors: Option<&[f32]>,
+) {
+    for (li, (key_data, _, _)) in layer_data.iter().enumerate() {
+        let factor = factors.map_or(1.0, |f| f[li]);
+        let mut layer_sum = 0.0f32;
+        for head in 0..h {
+            for (t, score) in scores.iter_mut().enumerate() {
+                let pos = t + sink;
+                let base = head * seq_len * d + pos * d;
+                let norm_sq: f32 = key_data[base..base + d].iter().map(|x| x * x).sum();
+                *score += norm_sq * factor;
+                layer_sum += norm_sq * factor;
+            }
+        }
+        layer_norms[li] = layer_sum;
+    }
+}
+
+/// Gather `keep` tokens (selected by `kept_indices`) from `src` into a
+/// freshly-allocated `keep * d` buffer.  Each index is relative to the
+/// prunable window; add `sink` to obtain the absolute position.
+fn gather_tokens(
+    src: &[f32],
+    kept_indices: &[usize],
+    head: usize,
+    seq_len: usize,
+    sink: usize,
+    d: usize,
+) -> Vec<f32> {
+    let keep = kept_indices.len();
+    let mut gathered = vec![0.0f32; keep * d];
+    for (out_t, &src_t) in kept_indices.iter().enumerate() {
+        let src_pos = src_t + sink;
+        let src_base = head * seq_len * d + src_pos * d;
+        let dst_base = out_t * d;
+        gathered[dst_base..dst_base + d].copy_from_slice(&src[src_base..src_base + d]);
+    }
+    gathered
+}
+
 // ── Public API ──────────────────────────────────────────────────────────
 
 pub struct KvCache {
@@ -280,19 +336,16 @@ impl KvCache {
         let mut scores = vec![0.0f32; prunable];
         let mut layer_norms = vec![0.0f32; c.num_layers];
 
-        for (li, (key_data, _, _)) in layer_data.iter().enumerate() {
-            let mut layer_sum = 0.0f32;
-            for head in 0..h {
-                for (t, score) in scores.iter_mut().enumerate() {
-                    let pos = t + sink;
-                    let base = head * seq_len * d + pos * d;
-                    let norm_sq: f32 = key_data[base..base + d].iter().map(|x| x * x).sum();
-                    *score += norm_sq;
-                    layer_sum += norm_sq;
-                }
-            }
-            layer_norms[li] = layer_sum;
-        }
+        accumulate_scores(
+            &layer_data,
+            &mut scores,
+            &mut layer_norms,
+            h,
+            d,
+            seq_len,
+            sink,
+            None,
+        );
 
         // Normalize per-layer contribution.
         if c.num_layers > 1 {
@@ -300,21 +353,21 @@ impl KvCache {
             if mean_norm > 1e-12 {
                 // Re-score with normalization. First reset.
                 scores.fill(0.0);
-                for (li, (key_data, _, _)) in layer_data.iter().enumerate() {
-                    let factor = if layer_norms[li] > 1e-12 {
-                        mean_norm / layer_norms[li]
-                    } else {
-                        1.0
-                    };
-                    for head in 0..h {
-                        for (t, score) in scores.iter_mut().enumerate() {
-                            let pos = t + sink;
-                            let base = head * seq_len * d + pos * d;
-                            let norm_sq: f32 = key_data[base..base + d].iter().map(|x| x * x).sum();
-                            *score += norm_sq * factor;
-                        }
-                    }
-                }
+                let factors: Vec<f32> = layer_norms
+                    .iter()
+                    .map(|&ln| if ln > 1e-12 { mean_norm / ln } else { 1.0 })
+                    .collect();
+                layer_norms.fill(0.0);
+                accumulate_scores(
+                    &layer_data,
+                    &mut scores,
+                    &mut layer_norms,
+                    h,
+                    d,
+                    seq_len,
+                    sink,
+                    Some(&factors),
+                );
             }
         }
 
@@ -362,17 +415,8 @@ impl KvCache {
 
                 if keep > 0 {
                     // Gather kept tokens.
-                    let mut gathered_k = vec![0.0f32; keep * d];
-                    let mut gathered_v = vec![0.0f32; keep * d];
-                    for (out_t, &src_t) in kept_indices.iter().enumerate() {
-                        let src_pos = src_t + sink;
-                        let src_base = head * seq_len * d + src_pos * d;
-                        let dst_base = out_t * d;
-                        gathered_k[dst_base..dst_base + d]
-                            .copy_from_slice(&key_data[src_base..src_base + d]);
-                        gathered_v[dst_base..dst_base + d]
-                            .copy_from_slice(&val_data[src_base..src_base + d]);
-                    }
+                    let gathered_k = gather_tokens(key_data, &kept_indices, head, seq_len, sink, d);
+                    let gathered_v = gather_tokens(val_data, &kept_indices, head, seq_len, sink, d);
 
                     // Rotate then quantize keys.
                     self.rotation

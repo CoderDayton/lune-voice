@@ -10,6 +10,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::audio::SAMPLE_RATE;
+
 /// Fully resolved pipeline configuration for a single ASR backend.
 ///
 /// Constructed by calling `AsrRegistry::pipeline_config()` and optionally
@@ -152,24 +154,25 @@ impl PipelineConfig {
     /// default. `None` fields are left unchanged.
     #[must_use]
     pub fn with_overrides(mut self, overrides: &PipelineOverrides) -> Self {
-        if let Some(v) = overrides.max_segment_ms {
-            self.max_segment_ms = v;
+        macro_rules! apply {
+            ($field:ident) => {
+                if let Some(v) = overrides.$field {
+                    self.$field = v;
+                }
+            };
         }
-        if let Some(v) = overrides.sentence_close_ms {
-            self.sentence_close_ms = v;
-        }
-        if let Some(v) = overrides.hard_close_ms {
-            self.hard_close_ms = v;
-        }
-        if let Some(v) = overrides.speech_threshold {
-            self.speech_threshold = v;
-        }
-        if let Some(v) = overrides.min_speech_ms {
-            self.min_speech_ms = v;
-        }
-        if let Some(v) = overrides.adaptive_vad {
-            self.adaptive_vad = v;
-        }
+
+        apply!(max_segment_ms);
+        apply!(sentence_close_ms);
+        apply!(hard_close_ms);
+        apply!(speech_threshold);
+        apply!(min_speech_ms);
+        apply!(adaptive_vad);
+        apply!(llm_timeout_secs);
+        apply!(word_boost_enabled);
+        apply!(word_boost_score);
+
+        // Target field is Option<f32>; wrap incoming value in Some.
         if let Some(v) = overrides.word_confidence_threshold {
             self.word_confidence_threshold = Some(v);
         }
@@ -179,18 +182,12 @@ impl PipelineConfig {
         if let Some(v) = overrides.llm_skip_noisy_threshold {
             self.llm_skip_noisy_threshold = Some(v);
         }
+
+        // Different target field + unit conversion.
         if let Some(v) = overrides.max_speech_secs {
-            self.max_speech_samples = (v as usize) * 16_000;
+            self.max_speech_samples = (v as usize) * SAMPLE_RATE;
         }
-        if let Some(v) = overrides.llm_timeout_secs {
-            self.llm_timeout_secs = v;
-        }
-        if let Some(v) = overrides.word_boost_enabled {
-            self.word_boost_enabled = v;
-        }
-        if let Some(v) = overrides.word_boost_score {
-            self.word_boost_score = v;
-        }
+
         self
     }
 
@@ -258,7 +255,7 @@ impl Default for PipelineConfig {
             word_confidence_threshold: Some(0.85),
             llm_skip_threshold: Some(0.95),
             llm_skip_noisy_threshold: Some(0.30),
-            max_speech_samples: 60 * 16_000,
+            max_speech_samples: 60 * SAMPLE_RATE,
             itn_enabled: false,
             llm_timeout_secs: 30,
             word_boost_enabled: true,

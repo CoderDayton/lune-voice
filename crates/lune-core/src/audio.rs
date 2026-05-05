@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 
+/// The canonical pipeline sample rate (Hz). All audio in Lune is processed at this rate.
+pub const SAMPLE_RATE: usize = 16_000;
+
 /// A chunk of audio data with metadata.
 #[derive(Debug, Clone)]
 pub struct AudioFrame {

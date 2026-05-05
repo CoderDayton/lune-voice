@@ -7,6 +7,20 @@ use crate::dto::{
 };
 use crate::runtime::AppRuntime;
 
+/// Runs a blocking operation on the Tauri async runtime, handling errors uniformly.
+///
+/// This helper eliminates the boilerplate of spawn_blocking + map_err + double-?.
+/// The closure should return Result<T, String>.
+async fn run_persist<F, T>(label: &str, f: F) -> Result<T, String>
+where
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+    T: Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(f)
+        .await
+        .map_err(|e| format!("{label}: {e}"))?
+}
+
 pub(crate) fn require_window_access<R: Runtime>(
     window: &WebviewWindow<R>,
     allowed: &[&str],
@@ -40,10 +54,10 @@ pub async fn load_workspace_snapshot(
     runtime: State<'_, AppRuntime>,
 ) -> Result<WorkspaceSnapshot, String> {
     require_window_access(&window, &["main"])?;
-    let mut snapshot =
-        tauri::async_runtime::spawn_blocking(crate::persistence::load_workspace_snapshot)
-            .await
-            .map_err(|e| format!("load workspace snapshot task failed: {e}"))??;
+    let mut snapshot = run_persist("load workspace snapshot", || {
+        crate::persistence::load_workspace_snapshot()
+    })
+    .await?;
     snapshot.service_status = runtime.service_status().await;
     Ok(snapshot)
 }
@@ -54,10 +68,10 @@ pub async fn load_pill_snapshot(
     runtime: State<'_, AppRuntime>,
 ) -> Result<PillSnapshotDto, String> {
     require_window_access(&window, &["pill"])?;
-    let mut snapshot =
-        tauri::async_runtime::spawn_blocking(crate::persistence::load_workspace_snapshot)
-            .await
-            .map_err(|e| format!("load pill snapshot task failed: {e}"))??;
+    let mut snapshot = run_persist("load pill snapshot", || {
+        crate::persistence::load_workspace_snapshot()
+    })
+    .await?;
     snapshot.service_status = runtime.service_status().await;
     Ok(PillSnapshotDto {
         service_status: snapshot.service_status,
@@ -73,11 +87,10 @@ pub async fn save_workspace_settings(
     input: SaveWorkspaceSettingsInput,
 ) -> Result<WorkspaceSnapshot, String> {
     require_window_access(&window, &["main"])?;
-    let mut snapshot = tauri::async_runtime::spawn_blocking(move || {
+    let mut snapshot = run_persist("save workspace settings", move || {
         crate::persistence::save_workspace_settings(input)
     })
-    .await
-    .map_err(|e| format!("save workspace settings task failed: {e}"))??;
+    .await?;
     runtime.mark_reload_required().await;
     // Notify pill of settings changes (activation mode, pill visibility)
     if let Err(e) = runtime.app_handle().emit_to(
@@ -101,11 +114,10 @@ pub async fn create_dictionary_entry(
     input: CreateDictionaryEntryInput,
 ) -> Result<WorkspaceSnapshot, String> {
     require_window_access(&window, &["main"])?;
-    let mut snapshot = tauri::async_runtime::spawn_blocking(move || {
+    let mut snapshot = run_persist("create dictionary entry", move || {
         crate::persistence::create_dictionary_entry(input)
     })
-    .await
-    .map_err(|e| format!("create dictionary entry task failed: {e}"))??;
+    .await?;
     runtime.mark_reload_required().await;
     snapshot.service_status = runtime.service_status().await;
     Ok(snapshot)
@@ -118,11 +130,10 @@ pub async fn delete_session(
     session_id: String,
 ) -> Result<WorkspaceSnapshot, String> {
     require_window_access(&window, &["main"])?;
-    let mut snapshot = tauri::async_runtime::spawn_blocking(move || {
+    let mut snapshot = run_persist("delete session", move || {
         crate::persistence::delete_session(session_id)
     })
-    .await
-    .map_err(|e| format!("delete session task failed: {e}"))??;
+    .await?;
     snapshot.service_status = runtime.service_status().await;
     Ok(snapshot)
 }
@@ -134,11 +145,10 @@ pub async fn delete_dictionary_entry(
     entry_id: i32,
 ) -> Result<WorkspaceSnapshot, String> {
     require_window_access(&window, &["main"])?;
-    let mut snapshot = tauri::async_runtime::spawn_blocking(move || {
+    let mut snapshot = run_persist("delete dictionary entry", move || {
         crate::persistence::delete_dictionary_entry(entry_id)
     })
-    .await
-    .map_err(|e| format!("delete dictionary entry task failed: {e}"))??;
+    .await?;
     runtime.mark_reload_required().await;
     snapshot.service_status = runtime.service_status().await;
     Ok(snapshot)
@@ -151,11 +161,10 @@ pub async fn update_dictionary_entry(
     input: UpdateDictionaryEntryInput,
 ) -> Result<WorkspaceSnapshot, String> {
     require_window_access(&window, &["main"])?;
-    let mut snapshot = tauri::async_runtime::spawn_blocking(move || {
+    let mut snapshot = run_persist("update dictionary entry", move || {
         crate::persistence::update_dictionary_entry(input)
     })
-    .await
-    .map_err(|e| format!("update dictionary entry task failed: {e}"))??;
+    .await?;
     runtime.mark_reload_required().await;
     snapshot.service_status = runtime.service_status().await;
     Ok(snapshot)
@@ -168,11 +177,10 @@ pub async fn create_custom_style(
     input: CreateCustomStyleInput,
 ) -> Result<WorkspaceSnapshot, String> {
     require_window_access(&window, &["main"])?;
-    let mut snapshot = tauri::async_runtime::spawn_blocking(move || {
+    let mut snapshot = run_persist("create custom style", move || {
         crate::persistence::create_custom_style(input)
     })
-    .await
-    .map_err(|e| format!("task failed: {e}"))??;
+    .await?;
     runtime.mark_reload_required().await;
     snapshot.service_status = runtime.service_status().await;
     Ok(snapshot)
@@ -185,11 +193,10 @@ pub async fn update_custom_style(
     input: UpdateCustomStyleInput,
 ) -> Result<WorkspaceSnapshot, String> {
     require_window_access(&window, &["main"])?;
-    let mut snapshot = tauri::async_runtime::spawn_blocking(move || {
+    let mut snapshot = run_persist("update custom style", move || {
         crate::persistence::update_custom_style(input)
     })
-    .await
-    .map_err(|e| format!("task failed: {e}"))??;
+    .await?;
     runtime.mark_reload_required().await;
     snapshot.service_status = runtime.service_status().await;
     Ok(snapshot)
@@ -202,11 +209,10 @@ pub async fn delete_custom_style(
     style_id: String,
 ) -> Result<WorkspaceSnapshot, String> {
     require_window_access(&window, &["main"])?;
-    let mut snapshot = tauri::async_runtime::spawn_blocking(move || {
+    let mut snapshot = run_persist("delete custom style", move || {
         crate::persistence::delete_custom_style(style_id)
     })
-    .await
-    .map_err(|e| format!("task failed: {e}"))??;
+    .await?;
     runtime.mark_reload_required().await;
     snapshot.service_status = runtime.service_status().await;
     Ok(snapshot)
@@ -220,7 +226,7 @@ pub async fn generate_style_examples(
 ) -> Result<WorkspaceSnapshot, String> {
     require_window_access(&window, &["main"])?;
     let llm = runtime.llm_service().await;
-    let (name, instructions) = tauri::async_runtime::spawn_blocking({
+    let (name, instructions) = run_persist("load custom style for examples", {
         let sid = style_id.clone();
         move || {
             let paths = lune_persist::AppPaths::resolve().ok_or("failed to resolve paths")?;
@@ -235,16 +241,14 @@ pub async fn generate_style_examples(
                 .ok_or_else(|| format!("custom style not found: {sid}"))
         }
     })
-    .await
-    .map_err(|e| format!("task failed: {e}"))??;
+    .await?;
     let pairs = lune_llm::few_shot::generate_few_shot_examples(llm.as_ref(), &name, &instructions)
         .await
         .map_err(|e| e.to_string())?;
-    let mut snapshot = tauri::async_runtime::spawn_blocking(move || {
+    let mut snapshot = run_persist("save style few-shot pairs", move || {
         crate::persistence::save_style_few_shot_pairs(&style_id, pairs)
     })
-    .await
-    .map_err(|e| format!("task failed: {e}"))??;
+    .await?;
     runtime.mark_reload_required().await;
     snapshot.service_status = runtime.service_status().await;
     Ok(snapshot)
@@ -312,7 +316,7 @@ pub async fn check_model_status(
     window: WebviewWindow,
 ) -> Result<Vec<lune_persist::ModelStatus>, String> {
     require_window_access(&window, &["main"])?;
-    tauri::async_runtime::spawn_blocking(|| {
+    run_persist("check model status", || {
         let paths = lune_persist::AppPaths::resolve().ok_or("resolve application paths")?;
         let store = lune_persist::SettingsStore::new(paths.settings_file());
         let settings = store.load().map_err(|e| format!("load settings: {e}"))?;
@@ -323,9 +327,7 @@ pub async fn check_model_status(
         ))
     })
     .await
-    .map_err(|e| format!("check model status: {e}"))?
 }
-
 #[tauri::command]
 pub async fn download_model_cmd(
     window: WebviewWindow,
@@ -336,7 +338,7 @@ pub async fn download_model_cmd(
     require_window_access(&window, &["main"])?;
     validate_local_name(&local_name)?;
     let app_handle = app.clone();
-    let models_dir = tauri::async_runtime::spawn_blocking(move || {
+    let models_dir = run_persist("download model", move || {
         let paths = lune_persist::AppPaths::resolve().ok_or("resolve application paths")?;
         let models_dir = paths.models_dir();
         tracing::info!(local_name, "starting model download");
@@ -353,8 +355,7 @@ pub async fn download_model_cmd(
             }
         }
     })
-    .await
-    .map_err(|e| format!("download task: {e}"))??;
+    .await?;
 
     if lune_persist::has_required_models(&models_dir) {
         runtime.eager_rebuild().await.ok();
@@ -366,14 +367,14 @@ pub async fn download_model_cmd(
 pub async fn delete_model_cmd(window: WebviewWindow, local_name: String) -> Result<(), String> {
     require_window_access(&window, &["main"])?;
     validate_local_name(&local_name)?;
-    tauri::async_runtime::spawn_blocking(move || {
+    run_persist("delete model", move || {
         let paths = lune_persist::AppPaths::resolve().ok_or("resolve application paths")?;
         lune_persist::delete_model(&paths.models_dir(), &local_name)
             .map_err(|e| format!("delete model: {e}"))?;
         Ok(())
     })
-    .await
-    .map_err(|e| format!("delete model task: {e}"))?
+    .await?;
+    Ok(())
 }
 
 #[tauri::command]

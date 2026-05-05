@@ -339,16 +339,15 @@ async fn run_session<A: AsrBackend + 'static>(
         match AudioStream::new(AudioConfig::default()) {
             Ok(s) => s,
             Err(e) => {
-                let _ = event_tx.send(SessionEvent::Error(e.to_string())).await;
-                finalize_db(
+                fail_init(
+                    &e,
                     session_id,
-                    Arc::clone(&persist),
-                    SessionStatus::Failed(e.to_string()),
-                    None,
-                    None,
+                    &event_tx,
+                    &persist,
+                    &active_arc,
+                    &idle_notify,
                 )
                 .await;
-                clear_active(&active_arc, &idle_notify).await;
                 return;
             }
         }
@@ -357,16 +356,15 @@ async fn run_session<A: AsrBackend + 'static>(
     let asr_session = match asr.start_session(config.asr_config).await {
         Ok(s) => s,
         Err(e) => {
-            let _ = event_tx.send(SessionEvent::Error(e.to_string())).await;
-            finalize_db(
+            fail_init(
+                &e,
                 session_id,
-                Arc::clone(&persist),
-                SessionStatus::Failed(e.to_string()),
-                None,
-                None,
+                &event_tx,
+                &persist,
+                &active_arc,
+                &idle_notify,
             )
             .await;
-            clear_active(&active_arc, &idle_notify).await;
             return;
         }
     };
@@ -380,16 +378,15 @@ async fn run_session<A: AsrBackend + 'static>(
     ) {
         Ok(v) => v,
         Err(e) => {
-            let _ = event_tx.send(SessionEvent::Error(e.to_string())).await;
-            finalize_db(
+            fail_init(
+                &e,
                 session_id,
-                Arc::clone(&persist),
-                SessionStatus::Failed(e.to_string()),
-                None,
-                None,
+                &event_tx,
+                &persist,
+                &active_arc,
+                &idle_notify,
             )
             .await;
-            clear_active(&active_arc, &idle_notify).await;
             return;
         }
     };
@@ -535,16 +532,15 @@ async fn run_session<A: AsrBackend + 'static>(
     }
 
     if cancelled {
-        finalize_db(
+        stop_session(
             session_id,
-            Arc::clone(&persist),
             SessionStatus::Cancelled,
-            Some(Utc::now()),
-            None,
+            &event_tx,
+            &persist,
+            &active_arc,
+            &idle_notify,
         )
         .await;
-        let _ = event_tx.send(SessionEvent::Stopped).await;
-        clear_active(&active_arc, &idle_notify).await;
         return;
     }
 
@@ -558,16 +554,15 @@ async fn run_session<A: AsrBackend + 'static>(
         } else {
             info!(%session_id, "no speech detected, ending session");
         }
-        finalize_db(
+        stop_session(
             session_id,
-            Arc::clone(&persist),
             status,
-            Some(Utc::now()),
-            None,
+            &event_tx,
+            &persist,
+            &active_arc,
+            &idle_notify,
         )
         .await;
-        let _ = event_tx.send(SessionEvent::Stopped).await;
-        clear_active(&active_arc, &idle_notify).await;
         return;
     }
 
@@ -736,16 +731,15 @@ async fn run_session<A: AsrBackend + 'static>(
 
     drain_processing_controls(&mut control_rx, &mut cancelled);
     if cancelled {
-        finalize_db(
+        stop_session(
             session_id,
-            Arc::clone(&persist),
             SessionStatus::Cancelled,
-            Some(Utc::now()),
-            None,
+            &event_tx,
+            &persist,
+            &active_arc,
+            &idle_notify,
         )
         .await;
-        let _ = event_tx.send(SessionEvent::Stopped).await;
-        clear_active(&active_arc, &idle_notify).await;
         return;
     }
 
@@ -791,6 +785,49 @@ async fn finalize_db(
         Ok(None) => warn!(%session_id, "session not found in DB during finalize"),
         Err(e) => warn!(error = %e, %session_id, "DB error during finalize"),
     }
+}
+
+#[cold]
+async fn fail_init(
+    error: impl std::fmt::Display,
+    session_id: Uuid,
+    event_tx: &mpsc::Sender<SessionEvent>,
+    persist: &Arc<Mutex<Database>>,
+    active_arc: &Arc<Mutex<Option<ActiveHandle>>>,
+    idle_notify: &Notify,
+) {
+    let msg = error.to_string();
+    let _ = event_tx.send(SessionEvent::Error(msg.clone())).await;
+    finalize_db(
+        session_id,
+        Arc::clone(persist),
+        SessionStatus::Failed(msg),
+        None,
+        None,
+    )
+    .await;
+    clear_active(active_arc, idle_notify).await;
+}
+
+#[cold]
+async fn stop_session(
+    session_id: Uuid,
+    status: SessionStatus,
+    event_tx: &mpsc::Sender<SessionEvent>,
+    persist: &Arc<Mutex<Database>>,
+    active_arc: &Arc<Mutex<Option<ActiveHandle>>>,
+    idle_notify: &Notify,
+) {
+    finalize_db(
+        session_id,
+        Arc::clone(persist),
+        status,
+        Some(Utc::now()),
+        None,
+    )
+    .await;
+    let _ = event_tx.send(SessionEvent::Stopped).await;
+    clear_active(active_arc, idle_notify).await;
 }
 
 #[cfg(test)]

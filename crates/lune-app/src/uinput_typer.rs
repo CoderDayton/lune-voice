@@ -577,35 +577,50 @@ pub fn set_clipboard(text: &str) -> Result<(), String> {
 
 // ─── Key mapping (US QWERTY) ─────────────────────────────────────────────────
 
-fn char_to_key(ch: char) -> Option<(KeyCode, bool)> {
-    let pair = match ch {
-        'a' | 'A' => (KeyCode::KEY_A, ch.is_uppercase()),
-        'b' | 'B' => (KeyCode::KEY_B, ch.is_uppercase()),
-        'c' | 'C' => (KeyCode::KEY_C, ch.is_uppercase()),
-        'd' | 'D' => (KeyCode::KEY_D, ch.is_uppercase()),
-        'e' | 'E' => (KeyCode::KEY_E, ch.is_uppercase()),
-        'f' | 'F' => (KeyCode::KEY_F, ch.is_uppercase()),
-        'g' | 'G' => (KeyCode::KEY_G, ch.is_uppercase()),
-        'h' | 'H' => (KeyCode::KEY_H, ch.is_uppercase()),
-        'i' | 'I' => (KeyCode::KEY_I, ch.is_uppercase()),
-        'j' | 'J' => (KeyCode::KEY_J, ch.is_uppercase()),
-        'k' | 'K' => (KeyCode::KEY_K, ch.is_uppercase()),
-        'l' | 'L' => (KeyCode::KEY_L, ch.is_uppercase()),
-        'm' | 'M' => (KeyCode::KEY_M, ch.is_uppercase()),
-        'n' | 'N' => (KeyCode::KEY_N, ch.is_uppercase()),
-        'o' | 'O' => (KeyCode::KEY_O, ch.is_uppercase()),
-        'p' | 'P' => (KeyCode::KEY_P, ch.is_uppercase()),
-        'q' | 'Q' => (KeyCode::KEY_Q, ch.is_uppercase()),
-        'r' | 'R' => (KeyCode::KEY_R, ch.is_uppercase()),
-        's' | 'S' => (KeyCode::KEY_S, ch.is_uppercase()),
-        't' | 'T' => (KeyCode::KEY_T, ch.is_uppercase()),
-        'u' | 'U' => (KeyCode::KEY_U, ch.is_uppercase()),
-        'v' | 'V' => (KeyCode::KEY_V, ch.is_uppercase()),
-        'w' | 'W' => (KeyCode::KEY_W, ch.is_uppercase()),
-        'x' | 'X' => (KeyCode::KEY_X, ch.is_uppercase()),
-        'y' | 'Y' => (KeyCode::KEY_Y, ch.is_uppercase()),
-        'z' | 'Z' => (KeyCode::KEY_Z, ch.is_uppercase()),
+/// Maps each lowercase ASCII letter to its Linux key code (US QWERTY layout).
+/// The order follows the alphabet (a–z); codes are non-sequential because they
+/// mirror physical QWERTY rows, so we cannot compute them arithmetically.
+const LETTER_KEYS: [(u8, KeyCode); 26] = [
+    (b'a', KeyCode::KEY_A),
+    (b'b', KeyCode::KEY_B),
+    (b'c', KeyCode::KEY_C),
+    (b'd', KeyCode::KEY_D),
+    (b'e', KeyCode::KEY_E),
+    (b'f', KeyCode::KEY_F),
+    (b'g', KeyCode::KEY_G),
+    (b'h', KeyCode::KEY_H),
+    (b'i', KeyCode::KEY_I),
+    (b'j', KeyCode::KEY_J),
+    (b'k', KeyCode::KEY_K),
+    (b'l', KeyCode::KEY_L),
+    (b'm', KeyCode::KEY_M),
+    (b'n', KeyCode::KEY_N),
+    (b'o', KeyCode::KEY_O),
+    (b'p', KeyCode::KEY_P),
+    (b'q', KeyCode::KEY_Q),
+    (b'r', KeyCode::KEY_R),
+    (b's', KeyCode::KEY_S),
+    (b't', KeyCode::KEY_T),
+    (b'u', KeyCode::KEY_U),
+    (b'v', KeyCode::KEY_V),
+    (b'w', KeyCode::KEY_W),
+    (b'x', KeyCode::KEY_X),
+    (b'y', KeyCode::KEY_Y),
+    (b'z', KeyCode::KEY_Z),
+];
 
+fn char_to_key(ch: char) -> Option<(KeyCode, bool)> {
+    // Handle all 26 letters with a single table lookup.
+    if ch.is_ascii_alphabetic() {
+        let lower = ch.to_ascii_lowercase() as u8;
+        let key = LETTER_KEYS
+            .iter()
+            .find(|(b, _)| *b == lower)
+            .map(|&(_, k)| k)?;
+        return Some((key, ch.is_uppercase()));
+    }
+
+    let pair = match ch {
         '1' | '!' => (KeyCode::KEY_1, ch == '!'),
         '2' | '@' => (KeyCode::KEY_2, ch == '@'),
         '3' | '#' => (KeyCode::KEY_3, ch == '#'),
@@ -777,41 +792,13 @@ impl UinputTyper {
     /// clipboard operation latency. Fast systems converge toward 40ms;
     /// slow systems (Electron, heavy toolkits) grow up to 300ms.
     pub fn type_str(&mut self, text: &str) {
-        let rtt_start = Instant::now();
-
-        // Set clipboard content (text stays on clipboard after paste)
-        if let Err(e) = set_clipboard(text) {
-            warn!(error = %e, "clipboard set failed, falling back to per-key typing");
-            self.type_str_keys(text);
-            return;
-        }
-
-        // Update adaptive delay from clipboard operation latency.
-        let rtt = rtt_start.elapsed();
-        self.paste_delay.record_rtt(rtt);
-
-        // Determine paste chord
         let is_terminal = match self.terminal_mode {
             TerminalMode::Auto => focused_is_terminal(),
             TerminalMode::Terminal => true,
             TerminalMode::Normal => false,
             _ => focused_is_terminal(),
         };
-
-        let chord = if is_terminal {
-            "Ctrl+Shift+V"
-        } else {
-            "Ctrl+V"
-        };
-        info!(
-            chord,
-            post_paste_ms = self.paste_delay.current_ms,
-            "emitting paste"
-        );
-        self.emit_paste(is_terminal);
-
-        // Wait for target app to read the clipboard
-        std::thread::sleep(self.paste_delay.delay());
+        self.do_clipboard_paste(text, is_terminal, "emitting paste");
     }
 
     pub fn type_str_to(&mut self, text: &str, target: &WindowTarget) {
@@ -821,7 +808,13 @@ impl UinputTyper {
             }
             std::thread::sleep(Duration::from_millis(50));
         }
+        self.do_clipboard_paste(text, target.is_terminal, "emitting paste to target");
+    }
 
+    /// Set clipboard, emit the appropriate paste chord, and wait for the
+    /// target app to consume it.  Falls back to per-key typing on clipboard
+    /// failure.  `label` is passed through to the info log.
+    fn do_clipboard_paste(&mut self, text: &str, is_terminal: bool, label: &str) {
         let rtt_start = Instant::now();
         if let Err(e) = set_clipboard(text) {
             warn!(error = %e, "clipboard set failed, falling back to per-key typing");
@@ -830,7 +823,7 @@ impl UinputTyper {
         }
         self.paste_delay.record_rtt(rtt_start.elapsed());
 
-        let chord = if target.is_terminal {
+        let chord = if is_terminal {
             "Ctrl+Shift+V"
         } else {
             "Ctrl+V"
@@ -838,9 +831,9 @@ impl UinputTyper {
         info!(
             chord,
             post_paste_ms = self.paste_delay.current_ms,
-            "emitting paste to target"
+            "{label}"
         );
-        self.emit_paste(target.is_terminal);
+        self.emit_paste(is_terminal);
         std::thread::sleep(self.paste_delay.delay());
     }
 

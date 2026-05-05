@@ -551,11 +551,15 @@ impl NGramModel {
 
     // ─── Private helpers ──────────────────────────────────────────────────────
 
+    fn smoothed_prob(&self, count: usize, context_total: usize) -> f64 {
+        let count_f = count as f64;
+        let denominator = context_total as f64 + self.config.add_k * self.vocabulary_size() as f64;
+        (count_f + self.config.add_k) / denominator.max(f64::MIN_POSITIVE)
+    }
+
     fn unigram_prob(&self, next: &str) -> f64 {
-        let count = self.unigram_counts.get(next).copied().unwrap_or(0) as f64;
-        let denominator =
-            self.total_unigrams as f64 + self.config.add_k * self.vocabulary_size() as f64;
-        (count + self.config.add_k) / denominator.max(f64::MIN_POSITIVE)
+        let count = self.unigram_counts.get(next).copied().unwrap_or(0);
+        self.smoothed_prob(count, self.total_unigrams)
     }
 
     fn bigram_prob(&self, prev: &str, next: &str) -> f64 {
@@ -563,10 +567,9 @@ impl NGramModel {
             .bigram_counts
             .get(&[prev.to_owned(), next.to_owned()])
             .copied()
-            .unwrap_or(0) as f64;
-        let context_total = self.bigram_context_totals.get(prev).copied().unwrap_or(0) as f64;
-        let denominator = context_total + self.config.add_k * self.vocabulary_size() as f64;
-        (count + self.config.add_k) / denominator.max(f64::MIN_POSITIVE)
+            .unwrap_or(0);
+        let context_total = self.bigram_context_totals.get(prev).copied().unwrap_or(0);
+        self.smoothed_prob(count, context_total)
     }
 
     fn trigram_prob(&self, w1: &str, w2: &str, next: &str) -> f64 {
@@ -574,15 +577,14 @@ impl NGramModel {
             .trigram_counts
             .get(&[w1.to_owned(), w2.to_owned(), next.to_owned()])
             .copied()
-            .unwrap_or(0) as f64;
+            .unwrap_or(0);
         let context = [w1.to_owned(), w2.to_owned()];
         let context_total = self
             .trigram_context_totals
             .get(&context)
             .copied()
-            .unwrap_or(0) as f64;
-        let denominator = context_total + self.config.add_k * self.vocabulary_size() as f64;
-        (count + self.config.add_k) / denominator.max(f64::MIN_POSITIVE)
+            .unwrap_or(0);
+        self.smoothed_prob(count, context_total)
     }
 
     fn effective_weights(&self) -> InterpolationWeights {

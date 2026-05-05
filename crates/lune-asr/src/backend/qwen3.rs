@@ -18,7 +18,7 @@ use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
 use lune_core::error::{Error, Result};
 
 use crate::mel::whisper;
-use crate::ort_utils::OrtModelLoader;
+use crate::ort_utils::{OrtContext, OrtModelLoader};
 
 // ── Model constants ─────────────────────────────────────────────────────────
 
@@ -43,7 +43,7 @@ const AUDIO_END: i64 = 151_670; // <|audio_end|>
 const SYSTEM_PROMPT: &str = "";
 
 /// Maximum audio buffer (5 min at 16 kHz).
-const MAX_WINDOW_SAMPLES: usize = 300 * 16_000;
+const MAX_WINDOW_SAMPLES: usize = 300 * whisper::SAMPLE_RATE;
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -110,8 +110,7 @@ impl Qwen3AsrBackend {
         let decoder = loader.load_first(&["qwen3-asr-decoder.onnx"], "qwen3-asr-decoder")?;
 
         let tok_path = config.model_dir.join("tokenizer.json");
-        let tokenizer = Tokenizer::from_file(&tok_path)
-            .map_err(|e| Error::Asr(format!("load tokenizer: {e}")))?;
+        let tokenizer = Tokenizer::from_file(&tok_path).ctx("load tokenizer")?;
 
         tracing::info!(dir = %config.model_dir.display(), "Qwen3-ASR backend loaded");
 
@@ -290,12 +289,9 @@ impl AsrBackend for Qwen3AsrBackend {
 
 /// Extract FP16 tensor to owned FP16 ArrayD (no conversion).
 fn extract_f16_array(value: &ort::value::Value) -> Result<ArrayD<f16>> {
-    let (shape, data) = value
-        .try_extract_tensor::<f16>()
-        .map_err(|e| Error::Asr(format!("extract f16: {e}")))?;
+    let (shape, data) = value.try_extract_tensor::<f16>().ctx("extract f16")?;
     let dims: Vec<usize> = shape.iter().map(|&d| d as usize).collect();
-    ArrayD::from_shape_vec(IxDyn(&dims), data.to_vec())
-        .map_err(|e| Error::Asr(format!("array reshape: {e}")))
+    ArrayD::from_shape_vec(IxDyn(&dims), data.to_vec()).ctx("array reshape")
 }
 
 const MABLE_TOP_K: usize = 16;
@@ -307,9 +303,7 @@ fn argmax_on_logits(
     vocab_size: usize,
     boost: &std::collections::HashMap<i64, f32>,
 ) -> Result<(i64, f32, Vec<f64>)> {
-    let (shape, data) = value
-        .try_extract_tensor::<f16>()
-        .map_err(|e| Error::Asr(format!("extract logits: {e}")))?;
+    let (shape, data) = value.try_extract_tensor::<f16>().ctx("extract logits")?;
     // Last position's logits: last `vocab_size` elements.
     let total = shape.iter().map(|&d| d as usize).product::<usize>();
     let start = total.saturating_sub(vocab_size);
@@ -420,15 +414,11 @@ fn append_empty_kv(inputs: &mut Vec<OrtInput<'_>>) -> Result<()> {
         let v = ndarray::ArrayD::from_elem(IxDyn(&[1, NUM_KV_HEADS, 0, HEAD_DIM]), f16::ZERO);
         inputs.push((
             std::borrow::Cow::Borrowed(kv_name(i, true)),
-            Value::from_array(k)
-                .map_err(|e| Error::Asr(format!("empty k{i}: {e}")))?
-                .into(),
+            Value::from_array(k).ctx("empty k{i}")?.into(),
         ));
         inputs.push((
             std::borrow::Cow::Borrowed(kv_name(i, false)),
-            Value::from_array(v)
-                .map_err(|e| Error::Asr(format!("empty v{i}: {e}")))?
-                .into(),
+            Value::from_array(v).ctx("empty v{i}")?.into(),
         ));
     }
     Ok(())
@@ -441,7 +431,7 @@ fn append_cached_kv(inputs: &mut Vec<OrtInput<'_>>, kv_cache: Vec<ArrayD<f16>>) 
         inputs.push((
             std::borrow::Cow::Borrowed(kv_name(layer, is_key)),
             Value::from_array(arr)
-                .map_err(|e| Error::Asr(format!("cached kv layer {layer}: {e}")))?
+                .ctx("cached kv layer {layer}")?
                 .into(),
         ));
     }
@@ -454,18 +444,18 @@ fn bind_empty_kv(binding: &mut ort::session::IoBinding) -> Result<()> {
             IxDyn(&[1, NUM_KV_HEADS, 0, HEAD_DIM]),
             f16::ZERO,
         ))
-        .map_err(|e| Error::Asr(format!("empty k{i}: {e}")))?;
+        .ctx("empty k{i}")?;
         let v = Value::from_array(ndarray::ArrayD::from_elem(
             IxDyn(&[1, NUM_KV_HEADS, 0, HEAD_DIM]),
             f16::ZERO,
         ))
-        .map_err(|e| Error::Asr(format!("empty v{i}: {e}")))?;
+        .ctx("empty v{i}")?;
         binding
             .bind_input(kv_name(i, true), &k)
-            .map_err(|e| Error::Asr(format!("bind empty key layer {i}: {e}")))?;
+            .ctx("bind empty key layer {i}")?;
         binding
             .bind_input(kv_name(i, false), &v)
-            .map_err(|e| Error::Asr(format!("bind empty value layer {i}: {e}")))?;
+            .ctx("bind empty value layer {i}")?;
     }
     Ok(())
 }
@@ -505,7 +495,7 @@ fn memory_info(
     context: &str,
 ) -> Result<MemoryInfo> {
     MemoryInfo::new(device, 0, AllocatorType::Device, memory_type)
-        .map_err(|e| Error::Asr(format!("{context} memory info: {e}")))
+        .ctx(&format!("{context} memory info"))
 }
 
 fn bind_decoder_outputs_to_device(
@@ -515,7 +505,7 @@ fn bind_decoder_outputs_to_device(
     let logits_mem = memory_info(AllocationDevice::CPU, MemoryType::Default, "logits")?;
     binding
         .bind_output_to_device("logits", &logits_mem)
-        .map_err(|e| Error::Asr(format!("bind logits output: {e}")))?;
+        .ctx("bind logits output")?;
 
     #[cfg(feature = "cuda")]
     let kv_mem = if use_gpu {
@@ -532,10 +522,10 @@ fn bind_decoder_outputs_to_device(
     for i in 0..NUM_LAYERS {
         binding
             .bind_output_to_device(present_kv_name(i, true), &kv_mem)
-            .map_err(|e| Error::Asr(format!("bind present key layer {i}: {e}")))?;
+            .ctx("bind present key layer {i}")?;
         binding
             .bind_output_to_device(present_kv_name(i, false), &kv_mem)
-            .map_err(|e| Error::Asr(format!("bind present value layer {i}: {e}")))?;
+            .ctx("bind present value layer {i}")?;
     }
     Ok(())
 }
@@ -569,9 +559,8 @@ impl Qwen3AsrBackend {
         let mel_t0 = std::time::Instant::now();
         let spec = self.mel.extract_from_f32_padded(pcm, MEL_MIN_FRAMES);
         let mel_3d = ndarray::Array3::from_shape_vec((1, spec.n_mels, spec.n_frames), spec.data)
-            .map_err(|e| Error::Asr(format!("mel reshape: {e}")))?;
-        let mel_val =
-            Value::from_array(mel_3d).map_err(|e| Error::Asr(format!("mel value: {e}")))?;
+            .ctx("mel reshape")?;
+        let mel_val = Value::from_array(mel_3d).ctx("mel value")?;
         let mel_ms = mel_t0.elapsed().as_secs_f64() * 1000.0;
 
         let mut models = self.models.lock().map_err(|e| lock_err("models", e))?;
@@ -582,7 +571,7 @@ impl Qwen3AsrBackend {
             let out = models
                 .encoder
                 .run(ort::inputs!("mel" => mel_val))
-                .map_err(|e| Error::Asr(format!("encoder: {e}")))?;
+                .ctx("encoder")?;
             extract_f16_array(&out[0])?
         };
         let encoder_ms = encoder_t0.elapsed().as_secs_f64() * 1000.0;
@@ -602,20 +591,18 @@ impl Qwen3AsrBackend {
 
         // 4. Embed tokens → [1, seq_len, D] (FP16), scatter encoder output
         let embeds = {
-            let ids_val = Value::from_array(
-                Array2::from_shape_vec((1, seq_len), input_ids)
-                    .map_err(|e| Error::Asr(format!("ids: {e}")))?,
-            )
-            .map_err(|e| Error::Asr(format!("ids val: {e}")))?;
+            let ids_val =
+                Value::from_array(Array2::from_shape_vec((1, seq_len), input_ids).ctx("ids")?)
+                    .ctx("ids val")?;
             let out = models
                 .embed_tokens
                 .run(ort::inputs!("input_ids" => ids_val))
-                .map_err(|e| Error::Asr(format!("embed_tokens: {e}")))?;
+                .ctx("embed_tokens")?;
             let emb = extract_f16_array(&out[0])?;
             let dims = emb.shape().to_vec();
             let mut arr = emb
                 .into_shape_with_order(IxDyn(&[dims[0], dims[1], dims[2]]))
-                .map_err(|e| Error::Asr(format!("embeds reshape: {e}")))?;
+                .ctx("embeds reshape")?;
             // Scatter: replace audio_pad positions with encoder output (both f16).
             // Use contiguous slice copies instead of per-element indexed writes.
             let emb_slice = arr
@@ -637,34 +624,31 @@ impl Qwen3AsrBackend {
         // 5. Prefill: run decoder with full embeddings + empty KV cache
         let prefill_t0 = std::time::Instant::now();
         let (first_token, first_conf, first_logits, mut kv_cache) = {
-            let embeds_val =
-                Value::from_array(embeds).map_err(|e| Error::Asr(format!("embeds val: {e}")))?;
-            let pos_val = Value::from_array(mrope_position_ids(seq_len))
-                .map_err(|e| Error::Asr(format!("pos val: {e}")))?;
-            let mask_val = Value::from_array(Array2::<i64>::ones((1, seq_len)))
-                .map_err(|e| Error::Asr(format!("mask val: {e}")))?;
+            let embeds_val = Value::from_array(embeds).ctx("embeds val")?;
+            let pos_val = Value::from_array(mrope_position_ids(seq_len)).ctx("pos val")?;
+            let mask_val = Value::from_array(Array2::<i64>::ones((1, seq_len))).ctx("mask val")?;
 
             if self.decoder_io_binding {
                 let mut binding = models
                     .decoder
                     .create_binding()
-                    .map_err(|e| Error::Asr(format!("decoder prefill binding: {e}")))?;
+                    .ctx("decoder prefill binding")?;
                 binding
                     .bind_input("inputs_embeds", &embeds_val)
-                    .map_err(|e| Error::Asr(format!("bind prefill embeds: {e}")))?;
+                    .ctx("bind prefill embeds")?;
                 binding
                     .bind_input("position_ids", &pos_val)
-                    .map_err(|e| Error::Asr(format!("bind prefill position_ids: {e}")))?;
+                    .ctx("bind prefill position_ids")?;
                 binding
                     .bind_input("attention_mask", &mask_val)
-                    .map_err(|e| Error::Asr(format!("bind prefill attention_mask: {e}")))?;
+                    .ctx("bind prefill attention_mask")?;
                 bind_empty_kv(&mut binding)?;
                 bind_decoder_outputs_to_device(&mut binding, self.use_gpu)?;
 
                 let mut out = models
                     .decoder
                     .run_binding(&binding)
-                    .map_err(|e| Error::Asr(format!("decoder prefill: {e}")))?;
+                    .ctx("decoder prefill")?;
                 let (tok, conf, logits_k) = argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost)?;
 
                 let mut cache: Vec<DynValue> = Vec::with_capacity(NUM_LAYERS * 2);
@@ -688,10 +672,7 @@ impl Qwen3AsrBackend {
                 );
                 append_empty_kv(&mut dec_inputs)?;
 
-                let mut out = models
-                    .decoder
-                    .run(dec_inputs)
-                    .map_err(|e| Error::Asr(format!("decoder prefill: {e}")))?;
+                let mut out = models.decoder.run(dec_inputs).ctx("decoder prefill")?;
                 let (tok, conf, logits_k) = argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost)?;
 
                 let mut cache: Vec<ArrayD<f16>> = Vec::with_capacity(NUM_LAYERS * 2);
@@ -717,12 +698,7 @@ impl Qwen3AsrBackend {
         // Pre-allocate reusable position array for the decode loop.
         let mut pos_arr = Array3::<i64>::zeros((3, 1, 1));
         let mut decoder_binding = if self.decoder_io_binding {
-            Some(
-                models
-                    .decoder
-                    .create_binding()
-                    .map_err(|e| Error::Asr(format!("decoder binding: {e}")))?,
-            )
+            Some(models.decoder.create_binding().ctx("decoder binding")?)
         } else {
             None
         };
@@ -754,12 +730,12 @@ impl Qwen3AsrBackend {
             let (tok, conf, logits_k) = {
                 // Embed single token (FP16 native, scoped to drop before decoder)
                 let emb = {
-                    let id_val = Value::from_array(Array2::from_elem((1, 1), last_tok))
-                        .map_err(|e| Error::Asr(format!("id val: {e}")))?;
+                    let id_val =
+                        Value::from_array(Array2::from_elem((1, 1), last_tok)).ctx("id val")?;
                     let emb_out = models
                         .embed_tokens
                         .run(ort::inputs!("input_ids" => id_val))
-                        .map_err(|e| Error::Asr(format!("embed step: {e}")))?;
+                        .ctx("embed step")?;
                     extract_f16_array(&emb_out[0])?
                 };
 
@@ -767,12 +743,10 @@ impl Qwen3AsrBackend {
                 pos_arr.fill(pos as i64);
 
                 let total_len = pos + 1;
-                let emb_val =
-                    Value::from_array(emb).map_err(|e| Error::Asr(format!("emb val: {e}")))?;
-                let pos_val = Value::from_array(pos_arr.clone())
-                    .map_err(|e| Error::Asr(format!("pos val: {e}")))?;
-                let mask_val = Value::from_array(Array2::<i64>::ones((1, total_len)))
-                    .map_err(|e| Error::Asr(format!("mask val: {e}")))?;
+                let emb_val = Value::from_array(emb).ctx("emb val")?;
+                let pos_val = Value::from_array(pos_arr.clone()).ctx("pos val")?;
+                let mask_val =
+                    Value::from_array(Array2::<i64>::ones((1, total_len))).ctx("mask val")?;
 
                 match &mut kv_cache {
                     DecodeKvCache::Bound(cache) => {
@@ -782,13 +756,13 @@ impl Qwen3AsrBackend {
                         binding.clear();
                         binding
                             .bind_input("inputs_embeds", &emb_val)
-                            .map_err(|e| Error::Asr(format!("bind embeds: {e}")))?;
+                            .ctx("bind embeds")?;
                         binding
                             .bind_input("position_ids", &pos_val)
-                            .map_err(|e| Error::Asr(format!("bind position_ids: {e}")))?;
+                            .ctx("bind position_ids")?;
                         binding
                             .bind_input("attention_mask", &mask_val)
-                            .map_err(|e| Error::Asr(format!("bind attention_mask: {e}")))?;
+                            .ctx("bind attention_mask")?;
                         // Move ORT-owned KV values directly into the next decoder run.
                         // Present KV outputs are bound to device memory below.
                         for (i, v) in cache.drain(..).enumerate() {
@@ -796,14 +770,11 @@ impl Qwen3AsrBackend {
                             let is_key = i % 2 == 0;
                             binding
                                 .bind_input(kv_name(layer, is_key), &v)
-                                .map_err(|e| Error::Asr(format!("bind kv layer {layer}: {e}")))?;
+                                .ctx("bind kv layer {layer}")?;
                         }
                         bind_decoder_outputs_to_device(binding, self.use_gpu)?;
 
-                        let mut out = models
-                            .decoder
-                            .run_binding(binding)
-                            .map_err(|e| Error::Asr(format!("decoder step: {e}")))?;
+                        let mut out = models.decoder.run_binding(binding).ctx("decoder step")?;
 
                         let result = argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost)?;
 
@@ -825,10 +796,7 @@ impl Qwen3AsrBackend {
                         );
                         append_cached_kv(&mut dec_inputs, std::mem::take(cache))?;
 
-                        let mut out = models
-                            .decoder
-                            .run(dec_inputs)
-                            .map_err(|e| Error::Asr(format!("decoder step: {e}")))?;
+                        let mut out = models.decoder.run(dec_inputs).ctx("decoder step")?;
 
                         let result = argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost)?;
 
@@ -856,7 +824,7 @@ impl Qwen3AsrBackend {
 
         let elapsed = start.elapsed();
         let profile = Qwen3AsrProfile {
-            audio_ms: pcm.len() * 1000 / 16_000,
+            audio_ms: pcm.len() * 1000 / whisper::SAMPLE_RATE,
             total_ms: elapsed.as_secs_f64() * 1000.0,
             mel_ms,
             encoder_ms,

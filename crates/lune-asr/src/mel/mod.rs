@@ -17,7 +17,7 @@ const N_FFT: usize = 512;
 const HOP_LENGTH: usize = 160;
 const WIN_LENGTH: usize = 400;
 const N_MELS: usize = 128;
-const SAMPLE_RATE: usize = 16000;
+use lune_core::audio::SAMPLE_RATE;
 const PREEMPHASIS: f32 = 0.97;
 const LOG_GUARD: f32 = 5.960_464_5e-8; // 2^-24 precomputed
 

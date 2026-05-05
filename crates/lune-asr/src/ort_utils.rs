@@ -13,6 +13,20 @@ use ort::session::builder::GraphOptimizationLevel;
 
 use lune_core::error::{Error, Result};
 
+/// Helper trait for concise error context wrapping in ORT operations.
+///
+/// Chains ORT errors with a descriptive label via `map_err`, converting them
+/// to `Error::Asr` with formatted context. Eliminates repetitive `.map_err(|e| Error::Asr(format!(...)))?`.
+pub trait OrtContext<T> {
+    fn ctx(self, label: &str) -> Result<T>;
+}
+
+impl<T, E: std::fmt::Display> OrtContext<T> for std::result::Result<T, E> {
+    fn ctx(self, label: &str) -> Result<T> {
+        self.map_err(|e| Error::Asr(format!("{label}: {e}")))
+    }
+}
+
 fn quiet_ort_logger() -> LoggerFunction {
     Arc::new(|level, _category, id, location, message| {
         if level >= LogLevel::Error {

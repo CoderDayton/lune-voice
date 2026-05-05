@@ -282,6 +282,10 @@ fn apply_penalties(logits: &mut [f32], state: &DecodeState, params: &SamplingPar
     let freq = params.frequency_penalty;
     let pres = params.presence_penalty;
 
+    let apply_rep = (rep - 1.0).abs() >= f32::EPSILON;
+    let apply_freq = freq != 0.0;
+    let apply_pres = pres != 0.0;
+
     for (&token_id, &count) in &state.token_counts {
         let idx = token_id as usize;
         if idx >= logits.len() {
@@ -290,17 +294,17 @@ fn apply_penalties(logits: &mut [f32], state: &DecodeState, params: &SamplingPar
 
         let logit = &mut logits[idx];
 
-        if (rep - 1.0).abs() >= f32::EPSILON {
+        if apply_rep {
             if *logit < 0.0 {
                 *logit *= rep;
             } else {
                 *logit /= rep;
             }
         }
-        if freq != 0.0 {
+        if apply_freq {
             *logit -= freq * (count as f32);
         }
-        if pres != 0.0 {
+        if apply_pres {
             *logit -= pres;
         }
     }

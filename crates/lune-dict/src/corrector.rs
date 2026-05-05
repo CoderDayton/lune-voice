@@ -17,11 +17,111 @@ pub struct WordScore {
     pub candidate_score: f32,
 }
 
+/// Result of processing a single word during correction.
+/// Contains the word to include in output and optional unresolved entry.
+struct ProcessedWord {
+    corrected_word: String,
+    unresolved: Option<WordScore>,
+}
+
 pub struct CorrectionResult {
     pub corrected_text: String,
     pub word_risk_positions: Vec<(usize, f32)>,
     pub unresolved_words: Vec<WordScore>,
     pub all_resolved: bool,
+}
+
+/// Process a single word during correction.
+///
+/// Returns the word to include in the output and optionally a `WordScore`
+/// for unresolved words that will be passed to the LLM.
+fn process_single_word(
+    word: &str,
+    i: usize,
+    stripped: &str,
+    lexicon_info: &Option<crate::lexicon::WordInfo>,
+    risk_score: f32,
+    dict_replacements: &[(String, String)],
+) -> ProcessedWord {
+    // Empty or digit-containing words pass through unchanged
+    if stripped.is_empty() || stripped.chars().any(|c| c.is_ascii_digit()) {
+        return ProcessedWord {
+            corrected_word: word.to_owned(),
+            unresolved: None,
+        };
+    }
+
+    let is_unknown = !lexicon_info.as_ref().is_some_and(|info| {
+        info.freq >= Lexicon::CONFIDENT_FREQ || info.source == WordSource::Vocab
+    });
+    let flagged = risk_score >= HWCE_FLAG_THRESHOLD;
+
+    // Dictionary replacements take priority
+    if let Some((_, repl)) = dict_replacements
+        .iter()
+        .find(|(phrase, _)| phrase.eq_ignore_ascii_case(stripped))
+    {
+        return ProcessedWord {
+            corrected_word: restore_punctuation(word, repl),
+            unresolved: None,
+        };
+    }
+
+    // Known, unflagged words pass through
+    if !is_unknown && !flagged {
+        return ProcessedWord {
+            corrected_word: word.to_owned(),
+            unresolved: None,
+        };
+    }
+
+    // Apply canonical casing from the vocab (e.g. "github" → "GitHub")
+    if let Some(info) = lexicon_info.as_ref() {
+        if info.canonical.as_ref() != stripped {
+            return ProcessedWord {
+                corrected_word: restore_punctuation(word, &info.canonical),
+                unresolved: None,
+            };
+        }
+
+        let is_high_freq = info.freq >= Lexicon::CONFIDENT_FREQ;
+        if info.source == WordSource::Vocab || (is_high_freq && risk_score < 0.75) {
+            return ProcessedWord {
+                corrected_word: word.to_owned(),
+                unresolved: None,
+            };
+        }
+    }
+
+    // Proper nouns and acronyms pass through unless very high risk
+    let looks_proper = stripped.starts_with(|c: char| c.is_ascii_uppercase())
+        || (stripped.len() >= 2 && stripped.chars().all(|c| c.is_ascii_uppercase()));
+    let is_camel_case = stripped.chars().any(|c| c.is_ascii_uppercase())
+        && stripped.chars().any(|c| c.is_ascii_lowercase())
+        && stripped.chars().filter(|c| c.is_ascii_uppercase()).count() >= 2;
+
+    if is_unknown && (looks_proper || is_camel_case) && risk_score < 0.80 {
+        return ProcessedWord {
+            corrected_word: word.to_owned(),
+            unresolved: None,
+        };
+    }
+
+    // Flagged words become uncertain — passed as hints to the LLM
+    let unresolved = if flagged {
+        Some(WordScore {
+            word: stripped.to_owned(),
+            position: i,
+            candidate_score: 0.0,
+        })
+    } else {
+        None
+    };
+
+    ProcessedWord {
+        corrected_word: word.to_owned(),
+        unresolved,
+    }
 }
 
 pub struct HeuristicCorrector {
@@ -71,72 +171,26 @@ impl HeuristicCorrector {
 
         for (i, &word) in words.iter().enumerate() {
             let stripped = strip_punctuation(word);
-            if stripped.is_empty() || stripped.chars().any(|c| c.is_ascii_digit()) {
-                result_words.push(word.to_owned());
-                continue;
-            }
-
             let lexicon_info = lexicon.lookup(stripped);
-            let is_unknown = !lexicon_info.as_ref().is_some_and(|info| {
-                info.freq >= Lexicon::CONFIDENT_FREQ || info.source == WordSource::Vocab
-            });
             let risk_score = word_risk_positions
                 .iter()
                 .find(|(position, _)| *position == i)
                 .map(|(_, risk)| *risk)
                 .unwrap_or(0.0);
-            let flagged = risk_score >= HWCE_FLAG_THRESHOLD;
 
-            // Dictionary replacements take priority
-            if let Some((_, repl)) = dict_replacements
-                .iter()
-                .find(|(phrase, _)| phrase.eq_ignore_ascii_case(stripped))
-            {
-                result_words.push(restore_punctuation(word, repl));
-                continue;
+            let processed = process_single_word(
+                word,
+                i,
+                stripped,
+                &lexicon_info,
+                risk_score,
+                dict_replacements,
+            );
+
+            result_words.push(processed.corrected_word);
+            if let Some(word_score) = processed.unresolved {
+                unresolved.push(word_score);
             }
-
-            // Known, unflagged words pass through
-            if !is_unknown && !flagged {
-                result_words.push(word.to_owned());
-                continue;
-            }
-
-            // Apply canonical casing from the vocab (e.g. "github" → "GitHub")
-            if let Some(info) = lexicon_info.as_ref() {
-                if info.canonical.as_ref() != stripped {
-                    result_words.push(restore_punctuation(word, &info.canonical));
-                    continue;
-                }
-
-                let is_high_freq = info.freq >= Lexicon::CONFIDENT_FREQ;
-                if info.source == WordSource::Vocab || (is_high_freq && risk_score < 0.75) {
-                    result_words.push(word.to_owned());
-                    continue;
-                }
-            }
-
-            // Proper nouns and acronyms pass through unless very high risk
-            let looks_proper = stripped.starts_with(|c: char| c.is_ascii_uppercase())
-                || (stripped.len() >= 2 && stripped.chars().all(|c| c.is_ascii_uppercase()));
-            let is_camel_case = stripped.chars().any(|c| c.is_ascii_uppercase())
-                && stripped.chars().any(|c| c.is_ascii_lowercase())
-                && stripped.chars().filter(|c| c.is_ascii_uppercase()).count() >= 2;
-
-            if is_unknown && (looks_proper || is_camel_case) && risk_score < 0.80 {
-                result_words.push(word.to_owned());
-                continue;
-            }
-
-            // Flagged words become uncertain — passed as hints to the LLM
-            if flagged {
-                unresolved.push(WordScore {
-                    word: stripped.to_owned(),
-                    position: i,
-                    candidate_score: 0.0,
-                });
-            }
-            result_words.push(word.to_owned());
         }
 
         let all_resolved = unresolved.is_empty();
