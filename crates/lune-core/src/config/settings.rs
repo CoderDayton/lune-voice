@@ -85,7 +85,7 @@ impl Default for UserSettings {
             asr_backend: AsrBackendConfig::Qwen3Asr {},
             llm_backend: LlmBackendConfig::Disabled,
             hotkey: HotkeyConfig::default(),
-            default_style: "casual".into(),
+            default_style: "minimal".into(),
             custom_styles: Vec::new(),
             language: "auto".into(),
             dictation_language: default_dictation_language(),
