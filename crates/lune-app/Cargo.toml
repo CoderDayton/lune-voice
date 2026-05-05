@@ -67,3 +67,7 @@ path = "../../benchmarks/llm_quality.rs"
 [[example]]
 name = "bench_domain"
 path = "../../benchmarks/bench_domain.rs"
+
+[[example]]
+name = "vram_growth"
+path = "../../benchmarks/vram_growth.rs"

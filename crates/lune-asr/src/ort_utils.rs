@@ -113,9 +113,11 @@ impl OrtModelLoader {
 /// When `use_gpu` is true, registers a per-session CUDA EP.
 /// Saves the graph-optimized model to `<path>.opt` on first load.
 pub fn build_ort_session(path: &Path, use_gpu: bool) -> Result<Session> {
-    make_builder(path, use_gpu)?
+    let session = make_builder(path, use_gpu)?
         .commit_from_file(path)
-        .map_err(|e| Error::Asr(format!("load model {}: {e}", path.display())))
+        .map_err(|e| Error::Asr(format!("load model {}: {e}", path.display())))?;
+    log_session_loaded(path, use_gpu, None);
+    Ok(session)
 }
 
 /// Build ORT session with external data pre-loaded in memory (shared across sessions).
@@ -125,11 +127,34 @@ pub fn build_ort_session_with_external_data(
     ext_filename: &str,
     ext_data: std::borrow::Cow<'static, [u8]>,
 ) -> Result<Session> {
-    make_builder(path, use_gpu)?
+    let ext_len = ext_data.len();
+    let session = make_builder(path, use_gpu)?
         .with_external_initializer_file_in_memory(ext_filename, ext_data)
         .map_err(|e| Error::Asr(format!("external data: {e}")))?
         .commit_from_file(path)
-        .map_err(|e| Error::Asr(format!("load model {}: {e}", path.display())))
+        .map_err(|e| Error::Asr(format!("load model {}: {e}", path.display())))?;
+    log_session_loaded(path, use_gpu, Some(ext_len as u64));
+    Ok(session)
+}
+
+fn log_session_loaded(path: &Path, use_gpu: bool, ext_data_bytes: Option<u64>) {
+    let onnx_bytes = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+    let data_path = path.with_extension("onnx_data");
+    let data_bytes = ext_data_bytes
+        .or_else(|| std::fs::metadata(&data_path).ok().map(|m| m.len()))
+        .unwrap_or(0);
+    let total_mib = (onnx_bytes + data_bytes) as f64 / (1024.0 * 1024.0);
+    let name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("<unknown>");
+    tracing::info!(
+        target: "vram",
+        model = name,
+        device = if use_gpu { "cuda" } else { "cpu" },
+        weights_mib = format_args!("{total_mib:.1}"),
+        "ASR session loaded"
+    );
 }
 
 fn make_builder(path: &Path, use_gpu: bool) -> Result<ort::session::builder::SessionBuilder> {
@@ -147,13 +172,22 @@ fn make_builder(path: &Path, use_gpu: bool) -> Result<ort::session::builder::Ses
         .with_intra_threads(4)
         .map_err(|e| Error::Asr(format!("intra threads: {e}")))?
         .with_optimized_model_path(&opt_path)
-        .map_err(|e| Error::Asr(format!("optimized model path: {e}")))?;
+        .map_err(|e| Error::Asr(format!("optimized model path: {e}")))?
+        // Share the env-registered CUDA arena across all ASR sessions.
+        .with_env_allocators()
+        .map_err(|e| Error::Asr(format!("env allocators: {e}")))?;
 
     #[cfg(feature = "cuda")]
     if use_gpu {
+        // Arena strategy: use the ORT default (kNextPowerOfTwo). The IO-binding
+        // decode loop allocates KV outputs of slightly different sizes each step
+        // (sequence length grows by 1 token). Power-of-two buckets coalesce
+        // those into a small set of pools that reuse across dictations.
+        // SameAsRequested fragments the arena and grew VRAM ~1 GB per dictation.
         builder = builder
             .with_execution_providers([ort::ep::CUDA::default()
-                .with_arena_extend_strategy(ort::ep::ArenaExtendStrategy::SameAsRequested)
+                .with_conv_algorithm_search(ort::ep::cuda::ConvAlgorithmSearch::Heuristic)
+                .with_conv_max_workspace(false)
                 .with_tf32(true)
                 .build()])
             .map_err(|e| Error::Asr(format!("CUDA EP: {e}")))?;

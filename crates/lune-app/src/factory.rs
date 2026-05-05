@@ -25,11 +25,37 @@ use lune_persist::ResolvedModels;
 /// "try CUDA, fall back to CPU" on standard builds.
 #[cold]
 pub fn init_ort_runtime() {
-    // CPU-only global init. CUDA EP is registered per-session by
-    // `build_ort_session` for ASR models — keeps VAD and forced
-    // aligner on CPU automatically.
-    if ort::init().with_logger(quiet_ort_logger()).commit() {
-        tracing::info!("ORT initialized (CPU global, CUDA per-session for ASR)");
+    // Cap cuBLAS per-handle workspace at 16 MiB (default is several hundred MB
+    // of lazily-allocated state per session). With 3 ASR + 1 LLM CUDA sessions
+    // alive simultaneously this saves ~0.5–1 GB of cuBLAS workspace VRAM.
+    // Must be set before any cuBLAS handle is created (i.e. before ORT loads
+    // its first CUDA session). Safe at process start: nothing has touched
+    // CUDA yet.
+    // Format: ":<workspace_size_mib>:<workspace_count>" — :16:8 = 8 × 16 MiB.
+    // SAFETY: called once at process start, before any CUDA work.
+    unsafe { std::env::set_var("CUBLAS_WORKSPACE_CONFIG", ":16:8") };
+
+    // Register CUDA EP at the environment level. Sessions that opt in via
+    // `SessionBuilder::with_env_allocators()` will share a single CUDA arena
+    // instead of each owning a private one. With 3 ASR + 1 LLM sessions, this
+    // collapses 4 independent arenas into 1 shared pool — material VRAM win
+    // when several sessions are warm at once.
+    //
+    // Sessions that do NOT call `with_env_allocators()` (e.g. CPU-only models
+    // like VAD/forced aligner) are unaffected: they keep their default
+    // allocator. Per-session EP overrides via `with_execution_providers()` on
+    // the session also continue to work; this is purely additive at the env.
+    let mut builder = ort::init().with_logger(quiet_ort_logger());
+    #[cfg(feature = "cuda")]
+    {
+        builder = builder.with_execution_providers([ort::ep::CUDA::default()
+            .with_conv_algorithm_search(ort::ep::cuda::ConvAlgorithmSearch::Heuristic)
+            .with_conv_max_workspace(false)
+            .with_tf32(true)
+            .build()]);
+    }
+    if builder.commit() {
+        tracing::info!("ORT initialized (env-level CUDA EP for shared arena)");
     } else {
         tracing::info!("ORT already initialized");
     }

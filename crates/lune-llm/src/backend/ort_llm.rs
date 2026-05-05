@@ -9,8 +9,8 @@ use std::sync::{Arc, Mutex};
 use half::f16;
 use ndarray::{Array2, Array4};
 use ort::logging::{LogLevel, LoggerFunction};
-use ort::session::Session;
 use ort::session::builder::GraphOptimizationLevel;
+use ort::session::{RunOptions, Session};
 use ort::value::{DynValue, Value};
 use tokenizers::Tokenizer;
 use tracing::info;
@@ -85,6 +85,16 @@ fn quiet_ort_logger() -> LoggerFunction {
             );
         }
     })
+}
+
+/// Build a `RunOptions` that asks ORT to shrink CPU and CUDA arenas at the
+/// end of the run. Used at the prefill step of each LLM generate call to
+/// reclaim leftover chunks from the prior call's variable-shape decode loop.
+fn make_shrink_run_options() -> Result<RunOptions> {
+    let mut opts = RunOptions::new().map_err(e)?;
+    opts.add_config_entry("memory.enable_memory_arena_shrinkage", "cpu:0;gpu:0")
+        .map_err(e)?;
+    Ok(opts)
 }
 
 fn dyn_i64(arr: Array2<i64>) -> Result<DynValue> {
@@ -232,10 +242,20 @@ impl OrtStyleLlm {
                 .with_optimization_level(GraphOptimizationLevel::Level3)
                 .map_err(e)?
                 .with_intra_threads(intra_threads)
+                .map_err(e)?
+                // Share the env-registered CUDA arena with the ASR sessions.
+                .with_env_allocators()
                 .map_err(e)?;
             if gpu {
+                // Use ORT default arena strategy (kNextPowerOfTwo). Variable
+                // KV-cache shapes per decode step fragment a SameAsRequested
+                // arena across runs; power-of-two buckets reuse cleanly.
                 b = b
-                    .with_execution_providers([ort::ep::CUDA::default().build()])
+                    .with_execution_providers([ort::ep::CUDA::default()
+                        .with_conv_algorithm_search(ort::ep::cuda::ConvAlgorithmSearch::Heuristic)
+                        .with_conv_max_workspace(false)
+                        .with_tf32(true)
+                        .build()])
                     .map_err(e)?;
             } else {
                 let opt_path = path.with_extension("onnx.opt");
@@ -475,7 +495,12 @@ impl OrtStyleLlm {
             inputs.push((std::borrow::Cow::Borrowed(names[i].as_str()), kv_val));
         }
 
-        let outputs = session.run(inputs).map_err(e)?;
+        // Apply CUDA arena shrinkage on this prefill run (once per generate
+        // call). Releases unused chunks from the previous call's variable-shape
+        // decode loop before this call grows the arena. Doing it here, not in
+        // the per-step decode loop, avoids per-step shrink/grow churn.
+        let prefill_opts = make_shrink_run_options()?;
+        let outputs = session.run_with_options(inputs, &prefill_opts).map_err(e)?;
         let first = sample_last_token(
             &outputs[0],
             &self.sampling_params,

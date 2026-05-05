@@ -10,7 +10,7 @@ use std::sync::Mutex;
 use half::f16;
 use ndarray::{Array2, Array3, ArrayD, IxDyn};
 use ort::memory::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType};
-use ort::session::Session;
+use ort::session::{RunOptions, Session};
 use ort::value::{DynValue, Value};
 use tokenizers::Tokenizer;
 
@@ -286,6 +286,20 @@ impl AsrBackend for Qwen3AsrBackend {
 }
 
 // ── Inference ───────────────────────────────────────────────────────────────
+
+/// Build a `RunOptions` that asks ORT to shrink the relevant memory arenas at
+/// the end of the run. Returns leftover chunks from prior runs back to the
+/// arena's free pool — critical for autoregressive decoders whose variable
+/// per-step KV shapes otherwise fragment the arena across sessions.
+///
+/// Format per ORT: "cpu:0;gpu:0" or "gpu:0" — semicolon-separated EP:device.
+fn make_shrink_run_options(use_gpu: bool) -> Result<RunOptions> {
+    let mut opts = RunOptions::new().ctx("run options")?;
+    let key = "memory.enable_memory_arena_shrinkage";
+    let value = if use_gpu { "cpu:0;gpu:0" } else { "cpu:0" };
+    opts.add_config_entry(key, value).ctx("shrinkage config")?;
+    Ok(opts)
+}
 
 /// Extract FP16 tensor to owned FP16 ArrayD (no conversion).
 fn extract_f16_array(value: &ort::value::Value) -> Result<ArrayD<f16>> {
@@ -565,12 +579,17 @@ impl Qwen3AsrBackend {
 
         let mut models = self.models.lock().map_err(|e| lock_err("models", e))?;
 
-        // 2. Encoder → audio features [1, N, D] (FP16 native)
+        // 2. Encoder → audio features [1, N, D] (FP16 native).
+        // Shrink the CUDA arena at the start of each dictation so chunks left
+        // over from the previous utterance's variable-shape decode loop are
+        // released before this utterance grows the arena again. Without this,
+        // each dictation's high-water mark accumulates across the session.
         let encoder_t0 = std::time::Instant::now();
         let audio_feat = {
+            let run_opts = make_shrink_run_options(self.use_gpu)?;
             let out = models
                 .encoder
-                .run(ort::inputs!("mel" => mel_val))
+                .run_with_options(ort::inputs!("mel" => mel_val), &run_opts)
                 .ctx("encoder")?;
             extract_f16_array(&out[0])?
         };

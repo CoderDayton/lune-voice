@@ -25,7 +25,7 @@ use tracing::{debug, warn};
 
 use crate::dto::SessionStreamEvent;
 
-const LOCAL_LLM_IDLE_TTL: Duration = Duration::from_secs(150);
+const LOCAL_LLM_IDLE_TTL: Duration = Duration::from_secs(30);
 const HOLD_WARMUP_GRACE: Duration = Duration::from_millis(250);
 const TOGGLE_DEBOUNCE: Duration = Duration::from_millis(150);
 const CANCEL_DEBOUNCE: Duration = Duration::from_millis(80);
@@ -896,7 +896,28 @@ impl LazyLocalLlm {
 
         match loaded {
             Ok(Ok(llm)) => {
-                tracing::info!("local style LLM warmed");
+                let weights_mib = std::fs::read_dir(&self.model_dir)
+                    .ok()
+                    .map(|rd| {
+                        rd.flatten()
+                            .filter(|e| {
+                                e.file_name().to_str().is_some_and(|n| {
+                                    n.ends_with(".onnx")
+                                        || n.ends_with(".onnx_data")
+                                        || n.ends_with(".opt")
+                                })
+                            })
+                            .filter_map(|e| e.metadata().ok().map(|m| m.len()))
+                            .sum::<u64>() as f64
+                            / (1024.0 * 1024.0)
+                    })
+                    .unwrap_or(0.0);
+                tracing::info!(
+                    target: "vram",
+                    device = if self.use_gpu { "cuda" } else { "cpu" },
+                    weights_mib = format_args!("{weights_mib:.1}"),
+                    "LLM session loaded"
+                );
                 *state = LazyLlmState::Ready(llm);
             }
             Ok(Err(error)) => {
