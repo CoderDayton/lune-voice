@@ -4,9 +4,15 @@ import { saveWorkspaceSetting } from '../../../store/workspace-store';
 import { OpenAiFields } from '../components/openai-fields';
 import { type SettingsProps, SettingsRow, SettingsSection } from '../components/section';
 import { asrBackends, dictationLanguages } from '../data/settings-data';
+import { useDebouncedSetting } from '../hooks/use-debounced-setting';
 
 export function TranscriptionSection({ settings }: SettingsProps) {
   const { t } = useLingui();
+  const [confidence, setConfidence] = useDebouncedSetting(
+    'confidenceThreshold',
+    settings.confidenceThreshold,
+  );
+
   return (
     <SettingsSection
       title="Recognition"
@@ -79,6 +85,27 @@ export function TranscriptionSection({ settings }: SettingsProps) {
             onChange={() => void saveWorkspaceSetting('useGpu', !settings.useGpu)}
             aria-label={t`Use hardware acceleration`}
           />
+        }
+      />
+      <SettingsRow
+        label={t`Correction level`}
+        description={t`How aggressively the LLM corrects transcribed words. Higher values send more words through correction.`}
+        control={
+          <div className="flex items-center gap-3">
+            <input
+              type="range"
+              className="range range-primary range-sm w-28 sm:w-36"
+              min={0.1}
+              max={0.95}
+              step={0.05}
+              value={confidence}
+              onChange={(e) => setConfidence(e.target.value)}
+              aria-label={t`Correction level`}
+            />
+            <span className="text-sm tabular-nums text-content-muted w-8 text-right">
+              {Number(confidence) < 0.35 ? t`Low` : Number(confidence) > 0.7 ? t`High` : t`Mid`}
+            </span>
+          </div>
         }
       />
     </SettingsSection>
