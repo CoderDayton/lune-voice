@@ -1,5 +1,17 @@
 import { useLingui } from '@lingui/react/macro';
-import { Check, CircleCheck, CircleX, Clock, Copy, Hash, Mic, Palette } from 'lucide-react';
+import { save } from '@tauri-apps/plugin-dialog';
+import { writeTextFile } from '@tauri-apps/plugin-fs';
+import {
+  Check,
+  CircleCheck,
+  CircleX,
+  Clock,
+  Copy,
+  Download,
+  Hash,
+  Mic,
+  Palette,
+} from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { ConfirmDialog } from '../../../components/feedback/confirm-dialog';
 import { type HistorySession, removeHistorySession } from '../../../store/workspace-store';
@@ -44,6 +56,22 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
 
   const isCompleted = session.status === 'Completed';
   const isFailed = session.status.startsWith('Failed');
+
+  async function handleDownload() {
+    if (!session.transcript) return;
+    const d = new Date(session.startedAt);
+    const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`;
+    try {
+      const path = await save({
+        title: t`Save Transcript`,
+        defaultPath: `lune-${stamp}.txt`,
+        filters: [{ name: 'Text', extensions: ['txt'] }],
+      });
+      if (path) await writeTextFile(path, session.transcript);
+    } catch (e) {
+      console.warn('[transcript-download]', e);
+    }
+  }
 
   function handleCopy() {
     if (!session.transcript) return;
@@ -91,20 +119,30 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
                 {time} · {relative}
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
               {session.transcript && (
-                <button
-                  type="button"
-                  onClick={handleCopy}
-                  className="btn btn-ghost btn-sm btn-circle"
-                  aria-label={t`Copy transcript`}
-                >
-                  {copied ? (
-                    <Check size={15} strokeWidth={2.5} className="text-success" />
-                  ) : (
-                    <Copy size={15} strokeWidth={1.8} />
-                  )}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={handleDownload}
+                    className="btn btn-ghost btn-sm btn-circle"
+                    aria-label={t`Download transcript`}
+                  >
+                    <Download size={15} strokeWidth={1.8} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCopy}
+                    className="btn btn-ghost btn-sm btn-circle"
+                    aria-label={t`Copy transcript`}
+                  >
+                    {copied ? (
+                      <Check size={15} strokeWidth={2.5} className="text-success" />
+                    ) : (
+                      <Copy size={15} strokeWidth={1.8} />
+                    )}
+                  </button>
+                </>
               )}
             </div>
           </div>
