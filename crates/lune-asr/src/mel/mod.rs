@@ -99,13 +99,15 @@ fn apply_preemphasis(audio: &[f32], coef: f32) -> Vec<f32> {
     }
     let n = audio.len();
     let mut out = vec![0.0f32; n];
-    out[0] = audio[0];
+    // Substitute 0 for non-finite samples so a single NaN/Inf from a USB
+    // dropout or denormal cannot poison the entire spectrogram.
+    let sanitize = |v: f32| if v.is_finite() { v } else { 0.0 };
+    out[0] = sanitize(audio[0]);
     // Difference equation: y[i] = x[i] - coef*x[i-1]
-    // Non-overlapping slices allow LLVM to auto-vectorize with FMA
     let src = audio;
     let dst = &mut out[1..];
     for (i, d) in dst.iter_mut().enumerate() {
-        *d = src[i + 1] - coef * src[i];
+        *d = sanitize(src[i + 1]) - coef * sanitize(src[i]);
     }
     out
 }
@@ -269,8 +271,12 @@ fn normalize_per_feature(features: &mut Array2<f32>) {
             m2 += delta * (x - mean);
             k += num_features;
         }
-        // m2 / (n-1) = sample variance; recip to multiply instead of divide in normalize pass
-        let std_inv = (m2 * inv_nm1).sqrt().max(1e-5).recip();
+        // m2 / (n-1) = sample variance. Clamp m2 ≥ 0 to defend against
+        // subnormal float roundoff that could push variance negative and
+        // produce NaN through sqrt → max → recip.
+        let var = (m2.max(0.0) * inv_nm1).max(0.0);
+        let std_inv = var.sqrt().max(1e-5).recip();
+        let std_inv = if std_inv.is_finite() { std_inv } else { 0.0 };
 
         // Normalize pass (second and final strided pass)
         k = feat;
@@ -328,5 +334,24 @@ mod tests {
         let fb2 = get_mel_filterbank();
         // Same pointer — truly static
         assert!(std::ptr::eq(fb1 as *const _, fb2 as *const _));
+    }
+
+    #[test]
+    fn extract_features_finite_with_nan_input() {
+        // Mic dropouts can produce NaN/Inf samples. Output must remain
+        // finite — the upstream model treats NaN inputs as garbage.
+        let mut audio = vec![0.1f32; 16000];
+        audio[100] = f32::NAN;
+        audio[200] = f32::INFINITY;
+        audio[300] = f32::NEG_INFINITY;
+        let features = extract_features(&audio);
+        assert!(features.iter().all(|v| v.is_finite()));
+    }
+
+    #[test]
+    fn preemphasis_zeros_non_finite_inputs() {
+        let audio = [0.5f32, f32::NAN, f32::INFINITY, -0.5];
+        let pre = apply_preemphasis(&audio, 0.97);
+        assert!(pre.iter().all(|v| v.is_finite()));
     }
 }

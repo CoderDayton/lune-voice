@@ -50,7 +50,27 @@ pub struct Vad {
 
 impl Vad {
     pub fn new(config: VadConfig, _sample_rate: u32) -> Result<Self, crate::AudioError> {
-        let hangover_samples = (config.hangover_ms as usize * 16).max(HOP_SIZE);
+        if !(0.0..=1.0).contains(&config.threshold) || !config.threshold.is_finite() {
+            return Err(crate::AudioError::Vad(format!(
+                "threshold {} out of range [0.0, 1.0]",
+                config.threshold
+            )));
+        }
+        if !(0.0..=1.0).contains(&config.threshold_end) || !config.threshold_end.is_finite() {
+            return Err(crate::AudioError::Vad(format!(
+                "threshold_end {} out of range [0.0, 1.0]",
+                config.threshold_end
+            )));
+        }
+        if config.threshold_end > config.threshold {
+            return Err(crate::AudioError::Vad(format!(
+                "threshold_end ({}) must be <= threshold ({})",
+                config.threshold_end, config.threshold
+            )));
+        }
+        let hangover_samples = (config.hangover_ms as usize)
+            .saturating_mul(16)
+            .max(HOP_SIZE);
         Ok(Self {
             inner: Detector::default(),
             threshold_start: config.threshold,
@@ -121,8 +141,12 @@ fn compute_rms(samples: &[f32]) -> f32 {
     if samples.is_empty() {
         return 0.0;
     }
-    let sum_sq: f32 = samples.iter().map(|&s| s * s).sum();
-    (sum_sq / samples.len() as f32).sqrt()
+    let sum_sq: f32 = samples
+        .iter()
+        .map(|&s| if s.is_finite() { s * s } else { 0.0 })
+        .sum();
+    let rms = (sum_sq / samples.len() as f32).sqrt();
+    if rms.is_finite() { rms } else { 0.0 }
 }
 
 #[cfg(test)]
@@ -137,5 +161,76 @@ mod tests {
 
         let _ = vad.process_chunk(&[0.0f32]);
         assert_eq!(vad.carry.len(), 0);
+    }
+
+    #[test]
+    fn rejects_inverted_thresholds() {
+        let r = Vad::new(
+            VadConfig {
+                threshold: 0.3,
+                threshold_end: 0.5,
+                hangover_ms: 30,
+            },
+            16_000,
+        );
+        assert!(matches!(r, Err(crate::AudioError::Vad(_))));
+    }
+
+    #[test]
+    fn rejects_out_of_range_thresholds() {
+        for (start, end) in [(-0.1, 0.0), (1.1, 0.5), (0.5, -0.01), (0.5, 1.01)] {
+            let r = Vad::new(
+                VadConfig {
+                    threshold: start,
+                    threshold_end: end,
+                    hangover_ms: 30,
+                },
+                16_000,
+            );
+            assert!(
+                matches!(r, Err(crate::AudioError::Vad(_))),
+                "expected rejection for ({start}, {end})"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_nan_thresholds() {
+        let r = Vad::new(
+            VadConfig {
+                threshold: f32::NAN,
+                threshold_end: 0.3,
+                hangover_ms: 30,
+            },
+            16_000,
+        );
+        assert!(matches!(r, Err(crate::AudioError::Vad(_))));
+    }
+
+    #[test]
+    fn hangover_ms_does_not_overflow() {
+        let r = Vad::new(
+            VadConfig {
+                threshold: 0.5,
+                threshold_end: 0.3,
+                hangover_ms: u32::MAX,
+            },
+            16_000,
+        );
+        assert!(r.is_ok(), "huge hangover_ms must saturate, not panic/wrap");
+    }
+
+    #[test]
+    fn rms_handles_non_finite_samples() {
+        let samples = [0.5f32, f32::NAN, f32::INFINITY, -0.5];
+        let rms = compute_rms(&samples);
+        assert!(rms.is_finite(), "rms must be finite, got {rms}");
+        assert!(rms > 0.0);
+    }
+
+    #[test]
+    fn rms_all_nan_returns_zero() {
+        let samples = [f32::NAN, f32::NAN, f32::NAN];
+        assert_eq!(compute_rms(&samples), 0.0);
     }
 }

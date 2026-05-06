@@ -57,6 +57,10 @@ impl WhisperMelF16 {
         win_length: usize,
         n_mels: usize,
     ) -> Self {
+        assert!(sample_rate > 0, "sample_rate must be positive");
+        assert!(n_fft > 0, "n_fft must be positive");
+        assert!(hop_length > 0, "hop_length must be positive");
+        assert!(win_length > 0, "win_length must be positive");
         assert!(win_length <= n_fft);
         assert!(n_mels > 0);
 
@@ -192,6 +196,10 @@ fn collate_specs(specs: &[MelSpecF16]) -> BatchMelF16 {
 
     let batch = specs.len();
     let n_mels = specs[0].n_mels;
+    assert!(
+        specs.iter().all(|s| s.n_mels == n_mels),
+        "collate_specs: all specs must share n_mels (got {n_mels} mixed with others)"
+    );
     let max_frames = specs.iter().map(|s| s.n_frames).max().unwrap_or(0);
 
     let mut lengths = Vec::with_capacity(batch);
@@ -264,16 +272,31 @@ fn reflect_get(x: &[f32], idx: isize) -> f32 {
 }
 
 fn whisper_log_normalize(mel: &mut [f32]) {
-    // Fuse log10 + peak-find into one pass.
+    // Whisper-spec floor when no real signal: log10(EPSILON)/4 + 1
+    // = ln(EPSILON) * INV4_LOG10E + 1
+    let epsilon_floor = EPSILON.ln().mul_add(INV4_LOG10E, 1.0);
+
+    // Fuse log10 + peak-find into one pass. Substitute the silence floor
+    // for any non-finite value so a stray NaN from upstream cannot poison
+    // peak (NaN comparisons all return false → peak stays NEG_INFINITY).
     let mut peak = f32::NEG_INFINITY;
     for v in mel.iter_mut() {
         let ln_v = v.max(EPSILON).ln();
-        // log10(x) / 4 + 1  =  ln(x) * (log10(e) / 4) + 1
         let scaled = ln_v.mul_add(INV4_LOG10E, 1.0);
+        let scaled = if scaled.is_finite() {
+            scaled
+        } else {
+            epsilon_floor
+        };
         *v = scaled;
         if scaled > peak {
             peak = scaled;
         }
+    }
+    // If every value was non-finite, peak fell back through epsilon_floor
+    // path. If mel was empty, leave it untouched.
+    if !peak.is_finite() {
+        return;
     }
     // floor = (peak_log10 - 8) / 4 + 1 = peak_scaled - 2
     let floor = peak - 2.0;
@@ -347,5 +370,61 @@ fn mel_to_hz_slaney(mel: f32) -> f32 {
         mel * f_sp
     } else {
         min_log_hz * (logstep * (mel - min_log_mel)).exp()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn whisper_log_normalize_finite_with_nan() {
+        let mut mel = vec![0.5_f32, f32::NAN, 1e-12, f32::INFINITY, 0.25];
+        whisper_log_normalize(&mut mel);
+        assert!(
+            mel.iter().all(|v| v.is_finite()),
+            "log normalize must produce all-finite output"
+        );
+    }
+
+    #[test]
+    fn whisper_log_normalize_empty_is_noop() {
+        let mut mel: Vec<f32> = vec![];
+        whisper_log_normalize(&mut mel);
+        assert!(mel.is_empty());
+    }
+
+    #[test]
+    fn extract_from_f32_with_nan_audio_is_finite() {
+        let mel = WhisperMelF16::new_qwen();
+        let mut pcm = vec![0.1f32; SAMPLE_RATE]; // 1s
+        pcm[100] = f32::NAN;
+        pcm[200] = f32::INFINITY;
+        let spec = mel.extract_from_f32(&pcm);
+        // The pre-FFT path doesn't filter NaN currently; whisper_log_normalize
+        // is the safety net. Output should be all finite f16 (no NaN tile).
+        assert!(spec.data.iter().all(|v| v.to_f32().is_finite()));
+    }
+
+    #[test]
+    #[should_panic(expected = "n_fft must be positive")]
+    fn rejects_zero_n_fft() {
+        let _ = WhisperMelF16::new(16_000, 0, 160, 400, 128);
+    }
+
+    #[test]
+    #[should_panic(expected = "all specs must share n_mels")]
+    fn collate_specs_rejects_mismatched_n_mels() {
+        let a = MelSpecF16 {
+            n_mels: 80,
+            n_frames: 1,
+            data: vec![f16::from_f32(0.0); 80],
+        };
+        let b = MelSpecF16 {
+            n_mels: 128,
+            n_frames: 1,
+            data: vec![f16::from_f32(0.0); 128],
+        };
+        let _ = collate_specs(&[a, b]);
     }
 }
