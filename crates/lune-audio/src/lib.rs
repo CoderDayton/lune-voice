@@ -23,10 +23,12 @@
 //! }
 //! ```
 
+pub mod calibrate;
 mod capture;
 mod ring;
 mod vad;
 
+pub use calibrate::{CalibrationError, CalibrationInput, CalibrationResult};
 pub use capture::{AudioConfig, AudioStream};
 pub use vad::{Vad, VadConfig, VadResult};
 

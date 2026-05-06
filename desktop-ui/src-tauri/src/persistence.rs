@@ -1,3 +1,5 @@
+use lune_asr::AsrRegistry;
+use lune_core::asr::AsrBackendKind;
 use lune_core::config::{
     ActivationMode, AsrBackendConfig, DevicePolicy, DictationMode, HotkeyConfig, KeyCombo,
     Modifier, PillVisibility, RedactedString, StreamingMode, StylePreset, UserSettings,
@@ -350,6 +352,8 @@ fn open_database(paths: &AppPaths) -> Result<Database, String> {
 }
 
 fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
+    let backend_defaults =
+        AsrRegistry::default_pipeline_config(asr_backend_kind(&settings.asr_backend));
     let (openai_asr_base_url, openai_asr_model, openai_asr_api_key_set) =
         match &settings.asr_backend {
             AsrBackendConfig::OpenAiCompatible {
@@ -376,7 +380,14 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
             .pipeline
             .adaptive_vad
             .unwrap_or(settings.adaptive_vad),
-        speech_threshold: settings.pipeline.speech_threshold.unwrap_or(0.5),
+        speech_threshold: settings
+            .pipeline
+            .speech_threshold
+            .unwrap_or(backend_defaults.speech_threshold),
+        speech_threshold_end: settings
+            .pipeline
+            .speech_threshold_end
+            .unwrap_or(backend_defaults.speech_threshold_end),
         style_preset: settings.default_style.clone(),
         hotkey_toggle: format_key_combo(&settings.hotkey.toggle_dictation),
         hotkey_cancel: format_key_combo(&settings.hotkey.cancel_dictation),
@@ -412,12 +423,26 @@ fn apply_settings_dto(
             input.speech_threshold
         ));
     }
+    if !input.speech_threshold_end.is_finite() || !(0.0..=1.0).contains(&input.speech_threshold_end)
+    {
+        return Err(format!(
+            "speechThresholdEnd must be 0.0–1.0, got {}",
+            input.speech_threshold_end
+        ));
+    }
+    if input.speech_threshold_end > input.speech_threshold {
+        return Err(format!(
+            "speechThresholdEnd ({}) must be <= speechThreshold ({})",
+            input.speech_threshold_end, input.speech_threshold
+        ));
+    }
 
     settings.pipeline.word_confidence_threshold = input.confidence_threshold;
     settings.word_confidence_threshold = input.confidence_threshold.unwrap_or(0.5);
     settings.pipeline.adaptive_vad = Some(input.adaptive_vad);
     settings.adaptive_vad = input.adaptive_vad;
     settings.pipeline.speech_threshold = Some(input.speech_threshold);
+    settings.pipeline.speech_threshold_end = Some(input.speech_threshold_end);
 
     // Validate style_preset — reject empty or excessively long values.
     let style = input.style_preset.trim();
@@ -503,6 +528,14 @@ fn resolve_device_policy(use_gpu: bool, policy: DevicePolicyDto) -> DevicePolicy
     match policy {
         DevicePolicyDto::Cuda => DevicePolicy::Cuda,
         DevicePolicyDto::Auto | DevicePolicyDto::Cpu => DevicePolicy::Auto,
+    }
+}
+
+fn asr_backend_kind(config: &AsrBackendConfig) -> AsrBackendKind {
+    match config {
+        AsrBackendConfig::Qwen3Asr { .. } => AsrBackendKind::Qwen3Asr,
+        AsrBackendConfig::OpenAiCompatible { .. } => AsrBackendKind::OpenAiCompatible,
+        _ => AsrBackendKind::Qwen3Asr,
     }
 }
 
@@ -716,6 +749,7 @@ mod tests {
             confidence_threshold: dto.confidence_threshold,
             adaptive_vad: dto.adaptive_vad,
             speech_threshold: dto.speech_threshold,
+            speech_threshold_end: dto.speech_threshold_end,
             style_preset: dto.style_preset,
             hotkey_toggle: dto.hotkey_toggle,
             hotkey_cancel: dto.hotkey_cancel,

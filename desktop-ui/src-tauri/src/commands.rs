@@ -1,7 +1,7 @@
 use tauri::{Emitter, Runtime, State, WebviewWindow, ipc::Channel};
 
 use crate::dto::{
-    CreateCustomStyleInput, CreateDictionaryEntryInput, PillSnapshotDto,
+    CalibrationStreamEvent, CreateCustomStyleInput, CreateDictionaryEntryInput, PillSnapshotDto,
     SaveWorkspaceSettingsInput, SessionStreamEvent, UpdateCustomStyleInput,
     UpdateDictionaryEntryInput, WorkspaceSnapshot,
 };
@@ -309,6 +309,35 @@ pub async fn toggle_dictation(
 ) -> Result<Option<String>, String> {
     require_window_access(&window, &["main", "pill"])?;
     runtime.inner().clone().toggle_dictation().await
+}
+
+#[tauri::command]
+pub async fn calibrate_start(
+    window: WebviewWindow,
+    runtime: State<'_, AppRuntime>,
+    channel: Channel<CalibrationStreamEvent>,
+) -> Result<(), String> {
+    require_window_access(&window, &["main"])?;
+    runtime.calibrate_start(channel).await
+}
+
+#[tauri::command]
+pub async fn calibrate_advance(
+    window: WebviewWindow,
+    runtime: State<'_, AppRuntime>,
+) -> Result<(), String> {
+    require_window_access(&window, &["main"])?;
+    runtime.calibrate_advance().await
+}
+
+#[tauri::command]
+pub async fn calibrate_cancel(
+    window: WebviewWindow,
+    runtime: State<'_, AppRuntime>,
+) -> Result<(), String> {
+    require_window_access(&window, &["main"])?;
+    runtime.calibrate_cancel().await;
+    Ok(())
 }
 
 #[tauri::command]

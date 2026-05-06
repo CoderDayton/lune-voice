@@ -42,8 +42,16 @@ pub struct PipelineConfig {
     /// segment is flushed regardless of other heuristics.
     pub hard_close_ms: u32,
 
-    /// VAD probability threshold for speech detection (0.0–1.0).
+    /// VAD probability threshold for entering speech (0.0–1.0).
     pub speech_threshold: f32,
+
+    /// VAD probability threshold for leaving speech (0.0–1.0).
+    ///
+    /// Must be ≤ `speech_threshold` to provide hysteresis. Lower values
+    /// hold speech open through brief score dips; higher values cut off
+    /// faster on pauses.
+    #[serde(default = "default_speech_threshold_end")]
+    pub speech_threshold_end: f32,
 
     /// Minimum speech duration to accept (ms). Rejects noise bursts.
     pub min_speech_ms: u32,
@@ -131,6 +139,10 @@ pub struct PipelineConfig {
     pub word_boost_score: f32,
 }
 
+fn default_speech_threshold_end() -> f32 {
+    0.3
+}
+
 fn default_itn_enabled() -> bool {
     false
 }
@@ -166,6 +178,7 @@ impl PipelineConfig {
         apply!(sentence_close_ms);
         apply!(hard_close_ms);
         apply!(speech_threshold);
+        apply!(speech_threshold_end);
         apply!(min_speech_ms);
         apply!(adaptive_vad);
         apply!(llm_timeout_secs);
@@ -202,6 +215,12 @@ impl PipelineConfig {
         }
         if !(0.0..=1.0).contains(&self.speech_threshold) {
             issues.push("speech_threshold must be in 0.0..=1.0");
+        }
+        if !(0.0..=1.0).contains(&self.speech_threshold_end) {
+            issues.push("speech_threshold_end must be in 0.0..=1.0");
+        }
+        if self.speech_threshold_end > self.speech_threshold {
+            issues.push("speech_threshold_end must be <= speech_threshold");
         }
         if let Some(t) = self.word_confidence_threshold
             && !(0.0..=1.0).contains(&t)
@@ -246,6 +265,7 @@ impl Default for PipelineConfig {
             sentence_close_ms: 776,
             hard_close_ms: 1_552,
             speech_threshold: 0.5,
+            speech_threshold_end: 0.3,
             min_speech_ms: 150,
             adaptive_vad: false,
             // Thresholds are on the calibrated P(correct) scale after the
@@ -274,6 +294,7 @@ pub struct PipelineOverrides {
     pub sentence_close_ms: Option<u32>,
     pub hard_close_ms: Option<u32>,
     pub speech_threshold: Option<f32>,
+    pub speech_threshold_end: Option<f32>,
     pub min_speech_ms: Option<u32>,
     pub adaptive_vad: Option<bool>,
     pub word_confidence_threshold: Option<f32>,

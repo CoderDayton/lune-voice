@@ -1,7 +1,13 @@
-import { invoke } from '@tauri-apps/api/core';
+import { Channel, invoke } from '@tauri-apps/api/core';
 import { mockBackendClient } from './mock';
 import { isTauriRuntime } from './runtime';
-import type { BackendClient, BackendPillSnapshot, BackendWorkspaceSnapshot } from './types';
+import type {
+  BackendClient,
+  BackendPillSnapshot,
+  BackendWorkspaceSnapshot,
+  CalibrationHandle,
+  CalibrationStreamEvent,
+} from './types';
 
 const tauriBackendClient: BackendClient = {
   loadWorkspaceSnapshot() {
@@ -70,6 +76,21 @@ const tauriBackendClient: BackendClient = {
 
   toggleDictation() {
     return invoke<string | null>('toggle_dictation');
+  },
+
+  async calibrateStart(onEvent): Promise<CalibrationHandle> {
+    const channel = new Channel<CalibrationStreamEvent>((event) => {
+      try {
+        onEvent(event);
+      } catch (e) {
+        console.error('[calibrate] event handler threw', e);
+      }
+    });
+    await invoke<void>('calibrate_start', { channel });
+    return {
+      advance: () => invoke<void>('calibrate_advance'),
+      cancel: () => invoke<void>('calibrate_cancel'),
+    };
   },
 };
 

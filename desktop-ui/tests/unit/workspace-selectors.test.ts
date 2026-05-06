@@ -24,6 +24,7 @@ function makeSnapshot(overrides: Partial<BackendWorkspaceSnapshot> = {}): Backen
       confidenceThreshold: 0.5,
       adaptiveVad: false,
       speechThreshold: 0.5,
+      speechThresholdEnd: 0.3,
       stylePreset: "casual",
       hotkeyToggle: "Ctrl+Space",
       hotkeyCancel: "Escape",

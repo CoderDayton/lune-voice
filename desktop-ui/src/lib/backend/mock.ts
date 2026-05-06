@@ -3,6 +3,8 @@ import type {
   BackendClient,
   BackendPillSnapshot,
   BackendWorkspaceSnapshot,
+  CalibrationHandle,
+  CalibrationStreamEvent,
   SaveWorkspaceSettingsInput,
 } from './types';
 
@@ -28,6 +30,7 @@ function createMockSnapshot(): BackendWorkspaceSnapshot {
       confidenceThreshold: 0.5,
       adaptiveVad: false,
       speechThreshold: 0.5,
+      speechThresholdEnd: 0.3,
       stylePreset: 'casual',
       hotkeyToggle: 'Ctrl+Space',
       hotkeyCancel: 'Escape',
@@ -254,5 +257,70 @@ export const mockBackendClient: BackendClient = {
 
   async toggleDictation() {
     return 'mock-session';
+  },
+
+  async calibrateStart(onEvent): Promise<CalibrationHandle> {
+    let cancelled = false;
+    let resolveAdvance: (() => void) | null = null;
+    const advancePromise = new Promise<void>((resolve) => {
+      resolveAdvance = resolve;
+    });
+
+    const emit = (e: CalibrationStreamEvent) => {
+      if (!cancelled) onEvent(e);
+    };
+
+    const tick = (phase: 'noise' | 'speech', durationMs: number, level: number) =>
+      new Promise<void>((resolve) => {
+        const start = performance.now();
+        const id = setInterval(() => {
+          if (cancelled) {
+            clearInterval(id);
+            resolve();
+            return;
+          }
+          const elapsed = performance.now() - start;
+          const jitter = (Math.random() - 0.5) * 0.1;
+          emit({
+            type: 'frame',
+            phase,
+            vadScore: Math.max(0, Math.min(1, level + jitter)),
+            energy: Math.max(0, Math.min(1, level * 0.4 + jitter * 0.2)),
+          });
+          if (elapsed >= durationMs) {
+            clearInterval(id);
+            resolve();
+          }
+        }, 50);
+      });
+
+    (async () => {
+      emit({ type: 'phaseChanged', phase: 'noise' });
+      await tick('noise', 3000, 0.05);
+      if (cancelled) return emit({ type: 'phaseChanged', phase: 'cancelled' });
+      emit({ type: 'phaseChanged', phase: 'waiting' });
+      await advancePromise;
+      if (cancelled) return emit({ type: 'phaseChanged', phase: 'cancelled' });
+      emit({ type: 'phaseChanged', phase: 'speech' });
+      await tick('speech', 8000, 0.85);
+      if (cancelled) return emit({ type: 'phaseChanged', phase: 'cancelled' });
+      emit({ type: 'phaseChanged', phase: 'done' });
+      emit({
+        type: 'result',
+        speechThreshold: 0.55,
+        speechThresholdEnd: 0.2,
+        diagnostics: { noiseP95: 0.07, speechP10: 0.78, pauseP20: 0.18 },
+      });
+    })();
+
+    return {
+      async advance() {
+        resolveAdvance?.();
+      },
+      async cancel() {
+        cancelled = true;
+        resolveAdvance?.(); // unblock the waiting phase if still pending
+      },
+    };
   },
 };

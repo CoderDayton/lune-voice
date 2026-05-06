@@ -69,6 +69,7 @@ pub struct WorkspaceSettingsDto {
     pub confidence_threshold: Option<f32>,
     pub adaptive_vad: bool,
     pub speech_threshold: f32,
+    pub speech_threshold_end: f32,
     pub style_preset: String,
     pub hotkey_toggle: String,
     pub hotkey_cancel: String,
@@ -123,6 +124,7 @@ pub struct SaveWorkspaceSettingsInput {
     pub confidence_threshold: Option<f32>,
     pub adaptive_vad: bool,
     pub speech_threshold: f32,
+    pub speech_threshold_end: f32,
     pub style_preset: String,
     pub hotkey_toggle: String,
     pub hotkey_cancel: String,
@@ -201,9 +203,41 @@ pub enum SessionStreamEvent {
     },
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CalibrationDiagnosticsDto {
+    pub noise_p95: f32,
+    pub speech_p10: f32,
+    pub pause_p20: f32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum CalibrationStreamEvent {
+    PhaseChanged {
+        phase: String,
+    },
+    Frame {
+        phase: String,
+        #[serde(rename = "vadScore")]
+        vad_score: f32,
+        energy: f32,
+    },
+    Result {
+        #[serde(rename = "speechThreshold")]
+        speech_threshold: f32,
+        #[serde(rename = "speechThresholdEnd")]
+        speech_threshold_end: f32,
+        diagnostics: CalibrationDiagnosticsDto,
+    },
+    Error {
+        message: String,
+    },
+}
+
 #[cfg(test)]
 mod tests {
-    use super::SessionStreamEvent;
+    use super::{CalibrationDiagnosticsDto, CalibrationStreamEvent, SessionStreamEvent};
 
     #[test]
     fn session_stream_events_match_frontend_shape() {
@@ -221,5 +255,48 @@ mod tests {
         .unwrap();
         assert_eq!(status["type"], "serviceStatus");
         assert_eq!(status["status"], "ready");
+    }
+
+    #[test]
+    fn calibration_stream_events_match_frontend_shape() {
+        // Use values that round-trip exactly through f32→f64 (powers of 2).
+        let frame = serde_json::to_value(CalibrationStreamEvent::Frame {
+            phase: "noise".into(),
+            vad_score: 0.5,
+            energy: 0.25,
+        })
+        .unwrap();
+        assert_eq!(frame["type"], "frame");
+        assert_eq!(frame["phase"], "noise");
+        assert_eq!(frame["vadScore"].as_f64(), Some(0.5));
+        assert_eq!(frame["energy"].as_f64(), Some(0.25));
+        // Snake_case must NOT leak across the IPC boundary — the rename is
+        // load-bearing for the frontend types.
+        assert!(
+            frame.get("vad_score").is_none(),
+            "snake_case leaked: vad_score"
+        );
+
+        let result = serde_json::to_value(CalibrationStreamEvent::Result {
+            speech_threshold: 0.5,
+            speech_threshold_end: 0.25,
+            diagnostics: CalibrationDiagnosticsDto {
+                noise_p95: 0.0625,
+                speech_p10: 0.75,
+                pause_p20: 0.125,
+            },
+        })
+        .unwrap();
+        assert_eq!(result["type"], "result");
+        assert_eq!(result["speechThreshold"].as_f64(), Some(0.5));
+        assert_eq!(result["speechThresholdEnd"].as_f64(), Some(0.25));
+        assert!(result.get("speech_threshold").is_none());
+        assert!(result.get("speech_threshold_end").is_none());
+
+        let diag = &result["diagnostics"];
+        assert_eq!(diag["noiseP95"].as_f64(), Some(0.0625));
+        assert_eq!(diag["speechP10"].as_f64(), Some(0.75));
+        assert_eq!(diag["pauseP20"].as_f64(), Some(0.125));
+        assert!(diag.get("noise_p95").is_none());
     }
 }

@@ -13,467 +13,588 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#. placeholder {0}: copy.action
-#. placeholder {0}: copy.description
-#. placeholder {0}: copy.title
-#: src/features/auth/components/auth-form.tsx:43
-#: src/features/auth/components/auth-form.tsx:44
-#: src/features/auth/components/auth-form.tsx:147
-msgid "{0}"
-msgstr ""
-
-#. placeholder {0}: copy.support
-#. placeholder {1}: copy.supportAction
-#: src/features/auth/components/auth-form.tsx:160
-msgid "{0} <0>{1}</0>"
-msgstr ""
-
-#. placeholder {0}: current.label
-#: src/features/shell/components/sidebar.tsx:111
-msgid "{0} is ready"
-msgstr ""
-
-#: src/features/overview/components/overview-hero.tsx:72
-msgid "A quick read on what is ready right now before you start dictating."
-msgstr ""
-
-#: src/features/shell/components/sidebar.tsx:147
-msgid "Across apps"
-msgstr ""
-
-#: src/features/dictionary/components/dictionary-table.tsx:17
+#: src/features/dictionary/components/dictionary-table.tsx:177
 msgid "Action"
 msgstr "操作"
 
-#: src/features/dictionary/components/dictionary-rail.tsx:23
-msgid "Active rules"
+#: src/features/dictionary/components/dictionary-form.tsx:100
+msgid "Add"
 msgstr ""
 
-#: src/features/settings/settings-page.tsx:38
-msgid "Active speech recognition backend."
+#: src/features/dictionary/components/dictionary-form.tsx:46
+msgid "Add correction rule"
 msgstr ""
 
-#: src/features/settings/sections/input-section.tsx:40
-#: src/features/settings/sections/input-section.tsx:46
-msgid "Adaptive pause detection"
-msgstr "適応型ポーズ検出"
-
-#: src/features/dictionary/dictionary-page.tsx:14
-msgid "Add common names, acronyms, and preferred spelling so repeated corrections happen automatically."
+#: src/features/dictionary/components/dictionary-form.tsx:97
+msgid "Added"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-form.tsx:15
-#: src/features/dictionary/components/dictionary-form.tsx:41
-msgid "Add rule"
-msgstr "ルールを追加"
-
-#: src/features/auth/components/auth-form.tsx:155
-msgid "Alt+1 log in"
+#: src/features/settings/components/calibrate-modal.tsx:100
+msgid "Adjust manually"
 msgstr ""
 
-#: src/features/auth/components/auth-form.tsx:156
-msgid "Alt+2 sign up"
+#: src/features/settings/sections/models-section.tsx:151
+msgid "AI models stored on your device."
 msgstr ""
 
-#: src/features/settings/components/openai-fields.tsx:23
-msgid "API endpoint"
+#: src/features/overview/components/model-setup.tsx:159
+msgid "All models are ready. Everything runs locally on your machine."
 msgstr ""
 
 #: src/features/settings/components/openai-fields.tsx:35
+msgid "API endpoint"
+msgstr ""
+
+#: src/features/settings/components/openai-fields.tsx:47
 msgid "API key"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-rail.tsx:31
-msgid "Applies"
+#: src/features/settings/sections/appearance-section.tsx:37
+msgid "Appearance"
 msgstr ""
 
-#: src/features/history/components/history-rail.tsx:10
-msgid "Archive filter"
-msgstr ""
-
-#: src/features/history/components/history-rail.tsx:21
-msgid "Archive signals"
+#: src/features/settings/components/calibrate-modal.tsx:99
+msgid "Apply"
 msgstr ""
 
 #: src/features/dictation/audio-dots.tsx:17
 msgid "Audio activity"
 msgstr "音声アクティビティ"
 
-#: src/features/settings/sections/cleanup-section.tsx:18
-#: src/features/settings/sections/cleanup-section.tsx:24
-msgid "Automatic cleanup"
-msgstr "自動修正"
-
-#: src/features/settings/settings-page.tsx:43
-msgid "Automatic correction of uncertain words."
+#: src/features/settings/components/theme-picker.tsx:321
+msgid "Browse themes"
 msgstr ""
 
-#: src/features/settings/sections/transcription-section.tsx:19
-msgid "Balanced works well for most people. Compact uses less memory."
+#: src/features/styles/styles-page.tsx:179
+msgid "Built-in"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-rail.tsx:32
-msgid "Before sending text"
+#: src/features/settings/sections/input-section.tsx:65
+msgid "Calibrate"
 msgstr ""
 
-#: src/features/history/components/history-rail.tsx:24
-msgid "Benchmark traces"
+#: src/features/settings/components/calibrate-modal.tsx:66
+#: src/features/settings/sections/input-section.tsx:62
+msgid "Calibrate microphone"
+msgstr ""
+
+#: src/components/feedback/confirm-dialog.tsx:52
+#: src/features/dictionary/components/dictionary-table.tsx:91
+#: src/features/settings/components/calibrate-modal.tsx:119
+#: src/features/settings/sections/models-section.tsx:233
+#: src/features/styles/styles-page.tsx:202
+#: src/features/styles/styles-page.tsx:318
+msgid "Cancel"
 msgstr ""
 
 #: src/features/settings/sections/shortcuts-section.tsx:31
 msgid "Cancel current recording"
 msgstr "現在の録音を取消"
 
-#: src/features/dictation/dictation-pill.tsx:43
+#: src/features/dictation/dictation-pill.tsx:65
 msgid "Cancel dictation"
 msgstr "ディクテーション取消"
 
-#: src/features/settings/sections/output-section.tsx:14
+#: src/features/overview/components/model-setup.tsx:199
+msgid "Check your connection and try again."
+msgstr ""
+
+#: src/features/settings/components/theme-picker.tsx:337
+msgid "Choose a theme"
+msgstr ""
+
+#: src/features/settings/sections/output-section.tsx:12
 msgid "Choose how finished text is inserted into the app you are currently using."
 msgstr ""
 
-#: src/features/settings/sections/input-section.tsx:21
+#: src/features/settings/sections/appearance-section.tsx:38
+msgid "Choose how Lune Voice looks."
+msgstr ""
+
+#: src/features/settings/sections/input-section.tsx:28
 msgid "Choose how quickly you want to enter and leave voice typing."
 msgstr ""
 
-#: src/features/settings/sections/cleanup-section.tsx:29
-msgid "Cleanup model"
+#: src/features/styles/styles-page.tsx:136
+msgid "Choose the tone and formatting applied to your transcriptions."
 msgstr ""
 
-#: src/features/settings/sections/cleanup-section.tsx:56
-msgid "Cleanup sensitivity"
+#: src/features/styles/styles-page.tsx:334
+msgid "close"
 msgstr ""
 
-#: src/features/shell/components/mobile-nav.tsx:41
-msgid "Close navigation menu"
+#: src/features/history/components/session-detail-modal.tsx:209
+#: src/features/styles/styles-page.tsx:306
+msgid "Close"
 msgstr ""
 
-#: src/features/shell/components/sidebar.tsx:170
-msgid "Collapse rail"
+#: src/features/shell/components/sidebar.tsx:47
+msgid "Collapse sidebar"
 msgstr ""
 
-#: src/features/history/components/history-summary.tsx:41
-msgid "Combined audio duration from the visible records."
+#: src/features/history/components/session-detail-modal.tsx:181
+msgid "Completed"
 msgstr ""
 
-#: src/features/shell/components/sidebar.tsx:171
-msgid "Compact the workspace chrome"
+#: src/features/overview/overview-page.tsx:38
+#: src/features/shell/components/sidebar-widgets.tsx:40
+msgid "Connecting"
 msgstr ""
 
-#: src/features/settings/settings-page.tsx:26
-msgid "Configure how Lune Voice listens, transcribes, cleans up text, and delivers it to the app you are using."
-msgstr ""
-
-#. placeholder {0}: p.key
-#: src/features/auth/components/auth-form.tsx:50
-msgid "Continue with {0}"
-msgstr ""
-
-#: src/features/settings/sections/transcription-section.tsx:16
+#: src/features/settings/sections/transcription-section.tsx:19
 msgid "Control how your speech is turned into text."
 msgstr ""
 
-#: src/features/history/components/history-rail.tsx:25
-msgid "Correction review"
+#: src/features/history/components/session-detail-modal.tsx:137
+msgid "Copy transcript"
 msgstr ""
 
-#: src/features/overview/components/overview-hero.tsx:70
-msgid "Current operating picture"
+#: src/features/settings/sections/transcription-section.tsx:91
+#: src/features/settings/sections/transcription-section.tsx:103
+msgid "Correction level"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-rail.tsx:20
-msgid "Current posture"
+#: src/features/styles/styles-page.tsx:244
+msgid "Create new style"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-rail.tsx:27
-msgid "Default priority"
+#: src/features/styles/styles-page.tsx:253
+msgid "Create style"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-table.tsx:36
+#: src/features/settings/components/calibrate-modal.tsx:104
+msgid "Current"
+msgstr ""
+
+#: src/features/settings/components/theme-picker.tsx:417
+#: src/features/settings/sections/appearance-section.tsx:47
+msgid "Dark"
+msgstr ""
+
+#: src/components/feedback/confirm-dialog.tsx:63
+#: src/features/history/components/session-detail-modal.tsx:199
+#: src/features/settings/sections/models-section.tsx:178
+#: src/features/styles/styles-page.tsx:197
+msgid "Delete"
+msgstr ""
+
+#. placeholder {0}: confirmDelete.name
+#: src/features/settings/sections/models-section.tsx:214
+msgid "Delete {0}?"
+msgstr ""
+
+#: src/features/settings/sections/models-section.tsx:236
+msgid "Delete model"
+msgstr ""
+
+#: src/features/history/components/session-detail-modal.tsx:197
+msgid "Delete session?"
+msgstr ""
+
+#: src/features/styles/styles-page.tsx:192
+msgid "Delete this style?"
+msgstr ""
+
+#: src/features/dictionary/components/dictionary-table.tsx:137
 msgid "Delete this word fix?"
 msgstr "この修正を削除しますか？"
 
-#: src/features/shell/components/mobile-nav.tsx:34
-#: src/features/shell/components/sidebar.tsx:70
-msgid "Desktop Dictation"
+#: src/features/styles/styles-page.tsx:292
+msgid "Describe how text should be formatted. E.g., \"Use bullet points. Keep sentences short. Avoid jargon.\""
+msgstr ""
+
+#: src/features/styles/styles-page.tsx:269
+msgid "Description"
+msgstr ""
+
+#: src/features/settings/sections/transcription-section.tsx:56
+msgid "Dictation language"
 msgstr ""
 
 #: src/features/settings/sections/shortcuts-section.tsx:32
 msgid "Discard the current draft and return to idle. Click the binding to change it."
 msgstr ""
 
-#: src/components/ui/error-toast.tsx:32
+#: src/features/overview/overview-page.tsx:38
+msgid "Disconnected"
+msgstr ""
+
+#: src/components/feedback/error-toast.tsx:24
 msgid "Dismiss error"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-form.tsx:24
+#: src/features/settings/sections/models-section.tsx:192
+msgid "Download"
+msgstr ""
+
+#. placeholder {0}: toGet.length
+#. placeholder {1}: toGet.length !== 1 ? 's' : ''
+#: src/features/overview/components/model-setup.tsx:230
+msgid "Download {0} model{1}"
+msgstr ""
+
+#. placeholder {0}: toGet.length
+#. placeholder {1}: toGet.length !== 1 ? 's' : ''
+#: src/features/overview/components/model-setup.tsx:207
+msgid "Download {0} optional model{1}"
+msgstr ""
+
+#: src/features/overview/components/model-setup.tsx:155
+msgid "Download failed"
+msgstr ""
+
+#: src/features/history/components/session-detail-modal.tsx:129
+msgid "Download transcript"
+msgstr ""
+
+#: src/features/overview/components/model-setup.tsx:153
+msgid "Downloading models"
+msgstr ""
+
+#: src/features/settings/sections/models-section.tsx:192
+msgid "Downloading…"
+msgstr ""
+
+#: src/features/styles/styles-page.tsx:308
+msgid "Duplicate"
+msgstr ""
+
+#: src/features/history/components/session-detail-modal.tsx:173
+msgid "Duration"
+msgstr ""
+
+#: src/features/dictionary/components/dictionary-form.tsx:61
 msgid "e.g. github…"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-form.tsx:29
+#: src/features/dictionary/components/dictionary-form.tsx:79
 msgid "e.g. GitHub…"
 msgstr ""
 
-#: src/features/auth/components/auth-form.tsx:134
-msgid "Enter your password…"
+#: src/features/styles/styles-page.tsx:262
+msgid "e.g. Meeting notes"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-rail.tsx:15
-msgid "Every saved term helps Lune Voice fix names and phrases automatically before text reaches your app."
+#: src/features/dictionary/components/dictionary-table.tsx:132
+#: src/features/styles/styles-page.tsx:219
+msgid "Edit"
 msgstr ""
 
-#: src/features/history/components/history-rail.tsx:13
-msgid "Filter across saved sessions to spot regressions, repeated prompts, or correction misses."
+#: src/features/styles/styles-page.tsx:253
+msgid "Edit style"
 msgstr ""
 
-#: src/features/history/history-page.tsx:13
-msgid "Find past recordings and the text they produced."
+#: src/features/history/components/history-session-list.tsx:31
+#: src/features/overview/overview-page.tsx:150
+msgid "Empty session"
 msgstr ""
 
-#: src/features/settings/sections/cleanup-section.tsx:16
-msgid "Give uncertain words a second look before text is sent to your app."
+#: src/features/history/components/session-detail-modal.tsx:174
+msgid "Engine"
 msgstr ""
 
-#: src/features/settings/settings-page.tsx:48
-msgid "How finished text reaches your app."
+#: src/features/overview/components/model-setup.tsx:219
+msgid "Enter Lune Voice"
 msgstr ""
 
-#: src/features/history/components/history-summary.tsx:42
-msgid "How the visible sessions were captured and cleaned up."
+#: src/features/shell/components/sidebar.tsx:92
+msgid "Expand sidebar"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-rail.tsx:13
-msgid "Keep repeated corrections out of the review loop."
+#: src/features/styles/styles-page.tsx:326
+msgid "Generating examples…"
 msgstr ""
 
-#: src/features/history/components/history-rail.tsx:30
-msgid "Keep the latest sessions visible while keeping long-term notes searchable."
+#: src/features/settings/sections/transcription-section.tsx:106
+msgid "High"
 msgstr ""
 
-#: src/features/settings/sections/shortcuts-section.tsx:19
+#: src/features/settings/sections/transcription-section.tsx:92
+msgid "How aggressively the LLM corrects transcribed words. Higher values send more words through correction."
+msgstr ""
+
+#: src/features/settings/sections/input-section.tsx:72
+msgid "How easily Lune triggers on speech. Higher = picks up quieter onsets."
+msgstr ""
+
+#: src/features/settings/sections/input-section.tsx:99
+msgid "How quickly Lune decides you're done speaking. Higher = ends sooner on a pause."
+msgstr ""
+
+#: src/features/styles/styles-page.tsx:282
+msgid "Instructions"
+msgstr ""
+
+#: src/features/settings/sections/shortcuts-section.tsx:16
 msgid "Keyboard controls"
 msgstr "キーボード操作"
 
-#: src/features/overview/components/activity-feed.tsx:30
-msgid "Latest transcriptions from this device, with enough context to judge quality fast."
+#: src/features/settings/sections/appearance-section.tsx:88
+msgid "Language"
 msgstr ""
 
-#: src/features/settings/sections/input-section.tsx:52
-msgid "Lower numbers wait longer before deciding you are done speaking."
+#: src/features/settings/components/theme-picker.tsx:402
+#: src/features/settings/sections/appearance-section.tsx:48
+msgid "Light"
 msgstr ""
 
-#: src/features/shell/components/sidebar.tsx:134
-msgid "Lune user"
+#: src/features/dictation/dictation-pill.tsx:58
+msgid "Listening"
 msgstr ""
 
-#: src/features/auth/components/auth-screen.tsx:33
-#: src/features/shell/components/mobile-nav.tsx:35
-#: src/features/shell/components/sidebar.tsx:71
-msgid "Lune Voice"
+#: src/features/shell/components/sidebar-widgets.tsx:46
+msgid "Listening…"
 msgstr ""
 
-#: src/features/overview/components/overview-hero.tsx:54
-msgid "Lune Voice helps you record quickly, fix common wording automatically, and send clean text wherever you are working."
+#: src/features/settings/sections/transcription-section.tsx:106
+msgid "Low"
 msgstr ""
 
-#: src/features/auth/components/auth-hero-panel.tsx:19
-msgid "Lune Voice is built for people who want faster writing, cleaner transcripts, and a workspace that feels calm instead of technical."
+#: src/features/settings/components/theme-picker.tsx:348
+msgid "Lune"
 msgstr ""
 
-#: src/features/settings/sections/input-section.tsx:41
-msgid "Lune Voice learns your pause rhythm so it does not cut you off too early."
+#: src/features/settings/sections/models-section.tsx:129
+msgid "Manage AI models stored on your device."
 msgstr ""
 
-#: src/features/auth/components/auth-form.tsx:154
-msgid "Mod+Enter submit"
+#: src/features/settings/sections/input-section.tsx:56
+msgid "Measure your room and voice to set both sensitivities automatically."
 msgstr ""
 
-#: src/features/overview/components/overview-rail.tsx:55
-msgid "Next move"
+#: src/features/settings/sections/input-section.tsx:55
+msgid "Microphone calibration"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-table.tsx:21
+#: src/features/settings/sections/transcription-section.tsx:106
+msgid "Mid"
+msgstr ""
+
+#: src/features/overview/overview-page.tsx:66
+msgid "Minutes"
+msgstr ""
+
+#: src/features/settings/sections/appearance-section.tsx:43
+msgid "Mode"
+msgstr ""
+
+#: src/features/settings/sections/models-section.tsx:128
+#: src/features/settings/sections/models-section.tsx:150
+msgid "Models"
+msgstr ""
+
+#: src/features/styles/styles-page.tsx:257
+msgid "Name"
+msgstr ""
+
+#: src/features/shell/components/sidebar.tsx:55
+msgid "Navigate"
+msgstr ""
+
+#: src/features/dictionary/components/dictionary-table.tsx:156
 msgid "No entries yet. Add your first correction rule above."
 msgstr ""
 
-#: src/features/overview/components/activity-feed.tsx:40
-msgid "No sessions yet. Start dictating to see recent activity."
+#: src/features/history/components/history-session-list.tsx:87
+msgid "No sessions found."
 msgstr ""
 
-#: src/features/overview/components/overview-rail.tsx:56
-msgid "Normalize repeated corrections."
+#. placeholder {0}: searchQuery.trim()
+#: src/features/history/components/history-session-list.tsx:84
+msgid "No sessions match \"{0}\". Try a different search."
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-form.tsx:18
-msgid "Normalize repeated product names, acronyms, and house terminology before text is delivered."
+#: src/features/overview/overview-page.tsx:122
+msgid "No sessions yet"
 msgstr ""
 
-#: src/features/history/components/history-rail.tsx:23
-msgid "Offline storage"
+#: src/features/history/components/history-session-list.tsx:86
+msgid "No sessions yet. Start dictating to see your transcripts here."
 msgstr ""
 
-#: src/features/overview/components/overview-rail.tsx:62
-msgid "Open dictionary"
+#: src/features/history/components/session-detail-modal.tsx:165
+msgid "No transcript"
 msgstr ""
 
-#: src/features/shell/components/topbar.tsx:25
-msgid "Open navigation menu"
-msgstr ""
-
-#: src/features/overview/components/overview-hero.tsx:61
-msgid "Open settings"
-msgstr "設定を開く"
-
-#: src/features/auth/components/auth-form.tsx:147
-msgid "Opening workspace…"
-msgstr ""
-
-#: src/features/auth/components/auth-form.tsx:56
-msgid "or use email"
+#: src/features/styles/styles-page.tsx:274
+msgid "One-line summary shown on the card"
 msgstr ""
 
 #: src/features/settings/sections/output-section.tsx:17
 msgid "Paste is simplest. Typing keystrokes can work better in some apps."
 msgstr ""
 
-#: src/features/settings/sections/input-section.tsx:51
+#: src/features/settings/components/calibrate-modal.tsx:103
+#: src/features/settings/sections/input-section.tsx:98
+#: src/features/settings/sections/input-section.tsx:114
 msgid "Pause sensitivity"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-table.tsx:15
+#: src/features/dictionary/components/dictionary-table.tsx:59
+#: src/features/dictionary/components/dictionary-table.tsx:168
 msgid "Phrase"
 msgstr "フレーズ"
 
-#: src/features/settings/sections/output-section.tsx:34
-msgid "Pick the tone used when final cleanup is applied."
+#: src/features/settings/components/calibrate-modal.tsx:25
+msgid "Please call Stella. Ask her to bring these things with her from the store: six spoons of fresh snow peas, five thick slabs of blue cheese, and maybe a snack for her brother Bob."
 msgstr ""
 
-#. placeholder {0}: entry.priority
-#: src/features/dictionary/components/dictionary-table.tsx:30
-msgid "Priority {0}"
+#: src/features/overview/components/model-setup.tsx:234
+msgid "Please don't close the app during download"
 msgstr ""
 
-#: src/features/auth/components/auth-hero-panel.tsx:14
-#: src/features/auth/components/auth-screen.tsx:32
-msgid "Private desktop dictation"
+#: src/features/overview/overview-page.tsx:124
+msgid "Press"
 msgstr ""
 
-#: src/features/shell/components/topbar.tsx:38
-msgid "Private on-device"
-msgstr "デバイス上でプライベート"
-
-#: src/features/history/components/history-rail.tsx:33
-msgid "Quality loop"
+#: src/features/dictionary/components/dictionary-form.tsx:87
+#: src/features/dictionary/components/dictionary-table.tsx:174
+#: src/features/dictionary/components/priority-picker.tsx:30
+msgid "Priority"
 msgstr ""
 
-#: src/features/shell/components/sidebar.tsx:139
-msgid "Ready now"
+#: src/features/dictation/dictation-pill.tsx:58
+#: src/features/dictation/dictation-pill.tsx:73
+msgid "Processing"
 msgstr ""
 
-#: src/features/overview/components/activity-feed.tsx:28
-msgid "Recent activity"
-msgstr "最近のアクティビティ"
+#: src/features/shell/components/sidebar-widgets.tsx:46
+msgid "Processing…"
+msgstr ""
 
-#: src/features/shell/components/sidebar.tsx:138
-msgid "Recording"
-msgstr "録音"
+#: src/features/settings/sections/transcription-section.tsx:24
+msgid "Qwen3-ASR runs locally with automatic language detection."
+msgstr ""
 
-#: src/features/settings/sections/input-section.tsx:23
+#: src/features/settings/components/calibrate-modal.tsx:90
+msgid "Read aloud. Don't worry about pace — just speak naturally."
+msgstr ""
+
+#: src/features/overview/components/model-card.tsx:94
+#: src/features/overview/overview-page.tsx:38
+msgid "Ready"
+msgstr ""
+
+#: src/features/settings/components/calibrate-modal.tsx:101
+msgid "Recalibrate"
+msgstr ""
+
+#: src/features/overview/overview-page.tsx:95
+msgid "Recent"
+msgstr ""
+
+#: src/features/settings/components/calibrate-modal.tsx:105
+msgid "Recommended"
+msgstr ""
+
+#: src/features/settings/sections/input-section.tsx:32
 msgid "Recording mode"
 msgstr "録音モード"
 
 #: src/features/settings/sections/shortcuts-section.tsx:41
-#: src/features/settings/settings-page.tsx:31
 msgid "Recording style"
 msgstr ""
 
-#: src/features/history/components/history-summary.tsx:39
-msgid "Records in the active search slice."
+#: src/components/feedback/confirm-dialog.tsx:33
+msgid "Remove"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-form.tsx:28
-#: src/features/dictionary/components/dictionary-table.tsx:16
+#. placeholder {0}: entry.phrase
+#. placeholder {1}: entry.replacement
+#: src/features/dictionary/components/dictionary-table.tsx:138
+msgid "Remove the saved correction for \"{0}\" → \"{1}\"."
+msgstr ""
+
+#: src/features/dictionary/components/dictionary-form.tsx:70
+#: src/features/dictionary/components/dictionary-table.tsx:69
+#: src/features/dictionary/components/dictionary-table.tsx:81
+#: src/features/dictionary/components/dictionary-table.tsx:171
 msgid "Replacement"
 msgstr "置換"
 
-#: src/features/history/components/history-rail.tsx:29
-msgid "Retention"
+#: src/features/overview/components/model-card.tsx:75
+msgid "Required"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-rail.tsx:12
-msgid "Rulebook"
+#: src/features/settings/components/calibrate-modal.tsx:118
+msgid "Retry"
 msgstr ""
 
-#: src/features/dictionary/dictionary-page.tsx:13
-msgid "Save the names and phrases you want Lune Voice to get right."
+#: src/features/history/components/history-session-list.tsx:39
+#: src/features/overview/overview-page.tsx:158
+msgid "s"
 msgstr ""
 
-#: src/features/shell/components/sidebar.tsx:143
-msgid "Saved fixes"
+#: src/features/dictionary/components/dictionary-table.tsx:100
+#: src/features/styles/styles-page.tsx:326
+msgid "Save"
 msgstr ""
 
-#: src/features/history/components/history-rail.tsx:11
-msgid "Search the local transcript log."
+#: src/features/history/components/session-detail-modal.tsx:66
+msgid "Save Transcript"
 msgstr ""
 
 #: src/features/history/components/history-search.tsx:17
-msgid "Search transcripts"
-msgstr "文字起こしを検索"
-
-#: src/features/history/components/history-search.tsx:18
 msgid "Search transcripts…"
 msgstr ""
 
-#: src/features/history/history-page.tsx:14
-msgid "Search what you said, reopen recent dictation, and spot phrases that should become permanent word fixes."
+#. placeholder {0}: preset.name
+#: src/features/styles/styles-page.tsx:167
+msgid "Select {0} style"
 msgstr ""
 
-#: src/features/settings/sections/input-section.tsx:57
-msgid "Select the language for the Lune Voice interface."
+#: src/features/overview/components/model-setup.tsx:229
+msgid "Select required models"
+msgstr ""
+
+#: src/features/overview/components/model-setup.tsx:164
+msgid "Select the AI models to download. Everything runs offline — no cloud, no accounts."
 msgstr ""
 
 #: src/features/settings/sections/output-section.tsx:16
 msgid "Send method"
 msgstr "送信方法"
 
-#: src/features/overview/components/overview-hero.tsx:69
-msgid "Session snapshot"
+#: src/features/overview/overview-page.tsx:97
+#: src/features/shell/components/sidebar-widgets.tsx:83
+msgid "session"
 msgstr ""
 
-#: src/features/shell/components/sidebar.tsx:146
-msgid "Shortcuts"
-msgstr "ショートカット"
-
-#: src/features/shell/components/sidebar.tsx:156
-msgid "Sign out"
-msgstr "サインアウト"
-
-#: src/features/shell/components/sidebar.tsx:133
-msgid "Signed in"
+#: src/features/history/history-page.tsx:44
+#: src/features/overview/overview-page.tsx:97
+#: src/features/shell/components/sidebar-widgets.tsx:83
+msgid "sessions"
 msgstr ""
 
-#: src/features/settings/sections/cleanup-section.tsx:16
-#: src/features/settings/settings-page.tsx:41
-msgid "Smart cleanup"
-msgstr "スマート修正"
-
-#: src/features/auth/components/auth-hero-panel.tsx:16
-msgid "Speak naturally. Keep every correction local and every shortcut close."
+#: src/features/overview/overview-page.tsx:75
+msgid "Sessions"
 msgstr ""
 
-#: src/features/overview/components/overview-hero.tsx:51
-msgid "Speak naturally. Keep the final text polished."
+#: src/features/shell/components/sidebar-widgets.tsx:57
+msgid "Set hotkey"
 msgstr ""
 
-#: src/features/history/components/history-summary.tsx:41
-msgid "Speaking time"
-msgstr "発話時間"
+#: src/features/settings/sections/transcription-section.tsx:57
+msgid "Set the language you speak. Auto uses detection from speech."
+msgstr ""
 
-#: src/features/dictionary/components/dictionary-form.tsx:23
+#: src/features/overview/components/model-setup.tsx:244
+msgid "Skip for now"
+msgstr ""
+
+#: src/features/settings/components/calibrate-modal.tsx:117
+msgid "Something went wrong."
+msgstr ""
+
+#: src/features/dictionary/components/dictionary-form.tsx:52
 msgid "Spoken phrase"
 msgstr ""
 
-#: src/features/dictation/dictation-pill.tsx:23
+#: src/features/shell/components/sidebar-widgets.tsx:40
+msgid "Start dictating"
+msgstr ""
+
+#: src/features/dictation/dictation-pill.tsx:49
 msgid "Start dictation"
 msgstr "ディクテーション開始"
 
@@ -481,142 +602,154 @@ msgstr "ディクテーション開始"
 msgid "Start or stop recording"
 msgstr "録音の開始または停止"
 
-#: src/features/dictation/dictation-pill.tsx:62
+#: src/features/settings/components/calibrate-modal.tsx:81
+msgid "Start reading"
+msgstr ""
+
+#: src/features/settings/components/calibrate-modal.tsx:102
+#: src/features/settings/sections/input-section.tsx:71
+#: src/features/settings/sections/input-section.tsx:88
+msgid "Start sensitivity"
+msgstr ""
+
+#: src/features/settings/components/calibrate-modal.tsx:125
+msgid "Starting…"
+msgstr ""
+
+#: src/features/settings/components/calibrate-modal.tsx:74
+msgid "Stay quiet — measuring background noise."
+msgstr ""
+
+#: src/features/shell/components/sidebar-widgets.tsx:40
+msgid "Stop dictating"
+msgstr ""
+
+#: src/features/dictation/dictation-pill.tsx:84
 msgid "Stop dictation"
 msgstr "ディクテーション停止"
 
-#: src/features/dictionary/components/dictionary-form.tsx:16
-msgid "Teach the correction layer your vocabulary."
+#: src/features/history/components/session-detail-modal.tsx:175
+msgid "Style"
 msgstr ""
 
-#: src/features/settings/settings-page.tsx:46
-msgid "Text delivery"
+#: src/features/settings/components/theme-picker.tsx:381
+#: src/features/settings/sections/appearance-section.tsx:24
+#: src/features/settings/sections/appearance-section.tsx:49
+msgid "System"
 msgstr ""
 
-#: src/features/settings/sections/output-section.tsx:14
+#: src/features/settings/sections/output-section.tsx:11
 msgid "Text output"
 msgstr "テキスト出力"
 
-#: src/features/overview/components/overview-rail.tsx:58
-msgid "The fastest visible quality gain now is tightening the dictionary layer around common house terms and code nouns."
-msgstr ""
-
 #: src/features/settings/sections/shortcuts-section.tsx:22
 msgid "The main shortcut used for voice typing. Click the binding to change it."
+msgstr ""
+
+#: src/features/settings/sections/appearance-section.tsx:73
+msgid "Theme"
 msgstr ""
 
 #: src/features/settings/sections/shortcuts-section.tsx:42
 msgid "This changes whether the shortcut toggles recording or only works while held."
 msgstr ""
 
-#: src/features/settings/sections/shortcuts-section.tsx:49
+#: src/features/settings/sections/models-section.tsx:224
+msgid "This is a required model. Dictation will not work without it."
+msgstr ""
+
+#: src/features/overview/components/model-setup.tsx:161
+msgid "This only happens once. Models are stored locally."
+msgstr ""
+
+#: src/features/history/components/session-detail-modal.tsx:198
+msgid "This will permanently remove this dictation session and its transcript."
+msgstr ""
+
+#: src/features/overview/overview-page.tsx:125
+msgid "to start dictating"
+msgstr ""
+
+#: src/features/shell/components/sidebar-widgets.tsx:81
+msgid "Today"
+msgstr ""
+
+#: src/features/settings/sections/shortcuts-section.tsx:54
 msgid "Toggle and cancel are bound to the same key combo. One will override the other."
 msgstr ""
 
-#: src/features/settings/sections/input-section.tsx:24
+#: src/features/settings/sections/input-section.tsx:33
 msgid "Toggle is easiest for longer dictation. Hold is better for quick bursts."
 msgstr ""
 
-#: src/features/settings/settings-page.tsx:33
-msgid "Toggle or hold-to-talk."
-msgstr ""
-
-#: src/features/history/components/history-summary.tsx:40
-msgid "Total dictated words in the active archive view."
-msgstr ""
-
-#: src/features/settings/sections/cleanup-section.tsx:19
-msgid "Use a local language model to tidy up uncertain phrases."
-msgstr ""
-
-#: src/features/settings/sections/shortcuts-section.tsx:19
+#: src/features/settings/sections/shortcuts-section.tsx:17
 msgid "Use fast commands without opening menus in the middle of work."
 msgstr ""
 
-#: src/features/settings/sections/transcription-section.tsx:52
-msgid "Use forced aligner for precise word timestamps and chunk merging."
-msgstr ""
-
-#: src/features/settings/sections/transcription-section.tsx:46
-#: src/features/settings/sections/transcription-section.tsx:48
+#: src/features/settings/sections/transcription-section.tsx:78
+#: src/features/settings/sections/transcription-section.tsx:86
 msgid "Use hardware acceleration"
 msgstr "ハードウェアアクセラレーションを使用"
 
-#: src/features/history/components/history-rail.tsx:34
-msgid "Use this view to move repeated misses into the dictionary and confirm benchmark changes."
+#: src/features/styles/styles-page.tsx:210
+msgid "View"
 msgstr ""
 
-#: src/features/overview/components/activity-feed.tsx:34
-msgid "View full history"
+#: src/features/overview/overview-page.tsx:102
+msgid "View all"
 msgstr ""
 
-#: src/features/overview/components/overview-hero.tsx:58
-msgid "View recent sessions"
+#: src/features/styles/styles-page.tsx:253
+msgid "View style"
 msgstr ""
 
-#: src/features/history/components/history-summary.tsx:39
-msgid "Visible sessions"
-msgstr ""
-
-#: src/features/history/components/history-summary.tsx:40
-msgid "Visible words"
-msgstr ""
-
-#: src/features/shell/components/sidebar.tsx:142
-msgid "Vocabulary"
-msgstr "辞書"
-
-#: src/features/settings/sections/input-section.tsx:21
+#: src/features/settings/sections/input-section.tsx:27
 msgid "Voice input"
 msgstr "音声入力"
 
-#: src/features/settings/settings-page.tsx:25
-msgid "Voice input, recognition, output, and shortcuts in one place."
+#: src/features/settings/sections/transcription-section.tsx:23
+msgid "Voice model"
 msgstr ""
 
-#: src/features/history/components/history-summary.tsx:42
-#: src/features/settings/sections/transcription-section.tsx:18
-#: src/features/settings/settings-page.tsx:36
-msgid "Voice mode"
-msgstr "音声モード"
+#: src/features/overview/components/model-setup.tsx:156
+msgid "Welcome to Lune Voice"
+msgstr ""
 
-#: src/features/overview/components/overview-hero.tsx:49
-msgid "Voice typing, simplified"
-msgstr "音声入力をシンプルに"
-
-#: src/features/settings/sections/transcription-section.tsx:47
+#: src/features/settings/sections/transcription-section.tsx:79
 msgid "When available, this can make transcription finish faster."
 msgstr ""
 
-#: src/features/settings/sections/transcription-section.tsx:51
-#: src/features/settings/sections/transcription-section.tsx:57
-msgid "Word-level alignment"
+#: src/features/settings/components/calibrate-modal.tsx:82
+msgid "When you're ready, click Start and read the sentence aloud at your normal pace."
 msgstr ""
 
-#: src/features/settings/sections/cleanup-section.tsx:57
-msgid "Words below this score are candidates for cleanup."
+#: src/features/history/components/history-session-list.tsx:36
+#: src/features/overview/overview-page.tsx:154
+#: src/features/shell/components/sidebar-widgets.tsx:85
+msgid "words"
 msgstr ""
 
-#: src/features/overview/components/overview-rail.tsx:40
-msgid "Workspace posture"
+#: src/features/history/components/session-detail-modal.tsx:172
+#: src/features/overview/overview-page.tsx:57
+msgid "Words"
 msgstr ""
 
-#: src/features/settings/sections/output-section.tsx:33
-msgid "Writing style"
-msgstr "文体"
-
-#: src/features/settings/components/openai-fields.tsx:36
-msgid "Your API key. Stored locally and never shared."
+#: src/features/styles/styles-page.tsx:134
+msgid "Writing styles"
 msgstr ""
 
-#: src/features/auth/components/auth-form.tsx:76
-msgid "Your name…"
+#: src/features/overview/components/model-setup.tsx:151
+msgid "You're all set!"
 msgstr ""
 
-#: src/features/shell/components/sidebar.tsx:113
-msgid "Your recordings stay private on this computer, with quick cleanup before text is inserted."
+#: src/features/settings/components/openai-fields.tsx:48
+msgid "Your API key. Leave it blank to keep the saved key."
 msgstr ""
 
-#: src/features/history/history-page.tsx:12
-msgid "Your sessions"
+#: src/features/overview/overview-page.tsx:124
+msgid "your hotkey"
+msgstr ""
+
+#: src/features/overview/overview-page.tsx:85
+msgid "Your session summary will appear here once you start dictating."
 msgstr ""

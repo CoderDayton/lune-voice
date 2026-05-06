@@ -20,6 +20,7 @@ function makeBackendSettings() {
     confidenceThreshold: 0.75,
     adaptiveVad: false,
     speechThreshold: 0.6,
+    speechThresholdEnd: 0.3,
     stylePreset: "professional",
     hotkeyToggle: "Ctrl+Space",
     hotkeyCancel: "Escape",

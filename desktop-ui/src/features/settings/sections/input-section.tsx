@@ -1,16 +1,26 @@
 import { useLingui } from '@lingui/react/macro';
-import { Mic } from 'lucide-react';
+import { Mic, Wand2 } from 'lucide-react';
+import { useState } from 'react';
 import { saveWorkspaceSetting } from '../../../store/workspace-store';
+import { CalibrateModal } from '../components/calibrate-modal';
 import { type SettingsProps, SettingsRow, SettingsSection } from '../components/section';
 import { activationModes } from '../data/settings-data';
 import { useDebouncedSetting } from '../hooks/use-debounced-setting';
 
 export function InputSection({ settings }: SettingsProps) {
   const { t } = useLingui();
-  const [threshold, setThreshold] = useDebouncedSetting(
+  const [startThreshold, setStartThreshold] = useDebouncedSetting(
     'speechThreshold',
     settings.speechThreshold,
   );
+  const [endThreshold, setEndThreshold] = useDebouncedSetting(
+    'speechThresholdEnd',
+    settings.speechThresholdEnd,
+  );
+
+  const startNum = Number(startThreshold);
+  const endNum = Number(endThreshold);
+  const [calibrateOpen, setCalibrateOpen] = useState(false);
 
   return (
     <SettingsSection
@@ -42,25 +52,78 @@ export function InputSection({ settings }: SettingsProps) {
       />
 
       <SettingsRow
-        label={t`Pause sensitivity`}
-        description={t`How quickly Lune decides you're done speaking.`}
+        label={t`Microphone calibration`}
+        description={t`Measure your room and voice to set both sensitivities automatically.`}
+        control={
+          <button
+            type="button"
+            className="btn btn-sm btn-ghost gap-2"
+            onClick={() => setCalibrateOpen(true)}
+            aria-label={t`Calibrate microphone`}
+          >
+            <Wand2 size={14} strokeWidth={1.8} />
+            {t`Calibrate`}
+          </button>
+        }
+      />
+
+      <SettingsRow
+        label={t`Start sensitivity`}
+        description={t`How easily Lune triggers on speech. Higher = picks up quieter onsets.`}
         control={
           <div className="flex items-center gap-3">
             <input
               type="range"
               className="range range-primary range-sm w-28 sm:w-36"
-              min={0.2}
-              max={0.9}
+              min={0.1}
+              max={0.8}
               step={0.05}
-              value={threshold}
-              onChange={(e) => setThreshold(e.target.value)}
-              aria-label={t`Pause sensitivity`}
+              value={(1 - startNum).toFixed(2)}
+              onChange={(e) => {
+                const sensitivity = Number(e.target.value);
+                const nextThreshold = (1 - sensitivity).toFixed(2);
+                setStartThreshold(nextThreshold);
+                if (Number(nextThreshold) < endNum) setEndThreshold(nextThreshold);
+              }}
+              aria-label={t`Start sensitivity`}
             />
-            <span className="text-sm tabular-nums text-content-muted w-8 text-right">
-              {Number(threshold) < 0.35 ? t`Slow` : Number(threshold) > 0.65 ? t`Fast` : t`Mid`}
+            <span className="text-sm tabular-nums text-content-muted w-12 text-right">
+              {(1 - startNum).toFixed(2)}
             </span>
           </div>
         }
+      />
+
+      <SettingsRow
+        label={t`Pause sensitivity`}
+        description={t`How quickly Lune decides you're done speaking. Higher = ends sooner on a pause.`}
+        control={
+          <div className="flex items-center gap-3">
+            <input
+              type="range"
+              className="range range-primary range-sm w-28 sm:w-36"
+              min={0.1}
+              max={0.9}
+              step={0.05}
+              value={endThreshold}
+              onChange={(e) => {
+                const next = e.target.value;
+                const clamped = Number(next) > startNum ? String(startNum) : next;
+                setEndThreshold(clamped);
+              }}
+              aria-label={t`Pause sensitivity`}
+            />
+            <span className="text-sm tabular-nums text-content-muted w-12 text-right">
+              {endNum.toFixed(2)}
+            </span>
+          </div>
+        }
+      />
+      <CalibrateModal
+        open={calibrateOpen}
+        onClose={() => setCalibrateOpen(false)}
+        currentStart={startNum}
+        currentEnd={endNum}
       />
     </SettingsSection>
   );

@@ -19,7 +19,7 @@ pub struct VadResult {
 /// VAD configuration
 #[derive(Debug, Clone)]
 pub struct VadConfig {
-    /// Speech-START threshold (0.0–1.0). Default: 0.7
+    /// Speech-START threshold (0.0–1.0). Default: 0.5
     pub threshold: f32,
     /// Speech-END threshold (0.0–1.0). Default: 0.3
     pub threshold_end: f32,
@@ -30,7 +30,7 @@ pub struct VadConfig {
 impl Default for VadConfig {
     fn default() -> Self {
         Self {
-            threshold: 0.7,
+            threshold: 0.5,
             threshold_end: 0.3,
             hangover_ms: 30,
         }

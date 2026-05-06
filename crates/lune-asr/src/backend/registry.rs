@@ -161,8 +161,16 @@ impl AsrRegistry {
     /// thresholds, and segment limits. Callers should merge user overrides
     /// on top via [`PipelineConfig::with_overrides`].
     pub fn pipeline_config(&self) -> PipelineConfig {
-        match self {
-            Self::Qwen3(_) => PipelineConfig {
+        Self::default_pipeline_config(self.kind())
+    }
+
+    /// Backend-specific defaults addressable without instantiating a backend.
+    ///
+    /// Used by callers (e.g. settings UI) that need the same tuned defaults
+    /// the runtime would apply, but cannot construct the heavy backend.
+    pub fn default_pipeline_config(kind: AsrBackendKind) -> PipelineConfig {
+        match kind {
+            AsrBackendKind::Qwen3Asr => PipelineConfig {
                 // Qwen3 is a batch decoder — one complete utterance per decode.
                 // Flushing is controlled by the dictation toggle/hold release,
                 // not by silence. Set silence thresholds extremely high so the
@@ -171,6 +179,7 @@ impl AsrRegistry {
                 sentence_close_ms: 300_000,
                 hard_close_ms: 300_000,
                 speech_threshold: 0.5,
+                speech_threshold_end: 0.3,
                 min_speech_ms: 200,
                 adaptive_vad: false,
                 itn_enabled: true,
@@ -182,11 +191,12 @@ impl AsrRegistry {
                 max_speech_samples: 300 * 16_000,
                 llm_timeout_secs: 30,
             },
-            Self::OpenAi(_) => PipelineConfig {
+            AsrBackendKind::OpenAiCompatible => PipelineConfig {
                 max_segment_ms: 30_000,
                 sentence_close_ms: 800,
                 hard_close_ms: 2_000,
                 speech_threshold: 0.5,
+                speech_threshold_end: 0.3,
                 min_speech_ms: 200,
                 adaptive_vad: false,
                 itn_enabled: true,
@@ -200,6 +210,8 @@ impl AsrRegistry {
                 max_speech_samples: 120 * 16_000,
                 llm_timeout_secs: 30,
             },
+            // Fallback for any future variants — start from PipelineConfig::default().
+            _ => PipelineConfig::default(),
         }
     }
 

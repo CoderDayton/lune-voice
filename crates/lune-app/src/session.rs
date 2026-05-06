@@ -372,6 +372,7 @@ async fn run_session<A: AsrBackend + 'static>(
     let mut vad = match Vad::new(
         VadConfig {
             threshold: config.pipeline.speech_threshold,
+            threshold_end: config.pipeline.speech_threshold_end,
             ..VadConfig::default()
         },
         16_000,
