@@ -31,7 +31,7 @@ export function HistoryPagination() {
       <div className="join">
         <button
           type="button"
-          className="btn btn-sm join-item gap-1"
+          className="btn btn-soft btn-sm join-item gap-1"
           disabled={page <= 1}
           onClick={() => workspaceActions.setHistoryPage(page - 1)}
           aria-label={t`Previous page`}
@@ -46,7 +46,7 @@ export function HistoryPagination() {
         </span>
         <button
           type="button"
-          className="btn btn-sm join-item gap-1"
+          className="btn btn-soft btn-sm join-item gap-1"
           disabled={page >= totalPages}
           onClick={() => workspaceActions.setHistoryPage(page + 1)}
           aria-label={t`Next page`}

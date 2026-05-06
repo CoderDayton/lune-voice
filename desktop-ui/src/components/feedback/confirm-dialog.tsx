@@ -41,7 +41,7 @@ export function ConfirmDialog({
         className="modal"
         aria-labelledby={titleId}
       >
-        <div className="modal-box">
+        <div className="modal-box border border-surface-border">
           <h3 id={titleId} className="text-xl font-bold">
             {title}
           </h3>
@@ -54,7 +54,7 @@ export function ConfirmDialog({
             </form>
             <button
               type="button"
-              className="btn btn-error"
+              className="btn btn-soft btn-error"
               onClick={() => {
                 onConfirm();
                 dialog?.close();

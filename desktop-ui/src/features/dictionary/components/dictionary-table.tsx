@@ -53,7 +53,7 @@ function EditRow({ entry, onDone }: { entry: DictionaryEntry; onDone: () => void
         <input
           ref={phraseRef}
           type="text"
-          className="input input-sm w-full font-mono"
+          className="input input-sm w-full"
           value={phrase}
           onChange={(e) => setPhrase(e.target.value)}
           placeholder={t`Phrase`}
@@ -63,7 +63,7 @@ function EditRow({ entry, onDone }: { entry: DictionaryEntry; onDone: () => void
         <div className="flex items-center gap-3">
           <input
             type="text"
-            className="input input-sm flex-1 font-mono"
+            className="input input-sm flex-1"
             value={replacement}
             onChange={(e) => setReplacement(e.target.value)}
             placeholder={t`Replacement`}
@@ -75,7 +75,7 @@ function EditRow({ entry, onDone }: { entry: DictionaryEntry; onDone: () => void
         <div className="sm:hidden mb-2 space-y-2">
           <input
             type="text"
-            className="input input-sm w-full font-mono"
+            className="input input-sm w-full"
             value={replacement}
             onChange={(e) => setReplacement(e.target.value)}
             placeholder={t`Replacement`}
@@ -113,10 +113,10 @@ function ViewRow({ entry, onEdit }: { entry: DictionaryEntry; onEdit: () => void
   return (
     <tr className="hover group">
       <td>
-        <div className="font-mono text-base">{entry.phrase}</div>
+        <div className="text-base">{entry.phrase}</div>
         <div className="sm:hidden text-xs text-content-dim mt-0.5">→ {entry.replacement}</div>
       </td>
-      <td className="hidden sm:table-cell font-mono text-base">{entry.replacement}</td>
+      <td className="hidden sm:table-cell text-base">{entry.replacement}</td>
       <td className="hidden sm:table-cell">
         <PriorityBadge value={entry.priority} />
       </td>
@@ -127,7 +127,7 @@ function ViewRow({ entry, onEdit }: { entry: DictionaryEntry; onEdit: () => void
           </span>
           <button
             type="button"
-            className="btn btn-ghost btn-sm btn-square opacity-60 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+            className="btn btn-ghost btn-sm btn-square opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
             onClick={onEdit}
             aria-label={t`Edit`}
           >

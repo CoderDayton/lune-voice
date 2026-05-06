@@ -45,7 +45,7 @@ export function SidebarQuickStart() {
                 <span className="status status-error animate-pulse" />
                 {serviceStatus === 'processing' ? t`Processing…` : t`Listening…`}
               </span>
-              <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-base-content/10">
+              <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-surface-border">
                 <span
                   className="block h-full rounded-full bg-error transition-[width] duration-75"
                   style={{ width: level }}
@@ -78,7 +78,7 @@ export function SidebarTodayStats() {
 
   return (
     <div className="mx-3.5 mb-3 rounded-box border border-surface-border bg-surface-elevated px-4 py-3 shadow-card">
-      <p className="text-xs font-medium uppercase tracking-widest text-content-dim">{t`Today`}</p>
+      <p className="section-label">{t`Today`}</p>
       <p className="mt-1 text-sm text-content-muted tabular-nums">
         {todayStats.count} {todayStats.count === 1 ? t`session` : t`sessions`}
         <span className="mx-1.5 text-content-dim">·</span>

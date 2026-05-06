@@ -68,16 +68,19 @@ export function AppShell() {
         <ErrorToast />
 
         {/* Mobile topbar */}
-        <div className="flex items-center px-4 py-2 lg:hidden">
+        <div className="flex items-center gap-2 px-3 py-2 lg:hidden border-b border-surface-border bg-surface-glass backdrop-blur-sm">
           <label htmlFor={DRAWER_ID} className="btn btn-ghost btn-sm" aria-label="Open menu">
             <Menu size={20} strokeWidth={1.5} />
           </label>
+          <span className="font-display tracking-heading text-base font-medium text-content-default select-none">
+            {page.label}
+          </span>
         </div>
 
         <main id="main-content" className="flex-1 overflow-y-auto">
           <div className="app-scroll">
             <div className="app-frame">
-              <h1 className="mb-6 text-3xl font-bold tracking-tight text-balance select-none sm:text-3xl">
+              <h1 className="hidden lg:block mb-6 text-[length:var(--text-h1)] font-display tracking-heading text-balance select-none">
                 {page.label}
               </h1>
               <Outlet />

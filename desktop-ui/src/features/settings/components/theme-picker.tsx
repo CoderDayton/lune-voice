@@ -345,7 +345,7 @@ export function ThemePicker() {
           <div className="overflow-y-auto max-h-[70vh] px-4 py-4 sm:px-6 sm:py-5 space-y-5 sm:space-y-6">
             {/* Custom */}
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wider text-content-subtle mb-2 sm:mb-3">{t`Lune`}</p>
+              <p className="section-label mb-2 sm:mb-3">{t`Lune`}</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
                 {THEME_GROUPS.custom.map((t) => (
                   <ThemeSwatch
@@ -399,7 +399,7 @@ export function ThemePicker() {
 
             {/* Light themes */}
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wider text-content-subtle mb-2 sm:mb-3">{t`Light`}</p>
+              <p className="section-label mb-2 sm:mb-3">{t`Light`}</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
                 {THEME_GROUPS.light.map((t) => (
                   <ThemeSwatch
@@ -414,7 +414,7 @@ export function ThemePicker() {
 
             {/* Dark themes */}
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wider text-content-subtle mb-2 sm:mb-3">{t`Dark`}</p>
+              <p className="section-label mb-2 sm:mb-3">{t`Dark`}</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
                 {THEME_GROUPS.dark.map((t) => (
                   <ThemeSwatch

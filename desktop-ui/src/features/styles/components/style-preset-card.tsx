@@ -31,7 +31,7 @@ export function StylePresetCard({
     <div
       className={`group card border rounded-box p-4 sm:p-5 relative transition-[background,border-color] duration-fast ease-standard ${
         isActive
-          ? 'border-primary bg-primary/5'
+          ? 'border-primary bg-surface-wash'
           : 'border-surface-border bg-surface-card hover:border-primary/40 hover:bg-surface-card-hover'
       }`}
     >
@@ -46,7 +46,7 @@ export function StylePresetCard({
           <div className="flex items-center gap-2 min-w-0">
             <span className="font-medium truncate">{preset.name}</span>
             {preset.isBuiltin && (
-              <span className="badge badge-ghost badge-sm shrink-0 gap-1">
+              <span className="badge badge-soft badge-sm shrink-0 gap-1">
                 <Lock size={10} />
                 {t`Built-in`}
               </span>

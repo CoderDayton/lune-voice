@@ -51,7 +51,7 @@ export function StyleEditorModal({
             <span className="text-sm font-medium text-content-default">{t`Name`}</span>
             <input
               type="text"
-              className="input input-bordered w-full"
+              className="input w-full"
               maxLength={64}
               placeholder={t`e.g. Meeting notes`}
               value={name}
@@ -63,7 +63,7 @@ export function StyleEditorModal({
             <span className="text-sm font-medium text-content-default">{t`Description`}</span>
             <input
               type="text"
-              className="input input-bordered w-full"
+              className="input w-full"
               maxLength={256}
               placeholder={t`One-line summary shown on the card`}
               value={description}
@@ -81,7 +81,7 @@ export function StyleEditorModal({
               </span>
             </div>
             <textarea
-              className="textarea textarea-bordered w-full min-h-32 resize-y leading-relaxed"
+              className="textarea w-full min-h-32 resize-y leading-relaxed"
               maxLength={2048}
               placeholder={t`Describe how text should be formatted. E.g., "Use bullet points. Keep sentences short. Avoid jargon."`}
               value={instructions}

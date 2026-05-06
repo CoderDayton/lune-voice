@@ -110,7 +110,7 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
       >
         <div className="modal-box max-w-lg p-0 overflow-hidden border border-surface-border sm:max-w-xl">
           {/* Header */}
-          <div className="flex items-center justify-between px-5 pt-5 pb-3 sm:px-6 sm:pt-6">
+          <div className="flex items-center justify-between px-5 pt-5 pb-3 sm:px-6 sm:pt-6 border-b border-surface-border">
             <div>
               <h3 id={titleId} className="text-base font-semibold tracking-tight">
                 {date}
@@ -231,7 +231,7 @@ function MetaItem({
     <div className="flex items-center gap-3">
       <Icon size={14} strokeWidth={1.6} className="text-content-dim shrink-0" />
       <div className="min-w-0">
-        <p className="text-[0.65rem] uppercase tracking-wider text-content-dim">{label}</p>
+        <p className="text-xs uppercase tracking-wider text-content-dim">{label}</p>
         <p className="text-sm font-medium truncate">{value}</p>
       </div>
     </div>

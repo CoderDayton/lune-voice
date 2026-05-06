@@ -48,7 +48,7 @@ function StatusBadge({ state }: { state: 'active' | 'downloaded' | 'missing' }) 
       );
     case 'downloaded':
       return (
-        <span className="badge badge-ghost badge-sm gap-1">
+        <span className="badge badge-soft badge-sm gap-1">
           <Circle size={10} />
           Idle
         </span>

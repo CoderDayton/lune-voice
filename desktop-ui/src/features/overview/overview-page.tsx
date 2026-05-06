@@ -52,7 +52,7 @@ export function OverviewPage() {
               </div>
             ) : stats.count > 0 ? (
               <div className="grid gap-3 sm:grid-cols-3">
-                <div className="metric-card">
+                <div className="metric-card interactive-card">
                   <div className="mb-4 flex items-center justify-between text-content-subtle">
                     <span className="section-label">{t`Words`}</span>
                     <Hash size={20} strokeWidth={1.5} className="text-primary/55" />
@@ -61,7 +61,7 @@ export function OverviewPage() {
                     {stats.totalWords.toLocaleString()}
                   </div>
                 </div>
-                <div className="metric-card">
+                <div className="metric-card interactive-card">
                   <div className="mb-4 flex items-center justify-between text-content-subtle">
                     <span className="section-label">{t`Minutes`}</span>
                     <Clock size={20} strokeWidth={1.5} className="text-secondary/55" />
@@ -70,7 +70,7 @@ export function OverviewPage() {
                     {stats.totalMinutes}
                   </div>
                 </div>
-                <div className="metric-card">
+                <div className="metric-card interactive-card">
                   <div className="mb-4 flex items-center justify-between text-content-subtle">
                     <span className="section-label">{t`Sessions`}</span>
                     <MessageSquareText size={20} strokeWidth={1.5} className="text-accent/60" />
@@ -93,12 +93,12 @@ export function OverviewPage() {
             <div className="flex items-center justify-between px-5 pb-3 pt-5">
               <div>
                 <h2 className="section-label">{t`Recent`}</h2>
-                <p className="mt-1 text-base text-content-muted">
+                <p className="mt-1 text-sm text-content-subtle tabular-nums">
                   {stats.count} {stats.count === 1 ? t`session` : t`sessions`}
                 </p>
               </div>
               {stats.count > 5 && (
-                <Link to="/history" className="btn btn-ghost btn-sm normal-case">
+                <Link to="/history" className="btn btn-soft btn-primary btn-sm normal-case">
                   {t`View all`}
                 </Link>
               )}
@@ -150,7 +150,7 @@ export function OverviewPage() {
                               {session.transcript || t`Empty session`}
                             </p>
                             <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-content-muted">
-                              <span className="badge badge-ghost badge-sm">
+                              <span className="badge badge-soft badge-sm">
                                 {session.words} {t`words`}
                               </span>
                               <span>

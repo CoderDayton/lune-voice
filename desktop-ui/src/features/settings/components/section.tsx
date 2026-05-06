@@ -35,7 +35,7 @@ export function SettingsSection({
           )}
           <div>
             <h3 className="text-xl font-semibold tracking-tight">{title}</h3>
-            <p className="text-base text-content-subtle mt-0.5">{description}</p>
+            <p className="text-sm text-content-subtle mt-0.5">{description}</p>
           </div>
         </div>
       </div>
@@ -46,7 +46,7 @@ export function SettingsSection({
 
 export function SettingsRow({ label, description, control }: SettingsRowProps) {
   return (
-    <div className="settings-row">
+    <div className="settings-row hover:bg-surface-hover transition-colors duration-fast">
       <div className="min-w-0">
         <div className="text-base font-medium">{label}</div>
         {description ? (

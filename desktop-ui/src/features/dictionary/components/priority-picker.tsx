@@ -1,7 +1,7 @@
 import { useLingui } from '@lingui/react/macro';
 
 const PRIORITY_LEVELS = [
-  { value: 1, label: 'Low', badge: 'badge-ghost' },
+  { value: 1, label: 'Low', badge: 'badge-soft' },
   { value: 5, label: 'Med', badge: 'badge-info badge-soft' },
   { value: 9, label: 'High', badge: 'badge-warning badge-soft' },
 ] as const;

@@ -124,7 +124,7 @@ export function StylesPage() {
   return (
     <div className="page-stack">
       <div className="flex items-center gap-4 mb-2">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/8">
+        <div className="token-icon size-9 shrink-0">
           <Paintbrush size={18} strokeWidth={1.8} className="text-primary/60" />
         </div>
         <div>
@@ -163,7 +163,7 @@ export function StylesPage() {
 
         <button
           type="button"
-          className="card border border-dashed rounded-box p-5 text-left border-surface-border bg-surface-card hover:border-primary/50 hover:bg-surface-card-hover transition-[background,border-color] duration-fast ease-standard cursor-pointer group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          className="card border border-dashed rounded-box p-5 text-left border-surface-border bg-surface-inset hover:border-primary/50 hover:bg-surface-card-hover transition-[background,border-color] duration-fast ease-standard cursor-pointer group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           onClick={() => openModal('create')}
         >
           <div className="flex items-center gap-3 text-content-dim group-hover:text-content-muted transition-colors">
