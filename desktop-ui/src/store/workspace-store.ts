@@ -31,6 +31,8 @@ export const workspaceStore = new Store<WorkspaceState>({
   sidebarCollapsed: false,
   mobileMenuOpen: false,
   historySearch: '',
+  historyPage: 1,
+  historyPageSize: 20,
   dictionaryEntries: [],
   historySessions: [],
   stylePresets: [],
@@ -56,7 +58,16 @@ export const workspaceActions = {
   },
 
   setHistorySearch(value: string) {
-    workspaceStore.setState((s) => ({ ...s, historySearch: value }));
+    workspaceStore.setState((s) => ({ ...s, historySearch: value, historyPage: 1 }));
+  },
+
+  setHistoryPage(page: number) {
+    workspaceStore.setState((s) => {
+      const visible = getVisibleHistorySessions(s);
+      const totalPages = Math.max(1, Math.ceil(visible.length / s.historyPageSize));
+      const clamped = Math.min(Math.max(1, Math.floor(page)), totalPages);
+      return clamped === s.historyPage ? s : { ...s, historyPage: clamped };
+    });
   },
 
   updateSetting<Key extends keyof WorkspaceSettings>(key: Key, value: WorkspaceSettings[Key]) {
@@ -388,6 +399,17 @@ export function getVisibleHistorySessions(state: WorkspaceState) {
 
 export function getVisibleSessionCount(state: WorkspaceState) {
   return getVisibleHistorySessions(state).length;
+}
+
+export function getHistoryPageCount(state: WorkspaceState) {
+  const total = getVisibleHistorySessions(state).length;
+  return Math.max(1, Math.ceil(total / state.historyPageSize));
+}
+
+export function getPaginatedHistorySessions(state: WorkspaceState) {
+  const all = getVisibleHistorySessions(state);
+  const start = (state.historyPage - 1) * state.historyPageSize;
+  return all.slice(start, start + state.historyPageSize);
 }
 
 // Memoized aggregate stats — recomputed only when historySessions reference changes.

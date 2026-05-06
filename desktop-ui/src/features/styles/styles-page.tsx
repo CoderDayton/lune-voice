@@ -1,6 +1,6 @@
 import { useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';
-import { Check, Copy, Lock, Paintbrush, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Paintbrush, Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
 import {
   createCustomStyle,
@@ -11,6 +11,8 @@ import {
   workspaceStore,
 } from '../../store/workspace-store';
 import type { StylePreset } from '../../store/workspace-types';
+import { StyleEditorModal } from './components/style-editor-modal';
+import { StylePresetCard } from './components/style-preset-card';
 
 type ModalMode = 'create' | 'edit' | 'view';
 
@@ -119,11 +121,6 @@ export function StylesPage() {
     setDeletingId(null);
   }
 
-  const isViewOnly = modal.mode === 'view';
-  const isEdit = modal.mode === 'edit';
-  const instrLen = modal.instructions.length;
-  const busy = modal.saving || modal.generating;
-
   return (
     <div className="page-stack">
       <div className="flex items-center gap-4 mb-2">
@@ -149,92 +146,24 @@ export function StylesPage() {
                 <div className="skeleton h-3 w-full" />
               </div>
             ))
-          : presets.map((preset) => {
-              const isActive = activePreset === preset.id;
-              const isConfirmingDelete = deletingId === preset.id;
-              return (
-                <div
-                  key={preset.id}
-                  className={`group card border rounded-box p-5 transition-colors relative ${
-                    isActive
-                      ? 'border-primary bg-primary/5'
-                      : 'border-surface-border bg-surface-card hover:border-primary/40'
-                  }`}
-                >
-                  <button
-                    type="button"
-                    className="absolute inset-0 rounded-box cursor-pointer focus-visible:outline-2 focus-visible:outline-primary"
-                    aria-label={t`Select ${preset.name} style`}
-                    onClick={() =>
-                      !isConfirmingDelete && void saveWorkspaceSetting('stylePreset', preset.id)
-                    }
-                  />
-                  <div className="relative pointer-events-none">
-                    <div className="flex items-start justify-between mb-2 gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="font-medium truncate">{preset.name}</span>
-                        {preset.isBuiltin && (
-                          <span className="badge badge-ghost badge-sm shrink-0 gap-1">
-                            <Lock size={10} />
-                            {t`Built-in`}
-                          </span>
-                        )}
-                      </div>
-                      {isActive && !isConfirmingDelete && (
-                        <Check size={16} className="text-primary shrink-0 mt-0.5" />
-                      )}
-                    </div>
-                    <p className="text-sm text-content-subtle">{preset.description}</p>
-                  </div>
-                  <div className="relative mt-3 flex items-center justify-between min-h-[1.5rem]">
-                    {isConfirmingDelete ? (
-                      <div className="flex items-center gap-2 w-full pointer-events-auto">
-                        <span className="text-xs text-content-muted">{t`Delete this style?`}</span>
-                        <button
-                          type="button"
-                          className="btn btn-xs btn-error"
-                          onClick={() => void handleDelete(preset.id)}
-                        >{t`Delete`}</button>
-                        <button
-                          type="button"
-                          className="btn btn-xs btn-ghost"
-                          onClick={() => setDeletingId(null)}
-                        >{t`Cancel`}</button>
-                      </div>
-                    ) : preset.isBuiltin ? (
-                      <button
-                        type="button"
-                        className="pointer-events-auto opacity-0 group-hover:opacity-100 transition-opacity text-xs text-content-dim hover:text-content-subtle flex items-center gap-1"
-                        onClick={() => openModal('view', preset)}
-                      >
-                        <Lock size={11} /> {t`View`}
-                      </button>
-                    ) : (
-                      <div className="pointer-events-auto flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-xs gap-1"
-                          onClick={() => openModal('edit', preset)}
-                        >
-                          <Pencil size={13} /> {t`Edit`}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/8"
-                          onClick={() => setDeletingId(preset.id)}
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+          : presets.map((preset) => (
+              <StylePresetCard
+                key={preset.id}
+                preset={preset}
+                isActive={activePreset === preset.id}
+                isConfirmingDelete={deletingId === preset.id}
+                onSelect={() => void saveWorkspaceSetting('stylePreset', preset.id)}
+                onView={() => openModal('view', preset)}
+                onEdit={() => openModal('edit', preset)}
+                onRequestDelete={() => setDeletingId(preset.id)}
+                onCancelDelete={() => setDeletingId(null)}
+                onConfirmDelete={() => void handleDelete(preset.id)}
+              />
+            ))}
 
         <button
           type="button"
-          className="card border border-dashed rounded-box p-5 text-left border-surface-border bg-surface-card hover:border-primary/50 hover:bg-primary/3 transition-colors cursor-pointer group"
+          className="card border border-dashed rounded-box p-5 text-left border-surface-border bg-surface-card hover:border-primary/50 hover:bg-surface-card-hover transition-[background,border-color] duration-fast ease-standard cursor-pointer group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           onClick={() => openModal('create')}
         >
           <div className="flex items-center gap-3 text-content-dim group-hover:text-content-muted transition-colors">
@@ -245,96 +174,21 @@ export function StylesPage() {
           </div>
         </button>
       </div>
-
-      {/* Modal */}
-      <dialog ref={dialogRef} className="modal backdrop-blur-sm" onClose={closeModal}>
-        <div className="modal-box max-w-lg overflow-hidden border border-surface-border">
-          <h3 className="font-semibold text-lg mb-4">
-            {isViewOnly ? t`View style` : isEdit ? t`Edit style` : t`Create style`}
-          </h3>
-          <div className="flex flex-col gap-4">
-            <label className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium text-content-default">{t`Name`}</span>
-              <input
-                type="text"
-                className="input input-bordered w-full"
-                maxLength={64}
-                placeholder={t`e.g. Meeting notes`}
-                value={modal.name}
-                readOnly={isViewOnly}
-                onChange={(e) => setModal((m) => ({ ...m, name: e.target.value }))}
-              />
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium text-content-default">{t`Description`}</span>
-              <input
-                type="text"
-                className="input input-bordered w-full"
-                maxLength={256}
-                placeholder={t`One-line summary shown on the card`}
-                value={modal.description}
-                readOnly={isViewOnly}
-                onChange={(e) => setModal((m) => ({ ...m, description: e.target.value }))}
-              />
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-content-default">{t`Instructions`}</span>
-                <span
-                  className={`text-xs tabular-nums ${instrLen > 1900 ? 'text-warning' : 'text-content-dim'}`}
-                >
-                  {instrLen}/2048
-                </span>
-              </div>
-              <textarea
-                className="textarea textarea-bordered w-full min-h-32 resize-y leading-relaxed"
-                maxLength={2048}
-                placeholder={t`Describe how text should be formatted. E.g., "Use bullet points. Keep sentences short. Avoid jargon."`}
-                value={modal.instructions}
-                readOnly={isViewOnly}
-                onChange={(e) => setModal((m) => ({ ...m, instructions: e.target.value }))}
-              />
-            </label>
-          </div>
-          <div className="modal-action mt-6">
-            {isViewOnly ? (
-              <>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={closeModal}
-                >{t`Close`}</button>
-                <button type="button" className="btn btn-primary gap-2" onClick={duplicateFromView}>
-                  <Copy size={15} /> {t`Duplicate`}
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={closeModal}
-                  disabled={busy}
-                >{t`Cancel`}</button>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  disabled={!modal.name.trim() || !modal.instructions.trim() || busy}
-                  onClick={() => void handleSave()}
-                >
-                  {busy && <span className="loading loading-spinner loading-sm" />}
-                  {modal.generating ? t`Generating examples…` : t`Save`}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-        {!busy && (
-          <form method="dialog" className="modal-backdrop">
-            <button type="submit">{t`close`}</button>
-          </form>
-        )}
-      </dialog>
+      <StyleEditorModal
+        dialogRef={dialogRef}
+        mode={modal.mode}
+        name={modal.name}
+        description={modal.description}
+        instructions={modal.instructions}
+        saving={modal.saving}
+        generating={modal.generating}
+        onNameChange={(v) => setModal((m) => ({ ...m, name: v }))}
+        onDescriptionChange={(v) => setModal((m) => ({ ...m, description: v }))}
+        onInstructionsChange={(v) => setModal((m) => ({ ...m, instructions: v }))}
+        onClose={closeModal}
+        onSave={() => void handleSave()}
+        onDuplicate={duplicateFromView}
+      />
     </div>
   );
 }

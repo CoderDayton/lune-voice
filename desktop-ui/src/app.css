@@ -13,26 +13,28 @@
   name: "lune";
   default: true;
   color-scheme: dark;
-  --color-base-100: oklch(0.145 0.013 238);
-  --color-base-200: oklch(0.185 0.014 238);
-  --color-base-300: oklch(0.24 0.016 238);
-  --color-base-content: oklch(0.93 0.007 238);
-  --color-primary: oklch(0.74 0.018 245);
-  --color-primary-content: oklch(0.13 0.010 245);
-  --color-secondary: oklch(0.62 0.025 250);
-  --color-secondary-content: oklch(0.12 0.010 250);
-  --color-accent: oklch(0.68 0.035 70);
-  --color-accent-content: oklch(0.16 0.020 70);
-  --color-neutral: oklch(0.24 0.014 238);
-  --color-neutral-content: oklch(0.88 0.008 238);
-  --color-info: oklch(0.7 0.12 225);
-  --color-info-content: oklch(0.12 0.02 225);
-  --color-success: oklch(0.68 0.14 155);
-  --color-success-content: oklch(0.98 0.005 155);
-  --color-warning: oklch(0.78 0.13 75);
-  --color-warning-content: oklch(0.22 0.04 75);
-  --color-error: oklch(0.65 0.18 18);
-  --color-error-content: oklch(0.98 0.005 18);
+  /* Surfaces neutral grey. Primary/secondary carry a violet identity
+     (H=295). Accent is a complementary soft teal (H=185). */
+  --color-base-100: oklch(0.135 0 0);
+  --color-base-200: oklch(0.175 0 0);
+  --color-base-300: oklch(0.225 0 0);
+  --color-base-content: oklch(0.94 0 0);
+  --color-primary: oklch(0.74 0.14 295);
+  --color-primary-content: oklch(0.16 0.04 295);
+  --color-secondary: oklch(0.62 0.07 295);
+  --color-secondary-content: oklch(0.14 0.03 295);
+  --color-accent: oklch(0.74 0.10 185);
+  --color-accent-content: oklch(0.16 0.04 185);
+  --color-neutral: oklch(0.245 0 0);
+  --color-neutral-content: oklch(0.89 0 0);
+  --color-info: oklch(0.72 0.13 232);
+  --color-info-content: oklch(0.13 0.030 232);
+  --color-success: oklch(0.72 0.14 148);
+  --color-success-content: oklch(0.14 0.040 148);
+  --color-warning: oklch(0.80 0.13 72);
+  --color-warning-content: oklch(0.20 0.04 72);
+  --color-error: oklch(0.66 0.18 22);
+  --color-error-content: oklch(0.98 0.005 22);
   --radius-selector: 0.75rem;
   --radius-field: 0.75rem;
   --radius-box: 0.95rem;
@@ -49,26 +51,27 @@
   name: "lune-light";
   default: false;
   color-scheme: light;
-  --color-base-100: oklch(0.985 0.006 225);
-  --color-base-200: oklch(0.955 0.008 225);
-  --color-base-300: oklch(0.91 0.010 225);
-  --color-base-content: oklch(0.20 0.016 235);
-  --color-primary: oklch(0.42 0.020 245);
-  --color-primary-content: oklch(0.98 0.005 245);
-  --color-secondary: oklch(0.50 0.024 250);
-  --color-secondary-content: oklch(0.98 0.005 250);
-  --color-accent: oklch(0.50 0.040 70);
-  --color-accent-content: oklch(0.98 0.005 70);
-  --color-neutral: oklch(0.88 0.008 225);
-  --color-neutral-content: oklch(0.28 0.014 235);
-  --color-info: oklch(0.55 0.14 225);
-  --color-info-content: oklch(0.98 0.005 225);
-  --color-success: oklch(0.52 0.16 155);
-  --color-success-content: oklch(0.98 0.005 155);
-  --color-warning: oklch(0.68 0.16 75);
-  --color-warning-content: oklch(0.22 0.04 75);
-  --color-error: oklch(0.55 0.20 18);
-  --color-error-content: oklch(0.98 0.005 18);
+  /* Light variant of the violet identity. */
+  --color-base-100: oklch(0.99 0 0);
+  --color-base-200: oklch(0.96 0 0);
+  --color-base-300: oklch(0.92 0 0);
+  --color-base-content: oklch(0.20 0 0);
+  --color-primary: oklch(0.50 0.18 295);
+  --color-primary-content: oklch(0.99 0.005 295);
+  --color-secondary: oklch(0.48 0.10 295);
+  --color-secondary-content: oklch(0.99 0.005 295);
+  --color-accent: oklch(0.50 0.13 185);
+  --color-accent-content: oklch(0.99 0.005 185);
+  --color-neutral: oklch(0.88 0 0);
+  --color-neutral-content: oklch(0.26 0 0);
+  --color-info: oklch(0.55 0.16 232);
+  --color-info-content: oklch(0.99 0.005 232);
+  --color-success: oklch(0.55 0.16 148);
+  --color-success-content: oklch(0.99 0.005 148);
+  --color-warning: oklch(0.72 0.16 72);
+  --color-warning-content: oklch(0.20 0.04 72);
+  --color-error: oklch(0.56 0.22 22);
+  --color-error-content: oklch(0.99 0.005 22);
   --radius-selector: 0.75rem;
   --radius-field: 0.75rem;
   --radius-box: 0.95rem;
@@ -83,44 +86,147 @@
 
 /* Dark scheme tokens (default) — applies to lune + all dark DaisyUI themes */
 :root, [data-color-scheme="dark"] {
-  --content-strong: oklch(0.94 0.007 238);
-  --content-default: oklch(0.86 0.007 238);
-  --content-muted: oklch(0.68 0.009 238);
-  --content-subtle: oklch(0.53 0.009 238);
-  --content-dim: oklch(0.40 0.009 238);
-  --surface-card: oklch(0.205 0.013 238 / 0.70);
-  --surface-elevated: oklch(0.245 0.015 238 / 0.86);
-  --surface-glass: oklch(0.18 0.014 238 / 0.90);
-  --surface-panel: oklch(0.19 0.014 238 / 0.78);
-  --surface-field: oklch(0.16 0.012 238 / 0.88);
-  --surface-wash: oklch(0.74 0.018 245 / 0.10);
-  --surface-nav-active: oklch(0.74 0.018 245 / 0.14);
-  --surface-hover: oklch(1 0 0 / 0.05);
-  --surface-border: oklch(0.90 0.008 238 / 0.12);
-  --surface-border-strong: oklch(0.90 0.008 238 / 0.20);
-  --surface-inset: oklch(0.13 0.012 238 / 0.62);
-  --ring-focus: oklch(0.74 0.018 245 / 0.45);
+  --content-strong: oklch(0.95 0 0);
+  --content-default: oklch(0.87 0 0);
+  --content-muted: oklch(0.69 0 0);
+  --content-subtle: oklch(0.54 0 0);
+  --content-dim: oklch(0.41 0 0);
+  /* Solid surfaces — no alpha, no glass */
+  --surface-card: oklch(0.18 0 0);
+  --surface-elevated: oklch(0.22 0 0);
+  --surface-glass: oklch(0.155 0 0);
+  --surface-panel: oklch(0.16 0 0);
+  --surface-field: oklch(0.14 0 0);
+  /* Hover/wash/border kept as alpha overlays — they layer on solid surfaces */
+  --surface-wash: oklch(1 0 0 / 0.06);
+  --surface-nav-active: oklch(1 0 0 / 0.08);
+  --surface-hover: oklch(1 0 0 / 0.04);
+  --surface-card-hover: oklch(0.22 0 0);
+  --surface-border: oklch(1 0 0 / 0.08);
+  --surface-border-strong: oklch(1 0 0 / 0.16);
+  --surface-inset: oklch(0.10 0 0);
+  --ring-focus: oklch(0.74 0.14 295 / 0.50);
+  --surface-success-tint: oklch(0.72 0.14 148 / 0.14);
+  --surface-warning-tint: oklch(0.80 0.13 72 / 0.14);
+  --surface-error-tint: oklch(0.66 0.18 22 / 0.16);
+  --surface-info-tint: oklch(0.72 0.13 232 / 0.14);
+
+  /* Elevation — dark scheme: subtle inner rim + moderate drop shadow.
+     The inner rim catches "light from above" against dark surfaces. */
+  --elev-soft:
+    inset 0 1px 0 oklch(1 0 0 / 0.04),
+    0 1px 2px oklch(0 0 0 / 0.24);
+  --elev-card:
+    inset 0 1px 0 oklch(1 0 0 / 0.05),
+    0 1px 2px oklch(0 0 0 / 0.20),
+    0 4px 12px -2px oklch(0 0 0 / 0.24);
+  --elev-raised:
+    inset 0 1px 0 oklch(1 0 0 / 0.06),
+    0 2px 4px oklch(0 0 0 / 0.24),
+    0 8px 20px -4px oklch(0 0 0 / 0.32);
+  --elev-glow:
+    inset 0 1px 0 oklch(1 0 0 / 0.08),
+    0 4px 12px oklch(0 0 0 / 0.32);
+  --elev-overlay:
+    inset 0 1px 0 oklch(1 0 0 / 0.06),
+    0 4px 8px oklch(0 0 0 / 0.28),
+    0 16px 32px -4px oklch(0 0 0 / 0.36);
+  --elev-modal:
+    inset 0 1px 0 oklch(1 0 0 / 0.08),
+    0 8px 16px oklch(0 0 0 / 0.32),
+    0 32px 64px -12px oklch(0 0 0 / 0.48);
+  --elev-floating:
+    inset 0 1px 0 oklch(1 0 0 / 0.10),
+    0 8px 24px oklch(0 0 0 / 0.40),
+    0 24px 48px -8px oklch(0 0 0 / 0.50);
 }
 
 /* Light scheme tokens — applies to lune-light + all light DaisyUI themes */
 [data-color-scheme="light"] {
-  --content-strong: oklch(0.18 0.015 265);
-  --content-default: oklch(0.25 0.012 265);
-  --content-muted: oklch(0.40 0.010 265);
-  --content-subtle: oklch(0.55 0.008 265);
-  --content-dim: oklch(0.70 0.006 265);
-  --surface-card: oklch(1 0 0 / 0.88);
-  --surface-elevated: oklch(1 0 0 / 0.96);
-  --surface-glass: oklch(0.99 0.004 225 / 0.94);
-  --surface-panel: oklch(1 0 0 / 0.82);
-  --surface-field: oklch(0.97 0.006 225 / 0.92);
-  --surface-wash: oklch(0.42 0.020 245 / 0.09);
-  --surface-nav-active: oklch(0.42 0.020 245 / 0.11);
-  --surface-hover: oklch(0 0 0 / 0.04);
-  --surface-border: oklch(0.20 0.010 265 / 0.12);
-  --surface-border-strong: oklch(0.20 0.010 265 / 0.20);
-  --surface-inset: oklch(0.94 0.005 265 / 0.8);
-  --ring-focus: oklch(0.42 0.020 245 / 0.36);
+  --content-strong: oklch(0.18 0 0);
+  --content-default: oklch(0.26 0 0);
+  --content-muted: oklch(0.42 0 0);
+  --content-subtle: oklch(0.55 0 0);
+  --content-dim: oklch(0.70 0 0);
+  /* Solid surfaces */
+  --surface-card: oklch(1 0 0);
+  --surface-elevated: oklch(1 0 0);
+  --surface-glass: oklch(0.99 0 0);
+  --surface-panel: oklch(1 0 0);
+  --surface-field: oklch(0.97 0 0);
+  --surface-wash: oklch(0 0 0 / 0.06);
+  --surface-nav-active: oklch(0 0 0 / 0.08);
+  --surface-hover: oklch(0 0 0 / 0.05);
+  --surface-card-hover: oklch(0.97 0 0);
+  --surface-border: oklch(0 0 0 / 0.10);
+  --surface-border-strong: oklch(0 0 0 / 0.20);
+  --surface-inset: oklch(0.94 0 0);
+  --ring-focus: oklch(0.50 0.18 295 / 0.40);
+  --surface-success-tint: oklch(0.55 0.16 148 / 0.10);
+  --surface-warning-tint: oklch(0.72 0.16 72 / 0.12);
+  --surface-error-tint: oklch(0.56 0.22 22 / 0.10);
+  --surface-info-tint: oklch(0.55 0.16 232 / 0.10);
+
+  /* Elevation — light scheme: dramatically lower opacity to avoid
+     muddy bands and dark halos on bright surfaces. */
+  --elev-soft: 0 1px 2px oklch(0 0 0 / 0.04);
+  --elev-card:
+    0 1px 2px oklch(0 0 0 / 0.04),
+    0 2px 4px oklch(0 0 0 / 0.04);
+  --elev-raised:
+    0 1px 3px oklch(0 0 0 / 0.06),
+    0 4px 8px -2px oklch(0 0 0 / 0.06);
+  --elev-glow:
+    0 2px 6px oklch(0 0 0 / 0.06),
+    0 8px 16px -4px oklch(0 0 0 / 0.08);
+  --elev-overlay:
+    0 2px 4px oklch(0 0 0 / 0.04),
+    0 8px 16px oklch(0 0 0 / 0.08),
+    0 16px 32px -8px oklch(0 0 0 / 0.10);
+  --elev-modal:
+    0 4px 8px oklch(0 0 0 / 0.06),
+    0 16px 32px oklch(0 0 0 / 0.10),
+    0 32px 64px -12px oklch(0 0 0 / 0.14);
+  --elev-floating:
+    0 4px 12px oklch(0 0 0 / 0.08),
+    0 16px 32px oklch(0 0 0 / 0.10),
+    0 32px 64px -8px oklch(0 0 0 / 0.16);
+}
+
+/* ── A11y: high-contrast & reduced-transparency (WCAG 2.2 / 2026) ──── */
+
+@media (prefers-contrast: more) {
+  :root, [data-color-scheme="dark"] {
+    --surface-border: oklch(1 0 0 / 0.20);
+    --surface-border-strong: oklch(1 0 0 / 0.36);
+    --content-muted: oklch(0.79 0 0);
+    --content-subtle: oklch(0.67 0 0);
+  }
+  [data-color-scheme="light"] {
+    --surface-border: oklch(0 0 0 / 0.20);
+    --surface-border-strong: oklch(0 0 0 / 0.36);
+    --content-muted: oklch(0.32 0 0);
+    --content-subtle: oklch(0.45 0 0);
+  }
+}
+
+/* Surfaces are already opaque; this block exists so token consumers
+   relying on prefers-reduced-transparency still get sensible fallbacks. */
+@media (prefers-reduced-transparency) {
+  :root, [data-color-scheme="dark"] {
+    --surface-hover: oklch(0.20 0 0);
+    --surface-wash: oklch(0.30 0 0);
+    --surface-nav-active: oklch(0.32 0 0);
+    --surface-border: oklch(0.30 0 0);
+    --surface-border-strong: oklch(0.40 0 0);
+  }
+  [data-color-scheme="light"] {
+    --surface-hover: oklch(0.94 0 0);
+    --surface-wash: oklch(0.90 0 0);
+    --surface-nav-active: oklch(0.88 0 0);
+    --surface-border: oklch(0.78 0 0);
+    --surface-border-strong: oklch(0.65 0 0);
+  }
 }
 
 /* ── Design tokens (Tailwind v4 @theme) ────────────────────────────── */
@@ -130,10 +236,13 @@
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Manrope", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
 
-  /* Brand palette — usable as bg-brand-500, text-brand-400, etc. */
-  --color-brand-500: oklch(0.54 0.018 245);
-  --color-brand-400: oklch(0.68 0.018 245);
-  --color-brand-300: oklch(0.78 0.014 245);
+  /* Brand palette — violet ramp (200..700), H=295 */
+  --color-brand-200: oklch(0.88 0.06 295);
+  --color-brand-300: oklch(0.80 0.10 295);
+  --color-brand-400: oklch(0.70 0.13 295);
+  --color-brand-500: oklch(0.55 0.18 295);
+  --color-brand-600: oklch(0.42 0.18 295);
+  --color-brand-700: oklch(0.32 0.13 295);
 
   /* Text + surface tokens — theme-adaptive values set in :root / [data-theme] */
   --color-content-strong: var(--content-strong);
@@ -163,11 +272,12 @@
   --spacing-space-section: 1.75rem;
   --spacing-space-page: 3rem;
 
-  /* Shadows — usable as shadow-soft, shadow-card, shadow-elevated, shadow-glow */
-  --shadow-soft: 0 1px 3px oklch(0 0 0 / 0.12), 0 4px 12px oklch(0 0 0 / 0.08);
-  --shadow-card: 0 1px 2px oklch(0 0 0 / 0.10), 0 8px 24px oklch(0 0 0 / 0.08);
-  --shadow-elevated: 0 18px 48px oklch(0 0 0 / 0.18), 0 2px 8px oklch(0 0 0 / 0.10);
-  --shadow-glow: 0 0 0 1px oklch(0.74 0.018 245 / 0.20), 0 10px 28px oklch(0.20 0.010 245 / 0.18);
+  /* Shadows — theme-adaptive. Actual values defined per [data-color-scheme].
+     Light mode uses much lower opacity than dark to avoid muddy bands. */
+  --shadow-soft: var(--elev-soft);
+  --shadow-card: var(--elev-card);
+  --shadow-elevated: var(--elev-raised);
+  --shadow-glow: var(--elev-glow);
   --shadow-focus: 0 0 0 3px var(--ring-focus);
 
   /* Animations — usable as animate-page-in, animate-shimmer, etc. */
@@ -177,6 +287,53 @@
   --animate-dot-bounce: dot-bounce 1.2s ease-in-out infinite;
   --animate-pulse-glow: pulse-glow 1.4s ease-in-out infinite;
   --animate-pill-expand: pill-expand 200ms ease;
+
+  /* Motion (2026) — durations + standardized easings.
+     Surfaces as `duration-fast`, `ease-standard`, etc. via Tailwind v4. */
+  --duration-instant: 75ms;
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --duration-slower: 500ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
+  --ease-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+
+  /* Fluid typography — clamp()-driven type scale (2026 convention) */
+  --text-display-2xl: clamp(2.5rem, 4vw + 1rem, 4rem);
+  --text-display-xl: clamp(2rem, 3vw + 1rem, 3rem);
+  --text-display-lg: clamp(1.5rem, 2vw + 0.75rem, 2.25rem);
+  --text-h1: clamp(1.5rem, 1.4vw + 0.875rem, 1.875rem);
+  --text-h2: clamp(1.25rem, 0.9vw + 0.875rem, 1.5rem);
+  --text-h3: clamp(1.125rem, 0.5vw + 0.875rem, 1.25rem);
+  --tracking-display: -0.035em;
+  --tracking-heading: -0.02em;
+  --tracking-uppercase: 0.14em;
+
+  /* Z-index scale */
+  --z-base: 0;
+  --z-raised: 10;
+  --z-dropdown: 50;
+  --z-sticky: 100;
+  --z-overlay: 200;
+  --z-modal: 300;
+  --z-popover: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
+
+  /* Semantic elevation tiers — theme-adaptive */
+  --shadow-rest: var(--elev-soft);
+  --shadow-raised: var(--elev-card);
+  --shadow-overlay: var(--elev-overlay);
+  --shadow-modal: var(--elev-modal);
+  --shadow-floating: var(--elev-floating);
+
+  /* Status surface tints — bridged to theme-adaptive vars */
+  --color-surface-success-tint: var(--surface-success-tint);
+  --color-surface-warning-tint: var(--surface-warning-tint);
+  --color-surface-error-tint: var(--surface-error-tint);
+  --color-surface-info-tint: var(--surface-info-tint);
 }
 
 /* ── Computed tokens (not Tailwind utilities — used by surfaces/layouts) */
@@ -193,24 +350,24 @@
   --space-page-bottom: 3.5rem;
 
   --surface-body:
-    linear-gradient(170deg, oklch(0.155 0.014 238), oklch(0.115 0.010 238));
+    linear-gradient(170deg, oklch(0.135 0 0), oklch(0.105 0 0));
   --surface-backdrop:
-    linear-gradient(135deg, oklch(0.74 0.018 245 / 0.08), transparent 42%),
-    linear-gradient(320deg, oklch(0.68 0.035 70 / 0.035), transparent 48%);
+    linear-gradient(135deg, oklch(0.74 0.14 295 / 0.05), transparent 42%),
+    linear-gradient(320deg, oklch(0.74 0.10 185 / 0.03), transparent 48%);
   --surface-grid:
-    radial-gradient(circle, oklch(0.95 0.004 238 / 0.045) 1px, transparent 1px);
+    radial-gradient(circle, oklch(1 0 0 / 0.04) 1px, transparent 1px);
   --surface-brand:
-    linear-gradient(135deg, oklch(0.74 0.018 245), oklch(0.46 0.012 245));
+    linear-gradient(135deg, oklch(0.74 0.14 295), oklch(0.50 0.18 295));
 }
 
 [data-color-scheme="light"] {
   --surface-body:
-    linear-gradient(170deg, oklch(0.965 0.006 225), oklch(0.93 0.010 225));
+    linear-gradient(170deg, oklch(0.97 0 0), oklch(0.93 0 0));
   --surface-backdrop:
-    linear-gradient(135deg, oklch(0.42 0.020 245 / 0.055), transparent 42%),
-    linear-gradient(320deg, oklch(0.50 0.040 70 / 0.035), transparent 48%);
+    linear-gradient(135deg, oklch(0.50 0.18 295 / 0.05), transparent 42%),
+    linear-gradient(320deg, oklch(0.50 0.13 185 / 0.03), transparent 48%);
   --surface-grid:
-    radial-gradient(circle, oklch(0.20 0.010 265 / 0.04) 1px, transparent 1px);
+    radial-gradient(circle, oklch(0 0 0 / 0.04) 1px, transparent 1px);
 }
 
 /* ── Base ──────────────────────────────────────────────────────────── */
@@ -261,6 +418,11 @@
   h3,
   h4 {
     @apply font-display;
+    letter-spacing: var(--tracking-heading);
+  }
+
+  h1 {
+    letter-spacing: var(--tracking-display);
   }
 
   /* Warm, subtle scrollbar */
@@ -282,21 +444,27 @@
     background: oklch(0.5 0 0 / 0.25);
   }
 
-  /* Card elevation */
+  /* Cards — defined by border + bg, not by drop shadow. Shadows are
+     reserved for genuinely floating elements (popovers, modals, the pill).
+     Interactive cards lift only via border-strong + a subtle bg shift. */
   .card {
-    box-shadow: var(--shadow-card);
-    transition: box-shadow 200ms ease, border-color 200ms ease;
+    transition: background-color var(--duration-base) var(--ease-standard),
+                border-color var(--duration-base) var(--ease-standard),
+                transform var(--duration-base) var(--ease-standard);
   }
 
   .interactive-card:hover,
   .card:has(a:hover, button:hover):hover {
     border-color: var(--surface-border-strong);
-    box-shadow: var(--shadow-glow);
+    background-color: var(--surface-card-hover);
   }
 
   /* Button micro-interactions */
   .btn {
-    transition: background-color 150ms ease, border-color 150ms ease, opacity 150ms ease, transform 100ms ease;
+    transition: background-color var(--duration-fast) var(--ease-standard),
+                border-color var(--duration-fast) var(--ease-standard),
+                opacity var(--duration-fast) var(--ease-standard),
+                transform var(--duration-instant) var(--ease-standard);
   }
 
   .btn:active:not(:disabled) {
@@ -469,7 +637,7 @@
 /* ── Sidebar ───────────────────────────────────────────────────────── */
 
 @utility sidebar-surface {
-  @apply border-r border-surface-border bg-surface-glass backdrop-blur-xl;
+  @apply border-r border-surface-border bg-surface-glass;
   box-shadow: inset -1px 0 0 oklch(1 0 0 / 0.025);
 }
 
@@ -480,15 +648,15 @@
 }
 
 @utility section-label {
-  @apply text-sm font-semibold uppercase tracking-[0.16em] text-base-content/40 select-none;
+  @apply text-sm font-semibold uppercase tracking-[0.16em] text-base-content/55 select-none;
 }
 
 @utility panel-surface {
-  @apply rounded-box border border-surface-border bg-surface-panel shadow-card;
+  @apply rounded-box border border-surface-border bg-surface-panel;
 }
 
 @utility toolbar-surface {
-  @apply rounded-box border border-surface-border bg-surface-elevated p-4 shadow-card;
+  @apply rounded-box border border-surface-border bg-surface-elevated p-4;
 }
 
 @utility token-icon {
@@ -510,11 +678,7 @@
 }
 
 @utility settings-row {
-  @apply flex flex-col gap-2 rounded-lg px-3 py-3 transition-colors sm:flex-row sm:items-center sm:justify-between;
-}
-
-@utility settings-row {
-  @apply flex-col gap-3 rounded-lg px-4 py-4 transition-colors sm:flex-row sm:items-center sm:justify-between;
+  @apply flex flex-col gap-3 rounded-lg px-4 py-4 transition-colors sm:flex-row sm:items-center sm:justify-between;
 }
 
 /* ── Skeleton loading ──────────────────────────────────────────────── */
@@ -570,23 +734,31 @@
 
 @utility pill-shell {
   @apply inline-flex items-center justify-center rounded-full p-2;
-  background: radial-gradient(circle at center, oklch(0.74 0.018 245 / 0.24), transparent 62%);
+  background: radial-gradient(
+    circle at center,
+    color-mix(in oklab, var(--color-primary) 24%, transparent),
+    transparent 62%
+  );
 }
 
 @utility pill-idle {
-  @apply btn btn-circle btn-lg flex items-center justify-center border-primary/30 bg-surface-glass text-base-content shadow-xl backdrop-blur-md;
-  transition: background-color 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+  @apply btn btn-circle btn-lg flex items-center justify-center border-surface-border-strong bg-surface-elevated text-base-content;
+  box-shadow: var(--shadow-floating);
+  transition: background-color var(--duration-base) var(--ease-standard),
+              border-color var(--duration-base) var(--ease-standard),
+              box-shadow var(--duration-base) var(--ease-standard);
 }
 
 .pill-idle:hover {
   @apply border-primary/55;
-  background: oklch(0.16 0.014 238 / 0.95);
+  background: var(--color-surface-elevated);
   box-shadow: var(--shadow-glow);
 }
 
 @utility pill-active {
-  @apply inline-flex min-h-14 items-center gap-2 rounded-full border border-primary/25 bg-surface-glass px-2 py-2 shadow-xl backdrop-blur-md;
-  animation: pill-expand 200ms ease;
+  @apply inline-flex min-h-14 items-center gap-2 rounded-full border border-surface-border-strong bg-surface-elevated px-2 py-2;
+  box-shadow: var(--shadow-floating);
+  animation: pill-expand var(--duration-base) var(--ease-standard);
 }
 
 @utility pill-processing {
@@ -595,7 +767,7 @@
 
 @keyframes pill-cancel-flash {
   0%   { opacity: 1; }
-  40%  { opacity: 0.5; border-color: oklch(0.64 0.2 25 / 0.6); }
+  40%  { opacity: 0.5; border-color: oklch(0.66 0.18 22 / 0.6); }
   100% { opacity: 0; transform: translateY(4px) scale(0.97); }
 }
 

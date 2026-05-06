@@ -61,17 +61,22 @@ export function SidebarContent() {
                 <Link
                   to={to}
                   aria-current={active ? 'page' : undefined}
-                  className={`group relative flex w-full items-center gap-3.5 rounded-field px-3.5 py-4 text-[0.9rem] transition-colors is-drawer-close:tooltip is-drawer-close:tooltip-right is-drawer-close:justify-center ${active ? 'bg-surface-nav-active text-primary font-medium shadow-card' : 'text-content-muted hover:bg-surface-hover hover:text-content'}`}
+                  className={`group relative flex w-full items-center gap-3.5 rounded-field border px-3.5 py-4 text-[0.9rem] transition-colors is-drawer-close:tooltip is-drawer-close:tooltip-right is-drawer-close:justify-center ${active ? 'border-surface-border-strong bg-surface-nav-active text-content-strong font-medium' : 'border-transparent text-content-muted hover:bg-surface-hover hover:text-content'}`}
                   data-tip={label}
                 >
                   {active ? (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-full bg-primary" />
+                    <span
+                      aria-hidden="true"
+                      className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-full bg-primary"
+                    />
                   ) : null}
                   <Icon
                     size={20}
                     strokeWidth={active ? 2.2 : 1.6}
                     className={
-                      active ? 'text-primary' : 'text-content-subtle group-hover:text-content-muted'
+                      active
+                        ? 'text-content-strong'
+                        : 'text-content-subtle group-hover:text-content-muted'
                     }
                   />
                   <span className="truncate is-drawer-close:hidden">{label}</span>

@@ -62,6 +62,8 @@ export interface WorkspaceState {
   sidebarCollapsed: boolean;
   mobileMenuOpen: boolean;
   historySearch: string;
+  historyPage: number;
+  historyPageSize: number;
   dictionaryEntries: DictionaryEntry[];
   historySessions: HistorySession[];
   stylePresets: StylePreset[];

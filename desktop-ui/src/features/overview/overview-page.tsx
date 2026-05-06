@@ -135,12 +135,12 @@ export function OverviewPage() {
                   return (
                     <SessionDetailModal key={session.id} session={session}>
                       {(open) => (
-                        <article
-                          className="interactive-row block px-5 py-4"
+                        <button
+                          type="button"
+                          className="interactive-row block w-full text-left px-5 py-4 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary"
                           onClick={open}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') open();
-                          }}
+                          aria-haspopup="dialog"
+                          aria-label={t`Open session from ${time}`}
                         >
                           <div className="pt-1 text-sm tabular-nums text-content-subtle">
                             {time}
@@ -159,7 +159,7 @@ export function OverviewPage() {
                               </span>
                             </div>
                           </div>
-                        </article>
+                        </button>
                       )}
                     </SessionDetailModal>
                   );
