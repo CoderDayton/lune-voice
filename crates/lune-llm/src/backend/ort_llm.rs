@@ -425,7 +425,13 @@ impl OrtStyleLlm {
         let input_ids = Array2::from_shape_vec((1, ids.len()), ids.to_vec()).map_err(e)?;
         let inputs: Inputs = vec![("input_ids".into(), dyn_i64(input_ids)?)];
         let outputs = sess.run(inputs).map_err(e)?;
-        Ok(Some(outputs.into_iter().next().unwrap().1))
+        // Surface a clean error rather than panic if the embed session
+        // somehow returns zero outputs (treat empty as a model contract bug).
+        let (_, value) = outputs
+            .into_iter()
+            .next()
+            .ok_or_else(|| e("embed session returned no outputs"))?;
+        Ok(Some(value))
     }
 
     fn generate(&self, prompt_ids: &[i64], sys_prefix_len: usize) -> Result<Vec<u32>> {
@@ -449,7 +455,9 @@ impl OrtStyleLlm {
             let prefix_ids = &prompt_ids[..sys_prefix_len];
             let pn = prefix_ids.len();
             let mut inputs = if split {
-                let embeds = self.embed_ids(prefix_ids)?.unwrap();
+                let embeds = self
+                    .embed_ids(prefix_ids)?
+                    .ok_or_else(|| e("split decode requires embed session"))?;
                 build_embeds_inputs(embeds, pn, p.has_position_ids)?
             } else {
                 build_inputs(prefix_ids, pn, p.has_position_ids)?
@@ -486,7 +494,9 @@ impl OrtStyleLlm {
         let total_prefill = prefix_seq_len + user_len;
 
         let mut inputs = if split {
-            let embeds = self.embed_ids(prefill_ids)?.unwrap();
+            let embeds = self
+                .embed_ids(prefill_ids)?
+                .ok_or_else(|| e("split decode requires embed session"))?;
             build_embeds_inputs_with_past(embeds, user_len, prefix_seq_len, p.has_position_ids)?
         } else {
             build_inputs_with_past(prefill_ids, user_len, prefix_seq_len, p.has_position_ids)?
@@ -522,12 +532,13 @@ impl OrtStyleLlm {
             let total = total_prefill + state.generated.len();
 
             let mut inputs = if split {
-                let embeds = self.embed_ids(&[tok])?.unwrap();
+                let embeds = self
+                    .embed_ids(&[tok])?
+                    .ok_or_else(|| e("split decode requires embed session"))?;
                 build_embeds_decode_inputs(embeds, total, p.has_position_ids)?
             } else {
                 build_decode_inputs(tok, total, p.has_position_ids)?
             };
-            let names = llm_kv_names(p.num_layers);
             for (i, v) in kv.drain(..).enumerate() {
                 inputs.push((std::borrow::Cow::Borrowed(names[i].as_str()), v));
             }

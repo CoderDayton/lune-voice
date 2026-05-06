@@ -76,7 +76,9 @@ impl RotationMatrix {
         let mut rng = rand::rng();
         let mut data = Vec::with_capacity(dim * dim);
         for _ in 0..dim * dim {
-            let u: f32 = rng.random();
+            // rng.random() yields [0, 1); guard u against 0.0 so ln(0) = -inf
+            // can't poison sqrt → cos → the entire rotation matrix.
+            let u: f32 = rng.random::<f32>().max(f32::MIN_POSITIVE);
             let v: f32 = rng.random();
             data.push((-2.0 * u.ln()).sqrt() * (std::f32::consts::TAU * v).cos());
         }
@@ -95,9 +97,16 @@ impl RotationMatrix {
             for k in 0..dim {
                 norm += data[k * dim + j] * data[k * dim + j];
             }
-            let inv = 1.0 / norm.sqrt().max(1e-12);
+            // Defend against degenerate columns and any NaN that snuck in
+            // before this guard ran — fall back to a unit-scaled column.
+            let inv = if norm.is_finite() && norm > 0.0 {
+                1.0 / norm.sqrt().max(1e-12)
+            } else {
+                0.0
+            };
             for k in 0..dim {
-                data[k * dim + j] *= inv;
+                let scaled = data[k * dim + j] * inv;
+                data[k * dim + j] = if scaled.is_finite() { scaled } else { 0.0 };
             }
         }
         Self { data, dim }
@@ -144,12 +153,23 @@ fn quantize_4bit(data: &[f32], tokens: usize, dim: usize) -> QuantizedTensor {
         let mut hi = f32::MIN;
         for t in 0..tokens {
             let v = data[t * dim + d];
-            lo = lo.min(v);
-            hi = hi.max(v);
+            // Skip non-finite inputs so a stray NaN can't poison the
+            // per-dim range and produce NaN scales/mins downstream.
+            if v.is_finite() {
+                lo = lo.min(v);
+                hi = hi.max(v);
+            }
         }
         let range = hi - lo;
-        scales[d] = if range < 1e-10 { 1.0 } else { range / levels };
-        mins[d] = lo;
+        // Treat degenerate or non-finite ranges as a unit scale so the
+        // quantized codes stay valid (scale=1.0, min=0.0).
+        if range.is_finite() && range >= 1e-10 {
+            scales[d] = range / levels;
+            mins[d] = lo;
+        } else {
+            scales[d] = 1.0;
+            mins[d] = if lo.is_finite() { lo } else { 0.0 };
+        }
     }
 
     let total_nibbles = tokens * dim;
@@ -157,9 +177,15 @@ fn quantize_4bit(data: &[f32], tokens: usize, dim: usize) -> QuantizedTensor {
     for t in 0..tokens {
         for d in 0..dim {
             let idx = t * dim + d;
-            let q = ((data[idx] - mins[d]) / scales[d])
-                .round()
-                .clamp(0.0, levels) as u8;
+            let raw = (data[idx] - mins[d]) / scales[d];
+            // Map non-finite inputs to 0 explicitly. `NaN as u8` saturates
+            // to 0 in safe Rust, but being explicit keeps quant behavior
+            // independent of cast semantics and survives future refactors.
+            let q = if raw.is_finite() {
+                raw.round().clamp(0.0, levels) as u8
+            } else {
+                0
+            };
             if idx % 2 == 0 {
                 codes[idx / 2] |= q;
             } else {
@@ -174,13 +200,20 @@ fn quantize_4bit(data: &[f32], tokens: usize, dim: usize) -> QuantizedTensor {
     }
 }
 
-fn dequantize_4bit(qt: &QuantizedTensor, tokens: usize, dim: usize, out: &mut [f32]) {
+fn dequantize_4bit(
+    codes: &[u8],
+    scales: &[f32],
+    mins: &[f32],
+    tokens: usize,
+    dim: usize,
+    out: &mut [f32],
+) {
     for t in 0..tokens {
         for d in 0..dim {
             let idx = t * dim + d;
-            let byte = qt.codes[idx / 2];
+            let byte = codes[idx / 2];
             let nibble = if idx % 2 == 0 { byte & 0x0F } else { byte >> 4 };
-            out[idx] = qt.mins[d] + nibble as f32 * qt.scales[d];
+            out[idx] = mins[d] + nibble as f32 * scales[d];
         }
     }
 }
@@ -380,7 +413,22 @@ impl KvCache {
                 .min(prunable)
         };
         let mut ranked: Vec<usize> = (0..prunable).collect();
-        ranked.sort_unstable_by(|&a, &b| scores[b].partial_cmp(&scores[a]).unwrap());
+        // total_cmp is NaN-safe — a NaN score sorts to one extreme rather
+        // than panicking via partial_cmp().unwrap(). Treat NaN as worst
+        // (sorted last in descending order) so corrupt tokens get pruned.
+        ranked.sort_unstable_by(|&a, &b| {
+            let sa = if scores[a].is_nan() {
+                f32::NEG_INFINITY
+            } else {
+                scores[a]
+            };
+            let sb = if scores[b].is_nan() {
+                f32::NEG_INFINITY
+            } else {
+                scores[b]
+            };
+            sb.total_cmp(&sa)
+        });
         let mut kept_indices: Vec<usize> = ranked[..keep].to_vec();
         kept_indices.sort_unstable(); // restore positional order
 
@@ -495,15 +543,17 @@ impl KvCache {
                     .copy_from_slice(&layer.sink_vals[sink_base..sink_base + sink * d]);
 
                 if keep > 0 {
-                    // Dequantize keys for this head.
+                    // Dequantize keys for this head — slice-based, no per-head Vec clones.
                     let code_off = head * nibbles_per_head;
                     let scale_off = head * d;
-                    let head_qt = QuantizedTensor {
-                        codes: layer.key_q.codes[code_off..code_off + nibbles_per_head].to_vec(),
-                        scales: layer.key_q.scales[scale_off..scale_off + d].to_vec(),
-                        mins: layer.key_q.mins[scale_off..scale_off + d].to_vec(),
-                    };
-                    dequantize_4bit(&head_qt, keep, d, &mut deq_buf[..keep * d]);
+                    dequantize_4bit(
+                        &layer.key_q.codes[code_off..code_off + nibbles_per_head],
+                        &layer.key_q.scales[scale_off..scale_off + d],
+                        &layer.key_q.mins[scale_off..scale_off + d],
+                        keep,
+                        d,
+                        &mut deq_buf[..keep * d],
+                    );
                     self.rotation.apply_inverse(
                         &deq_buf[..keep * d],
                         keep,
@@ -513,12 +563,14 @@ impl KvCache {
                     key_out[k_dst..k_dst + keep * d].copy_from_slice(&inv_buf[..keep * d]);
 
                     // Dequantize values for this head.
-                    let head_vt = QuantizedTensor {
-                        codes: layer.val_q.codes[code_off..code_off + nibbles_per_head].to_vec(),
-                        scales: layer.val_q.scales[scale_off..scale_off + d].to_vec(),
-                        mins: layer.val_q.mins[scale_off..scale_off + d].to_vec(),
-                    };
-                    dequantize_4bit(&head_vt, keep, d, &mut deq_buf[..keep * d]);
+                    dequantize_4bit(
+                        &layer.val_q.codes[code_off..code_off + nibbles_per_head],
+                        &layer.val_q.scales[scale_off..scale_off + d],
+                        &layer.val_q.mins[scale_off..scale_off + d],
+                        keep,
+                        d,
+                        &mut deq_buf[..keep * d],
+                    );
                     self.rotation.apply_inverse(
                         &deq_buf[..keep * d],
                         keep,

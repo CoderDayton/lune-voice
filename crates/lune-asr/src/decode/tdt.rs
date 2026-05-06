@@ -333,7 +333,9 @@ impl TdtModel {
                     let shifted = l - max_logit;
                     let e = shifted.exp();
                     z += e;
-                    half_sum += (shifted * 0.5).exp();
+                    // exp(x/2) = sqrt(exp(x)) — saves one transcendental per
+                    // vocab entry (~30 cycles each) across V × T iterations.
+                    half_sum += e.sqrt();
                 }
                 let sum_p_alpha = if z > 0.0 { half_sum / z.sqrt() } else { 1.0 };
                 let v_sqrt = (vocab_size as f32).sqrt();

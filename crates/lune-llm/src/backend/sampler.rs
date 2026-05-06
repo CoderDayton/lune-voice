@@ -374,10 +374,12 @@ fn softmax_candidates(kept: &[Candidate], temperature: f32, probs: &mut Vec<f32>
 }
 
 fn apply_min_p(probs: &mut [f32], min_p: f32) {
-    if probs.is_empty() {
+    // probs[0] is the largest mass — softmax is monotone in logit, and
+    // build_candidates returns `kept` sorted by descending logit. Skips
+    // the O(n) max scan.
+    let Some(&max_p) = probs.first() else {
         return;
-    }
-    let max_p = probs.iter().copied().fold(0.0f32, f32::max);
+    };
     let cutoff = max_p * min_p;
     for p in probs.iter_mut() {
         if *p < cutoff {
@@ -387,14 +389,23 @@ fn apply_min_p(probs: &mut [f32], min_p: f32) {
 }
 
 fn apply_top_p(probs: &mut [f32], top_p: f32) {
+    // Nucleus sampling (Holtzman et al. 2019): keep the smallest prefix whose
+    // cumulative mass first reaches top_p — *inclusive* of the crossing token.
+    // Truncating the crossing token (older bug) leaves total mass < top_p,
+    // contradicting the threshold semantics.
     let mut cumulative = 0.0f32;
+    let mut crossed = false;
     for p in probs.iter_mut() {
         if *p <= 0.0 {
             continue;
         }
-        cumulative += *p;
-        if cumulative > top_p {
+        if crossed {
             *p = 0.0;
+            continue;
+        }
+        cumulative += *p;
+        if cumulative >= top_p {
+            crossed = true;
         }
     }
 }
