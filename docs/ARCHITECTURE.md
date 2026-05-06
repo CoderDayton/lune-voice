@@ -48,8 +48,6 @@ lune-app (binary)
 |   `-- lune-core
 |-- lune-commands    Voice command detection
 |-- lune-dict        User dictionary
-|-- lune-output      Text delivery controller
-|   `-- lune-core
 `-- lune-persist     Settings, DB (SQLite), model downloads
     `-- lune-core
 ```
@@ -140,20 +138,14 @@ Local LLM mode uses the ONNX style model when it is downloaded. If it is missing
 
 ### 5. Text Delivery
 
-**Crate:** `lune-output` | **File:** `crates/lune-output/src/lib.rs`
+**Crate:** `lune-app` | **File:** `crates/lune-app/src/delivery.rs`
 
-`TextOutputController` emits two event types:
+The session emits two `SessionEvent` variants directly on the event channel:
 
-- `PartialText(String)` - in-progress text for live preview
+- `PartialText` - in-progress signal for live preview
 - `FinalizedText(String)` - corrected text for delivery
 
-The controller computes minimal edit actions via `char_diff()`:
-
-- **ASCII fast path:** Byte comparison (~3x faster than char iteration)
-- **Unicode path:** Single combined pass to find the common-prefix byte offset in both strings
-- Returns `(delete_count, new_suffix)` for incremental editing
-
-Delivery modes (handled in `main.rs`):
+Delivery modes:
 
 | Mode | Implementation |
 |------|----------------|

@@ -5,7 +5,6 @@ members = [
     "crates/lune-audio",
     "crates/lune-asr",
     "crates/lune-llm",
-    "crates/lune-output",
     "crates/lune-commands",
     "crates/lune-dict",
     "crates/lune-persist",
@@ -42,7 +41,6 @@ lune-ngram = { path = "crates/lune-ngram" }
 lune-audio = { path = "crates/lune-audio" }
 lune-asr = { path = "crates/lune-asr" }
 lune-llm = { path = "crates/lune-llm" }
-lune-output = { path = "crates/lune-output" }
 lune-commands = { path = "crates/lune-commands" }
 lune-dict = { path = "crates/lune-dict" }
 lune-persist = { path = "crates/lune-persist" }

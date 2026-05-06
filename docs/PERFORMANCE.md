@@ -179,7 +179,6 @@ Recent local runs on this repository produced the following comparisons.
 | **Single-pass argmax + logit collection** | `tdt_decoder.rs` | Combined loop finds the max logit while collecting values, avoiding a second O(vocab_size) scan |
 | **Incremental word counting** | `confidence_router.rs` | Counts only new words per accumulation, not the whole buffer |
 | **Bit-shift length check** | `confidence_router.rs` | `(corr_len << 1) >= orig_len` for the default 0.5/2.0 thresholds |
-| **ASCII fast-path char_diff** | `lune-output` | Byte comparison for ASCII text (~3× faster than char iteration) |
 
 ### Concurrency
 
