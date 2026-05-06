@@ -225,9 +225,9 @@ impl TdtModel {
         let mut emitted_tokens = 0;
         let mut last_token = blank_id as i32;
 
-        // Reusable buffers to avoid per-step allocation
+        // Reusable buffer to avoid per-step allocation. Duration logits are
+        // argmaxed directly over the trailing slice — no Vec needed.
         let mut vocab_logits = Vec::with_capacity(vocab_size);
-        let mut duration_logits = Vec::with_capacity(8);
 
         while t < time_steps {
             // Single encoder frame: [0, :, t] → (1, enc_dim, 1)
@@ -272,26 +272,41 @@ impl TdtModel {
             // descending logit, so insertion is O(TOP_K).
             vocab_logits.clear();
             let mut top: [(f32, usize); TOP_K] = [(f32::NEG_INFINITY, blank_id); TOP_K];
-            for (i, &raw) in logits_data.iter().take(vocab_size).enumerate() {
-                let v = raw + self.boost_map.get(&i).copied().unwrap_or(0.0);
-                vocab_logits.push(v);
-                // Insertion sort into `top` — NaN-safe via total_cmp.
-                if v.total_cmp(&top[TOP_K - 1].0).is_gt() {
-                    top[TOP_K - 1] = (v, i);
-                    let mut k = TOP_K - 1;
-                    while k > 0 && top[k].0.total_cmp(&top[k - 1].0).is_gt() {
-                        top.swap(k - 1, k);
-                        k -= 1;
+            // Hot inner loop: vocab_size × time_steps iterations. The boost
+            // map is empty for most calls, so branch outside the loop to skip
+            // the per-token HashMap probe.
+            if self.boost_map.is_empty() {
+                for (i, &raw) in logits_data.iter().take(vocab_size).enumerate() {
+                    vocab_logits.push(raw);
+                    if raw.total_cmp(&top[TOP_K - 1].0).is_gt() {
+                        top[TOP_K - 1] = (raw, i);
+                        let mut k = TOP_K - 1;
+                        while k > 0 && top[k].0.total_cmp(&top[k - 1].0).is_gt() {
+                            top.swap(k - 1, k);
+                            k -= 1;
+                        }
+                    }
+                }
+            } else {
+                for (i, &raw) in logits_data.iter().take(vocab_size).enumerate() {
+                    let v = raw + self.boost_map.get(&i).copied().unwrap_or(0.0);
+                    vocab_logits.push(v);
+                    if v.total_cmp(&top[TOP_K - 1].0).is_gt() {
+                        top[TOP_K - 1] = (v, i);
+                        let mut k = TOP_K - 1;
+                        while k > 0 && top[k].0.total_cmp(&top[k - 1].0).is_gt() {
+                            top.swap(k - 1, k);
+                            k -= 1;
+                        }
                     }
                 }
             }
             let token_id = top[0].1;
             let max_logit = top[0].0;
 
-            // Duration argmax (small slice ~5 elements, single pass)
-            duration_logits.clear();
-            duration_logits.extend(logits_data.iter().copied().skip(vocab_size));
-            let duration_step = duration_logits
+            // Duration argmax (small slice ~5 elements, single pass over
+            // the trailing logit tail — no intermediate Vec).
+            let duration_step = logits_data[vocab_size..]
                 .iter()
                 .enumerate()
                 .max_by(|(_, a), (_, b)| a.total_cmp(b))

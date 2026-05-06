@@ -295,6 +295,18 @@ fn process_audio_callback(
     // 2. Resample if needed
     if let Some(r) = resampler {
         input_resample_buf.extend_from_slice(mono_buf);
+        // Cap resample buffer to prevent unbounded growth if the resampler
+        // repeatedly errors. ~1s of 48kHz audio is the upper sane bound for a
+        // backlog before we're better off dropping than queueing forever.
+        const MAX_RESAMPLE_BACKLOG: usize = 48_000;
+        if input_resample_buf.len() > MAX_RESAMPLE_BACKLOG {
+            warn!(
+                "Resample backlog {} exceeds cap; dropping oldest",
+                input_resample_buf.len()
+            );
+            let drop_n = input_resample_buf.len() - MAX_RESAMPLE_BACKLOG;
+            input_resample_buf.drain(..drop_n);
+        }
         let required_input = r.input_frames_next();
         while input_resample_buf.len() >= required_input {
             // Reuse resample_input_slice instead of allocating per iteration.
@@ -302,12 +314,23 @@ fn process_audio_callback(
             resample_input_slice.extend_from_slice(&input_resample_buf[..required_input]);
             input_resample_buf.drain(..required_input);
             let frames = resample_input_slice.len();
-            let adapter = SequentialSlice::new(resample_input_slice.as_slice(), 1, frames)
-                .expect("SequentialSlice size mismatch");
+            let Ok(adapter) = SequentialSlice::new(resample_input_slice.as_slice(), 1, frames)
+            else {
+                // Adapter construction shouldn't fail with valid contiguous input,
+                // but never panic in the audio thread — drop this iteration's frames.
+                warn!(
+                    "SequentialSlice construction failed; skipping {} frames",
+                    frames
+                );
+                continue;
+            };
             match r.process(&adapter, 0, None) {
                 Ok(output) => output_buf.extend_from_slice(&output.take_data()),
                 Err(e) => {
                     warn!("Resampling error: {}", e);
+                    // Reset internal pending data so a transient resampler error
+                    // doesn't keep us in a degraded state forever.
+                    input_resample_buf.clear();
                     break;
                 }
             }
