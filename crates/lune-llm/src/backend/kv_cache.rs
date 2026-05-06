@@ -64,15 +64,60 @@ struct FrozenPrefix {
     total_seq_len: usize,
 }
 
+// ── Rotation ────────────────────────────────────────────────────────────
+//
+// R = (1/√d) · H · D, where H is the Sylvester Hadamard matrix and D is a
+// diagonal of random ±1. Both H and D are symmetric; H · H = d · I, so
+//
+//     Rᵀ R = (1/d) Dᵀ Hᵀ H D = (1/d) D (d I) D = D² = I.
+//
+// R is therefore an exact orthogonal transform. Applying R or Rᵀ uses the
+// Fast Walsh-Hadamard Transform (FWHT) in O(d log d) per token — ~18× faster
+// than the dense d×d matmul for d=128 — and accumulates only O(log d · ε)
+// floating error vs O(d · ε) for the dense path.
+//
+// For non-power-of-two head dims (rare; e.g. Phi-3-mini uses d=96) we fall
+// back to a random orthogonal matrix built via Box-Muller + Gram-Schmidt.
+
 struct RotationMatrix {
-    data: Vec<f32>,
     dim: usize,
+    inner: RotationImpl,
 }
 
-// ── Rotation ────────────────────────────────────────────────────────────
+enum RotationImpl {
+    Hadamard {
+        /// signs[i] ∈ {-1/√d, +1/√d}: the diagonal D and the 1/√d scaling
+        /// folded into a single elementwise multiply per token.
+        signs: Vec<f32>,
+    },
+    Dense {
+        /// Row-major dim×dim orthogonal matrix.
+        data: Vec<f32>,
+    },
+}
 
 impl RotationMatrix {
     fn random(dim: usize) -> Self {
+        if dim >= 2 && dim.is_power_of_two() {
+            Self::hadamard_random(dim)
+        } else {
+            Self::dense_random(dim)
+        }
+    }
+
+    fn hadamard_random(dim: usize) -> Self {
+        let mut rng = rand::rng();
+        let scale = (dim as f32).sqrt().recip();
+        let signs: Vec<f32> = (0..dim)
+            .map(|_| if rng.random::<bool>() { scale } else { -scale })
+            .collect();
+        Self {
+            dim,
+            inner: RotationImpl::Hadamard { signs },
+        }
+    }
+
+    fn dense_random(dim: usize) -> Self {
         let mut rng = rand::rng();
         let mut data = Vec::with_capacity(dim * dim);
         for _ in 0..dim * dim {
@@ -109,35 +154,91 @@ impl RotationMatrix {
                 data[k * dim + j] = if scaled.is_finite() { scaled } else { 0.0 };
             }
         }
-        Self { data, dim }
+        Self {
+            dim,
+            inner: RotationImpl::Dense { data },
+        }
     }
 
+    /// dst = R · src per-token. Hadamard path: `dst = H · ((D/√d) ⊙ src)`.
     fn apply(&self, src: &[f32], tokens: usize, dst: &mut [f32]) {
         let d = self.dim;
-        for t in 0..tokens {
-            let row = t * d;
-            for j in 0..d {
-                let mut sum = 0.0f32;
-                for k in 0..d {
-                    sum += src[row + k] * self.data[k * d + j];
+        match &self.inner {
+            RotationImpl::Hadamard { signs } => {
+                for t in 0..tokens {
+                    let row = &mut dst[t * d..(t + 1) * d];
+                    let src_row = &src[t * d..(t + 1) * d];
+                    for j in 0..d {
+                        row[j] = src_row[j] * signs[j];
+                    }
+                    fwht(row);
                 }
-                dst[row + j] = sum;
+            }
+            RotationImpl::Dense { data } => {
+                for t in 0..tokens {
+                    let row = t * d;
+                    for j in 0..d {
+                        let mut sum = 0.0f32;
+                        for k in 0..d {
+                            sum += src[row + k] * data[k * d + j];
+                        }
+                        dst[row + j] = sum;
+                    }
+                }
             }
         }
     }
 
+    /// dst = Rᵀ · src per-token. Hadamard path: `dst = (D/√d) ⊙ (H · src)`.
     fn apply_inverse(&self, src: &[f32], tokens: usize, dst: &mut [f32]) {
         let d = self.dim;
-        for t in 0..tokens {
-            let row = t * d;
-            for j in 0..d {
-                let mut sum = 0.0f32;
-                for k in 0..d {
-                    sum += src[row + k] * self.data[j * d + k];
+        match &self.inner {
+            RotationImpl::Hadamard { signs } => {
+                for t in 0..tokens {
+                    let row = &mut dst[t * d..(t + 1) * d];
+                    row.copy_from_slice(&src[t * d..(t + 1) * d]);
+                    fwht(row);
+                    for (j, v) in row.iter_mut().enumerate() {
+                        *v *= signs[j];
+                    }
                 }
-                dst[row + j] = sum;
+            }
+            RotationImpl::Dense { data } => {
+                for t in 0..tokens {
+                    let row = t * d;
+                    for j in 0..d {
+                        let mut sum = 0.0f32;
+                        for k in 0..d {
+                            sum += src[row + k] * data[j * d + k];
+                        }
+                        dst[row + j] = sum;
+                    }
+                }
             }
         }
+    }
+}
+
+/// In-place Fast Walsh-Hadamard Transform (Sylvester construction, unnormalized).
+/// Length must be a power of two. Computes y = H · x in O(n log n).
+/// H is symmetric and H · H = n · I, so applying twice and dividing by n is
+/// the identity.
+fn fwht(x: &mut [f32]) {
+    let n = x.len();
+    debug_assert!(n.is_power_of_two());
+    let mut h = 1;
+    while h < n {
+        let mut i = 0;
+        while i < n {
+            for j in i..i + h {
+                let a = x[j];
+                let b = x[j + h];
+                x[j] = a + b;
+                x[j + h] = a - b;
+            }
+            i += h * 2;
+        }
+        h *= 2;
     }
 }
 
@@ -607,6 +708,75 @@ mod tests {
             }
         }
         out
+    }
+
+    #[test]
+    fn fwht_self_inverse_up_to_n_scaling() {
+        // H · H = n · I, so applying FWHT twice scales by n.
+        let mut x = vec![1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+        let original = x.clone();
+        super::fwht(&mut x);
+        super::fwht(&mut x);
+        for (a, b) in x.iter().zip(original.iter()) {
+            assert!(
+                (*a - 8.0 * *b).abs() < 1e-5,
+                "fwht·fwht ≠ 8·I: {a} vs {}",
+                8.0 * b
+            );
+        }
+    }
+
+    #[test]
+    fn rotation_hadamard_roundtrip_is_identity() {
+        // R · Rᵀ = I to within float epsilon for power-of-two dim.
+        let dim = 16;
+        let r = super::RotationMatrix::random(dim);
+        let tokens = 4;
+        let src: Vec<f32> = (0..tokens * dim)
+            .map(|i| (i as f32) * 0.137 - 1.5)
+            .collect();
+        let mut intermediate = vec![0.0f32; tokens * dim];
+        let mut restored = vec![0.0f32; tokens * dim];
+        r.apply(&src, tokens, &mut intermediate);
+        r.apply_inverse(&intermediate, tokens, &mut restored);
+        for (a, b) in src.iter().zip(restored.iter()) {
+            assert!(
+                (a - b).abs() < 1e-4,
+                "rotation roundtrip mismatch: {a} vs {b}"
+            );
+        }
+    }
+
+    #[test]
+    fn rotation_hadamard_preserves_l2_norm() {
+        // Orthogonal transforms are isometries.
+        let dim = 32;
+        let r = super::RotationMatrix::random(dim);
+        let src: Vec<f32> = (0..dim).map(|i| ((i * 7) % 11) as f32 - 5.0).collect();
+        let mut dst = vec![0.0f32; dim];
+        r.apply(&src, 1, &mut dst);
+        let n_src: f32 = src.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let n_dst: f32 = dst.iter().map(|x| x * x).sum::<f32>().sqrt();
+        assert!(
+            (n_src - n_dst).abs() < 1e-4,
+            "norm not preserved: {n_src} vs {n_dst}"
+        );
+    }
+
+    #[test]
+    fn rotation_dense_fallback_for_non_pow2() {
+        // dim = 10 is not a power of two — must take the dense path and still
+        // round-trip correctly within MGS-orthogonality bounds.
+        let dim = 10;
+        let r = super::RotationMatrix::random(dim);
+        let src: Vec<f32> = (0..dim).map(|i| (i as f32) * 0.5 - 1.0).collect();
+        let mut intermediate = vec![0.0f32; dim];
+        let mut restored = vec![0.0f32; dim];
+        r.apply(&src, 1, &mut intermediate);
+        r.apply_inverse(&intermediate, 1, &mut restored);
+        for (a, b) in src.iter().zip(restored.iter()) {
+            assert!((a - b).abs() < 1e-3, "dense roundtrip mismatch: {a} vs {b}");
+        }
     }
 
     #[test]
