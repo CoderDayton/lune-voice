@@ -412,6 +412,8 @@ async fn run_session<A: AsrBackend + 'static>(
     let mut prev_chunk: Option<Vec<f32>> = None;
     let mut was_speech = false;
     let mut last_audio_at = tokio::time::Instant::now();
+    let session_start = tokio::time::Instant::now();
+    let mut first_audio_logged = false;
     let audio_starvation_limit = Duration::from_secs(5);
     'capture: loop {
         tokio::select! {
@@ -441,6 +443,16 @@ async fn run_session<A: AsrBackend + 'static>(
                 let mut saw_audio = false;
                 while let Some(chunk) = audio_stream.try_next_chunk() {
                     saw_audio = true;
+                    if !first_audio_logged {
+                        let elapsed_ms = session_start.elapsed().as_millis();
+                        info!(
+                            %session_id,
+                            elapsed_ms,
+                            samples = chunk.samples.len(),
+                            "vad: first audio chunk received",
+                        );
+                        first_audio_logged = true;
+                    }
                     let vad_result = vad.process_chunk(&chunk.samples);
                     if vad_result.energy > peak_rms { peak_rms = vad_result.energy; }
                     if !vad_result.is_speech {

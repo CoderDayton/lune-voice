@@ -251,16 +251,20 @@ fn spawn_evdev_hotkeys(app: &tauri::App) -> Result<(), Box<dyn std::error::Error
         while let Some(action) = rx.recv().await {
             match action {
                 hotkey_linux::HotkeyAction::Toggle => {
+                    tracing::info!(action = "toggle", "hotkey pressed");
                     let _ = rt.toggle_dictation().await;
                 }
                 hotkey_linux::HotkeyAction::Start => {
+                    tracing::info!(action = "start", "hotkey pressed");
                     let _ = rt.start_dictation().await;
                 }
                 hotkey_linux::HotkeyAction::Stop => {
+                    tracing::info!(action = "stop", "hotkey pressed");
                     let _ = rt.stop_and_wait_dictation().await;
                 }
                 hotkey_linux::HotkeyAction::Cancel => {
                     if rt.is_active().await {
+                        tracing::info!(action = "cancel", "hotkey pressed");
                         let _ = rt.cancel_dictation().await;
                     }
                 }
