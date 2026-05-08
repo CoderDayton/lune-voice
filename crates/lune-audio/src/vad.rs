@@ -27,9 +27,10 @@ pub struct VadConfig {
     pub threshold_end: f32,
     /// Hangover duration in milliseconds. Default: 30
     pub hangover_ms: u32,
-    /// Optional PCEN-style adaptive AGC frontend. `None` (default) disables it.
-    /// When `Some`, each Earshot hop is normalized in place before scoring,
-    /// while the diagnostic `energy` field still reflects the raw input level.
+    /// PCEN-style adaptive AGC frontend. Enabled by default with sensible
+    /// defaults; pass `None` to disable. When `Some`, each Earshot hop is
+    /// normalized in place before scoring, while the diagnostic `energy`
+    /// field still reflects the raw input level.
     pub pcen: Option<PcenAgcConfig>,
 }
 
@@ -39,7 +40,7 @@ impl Default for VadConfig {
             threshold: 0.5,
             threshold_end: 0.3,
             hangover_ms: 30,
-            pcen: None,
+            pcen: Some(PcenAgcConfig::default()),
         }
     }
 }
@@ -213,12 +214,10 @@ mod tests {
     }
 
     #[test]
-    fn pcen_opt_in_processes_chunks_and_preserves_raw_energy() {
-        let cfg = VadConfig {
-            pcen: Some(crate::pcen::PcenAgcConfig::default()),
-            ..Default::default()
-        };
-        let mut vad = Vad::new(cfg, 16_000).unwrap();
+    fn pcen_default_on_processes_chunks_and_preserves_raw_energy() {
+        // Default VadConfig now enables PCEN; verify the AGC path runs cleanly
+        // and the diagnostic energy still reflects the unmodified input.
+        let mut vad = Vad::new(VadConfig::default(), 16_000).unwrap();
         // Quiet sine well below VAD threshold so non-finite output would surface.
         let dt = 1.0 / 16_000.0f32;
         let chunk: Vec<f32> = (0..HOP_SIZE * 4)
