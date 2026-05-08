@@ -60,6 +60,14 @@ pub struct UserSettings {
     /// prefer the indicator only appearing during dictation.
     #[serde(default)]
     pub mic_prewarm: bool,
+    /// Enable the PCEN-style adaptive AGC frontend before the VAD.
+    /// Improves robustness on quiet mics and noisy environments. Default on.
+    #[serde(default = "default_vad_pcen")]
+    pub vad_pcen: bool,
+}
+
+fn default_vad_pcen() -> bool {
+    true
 }
 
 impl UserSettings {
@@ -106,6 +114,7 @@ impl Default for UserSettings {
             adaptive_vad: false,
             pipeline: PipelineOverrides::default(),
             mic_prewarm: false,
+            vad_pcen: true,
         }
     }
 }

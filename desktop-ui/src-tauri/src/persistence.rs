@@ -394,6 +394,8 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
         pill_visibility: pill_visibility_to_dto(settings.pill_visibility),
         language: settings.language.clone(),
         dictation_language: settings.dictation_language.clone(),
+        mic_prewarm: settings.mic_prewarm,
+        vad_pcen: settings.vad_pcen,
         openai_asr_base_url,
         openai_asr_model,
         openai_asr_api_key_set,
@@ -476,6 +478,8 @@ fn apply_settings_dto(
         );
     }
     settings.dictation_language = dictation_language.to_owned();
+    settings.mic_prewarm = input.mic_prewarm;
+    settings.vad_pcen = input.vad_pcen;
     Ok(())
 }
 
@@ -756,6 +760,8 @@ mod tests {
             pill_visibility: dto.pill_visibility,
             language: dto.language,
             dictation_language: dto.dictation_language,
+            mic_prewarm: dto.mic_prewarm,
+            vad_pcen: dto.vad_pcen,
             openai_asr_base_url: dto.openai_asr_base_url,
             openai_asr_api_key: None,
             openai_asr_model: dto.openai_asr_model,

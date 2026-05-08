@@ -416,14 +416,16 @@ async fn run_session<A: AsrBackend + 'static>(
         }
     };
 
-    let mut vad = match Vad::new(
-        VadConfig {
-            threshold: config.pipeline.speech_threshold,
-            threshold_end: config.pipeline.speech_threshold_end,
-            ..VadConfig::default()
-        },
-        16_000,
-    ) {
+    let vad_pcen_enabled = _settings.read().await.vad_pcen;
+    let mut vad_config = VadConfig {
+        threshold: config.pipeline.speech_threshold,
+        threshold_end: config.pipeline.speech_threshold_end,
+        ..VadConfig::default()
+    };
+    if !vad_pcen_enabled {
+        vad_config.pcen = None;
+    }
+    let mut vad = match Vad::new(vad_config, 16_000) {
         Ok(v) => v,
         Err(e) => {
             fail_init(

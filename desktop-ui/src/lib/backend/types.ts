@@ -38,6 +38,8 @@ export interface BackendWorkspaceSettings {
   pillVisibility: PillVisibilityValue;
   language: string;
   dictationLanguage: string;
+  micPrewarm: boolean;
+  vadPcen: boolean;
   // OpenAI ASR fields (present when asrBackendType == "OpenAiCompatible")
   openaiAsrBaseUrl?: string | null;
   openaiAsrModel?: string | null;
@@ -83,6 +85,8 @@ export interface SaveWorkspaceSettingsInput {
   pillVisibility: PillVisibilityValue;
   language: string;
   dictationLanguage: string;
+  micPrewarm: boolean;
+  vadPcen: boolean;
   // OpenAI ASR fields (sent when asrBackendType == "OpenAiCompatible")
   openaiAsrBaseUrl?: string | null;
   openaiAsrApiKey?: string | null;

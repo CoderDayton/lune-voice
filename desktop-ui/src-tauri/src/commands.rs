@@ -92,6 +92,10 @@ pub async fn save_workspace_settings(
     })
     .await?;
     runtime.mark_reload_required().await;
+    // Reconcile long-lived audio capture with the new mic_prewarm setting.
+    runtime
+        .sync_mic_prewarm(Some(snapshot.settings.mic_prewarm))
+        .await;
     // Notify pill of settings changes (activation mode, pill visibility)
     if let Err(e) = runtime.app_handle().emit_to(
         "pill",

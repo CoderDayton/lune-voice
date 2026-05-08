@@ -119,6 +119,34 @@ export function InputSection({ settings }: SettingsProps) {
           </div>
         }
       />
+
+      <SettingsRow
+        label={t`Adaptive gain control`}
+        description={t`Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended.`}
+        control={
+          <input
+            type="checkbox"
+            className="toggle toggle-primary"
+            checked={settings.vadPcen}
+            onChange={() => void saveWorkspaceSetting('vadPcen', !settings.vadPcen)}
+            aria-label={t`Adaptive gain control`}
+          />
+        }
+      />
+
+      <SettingsRow
+        label={t`Pre-warm microphone`}
+        description={t`Keep the mic open in the background so dictation starts ~70ms sooner. The OS may show a recording indicator while Lune is running.`}
+        control={
+          <input
+            type="checkbox"
+            className="toggle toggle-primary"
+            checked={settings.micPrewarm}
+            onChange={() => void saveWorkspaceSetting('micPrewarm', !settings.micPrewarm)}
+            aria-label={t`Pre-warm microphone`}
+          />
+        }
+      />
       <CalibrateModal
         open={calibrateOpen}
         onClose={() => setCalibrateOpen(false)}

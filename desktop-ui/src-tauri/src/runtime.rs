@@ -123,14 +123,19 @@ impl AppRuntime {
             }),
         };
 
-        runtime.sync_mic_prewarm().await;
+        runtime.sync_mic_prewarm(None).await;
         Ok(runtime)
     }
 
-    /// Reconcile the long-lived audio stream with the current `mic_prewarm`
-    /// setting. Call after settings load and on settings updates.
-    pub async fn sync_mic_prewarm(&self) {
-        let want = self.inner.settings.read().await.mic_prewarm;
+    /// Reconcile the long-lived audio stream with the desired `mic_prewarm`
+    /// state. Pass `None` to read the current in-memory setting (suitable for
+    /// startup); pass `Some(value)` after a settings save when in-memory
+    /// settings may be stale.
+    pub async fn sync_mic_prewarm(&self, want: Option<bool>) {
+        let want = match want {
+            Some(w) => w,
+            None => self.inner.settings.read().await.mic_prewarm,
+        };
         let mut slot = self.inner.prewarmed_audio.lock().await;
         match (want, slot.is_some()) {
             (true, false) => match AudioStream::new(AudioConfig::default()) {

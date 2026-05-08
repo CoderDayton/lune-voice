@@ -37,6 +37,8 @@ function createMockSnapshot(): BackendWorkspaceSnapshot {
       pillVisibility: 'Always',
       language: 'en',
       dictationLanguage: 'auto',
+      micPrewarm: false,
+      vadPcen: true,
       openaiAsrBaseUrl: null,
       openaiAsrModel: null,
       openaiAsrApiKeySet: false,

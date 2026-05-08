@@ -22,6 +22,8 @@ export interface WorkspaceSettings {
   pillVisibility: PillVisibilityValue;
   language: string;
   dictationLanguage: string;
+  micPrewarm: boolean;
+  vadPcen: boolean;
   openaiAsrBaseUrl: string;
   openaiAsrApiKey: string;
   openaiAsrModel: string;
@@ -87,6 +89,8 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   pillVisibility: 'Always',
   language: 'en',
   dictationLanguage: 'auto',
+  micPrewarm: false,
+  vadPcen: true,
   openaiAsrBaseUrl: 'https://api.openai.com/v1',
   openaiAsrApiKey: '',
   openaiAsrModel: 'whisper-1',

@@ -57,6 +57,8 @@ export function mapWorkspaceSettings(snapshot: BackendWorkspaceSnapshot): Worksp
     pillVisibility: snapshot.settings.pillVisibility ?? 'Always',
     language: snapshot.settings.language ?? 'en',
     dictationLanguage: snapshot.settings.dictationLanguage ?? 'auto',
+    micPrewarm: snapshot.settings.micPrewarm ?? DEFAULT_SETTINGS.micPrewarm,
+    vadPcen: snapshot.settings.vadPcen ?? DEFAULT_SETTINGS.vadPcen,
     openaiAsrBaseUrl: snapshot.settings.openaiAsrBaseUrl ?? DEFAULT_SETTINGS.openaiAsrBaseUrl,
     openaiAsrApiKey: snapshot.settings.openaiAsrApiKeySet
       ? '••••••••'
@@ -98,6 +100,8 @@ export function settingsToSaveInput(settings: WorkspaceSettings): SaveWorkspaceS
     pillVisibility: settings.pillVisibility,
     language: settings.language,
     dictationLanguage: settings.dictationLanguage,
+    micPrewarm: settings.micPrewarm,
+    vadPcen: settings.vadPcen,
     openaiAsrBaseUrl: settings.openaiAsrBaseUrl || null,
     openaiAsrApiKey:
       settings.openaiAsrApiKey && !settings.openaiAsrApiKey.startsWith('•')
