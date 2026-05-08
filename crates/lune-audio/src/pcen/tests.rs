@@ -184,6 +184,65 @@ fn nan_inf_input_does_not_poison_state() {
 }
 
 #[test]
+fn warmup_holds_gain_at_unity_then_releases() {
+    // 8-frame warmup; force a quiet input that *would* normally be boosted.
+    let cfg = PcenAgcConfig {
+        warmup_frames: 8,
+        ..Default::default()
+    };
+    let mut a = agc(cfg);
+
+    let mut buf = bursty(440.0, 0.014, HOP * 16, 50, 150);
+    // First 8 frames: gain must be exactly 1.0 (no boost, no attenuation).
+    for chunk in buf.chunks_mut(HOP).take(8) {
+        let stats = a.process_frame(chunk);
+        assert_eq!(stats.gain_applied, 1.0, "warmup gain must be unity");
+    }
+    assert_eq!(a.warmup_remaining(), 0);
+
+    // After warmup, push enough frames for the gain smoother to engage on
+    // the bursty signal. Expect the boost to come online.
+    let mut tail = bursty(440.0, 0.014, HOP * 200, 50, 150);
+    let stats = process_in_hops(&mut a, &mut tail);
+    assert!(
+        stats.gain_applied > 1.5,
+        "post-warmup boost should engage, got gain={}",
+        stats.gain_applied
+    );
+}
+
+#[test]
+fn warmup_zero_means_no_warmup() {
+    let cfg = PcenAgcConfig {
+        warmup_frames: 0,
+        ..Default::default()
+    };
+    let mut a = agc(cfg);
+    let mut frame = vec![0.5f32; HOP];
+    let stats = a.process_frame(&mut frame);
+    // No warmup → gain came straight from the smoother (might still be 1.0 on
+    // the first frame because of seed, but warmup_remaining must be 0).
+    assert_eq!(a.warmup_remaining(), 0);
+    assert!(stats.gain_applied.is_finite());
+}
+
+#[test]
+fn reset_restores_warmup_counter() {
+    let cfg = PcenAgcConfig {
+        warmup_frames: 4,
+        ..Default::default()
+    };
+    let mut a = agc(cfg);
+    let mut frame = vec![0.0f32; HOP];
+    for _ in 0..4 {
+        a.process_frame(&mut frame);
+    }
+    assert_eq!(a.warmup_remaining(), 0);
+    a.reset();
+    assert_eq!(a.warmup_remaining(), 4);
+}
+
+#[test]
 fn reset_reseeds_envelopes() {
     let mut a = agc(PcenAgcConfig::default());
     let mut buf = sine(440.0, 0.5, HOP * 50);

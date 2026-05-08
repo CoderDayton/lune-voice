@@ -46,6 +46,10 @@ pub struct PcenAgcConfig {
     pub tau_noise_down_ms: f32,
     /// Time constant of the gain smoother (ms). Suppresses pumping.
     pub tau_gain_ms: f32,
+    /// Number of leading frames during which the AGC tracks envelopes but
+    /// holds `gain = 1.0`. Prevents misapplied gain on hotkey-onset speech
+    /// before the noise tracker has had time to drain to the room floor.
+    pub warmup_frames: u32,
     /// Numerical floor for divisions and envelope clamps.
     pub eps: f32,
 }
@@ -62,6 +66,7 @@ impl Default for PcenAgcConfig {
             tau_noise_up_ms: 5_000.0,
             tau_noise_down_ms: 200.0,
             tau_gain_ms: 50.0,
+            warmup_frames: 16,
             eps: 1.0e-8,
         }
     }
@@ -91,6 +96,7 @@ pub struct PcenAgc {
     sig_env_pow: f32,
     noise_env_pow: f32,
     last_gain: f32,
+    warmup_remaining: u32,
     initialized: bool,
 }
 
@@ -109,6 +115,7 @@ impl PcenAgc {
         }
         validate(&cfg)?;
         let hop_ms = (hop_samples as f32) * 1_000.0 / (sample_rate as f32);
+        let warmup_remaining = cfg.warmup_frames;
         Ok(Self {
             s_signal: coeff(hop_ms, cfg.tau_signal_ms),
             s_noise_up: coeff(hop_ms, cfg.tau_noise_up_ms),
@@ -119,6 +126,7 @@ impl PcenAgc {
             sig_env_pow: 0.0,
             noise_env_pow: 0.0,
             last_gain: 1.0,
+            warmup_remaining,
             initialized: false,
         })
     }
@@ -128,6 +136,7 @@ impl PcenAgc {
         self.sig_env_pow = 0.0;
         self.noise_env_pow = 0.0;
         self.last_gain = 1.0;
+        self.warmup_remaining = self.cfg.warmup_frames;
         self.initialized = false;
     }
 
@@ -158,27 +167,33 @@ impl PcenAgc {
         self.sig_env_pow = self.sig_env_pow.max(self.cfg.eps);
         self.noise_env_pow = self.noise_env_pow.max(self.cfg.eps);
 
-        // desired_gain: how much we'd amplify to hit target signal RMS.
-        let sig_norm = self
-            .sig_env_pow
-            .powf(0.5 * self.cfg.alpha)
-            .max(self.cfg.eps);
-        let desired_gain = self.cfg.target_rms / sig_norm;
-
-        // noise_cap: how much we *can* amplify before noise exceeds its ceiling.
-        let noise_rms_now = self.noise_env_pow.sqrt().max(self.cfg.eps);
-        let noise_cap = self.cfg.noise_ceiling_rms / noise_rms_now;
-
-        let mut raw_gain = desired_gain.min(noise_cap).min(self.cfg.max_gain);
-        raw_gain = raw_gain.max(self.cfg.min_gain);
-        if !raw_gain.is_finite() {
-            raw_gain = 1.0;
-        }
-
-        self.last_gain = lerp(self.last_gain, raw_gain, self.s_gain);
-        self.last_gain = self.last_gain.clamp(self.cfg.min_gain, self.cfg.max_gain);
-        if !self.last_gain.is_finite() {
+        if self.warmup_remaining > 0 {
+            // Track envelopes but hold gain at unity until trackers settle.
+            self.warmup_remaining -= 1;
             self.last_gain = 1.0;
+        } else {
+            // desired_gain: how much we'd amplify to hit target signal RMS.
+            let sig_norm = self
+                .sig_env_pow
+                .powf(0.5 * self.cfg.alpha)
+                .max(self.cfg.eps);
+            let desired_gain = self.cfg.target_rms / sig_norm;
+
+            // noise_cap: how much we *can* amplify before noise exceeds its ceiling.
+            let noise_rms_now = self.noise_env_pow.sqrt().max(self.cfg.eps);
+            let noise_cap = self.cfg.noise_ceiling_rms / noise_rms_now;
+
+            let mut raw_gain = desired_gain.min(noise_cap).min(self.cfg.max_gain);
+            raw_gain = raw_gain.max(self.cfg.min_gain);
+            if !raw_gain.is_finite() {
+                raw_gain = 1.0;
+            }
+
+            self.last_gain = lerp(self.last_gain, raw_gain, self.s_gain);
+            self.last_gain = self.last_gain.clamp(self.cfg.min_gain, self.cfg.max_gain);
+            if !self.last_gain.is_finite() {
+                self.last_gain = 1.0;
+            }
         }
 
         let g = self.last_gain;
@@ -210,6 +225,9 @@ impl PcenAgc {
     }
     pub fn hop_samples(&self) -> usize {
         self.hop_samples
+    }
+    pub fn warmup_remaining(&self) -> u32 {
+        self.warmup_remaining
     }
 }
 
