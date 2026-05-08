@@ -9,6 +9,7 @@ use lune_app::{DeliveryService, SessionManager, SessionManagerConfig};
 #[cfg(unix)]
 use lune_app::{WindowTarget, capture_focus_target};
 use lune_asr::AsrRegistry;
+use lune_audio::{AudioConfig, AudioStream};
 use lune_commands::VoiceCommandRouter;
 use lune_core::asr::AsrSessionConfig;
 use lune_core::command::VoiceCommand;
@@ -53,6 +54,10 @@ struct RuntimeInner {
     last_cancel_at: Mutex<Instant>,
     /// Active microphone-calibration session (mutually exclusive with dictation).
     calibration: Mutex<Option<CalibrationSession>>,
+    /// Long-lived microphone capture stream when `mic_prewarm` is enabled.
+    /// Sessions consume via `AudioStreamHandle` so the cpal::Stream stays
+    /// open across hotkey presses and the first chunk arrives ~70 ms sooner.
+    prewarmed_audio: Mutex<Option<AudioStream>>,
 }
 
 struct LivePipeline {
@@ -114,10 +119,38 @@ impl AppRuntime {
                 last_toggle_at: Mutex::new(Instant::now() - TOGGLE_DEBOUNCE),
                 last_cancel_at: Mutex::new(Instant::now() - CANCEL_DEBOUNCE),
                 calibration: Mutex::new(None),
+                prewarmed_audio: Mutex::new(None),
             }),
         };
 
+        runtime.sync_mic_prewarm().await;
         Ok(runtime)
+    }
+
+    /// Reconcile the long-lived audio stream with the current `mic_prewarm`
+    /// setting. Call after settings load and on settings updates.
+    pub async fn sync_mic_prewarm(&self) {
+        let want = self.inner.settings.read().await.mic_prewarm;
+        let mut slot = self.inner.prewarmed_audio.lock().await;
+        match (want, slot.is_some()) {
+            (true, false) => match AudioStream::new(AudioConfig::default()) {
+                Ok(s) => {
+                    debug!("mic prewarm: capture stream opened");
+                    *slot = Some(s);
+                }
+                Err(e) => warn!("mic prewarm: failed to open capture stream: {e}"),
+            },
+            (false, true) => {
+                debug!("mic prewarm: closing capture stream");
+                *slot = None;
+            }
+            _ => {}
+        }
+    }
+
+    async fn prewarmed_handle(&self) -> Option<lune_audio::AudioStreamHandle> {
+        let slot = self.inner.prewarmed_audio.lock().await;
+        slot.as_ref().map(|s| s.handle())
     }
 
     pub async fn service_status(&self) -> String {
@@ -273,7 +306,12 @@ impl AppRuntime {
             }
         };
         let (event_tx, event_rx) = mpsc::channel(256);
-        let session_id = match manager.start(event_tx).await {
+        let prewarm = self.prewarmed_handle().await;
+        let start_result = match prewarm {
+            Some(handle) => manager.start_with_handle(event_tx, handle).await,
+            None => manager.start(event_tx).await,
+        };
+        let session_id = match start_result {
             Ok(session_id) => session_id,
             Err(error) => {
                 self.set_pipeline_session(None, false).await;

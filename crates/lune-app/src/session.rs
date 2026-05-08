@@ -7,7 +7,7 @@ use tokio::sync::{Mutex, RwLock, mpsc};
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-use lune_audio::{AudioConfig, AudioStream, Vad, VadConfig};
+use lune_audio::{AudioConfig, AudioStream, AudioStreamHandle, Vad, VadConfig};
 use lune_commands::VoiceCommandRouter;
 use lune_core::Result;
 use lune_core::asr::{AsrBackend, AsrBackendKind, AsrSegment, AsrSessionConfig};
@@ -50,6 +50,38 @@ struct ActiveHandle {
 enum SessionControl {
     Stop,
     Cancel,
+}
+
+/// How the session should obtain audio.
+enum SessionAudio {
+    /// Open a fresh `AudioStream` inside the session task (default path).
+    Open,
+    /// Consume from a stream owned by the caller (tests/file replay).
+    Owned(AudioStream),
+    /// Consume from a long-lived pre-warmed stream's ring buffer.
+    Shared(AudioStreamHandle),
+}
+
+/// Resolved audio source used inside the session loop.
+enum AudioSource {
+    Owned(AudioStream),
+    Shared(AudioStreamHandle),
+}
+
+impl AudioSource {
+    fn try_next_chunk(&self) -> Option<lune_audio::AudioChunk> {
+        match self {
+            AudioSource::Owned(s) => s.try_next_chunk(),
+            AudioSource::Shared(h) => h.try_next_chunk(),
+        }
+    }
+    fn is_offline(&self) -> bool {
+        match self {
+            AudioSource::Owned(s) => s.is_offline(),
+            // Shared streams are always live (the runtime owns the cpal::Stream).
+            AudioSource::Shared(_) => false,
+        }
+    }
 }
 
 /// Orchestrates the full dictation pipeline.
@@ -98,7 +130,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
 
     /// Start a new session. Returns `Err` if one is already active.
     pub async fn start(&self, event_tx: mpsc::Sender<SessionEvent>) -> Result<Uuid> {
-        self.start_inner(event_tx, None).await
+        self.start_inner(event_tx, SessionAudio::Open).await
     }
 
     /// Start a session with a pre-built audio stream (e.g. from a file).
@@ -107,13 +139,25 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         event_tx: mpsc::Sender<SessionEvent>,
         audio: AudioStream,
     ) -> Result<Uuid> {
-        self.start_inner(event_tx, Some(audio)).await
+        self.start_inner(event_tx, SessionAudio::Owned(audio)).await
+    }
+
+    /// Start a session reading from a pre-warmed shared audio stream.
+    /// The handle's ring is drained on entry so stale audio captured
+    /// during the idle period is discarded.
+    pub async fn start_with_handle(
+        &self,
+        event_tx: mpsc::Sender<SessionEvent>,
+        handle: AudioStreamHandle,
+    ) -> Result<Uuid> {
+        self.start_inner(event_tx, SessionAudio::Shared(handle))
+            .await
     }
 
     async fn start_inner(
         &self,
         event_tx: mpsc::Sender<SessionEvent>,
-        audio_override: Option<AudioStream>,
+        audio_override: SessionAudio,
     ) -> Result<Uuid> {
         let mut lock = self.active.lock().await;
         if lock.is_some() {
@@ -327,17 +371,20 @@ async fn run_session<A: AsrBackend + 'static>(
     mut control_rx: mpsc::UnboundedReceiver<SessionControl>,
     active_arc: Arc<Mutex<Option<ActiveHandle>>>,
     idle_notify: Arc<Notify>,
-    audio_override: Option<AudioStream>,
+    audio_override: SessionAudio,
     _settings: Arc<RwLock<UserSettings>>,
 ) {
     let mut status = SessionStatus::Completed;
 
     // ── Start audio capture ───────────────────────────────────────────────
-    let audio_stream = if let Some(stream) = audio_override {
-        stream
-    } else {
-        match AudioStream::new(AudioConfig::default()) {
-            Ok(s) => s,
+    let audio_source: AudioSource = match audio_override {
+        SessionAudio::Owned(stream) => AudioSource::Owned(stream),
+        SessionAudio::Shared(handle) => {
+            handle.drain();
+            AudioSource::Shared(handle)
+        }
+        SessionAudio::Open => match AudioStream::new(AudioConfig::default()) {
+            Ok(s) => AudioSource::Owned(s),
             Err(e) => {
                 fail_init(
                     &e,
@@ -350,7 +397,7 @@ async fn run_session<A: AsrBackend + 'static>(
                 .await;
                 return;
             }
-        }
+        },
     };
 
     let asr_session = match asr.start_session(config.asr_config).await {
@@ -441,7 +488,7 @@ async fn run_session<A: AsrBackend + 'static>(
 
             _ = audio_poll_tick.tick() => {
                 let mut saw_audio = false;
-                while let Some(chunk) = audio_stream.try_next_chunk() {
+                while let Some(chunk) = audio_source.try_next_chunk() {
                     saw_audio = true;
                     if !first_audio_logged {
                         let elapsed_ms = session_start.elapsed().as_millis();
@@ -499,7 +546,7 @@ async fn run_session<A: AsrBackend + 'static>(
 
                 if saw_audio {
                     last_audio_at = tokio::time::Instant::now();
-                } else if !audio_stream.is_offline()
+                } else if !audio_source.is_offline()
                     && last_audio_at.elapsed() > audio_starvation_limit
                 {
                     warn!(%session_id, "no audio received for 5s — mic may have disconnected");
@@ -508,7 +555,7 @@ async fn run_session<A: AsrBackend + 'static>(
                     break 'capture;
                 }
 
-                if !saw_audio && audio_stream.is_offline() {
+                if !saw_audio && audio_source.is_offline() {
                     debug!(%session_id, "offline audio exhausted");
                     break 'capture;
                 }

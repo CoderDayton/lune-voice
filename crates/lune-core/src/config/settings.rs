@@ -54,6 +54,12 @@ pub struct UserSettings {
     /// `None` inherits the active backend's recommended default.
     #[serde(default)]
     pub pipeline: PipelineOverrides,
+    /// Keep the microphone input stream open across sessions so the first
+    /// chunk arrives ~70 ms sooner after a hotkey press. The mic remains
+    /// powered/visible to the OS while the app runs; turn this off if you
+    /// prefer the indicator only appearing during dictation.
+    #[serde(default)]
+    pub mic_prewarm: bool,
 }
 
 impl UserSettings {
@@ -99,6 +105,7 @@ impl Default for UserSettings {
             max_speech_secs: default_max_speech_secs(),
             adaptive_vad: false,
             pipeline: PipelineOverrides::default(),
+            mic_prewarm: false,
         }
     }
 }

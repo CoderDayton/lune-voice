@@ -265,6 +265,59 @@ impl AudioStream {
     pub fn buffer_fill(&self) -> f32 {
         self.ring.len() as f32 / self.config.buffer_capacity as f32
     }
+
+    /// Discard every chunk currently buffered in the ring. Call before a
+    /// new consumer starts on a long-lived stream so stale audio captured
+    /// during the idle period isn't transcribed.
+    pub fn drain(&self) {
+        while self.ring.try_pop().is_some() {}
+    }
+
+    /// Lightweight handle that shares this stream's ring buffer.
+    ///
+    /// Multiple handles can coexist; whichever consumer pops first wins.
+    /// In practice the runtime holds the underlying `AudioStream` long
+    /// enough to outlive any handles, and only one session consumes at a
+    /// time.
+    pub fn handle(&self) -> AudioStreamHandle {
+        AudioStreamHandle {
+            config: self.config.clone(),
+            ring: Arc::clone(&self.ring),
+        }
+    }
+}
+
+/// Cheap-to-clone reader that shares an `AudioStream`'s ring buffer.
+///
+/// Lifetime of the underlying live capture is tied to the source
+/// `AudioStream` — drop the source and no new chunks arrive (already
+/// queued chunks remain consumable until drained).
+#[derive(Clone)]
+pub struct AudioStreamHandle {
+    config: AudioConfig,
+    ring: Arc<RingBuffer<AudioChunk>>,
+}
+
+impl AudioStreamHandle {
+    pub fn config(&self) -> &AudioConfig {
+        &self.config
+    }
+
+    pub async fn next_chunk(&self) -> Option<AudioChunk> {
+        self.ring.pop().await
+    }
+
+    pub fn try_next_chunk(&self) -> Option<AudioChunk> {
+        self.ring.try_pop()
+    }
+
+    pub fn drain(&self) {
+        while self.ring.try_pop().is_some() {}
+    }
+
+    pub fn buffer_fill(&self) -> f32 {
+        self.ring.len() as f32 / self.config.buffer_capacity as f32
+    }
 }
 
 /// Core audio processing callback (runs in real-time audio thread)
