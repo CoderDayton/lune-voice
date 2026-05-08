@@ -25,11 +25,15 @@
 
 pub mod calibrate;
 mod capture;
+pub mod pcen;
 mod ring;
 mod vad;
 
 pub use calibrate::{CalibrationError, CalibrationInput, CalibrationResult};
 pub use capture::{AudioConfig, AudioStream};
+pub use pcen::{
+    DEFAULT_NOISE_CEILING_RMS, EXPECTED_OUTPUT_RMS, PcenAgc, PcenAgcConfig, PcenFrameStats,
+};
 pub use vad::{Vad, VadConfig, VadResult};
 
 /// A chunk of resampled audio ready for downstream processing.

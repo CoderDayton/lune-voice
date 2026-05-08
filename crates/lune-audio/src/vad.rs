@@ -2,6 +2,8 @@
 
 use earshot::Detector;
 
+use crate::pcen::{PcenAgc, PcenAgcConfig};
+
 /// Earshot hop size: 256 samples = 16ms at 16kHz.
 const HOP_SIZE: usize = 256;
 
@@ -25,6 +27,10 @@ pub struct VadConfig {
     pub threshold_end: f32,
     /// Hangover duration in milliseconds. Default: 30
     pub hangover_ms: u32,
+    /// Optional PCEN-style adaptive AGC frontend. `None` (default) disables it.
+    /// When `Some`, each Earshot hop is normalized in place before scoring,
+    /// while the diagnostic `energy` field still reflects the raw input level.
+    pub pcen: Option<PcenAgcConfig>,
 }
 
 impl Default for VadConfig {
@@ -33,6 +39,7 @@ impl Default for VadConfig {
             threshold: 0.5,
             threshold_end: 0.3,
             hangover_ms: 30,
+            pcen: None,
         }
     }
 }
@@ -46,10 +53,12 @@ pub struct Vad {
     hangover_remaining: usize,
     hangover_total: usize,
     carry: Vec<f32>,
+    pcen: Option<PcenAgc>,
+    scratch: Vec<f32>,
 }
 
 impl Vad {
-    pub fn new(config: VadConfig, _sample_rate: u32) -> Result<Self, crate::AudioError> {
+    pub fn new(config: VadConfig, sample_rate: u32) -> Result<Self, crate::AudioError> {
         if !(0.0..=1.0).contains(&config.threshold) || !config.threshold.is_finite() {
             return Err(crate::AudioError::Vad(format!(
                 "threshold {} out of range [0.0, 1.0]",
@@ -71,6 +80,15 @@ impl Vad {
         let hangover_samples = (config.hangover_ms as usize)
             .saturating_mul(16)
             .max(HOP_SIZE);
+        let pcen = match config.pcen {
+            Some(cfg) => Some(PcenAgc::new(cfg, sample_rate, HOP_SIZE)?),
+            None => None,
+        };
+        let scratch = if pcen.is_some() {
+            vec![0.0; HOP_SIZE]
+        } else {
+            Vec::new()
+        };
         Ok(Self {
             inner: Detector::default(),
             threshold_start: config.threshold,
@@ -79,7 +97,27 @@ impl Vad {
             hangover_remaining: 0,
             hangover_total: hangover_samples,
             carry: Vec::with_capacity(HOP_SIZE),
+            pcen,
+            scratch,
         })
+    }
+
+    #[inline]
+    fn predict_frame(
+        inner: &mut Detector,
+        pcen: Option<&mut PcenAgc>,
+        scratch: &mut Vec<f32>,
+        frame: &[f32],
+    ) -> f32 {
+        match pcen {
+            Some(p) => {
+                scratch.clear();
+                scratch.extend_from_slice(frame);
+                let _ = p.process_frame(scratch);
+                inner.predict_f32(scratch)
+            }
+            None => inner.predict_f32(frame),
+        }
     }
 
     pub fn process_chunk(&mut self, samples: &[f32]) -> VadResult {
@@ -92,7 +130,13 @@ impl Vad {
             let needed = HOP_SIZE - self.carry.len();
             if samples.len() >= needed {
                 self.carry.extend_from_slice(&samples[..needed]);
-                max_score = max_score.max(self.inner.predict_f32(&self.carry));
+                let s = Self::predict_frame(
+                    &mut self.inner,
+                    self.pcen.as_mut(),
+                    &mut self.scratch,
+                    &self.carry,
+                );
+                max_score = max_score.max(s);
                 self.carry.clear();
                 offset = needed;
             } else {
@@ -102,7 +146,12 @@ impl Vad {
 
         while offset + HOP_SIZE <= samples.len() {
             let frame = &samples[offset..offset + HOP_SIZE];
-            let score = self.inner.predict_f32(frame);
+            let score = Self::predict_frame(
+                &mut self.inner,
+                self.pcen.as_mut(),
+                &mut self.scratch,
+                frame,
+            );
             max_score = max_score.max(score);
             offset += HOP_SIZE;
         }
@@ -164,12 +213,32 @@ mod tests {
     }
 
     #[test]
+    fn pcen_opt_in_processes_chunks_and_preserves_raw_energy() {
+        let cfg = VadConfig {
+            pcen: Some(crate::pcen::PcenAgcConfig::default()),
+            ..Default::default()
+        };
+        let mut vad = Vad::new(cfg, 16_000).unwrap();
+        // Quiet sine well below VAD threshold so non-finite output would surface.
+        let dt = 1.0 / 16_000.0f32;
+        let chunk: Vec<f32> = (0..HOP_SIZE * 4)
+            .map(|i| 0.02 * (2.0 * std::f32::consts::PI * 440.0 * i as f32 * dt).sin())
+            .collect();
+        let raw_rms = compute_rms(&chunk);
+        let r = vad.process_chunk(&chunk);
+        // Diagnostic energy must reflect raw input, unaffected by AGC.
+        assert!((r.energy - raw_rms).abs() < 1e-6);
+        assert!(r.vad_score.is_finite() && (0.0..=1.0).contains(&r.vad_score));
+    }
+
+    #[test]
     fn rejects_inverted_thresholds() {
         let r = Vad::new(
             VadConfig {
                 threshold: 0.3,
                 threshold_end: 0.5,
                 hangover_ms: 30,
+                ..Default::default()
             },
             16_000,
         );
@@ -184,6 +253,7 @@ mod tests {
                     threshold: start,
                     threshold_end: end,
                     hangover_ms: 30,
+                    ..Default::default()
                 },
                 16_000,
             );
@@ -201,6 +271,7 @@ mod tests {
                 threshold: f32::NAN,
                 threshold_end: 0.3,
                 hangover_ms: 30,
+                ..Default::default()
             },
             16_000,
         );
@@ -214,6 +285,7 @@ mod tests {
                 threshold: 0.5,
                 threshold_end: 0.3,
                 hangover_ms: u32::MAX,
+                ..Default::default()
             },
             16_000,
         );
