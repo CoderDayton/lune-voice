@@ -59,13 +59,13 @@ impl Default for PcenAgcConfig {
         Self {
             target_rms: EXPECTED_OUTPUT_RMS,
             noise_ceiling_rms: DEFAULT_NOISE_CEILING_RMS,
-            max_gain: 32.0,
+            max_gain: 12.0,
             min_gain: 0.25,
-            alpha: 0.95,
-            tau_signal_ms: 150.0,
+            alpha: 0.85,
+            tau_signal_ms: 250.0,
             tau_noise_up_ms: 5_000.0,
             tau_noise_down_ms: 200.0,
-            tau_gain_ms: 50.0,
+            tau_gain_ms: 80.0,
             warmup_frames: 16,
             eps: 1.0e-8,
         }
