@@ -85,7 +85,7 @@ function EditRow({ entry, onDone }: { entry: DictionaryEntry; onDone: () => void
         <div className="flex items-center justify-end gap-1">
           <button
             type="button"
-            className="btn btn-ghost btn-sm btn-square"
+            className="btn btn-soft btn-sm btn-square"
             onClick={onDone}
             disabled={saving}
             aria-label={t`Cancel`}
@@ -127,7 +127,7 @@ function ViewRow({ entry, onEdit }: { entry: DictionaryEntry; onEdit: () => void
           </span>
           <button
             type="button"
-            className="btn btn-ghost btn-sm btn-square opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+            className="btn btn-soft btn-sm btn-square opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
             onClick={onEdit}
             aria-label={t`Edit`}
           >

@@ -336,7 +336,7 @@ export function ThemePicker() {
               className="text-base sm:text-lg font-bold text-content-strong"
             >{t`Choose a theme`}</h3>
             <form method="dialog">
-              <button type="submit" className="btn btn-ghost btn-sm btn-circle">
+              <button type="submit" className="btn btn-soft btn-sm btn-circle">
                 ✕
               </button>
             </form>

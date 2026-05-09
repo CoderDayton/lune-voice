@@ -1,16 +1,7 @@
 import { useLingui } from '@lingui/react/macro';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import {
-  AlertTriangle,
-  Circle,
-  Download,
-  HardDrive,
-  Info,
-  Loader2,
-  Trash2,
-  Zap,
-} from 'lucide-react';
+import { AlertTriangle, Circle, Download, HardDrive, Loader2, Trash2, Zap } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SettingsSection } from '../components/section';
 
@@ -161,17 +152,17 @@ export function ModelsSection() {
           return (
             <div
               key={model.localName}
-              className="flex flex-col gap-2 py-3 border-b border-surface-border last:border-0 sm:flex-row sm:items-start sm:justify-between"
+              className="flex flex-col gap-2 py-3 border-b border-surface-border last:border-0"
             >
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
                   <StatusBadge state={state} />
-                  <span className="font-medium text-sm">{model.name}</span>
+                  <span className="font-medium text-sm truncate">{model.name}</span>
                 </div>
                 {model.ready ? (
                   <button
                     type="button"
-                    className="btn btn-ghost btn-sm text-error"
+                    className="btn btn-soft btn-error btn-sm gap-1.5"
                     onClick={() => handleDeleteClick(model)}
                   >
                     <Trash2 size={13} />
@@ -180,7 +171,7 @@ export function ModelsSection() {
                 ) : (
                   <button
                     type="button"
-                    className="btn btn-primary btn-sm whitespace-nowrap"
+                    className="btn btn-primary btn-sm whitespace-nowrap gap-1.5"
                     onClick={() => handleDownload(model.localName)}
                     disabled={!!downloading}
                   >
@@ -194,12 +185,11 @@ export function ModelsSection() {
                 )}
               </div>
               {model.description && (
-                <p className="text-sm text-content-subtle flex gap-1.5 items-start">
-                  <Info size={12} className="mt-0.5 shrink-0" />
-                  {model.description}
-                </p>
+                <p className="text-xs text-content-subtle pl-1">{model.description}</p>
               )}
-              {progressText && <p className="text-sm text-content-subtle">{progressText}</p>}
+              {progressText && (
+                <p className="text-xs text-content-subtle pl-1 tabular-nums">{progressText}</p>
+              )}
             </div>
           );
         })}
@@ -227,7 +217,7 @@ export function ModelsSection() {
                   <div className="modal-action">
                     <button
                       type="button"
-                      className="btn btn-ghost"
+                      className="btn btn-soft"
                       onClick={() => dialogRef.current?.close()}
                     >
                       {t`Cancel`}
@@ -241,7 +231,7 @@ export function ModelsSection() {
             })()}
           <button
             type="button"
-            className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
+            className="btn btn-sm btn-circle btn-soft absolute right-2 top-2"
             onClick={() => dialogRef.current?.close()}
           >
             ✕

@@ -39,7 +39,7 @@ export function HistoryPagination() {
           <ChevronLeft size={14} /> {t`Prev`}
         </button>
         <span
-          className="btn btn-sm join-item btn-ghost no-animation pointer-events-none tabular-nums"
+          className="btn btn-sm join-item btn-soft no-animation pointer-events-none tabular-nums"
           aria-current="page"
         >
           {t`${page} / ${totalPages}`}

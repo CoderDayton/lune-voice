@@ -53,7 +53,7 @@ export function HistoryToolbar() {
           <button
             type="button"
             onClick={() => workspaceActions.setHistorySearch('')}
-            className="btn btn-ghost btn-circle btn-xs text-content-subtle hover:text-content-strong"
+            className="btn btn-soft btn-circle btn-xs"
             aria-label={t`Clear search`}
           >
             <X size={14} />

@@ -65,7 +65,7 @@ export function StylePresetCard({
             <button type="button" className="btn btn-xs btn-error" onClick={onConfirmDelete}>
               {t`Delete`}
             </button>
-            <button type="button" className="btn btn-xs btn-ghost" onClick={onCancelDelete}>
+            <button type="button" className="btn btn-xs btn-soft" onClick={onCancelDelete}>
               {t`Cancel`}
             </button>
           </div>
@@ -79,12 +79,12 @@ export function StylePresetCard({
           </button>
         ) : (
           <div className="pointer-events-auto flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button type="button" className="btn btn-ghost btn-xs gap-1" onClick={onEdit}>
+            <button type="button" className="btn btn-soft btn-xs gap-1" onClick={onEdit}>
               <Pencil size={13} /> {t`Edit`}
             </button>
             <button
               type="button"
-              className="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/8"
+              className="btn btn-soft btn-error btn-xs gap-1.5"
               onClick={onRequestDelete}
             >
               <Trash2 size={13} />

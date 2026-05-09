@@ -93,7 +93,7 @@ export function StyleEditorModal({
         <div className="modal-action mt-6">
           {isViewOnly ? (
             <>
-              <button type="button" className="btn btn-ghost" onClick={onClose}>
+              <button type="button" className="btn btn-soft" onClick={onClose}>
                 {t`Close`}
               </button>
               <button type="button" className="btn btn-primary gap-2" onClick={onDuplicate}>
@@ -102,7 +102,7 @@ export function StyleEditorModal({
             </>
           ) : (
             <>
-              <button type="button" className="btn btn-ghost" onClick={onClose} disabled={busy}>
+              <button type="button" className="btn btn-soft" onClick={onClose} disabled={busy}>
                 {t`Cancel`}
               </button>
               <button

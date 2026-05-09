@@ -8,25 +8,44 @@ mod runtime;
 #[cfg(test)]
 mod tauri_integration_tests;
 
-use tauri::Manager;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 #[cfg(not(target_os = "linux"))]
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
-/// Show, unminimize, and focus the main application window.
-fn show_main_window(app: &tauri::AppHandle) {
+/// Set when the user explicitly requested a quit (tray "Quit" menu).
+/// Without this flag, the ExitRequested handler can't tell intentional
+/// quits apart from window-closes, and we'd block both.
+static QUIT_REQUESTED: AtomicBool = AtomicBool::new(false);
+
+/// Bring the main window to front, creating it on demand if it doesn't exist.
+/// We don't keep the window alive while minimized — closing destroys the
+/// webview to free its memory, and the next call here rebuilds it.
+fn create_or_focus_main_window(app: &tauri::AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.unminimize();
         let _ = w.show();
         let _ = w.set_focus();
+        return;
+    }
+    if let Err(e) = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+        .title("Lune Voice")
+        .inner_size(1280.0, 720.0)
+        .min_inner_size(1280.0, 720.0)
+        .resizable(true)
+        .decorations(true)
+        .build()
+    {
+        tracing::error!(error = %e, "failed to create main window");
     }
 }
 
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            show_main_window(app);
+            create_or_focus_main_window(app);
         }))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
@@ -39,10 +58,12 @@ pub fn run() {
             let start_minimized = tauri::async_runtime::block_on(runtime.start_minimized());
             app.manage(runtime);
 
-            // Hide the main window when start_minimized is on. The tray icon
-            // (registered below) remains the way to bring it back up.
-            if start_minimized && let Some(w) = app.get_webview_window("main") {
-                let _ = w.hide();
+            // Build the main window only when not starting minimized. While
+            // minimized the webview isn't created at all — the tray icon
+            // (registered below) is the way to bring it up, which lazily
+            // builds it via create_or_focus_main_window.
+            if !start_minimized {
+                create_or_focus_main_window(app.handle());
             }
 
             // ── Global hotkeys ─────────────────────────────────────────────
@@ -71,7 +92,7 @@ pub fn run() {
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "show" => {
-                        show_main_window(app);
+                        create_or_focus_main_window(app);
                     }
                     "toggle" => {
                         let rt = app.state::<runtime::AppRuntime>();
@@ -81,6 +102,7 @@ pub fn run() {
                         });
                     }
                     "quit" => {
+                        QUIT_REQUESTED.store(true, Ordering::SeqCst);
                         app.exit(0);
                     }
                     _ => {}
@@ -93,21 +115,10 @@ pub fn run() {
                     } = event
                     {
                         let app = tray.app_handle();
-                        show_main_window(app);
+                        create_or_focus_main_window(app);
                     }
                 })
                 .build(app)?;
-
-            // ── Close to tray (hide instead of quit) ─────────────────────
-            if let Some(main_window) = app.get_webview_window("main") {
-                let w = main_window.clone();
-                main_window.on_window_event(move |event| {
-                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                        api.prevent_close();
-                        let _ = w.hide();
-                    }
-                });
-            }
 
             Ok(())
         })
@@ -140,10 +151,23 @@ pub fn run() {
             commands::delete_model_cmd,
             commands::initialize_pipeline
         ])
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .unwrap_or_else(|e| {
             eprintln!("fatal: tauri application exited with error: {e}");
             std::process::exit(1);
+        })
+        .run(|_app, event| {
+            // Closing the main window destroys it to free webview memory.
+            // Without this, Tauri would also exit the app. We keep the
+            // process alive so the tray icon, hotkeys, and dictation
+            // runtime continue working — the user can rebuild the window
+            // from the tray. Tray "Quit" sets QUIT_REQUESTED so its
+            // explicit app.exit(0) is honored.
+            if let tauri::RunEvent::ExitRequested { api, .. } = event
+                && !QUIT_REQUESTED.load(Ordering::SeqCst)
+            {
+                api.prevent_exit();
+            }
         });
 }
 

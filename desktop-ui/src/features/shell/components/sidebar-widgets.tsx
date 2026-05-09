@@ -18,7 +18,7 @@ export function SidebarQuickStart() {
         type="button"
         onClick={() => void toggleDictation()}
         disabled={isConnecting}
-        className={`group flex w-full items-center gap-4 rounded-field border px-4 py-3.5 shadow-card transition-all sm:gap-4 sm:px-4 sm:py-3.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+        className={`group flex w-full cursor-pointer items-center gap-4 rounded-field border px-4 py-3.5 shadow-card transition-all sm:gap-4 sm:px-4 sm:py-3.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
           isActive
             ? 'border-error/30 bg-error/[0.08] hover:bg-error/[0.12] hover:border-error/40'
             : 'border-primary/15 bg-primary/[0.06] hover:bg-primary/[0.1] hover:border-primary/25 disabled:cursor-not-allowed disabled:opacity-60'

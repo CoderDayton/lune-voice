@@ -241,10 +241,10 @@ function PhaseResult(props: PhaseResultProps) {
         </div>
       </div>
       <div className="modal-action gap-2">
-        <button type="button" className="btn btn-ghost" onClick={props.onRecalibrate}>
+        <button type="button" className="btn btn-soft" onClick={props.onRecalibrate}>
           {props.recalibrateLabel}
         </button>
-        <button type="button" className="btn btn-ghost" onClick={props.onAdjust}>
+        <button type="button" className="btn btn-soft" onClick={props.onAdjust}>
           {props.adjustLabel}
         </button>
         <button type="button" className="btn btn-primary" onClick={() => void props.onApply()}>
@@ -268,7 +268,7 @@ function PhaseError({ message, retryLabel, cancelLabel, onRetry, onCancel }: Pha
     <div className="py-4 flex flex-col gap-3">
       <p className="text-sm text-error">{message}</p>
       <div className="modal-action gap-2">
-        <button type="button" className="btn btn-ghost" onClick={onCancel}>
+        <button type="button" className="btn btn-soft" onClick={onCancel}>
           {cancelLabel}
         </button>
         <button type="button" className="btn btn-primary" onClick={onRetry}>

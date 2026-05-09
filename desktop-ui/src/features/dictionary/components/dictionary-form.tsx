@@ -1,5 +1,5 @@
 import { Trans, useLingui } from '@lingui/react/macro';
-import { Check } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useActionState, useRef, useState } from 'react';
 import { addDictionaryEntry } from '../../../store/workspace-store';
 import { PriorityPicker } from './priority-picker';
@@ -8,10 +8,9 @@ interface FormState {
   phrase: string;
   replacement: string;
   error: string | null;
-  success: boolean;
 }
 
-const initialState: FormState = { phrase: '', replacement: '', error: null, success: false };
+const initialState: FormState = { phrase: '', replacement: '', error: null };
 
 export function DictionaryForm() {
   const { t } = useLingui();
@@ -26,13 +25,12 @@ export function DictionaryForm() {
       const added = await addDictionaryEntry(phrase, replacement, p);
       if (added) {
         resetCounter.current++;
-        return { ...initialState, success: true };
+        return initialState;
       }
       return {
         phrase,
         replacement,
         error: 'Failed to add entry. Please try again.',
-        success: false,
       };
     },
     initialState,
@@ -45,63 +43,64 @@ export function DictionaryForm() {
         <h3 className="text-xl font-semibold tracking-tight mb-4">
           <Trans>Add correction rule</Trans>
         </h3>
-        <fieldset className="flex flex-col sm:flex-row gap-3 items-end" disabled={isPending}>
-          <label className="form-control flex-1">
-            <div className="label">
-              <span className="label-text">
+        <fieldset className="flex flex-col gap-4" disabled={isPending}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <label className="flex flex-1 flex-col gap-1.5">
+              <span className="text-sm font-medium">
                 <Trans>Spoken phrase</Trans>
               </span>
-            </div>
-            <input
-              type="text"
-              name="phrase"
-              className="input w-full"
-              defaultValue={state.phrase}
-              key={state.success ? `reset-phrase-${resetCounter.current}` : undefined}
-              placeholder={t`e.g. github…`}
-              required
-              aria-required="true"
-            />
-          </label>
-          <span className="hidden sm:block pb-3 text-content-dim text-lg" aria-hidden="true">
-            →
-          </span>
-          <label className="form-control flex-1">
-            <div className="label">
-              <span className="label-text">
+              <input
+                type="text"
+                name="phrase"
+                className="input w-full"
+                defaultValue={state.phrase}
+                key={`phrase-${resetCounter.current}`}
+                placeholder={t`e.g. github…`}
+                required
+                aria-required="true"
+              />
+            </label>
+            <span className="hidden text-lg text-content-dim sm:block sm:pb-2.5" aria-hidden="true">
+              →
+            </span>
+            <label className="flex flex-1 flex-col gap-1.5">
+              <span className="text-sm font-medium">
                 <Trans>Replacement</Trans>
               </span>
-            </div>
-            <input
-              type="text"
-              name="replacement"
-              className="input w-full"
-              defaultValue={state.replacement}
-              key={state.success ? `reset-replacement-${resetCounter.current}` : undefined}
-              placeholder={t`e.g. GitHub…`}
-              required
-              aria-required="true"
-            />
-          </label>
-          <div className="form-control">
-            <div className="label">
-              <span className="label-text">
+              <input
+                type="text"
+                name="replacement"
+                className="input w-full"
+                defaultValue={state.replacement}
+                key={`replacement-${resetCounter.current}`}
+                placeholder={t`e.g. GitHub…`}
+                required
+                aria-required="true"
+              />
+            </label>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium">
                 <Trans>Priority</Trans>
               </span>
+              <PriorityPicker value={priority} onChange={setPriority} size="sm" />
             </div>
-            <PriorityPicker value={priority} onChange={setPriority} />
+            <button
+              type="submit"
+              className="btn btn-primary btn-sm w-full sm:w-auto sm:min-w-32"
+              disabled={isPending}
+            >
+              {isPending ? (
+                <span className="loading loading-spinner loading-sm" />
+              ) : (
+                <>
+                  <Plus size={14} strokeWidth={2.5} />
+                  <Trans>Add</Trans>
+                </>
+              )}
+            </button>
           </div>
-          <button type="submit" className="btn btn-primary w-full sm:w-auto" disabled={isPending}>
-            {isPending ? (
-              <span className="loading loading-spinner loading-sm" />
-            ) : state.success ? (
-              <>
-                <Check size={16} strokeWidth={2.5} /> <Trans>Added</Trans>
-              </>
-            ) : (
-              <Trans>Add</Trans>
-            )}
-          </button>
         </fieldset>
         {state.error && (
           <p role="alert" className="mt-3 text-sm text-error">

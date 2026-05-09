@@ -85,7 +85,7 @@ export function KeyCaptureInput({
         className={cn(
           'btn btn-outline btn-sm font-mono font-semibold select-none',
           'min-w-28 sm:min-w-36 justify-center',
-          listening ? 'btn-primary animate-pulse' : 'btn-ghost',
+          listening ? 'btn-primary animate-pulse' : 'btn-soft',
           disabled && 'btn-disabled',
         )}
       >

@@ -471,13 +471,27 @@
     transform: scale(0.97);
   }
 
-  /* Focus ring — primary-tinted, offset for clarity */
-  .input:focus-within,
-  .select:focus,
-  .toggle:focus-visible,
-  .btn:focus-visible {
-    outline: 2px solid var(--ring-focus);
-    outline-offset: 2px;
+  /* Strip every default focus indicator (outline + DaisyUI box-shadow
+     rings). Scoped to the focused element itself — parents using
+     :focus-within keep their own shadows. */
+  *:focus,
+  *:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Polished keyboard focus on textual fields: 1px primary-tinted border
+     plus a soft halo glow. No chunky outline, no offset gap. Only fires
+     for keyboard navigation (:focus-visible). */
+  .input:focus-visible,
+  .textarea:focus-visible {
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 0 0 3px var(--ring-focus) !important;
+  }
+
+  /* Toggle gets just the halo — its track already shows on/off state. */
+  .toggle:focus-visible {
+    box-shadow: 0 0 0 3px var(--ring-focus) !important;
   }
 
   .input,
@@ -485,6 +499,16 @@
   .textarea {
     background: var(--surface-field);
     border-color: var(--surface-border);
+  }
+
+  /* Lock the select's border on focus/open — DaisyUI brightens it,
+     which reads as a chunky outline. Selects use the dropdown chevron
+     for affordance, no need to highlight the border. */
+  .select:focus,
+  .select:focus-visible,
+  .select:focus-within,
+  .select:hover {
+    border-color: var(--surface-border) !important;
   }
 
   /* UI chrome should not be selectable — only content text */
@@ -571,10 +595,16 @@
   }
 }
 
-/* ── btn-soft fix: DaisyUI mixes only 8% of color into base-100,
-   invisible on dark themes. Override to 30% for a visible tint.
-   Must be unlayered to beat DaisyUI's @layer daisyui.l1 specificity. */
-.btn-soft:not(
+/* ── btn-soft fix: DaisyUI's default 8% mix is invisible on dark themes
+   and the same 30% override looks too dark on light themes. Tune per
+   scheme so the tint reads as "subtle button" in both. Must be unlayered
+   to beat DaisyUI's @layer daisyui.l1 specificity. */
+:root .btn-soft:not(
+  .btn-active, :hover, :active:focus, :focus-visible,
+  input:checked:not(.filter .btn),
+  :disabled, [disabled], .btn-disabled
+),
+[data-color-scheme="dark"] .btn-soft:not(
   .btn-active, :hover, :active:focus, :focus-visible,
   input:checked:not(.filter .btn),
   :disabled, [disabled], .btn-disabled
@@ -587,6 +617,23 @@
   --btn-border: color-mix(
     in oklab,
     var(--btn-color, var(--color-base-content)) 35%,
+    var(--color-base-100)
+  );
+}
+
+[data-color-scheme="light"] .btn-soft:not(
+  .btn-active, :hover, :active:focus, :focus-visible,
+  input:checked:not(.filter .btn),
+  :disabled, [disabled], .btn-disabled
+) {
+  --btn-bg: color-mix(
+    in oklab,
+    var(--btn-color, var(--color-base-content)) 6%,
+    var(--color-base-100)
+  );
+  --btn-border: color-mix(
+    in oklab,
+    var(--btn-color, var(--color-base-content)) 11%,
     var(--color-base-100)
   );
 }
@@ -697,8 +744,13 @@
 
 /* ── Status pulse ──────────────────────────────────────────────────── */
 
+/* status-pulse adds an animated halo via ::after. The host element must
+   already establish a positioning context (position: absolute/relative);
+   we don't add `position: relative` here because it would clobber an
+   `absolute`-positioned host (e.g. the corner status dot on the brand
+   logo) and make the host reflow in normal document order. */
 @utility status-pulse {
-  @apply relative;
+  isolation: isolate;
 }
 
 .status-pulse::after {
@@ -776,7 +828,7 @@
 }
 
 @utility pill-btn {
-  @apply btn btn-circle btn-ghost btn-sm border border-transparent text-base-content/60;
+  @apply btn btn-circle btn-soft btn-sm border border-transparent text-base-content/60;
   transition: color 150ms ease, background-color 150ms ease;
 }
 

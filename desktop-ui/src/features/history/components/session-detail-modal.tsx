@@ -125,7 +125,7 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
                   <button
                     type="button"
                     onClick={handleDownload}
-                    className="btn btn-ghost btn-sm btn-circle"
+                    className="btn btn-soft btn-sm btn-circle"
                     aria-label={t`Download transcript`}
                   >
                     <Download size={15} strokeWidth={1.8} />
@@ -133,7 +133,7 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
                   <button
                     type="button"
                     onClick={handleCopy}
-                    className="btn btn-ghost btn-sm btn-circle"
+                    className="btn btn-soft btn-sm btn-circle"
                     aria-label={t`Copy transcript`}
                   >
                     {copied ? (
@@ -203,10 +203,7 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
               }}
             />
             <form method="dialog">
-              <button
-                type="submit"
-                className="btn btn-ghost btn-sm text-content-muted"
-              >{t`Close`}</button>
+              <button type="submit" className="btn btn-soft btn-sm">{t`Close`}</button>
             </form>
           </div>
         </div>

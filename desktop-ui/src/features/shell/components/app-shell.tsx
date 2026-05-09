@@ -69,7 +69,7 @@ export function AppShell() {
 
         {/* Mobile topbar */}
         <div className="flex items-center gap-2 px-3 py-2 lg:hidden border-b border-surface-border bg-surface-glass backdrop-blur-sm">
-          <label htmlFor={DRAWER_ID} className="btn btn-ghost btn-sm" aria-label="Open menu">
+          <label htmlFor={DRAWER_ID} className="btn btn-soft btn-sm" aria-label="Open menu">
             <Menu size={20} strokeWidth={1.5} />
           </label>
           <span className="font-display tracking-heading text-base font-medium text-content-default select-none">

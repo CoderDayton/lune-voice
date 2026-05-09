@@ -26,7 +26,7 @@ export function ConfirmDialog({
     <>
       <button
         type="button"
-        className="btn btn-ghost btn-sm"
+        className="btn btn-soft btn-sm"
         aria-haspopup="dialog"
         onClick={() => dialog?.showModal()}
       >
@@ -48,7 +48,7 @@ export function ConfirmDialog({
           <p className="py-4 text-sm text-content-muted">{description}</p>
           <div className="modal-action">
             <form method="dialog">
-              <button type="submit" className="btn btn-ghost">
+              <button type="submit" className="btn btn-soft">
                 {cancelLabel ?? t`Cancel`}
               </button>
             </form>

@@ -57,7 +57,7 @@ export function InputSection({ settings }: SettingsProps) {
         control={
           <button
             type="button"
-            className="btn btn-sm btn-ghost gap-2"
+            className="btn btn-sm btn-soft gap-2"
             onClick={() => setCalibrateOpen(true)}
             aria-label={t`Calibrate microphone`}
           >

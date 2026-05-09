@@ -235,7 +235,7 @@ export function ModelSetup({ children }: { children: React.ReactNode }) {
           ) : (
             <button
               type="button"
-              className="btn btn-ghost btn-sm text-content-dim"
+              className="btn btn-soft btn-sm"
               onClick={() => {
                 localStorage.setItem('lune-setup-complete', '1');
                 setPhase('ready');

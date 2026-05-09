@@ -20,11 +20,14 @@ export function PriorityBadge({ value }: { value: number }) {
 export function PriorityPicker({
   value,
   onChange,
+  size = 'xs',
 }: {
   value: number;
   onChange: (v: number) => void;
+  size?: 'xs' | 'sm' | 'md';
 }) {
   const { t } = useLingui();
+  const sizeClass = size === 'md' ? '' : `btn-${size}`;
 
   return (
     <div className="join join-horizontal" role="toolbar" aria-label={t`Priority`}>
@@ -35,7 +38,7 @@ export function PriorityPicker({
             key={level.value}
             type="button"
             aria-pressed={active}
-            className={`join-item btn btn-xs ${active ? 'btn-primary' : 'btn-ghost'}`}
+            className={`join-item btn ${sizeClass} ${active ? 'btn-primary' : 'btn-soft'}`}
             onClick={() => onChange(level.value)}
           >
             {level.label}
