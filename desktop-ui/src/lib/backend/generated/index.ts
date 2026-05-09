@@ -11,6 +11,7 @@ export type { HistoryItemDto } from './HistoryItemDto';
 export type { PillSnapshotDto } from './PillSnapshotDto';
 export type { PillVisibilityDto } from './PillVisibilityDto';
 export type { SaveWorkspaceSettingsInput } from './SaveWorkspaceSettingsInput';
+export type { SessionStatsDto } from './SessionStatsDto';
 export type { StylePresetDto } from './StylePresetDto';
 export type { WorkspaceSettingsDto } from './WorkspaceSettingsDto';
 export type { WorkspaceSnapshot } from './WorkspaceSnapshot';

@@ -16,6 +16,13 @@ use self::models::{NewDictionaryEntry, NewSession, NewSnippet};
 use self::schema::{dictionary, sessions, snippets};
 use crate::error::{PersistError, PersistResult};
 
+#[derive(Debug, Default, Clone, Copy)]
+pub struct SessionStats {
+    pub sessions: u32,
+    pub words: u32,
+    pub seconds: u32,
+}
+
 type SessionRow7 = (
     String,
     String,
@@ -286,6 +293,38 @@ impl Database {
             .values(&new)
             .execute(&mut self.conn)?;
         Ok(())
+    }
+
+    /// Aggregate stats across the entire sessions table (not capped by history limits).
+    /// Counts only sessions with non-empty transcripts so it matches what the UI shows
+    /// in the recent-sessions list.
+    pub fn session_stats(&mut self) -> PersistResult<SessionStats> {
+        use self::schema::sessions::dsl::*;
+
+        let rows = sessions
+            .select((started_at, ended_at, transcript))
+            .filter(transcript.is_not_null())
+            .load::<(String, Option<String>, Option<String>)>(&mut self.conn)?;
+
+        let mut stats = SessionStats::default();
+        for (s_at, e_at, trans) in rows {
+            let Some(text) = trans else { continue };
+            let words = text.split_whitespace().count() as u32;
+            if words == 0 {
+                continue;
+            }
+            stats.sessions += 1;
+            stats.words += words;
+            if let Some(ended) = e_at {
+                let started = DateTime::parse_from_rfc3339(&s_at).ok();
+                let ended = DateTime::parse_from_rfc3339(&ended).ok();
+                if let (Some(started), Some(ended)) = (started, ended) {
+                    let secs = (ended - started).num_seconds().max(1) as u32;
+                    stats.seconds = stats.seconds.saturating_add(secs);
+                }
+            }
+        }
+        Ok(stats)
     }
 
     pub fn list_sessions(&mut self, limit: u32) -> PersistResult<Vec<DictationSession>> {

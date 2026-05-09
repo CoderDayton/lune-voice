@@ -89,6 +89,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
       replacement: entry.replacement,
       priority: entry.priority,
     })),
+    stats: { sessions: 0, words: 0, seconds: 0 },
     stylePresets: [
       {
         id: 'minimal',
@@ -136,7 +137,29 @@ function createMockSnapshot(): WorkspaceSnapshot {
   };
 }
 
-let mockSnapshot: WorkspaceSnapshot = createMockSnapshot();
+function computeStats(history: WorkspaceSnapshot['history']) {
+  let words = 0;
+  let seconds = 0;
+  let sessions = 0;
+  for (const h of history) {
+    if (!h.transcript) continue;
+    const w = h.transcript.trim().split(/\s+/).filter(Boolean).length;
+    if (w === 0) continue;
+    sessions++;
+    words += w;
+    if (h.endedAt) {
+      const dt = (new Date(h.endedAt).getTime() - new Date(h.startedAt).getTime()) / 1000;
+      seconds += Math.max(1, Math.round(dt));
+    }
+  }
+  return { sessions, words, seconds };
+}
+
+function snapshotWithStats(s: WorkspaceSnapshot): WorkspaceSnapshot {
+  return { ...s, stats: computeStats(s.history) };
+}
+
+let mockSnapshot: WorkspaceSnapshot = snapshotWithStats(createMockSnapshot());
 let nextDictionaryId = 1000;
 let nextStyleId = 1000;
 
@@ -208,10 +231,10 @@ export const mockBackendClient: BackendClient = {
   },
 
   async deleteSession(sessionId) {
-    mockSnapshot = {
+    mockSnapshot = snapshotWithStats({
       ...mockSnapshot,
       history: mockSnapshot.history.filter((entry) => entry.id !== sessionId),
-    };
+    });
     return structuredClone(mockSnapshot);
   },
 

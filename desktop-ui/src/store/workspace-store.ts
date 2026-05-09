@@ -35,6 +35,7 @@ export const workspaceStore = new Store<WorkspaceState>({
   historyPageSize: 20,
   dictionaryEntries: [],
   historySessions: [],
+  sessionTotals: { sessions: 0, words: 0, seconds: 0 },
   stylePresets: [],
   settings: { ...DEFAULT_SETTINGS },
   runtime: { ...DEFAULT_RUNTIME },
@@ -112,6 +113,11 @@ export const workspaceActions = {
         .filter((entry) => entry.transcript)
         .map(mapHistoryEntry)
         .filter((entry): entry is HistorySession => entry !== null),
+      sessionTotals: {
+        sessions: snapshot.stats.sessions,
+        words: snapshot.stats.words,
+        seconds: snapshot.stats.seconds,
+      },
       settings: mapWorkspaceSettings(snapshot),
       runtime: {
         ipcFlavor: snapshot.ipcFlavor,
@@ -419,23 +425,17 @@ export interface SessionStats {
   count: number;
 }
 
-let _statsCache: { sessions: HistorySession[]; result: SessionStats } | null = null;
+let _statsCache: { totals: WorkspaceState['sessionTotals']; result: SessionStats } | null = null;
 
 export function getSessionStats(state: WorkspaceState): SessionStats {
-  const sessions = state.historySessions;
-  if (_statsCache && _statsCache.sessions === sessions) return _statsCache.result;
-  let words = 0;
-  let seconds = 0;
-  for (const s of sessions) {
-    words += s.words;
-    seconds += s.seconds;
-  }
+  const totals = state.sessionTotals;
+  if (_statsCache && _statsCache.totals === totals) return _statsCache.result;
   const result = {
-    totalWords: words,
-    totalMinutes: Math.round(seconds / 60),
-    count: sessions.length,
+    totalWords: totals.words,
+    totalMinutes: Math.round(totals.seconds / 60),
+    count: totals.sessions,
   };
-  _statsCache = { sessions, result };
+  _statsCache = { totals, result };
   return result;
 }
 

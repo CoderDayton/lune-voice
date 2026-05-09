@@ -39,6 +39,7 @@ function makeSnapshot(overrides: Partial<WorkspaceSnapshot> = {}): WorkspaceSnap
     history: [],
     dictionary: [],
     stylePresets: [],
+    stats: { sessions: 0, words: 0, seconds: 0 },
     ...overrides,
   };
 }

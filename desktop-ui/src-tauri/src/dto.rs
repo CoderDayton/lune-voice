@@ -102,6 +102,16 @@ pub struct WorkspaceSnapshot {
     pub history: Vec<HistoryItemDto>,
     pub dictionary: Vec<DictionaryItemDto>,
     pub style_presets: Vec<StylePresetDto>,
+    pub stats: SessionStatsDto,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct SessionStatsDto {
+    pub sessions: u32,
+    pub words: u32,
+    pub seconds: u32,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]

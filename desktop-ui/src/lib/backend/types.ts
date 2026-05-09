@@ -18,6 +18,7 @@ export type {
   PillSnapshotDto,
   PillVisibilityDto,
   SaveWorkspaceSettingsInput,
+  SessionStatsDto,
   StylePresetDto,
   WorkspaceSettingsDto,
   WorkspaceSnapshot,

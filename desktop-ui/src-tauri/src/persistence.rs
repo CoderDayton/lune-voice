@@ -10,8 +10,8 @@ use lune_persist::{AppPaths, Database, SettingsStore, StoredDictionaryEntry};
 use crate::dto::{
     ActivationModeDto, AsrBackendTypeDto, CreateCustomStyleInput, CreateDictionaryEntryInput,
     DevicePolicyDto, DictationModeDto, DictionaryItemDto, HistoryItemDto, PillVisibilityDto,
-    SaveWorkspaceSettingsInput, StylePresetDto, UpdateCustomStyleInput, UpdateDictionaryEntryInput,
-    WorkspaceSettingsDto, WorkspaceSnapshot,
+    SaveWorkspaceSettingsInput, SessionStatsDto, StylePresetDto, UpdateCustomStyleInput,
+    UpdateDictionaryEntryInput, WorkspaceSettingsDto, WorkspaceSnapshot,
 };
 
 const HISTORY_LIMIT: u32 = 200;
@@ -315,6 +315,15 @@ fn build_snapshot(
         });
     }
 
+    let stats = database
+        .session_stats()
+        .map(|s| SessionStatsDto {
+            sessions: s.sessions,
+            words: s.words,
+            seconds: s.seconds,
+        })
+        .unwrap_or_default();
+
     Ok(WorkspaceSnapshot {
         ipc_flavor: "tauri",
         service_status: "ready".into(),
@@ -322,6 +331,7 @@ fn build_snapshot(
         history,
         dictionary,
         style_presets,
+        stats,
     })
 }
 

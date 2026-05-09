@@ -60,6 +60,12 @@ export interface StylePreset {
   instructions: string;
 }
 
+export interface SessionTotals {
+  sessions: number;
+  words: number;
+  seconds: number;
+}
+
 export interface WorkspaceState {
   sidebarCollapsed: boolean;
   mobileMenuOpen: boolean;
@@ -68,6 +74,7 @@ export interface WorkspaceState {
   historyPageSize: number;
   dictionaryEntries: DictionaryEntry[];
   historySessions: HistorySession[];
+  sessionTotals: SessionTotals;
   stylePresets: StylePreset[];
   settings: WorkspaceSettings;
   runtime: WorkspaceRuntimeState;

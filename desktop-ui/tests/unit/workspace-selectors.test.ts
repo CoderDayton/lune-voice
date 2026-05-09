@@ -12,7 +12,7 @@ import { DEFAULT_RUNTIME, DEFAULT_SETTINGS, type WorkspaceState } from "../../sr
 import type { WorkspaceSnapshot } from "../../src/lib/backend/types";
 
 function makeSnapshot(overrides: Partial<WorkspaceSnapshot> = {}): WorkspaceSnapshot {
-  return {
+  const base: WorkspaceSnapshot = {
     ipcFlavor: "mock",
     serviceStatus: "ready",
     settings: {
@@ -66,8 +66,28 @@ function makeSnapshot(overrides: Partial<WorkspaceSnapshot> = {}): WorkspaceSnap
     ],
     dictionary: [],
     stylePresets: [],
+    stats: { sessions: 0, words: 0, seconds: 0 },
     ...overrides,
   };
+  if (overrides.stats) return base;
+  let words = 0;
+  let seconds = 0;
+  let count = 0;
+  for (const h of base.history) {
+    if (!h.transcript) continue;
+    const w = h.transcript.trim().split(/\s+/).filter(Boolean).length;
+    if (w === 0) continue;
+    count++;
+    words += w;
+    if (h.endedAt) {
+      seconds += Math.max(
+        1,
+        Math.round((new Date(h.endedAt).getTime() - new Date(h.startedAt).getTime()) / 1000),
+      );
+    }
+  }
+  base.stats = { sessions: count, words, seconds };
+  return base;
 }
 
 describe("workspace selectors", () => {
@@ -78,6 +98,7 @@ describe("workspace selectors", () => {
       historySearch: "",
       dictionaryEntries: [],
       historySessions: [],
+      sessionTotals: { sessions: 0, words: 0, seconds: 0 },
       stylePresets: [],
       settings: { ...DEFAULT_SETTINGS },
       runtime: { ...DEFAULT_RUNTIME },
