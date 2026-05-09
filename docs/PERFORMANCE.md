@@ -33,7 +33,7 @@ Current benchmarked emphasis:
 | Stage | Cost Profile | Notes |
 |-------|--------------|-------|
 | Mel extraction | Negligible | Single-digit milliseconds or less on real fixtures |
-| ASR inference | Primary fixed cost | Depends on backend: Parakeet vs Qwen |
+| ASR inference | Primary fixed cost | Qwen3-ASR 0.6B (INT4) is the only local backend; OpenAI-compatible remote ASR is also supported |
 | LLM cleanup | Variable | Triggered only for lower-confidence text |
 | Delivery | Small | Usually dominated by ASR/LLM, not paste/type output |
 | Memory footprint | Important secondary constraint | Both examples now print `RSS` and `Peak` |
@@ -48,7 +48,7 @@ Current benchmarked emphasis:
 
 | Rank | Bottleneck | Why it matters |
 |------|------------|----------------|
-| 1 | ASR backend choice | The largest consistent latency/quality tradeoff is Parakeet INT8 vs Qwen INT4 |
+| 1 | ASR inference time | Qwen3-ASR 0.6B (INT4) dominates the after-speech wait on local runs |
 | 2 | LLM routing threshold | Cleanup can add a few hundred milliseconds on benchmark fixtures |
 | 3 | Utterance timing / VAD | Finalization timing changes perceived responsiveness materially |
 | 4 | Memory movement | Several recent optimizations removed hot-path copies and queue churn |
@@ -63,22 +63,14 @@ Measures isolated ASR, LLM, and VAD stages on real WAV fixtures. This is the bes
 
 ```bash
 cargo run --example pipeline_stages -p lune-app --release
-
-# Force a backend
-ASR=qwen cargo run --release --example pipeline_stages -p lune-app
-ASR=parakeet cargo run --release --example pipeline_stages -p lune-app
-
-# Equivalent CLI flag form
-cargo run --release --example pipeline_stages -p lune-app -- --asr qwen
-cargo run --release --example pipeline_stages -p lune-app -- --asr parakeet
 ```
 
 #### What It Measures
 
 | Stage | Description |
 |-------|-------------|
-| Stage 1 | Qwen mel extraction on real fixtures |
-| Stage 2 | Real ASR inference on every available backend |
+| Stage 1 | Whisper-style mel extraction on real fixtures |
+| Stage 2 | Real Qwen3-ASR inference |
 | Stage 3 | Confidence gate behavior |
 | Stage 4 | Threshold sweep for LLM cleanup routing |
 | Stage 5 | VAD timing sweep |
@@ -99,14 +91,6 @@ Measures the real `SessionManager` path with VAD, ASR, LLM, and final delivery e
 
 ```bash
 cargo run --release --example pipeline_real -p lune-app
-
-# Force a backend
-ASR=qwen cargo run --release --example pipeline_real -p lune-app
-ASR=parakeet cargo run --release --example pipeline_real -p lune-app
-
-# Equivalent CLI flag form
-cargo run --release --example pipeline_real -p lune-app -- --asr qwen
-cargo run --release --example pipeline_real -p lune-app -- --asr parakeet
 ```
 
 #### What It Measures
@@ -120,23 +104,8 @@ cargo run --release --example pipeline_real -p lune-app -- --asr parakeet
 
 ### Recent Benchmark Snapshot
 
-Recent local runs on this repository produced the following comparisons.
-
-#### `pipeline_stages` Aggregate Winner
-
-| Backend | Avg ASR Time | Avg RTF | Peak Memory | Notes |
-|---------|--------------|---------|-------------|-------|
-| Parakeet INT8 | `1.308s` | `0.045x` | `3186 MB` | Best overall latency/quality balance |
-| Qwen INT4 | `1.476s` | `0.051x` | `2690 MB` | Lower memory, slightly slower aggregate |
-
-#### `pipeline_real` Aggregate Winner
-
-| Backend | Avg Wall Time | Avg WER | Avg CER | Peak Memory | Notes |
-|---------|---------------|---------|---------|-------------|-------|
-| Parakeet INT8 | `1.520s` | `2.53%` | `2.2%` | `2789 MB` | Current default recommendation |
-| Qwen INT4 | `2.379s` | `3.2%` | `2.5%` | `2737 MB` | Good fallback when memory matters more |
-
-#### Qwen INT4 Stage-2 ASR After Export Fix
+Qwen3-ASR 0.6B (INT4) is the only local backend. Representative numbers
+from `pipeline_stages` runs on this repository:
 
 | Fixture | Total | RTF | WER | CER |
 |---------|-------|-----|-----|-----|
@@ -144,12 +113,10 @@ Recent local runs on this repository produced the following comparisons.
 | `librispeech_40744` | `1.755s` | `0.059x` | `4.8%` | `4.3%` |
 | `custom_recording` | `1.581s` | `0.046x` | `2.5%` | `1.1%` |
 
-#### Practical Takeaway
-
-| Choice | Recommended When |
-|--------|-------------------|
-| Parakeet INT8 | You want the best default speed/quality tradeoff |
-| Qwen INT4 | You want the Qwen path specifically or lower memory in the latency benchmark |
+Aggregate `pipeline_real` end-to-end wall time hovers around 1.5–2.5s
+for short utterances, dominated by ASR inference. Peak resident memory
+sits near 2.7 GB once the LLM correction model is loaded alongside
+ASR.
 
 ---
 
@@ -159,11 +126,11 @@ Recent local runs on this repository produced the following comparisons.
 
 | Technique | Location | Impact |
 |-----------|----------|--------|
-| **Pre-allocated audio snapshot** | `parakeet_backend.rs` | `mem::take` swaps a pre-allocated `Vec` in/out of the session — zero heap allocation during steady-state inference |
+| **Pre-allocated audio snapshot** | `lune-asr/src/backend/qwen3.rs` | `mem::take` swaps a pre-allocated `Vec` in/out of the session — zero heap allocation during steady-state inference |
 | **Persistent partial buffers** | `session.rs` | `partial_buf` and `audio_batch` are allocated once and reused across all iterations of the main loop |
 | **Pre-computed capacity** | `confidence_router.rs`, `prompt.rs` | String builders compute exact capacity before allocation (context joins, ChatML prompts) |
 | **Segment tracker drain** | `segment.rs` | `mem::replace` with a pre-allocated `Vec::with_capacity(8)` avoids reallocation on the next burst |
-| **Static caches** | `mel.rs` | `OnceLock<Array2<f32>>` for the mel filterbank (128×257) and Hann window (400) — computed once, shared immutably |
+| **Static caches** | `mel/whisper.rs` | `OnceLock<Array2<f32>>` for the mel filterbank and Hann window — computed once, shared immutably |
 | **Batch vec reuse** | `llm_worker.rs` | The `batch: Vec<LlmRequest>` is allocated once and cleared each iteration |
 | **Pending buffer** | `confidence_router.rs` | 128-byte pre-allocated `String` with incremental word counting |
 
@@ -171,12 +138,9 @@ Recent local runs on this repository produced the following comparisons.
 
 | Technique | Location | Impact |
 |-----------|----------|--------|
-| **Welford's online algorithm** | `mel.rs:normalize_per_feature` | Single pass for mean+variance instead of two full strided traversals |
-| **Branchless triangle filters** | `mel.rs:create_mel_filterbank` | `max(0, min(lower, upper))` eliminates branches in the hot inner loop |
-| **norm_sqr() vs norm()*norm()** | `mel.rs:stft` | Eliminates a `sqrt()` call per bin per frame in the STFT power spectrum |
-| **Sequential-write transpose** | `mel.rs:extract_features` | Outer loop over time gives stride-1 writes (cache-friendly for L1) |
-| **memchr stop detection** | `decode_utils.rs` | `memchr_iter(b'<')` + byte comparison instead of string search — all stop sequences verified ASCII at compile time |
-| **Single-pass argmax + logit collection** | `tdt_decoder.rs` | Combined loop finds the max logit while collecting values, avoiding a second O(vocab_size) scan |
+| **norm_sqr() vs norm()*norm()** | `mel/whisper.rs` | Eliminates a `sqrt()` call per bin per frame in the STFT power spectrum |
+| **Sequential-write transpose** | `mel/whisper.rs` | Outer loop over time gives stride-1 writes (cache-friendly for L1) |
+| **PCEN AGC frontend** | `lune-audio/src/vad.rs` | Default-on adaptive gain (`vad_pcen = true`) flattens loudness drift before VAD scoring; warmup holds unity gain while envelopes settle |
 | **Incremental word counting** | `confidence_router.rs` | Counts only new words per accumulation, not the whole buffer |
 | **Bit-shift length check** | `confidence_router.rs` | `(corr_len << 1) >= orig_len` for the default 0.5/2.0 thresholds |
 
@@ -184,7 +148,7 @@ Recent local runs on this repository produced the following comparisons.
 
 | Technique | Location | Impact |
 |-----------|----------|--------|
-| **Split-phase locking** | `parakeet_backend.rs:poll_results` | Session lock held only during snapshot copy; released before mel extraction and inference. Allows `push_audio` to make progress concurrently |
+| **Split-phase locking** | `lune-asr/src/backend/qwen3.rs:poll_results` | Session lock held only during snapshot copy; released before mel extraction and inference. Allows `push_audio` to make progress concurrently |
 | **Audio frame coalescing** | `session.rs` | Initial frame + `try_recv()` batch reduces await-point count during microphone bursts |
 | **spawn_blocking for LLM** | `ort_backend.rs` | Inference runs on the blocking thread pool, never starving the async runtime |
 | **recv_many batch drain** | `llm_worker.rs` | Single lock acquisition to drain all queued LLM requests |
@@ -258,7 +222,7 @@ RUST_LOG=lune_asr=debug,lune_llm=debug,lune_app=debug ./target/release/lune-voic
 ```
 
 Key trace points:
-- `lune_asr::parakeet_backend` — `inference` with `elapsed_ms`
+- `lune_asr::backend::qwen3` — `inference` with `elapsed_ms`
 - `lune_llm::ort_backend` — `LLM post-process request` with `prompt_len`, `raw_text_len`
 - `lune_llm::ort_backend` — `LLM post-process complete` with `output_len`
 - `lune_app::llm_worker` — `LLM batch: combined N requests`
@@ -283,10 +247,6 @@ cargo run --release --example pipeline_stages -p lune-app
 
 # Real end-to-end session benchmark
 cargo run --release --example pipeline_real -p lune-app
-
-# Optional backend forcing
-ASR=qwen cargo run --release --example pipeline_stages -p lune-app
-ASR=parakeet cargo run --release --example pipeline_real -p lune-app
 
 # Quick regression pass
 cargo test --workspace --release

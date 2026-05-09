@@ -37,7 +37,7 @@ Most settings apply through the runtime settings channel or on the next dictatio
 
 ```bash
 lune-voice settings                     # dump all settings as TOML
-lune-voice settings style email         # switch style preset
+lune-voice settings style technical     # switch style preset
 lune-voice settings language en-GB      # change language (BCP-47 validated)
 lune-voice settings privacy AllowRemote # change privacy mode
 lune-voice settings history 90          # set retention to 90 days
@@ -49,7 +49,7 @@ Settings mutability tiers:
 | Tier | When Applied | Fields |
 |------|-------------|--------|
 | **Hot** | Immediately (watch channel) | `dictation_mode`, `activation_mode` |
-| **Warm** | Next session start | `default_style`, `language` |
+| **Warm** | Next session start | `default_style`, `language`, `vad_pcen`, `mic_prewarm` |
 | **Cold** | Persist only | `privacy_mode`, `session_history_days`, `hotkey` |
 | **Reload** | Before next session | `asr_backend`, `llm_backend`, `device` |
 
@@ -77,8 +77,10 @@ device = "auto"
 privacy_mode = "LocalOnly"
 dictation_mode = "TypeInPlace"
 activation_mode = "Toggle"
-default_style = "casual"
+default_style = "minimal"
 session_history_days = 30
+mic_prewarm = false
+vad_pcen = true
 
 [asr_backend]
 type = "Qwen3Asr"
@@ -310,25 +312,28 @@ Use AutoHotkey or PowerToys to bind to `lune-voice toggle`.
 
 ### Built-in Presets
 
-| ID | Name | Description | Use Case |
+| ID | Name | Description | Behavior |
 |----|------|-------------|----------|
-| `general` | General | Clean grammar and remove disfluencies | Everyday dictation |
-| `email` | Email | Formal register with paragraph breaks | Professional emails |
-| `slack` | Slack | Casual, concise messaging tone | Chat messages |
-| `meeting_notes` | Meeting Notes | Bullet points with `Action:` items | Meeting summaries |
-| `code_comments` | Code Comments | Terse, imperative, technical doc comments | Documentation |
+| `minimal` | Minimal | Fix errors only — no style changes | Correction pass only; styling pass is skipped via `skip_styling: true` |
+| `casual` | Casual | Texting, messaging, chat | Lowercase, contractions, comma-joined clauses |
+| `professional` | Professional | Clear workplace communication | Standard capitalization, broken run-ons, no contractions |
+| `formal` | Formal | Official correspondence and documents | Formal register, expanded contractions, structured sentences |
+| `technical` | Technical | Code and developer communication | Wraps identifiers/keywords in backticks; preserves jargon |
+| `writing` | Writing | Long-form content — articles, docs, essays | Polished prose, varied sentence length, filler words removed |
 
 Set the default style:
 
 ```toml
-default_style = "general"
+default_style = "minimal"
 ```
 
 Switch at runtime:
 
 ```bash
-lune-voice settings style email
+lune-voice settings style technical
 ```
+
+The `skip_styling` field on each preset controls whether the LLM runs a second styling pass. Setting it to `true` (as `minimal` does) means the correction pass is the entire pipeline — no rephrasing, only error fixes.
 
 ### Prompt Structure
 
@@ -372,27 +377,28 @@ The `/no_think` directive disables Qwen3's chain-of-thought mode. The pre-filled
 
 Each preset includes 2 input/output pairs that teach the LLM the expected transformation:
 
-**General:**
+**Casual:**
 ```
-Input:  "so um I was thinking that we should like go to the store"
-Output: "I was thinking that we should go to the store."
-
-Input:  "the the meeting is uh scheduled for tomorrow at 3"
-Output: "The meeting is scheduled for tomorrow at 3."
+Input:  She said: "I will be there"; however, I do not think she meant it.
+Output: she said she'd be there, but i don't think she meant it.
 ```
 
-**Email:**
+**Professional:**
 ```
-Input:  "hey uh just wanted to follow up on the thing we discussed last week about the project timeline"
-Output: "I wanted to follow up on our discussion last week regarding the project timeline."
+Input:  i talked to the client and they're fine with the delay but they want weekly updates going forward.
+Output: I spoke with the client, and they are fine with the delay. They want weekly updates going forward.
 ```
 
-**Meeting Notes:**
+**Technical:**
 ```
-Input:  "so we talked about the Q3 roadmap and uh John is going to handle the API redesign and Sarah needs to review the mockups by next Tuesday"
-Output: "- Discussed Q3 roadmap
-         - Action: John - API redesign
-         - Action: Sarah - review mockups by next Tuesday"
+Input:  The user profile class needs a get by ID method that returns an optional user.
+Output: The `UserProfile` class needs a `get_by_id` method that returns an `Optional<User>`.
+```
+
+**Writing:**
+```
+Input:  Basically the problem is that it just scales poorly and once you hit about ten thousand users things start to break down.
+Output: The problem is that it scales poorly. Once you hit ten thousand users, things start to break down.
 ```
 
 ---

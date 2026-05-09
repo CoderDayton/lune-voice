@@ -75,7 +75,7 @@ The active ASR choices are local Qwen3-ASR and OpenAI-compatible remote ASR. Bot
 
 #### 2a. Qwen3-ASR ONNX
 
-**Files:** `backend/qwen3.rs`, `decode/`, `mel.rs`
+**Files:** `backend/qwen3.rs`, `mel/whisper.rs`
 
 The Qwen path uses a three-part ONNX export produced by `scripts/export_onnx.py`:
 
@@ -120,7 +120,7 @@ Unsupported dictionaries are handled conservatively. If the language has no bund
 
 ### 4. LLM Post-Processing
 
-**Crate:** `lune-llm`
+**Crate:** `lune-llm` | **File:** `crates/lune-llm/src/pipeline.rs`
 
 The session calls `TextPostProcessor::transform()` inline. There is no LLM worker queue in the current desktop runtime.
 
@@ -134,7 +134,12 @@ The session calls `TextPostProcessor::transform()` inline. There is no LLM worke
 | `uncertain_words` | Words the heuristic left unresolved |
 | `style_preset` | Output style contract |
 
-Local LLM mode uses the ONNX style model when it is downloaded. If it is missing or fails to load, the runtime uses `NullPostProcessor` and returns the corrected text unchanged. Remote LLM mode uses an OpenAI-compatible chat API.
+The shared `CorrectionPipeline` wraps any `LlmService` (local ONNX or remote OpenAI-compatible) and runs up to two passes:
+
+1. **Correction pass** — system prompt + transcript + dictionary + uncertain words. Output is run through number-space repair, a forbidden-meta-output filter, and an LCS-based `validate_and_merge` that rejects outputs diverging too far from the raw input.
+2. **Styling pass** — gated by `style_preset.skip_styling`. The `minimal` preset sets this to `true` and bypasses styling entirely. Styling output that fails the same forbidden-meta filter is dropped, keeping the corrected text.
+
+Both pre-correction and post-styling hardening live in `CorrectionPipeline`, so every backend behaves identically. If the local ONNX model is missing or fails to load, the runtime falls back to `NullPostProcessor` and returns the heuristic-corrected text unchanged.
 
 ### 5. Text Delivery
 

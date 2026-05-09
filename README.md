@@ -26,7 +26,7 @@ Speech flows through a pipeline that gets smarter at each stage:
 Mic → VAD → Qwen3-ASR → Dictionary → Correction → LLM Style Pass → Paste
 ```
 
-Raw transcription is rarely ready to use. Lune runs it through your custom dictionary to fix names and jargon, applies heuristic correction for common mistakes, then hands it to a local LLM that reformats the result to match a style you pick — casual, email, technical, or one you define yourself.
+Raw transcription is rarely ready to use. Lune runs it through your custom dictionary to fix names and jargon, applies heuristic correction for common mistakes, then hands it to a local LLM that reformats the result to match a style you pick — casual, professional, technical, or one you define yourself.
 
 First launch downloads ~1.8 GB of models to your machine. After that, the entire pipeline is air-gapped.
 
@@ -36,7 +36,7 @@ First launch downloads ~1.8 GB of models to your machine. After that, the entire
 
 **A dictation pill that stays out of your way** — A floating overlay shows live audio levels and session state. Stop or cancel without ever leaving the app you're working in.
 
-**Style presets that match how you write** — "Email" adds greetings and tightens prose. "Technical" preserves jargon. Roll your own with custom prompts and few-shot examples that teach the LLM your voice.
+**Style presets that match how you write** — "Professional" tightens prose for workplace messages. "Technical" preserves jargon and code formatting. "Minimal" only fixes ASR mistakes and leaves your phrasing alone. Roll your own with custom prompts and few-shot examples that teach the LLM your voice.
 
 **A dictionary that learns your world** — Names, acronyms, slang — anything the ASR has never heard. Entries are fuzzy-matched and priority-ranked, so corrections land even when pronunciation is rough.
 
