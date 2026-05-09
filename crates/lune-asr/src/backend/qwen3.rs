@@ -89,6 +89,9 @@ pub struct Qwen3Session {
     total_samples: u64,
     sample_rate: u32,
     next_id: u64,
+    /// Language to force on the model prompt, in the form Qwen3-ASR expects
+    /// ("English", "Chinese", ...). `None` means auto-detect.
+    forced_language: Option<String>,
 }
 
 // ── Constructor ─────────────────────────────────────────────────────────────
@@ -226,14 +229,17 @@ impl AsrBackend for Qwen3AsrBackend {
     type SessionHandle = Mutex<Qwen3Session>;
 
     async fn start_session(&self, config: AsrSessionConfig) -> Result<Self::SessionHandle> {
+        let forced_language = config.language.as_deref().and_then(bcp47_to_qwen3_language);
         let session = Qwen3Session {
             pending: Vec::with_capacity(MAX_WINDOW_SAMPLES),
             total_samples: 0,
             sample_rate: config.sample_rate,
             next_id: 1,
+            forced_language: forced_language.clone(),
         };
         tracing::info!(
             sample_rate = config.sample_rate,
+            language = ?forced_language,
             "Qwen3 ASR session started"
         );
         Ok(Mutex::new(session))
@@ -255,7 +261,7 @@ impl AsrBackend for Qwen3AsrBackend {
     }
 
     async fn poll_final(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>> {
-        let (pcm, ts_ms, id) = {
+        let (pcm, ts_ms, id, language) = {
             let mut sess = session.lock().map_err(|e| lock_err("session", e))?;
             if sess.pending.is_empty() {
                 return Ok(vec![]);
@@ -264,14 +270,15 @@ impl AsrBackend for Qwen3AsrBackend {
             let id = sess.next_id;
             sess.next_id += 1;
             let pcm = std::mem::take(&mut sess.pending);
-            (pcm, ts, id)
+            let lang = sess.forced_language.clone();
+            (pcm, ts, id, lang)
         };
 
         if pcm.is_empty() {
             return Ok(vec![]);
         }
 
-        self.transcribe_pcm(&pcm, ts_ms, id, None)
+        self.transcribe_pcm(&pcm, ts_ms, id, language.as_deref())
     }
 
     async fn reset_context(&self, session: &Self::SessionHandle) -> Result<()> {
@@ -1042,16 +1049,22 @@ impl Qwen3AsrBackend {
 
 fn parse_auto_asr_output(raw: &str) -> (Option<String>, String) {
     let raw = raw.trim();
-    let Some(rest) = raw.strip_prefix("language ") else {
-        return (None, raw.to_string());
-    };
 
-    if let Some(asr_pos) = rest.find("<asr_text>") {
-        let lang = rest[..asr_pos].trim();
-        let text = rest[asr_pos + "<asr_text>".len()..].trim();
+    // Preferred path: split on the `<asr_text>` marker. The prefix may
+    // optionally start with `language ` ("language Chinese<asr_text>...")
+    // or be a bare language name ("Chinese<asr_text>...") — both occur in
+    // the wild depending on whether the model emitted the leading word.
+    if let Some(asr_pos) = raw.find("<asr_text>") {
+        let prefix = raw[..asr_pos].trim();
+        let lang = prefix.strip_prefix("language ").unwrap_or(prefix).trim();
+        let text = raw[asr_pos + "<asr_text>".len()..].trim();
         return (non_empty_string(lang), text.to_string());
     }
 
+    // Legacy fallback: "language X some text" with no marker.
+    let Some(rest) = raw.strip_prefix("language ") else {
+        return (None, raw.to_string());
+    };
     let mut lang_end = 0;
     for (i, c) in rest.char_indices() {
         if c.is_whitespace() || !c.is_alphabetic() {
@@ -1060,14 +1073,64 @@ fn parse_auto_asr_output(raw: &str) -> (Option<String>, String) {
         }
         lang_end = i + c.len_utf8();
     }
-
     if lang_end == 0 {
         return (None, raw.to_string());
     }
-
     let lang = &rest[..lang_end];
     let text = rest[lang_end..].trim();
     (non_empty_string(lang), text.to_string())
+}
+
+/// Map a BCP-47 tag (or English name) to the language label Qwen3-ASR
+/// expects in its `language X` prompt. Returns `None` for unrecognised
+/// tags so the model falls back to auto-detection rather than receiving
+/// a malformed hint.
+fn bcp47_to_qwen3_language(tag: &str) -> Option<String> {
+    let t = tag.trim().to_ascii_lowercase();
+    if t.is_empty() || t == "auto" {
+        return None;
+    }
+    let primary = t.split(['-', '_']).next().unwrap_or(&t);
+    let name = match primary {
+        "en" => "English",
+        "zh" | "cmn" | "yue" => "Chinese",
+        "ja" => "Japanese",
+        "ko" => "Korean",
+        "es" => "Spanish",
+        "fr" => "French",
+        "de" => "German",
+        "it" => "Italian",
+        "pt" => "Portuguese",
+        "ru" => "Russian",
+        "ar" => "Arabic",
+        "hi" => "Hindi",
+        "vi" => "Vietnamese",
+        "th" => "Thai",
+        "id" => "Indonesian",
+        "nl" => "Dutch",
+        "pl" => "Polish",
+        "tr" => "Turkish",
+        // Already an English language name — pass through with title case.
+        _ => return Some(title_case_ascii(tag.trim())),
+    };
+    Some(name.to_string())
+}
+
+fn title_case_ascii(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut at_word_start = true;
+    for c in s.chars() {
+        if c.is_whitespace() {
+            at_word_start = true;
+            out.push(c);
+        } else if at_word_start {
+            out.extend(c.to_uppercase());
+            at_word_start = false;
+        } else {
+            out.extend(c.to_lowercase());
+        }
+    }
+    out
 }
 
 fn non_empty_string(value: &str) -> Option<String> {
@@ -1099,5 +1162,35 @@ mod tests {
         let (lang, text) = parse_auto_asr_output("language French Bonjour tout le monde.");
         assert_eq!(lang.as_deref(), Some("French"));
         assert_eq!(text, "Bonjour tout le monde.");
+    }
+
+    #[test]
+    fn parse_auto_output_bare_language_prefix() {
+        // Model sometimes omits the "language " literal and emits just
+        // the bare language name before <asr_text>.
+        let (lang, text) = parse_auto_asr_output("Chinese<asr_text>穿衣服。");
+        assert_eq!(lang.as_deref(), Some("Chinese"));
+        assert_eq!(text, "穿衣服。");
+    }
+
+    #[test]
+    fn parse_auto_output_marker_only_no_lang() {
+        let (lang, text) = parse_auto_asr_output("<asr_text>Hello.");
+        assert_eq!(lang, None);
+        assert_eq!(text, "Hello.");
+    }
+
+    #[test]
+    fn bcp47_maps_common_tags() {
+        use super::bcp47_to_qwen3_language as m;
+        assert_eq!(m("en"), Some("English".into()));
+        assert_eq!(m("en-US"), Some("English".into()));
+        assert_eq!(m("zh-CN"), Some("Chinese".into()));
+        assert_eq!(m("ja"), Some("Japanese".into()));
+        assert_eq!(m("auto"), None);
+        assert_eq!(m(""), None);
+        // Unknown primary tag falls through to title-cased pass-through.
+        assert_eq!(m("English"), Some("English".into()));
+        assert_eq!(m("ENGLISH"), Some("English".into()));
     }
 }

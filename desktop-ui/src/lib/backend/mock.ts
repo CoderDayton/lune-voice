@@ -37,7 +37,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
       pillVisibility: 'Always',
       language: 'en',
       dictationLanguage: 'auto',
-      micPrewarm: false,
+      micPrewarm: true,
       vadPcen: true,
       openaiAsrBaseUrl: null,
       openaiAsrModel: null,

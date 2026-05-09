@@ -89,7 +89,7 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   pillVisibility: 'Always',
   language: 'en',
   dictationLanguage: 'auto',
-  micPrewarm: false,
+  micPrewarm: true,
   vadPcen: true,
   openaiAsrBaseUrl: 'https://api.openai.com/v1',
   openaiAsrApiKey: '',

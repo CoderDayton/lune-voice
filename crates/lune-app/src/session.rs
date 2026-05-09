@@ -359,7 +359,9 @@ async fn run_session<A: AsrBackend + 'static>(
     let audio_source: Box<dyn AudioPull> = match audio_override {
         SessionAudio::Owned(stream) => Box::new(stream),
         SessionAudio::Shared(handle) => {
-            handle.drain();
+            // Keep ~500ms of pre-session audio so speech captured between
+            // hotkey press and this task scheduling isn't lost.
+            handle.drain_keep_last(6);
             Box::new(handle)
         }
         SessionAudio::Open => match AudioStream::new(AudioConfig::default()) {
@@ -442,6 +444,7 @@ async fn run_session<A: AsrBackend + 'static>(
     let mut last_audio_at = tokio::time::Instant::now();
     let session_start = tokio::time::Instant::now();
     let mut first_audio_logged = false;
+    let mut first_speech_logged = false;
     let audio_starvation_limit = Duration::from_secs(5);
     'capture: loop {
         tokio::select! {
@@ -489,6 +492,14 @@ async fn run_session<A: AsrBackend + 'static>(
                         continue;
                     }
 
+                    if !first_speech_logged {
+                        info!(
+                            %session_id,
+                            elapsed_ms = session_start.elapsed().as_millis() as u64,
+                            "vad: first speech detected",
+                        );
+                        first_speech_logged = true;
+                    }
                     if !was_speech
                         && let Some(pre) = prev_chunk.take()
                     {
@@ -553,7 +564,11 @@ async fn run_session<A: AsrBackend + 'static>(
             warn!(error = %e, "reset_context error during cancel");
         }
     } else {
-        match asr.poll_final(&asr_session).await {
+        let poll_final_t0 = tokio::time::Instant::now();
+        let poll_final_result = asr.poll_final(&asr_session).await;
+        let poll_final_ms = poll_final_t0.elapsed().as_millis() as u64;
+        info!(%session_id, poll_final_ms, "asr: poll_final complete");
+        match poll_final_result {
             Ok(new_segments) => {
                 if append_segments(&mut segments, &mut raw_text, new_segments) {
                     saw_asr_success = true;

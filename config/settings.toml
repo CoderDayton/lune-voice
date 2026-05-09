@@ -7,7 +7,7 @@
 
 # ── Compute device ────────────────────────────────────────────────────────────
 #
-# Controls which execution provider ORT uses for ASR inference.
+# Controls which execution provider ORT uses for ASR + local LLM inference.
 #
 #   "auto"  — Try CUDA at startup; fall back to CPU if unavailable. (default)
 #   "cuda"  — Prefer CUDA; still falls back gracefully if CUDA init fails.
@@ -17,11 +17,16 @@
 device = "auto"
 
 # Built-in style preset applied by default.
-# Options: "general" | "coding" | "email" | "slack" | "meeting_notes" | "code_comments"
-default_style = "general"
+# Options: "casual" | "professional" | "formal" | "minimal" | "technical" | "writing"
+default_style = "minimal"
 
-# BCP-47 language tag (hint only — Parakeet v3 auto-detects language).
-language = "en-US"
+# UI language tag (BCP-47, hint only).
+# "auto" lets the app pick from system locale.
+language = "auto"
+
+# Dictation language fed to ASR + correction.
+# "auto" detects from speech; otherwise a BCP-47 tag like "en-US", "es", "ja".
+dictation_language = "auto"
 
 # Privacy policy for backend selection.
 # "LocalOnly"       — Reject any remote backend. (default)
@@ -40,29 +45,86 @@ dictation_mode = "TypeInPlace"
 # "Hold"    — Hold key to dictate, release to stop.
 activation_mode = "Toggle"
 
+# When to show the floating dictation pill overlay.
+# "Always"        — Show whenever the service is ready. (default)
+# "WhenDictating" — Show only while a session is active.
+# "Never"         — Don't show the pill.
+pill_visibility = "Always"
+
+# How delivery picks the paste chord (Ctrl+V vs Ctrl+Shift+V).
+# "Auto"     — Probe compositor (Hyprland/Sway/KDE/GNOME). (default)
+# "Terminal" — Always Ctrl+Shift+V (use on COSMIC if you dictate into terminals).
+# "Normal"   — Always Ctrl+V.
+terminal_mode = "Auto"
+
 # Days to retain session history in the database.
 # Remove this key (or comment it out) to disable history entirely.
 session_history_days = 30
+
+# Keep the microphone input stream open across sessions so the first audio
+# chunk arrives immediately after a hotkey press (eliminates ~100–500 ms of
+# cold cpal/alsa init latency). The mic remains powered/visible to the OS
+# while the app runs; set to false if you prefer the indicator only
+# appearing during dictation.
+mic_prewarm = true
+
+# Enable the PCEN-style adaptive AGC frontend before the VAD.
+# Improves robustness on quiet mics and noisy environments.
+vad_pcen = true
 
 
 # ── ASR backend ───────────────────────────────────────────────────────────────
 #
 # Supported types:
-#   "ParakeetTdt"        — Parakeet-TDT-0.6B-v3 via ONNX Runtime. (default, local)
-#   "OpenAiCompatible"   — Remote Whisper-compatible HTTP endpoint.
+#   "Qwen3Asr"          — Qwen3-ASR-ONNX (encoder + embed-tokens + decoder). (default, local)
+#   "OpenAiCompatible"  — Remote Whisper-compatible HTTP endpoint.
 #
+[asr_backend]
+type = "Qwen3Asr"
+
+# Example remote ASR (uncomment + fill to use):
+# [asr_backend]
+# type = "OpenAiCompatible"
+# base_url = "https://api.openai.com/v1"
+# api_key  = "sk-..."
+# model    = "whisper-1"
+# streaming = "Off"   # or "On"
+
+
 # ── LLM backend ──────────────────────────────────────────────────────────────
 #
+# Used for low-confidence ASR correction + style polishing. Only invoked
+# when the per-word confidence gate flags risky words.
+#
 # Supported types:
-#   "Local"              — Llama 3.2 1B ONNX style LLM (auto-downloaded). (default)
-#   "OpenAiCompatible"   — Remote OpenAI-compatible endpoint.
-#   "Disabled"           — No LLM post-processing (ITN only).
+#   "Local"             — Local Qwen3-0.6B style LLM (auto-downloaded). (default when omitted)
+#   "OpenAiCompatible"  — Remote OpenAI-compatible endpoint.
+#   "Disabled"          — Skip LLM post-processing entirely (heuristic correction only).
 #
 [llm_backend]
 type = "Local"
 
-[asr_backend]
-type = "ParakeetTdt"
+# Example remote LLM (uncomment + fill to use):
+# [llm_backend]
+# type = "OpenAiCompatible"
+# base_url   = "https://api.openai.com/v1"
+# api_key    = "sk-..."
+# model      = "gpt-4o-mini"
+# max_tokens = 256
+
+
+# ── Pipeline overrides (optional) ────────────────────────────────────────────
+#
+# All fields are optional; omitted fields inherit the active backend's
+# recommended default. Uncomment to override.
+#
+# [pipeline]
+# word_confidence_threshold = 0.65   # Below this, words flagged "uncertain" → LLM
+# max_speech_secs = 60               # Auto-stop after N seconds of speech
+# adaptive_vad = false               # Adapt VAD thresholds to ambient noise
+# llm_timeout_secs = 8               # Drop LLM correction if it exceeds this
+# speech_threshold = 0.50            # VAD speech-onset probability
+# speech_threshold_end = 0.30        # VAD speech-end probability (hysteresis)
 
 
 # ── Hotkeys ───────────────────────────────────────────────────────────────────

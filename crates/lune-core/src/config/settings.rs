@@ -77,7 +77,7 @@ pub struct UserSettings {
     /// chunk arrives ~70 ms sooner after a hotkey press. The mic remains
     /// powered/visible to the OS while the app runs; turn this off if you
     /// prefer the indicator only appearing during dictation.
-    #[serde(default)]
+    #[serde(default = "default_mic_prewarm")]
     pub mic_prewarm: bool,
     /// Enable the PCEN-style adaptive AGC frontend before the VAD.
     /// Improves robustness on quiet mics and noisy environments. Default on.
@@ -86,6 +86,10 @@ pub struct UserSettings {
 }
 
 fn default_vad_pcen() -> bool {
+    true
+}
+
+fn default_mic_prewarm() -> bool {
     true
 }
 
@@ -132,7 +136,7 @@ impl Default for UserSettings {
             max_speech_secs: default_max_speech_secs(),
             adaptive_vad: false,
             pipeline: PipelineOverrides::default(),
-            mic_prewarm: false,
+            mic_prewarm: true,
             vad_pcen: true,
         }
     }

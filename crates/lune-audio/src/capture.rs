@@ -273,6 +273,18 @@ impl AudioStream {
         while self.ring.try_pop().is_some() {}
     }
 
+    /// Drop chunks older than the most recent `keep` chunks. Use on
+    /// session start to discard idle-period audio while preserving the
+    /// short window captured between hotkey press and consumer startup.
+    pub fn drain_keep_last(&self, keep: usize) {
+        let to_drop = self.ring.len().saturating_sub(keep);
+        for _ in 0..to_drop {
+            if self.ring.try_pop().is_none() {
+                break;
+            }
+        }
+    }
+
     /// Lightweight handle that shares this stream's ring buffer.
     ///
     /// Multiple handles can coexist; whichever consumer pops first wins.
@@ -313,6 +325,16 @@ impl AudioStreamHandle {
 
     pub fn drain(&self) {
         while self.ring.try_pop().is_some() {}
+    }
+
+    /// See `AudioStream::drain_keep_last`.
+    pub fn drain_keep_last(&self, keep: usize) {
+        let to_drop = self.ring.len().saturating_sub(keep);
+        for _ in 0..to_drop {
+            if self.ring.try_pop().is_none() {
+                break;
+            }
+        }
     }
 
     pub fn buffer_fill(&self) -> f32 {

@@ -27,7 +27,7 @@ use tracing::{debug, warn};
 
 use crate::dto::{CalibrationDiagnosticsDto, CalibrationStreamEvent, SessionStreamEvent};
 
-const LOCAL_LLM_IDLE_TTL: Duration = Duration::from_secs(30);
+const LOCAL_LLM_IDLE_TTL: Duration = Duration::from_secs(8);
 const HOLD_WARMUP_GRACE: Duration = Duration::from_millis(250);
 const TOGGLE_DEBOUNCE: Duration = Duration::from_millis(150);
 const CANCEL_DEBOUNCE: Duration = Duration::from_millis(80);
@@ -478,7 +478,7 @@ impl AppRuntime {
                         saw_error = true;
                         // Log full error internally; send sanitized version to frontend.
                         warn!(error = %message, "session error");
-                        runtime.finish_session().await;
+                        runtime.finish_session(false).await;
                         runtime.publish_status("error").await;
                         runtime
                             .push_session_event(SessionStreamEvent::SessionError {
@@ -487,7 +487,7 @@ impl AppRuntime {
                             .await;
                     }
                     SessionEvent::Stopped => {
-                        runtime.finish_session().await;
+                        runtime.finish_session(saw_text).await;
                         if !saw_error {
                             runtime.publish_status("ready").await;
                         }
@@ -574,9 +574,34 @@ impl AppRuntime {
         }
     }
 
-    async fn finish_session(&self) {
-        self.schedule_local_llm_unload().await;
+    async fn finish_session(&self, produced_output: bool) {
+        // Free the active flag and notify the UI BEFORE doing any LLM
+        // bookkeeping. A second toggle press during the brief window where
+        // the LLM is being unloaded would otherwise see active=true and
+        // try to stop an already-stopping session (no-op), forcing the
+        // user to press a third time.
         self.set_pipeline_session(None, false).await;
+        if produced_output {
+            self.schedule_local_llm_unload().await;
+        } else {
+            // Run eviction in the background so finish_session returns
+            // immediately to the event-forwarder loop.
+            let runtime = self.clone();
+            tauri::async_runtime::spawn(async move {
+                runtime.evict_local_llm_now().await;
+            });
+        }
+    }
+
+    async fn evict_local_llm_now(&self) {
+        let local_llm = {
+            let pipeline = self.inner.pipeline.lock().await;
+            pipeline.local_llm.clone()
+        };
+        if let Some(local_llm) = local_llm {
+            tracing::info!(target: "vram", "session produced no output — evicting LLM immediately");
+            local_llm.unload().await;
+        }
     }
 
     async fn publish_status(&self, status: &str) {
@@ -786,7 +811,16 @@ async fn build_pipeline(
     let config = SessionManagerConfig {
         asr_backend_kind: asr.kind(),
         asr_config: AsrSessionConfig {
-            language: Some(settings.read().await.language.clone()),
+            // dictation_language is the user-facing ASR language; "auto"
+            // means let the model detect. UI `language` is unrelated.
+            language: {
+                let lang = settings.read().await.dictation_language.clone();
+                if lang == "auto" || lang.is_empty() {
+                    None
+                } else {
+                    Some(lang)
+                }
+            },
             ..Default::default()
         },
         pipeline: asr
@@ -990,6 +1024,7 @@ impl LazyLocalLlm {
             }
         }
 
+        let warmup_t0 = std::time::Instant::now();
         let model_dir = self.model_dir.clone();
         let use_gpu = self.use_gpu;
         let max_new_tokens = self.max_new_tokens;
@@ -1036,6 +1071,7 @@ impl LazyLocalLlm {
                     target: "vram",
                     device = if self.use_gpu { "cuda" } else { "cpu" },
                     weights_mib = format_args!("{weights_mib:.1}"),
+                    warmup_ms = warmup_t0.elapsed().as_millis() as u64,
                     "LLM session loaded"
                 );
                 *state = LazyLlmState::Ready(llm);

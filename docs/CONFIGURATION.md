@@ -79,7 +79,7 @@ dictation_mode = "TypeInPlace"
 activation_mode = "Toggle"
 default_style = "minimal"
 session_history_days = 30
-mic_prewarm = false
+mic_prewarm = true
 vad_pcen = true
 
 [asr_backend]

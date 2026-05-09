@@ -142,10 +142,18 @@ fn run_listener(
             continue;
         }
 
-        // Defer combo modifier presses
+        // Defer combo modifier presses. If the modifier press itself
+        // completes a hotkey (trigger key was already down), drop the
+        // deferred queue and dispatch the action instead of forwarding
+        // the modifier through to apps. Without this, the Start action
+        // is silently dropped and the next release emits a stray Stop.
         if pressed && combo_mod_codes.contains(code) {
             deferred.push(raw);
-            state.handle(code, pressed, activation_mode);
+            if let Some(action) = state.handle(code, pressed, activation_mode) {
+                deferred.clear();
+                consumed.insert(code);
+                dispatch(action, &cmd_tx);
+            }
             continue;
         }
 

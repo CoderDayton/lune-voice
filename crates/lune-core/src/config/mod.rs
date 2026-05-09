@@ -136,4 +136,18 @@ mod tests {
         let err = "bad".parse::<ActivationMode>().unwrap_err();
         assert!(err.contains("Toggle|Hold"));
     }
+
+    #[test]
+    fn example_settings_toml_parses() {
+        let example = include_str!("../../../../config/settings.toml");
+        let parsed: UserSettings = toml::from_str(example)
+            .expect("config/settings.toml must parse against current schema");
+        assert_eq!(parsed.default_style, "minimal");
+        assert_eq!(parsed.language, "auto");
+        assert_eq!(parsed.dictation_language, "auto");
+        assert!(parsed.mic_prewarm);
+        assert!(parsed.vad_pcen);
+        assert!(matches!(parsed.asr_backend, AsrBackendConfig::Qwen3Asr {}));
+        assert!(matches!(parsed.llm_backend, LlmBackendConfig::Local {}));
+    }
 }
