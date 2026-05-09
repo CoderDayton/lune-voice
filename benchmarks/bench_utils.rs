@@ -629,7 +629,9 @@ impl HarnessBuilder {
                     use_gpu: has_gpu,
                     ..Default::default()
                 }) {
-                    Ok(llm) => Arc::new(llm),
+                    Ok(ort_llm) => Arc::new(lune_llm::CorrectionPipeline::new(
+                        Arc::new(ort_llm) as Arc<dyn lune_core::llm::LlmService>
+                    )),
                     Err(e) => {
                         eprintln!("[warn] LLM load failed ({e}), using NullPostProcessor");
                         Arc::new(lune_llm::NullPostProcessor::new())

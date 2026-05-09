@@ -1,5 +1,4 @@
 use lune_asr::AsrRegistry;
-use lune_core::asr::AsrBackendKind;
 use lune_core::config::{
     ActivationMode, AsrBackendConfig, DevicePolicy, DictationMode, HotkeyConfig, KeyCombo,
     Modifier, PillVisibility, RedactedString, StreamingMode, StylePreset, UserSettings,
@@ -207,6 +206,7 @@ pub fn create_custom_style(input: CreateCustomStyleInput) -> Result<WorkspaceSna
         style_instructions: instructions,
         user_prompt_template: "{raw_text}".into(),
         few_shot_pairs: Vec::new(),
+        skip_styling: false,
     });
     save_settings(&paths, &settings)?;
     let mut database = open_database(&paths)?;
@@ -352,8 +352,7 @@ fn open_database(paths: &AppPaths) -> Result<Database, String> {
 }
 
 fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
-    let backend_defaults =
-        AsrRegistry::default_pipeline_config(asr_backend_kind(&settings.asr_backend));
+    let backend_defaults = AsrRegistry::default_pipeline_config(settings.asr_backend.kind());
     let (openai_asr_base_url, openai_asr_model, openai_asr_api_key_set) =
         match &settings.asr_backend {
             AsrBackendConfig::OpenAiCompatible {
@@ -374,7 +373,7 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
         dictation_mode: dictation_mode_to_dto(settings.dictation_mode),
         use_gpu: !matches!(settings.device, DevicePolicy::Cpu),
         device_policy: device_policy_to_dto(settings.device),
-        asr_backend_type: asr_backend_type_to_dto(&settings.asr_backend),
+        asr_backend_type: settings.asr_backend.kind().into(),
         confidence_threshold: settings.pipeline.word_confidence_threshold,
         adaptive_vad: settings
             .pipeline
@@ -532,22 +531,6 @@ fn resolve_device_policy(use_gpu: bool, policy: DevicePolicyDto) -> DevicePolicy
     match policy {
         DevicePolicyDto::Cuda => DevicePolicy::Cuda,
         DevicePolicyDto::Auto | DevicePolicyDto::Cpu => DevicePolicy::Auto,
-    }
-}
-
-fn asr_backend_kind(config: &AsrBackendConfig) -> AsrBackendKind {
-    match config {
-        AsrBackendConfig::Qwen3Asr { .. } => AsrBackendKind::Qwen3Asr,
-        AsrBackendConfig::OpenAiCompatible { .. } => AsrBackendKind::OpenAiCompatible,
-        _ => AsrBackendKind::Qwen3Asr,
-    }
-}
-
-fn asr_backend_type_to_dto(config: &AsrBackendConfig) -> AsrBackendTypeDto {
-    match config {
-        AsrBackendConfig::Qwen3Asr { .. } => AsrBackendTypeDto::Qwen3Asr,
-        AsrBackendConfig::OpenAiCompatible { .. } => AsrBackendTypeDto::OpenAiCompatible,
-        _ => AsrBackendTypeDto::Qwen3Asr,
     }
 }
 

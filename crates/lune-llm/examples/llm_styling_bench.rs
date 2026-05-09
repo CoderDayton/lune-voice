@@ -11,7 +11,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use lune_core::config::StylePreset;
-use lune_core::llm::{PostProcessInput, TextPostProcessor};
+use lune_core::llm::{LlmService, PostProcessInput, TextPostProcessor};
+use lune_llm::CorrectionPipeline;
 use lune_llm::backend::ort_llm::{OrtStyleLlm, OrtStyleLlmConfig};
 
 const DEFAULT_FIXTURE: &str = "so i went to the store and brought some groceries and then i came home and i cooked dinner for my family and it was really good they said they liked it a lot";
@@ -46,12 +47,15 @@ fn main() {
     println!("  device: {}", if use_gpu { "CUDA" } else { "CPU" });
     println!();
 
-    let llm = OrtStyleLlm::new(OrtStyleLlmConfig {
-        model_dir: model_dir(),
-        use_gpu,
-        max_new_tokens: 256,
-    })
-    .expect("failed to load model");
+    let llm = Arc::new(
+        OrtStyleLlm::new(OrtStyleLlmConfig {
+            model_dir: model_dir(),
+            use_gpu,
+            max_new_tokens: 256,
+        })
+        .expect("failed to load model"),
+    );
+    let pipeline = CorrectionPipeline::new(Arc::clone(&llm) as Arc<dyn LlmService>);
 
     let fixture = load_fixture();
     println!("  INPUT:  {fixture}");
@@ -76,7 +80,7 @@ fn main() {
 
     let t0 = Instant::now();
     let corrected_output = rt
-        .block_on(llm.transform(&minimal_input))
+        .block_on(pipeline.transform(&minimal_input))
         .expect("correction failed");
     let correction_ms = t0.elapsed().as_secs_f64() * 1000.0;
     let corrected = &corrected_output.cleaned_text;

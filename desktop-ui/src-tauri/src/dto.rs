@@ -1,34 +1,77 @@
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
+
+/// Generated TS bindings live alongside the hand-rolled types under
+/// `desktop-ui/src/lib/backend/generated/`. Run `cargo test -p lune-ui` to
+/// regenerate after editing any DTO. The `types.ts` barrel re-exports the
+/// generated names so downstream imports stay stable.
+const _GENERATED_EXPORT_DIR: &str = "../../src/lib/backend/generated/";
 
 // ── DTO enums ────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
 pub enum ActivationModeDto {
     Toggle,
     Hold,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
 pub enum DictationModeDto {
     TypeInPlace,
     Clipboard,
     Both,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
 pub enum DevicePolicyDto {
     Cpu,
     Cuda,
     Auto,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
 pub enum AsrBackendTypeDto {
     Qwen3Asr,
     OpenAiCompatible,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+impl From<lune_core::asr::AsrBackendKind> for AsrBackendTypeDto {
+    fn from(kind: lune_core::asr::AsrBackendKind) -> Self {
+        use lune_core::asr::AsrBackendKind;
+        match kind {
+            AsrBackendKind::Qwen3Asr => Self::Qwen3Asr,
+            AsrBackendKind::OpenAiCompatible => Self::OpenAiCompatible,
+            // `AsrBackendKind` is `#[non_exhaustive]`. The catch-all fires only
+            // when a new lune-core variant ships without a matching
+            // `AsrBackendTypeDto` variant + arm here. Loud in dev, fall back to
+            // Qwen3 in release so end users keep a working selector.
+            other => {
+                debug_assert!(
+                    false,
+                    "unhandled AsrBackendKind variant {other:?}: add a matching \
+                     AsrBackendTypeDto variant and From arm before shipping"
+                );
+                Self::Qwen3Asr
+            }
+        }
+    }
+}
+
+impl From<AsrBackendTypeDto> for lune_core::asr::AsrBackendKind {
+    fn from(dto: AsrBackendTypeDto) -> Self {
+        match dto {
+            AsrBackendTypeDto::Qwen3Asr => Self::Qwen3Asr,
+            AsrBackendTypeDto::OpenAiCompatible => Self::OpenAiCompatible,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
 pub enum PillVisibilityDto {
     Always,
     WhenDictating,
@@ -37,7 +80,8 @@ pub enum PillVisibilityDto {
 
 // ── Read DTOs (Serialize → frontend) ─────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
 #[serde(rename_all = "camelCase")]
 pub struct StylePresetDto {
     pub id: String,
@@ -47,9 +91,11 @@ pub struct StylePresetDto {
     pub instructions: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceSnapshot {
+    #[ts(type = "string")]
     pub ipc_flavor: &'static str,
     pub service_status: String,
     pub settings: WorkspaceSettingsDto,
@@ -58,7 +104,8 @@ pub struct WorkspaceSnapshot {
     pub style_presets: Vec<StylePresetDto>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceSettingsDto {
     pub activation_mode: ActivationModeDto,
@@ -84,7 +131,8 @@ pub struct WorkspaceSettingsDto {
     pub openai_asr_api_key_set: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
 #[serde(rename_all = "camelCase")]
 pub struct PillSnapshotDto {
     pub service_status: String,
@@ -92,7 +140,8 @@ pub struct PillSnapshotDto {
     pub pill_visibility: PillVisibilityDto,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
 #[serde(rename_all = "camelCase")]
 pub struct HistoryItemDto {
     pub id: String,
@@ -104,7 +153,8 @@ pub struct HistoryItemDto {
     pub status: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
 #[serde(rename_all = "camelCase")]
 pub struct DictionaryItemDto {
     pub id: i32,
@@ -115,7 +165,8 @@ pub struct DictionaryItemDto {
 
 // ── Write DTOs (Deserialize ← frontend) ──────────────────────────────────
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SaveWorkspaceSettingsInput {
     pub activation_mode: ActivationModeDto,
@@ -241,7 +292,9 @@ pub enum CalibrationStreamEvent {
 
 #[cfg(test)]
 mod tests {
-    use super::{CalibrationDiagnosticsDto, CalibrationStreamEvent, SessionStreamEvent};
+    use super::{
+        AsrBackendTypeDto, CalibrationDiagnosticsDto, CalibrationStreamEvent, SessionStreamEvent,
+    };
 
     #[test]
     fn session_stream_events_match_frontend_shape() {
@@ -302,5 +355,15 @@ mod tests {
         assert_eq!(diag["speechP10"].as_f64(), Some(0.75));
         assert_eq!(diag["pauseP20"].as_f64(), Some(0.125));
         assert!(diag.get("noise_p95").is_none());
+    }
+
+    #[test]
+    fn asr_backend_kind_dto_round_trip() {
+        use lune_core::asr::AsrBackendKind;
+        for kind in [AsrBackendKind::Qwen3Asr, AsrBackendKind::OpenAiCompatible] {
+            let dto: AsrBackendTypeDto = kind.into();
+            let back: AsrBackendKind = dto.into();
+            assert_eq!(back, kind);
+        }
     }
 }

@@ -91,13 +91,15 @@ fn main() {
     let backend = lune_asr::Qwen3AsrBackend::new(asr_config).expect("load ASR");
 
     let llm_dir = models_dir.join(lune_core::models::DIR_STYLE_LLM);
-    let llm = lune_llm::OrtStyleLlm::new(lune_llm::OrtStyleLlmConfig {
+    let ort_llm = lune_llm::OrtStyleLlm::new(lune_llm::OrtStyleLlmConfig {
         model_dir: llm_dir,
         use_gpu: true,
         ..Default::default()
     })
     .expect("load LLM");
-    let llm: Arc<dyn lune_core::llm::TextPostProcessor> = Arc::new(llm);
+    let llm: Arc<dyn lune_core::llm::TextPostProcessor> = Arc::new(
+        lune_llm::CorrectionPipeline::new(Arc::new(ort_llm) as Arc<dyn lune_core::llm::LlmService>),
+    );
 
     let fixtures_dir = root.join("fixtures/audio");
     let mut fixtures: Vec<(String, Vec<f32>)> = Vec::new();

@@ -45,7 +45,7 @@ impl CorrectionPipeline {
 
     /// Build the user prompt for the correction pass.
     fn build_correction_prompt(&self, input: &PostProcessInput) -> String {
-        super::backend::ort_llm::OrtStyleLlm::user_prompt(
+        crate::backend::ort_llm::OrtStyleLlm::user_prompt(
             &input.raw_text,
             &input.language,
             &input.uncertain_words,
@@ -73,13 +73,34 @@ impl TextPostProcessor for CorrectionPipeline {
 
         tracing::debug!(corrected_len = text.len(), "correction pass complete");
 
-        // Pass 2: Styling (skip for minimal preset)
+        // Hardening: number-space repair + forbidden-meta-output guard +
+        // alignment-based merge against the raw input. Previously duplicated
+        // in OrtStyleLlm::transform; lifted here so every backend benefits.
+        text = crate::prompt::fix_all_number_spaces(&text);
+        if crate::backend::ort_llm::contains_forbidden_output(&text) {
+            tracing::warn!(output = %text, "LLM produced meta-text, falling back to raw");
+            return Ok(PostProcessOutput {
+                cleaned_text: input.raw_text.clone(),
+                metadata: None,
+            });
+        }
+        text = crate::backend::ort_llm::validate_and_merge(&input.raw_text, &text, &input.language);
+
+        // Pass 2: Styling (gated by preset.skip_styling)
         if input.style_preset.needs_styling() {
             let style_prompt = input.style_preset.build_styling_prompt(&text);
             match self.llm.complete("", &style_prompt).await {
                 Ok(styled) => {
-                    tracing::debug!(styled_len = styled.len(), "styling pass complete");
-                    text = styled;
+                    if !styled.is_empty()
+                        && !crate::backend::ort_llm::contains_forbidden_output(&styled)
+                    {
+                        tracing::debug!(styled_len = styled.len(), "styling pass complete");
+                        text = styled;
+                    } else {
+                        tracing::warn!(
+                            "styling pass produced empty or forbidden output, keeping corrected text"
+                        );
+                    }
                 }
                 Err(e) => {
                     tracing::warn!(error = %e, "styling pass failed, keeping corrected text");
@@ -120,8 +141,11 @@ mod tests {
 
     #[tokio::test]
     async fn correction_pass_only_for_minimal_style() {
+        // The post-correction validator drops outputs that share no words with
+        // the input — see `backend::ort_llm::validate_and_merge`. Mocks must
+        // therefore preserve enough vocabulary to clear the 40% LCS gate.
         let mock = Arc::new(MockLlm {
-            correction_output: "Corrected text".to_string(),
+            correction_output: "raw text corrected".to_string(),
             styling_output: "Should not be used".to_string(),
         });
         let pipeline = CorrectionPipeline::new(mock);
@@ -136,13 +160,14 @@ mod tests {
         };
 
         let output = pipeline.transform(&input).await.unwrap();
-        assert_eq!(output.cleaned_text, "Corrected text");
+        // skip_styling=true on minimal → only the correction pass runs.
+        assert_eq!(output.cleaned_text, "raw text");
     }
 
     #[tokio::test]
     async fn correction_and_styling_for_non_minimal_style() {
         let mock = Arc::new(MockLlm {
-            correction_output: "Corrected text".to_string(),
+            correction_output: "raw text corrected".to_string(),
             styling_output: "Styled text".to_string(),
         });
         let pipeline = CorrectionPipeline::new(mock);

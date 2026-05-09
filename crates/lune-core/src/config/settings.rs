@@ -151,6 +151,17 @@ pub enum AsrBackendConfig {
     },
 }
 
+impl AsrBackendConfig {
+    /// Return the [`AsrBackendKind`] discriminant for this config.
+    pub fn kind(&self) -> crate::asr::AsrBackendKind {
+        use crate::asr::AsrBackendKind;
+        match self {
+            Self::Qwen3Asr { .. } => AsrBackendKind::Qwen3Asr,
+            Self::OpenAiCompatible { .. } => AsrBackendKind::OpenAiCompatible,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 #[non_exhaustive]

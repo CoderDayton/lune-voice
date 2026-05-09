@@ -16,7 +16,6 @@ use tokenizers::Tokenizer;
 use tracing::info;
 
 use lune_core::error::{Error, Result};
-use lune_core::llm::{PostProcessInput, PostProcessOutput, TextPostProcessor};
 
 const DEFAULT_MAX_TOKENS: usize = 512;
 
@@ -688,7 +687,7 @@ fn looks_like_spelling_repair(from: &str, to: &str) -> bool {
     max_len >= 4 && (dist <= 1 || (dist <= 2 && max_len >= 7))
 }
 
-fn contains_forbidden_output(text: &str) -> bool {
+pub(crate) fn contains_forbidden_output(text: &str) -> bool {
     let lower = text.to_lowercase();
     [
         "here is",
@@ -707,7 +706,7 @@ fn contains_forbidden_output(text: &str) -> bool {
 /// Token-level validator: align input/output words via LCS, accept safe
 /// edits (case, punctuation, function-word insertions, known substitutions,
 /// spelling repairs), reject everything else.
-fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> String {
+pub(crate) fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> String {
     let inp: Vec<&str> = input.split_whitespace().collect();
     let out: Vec<&str> = llm_output.split_whitespace().collect();
 
@@ -814,51 +813,6 @@ impl lune_core::llm::LlmService for OrtStyleLlm {
             .decode(&out_ids, true)
             .map_err(|e| Error::Llm(format!("decode: {e}")))?;
         Ok(strip_think_tags(&text).trim().to_owned())
-    }
-}
-
-#[async_trait::async_trait]
-impl TextPostProcessor for OrtStyleLlm {
-    async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput> {
-        // Pass 1: correction only (uses cached system-prompt prefix).
-        let mut text =
-            self.apply_correction(&input.raw_text, &input.language, &input.uncertain_words)?;
-
-        text = crate::prompt::fix_all_number_spaces(&text);
-
-        if contains_forbidden_output(&text) {
-            tracing::warn!(output = %text, "LLM produced meta-text, falling back");
-            return Ok(PostProcessOutput {
-                cleaned_text: input.raw_text.clone(),
-                metadata: None,
-            });
-        }
-
-        text = validate_and_merge(&input.raw_text, &text, &input.language);
-
-        // Pass 2: styling (no system prompt, no prefix cache interaction).
-        if input.style_preset.needs_styling() {
-            tracing::debug!(style = %input.style_preset.id, "running styling pass");
-            match self.apply_styling(&text, &input.style_preset) {
-                Ok(styled) => {
-                    if !styled.is_empty() && !contains_forbidden_output(&styled) {
-                        text = styled;
-                    } else {
-                        tracing::warn!(
-                            "styling pass produced empty or forbidden output, keeping corrected text"
-                        );
-                    }
-                }
-                Err(e) => {
-                    tracing::warn!(error = %e, "styling pass failed, keeping corrected text");
-                }
-            }
-        }
-
-        Ok(PostProcessOutput {
-            cleaned_text: text,
-            metadata: None,
-        })
     }
 }
 

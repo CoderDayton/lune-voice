@@ -1,97 +1,39 @@
+// DTO shapes are generated from `desktop-ui/src-tauri/src/dto.rs` via ts-rs.
+// Run `cargo test -p lune-ui` after editing any Rust DTO to regenerate.
+//
+// The historical `Backend*` aliases below are kept so downstream imports
+// (workspace store, mappers, components, tests) don't need a sweeping rename.
+
 import type {
-  ActivationModeValue,
-  AsrBackendValue,
-  DictationModeValue,
-  PillVisibilityValue,
-} from '../../features/settings/data/settings-data';
+  DictionaryItemDto,
+  HistoryItemDto,
+  PillSnapshotDto,
+  SaveWorkspaceSettingsInput as SaveWorkspaceSettingsInputDto,
+  StylePresetDto,
+  WorkspaceSettingsDto,
+  WorkspaceSnapshot,
+} from './generated';
 
-export interface BackendDictionaryEntry {
-  id: number;
-  phrase: string;
-  replacement: string;
-  priority: number;
-}
+export type {
+  ActivationModeDto,
+  AsrBackendTypeDto,
+  DevicePolicyDto,
+  DictationModeDto,
+  PillVisibilityDto,
+} from './generated';
 
-export interface BackendHistoryEntry {
-  id: string;
-  startedAt: string;
-  endedAt: string | null;
-  transcript: string | null;
-  backend: string;
-  style: string;
-  status: string;
-}
+export type BackendDictionaryEntry = DictionaryItemDto;
+export type BackendHistoryEntry = HistoryItemDto;
+export type BackendPillSnapshot = PillSnapshotDto;
+export type BackendStylePreset = StylePresetDto;
+export type BackendWorkspaceSettings = WorkspaceSettingsDto;
+export type BackendWorkspaceSnapshot = WorkspaceSnapshot;
+export type SaveWorkspaceSettingsInput = SaveWorkspaceSettingsInputDto;
 
-export interface BackendWorkspaceSettings {
-  activationMode: ActivationModeValue;
-  dictationMode: DictationModeValue;
-  useGpu: boolean;
-  devicePolicy: 'Cpu' | 'Cuda' | 'Auto';
-  asrBackendType: AsrBackendValue;
-  confidenceThreshold: number | null;
-  adaptiveVad: boolean;
-  speechThreshold: number;
-  speechThresholdEnd: number;
-  stylePreset: string;
-  hotkeyToggle: string;
-  hotkeyCancel: string;
-  pillVisibility: PillVisibilityValue;
-  language: string;
-  dictationLanguage: string;
-  micPrewarm: boolean;
-  vadPcen: boolean;
-  // OpenAI ASR fields (present when asrBackendType == "OpenAiCompatible")
-  openaiAsrBaseUrl?: string | null;
-  openaiAsrModel?: string | null;
-  openaiAsrApiKeySet: boolean;
-}
-
-export interface BackendStylePreset {
-  id: string;
-  name: string;
-  description: string;
-  isBuiltin: boolean;
-  instructions: string;
-}
-
-export interface BackendWorkspaceSnapshot {
-  ipcFlavor: string;
-  serviceStatus: string;
-  settings: BackendWorkspaceSettings;
-  history: BackendHistoryEntry[];
-  dictionary: BackendDictionaryEntry[];
-  stylePresets: BackendStylePreset[];
-}
-
-export interface BackendPillSnapshot {
-  serviceStatus: string;
-  activationMode: ActivationModeValue;
-  pillVisibility: PillVisibilityValue;
-}
-
-export interface SaveWorkspaceSettingsInput {
-  activationMode: ActivationModeValue;
-  dictationMode: DictationModeValue;
-  useGpu: boolean;
-  devicePolicy: 'Cpu' | 'Cuda' | 'Auto';
-  asrBackendType: AsrBackendValue;
-  confidenceThreshold: number | null;
-  adaptiveVad: boolean;
-  speechThreshold: number;
-  speechThresholdEnd: number;
-  stylePreset: string;
-  hotkeyToggle: string;
-  hotkeyCancel: string;
-  pillVisibility: PillVisibilityValue;
-  language: string;
-  dictationLanguage: string;
-  micPrewarm: boolean;
-  vadPcen: boolean;
-  // OpenAI ASR fields (sent when asrBackendType == "OpenAiCompatible")
-  openaiAsrBaseUrl?: string | null;
-  openaiAsrApiKey?: string | null;
-  openaiAsrModel?: string | null;
-}
+// ── Hand-rolled (not yet ts-rs-generated) ────────────────────────────────
+// These remain hand-rolled because the underlying Rust definitions are
+// tagged enums whose ts-rs output needs more thought (tag/content layout),
+// or because they describe client-side interfaces that have no Rust DTO.
 
 export type CalibrationPhase =
   | 'idle'

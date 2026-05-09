@@ -103,6 +103,29 @@ mod tests {
     }
 
     #[test]
+    fn needs_styling_driven_by_skip_styling_field() {
+        assert!(!StylePreset::minimal().needs_styling());
+        assert!(StylePreset::casual().needs_styling());
+        assert!(StylePreset::technical().needs_styling());
+        // Non-"minimal" id with skip_styling=true also skips.
+        let mut p = StylePreset::casual();
+        p.skip_styling = true;
+        assert!(!p.needs_styling());
+    }
+
+    #[test]
+    fn skip_styling_defaults_to_false_on_missing_field() {
+        let json = r#"{
+            "id":"x","name":"X","description":"",
+            "style_instructions":"","user_prompt_template":"{raw_text}",
+            "few_shot_pairs":[]
+        }"#;
+        let parsed: StylePreset = serde_json::from_str(json).unwrap();
+        assert!(!parsed.skip_styling);
+        assert!(parsed.needs_styling());
+    }
+
+    #[test]
     fn dictation_mode_fromstr_err_is_cold() {
         let err = "bad".parse::<DictationMode>().unwrap_err();
         assert!(err.contains("TypeInPlace|Clipboard|Both"));

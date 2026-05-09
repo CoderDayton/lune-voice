@@ -7,11 +7,6 @@ use async_openai::{
     },
 };
 
-use lune_core::{
-    config::BASE_SYSTEM_PROMPT,
-    llm::{PostProcessInput, PostProcessOutput, TextPostProcessor},
-};
-
 /// Configuration for the OpenAI-compatible LLM backend.
 #[derive(Debug, Clone)]
 pub struct OpenAiLlmConfig {
@@ -100,228 +95,10 @@ impl lune_core::llm::LlmService for OpenAiLlmBackend {
     }
 }
 
-/// Build correction-pass messages: system = BASE_SYSTEM_PROMPT, user = transcript.
-fn build_correction_messages(input: &PostProcessInput) -> Vec<ChatCompletionRequestMessage> {
-    let mut messages = Vec::with_capacity(2);
-
-    let mut system_content = BASE_SYSTEM_PROMPT.replace("{lang}", &input.language);
-    if !input.dictionary.is_empty() {
-        system_content.push_str("\nDictionary terms (use these exact spellings):");
-        for entry in &input.dictionary {
-            system_content.push_str("\n- ");
-            system_content.push_str(&entry.phrase);
-            system_content.push_str(" → ");
-            system_content.push_str(&entry.replacement);
-        }
-    }
-
-    messages.push(
-        ChatCompletionRequestSystemMessageArgs::default()
-            .content(system_content)
-            .build()
-            .expect("system message build")
-            .into(),
-    );
-
-    let user_text = super::ort_llm::OrtStyleLlm::user_prompt(
-        &input.raw_text,
-        &input.language,
-        &input.uncertain_words,
-    );
-
-    messages.push(
-        ChatCompletionRequestUserMessageArgs::default()
-            .content(user_text)
-            .build()
-            .expect("user message build")
-            .into(),
-    );
-
-    messages
-}
-
-/// Build styling-pass messages: user-only prompt with style instructions + few-shot.
-fn build_styling_messages(
-    corrected_text: &str,
-    style: &lune_core::config::StylePreset,
-) -> Vec<ChatCompletionRequestMessage> {
-    let user_text = style.build_styling_prompt(corrected_text);
-    vec![
-        ChatCompletionRequestUserMessageArgs::default()
-            .content(user_text)
-            .build()
-            .expect("user message build")
-            .into(),
-    ]
-}
-
-fn fallback_output(raw_text: &str) -> PostProcessOutput {
-    PostProcessOutput {
-        cleaned_text: raw_text.to_owned(),
-        metadata: None,
-    }
-}
-
-#[async_trait::async_trait]
-impl TextPostProcessor for OpenAiLlmBackend {
-    async fn transform(&self, input: &PostProcessInput) -> lune_core::Result<PostProcessOutput> {
-        // Pass 1: correction.
-        let messages = build_correction_messages(input);
-        let request = match CreateChatCompletionRequestArgs::default()
-            .model(&self.config.model)
-            .max_tokens(self.config.max_tokens)
-            .temperature(self.config.temperature)
-            .messages(messages)
-            .build()
-        {
-            Ok(req) => req,
-            Err(e) => {
-                tracing::warn!(error = %e, "failed to build correction request, returning raw text");
-                return Ok(fallback_output(&input.raw_text));
-            }
-        };
-
-        tracing::debug!(
-            model = %self.config.model,
-            raw_text_len = input.raw_text.len(),
-            style = %input.style_preset.id,
-            "OpenAI correction request"
-        );
-
-        let mut text = match self.client.chat().create(request).await {
-            Ok(response) => response
-                .choices
-                .first()
-                .and_then(|c| c.message.content.as_deref())
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-                .unwrap_or(input.raw_text.trim())
-                .to_owned(),
-            Err(e) => {
-                tracing::warn!(error = %e, "OpenAI correction failed, returning raw text");
-                return Ok(fallback_output(&input.raw_text));
-            }
-        };
-
-        // Pass 2: styling (skip for minimal preset).
-        if input.style_preset.needs_styling() {
-            let style_msgs = build_styling_messages(&text, &input.style_preset);
-            let style_req = match CreateChatCompletionRequestArgs::default()
-                .model(&self.config.model)
-                .max_tokens(self.config.max_tokens)
-                .temperature(self.config.temperature)
-                .messages(style_msgs)
-                .build()
-            {
-                Ok(req) => req,
-                Err(e) => {
-                    tracing::warn!(error = %e, "failed to build styling request, keeping corrected text");
-                    return Ok(PostProcessOutput {
-                        cleaned_text: text,
-                        metadata: None,
-                    });
-                }
-            };
-
-            tracing::debug!(style = %input.style_preset.id, "OpenAI styling request");
-
-            match self.client.chat().create(style_req).await {
-                Ok(response) => {
-                    if let Some(styled) = response
-                        .choices
-                        .first()
-                        .and_then(|c| c.message.content.as_deref())
-                        .map(str::trim)
-                        .filter(|s| !s.is_empty())
-                    {
-                        text = styled.to_owned();
-                    }
-                }
-                Err(e) => {
-                    tracing::warn!(error = %e, "OpenAI styling failed, keeping corrected text");
-                }
-            }
-        }
-
-        tracing::debug!(output_len = text.len(), "OpenAI post-process complete");
-
-        Ok(PostProcessOutput {
-            cleaned_text: text,
-            metadata: None,
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Arc;
-
-    use lune_core::config::StylePreset;
-    use lune_core::dict::DictionaryEntry;
-
-    fn test_input(raw_text: &str) -> PostProcessInput {
-        PostProcessInput {
-            raw_text: raw_text.into(),
-            style_preset: Arc::new(StylePreset::casual()),
-            app_category: None,
-            dictionary: vec![],
-            context: None,
-            language: "en".into(),
-            uncertain_words: Vec::new(),
-        }
-    }
-
-    #[test]
-    fn build_correction_messages_basic() {
-        let input = test_input("hello um world");
-        let msgs = build_correction_messages(&input);
-
-        assert_eq!(msgs.len(), 2);
-
-        let json = serde_json::to_string(&msgs).unwrap();
-        assert!(json.contains("hello um world"));
-    }
-
-    #[test]
-    fn build_correction_messages_with_dictionary() {
-        let input = PostProcessInput {
-            dictionary: vec![DictionaryEntry {
-                phrase: "lunevoice".into(),
-                replacement: "Lune Voice".into(),
-                priority: 10,
-            }],
-            ..test_input("use lunevoice")
-        };
-        let msgs = build_correction_messages(&input);
-
-        let json = serde_json::to_string(&msgs).unwrap();
-        assert!(json.contains("Lune Voice"));
-        assert!(json.contains("Dictionary terms"));
-    }
-
-    #[test]
-    fn build_correction_messages_includes_transcript() {
-        let input = test_input("hello world");
-        let msgs = build_correction_messages(&input);
-        let json = serde_json::to_string(&msgs).unwrap();
-        assert!(json.contains("hello world"));
-    }
-
-    #[test]
-    fn build_correction_messages_with_uncertain_words() {
-        let input = PostProcessInput {
-            uncertain_words: vec![("brought".into(), 6)],
-            ..test_input(
-                "call with Jennifer Martinez to discuss interesting their OAuth deployment on AWS",
-            )
-        };
-        let msgs = build_correction_messages(&input);
-        let json = serde_json::to_string(&msgs).unwrap();
-
-        assert!(json.contains("call with Jennifer Martinez"));
-        assert!(json.contains("/no_think"));
-    }
+    use lune_core::llm::LlmService;
 
     #[test]
     fn config_defaults() {
@@ -332,18 +109,19 @@ mod tests {
         assert_eq!(cfg.base_url, "https://api.openai.com/v1");
     }
 
+    /// Network failures surface as `Err` from `LlmService::complete`. Pipeline-
+    /// level graceful degradation is tested in `pipeline.rs` against a mock
+    /// `LlmService` that returns the same `Err`, so this test only needs to
+    /// verify the backend reports the failure rather than swallowing it.
     #[tokio::test]
-    async fn graceful_degradation() {
+    async fn complete_errors_on_unreachable_endpoint() {
         let config = OpenAiLlmConfig {
             base_url: "http://127.0.0.1:1".into(),
             api_key: "test-key".into(),
             ..Default::default()
         };
         let backend = OpenAiLlmBackend::new(config);
-        let input = test_input("hello world");
-
-        let output = backend.transform(&input).await.unwrap();
-        assert_eq!(output.cleaned_text, "hello world");
-        assert!(output.metadata.is_none());
+        let result = backend.complete("system", "user").await;
+        assert!(result.is_err());
     }
 }

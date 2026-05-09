@@ -46,6 +46,11 @@ pub struct StylePreset {
     /// Template with `{raw_text}` slot.
     pub user_prompt_template: String,
     pub few_shot_pairs: Vec<(String, String)>,
+    /// When `true`, the styling LLM pass is skipped — only the correction pass
+    /// runs. The natural carrier for "this preset is correction-only".
+    /// Decouples behavior from the historical `id == "minimal"` sentinel.
+    #[serde(default)]
+    pub skip_styling: bool,
 }
 
 /// O(1) lookup registry for style presets.
@@ -111,9 +116,9 @@ impl StylePreset {
     }
 
     /// Whether this preset requires a separate styling pass.
-    /// "minimal" only corrects errors — no restyling needed.
+    /// Driven by `skip_styling` so behavior is not coupled to a magic ID.
     pub fn needs_styling(&self) -> bool {
-        self.id != "minimal"
+        !self.skip_styling
     }
 
     /// Build a self-contained user prompt for the styling-only pass.
@@ -163,6 +168,7 @@ impl StylePreset {
                     "he asked if i was coming. i said yes.".into(),
                 ),
             ],
+            skip_styling: false,
         }
     }
 
@@ -188,6 +194,7 @@ impl StylePreset {
                     "The deploy broke last night due to a configuration issue. Mike fixed it around 2 AM.".into(),
                 ),
             ],
+            skip_styling: false,
         }
     }
 
@@ -213,6 +220,7 @@ impl StylePreset {
                     "I am writing to inquire about the current status of the project.".into(),
                 ),
             ],
+            skip_styling: false,
         }
     }
 
@@ -239,6 +247,7 @@ impl StylePreset {
                     "The weather is nice today, I think we should go outside.".into(),
                 ),
             ],
+            skip_styling: true,
         }
     }
 
@@ -264,6 +273,7 @@ impl StylePreset {
                     "If the `boolean` is `true` then we push to the `state` array and trigger a re-render.".into(),
                 ),
             ],
+            skip_styling: false,
         }
     }
 
@@ -285,6 +295,7 @@ impl StylePreset {
                     "The problem is that it scales poorly. Once you hit ten thousand users, things start to break down.".into(),
                 ),
             ],
+            skip_styling: false,
         }
     }
 }
