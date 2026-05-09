@@ -308,7 +308,18 @@ impl OrtStyleLlm {
         language: &str,
         _uncertain_words: &[(String, usize)],
     ) -> String {
-        format!("Correct the following {language} transcript:\n{transcript}\n\n/no_think")
+        // The `language` field arrives in inconsistent forms — the runtime
+        // sometimes hands us a BCP-47 code ("en") and sometimes a full
+        // English name from the ASR's language head ("English", "Dutch").
+        // Only inject a recognizable label; otherwise omit it entirely so
+        // the model isn't shown an ungrammatical header like
+        // "the following en transcript".
+        let label = normalize_language_label(language);
+        let header = match label {
+            Some(name) => format!("Correct the following {name} transcript:"),
+            None => "Correct the following transcript:".to_string(),
+        };
+        format!("{header}\n{transcript}\n\n/no_think")
     }
 
     pub fn apply_correction(
@@ -1024,6 +1035,34 @@ fn strip_think_tags(text: &str) -> &str {
     }
 }
 
+/// Normalize a language hint into the English language name shown in the user
+/// prompt. Returns `None` for missing / unknown / "auto" so callers can drop
+/// the tag rather than emit ungrammatical text like "the following en
+/// transcript". Accepts BCP-47 codes and the full English names emitted by
+/// Qwen3-ASR's language head.
+fn normalize_language_label(raw: &str) -> Option<&'static str> {
+    let lang = raw.trim();
+    if lang.is_empty() || lang.eq_ignore_ascii_case("auto") {
+        return None;
+    }
+    Some(match lang.to_ascii_lowercase().as_str() {
+        "en" | "english" => "English",
+        "fr" | "french" => "French",
+        "de" | "german" => "German",
+        "es" | "spanish" => "Spanish",
+        "it" | "italian" => "Italian",
+        "pt" | "portuguese" => "Portuguese",
+        "nl" | "dutch" => "Dutch",
+        "ja" | "japanese" => "Japanese",
+        "zh" | "chinese" | "mandarin" => "Chinese",
+        "ko" | "korean" => "Korean",
+        "ru" | "russian" => "Russian",
+        "pl" | "polish" => "Polish",
+        "ar" | "arabic" => "Arabic",
+        _ => return None,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1034,7 +1073,7 @@ mod tests {
     fn user_prompt_appends_no_think() {
         let prompt = OrtStyleLlm::user_prompt("hello world", "en", &[]);
         assert!(prompt.contains("hello world"));
-        assert!(prompt.contains("en"));
+        assert!(prompt.contains("English"));
         assert!(prompt.ends_with("/no_think"));
     }
 
@@ -1042,8 +1081,28 @@ mod tests {
     fn user_prompt_preserves_transcript() {
         let prompt = OrtStyleLlm::user_prompt("das ist ein test", "de", &[]);
         assert!(prompt.contains("das ist ein test"));
-        assert!(prompt.contains("de"));
+        assert!(prompt.contains("German"));
         assert!(prompt.ends_with("/no_think"));
+    }
+
+    #[test]
+    fn user_prompt_normalizes_full_english_name_from_asr() {
+        let prompt = OrtStyleLlm::user_prompt("das ist ein test", "German", &[]);
+        assert!(prompt.contains("German transcript"));
+    }
+
+    #[test]
+    fn user_prompt_drops_language_when_auto_or_unknown() {
+        let auto = OrtStyleLlm::user_prompt("hello", "auto", &[]);
+        assert!(auto.contains("Correct the following transcript:"));
+        assert!(!auto.contains("auto"));
+
+        let empty = OrtStyleLlm::user_prompt("hello", "", &[]);
+        assert!(empty.contains("Correct the following transcript:"));
+
+        let unknown = OrtStyleLlm::user_prompt("hello", "klingon", &[]);
+        assert!(unknown.contains("Correct the following transcript:"));
+        assert!(!unknown.contains("klingon"));
     }
 
     #[test]
