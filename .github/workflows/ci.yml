@@ -119,6 +119,52 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: cargo test --workspace --exclude lune-ui --exclude lune-audio --exclude lune-app --exclude lune-llm --no-default-features --lib
 
+  # ── DTO drift guard ───────────────────────────────────────────────────────
+  # Ensure ts-rs-generated TypeScript bindings stay in sync with their Rust
+  # DTO sources. Running `cargo test -p lune-ui` re-emits files into
+  # desktop-ui/src/lib/backend/generated/; if anything differs from the
+  # checked-in version, the DTO source was edited without committing the
+  # regenerated bindings.
+  dto-drift:
+    name: DTO Drift
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: dto-drift
+
+      - name: Install Linux system deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libasound2-dev \
+            libdbus-1-dev \
+            libglib2.0-dev \
+            libssl-dev \
+            libxkbcommon-dev \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libjavascriptcoregtk-4.1-dev \
+            libsoup-3.0-dev \
+            librsvg2-dev \
+            pkg-config
+
+      - name: Regenerate DTO bindings
+        run: cargo test -p lune-ui --lib
+
+      - name: Verify no drift
+        run: |
+          if ! git diff --quiet -- desktop-ui/src/lib/backend/generated/; then
+            echo "::error::DTO bindings drifted. Run 'cargo test -p lune-ui' locally and commit the regenerated files."
+            git --no-pager diff -- desktop-ui/src/lib/backend/generated/
+            exit 1
+          fi
+
   # ── Security audit (push/PR + weekly schedule) ────────────────────────────
   audit:
     name: Security Audit

@@ -17,6 +17,18 @@ pre-commit:
       run: CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-2} cargo test --workspace --lib --bins
       fail_text: "Rust unit and binary tests failed"
 
+    dto-drift:
+      # ts-rs regenerates desktop-ui/src/lib/backend/generated/ during the
+      # `test` step above. If any of those files differ from HEAD, a Rust DTO
+      # was edited without committing the regenerated TypeScript bindings.
+      run: |
+        if ! git diff --quiet -- desktop-ui/src/lib/backend/generated/; then
+          echo "DTO bindings drifted — stage the regenerated files:"
+          git --no-pager diff --stat -- desktop-ui/src/lib/backend/generated/
+          exit 1
+        fi
+      fail_text: "DTO bindings drift — run `cargo test -p lune-ui` and stage the regenerated files in desktop-ui/src/lib/backend/generated/"
+
     frontend-lint:
       run: cd desktop-ui && bunx @biomejs/biome check src/
       fail_text: "frontend lint failed — run `bunx @biomejs/biome check --write src/` to fix"
