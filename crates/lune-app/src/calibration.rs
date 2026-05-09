@@ -328,16 +328,11 @@ mod tests {
         F: FnMut(&CalibrationFrame) -> bool,
     {
         let mut out = Vec::new();
-        loop {
-            match tokio::time::timeout(Duration::from_secs(2), rx.recv()).await {
-                Ok(Some(frame)) => {
-                    let matched = stop(&frame);
-                    out.push(frame);
-                    if matched {
-                        break;
-                    }
-                }
-                _ => break,
+        while let Ok(Some(frame)) = tokio::time::timeout(Duration::from_secs(2), rx.recv()).await {
+            let matched = stop(&frame);
+            out.push(frame);
+            if matched {
+                break;
             }
         }
         out

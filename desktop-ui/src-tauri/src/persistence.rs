@@ -795,8 +795,10 @@ mod tests {
 
     #[test]
     fn dictation_language_round_trips_through_dto() {
-        let mut settings = UserSettings::default();
-        settings.dictation_language = "de".into();
+        let settings = UserSettings {
+            dictation_language: "de".into(),
+            ..UserSettings::default()
+        };
 
         let dto = settings_to_dto(&settings);
         assert_eq!(dto.dictation_language, "de");

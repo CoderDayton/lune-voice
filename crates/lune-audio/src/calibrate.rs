@@ -213,8 +213,8 @@ mod tests {
     #[test]
     fn quiet_room_clear_voice_recommends_low_thresholds() {
         let mut speech = vec_of(0.85, 600);
-        for i in 200..230 {
-            speech[i] = 0.20;
+        for s in speech.iter_mut().take(230).skip(200) {
+            *s = 0.20;
         }
         let r = recommend(&CalibrationInput {
             noise_scores: vec_of(0.05, 100),
@@ -229,8 +229,8 @@ mod tests {
     #[test]
     fn noisy_room_clear_voice_raises_start_threshold() {
         let mut speech = vec_of(0.90, 600);
-        for i in 200..225 {
-            speech[i] = 0.30;
+        for s in speech.iter_mut().take(225).skip(200) {
+            *s = 0.30;
         }
         let r = recommend(&CalibrationInput {
             noise_scores: vec_of(0.30, 100),
