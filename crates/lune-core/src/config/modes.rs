@@ -19,7 +19,8 @@ pub enum DictationMode {
     TypeInPlace,
     /// Copy finalized text to clipboard via wl-copy.
     Clipboard,
-    /// Both type and copy to clipboard.
+    /// Type keystrokes into the focused app AND copy text to the clipboard.
+    /// Lets the user re-paste the dictation later without overwriting it.
     Both,
 }
 

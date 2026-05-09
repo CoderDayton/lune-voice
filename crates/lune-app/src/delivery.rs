@@ -108,6 +108,12 @@ fn delivery_thread(rx: mpsc::Receiver<DeliveryMsg>, terminal_mode: TerminalMode)
 
         match msg.mode {
             DictationMode::TypeInPlace => driver.type_keys(text),
+            DictationMode::Both => {
+                if let Err(e) = driver.copy_to_clipboard(text) {
+                    warn!(error = %e, "clipboard copy failed in Both mode");
+                }
+                driver.type_keys(text);
+            }
             _ => {
                 #[cfg(unix)]
                 if let Some(ref target) = msg.target {
@@ -155,6 +161,10 @@ impl PlatformDriver {
 
     fn type_keys(&mut self, text: &str) {
         self.typer.type_str_keys(text);
+    }
+
+    fn copy_to_clipboard(&mut self, text: &str) -> Result<(), String> {
+        crate::uinput_typer::set_clipboard(text)
     }
 }
 
@@ -220,5 +230,11 @@ impl PlatformDriver {
         if let Err(e) = self.enigo.text(text) {
             warn!(error = %e, "per-key typing failed");
         }
+    }
+
+    fn copy_to_clipboard(&mut self, text: &str) -> Result<(), String> {
+        self.clipboard
+            .set_text(text)
+            .map_err(|e| format!("clipboard set failed: {e}"))
     }
 }

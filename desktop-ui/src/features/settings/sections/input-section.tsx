@@ -1,6 +1,7 @@
 import { useLingui } from '@lingui/react/macro';
 import { Mic, Wand2 } from 'lucide-react';
 import { useState } from 'react';
+import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown';
 import { saveWorkspaceSetting } from '../../../store/workspace-store';
 import { CalibrateModal } from '../components/calibrate-modal';
 import { type SettingsProps, SettingsRow, SettingsSection } from '../components/section';
@@ -32,22 +33,14 @@ export function InputSection({ settings }: SettingsProps) {
         label={t`Recording mode`}
         description={t`Toggle is easiest for longer dictation. Hold is better for quick bursts.`}
         control={
-          <select
-            className="select w-full sm:w-auto sm:min-w-56"
+          <DescriptiveDropdown
             value={settings.activationMode}
-            onChange={(event) =>
-              void saveWorkspaceSetting(
-                'activationMode',
-                event.target.value as typeof settings.activationMode,
-              )
+            options={activationModes}
+            ariaLabel={t`Recording mode`}
+            onChange={(next) =>
+              void saveWorkspaceSetting('activationMode', next as typeof settings.activationMode)
             }
-          >
-            {activationModes.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          />
         }
       />
 

@@ -1,5 +1,6 @@
 import { useLingui } from '@lingui/react/macro';
 import { TextCursorInput } from 'lucide-react';
+import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown';
 import { saveWorkspaceSetting } from '../../../store/workspace-store';
 import { type SettingsProps, SettingsRow, SettingsSection } from '../components/section';
 import { deliveryMethods } from '../data/settings-data';
@@ -16,22 +17,14 @@ export function OutputSection({ settings }: SettingsProps) {
         label={t`Send method`}
         description={t`Paste is simplest. Typing keystrokes can work better in some apps.`}
         control={
-          <select
-            className="select w-full sm:w-auto sm:min-w-56"
+          <DescriptiveDropdown
             value={settings.dictationMode}
-            onChange={(event) =>
-              void saveWorkspaceSetting(
-                'dictationMode',
-                event.target.value as typeof settings.dictationMode,
-              )
+            options={deliveryMethods}
+            ariaLabel={t`Send method`}
+            onChange={(next) =>
+              void saveWorkspaceSetting('dictationMode', next as typeof settings.dictationMode)
             }
-          >
-            {deliveryMethods.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          />
         }
       />
     </SettingsSection>

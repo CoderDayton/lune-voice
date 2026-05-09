@@ -1,5 +1,6 @@
 import { useLingui } from '@lingui/react/macro';
 import { AudioWaveform } from 'lucide-react';
+import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown';
 import { saveWorkspaceSetting } from '../../../store/workspace-store';
 import { OpenAiFields } from '../components/openai-fields';
 import { type SettingsProps, SettingsRow, SettingsSection } from '../components/section';
@@ -23,22 +24,14 @@ export function TranscriptionSection({ settings }: SettingsProps) {
         label={t`Voice model`}
         description={t`Qwen3-ASR runs locally with automatic language detection.`}
         control={
-          <select
-            className="select w-full sm:w-auto sm:min-w-64"
+          <DescriptiveDropdown
             value={settings.asrBackend}
-            onChange={(event) =>
-              void saveWorkspaceSetting(
-                'asrBackend',
-                event.target.value as typeof settings.asrBackend,
-              )
+            options={asrBackends}
+            ariaLabel={t`Voice model`}
+            onChange={(next) =>
+              void saveWorkspaceSetting('asrBackend', next as typeof settings.asrBackend)
             }
-          >
-            {asrBackends.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          />
         }
       />
       {settings.asrBackend === 'OpenAiCompatible' && (
@@ -56,22 +49,17 @@ export function TranscriptionSection({ settings }: SettingsProps) {
         label={t`Dictation language`}
         description={t`Set the language you speak. Auto uses detection from speech.`}
         control={
-          <select
-            className="select w-full sm:w-auto sm:min-w-56"
+          <DescriptiveDropdown
             value={settings.dictationLanguage}
-            onChange={(event) =>
+            options={dictationLanguages}
+            ariaLabel={t`Dictation language`}
+            onChange={(next) =>
               void saveWorkspaceSetting(
                 'dictationLanguage',
-                event.target.value as typeof settings.dictationLanguage,
+                next as typeof settings.dictationLanguage,
               )
             }
-          >
-            {dictationLanguages.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          />
         }
       />
       <SettingsRow

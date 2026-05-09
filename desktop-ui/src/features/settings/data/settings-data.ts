@@ -1,3 +1,14 @@
+import {
+  ClipboardCopy,
+  ClipboardPaste,
+  Cloud,
+  Cpu,
+  Hand,
+  Keyboard,
+  ToggleLeft,
+} from 'lucide-react';
+import type { ComponentType } from 'react';
+
 export type ActivationModeValue = 'Toggle' | 'Hold';
 export type AsrBackendValue = 'Qwen3Asr' | 'OpenAiCompatible';
 
@@ -9,9 +20,32 @@ export interface Option<Value extends string> {
   label: string;
 }
 
-export const activationModes: Option<ActivationModeValue>[] = [
-  { value: 'Toggle', label: 'Toggle to start and stop' },
-  { value: 'Hold', label: 'Hold while speaking' },
+type IconComponent = ComponentType<{
+  size?: number;
+  strokeWidth?: number;
+  className?: string;
+}>;
+
+export interface DescriptiveOptionData<Value extends string> {
+  value: Value;
+  label: string;
+  description?: string;
+  icon?: IconComponent;
+}
+
+export const activationModes: DescriptiveOptionData<ActivationModeValue>[] = [
+  {
+    value: 'Toggle',
+    label: 'Toggle to start and stop',
+    description: 'Press the hotkey to start, press again to stop. Easiest for longer dictations.',
+    icon: ToggleLeft,
+  },
+  {
+    value: 'Hold',
+    label: 'Hold while speaking',
+    description: 'Hold the hotkey while speaking, release to stop. Better for quick bursts.',
+    icon: Hand,
+  },
 ];
 
 export const pillVisibilityOptions: Option<PillVisibilityValue>[] = [
@@ -20,15 +54,40 @@ export const pillVisibilityOptions: Option<PillVisibilityValue>[] = [
   { value: 'Never', label: 'Never' },
 ];
 
-export const asrBackends: Option<AsrBackendValue>[] = [
-  { value: 'Qwen3Asr', label: 'Qwen3-ASR 0.6B (local)' },
-  { value: 'OpenAiCompatible', label: 'Cloud API (OpenAI-compatible)' },
+export const asrBackends: DescriptiveOptionData<AsrBackendValue>[] = [
+  {
+    value: 'Qwen3Asr',
+    label: 'Qwen3-ASR 0.6B (local)',
+    description: 'Runs on-device. Audio never leaves your machine.',
+    icon: Cpu,
+  },
+  {
+    value: 'OpenAiCompatible',
+    label: 'Cloud API (OpenAI-compatible)',
+    description: 'Sends audio to a remote OpenAI-compatible endpoint you configure.',
+    icon: Cloud,
+  },
 ];
 
-export const deliveryMethods: Option<DictationModeValue>[] = [
-  { value: 'Clipboard', label: 'Paste into app' },
-  { value: 'TypeInPlace', label: 'Type keystrokes' },
-  { value: 'Both', label: 'Paste and type' },
+export const deliveryMethods: DescriptiveOptionData<DictationModeValue>[] = [
+  {
+    value: 'Clipboard',
+    label: 'Paste into app',
+    description: 'Sets the clipboard, then sends a paste shortcut. Fastest for long dictations.',
+    icon: ClipboardPaste,
+  },
+  {
+    value: 'TypeInPlace',
+    label: 'Type into app',
+    description: 'Simulates keystrokes one character at a time. Works where paste is blocked.',
+    icon: Keyboard,
+  },
+  {
+    value: 'Both',
+    label: 'Type into app and copy',
+    description: 'Types the text into the focused app and keeps it on the clipboard for re-use.',
+    icon: ClipboardCopy,
+  },
 ];
 
 export type DictationLanguageValue =
@@ -44,8 +103,8 @@ export type DictationLanguageValue =
   | 'ru'
   | 'zh';
 
-export const dictationLanguages: Option<DictationLanguageValue>[] = [
-  { value: 'auto', label: 'Auto-detect' },
+export const dictationLanguages: DescriptiveOptionData<DictationLanguageValue>[] = [
+  { value: 'auto', label: 'Auto-detect', description: 'Detects the spoken language each session.' },
   { value: 'en', label: 'English' },
   { value: 'de', label: 'Deutsch' },
   { value: 'es', label: 'Español' },

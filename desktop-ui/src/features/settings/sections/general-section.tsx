@@ -1,11 +1,22 @@
 import { useLingui } from '@lingui/react/macro';
 import { Settings2 } from 'lucide-react';
+import { useMemo } from 'react';
+import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown';
 import { activateLocale, type LocaleKey, locales } from '../../../i18n';
 import { saveWorkspaceSetting, type WorkspaceSettings } from '../../../store/workspace-store';
 import { SettingsSection } from '../components/section';
+import type { DescriptiveOptionData } from '../data/settings-data';
 
 export function GeneralSection({ settings }: { settings: WorkspaceSettings }) {
   const { t } = useLingui();
+  const localeOptions = useMemo<DescriptiveOptionData<LocaleKey>[]>(
+    () =>
+      (Object.entries(locales) as [LocaleKey, string][]).map(([key, label]) => ({
+        value: key,
+        label,
+      })),
+    [],
+  );
 
   return (
     <SettingsSection
@@ -16,21 +27,15 @@ export function GeneralSection({ settings }: { settings: WorkspaceSettings }) {
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm font-medium">{t`Language`}</span>
-          <select
-            className="select w-full sm:w-auto sm:min-w-56"
+          <DescriptiveDropdown
             value={settings.language}
-            onChange={(event) => {
-              const lang = event.target.value as LocaleKey;
+            options={localeOptions}
+            ariaLabel={t`Language`}
+            onChange={(lang) => {
               void saveWorkspaceSetting('language', lang);
               void activateLocale(lang);
             }}
-          >
-            {(Object.entries(locales) as [LocaleKey, string][]).map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </select>
+          />
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
