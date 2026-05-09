@@ -1,11 +1,11 @@
 import type { DictionaryEntry } from '../../features/dictionary/data/dictionary-data';
 import type {
   BackendClient,
-  BackendPillSnapshot,
-  BackendWorkspaceSnapshot,
   CalibrationHandle,
   CalibrationStreamEvent,
+  PillSnapshotDto,
   SaveWorkspaceSettingsInput,
+  WorkspaceSnapshot,
 } from './types';
 
 const initialDictionaryEntries: DictionaryEntry[] = [
@@ -17,7 +17,7 @@ const initialDictionaryEntries: DictionaryEntry[] = [
   { id: 6, phrase: 'llm', replacement: 'LLM', priority: 7 },
 ];
 
-function createMockSnapshot(): BackendWorkspaceSnapshot {
+function createMockSnapshot(): WorkspaceSnapshot {
   return {
     ipcFlavor: 'mock',
     serviceStatus: 'ready',
@@ -136,7 +136,7 @@ function createMockSnapshot(): BackendWorkspaceSnapshot {
   };
 }
 
-let mockSnapshot: BackendWorkspaceSnapshot = createMockSnapshot();
+let mockSnapshot: WorkspaceSnapshot = createMockSnapshot();
 let nextDictionaryId = 1000;
 let nextStyleId = 1000;
 
@@ -158,7 +158,7 @@ export const mockBackendClient: BackendClient = {
     return structuredClone(mockSnapshot);
   },
 
-  async loadPillSnapshot(): Promise<BackendPillSnapshot> {
+  async loadPillSnapshot(): Promise<PillSnapshotDto> {
     return {
       serviceStatus: mockSnapshot.serviceStatus,
       activationMode: mockSnapshot.settings.activationMode,

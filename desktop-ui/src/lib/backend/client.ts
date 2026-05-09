@@ -3,27 +3,27 @@ import { mockBackendClient } from './mock';
 import { isTauriRuntime } from './runtime';
 import type {
   BackendClient,
-  BackendPillSnapshot,
-  BackendWorkspaceSnapshot,
   CalibrationHandle,
   CalibrationStreamEvent,
+  PillSnapshotDto,
+  WorkspaceSnapshot,
 } from './types';
 
 const tauriBackendClient: BackendClient = {
   loadWorkspaceSnapshot() {
-    return invoke<BackendWorkspaceSnapshot>('load_workspace_snapshot');
+    return invoke<WorkspaceSnapshot>('load_workspace_snapshot');
   },
 
   loadPillSnapshot() {
-    return invoke<BackendPillSnapshot>('load_pill_snapshot');
+    return invoke<PillSnapshotDto>('load_pill_snapshot');
   },
 
   saveWorkspaceSettings(input) {
-    return invoke<BackendWorkspaceSnapshot>('save_workspace_settings', { input });
+    return invoke<WorkspaceSnapshot>('save_workspace_settings', { input });
   },
 
   createDictionaryEntry(phrase, replacement, priority) {
-    return invoke<BackendWorkspaceSnapshot>('create_dictionary_entry', {
+    return invoke<WorkspaceSnapshot>('create_dictionary_entry', {
       input: {
         phrase,
         replacement,
@@ -33,34 +33,34 @@ const tauriBackendClient: BackendClient = {
   },
 
   updateDictionaryEntry(id, phrase, replacement, priority) {
-    return invoke<BackendWorkspaceSnapshot>('update_dictionary_entry', {
+    return invoke<WorkspaceSnapshot>('update_dictionary_entry', {
       input: { id, phrase, replacement, priority },
     });
   },
 
   deleteDictionaryEntry(id) {
-    return invoke<BackendWorkspaceSnapshot>('delete_dictionary_entry', { entryId: id });
+    return invoke<WorkspaceSnapshot>('delete_dictionary_entry', { entryId: id });
   },
 
   deleteSession(sessionId) {
-    return invoke<BackendWorkspaceSnapshot>('delete_session', { sessionId });
+    return invoke<WorkspaceSnapshot>('delete_session', { sessionId });
   },
 
   createCustomStyle(name, description, instructions) {
-    return invoke<BackendWorkspaceSnapshot>('create_custom_style', {
+    return invoke<WorkspaceSnapshot>('create_custom_style', {
       input: { name, description, instructions },
     });
   },
   updateCustomStyle(id, name, description, instructions) {
-    return invoke<BackendWorkspaceSnapshot>('update_custom_style', {
+    return invoke<WorkspaceSnapshot>('update_custom_style', {
       input: { id, name, description, instructions },
     });
   },
   deleteCustomStyle(styleId) {
-    return invoke<BackendWorkspaceSnapshot>('delete_custom_style', { styleId });
+    return invoke<WorkspaceSnapshot>('delete_custom_style', { styleId });
   },
   generateStyleExamples(styleId) {
-    return invoke<BackendWorkspaceSnapshot>('generate_style_examples', { styleId });
+    return invoke<WorkspaceSnapshot>('generate_style_examples', { styleId });
   },
   startDictation() {
     return invoke<string>('start_dictation');

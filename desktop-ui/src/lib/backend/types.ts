@@ -1,39 +1,27 @@
 // DTO shapes are generated from `desktop-ui/src-tauri/src/dto.rs` via ts-rs.
 // Run `cargo test -p lune-ui` after editing any Rust DTO to regenerate.
 //
-// The historical `Backend*` aliases below are kept so downstream imports
-// (workspace store, mappers, components, tests) don't need a sweeping rename.
+// Consumers should import DTO types by their canonical generated names
+// (e.g. `WorkspaceSnapshot`, `DictionaryItemDto`). The hand-rolled types
+// below describe client-side interfaces and tagged enums that have no Rust
+// counterpart yet.
 
-import type {
-  DictionaryItemDto,
-  HistoryItemDto,
-  PillSnapshotDto,
-  SaveWorkspaceSettingsInput as SaveWorkspaceSettingsInputDto,
-  StylePresetDto,
-  WorkspaceSettingsDto,
-  WorkspaceSnapshot,
-} from './generated';
+import type { PillSnapshotDto, SaveWorkspaceSettingsInput, WorkspaceSnapshot } from './generated';
 
 export type {
   ActivationModeDto,
   AsrBackendTypeDto,
   DevicePolicyDto,
   DictationModeDto,
+  DictionaryItemDto,
+  HistoryItemDto,
+  PillSnapshotDto,
   PillVisibilityDto,
+  SaveWorkspaceSettingsInput,
+  StylePresetDto,
+  WorkspaceSettingsDto,
+  WorkspaceSnapshot,
 } from './generated';
-
-export type BackendDictionaryEntry = DictionaryItemDto;
-export type BackendHistoryEntry = HistoryItemDto;
-export type BackendPillSnapshot = PillSnapshotDto;
-export type BackendStylePreset = StylePresetDto;
-export type BackendWorkspaceSettings = WorkspaceSettingsDto;
-export type BackendWorkspaceSnapshot = WorkspaceSnapshot;
-export type SaveWorkspaceSettingsInput = SaveWorkspaceSettingsInputDto;
-
-// ── Hand-rolled (not yet ts-rs-generated) ────────────────────────────────
-// These remain hand-rolled because the underlying Rust definitions are
-// tagged enums whose ts-rs output needs more thought (tag/content layout),
-// or because they describe client-side interfaces that have no Rust DTO.
 
 export type CalibrationPhase =
   | 'idle'
@@ -67,35 +55,35 @@ export interface CalibrationHandle {
 }
 
 export interface BackendClient {
-  loadWorkspaceSnapshot(): Promise<BackendWorkspaceSnapshot>;
-  loadPillSnapshot(): Promise<BackendPillSnapshot>;
-  saveWorkspaceSettings(input: SaveWorkspaceSettingsInput): Promise<BackendWorkspaceSnapshot>;
+  loadWorkspaceSnapshot(): Promise<WorkspaceSnapshot>;
+  loadPillSnapshot(): Promise<PillSnapshotDto>;
+  saveWorkspaceSettings(input: SaveWorkspaceSettingsInput): Promise<WorkspaceSnapshot>;
   createDictionaryEntry(
     phrase: string,
     replacement: string,
     priority: number,
-  ): Promise<BackendWorkspaceSnapshot>;
+  ): Promise<WorkspaceSnapshot>;
   updateDictionaryEntry(
     id: number,
     phrase: string,
     replacement: string,
     priority: number,
-  ): Promise<BackendWorkspaceSnapshot>;
-  deleteDictionaryEntry(id: number): Promise<BackendWorkspaceSnapshot>;
-  deleteSession(sessionId: string): Promise<BackendWorkspaceSnapshot>;
+  ): Promise<WorkspaceSnapshot>;
+  deleteDictionaryEntry(id: number): Promise<WorkspaceSnapshot>;
+  deleteSession(sessionId: string): Promise<WorkspaceSnapshot>;
   createCustomStyle(
     name: string,
     description: string,
     instructions: string,
-  ): Promise<BackendWorkspaceSnapshot>;
+  ): Promise<WorkspaceSnapshot>;
   updateCustomStyle(
     id: string,
     name: string,
     description: string,
     instructions: string,
-  ): Promise<BackendWorkspaceSnapshot>;
-  deleteCustomStyle(styleId: string): Promise<BackendWorkspaceSnapshot>;
-  generateStyleExamples(styleId: string): Promise<BackendWorkspaceSnapshot>;
+  ): Promise<WorkspaceSnapshot>;
+  deleteCustomStyle(styleId: string): Promise<WorkspaceSnapshot>;
+  generateStyleExamples(styleId: string): Promise<WorkspaceSnapshot>;
   startDictation(): Promise<string>;
   stopDictation(): Promise<void>;
   cancelDictation(): Promise<void>;

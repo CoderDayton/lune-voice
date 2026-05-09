@@ -9,9 +9,9 @@ import {
   workspaceStore,
 } from "../../src/store/workspace-store";
 import { DEFAULT_RUNTIME, DEFAULT_SETTINGS, type WorkspaceState } from "../../src/store/workspace-types";
-import type { BackendWorkspaceSnapshot } from "../../src/lib/backend/types";
+import type { WorkspaceSnapshot } from "../../src/lib/backend/types";
 
-function makeSnapshot(overrides: Partial<BackendWorkspaceSnapshot> = {}): BackendWorkspaceSnapshot {
+function makeSnapshot(overrides: Partial<WorkspaceSnapshot> = {}): WorkspaceSnapshot {
   return {
     ipcFlavor: "mock",
     serviceStatus: "ready",

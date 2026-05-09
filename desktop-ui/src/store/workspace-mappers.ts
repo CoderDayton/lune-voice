@@ -7,14 +7,14 @@ import {
   labelFor,
 } from '../features/settings/data/settings-data';
 import type {
-  BackendDictionaryEntry,
-  BackendHistoryEntry,
-  BackendWorkspaceSnapshot,
+  DictionaryItemDto,
+  HistoryItemDto,
   SaveWorkspaceSettingsInput,
+  WorkspaceSnapshot,
 } from '../lib/backend/types';
 import { DEFAULT_SETTINGS, type HistorySession, type WorkspaceSettings } from './workspace-types';
 
-export function mapHistoryEntry(entry: BackendHistoryEntry): HistorySession | null {
+export function mapHistoryEntry(entry: HistoryItemDto): HistorySession | null {
   if (!entry.transcript) return null;
 
   const startedAt = new Date(entry.startedAt);
@@ -36,11 +36,11 @@ export function mapHistoryEntry(entry: BackendHistoryEntry): HistorySession | nu
   };
 }
 
-export function mapDictionaryEntry(entry: BackendDictionaryEntry): DictionaryEntry {
+export function mapDictionaryEntry(entry: DictionaryItemDto): DictionaryEntry {
   return entry;
 }
 
-export function mapWorkspaceSettings(snapshot: BackendWorkspaceSnapshot): WorkspaceSettings {
+export function mapWorkspaceSettings(snapshot: WorkspaceSnapshot): WorkspaceSettings {
   return {
     activationMode: snapshot.settings.activationMode,
     asrBackend: snapshot.settings.asrBackendType,

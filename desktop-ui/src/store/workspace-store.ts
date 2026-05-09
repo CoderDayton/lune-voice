@@ -1,6 +1,6 @@
 import { Store } from '@tanstack/store';
 import { backendClient } from '../lib/backend/client';
-import type { BackendWorkspaceSnapshot, SessionStreamEvent } from '../lib/backend/types';
+import type { SessionStreamEvent, WorkspaceSnapshot } from '../lib/backend/types';
 import {
   mapDictionaryEntry,
   mapHistoryEntry,
@@ -103,7 +103,7 @@ export const workspaceActions = {
     }
   },
 
-  hydrate(snapshot: BackendWorkspaceSnapshot) {
+  hydrate(snapshot: WorkspaceSnapshot) {
     workspaceStore.setState((s) => ({
       ...s,
       dictionaryEntries: snapshot.dictionary.map(mapDictionaryEntry),

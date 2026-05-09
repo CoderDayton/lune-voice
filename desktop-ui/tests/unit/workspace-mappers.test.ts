@@ -8,7 +8,7 @@ import {
   summarizeDictationMode,
 } from "../../src/store/workspace-mappers";
 import { DEFAULT_SETTINGS } from "../../src/store/workspace-types";
-import type { BackendHistoryEntry, BackendWorkspaceSnapshot } from "../../src/lib/backend/types";
+import type { HistoryItemDto, WorkspaceSnapshot } from "../../src/lib/backend/types";
 
 function makeBackendSettings() {
   return {
@@ -36,7 +36,7 @@ describe("workspace mappers", () => {
   // ── mapHistoryEntry ─────────────────────────────────────────────────
 
   test("maps a valid history entry with all fields", () => {
-    const entry: BackendHistoryEntry = {
+    const entry: HistoryItemDto = {
       id: "s1",
       startedAt: "2026-01-15T10:00:00.000Z",
       endedAt: "2026-01-15T10:00:22.000Z",
@@ -56,7 +56,7 @@ describe("workspace mappers", () => {
   });
 
   test("returns null for entries without transcript", () => {
-    const entry: BackendHistoryEntry = {
+    const entry: HistoryItemDto = {
       id: "s2",
       startedAt: "2026-01-15T10:00:00.000Z",
       endedAt: "2026-01-15T10:00:05.000Z",
@@ -70,7 +70,7 @@ describe("workspace mappers", () => {
   });
 
   test("returns null for empty transcript", () => {
-    const entry: BackendHistoryEntry = {
+    const entry: HistoryItemDto = {
       id: "s3",
       startedAt: "2026-01-15T10:00:00.000Z",
       endedAt: "2026-01-15T10:00:05.000Z",
@@ -85,7 +85,7 @@ describe("workspace mappers", () => {
   });
 
   test("seconds defaults to 0 when endedAt is null", () => {
-    const entry: BackendHistoryEntry = {
+    const entry: HistoryItemDto = {
       id: "s4",
       startedAt: "2026-01-15T10:00:00.000Z",
       endedAt: null,
@@ -100,7 +100,7 @@ describe("workspace mappers", () => {
   });
 
   test("seconds is at least 1 for very short sessions", () => {
-    const entry: BackendHistoryEntry = {
+    const entry: HistoryItemDto = {
       id: "s5",
       startedAt: "2026-01-15T10:00:00.000Z",
       endedAt: "2026-01-15T10:00:00.100Z",
@@ -115,7 +115,7 @@ describe("workspace mappers", () => {
   });
 
   test("word count handles multiple spaces and tabs", () => {
-    const entry: BackendHistoryEntry = {
+    const entry: HistoryItemDto = {
       id: "s6",
       startedAt: "2026-01-15T10:00:00.000Z",
       endedAt: "2026-01-15T10:00:05.000Z",
@@ -141,7 +141,7 @@ describe("workspace mappers", () => {
   test("maps backend settings to workspace settings", () => {
     const snapshot = {
       settings: makeBackendSettings(),
-    } as BackendWorkspaceSnapshot;
+    } as WorkspaceSnapshot;
 
     const result = mapWorkspaceSettings(snapshot);
 
@@ -155,7 +155,7 @@ describe("workspace mappers", () => {
   test("masks API key when set", () => {
     const snapshot = {
       settings: { ...makeBackendSettings(), openaiAsrApiKeySet: true },
-    } as BackendWorkspaceSnapshot;
+    } as WorkspaceSnapshot;
 
     const result = mapWorkspaceSettings(snapshot);
     expect(result.openaiAsrApiKey).toBe("••••••••");
@@ -164,7 +164,7 @@ describe("workspace mappers", () => {
   test("uses empty string for API key when not set", () => {
     const snapshot = {
       settings: { ...makeBackendSettings(), openaiAsrApiKeySet: false },
-    } as BackendWorkspaceSnapshot;
+    } as WorkspaceSnapshot;
 
     const result = mapWorkspaceSettings(snapshot);
     expect(result.openaiAsrApiKey).toBe("");
@@ -178,7 +178,7 @@ describe("workspace mappers", () => {
         openaiAsrModel: null,
         pillVisibility: null as any,
       },
-    } as BackendWorkspaceSnapshot;
+    } as WorkspaceSnapshot;
 
     const result = mapWorkspaceSettings(snapshot);
     expect(result.openaiAsrBaseUrl).toBe(DEFAULT_SETTINGS.openaiAsrBaseUrl);
@@ -189,7 +189,7 @@ describe("workspace mappers", () => {
   test("null confidenceThreshold defaults to 0.5", () => {
     const snapshot = {
       settings: { ...makeBackendSettings(), confidenceThreshold: null },
-    } as BackendWorkspaceSnapshot;
+    } as WorkspaceSnapshot;
 
     const result = mapWorkspaceSettings(snapshot);
     expect(result.confidenceThreshold).toBe("0.50");
