@@ -1,0 +1,187 @@
+//! COSMIC `zcosmic_toplevel_info_v1` client.
+//!
+//! cosmic-comp does not implement `zwlr_foreign_toplevel_manager_v1`. It
+//! exposes its own `zcosmic_toplevel_info_v1` (and the standardized
+//! `ext_foreign_toplevel_list_v1` umbrella). This module queries the COSMIC
+//! protocol directly to recover the activated toplevel's `app_id`.
+//!
+//! We bind the protocol at **version 1** intentionally: in v1 the manager
+//! emits `Toplevel { handle: zcosmic_toplevel_handle_v1 }` events directly,
+//! and each handle ships `app_id` / `state` events. Higher versions
+//! deprecate this in favour of bridging through `ext_foreign_toplevel_list`,
+//! which would double the protocol surface (two managers, two handle
+//! lifetimes, plus `get_cosmic_toplevel` calls) for zero functional gain on
+//! a one-shot read. cosmic-comp keeps v1 fully functional for backward
+//! compatibility, so this is the lean option.
+//!
+//! Like the wlr client, this opens a fresh connection per call and bounds
+//! its work by a hard time budget — see `wayland_toplevel.rs` for the
+//! "why per-call" discussion.
+
+use std::collections::HashMap;
+use std::time::{Duration, Instant};
+
+use cosmic_protocols::toplevel_info::v1::client::{
+    zcosmic_toplevel_handle_v1::{self, ZcosmicToplevelHandleV1},
+    zcosmic_toplevel_info_v1::{self, ZcosmicToplevelInfoV1},
+};
+use tracing::{debug, trace};
+use wayland_client::{
+    Connection, Dispatch, Proxy, QueueHandle, event_created_child,
+    globals::{GlobalListContents, registry_queue_init},
+    protocol::wl_registry::WlRegistry,
+};
+
+/// `state` array enum value for an activated toplevel
+/// (cosmic-toplevel-info v1 protocol — same numbering as xdg-toplevel).
+const STATE_ACTIVATED: u32 = 2;
+
+const QUERY_BUDGET: Duration = Duration::from_millis(150);
+
+/// Returns the `app_id` of the activated toplevel via cosmic-toplevel-info,
+/// or `None` if the protocol is not advertised, no toplevel is activated,
+/// the session is not Wayland, or any wayland error occurs.
+pub fn cosmic_active_app_id() -> Option<String> {
+    std::env::var_os("WAYLAND_DISPLAY")?;
+
+    let started = Instant::now();
+    let result = query(started);
+    trace!(
+        elapsed_ms = started.elapsed().as_millis() as u64,
+        ?result,
+        "cosmic-toplevel query done"
+    );
+    result
+}
+
+fn query(started: Instant) -> Option<String> {
+    let conn = Connection::connect_to_env().ok()?;
+    let (globals, mut queue) = registry_queue_init::<State>(&conn).ok()?;
+    let qh = queue.handle();
+
+    let info: ZcosmicToplevelInfoV1 = match globals.bind(&qh, 1..=1, ()) {
+        Ok(i) => i,
+        Err(e) => {
+            debug!(error = %e, "zcosmic_toplevel_info_v1 not advertised");
+            return None;
+        }
+    };
+
+    let mut state = State::default();
+
+    // Roundtrip until we observe an activated toplevel with an app_id, or
+    // exhaust the budget. Each roundtrip drains a layer of the protocol:
+    // 1. globals already settled by registry_queue_init
+    // 2. manager emits Toplevel events (one per existing toplevel)
+    // 3+ each handle emits app_id / title / state / output_enter / done
+    for _ in 0..6 {
+        if started.elapsed() >= QUERY_BUDGET {
+            debug!("cosmic-toplevel query budget exhausted");
+            break;
+        }
+        queue.roundtrip(&mut state).ok()?;
+        if state
+            .toplevels
+            .values()
+            .any(|t| t.activated && t.app_id.is_some())
+        {
+            // One extra roundtrip to absorb any final state events that
+            // might overwrite the activated flag (e.g., minimized=false
+            // arriving after activated=true on the same window).
+            let _ = queue.roundtrip(&mut state);
+            break;
+        }
+    }
+
+    info.stop();
+    let _ = queue.flush();
+
+    state
+        .toplevels
+        .into_values()
+        .find(|t| t.activated)
+        .and_then(|t| t.app_id)
+}
+
+#[derive(Default)]
+struct ToplevelInfo {
+    app_id: Option<String>,
+    activated: bool,
+}
+
+#[derive(Default)]
+struct State {
+    toplevels: HashMap<u32, ToplevelInfo>,
+}
+
+// ─── Dispatch: registry (no-op; registry_queue_init handles bookkeeping) ─────
+
+impl Dispatch<WlRegistry, GlobalListContents> for State {
+    fn event(
+        _: &mut Self,
+        _: &WlRegistry,
+        _: <WlRegistry as Proxy>::Event,
+        _: &GlobalListContents,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+    }
+}
+
+// ─── Dispatch: manager ───────────────────────────────────────────────────────
+
+impl Dispatch<ZcosmicToplevelInfoV1, ()> for State {
+    fn event(
+        s: &mut Self,
+        _: &ZcosmicToplevelInfoV1,
+        event: zcosmic_toplevel_info_v1::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+        if let zcosmic_toplevel_info_v1::Event::Toplevel { toplevel } = event {
+            s.toplevels
+                .insert(toplevel.id().protocol_id(), ToplevelInfo::default());
+        }
+    }
+
+    event_created_child!(
+        State,
+        ZcosmicToplevelInfoV1,
+        [
+            zcosmic_toplevel_info_v1::EVT_TOPLEVEL_OPCODE => (ZcosmicToplevelHandleV1, ()),
+        ]
+    );
+}
+
+// ─── Dispatch: per-toplevel handle ───────────────────────────────────────────
+
+impl Dispatch<ZcosmicToplevelHandleV1, ()> for State {
+    fn event(
+        s: &mut Self,
+        handle: &ZcosmicToplevelHandleV1,
+        event: zcosmic_toplevel_handle_v1::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+        let id = handle.id().protocol_id();
+        let entry = s.toplevels.entry(id).or_default();
+        match event {
+            zcosmic_toplevel_handle_v1::Event::AppId { app_id } => {
+                entry.app_id = Some(app_id);
+            }
+            zcosmic_toplevel_handle_v1::Event::State { state } => {
+                entry.activated = state
+                    .chunks_exact(4)
+                    .any(|c| u32::from_ne_bytes([c[0], c[1], c[2], c[3]]) == STATE_ACTIVATED);
+            }
+            zcosmic_toplevel_handle_v1::Event::Closed => {
+                s.toplevels.remove(&id);
+            }
+            // Title / OutputEnter / OutputLeave / WorkspaceEnter /
+            // WorkspaceLeave / Done / Geometry: ignored.
+            _ => {}
+        }
+    }
+}

@@ -144,7 +144,8 @@ const KNOWN_TERMINALS: &[&str] = &[
 
 /// Query the focused window's app_id / WM_CLASS from the compositor.
 ///
-/// Detection chain: Hyprland → Sway → COSMIC → KDE (D-Bus) → GNOME (D-Bus) → xdotool → None
+/// Detection chain: Hyprland → Sway → wlr-foreign-toplevel (COSMIC, KDE-Wayland,
+/// Wayfire, river, …) → KDE (D-Bus) → GNOME (D-Bus) → xdotool (X11) → None
 fn focused_window_class() -> Option<String> {
     // Hyprland: hyprctl activewindow -j → .class
     if std::env::var("HYPRLAND_INSTANCE_SIGNATURE").is_ok()
@@ -160,17 +161,16 @@ fn focused_window_class() -> Option<String> {
         return Some(class);
     }
 
-    // COSMIC: uses wlr-foreign-toplevel-management but no CLI tool exposes it.
-    // cosmic-comp is a standard Wayland compositor — wl-copy/wl-paste work natively.
-    // For focused window detection, try cosmic-query (if installed) or fall through
-    // to xdotool (XWayland) / None (defaults to Ctrl+V, safe for all GUI apps).
-    if std::env::var("XDG_CURRENT_DESKTOP")
-        .map(|d| d.to_lowercase().contains("cosmic"))
-        .unwrap_or(false)
-        && let Some(class) = cosmic_focused_app_id()
-    {
+    // Generic Wayland: try wlr-foreign-toplevel-management first (covers
+    // KDE Plasma 5.27+, Wayfire, river, niri, Mir-based compositors —
+    // also Hyprland/Sway as a fallback though those have faster IPC paths
+    // above). Then try COSMIC's zcosmic_toplevel_info_v1 (cosmic-comp does
+    // NOT advertise wlr-foreign-toplevel — verified by live globals probe).
+    if let Some(class) = crate::wayland_toplevel::wlr_active_app_id() {
         return Some(class);
-        // Fall through to KDE/GNOME/xdotool chains (XWayland apps visible there)
+    }
+    if let Some(class) = crate::cosmic_toplevel::cosmic_active_app_id() {
+        return Some(class);
     }
 
     // KDE Plasma: D-Bus org.kde.KWin /Scripting
@@ -204,15 +204,40 @@ fn focused_is_terminal() -> bool {
         info!("focused window: unknown (defaulting to Ctrl+V)");
         return false;
     };
-    let lower = class.to_lowercase();
-    let is_term = KNOWN_TERMINALS.iter().any(|t| lower == *t);
+    let is_term = is_terminal_class(&class);
     info!(class = %class, is_term, "focused window detected");
     is_term
 }
 
+/// Match a window class / app_id against `KNOWN_TERMINALS`.
+///
+/// Compositors report classes in three shapes that all need to map to the
+/// same logical terminal name:
+///
+/// - bare token: `kitty`, `konsole`
+/// - reverse-DNS app_id: `dev.warp.Warp`, `org.gnome.Console`
+/// - hyphenated bare: `cosmic-term`, `gnome-terminal`
+///
+/// We normalize by taking the last `.`-separated segment, lowercasing, and
+/// stripping non-alphanumeric chars on both sides of the comparison. So
+/// `com.system76.CosmicTerm` and `cosmic-term` both reduce to `cosmicterm`,
+/// `dev.warp.Warp` and `warp` both reduce to `warp`.
 fn is_terminal_class(class: &str) -> bool {
-    let lower = class.to_lowercase();
-    KNOWN_TERMINALS.iter().any(|t| lower == *t)
+    let key = terminal_key(class);
+    if key.is_empty() {
+        return false;
+    }
+    KNOWN_TERMINALS.iter().any(|t| terminal_key(t) == key)
+}
+
+fn terminal_key(s: &str) -> String {
+    s.rsplit('.')
+        .next()
+        .unwrap_or(s)
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .map(|c| c.to_ascii_lowercase())
+        .collect()
 }
 
 pub fn capture_focus_target() -> WindowTarget {
@@ -235,6 +260,23 @@ pub fn capture_focus_target() -> WindowTarget {
             class: Some(class),
             is_terminal,
             focus_token: Some(FocusToken::SwayConId(con_id)),
+        };
+    }
+
+    // Generic Wayland: try both wlr-foreign-toplevel-management and
+    // cosmic-toplevel-info. No focus_token — neither protocol exposes a
+    // portable re-focus request, but delivery only needs the class to pick
+    // the paste chord. The window already has focus because the user just
+    // released the hotkey there.
+    if std::env::var_os("WAYLAND_DISPLAY").is_some()
+        && let Some(class) = crate::wayland_toplevel::wlr_active_app_id()
+            .or_else(crate::cosmic_toplevel::cosmic_active_app_id)
+    {
+        let is_terminal = is_terminal_class(&class);
+        return WindowTarget {
+            class: Some(class),
+            is_terminal,
+            focus_token: None,
         };
     }
 
@@ -405,25 +447,6 @@ fn find_focused_node(node: &serde_json::Value) -> Option<String> {
             }
         }
     }
-    None
-}
-
-/// COSMIC: attempt to read focused toplevel from cosmic-comp.
-///
-/// cosmic-comp implements wlr-foreign-toplevel-management but doesn't expose
-/// a CLI query tool yet. We try `cosmic-toplevel-info` (community tool) and
-/// fall back to checking /proc for the focused PID via loginctl.
-fn cosmic_focused_app_id() -> Option<String> {
-    // Try community tool first (may be installed on some setups)
-    if let Some(class) = run_json_query(
-        "cosmic-toplevel-info",
-        &["--focused", "--json"],
-        &["app_id"],
-    ) {
-        return Some(class);
-    }
-    // Fallback: use loginctl to find the foreground session's leader,
-    // then check /proc/<pid>/comm. This is a rough heuristic.
     None
 }
 
@@ -858,5 +881,45 @@ impl UinputTyper {
         if needs_shift {
             self.emit_raw(EventType::KEY, KeyCode::KEY_LEFTSHIFT.0, 0);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_terminal_class;
+
+    #[test]
+    fn matches_bare_terminal_names() {
+        assert!(is_terminal_class("kitty"));
+        assert!(is_terminal_class("konsole"));
+        assert!(is_terminal_class("alacritty"));
+        assert!(is_terminal_class("Konsole")); // case-insensitive
+    }
+
+    #[test]
+    fn matches_reverse_dns_app_ids() {
+        assert!(is_terminal_class("dev.warp.Warp"));
+        assert!(is_terminal_class("org.gnome.Console"));
+        assert!(is_terminal_class("org.kde.konsole"));
+        assert!(is_terminal_class("com.raggesilver.BlackBox"));
+    }
+
+    #[test]
+    fn matches_camelcase_against_hyphenated_list_entries() {
+        // `cosmic-term` (list) → "cosmicterm"
+        // `com.system76.CosmicTerm` (compositor) → "CosmicTerm" → "cosmicterm"
+        assert!(is_terminal_class("com.system76.CosmicTerm"));
+        // `gnome-terminal` ↔ `org.gnome.Terminal`
+        assert!(is_terminal_class("org.gnome.Terminal"));
+    }
+
+    #[test]
+    fn rejects_non_terminals() {
+        assert!(!is_terminal_class("firefox"));
+        assert!(!is_terminal_class("org.mozilla.firefox"));
+        assert!(!is_terminal_class("code-oss"));
+        assert!(!is_terminal_class("discord"));
+        assert!(!is_terminal_class("google-chrome"));
+        assert!(!is_terminal_class(""));
     }
 }

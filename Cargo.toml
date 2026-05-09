@@ -88,3 +88,6 @@ reqwest = { version = "0.13", features = ["json", "multipart"] }
 zbus = "5"
 evdev = "0.13"
 smallvec = { version = "1", features = ["union"] }
+wayland-client = "0.31"
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+cosmic-protocols = { version = "0.2", default-features = false, features = ["client"] }

@@ -29,6 +29,9 @@ enigo.workspace = true
 
 [target.'cfg(unix)'.dependencies]
 evdev = "0.13"
+wayland-client = { workspace = true }
+wayland-protocols-wlr = { workspace = true }
+cosmic-protocols = { workspace = true }
 
 [dev-dependencies]
 hound = "3.5"
