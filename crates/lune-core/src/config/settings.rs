@@ -8,6 +8,25 @@ use super::redacted::RedactedString;
 use super::style_llm::{StyleId, StylePreset};
 
 /// Top-level user settings, persisted as TOML.
+///
+/// # Layering rule (where does a new field belong?)
+///
+/// A new setting belongs in **`pipeline: PipelineOverrides`** (and the
+/// underlying `PipelineConfig`) when it is a *runtime tuning knob* whose
+/// sensible default depends on the active ASR backend — e.g. silence
+/// thresholds, segment limits, confidence gating. These flow through
+/// `AsrRegistry::pipeline_config().with_overrides(&user.pipeline)` so each
+/// backend can ship its own defaults and the user can override them.
+///
+/// A new setting belongs **here at top level** when it is a *binary
+/// feature toggle or session-level preference* that the session reads
+/// directly at start time and that has no per-backend default —
+/// e.g. `mic_prewarm`, `vad_pcen`, hotkey config, language. These bypass
+/// the pipeline merge and are read straight from `UserSettings` in
+/// `SessionManager` / `AppRuntime`.
+///
+/// When in doubt: if Qwen3 and OpenAI would want different defaults, it
+/// belongs in `PipelineOverrides`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserSettings {
     /// Compute device for local inference: `Cpu`, `Cuda`, or `Auto`.

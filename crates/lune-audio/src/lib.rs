@@ -36,6 +36,37 @@ pub use pcen::{
 };
 pub use vad::{Vad, VadConfig, VadResult};
 
+/// Polling source for downstream consumers (sessions, tests).
+///
+/// Implemented by both [`AudioStream`] (owns the cpal capture) and
+/// [`AudioStreamHandle`] (shares the ring buffer of an outer stream).
+/// Lets consumers be agnostic about which kind of source they hold.
+pub trait AudioPull: Send + Sync {
+    /// Non-blocking pop of the next available chunk.
+    fn try_next_chunk(&self) -> Option<AudioChunk>;
+    /// True when this source can never produce more audio (file replay
+    /// drained, no live capture). Live mics and shared handles return false.
+    fn is_offline(&self) -> bool;
+}
+
+impl AudioPull for AudioStream {
+    fn try_next_chunk(&self) -> Option<AudioChunk> {
+        AudioStream::try_next_chunk(self)
+    }
+    fn is_offline(&self) -> bool {
+        AudioStream::is_offline(self)
+    }
+}
+
+impl AudioPull for AudioStreamHandle {
+    fn try_next_chunk(&self) -> Option<AudioChunk> {
+        AudioStreamHandle::try_next_chunk(self)
+    }
+    fn is_offline(&self) -> bool {
+        false
+    }
+}
+
 /// A chunk of resampled audio ready for downstream processing.
 #[derive(Debug, Clone)]
 pub struct AudioChunk {

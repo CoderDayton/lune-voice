@@ -3184,6 +3184,7 @@ dependencies = [
  "gtk-layer-shell",
  "lune-app",
  "lune-asr",
+ "lune-audio",
  "lune-commands",
  "lune-core",
  "lune-dict",

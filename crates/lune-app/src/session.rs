@@ -7,10 +7,11 @@ use tokio::sync::{Mutex, RwLock, mpsc};
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-use lune_audio::{AudioConfig, AudioStream, AudioStreamHandle, Vad, VadConfig};
+use lune_audio::{AudioConfig, AudioPull, AudioStream, AudioStreamHandle, Vad, VadConfig};
 use lune_commands::VoiceCommandRouter;
 use lune_core::Result;
 use lune_core::asr::{AsrBackend, AsrBackendKind, AsrSegment, AsrSessionConfig};
+use lune_core::audio::SAMPLE_RATE;
 use lune_core::config::{PipelineConfig, StylePreset, UserSettings, builtin_registry};
 use lune_core::error::Error;
 use lune_core::llm::TextPostProcessor;
@@ -60,28 +61,6 @@ enum SessionAudio {
     Owned(AudioStream),
     /// Consume from a long-lived pre-warmed stream's ring buffer.
     Shared(AudioStreamHandle),
-}
-
-/// Resolved audio source used inside the session loop.
-enum AudioSource {
-    Owned(AudioStream),
-    Shared(AudioStreamHandle),
-}
-
-impl AudioSource {
-    fn try_next_chunk(&self) -> Option<lune_audio::AudioChunk> {
-        match self {
-            AudioSource::Owned(s) => s.try_next_chunk(),
-            AudioSource::Shared(h) => h.try_next_chunk(),
-        }
-    }
-    fn is_offline(&self) -> bool {
-        match self {
-            AudioSource::Owned(s) => s.is_offline(),
-            // Shared streams are always live (the runtime owns the cpal::Stream).
-            AudioSource::Shared(_) => false,
-        }
-    }
 }
 
 /// Orchestrates the full dictation pipeline.
@@ -377,14 +356,14 @@ async fn run_session<A: AsrBackend + 'static>(
     let mut status = SessionStatus::Completed;
 
     // ── Start audio capture ───────────────────────────────────────────────
-    let audio_source: AudioSource = match audio_override {
-        SessionAudio::Owned(stream) => AudioSource::Owned(stream),
+    let audio_source: Box<dyn AudioPull> = match audio_override {
+        SessionAudio::Owned(stream) => Box::new(stream),
         SessionAudio::Shared(handle) => {
             handle.drain();
-            AudioSource::Shared(handle)
+            Box::new(handle)
         }
         SessionAudio::Open => match AudioStream::new(AudioConfig::default()) {
-            Ok(s) => AudioSource::Owned(s),
+            Ok(s) => Box::new(s),
             Err(e) => {
                 fail_init(
                     &e,
@@ -400,7 +379,7 @@ async fn run_session<A: AsrBackend + 'static>(
         },
     };
 
-    let asr_session = match asr.start_session(config.asr_config).await {
+    let asr_session = match asr.start_session(config.asr_config.clone()).await {
         Ok(s) => s,
         Err(e) => {
             fail_init(
@@ -425,7 +404,7 @@ async fn run_session<A: AsrBackend + 'static>(
     if !vad_pcen_enabled {
         vad_config.pcen = None;
     }
-    let mut vad = match Vad::new(vad_config, 16_000) {
+    let mut vad = match Vad::new(vad_config, SAMPLE_RATE as u32) {
         Ok(v) => v,
         Err(e) => {
             fail_init(
@@ -451,7 +430,7 @@ async fn run_session<A: AsrBackend + 'static>(
     let mut cancelled = false;
 
     let session_deadline = tokio::time::Instant::now()
-        + Duration::from_secs((config.pipeline.max_speech_samples / 16_000) as u64 * 3);
+        + Duration::from_secs((config.pipeline.max_speech_samples / SAMPLE_RATE) as u64 * 3);
 
     let mut audio_poll_tick = tokio::time::interval(Duration::from_millis(10));
     audio_poll_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -529,7 +508,7 @@ async fn run_session<A: AsrBackend + 'static>(
                     if speech_samples >= config.pipeline.max_speech_samples {
                         info!(
                             %session_id,
-                            speech_secs = speech_samples / 16_000,
+                            speech_secs = speech_samples / SAMPLE_RATE,
                             "max speech duration reached; stopping session"
                         );
                         break 'capture;
@@ -628,16 +607,68 @@ async fn run_session<A: AsrBackend + 'static>(
         return;
     }
 
+    process_and_deliver(
+        session_id,
+        raw_text,
+        segments,
+        status,
+        router,
+        post_processor,
+        dict,
+        persist,
+        heuristic,
+        config,
+        style_preset,
+        event_tx,
+        control_rx,
+        active_arc,
+        idle_notify,
+        _settings,
+        cancelled,
+    )
+    .await;
+}
+
+/// Post-capture pipeline: voice command routing, heuristic correction,
+/// optional LLM polishing, and final delivery.
+///
+/// Called once per session after the `'capture` loop has produced
+/// `(raw_text, segments)`. All early-exit paths (empty after voice
+/// commands, mid-LLM cancellation) finalize the DB and clear active
+/// state before returning, so the caller has nothing to clean up.
+///
+/// `cancelled` carries the cancel signal observed during capture; this
+/// function may flip it to true if a later signal arrives via
+/// `control_rx`.
+#[allow(clippy::too_many_arguments)]
+async fn process_and_deliver(
+    session_id: Uuid,
+    raw_text: String,
+    segments: Vec<AsrSegment>,
+    status: SessionStatus,
+    router: Arc<VoiceCommandRouter>,
+    post_processor: Arc<dyn TextPostProcessor>,
+    dict: Arc<Mutex<DictionaryManager>>,
+    persist: Arc<Mutex<Database>>,
+    heuristic: Arc<HeuristicCorrector>,
+    config: SessionManagerConfig,
+    mut style_preset: Arc<StylePreset>,
+    event_tx: mpsc::Sender<SessionEvent>,
+    mut control_rx: mpsc::UnboundedReceiver<SessionControl>,
+    active_arc: Arc<Mutex<Option<ActiveHandle>>>,
+    idle_notify: Arc<Notify>,
+    settings: Arc<RwLock<UserSettings>>,
+    mut cancelled: bool,
+) {
     debug!(%session_id, "[ASR] output ready, len={}", raw_text.len());
 
     let route = router.route_full(&raw_text);
-    let mut style_preset = style_preset;
     for cmd in &route.commands {
         if let lune_core::command::VoiceCommand::SwitchStyle(style_id) = cmd {
             let next_preset =
                 builtin_registry()
                     .get(style_id)
-                    .or_else(|| match _settings.try_read() {
+                    .or_else(|| match settings.try_read() {
                         Ok(s) => s
                             .custom_styles
                             .iter()
@@ -1125,6 +1156,70 @@ mod tests {
                 mgr.stop().await;
                 let _ = collect_events(rx).await;
                 assert!(mgr.active_session_id().await.is_none());
+            })
+            .await;
+    }
+
+    /// Regression: when `Stop` arrives while the `'capture` loop is
+    /// actively pumping audio (not at the very start, not after the
+    /// stream has exhausted), the loop must break out via the `biased`
+    /// select in well under the audio's own duration.
+    ///
+    /// Uses a 10-second silent stream — without an early break, the
+    /// session would run for ~10s. We assert it finalizes in under 2s.
+    /// Silent audio means no segments are produced, so the session
+    /// takes the "no speech detected" path and terminates as
+    /// `Completed` with no transcript.
+    #[tokio::test]
+    async fn stop_breaks_capture_loop_promptly() {
+        local_set()
+            .run_until(async {
+                let (mgr, db) = make_manager(scripted_asr(vec![]), Arc::new(EchoPostProcessor));
+                let (tx, rx) = mpsc::channel(64);
+                let session_id = mgr.start_with_audio(tx, silent_stream(10)).await.unwrap();
+
+                // Yield long enough for the capture loop to start
+                // pumping ticks, then issue Stop while it's mid-loop.
+                tokio::time::sleep(Duration::from_millis(100)).await;
+
+                let stop_t0 = tokio::time::Instant::now();
+                mgr.stop_and_wait().await;
+                let stop_elapsed = stop_t0.elapsed();
+
+                assert!(
+                    stop_elapsed < Duration::from_secs(2),
+                    "stop_and_wait took {stop_elapsed:?}; the biased \
+                     select arm for control_rx must short-circuit \
+                     audio_poll_tick — otherwise we'd wait for the \
+                     10s silent stream to exhaust"
+                );
+
+                assert!(mgr.active_session_id().await.is_none());
+
+                let events = collect_events(rx).await;
+                assert!(
+                    events.iter().any(|e| matches!(e, SessionEvent::Started)),
+                    "expected Started event before Stop arrived"
+                );
+                assert!(
+                    events.iter().any(|e| matches!(e, SessionEvent::Stopped)),
+                    "expected Stopped terminal event"
+                );
+                assert!(
+                    !events
+                        .iter()
+                        .any(|e| matches!(e, SessionEvent::FinalizedText(_))),
+                    "no speech was produced; FinalizedText should not fire"
+                );
+
+                let session = db.lock().await.get_session(session_id).unwrap().unwrap();
+                assert!(session.ended_at.is_some(), "ended_at must be set");
+                assert!(
+                    matches!(session.status, SessionStatus::Completed),
+                    "graceful Stop must yield Completed (got {:?})",
+                    session.status
+                );
+                assert_eq!(session.transcript, None);
             })
             .await;
     }

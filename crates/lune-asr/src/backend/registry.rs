@@ -14,6 +14,19 @@ use lune_core::error::{Error, Result};
 use crate::{OpenAiAsrConfig, OpenAiCompatibleAsrBackend, Qwen3AsrBackend, Qwen3AsrConfig};
 
 // ── Dispatch helpers ────────────────────────────────────────────────────────
+//
+// Two macros cover every `AsrBackend` method on `AsrRegistry`:
+//
+//   * `dispatch!`     — calls a method on an existing session handle.
+//                       Works whether `$session` is `&SessionHandle` or
+//                       owned `SessionHandle`; the match arm binds `s`
+//                       with the same ownership the caller passed in.
+//   * `dispatch_new!` — calls a backend constructor (no session input)
+//                       and wraps the returned handle into the matching
+//                       `AsrSessionHandle` variant.
+//
+// Adding a backend variant requires editing both macros plus the two
+// enums below. Compile-time exhaustiveness checking catches misses.
 
 const MISMATCH: &str = "backend/session type mismatch";
 
@@ -23,8 +36,10 @@ fn mismatch_err() -> Error {
     Error::Asr(MISMATCH.into())
 }
 
-/// Dispatch a `&session` method call to the matching backend variant.
-macro_rules! dispatch_ref {
+/// Dispatch a method call on a session handle to the matching backend.
+///
+/// `$session` may be `&SessionHandle` or owned; ownership flows through.
+macro_rules! dispatch {
     ($self:ident, $session:ident, $method:ident $(, $arg:expr)*) => {
         match $self {
             AsrRegistry::Qwen3(b) => match $session {
@@ -35,6 +50,17 @@ macro_rules! dispatch_ref {
                 AsrSessionHandle::OpenAi(s) => b.$method(s $(, $arg)*).await,
                 _ => Err(mismatch_err()),
             },
+        }
+    };
+}
+
+/// Dispatch a constructor (e.g. `start_session`) and wrap the returned
+/// session handle into the matching `AsrSessionHandle` variant.
+macro_rules! dispatch_new {
+    ($self:ident, $method:ident $(, $arg:expr)*) => {
+        match $self {
+            AsrRegistry::Qwen3(b) => Ok(AsrSessionHandle::Qwen3(b.$method($($arg),*).await?)),
+            AsrRegistry::OpenAi(b) => Ok(AsrSessionHandle::OpenAi(b.$method($($arg),*).await?)),
         }
     };
 }
@@ -62,39 +88,27 @@ impl AsrBackend for AsrRegistry {
     type SessionHandle = AsrSessionHandle;
 
     async fn start_session(&self, config: AsrSessionConfig) -> Result<Self::SessionHandle> {
-        match self {
-            Self::Qwen3(b) => Ok(AsrSessionHandle::Qwen3(b.start_session(config).await?)),
-            Self::OpenAi(b) => Ok(AsrSessionHandle::OpenAi(b.start_session(config).await?)),
-        }
+        dispatch_new!(self, start_session, config)
     }
 
     async fn push_audio(&self, session: &Self::SessionHandle, pcm: &[f32]) -> Result<()> {
-        dispatch_ref!(self, session, push_audio, pcm)
+        dispatch!(self, session, push_audio, pcm)
     }
 
     async fn poll_results(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>> {
-        dispatch_ref!(self, session, poll_results)
+        dispatch!(self, session, poll_results)
     }
 
     async fn poll_final(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>> {
-        dispatch_ref!(self, session, poll_final)
+        dispatch!(self, session, poll_final)
     }
 
     async fn end_session(&self, session: Self::SessionHandle) -> Result<()> {
-        match self {
-            Self::Qwen3(b) => match session {
-                AsrSessionHandle::Qwen3(s) => b.end_session(s).await,
-                _ => Err(mismatch_err()),
-            },
-            Self::OpenAi(b) => match session {
-                AsrSessionHandle::OpenAi(s) => b.end_session(s).await,
-                _ => Err(mismatch_err()),
-            },
-        }
+        dispatch!(self, session, end_session)
     }
 
     async fn reset_context(&self, session: &Self::SessionHandle) -> Result<()> {
-        dispatch_ref!(self, session, reset_context)
+        dispatch!(self, session, reset_context)
     }
 
     fn supports_streaming(&self) -> bool {
