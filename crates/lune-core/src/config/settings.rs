@@ -83,6 +83,10 @@ pub struct UserSettings {
     /// Improves robustness on quiet mics and noisy environments. Default on.
     #[serde(default = "default_vad_pcen")]
     pub vad_pcen: bool,
+    /// Launch the desktop app with the main window hidden to the system
+    /// tray instead of shown. Useful when Lune is autostarted on login.
+    #[serde(default)]
+    pub start_minimized: bool,
 }
 
 fn default_vad_pcen() -> bool {
@@ -138,6 +142,7 @@ impl Default for UserSettings {
             pipeline: PipelineOverrides::default(),
             mic_prewarm: true,
             vad_pcen: true,
+            start_minimized: false,
         }
     }
 }

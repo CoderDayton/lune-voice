@@ -39,6 +39,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
       dictationLanguage: 'auto',
       micPrewarm: true,
       vadPcen: true,
+      startMinimized: false,
       openaiAsrBaseUrl: null,
       openaiAsrModel: null,
       openaiAsrApiKeySet: false,

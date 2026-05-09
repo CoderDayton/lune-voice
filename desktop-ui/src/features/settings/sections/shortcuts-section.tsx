@@ -39,7 +39,7 @@ export function ShortcutsSection({ settings }: SettingsProps) {
         />
         <SettingsRow
           label={t`Recording style`}
-          description={t`This changes whether the shortcut toggles recording or only works while held.`}
+          description={t`Whether the shortcut toggles recording or only works while held. Change in Voice input.`}
           control={
             <span className="badge badge-outline badge-sm">
               {labelFor(activationModes, settings.activationMode).split(' ')[0]}

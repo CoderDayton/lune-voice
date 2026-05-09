@@ -158,6 +158,12 @@ impl AppRuntime {
         slot.as_ref().map(|s| s.handle())
     }
 
+    /// Return the persisted `start_minimized` preference. Read at app
+    /// startup to decide whether to hide the main window on launch.
+    pub async fn start_minimized(&self) -> bool {
+        self.inner.settings.read().await.start_minimized
+    }
+
     pub async fn service_status(&self) -> String {
         self.inner.status.read().await.clone()
     }

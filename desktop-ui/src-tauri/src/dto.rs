@@ -135,6 +135,7 @@ pub struct WorkspaceSettingsDto {
     pub dictation_language: String,
     pub mic_prewarm: bool,
     pub vad_pcen: bool,
+    pub start_minimized: bool,
     // OpenAI ASR fields (populated when asr_backend_type == OpenAiCompatible)
     pub openai_asr_base_url: Option<String>,
     pub openai_asr_model: Option<String>,
@@ -196,6 +197,7 @@ pub struct SaveWorkspaceSettingsInput {
     pub dictation_language: String,
     pub mic_prewarm: bool,
     pub vad_pcen: bool,
+    pub start_minimized: bool,
     // OpenAI ASR fields (sent when asr_backend_type == OpenAiCompatible)
     pub openai_asr_base_url: Option<String>,
     pub openai_asr_api_key: Option<String>,

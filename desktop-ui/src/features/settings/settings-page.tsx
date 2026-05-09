@@ -1,6 +1,7 @@
 import { useStore } from '@tanstack/react-store';
 import { workspaceStore } from '../../store/workspace-store';
 import { AppearanceSection } from './sections/appearance-section';
+import { GeneralSection } from './sections/general-section';
 import { InputSection } from './sections/input-section';
 import { ModelsSection } from './sections/models-section';
 import { OutputSection } from './sections/output-section';
@@ -39,12 +40,13 @@ export function SettingsPage() {
 
   return (
     <div className="page-stack">
-      <AppearanceSection settings={settings} />
+      <GeneralSection settings={settings} />
+      <AppearanceSection />
+      <ShortcutsSection settings={settings} />
       <InputSection settings={settings} />
       <TranscriptionSection settings={settings} />
       <OutputSection settings={settings} />
       <ModelsSection />
-      <ShortcutsSection settings={settings} />
     </div>
   );
 }

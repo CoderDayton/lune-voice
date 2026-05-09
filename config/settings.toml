@@ -72,6 +72,11 @@ mic_prewarm = true
 # Improves robustness on quiet mics and noisy environments.
 vad_pcen = true
 
+# Launch the app hidden to the system tray instead of showing the main
+# window. Click the tray icon (or press the dictation hotkey) to bring it up.
+# Useful when Lune is autostarted on login.
+start_minimized = false
+
 
 # ── ASR backend ───────────────────────────────────────────────────────────────
 #

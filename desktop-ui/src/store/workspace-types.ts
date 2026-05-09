@@ -24,6 +24,7 @@ export interface WorkspaceSettings {
   dictationLanguage: string;
   micPrewarm: boolean;
   vadPcen: boolean;
+  startMinimized: boolean;
   openaiAsrBaseUrl: string;
   openaiAsrApiKey: string;
   openaiAsrModel: string;
@@ -98,6 +99,7 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   dictationLanguage: 'auto',
   micPrewarm: true,
   vadPcen: true,
+  startMinimized: false,
   openaiAsrBaseUrl: 'https://api.openai.com/v1',
   openaiAsrApiKey: '',
   openaiAsrModel: 'whisper-1',

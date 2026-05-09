@@ -59,6 +59,7 @@ export function mapWorkspaceSettings(snapshot: WorkspaceSnapshot): WorkspaceSett
     dictationLanguage: snapshot.settings.dictationLanguage ?? 'auto',
     micPrewarm: snapshot.settings.micPrewarm ?? DEFAULT_SETTINGS.micPrewarm,
     vadPcen: snapshot.settings.vadPcen ?? DEFAULT_SETTINGS.vadPcen,
+    startMinimized: snapshot.settings.startMinimized ?? DEFAULT_SETTINGS.startMinimized,
     openaiAsrBaseUrl: snapshot.settings.openaiAsrBaseUrl ?? DEFAULT_SETTINGS.openaiAsrBaseUrl,
     openaiAsrApiKey: snapshot.settings.openaiAsrApiKeySet
       ? '••••••••'
@@ -102,6 +103,7 @@ export function settingsToSaveInput(settings: WorkspaceSettings): SaveWorkspaceS
     dictationLanguage: settings.dictationLanguage,
     micPrewarm: settings.micPrewarm,
     vadPcen: settings.vadPcen,
+    startMinimized: settings.startMinimized,
     openaiAsrBaseUrl: settings.openaiAsrBaseUrl || null,
     openaiAsrApiKey:
       settings.openaiAsrApiKey && !settings.openaiAsrApiKey.startsWith('•')

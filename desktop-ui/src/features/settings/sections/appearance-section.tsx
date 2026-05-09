@@ -1,7 +1,6 @@
 import { useLingui } from '@lingui/react/macro';
 import { Monitor, Moon, Palette, Sun } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { activateLocale, type LocaleKey, locales } from '../../../i18n';
 import {
   getThemePreference,
   isDarkTheme,
@@ -9,11 +8,10 @@ import {
   themeLabel,
   watchSystemTheme,
 } from '../../../lib/theme';
-import { saveWorkspaceSetting, type WorkspaceSettings } from '../../../store/workspace-store';
 import { SettingsSection } from '../components/section';
 import { ThemePicker } from '../components/theme-picker';
 
-export function AppearanceSection({ settings }: { settings: WorkspaceSettings }) {
+export function AppearanceSection() {
   const { t } = useLingui();
   const [theme, setTheme] = useState(getThemePreference);
 
@@ -82,25 +80,6 @@ export function AppearanceSection({ settings }: { settings: WorkspaceSettings })
             </div>
             <ThemePicker />
           </div>
-        </div>
-
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-sm font-medium">{t`Language`}</span>
-          <select
-            className="select w-full sm:w-auto sm:min-w-56"
-            value={settings.language}
-            onChange={(event) => {
-              const lang = event.target.value as LocaleKey;
-              void saveWorkspaceSetting('language', lang);
-              void activateLocale(lang);
-            }}
-          >
-            {(Object.entries(locales) as [LocaleKey, string][]).map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
     </SettingsSection>

@@ -36,7 +36,14 @@ pub fn run() {
             let runtime =
                 tauri::async_runtime::block_on(runtime::AppRuntime::new(app.handle().clone()))
                     .map_err(|error| -> Box<dyn std::error::Error> { error.into() })?;
+            let start_minimized = tauri::async_runtime::block_on(runtime.start_minimized());
             app.manage(runtime);
+
+            // Hide the main window when start_minimized is on. The tray icon
+            // (registered below) remains the way to bring it back up.
+            if start_minimized && let Some(w) = app.get_webview_window("main") {
+                let _ = w.hide();
+            }
 
             // ── Global hotkeys ─────────────────────────────────────────────
             // Linux: evdev grab works on both X11 and Wayland.
