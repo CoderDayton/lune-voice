@@ -191,6 +191,10 @@ fn compute_rms(samples: &[f32]) -> f32 {
     if samples.is_empty() {
         return 0.0;
     }
+    // Per-sample finite check preserves the contract that non-finite
+    // inputs are zeroed rather than poisoning the sum. The branch
+    // prevents full SIMD auto-vectorization, but VAD runs at audio rate
+    // (~16 ms hops) and the cost is negligible vs the rest of the pipeline.
     let sum_sq: f32 = samples
         .iter()
         .map(|&s| if s.is_finite() { s * s } else { 0.0 })

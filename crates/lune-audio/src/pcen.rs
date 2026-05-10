@@ -98,6 +98,7 @@ pub struct PcenAgc {
     last_gain: f32,
     warmup_remaining: u32,
     initialized: bool,
+    half_alpha: f32,
 }
 
 impl PcenAgc {
@@ -116,6 +117,7 @@ impl PcenAgc {
         validate(&cfg)?;
         let hop_ms = (hop_samples as f32) * 1_000.0 / (sample_rate as f32);
         let warmup_remaining = cfg.warmup_frames;
+        let half_alpha = 0.5 * cfg.alpha;
         Ok(Self {
             s_signal: coeff(hop_ms, cfg.tau_signal_ms),
             s_noise_up: coeff(hop_ms, cfg.tau_noise_up_ms),
@@ -128,6 +130,7 @@ impl PcenAgc {
             last_gain: 1.0,
             warmup_remaining,
             initialized: false,
+            half_alpha,
         })
     }
 
@@ -173,10 +176,7 @@ impl PcenAgc {
             self.last_gain = 1.0;
         } else {
             // desired_gain: how much we'd amplify to hit target signal RMS.
-            let sig_norm = self
-                .sig_env_pow
-                .powf(0.5 * self.cfg.alpha)
-                .max(self.cfg.eps);
+            let sig_norm = self.sig_env_pow.powf(self.half_alpha).max(self.cfg.eps);
             let desired_gain = self.cfg.target_rms / sig_norm;
 
             // noise_cap: how much we *can* amplify before noise exceeds its ceiling.
@@ -280,13 +280,10 @@ fn mean_square_finite(frame: &[f32]) -> f32 {
     if frame.is_empty() {
         return 0.0;
     }
-    let mut acc = 0.0f64;
-    for &x in frame {
-        if x.is_finite() {
-            acc += (x as f64) * (x as f64);
-        }
-    }
-    let m = (acc / frame.len() as f64) as f32;
+    // Branch-free f32 reduction; LLVM auto-vectorizes to AVX2/AVX-512 with
+    // target-cpu=native. NaN guard runs once on the result, not per sample.
+    let sum_sq: f32 = frame.iter().map(|&x| x * x).sum();
+    let m = sum_sq / frame.len() as f32;
     if m.is_finite() { m } else { 0.0 }
 }
 

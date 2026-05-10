@@ -4,19 +4,27 @@
 //! chunk is evicted atomically before the new chunk is pushed.
 
 use crossbeam_channel::{Receiver, Sender, TryRecvError, TrySendError, bounded};
-use std::time::Duration;
+use tokio::sync::Notify;
 
 /// Single-producer, single-consumer ring buffer.
 pub struct RingBuffer<T> {
     tx: Sender<T>,
     rx: Receiver<T>,
+    /// Wakes a waiting `pop().await` when a producer pushes. Replaces an
+    /// exponential-backoff sleep loop that added up to 10 ms of latency
+    /// on the first miss.
+    notify: Notify,
 }
 
 impl<T> RingBuffer<T> {
     pub fn new(capacity: usize) -> Self {
         assert!(capacity > 0, "ring buffer capacity must be > 0");
         let (tx, rx) = bounded(capacity);
-        Self { tx, rx }
+        Self {
+            tx,
+            rx,
+            notify: Notify::new(),
+        }
     }
 
     /// Push an item. If full, evicts the oldest item first.
@@ -38,18 +46,20 @@ impl<T> RingBuffer<T> {
                 // Channel closed — consumer dropped. Nothing to do.
             }
         }
+        // Wake one parked consumer (if any). `notify_one` is non-blocking
+        // and safe to call from a non-async producer thread.
+        self.notify.notify_one();
     }
 
-    /// Pop an item (async, waits for data with exponential backoff).
+    /// Pop an item (async, parks until a producer pushes).
     pub async fn pop(&self) -> Option<T> {
-        let mut backoff_ms = 1u64;
         loop {
             match self.rx.try_recv() {
                 Ok(item) => return Some(item),
-                Err(TryRecvError::Empty) => {
-                    tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
-                    backoff_ms = (backoff_ms * 2).min(10); // cap at 10ms
-                }
+                // `notify_one` calls during the await window are coalesced
+                // by `Notify`, so a push that races with the empty check
+                // still wakes us instead of being lost.
+                Err(TryRecvError::Empty) => self.notify.notified().await,
                 Err(TryRecvError::Disconnected) => return None,
             }
         }

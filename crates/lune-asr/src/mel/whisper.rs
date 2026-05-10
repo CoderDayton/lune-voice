@@ -6,7 +6,7 @@
 use half::f16;
 use rustfft::num_complex::Complex;
 use rustfft::{Fft, FftPlanner};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 pub use lune_core::audio::SAMPLE_RATE;
 pub const N_FFT: usize = 400;
@@ -34,6 +34,17 @@ pub struct BatchMelF16 {
     pub data: Vec<f16>,
 }
 
+/// Reusable per-call workspace. Capacity grows monotonically; the contents
+/// are overwritten every call. Holding it behind a `Mutex` lets the public
+/// API stay `&self` while still amortizing allocations across calls.
+#[derive(Default)]
+struct MelScratch {
+    padded: Vec<f32>,
+    fft_in: Vec<Complex<f32>>,
+    power: Vec<f32>,
+    mel_f32: Vec<f32>,
+}
+
 pub struct WhisperMelF16 {
     n_fft: usize,
     hop_length: usize,
@@ -43,6 +54,7 @@ pub struct WhisperMelF16 {
     mel_filters_f32: Vec<f32>,       // [n_mels][n_fft/2+1]
     mel_ranges: Vec<(usize, usize)>, // (start_bin, end_bin) per mel band
     fft: Arc<dyn Fft<f32>>,
+    scratch: Mutex<MelScratch>,
 }
 
 impl WhisperMelF16 {
@@ -91,6 +103,7 @@ impl WhisperMelF16 {
             mel_filters_f32,
             mel_ranges,
             fft,
+            scratch: Mutex::new(MelScratch::default()),
         }
     }
 
@@ -102,12 +115,27 @@ impl WhisperMelF16 {
     /// Extract mel, then pad output to at least `min_frames` with the silence
     /// floor value. Avoids computing FFT on zero-padded silence.
     pub fn extract_from_f32_padded(&self, pcm: &[f32], min_frames: usize) -> MelSpecF16 {
-        let padded = reflect_pad_center(pcm, self.n_fft / 2);
+        // Hold scratch for the whole call. Audio extraction is single-threaded
+        // per session; uncontended Mutex overhead is nanoseconds vs ms of FFT.
+        let mut guard = self.scratch.lock().unwrap_or_else(|p| p.into_inner());
+        // Deref once into a plain &mut so the borrow checker can split fields.
+        let scratch: &mut MelScratch = &mut guard;
+        let MelScratch {
+            padded,
+            fft_in,
+            power,
+            mel_f32,
+        } = scratch;
+
+        reflect_pad_center_into(padded, pcm, self.n_fft / 2);
         let n_frames = num_frames(padded.len(), self.win_length, self.hop_length) - 1;
         let n_bins = self.n_fft / 2 + 1;
 
-        let mut power = vec![0.0f32; n_bins * n_frames];
-        let mut fft_in = vec![Complex::new(0.0f32, 0.0); self.n_fft];
+        power.clear();
+        power.resize(n_bins * n_frames, 0.0);
+        fft_in.clear();
+        fft_in.resize(self.n_fft, Complex::new(0.0f32, 0.0));
+
         let full_cover = self.n_fft == self.win_length;
 
         for frame_idx in 0..n_frames {
@@ -115,7 +143,7 @@ impl WhisperMelF16 {
             let frame = &padded[start..start + self.win_length];
 
             if !full_cover {
-                for x in &mut fft_in {
+                for x in fft_in.iter_mut() {
                     *x = Complex::new(0.0, 0.0);
                 }
             }
@@ -128,7 +156,7 @@ impl WhisperMelF16 {
                 fft_in[win_offset + i] = Complex::new(frame[i] * self.window_f32[i], 0.0);
             }
 
-            self.fft.process(&mut fft_in);
+            self.fft.process(fft_in);
 
             let dst = &mut power[frame_idx * n_bins..(frame_idx + 1) * n_bins];
             for k in 0..n_bins {
@@ -138,7 +166,8 @@ impl WhisperMelF16 {
         }
 
         // Mel filterbank — iterate only non-zero filter bins per band.
-        let mut mel_f32 = vec![0.0f32; self.n_mels * n_frames];
+        mel_f32.clear();
+        mel_f32.resize(self.n_mels * n_frames, 0.0);
         for m in 0..self.n_mels {
             let (lo, hi) = self.mel_ranges[m];
             let filter = &self.mel_filters_f32[m * n_bins + lo..m * n_bins + hi];
@@ -154,19 +183,17 @@ impl WhisperMelF16 {
             }
         }
 
-        whisper_log_normalize(&mut mel_f32);
+        whisper_log_normalize(mel_f32);
 
         let out_frames = n_frames.max(min_frames);
         if out_frames == n_frames {
             MelSpecF16 {
                 n_mels: self.n_mels,
                 n_frames,
-                data: mel_f32.into_iter().map(f16::from_f32).collect(),
+                data: mel_f32.iter().map(|&v| f16::from_f32(v)).collect(),
             }
         } else {
-            // Silence floor: log10(EPSILON) clamped to (peak - 8), then scaled.
-            // The peak comes from real audio, so the floor is already in mel_f32
-            // as the minimum value after normalization.
+            // Silence floor: minimum value after log normalization.
             let floor_val = mel_f32.iter().copied().fold(f32::INFINITY, f32::min);
             let floor_f16 = f16::from_f32(floor_val);
             let pad_frames = out_frames - n_frames;
@@ -241,17 +268,18 @@ fn hann_window(n: usize) -> Vec<f32> {
         .collect()
 }
 
-fn reflect_pad_center(x: &[f32], pad: usize) -> Vec<f32> {
+fn reflect_pad_center_into(out: &mut Vec<f32>, x: &[f32], pad: usize) {
+    out.clear();
     if x.is_empty() {
-        return vec![0.0; pad * 2 + WIN_LENGTH];
+        out.resize(pad * 2 + WIN_LENGTH, 0.0);
+        return;
     }
     let start = -(pad as isize);
     let end = x.len() as isize + pad as isize;
-    let mut out = Vec::with_capacity((end - start) as usize);
+    out.reserve((end - start) as usize);
     for i in start..end {
         out.push(reflect_get(x, i));
     }
-    out
 }
 
 fn reflect_get(x: &[f32], idx: isize) -> f32 {

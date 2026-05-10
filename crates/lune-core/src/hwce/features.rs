@@ -23,12 +23,18 @@ pub(crate) struct TokenFeatures {
 const ENTROPY_SPIKE_THRESHOLD: f64 = 0.35;
 
 pub(crate) fn extract_token_features(tokens: &[TokenInput]) -> Vec<TokenFeatures> {
+    // softmax is the dominant cost per token; compute once and feed the
+    // resulting probability slice to all three measures instead of paying
+    // for three independent Vec<f64> allocations and three exp passes.
     tokens
         .iter()
-        .map(|t| TokenFeatures {
-            entropy: entropy::shannon_entropy(&t.top_k_logits),
-            tsallis: entropy::tsallis_confidence(&t.top_k_logits),
-            margin: entropy::top_margin(&t.top_k_logits),
+        .map(|t| {
+            let probs = entropy::softmax(&t.top_k_logits);
+            TokenFeatures {
+                entropy: entropy::shannon_entropy_from_probs(&probs),
+                tsallis: entropy::tsallis_confidence_from_probs(&probs),
+                margin: entropy::top_margin_from_probs(&probs),
+            }
         })
         .collect()
 }

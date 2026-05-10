@@ -464,14 +464,16 @@ impl OrtStyleLlm {
             // First call: prefill system prefix alone to build the frozen cache.
             let prefix_ids = &prompt_ids[..sys_prefix_len];
             let pn = prefix_ids.len();
-            let mut inputs = if split {
+            let mut inputs: Inputs<'static> =
+                Vec::with_capacity(input_capacity(p.num_layers, p.has_position_ids));
+            if split {
                 let embeds = self
                     .embed_ids(prefix_ids)?
                     .ok_or_else(|| e("split decode requires embed session"))?;
-                build_embeds_inputs(embeds, pn, p.has_position_ids)?
+                build_embeds_inputs_into(&mut inputs, embeds, pn, p.has_position_ids)?;
             } else {
-                build_inputs(prefix_ids, pn, p.has_position_ids)?
-            };
+                build_inputs_into(&mut inputs, prefix_ids, pn, p.has_position_ids)?;
+            }
             for i in 0..p.num_layers {
                 let (k, v) = empty_kv(p.num_kv_heads, p.head_dim, p.kv_is_f16)?;
                 inputs.push((std::borrow::Cow::Borrowed(names[i * 2].as_str()), k));
@@ -503,14 +505,28 @@ impl OrtStyleLlm {
         let user_len = prefill_ids.len();
         let total_prefill = prefix_seq_len + user_len;
 
-        let mut inputs = if split {
+        let mut inputs: Inputs<'static> =
+            Vec::with_capacity(input_capacity(p.num_layers, p.has_position_ids));
+        if split {
             let embeds = self
                 .embed_ids(prefill_ids)?
                 .ok_or_else(|| e("split decode requires embed session"))?;
-            build_embeds_inputs_with_past(embeds, user_len, prefix_seq_len, p.has_position_ids)?
+            build_embeds_inputs_with_past_into(
+                &mut inputs,
+                embeds,
+                user_len,
+                prefix_seq_len,
+                p.has_position_ids,
+            )?;
         } else {
-            build_inputs_with_past(prefill_ids, user_len, prefix_seq_len, p.has_position_ids)?
-        };
+            build_inputs_with_past_into(
+                &mut inputs,
+                prefill_ids,
+                user_len,
+                prefix_seq_len,
+                p.has_position_ids,
+            )?;
+        }
         for (i, kv_val) in initial_kv.into_iter().enumerate() {
             inputs.push((std::borrow::Cow::Borrowed(names[i].as_str()), kv_val));
         }
@@ -533,22 +549,30 @@ impl OrtStyleLlm {
         }
         state.push(first);
 
-        let mut kv: Vec<DynValue> = outputs.into_iter().skip(1).map(|(_, v)| v).collect();
+        // Reused across the decode loop to avoid reallocating `Vec<DynValue>`
+        // every step (28 layers × 2 = 56 entries × up to ~448 tokens).
+        let mut kv: Vec<DynValue> = Vec::with_capacity(p.num_layers * 2);
+        kv.extend(outputs.into_iter().skip(1).map(|(_, v)| v));
 
         // ── Decode ──────────────────────────────────────────────────────
         let max = self.max_new_tokens;
+        let inputs_cap = input_capacity(p.num_layers, p.has_position_ids);
         for _ in 1..max {
             let tok = *state.generated.last().unwrap() as i64;
             let total = total_prefill + state.generated.len();
 
-            let mut inputs = if split {
+            // ORT's session.run consumes `inputs`; we can't keep the Vec
+            // across iterations, but we can pre-size it so the in-loop
+            // pushes never reallocate.
+            let mut inputs: Inputs<'static> = Vec::with_capacity(inputs_cap);
+            if split {
                 let embeds = self
                     .embed_ids(&[tok])?
                     .ok_or_else(|| e("split decode requires embed session"))?;
-                build_embeds_decode_inputs(embeds, total, p.has_position_ids)?
+                build_embeds_decode_inputs_into(&mut inputs, embeds, total, p.has_position_ids)?;
             } else {
-                build_decode_inputs(tok, total, p.has_position_ids)?
-            };
+                build_decode_inputs_into(&mut inputs, tok, total, p.has_position_ids)?;
+            }
             for (i, v) in kv.drain(..).enumerate() {
                 inputs.push((std::borrow::Cow::Borrowed(names[i].as_str()), v));
             }
@@ -565,7 +589,8 @@ impl OrtStyleLlm {
                 break;
             }
             state.push(next);
-            kv = outputs.into_iter().skip(1).map(|(_, v)| v).collect();
+            // kv was emptied by drain above; refill in place.
+            kv.extend(outputs.into_iter().skip(1).map(|(_, v)| v));
         }
 
         Ok(state.generated)
@@ -720,21 +745,32 @@ pub(crate) fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> S
     let m = inp.len();
     let n = out.len();
 
-    // LCS table — words match when their normalized forms are equal.
-    let mut dp = vec![vec![0u16; n + 1]; m + 1];
+    // Pre-normalize once. `norm_word` allocates, and the original code
+    // called it on every cell of the O(m*n) DP fill plus again in the
+    // backtrack. Memoizing collapses both passes to O(m+n) allocations.
+    let inp_norm: Vec<String> = inp.iter().map(|w| norm_word(w)).collect();
+    let out_norm: Vec<String> = out.iter().map(|w| norm_word(w)).collect();
+
+    // LCS table — flat 1-D row-major Vec instead of Vec<Vec<u16>>.
+    // For a 20-word utterance this collapses 21 inner allocations to 1
+    // and gives the inner loop sequential cache access.
+    let stride = n + 1;
+    let mut dp = vec![0u16; (m + 1) * stride];
+    let dp_at = |dp: &[u16], i: usize, j: usize| dp[i * stride + j];
     for i in 1..=m {
         for j in 1..=n {
-            dp[i][j] = if norm_word(inp[i - 1]) == norm_word(out[j - 1]) {
-                dp[i - 1][j - 1] + 1
+            let v = if inp_norm[i - 1] == out_norm[j - 1] {
+                dp_at(&dp, i - 1, j - 1) + 1
             } else {
-                dp[i - 1][j].max(dp[i][j - 1])
+                dp_at(&dp, i - 1, j).max(dp_at(&dp, i, j - 1))
             };
+            dp[i * stride + j] = v;
         }
     }
 
     // If fewer than 40% of input words survived, the output is suspect
     // (translation, heavy censoring, hallucination) — fall back entirely.
-    let lcs_len = dp[m][n] as usize;
+    let lcs_len = dp_at(&dp, m, n) as usize;
     if lcs_len * 100 / m.max(1) < 40 {
         return input.to_string();
     }
@@ -750,11 +786,11 @@ pub(crate) fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> S
     let mut ops: Vec<Op<'_>> = Vec::with_capacity(m + n);
     let (mut i, mut j) = (m, n);
     while i > 0 || j > 0 {
-        if i > 0 && j > 0 && norm_word(inp[i - 1]) == norm_word(out[j - 1]) {
+        if i > 0 && j > 0 && inp_norm[i - 1] == out_norm[j - 1] {
             ops.push(Op::Match(inp[i - 1], out[j - 1]));
             i -= 1;
             j -= 1;
-        } else if j > 0 && (i == 0 || dp[i][j - 1] >= dp[i - 1][j]) {
+        } else if j > 0 && (i == 0 || dp_at(&dp, i, j - 1) >= dp_at(&dp, i - 1, j)) {
             ops.push(Op::Insert(out[j - 1]));
             j -= 1;
         } else {
@@ -825,107 +861,113 @@ fn push_position_ids(out: &mut Inputs<'static>, positions: Vec<i64>) -> Result<(
     Ok(())
 }
 
-fn build_inputs(ids: &[i64], seq_len: usize, position_ids: bool) -> Result<Inputs<'static>> {
-    let input_ids = Array2::from_shape_vec((1, seq_len), ids.to_vec()).map_err(e)?;
-    let mask = Array2::<i64>::ones((1, seq_len));
-    let mut out = vec![
-        ("input_ids".into(), dyn_i64(input_ids)?),
-        ("attention_mask".into(), dyn_i64(mask)?),
-    ];
-    if position_ids {
-        push_position_ids(&mut out, (0..seq_len as i64).collect())?;
-    }
-    Ok(out)
+/// Capacity hint for prefill-style input vectors:
+/// inputs_embeds/input_ids + attention_mask + optional position_ids + KV pairs.
+#[inline]
+fn input_capacity(num_layers: usize, position_ids: bool) -> usize {
+    let base = if position_ids { 3 } else { 2 };
+    base + num_layers * 2
 }
 
-fn build_embeds_inputs(
+fn build_inputs_into(
+    out: &mut Inputs<'static>,
+    ids: &[i64],
+    seq_len: usize,
+    position_ids: bool,
+) -> Result<()> {
+    let input_ids = Array2::from_shape_vec((1, seq_len), ids.to_vec()).map_err(e)?;
+    let mask = Array2::<i64>::ones((1, seq_len));
+    out.push(("input_ids".into(), dyn_i64(input_ids)?));
+    out.push(("attention_mask".into(), dyn_i64(mask)?));
+    if position_ids {
+        push_position_ids(out, (0..seq_len as i64).collect())?;
+    }
+    Ok(())
+}
+
+fn build_embeds_inputs_into(
+    out: &mut Inputs<'static>,
     embeds: DynValue,
     seq_len: usize,
     position_ids: bool,
-) -> Result<Inputs<'static>> {
+) -> Result<()> {
     let mask = Array2::<i64>::ones((1, seq_len));
-    let mut out = vec![
-        ("inputs_embeds".into(), embeds),
-        ("attention_mask".into(), dyn_i64(mask)?),
-    ];
+    out.push(("inputs_embeds".into(), embeds));
+    out.push(("attention_mask".into(), dyn_i64(mask)?));
     if position_ids {
-        push_position_ids(&mut out, (0..seq_len as i64).collect())?;
+        push_position_ids(out, (0..seq_len as i64).collect())?;
     }
-    Ok(out)
+    Ok(())
 }
 
-fn build_embeds_decode_inputs(
+fn build_embeds_decode_inputs_into(
+    out: &mut Inputs<'static>,
     embeds: DynValue,
     total_len: usize,
     position_ids: bool,
-) -> Result<Inputs<'static>> {
+) -> Result<()> {
     let mask = Array2::<i64>::ones((1, total_len));
-    let mut out = vec![
-        ("inputs_embeds".into(), embeds),
-        ("attention_mask".into(), dyn_i64(mask)?),
-    ];
+    out.push(("inputs_embeds".into(), embeds));
+    out.push(("attention_mask".into(), dyn_i64(mask)?));
     if position_ids {
-        push_position_ids(&mut out, vec![(total_len - 1) as i64])?;
+        push_position_ids(out, vec![(total_len - 1) as i64])?;
     }
-    Ok(out)
+    Ok(())
 }
 
-fn build_decode_inputs(
+fn build_decode_inputs_into(
+    out: &mut Inputs<'static>,
     token: i64,
     total_len: usize,
     position_ids: bool,
-) -> Result<Inputs<'static>> {
+) -> Result<()> {
     let ids = Array2::from_shape_vec((1, 1), vec![token]).map_err(e)?;
     let mask = Array2::<i64>::ones((1, total_len));
-    let mut out = vec![
-        ("input_ids".into(), dyn_i64(ids)?),
-        ("attention_mask".into(), dyn_i64(mask)?),
-    ];
+    out.push(("input_ids".into(), dyn_i64(ids)?));
+    out.push(("attention_mask".into(), dyn_i64(mask)?));
     if position_ids {
-        push_position_ids(&mut out, vec![(total_len - 1) as i64])?;
+        push_position_ids(out, vec![(total_len - 1) as i64])?;
     }
-    Ok(out)
+    Ok(())
 }
 
-fn build_inputs_with_past(
+fn build_inputs_with_past_into(
+    out: &mut Inputs<'static>,
     ids: &[i64],
     seq_len: usize,
     past_len: usize,
     position_ids: bool,
-) -> Result<Inputs<'static>> {
+) -> Result<()> {
     let input_ids = Array2::from_shape_vec((1, seq_len), ids.to_vec()).map_err(e)?;
     let mask = Array2::<i64>::ones((1, past_len + seq_len));
-    let mut out = vec![
-        ("input_ids".into(), dyn_i64(input_ids)?),
-        ("attention_mask".into(), dyn_i64(mask)?),
-    ];
+    out.push(("input_ids".into(), dyn_i64(input_ids)?));
+    out.push(("attention_mask".into(), dyn_i64(mask)?));
     if position_ids {
         push_position_ids(
-            &mut out,
+            out,
             (past_len..past_len + seq_len).map(|i| i as i64).collect(),
         )?;
     }
-    Ok(out)
+    Ok(())
 }
 
-fn build_embeds_inputs_with_past(
+fn build_embeds_inputs_with_past_into(
+    out: &mut Inputs<'static>,
     embeds: DynValue,
     seq_len: usize,
     past_len: usize,
     position_ids: bool,
-) -> Result<Inputs<'static>> {
+) -> Result<()> {
     let mask = Array2::<i64>::ones((1, past_len + seq_len));
-    let mut out = vec![
-        ("inputs_embeds".into(), embeds),
-        ("attention_mask".into(), dyn_i64(mask)?),
-    ];
+    out.push(("inputs_embeds".into(), embeds));
+    out.push(("attention_mask".into(), dyn_i64(mask)?));
     if position_ids {
         push_position_ids(
-            &mut out,
+            out,
             (past_len..past_len + seq_len).map(|i| i as i64).collect(),
         )?;
     }
-    Ok(out)
+    Ok(())
 }
 
 struct ModelFiles {

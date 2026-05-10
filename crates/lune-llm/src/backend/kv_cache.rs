@@ -249,18 +249,30 @@ fn quantize_4bit(data: &[f32], tokens: usize, dim: usize) -> QuantizedTensor {
     let mut scales = vec![0.0f32; dim];
     let mut mins = vec![0.0f32; dim];
 
-    for d in 0..dim {
-        let mut lo = f32::MAX;
-        let mut hi = f32::MIN;
-        for t in 0..tokens {
-            let v = data[t * dim + d];
+    // Per-dim min/max scan with sequential memory access. Walking row-major
+    // data (`t` outer, `d` inner) lets the auto-vectorizer keep the working
+    // set in cache and emit SIMD min/max instead of stride-`dim` scalar loads.
+    let mut lo_v = vec![f32::MAX; dim];
+    let mut hi_v = vec![f32::MIN; dim];
+    for t in 0..tokens {
+        let row = &data[t * dim..(t + 1) * dim];
+        for d in 0..dim {
+            let v = row[d];
             // Skip non-finite inputs so a stray NaN can't poison the
             // per-dim range and produce NaN scales/mins downstream.
             if v.is_finite() {
-                lo = lo.min(v);
-                hi = hi.max(v);
+                if v < lo_v[d] {
+                    lo_v[d] = v;
+                }
+                if v > hi_v[d] {
+                    hi_v[d] = v;
+                }
             }
         }
+    }
+    for d in 0..dim {
+        let lo = lo_v[d];
+        let hi = hi_v[d];
         let range = hi - lo;
         // Treat degenerate or non-finite ranges as a unit scale so the
         // quantized codes stay valid (scale=1.0, min=0.0).
@@ -630,9 +642,18 @@ impl KvCache {
         let mut inv_buf = vec![0.0f32; keep.max(1) * d];
         let mut result = Vec::with_capacity(c.num_layers * 2);
 
+        // Reused per-layer dequant buffers. `to_dyn_value` reads from these
+        // by slice and clones internally, so we only keep capacity here and
+        // pay the conversion alloc once per call to ORT.
+        let layer_len = h * total * d;
+        let mut key_out: Vec<f32> = Vec::with_capacity(layer_len);
+        let mut val_out: Vec<f32> = Vec::with_capacity(layer_len);
+
         for layer in &fp.layers {
-            let mut key_out = vec![0.0f32; h * total * d];
-            let mut val_out = vec![0.0f32; h * total * d];
+            key_out.clear();
+            key_out.resize(layer_len, 0.0);
+            val_out.clear();
+            val_out.resize(layer_len, 0.0);
 
             for head in 0..h {
                 // Copy sink tokens directly.

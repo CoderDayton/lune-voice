@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use lune_ngram::NGramModel;
@@ -205,17 +206,19 @@ impl HeuristicCorrector {
         }
 
         let lexicon = Lexicon::for_lang(lang);
-        let mut result_words: Vec<String> = Vec::with_capacity(words.len());
+        // Index risk positions for O(1) lookup. The original linear scan was
+        // O(words) inside the per-word loop → O(words²) overall.
+        let risk_lookup: HashMap<usize, f32> = word_risk_positions.iter().copied().collect();
+        // Estimate output capacity: input length plus a small slack for
+        // expansions (e.g. "im" → "I'm"). Slightly oversize beats reallocs.
+        let approx_cap = text.len() + words.len() * 2 + 8;
+        let mut corrected_text = String::with_capacity(approx_cap);
         let mut unresolved = Vec::new();
 
         for (i, &word) in words.iter().enumerate() {
             let stripped = strip_punctuation(word);
             let lexicon_info = lexicon.lookup(stripped);
-            let risk_score = word_risk_positions
-                .iter()
-                .find(|(position, _)| *position == i)
-                .map(|(_, risk)| *risk)
-                .unwrap_or(0.0);
+            let risk_score = risk_lookup.get(&i).copied().unwrap_or(0.0);
 
             let processed = process_single_word(
                 word,
@@ -226,7 +229,10 @@ impl HeuristicCorrector {
                 dict_replacements,
             );
 
-            result_words.push(processed.corrected_word);
+            if i > 0 {
+                corrected_text.push(' ');
+            }
+            corrected_text.push_str(&processed.corrected_word);
             if let Some(word_score) = processed.unresolved {
                 unresolved.push(word_score);
             }
@@ -234,7 +240,7 @@ impl HeuristicCorrector {
 
         let all_resolved = unresolved.is_empty();
         CorrectionResult {
-            corrected_text: result_words.join(" "),
+            corrected_text,
             word_risk_positions,
             unresolved_words: unresolved,
             all_resolved,

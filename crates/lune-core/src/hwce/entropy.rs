@@ -13,10 +13,8 @@ pub(crate) fn softmax(logits: &[f64]) -> Vec<f64> {
     exps.into_iter().map(|e| e / sum).collect()
 }
 
-/// Normalized Shannon entropy ∈ [0, 1].
-/// 0 = peaked (confident), 1 = uniform (uncertain).
-pub(crate) fn shannon_entropy(logits: &[f64]) -> f64 {
-    let probs = softmax(logits);
+/// Normalized Shannon entropy from precomputed softmax probabilities.
+pub(crate) fn shannon_entropy_from_probs(probs: &[f64]) -> f64 {
     let k = probs.len();
     if k <= 1 {
         return 0.0;
@@ -29,10 +27,8 @@ pub(crate) fn shannon_entropy(logits: &[f64]) -> f64 {
     (h / (k as f64).ln()).clamp(0.0, 1.0)
 }
 
-/// Tsallis entropy confidence ∈ [0, 1] (exponentially normalized, α = 1/3).
-/// 1 = peaked (confident), 0 = uniform (uncertain).
-pub(crate) fn tsallis_confidence(logits: &[f64]) -> f64 {
-    let probs = softmax(logits);
+/// Tsallis confidence from precomputed softmax probabilities.
+pub(crate) fn tsallis_confidence_from_probs(probs: &[f64]) -> f64 {
     let k = probs.len();
     if k <= 1 {
         return 1.0;
@@ -57,16 +53,14 @@ pub(crate) fn tsallis_confidence(logits: &[f64]) -> f64 {
     (numer / denom).clamp(0.0, 1.0)
 }
 
-/// Margin between top-1 and top-2 softmax probabilities ∈ [0, 1].
-/// Higher = more confident.
-pub(crate) fn top_margin(logits: &[f64]) -> f64 {
-    let probs = softmax(logits);
+/// Top-1 vs top-2 margin from precomputed softmax probabilities.
+pub(crate) fn top_margin_from_probs(probs: &[f64]) -> f64 {
     if probs.len() < 2 {
         return 1.0;
     }
     let mut top1 = f64::NEG_INFINITY;
     let mut top2 = f64::NEG_INFINITY;
-    for &p in &probs {
+    for &p in probs {
         if p > top1 {
             top2 = top1;
             top1 = p;
@@ -75,6 +69,27 @@ pub(crate) fn top_margin(logits: &[f64]) -> f64 {
         }
     }
     (top1 - top2).clamp(0.0, 1.0)
+}
+
+/// Normalized Shannon entropy ∈ [0, 1].
+/// 0 = peaked (confident), 1 = uniform (uncertain).
+#[cfg(test)]
+pub(crate) fn shannon_entropy(logits: &[f64]) -> f64 {
+    shannon_entropy_from_probs(&softmax(logits))
+}
+
+/// Tsallis entropy confidence ∈ [0, 1] (exponentially normalized, α = 1/3).
+/// 1 = peaked (confident), 0 = uniform (uncertain).
+#[cfg(test)]
+pub(crate) fn tsallis_confidence(logits: &[f64]) -> f64 {
+    tsallis_confidence_from_probs(&softmax(logits))
+}
+
+/// Margin between top-1 and top-2 softmax probabilities ∈ [0, 1].
+/// Higher = more confident.
+#[cfg(test)]
+pub(crate) fn top_margin(logits: &[f64]) -> f64 {
+    top_margin_from_probs(&softmax(logits))
 }
 
 #[cfg(test)]
