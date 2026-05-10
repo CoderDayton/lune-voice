@@ -4,6 +4,9 @@ import { useEffect, useEffectEvent, useRef } from 'react';
 import { ErrorToast } from '../../../components/feedback';
 import type { SessionStreamEvent } from '../../../lib/backend/types';
 import { workspaceActions } from '../../../store/workspace-store';
+import { useFirstRunGate } from '../../welcome/use-model-setup';
+import { WelcomeLayout } from '../../welcome/welcome-layout';
+import { WelcomePage } from '../../welcome/welcome-page';
 import { findNavigationItem } from '../config/navigation';
 import { useAppShortcuts } from '../hooks/use-app-shortcuts';
 import { startWorkspaceBridge } from '../workspace-bridge';
@@ -13,8 +16,11 @@ export const DRAWER_ID = 'app-drawer';
 
 export function AppShell() {
   useAppShortcuts();
-  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
   const page = findNavigationItem(pathname);
+  const firstRun = useFirstRunGate();
 
   const onSessionEvent = useEffectEvent((event: SessionStreamEvent) => {
     workspaceActions.applySessionEvent(event);
@@ -32,7 +38,10 @@ export function AppShell() {
     return () => mq.removeEventListener('change', handle);
   }, []);
 
+  // Workspace bridge — only start once setup is complete so we don't race
+  // against backend init while the user is still picking models.
   useEffect(() => {
+    if (firstRun.status !== 'ready') return;
     return startWorkspaceBridge({
       onSessionEvent,
       onSnapshotError: (error) => {
@@ -44,7 +53,27 @@ export function AppShell() {
         console.error(`[app-shell] ${scope} bridge failed`, error);
       },
     });
-  }, []);
+  }, [firstRun.status]);
+
+  if (firstRun.status === 'checking') {
+    return (
+      <div className="welcome-shell relative h-dvh overflow-hidden">
+        <div className="app-shell-backdrop" aria-hidden="true" />
+        <div className="relative z-10 flex h-full items-center justify-center">
+          <span className="loading loading-spinner loading-lg text-primary" />
+        </div>
+      </div>
+    );
+  }
+
+  if (firstRun.status === 'needed') {
+    return (
+      <WelcomeLayout>
+        <ErrorToast />
+        <WelcomePage onFinish={firstRun.finish} />
+      </WelcomeLayout>
+    );
+  }
 
   return (
     <div className="app-shell-root drawer lg:drawer-open fixed inset-0">
