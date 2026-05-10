@@ -692,6 +692,46 @@ fn norm_word(w: &str) -> String {
         .to_lowercase()
 }
 
+/// Whether `s` ends with a sentence-terminating punctuation mark.
+/// Trailing closing quotes/brackets are stripped before checking.
+fn ends_sentence(s: &str) -> bool {
+    let trimmed = s.trim_end_matches(['"', '\'', ')', ']', '}', '»']);
+    trimmed
+        .chars()
+        .last()
+        .is_some_and(|c| matches!(c, '.' | '!' | '?' | '…'))
+}
+
+/// First alphabetic character is uppercase.
+fn starts_uppercase_alpha(s: &str) -> bool {
+    s.chars()
+        .find(|c| c.is_alphabetic())
+        .is_some_and(|c| c.is_uppercase())
+}
+
+/// First alphabetic character is lowercase.
+fn starts_lowercase_alpha(s: &str) -> bool {
+    s.chars()
+        .find(|c| c.is_alphabetic())
+        .is_some_and(|c| c.is_lowercase())
+}
+
+/// Lowercase the first alphabetic character of `s`, leaving everything else
+/// (leading punctuation, interior letters, trailing punctuation) intact.
+fn lowercase_first_letter(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut done = false;
+    for c in s.chars() {
+        if !done && c.is_alphabetic() {
+            out.extend(c.to_lowercase());
+            done = true;
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
 fn is_allowed_sub(from: &str, to: &str) -> bool {
     ALLOWED_SUBS.iter().any(|(a, b)| from == *a && to == *b)
 }
@@ -812,12 +852,33 @@ pub(crate) fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> S
 
     let is_en = matches!(lune_core::lang::display_name(lang), Some("English"));
 
-    let mut result: Vec<&str> = Vec::with_capacity(ops.len());
+    // Detect the "second-word capitalization" failure mode: the LLM invents
+    // a mid-utterance sentence break (period + Title-cased next word) where
+    // the input had none. Both signals must hold to suppress the cap:
+    //   * LLM-side previous word ended with `.!?` (it thinks new sentence)
+    //   * Input-side previous word did NOT end with `.!?` (no real break)
+    // This preserves legitimate mid-sentence proper-noun cap like "John",
+    // because in that case the previous LLM word ("met") has no terminator.
+    let mut result: Vec<String> = Vec::with_capacity(ops.len());
+    let mut prev_inp_terminated = true; // utterance start = sentence-initial
+    let mut prev_out_terminated = true;
     let mut idx = 0;
     while idx < ops.len() {
         match &ops[idx] {
-            Op::Match(_inp_w, out_w) => {
-                result.push(out_w);
+            Op::Match(inp_w, out_w) => {
+                let spurious_break = prev_out_terminated && !prev_inp_terminated;
+                let emitted = if is_en
+                    && spurious_break
+                    && starts_lowercase_alpha(inp_w)
+                    && starts_uppercase_alpha(out_w)
+                {
+                    lowercase_first_letter(out_w)
+                } else {
+                    (*out_w).to_string()
+                };
+                prev_inp_terminated = ends_sentence(inp_w);
+                prev_out_terminated = ends_sentence(out_w);
+                result.push(emitted);
                 idx += 1;
             }
             Op::Delete(inp_w) => {
@@ -828,17 +889,33 @@ pub(crate) fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> S
                     if is_en
                         && (is_allowed_sub(&from, &to) || looks_like_spelling_repair(&from, &to))
                     {
-                        result.push(out_w);
+                        let spurious_break = prev_out_terminated && !prev_inp_terminated;
+                        let emitted = if spurious_break
+                            && starts_lowercase_alpha(inp_w)
+                            && starts_uppercase_alpha(out_w)
+                        {
+                            lowercase_first_letter(out_w)
+                        } else {
+                            (*out_w).to_string()
+                        };
+                        prev_inp_terminated = ends_sentence(inp_w);
+                        prev_out_terminated = ends_sentence(out_w);
+                        result.push(emitted);
                         idx += 2;
                         continue;
                     }
                 }
-                result.push(inp_w);
+                result.push((*inp_w).to_string());
+                prev_inp_terminated = ends_sentence(inp_w);
+                prev_out_terminated = ends_sentence(inp_w);
                 idx += 1;
             }
             Op::Insert(w) => {
                 if is_en && SAFE_INSERTIONS.contains(&norm_word(w).as_str()) {
-                    result.push(w);
+                    // Inserted function words ("the", "a", "to", …) are never
+                    // sentence-initial in any meaningful sense — keep as-is.
+                    result.push((*w).to_string());
+                    prev_out_terminated = ends_sentence(w);
                 }
                 idx += 1;
             }
@@ -1230,6 +1307,42 @@ mod tests {
             validate_and_merge("dont worry about it", "Don't worry about it.", "en"),
             "Don't worry about it."
         );
+    }
+
+    #[test]
+    fn merge_strips_spurious_mid_utterance_capitalization() {
+        // The LLM hallucinated sentence breaks the user did not produce.
+        // The merge must keep punctuation but suppress the false title-case
+        // it injected on every "new sentence" head.
+        let merged = validate_and_merge("hello there friend", "Hello. There. Friend.", "en");
+        assert_eq!(merged, "Hello. there. friend.");
+    }
+
+    #[test]
+    fn merge_preserves_legitimate_sentence_initial_cap() {
+        // Input has its own sentence terminator — the LLM's capitalization
+        // of the next sentence is correct and must survive.
+        let merged = validate_and_merge("hello. how are you", "Hello. How are you?", "en");
+        assert_eq!(merged, "Hello. How are you?");
+    }
+
+    #[test]
+    fn merge_preserves_proper_noun_capitalization() {
+        // Mid-sentence proper noun capitalization (no LLM-introduced sentence
+        // break before it) is legitimate and must survive.
+        let merged = validate_and_merge("i met john today", "I met John today.", "en");
+        assert_eq!(merged, "I met John today.");
+    }
+
+    #[test]
+    fn merge_strips_cap_on_replacement_after_spurious_break() {
+        // Replacement words (Delete+Insert) must follow the same rule:
+        // if the previous input word didn't end a sentence, suppress the
+        // LLM's spurious title-case on the replacement.
+        let merged = validate_and_merge("we should meat at noon", "We should. Meet at noon.", "en");
+        // "Meet" replaces "meat" (homophone repair) but mid-sentence after a
+        // spurious "." → leading cap suppressed.
+        assert_eq!(merged, "We should. meet at noon.");
     }
 
     #[test]
