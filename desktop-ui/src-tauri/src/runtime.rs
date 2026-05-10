@@ -960,6 +960,7 @@ async fn build_llm_service(
                 let llm = Arc::new(LazyLocalLlm::new(
                     style_dir,
                     settings.device.use_gpu(cfg!(feature = "cuda")),
+                    settings.device.strict_cuda(),
                     128,
                 ));
                 Ok((llm.clone() as Arc<dyn LlmService>, Some(llm)))
@@ -996,6 +997,7 @@ async fn build_llm_service(
 struct LazyLocalLlm {
     model_dir: std::path::PathBuf,
     use_gpu: bool,
+    cuda_required: bool,
     max_new_tokens: usize,
     generation: AtomicU64,
     unload_epoch: AtomicU64,
@@ -1009,10 +1011,16 @@ enum LazyLlmState {
 }
 
 impl LazyLocalLlm {
-    fn new(model_dir: std::path::PathBuf, use_gpu: bool, max_new_tokens: usize) -> Self {
+    fn new(
+        model_dir: std::path::PathBuf,
+        use_gpu: bool,
+        cuda_required: bool,
+        max_new_tokens: usize,
+    ) -> Self {
         Self {
             model_dir,
             use_gpu,
+            cuda_required,
             max_new_tokens,
             generation: AtomicU64::new(0),
             unload_epoch: AtomicU64::new(0),
@@ -1033,12 +1041,14 @@ impl LazyLocalLlm {
         let warmup_t0 = std::time::Instant::now();
         let model_dir = self.model_dir.clone();
         let use_gpu = self.use_gpu;
+        let cuda_required = self.cuda_required;
         let max_new_tokens = self.max_new_tokens;
         let loaded = tokio::task::spawn_blocking(move || {
             lune_llm::backend::ort_llm::OrtStyleLlm::new(
                 lune_llm::backend::ort_llm::OrtStyleLlmConfig {
                     model_dir,
                     use_gpu,
+                    cuda_required,
                     max_new_tokens,
                 },
             )
@@ -1178,7 +1188,7 @@ mod tests {
 
     #[tokio::test]
     async fn lazy_local_llm_errors_when_not_warmed() {
-        let llm = LazyLocalLlm::new(std::path::PathBuf::from("/missing/model"), false, 8);
+        let llm = LazyLocalLlm::new(std::path::PathBuf::from("/missing/model"), false, false, 8);
         let result = llm.complete("system", "user").await;
         assert!(result.is_err());
     }
@@ -1187,6 +1197,7 @@ mod tests {
     async fn lazy_local_llm_ttl_unloads_in_flight_warmup() {
         let llm = Arc::new(LazyLocalLlm::new(
             std::path::PathBuf::from("/missing/model"),
+            false,
             false,
             8,
         ));
@@ -1207,6 +1218,7 @@ mod tests {
     async fn lazy_local_llm_ttl_can_be_cancelled() {
         let llm = Arc::new(LazyLocalLlm::new(
             std::path::PathBuf::from("/missing/model"),
+            false,
             false,
             8,
         ));

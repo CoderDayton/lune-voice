@@ -31,11 +31,28 @@
     "copyright": "© 2026 Lune Voice",
     "linux": {
       "deb": {
-        "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0", "libayatana-appindicator3-1"],
-        "section": "utils"
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0",
+          "libayatana-appindicator3-1",
+          "libcudart12",
+          "libcublas12",
+          "libcufft11",
+          "libcurand10",
+          "libcudnn9-cuda-12"
+        ],
+        "section": "utils",
+        "files": {
+          "/usr/lib/libonnxruntime_providers_cuda.so": "onnx-libs/libonnxruntime_providers_cuda.so",
+          "/usr/lib/libonnxruntime_providers_shared.so": "onnx-libs/libonnxruntime_providers_shared.so"
+        }
       },
       "appimage": {
-        "bundleMediaFramework": false
+        "bundleMediaFramework": false,
+        "files": {
+          "/usr/lib/libonnxruntime_providers_cuda.so": "onnx-libs/libonnxruntime_providers_cuda.so",
+          "/usr/lib/libonnxruntime_providers_shared.so": "onnx-libs/libonnxruntime_providers_shared.so"
+        }
       }
     },
     "macOS": {

@@ -47,6 +47,7 @@ fn main() {
     let llm = OrtStyleLlm::new(OrtStyleLlmConfig {
         model_dir: model_dir(),
         use_gpu,
+        cuda_required: false,
         max_new_tokens: 128,
     })
     .expect("failed to load model");

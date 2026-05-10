@@ -22,6 +22,10 @@ const DEFAULT_MAX_TOKENS: usize = 512;
 pub struct OrtStyleLlmConfig {
     pub model_dir: PathBuf,
     pub use_gpu: bool,
+    /// True when the user explicitly chose CUDA — registers the EP with
+    /// `error_on_failure()` so the session fails to load instead of silently
+    /// running on CPU.
+    pub cuda_required: bool,
     pub max_new_tokens: usize,
 }
 
@@ -30,6 +34,7 @@ impl Default for OrtStyleLlmConfig {
         Self {
             model_dir: PathBuf::new(),
             use_gpu: true,
+            cuda_required: false,
             max_new_tokens: DEFAULT_MAX_TOKENS,
         }
     }
@@ -231,6 +236,7 @@ impl OrtStyleLlm {
             .map(|n| n.get().clamp(2, 8))
             .unwrap_or(4);
 
+        let cuda_required = config.cuda_required;
         let make_builder = |gpu: bool, path: &Path| -> Result<Session> {
             let mut b = Session::builder()
                 .map_err(e)?
@@ -249,13 +255,17 @@ impl OrtStyleLlm {
                 // Use ORT default arena strategy (kNextPowerOfTwo). Variable
                 // KV-cache shapes per decode step fragment a SameAsRequested
                 // arena across runs; power-of-two buckets reuse cleanly.
-                b = b
-                    .with_execution_providers([ort::ep::CUDA::default()
-                        .with_conv_algorithm_search(ort::ep::cuda::ConvAlgorithmSearch::Heuristic)
-                        .with_conv_max_workspace(false)
-                        .with_tf32(true)
-                        .build()])
-                    .map_err(e)?;
+                let cuda_ep = ort::ep::CUDA::default()
+                    .with_conv_algorithm_search(ort::ep::cuda::ConvAlgorithmSearch::Heuristic)
+                    .with_conv_max_workspace(false)
+                    .with_tf32(true)
+                    .build();
+                let cuda_ep = if cuda_required {
+                    cuda_ep.error_on_failure()
+                } else {
+                    cuda_ep
+                };
+                b = b.with_execution_providers([cuda_ep]).map_err(e)?;
             } else {
                 let opt_path = path.with_extension("onnx.opt");
                 b = b.with_optimized_model_path(&opt_path).map_err(e)?;

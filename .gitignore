@@ -1,5 +1,6 @@
 /target
 /dist
+desktop-ui/src-tauri/onnx-libs/
 **/*.rs.bk
 *.swp
 *.swo

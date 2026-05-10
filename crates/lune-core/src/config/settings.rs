@@ -244,4 +244,12 @@ impl DevicePolicy {
             Self::Auto => cuda_available,
         }
     }
+
+    /// True when the user explicitly chose CUDA. ORT EP registration should
+    /// fail loudly in this case instead of silently falling back to CPU —
+    /// the surrounding code is expected to forward this to
+    /// `ep::CUDA::default().build().error_on_failure()`.
+    pub fn strict_cuda(self) -> bool {
+        matches!(self, Self::Cuda)
+    }
 }

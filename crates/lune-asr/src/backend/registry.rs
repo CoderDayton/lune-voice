@@ -132,12 +132,14 @@ impl AsrRegistry {
         models_dir: &Path,
     ) -> Result<Self> {
         let use_gpu = device.use_gpu(cfg!(feature = "cuda"));
+        let cuda_required = device.strict_cuda();
 
         match config {
             AsrBackendConfig::Qwen3Asr { .. } => {
                 let backend = Qwen3AsrBackend::new(Qwen3AsrConfig {
                     model_dir: models_dir.join(lune_core::models::DIR_QWEN3_ASR),
                     use_gpu,
+                    cuda_required,
                 })?;
                 Ok(Self::Qwen3(backend))
             }

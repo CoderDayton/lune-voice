@@ -16,6 +16,7 @@ fn make_llm() -> OrtStyleLlm {
     let config = OrtStyleLlmConfig {
         model_dir: dir,
         use_gpu: true,
+        cuda_required: false,
         max_new_tokens: 512,
     };
     OrtStyleLlm::new(config).expect("failed to load model")

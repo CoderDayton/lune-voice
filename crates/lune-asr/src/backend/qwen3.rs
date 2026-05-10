@@ -50,6 +50,10 @@ const MAX_WINDOW_SAMPLES: usize = 300 * whisper::SAMPLE_RATE;
 pub struct Qwen3AsrConfig {
     pub model_dir: PathBuf,
     pub use_gpu: bool,
+    /// True when the user explicitly chose CUDA — registers the EP with
+    /// `error_on_failure()` so the session fails to load instead of silently
+    /// running on CPU.
+    pub cuda_required: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -105,7 +109,11 @@ impl Qwen3AsrBackend {
         config: Qwen3AsrConfig,
         decoder_io_binding: bool,
     ) -> Result<Self> {
-        let loader = OrtModelLoader::new(config.model_dir.clone(), config.use_gpu);
+        let loader = OrtModelLoader::new(
+            config.model_dir.clone(),
+            config.use_gpu,
+            config.cuda_required,
+        );
 
         let encoder = loader.load_first(&["qwen3-asr-encoder.onnx"], "qwen3-asr-encoder")?;
         let embed_tokens =

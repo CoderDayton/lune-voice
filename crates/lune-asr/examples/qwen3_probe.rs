@@ -87,6 +87,7 @@ fn main() {
     let asr_config = lune_asr::Qwen3AsrConfig {
         model_dir: asr_model_dir,
         use_gpu: true,
+        cuda_required: false,
     };
     let backend = lune_asr::Qwen3AsrBackend::new(asr_config).expect("load ASR");
 

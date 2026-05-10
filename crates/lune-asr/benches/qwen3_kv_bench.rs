@@ -69,6 +69,7 @@ fn run_variant(
         lune_asr::Qwen3AsrConfig {
             model_dir: model_dir.to_path_buf(),
             use_gpu,
+            cuda_required: false,
         },
         decoder_io_binding,
     )
