@@ -2,7 +2,7 @@
 name = "lune-ui"
 version = "0.1.0"
 edition = "2024"
-default-run = "lune-ui"
+default-run = "lune-app"
 
 [features]
 default = ["cuda"]
@@ -46,7 +46,7 @@ gtk-layer-shell = { version = "0.8", features = ["v0_6"] }
 evdev = "0.13"
 
 [[bin]]
-name = "lune-ui"
+name = "lune-app"
 path = "src/main.rs"
 
 [dev-dependencies]

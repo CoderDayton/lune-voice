@@ -96,14 +96,6 @@ bash scripts/package-all.sh "${TYPE:-all}"
 '''
 info = "Build .deb/.AppImage/.rpm via Docker (--env TYPE=all|deb-appimage|rpm)"
 
-[scripts.install]
-command = "bash scripts/install.sh"
-info = "Install systemd unit + binary"
-
-[scripts.uninstall]
-command = "bash scripts/uninstall.sh"
-info = "Remove systemd service + binary"
-
 # ── CI / composite ──────────────────────────────────────────────────────────
 
 ci = { include = ["fmt", "clippy", "check", "test"], info = "Full CI: fmt + clippy + check + test" }
