@@ -5,8 +5,8 @@
 //! reading a prompt that contains intra-sentence pauses. [`recommend`]
 //! returns a pair of thresholds tuned to that mic + voice + room.
 
-const MIN_NOISE_FRAMES: usize = 60;
-const MIN_SPEECH_FRAMES: usize = 250;
+const MIN_NOISE_DURATION_MS: u32 = 2000;
+const MIN_SPEECH_DURATION_MS: u32 = 8000;
 const MIN_SEPARATION: f32 = 0.20;
 
 const ACTIVE_WINDOW: usize = 10;
@@ -29,6 +29,10 @@ const END_FLOOR: f32 = 0.10;
 pub struct CalibrationInput {
     pub noise_scores: Vec<f32>,
     pub speech_scores: Vec<f32>,
+    /// Duration of one VAD frame in milliseconds (matches the audio capture
+    /// `chunk_duration_ms`). Used to convert frame counts into wall-clock
+    /// durations for the minimum-sample gates.
+    pub frame_duration_ms: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -42,26 +46,28 @@ pub struct CalibrationResult {
 
 #[derive(Debug, thiserror::Error)]
 pub enum CalibrationError {
-    #[error("noise sample too short ({0} frames, need ≥ {1})")]
-    NoiseTooShort(usize, usize),
-    #[error("speech sample too short ({0} frames, need ≥ {1})")]
-    SpeechTooShort(usize, usize),
+    #[error("noise sample too short ({0} ms, need ≥ {1} ms)")]
+    NoiseTooShort(u32, u32),
+    #[error("speech sample too short ({0} ms, need ≥ {1} ms)")]
+    SpeechTooShort(u32, u32),
     #[error("insufficient signal: speech_p10 ({0:.2}) - noise_p95 ({1:.2}) < {2:.2}")]
     InsufficientSignal(f32, f32, f32),
 }
 
 /// Compute recommended VAD thresholds from per-frame score vectors.
 pub fn recommend(input: &CalibrationInput) -> Result<CalibrationResult, CalibrationError> {
-    if input.noise_scores.len() < MIN_NOISE_FRAMES {
+    let noise_ms = input.noise_scores.len() as u32 * input.frame_duration_ms;
+    if noise_ms < MIN_NOISE_DURATION_MS {
         return Err(CalibrationError::NoiseTooShort(
-            input.noise_scores.len(),
-            MIN_NOISE_FRAMES,
+            noise_ms,
+            MIN_NOISE_DURATION_MS,
         ));
     }
-    if input.speech_scores.len() < MIN_SPEECH_FRAMES {
+    let speech_ms = input.speech_scores.len() as u32 * input.frame_duration_ms;
+    if speech_ms < MIN_SPEECH_DURATION_MS {
         return Err(CalibrationError::SpeechTooShort(
-            input.speech_scores.len(),
-            MIN_SPEECH_FRAMES,
+            speech_ms,
+            MIN_SPEECH_DURATION_MS,
         ));
     }
 
@@ -183,30 +189,34 @@ mod tests {
         vec![value; n]
     }
 
+    /// 80ms frame duration matches `AudioConfig::default().chunk_duration_ms`.
+    /// At this rate the existing test fixture sizes (100 noise / 300+ speech
+    /// frames) easily clear the 2000ms / 8000ms minimums.
+    const FRAME_MS: u32 = 80;
+
+    fn input(noise: Vec<f32>, speech: Vec<f32>) -> CalibrationInput {
+        CalibrationInput {
+            noise_scores: noise,
+            speech_scores: speech,
+            frame_duration_ms: FRAME_MS,
+        }
+    }
+
     #[test]
     fn noise_too_short_rejected() {
-        let r = recommend(&CalibrationInput {
-            noise_scores: vec_of(0.05, 10),
-            speech_scores: vec_of(0.8, 300),
-        });
+        let r = recommend(&input(vec_of(0.05, 10), vec_of(0.8, 300)));
         assert!(matches!(r, Err(CalibrationError::NoiseTooShort(..))));
     }
 
     #[test]
     fn speech_too_short_rejected() {
-        let r = recommend(&CalibrationInput {
-            noise_scores: vec_of(0.05, 100),
-            speech_scores: vec_of(0.8, 100),
-        });
+        let r = recommend(&input(vec_of(0.05, 100), vec_of(0.8, 50)));
         assert!(matches!(r, Err(CalibrationError::SpeechTooShort(..))));
     }
 
     #[test]
     fn insufficient_signal_rejected() {
-        let r = recommend(&CalibrationInput {
-            noise_scores: vec_of(0.55, 100),
-            speech_scores: vec_of(0.60, 300),
-        });
+        let r = recommend(&input(vec_of(0.55, 100), vec_of(0.60, 300)));
         assert!(matches!(r, Err(CalibrationError::InsufficientSignal(..))));
     }
 
@@ -216,11 +226,7 @@ mod tests {
         for s in speech.iter_mut().take(230).skip(200) {
             *s = 0.20;
         }
-        let r = recommend(&CalibrationInput {
-            noise_scores: vec_of(0.05, 100),
-            speech_scores: speech,
-        })
-        .unwrap();
+        let r = recommend(&input(vec_of(0.05, 100), speech)).unwrap();
         assert!(r.speech_threshold >= 0.30 && r.speech_threshold <= 0.55);
         assert!(r.speech_threshold_end < r.speech_threshold);
         assert!(r.speech_threshold_end >= END_FLOOR);
@@ -232,11 +238,7 @@ mod tests {
         for s in speech.iter_mut().take(225).skip(200) {
             *s = 0.30;
         }
-        let r = recommend(&CalibrationInput {
-            noise_scores: vec_of(0.30, 100),
-            speech_scores: speech,
-        })
-        .unwrap();
+        let r = recommend(&input(vec_of(0.30, 100), speech)).unwrap();
         assert!(r.speech_threshold > 0.35);
         assert!(r.speech_threshold_end >= 0.30);
         assert!(r.speech_threshold_end < r.speech_threshold);
@@ -244,11 +246,7 @@ mod tests {
 
     #[test]
     fn no_intra_speech_dip_uses_noise_fallback() {
-        let r = recommend(&CalibrationInput {
-            noise_scores: vec_of(0.05, 100),
-            speech_scores: vec_of(0.85, 400),
-        })
-        .unwrap();
+        let r = recommend(&input(vec_of(0.05, 100), vec_of(0.85, 400))).unwrap();
         let expected_pause = (0.05_f32 + FALLBACK_PAUSE_OFFSET).max(END_FLOOR);
         assert!((r.pause_p20 - expected_pause).abs() < 0.05);
         assert!(r.speech_threshold_end < r.speech_threshold);
@@ -256,11 +254,7 @@ mod tests {
 
     #[test]
     fn hysteresis_gap_always_present() {
-        let r = recommend(&CalibrationInput {
-            noise_scores: vec_of(0.05, 100),
-            speech_scores: vec_of(0.95, 300),
-        })
-        .unwrap();
+        let r = recommend(&input(vec_of(0.05, 100), vec_of(0.95, 300))).unwrap();
         assert!((r.speech_threshold - r.speech_threshold_end) >= HYSTERESIS_GAP - 0.01);
     }
 

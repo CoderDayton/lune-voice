@@ -143,9 +143,11 @@ async fn run_calibration(
     stream: Option<AudioStream>,
     timings: CalibrationTimings,
 ) {
+    let audio_config = AudioConfig::default();
+    let frame_duration_ms = audio_config.chunk_duration_ms;
     let stream = match stream {
         Some(s) => s,
-        None => match AudioStream::new(AudioConfig::default()) {
+        None => match AudioStream::new(audio_config) {
             Ok(s) => s,
             Err(e) => {
                 let _ = event_tx
@@ -223,6 +225,7 @@ async fn run_calibration(
     let input = CalibrationInput {
         noise_scores,
         speech_scores,
+        frame_duration_ms,
     };
     match calibrate::recommend(&input) {
         Ok(result) => {
