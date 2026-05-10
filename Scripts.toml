@@ -23,15 +23,20 @@ requires = ["bun"]
 [scripts.ui-build]
 interpreter = "bash"
 command = '''
-cd desktop-ui && bun tauri build
+cd desktop-ui && APPIMAGE_EXTRACT_AND_RUN=1 bun tauri build
 '''
 info = "Production build of desktop app"
 requires = ["bun"]
 
 # ── Quick iteration ──────────────────────────────────────────────────────────
 
-check = { command = "cargo check --workspace", info = "Type-check all crates" }
-clippy = { command = "cargo clippy --workspace -- -D warnings", info = "Lint with clippy (deny warnings)" }
+[scripts.check]
+command = "cargo check --workspace"
+info = "Type-check all crates"
+
+[scripts.clippy]
+command = "cargo clippy --workspace -- -D warnings"
+info = "Lint with clippy (deny warnings)"
 
 [scripts.fmt]
 interpreter = "bash"
@@ -42,7 +47,9 @@ info = "Check formatting (--env FIX=1 to apply)"
 
 # ── Testing ──────────────────────────────────────────────────────────────────
 
-test = { command = "cargo test --workspace", info = "Run unit tests (no real models)" }
+[scripts.test]
+command = "cargo test --workspace"
+info = "Run unit tests (no real models)"
 
 [scripts.test-e2e]
 interpreter = "bash"
@@ -72,7 +79,9 @@ info = "Benchmark (--env TYPE=stages|real|latency|confusion|llm|domain|vram|agc)
 
 # ── Build ────────────────────────────────────────────────────────────────────
 
-build = { command = "cargo build --release", info = "Release build (CUDA default)" }
+[scripts.build]
+command = "cargo build --release"
+info = "Release build (CUDA default)"
 
 # ── Tools ────────────────────────────────────────────────────────────────────
 
@@ -98,7 +107,9 @@ info = "Build .deb/.AppImage/.rpm via Docker (--env TYPE=all|deb-appimage|rpm)"
 
 # ── CI / composite ──────────────────────────────────────────────────────────
 
-ci = { include = ["fmt", "clippy", "check", "test"], info = "Full CI: fmt + clippy + check + test" }
+[scripts.ci]
+include = ["fmt", "clippy", "check", "test"]
+info = "Full CI: fmt + clippy + check + test"
 
 # ── Cleanup ──────────────────────────────────────────────────────────────────
 
