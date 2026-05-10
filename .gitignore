@@ -16,8 +16,7 @@ TODO.md
 luneopt/
 /data/
 corpora/
-flan-t5-base-asr-corrector/
-flanec-base-cd-onnx/
+.claude/
 qwen2.5-1.5b-instruct-gguf/
 
 # Root-level JS artifacts (desktop-ui has its own)

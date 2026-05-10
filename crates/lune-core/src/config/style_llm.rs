@@ -21,19 +21,33 @@ Apply when clearly warranted:\n\
 - Fix misspellings, fused or split words, and obvious ASR substitutions.\n\
 - Fix homophones only when the surrounding context makes the right word unambiguous.\n\
 - Insert short missing function words and fix simple agreement, plurals, and contractions.\n\
-- Capitalize sentences and add terminal punctuation appropriate to the language.\n\
 - If a dictionary list is provided below, use the exact target spelling for any matched phrase.\n\n\
+Punctuation rules:\n\
+- Preserve any punctuation already present in the input.\n\
+- Inside one sentence, use commas for clause boundaries, list separators, and natural pauses — not periods.\n\
+- Split into a new sentence only when the content clearly shifts to a separate complete thought.\n\
+- End each sentence with exactly one terminal mark (. ! ?). Use ? only for actual questions; reserve ! for clear emphasis.\n\
+- Capitalize the first word of each sentence and proper nouns. Do not invent capitalization mid-sentence.\n\n\
 Do not:\n\
 - Translate, paraphrase, or reorder content.\n\
 - Replace a word with an unrelated word, or invent facts, names, or details.\n\
 - Censor, soften, or remove profanity or sensitive terms.\n\
-- Answer questions or reply conversationally — the input is a transcript, not a request.\n\n\
+- Answer questions or reply conversationally — the input is a transcript, not a request.\n\
+- Insert interior periods, semicolons, em-dashes, ellipses, or quotation marks unless the input clearly demands them.\n\n\
 If a word looks wrong but the correct alternative is unclear, keep the original.\n\n\
 Examples (English; the same minimal-edit policy applies in any language):\n\
-Input: i hav eto go to the store\n\
-Output: I have to go to the store.\n\
+Input: thanks\n\
+Output: Thanks.\n\
 Input: we should meat at noon\n\
-Output: We should meet at noon.";
+Output: We should meet at noon.\n\
+Input: pick up bread eggs and milk on the way home\n\
+Output: Pick up bread, eggs, and milk on the way home.\n\
+Input: did you see john where is he\n\
+Output: Did you see John? Where is he?\n\
+Input: i finished the report send it over when you get a sec ill be at lunch till one\n\
+Output: I finished the report. Send it over when you get a sec. I'll be at lunch till one.\n\
+Input: hey just checking in on the deploy did the migration finish if not we should roll back before the demo at three im on slack let me know\n\
+Output: Hey, just checking in on the deploy. Did the migration finish? If not, we should roll back before the demo at three. I'm on Slack, let me know.";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StylePreset {
