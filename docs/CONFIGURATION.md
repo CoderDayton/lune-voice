@@ -48,9 +48,9 @@ Settings mutability tiers:
 
 | Tier | When Applied | Fields |
 |------|-------------|--------|
-| **Hot** | Immediately (watch channel) | `dictation_mode`, `activation_mode` |
-| **Warm** | Next session start | `default_style`, `language`, `vad_pcen`, `mic_prewarm` |
-| **Cold** | Persist only | `privacy_mode`, `session_history_days`, `hotkey` |
+| **Hot** | Immediately (watch channel) | `dictation_mode`, `activation_mode`, `pill_visibility`, `terminal_mode` |
+| **Warm** | Next session start | `default_style`, `language`, `dictation_language`, `vad_pcen`, `mic_prewarm` |
+| **Cold** | Persist only | `privacy_mode`, `session_history_days`, `start_minimized`, `hotkey` |
 | **Reload** | Before next session | `asr_backend`, `llm_backend`, `device` |
 
 All changes are persisted to disk immediately. The desktop app reloads a workspace snapshot after save, so the UI reflects the stored settings rather than a local guess.
@@ -72,15 +72,19 @@ If the file doesn't exist or fails to parse, defaults are used and a warning is 
 ### Full Default Configuration
 
 ```toml
-language = "en-US"
 device = "auto"
+default_style = "minimal"
+language = "auto"
+dictation_language = "auto"
 privacy_mode = "LocalOnly"
 dictation_mode = "TypeInPlace"
 activation_mode = "Toggle"
-default_style = "minimal"
+pill_visibility = "Always"
+terminal_mode = "Auto"
 session_history_days = 30
 mic_prewarm = true
 vad_pcen = true
+start_minimized = false
 
 [asr_backend]
 type = "Qwen3Asr"
@@ -88,9 +92,13 @@ type = "Qwen3Asr"
 [llm_backend]
 type = "Local"
 
-[hotkey]
-toggle_dictation = { modifiers = ["Ctrl"], key = "Space" }
-cancel_dictation = { modifiers = [], key = "Escape" }
+[hotkey.toggle_dictation]
+modifiers = ["Ctrl"]
+key = "Space"
+
+[hotkey.cancel_dictation]
+modifiers = []
+key = "Escape"
 ```
 
 Model files live under the app model directory. The settings file stores backend choice and policy, not resolved model paths.

@@ -126,6 +126,11 @@ ASR.
 
 | Technique | Location | Impact |
 |-----------|----------|--------|
+| **Global mimalloc allocator** | `desktop-ui/src-tauri/src/main.rs` | Replaces glibc malloc with mimalloc; faster small-alloc paths and lower fragmentation across the desktop shell and pipeline crates |
+| **Mel scratch reuse** | `lune-asr/src/mel/whisper.rs` | `padded`, `fft_in`, `power`, and `mel_f32` workspaces live behind a `Mutex` and grow monotonically — STFT/mel passes allocate once, then reuse |
+| **KV dequant buffer reuse** | `lune-llm/src/backend/kv_cache.rs` | Per-layer dequant scratch is hoisted out of the unload loop and refilled in place |
+| **ORT input pre-allocation** | `lune-llm/src/backend/ort_llm.rs` | `Inputs<'static>` is built into a `Vec::with_capacity(input_capacity(...))` instead of being constructed and then extended |
+| **Corrector single-buffer output** | `lune-dict/src/corrector.rs` | Builds the corrected text directly into a sized `String` instead of a `Vec<String>` + `join(" ")` |
 | **Pre-allocated audio snapshot** | `lune-asr/src/backend/qwen3.rs` | `mem::take` swaps a pre-allocated `Vec` in/out of the session — zero heap allocation during steady-state inference |
 | **Persistent partial buffers** | `session.rs` | `partial_buf` and `audio_batch` are allocated once and reused across all iterations of the main loop |
 | **Pre-computed capacity** | `confidence_router.rs`, `prompt.rs` | String builders compute exact capacity before allocation (context joins, ChatML prompts) |
@@ -138,6 +143,9 @@ ASR.
 
 | Technique | Location | Impact |
 |-----------|----------|--------|
+| **Shared softmax for HWCE** | `lune-core/src/hwce/features.rs` | Computes softmax once per token and feeds the probability slice to entropy/Tsallis/margin instead of paying for three independent passes |
+| **Sequential-write 4-bit quant** | `lune-llm/src/backend/kv_cache.rs` | Row-major `(t, d)` min/max scan with stride-1 reads lets the auto-vectorizer emit SIMD min/max instead of stride-`dim` scalar loads |
+| **O(1) risk lookup in corrector** | `lune-dict/src/corrector.rs` | Risk positions indexed in a `HashMap`, replacing a per-word linear scan that was O(words²) overall |
 | **norm_sqr() vs norm()*norm()** | `mel/whisper.rs` | Eliminates a `sqrt()` call per bin per frame in the STFT power spectrum |
 | **Sequential-write transpose** | `mel/whisper.rs` | Outer loop over time gives stride-1 writes (cache-friendly for L1) |
 | **PCEN AGC frontend** | `lune-audio/src/vad.rs` | Default-on adaptive gain (`vad_pcen = true`) flattens loudness drift before VAD scoring; warmup holds unity gain while envelopes settle |
