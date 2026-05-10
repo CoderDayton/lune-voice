@@ -89,6 +89,13 @@ command = "uv run scripts/record_mic.py"
 info = "Record mic to float32 WAV (16kHz mono)"
 requires = ["uv"]
 
+[scripts.package]
+interpreter = "bash"
+command = '''
+bash scripts/package-all.sh "${TYPE:-all}"
+'''
+info = "Build .deb/.AppImage/.rpm via Docker (--env TYPE=all|deb-appimage|rpm)"
+
 [scripts.install]
 command = "bash scripts/install.sh"
 info = "Install systemd unit + binary"

@@ -43,4 +43,35 @@ else
     info "lune-voice is not installed."
 fi
 
+# ── Step 3: Remove ORT env snippet + shell rc references ────────────────────
+PROFILE_SNIPPET="$HOME/.config/lune-voice/ort-env.sh"
+if [[ -f "$PROFILE_SNIPPET" ]]; then
+    info "Removing ORT env snippet: $PROFILE_SNIPPET"
+    rm -f "$PROFILE_SNIPPET"
+fi
+
+for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
+    if [[ -f "$rc" ]] && grep -qF '# lune-voice ORT CUDA libs' "$rc" 2>/dev/null; then
+        info "Cleaning ORT env source from $(basename "$rc")"
+        # Drop the "# lune-voice ORT CUDA libs" marker comment and the
+        # source line directly after it, leaving the rest untouched.
+        awk '
+          $0 == "# lune-voice ORT CUDA libs" { skip = 1; next }
+          skip { skip = 0; next }
+          { print }
+        ' "$rc" > "$rc.lune-tmp" && mv "$rc.lune-tmp" "$rc"
+    fi
+done
+
+# ── Step 4: Remove model symlink (only if it IS a symlink) ──────────────────
+XDG_DATA="${XDG_DATA_HOME:-$HOME/.local/share}"
+APP_MODELS="$XDG_DATA/lune-voice/models"
+if [[ -L "$APP_MODELS" ]]; then
+    info "Removing model symlink: $APP_MODELS"
+    rm "$APP_MODELS"
+elif [[ -d "$APP_MODELS" ]]; then
+    info "Models directory at $APP_MODELS is not a symlink — leaving in place."
+    info "  Remove manually if desired: rm -rf '$APP_MODELS'"
+fi
+
 bold "==> Done."

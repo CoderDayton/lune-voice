@@ -58,7 +58,7 @@ else
     info "No NVIDIA GPU detected — CPU only"
 fi
 
-# ── Step 3b: Ensure clipboard tools ───────────────────────────────────────────
+# ── Step 3b: Ensure clipboard tools (cross-distro) ───────────────────────────
 MISSING=()
 for tool in wl-copy wl-paste xdotool; do
     if ! command -v "$tool" &>/dev/null; then
@@ -66,9 +66,24 @@ for tool in wl-copy wl-paste xdotool; do
     fi
 done
 if [[ ${#MISSING[@]} -gt 0 ]]; then
-    info "Installing missing tools: ${MISSING[*]}"
-    sudo apt install -y wl-clipboard xdotool 2>/dev/null || \
-        info "Could not auto-install. Please install: ${MISSING[*]}"
+    info "Missing clipboard tools: ${MISSING[*]}"
+    install_cmd=()
+    if command -v apt-get &>/dev/null; then
+        install_cmd=(sudo apt-get install -y wl-clipboard xdotool)
+    elif command -v dnf &>/dev/null; then
+        install_cmd=(sudo dnf install -y wl-clipboard xdotool)
+    elif command -v pacman &>/dev/null; then
+        install_cmd=(sudo pacman -S --noconfirm --needed wl-clipboard xdotool)
+    elif command -v zypper &>/dev/null; then
+        install_cmd=(sudo zypper install -y wl-clipboard xdotool)
+    fi
+    if [[ ${#install_cmd[@]} -gt 0 ]]; then
+        info "Installing: ${install_cmd[*]}"
+        "${install_cmd[@]}" || \
+            info "Auto-install failed. Install manually: ${MISSING[*]}"
+    else
+        info "Unknown package manager. Install manually: ${MISSING[*]}"
+    fi
 fi
 
 # ── Step 4: Build release ─────────────────────────────────────────────────────
