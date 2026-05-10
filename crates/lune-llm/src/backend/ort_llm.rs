@@ -313,7 +313,7 @@ impl OrtStyleLlm {
         // Only inject a recognizable label; otherwise omit it entirely so
         // the model isn't shown an ungrammatical header like
         // "the following en transcript".
-        let label = normalize_language_label(language);
+        let label = lune_core::lang::display_name(language);
         let header = match label {
             Some(name) => format!("Correct the following {name} transcript:"),
             None => "Correct the following transcript:".to_string(),
@@ -800,8 +800,7 @@ pub(crate) fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> S
     }
     ops.reverse();
 
-    let is_en =
-        lang.eq_ignore_ascii_case("en") || lang.starts_with("en-") || lang.starts_with("en_");
+    let is_en = matches!(lune_core::lang::display_name(lang), Some("English"));
 
     let mut result: Vec<&str> = Vec::with_capacity(ops.len());
     let mut idx = 0;
@@ -1029,34 +1028,6 @@ fn strip_think_tags(text: &str) -> &str {
     } else {
         text
     }
-}
-
-/// Normalize a language hint into the English language name shown in the user
-/// prompt. Returns `None` for missing / unknown / "auto" so callers can drop
-/// the tag rather than emit ungrammatical text like "the following en
-/// transcript". Accepts BCP-47 codes and the full English names emitted by
-/// Qwen3-ASR's language head.
-fn normalize_language_label(raw: &str) -> Option<&'static str> {
-    let lang = raw.trim();
-    if lang.is_empty() || lang.eq_ignore_ascii_case("auto") {
-        return None;
-    }
-    Some(match lang.to_ascii_lowercase().as_str() {
-        "en" | "english" => "English",
-        "fr" | "french" => "French",
-        "de" | "german" => "German",
-        "es" | "spanish" => "Spanish",
-        "it" | "italian" => "Italian",
-        "pt" | "portuguese" => "Portuguese",
-        "nl" | "dutch" => "Dutch",
-        "ja" | "japanese" => "Japanese",
-        "zh" | "chinese" | "mandarin" => "Chinese",
-        "ko" | "korean" => "Korean",
-        "ru" | "russian" => "Russian",
-        "pl" | "polish" => "Polish",
-        "ar" | "arabic" => "Arabic",
-        _ => return None,
-    })
 }
 
 #[cfg(test)]

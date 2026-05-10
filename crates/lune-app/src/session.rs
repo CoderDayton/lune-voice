@@ -755,7 +755,8 @@ async fn process_and_deliver(
     let detected_lang = segments
         .first()
         .and_then(|s| s.detected_language.as_deref())
-        .unwrap_or("en");
+        .and_then(lune_core::lang::display_name)
+        .unwrap_or("English");
     let heuristic_result = heuristic.correct(
         &text_after_commands,
         &word_risk_scores,

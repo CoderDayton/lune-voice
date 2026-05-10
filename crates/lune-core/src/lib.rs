@@ -5,6 +5,7 @@ pub mod config;
 pub mod dict;
 pub mod error;
 pub mod hwce;
+pub mod lang;
 pub mod llm;
 pub mod models;
 pub mod session;
