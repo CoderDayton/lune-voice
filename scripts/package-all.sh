@@ -96,18 +96,23 @@ if [[ ! -x /root/.bun/bin/bun ]]; then
     curl -fsSL https://bun.sh/install | bash
 fi
 
+# Restore host ownership of cached/output dirs whether the build succeeds or
+# fails — without this trap, an aborted run leaves root-owned files in
+# /work/desktop-ui/{dist,node_modules}, blocking subsequent host builds.
+restore_ownership() {
+    chown -R "$HOST_UID:$HOST_GID" \
+        /cache/target \
+        /root/.cargo \
+        /root/.rustup \
+        /root/.bun \
+        /work/desktop-ui/node_modules \
+        /work/desktop-ui/dist 2>/dev/null || true
+}
+trap restore_ownership EXIT
+
 cd /work/desktop-ui
 bun install --frozen-lockfile
 bun tauri build --bundles "$BUNDLES"
-
-# Restore host ownership of cached/output dirs before the container exits.
-chown -R "$HOST_UID:$HOST_GID" \
-    /cache/target \
-    /root/.cargo \
-    /root/.rustup \
-    /root/.bun \
-    /work/desktop-ui/node_modules \
-    /work/desktop-ui/dist 2>/dev/null || true
 INNER
 }
 
@@ -133,9 +138,9 @@ build_deb_appimage() {
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y --no-install-recommends \
-    build-essential pkg-config curl ca-certificates file desktop-file-utils \
+    build-essential pkg-config curl ca-certificates file desktop-file-utils unzip \
     libasound2-dev libdbus-1-dev libglib2.0-dev libssl-dev \
-    libxkbcommon-dev libgtk-3-dev \
+    libxkbcommon-dev libgtk-3-dev libgtk-layer-shell-dev \
     libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev \
     libsoup-3.0-dev librsvg2-dev libayatana-appindicator3-dev
 PRE
