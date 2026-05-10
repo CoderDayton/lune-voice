@@ -6,7 +6,8 @@
   "packageManager": "bun@1.3.10",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "lingui extract --clean && tsc && vite build",
+    "extract": "lingui extract",
     "preview": "vite preview",
     "test": "bun test tests/unit src",
     "test:e2e:tauri": "bun run tauri build --debug --no-bundle && bun test tests/e2e/tauri-smoke.test.ts",
