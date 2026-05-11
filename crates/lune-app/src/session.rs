@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -280,6 +281,13 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
 const MAX_SEGMENTS: usize = 500;
 
 const GARBAGE_DROP_THRESHOLD: f32 = 0.25;
+
+/// Number of pre-speech chunks (~80 ms each at 16 kHz / 1280 samples) kept
+/// in a rolling buffer and flushed to ASR when VAD first fires. Sized to
+/// cover word-onset consonants/breaths that score below `threshold` but
+/// belong to the same word as the vowel that did fire — without enough
+/// pre-roll, hard-onset words like "hello" arrive at ASR as "ello".
+const PREROLL_CHUNKS: usize = 4;
 fn append_segments(
     all_segments: &mut Vec<AsrSegment>,
     joined_text: &mut String,
@@ -439,7 +447,7 @@ async fn run_session<A: AsrBackend + 'static>(
     let mut next_level_emit = tokio::time::Instant::now();
     let level_emit_interval = Duration::from_millis(67); // ~15 fps
     let mut peak_rms: f32 = 0.0;
-    let mut prev_chunk: Option<Vec<f32>> = None;
+    let mut preroll: VecDeque<Vec<f32>> = VecDeque::with_capacity(PREROLL_CHUNKS);
     let mut was_speech = false;
     let mut last_audio_at = tokio::time::Instant::now();
     let session_start = tokio::time::Instant::now();
@@ -487,7 +495,10 @@ async fn run_session<A: AsrBackend + 'static>(
                     let vad_result = vad.process_chunk(&chunk.samples);
                     if vad_result.energy > peak_rms { peak_rms = vad_result.energy; }
                     if !vad_result.is_speech {
-                        prev_chunk = Some(chunk.samples);
+                        if preroll.len() == PREROLL_CHUNKS {
+                            preroll.pop_front();
+                        }
+                        preroll.push_back(chunk.samples);
                         was_speech = false;
                         continue;
                     }
@@ -500,13 +511,12 @@ async fn run_session<A: AsrBackend + 'static>(
                         );
                         first_speech_logged = true;
                     }
-                    if !was_speech
-                        && let Some(pre) = prev_chunk.take()
-                    {
-                        let _ = asr.push_audio(&asr_session, &pre).await;
+                    if !was_speech {
+                        for pre in preroll.drain(..) {
+                            let _ = asr.push_audio(&asr_session, &pre).await;
+                        }
                     }
                     was_speech = true;
-                    prev_chunk = None;
                     speech_samples += chunk.samples.len();
 
                     if let Err(e) = asr.push_audio(&asr_session, &chunk.samples).await {

@@ -304,10 +304,13 @@ impl AppRuntime {
         // Reverted on failure so the pill doesn't stick in "listening" state.
         self.publish_status("listening").await;
 
+        // Capture focus off the start path: the value is only consumed at
+        // delivery time (many seconds later), but the underlying Wayland /
+        // subprocess probes are synchronous and block the tokio worker for
+        // ~400–500 ms on COSMIC. Letting them race the audio bring-up
+        // unblocks the first VAD chunk by the same amount.
         #[cfg(unix)]
-        let focus_target = capture_focus_target();
-        #[cfg(unix)]
-        debug!(?focus_target, "captured focus target for session");
+        let focus_capture = tokio::task::spawn_blocking(capture_focus_target);
 
         let manager = match self.prepare_manager_for_start().await {
             Ok(m) => m,
@@ -342,7 +345,9 @@ impl AppRuntime {
         .await;
         #[cfg(unix)]
         {
-            self.inner.pipeline.lock().await.focus_target = Some(focus_target);
+            let focus_target = focus_capture.await.ok();
+            debug!(?focus_target, "captured focus target for session");
+            self.inner.pipeline.lock().await.focus_target = focus_target;
         }
 
         self.spawn_event_forwarder(event_rx);
