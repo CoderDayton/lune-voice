@@ -50,12 +50,12 @@ msgstr ""
 msgid "Adjust manually"
 msgstr ""
 
-#: src/features/settings/sections/models-section.tsx:142
+#: src/features/settings/sections/models-section.tsx:129
 msgid "AI models stored on your device."
 msgstr ""
 
-#: src/features/overview/components/model-setup.tsx:159
-msgid "All models are ready. Everything runs locally on your machine."
+#: src/features/welcome/welcome-page.tsx:131
+msgid "All required models are already installed. Continue when you're ready."
 msgstr ""
 
 #: src/features/settings/components/openai-fields.tsx:35
@@ -102,7 +102,7 @@ msgstr ""
 #: src/components/feedback/confirm-dialog.tsx:52
 #: src/features/dictionary/components/dictionary-table.tsx:91
 #: src/features/settings/components/calibrate-modal.tsx:115
-#: src/features/settings/sections/models-section.tsx:223
+#: src/features/settings/sections/models-section.tsx:316
 #: src/features/styles/components/style-editor-modal.tsx:106
 #: src/features/styles/components/style-preset-card.tsx:69
 msgid "Cancel"
@@ -116,8 +116,12 @@ msgstr ""
 msgid "Cancel dictation"
 msgstr "Cancelar ditado"
 
-#: src/features/overview/components/model-setup.tsx:199
-msgid "Check your connection and try again."
+#: src/features/welcome/welcome-page.tsx:125
+msgid "Check your network and we'll pick up where we left off."
+msgstr ""
+
+#: src/features/welcome/welcome-page.tsx:50
+msgid "Checking installed models…"
 msgstr ""
 
 #: src/features/settings/components/theme-picker.tsx:337
@@ -136,6 +140,11 @@ msgstr ""
 msgid "Choose how quickly you want to enter and leave voice typing."
 msgstr ""
 
+#: src/features/welcome/welcome-page.tsx:128
+#: src/features/welcome/welcome-page.tsx:134
+msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
+msgstr ""
+
 #: src/features/styles/styles-page.tsx:133
 msgid "Choose the tone and formatting applied to your transcriptions."
 msgstr ""
@@ -149,6 +158,7 @@ msgid "close"
 msgstr ""
 
 #: src/features/history/components/session-detail-modal.tsx:206
+#: src/features/settings/sections/models-section.tsx:328
 #: src/features/styles/components/style-editor-modal.tsx:97
 msgid "Close"
 msgstr ""
@@ -161,9 +171,13 @@ msgstr ""
 msgid "Completed"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:38
+#: src/features/overview/overview-page.tsx:36
 #: src/features/shell/components/sidebar-widgets.tsx:40
 msgid "Connecting"
+msgstr ""
+
+#: src/features/welcome/welcome-page.tsx:243
+msgid "Continue"
 msgstr ""
 
 #: src/features/settings/sections/transcription-section.tsx:20
@@ -198,17 +212,17 @@ msgstr ""
 
 #: src/components/feedback/confirm-dialog.tsx:63
 #: src/features/history/components/session-detail-modal.tsx:199
-#: src/features/settings/sections/models-section.tsx:169
+#: src/features/settings/sections/models-section.tsx:264
 #: src/features/styles/components/style-preset-card.tsx:66
 msgid "Delete"
 msgstr ""
 
-#. placeholder {0}: confirmDelete.name
-#: src/features/settings/sections/models-section.tsx:204
+#. placeholder {0}: model.name
+#: src/features/settings/sections/models-section.tsx:301
 msgid "Delete {0}?"
 msgstr ""
 
-#: src/features/settings/sections/models-section.tsx:226
+#: src/features/settings/sections/models-section.tsx:319
 msgid "Delete model"
 msgstr ""
 
@@ -241,7 +255,7 @@ msgstr ""
 msgid "Discard the current draft and return to idle. Click the binding to change it."
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:38
+#: src/features/overview/overview-page.tsx:36
 msgid "Disconnected"
 msgstr ""
 
@@ -249,35 +263,41 @@ msgstr ""
 msgid "Dismiss error"
 msgstr ""
 
-#: src/features/settings/sections/models-section.tsx:183
+#: src/features/settings/sections/models-section.tsx:278
 msgid "Download"
 msgstr ""
 
-#. placeholder {0}: toGet.length
-#. placeholder {1}: toGet.length !== 1 ? 's' : ''
-#: src/features/overview/components/model-setup.tsx:230
-msgid "Download {0} model{1}"
+#: src/features/welcome/welcome-page.tsx:235
+msgid "Download {pendingCount} models"
 msgstr ""
 
-#. placeholder {0}: toGet.length
-#. placeholder {1}: toGet.length !== 1 ? 's' : ''
-#: src/features/overview/components/model-setup.tsx:207
-msgid "Download {0} optional model{1}"
+#: src/features/welcome/welcome-page.tsx:235
+msgid "Download 1 model"
 msgstr ""
 
-#: src/features/overview/components/model-setup.tsx:155
+#: src/features/welcome/welcome-page.tsx:85
 msgid "Download failed"
+msgstr ""
+
+#: src/features/welcome/welcome-page.tsx:124
+msgid "Download interrupted"
+msgstr ""
+
+#: src/features/settings/sections/models-section.tsx:237
+#: src/features/welcome/components/model-card.tsx:99
+msgid "Download progress"
 msgstr ""
 
 #: src/features/history/components/session-detail-modal.tsx:129
 msgid "Download transcript"
 msgstr ""
 
-#: src/features/overview/components/model-setup.tsx:153
+#: src/features/welcome/welcome-page.tsx:121
 msgid "Downloading models"
 msgstr ""
 
-#: src/features/settings/sections/models-section.tsx:183
+#: src/features/settings/sections/models-section.tsx:278
+#: src/features/welcome/welcome-page.tsx:196
 msgid "Downloading…"
 msgstr ""
 
@@ -311,7 +331,7 @@ msgid "Edit style"
 msgstr ""
 
 #: src/features/history/components/history-session-list.tsx:37
-#: src/features/overview/overview-page.tsx:150
+#: src/features/overview/overview-page.tsx:146
 msgid "Empty session"
 msgstr ""
 
@@ -319,7 +339,7 @@ msgstr ""
 msgid "Engine"
 msgstr ""
 
-#: src/features/overview/components/model-setup.tsx:219
+#: src/features/welcome/welcome-page.tsx:222
 msgid "Enter Lune Voice"
 msgstr ""
 
@@ -349,6 +369,11 @@ msgstr ""
 
 #: src/features/settings/sections/input-section.tsx:92
 msgid "How quickly Lune decides you're done speaking. Higher = ends sooner on a pause."
+msgstr ""
+
+#: src/features/settings/sections/models-section.tsx:224
+#: src/features/welcome/components/model-card.tsx:89
+msgid "Installed"
 msgstr ""
 
 #: src/features/styles/components/style-editor-modal.tsx:76
@@ -393,7 +418,7 @@ msgstr ""
 msgid "Lune"
 msgstr ""
 
-#: src/features/settings/sections/models-section.tsx:120
+#: src/features/settings/sections/models-section.tsx:104
 msgid "Manage AI models stored on your device."
 msgstr ""
 
@@ -409,7 +434,7 @@ msgstr ""
 msgid "Mid"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:66
+#: src/features/overview/overview-page.tsx:64
 msgid "Minutes"
 msgstr ""
 
@@ -417,9 +442,13 @@ msgstr ""
 msgid "Mode"
 msgstr ""
 
-#: src/features/settings/sections/models-section.tsx:119
-#: src/features/settings/sections/models-section.tsx:141
+#: src/features/settings/sections/models-section.tsx:103
+#: src/features/settings/sections/models-section.tsx:128
 msgid "Models"
+msgstr ""
+
+#: src/features/welcome/welcome-page.tsx:259
+msgid "Models are stored locally. No telemetry, no accounts."
 msgstr ""
 
 #: src/features/styles/components/style-editor-modal.tsx:51
@@ -451,7 +480,7 @@ msgstr ""
 msgid "No sessions match \"{0}\". Try a different search."
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:122
+#: src/features/overview/overview-page.tsx:120
 msgid "No sessions yet"
 msgstr ""
 
@@ -467,6 +496,10 @@ msgstr ""
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
 msgstr ""
 
+#: src/features/settings/sections/models-section.tsx:227
+msgid "Not installed"
+msgstr ""
+
 #: src/features/styles/components/style-editor-modal.tsx:68
 msgid "One-line summary shown on the card"
 msgstr ""
@@ -475,8 +508,17 @@ msgstr ""
 msgid "Open session details"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:143
+#: src/features/overview/overview-page.tsx:141
 msgid "Open session from {time}"
+msgstr ""
+
+#: src/features/settings/sections/models-section.tsx:221
+#: src/features/welcome/components/model-card.tsx:86
+msgid "Optional"
+msgstr ""
+
+#: src/features/welcome/welcome-page.tsx:169
+msgid "Overall progress"
 msgstr ""
 
 #: src/features/history/components/history-pagination.tsx:25
@@ -502,8 +544,8 @@ msgstr ""
 msgid "Please call Stella. Ask her to bring these things with her from the store: six spoons of fresh snow peas, five thick slabs of blue cheese, and maybe a snack for her brother Bob."
 msgstr ""
 
-#: src/features/overview/components/model-setup.tsx:234
-msgid "Please don't close the app during download"
+#: src/features/welcome/welcome-page.tsx:199
+msgid "Please keep the app open until downloads finish"
 msgstr ""
 
 #: src/features/settings/sections/input-section.tsx:131
@@ -511,7 +553,7 @@ msgstr ""
 msgid "Pre-warm microphone"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:124
+#: src/features/overview/overview-page.tsx:122
 msgid "Press"
 msgstr ""
 
@@ -546,8 +588,7 @@ msgstr ""
 msgid "Read aloud. Don't worry about pace — just speak naturally."
 msgstr ""
 
-#: src/features/overview/components/model-card.tsx:94
-#: src/features/overview/overview-page.tsx:38
+#: src/features/overview/overview-page.tsx:36
 msgid "Ready"
 msgstr ""
 
@@ -555,7 +596,7 @@ msgstr ""
 msgid "Recalibrate"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:95
+#: src/features/overview/overview-page.tsx:93
 msgid "Recent"
 msgstr ""
 
@@ -589,7 +630,8 @@ msgstr ""
 msgid "Replacement"
 msgstr ""
 
-#: src/features/overview/components/model-card.tsx:75
+#: src/features/settings/sections/models-section.tsx:218
+#: src/features/welcome/components/model-card.tsx:83
 msgid "Required"
 msgstr ""
 
@@ -597,8 +639,12 @@ msgstr ""
 msgid "Retry"
 msgstr ""
 
+#: src/features/welcome/welcome-page.tsx:210
+msgid "Retry download"
+msgstr ""
+
 #: src/features/history/components/history-session-list.tsx:45
-#: src/features/overview/overview-page.tsx:158
+#: src/features/overview/overview-page.tsx:154
 msgid "s"
 msgstr ""
 
@@ -624,12 +670,8 @@ msgstr ""
 msgid "Select {0} style"
 msgstr ""
 
-#: src/features/overview/components/model-setup.tsx:229
+#: src/features/welcome/welcome-page.tsx:239
 msgid "Select required models"
-msgstr ""
-
-#: src/features/overview/components/model-setup.tsx:164
-msgid "Select the AI models to download. Everything runs offline — no cloud, no accounts."
 msgstr ""
 
 #: src/features/settings/sections/output-section.tsx:17
@@ -637,17 +679,17 @@ msgstr ""
 msgid "Send method"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:97
+#: src/features/overview/overview-page.tsx:95
 #: src/features/shell/components/sidebar-widgets.tsx:83
 msgid "session"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:97
+#: src/features/overview/overview-page.tsx:95
 #: src/features/shell/components/sidebar-widgets.tsx:83
 msgid "sessions"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:75
+#: src/features/overview/overview-page.tsx:73
 msgid "Sessions"
 msgstr ""
 
@@ -659,7 +701,8 @@ msgstr ""
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr ""
 
-#: src/features/overview/components/model-setup.tsx:244
+#: src/features/welcome/welcome-page.tsx:213
+#: src/features/welcome/welcome-page.tsx:248
 msgid "Skip for now"
 msgstr ""
 
@@ -736,19 +779,19 @@ msgstr ""
 msgid "Theme"
 msgstr ""
 
-#: src/features/settings/sections/models-section.tsx:214
+#: src/features/settings/sections/models-section.tsx:311
 msgid "This is a required model. Dictation will not work without it."
 msgstr ""
 
-#: src/features/overview/components/model-setup.tsx:161
-msgid "This only happens once. Models are stored locally."
+#: src/features/welcome/welcome-page.tsx:122
+msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr ""
 
 #: src/features/history/components/session-detail-modal.tsx:198
 msgid "This will permanently remove this dictation session and its transcript."
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:125
+#: src/features/overview/overview-page.tsx:123
 msgid "to start dictating"
 msgstr ""
 
@@ -777,7 +820,7 @@ msgstr ""
 msgid "View"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:102
+#: src/features/overview/overview-page.tsx:100
 msgid "View all"
 msgstr ""
 
@@ -794,7 +837,12 @@ msgstr "Entrada de voz"
 msgid "Voice model"
 msgstr ""
 
-#: src/features/overview/components/model-setup.tsx:156
+#: src/features/welcome/welcome-page.tsx:130
+msgid "Welcome back"
+msgstr ""
+
+#: src/features/welcome/welcome-page.tsx:127
+#: src/features/welcome/welcome-page.tsx:133
 msgid "Welcome to Lune Voice"
 msgstr ""
 
@@ -811,13 +859,13 @@ msgid "Whether the shortcut toggles recording or only works while held. Change i
 msgstr ""
 
 #: src/features/history/components/history-session-list.tsx:42
-#: src/features/overview/overview-page.tsx:154
+#: src/features/overview/overview-page.tsx:150
 #: src/features/shell/components/sidebar-widgets.tsx:85
 msgid "words"
 msgstr ""
 
 #: src/features/history/components/session-detail-modal.tsx:172
-#: src/features/overview/overview-page.tsx:57
+#: src/features/overview/overview-page.tsx:55
 msgid "Words"
 msgstr ""
 
@@ -825,18 +873,22 @@ msgstr ""
 msgid "Writing styles"
 msgstr ""
 
-#: src/features/overview/components/model-setup.tsx:151
-msgid "You're all set!"
+#: src/features/welcome/welcome-page.tsx:118
+msgid "You're all set"
 msgstr ""
 
 #: src/features/settings/components/openai-fields.tsx:48
 msgid "Your API key. Leave it blank to keep the saved key."
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:124
+#: src/features/overview/overview-page.tsx:122
 msgid "your hotkey"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:85
+#: src/features/welcome/welcome-page.tsx:119
+msgid "Your models are ready. Everything stays on this machine."
+msgstr ""
+
+#: src/features/overview/overview-page.tsx:83
 msgid "Your session summary will appear here once you start dictating."
 msgstr ""
