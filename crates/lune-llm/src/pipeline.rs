@@ -44,20 +44,51 @@ impl CorrectionPipeline {
     }
 
     /// Build the user prompt for the correction pass.
-    fn build_correction_prompt(&self, input: &PostProcessInput) -> String {
-        crate::backend::ort_llm::OrtStyleLlm::user_prompt(
-            &input.raw_text,
+    fn build_correction_prompt(&self, input: &PostProcessInput, raw_text: &str) -> String {
+        let examples = dictionary_examples(input);
+        crate::backend::ort_llm::OrtStyleLlm::user_prompt_with_examples(
+            raw_text,
             &input.language,
-            &input.uncertain_words,
+            &examples,
         )
     }
+}
+
+fn dictionary_examples(input: &PostProcessInput) -> Vec<(String, String)> {
+    input
+        .dictionary
+        .iter()
+        .take(6)
+        .filter_map(|entry| {
+            let phrase = clean_example_fragment(&entry.phrase);
+            let replacement = clean_example_fragment(&entry.replacement);
+            if phrase.is_empty() || replacement.is_empty() {
+                return None;
+            }
+            Some((
+                format!("I said {phrase} in the meeting."),
+                format!("I said {replacement} in the meeting."),
+            ))
+        })
+        .collect()
+}
+
+fn clean_example_fragment(s: &str) -> String {
+    const MAX_CHARS: usize = 80;
+    s.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .take(MAX_CHARS)
+        .collect()
 }
 
 #[async_trait]
 impl TextPostProcessor for CorrectionPipeline {
     async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput> {
+        let seeded_raw_text = apply_dictionary_seed(&input.raw_text, &input.dictionary);
         let system = self.build_system_prompt(input);
-        let user = self.build_correction_prompt(input);
+        let user = self.build_correction_prompt(input, &seeded_raw_text);
 
         // Pass 1: Correction
         let mut text = match self.llm.complete(&system, &user).await {
@@ -65,7 +96,7 @@ impl TextPostProcessor for CorrectionPipeline {
             Err(e) => {
                 tracing::warn!(error = %e, "correction pass failed, returning raw text");
                 return Ok(PostProcessOutput {
-                    cleaned_text: input.raw_text.clone(),
+                    cleaned_text: seeded_raw_text,
                     metadata: None,
                 });
             }
@@ -80,11 +111,16 @@ impl TextPostProcessor for CorrectionPipeline {
         if crate::backend::ort_llm::contains_forbidden_output(&text) {
             tracing::warn!(output = %text, "LLM produced meta-text, falling back to raw");
             return Ok(PostProcessOutput {
-                cleaned_text: input.raw_text.clone(),
+                cleaned_text: seeded_raw_text,
                 metadata: None,
             });
         }
-        text = crate::backend::ort_llm::validate_and_merge(&input.raw_text, &text, &input.language);
+        text = crate::backend::ort_llm::validate_and_merge_with_dictionary(
+            &seeded_raw_text,
+            &text,
+            &input.language,
+            &input.dictionary,
+        );
 
         // Pass 2: Styling (gated by preset.skip_styling)
         if input.style_preset.needs_styling() {
@@ -115,10 +151,54 @@ impl TextPostProcessor for CorrectionPipeline {
     }
 }
 
+fn apply_dictionary_seed(text: &str, dictionary: &[lune_core::dict::DictionaryEntry]) -> String {
+    if dictionary.is_empty() {
+        return text.to_string();
+    }
+
+    let words: Vec<&str> = text.split_whitespace().collect();
+    let mut out = Vec::with_capacity(words.len());
+    for word in words {
+        let (prefix, core, suffix) = split_edge_punctuation(word);
+        let replacement = dictionary
+            .iter()
+            .filter(|entry| !entry.phrase.contains(char::is_whitespace))
+            .find(|entry| core.eq_ignore_ascii_case(&entry.phrase))
+            .map(|entry| entry.replacement.as_str());
+        match replacement {
+            Some(replacement) => {
+                let mut s = String::with_capacity(prefix.len() + replacement.len() + suffix.len());
+                s.push_str(prefix);
+                s.push_str(replacement);
+                s.push_str(suffix);
+                out.push(s);
+            }
+            None => out.push(word.to_string()),
+        }
+    }
+    out.join(" ")
+}
+
+fn split_edge_punctuation(word: &str) -> (&str, &str, &str) {
+    let core_start = word
+        .find(|c: char| !c.is_ascii_punctuation())
+        .unwrap_or(word.len());
+    let core_end = word
+        .rfind(|c: char| !c.is_ascii_punctuation())
+        .map(|i| i + word[i..].chars().next().map(char::len_utf8).unwrap_or(0))
+        .unwrap_or(core_start);
+    (
+        &word[..core_start],
+        &word[core_start..core_end],
+        &word[core_end..],
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use lune_core::config::StylePreset;
+    use lune_core::dict::DictionaryEntry;
     use std::sync::Arc;
 
     /// Mock LLM that returns predictable outputs.
@@ -210,5 +290,44 @@ mod tests {
 
         let output = pipeline.transform(&input).await.unwrap();
         assert_eq!(output.cleaned_text, "raw text");
+    }
+
+    #[test]
+    fn dictionary_entries_become_correction_examples() {
+        let input = PostProcessInput {
+            raw_text: "I visited Barolo yesterday".into(),
+            style_preset: Arc::new(StylePreset::minimal()),
+            app_category: None,
+            dictionary: vec![DictionaryEntry {
+                phrase: "Barolo".into(),
+                replacement: "Boorloo".into(),
+                priority: 10,
+            }],
+            context: None,
+            language: "en".into(),
+            uncertain_words: vec![],
+        };
+
+        let examples = dictionary_examples(&input);
+        assert_eq!(
+            examples,
+            vec![(
+                "I said Barolo in the meeting.".to_string(),
+                "I said Boorloo in the meeting.".to_string()
+            )]
+        );
+    }
+
+    #[test]
+    fn dictionary_seed_applies_single_word_replacements() {
+        let dictionary = vec![DictionaryEntry {
+            phrase: "Barolo".into(),
+            replacement: "Boorloo".into(),
+            priority: 10,
+        }];
+        assert_eq!(
+            apply_dictionary_seed("I visited Barolo.", &dictionary),
+            "I visited Boorloo."
+        );
     }
 }

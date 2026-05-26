@@ -2,7 +2,12 @@
 //! Skip with `cargo test` (ignored by default).
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
+use lune_core::config::StylePreset;
+use lune_core::dict::DictionaryEntry;
+use lune_core::llm::{LlmService, PostProcessInput, TextPostProcessor};
+use lune_llm::CorrectionPipeline;
 use lune_llm::backend::ort_llm::{OrtStyleLlm, OrtStyleLlmConfig};
 
 fn model_dir() -> Option<PathBuf> {
@@ -92,4 +97,40 @@ fn smoke_correction() {
 
     // Clean text should be mostly unchanged
     assert!(r4.contains("quick brown fox"), "mangled clean text: {r4}");
+}
+
+#[test]
+#[ignore]
+fn dictionary_example_correction_smoke() {
+    let _ = tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::DEBUG)
+        .with_test_writer()
+        .try_init();
+
+    let llm = Arc::new(make_llm());
+    let pipeline = CorrectionPipeline::new(Arc::clone(&llm) as Arc<dyn LlmService>);
+    let input = PostProcessInput {
+        raw_text: "I gave a talk in Barolo about transcription.".into(),
+        style_preset: Arc::new(StylePreset::minimal()),
+        app_category: None,
+        dictionary: vec![DictionaryEntry {
+            phrase: "Barolo".into(),
+            replacement: "Boorloo".into(),
+            priority: 10,
+        }],
+        context: None,
+        language: "en".into(),
+        uncertain_words: vec![],
+    };
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("tokio runtime");
+    let output = rt.block_on(pipeline.transform(&input)).unwrap();
+    println!("OUTPUT: {}", output.cleaned_text);
+    assert!(
+        output.cleaned_text.contains("Boorloo"),
+        "dictionary example did not produce replacement: {}",
+        output.cleaned_text
+    );
 }

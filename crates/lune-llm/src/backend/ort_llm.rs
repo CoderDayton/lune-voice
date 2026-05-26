@@ -15,6 +15,7 @@ use ort::value::{DynValue, Value};
 use tokenizers::Tokenizer;
 use tracing::info;
 
+use lune_core::dict::DictionaryEntry;
 use lune_core::error::{Error, Result};
 
 const DEFAULT_MAX_TOKENS: usize = 512;
@@ -317,6 +318,14 @@ impl OrtStyleLlm {
         language: &str,
         _uncertain_words: &[(String, usize)],
     ) -> String {
+        Self::user_prompt_with_examples(transcript, language, &[])
+    }
+
+    pub fn user_prompt_with_examples(
+        transcript: &str,
+        language: &str,
+        examples: &[(String, String)],
+    ) -> String {
         // The `language` field arrives in inconsistent forms — the runtime
         // sometimes hands us a BCP-47 code ("en") and sometimes a full
         // English name from the ASR's language head ("English", "Dutch").
@@ -328,7 +337,21 @@ impl OrtStyleLlm {
             Some(name) => format!("Correct the following {name} transcript:"),
             None => "Correct the following transcript:".to_string(),
         };
-        format!("{header}\n{transcript}\n\n/no_think")
+        let mut prompt = String::with_capacity(header.len() + transcript.len() + 128);
+        prompt.push_str(&header);
+        if !examples.is_empty() {
+            prompt.push_str("\n\nExamples:");
+            for (input, output) in examples {
+                prompt.push_str("\nInput: ");
+                prompt.push_str(input);
+                prompt.push_str("\nOutput: ");
+                prompt.push_str(output);
+            }
+        }
+        prompt.push('\n');
+        prompt.push_str(transcript);
+        prompt.push_str("\n\n/no_think");
+        prompt
     }
 
     pub fn apply_correction(
@@ -781,7 +804,17 @@ pub(crate) fn contains_forbidden_output(text: &str) -> bool {
 /// Token-level validator: align input/output words via LCS, accept safe
 /// edits (case, punctuation, function-word insertions, known substitutions,
 /// spelling repairs), reject everything else.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> String {
+    validate_and_merge_with_dictionary(input, llm_output, lang, &[])
+}
+
+pub(crate) fn validate_and_merge_with_dictionary(
+    input: &str,
+    llm_output: &str,
+    lang: &str,
+    dictionary: &[DictionaryEntry],
+) -> String {
     let inp: Vec<&str> = input.split_whitespace().collect();
     let out: Vec<&str> = llm_output.split_whitespace().collect();
 
@@ -886,8 +919,12 @@ pub(crate) fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> S
                 if let Some(Op::Insert(out_w)) = ops.get(idx + 1) {
                     let from = norm_word(inp_w);
                     let to = norm_word(out_w);
-                    if is_en
-                        && (is_allowed_sub(&from, &to) || looks_like_spelling_repair(&from, &to))
+                    let allowed_by_dictionary =
+                        dictionary_allows_substitution(&from, &to, dictionary);
+                    if allowed_by_dictionary
+                        || (is_en
+                            && (is_allowed_sub(&from, &to)
+                                || looks_like_spelling_repair(&from, &to)))
                     {
                         let spurious_break = prev_out_terminated && !prev_inp_terminated;
                         let emitted = if spurious_break
@@ -911,7 +948,11 @@ pub(crate) fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> S
                 idx += 1;
             }
             Op::Insert(w) => {
-                if is_en && SAFE_INSERTIONS.contains(&norm_word(w).as_str()) {
+                let has_following_input = ops[idx + 1..]
+                    .iter()
+                    .any(|op| matches!(op, Op::Match(_, _) | Op::Delete(_)));
+                if is_en && has_following_input && SAFE_INSERTIONS.contains(&norm_word(w).as_str())
+                {
                     // Inserted function words ("the", "a", "to", …) are never
                     // sentence-initial in any meaningful sense — keep as-is.
                     result.push((*w).to_string());
@@ -923,6 +964,12 @@ pub(crate) fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> S
     }
 
     result.join(" ")
+}
+
+fn dictionary_allows_substitution(from: &str, to: &str, dictionary: &[DictionaryEntry]) -> bool {
+    dictionary
+        .iter()
+        .any(|entry| norm_word(&entry.phrase) == from && norm_word(&entry.replacement) == to)
 }
 
 #[async_trait::async_trait]
@@ -1160,13 +1207,21 @@ mod tests {
     }
 
     #[test]
-    fn user_prompt_ignores_uncertain_words() {
-        let uncertain = vec![("brought".into(), 6usize), ("wrld".into(), 1usize)];
-        let prompt =
-            OrtStyleLlm::user_prompt("I went the store and brought some wrld", "en", &uncertain);
+    fn user_prompt_includes_examples_when_provided() {
+        let examples = vec![(
+            "I said Barolo in the meeting.".to_string(),
+            "I said Boorloo in the meeting.".to_string(),
+        )];
+        let prompt = OrtStyleLlm::user_prompt_with_examples(
+            "I went the store and brought some wrld",
+            "en",
+            &examples,
+        );
         assert!(prompt.contains("I went the store"));
         assert!(prompt.ends_with("/no_think"));
-        assert!(!prompt.contains("misheard"));
+        assert!(prompt.contains("Examples:"));
+        assert!(prompt.contains("Input: I said Barolo in the meeting."));
+        assert!(prompt.contains("Output: I said Boorloo in the meeting."));
     }
 
     // ── strip_think_tags ─────────────────────────────────────────────────
@@ -1267,6 +1322,24 @@ mod tests {
     }
 
     #[test]
+    fn merge_accepts_dictionary_replacement() {
+        let dictionary = vec![DictionaryEntry {
+            phrase: "Barolo".into(),
+            replacement: "Boorloo".into(),
+            priority: 10,
+        }];
+        assert_eq!(
+            validate_and_merge_with_dictionary(
+                "I gave a talk in Barolo.",
+                "I gave a talk in Boorloo.",
+                "en",
+                &dictionary,
+            ),
+            "I gave a talk in Boorloo."
+        );
+    }
+
+    #[test]
     fn merge_accepts_spelling_repair() {
         assert_eq!(
             validate_and_merge("i went to the storee", "I went to the store.", "en"),
@@ -1298,6 +1371,18 @@ mod tests {
         assert!(
             !merged.contains("extra"),
             "hallucinated content must be dropped: {merged}"
+        );
+    }
+
+    #[test]
+    fn merge_rejects_trailing_function_word_insertion() {
+        assert_eq!(
+            validate_and_merge(
+                "I gave a talk in Boorloo about transcription.",
+                "I gave a talk in Boorloo about transcription in",
+                "en",
+            ),
+            "I gave a talk in Boorloo about transcription"
         );
     }
 
