@@ -13,7 +13,7 @@ use std::sync::Arc;
 ///
 /// Delegates to a shared `LlmService` for all LLM calls, ensuring:
 /// - One system prompt construction (BASE_SYSTEM_PROMPT + dictionary terms)
-/// - One user prompt format (via OrtStyleLlm::user_prompt)
+/// - One user prompt format (via OrtStyleLlm::user_prompt_with_examples)
 /// - Two-pass workflow: correction → styling (if needed)
 /// - Graceful degradation: raw text on any LLM failure
 pub struct CorrectionPipeline {
@@ -115,12 +115,8 @@ impl TextPostProcessor for CorrectionPipeline {
                 metadata: None,
             });
         }
-        text = crate::backend::ort_llm::validate_and_merge_with_dictionary(
-            &seeded_raw_text,
-            &text,
-            &input.language,
-            &input.dictionary,
-        );
+        text =
+            crate::backend::ort_llm::validate_and_merge(&seeded_raw_text, &text, &input.language);
 
         // Pass 2: Styling (gated by preset.skip_styling)
         if input.style_preset.needs_styling() {
@@ -151,6 +147,17 @@ impl TextPostProcessor for CorrectionPipeline {
     }
 }
 
+/// Pre-replace single-token dictionary phrases in the raw transcript before
+/// the LLM ever sees it.
+///
+/// Policy: the user's dictionary wins unconditionally — every case-insensitive
+/// whole-word hit is rewritten, and the post-pass validator then accepts the
+/// replacement as an `Op::Match`. The trade-off is that homonyms ("lit" →
+/// "lit-up") cannot be selectively kept; users opt in by adding the entry.
+///
+/// Multi-word phrases are skipped here — seeding them safely needs phrase
+/// boundaries we don't have at this layer. The LLM still sees them via the
+/// system prompt + correction examples.
 fn apply_dictionary_seed(text: &str, dictionary: &[lune_core::dict::DictionaryEntry]) -> String {
     if dictionary.is_empty() {
         return text.to_string();
@@ -179,12 +186,16 @@ fn apply_dictionary_seed(text: &str, dictionary: &[lune_core::dict::DictionaryEn
     out.join(" ")
 }
 
+// Peel off any leading/trailing non-alphanumeric characters so dictionary
+// matches survive ASCII *and* unicode punctuation (smart quotes, em-dashes,
+// guillemets). Using `is_alphanumeric` also keeps accented letters in the
+// core, which `is_ascii_punctuation` would have left dangling.
 fn split_edge_punctuation(word: &str) -> (&str, &str, &str) {
     let core_start = word
-        .find(|c: char| !c.is_ascii_punctuation())
+        .find(|c: char| c.is_alphanumeric())
         .unwrap_or(word.len());
     let core_end = word
-        .rfind(|c: char| !c.is_ascii_punctuation())
+        .rfind(|c: char| c.is_alphanumeric())
         .map(|i| i + word[i..].chars().next().map(char::len_utf8).unwrap_or(0))
         .unwrap_or(core_start);
     (
@@ -328,6 +339,21 @@ mod tests {
         assert_eq!(
             apply_dictionary_seed("I visited Barolo.", &dictionary),
             "I visited Boorloo."
+        );
+    }
+
+    #[test]
+    fn dictionary_seed_strips_unicode_edge_punctuation() {
+        let dictionary = vec![DictionaryEntry {
+            phrase: "Barolo".into(),
+            replacement: "Boorloo".into(),
+            priority: 10,
+        }];
+        // Smart quotes and em-dash are not ASCII punctuation, but we still
+        // want the dictionary match to fire when they surround the core word.
+        assert_eq!(
+            apply_dictionary_seed("\u{201C}Barolo\u{201D}\u{2014}", &dictionary),
+            "\u{201C}Boorloo\u{201D}\u{2014}"
         );
     }
 }

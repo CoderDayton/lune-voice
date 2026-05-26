@@ -15,7 +15,6 @@ use ort::value::{DynValue, Value};
 use tokenizers::Tokenizer;
 use tracing::info;
 
-use lune_core::dict::DictionaryEntry;
 use lune_core::error::{Error, Result};
 
 const DEFAULT_MAX_TOKENS: usize = 512;
@@ -313,14 +312,6 @@ impl OrtStyleLlm {
         })
     }
 
-    pub fn user_prompt(
-        transcript: &str,
-        language: &str,
-        _uncertain_words: &[(String, usize)],
-    ) -> String {
-        Self::user_prompt_with_examples(transcript, language, &[])
-    }
-
     pub fn user_prompt_with_examples(
         transcript: &str,
         language: &str,
@@ -358,11 +349,11 @@ impl OrtStyleLlm {
         &self,
         transcript: &str,
         language: &str,
-        uncertain_words: &[(String, usize)],
+        _uncertain_words: &[(String, usize)],
     ) -> Result<String> {
         use std::hash::{Hash, Hasher};
         let system = lune_core::config::BASE_SYSTEM_PROMPT.replace("{lang}", language);
-        let user_text = Self::user_prompt(transcript, language, uncertain_words);
+        let user_text = Self::user_prompt_with_examples(transcript, language, &[]);
 
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         system.hash(&mut hasher);
@@ -804,17 +795,11 @@ pub(crate) fn contains_forbidden_output(text: &str) -> bool {
 /// Token-level validator: align input/output words via LCS, accept safe
 /// edits (case, punctuation, function-word insertions, known substitutions,
 /// spelling repairs), reject everything else.
-#[cfg_attr(not(test), allow(dead_code))]
+///
+/// Dictionary-mandated substitutions are not handled here — the pipeline
+/// pre-seeds those into the input before the LLM runs, so they arrive at
+/// this validator as `Op::Match` already.
 pub(crate) fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> String {
-    validate_and_merge_with_dictionary(input, llm_output, lang, &[])
-}
-
-pub(crate) fn validate_and_merge_with_dictionary(
-    input: &str,
-    llm_output: &str,
-    lang: &str,
-    dictionary: &[DictionaryEntry],
-) -> String {
     let inp: Vec<&str> = input.split_whitespace().collect();
     let out: Vec<&str> = llm_output.split_whitespace().collect();
 
@@ -919,12 +904,8 @@ pub(crate) fn validate_and_merge_with_dictionary(
                 if let Some(Op::Insert(out_w)) = ops.get(idx + 1) {
                     let from = norm_word(inp_w);
                     let to = norm_word(out_w);
-                    let allowed_by_dictionary =
-                        dictionary_allows_substitution(&from, &to, dictionary);
-                    if allowed_by_dictionary
-                        || (is_en
-                            && (is_allowed_sub(&from, &to)
-                                || looks_like_spelling_repair(&from, &to)))
+                    if is_en
+                        && (is_allowed_sub(&from, &to) || looks_like_spelling_repair(&from, &to))
                     {
                         let spurious_break = prev_out_terminated && !prev_inp_terminated;
                         let emitted = if spurious_break
@@ -964,12 +945,6 @@ pub(crate) fn validate_and_merge_with_dictionary(
     }
 
     result.join(" ")
-}
-
-fn dictionary_allows_substitution(from: &str, to: &str, dictionary: &[DictionaryEntry]) -> bool {
-    dictionary
-        .iter()
-        .any(|entry| norm_word(&entry.phrase) == from && norm_word(&entry.replacement) == to)
 }
 
 #[async_trait::async_trait]
@@ -1172,7 +1147,7 @@ mod tests {
 
     #[test]
     fn user_prompt_appends_no_think() {
-        let prompt = OrtStyleLlm::user_prompt("hello world", "en", &[]);
+        let prompt = OrtStyleLlm::user_prompt_with_examples("hello world", "en", &[]);
         assert!(prompt.contains("hello world"));
         assert!(prompt.contains("English"));
         assert!(prompt.ends_with("/no_think"));
@@ -1180,7 +1155,7 @@ mod tests {
 
     #[test]
     fn user_prompt_preserves_transcript() {
-        let prompt = OrtStyleLlm::user_prompt("das ist ein test", "de", &[]);
+        let prompt = OrtStyleLlm::user_prompt_with_examples("das ist ein test", "de", &[]);
         assert!(prompt.contains("das ist ein test"));
         assert!(prompt.contains("German"));
         assert!(prompt.ends_with("/no_think"));
@@ -1188,20 +1163,20 @@ mod tests {
 
     #[test]
     fn user_prompt_normalizes_full_english_name_from_asr() {
-        let prompt = OrtStyleLlm::user_prompt("das ist ein test", "German", &[]);
+        let prompt = OrtStyleLlm::user_prompt_with_examples("das ist ein test", "German", &[]);
         assert!(prompt.contains("German transcript"));
     }
 
     #[test]
     fn user_prompt_drops_language_when_auto_or_unknown() {
-        let auto = OrtStyleLlm::user_prompt("hello", "auto", &[]);
+        let auto = OrtStyleLlm::user_prompt_with_examples("hello", "auto", &[]);
         assert!(auto.contains("Correct the following transcript:"));
         assert!(!auto.contains("auto"));
 
-        let empty = OrtStyleLlm::user_prompt("hello", "", &[]);
+        let empty = OrtStyleLlm::user_prompt_with_examples("hello", "", &[]);
         assert!(empty.contains("Correct the following transcript:"));
 
-        let unknown = OrtStyleLlm::user_prompt("hello", "klingon", &[]);
+        let unknown = OrtStyleLlm::user_prompt_with_examples("hello", "klingon", &[]);
         assert!(unknown.contains("Correct the following transcript:"));
         assert!(!unknown.contains("klingon"));
     }
@@ -1318,24 +1293,6 @@ mod tests {
         assert_eq!(
             validate_and_merge("the cat sat on the mat", "The dog sat on the mat.", "en"),
             "The cat sat on the mat."
-        );
-    }
-
-    #[test]
-    fn merge_accepts_dictionary_replacement() {
-        let dictionary = vec![DictionaryEntry {
-            phrase: "Barolo".into(),
-            replacement: "Boorloo".into(),
-            priority: 10,
-        }];
-        assert_eq!(
-            validate_and_merge_with_dictionary(
-                "I gave a talk in Barolo.",
-                "I gave a talk in Boorloo.",
-                "en",
-                &dictionary,
-            ),
-            "I gave a talk in Boorloo."
         );
     }
 
