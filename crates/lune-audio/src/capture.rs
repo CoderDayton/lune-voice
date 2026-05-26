@@ -66,6 +66,19 @@ fn convert_u16_samples_into(data: &[u16], out: &mut Vec<f32>) {
     out.extend(data.iter().map(|&s| (s as f32 - 32768.0) / 32768.0));
 }
 
+// Channel-imbalance thresholds applied per audio callback:
+//
+// * `POWER_RATIO_LIMIT` (16.0) — if one channel carries >16× the energy of
+//   the weakest, channels are imbalanced beyond ~12 dB and averaging would
+//   attenuate the dominant content. Fall back to the strongest channel.
+// * `STEREO_CORR_FLOOR` (0.1) — required correlation between L and R before
+//   we trust their sum. Below this the channels are largely uncorrelated or
+//   antiphase, and summing risks partial-to-total cancellation. Stereo-only
+//   gate (multi-channel layouts don't have a single correlation coefficient).
+const POWER_RATIO_LIMIT: f32 = 16.0;
+const STEREO_CORR_FLOOR: f32 = 0.1;
+const POWER_FLOOR: f32 = 1.0e-12;
+
 fn clean_sample(sample: f32) -> f32 {
     if sample.is_finite() {
         sample.clamp(-1.0, 1.0)
@@ -87,6 +100,11 @@ fn downmix_mono_into(data: &[f32], channels: usize, out: &mut Vec<f32>) {
             return;
         }
 
+        // Single pass: emit the optimistic average while accumulating channel
+        // power. If the imbalance/correlation checks reject averaging we
+        // overwrite the buffer below. The expected case (coherent stereo) is
+        // therefore one pass over `data`.
+        out.reserve(frames);
         let mut left_power = 0.0f32;
         let mut right_power = 0.0f32;
         let mut cross = 0.0f32;
@@ -96,27 +114,20 @@ fn downmix_mono_into(data: &[f32], channels: usize, out: &mut Vec<f32>) {
             left_power += left * left;
             right_power += right * right;
             cross += left * right;
+            out.push(0.5 * (left + right));
         }
 
-        let strongest_channel = if left_power >= right_power { 0 } else { 1 };
         let strongest_power = left_power.max(right_power);
         let weakest_power = left_power.min(right_power);
-        let power_ratio = strongest_power / weakest_power.max(1.0e-12);
-        let stereo_corr = cross / (left_power * right_power).sqrt().max(1.0e-12);
-        let average_channels = power_ratio <= 16.0 && stereo_corr >= 0.1;
+        let power_ratio = strongest_power / weakest_power.max(POWER_FLOOR);
+        let stereo_corr = cross / (left_power * right_power).sqrt().max(POWER_FLOOR);
+        let average_channels = power_ratio <= POWER_RATIO_LIMIT && stereo_corr >= STEREO_CORR_FLOOR;
 
-        out.reserve(frames);
-        if average_channels {
-            out.extend(data.chunks_exact(2).map(|frame| {
-                let left = clean_sample(frame[0]);
-                let right = clean_sample(frame[1]);
-                0.5 * (left + right)
-            }));
-        } else {
-            out.extend(
-                data.chunks_exact(2)
-                    .map(|frame| clean_sample(frame[strongest_channel])),
-            );
+        if !average_channels {
+            let strongest_channel = if left_power >= right_power { 0 } else { 1 };
+            for (slot, frame) in out.iter_mut().zip(data.chunks_exact(2)) {
+                *slot = clean_sample(frame[strongest_channel]);
+            }
         }
         return;
     }
@@ -126,6 +137,9 @@ fn downmix_mono_into(data: &[f32], channels: usize, out: &mut Vec<f32>) {
         return;
     }
     if channels > 32 {
+        // Beyond 32 channels (uncommon — ambisonic / mixdown busses) skip
+        // imbalance detection and average; the fixed-size power array below
+        // would not fit, and these layouts are not realistic capture devices.
         out.extend(
             data.chunks_exact(channels)
                 .map(|frame| frame.iter().map(|&s| clean_sample(s)).sum::<f32>() / channels as f32),
@@ -133,12 +147,20 @@ fn downmix_mono_into(data: &[f32], channels: usize, out: &mut Vec<f32>) {
         return;
     }
 
+    // Same single-pass strategy as the stereo branch: emit the optimistic
+    // average while accumulating per-channel power, then overwrite if the
+    // imbalance check rejects averaging.
     let mut channel_power = [0.0f32; 32];
+    let inv_channels = 1.0 / channels as f32;
+    out.reserve(frames);
     for frame in data.chunks_exact(channels) {
+        let mut sum = 0.0f32;
         for (ch, &sample) in frame.iter().enumerate() {
             let s = clean_sample(sample);
             channel_power[ch] += s * s;
+            sum += s;
         }
+        out.push(sum * inv_channels);
     }
 
     let powers = &channel_power[..channels];
@@ -153,16 +175,11 @@ fn downmix_mono_into(data: &[f32], channels: usize, out: &mut Vec<f32>) {
         })
         .unwrap_or((0, 0.0));
     let weakest_power = powers.iter().copied().fold(f32::INFINITY, f32::min);
-    let power_ratio = strongest_power / weakest_power.max(1.0e-12);
-    let average_channels = power_ratio <= 16.0;
-    out.reserve(frames);
-    for frame in data.chunks_exact(channels) {
-        let sample = if average_channels {
-            frame.iter().map(|&s| clean_sample(s)).sum::<f32>() / channels as f32
-        } else {
-            clean_sample(frame[strongest_channel])
-        };
-        out.push(sample);
+    let power_ratio = strongest_power / weakest_power.max(POWER_FLOOR);
+    if power_ratio > POWER_RATIO_LIMIT {
+        for (slot, frame) in out.iter_mut().zip(data.chunks_exact(channels)) {
+            *slot = clean_sample(frame[strongest_channel]);
+        }
     }
 }
 
