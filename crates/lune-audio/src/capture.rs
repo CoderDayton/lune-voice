@@ -66,6 +66,106 @@ fn convert_u16_samples_into(data: &[u16], out: &mut Vec<f32>) {
     out.extend(data.iter().map(|&s| (s as f32 - 32768.0) / 32768.0));
 }
 
+fn clean_sample(sample: f32) -> f32 {
+    if sample.is_finite() {
+        sample.clamp(-1.0, 1.0)
+    } else {
+        0.0
+    }
+}
+
+fn downmix_mono_into(data: &[f32], channels: usize, out: &mut Vec<f32>) {
+    out.clear();
+    if channels <= 1 {
+        out.extend(data.iter().map(|&s| clean_sample(s)));
+        return;
+    }
+
+    if channels == 2 {
+        let frames = data.len() / 2;
+        if frames == 0 {
+            return;
+        }
+
+        let mut left_power = 0.0f32;
+        let mut right_power = 0.0f32;
+        let mut cross = 0.0f32;
+        for frame in data.chunks_exact(2) {
+            let left = clean_sample(frame[0]);
+            let right = clean_sample(frame[1]);
+            left_power += left * left;
+            right_power += right * right;
+            cross += left * right;
+        }
+
+        let strongest_channel = if left_power >= right_power { 0 } else { 1 };
+        let strongest_power = left_power.max(right_power);
+        let weakest_power = left_power.min(right_power);
+        let power_ratio = strongest_power / weakest_power.max(1.0e-12);
+        let stereo_corr = cross / (left_power * right_power).sqrt().max(1.0e-12);
+        let average_channels = power_ratio <= 16.0 && stereo_corr >= 0.1;
+
+        out.reserve(frames);
+        if average_channels {
+            out.extend(data.chunks_exact(2).map(|frame| {
+                let left = clean_sample(frame[0]);
+                let right = clean_sample(frame[1]);
+                0.5 * (left + right)
+            }));
+        } else {
+            out.extend(
+                data.chunks_exact(2)
+                    .map(|frame| clean_sample(frame[strongest_channel])),
+            );
+        }
+        return;
+    }
+
+    let frames = data.len() / channels;
+    if frames == 0 {
+        return;
+    }
+    if channels > 32 {
+        out.extend(
+            data.chunks_exact(channels)
+                .map(|frame| frame.iter().map(|&s| clean_sample(s)).sum::<f32>() / channels as f32),
+        );
+        return;
+    }
+
+    let mut channel_power = [0.0f32; 32];
+    for frame in data.chunks_exact(channels) {
+        for (ch, &sample) in frame.iter().enumerate() {
+            let s = clean_sample(sample);
+            channel_power[ch] += s * s;
+        }
+    }
+
+    let powers = &channel_power[..channels];
+    let (strongest_channel, strongest_power) = powers
+        .iter()
+        .copied()
+        .enumerate()
+        .max_by(|a, b| {
+            a.1.partial_cmp(&b.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| b.0.cmp(&a.0))
+        })
+        .unwrap_or((0, 0.0));
+    let weakest_power = powers.iter().copied().fold(f32::INFINITY, f32::min);
+    let power_ratio = strongest_power / weakest_power.max(1.0e-12);
+    let average_channels = power_ratio <= 16.0;
+    out.reserve(frames);
+    for frame in data.chunks_exact(channels) {
+        let sample = if average_channels {
+            frame.iter().map(|&s| clean_sample(s)).sum::<f32>() / channels as f32
+        } else {
+            clean_sample(frame[strongest_channel])
+        };
+        out.push(sample);
+    }
+}
+
 impl AudioStream {
     /// Create a new audio stream with the given configuration
     pub fn new(config: AudioConfig) -> Result<Self, AudioError> {
@@ -356,16 +456,10 @@ fn process_audio_callback(
     ring: &RingBuffer<AudioChunk>,
     start_time: Instant,
 ) {
-    // 1. Downmix to mono (simple average) — reuse pre-allocated buffer, zero per-frame alloc.
-    mono_buf.clear();
-    if channels == 1 {
-        mono_buf.extend_from_slice(data);
-    } else {
-        mono_buf.extend(
-            data.chunks_exact(channels)
-                .map(|frame| frame.iter().sum::<f32>() / channels as f32),
-        );
-    }
+    // 1. Downmix to mono. Averaging coherent channels is fine, but some
+    // devices expose antiphase or highly imbalanced channels; in those cases
+    // keep the strongest channel so speech is not attenuated before ASR.
+    downmix_mono_into(data, channels, mono_buf);
 
     // 2. Resample if needed
     if let Some(r) = resampler {
@@ -477,5 +571,29 @@ mod tests {
         assert_eq!(converted[0], -1.0);
         assert_eq!(converted[1], 0.0);
         assert!(converted[2] > 0.99);
+    }
+
+    #[test]
+    fn downmix_averages_coherent_stereo() {
+        let data = [0.2, 0.4, -0.4, -0.2];
+        let mut out = Vec::new();
+        downmix_mono_into(&data, 2, &mut out);
+        assert_eq!(out, vec![0.3, -0.3]);
+    }
+
+    #[test]
+    fn downmix_preserves_antiphase_stereo() {
+        let data = [0.5, -0.5, -0.25, 0.25];
+        let mut out = Vec::new();
+        downmix_mono_into(&data, 2, &mut out);
+        assert_eq!(out, vec![0.5, -0.25]);
+    }
+
+    #[test]
+    fn downmix_uses_strongest_channel_when_imbalanced() {
+        let data = [0.02, 0.6, -0.02, -0.6];
+        let mut out = Vec::new();
+        downmix_mono_into(&data, 2, &mut out);
+        assert_eq!(out, vec![0.6, -0.6]);
     }
 }
