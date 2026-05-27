@@ -82,7 +82,11 @@ impl AppRuntime {
         let settings = load_settings(&paths)?;
         init_ort_runtime();
 
-        let models_ready = lune_persist::has_required_models(&paths.models_dir());
+        let models_ready = lune_persist::has_required_models(
+            &paths.models_dir(),
+            &settings.asr_backend,
+            &settings.llm_backend,
+        );
 
         let (pipeline, llm_service, settings) = if models_ready {
             build_pipeline(paths.clone(), settings).await?

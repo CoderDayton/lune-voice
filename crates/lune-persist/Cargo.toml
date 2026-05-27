@@ -21,7 +21,8 @@ uuid.workspace = true
 thiserror.workspace = true
 hf-hub.workspace = true
 libsqlite3-sys = { version = "0.35", features = ["bundled"] }
-ureq = "3.3.0"
+ureq = { version = "3.3.0", features = ["json"] }
+sha2 = "0.10"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

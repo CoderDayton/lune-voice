@@ -18,25 +18,17 @@ impl SettingsStore {
         Self { path: path.into() }
     }
 
-    /// Load settings from disk. Returns defaults if file doesn't exist
-    /// or cannot be parsed (pre-release migration: old keys like `output_mode`
-    /// will fail to parse, so we fall back gracefully).
+    /// Load settings from disk. Returns defaults when the file doesn't exist.
+    /// A malformed file produces `PersistError::TomlDeserialize` so callers can
+    /// decide between failing the startup, prompting the user, or backing up
+    /// the broken file — silently defaulting was discarding real configuration
+    /// (including API keys) and hiding the underlying problem.
     pub fn load(&self) -> PersistResult<UserSettings> {
         if !self.path.exists() {
             return Ok(UserSettings::default());
         }
         let content = fs::read_to_string(&self.path)?;
-        match toml::from_str(&content) {
-            Ok(settings) => Ok(settings),
-            Err(e) => {
-                tracing::warn!(
-                    error = %e,
-                    path = %self.path.display(),
-                    "failed to parse settings, using defaults"
-                );
-                Ok(UserSettings::default())
-            }
-        }
+        Ok(toml::from_str(&content)?)
     }
 
     /// Save settings atomically (write to temp, then rename).
@@ -102,6 +94,22 @@ mod tests {
             })
             .count();
         assert_eq!(leftovers, 0);
+    }
+
+    #[test]
+    fn load_propagates_toml_parse_errors() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        std::fs::write(&path, b"= not valid = toml ===\n").unwrap();
+
+        let store = SettingsStore::new(&path);
+        let err = store
+            .load()
+            .expect_err("malformed toml must produce an error, not silent defaults");
+        assert!(
+            matches!(err, crate::error::PersistError::TomlDeserialize(_)),
+            "expected TomlDeserialize, got {err:?}",
+        );
     }
 
     #[test]

@@ -24,9 +24,23 @@ pub enum PersistError {
     #[error("row decode error: {0}")]
     RowDecode(String),
 
+    #[error("row encode error: {0}")]
+    RowEncode(String),
+
     #[error("model download: {0}")]
     ModelDownload(String),
 
     #[error("not found: {0}")]
     NotFound(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn row_encode_display() {
+        let e = PersistError::RowEncode("status serialize: bad".into());
+        assert_eq!(e.to_string(), "row encode error: status serialize: bad");
+    }
 }

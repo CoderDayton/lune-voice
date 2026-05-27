@@ -371,16 +371,19 @@ pub async fn download_model_cmd(
     require_window_access(&window, &["main"])?;
     validate_local_name(&local_name)?;
     let app_handle = app.clone();
-    let models_dir = run_persist("download model", move || {
+    let (models_dir, asr_backend, llm_backend) = run_persist("download model", move || {
         let paths = lune_persist::AppPaths::resolve().ok_or("resolve application paths")?;
         let models_dir = paths.models_dir();
+        let settings = lune_persist::SettingsStore::new(paths.settings_file())
+            .load()
+            .map_err(|e| format!("load settings: {e}"))?;
         tracing::info!(local_name, "starting model download");
         match lune_persist::download_model(&models_dir, &local_name, |progress| {
             let _ = app_handle.emit("lune://download-progress", &progress);
         }) {
             Ok(_) => {
                 tracing::info!(local_name, "download complete");
-                Ok(models_dir)
+                Ok((models_dir, settings.asr_backend, settings.llm_backend))
             }
             Err(e) => {
                 tracing::error!(local_name, error = %e, "download failed");
@@ -390,7 +393,7 @@ pub async fn download_model_cmd(
     })
     .await?;
 
-    if lune_persist::has_required_models(&models_dir) {
+    if lune_persist::has_required_models(&models_dir, &asr_backend, &llm_backend) {
         runtime.eager_rebuild().await.ok();
     }
     Ok(())

@@ -287,9 +287,9 @@ impl Database {
     ) -> PersistResult<()> {
         // Serialize small enums — output is typically <20 bytes, stack-friendly.
         let status_str = serde_json::to_string(&session.status)
-            .map_err(|e| PersistError::Migration(e.to_string()))?;
+            .map_err(|e| PersistError::RowEncode(format!("status: {e}")))?;
         let backend_str = serde_json::to_string(&session.backend)
-            .map_err(|e| PersistError::Migration(e.to_string()))?;
+            .map_err(|e| PersistError::RowEncode(format!("backend: {e}")))?;
         // RFC3339 with sub-second precision; fixed-size stack allocation via SmolStr
         // is not available here so we accept the heap String from chrono.
         let started = session.started_at.to_rfc3339();
@@ -315,31 +315,55 @@ impl Database {
 
     /// Aggregate stats across the entire sessions table (not capped by history limits).
     /// Counts only sessions with non-empty transcripts so it matches what the UI shows
-    /// in the recent-sessions list.
+    /// in the recent-sessions list. Rows with malformed timestamps are skipped entirely
+    /// (no count, no words, no seconds) — `julianday()` returns NULL on parse failure,
+    /// which propagates through the CASE and gives us a uniform skip path.
     pub fn session_stats(&mut self) -> PersistResult<SessionStats> {
-        use self::schema::sessions::dsl::*;
+        use diesel::sql_types::{BigInt, Nullable, Text};
 
-        let rows = sessions
-            .select((started_at, ended_at, transcript))
-            .filter(transcript.is_not_null())
-            .load::<(String, Option<String>, Option<String>)>(&mut self.conn)?;
+        #[derive(diesel::QueryableByName)]
+        struct Row {
+            #[diesel(sql_type = Text)]
+            transcript: String,
+            // NULL when ended_at is NULL OR either timestamp is malformed.
+            #[diesel(sql_type = Nullable<BigInt>)]
+            secs: Option<i64>,
+            // 0 when started_at is malformed; non-zero otherwise.
+            #[diesel(sql_type = BigInt)]
+            started_valid: i64,
+        }
+
+        let rows: Vec<Row> = diesel::sql_query(
+            "SELECT \
+                 transcript, \
+                 CASE \
+                     WHEN ended_at IS NULL \
+                          OR julianday(ended_at) IS NULL \
+                          OR julianday(started_at) IS NULL \
+                         THEN NULL \
+                     ELSE CAST(MAX(1, (julianday(ended_at) - julianday(started_at)) * 86400) AS INTEGER) \
+                 END AS secs, \
+                 CASE WHEN julianday(started_at) IS NULL THEN 0 ELSE 1 END AS started_valid \
+             FROM sessions \
+             WHERE transcript IS NOT NULL \
+               AND length(trim(transcript)) > 0",
+        )
+        .load(&mut self.conn)?;
 
         let mut stats = SessionStats::default();
-        for (s_at, e_at, trans) in rows {
-            let Some(text) = trans else { continue };
-            let words = text.split_whitespace().count() as u32;
+        for row in rows {
+            if row.started_valid == 0 {
+                continue;
+            }
+            let words = row.transcript.split_whitespace().count() as u32;
             if words == 0 {
                 continue;
             }
             stats.sessions += 1;
             stats.words += words;
-            if let Some(ended) = e_at {
-                let started = DateTime::parse_from_rfc3339(&s_at).ok();
-                let ended = DateTime::parse_from_rfc3339(&ended).ok();
-                if let (Some(started), Some(ended)) = (started, ended) {
-                    let secs = (ended - started).num_seconds().max(1) as u32;
-                    stats.seconds = stats.seconds.saturating_add(secs);
-                }
+            if let Some(secs) = row.secs {
+                let bounded = secs.max(0).min(i64::from(u32::MAX)) as u32;
+                stats.seconds = stats.seconds.saturating_add(bounded);
             }
         }
         Ok(stats)
@@ -379,7 +403,7 @@ impl Database {
         use self::schema::sessions::dsl::*;
 
         let status_str = serde_json::to_string(&session.status)
-            .map_err(|e| PersistError::Migration(format!("status serialize: {e}")))?;
+            .map_err(|e| PersistError::RowEncode(format!("status: {e}")))?;
         let ended = session.ended_at.map(|t| t.to_rfc3339());
         let id_str = session.id.to_string();
 
@@ -742,6 +766,42 @@ mod tests {
         let id_str = session.id.to_string();
         assert!(db.delete_session(&id_str).unwrap());
         assert!(!db.delete_session(&id_str).unwrap());
+    }
+
+    #[test]
+    fn session_stats_skips_rows_with_malformed_started_at() {
+        use diesel::RunQueryDsl;
+
+        let mut db = Database::open_in_memory().unwrap();
+
+        // Insert a valid completed session via the normal API.
+        let good = DictationSession {
+            id: Uuid::new_v4(),
+            started_at: Utc::now() - chrono::Duration::seconds(10),
+            ended_at: Some(Utc::now()),
+            style: "casual".into(),
+            backend: AsrBackendKind::Qwen3Asr,
+            status: SessionStatus::Completed,
+            transcript: Some("two words".into()),
+        };
+        db.insert_session(&good).unwrap();
+
+        // Inject a session row with a malformed started_at, bypassing the API.
+        diesel::sql_query(
+            "INSERT INTO sessions (id, started_at, ended_at, style, backend, status, transcript, created_at) \
+             VALUES ('bad-uuid', 'not-a-date', '2024-01-01T00:00:00Z', 'casual', '\"Qwen3Asr\"', '\"Completed\"', 'three words here', datetime('now'))",
+        )
+        .execute(&mut db.conn)
+        .unwrap();
+
+        let stats = db.session_stats().unwrap();
+        // The malformed row must be skipped entirely — not counted in sessions, words, or seconds.
+        assert_eq!(stats.sessions, 1, "only the well-formed session counts");
+        assert_eq!(stats.words, 2, "words from malformed row must not be added");
+        assert!(
+            stats.seconds >= 1,
+            "seconds from well-formed session counted"
+        );
     }
 
     #[test]

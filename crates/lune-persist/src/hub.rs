@@ -1,8 +1,11 @@
+use std::collections::HashMap;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use hf_hub::api::sync::{Api, ApiBuilder, ApiRepo};
 use lune_core::config::AsrBackendConfig;
-use tracing::info;
+use sha2::{Digest, Sha256};
+use tracing::{info, warn};
 
 use lune_core::models as model_dirs;
 
@@ -53,12 +56,6 @@ pub struct DownloadProgress {
     pub file_index: usize,
     pub file_count: usize,
     pub done: bool,
-}
-
-/// Resolved local model paths.
-pub struct ResolvedModels {
-    pub asr_model_dir: PathBuf,
-    pub style_llm_dir: PathBuf,
 }
 
 impl ModelSpec {
@@ -162,25 +159,50 @@ impl ModelSpec {
     }
 }
 
-/// Returns true if every model marked `required` is fully present locally.
-pub fn has_required_models(models_dir: &Path) -> bool {
+/// Returns true if every local model the active config depends on is present.
+///
+/// Remote backends (e.g. OpenAI-compatible) need no local files, so a fully-remote
+/// configuration trivially satisfies this check even with an empty models directory.
+pub fn has_required_models(
+    models_dir: &Path,
+    asr_backend: &AsrBackendConfig,
+    llm_backend: &lune_core::config::LlmBackendConfig,
+) -> bool {
     ModelSpec::all()
         .iter()
-        .filter(|s| s.required())
+        .filter(|s| spec_needed(s, asr_backend, llm_backend))
         .all(|s| s.is_ready(models_dir))
 }
 
 /// Check which models are needed for the current config. Returns status of each.
-/// Does NOT download anything.
+/// Does NOT download anything. Specs whose backend is remote (or disabled) are
+/// excluded from the result so the UI doesn't push users to download models they
+/// won't use.
 pub fn check_model_status(
     models_dir: &Path,
-    _asr_backend: &AsrBackendConfig,
-    _llm_backend: &lune_core::config::LlmBackendConfig,
+    asr_backend: &AsrBackendConfig,
+    llm_backend: &lune_core::config::LlmBackendConfig,
 ) -> Vec<ModelStatus> {
     ModelSpec::all()
-        .iter()
+        .into_iter()
+        .filter(|spec| spec_needed(spec, asr_backend, llm_backend))
         .map(|spec| spec.to_status(models_dir))
         .collect()
+}
+
+/// Whether `spec` corresponds to a local model the active backend selection uses.
+fn spec_needed(
+    spec: &ModelSpec,
+    asr: &AsrBackendConfig,
+    llm: &lune_core::config::LlmBackendConfig,
+) -> bool {
+    use lune_core::config::LlmBackendConfig;
+
+    match spec.local_name() {
+        n if n == model_dirs::DIR_QWEN3_ASR => matches!(asr, AsrBackendConfig::Qwen3Asr { .. }),
+        n if n == model_dirs::DIR_STYLE_LLM => matches!(llm, LlmBackendConfig::Local { .. }),
+        _ => spec.required(),
+    }
 }
 
 /// Delete a downloaded model by local_name. Returns Ok(true) if removed,
@@ -279,6 +301,105 @@ impl ModelHub {
     }
 }
 
+/// What we know about a remote file before/after download. `size` is the
+/// authoritative byte count from the HF tree API; `sha256` is the LFS content
+/// hash when the file is LFS-tracked (typically the large model files we most
+/// care about validating). Both are optional — non-LFS small files like
+/// `config.json` are reported by HF with `size` but no sha256.
+#[derive(Debug, Default, Clone)]
+struct FileMetadata {
+    size: Option<u64>,
+    sha256: Option<String>,
+}
+
+/// True when `path` looks like a complete download of `meta`.
+///
+/// - With a known size, the file must match exactly (no partial-write tolerance).
+/// - With a known sha256, the file's hash must match.
+/// - With neither, accept any non-empty file (legacy behaviour for callers
+///   that don't have HF metadata yet).
+fn local_file_complete(path: &Path, meta: &FileMetadata) -> bool {
+    let Ok(file_meta) = path.metadata() else {
+        return false;
+    };
+    if !file_meta.is_file() {
+        return false;
+    }
+    let len = file_meta.len();
+    match (meta.size, meta.sha256.as_deref()) {
+        (Some(expected), _) if len != expected => false,
+        (None, None) if len == 0 => false,
+        (_, Some(expected)) => sha256_of_file(path)
+            .map(|got| got.eq_ignore_ascii_case(expected))
+            .unwrap_or(false),
+        _ => true,
+    }
+}
+
+/// Stream-hash a file with SHA-256; returns lowercase hex.
+fn sha256_of_file(path: &Path) -> std::io::Result<String> {
+    let mut file = std::fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buf = [0u8; 64 * 1024];
+    loop {
+        let n = file.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+/// Fetch per-file size + LFS sha256 from the HF tree API.
+///
+/// Returns an empty map on any failure — callers fall back to the size-less
+/// behaviour rather than blocking downloads when HF is unreachable or rate-limits
+/// us. We log the failure once per repo at WARN so it's visible in support logs.
+fn fetch_repo_file_metadata(repo_id: &str) -> HashMap<String, FileMetadata> {
+    let url = format!("https://huggingface.co/api/models/{repo_id}/tree/main?recursive=true");
+    let mut req = ureq::get(&url);
+    if let Ok(token) = std::env::var("HF_TOKEN") {
+        req = req.header("Authorization", &format!("Bearer {token}"));
+    }
+    let entries: Vec<TreeEntry> = match req.call().and_then(|mut r| r.body_mut().read_json()) {
+        Ok(v) => v,
+        Err(e) => {
+            warn!(repo_id, error = %e, "could not fetch repo tree metadata; falling back to size-less integrity check");
+            return HashMap::new();
+        }
+    };
+    entries
+        .into_iter()
+        .filter(|e| e.entry_type == "file")
+        .map(|e| {
+            let sha = e.lfs.as_ref().map(|l| l.oid.clone());
+            (
+                e.path,
+                FileMetadata {
+                    size: Some(e.size),
+                    sha256: sha,
+                },
+            )
+        })
+        .collect()
+}
+
+#[derive(serde::Deserialize)]
+struct TreeEntry {
+    #[serde(rename = "type")]
+    entry_type: String,
+    path: String,
+    size: u64,
+    #[serde(default)]
+    lfs: Option<TreeEntryLfs>,
+}
+
+#[derive(serde::Deserialize)]
+struct TreeEntryLfs {
+    oid: String,
+}
+
 /// Hard-link `src` → `dst`; on EXDEV fall back to byte copy.
 ///
 /// Hard links are instantaneous and consume no additional disk space when
@@ -288,8 +409,7 @@ impl ModelHub {
 fn link_or_copy(src: &Path, dst: &Path) -> std::io::Result<()> {
     match std::fs::hard_link(src, dst) {
         Ok(()) => Ok(()),
-        Err(e) if e.raw_os_error() == Some(18) => {
-            // EXDEV: cross-device link
+        Err(e) if e.kind() == std::io::ErrorKind::CrossesDevices => {
             std::fs::copy(src, dst).map(|_| ())
         }
         Err(e) => Err(e),
@@ -308,9 +428,9 @@ fn download_file_direct(repo_id: &str, filename: &str, dst: &Path) -> PersistRes
     if let Ok(token) = std::env::var("HF_TOKEN") {
         req = req.header("Authorization", &format!("Bearer {token}"));
     }
-    let resp = req.call().map_err(|_| {
-        PersistError::ModelDownload(format!("{repo_id}/{filename}: HTTP request failed"))
-    })?;
+    let resp = req
+        .call()
+        .map_err(|e| PersistError::ModelDownload(format!("{repo_id}/{filename}: {e}")))?;
 
     let tmp = dst.with_extension("dl.tmp");
     {
@@ -325,54 +445,8 @@ fn download_file_direct(repo_id: &str, filename: &str, dst: &Path) -> PersistRes
     Ok(())
 }
 
-/// Download default models if not already present.
-///
-/// Only the ASR model selected by `asr_backend` is downloaded.
-///
-/// Layout after completion:
-/// ```text
-/// models_dir/
-///   parakeet-tdt-0.6b/
-///     encoder-model.int8.onnx
-///     decoder_joint-model.int8.onnx
-///     vocab.txt
-///   qwen3-asr-0.6b/
-///     model.safetensors
-///     vocab.json
-///     merges.txt
-///   Qwen3-0.6B-Q4_K_M.gguf
-///   .hub-cache/          (hf_hub internal cache)
-/// ```
-pub fn ensure_default_models(
-    models_dir: &Path,
-    asr_backend: &AsrBackendConfig,
-) -> PersistResult<ResolvedModels> {
-    let hub_cache = models_dir.join(".hub-cache");
-    let hub = ModelHub::new(&hub_cache)?;
-
-    let asr_spec = match asr_backend {
-        AsrBackendConfig::Qwen3Asr { .. } => ModelSpec::qwen3_asr(),
-        AsrBackendConfig::OpenAiCompatible { .. } | _ => ModelSpec::qwen3_asr(),
-    };
-    let asr_model_dir = ensure_directory_model(&hub, &asr_spec, models_dir)?;
-    let style_llm_dir = ensure_directory_model(&hub, &ModelSpec::style_llm(), models_dir)?;
-
-    Ok(ResolvedModels {
-        asr_model_dir,
-        style_llm_dir,
-    })
-}
-
-/// Ensure a directory-type model is present at `models_dir/<local_name>/`.
-fn ensure_directory_model(
-    hub: &ModelHub,
-    spec: &ModelSpec,
-    models_dir: &Path,
-) -> PersistResult<PathBuf> {
-    ensure_directory_model_with_progress(hub, spec, models_dir, |_, _, _| {})
-}
-
-/// Like `ensure_directory_model` but calls `on_file` for each file downloaded.
+/// Ensure a directory-type model is present at `models_dir/<local_name>/`,
+/// downloading any missing files and reporting per-file progress.
 fn ensure_directory_model_with_progress(
     hub: &ModelHub,
     spec: &ModelSpec,
@@ -389,7 +463,14 @@ fn ensure_directory_model_with_progress(
 
     let local_dir = models_dir.join(local_name);
 
-    if local_dir.exists() && required_files.iter().all(|f| local_dir.join(f).is_file()) {
+    // Fetch authoritative size + LFS sha256 once per ensure call. Empty on failure.
+    let remote_meta = fetch_repo_file_metadata(repo_id);
+
+    if local_dir.exists()
+        && required_files.iter().all(|f| {
+            local_file_complete(&local_dir.join(file_basename(f)), meta_for(&remote_meta, f))
+        })
+    {
         info!(path = %local_dir.display(), "model directory already present");
         return Ok(local_dir);
     }
@@ -411,40 +492,46 @@ fn ensure_directory_model_with_progress(
         .map_err(|e| PersistError::ModelDownload(format!("create dir: {e}")))?;
 
     for (idx, filename) in files_to_download.iter().enumerate() {
-        // Flatten nested paths: "onnx/model.onnx" → "model.onnx" locally
-        let local_name = Path::new(filename)
-            .file_name()
-            .ok_or_else(|| PersistError::ModelDownload(format!("invalid filename: {filename}")))?;
-        let dst = local_dir.join(local_name);
-        if dst.is_file() && dst.metadata().map(|m| m.len() > 0).unwrap_or(false) {
+        // Flatten nested paths: "onnx/model.onnx" → "model.onnx" locally.
+        let basename = file_basename(filename);
+        let dst = local_dir.join(basename);
+        let meta = meta_for(&remote_meta, filename);
+        if local_file_complete(&dst, meta) {
             on_file(filename, idx, total);
             continue;
         }
+        // Any stale partial from a prior run is dropped before re-downloading.
+        let _ = std::fs::remove_file(&dst);
         on_file(filename, idx, total);
 
-        // Try hf_hub cache; fall back to direct HTTPS for Xet-backed repos
-        let ok = repo
+        // Try hf_hub cache; fall back to direct HTTPS for Xet-backed repos.
+        let linked = repo
             .get(filename)
             .ok()
             .and_then(|p| p.canonicalize().ok())
-            .filter(|src| src.metadata().map(|m| m.len() > 0).unwrap_or(false))
+            .filter(|src| local_file_complete(src, meta))
             .and_then(|src| link_or_copy(&src, &dst).ok())
             .is_some();
-        if !ok {
+        if !linked {
             let _ = std::fs::remove_file(&dst);
             download_file_direct(repo_id, filename, &dst)?;
+        }
+
+        // Post-download verification — if we have remote metadata, the final file
+        // must match. Mismatch indicates a corrupted CDN response or a mid-stream
+        // failure that left bytes on disk; refuse rather than ship a broken model.
+        if !local_file_complete(&dst, meta) {
+            let _ = std::fs::remove_file(&dst);
+            return Err(PersistError::ModelDownload(format!(
+                "{repo_id}/{filename}: downloaded file failed integrity check (size/sha mismatch)"
+            )));
         }
     }
 
     let missing: Vec<&str> = required_files
         .iter()
         .map(String::as_str)
-        .filter(|filename| {
-            let local_name = Path::new(filename)
-                .file_name()
-                .is_some_and(|name| local_dir.join(name).is_file());
-            !local_name
-        })
+        .filter(|filename| !local_dir.join(file_basename(filename)).is_file())
         .collect();
     if !missing.is_empty() {
         return Err(PersistError::ModelDownload(format!(
@@ -458,9 +545,145 @@ fn ensure_directory_model_with_progress(
     Ok(local_dir)
 }
 
+/// Flatten a possibly-nested HF repo path (`onnx/model.onnx`) to the last segment.
+/// Falls back to the original string if it ends in a separator (shouldn't happen
+/// for file entries, but keeps the call infallible at the use sites).
+fn file_basename(filename: &str) -> &str {
+    Path::new(filename)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or(filename)
+}
+
+fn meta_for<'a>(map: &'a HashMap<String, FileMetadata>, filename: &str) -> &'a FileMetadata {
+    static EMPTY: FileMetadata = FileMetadata {
+        size: None,
+        sha256: None,
+    };
+    map.get(filename).unwrap_or(&EMPTY)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lune_core::config::{AsrBackendConfig, LlmBackendConfig};
+
+    fn fake_openai_asr() -> AsrBackendConfig {
+        AsrBackendConfig::OpenAiCompatible {
+            base_url: "https://example.com/v1".parse().unwrap(),
+            api_key: lune_core::config::RedactedString::new("test-key"),
+            model: "whisper".into(),
+            streaming: lune_core::config::StreamingMode::HttpPolling,
+        }
+    }
+
+    #[test]
+    fn check_model_status_returns_nothing_when_all_backends_are_remote() {
+        let tmp = tempfile::tempdir().unwrap();
+        let statuses =
+            check_model_status(tmp.path(), &fake_openai_asr(), &LlmBackendConfig::Disabled);
+        assert!(
+            statuses.is_empty(),
+            "no local models needed when ASR is remote and LLM is disabled, got {statuses:?}"
+        );
+    }
+
+    #[test]
+    fn check_model_status_includes_only_asr_when_llm_disabled() {
+        let tmp = tempfile::tempdir().unwrap();
+        let statuses = check_model_status(
+            tmp.path(),
+            &AsrBackendConfig::Qwen3Asr {},
+            &LlmBackendConfig::Disabled,
+        );
+        assert_eq!(statuses.len(), 1);
+        assert_eq!(statuses[0].local_name, lune_core::models::DIR_QWEN3_ASR);
+    }
+
+    #[test]
+    fn check_model_status_includes_both_when_local_asr_and_local_llm() {
+        let tmp = tempfile::tempdir().unwrap();
+        let statuses = check_model_status(
+            tmp.path(),
+            &AsrBackendConfig::Qwen3Asr {},
+            &LlmBackendConfig::Local {},
+        );
+        let names: Vec<&str> = statuses.iter().map(|s| s.local_name.as_str()).collect();
+        assert!(
+            names.contains(&lune_core::models::DIR_QWEN3_ASR),
+            "{names:?}"
+        );
+        assert!(
+            names.contains(&lune_core::models::DIR_STYLE_LLM),
+            "{names:?}"
+        );
+    }
+
+    #[test]
+    fn local_file_complete_accepts_matching_size() {
+        let tmp = tempfile::tempdir().unwrap();
+        let p = tmp.path().join("a.bin");
+        std::fs::write(&p, b"hello").unwrap();
+        let meta = FileMetadata {
+            size: Some(5),
+            sha256: None,
+        };
+        assert!(local_file_complete(&p, &meta));
+    }
+
+    #[test]
+    fn local_file_complete_rejects_size_mismatch() {
+        let tmp = tempfile::tempdir().unwrap();
+        let p = tmp.path().join("a.bin");
+        std::fs::write(&p, b"hello").unwrap();
+        let meta = FileMetadata {
+            size: Some(99),
+            sha256: None,
+        };
+        assert!(
+            !local_file_complete(&p, &meta),
+            "wrong-sized file must be rejected"
+        );
+    }
+
+    #[test]
+    fn local_file_complete_validates_sha256_when_present() {
+        let tmp = tempfile::tempdir().unwrap();
+        let p = tmp.path().join("a.bin");
+        std::fs::write(&p, b"hello").unwrap();
+        // sha256("hello") = 2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824
+        let meta = FileMetadata {
+            size: Some(5),
+            sha256: Some("2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824".into()),
+        };
+        assert!(local_file_complete(&p, &meta));
+
+        let wrong = FileMetadata {
+            size: Some(5),
+            sha256: Some("0000000000000000000000000000000000000000000000000000000000000000".into()),
+        };
+        assert!(
+            !local_file_complete(&p, &wrong),
+            "wrong sha must be rejected even when size matches"
+        );
+    }
+
+    #[test]
+    fn local_file_complete_falls_back_to_size_only_when_no_metadata() {
+        let tmp = tempfile::tempdir().unwrap();
+        let p = tmp.path().join("a.bin");
+        std::fs::write(&p, b"hello").unwrap();
+        let meta = FileMetadata {
+            size: None,
+            sha256: None,
+        };
+        // No metadata → accept any non-empty file (legacy behaviour).
+        assert!(local_file_complete(&p, &meta));
+
+        let empty = tmp.path().join("empty.bin");
+        std::fs::write(&empty, b"").unwrap();
+        assert!(!local_file_complete(&empty, &meta), "empty file rejected");
+    }
 
     #[test]
     fn hub_constructs_with_valid_dir() {
@@ -468,20 +691,5 @@ mod tests {
         let hub_cache = tmp.path().join(".hub-cache");
         let hub = ModelHub::new(&hub_cache);
         assert!(hub.is_ok());
-    }
-
-    #[test]
-    #[ignore] // Requires network — run with `cargo test -- --ignored`
-    fn integration_download_parakeet() {
-        let tmp = tempfile::tempdir().unwrap();
-        let models_dir = tmp.path();
-        let defaults = lune_core::config::UserSettings::default();
-
-        let resolved = ensure_default_models(models_dir, &defaults.asr_backend).unwrap();
-        assert!(resolved.asr_model_dir.exists());
-
-        // Second call should be instant (already present).
-        let resolved2 = ensure_default_models(models_dir, &defaults.asr_backend).unwrap();
-        assert_eq!(resolved.asr_model_dir, resolved2.asr_model_dir);
     }
 }
