@@ -53,7 +53,36 @@ fn validate_config(config: &AudioConfig) -> Result<(), AudioError> {
             "chunk_duration_ms must be greater than 0".into(),
         ));
     }
+    if config.buffer_capacity == 0 {
+        return Err(AudioError::StreamBuild(
+            "buffer_capacity must be greater than 0".into(),
+        ));
+    }
+    // Catch overflow up front so the audio thread never panics on a
+    // misconfigured rate × duration combination. computed_chunk_samples
+    // also doubles as the validity check for the result being > 0.
+    let _ = computed_chunk_samples(config)?;
     Ok(())
+}
+
+/// Resolve `target_sample_rate × chunk_duration_ms / 1000` as a usize,
+/// surfacing overflow as a `StreamBuild` error rather than panicking on
+/// the audio thread. Casting to usize before multiplying widens to 64 bits
+/// on common targets and elides u32 overflow; `checked_mul` covers 32-bit.
+fn computed_chunk_samples(config: &AudioConfig) -> Result<usize, AudioError> {
+    let rate = config.target_sample_rate as usize;
+    let dur_ms = config.chunk_duration_ms as usize;
+    let samples = rate
+        .checked_mul(dur_ms)
+        .and_then(|n| n.checked_div(1000))
+        .filter(|&n| n > 0)
+        .ok_or_else(|| {
+            AudioError::StreamBuild(format!(
+                "chunk_samples is invalid for rate={} Hz × duration={} ms",
+                config.target_sample_rate, config.chunk_duration_ms
+            ))
+        })?;
+    Ok(samples)
 }
 
 fn convert_i16_samples_into(data: &[i16], out: &mut Vec<f32>) {
@@ -212,14 +241,17 @@ impl AudioStream {
         );
 
         // Build stream config
-        let chunk_samples = (config.target_sample_rate * config.chunk_duration_ms / 1000) as usize;
+        let chunk_samples = computed_chunk_samples(&config)?;
         let stream_config = StreamConfig {
             channels,
             sample_rate: native_sample_rate,
             buffer_size: BufferSize::Default,
         };
 
-        let ring = Arc::new(RingBuffer::new(config.buffer_capacity));
+        let ring = Arc::new(
+            RingBuffer::new(config.buffer_capacity)
+                .map_err(|e| AudioError::StreamBuild(e.into()))?,
+        );
         let ring_clone = Arc::clone(&ring);
 
         let target_rate = config.target_sample_rate;
@@ -340,11 +372,12 @@ impl AudioStream {
     /// Useful for integration tests and offline file processing.
     pub fn from_samples(samples: &[f32], config: AudioConfig) -> Result<Self, AudioError> {
         validate_config(&config)?;
-        let chunk_samples = (config.target_sample_rate * config.chunk_duration_ms / 1000) as usize;
+        let chunk_samples = computed_chunk_samples(&config)?;
         // Auto-size buffer to fit all chunks so nothing is dropped.
         let num_chunks = samples.len().div_ceil(chunk_samples);
         let capacity = num_chunks.max(config.buffer_capacity);
-        let ring = Arc::new(RingBuffer::new(capacity));
+        let ring =
+            Arc::new(RingBuffer::new(capacity).map_err(|e| AudioError::StreamBuild(e.into()))?);
         let mut offset_ms = 0u64;
         for chunk in samples.chunks(chunk_samples) {
             ring.push(AudioChunk {
@@ -570,6 +603,40 @@ mod tests {
         .err()
         .unwrap();
         assert!(err.to_string().contains("target_sample_rate"));
+    }
+
+    /// Regression: a zero ring buffer would silently drop every chunk the
+    /// audio callback pushed. `validate_config` must reject it up front
+    /// — both audio-device construction and `from_samples` rely on this
+    /// single source of truth.
+    #[test]
+    fn validate_config_rejects_zero_buffer_capacity() {
+        let err = validate_config(&AudioConfig {
+            buffer_capacity: 0,
+            ..AudioConfig::default()
+        })
+        .unwrap_err();
+        assert!(err.to_string().contains("buffer_capacity"), "got: {err}");
+    }
+
+    /// Regression: `target_sample_rate × chunk_duration_ms / 1000` can
+    /// truncate to zero for low rates × short durations (e.g. 500 Hz × 1 ms).
+    /// `validate_config` must catch this — otherwise the audio thread
+    /// later panics on `chunks_exact(0)` or pushes empty buffers into
+    /// the ring forever.
+    #[test]
+    fn validate_config_rejects_chunk_samples_truncating_to_zero() {
+        let err = validate_config(&AudioConfig {
+            target_sample_rate: 500,
+            chunk_duration_ms: 1,
+            ..AudioConfig::default()
+        })
+        .unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("chunk_samples"),
+            "expected message to mention chunk_samples; got: {msg}"
+        );
     }
 
     #[test]

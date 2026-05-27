@@ -139,14 +139,9 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         event_tx: mpsc::Sender<SessionEvent>,
         audio_override: SessionAudio,
     ) -> Result<Uuid> {
-        let mut lock = self.active.lock().await;
-        if lock.is_some() {
-            return Err(Error::Session("session already active".into()));
-        }
-
-        let session_id = Uuid::new_v4();
-        let (control_tx, control_rx) = mpsc::unbounded_channel();
-
+        // Resolve style preset BEFORE touching the active lock — a missing
+        // style is a config error, not a session-state error, and we don't
+        // want to mark the session active just to fail validation.
         let (current_style_id, custom_styles) = {
             let settings = self.settings.read().await;
             (
@@ -164,6 +159,22 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             })
             .or_else(|| builtin_registry().get("minimal"))
             .ok_or_else(|| Error::Config("no usable style preset found".into()))?;
+
+        // Hold the active lock across persist + spawn and only assign
+        // `*lock = Some(...)` at the very end. Cancellation safety
+        // relies on the `MutexGuard` auto-dropping on early return:
+        // if `start_inner` is wrapped in `tokio::time::timeout` and
+        // cancelled at any await below, the slot stays `None` and a
+        // subsequent start succeeds. Style resolution is intentionally
+        // outside the lock so a config error returns without
+        // contending with concurrent stop/cancel callers.
+        let mut lock = self.active.lock().await;
+        if lock.is_some() {
+            return Err(Error::Session("session already active".into()));
+        }
+
+        let session_id = Uuid::new_v4();
+        let (control_tx, control_rx) = mpsc::unbounded_channel();
 
         {
             let session = DictationSession {
@@ -213,9 +224,12 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         tokio::task::spawn(async move {
             if handle.await.is_err() {
                 tracing::error!(%session_id, "session task panicked — forcing cleanup");
-                let _ = event_tx_guard
+                if let Err(e) = event_tx_guard
                     .send(SessionEvent::Error("internal session panic".into()))
-                    .await;
+                    .await
+                {
+                    warn!(error = %e, %session_id, "could not deliver panic error to listener");
+                }
                 clear_active(&active_arc_guard, &idle_notify_guard).await;
             }
         });
@@ -232,7 +246,9 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let lock = self.active.lock().await;
         if let Some(handle) = lock.as_ref() {
             debug!(session_id = %handle.session_id, "sending stop signal");
-            let _ = handle.control_tx.send(SessionControl::Stop);
+            if let Err(e) = handle.control_tx.send(SessionControl::Stop) {
+                debug!(error = %e, session_id = %handle.session_id, "stop signal not delivered — session task already exited");
+            }
         }
     }
 
@@ -251,7 +267,9 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
                     let notified = self.idle_notify.notified();
                     let mut boxed = Box::pin(notified);
                     boxed.as_mut().enable();
-                    let _ = handle.control_tx.send(SessionControl::Stop);
+                    if let Err(e) = handle.control_tx.send(SessionControl::Stop) {
+                        debug!(error = %e, session_id = %handle.session_id, "stop signal not delivered — session task already exited");
+                    }
                     Some(boxed)
                 }
                 None => None,
@@ -267,7 +285,9 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let lock = self.active.lock().await;
         if let Some(handle) = lock.as_ref() {
             debug!(session_id = %handle.session_id, "sending cancel signal");
-            let _ = handle.control_tx.send(SessionControl::Cancel);
+            if let Err(e) = handle.control_tx.send(SessionControl::Cancel) {
+                debug!(error = %e, session_id = %handle.session_id, "cancel signal not delivered — session task already exited");
+            }
         }
     }
 
@@ -327,12 +347,18 @@ fn append_segments(
     appended
 }
 
+// Drain any control signals that arrived during post-VAD processing.
+//
+// Stop is intentionally ignored here: recording has already ended, so a
+// Stop request just means "wrap up" — letting processing finish and
+// delivering the transcript is the user-visible win. Only Cancel
+// discards the partial result.
 fn drain_processing_controls(
     control_rx: &mut mpsc::UnboundedReceiver<SessionControl>,
     cancelled: &mut bool,
 ) {
     while let Ok(control) = control_rx.try_recv() {
-        if matches!(control, SessionControl::Stop | SessionControl::Cancel) {
+        if matches!(control, SessionControl::Cancel) {
             *cancelled = true;
         }
     }
@@ -389,11 +415,32 @@ async fn run_session<A: AsrBackend + 'static>(
         },
     };
 
-    let asr_session = match asr.start_session(config.asr_config.clone()).await {
-        Ok(s) => s,
-        Err(e) => {
+    // Hard ceiling on ASR backend init. A hung Qwen3/Parakeet ONNX session
+    // would otherwise block the session forever — caller would never see
+    // an error event, hotkey would feel broken until process restart.
+    const ASR_START_TIMEOUT: Duration = Duration::from_secs(15);
+    let asr_session = match tokio::time::timeout(
+        ASR_START_TIMEOUT,
+        asr.start_session(config.asr_config.clone()),
+    )
+    .await
+    {
+        Ok(Ok(s)) => s,
+        Ok(Err(e)) => {
             fail_init(
                 &e,
+                session_id,
+                &event_tx,
+                &persist,
+                &active_arc,
+                &idle_notify,
+            )
+            .await;
+            return;
+        }
+        Err(_) => {
+            fail_init(
+                &format!("ASR backend did not initialize within {ASR_START_TIMEOUT:?}"),
                 session_id,
                 &event_tx,
                 &persist,
@@ -876,10 +923,11 @@ async fn process_and_deliver(
     } else {
         Some(post_llm_text)
     };
+    // Await the DB finalize inline so a runtime shutdown between here and
+    // the next tick can't drop the transcript. The lock is short-held and
+    // sqlite writes are sync, so worst-case added latency is ~10ms.
     let ended_at = Some(Utc::now());
-    tokio::spawn(async move {
-        finalize_db(session_id, persist, status, ended_at, transcript).await;
-    });
+    finalize_db(session_id, persist, status, ended_at, transcript).await;
 
     let _ = event_tx.send(SessionEvent::Stopped).await;
     clear_active(&active_arc, &idle_notify).await;
@@ -1422,6 +1470,83 @@ mod tests {
                     .uncertain_words
                     .iter()
                     .any(|(word, _)| word.eq_ignore_ascii_case("interesting")));
+            })
+            .await;
+    }
+
+    /// Regression: a `Stop` arriving during post-VAD processing means
+    /// "wrap up and deliver the partial transcript" — it must NOT mark
+    /// the session as cancelled. An earlier version matched both
+    /// `Stop | Cancel`, dropping transcripts when the user released
+    /// the hotkey while the LLM/post-processing was still running.
+    #[test]
+    fn drain_processing_controls_ignores_stop() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<SessionControl>();
+        tx.send(SessionControl::Stop).unwrap();
+        tx.send(SessionControl::Stop).unwrap();
+        let mut cancelled = false;
+        drain_processing_controls(&mut rx, &mut cancelled);
+        assert!(
+            !cancelled,
+            "Stop during post-VAD processing must leave cancelled = false"
+        );
+    }
+
+    /// Regression: `Cancel` during processing must still flip the
+    /// cancelled flag even when interleaved with `Stop` signals.
+    #[test]
+    fn drain_processing_controls_marks_cancel() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<SessionControl>();
+        tx.send(SessionControl::Stop).unwrap();
+        tx.send(SessionControl::Cancel).unwrap();
+        tx.send(SessionControl::Stop).unwrap();
+        let mut cancelled = false;
+        drain_processing_controls(&mut rx, &mut cancelled);
+        assert!(
+            cancelled,
+            "Cancel during processing must flip cancelled to true"
+        );
+    }
+
+    /// Regression: `start_inner` must remain cancellation-safe. If the
+    /// future is dropped while it is parked on the persist write (e.g.
+    /// wrapped in `tokio::time::timeout`), the active slot must not
+    /// stay populated — otherwise no future session can ever start and
+    /// `SessionManager` is permanently wedged.
+    #[tokio::test]
+    async fn start_is_cancellation_safe_during_persist() {
+        local_set()
+            .run_until(async {
+                let (mgr, db) = make_manager(scripted_asr(vec![]), Arc::new(EchoPostProcessor));
+
+                // Hold the persist lock so the persist write inside start_inner
+                // parks. The exact phase doesn't matter — we just need a
+                // suspension point that the timeout can land in.
+                let persist_guard = db.lock().await;
+
+                let (tx, _rx) = mpsc::channel(16);
+                let start_fut = mgr.start_with_audio(tx, speech_stream());
+                let timed = tokio::time::timeout(Duration::from_millis(50), start_fut).await;
+                assert!(
+                    timed.is_err(),
+                    "expected start_inner to be cancelled by timeout"
+                );
+
+                drop(persist_guard);
+
+                assert!(
+                    mgr.active_session_id().await.is_none(),
+                    "cancelled start left active = Some; SessionManager is wedged"
+                );
+
+                let (tx2, rx2) = mpsc::channel(16);
+                let id = mgr
+                    .start_with_audio(tx2, speech_stream())
+                    .await
+                    .expect("subsequent start should succeed after cancellation");
+                assert!(!id.is_nil());
+                mgr.stop_and_wait().await;
+                let _ = collect_events(rx2).await;
             })
             .await;
     }

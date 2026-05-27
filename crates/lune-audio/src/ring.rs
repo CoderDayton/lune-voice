@@ -17,14 +17,16 @@ pub struct RingBuffer<T> {
 }
 
 impl<T> RingBuffer<T> {
-    pub fn new(capacity: usize) -> Self {
-        assert!(capacity > 0, "ring buffer capacity must be > 0");
+    pub fn new(capacity: usize) -> Result<Self, &'static str> {
+        if capacity == 0 {
+            return Err("ring buffer capacity must be > 0");
+        }
         let (tx, rx) = bounded(capacity);
-        Self {
+        Ok(Self {
             tx,
             rx,
             notify: Notify::new(),
-        }
+        })
     }
 
     /// Push an item. If full, evicts the oldest item first.

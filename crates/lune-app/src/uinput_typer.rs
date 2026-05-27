@@ -12,13 +12,73 @@
 
 use std::{
     fs::OpenOptions,
-    process::Command,
+    process::{Command, Output, Stdio},
     time::{Duration, Instant},
 };
 
 use evdev::{AttributeSet, EventType, InputEvent, KeyCode, uinput::VirtualDevice};
 use lune_core::config::TerminalMode;
 use tracing::{debug, info, warn};
+
+// Hard ceiling on every compositor / IPC subprocess we spawn during delivery.
+// These tools normally return in single-digit ms; anything beyond means the
+// daemon is wedged and we'd rather fall through than stall paste.
+//
+// `capture_focus_target` and `active_class_for_terminal_detection` may try
+// several backends in sequence (Hyprland → Sway → KDE → GNOME → X11), so the
+// worst-case latency on a system where every gating env var is set AND every
+// daemon is wedged is bounded by N × SUBPROCESS_TIMEOUT. In practice only one
+// backend matches per session, so the typical worst case is one timeout.
+const SUBPROCESS_TIMEOUT: Duration = Duration::from_secs(1);
+
+// Clipboard tooling gets a slightly looser budget because wl-copy/xclip
+// have to round-trip through the compositor's clipboard manager.
+const CLIPBOARD_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// Spawn `cmd` with `args`, collect stdout/stderr, kill if it doesn't finish
+/// within `timeout`. Returns `None` on spawn failure or timeout.
+///
+/// `try_wait` polling at 10ms; the upper bound on overshoot is ~10ms. We
+/// must close stdin (Stdio::null) so children that read stdin don't block.
+fn output_with_timeout(cmd: &str, args: &[&str], timeout: Duration) -> Option<Output> {
+    let mut child = Command::new(cmd)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .ok()?;
+
+    let deadline = Instant::now() + timeout;
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => return child.wait_with_output().ok(),
+            Ok(None) => {
+                if Instant::now() >= deadline {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    debug!(
+                        cmd,
+                        timeout_ms = timeout.as_millis() as u64,
+                        "subprocess timeout"
+                    );
+                    return None;
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err(_) => return None,
+        }
+    }
+}
+
+/// Status-only variant of `output_with_timeout` for fire-and-forget commands.
+fn status_with_timeout(
+    cmd: &str,
+    args: &[&str],
+    timeout: Duration,
+) -> Option<std::process::ExitStatus> {
+    output_with_timeout(cmd, args, timeout).map(|o| o.status)
+}
 
 // ─── Window target (focus lock) ──────────────────────────────────────────────
 
@@ -302,10 +362,7 @@ pub fn capture_focus_target() -> WindowTarget {
 }
 
 fn hyprland_active_info() -> Option<(String, String)> {
-    let output = Command::new("hyprctl")
-        .args(["activewindow", "-j"])
-        .output()
-        .ok()?;
+    let output = output_with_timeout("hyprctl", &["activewindow", "-j"], SUBPROCESS_TIMEOUT)?;
     if !output.status.success() {
         return None;
     }
@@ -319,10 +376,7 @@ fn hyprland_active_info() -> Option<(String, String)> {
 }
 
 fn sway_focused_with_id() -> Option<(String, i64)> {
-    let output = Command::new("swaymsg")
-        .args(["-t", "get_tree"])
-        .output()
-        .ok()?;
+    let output = output_with_timeout("swaymsg", &["-t", "get_tree"], SUBPROCESS_TIMEOUT)?;
     if !output.status.success() {
         return None;
     }
@@ -358,10 +412,7 @@ fn find_focused_with_id(node: &serde_json::Value) -> Option<(String, i64)> {
 }
 
 fn xdotool_active_id() -> Option<String> {
-    let output = Command::new("xdotool")
-        .arg("getactivewindow")
-        .output()
-        .ok()?;
+    let output = output_with_timeout("xdotool", &["getactivewindow"], SUBPROCESS_TIMEOUT)?;
     if !output.status.success() {
         return None;
     }
@@ -375,27 +426,30 @@ fn xdotool_active_id() -> Option<String> {
 
 fn restore_focus(token: &FocusToken) -> bool {
     match token {
-        FocusToken::HyprlandAddress(addr) => Command::new("hyprctl")
-            .args(["dispatch", "focuswindow", &format!("address:{addr}")])
-            .status()
-            .ok()
-            .is_some_and(|s| s.success()),
-        FocusToken::SwayConId(id) => Command::new("swaymsg")
-            .arg(format!("[con_id={id}] focus"))
-            .status()
-            .ok()
-            .is_some_and(|s| s.success()),
-        FocusToken::X11WindowId(wid) => Command::new("xdotool")
-            .args(["windowactivate", "--sync", wid])
-            .status()
-            .ok()
-            .is_some_and(|s| s.success()),
+        FocusToken::HyprlandAddress(addr) => status_with_timeout(
+            "hyprctl",
+            &["dispatch", "focuswindow", &format!("address:{addr}")],
+            SUBPROCESS_TIMEOUT,
+        )
+        .is_some_and(|s| s.success()),
+        FocusToken::SwayConId(id) => status_with_timeout(
+            "swaymsg",
+            &[&format!("[con_id={id}] focus")],
+            SUBPROCESS_TIMEOUT,
+        )
+        .is_some_and(|s| s.success()),
+        FocusToken::X11WindowId(wid) => status_with_timeout(
+            "xdotool",
+            &["windowactivate", "--sync", wid],
+            SUBPROCESS_TIMEOUT,
+        )
+        .is_some_and(|s| s.success()),
     }
 }
 
 /// Run a command, parse stdout as JSON, extract a string field.
 fn run_json_query(cmd: &str, args: &[&str], path: &[&str]) -> Option<String> {
-    let output = Command::new(cmd).args(args).output().ok()?;
+    let output = output_with_timeout(cmd, args, SUBPROCESS_TIMEOUT)?;
     if !output.status.success() {
         return None;
     }
@@ -409,10 +463,7 @@ fn run_json_query(cmd: &str, args: &[&str], path: &[&str]) -> Option<String> {
 
 /// Sway: walk the tree to find the focused node's app_id.
 fn sway_focused_app_id() -> Option<String> {
-    let output = Command::new("swaymsg")
-        .args(["-t", "get_tree"])
-        .output()
-        .ok()?;
+    let output = output_with_timeout("swaymsg", &["-t", "get_tree"], SUBPROCESS_TIMEOUT)?;
     if !output.status.success() {
         return None;
     }
@@ -453,8 +504,9 @@ fn find_focused_node(node: &serde_json::Value) -> Option<String> {
 /// KDE: use gdbus to call KWin scripting for the active window caption/resourceClass.
 fn kde_focused_class() -> Option<String> {
     // KDE exposes active window info via qdbus/gdbus
-    let output = Command::new("gdbus")
-        .args([
+    let output = output_with_timeout(
+        "gdbus",
+        &[
             "call",
             "--session",
             "--dest",
@@ -463,9 +515,9 @@ fn kde_focused_class() -> Option<String> {
             "/KWin",
             "--method",
             "org.kde.KWin.getActiveWindow",
-        ])
-        .output()
-        .ok()?;
+        ],
+        SUBPROCESS_TIMEOUT,
+    )?;
     if !output.status.success() {
         return None;
     }
@@ -488,8 +540,9 @@ fn kde_focused_class() -> Option<String> {
 
 /// GNOME: use gdbus to eval JS in the shell for the focused window's WM_CLASS.
 fn gnome_focused_class() -> Option<String> {
-    let output = Command::new("gdbus")
-        .args([
+    let output = output_with_timeout(
+        "gdbus",
+        &[
             "call",
             "--session",
             "--dest",
@@ -499,9 +552,9 @@ fn gnome_focused_class() -> Option<String> {
             "--method",
             "org.gnome.Shell.Eval",
             "global.display.focus_window?.get_wm_class() ?? ''",
-        ])
-        .output()
-        .ok()?;
+        ],
+        SUBPROCESS_TIMEOUT,
+    )?;
     if !output.status.success() {
         return None;
     }
@@ -512,10 +565,7 @@ fn gnome_focused_class() -> Option<String> {
 
 /// X11: xdotool getactivewindow + xprop for WM_CLASS.
 fn xdotool_focused_class() -> Option<String> {
-    let wid = Command::new("xdotool")
-        .arg("getactivewindow")
-        .output()
-        .ok()?;
+    let wid = output_with_timeout("xdotool", &["getactivewindow"], SUBPROCESS_TIMEOUT)?;
     if !wid.status.success() {
         return None;
     }
@@ -523,10 +573,11 @@ fn xdotool_focused_class() -> Option<String> {
     if window_id.is_empty() {
         return None;
     }
-    let xprop = Command::new("xprop")
-        .args(["-id", &window_id, "WM_CLASS"])
-        .output()
-        .ok()?;
+    let xprop = output_with_timeout(
+        "xprop",
+        &["-id", &window_id, "WM_CLASS"],
+        SUBPROCESS_TIMEOUT,
+    )?;
     if !xprop.status.success() {
         return None;
     }
@@ -567,35 +618,69 @@ fn is_wayland() -> bool {
 }
 
 /// Set clipboard contents. Uses `wl-copy` on Wayland, `xclip` on X11.
+///
+/// Capped at `CLIPBOARD_TIMEOUT` — a wedged clipboard daemon used to block
+/// delivery indefinitely. On timeout the child is killed and the caller
+/// falls back to per-key typing.
 pub fn set_clipboard(text: &str) -> Result<(), String> {
     let (cmd, args): (&str, &[&str]) = if is_wayland() {
         ("wl-copy", &["--"])
     } else {
         ("xclip", &["-selection", "clipboard"])
     };
+    pipe_text_to_command(cmd, args, text, CLIPBOARD_TIMEOUT)
+}
 
+/// Spawn `cmd` with a piped stdin, write `text`, close the pipe so the
+/// child sees EOF, then poll for exit up to `timeout`. On timeout the
+/// child is killed and an error is returned.
+fn pipe_text_to_command(
+    cmd: &str,
+    args: &[&str],
+    text: &str,
+    timeout: Duration,
+) -> Result<(), String> {
     let mut child = Command::new(cmd)
         .args(args)
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::piped())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("{cmd} spawn failed: {e}"))?;
 
+    // Take ownership of stdin so dropping it closes the pipe and signals
+    // EOF — without this, wl-copy/xclip read forever and we always time out.
     use std::io::Write;
-    if let Some(stdin) = child.stdin.as_mut() {
-        stdin
-            .write_all(text.as_bytes())
-            .map_err(|e| format!("{cmd} write failed: {e}"))?;
+    if let Some(mut stdin) = child.stdin.take() {
+        if let Err(e) = stdin.write_all(text.as_bytes()) {
+            // Reap the child explicitly: `Child` does not kill on drop,
+            // so without this a misbehaving wl-copy/xclip keeps running.
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(format!("{cmd} write failed: {e}"));
+        }
     }
 
-    let status = child
-        .wait()
-        .map_err(|e| format!("{cmd} wait failed: {e}"))?;
-    if !status.success() {
-        return Err(format!("{cmd} exited with {status}"));
+    let deadline = Instant::now() + timeout;
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                if !status.success() {
+                    return Err(format!("{cmd} exited with {status}"));
+                }
+                return Ok(());
+            }
+            Ok(None) => {
+                if Instant::now() >= deadline {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(format!("{cmd} timed out after {timeout:?}"));
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err(e) => return Err(format!("{cmd} wait failed: {e}")),
+        }
     }
-    Ok(())
 }
 
 // ─── Key mapping (US QWERTY) ─────────────────────────────────────────────────
@@ -886,7 +971,8 @@ impl UinputTyper {
 
 #[cfg(test)]
 mod tests {
-    use super::is_terminal_class;
+    use super::{is_terminal_class, pipe_text_to_command};
+    use std::time::{Duration, Instant};
 
     #[test]
     fn matches_bare_terminal_names() {
@@ -921,5 +1007,63 @@ mod tests {
         assert!(!is_terminal_class("discord"));
         assert!(!is_terminal_class("google-chrome"));
         assert!(!is_terminal_class(""));
+    }
+
+    /// Regression: `pipe_text_to_command` must `take()` the child's stdin
+    /// so dropping the writer closes the pipe and the child sees EOF.
+    /// Earlier code left stdin owned by `Child`, so wl-copy/xclip kept
+    /// reading forever and every `set_clipboard` call timed out. `cat`
+    /// is a POSIX stand-in that reads stdin to EOF then exits 0.
+    #[test]
+    fn pipe_text_to_command_closes_stdin_so_child_exits() {
+        let result = pipe_text_to_command("cat", &[], "hello", Duration::from_secs(2));
+        assert!(result.is_ok(), "expected Ok; got {result:?}");
+    }
+
+    /// Regression: the polling loop must kill the child once `timeout`
+    /// elapses. `sleep 5` ignores stdin entirely and is a wedged-child
+    /// proxy — we assert the helper terminates well before the sleep
+    /// would have finished.
+    #[test]
+    fn pipe_text_to_command_kills_after_timeout() {
+        let started = Instant::now();
+        let result = pipe_text_to_command("sleep", &["5"], "x", Duration::from_millis(200));
+        let elapsed = started.elapsed();
+        assert!(result.is_err(), "expected timeout Err; got {result:?}");
+        assert!(
+            elapsed < Duration::from_secs(2),
+            "expected ~200ms termination via kill; elapsed: {elapsed:?}"
+        );
+    }
+
+    /// Regression: when `write_all` fails (e.g. broken pipe because the
+    /// child closed its stdin), the helper must kill and reap the child
+    /// instead of dropping it. `std::process::Child` does NOT kill on
+    /// drop, so without explicit cleanup the spawned process keeps
+    /// running for the lifetime of the parent.
+    ///
+    /// The script closes its own stdin (forcing EPIPE on our large
+    /// write), then sleeps and touches a sentinel file. If the child
+    /// was killed on the write-failure path, the sentinel never
+    /// appears; without the fix, it shows up within ~400ms.
+    #[test]
+    fn pipe_text_to_command_kills_child_on_write_failure() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let sentinel = dir.path().join("touched");
+        let sentinel_str = sentinel.to_str().expect("utf-8 path");
+        let script = format!("exec </dev/null; sleep 0.4; touch {sentinel_str}");
+
+        let big = "x".repeat(200_000);
+        let result = pipe_text_to_command("sh", &["-c", &script], &big, Duration::from_secs(10));
+        assert!(
+            result.is_err(),
+            "expected write-failure Err; got {result:?}"
+        );
+
+        std::thread::sleep(Duration::from_millis(900));
+        assert!(
+            !sentinel.exists(),
+            "child was not killed on write failure — sentinel file exists",
+        );
     }
 }
