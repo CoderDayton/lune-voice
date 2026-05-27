@@ -79,19 +79,19 @@ impl lune_core::llm::LlmService for OpenAiLlmBackend {
             .temperature(self.config.temperature)
             .messages(messages)
             .build()
-            .map_err(|e| lune_core::Error::Llm(format!("build request: {e}")))?;
+            .map_err(|e| lune_core::Error::llm(format!("build request: {e}")))?;
         let response = self
             .client
             .chat()
             .create(request)
             .await
-            .map_err(|e| lune_core::Error::Llm(format!("API call: {e}")))?;
+            .map_err(|e| lune_core::Error::llm(format!("API call: {e}")))?;
         response
             .choices
             .first()
             .and_then(|c| c.message.content.as_deref())
             .map(|s| s.trim().to_owned())
-            .ok_or_else(|| lune_core::Error::Llm("empty response".into()))
+            .ok_or_else(|| lune_core::Error::llm("empty response"))
     }
 }
 

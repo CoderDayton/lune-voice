@@ -21,6 +21,9 @@ pub enum PersistError {
     #[error("migration error: {0}")]
     Migration(String),
 
+    #[error("row decode error: {0}")]
+    RowDecode(String),
+
     #[error("model download: {0}")]
     ModelDownload(String),
 

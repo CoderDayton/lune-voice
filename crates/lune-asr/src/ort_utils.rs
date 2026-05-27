@@ -16,18 +16,23 @@ use lune_core::error::{Error, Result};
 /// Helper trait for concise error context wrapping in ORT operations.
 ///
 /// Chains ORT errors with a descriptive label via `map_err`, converting them
-/// to `Error::Asr` with formatted context. Eliminates repetitive `.map_err(|e| Error::Asr(format!(...)))?`.
+/// to `Error::Asr` with formatted context. The bound is `Display` rather
+/// than `Error` because several ORT error types embed non-`Send`/`Sync`
+/// inner state that cannot be stored as a `#[source]` chain.
 pub trait OrtContext<T> {
     fn ctx(self, label: &str) -> Result<T>;
 }
 
 impl<T, E: std::fmt::Display> OrtContext<T> for std::result::Result<T, E> {
     fn ctx(self, label: &str) -> Result<T> {
-        self.map_err(|e| Error::Asr(format!("{label}: {e}")))
+        self.map_err(|e| Error::asr(format!("{label}: {e}")))
     }
 }
 
-fn quiet_ort_logger() -> LoggerFunction {
+/// ORT log callback that forwards `Error`-level messages into `tracing`
+/// under the `ort::logging` target and drops the rest. Shared across
+/// `lune-asr` and `lune-llm` (both build ORT sessions).
+pub fn quiet_ort_logger() -> LoggerFunction {
     Arc::new(|level, _category, id, location, message| {
         if level >= LogLevel::Error {
             tracing::error!(
@@ -38,6 +43,18 @@ fn quiet_ort_logger() -> LoggerFunction {
             );
         }
     })
+}
+
+/// Build a `RunOptions` that asks ORT to shrink CPU (and CUDA when
+/// `use_gpu` is true) arenas at the end of the run. Used at the prefill
+/// step of each ORT inference call to reclaim leftover chunks from the
+/// prior call's variable-shape loop.
+pub fn make_shrink_run_options(use_gpu: bool) -> Result<ort::session::RunOptions> {
+    let mut opts = ort::session::RunOptions::new().ctx("run options")?;
+    let key = "memory.enable_memory_arena_shrinkage";
+    let value = if use_gpu { "cpu:0;gpu:0" } else { "cpu:0" };
+    opts.add_config_entry(key, value).ctx("shrinkage config")?;
+    Ok(opts)
 }
 
 /// Shared ORT model loading context.
@@ -90,7 +107,7 @@ impl OrtModelLoader {
                 }
             }
         }
-        Err(Error::Asr(format!(
+        Err(Error::asr(format!(
             "no {kind} model found in {}",
             self.model_dir.display()
         )))
@@ -131,7 +148,7 @@ impl OrtModelLoader {
 pub fn build_ort_session(path: &Path, use_gpu: bool, cuda_required: bool) -> Result<Session> {
     let session = make_builder(path, use_gpu, cuda_required)?
         .commit_from_file(path)
-        .map_err(|e| Error::Asr(format!("load model {}: {e}", path.display())))?;
+        .map_err(|e| Error::asr(format!("load model {}: {e}", path.display())))?;
     log_session_loaded(path, use_gpu, None);
     Ok(session)
 }
@@ -147,9 +164,9 @@ pub fn build_ort_session_with_external_data(
     let ext_len = ext_data.len();
     let session = make_builder(path, use_gpu, cuda_required)?
         .with_external_initializer_file_in_memory(ext_filename, ext_data)
-        .map_err(|e| Error::Asr(format!("external data: {e}")))?
+        .map_err(|e| Error::asr(format!("external data: {e}")))?
         .commit_from_file(path)
-        .map_err(|e| Error::Asr(format!("load model {}: {e}", path.display())))?;
+        .map_err(|e| Error::asr(format!("load model {}: {e}", path.display())))?;
     log_session_loaded(path, use_gpu, Some(ext_len as u64));
     Ok(session)
 }
@@ -183,20 +200,20 @@ fn make_builder(
 
     #[allow(unused_mut)]
     let mut builder = Session::builder()
-        .map_err(|e| Error::Asr(format!("session builder: {e}")))?
+        .map_err(|e| Error::asr(format!("session builder: {e}")))?
         .with_logger(quiet_ort_logger())
-        .map_err(|e| Error::Asr(format!("logger: {e}")))?
+        .map_err(|e| Error::asr(format!("logger: {e}")))?
         .with_log_level(LogLevel::Error)
-        .map_err(|e| Error::Asr(format!("log level: {e}")))?
+        .map_err(|e| Error::asr(format!("log level: {e}")))?
         .with_optimization_level(GraphOptimizationLevel::Level3)
-        .map_err(|e| Error::Asr(format!("optimization level: {e}")))?
+        .map_err(|e| Error::asr(format!("optimization level: {e}")))?
         .with_intra_threads(4)
-        .map_err(|e| Error::Asr(format!("intra threads: {e}")))?
+        .map_err(|e| Error::asr(format!("intra threads: {e}")))?
         .with_optimized_model_path(&opt_path)
-        .map_err(|e| Error::Asr(format!("optimized model path: {e}")))?
+        .map_err(|e| Error::asr(format!("optimized model path: {e}")))?
         // Share the env-registered CUDA arena across all ASR sessions.
         .with_env_allocators()
-        .map_err(|e| Error::Asr(format!("env allocators: {e}")))?;
+        .map_err(|e| Error::asr(format!("env allocators: {e}")))?;
 
     #[cfg(feature = "cuda")]
     if use_gpu {
@@ -217,7 +234,7 @@ fn make_builder(
         };
         builder = builder
             .with_execution_providers([cuda_ep])
-            .map_err(|e| Error::Asr(format!("CUDA EP: {e}")))?;
+            .map_err(|e| Error::asr(format!("CUDA EP: {e}")))?;
     }
 
     #[cfg(not(feature = "cuda"))]

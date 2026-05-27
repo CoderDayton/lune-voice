@@ -95,7 +95,7 @@ impl PartialOrd for HeapItem {
 }
 
 fn e(msg: impl std::fmt::Display) -> Error {
-    Error::Config(msg.to_string())
+    Error::config(msg.to_string())
 }
 
 pub fn sample_last_token(
@@ -269,7 +269,7 @@ fn sample_from_logits(
     // Fallback: CDF may not sum to 1.0 due to floating point. Return highest-probability.
     kept.first()
         .map(|c| c.id)
-        .ok_or_else(|| Error::Llm("sampler: no valid candidates after filtering".into()))
+        .ok_or_else(|| Error::llm("sampler: no valid candidates after filtering"))
 }
 
 fn apply_penalties(logits: &mut [f32], state: &DecodeState, params: &SamplingParams) {

@@ -72,6 +72,10 @@ pub enum SessionEvent {
         unresolved: Vec<(String, usize)>,
     },
     Error(String),
+    /// Non-fatal anomaly observable by listeners (e.g. a persist write
+    /// failed but the session itself is still progressing). Carries human
+    /// text; never terminal.
+    Warning(String),
     Stopped,
 }
 
@@ -82,7 +86,8 @@ impl SessionEvent {
             Self::FinalizedText(s)
             | Self::CorrectedText(s)
             | Self::CommandDetected(s)
-            | Self::Error(s) => Some(s.as_str()),
+            | Self::Error(s)
+            | Self::Warning(s) => Some(s.as_str()),
             Self::Started
             | Self::PartialText
             | Self::Processing
@@ -171,6 +176,16 @@ mod tests {
         );
         assert_eq!(SessionEvent::Started.text(), None);
         assert_eq!(SessionEvent::Stopped.text(), None);
+    }
+
+    #[test]
+    fn session_event_warning_carries_text_and_is_not_terminal() {
+        let evt = SessionEvent::Warning("persist offline".into());
+        assert_eq!(evt.text(), Some("persist offline"));
+        assert!(
+            !evt.is_terminal(),
+            "Warning is informational; session must keep running",
+        );
     }
 
     #[test]

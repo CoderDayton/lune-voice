@@ -4,17 +4,18 @@
 //! by probing the session's input metadata at load time.
 
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use half::f16;
 use ndarray::{Array2, Array4};
-use ort::logging::{LogLevel, LoggerFunction};
+use ort::logging::LogLevel;
+use ort::session::Session;
 use ort::session::builder::GraphOptimizationLevel;
-use ort::session::{RunOptions, Session};
 use ort::value::{DynValue, Value};
 use tokenizers::Tokenizer;
 use tracing::info;
 
+use lune_asr::ort_utils::{make_shrink_run_options, quiet_ort_logger};
 use lune_core::error::{Error, Result};
 
 const DEFAULT_MAX_TOKENS: usize = 512;
@@ -72,33 +73,11 @@ pub struct OrtStyleLlm {
     sampling_params: super::sampler::SamplingParams,
     kv_cache: std::sync::Mutex<super::kv_cache::KvCache>,
     cached_prefix_hash: std::sync::Mutex<u64>,
+    use_gpu: bool,
 }
 
 fn e(msg: impl std::fmt::Display) -> Error {
-    Error::Config(msg.to_string())
-}
-
-fn quiet_ort_logger() -> LoggerFunction {
-    Arc::new(|level, _category, id, location, message| {
-        if level >= LogLevel::Error {
-            tracing::error!(
-                target: "ort::logging",
-                ort_id = %id,
-                ort_location = %location,
-                "{message}"
-            );
-        }
-    })
-}
-
-/// Build a `RunOptions` that asks ORT to shrink CPU and CUDA arenas at the
-/// end of the run. Used at the prefill step of each LLM generate call to
-/// reclaim leftover chunks from the prior call's variable-shape decode loop.
-fn make_shrink_run_options() -> Result<RunOptions> {
-    let mut opts = RunOptions::new().map_err(e)?;
-    opts.add_config_entry("memory.enable_memory_arena_shrinkage", "cpu:0;gpu:0")
-        .map_err(e)?;
-    Ok(opts)
+    Error::config(msg.to_string())
 }
 
 fn dyn_i64(arr: Array2<i64>) -> Result<DynValue> {
@@ -281,7 +260,7 @@ impl OrtStyleLlm {
             .transpose()?;
 
         let tokenizer = Tokenizer::from_file(config.model_dir.join("tokenizer.json"))
-            .map_err(|e| Error::Config(format!("tokenizer: {e}")))?;
+            .map_err(|e| Error::config(format!("tokenizer: {e}")))?;
 
         let params = probe_model_params(&session, &tokenizer);
 
@@ -309,6 +288,7 @@ impl OrtStyleLlm {
             sampling_params,
             kv_cache: std::sync::Mutex::new(kv_cache),
             cached_prefix_hash: std::sync::Mutex::new(0),
+            use_gpu: config.use_gpu,
         })
     }
 
@@ -372,7 +352,7 @@ impl OrtStyleLlm {
         let text = self
             .tokenizer
             .decode(&out, true)
-            .map_err(|err| Error::Config(format!("detokenize: {err}")))?;
+            .map_err(|err| Error::config(format!("detokenize: {err}")))?;
         let text = strip_think_tags(text.trim());
         Ok(text.to_string())
     }
@@ -390,7 +370,7 @@ impl OrtStyleLlm {
         let text = self
             .tokenizer
             .decode(&out, true)
-            .map_err(|err| Error::Config(format!("detokenize: {err}")))?;
+            .map_err(|err| Error::config(format!("detokenize: {err}")))?;
         let text = strip_think_tags(text.trim());
         Ok(text.to_string())
     }
@@ -399,7 +379,7 @@ impl OrtStyleLlm {
         let enc = self
             .tokenizer
             .encode(text, false)
-            .map_err(|err| Error::Config(format!("tokenize: {err}")))?;
+            .map_err(|err| Error::config(format!("tokenize: {err}")))?;
         Ok(enc.get_ids().iter().map(|&id| id as i64).collect())
     }
 
@@ -469,48 +449,105 @@ impl OrtStyleLlm {
     }
 
     fn generate(&self, prompt_ids: &[i64], sys_prefix_len: usize) -> Result<Vec<u32>> {
-        use super::sampler::{DecodeState, SamplerWorkspace, sample_last_token};
+        use super::sampler::{DecodeState, SamplerWorkspace};
 
         let p = &self.params;
         let mut session = self.session.lock().map_err(e)?;
-        let split = self.embed_session.is_some();
+        let names = llm_kv_names(p.num_layers);
 
         let mut state = DecodeState::default();
         let mut ws = SamplerWorkspace::default();
         let mut rng = rand::rng();
-        let names = llm_kv_names(p.num_layers);
 
-        // ── Acquire or build prefix KV ──────────────────────────────────
+        self.ensure_prefix_kv(&mut session, names, prompt_ids, sys_prefix_len)?;
+        let Some((kv, total_prefill)) = self.prefill_user(
+            &mut session,
+            names,
+            prompt_ids,
+            sys_prefix_len,
+            &mut state,
+            &mut ws,
+            &mut rng,
+        )?
+        else {
+            return Ok(vec![]);
+        };
+        self.decode_loop(
+            &mut session,
+            names,
+            kv,
+            total_prefill,
+            &mut state,
+            &mut ws,
+            &mut rng,
+        )?;
+        Ok(state.generated)
+    }
+
+    /// Phase 1: on first call, prefill the system prefix alone and freeze
+    /// the resulting KV into the cache. No-op on subsequent calls or when
+    /// there is no prefix to freeze.
+    fn ensure_prefix_kv(
+        &self,
+        session: &mut Session,
+        names: &'static [String],
+        prompt_ids: &[i64],
+        sys_prefix_len: usize,
+    ) -> Result<()> {
+        let p = &self.params;
         let mut cache = self.kv_cache.lock().map_err(e)?;
-        let prefix_seq_len;
-
-        if !cache.has_prefix() && sys_prefix_len > 0 {
-            // First call: prefill system prefix alone to build the frozen cache.
-            let prefix_ids = &prompt_ids[..sys_prefix_len];
-            let pn = prefix_ids.len();
-            let mut inputs: Inputs<'static> =
-                Vec::with_capacity(input_capacity(p.num_layers, p.has_position_ids));
-            if split {
-                let embeds = self
-                    .embed_ids(prefix_ids)?
-                    .ok_or_else(|| e("split decode requires embed session"))?;
-                build_embeds_inputs_into(&mut inputs, embeds, pn, p.has_position_ids)?;
-            } else {
-                build_inputs_into(&mut inputs, prefix_ids, pn, p.has_position_ids)?;
-            }
-            for i in 0..p.num_layers {
-                let (k, v) = empty_kv(p.num_kv_heads, p.head_dim, p.kv_is_f16)?;
-                inputs.push((std::borrow::Cow::Borrowed(names[i * 2].as_str()), k));
-                inputs.push((std::borrow::Cow::Borrowed(names[i * 2 + 1].as_str()), v));
-            }
-            let outputs = session.run(inputs).map_err(e)?;
-            let raw_kv: Vec<DynValue> = outputs.into_iter().skip(1).map(|(_, v)| v).collect();
-            cache.freeze_prefix(raw_kv)?;
+        if cache.has_prefix() || sys_prefix_len == 0 {
+            return Ok(());
         }
+        let split = self.embed_session.is_some();
+        let prefix_ids = &prompt_ids[..sys_prefix_len];
+        let pn = prefix_ids.len();
+        let mut inputs: Inputs<'static> =
+            Vec::with_capacity(input_capacity(p.num_layers, p.has_position_ids));
+        if split {
+            let embeds = self
+                .embed_ids(prefix_ids)?
+                .ok_or_else(|| e("split decode requires embed session"))?;
+            build_embeds_inputs_into(&mut inputs, embeds, pn, p.has_position_ids)?;
+        } else {
+            build_inputs_into(&mut inputs, prefix_ids, pn, p.has_position_ids)?;
+        }
+        for i in 0..p.num_layers {
+            let (k, v) = empty_kv(p.num_kv_heads, p.head_dim, p.kv_is_f16)?;
+            inputs.push((std::borrow::Cow::Borrowed(names[i * 2].as_str()), k));
+            inputs.push((std::borrow::Cow::Borrowed(names[i * 2 + 1].as_str()), v));
+        }
+        let outputs = session.run(inputs).map_err(e)?;
+        let raw_kv: Vec<DynValue> = outputs.into_iter().skip(1).map(|(_, v)| v).collect();
+        cache.freeze_prefix(raw_kv)?;
+        Ok(())
+    }
 
-        // ── Prefill user portion with cached prefix KV ──────────────────
-        let has_prefix = cache.has_prefix();
-        let (prefill_ids, initial_kv) = if has_prefix && sys_prefix_len > 0 {
+    /// Phase 2: prefill the user portion of the prompt seeded with the
+    /// cached prefix KV. Samples the first generated token; returns
+    /// `None` if that token already signals stop. On success, returns the
+    /// initial KV outputs and `total_prefill` (prefix + user lengths) for
+    /// the decode loop.
+    #[allow(clippy::too_many_arguments)]
+    fn prefill_user(
+        &self,
+        session: &mut Session,
+        names: &'static [String],
+        prompt_ids: &[i64],
+        sys_prefix_len: usize,
+        state: &mut super::sampler::DecodeState,
+        ws: &mut super::sampler::SamplerWorkspace,
+        rng: &mut rand::rngs::ThreadRng,
+    ) -> Result<Option<(Vec<DynValue>, usize)>> {
+        use super::sampler::sample_last_token;
+
+        let p = &self.params;
+        let split = self.embed_session.is_some();
+
+        // ── Acquire prefix KV (or build empty when no system prefix) ───
+        let cache = self.kv_cache.lock().map_err(e)?;
+        let prefix_seq_len;
+        let (prefill_ids, initial_kv) = if cache.has_prefix() && sys_prefix_len > 0 {
             let cached_kv = cache.prefix_kv()?;
             prefix_seq_len = cache.prefix_len();
             (&prompt_ids[sys_prefix_len..], cached_kv)
@@ -556,20 +593,15 @@ impl OrtStyleLlm {
         }
 
         // Apply CUDA arena shrinkage on this prefill run (once per generate
-        // call). Releases unused chunks from the previous call's variable-shape
-        // decode loop before this call grows the arena. Doing it here, not in
-        // the per-step decode loop, avoids per-step shrink/grow churn.
-        let prefill_opts = make_shrink_run_options()?;
+        // call). Releases unused chunks from the previous call's
+        // variable-shape decode loop before this call grows the arena.
+        // Doing it here, not in the per-step decode loop, avoids per-step
+        // shrink/grow churn.
+        let prefill_opts = make_shrink_run_options(self.use_gpu)?;
         let outputs = session.run_with_options(inputs, &prefill_opts).map_err(e)?;
-        let first = sample_last_token(
-            &outputs[0],
-            &self.sampling_params,
-            &state,
-            &mut ws,
-            &mut rng,
-        )?;
+        let first = sample_last_token(&outputs[0], &self.sampling_params, state, ws, rng)?;
         if state.should_stop(first, &self.sampling_params) {
-            return Ok(vec![]);
+            return Ok(None);
         }
         state.push(first);
 
@@ -577,10 +609,30 @@ impl OrtStyleLlm {
         // every step (28 layers × 2 = 56 entries × up to ~448 tokens).
         let mut kv: Vec<DynValue> = Vec::with_capacity(p.num_layers * 2);
         kv.extend(outputs.into_iter().skip(1).map(|(_, v)| v));
+        Ok(Some((kv, total_prefill)))
+    }
 
-        // ── Decode ──────────────────────────────────────────────────────
+    /// Phase 3: autoregressive decode. Reuses `kv` across iterations to
+    /// avoid per-step `Vec<DynValue>` allocation. Mutates `state` until
+    /// the sampler signals stop or `max_new_tokens` is reached.
+    #[allow(clippy::too_many_arguments)]
+    fn decode_loop(
+        &self,
+        session: &mut Session,
+        names: &'static [String],
+        mut kv: Vec<DynValue>,
+        total_prefill: usize,
+        state: &mut super::sampler::DecodeState,
+        ws: &mut super::sampler::SamplerWorkspace,
+        rng: &mut rand::rngs::ThreadRng,
+    ) -> Result<()> {
+        use super::sampler::sample_last_token;
+
+        let p = &self.params;
+        let split = self.embed_session.is_some();
         let max = self.max_new_tokens;
         let inputs_cap = input_capacity(p.num_layers, p.has_position_ids);
+
         for _ in 1..max {
             let tok = *state.generated.last().unwrap() as i64;
             let total = total_prefill + state.generated.len();
@@ -602,13 +654,7 @@ impl OrtStyleLlm {
             }
 
             let outputs = session.run(inputs).map_err(e)?;
-            let next = sample_last_token(
-                &outputs[0],
-                &self.sampling_params,
-                &state,
-                &mut ws,
-                &mut rng,
-            )?;
+            let next = sample_last_token(&outputs[0], &self.sampling_params, state, ws, rng)?;
             if state.should_stop(next, &self.sampling_params) {
                 break;
             }
@@ -616,8 +662,7 @@ impl OrtStyleLlm {
             // kv was emptied by drain above; refill in place.
             kv.extend(outputs.into_iter().skip(1).map(|(_, v)| v));
         }
-
-        Ok(state.generated)
+        Ok(())
     }
 }
 
@@ -955,7 +1000,7 @@ impl lune_core::llm::LlmService for OrtStyleLlm {
         let text = self
             .tokenizer
             .decode(&out_ids, true)
-            .map_err(|e| Error::Llm(format!("decode: {e}")))?;
+            .map_err(|e| Error::llm(format!("decode: {e}")))?;
         Ok(strip_think_tags(&text).trim().to_owned())
     }
 }
@@ -1126,7 +1171,7 @@ fn find_model(dir: &Path) -> Result<ModelFiles> {
         }
     }
 
-    Err(Error::Config(format!("no ONNX model in {}", dir.display())))
+    Err(Error::config(format!("no ONNX model in {}", dir.display())))
 }
 
 fn strip_think_tags(text: &str) -> &str {

@@ -33,7 +33,7 @@ const MISMATCH: &str = "backend/session type mismatch";
 #[cold]
 #[inline(never)]
 fn mismatch_err() -> Error {
-    Error::Asr(MISMATCH.into())
+    Error::asr(MISMATCH)
 }
 
 /// Dispatch a method call on a session handle to the matching backend.
@@ -159,7 +159,7 @@ impl AsrRegistry {
                 Ok(Self::OpenAi(backend))
             }
             #[allow(unreachable_patterns)]
-            _ => Err(Error::Config("unknown ASR backend type".into())),
+            _ => Err(Error::config("unknown ASR backend type")),
         }
     }
 

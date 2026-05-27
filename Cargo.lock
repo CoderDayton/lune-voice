@@ -3155,6 +3155,7 @@ dependencies = [
  "async-openai",
  "async-trait",
  "half",
+ "lune-asr",
  "lune-core",
  "ndarray",
  "ort",

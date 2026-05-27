@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2024"
 default-run = "lune-app"
 
+[lints]
+workspace = true
+
 [features]
 default = ["cuda"]
 cuda = ["lune-app/cuda", "ort/cuda"]

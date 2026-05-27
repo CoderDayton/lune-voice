@@ -10,7 +10,7 @@ use std::sync::Mutex;
 use half::f16;
 use ndarray::{Array2, Array3, ArrayD, IxDyn};
 use ort::memory::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType};
-use ort::session::{RunOptions, Session};
+use ort::session::Session;
 use ort::value::{DynValue, Value};
 use tokenizers::Tokenizer;
 
@@ -18,7 +18,7 @@ use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
 use lune_core::error::{Error, Result};
 
 use crate::mel::whisper;
-use crate::ort_utils::{OrtContext, OrtModelLoader};
+use crate::ort_utils::{OrtContext, OrtModelLoader, make_shrink_run_options};
 
 // ── Model constants ─────────────────────────────────────────────────────────
 
@@ -121,7 +121,10 @@ impl Qwen3AsrBackend {
         let decoder = loader.load_first(&["qwen3-asr-decoder.onnx"], "qwen3-asr-decoder")?;
 
         let tok_path = config.model_dir.join("tokenizer.json");
-        let tokenizer = Tokenizer::from_file(&tok_path).ctx("load tokenizer")?;
+        // Tokenizer's error type isn't `'static`, so it can't satisfy the
+        // generic source bound used by `.ctx()`. Format inline instead.
+        let tokenizer = Tokenizer::from_file(&tok_path)
+            .map_err(|e| Error::asr(format!("load tokenizer: {e}")))?;
 
         tracing::info!(dir = %config.model_dir.display(), "Qwen3-ASR backend loaded");
 
@@ -301,21 +304,6 @@ impl AsrBackend for Qwen3AsrBackend {
 }
 
 // ── Inference ───────────────────────────────────────────────────────────────
-
-/// Build a `RunOptions` that asks ORT to shrink the relevant memory arenas at
-/// the end of the run. Returns leftover chunks from prior runs back to the
-/// arena's free pool — critical for autoregressive decoders whose variable
-/// per-step KV shapes otherwise fragment the arena across sessions.
-///
-/// Format per ORT: "cpu:0;gpu:0" or "gpu:0" — semicolon-separated EP:device.
-fn make_shrink_run_options(use_gpu: bool) -> Result<RunOptions> {
-    let mut opts = RunOptions::new().ctx("run options")?;
-    let key = "memory.enable_memory_arena_shrinkage";
-    let value = if use_gpu { "cpu:0;gpu:0" } else { "cpu:0" };
-    opts.add_config_entry(key, value).ctx("shrinkage config")?;
-    Ok(opts)
-}
-
 /// Extract FP16 tensor to owned FP16 ArrayD (no conversion).
 fn extract_f16_array(value: &ort::value::Value) -> Result<ArrayD<f16>> {
     let (shape, data) = value.try_extract_tensor::<f16>().ctx("extract f16")?;
@@ -339,10 +327,10 @@ fn argmax_on_logits(
     let logits = &data[start..];
 
     if logits.is_empty() {
-        return Err(Error::Asr("empty logits tensor".into()));
+        return Err(Error::asr("empty logits tensor"));
     }
     if logits.len() != vocab_size {
-        return Err(Error::Asr(format!(
+        return Err(Error::asr(format!(
             "logits slice {} != vocab {vocab_size}",
             logits.len()
         )));
@@ -641,10 +629,10 @@ impl Qwen3AsrBackend {
             // Use contiguous slice copies instead of per-element indexed writes.
             let emb_slice = arr
                 .as_slice_mut()
-                .ok_or_else(|| Error::Asr("embeds not contiguous".into()))?;
+                .ok_or_else(|| Error::asr("embeds not contiguous"))?;
             let feat_slice = audio_feat
                 .as_slice()
-                .ok_or_else(|| Error::Asr("audio_feat not contiguous".into()))?;
+                .ok_or_else(|| Error::asr("audio_feat not contiguous"))?;
             for t in 0..n_audio {
                 let dst = (audio_offset + t) * hidden_size;
                 let src = t * hidden_size;
@@ -689,11 +677,11 @@ impl Qwen3AsrBackend {
                 for i in 0..NUM_LAYERS {
                     cache.push(
                         out.remove(present_kv_name(i, true))
-                            .ok_or_else(|| Error::Asr(format!("missing present key layer {i}")))?,
+                            .ok_or_else(|| Error::asr(format!("missing present key layer {i}")))?,
                     );
                     cache.push(
                         out.remove(present_kv_name(i, false)).ok_or_else(|| {
-                            Error::Asr(format!("missing present value layer {i}"))
+                            Error::asr(format!("missing present value layer {i}"))
                         })?,
                     );
                 }
@@ -713,10 +701,10 @@ impl Qwen3AsrBackend {
                 for i in 0..NUM_LAYERS {
                     let key = out
                         .remove(present_kv_name(i, true))
-                        .ok_or_else(|| Error::Asr(format!("missing present key layer {i}")))?;
+                        .ok_or_else(|| Error::asr(format!("missing present key layer {i}")))?;
                     let value = out
                         .remove(present_kv_name(i, false))
-                        .ok_or_else(|| Error::Asr(format!("missing present value layer {i}")))?;
+                        .ok_or_else(|| Error::asr(format!("missing present value layer {i}")))?;
                     cache.push(extract_f16_array(&key)?);
                     cache.push(extract_f16_array(&value)?);
                 }
@@ -786,7 +774,7 @@ impl Qwen3AsrBackend {
                     DecodeKvCache::Bound(cache) => {
                         let binding = decoder_binding
                             .as_mut()
-                            .ok_or_else(|| Error::Asr("missing decoder binding".into()))?;
+                            .ok_or_else(|| Error::asr("missing decoder binding"))?;
                         binding.clear();
                         binding
                             .bind_input("inputs_embeds", &emb_val)
@@ -814,10 +802,10 @@ impl Qwen3AsrBackend {
 
                         for i in 0..NUM_LAYERS {
                             cache.push(out.remove(present_kv_name(i, true)).ok_or_else(|| {
-                                Error::Asr(format!("missing present key layer {i}"))
+                                Error::asr(format!("missing present key layer {i}"))
                             })?);
                             cache.push(out.remove(present_kv_name(i, false)).ok_or_else(|| {
-                                Error::Asr(format!("missing present value layer {i}"))
+                                Error::asr(format!("missing present value layer {i}"))
                             })?);
                         }
                         result
@@ -836,10 +824,10 @@ impl Qwen3AsrBackend {
 
                         for i in 0..NUM_LAYERS {
                             let key = out.remove(present_kv_name(i, true)).ok_or_else(|| {
-                                Error::Asr(format!("missing present key layer {i}"))
+                                Error::asr(format!("missing present key layer {i}"))
                             })?;
                             let value = out.remove(present_kv_name(i, false)).ok_or_else(|| {
-                                Error::Asr(format!("missing present value layer {i}"))
+                                Error::asr(format!("missing present value layer {i}"))
                             })?;
                             cache.push(extract_f16_array(&key)?);
                             cache.push(extract_f16_array(&value)?);
@@ -1151,7 +1139,7 @@ fn non_empty_string(value: &str) -> Option<String> {
 }
 
 fn lock_err<T>(what: &str, e: std::sync::PoisonError<T>) -> Error {
-    Error::Asr(format!("{what} lock poisoned: {e}"))
+    Error::asr(format!("{what} lock poisoned: {e}"))
 }
 
 #[cfg(test)]

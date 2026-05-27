@@ -12,7 +12,7 @@ use tracing::debug;
 use lune_core::error::{Error, Result};
 
 fn err(msg: impl std::fmt::Display) -> Error {
-    Error::Config(msg.to_string())
+    Error::config(msg.to_string())
 }
 
 // ── Config ──────────────────────────────────────────────────────────────

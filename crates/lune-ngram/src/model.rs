@@ -1,0 +1,521 @@
+//! N-gram language model: training, scoring, persistence, ASR rerank.
+
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::fs;
+use std::path::Path;
+
+use crate::candidates::{AsrCandidateInput, AsrCandidateScore, AsrRerankWeights, CandidateScore};
+use crate::scoring::{InterpolationWeights, ScoringConfig};
+use crate::tokenize::{
+    acoustic_shape, last_or_start, last_two_or_start, lexical_similarity, minmax_normalize,
+    normalize_similarity_text, normalize_word_or_boundary, tokenize,
+};
+#[cfg(feature = "training")]
+use crate::training::{CorpusConfig, CorpusFetch, fetch_wordnik_corpus};
+use crate::{AnyError, END, MODEL_FORMAT_VERSION, START};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NGramModel {
+    config: ScoringConfig,
+
+    unigram_counts: HashMap<String, usize>,
+    bigram_counts: HashMap<[String; 2], usize>,
+    trigram_counts: HashMap<[String; 3], usize>,
+
+    bigram_context_totals: HashMap<String, usize>,
+    trigram_context_totals: HashMap<[String; 2], usize>,
+
+    total_unigrams: usize,
+    vocab: HashSet<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ModelSnapshot {
+    format_version: u16,
+    model: NGramModel,
+}
+
+impl NGramModel {
+    pub fn new(config: ScoringConfig) -> Result<Self, AnyError> {
+        let config = config.validate()?;
+        let mut vocab = HashSet::new();
+        vocab.insert(END.to_owned());
+
+        Ok(Self {
+            config,
+            unigram_counts: HashMap::new(),
+            bigram_counts: HashMap::new(),
+            trigram_counts: HashMap::new(),
+            bigram_context_totals: HashMap::new(),
+            trigram_context_totals: HashMap::new(),
+            total_unigrams: 0,
+            vocab,
+        })
+    }
+
+    pub fn config(&self) -> ScoringConfig {
+        self.config
+    }
+
+    /// Build a model from Wordnik example sentences. Requires the `training` feature.
+    #[cfg(feature = "training")]
+    pub async fn from_wordnik_seed_words<I, S>(
+        api_key: &str,
+        seed_words: I,
+        config: ScoringConfig,
+        corpus_config: CorpusConfig,
+    ) -> Result<(Self, CorpusFetch), AnyError>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        let mut model = Self::new(config)?;
+        let corpus = fetch_wordnik_corpus(api_key, seed_words, corpus_config).await?;
+
+        if corpus.sentences.is_empty() {
+            return Err("Wordnik returned no usable example sentences".into());
+        }
+
+        model.train_sentences(&corpus.sentences);
+        Ok((model, corpus))
+    }
+
+    pub fn train_sentences<I, S>(&mut self, sentences: I)
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        for sentence in sentences {
+            self.train_sentence(sentence.as_ref());
+        }
+    }
+
+    pub fn train_sentence(&mut self, sentence: &str) {
+        let mut tokens = tokenize(sentence);
+        if tokens.is_empty() {
+            return;
+        }
+
+        for token in &tokens {
+            self.vocab.insert(token.clone());
+        }
+        self.vocab.insert(END.to_owned());
+
+        let mut sequence = Vec::with_capacity(tokens.len() + 3);
+        sequence.push(START.to_owned());
+        sequence.push(START.to_owned());
+        sequence.append(&mut tokens);
+        sequence.push(END.to_owned());
+
+        for token in sequence.iter().skip(2) {
+            *self.unigram_counts.entry(token.clone()).or_default() += 1;
+            self.total_unigrams += 1;
+        }
+
+        for window in sequence.windows(2) {
+            let prev = window[0].clone();
+            let next = window[1].clone();
+            *self.bigram_counts.entry([prev.clone(), next]).or_default() += 1;
+            *self.bigram_context_totals.entry(prev).or_default() += 1;
+        }
+
+        for window in sequence.windows(3) {
+            let context = [window[0].clone(), window[1].clone()];
+            let trigram = [window[0].clone(), window[1].clone(), window[2].clone()];
+            *self.trigram_counts.entry(trigram).or_default() += 1;
+            *self.trigram_context_totals.entry(context).or_default() += 1;
+        }
+    }
+
+    pub fn vocabulary_size(&self) -> usize {
+        self.vocab.len().max(1)
+    }
+
+    // ─── Persistence ──────────────────────────────────────────────────────────
+
+    pub fn to_bincode_bytes(&self) -> Result<Vec<u8>, AnyError> {
+        let snapshot = ModelSnapshot {
+            format_version: MODEL_FORMAT_VERSION,
+            model: self.clone(),
+        };
+        Ok(bincode::serde::encode_to_vec(
+            &snapshot,
+            bincode::config::standard(),
+        )?)
+    }
+
+    pub fn from_bincode_bytes(bytes: &[u8]) -> Result<Self, AnyError> {
+        let (snapshot, bytes_read): (ModelSnapshot, usize) =
+            bincode::serde::decode_from_slice(bytes, bincode::config::standard())?;
+
+        if bytes_read != bytes.len() {
+            return Err("trailing bytes in model snapshot".into());
+        }
+        if snapshot.format_version != MODEL_FORMAT_VERSION {
+            return Err(format!(
+                "unsupported model snapshot version: expected {}, got {}",
+                MODEL_FORMAT_VERSION, snapshot.format_version
+            )
+            .into());
+        }
+
+        Ok(snapshot.model)
+    }
+
+    pub fn save_bincode(&self, path: impl AsRef<Path>) -> Result<(), AnyError> {
+        fs::write(path, self.to_bincode_bytes()?)?;
+        Ok(())
+    }
+
+    pub fn load_bincode(path: impl AsRef<Path>) -> Result<Self, AnyError> {
+        let bytes = fs::read(path)?;
+        Self::from_bincode_bytes(&bytes)
+    }
+
+    /// Load the pre-trained model bundled into the binary via `include_bytes!`.
+    ///
+    /// The model file must exist at `crates/lune-ngram/data/lune_ngram_model.bin`
+    /// at compile time. Run the training binary to produce it first.
+    pub fn load_bundled() -> Result<Self, AnyError> {
+        let bytes = include_bytes!("../data/lune_ngram_model.bin");
+        Self::from_bincode_bytes(bytes)
+    }
+
+    // ─── Scoring ──────────────────────────────────────────────────────────────
+
+    pub fn interpolated_prob(&self, prefix: &[String], next: &str) -> f64 {
+        let next = normalize_word_or_boundary(next);
+        if next.is_empty() {
+            return 0.0;
+        }
+
+        let uni = self.unigram_prob(&next);
+        let bi = if self.config.max_order >= 2 {
+            self.bigram_prob(last_or_start(prefix), &next)
+        } else {
+            0.0
+        };
+        let tri = if self.config.max_order >= 3 {
+            let [w1, w2] = last_two_or_start(prefix);
+            self.trigram_prob(&w1, &w2, &next)
+        } else {
+            0.0
+        };
+
+        let w = self.effective_weights();
+        (w.unigram * uni + w.bigram * bi + w.trigram * tri).max(f64::MIN_POSITIVE)
+    }
+
+    pub fn score_candidate(&self, prefix: &str, candidate: &str) -> CandidateScore {
+        let mut context = tokenize(prefix);
+        let tokens = tokenize(candidate);
+
+        if tokens.is_empty() {
+            return CandidateScore {
+                candidate: candidate.to_owned(),
+                tokens,
+                log_prob: f64::NEG_INFINITY,
+                avg_log_prob: f64::NEG_INFINITY,
+            };
+        }
+
+        let mut log_prob = 0.0;
+        for token in &tokens {
+            let p = self.interpolated_prob(&context, token);
+            log_prob += p.ln();
+            context.push(token.clone());
+        }
+
+        CandidateScore {
+            candidate: candidate.to_owned(),
+            avg_log_prob: log_prob / tokens.len() as f64,
+            tokens,
+            log_prob,
+        }
+    }
+
+    pub fn rank_candidates<I, S>(&self, prefix: &str, candidates: I) -> Vec<CandidateScore>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        let mut scored: Vec<_> = candidates
+            .into_iter()
+            .map(|candidate| self.score_candidate(prefix, candidate.as_ref()))
+            .collect();
+
+        scored.sort_by(|a, b| b.avg_log_prob.total_cmp(&a.avg_log_prob));
+        scored
+    }
+
+    pub fn best_candidate<I, S>(&self, prefix: &str, candidates: I) -> Option<CandidateScore>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        self.rank_candidates(prefix, candidates).into_iter().next()
+    }
+
+    pub fn rerank_asr_candidates<I, C>(
+        &self,
+        prefix: &str,
+        observed_slot: &str,
+        candidates: I,
+        weights: AsrRerankWeights,
+    ) -> Result<Vec<AsrCandidateScore>, AnyError>
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<AsrCandidateInput>,
+    {
+        let weights = weights.validate()?;
+        let inputs: Vec<AsrCandidateInput> = candidates.into_iter().map(Into::into).collect();
+        if inputs.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let ngram_scores: Vec<CandidateScore> = inputs
+            .iter()
+            .map(|candidate| self.score_candidate(prefix, &candidate.text))
+            .collect();
+        let raw_ngram: Vec<f64> = ngram_scores
+            .iter()
+            .map(|score| score.avg_log_prob)
+            .collect();
+        let normalized_ngram = minmax_normalize(&raw_ngram);
+
+        let acoustic_available = inputs
+            .iter()
+            .any(|candidate| candidate.acoustic_score.is_some());
+        let acoustic_values: Vec<f64> = inputs
+            .iter()
+            .map(|candidate| candidate.acoustic_score.unwrap_or(f64::NEG_INFINITY))
+            .collect();
+        let normalized_acoustic = if acoustic_available {
+            Some(minmax_normalize(&acoustic_values))
+        } else {
+            None
+        };
+
+        let observed_norm = normalize_similarity_text(observed_slot);
+        let observed_key = acoustic_shape(observed_slot);
+
+        let active_acoustic_weight = if acoustic_available {
+            weights.acoustic
+        } else {
+            0.0
+        };
+        let total_weight = weights.ngram + active_acoustic_weight + weights.edit + weights.phonetic;
+
+        let mut scores = Vec::with_capacity(inputs.len());
+        for (idx, input) in inputs.into_iter().enumerate() {
+            let candidate_norm = normalize_similarity_text(&input.text);
+            let candidate_key = acoustic_shape(&input.text);
+            let edit_similarity = lexical_similarity(&observed_norm, &candidate_norm);
+            let phonetic_similarity = lexical_similarity(&observed_key, &candidate_key);
+            let acoustic_component = normalized_acoustic
+                .as_ref()
+                .map(|scores| scores[idx])
+                .unwrap_or(0.0);
+
+            let final_score = ((weights.ngram * normalized_ngram[idx])
+                + (active_acoustic_weight * acoustic_component)
+                + (weights.edit * edit_similarity)
+                + (weights.phonetic * phonetic_similarity))
+                / total_weight.max(f64::MIN_POSITIVE);
+
+            scores.push(AsrCandidateScore {
+                candidate: input.text,
+                tokens: ngram_scores[idx].tokens.clone(),
+                final_score,
+                ngram_log_prob: ngram_scores[idx].log_prob,
+                ngram_avg_log_prob: ngram_scores[idx].avg_log_prob,
+                normalized_ngram: normalized_ngram[idx],
+                acoustic_score: input.acoustic_score,
+                normalized_acoustic: normalized_acoustic.as_ref().map(|scores| scores[idx]),
+                edit_similarity,
+                phonetic_similarity,
+                candidate_phonetic_key: candidate_key,
+            });
+        }
+
+        scores.sort_by(|a, b| b.final_score.total_cmp(&a.final_score));
+        Ok(scores)
+    }
+
+    pub fn best_asr_candidate<I, C>(
+        &self,
+        prefix: &str,
+        observed_slot: &str,
+        candidates: I,
+        weights: AsrRerankWeights,
+    ) -> Result<Option<AsrCandidateScore>, AnyError>
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<AsrCandidateInput>,
+    {
+        Ok(self
+            .rerank_asr_candidates(prefix, observed_slot, candidates, weights)?
+            .into_iter()
+            .next())
+    }
+
+    pub fn score_phrase_avg_logprob(&self, phrase: &str) -> f64 {
+        self.score_candidate("", phrase).avg_log_prob
+    }
+
+    // ─── Private helpers ──────────────────────────────────────────────────────
+
+    fn smoothed_prob(&self, count: usize, context_total: usize) -> f64 {
+        let count_f = count as f64;
+        let denominator = context_total as f64 + self.config.add_k * self.vocabulary_size() as f64;
+        (count_f + self.config.add_k) / denominator.max(f64::MIN_POSITIVE)
+    }
+
+    fn unigram_prob(&self, next: &str) -> f64 {
+        let count = self.unigram_counts.get(next).copied().unwrap_or(0);
+        self.smoothed_prob(count, self.total_unigrams)
+    }
+
+    fn bigram_prob(&self, prev: &str, next: &str) -> f64 {
+        let count = self
+            .bigram_counts
+            .get(&[prev.to_owned(), next.to_owned()])
+            .copied()
+            .unwrap_or(0);
+        let context_total = self.bigram_context_totals.get(prev).copied().unwrap_or(0);
+        self.smoothed_prob(count, context_total)
+    }
+
+    fn trigram_prob(&self, w1: &str, w2: &str, next: &str) -> f64 {
+        let count = self
+            .trigram_counts
+            .get(&[w1.to_owned(), w2.to_owned(), next.to_owned()])
+            .copied()
+            .unwrap_or(0);
+        let context = [w1.to_owned(), w2.to_owned()];
+        let context_total = self
+            .trigram_context_totals
+            .get(&context)
+            .copied()
+            .unwrap_or(0);
+        self.smoothed_prob(count, context_total)
+    }
+
+    fn effective_weights(&self) -> InterpolationWeights {
+        match self.config.max_order {
+            1 => InterpolationWeights {
+                unigram: 1.0,
+                bigram: 0.0,
+                trigram: 0.0,
+            },
+            2 => {
+                let total = self.config.weights.unigram + self.config.weights.bigram;
+                InterpolationWeights {
+                    unigram: self.config.weights.unigram / total,
+                    bigram: self.config.weights.bigram / total,
+                    trigram: 0.0,
+                }
+            }
+            _ => self.config.weights,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn trained_test_model() -> NGramModel {
+        let mut model = NGramModel::new(ScoringConfig::trigram_default()).unwrap();
+        model.train_sentences([
+            "play some roblox with friends",
+            "play some roblox after school",
+            "play some roblox today",
+            "play some games today",
+            "the black car stopped",
+            "black coffee tastes bitter",
+            "paint it black",
+        ]);
+        model
+    }
+
+    #[test]
+    fn ranks_domain_candidate_above_common_but_wrong_candidate() {
+        let model = trained_test_model();
+        let ranked = model.rank_candidates("play some", ["black", "roblox"]);
+        assert_eq!(ranked[0].candidate, "roblox");
+    }
+
+    #[test]
+    fn supports_multi_token_candidates_without_length_bias() {
+        let model = trained_test_model();
+        let ranked = model.rank_candidates("play", ["some roblox", "some black"]);
+        assert_eq!(ranked[0].candidate, "some roblox");
+    }
+
+    #[test]
+    fn unseen_candidates_still_have_finite_score() {
+        let model = trained_test_model();
+        let score = model.score_candidate("play some", "minecraft");
+        assert!(score.avg_log_prob.is_finite());
+    }
+
+    #[test]
+    fn model_roundtrips_through_bincode() {
+        let model = trained_test_model();
+        let bytes = model.to_bincode_bytes().unwrap();
+        let restored = NGramModel::from_bincode_bytes(&bytes).unwrap();
+
+        let before = model.rank_candidates("play some", ["black", "roblox"]);
+        let after = restored.rank_candidates("play some", ["black", "roblox"]);
+        assert_eq!(before[0].candidate, after[0].candidate);
+    }
+
+    #[test]
+    fn asr_reranker_blends_ngram_and_similarity_features() {
+        let model = trained_test_model();
+        let ranked = model
+            .rerank_asr_candidates(
+                "play some",
+                "black",
+                ["black", "roblox"],
+                AsrRerankWeights::transcript_default(),
+            )
+            .unwrap();
+
+        assert_eq!(ranked[0].candidate, "roblox");
+        assert!(ranked[0].final_score >= ranked[1].final_score);
+    }
+
+    #[test]
+    fn load_bundled_model() {
+        let model = NGramModel::load_bundled().unwrap();
+        assert!(model.vocabulary_size() > 100);
+        let prob = model.interpolated_prob(&["the".to_string()], "quick");
+        assert!(prob > 0.0);
+    }
+
+    #[test]
+    fn acoustic_score_can_override_when_weighted_heavily() {
+        let model = trained_test_model();
+        let ranked = model
+            .rerank_asr_candidates(
+                "play some",
+                "black",
+                [
+                    AsrCandidateInput::with_acoustic_score("black", 0.95),
+                    AsrCandidateInput::with_acoustic_score("roblox", 0.10),
+                ],
+                AsrRerankWeights {
+                    ngram: 0.10,
+                    acoustic: 0.80,
+                    edit: 0.05,
+                    phonetic: 0.05,
+                },
+            )
+            .unwrap();
+
+        assert_eq!(ranked[0].candidate, "black");
+    }
+}

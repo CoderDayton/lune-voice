@@ -268,6 +268,12 @@ pub enum SessionStreamEvent {
     SessionError {
         message: String,
     },
+    /// Non-fatal anomaly (e.g. a persist write failed but dictation is
+    /// still progressing). Frontend should surface as a transient warning;
+    /// no terminal/teardown semantics.
+    SessionWarning {
+        message: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize)]

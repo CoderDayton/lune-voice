@@ -23,10 +23,10 @@ pub async fn generate_few_shot_examples(
     let response = llm.complete(system, &user).await?;
 
     let json_str = extract_json_array(&response)
-        .ok_or_else(|| Error::Llm("no JSON array found in LLM response".into()))?;
+        .ok_or_else(|| Error::llm("no JSON array found in LLM response"))?;
 
     let pairs: Vec<Vec<String>> = serde_json::from_str(json_str)
-        .map_err(|e| Error::Llm(format!("failed to parse few-shot response: {e}")))?;
+        .map_err(|e| Error::llm(format!("failed to parse few-shot response: {e}")))?;
 
     let result: Vec<(String, String)> = pairs
         .into_iter()
@@ -41,7 +41,7 @@ pub async fn generate_few_shot_examples(
         .collect();
 
     if result.is_empty() {
-        return Err(Error::Llm("LLM returned no valid examples".into()));
+        return Err(Error::llm("LLM returned no valid examples"));
     }
 
     Ok(result)

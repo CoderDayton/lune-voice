@@ -33,25 +33,43 @@ type SessionRow7 = (
     Option<String>,
 );
 
+/// Decode a stored backend kind from its JSON column value.
+///
+/// Returns `(kind, Some(reason))` when the value cannot be parsed — falls
+/// back to `Qwen3Asr` so history still loads after a backend is removed or
+/// renamed, but surfaces the raw decode failure so callers can log it.
+fn decode_backend_or_fallback(raw: &str) -> (AsrBackendKind, Option<String>) {
+    match serde_json::from_str::<AsrBackendKind>(raw) {
+        Ok(k) => (k, None),
+        Err(e) => (AsrBackendKind::Qwen3Asr, Some(e.to_string())),
+    }
+}
+
 fn row_to_session(
     (sid, s_at, e_at, sty, back, stat, trans): SessionRow7,
 ) -> PersistResult<DictationSession> {
-    let id = Uuid::parse_str(&sid).map_err(|e| PersistError::Migration(format!("uuid: {e}")))?;
+    let id = Uuid::parse_str(&sid).map_err(|e| PersistError::RowDecode(format!("uuid: {e}")))?;
     let started_at = DateTime::parse_from_rfc3339(&s_at)
-        .map_err(|e| PersistError::Migration(format!("started_at: {e}")))?
+        .map_err(|e| PersistError::RowDecode(format!("started_at: {e}")))?
         .with_timezone(&Utc);
     let ended_at = e_at
         .map(|t| {
             DateTime::parse_from_rfc3339(&t)
                 .map(|dt| dt.with_timezone(&Utc))
-                .map_err(|e| PersistError::Migration(format!("ended_at: {e}")))
+                .map_err(|e| PersistError::RowDecode(format!("ended_at: {e}")))
         })
         .transpose()?;
-    // Fall back to Qwen3Asr for sessions recorded with a since-removed
-    // backend so history still loads after backend removal.
-    let backend: AsrBackendKind = serde_json::from_str(&back).unwrap_or(AsrBackendKind::Qwen3Asr);
+    let (backend, backend_fallback_reason) = decode_backend_or_fallback(&back);
+    if let Some(reason) = backend_fallback_reason {
+        tracing::warn!(
+            session_id = %sid,
+            stored_backend = %back,
+            error = %reason,
+            "session row stored an unknown backend kind; falling back to Qwen3Asr",
+        );
+    }
     let status: SessionStatus =
-        serde_json::from_str(&stat).map_err(|e| PersistError::Migration(format!("status: {e}")))?;
+        serde_json::from_str(&stat).map_err(|e| PersistError::RowDecode(format!("status: {e}")))?;
     Ok(DictationSession {
         id,
         started_at,
@@ -406,6 +424,84 @@ mod tests {
     #[test]
     fn migration_from_empty() {
         let _db = Database::open_in_memory().unwrap();
+    }
+
+    #[test]
+    fn decode_backend_passes_known_through() {
+        let (kind, fallback) = decode_backend_or_fallback("\"OpenAiCompatible\"");
+        assert_eq!(kind, AsrBackendKind::OpenAiCompatible);
+        assert!(fallback.is_none());
+    }
+
+    #[test]
+    fn decode_backend_falls_back_on_unknown() {
+        let (kind, fallback) = decode_backend_or_fallback("\"SomeRemovedBackend\"");
+        assert_eq!(kind, AsrBackendKind::Qwen3Asr);
+        assert!(
+            fallback.is_some(),
+            "unknown backend JSON must surface a fallback reason",
+        );
+    }
+
+    #[test]
+    fn row_to_session_bad_uuid_returns_row_decode() {
+        let row: SessionRow7 = (
+            "not-a-uuid".into(),
+            "2024-01-01T00:00:00Z".into(),
+            None,
+            "minimal".into(),
+            "\"Qwen3Asr\"".into(),
+            "\"Completed\"".into(),
+            None,
+        );
+        let err = row_to_session(row).unwrap_err();
+        assert!(
+            matches!(err, PersistError::RowDecode(_)),
+            "bad uuid should yield RowDecode, got {err:?}",
+        );
+    }
+
+    #[test]
+    fn row_to_session_bad_started_at_returns_row_decode() {
+        let row: SessionRow7 = (
+            Uuid::new_v4().to_string(),
+            "not-a-date".into(),
+            None,
+            "minimal".into(),
+            "\"Qwen3Asr\"".into(),
+            "\"Completed\"".into(),
+            None,
+        );
+        let err = row_to_session(row).unwrap_err();
+        assert!(
+            matches!(err, PersistError::RowDecode(_)),
+            "bad started_at should yield RowDecode, got {err:?}",
+        );
+    }
+
+    #[test]
+    fn row_to_session_bad_status_returns_row_decode() {
+        let row: SessionRow7 = (
+            Uuid::new_v4().to_string(),
+            "2024-01-01T00:00:00Z".into(),
+            None,
+            "minimal".into(),
+            "\"Qwen3Asr\"".into(),
+            "\"NotAStatus\"".into(),
+            None,
+        );
+        let err = row_to_session(row).unwrap_err();
+        assert!(
+            matches!(err, PersistError::RowDecode(_)),
+            "bad status should yield RowDecode, got {err:?}",
+        );
+    }
+
+    #[test]
+    fn decode_backend_falls_back_on_malformed_json() {
+        let (kind, fallback) = decode_backend_or_fallback("not-valid-json");
+        assert_eq!(kind, AsrBackendKind::Qwen3Asr);
+        assert!(fallback.is_some());
     }
 
     #[test]

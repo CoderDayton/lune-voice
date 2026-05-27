@@ -19,7 +19,7 @@ use lune_core::llm::TextPostProcessor;
 use lune_core::session::{DictationSession, SessionEvent, SessionStatus};
 use lune_dict::DictionaryManager;
 use lune_dict::corrector::HeuristicCorrector;
-use lune_persist::Database;
+use lune_persist::{Database, PersistResult};
 
 /// Configuration for the session pipeline.
 ///
@@ -158,7 +158,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
                     .map(|s| Arc::new(s.clone()))
             })
             .or_else(|| builtin_registry().get("minimal"))
-            .ok_or_else(|| Error::Config("no usable style preset found".into()))?;
+            .ok_or_else(|| Error::config("no usable style preset found"))?;
 
         // Hold the active lock across persist + spawn and only assign
         // `*lock = Some(...)` at the very end. Cancellation safety
@@ -170,7 +170,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         // contending with concurrent stop/cancel callers.
         let mut lock = self.active.lock().await;
         if lock.is_some() {
-            return Err(Error::Session("session already active".into()));
+            return Err(Error::session("session already active"));
         }
 
         let session_id = Uuid::new_v4();
@@ -186,9 +186,9 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
                 status: SessionStatus::Active,
                 transcript: None,
             };
-            if let Err(e) = self.persist.lock().await.insert_session(&session) {
-                warn!(error = %e, "failed to persist session start");
-            }
+            let insert_result = self.persist.lock().await.insert_session(&session);
+            notify_persist_failure("failed to persist session start", insert_result, &event_tx)
+                .await;
         }
 
         let asr = Arc::clone(&self.asr);
@@ -369,6 +369,105 @@ async fn clear_active(active_arc: &Arc<Mutex<Option<ActiveHandle>>>, idle_notify
     idle_notify.notify_waiters();
 }
 
+/// Log a persist failure and surface it to the listener as a
+/// `SessionEvent::Warning`. Returns the inner value on success, `None` on
+/// failure — so the caller can keep going without taking the session down.
+///
+/// Persist writes during a session (initial insert, finalize update) are
+/// not on the critical path: the user's transcript still reaches the
+/// active app. Silently swallowing the error, though, hides history loss
+/// from anything watching the event stream.
+async fn notify_persist_failure<T>(
+    label: &str,
+    result: PersistResult<T>,
+    event_tx: &mpsc::Sender<SessionEvent>,
+) -> Option<T> {
+    match result {
+        Ok(v) => Some(v),
+        Err(e) => {
+            warn!(error = %e, label, "persist write failed");
+            let _ = event_tx
+                .send(SessionEvent::Warning(format!("{label}: {e}")))
+                .await;
+            None
+        }
+    }
+}
+
+/// Hard ceiling on ASR backend init. A hung Qwen3/Parakeet ONNX session
+/// would otherwise block the session forever — caller would never see an
+/// error event, hotkey would feel broken until process restart.
+const ASR_START_TIMEOUT: Duration = Duration::from_secs(15);
+
+/// Resolved per-session runtime objects built before the capture loop starts.
+struct SessionRuntime<H> {
+    audio_source: Box<dyn AudioPull>,
+    asr_session: H,
+    vad: Vad,
+}
+
+/// Open audio capture; not async because all current variants are sync.
+fn init_audio_source(
+    audio_override: SessionAudio,
+) -> std::result::Result<Box<dyn AudioPull>, String> {
+    let source: Box<dyn AudioPull> = match audio_override {
+        SessionAudio::Owned(stream) => Box::new(stream),
+        SessionAudio::Shared(handle) => {
+            // Keep ~500ms of pre-session audio so speech captured between
+            // hotkey press and this task scheduling isn't lost.
+            handle.drain_keep_last(6);
+            Box::new(handle)
+        }
+        SessionAudio::Open => Box::new(
+            AudioStream::new(AudioConfig::default()).map_err(|e| format!("audio init: {e}"))?,
+        ),
+    };
+    Ok(source)
+}
+
+/// Start the ASR backend session with a hard timeout.
+async fn init_asr_session<A: AsrBackend + 'static>(
+    asr: &A,
+    asr_config: AsrSessionConfig,
+) -> std::result::Result<A::SessionHandle, String> {
+    match tokio::time::timeout(ASR_START_TIMEOUT, asr.start_session(asr_config)).await {
+        Ok(Ok(s)) => Ok(s),
+        Ok(Err(e)) => Err(format!("ASR init: {e}")),
+        Err(_) => Err(format!(
+            "ASR init: backend did not initialize within {ASR_START_TIMEOUT:?}"
+        )),
+    }
+}
+
+fn init_vad(pipeline: &PipelineConfig, vad_pcen_enabled: bool) -> std::result::Result<Vad, String> {
+    let mut vad_config = VadConfig {
+        threshold: pipeline.speech_threshold,
+        threshold_end: pipeline.speech_threshold_end,
+        ..VadConfig::default()
+    };
+    if !vad_pcen_enabled {
+        vad_config.pcen = None;
+    }
+    Vad::new(vad_config, SAMPLE_RATE as u32).map_err(|e| format!("VAD init: {e}"))
+}
+
+async fn init_session_runtime<A: AsrBackend + 'static>(
+    asr: &A,
+    asr_config: AsrSessionConfig,
+    audio_override: SessionAudio,
+    pipeline: &PipelineConfig,
+    vad_pcen_enabled: bool,
+) -> std::result::Result<SessionRuntime<A::SessionHandle>, String> {
+    let audio_source = init_audio_source(audio_override)?;
+    let asr_session = init_asr_session(asr, asr_config).await?;
+    let vad = init_vad(pipeline, vad_pcen_enabled)?;
+    Ok(SessionRuntime {
+        audio_source,
+        asr_session,
+        vad,
+    })
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn run_session<A: AsrBackend + 'static>(
     session_id: Uuid,
@@ -389,80 +488,18 @@ async fn run_session<A: AsrBackend + 'static>(
 ) {
     let mut status = SessionStatus::Completed;
 
-    // ── Start audio capture ───────────────────────────────────────────────
-    let audio_source: Box<dyn AudioPull> = match audio_override {
-        SessionAudio::Owned(stream) => Box::new(stream),
-        SessionAudio::Shared(handle) => {
-            // Keep ~500ms of pre-session audio so speech captured between
-            // hotkey press and this task scheduling isn't lost.
-            handle.drain_keep_last(6);
-            Box::new(handle)
-        }
-        SessionAudio::Open => match AudioStream::new(AudioConfig::default()) {
-            Ok(s) => Box::new(s),
-            Err(e) => {
-                fail_init(
-                    &e,
-                    session_id,
-                    &event_tx,
-                    &persist,
-                    &active_arc,
-                    &idle_notify,
-                )
-                .await;
-                return;
-            }
-        },
-    };
-
-    // Hard ceiling on ASR backend init. A hung Qwen3/Parakeet ONNX session
-    // would otherwise block the session forever — caller would never see
-    // an error event, hotkey would feel broken until process restart.
-    const ASR_START_TIMEOUT: Duration = Duration::from_secs(15);
-    let asr_session = match tokio::time::timeout(
-        ASR_START_TIMEOUT,
-        asr.start_session(config.asr_config.clone()),
+    // ── Initialize audio capture, ASR session, and VAD ──────────────────
+    let vad_pcen_enabled = _settings.read().await.vad_pcen;
+    let runtime = match init_session_runtime(
+        &*asr,
+        config.asr_config.clone(),
+        audio_override,
+        &config.pipeline,
+        vad_pcen_enabled,
     )
     .await
     {
-        Ok(Ok(s)) => s,
-        Ok(Err(e)) => {
-            fail_init(
-                &e,
-                session_id,
-                &event_tx,
-                &persist,
-                &active_arc,
-                &idle_notify,
-            )
-            .await;
-            return;
-        }
-        Err(_) => {
-            fail_init(
-                &format!("ASR backend did not initialize within {ASR_START_TIMEOUT:?}"),
-                session_id,
-                &event_tx,
-                &persist,
-                &active_arc,
-                &idle_notify,
-            )
-            .await;
-            return;
-        }
-    };
-
-    let vad_pcen_enabled = _settings.read().await.vad_pcen;
-    let mut vad_config = VadConfig {
-        threshold: config.pipeline.speech_threshold,
-        threshold_end: config.pipeline.speech_threshold_end,
-        ..VadConfig::default()
-    };
-    if !vad_pcen_enabled {
-        vad_config.pcen = None;
-    }
-    let mut vad = match Vad::new(vad_config, SAMPLE_RATE as u32) {
-        Ok(v) => v,
+        Ok(r) => r,
         Err(e) => {
             fail_init(
                 &e,
@@ -476,6 +513,11 @@ async fn run_session<A: AsrBackend + 'static>(
             return;
         }
     };
+    let SessionRuntime {
+        audio_source,
+        asr_session,
+        mut vad,
+    } = runtime;
     let _ = event_tx.send(SessionEvent::Started).await;
 
     let mut segments = Vec::with_capacity(asr.segment_capacity_hint());
@@ -1011,7 +1053,36 @@ mod tests {
     use lune_core::asr::{AsrSegment, AsrSessionConfig, WordConfidence};
     use lune_core::error::Error as CoreError;
     use lune_core::llm::{PostProcessInput, PostProcessOutput};
+    use lune_persist::PersistError;
     use tokio::sync::{Notify, mpsc};
+
+    #[tokio::test]
+    async fn notify_persist_failure_emits_warning_with_label_and_error() {
+        let (tx, mut rx) = mpsc::channel(2);
+        let err: PersistResult<()> = Err(PersistError::NotFound("xyz".into()));
+        let out = notify_persist_failure("save snapshot", err, &tx).await;
+        assert!(out.is_none(), "failure must collapse to None");
+        let event = rx.try_recv().expect("expected a Warning event");
+        match event {
+            SessionEvent::Warning(msg) => {
+                assert!(msg.contains("save snapshot"), "label missing: {msg}");
+                assert!(msg.contains("xyz"), "error text missing: {msg}");
+            }
+            other => panic!("expected Warning, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn notify_persist_failure_passes_value_through_on_ok() {
+        let (tx, mut rx) = mpsc::channel(2);
+        let ok: PersistResult<u32> = Ok(42);
+        let out = notify_persist_failure("save snapshot", ok, &tx).await;
+        assert_eq!(out, Some(42));
+        assert!(
+            rx.try_recv().is_err(),
+            "no event should fire on the happy path",
+        );
+    }
 
     struct ScriptedAsr {
         responses: Mutex<VecDeque<Result<Vec<AsrSegment>>>>,
@@ -1345,10 +1416,7 @@ mod tests {
     async fn asr_errors_mark_session_failed() {
         local_set()
             .run_until(async {
-                let responses = vec![
-                    Err(CoreError::Asr("boom".into())),
-                    Err(CoreError::Asr("boom".into())),
-                ];
+                let responses = vec![Err(CoreError::asr("boom")), Err(CoreError::asr("boom"))];
                 let (mgr, db) = make_manager(scripted_asr(responses), Arc::new(EchoPostProcessor));
                 let (tx, rx) = mpsc::channel(32);
                 let session_id = mgr.start_with_audio(tx, speech_stream()).await.unwrap();
@@ -1375,10 +1443,7 @@ mod tests {
     async fn asr_errors_without_detected_speech_still_fail_session() {
         local_set()
             .run_until(async {
-                let responses = vec![
-                    Err(CoreError::Asr("boom".into())),
-                    Err(CoreError::Asr("boom".into())),
-                ];
+                let responses = vec![Err(CoreError::asr("boom")), Err(CoreError::asr("boom"))];
                 let (mgr, db) = make_manager(scripted_asr(responses), Arc::new(EchoPostProcessor));
                 let (tx, rx) = mpsc::channel(32);
                 let session_id = mgr.start_with_audio(tx, silent_stream(1)).await.unwrap();

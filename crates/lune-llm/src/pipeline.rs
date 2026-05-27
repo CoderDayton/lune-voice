@@ -283,7 +283,7 @@ mod tests {
         #[async_trait]
         impl LlmService for FailingLlm {
             async fn complete(&self, _system: &str, _user: &str) -> Result<String> {
-                Err(lune_core::Error::Llm("test failure".into()))
+                Err(lune_core::Error::llm("test failure"))
             }
         }
 

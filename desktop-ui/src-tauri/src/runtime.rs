@@ -497,6 +497,14 @@ impl AppRuntime {
                             })
                             .await;
                     }
+                    SessionEvent::Warning(message) => {
+                        warn!(warning = %message, "session warning");
+                        runtime
+                            .push_session_event(SessionStreamEvent::SessionWarning {
+                                message: sanitize_error_for_frontend(&message),
+                            })
+                            .await;
+                    }
                     SessionEvent::Stopped => {
                         runtime.finish_session(saw_text).await;
                         if !saw_error {
@@ -1152,7 +1160,7 @@ impl LlmService for LazyLocalLlm {
         };
         match llm {
             Some(llm) => llm.complete(system, user).await,
-            None => Err(lune_core::Error::Llm("local LLM not ready".into())),
+            None => Err(lune_core::Error::llm("local LLM not ready")),
         }
     }
 }

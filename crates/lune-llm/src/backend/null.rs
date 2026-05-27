@@ -29,7 +29,7 @@ impl TextPostProcessor for NullPostProcessor {
 #[async_trait::async_trait]
 impl LlmService for NullPostProcessor {
     async fn complete(&self, _system: &str, _user: &str) -> Result<String> {
-        Err(lune_core::Error::Llm("LLM backend is disabled".into()))
+        Err(lune_core::Error::llm("LLM backend is disabled"))
     }
 }
 

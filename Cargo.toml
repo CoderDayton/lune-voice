@@ -18,6 +18,11 @@ version = "0.1.0"
 edition = "2024"
 license = "LicenseRef-Proprietary"
 
+[workspace.lints.clippy]
+dbg_macro = "deny"
+todo = "warn"
+unimplemented = "warn"
+
 [profile.release]
 # thin LTO: ~80% of fat's benefit at fraction of link time; cross-crate inlining
 # unlocked across all 9 crates. codegen-units=1 removes parallelism barriers so

@@ -78,7 +78,7 @@ impl OpenAiCompatibleAsrBackend {
         let host = config.base_url.host_str().unwrap_or("");
         let is_loopback = host == "127.0.0.1" || host == "localhost" || host == "::1";
         if scheme != "https" && !is_loopback {
-            return Err(Error::Asr(format!(
+            return Err(Error::asr(format!(
                 "OpenAI ASR base_url must use HTTPS (got {scheme}://); \
                  plaintext only allowed for loopback addresses"
             )));
@@ -93,7 +93,7 @@ impl OpenAiCompatibleAsrBackend {
         let client = reqwest::Client::builder()
             .timeout(config.timeout)
             .build()
-            .map_err(|e| Error::Asr(format!("build http client: {e}")))?;
+            .map_err(|e| Error::asr(format!("build http client: {e}")))?;
 
         tracing::info!(
             base_url = %config.base_url,
@@ -113,7 +113,7 @@ impl OpenAiCompatibleAsrBackend {
 /// Lock helper: maps poison error to `Error::Asr` with a fixed message.
 #[inline(always)]
 fn lock_err<T>(r: std::sync::LockResult<T>) -> Result<T> {
-    r.map_err(|_| Error::Asr("session lock poisoned".into()))
+    r.map_err(|_| Error::asr("session lock poisoned"))
 }
 
 #[async_trait::async_trait]
@@ -229,7 +229,7 @@ impl OpenAiCompatibleAsrBackend {
             let part = reqwest::multipart::Part::bytes(wav.clone())
                 .file_name("audio.wav")
                 .mime_str("audio/wav")
-                .map_err(|e| Error::Asr(format!("mime: {e}")))?;
+                .map_err(|e| Error::asr(format!("mime: {e}")))?;
 
             let mut form = reqwest::multipart::Form::new()
                 .part("file", part)
@@ -260,19 +260,19 @@ impl OpenAiCompatibleAsrBackend {
                 Ok(r) if !r.status().is_success() => {
                     let status = r.status();
                     let body = r.text().await.unwrap_or_default();
-                    return Err(Error::Asr(format!("ASR API error {status}: {body}")));
+                    return Err(Error::asr(format!("ASR API error {status}: {body}")));
                 }
                 Ok(r) => {
                     let body: VerboseJsonResponse = r
                         .json()
                         .await
-                        .map_err(|e| Error::Asr(format!("parse response: {e}")))?;
+                        .map_err(|e| Error::asr(format!("parse response: {e}")))?;
                     return Ok(body.into_segments(base_id));
                 }
             }
         }
 
-        Err(Error::Asr(format!(
+        Err(Error::asr(format!(
             "ASR failed after 3 attempts: {last_err}"
         )))
     }
@@ -282,7 +282,7 @@ fn build_transcription_url(base_url: &Url) -> Result<Url> {
     let mut url = base_url.clone();
     let mut segments = url
         .path_segments_mut()
-        .map_err(|_| Error::Asr("base_url cannot be a cannot-be-a-base URL".into()))?;
+        .map_err(|_| Error::asr("base_url cannot be a cannot-be-a-base URL"))?;
     segments.push("audio");
     segments.push("transcriptions");
     drop(segments);
