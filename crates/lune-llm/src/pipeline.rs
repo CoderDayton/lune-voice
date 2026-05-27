@@ -55,6 +55,10 @@ impl CorrectionPipeline {
 }
 
 fn dictionary_examples(input: &PostProcessInput) -> Vec<(String, String)> {
+    let use_english_carrier = matches!(
+        lune_core::lang::display_name(&input.language),
+        Some("English")
+    );
     input
         .dictionary
         .iter()
@@ -65,22 +69,44 @@ fn dictionary_examples(input: &PostProcessInput) -> Vec<(String, String)> {
             if phrase.is_empty() || replacement.is_empty() {
                 return None;
             }
-            Some((
-                format!("I said {phrase} in the meeting."),
-                format!("I said {replacement} in the meeting."),
-            ))
+            if use_english_carrier {
+                Some((
+                    format!("I said {phrase} in the meeting."),
+                    format!("I said {replacement} in the meeting."),
+                ))
+            } else {
+                // For any other language we hand the LLM bare phrase pairs
+                // rather than ship an English carrier sentence into a
+                // non-English correction prompt.
+                Some((phrase, replacement))
+            }
         })
         .collect()
 }
 
 fn clean_example_fragment(s: &str) -> String {
     const MAX_CHARS: usize = 80;
-    s.split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .chars()
-        .take(MAX_CHARS)
-        .collect()
+    let mut out = String::with_capacity(s.len().min(MAX_CHARS * 4));
+    let mut chars_taken = 0usize;
+    let mut first = true;
+    for tok in s.split_whitespace() {
+        if !first {
+            if chars_taken >= MAX_CHARS {
+                break;
+            }
+            out.push(' ');
+            chars_taken += 1;
+        }
+        for c in tok.chars() {
+            if chars_taken >= MAX_CHARS {
+                return out;
+            }
+            out.push(c);
+            chars_taken += 1;
+        }
+        first = false;
+    }
+    out
 }
 
 #[async_trait]
@@ -147,43 +173,109 @@ impl TextPostProcessor for CorrectionPipeline {
     }
 }
 
-/// Pre-replace single-token dictionary phrases in the raw transcript before
-/// the LLM ever sees it.
+/// Pre-replace dictionary phrases in the raw transcript before the LLM ever
+/// sees it. Single-word and multi-word phrases are both handled; the
+/// post-pass validator then accepts each replacement as an `Op::Match`.
 ///
-/// Policy: the user's dictionary wins unconditionally — every case-insensitive
-/// whole-word hit is rewritten, and the post-pass validator then accepts the
-/// replacement as an `Op::Match`. The trade-off is that homonyms ("lit" →
-/// "lit-up") cannot be selectively kept; users opt in by adding the entry.
+/// Matching is Unicode case-insensitive on the alphanumeric core of each
+/// whitespace-delimited token, so leading/trailing punctuation (ASCII or
+/// smart quotes / em-dashes / guillemets) does not block the match. When
+/// several phrases could match at the same position, the longest one wins.
 ///
-/// Multi-word phrases are skipped here — seeding them safely needs phrase
-/// boundaries we don't have at this layer. The LLM still sees them via the
-/// system prompt + correction examples.
+/// Whitespace between non-matching tokens is preserved byte-for-byte from
+/// the input — tabs, newlines, and runs of spaces all survive.
 fn apply_dictionary_seed(text: &str, dictionary: &[lune_core::dict::DictionaryEntry]) -> String {
     if dictionary.is_empty() {
         return text.to_string();
     }
 
-    let words: Vec<&str> = text.split_whitespace().collect();
-    let mut out = Vec::with_capacity(words.len());
-    for word in words {
-        let (prefix, core, suffix) = split_edge_punctuation(word);
-        let replacement = dictionary
-            .iter()
-            .filter(|entry| !entry.phrase.contains(char::is_whitespace))
-            .find(|entry| core.eq_ignore_ascii_case(&entry.phrase))
-            .map(|entry| entry.replacement.as_str());
-        match replacement {
-            Some(replacement) => {
-                let mut s = String::with_capacity(prefix.len() + replacement.len() + suffix.len());
-                s.push_str(prefix);
-                s.push_str(replacement);
-                s.push_str(suffix);
-                out.push(s);
+    // Pre-tokenize each dictionary phrase into lowercase tokens. Longest
+    // phrase first so multi-word entries win over their single-word
+    // substrings at the same position.
+    let mut phrases: Vec<(Vec<String>, &str)> = dictionary
+        .iter()
+        .filter_map(|entry| {
+            let toks: Vec<String> = entry.phrase.split_whitespace().map(unicode_lower).collect();
+            if toks.iter().any(|t| t.is_empty()) || toks.is_empty() {
+                None
+            } else {
+                Some((toks, entry.replacement.as_str()))
             }
-            None => out.push(word.to_string()),
+        })
+        .collect();
+    phrases.sort_by_key(|(toks, _)| std::cmp::Reverse(toks.len()));
+
+    let tokens = tokenize_word_spans(text);
+    // Lowercase each token's alphanumeric core once up front. The matcher
+    // is O(tokens * phrases * phrase_len) and used to allocate a fresh
+    // String per comparison; precomputing cuts those allocations entirely.
+    let lowered_cores: Vec<String> = tokens
+        .iter()
+        .map(|&(s, e)| unicode_lower(split_edge_punctuation(&text[s..e]).1))
+        .collect();
+    let mut out = String::with_capacity(text.len());
+    let mut last_end = 0usize;
+    let mut t = 0usize;
+    while t < tokens.len() {
+        let matched = phrases.iter().find_map(|(phrase_toks, replacement)| {
+            let n = phrase_toks.len();
+            if t + n > tokens.len() {
+                return None;
+            }
+            let all_match = (0..n).all(|k| lowered_cores[t + k] == phrase_toks[k]);
+            if all_match {
+                Some((n, *replacement))
+            } else {
+                None
+            }
+        });
+
+        if let Some((n, replacement)) = matched {
+            let (first_s, first_e) = tokens[t];
+            let (last_s, last_e) = tokens[t + n - 1];
+            // Preserve everything before the matched span verbatim.
+            out.push_str(&text[last_end..first_s]);
+            // Keep the first token's leading punctuation and the last
+            // token's trailing punctuation; drop anything in between
+            // (internal whitespace and punctuation of the matched span)
+            // since the replacement is a single unit.
+            let (prefix, _, _) = split_edge_punctuation(&text[first_s..first_e]);
+            let (_, _, suffix) = split_edge_punctuation(&text[last_s..last_e]);
+            out.push_str(prefix);
+            out.push_str(replacement);
+            out.push_str(suffix);
+            last_end = last_e;
+            t += n;
+        } else {
+            t += 1;
         }
     }
-    out.join(" ")
+    out.push_str(&text[last_end..]);
+    out
+}
+
+fn unicode_lower(s: &str) -> String {
+    s.chars().flat_map(char::to_lowercase).collect()
+}
+
+/// Byte-range spans of every whitespace-delimited token in `text`. Used
+/// to rebuild output with the input's whitespace intact.
+fn tokenize_word_spans(text: &str) -> Vec<(usize, usize)> {
+    let mut spans = Vec::new();
+    let mut start: Option<usize> = None;
+    for (i, c) in text.char_indices() {
+        if c.is_whitespace() {
+            if let Some(s) = start.take() {
+                spans.push((s, i));
+            }
+        } else if start.is_none() {
+            start = Some(i);
+        }
+    }
+    if let Some(s) = start {
+        spans.push((s, text.len()));
+    }
+    spans
 }
 
 // Peel off any leading/trailing non-alphanumeric characters so dictionary
@@ -195,8 +287,10 @@ fn split_edge_punctuation(word: &str) -> (&str, &str, &str) {
         .find(|c: char| c.is_alphanumeric())
         .unwrap_or(word.len());
     let core_end = word
-        .rfind(|c: char| c.is_alphanumeric())
-        .map(|i| i + word[i..].chars().next().map(char::len_utf8).unwrap_or(0))
+        .char_indices()
+        .rev()
+        .find(|(_, c)| c.is_alphanumeric())
+        .map(|(i, c)| i + c.len_utf8())
         .unwrap_or(core_start);
     (
         &word[..core_start],
@@ -339,6 +433,124 @@ mod tests {
         assert_eq!(
             apply_dictionary_seed("I visited Barolo.", &dictionary),
             "I visited Boorloo."
+        );
+    }
+
+    #[test]
+    fn dictionary_examples_drop_english_carrier_for_non_english() {
+        let input = PostProcessInput {
+            raw_text: "...".into(),
+            style_preset: Arc::new(StylePreset::minimal()),
+            app_category: None,
+            dictionary: vec![DictionaryEntry {
+                phrase: "Bordeaux".into(),
+                replacement: "Bordo".into(),
+                priority: 10,
+            }],
+            context: None,
+            language: "fr".into(),
+            uncertain_words: vec![],
+        };
+        let examples = dictionary_examples(&input);
+        assert_eq!(
+            examples,
+            vec![("Bordeaux".to_string(), "Bordo".to_string())]
+        );
+    }
+
+    #[test]
+    fn dictionary_seed_matches_unicode_case_variants() {
+        let dictionary = vec![DictionaryEntry {
+            phrase: "métro".into(),
+            replacement: "subway".into(),
+            priority: 10,
+        }];
+        // Uppercase non-ASCII letter must fold to its lowercase form.
+        assert_eq!(
+            apply_dictionary_seed("J'aime le MÉTRO.", &dictionary),
+            "J'aime le subway."
+        );
+    }
+
+    #[test]
+    fn dictionary_seed_preserves_internal_whitespace() {
+        let dictionary = vec![DictionaryEntry {
+            phrase: "Barolo".into(),
+            replacement: "Boorloo".into(),
+            priority: 10,
+        }];
+        // Tabs and runs of spaces between non-matching tokens must survive
+        // — apply_dictionary_seed used to collapse them via split_whitespace.
+        assert_eq!(
+            apply_dictionary_seed("I  visited\tBarolo today", &dictionary),
+            "I  visited\tBoorloo today"
+        );
+    }
+
+    #[test]
+    fn dictionary_seed_applies_multi_word_phrase() {
+        let dictionary = vec![DictionaryEntry {
+            phrase: "machine learning".into(),
+            replacement: "ML".into(),
+            priority: 10,
+        }];
+        assert_eq!(
+            apply_dictionary_seed("I work on machine learning daily.", &dictionary),
+            "I work on ML daily."
+        );
+    }
+
+    #[test]
+    fn dictionary_seed_multi_word_drops_internal_punctuation() {
+        let dictionary = vec![DictionaryEntry {
+            phrase: "machine learning".into(),
+            replacement: "ML".into(),
+            priority: 10,
+        }];
+        // Punctuation between matched phrase tokens is intentionally
+        // collapsed — the replacement is a single unit, so the comma
+        // between "machine" and "learning" is dropped along with the
+        // internal whitespace. Pin this so a future refactor doesn't
+        // silently start emitting "ML,".
+        assert_eq!(
+            apply_dictionary_seed("I prefer machine, learning techniques.", &dictionary),
+            "I prefer ML techniques."
+        );
+    }
+
+    #[test]
+    fn dictionary_seed_multi_word_is_case_insensitive_and_punctuation_tolerant() {
+        let dictionary = vec![DictionaryEntry {
+            phrase: "machine learning".into(),
+            replacement: "ML".into(),
+            priority: 10,
+        }];
+        // Punctuation between phrase tokens and surrounding the phrase must
+        // not block the match; surface case of the user input should not matter.
+        assert_eq!(
+            apply_dictionary_seed("Hello, Machine Learning! Yes.", &dictionary),
+            "Hello, ML! Yes."
+        );
+    }
+
+    #[test]
+    fn dictionary_seed_prefers_longest_match() {
+        let dictionary = vec![
+            DictionaryEntry {
+                phrase: "machine".into(),
+                replacement: "MCH".into(),
+                priority: 10,
+            },
+            DictionaryEntry {
+                phrase: "machine learning".into(),
+                replacement: "ML".into(),
+                priority: 10,
+            },
+        ];
+        // The longer phrase wins even when a single-word entry could fire first.
+        assert_eq!(
+            apply_dictionary_seed("I love machine learning.", &dictionary),
+            "I love ML."
         );
     }
 

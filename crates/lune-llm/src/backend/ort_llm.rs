@@ -925,6 +925,12 @@ pub(crate) fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> S
     let mut result: Vec<String> = Vec::with_capacity(ops.len());
     let mut prev_inp_terminated = true; // utterance start = sentence-initial
     let mut prev_out_terminated = true;
+    // Precompute the last op that consumes an input token. Any Insert past
+    // this position is trailing (no following input) — drop it to suppress
+    // function-word hallucinations at the tail of the utterance.
+    let last_input_op_idx = ops
+        .iter()
+        .rposition(|op| matches!(op, Op::Match(_, _) | Op::Delete(_)));
     let mut idx = 0;
     while idx < ops.len() {
         match &ops[idx] {
@@ -974,9 +980,7 @@ pub(crate) fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> S
                 idx += 1;
             }
             Op::Insert(w) => {
-                let has_following_input = ops[idx + 1..]
-                    .iter()
-                    .any(|op| matches!(op, Op::Match(_, _) | Op::Delete(_)));
+                let has_following_input = last_input_op_idx.is_some_and(|last| idx < last);
                 if is_en && has_following_input && SAFE_INSERTIONS.contains(&norm_word(w).as_str())
                 {
                     // Inserted function words ("the", "a", "to", …) are never
