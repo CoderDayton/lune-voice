@@ -728,6 +728,65 @@
   @apply flex flex-col gap-3 rounded-lg px-4 py-4 transition-colors sm:flex-row sm:items-center sm:justify-between;
 }
 
+/* ── Bento board ───────────────────────────────────────────────────── */
+
+/* Asymmetric command-center grid. Cells span varying columns/rows via
+   Tailwind `col-span-*` / `row-span-*` utilities. The board exposes a
+   single column on small screens and 12 columns at >=48rem, so a cell
+   marked `col-span-12 md:col-span-6` collapses cleanly on mobile. This
+   replaces the old vertical `.page-stack` of full-width panels. */
+@utility bento-board {
+  @apply grid gap-space-md;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  grid-auto-rows: minmax(6.5rem, auto);
+}
+
+@media (min-width: 48rem) {
+  .bento-board {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+}
+
+/* Base cell — a panel surface that fills its grid track. Density (padding
+   + type scale) is applied per-cell with spacing utilities in the markup,
+   which is what produces the intentional asymmetry between hero and stat
+   cells. `min-w-0` lets long content truncate instead of blowing out the
+   track. */
+@utility bento-cell {
+  @apply flex min-w-0 flex-col rounded-box border border-surface-border bg-surface-panel;
+}
+
+@utility bento-cell-elevated {
+  @apply flex min-w-0 flex-col rounded-box border border-surface-border bg-surface-elevated;
+}
+
+/* Slim status ribbon — a full-width header strip, deliberately short so it
+   reads as a status bar rather than another stacked section. */
+@utility bento-ribbon {
+  @apply flex flex-wrap items-center gap-3 rounded-box border border-surface-border bg-surface-elevated px-5 py-3.5;
+}
+
+/* ── Audio meter ───────────────────────────────────────────────────── */
+
+/* Segmented input-level meter. Bars are data-driven (height set inline,
+   lit state via `data-on`) rather than keyframe-animated, so it stays
+   honest under prefers-reduced-motion — the global reduced-motion rule
+   collapses the 80ms transitions to ~0 without freezing a fake animation. */
+@utility audio-meter {
+  @apply flex items-end gap-1;
+  height: 2.5rem;
+}
+
+@utility audio-meter-bar {
+  @apply w-1.5 shrink-0 rounded-full bg-surface-border-strong;
+  transition: background-color 80ms var(--ease-standard),
+              opacity 80ms var(--ease-standard);
+}
+
+.audio-meter-bar[data-on="true"] {
+  @apply bg-primary;
+}
+
 /* ── Skeleton loading ──────────────────────────────────────────────── */
 
 @utility skeleton-shimmer {

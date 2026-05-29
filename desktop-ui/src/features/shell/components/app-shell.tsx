@@ -1,9 +1,11 @@
+import { useLingui } from '@lingui/react/macro';
 import { Outlet, useRouterState } from '@tanstack/react-router';
+import { useStore } from '@tanstack/react-store';
 import { Menu } from 'lucide-react';
 import { useEffect, useEffectEvent, useRef } from 'react';
 import { ErrorToast } from '../../../components/feedback';
 import type { SessionStreamEvent } from '../../../lib/backend/types';
-import { workspaceActions } from '../../../store/workspace-store';
+import { workspaceActions, workspaceStore } from '../../../store/workspace-store';
 import { useFirstRunGate } from '../../welcome/use-model-setup';
 import { WelcomeLayout } from '../../welcome/welcome-layout';
 import { WelcomePage } from '../../welcome/welcome-page';
@@ -109,9 +111,16 @@ export function AppShell() {
         <main id="main-content" className="flex-1 overflow-y-auto">
           <div className="app-scroll">
             <div className="app-frame">
-              <h1 className="hidden lg:block mb-6 text-[length:var(--text-h1)] font-display tracking-heading text-balance select-none">
-                {page.label}
-              </h1>
+              {/* Desktop command bar — page identity + live service status */}
+              <div className="mb-7 hidden items-end justify-between gap-4 lg:flex">
+                <div className="min-w-0">
+                  <h1 className="font-display text-display-lg font-semibold tracking-display text-balance text-content-strong select-none">
+                    {page.label}
+                  </h1>
+                  <p className="mt-1 text-sm text-content-subtle select-none">{page.description}</p>
+                </div>
+                <ShellStatusChip />
+              </div>
               <Outlet />
             </div>
           </div>
@@ -125,6 +134,37 @@ export function AppShell() {
           <SidebarContent />
         </aside>
       </div>
+    </div>
+  );
+}
+
+/** Live service-status chip for the desktop command bar. Subscribes to the
+ *  runtime status only, so it re-renders independently of route changes. */
+function ShellStatusChip() {
+  const { t } = useLingui();
+  const serviceStatus = useStore(workspaceStore, (s) => s.runtime.serviceStatus);
+
+  const isActive = serviceStatus === 'listening' || serviceStatus === 'processing';
+  const isConnected = serviceStatus === 'ready' || isActive;
+  const isConnecting = serviceStatus === 'Connecting';
+  const dotClass = isConnecting ? 'bg-warning' : isConnected ? 'bg-success' : 'bg-error';
+  const label = isConnecting
+    ? t`Connecting`
+    : serviceStatus === 'processing'
+      ? t`Processing`
+      : serviceStatus === 'listening'
+        ? t`Listening`
+        : isConnected
+          ? t`Ready`
+          : t`Offline`;
+
+  return (
+    <div className="flex shrink-0 items-center gap-2 rounded-selector border border-surface-border bg-surface-elevated px-3 py-1.5 text-sm text-content-muted select-none">
+      <span className="relative inline-flex size-2 items-center justify-center">
+        {isActive && <span className={`status-pulse absolute inset-0 rounded-full ${dotClass}`} />}
+        <span className={`relative size-2 rounded-full ${dotClass}`} />
+      </span>
+      {label}
     </div>
   );
 }

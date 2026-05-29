@@ -1,6 +1,6 @@
 import { useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';
-import { Paintbrush, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
 import {
   createCustomStyle,
@@ -123,18 +123,6 @@ export function StylesPage() {
 
   return (
     <div className="page-stack">
-      <div className="flex items-center gap-4 mb-2">
-        <div className="token-icon size-9 shrink-0">
-          <Paintbrush size={18} strokeWidth={1.8} className="text-primary/60" />
-        </div>
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight">{t`Writing styles`}</h2>
-          <p className="text-sm text-content-subtle mt-0.5">
-            {t`Choose the tone and formatting applied to your transcriptions.`}
-          </p>
-        </div>
-      </div>
-
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {loading && presets.length === 0
           ? [0, 1, 2].map((i) => (

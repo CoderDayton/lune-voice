@@ -1,4 +1,16 @@
+import { useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';
+import {
+  AudioLines,
+  Boxes,
+  Keyboard,
+  type LucideIcon,
+  Mic,
+  Palette,
+  Send,
+  SlidersHorizontal,
+} from 'lucide-react';
+import { useState } from 'react';
 import { workspaceStore } from '../../store/workspace-store';
 import { AppearanceSection } from './sections/appearance-section';
 import { GeneralSection } from './sections/general-section';
@@ -8,9 +20,20 @@ import { OutputSection } from './sections/output-section';
 import { ShortcutsSection } from './sections/shortcuts-section';
 import { TranscriptionSection } from './sections/transcription-section';
 
+type SectionId =
+  | 'general'
+  | 'appearance'
+  | 'shortcuts'
+  | 'input'
+  | 'transcription'
+  | 'output'
+  | 'models';
+
 export function SettingsPage() {
+  const { t } = useLingui();
   const settings = useStore(workspaceStore, (s) => s.settings);
   const loaded = useStore(workspaceStore, (s) => s.runtime.loaded);
+  const [active, setActive] = useState<SectionId>('general');
 
   if (!loaded) {
     return (
@@ -38,15 +61,67 @@ export function SettingsPage() {
     );
   }
 
+  const sections: { id: SectionId; label: string; icon: LucideIcon }[] = [
+    { id: 'general', label: t`General`, icon: SlidersHorizontal },
+    { id: 'appearance', label: t`Appearance`, icon: Palette },
+    { id: 'shortcuts', label: t`Shortcuts`, icon: Keyboard },
+    { id: 'input', label: t`Input`, icon: Mic },
+    { id: 'transcription', label: t`Transcription`, icon: AudioLines },
+    { id: 'output', label: t`Output`, icon: Send },
+    { id: 'models', label: t`Models`, icon: Boxes },
+  ];
+
+  const content: Record<SectionId, React.ReactNode> = {
+    general: <GeneralSection settings={settings} />,
+    appearance: <AppearanceSection />,
+    shortcuts: <ShortcutsSection settings={settings} />,
+    input: <InputSection settings={settings} />,
+    transcription: <TranscriptionSection settings={settings} />,
+    output: <OutputSection settings={settings} />,
+    models: <ModelsSection />,
+  };
+
   return (
-    <div className="page-stack">
-      <GeneralSection settings={settings} />
-      <AppearanceSection />
-      <ShortcutsSection settings={settings} />
-      <InputSection settings={settings} />
-      <TranscriptionSection settings={settings} />
-      <OutputSection settings={settings} />
-      <ModelsSection />
+    <div className="bento-board">
+      {/* Section rail — horizontal scroll on mobile, vertical on desktop */}
+      <nav
+        aria-label={t`Settings sections`}
+        className="bento-cell col-span-12 flex-row gap-1 overflow-x-auto p-space-sm md:col-span-3 md:flex-col md:self-start"
+      >
+        {sections.map(({ id, label, icon: Icon }) => {
+          const isActive = id === active;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setActive(id)}
+              aria-current={isActive ? 'page' : undefined}
+              className={`flex shrink-0 items-center gap-3 rounded-field px-3.5 py-3 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary md:w-full ${
+                isActive
+                  ? 'bg-surface-nav-active font-medium text-content-strong'
+                  : 'text-content-muted hover:bg-surface-hover hover:text-content'
+              }`}
+            >
+              <Icon
+                size={18}
+                strokeWidth={isActive ? 2.1 : 1.6}
+                className={isActive ? 'text-content-strong' : 'text-content-subtle'}
+              />
+              {label}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* All sections stay mounted; inactive ones are hidden so transient
+          state (e.g. an in-progress model download) survives tab switches. */}
+      <div className="col-span-12 min-w-0 md:col-span-9">
+        {sections.map(({ id }) => (
+          <div key={id} hidden={id !== active}>
+            {content[id]}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

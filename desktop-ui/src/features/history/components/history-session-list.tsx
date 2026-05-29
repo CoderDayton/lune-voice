@@ -10,17 +10,64 @@ import {
 import { HistoryPagination } from './history-pagination';
 import { SessionDetailModal } from './session-detail-modal';
 
-interface SessionRowProps {
-  item: HistorySession;
+interface HistorySessionListProps {
+  /** When provided, rows select into a detail pane instead of opening the
+   *  modal (desktop master-detail mode). */
+  selectedId?: string | null;
+  onSelect?: (session: HistorySession) => void;
 }
 
-const SessionRow = memo(function SessionRow({ item }: SessionRowProps) {
+function SessionRowBody({ item }: { item: HistorySession }) {
   const { t } = useLingui();
   const time = new Date(item.startedAt).toLocaleTimeString([], {
     hour: 'numeric',
     minute: '2-digit',
   });
+  return (
+    <div className="list-col-grow min-w-0">
+      <p className="text-base line-clamp-2 sm:line-clamp-3">
+        {item.transcript || t`Empty session`}
+      </p>
+      <div className="text-sm text-content-subtle mt-0.5">
+        <span className="tabular-nums">{time}</span>
+        <span className="mx-1">·</span>
+        {item.words} {t`words`}
+        <span className="mx-1">·</span>
+        {item.seconds}
+        {t`s`}
+      </div>
+    </div>
+  );
+}
 
+interface SessionRowProps {
+  item: HistorySession;
+  selected?: boolean;
+  onSelect?: (session: HistorySession) => void;
+}
+
+const SessionRow = memo(function SessionRow({ item, selected, onSelect }: SessionRowProps) {
+  const { t } = useLingui();
+
+  // Master-detail mode: the row selects into the side pane.
+  if (onSelect) {
+    return (
+      <li className="list-row p-0">
+        <button
+          type="button"
+          aria-current={selected ? 'true' : undefined}
+          onClick={() => onSelect(item)}
+          className={`interactive-row flex w-full items-center text-left px-4 py-3 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary ${
+            selected ? 'border-l-2 border-primary bg-surface-nav-active' : ''
+          }`}
+        >
+          <SessionRowBody item={item} />
+        </button>
+      </li>
+    );
+  }
+
+  // Default mode: the row opens the modal.
   return (
     <SessionDetailModal session={item}>
       {(open) => (
@@ -32,19 +79,7 @@ const SessionRow = memo(function SessionRow({ item }: SessionRowProps) {
             aria-label={t`Open session details`}
             onClick={open}
           >
-            <div className="list-col-grow min-w-0">
-              <p className="text-base line-clamp-2 sm:line-clamp-3">
-                {item.transcript || t`Empty session`}
-              </p>
-              <div className="text-sm text-content-subtle mt-0.5">
-                <span className="tabular-nums">{time}</span>
-                <span className="mx-1">·</span>
-                {item.words} {t`words`}
-                <span className="mx-1">·</span>
-                {item.seconds}
-                {t`s`}
-              </div>
-            </div>
+            <SessionRowBody item={item} />
           </button>
         </li>
       )}
@@ -52,7 +87,7 @@ const SessionRow = memo(function SessionRow({ item }: SessionRowProps) {
   );
 });
 
-export function HistorySessionList() {
+export function HistorySessionList({ selectedId, onSelect }: HistorySessionListProps = {}) {
   const { t } = useLingui();
   const visibleSessions = useStore(workspaceStore, getPaginatedHistorySessions);
   const totalVisible = useStore(workspaceStore, getVisibleSessionCount);
@@ -107,7 +142,12 @@ export function HistorySessionList() {
           </h3>
           <ul className="list panel-surface overflow-hidden">
             {group.items.map((item) => (
-              <SessionRow key={item.id} item={item} />
+              <SessionRow
+                key={item.id}
+                item={item}
+                selected={selectedId === item.id}
+                onSelect={onSelect}
+              />
             ))}
           </ul>
         </div>

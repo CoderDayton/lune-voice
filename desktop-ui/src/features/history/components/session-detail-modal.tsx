@@ -12,7 +12,7 @@ import {
   Mic,
   Palette,
 } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ConfirmDialog } from '../../../components/feedback/confirm-dialog';
 import { type HistorySession, removeHistorySession } from '../../../store/workspace-store';
 
@@ -38,12 +38,16 @@ function relativeTime(iso: string): string {
   return `${days}d ago`;
 }
 
-export function SessionDetailModal({ session, children }: SessionDetailModalProps) {
+/**
+ * Presentational detail for a single session — header (date + copy/download),
+ * transcript, and metadata. Shared by the mobile modal and the desktop
+ * master-detail pane. Owns copy/download and the Ctrl+C shortcut, scoped to
+ * its own root so it works in either host.
+ */
+export function SessionDetailContent({ session }: { session: HistorySession }) {
   const { t } = useLingui();
-  const dialogRef = useRef<HTMLDialogElement | null>(null);
   const [copied, setCopied] = useState(false);
-  const titleId = useId();
-  const transcriptId = useId();
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   const startDate = new Date(session.startedAt);
   const date = startDate.toLocaleDateString(undefined, {
@@ -84,115 +88,112 @@ export function SessionDetailModal({ session, children }: SessionDetailModalProp
       .catch(() => {});
   }
 
-  // Ctrl+C copies full transcript when modal is open and no text is selected
+  // Ctrl/Cmd+C copies the full transcript when focus is inside this detail and
+  // the user has not made a manual text selection.
   useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
+    const el = rootRef.current;
+    if (!el) return;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'c' && (e.ctrlKey || e.metaKey) && !window.getSelection()?.toString()) {
         e.preventDefault();
         handleCopy();
       }
     }
-    dialog.addEventListener('keydown', onKeyDown);
-    return () => dialog.removeEventListener('keydown', onKeyDown);
+    el.addEventListener('keydown', onKeyDown);
+    return () => el.removeEventListener('keydown', onKeyDown);
   });
+
+  return (
+    <div ref={rootRef}>
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-surface-border px-5 pb-3 pt-5 sm:px-6 sm:pt-6">
+        <div>
+          <h3 className="text-base font-semibold tracking-tight">{date}</h3>
+          <p className="mt-0.5 text-sm text-content-subtle tabular-nums">
+            {time} · {relative}
+          </p>
+        </div>
+        {session.transcript && (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={handleDownload}
+              className="btn btn-soft btn-sm btn-circle"
+              aria-label={t`Download transcript`}
+            >
+              <Download size={15} strokeWidth={1.8} />
+            </button>
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="btn btn-soft btn-sm btn-circle"
+              aria-label={t`Copy transcript`}
+            >
+              {copied ? (
+                <Check size={15} strokeWidth={2.5} className="text-success" />
+              ) : (
+                <Copy size={15} strokeWidth={1.8} />
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Transcript */}
+      <div className="px-5 pb-4 pt-4 sm:px-6">
+        {session.transcript ? (
+          <div className="rounded-lg border border-surface-border bg-surface-inset p-5">
+            <p className="whitespace-pre-wrap break-words text-base leading-relaxed text-content sm:text-lg">
+              {session.transcript}
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm italic text-content-subtle">{t`No transcript`}</p>
+        )}
+      </div>
+
+      {/* Metadata */}
+      <div className="border-t border-surface-border bg-surface-inset px-5 py-4 sm:px-6">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <MetaItem icon={Hash} label={t`Words`} value={String(session.words)} />
+          <MetaItem icon={Clock} label={t`Duration`} value={formatDuration(session.seconds)} />
+          <MetaItem icon={Mic} label={t`Engine`} value={formatBackend(session.backend)} />
+          <MetaItem icon={Palette} label={t`Style`} value={session.style} />
+        </div>
+        <div className="mt-3 flex items-center gap-3 text-sm text-content-subtle">
+          {isCompleted ? (
+            <>
+              <CircleCheck size={13} strokeWidth={2} className="text-success/60" />{' '}
+              <span>{t`Completed`}</span>
+            </>
+          ) : isFailed ? (
+            <>
+              <CircleX size={13} strokeWidth={2} className="text-error/60" />{' '}
+              <span>{session.status}</span>
+            </>
+          ) : (
+            <span>{session.status}</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function SessionDetailModal({ session, children }: SessionDetailModalProps) {
+  const { t } = useLingui();
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
 
   return (
     <>
       {children(() => dialogRef.current?.showModal())}
 
-      <dialog
-        ref={dialogRef}
-        className="modal backdrop-blur-sm"
-        aria-labelledby={titleId}
-        aria-describedby={transcriptId}
-      >
-        <div className="modal-box max-w-lg p-0 overflow-hidden border border-surface-border sm:max-w-xl">
-          {/* Header */}
-          <div className="flex items-center justify-between px-5 pt-5 pb-3 sm:px-6 sm:pt-6 border-b border-surface-border">
-            <div>
-              <h3 id={titleId} className="text-base font-semibold tracking-tight">
-                {date}
-              </h3>
-              <p className="text-sm text-content-subtle mt-0.5 tabular-nums">
-                {time} · {relative}
-              </p>
-            </div>
-            <div className="flex items-center gap-1">
-              {session.transcript && (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleDownload}
-                    className="btn btn-soft btn-sm btn-circle"
-                    aria-label={t`Download transcript`}
-                  >
-                    <Download size={15} strokeWidth={1.8} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCopy}
-                    className="btn btn-soft btn-sm btn-circle"
-                    aria-label={t`Copy transcript`}
-                  >
-                    {copied ? (
-                      <Check size={15} strokeWidth={2.5} className="text-success" />
-                    ) : (
-                      <Copy size={15} strokeWidth={1.8} />
-                    )}
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Transcript */}
-          <div className="px-5 pb-4 sm:px-6">
-            {session.transcript ? (
-              <div className="rounded-lg border border-surface-border bg-surface-inset p-5">
-                <p
-                  id={transcriptId}
-                  className="text-base leading-relaxed text-content whitespace-pre-wrap break-words sm:text-lg"
-                >
-                  {session.transcript}
-                </p>
-              </div>
-            ) : (
-              <p
-                id={transcriptId}
-                className="text-sm italic text-content-subtle"
-              >{t`No transcript`}</p>
-            )}
-          </div>
-
-          {/* Metadata grid */}
-          <div className="border-t border-surface-border bg-surface-inset px-5 py-4 sm:px-6">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <MetaItem icon={Hash} label={t`Words`} value={String(session.words)} />
-              <MetaItem icon={Clock} label={t`Duration`} value={formatDuration(session.seconds)} />
-              <MetaItem icon={Mic} label={t`Engine`} value={formatBackend(session.backend)} />
-              <MetaItem icon={Palette} label={t`Style`} value={session.style} />
-            </div>
-            <div className="mt-3 flex items-center gap-3 text-sm text-content-subtle">
-              {isCompleted ? (
-                <>
-                  <CircleCheck size={13} strokeWidth={2} className="text-success/60" />{' '}
-                  <span>{t`Completed`}</span>
-                </>
-              ) : isFailed ? (
-                <>
-                  <CircleX size={13} strokeWidth={2} className="text-error/60" />{' '}
-                  <span>{session.status}</span>
-                </>
-              ) : (
-                <span>{session.status}</span>
-              )}
-            </div>
-          </div>
+      <dialog ref={dialogRef} className="modal backdrop-blur-sm" aria-label={t`Session details`}>
+        <div className="modal-box max-w-lg overflow-hidden border border-surface-border p-0 sm:max-w-xl">
+          <SessionDetailContent session={session} />
 
           {/* Actions */}
-          <div className="modal-action px-5 pb-4 pt-0 sm:px-6 justify-between">
+          <div className="modal-action justify-between border-t border-surface-border px-5 pb-4 pt-3 sm:px-6">
             <ConfirmDialog
               title={t`Delete session?`}
               description={t`This will permanently remove this dictation session and its transcript.`}
