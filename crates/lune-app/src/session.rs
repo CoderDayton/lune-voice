@@ -837,19 +837,11 @@ async fn process_and_deliver(
         let replacements = guard.scan(&text_after_commands);
         (entries, replacements)
     };
-    let mut word_risk_scores: Vec<(String, f32)> = segments
+    let word_risk_scores: Vec<(&str, f32)> = segments
         .iter()
         .flat_map(|s| s.word_confidences.iter())
-        .map(|wc| (wc.word.clone(), wc.word_error_risk))
+        .map(|wc| (wc.word.as_str(), wc.word_error_risk))
         .collect();
-    for (phrase, _) in &dict_replacements {
-        if !word_risk_scores
-            .iter()
-            .any(|(w, _)| w.eq_ignore_ascii_case(phrase))
-        {
-            word_risk_scores.push((phrase.clone(), 1.0));
-        }
-    }
 
     let detected_lang = segments
         .first()
@@ -864,22 +856,29 @@ async fn process_and_deliver(
     );
     let text_after_heuristic = heuristic_result.corrected_text;
 
+    // Gate on the heuristic's residual uncertainty rather than raw ASR risk:
+    // a word only reaches the LLM if the heuristic could neither resolve nor
+    // confidently preserve it. Dictionary hits and canonical/proper-noun words
+    // are resolved deterministically, so they no longer trip the gate.
+    let needs_llm = !heuristic_result.all_resolved;
+    let unresolved_count = heuristic_result.unresolved_words.len();
+    let dropped_risks = heuristic_result.dropped_risk_entries;
+
+    // Move (not clone) the residual words out of the heuristic result, which is
+    // dropped right after; the only remaining copy is the one the GateDecision
+    // event carries below.
     let uncertain_words: Vec<(String, usize)> = heuristic_result
         .unresolved_words
-        .iter()
-        .map(|ws| (ws.word.clone(), ws.position))
+        .into_iter()
+        .map(|ws| (ws.word, ws.position))
         .collect();
-
-    let needs_llm = word_risk_scores
-        .iter()
-        .any(|(_, r)| *r >= lune_dict::corrector::LLM_GATE_RISK);
 
     info!(%session_id, "[ASR] raw: {raw_text}");
     info!(
         %session_id,
         lang = detected_lang,
-        unresolved = heuristic_result.unresolved_words.len(),
-        dropped_risks = heuristic_result.dropped_risk_entries,
+        unresolved = unresolved_count,
+        dropped_risks,
         needs_llm,
         "bypass gate"
     );

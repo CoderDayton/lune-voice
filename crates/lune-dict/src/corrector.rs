@@ -113,8 +113,14 @@ fn process_single_word(
         }
 
         let is_high_freq = info.freq >= Lexicon::CONFIDENT_FREQ;
+        // A Wordnik hit is a valid dictionary word that merely lacks a
+        // frequency entry. Treat it like a known word and preserve it
+        // verbatim under the risk ceiling instead of flagging it as a
+        // suspected out-of-vocabulary error (e.g. "unmounted", "reparented").
+        let is_valid_dictionary_word = info.source == WordSource::Wordnik;
         if info.source == WordSource::Vocab
-            || (is_high_freq && risk_score < CANONICAL_OVERRIDE_RISK_CEIL)
+            || ((is_high_freq || is_valid_dictionary_word)
+                && risk_score < CANONICAL_OVERRIDE_RISK_CEIL)
         {
             return ProcessedWord {
                 corrected_word: word.to_owned(),
@@ -183,10 +189,10 @@ impl HeuristicCorrector {
         ))
     }
 
-    pub fn correct(
+    pub fn correct<S: AsRef<str>>(
         &self,
         text: &str,
-        word_risk_scores: &[(String, f32)],
+        word_risk_scores: &[(S, f32)],
         dict_replacements: &[(String, String)],
         lang: &str,
     ) -> CorrectionResult {
@@ -261,13 +267,16 @@ struct AlignedRisks {
     dropped: usize,
 }
 
-fn align_word_risk_positions(words: &[&str], word_risk_scores: &[(String, f32)]) -> AlignedRisks {
+fn align_word_risk_positions<S: AsRef<str>>(
+    words: &[&str],
+    word_risk_scores: &[(S, f32)],
+) -> AlignedRisks {
     let mut out = Vec::new();
     let mut dropped = 0usize;
     let mut cursor = 0usize;
 
     for (risk_word, risk) in word_risk_scores {
-        let risk_word = strip_punctuation(risk_word);
+        let risk_word = strip_punctuation(risk_word.as_ref());
         if risk_word.is_empty() {
             continue;
         }
@@ -306,17 +315,21 @@ fn restore_punctuation(original: &str, corrected: &str) -> String {
 mod tests {
     use super::*;
 
+    /// Typed empty risk slice for calls that exercise correction without any
+    /// ASR risk scores (lets `correct`'s generic `S` parameter infer).
+    const NO_RISKS: &[(&str, f32)] = &[];
+
     #[test]
     fn known_word_not_flagged_passes_through() {
         let c = HeuristicCorrector::new();
-        let result = c.correct("the quick brown fox", &[], &[], "en");
+        let result = c.correct("the quick brown fox", NO_RISKS, &[], "en");
         assert_eq!(result.corrected_text, "the quick brown fox");
     }
 
     #[test]
     fn word_risk_positions_survive_heuristic() {
         let c = HeuristicCorrector::new();
-        let scores = vec![("teh".into(), 0.80)];
+        let scores = vec![("teh", 0.80)];
         let result = c.correct("teh quick", &scores, &[], "en");
         assert_eq!(result.word_risk_positions, vec![(0, 0.80)]);
     }
@@ -324,7 +337,7 @@ mod tests {
     #[test]
     fn word_risk_positions_handle_duplicate_words_by_order() {
         let c = HeuristicCorrector::new();
-        let scores = vec![("the".into(), 0.10), ("the".into(), 0.85)];
+        let scores = vec![("the", 0.10), ("the", 0.85)];
         let result = c.correct("the build fixed the deployment", &scores, &[], "en");
         assert_eq!(result.word_risk_positions, vec![(0, 0.10), (3, 0.85)]);
     }
@@ -332,14 +345,14 @@ mod tests {
     #[test]
     fn proper_noun_skipped_when_not_flagged() {
         let c = HeuristicCorrector::new();
-        let result = c.correct("London is great", &[], &[], "en");
+        let result = c.correct("London is great", NO_RISKS, &[], "en");
         assert!(result.corrected_text.contains("London"));
     }
 
     #[test]
     fn acronym_skipped_when_not_flagged() {
         let c = HeuristicCorrector::new();
-        let result = c.correct("the NASA program", &[], &[], "en");
+        let result = c.correct("the NASA program", NO_RISKS, &[], "en");
         assert!(result.corrected_text.contains("NASA"));
     }
 
@@ -347,21 +360,21 @@ mod tests {
     fn dict_replacement_takes_priority() {
         let c = HeuristicCorrector::new();
         let dict = vec![("helo".into(), "hello".into())];
-        let result = c.correct("helo world", &[], &dict, "en");
+        let result = c.correct("helo world", NO_RISKS, &dict, "en");
         assert_eq!(result.corrected_text, "hello world");
     }
 
     #[test]
     fn unsupported_lang_bypasses_corrector() {
         let c = HeuristicCorrector::new();
-        let result = c.correct("jambo dunia", &[], &[], "swahili");
+        let result = c.correct("jambo dunia", NO_RISKS, &[], "swahili");
         assert_eq!(result.corrected_text, "jambo dunia");
     }
 
     #[test]
     fn french_known_words_pass_through() {
         let c = HeuristicCorrector::new();
-        let result = c.correct("bonjour le monde", &[], &[], "fr");
+        let result = c.correct("bonjour le monde", NO_RISKS, &[], "fr");
         assert_eq!(result.corrected_text, "bonjour le monde");
     }
 
@@ -377,14 +390,14 @@ mod tests {
     #[test]
     fn empty_input() {
         let c = HeuristicCorrector::new();
-        let result = c.correct("", &[], &[], "en");
+        let result = c.correct("", NO_RISKS, &[], "en");
         assert_eq!(result.corrected_text, "");
     }
 
     #[test]
     fn single_char_word_not_corrected() {
         let c = HeuristicCorrector::new();
-        let result = c.correct("I a", &[], &[], "en");
+        let result = c.correct("I a", NO_RISKS, &[], "en");
         assert_eq!(result.corrected_text, "I a");
     }
 
@@ -394,6 +407,51 @@ mod tests {
         let risks = vec![("WebSocket".to_string(), 0.95)];
         let result = c.correct("WebSocket failed", &risks, &[], "en");
         assert_eq!(result.corrected_text, "WebSocket failed");
+    }
+
+    #[test]
+    fn dev_vocabulary_word_passes_through_at_high_risk() {
+        let c = HeuristicCorrector::new();
+        // "hotkey" is curated dev vocabulary (WordSource::Vocab): trusted and
+        // preserved verbatim even above the risk ceiling, never sent to the LLM.
+        let risks = vec![("hotkey", 0.95)];
+        let result = c.correct("press the hotkey", &risks, &[], "en");
+        assert!(
+            result.unresolved_words.is_empty(),
+            "curated dev term should not be flagged: {:?}",
+            result.unresolved_words
+        );
+        assert_eq!(result.corrected_text, "press the hotkey");
+    }
+
+    #[test]
+    fn wordnik_word_preserved_under_risk_ceiling() {
+        let c = HeuristicCorrector::new();
+        // "unmounted" is valid English (Wordnik tier, freq 0). At moderate
+        // risk it must pass through verbatim, not be flagged for the LLM.
+        let risks = vec![("unmounted", 0.60)];
+        let result = c.correct("the unmounted drive", &risks, &[], "en");
+        assert!(
+            result.unresolved_words.is_empty(),
+            "valid dictionary word should not be flagged: {:?}",
+            result.unresolved_words
+        );
+        assert_eq!(result.corrected_text, "the unmounted drive");
+    }
+
+    #[test]
+    fn wordnik_word_flagged_above_ceiling() {
+        let c = HeuristicCorrector::new();
+        // Above CANONICAL_OVERRIDE_RISK_CEIL even a valid word is surfaced.
+        let risks = vec![("unmounted", 0.90)];
+        let result = c.correct("the unmounted drive", &risks, &[], "en");
+        assert!(
+            result
+                .unresolved_words
+                .iter()
+                .any(|ws| ws.word == "unmounted"),
+            "very-high-risk word should still reach the LLM"
+        );
     }
 
     #[test]
@@ -492,7 +550,7 @@ mod tests {
     fn punctuation_preserved_with_dict() {
         let c = HeuristicCorrector::new();
         let dict = vec![("teh".into(), "the".into())];
-        let result = c.correct("teh, quick", &[], &dict, "en");
+        let result = c.correct("teh, quick", NO_RISKS, &dict, "en");
         assert!(result.corrected_text.contains("the,"));
     }
 
@@ -503,7 +561,7 @@ mod tests {
 
         let model = NGramModel::new(ScoringConfig::trigram_default()).unwrap();
         let c = HeuristicCorrector::from_ngram(Arc::new(model));
-        let result = c.correct("the quick", &[], &[], "en");
+        let result = c.correct("the quick", NO_RISKS, &[], "en");
         assert_eq!(result.corrected_text, "the quick");
     }
 
@@ -511,7 +569,7 @@ mod tests {
     fn qd_002_no_false_positives() {
         let c = HeuristicCorrector::new();
         let text = "The memory leak was traced back to the event listener on the WebSocket connection. It wasn't being cleaned up when the component unmounted. I pushed a fix to the dev branch and it looks stable now.";
-        let result = c.correct(text, &[], &[], "en");
+        let result = c.correct(text, NO_RISKS, &[], "en");
         assert!(
             result.unresolved_words.is_empty(),
             "unexpected unresolved: {:?}",

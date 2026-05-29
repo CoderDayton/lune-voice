@@ -16,6 +16,10 @@ serde = { version = "1", features = ["derive"] }
 tracing.workspace = true
 wordnik_list = "0.2"
 
+[build-dependencies]
+bincode = { version = "2", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+
 [[bench]]
 name = "corrector_bench"
 harness = false

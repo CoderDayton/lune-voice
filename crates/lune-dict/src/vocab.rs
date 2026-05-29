@@ -41,7 +41,7 @@ impl SupplementalVocab {
 }
 
 static BUNDLED: LazyLock<SupplementalVocab> = LazyLock::new(|| {
-    let bytes = include_bytes!("../data/supplemental_vocab.bin");
+    let bytes = include_bytes!(concat!(env!("OUT_DIR"), "/supplemental_vocab.bin"));
     if bytes.is_empty() {
         return SupplementalVocab {
             categories: Vec::new(),
