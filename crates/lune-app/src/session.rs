@@ -854,13 +854,19 @@ async fn process_and_deliver(
         &dict_replacements,
         detected_lang,
     );
-    let text_after_heuristic = heuristic_result.corrected_text;
+    // Apply deterministic punctuation (leading capital, terminal period) and
+    // detect whether residual punctuation is ambiguous. The returned text is
+    // both the fast-path output and the LLM input.
+    let punctuation = lune_dict::punctuation::normalize(&heuristic_result.corrected_text);
+    let text_after_heuristic = punctuation.text;
 
     // Gate on the heuristic's residual uncertainty rather than raw ASR risk:
     // a word only reaches the LLM if the heuristic could neither resolve nor
     // confidently preserve it. Dictionary hits and canonical/proper-noun words
-    // are resolved deterministically, so they no longer trip the gate.
-    let needs_llm = !heuristic_result.all_resolved;
+    // are resolved deterministically, so they no longer trip the gate. The LLM
+    // is also invoked when punctuation is ambiguous (run-on, interrogative
+    // without an end mark) even if every word resolved.
+    let needs_llm = !heuristic_result.all_resolved || punctuation.needs_llm;
     let unresolved_count = heuristic_result.unresolved_words.len();
     let dropped_risks = heuristic_result.dropped_risk_entries;
 
@@ -880,6 +886,7 @@ async fn process_and_deliver(
         unresolved = unresolved_count,
         dropped_risks,
         needs_llm,
+        needs_punct = punctuation.needs_llm,
         "bypass gate"
     );
 
@@ -1403,10 +1410,10 @@ mod tests {
                         _ => None,
                     })
                     .collect();
-                assert_eq!(finalized.last().copied(), Some("hello world"));
+                assert_eq!(finalized.last().copied(), Some("Hello world."));
 
                 let session = db.lock().await.get_session(session_id).unwrap().unwrap();
-                assert_eq!(session.transcript.as_deref(), Some("hello world"));
+                assert_eq!(session.transcript.as_deref(), Some("Hello world."));
             })
             .await;
     }

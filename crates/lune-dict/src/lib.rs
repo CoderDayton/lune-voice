@@ -1,6 +1,7 @@
 pub mod corrector;
 pub mod freq;
 pub mod lexicon;
+pub mod punctuation;
 pub mod vocab;
 
 use lune_core::dict::DictionaryEntry;
