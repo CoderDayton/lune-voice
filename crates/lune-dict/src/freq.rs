@@ -113,6 +113,7 @@ freq_dict!(FR_FREQ, "../data/fr_freq.bin");
 freq_dict!(IT_FREQ, "../data/it_freq.bin");
 freq_dict!(JA_FREQ, "../data/ja_freq.bin");
 freq_dict!(KO_FREQ, "../data/ko_freq.bin");
+freq_dict!(NL_FREQ, "../data/nl_freq.bin");
 freq_dict!(PT_FREQ, "../data/pt_freq.bin");
 freq_dict!(RU_FREQ, "../data/ru_freq.bin");
 freq_dict!(ZH_FREQ, "../data/zh_freq.bin");
@@ -120,8 +121,10 @@ freq_dict!(ZH_FREQ, "../data/zh_freq.bin");
 pub fn dict_for(lang: &str) -> &'static FreqDict {
     let bytes = lang.as_bytes();
     match bytes.first().map(|b| b.to_ascii_lowercase()) {
+        Some(b'd') if bytes.get(1) == Some(&b'u') => &NL_FREQ, // "dutch"
         Some(b'd') => &DE_FREQ,
         Some(b'g') if lang.len() > 2 => &DE_FREQ, // "german"
+        Some(b'n') if bytes.get(1) == Some(&b'l') => &NL_FREQ, // "nl"
         Some(b's') if bytes.get(1) == Some(&b'p') => &ES_FREQ, // "spanish"
         Some(b'f') => &FR_FREQ,
         Some(b'i') => &IT_FREQ,
@@ -144,7 +147,9 @@ pub fn is_english(lang: &str) -> bool {
         || lang.starts_with("En")
 }
 
-pub const SUPPORTED: &[&str] = &["en", "de", "es", "fr", "it", "ja", "ko", "pt", "ru", "zh"];
+pub const SUPPORTED: &[&str] = &[
+    "en", "de", "es", "fr", "it", "ja", "ko", "nl", "pt", "ru", "zh",
+];
 
 pub fn has_dict(lang: &str) -> bool {
     if lang.is_empty() {
@@ -161,6 +166,7 @@ pub fn has_dict(lang: &str) -> bool {
                 | "italian"
                 | "japanese"
                 | "korean"
+                | "dutch"
                 | "portuguese"
                 | "russian"
                 | "chinese"
@@ -169,4 +175,26 @@ pub fn has_dict(lang: &str) -> bool {
 
 pub fn warm() {
     let _ = EN_FREQ.len();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dict_for_routes_dutch_to_nl_not_german() {
+        // "dutch" shares its first byte with "de"/"german"; ensure it is not
+        // misrouted to the German dictionary.
+        assert!(std::ptr::eq(dict_for("nl"), dict_for("Dutch")));
+        assert!(std::ptr::eq(dict_for("Dutch"), &*NL_FREQ));
+        assert!(!std::ptr::eq(dict_for("Dutch"), dict_for("de")));
+        assert!(std::ptr::eq(dict_for("de"), &*DE_FREQ));
+    }
+
+    #[test]
+    fn dutch_dictionary_loads_common_words() {
+        // Sanity-check the bundled nl_freq.bin actually decoded.
+        let nl = dict_for("nl");
+        assert!(nl.len() > 10_000, "nl dict too small: {}", nl.len());
+    }
 }

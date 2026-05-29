@@ -1,3 +1,11 @@
+//! Compiles per-language frequency lists from `corpora/{lang}.csv` into the
+//! `data/{lang}_freq.bin` artifacts bundled via `include_bytes!`.
+//!
+//! Source corpora are the OpenSubtitles-derived word lists from
+//! hermitdave/FrequencyWords (MIT License, Copyright (c) 2016 Hermit Dave).
+//! Input accepts either CSV (`word,freq`) or the raw whitespace-separated
+//! upstream format (`word freq`).
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -6,7 +14,9 @@ fn main() {
     let corpora_dir = manifest_dir.join("../../corpora");
     let out_dir = manifest_dir.join("data");
 
-    let languages = ["en", "de", "es", "fr", "it", "ja", "ko", "pt", "ru", "zh"];
+    let languages = [
+        "en", "de", "es", "fr", "it", "ja", "ko", "nl", "pt", "ru", "zh",
+    ];
     let mut total_entries = 0;
     let mut total_bytes = 0;
 
@@ -26,7 +36,13 @@ fn main() {
             if i == 0 && line.starts_with("word,") {
                 continue;
             }
-            let Some((word, freq_str)) = line.split_once(',') else {
+            // Accept either CSV (`word,freq`) or the raw hermitdave format
+            // (`word freq`, whitespace-separated) so source lists can be dropped
+            // in without conversion.
+            let Some((word, freq_str)) = line
+                .split_once(',')
+                .or_else(|| line.split_once(char::is_whitespace))
+            else {
                 continue;
             };
             let word = word.trim().to_lowercase();

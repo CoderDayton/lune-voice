@@ -536,6 +536,8 @@ mod tests {
         assert!(has_dict("fr"));
         assert!(has_dict("de"));
         assert!(has_dict("Japanese"));
+        assert!(has_dict("nl"));
+        assert!(has_dict("Dutch"));
         assert!(!has_dict("swahili"));
     }
 
