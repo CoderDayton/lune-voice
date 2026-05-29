@@ -458,6 +458,16 @@ mod tests {
     }
 
     #[test]
+    fn decode_backend_accepts_legacy_ort_qwen_alias() {
+        let (kind, fallback) = decode_backend_or_fallback("\"OrtQwenAsr\"");
+        assert_eq!(kind, AsrBackendKind::Qwen3Asr);
+        assert!(
+            fallback.is_none(),
+            "legacy OrtQwenAsr rows must decode without a fallback warning",
+        );
+    }
+
+    #[test]
     fn decode_backend_falls_back_on_unknown() {
         let (kind, fallback) = decode_backend_or_fallback("\"SomeRemovedBackend\"");
         assert_eq!(kind, AsrBackendKind::Qwen3Asr);

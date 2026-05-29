@@ -105,6 +105,9 @@ impl Default for AsrSessionConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum AsrBackendKind {
+    // `OrtQwenAsr` is the pre-rename name still present in older session
+    // rows; accept it as an alias so history loads without a fallback warning.
+    #[serde(alias = "OrtQwenAsr")]
     Qwen3Asr,
     OpenAiCompatible,
 }
