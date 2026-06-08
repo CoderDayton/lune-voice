@@ -35,8 +35,8 @@ regex = "1.12.3"
 url.workspace = true
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
-tauri-plugin-single-instance = "2.4.1"
-tauri-plugin-global-shortcut = "2.3.1"
+tauri-plugin-single-instance = "2.4.2"
+tauri-plugin-global-shortcut = "2.3.2"
 ts-rs = { version = "11", features = ["serde-compat"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
