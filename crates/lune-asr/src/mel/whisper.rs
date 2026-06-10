@@ -183,7 +183,7 @@ impl WhisperMelF16 {
             }
         }
 
-        whisper_log_normalize(mel_f32);
+        let peak = whisper_log_normalize(mel_f32);
 
         let out_frames = n_frames.max(min_frames);
         if out_frames == n_frames {
@@ -193,8 +193,13 @@ impl WhisperMelF16 {
                 data: mel_f32.iter().map(|&v| f16::from_f32(v)).collect(),
             }
         } else {
-            // Silence floor: minimum value after log normalization.
-            let floor_val = mel_f32.iter().copied().fold(f32::INFINITY, f32::min);
+            // Exact Whisper silence frame. Padding the audio to 30 s and running
+            // mel over the silence yields `clamp(log10(1e-10), peak-8)` in scaled
+            // units, i.e. `max(silence_floor, peak - 2)`. Computing it directly
+            // avoids both the FFT-on-silence and a `min` scan, and is exact even
+            // when no real mel bin reaches the `peak-8` floor.
+            let silence_floor = EPSILON.ln().mul_add(INV4_LOG10E, 1.0);
+            let floor_val = (peak - 2.0).max(silence_floor);
             let floor_f16 = f16::from_f32(floor_val);
             let pad_frames = out_frames - n_frames;
             let mut data = Vec::with_capacity(self.n_mels * out_frames);
@@ -299,7 +304,9 @@ fn reflect_get(x: &[f32], idx: isize) -> f32 {
     }
 }
 
-fn whisper_log_normalize(mel: &mut [f32]) {
+/// Whisper log-mel normalization, returning the post-scale `peak` so callers
+/// can derive the exact silence floor (`peak - 2`) for padding.
+fn whisper_log_normalize(mel: &mut [f32]) -> f32 {
     // Whisper-spec floor when no real signal: log10(EPSILON)/4 + 1
     // = ln(EPSILON) * INV4_LOG10E + 1
     let epsilon_floor = EPSILON.ln().mul_add(INV4_LOG10E, 1.0);
@@ -324,7 +331,7 @@ fn whisper_log_normalize(mel: &mut [f32]) {
     // If every value was non-finite, peak fell back through epsilon_floor
     // path. If mel was empty, leave it untouched.
     if !peak.is_finite() {
-        return;
+        return peak;
     }
     // floor = (peak_log10 - 8) / 4 + 1 = peak_scaled - 2
     let floor = peak - 2.0;
@@ -333,6 +340,7 @@ fn whisper_log_normalize(mel: &mut [f32]) {
             *v = floor;
         }
     }
+    peak
 }
 
 fn build_slaney_mel_filterbank(sample_rate: usize, n_fft: usize, n_mels: usize) -> Vec<f32> {
@@ -432,6 +440,37 @@ mod tests {
         // The pre-FFT path doesn't filter NaN currently; whisper_log_normalize
         // is the safety net. Output should be all finite f16 (no NaN tile).
         assert!(spec.data.iter().all(|v| v.to_f32().is_finite()));
+    }
+
+    #[test]
+    fn padded_silence_floor_is_exact_whisper_value() {
+        let mel = WhisperMelF16::new_qwen();
+        let pcm = vec![0.1f32; SAMPLE_RATE / 2]; // 0.5 s of real signal
+        let real = mel.extract_from_f32(&pcm);
+        let padded = mel.extract_from_f32_padded(&pcm, 3000);
+        assert_eq!(padded.n_frames, 3000);
+        assert_eq!(real.n_frames.min(3000), real.n_frames);
+
+        // Padded columns must all carry one finite value: the exact Whisper
+        // silence frame max(silence_floor, peak-2). The real-region max bounds
+        // the peak, so the pad must not exceed it and must be finite.
+        let real_max = real
+            .data
+            .iter()
+            .map(|v| v.to_f32())
+            .fold(f32::NEG_INFINITY, f32::max);
+        let pad_cell = padded.data[real.n_frames].to_f32(); // first padded frame of mel 0
+        assert!(pad_cell.is_finite(), "pad must be finite, got {pad_cell}");
+        assert!(
+            pad_cell <= real_max + 1e-3,
+            "silence pad {pad_cell} should not exceed real peak {real_max}"
+        );
+        // Every padded frame in every mel row equals the same floor value.
+        for m in 0..padded.n_mels {
+            for t in real.n_frames..3000 {
+                assert_eq!(padded.data[m * 3000 + t].to_f32(), pad_cell);
+            }
+        }
     }
 
     #[test]

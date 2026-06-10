@@ -11,7 +11,7 @@ use half::f16;
 use ndarray::{Array2, Array3, ArrayD, IxDyn};
 use ort::memory::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType};
 use ort::session::Session;
-use ort::value::{DynValue, Value};
+use ort::value::{DynValue, TensorRef, Value};
 use tokenizers::Tokenizer;
 
 use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
@@ -26,7 +26,12 @@ const VOCAB_SIZE: usize = 151_936;
 const NUM_LAYERS: usize = 28;
 const NUM_KV_HEADS: usize = 8;
 const HEAD_DIM: usize = 128;
-const MAX_NEW_TOKENS: usize = 448;
+/// Decode budget. Sized from a tokens/sec simulation over the real fixture
+/// transcripts (peak ~3.3 tok/s English, ~4.3 tok/s multilingual) against the
+/// encoder's 30 s trained geometry: ~60 s of dense speech × 2× margin ≈ 512.
+/// Generous enough that no realistic single segment is truncated, yet bounded
+/// so a degenerate run terminates (the repeat guard is the inner backstop).
+const MAX_NEW_TOKENS: usize = 512;
 
 const EOS_IDS: [i64; 2] = [151_643, 151_645];
 const AUDIO_PAD_ID: i64 = 151_676;
@@ -319,6 +324,7 @@ fn argmax_on_logits(
     value: &ort::value::Value,
     vocab_size: usize,
     boost: &std::collections::HashMap<i64, f32>,
+    banned: &std::collections::HashSet<i64>,
 ) -> Result<(i64, f32, Vec<f64>)> {
     let (shape, data) = value.try_extract_tensor::<f16>().ctx("extract logits")?;
     // Last position's logits: last `vocab_size` elements.
@@ -341,7 +347,7 @@ fn argmax_on_logits(
     let mut heap_min = f32::NEG_INFINITY;
     let mut heap_min_pos = 0usize;
 
-    if boost.is_empty() {
+    if boost.is_empty() && banned.is_empty() {
         // Single-pass: argmax + top-k + LSE fused (one f16→f32 conversion per element).
         let mut max_idx = 0usize;
         let mut max_val = f32::NEG_INFINITY;
@@ -372,17 +378,26 @@ fn argmax_on_logits(
         let lse = sum_exp.ln() + max_val;
         Ok((max_idx as i64, (max_val - lse).exp(), top_k))
     } else {
-        // Boosted single-pass: fused argmax + LSE over raw logits.
+        // Constrained single-pass: argmax over boosted + no-repeat-masked
+        // values, while the LSE and top-k stay on the raw distribution. The
+        // reported confidence is the raw softmax probability of the *chosen*
+        // token (`chosen_raw`), not of the raw argmax — boosting or banning can
+        // divert the winner, and the confidence must follow the emitted token.
         let mut max_idx = 0usize;
-        let mut max_boosted = f32::NEG_INFINITY;
+        let mut max_adj = f32::NEG_INFINITY;
+        let mut chosen_raw = f32::NEG_INFINITY;
         let mut raw_max = f32::NEG_INFINITY;
         let mut sum_exp = 0.0f32;
         for (i, &v) in logits.iter().enumerate() {
             let raw = v.to_f32();
-            let boosted = raw + boost.get(&(i as i64)).copied().unwrap_or(0.0);
-            if boosted > max_boosted {
-                max_boosted = boosted;
+            let mut adj = raw + boost.get(&(i as i64)).copied().unwrap_or(0.0);
+            if banned.contains(&(i as i64)) {
+                adj = f32::NEG_INFINITY;
+            }
+            if adj > max_adj {
+                max_adj = adj;
                 max_idx = i;
+                chosen_raw = raw;
             }
             if raw > raw_max {
                 sum_exp *= (raw_max - raw).exp();
@@ -405,8 +420,51 @@ fn argmax_on_logits(
             return Ok((max_idx as i64, 0.0, top_k));
         }
         let lse = sum_exp.ln() + raw_max;
-        Ok((max_idx as i64, (raw_max - lse).exp(), top_k))
+        Ok((max_idx as i64, (chosen_raw - lse).exp(), top_k))
     }
+}
+
+/// Order of the repeat guard: greedy decoding never emits a token that
+/// would re-complete a length-`REPEAT_GUARD_ORDER` token block already
+/// produced in this utterance. This kills the runaway repetition loops ASR
+/// models fall into on noisy or silent tails, without the indiscriminate WER
+/// cost a flat repetition penalty imposes on legitimate word reuse. Distinct
+/// from `lune-ngram` (a word-level correction LM): this is a decode-time mask
+/// over raw decoder token ids, not a probabilistic model.
+const REPEAT_GUARD_ORDER: usize = 3;
+
+/// Fill `out` with the token ids that would re-complete a length-`n` block
+/// given the tail of `generated`. Empty in the common case, so the hot argmax
+/// path stays on its single-pass fast branch.
+fn banned_next_tokens(generated: &[i64], n: usize, out: &mut std::collections::HashSet<i64>) {
+    out.clear();
+    if n < 2 || generated.len() < n {
+        return;
+    }
+    let prefix = &generated[generated.len() - (n - 1)..];
+    for w in generated.windows(n) {
+        if w[..n - 1] == *prefix {
+            out.insert(w[n - 1]);
+        }
+    }
+}
+
+/// Detect a degenerate tail loop: the last `4 * n` tokens are an `n`-token
+/// block repeated four times, for some `n` in 1..=8. Returns the block
+/// length so the caller can trim the redundant copies. Requires ≥16 tokens
+/// before it bothers checking.
+fn repeated_cycle_len(ids: &[i64]) -> Option<usize> {
+    let len = ids.len();
+    if len < 16 {
+        return None;
+    }
+    (1..=8).find(|&n| {
+        let window = 4 * n;
+        len >= window && {
+            let base = len - window;
+            (1..4).all(|r| (0..n).all(|k| ids[base + k] == ids[base + r * n + k]))
+        }
+    })
 }
 
 /// Build mRoPE position_ids `[3, 1, seq_len]` — all 3 dims identical for audio-only.
@@ -644,6 +702,7 @@ impl Qwen3AsrBackend {
         let prompt_ms = prompt_t0.elapsed().as_secs_f64() * 1000.0;
 
         // 5. Prefill: run decoder with full embeddings + empty KV cache
+        let empty_banned: std::collections::HashSet<i64> = std::collections::HashSet::new();
         let prefill_t0 = std::time::Instant::now();
         let (first_token, first_conf, first_logits, mut kv_cache) = {
             let embeds_val = Value::from_array(embeds).ctx("embeds val")?;
@@ -671,7 +730,8 @@ impl Qwen3AsrBackend {
                     .decoder
                     .run_binding(&binding)
                     .ctx("decoder prefill")?;
-                let (tok, conf, logits_k) = argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost)?;
+                let (tok, conf, logits_k) =
+                    argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost, &empty_banned)?;
 
                 let mut cache: Vec<DynValue> = Vec::with_capacity(NUM_LAYERS * 2);
                 for i in 0..NUM_LAYERS {
@@ -695,7 +755,8 @@ impl Qwen3AsrBackend {
                 append_empty_kv(&mut dec_inputs)?;
 
                 let mut out = models.decoder.run(dec_inputs).ctx("decoder prefill")?;
-                let (tok, conf, logits_k) = argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost)?;
+                let (tok, conf, logits_k) =
+                    argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost, &empty_banned)?;
 
                 let mut cache: Vec<ArrayD<f16>> = Vec::with_capacity(NUM_LAYERS * 2);
                 for i in 0..NUM_LAYERS {
@@ -716,9 +777,15 @@ impl Qwen3AsrBackend {
         let mut tokens: Vec<(i64, f32, Vec<f64>)> = vec![(first_token, first_conf, first_logits)];
         let mut pos = seq_len;
         let mut decode_steps = 0usize;
+        let mut gen_ids: Vec<i64> = tokens.iter().map(|(id, _, _)| *id).collect();
+        let mut banned: std::collections::HashSet<i64> = std::collections::HashSet::new();
 
         // Pre-allocate reusable position array for the decode loop.
         let mut pos_arr = Array3::<i64>::zeros((3, 1, 1));
+        // Preallocated all-ones attention mask. The decode mask is always ones,
+        // so each step binds a length-`total_len` prefix *view* of this row —
+        // zero per-step allocation. Width covers the worst case pos + 1.
+        let mask_ones = Array2::<i64>::ones((1, seq_len + MAX_NEW_TOKENS));
         let mut decoder_binding = if self.decoder_io_binding {
             Some(models.decoder.create_binding().ctx("decoder binding")?)
         } else {
@@ -732,22 +799,22 @@ impl Qwen3AsrBackend {
             if EOS_IDS.contains(&last_tok) || tokens.len() >= MAX_NEW_TOKENS {
                 break;
             }
-            // Repetition guard: check directly on tokens slice (no allocation).
-            let len = tokens.len();
-            if len >= 16 {
-                let found_repeat = (1..=8).any(|n| {
-                    let window = 4 * n;
-                    if len < window {
-                        return false;
-                    }
-                    let base = len - window;
-                    (1..4).all(|r| (0..n).all(|k| tokens[base + k].0 == tokens[base + r * n + k].0))
-                });
-                if found_repeat {
-                    tracing::warn!(tokens_so_far = len, "repetition loop detected, stopping");
-                    break;
-                }
+            // Repetition guard: if the tail has collapsed into a repeated
+            // block, drop the redundant copies and stop — emitting the loop
+            // verbatim is worse than truncating it.
+            if let Some(n) = repeated_cycle_len(&gen_ids) {
+                let keep = gen_ids.len() - 3 * n;
+                tokens.truncate(keep);
+                tracing::warn!(
+                    cycle = n,
+                    kept = keep,
+                    "repetition loop detected, trimming tail"
+                );
+                break;
             }
+            // Repeat-guard mask for the upcoming token (empty in the common
+            // case, so the argmax fast path is preserved).
+            banned_next_tokens(&gen_ids, REPEAT_GUARD_ORDER, &mut banned);
 
             let (tok, conf, logits_k) = {
                 // Embed single token (FP16 native, scoped to drop before decoder)
@@ -767,8 +834,9 @@ impl Qwen3AsrBackend {
                 let total_len = pos + 1;
                 let emb_val = Value::from_array(emb).ctx("emb val")?;
                 let pos_val = Value::from_array(pos_arr.clone()).ctx("pos val")?;
-                let mask_val =
-                    Value::from_array(Array2::<i64>::ones((1, total_len))).ctx("mask val")?;
+                let mask_ref =
+                    TensorRef::from_array_view(mask_ones.slice(ndarray::s![.., ..total_len]))
+                        .ctx("mask view")?;
 
                 match &mut kv_cache {
                     DecodeKvCache::Bound(cache) => {
@@ -783,7 +851,7 @@ impl Qwen3AsrBackend {
                             .bind_input("position_ids", &pos_val)
                             .ctx("bind position_ids")?;
                         binding
-                            .bind_input("attention_mask", &mask_val)
+                            .bind_input("attention_mask", &mask_ref)
                             .ctx("bind attention_mask")?;
                         // Move ORT-owned KV values directly into the next decoder run.
                         // Present KV outputs are bound to device memory below.
@@ -798,7 +866,7 @@ impl Qwen3AsrBackend {
 
                         let mut out = models.decoder.run_binding(binding).ctx("decoder step")?;
 
-                        let result = argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost)?;
+                        let result = argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost, &banned)?;
 
                         for i in 0..NUM_LAYERS {
                             cache.push(out.remove(present_kv_name(i, true)).ok_or_else(|| {
@@ -814,13 +882,13 @@ impl Qwen3AsrBackend {
                         let mut dec_inputs = ort::inputs!(
                             "inputs_embeds" => emb_val,
                             "position_ids" => pos_val,
-                            "attention_mask" => mask_val
+                            "attention_mask" => mask_ref
                         );
                         append_cached_kv(&mut dec_inputs, std::mem::take(cache))?;
 
                         let mut out = models.decoder.run(dec_inputs).ctx("decoder step")?;
 
-                        let result = argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost)?;
+                        let result = argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost, &banned)?;
 
                         for i in 0..NUM_LAYERS {
                             let key = out.remove(present_kv_name(i, true)).ok_or_else(|| {
@@ -837,6 +905,7 @@ impl Qwen3AsrBackend {
                 }
             };
             tokens.push((tok, conf, logits_k));
+            gen_ids.push(tok);
             decode_steps += 1;
             pos += 1;
         }
@@ -1106,13 +1175,23 @@ fn bcp47_to_qwen3_language(tag: &str) -> Option<String> {
         "nl" => "Dutch",
         "pl" => "Polish",
         "tr" => "Turkish",
-        // Already an English language name — pass through with title case.
-        _ => return Some(title_case_ascii(tag.trim())),
+        // Unknown tag. Only pass through values that look like a spelled-out
+        // language name (a single all-alphabetic word) — anything carrying a
+        // region/script subtag, digits, or separators is a malformed hint, so
+        // fall back to auto-detection (`None`) per the documented contract.
+        _ => {
+            let trimmed = tag.trim();
+            return if !trimmed.is_empty() && trimmed.chars().all(|c| c.is_alphabetic()) {
+                Some(title_case(trimmed))
+            } else {
+                None
+            };
+        }
     };
     Some(name.to_string())
 }
 
-fn title_case_ascii(s: &str) -> String {
+fn title_case(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut at_word_start = true;
     for c in s.chars() {
@@ -1144,7 +1223,7 @@ fn lock_err<T>(what: &str, e: std::sync::PoisonError<T>) -> Error {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_auto_asr_output;
+    use super::*;
 
     #[test]
     fn parse_auto_output_with_asr_text_marker() {
@@ -1185,8 +1264,52 @@ mod tests {
         assert_eq!(m("ja"), Some("Japanese".into()));
         assert_eq!(m("auto"), None);
         assert_eq!(m(""), None);
-        // Unknown primary tag falls through to title-cased pass-through.
+        // Unknown but name-like tags pass through title-cased; malformed tags
+        // (region/script subtags, digits, separators) fall back to auto (None)
+        // rather than emitting a bogus `language X` hint.
         assert_eq!(m("English"), Some("English".into()));
         assert_eq!(m("ENGLISH"), Some("English".into()));
+        assert_eq!(m("Klingon"), Some("Klingon".into()));
+        assert_eq!(m("zz-ZZ"), None);
+        assert_eq!(m("xx9"), None);
+    }
+
+    #[test]
+    fn repeat_guard_bans_seen_completions() {
+        use std::collections::HashSet;
+        // "a b c a b" → last bigram [a,b] previously continued with c → ban c.
+        let mut out = HashSet::new();
+        banned_next_tokens(&[1, 2, 3, 1, 2], 3, &mut out);
+        assert_eq!(out.len(), 1);
+        assert!(out.contains(&3));
+    }
+
+    #[test]
+    fn repeat_guard_empty_without_repeat() {
+        use std::collections::HashSet;
+        let mut out = HashSet::new();
+        banned_next_tokens(&[1, 2, 3, 4], 3, &mut out);
+        assert!(out.is_empty(), "no repeated bigram → nothing banned");
+        banned_next_tokens(&[1, 2], 3, &mut out);
+        assert!(out.is_empty(), "too short → nothing banned");
+    }
+
+    #[test]
+    fn repeated_cycle_len_detects_and_sizes_loop() {
+        // 12 unique tokens then "7 8" repeated 4× = 20 tokens; cycle len 2.
+        let mut ids: Vec<i64> = (0..12).collect();
+        for _ in 0..4 {
+            ids.push(7);
+            ids.push(8);
+        }
+        assert_eq!(repeated_cycle_len(&ids), Some(2));
+        // Trimming keeps one clean cycle: len - 3*n.
+        assert_eq!(ids.len() - 3 * 2, 14);
+    }
+
+    #[test]
+    fn repeated_cycle_len_ignores_normal_text() {
+        let ids: Vec<i64> = (0..40).map(|i| i % 9).collect();
+        assert_eq!(repeated_cycle_len(&ids), None);
     }
 }

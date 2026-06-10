@@ -280,9 +280,15 @@ fn mean_square_finite(frame: &[f32]) -> f32 {
     if frame.is_empty() {
         return 0.0;
     }
-    // Branch-free f32 reduction; LLVM auto-vectorizes to AVX2/AVX-512 with
-    // target-cpu=native. NaN guard runs once on the result, not per sample.
-    let sum_sq: f32 = frame.iter().map(|&x| x * x).sum();
+    // Per-sample finite gate: a single non-finite sample is dropped from the
+    // sum rather than collapsing the whole frame's energy to zero. Division is
+    // by the full frame length, matching the original contract (and the
+    // identical guard in `vad::compute_rms`). The branch costs some SIMD width,
+    // but PCEN runs at audio rate where it's negligible.
+    let sum_sq: f32 = frame
+        .iter()
+        .map(|&x| if x.is_finite() { x * x } else { 0.0 })
+        .sum();
     let m = sum_sq / frame.len() as f32;
     if m.is_finite() { m } else { 0.0 }
 }
