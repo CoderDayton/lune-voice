@@ -146,10 +146,27 @@ impl OrtModelLoader {
 /// instead of silently falling back to CPU.
 /// Saves the graph-optimized model to `<path>.opt` on first load.
 pub fn build_ort_session(path: &Path, use_gpu: bool, cuda_required: bool) -> Result<Session> {
-    let session = make_builder(path, use_gpu, cuda_required)?
-        .commit_from_file(path)
-        .map_err(|e| Error::asr(format!("load model {}: {e}", path.display())))?;
-    log_session_loaded(path, use_gpu, None);
+    let commit = |gpu: bool| -> Result<Session> {
+        make_builder(path, gpu, cuda_required)?
+            .commit_from_file(path)
+            .map_err(|e| Error::asr(format!("load model {}: {e}", path.display())))
+    };
+    // GPU registration always hard-errors (see make_builder); a CPU retry is
+    // only taken explicitly and loudly here, never silently inside ORT —
+    // a silently-CPU ASR session is a multi-second latency regression.
+    let (session, gpu_active) = match commit(use_gpu) {
+        Ok(s) => (s, use_gpu),
+        Err(err) if use_gpu && !cuda_required => {
+            tracing::error!(
+                error = %err,
+                model = %path.display(),
+                "CUDA unavailable — retrying on CPU; inference will be slow"
+            );
+            (commit(false)?, false)
+        }
+        Err(err) => return Err(err),
+    };
+    log_session_loaded(path, gpu_active, None);
     Ok(session)
 }
 
@@ -162,12 +179,27 @@ pub fn build_ort_session_with_external_data(
     ext_data: std::borrow::Cow<'static, [u8]>,
 ) -> Result<Session> {
     let ext_len = ext_data.len();
-    let session = make_builder(path, use_gpu, cuda_required)?
-        .with_external_initializer_file_in_memory(ext_filename, ext_data)
-        .map_err(|e| Error::asr(format!("external data: {e}")))?
-        .commit_from_file(path)
-        .map_err(|e| Error::asr(format!("load model {}: {e}", path.display())))?;
-    log_session_loaded(path, use_gpu, Some(ext_len as u64));
+    let commit = |gpu: bool, data: std::borrow::Cow<'static, [u8]>| -> Result<Session> {
+        make_builder(path, gpu, cuda_required)?
+            .with_external_initializer_file_in_memory(ext_filename, data)
+            .map_err(|e| Error::asr(format!("external data: {e}")))?
+            .commit_from_file(path)
+            .map_err(|e| Error::asr(format!("load model {}: {e}", path.display())))
+    };
+    // Same explicit-fallback contract as `build_ort_session`.
+    let (session, gpu_active) = match commit(use_gpu, ext_data.clone()) {
+        Ok(s) => (s, use_gpu),
+        Err(err) if use_gpu && !cuda_required => {
+            tracing::error!(
+                error = %err,
+                model = %path.display(),
+                "CUDA unavailable — retrying on CPU; inference will be slow"
+            );
+            (commit(false, ext_data)?, false)
+        }
+        Err(err) => return Err(err),
+    };
+    log_session_loaded(path, gpu_active, Some(ext_len as u64));
     Ok(session)
 }
 
@@ -227,11 +259,10 @@ fn make_builder(
             .with_conv_max_workspace(false)
             .with_tf32(true)
             .build();
-        let cuda_ep = if cuda_required {
-            cuda_ep.error_on_failure()
-        } else {
-            cuda_ep
-        };
+        // Always error_on_failure: silent in-ORT CPU fallback hides massive
+        // latency regressions. Callers retry on CPU explicitly when allowed.
+        let _ = cuda_required;
+        let cuda_ep = cuda_ep.error_on_failure();
         builder = builder
             .with_execution_providers([cuda_ep])
             .map_err(|e| Error::asr(format!("CUDA EP: {e}")))?;

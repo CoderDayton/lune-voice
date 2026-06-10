@@ -39,7 +39,12 @@ impl Default for VadConfig {
         Self {
             threshold: 0.5,
             threshold_end: 0.3,
-            hangover_ms: 30,
+            // Wide enough to keep natural inter-word pauses and utterance-final
+            // silence in the audio fed to ASR. At 30 ms, every short pause
+            // diverted chunks away from the decoder, splicing unrelated speech
+            // together — the model then heard hard cuts mid-phrase and emitted
+            // spurious sentence breaks ("…against. Miss Shape and Monsters").
+            hangover_ms: 240,
             pcen: Some(PcenAgcConfig::default()),
         }
     }

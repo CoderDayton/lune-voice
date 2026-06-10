@@ -4,6 +4,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{BufferSize, SampleFormat, StreamConfig};
 use rubato::{Async, FixedAsync, PolynomialDegree, Resampler};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 use tracing::{debug, warn};
 
@@ -38,6 +39,9 @@ impl Default for AudioConfig {
 pub struct AudioStream {
     config: AudioConfig,
     ring: Arc<RingBuffer<AudioChunk>>,
+    /// When set, the audio callback emits its sub-chunk tail as a final short
+    /// chunk on its next invocation. See [`AudioStream::request_flush`].
+    flush: Arc<AtomicBool>,
     /// Kept alive to keep the cpal callback running. `None` for file-backed streams.
     _stream: Option<cpal::Stream>,
 }
@@ -256,6 +260,8 @@ impl AudioStream {
 
         let target_rate = config.target_sample_rate;
         let start_time = Instant::now();
+        let flush = Arc::new(AtomicBool::new(false));
+        let flush_cb = Arc::clone(&flush);
 
         // Shared state for the audio callback
         let mut resampler = if native_sample_rate != target_rate {
@@ -305,6 +311,7 @@ impl AudioStream {
                                 chunk_samples,
                                 &ring_clone,
                                 start_time,
+                                &flush_cb,
                             );
                         },
                         |err| warn!("Audio stream error: {}", err),
@@ -331,6 +338,7 @@ impl AudioStream {
                                 chunk_samples,
                                 &ring_clone,
                                 start_time,
+                                &flush_cb,
                             );
                         },
                         |err| warn!("Audio stream error: {}", err),
@@ -361,6 +369,7 @@ impl AudioStream {
         Ok(Self {
             config,
             ring,
+            flush,
             _stream: Some(stream),
         })
     }
@@ -389,6 +398,7 @@ impl AudioStream {
         Ok(Self {
             config,
             ring,
+            flush: Arc::new(AtomicBool::new(false)),
             _stream: None,
         })
     }
@@ -435,6 +445,16 @@ impl AudioStream {
         }
     }
 
+    /// Ask the audio callback to emit its buffered sub-chunk tail (up to one
+    /// chunk duration of audio) as a final short chunk on its next invocation.
+    /// Without this, audio captured after the last full chunk boundary —
+    /// often the final phonemes of the last word — is silently dropped when
+    /// the session stops. No-op for file-backed streams (`from_samples`
+    /// already pushes its partial tail chunk).
+    pub fn request_flush(&self) {
+        self.flush.store(true, Ordering::Release);
+    }
+
     /// Lightweight handle that shares this stream's ring buffer.
     ///
     /// Multiple handles can coexist; whichever consumer pops first wins.
@@ -445,6 +465,7 @@ impl AudioStream {
         AudioStreamHandle {
             config: self.config.clone(),
             ring: Arc::clone(&self.ring),
+            flush: Arc::clone(&self.flush),
         }
     }
 }
@@ -458,11 +479,17 @@ impl AudioStream {
 pub struct AudioStreamHandle {
     config: AudioConfig,
     ring: Arc<RingBuffer<AudioChunk>>,
+    flush: Arc<AtomicBool>,
 }
 
 impl AudioStreamHandle {
     pub fn config(&self) -> &AudioConfig {
         &self.config
+    }
+
+    /// See `AudioStream::request_flush`.
+    pub fn request_flush(&self) {
+        self.flush.store(true, Ordering::Release);
     }
 
     pub async fn next_chunk(&self) -> Option<AudioChunk> {
@@ -505,6 +532,7 @@ fn process_audio_callback(
     chunk_samples: usize,
     ring: &RingBuffer<AudioChunk>,
     start_time: Instant,
+    flush: &AtomicBool,
 ) {
     // 1. Downmix to mono. Averaging coherent channels is fine, but some
     // devices expose antiphase or highly imbalanced channels; in those cases
@@ -570,6 +598,19 @@ fn process_audio_callback(
 
         // RingBuffer.push handles eviction atomically — no TOCTOU race.
         ring.push(chunk);
+    }
+
+    // Flush request: emit the sub-chunk tail so the session's final word
+    // isn't clipped at the last full-chunk boundary. Consumers accept
+    // arbitrary chunk lengths (VAD carries partial frames; ASR appends raw
+    // samples), so a short final chunk is safe.
+    if flush.swap(false, Ordering::AcqRel) && !output_buf.is_empty() {
+        let samples = std::mem::take(output_buf);
+        let timestamp_ms = start_time.elapsed().as_millis() as u64;
+        ring.push(AudioChunk {
+            samples,
+            timestamp_ms,
+        });
     }
 }
 

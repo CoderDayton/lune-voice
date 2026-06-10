@@ -80,6 +80,10 @@ pub struct SessionManager<A: AsrBackend> {
     settings: Arc<RwLock<UserSettings>>,
     active: Arc<Mutex<Option<ActiveHandle>>>,
     idle_notify: Arc<Notify>,
+    /// Rolling tail of recently delivered transcripts, shared across
+    /// sessions. Passed to the LLM as cross-utterance context so follow-up
+    /// dictations can disambiguate names/homophones consistently.
+    recent_text: Arc<std::sync::Mutex<String>>,
 }
 
 impl<A: AsrBackend + 'static> SessionManager<A> {
@@ -105,6 +109,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             settings,
             active: Arc::new(Mutex::new(None)),
             idle_notify: Arc::new(Notify::new()),
+            recent_text: Arc::new(std::sync::Mutex::new(String::new())),
         }
     }
 
@@ -204,6 +209,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let active_arc_guard = Arc::clone(&active_arc);
         let idle_notify_guard = Arc::clone(&idle_notify);
         let event_tx_guard = event_tx.clone();
+        let recent_text = Arc::clone(&self.recent_text);
         let handle = tokio::task::spawn(run_session(
             session_id,
             asr,
@@ -220,6 +226,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             idle_notify,
             audio_override,
             settings,
+            recent_text,
         ));
         tokio::task::spawn(async move {
             if handle.await.is_err() {
@@ -485,6 +492,7 @@ async fn run_session<A: AsrBackend + 'static>(
     idle_notify: Arc<Notify>,
     audio_override: SessionAudio,
     _settings: Arc<RwLock<UserSettings>>,
+    recent_text: Arc<std::sync::Mutex<String>>,
 ) {
     let mut status = SessionStatus::Completed;
 
@@ -654,6 +662,23 @@ async fn run_session<A: AsrBackend + 'static>(
         }
     }
 
+    // Recover the producer-side audio tail: the capture callback may hold up
+    // to one chunk (~80 ms) of audio past the last full-chunk boundary —
+    // often the final phonemes of the last word. Ask the producer to flush,
+    // give the audio thread one callback cycle to deliver, then feed whatever
+    // arrives to ASR. Only worth doing when speech was in progress.
+    if !cancelled && was_speech {
+        audio_source.request_flush();
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        while let Some(chunk) = audio_source.try_next_chunk() {
+            speech_samples += chunk.samples.len();
+            if let Err(e) = asr.push_audio(&asr_session, &chunk.samples).await {
+                warn!(error = %e, "push_audio error during tail flush");
+                break;
+            }
+        }
+    }
+
     if !cancelled {
         let _ = event_tx.send(SessionEvent::Processing).await;
     }
@@ -738,6 +763,7 @@ async fn run_session<A: AsrBackend + 'static>(
         active_arc,
         idle_notify,
         _settings,
+        recent_text,
         cancelled,
     )
     .await;
@@ -772,6 +798,7 @@ async fn process_and_deliver(
     active_arc: Arc<Mutex<Option<ActiveHandle>>>,
     idle_notify: Arc<Notify>,
     settings: Arc<RwLock<UserSettings>>,
+    recent_text: Arc<std::sync::Mutex<String>>,
     mut cancelled: bool,
 ) {
     debug!(%session_id, "[ASR] output ready, len={}", raw_text.len());
@@ -914,7 +941,14 @@ async fn process_and_deliver(
             style_preset: Arc::clone(&style_preset),
             app_category: None,
             dictionary: dictionary_entries.clone(),
-            context: None,
+            context: {
+                let recent = recent_text.lock().unwrap_or_else(|e| e.into_inner());
+                if recent.is_empty() {
+                    None
+                } else {
+                    Some(recent.clone())
+                }
+            },
             language: detected_lang.into(),
             uncertain_words,
         };
@@ -969,6 +1003,24 @@ async fn process_and_deliver(
     let transcript = if post_llm_text.is_empty() {
         None
     } else {
+        // Roll the delivered text into the shared cross-utterance context,
+        // keeping only the tail. 400 chars ≈ the last few utterances —
+        // enough for name/homophone consistency without bloating the prompt.
+        const RECENT_TEXT_CAP: usize = 400;
+        {
+            let mut recent = recent_text.lock().unwrap_or_else(|e| e.into_inner());
+            if !recent.is_empty() {
+                recent.push(' ');
+            }
+            recent.push_str(&post_llm_text);
+            if recent.len() > RECENT_TEXT_CAP {
+                let mut cut = recent.len() - RECENT_TEXT_CAP;
+                while !recent.is_char_boundary(cut) {
+                    cut += 1;
+                }
+                recent.drain(..cut);
+            }
+        }
         Some(post_llm_text)
     };
     // Await the DB finalize inline so a runtime shutdown between here and

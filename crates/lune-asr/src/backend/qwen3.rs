@@ -4,6 +4,7 @@
 //! Mel: Whisper-compatible 128-bin log-mel at 16 kHz (see `whisper_mel.rs`).
 //! Decoding: greedy argmax with per-token softmax confidence.
 
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -45,10 +46,54 @@ const NEWLINE: i64 = 198; // \n
 const AUDIO_START: i64 = 151_669; // <|audio_start|>
 const AUDIO_END: i64 = 151_670; // <|audio_end|>
 
-const SYSTEM_PROMPT: &str = "";
+/// Base ASR instruction, matching the reference deployment
+/// (`scripts/test_asr_reference.py`). An empty system prompt measurably
+/// increases hallucination and translation drift on noisy audio.
+const SYSTEM_PROMPT: &str = "You are an ASR engine. Transcribe spoken audio exactly in the spoken language. Do not translate. Do not add words not clearly present.";
 
 /// Maximum audio buffer (5 min at 16 kHz).
 const MAX_WINDOW_SAMPLES: usize = 300 * whisper::SAMPLE_RATE;
+
+/// Target utterance RMS for loudness normalization (≈ −22 dBFS). The mel
+/// front-end's final scale is absolute, so quiet input lands outside the
+/// model's training distribution — accuracy becomes volume-dependent.
+const NORM_TARGET_RMS: f32 = 0.08;
+/// Boost ceiling: past this we are amplifying room tone, not speech.
+const NORM_MAX_GAIN: f32 = 10.0;
+
+/// Utterance-level loudness normalization: a single scalar gain per
+/// utterance (boost-only, peak-limited) so quiet dictation reaches the
+/// level the model was trained on. One scalar — unlike a running AGC — adds
+/// no time-varying artifacts the encoder never saw in training. Loud input
+/// passes through untouched; near-silence is left alone rather than blown
+/// up into noise.
+fn normalize_loudness(pcm: &[f32]) -> std::borrow::Cow<'_, [f32]> {
+    use std::borrow::Cow;
+    if pcm.is_empty() {
+        return Cow::Borrowed(pcm);
+    }
+    let mut sum_sq = 0.0f64;
+    let mut peak = 0.0f32;
+    for &x in pcm {
+        if x.is_finite() {
+            sum_sq += f64::from(x) * f64::from(x);
+            peak = peak.max(x.abs());
+        }
+    }
+    let rms = (sum_sq / pcm.len() as f64).sqrt() as f32;
+    if rms <= 1.0e-6 || peak <= 0.0 {
+        return Cow::Borrowed(pcm); // effectively silence — nothing to gain
+    }
+    let gain = (NORM_TARGET_RMS / rms)
+        .clamp(1.0, NORM_MAX_GAIN)
+        .min(0.985 / peak)
+        .max(1.0);
+    if gain <= 1.01 {
+        return Cow::Borrowed(pcm);
+    }
+    tracing::debug!(gain, rms, peak, "utterance loudness normalized");
+    Cow::Owned(pcm.iter().map(|&x| (x * gain).clamp(-1.0, 1.0)).collect())
+}
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -87,7 +132,10 @@ pub struct Qwen3AsrBackend {
     use_gpu: bool,
     decoder_io_binding: bool,
     last_profile: Mutex<Option<Qwen3AsrProfile>>,
-    boost_map: Mutex<std::collections::HashMap<i64, f32>>,
+    /// Tokenized boost phrases (both bare and leading-space tokenizations)
+    /// plus the additive logit score. Consumed per decode step by
+    /// `phrase_boost_tokens` — prefix-constrained, not a flat token set.
+    boost_seqs: Mutex<(Vec<Vec<i64>>, f32)>,
     /// Per-session context phrases injected into the system prompt.
     /// e.g. ["Toledans", "Rodolfo"] → "Preferred terms: Toledans, Rodolfo"
     context_phrases: Mutex<Vec<String>>,
@@ -144,7 +192,7 @@ impl Qwen3AsrBackend {
             use_gpu: config.use_gpu,
             decoder_io_binding,
             last_profile: Mutex::new(None),
-            boost_map: Mutex::new(std::collections::HashMap::new()),
+            boost_seqs: Mutex::new((Vec::new(), 0.0)),
             context_phrases: Mutex::new(Vec::new()),
         })
     }
@@ -155,7 +203,10 @@ impl Qwen3AsrBackend {
 
     /// Set word boost phrases — dual-layer: system prompt context + logit bias.
     /// Phrases are injected into the system prompt as preferred terms AND
-    /// tokenized for additive logit bias on decode.
+    /// tokenized for prefix-constrained additive logit bias on decode.
+    ///
+    /// Each phrase is tokenized twice — bare and with a leading space — because
+    /// BPE assigns different ids to word-initial and mid-sentence forms.
     pub fn set_boost_phrases(&self, phrases: &[String], score: f32) {
         // Layer 1: context phrases for system prompt injection
         *self
@@ -163,23 +214,26 @@ impl Qwen3AsrBackend {
             .lock()
             .unwrap_or_else(|e| e.into_inner()) = phrases.to_vec();
 
-        // Layer 2: token-level logit bias
-        let mut map = self.boost_map.lock().unwrap_or_else(|e| e.into_inner());
-        map.clear();
+        // Layer 2: tokenized sequences for prefix-constrained logit bias
+        let mut seqs: Vec<Vec<i64>> = Vec::with_capacity(phrases.len() * 2);
         for phrase in phrases {
-            if let Ok(encoding) = self.tokenizer.encode(phrase.as_str(), false) {
-                for &id in encoding.get_ids() {
-                    map.entry(id as i64).or_insert(score);
+            for variant in [phrase.clone(), format!(" {phrase}")] {
+                if let Ok(enc) = self.tokenizer.encode(variant.as_str(), false) {
+                    let ids: Vec<i64> = enc.get_ids().iter().map(|&id| id as i64).collect();
+                    if !ids.is_empty() && !seqs.contains(&ids) {
+                        seqs.push(ids);
+                    }
                 }
             }
         }
-        if !map.is_empty() {
+        if !seqs.is_empty() {
             tracing::debug!(
                 phrases = phrases.len(),
-                tokens = map.len(),
-                "boost map updated"
+                seqs = seqs.len(),
+                "boost phrases set"
             );
         }
+        *self.boost_seqs.lock().unwrap_or_else(|e| e.into_inner()) = (seqs, score);
     }
 
     /// Build prompt token IDs: prefix (before audio) and suffix (after audio).
@@ -323,8 +377,8 @@ const MABLE_TOP_K: usize = 16;
 fn argmax_on_logits(
     value: &ort::value::Value,
     vocab_size: usize,
-    boost: &std::collections::HashMap<i64, f32>,
-    banned: &std::collections::HashSet<i64>,
+    boost: &HashMap<i64, f32>,
+    banned: &HashSet<i64>,
 ) -> Result<(i64, f32, Vec<f64>)> {
     let (shape, data) = value.try_extract_tensor::<f16>().ctx("extract logits")?;
     // Last position's logits: last `vocab_size` elements.
@@ -433,10 +487,40 @@ fn argmax_on_logits(
 /// over raw decoder token ids, not a probabilistic model.
 const REPEAT_GUARD_ORDER: usize = 3;
 
+/// Prefix-constrained phrase biasing: fill `out` with the boost for the next
+/// decode step. A phrase's entry token is always boosted at `score` (a match
+/// can start anywhere); its k-th token is boosted at `2 × score` only when
+/// the decode tail already equals the phrase's first k tokens. Unlike a flat
+/// per-token boost, subwords like "ton" never get promoted in the middle of
+/// unrelated words — the bias follows the phrase, not the alphabet.
+fn phrase_boost_tokens(
+    generated: &[i64],
+    seqs: &[Vec<i64>],
+    score: f32,
+    out: &mut HashMap<i64, f32>,
+) {
+    out.clear();
+    for seq in seqs {
+        if let Some(&first) = seq.first() {
+            let e = out.entry(first).or_insert(0.0);
+            *e = e.max(score);
+        }
+        // Longest matching prefix wins; stop at the first (longest) hit.
+        let max_k = seq.len().saturating_sub(1).min(generated.len());
+        for k in (1..=max_k).rev() {
+            if generated[generated.len() - k..] == seq[..k] {
+                let e = out.entry(seq[k]).or_insert(0.0);
+                *e = e.max(score * 2.0);
+                break;
+            }
+        }
+    }
+}
+
 /// Fill `out` with the token ids that would re-complete a length-`n` block
 /// given the tail of `generated`. Empty in the common case, so the hot argmax
 /// path stays on its single-pass fast branch.
-fn banned_next_tokens(generated: &[i64], n: usize, out: &mut std::collections::HashSet<i64>) {
+fn banned_next_tokens(generated: &[i64], n: usize, out: &mut HashSet<i64>) {
     out.clear();
     if n < 2 || generated.len() < n {
         return;
@@ -619,11 +703,18 @@ impl Qwen3AsrBackend {
         language: Option<&str>,
     ) -> Result<Vec<AsrSegment>> {
         let start = std::time::Instant::now();
-        let boost = self
-            .boost_map
+        let (boost_seqs, boost_score) = self
+            .boost_seqs
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .clone();
+        // Boost for the first decoded token: no history yet, entry tokens only.
+        let mut boost: HashMap<i64, f32> = HashMap::new();
+        phrase_boost_tokens(&[], &boost_seqs, boost_score, &mut boost);
+
+        // 0. Loudness normalization — quiet dictation otherwise decodes
+        //    measurably worse (absolute mel scale; see `normalize_loudness`).
+        let pcm = normalize_loudness(pcm);
 
         // 1. Mel spectrogram [1, 128, T] — FP16 native.
         //    Pad mel output to 3000 frames (30s) matching the reference
@@ -632,7 +723,7 @@ impl Qwen3AsrBackend {
         //    computing FFT on silence.
         const MEL_MIN_FRAMES: usize = 3000;
         let mel_t0 = std::time::Instant::now();
-        let spec = self.mel.extract_from_f32_padded(pcm, MEL_MIN_FRAMES);
+        let spec = self.mel.extract_from_f32_padded(&pcm, MEL_MIN_FRAMES);
         let mel_3d = ndarray::Array3::from_shape_vec((1, spec.n_mels, spec.n_frames), spec.data)
             .ctx("mel reshape")?;
         let mel_val = Value::from_array(mel_3d).ctx("mel value")?;
@@ -702,7 +793,7 @@ impl Qwen3AsrBackend {
         let prompt_ms = prompt_t0.elapsed().as_secs_f64() * 1000.0;
 
         // 5. Prefill: run decoder with full embeddings + empty KV cache
-        let empty_banned: std::collections::HashSet<i64> = std::collections::HashSet::new();
+        let empty_banned: HashSet<i64> = HashSet::new();
         let prefill_t0 = std::time::Instant::now();
         let (first_token, first_conf, first_logits, mut kv_cache) = {
             let embeds_val = Value::from_array(embeds).ctx("embeds val")?;
@@ -778,7 +869,7 @@ impl Qwen3AsrBackend {
         let mut pos = seq_len;
         let mut decode_steps = 0usize;
         let mut gen_ids: Vec<i64> = tokens.iter().map(|(id, _, _)| *id).collect();
-        let mut banned: std::collections::HashSet<i64> = std::collections::HashSet::new();
+        let mut banned: HashSet<i64> = HashSet::new();
 
         // Pre-allocate reusable position array for the decode loop.
         let mut pos_arr = Array3::<i64>::zeros((3, 1, 1));
@@ -815,6 +906,10 @@ impl Qwen3AsrBackend {
             // Repeat-guard mask for the upcoming token (empty in the common
             // case, so the argmax fast path is preserved).
             banned_next_tokens(&gen_ids, REPEAT_GUARD_ORDER, &mut banned);
+            // Refresh the prefix-constrained phrase bias for this step.
+            if !boost_seqs.is_empty() {
+                phrase_boost_tokens(&gen_ids, &boost_seqs, boost_score, &mut boost);
+            }
 
             let (tok, conf, logits_k) = {
                 // Embed single token (FP16 native, scoped to drop before decoder)
@@ -910,6 +1005,50 @@ impl Qwen3AsrBackend {
             pos += 1;
         }
         let decode_ms = decode_t0.elapsed().as_secs_f64() * 1000.0;
+
+        // Arena janitor: ORT shrink run-options only act on the arenas of the
+        // session that runs, and every session here owns a private CUDA arena
+        // (no CUDA allocator is registered at env level). The decoder's arena
+        // is where the decode ladder lives — KV growth plus the all-position
+        // prefill-logits scratch, ~1 GB high-water. After dropping the KV and
+        // binding, every chunk in it is fully free, so one trivial 1-token
+        // decoder run carrying shrink options releases the lot back to the
+        // driver. Costs one decode step (~10 ms) per utterance; idle VRAM
+        // between dictations drops by the full ladder.
+        drop(decoder_binding);
+        drop(kv_cache);
+        if self.use_gpu {
+            let mut janitor = || -> Result<()> {
+                let shrink = make_shrink_run_options(true)?;
+                let id_val =
+                    Value::from_array(Array2::from_elem((1, 1), EOS_IDS[0])).ctx("janitor id")?;
+                let emb_out = models
+                    .embed_tokens
+                    .run(ort::inputs!("input_ids" => id_val))
+                    .ctx("janitor embed")?;
+                let emb = extract_f16_array(&emb_out[0])?;
+                drop(emb_out);
+                let emb_val = Value::from_array(emb).ctx("janitor emb val")?;
+                let pos_val =
+                    Value::from_array(Array3::<i64>::zeros((3, 1, 1))).ctx("janitor pos")?;
+                let mask_val =
+                    Value::from_array(Array2::<i64>::ones((1, 1))).ctx("janitor mask")?;
+                let mut inputs = ort::inputs!(
+                    "inputs_embeds" => emb_val,
+                    "position_ids" => pos_val,
+                    "attention_mask" => mask_val
+                );
+                append_empty_kv(&mut inputs)?;
+                models
+                    .decoder
+                    .run_with_options(inputs, &shrink)
+                    .ctx("janitor run")?;
+                Ok(())
+            };
+            if let Err(err) = janitor() {
+                tracing::debug!(error = %err, "post-utterance arena janitor skipped");
+            }
+        }
 
         drop(models);
 
@@ -1275,8 +1414,81 @@ mod tests {
     }
 
     #[test]
+    fn loudness_norm_boosts_quiet_speech_to_target() {
+        // Quiet sine at RMS ≈ 0.008 → boosted toward 0.08 (10× cap applies).
+        let pcm: Vec<f32> = (0..16_000)
+            .map(|i| 0.0113 * (i as f32 * 0.2).sin())
+            .collect();
+        let out = normalize_loudness(&pcm);
+        let rms = (out.iter().map(|x| x * x).sum::<f32>() / out.len() as f32).sqrt();
+        assert!(rms > 0.05, "quiet speech should be boosted, rms={rms}");
+        assert!(out.iter().all(|x| x.abs() <= 1.0));
+    }
+
+    #[test]
+    fn loudness_norm_leaves_normal_level_untouched() {
+        let pcm: Vec<f32> = (0..16_000).map(|i| 0.14 * (i as f32 * 0.2).sin()).collect();
+        let out = normalize_loudness(&pcm);
+        assert!(
+            matches!(out, std::borrow::Cow::Borrowed(_)),
+            "healthy-level audio must pass through without copy"
+        );
+    }
+
+    #[test]
+    fn loudness_norm_ignores_silence_and_respects_peak() {
+        let silent = vec![0.0f32; 1600];
+        assert!(matches!(
+            normalize_loudness(&silent),
+            std::borrow::Cow::Borrowed(_)
+        ));
+        // Quiet RMS but a single hot transient: gain limited by peak.
+        let mut pcm = vec![0.005f32; 16_000];
+        pcm[3] = 0.9;
+        let out = normalize_loudness(&pcm);
+        assert!(out.iter().all(|x| x.abs() <= 1.0));
+        assert!(out[3].abs() <= 0.99, "peak limited, got {}", out[3]);
+    }
+
+    #[test]
+    fn phrase_boost_entry_tokens_always_active() {
+        let seqs = vec![vec![10, 11, 12], vec![20, 21]];
+        let mut out = HashMap::new();
+        phrase_boost_tokens(&[], &seqs, 1.5, &mut out);
+        assert_eq!(out.get(&10), Some(&1.5));
+        assert_eq!(out.get(&20), Some(&1.5));
+        assert!(
+            !out.contains_key(&11),
+            "mid-phrase token must not be boosted without prefix"
+        );
+        assert!(!out.contains_key(&12));
+    }
+
+    #[test]
+    fn phrase_boost_continuation_requires_matching_tail() {
+        let seqs = vec![vec![10, 11, 12]];
+        let mut out = HashMap::new();
+        // Tail matches first two tokens → third gets the doubled boost.
+        phrase_boost_tokens(&[5, 10, 11], &seqs, 1.0, &mut out);
+        assert_eq!(out.get(&12), Some(&2.0));
+        // Unrelated tail → only the entry token.
+        phrase_boost_tokens(&[5, 6, 7], &seqs, 1.0, &mut out);
+        assert_eq!(out.get(&10), Some(&1.0));
+        assert!(!out.contains_key(&12));
+    }
+
+    #[test]
+    fn phrase_boost_longest_prefix_wins() {
+        // Tail [10, 11] matches prefix len 2 → boost seq[2], not seq[1].
+        let seqs = vec![vec![10, 11, 12, 13]];
+        let mut out = HashMap::new();
+        phrase_boost_tokens(&[10, 11], &seqs, 1.0, &mut out);
+        assert_eq!(out.get(&12), Some(&2.0));
+        assert!(!out.contains_key(&13));
+    }
+
+    #[test]
     fn repeat_guard_bans_seen_completions() {
-        use std::collections::HashSet;
         // "a b c a b" → last bigram [a,b] previously continued with c → ban c.
         let mut out = HashSet::new();
         banned_next_tokens(&[1, 2, 3, 1, 2], 3, &mut out);
@@ -1286,7 +1498,6 @@ mod tests {
 
     #[test]
     fn repeat_guard_empty_without_repeat() {
-        use std::collections::HashSet;
         let mut out = HashSet::new();
         banned_next_tokens(&[1, 2, 3, 4], 3, &mut out);
         assert!(out.is_empty(), "no repeated bigram → nothing banned");

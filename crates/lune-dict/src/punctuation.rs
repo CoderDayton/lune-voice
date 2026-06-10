@@ -62,6 +62,9 @@ pub fn normalize(text: &str) -> PunctuationOutcome {
         };
     }
 
+    let abbreviated = abbreviate_titles(trimmed);
+    let trimmed = abbreviated.as_str();
+
     let words: Vec<&str> = trimmed.split_whitespace().collect();
     let ends_terminal = ends_with_terminal(trimmed);
     let interrogative = words
@@ -100,6 +103,36 @@ pub fn normalize(text: &str) -> PunctuationOutcome {
         text: out,
         needs_llm,
     }
+}
+
+/// Spoken-form honorifics ASR emits verbatim ("Mister Thompson") where
+/// written English universally abbreviates ("Mr. Thompson"). Applied only
+/// when the next word is capitalized, so "hey mister" and "the doctor said"
+/// pass through untouched.
+const TITLE_ABBREVIATIONS: &[(&str, &str)] =
+    &[("mister", "Mr."), ("missus", "Mrs."), ("doctor", "Dr.")];
+
+/// Rewrite spoken honorifics to their written abbreviation when followed by
+/// a capitalized word. Words carrying any edge punctuation are left alone —
+/// "mister," mid-list is vocative, not a title. Rebuilds with single spaces,
+/// which dictation text already uses.
+fn abbreviate_titles(text: &str) -> String {
+    let words: Vec<&str> = text.split_whitespace().collect();
+    let mut out: Vec<String> = Vec::with_capacity(words.len());
+    for (i, w) in words.iter().enumerate() {
+        let next_capitalized = words.get(i + 1).is_some_and(|n| {
+            n.chars()
+                .find(|c| c.is_alphabetic())
+                .is_some_and(|c| c.is_uppercase())
+        });
+        let abbrev = TITLE_ABBREVIATIONS
+            .iter()
+            .find(|(spoken, _)| w.eq_ignore_ascii_case(spoken))
+            .filter(|_| next_capitalized)
+            .map(|(_, abbr)| *abbr);
+        out.push(abbrev.map_or_else(|| (*w).to_string(), |a| a.to_string()));
+    }
+    out.join(" ")
 }
 
 /// True when every alphabetic character is in a Latin range. Accented European
@@ -209,6 +242,29 @@ mod tests {
     fn empty_text_passes_through() {
         let out = normalize("   ");
         assert!(!out.needs_llm);
+    }
+
+    #[test]
+    fn abbreviates_spoken_titles_before_names() {
+        let out = normalize("dear mister Thompson, I am writing to confirm");
+        assert!(out.text.starts_with("Dear Mr. Thompson,"));
+        let out = normalize("Missus Robinson arrived.");
+        assert_eq!(out.text, "Mrs. Robinson arrived.");
+        let out = normalize("Doctor Chen will see you now.");
+        assert_eq!(out.text, "Dr. Chen will see you now.");
+    }
+
+    #[test]
+    fn leaves_non_title_honorifics_alone() {
+        let out = normalize("hey mister");
+        assert_eq!(out.text, "Hey mister.");
+        let out = normalize("the doctor said it was fine.");
+        assert_eq!(out.text, "The doctor said it was fine.");
+        let out = normalize("listen here mister you can't park there.");
+        assert!(
+            out.text.contains("mister you"),
+            "lowercase next word → no abbreviation"
+        );
     }
 
     #[test]

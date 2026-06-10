@@ -47,6 +47,10 @@ pub trait AudioPull: Send + Sync {
     /// True when this source can never produce more audio (file replay
     /// drained, no live capture). Live mics and shared handles return false.
     fn is_offline(&self) -> bool;
+    /// Ask the producer to emit any buffered sub-chunk audio as a final
+    /// short chunk. Default no-op for sources without producer-side
+    /// buffering (file replay already delivers its tail).
+    fn request_flush(&self) {}
 }
 
 impl AudioPull for AudioStream {
@@ -56,11 +60,17 @@ impl AudioPull for AudioStream {
     fn is_offline(&self) -> bool {
         AudioStream::is_offline(self)
     }
+    fn request_flush(&self) {
+        AudioStream::request_flush(self)
+    }
 }
 
 impl AudioPull for AudioStreamHandle {
     fn try_next_chunk(&self) -> Option<AudioChunk> {
         AudioStreamHandle::try_next_chunk(self)
+    }
+    fn request_flush(&self) {
+        AudioStreamHandle::request_flush(self)
     }
     fn is_offline(&self) -> bool {
         false

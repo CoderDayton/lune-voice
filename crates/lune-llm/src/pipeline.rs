@@ -50,6 +50,7 @@ impl CorrectionPipeline {
             raw_text,
             &input.language,
             &examples,
+            input.context.as_deref(),
         )
     }
 }
