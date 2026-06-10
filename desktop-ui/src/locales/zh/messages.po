@@ -29,6 +29,14 @@ msgstr ""
 msgid "{visibleCount} of {totalCount} sessions"
 msgstr ""
 
+#: src/features/shell/components/sidebar.tsx:198
+msgid "Account"
+msgstr ""
+
+#: src/features/shell/components/sidebar.tsx:186
+msgid "Account and status"
+msgstr ""
+
 #: src/features/dictionary/components/dictionary-table.tsx:177
 msgid "Action"
 msgstr "操作"
@@ -58,6 +66,10 @@ msgstr ""
 msgid "All required models are already installed. Continue when you're ready."
 msgstr ""
 
+#: src/features/overview/overview-page.tsx:91
+msgid "all-time"
+msgstr ""
+
 #: src/features/settings/components/openai-fields.tsx:35
 msgid "API endpoint"
 msgstr ""
@@ -67,6 +79,7 @@ msgid "API key"
 msgstr ""
 
 #: src/features/settings/sections/appearance-section.tsx:35
+#: src/features/settings/settings-page.tsx:66
 msgid "Appearance"
 msgstr ""
 
@@ -76,6 +89,10 @@ msgstr ""
 
 #: src/features/settings/components/calibrate-modal.tsx:95
 msgid "Apply"
+msgstr ""
+
+#: src/features/overview/overview-page.tsx:136
+msgid "Audio"
 msgstr ""
 
 #: src/features/dictation/audio-dots.tsx:17
@@ -145,10 +162,6 @@ msgstr ""
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr ""
 
-#: src/features/styles/styles-page.tsx:133
-msgid "Choose the tone and formatting applied to your transcriptions."
-msgstr ""
-
 #: src/features/history/components/history-toolbar.tsx:57
 msgid "Clear search"
 msgstr ""
@@ -157,22 +170,29 @@ msgstr ""
 msgid "close"
 msgstr ""
 
-#: src/features/history/components/session-detail-modal.tsx:206
+#: src/features/history/components/session-detail-modal.tsx:207
 #: src/features/settings/sections/models-section.tsx:328
 #: src/features/styles/components/style-editor-modal.tsx:97
 msgid "Close"
 msgstr ""
 
-#: src/features/shell/components/sidebar.tsx:47
+#: src/features/shell/components/app-shell.tsx:163
+msgid "Close sidebar"
+msgstr ""
+
+#: src/features/shell/components/sidebar.tsx:57
 msgid "Collapse sidebar"
 msgstr ""
 
-#: src/features/history/components/session-detail-modal.tsx:181
+#: src/features/history/components/session-detail-modal.tsx:167
 msgid "Completed"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:36
+#: src/features/overview/overview-page.tsx:74
+#: src/features/shell/components/app-shell.tsx:183
 #: src/features/shell/components/sidebar-widgets.tsx:40
+#: src/features/shell/components/sidebar.tsx:165
+#: src/features/shell/components/sidebar.tsx:220
 msgid "Connecting"
 msgstr ""
 
@@ -184,7 +204,7 @@ msgstr ""
 msgid "Control how your speech is turned into text."
 msgstr ""
 
-#: src/features/history/components/session-detail-modal.tsx:137
+#: src/features/history/components/session-detail-modal.tsx:130
 msgid "Copy transcript"
 msgstr ""
 
@@ -193,7 +213,7 @@ msgstr ""
 msgid "Correction level"
 msgstr ""
 
-#: src/features/styles/styles-page.tsx:173
+#: src/features/styles/styles-page.tsx:161
 msgid "Create new style"
 msgstr ""
 
@@ -211,7 +231,8 @@ msgid "Dark"
 msgstr ""
 
 #: src/components/feedback/confirm-dialog.tsx:63
-#: src/features/history/components/session-detail-modal.tsx:199
+#: src/features/history/components/session-detail-modal.tsx:200
+#: src/features/history/history-page.tsx:92
 #: src/features/settings/sections/models-section.tsx:264
 #: src/features/styles/components/style-preset-card.tsx:66
 msgid "Delete"
@@ -226,7 +247,8 @@ msgstr ""
 msgid "Delete model"
 msgstr ""
 
-#: src/features/history/components/session-detail-modal.tsx:197
+#: src/features/history/components/session-detail-modal.tsx:198
+#: src/features/history/history-page.tsx:90
 msgid "Delete session?"
 msgstr ""
 
@@ -255,7 +277,7 @@ msgstr ""
 msgid "Discard the current draft and return to idle. Click the binding to change it."
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:36
+#: src/features/overview/overview-page.tsx:74
 msgid "Disconnected"
 msgstr ""
 
@@ -288,7 +310,7 @@ msgstr ""
 msgid "Download progress"
 msgstr ""
 
-#: src/features/history/components/session-detail-modal.tsx:129
+#: src/features/history/components/session-detail-modal.tsx:122
 msgid "Download transcript"
 msgstr ""
 
@@ -305,7 +327,7 @@ msgstr ""
 msgid "Duplicate"
 msgstr ""
 
-#: src/features/history/components/session-detail-modal.tsx:173
+#: src/features/history/components/session-detail-modal.tsx:159
 msgid "Duration"
 msgstr ""
 
@@ -330,12 +352,12 @@ msgstr ""
 msgid "Edit style"
 msgstr ""
 
-#: src/features/history/components/history-session-list.tsx:37
-#: src/features/overview/overview-page.tsx:146
+#: src/features/history/components/history-session-list.tsx:29
+#: src/features/overview/overview-page.tsx:211
 msgid "Empty session"
 msgstr ""
 
-#: src/features/history/components/session-detail-modal.tsx:174
+#: src/features/history/components/session-detail-modal.tsx:160
 msgid "Engine"
 msgstr ""
 
@@ -343,11 +365,12 @@ msgstr ""
 msgid "Enter Lune Voice"
 msgstr ""
 
-#: src/features/shell/components/sidebar.tsx:97
+#: src/features/shell/components/sidebar.tsx:84
 msgid "Expand sidebar"
 msgstr ""
 
 #: src/features/settings/sections/general-section.tsx:23
+#: src/features/settings/settings-page.tsx:65
 msgid "General"
 msgstr ""
 
@@ -369,6 +392,14 @@ msgstr ""
 
 #: src/features/settings/sections/input-section.tsx:92
 msgid "How quickly Lune decides you're done speaking. Higher = ends sooner on a pause."
+msgstr ""
+
+#: src/features/overview/overview-page.tsx:161
+msgid "Idle"
+msgstr ""
+
+#: src/features/settings/settings-page.tsx:68
+msgid "Input"
 msgstr ""
 
 #: src/features/settings/sections/models-section.tsx:224
@@ -403,11 +434,18 @@ msgid "Light"
 msgstr ""
 
 #: src/features/dictation/dictation-pill.tsx:58
+#: src/features/shell/components/app-shell.tsx:187
+#: src/features/shell/components/sidebar.tsx:163
 msgid "Listening"
 msgstr ""
 
+#: src/features/overview/overview-page.tsx:161
 #: src/features/shell/components/sidebar-widgets.tsx:46
 msgid "Listening…"
+msgstr ""
+
+#: src/features/shell/components/sidebar.tsx:200
+msgid "Local"
 msgstr ""
 
 #: src/features/settings/sections/transcription-section.tsx:94
@@ -430,11 +468,15 @@ msgstr ""
 msgid "Microphone calibration"
 msgstr ""
 
+#: src/features/overview/overview-page.tsx:139
+msgid "Microphone input level"
+msgstr ""
+
 #: src/features/settings/sections/transcription-section.tsx:94
 msgid "Mid"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:64
+#: src/features/overview/overview-page.tsx:100
 msgid "Minutes"
 msgstr ""
 
@@ -444,6 +486,7 @@ msgstr ""
 
 #: src/features/settings/sections/models-section.tsx:103
 #: src/features/settings/sections/models-section.tsx:128
+#: src/features/settings/settings-page.tsx:71
 msgid "Models"
 msgstr ""
 
@@ -453,10 +496,6 @@ msgstr ""
 
 #: src/features/styles/components/style-editor-modal.tsx:51
 msgid "Name"
-msgstr ""
-
-#: src/features/shell/components/sidebar.tsx:55
-msgid "Navigate"
 msgstr ""
 
 #: src/features/history/components/history-pagination.tsx:54
@@ -471,24 +510,24 @@ msgstr ""
 msgid "No entries yet. Add your first correction rule above."
 msgstr ""
 
-#: src/features/history/components/history-session-list.tsx:95
+#: src/features/history/components/history-session-list.tsx:130
 msgid "No sessions found."
 msgstr ""
 
 #. placeholder {0}: searchQuery.trim()
-#: src/features/history/components/history-session-list.tsx:92
+#: src/features/history/components/history-session-list.tsx:127
 msgid "No sessions match \"{0}\". Try a different search."
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:120
+#: src/features/overview/overview-page.tsx:185
 msgid "No sessions yet"
 msgstr ""
 
-#: src/features/history/components/history-session-list.tsx:94
+#: src/features/history/components/history-session-list.tsx:129
 msgid "No sessions yet. Start dictating to see your transcripts here."
 msgstr ""
 
-#: src/features/history/components/session-detail-modal.tsx:165
+#: src/features/history/components/session-detail-modal.tsx:151
 msgid "No transcript"
 msgstr ""
 
@@ -500,21 +539,39 @@ msgstr ""
 msgid "Not installed"
 msgstr ""
 
+#: src/features/overview/overview-page.tsx:161
+#: src/features/shell/components/app-shell.tsx:190
+#: src/features/shell/components/sidebar.tsx:168
+msgid "Offline"
+msgstr ""
+
+#: src/features/shell/components/sidebar.tsx:52
+msgid "Offline dictation"
+msgstr ""
+
 #: src/features/styles/components/style-editor-modal.tsx:68
 msgid "One-line summary shown on the card"
 msgstr ""
 
-#: src/features/history/components/history-session-list.tsx:32
+#: src/features/shell/components/app-shell.tsx:107
+msgid "Open menu"
+msgstr ""
+
+#: src/features/history/components/history-session-list.tsx:79
 msgid "Open session details"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:141
+#: src/features/overview/overview-page.tsx:206
 msgid "Open session from {time}"
 msgstr ""
 
 #: src/features/settings/sections/models-section.tsx:221
 #: src/features/welcome/components/model-card.tsx:86
 msgid "Optional"
+msgstr ""
+
+#: src/features/settings/settings-page.tsx:70
+msgid "Output"
 msgstr ""
 
 #: src/features/welcome/welcome-page.tsx:169
@@ -553,7 +610,7 @@ msgstr ""
 msgid "Pre-warm microphone"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:122
+#: src/features/overview/overview-page.tsx:187
 msgid "Press"
 msgstr ""
 
@@ -573,6 +630,7 @@ msgstr ""
 
 #: src/features/dictation/dictation-pill.tsx:58
 #: src/features/dictation/dictation-pill.tsx:73
+#: src/features/shell/components/app-shell.tsx:185
 msgid "Processing"
 msgstr ""
 
@@ -588,7 +646,9 @@ msgstr ""
 msgid "Read aloud. Don't worry about pace — just speak naturally."
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:36
+#: src/features/overview/overview-page.tsx:74
+#: src/features/shell/components/app-shell.tsx:189
+#: src/features/shell/components/sidebar.tsx:167
 msgid "Ready"
 msgstr ""
 
@@ -596,7 +656,7 @@ msgstr ""
 msgid "Recalibrate"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:93
+#: src/features/overview/overview-page.tsx:169
 msgid "Recent"
 msgstr ""
 
@@ -643,8 +703,8 @@ msgstr ""
 msgid "Retry download"
 msgstr ""
 
-#: src/features/history/components/history-session-list.tsx:45
-#: src/features/overview/overview-page.tsx:154
+#: src/features/history/components/history-session-list.tsx:37
+#: src/features/overview/overview-page.tsx:219
 msgid "s"
 msgstr ""
 
@@ -653,7 +713,7 @@ msgstr ""
 msgid "Save"
 msgstr ""
 
-#: src/features/history/components/session-detail-modal.tsx:66
+#: src/features/history/components/session-detail-modal.tsx:70
 msgid "Save Transcript"
 msgstr ""
 
@@ -670,6 +730,10 @@ msgstr ""
 msgid "Select {0} style"
 msgstr ""
 
+#: src/features/history/history-page.tsx:103
+msgid "Select a session to view its transcript"
+msgstr ""
+
 #: src/features/welcome/welcome-page.tsx:239
 msgid "Select required models"
 msgstr ""
@@ -679,17 +743,23 @@ msgstr ""
 msgid "Send method"
 msgstr "发送方式"
 
-#: src/features/overview/overview-page.tsx:95
+#: src/features/overview/overview-page.tsx:128
+#: src/features/overview/overview-page.tsx:171
 #: src/features/shell/components/sidebar-widgets.tsx:83
 msgid "session"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:95
+#: src/features/history/components/session-detail-modal.tsx:191
+msgid "Session details"
+msgstr ""
+
+#: src/features/overview/overview-page.tsx:128
+#: src/features/overview/overview-page.tsx:171
 #: src/features/shell/components/sidebar-widgets.tsx:83
 msgid "sessions"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:73
+#: src/features/overview/overview-page.tsx:110
 msgid "Sessions"
 msgstr ""
 
@@ -701,9 +771,25 @@ msgstr ""
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr ""
 
+#: src/features/shell/components/sidebar.tsx:238
+msgid "Settings"
+msgstr ""
+
+#: src/features/settings/settings-page.tsx:88
+msgid "Settings sections"
+msgstr ""
+
+#: src/features/settings/settings-page.tsx:67
+msgid "Shortcuts"
+msgstr ""
+
 #: src/features/welcome/welcome-page.tsx:213
 #: src/features/welcome/welcome-page.tsx:248
 msgid "Skip for now"
+msgstr ""
+
+#: src/features/shell/components/app-shell.tsx:100
+msgid "Skip to main content"
 msgstr ""
 
 #: src/features/settings/components/calibrate-modal.tsx:113
@@ -715,6 +801,7 @@ msgid "Spoken phrase"
 msgstr ""
 
 #: src/features/shell/components/sidebar-widgets.tsx:40
+#: src/features/shell/components/sidebar.tsx:220
 msgid "Start dictating"
 msgstr ""
 
@@ -750,6 +837,7 @@ msgid "Stay quiet — measuring background noise."
 msgstr ""
 
 #: src/features/shell/components/sidebar-widgets.tsx:40
+#: src/features/shell/components/sidebar.tsx:220
 msgid "Stop dictating"
 msgstr ""
 
@@ -757,7 +845,7 @@ msgstr ""
 msgid "Stop dictation"
 msgstr "停止听写"
 
-#: src/features/history/components/session-detail-modal.tsx:175
+#: src/features/history/components/session-detail-modal.tsx:161
 msgid "Style"
 msgstr ""
 
@@ -787,14 +875,20 @@ msgstr ""
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr ""
 
-#: src/features/history/components/session-detail-modal.tsx:198
+#: src/features/history/components/session-detail-modal.tsx:199
+#: src/features/history/history-page.tsx:91
 msgid "This will permanently remove this dictation session and its transcript."
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:123
+#: src/features/overview/overview-page.tsx:188
 msgid "to start dictating"
 msgstr ""
 
+#: src/features/overview/overview-page.tsx:92
+msgid "today"
+msgstr ""
+
+#: src/features/overview/overview-page.tsx:120
 #: src/features/shell/components/sidebar-widgets.tsx:81
 msgid "Today"
 msgstr ""
@@ -805,6 +899,18 @@ msgstr ""
 
 #: src/features/settings/sections/input-section.tsx:34
 msgid "Toggle is easiest for longer dictation. Hold is better for quick bursts."
+msgstr ""
+
+#: src/features/shell/components/app-shell.tsx:124
+msgid "Toggle sidebar"
+msgstr ""
+
+#: src/features/shell/components/sidebar.tsx:232
+msgid "Toggle theme"
+msgstr ""
+
+#: src/features/settings/settings-page.tsx:69
+msgid "Transcription"
 msgstr ""
 
 #: src/features/settings/sections/shortcuts-section.tsx:17
@@ -820,7 +926,7 @@ msgstr "使用硬件加速"
 msgid "View"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:100
+#: src/features/overview/overview-page.tsx:176
 msgid "View all"
 msgstr ""
 
@@ -858,19 +964,15 @@ msgstr ""
 msgid "Whether the shortcut toggles recording or only works while held. Change in Voice input."
 msgstr ""
 
-#: src/features/history/components/history-session-list.tsx:42
-#: src/features/overview/overview-page.tsx:150
+#: src/features/history/components/history-session-list.tsx:34
+#: src/features/overview/overview-page.tsx:215
 #: src/features/shell/components/sidebar-widgets.tsx:85
 msgid "words"
 msgstr ""
 
-#: src/features/history/components/session-detail-modal.tsx:172
-#: src/features/overview/overview-page.tsx:55
+#: src/features/history/components/session-detail-modal.tsx:158
+#: src/features/overview/overview-page.tsx:83
 msgid "Words"
-msgstr ""
-
-#: src/features/styles/styles-page.tsx:131
-msgid "Writing styles"
 msgstr ""
 
 #: src/features/welcome/welcome-page.tsx:118
@@ -881,14 +983,10 @@ msgstr ""
 msgid "Your API key. Leave it blank to keep the saved key."
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:122
+#: src/features/overview/overview-page.tsx:187
 msgid "your hotkey"
 msgstr ""
 
 #: src/features/welcome/welcome-page.tsx:119
 msgid "Your models are ready. Everything stays on this machine."
-msgstr ""
-
-#: src/features/overview/overview-page.tsx:83
-msgid "Your session summary will appear here once you start dictating."
 msgstr ""

@@ -1,7 +1,7 @@
 import { useLingui } from '@lingui/react/macro';
-import { Outlet, useRouterState } from '@tanstack/react-router';
+import { Link, Outlet, useRouterState } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { Menu } from 'lucide-react';
+import { ChevronRight, Menu, PanelLeft } from 'lucide-react';
 import { useEffect, useEffectEvent, useRef } from 'react';
 import { ErrorToast } from '../../../components/feedback';
 import type { SessionStreamEvent } from '../../../lib/backend/types';
@@ -9,7 +9,7 @@ import { workspaceActions, workspaceStore } from '../../../store/workspace-store
 import { useFirstRunGate } from '../../welcome/use-model-setup';
 import { WelcomeLayout } from '../../welcome/welcome-layout';
 import { WelcomePage } from '../../welcome/welcome-page';
-import { findNavigationItem } from '../config/navigation';
+import { findNavigationItem, navigationGroups } from '../config/navigation';
 import { useAppShortcuts } from '../hooks/use-app-shortcuts';
 import { startWorkspaceBridge } from '../workspace-bridge';
 import { SidebarContent } from './sidebar';
@@ -17,11 +17,15 @@ import { SidebarContent } from './sidebar';
 export const DRAWER_ID = 'app-drawer';
 
 export function AppShell() {
+  const { t } = useLingui();
   useAppShortcuts();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
   const page = findNavigationItem(pathname);
+  // Breadcrumb trail: the group crumb links to that group's primary route.
+  const breadcrumbGroup = navigationGroups.find((g) => g.label === page.group);
+  const groupHome = breadcrumbGroup?.items[0]?.to ?? '/';
   const firstRun = useFirstRunGate();
 
   const onSessionEvent = useEffectEvent((event: SessionStreamEvent) => {
@@ -93,34 +97,61 @@ export function AppShell() {
           href="#main-content"
           className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 sm:focus:top-4 sm:focus:left-4 focus:z-50 focus:btn focus:btn-primary focus:btn-sm"
         >
-          Skip to main content
+          {t`Skip to main content`}
         </a>
         <div className="app-shell-backdrop" />
         <ErrorToast />
 
         {/* Mobile topbar */}
         <div className="flex items-center gap-2 px-3 py-2 lg:hidden border-b border-surface-border bg-surface-glass backdrop-blur-sm">
-          <label htmlFor={DRAWER_ID} className="btn btn-soft btn-sm" aria-label="Open menu">
+          <label htmlFor={DRAWER_ID} className="btn btn-soft btn-sm" aria-label={t`Open menu`}>
             <Menu size={20} strokeWidth={1.5} />
           </label>
           <span className="font-display tracking-heading text-base font-medium text-content-default select-none">
             {page.label}
           </span>
+          <div className="ml-auto">
+            <ShellStatusChip />
+          </div>
         </div>
 
-        <main id="main-content" className="flex-1 overflow-y-auto">
+        <main id="main-content" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {/* Desktop breadcrumb bar — sidebar toggle + trail + live status */}
+          <div className="hidden h-14 shrink-0 items-center gap-3 border-b border-surface-border bg-surface-glass px-4 lg:flex xl:px-6">
+            <label
+              htmlFor={DRAWER_ID}
+              className="cursor-pointer rounded-field p-1.5 text-content-subtle transition-colors hover:bg-surface-hover hover:text-content"
+              aria-label={t`Toggle sidebar`}
+            >
+              <PanelLeft size={18} strokeWidth={1.8} />
+            </label>
+            <div className="h-5 w-px bg-surface-border" />
+            <nav
+              aria-label="Breadcrumb"
+              className="flex min-w-0 items-center gap-1 text-sm select-none"
+            >
+              <Link
+                to={groupHome}
+                className="shrink-0 rounded-field px-1.5 py-0.5 text-content-subtle transition-colors hover:bg-surface-hover hover:text-content"
+              >
+                {page.group}
+              </Link>
+              <ChevronRight size={14} strokeWidth={2} className="shrink-0 text-content-dim" />
+              <Link
+                to={page.to}
+                aria-current="page"
+                className="truncate rounded-field px-1.5 py-0.5 font-medium text-content-strong transition-colors hover:bg-surface-hover"
+              >
+                {page.label}
+              </Link>
+            </nav>
+            <div className="ml-auto shrink-0">
+              <ShellStatusChip />
+            </div>
+          </div>
+
           <div className="app-scroll">
             <div className="app-frame">
-              {/* Desktop command bar — page identity + live service status */}
-              <div className="mb-7 hidden items-end justify-between gap-4 lg:flex">
-                <div className="min-w-0">
-                  <h1 className="font-display text-display-lg font-semibold tracking-display text-balance text-content-strong select-none">
-                    {page.label}
-                  </h1>
-                  <p className="mt-1 text-sm text-content-subtle select-none">{page.description}</p>
-                </div>
-                <ShellStatusChip />
-              </div>
               <Outlet />
             </div>
           </div>
@@ -129,8 +160,8 @@ export function AppShell() {
 
       {/* Sidebar drawer */}
       <div className="drawer-side z-40 is-drawer-close:overflow-visible">
-        <label htmlFor={DRAWER_ID} aria-label="Close sidebar" className="drawer-overlay" />
-        <aside className="sidebar-surface flex is-drawer-close:w-[5rem] is-drawer-open:w-[18.5rem] min-h-full flex-col overflow-hidden transition-[width] duration-200">
+        <label htmlFor={DRAWER_ID} aria-label={t`Close sidebar`} className="drawer-overlay" />
+        <aside className="sidebar-surface flex is-drawer-close:w-[5rem] is-drawer-open:w-[18.5rem] min-h-full flex-col overflow-hidden is-drawer-close:overflow-visible transition-[width] duration-200">
           <SidebarContent />
         </aside>
       </div>
