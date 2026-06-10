@@ -40,6 +40,9 @@ export function OverviewPage() {
   const sessionsCount = useCountUp(stats.count);
   const todayWords = useCountUp(today.words);
 
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? t`Good morning` : hour < 18 ? t`Good afternoon` : t`Good evening`;
+
   const statusTone = isLoading ? 'warning' : isConnected ? 'success' : 'error';
   const dotClass =
     statusTone === 'success' ? 'bg-success' : statusTone === 'warning' ? 'bg-warning' : 'bg-error';
@@ -68,13 +71,26 @@ export function OverviewPage() {
 
   return (
     <div className="bento-board">
-      {/* Status ribbon — slim, not a stacked section */}
-      <div className="bento-ribbon col-span-12 text-base">
-        <StatusBadge variant={statusTone}>
-          {isLoading ? t`Connecting` : isConnected ? t`Ready` : t`Disconnected`}
-        </StatusBadge>
-        <InfoBadge>{summarizeAsrBackend(asrBackend)}</InfoBadge>
-        <InfoBadge>{summarizeDictationMode(dictationMode)}</InfoBadge>
+      {/* Brand hero — slim identity row; live status folds into its right side */}
+      <div className="col-span-12 flex flex-col gap-3 px-1 pt-1 pb-2 select-none sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="font-display text-4xl font-semibold tracking-display sm:text-5xl">
+            <span className="text-content-strong">Lune</span>{' '}
+            <span className="text-primary">Voice</span>
+          </h1>
+          <p className="mt-1.5 text-sm text-content-subtle">
+            {greeting} — {t`hold the hotkey and speak, your words land where your cursor is.`}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2 pb-1">
+          <StatusBadge variant={statusTone}>
+            {isLoading ? t`Connecting` : isConnected ? t`Ready` : t`Disconnected`}
+          </StatusBadge>
+          <InfoBadge>{summarizeAsrBackend(asrBackend)}</InfoBadge>
+          <InfoBadge>
+            {t`Output`}: {summarizeDictationMode(dictationMode)}
+          </InfoBadge>
+        </div>
       </div>
 
       {/* Hero metric — Words dominates the board */}

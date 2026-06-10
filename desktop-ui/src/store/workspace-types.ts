@@ -25,6 +25,7 @@ export interface WorkspaceSettings {
   micPrewarm: boolean;
   vadPcen: boolean;
   startMinimized: boolean;
+  llmEnabled: boolean;
   openaiAsrBaseUrl: string;
   openaiAsrApiKey: string;
   openaiAsrModel: string;
@@ -100,6 +101,7 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   micPrewarm: true,
   vadPcen: true,
   startMinimized: false,
+  llmEnabled: true,
   openaiAsrBaseUrl: 'https://api.openai.com/v1',
   openaiAsrApiKey: '',
   openaiAsrModel: 'whisper-1',

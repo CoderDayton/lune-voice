@@ -3,7 +3,8 @@
 //! Grabs physical keyboards exclusively and re-injects non-hotkey events
 //! through a uinput passthrough device. This works on both X11 and Wayland.
 
-use std::sync::mpsc as std_mpsc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, RwLock, mpsc as std_mpsc};
 
 use evdev::{AttributeSet, Device, EventType, InputEvent, KeyCode, uinput::VirtualDevice};
 use tokio::sync::mpsc;
@@ -21,38 +22,91 @@ pub enum HotkeyAction {
     Cancel,
 }
 
+/// Live-updatable hotkey configuration shared between the settings-save
+/// path and the evdev listener thread. The listener polls `generation` per
+/// key event (a single atomic load) and re-reads the snapshot only when it
+/// changed, so every hotkey setting — trigger key, modifiers, cancel key,
+/// activation mode — applies immediately without restarting the listener.
+pub struct LiveHotkeyConfig {
+    inner: RwLock<HotkeySnapshot>,
+    generation: AtomicU64,
+}
+
+#[derive(Clone)]
+struct HotkeySnapshot {
+    main_trigger: KeyCode,
+    main_mods: Vec<Modifier>,
+    cancel_trigger: KeyCode,
+    cancel_mods: Vec<Modifier>,
+    mode: ActivationMode,
+}
+
+impl HotkeySnapshot {
+    fn from_config(config: &HotkeyConfig, mode: ActivationMode) -> Option<Self> {
+        let main_trigger = key_name_to_code(&config.toggle_dictation.key)?;
+        let cancel_trigger = key_name_to_code(&config.cancel_dictation.key).unwrap_or_else(|| {
+            warn!(
+                key = %config.cancel_dictation.key,
+                "unknown cancel hotkey key; cancel hotkey disabled"
+            );
+            KeyCode::KEY_RESERVED
+        });
+        Some(Self {
+            main_trigger,
+            main_mods: config.toggle_dictation.modifiers.clone(),
+            cancel_trigger,
+            cancel_mods: config.cancel_dictation.modifiers.clone(),
+            mode,
+        })
+    }
+}
+
+impl LiveHotkeyConfig {
+    /// Returns `None` when the trigger key name is unknown.
+    pub fn new(config: &HotkeyConfig, mode: ActivationMode) -> Option<Self> {
+        Some(Self {
+            inner: RwLock::new(HotkeySnapshot::from_config(config, mode)?),
+            generation: AtomicU64::new(0),
+        })
+    }
+
+    /// Swap in a new configuration. On an unknown trigger key the previous
+    /// config is kept and an error returned — a half-applied hotkey is worse
+    /// than a stale one.
+    pub fn update(&self, config: &HotkeyConfig, mode: ActivationMode) -> Result<(), String> {
+        let snap = HotkeySnapshot::from_config(config, mode)
+            .ok_or_else(|| format!("unknown hotkey key name: {}", config.toggle_dictation.key))?;
+        *self.inner.write().unwrap_or_else(|e| e.into_inner()) = snap;
+        self.generation.fetch_add(1, Ordering::Release);
+        info!(
+            key = %config.toggle_dictation.key,
+            ?mode,
+            "hotkey configuration hot-reloaded"
+        );
+        Ok(())
+    }
+
+    fn generation(&self) -> u64 {
+        self.generation.load(Ordering::Acquire)
+    }
+
+    fn snapshot(&self) -> HotkeySnapshot {
+        self.inner.read().unwrap_or_else(|e| e.into_inner()).clone()
+    }
+}
+
 /// Spawn the evdev hotkey listener on a background OS thread.
 ///
 /// Returns `None` if the hotkey config references unknown key names or no
 /// keyboards are accessible.
 pub fn spawn(
-    config: HotkeyConfig,
-    activation_mode: ActivationMode,
+    live: Arc<LiveHotkeyConfig>,
     tx: mpsc::Sender<HotkeyAction>,
 ) -> Option<std::thread::JoinHandle<()>> {
-    let main_trigger = key_name_to_code(&config.toggle_dictation.key)?;
-    let cancel_trigger = key_name_to_code(&config.cancel_dictation.key).unwrap_or_else(|| {
-        warn!(
-            key = %config.cancel_dictation.key,
-            "unknown cancel hotkey key; cancel hotkey disabled"
-        );
-        KeyCode::KEY_RESERVED
-    });
-
-    let main_mods = config.toggle_dictation.modifiers;
-    let cancel_mods = config.cancel_dictation.modifiers;
-
     let handle = std::thread::Builder::new()
         .name("hotkey-evdev".into())
         .spawn(move || {
-            run_listener(
-                main_trigger,
-                main_mods,
-                cancel_trigger,
-                cancel_mods,
-                activation_mode,
-                tx,
-            );
+            run_listener(live, tx);
         })
         .map_err(|e| warn!(error = %e, "failed to spawn hotkey listener thread"))
         .ok()?;
@@ -62,14 +116,17 @@ pub fn spawn(
 
 // ─── Listener core ───────────────────────────────────────────────────────────
 
-fn run_listener(
-    main_trigger: KeyCode,
-    main_mods: Vec<Modifier>,
-    cancel_trigger: KeyCode,
-    cancel_mods: Vec<Modifier>,
-    activation_mode: ActivationMode,
-    cmd_tx: mpsc::Sender<HotkeyAction>,
-) {
+fn build_combo_mods(mods: &[Modifier]) -> PressedCodes {
+    let mut combo = PressedCodes::default();
+    for m in mods {
+        let (l, r) = modifier_keycodes(*m);
+        combo.insert(l);
+        combo.insert(r);
+    }
+    combo
+}
+
+fn run_listener(live: Arc<LiveHotkeyConfig>, cmd_tx: mpsc::Sender<HotkeyAction>) {
     let keyboards = enumerate_keyboards();
     if keyboards.is_empty() {
         warn!("no accessible keyboard devices found; hotkey detection disabled");
@@ -102,14 +159,16 @@ fn run_listener(
     }
     drop(event_tx);
 
-    let mut combo_mod_codes = PressedCodes::default();
-    for m in &main_mods {
-        let (l, r) = modifier_keycodes(*m);
-        combo_mod_codes.insert(l);
-        combo_mod_codes.insert(r);
-    }
+    let mut config_gen = live.generation();
+    let mut snap = live.snapshot();
+    let mut combo_mod_codes = build_combo_mods(&snap.main_mods);
 
-    let mut state = HotkeyState::new(main_trigger, main_mods, cancel_trigger, cancel_mods);
+    let mut state = HotkeyState::new(
+        snap.main_trigger,
+        snap.main_mods.clone(),
+        snap.cancel_trigger,
+        snap.cancel_mods.clone(),
+    );
     let mut consumed = PressedCodes::default();
     let mut deferred: Vec<InputEvent> = Vec::new();
 
@@ -133,6 +192,22 @@ fn run_listener(
         }
 
         let pressed = value == 1;
+        // Hot-reload: one atomic load per event; rebuild targeting only when
+        // a settings save bumped the generation. Pressed-key tracking is
+        // preserved so a mid-combo reload can't wedge the state machine.
+        let current_gen = live.generation();
+        if current_gen != config_gen {
+            config_gen = current_gen;
+            snap = live.snapshot();
+            combo_mod_codes = build_combo_mods(&snap.main_mods);
+            state.retarget(
+                snap.main_trigger,
+                snap.main_mods.clone(),
+                snap.cancel_trigger,
+                snap.cancel_mods.clone(),
+            );
+        }
+        let activation_mode = snap.mode;
 
         if !grabbed {
             let action = state.handle(code, pressed, activation_mode);
@@ -304,6 +379,23 @@ impl HotkeyState {
             cancel_mods,
             hold_active: false,
         }
+    }
+
+    /// Swap key/modifier targets in place, preserving the physical
+    /// pressed-key set. `hold_active` resets — a hold in progress under the
+    /// old combo must not emit a Stop for the new one.
+    fn retarget(
+        &mut self,
+        main_trigger: KeyCode,
+        main_mods: Vec<Modifier>,
+        cancel_trigger: KeyCode,
+        cancel_mods: Vec<Modifier>,
+    ) {
+        self.main_trigger = main_trigger;
+        self.main_mods = main_mods;
+        self.cancel_trigger = cancel_trigger;
+        self.cancel_mods = cancel_mods;
+        self.hold_active = false;
     }
 
     fn handle(
@@ -481,6 +573,107 @@ fn key_name_to_code(name: &str) -> Option<KeyCode> {
         "slash" => KeyCode::KEY_SLASH,
         _ => return None,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ctrl_space_state() -> HotkeyState {
+        HotkeyState::new(
+            KeyCode::KEY_SPACE,
+            vec![Modifier::Ctrl],
+            KeyCode::KEY_ESC,
+            vec![],
+        )
+    }
+
+    #[test]
+    fn live_config_update_bumps_generation_and_rejects_unknown_keys() {
+        let config = HotkeyConfig::default();
+        let live = LiveHotkeyConfig::new(&config, ActivationMode::Toggle).unwrap();
+        let g0 = live.generation();
+        live.update(&config, ActivationMode::Hold).unwrap();
+        assert!(live.generation() > g0);
+        assert_eq!(live.snapshot().mode, ActivationMode::Hold);
+
+        let mut bad = config.clone();
+        bad.toggle_dictation.key = "definitely-not-a-key".into();
+        assert!(live.update(&bad, ActivationMode::Toggle).is_err());
+        // Failed update keeps the previous config.
+        assert_eq!(live.snapshot().mode, ActivationMode::Hold);
+    }
+
+    #[test]
+    fn retarget_preserves_pressed_keys_and_clears_hold() {
+        let mut s = ctrl_space_state();
+        let m = ActivationMode::Hold;
+        s.handle(KeyCode::KEY_LEFTCTRL, true, m);
+        s.handle(KeyCode::KEY_SPACE, true, m); // Start; hold_active = true
+        s.retarget(KeyCode::KEY_F9, vec![], KeyCode::KEY_ESC, vec![]);
+        // Old combo's release must not emit a Stop for the new combo.
+        assert!(s.handle(KeyCode::KEY_SPACE, false, m).is_none());
+        // Still-held Ctrl counts as an extra modifier for the bare-F9 combo —
+        // pressed-key tracking survived the retarget.
+        assert!(s.handle(KeyCode::KEY_F9, true, m).is_none());
+        s.handle(KeyCode::KEY_F9, false, m);
+        s.handle(KeyCode::KEY_LEFTCTRL, false, m);
+        // With Ctrl released, the new trigger works.
+        assert!(matches!(
+            s.handle(KeyCode::KEY_F9, true, m),
+            Some(HotkeyAction::Start)
+        ));
+    }
+
+    #[test]
+    fn hold_mode_emits_start_on_press_and_stop_on_release() {
+        let mut s = ctrl_space_state();
+        let m = ActivationMode::Hold;
+        assert!(s.handle(KeyCode::KEY_LEFTCTRL, true, m).is_none());
+        assert!(matches!(
+            s.handle(KeyCode::KEY_SPACE, true, m),
+            Some(HotkeyAction::Start)
+        ));
+        // Releasing the trigger stops, regardless of release order.
+        assert!(matches!(
+            s.handle(KeyCode::KEY_SPACE, false, m),
+            Some(HotkeyAction::Stop)
+        ));
+        assert!(s.handle(KeyCode::KEY_LEFTCTRL, false, m).is_none());
+    }
+
+    #[test]
+    fn hold_mode_stops_when_modifier_released_first() {
+        let mut s = ctrl_space_state();
+        let m = ActivationMode::Hold;
+        s.handle(KeyCode::KEY_LEFTCTRL, true, m);
+        assert!(matches!(
+            s.handle(KeyCode::KEY_SPACE, true, m),
+            Some(HotkeyAction::Start)
+        ));
+        assert!(matches!(
+            s.handle(KeyCode::KEY_LEFTCTRL, false, m),
+            Some(HotkeyAction::Stop)
+        ));
+    }
+
+    #[test]
+    fn mode_switch_mid_session_does_not_panic_or_double_fire() {
+        // Listener was in Toggle when the user pressed; settings flip to
+        // Hold before release — the release must not emit a spurious action.
+        let mut s = ctrl_space_state();
+        s.handle(KeyCode::KEY_LEFTCTRL, true, ActivationMode::Toggle);
+        assert!(matches!(
+            s.handle(KeyCode::KEY_SPACE, true, ActivationMode::Toggle),
+            Some(HotkeyAction::Toggle)
+        ));
+        // Hold-mode evaluation on release: hold_active was never set, so the
+        // release is silent rather than a stray Stop.
+        assert!(
+            s.handle(KeyCode::KEY_SPACE, false, ActivationMode::Hold)
+                .is_none()
+        );
+    }
 }
 
 // ─── Pressed-key bitset ──────────────────────────────────────────────────────

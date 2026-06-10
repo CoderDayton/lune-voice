@@ -60,6 +60,7 @@ export function mapWorkspaceSettings(snapshot: WorkspaceSnapshot): WorkspaceSett
     micPrewarm: snapshot.settings.micPrewarm ?? DEFAULT_SETTINGS.micPrewarm,
     vadPcen: snapshot.settings.vadPcen ?? DEFAULT_SETTINGS.vadPcen,
     startMinimized: snapshot.settings.startMinimized ?? DEFAULT_SETTINGS.startMinimized,
+    llmEnabled: snapshot.settings.llmEnabled ?? DEFAULT_SETTINGS.llmEnabled,
     openaiAsrBaseUrl: snapshot.settings.openaiAsrBaseUrl ?? DEFAULT_SETTINGS.openaiAsrBaseUrl,
     openaiAsrApiKey: snapshot.settings.openaiAsrApiKeySet
       ? '••••••••'
@@ -104,6 +105,7 @@ export function settingsToSaveInput(settings: WorkspaceSettings): SaveWorkspaceS
     micPrewarm: settings.micPrewarm,
     vadPcen: settings.vadPcen,
     startMinimized: settings.startMinimized,
+    llmEnabled: settings.llmEnabled,
     openaiAsrBaseUrl: settings.openaiAsrBaseUrl || null,
     openaiAsrApiKey:
       settings.openaiAsrApiKey && !settings.openaiAsrApiKey.startsWith('•')

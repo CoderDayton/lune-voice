@@ -661,6 +661,16 @@
     var(--space-page-bottom);
 }
 
+/* Desktop reading scale: everything in the app is rem-based, so raising the
+   root font on wide viewports scales type, spacing, and controls together.
+   Fixes the "everything looks tiny at 1080p+" effect without per-component
+   size overrides. */
+@media (min-width: 100rem) {
+  :root {
+    font-size: 17px;
+  }
+}
+
 @utility app-frame {
   @apply w-full animate-page-in;
   max-width: 76rem;

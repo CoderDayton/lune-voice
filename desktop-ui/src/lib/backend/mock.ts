@@ -27,6 +27,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
       useGpu: true,
       devicePolicy: 'Auto',
       asrBackendType: 'Qwen3Asr',
+      llmEnabled: true,
       confidenceThreshold: 0.5,
       adaptiveVad: false,
       speechThreshold: 0.5,

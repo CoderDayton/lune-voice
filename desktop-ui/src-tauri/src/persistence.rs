@@ -1,8 +1,8 @@
 use lune_asr::AsrRegistry;
 use lune_core::config::{
     ActivationMode, AsrBackendConfig, DevicePolicy, DictationMode, HotkeyConfig, KeyCombo,
-    Modifier, PillVisibility, RedactedString, StreamingMode, StylePreset, UserSettings,
-    builtin_registry,
+    LlmBackendConfig, Modifier, PillVisibility, RedactedString, StreamingMode, StylePreset,
+    UserSettings, builtin_registry,
 };
 use lune_core::session::SessionStatus;
 use lune_persist::{AppPaths, Database, SettingsStore, StoredDictionaryEntry};
@@ -406,6 +406,7 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
         mic_prewarm: settings.mic_prewarm,
         vad_pcen: settings.vad_pcen,
         start_minimized: settings.start_minimized,
+        llm_enabled: !matches!(settings.llm_backend, LlmBackendConfig::Disabled),
         openai_asr_base_url,
         openai_asr_model,
         openai_asr_api_key_set,
@@ -491,6 +492,16 @@ fn apply_settings_dto(
     settings.mic_prewarm = input.mic_prewarm;
     settings.vad_pcen = input.vad_pcen;
     settings.start_minimized = input.start_minimized;
+    settings.llm_backend = if input.llm_enabled {
+        match std::mem::take(&mut settings.llm_backend) {
+            // Re-enabling from Disabled lands on the local ONNX LLM; an
+            // already-configured Local/remote backend is preserved as-is.
+            LlmBackendConfig::Disabled => LlmBackendConfig::Local {},
+            other => other,
+        }
+    } else {
+        LlmBackendConfig::Disabled
+    };
     Ok(())
 }
 
@@ -758,6 +769,7 @@ mod tests {
             mic_prewarm: dto.mic_prewarm,
             vad_pcen: dto.vad_pcen,
             start_minimized: dto.start_minimized,
+            llm_enabled: dto.llm_enabled,
             openai_asr_base_url: dto.openai_asr_base_url,
             openai_asr_api_key: None,
             openai_asr_model: dto.openai_asr_model,

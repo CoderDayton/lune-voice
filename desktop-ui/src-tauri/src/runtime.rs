@@ -974,11 +974,17 @@ async fn build_llm_service(
         LlmBackendConfig::Local { .. } => {
             let style_dir = models_dir.join(lune_core::models::DIR_STYLE_LLM);
             if style_dir.join("tokenizer.json").exists() {
+                // Decode budget 512: the corrector must re-emit the whole
+                // transcript, and 128 tokens (~90 words) truncated every
+                // longer dictation's correction — the validator then threw
+                // the truncated output away. Greedy decode stops at EOS, so
+                // short utterances never pay for the larger cap. Matches the
+                // ASR decoder's own 512-token budget.
                 let llm = Arc::new(LazyLocalLlm::new(
                     style_dir,
                     settings.device.use_gpu(cfg!(feature = "cuda")),
                     settings.device.strict_cuda(),
-                    128,
+                    512,
                 ));
                 Ok((llm.clone() as Arc<dyn LlmService>, Some(llm)))
             } else {

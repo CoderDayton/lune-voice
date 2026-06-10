@@ -1,7 +1,7 @@
 import { useLingui } from '@lingui/react/macro';
 import { Link, Outlet, useRouterState } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { ChevronRight, Menu, PanelLeft } from 'lucide-react';
+import { ChevronRight, Menu } from 'lucide-react';
 import { useEffect, useEffectEvent, useRef } from 'react';
 import { ErrorToast } from '../../../components/feedback';
 import type { SessionStreamEvent } from '../../../lib/backend/types';
@@ -116,16 +116,8 @@ export function AppShell() {
         </div>
 
         <main id="main-content" className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          {/* Desktop breadcrumb bar — sidebar toggle + trail + live status */}
+          {/* Desktop breadcrumb bar — trail + page context + live status */}
           <div className="hidden h-14 shrink-0 items-center gap-3 border-b border-surface-border bg-surface-glass px-4 lg:flex xl:px-6">
-            <label
-              htmlFor={DRAWER_ID}
-              className="cursor-pointer rounded-field p-1.5 text-content-subtle transition-colors hover:bg-surface-hover hover:text-content"
-              aria-label={t`Toggle sidebar`}
-            >
-              <PanelLeft size={18} strokeWidth={1.8} />
-            </label>
-            <div className="h-5 w-px bg-surface-border" />
             <nav
               aria-label="Breadcrumb"
               className="flex min-w-0 items-center gap-1 text-sm select-none"
@@ -145,13 +137,34 @@ export function AppShell() {
                 {page.label}
               </Link>
             </nav>
-            <div className="ml-auto shrink-0">
+            <div className="hidden h-5 w-px shrink-0 bg-surface-border xl:block" />
+            <p className="hidden min-w-0 truncate text-sm text-content-subtle select-none xl:block">
+              {page.description}
+            </p>
+            <div className="ml-auto flex shrink-0 items-center gap-3">
+              <span className="hidden text-sm text-content-dim select-none xl:block">
+                {new Date().toLocaleDateString(undefined, {
+                  weekday: 'long',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+              </span>
               <ShellStatusChip />
             </div>
           </div>
 
           <div className="app-scroll">
             <div className="app-frame">
+              {/* Page hero — Home leads with its bento board; every other
+                  page gets its title + description back as an in-page header. */}
+              {page.to !== '/' && (
+                <header className="mb-7 select-none">
+                  <h1 className="font-display text-display-lg font-semibold tracking-display text-content-strong">
+                    {page.label}
+                  </h1>
+                  <p className="mt-1.5 text-sm text-content-subtle">{page.description}</p>
+                </header>
+              )}
               <Outlet />
             </div>
           </div>

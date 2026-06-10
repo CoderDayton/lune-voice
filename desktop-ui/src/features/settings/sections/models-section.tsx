@@ -1,4 +1,5 @@
 import { useLingui } from '@lingui/react/macro';
+import { useStore } from '@tanstack/react-store';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import {
@@ -14,6 +15,7 @@ import {
   Wand2,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { saveWorkspaceSetting, workspaceStore } from '../../../store/workspace-store';
 import { SettingsSection } from '../components/section';
 
 interface ModelStatus {
@@ -39,6 +41,7 @@ function modelIcon(localName: string): LucideIcon {
 
 export function ModelsSection() {
   const { t } = useLingui();
+  const llmEnabled = useStore(workspaceStore, (s) => s.settings.llmEnabled);
 
   const [models, setModels] = useState<ModelStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,6 +74,13 @@ export function ModelsSection() {
       void unlisten.then((f) => f());
     };
   }, [refresh]);
+
+  async function handleLlmToggle(enabled: boolean) {
+    // The model list is config-dependent (disabled backends hide their
+    // models), so refresh after the save lands.
+    const ok = await saveWorkspaceSetting('llmEnabled', enabled);
+    if (ok) refresh();
+  }
 
   function handleDownload(localName: string) {
     setDownloading(localName);
@@ -128,6 +138,32 @@ export function ModelsSection() {
         title={t`Models`}
         description={t`AI models stored on your device.`}
       >
+        {/* Correction LLM enable — a disabled backend hides its model below */}
+        <div className="flex items-center justify-between gap-4 rounded-box border border-surface-border bg-base-200/60 p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-field bg-base-300 text-content-subtle">
+              <Wand2 size={18} strokeWidth={1.6} />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-content-default sm:text-base">
+                {t`Correction LLM`}
+              </p>
+              <p className="mt-1 text-xs leading-snug text-content-subtle sm:text-sm">
+                {llmEnabled
+                  ? t`Polishes punctuation and fixes obvious ASR errors after transcription.`
+                  : t`Disabled — transcripts are delivered raw, and the LLM model is hidden from the list below.`}
+              </p>
+            </div>
+          </div>
+          <input
+            type="checkbox"
+            className="toggle toggle-primary"
+            checked={llmEnabled}
+            onChange={(e) => void handleLlmToggle(e.target.checked)}
+            aria-label={t`Enable correction LLM`}
+          />
+        </div>
+
         {models.map((model) => (
           <ModelManagementCard
             key={model.localName}

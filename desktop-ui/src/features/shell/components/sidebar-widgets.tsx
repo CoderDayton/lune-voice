@@ -7,10 +7,8 @@ export function SidebarQuickStart() {
   const { t } = useLingui();
   const serviceStatus = useStore(workspaceStore, (s) => s.runtime.serviceStatus);
   const hotkeyToggle = useStore(workspaceStore, (s) => s.settings.hotkeyToggle);
-  const audioLevel = useStore(workspaceStore, (s) => s.runtime.audioLevel);
   const isActive = serviceStatus === 'listening' || serviceStatus === 'processing';
   const isConnecting = serviceStatus === 'Connecting';
-  const level = `${Math.round(audioLevel * 100)}%`;
 
   return (
     <div className="px-3 pb-3 sm:px-3.5">
@@ -40,17 +38,11 @@ export function SidebarQuickStart() {
             {isActive ? t`Stop dictating` : isConnecting ? t`Connecting` : t`Start dictating`}
           </span>
           {isActive ? (
-            <span className="mt-1.5 block">
-              <span className="flex items-center gap-1.5 text-xs text-content-subtle">
-                <span className="status status-error animate-pulse" />
-                {serviceStatus === 'processing' ? t`Processing…` : t`Listening…`}
-              </span>
-              <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-surface-border">
-                <span
-                  className="block h-full rounded-full bg-error transition-[width] duration-75"
-                  style={{ width: level }}
-                />
-              </span>
+            // Live level metering lives in the Home "Audio" card — this stays
+            // a status line so there's exactly one voice meter on screen.
+            <span className="mt-1.5 flex items-center gap-1.5 text-xs text-content-subtle">
+              <span className="status status-error animate-pulse" />
+              {serviceStatus === 'processing' ? t`Processing…` : t`Listening…`}
             </span>
           ) : (
             <span className="flex min-w-0 items-center gap-1 text-xs text-content-dim">

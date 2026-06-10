@@ -28,28 +28,40 @@ export function SidebarContent() {
 
   return (
     <>
-      {/* Brand header — org-switcher style block */}
+      {/* Brand header — org-switcher style block. When the sidebar is
+          collapsed the logo doubles as the expand toggle: hovering it
+          crossfades to the expand icon. */}
       <div className="flex w-full items-center gap-3 px-3 py-4 select-none is-drawer-close:justify-center is-drawer-close:px-2 sm:px-3.5 sm:py-5">
-        <div className="relative shrink-0">
+        <label
+          htmlFor={DRAWER_ID}
+          aria-label={t`Expand sidebar`}
+          className="group/logo relative shrink-0 is-drawer-close:cursor-pointer is-drawer-open:pointer-events-none"
+        >
           <div className="size-9 rounded-field ring-1 ring-surface-border-strong overflow-hidden sm:size-10">
             <img
               src={luneLogo}
               alt=""
-              className="size-full object-cover pointer-events-none"
+              className="size-full object-cover pointer-events-none transition-opacity duration-150 is-drawer-close:group-hover/logo:opacity-0"
               draggable={false}
             />
           </div>
           <span
+            aria-hidden="true"
+            className="absolute inset-0 hidden items-center justify-center text-content opacity-0 transition-opacity duration-150 is-drawer-close:flex is-drawer-close:group-hover/logo:opacity-100"
+          >
+            <PanelLeftOpen size={20} strokeWidth={2} />
+          </span>
+          <span
             className={`absolute -bottom-0.5 -right-0.5 block size-2.5 rounded-full ring-2 ring-base-100 ${isActive ? 'bg-success status-pulse' : isConnecting ? 'bg-warning' : isConnected ? 'bg-success/50' : 'bg-base-content/20'}`}
             aria-hidden="true"
           />
-        </div>
+        </label>
         <div className="min-w-0 flex-1 is-drawer-close:hidden">
-          <span className="block text-base leading-tight tracking-tight sm:text-lg">
+          <span className="block text-lg leading-tight tracking-tight">
             <span className="font-bold">Lune</span>
             <span className="font-light text-content-muted"> Voice</span>
           </span>
-          <span className="block text-xs text-content-subtle">{t`Offline dictation`}</span>
+          <span className="block text-[0.8rem] text-content-subtle">{t`Offline dictation`}</span>
         </div>
         <label
           htmlFor={DRAWER_ID}
@@ -75,17 +87,6 @@ export function SidebarContent() {
           </div>
         ))}
       </nav>
-
-      {/* Expand button — only when collapsed */}
-      <div className="is-drawer-open:hidden mb-4 flex justify-center">
-        <label
-          htmlFor={DRAWER_ID}
-          className="cursor-pointer rounded-field p-2 text-content-subtle transition-colors hover:bg-surface-hover hover:text-content"
-          aria-label={t`Expand sidebar`}
-        >
-          <PanelLeftOpen size={22} strokeWidth={2} />
-        </label>
-      </div>
 
       {/* Primary action + today (expanded only) */}
       <div className="is-drawer-close:hidden">
@@ -121,7 +122,7 @@ function NavRow({
         to={to}
         aria-current={active ? 'page' : undefined}
         data-tip={label}
-        className={`group relative flex w-full items-center gap-3 rounded-field px-3 py-2.5 text-[0.9rem] transition-colors is-drawer-close:tooltip is-drawer-close:tooltip-right is-drawer-close:justify-center ${
+        className={`group relative flex w-full items-center gap-3 rounded-field px-3 py-2.5 text-[0.95rem] transition-colors is-drawer-close:tooltip is-drawer-close:tooltip-right is-drawer-close:justify-center ${
           active
             ? 'bg-surface-nav-active text-content-strong font-medium'
             : 'text-content-muted hover:bg-surface-hover hover:text-content'
@@ -134,7 +135,7 @@ function NavRow({
           />
         ) : null}
         <Icon
-          size={18}
+          size={19}
           strokeWidth={active ? 2.2 : 1.7}
           className={active ? 'text-primary' : 'text-content-subtle group-hover:text-content-muted'}
         />

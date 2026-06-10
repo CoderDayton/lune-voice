@@ -92,6 +92,28 @@ pub async fn save_workspace_settings(
     })
     .await?;
     runtime.mark_reload_required().await;
+    // Hot-reload the evdev hotkey listener — trigger key, modifiers, cancel
+    // key, and activation mode all apply immediately, no restart required.
+    #[cfg(target_os = "linux")]
+    {
+        use tauri::Manager;
+        if let Some(paths) = lune_persist::AppPaths::resolve() {
+            let store = lune_persist::SettingsStore::new(paths.settings_file());
+            match store.load() {
+                Ok(s) => {
+                    if let Some(live) = runtime
+                        .app_handle()
+                        .try_state::<std::sync::Arc<crate::hotkey_linux::LiveHotkeyConfig>>()
+                    {
+                        if let Err(e) = live.update(&s.hotkey, s.activation_mode) {
+                            tracing::warn!(error = %e, "hotkey hot-reload rejected");
+                        }
+                    }
+                }
+                Err(e) => tracing::warn!(error = %e, "settings reload for hotkey update failed"),
+            }
+        }
+    }
     // Reconcile long-lived audio capture with the new mic_prewarm setting.
     runtime
         .sync_mic_prewarm(Some(snapshot.settings.mic_prewarm))

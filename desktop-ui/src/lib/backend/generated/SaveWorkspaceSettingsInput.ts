@@ -5,4 +5,8 @@ import type { DevicePolicyDto } from "./DevicePolicyDto";
 import type { DictationModeDto } from "./DictationModeDto";
 import type { PillVisibilityDto } from "./PillVisibilityDto";
 
-export type SaveWorkspaceSettingsInput = { activationMode: ActivationModeDto, dictationMode: DictationModeDto, useGpu: boolean, devicePolicy: DevicePolicyDto, asrBackendType: AsrBackendTypeDto, confidenceThreshold: number | null, adaptiveVad: boolean, speechThreshold: number, speechThresholdEnd: number, stylePreset: string, hotkeyToggle: string, hotkeyCancel: string, pillVisibility: PillVisibilityDto, language: string, dictationLanguage: string, micPrewarm: boolean, vadPcen: boolean, startMinimized: boolean, openaiAsrBaseUrl: string | null, openaiAsrApiKey: string | null, openaiAsrModel: string | null, };
+export type SaveWorkspaceSettingsInput = { activationMode: ActivationModeDto, dictationMode: DictationModeDto, useGpu: boolean, devicePolicy: DevicePolicyDto, asrBackendType: AsrBackendTypeDto, confidenceThreshold: number | null, adaptiveVad: boolean, speechThreshold: number, speechThresholdEnd: number, stylePreset: string, hotkeyToggle: string, hotkeyCancel: string, pillVisibility: PillVisibilityDto, language: string, dictationLanguage: string, micPrewarm: boolean, vadPcen: boolean, startMinimized: boolean, 
+/**
+ * Whether the correction LLM backend should be enabled.
+ */
+llmEnabled: boolean, openaiAsrBaseUrl: string | null, openaiAsrApiKey: string | null, openaiAsrModel: string | null, };

@@ -96,14 +96,14 @@ export function SettingsPage() {
               type="button"
               onClick={() => setActive(id)}
               aria-current={isActive ? 'page' : undefined}
-              className={`flex shrink-0 items-center gap-3 rounded-field px-3.5 py-3 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary md:w-full ${
+              className={`flex shrink-0 items-center gap-3 rounded-field px-3.5 py-3 text-left text-[0.95rem] transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary md:w-full ${
                 isActive
                   ? 'bg-surface-nav-active font-medium text-content-strong'
                   : 'text-content-muted hover:bg-surface-hover hover:text-content'
               }`}
             >
               <Icon
-                size={18}
+                size={19}
                 strokeWidth={isActive ? 2.1 : 1.6}
                 className={isActive ? 'text-content-strong' : 'text-content-subtle'}
               />

@@ -266,13 +266,25 @@ fn spawn_evdev_hotkeys(app: &tauri::App) -> Result<(), Box<dyn std::error::Error
         "spawning evdev hotkey listener"
     );
 
-    match hotkey_linux::spawn(settings.hotkey, settings.activation_mode, tx) {
+    // Live config — managed in Tauri state so settings saves can hot-reload
+    // every hotkey setting (trigger, modifiers, cancel, activation mode)
+    // without restarting the listener thread.
+    let Some(live) =
+        hotkey_linux::LiveHotkeyConfig::new(&settings.hotkey, settings.activation_mode)
+    else {
+        tracing::warn!("evdev hotkey listener not started (unknown key name in config)");
+        return Ok(());
+    };
+    let live = std::sync::Arc::new(live);
+    app.manage(std::sync::Arc::clone(&live));
+
+    match hotkey_linux::spawn(live, tx) {
         Some(_handle) => {
             // Thread handle intentionally leaked — runs for app lifetime.
             tracing::info!("evdev hotkey listener thread started");
         }
         None => {
-            tracing::warn!("evdev hotkey listener failed to start (unknown key name in config?)");
+            tracing::warn!("evdev hotkey listener thread failed to spawn");
             return Ok(());
         }
     }
