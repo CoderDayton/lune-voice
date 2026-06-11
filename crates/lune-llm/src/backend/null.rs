@@ -49,7 +49,6 @@ mod tests {
             dictionary: vec![],
             context: None,
             language: "en".into(),
-            uncertain_words: Vec::new(),
             correction_needed: true,
         };
         let out = processor.transform(&input).await.unwrap();

@@ -76,7 +76,6 @@ fn main() {
         dictionary: vec![],
         context: None,
         language: "en".into(),
-        uncertain_words: vec![],
         correction_needed: true,
     };
 

@@ -319,8 +319,10 @@ const PREROLL_CHUNKS: usize = 4;
 /// Minimum total acoustic gap (last speech → next speech) that counts as an
 /// intentional pause rather than a breath. Defined on the TOTAL gap, not the
 /// post-hangover silence, so its meaning is stable under UI/calibrator VAD
-/// changes and any future hangover tuning.
-const PAUSE_TOTAL_MIN_SAMPLES: usize = (SAMPLE_RATE * 65) / 100; // 650 ms
+/// changes and any future hangover tuning. 650 ms proved too eager in real
+/// dictation — every compositional hesitation became a comma — so only
+/// gaps of a full second and up count as deliberate pauses.
+const PAUSE_TOTAL_MIN_SAMPLES: usize = SAMPLE_RATE; // 1000 ms
 /// Ceiling on the total pause the model hears. Longer pauses carry no extra
 /// punctuation information and only cost encoder frames.
 const PAUSE_TOTAL_CAP_SAMPLES: usize = (SAMPLE_RATE * 3) / 2; // 1500 ms
@@ -948,11 +950,17 @@ async fn process_and_deliver(
         .and_then(|s| s.detected_language.as_deref())
         .and_then(lune_core::lang::display_name)
         .unwrap_or("English");
-    let heuristic_result = heuristic.correct(
+    let heuristic_flag_risk = config
+        .pipeline
+        .word_confidence_threshold
+        .map(|threshold| 1.0 - threshold)
+        .unwrap_or(lune_dict::corrector::HWCE_FLAG_THRESHOLD);
+    let heuristic_result = heuristic.correct_with_risk_threshold(
         &text_after_commands,
         &word_risk_scores,
         &dict_replacements,
         detected_lang,
+        heuristic_flag_risk,
     );
     // Apply deterministic punctuation (leading capital, terminal period) and
     // detect whether residual punctuation is ambiguous. The returned text is
@@ -963,47 +971,26 @@ async fn process_and_deliver(
     let unresolved_count = heuristic_result.unresolved_words.len();
     let dropped_risks = heuristic_result.dropped_risk_entries;
 
-    // Hints for the LLM: heuristic-unresolved words plus every word whose
-    // HWCE risk reaches the flag threshold even when the heuristic resolved
-    // it via a trust pass (lexicon / proper-noun / vocab). Trust-resolved
-    // words can still be homophone mishears ("no"/"know"), and a hinted LLM
-    // call is the only kind that measurably edits.
-    let mut hinted_positions: std::collections::HashSet<usize> = heuristic_result
+    // Words the corrector could neither resolve nor confidently preserve —
+    // shown in the gate UI and the reason the correction pass runs. They are
+    // deliberately NOT fed to the LLM prompt as hints: risk-based hint lists
+    // flagged ordinary words ("am", "our", "a") and biased the model into
+    // wrong edits and hint-echo punctuation.
+    let unresolved_words: Vec<(String, usize)> = heuristic_result
         .unresolved_words
         .iter()
-        .map(|ws| ws.position)
+        .map(|ws| (ws.word.clone(), ws.position))
         .collect();
-    let mut uncertain_words: Vec<(String, usize)> = heuristic_result
-        .unresolved_words
-        .into_iter()
-        .map(|ws| (ws.word, ws.position))
-        .collect();
-    {
-        let words: Vec<&str> = text_after_commands.split_whitespace().collect();
-        for &(pos, risk) in &heuristic_result.word_risk_positions {
-            if risk >= lune_dict::corrector::LLM_GATE_RISK && hinted_positions.insert(pos) {
-                let stripped = words.get(pos).map_or("", |w| {
-                    w.trim_start_matches(|c: char| c.is_ascii_punctuation())
-                        .trim_end_matches(|c: char| c.is_ascii_punctuation())
-                });
-                if !stripped.is_empty() {
-                    uncertain_words.push((stripped.to_string(), pos));
-                }
-            }
-        }
-    }
-    uncertain_words.sort_by_key(|(_, pos)| *pos);
 
     // Gate on three signals: (1) residual heuristic uncertainty — a word the
     // corrector could neither resolve nor confidently preserve; (2) ambiguous
     // punctuation (run-on, interrogative without an end mark); (3) the
-    // confidence band gate — but only when there is at least one hint word
-    // to hand the model. Predicted-noop bypass: a band-gated call with no
-    // hints on a fully-trusted transcript was measured 100% no-op
-    // (bench llm: 9/9 runs, zero surviving edits) — the model only acts when
-    // something concrete is flagged. Skip-when-broken caps the band: when
-    // the weakest word drops below `llm_skip_noisy_threshold`, correction is
-    // more likely to harm than help (arXiv:2509.25048).
+    // confidence band — when the weakest word's confidence falls below
+    // `llm_skip_threshold`, the correction pass runs even if the heuristic
+    // resolved everything, since trust-resolved words can still be homophone
+    // mishears ("no"/"know"). Skip-when-broken vetoes correction when the
+    // transcript is shaky across the board — correction degrades quality in
+    // that regime (arXiv:2509.25048).
     let max_risk = word_risk_scores
         .iter()
         .map(|(_, r)| *r)
@@ -1012,12 +999,11 @@ async fn process_and_deliver(
     let conf_attention = config
         .pipeline
         .llm_skip_threshold
-        .is_some_and(|t| min_conf < t)
-        && !uncertain_words.is_empty();
+        .is_some_and(|t| min_conf < t);
     // Skip-when-broken is a SEGMENT-AVERAGE property: one garbled word in an
-    // otherwise clean utterance is the prime correction case (that's what
-    // hints exist for), while a transcript that is shaky across the board is
-    // the regime where correction degrades quality (arXiv:2509.25048).
+    // otherwise clean utterance is the prime correction case, while a
+    // transcript that is shaky across the board is the regime where
+    // correction degrades quality (arXiv:2509.25048).
     let word_count = text_after_commands.split_whitespace().count().max(1);
     let mean_risk = heuristic_result
         .word_risk_positions
@@ -1050,7 +1036,6 @@ async fn process_and_deliver(
         needs_punct = punctuation.needs_llm,
         min_conf,
         avg_conf,
-        hints = uncertain_words.len(),
         "bypass gate"
     );
 
@@ -1058,7 +1043,7 @@ async fn process_and_deliver(
         .send(SessionEvent::GateDecision {
             used_llm: needs_llm,
             lang: detected_lang.to_owned(),
-            unresolved: uncertain_words.clone(),
+            unresolved: unresolved_words,
         })
         .await;
 
@@ -1087,7 +1072,6 @@ async fn process_and_deliver(
                 }
             },
             language: detected_lang.into(),
-            uncertain_words,
             correction_needed: needs_correction,
         };
         let llm_result = if timeout_secs > 0 {
@@ -1378,21 +1362,6 @@ mod tests {
         async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput> {
             self.entered.notify_waiters();
             self.release.notified().await;
-            Ok(PostProcessOutput {
-                cleaned_text: input.raw_text.clone(),
-                metadata: None,
-            })
-        }
-    }
-
-    struct CapturingPostProcessor {
-        seen: Arc<Mutex<Option<PostProcessInput>>>,
-    }
-
-    #[async_trait::async_trait]
-    impl TextPostProcessor for CapturingPostProcessor {
-        async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput> {
-            *self.seen.lock().await = Some(input.clone());
             Ok(PostProcessOutput {
                 cleaned_text: input.raw_text.clone(),
                 metadata: None,
@@ -1735,43 +1704,6 @@ mod tests {
                 let session = db.lock().await.get_session(session_id).unwrap().unwrap();
                 assert!(matches!(session.status, SessionStatus::Cancelled));
                 assert_eq!(session.transcript, None);
-            })
-            .await;
-    }
-
-    #[tokio::test]
-    async fn risky_known_word_reaches_llm_as_uncertain() {
-        local_set()
-            .run_until(async {
-                let seen = Arc::new(Mutex::new(None));
-                let post = Arc::new(CapturingPostProcessor {
-                    seen: Arc::clone(&seen),
-                });
-                let mut segment = make_segment(
-                    "call with Jennifer Martinez to discuss interesting their OAuth deployment on AWS",
-                    false,
-                );
-                segment.word_confidences = vec![WordConfidence {
-                    word: "interesting".into(),
-                    confidence: 0.18,
-                    word_error_risk: 0.82,
-                }];
-                let responses = vec![Ok(vec![segment])];
-                let (mgr, _) = make_manager(scripted_asr(responses), post);
-                let (tx, rx) = mpsc::channel(32);
-                mgr.start_with_audio(tx, speech_stream()).await.unwrap();
-
-                let events = collect_events(rx).await;
-                assert!(events.iter().any(|event| matches!(
-                    event,
-                    SessionEvent::GateDecision { used_llm: true, .. }
-                )));
-
-                let input = seen.lock().await.clone().expect("LLM input captured");
-                assert!(input
-                    .uncertain_words
-                    .iter()
-                    .any(|(word, _)| word.eq_ignore_ascii_case("interesting")));
             })
             .await;
     }

@@ -18,6 +18,7 @@ function makeBackendSettings() {
     devicePolicy: "Auto" as const,
     asrBackendType: "Qwen3Asr" as const,
     confidenceThreshold: 0.75,
+    llmSkipThreshold: 0.8,
     adaptiveVad: false,
     speechThreshold: 0.6,
     speechThresholdEnd: 0.3,
@@ -148,6 +149,7 @@ describe("workspace mappers", () => {
     expect(result.activationMode).toBe("Toggle");
     expect(result.asrBackend).toBe("Qwen3Asr");
     expect(result.confidenceThreshold).toBe("0.75");
+    expect(result.llmSkipThreshold).toBe("0.80");
     expect(result.speechThreshold).toBe("0.60");
     expect(result.pillVisibility).toBe("WhenDictating");
   });
@@ -186,13 +188,22 @@ describe("workspace mappers", () => {
     expect(result.pillVisibility).toBe("Always");
   });
 
-  test("null confidenceThreshold defaults to 0.5", () => {
+  test("null confidenceThreshold defaults to 0.55", () => {
     const snapshot = {
       settings: { ...makeBackendSettings(), confidenceThreshold: null },
     } as WorkspaceSnapshot;
 
     const result = mapWorkspaceSettings(snapshot);
-    expect(result.confidenceThreshold).toBe("0.50");
+    expect(result.confidenceThreshold).toBe("0.55");
+  });
+
+  test("null llmSkipThreshold defaults to 0.65", () => {
+    const snapshot = {
+      settings: { ...makeBackendSettings(), llmSkipThreshold: null },
+    } as WorkspaceSnapshot;
+
+    const result = mapWorkspaceSettings(snapshot);
+    expect(result.llmSkipThreshold).toBe("0.65");
   });
 
   // ── settingsToSaveInput ─────────────────────────────────────────────
@@ -202,9 +213,16 @@ describe("workspace mappers", () => {
     const input = settingsToSaveInput(settings);
 
     expect(input.activationMode).toBe("Toggle");
-    expect(input.confidenceThreshold).toBe(0.5);
+    expect(input.confidenceThreshold).toBe(0.55);
+    expect(input.llmSkipThreshold).toBe(0.65);
     expect(input.speechThreshold).toBe(0.5);
     expect(input.openaiAsrApiKey).toBeNull();
+  });
+
+  test("clamps llmSkipThreshold to confidenceThreshold on save", () => {
+    const settings = { ...DEFAULT_SETTINGS, confidenceThreshold: "0.75", llmSkipThreshold: "0.65" };
+    const input = settingsToSaveInput(settings);
+    expect(input.llmSkipThreshold).toBe(0.75);
   });
 
   test("does not send masked API key back to backend", () => {

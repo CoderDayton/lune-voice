@@ -21,11 +21,9 @@ pub struct PostProcessInput {
     /// BCP-47 language code from ASR detection (e.g. "en", "eng", "fr").
     /// Defaults to "en" if not set by pipeline.
     pub language: String,
-    /// Words flagged as likely incorrect, with their word-index position in text.
-    pub uncertain_words: Vec<(String, usize)>,
     /// Whether the correction pass should run. The session gate sets this to
-    /// false when it predicts a correction no-op (nothing unresolved, no risk
-    /// hints, unambiguous punctuation); the styling pass still runs whenever
+    /// false when it predicts a correction no-op (nothing unresolved,
+    /// unambiguous punctuation); the styling pass still runs whenever
     /// the preset asks for it.
     pub correction_needed: bool,
 }
@@ -98,7 +96,6 @@ mod tests {
             dictionary: vec![],
             context: None,
             language: "en".into(),
-            uncertain_words: Vec::new(),
             correction_needed: true,
         };
         assert_eq!(input.raw_text, "hello um world");

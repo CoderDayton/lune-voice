@@ -10,19 +10,17 @@ pub fn has_dict(language: &str) -> bool {
 }
 
 /// Risk score (Heuristic Word Confidence Estimate) at which a word is treated
-/// as "uncertain" — surfaced to the LLM via `unresolved_words` and used as the
-/// gate for invoking the LLM at all (see [`LLM_GATE_RISK`]).
+/// as "uncertain" for the session gate and gate-decision event.
 pub const HWCE_FLAG_THRESHOLD: f32 = 0.40;
 
 /// Risk score that triggers the LLM correction pass. Aliased to
-/// [`HWCE_FLAG_THRESHOLD`] so a session can never reach the LLM without at
-/// least one word also qualifying as a hint — keeps `needs_llm=true` and
-/// `unresolved_words` consistent.
+/// [`HWCE_FLAG_THRESHOLD`] so unresolved-word reporting and the
+/// `needs_llm=true` gate stay consistent.
 pub const LLM_GATE_RISK: f32 = HWCE_FLAG_THRESHOLD;
 
 /// Maximum risk at which a known high-frequency word is allowed to pass
-/// through unchanged. Above this, the word is sent to the LLM as uncertain
-/// even if the lexicon recognizes it.
+/// through unchanged. Above this, the word is marked uncertain even if the
+/// lexicon recognizes it.
 pub const CANONICAL_OVERRIDE_RISK_CEIL: f32 = 0.75;
 
 /// Maximum risk at which an unknown but proper-shaped token (capitalized
@@ -65,6 +63,7 @@ fn process_single_word(
     stripped: &str,
     lexicon_info: &Option<crate::lexicon::WordInfo>,
     risk_score: f32,
+    flag_threshold: f32,
     dict_replacements: &[(String, String)],
 ) -> ProcessedWord {
     // Empty or digit-containing words pass through unchanged
@@ -78,7 +77,7 @@ fn process_single_word(
     let is_unknown = !lexicon_info.as_ref().is_some_and(|info| {
         info.freq >= Lexicon::CONFIDENT_FREQ || info.source == WordSource::Vocab
     });
-    let flagged = risk_score >= HWCE_FLAG_THRESHOLD;
+    let flagged = risk_score >= flag_threshold;
 
     // Dictionary replacements take priority
     if let Some((_, repl)) = dict_replacements
@@ -168,7 +167,7 @@ fn process_single_word(
         };
     }
 
-    // Flagged words become uncertain — passed as hints to the LLM
+    // Flagged words become uncertain for the session gate/event.
     let unresolved = if flagged {
         Some(WordScore {
             word: stripped.to_owned(),
@@ -214,6 +213,23 @@ impl HeuristicCorrector {
         dict_replacements: &[(String, String)],
         lang: &str,
     ) -> CorrectionResult {
+        self.correct_with_risk_threshold(
+            text,
+            word_risk_scores,
+            dict_replacements,
+            lang,
+            HWCE_FLAG_THRESHOLD,
+        )
+    }
+
+    pub fn correct_with_risk_threshold<S: AsRef<str>>(
+        &self,
+        text: &str,
+        word_risk_scores: &[(S, f32)],
+        dict_replacements: &[(String, String)],
+        lang: &str,
+        flag_threshold: f32,
+    ) -> CorrectionResult {
         let words: Vec<&str> = text.split_whitespace().collect();
         let aligned = align_word_risk_positions(&words, word_risk_scores);
         let word_risk_positions = aligned.positions;
@@ -250,6 +266,7 @@ impl HeuristicCorrector {
                 stripped,
                 &lexicon_info,
                 risk_score,
+                flag_threshold,
                 dict_replacements,
             );
 
@@ -489,6 +506,23 @@ mod tests {
         let result = c.correct("the quick brown fox", &risks, &[], "en");
         assert!(result.unresolved_words.is_empty());
         assert!(!risks.iter().any(|(_, r)| *r >= LLM_GATE_RISK));
+    }
+
+    #[test]
+    fn custom_risk_threshold_controls_unresolved_words() {
+        let c = HeuristicCorrector::new();
+        let risks = vec![("xyzqqq".to_string(), 0.35)];
+        let default_result = c.correct("the xyzqqq fox", &risks, &[], "en");
+        assert!(default_result.unresolved_words.is_empty());
+
+        let custom_result =
+            c.correct_with_risk_threshold("the xyzqqq fox", &risks, &[], "en", 0.30);
+        assert!(
+            custom_result
+                .unresolved_words
+                .iter()
+                .any(|ws| ws.word == "xyzqqq")
+        );
     }
 
     #[test]

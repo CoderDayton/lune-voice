@@ -97,7 +97,7 @@ pub struct PipelineConfig {
     /// transcript is considered too degraded for the LLM corrector to help
     /// and the whole LLM stage is skipped. Deliberately not the weakest
     /// token — one garbled word in a clean utterance is the prime correction
-    /// case, served by the hint band. The paper (arXiv:2509.25048 Fig 3)
+    /// case, served by the attention band. The paper (arXiv:2509.25048 Fig 3)
     /// shows naive correction on broken transcripts routinely degrades WER —
     /// this gate is the defensive counterpart to skip-when-clean.
     ///

@@ -59,7 +59,7 @@ fn main() {
     for (i, input) in INPUTS.iter().enumerate() {
         let t0 = Instant::now();
         let result = llm
-            .apply_correction(input, "en", &[])
+            .apply_correction(input, "en")
             .expect("apply_correction failed");
         let ms = t0.elapsed().as_secs_f64() * 1000.0;
         timings_ms.push(ms);

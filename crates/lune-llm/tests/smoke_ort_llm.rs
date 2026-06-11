@@ -27,15 +27,11 @@ fn make_llm() -> OrtStyleLlm {
     OrtStyleLlm::new(config).expect("failed to load model")
 }
 
-fn run_case(llm: &OrtStyleLlm, input: &str, uncertain: &[(String, usize)]) -> String {
+fn run_case(llm: &OrtStyleLlm, input: &str) -> String {
     let result = llm
-        .apply_correction(input, "en", uncertain)
+        .apply_correction(input, "en")
         .expect("apply_correction failed");
     println!("INPUT:  {input}");
-    if !uncertain.is_empty() {
-        let words: Vec<&str> = uncertain.iter().map(|(w, _)| w.as_str()).collect();
-        println!("HINTS:  {}", words.join(", "));
-    }
     println!("OUTPUT: {result}");
     println!("---");
     result
@@ -52,31 +48,23 @@ fn smoke_correction() {
     let llm = make_llm();
 
     // Basic typo + capitalization
-    let r1 = run_case(&llm, "hello wrld how you doing today.", &[]);
+    let r1 = run_case(&llm, "hello wrld how you doing today.");
 
-    // Missing words + misheard word with hint
-    let r2 = run_case(
-        &llm,
-        "I went store and brought some groceries",
-        &[("brought".into(), 4)],
-    );
+    // Missing words + misheard word
+    let r2 = run_case(&llm, "I went store and brought some groceries");
 
     // Missing small words
-    let _r3 = run_case(&llm, "can you tell me what time it", &[]);
+    let _r3 = run_case(&llm, "can you tell me what time it");
 
     // Already correct - should pass through
-    let r4 = run_case(&llm, "The quick brown fox jumps over the lazy dog.", &[]);
+    let r4 = run_case(&llm, "The quick brown fox jumps over the lazy dog.");
 
     // Multiple issues
-    let r5 = run_case(
-        &llm,
-        "i dont no why the computor isnt working",
-        &[("no".into(), 2), ("computor".into(), 4)],
-    );
+    let r5 = run_case(&llm, "i dont no why the computor isnt working");
 
-    let _r6 = run_case(&llm, "let go to the mall and bye some cloth", &[]);
+    let _r6 = run_case(&llm, "let go to the mall and bye some cloth");
 
-    let _r7 = run_case(&llm, "let meet at my hotle and git some sleep!", &[]);
+    let _r7 = run_case(&llm, "let meet at my hotle and git some sleep!");
 
     // No echo of system prompt or hints
     assert!(!r1.contains("Fix"), "leaked system prompt: {r1}");
@@ -120,7 +108,6 @@ fn dictionary_example_correction_smoke() {
         }],
         context: None,
         language: "en".into(),
-        uncertain_words: vec![],
         correction_needed: true,
     };
     let rt = tokio::runtime::Builder::new_current_thread()

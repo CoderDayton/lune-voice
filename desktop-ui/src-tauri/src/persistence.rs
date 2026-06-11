@@ -384,7 +384,14 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
         use_gpu: !matches!(settings.device, DevicePolicy::Cpu),
         device_policy: device_policy_to_dto(settings.device),
         asr_backend_type: settings.asr_backend.kind().into(),
-        confidence_threshold: settings.pipeline.word_confidence_threshold,
+        confidence_threshold: settings
+            .pipeline
+            .word_confidence_threshold
+            .or(backend_defaults.word_confidence_threshold),
+        llm_skip_threshold: settings
+            .pipeline
+            .llm_skip_threshold
+            .or(backend_defaults.llm_skip_threshold),
         adaptive_vad: settings
             .pipeline
             .adaptive_vad
@@ -430,6 +437,18 @@ fn apply_settings_dto(
     {
         return Err(format!("confidenceThreshold must be 0.0–1.0, got {ct}"));
     }
+    if let Some(threshold) = input.llm_skip_threshold {
+        if !threshold.is_finite() || !(0.0..=1.0).contains(&threshold) {
+            return Err(format!("llmSkipThreshold must be 0.0–1.0, got {threshold}"));
+        }
+        if let Some(confidence_threshold) = input.confidence_threshold
+            && threshold < confidence_threshold
+        {
+            return Err(format!(
+                "llmSkipThreshold ({threshold}) must be >= confidenceThreshold ({confidence_threshold})"
+            ));
+        }
+    }
     if !input.speech_threshold.is_finite() || !(0.0..=1.0).contains(&input.speech_threshold) {
         return Err(format!(
             "speechThreshold must be 0.0–1.0, got {}",
@@ -451,6 +470,7 @@ fn apply_settings_dto(
     }
 
     settings.pipeline.word_confidence_threshold = input.confidence_threshold;
+    settings.pipeline.llm_skip_threshold = input.llm_skip_threshold;
     settings.word_confidence_threshold = input.confidence_threshold.unwrap_or(0.5);
     settings.pipeline.adaptive_vad = Some(input.adaptive_vad);
     settings.adaptive_vad = input.adaptive_vad;
@@ -757,6 +777,7 @@ mod tests {
             device_policy: dto.device_policy,
             asr_backend_type: dto.asr_backend_type,
             confidence_threshold: dto.confidence_threshold,
+            llm_skip_threshold: dto.llm_skip_threshold,
             adaptive_vad: dto.adaptive_vad,
             speech_threshold: dto.speech_threshold,
             speech_threshold_end: dto.speech_threshold_end,
@@ -786,6 +807,22 @@ mod tests {
 
         let mut input = default_save_input();
         input.language = "bad tag".into();
+        assert!(apply_settings_dto(&mut settings, input).is_err());
+    }
+
+    #[test]
+    fn apply_settings_persists_llm_skip_threshold() {
+        let mut settings = UserSettings::default();
+
+        let mut input = default_save_input();
+        input.confidence_threshold = Some(0.55);
+        input.llm_skip_threshold = Some(0.75);
+        apply_settings_dto(&mut settings, input).unwrap();
+        assert_eq!(settings.pipeline.llm_skip_threshold, Some(0.75));
+
+        let mut input = default_save_input();
+        input.confidence_threshold = Some(0.8);
+        input.llm_skip_threshold = Some(0.7);
         assert!(apply_settings_dto(&mut settings, input).is_err());
     }
 

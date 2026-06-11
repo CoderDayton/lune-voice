@@ -9,9 +9,11 @@ import {
   Palette,
   Send,
   SlidersHorizontal,
+  Wrench,
 } from 'lucide-react';
 import { useState } from 'react';
 import { workspaceStore } from '../../store/workspace-store';
+import { AdvancedSection } from './sections/advanced-section';
 import { AppearanceSection } from './sections/appearance-section';
 import { GeneralSection } from './sections/general-section';
 import { InputSection } from './sections/input-section';
@@ -27,7 +29,8 @@ type SectionId =
   | 'input'
   | 'transcription'
   | 'output'
-  | 'models';
+  | 'models'
+  | 'advanced';
 
 export function SettingsPage() {
   const { t } = useLingui();
@@ -69,6 +72,7 @@ export function SettingsPage() {
     { id: 'transcription', label: t`Transcription`, icon: AudioLines },
     { id: 'output', label: t`Output`, icon: Send },
     { id: 'models', label: t`Models`, icon: Boxes },
+    { id: 'advanced', label: t`Advanced`, icon: Wrench },
   ];
 
   const content: Record<SectionId, React.ReactNode> = {
@@ -79,6 +83,7 @@ export function SettingsPage() {
     transcription: <TranscriptionSection settings={settings} />,
     output: <OutputSection settings={settings} />,
     models: <ModelsSection />,
+    advanced: <AdvancedSection settings={settings} />,
   };
 
   return (

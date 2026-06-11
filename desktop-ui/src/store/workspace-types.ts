@@ -12,6 +12,7 @@ export interface WorkspaceSettings {
   useGpu: boolean;
   devicePolicy: 'Cpu' | 'Cuda' | 'Auto';
   confidenceThreshold: string;
+  llmSkipThreshold: string;
   dictationMode: DictationModeValue;
   stylePreset: string;
   adaptiveVad: boolean;
@@ -87,7 +88,8 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   asrBackend: 'Qwen3Asr',
   useGpu: true,
   devicePolicy: 'Auto',
-  confidenceThreshold: '0.50',
+  confidenceThreshold: '0.55',
+  llmSkipThreshold: '0.65',
   dictationMode: 'Clipboard',
   stylePreset: 'casual',
   adaptiveVad: false,

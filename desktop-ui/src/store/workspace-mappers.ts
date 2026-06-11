@@ -46,7 +46,12 @@ export function mapWorkspaceSettings(snapshot: WorkspaceSnapshot): WorkspaceSett
     asrBackend: snapshot.settings.asrBackendType,
     useGpu: snapshot.settings.useGpu,
     devicePolicy: snapshot.settings.devicePolicy,
-    confidenceThreshold: formatThreshold(snapshot.settings.confidenceThreshold ?? 0.5),
+    confidenceThreshold: formatThreshold(
+      snapshot.settings.confidenceThreshold ?? Number(DEFAULT_SETTINGS.confidenceThreshold),
+    ),
+    llmSkipThreshold: formatThreshold(
+      snapshot.settings.llmSkipThreshold ?? Number(DEFAULT_SETTINGS.llmSkipThreshold),
+    ),
     dictationMode: snapshot.settings.dictationMode,
     stylePreset: snapshot.settings.stylePreset,
     adaptiveVad: snapshot.settings.adaptiveVad,
@@ -93,6 +98,10 @@ export function settingsToSaveInput(settings: WorkspaceSettings): SaveWorkspaceS
     devicePolicy: settings.devicePolicy,
     asrBackendType: settings.asrBackend,
     confidenceThreshold: Number(settings.confidenceThreshold),
+    llmSkipThreshold: Math.max(
+      Number(settings.llmSkipThreshold),
+      Number(settings.confidenceThreshold),
+    ),
     adaptiveVad: settings.adaptiveVad,
     speechThreshold: Number(settings.speechThreshold),
     speechThresholdEnd: Number(settings.speechThresholdEnd),

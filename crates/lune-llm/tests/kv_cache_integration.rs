@@ -27,7 +27,7 @@ fn make_llm() -> OrtStyleLlm {
 fn run(llm: &OrtStyleLlm, input: &str) -> (String, std::time::Duration) {
     let t0 = Instant::now();
     let result = llm
-        .apply_correction(input, "en", &[])
+        .apply_correction(input, "en")
         .expect("apply_correction failed");
     (result, t0.elapsed())
 }
@@ -89,20 +89,18 @@ fn cache_invalidation_on_language_change() {
     let llm = make_llm();
 
     // English — builds cache.
-    let r1 = llm
-        .apply_correction("hello wrld", "en", &[])
-        .expect("en failed");
+    let r1 = llm.apply_correction("hello wrld", "en").expect("en failed");
     println!("EN: {r1}");
 
     // French — different system prompt, cache should be invalidated.
     let r2 = llm
-        .apply_correction("bonjur le monde", "fr", &[])
+        .apply_correction("bonjur le monde", "fr")
         .expect("fr failed");
     println!("FR: {r2}");
 
     // Back to English — should rebuild cache.
     let r3 = llm
-        .apply_correction("how are you doing today", "en", &[])
+        .apply_correction("how are you doing today", "en")
         .expect("en2 failed");
     println!("EN2: {r3}");
 

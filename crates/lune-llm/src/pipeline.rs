@@ -51,7 +51,6 @@ impl CorrectionPipeline {
             &input.language,
             &examples,
             input.context.as_deref(),
-            &input.uncertain_words,
         )
     }
 }
@@ -363,7 +362,6 @@ mod tests {
             dictionary: vec![],
             context: None,
             language: "en".into(),
-            uncertain_words: vec![],
             correction_needed: true,
         };
 
@@ -386,7 +384,6 @@ mod tests {
             dictionary: vec![],
             context: None,
             language: "en".into(),
-            uncertain_words: vec![],
             correction_needed: true,
         };
 
@@ -414,7 +411,6 @@ mod tests {
             dictionary: vec![],
             context: None,
             language: "en".into(),
-            uncertain_words: vec![],
             correction_needed: true,
         };
 
@@ -435,7 +431,6 @@ mod tests {
             }],
             context: None,
             language: "en".into(),
-            uncertain_words: vec![],
             correction_needed: true,
         };
 
@@ -475,7 +470,6 @@ mod tests {
             }],
             context: None,
             language: "fr".into(),
-            uncertain_words: vec![],
             correction_needed: true,
         };
         let examples = dictionary_examples(&input);

@@ -124,6 +124,8 @@ pub struct WorkspaceSettingsDto {
     pub device_policy: DevicePolicyDto,
     pub asr_backend_type: AsrBackendTypeDto,
     pub confidence_threshold: Option<f32>,
+    /// Clean-segment confidence bound for bypassing the correction LLM.
+    pub llm_skip_threshold: Option<f32>,
     pub adaptive_vad: bool,
     pub speech_threshold: f32,
     pub speech_threshold_end: f32,
@@ -188,6 +190,8 @@ pub struct SaveWorkspaceSettingsInput {
     pub device_policy: DevicePolicyDto,
     pub asr_backend_type: AsrBackendTypeDto,
     pub confidence_threshold: Option<f32>,
+    /// Clean-segment confidence bound for bypassing the correction LLM.
+    pub llm_skip_threshold: Option<f32>,
     pub adaptive_vad: bool,
     pub speech_threshold: f32,
     pub speech_threshold_end: f32,
