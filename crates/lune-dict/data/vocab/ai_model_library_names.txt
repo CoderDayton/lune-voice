@@ -1,23 +1,23 @@
 Activation Quantization
-Actix
+actix
 AdaLoRA
 AdamW
 Adapter Fusion
 Adapter Model
-Adept AI | Adept
+Adept AI
 AGIEval
 AI21 Labs
-Aider
+aider
 AIME
-Albumentations
-Alembic
-Algolia
+albumentations
+alembic
+algolia
 ALiBi
-all-MiniLM-L6-v2 | all MiniLM L6 v2
+all-MiniLM-L6-v2
 AllenNLP
 AlpacaEval
 AlphaCode
-AlphaCode 2 | AlphaCode 2
+AlphaCode 2
 AlphaFold
 AlphaFold 2
 AlphaFold 3
@@ -25,25 +25,25 @@ AlphaGeometry
 AlphaGo
 AlphaTensor
 AlphaZero
-Altair
+altair
 Amazon AGI
-Amazon Bedrock | Bedrock
-Amazon CodeWhisperer | CodeWhisperer
+Amazon Bedrock
+Amazon CodeWhisperer
 Amazon Q
-Amazon SageMaker | SageMaker
+Amazon SageMaker
 Ansible
 Anthropic
 Anthropic API
-Anyscale
-Apache Pulsar | Pulsar
-Apple Machine Learning | Apple ML
+anyscale
+Apache Pulsar
+Apple Machine Learning
 APPS
-ARC Challenge | ARC-C
-ARC Easy | ARC-E
+ARC Challenge
+ARC Easy
 Arena Elo
-Arrow | Apache Arrow
+arrow
 AssemblyAI
-Astro
+astro
 AudioCraft
 AudioLM
 AutoGen
@@ -52,74 +52,74 @@ Autoregressive Model
 AWQ
 AWQ Quantization
 AWS
-Ax Platform | Ax
-Axum
+Ax Platform
+axum
 Azure
-Azure OpenAI Service | Azure OpenAI
-Babel
-Baichuan
-Bard | Google Bard
+Azure OpenAI Service
+babel
+baichuan
+bard
 Base Model
-Baseten
-Bazel
+baseten
+bazel
 Beam Search
-Beautiful Soup | bs4
+Beautiful Soup
 BentoML
-BF16 | bfloat16
-BFCL | Berkeley Function Calling Leaderboard
+BF16
+BFCL
 BGE Base
 BGE Large
 BGE M3
 BGE Small
-BGE | BAAI General Embedding
-bge-reranker | BGE Reranker
+BGE
+bge-reranker
 Bi Encoder
-BIG-bench Hard | BBH
-Big-Bench | BIG-bench
+BIG-bench Hard
+Big-Bench
 BigQuery
 BioASQ
-Bitbucket
-BitsAndBytes | bitsandbytes
-Black
+bitbucket
+BitsAndBytes
+black
 BLIP
-BLIP-2 | BLIP 2
+BLIP-2
 BM25
-Bokeh
+bokeh
 BookCorpus
 BoolQ
-BPE | Byte Pair Encoding
-Braintrust
-Bruno
-Byte Pair Encoding | BPE
+BPE
+braintrust
+bruno
+Byte Pair Encoding
 C
-C# | C Sharp
-C++ | C Plus Plus
-C4 | Colossal Clean Crawled Corpus
-candle | Hugging Face Candle
+C#
+C++
+C4
+candle
 Cassandra
 CatBoost
-Causal Language Model | CLM
-Cerebras
+Causal Language Model
+cerebras
 CEval
-Chainlit
+chainlit
 Chakra UI
-Character AI | Character.AI
+Character AI
 Chat Model
 Chat Template
 Chatbot Arena
 ChatGLM
 ChatGPT
-Chroma | ChromaDB
-ckpt | checkpoint
+chroma
+ckpt
 Claude
 Claude 2
 Claude 3
 Claude 3 Haiku
 Claude 3 Opus
 Claude 3 Sonnet
-Claude 3.5 Haiku | Claude 3 point 5 Haiku
-Claude 3.5 Sonnet | Claude 3 point 5 Sonnet
-Claude 3.7 Sonnet | Claude 3 point 7 Sonnet
+Claude 3.5 Haiku
+Claude 3.5 Sonnet
+Claude 3.7 Sonnet
 Claude Code
 Claude Desktop
 Claude Haiku
@@ -133,46 +133,46 @@ Cloudflare
 Cloudflare Tunnel
 CMake
 CMMLU
-CNN | Convolutional Neural Network
+CNN
 COCO
 Code Llama
-Codeforces
+codeforces
 CodeGeeX
 CodeGemma
 CodeGen
-Codeium
+codeium
 CodeQwen
-Codestral
+codestral
 CodeT5
-CodeT5 Plus | CodeT5+
+CodeT5 Plus
 Cohere
 Cohere API
 Cohere Command
 Cohere Embed
 Cohere Rerank
 ColBERT
-ColBERTv2 | ColBERT v2
-Colossal-AI | Colossal AI
+ColBERTv2
+Colossal-AI
 Comet ML
 Command A
 Command R
-Command R Plus | Command R+
+Command R Plus
 Common Crawl
 CommonsenseQA
-Conda
+conda
 Consistency Model
 Constrained Decoding
 Context Window
-Contriever
+contriever
 ControlNet
 ConvNeXt
 Copilot Chat
 Coqui TTS
 Core ML
-Core ML Model | mlmodel
+Core ML Model
 CoreWeave
 Cosine Scheduler
-Crates.io | crates io
+Crates.io
 CrewAI
 Cross Encoder
 Cross-Attention
@@ -182,80 +182,80 @@ CUDA
 cuDNN
 Cursor Composer
 Dagster
-DALL-E 2 | Dall E 2
-DALL-E 3 | Dall E 3
-DALL-E | Dall E
-Dask
+DALL-E 2
+DALL-E 3
+DALL-E
+dask
 Databricks
-Databricks Mosaic AI | MosaicML
-Datadog
+Databricks Mosaic AI
+datadog
 Dataset Card
-Datasets | Hugging Face Datasets
+datasets
 DBRX
-dbt | Data Build Tool
-DDP | Distributed Data Parallel
+dbt
+DDP
 Decoder-Only
 DeepEval
 DeepFace
-Deepgram
+deepgram
 DeepSeek
 DeepSeek Coder
 DeepSeek Coder V2
-DeepSeek R1 | DeepSeek R one
-DeepSeek V2 | DeepSeek V two
-DeepSeek V3 | DeepSeek V three
+DeepSeek R1
+DeepSeek V2
+DeepSeek V3
 DeepSpeed
 Delta Lake
-Demucs
-Deno
-Detectron2 | Detectron 2
-Devbox
+demucs
+deno
+Detectron2
+devbox
 Developer Message
-Devin
-Diffusers | Hugging Face Diffusers
+devin
+diffusers
 Diffusion Model
 DigitalOcean
-DINOv2 | DINO v2
-Direct Preference Optimization | DPO
+DINOv2
+Direct Preference Optimization
 direnv
-Distil-Whisper | Distil Whisper
+Distil-Whisper
 Django
 Docker
 Docker Compose
 DoRA
-DPR | Dense Passage Retrieval
+DPR
 DreamBooth
 DROP
 DS-1000
 DSPy
 DuckDB
-DVC | Data Version Control
+DVC
 DynamoDB
 E5
 E5 Large
 EAGLE
 EfficientNet
-Elastic | Elasticsearch
+elastic
 EleutherAI Eval Harness
 ElevenLabs
-Emacs
+emacs
 Embedding Model
 Encoder-Decoder
-Ensembling
-Equinox
+ensembling
+equinox
 Erlang
 ERNIE
-ERNIE 4.0 | Ernie 4.0
-ERNIE Bot | Ernie Bot
+ERNIE 4.0
+ERNIE Bot
 esbuild
 ESLint
 ESRGAN
 ExLlama
-ExLlamaV2 | ExLlama v2
+ExLlamaV2
 Expert Choice
-F# | F Sharp
+F#
 FaceNet
-Fairseq
+fairseq
 FAISS
 Falcon 180B
 Falcon 40B
@@ -266,29 +266,29 @@ FineWeb
 FineWeb-Edu
 Firebase
 Fireworks AI
-Fish Shell | fish
+Fish Shell
 FlashAttention
 FlashAttention 2
 FlashAttention 3
-Florence
-Florence-2 | Florence 2
+florence
+Florence-2
 Flow Matching
-Flux Pro | FLUX Pro
-Flux Schnell | FLUX Schnell
-Flux | FLUX
-Fly.io | Fly
-Forgejo
-FP16 | float16
-FP32 | float32
-FP8 | float8
+Flux Pro
+Flux Schnell
+flux
+Fly.io
+forgejo
+FP16
+FP32
+FP8
 Framer Motion
 Frequency Penalty
-FSDP | Fully Sharded Data Parallel
+FSDP
 Function Calling
-Fuyu
+fuyu
 GAIA
-GAN | Generative Adversarial Network
-GCP | Google Cloud
+GAN
+GCP
 GeGLU
 GELU
 Gemini
@@ -301,135 +301,135 @@ Gemini Ultra
 Gemma
 Gemma 2
 Gemma 3
-Gensim
+gensim
 GFPGAN
 ggml
 GGUF
-gguf | GGUF
+GGUF
 Git
-Gitea
+gitea
 GitHub
 GitHub Copilot
 GitLab
 GLM
-GLM-4 | GLM 4
+GLM-4
 GLUE
-Go | Golang
+Go
 Google AI
-Google AI Studio | AI Studio
-Google DeepMind | DeepMind
+Google AI Studio
+Google DeepMind
 Google Research
-Google Vertex AI | Vertex AI
+Google Vertex AI
 GPQA
 GPT
-GPT-2 | GPT 2
-GPT-3 | GPT 3
-GPT-3.5 | GPT 3.5
-GPT-4 | GPT 4
-GPT-4.1 | GPT 4.1
-GPT-4o | GPT 4o
-GPT-5 | GPT 5
+GPT-2
+GPT-3
+GPT-3.5
+GPT-4
+GPT-4.1
+GPT-4o
+GPT-5
 GPTQ
 GPTQ Quantization
 Gradient Accumulation
 Gradient Checkpointing
-Gradio
-Gradle
+gradio
+gradle
 Grafana
 Grammar Sampling
 GraphQL
-GraphRAG | Graph RAG
+GraphRAG
 Greedy Decoding
-Grok | xAI Grok
-Grok-1 | Grok 1
-Grok-2 | Grok 2
-Grok-3 | Grok 3
-Groq
+grok
+Grok-1
+Grok-2
+Grok-3
+groq
 Groq API
 GroqCloud
 Grounding DINO
 gRPC
-GRPO | Group Relative Policy Optimization
+GRPO
 GRU
 GSM8K
 Guild AI
-Gunicorn
-Harvey AI | Harvey
+gunicorn
+Harvey AI
 Haskell
-Hebbia
-Helicone
+hebbia
+helicone
 HellaSwag
 HELM
 Heroku
 HNSW
 HNSWlib
-Horovod
+horovod
 HotpotQA
 HTML
 httpx
-Hudi | Apache Hudi
+hudi
 Hugging Face
-Hugging Face Hub | HF Hub
+Hugging Face Hub
 HumanEval
 Hybrid Search
-HyDE | Hypothetical Document Embeddings
-Hyperopt
+HyDE
+hyperopt
 IA3
 IBM Granite
-Iceberg | Apache Iceberg
+iceberg
 IDEFICS
 IFEval
-Imagen
+imagen
 Imagen 2
 Imagen 3
 ImageNet
 Inflection AI
 Instruct Model
 Instruction Tuning
-INT4 | int4
-INT8 | int8
+INT4
+INT8
 IntelliJ IDEA
 InternLM
-IP-Adapter | IP Adapter
-IPO | Identity Preference Optimization
-IVF Index | Inverted File Index
-Jamba
+IP-Adapter
+IPO
+IVF Index
+jamba
 Jamba Instruct
-Jasper
+jasper
 Java
 JavaScript
 JAX
 Jina Embeddings
 Jina Reranker
-Jinja Template | Jinja
-Jira
+Jinja Template
+jira
 JSON
 JSON Mode
-Jsonformer
+jsonformer
 Julia
 Jupyter
 JupyterLab
-Jurassic
-Jurassic-2 | Jurassic 2
+jurassic
+Jurassic-2
 Kafka
 Keras
 Keyword Search
 Knowledge Distillation
-Kosmos
-Kosmos-2 | Kosmos 2
+kosmos
+Kosmos-2
 Kotlin
 KServe
-KTO | Kahneman-Tversky Optimization
+KTO
 Kubeflow
-Kubernetes | K8s
-Kustomize
+Kubernetes
+kustomize
 KV Cache
 KV Cache Quantization
-Labelbox
+labelbox
 LAION
-LAION-5B | LAION 5B
-Lambda Labs | Lambda
-LaMDA | Lambda
+LAION-5B
+Lambda Labs
+LaMDA
 LanceDB
 LangChain
 LangFuse
@@ -438,137 +438,137 @@ LangServe
 LangSmith
 Latent Diffusion
 LayerNorm
-Le Chat | Mistral Le Chat
+Le Chat
 LightGBM
-Lion Optimizer | Lion
+Lion Optimizer
 LiteLLM
 LiveCodeBench
-Llama 2 | LLaMA 2
-Llama 3 | LLaMA 3
-Llama 3.1 | LLaMA 3.1
-Llama 3.2 | LLaMA 3.2
-Llama 3.3 | LLaMA 3.3
-Llama | LLaMA
-llama-cpp-python | llama cpp python
-llama-cpp-rs | llama cpp rs
+Llama 2
+Llama 3
+Llama 3.1
+Llama 3.2
+Llama 3.3
+Llama
+llama-cpp-python
+llama-cpp-rs
 llama.cpp server
-llama.cpp | llama cpp
+llama.cpp
 llamafile
 LlamaIndex
-LLaVA | Llava
-LLaVA-NeXT | Llava Next
+LLaVA
+LLaVA-NeXT
 LM Studio
-lm-evaluation-harness | LM Eval Harness
+lm-evaluation-harness
 LMQL
-LMSYS Arena | Chatbot Arena
+LMSYS Arena
 LocalAI
-Logprob | Log Probability
+logprob
 LoRA
-LoRA Adapter | Adapter
-LoRA | Low-Rank Adaptation
+LoRA Adapter
+LoRA
 LSTM
 Lua
-Luma Dream Machine | Dream Machine
-Magicoder
-Make-A-Video | Make A Video
-Mamba
+Luma Dream Machine
+magicoder
+Make-A-Video
+mamba
 MariaDB
 MarianNMT
-Markdown
-Mask R-CNN | Mask RCNN
-Masked Language Model | MLM
-Material UI | MUI
+markdown
+Mask R-CNN
+Masked Language Model
+Material UI
 MATH
 MATLAB
 Matplotlib
-Maturin
+maturin
 MBPP
 MedMCQA
 MedQA
-Medusa
-Megatron-LM | Megatron LM
+medusa
+Megatron-LM
 MergeKit
-Meta AI | Facebook AI
+Meta AI
 Meta Llama
-Metaflow
-Metal Performance Shaders | MPS
+metaflow
+Metal Performance Shaders
 Microsoft AI
 Midjourney
-Midjourney V6 | Midjourney 6
-Milvus
+Midjourney V6
+milvus
 MiniCPM
-MiniGPT-4 | Mini GPT 4
+MiniGPT-4
 MiniLM
-Ministral
+ministral
 MiniWoB
 Mistral
-Mistral 7B | Mistral Seven B
-Mistral AI | Mistral
+Mistral 7B
+Mistral AI
 Mistral API
 Mistral Large
 Mistral Small
 Mixed Precision
 Mixtral
-Mixtral 8x22B | Mixtral eight by twenty two B
-Mixtral 8x7B | Mixtral eight by seven B
+Mixtral 8x22B
+Mixtral 8x7B
 MLC LLM
 MLflow
 MLIR
-MLP | Multilayer Perceptron
+MLP
 MLX
 MMLU
 MMLU Pro
 MMMU
 Model Card
 Model Soups
-MoE | Mixture of Experts
+MoE
 MongoDB
 MosaicML
 MPNet
 MT-Bench
-Muon Optimizer | Muon
+Muon Optimizer
 MusicGen
 MusicLM
 MuZero
-Mypy
+mypy
 MySQL
 MythoMax
 NATS
-Natural Questions | NQ
+Natural Questions
 NCCL
-Nemotron
-Neovim
-Neptune
-Netlify
+nemotron
+neovim
+neptune
+netlify
 New Relic
-Next.js | NextJS
+Next.js
 NF4
 ngrok
 NixOS
 NLTK
-Node.js | Node
+Node.js
 Nomic AI
 Nous Hermes 2
 Nous Hermes 3
-Nous Hermes | Hermes
+Nous Hermes
 NousResearch
 npm
 NumPy
-Nuxt
-NVIDIA AI | Nvidia AI
+nuxt
+NVIDIA AI
 o1
-o1-mini | o1 mini
+o1-mini
 o3
-o3-mini | o3 mini
-o4-mini | o4 mini
+o3-mini
+o4-mini
 OCaml
 OctoAI
-Ollama
+ollama
 OLMo
 OLMoE
 ONNX
 ONNX Runtime Server
-ONNX Runtime | ORT
+ONNX Runtime
 OpenAI
 OpenAI API
 OpenAI compatible API
@@ -578,7 +578,7 @@ OpenAPI
 OpenBookQA
 OpenChat
 OpenCLIP
-OpenCode | opencode
+OpenCode
 OpenCoder
 OpenCV
 OpenDevin
@@ -587,135 +587,135 @@ OpenHermes
 OpenNMT
 OpenRouter
 OpenSearch
-OpenTelemetry | OTel
+OpenTelemetry
 OpenVINO
 OpenWebText
-Optuna
-Oracle Cloud | OCI
+optuna
+Oracle Cloud
 ORPO
-ort | ONNX Runtime Rust
+ort
 OSCAR
 P-Tuning
 PagedAttention
 PagerDuty
 PaliGemma
-PaLM 2 | Palm 2
-PaLM | Pathways Language Model
-Parquet
-Parti
+PaLM 2
+PaLM
+parquet
+parti
 PEFT
 Perl
-Phi-2 | Phi 2
-Phi-3 Mini | Phi 3 Mini
-Phi-3 | Phi 3
-Phi-4 | Phi 4
-Phind CodeLlama | Phind Code Llama
-Phoenix | Arize Phoenix
+Phi-2
+Phi-3 Mini
+Phi-3
+Phi-4
+Phind CodeLlama
+phoenix
 PHP
-Pika
+pika
 Pika Labs
 Pile of Law
-Pillow | PIL
+pillow
 pip
 PIQA
-Pixi
-Pixtral
+pixi
+pixtral
 PlanetScale
-Plotly
+plotly
 pnpm
-Podman
-Polars
-PostgreSQL | Postgres
+podman
+polars
+PostgreSQL
 PowerShell
-PPO | Proximal Policy Optimization
-PQ | Product Quantization
-Predibase
+PPO
+PQ
+predibase
 Prefix Tuning
 Presence Penalty
 Prometheus
 Prompt Tuning
-Promptfoo
+promptfoo
 PromptLayer
-Protocol Buffers | Protobuf
+Protocol Buffers
 PubMedQA
-Pulumi
+pulumi
 PyCharm
 Pydantic
-PydanticAI | Pydantic AI
+PydanticAI
 PyO3
 PyPI
-Pyright
-Pytest
+pyright
+pytest
 Python
 PyTorch
-PyTorch Checkpoint | pt file
-Qdrant
+PyTorch Checkpoint
+qdrant
 QLoRA
 Qwen
 Qwen ASR
 Qwen Audio
 Qwen Coder
 Qwen VL
-Qwen2 | Qwen 2
-Qwen2.5 | Qwen 2.5
-Qwen3 | Qwen 3
+Qwen2
+Qwen2.5
+Qwen3
 QwQ
 R
 RabbitMQ
 Radix UI
-RAG | Retrieval Augmented Generation
-Ragas
+RAG
+ragas
 Ray Serve
 Ray Train
 Ray Tune
 React Native
-Real-ESRGAN | Real ESRGAN
+Real-ESRGAN
 Reasoning Model
-Reciprocal Rank Fusion | RRF
+Reciprocal Rank Fusion
 Rectified Flow
 RecurrentGemma
 Redis
 RedPajama
 RedPajama Dataset
-Redshift
+redshift
 RefinedWeb
-ReFT | Representation Finetuning
+ReFT
 Reka AI
 ReLU
 Repetition Penalty
 Replit Agent
-Reqwest
-Reranker
+reqwest
+reranker
 ResNet
 REST
 Rev AI
-RLAIF | Reinforcement Learning from AI Feedback
-RLHF | Reinforcement Learning from Human Feedback
+RLAIF
+RLHF
 RMSNorm
-RNN | Recurrent Neural Network
+RNN
 ROCm
-Rollup
+rollup
 ROOTS
-RoPE | Rotary Position Embedding
+RoPE
 rsLoRA
-Ruff
-Runway Gen-1 | Gen 1
-Runway Gen-2 | Gen 2
-Runway Gen-3 | Gen 3
-RVC | Retrieval-based Voice Conversion
-Safetensors
-SafeTensors | safetensors
-SAM 2 | Segment Anything 2
-SAM | Segment Anything Model
+ruff
+Runway Gen-1
+Runway Gen-2
+Runway Gen-3
+RVC
+SafeTensors
+SafeTensors
+SAM 2
+SAM
 SantaCoder
 SavedModel
 Scala
 Scale AI
 ScaNN
-Scikit-learn | sklearn
+Scikit-learn
 SciPy
-SDXL | Stable Diffusion XL
-Seaborn
+SDXL
+seaborn
 Seamless Communication
 SeamlessM4T
 SeaORM
@@ -724,13 +724,13 @@ Self-Attention
 Semantic Kernel
 Semantic Search
 Sentence Transformers
-Sentence-BERT | SBERT
+Sentence-BERT
 SentencePiece
-SentencePiece Model | spm
-Serde
-SGD | Stochastic Gradient Descent
+SentencePiece Model
+serde
+SGD
 SGLang
-shadcn/ui | shadcn UI
+shadcn/ui
 SigLIP
 SIQA
 SmolLM
@@ -738,161 +738,161 @@ SmolVLM
 SmoothQuant
 Snowflake Arctic
 SolidJS
-Sora
-Sourcegraph Cody | Cody
-Space | Hugging Face Space
+sora
+Sourcegraph Cody
+space
 spaCy
 Speculative Decoding
-Speechmatics
+speechmatics
 SPLADE
 SQL
 SQLAlchemy
 SQLite
 SQLx
 SQuAD
-SQuAD 2.0 | SQuAD v2
+SQuAD 2.0
 Stability AI
 Stable Cascade
 Stable Diffusion
 Stable Diffusion 3
-Stable Diffusion XL | SDXL
+Stable Diffusion XL
 Stable Video Diffusion
 StableLM
 StarCoder
-StarCoder2 | StarCoder 2
-Starlette
-Statsmodels
-Streamlit
+StarCoder2
+starlette
+statsmodels
+streamlit
 Structured Outputs
 Structured Sparsity
-Supabase
+supabase
 SuperGLUE
-Supervised Fine-Tuning | SFT
+Supervised Fine-Tuning
 Svelte
 SvelteKit
 SWC
-SWE-agent | SWE agent
-SWE-bench Verified | SWE Bench Verified
-SWE-bench | SWE Bench
+SWE-agent
+SWE-bench Verified
+SWE-bench
 SwiGLU
 Swin Transformer
 Switch Transformer
 System Prompt
-Tabnine
-Tailwind CSS | Tailwind
-Tauri
+tabnine
+Tailwind CSS
+tauri
 TensorFlow
 TensorRT
 TensorRT-LLM
 Terraform
 Text Generation Inference
-text-embedding-3-large | embedding 3 large
-text-embedding-3-small | embedding 3 small
-text-embedding-ada-002 | ada 002
+text-embedding-3-large
+text-embedding-3-small
+text-embedding-ada-002
 Textual Inversion
-TFLite | TensorFlow Lite
-TGI | Text Generation Inference
+TFLite
+TGI
 The Pile
-Three.js | ThreeJS
+Three.js
 tiktoken
 Together AI
 Together Inference
 Token Budget
 Token Limit
-Tokenizer
+tokenizer
 Tokenizer JSON
 tokenizers
-Tokenizers | Hugging Face Tokenizers
+tokenizers
 tokenmonster
-Tokio
+tokio
 TOML
 Tool Call
 ToolBench
 ToolLLM
-Top-k Sampling | Top K
-Top-p Sampling | Nucleus Sampling
+Top-k Sampling
+Top-p Sampling
 TorchAudio
 TorchText
 TorchVision
 Tortoise TTS
 tract
-Transformers | Hugging Face Transformers
-Triton Inference Server | NVIDIA Triton
+transformers
+Triton Inference Server
 TriviaQA
-TRL | Transformer Reinforcement Learning
+TRL
 TruLens
 TruthfulQA
 ts-node
 tsx
-Turso
-TVM | Apache TVM
+turso
+TVM
 TypeScript
-TypeScript Compiler | tsc
-Typesense
-U-Net | UNet
+TypeScript Compiler
+typesense
+U-Net
 Unigram Tokenizer
 uv
-Uvicorn
-VAE | Variational Autoencoder
-Valkey
-VALL-E X | Vall E X
-VALL-E | Vall E
+uvicorn
+VAE
+valkey
+VALL-E X
+VALL-E
 Vector Search
-Vercel
-Vercel AI SDK | AI SDK
+vercel
+Vercel AI SDK
 Vertex AI API
-Vespa
-Vicuna
+vespa
+vicuna
 VideoPoet
-Vim
-Vision Transformer | ViT
+vim
+Vision Transformer
 Visual Studio
-Vite
-Vitest
+vite
+vitest
 vLLM
 Voyage AI
 Voyage Embeddings
 VQAv2
-VS Code | Visual Studio Code
+VS Code
 Vue
-Weaviate
+weaviate
 WebArena
-Webpack
+webpack
 WebStorm
 Weight Quantization
-Weights & Biases | wandb
+Weights & Biases
 Whisper API
 Whisper Base
 Whisper Large
-Whisper Large V2 | Whisper Large Version 2
-Whisper Large V3 | Whisper Large Version 3
+Whisper Large V2
+Whisper Large V3
 Whisper Medium
 Whisper Small
 Whisper Tiny
-Whisper.cpp | whisper cpp
-Wikitext
-Wikitext-103 | WikiText 103
-WikiText-2 | WikiText 2
-Windsurf | Codeium
-Winogrande
+Whisper.cpp
+wikitext
+Wikitext-103
+WikiText-2
+windsurf
+winogrande
 WizardCoder
 WizardLM
 WordPiece
-xAI | X AI
+xAI
 XGBoost
 XLA
 XML
 XTTS
 YAML
 YaRN
-Yi
+yi
 Yi Coder
 Yi Large
 YOLO
-YOLOv10 | YOLO v10
-YOLOv5 | YOLO v5
-YOLOv8 | YOLO v8
-Zed
-Zephyr
-Zilliz
-Zsh
+YOLOv10
+YOLOv5
+YOLOv8
+zed
+zephyr
+zilliz
+zsh

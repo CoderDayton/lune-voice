@@ -1,47 +1,47 @@
 10x Genomics
 23andMe
 2K Games
-3M | Minnesota Mining and Manufacturing
+3M
 7-Eleven
 A. O. Smith
-A.P. Moller Maersk | Maersk
+A.P. Moller Maersk
 A24
-Aave
+aave
 ABB
-Abbott Laboratories | Abbott
+Abbott Laboratories
 AbbVie
-ABC | American Broadcasting Company
+ABC
 AbCellera
 Abercrombie & Fitch
 ABN AMRO
 Abnormal Security
-Absci
+absci
 Acadia Healthcare
 Acadia Pharmaceuticals
 Accenture
-Accor
+accor
 Acer
 Activision Blizzard
-Actuate
+actuate
 Acuity Brands
-Ada
+ada
 AdaCore
 Adaptive Biotechnologies
-Adevinta
-Adform
+adevinta
+adform
 Adidas
-Adobe | Adobe Systems
+Adobe
 Adore Me
 AdRoll
 ADT
 Adult Swim
 Advance Auto Parts
-Advanced Micro Devices | AMD
+Advanced Micro Devices
 Advent International
-Adyen
+adyen
 AECOM
 AerCap
-Aetna
+aetna
 Aflac
 Afterpay
 AGCO
@@ -59,47 +59,47 @@ Airbus
 Airbus Defence and Space
 Airbus Helicopters
 Airtable
-Aisin
-Aiven
+aisin
+aiven
 Akamai Technologies
-Akili
+akili
 AkzoNobel
 Alaska Airlines
-Alation
-Albemarle
+alation
+albemarle
 Albertsons
 Alcoa
-Alcon
+alcon
 Aldi
 Alexion Pharmaceuticals
-Algolia
-Alibaba | Alibaba Group
+algolia
+Alibaba
 Align Technology
 Alimentation Couche-Tard
-Alkermes
-Allbirds
+alkermes
+allbirds
 Allegheny Technologies
-Allegion
+allegion
 Allianz
 AllSaints
 Allstate
 Ally Financial
 Alnylam Pharmaceuticals
-Alphabet | Google
+alphabet
 AlphaSense
-Alstom
+alstom
 Altair Engineering
-Alteryx
+alteryx
 Altos Labs
-Altria | Philip Morris Companies
+Altria
 Amadeus IT Group
-Amarin
-Amazon Web Services | AWS
-Amazon | Amazon.com
+amarin
+Amazon Web Services
+Amazon
 Ambarella
 AMC Entertainment
 AMC Networks
-AMD | Advanced Micro Devices
+AMD
 Amec Foster Wheeler
 Amenity Analytics
 American Airlines
@@ -107,116 +107,116 @@ American Apparel
 American Century Investments
 American Eagle Outfitters
 American Electric Power
-American Express | Amex
-American International Group | AIG
+American Express
+American International Group
 American Tower
 Ameriprise Financial
-AmerisourceBergen | Cencora
+AmerisourceBergen
 AMETEK
 Amgen
 Amicus Therapeutics
 Amkor Technology
-Amphenol
+amphenol
 Amtrak
 Analog Devices
-Analogic
-Anaplan
-Anduril Industries | Anduril
+analogic
+anaplan
+Anduril Industries
 AngelList
-Anheuser-Busch InBev | AB InBev
-Anker
+Anheuser-Busch InBev
+anker
 Anker Innovations
 Annaly Capital Management
 Annapurna Interactive
-Ansys
-Ant Group | Alipay
-Anthemis
+ansys
+Ant Group
+anthemis
 Anthropic
-Anthropologie
-Aon
-Apache | APA Corporation
+anthropologie
+aon
+Apache
 Apellis Pharmaceuticals
 Apollo Global Management
 AppDynamics
-Appian
-Apple | Apple Computer
+appian
+Apple
 Applied Materials
 AppLovin
 AppsFlyer
 Aptos Labs
-Aramark
+aramark
 ArcelorMittal
 Arch Capital
 Arch Insurance
-Archer Daniels Midland | ADM
-Arconic
+Archer Daniels Midland
+arconic
 Arctic Wolf
 Arcus Biosciences
-Argenx
+argenx
 Argo AI
 Arista
 Arista Networks
-Arm | Arm Holdings
+arm
 Array Technologies
 Arthur J. Gallagher
-Arvinas
+arvinas
 Asana
 Ascendis Pharma
-Ashland
+ashland
 ASML
 ASOS
 Assa Abloy
 AssemblyAI
 AstraZeneca
-AT&T | American Telephone and Telegraph
+AT&T
 Atlas Copco
 Atlassian
 Auntie Anne's
 Aurora Innovation
-Austal
-Auterion
+austal
+auterion
 Autodesk
 AutoNation
 AutoZone
 Avalanche Energy
-Avantor
+avantor
 Avery Dennison
 Avis Budget Group
-Aviva
+aviva
 AXA
 Axiom Space
-Axon Enterprise | Taser International
-Axonius
+Axon Enterprise
+axonius
 Baidu
 Bain & Company
 Baker Hughes
 Ball Corporation
 Ballard Power Systems
-Banco Bilbao Vizcaya Argentaria | BBVA
-Banco Santander | Santander
+Banco Bilbao Vizcaya Argentaria
+Banco Santander
 Bandai Namco
 Bank of America
-Bank of Montreal | BMO
-Bank of New York Mellon | BNY Mellon
-Bankrate
+Bank of Montreal
+Bank of New York Mellon
+bankrate
 Barclays
 Barnes & Noble
 Barrick Gold
 BASF
 Bath & Body Works
 Baxter International
-Bay Area Rapid Transit | BART
+Bay Area Rapid Transit
 Bayer
 BBC Studios
-BBC | British Broadcasting Corporation
-BBVA | Banco Bilbao Vizcaya Argentaria
-BD | Becton Dickinson
-Bechtel
-Becton Dickinson | BD
-Belkin
-Bell Canada | BCE
+BBC
+BBVA
+BD
+bechtel
+Becton Dickinson
+belkin
+Bell Canada
 Ben & Jerry's
-Benchling
+benchling
 Bending Spoons
 Berkshire Hathaway
 Bertelsmann
@@ -227,28 +227,28 @@ Beyond Meat
 BHP
 Big Lots
 BigCommerce
-Bill.com | BILL
+Bill.com
 Bio-Rad Laboratories
 Biogen
 BioMarin
 BioMarin Pharmaceutical
 BioNTech
 Birkenstock
-Bitbucket
+bitbucket
 BitGo
-Bitmain
-Bitstamp
+bitmain
+bitstamp
 Bitwarden
 Black & Decker
-BlackBerry | Research In Motion
+BlackBerry
 BlackLine
 BlackRock
 Blackstone
 Blizzard Entertainment
-Block | Square
+block
 BlockFi
 Bloom Energy
-Bloomberg | Bloomberg LP
+Bloomberg
 Blue Apron
 Blue Nile
 Blue Origin
@@ -258,39 +258,39 @@ Blue Yonder
 Bluebird Bio
 Blueprint Medicines
 Blumhouse Productions
-BMO | Bank of Montreal
-BMW | Bayerische Motoren Werke
+BMO
+BMW
 BNP Paribas
-BNY Mellon | Bank of New York Mellon
+BNY Mellon
 Boeing
-Booking Holdings | Priceline
+Booking Holdings
 Booz Allen Hamilton
-Bosch | Robert Bosch
+Bosch
 Bose
 Boston Beer Company
-Boston Consulting Group | BCG
+Boston Consulting Group
 Boston Scientific
 BostonGene
-BP | British Petroleum
-Bradesco
-Braze
+BP
+bradesco
+braze
 Bread Financial
 BrewDog
-Brex
+brex
 BridgeBio Pharma
 Bridgestone
 Bridgewater Associates
-Brightcove
+brightcove
 British Airways
-British American Tobacco | BAT
-Broadcom | Avago
+British American Tobacco
+Broadcom
 Broadridge Financial Solutions
 Brookfield Asset Management
 Brooks Running
 Brown-Forman
 BrowserStack
-BT Group | British Telecom
-Bugcrowd
+BT Group
+bugcrowd
 Builder.ai
 Built Robotics
 Burberry
@@ -303,11 +303,11 @@ C3 AI
 Cadence Design Systems
 CAE
 Caesars Entertainment
-Campbell Soup Company | Campbell's
+Campbell Soup Company
 Canada Goose
 Canva
 Capcom
-Capgemini
+capgemini
 Capital Group
 Capital One
 Carbon Health
@@ -319,84 +319,84 @@ Carlisle Companies
 Carlsberg
 Carnival Corporation
 Carrier Global
-Carvana
+carvana
 Casio
-Casper
-Catalent
-Caterpillar | CAT
-Cboe
+casper
+catalent
+Caterpillar
+cboe
 Cboe Global Markets
 CBRE
-CBS | Columbia Broadcasting System
+CBS
 CDW
-Celanese
-Celestica
-Celonis
-Cemex
-Cencora | AmerisourceBergen
-Centene
+celanese
+celestica
+celonis
+cemex
+cencora
+centene
 Centene Corporation
-Chainalysis
+chainalysis
 ChargePoint
 Charles River Laboratories
-Charles Schwab | Schwab
-Charter Communications | Spectrum
+Charles Schwab
+Charter Communications
 Check Point Software
-Checkr
+checkr
 Cheesecake Factory
 Chegg
-Chemours
+chemours
 Cheniere Energy
 Chick-fil-A
-Chipotle Mexican Grill | Chipotle
+Chipotle Mexican Grill
 Chubb
 Chugai Pharmaceutical
-Cigna | Cigna Group
+Cigna
 CIMB
-Cinemark
+cinemark
 Cirrus Logic
-Cisco | Cisco Systems
-Citigroup | Citi
+Cisco
+Citigroup
 Citizens Financial Group
-Clarifai
-Clear Secure | CLEAR
-Clearbit
+clarifai
+Clear Secure
+clearbit
 Clearwater Analytics
 ClickHouse
 Clorox
 CloudBees
-Cloudera
+cloudera
 Cloudflare
 Cloudflare Workers
-CME Group | Chicago Mercantile Exchange
+CME Group
 CNH Industrial
-CNN | Cable News Network
-Coca-Cola | Coke
+CNN
+Coca-Cola
 Code42
-Codecademy
-Codeium | Windsurf
+codecademy
+codeium
 Cohere
 Coinbase
 Colgate-Palmolive
-Collibra
+collibra
 Columbia Sportswear
-Comcast | Xfinity
-Comerica
-Commvault
+Comcast
+comerica
+commvault
 Conagra Brands
 Confluent
 ConocoPhillips
-Consolidated Edison | ConEd
+Consolidated Edison
 Constellation Brands
 Constellation Energy
-Contentful
+contentful
 CooperCompanies
 CoreWeave
-Corning
-Corteva
-Costco | Costco Wholesale
+corning
+corteva
+Costco
 Coupa Software
-Coupang
+coupang
 Coursera
 Cracker Barrel
 Crane Company
@@ -404,9 +404,9 @@ Crate & Barrel
 Credit Agricole
 Credit Karma
 Credit Suisse
-Cribl
+cribl
 CRISPR Therapeutics
-Criteo
+criteo
 CrowdStrike
 Crown Castle
 Crunchyroll
@@ -416,9 +416,9 @@ CSX
 Culture Amp
 Cummins
 Curtiss-Wright
-Cvent
+cvent
 CVS Caremark
-CVS Health | CVS
+CVS Health
 CyberArk
 D.R. Horton
 Daimler Truck
@@ -426,33 +426,33 @@ Dana Incorporated
 Danaher
 Darden Restaurants
 Darktrace
-Dashlane
+dashlane
 Dassault Aviation
 Dassault Systemes
 Databricks
-Datadog
-Dataminr
+datadog
+dataminr
 DataRobot
 DataStax
 DaVita
 DBS Bank
 dbt Labs
-Deel
+deel
 DeepL
-DeepMind | Google DeepMind
-Deere & Company | John Deere
-Degreed
-Deliverr
-Dell Technologies | Dell
+DeepMind
+Deere & Company
+degreed
+deliverr
+Dell Technologies
 Deloitte
-Delta Air Lines | Delta
-Denso
+Delta Air Lines
+denso
 Dentsply Sirona
 Deutsche Bahn
 Deutsche Bank
 Deutsche Boerse
-Deutsche Post | DHL
-Deutsche Telekom | T-Mobile
+Deutsche Post
+Deutsche Telekom
 Devolver Digital
 Devon Energy
 Devoted Health
@@ -470,17 +470,17 @@ Dolby Laboratories
 Dollar General
 Dollar Tree
 Domino Data Lab
-Domino's Pizza | Domino's
+Domino's Pizza
 Donaldson Company
 DoorDash
 Dover Corporation
-Dow | Dow Chemical
+dow
 Dr. Martens
-Drata
+drata
 DreamWorks Animation
 DroneDeploy
 Dropbox
-Druva
+druva
 DRW
 DTE Energy
 Duke Energy
@@ -489,182 +489,182 @@ DuPont
 DXC Technology
 Dyson
 E.ON
-EA | Electronic Arts
+EA
 Eastman Chemical
-Eaton
+eaton
 eBay
 Ecolab
-Edenred
+edenred
 Edgewell Personal Care
 Edison International
 Edwards Lifesciences
 Eightfold AI
-Elastic | Elasticsearch
-Electronic Arts | EA
-Elevance Health | Anthem
+elastic
+Electronic Arts
+Elevance Health
 ElevenLabs
-Eli Lilly | Lilly
+Eli Lilly
 Embark Trucks
 Embraer
 Emerson Electric
 Emirates
 Enel
 Energy Transfer
-Enovix
+enovix
 Enphase Energy
 Enterprise Products Partners
 Epic Games
 Equifax
 Equinix
-Equinor | Statoil
-Erasca
+Equinor
+erasca
 Ericsson
-Ernst & Young | EY
+Ernst & Young
 ESPN
 Estee Lauder
 eToro
 Etsy
-Euroclear
-Evercore
-Evergrande | China Evergrande
-Everlane
-Everlaw
+euroclear
+evercore
+Evergrande
+everlane
+everlaw
 Eversource Energy
 Evoqua Water Technologies
-Exabeam
+exabeam
 Exact Sciences
-Exelixis
-Exelon
-Expedia Group | Expedia
-Expeditors
+exelixis
+exelon
+Expedia Group
+expeditors
 Experian
-ExxonMobil | Exxon
-EY | Ernst & Young
+ExxonMobil
+EY
 F5
-Fabletics
-Faire
+fabletics
+faire
 FanDuel
 Fannie Mae
 FANUC
 Faraday Future
-Fast Retailing | Uniqlo
-Fastenal
+Fast Retailing
+fastenal
 Fastly
 FDM Group
-FedEx | Federal Express
+FedEx
 Fendi
 Ferrari
 Fetch Robotics
 Fidelity Investments
-Fidelity National Information Services | FIS
+Fidelity National Information Services
 Fifth Third Bank
 Figma
 Figure AI
-Fincantieri
-Finra
-Fireblocks
+fincantieri
+finra
+fireblocks
 First Citizens BancShares
 First Republic Bank
 First Solar
-Fiserv
+fiserv
 Five Below
 Five Guys
 Fiverr
-FleetCor | Corpay
+FleetCor
 Flock Safety
 Floor & Decor
 Flow Traders
-Fluor
+fluor
 Flutter Entertainment
-Flywire
-Ford | Ford Motor Company
+flywire
+Ford
 Forever 21
-Formlabs
+formlabs
 Fortinet
-Fortive
-Fox Corporation | Fox
+fortive
+Fox Corporation
 Fox News
 Franklin Templeton
 Freddie Mac
-Freenome
+freenome
 Freeport-McMoRan
 Freshworks
 Frontier Communications
-Fubo
-Fujifilm | FujiFilm
+fubo
+Fujifilm
 Fujitsu
 FullStory
-Funimation
+funimation
 G2
 GameStop
 Garmin
 Garrett Motion
 Gartner
-GE Aerospace | General Electric Aerospace
+GE Aerospace
 GE HealthCare
 GE Vernova
-Gen Digital | NortonLifeLock
+Gen Digital
 Genentech
 General Atomics
 General Dynamics
-General Electric | GE
+General Electric
 General Mills
-General Motors | GM
-Genmab
-Genpact
+General Motors
+genmab
+genpact
 Genuine Parts Company
 Genworth Financial
 Gilead Sciences
 Ginkgo Bioworks
 GitHub
 GitLab
-GlaxoSmithKline | GSK
+GlaxoSmithKline
 Global Payments
-Globant
-Glovo
-GM | General Motors
+globant
+glovo
+GM
 GoCardless
 GoDaddy
 Goldman Sachs
 GoodRx
 GoPro
 Grafana Labs
-Grainger | W.W. Grainger
+Grainger
 Grammarly
-Graybar
+graybar
 Green Dot
-Grifols
-Groq
+grifols
+groq
 Grubhub
 Grupo Bimbo
 Guardant Health
 Guardian Life
 Gucci
 Guidewire Software
-Gymshark
+gymshark
 H&M
 H&R Block
 H2O.ai
 Hackensack Meridian Health
-Haier
+haier
 Halliburton
-Hanesbrands
+hanesbrands
 Harley-Davidson
 Hasbro
 HashiCorp
 HBO
 HCA Healthcare
-HCLTech | HCL Technologies
+HCLTech
 Heineken
 Helion Energy
 HelloFresh
 Henkel
 Henry Schein
 Hermes
-Hershey | The Hershey Company
-Hewlett Packard Enterprise | HPE
-Hexcel
-Hilton | Hilton Worldwide
+Hershey
+Hewlett Packard Enterprise
+hexcel
+Hilton
 Hinge Health
 Hitachi
 Hologic
@@ -674,7 +674,7 @@ Honeywell
 Honeywell Aerospace
 Horizon Therapeutics
 Hormel Foods
-HP | Hewlett-Packard
+HP
 HSBC
 HubSpot
 Hudson Pacific Properties
@@ -688,80 +688,80 @@ Huntington Ingalls Industries
 Hyatt
 Hyundai
 Häagen-Dazs
-IBM | International Business Machines
-ICBC | Industrial and Commercial Bank of China
-ICE | Intercontinental Exchange
+IBM
+ICBC
+ICE
 Icon Plc
 IDEXX Laboratories
-Idorsia
+idorsia
 IGN
 iHeartMedia
 IKEA
 Illumina
 Imperial Brands
-Incyte
+incyte
 Indigo Agriculture
-Inditex | Zara
+inditex
 Indra Sistemas
 Inflection AI
 Informatica
 Infosys
 Ingersoll Rand
-Ingredion
-Insitro
-Insmed
+ingredion
+insitro
+insmed
 Insomniac Games
-Instabase
-Instacart | Maplebear
+instabase
+Instacart
 Interactive Brokers
-Intercontinental Exchange | ICE
-International Airlines Group | IAG
-International Flavors & Fragrances | IFF
+Intercontinental Exchange
+International Airlines Group
+International Flavors & Fragrances
 Intuit
 Intuitive Surgical
-Invitae
-Invoca
+invitae
+invoca
 Ionis Pharmaceuticals
-Ipsen
+ipsen
 IQVIA
 Iron Mountain
 Itau Unibanco
-Iterable
+iterable
 ITT
 J.B. Hunt
 J.Crew
 J.M. Smucker
-Jabil
+jabil
 Jack in the Box
-Jacobs
+jacobs
 Jacobs Engineering
 Jaguar Land Rover
 Jane Street
-Jane Street Capital | Jane Street
+Jane Street Capital
 Jardine Matheson
 Jazz Pharmaceuticals
 Jefferies
 JetBlue
 Joby Aviation
-Johnson & Johnson | J&J
+Johnson & Johnson
 Johnson Controls
-Jollibee
-JPMorgan Chase | JPMorgan
+jollibee
+JPMorgan Chase
 Jump Trading
 Juniper Networks
 Just Eat Takeaway
 Kaiser Permanente
-Kakao
-Kandji
+kakao
+kandji
 Kao Corporation
-Kaseya
+kaseya
 Kate Spade
 Kawasaki Heavy Industries
 KBC Group
 KBR
-Kellogg | Kellanova
-Kenvue
-Kering
+Kellogg
+kenvue
+kering
 Keurig Dr Pepper
 KeyBank
 Keysight Technologies
@@ -772,25 +772,25 @@ KitchenAid
 KKR
 KLA
 Klarna
-Klaviyo
+klaviyo
 Knight-Swift Transportation
 KoBold Metals
 Kodiak Robotics
 Kohl's
-Komatsu
+komatsu
 Konami
-Kone
+kone
 KPMG
 Kraft Heinz
 Kraken
 Krispy Kreme
 Kroger
-Kyndryl
+kyndryl
 L'Oreal
 L3Harris Technologies
-Labcorp
-Labelbox
-Lacework
+labcorp
+labelbox
+lacework
 Lacoste
 Lam Research
 Lamborghini
@@ -802,40 +802,40 @@ LegalZoom
 Legend Biotech
 Legendary Entertainment
 Lego
-Legrand
-Leidos
+legrand
+leidos
 Lennar
 Lenovo
 Leonardo
-Levi Strauss | Levi's
+Levi Strauss
 LexisNexis
-LG Electronics | LG
+LG Electronics
 Liberty Global
-Liebherr
+liebherr
 Lincoln Financial Group
 Linde
 Lineage Logistics
 LinkedIn
-Lionel
+lionel
 Lionsgate
 Liquid Death
 Live Nation Entertainment
 LiveRamp
 Lockheed Martin
 Logitech
-London Metal Exchange | LME
-London Stock Exchange Group | LSEG
-Lonza
-Looker | Google Looker
-Loom | Atlassian Loom
+London Metal Exchange
+London Stock Exchange Group
+lonza
+looker
+loom
 Lowe's
 Lucasfilm
-Lucid Group | Lucid Motors
+Lucid Group
 Lucid Software
 Lufthansa
 Lululemon
-Lumen Technologies | CenturyLink
-LVMH | Louis Vuitton Moet Hennessy
+Lumen Technologies
+LVMH
 Lyft
 Lyra Health
 Macquarie Group
@@ -845,52 +845,52 @@ Magic Leap
 Magna International
 Mahindra & Mahindra
 Man Group
-Mandiant | Google Mandiant
+mandiant
 Manitowoc
-ManpowerGroup
-Mapbox
+Manpowergroup
+mapbox
 Marathon Oil
 Marathon Petroleum
-Marqeta
-Marriott International | Marriott
+marqeta
+Marriott International
 Marsh McLennan
 Martin Marietta
 Marvel Entertainment
 Marvell Technology
-Masimo
+masimo
 Mastercard
 MasterClass
 Match Group
 Mattel
-Matternet
+matternet
 Mazda
 McAfee
 McCormick
 McDonald's
 McKesson
-McKinsey & Company | McKinsey
+McKinsey & Company
 MediaTek
-Medpace
+medpace
 Medtronic
-Melio
+melio
 Mercado Libre
 Mercedes-Benz
 Merck
-MessageBird | Bird
-Meta | Facebook
+MessageBird
+Meta
 MetLife
-MGM | Metro-Goldwyn-Mayer
+MGM
 Microchip Technology
 Micron Technology
 Microsoft
 Midjourney
 Millennium Management
-Mirakl
+mirakl
 Mirion Technologies
-Miro
+miro
 Mitsubishi
 Mitsubishi Electric
-Mitsubishi UFJ Financial Group | MUFG
+Mitsubishi UFJ Financial Group
 Mixpanel
 Mizuho Financial Group
 Moderna
@@ -898,7 +898,7 @@ Moelis & Company
 Mohawk Industries
 Mojang Studios
 Molina Healthcare
-Moloco
+moloco
 Molson Coors
 Moncler
 Monday.com
@@ -907,24 +907,24 @@ Monolithic Power Systems
 Monster Beverage
 Monzo
 Moody's
-Moog
+moog
 Morgan Stanley
-Motional
-Motive | KeepTruckin
+motional
+Motive
 Motorola Solutions
 Mozilla
 MSCI
 Murata Manufacturing
 N26
 Natera
-National Australia Bank | NAB
+National Australia Bank
 National Grid
-National Instruments | NI
-Natixis
+National Instruments
+natixis
 NatWest
-Navan | TripActions
-Navient
-Navistar
+Navan
+navient
+navistar
 NEC
 NerdWallet
 NetApp
@@ -940,7 +940,7 @@ Newmont
 News Corp
 Nextdoor
 NextEra Energy
-Nexthink
+nexthink
 Niantic
 Nike
 Nikola
@@ -954,20 +954,20 @@ Norfolk Southern
 Northern Trust
 Northrop Grumman
 Northvolt
-NortonLifeLock | Gen Digital
+NortonLifeLock
 Novartis
-Novelis
+novelis
 Novo Nordisk
 NPR
 NRG Energy
-Nucor
-Nuro
-Nutanix
-Nvidia | NVIDIA
+nucor
+nuro
+nutanix
+Nvidia
 NXP Semiconductors
 O'Reilly Automotive
 Oakley
-Occidental Petroleum | Oxy
+Occidental Petroleum
 Octopus Energy
 Okta
 Old Dominion Freight Line
@@ -975,18 +975,18 @@ Olive AI
 Olympus
 Omnicom Group
 On Running
-ON Semiconductor | onsemi
+ON Semiconductor
 OneMain Financial
 OpenAI
 OpenSea
 OpenText
 Orca Security
-Organon
+organon
 Orsted
 Oshkosh
 Otis Worldwide
 Otsuka Pharmaceutical
-Oura
+oura
 Outdoor Voices
 OutSystems
 OwnBackup
@@ -997,33 +997,33 @@ Palantir Technologies
 Palo Alto Networks
 Panasonic
 Panda Express
-Pandora
+pandora
 Papa John's
 Papaya Global
-Paramount Global | ViacomCBS
+Paramount Global
 Paramount Pictures
 Parker Hannifin
-Parsons
+parsons
 Patagonia
 Patreon
 Paychex
-Paycom
-Payoneer
+paycom
+payoneer
 PayPal
 Pearson
 Peloton
-Pendo
+pendo
 Penske
 PepsiCo
 Perplexity
-Personio
-Petco
+personio
+petco
 PetSmart
 Pfizer
-PG&E | Pacific Gas and Electric
+PG&E
 Philip Morris International
 Phillips 66
-Pimco
+pimco
 Pinterest
 Pioneer Natural Resources
 PitchBook
@@ -1031,11 +1031,11 @@ Pixar
 Planet Fitness
 Planet Labs
 PlanetScale
-PlayStation | Sony Interactive Entertainment
+PlayStation
 Plug Power
-Pluralsight
+pluralsight
 PNC Financial Services
-Polaris
+polaris
 Popeyes
 Portland General Electric
 Post Holdings
@@ -1043,10 +1043,10 @@ PPG Industries
 PPL Corporation
 Prada
 Principal Financial Group
-Printful
+printful
 Procore Technologies
-Procter & Gamble | P&G
-Prologis
+Procter & Gamble
+prologis
 Prudential Financial
 PsiQuantum
 Public Storage
@@ -1057,24 +1057,24 @@ PVH
 Qantas
 Qatar Airways
 QinetiQ
-Qonto
-Qorvo
+qonto
+qorvo
 Qualcomm
-Qualtrics
-Qualys
-Quantexa
+qualtrics
+qualys
+quantexa
 Quest Diagnostics
-Questcor
-QuickBooks | Intuit QuickBooks
+questcor
+QuickBooks
 Quora
 Rakuten
 Ralph Lauren
 Rapid7
-Rapyd
+rapyd
 Raymond James
-Raytheon | RTX
+Raytheon
 Razer
-Razorpay
+razorpay
 RealPage
 Recorded Future
 Recursion Pharmaceuticals
@@ -1087,24 +1087,24 @@ Regions Financial
 REI
 Relativity Space
 Reliance Industries
-Reltio
-Remitly
+reltio
+remitly
 Renault
 Rent the Runway
 Replit
 Republic Services
 ResMed
 Revolut
-Rimowa
+rimowa
 Rio Tinto
 Riot Games
-Riskified
+riskified
 Rivian
-Ro
+ro
 Robinhood
-Robinhood Markets | Robinhood
+Robinhood Markets
 Roblox
-Robomart
+robomart
 Roche
 Rocket Lab
 Rockstar Games
@@ -1116,12 +1116,12 @@ Rolls-Royce
 Rolls-Royce Holdings
 Roper Technologies
 Ross Stores
-Royal Bank of Canada | RBC
-Royal Bank of Scotland | RBS
+Royal Bank of Canada
+Royal Bank of Scotland
 Royal Caribbean Group
-Royal Dutch Shell | Shell
-Royal Philips | Philips
-RTX | Raytheon
+Royal Dutch Shell
+Royal Philips
+RTX
 Rubrik
 S&P Global
 Saab
@@ -1139,52 +1139,52 @@ Sarepta Therapeutics
 SAS Institute
 Scale AI
 Schindler Group
-Schlumberger | SLB
+Schlumberger
 Schneider Electric
-Schott
-Scopely
+schott
+scopely
 Scotiabank
 Sea Limited
 Seagate Technology
-Seagen | Seattle Genetics
+Seagen
 SeatGeek
-Secom
+secom
 Sega
-Segment | Twilio Segment
+segment
 Sempra
-Sendbird
+sendbird
 SentinelOne
 ServiceNow
 Seven & i Holdings
 Shake Shack
 Shein
-Shell | Royal Dutch Shell
+shell
 Sherwin-Williams
 Shield AI
 Shockwave Medical
 Shopify
 Siemens
 Siemens Energy
-Signifyd
+signifyd
 Silicon Labs
-Silicon Valley Bank | SVB
-Silverfort
+Silicon Valley Bank
+silverfort
 Silvergate Bank
-Similarweb
+similarweb
 Singapore Airlines
 SiriusXM
-Skanska
+skanska
 Skechers
-Slack | Salesforce Slack
-SLB | Schlumberger
+Slack
+SLB
 Smartsheet
-Snap | Snapchat
+Snap
 SnapLogic
-Snyk
+snyk
 Societe Generale
-Socure
+socure
 SoFi
-SoFi Technologies | SoFi
+SoFi Technologies
 SolarEdge Technologies
 SonderMind
 Sonos
@@ -1192,14 +1192,14 @@ Sony
 Sophos
 Sotera Health
 SoundHound AI
-Sourcegraph
+sourcegraph
 Southwest Airlines
-SpaceX | Space Exploration Technologies
+SpaceX
 Spirit AeroSystems
 Splunk
 Spotify
 Square Enix
-Square | Block
+square
 Squarespace
 SS&C Technologies
 Stability AI
@@ -1215,43 +1215,43 @@ StoneX
 Stryker
 StubHub
 Subaru
-Sumitomo Mitsui Financial Group | SMBC
+Sumitomo Mitsui Financial Group
 Sumo Logic
-Supabase
-Super Micro Computer | Supermicro
-Supercell
-SurveyMonkey | Momentive
-Susquehanna International Group | SIG
+supabase
+Super Micro Computer
+supercell
+SurveyMonkey
+Susquehanna International Group
 Suzuki
 Sweetgreen
 Synchrony Financial
 Synopsys
 Sysco
 T-Mobile US
-T-Mobile | Deutsche Telekom
-Tableau | Salesforce Tableau
+T-Mobile
+Tableau
 Taco Bell
 Take-Two Interactive
-Talkdesk
-Tanium
-Tata Consultancy Services | TCS
+talkdesk
+tanium
+Tata Consultancy Services
 TD Ameritrade
-TD Bank | Toronto-Dominion Bank
+TD Bank
 TE Connectivity
 TeamViewer
-Technicolor
+technicolor
 Teck Resources
 Teladoc Health
-Teleperformance
+teleperformance
 Telix Pharmaceuticals
-Telstra
+telstra
 Tempur Sealy
 Tenaya Therapeutics
 Tencent
 Tenet Healthcare
-Teradyne
-Terex
-Tesla | Tesla Motors
+teradyne
+terex
+Tesla
 Texas Instruments
 Textron
 Textron Aviation
@@ -1267,11 +1267,11 @@ ThoughtSpot
 ThredUp
 TIAA
 Ticketmaster
-TikTok | ByteDance TikTok
+TikTok
 Tim Hortons
-Timken
-Tines
-Tipalti
+timken
+tines
+tipalti
 TJX Companies
 Toll Brothers
 Topgolf Callaway Brands
@@ -1281,15 +1281,15 @@ Trade Republic
 Trader Joe's
 Tradeweb Markets
 TransDigm
-TransferWise | Wise
+TransferWise
 TransUnion
 Trimble
-TripActions | Navan
+TripActions
 Tripadvisor
 Triumph Group
 TrueLayer
 Truist Financial
-TSMC | Taiwan Semiconductor Manufacturing Company
+TSMC
 TuSimple
 Twilio
 Two Sigma
@@ -1303,54 +1303,54 @@ Udemy
 UiPath
 Ulta Beauty
 Ultra Electronics
-Ultragenyx
-Unacademy
+ultragenyx
+unacademy
 Under Armour
 Unilever
 Union Pacific
 Uniswap Labs
 United Airlines
-United Launch Alliance | ULA
-United Parcel Service | UPS
+United Launch Alliance
+United Parcel Service
 United Rentals
 United Therapeutics
 UnitedHealth Group
-Unity | Unity Software
+Unity
 Universal Music Group
 Universal Pictures
-Unqork
+unqork
 Unum Group
 Upwork
 Urban Outfitters
-US Bancorp | U.S. Bank
+US Bancorp
 USAA
-Vale
+vale
 Valero Energy
 Valve
 Vectra AI
-Veeam
+veeam
 Veeva Systems
-Ventas
-Vercel
-Veriff
-Verisign
+ventas
+vercel
+veriff
+verisign
 Verisk Analytics
 Verizon
-Verkada
+verkada
 Vertex Pharmaceuticals
-Vestas
+vestas
 VF Corporation
-ViacomCBS | Paramount Global
-Viatris
+ViacomCBS
+viatris
 Vice Media
-Victaulic
+victaulic
 Victoria's Secret
 Vimeo
 Virta Health
 Virtu Financial
 Visa Europe
-Volkswagen | VW
-Volocopter
+Volkswagen
+volocopter
 Volvo
 Vornado Realty Trust
 Vox Media
@@ -1358,22 +1358,22 @@ Voya Financial
 VTS
 Vulcan Materials
 W.R. Berkley
-W.W. Grainger | Grainger
-Walgreens Boots Alliance | Walgreens
+W.W. Grainger
+Walgreens Boots Alliance
 WalkMe
 Walmart
-Walt Disney Company | Disney
+Walt Disney Company
 Warby Parker
 Warner Bros.
-Warner Bros. Discovery | WarnerMedia
-Waste Management | WM
+Warner Bros. Discovery
+Waste Management
 Waters Corporation
 Wayfair
-Waymo | Google Waymo
-Wealthfront
-Webflow
-Webull
-WeChat | Tencent WeChat
+Waymo
+wealthfront
+webflow
+webull
+WeChat
 Wells Fargo
 Wendy's
 West Pharmaceutical Services
@@ -1382,43 +1382,43 @@ Western Union
 WeWork
 Weyerhaeuser
 White Castle
-Whole Foods Market | Amazon Whole Foods
+Whole Foods Market
 Williams Companies
 Williams-Sonoma
-Willis Towers Watson | WTW
-Wing | Google Wing
-Wingtra
+Willis Towers Watson
+Wing
+wingtra
 Wipro
-Wise | TransferWise
+Wise
 Wizards of the Coast
 Wolters Kluwer
-Wonolo
+wonolo
 Woodward
-Workato
-Workiva
+workato
+workiva
 World Fuel Services
-Worldpay
+worldpay
 WorldRemit
-Worley
+worley
 WPP
-WTW | Willis Towers Watson
-WW International | Weight Watchers
+WTW
+WW International
 Wyndham Hotels & Resorts
-X | Twitter
-Xbox | Microsoft Xbox
+X
+Xbox
 Xcel Energy
 Xero
 Xiaomi
 XPeng
-Y Combinator | YC
+Y Combinator
 Yamaha
 Yandex
-Yotpo
+yotpo
 Yum Brands
-Zalando
-Zara | Inditex
+zalando
+Zara
 Zebra Technologies
-Zego
+zego
 Zelle
 Zendesk
 Zillow
@@ -1427,10 +1427,10 @@ Zions Bancorporation
 Zipline
 ZipRecruiter
 Zocdoc
-Zoetis
+zoetis
 Zoho
-Zoom | Zoom Video Communications
+Zoom
 ZoomInfo
 Zscaler
-Zuora
+zuora
 Zynga
