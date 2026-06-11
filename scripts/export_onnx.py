@@ -38,6 +38,11 @@ except ImportError:
     pass
 
 DTYPE = torch.float16
+ASR_ONNX_FILES = [
+    "qwen3-asr-encoder.onnx",
+    "qwen3-asr-embed-tokens.onnx",
+    "qwen3-asr-decoder.onnx",
+]
 
 
 # ── Utilities ────────────────────────────────────────────────────────────────
@@ -46,17 +51,22 @@ DTYPE = torch.float16
 def _save_consolidated(model: onnx.ModelProto, out_path: Path) -> None:
     """Save ONNX model with all large tensors in a single external data file.
 
-    Serializes into a temp directory first, then moves both files into place,
-    so a failed save never leaves a corrupt model/data pair behind.
+    Serializes into a temp directory first, then swaps the canonical model/data
+    pair with rollback for ordinary filesystem errors during the replace step.
     """
     data_name = out_path.stem + ".onnx_data"
     data_path = out_path.parent / data_name
     tmp_dir = out_path.parent / f".{out_path.stem}.tmp-save"
+    backup_model = out_path.with_name(out_path.name + ".bak")
+    backup_data = data_path.with_name(data_path.name + ".bak")
     if tmp_dir.exists():
         for stale in tmp_dir.iterdir():
             stale.unlink()
     else:
         tmp_dir.mkdir(parents=True)
+    for backup in (backup_model, backup_data):
+        if backup.exists():
+            backup.unlink()
 
     onnx.save_model(
         model,
@@ -66,13 +76,33 @@ def _save_consolidated(model: onnx.ModelProto, out_path: Path) -> None:
         location=data_name,
         size_threshold=1024,
     )
-    (tmp_dir / out_path.name).replace(out_path)
     tmp_data = tmp_dir / data_name
-    if tmp_data.exists():
-        tmp_data.replace(data_path)
-    elif data_path.exists():
-        data_path.unlink()
-    tmp_dir.rmdir()
+    committed = False
+    try:
+        if out_path.exists():
+            out_path.replace(backup_model)
+        if data_path.exists():
+            data_path.replace(backup_data)
+        if tmp_data.exists():
+            tmp_data.replace(data_path)
+        (tmp_dir / out_path.name).replace(out_path)
+        committed = True
+    finally:
+        if not committed:
+            if out_path.exists():
+                out_path.unlink()
+            if data_path.exists():
+                data_path.unlink()
+            if backup_model.exists():
+                backup_model.replace(out_path)
+            if backup_data.exists():
+                backup_data.replace(data_path)
+        for backup in (backup_model, backup_data):
+            if backup.exists():
+                backup.unlink()
+        for stale in tmp_dir.iterdir():
+            stale.unlink()
+        tmp_dir.rmdir()
     if data_path.exists():
         sz = data_path.stat().st_size / (1024 * 1024)
         print(f"    {data_name}: {sz:.1f} MB")
@@ -85,6 +115,78 @@ def _consolidate_external_data(directory: Path, onnx_name: str) -> None:
     print(f"  Consolidating {onnx_name}...")
     model = onnx.load(str(onnx_path), load_external_data=True)
     _save_consolidated(model, onnx_path)
+
+
+def _preprocess_onnx_for_quantization(directory: Path, onnx_name: str) -> None:
+    """Run ORT's offline preprocess pass while preserving external-data layout.
+
+    Runs shape inference ONLY (onnx + symbolic). ORT's graph optimizer is
+    deliberately skipped: it optimizes for the session's EP, and on CPU (no
+    fp16 kernels) it bakes InsertedPrecisionFreeCast fp32 casts between every
+    fp16 initializer and its MatMul — which breaks the weight quantizers
+    (no initializer at MatMul input[1] anymore) and doubles the data file.
+
+    ORT's symbolic shape inference asserts ``len(pads) == 2 * rank`` and
+    crashes on graphs whose Pad pads are built at runtime — the encoder pads
+    the mel by a computed length, so its Pad input is dynamic. On that failure
+    we retry with symbolic shape inference disabled (keeping ONNX shape
+    inference), and if even that fails we skip the preprocess for this graph
+    rather than aborting the whole export.
+    """
+    from onnxruntime.quantization.preprocess import quant_pre_process
+
+    onnx_path = directory / onnx_name
+    if not onnx_path.exists():
+        return
+    print(f"  ORT preprocessing {onnx_name}...")
+    tmp_dir = directory / f".{onnx_path.stem}.tmp-preprocess"
+    tmp_model = tmp_dir / onnx_name
+    data_name = onnx_path.stem + ".onnx_data"
+
+    def _reset_tmp() -> None:
+        if tmp_dir.exists():
+            for stale in tmp_dir.iterdir():
+                stale.unlink()
+        else:
+            tmp_dir.mkdir(parents=True)
+
+    try:
+        # First attempt with symbolic shape inference, then a fallback without.
+        for skip_symbolic in (False, True):
+            _reset_tmp()
+            try:
+                quant_pre_process(
+                    input_model=str(onnx_path),
+                    output_model_path=str(tmp_model),
+                    skip_optimization=True,
+                    skip_onnx_shape=False,
+                    skip_symbolic_shape=skip_symbolic,
+                    auto_merge=True,
+                    save_as_external_data=True,
+                    all_tensors_to_one_file=True,
+                    external_data_location=data_name,
+                    external_data_size_threshold=1024,
+                )
+            except Exception as e:  # noqa: BLE001 — ORT raises bare AssertionError
+                if not skip_symbolic:
+                    print(
+                        f"    WARNING: ORT symbolic shape inference failed on "
+                        f"{onnx_name} ({type(e).__name__}); retrying with it disabled"
+                    )
+                    continue
+                print(
+                    f"    WARNING: ORT preprocess failed on {onnx_name} "
+                    f"({type(e).__name__}); keeping the un-preprocessed graph"
+                )
+                return
+            model = onnx.load(str(tmp_model), load_external_data=True)
+            _save_consolidated(model, onnx_path)
+            return
+    finally:
+        if tmp_dir.exists():
+            for stale in tmp_dir.iterdir():
+                stale.unlink()
+            tmp_dir.rmdir()
 
 
 def _list_files(directory: Path) -> None:
@@ -102,12 +204,8 @@ def _list_files(directory: Path) -> None:
 def _cleanup_temp_artifacts(output_dir: Path) -> None:
     """Remove exporter temp files while preserving canonical ONNX/data pairs."""
     keep = {
-        "qwen3-asr-encoder.onnx",
-        "qwen3-asr-encoder.onnx_data",
-        "qwen3-asr-embed-tokens.onnx",
-        "qwen3-asr-embed-tokens.onnx_data",
-        "qwen3-asr-decoder.onnx",
-        "qwen3-asr-decoder.onnx_data",
+        *ASR_ONNX_FILES,
+        *(Path(name).stem + ".onnx_data" for name in ASR_ONNX_FILES),
         "export_manifest.json",
     }
     for f in output_dir.iterdir():
@@ -148,11 +246,7 @@ def _write_export_manifest(
     or unexpected op/domain drift.
     """
     graphs = []
-    for name in [
-        "qwen3-asr-encoder.onnx",
-        "qwen3-asr-embed-tokens.onnx",
-        "qwen3-asr-decoder.onnx",
-    ]:
+    for name in ASR_ONNX_FILES:
         path = output_dir / name
         if not path.exists():
             continue
@@ -365,9 +459,9 @@ def verify_asr_export(
 
     print(f"[ASR] Verifying {label} (CPU smoke test)...")
 
-    # Encoder: deterministic pseudo-mel spanning multiple chunks.
+    # Encoder: deterministic pseudo-mel at production's padded 30s geometry.
     rng = np.random.default_rng(0)
-    mel = (rng.standard_normal((1, 128, 300)) * 0.5).astype(np.float16)
+    mel = (rng.standard_normal((1, 128, 3000)) * 0.5).astype(np.float16)
     feats = session("qwen3-asr-encoder.onnx").run(["features"], {"mel": mel})[0]
     if feats.ndim != 3 or feats.shape[0] != 1 or feats.shape[2] != hidden_size:
         raise RuntimeError(f"[verify:{label}] encoder features shape {feats.shape}")
@@ -686,6 +780,12 @@ def awq_smooth(
 # (lm_head): pinned to INT8 per-channel — never INT4 — as the most
 # error-sensitive matmul in autoregressive decoding.
 _VOCAB_HEAD_MIN_OUT = 32768
+
+# Fixed encoder INT8 strategy (S1): keep the first and last N transformer
+# blocks FP16 (layer 0 carries the largest INT8 error; the last feeds
+# proj1/proj2 -> decoder). The encoder choice is binary per profile — INT8
+# with this protection, or no-quant — not a user-tunable count.
+_ENCODER_PROTECT_EDGE_LAYERS = 1
 
 
 def _pack_matmulnbits_int4(W: "np.ndarray", block: int):
@@ -1259,9 +1359,24 @@ def _quantize_graph_file_int8(
 # was 28 down_proj weights — 96% probe agreement, '!!!!!!' in dictation).
 # The probe cannot catch this failure mode; only real transcription can.
 _PROFILE_INT8_CLASSES = {
+    # lm_head INT8 measured harmless: the lm_head-FP16 A/B sweep (v3) scored
+    # 25/42 word-perfect, mean 4.0% vs 27/42, 3.9% with lm_head INT8 (v2),
+    # at +155MB — so the head stays quantized.
     "balanced": {"lm_head", "gate_up"},
     "compact": {"lm_head", "gate_up", "attention"},
 }
+
+# Decoder S1 edge protection: DISABLED after a three-way fixture A/B
+# (2026-06-11, 42 fixtures, forced-language protocol). Per-layer attention
+# INT8 rel-err is flat (0.009-0.013, worst MID-stack, not edges), and both
+# edge-protected builds measured worse than full coverage:
+#   v2 no-protection + lm_head INT8: 27/42 word-perfect, mean 3.9%  <- shipped
+#   v3 protect{0,27} + lm_head FP16: 25/42, 4.0%
+#   v4 protect{0,27} + lm_head INT8: 23/42, 4.5%
+# Protection removes no error source here; it just reshuffles which weights
+# carry quantization noise. The ENCODER keeps protection — its layer 0 is a
+# measured 2.6x error hotspot and its protected build won its sweep.
+_DECODER_PROTECT_EDGE_LAYERS = 0
 
 
 def _classify_decoder_weight(k: int, n: int) -> str:
@@ -1284,24 +1399,32 @@ def _classify_decoder_weight(k: int, n: int) -> str:
 def _quantize_decoder_targeted(
     path: Path, profile: str, quant_notes: "list[dict] | None" = None
 ) -> dict:
-    """Quantize only the profile's allowed decoder weight classes to INT8.
+    """Quantize only the profile's allowed decoder weight classes to INT8,
+    with encoder-style careful selection (S1 edge protection, exact naming).
+
+    Selection:
+      - Exact class + layer identity comes from MatMul/Gemm NODE names
+        (``/text_model/layers.N/self_attn/q_proj/MatMul``, ``/lm_head/MatMul``)
+        — initializer names are anonymized by the legacy exporter, but node
+        names preserve module paths. Shape classification stays as fallback
+        for unmatched weights.
+      - S1: the first and last _DECODER_PROTECT_EDGE_LAYERS transformer
+        layers keep their attention/FFN weights FP16. lm_head has no layer
+        and is never edge-protected.
+      - S2: the core pass only touches 2-D weights consumed exclusively by
+        MatMul/Gemm at input[1]. Embeddings (separate graph), RMSNorm gammas
+        (1-D, feed Mul), Softmax, RoPE position ops, residual Adds,
+        attention-score matmuls (no constant weight), KV cache tensors, and
+        logits postprocess are all structurally outside weight-only quant.
+      - down_proj is NEVER quantized (see class-table comment above).
 
     Per-output-channel symmetric weight-only INT8 via DequantizeLinear;
     activations stay FP16. Returns {"int8": total, "classes": {cls: count}}.
     """
+    import re
+
     allowed = _PROFILE_INT8_CLASSES[profile]
     decisions: dict[str, int] = {}
-
-    def select(name, W, out_axis):
-        if out_axis == 0:
-            k, n = int(W.shape[1]), int(W.shape[0])
-        else:
-            k, n = int(W.shape[0]), int(W.shape[1])
-        cls = _classify_decoder_weight(k, n)
-        if cls not in allowed:
-            return False
-        decisions[cls] = decisions.get(cls, 0) + 1
-        return True
 
     print(f"  Quantizing {path.name} (targeted: {', '.join(sorted(allowed))})...")
     m = onnx.load(str(path))
@@ -1309,6 +1432,59 @@ def _quantize_decoder_targeted(
     cur = next((o.version for o in m.opset_import if o.domain == ""), 17)
     if cur < target_opset:
         m = onnx.version_converter.convert_version(m, target_opset)
+
+    # Map initializer name -> (layer index | None, class) from node names.
+    _CLS_BY_PROJ = {
+        "q_proj": "attention",
+        "k_proj": "attention",
+        "v_proj": "attention",
+        "o_proj": "attention",
+        "gate_proj": "gate_up",
+        "up_proj": "gate_up",
+        "down_proj": "down_proj",
+    }
+    layer_pat = re.compile(r"/layers\.(\d+)/(?:self_attn|mlp)/(\w+_proj)/")
+    init_names = {i.name for i in m.graph.initializer}
+    ident: dict[str, tuple] = {}
+    for node in m.graph.node:
+        if (
+            node.op_type not in ("MatMul", "Gemm")
+            or len(node.input) < 2
+            or node.input[1] not in init_names
+        ):
+            continue
+        mo = layer_pat.search(node.name)
+        if mo and mo.group(2) in _CLS_BY_PROJ:
+            ident[node.input[1]] = (int(mo.group(1)), _CLS_BY_PROJ[mo.group(2)])
+        elif "/lm_head/" in node.name:
+            ident[node.input[1]] = (None, "lm_head")
+
+    layer_ids = sorted({li for li, _ in ident.values() if li is not None})
+    protect: set[int] = set()
+    if _DECODER_PROTECT_EDGE_LAYERS > 0 and layer_ids:
+        protect = set(layer_ids[:_DECODER_PROTECT_EDGE_LAYERS]) | set(
+            layer_ids[-_DECODER_PROTECT_EDGE_LAYERS:]
+        )
+    counters = {"edge_skipped": 0, "shape_fallback": 0}
+
+    def select(name, W, out_axis):
+        if name in ident:
+            layer, cls = ident[name]
+        else:
+            # Fallback: classify by shape (no layer identity -> no protection).
+            counters["shape_fallback"] += 1
+            if out_axis == 0:
+                k, n = int(W.shape[1]), int(W.shape[0])
+            else:
+                k, n = int(W.shape[0]), int(W.shape[1])
+            layer, cls = None, _classify_decoder_weight(k, n)
+        if cls not in allowed:
+            return False
+        if layer is not None and layer in protect:
+            counters["edge_skipped"] += 1
+            return False
+        decisions[cls] = decisions.get(cls, 0) + 1
+        return True
     # Ship per-channel DQ, not pre-emitted blockwise MatMulNBits(bits=8):
     # measured 2026-06: blockwise cut probe drift 31% (mean 0.283->0.194) at
     # +6.7MB and CUDA decode parity (4.94 vs 4.96 ms/step), but the CPU
@@ -1317,12 +1493,122 @@ def _quantize_decoder_targeted(
     # optimizer fuses DQ+MatMul into packed nbits8 at session load anyway.
     n8, _ = _quantize_matmul_weights_int8(m, select=select)
     _save_consolidated(m, path)
-    print(f"    {path.name}: {n8} tensors INT8 by class {decisions}")
+    print(
+        f"    {path.name}: {n8} tensors INT8 by class {decisions} "
+        f"(protected layers {sorted(protect) or 'none'}, "
+        f"edge-skipped {counters['edge_skipped']}, "
+        f"shape-fallback {counters['shape_fallback']})"
+    )
     if quant_notes is not None:
         quant_notes.append(
-            {"graph": path.name, "int8_by_class": dict(decisions), "int8_total": n8}
+            {
+                "graph": path.name,
+                "int8_by_class": dict(decisions),
+                "int8_total": n8,
+                "protected_layers": sorted(protect),
+                "edge_skipped": counters["edge_skipped"],
+                "shape_fallback": counters["shape_fallback"],
+            }
         )
     return {"int8": n8, "classes": decisions}
+
+
+def _quantize_encoder_int8_selective(
+    path: Path,
+    protect_edge_layers: int = 1,
+    quant_notes: "list[dict] | None" = None,
+) -> int:
+    """Encoder INT8 with S1 edge-protection + S2 explicit op-exclusion.
+
+    S1 (mixed precision): keep the first and last ``protect_edge_layers``
+    transformer blocks FP16 and take only the middle blocks to INT8. The first
+    block carries the largest per-channel INT8 error (measured layer-0 max
+    rel-err 0.024 vs ~0.011 mid) because it consumes the rawest acoustic
+    features; the last block feeds proj1/proj2 -> decoder directly.
+    ``protect_edge_layers=0`` reproduces the prior full-encoder INT8 behaviour.
+
+    S2 (exclusion pass): only weights consumed exclusively by MatMul/Gemm are
+    quantized; anything also feeding LayerNormalization/Softmax/Add/Mul/Div/
+    Gather (or any non-MatMul/Gemm op) stays FP16. The core INT8 pass already
+    enforces MatMul/Gemm-only consumption; this restates it explicitly over the
+    live consumer map as a guard and records what was excluded.
+
+    Conv front-end weights (conv2d1/2/3) stay FP16: they are 4-D (outside the
+    2-D INT8 path), the most acoustically sensitive stage, and worth only ~4MB
+    INT8 -- not worth the risk on a ~188MB encoder.
+
+    Per-output-channel symmetric INT8 via DequantizeLinear; activations FP16.
+    Layer indices come from the dynamo export's preserved module names
+    (``layers.<i>.*``). Returns the INT8 weight count.
+    """
+    import re
+
+    print(
+        f"  Quantizing {path.name} "
+        f"(encoder S1/S2, protect_edge_layers={protect_edge_layers})..."
+    )
+    m = onnx.load(str(path))
+    target_opset = 19
+    cur = next((o.version for o in m.opset_import if o.domain == ""), 17)
+    if cur < target_opset:
+        m = onnx.version_converter.convert_version(m, target_opset)
+
+    init_names = {i.name for i in m.graph.initializer}
+    consumer_ops: dict[str, set] = {}
+    for node in m.graph.node:
+        for inp in node.input:
+            if inp in init_names:
+                consumer_ops.setdefault(inp, set()).add(node.op_type)
+
+    blocked = {"LayerNormalization", "Softmax", "Add", "Mul", "Div", "Gather"}
+    layer_ids = sorted(
+        {
+            int(mo.group(1))
+            for nm in init_names
+            for mo in [re.search(r"layers\.(\d+)\.", nm)]
+            if mo
+        }
+    )
+    protect: set[int] = set()
+    if protect_edge_layers > 0 and layer_ids:
+        protect = set(layer_ids[:protect_edge_layers]) | set(
+            layer_ids[-protect_edge_layers:]
+        )
+
+    counters = {"edge_skipped": 0, "op_excluded": 0}
+
+    def select(name, _w, _out_axis) -> bool:
+        ops = consumer_ops.get(name, set())
+        # S2: MatMul/Gemm consumers only, never a normalization/elementwise op.
+        if not ops or (ops - {"MatMul", "Gemm"}) or (ops & blocked):
+            counters["op_excluded"] += 1
+            return False
+        # S1: protect the outermost transformer blocks.
+        mo = re.search(r"layers\.(\d+)\.", name)
+        if mo and int(mo.group(1)) in protect:
+            counters["edge_skipped"] += 1
+            return False
+        return True
+
+    n8, _ = _quantize_matmul_weights_int8(m, select=select)
+    _save_consolidated(m, path)
+    print(
+        f"    {path.name}: {n8} INT8 "
+        f"(protected layers {sorted(protect) or 'none'}, "
+        f"edge-skipped {counters['edge_skipped']}, "
+        f"op-excluded {counters['op_excluded']})"
+    )
+    if quant_notes is not None:
+        quant_notes.append(
+            {
+                "graph": path.name,
+                "encoder_int8": n8,
+                "protected_layers": sorted(protect),
+                "edge_skipped": counters["edge_skipped"],
+                "op_excluded": counters["op_excluded"],
+            }
+        )
+    return n8
 
 
 # ── ASR Wrappers ──────────────────────────────────────────────────────────────
@@ -1335,6 +1621,13 @@ class EncoderWrapper(nn.Module):
     exported encoder geometry. The upstream module uses Python list splits that
     do not survive ONNX export with dynamic mel lengths, so this wrapper keeps
     the same math but reformulates chunking/masking with tensor ops.
+
+    Export target is ONNX Runtime only (CUDA EP default, CPU EP fallback). The
+    valid-frame selection below emits a data-dependent op (NonZero/Compress)
+    whose output length varies with audio length -- intrinsic to ASR, since the
+    audio-token count is not fixed. ORT lowers this on CPU and CUDA; TensorRT,
+    CoreML, and several mobile EPs do not, so the exported encoder is not
+    portable to those backends without a fixed-shape rework.
     """
 
     def __init__(self, thinker):
@@ -1415,6 +1708,9 @@ class EncoderWrapper(nn.Module):
         valid_mask = torch.arange(t, device=mel.device).unsqueeze(
             0
         ) < chunk_aftercnn_lengths.unsqueeze(1)
+        # Data-dependent gather (NonZero/Compress under ONNX): drops the
+        # padded tail of the final chunk. Output length is dynamic by design;
+        # ORT-only (see class docstring).
         hidden = x[valid_mask]
 
         aftercnn_len = self._feat_extract_output_lengths(feature_len)[0]
@@ -1565,18 +1861,25 @@ def export_asr(
     allow_quality_drift: bool = False,
     min_quant_agreement: "float | None" = None,
     max_quant_mean_delta: "float | None" = None,
+    encoder_quant: str = "auto",
 ) -> None:
     """Export Qwen3-ASR-0.6B to encoder/embed/decoder ONNX graphs.
 
-    Policy frontier (encoder stays FP16 everywhere; token embeddings are
-    row-wise INT8 in every quantized profile):
+    Policy frontier (token embeddings are row-wise INT8 in every quantized
+    profile; the encoder uses ONE fixed strategy — S1 edge-protected + S2
+    op-excluded INT8 — and the only per-profile choice is whether it runs):
       fp16: no quantization anywhere.
-      safe: decoder fully FP16. Guaranteed-quality fallback.
+      safe: decoder + encoder FP16. Guaranteed-quality fallback.
       balanced (default): decoder targeted INT8 — lm_head + AWQ-smoothed
           gate/up per-output-channel; attention and down_proj stay FP16.
-      compact: balanced plus attention q/k/v/o INT8 and encoder INT8;
-          down_proj stays FP16 (INT8 there breaks real decoding); middle
-          FFN INT4 is opportunistic under a strict threshold.
+          Encoder S1/S2 INT8.
+      compact: balanced plus attention q/k/v/o INT8; down_proj stays FP16
+          (INT8 there breaks real decoding); middle FFN INT4 is opportunistic
+          under a strict threshold.
+
+    ``encoder_quant`` overrides the encoder choice: "auto" follows the profile
+    (INT8 in balanced/compact, FP16 in safe), "int8" forces it on, "none"
+    forces FP16.
 
     Full-decoder INT8 and broad INT4 are intentionally absent: both were
     built and measurably degraded real dictation. Each quantized profile is
@@ -1593,6 +1896,12 @@ def export_asr(
         )
     if int4_block < 2 or int4_block % 2 != 0:
         raise ValueError(f"int4_block must be an even integer >= 2, got {int4_block}")
+    valid_encoder_quant = {"auto", "int8", "none"}
+    if encoder_quant not in valid_encoder_quant:
+        raise ValueError(
+            f"unknown encoder_quant={encoder_quant!r}; expected one of "
+            f"{sorted(valid_encoder_quant)}"
+        )
     if min_quant_agreement is not None and not 0.0 <= min_quant_agreement <= 1.0:
         raise ValueError(
             f"min_quant_agreement must be in [0, 1], got {min_quant_agreement}"
@@ -1796,12 +2105,16 @@ def export_asr(
     gc.collect()
 
     # ── 4. Consolidate ───────────────────────────────────────────────────
-    for name in [
-        "qwen3-asr-encoder.onnx",
-        "qwen3-asr-embed-tokens.onnx",
-        "qwen3-asr-decoder.onnx",
-    ]:
+    for name in ASR_ONNX_FILES:
         _consolidate_external_data(output_dir, name)
+
+    # ── 4.25 ORT preprocess ─────────────────────────────────────────────
+    # Shape inference only (onnx + symbolic, auto_merge). The ORT optimizer
+    # is skipped: on CPU it inserts fp32 precision casts that detach fp16
+    # weights from their MatMuls, breaking quantization (matched 0 tensors)
+    # and doubling the decoder data file.
+    for name in ASR_ONNX_FILES:
+        _preprocess_onnx_for_quantization(output_dir, name)
 
     # ── 4.5 Verify unquantized export against the torch reference ───────
     verify_asr_export(
@@ -1816,9 +2129,11 @@ def export_asr(
     )
 
     # ── 5. Quantize ────────────────────────────────────────────────────
-    # Encoder stays FP16 except in compact: it runs once per utterance (not
-    # in the decode loop where errors compound), and encoder INT8 was part
-    # of every fixture-validated earlier build.
+    # Encoder: one fixed strategy (S1 edge-protected + S2 op-excluded INT8),
+    # applied in balanced and compact under "auto" and forceable via
+    # encoder_quant. It runs once per utterance (not in the decode loop where
+    # errors compound), and encoder INT8 was part of every fixture-validated
+    # earlier build.
     quant_notes: list[dict] = []
     if quant_policy == "fp16":
         print("[ASR] Skipping quantization; all graphs keep FP16 weights")
@@ -1838,8 +2153,16 @@ def export_asr(
                 "decoder targeted INT8", res["int8"], strict=strict_quant
             )
 
-        if quant_policy == "compact":
-            n8, _ = _quantize_graph_file_int8(output_dir / "qwen3-asr-encoder.onnx")
+        if encoder_quant == "auto":
+            do_encoder_int8 = quant_policy in ("balanced", "compact")
+        else:
+            do_encoder_int8 = encoder_quant == "int8"
+        if do_encoder_int8:
+            n8 = _quantize_encoder_int8_selective(
+                output_dir / "qwen3-asr-encoder.onnx",
+                protect_edge_layers=_ENCODER_PROTECT_EDGE_LAYERS,
+                quant_notes=quant_notes,
+            )
             _require_quantized("encoder INT8", n8, strict=strict_quant)
 
         if quant_policy == "compact" and int4_threshold is not None:
@@ -1917,9 +2240,10 @@ def main() -> None:
         choices=["fp16", "safe", "balanced", "compact"],
         default="balanced",
         help="Compression policy. balanced (default) = targeted decoder INT8 "
-        "(lm_head + AWQ-smoothed gate/up only) + INT8 embeddings; safe = "
-        "decoder FP16 fallback; compact = balanced + attention INT8 + "
-        "encoder INT8 (down_proj always FP16 — INT8 there breaks decoding).",
+        "(lm_head + AWQ-smoothed gate/up only) + INT8 embeddings + S1/S2 "
+        "encoder INT8; safe = decoder + encoder FP16 fallback; compact = "
+        "balanced + attention INT8 (down_proj always FP16 — INT8 there breaks "
+        "decoding).",
     )
     parser.add_argument(
         "--no-awq",
@@ -1960,6 +2284,14 @@ def main() -> None:
         type=int,
         default=32,
         help="INT4 quantization block size along K (default: 32)",
+    )
+    parser.add_argument(
+        "--encoder-quant",
+        choices=["auto", "int8", "none"],
+        default="auto",
+        help="Encoder precision. auto (default) = INT8 in balanced/compact, "
+        "FP16 in safe; int8 = force S1/S2 encoder INT8; none = force FP16. The "
+        "INT8 strategy itself is fixed (first+last block FP16, middle INT8).",
     )
     parser.add_argument(
         "--int4-requant",
@@ -2066,6 +2398,7 @@ def main() -> None:
         allow_quality_drift=args.allow_quality_drift,
         min_quant_agreement=args.min_quant_agreement,
         max_quant_mean_delta=args.max_quant_mean_delta,
+        encoder_quant=args.encoder_quant,
     )
 
 

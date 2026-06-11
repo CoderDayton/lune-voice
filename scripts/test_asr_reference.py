@@ -2,44 +2,63 @@
 
 Records a short WAV or uses an existing one, runs both pipelines, compares output.
 """
+
+import argparse
 import sys
-import os
 import numpy as np
 from pathlib import Path
 
 MODEL_ID = "Qwen/Qwen3-ASR-0.6B"
-ONNX_DIR = Path.home() / ".local/share/lune-voice/models/qwen3-asr-0.6b"
+# ONNX_DIR = Path.home() / ".local/share/lune-voice/models/qwen3-asr-0.6b"
+ONNX_DIR = Path(__file__).parent.parent / "models/qwen3-asr-0.6b-compact-v4"
 
-# Find a test WAV — use the first arg, or look for fixture WAVs
-wav_path = None
-if len(sys.argv) > 1:
-    wav_path = sys.argv[1]
+_ap = argparse.ArgumentParser(description="Compare ONNX ASR vs torch reference")
+_ap.add_argument("wavs", nargs="*", help="WAV files (default: all fixtures/)")
+_ap.add_argument(
+    "--language",
+    default="English",
+    help="Force this language on BOTH pipelines (production-faithful; the "
+    "language header is the highest-entropy decode decision, so forcing it "
+    'isolates quantization drift). "auto" lets both sides self-detect.',
+)
+_args = _ap.parse_args()
+LANGUAGE = _args.language
+
+# Collect test WAVs — explicit paths from args, or every fixture WAV.
+if _args.wavs:
+    wav_paths = list(_args.wavs)
 else:
     fixture_dir = Path(__file__).parent.parent / "fixtures"
-    if fixture_dir.exists():
-        wavs = list(fixture_dir.glob("*.wav"))
-        if wavs:
-            wav_path = str(wavs[0])
+    wav_paths = (
+        [str(p) for p in sorted(fixture_dir.rglob("*.wav"))]
+        if fixture_dir.exists()
+        else []
+    )
 
-if not wav_path:
-    print("Usage: python test_asr_reference.py <path_to_wav>")
-    print("  or place a .wav in fixtures/")
+if not wav_paths:
+    print("Usage: python test_asr_reference.py [wav ...]")
+    print("  or place .wav files in fixtures/")
     sys.exit(1)
 
-print(f"WAV: {wav_path}")
+print(f"WAVs: {len(wav_paths)}  language: {LANGUAGE}")
 
 
 def load_wav_f32(path: str) -> tuple[np.ndarray, int]:
     """Load WAV as float32 mono 16kHz."""
     import soundfile as sf
+
     pcm, sr = sf.read(path, dtype="float32", always_2d=False)
     if pcm.ndim > 1:
         pcm = pcm[:, 0]
     return pcm, sr
 
 
-def run_reference(pcm: np.ndarray, sr: int) -> str:
-    """Run reference transformers pipeline."""
+def run_reference(wav_path: str, language: str = "English") -> str:
+    """Run reference transformers pipeline (model/processor cached across calls).
+
+    ``language`` != "auto" force-feeds the "language X<asr_text>" header into
+    the prompt (matching qwen3.rs); "auto" lets the model generate it.
+    """
     import torch
     from transformers import AutoProcessor
 
@@ -52,18 +71,31 @@ def run_reference(pcm: np.ndarray, sr: int) -> str:
         return ""
 
     print("\n=== Reference (transformers) ===")
-    processor = AutoProcessor.from_pretrained(MODEL_ID, trust_remote_code=True)
-    model = Qwen3ASRForConditionalGeneration.from_pretrained(
-        MODEL_ID,
-        trust_remote_code=True,
-        dtype=torch.bfloat16,
-        attn_implementation="eager",
-    )
-    model.eval()
+    if not hasattr(run_reference, "_ctx"):
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        processor = AutoProcessor.from_pretrained(MODEL_ID, trust_remote_code=True)
+        model = Qwen3ASRForConditionalGeneration.from_pretrained(
+            MODEL_ID,
+            trust_remote_code=True,
+            dtype=torch.bfloat16,
+            attn_implementation="eager",
+        )
+        model.eval()
+        model.to(device)
+        run_reference._ctx = (processor, model, device)
+    processor, model, device = run_reference._ctx
 
     # Build conversation in the expected format
     conversation = [
-        {"role": "system", "content": "You are an ASR engine. Transcribe spoken audio exactly in the spoken language. Do not translate. Do not add words not clearly present."},
+        {
+            "role": "system",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "You are an ASR engine. Transcribe spoken audio exactly in the spoken language. Do not translate. Do not add words not clearly present.",
+                }
+            ],
+        },
         {"role": "user", "content": [{"type": "audio", "audio": wav_path}]},
     ]
 
@@ -75,38 +107,83 @@ def run_reference(pcm: np.ndarray, sr: int) -> str:
         return_dict=True,
         add_generation_prompt=True,
     )
-    # Add language suffix
+    # Float tensors (mel features) must match the bf16 model; ids stay int64.
+    inputs = {
+        k: (
+            v.to(device=device, dtype=torch.bfloat16)
+            if hasattr(v, "is_floating_point") and v.is_floating_point()
+            else v.to(device)
+            if hasattr(v, "to")
+            else v
+        )
+        for k, v in inputs.items()
+    }
+    if language.lower() != "auto":
+        # Force the language header (151704 = <asr_text>), mirroring qwen3.rs.
+        lang_ids = processor.tokenizer.encode(
+            f"language {language}", add_special_tokens=False
+        ) + [151704]
+        extra = torch.tensor([lang_ids], dtype=inputs["input_ids"].dtype, device=device)
+        inputs["input_ids"] = torch.cat([inputs["input_ids"], extra], dim=1)
+        if "attention_mask" in inputs:
+            ones = torch.ones_like(extra)
+            inputs["attention_mask"] = torch.cat(
+                [inputs["attention_mask"], ones], dim=1
+            )
     text_ids = inputs["input_ids"]
     print(f"  Input IDs shape: {text_ids.shape}")
-    print(f"  Input features shape: {inputs.get('input_features', inputs.get('audio_features', 'N/A'))}")
+    print(
+        f"  Input features shape: {inputs.get('input_features', inputs.get('audio_features', 'N/A'))}"
+    )
 
     with torch.no_grad():
         generated = model.generate(
             **inputs,
             max_new_tokens=448,
             do_sample=False,
-            temperature=1e-6,
         )
 
+    # qwen_asr's generate wraps thinker.generate(return_dict_in_generate=True),
+    # so the result is a GenerateOutput; token ids live in .sequences.
+    sequences = getattr(generated, "sequences", generated)
     # Decode only new tokens
-    new_tokens = generated[0, text_ids.shape[1]:]
+    new_tokens = sequences[0, text_ids.shape[1] :].cpu()
     text = processor.tokenizer.decode(new_tokens, skip_special_tokens=True)
+    # The reference generates its own "language X<asr_text>" header; the ONNX
+    # path force-feeds those as prompt tokens, so strip it before comparing.
+    if "<asr_text>" in text:
+        text = text.split("<asr_text>", 1)[1]
+    text = text.strip()
     print(f"  Output: {text}")
     return text
 
 
-def run_onnx(pcm: np.ndarray, sr: int) -> str:
-    """Run ONNX pipeline mimicking lune-voice's Rust code."""
+def run_onnx(pcm: np.ndarray, sr: int, language: str = "English") -> str:
+    """Run ONNX pipeline mimicking lune-voice's Rust code.
+
+    ``language`` != "auto" force-feeds "language X<asr_text>" (as qwen3.rs
+    does); "auto" ends the prompt at the assistant turn and lets the model
+    generate the header itself.
+    """
     import onnxruntime as ort
     from tokenizers import Tokenizer
 
     print("\n=== ONNX (lune-voice style) ===")
 
-    providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
-    encoder = ort.InferenceSession(str(ONNX_DIR / "qwen3-asr-encoder.onnx"), providers=providers)
-    embed_tokens = ort.InferenceSession(str(ONNX_DIR / "qwen3-asr-embed-tokens.onnx"), providers=providers)
-    decoder = ort.InferenceSession(str(ONNX_DIR / "qwen3-asr-decoder.onnx"), providers=providers)
-    tokenizer = Tokenizer.from_file(str(ONNX_DIR / "tokenizer.json"))
+    if not hasattr(run_onnx, "_ctx"):
+        providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+        encoder = ort.InferenceSession(
+            str(ONNX_DIR / "qwen3-asr-encoder.onnx"), providers=providers
+        )
+        embed_tokens = ort.InferenceSession(
+            str(ONNX_DIR / "qwen3-asr-embed-tokens.onnx"), providers=providers
+        )
+        decoder = ort.InferenceSession(
+            str(ONNX_DIR / "qwen3-asr-decoder.onnx"), providers=providers
+        )
+        tokenizer = Tokenizer.from_file(str(ONNX_DIR / "tokenizer.json"))
+        run_onnx._ctx = (encoder, embed_tokens, decoder, tokenizer)
+    encoder, embed_tokens, decoder, tokenizer = run_onnx._ctx
 
     print(f"  Provider: {encoder.get_providers()[0]}")
 
@@ -126,6 +203,7 @@ def run_onnx(pcm: np.ndarray, sr: int) -> str:
 
     # 1. Mel spectrogram — use whisper-compatible extraction
     from whisper_mel import WhisperMelExtractor
+
     mel_extractor = WhisperMelExtractor()
 
     # Pad with 1s tail silence (matching Rust code)
@@ -148,24 +226,35 @@ def run_onnx(pcm: np.ndarray, sr: int) -> str:
     sys_text = "You are an ASR engine. Transcribe spoken audio exactly in the spoken language. Do not translate. Do not add words not clearly present."
     sys_ids = tokenizer.encode(sys_text, add_special_tokens=False).ids
 
-    prefix = [IM_START, 8948, NEWLINE] + list(sys_ids) + [IM_END, NEWLINE, IM_START, 872, NEWLINE, AUDIO_START]
+    prefix = (
+        [IM_START, 8948, NEWLINE]
+        + list(sys_ids)
+        + [IM_END, NEWLINE, IM_START, 872, NEWLINE, AUDIO_START]
+    )
     suffix = [AUDIO_END, IM_END, NEWLINE, IM_START, 77091, NEWLINE]
-    lang_text = "language English"
-    lang_ids = tokenizer.encode(lang_text, add_special_tokens=False).ids
-    suffix += list(lang_ids)
-    suffix.append(ASR_TEXT_ID)
+    if language.lower() != "auto":
+        # Force the language header, mirroring qwen3.rs build_prompt_ids.
+        lang_ids = tokenizer.encode(
+            f"language {language}", add_special_tokens=False
+        ).ids
+        suffix += list(lang_ids)
+        suffix.append(ASR_TEXT_ID)
+    # else: the model generates "language X<asr_text>" itself (auto-detect);
+    # content extraction below starts after the generated <asr_text>.
 
     input_ids = prefix + [AUDIO_PAD_ID] * n_audio + suffix
     seq_len = len(input_ids)
     audio_offset = len(prefix)
-    print(f"  Prompt: {len(prefix)} prefix + {n_audio} audio + {len(suffix)} suffix = {seq_len} tokens")
+    print(
+        f"  Prompt: {len(prefix)} prefix + {n_audio} audio + {len(suffix)} suffix = {seq_len} tokens"
+    )
 
     # 4. Embed tokens + scatter encoder output
     ids_array = np.array([input_ids], dtype=np.int64)
     embed_out = embed_tokens.run(None, {"input_ids": ids_array})
     embeds = embed_out[0]  # [1, seq_len, D]
     # Scatter audio features into embed positions
-    embeds[0, audio_offset:audio_offset + n_audio, :] = audio_feat[0]
+    embeds[0, audio_offset : audio_offset + n_audio, :] = audio_feat[0]
 
     # 5. Prefill
     position_ids = np.tile(np.arange(seq_len, dtype=np.int64).reshape(1, -1), (3, 1, 1))
@@ -177,8 +266,12 @@ def run_onnx(pcm: np.ndarray, sr: int) -> str:
         "attention_mask": attn_mask,
     }
     for i in range(NUM_LAYERS):
-        feeds[f"past_key_values.{i}.key"] = np.zeros((1, NUM_KV_HEADS, 0, HEAD_DIM), dtype=np.float16)
-        feeds[f"past_key_values.{i}.value"] = np.zeros((1, NUM_KV_HEADS, 0, HEAD_DIM), dtype=np.float16)
+        feeds[f"past_key_values.{i}.key"] = np.zeros(
+            (1, NUM_KV_HEADS, 0, HEAD_DIM), dtype=np.float16
+        )
+        feeds[f"past_key_values.{i}.value"] = np.zeros(
+            (1, NUM_KV_HEADS, 0, HEAD_DIM), dtype=np.float16
+        )
 
     outputs = decoder.run(None, feeds)
     logits = outputs[0]
@@ -193,7 +286,9 @@ def run_onnx(pcm: np.ndarray, sr: int) -> str:
         if tokens[-1] in EOS_IDS:
             break
 
-        tok_embed = embed_tokens.run(None, {"input_ids": np.array([[tokens[-1]]], dtype=np.int64)})[0]
+        tok_embed = embed_tokens.run(
+            None, {"input_ids": np.array([[tokens[-1]]], dtype=np.int64)}
+        )[0]
 
         pos_ids = np.full((3, 1, 1), pos, dtype=np.int64)
         total_len = pos + 1
@@ -225,9 +320,22 @@ def run_onnx(pcm: np.ndarray, sr: int) -> str:
             print(f"    ... ({len(tokens) - i - 1} more)")
             break
 
+    # Content starts after the model's own <asr_text> marker (the generated
+    # "language X" header before it is conditioning, not transcript).
+    if ASR_TEXT_ID in tokens:
+        content = tokens[tokens.index(ASR_TEXT_ID) + 1 :]
+    else:
+        content = tokens
     # Filter EOS/meta tokens (matching Rust decode_output: unwrap_or(0) fallback)
-    META_IDS = EOS_IDS | {IM_START, IM_END, NEWLINE, ASR_TEXT_ID, AUDIO_START, AUDIO_END}
-    content_tokens = [t for t in tokens if t not in META_IDS]
+    META_IDS = EOS_IDS | {
+        IM_START,
+        IM_END,
+        NEWLINE,
+        ASR_TEXT_ID,
+        AUDIO_START,
+        AUDIO_END,
+    }
+    content_tokens = [t for t in content if t not in META_IDS]
 
     text = tokenizer.decode(content_tokens, skip_special_tokens=True).strip()
     print(f"  Output: {text}")
@@ -242,6 +350,7 @@ class WhisperMelExtractor:
 
     def __init__(self, sr=16000, n_fft=400, hop=160, win=400, n_mels=128):
         import scipy.signal
+
         self.sr = sr
         self.n_fft = n_fft
         self.hop = hop
@@ -257,10 +366,18 @@ class WhisperMelExtractor:
         logstep = np.log(6.4) / 27.0
 
         def hz_to_mel(hz):
-            return np.where(hz < min_log_hz, hz / f_sp, min_log_mel + np.log(hz / min_log_hz) / logstep)
+            return np.where(
+                hz < min_log_hz,
+                hz / f_sp,
+                min_log_mel + np.log(hz / min_log_hz) / logstep,
+            )
 
         def mel_to_hz(mel):
-            return np.where(mel < min_log_mel, mel * f_sp, min_log_hz * np.exp(logstep * (mel - min_log_mel)))
+            return np.where(
+                mel < min_log_mel,
+                mel * f_sp,
+                min_log_hz * np.exp(logstep * (mel - min_log_mel)),
+            )
 
         n_bins = n_fft // 2 + 1
         mel_min = hz_to_mel(np.array(0.0))
@@ -296,7 +413,9 @@ class WhisperMelExtractor:
         for i in range(n_frames):
             start = i * self.hop
             frame = np.zeros(self.n_fft, dtype=np.float32)
-            frame[win_offset:win_offset + self.win] = padded[start:start + self.win] * self.window
+            frame[win_offset : win_offset + self.win] = (
+                padded[start : start + self.win] * self.window
+            )
             spectrum = np.fft.rfft(frame)
             power[i] = np.abs(spectrum) ** 2
 
@@ -317,11 +436,6 @@ class WhisperMelExtractor:
 sys.modules["whisper_mel"] = type(sys)("whisper_mel")
 sys.modules["whisper_mel"].WhisperMelExtractor = WhisperMelExtractor
 
-pcm, sr = load_wav_f32(wav_path)
-print(f"Audio: {len(pcm)} samples, {sr} Hz, {len(pcm)/sr:.2f}s")
-
-if sr != 16000:
-    print(f"WARNING: Sample rate is {sr}, expected 16000. Results may differ.")
 
 def normalize_for_match(s: str) -> str:
     """Lowercase, strip punctuation, collapse whitespace — mirrors
@@ -345,14 +459,31 @@ def word_error_rate(hyp: str, ref: str) -> float:
     return dp[len(r)] / len(r)
 
 
-onnx_text = run_onnx(pcm, sr)
+results = []
+for n, wav_path in enumerate(wav_paths, 1):
+    print(f"\n{'#' * 60}")
+    print(f"[{n}/{len(wav_paths)}] {wav_path}")
+    pcm, sr = load_wav_f32(wav_path)
+    print(f"Audio: {len(pcm)} samples, {sr} Hz, {len(pcm) / sr:.2f}s")
+    if sr != 16000:
+        print(f"WARNING: Sample rate is {sr}, expected 16000. Results may differ.")
 
-print("\n" + "=" * 60)
-print("Attempting reference model comparison...")
-try:
-    ref_text = run_reference(pcm, sr)
+    onnx_text = run_onnx(pcm, sr, LANGUAGE)
+
+    print("\n" + "=" * 60)
+    print("Attempting reference model comparison...")
+    try:
+        ref_text = run_reference(wav_path, LANGUAGE)
+    except Exception as e:
+        print(f"Reference failed: {e}")
+        print("(This is OK — the ONNX result above is the important one)")
+        results.append((wav_path, onnx_text, None, None))
+        continue
+
+    wer = None
     if ref_text and onnx_text:
-        print(f"\n{'='*60}")
+        wer = word_error_rate(onnx_text, ref_text)
+        print(f"\n{'=' * 60}")
         print(f"Reference: {ref_text}")
         print(f"ONNX:      {onnx_text}")
         print(f"Match (raw):        {ref_text.strip() == onnx_text.strip()}")
@@ -360,7 +491,24 @@ try:
             f"Match (normalized): "
             f"{normalize_for_match(ref_text) == normalize_for_match(onnx_text)}"
         )
-        print(f"WER (normalized):   {word_error_rate(onnx_text, ref_text)*100:.1f}%")
-except Exception as e:
-    print(f"Reference failed: {e}")
-    print("(This is OK — the ONNX result above is the important one)")
+        print(f"WER (normalized):   {wer * 100:.1f}%")
+    results.append((wav_path, onnx_text, ref_text, wer))
+
+# ── Summary ──────────────────────────────────────────────────────────────────
+print(f"\n{'#' * 60}")
+print("SUMMARY")
+scored = [r for r in results if r[3] is not None]
+for wav, _onnx_t, _ref_t, wer in results:
+    name = Path(wav).name
+    if wer is None:
+        print(f"  {name:40s} reference unavailable")
+    else:
+        flag = "OK " if wer == 0.0 else "DIFF"
+        print(f"  {name:40s} WER {wer * 100:5.1f}%  {flag}")
+if scored:
+    mean_wer = sum(r[3] for r in scored) / len(scored)
+    perfect = sum(1 for r in scored if r[3] == 0.0)
+    print(
+        f"\n  {len(scored)} compared, {perfect} word-perfect, "
+        f"mean WER {mean_wer * 100:.1f}%"
+    )
