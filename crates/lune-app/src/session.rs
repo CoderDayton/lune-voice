@@ -315,6 +315,45 @@ const GARBAGE_DROP_THRESHOLD: f32 = 0.25;
 /// belong to the same word as the vowel that did fire — without enough
 /// pre-roll, hard-onset words like "hello" arrive at ASR as "ello".
 const PREROLL_CHUNKS: usize = 4;
+
+/// Minimum total acoustic gap (last speech → next speech) that counts as an
+/// intentional pause rather than a breath. Defined on the TOTAL gap, not the
+/// post-hangover silence, so its meaning is stable under UI/calibrator VAD
+/// changes and any future hangover tuning.
+const PAUSE_TOTAL_MIN_SAMPLES: usize = (SAMPLE_RATE * 65) / 100; // 650 ms
+/// Ceiling on the total pause the model hears. Longer pauses carry no extra
+/// punctuation information and only cost encoder frames.
+const PAUSE_TOTAL_CAP_SAMPLES: usize = (SAMPLE_RATE * 3) / 2; // 1500 ms
+
+/// How much silence to feed ASR at a silence→speech transition so the model
+/// hears the pause the VAD gate removed — exactly.
+///
+/// `gap_fed_samples` is MEASURED, not configured: every chunk fed live while
+/// `is_speech` held but the VAD score sat below `speech_threshold_end` (the
+/// hangover tail) is counted by the caller, so the math is exact under any
+/// UI/calibrator threshold or hangover setting and any chunk size. The true
+/// gated gap is `gap_fed + silence`; injecting `silence − preroll` (capped)
+/// makes the heard pause `min(true gap, PAUSE_TOTAL_CAP_SAMPLES)`
+/// sample-for-sample.
+fn pause_injection_samples(
+    silence_samples: usize,
+    preroll_samples: usize,
+    gap_fed_samples: usize,
+) -> usize {
+    if silence_samples == 0 {
+        // Speech resumed within the hangover: the entire gap was fed live.
+        return 0;
+    }
+    let total_gap = gap_fed_samples + silence_samples;
+    if total_gap < PAUSE_TOTAL_MIN_SAMPLES {
+        return 0;
+    }
+    let already_heard = gap_fed_samples + preroll_samples;
+    silence_samples
+        .saturating_sub(preroll_samples)
+        .min(PAUSE_TOTAL_CAP_SAMPLES.saturating_sub(already_heard))
+}
+
 fn append_segments(
     all_segments: &mut Vec<AsrSegment>,
     joined_text: &mut String,
@@ -546,6 +585,17 @@ async fn run_session<A: AsrBackend + 'static>(
     let mut peak_rms: f32 = 0.0;
     let mut preroll: VecDeque<Vec<f32>> = VecDeque::with_capacity(PREROLL_CHUNKS);
     let mut was_speech = false;
+    // Silence samples accumulated since the last speech burst ended. The VAD
+    // gate strips inter-burst silence from the audio fed to ASR, which also
+    // strips the model's punctuation evidence — Qwen3-ASR (like Whisper)
+    // places commas and sentence breaks from pause prosody. A bounded slice
+    // of each real pause is re-injected so the model hears it.
+    let mut silence_samples: usize = 0;
+    // Samples fed to ASR during the hangover tail (is_speech still true but
+    // VAD score below the end threshold): real silence the model already
+    // heard, measured exactly so injection completes the gap rather than
+    // double-counting it.
+    let mut gap_fed_samples: usize = 0;
     let mut last_audio_at = tokio::time::Instant::now();
     let session_start = tokio::time::Instant::now();
     let mut first_audio_logged = false;
@@ -592,6 +642,9 @@ async fn run_session<A: AsrBackend + 'static>(
                     let vad_result = vad.process_chunk(&chunk.samples);
                     if vad_result.energy > peak_rms { peak_rms = vad_result.energy; }
                     if !vad_result.is_speech {
+                        if speech_samples > 0 {
+                            silence_samples += chunk.samples.len();
+                        }
                         if preroll.len() == PREROLL_CHUNKS {
                             preroll.pop_front();
                         }
@@ -608,11 +661,31 @@ async fn run_session<A: AsrBackend + 'static>(
                         );
                         first_speech_logged = true;
                     }
+                    if vad_result.vad_score < config.pipeline.speech_threshold_end {
+                        // Hangover tail: silence fed live as "speech".
+                        gap_fed_samples += chunk.samples.len();
+                    } else if was_speech {
+                        gap_fed_samples = 0;
+                    }
                     if !was_speech {
+                        let inject = pause_injection_samples(
+                            silence_samples,
+                            preroll.iter().map(Vec::len).sum(),
+                            gap_fed_samples,
+                        );
+                        if inject > 0 {
+                            let gap_ms =
+                                (gap_fed_samples + silence_samples) * 1000 / SAMPLE_RATE;
+                            info!(%session_id, gap_ms, inject_ms = inject * 1000 / SAMPLE_RATE,
+                                "vad: re-injecting pause for punctuation prosody");
+                            let _ = asr.push_audio(&asr_session, &vec![0.0f32; inject]).await;
+                        }
                         for pre in preroll.drain(..) {
                             let _ = asr.push_audio(&asr_session, &pre).await;
                         }
+                        gap_fed_samples = 0;
                     }
+                    silence_samples = 0;
                     was_speech = true;
                     speech_samples += chunk.samples.len();
 
@@ -887,24 +960,83 @@ async fn process_and_deliver(
     let punctuation = lune_dict::punctuation::normalize(&heuristic_result.corrected_text);
     let text_after_heuristic = punctuation.text;
 
-    // Gate on the heuristic's residual uncertainty rather than raw ASR risk:
-    // a word only reaches the LLM if the heuristic could neither resolve nor
-    // confidently preserve it. Dictionary hits and canonical/proper-noun words
-    // are resolved deterministically, so they no longer trip the gate. The LLM
-    // is also invoked when punctuation is ambiguous (run-on, interrogative
-    // without an end mark) even if every word resolved.
-    let needs_llm = !heuristic_result.all_resolved || punctuation.needs_llm;
     let unresolved_count = heuristic_result.unresolved_words.len();
     let dropped_risks = heuristic_result.dropped_risk_entries;
 
-    // Move (not clone) the residual words out of the heuristic result, which is
-    // dropped right after; the only remaining copy is the one the GateDecision
-    // event carries below.
-    let uncertain_words: Vec<(String, usize)> = heuristic_result
+    // Hints for the LLM: heuristic-unresolved words plus every word whose
+    // HWCE risk reaches the flag threshold even when the heuristic resolved
+    // it via a trust pass (lexicon / proper-noun / vocab). Trust-resolved
+    // words can still be homophone mishears ("no"/"know"), and a hinted LLM
+    // call is the only kind that measurably edits.
+    let mut hinted_positions: std::collections::HashSet<usize> = heuristic_result
+        .unresolved_words
+        .iter()
+        .map(|ws| ws.position)
+        .collect();
+    let mut uncertain_words: Vec<(String, usize)> = heuristic_result
         .unresolved_words
         .into_iter()
         .map(|ws| (ws.word, ws.position))
         .collect();
+    {
+        let words: Vec<&str> = text_after_commands.split_whitespace().collect();
+        for &(pos, risk) in &heuristic_result.word_risk_positions {
+            if risk >= lune_dict::corrector::LLM_GATE_RISK && hinted_positions.insert(pos) {
+                let stripped = words.get(pos).map_or("", |w| {
+                    w.trim_start_matches(|c: char| c.is_ascii_punctuation())
+                        .trim_end_matches(|c: char| c.is_ascii_punctuation())
+                });
+                if !stripped.is_empty() {
+                    uncertain_words.push((stripped.to_string(), pos));
+                }
+            }
+        }
+    }
+    uncertain_words.sort_by_key(|(_, pos)| *pos);
+
+    // Gate on three signals: (1) residual heuristic uncertainty — a word the
+    // corrector could neither resolve nor confidently preserve; (2) ambiguous
+    // punctuation (run-on, interrogative without an end mark); (3) the
+    // confidence band gate — but only when there is at least one hint word
+    // to hand the model. Predicted-noop bypass: a band-gated call with no
+    // hints on a fully-trusted transcript was measured 100% no-op
+    // (bench llm: 9/9 runs, zero surviving edits) — the model only acts when
+    // something concrete is flagged. Skip-when-broken caps the band: when
+    // the weakest word drops below `llm_skip_noisy_threshold`, correction is
+    // more likely to harm than help (arXiv:2509.25048).
+    let max_risk = word_risk_scores
+        .iter()
+        .map(|(_, r)| *r)
+        .fold(0.0_f32, f32::max);
+    let min_conf = 1.0 - max_risk;
+    let conf_attention = config
+        .pipeline
+        .llm_skip_threshold
+        .is_some_and(|t| min_conf < t)
+        && !uncertain_words.is_empty();
+    // Skip-when-broken is a SEGMENT-AVERAGE property: one garbled word in an
+    // otherwise clean utterance is the prime correction case (that's what
+    // hints exist for), while a transcript that is shaky across the board is
+    // the regime where correction degrades quality (arXiv:2509.25048).
+    let word_count = text_after_commands.split_whitespace().count().max(1);
+    let mean_risk = heuristic_result
+        .word_risk_positions
+        .iter()
+        .map(|(_, r)| *r)
+        .sum::<f32>()
+        / word_count as f32;
+    let avg_conf = 1.0 - mean_risk;
+    let too_broken = config
+        .pipeline
+        .llm_skip_noisy_threshold
+        .is_some_and(|t| avg_conf < t);
+    let needs_correction =
+        !heuristic_result.all_resolved || punctuation.needs_llm || conf_attention;
+    // Styling is orthogonal to correction: a clean transcript still gets the
+    // style pass when the preset asks for it, so a predicted correction
+    // no-op only skips the correction pass, never styling.
+    let wants_styling = style_preset.needs_styling();
+    let needs_llm = (needs_correction || wants_styling) && !too_broken;
 
     info!(%session_id, "[ASR] raw: {raw_text}");
     info!(
@@ -913,7 +1045,12 @@ async fn process_and_deliver(
         unresolved = unresolved_count,
         dropped_risks,
         needs_llm,
+        needs_correction,
+        wants_styling,
         needs_punct = punctuation.needs_llm,
+        min_conf,
+        avg_conf,
+        hints = uncertain_words.len(),
         "bypass gate"
     );
 
@@ -951,6 +1088,7 @@ async fn process_and_deliver(
             },
             language: detected_lang.into(),
             uncertain_words,
+            correction_needed: needs_correction,
         };
         let llm_result = if timeout_secs > 0 {
             tokio::time::timeout(
@@ -1103,6 +1241,47 @@ async fn stop_session(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Chunk-quantized fed-gap values as the session actually measures them:
+    // hangover rounds UP to whole 80 ms chunks (3 chunks for 240 ms, 4 for
+    // a 250 ms setting, 1 for 30 ms), preroll is 4 × 80 ms chunks.
+    const CHUNK: usize = SAMPLE_RATE * 80 / 1000;
+    const PREROLL: usize = 4 * CHUNK;
+
+    #[test]
+    fn pause_injection_breath_gaps_skipped() {
+        // Gap fully absorbed by hangover: everything was fed live.
+        assert_eq!(pause_injection_samples(0, 0, 3 * CHUNK), 0);
+        // Total gap 240 + 320 = 560 ms < 650 ms floor: a breath.
+        assert_eq!(pause_injection_samples(PREROLL, PREROLL, 3 * CHUNK), 0);
+    }
+
+    #[test]
+    fn pause_injection_heard_equals_true_gap() {
+        // heard = gap_fed + inject + preroll must equal the measured gap
+        // exactly, for any fed-gap size (i.e. any hangover configuration).
+        for gap_fed in [CHUNK, 3 * CHUNK, 6 * CHUNK] {
+            let silence = SAMPLE_RATE - gap_fed; // 1 s total gap
+            let inject = pause_injection_samples(silence, PREROLL, gap_fed);
+            assert_eq!(gap_fed + inject + PREROLL, SAMPLE_RATE, "gap_fed={gap_fed}");
+        }
+    }
+
+    #[test]
+    fn pause_injection_caps_total_heard() {
+        // 5 s gap: heard must be exactly the 1500 ms total cap.
+        for gap_fed in [CHUNK, 3 * CHUNK] {
+            let silence = SAMPLE_RATE * 5 - gap_fed;
+            let inject = pause_injection_samples(silence, PREROLL, gap_fed);
+            assert_eq!(
+                gap_fed + inject + PREROLL,
+                PAUSE_TOTAL_CAP_SAMPLES,
+                "gap_fed={gap_fed}"
+            );
+        }
+        // Fed gap already beyond the cap: never underflow, inject nothing.
+        assert_eq!(pause_injection_samples(SAMPLE_RATE, 0, SAMPLE_RATE * 2), 0);
+    }
     use std::collections::VecDeque;
     use std::path::PathBuf;
     use std::time::Duration;

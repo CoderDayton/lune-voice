@@ -51,6 +51,7 @@ impl CorrectionPipeline {
             &input.language,
             &examples,
             input.context.as_deref(),
+            &input.uncertain_words,
         )
     }
 }
@@ -114,36 +115,56 @@ fn clean_example_fragment(s: &str) -> String {
 impl TextPostProcessor for CorrectionPipeline {
     async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput> {
         let seeded_raw_text = apply_dictionary_seed(&input.raw_text, &input.dictionary);
-        let system = self.build_system_prompt(input);
-        let user = self.build_correction_prompt(input, &seeded_raw_text);
 
-        // Pass 1: Correction
-        let mut text = match self.llm.complete(&system, &user).await {
-            Ok(corrected) => corrected,
-            Err(e) => {
-                tracing::warn!(error = %e, "correction pass failed, returning raw text");
-                return Ok(PostProcessOutput {
-                    cleaned_text: seeded_raw_text,
-                    metadata: None,
-                });
+        // Pass 1: Correction — skipped when the session gate predicted a
+        // correction no-op (nothing unresolved, no risk hints, unambiguous
+        // punctuation). Styling below runs either way, and a FAILED
+        // correction no longer aborts the pipeline: styling still gets its
+        // chance on the raw text.
+        let mut text = if !input.correction_needed {
+            tracing::debug!("correction pass skipped by gate; styling only");
+            seeded_raw_text.clone()
+        } else {
+            let system = self.build_system_prompt(input);
+            let user = self.build_correction_prompt(input, &seeded_raw_text);
+            match self.llm.complete(&system, &user).await {
+                Ok(corrected) => {
+                    tracing::debug!(corrected_len = corrected.len(), "correction pass complete");
+                    // Hardening: number-space repair + forbidden-meta-output
+                    // guard + alignment-based merge against the raw input.
+                    // Previously duplicated in OrtStyleLlm::transform; lifted
+                    // here so every backend benefits.
+                    let corrected = crate::prompt::fix_all_number_spaces(&corrected);
+                    if crate::backend::ort_llm::contains_forbidden_output(&corrected) {
+                        tracing::warn!(output = %corrected, "LLM produced meta-text, falling back to raw");
+                        seeded_raw_text.clone()
+                    } else {
+                        let merged = crate::backend::ort_llm::validate_and_merge(
+                            &seeded_raw_text,
+                            &corrected,
+                            &input.language,
+                        );
+                        // Make validator rejections observable: a downstream
+                        // "LLM made no changes" can mean the model proposed
+                        // nothing OR everything it proposed was reverted here
+                        // — opposite tuning problems.
+                        if merged != corrected {
+                            tracing::info!(
+                                fully_reverted = merged == seeded_raw_text,
+                                proposed_len = corrected.len(),
+                                merged_len = merged.len(),
+                                "validator rejected some LLM edits"
+                            );
+                        }
+                        merged
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "correction pass failed, using raw text");
+                    seeded_raw_text.clone()
+                }
             }
         };
-
-        tracing::debug!(corrected_len = text.len(), "correction pass complete");
-
-        // Hardening: number-space repair + forbidden-meta-output guard +
-        // alignment-based merge against the raw input. Previously duplicated
-        // in OrtStyleLlm::transform; lifted here so every backend benefits.
-        text = crate::prompt::fix_all_number_spaces(&text);
-        if crate::backend::ort_llm::contains_forbidden_output(&text) {
-            tracing::warn!(output = %text, "LLM produced meta-text, falling back to raw");
-            return Ok(PostProcessOutput {
-                cleaned_text: seeded_raw_text,
-                metadata: None,
-            });
-        }
-        text =
-            crate::backend::ort_llm::validate_and_merge(&seeded_raw_text, &text, &input.language);
 
         // Pass 2: Styling (gated by preset.skip_styling)
         if input.style_preset.needs_styling() {
@@ -343,6 +364,7 @@ mod tests {
             context: None,
             language: "en".into(),
             uncertain_words: vec![],
+            correction_needed: true,
         };
 
         let output = pipeline.transform(&input).await.unwrap();
@@ -365,6 +387,7 @@ mod tests {
             context: None,
             language: "en".into(),
             uncertain_words: vec![],
+            correction_needed: true,
         };
 
         let output = pipeline.transform(&input).await.unwrap();
@@ -392,6 +415,7 @@ mod tests {
             context: None,
             language: "en".into(),
             uncertain_words: vec![],
+            correction_needed: true,
         };
 
         let output = pipeline.transform(&input).await.unwrap();
@@ -412,6 +436,7 @@ mod tests {
             context: None,
             language: "en".into(),
             uncertain_words: vec![],
+            correction_needed: true,
         };
 
         let examples = dictionary_examples(&input);
@@ -451,6 +476,7 @@ mod tests {
             context: None,
             language: "fr".into(),
             uncertain_words: vec![],
+            correction_needed: true,
         };
         let examples = dictionary_examples(&input);
         assert_eq!(

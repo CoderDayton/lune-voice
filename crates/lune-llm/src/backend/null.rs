@@ -50,6 +50,7 @@ mod tests {
             context: None,
             language: "en".into(),
             uncertain_words: Vec::new(),
+            correction_needed: true,
         };
         let out = processor.transform(&input).await.unwrap();
         assert_eq!(out.cleaned_text, "hello world");

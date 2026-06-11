@@ -323,6 +323,28 @@ print(f"Audio: {len(pcm)} samples, {sr} Hz, {len(pcm)/sr:.2f}s")
 if sr != 16000:
     print(f"WARNING: Sample rate is {sr}, expected 16000. Results may differ.")
 
+def normalize_for_match(s: str) -> str:
+    """Lowercase, strip punctuation, collapse whitespace — mirrors
+    benchmarks/bench_utils.rs normalize_text so casing and punctuation
+    differences (e.g. pause-driven commas) never count against the score."""
+    return " ".join("".join(c.lower() if c.isalnum() else " " for c in s).split())
+
+
+def word_error_rate(hyp: str, ref: str) -> float:
+    h = normalize_for_match(hyp).split()
+    r = normalize_for_match(ref).split()
+    if not r:
+        return 0.0
+    dp = list(range(len(r) + 1))
+    for i in range(1, len(h) + 1):
+        prev, dp[0] = dp[0], i
+        for j in range(1, len(r) + 1):
+            cur = dp[j]
+            dp[j] = min(dp[j] + 1, dp[j - 1] + 1, prev + (h[i - 1] != r[j - 1]))
+            prev = cur
+    return dp[len(r)] / len(r)
+
+
 onnx_text = run_onnx(pcm, sr)
 
 print("\n" + "=" * 60)
@@ -333,7 +355,12 @@ try:
         print(f"\n{'='*60}")
         print(f"Reference: {ref_text}")
         print(f"ONNX:      {onnx_text}")
-        print(f"Match: {ref_text.strip() == onnx_text.strip()}")
+        print(f"Match (raw):        {ref_text.strip() == onnx_text.strip()}")
+        print(
+            f"Match (normalized): "
+            f"{normalize_for_match(ref_text) == normalize_for_match(onnx_text)}"
+        )
+        print(f"WER (normalized):   {word_error_rate(onnx_text, ref_text)*100:.1f}%")
 except Exception as e:
     print(f"Reference failed: {e}")
     print("(This is OK — the ONNX result above is the important one)")

@@ -21,7 +21,6 @@ Acadia Pharmaceuticals
 Accenture
 Accor
 Acer
-Acorns
 Activision Blizzard
 Actuate
 Acuity Brands
@@ -43,7 +42,6 @@ Adyen
 AECOM
 AerCap
 Aetna
-Affirm
 Aflac
 Afterpay
 AGCO
@@ -70,7 +68,6 @@ Alaska Airlines
 Alation
 Albemarle
 Albertsons
-Alchemy
 Alcoa
 Alcon
 Aldi
@@ -120,9 +117,7 @@ Amgen
 Amicus Therapeutics
 Amkor Technology
 Amphenol
-Amplitude
 Amtrak
-Anaconda
 Analog Devices
 Analogic
 Anaplan
@@ -249,7 +244,6 @@ BlackBerry | Research In Motion
 BlackLine
 BlackRock
 Blackstone
-Blend
 Blizzard Entertainment
 Block | Square
 BlockFi
@@ -269,7 +263,6 @@ BMW | Bayerische Motoren Werke
 BNP Paribas
 BNY Mellon | Bank of New York Mellon
 Boeing
-Boohoo
 Booking Holdings | Priceline
 Booz Allen Hamilton
 Bosch | Robert Bosch
@@ -278,7 +271,6 @@ Boston Beer Company
 Boston Consulting Group | BCG
 Boston Scientific
 BostonGene
-Box
 BP | British Petroleum
 Bradesco
 Braze
@@ -301,7 +293,6 @@ BT Group | British Telecom
 Bugcrowd
 Builder.ai
 Built Robotics
-Bumble
 Burberry
 Burger King
 Burlington Stores
@@ -312,8 +303,6 @@ C3 AI
 Cadence Design Systems
 CAE
 Caesars Entertainment
-Calm
-Cameo
 Campbell Soup Company | Campbell's
 Canada Goose
 Canva
@@ -358,17 +347,13 @@ Cheesecake Factory
 Chegg
 Chemours
 Cheniere Energy
-Chevron
-Chewy
 Chick-fil-A
-Chime
 Chipotle Mexican Grill | Chipotle
 Chubb
 Chugai Pharmaceutical
 Cigna | Cigna Group
 CIMB
 Cinemark
-Circle
 Cirrus Logic
 Cisco | Cisco Systems
 Citigroup | Citi
@@ -386,8 +371,6 @@ Cloudflare Workers
 CME Group | Chicago Mercantile Exchange
 CNH Industrial
 CNN | Cable News Network
-Coach
-Coalition
 Coca-Cola | Coke
 Code42
 Codecademy
@@ -400,7 +383,6 @@ Columbia Sportswear
 Comcast | Xfinity
 Comerica
 Commvault
-Compass
 Conagra Brands
 Confluent
 ConocoPhillips
@@ -408,8 +390,6 @@ Consolidated Edison | ConEd
 Constellation Brands
 Constellation Energy
 Contentful
-Continental
-Converse
 CooperCompanies
 CoreWeave
 Corning
@@ -418,7 +398,6 @@ Costco | Costco Wholesale
 Coupa Software
 Coupang
 Coursera
-Courtyard
 Cracker Barrel
 Crane Company
 Crate & Barrel
@@ -428,7 +407,6 @@ Credit Suisse
 Cribl
 CRISPR Therapeutics
 Criteo
-Crocs
 CrowdStrike
 Crown Castle
 Crunchyroll
@@ -459,7 +437,6 @@ DataStax
 DaVita
 DBS Bank
 dbt Labs
-Decathlon
 Deel
 DeepL
 DeepMind | Google DeepMind
@@ -469,7 +446,6 @@ Deliverr
 Dell Technologies | Dell
 Deloitte
 Delta Air Lines | Delta
-Density
 Denso
 Dentsply Sirona
 Deutsche Bahn
@@ -486,7 +462,6 @@ Dick's Sporting Goods
 Digital Realty
 DigitalOcean
 DirecTV
-Discord
 Discover Financial Services
 DISH Network
 Docker
@@ -533,7 +508,6 @@ Embark Trucks
 Embraer
 Emerson Electric
 Emirates
-Endeavor
 Enel
 Energy Transfer
 Enovix
@@ -563,14 +537,12 @@ Exelixis
 Exelon
 Expedia Group | Expedia
 Expeditors
-Expel
 Experian
 ExxonMobil | Exxon
 EY | Ernst & Young
 F5
 Fabletics
 Faire
-Fanatics
 FanDuel
 Fannie Mae
 FANUC
@@ -599,7 +571,6 @@ Five Below
 Five Guys
 Fiverr
 FleetCor | Corpay
-Flex
 Flock Safety
 Floor & Decor
 Flow Traders
@@ -611,7 +582,6 @@ Forever 21
 Formlabs
 Fortinet
 Fortive
-Forward
 Fox Corporation | Fox
 Fox News
 Franklin Templeton
@@ -619,7 +589,6 @@ Freddie Mac
 Freenome
 Freeport-McMoRan
 Freshworks
-Front
 Frontier Communications
 Fubo
 Fujifilm | FujiFilm
@@ -628,7 +597,6 @@ FullStory
 Funimation
 G2
 GameStop
-Gap
 Garmin
 Garrett Motion
 Gartner
@@ -651,7 +619,6 @@ Ginkgo Bioworks
 GitHub
 GitLab
 GlaxoSmithKline | GSK
-Glean
 Global Payments
 Globant
 Glovo
@@ -659,17 +626,13 @@ GM | General Motors
 GoCardless
 GoDaddy
 Goldman Sachs
-Gong
 GoodRx
-Goop
 GoPro
-Grab
 Grafana Labs
 Grainger | W.W. Grainger
 Grammarly
 Graybar
 Green Dot
-Greenhouse
 Grifols
 Groq
 Grubhub
@@ -677,9 +640,7 @@ Grupo Bimbo
 Guardant Health
 Guardian Life
 Gucci
-Guess
 Guidewire Software
-Gusto
 Gymshark
 H&M
 H&R Block
@@ -694,7 +655,6 @@ HashiCorp
 HBO
 HCA Healthcare
 HCLTech | HCL Technologies
-Headspace
 Heineken
 Helion Energy
 HelloFresh
@@ -702,7 +662,6 @@ Henkel
 Henry Schein
 Hermes
 Hershey | The Hershey Company
-Hertz
 Hewlett Packard Enterprise | HPE
 Hexcel
 Hilton | Hilton Worldwide
@@ -713,7 +672,6 @@ Home Depot
 Honda
 Honeywell
 Honeywell Aerospace
-Hopper
 Horizon Therapeutics
 Hormel Foods
 HP | Hewlett-Packard
@@ -725,7 +683,6 @@ Hugo Boss
 Hulu
 Human Interest
 Humana
-Humane
 Huntington Bancshares
 Huntington Ingalls Industries
 Hyatt
@@ -734,7 +691,6 @@ Häagen-Dazs
 IBM | International Business Machines
 ICBC | Industrial and Commercial Bank of China
 ICE | Intercontinental Exchange
-Icon
 Icon Plc
 IDEXX Laboratories
 Idorsia
@@ -742,9 +698,7 @@ IGN
 iHeartMedia
 IKEA
 Illumina
-Illumination
 Imperial Brands
-Improbable
 Incyte
 Indigo Agriculture
 Inditex | Zara
@@ -759,9 +713,7 @@ Insmed
 Insomniac Games
 Instabase
 Instacart | Maplebear
-Intel
 Interactive Brokers
-Intercom
 Intercontinental Exchange | ICE
 International Airlines Group | IAG
 International Flavors & Fragrances | IFF
@@ -816,7 +768,6 @@ Keysight Technologies
 Kia
 Kimberly-Clark
 Kinder Morgan
-Kingfisher
 KitchenAid
 KKR
 KLA
@@ -842,12 +793,10 @@ Labelbox
 Lacework
 Lacoste
 Lam Research
-Lambda
 Lamborghini
 Land O'Lakes
 Lands' End
 Las Vegas Sands
-Lattice
 Lear Corporation
 LegalZoom
 Legend Biotech
@@ -855,7 +804,6 @@ Legendary Entertainment
 Lego
 Legrand
 Leidos
-Lemonade
 Lennar
 Lenovo
 Leonardo
@@ -867,7 +815,6 @@ Liebherr
 Lincoln Financial Group
 Linde
 Lineage Logistics
-Linear
 LinkedIn
 Lionel
 Lionsgate
@@ -888,7 +835,6 @@ Lucid Software
 Lufthansa
 Lululemon
 Lumen Technologies | CenturyLink
-Lush
 LVMH | Louis Vuitton Moet Hennessy
 Lyft
 Lyra Health
@@ -930,7 +876,6 @@ Melio
 Mercado Libre
 Mercedes-Benz
 Merck
-Mercury
 MessageBird | Bird
 Meta | Facebook
 MetLife
@@ -969,7 +914,6 @@ Motive | KeepTruckin
 Motorola Solutions
 Mozilla
 MSCI
-Mural
 Murata Manufacturing
 N26
 Natera
@@ -983,7 +927,6 @@ Navient
 Navistar
 NEC
 NerdWallet
-Nestle
 NetApp
 Netflix
 Netflix Games
@@ -1012,7 +955,6 @@ Northern Trust
 Northrop Grumman
 Northvolt
 NortonLifeLock | Gen Digital
-Notion
 Novartis
 Novelis
 Novo Nordisk
@@ -1038,7 +980,6 @@ OneMain Financial
 OpenAI
 OpenSea
 OpenText
-Oracle
 Orca Security
 Organon
 Orsted
@@ -1046,14 +987,11 @@ Oshkosh
 Otis Worldwide
 Otsuka Pharmaceutical
 Oura
-Ouster
 Outdoor Voices
-Outreach
 OutSystems
 OwnBackup
 Oxford Nanopore Technologies
 PACCAR
-Paddle
 PagerDuty
 Palantir Technologies
 Palo Alto Networks
@@ -1085,15 +1023,11 @@ Pfizer
 PG&E | Pacific Gas and Electric
 Philip Morris International
 Phillips 66
-Pilot
 Pimco
-Pinecone
 Pinterest
 Pioneer Natural Resources
-Pipe
 PitchBook
 Pixar
-Plaid
 Planet Fitness
 Planet Labs
 PlanetScale
@@ -1101,30 +1035,23 @@ PlayStation | Sony Interactive Entertainment
 Plug Power
 Pluralsight
 PNC Financial Services
-Podium
 Polaris
-Polygon
 Popeyes
 Portland General Electric
 Post Holdings
-Postman
 PPG Industries
 PPL Corporation
 Prada
-Prefect
-Primer
 Principal Financial Group
 Printful
 Procore Technologies
 Procter & Gamble | P&G
-Progressive
 Prologis
 Prudential Financial
 PsiQuantum
 Public Storage
 Publicis Groupe
 PulteGroup
-Puma
 Pure Storage
 PVH
 Qantas
@@ -1142,7 +1069,6 @@ QuickBooks | Intuit QuickBooks
 Quora
 Rakuten
 Ralph Lauren
-Ramp
 Rapid7
 Rapyd
 Raymond James
@@ -1168,12 +1094,10 @@ Rent the Runway
 Replit
 Republic Services
 ResMed
-Retool
 Revolut
 Rimowa
 Rio Tinto
 Riot Games
-Rippling
 Riskified
 Rivian
 Ro
@@ -1199,7 +1123,6 @@ Royal Dutch Shell | Shell
 Royal Philips | Philips
 RTX | Raytheon
 Rubrik
-Runway
 S&P Global
 Saab
 Safran
@@ -1231,7 +1154,6 @@ Segment | Twilio Segment
 Sempra
 Sendbird
 SentinelOne
-Sentry
 ServiceNow
 Seven & i Holdings
 Shake Shack
@@ -1253,13 +1175,11 @@ Singapore Airlines
 SiriusXM
 Skanska
 Skechers
-Sky
 Slack | Salesforce Slack
 SLB | Schlumberger
 Smartsheet
 Snap | Snapchat
 SnapLogic
-Snowflake
 Snyk
 Societe Generale
 Socure
@@ -1286,19 +1206,15 @@ Stability AI
 Standard Chartered
 Stanley Black & Decker
 Starbucks
-Starburst
 Starling Bank
-Stash
 State Farm
 Steelcase
 Stellantis
 Stitch Fix
 StoneX
-Stripe
 Stryker
 StubHub
 Subaru
-Subway
 Sumitomo Mitsui Financial Group | SMBC
 Sumo Logic
 Supabase
@@ -1318,7 +1234,6 @@ Taco Bell
 Take-Two Interactive
 Talkdesk
 Tanium
-Target
 Tata Consultancy Services | TCS
 TD Ameritrade
 TD Bank | Toronto-Dominion Bank
@@ -1327,12 +1242,10 @@ TeamViewer
 Technicolor
 Teck Resources
 Teladoc Health
-Telegram
 Teleperformance
 Telix Pharmaceuticals
 Telstra
 Tempur Sealy
-Tenable
 Tenaya Therapeutics
 Tencent
 Tenet Healthcare
@@ -1352,7 +1265,6 @@ Thor Industries
 Thought Machine
 ThoughtSpot
 ThredUp
-Thumbtack
 TIAA
 Ticketmaster
 TikTok | ByteDance TikTok
@@ -1361,9 +1273,7 @@ Timken
 Tines
 Tipalti
 TJX Companies
-Toast
 Toll Brothers
-Tonal
 Topgolf Callaway Brands
 Toyota
 Tractor Supply Company
@@ -1373,7 +1283,6 @@ Tradeweb Markets
 TransDigm
 TransferWise | Wise
 TransUnion
-Travelers
 Trimble
 TripActions | Navan
 Tripadvisor
@@ -1383,7 +1292,6 @@ Truist Financial
 TSMC | Taiwan Semiconductor Manufacturing Company
 TuSimple
 Twilio
-Twitch
 Two Sigma
 Tyson Foods
 Uber
@@ -1412,8 +1320,6 @@ Universal Music Group
 Universal Pictures
 Unqork
 Unum Group
-Upgrade
-Upstart
 Upwork
 Urban Outfitters
 US Bancorp | U.S. Bank
@@ -1421,8 +1327,6 @@ USAA
 Vale
 Valero Energy
 Valve
-Vanguard
-Vans
 Vectra AI
 Veeam
 Veeva Systems
@@ -1436,7 +1340,6 @@ Verkada
 Vertex Pharmaceuticals
 Vestas
 VF Corporation
-Via
 ViacomCBS | Paramount Global
 Viatris
 Vice Media
@@ -1445,7 +1348,6 @@ Victoria's Secret
 Vimeo
 Virta Health
 Virtu Financial
-Visa
 Visa Europe
 Volkswagen | VW
 Volocopter
@@ -1479,10 +1381,8 @@ Western Digital
 Western Union
 WeWork
 Weyerhaeuser
-Whirlpool
 White Castle
 Whole Foods Market | Amazon Whole Foods
-Whoop
 Williams Companies
 Williams-Sonoma
 Willis Towers Watson | WTW
@@ -1490,13 +1390,11 @@ Wing | Google Wing
 Wingtra
 Wipro
 Wise | TransferWise
-Wiz
 Wizards of the Coast
 Wolters Kluwer
 Wonolo
 Woodward
 Workato
-Workday
 Workiva
 World Fuel Services
 Worldpay
@@ -1510,14 +1408,11 @@ X | Twitter
 Xbox | Microsoft Xbox
 Xcel Energy
 Xero
-Xerox
 Xiaomi
 XPeng
 Y Combinator | YC
 Yamaha
 Yandex
-Yelp
-Yeti
 Yotpo
 Yum Brands
 Zalando

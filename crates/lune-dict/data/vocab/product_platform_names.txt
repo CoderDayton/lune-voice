@@ -55,12 +55,9 @@ Amazon SNS | SNS
 Amazon SQS | SQS
 Amazon Web Services | AWS
 Amazon WorkSpaces
-Anaconda
-Android
 Android Auto
 Android Studio
 Android Wear | Wear OS
-Angular
 Anki
 Ansible
 Apache Airflow | Airflow
@@ -90,7 +87,6 @@ Arc Browser | Arc
 Arch Linux | Arch
 Arduino
 Argo CD | ArgoCD
-Audible
 Auth0
 AutoCAD
 AutoHotkey
@@ -112,7 +108,6 @@ Babel
 Backbone.js | Backbone
 Bandcamp
 Basecamp
-Bash
 Battle.net | Blizzard Battle.net
 Behance
 BeReal
@@ -123,17 +118,13 @@ Bitbucket
 Bitcoin | BTC
 Bitdefender
 Bitly
-Blender
 Bluesky
 BlueStacks
-Bootstrap
 Box Drive
 Box Notes
 Braintree
 Brave Browser | Brave
 BTC | Bitcoin
-Buffer
-Bun
 Calendly
 Canva
 CapCut
@@ -141,7 +132,6 @@ Cash App
 CentOS
 Chatfuel
 ChatGPT
-Chime
 Chrome Web Store
 Chrome | Google Chrome
 Chromebook
@@ -160,7 +150,6 @@ CodePen
 CodeSandbox
 Coinbase Wallet
 Conda
-Confluence
 Constant Contact
 Copilot | Microsoft Copilot
 Corel Painter
@@ -169,8 +158,6 @@ Coursera
 cPanel
 Creative Cloud | Adobe Creative Cloud
 Cron
-Cursor
-Cypress
 DALL-E | Dall E
 Dashlane
 Databricks Lakehouse | Lakehouse
@@ -183,7 +170,6 @@ Deno
 Dependabot
 DigitalOcean Droplets | Droplets
 DigitalOcean Spaces | Spaces
-Discord
 Discord Nitro | Nitro
 Disney Plus | Disney+
 Django
@@ -198,17 +184,13 @@ Dropbox Paper
 Drupal
 DuckDB
 Duolingo
-Eclipse
 Edge | Microsoft Edge
 Elastic Stack | ELK Stack
 ElasticSearch | Elasticsearch
-Electron
-Elm
 Emacs
 Ethereum | ETH
 Eventbrite
 Excel | Microsoft Excel
-Expo
 Express.js | Express
 Facebook
 Facebook Ads | Meta Ads
@@ -216,7 +198,6 @@ Facebook Messenger | Messenger
 FaceTime
 FastAPI
 Fediverse
-Fedora
 Figma
 FileZilla
 Final Cut Pro
@@ -224,8 +205,6 @@ Firebase
 Firefox | Mozilla Firefox
 Fitbit
 Fivetran
-Flask
-Flutter
 FlutterFlow
 Fortnite
 Framer
@@ -236,7 +215,6 @@ Garmin Connect
 Garmin Pay
 GCP | Google Cloud Platform
 Gemini | Google Gemini
-Ghost
 GIMP
 Git
 GitHub
@@ -297,7 +275,6 @@ GoTo Meeting
 Gradle
 Grafana
 Grammarly
-Graphite
 GraphQL
 Gravatar
 Grubhub
@@ -307,7 +284,6 @@ HashiCorp Terraform | Terraform
 HBO Max | Max
 Heroku
 Heroku Postgres
-Hinge
 Home Assistant
 Hootsuite
 Hotmail | Outlook.com
@@ -318,7 +294,6 @@ iCloud Keychain
 iCloud | Apple iCloud
 If This Then That | IFTTT
 iMessage
-Indeed
 InDesign | Adobe InDesign
 Instacart
 Instagram
@@ -346,15 +321,12 @@ Krita
 Kubernetes | K8s
 Laravel
 League of Legends
-Linear
 LinkedIn
 Linode | Akamai Connected Cloud
 Linux
 Logic Pro
 Logstash
-Looker
 Looker Studio | Google Data Studio
-Loom
 Magento | Adobe Commerce
 Mailchimp
 Make | Integromat
@@ -365,8 +337,6 @@ Mastodon
 Matlab | MATLAB
 Matplotlib
 Max | HBO Max
-Medium
-Mercurial
 Messenger | Facebook Messenger
 Meta Ads | Facebook Ads
 Meta Quest | Oculus Quest
@@ -394,7 +364,6 @@ Minecraft
 Minecraft Bedrock Edition | Bedrock Edition
 Minecraft Java Edition | Java Edition
 Minikube
-Mint
 Miro
 Miro Boards | Miro
 Mixpanel
@@ -421,7 +390,6 @@ NixOS
 Node.js | Node
 NordVPN
 Notepad++
-Notion
 npm | Node Package Manager
 NumPy
 Nuxt
@@ -443,33 +411,27 @@ Oracle Cloud | OCI
 Oracle Database
 Outlook | Microsoft Outlook
 Overwatch
-Pandas
 Pandora
 Patreon
 PayPal
 PayPal Venmo | Venmo
 Perforce
-Perplexity
 Photos | Apple Photos
 Photoshop | Adobe Photoshop
 Pinboard
 Pinterest
 PlanetScale
 PlayStation Network | PSN
-Playwright
 Podman
 Pokémon Go | Pokemon Go
 PostgreSQL | Postgres
 PostHog
-Postman
 Power BI | Microsoft Power BI
 PowerPoint | Microsoft PowerPoint
 Premiere Pro | Adobe Premiere Pro
-Prettier
 Prime Video | Amazon Prime Video
 Prisma
 Pro Tools
-Procreate
 Prometheus
 Proton Mail | ProtonMail
 Proton VPN
@@ -482,16 +444,12 @@ QuickBooks
 Quora
 R
 Raycast
-React
 Reddit
 Redis
 Redux
 Reels | Instagram Reels
-Remix
-Render
 Replit
 Retool
-Ring
 RingCentral
 Roblox
 Rocky Linux
@@ -499,29 +457,21 @@ Roku
 Rollup
 Ruby on Rails | Rails
 RubyGems
-Rust
 SageMaker | Amazon SageMaker
 Salesforce CRM | Salesforce
 Salesforce Marketing Cloud
 Salesforce Service Cloud
 Samsung Pay
 Samsung SmartThings | SmartThings
-Sanity
 SAP HANA | HANA
-Sass
 Scala
 Scikit-learn | sklearn
 SendGrid
-Sentry
 Shopify
 Shopify Plus
-Signal
 Signal Desktop
-Sketch
 SketchUp
-Slack
 Snapchat
-Snowflake
 Solana | SOL
 SonarQube
 SoundCloud
@@ -532,22 +482,17 @@ SQLite
 Square Payments | Square
 Squarespace
 Stack Overflow
-Steam
-Storybook
 Strapi
-Stripe
 Stripe Atlas
 Stripe Checkout
 Substack
 Subversion | SVN
 Svelte
-Swift
 Tableau
 TablePlus
 Tailwind CSS | Tailwind
 Tailwind UI
 Tauri
-Telegram
 TensorBoard
 TensorFlow
 Terraform | HashiCorp Terraform
@@ -560,7 +505,6 @@ Todoist
 Travis CI
 Trello
 Twilio SendGrid | SendGrid
-Twitch
 Twitter | X
 TypeScript
 Uber
@@ -571,7 +515,6 @@ Unity Engine | Unity
 Unreal Editor
 Unreal Engine
 Upwork
-Vagrant
 Vercel
 Vim
 Vimeo
@@ -608,7 +551,6 @@ Xcode
 Xero
 Yahoo Mail
 Yammer | Viva Engage
-Yelp
 YouTube Kids
 YouTube Music
 YouTube Shorts | Shorts
@@ -618,7 +560,6 @@ Zapier
 Zapier Interfaces
 Zelle
 Zendesk
-Zoom
 Zoom Phone
 ZoomInfo
 Zotero

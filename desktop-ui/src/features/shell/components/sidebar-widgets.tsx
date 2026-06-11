@@ -14,7 +14,12 @@ export function SidebarQuickStart() {
     <div className="px-3 pb-3 sm:px-3.5">
       <button
         type="button"
-        onClick={() => void toggleDictation()}
+        onClick={(e) => {
+          // Drop focus: dictated text typed into this window must not
+          // re-activate the button via Space/Enter and re-toggle sessions.
+          e.currentTarget.blur();
+          void toggleDictation();
+        }}
         disabled={isConnecting}
         className={`group flex w-full cursor-pointer items-center gap-4 rounded-field border px-4 py-3.5 shadow-card transition-all sm:gap-4 sm:px-4 sm:py-3.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
           isActive

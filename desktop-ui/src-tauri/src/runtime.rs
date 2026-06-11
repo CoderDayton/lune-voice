@@ -294,8 +294,12 @@ impl AppRuntime {
             return Err("text delivery service is unavailable — cannot start dictation".into());
         }
 
-        if !self.inner.delivery.is_alive() {
-            return Err("text delivery service is unavailable — cannot start dictation".into());
+        // Our own typed/pasted output may still be in flight; starting now
+        // would let those synthetic keystrokes (or a focused UI button they
+        // re-activate) toggle sessions in a feedback loop.
+        if self.inner.delivery.is_busy() {
+            debug!("start_dictation suppressed — text delivery in progress");
+            return Err("text delivery in progress".into());
         }
 
         if self.inner.session_stream.read().await.is_none() {
@@ -408,6 +412,10 @@ impl AppRuntime {
             self.stop_dictation().await?;
             Ok(None)
         } else {
+            if self.inner.delivery.is_busy() {
+                debug!("toggle_dictation suppressed — text delivery in progress");
+                return Ok(None);
+            }
             self.start_dictation().await.map(Some)
         }
     }

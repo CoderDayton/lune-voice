@@ -105,7 +105,25 @@ fn process_single_word(
     // "All" → "all") because freq-dict canonicals fall back to lowercase.
     if let Some(info) = lexicon_info.as_ref() {
         let canonical_has_upper = info.canonical.chars().any(|c| c.is_ascii_uppercase());
-        if canonical_has_upper && info.canonical.as_ref() != stripped {
+        // Title-case-only canonicals ("Calibration", "Transformers") carry no
+        // brand-casing information when the lowercase form is ordinary
+        // English — they are sentence-start artifacts in harvested vocab
+        // lists, and enforcing them mid-sentence capitalizes common nouns.
+        // Casing authority is limited to canonicals with uppercase beyond
+        // the first character (GitHub, NASA, iPhone) or words that are not
+        // ordinary dictionary words. Ambiguous proper-noun casing is the
+        // LLM's job, not the heuristic's.
+        let title_case_only = {
+            let mut chars = info.canonical.chars();
+            chars.next().is_some_and(|c| c.is_ascii_uppercase())
+                && !chars.any(|c| c.is_ascii_uppercase())
+        };
+        let lowercase_is_common = info.source == WordSource::FreqMap
+            || wordnik_list::word_exists(&stripped.to_lowercase());
+        if canonical_has_upper
+            && info.canonical.as_ref() != stripped
+            && !(title_case_only && lowercase_is_common)
+        {
             return ProcessedWord {
                 corrected_word: restore_punctuation(word, &info.canonical),
                 unresolved: None,
@@ -517,6 +535,16 @@ mod tests {
             "expected leading 'All' preserved, got {:?}",
             result.corrected_text
         );
+    }
+
+    #[test]
+    fn title_case_vocab_entry_does_not_capitalize_common_word() {
+        let c = HeuristicCorrector::new();
+        // "Calibration" appears title-cased in harvested vocab data; flagged
+        // mid-sentence occurrences must not inherit that casing.
+        let risks = vec![("calibration".to_string(), 0.55)];
+        let result = c.correct("the calibration step failed", &risks, &[], "en");
+        assert_eq!(result.corrected_text, "the calibration step failed");
     }
 
     #[test]

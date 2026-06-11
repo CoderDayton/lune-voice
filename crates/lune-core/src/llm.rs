@@ -23,6 +23,11 @@ pub struct PostProcessInput {
     pub language: String,
     /// Words flagged as likely incorrect, with their word-index position in text.
     pub uncertain_words: Vec<(String, usize)>,
+    /// Whether the correction pass should run. The session gate sets this to
+    /// false when it predicts a correction no-op (nothing unresolved, no risk
+    /// hints, unambiguous punctuation); the styling pass still runs whenever
+    /// the preset asks for it.
+    pub correction_needed: bool,
 }
 
 /// Output from the text post-processor.
@@ -94,6 +99,7 @@ mod tests {
             context: None,
             language: "en".into(),
             uncertain_words: Vec::new(),
+            correction_needed: true,
         };
         assert_eq!(input.raw_text, "hello um world");
         assert_eq!(input.app_category, Some(AppCategory::Email));

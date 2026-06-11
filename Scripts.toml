@@ -54,9 +54,9 @@ info = "Run unit tests (no real models)"
 [scripts.test-e2e]
 interpreter = "bash"
 command = '''
-cargo test -p lune-app --test e2e_pipeline -- --ignored --nocapture
+cargo test -p lune-app --test e2e_pipeline -- --nocapture
 '''
-info = "Real-model integration tests (requires models on disk)"
+info = "Run lightweight app pipeline integration tests"
 
 # ── Benchmarks ───────────────────────────────────────────────────────────────
 
@@ -130,6 +130,6 @@ info = "Clean build artifacts (--env ALL=1 includes .venv)"
 # ── ONNX model export ───────────────────────────────────────────────────────
 
 [scripts.export]
-command = "uv run python scripts/export_onnx.py --asr"
+command = "uv run scripts/export_onnx.py --asr"
 info = "Export Qwen3-ASR ONNX model"
 requires = ["uv"]

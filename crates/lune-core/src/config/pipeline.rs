@@ -70,31 +70,36 @@ pub struct PipelineConfig {
     /// OpenAI-compatible).
     pub word_confidence_threshold: Option<f32>,
 
-    /// Skip-when-clean LLM bypass threshold (calibrated `P(correct)` scale).
+    /// Skip-when-clean LLM bypass threshold (HWCE confidence scale,
+    /// `1 − word_error_risk`).
     ///
-    /// When every word in a segment has calibrated confidence at or above
-    /// this value, the LLM correction pass is skipped entirely — the raw
-    /// segment text is passed through untouched. This is a separate, stricter
-    /// gate than `word_confidence_threshold`: it protects clean segments from
-    /// over-correction (the dominant failure mode on noisy audio per
-    /// arXiv:2509.25048) while letting the marking gate continue to operate
-    /// at a lower threshold for borderline words.
+    /// When every word in a segment has confidence at or above this value
+    /// the LLM correction pass is skipped, protecting clean segments from
+    /// over-correction (the dominant failure mode per arXiv:2509.25048).
+    /// Below it, the segment enters the LLM attention band even when the
+    /// heuristic resolved every word deterministically.
     ///
-    /// `None` disables the bypass — all segments go through the normal
-    /// marking / LLM pipeline. Default is `Some(0.95)` for backends that
-    /// expose per-word confidence, `None` for those that don't.
+    /// The scale is HWCE's sigmoid output: a perfectly confident word floors
+    /// at risk ≈ 0.226 (confidence ≈ 0.774), so thresholds near 1.0 can
+    /// never bypass and values above ~0.77 force the LLM on every segment.
+    /// Default `Some(0.65)` puts the attention band at `max risk > 0.35` —
+    /// between the confident floor and the 0.40 heuristic flag threshold.
+    ///
+    /// `None` disables the band gate — the LLM then runs only for unresolved
+    /// words or ambiguous punctuation.
     #[serde(default)]
     pub llm_skip_threshold: Option<f32>,
 
-    /// Skip-when-broken LLM bypass threshold (calibrated `P(correct)` scale).
+    /// Skip-when-broken LLM bypass threshold (HWCE confidence scale).
     ///
-    /// Symmetric lower bound of `llm_skip_threshold`: when the weakest
-    /// token in a segment falls below this value, the transcript is
-    /// considered too degraded for the LLM corrector to help and the
-    /// correction pass is skipped. The paper (arXiv:2509.25048 Fig 3)
-    /// shows that naive correction on broken transcripts routinely
-    /// degrades WER — this gate is the defensive counterpart to
-    /// skip-when-clean.
+    /// Lower bound of `llm_skip_threshold`, evaluated on the SEGMENT-AVERAGE
+    /// confidence: when the mean word confidence falls below this value, the
+    /// transcript is considered too degraded for the LLM corrector to help
+    /// and the whole LLM stage is skipped. Deliberately not the weakest
+    /// token — one garbled word in a clean utterance is the prime correction
+    /// case, served by the hint band. The paper (arXiv:2509.25048 Fig 3)
+    /// shows naive correction on broken transcripts routinely degrades WER —
+    /// this gate is the defensive counterpart to skip-when-clean.
     ///
     /// Together with `llm_skip_threshold`, this forms an adaptive,
     /// bimodal invocation gate: the LLM runs only when
@@ -272,8 +277,8 @@ impl Default for PipelineConfig {
             // session layer runs the isotonic calibrator. See the per-backend
             // overrides in `lune_asr::AsrRegistry::pipeline_config` for the
             // reasoning behind these values.
-            word_confidence_threshold: Some(0.85),
-            llm_skip_threshold: Some(0.95),
+            word_confidence_threshold: Some(0.55),
+            llm_skip_threshold: Some(0.65),
             llm_skip_noisy_threshold: Some(0.30),
             max_speech_samples: 60 * SAMPLE_RATE,
             itn_enabled: false,
@@ -397,8 +402,8 @@ mod tests {
     fn default_has_skip_threshold_at_0_95() {
         // Matches the per-backend registry overrides for Parakeet.
         let cfg = PipelineConfig::default();
-        assert_eq!(cfg.llm_skip_threshold, Some(0.95));
-        assert_eq!(cfg.word_confidence_threshold, Some(0.85));
+        assert_eq!(cfg.llm_skip_threshold, Some(0.65));
+        assert_eq!(cfg.word_confidence_threshold, Some(0.55));
         assert!(cfg.validate().is_empty(), "default must validate");
     }
 

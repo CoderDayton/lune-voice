@@ -214,7 +214,10 @@ function SidebarUserCard({
           <button
             type="button"
             disabled={isConnecting}
-            onClick={() => {
+            onClick={(e) => {
+              // Drop focus: dictated text typed into this window must not
+              // re-activate the button via Space/Enter and re-toggle sessions.
+              e.currentTarget.blur();
               closeDropdown();
               void toggleDictation();
             }}

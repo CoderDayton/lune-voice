@@ -5,7 +5,7 @@ import onnxruntime as ort
 from tokenizers import Tokenizer
 from pathlib import Path
 
-MODEL_DIR = Path.home() / ".local/share/lune-voice/models/qwen2.5-1.5b-instruct"
+MODEL_DIR = Path.home() / ".local/share/lune-voice/models/qwen3-0.6b"
 MODEL_PATH = MODEL_DIR / "model_q4f16.onnx"
 TOKENIZER_PATH = MODEL_DIR / "tokenizer.json"
 

@@ -19,7 +19,6 @@ Dockerfile
 ESLint
 FastAPI
 Firebase
-Flask
 GCP
 GPU
 GRPC
@@ -38,7 +37,6 @@ JWT
 Kafka
 Kotlin
 Kubernetes
-Lambda
 LaTeX
 LLM
 macOS
@@ -50,20 +48,17 @@ MQTT
 MVP
 Nginx
 NLP
-Node
 NodeJS
 npm
 NumPy
 OAuth
 ORM
 OSS
-Pandas
 PHP
 PostgreSQL
 PowerShell
 PyTorch
 RAM
-React
 Redis
 Redux
 REST
@@ -71,7 +66,6 @@ RESTful
 regex
 RPM
 RSA
-Rust
 SDK
 SMTP
 SQL

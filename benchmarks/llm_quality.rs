@@ -162,7 +162,23 @@ fn main() {
         let gate_invoked_llm = gate_no_llm.used_llm;
 
         let llm_delta = time_with_llm - time_no_llm;
-        let bypassed = text_no_llm == text_with_llm;
+        // Outcome classification. Raw equality alone conflated three distinct
+        // situations under "LLM made no changes": the gate never invoking the
+        // LLM, the validator reverting every proposed edit (or a model
+        // no-op), and case/punctuation-only styling. Word metrics are
+        // normalization-aware, so style-only changes must not read as edits.
+        let raw_same = text_no_llm == text_with_llm;
+        let semantic_same = bench_utils::normalize_text(&text_no_llm)
+            == bench_utils::normalize_text(&text_with_llm);
+        let outcome = if !gate_invoked_llm {
+            LlmOutcome::GateSkip
+        } else if raw_same {
+            LlmOutcome::Noop
+        } else if semantic_same {
+            LlmOutcome::StyleOnly
+        } else {
+            LlmOutcome::Edited
+        };
 
         let wer_raw = word_error_rate(&text_no_llm, &fixture.reference) * 100.0;
         let cer_raw = char_error_rate(&text_no_llm, &fixture.reference) * 100.0;
@@ -183,14 +199,28 @@ fn main() {
             unresolved_count,
         );
 
-        if bypassed {
+        if outcome != LlmOutcome::Edited {
             println!();
-            println!("  [SAME] LLM made no changes (Δ {:.1}s)", llm_delta);
+            match outcome {
+                LlmOutcome::GateSkip => println!("  [BYPASS] gate skipped the LLM"),
+                LlmOutcome::Noop => println!(
+                    "  [NOOP] LLM ran but no edits survived — model no-op or \
+                     validator revert; see the pipeline merge log (Δ {llm_delta:.1}s)"
+                ),
+                LlmOutcome::StyleOnly => {
+                    println!("  [STYLE] LLM changed case/punctuation only (Δ {llm_delta:.1}s)")
+                }
+                LlmOutcome::Edited => unreachable!(),
+            }
             println!("  {:>20}  {:>10.1}%", "WER", wer_raw);
             println!("  {:>20}  {:>10.1}%", "CER", cer_raw);
             println!("  acoustics: {}", acoustics_line);
             println!();
             wrap_print("    ", &text_no_llm, 72);
+            if outcome == LlmOutcome::StyleOnly {
+                println!("  Styled:");
+                wrap_print("    ", &text_with_llm, 72);
+            }
             println!("  Reference:");
             wrap_print("    ", &fixture.reference, 72);
 
@@ -200,8 +230,13 @@ fn main() {
                 wer_llm: wer_raw,
                 cer_raw,
                 cer_llm: cer_raw,
-                llm_delta: 0.0,
-                bypassed: true,
+                // LLM wall cost is real whenever it ran; only a gate skip is free.
+                llm_delta: if outcome == LlmOutcome::GateSkip {
+                    0.0
+                } else {
+                    llm_delta
+                },
+                outcome,
                 acoustics,
                 detected_lang: detected_lang.clone(),
                 configured_lang,
@@ -238,7 +273,7 @@ fn main() {
                 cer_raw,
                 cer_llm,
                 llm_delta,
-                bypassed: false,
+                outcome,
                 acoustics,
                 detected_lang: detected_lang.clone(),
                 configured_lang,
@@ -298,16 +333,27 @@ fn main() {
                 )
             };
             let gate_tag = if r.gate_invoked_llm { "LLM" } else { "skip" };
-            if r.bypassed {
+            let outcome_tag = match r.outcome {
+                LlmOutcome::GateSkip => "skip",
+                LlmOutcome::Noop => "noop",
+                LlmOutcome::StyleOnly => "style",
+                LlmOutcome::Edited => "edit",
+            };
+            if r.outcome != LlmOutcome::Edited {
+                let delta_str = if r.outcome == LlmOutcome::GateSkip {
+                    "—".to_string()
+                } else {
+                    format!("{:.3}", r.llm_delta)
+                };
                 println!(
                     "  {:20}  {:>4}  {:>7.1}%  {:>8}  {:>7.1}%  {:>8}  {:>9}  {:>7.1}  {:>7.1}  {:>5.2}  {:>5}  {:>4}",
                     r.name,
                     gate_tag,
                     r.wer_raw,
-                    "BYPASS",
+                    outcome_tag,
                     r.cer_raw,
-                    "BYPASS",
-                    "—",
+                    outcome_tag,
+                    delta_str,
                     r.acoustics.snr_p10_db,
                     r.acoustics.snr_median_db,
                     r.acoustics.gain_p90,
@@ -332,34 +378,63 @@ fn main() {
                 );
             }
         }
-        let llm_results: Vec<_> = results.iter().filter(|r| !r.bypassed).collect();
-        let n_llm = llm_results.len() as f64;
-        let avg_delta = if n_llm > 0.0 {
-            llm_results.iter().map(|r| r.llm_delta).sum::<f64>() / n_llm
-        } else {
+        let ran: Vec<_> = results
+            .iter()
+            .filter(|r| r.outcome != LlmOutcome::GateSkip)
+            .collect();
+        let edited: Vec<_> = results
+            .iter()
+            .filter(|r| r.outcome == LlmOutcome::Edited)
+            .collect();
+        let avg_delta = if ran.is_empty() {
             0.0
+        } else {
+            ran.iter().map(|r| r.llm_delta).sum::<f64>() / ran.len() as f64
         };
         let n = results.len() as f64;
         let avg_wer_raw = results.iter().map(|r| r.wer_raw).sum::<f64>() / n;
         let avg_wer_pipeline = results.iter().map(|r| r.wer_llm).sum::<f64>() / n;
-        let avg_wer_llm_only = if n_llm > 0.0 {
-            let raw_llm = llm_results.iter().map(|r| r.wer_raw).sum::<f64>() / n_llm;
-            let post_llm = llm_results.iter().map(|r| r.wer_llm).sum::<f64>() / n_llm;
-            format!("  LLM-only: {:.1}% → {:.1}%", raw_llm, post_llm)
-        } else {
-            String::new()
-        };
+        let count = |o: LlmOutcome| results.iter().filter(|r| r.outcome == o).count();
         println!();
         println!(
-            "  Avg WER: {:.1}% → {:.1}%  |  Avg LLM Δ: {:.3}s",
-            avg_wer_raw, avg_wer_pipeline, avg_delta
+            "  Outcomes: {} edit · {} style · {} noop (ran, nothing survived) · {} gate-skip",
+            count(LlmOutcome::Edited),
+            count(LlmOutcome::StyleOnly),
+            count(LlmOutcome::Noop),
+            count(LlmOutcome::GateSkip),
         );
-        if !avg_wer_llm_only.is_empty() {
-            println!("{avg_wer_llm_only}");
+        println!(
+            "  Avg WER: {:.1}% → {:.1}%  |  Avg LLM Δ over {} LLM runs: {:.3}s",
+            avg_wer_raw,
+            avg_wer_pipeline,
+            ran.len(),
+            avg_delta
+        );
+        if !edited.is_empty() {
+            let raw_llm = edited.iter().map(|r| r.wer_raw).sum::<f64>() / edited.len() as f64;
+            let post_llm = edited.iter().map(|r| r.wer_llm).sum::<f64>() / edited.len() as f64;
+            println!("  Edited-only WER: {raw_llm:.1}% → {post_llm:.1}%");
         }
     }
 
     println!();
+}
+
+/// What the LLM pass actually did for a fixture. Raw output equality alone
+/// cannot distinguish these, and they call for opposite tuning responses:
+/// a sea of `Noop` means the validator is rejecting proposed edits (or the
+/// model proposes none); `GateSkip` means the session gate filtered it out.
+#[derive(Clone, Copy, PartialEq)]
+enum LlmOutcome {
+    /// The session gate never invoked the LLM.
+    GateSkip,
+    /// The LLM ran but the final text is byte-identical to the input:
+    /// model no-op or validator revert (the pipeline merge log says which).
+    Noop,
+    /// Only case/punctuation changed — invisible to normalized WER/CER.
+    StyleOnly,
+    /// Word-level edits survived validation.
+    Edited,
 }
 
 struct FixtureResult {
@@ -369,7 +444,7 @@ struct FixtureResult {
     cer_raw: f64,
     cer_llm: f64,
     llm_delta: f64,
-    bypassed: bool,
+    outcome: LlmOutcome,
     acoustics: Acoustics,
     detected_lang: String,
     configured_lang: &'static str,

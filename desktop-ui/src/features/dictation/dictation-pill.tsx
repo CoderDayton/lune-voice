@@ -28,7 +28,10 @@ export function DictationPill() {
   const isIdle = mode === 'idle';
   const isProcessing = mode === 'processing';
 
-  const handleCancel = () => {
+  const handleCancel = (e: React.MouseEvent<HTMLButtonElement>) => {
+    // Drop focus: dictated text typed while this window is focused must not
+    // re-activate pill buttons via Space/Enter.
+    e.currentTarget.blur();
     cancelRef.current = true;
     debouncedFire(() => backendClient.cancelDictation(), 'cancel');
     setTimeout(() => {
@@ -45,7 +48,10 @@ export function DictationPill() {
           <button
             type="button"
             className="pill-idle"
-            onClick={() => debouncedFire(() => backendClient.toggleDictation(), 'toggle')}
+            onClick={(e) => {
+              e.currentTarget.blur();
+              debouncedFire(() => backendClient.toggleDictation(), 'toggle');
+            }}
             aria-label={t`Start dictation`}
           >
             <MicIcon />
@@ -80,7 +86,10 @@ export function DictationPill() {
               <button
                 type="button"
                 className="pill-btn pill-btn-stop"
-                onClick={() => debouncedFire(() => backendClient.stopDictation(), 'stop')}
+                onClick={(e) => {
+                  e.currentTarget.blur();
+                  debouncedFire(() => backendClient.stopDictation(), 'stop');
+                }}
                 aria-label={t`Stop dictation`}
               >
                 <StopIcon />

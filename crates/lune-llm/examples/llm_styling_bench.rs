@@ -77,6 +77,7 @@ fn main() {
         context: None,
         language: "en".into(),
         uncertain_words: vec![],
+        correction_needed: true,
     };
 
     let t0 = Instant::now();

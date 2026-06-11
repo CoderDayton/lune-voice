@@ -1,9 +1,7 @@
-Accelerate
 Activation Quantization
 Actix
 AdaLoRA
 AdamW
-Adapter
 Adapter Fusion
 Adapter Model
 Adept AI | Adept
@@ -11,14 +9,12 @@ AGIEval
 AI21 Labs
 Aider
 AIME
-Airflow
 Albumentations
 Alembic
 Algolia
 ALiBi
 all-MiniLM-L6-v2 | all MiniLM L6 v2
 AllenNLP
-Alpaca
 AlpacaEval
 AlphaCode
 AlphaCode 2 | AlphaCode 2
@@ -35,8 +31,6 @@ Amazon Bedrock | Bedrock
 Amazon CodeWhisperer | CodeWhisperer
 Amazon Q
 Amazon SageMaker | SageMaker
-Angular
-Annoy
 Ansible
 Anthropic
 Anthropic API
@@ -46,12 +40,10 @@ Apple Machine Learning | Apple ML
 APPS
 ARC Challenge | ARC-C
 ARC Easy | ARC-E
-Arctic
 Arena Elo
 Arrow | Apache Arrow
 AssemblyAI
 Astro
-Attention
 AudioCraft
 AudioLM
 AutoGen
@@ -67,10 +59,8 @@ Azure OpenAI Service | Azure OpenAI
 Babel
 Baichuan
 Bard | Google Bard
-Bark
 Base Model
 Baseten
-Bash
 Bazel
 Beam Search
 Beautiful Soup | bs4
@@ -88,7 +78,6 @@ BIG-bench Hard | BBH
 Big-Bench | BIG-bench
 BigQuery
 BioASQ
-Biome
 Bitbucket
 BitsAndBytes | bitsandbytes
 Black
@@ -98,25 +87,18 @@ BM25
 Bokeh
 BookCorpus
 BoolQ
-Bootstrap
 BPE | Byte Pair Encoding
 Braintrust
 Bruno
-Buck
-Bun
-Burn
 Byte Pair Encoding | BPE
 C
 C# | C Sharp
 C++ | C Plus Plus
 C4 | Colossal Clean Crawled Corpus
-Calibration
 candle | Hugging Face Candle
-Cargo
 Cassandra
 CatBoost
 Causal Language Model | CLM
-Celery
 Cerebras
 CEval
 Chainlit
@@ -163,7 +145,6 @@ CodeQwen
 Codestral
 CodeT5
 CodeT5 Plus | CodeT5+
-Cog
 Cohere
 Cohere API
 Cohere Command
@@ -182,7 +163,6 @@ Conda
 Consistency Model
 Constrained Decoding
 Context Window
-Continue
 Contriever
 ControlNet
 ConvNeXt
@@ -200,14 +180,11 @@ Cross-Encoder
 CSS
 CUDA
 cuDNN
-Cursor
 Cursor Composer
-Cypress
 Dagster
 DALL-E 2 | Dall E 2
 DALL-E 3 | Dall E 3
 DALL-E | Dall E
-Dart
 Dask
 Databricks
 Databricks Mosaic AI | MosaicML
@@ -217,7 +194,6 @@ Datasets | Hugging Face Datasets
 DBRX
 dbt | Data Build Tool
 DDP | Distributed Data Parallel
-Decoder
 Decoder-Only
 DeepEval
 DeepFace
@@ -236,20 +212,16 @@ Detectron2 | Detectron 2
 Devbox
 Developer Message
 Devin
-Diesel
 Diffusers | Hugging Face Diffusers
 Diffusion Model
 DigitalOcean
 DINOv2 | DINO v2
 Direct Preference Optimization | DPO
 direnv
-Discord
 Distil-Whisper | Distil Whisper
-Distillation
 Django
 Docker
 Docker Compose
-Dolly
 DoRA
 DPR | Dense Passage Retrieval
 DreamBooth
@@ -257,7 +229,6 @@ DROP
 DS-1000
 DSPy
 DuckDB
-Dust
 DVC | Data Version Control
 DynamoDB
 E5
@@ -265,16 +236,12 @@ E5 Large
 EAGLE
 EfficientNet
 Elastic | Elasticsearch
-Electron
 EleutherAI Eval Harness
 ElevenLabs
-Elixir
 Emacs
 Embedding Model
-Encoder
 Encoder-Decoder
 Ensembling
-Entropy
 Equinox
 Erlang
 ERNIE
@@ -290,7 +257,6 @@ F# | F Sharp
 FaceNet
 Fairseq
 FAISS
-Falcon
 Falcon 180B
 Falcon 40B
 Falcon 7B
@@ -301,12 +267,9 @@ FineWeb-Edu
 Firebase
 Fireworks AI
 Fish Shell | fish
-Flamingo
 FlashAttention
 FlashAttention 2
 FlashAttention 3
-Flask
-Flax
 Florence
 Florence-2 | Florence 2
 Flow Matching
@@ -348,7 +311,6 @@ Gitea
 GitHub
 GitHub Copilot
 GitLab
-Glean
 GLM
 GLM-4 | GLM 4
 GLUE
@@ -358,7 +320,6 @@ Google AI Studio | AI Studio
 Google DeepMind | DeepMind
 Google Research
 Google Vertex AI | Vertex AI
-Goose
 GPQA
 GPT
 GPT-2 | GPT 2
@@ -376,7 +337,6 @@ Gradio
 Gradle
 Grafana
 Grammar Sampling
-Granite
 GraphQL
 GraphRAG | Graph RAG
 Greedy Decoding
@@ -392,13 +352,10 @@ gRPC
 GRPO | Group Relative Policy Optimization
 GRU
 GSM8K
-Guidance
 Guild AI
 Gunicorn
-Haiku
 Harvey AI | Harvey
 Haskell
-Haystack
 Hebbia
 Helicone
 HellaSwag
@@ -416,7 +373,6 @@ Hugging Face Hub | HF Hub
 HumanEval
 Hybrid Search
 HyDE | Hypothetical Document Embeddings
-Hyper
 Hyperopt
 IA3
 IBM Granite
@@ -428,10 +384,8 @@ Imagen 2
 Imagen 3
 ImageNet
 Inflection AI
-Insomnia
 Instruct Model
 Instruction Tuning
-Instructor
 INT4 | int4
 INT8 | int8
 IntelliJ IDEA
@@ -445,7 +399,6 @@ Jasper
 Java
 JavaScript
 JAX
-Jest
 Jina Embeddings
 Jina Reranker
 Jinja Template | Jinja
@@ -487,7 +440,6 @@ Latent Diffusion
 LayerNorm
 Le Chat | Mistral Le Chat
 LightGBM
-Linear
 Lion Optimizer | Lion
 LiteLLM
 LiveCodeBench
@@ -518,7 +470,6 @@ LSTM
 Lua
 Luma Dream Machine | Dream Machine
 Magicoder
-Make
 Make-A-Video | Make A Video
 Mamba
 MariaDB
@@ -531,7 +482,6 @@ MATH
 MATLAB
 Matplotlib
 Maturin
-Maven
 MBPP
 MedMCQA
 MedQA
@@ -569,8 +519,6 @@ MLX
 MMLU
 MMLU Pro
 MMMU
-Mocha
-Modal
 Model Card
 Model Soups
 MoE | Mixture of Experts
@@ -589,7 +537,6 @@ NATS
 Natural Questions | NQ
 NCCL
 Nemotron
-Neon
 Neovim
 Neptune
 Netlify
@@ -597,14 +544,10 @@ New Relic
 Next.js | NextJS
 NF4
 ngrok
-Ninja
-Nix
 NixOS
 NLTK
 Node.js | Node
 Nomic AI
-Notebook
-Notion
 Nous Hermes 2
 Nous Hermes 3
 Nous Hermes | Hermes
@@ -647,28 +590,21 @@ OpenSearch
 OpenTelemetry | OTel
 OpenVINO
 OpenWebText
-Optimum
 Optuna
 Oracle Cloud | OCI
-Orca
 ORPO
 ort | ONNX Runtime Rust
 OSCAR
-Outlines
 P-Tuning
 PagedAttention
 PagerDuty
 PaliGemma
 PaLM 2 | Palm 2
 PaLM | Pathways Language Model
-Pandas
-Pants
 Parquet
 Parti
 PEFT
 Perl
-Perplexity
-Phi
 Phi-2 | Phi 2
 Phi-3 Mini | Phi 3 Mini
 Phi-3 | Phi 3
@@ -678,38 +614,29 @@ Phoenix | Arize Phoenix
 PHP
 Pika
 Pika Labs
-Pile
 Pile of Law
 Pillow | PIL
-Pinecone
 pip
 PIQA
 Pixi
 Pixtral
 PlanetScale
-Playwright
 Plotly
 pnpm
 Podman
-Poetry
 Polars
 PostgreSQL | Postgres
-Postman
 PowerShell
 PPO | Proximal Policy Optimization
 PQ | Product Quantization
 Predibase
-Prefect
 Prefix Tuning
 Presence Penalty
-Prettier
 Prometheus
-Prompt
 Prompt Tuning
 Promptfoo
 PromptLayer
 Protocol Buffers | Protobuf
-Pruning
 PubMedQA
 Pulumi
 PyCharm
@@ -738,12 +665,9 @@ RabbitMQ
 Radix UI
 RAG | Retrieval Augmented Generation
 Ragas
-Railway
-Ray
 Ray Serve
 Ray Train
 Ray Tune
-React
 React Native
 Real-ESRGAN | Real ESRGAN
 Reasoning Model
@@ -758,12 +682,8 @@ RefinedWeb
 ReFT | Representation Finetuning
 Reka AI
 ReLU
-Remix
-Render
 Repetition Penalty
-Replicate
 Replit Agent
-Requests
 Reqwest
 Reranker
 ResNet
@@ -773,21 +693,16 @@ RLAIF | Reinforcement Learning from AI Feedback
 RLHF | Reinforcement Learning from Human Feedback
 RMSNorm
 RNN | Recurrent Neural Network
-Rocket
 ROCm
 Rollup
 ROOTS
 RoPE | Rotary Position Embedding
 rsLoRA
-Ruby
 Ruff
-Runway
 Runway Gen-1 | Gen 1
 Runway Gen-2 | Gen 2
 Runway Gen-3 | Gen 3
-Rust
 RVC | Retrieval-based Voice Conversion
-Rye
 Safetensors
 SafeTensors | safetensors
 SAM 2 | Segment Anything 2
@@ -812,27 +727,21 @@ Sentence Transformers
 Sentence-BERT | SBERT
 SentencePiece
 SentencePiece Model | spm
-Sentry
 Serde
 SGD | Stochastic Gradient Descent
 SGLang
 shadcn/ui | shadcn UI
 SigLIP
 SIQA
-Slack
 SmolLM
 SmolVLM
 SmoothQuant
-Snowflake
 Snowflake Arctic
-Solar
 SolidJS
 Sora
 Sourcegraph Cody | Cody
 Space | Hugging Face Space
 spaCy
-Spark
-Sparsity
 Speculative Decoding
 Speechmatics
 SPLADE
@@ -849,13 +758,10 @@ Stable Diffusion 3
 Stable Diffusion XL | SDXL
 Stable Video Diffusion
 StableLM
-Stanza
 StarCoder
 StarCoder2 | StarCoder 2
 Starlette
-Starling
 Statsmodels
-Storybook
 Streamlit
 Structured Outputs
 Structured Sparsity
@@ -864,12 +770,10 @@ SuperGLUE
 Supervised Fine-Tuning | SFT
 Svelte
 SvelteKit
-Swagger
 SWC
 SWE-agent | SWE agent
 SWE-bench Verified | SWE Bench Verified
 SWE-bench | SWE Bench
-Swift
 SwiGLU
 Swin Transformer
 Switch Transformer
@@ -877,7 +781,6 @@ System Prompt
 Tabnine
 Tailwind CSS | Tailwind
 Tauri
-Temperature
 TensorFlow
 TensorRT
 TensorRT-LLM
@@ -913,7 +816,6 @@ TorchText
 TorchVision
 Tortoise TTS
 tract
-Transformer
 Transformers | Hugging Face Transformers
 Triton Inference Server | NVIDIA Triton
 TriviaQA
@@ -953,14 +855,12 @@ Voyage Embeddings
 VQAv2
 VS Code | Visual Studio Code
 Vue
-Warmup
 Weaviate
 WebArena
 Webpack
 WebStorm
 Weight Quantization
 Weights & Biases | wandb
-Whisper
 Whisper API
 Whisper Base
 Whisper Large
@@ -978,7 +878,6 @@ Winogrande
 WizardCoder
 WizardLM
 WordPiece
-Writer
 xAI | X AI
 XGBoost
 XLA

@@ -121,6 +121,7 @@ fn dictionary_example_correction_smoke() {
         context: None,
         language: "en".into(),
         uncertain_words: vec![],
+        correction_needed: true,
     };
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()

@@ -20,7 +20,7 @@ pub enum ModelSpec {
         required_files: Vec<String>,
         /// Suffix patterns to match (e.g. `.onnx`).
         suffix_patterns: Vec<String>,
-        /// Local directory name under `models/` (e.g. `parakeet-tdt-0.6b`).
+        /// Local directory name under `models/` (e.g. `qwen3-asr-0.6b`).
         local_name: String,
         /// Human-readable description of this model's role.
         description: &'static str,
@@ -59,21 +59,6 @@ pub struct DownloadProgress {
 }
 
 impl ModelSpec {
-    pub fn parakeet_tdt() -> Self {
-        Self::Directory {
-            repo_id: "istupakov/parakeet-tdt-0.6b-v3-onnx".into(),
-            required_files: vec![
-                "vocab.txt".into(),
-                "encoder-model.int8.onnx".into(),
-                "decoder_joint-model.int8.onnx".into(),
-            ],
-            suffix_patterns: vec![],
-            local_name: model_dirs::DIR_PARAKEET.into(),
-            description: "Speech-to-text engine. CTC-based ONNX model.",
-            required: true,
-        }
-    }
-
     pub fn qwen3_asr() -> Self {
         Self::Directory {
             repo_id: "Qwen/Qwen3-ASR-0.6B".into(),
@@ -105,7 +90,6 @@ impl ModelSpec {
     pub fn display_name(&self) -> &str {
         let Self::Directory { local_name, .. } = self;
         match local_name.as_str() {
-            model_dirs::DIR_PARAKEET => "Parakeet TDT 0.6B",
             model_dirs::DIR_QWEN3_ASR => "Qwen3-ASR 0.6B ONNX",
             model_dirs::DIR_STYLE_LLM => "Qwen3 0.6B ONNX",
             _ => local_name,

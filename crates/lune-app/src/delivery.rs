@@ -1,4 +1,5 @@
-use std::sync::mpsc;
+use std::sync::{Arc, Mutex, mpsc};
+use std::time::{Duration, Instant};
 
 use lune_core::config::{DictationMode, TerminalMode};
 use tracing::{debug, info, warn};
@@ -17,20 +18,27 @@ struct DeliveryMsg {
     target: Option<WindowTarget>,
 }
 
+/// Tail after a delivery finishes during which it still reports busy — lets
+/// in-flight synthetic key events drain out of the compositor and app queues.
+const DELIVERY_SETTLE: Duration = Duration::from_millis(300);
+
 /// Handle to the background delivery thread.
 #[derive(Clone)]
 pub struct DeliveryService {
     tx: mpsc::Sender<DeliveryMsg>,
+    busy_until: Arc<Mutex<Option<Instant>>>,
 }
 
 impl DeliveryService {
     pub fn new(terminal_mode: TerminalMode) -> Result<Self, String> {
         let (tx, rx) = mpsc::channel::<DeliveryMsg>();
+        let busy_until = Arc::new(Mutex::new(None));
+        let busy = Arc::clone(&busy_until);
         std::thread::Builder::new()
             .name("delivery".into())
-            .spawn(move || delivery_thread(rx, terminal_mode))
+            .spawn(move || delivery_thread(rx, terminal_mode, busy))
             .map_err(|e| format!("spawn delivery thread: {e}"))?;
-        Ok(Self { tx })
+        Ok(Self { tx, busy_until })
     }
 
     pub fn deliver(&self, text: &str, mode: DictationMode) -> bool {
@@ -71,6 +79,18 @@ impl DeliveryService {
         self.deliver(&text, mode)
     }
 
+    /// True while queued text is being typed/pasted, plus a short settle
+    /// tail. Dictation starts are suppressed during this window: our own
+    /// synthetic keystrokes landing on a focused UI control (e.g. the toggle
+    /// button, re-activated by every typed space) must never be able to
+    /// drive sessions in a feedback loop.
+    pub fn is_busy(&self) -> bool {
+        self.busy_until
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .is_some_and(|t| Instant::now() < t)
+    }
+
     pub fn is_alive(&self) -> bool {
         // A zero-capacity test: if the receiver is dropped, send returns Err.
         // We send empty text which `deliver()` guards against, but the thread
@@ -88,7 +108,11 @@ impl DeliveryService {
 
 // ─── Platform-specific delivery ──────────────────────────────────────────────
 
-fn delivery_thread(rx: mpsc::Receiver<DeliveryMsg>, terminal_mode: TerminalMode) {
+fn delivery_thread(
+    rx: mpsc::Receiver<DeliveryMsg>,
+    terminal_mode: TerminalMode,
+    busy_until: Arc<Mutex<Option<Instant>>>,
+) {
     let mut driver = match PlatformDriver::new(terminal_mode) {
         Ok(d) => d,
         Err(e) => {
@@ -101,6 +125,14 @@ fn delivery_thread(rx: mpsc::Receiver<DeliveryMsg>, terminal_mode: TerminalMode)
 
     while let Ok(msg) = rx.recv() {
         let text: &str = &msg.text;
+        // Empty `is_alive` probes must not register as busy.
+        if text.is_empty() {
+            continue;
+        }
+        // Busy from dequeue until the driver returns; typing can take
+        // seconds (~2 ms/char), and senders only see the queue, not this.
+        *busy_until.lock().unwrap_or_else(|e| e.into_inner()) =
+            Some(Instant::now() + Duration::from_secs(3600));
         #[cfg(unix)]
         let has_target = msg.target.is_some();
         #[cfg(not(unix))]
@@ -126,6 +158,8 @@ fn delivery_thread(rx: mpsc::Receiver<DeliveryMsg>, terminal_mode: TerminalMode)
             }
         }
         let _ = has_target;
+        *busy_until.lock().unwrap_or_else(|e| e.into_inner()) =
+            Some(Instant::now() + DELIVERY_SETTLE);
     }
 
     debug!("delivery thread exiting");

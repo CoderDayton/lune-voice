@@ -8,15 +8,19 @@ I/O.
 
 Usage:
     python scripts/export_onnx.py --asr --output-dir models/qwen3-asr-0.6b-onnx
-    python scripts/export_onnx.py --fa
+    python scripts/export_onnx.py --asr --quant-policy balanced
+    python scripts/export_onnx.py --asr --revision <commit-sha> --quant-policy safe
+    python scripts/export_onnx.py --asr --quant-policy compact
     python scripts/export_onnx.py --asr --no-quantize
 
 Requirements:
     pip install torch transformers onnx onnxscript onnxruntime
 """
+
 from __future__ import annotations
 
 import argparse
+import json
 import warnings
 from pathlib import Path
 
@@ -40,22 +44,38 @@ DTYPE = torch.float16
 
 
 def _save_consolidated(model: onnx.ModelProto, out_path: Path) -> None:
-    """Save ONNX model with all large tensors in a single external data file."""
+    """Save ONNX model with all large tensors in a single external data file.
+
+    Serializes into a temp directory first, then moves both files into place,
+    so a failed save never leaves a corrupt model/data pair behind.
+    """
     data_name = out_path.stem + ".onnx_data"
     data_path = out_path.parent / data_name
-    if data_path.exists():
-        data_path.unlink()
+    tmp_dir = out_path.parent / f".{out_path.stem}.tmp-save"
+    if tmp_dir.exists():
+        for stale in tmp_dir.iterdir():
+            stale.unlink()
+    else:
+        tmp_dir.mkdir(parents=True)
 
     onnx.save_model(
         model,
-        str(out_path),
+        str(tmp_dir / out_path.name),
         save_as_external_data=True,
         all_tensors_to_one_file=True,
         location=data_name,
         size_threshold=1024,
     )
-    sz = data_path.stat().st_size / (1024 * 1024)
-    print(f"    {data_name}: {sz:.1f} MB")
+    (tmp_dir / out_path.name).replace(out_path)
+    tmp_data = tmp_dir / data_name
+    if tmp_data.exists():
+        tmp_data.replace(data_path)
+    elif data_path.exists():
+        data_path.unlink()
+    tmp_dir.rmdir()
+    if data_path.exists():
+        sz = data_path.stat().st_size / (1024 * 1024)
+        print(f"    {data_name}: {sz:.1f} MB")
 
 
 def _consolidate_external_data(directory: Path, onnx_name: str) -> None:
@@ -70,6 +90,8 @@ def _consolidate_external_data(directory: Path, onnx_name: str) -> None:
 def _list_files(directory: Path) -> None:
     total = 0
     for f in sorted(directory.iterdir()):
+        if not f.is_file():
+            continue
         sz = f.stat().st_size
         total += sz
         if sz > 1_000_000:
@@ -77,324 +99,890 @@ def _list_files(directory: Path) -> None:
     print(f"  TOTAL: {total / (1024 * 1024):.1f} MB")
 
 
-# ── SmoothQuant Calibration ──────────────────────────────────────────────────
-
-# Multilingual calibration corpus for SmoothQuant W8A8 quantization.  Covers
-# English (~25%, dominant dictation use-case) plus balanced representation of
-# all 30 Qwen3-ASR supported languages so the per-channel smoothing factors
-# capture activation distributions across language-specific decoder pathways.
-# ~160 samples.  Variety in register (formal, technical, casual, numbers) and
-# sentence length exercises different sequence-length regimes.
-_CALIB_TEXTS: list[str] = [
-    # ── English (100) ───────────────────────────────────────────────────────
-    "The meeting is scheduled for Tuesday at three pm.",
-    "She finished the report ahead of schedule and her manager approved it.",
-    "Install the dependency and then run the build command in the terminal.",
-    "The quick brown fox jumps over the lazy dog.",
-    "I wanted to follow up on our discussion last week regarding the project timeline.",
-    "Let's make an async function called sync data that awaits a fetch to the API.",
-    "Handle the case where the cache is empty or the key does not exist.",
-    "So we gotta nuke the old user profile class and replace it with a new interface.",
-    "Thank you for getting back to me. I will review the document and send my feedback by Friday.",
-    "The main blocker is the dependency on the auth service owned by the platform team.",
-    "From the respect paid her on all sides she seemed like a queen.",
-    "The church was built in the fourteenth century and restored in eighteen ninety.",
-    "The neural network was trained on a large corpus of annotated speech data.",
-    "After three weeks of testing we finally shipped the feature to production.",
-    "Hey can you take a look at the PR when you get a chance?",
-    "The quarterly earnings report will be published on the company website.",
-    "We need to refactor the authentication module before the next sprint.",
-    "The patient was admitted to the hospital on December fifth with mild symptoms.",
-    "Could you please mute yourself? There's a lot of background noise.",
-    "Revenue increased by fourteen percent compared to the same quarter last year.",
-    "The transformer architecture relies on multi-head self-attention mechanisms.",
-    "I'll circle back with you after I get the numbers from the finance team.",
-    "Add a try catch block around the database query to handle connection timeouts.",
-    "Ladies and gentlemen, welcome aboard flight seven twenty three to London.",
-    "The contract expires on March thirty first and we need to renegotiate the terms.",
-    "She said she'd be about fifteen minutes late because of traffic on the highway.",
-    "Please make sure the unit tests pass before you push your changes to main.",
-    "Global temperatures have risen by approximately one point two degrees Celsius.",
-    "The server returned a five hundred error when we tried to process the payment.",
-    "I think the issue is in the middleware layer between the gateway and the backend.",
-    "The new policy goes into effect on January first of next year.",
-    "Can you read that back to me? I want to make sure I didn't miss anything.",
-    "We observed a significant improvement in latency after switching to the new cache.",
-    "Uh let me think about that for a second. Yeah I think we should go with option B.",
-    "The study enrolled three hundred and forty two participants across eight sites.",
-    "Set the environment variable to production and restart the Docker container.",
-    "He spoke for roughly twenty minutes about the importance of renewable energy.",
-    "Open a pull request against the develop branch and tag me as a reviewer.",
-    "The population of the metropolitan area exceeded four point seven million.",
-    "Don't forget to update the changelog and bump the version number.",
-    # ── English slang / casual / internet speech ────────────────────────────
-    "Bro that deploy was lowkey sketchy, we should probably roll it back.",
-    "Nah I'm good, I already ate like an hour ago.",
-    "That's cap, there's no way the tests passed on the first try.",
-    "Yo did you see the new trailer? It looks fire honestly.",
-    "I'm literally dying, the CI has been broken for three days straight.",
-    "She really said that in the standup? That's wild bro.",
-    "OK boomer, we don't use jQuery anymore.",
-    "Fr fr that error message is so unhelpful it might as well not exist.",
-    "It's giving spaghetti code vibes, we need to clean this up ASAP.",
-    "No shot that runs in under two seconds, the query is way too heavy.",
-    "Bet, I'll push the fix after lunch and ping you on Slack.",
-    "Dude the latency on this endpoint is sus, something's definitely wrong.",
-    "Deadass the whole service went down because of a missing semicolon.",
-    "That's bussin, the new UI is way cleaner than the old one.",
-    "Bruh moment when you realize you've been debugging the wrong branch.",
-    "He's goated at system design, like actually cracked at it.",
-    "I'm not gonna lie, the docs for this library are mid at best.",
-    "Ayo who pushed to main without a review? That's not it chief.",
-    "Slay, the refactor actually made the code readable for once.",
-    "This meeting could've been an email, I'm just saying.",
-    "Finna yeet this whole module and rewrite it from scratch.",
-    "That PR is a vibe check for the entire codebase honestly.",
-    "W take on the architecture decision, that's gonna save us months.",
-    "L move putting the secrets in the repo, even on accident.",
-    "Gonna dip early today, I've been grinding since like six AM.",
-    "That feature request is so extra, nobody's ever gonna use it.",
-    "Ight imma head out, my brain is cooked from this debugging session.",
-    "Sheesh that function is like two hundred lines, we gotta break it up.",
-    "Lowkey the intern wrote better code than half the senior devs.",
-    "It's not a bug it's a feature, copium at its finest.",
-    "Respectfully, that code review comment was kinda toxic.",
-    "Touch grass bro, you've been staring at that stack trace for four hours.",
-    "Main character energy walking into the sprint planning with zero tickets done.",
-    "The API is ghosting us, keeps timing out with no error message.",
-    "Tell me you don't write tests without telling me you don't write tests.",
-    "Rent free in my head, I keep thinking about that race condition.",
-    "That's a skill issue not a tooling issue, just read the docs.",
-    "Unalive the process and restart it, the memory leak is getting bad.",
-    "Big yikes on that SQL injection vulnerability, how did that pass review?",
-    "NGL that's actually a pretty clean solution, props to whoever wrote it.",
-    "Caught in four K pushing to prod on a Friday afternoon.",
-    "POV you're the oncall engineer and everything breaks at three AM.",
-    "Ratio'd by the linter, it found more issues than the reviewer did.",
-    "This codebase is giving legacy vibes, nobody's touched it since twenty nineteen.",
-    "Ate and left no crumbs with that database migration, zero downtime.",
-    "The code is cheugy but it works so I'm not touching it.",
-    "Periodt, we're not shipping without integration tests anymore.",
-    "Iykyk but the real bottleneck is the network call not the algorithm.",
-    "Mid opinion but I think we should just use Postgres for everything.",
-    "Clapped back at the stakeholder with actual metrics, not just vibes.",
-    "That commit message is giving unhinged energy, what does fix stuff even mean?",
-    "Salty about the merge conflict, I literally just rebased five minutes ago.",
-    "It's the lack of error handling for me, like what if the file doesn't exist?",
-    "Based take, microservices are overkill for a team of three.",
-    "Understood the assignment, shipped the hotfix in under twenty minutes.",
-    "Core memory unlocked, remember when we used to FTP deploy to production?",
-    "Living rent free in the tech debt backlog for six sprints now.",
-    "Hits different when the tests actually catch a real bug for once.",
-    "We stay winning, the migration finished with zero data loss.",
-    "Hard pass on that framework, the bundle size is absolutely unhinged.",
-    # ── Chinese (10) ────────────────────────────────────────────────────────
-    "今天的会议讨论了季度业绩报告的初步结果和下一步计划。",
-    "她打开窗户，清晨的阳光洒进了整个房间。",
-    "请在周五之前提交你的项目进展报告，包括具体的数据指标。",
-    "这个函数的时间复杂度是O(n log n)，可以满足性能要求。",
-    "上海的常住人口已经超过了两千四百万人。",
-    "我觉得这个方案可以，但是需要再考虑一下成本问题。",
-    "新版本修复了三个关键的安全漏洞，建议尽快升级。",
-    "下午三点半我们在会议室开一个简短的站会。",
-    "深度学习模型的训练需要大量的标注数据和计算资源。",
-    "麻烦帮我把这段话翻译成英文，谢谢。",
-    # ── Cantonese (5) ───────────────────────────────────────────────────────
-    "今日嘅會議傾咗好多關於項目進度嘅嘢。",
-    "你幫我睇下呢個文件有冇問題先。",
-    "聽日下晝三點喺辦公室開會，記得準時。",
-    "呢個月嘅銷售額比上個月增長咗百分之十二。",
-    "我哋要喺截止日期之前完成所有測試。",
-    # ── Japanese (8) ────────────────────────────────────────────────────────
-    "本日の会議では四���期業績レポートの初期結果について議論しました。",
-    "彼女は窓を開けて、朝の光が部屋全体に差し込んだ。",
-    "来週の月曜日までにレビューを完了してください。",
-    "このアルゴリズムの計算量はO(n)で、十分高速です。",
-    "東京の人口は約千四百万人で、世界最大級の都市圏です。",
-    "すみません、もう一度言っていただけますか。",
-    "新しいバージョンではユーザーインターフェースが大幅に改善されました。",
-    "データベースのマイグレーションは深夜のメンテナンス時間に実行します。",
-    # ── Korean (6) ──────────────────────────────────────────────────────────
-    "오늘 회의에서 분기별 실적 보고서의 초기 결과를 논의했습니다.",
-    "다음 주 화요일까지 코드 리뷰를 완료해 주세요.",
-    "이 시스템의 응답 시간이 평균 이백 밀리초 이하로 줄었습니다.",
-    "서울의 인구는 약 천만 명으로 한국 전체 인구의 오분의 일입니다.",
-    "죄송합니다만 다시 한번 말씀해 주시겠어요?",
-    "배포 전에 스테이징 환경에서 모든 테스트를 통과해야 합니다.",
-    # ── French (8) ──────────────────────────────────────────────────────────
-    "Je souhaite rappeler que ces droits étaient intégrés dans la réforme de deux mille huit.",
-    "La prochaine réunion est prévue pour mardi à quinze heures.",
-    "Le chiffre d'affaires a augmenté de dix-huit pour cent au troisième trimestre.",
-    "Veuillez vérifier que tous les tests unitaires passent avant de fusionner.",
-    "La température moyenne a augmenté d'environ un degré et demi depuis mille neuf cent.",
-    "Est-ce que tu peux me renvoyer le fichier? Je ne le trouve plus.",
-    "Le nouveau modèle utilise une architecture de type transformeur avec attention multi-tête.",
-    "Paris compte environ deux millions d'habitants dans la ville intra-muros.",
-    # ── German (8) ──────────────────────────────────────────────────────────
-    "Es antwortet auf die Notwendigkeit, Filmförderung als Motor des interkulturellen Dialogs einzusetzen.",
-    "Die Sitzung wurde auf nächsten Donnerstag verschoben.",
-    "Der Umsatz ist im Vergleich zum Vorjahr um zwölf Prozent gestiegen.",
-    "Bitte stellen Sie sicher, dass alle Abhängigkeiten korrekt installiert sind.",
-    "Die Bevölkerung Berlins beträgt ungefähr drei Komma sieben Millionen Einwohner.",
-    "Können Sie das bitte noch einmal wiederholen? Ich habe es nicht verstanden.",
-    "Das neuronale Netz wurde mit über zwei Millionen annotierten Beispielen trainiert.",
-    "Wir müssen den Fehler vor dem nächsten Release beheben.",
-    # ── Spanish (8) ─────────────────────────────────────────────────────────
-    "Quiero comenzar mis palabras haciendo referencia a la huelga general en defensa de la educación pública.",
-    "El informe trimestral será publicado en el sitio web de la empresa.",
-    "Los ingresos aumentaron un quince por ciento en comparación con el año anterior.",
-    "Por favor, asegúrate de que las pruebas pasen antes de hacer el despliegue.",
-    "La Ciudad de México tiene una población de aproximadamente nueve millones de habitantes.",
-    "¿Puedes repetir eso? No te escuché bien por el ruido de fondo.",
-    "El algoritmo de ordenamiento tiene una complejidad temporal de O(n log n).",
-    "Necesitamos revisar el contrato antes de que expire el treinta y uno de marzo.",
-    # ── Portuguese (5) ──────────────────────────────────────────────────────
-    "A reunião foi adiada para a próxima semana por motivos de agenda.",
-    "O faturamento cresceu dezenove por cento no último trimestre.",
-    "Por favor, verifique se todos os testes estão passando antes de enviar.",
-    "São Paulo é a cidade mais populosa do Brasil com mais de doze milhões de habitantes.",
-    "O novo sistema reduziu o tempo de resposta em quarenta por cento.",
-    # ── Italian (5) ─────────────────────────────────────────────────────────
-    "Il G8 e il G20 hanno confermato il nostro indirizzo sull'abolizione del segreto bancario.",
-    "La riunione è stata rinviata a giovedì prossimo.",
-    "Il fatturato è aumentato del tredici per cento rispetto all'anno precedente.",
-    "Assicurati che tutti i test siano superati prima di fare il rilascio.",
-    "Roma ha una popolazione di circa due milioni e ottocentomila abitanti.",
-    # ── Russian (5) ─────────────────────────────────────────────────────────
-    "Заседание было перенесено на следующий четверг из-за расписания.",
-    "Квартальный отчёт будет опубликован на сайте компании.",
-    "Выручка выросла на шестнадцать процентов по сравнению с прошлым годом.",
-    "Пожалуйста, убедитесь, что все зависимости установлены корректно.",
-    "Население Москвы составляет около тринадцати миллионов человек.",
-    # ── Arabic (5) ──────────────────────────────────────────────────────────
-    "تم تأجيل الاجتماع إلى يوم الخميس القادم بسبب ظروف الجدول الزمني.",
-    "ارتفعت الإيرادات بنسبة أربعة عشر بالمائة مقارنة بالعام الماضي.",
-    "يرجى التأكد من اجتياز جميع الاختبارات قبل النشر.",
-    "يبلغ عدد سكان القاهرة الكبرى حوالي عشرين مليون نسمة.",
-    "النموذج الجديد يستخدم بنية المحولات مع آلية الانتباه الذاتي.",
-    # ── Hindi (4) ───────────────────────────────────────────────────────────
-    "आज की बैठक में तिमाही प्रदर्शन रिपोर्ट के प्रारंभिक परिणामों पर चर्चा हुई।",
-    "कृपया सुनिश्चित करें कि सभी परीक्षण तैनाती से पहले सफल हों।",
-    "दिल्ली की जनसंख्या लगभग दो करोड़ से अधिक है।",
-    "नया संस्करण तीन प्रमुख सुरक्षा कमजोरियों को ठीक करता है।",
-    # ── Thai (4) ────────────────────────────────────────────────────────────
-    "การประชุมวันนี้ได้หารือเกี่ยวกับผลการดำเนินงานประจำไตรมาส",
-    "กรุณาตรวจสอบว่าการทดสอบทั้งหมดผ่านก่อนการปรับใช้",
-    "กรุงเทพมหานครมีประชากรประมาณสิบล้านคน",
-    "รายได้เพิ่มขึ้นร้อยละสิบสองเมื่อเทียบกับปีที่แล้ว",
-    # ── Vietnamese (4) ──────────────────────────────────────────────────────
-    "Cuộc họp hôm nay đã thảo luận về kết quả hoạt động hàng quý.",
-    "Vui lòng đảm bảo tất cả các bài kiểm tra đều đạt trước khi triển khai.",
-    "Dân số thành phố Hồ Chí Minh vào khoảng chín triệu người.",
-    "Doanh thu tăng mười bảy phần trăm so với cùng kỳ năm ngoái.",
-    # ── Indonesian (4) ──────────────────────────────────────────────────────
-    "Rapat hari ini membahas hasil kinerja kuartal dan rencana selanjutnya.",
-    "Pastikan semua pengujian berhasil sebelum melakukan deploy ke produksi.",
-    "Jakarta memiliki populasi sekitar sepuluh juta penduduk.",
-    "Pendapatan meningkat sebesar lima belas persen dibandingkan tahun lalu.",
-    # ── Turkish (4) ─────────────────────────────────────────────────────────
-    "Toplantı gelecek perşembe gününe ertelendi.",
-    "Gelir geçen yıla kıyasla yüzde on üç oranında arttı.",
-    "Lütfen dağıtımdan önce tüm testlerin geçtiğinden emin olun.",
-    "İstanbul'un nüfusu yaklaşık on altı milyon kişidir.",
-    # ── Dutch (3) ───────────────────────────────────────────────────────────
-    "De vergadering is verplaatst naar volgende donderdag.",
-    "De omzet is met veertien procent gestegen ten opzichte van vorig jaar.",
-    "Zorg ervoor dat alle tests slagen voordat je de wijzigingen pusht.",
-    # ── Polish (3) ──────────────────────────────────────────────────────────
-    "Spotkanie zostało przeniesione na przyszły czwartek z powodu harmonogramu.",
-    "Przychody wzrosły o szesnaście procent w porównaniu z poprzednim rokiem.",
-    "Proszę upewnić się, że wszystkie testy przechodzą przed wdrożeniem.",
-    # ── Malay (3) ───────────────────────────────────────────────────────────
-    "Mesyuarat hari ini membincangkan keputusan prestasi suku tahunan.",
-    "Sila pastikan semua ujian lulus sebelum penggunaan ke produksi.",
-    "Kuala Lumpur mempunyai populasi kira-kira dua juta penduduk.",
-    # ── Swedish (3) ─────────────────────────────────────────────────────────
-    "Mötet har flyttats till nästa torsdag på grund av schemat.",
-    "Intäkterna ökade med elva procent jämfört med föregående år.",
-    "Se till att alla tester går igenom innan du pushar ändringarna.",
-    # ── Danish (2) ──────────────────────────────────────────────────────────
-    "Mødet er udsat til næste torsdag.",
-    "Omsætningen steg med tretten procent i forhold til sidste år.",
-    # ── Finnish (2) ─────────────────────────────────────────────────────────
-    "Kokous siirrettiin ensi torstaille aikataulusyistä.",
-    "Liikevaihto kasvoi neljätoista prosenttia edellisvuoteen verrattuna.",
-    # ── Czech (2) ───────────────────────────────────────────────────────────
-    "Schůzka byla přesunuta na příští čtvrtek kvůli rozvrhu.",
-    "Tržby vzrostly o dvanáct procent ve srovnání s předchozím rokem.",
-    # ── Greek (2) ───────────────────────────────────────────────────────────
-    "Η συνεδρίαση αναβλήθηκε για την επόμενη Πέμπτη.",
-    "Τα έσοδα αυξήθηκαν κατά δεκατρία τοις εκατό σε σχέση με πέρυσι.",
-    # ── Romanian (2) ────────────────────────────────────────────────────────
-    "Ședința a fost amânată pentru joi viitoare din cauza programului.",
-    "Veniturile au crescut cu paisprezece la sută față de anul trecut.",
-    # ── Hungarian (2) ───────────────────────────────────────────────────────
-    "Az ülést a jövő csütörtökre halasztották az időbeosztás miatt.",
-    "A bevétel tizenkét százalékkal nőtt az előző évhez képest.",
-    # ── Persian (2) ─────────────────────────────────────────────────────────
-    "جلسه به پنجشنبه آینده موکول شد.",
-    "درآمد نسبت به سال گذشته چهارده درصد افزایش یافت.",
-    # ── Filipino (2) ────────────────────────────────────────────────────────
-    "Ang pulong ay inilipat sa susunod na Huwebes dahil sa iskedyul.",
-    "Ang kita ay tumaas ng labinlimang porsyento kumpara sa nakaraang taon.",
-    # ── Macedonian (2) ──────────────────────────────────────────────────────
-    "Состанокот беше одложен за следниот четврток поради распоредот.",
-    "Приходите се зголемија за тринаесет проценти во споредба со минатата година.",
-]
+def _cleanup_temp_artifacts(output_dir: Path) -> None:
+    """Remove exporter temp files while preserving canonical ONNX/data pairs."""
+    keep = {
+        "qwen3-asr-encoder.onnx",
+        "qwen3-asr-encoder.onnx_data",
+        "qwen3-asr-embed-tokens.onnx",
+        "qwen3-asr-embed-tokens.onnx_data",
+        "qwen3-asr-decoder.onnx",
+        "qwen3-asr-decoder.onnx_data",
+        "export_manifest.json",
+    }
+    for f in output_dir.iterdir():
+        if f.is_dir() and f.name.endswith(".tmp-save"):
+            for stale in f.iterdir():
+                stale.unlink()
+            f.rmdir()
+        elif f.suffix in (".data", ".onnx.data") and f.name not in keep:
+            f.unlink()
+        elif f.name.startswith("onnx__"):
+            f.unlink()
 
 
+def _dtype_name(data_type: int) -> str:
+    return onnx.TensorProto.DataType.Name(data_type) if data_type else "UNKNOWN"
 
 
+def _write_export_manifest(
+    output_dir: Path,
+    *,
+    model_id: str,
+    revision: "str | None",
+    quant_policy: str,
+    decoder_int8_classes: "list[str]",
+    int4_threshold: "float | None",
+    int4_block: int,
+    strict_quant: bool,
+    allow_quality_drift: bool,
+    min_quant_agreement: float,
+    max_quant_mean_delta: float,
+    verify_prompt_tokens: "int | None" = None,
+    quant_notes: "list[dict] | None" = None,
+) -> None:
+    """Write a compact machine-readable export/quantization summary.
+
+    The manifest is intentionally graph-derived after all rewrites so it can
+    catch silent policy misses such as zero INT4 nodes, stale FP16 initializers,
+    or unexpected op/domain drift.
+    """
+    graphs = []
+    for name in [
+        "qwen3-asr-encoder.onnx",
+        "qwen3-asr-embed-tokens.onnx",
+        "qwen3-asr-decoder.onnx",
+    ]:
+        path = output_dir / name
+        if not path.exists():
+            continue
+        model = onnx.load(str(path), load_external_data=False)
+        op_counts: dict[str, int] = {}
+        domain_counts: dict[str, int] = {}
+        for node in model.graph.node:
+            op_counts[node.op_type] = op_counts.get(node.op_type, 0) + 1
+            dom = node.domain or "ai.onnx"
+            domain_counts[dom] = domain_counts.get(dom, 0) + 1
+        init_counts: dict[str, int] = {}
+        init_bytes: dict[str, int] = {}
+        for init in model.graph.initializer:
+            dt = _dtype_name(init.data_type)
+            init_counts[dt] = init_counts.get(dt, 0) + 1
+            elem_size = {
+                "FLOAT16": 2,
+                "FLOAT": 4,
+                "INT8": 1,
+                "UINT8": 1,
+                "INT64": 8,
+                "INT32": 4,
+            }.get(dt, 0)
+            n = 1
+            for d in init.dims:
+                n *= int(d)
+            init_bytes[dt] = init_bytes.get(dt, 0) + n * elem_size
+        graphs.append(
+            {
+                "file": name,
+                "onnx_bytes": path.stat().st_size,
+                "external_data_bytes": (
+                    path.with_name(path.stem + ".onnx_data").stat().st_size
+                    if path.with_name(path.stem + ".onnx_data").exists()
+                    else 0
+                ),
+                "ops": dict(sorted(op_counts.items())),
+                "domains": dict(sorted(domain_counts.items())),
+                "initializer_count_by_dtype": dict(sorted(init_counts.items())),
+                "initializer_bytes_by_dtype_estimate": dict(sorted(init_bytes.items())),
+            }
+        )
+    manifest = {
+        "model_id": model_id,
+        "revision": revision,
+        "quant_policy": quant_policy,
+        "decoder_int8_classes": decoder_int8_classes,
+        "int4_threshold": int4_threshold,
+        "int4_block": int4_block,
+        "strict_quant": strict_quant,
+        "allow_quality_drift": allow_quality_drift,
+        "min_quant_agreement": min_quant_agreement,
+        "max_quant_mean_delta": max_quant_mean_delta,
+        "verify_prompt_tokens": verify_prompt_tokens,
+        "notes": quant_notes or [],
+        "graphs": graphs,
+    }
+    (output_dir / "export_manifest.json").write_text(json.dumps(manifest, indent=2))
+    print(f"[ASR] Wrote export_manifest.json")
 
 
-def _quantize_matmul_weights_int8(model: onnx.ModelProto) -> int:
-    """Replace fp16 MatMul weights with INT8 via DequantizeLinear.
+def _require_quantized(stage: str, count: int, *, strict: bool) -> None:
+    """Fail on silent quantization misses unless explicitly allowed."""
+    if count > 0:
+        return
+    msg = (
+        f"{stage}: quantization matched 0 tensors. This usually means the graph "
+        "layout, initializer names, or policy assumptions changed. Refusing to "
+        "ship a silently under-compressed or misconfigured export."
+    )
+    if strict:
+        raise RuntimeError(
+            msg + " Pass --allow-quant-misses to downgrade this to a warning."
+        )
+    print(f"[ASR] WARNING: {msg}")
 
-    For each MatMul with a constant weight W (fp16):
-      scale = max(abs(W_fp32)) / 127  (per-tensor symmetric)
-      W_i8 = round(clamp(W_fp32 / scale, -128, 127))
-    Then replace: MatMul(x, W) → MatMul(x, DequantizeLinear(W_i8, scale))
-    DequantizeLinear outputs fp16 so the rest of the graph is unchanged.
+
+# Per-profile quality gates: (min top-1 agreement, max mean |Δlogit|) versus
+# the torch reference on the verification prompt. safe is probe-lossless by
+# construction; targeted profiles tolerate one-token-in-ten probe drift
+# (measured balanced: 98.1% agreement, mean 0.195) before aborting toward
+# the fallback.
+_PROFILE_GATES = {
+    "safe": (1.0, 0.25),
+    "balanced": (0.9, 0.25),
+    "compact": (0.9, 0.35),
+}
+_PROFILE_FALLBACK = {"balanced": "safe", "compact": "balanced"}
+
+
+def _check_quant_quality(
+    stats: "dict | None",
+    *,
+    profile: str,
+    allow_quality_drift: bool,
+    min_agreement: float,
+    max_mean_delta: float,
+) -> None:
+    """Hard-gate quantized probe drift per profile; abort toward the fallback.
+
+    The probe is text-only (no audio conditioning), so passing is necessary
+    but not sufficient — fixture transcription via scripts/test_asr_reference.py
+    remains the authoritative quality check before shipping.
+    """
+    if stats is None:
+        return
+    agreement = float(stats["top1_agreement"])
+    mean_delta = float(stats["mean_abs_logit"])
+    if agreement >= min_agreement and mean_delta <= max_mean_delta:
+        print(
+            f"[ASR] Quality gate passed ({profile}): "
+            f"agreement={agreement:.2%}, mean|Δlogit|={mean_delta:.4f}"
+        )
+        return
+
+    fallback = _PROFILE_FALLBACK.get(profile)
+    msg = (
+        f"{profile} build failed the quality gate: "
+        f"top1_agreement={agreement:.2%} < {min_agreement:.2%} or "
+        f"mean|Δlogit|={mean_delta:.4f} > {max_mean_delta:.4f}."
+        + (f" Re-run with --quant-policy {fallback}." if fallback else "")
+    )
+    if allow_quality_drift:
+        print(f"[ASR] WARNING: {msg}")
+    else:
+        raise RuntimeError(msg)
+
+
+# ── Verification ─────────────────────────────────────────────────────────────
+
+# Fallback verification prompt: chat-control tokens plus a few ordinary text
+# ids. Only used when no tokenizer is available (e.g. --int4-requant smoke
+# runs). Too short and too degenerate (token 0) to measure quantization drift
+# reliably — export paths build a realistic prompt via _build_verify_ids.
+_VERIFY_IDS = [151644, 8948, 198, 9707, 1879, 0]
+
+# Dictation-style text for the export-time verification prompt: long and
+# lexically varied so top-1 agreement is measured over ~64 realistic decode
+# positions instead of 6 control tokens.
+_VERIFY_TEXT = (
+    "Please schedule a follow-up appointment for Tuesday at three thirty, "
+    "then remind me to email the quarterly report to Sandra before noon. "
+    "The patient described intermittent dizziness, mild nausea, and a "
+    "persistent ringing in the left ear after the long flight from Denver."
+)
+
+
+def _build_verify_ids(processor) -> "list[int]":
+    """Tokenize the realistic verification prompt with the model's tokenizer.
+
+    Prefixed with the chat-control skeleton (im_start, "system", newline) so
+    the prompt exercises both control and ordinary text embeddings; capped at
+    64 tokens to keep the CPU smoke test fast.
+    """
+    tok = getattr(processor, "tokenizer", processor)
+    ids = [151644, 8948, 198] + list(tok.encode(_VERIFY_TEXT))
+    return ids[:64]
+
+
+def verify_asr_export(
+    output_dir: Path,
+    num_layers: int,
+    num_kv_heads: int,
+    head_dim: int,
+    hidden_size: int,
+    ref_logits=None,
+    label: str = "export",
+    verify_ids: "list[int] | None" = None,
+) -> None:
+    """Smoke-test the three exported graphs end to end on CPU.
+
+    Runs encoder → embed-tokens → decoder prefill → one cached decode step
+    and raises on shape mismatches or non-finite outputs, so a broken export
+    fails here instead of at runtime. When ``ref_logits`` (torch reference
+    for the verification prompt) is given, reports max logit deviation and
+    top-1 agreement of the prefill pass.
     """
     import numpy as np
-    from onnx import numpy_helper
+    import onnxruntime as ort
+
+    def session(name: str) -> ort.InferenceSession:
+        return ort.InferenceSession(
+            str(output_dir / name), providers=["CPUExecutionProvider"]
+        )
+
+    def check(name: str, arr, lead_shape: tuple) -> None:
+        actual = tuple(int(d) for d in arr.shape[: len(lead_shape)])
+        if actual != lead_shape:
+            raise RuntimeError(
+                f"[verify:{label}] {name}: shape {tuple(arr.shape)}, "
+                f"expected leading dims {lead_shape}"
+            )
+        if not np.isfinite(arr.astype(np.float32)).all():
+            raise RuntimeError(f"[verify:{label}] {name}: non-finite values")
+
+    def to_numpy_logits(name: str, value) -> np.ndarray:
+        if hasattr(value, "detach"):
+            value = value.detach()
+        if hasattr(value, "cpu"):
+            value = value.cpu()
+        arr = np.asarray(value, dtype=np.float32)
+        if arr.ndim != 3:
+            raise RuntimeError(
+                f"[verify:{label}] {name}: expected rank-3 logits [B, S, V], "
+                f"got shape {arr.shape}"
+            )
+        if not np.isfinite(arr).all():
+            raise RuntimeError(f"[verify:{label}] {name}: non-finite values")
+        return arr
+
+    print(f"[ASR] Verifying {label} (CPU smoke test)...")
+
+    # Encoder: deterministic pseudo-mel spanning multiple chunks.
+    rng = np.random.default_rng(0)
+    mel = (rng.standard_normal((1, 128, 300)) * 0.5).astype(np.float16)
+    feats = session("qwen3-asr-encoder.onnx").run(["features"], {"mel": mel})[0]
+    if feats.ndim != 3 or feats.shape[0] != 1 or feats.shape[2] != hidden_size:
+        raise RuntimeError(f"[verify:{label}] encoder features shape {feats.shape}")
+    if not np.isfinite(feats.astype(np.float32)).all():
+        raise RuntimeError(f"[verify:{label}] encoder produced non-finite features")
+
+    # Embed → decoder prefill.
+    ids = np.array(
+        [verify_ids if verify_ids is not None else _VERIFY_IDS], dtype=np.int64
+    )
+    seq = ids.shape[1]
+    embeds = session("qwen3-asr-embed-tokens.onnx").run(["embeds"], {"input_ids": ids})[
+        0
+    ]
+    check("embeds", embeds, (1, seq, hidden_size))
+
+    dec = session("qwen3-asr-decoder.onnx")
+    out_names = ["logits"] + [
+        f"present_key_values.{i}.{kv}"
+        for i in range(num_layers)
+        for kv in ("key", "value")
+    ]
+    feed = {
+        "inputs_embeds": embeds,
+        "position_ids": np.broadcast_to(
+            np.arange(seq, dtype=np.int64), (3, 1, seq)
+        ).copy(),
+        "attention_mask": np.ones((1, seq), dtype=np.int64),
+    }
+    for i in range(num_layers):
+        feed[f"past_key_values.{i}.key"] = np.zeros(
+            (1, num_kv_heads, 0, head_dim), dtype=np.float16
+        )
+        feed[f"past_key_values.{i}.value"] = np.zeros(
+            (1, num_kv_heads, 0, head_dim), dtype=np.float16
+        )
+    outs = dec.run(out_names, feed)
+    logits, present = outs[0], outs[1:]
+    check("prefill logits", logits, (1, seq))
+    for i in range(num_layers):
+        check(f"present.{i}.key", present[2 * i], (1, num_kv_heads, seq, head_dim))
+        check(
+            f"present.{i}.value", present[2 * i + 1], (1, num_kv_heads, seq, head_dim)
+        )
+
+    # One cached decode step: past from prefill, single new position.
+    step_feed = {
+        "inputs_embeds": embeds[:, -1:, :],
+        "position_ids": np.full((3, 1, 1), seq, dtype=np.int64),
+        "attention_mask": np.ones((1, seq + 1), dtype=np.int64),
+    }
+    for i in range(num_layers):
+        step_feed[f"past_key_values.{i}.key"] = present[2 * i]
+        step_feed[f"past_key_values.{i}.value"] = present[2 * i + 1]
+    step_out = dec.run(out_names, step_feed)
+    check("decode-step logits", step_out[0], (1, 1))
+    step_present = step_out[1:]
+    for i in range(num_layers):
+        check(
+            f"decode-step present.{i}.key",
+            step_present[2 * i],
+            (1, num_kv_heads, seq + 1, head_dim),
+        )
+        check(
+            f"decode-step present.{i}.value",
+            step_present[2 * i + 1],
+            (1, num_kv_heads, seq + 1, head_dim),
+        )
+
+    stats = None
+    if ref_logits is not None:
+        onnx_logits = to_numpy_logits("onnx logits", logits)
+        torch_logits = to_numpy_logits("torch reference logits", ref_logits)
+
+        if onnx_logits.shape != torch_logits.shape:
+            raise RuntimeError(
+                f"[verify:{label}] logits shape mismatch: ONNX {onnx_logits.shape}, "
+                f"torch reference {torch_logits.shape}"
+            )
+
+        diff = np.abs(onnx_logits - torch_logits)
+        onnx_top1 = np.argmax(onnx_logits, axis=-1)
+        torch_top1 = np.argmax(torch_logits, axis=-1)
+        matches = onnx_top1 == torch_top1
+
+        agree = float(matches.sum(dtype=np.float64) / matches.size)
+        mismatches = int(matches.size - int(matches.sum()))
+
+        stats = {
+            "max_abs_logit": float(diff.max()),
+            "mean_abs_logit": float(diff.mean()),
+            "top1_agreement": float(agree),
+            "top1_matches": int(matches.size - mismatches),
+            "top1_total": int(matches.size),
+            "top1_mismatches": int(mismatches),
+        }
+        print(
+            f"[ASR]   vs torch reference: max|Δlogit|={stats['max_abs_logit']:.4f}, "
+            f"mean|Δlogit|={stats['mean_abs_logit']:.4f}, "
+            f"top-1 agreement={stats['top1_agreement']:.2%} "
+            f"({stats['top1_matches']}/{stats['top1_total']})"
+        )
+        if label == "export" and mismatches:
+            print(
+                "[ASR]   WARNING: top-1 mismatch vs torch reference on the "
+                "unquantized export — inspect before shipping"
+            )
+
+    print(f"[ASR] Verify {label}: OK")
+    return stats
+
+
+# ── AWQ Smoothing ────────────────────────────────────────────────────────────
+#
+# Activation-aware weight smoothing (Lin et al., AWQ), folded into the torch
+# weights BEFORE export so the ONNX graphs need no post-hoc surgery and the
+# fold is exactly output-equivalent in fp32:
+#   gamma_new = gamma / s        (RMSNorm weight)
+#   W_new     = W * s[None, :]   (input channels of every consumer linear)
+# with s = (act_mean_abs / mean(act_mean_abs)) ** alpha per channel.
+#
+# Calibration runs REAL AUDIO through the full generate() path (encoder +
+# autoregressive decode) over the repo's fixture corpus, matching the
+# production activation distribution — text-only calibration misses the
+# audio-token statistics that dominate dictation traffic.
+#
+# Groups (norm → linears sharing its output), Qwen3 decoder layout:
+#   input_layernorm          → self_attn.{q,k,v}_proj
+#   post_attention_layernorm → mlp.{gate,up}_proj
+# o_proj / down_proj have no preceding norm and are not smoothed. The final
+# norm → lm_head group is skipped: folding it would desync the tied
+# embed_tokens table, which is exported as its own graph.
+
+_AWQ_SYSTEM_PROMPT = (
+    "You are an ASR engine. Transcribe spoken audio exactly in the spoken "
+    "language. Do not translate. Do not add words not clearly present."
+)
+
+
+def _awq_groups(text_model) -> "dict[str, tuple]":
+    groups: dict[str, tuple] = {}
+    for i, layer in enumerate(text_model.layers):
+        groups[f"layers.{i}.input_layernorm"] = (
+            layer.input_layernorm,
+            [layer.self_attn.q_proj, layer.self_attn.k_proj, layer.self_attn.v_proj],
+        )
+        groups[f"layers.{i}.post_attention_layernorm"] = (
+            layer.post_attention_layernorm,
+            [layer.mlp.gate_proj, layer.mlp.up_proj],
+        )
+    return groups
+
+
+def _awq_collect_activations(
+    full_model,
+    processor,
+    wav_paths: "list[Path]",
+    device: str,
+    max_new_tokens: int = 64,
+) -> "dict[str, torch.Tensor]":
+    """Per-channel mean-abs activations at each smoothing norm, collected by
+    running real audio through the full encoder + greedy-decode path."""
+    text_model = full_model.thinker.model
+    groups = _awq_groups(text_model)
+
+    accum: dict[str, torch.Tensor] = {}
+    counts: dict[str, int] = {}
+    hooks = []
+    for name, (norm, _) in groups.items():
+
+        def make_hook(n: str):
+            def hook(_mod, _inp, output):
+                stats = output.detach().float().abs().mean(dim=(0, 1)).cpu()
+                if n in accum:
+                    accum[n] += stats
+                    counts[n] += 1
+                else:
+                    accum[n] = stats
+                    counts[n] = 1
+
+            return hook
+
+        hooks.append(norm.register_forward_hook(make_hook(name)))
+
+    done = 0
+    try:
+        for wav in wav_paths:
+            conversation = [
+                {
+                    "role": "system",
+                    "content": [{"type": "text", "text": _AWQ_SYSTEM_PROMPT}],
+                },
+                {"role": "user", "content": [{"type": "audio", "audio": str(wav)}]},
+            ]
+            inputs = processor.apply_chat_template(
+                conversation,
+                tokenize=True,
+                return_tensors="pt",
+                return_dict=True,
+                add_generation_prompt=True,
+            )
+            inputs = {
+                # Float tensors (mel features) must match the fp16 model.
+                k: (
+                    v.to(device=device, dtype=DTYPE)
+                    if hasattr(v, "is_floating_point") and v.is_floating_point()
+                    else v.to(device)
+                    if hasattr(v, "to")
+                    else v
+                )
+                for k, v in inputs.items()
+            }
+            with torch.no_grad():
+                full_model.generate(
+                    **inputs, max_new_tokens=max_new_tokens, do_sample=False
+                )
+            done += 1
+            if done % 8 == 0 or done == len(wav_paths):
+                print(f"    calibrated {done}/{len(wav_paths)} audio samples")
+    finally:
+        for h in hooks:
+            h.remove()
+
+    missing = [n for n in groups if n not in accum]
+    if missing:
+        raise RuntimeError(
+            f"AWQ calibration produced no activations for {len(missing)} norms "
+            f"(e.g. {missing[0]}) — decoder layout changed?"
+        )
+    return {n: accum[n] / counts[n] for n in accum}
+
+
+def _awq_search_alpha(
+    act: "torch.Tensor",
+    weights: "list[torch.Tensor]",
+    alphas: "list[float]",
+) -> "tuple[float, torch.Tensor]":
+    """Pick the smoothing exponent minimizing activation-weighted INT8
+    reconstruction error for this group (AWQ's salience objective, evaluated
+    analytically against the same per-output-channel symmetric quantizer the
+    export uses)."""
+    a_norm = act / act.mean().clamp(min=1e-8)
+    best_alpha, best_err, best_s = 0.0, None, torch.ones_like(act)
+    for alpha in alphas:
+        s = a_norm.pow(alpha).clamp(0.01, 100.0)
+        err = 0.0
+        for W in weights:
+            ws = W * s
+            scale = (ws.abs().amax(dim=1, keepdim=True) / 127.0).clamp(min=1e-8)
+            rec = (ws / scale).round().clamp(-128, 127) * scale / s
+            err += ((rec - W) * act).pow(2).sum().item()
+        if best_err is None or err < best_err:
+            best_alpha, best_err, best_s = alpha, err, s
+    return best_alpha, best_s
+
+
+def awq_smooth(
+    full_model,
+    processor,
+    calib_dir: Path,
+    calib_samples: "int | None",
+    alpha: "float | None",
+    device: str,
+) -> None:
+    """Calibrate on real audio and fold AWQ scales into the decoder weights.
+
+    ``alpha=None`` grid-searches the exponent per group; a float pins it
+    globally (0.0 disables smoothing). Output-equivalent in fp32; the fp16
+    fold uses fp32 intermediates and scales clamped to [0.01, 100].
+    """
+    wavs = sorted(calib_dir.rglob("*.wav"))
+    if calib_samples is not None:
+        wavs = wavs[: max(1, calib_samples)]
+    if not wavs:
+        raise SystemExit(
+            f"AWQ calibration: no .wav files under {calib_dir}. "
+            "Pass --no-awq to skip smoothing or provide --calib-audio."
+        )
+
+    print(f"[ASR] AWQ smoothing: calibrating on {len(wavs)} audio files ({device})...")
+    full_model.to(device)
+    acts = _awq_collect_activations(full_model, processor, wavs, device)
+    full_model.to("cpu")
+    if device != "cpu" and torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+    text_model = full_model.thinker.model
+    groups = _awq_groups(text_model)
+    alphas = [i / 20.0 for i in range(21)] if alpha is None else [float(alpha)]
+
+    chosen: list[float] = []
+    for name, (norm, linears) in groups.items():
+        act = acts[name]
+        ws = [lin.weight.data.float() for lin in linears]
+        a_star, s = _awq_search_alpha(act, ws, alphas)
+        chosen.append(a_star)
+        if a_star == 0.0:
+            continue
+        norm.weight.data = (norm.weight.data.float() / s).to(norm.weight.dtype)
+        for lin in linears:
+            lin.weight.data = (lin.weight.data.float() * s[None, :]).to(
+                lin.weight.dtype
+            )
+
+    import collections
+
+    hist = collections.Counter(f"{a:.2f}" for a in chosen)
+    print(
+        "[ASR] AWQ smoothing folded into "
+        f"{sum(1 for a in chosen if a > 0)}/{len(chosen)} groups; "
+        f"alpha histogram: {dict(sorted(hist.items()))}"
+    )
+
+
+# Output-channel count above which a projection is treated as a vocab head
+# (lm_head): pinned to INT8 per-channel — never INT4 — as the most
+# error-sensitive matmul in autoregressive decoding.
+_VOCAB_HEAD_MIN_OUT = 32768
+
+
+def _pack_matmulnbits_int4(W: "np.ndarray", block: int):
+    """Pack W [K, N] (fp32) into MatMulNBits 4-bit blockwise layout.
+
+    Symmetric around the op's implicit zero-point 8: q = round(W/s) + 8 in
+    [0, 15], two nibbles per byte (low first). Scales are fp16-rounded before
+    quantizing so the stored scale equals the dequant grid. Returns
+    (packed [N, nb, block//2] uint8, scales [N*nb] fp16, frobenius_rel_err).
+    """
+    import numpy as np
+
+    K, N = W.shape
+    nb = K // block
+    wt = W.T.reshape(N, nb, block)
+    amax = np.abs(wt).max(-1, keepdims=True)
+    # MSE clip search per block: rare outliers otherwise dictate the whole
+    # block's grid (MinMax), wasting the 16 levels on values that occur once.
+    best_scale = None
+    best_err = None
+    for ratio in (1.0, 0.95, 0.9, 0.85, 0.8, 0.7):
+        s = np.maximum(amax * (ratio / 7.0), 1e-8).astype(np.float16).astype(np.float32)
+        q = np.clip(np.round(wt / s) + 8, 0, 15)
+        err = (((q - 8.0) * s - wt) ** 2).sum(-1, keepdims=True)
+        if best_err is None:
+            best_scale, best_err = s, err
+        else:
+            better = err < best_err
+            best_scale = np.where(better, s, best_scale)
+            best_err = np.where(better, err, best_err)
+    q = np.clip(np.round(wt / best_scale) + 8, 0, 15).astype(np.uint8)
+    packed = (q[..., 0::2] | (q[..., 1::2] << 4)).astype(np.uint8)
+    deq = (q.astype(np.float32) - 8.0) * best_scale
+    rel = float(np.linalg.norm(deq - wt) / max(np.linalg.norm(wt), 1e-12))
+    return packed, best_scale.reshape(N * nb).astype(np.float16), rel
+
+
+def _pack_matmulnbits_int8(W: "np.ndarray", block: int):
+    """Pack W [K, N] (fp32) into MatMulNBits 8-bit blockwise layout.
+
+    Symmetric around the op's implicit zero-point 128: q = round(W/s) + 128
+    in [0, 255], one byte per value, B is [N, K//block, block] uint8. Scales
+    are fp16-rounded before quantizing so the stored scale equals the dequant
+    grid. Per-block scales isolate rare outliers to their own block instead
+    of letting them dictate an entire output channel's grid (the per-channel
+    DequantizeLinear form). Returns (packed, scales [N*nb] fp16, rel_err).
+    """
+    import numpy as np
+
+    K, N = W.shape
+    nb = K // block
+    wt = W.T.reshape(N, nb, block)
+    amax = np.abs(wt).max(-1, keepdims=True)
+    best_scale = None
+    best_err = None
+    for ratio in (1.0, 0.95, 0.9):
+        s = (
+            np.maximum(amax * (ratio / 127.0), 1e-8)
+            .astype(np.float16)
+            .astype(np.float32)
+        )
+        q = np.clip(np.round(wt / s) + 128, 0, 255)
+        err = (((q - 128.0) * s - wt) ** 2).sum(-1, keepdims=True)
+        if best_err is None:
+            best_scale, best_err = s, err
+        else:
+            better = err < best_err
+            best_scale = np.where(better, s, best_scale)
+            best_err = np.where(better, err, best_err)
+    q = np.clip(np.round(wt / best_scale) + 128, 0, 255).astype(np.uint8)
+    deq = (q.astype(np.float32) - 128.0) * best_scale
+    rel = float(np.linalg.norm(deq - wt) / max(np.linalg.norm(wt), 1e-12))
+    return q, best_scale.reshape(N * nb).astype(np.float16), rel
+
+
+def _quantize_matmul_weights_int8(
+    model: onnx.ModelProto,
+    max_out_channels: int | None = None,
+    int4_threshold: "float | None" = None,
+    int4_block: int = 64,
+    select=None,
+    int8_block: "int | None" = None,
+) -> "tuple[int, int]":
+    """Replace fp16 MatMul/Gemm weights with INT8 via DequantizeLinear.
+
+    For each MatMul or Gemm with a constant 2-D weight (fp16), every output
+    channel n gets its own scale, picked by MSE search over clip ratios:
+      scale_n = argmin_r Σ_k (deq(quant(W[k,n]; r)) − W[k,n])²,
+      r ∈ {1.0 … 0.7}, base scale = max|W[:,n]| / 127
+    Then: op(x, W) → op(x, DequantizeLinear(W_i8, scales, axis=out_axis)).
+    The output-channel axis follows the layout: 1 for MatMul / Gemm transB=0
+    (W is [K, N]), 0 for Gemm transB=1 (W is [N, K]). DequantizeLinear
+    outputs fp16 so the rest of the graph is unchanged. Per-channel scales +
+    MSE-optimal clipping cut quantization error sharply versus per-tensor
+    max scaling, at identical storage cost.
+
+    Scales are rounded to fp16 before quantizing so the stored scales and
+    the quantization grid agree exactly. Weights shared by several nodes are
+    quantized once (provided all consumers agree on layout) and every
+    consumer repointed to the same dequantized tensor; weights that also
+    feed any other op type, and non-2-D weights, are left untouched.
+    """
+    import numpy as np
     import onnx.helper as oh
+    from onnx import numpy_helper
 
     inits = {i.name: i for i in model.graph.initializer}
+
+    def _out_axis(n: onnx.NodeProto) -> int:
+        if n.op_type == "Gemm":
+            trans_b = next((a.i for a in n.attribute if a.name == "transB"), 0)
+            return 0 if trans_b else 1
+        return 1
+
+    # Weight name → consuming nodes, so shared weights are handled safely.
+    consumers: dict[str, list[onnx.NodeProto]] = {}
+    for node in model.graph.node:
+        for inp in node.input:
+            if inp in inits:
+                consumers.setdefault(inp, []).append(node)
+
     count = 0
+    count4 = 0
+    dq_for_weight: dict[str, str] = {}
+    nbits_for_weight: dict[str, tuple] = {}
 
     for node in list(model.graph.node):
-        if node.op_type != "MatMul" or node.input[1] not in inits:
+        if (
+            node.op_type not in ("MatMul", "Gemm")
+            or len(node.input) < 2
+            or node.input[1] not in inits
+        ):
             continue
         wt_name = node.input[1]
+
+        if wt_name in dq_for_weight:
+            node.input[1] = dq_for_weight[wt_name]
+            count += 1
+            continue
+        if wt_name in nbits_for_weight:
+            b_name, s_name, kk, nn, w_bits, w_block = nbits_for_weight[wt_name]
+            act_in = node.input[0]
+            del node.input[:]
+            node.input.extend([act_in, b_name, s_name])
+            node.op_type = "MatMulNBits"
+            node.domain = "com.microsoft"
+            node.attribute.extend(
+                [
+                    oh.make_attribute("K", kk),
+                    oh.make_attribute("N", nn),
+                    oh.make_attribute("bits", w_bits),
+                    oh.make_attribute("block_size", w_block),
+                ]
+            )
+            if w_bits == 4:
+                count4 += 1
+            else:
+                count += 1
+            continue
+        wt_consumers = consumers.get(wt_name, [])
+        if any(c.op_type not in ("MatMul", "Gemm") for c in wt_consumers):
+            continue
+        # The weight must be consumed as input[1] everywhere, with one layout.
+        if any(list(c.input).index(wt_name) != 1 for c in wt_consumers):
+            continue
+        out_axis = _out_axis(node)
+        if any(_out_axis(c) != out_axis for c in wt_consumers):
+            continue
+
         init = inits[wt_name]
         W = numpy_helper.to_array(init).astype(np.float32)
-
-        scale = np.max(np.abs(W)) / 127.0
-        if scale < 1e-10:
+        if W.ndim != 2:
             continue
-        W_i8 = np.clip(np.round(W / scale), -128, 127).astype(np.int8)
-        scale_fp16 = np.float16(scale)
+        if select is not None and not select(wt_name, W, out_axis):
+            continue
+        # Blockwise 8-bit MatMulNBits: same byte count as per-channel INT8 DQ
+        # but K//block scales per output channel instead of one, and the
+        # weight ships in the packed layout ORT keeps resident instead of
+        # relying on runtime DQ+MatMul fusion.
+        if (
+            int8_block is not None
+            and node.op_type == "MatMul"
+            and W.shape[0] % int8_block == 0
+        ):
+            packed, scales8, _rel = _pack_matmulnbits_int8(W, int8_block)
+            b_name = f"{wt_name}_q8"
+            s_name = f"{wt_name}_q8_scales"
+            model.graph.initializer.append(numpy_helper.from_array(packed, b_name))
+            model.graph.initializer.append(numpy_helper.from_array(scales8, s_name))
+            kk, nn = W.shape
+            act_in = node.input[0]
+            del node.input[:]
+            node.input.extend([act_in, b_name, s_name])
+            node.op_type = "MatMulNBits"
+            node.domain = "com.microsoft"
+            node.attribute.extend(
+                [
+                    oh.make_attribute("K", kk),
+                    oh.make_attribute("N", nn),
+                    oh.make_attribute("bits", 8),
+                    oh.make_attribute("block_size", int8_block),
+                ]
+            )
+            nbits_for_weight[wt_name] = (b_name, s_name, kk, nn, 8, int8_block)
+            for i, ini in enumerate(model.graph.initializer):
+                if ini.name == wt_name:
+                    model.graph.initializer.pop(i)
+                    break
+            count += 1
+            continue
+        # Sensitivity scan: prefer blockwise INT4 (emitted directly as
+        # MatMulNBits — the packed form ORT keeps resident in VRAM) when the
+        # post-AWQ reconstruction error stays under threshold. Vocab-sized
+        # heads are pinned to INT8; Gemm weights use the INT8 DQ path.
+        force_int8 = (
+            max_out_channels is not None and W.shape[out_axis] > max_out_channels
+        )
+        if (
+            int4_threshold is not None
+            and not force_int8
+            and node.op_type == "MatMul"
+            and W.shape[0] % int4_block == 0
+        ):
+            packed, scales4, rel = _pack_matmulnbits_int4(W, int4_block)
+            if rel <= int4_threshold:
+                b_name = f"{wt_name}_q4"
+                s_name = f"{wt_name}_q4_scales"
+                model.graph.initializer.append(numpy_helper.from_array(packed, b_name))
+                model.graph.initializer.append(numpy_helper.from_array(scales4, s_name))
+                kk, nn = W.shape
+                act_in = node.input[0]
+                del node.input[:]
+                node.input.extend([act_in, b_name, s_name])
+                node.op_type = "MatMulNBits"
+                node.domain = "com.microsoft"
+                node.attribute.extend(
+                    [
+                        oh.make_attribute("K", kk),
+                        oh.make_attribute("N", nn),
+                        oh.make_attribute("bits", 4),
+                        oh.make_attribute("block_size", int4_block),
+                    ]
+                )
+                nbits_for_weight[wt_name] = (b_name, s_name, kk, nn, 4, int4_block)
+                for i, ini in enumerate(model.graph.initializer):
+                    if ini.name == wt_name:
+                        model.graph.initializer.pop(i)
+                        break
+                count4 += 1
+                continue
+
+        red_axis = 1 - out_axis
+        ch_max = np.maximum(np.abs(W).max(axis=red_axis), 1e-8)
+
+        def _expand(s: "np.ndarray") -> "np.ndarray":
+            return s[:, None] if out_axis == 0 else s[None, :]
+
+        best_scale = None
+        best_err = None
+        for ratio in (1.0, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7):
+            s = (ch_max * (ratio / 127.0)).astype(np.float16).astype(np.float32)
+            s = np.maximum(s, 1e-8)
+            q = np.clip(np.round(W / _expand(s)), -128, 127)
+            err = ((q * _expand(s) - W) ** 2).sum(axis=red_axis)
+            if best_err is None:
+                best_scale, best_err = s, err
+            else:
+                better = err < best_err
+                best_scale = np.where(better, s, best_scale)
+                best_err = np.where(better, err, best_err)
+        W_i8 = np.clip(np.round(W / _expand(best_scale)), -128, 127).astype(np.int8)
 
         i8_name = f"{wt_name}_i8"
         scale_name = f"{wt_name}_scale"
         dq_out = f"{wt_name}_dq"
 
         i8_init = numpy_helper.from_array(W_i8, name=i8_name)
-        scale_init = numpy_helper.from_array(np.array(scale_fp16, dtype=np.float16), name=scale_name)
+        scale_init = numpy_helper.from_array(
+            best_scale.astype(np.float16), name=scale_name
+        )
         model.graph.initializer.append(i8_init)
         model.graph.initializer.append(scale_init)
 
         dq_node = oh.make_node(
-            "DequantizeLinear", inputs=[i8_name, scale_name], outputs=[dq_out],
+            "DequantizeLinear",
+            inputs=[i8_name, scale_name],
+            outputs=[dq_out],
+            axis=out_axis,
         )
 
-        # Insert DequantizeLinear before the MatMul.
+        # Insert DequantizeLinear before its first consumer.
         idx = list(model.graph.node).index(node)
         model.graph.node.insert(idx, dq_node)
 
         # Point MatMul at the dequantized output instead of raw weight.
         node.input[1] = dq_out
+        dq_for_weight[wt_name] = dq_out
 
         # Remove old fp16 weight initializer.
         for i, ini in enumerate(model.graph.initializer):
@@ -404,208 +992,337 @@ def _quantize_matmul_weights_int8(model: onnx.ModelProto) -> int:
 
         count += 1
 
-    return count
+    if nbits_for_weight and not any(
+        o.domain == "com.microsoft" for o in model.opset_import
+    ):
+        model.opset_import.append(onnx.helper.make_opsetid("com.microsoft", 1))
+
+    return count, count4
 
 
-def _smooth_model(
-    model: onnx.ModelProto,
-    act_maxes: dict[str, "np.ndarray"],
-    alpha: float = 0.5,
+def _arch_from_decoder(path: Path) -> "tuple[int, int, int, int]":
+    """Derive (num_layers, num_kv_heads, head_dim, hidden) from decoder I/O."""
+    m = onnx.load(str(path), load_external_data=False)
+    past = [i for i in m.graph.input if i.name.startswith("past_key_values.")]
+    num_layers = len(past) // 2
+    dims = past[0].type.tensor_type.shape.dim
+    num_kv = dims[1].dim_value
+    head_dim = dims[3].dim_value
+    emb = next(i for i in m.graph.input if i.name == "inputs_embeds")
+    hidden = emb.type.tensor_type.shape.dim[2].dim_value
+    return num_layers, num_kv, head_dim, hidden
+
+
+def _convert_int8_decoder_to_int4(
+    path: Path,
+    threshold: float,
+    block: int,
+    max_out_channels: "int | None",
+    selection: str = "middle-ffn",
+    quant_notes: "list[dict] | None" = None,
 ) -> int:
-    """Apply SmoothQuant transform in-place.  Returns number of smoothed pairs.
+    """Requantize an already-INT8 decoder graph to blockwise INT4 in place.
 
-    Groups MatMuls that share the same norm output, computes a single combined
-    scale per norm (element-wise max across all consumers' weight maxima), then
-    applies once:  gamma /= s,  W *= s  for each consumer.
+    Reconstructs each weight from its DequantizeLinear pair and replaces DQ +
+    MatMul with a packed MatMulNBits node. This materially reduces file size
+    and ORT resident/prepacked VRAM for accepted weights. Vocab-sized heads stay
+    INT8. ``selection`` controls the quality/size frontier:
+      middle-ffn: only non-edge FFN-shaped weights (default, ASR-safe)
+      all-ffn: every FFN-shaped weight passing the error threshold
+      all: every MatMul weight passing the error threshold, except vocab head
     """
     import numpy as np
-    from collections import defaultdict
+    import onnx.helper as oh
+    from onnx import numpy_helper
+
+    if selection not in {"middle-ffn", "all-ffn", "all"}:
+        raise ValueError(f"unknown INT4 selection policy: {selection}")
+
+    m = onnx.load(str(path))
+    inits = {i.name: i for i in m.graph.initializer}
+    consumers: dict[str, list] = {}
+    for node in m.graph.node:
+        for inp in node.input:
+            consumers.setdefault(inp, []).append(node)
+
+    candidates = []
+    for dq in [n for n in m.graph.node if n.op_type == "DequantizeLinear"]:
+        if dq.input[0] not in inits:
+            continue
+        Wq = numpy_helper.to_array(inits[dq.input[0]])
+        if Wq.dtype != np.int8 or Wq.ndim != 2:
+            continue
+        users = consumers.get(dq.output[0], [])
+        if len(users) != 1 or users[0].op_type != "MatMul":
+            continue
+        axis = next((a.i for a in dq.attribute if a.name == "axis"), 1)
+        if axis != 1:
+            continue
+        sc = numpy_helper.to_array(inits[dq.input[1]]).astype(np.float32)
+        W = Wq.astype(np.float32) * sc[None, :]
+        K, N = W.shape
+        if max_out_channels is not None and N > max_out_channels:
+            continue
+        if K % block:
+            continue
+        candidates.append((dq, users[0], W, K, N))
+
+    ffn = [c for c in candidates if max(c[3], c[4]) >= 3 * min(c[3], c[4])]
+    if selection == "all":
+        selected = {id(c[0]) for c in candidates}
+    elif selection == "all-ffn":
+        selected = {id(c[0]) for c in ffn}
+    else:
+        per_layer = 3  # gate, up, down
+        selected = (
+            {id(c[0]) for c in ffn[per_layer:-per_layer]}
+            if len(ffn) > 2 * per_layer
+            else set()
+        )
+
+    drop_nodes = []
+    drop_inits: set[str] = set()
+    n4 = 0
+    rejected = 0
+    considered = 0
+    for dq, mm, W, K, N in candidates:
+        if id(dq) not in selected:
+            continue
+        considered += 1
+        packed, scales4, rel = _pack_matmulnbits_int4(W, block)
+        if rel > threshold:
+            rejected += 1
+            continue
+
+        base = dq.input[0]
+        b_name, s_name = f"{base}_q4", f"{base}_q4s"
+        m.graph.initializer.append(numpy_helper.from_array(packed, b_name))
+        m.graph.initializer.append(numpy_helper.from_array(scales4, s_name))
+        act_in = mm.input[0]
+        del mm.input[:]
+        mm.input.extend([act_in, b_name, s_name])
+        mm.op_type = "MatMulNBits"
+        mm.domain = "com.microsoft"
+        del mm.attribute[:]
+        mm.attribute.extend(
+            [
+                oh.make_attribute("K", K),
+                oh.make_attribute("N", N),
+                oh.make_attribute("bits", 4),
+                oh.make_attribute("block_size", block),
+            ]
+        )
+        drop_nodes.append(dq)
+        drop_inits.add(dq.input[0])
+        drop_inits.add(dq.input[1])
+        n4 += 1
+        if quant_notes is not None:
+            quant_notes.append(
+                {
+                    "graph": path.name,
+                    "op": "MatMulNBits",
+                    "source_initializer": base,
+                    "shape": [int(K), int(N)],
+                    "block": int(block),
+                    "relative_error": float(rel),
+                    "selection": selection,
+                }
+            )
+
+    for n in drop_nodes:
+        m.graph.node.remove(n)
+    for init in [i for i in m.graph.initializer if i.name in drop_inits]:
+        m.graph.initializer.remove(init)
+    if n4 and not any(o.domain == "com.microsoft" for o in m.opset_import):
+        m.opset_import.append(onnx.helper.make_opsetid("com.microsoft", 1))
+
+    _save_consolidated(m, path)
+    print(
+        f"    {path.name}: {n4}/{considered} selected weights INT8→INT4 "
+        f"(selection={selection}, rejected={rejected}, block={block}, threshold={threshold})"
+    )
+    return n4
+
+
+def _quantize_gather_embeddings_int8(model: onnx.ModelProto) -> int:
+    """Quantize large fp16 Gather tables (token embeddings) to row-wise INT8.
+
+    Gather(E, ids) becomes
+        Cast(Gather(E_i8, ids), fp16) * Unsqueeze(Gather(scales, ids), -1)
+    so only the gathered rows are dequantized at runtime (negligible compute)
+    while the dominant initializer halves in size. Row-wise scales preserve
+    per-token accuracy; a per-tensor scale would let outlier rows dominate.
+    """
+    import numpy as np
+    import onnx.helper as oh
     from onnx import numpy_helper
 
     inits = {i.name: i for i in model.graph.initializer}
-    out2node: dict[str, onnx.NodeProto] = {}
+    use_count: dict[str, int] = {}
     for node in model.graph.node:
-        for o in node.output:
-            out2node[o] = node
-
-    # Group: gamma_name → [(act_name, wt_name), ...]
-    groups: dict[str, list[tuple[str, str]]] = defaultdict(list)
-    gamma_for_act: dict[str, str] = {}
-
-    for node in model.graph.node:
-        if node.op_type != "MatMul" or node.input[1] not in inits:
-            continue
-        act_name, wt_name = node.input[0], node.input[1]
-        mul_node = out2node.get(act_name)
-        if not mul_node or mul_node.op_type != "Mul":
-            continue
-        gamma_name = next((inp for inp in mul_node.input if inp in inits), None)
-        if gamma_name is None or act_name not in act_maxes:
-            continue
-        groups[gamma_name].append((act_name, wt_name))
-        gamma_for_act[act_name] = gamma_name
+        for inp in node.input:
+            if inp in inits:
+                use_count[inp] = use_count.get(inp, 0) + 1
 
     count = 0
-    for gamma_name, pairs in groups.items():
-        a_max = act_maxes[pairs[0][0]].copy()
-        a_max = np.clip(a_max, 1e-5, None)
+    for node in list(model.graph.node):
+        if node.op_type != "Gather" or node.input[0] not in inits:
+            continue
+        base = node.input[0]
+        if use_count.get(base, 0) != 1:
+            continue
+        E = numpy_helper.to_array(inits[base])
+        if E.ndim != 2 or E.size < (1 << 20):
+            continue
 
-        # Combined w_max: element-wise max across all consumer weights.
-        combined_w_max = np.zeros_like(a_max)
-        for _, wt_name in pairs:
-            W = numpy_helper.to_array(inits[wt_name]).astype(np.float32)
-            combined_w_max = np.maximum(combined_w_max, np.max(np.abs(W), axis=1))
-        combined_w_max = np.clip(combined_w_max, 1e-5, None)
+        Ef = E.astype(np.float32)
+        scales = np.abs(Ef).max(axis=1) / 127.0
+        scales = np.maximum(scales.astype(np.float16).astype(np.float32), 1e-8)
+        E_i8 = np.clip(np.round(Ef / scales[:, None]), -128, 127).astype(np.int8)
 
-        scales = (a_max ** alpha) / (combined_w_max ** (1.0 - alpha))
-        scales = np.clip(scales, 1e-5, None)
+        ids_name = node.input[1]
+        out_name = node.output[0]
+        model.graph.initializer.append(numpy_helper.from_array(E_i8, f"{base}_i8"))
+        model.graph.initializer.append(
+            numpy_helper.from_array(scales.astype(np.float16), f"{base}_scales")
+        )
+        model.graph.initializer.append(
+            numpy_helper.from_array(np.array([-1], dtype=np.int64), f"{base}_unsq_axes")
+        )
 
-        # Apply to gamma once.
-        gamma = numpy_helper.to_array(inits[gamma_name]).astype(np.float32)
-        gamma_new = gamma / scales
-        orig_gm_dtype = inits[gamma_name].data_type
-        gm_np = gamma_new.astype(numpy_helper.to_array(inits[gamma_name]).dtype)
-        inits[gamma_name].CopyFrom(numpy_helper.from_array(gm_np, name=gamma_name))
-        inits[gamma_name].data_type = orig_gm_dtype
+        node.input[0] = f"{base}_i8"
+        node.output[0] = f"{base}_rows_i8"
+        idx = list(model.graph.node).index(node)
+        new_nodes = [
+            oh.make_node(
+                "Cast",
+                [f"{base}_rows_i8"],
+                [f"{base}_rows_f16"],
+                to=onnx.TensorProto.FLOAT16,
+            ),
+            oh.make_node(
+                "Gather", [f"{base}_scales", ids_name], [f"{base}_row_scales"]
+            ),
+            oh.make_node(
+                "Unsqueeze",
+                [f"{base}_row_scales", f"{base}_unsq_axes"],
+                [f"{base}_row_scales_u"],
+            ),
+            oh.make_node(
+                "Mul", [f"{base}_rows_f16", f"{base}_row_scales_u"], [out_name]
+            ),
+        ]
+        for off, nn in enumerate(new_nodes, 1):
+            model.graph.node.insert(idx + off, nn)
 
-        # Apply per-weight scale to each consumer.
-        for _, wt_name in pairs:
-            W = numpy_helper.to_array(inits[wt_name]).astype(np.float32)
-            W_new = W * scales[:, None]
-            orig_wt_dtype = inits[wt_name].data_type
-            wt_np = W_new.astype(numpy_helper.to_array(inits[wt_name]).dtype)
-            inits[wt_name].CopyFrom(numpy_helper.from_array(wt_np, name=wt_name))
-            inits[wt_name].data_type = orig_wt_dtype
-            count += 1
+        for i, ini in enumerate(model.graph.initializer):
+            if ini.name == base:
+                model.graph.initializer.pop(i)
+                break
+        count += 1
 
     return count
 
 
-def quantize_smoothquant(
-    model_path: Path,
-    embed_path: Path,
-    model_id: str,
-    num_layers: int,
-    num_kv_heads: int,
-    head_dim: int,
-    skip_int8: bool = False,
-) -> None:
-    """SmoothQuant + optional INT8 weight quantization.  No external libs.
-
-    1. Collect per-channel activation maxima at each Norm→MatMul boundary
-    2. Compute per-channel scales s = act_max^α / weight_max^(1-α)
-    3. Fold scales: divide norm gamma by s, multiply MatMul weight by s
-    4. Replace fp16 MatMul weights with INT8 via DequantizeLinear
-    """
-    import numpy as np
-    import onnxruntime as ort
-    from onnx import numpy_helper
-    from onnx import numpy_helper
-    from transformers import AutoTokenizer
-
-    alpha = 0.5
-    print(f"  Quantizing {model_path.name} (SmoothQuant W8A8, α={alpha})...")
-
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
-    embed_sess = ort.InferenceSession(
-        str(embed_path), providers=["CPUExecutionProvider"]
-    )
-
-    model = onnx.load(str(model_path))
-    inits = {i.name for i in model.graph.initializer}
-    pos_ndim = next(
-        (len(i.type.tensor_type.shape.dim) for i in model.graph.input if i.name == "position_ids"), 2
-    )
-
-    # Find activation tensor names that feed from Mul (RMSNorm) into MatMul.
-    out2node: dict[str, onnx.NodeProto] = {}
-    for node in model.graph.node:
-        for o in node.output:
-            out2node[o] = node
-
-    act_tensors: set[str] = set()
-    for node in model.graph.node:
-        if node.op_type == "MatMul" and node.input[1] in inits:
-            mul_node = out2node.get(node.input[0])
-            if mul_node and mul_node.op_type == "Mul":
-                act_tensors.add(node.input[0])
-
-    print(f"    Found {len(act_tensors)} smoothable activation points")
-
-    # Add activation tensors as extra graph outputs so ORT returns them.
-    # Use FLOAT type — ORT casts fp16 intermediates to float for outputs.
-    extra_outputs = []
-    for name in act_tensors:
-        vi = onnx.helper.make_tensor_value_info(name, onnx.TensorProto.FLOAT16, None)
-        model.graph.output.append(vi)
-        extra_outputs.append(name)
-
-    # Serialize to bytes for ORT session (model already has data loaded).
-    so = ort.SessionOptions()
-    so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
-    sess = ort.InferenceSession(model.SerializeToString(), so, providers=["CPUExecutionProvider"])
-    output_names = [o.name for o in sess.get_outputs()]
-
-    # Calibrate: collect per-channel max abs for each activation tensor.
-    act_maxes: dict[str, np.ndarray] = {}
-    n_samples = min(64, len(_CALIB_TEXTS))
-    print(f"    Calibrating on {n_samples} samples...")
-
-    for idx in range(n_samples):
-        ids = tokenizer(_CALIB_TEXTS[idx], return_tensors="np").input_ids
-        embeds = embed_sess.run(["embeds"], {"input_ids": ids})[0]
-        seq = embeds.shape[1]
-        pos = np.arange(seq, dtype=np.int64)
-        pos_ids = (
-            np.broadcast_to(pos, (3, 1, seq)).copy()
-            if pos_ndim == 3
-            else pos.reshape(1, seq)
-        )
-        feed = {
-            "inputs_embeds": embeds,
-            "position_ids": pos_ids,
-            "attention_mask": np.ones((1, seq), dtype=np.int64),
-        }
-        for i in range(num_layers):
-            feed[f"past_key_values.{i}.key"] = np.zeros((1, num_kv_heads, 0, head_dim), dtype=np.float16)
-            feed[f"past_key_values.{i}.value"] = np.zeros((1, num_kv_heads, 0, head_dim), dtype=np.float16)
-
-        results = sess.run(output_names, feed)
-        result_map = dict(zip(output_names, results))
-
-        for name in extra_outputs:
-            if name not in result_map:
-                continue
-            val = np.abs(result_map[name].astype(np.float32))
-            ch_max = val.reshape(-1, val.shape[-1]).max(axis=0)
-            if name in act_maxes:
-                act_maxes[name] = np.maximum(act_maxes[name], ch_max)
-            else:
-                act_maxes[name] = ch_max
-
-    del sess
-
-    # Remove extra outputs we added.
-    for name in extra_outputs:
-        for o in list(model.graph.output):
-            if o.name == name:
-                model.graph.output.remove(o)
-
-    count = _smooth_model(model, act_maxes, alpha)
-    print(f"    Smoothed {count} Norm→MatMul pairs")
-
-    if not skip_int8:
+def _quantize_graph_file_int8(
+    path: Path,
+    gather: bool = False,
+    max_out_channels: "int | None" = None,
+    int4_threshold: "float | None" = None,
+    int4_block: int = 64,
+) -> "tuple[int, int]":
+    """Load an exported graph, quantize its big tensors (INT8/INT4), save back."""
+    print(f"  Quantizing {path.name}...")
+    m = onnx.load(str(path))
+    if gather:
+        n8, n4 = _quantize_gather_embeddings_int8(m), 0
+    else:
         target_opset = 19
-        cur_opset = next((o.version for o in model.opset_import if o.domain == ""), 17)
-        if cur_opset < target_opset:
-            model = onnx.version_converter.convert_version(model, target_opset)
-        wq = _quantize_matmul_weights_int8(model)
-        print(f"    Quantized {wq} MatMul weights to INT8")
+        cur = next((o.version for o in m.opset_import if o.domain == ""), 17)
+        if cur < target_opset:
+            m = onnx.version_converter.convert_version(m, target_opset)
+        n8, n4 = _quantize_matmul_weights_int8(
+            m,
+            max_out_channels=max_out_channels,
+            int4_threshold=int4_threshold,
+            int4_block=int4_block,
+        )
+    _save_consolidated(m, path)
+    print(f"    {path.name}: {n8} tensors INT8, {n4} INT4")
+    return n8, n4
 
-    _save_consolidated(model, model_path)
-    label = "SmoothQuant + W8" if not skip_int8 else "SmoothQuant (fp16)"
-    print(f"  {model_path.name}: {label} complete")
 
+# Decoder weight classes eligible for INT8 per profile. down_proj is NEVER
+# quantized: it eats heavy-tailed SwiGLU products with no AWQ-smoothable norm,
+# and INT8 there produced garbage real-world output twice (full-decoder INT8
+# build, and a compact build whose only delta from the known-good balanced
+# was 28 down_proj weights — 96% probe agreement, '!!!!!!' in dictation).
+# The probe cannot catch this failure mode; only real transcription can.
+_PROFILE_INT8_CLASSES = {
+    "balanced": {"lm_head", "gate_up"},
+    "compact": {"lm_head", "gate_up", "attention"},
+}
+
+
+def _classify_decoder_weight(k: int, n: int) -> str:
+    """Classify a decoder MatMul weight [K, N] by shape.
+
+    The legacy exporter renames Linear weights to anonymous onnx::MatMul_*
+    initializers, so module names are unavailable; shape is unambiguous:
+    vocab head has N >= 32768, FFN matrices have >= 3:1 aspect (gate/up grow
+    K->N, down shrinks K->N), attention projections are square-ish.
+    """
+    if n >= _VOCAB_HEAD_MIN_OUT:
+        return "lm_head"
+    if n >= 3 * k:
+        return "gate_up"
+    if k >= 3 * n:
+        return "down_proj"
+    return "attention"
+
+
+def _quantize_decoder_targeted(
+    path: Path, profile: str, quant_notes: "list[dict] | None" = None
+) -> dict:
+    """Quantize only the profile's allowed decoder weight classes to INT8.
+
+    Per-output-channel symmetric weight-only INT8 via DequantizeLinear;
+    activations stay FP16. Returns {"int8": total, "classes": {cls: count}}.
+    """
+    allowed = _PROFILE_INT8_CLASSES[profile]
+    decisions: dict[str, int] = {}
+
+    def select(name, W, out_axis):
+        if out_axis == 0:
+            k, n = int(W.shape[1]), int(W.shape[0])
+        else:
+            k, n = int(W.shape[0]), int(W.shape[1])
+        cls = _classify_decoder_weight(k, n)
+        if cls not in allowed:
+            return False
+        decisions[cls] = decisions.get(cls, 0) + 1
+        return True
+
+    print(f"  Quantizing {path.name} (targeted: {', '.join(sorted(allowed))})...")
+    m = onnx.load(str(path))
+    target_opset = 19
+    cur = next((o.version for o in m.opset_import if o.domain == ""), 17)
+    if cur < target_opset:
+        m = onnx.version_converter.convert_version(m, target_opset)
+    # Ship per-channel DQ, not pre-emitted blockwise MatMulNBits(bits=8):
+    # measured 2026-06: blockwise cut probe drift 31% (mean 0.283->0.194) at
+    # +6.7MB and CUDA decode parity (4.94 vs 4.96 ms/step), but the CPU
+    # MatMulNBits-8 kernel is 15-70x slower per node at batch-1 (decode step
+    # 19ms -> 218ms), and CPU must stay viable as a fallback EP. ORT's CUDA
+    # optimizer fuses DQ+MatMul into packed nbits8 at session load anyway.
+    n8, _ = _quantize_matmul_weights_int8(m, select=select)
+    _save_consolidated(m, path)
+    print(f"    {path.name}: {n8} tensors INT8 by class {decisions}")
+    if quant_notes is not None:
+        quant_notes.append(
+            {"graph": path.name, "int8_by_class": dict(decisions), "int8_total": n8}
+        )
+    return {"int8": n8, "classes": decisions}
 
 
 # ── ASR Wrappers ──────────────────────────────────────────────────────────────
@@ -627,9 +1344,7 @@ class EncoderWrapper(nn.Module):
         self.conv2d2 = at.conv2d2
         self.conv2d3 = at.conv2d3
         self.conv_out = at.conv_out
-        self.register_buffer(
-            "pos_embed", at.positional_embedding.positional_embedding
-        )
+        self.register_buffer("pos_embed", at.positional_embedding.positional_embedding)
         self.layers = at.layers
         self.ln_post = at.ln_post
         self.proj1 = at.proj1
@@ -641,12 +1356,16 @@ class EncoderWrapper(nn.Module):
         self.chunk_aftercnn = self._feat_extract_output_lengths(
             torch.tensor(self.chunk_size, dtype=torch.long)
         ).item()
-        self.window_aftercnn = self.chunk_aftercnn * (self.n_window_infer // self.chunk_size)
+        self.window_aftercnn = self.chunk_aftercnn * (
+            self.n_window_infer // self.chunk_size
+        )
         self.max_encoder_frames = 6000
         self.max_aftercnn = self._feat_extract_output_lengths(
             torch.tensor(self.max_encoder_frames, dtype=torch.long)
         ).item()
-        self.max_attention_windows = (self.max_aftercnn + self.window_aftercnn - 1) // self.window_aftercnn
+        self.max_attention_windows = (
+            self.max_aftercnn + self.window_aftercnn - 1
+        ) // self.window_aftercnn
 
     def _feat_extract_output_lengths(self, lengths: torch.Tensor) -> torch.Tensor:
         lengths = (lengths - 1) // 2 + 1
@@ -670,7 +1389,11 @@ class EncoderWrapper(nn.Module):
         pad_frames = padded_frames - total_frames
 
         padded = torch.nn.functional.pad(mel, (0, pad_frames))
-        chunks = padded.reshape(1, mel.shape[1], num_chunks, chunk_size).permute(2, 0, 1, 3).squeeze(1)
+        chunks = (
+            padded.reshape(1, mel.shape[1], num_chunks, chunk_size)
+            .permute(2, 0, 1, 3)
+            .squeeze(1)
+        )
 
         chunk_lengths = torch.full(
             (num_chunks,),
@@ -689,14 +1412,16 @@ class EncoderWrapper(nn.Module):
         x = x + self.pos_embed[:t, :].unsqueeze(0).to(x.dtype)
 
         chunk_aftercnn_lengths = self._feat_extract_output_lengths(chunk_lengths)
-        valid_mask = (
-            torch.arange(t, device=mel.device).unsqueeze(0) < chunk_aftercnn_lengths.unsqueeze(1)
-        )
+        valid_mask = torch.arange(t, device=mel.device).unsqueeze(
+            0
+        ) < chunk_aftercnn_lengths.unsqueeze(1)
         hidden = x[valid_mask]
 
         aftercnn_len = self._feat_extract_output_lengths(feature_len)[0]
         step_ends = (
-            torch.arange(1, self.max_attention_windows + 1, device=mel.device, dtype=torch.long)
+            torch.arange(
+                1, self.max_attention_windows + 1, device=mel.device, dtype=torch.long
+            )
             * self.window_aftercnn
         )
         step_ends = torch.minimum(
@@ -759,8 +1484,12 @@ class DecoderWrapper(nn.Module):
         past_len = total_len - seq_len
         # Upper-triangular causal mask: -inf above diagonal (relative to past_len)
         causal = torch.triu(
-            torch.full((seq_len, total_len), torch.finfo(dtype).min, dtype=dtype,
-                        device=attention_mask.device),
+            torch.full(
+                (seq_len, total_len),
+                torch.finfo(dtype).min,
+                dtype=dtype,
+                device=attention_mask.device,
+            ),
             diagonal=past_len + 1,
         )
         causal_4d = causal.unsqueeze(0).unsqueeze(0)  # [1, 1, seq_len, total_len]
@@ -772,9 +1501,9 @@ class DecoderWrapper(nn.Module):
     @torch.no_grad()
     def forward(
         self,
-        inputs_embeds: torch.Tensor,       # [B, L, H]
-        position_ids: torch.Tensor,         # [3, B, L] (mRoPE)
-        attention_mask: torch.Tensor,       # [B, past_len + L]
+        inputs_embeds: torch.Tensor,  # [B, L, H]
+        position_ids: torch.Tensor,  # [3, B, L] (mRoPE)
+        attention_mask: torch.Tensor,  # [B, past_len + L]
         past_key_values_flat: list[torch.Tensor],
     ):
         from transformers import DynamicCache
@@ -790,7 +1519,10 @@ class DecoderWrapper(nn.Module):
         # Build 4D causal mask ourselves to bypass transformers' non-traceable
         # create_causal_mask. Passing a 4D mask makes the model skip its own.
         causal_mask_4d = self._build_causal_mask_4d(
-            attention_mask, seq_len, total_len, inputs_embeds.dtype,
+            attention_mask,
+            seq_len,
+            total_len,
+            inputs_embeds.dtype,
         )
 
         outputs = self.text_model(
@@ -820,37 +1552,134 @@ class DecoderWrapper(nn.Module):
 def export_asr(
     output_dir: Path,
     model_id: str = "Qwen/Qwen3-ASR-0.6B",
+    revision: "str | None" = None,
     quantize: bool = True,
+    calib_samples: int | None = None,
+    alpha: "float | None" = None,
+    calib_audio_dir: "Path | None" = None,
+    int4_threshold: "float | None" = 0.035,
+    int4_block: int = 32,
+    quant_policy: str = "balanced",
+    no_awq: bool = False,
+    strict_quant: bool = True,
+    allow_quality_drift: bool = False,
+    min_quant_agreement: "float | None" = None,
+    max_quant_mean_delta: "float | None" = None,
 ) -> None:
-    """Export Qwen3-ASR-0.6B to three ONNX files (FP16), then SmoothQuant W8A8 decoder."""
-    output_dir.mkdir(parents=True, exist_ok=True)
-    print(f"[ASR] Exporting {model_id} → {output_dir}")
+    """Export Qwen3-ASR-0.6B to encoder/embed/decoder ONNX graphs.
 
-    from transformers import AutoProcessor
-    from qwen_asr.core.transformers_backend.modeling_qwen3_asr import (
-        Qwen3ASRForConditionalGeneration,
+    Policy frontier (encoder stays FP16 everywhere; token embeddings are
+    row-wise INT8 in every quantized profile):
+      fp16: no quantization anywhere.
+      safe: decoder fully FP16. Guaranteed-quality fallback.
+      balanced (default): decoder targeted INT8 — lm_head + AWQ-smoothed
+          gate/up per-output-channel; attention and down_proj stay FP16.
+      compact: balanced plus attention q/k/v/o INT8 and encoder INT8;
+          down_proj stays FP16 (INT8 there breaks real decoding); middle
+          FFN INT4 is opportunistic under a strict threshold.
+
+    Full-decoder INT8 and broad INT4 are intentionally absent: both were
+    built and measurably degraded real dictation. Each quantized profile is
+    hard-gated against the torch reference probe and aborts toward its
+    fallback (compact -> balanced -> safe) on drift.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    if not quantize:
+        quant_policy = "fp16"
+    valid_policies = {"fp16", "safe", "balanced", "compact"}
+    if quant_policy not in valid_policies:
+        raise ValueError(
+            f"unknown quant_policy={quant_policy!r}; expected one of {sorted(valid_policies)}"
+        )
+    if int4_block < 2 or int4_block % 2 != 0:
+        raise ValueError(f"int4_block must be an even integer >= 2, got {int4_block}")
+    if min_quant_agreement is not None and not 0.0 <= min_quant_agreement <= 1.0:
+        raise ValueError(
+            f"min_quant_agreement must be in [0, 1], got {min_quant_agreement}"
+        )
+    if max_quant_mean_delta is not None and max_quant_mean_delta < 0.0:
+        raise ValueError(
+            f"max_quant_mean_delta must be >= 0, got {max_quant_mean_delta}"
+        )
+
+    # Profile gate thresholds; explicit CLI overrides win.
+    gate_agreement, gate_mean = _PROFILE_GATES.get(quant_policy, (1.0, 0.25))
+    if min_quant_agreement is not None:
+        gate_agreement = min_quant_agreement
+    if max_quant_mean_delta is not None:
+        gate_mean = max_quant_mean_delta
+
+    decoder_int8_classes = sorted(_PROFILE_INT8_CLASSES.get(quant_policy, set()))
+    awq_on = quant_policy in ("balanced", "compact") and not no_awq
+
+    print(f"[ASR] Exporting {model_id} → {output_dir}")
+    print(
+        f"[ASR] Policy: {quant_policy}, revision={revision or 'default'}, "
+        f"decoder_int8={decoder_int8_classes or 'none'}, "
+        f"int4_threshold={int4_threshold}, int4_block={int4_block}, "
+        f"gate=({gate_agreement:.2f}, {gate_mean:.2f}), "
+        f"awq={'on' if awq_on else 'off'}"
     )
 
-    processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
+    # Seeded so dummy trace inputs and verification are reproducible.
+    torch.manual_seed(0)
+
+    from transformers import AutoProcessor
+
+    try:
+        from qwen_asr.core.transformers_backend.modeling_qwen3_asr import (
+            Qwen3ASRForConditionalGeneration,
+        )
+    except ImportError as e:
+        raise SystemExit(
+            f"qwen_asr is required for ASR export but could not be imported: {e}\n"
+            "Install it in this environment: uv add qwen-asr"
+        ) from e
+
+    processor = AutoProcessor.from_pretrained(
+        model_id,
+        revision=revision,
+        trust_remote_code=True,
+    )
     full_model = Qwen3ASRForConditionalGeneration.from_pretrained(
         model_id,
+        revision=revision or "main",
         trust_remote_code=True,
         dtype=DTYPE,
         attn_implementation="eager",
     )
     full_model.eval()
 
+    verify_prompt_ids = _build_verify_ids(processor)
+    print(f"[ASR] Verification prompt: {len(verify_prompt_ids)} tokens")
+
     thinker = full_model.thinker
     text_config = thinker.config.text_config
     num_layers = text_config.num_hidden_layers
-    num_kv_heads = getattr(text_config, "num_key_value_heads", text_config.num_attention_heads)
-    head_dim = getattr(text_config, "head_dim", text_config.hidden_size // text_config.num_attention_heads)
+    num_kv_heads = getattr(
+        text_config, "num_key_value_heads", text_config.num_attention_heads
+    )
+    head_dim = getattr(
+        text_config,
+        "head_dim",
+        text_config.hidden_size // text_config.num_attention_heads,
+    )
     hidden_size = text_config.hidden_size
 
     print(
         f"[ASR] Architecture: {num_layers}L, {hidden_size}H, "
         f"{num_kv_heads}KV, {head_dim}D, dtype={DTYPE}"
     )
+
+    # AWQ smoothing folds gamma->W scales for the {q,k,v} and {gate,up}
+    # groups only. Both quantized profiles target gate/up, so smoothing
+    # directly conditions exactly the weights that drop to INT8; lm_head and
+    # down_proj sit outside the smoothing groups regardless.
+    if awq_on:
+        if calib_audio_dir is None:
+            calib_audio_dir = Path(__file__).resolve().parent.parent / "fixtures"
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        awq_smooth(full_model, processor, calib_audio_dir, calib_samples, alpha, device)
 
     # ── 1. Encoder ───────────────────────────────────────────────────────
     print("[ASR]   Exporting qwen3-asr-encoder.onnx ...")
@@ -905,8 +1734,12 @@ def export_asr(
     dummy_attn_mask = torch.ones(batch_size, past_len + seq_len, dtype=torch.long)
     dummy_past = []
     for _ in range(num_layers):
-        dummy_past.append(torch.zeros(batch_size, num_kv_heads, past_len, head_dim, dtype=DTYPE))
-        dummy_past.append(torch.zeros(batch_size, num_kv_heads, past_len, head_dim, dtype=DTYPE))
+        dummy_past.append(
+            torch.zeros(batch_size, num_kv_heads, past_len, head_dim, dtype=DTYPE)
+        )
+        dummy_past.append(
+            torch.zeros(batch_size, num_kv_heads, past_len, head_dim, dtype=DTYPE)
+        )
 
     input_names = ["inputs_embeds", "position_ids", "attention_mask"]
     output_names = ["logits"]
@@ -941,6 +1774,27 @@ def export_asr(
     )
     print("[ASR]   qwen3-asr-decoder.onnx exported")
 
+    # Torch reference logits for the verification prompt, captured before the
+    # torch model is released.
+    verify_ids = torch.tensor([verify_prompt_ids], dtype=torch.long)
+    with torch.no_grad():
+        v_embeds = emb(verify_ids)
+        v_len = verify_ids.shape[1]
+        v_pos = torch.arange(v_len).reshape(1, 1, v_len).expand(3, 1, v_len)
+        v_mask = torch.ones(1, v_len, dtype=torch.long)
+        v_past = [
+            torch.zeros(1, num_kv_heads, 0, head_dim, dtype=DTYPE)
+            for _ in range(2 * num_layers)
+        ]
+        ref_logits = dec(v_embeds, v_pos, v_mask, v_past)[0].float().numpy()
+
+    # Release the torch model: quantization and verification reload the
+    # graphs from disk and don't need ~1.2 GB of weights resident.
+    del dec, emb, enc, thinker, full_model
+    import gc
+
+    gc.collect()
+
     # ── 4. Consolidate ───────────────────────────────────────────────────
     for name in [
         "qwen3-asr-encoder.onnx",
@@ -949,94 +1803,270 @@ def export_asr(
     ]:
         _consolidate_external_data(output_dir, name)
 
-    # ── 5. Quantize ────────────────────────────────────────────────────
-    if quantize:
-        quantize_smoothquant(
-            output_dir / "qwen3-asr-decoder.onnx",
-            output_dir / "qwen3-asr-embed-tokens.onnx",
-            model_id,
-            num_layers,
-            num_kv_heads,
-            head_dim,
-        )
-    else:
-        # --fp16-decoder: smooth decoder (quality) but keep fp16 weights.
-        # Quantize encoder + embed-tokens to INT8 instead.
-        quantize_smoothquant(
-            output_dir / "qwen3-asr-decoder.onnx",
-            output_dir / "qwen3-asr-embed-tokens.onnx",
-            model_id,
-            num_layers,
-            num_kv_heads,
-            head_dim,
-            skip_int8=True,
-        )
-        for name in ["qwen3-asr-encoder.onnx", "qwen3-asr-embed-tokens.onnx"]:
-            path = output_dir / name
-            print(f"  Quantizing {name} weights to INT8...")
-            m = onnx.load(str(path))
-            target_opset = 19
-            cur = next((o.version for o in m.opset_import if o.domain == ""), 17)
-            if cur < target_opset:
-                m = onnx.version_converter.convert_version(m, target_opset)
-            n = _quantize_matmul_weights_int8(m)
-            _save_consolidated(m, path)
-            print(f"    {name}: {n} weights quantized")
+    # ── 4.5 Verify unquantized export against the torch reference ───────
+    verify_asr_export(
+        output_dir,
+        num_layers,
+        num_kv_heads,
+        head_dim,
+        hidden_size,
+        ref_logits=ref_logits,
+        label="export",
+        verify_ids=verify_prompt_ids,
+    )
 
-    # ── 6. Cleanup ───────────────────────────────────────────────────────
-    keep = {
-        "qwen3-asr-encoder.onnx", "qwen3-asr-encoder.onnx_data",
-        "qwen3-asr-embed-tokens.onnx", "qwen3-asr-embed-tokens.onnx_data",
-        "qwen3-asr-decoder.onnx", "qwen3-asr-decoder.onnx_data",
-    }
-    for f in output_dir.iterdir():
-        if f.suffix in (".data", ".onnx.data") and f.name not in keep:
-            f.unlink()
-        elif f.name.startswith("onnx__"):
-            f.unlink()
+    # ── 5. Quantize ────────────────────────────────────────────────────
+    # Encoder stays FP16 except in compact: it runs once per utterance (not
+    # in the decode loop where errors compound), and encoder INT8 was part
+    # of every fixture-validated earlier build.
+    quant_notes: list[dict] = []
+    if quant_policy == "fp16":
+        print("[ASR] Skipping quantization; all graphs keep FP16 weights")
+    else:
+        # Embeddings: row-wise INT8 Gather is the proven-safe baseline (the
+        # safe profile measures 100% probe agreement with only this applied).
+        n8, _ = _quantize_graph_file_int8(
+            output_dir / "qwen3-asr-embed-tokens.onnx", gather=True
+        )
+        _require_quantized("embed-tokens row-wise INT8", n8, strict=strict_quant)
+
+        if quant_policy in ("balanced", "compact"):
+            res = _quantize_decoder_targeted(
+                output_dir / "qwen3-asr-decoder.onnx", quant_policy, quant_notes
+            )
+            _require_quantized(
+                "decoder targeted INT8", res["int8"], strict=strict_quant
+            )
+
+        if quant_policy == "compact":
+            n8, _ = _quantize_graph_file_int8(output_dir / "qwen3-asr-encoder.onnx")
+            _require_quantized("encoder INT8", n8, strict=strict_quant)
+
+        if quant_policy == "compact" and int4_threshold is not None:
+            # Opportunistic: middle-layer FFN weights drop to INT4 only when
+            # reconstruction error clears the strict threshold. Measured
+            # block-32 errors are ~0.10-0.13, so zero acceptances is the
+            # expected outcome until the INT4 quantizer improves — not a
+            # failure, hence no _require_quantized here.
+            _convert_int8_decoder_to_int4(
+                output_dir / "qwen3-asr-decoder.onnx",
+                threshold=int4_threshold,
+                block=int4_block,
+                max_out_channels=_VOCAB_HEAD_MIN_OUT,
+                selection="middle-ffn",
+                quant_notes=quant_notes,
+            )
+
+    # ── 5.5 Verify quantized graphs still run and stay finite ───────────
+    if quant_policy != "fp16":
+        quant_stats = verify_asr_export(
+            output_dir,
+            num_layers,
+            num_kv_heads,
+            head_dim,
+            hidden_size,
+            ref_logits=ref_logits,
+            label="quantized",
+            verify_ids=verify_prompt_ids,
+        )
+        _check_quant_quality(
+            quant_stats,
+            profile=quant_policy,
+            allow_quality_drift=allow_quality_drift,
+            min_agreement=gate_agreement,
+            max_mean_delta=gate_mean,
+        )
+
+    # ── 6. Manifest + cleanup ──────────────────────────────────────────
+    _write_export_manifest(
+        output_dir,
+        model_id=model_id,
+        revision=revision,
+        quant_policy=quant_policy,
+        decoder_int8_classes=decoder_int8_classes,
+        int4_threshold=int4_threshold,
+        int4_block=int4_block,
+        strict_quant=strict_quant,
+        allow_quality_drift=allow_quality_drift,
+        min_quant_agreement=gate_agreement,
+        max_quant_mean_delta=gate_mean,
+        verify_prompt_tokens=len(verify_prompt_ids),
+        quant_notes=quant_notes,
+    )
+    _cleanup_temp_artifacts(output_dir)
 
     processor.save_pretrained(str(output_dir))
 
     print(f"[ASR] Export complete: {output_dir}")
     _list_files(output_dir)
 
+
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Export Qwen3 models to ONNX format"
-    )
+    parser = argparse.ArgumentParser(description="Export Qwen3 models to ONNX format")
     parser.add_argument("--asr", action="store_true", help="Export Qwen3-ASR-0.6B")
     parser.add_argument(
-        "--no-quantize", action="store_true",
-        help="Skip INT4 quantization (keep FP16 weights)",
+        "--no-quantize",
+        action="store_true",
+        help="Skip quantization entirely (all graphs keep FP16 weights)",
     )
     parser.add_argument(
-        "--fp16-decoder", action="store_true",
-        help="Keep decoder as FP16 (skip INT4 quantization on decoder only). "
-             "Encoder stays FP16 by default. Use for mixed-precision export "
-             "where INT4 autoregressive decoding degrades quality.",
+        "--quant-policy",
+        choices=["fp16", "safe", "balanced", "compact"],
+        default="balanced",
+        help="Compression policy. balanced (default) = targeted decoder INT8 "
+        "(lm_head + AWQ-smoothed gate/up only) + INT8 embeddings; safe = "
+        "decoder FP16 fallback; compact = balanced + attention INT8 + "
+        "encoder INT8 (down_proj always FP16 — INT8 there breaks decoding).",
     )
     parser.add_argument(
-        "--output-dir", type=Path, default=None,
+        "--no-awq",
+        action="store_true",
+        help="Skip AWQ smoothing before targeted decoder quantization. "
+        "Faster export, lower INT8 quality on gate/up.",
+    )
+    parser.add_argument(
+        "--calib-samples",
+        type=int,
+        default=None,
+        help="Max calibration audio files for AWQ (default: all in the dir)",
+    )
+    parser.add_argument(
+        "--alpha",
+        type=float,
+        default=None,
+        help="Pin the AWQ smoothing exponent globally "
+        "(default: per-group grid search; 0 disables smoothing)",
+    )
+    parser.add_argument(
+        "--calib-audio",
+        type=Path,
+        default=None,
+        help="Directory of .wav calibration audio (default: fixtures/)",
+    )
+    parser.add_argument(
+        "--int4-threshold",
+        type=float,
+        default=0.035,
+        help="Reconstruction relative-error ceiling for opportunistic "
+        "middle-FFN INT4 in compact; <=0 disables INT4. Measured block-32 "
+        "errors are ~0.10-0.13, so the default accepts nothing until the "
+        "INT4 quantizer improves — zero acceptances is a valid outcome.",
+    )
+    parser.add_argument(
+        "--int4-block",
+        type=int,
+        default=32,
+        help="INT4 quantization block size along K (default: 32)",
+    )
+    parser.add_argument(
+        "--int4-requant",
+        action="store_true",
+        help="Requantize the INT8 decoder in --output-dir to blockwise INT4 "
+        "in place (no re-export), then re-run the CPU smoke test",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
         help="Output directory (default: models/<model-name>-onnx)",
     )
     parser.add_argument(
-        "--asr-model", default="Qwen/Qwen3-ASR-0.6B",
+        "--asr-model",
+        default="Qwen/Qwen3-ASR-0.6B",
         help="HuggingFace model ID for ASR",
+    )
+    parser.add_argument(
+        "--revision",
+        default=None,
+        help="Pinned HuggingFace model/code revision or commit SHA for reproducible export",
+    )
+    parser.add_argument(
+        "--strict-quant",
+        dest="strict_quant",
+        action="store_true",
+        default=True,
+        help="Fail if a requested quantization stage matches zero tensors (default)",
+    )
+    parser.add_argument(
+        "--allow-quant-misses",
+        dest="strict_quant",
+        action="store_false",
+        help="Warn instead of failing when a requested quantization stage matches zero tensors",
+    )
+    parser.add_argument(
+        "--allow-quality-drift",
+        action="store_true",
+        help="Continue with a warning when the quantized probe fails the "
+        "profile quality gate instead of aborting toward the fallback profile",
+    )
+    parser.add_argument(
+        "--min-quant-agreement",
+        type=float,
+        default=None,
+        help="Override the profile's top-1 probe agreement gate "
+        "(default: safe 1.0, balanced/compact 0.9)",
+    )
+    parser.add_argument(
+        "--max-quant-mean-delta",
+        type=float,
+        default=None,
+        help="Override the profile's mean |Δlogit| gate "
+        "(default: safe/balanced 0.25, compact 0.35)",
     )
     args = parser.parse_args()
 
+    if args.int4_block < 2 or args.int4_block % 2 != 0:
+        parser.error("--int4-block must be an even integer >= 2")
+    if args.min_quant_agreement is not None and not (
+        0.0 <= args.min_quant_agreement <= 1.0
+    ):
+        parser.error("--min-quant-agreement must be in [0, 1]")
+    if args.max_quant_mean_delta is not None and args.max_quant_mean_delta < 0.0:
+        parser.error("--max-quant-mean-delta must be >= 0")
+
+    if args.int4_requant:
+        out = args.output_dir or Path("models/qwen3-asr-0.6b-onnx")
+        dec = out / "qwen3-asr-decoder.onnx"
+        if not dec.exists():
+            parser.error(f"--int4-requant: {dec} not found")
+        _convert_int8_decoder_to_int4(
+            dec,
+            threshold=args.int4_threshold,
+            block=args.int4_block,
+            max_out_channels=_VOCAB_HEAD_MIN_OUT,
+            selection="middle-ffn",
+        )
+        num_layers, num_kv, head_dim, hidden = _arch_from_decoder(dec)
+        verify_asr_export(out, num_layers, num_kv, head_dim, hidden, label="int4")
+        _list_files(out)
+        return
+
     if not args.asr:
         parser.error("Specify --asr")
+    if args.calib_samples is not None and args.calib_samples < 1:
+        parser.error("--calib-samples must be >= 1")
 
-    do_quant = not args.no_quantize
-    fp16_decoder = args.fp16_decoder
-
-    if args.asr:
-        out = args.output_dir or Path("models/qwen3-asr-0.6b-onnx")
-        export_asr(out, args.asr_model, quantize=do_quant and not fp16_decoder)
+    out = args.output_dir or Path("models/qwen3-asr-0.6b-onnx")
+    export_asr(
+        out,
+        args.asr_model,
+        revision=args.revision,
+        quantize=not args.no_quantize,
+        calib_samples=args.calib_samples,
+        alpha=args.alpha,
+        calib_audio_dir=args.calib_audio,
+        int4_threshold=args.int4_threshold if args.int4_threshold > 0 else None,
+        int4_block=args.int4_block,
+        quant_policy=args.quant_policy,
+        no_awq=args.no_awq,
+        strict_quant=args.strict_quant,
+        allow_quality_drift=args.allow_quality_drift,
+        min_quant_agreement=args.min_quant_agreement,
+        max_quant_mean_delta=args.max_quant_mean_delta,
+    )
 
 
 if __name__ == "__main__":

@@ -183,6 +183,7 @@ fn main() {
                     context: None,
                     language: "en".into(),
                     uncertain_words: Vec::new(),
+                    correction_needed: true,
                 };
                 llm.transform(&input).await.unwrap().cleaned_text
             })
