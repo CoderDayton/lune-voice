@@ -75,7 +75,7 @@ export function SidebarContent() {
       <div className="mx-3 border-t border-surface-border sm:mx-3.5" />
 
       {/* Grouped navigation */}
-      <nav className="flex-1 overflow-y-auto px-2 py-3 sm:px-3">
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-3 is-drawer-close:px-0 sm:px-3">
         {navigationGroups.map((group) => (
           <div key={group.label} className="mb-5 last:mb-0">
             <p className="section-label mb-2 px-3 is-drawer-close:hidden">{group.label}</p>
@@ -121,8 +121,8 @@ function NavRow({
       <Link
         to={to}
         aria-current={active ? 'page' : undefined}
-        data-tip={label}
-        className={`group relative flex w-full items-center gap-3 rounded-field px-3 py-2.5 text-[0.95rem] transition-colors is-drawer-close:tooltip is-drawer-close:tooltip-right is-drawer-close:justify-center ${
+        title={label}
+        className={`group relative flex w-full items-center gap-3 rounded-field px-3 py-2.5 text-[0.95rem] transition-colors is-drawer-close:mx-auto is-drawer-close:size-10 is-drawer-close:justify-center is-drawer-close:gap-0 is-drawer-close:px-0 is-drawer-close:py-0 ${
           active
             ? 'bg-surface-nav-active text-content-strong font-medium'
             : 'text-content-muted hover:bg-surface-hover hover:text-content'
@@ -185,7 +185,7 @@ function SidebarUserCard({
     <div className="dropdown dropdown-top w-full is-drawer-close:dropdown-right is-drawer-close:dropdown-end">
       <button
         type="button"
-        className="flex w-full items-center gap-3 rounded-field border border-surface-border bg-surface-elevated px-2.5 py-2.5 text-left transition-colors hover:bg-surface-card-hover hover:border-surface-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary is-drawer-close:justify-center is-drawer-close:px-2 sm:px-3"
+        className="flex w-full items-center gap-3 rounded-field border border-surface-border bg-surface-elevated px-2.5 py-2.5 text-left transition-colors hover:bg-surface-card-hover hover:border-surface-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary is-drawer-close:mx-auto is-drawer-close:size-10 is-drawer-close:justify-center is-drawer-close:gap-0 is-drawer-close:p-0 sm:px-3 is-drawer-close:sm:p-0"
         aria-label={t`Account and status`}
       >
         <span className="relative shrink-0">

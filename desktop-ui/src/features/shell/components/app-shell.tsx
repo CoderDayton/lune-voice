@@ -174,9 +174,9 @@ export function AppShell() {
       </div>
 
       {/* Sidebar drawer */}
-      <div className="drawer-side z-40 is-drawer-close:overflow-visible">
+      <div className="drawer-side z-40 overflow-x-hidden">
         <label htmlFor={DRAWER_ID} aria-label={t`Close sidebar`} className="drawer-overlay" />
-        <aside className="sidebar-surface flex is-drawer-close:w-[5rem] is-drawer-open:w-[18.5rem] min-h-full flex-col overflow-hidden is-drawer-close:overflow-visible transition-[width] duration-200">
+        <aside className="sidebar-surface flex is-drawer-close:w-[5rem] is-drawer-open:w-[18.5rem] min-h-full flex-col overflow-hidden transition-[width] duration-200">
           <SidebarContent />
         </aside>
       </div>
