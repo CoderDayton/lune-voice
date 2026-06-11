@@ -1156,22 +1156,6 @@ fn transplant_case(inp_w: &str, out_w: &str) -> String {
         .collect()
 }
 
-/// Lowercase the first alphabetic character of `s`, leaving everything else
-/// (leading punctuation, interior letters, trailing punctuation) intact.
-fn lowercase_first_letter(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    let mut done = false;
-    for c in s.chars() {
-        if !done && c.is_alphabetic() {
-            out.extend(c.to_lowercase());
-            done = true;
-        } else {
-            out.push(c);
-        }
-    }
-    out
-}
-
 /// Substitutions that must never be accepted, even when they look like a
 /// 1-edit spelling repair — expanding a correct word into a contraction is
 /// grammar damage far more often than repair.
@@ -1311,13 +1295,13 @@ pub(crate) fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> S
 
     let is_en = matches!(lune_core::lang::display_name(lang), Some("English"));
 
-    // Detect the "second-word capitalization" failure mode: the LLM invents
-    // a mid-utterance sentence break (period + Title-cased next word) where
-    // the input had none. Both signals must hold to suppress the cap:
-    //   * LLM-side previous word ended with `.!?` (it thinks new sentence)
-    //   * Input-side previous word did NOT end with `.!?` (no real break)
-    // This preserves legitimate mid-sentence proper-noun cap like "John",
-    // because in that case the previous LLM word ("met") has no terminator.
+    // Trust the model's sentence segmentation and capitalization. Splitting an
+    // un-punctuated run-on into sentences is a primary job of the correction
+    // pass, so when the LLM adds a terminal mark and capitalizes the next word
+    // we keep both. Terminator tracking below exists only to spot the inverse
+    // — a sentence break the input really had that the LLM merged away
+    // (`legit_debreak`) — so we don't fight the model by re-capitalizing a word
+    // it deliberately downcased.
     let mut result: Vec<String> = Vec::with_capacity(ops.len());
     let mut prev_inp_terminated = true; // utterance start = sentence-initial
     let mut prev_out_terminated = true;
@@ -1331,17 +1315,11 @@ pub(crate) fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> S
     while idx < ops.len() {
         match &ops[idx] {
             Op::Match(inp_w, out_w) => {
-                let spurious_break = prev_out_terminated && !prev_inp_terminated;
                 // The LLM removed a sentence break the input really had; its
-                // downcasing of the now-mid-sentence word is legitimate.
+                // downcasing of the now-mid-sentence word is legitimate, so we
+                // must not restore the input's sentence-initial capital.
                 let legit_debreak = prev_inp_terminated && !prev_out_terminated;
-                let emitted = if is_en
-                    && spurious_break
-                    && starts_lowercase_alpha(inp_w)
-                    && starts_uppercase_alpha(out_w)
-                {
-                    lowercase_first_letter(out_w)
-                } else if has_interior_uppercase(inp_w)
+                let emitted = if has_interior_uppercase(inp_w)
                     || (starts_uppercase_alpha(inp_w)
                         && starts_lowercase_alpha(out_w)
                         && !legit_debreak)
@@ -1367,18 +1345,12 @@ pub(crate) fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> S
                         && !is_blocked_sub(&from, &to)
                         && (is_allowed_sub(&from, &to) || looks_like_spelling_repair(&from, &to))
                     {
-                        let spurious_break = prev_out_terminated && !prev_inp_terminated;
-                        let emitted = if spurious_break
-                            && starts_lowercase_alpha(inp_w)
-                            && starts_uppercase_alpha(out_w)
-                        {
-                            lowercase_first_letter(out_w)
-                        } else {
-                            (*out_w).to_string()
-                        };
+                        // Trust the model's casing on the replacement too,
+                        // including a capital that follows a sentence break the
+                        // model introduced.
                         prev_inp_terminated = ends_sentence(inp_w);
                         prev_out_terminated = ends_sentence(out_w);
-                        result.push(emitted);
+                        result.push((*out_w).to_string());
                         idx += 2;
                         continue;
                     }
@@ -1824,12 +1796,12 @@ mod tests {
     }
 
     #[test]
-    fn merge_strips_spurious_mid_utterance_capitalization() {
-        // The LLM hallucinated sentence breaks the user did not produce.
-        // The merge must keep punctuation but suppress the false title-case
-        // it injected on every "new sentence" head.
+    fn merge_trusts_llm_sentence_splits() {
+        // We trust the model's segmentation: when it splits an un-punctuated
+        // run-on into sentences, its terminal marks and the capitals that
+        // follow them are kept verbatim.
         let merged = validate_and_merge("hello there friend", "Hello. There. Friend.", "en");
-        assert_eq!(merged, "Hello. there. friend.");
+        assert_eq!(merged, "Hello. There. Friend.");
     }
 
     #[test]
@@ -1849,14 +1821,12 @@ mod tests {
     }
 
     #[test]
-    fn merge_strips_cap_on_replacement_after_spurious_break() {
-        // Replacement words (Delete+Insert) must follow the same rule:
-        // if the previous input word didn't end a sentence, suppress the
-        // LLM's spurious title-case on the replacement.
+    fn merge_trusts_cap_on_replacement_after_split() {
+        // Replacement words (Delete+Insert) follow the same trust rule: a
+        // homophone repair that lands at the head of a sentence the model
+        // split out keeps the model's capital.
         let merged = validate_and_merge("we should meat at noon", "We should. Meet at noon.", "en");
-        // "Meet" replaces "meat" (homophone repair) but mid-sentence after a
-        // spurious "." → leading cap suppressed.
-        assert_eq!(merged, "We should. meet at noon.");
+        assert_eq!(merged, "We should. Meet at noon.");
     }
 
     #[test]
