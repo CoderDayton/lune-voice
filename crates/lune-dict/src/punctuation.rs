@@ -27,13 +27,42 @@
 /// low enough to catch genuinely jarring run-ons.
 const RUN_ON_WORD_THRESHOLD: usize = 12;
 
-/// Leading tokens that mark a segment as interrogative. When one of these opens
-/// a segment that lacks an end mark, the statement-vs-question punctuation is
-/// ambiguous, so it is deferred to the LLM rather than guessed.
-const INTERROGATIVE_LEADS: &[&str] = &[
-    "who", "what", "when", "where", "why", "how", "which", "whose", "whom", "is", "are", "am",
-    "was", "were", "do", "does", "did", "can", "could", "would", "should", "will", "shall", "has",
-    "have", "had", "may", "might", "must",
+/// Wh-words that mark a segment as interrogative on their own. When one of
+/// these opens a segment that lacks an end mark, statement-vs-question
+/// punctuation is ambiguous, so it is deferred to the LLM rather than guessed.
+const WH_LEADS: &[&str] = &[
+    "who", "what", "when", "where", "why", "how", "which", "whose", "whom",
+];
+
+/// Auxiliaries that open a question only via subject-auxiliary inversion
+/// ("can you…", "did he…"). Alone they are imperative/declarative-prone
+/// ("have a great day", "do not touch that", "will check later"), so they
+/// count as interrogative only when a question subject follows.
+const AUX_LEADS: &[&str] = &[
+    "is", "are", "am", "was", "were", "do", "does", "did", "can", "could", "would", "should",
+    "will", "shall", "has", "have", "had", "may", "might", "must",
+];
+
+/// Subjects that, following an auxiliary, signal genuine inversion — pronouns
+/// plus the existential/demonstrative heads ("is there…", "was that…").
+const QUESTION_SUBJECTS: &[&str] = &[
+    "i",
+    "you",
+    "we",
+    "they",
+    "he",
+    "she",
+    "it",
+    "this",
+    "that",
+    "there",
+    "anyone",
+    "anybody",
+    "someone",
+    "somebody",
+    "everyone",
+    "everybody",
+    "nobody",
 ];
 
 /// Result of [`normalize`].
@@ -67,10 +96,7 @@ pub fn normalize(text: &str) -> PunctuationOutcome {
 
     let words: Vec<&str> = trimmed.split_whitespace().collect();
     let ends_terminal = ends_with_terminal(trimmed);
-    let interrogative = words
-        .first()
-        .map(|w| is_interrogative_lead(w))
-        .unwrap_or(false);
+    let interrogative = is_interrogative_lead(&words);
 
     // Run-on: long stretch with no internal separator or sentence break. Such a
     // segment likely needs internal commas or a split — the deterministic pass
@@ -81,17 +107,10 @@ pub fn normalize(text: &str) -> PunctuationOutcome {
     // so let the LLM decide rather than guessing a question mark.
     let needs_llm = run_on || (interrogative && !ends_terminal);
 
-    // Tier 1: always capitalize the first letter.
-    let mut out = String::with_capacity(trimmed.len() + 1);
-    let mut capitalized = false;
-    for c in trimmed.chars() {
-        if !capitalized && c.is_alphabetic() {
-            out.extend(c.to_uppercase());
-            capitalized = true;
-        } else {
-            out.push(c);
-        }
-    }
+    // Tier 1: capitalize the first word of the segment and of every internal
+    // sentence (ASR emits sentence breaks from pause prosody, and the words
+    // after them arrive lowercase).
+    let mut out = capitalize_sentence_starts(trimmed);
 
     // Tier 1: append a terminal period only for resolved declaratives. When
     // `needs_llm` is set the interrogative/run-on branch owns the end mark.
@@ -165,13 +184,130 @@ fn has_internal_separator(text: &str) -> bool {
         .any(|c| matches!(c, ',' | ';' | ':' | '—' | '–' | '.' | '!' | '?'))
 }
 
-/// Whether `word` (with leading punctuation stripped, case-folded) opens an
-/// interrogative.
-fn is_interrogative_lead(word: &str) -> bool {
-    let w = word.trim_start_matches(|c: char| !c.is_alphanumeric());
-    INTERROGATIVE_LEADS
+/// Trailing-`.` tokens that mark an abbreviation, not a sentence end. `Mr.`,
+/// `Mrs.`, `Dr.` are produced by [`abbreviate_titles`] above; the rest are
+/// common in dictated text. Dotted abbreviations (`e.g.`, `U.S.`) need no
+/// listing — any interior dot already disqualifies a token.
+const NON_TERMINAL_ABBREVIATIONS: &[&str] = &["mr", "mrs", "dr", "st", "etc", "vs", "prof"];
+
+/// Capitalize the first word of every sentence: the segment start plus every
+/// word following a sentence terminator (`.` `!` `?` `…`), skipping periods
+/// that belong to abbreviations (`Mr.`, `e.g.`, `U.S.`) or single-letter
+/// initials (`J.`). Tokens that already carry any uppercase (`iPhone`,
+/// `GitHub`, mid-name caps) are never altered. Whitespace is preserved
+/// byte-for-byte; non-Latin text passes through untouched.
+pub fn capitalize_sentence_starts(text: &str) -> String {
+    if !is_latin(text) {
+        return text.to_owned();
+    }
+
+    let mut out = String::with_capacity(text.len());
+    let mut at_sentence_start = true;
+    let mut rest = text;
+    while !rest.is_empty() {
+        let ws_end = rest
+            .find(|c: char| !c.is_whitespace())
+            .unwrap_or(rest.len());
+        out.push_str(&rest[..ws_end]);
+        rest = &rest[ws_end..];
+        if rest.is_empty() {
+            break;
+        }
+        let tok_end = rest.find(char::is_whitespace).unwrap_or(rest.len());
+        let token = &rest[..tok_end];
+        if at_sentence_start {
+            push_capitalized(&mut out, token);
+        } else {
+            out.push_str(token);
+        }
+        at_sentence_start = token_ends_sentence(token);
+        rest = &rest[tok_end..];
+    }
+    out
+}
+
+/// Append `token` with its first alphabetic character uppercased — unless the
+/// token already contains any uppercase, in which case its casing is treated
+/// as deliberate (brand/proper casing) and preserved verbatim.
+fn push_capitalized(out: &mut String, token: &str) {
+    if token.chars().any(|c| c.is_uppercase()) {
+        out.push_str(token);
+        return;
+    }
+    let mut done = false;
+    for c in token.chars() {
+        if !done && c.is_alphabetic() {
+            out.extend(c.to_uppercase());
+            done = true;
+        } else {
+            out.push(c);
+        }
+    }
+}
+
+/// Whether `token` ends a sentence for capitalization purposes. `!`, `?`, and
+/// `…` always do; `.` does unless the token is an abbreviation, a dotted
+/// acronym, or a single-letter initial.
+fn token_ends_sentence(token: &str) -> bool {
+    let t = token.trim_end_matches(CLOSING);
+    let Some(last) = t.chars().last() else {
+        return false;
+    };
+    if !TERMINATORS.contains(&last) {
+        return false;
+    }
+    if last != '.' {
+        return true;
+    }
+    let bare = t
+        .trim_end_matches(TERMINATORS)
+        .trim_start_matches(|c: char| !c.is_alphanumeric());
+    if bare.is_empty() {
+        return true;
+    }
+    if bare.contains('.') {
+        return false;
+    }
+    if NON_TERMINAL_ABBREVIATIONS.contains(&bare.to_lowercase().as_str()) {
+        return false;
+    }
+    // Single-letter initials ("J. Smith").
+    let mut chars = bare.chars();
+    if let (Some(c), None) = (chars.next(), chars.next())
+        && c.is_alphabetic()
+    {
+        return false;
+    }
+    true
+}
+
+/// Whether the segment opens an interrogative: a wh-word lead, or an
+/// auxiliary lead followed by a question subject (subject-auxiliary
+/// inversion). Bare auxiliary leads are imperative-prone and do not count.
+fn is_interrogative_lead(words: &[&str]) -> bool {
+    let Some(first) = words.first().map(|w| word_core(w)) else {
+        return false;
+    };
+    if WH_LEADS.iter().any(|lead| first.eq_ignore_ascii_case(lead)) {
+        return true;
+    }
+    if AUX_LEADS
         .iter()
-        .any(|lead| w.eq_ignore_ascii_case(lead))
+        .any(|lead| first.eq_ignore_ascii_case(lead))
+    {
+        return words.get(1).map(|w| word_core(w)).is_some_and(|second| {
+            QUESTION_SUBJECTS
+                .iter()
+                .any(|s| second.eq_ignore_ascii_case(s))
+        });
+    }
+    false
+}
+
+/// `word` with edge punctuation stripped ("you," → "you").
+fn word_core(word: &str) -> &str {
+    word.trim_start_matches(|c: char| !c.is_alphanumeric())
+        .trim_end_matches(|c: char| !c.is_alphanumeric())
 }
 
 #[cfg(test)]
@@ -265,6 +401,99 @@ mod tests {
             out.text.contains("mister you"),
             "lowercase next word → no abbreviation"
         );
+    }
+
+    #[test]
+    fn imperative_aux_leads_stay_deterministic() {
+        for text in [
+            "have a great day",
+            "do not touch that",
+            "will check later tonight",
+            "must remember to call mom",
+            "can confirm the fix works",
+            "would love to see that",
+        ] {
+            let out = normalize(text);
+            assert!(!out.needs_llm, "imperative escalated: {text}");
+            assert!(out.text.ends_with('.'), "no terminal period: {text}");
+        }
+    }
+
+    #[test]
+    fn aux_with_question_subject_defers_to_llm() {
+        for text in [
+            "can you hear me",
+            "do you want coffee",
+            "is there a way around it",
+            "did he call back",
+            "am i wrong about this",
+        ] {
+            let out = normalize(text);
+            assert!(out.needs_llm, "question not escalated: {text}");
+            assert!(
+                !out.text.ends_with('.'),
+                "period forced on question: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn capitalizes_after_internal_sentence_breaks() {
+        let out = normalize("okay that works. now let me think");
+        assert_eq!(out.text, "Okay that works. Now let me think.");
+        let out = normalize("hello there. how are you? great!");
+        assert_eq!(out.text, "Hello there. How are you? Great!");
+    }
+
+    #[test]
+    fn sentence_caps_skip_abbreviations_and_decimals() {
+        assert_eq!(
+            capitalize_sentence_starts("we used e.g. the fast path."),
+            "We used e.g. the fast path."
+        );
+        assert_eq!(
+            capitalize_sentence_starts("it costs 3.5 dollars. then we left."),
+            "It costs 3.5 dollars. Then we left."
+        );
+        assert_eq!(
+            capitalize_sentence_starts("j. smith signed it."),
+            "J. smith signed it."
+        );
+        assert_eq!(
+            capitalize_sentence_starts("the U.S. team won. great job."),
+            "The U.S. team won. Great job."
+        );
+    }
+
+    #[test]
+    fn sentence_caps_respect_terminal_quotes_and_brand_casing() {
+        assert_eq!(
+            capitalize_sentence_starts("he said \"go.\" then he left."),
+            "He said \"go.\" Then he left."
+        );
+        // Tokens with deliberate casing are never altered, even sentence-initially.
+        assert_eq!(
+            capitalize_sentence_starts("iPhone is great. iPhone is fine."),
+            "iPhone is great. iPhone is fine."
+        );
+    }
+
+    #[test]
+    fn sentence_caps_preserve_whitespace_and_non_latin() {
+        assert_eq!(
+            capitalize_sentence_starts("  spaced   out. fine. "),
+            "  Spaced   out. Fine. "
+        );
+        assert_eq!(
+            capitalize_sentence_starts("你好世界. 再见"),
+            "你好世界. 再见"
+        );
+    }
+
+    #[test]
+    fn mister_abbreviation_does_not_end_sentence() {
+        let out = normalize("dear mister Thompson, I am writing");
+        assert_eq!(out.text, "Dear Mr. Thompson, I am writing.");
     }
 
     #[test]

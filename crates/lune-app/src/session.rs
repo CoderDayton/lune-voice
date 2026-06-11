@@ -931,11 +931,22 @@ async fn process_and_deliver(
     // ── Step 1: Dictionary scan + Heuristic correction ─────────────────
     let (dictionary_entries, dict_replacements) = {
         let guard = dict.lock().await;
-        let entries = guard
+        let mut entries = guard
             .top_relevant(&text_after_commands, 20)
             .into_iter()
             .cloned()
             .collect::<Vec<_>>();
+        // Soften Title-case-only replacements of ordinary words ("Dev",
+        // "Server") before they reach the LLM prompt and input seed — the
+        // forced capital is wrong mid-sentence, and the sentence-initial
+        // capitalizer restores it where it belongs. The heuristic corrector
+        // applies the same guard internally.
+        for entry in &mut entries {
+            if let Some(lower) = lune_dict::corrector::soften_forced_title_case(&entry.replacement)
+            {
+                entry.replacement = lower;
+            }
+        }
         let replacements = guard.scan(&text_after_commands);
         (entries, replacements)
     };
@@ -1086,7 +1097,10 @@ async fn process_and_deliver(
         match llm_result {
             Ok(Ok(output)) => {
                 debug!(%session_id, llm_ms = llm_t0.elapsed().as_millis() as u64, "[LLM] output ready, len={}", output.cleaned_text.len());
-                output.cleaned_text
+                // Deterministic backstop: any sentence the model left
+                // uncapitalized (or that the merge reverted to input casing)
+                // still gets its sentence-initial capital.
+                lune_dict::punctuation::capitalize_sentence_starts(&output.cleaned_text)
             }
             Ok(Err(e)) => {
                 warn!(error = %e, llm_ms = llm_t0.elapsed().as_millis() as u64, "LLM correction failed, using text as-is");

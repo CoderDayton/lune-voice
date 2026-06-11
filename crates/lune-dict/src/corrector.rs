@@ -84,8 +84,13 @@ fn process_single_word(
         .iter()
         .find(|(phrase, _)| phrase.eq_ignore_ascii_case(stripped))
     {
+        // Title-case-only replacements of ordinary words ("Dev", "Server")
+        // must not force a mid-sentence capital: apply the spelling in
+        // lowercase and let the sentence-initial capitalizer own position
+        // casing. Brand casing (GitHub, iPhone, NASA) applies verbatim.
+        let softened = soften_forced_title_case(repl);
         return ProcessedWord {
-            corrected_word: restore_punctuation(word, repl),
+            corrected_word: restore_punctuation(word, softened.as_deref().unwrap_or(repl)),
             unresolved: None,
         };
     }
@@ -182,6 +187,27 @@ fn process_single_word(
         corrected_word: word.to_owned(),
         unresolved,
     }
+}
+
+/// Lowercased form of `replacement` when it is Title-case-only ("Dev",
+/// "Server") and its lowercase form is an ordinary English word — i.e. when
+/// applying it verbatim would force a capital that is wrong mid-sentence.
+/// Brand-cased ("GitHub", "iPhone", acronyms) and genuinely proper
+/// ("Kubernetes", "Roblox" — not dictionary words) replacements return
+/// `None` and apply verbatim. Mirrors the lexicon path's
+/// `title_case_only && lowercase_is_common` canonical guard.
+pub fn soften_forced_title_case(replacement: &str) -> Option<String> {
+    // Unicode-aware so accented capitals ("Élan") are detected as title case;
+    // the wordnik list is ASCII-only, so accented words still fail the
+    // commonness lookup below and apply verbatim — the safe outcome.
+    let mut chars = replacement.chars();
+    let title_only =
+        chars.next().is_some_and(|c| c.is_uppercase()) && !chars.any(|c| c.is_uppercase());
+    if !title_only {
+        return None;
+    }
+    let lower = replacement.to_lowercase();
+    wordnik_list::word_exists(&lower).then_some(lower)
 }
 
 pub struct HeuristicCorrector {
@@ -353,6 +379,43 @@ mod tests {
     /// Typed empty risk slice for calls that exercise correction without any
     /// ASR risk scores (lets `correct`'s generic `S` parameter infer).
     const NO_RISKS: &[(&str, f32)] = &[];
+
+    #[test]
+    fn soften_targets_title_cased_common_words_only() {
+        assert_eq!(soften_forced_title_case("Dev"), Some("dev".into()));
+        assert_eq!(soften_forced_title_case("Server"), Some("server".into()));
+        // Proper nouns that are not dictionary words keep their capital.
+        assert_eq!(soften_forced_title_case("Kubernetes"), None);
+        assert_eq!(soften_forced_title_case("Roblox"), None);
+        // Brand casing (interior uppercase) is never softened.
+        assert_eq!(soften_forced_title_case("GitHub"), None);
+        assert_eq!(soften_forced_title_case("NASA"), None);
+        assert_eq!(soften_forced_title_case("iPhone"), None);
+        // "Lune Voice" passes through via its interior uppercase 'V';
+        // lowercase replacements carry no forced capital to begin with.
+        assert_eq!(soften_forced_title_case("Lune Voice"), None);
+        assert_eq!(soften_forced_title_case("dev"), None);
+        // Accented capitals are detected as title case, but the ASCII-only
+        // word list never recognizes their lowercase — verbatim is the safe
+        // outcome for likely proper nouns.
+        assert_eq!(soften_forced_title_case("Élan"), None);
+    }
+
+    #[test]
+    fn dict_replacement_does_not_force_mid_sentence_capital() {
+        let c = HeuristicCorrector::new();
+        let dict = vec![("dev".to_string(), "Dev".to_string())];
+        let result = c.correct("restart the dev box", NO_RISKS, &dict, "en");
+        assert_eq!(result.corrected_text, "restart the dev box");
+    }
+
+    #[test]
+    fn dict_replacement_keeps_brand_casing() {
+        let c = HeuristicCorrector::new();
+        let dict = vec![("github".to_string(), "GitHub".to_string())];
+        let result = c.correct("i use github daily", NO_RISKS, &dict, "en");
+        assert_eq!(result.corrected_text, "i use GitHub daily");
+    }
 
     #[test]
     fn known_word_not_flagged_passes_through() {
