@@ -12,6 +12,7 @@ import { WelcomePage } from '../../welcome/welcome-page';
 import { findNavigationItem, navigationGroups } from '../config/navigation';
 import { useAppShortcuts } from '../hooks/use-app-shortcuts';
 import { startWorkspaceBridge } from '../workspace-bridge';
+import { ShaderBackground } from './shader-background';
 import { SidebarContent } from './sidebar';
 
 export const DRAWER_ID = 'app-drawer';
@@ -83,6 +84,7 @@ export function AppShell() {
 
   return (
     <div className="app-shell-root drawer lg:drawer-open fixed inset-0">
+      <ShaderBackground />
       <input
         ref={drawerRef}
         id={DRAWER_ID}
@@ -92,7 +94,7 @@ export function AppShell() {
       />
 
       {/* Main content — must come before drawer-side per DaisyUI spec */}
-      <div className="drawer-content flex flex-col min-h-0">
+      <div className="drawer-content relative z-10 flex flex-col min-h-0">
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 sm:focus:top-4 sm:focus:left-4 focus:z-50 focus:btn focus:btn-primary focus:btn-sm"

@@ -25,14 +25,14 @@ function SessionRowBody({ item }: { item: HistorySession }) {
   });
   return (
     <div className="list-col-grow min-w-0">
-      <p className="text-base line-clamp-2 sm:line-clamp-3">
+      <p className="line-clamp-2 text-[0.95rem] leading-6 text-content">
         {item.transcript || t`Empty session`}
       </p>
-      <div className="text-sm text-content-subtle mt-0.5">
+      <div className="mt-1 flex items-center gap-1.5 text-xs text-content-subtle">
         <span className="tabular-nums">{time}</span>
-        <span className="mx-1">·</span>
+        <span aria-hidden="true">·</span>
         {item.words} {t`words`}
-        <span className="mx-1">·</span>
+        <span aria-hidden="true">·</span>
         {item.seconds}
         {t`s`}
       </div>
@@ -57,8 +57,10 @@ const SessionRow = memo(function SessionRow({ item, selected, onSelect }: Sessio
           type="button"
           aria-current={selected ? 'true' : undefined}
           onClick={() => onSelect(item)}
-          className={`interactive-row flex w-full items-center text-left px-4 py-3 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary ${
-            selected ? 'border-l-2 border-primary bg-surface-nav-active' : ''
+          className={`interactive-row flex min-h-20 w-full items-center rounded-none px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary ${
+            selected
+              ? 'border-l-2 border-primary bg-surface-nav-active pl-[0.875rem] text-content-strong'
+              : ''
           }`}
         >
           <SessionRowBody item={item} />
@@ -74,7 +76,7 @@ const SessionRow = memo(function SessionRow({ item, selected, onSelect }: Sessio
         <li className="list-row p-0">
           <button
             type="button"
-            className="interactive-row flex w-full items-center text-left px-4 py-3 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary"
+            className="interactive-row flex min-h-20 w-full items-center rounded-none px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary"
             aria-haspopup="dialog"
             aria-label={t`Open session details`}
             onClick={open}
@@ -134,13 +136,13 @@ export function HistorySessionList({ selectedId, onSelect }: HistorySessionListP
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       {groups.map((group) => (
         <div key={group.date}>
-          <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-content-subtle mb-2 px-1">
+          <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.16em] text-content-subtle">
             {group.date}
           </h3>
-          <ul className="list panel-surface overflow-hidden">
+          <ul className="panel-surface divide-y divide-surface-border overflow-hidden">
             {group.items.map((item) => (
               <SessionRow
                 key={item.id}

@@ -1,5 +1,14 @@
 import { Check, ChevronDown } from 'lucide-react';
-import { type ComponentType, type ReactNode, useEffect, useId, useRef, useState } from 'react';
+import {
+  type ComponentType,
+  type CSSProperties,
+  type ReactNode,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
+import { createPortal } from 'react-dom';
 
 type IconComponent = ComponentType<{
   size?: number;
@@ -40,7 +49,9 @@ export function DescriptiveDropdown<Value extends string>({
   align = 'end',
 }: DescriptiveDropdownProps<Value>) {
   const [open, setOpen] = useState(false);
+  const [menuStyle, setMenuStyle] = useState<CSSProperties | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const listboxId = useId();
 
   const current = options.find((opt) => opt.value === value) ?? options[0];
@@ -48,7 +59,8 @@ export function DescriptiveDropdown<Value extends string>({
   useEffect(() => {
     if (!open) return;
     function onPointerDown(event: PointerEvent) {
-      if (!containerRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (!containerRef.current?.contains(target) && !menuRef.current?.contains(target)) {
         setOpen(false);
       }
     }
@@ -63,13 +75,106 @@ export function DescriptiveDropdown<Value extends string>({
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+
+    function updateMenuPosition() {
+      const trigger = containerRef.current;
+      if (!trigger) return;
+
+      const rect = trigger.getBoundingClientRect();
+      const gutter = 8;
+      const width = Math.min(320, window.innerWidth - gutter * 2);
+      const left =
+        align === 'end'
+          ? Math.min(Math.max(gutter, rect.right - width), window.innerWidth - width - gutter)
+          : Math.min(Math.max(gutter, rect.left), window.innerWidth - width - gutter);
+
+      setMenuStyle({
+        position: 'fixed',
+        top: rect.bottom + gutter,
+        left,
+        width,
+        maxHeight: `min(60vh, ${Math.max(160, window.innerHeight - rect.bottom - gutter * 2)}px)`,
+      });
+    }
+
+    updateMenuPosition();
+    window.addEventListener('resize', updateMenuPosition);
+    window.addEventListener('scroll', updateMenuPosition, true);
+    return () => {
+      window.removeEventListener('resize', updateMenuPosition);
+      window.removeEventListener('scroll', updateMenuPosition, true);
+    };
+  }, [open, align]);
+
   function pick(next: Value) {
     onChange(next);
     setOpen(false);
   }
 
   const TriggerIcon = current?.icon;
-  const menuPos = align === 'end' ? 'right-0' : 'left-0';
+  const menu =
+    open && menuStyle
+      ? createPortal(
+          <div
+            ref={menuRef}
+            id={listboxId}
+            role="listbox"
+            aria-label={ariaLabel}
+            style={menuStyle}
+            className="z-popover flex flex-col gap-1 overflow-y-auto rounded-box border border-surface-border bg-surface-elevated p-1.5 shadow-card backdrop-blur-xl"
+          >
+            {options.map((option) => {
+              const Icon = option.icon;
+              const active = option.value === value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="option"
+                  aria-selected={active}
+                  onClick={() => pick(option.value)}
+                  className={`group flex w-full items-start gap-3 rounded-field px-2.5 py-2 text-left transition-colors duration-fast hover:bg-surface-hover ${
+                    active ? 'bg-primary/8' : ''
+                  }`}
+                >
+                  {Icon && (
+                    <span
+                      className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-selector ${
+                        active
+                          ? 'bg-primary/15 text-primary'
+                          : 'bg-surface-hover text-content-subtle group-hover:text-content'
+                      }`}
+                    >
+                      <Icon size={16} strokeWidth={1.8} />
+                    </span>
+                  )}
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="flex items-center gap-2">
+                      <span
+                        className={`text-sm font-medium ${active ? 'text-content-strong' : 'text-content'}`}
+                      >
+                        {option.label}
+                      </span>
+                      {option.badge}
+                    </span>
+                    {option.description && (
+                      <span className="text-xs leading-snug text-content-subtle">
+                        {option.description}
+                      </span>
+                    )}
+                  </span>
+                  {active && (
+                    <Check size={14} strokeWidth={2.5} className="mt-1.5 shrink-0 text-primary" />
+                  )}
+                </button>
+              );
+            })}
+          </div>,
+          document.body,
+        )
+      : null;
 
   return (
     <div ref={containerRef} className={`relative inline-block ${className}`}>
@@ -96,62 +201,7 @@ export function DescriptiveDropdown<Value extends string>({
           className={`shrink-0 text-content-subtle transition-transform duration-fast ${open ? 'rotate-180' : ''}`}
         />
       </button>
-
-      {open && (
-        <div
-          id={listboxId}
-          role="listbox"
-          aria-label={ariaLabel}
-          className={`absolute ${menuPos} z-dropdown mt-2 flex max-h-[min(60vh,28rem)] w-[min(20rem,90vw)] flex-col gap-1 overflow-y-auto rounded-box border border-surface-border bg-surface-elevated p-1.5 shadow-card backdrop-blur-xl`}
-        >
-          {options.map((option) => {
-            const Icon = option.icon;
-            const active = option.value === value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                role="option"
-                aria-selected={active}
-                onClick={() => pick(option.value)}
-                className={`group flex w-full items-start gap-3 rounded-field px-2.5 py-2 text-left transition-colors duration-fast hover:bg-surface-hover ${
-                  active ? 'bg-primary/8' : ''
-                }`}
-              >
-                {Icon && (
-                  <span
-                    className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-selector ${
-                      active
-                        ? 'bg-primary/15 text-primary'
-                        : 'bg-surface-hover text-content-subtle group-hover:text-content'
-                    }`}
-                  >
-                    <Icon size={16} strokeWidth={1.8} />
-                  </span>
-                )}
-                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="flex items-center gap-2">
-                    <span
-                      className={`text-sm font-medium ${active ? 'text-content-strong' : 'text-content'}`}
-                    >
-                      {option.label}
-                    </span>
-                    {option.badge}
-                  </span>
-                  {option.description && (
-                    <span className="text-xs leading-snug text-content-subtle">
-                      {option.description}
-                    </span>
-                  )}
-                </span>
-                {active && (
-                  <Check size={14} strokeWidth={2.5} className="mt-1.5 shrink-0 text-primary" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {menu}
     </div>
   );
 }

@@ -169,7 +169,7 @@ function PhaseWaiting({ prompt, description, onStart, startLabel }: PhaseWaiting
   return (
     <div className="py-4 flex flex-col gap-3">
       <p className="text-sm text-content-muted">{description}</p>
-      <p className="text-base leading-relaxed bg-surface-subtle rounded-lg p-3 border border-surface-border">
+      <p className="text-base leading-relaxed bg-surface-subtle rounded-field p-3 border border-surface-border">
         {prompt}
       </p>
       <div className="modal-action">
@@ -191,7 +191,7 @@ function PhaseSpeech({ prompt, level, description }: PhaseSpeechProps) {
   return (
     <div className="py-4 flex flex-col gap-3">
       <p className="text-sm text-content-muted">{description}</p>
-      <p className="text-base leading-relaxed bg-surface-subtle rounded-lg p-3 border border-surface-border">
+      <p className="text-base leading-relaxed bg-surface-subtle rounded-field p-3 border border-surface-border">
         {prompt}
       </p>
       <div className="flex justify-center py-1">

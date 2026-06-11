@@ -28,7 +28,7 @@ export function SidebarQuickStart() {
         }`}
       >
         <div
-          className={`flex size-9 items-center justify-center rounded-lg ${
+          className={`flex size-9 items-center justify-center rounded-field ${
             isActive ? 'bg-error/15' : 'bg-primary/15'
           }`}
         >

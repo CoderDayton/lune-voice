@@ -71,21 +71,21 @@ export function HistoryPage() {
   const selected = visible.find((s) => s.id === selectedId) ?? null;
 
   return (
-    <div className="flex flex-col gap-space-md">
+    <div className="flex flex-col gap-4">
       <HistoryToolbar />
-      <div className="bento-board">
-        <div className="col-span-5 min-w-0">
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(20rem,0.9fr)_minmax(0,1.1fr)] xl:grid-cols-[minmax(22rem,0.82fr)_minmax(0,1.18fr)]">
+        <div className="min-w-0">
           <HistorySessionList
             selectedId={selectedId}
             onSelect={(session) => setSelectedId(session.id)}
           />
         </div>
-        <div className="col-span-7 min-w-0">
-          <div className="bento-cell sticky top-4 overflow-hidden">
+        <div className="min-w-0 lg:pt-[25px]">
+          <div className="panel-surface sticky top-4 overflow-hidden">
             {selected ? (
               <>
                 <SessionDetailContent session={selected} />
-                <div className="flex justify-end border-t border-surface-border px-5 py-3 sm:px-6">
+                <div className="flex justify-end border-t border-surface-border bg-surface-inset/50 px-4 py-3">
                   <ConfirmDialog
                     title={t`Delete session?`}
                     description={t`This will permanently remove this dictation session and its transcript.`}

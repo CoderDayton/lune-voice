@@ -106,10 +106,12 @@ export function SessionDetailContent({ session }: { session: HistorySession }) {
   return (
     <div ref={rootRef}>
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-surface-border px-5 pb-3 pt-5 sm:px-6 sm:pt-6">
-        <div>
-          <h3 className="text-base font-semibold tracking-tight">{date}</h3>
-          <p className="mt-0.5 text-sm text-content-subtle tabular-nums">
+      <div className="flex items-start justify-between gap-4 border-b border-surface-border px-4 py-4 sm:px-5">
+        <div className="min-w-0">
+          <h3 className="truncate text-base font-semibold tracking-tight text-content-strong">
+            {date}
+          </h3>
+          <p className="mt-1 text-sm tabular-nums text-content-subtle">
             {time} · {relative}
           </p>
         </div>
@@ -140,10 +142,10 @@ export function SessionDetailContent({ session }: { session: HistorySession }) {
       </div>
 
       {/* Transcript */}
-      <div className="px-5 pb-4 pt-4 sm:px-6">
+      <div className="px-4 py-4 sm:px-5">
         {session.transcript ? (
-          <div className="rounded-lg border border-surface-border bg-surface-inset p-5">
-            <p className="whitespace-pre-wrap break-words text-base leading-relaxed text-content sm:text-lg">
+          <div className="rounded-field border border-surface-border bg-surface-inset p-4">
+            <p className="whitespace-pre-wrap break-words text-[1rem] leading-7 text-content">
               {session.transcript}
             </p>
           </div>
@@ -153,8 +155,8 @@ export function SessionDetailContent({ session }: { session: HistorySession }) {
       </div>
 
       {/* Metadata */}
-      <div className="border-t border-surface-border bg-surface-inset px-5 py-4 sm:px-6">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="border-t border-surface-border bg-surface-inset/70 px-4 py-4 sm:px-5">
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
           <MetaItem icon={Hash} label={t`Words`} value={String(session.words)} />
           <MetaItem icon={Clock} label={t`Duration`} value={formatDuration(session.seconds)} />
           <MetaItem icon={Mic} label={t`Engine`} value={formatBackend(session.backend)} />
@@ -226,11 +228,11 @@ function MetaItem({
   value: string;
 }) {
   return (
-    <div className="flex items-center gap-3">
-      <Icon size={14} strokeWidth={1.6} className="text-content-dim shrink-0" />
+    <div className="flex min-w-0 items-center gap-2 rounded-field border border-surface-border/70 bg-surface-elevated px-3 py-2">
+      <Icon size={14} strokeWidth={1.6} className="shrink-0 text-content-dim" />
       <div className="min-w-0">
-        <p className="text-xs uppercase tracking-wider text-content-dim">{label}</p>
-        <p className="text-sm font-medium truncate">{value}</p>
+        <p className="text-[0.68rem] uppercase tracking-[0.12em] text-content-dim">{label}</p>
+        <p className="truncate text-sm font-medium text-content">{value}</p>
       </div>
     </div>
   );

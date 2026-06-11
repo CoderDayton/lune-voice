@@ -37,16 +37,16 @@ export function HistoryToolbar() {
     : t`${totalCount} sessions`;
 
   return (
-    <div className="panel-surface flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:gap-3 sm:p-3">
-      <label className="input input-lg flex-1 gap-3 bg-surface-field">
-        <Search size={18} strokeWidth={2} className="text-content-subtle shrink-0" />
+    <div className="panel-surface flex flex-col gap-2 p-2 sm:flex-row sm:items-center sm:gap-3">
+      <label className="flex h-10 flex-1 items-center gap-3 rounded-field border border-surface-border bg-surface-field px-3.5 transition-colors focus-within:border-surface-border-strong focus-within:outline-2 focus-within:outline-offset-[-2px] focus-within:outline-primary/60">
+        <Search size={17} strokeWidth={2} className="shrink-0 text-content-subtle" />
         <input
           ref={inputRef}
           type="search"
           value={search}
           onChange={(e) => workspaceActions.setHistorySearch(e.target.value)}
           placeholder={t`Search transcripts…`}
-          className="grow text-base"
+          className="h-full min-w-0 grow bg-transparent text-sm text-content outline-none placeholder:text-content-dim"
           aria-label={t`Search transcripts`}
         />
         {filtered ? (
@@ -63,7 +63,9 @@ export function HistoryToolbar() {
         )}
       </label>
       <div className="flex items-center justify-between gap-2 sm:justify-end">
-        <span className="text-sm text-content-subtle tabular-nums shrink-0 px-1">{countLabel}</span>
+        <span className="flex h-10 shrink-0 items-center rounded-field border border-surface-border bg-surface-elevated px-4 text-sm tabular-nums text-content-subtle">
+          {countLabel}
+        </span>
       </div>
     </div>
   );

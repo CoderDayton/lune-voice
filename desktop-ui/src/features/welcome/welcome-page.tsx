@@ -136,7 +136,7 @@ function Header({ phase, requiredOk, pendingCount, error: _error }: HeaderProps)
 
   return (
     <header className="flex flex-col items-center gap-3 text-center">
-      <div className="token-icon size-14 sm:size-16 rounded-2xl">
+      <div className="token-icon size-14 sm:size-16">
         {phase === 'done' ? (
           <Sparkles size={26} strokeWidth={1.6} className="text-primary" />
         ) : (
