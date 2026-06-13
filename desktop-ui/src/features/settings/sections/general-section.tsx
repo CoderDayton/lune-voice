@@ -42,7 +42,7 @@ export function GeneralSection({ settings }: { settings: WorkspaceSettings }) {
           <div className="flex flex-col">
             <span className="text-sm font-medium">{t`Start minimized`}</span>
             <span className="text-xs text-content-muted">
-              {t`Launch into the system tray instead of opening the main window. Useful when Lune autostarts on login.`}
+              {t`Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login.`}
             </span>
           </div>
           <input

@@ -13,16 +13,34 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#. placeholder {0}: filtered.length
+#. placeholder {1}: entries.length
+#: src/features/dictionary/components/dictionary-table.tsx:243
+msgid "{0} of {1}"
+msgstr ""
+
+#. placeholder {0}: entries.length
+#: src/features/dictionary/components/dictionary-table.tsx:243
+msgid "{0} rules"
+msgstr ""
+
 #: src/features/history/components/history-pagination.tsx:45
+#: src/features/history/components/history-table.tsx:173
 msgid "{page} / {totalPages}"
 msgstr ""
 
 #: src/features/history/components/history-pagination.tsx:29
+#: src/features/history/components/history-table.tsx:157
 msgid "{start}–{end} of {visibleCount}"
 msgstr ""
 
+#: src/features/history/components/history-table.tsx:105
 #: src/features/history/components/history-toolbar.tsx:37
 msgid "{totalCount} sessions"
+msgstr ""
+
+#: src/features/history/components/history-table.tsx:105
+msgid "{visibleCount} / {totalCount}"
 msgstr ""
 
 #: src/features/history/components/history-toolbar.tsx:36
@@ -37,7 +55,7 @@ msgstr ""
 msgid "Account and status"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-table.tsx:177
+#: src/features/dictionary/components/dictionary-table.tsx:266
 msgid "Action"
 msgstr "操作"
 
@@ -46,13 +64,29 @@ msgstr "操作"
 msgid "Adaptive gain control"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-form.tsx:99
-msgid "Add"
+#: src/features/dictionary/components/dictionary-form.tsx:113
+#~ msgid "Add"
+#~ msgstr ""
+
+#: src/features/dictionary/components/dictionary-form.tsx:57
+msgid "Add a correction"
+msgstr ""
+
+#: src/features/dictionary/components/dictionary-table.tsx:168
+#~ msgid "Add a fix and Lune applies it every time you dictate. Try a starter below or add your own above."
+#~ msgstr ""
+
+#: src/features/dictionary/components/dictionary-table.tsx:168
+msgid "Add a fix and Lune Voice applies it every time you dictate. Try a starter below or add your own above."
+msgstr ""
+
+#: src/features/dictionary/components/dictionary-form.tsx:159
+msgid "Add correction"
 msgstr ""
 
 #: src/features/dictionary/components/dictionary-form.tsx:44
-msgid "Add correction rule"
-msgstr ""
+#~ msgid "Add correction rule"
+#~ msgstr ""
 
 #: src/features/settings/components/calibrate-modal.tsx:96
 msgid "Adjust manually"
@@ -75,7 +109,7 @@ msgstr ""
 msgid "all-time"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:135
+#: src/features/overview/overview-page.tsx:139
 msgid "all-time avg"
 msgstr ""
 
@@ -100,7 +134,7 @@ msgstr ""
 msgid "Apply"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:183
+#: src/features/overview/overview-page.tsx:187
 msgid "Audio"
 msgstr ""
 
@@ -126,7 +160,7 @@ msgid "Calibrate microphone"
 msgstr ""
 
 #: src/components/feedback/confirm-dialog.tsx:52
-#: src/features/dictionary/components/dictionary-table.tsx:91
+#: src/features/dictionary/components/dictionary-table.tsx:96
 #: src/features/settings/components/calibrate-modal.tsx:115
 #: src/features/settings/sections/models-section.tsx:352
 #: src/features/styles/components/style-editor-modal.tsx:106
@@ -171,6 +205,11 @@ msgstr ""
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr ""
 
+#: src/features/dictionary/components/dictionary-table.tsx:236
+msgid "Clear filter"
+msgstr ""
+
+#: src/features/history/components/history-table.tsx:97
 #: src/features/history/components/history-toolbar.tsx:57
 msgid "Clear search"
 msgstr ""
@@ -213,6 +252,14 @@ msgstr ""
 msgid "Control how your speech is turned into text."
 msgstr ""
 
+#: src/features/history/components/history-table.tsx:291
+msgid "Copied"
+msgstr ""
+
+#: src/features/history/components/history-table.tsx:291
+msgid "Copy"
+msgstr ""
+
 #: src/features/history/components/session-detail-modal.tsx:132
 msgid "Copy transcript"
 msgstr ""
@@ -224,6 +271,10 @@ msgstr ""
 
 #: src/features/settings/sections/models-section.tsx:149
 msgid "Correction LLM"
+msgstr ""
+
+#: src/features/dictionary/components/dictionary-form.tsx:41
+msgid "Couldn't add that rule. Try again."
 msgstr ""
 
 #: src/features/styles/styles-page.tsx:161
@@ -244,8 +295,9 @@ msgid "Dark"
 msgstr ""
 
 #: src/components/feedback/confirm-dialog.tsx:63
+#: src/features/dictionary/components/dictionary-table.tsx:146
+#: src/features/history/components/history-table.tsx:300
 #: src/features/history/components/session-detail-modal.tsx:202
-#: src/features/history/history-page.tsx:92
 #: src/features/settings/sections/models-section.tsx:300
 #: src/features/styles/components/style-preset-card.tsx:66
 msgid "Delete"
@@ -260,8 +312,8 @@ msgstr ""
 msgid "Delete model"
 msgstr ""
 
+#: src/features/history/components/history-table.tsx:298
 #: src/features/history/components/session-detail-modal.tsx:200
-#: src/features/history/history-page.tsx:90
 msgid "Delete session?"
 msgstr ""
 
@@ -269,7 +321,7 @@ msgstr ""
 msgid "Delete this style?"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-table.tsx:137
+#: src/features/dictionary/components/dictionary-table.tsx:144
 msgid "Delete this word fix?"
 msgstr "删除此修正？"
 
@@ -302,6 +354,7 @@ msgstr ""
 msgid "Dismiss error"
 msgstr ""
 
+#: src/features/history/components/history-table.tsx:294
 #: src/features/settings/sections/models-section.tsx:314
 msgid "Download"
 msgstr ""
@@ -348,29 +401,42 @@ msgstr ""
 msgid "Duration"
 msgstr ""
 
+#: src/features/dictionary/components/dictionary-form.tsx:71
+#~ msgid "e.g. github"
+#~ msgstr ""
+
+#: src/features/dictionary/components/dictionary-form.tsx:91
+#~ msgid "e.g. GitHub"
+#~ msgstr ""
+
 #: src/features/dictionary/components/dictionary-form.tsx:58
-msgid "e.g. github…"
-msgstr ""
+#~ msgid "e.g. github…"
+#~ msgstr ""
 
 #: src/features/dictionary/components/dictionary-form.tsx:76
-msgid "e.g. GitHub…"
-msgstr ""
+#~ msgid "e.g. GitHub…"
+#~ msgstr ""
 
 #: src/features/styles/components/style-editor-modal.tsx:56
 msgid "e.g. Meeting notes"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-table.tsx:132
 #: src/features/styles/components/style-preset-card.tsx:83
 msgid "Edit"
+msgstr ""
+
+#. placeholder {0}: entry.phrase
+#: src/features/dictionary/components/dictionary-table.tsx:139
+msgid "Edit {0}"
 msgstr ""
 
 #: src/features/styles/components/style-editor-modal.tsx:47
 msgid "Edit style"
 msgstr ""
 
-#: src/features/history/components/history-session-list.tsx:29
-#: src/features/overview/overview-page.tsx:258
+#: src/features/history/components/history-session-list.tsx:28
+#: src/features/history/components/history-table.tsx:253
+#: src/features/overview/overview-page.tsx:262
 msgid "Empty session"
 msgstr ""
 
@@ -378,6 +444,7 @@ msgstr ""
 msgid "Enable correction LLM"
 msgstr ""
 
+#: src/features/history/components/history-table.tsx:130
 #: src/features/history/components/session-detail-modal.tsx:162
 msgid "Engine"
 msgstr ""
@@ -390,6 +457,18 @@ msgstr ""
 msgid "Expand sidebar"
 msgstr ""
 
+#: src/features/dictionary/components/dictionary-form.tsx:140
+msgid "Fill both fields to see the correction."
+msgstr ""
+
+#: src/features/dictionary/components/dictionary-table.tsx:228
+msgid "Filter rules"
+msgstr ""
+
+#: src/features/dictionary/components/dictionary-table.tsx:227
+msgid "Filter rules…"
+msgstr ""
+
 #: src/features/settings/sections/general-section.tsx:23
 #: src/features/settings/settings-page.tsx:68
 msgid "General"
@@ -397,6 +476,14 @@ msgstr ""
 
 #: src/features/styles/components/style-editor-modal.tsx:115
 msgid "Generating examples…"
+msgstr ""
+
+#: src/features/dictionary/components/dictionary-form.tsx:82
+msgid "github"
+msgstr ""
+
+#: src/features/dictionary/components/dictionary-form.tsx:113
+msgid "GitHub"
 msgstr ""
 
 #: src/features/overview/overview-page.tsx:62
@@ -416,14 +503,22 @@ msgid "hold the hotkey and speak, your words land where your cursor is."
 msgstr ""
 
 #: src/features/settings/sections/input-section.tsx:65
-msgid "How easily Lune triggers on speech. Higher = picks up quieter onsets."
+#~ msgid "How easily Lune triggers on speech. Higher = picks up quieter onsets."
+#~ msgstr ""
+
+#: src/features/settings/sections/input-section.tsx:65
+msgid "How easily Lune Voice triggers on speech. Higher = picks up quieter onsets."
 msgstr ""
 
 #: src/features/settings/sections/input-section.tsx:92
-msgid "How quickly Lune decides you're done speaking. Higher = ends sooner on a pause."
+#~ msgid "How quickly Lune decides you're done speaking. Higher = ends sooner on a pause."
+#~ msgstr ""
+
+#: src/features/settings/sections/input-section.tsx:92
+msgid "How quickly Lune Voice decides you're done speaking. Higher = ends sooner on a pause."
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:208
+#: src/features/overview/overview-page.tsx:212
 msgid "Idle"
 msgstr ""
 
@@ -441,7 +536,11 @@ msgid "Instructions"
 msgstr ""
 
 #: src/features/settings/sections/input-section.tsx:132
-msgid "Keep the mic open in the background so dictation starts ~70ms sooner. The OS may show a recording indicator while Lune is running."
+#~ msgid "Keep the mic open in the background so dictation starts ~70ms sooner. The OS may show a recording indicator while Lune is running."
+#~ msgstr ""
+
+#: src/features/settings/sections/input-section.tsx:132
+msgid "Keep the mic open in the background so dictation starts ~70ms sooner. The OS may show a recording indicator while Lune Voice is running."
 msgstr ""
 
 #: src/features/settings/sections/shortcuts-section.tsx:16
@@ -454,7 +553,15 @@ msgid "Language"
 msgstr ""
 
 #: src/features/settings/sections/general-section.tsx:45
-msgid "Launch into the system tray instead of opening the main window. Useful when Lune autostarts on login."
+#~ msgid "Launch into the system tray instead of opening the main window. Useful when Lune autostarts on login."
+#~ msgstr ""
+
+#: src/features/settings/sections/general-section.tsx:45
+msgid "Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login."
+msgstr ""
+
+#: src/features/history/components/history-table.tsx:129
+msgid "Length"
 msgstr ""
 
 #: src/features/settings/components/theme-picker.tsx:402
@@ -468,7 +575,7 @@ msgstr ""
 msgid "Listening"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:208
+#: src/features/overview/overview-page.tsx:212
 #: src/features/shell/components/sidebar-widgets.tsx:50
 msgid "Listening…"
 msgstr ""
@@ -486,9 +593,21 @@ msgstr ""
 msgid "Lune"
 msgstr ""
 
+#: src/features/dictionary/components/dictionary-form.tsx:105
+msgid "Lune Voice writes"
+msgstr ""
+
+#: src/features/dictionary/components/dictionary-form.tsx:105
+#~ msgid "Lune writes"
+#~ msgstr ""
+
 #: src/features/settings/sections/models-section.tsx:114
 msgid "Manage AI models stored on your device."
 msgstr ""
+
+#: src/features/dictionary/dictionary-page.tsx:49
+#~ msgid "Map what you say to how it should be written."
+#~ msgstr ""
 
 #: src/features/settings/sections/input-section.tsx:49
 msgid "Measure your room and voice to set both sensitivities automatically."
@@ -498,7 +617,7 @@ msgstr ""
 msgid "Microphone calibration"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:186
+#: src/features/overview/overview-page.tsx:190
 msgid "Microphone input level"
 msgstr ""
 
@@ -525,34 +644,48 @@ msgid "Name"
 msgstr ""
 
 #: src/features/history/components/history-pagination.tsx:54
+#: src/features/history/components/history-table.tsx:182
 msgid "Next"
 msgstr ""
 
 #: src/features/history/components/history-pagination.tsx:52
+#: src/features/history/components/history-table.tsx:180
 msgid "Next page"
 msgstr ""
 
 #: src/features/dictionary/components/dictionary-table.tsx:156
-msgid "No entries yet. Add your first correction rule above."
-msgstr ""
+#~ msgid "No entries yet. Add your first correction rule above."
+#~ msgstr ""
 
-#: src/features/history/components/history-session-list.tsx:132
-msgid "No sessions found."
-msgstr ""
-
-#. placeholder {0}: searchQuery.trim()
-#: src/features/history/components/history-session-list.tsx:129
-msgid "No sessions match \"{0}\". Try a different search."
-msgstr ""
-
-#: src/features/overview/overview-page.tsx:232
-msgid "No sessions yet"
+#: src/features/dictionary/components/dictionary-table.tsx:249
+msgid "No rules match “{query}”."
 msgstr ""
 
 #: src/features/history/components/history-session-list.tsx:131
+#: src/features/history/components/history-table.tsx:118
+msgid "No sessions found."
+msgstr ""
+
+#. placeholder {0}: search.trim()
+#: src/features/history/components/history-table.tsx:115
+msgid "No sessions match \"{0}\"."
+msgstr ""
+
+#. placeholder {0}: searchQuery.trim()
+#: src/features/history/components/history-session-list.tsx:128
+msgid "No sessions match \"{0}\". Try a different search."
+msgstr ""
+
+#: src/features/overview/overview-page.tsx:236
+msgid "No sessions yet"
+msgstr ""
+
+#: src/features/history/components/history-session-list.tsx:130
+#: src/features/history/components/history-table.tsx:117
 msgid "No sessions yet. Start dictating to see your transcripts here."
 msgstr ""
 
+#: src/features/history/components/history-table.tsx:272
 #: src/features/history/components/session-detail-modal.tsx:153
 msgid "No transcript"
 msgstr ""
@@ -565,7 +698,7 @@ msgstr ""
 msgid "Not installed"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:208
+#: src/features/overview/overview-page.tsx:212
 #: src/features/shell/components/app-shell.tsx:163
 #: src/features/shell/components/sidebar.tsx:169
 msgid "Offline"
@@ -583,11 +716,11 @@ msgstr ""
 msgid "Open menu"
 msgstr ""
 
-#: src/features/history/components/history-session-list.tsx:81
+#: src/features/history/components/history-session-list.tsx:80
 msgid "Open session details"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:253
+#: src/features/overview/overview-page.tsx:257
 msgid "Open session from {time}"
 msgstr ""
 
@@ -610,6 +743,7 @@ msgid "Overall progress"
 msgstr ""
 
 #: src/features/history/components/history-pagination.tsx:25
+#: src/features/history/components/history-table.tsx:153
 msgid "Pagination"
 msgstr ""
 
@@ -623,8 +757,8 @@ msgstr ""
 msgid "Pause sensitivity"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-table.tsx:59
-#: src/features/dictionary/components/dictionary-table.tsx:168
+#: src/features/dictionary/components/dictionary-table.tsx:61
+#: src/features/dictionary/components/dictionary-table.tsx:257
 msgid "Phrase"
 msgstr "短语"
 
@@ -645,21 +779,27 @@ msgstr ""
 msgid "Pre-warm microphone"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:234
+#: src/features/overview/overview-page.tsx:238
 msgid "Press"
 msgstr ""
 
 #: src/features/history/components/history-pagination.tsx:39
+#: src/features/history/components/history-table.tsx:167
 msgid "Prev"
 msgstr ""
 
+#: src/features/dictionary/components/dictionary-form.tsx:130
+msgid "Preview"
+msgstr ""
+
 #: src/features/history/components/history-pagination.tsx:37
+#: src/features/history/components/history-table.tsx:165
 msgid "Previous page"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-form.tsx:85
-#: src/features/dictionary/components/dictionary-table.tsx:174
-#: src/features/dictionary/components/priority-picker.tsx:33
+#: src/features/dictionary/components/dictionary-form.tsx:149
+#: src/features/dictionary/components/dictionary-table.tsx:263
+#: src/features/dictionary/components/priority-picker.tsx:47
 msgid "Priority"
 msgstr ""
 
@@ -691,7 +831,7 @@ msgstr ""
 msgid "Recalibrate"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:216
+#: src/features/overview/overview-page.tsx:220
 msgid "Recent"
 msgstr ""
 
@@ -714,14 +854,15 @@ msgstr ""
 
 #. placeholder {0}: entry.phrase
 #. placeholder {1}: entry.replacement
-#: src/features/dictionary/components/dictionary-table.tsx:138
+#: src/features/dictionary/components/dictionary-table.tsx:145
 msgid "Remove the saved correction for \"{0}\" → \"{1}\"."
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-form.tsx:68
-#: src/features/dictionary/components/dictionary-table.tsx:69
-#: src/features/dictionary/components/dictionary-table.tsx:81
-#: src/features/dictionary/components/dictionary-table.tsx:171
+#: src/features/dictionary/components/dictionary-table.tsx:72
+#: src/features/dictionary/components/dictionary-table.tsx:73
+#: src/features/dictionary/components/dictionary-table.tsx:85
+#: src/features/dictionary/components/dictionary-table.tsx:86
+#: src/features/dictionary/components/dictionary-table.tsx:260
 msgid "Replacement"
 msgstr "替换"
 
@@ -738,24 +879,27 @@ msgstr ""
 msgid "Retry download"
 msgstr ""
 
-#: src/features/history/components/history-session-list.tsx:37
-#: src/features/overview/overview-page.tsx:266
+#: src/features/history/components/history-session-list.tsx:36
+#: src/features/overview/overview-page.tsx:270
 msgid "s"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-table.tsx:100
+#: src/features/dictionary/components/dictionary-table.tsx:105
 #: src/features/styles/components/style-editor-modal.tsx:115
 msgid "Save"
 msgstr ""
 
+#: src/features/history/components/history-table.tsx:222
 #: src/features/history/components/session-detail-modal.tsx:70
 msgid "Save Transcript"
 msgstr ""
 
+#: src/features/history/components/history-table.tsx:90
 #: src/features/history/components/history-toolbar.tsx:50
 msgid "Search transcripts"
 msgstr ""
 
+#: src/features/history/components/history-table.tsx:88
 #: src/features/history/components/history-toolbar.tsx:48
 msgid "Search transcripts…"
 msgstr ""
@@ -766,8 +910,8 @@ msgid "Select {0} style"
 msgstr ""
 
 #: src/features/history/history-page.tsx:103
-msgid "Select a session to view its transcript"
-msgstr ""
+#~ msgid "Select a session to view its transcript"
+#~ msgstr ""
 
 #: src/features/welcome/welcome-page.tsx:239
 msgid "Select required models"
@@ -778,8 +922,8 @@ msgstr ""
 msgid "Send method"
 msgstr "发送方式"
 
-#: src/features/overview/overview-page.tsx:175
-#: src/features/overview/overview-page.tsx:218
+#: src/features/overview/overview-page.tsx:179
+#: src/features/overview/overview-page.tsx:222
 msgid "session"
 msgstr ""
 
@@ -787,12 +931,12 @@ msgstr ""
 msgid "Session details"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:175
-#: src/features/overview/overview-page.tsx:218
+#: src/features/overview/overview-page.tsx:179
+#: src/features/overview/overview-page.tsx:222
 msgid "sessions"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:157
+#: src/features/overview/overview-page.tsx:161
 msgid "Sessions"
 msgstr ""
 
@@ -837,11 +981,11 @@ msgstr ""
 msgid "Something went wrong."
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:147
+#: src/features/overview/overview-page.tsx:151
 msgid "Speaking Time"
 msgstr "说话时长"
 
-#: src/features/dictionary/components/dictionary-form.tsx:50
+#: src/features/dictionary/components/dictionary-table.tsx:62
 msgid "Spoken phrase"
 msgstr ""
 
@@ -900,6 +1044,22 @@ msgstr ""
 msgid "System"
 msgstr ""
 
+#: src/features/dictionary/components/dictionary-form.tsx:60
+#~ msgid "Teach Lune the right spelling for a word it mishears."
+#~ msgstr ""
+
+#: src/features/dictionary/components/dictionary-form.tsx:60
+msgid "Teach Lune Voice the right spelling for a word it mishears."
+msgstr ""
+
+#: src/features/dictionary/components/dictionary-table.tsx:165
+msgid "Teach Lune Voice your words"
+msgstr ""
+
+#: src/features/dictionary/components/dictionary-table.tsx:165
+#~ msgid "Teach Lune your words"
+#~ msgstr ""
+
 #: src/features/settings/sections/output-section.tsx:12
 msgid "Text output"
 msgstr "文本输出"
@@ -920,21 +1080,25 @@ msgstr ""
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr ""
 
+#: src/features/history/components/history-table.tsx:299
 #: src/features/history/components/session-detail-modal.tsx:201
-#: src/features/history/history-page.tsx:91
 msgid "This will permanently remove this dictation session and its transcript."
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:235
+#: src/features/history/components/history-table.tsx:126
+msgid "Time"
+msgstr ""
+
+#: src/features/overview/overview-page.tsx:239
 msgid "to start dictating"
 msgstr ""
 
 #: src/features/overview/overview-page.tsx:127
-#: src/features/overview/overview-page.tsx:137
+#: src/features/overview/overview-page.tsx:141
 msgid "today"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:167
+#: src/features/overview/overview-page.tsx:171
 msgid "Today"
 msgstr ""
 
@@ -953,6 +1117,10 @@ msgstr ""
 #: src/features/overview/overview-page.tsx:117
 msgid "Total Words"
 msgstr "总字数"
+
+#: src/features/history/components/history-table.tsx:127
+msgid "Transcript"
+msgstr ""
 
 #: src/features/settings/settings-page.tsx:72
 msgid "Transcription"
@@ -975,7 +1143,7 @@ msgstr "使用硬件加速"
 msgid "View"
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:223
+#: src/features/overview/overview-page.tsx:227
 msgid "View all"
 msgstr ""
 
@@ -1013,11 +1181,13 @@ msgstr ""
 msgid "Whether the shortcut toggles recording or only works while held. Change in Voice input."
 msgstr ""
 
-#: src/features/history/components/history-session-list.tsx:34
-#: src/features/overview/overview-page.tsx:262
+#: src/features/history/components/history-session-list.tsx:33
+#: src/features/history/components/history-table.tsx:277
+#: src/features/overview/overview-page.tsx:266
 msgid "words"
 msgstr ""
 
+#: src/features/history/components/history-table.tsx:128
 #: src/features/history/components/session-detail-modal.tsx:160
 msgid "Words"
 msgstr ""
@@ -1025,6 +1195,10 @@ msgstr ""
 #: src/features/overview/overview-page.tsx:118
 msgid "Words Per Minute"
 msgstr "每分钟字数"
+
+#: src/features/dictionary/components/dictionary-form.tsx:73
+msgid "You say"
+msgstr ""
 
 #: src/features/welcome/welcome-page.tsx:118
 msgid "You're all set"
@@ -1034,7 +1208,7 @@ msgstr ""
 msgid "Your API key. Leave it blank to keep the saved key."
 msgstr ""
 
-#: src/features/overview/overview-page.tsx:234
+#: src/features/overview/overview-page.tsx:238
 msgid "your hotkey"
 msgstr ""
 

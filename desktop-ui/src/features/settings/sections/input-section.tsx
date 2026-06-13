@@ -62,7 +62,7 @@ export function InputSection({ settings }: SettingsProps) {
 
       <SettingsRow
         label={t`Start sensitivity`}
-        description={t`How easily Lune triggers on speech. Higher = picks up quieter onsets.`}
+        description={t`How easily Lune Voice triggers on speech. Higher = picks up quieter onsets.`}
         control={
           <div className="flex items-center gap-3">
             <input
@@ -89,7 +89,7 @@ export function InputSection({ settings }: SettingsProps) {
 
       <SettingsRow
         label={t`Pause sensitivity`}
-        description={t`How quickly Lune decides you're done speaking. Higher = ends sooner on a pause.`}
+        description={t`How quickly Lune Voice decides you're done speaking. Higher = ends sooner on a pause.`}
         control={
           <div className="flex items-center gap-3">
             <input
@@ -129,7 +129,7 @@ export function InputSection({ settings }: SettingsProps) {
 
       <SettingsRow
         label={t`Pre-warm microphone`}
-        description={t`Keep the mic open in the background so dictation starts ~70ms sooner. The OS may show a recording indicator while Lune is running.`}
+        description={t`Keep the mic open in the background so dictation starts ~70ms sooner. The OS may show a recording indicator while Lune Voice is running.`}
         control={
           <input
             type="checkbox"
