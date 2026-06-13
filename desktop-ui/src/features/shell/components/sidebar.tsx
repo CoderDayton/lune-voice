@@ -14,13 +14,12 @@ import { setThemePreference } from '../../../lib/theme';
 import { toggleDictation, workspaceStore } from '../../../store/workspace-store';
 import { navigationGroups } from '../config/navigation';
 import { DRAWER_ID } from './app-shell';
-import { SidebarQuickStart, SidebarTodayStats, SidebarTodayStatsSkeleton } from './sidebar-widgets';
+import { SidebarQuickStart } from './sidebar-widgets';
 
 export function SidebarContent() {
   const { t } = useLingui();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const serviceStatus = useStore(workspaceStore, (s) => s.runtime.serviceStatus);
-  const loaded = useStore(workspaceStore, (s) => s.runtime.loaded);
 
   const isActive = serviceStatus === 'listening' || serviceStatus === 'processing';
   const isConnected = serviceStatus === 'ready' || isActive;
@@ -88,10 +87,9 @@ export function SidebarContent() {
         ))}
       </nav>
 
-      {/* Primary action + today (expanded only) */}
+      {/* Primary action (expanded only) */}
       <div className="is-drawer-close:hidden">
         <SidebarQuickStart />
-        {loaded ? <SidebarTodayStats /> : <SidebarTodayStatsSkeleton />}
       </div>
 
       {/* Account / status card */}

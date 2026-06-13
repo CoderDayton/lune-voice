@@ -17,7 +17,7 @@ interface StatusBadgeProps {
 /** Status badge with dot indicator. Uses surface + content design tokens. */
 export function StatusBadge({ variant, children }: StatusBadgeProps) {
   return (
-    <div className="inline-flex items-center gap-1.5 sm:gap-2 rounded-full border border-surface-border bg-surface-elevated px-3 py-1.5 text-sm">
+    <div className="inline-flex items-center gap-1.5 sm:gap-2 rounded-full border border-surface-border bg-surface-panel px-3 py-1.5 text-sm">
       <span className={`status ${DOT_STYLES[variant]}`} />
       <span className="text-content">{children}</span>
     </div>
@@ -31,7 +31,7 @@ interface InfoBadgeProps {
 /** Metadata badge using surface + content tokens. */
 export function InfoBadge({ children }: InfoBadgeProps) {
   return (
-    <div className="inline-flex items-center rounded-full border border-surface-border bg-surface-elevated px-3 py-1.5 text-sm text-content-muted">
+    <div className="inline-flex items-center rounded-full border border-surface-border bg-surface-panel px-3 py-1.5 text-sm text-content-muted">
       {children}
     </div>
   );

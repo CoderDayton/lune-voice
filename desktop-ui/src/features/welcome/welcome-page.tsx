@@ -164,7 +164,7 @@ interface OverallProgressProps {
 function OverallProgress({ completed, total, pct }: OverallProgressProps) {
   const { t } = useLingui();
   return (
-    <div className="rounded-box border border-surface-border bg-surface-elevated p-4">
+    <div className="rounded-box border border-surface-border bg-surface-panel p-4">
       <div className="mb-2 flex items-center justify-between text-xs text-content-subtle">
         <span className="font-medium uppercase tracking-wider">{t`Overall progress`}</span>
         <span className="tabular-nums">

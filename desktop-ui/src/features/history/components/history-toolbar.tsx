@@ -63,7 +63,7 @@ export function HistoryToolbar() {
         )}
       </label>
       <div className="flex items-center justify-between gap-2 sm:justify-end">
-        <span className="flex h-10 shrink-0 items-center rounded-field border border-surface-border bg-surface-elevated px-4 text-sm tabular-nums text-content-subtle">
+        <span className="flex h-10 shrink-0 items-center rounded-field border border-surface-border bg-surface-panel px-4 text-sm tabular-nums text-content-subtle">
           {countLabel}
         </span>
       </div>

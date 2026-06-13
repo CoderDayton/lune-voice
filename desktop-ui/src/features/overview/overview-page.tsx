@@ -1,7 +1,7 @@
 import { useLingui } from '@lingui/react/macro';
 import { Link } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { Activity, CalendarDays, Clock, Hash, MessageSquareText, Mic } from 'lucide-react';
+import { Activity, CalendarDays, Clock, MessageSquareText, Mic } from 'lucide-react';
 import { InfoBadge, StatusBadge } from '../../components/ui/status-badge';
 import {
   getSessionStats,
@@ -25,7 +25,8 @@ export function OverviewPage() {
   const hotkeyToggle = useStore(workspaceStore, (s) => s.settings.hotkeyToggle);
   const stats = useStore(workspaceStore, getSessionStats);
   const today = useStore(workspaceStore, getTodayStats);
-  const recentSessions = useStore(workspaceStore, (s) => s.historySessions.slice(0, 5));
+  const historySessions = useStore(workspaceStore, (s) => s.historySessions);
+  const recentSessions = historySessions.slice(0, 5);
 
   const isActive = serviceStatus === 'listening' || serviceStatus === 'processing';
   const isConnected =
@@ -39,6 +40,23 @@ export function OverviewPage() {
   const minutesCount = useCountUp(stats.totalMinutes);
   const sessionsCount = useCountUp(stats.count);
   const todayWords = useCountUp(today.words);
+  const wpm = stats.totalMinutes > 0 ? Math.round(stats.totalWords / stats.totalMinutes) : 0;
+  const wpmCount = useCountUp(wpm);
+  // Today's speaking pace vs the all-time average — a quick trending-up/down
+  // read on the hero card, mirroring the all-time/today split on the left.
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayStartMs = todayStart.getTime();
+  let wordsToday = 0;
+  let secondsToday = 0;
+  for (const s of historySessions) {
+    if (new Date(s.startedAt).getTime() >= todayStartMs) {
+      wordsToday += s.words;
+      secondsToday += s.seconds;
+    }
+  }
+  const wpmToday = secondsToday > 0 ? Math.round(wordsToday / (secondsToday / 60)) : null;
+  const wpmDelta = wpmToday !== null && wpm > 0 ? wpmToday - wpm : null;
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? t`Good morning` : hour < 18 ? t`Good afternoon` : t`Good evening`;
@@ -96,24 +114,41 @@ export function OverviewPage() {
       {/* Hero metric — Words dominates the board */}
       <div className="bento-cell interactive-card col-span-12 p-space-lg md:col-span-6 md:row-span-2">
         <div className="flex items-center justify-between text-content-subtle">
-          <span className="section-label">{t`Words`}</span>
-          <Hash size={22} strokeWidth={1.5} className="text-primary/55" />
+          <span className="section-label">{t`Total Words`}</span>
+          <span className="section-label">{t`Words Per Minute`}</span>
         </div>
-        <div className="mt-auto pt-6">
-          <div className="font-display text-display-2xl font-semibold tracking-display tabular-nums text-content-strong">
-            {wordsCount.toLocaleString()}
+        <div className="mt-auto flex items-end justify-between gap-4 pt-6">
+          <div className="min-w-0">
+            <div className="font-display text-display-2xl font-semibold tracking-display tabular-nums text-content-strong">
+              {wordsCount.toLocaleString()}
+            </div>
+            <p className="mt-2 text-sm text-content-muted tabular-nums">
+              {t`all-time`}
+              {today.words > 0 ? ` · ↑ ${todayWords.toLocaleString()} ${t`today`}` : ''}
+            </p>
           </div>
-          <p className="mt-2 text-sm text-content-muted tabular-nums">
-            {t`all-time`}
-            {today.words > 0 ? ` · ↑ ${todayWords.toLocaleString()} ${t`today`}` : ''}
-          </p>
+          <div
+            aria-hidden="true"
+            className="w-px self-stretch bg-linear-to-b from-transparent via-surface-border-strong to-transparent"
+          />
+          <div className="shrink-0 text-right">
+            <div className="font-display text-display-2xl font-semibold tracking-display tabular-nums text-content-strong">
+              {wpmCount.toLocaleString()}
+            </div>
+            <p className="mt-2 text-sm text-content-muted tabular-nums">
+              {t`all-time avg`}
+              {wpmDelta !== null && wpmDelta !== 0
+                ? ` · ${wpmDelta > 0 ? '↑' : '↓'} ${Math.abs(wpmDelta)} ${t`today`}`
+                : ''}
+            </p>
+          </div>
         </div>
       </div>
 
       {/* Stat cells — tighter density, asymmetric to the hero */}
       <div className="bento-cell-elevated interactive-card col-span-12 gap-4 p-space-md md:col-span-3">
         <div className="flex items-center justify-between text-content-subtle">
-          <span className="section-label">{t`Minutes`}</span>
+          <span className="section-label">{t`Speaking Time`}</span>
           <Clock size={20} strokeWidth={1.5} className="text-secondary/55" />
         </div>
         <div className="mt-auto text-3xl font-semibold tracking-tight tabular-nums text-content-strong">

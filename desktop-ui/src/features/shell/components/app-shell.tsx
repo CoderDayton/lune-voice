@@ -1,7 +1,7 @@
 import { useLingui } from '@lingui/react/macro';
-import { Link, Outlet, useRouterState } from '@tanstack/react-router';
+import { Outlet, useRouterState } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { ChevronRight, Menu } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { useEffect, useEffectEvent, useRef } from 'react';
 import { ErrorToast } from '../../../components/feedback';
 import type { SessionStreamEvent } from '../../../lib/backend/types';
@@ -9,10 +9,9 @@ import { workspaceActions, workspaceStore } from '../../../store/workspace-store
 import { useFirstRunGate } from '../../welcome/use-model-setup';
 import { WelcomeLayout } from '../../welcome/welcome-layout';
 import { WelcomePage } from '../../welcome/welcome-page';
-import { findNavigationItem, navigationGroups } from '../config/navigation';
+import { findNavigationItem } from '../config/navigation';
 import { useAppShortcuts } from '../hooks/use-app-shortcuts';
 import { startWorkspaceBridge } from '../workspace-bridge';
-import { ShaderBackground } from './shader-background';
 import { SidebarContent } from './sidebar';
 
 export const DRAWER_ID = 'app-drawer';
@@ -24,9 +23,6 @@ export function AppShell() {
     select: (state) => state.location.pathname,
   });
   const page = findNavigationItem(pathname);
-  // Breadcrumb trail: the group crumb links to that group's primary route.
-  const breadcrumbGroup = navigationGroups.find((g) => g.label === page.group);
-  const groupHome = breadcrumbGroup?.items[0]?.to ?? '/';
   const firstRun = useFirstRunGate();
 
   const onSessionEvent = useEffectEvent((event: SessionStreamEvent) => {
@@ -84,7 +80,6 @@ export function AppShell() {
 
   return (
     <div className="app-shell-root drawer lg:drawer-open fixed inset-0">
-      <ShaderBackground />
       <input
         ref={drawerRef}
         id={DRAWER_ID}
@@ -118,43 +113,6 @@ export function AppShell() {
         </div>
 
         <main id="main-content" className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          {/* Desktop breadcrumb bar — trail + page context + live status */}
-          <div className="hidden h-14 shrink-0 items-center gap-3 border-b border-surface-border bg-surface-glass px-4 lg:flex xl:px-6">
-            <nav
-              aria-label="Breadcrumb"
-              className="flex min-w-0 items-center gap-1 text-sm select-none"
-            >
-              <Link
-                to={groupHome}
-                className="shrink-0 rounded-field px-1.5 py-0.5 text-content-subtle transition-colors hover:bg-surface-hover hover:text-content"
-              >
-                {page.group}
-              </Link>
-              <ChevronRight size={14} strokeWidth={2} className="shrink-0 text-content-dim" />
-              <Link
-                to={page.to}
-                aria-current="page"
-                className="truncate rounded-field px-1.5 py-0.5 font-medium text-content-strong transition-colors hover:bg-surface-hover"
-              >
-                {page.label}
-              </Link>
-            </nav>
-            <div className="hidden h-5 w-px shrink-0 bg-surface-border xl:block" />
-            <p className="hidden min-w-0 truncate text-sm text-content-subtle select-none xl:block">
-              {page.description}
-            </p>
-            <div className="ml-auto flex shrink-0 items-center gap-3">
-              <span className="hidden text-sm text-content-dim select-none xl:block">
-                {new Date().toLocaleDateString(undefined, {
-                  weekday: 'long',
-                  month: 'long',
-                  day: 'numeric',
-                })}
-              </span>
-              <ShellStatusChip />
-            </div>
-          </div>
-
           <div className="app-scroll">
             <div className="app-frame">
               {/* Page hero — Home leads with its bento board; every other
@@ -186,7 +144,7 @@ export function AppShell() {
 
 /** Live service-status chip for the desktop command bar. Subscribes to the
  *  runtime status only, so it re-renders independently of route changes. */
-function ShellStatusChip() {
+export function ShellStatusChip() {
   const { t } = useLingui();
   const serviceStatus = useStore(workspaceStore, (s) => s.runtime.serviceStatus);
 

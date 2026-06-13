@@ -355,7 +355,7 @@
     linear-gradient(135deg, oklch(0.74 0.14 295 / 0.05), transparent 42%),
     linear-gradient(320deg, oklch(0.74 0.10 185 / 0.03), transparent 48%);
   --surface-grid:
-    radial-gradient(circle, oklch(1 0 0 / 0.04) 1px, transparent 1px);
+    radial-gradient(circle, oklch(1 0 0 / 0.055) 1px, transparent 1px);
   --surface-brand:
     linear-gradient(135deg, oklch(0.74 0.14 295), oklch(0.50 0.18 295));
 }
@@ -654,10 +654,6 @@
   @apply relative h-dvh overflow-hidden;
 }
 
-@utility app-shader-background {
-  @apply pointer-events-none fixed inset-0 z-0 h-full w-full;
-}
-
 @utility app-shell-backdrop {
   @apply pointer-events-none absolute inset-0;
   background-image: var(--surface-backdrop);
@@ -727,7 +723,7 @@
 }
 
 @utility toolbar-surface {
-  @apply rounded-box border border-surface-border bg-surface-elevated p-4;
+  @apply rounded-box border border-surface-border bg-surface-panel p-4;
 }
 
 @utility token-icon {
@@ -735,7 +731,7 @@
 }
 
 @utility metric-card {
-  @apply rounded-box border border-surface-border bg-surface-elevated p-4;
+  @apply rounded-box border border-surface-border bg-surface-panel p-4;
   @apply cursor-pointer transition-[background,border-color,transform] duration-150;
 }
 
@@ -781,13 +777,13 @@
 }
 
 @utility bento-cell-elevated {
-  @apply flex min-w-0 flex-col rounded-box border border-surface-border bg-surface-elevated;
+  @apply flex min-w-0 flex-col rounded-box border border-surface-border bg-surface-panel;
 }
 
 /* Slim status ribbon — a full-width header strip, deliberately short so it
    reads as a status bar rather than another stacked section. */
 @utility bento-ribbon {
-  @apply flex flex-wrap items-center gap-3 rounded-box border border-surface-border bg-surface-elevated px-5 py-3.5;
+  @apply flex flex-wrap items-center gap-3 rounded-box border border-surface-border bg-surface-panel px-5 py-3.5;
 }
 
 /* ── Audio meter ───────────────────────────────────────────────────── */

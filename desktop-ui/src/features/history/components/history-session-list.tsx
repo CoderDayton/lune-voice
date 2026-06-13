@@ -7,7 +7,6 @@ import {
   getVisibleSessionCount,
   workspaceStore,
 } from '../../../store/workspace-store';
-import { HistoryPagination } from './history-pagination';
 import { SessionDetailModal } from './session-detail-modal';
 
 interface HistorySessionListProps {
@@ -136,7 +135,7 @@ export function HistorySessionList({ selectedId, onSelect }: HistorySessionListP
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2 sm:gap-3">
       {groups.map((group) => (
         <div key={group.date}>
           <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.16em] text-content-subtle">
@@ -154,7 +153,6 @@ export function HistorySessionList({ selectedId, onSelect }: HistorySessionListP
           </ul>
         </div>
       ))}
-      <HistoryPagination />
     </div>
   );
 }

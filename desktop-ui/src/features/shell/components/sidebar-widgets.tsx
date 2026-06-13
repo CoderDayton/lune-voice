@@ -1,7 +1,7 @@
 import { useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';
 import { Mic, Square } from 'lucide-react';
-import { getTodayStats, toggleDictation, workspaceStore } from '../../../store/workspace-store';
+import { toggleDictation, workspaceStore } from '../../../store/workspace-store';
 
 export function SidebarQuickStart() {
   const { t } = useLingui();
@@ -56,31 +56,6 @@ export function SidebarQuickStart() {
           )}
         </div>
       </button>
-    </div>
-  );
-}
-
-export function SidebarTodayStatsSkeleton() {
-  return (
-    <div className="px-3 py-2 sm:px-4">
-      <div className="skeleton-shimmer h-3 w-12 mb-1.5" />
-      <div className="skeleton-shimmer h-3 w-28 sm:w-36" />
-    </div>
-  );
-}
-
-export function SidebarTodayStats() {
-  const { t } = useLingui();
-  const todayStats = useStore(workspaceStore, getTodayStats);
-
-  return (
-    <div className="mx-3.5 mb-3 rounded-box border border-surface-border bg-surface-elevated px-4 py-3 shadow-card">
-      <p className="section-label">{t`Today`}</p>
-      <p className="mt-1 text-sm text-content-muted tabular-nums">
-        {todayStats.count} {todayStats.count === 1 ? t`session` : t`sessions`}
-        <span className="mx-1.5 text-content-dim">·</span>
-        {todayStats.words.toLocaleString()} {t`words`}
-      </p>
     </div>
   );
 }
