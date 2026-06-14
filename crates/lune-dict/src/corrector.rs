@@ -119,8 +119,18 @@ fn process_single_word(
             chars.next().is_some_and(|c| c.is_ascii_uppercase())
                 && !chars.any(|c| c.is_ascii_uppercase())
         };
-        let lowercase_is_common = info.source == WordSource::FreqMap
-            || wordnik_list::word_exists(&stripped.to_lowercase());
+        // Whether the lowercase form is an ordinary (normally-lowercase) word,
+        // so a Title-case-only canonical must NOT force a mid-sentence capital.
+        // The capitalization rate is the authority when the cap-rate table knows
+        // the word (a high rate means a genuine proper noun whose canonical
+        // capital is correct); fall back to dictionary membership otherwise.
+        let lowercase_is_common = match info.p_cap {
+            Some(p) => p < crate::caprate::CAP_KEEP_THRESHOLD,
+            None => {
+                info.source == WordSource::FreqMap
+                    || wordnik_list::word_exists(&stripped.to_lowercase())
+            }
+        };
         if canonical_has_upper
             && info.canonical.as_ref() != stripped
             && !(title_case_only && lowercase_is_common)

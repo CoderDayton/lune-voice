@@ -12,6 +12,9 @@ pub struct WordInfo {
     pub freq: u32,
     pub freq_score: f32,
     pub source: WordSource,
+    /// P(capitalized | mid-sentence) for English words (from `caprate`); `None`
+    /// for non-English or words absent from the cap-rate table.
+    pub p_cap: Option<f32>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -53,6 +56,10 @@ impl Lexicon {
 
     pub fn lookup(&self, word: &str) -> Option<WordInfo> {
         let lower = word.to_lowercase();
+        let p_cap = self
+            .is_english()
+            .then(|| crate::caprate::en_p_cap(&lower))
+            .flatten();
         if let Some(freq) = self.dict.get(&lower) {
             let canonical = VOCAB_INDEX
                 .canonical_by_lower
@@ -64,6 +71,7 @@ impl Lexicon {
                 freq,
                 freq_score: freq_score(freq),
                 source: WordSource::FreqMap,
+                p_cap,
             });
         }
 
@@ -73,6 +81,7 @@ impl Lexicon {
                 freq: VOCAB_FREQ_FLOOR,
                 freq_score: freq_score(VOCAB_FREQ_FLOOR),
                 source: WordSource::Vocab,
+                p_cap,
             });
         }
 
@@ -82,6 +91,7 @@ impl Lexicon {
                 freq: 0,
                 freq_score: 0.0,
                 source: WordSource::Wordnik,
+                p_cap,
             });
         }
 
@@ -172,5 +182,27 @@ mod tests {
             WordSource::Wordnik
         );
         assert!(french.lookup("zymurgy").is_none());
+    }
+
+    #[test]
+    fn lookup_exposes_p_cap_for_english_only() {
+        let english = Lexicon::for_lang("en");
+        let make = english.lookup("make").unwrap();
+        assert!(
+            make.p_cap.is_some_and(|p| p < 0.5),
+            "make p_cap={:?}",
+            make.p_cap
+        );
+        let monday = english.lookup("monday").unwrap();
+        assert!(
+            monday.p_cap.is_some_and(|p| p > 0.75),
+            "monday p_cap={:?}",
+            monday.p_cap
+        );
+        // Non-English lexicons never carry a (English) p_cap.
+        let french = Lexicon::for_lang("fr");
+        if let Some(info) = french.lookup("le") {
+            assert!(info.p_cap.is_none());
+        }
     }
 }
