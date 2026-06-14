@@ -81,3 +81,7 @@ path = "../../benchmarks/vram_growth.rs"
 [[example]]
 name = "homophone_tune"
 path = "../../benchmarks/homophone_tune.rs"
+
+[[example]]
+name = "homophone_pipeline"
+path = "../../benchmarks/homophone_pipeline.rs"
