@@ -1,0 +1,1 @@
+The configuration file needs to be updated before we deploy. After that, restart the service and watch the logs.

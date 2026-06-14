@@ -1,4 +1,4 @@
-//! Hybrid VAD: Earshot (fast acoustic gate) → Silero (neural verify) → chunker.
+//! Hybrid VAD: Earshot (fast acoustic gate) → Silero (neural verify) → span gate.
 //!
 //! Lives in `lune-app` because it needs both `ort` (Silero) and `lune-audio`
 //! (Earshot/PCEN), and is consumed by the capture loop next door
@@ -12,14 +12,18 @@
 //!      UI level meter.
 //!   2. **Silero** (stage 2) — neural speech probability; rejects fans,
 //!      keyboard, music, static that Earshot lets through.
-//!   3. **Chunker** (stage 3) — onset/offset/hangover state machine that turns
-//!      the probability stream into stable speech segments.
+//!   3. **Span gate** (stage 3) — opens on onset and stays open through short
+//!      pauses, closing only on a `long_gap` run of trailing silence.
 //!
-//! Segments are **buffered**, not streamed: the orchestrator accumulates a
-//! segment and only emits its audio once the chunker finalizes it (and only if
-//! it clears `min_chunk_ms`), which is what lets sub-`min_chunk` noise blips be
-//! dropped. Because the ASR decode is batch (`poll_final` at session end),
-//! delaying the per-segment push costs no latency.
+//! The gate is **contiguous**: while a span is open the orchestrator appends
+//! *every* frame — speech and sub-`long_gap` silence alike — so the natural
+//! rhythm of an utterance survives to the recognizer. This is what stops
+//! adjacent words fusing (`MakeSure`): stripping the inter-word pauses is what
+//! destroyed the word boundaries Qwen3-ASR reads. A span is emitted only once
+//! it closes and only if it clears `min_speech_ms`, so noise blips drop. The
+//! long dead-air between spans is discarded; a splice there is harmless because
+//! the words are seconds apart. Because the ASR decode is batch (`poll_final`
+//! at session end), delaying the per-span push costs no latency.
 
 mod chunker;
 mod config;
@@ -30,31 +34,19 @@ use std::collections::VecDeque;
 use tracing::warn;
 
 use lune_audio::{AudioChunk, Vad, VadConfig};
-use lune_core::audio::SAMPLE_RATE;
-use lune_core::config::PipelineConfig;
 
-use self::chunker::{Chunker, ChunkerEvent};
+use self::chunker::{SpanEvent, SpanGate};
 use self::silero::{SILERO_FRAME, Silero};
 
 pub use self::config::{DEFAULT_VAD_CONFIG, VadPipelineConfig};
 
-/// Minimum total gated gap that counts as an intentional pause rather than a
-/// breath. Below a full second every compositional hesitation became a comma
-/// in real dictation, so only second-plus gaps inject pause prosody.
-const PAUSE_TOTAL_MIN_SAMPLES: usize = SAMPLE_RATE; // 1000 ms
-/// Ceiling on the reconstructed pause the model hears. Longer pauses carry no
-/// extra punctuation information and only cost encoder frames.
-const PAUSE_TOTAL_CAP_SAMPLES: usize = (SAMPLE_RATE * 3) / 2; // 1500 ms
-
 /// What the gate decided the capture loop should do with the ASR stream.
 #[derive(Debug, Clone, PartialEq)]
 pub enum GateAction {
-    /// Verified speech audio (preroll + segment) to push to the ASR backend.
+    /// Verified speech audio (preroll + span, intra-utterance pauses intact) to
+    /// push to the ASR backend.
     PushSamples(Vec<f32>),
-    /// Inject this many silence samples to reconstruct an inter-segment pause
-    /// (only emitted when `pause_injection` is on).
-    InjectPause(usize),
-    /// A segment just closed — informational, for metrics/logging.
+    /// A span just closed — informational, for metrics/logging.
     SegmentFinalized,
 }
 
@@ -68,10 +60,10 @@ pub struct HybridVad {
     earshot_config: VadConfig,
     sample_rate: u32,
     /// Stage 2 — neural verifier. `None` when `silero_enabled` is off
-    /// (Earshot-only fallback through the same chunker).
+    /// (Earshot-only fallback through the same span gate).
     silero: Option<Silero>,
-    /// Stage 3 — onset/offset/hangover segment state machine.
-    chunker: Chunker,
+    /// Stage 3 — contiguous-span state machine.
+    span_gate: SpanGate,
     config: VadPipelineConfig,
     /// Earshot gate hangover: frames the gate stays open after the last active
     /// frame, so Silero receives a continuous, unbroken run of audio across
@@ -82,31 +74,28 @@ pub struct HybridVad {
 
     /// Leftover samples (< one Silero frame) awaiting the next chunk.
     sample_buf: Vec<f32>,
-    /// Rolling pre-onset audio prepended to a segment so hard word onsets
+    /// Rolling pre-onset audio prepended to a span so hard word onsets
     /// ("hello") aren't clipped to "ello". Bounded to `preroll_cap` samples.
     preroll: VecDeque<f32>,
     preroll_cap: usize,
-    /// The segment currently being accumulated.
-    segment: Vec<f32>,
-    /// Gated silence seen since the last kept segment (for pause injection).
-    idle_samples: usize,
-    /// Snapshot of `idle_samples` at the current segment's onset.
-    segment_lead_silence: usize,
-    /// Preroll actually prepended to the current segment (already "heard").
-    segment_preroll_samples: usize,
-    /// Whether any segment has been kept this session (gates pause injection).
-    had_kept_segment: bool,
+    /// The span currently being accumulated (speech + intra-utterance silence).
+    span: Vec<f32>,
+    /// Trailing silence (samples) accrued at the tail of the open span, trimmed
+    /// to the hangover window when the span closes.
+    trailing_silence_samples: usize,
     /// Peak Earshot energy since the last [`take_peak_energy`](Self::take_peak_energy).
     peak_energy: f32,
 }
 
 impl HybridVad {
-    /// Build the gate from the resolved pipeline config. Mirrors the old
-    /// `init_vad`: Earshot reuses `speech_threshold`/`speech_threshold_end`
-    /// and the PCEN toggle; the Silero/chunker knobs come from
-    /// [`VadPipelineConfig::from_pipeline`].
+    /// Build the gate for a session. The gate is self-tuned via
+    /// [`DEFAULT_VAD_CONFIG`] (returned by [`VadPipelineConfig::from_pipeline`]);
+    /// only `vad_pcen_enabled` is taken from the caller. `pipeline` is accepted
+    /// for a stable call site but no longer drives the gate's thresholds — the
+    /// legacy `speech_threshold` fed the old Earshot-only `is_speech` gate the
+    /// raw-`vad_score` gate replaced.
     pub fn new(
-        pipeline: &PipelineConfig,
+        pipeline: &lune_core::config::PipelineConfig,
         vad_pcen_enabled: bool,
     ) -> std::result::Result<Self, String> {
         Self::with_config(VadPipelineConfig::from_pipeline(pipeline), vad_pcen_enabled)
@@ -134,10 +123,10 @@ impl HybridVad {
         } else {
             None
         };
-        let chunker = Chunker::new(&config);
+        let span_gate = SpanGate::new(&config);
         let preroll_cap = config.preroll_samples();
         // Hold the Earshot gate open at least as long as the chunker's hangover
-        // so Silero keeps verifying right up to the moment the chunker finalizes.
+        // so Silero keeps verifying right up to the moment a span finalizes.
         let gate_hold_frames = config.hangover_frames().max(1);
 
         Ok(Self {
@@ -145,25 +134,22 @@ impl HybridVad {
             earshot_config,
             sample_rate,
             silero,
-            chunker,
+            span_gate,
             config,
             gate_hold_frames,
             earshot_hold: 0,
             sample_buf: Vec::with_capacity(2 * SILERO_FRAME),
             preroll: VecDeque::with_capacity(preroll_cap + SILERO_FRAME),
             preroll_cap,
-            segment: Vec::new(),
-            idle_samples: 0,
-            segment_lead_silence: 0,
-            segment_preroll_samples: 0,
-            had_kept_segment: false,
+            span: Vec::new(),
+            trailing_silence_samples: 0,
             peak_energy: 0.0,
         })
     }
 
     /// Feed one captured chunk through the gate. Reframes to Silero frames and
     /// returns the actions the caller applies to the ASR stream (often empty —
-    /// segments emit only at finalize).
+    /// spans emit only at close).
     pub fn process_chunk(&mut self, chunk: &AudioChunk) -> Vec<GateAction> {
         let mut actions = Vec::new();
         self.sample_buf.extend_from_slice(&chunk.samples);
@@ -178,7 +164,6 @@ impl HybridVad {
         // Stage 1 — Earshot acoustic gate (also feeds the level meter). It opens
         // on raw activity and holds open for `gate_hold_frames`, handing Silero a
         // continuous, *unchunked* run of audio across brief intra-utterance dips.
-        // Earshot only gates; it never segments the audio itself.
         let er = self.earshot.process_chunk(frame);
         self.peak_energy = self.peak_energy.max(er.energy);
         let earshot_active = er.vad_score >= self.config.earshot_activity_threshold;
@@ -190,10 +175,9 @@ impl HybridVad {
         let gate_open = earshot_active || self.earshot_hold > 0;
 
         // Stage 2 — Silero verifies the audio the gate passes. Its invocation
-        // depends only on the Earshot gate (forward flow); the chunker never
-        // feeds back into whether Silero runs. A failed call is fail-safe
-        // (treated as silence). Gate-skipped frames still advance Silero's
-        // rolling context so the next verified frame isn't misaligned.
+        // depends only on the Earshot gate (forward flow). A failed call is
+        // fail-safe (treated as silence). Gate-skipped frames still advance
+        // Silero's rolling context so the next verified frame isn't misaligned.
         let prob = if let Some(silero) = self.silero.as_mut() {
             if !self.config.earshot_prefilter || gate_open {
                 match silero.predict(frame) {
@@ -209,34 +193,31 @@ impl HybridVad {
             }
         } else {
             // Earshot-only fallback: collapse the raw gate to a 0/1 probability
-            // so the same chunker still owns segmentation.
+            // so the same span gate still owns segmentation.
             if earshot_active { 1.0 } else { 0.0 }
         };
 
-        // Stage 3 — the chunker segments Silero's probability stream. It is
-        // strictly downstream: chunking happens *after* Silero, never before.
-        match self.chunker.step(prob) {
-            ChunkerEvent::Idle => {
-                self.push_preroll(frame);
-                if self.had_kept_segment {
-                    self.idle_samples += frame.len();
+        // Stage 3 — the span gate decides boundaries; the orchestrator owns the
+        // audio. While in-span, *every* frame is appended (speech and silence)
+        // so intra-utterance pauses survive. The closing tail is trimmed to the
+        // hangover window.
+        match self.span_gate.step(prob) {
+            SpanEvent::Idle => self.push_preroll(frame),
+            SpanEvent::Open => {
+                self.span.clear();
+                self.span.extend(self.preroll.drain(..));
+                self.span.extend_from_slice(frame);
+                self.trailing_silence_samples = 0;
+            }
+            SpanEvent::Append => {
+                self.span.extend_from_slice(frame);
+                if prob <= self.config.silero_offset {
+                    self.trailing_silence_samples += frame.len();
+                } else {
+                    self.trailing_silence_samples = 0;
                 }
             }
-            ChunkerEvent::Begin => {
-                self.segment.clear();
-                self.segment_lead_silence = self.idle_samples;
-                self.idle_samples = 0;
-                self.segment_preroll_samples = self.preroll.len();
-                self.segment.extend(self.preroll.drain(..));
-                self.segment.extend_from_slice(frame);
-            }
-            ChunkerEvent::Continue => {
-                self.segment.extend_from_slice(frame);
-            }
-            ChunkerEvent::Finalize { keep } => {
-                self.segment.extend_from_slice(frame);
-                self.finalize_segment(keep, actions);
-            }
+            SpanEvent::Close { keep } => self.close_span(keep, &[], actions),
         }
     }
 
@@ -250,53 +231,42 @@ impl HybridVad {
         }
     }
 
-    fn finalize_segment(&mut self, keep: bool, actions: &mut Vec<GateAction>) {
-        if keep {
-            if self.config.pause_injection && self.had_kept_segment {
-                let inject = pause_injection_samples(
-                    self.segment_lead_silence,
-                    self.segment_preroll_samples,
-                    0,
-                );
-                if inject > 0 {
-                    actions.push(GateAction::InjectPause(inject));
-                }
-            }
-            let seg = std::mem::take(&mut self.segment);
-            actions.push(GateAction::PushSamples(seg));
-            actions.push(GateAction::SegmentFinalized);
-            self.had_kept_segment = true;
-        } else {
-            // Dropped as a noise blip: fold its lead silence back into the
-            // running gap so pause timing across the drop stays continuous.
-            if self.had_kept_segment {
-                self.idle_samples = self.idle_samples.saturating_add(self.segment_lead_silence);
-            }
-            self.segment.clear();
+    /// Close the open span: trim its trailing silence to the hangover window,
+    /// append any end-of-stream `tail`, and emit the audio if it cleared
+    /// `min_speech` (the [`SpanGate`] already folded that into `keep`).
+    fn close_span(&mut self, keep: bool, tail: &[f32], actions: &mut Vec<GateAction>) {
+        let hangover = self.config.hangover_samples();
+        if self.trailing_silence_samples > hangover {
+            let drop = self.trailing_silence_samples - hangover;
+            let new_len = self.span.len().saturating_sub(drop);
+            self.span.truncate(new_len);
         }
-        self.segment_lead_silence = 0;
-        self.segment_preroll_samples = 0;
+        self.span.extend_from_slice(tail);
+        self.trailing_silence_samples = 0;
+        if keep && !self.span.is_empty() {
+            let span = std::mem::take(&mut self.span);
+            actions.push(GateAction::PushSamples(span));
+            actions.push(GateAction::SegmentFinalized);
+        } else {
+            self.span.clear();
+        }
     }
 
-    /// Flush any open segment at end of stream. Appends the sub-frame tail to
-    /// the open segment first so the final word's phonemes aren't clipped
-    /// (mirrors the old producer tail-flush).
+    /// Flush any open span at end of stream. Appends the sub-frame tail to the
+    /// open span (after the trailing-silence trim) so the final word's phonemes
+    /// aren't clipped.
     pub fn finish(&mut self) -> Vec<GateAction> {
         let mut actions = Vec::new();
-        if self.chunker.in_speech() && !self.sample_buf.is_empty() {
-            let tail = std::mem::take(&mut self.sample_buf);
-            self.segment.extend_from_slice(&tail);
+        let tail = std::mem::take(&mut self.sample_buf);
+        if let SpanEvent::Close { keep } = self.span_gate.finish() {
+            self.close_span(keep, &tail, &mut actions);
         }
-        if let ChunkerEvent::Finalize { keep } = self.chunker.finish() {
-            self.finalize_segment(keep, &mut actions);
-        }
-        self.sample_buf.clear();
         actions
     }
 
-    /// True while a segment is open — lets the caller gate its tail-flush.
+    /// True while a span is open — lets the caller gate its tail-flush.
     pub fn in_segment(&self) -> bool {
-        self.chunker.in_speech()
+        self.span_gate.in_span()
     }
 
     /// Peak Earshot energy since the last call, then resets it (level meter).
@@ -314,83 +284,21 @@ impl HybridVad {
         if let Some(s) = self.silero.as_mut() {
             s.reset();
         }
-        self.chunker.reset();
+        self.span_gate.reset();
         self.earshot_hold = 0;
         self.sample_buf.clear();
         self.preroll.clear();
-        self.segment.clear();
-        self.idle_samples = 0;
-        self.segment_lead_silence = 0;
-        self.segment_preroll_samples = 0;
-        self.had_kept_segment = false;
+        self.span.clear();
+        self.trailing_silence_samples = 0;
         self.peak_energy = 0.0;
         Ok(())
     }
 }
 
-/// How much silence to inject at a segment boundary so the (batch) model hears
-/// the pause the gate stripped — exactly.
-///
-/// `gap_fed_samples` is silence already fed live as part of the segment (zero
-/// in the buffered Silero model, where the hangover tail is inside the
-/// segment). `preroll_samples` is the pre-onset audio prepended to the new
-/// segment — also already heard. The heard pause becomes
-/// `min(true gap, PAUSE_TOTAL_CAP_SAMPLES)` sample-for-sample.
-fn pause_injection_samples(
-    silence_samples: usize,
-    preroll_samples: usize,
-    gap_fed_samples: usize,
-) -> usize {
-    if silence_samples == 0 {
-        return 0;
-    }
-    let total_gap = gap_fed_samples + silence_samples;
-    if total_gap < PAUSE_TOTAL_MIN_SAMPLES {
-        return 0;
-    }
-    let already_heard = gap_fed_samples + preroll_samples;
-    silence_samples
-        .saturating_sub(preroll_samples)
-        .min(PAUSE_TOTAL_CAP_SAMPLES.saturating_sub(already_heard))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // Chunk-quantized fed-gap values (80 ms chunks); preroll = 4 × 80 ms.
-    const CHUNK: usize = SAMPLE_RATE * 80 / 1000;
-    const PREROLL: usize = 4 * CHUNK;
-
-    #[test]
-    fn pause_injection_breath_gaps_skipped() {
-        assert_eq!(pause_injection_samples(0, 0, 3 * CHUNK), 0);
-        // Total gap 560 ms < 1000 ms floor: a breath.
-        assert_eq!(pause_injection_samples(PREROLL, PREROLL, 3 * CHUNK), 0);
-    }
-
-    #[test]
-    fn pause_injection_heard_equals_true_gap() {
-        for gap_fed in [CHUNK, 3 * CHUNK, 6 * CHUNK] {
-            let silence = SAMPLE_RATE - gap_fed; // 1 s total gap
-            let inject = pause_injection_samples(silence, PREROLL, gap_fed);
-            assert_eq!(gap_fed + inject + PREROLL, SAMPLE_RATE, "gap_fed={gap_fed}");
-        }
-    }
-
-    #[test]
-    fn pause_injection_caps_total_heard() {
-        for gap_fed in [CHUNK, 3 * CHUNK] {
-            let silence = SAMPLE_RATE * 5 - gap_fed;
-            let inject = pause_injection_samples(silence, PREROLL, gap_fed);
-            assert_eq!(
-                gap_fed + inject + PREROLL,
-                PAUSE_TOTAL_CAP_SAMPLES,
-                "gap_fed={gap_fed}"
-            );
-        }
-        assert_eq!(pause_injection_samples(SAMPLE_RATE, 0, SAMPLE_RATE * 2), 0);
-    }
+    use lune_core::config::PipelineConfig;
 
     fn load_fixture(name: &str) -> Vec<f32> {
         let wav = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -453,7 +361,7 @@ mod tests {
     }
 
     /// End-to-end smoke test through the real bundled Silero model: pure
-    /// silence must never produce a kept speech segment.
+    /// silence must never produce a kept speech span.
     #[test]
     fn silence_yields_no_segments() {
         let mut hybrid = HybridVad::new(&PipelineConfig::default(), true)

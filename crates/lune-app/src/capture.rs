@@ -85,9 +85,6 @@ async fn apply_gate_actions<A: AsrBackend + 'static>(
                     first_asr_error.get_or_insert(msg);
                 }
             }
-            GateAction::InjectPause(n) => {
-                let _ = asr.push_audio(asr_session, &vec![0.0f32; n]).await;
-            }
             GateAction::SegmentFinalized => {}
         }
     }

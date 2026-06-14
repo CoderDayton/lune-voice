@@ -313,6 +313,57 @@ pub fn char_error_rate(hyp: &str, ref_: &str) -> f64 {
     levenshtein(&hc, &rc) as f64 / rc.len() as f64
 }
 
+// ─── Case/spacing-aware metrics ──────────────────────────────────────────────
+//
+// WER and `char_error_rate` both `normalize_text` first (lowercase, strip
+// punctuation, collapse whitespace), so they are blind to the exact failures
+// users hit: stray mid-word capitals and fused words (`MakeSure`). These three
+// metrics see what WER erases.
+
+/// Character error rate with **no** normalization — case, spacing, and
+/// punctuation differences all count. Unlike [`char_error_rate`], a pure case
+/// change (`Abc` vs `abc`) is a real error here.
+pub fn cased_cer(hyp: &str, ref_: &str) -> f64 {
+    let hc: Vec<char> = hyp.chars().collect();
+    let rc: Vec<char> = ref_.chars().collect();
+    if rc.is_empty() {
+        return 0.0;
+    }
+    levenshtein(&hc, &rc) as f64 / rc.len() as f64
+}
+
+/// Count spurious fused-word boundaries — a lowercase letter immediately
+/// followed by an uppercase letter with no space (`MakeSure`) — present in
+/// `hyp` but not in `ref_`. The numeric signature of the VAD-splice regression.
+/// camelCase already in the reference (`iPhone`) is subtracted out, not flagged.
+pub fn concat_errors(hyp: &str, ref_: &str) -> usize {
+    /// Count adjacent `[a-z][A-Z]` char pairs. The space requirement is
+    /// implicit: a space between the letters breaks adjacency, so only
+    /// genuinely fused words contribute.
+    fn fused_boundaries(s: &str) -> usize {
+        let chars: Vec<char> = s.chars().collect();
+        chars
+            .windows(2)
+            .filter(|w| w[0].is_ascii_lowercase() && w[1].is_ascii_uppercase())
+            .count()
+    }
+    fused_boundaries(hyp).saturating_sub(fused_boundaries(ref_))
+}
+
+/// Signed word-count difference (`hyp − ref_`) after de-punctuation only (no
+/// lowercasing). Negative means `hyp` merged words (`MakeSure`); positive means
+/// it split them. Punctuation never adds or removes a word.
+pub fn spacing_delta(hyp: &str, ref_: &str) -> i64 {
+    /// Count whitespace-separated tokens carrying at least one alphanumeric
+    /// char, so trailing punctuation (`world.`) never changes the tally.
+    fn word_count(s: &str) -> i64 {
+        s.split_whitespace()
+            .filter(|tok| tok.chars().any(|c| c.is_alphanumeric()))
+            .count() as i64
+    }
+    word_count(hyp) - word_count(ref_)
+}
+
 // ─── Display helpers ────────────────────────────────────────────────────────
 
 pub fn wrap_print(prefix: &str, text: &str, width: usize) {
@@ -666,5 +717,70 @@ impl HarnessBuilder {
             has_gpu,
             models_dir,
         }
+    }
+}
+
+// ─── Metric tests ────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod metric_tests {
+    use super::{cased_cer, char_error_rate, concat_errors, spacing_delta};
+
+    #[test]
+    fn cased_cer_is_zero_for_identical() {
+        assert_eq!(cased_cer("Make sure", "Make sure"), 0.0);
+    }
+
+    #[test]
+    fn cased_cer_counts_case_differences() {
+        // The whole point: a pure case change is a real error here, while the
+        // case-folded char_error_rate is blind to it.
+        assert!((cased_cer("Abc", "abc") - 1.0 / 3.0).abs() < 1e-9);
+        assert_eq!(char_error_rate("Abc", "abc"), 0.0);
+    }
+
+    #[test]
+    fn concat_errors_zero_when_no_fusion() {
+        assert_eq!(concat_errors("Make sure", "Make sure"), 0);
+    }
+
+    #[test]
+    fn concat_errors_flags_fused_words() {
+        // The MakeSure signature: lowercase immediately followed by uppercase.
+        assert_eq!(concat_errors("MakeSure", "Make sure"), 1);
+        assert_eq!(concat_errors("oneTwoThree", "one two three"), 2);
+    }
+
+    #[test]
+    fn concat_errors_ignores_casing_only_defect() {
+        // "So Let's" is a double-capital defect (space-separated), not a fusion;
+        // that belongs to cased_cer, not here.
+        assert_eq!(concat_errors("So Let's", "So let's"), 0);
+    }
+
+    #[test]
+    fn concat_errors_preserves_legit_camelcase() {
+        // camelCase already in the reference is not a regression.
+        assert_eq!(concat_errors("iPhone app", "iPhone app"), 0);
+    }
+
+    #[test]
+    fn spacing_delta_zero_for_identical() {
+        assert_eq!(spacing_delta("Make sure it works", "Make sure it works"), 0);
+    }
+
+    #[test]
+    fn spacing_delta_negative_for_merge() {
+        assert_eq!(spacing_delta("MakeSure it works", "Make sure it works"), -1);
+    }
+
+    #[test]
+    fn spacing_delta_positive_for_split() {
+        assert_eq!(spacing_delta("a b c", "a b"), 1);
+    }
+
+    #[test]
+    fn spacing_delta_ignores_punctuation() {
+        assert_eq!(spacing_delta("hello, world.", "hello world"), 0);
     }
 }

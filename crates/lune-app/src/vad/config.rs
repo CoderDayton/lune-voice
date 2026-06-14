@@ -1,7 +1,7 @@
 //! Tunable knobs for the hybrid VAD pipeline.
 //!
 //! [`VadPipelineConfig`] is the internal, fully-resolved config consumed by
-//! [`super::chunker::Chunker`] and the `HybridVad` orchestrator. It is seeded
+//! [`super::chunker::SpanGate`] and the `HybridVad` orchestrator. It is seeded
 //! from the user-facing [`lune_core::config::PipelineConfig`] via
 //! [`VadPipelineConfig::from_pipeline`]; the Silero/chunker knobs that
 //! `PipelineConfig` does not yet surface carry the [`DEFAULT_VAD_CONFIG`]
@@ -34,21 +34,31 @@ pub struct VadPipelineConfig {
     pub preroll_ms: u32,
     /// Trailing silence tolerated inside a segment before it finalizes.
     pub hangover_ms: u32,
-    /// Segments with less voiced audio than this are dropped as noise blips.
-    pub min_chunk_ms: u32,
-    /// Hard cap — force-finalize a segment once it reaches this length.
+    /// Hard cap — force-finalize a span once it reaches this length.
     pub max_chunk_ms: u32,
-    /// Reconstruct inter-segment pauses by injecting silence into the ASR
-    /// buffer. The benchmark decides whether it still helps once Silero
-    /// segments cleanly.
-    pub pause_injection: bool,
+    /// Minimum voiced length to KEEP a whole span (contiguous-span gate). Spans
+    /// with less verified speech than this are dropped as noise. Replaces the
+    /// per-segment `min_chunk_ms`.
+    pub min_speech_ms: u32,
+    /// A trailing-silence run this long closes the current span (an intentional
+    /// stop). Sub-`long_gap` pauses are KEPT inside the span so Qwen3-ASR sees
+    /// the real speech rhythm — this is what stops adjacent words fusing.
+    pub long_gap_ms: u32,
 }
 
-/// Gate defaults, tuned by `cgs bench TYPE=vad` against end-to-end ASR WER over
-/// the 24-fixture panel (clean + SNR 0/5/10 + multilingual). The tuned hybrid
-/// scored 12.4% mean WER vs 13.6% for no-VAD (p90 27.8% vs 31.9%, noisy 19.2%
-/// vs 20.7%) — the gate removes ~14% of audio the recognizer was hallucinating
-/// on. Re-run the benchmark and update here if the pipeline changes.
+/// Gate defaults for the contiguous-span gate. The acoustic thresholds
+/// (`silero_onset/offset`, `earshot_activity_threshold`, `hangover_ms`,
+/// `preroll_ms`) are tuned by `cgs bench TYPE=vad` against end-to-end ASR WER;
+/// the span gate matches no-VAD mean WER (8.2%) while improving the tail
+/// (p90 16.7% vs 19.2%) and cutting segments-per-clip from ~5 to ~1.6 — the
+/// fragmentation that stripped inter-word pauses and fused adjacent words
+/// (`MakeSure`) is gone. `long_gap_ms` is deliberately NOT WER-tuned: WER is
+/// blind to the fusion bug (it normalizes case/spacing away), so a WER sweep
+/// would shrink it back toward the old splice behaviour. It is set to the
+/// intentional-stop threshold — pauses below it stay inside the span so the
+/// recognizer hears the real rhythm; only a deliberate multi-second stop closes
+/// a span. Re-run the benchmark and update the acoustic knobs if the pipeline
+/// changes.
 pub const DEFAULT_VAD_CONFIG: VadPipelineConfig = VadPipelineConfig {
     sample_rate: 16_000,
     silero_enabled: true,
@@ -58,9 +68,9 @@ pub const DEFAULT_VAD_CONFIG: VadPipelineConfig = VadPipelineConfig {
     silero_offset: 0.20,
     preroll_ms: 500,
     hangover_ms: 350,
-    min_chunk_ms: 100,
     max_chunk_ms: 20_000,
-    pause_injection: false,
+    min_speech_ms: 100,
+    long_gap_ms: 2_000,
 };
 
 impl Default for VadPipelineConfig {
@@ -109,9 +119,19 @@ impl VadPipelineConfig {
         self.ms_to_frames(self.hangover_ms)
     }
 
-    /// Minimum voiced length to keep a segment, in whole Silero frames.
-    pub fn min_chunk_frames(&self) -> usize {
-        self.ms_to_frames(self.min_chunk_ms)
+    /// Hangover (trailing-silence to keep at a span's tail) in samples.
+    pub fn hangover_samples(&self) -> usize {
+        self.ms_to_samples(self.hangover_ms)
+    }
+
+    /// Long-gap cutoff (intentional-stop threshold) in whole Silero frames.
+    pub fn long_gap_frames(&self) -> usize {
+        self.ms_to_frames(self.long_gap_ms)
+    }
+
+    /// Minimum voiced length to keep a span, in whole Silero frames.
+    pub fn min_speech_frames(&self) -> usize {
+        self.ms_to_frames(self.min_speech_ms)
     }
 
     /// Force-finalize length, in whole Silero frames.
@@ -129,17 +149,20 @@ mod tests {
         // 16 kHz, 512-sample Silero frames → 1 frame = 32 ms.
         let cfg = VadPipelineConfig {
             hangover_ms: 96,
-            min_chunk_ms: 64,
+            min_speech_ms: 64,
             max_chunk_ms: 320,
             preroll_ms: 96,
+            long_gap_ms: 2_048,
             ..VadPipelineConfig::default()
         };
         assert_eq!(cfg.frame_samples(), 512);
         assert_eq!(cfg.hangover_frames(), 3);
-        assert_eq!(cfg.min_chunk_frames(), 2);
+        assert_eq!(cfg.hangover_samples(), 1_536);
+        assert_eq!(cfg.min_speech_frames(), 2);
         assert_eq!(cfg.max_chunk_frames(), 10);
         assert_eq!(cfg.preroll_frames(), 3);
         assert_eq!(cfg.preroll_samples(), 1_536);
+        assert_eq!(cfg.long_gap_frames(), 64);
     }
 
     #[test]

@@ -1,223 +1,267 @@
-//! Segment state machine — stage 3 of the hybrid gate.
+//! Contiguous-span gate — stage 3 of the hybrid VAD.
 //!
 //! Pure and model-free: it consumes a stream of Silero speech probabilities
-//! (one per [`super::silero::SILERO_FRAME`] frame) and emits segment-boundary
-//! events. The `HybridVad` orchestrator owns the actual audio buffers and
-//! turns these events into ASR pushes; keeping the machine pure makes the
-//! onset/offset/hangover/min/max logic fully unit-testable without models.
+//! (one per [`super::silero::SILERO_FRAME`] frame) and emits span-boundary
+//! events. The `HybridVad` orchestrator owns the audio buffers and turns these
+//! events into ASR pushes; keeping the machine pure makes the
+//! onset/offset/long-gap/min/max logic fully unit-testable without models.
 //!
 //! Hysteresis: `silero_onset > silero_offset` so brief score dips inside an
-//! utterance don't end the segment. A segment finalizes when trailing silence
-//! exceeds the hangover window, or when it reaches the max-length cap.
+//! utterance don't end the span. Unlike a hangover-based chunker, a span closes
+//! only on a `long_gap` run of trailing silence (an intentional stop) or the
+//! max-length cap — short pauses are kept *inside* the span so the recognizer
+//! still hears the real word boundaries.
 
 use super::config::VadPipelineConfig;
 
-/// One boundary decision per frame.
+/// One boundary decision per frame for the contiguous-span gate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum ChunkerEvent {
-    /// No speech; the frame belongs in the pre-roll ring.
+pub(crate) enum SpanEvent {
+    /// Not in a span and below onset — the frame belongs in the pre-roll ring.
     Idle,
-    /// Speech just started this frame — flush pre-roll and open a segment.
-    Begin,
-    /// Speech continues (or sits inside the hangover window) — append the frame.
-    Continue,
-    /// Segment closed. `keep` is `false` for sub-`min_chunk` noise blips.
-    Finalize { keep: bool },
+    /// Onset this frame — drain pre-roll and open a span (append this frame).
+    Open,
+    /// In a span — append this frame (voiced OR sub-`long_gap` silence). This is
+    /// the fix: intra-utterance pauses stay inside the span, so the word
+    /// boundaries Qwen3-ASR reads from them are never spliced away.
+    Append,
+    /// A long gap (intentional stop) closed the span. `keep` is `false` for
+    /// spans with less voiced audio than `min_speech` (noise blips).
+    Close { keep: bool },
 }
 
-/// Frame-clocked onset/offset/hangover state machine.
-pub(crate) struct Chunker {
+/// Contiguous-span gate — the stage-3 replacement for [`Chunker`].
+///
+/// Where `Chunker` ends a segment after a short hangover and lets the
+/// orchestrator drop the silence between segments, `SpanGate` keeps a span
+/// open through short pauses and closes only on a `long_gap_frames` run of
+/// trailing silence. The orchestrator appends every in-span frame (speech and
+/// silence alike) and trims the closing tail to the hangover window, so the
+/// real rhythm of an utterance survives to the recognizer.
+pub(crate) struct SpanGate {
     onset: f32,
     offset: f32,
-    hangover_frames: usize,
+    long_gap_frames: usize,
     min_speech_frames: usize,
     max_frames: usize,
-    in_speech: bool,
-    /// Frames since the segment opened (includes trailing silence).
-    segment_frames: usize,
-    /// Length of the current trailing-silence run (resets on a voiced frame).
-    silence_frames: usize,
+    in_span: bool,
+    /// Voiced frames seen in the current span (drives the keep decision).
+    voiced_frames: usize,
+    /// Total frames in the current span (drives the max-length cap).
+    span_frames: usize,
+    /// Current trailing-silence run (resets on a voiced frame).
+    silence_run: usize,
 }
 
-impl Chunker {
+impl SpanGate {
     pub(crate) fn new(cfg: &VadPipelineConfig) -> Self {
         Self {
             onset: cfg.silero_onset,
             offset: cfg.silero_offset,
-            // Guard against degenerate sweep values: a 0-frame hangover would
-            // finalize a segment the instant it opened.
-            hangover_frames: cfg.hangover_frames().max(1),
-            min_speech_frames: cfg.min_chunk_frames(),
+            // A 0-frame long-gap would close a span the instant any silence
+            // appeared, collapsing back to the old splice behaviour.
+            long_gap_frames: cfg.long_gap_frames().max(1),
+            min_speech_frames: cfg.min_speech_frames(),
             max_frames: cfg.max_chunk_frames().max(1),
-            in_speech: false,
-            segment_frames: 0,
-            silence_frames: 0,
+            in_span: false,
+            voiced_frames: 0,
+            span_frames: 0,
+            silence_run: 0,
         }
     }
 
-    /// True while a segment is open (drives the Earshot-prefilter bypass).
-    pub(crate) fn in_speech(&self) -> bool {
-        self.in_speech
+    /// True while a span is open (drives the Earshot-prefilter bypass).
+    pub(crate) fn in_span(&self) -> bool {
+        self.in_span
     }
 
     /// Advance one frame with its Silero speech probability.
-    pub(crate) fn step(&mut self, prob: f32) -> ChunkerEvent {
-        if !self.in_speech {
+    pub(crate) fn step(&mut self, prob: f32) -> SpanEvent {
+        if !self.in_span {
             if prob >= self.onset {
-                self.in_speech = true;
-                self.segment_frames = 1;
-                self.silence_frames = 0;
-                return ChunkerEvent::Begin;
+                self.in_span = true;
+                self.voiced_frames = 1;
+                self.span_frames = 1;
+                self.silence_run = 0;
+                return SpanEvent::Open;
             }
-            return ChunkerEvent::Idle;
+            return SpanEvent::Idle;
         }
 
-        self.segment_frames += 1;
+        self.span_frames += 1;
         if prob <= self.offset {
-            self.silence_frames += 1;
+            self.silence_run += 1;
         } else {
-            self.silence_frames = 0;
+            self.silence_run = 0;
+            self.voiced_frames += 1;
         }
 
-        // Trailing silence ran past the hangover window → close the segment.
-        if self.silence_frames >= self.hangover_frames {
-            let voiced = self.segment_frames - self.silence_frames;
-            let keep = voiced >= self.min_speech_frames;
+        // A long trailing-silence run is an intentional stop → close the span.
+        if self.silence_run >= self.long_gap_frames {
+            let keep = self.voiced_frames >= self.min_speech_frames;
             self.reset();
-            return ChunkerEvent::Finalize { keep };
+            return SpanEvent::Close { keep };
         }
 
-        // Hard length cap → force-finalize ongoing speech (always kept).
-        if self.segment_frames >= self.max_frames {
+        // Safety cap: force-close a span that never stops (always real speech).
+        if self.span_frames >= self.max_frames {
             self.reset();
-            return ChunkerEvent::Finalize { keep: true };
+            return SpanEvent::Close { keep: true };
         }
 
-        ChunkerEvent::Continue
+        SpanEvent::Append
     }
 
-    /// Close any in-progress segment at end of stream.
-    pub(crate) fn finish(&mut self) -> ChunkerEvent {
-        if !self.in_speech {
-            return ChunkerEvent::Idle;
+    /// Close any open span at end of stream.
+    pub(crate) fn finish(&mut self) -> SpanEvent {
+        if !self.in_span {
+            return SpanEvent::Idle;
         }
-        let voiced = self.segment_frames - self.silence_frames;
-        let keep = voiced >= self.min_speech_frames;
+        let keep = self.voiced_frames >= self.min_speech_frames;
         self.reset();
-        ChunkerEvent::Finalize { keep }
+        SpanEvent::Close { keep }
     }
 
-    /// Drop all segment state (back to `Idle`).
+    /// Drop all span state (back to `Idle`).
     pub(crate) fn reset(&mut self) {
-        self.in_speech = false;
-        self.segment_frames = 0;
-        self.silence_frames = 0;
+        self.in_span = false;
+        self.voiced_frames = 0;
+        self.span_frames = 0;
+        self.silence_run = 0;
     }
 }
 
 #[cfg(test)]
-mod tests {
+mod span_tests {
     use super::*;
 
     // 16 kHz, 512-sample frames → 1 frame = 32 ms.
-    // hangover 96 ms = 3 frames, min 64 ms = 2 frames, max 320 ms = 10 frames.
-    fn test_chunker() -> Chunker {
+    // long_gap 320 ms = 10 frames, min_speech 64 ms = 2 frames, max 3200 ms = 100 frames.
+    fn test_gate() -> SpanGate {
         let cfg = VadPipelineConfig {
             sample_rate: 16_000,
             silero_onset: 0.6,
             silero_offset: 0.35,
-            hangover_ms: 96,
-            min_chunk_ms: 64,
-            max_chunk_ms: 320,
+            min_speech_ms: 64,
+            long_gap_ms: 320,
+            max_chunk_ms: 3_200,
             ..VadPipelineConfig::default()
         };
-        Chunker::new(&cfg)
+        SpanGate::new(&cfg)
     }
 
     #[test]
     fn stays_idle_below_onset() {
-        let mut c = test_chunker();
-        assert_eq!(c.step(0.10), ChunkerEvent::Idle);
-        assert_eq!(c.step(0.59), ChunkerEvent::Idle);
-        assert!(!c.in_speech());
+        let mut g = test_gate();
+        assert_eq!(g.step(0.10), SpanEvent::Idle);
+        assert_eq!(g.step(0.59), SpanEvent::Idle);
+        assert!(!g.in_span());
     }
 
     #[test]
-    fn onset_begins_segment() {
-        let mut c = test_chunker();
-        assert_eq!(c.step(0.60), ChunkerEvent::Begin);
-        assert!(c.in_speech());
-        assert_eq!(c.step(0.90), ChunkerEvent::Continue);
+    fn onset_opens_span() {
+        let mut g = test_gate();
+        assert_eq!(g.step(0.60), SpanEvent::Open);
+        assert!(g.in_span());
+        assert_eq!(g.step(0.90), SpanEvent::Append);
     }
 
+    /// THE fix: a pause shorter than `long_gap` keeps the span open, so the
+    /// silence — and the word boundary it encodes — is preserved, not stripped.
     #[test]
-    fn hangover_then_finalize_keep() {
-        let mut c = test_chunker();
-        // 3 voiced frames (≥ min 2), then a full hangover of silence.
-        assert_eq!(c.step(0.90), ChunkerEvent::Begin);
-        assert_eq!(c.step(0.90), ChunkerEvent::Continue);
-        assert_eq!(c.step(0.90), ChunkerEvent::Continue);
-        assert_eq!(c.step(0.10), ChunkerEvent::Continue); // silence 1
-        assert_eq!(c.step(0.10), ChunkerEvent::Continue); // silence 2
-        assert_eq!(c.step(0.10), ChunkerEvent::Finalize { keep: true }); // silence 3 == hangover
-        assert!(!c.in_speech());
-    }
-
-    #[test]
-    fn short_blip_dropped() {
-        let mut c = test_chunker();
-        // One voiced frame → voiced span 1 < min 2 → dropped as noise.
-        assert_eq!(c.step(0.70), ChunkerEvent::Begin); // voiced 1
-        assert_eq!(c.step(0.10), ChunkerEvent::Continue); // silence 1
-        assert_eq!(c.step(0.10), ChunkerEvent::Continue); // silence 2
-        assert_eq!(c.step(0.10), ChunkerEvent::Finalize { keep: false }); // silence 3
-    }
-
-    #[test]
-    fn voiced_frame_resets_hangover() {
-        let mut c = test_chunker();
-        c.step(0.90); // Begin
-        c.step(0.10); // silence 1
-        c.step(0.10); // silence 2
-        assert_eq!(c.step(0.90), ChunkerEvent::Continue); // resets the run
-        c.step(0.10); // silence 1
-        c.step(0.10); // silence 2
-        assert_eq!(c.step(0.10), ChunkerEvent::Finalize { keep: true }); // silence 3
-    }
-
-    #[test]
-    fn max_length_force_finalizes() {
-        let mut c = test_chunker();
-        // max = 10 frames: frame 1 Begin, frames 2..=9 Continue, frame 10 closes.
-        assert_eq!(c.step(0.90), ChunkerEvent::Begin);
-        for i in 2..10 {
-            assert_eq!(c.step(0.90), ChunkerEvent::Continue, "frame {i}");
+    fn sub_long_gap_pause_keeps_span_open() {
+        let mut g = test_gate();
+        g.step(0.90); // Open, voiced 1
+        g.step(0.90); // Append, voiced 2
+        // 9 frames of silence — one short of the 10-frame long gap.
+        for i in 0..9 {
+            assert_eq!(g.step(0.10), SpanEvent::Append, "silence frame {i}");
         }
-        assert_eq!(c.step(0.90), ChunkerEvent::Finalize { keep: true });
-        assert!(!c.in_speech());
+        assert!(g.in_span(), "span must survive a sub-long-gap pause");
+        // Speech resumes — still the same span.
+        assert_eq!(g.step(0.90), SpanEvent::Append);
     }
 
     #[test]
-    fn finish_finalizes_in_progress() {
-        let mut c = test_chunker();
-        c.step(0.90); // Begin, voiced 1
-        c.step(0.90); // Continue, voiced 2 (≥ min)
-        assert_eq!(c.finish(), ChunkerEvent::Finalize { keep: true });
-        assert!(!c.in_speech());
-        // Idempotent — nothing is open now.
-        assert_eq!(c.finish(), ChunkerEvent::Idle);
+    fn long_gap_closes_span_and_keeps() {
+        let mut g = test_gate();
+        g.step(0.90); // Open, voiced 1
+        g.step(0.90); // Append, voiced 2 (>= min)
+        g.step(0.90); // Append, voiced 3
+        // 10 silence frames: frames 1..=9 Append, the 10th hits the long gap.
+        for _ in 0..9 {
+            assert_eq!(g.step(0.10), SpanEvent::Append);
+        }
+        assert_eq!(g.step(0.10), SpanEvent::Close { keep: true });
+        assert!(!g.in_span());
+    }
+
+    #[test]
+    fn short_blip_dropped_at_long_gap() {
+        let mut g = test_gate();
+        assert_eq!(g.step(0.70), SpanEvent::Open); // voiced 1 < min 2
+        for _ in 0..9 {
+            g.step(0.10);
+        }
+        assert_eq!(g.step(0.10), SpanEvent::Close { keep: false });
+    }
+
+    /// A voiced frame mid-pause resets the long-gap timer — proving only a
+    /// *continuous* long silence (an intentional stop) ends the span.
+    #[test]
+    fn voiced_frame_resets_long_gap_timer() {
+        let mut g = test_gate();
+        g.step(0.90); // Open
+        for _ in 0..9 {
+            g.step(0.10); // 9 silence (one short of the long gap)
+        }
+        assert_eq!(g.step(0.90), SpanEvent::Append); // voiced resets the run
+        for _ in 0..9 {
+            assert_eq!(g.step(0.10), SpanEvent::Append); // run restarts, still open
+        }
+        assert!(g.in_span());
+    }
+
+    #[test]
+    fn max_length_force_closes() {
+        let cfg = VadPipelineConfig {
+            sample_rate: 16_000,
+            silero_onset: 0.6,
+            silero_offset: 0.35,
+            min_speech_ms: 64,
+            long_gap_ms: 10_000, // disabled for this test
+            max_chunk_ms: 320,   // 10 frames
+            ..VadPipelineConfig::default()
+        };
+        let mut g = SpanGate::new(&cfg);
+        assert_eq!(g.step(0.90), SpanEvent::Open);
+        for i in 2..10 {
+            assert_eq!(g.step(0.90), SpanEvent::Append, "frame {i}");
+        }
+        assert_eq!(g.step(0.90), SpanEvent::Close { keep: true });
+        assert!(!g.in_span());
+    }
+
+    #[test]
+    fn finish_closes_open_span() {
+        let mut g = test_gate();
+        g.step(0.90); // Open, voiced 1
+        g.step(0.90); // Append, voiced 2
+        assert_eq!(g.finish(), SpanEvent::Close { keep: true });
+        assert!(!g.in_span());
+        assert_eq!(g.finish(), SpanEvent::Idle); // idempotent
     }
 
     #[test]
     fn finish_when_idle_is_idle() {
-        let mut c = test_chunker();
-        assert_eq!(c.finish(), ChunkerEvent::Idle);
+        let mut g = test_gate();
+        assert_eq!(g.finish(), SpanEvent::Idle);
     }
 
     #[test]
-    fn finish_drops_short_segment() {
-        let mut c = test_chunker();
-        c.step(0.90); // Begin, voiced 1 < min 2
-        assert_eq!(c.finish(), ChunkerEvent::Finalize { keep: false });
+    fn finish_drops_short_span() {
+        let mut g = test_gate();
+        g.step(0.90); // Open, voiced 1 < min 2
+        assert_eq!(g.finish(), SpanEvent::Close { keep: false });
     }
 }

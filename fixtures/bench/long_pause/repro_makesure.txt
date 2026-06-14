@@ -1,0 +1,1 @@
+Just real quick, I want you to review the VAD pipeline. Make sure it all makes logical sense. Make sure there's no problems. Make sure there's nothing missing. Make sure everything is good to go, and then we can run it.
