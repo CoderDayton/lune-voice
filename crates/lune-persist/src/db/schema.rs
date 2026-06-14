@@ -31,3 +31,13 @@ diesel::table! {
         created_at -> Text,
     }
 }
+
+diesel::table! {
+    correction_pairs (id) {
+        id -> Integer,
+        session_id -> Text,
+        raw -> Text,
+        final_text -> Text,
+        created_at -> Text,
+    }
+}

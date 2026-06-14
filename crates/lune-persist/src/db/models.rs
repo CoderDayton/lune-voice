@@ -1,6 +1,6 @@
 use diesel::prelude::*;
 
-use super::schema::{dictionary, sessions, snippets};
+use super::schema::{correction_pairs, dictionary, sessions, snippets};
 
 // ── Dictionary ───────────────────────────────────────────────────────────────
 
@@ -71,4 +71,26 @@ pub struct NewSession<'a> {
     pub backend: &'a str,
     pub status: &'a str,
     pub transcript: Option<&'a str>,
+}
+
+// ── Correction pairs (homophone calibration data) ────────────────────────────
+
+#[derive(Queryable, Selectable, Debug)]
+#[diesel(table_name = correction_pairs)]
+#[allow(dead_code)]
+pub struct CorrectionPairRow {
+    pub id: i32,
+    pub session_id: String,
+    pub raw: String,
+    pub final_text: String,
+    pub created_at: String,
+}
+
+#[derive(Insertable)]
+#[diesel(table_name = correction_pairs)]
+pub struct NewCorrectionPair<'a> {
+    pub session_id: &'a str,
+    pub raw: &'a str,
+    pub final_text: &'a str,
+    pub created_at: &'a str,
 }

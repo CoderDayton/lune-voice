@@ -1,6 +1,7 @@
 pub mod corrector;
 pub mod freq;
 pub mod homophone;
+pub mod homophone_calib;
 pub mod lexicon;
 pub mod punctuation;
 pub mod vocab;

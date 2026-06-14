@@ -17,10 +17,12 @@
 //!   net         = baseline - resolved  (higher = better)
 
 use lune_dict::homophone::{HomophoneResolver, ResolverConfig, ResolverPolicy};
+use lune_dict::homophone_calib;
 use lune_ngram::{NGramModel, ScoringConfig};
 
 const P_ERR: f64 = 0.18; // ASR homophone substitution rate
-const N_TEST: usize = 4000;
+const N_TEST: usize = 2500; // test sentences per seed
+const SEEDS: u64 = 8; // independent train/test draws averaged per cell
 
 // ─── deterministic RNG (xorshift64*, no external deps) ───────────────────────
 struct Rng(u64);
@@ -140,36 +142,41 @@ struct Metrics {
     over_corr: f64,
 }
 
-fn evaluate(seed: u64, n_train: usize, eps: f64, policy: ResolverPolicy) -> Metrics {
-    let mut rng = Rng::new(seed);
-    let mut model = NGramModel::new(ScoringConfig::trigram_default()).expect("model");
-    for _ in 0..n_train {
-        model.train_sentence(&gen_sentence(&mut rng, eps).join(" "));
-    }
-    let resolver = HomophoneResolver::with_config(ResolverConfig {
-        policy,
-        ..Default::default()
-    });
-
+/// Average metrics over `SEEDS` independent train/test draws. Single-seed
+/// cells carry enough training-draw variance to invert conclusions (an early
+/// run showed a spurious error spike at one N that vanished under averaging).
+fn evaluate(n_train: usize, eps: f64, policy: ResolverPolicy, min_context_gain: f64) -> Metrics {
     let (mut slots, mut base_err, mut res_err, mut over) = (0usize, 0usize, 0usize, 0usize);
-    for _ in 0..N_TEST {
-        let truth = gen_sentence(&mut rng, eps);
-        let observed = corrupt(&mut rng, &truth);
-        let owords: Vec<&str> = observed.iter().map(String::as_str).collect();
-        let mut finalw = observed.clone();
-        for r in resolver.resolve_words(&model, &owords, &[]) {
-            finalw[r.index] = r.to;
+    for seed in 0..SEEDS {
+        let mut rng = Rng::new(1000 + seed);
+        let mut model = NGramModel::new(ScoringConfig::trigram_default()).expect("model");
+        for _ in 0..n_train {
+            model.train_sentence(&gen_sentence(&mut rng, eps).join(" "));
         }
-        for (i, tw) in truth.iter().enumerate() {
-            if confusion_for(tw).is_none() {
-                continue;
+        let resolver = HomophoneResolver::with_config(ResolverConfig {
+            policy,
+            min_context_gain,
+            ..Default::default()
+        });
+        for _ in 0..N_TEST {
+            let truth = gen_sentence(&mut rng, eps);
+            let observed = corrupt(&mut rng, &truth);
+            let owords: Vec<&str> = observed.iter().map(String::as_str).collect();
+            let mut finalw = observed.clone();
+            for r in resolver.resolve_words(&model, &owords, &[]) {
+                finalw[r.index] = r.to;
             }
-            slots += 1;
-            let ok_base = observed[i] == *tw;
-            let ok_final = finalw[i] == *tw;
-            base_err += usize::from(!ok_base);
-            res_err += usize::from(!ok_final);
-            over += usize::from(ok_base && !ok_final);
+            for (i, tw) in truth.iter().enumerate() {
+                if confusion_for(tw).is_none() {
+                    continue;
+                }
+                slots += 1;
+                let ok_base = observed[i] == *tw;
+                let ok_final = finalw[i] == *tw;
+                base_err += usize::from(!ok_base);
+                res_err += usize::from(!ok_final);
+                over += usize::from(ok_base && !ok_final);
+            }
         }
     }
     let s = slots.max(1) as f64;
@@ -180,19 +187,70 @@ fn evaluate(seed: u64, n_train: usize, eps: f64, policy: ResolverPolicy) -> Metr
     }
 }
 
+/// Conformal Risk Control validation: calibrate per-set tau on a held-out
+/// "history", then measure on FRESH data whether the empirical over-correction
+/// rate honours the target `alpha`. Returns (over-correction, coverage,
+/// sets-enabled) averaged over seeds.
+fn conformal_validation(alpha: f64, n_calib: usize, n_test: usize) -> (f64, f64, usize) {
+    let (mut over, mut correct, mut fixed, mut errors, mut enabled) = (0usize, 0, 0, 0, 0);
+    for seed in 0..SEEDS {
+        let mut rng = Rng::new(2000 + seed);
+        let mut model = NGramModel::new(ScoringConfig::trigram_default()).expect("model");
+        let mut pairs = Vec::with_capacity(n_calib);
+        for _ in 0..n_calib {
+            let truth = gen_sentence(&mut rng, 0.05);
+            model.train_sentence(&truth.join(" "));
+            let observed = corrupt(&mut rng, &truth);
+            pairs.push((observed.join(" "), truth.join(" ")));
+        }
+        let cal = homophone_calib::calibrate(&model, &pairs, alpha, 1);
+        enabled += cal
+            .iter()
+            .filter(|c| c.as_ref().is_some_and(|c| c.enabled))
+            .count();
+        let resolver = HomophoneResolver::with_calibration(ResolverConfig::default(), cal);
+        for _ in 0..n_test {
+            let truth = gen_sentence(&mut rng, 0.05);
+            let observed = corrupt(&mut rng, &truth);
+            let owords: Vec<&str> = observed.iter().map(String::as_str).collect();
+            let mut finalw = observed.clone();
+            for r in resolver.resolve_words(&model, &owords, &[]) {
+                finalw[r.index] = r.to;
+            }
+            for (i, tw) in truth.iter().enumerate() {
+                if confusion_for(tw).is_none() {
+                    continue;
+                }
+                if observed[i] == *tw {
+                    correct += 1;
+                    over += usize::from(finalw[i] != *tw);
+                } else {
+                    errors += 1;
+                    fixed += usize::from(finalw[i] == *tw);
+                }
+            }
+        }
+    }
+    (
+        over as f64 / correct.max(1) as f64,
+        fixed as f64 / errors.max(1) as f64,
+        enabled / SEEDS as usize,
+    )
+}
+
 fn main() {
     println!("Homophone resolver tuning — synthetic ground truth, REAL model + resolver");
-    println!("P_ERR={P_ERR}  N_TEST={N_TEST}\n");
+    println!("P_ERR={P_ERR}  N_TEST={N_TEST}  seeds={SEEDS} (averaged)\n");
 
-    println!("== EXP 1 — history scaling (RerankArgmax vs MarginGate tau=1.5) ==");
+    println!("== EXP 1 — history scaling (RerankArgmax vs MarginGate tau=2.0) ==");
     println!(
         "{:>6} | {:>9} {:>11} {:>11} | {:>10} {:>10}",
-        "N", "baseline", "rerank", "gate1.5", "rr_over", "gate_over"
+        "N", "baseline", "rerank", "gate2.0", "rr_over", "gate_over"
     );
     println!("{}", "-".repeat(72));
     for n in [25usize, 50, 100, 250, 500, 1000, 2000] {
-        let rr = evaluate(1, n, 0.05, ResolverPolicy::RerankArgmax);
-        let g = evaluate(1, n, 0.05, ResolverPolicy::MarginGate { tau: 1.5 });
+        let rr = evaluate(n, 0.05, ResolverPolicy::RerankArgmax, 0.0);
+        let g = evaluate(n, 0.05, ResolverPolicy::MarginGate { tau: 2.0 }, 0.0);
         println!(
             "{n:>6} | {:>9.4} {:>11.4} {:>11.4} | {:>10.4} {:>10.4}",
             rr.baseline, rr.resolved, g.resolved, rr.over_corr, g.over_corr
@@ -205,8 +263,8 @@ fn main() {
         "tau", "baseline", "resolved", "over_corr", "net"
     );
     println!("{}", "-".repeat(60));
-    for tau in [0.0_f64, 0.25, 0.5, 1.0, 1.5, 2.0, 3.0] {
-        let m = evaluate(1, 500, 0.05, ResolverPolicy::MarginGate { tau });
+    for tau in [0.0_f64, 0.5, 1.0, 1.5, 2.0, 3.0] {
+        let m = evaluate(500, 0.05, ResolverPolicy::MarginGate { tau }, 0.0);
         println!(
             "{tau:>6.2} | {:>9.4} {:>9.4} {:>10.4} | {:>+9.4}",
             m.baseline,
@@ -216,18 +274,30 @@ fn main() {
         );
     }
 
-    println!("\n== EXP 3 — learnable signal (eps high => usage ~unpredictable) ==");
+    println!("\n== EXP 3 — learnable signal + contextual-gain gate (tau=2.0, N=500) ==");
     println!(
-        "{:>6} | {:>9} {:>11} {:>11} | {:>10} {:>10}",
-        "eps", "baseline", "rerank", "gate1.5", "rr_over", "gate_over"
+        "{:>6} | {:>9} {:>10} {:>10} | {:>9} {:>9}",
+        "eps", "baseline", "gate g=0", "gate g=1", "ov g=0", "ov g=1"
     );
-    println!("{}", "-".repeat(72));
+    println!("{}", "-".repeat(64));
     for eps in [0.0_f64, 0.05, 0.2, 0.5] {
-        let rr = evaluate(7, 500, eps, ResolverPolicy::RerankArgmax);
-        let g = evaluate(7, 500, eps, ResolverPolicy::MarginGate { tau: 1.5 });
+        let g0 = evaluate(500, eps, ResolverPolicy::MarginGate { tau: 2.0 }, 0.0);
+        let g1 = evaluate(500, eps, ResolverPolicy::MarginGate { tau: 2.0 }, 1.0);
         println!(
-            "{eps:>6.2} | {:>9.4} {:>11.4} {:>11.4} | {:>10.4} {:>10.4}",
-            rr.baseline, rr.resolved, g.resolved, rr.over_corr, g.over_corr
+            "{eps:>6.2} | {:>9.4} {:>10.4} {:>10.4} | {:>9.4} {:>9.4}",
+            g0.baseline, g0.resolved, g1.resolved, g0.over_corr, g1.over_corr
         );
+    }
+
+    println!("\n== EXP 4 — conformal over-correction guarantee (per-set tau via CRC) ==");
+    println!(
+        "{:>7} | {:>12} {:>9} | {:>9}",
+        "alpha", "emp_overcor", "coverage", "n_enabled"
+    );
+    println!("{}", "-".repeat(50));
+    for alpha in [0.005_f64, 0.01, 0.02, 0.05] {
+        let (over, cov, n_en) = conformal_validation(alpha, 500, 2000);
+        let flag = if over <= alpha + 0.01 { "ok" } else { "HIGH" };
+        println!("{alpha:>7.3} | {over:>12.4} {cov:>9.4} | {n_en:>9}  {flag}");
     }
 }

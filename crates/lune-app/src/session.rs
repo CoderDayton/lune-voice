@@ -1123,6 +1123,19 @@ async fn process_and_deliver(
     } else {
         Some(post_llm_text)
     };
+
+    // Record (raw ASR, final delivered) as labelled data for the homophone
+    // calibrator. Best-effort — a write failure never affects delivery.
+    if let Some(final_text) = transcript.as_deref() {
+        let result = persist
+            .lock()
+            .await
+            .insert_correction_pair(session_id, &raw_text, final_text);
+        if let Err(e) = result {
+            warn!(error = %e, %session_id, "failed to persist correction pair");
+        }
+    }
+
     // Await the DB finalize inline so a runtime shutdown between here and
     // the next tick can't drop the transcript. The lock is short-held and
     // sqlite writes are sync, so worst-case added latency is ~10ms.

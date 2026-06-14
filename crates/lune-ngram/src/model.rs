@@ -379,6 +379,22 @@ impl NGramModel {
             .unwrap_or(0)
     }
 
+    /// Average log-probability of `candidate` under the UNIGRAM model only
+    /// (no context). Compared against the full contextual score, the gap
+    /// isolates how much the *context* — rather than raw word frequency —
+    /// favors a candidate (a PMI-style signal). Returns `-inf` for empty input.
+    pub fn unigram_avg_logprob(&self, candidate: &str) -> f64 {
+        let tokens = tokenize(candidate);
+        if tokens.is_empty() {
+            return f64::NEG_INFINITY;
+        }
+        let lp: f64 = tokens
+            .iter()
+            .map(|t| self.unigram_prob(&normalize_word_or_boundary(t)).ln())
+            .sum();
+        lp / tokens.len() as f64
+    }
+
     // ─── Private helpers ──────────────────────────────────────────────────────
 
     fn smoothed_prob(&self, count: usize, context_total: usize) -> f64 {
@@ -532,5 +548,18 @@ mod tests {
             .unwrap();
 
         assert_eq!(ranked[0].candidate, "black");
+    }
+
+    #[test]
+    fn unigram_avg_logprob_ranks_frequent_above_rare() {
+        let model = trained_test_model(); // "black" appears often, "minecraft" never
+        let frequent = model.unigram_avg_logprob("black");
+        let rare = model.unigram_avg_logprob("minecraft");
+        assert!(frequent.is_finite() && rare.is_finite());
+        assert!(
+            frequent > rare,
+            "frequent word must have higher unigram logprob"
+        );
+        assert_eq!(model.unigram_avg_logprob(""), f64::NEG_INFINITY);
     }
 }

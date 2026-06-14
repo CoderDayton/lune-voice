@@ -872,6 +872,27 @@ async fn build_pipeline(
                 .collect();
             ngram.train_sentences(transcripts);
         }
+        // Self-evaluating homophone calibration: replay the resolver over the
+        // user's own (raw → final) history and conformally bound over-correction
+        // per confusion set (Angelopoulos et al., arXiv:2208.02814). Logged now;
+        // consumed once the resolver is wired into the correction path.
+        match db.lock().await.list_correction_pairs(1000) {
+            Ok(pairs) if !pairs.is_empty() => {
+                let cal = lune_dict::homophone_calib::calibrate(
+                    &ngram,
+                    &pairs,
+                    lune_dict::homophone_calib::DEFAULT_ALPHA,
+                    1,
+                );
+                tracing::info!(
+                    "homophone calibration ({} pairs):\n{}",
+                    pairs.len(),
+                    lune_dict::homophone_calib::summarize(&cal),
+                );
+            }
+            Ok(_) => tracing::debug!("homophone calibration: no correction pairs yet"),
+            Err(e) => tracing::warn!(error = %e, "homophone calibration: could not load pairs"),
+        }
         Arc::new(lune_dict::corrector::HeuristicCorrector::from_ngram(
             Arc::new(ngram),
         ))

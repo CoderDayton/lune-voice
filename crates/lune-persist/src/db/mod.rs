@@ -12,7 +12,7 @@ use uuid::Uuid;
 use lune_core::asr::AsrBackendKind;
 use lune_core::session::{DictationSession, SessionStatus};
 
-use self::models::{NewDictionaryEntry, NewSession, NewSnippet};
+use self::models::{NewCorrectionPair, NewDictionaryEntry, NewSession, NewSnippet};
 use self::schema::{dictionary, sessions, snippets};
 use crate::error::{PersistError, PersistResult};
 
@@ -417,8 +417,59 @@ impl Database {
         Ok(())
     }
 
+    /// Record the raw ASR text and final delivered text for a session — the
+    /// labelled data the homophone calibrator replays. Best-effort; the caller
+    /// treats failure as non-fatal.
+    pub fn insert_correction_pair(
+        &mut self,
+        session_id: Uuid,
+        raw: &str,
+        final_text: &str,
+    ) -> PersistResult<()> {
+        use self::schema::correction_pairs::dsl as cp;
+        // Keep only the newest rows so the table can't grow without bound.
+        const CAP: i64 = 5000;
+        let sid = session_id.to_string();
+        let now = Utc::now().to_rfc3339();
+        diesel::insert_into(cp::correction_pairs)
+            .values(NewCorrectionPair {
+                session_id: &sid,
+                raw,
+                final_text,
+                created_at: &now,
+            })
+            .execute(&mut self.conn)?;
+        diesel::sql_query(
+            "DELETE FROM correction_pairs \
+             WHERE id <= (SELECT MAX(id) FROM correction_pairs) - ?",
+        )
+        .bind::<diesel::sql_types::BigInt, _>(CAP)
+        .execute(&mut self.conn)?;
+        Ok(())
+    }
+
+    /// Most recent `(raw, final)` correction pairs, newest first.
+    pub fn list_correction_pairs(&mut self, limit: u32) -> PersistResult<Vec<(String, String)>> {
+        use self::schema::correction_pairs::dsl as cp;
+        let rows = cp::correction_pairs
+            .select((cp::raw, cp::final_text))
+            .order((cp::created_at.desc(), cp::id.desc()))
+            .limit(i64::from(limit))
+            .load::<(String, String)>(&mut self.conn)?;
+        Ok(rows)
+    }
+
     pub fn delete_session(&mut self, session_id: &str) -> PersistResult<bool> {
         use self::schema::sessions::dsl::*;
+
+        // Cascade: drop the session's calibration pairs so deleting a session
+        // leaves no transcript text behind. There is no SQL foreign key and the
+        // connection doesn't enable `PRAGMA foreign_keys`, so delete explicitly.
+        {
+            use self::schema::correction_pairs::dsl as cp;
+            diesel::delete(cp::correction_pairs.filter(cp::session_id.eq(session_id)))
+                .execute(&mut self.conn)?;
+        }
 
         let count = diesel::delete(sessions.filter(id.eq(session_id))).execute(&mut self.conn)?;
         Ok(count > 0)
@@ -433,6 +484,12 @@ impl Database {
         let cutoff = (Utc::now() - chrono::Duration::days(i64::from(days))).to_rfc3339();
         let count =
             diesel::delete(sessions.filter(started_at.lt(&cutoff))).execute(&mut self.conn)?;
+        // Prune calibration pairs in the same retention window.
+        {
+            use self::schema::correction_pairs::dsl as cp;
+            diesel::delete(cp::correction_pairs.filter(cp::created_at.lt(&cutoff)))
+                .execute(&mut self.conn)?;
+        }
         Ok(count)
     }
 }
@@ -776,6 +833,30 @@ mod tests {
         let id_str = session.id.to_string();
         assert!(db.delete_session(&id_str).unwrap());
         assert!(!db.delete_session(&id_str).unwrap());
+    }
+
+    #[test]
+    fn correction_pairs_roundtrip_order_and_cascade() {
+        let mut db = Database::open_in_memory().unwrap();
+        let sid = Uuid::new_v4();
+        db.insert_correction_pair(sid, "send there", "send their")
+            .unwrap();
+        db.insert_correction_pair(sid, "over their", "over there")
+            .unwrap();
+
+        let all = db.list_correction_pairs(10).unwrap();
+        assert_eq!(all.len(), 2);
+        // Newest first; the id tiebreaker makes this deterministic under equal timestamps.
+        assert_eq!(all[0], ("over their".to_string(), "over there".to_string()));
+        assert_eq!(db.list_correction_pairs(1).unwrap().len(), 1);
+
+        // delete_session cascades to the session's pairs (no session row here,
+        // so it returns false, but the pairs must still be gone).
+        assert!(!db.delete_session(&sid.to_string()).unwrap());
+        assert!(
+            db.list_correction_pairs(10).unwrap().is_empty(),
+            "deleting the session must remove its correction pairs"
+        );
     }
 
     #[test]
