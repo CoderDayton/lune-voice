@@ -73,6 +73,12 @@ pub struct HybridVad {
     /// Stage 3 — onset/offset/hangover segment state machine.
     chunker: Chunker,
     config: VadPipelineConfig,
+    /// Earshot gate hangover: frames the gate stays open after the last active
+    /// frame, so Silero receives a continuous, unbroken run of audio across
+    /// brief intra-utterance dips instead of being re-gated mid-word.
+    gate_hold_frames: usize,
+    /// Frames the Earshot gate is still open (counts down once Earshot quiets).
+    earshot_hold: usize,
 
     /// Leftover samples (< one Silero frame) awaiting the next chunk.
     sample_buf: Vec<f32>,
@@ -130,6 +136,9 @@ impl HybridVad {
         };
         let chunker = Chunker::new(&config);
         let preroll_cap = config.preroll_samples();
+        // Hold the Earshot gate open at least as long as the chunker's hangover
+        // so Silero keeps verifying right up to the moment the chunker finalizes.
+        let gate_hold_frames = config.hangover_frames().max(1);
 
         Ok(Self {
             earshot,
@@ -138,6 +147,8 @@ impl HybridVad {
             silero,
             chunker,
             config,
+            gate_hold_frames,
+            earshot_hold: 0,
             sample_buf: Vec::with_capacity(2 * SILERO_FRAME),
             preroll: VecDeque::with_capacity(preroll_cap + SILERO_FRAME),
             preroll_cap,
@@ -164,18 +175,27 @@ impl HybridVad {
     }
 
     fn process_frame(&mut self, frame: &[f32], actions: &mut Vec<GateAction>) {
-        // Stage 1: Earshot activity + energy (drives the level meter too).
+        // Stage 1 — Earshot acoustic gate (also feeds the level meter). It opens
+        // on raw activity and holds open for `gate_hold_frames`, handing Silero a
+        // continuous, *unchunked* run of audio across brief intra-utterance dips.
+        // Earshot only gates; it never segments the audio itself.
         let er = self.earshot.process_chunk(frame);
         self.peak_energy = self.peak_energy.max(er.energy);
         let earshot_active = er.vad_score >= self.config.earshot_activity_threshold;
+        if earshot_active {
+            self.earshot_hold = self.gate_hold_frames;
+        } else if self.earshot_hold > 0 {
+            self.earshot_hold -= 1;
+        }
+        let gate_open = earshot_active || self.earshot_hold > 0;
 
-        // Stage 2: speech probability. Skip the neural pass when Earshot
-        // pre-filters an idle frame out — but always run it inside a segment so
-        // the offset/hangover decision sees true silence. A failed Silero call
-        // is fail-safe: treat the frame as silence rather than force speech.
+        // Stage 2 — Silero verifies the audio the gate passes. Its invocation
+        // depends only on the Earshot gate (forward flow); the chunker never
+        // feeds back into whether Silero runs. A failed call is fail-safe
+        // (treated as silence). Gate-skipped frames still advance Silero's
+        // rolling context so the next verified frame isn't misaligned.
         let prob = if let Some(silero) = self.silero.as_mut() {
-            let run = self.chunker.in_speech() || !self.config.earshot_prefilter || earshot_active;
-            if run {
+            if !self.config.earshot_prefilter || gate_open {
                 match silero.predict(frame) {
                     Ok(p) => p,
                     Err(e) => {
@@ -184,18 +204,17 @@ impl HybridVad {
                     }
                 }
             } else {
-                // Pre-filtered out: keep Silero's rolling context continuous so
-                // the first verified frame after this gap isn't misaligned.
                 silero.observe(frame);
                 0.0
             }
         } else {
-            // Earshot-only fallback: collapse the activity gate to 0/1 prob so
-            // the same chunker drives segmentation.
+            // Earshot-only fallback: collapse the raw gate to a 0/1 probability
+            // so the same chunker still owns segmentation.
             if earshot_active { 1.0 } else { 0.0 }
         };
 
-        // Stage 3: segment state machine.
+        // Stage 3 — the chunker segments Silero's probability stream. It is
+        // strictly downstream: chunking happens *after* Silero, never before.
         match self.chunker.step(prob) {
             ChunkerEvent::Idle => {
                 self.push_preroll(frame);
@@ -296,6 +315,7 @@ impl HybridVad {
             s.reset();
         }
         self.chunker.reset();
+        self.earshot_hold = 0;
         self.sample_buf.clear();
         self.preroll.clear();
         self.segment.clear();

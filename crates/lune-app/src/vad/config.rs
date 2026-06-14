@@ -44,17 +44,21 @@ pub struct VadPipelineConfig {
     pub pause_injection: bool,
 }
 
-/// Placeholder defaults until `cgs bench TYPE=vad` locks the tuned values.
+/// Gate defaults, tuned by `cgs bench TYPE=vad` against end-to-end ASR WER over
+/// the 24-fixture panel (clean + SNR 0/5/10 + multilingual). The tuned hybrid
+/// scored 12.4% mean WER vs 13.6% for no-VAD (p90 27.8% vs 31.9%, noisy 19.2%
+/// vs 20.7%) — the gate removes ~14% of audio the recognizer was hallucinating
+/// on. Re-run the benchmark and update here if the pipeline changes.
 pub const DEFAULT_VAD_CONFIG: VadPipelineConfig = VadPipelineConfig {
     sample_rate: 16_000,
     silero_enabled: true,
     earshot_prefilter: true,
     earshot_activity_threshold: 0.35,
-    silero_onset: 0.6,
-    silero_offset: 0.35,
-    preroll_ms: 300,
-    hangover_ms: 500,
-    min_chunk_ms: 250,
+    silero_onset: 0.30,
+    silero_offset: 0.20,
+    preroll_ms: 500,
+    hangover_ms: 350,
+    min_chunk_ms: 100,
     max_chunk_ms: 20_000,
     pause_injection: false,
 };
@@ -66,15 +70,15 @@ impl Default for VadPipelineConfig {
 }
 
 impl VadPipelineConfig {
-    /// Seed from the user-facing pipeline config. Fields the hybrid gate does
-    /// not yet surface through `PipelineConfig` keep their tuned defaults.
-    pub(crate) fn from_pipeline(p: &PipelineConfig) -> Self {
-        Self {
-            // The Earshot stage-1 recall gate reuses the existing VAD start
-            // threshold; Silero (stage 2) owns the precision decision.
-            earshot_activity_threshold: p.speech_threshold,
-            ..DEFAULT_VAD_CONFIG
-        }
+    /// Resolve the gate config for a session. The hybrid gate is self-tuned
+    /// ([`DEFAULT_VAD_CONFIG`], set by `cgs bench TYPE=vad`); it runs on the raw
+    /// Earshot `vad_score`, so the legacy `PipelineConfig::speech_threshold`
+    /// (which drove the old Earshot-only `is_speech` gate) deliberately no
+    /// longer feeds it — mapping it in regressed WER badly (0.50 → 16% vs
+    /// 0.35 → 13.8%). Kept as the single bridge point should the knobs ever be
+    /// surfaced for user override.
+    pub(crate) fn from_pipeline(_pipeline: &PipelineConfig) -> Self {
+        DEFAULT_VAD_CONFIG
     }
 
     /// Samples per Silero frame — the chunker's clock tick.
@@ -139,15 +143,18 @@ mod tests {
     }
 
     #[test]
-    fn from_pipeline_takes_earshot_threshold_from_speech_threshold() {
+    fn from_pipeline_is_self_tuned_and_ignores_speech_threshold() {
+        // The raw-score gate is self-tuned: the legacy `speech_threshold` must
+        // not leak into `earshot_activity_threshold` (doing so regressed WER).
         let p = PipelineConfig {
             speech_threshold: 0.42,
             ..PipelineConfig::default()
         };
         let v = VadPipelineConfig::from_pipeline(&p);
-        assert!((v.earshot_activity_threshold - 0.42).abs() < f32::EPSILON);
-        // Untouched Silero knobs keep the tuned defaults.
-        assert_eq!(v.silero_onset, DEFAULT_VAD_CONFIG.silero_onset);
-        assert!(v.silero_enabled);
+        assert_eq!(v, DEFAULT_VAD_CONFIG);
+        assert_eq!(
+            v.earshot_activity_threshold,
+            DEFAULT_VAD_CONFIG.earshot_activity_threshold
+        );
     }
 }
