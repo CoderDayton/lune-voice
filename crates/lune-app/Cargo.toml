@@ -27,6 +27,7 @@ tracing-subscriber.workspace = true
 uuid.workspace = true
 serde_json.workspace = true
 ort.workspace = true
+ndarray.workspace = true
 arboard.workspace = true
 enigo.workspace = true
 
@@ -85,3 +86,7 @@ path = "../../benchmarks/homophone_tune.rs"
 [[example]]
 name = "homophone_pipeline"
 path = "../../benchmarks/homophone_pipeline.rs"
+
+[[example]]
+name = "vad_tune"
+path = "../../benchmarks/vad_tune.rs"

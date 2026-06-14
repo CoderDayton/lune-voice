@@ -72,10 +72,11 @@ case "${TYPE:-real}" in
   domain)    cargo run --release --features cuda --example bench_domain -p lune-app ;;
   vram)      cargo run --release --features cuda --example vram_growth -p lune-app ;;
   agc)       cargo run --release --example agc_bench -p lune-audio ;;
-  *)         echo "TYPE must be stages|real|latency|confusion|llm|domain|vram|agc"; exit 1 ;;
+  vad)       cargo run --release --features cuda --example vad_tune -p lune-app ;;
+  *)         echo "TYPE must be stages|real|latency|confusion|llm|domain|vram|agc|vad"; exit 1 ;;
 esac
 '''
-info = "Benchmark (--env TYPE=stages|real|latency|confusion|llm|domain|vram|agc)"
+info = "Benchmark (--env TYPE=stages|real|latency|confusion|llm|domain|vram|agc|vad)"
 
 # ── Build ────────────────────────────────────────────────────────────────────
 

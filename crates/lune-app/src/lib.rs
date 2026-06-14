@@ -5,6 +5,7 @@ pub mod events;
 pub mod session;
 #[cfg(unix)]
 mod uinput_typer;
+pub mod vad;
 
 #[cfg(unix)]
 mod cosmic_toplevel;

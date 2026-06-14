@@ -3060,6 +3060,7 @@ dependencies = [
  "lune-llm",
  "lune-ngram",
  "lune-persist",
+ "ndarray",
  "ort",
  "serde_json",
  "tempfile",
