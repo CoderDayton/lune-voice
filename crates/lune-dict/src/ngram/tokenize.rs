@@ -2,7 +2,7 @@
 
 use strsim::{jaro_winkler, normalized_damerau_levenshtein};
 
-use crate::{END, START};
+use super::{END, START};
 
 pub fn tokenize(text: &str) -> Vec<String> {
     text.to_ascii_lowercase()

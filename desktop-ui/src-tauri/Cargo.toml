@@ -26,7 +26,6 @@ lune-audio = { path = "../../crates/lune-audio" }
 lune-commands = { path = "../../crates/lune-commands" }
 lune-core = { path = "../../crates/lune-core" }
 lune-dict = { path = "../../crates/lune-dict" }
-lune-ngram = { path = "../../crates/lune-ngram" }
 lune-llm = { path = "../../crates/lune-llm" }
 lune-persist = { path = "../../crates/lune-persist" }
 ort = { workspace = true }

@@ -7,14 +7,26 @@ license.workspace = true
 [lints]
 workspace = true
 
+[features]
+# Offline ngram model training tool only (`--features training`); the bundled
+# model ships prebuilt, so the default build never pulls these.
+training = ["dep:reqwest", "dep:futures", "dep:tokio", "dep:urlencoding", "dep:serde_json"]
+
 [dependencies]
 bincode = { version = "2", features = ["serde"] }
 lune-core.workspace = true
-lune-ngram.workspace = true
 lune-persist.workspace = true
 serde = { version = "1", features = ["derive"] }
+strsim = "0.11"
 tracing.workspace = true
 wordnik_list = "0.2"
+
+# ngram training-only deps, gated behind the `training` feature.
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"], optional = true }
+futures = { version = "0.3", optional = true }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"], optional = true }
+urlencoding = { version = "2", optional = true }
+serde_json = { version = "1", optional = true }
 
 [build-dependencies]
 bincode = { version = "2", features = ["serde"] }

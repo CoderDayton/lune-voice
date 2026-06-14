@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::AnyError;
+use super::AnyError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct InterpolationWeights {

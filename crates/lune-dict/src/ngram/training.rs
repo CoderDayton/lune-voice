@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use urlencoding;
 use wordnik_list::word_exists;
 
-use crate::{AnyError, NGramModel, ScoringConfig, tokenize};
+use super::{AnyError, NGramModel, ScoringConfig, tokenize};
 
 // ─── Config types ─────────────────────────────────────────────────────────────
 

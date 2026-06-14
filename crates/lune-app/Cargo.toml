@@ -41,7 +41,6 @@ cosmic-protocols = { workspace = true }
 hound = "3.5"
 cpal.workspace = true
 tempfile = "3.27.0"
-lune-ngram.workspace = true
 
 [[example]]
 name = "pipeline_real"

@@ -865,9 +865,10 @@ async fn build_pipeline(
     };
 
     let heuristic = {
-        let mut ngram = lune_ngram::NGramModel::load_bundled().unwrap_or_else(|e| {
+        let mut ngram = lune_dict::ngram::NGramModel::load_bundled().unwrap_or_else(|e| {
             tracing::warn!("Failed to load bundled ngram model: {e}, using empty");
-            lune_ngram::NGramModel::new(lune_ngram::ScoringConfig::trigram_default()).unwrap()
+            lune_dict::ngram::NGramModel::new(lune_dict::ngram::ScoringConfig::trigram_default())
+                .unwrap()
         });
         if let Ok(sessions) = db.lock().await.list_sessions(500) {
             let transcripts: Vec<&str> = sessions

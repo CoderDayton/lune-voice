@@ -4,6 +4,7 @@ pub mod freq;
 pub mod homophone;
 pub mod homophone_calib;
 pub mod lexicon;
+pub mod ngram;
 pub mod punctuation;
 pub mod vocab;
 

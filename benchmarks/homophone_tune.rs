@@ -2,7 +2,7 @@
 //!
 //! Run:   cargo run --release --example homophone_tune -p lune-app
 //!
-//! Trains a REAL `lune_ngram::NGramModel` on a synthetic, context-predictable
+//! Trains a REAL `lune_dict::ngram::NGramModel` on a synthetic, context-predictable
 //! "user" corpus, applies a homophone ASR-error model, and measures the REAL
 //! `lune_dict::homophone::HomophoneResolver` under each policy. Synthetic
 //! ground truth is the only way to score homophone correction (no labelled
@@ -18,7 +18,7 @@
 
 use lune_dict::homophone::{HomophoneResolver, ResolverConfig, ResolverPolicy};
 use lune_dict::homophone_calib;
-use lune_ngram::{NGramModel, ScoringConfig};
+use lune_dict::ngram::{NGramModel, ScoringConfig};
 
 const P_ERR: f64 = 0.18; // ASR homophone substitution rate
 const N_TEST: usize = 2500; // test sentences per seed

@@ -9,7 +9,6 @@ members = [
     "crates/lune-dict",
     "crates/lune-persist",
     "crates/lune-app",
-    "crates/lune-ngram",
     "desktop-ui/src-tauri",
 ]
 
@@ -42,7 +41,6 @@ debug = true
 [workspace.dependencies]
 # Internal crates
 lune-core = { path = "crates/lune-core" }
-lune-ngram = { path = "crates/lune-ngram" }
 lune-audio = { path = "crates/lune-audio" }
 lune-asr = { path = "crates/lune-asr" }
 lune-llm = { path = "crates/lune-llm" }

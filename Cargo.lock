@@ -3058,7 +3058,6 @@ dependencies = [
  "lune-core",
  "lune-dict",
  "lune-llm",
- "lune-ngram",
  "lune-persist",
  "ndarray",
  "ort",
@@ -3142,11 +3141,16 @@ name = "lune-dict"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "futures",
  "lune-core",
- "lune-ngram",
  "lune-persist",
+ "reqwest 0.13.2",
  "serde",
+ "serde_json",
+ "strsim",
+ "tokio",
  "tracing",
+ "urlencoding",
  "wordnik_list",
 ]
 
@@ -3171,21 +3175,6 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "lune-ngram"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "futures",
- "reqwest 0.13.2",
- "serde",
- "serde_json",
- "strsim",
- "tokio",
- "urlencoding",
- "wordnik_list",
 ]
 
 [[package]]
@@ -3226,7 +3215,6 @@ dependencies = [
  "lune-core",
  "lune-dict",
  "lune-llm",
- "lune-ngram",
  "lune-persist",
  "mimalloc",
  "ort",

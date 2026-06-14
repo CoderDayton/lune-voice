@@ -1,4 +1,4 @@
-use lune_ngram::{NGramModel, ScoringConfig};
+use lune_dict::ngram::{NGramModel, ScoringConfig};
 use std::path::Path;
 
 const SEED_SENTENCES: &[&str] = &[

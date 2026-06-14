@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use lune_ngram::NGramModel;
+use crate::ngram::NGramModel;
 
 use crate::lexicon::{Lexicon, WordSource};
 
@@ -683,7 +683,7 @@ mod tests {
 
     #[test]
     fn from_ngram_constructor_works() {
-        use lune_ngram::{NGramModel, ScoringConfig};
+        use crate::ngram::{NGramModel, ScoringConfig};
         use std::sync::Arc;
 
         let model = NGramModel::new(ScoringConfig::trigram_default()).unwrap();

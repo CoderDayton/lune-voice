@@ -1,8 +1,8 @@
 //! N-gram language model and ASR candidate reranker.
 //!
-//! Split across focused submodules; the crate root re-exports the public
-//! surface so callers keep using `lune_ngram::NGramModel`,
-//! `lune_ngram::ScoringConfig`, etc.
+//! Split across focused submodules; this module re-exports the public surface
+//! so callers use `lune_dict::ngram::NGramModel`,
+//! `lune_dict::ngram::ScoringConfig`, etc.
 
 use std::error::Error;
 

@@ -27,7 +27,7 @@ use lune_dict::homophone::{
     CONFUSION_SETS, HomophoneResolver, ResolverConfig, ResolverPolicy, SetCalibration,
 };
 use lune_dict::homophone_calib;
-use lune_ngram::{NGramModel, ScoringConfig};
+use lune_dict::ngram::{NGramModel, ScoringConfig};
 use lune_persist::{AppPaths, Database};
 
 const ALPHA: f64 = 0.01; // conformal over-correction budget

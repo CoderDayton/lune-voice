@@ -5,15 +5,15 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 
-use crate::candidates::{AsrCandidateInput, AsrCandidateScore, AsrRerankWeights, CandidateScore};
-use crate::scoring::{InterpolationWeights, ScoringConfig};
-use crate::tokenize::{
+use super::candidates::{AsrCandidateInput, AsrCandidateScore, AsrRerankWeights, CandidateScore};
+use super::scoring::{InterpolationWeights, ScoringConfig};
+use super::tokenize::{
     acoustic_shape, last_or_start, last_two_or_start, lexical_similarity, minmax_normalize,
     normalize_similarity_text, normalize_word_or_boundary, tokenize,
 };
 #[cfg(feature = "training")]
-use crate::training::{CorpusConfig, CorpusFetch, fetch_wordnik_corpus};
-use crate::{AnyError, END, MODEL_FORMAT_VERSION, START};
+use super::training::{CorpusConfig, CorpusFetch, fetch_wordnik_corpus};
+use super::{AnyError, END, MODEL_FORMAT_VERSION, START};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NGramModel {
@@ -175,10 +175,10 @@ impl NGramModel {
 
     /// Load the pre-trained model bundled into the binary via `include_bytes!`.
     ///
-    /// The model file must exist at `crates/lune-ngram/data/lune_ngram_model.bin`
-    /// at compile time. Run the training binary to produce it first.
+    /// The model file must exist at `crates/lune-dict/data/lune_ngram_model.bin`
+    /// at compile time. Run the `train_model` binary to produce it first.
     pub fn load_bundled() -> Result<Self, AnyError> {
-        let bytes = include_bytes!("../data/lune_ngram_model.bin");
+        let bytes = include_bytes!("../../data/lune_ngram_model.bin");
         Self::from_bincode_bytes(bytes)
     }
 
@@ -370,7 +370,7 @@ impl NGramModel {
     /// Callers gate context-dependent decisions on this: a context with little
     /// support carries no evidence beyond unigram/bigram frequency, so trusting
     /// the trigram there would merely echo global word frequency. `prefix` is
-    /// expected to be already-tokenized (see [`tokenize`](crate::tokenize)).
+    /// expected to be already-tokenized (see [`tokenize`](super::tokenize)).
     pub fn context_support(&self, prefix: &[String]) -> usize {
         let [w1, w2] = last_two_or_start(prefix);
         self.trigram_context_totals

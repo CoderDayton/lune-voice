@@ -14,7 +14,7 @@
 
 use std::collections::HashMap;
 
-use lune_ngram::{NGramModel, tokenize};
+use crate::ngram::{NGramModel, tokenize};
 
 use crate::homophone::{
     CONFUSION_SETS, SetCalibration, best_member_margin, build_member_index, norm_match,
@@ -285,7 +285,7 @@ fn align(asr: &[String], fin: &[String]) -> Vec<Op> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lune_ngram::ScoringConfig;
+    use crate::ngram::ScoringConfig;
 
     fn model() -> NGramModel {
         let mut m = NGramModel::new(ScoringConfig::trigram_default()).unwrap();

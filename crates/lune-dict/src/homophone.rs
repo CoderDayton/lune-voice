@@ -33,7 +33,7 @@
 
 use std::collections::HashMap;
 
-use lune_ngram::{AsrRerankWeights, NGramModel, tokenize};
+use crate::ngram::{AsrRerankWeights, NGramModel, tokenize};
 
 /// A set of mutually-confusable surface forms.
 ///
@@ -395,7 +395,7 @@ pub(crate) fn norm_match(word: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lune_ngram::ScoringConfig;
+    use crate::ngram::ScoringConfig;
 
     fn trained_model() -> NGramModel {
         let mut m = NGramModel::new(ScoringConfig::trigram_default()).unwrap();
