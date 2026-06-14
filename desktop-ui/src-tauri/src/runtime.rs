@@ -899,9 +899,9 @@ async fn build_pipeline(
             Ok(_) => tracing::debug!("homophone calibration: no correction pairs yet"),
             Err(e) => tracing::warn!(error = %e, "homophone calibration: could not load pairs"),
         }
-        Arc::new(lune_dict::corrector::HeuristicCorrector::from_ngram(
-            Arc::new(ngram),
-        ))
+        // The trained ngram above still feeds homophone calibration; the
+        // lexical gate no longer holds it.
+        Arc::new(lune_dict::corrector::LexicalGate::new())
     };
 
     let manager = SessionManager::new(

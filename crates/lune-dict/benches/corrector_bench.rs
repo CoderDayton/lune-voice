@@ -1,7 +1,7 @@
 use std::hint::black_box;
 use std::time::{Duration, Instant};
 
-use lune_dict::corrector::HeuristicCorrector;
+use lune_dict::corrector::LexicalGate;
 
 const DEFAULT_WARMUP_ITERS: usize = 2;
 const DEFAULT_MEASURE_ITERS: usize = 10;
@@ -27,7 +27,7 @@ struct BenchResult {
 
 fn main() {
     lune_dict::lexicon::warm();
-    let corrector = HeuristicCorrector::new();
+    let corrector = LexicalGate::new();
     let warmup_iters = env_usize("LUNE_BENCH_WARMUP", DEFAULT_WARMUP_ITERS);
     let measure_iters = env_usize("LUNE_BENCH_ITERS", DEFAULT_MEASURE_ITERS);
 
@@ -57,7 +57,7 @@ fn main() {
 }
 
 fn run_workload(
-    corrector: &HeuristicCorrector,
+    corrector: &LexicalGate,
     workload: &Workload,
     warmup_iters: usize,
     measure_iters: usize,

@@ -583,7 +583,7 @@ impl BenchmarkHarness {
             Arc::clone(&self.llm),
             Arc::new(Mutex::new(dict)),
             Arc::new(Mutex::new(db)),
-            Arc::new(lune_dict::corrector::HeuristicCorrector::new()),
+            Arc::new(lune_dict::corrector::LexicalGate::new()),
             config,
             Arc::new(RwLock::new(UserSettings::default())),
         )

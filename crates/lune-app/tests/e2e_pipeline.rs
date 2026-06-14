@@ -61,7 +61,7 @@ fn make_manager() -> SessionManager<NoopAsr> {
         Arc::new(EchoPostProcessor),
         Arc::new(Mutex::new(dict)),
         Arc::new(Mutex::new(db)),
-        Arc::new(lune_dict::corrector::HeuristicCorrector::new()),
+        Arc::new(lune_dict::corrector::LexicalGate::new()),
         SessionManagerConfig::default(),
         settings,
     )

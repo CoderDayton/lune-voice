@@ -408,7 +408,7 @@ async fn run_pipeline(
         Arc::clone(&harness.llm),
         Arc::new(Mutex::new(dict)),
         Arc::new(Mutex::new(db)),
-        Arc::new(lune_dict::corrector::HeuristicCorrector::new()),
+        Arc::new(lune_dict::corrector::LexicalGate::new()),
         config,
         settings,
     );

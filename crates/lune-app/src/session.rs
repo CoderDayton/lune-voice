@@ -16,7 +16,7 @@ use lune_core::error::Error;
 use lune_core::llm::TextPostProcessor;
 use lune_core::session::{DictationSession, SessionEvent, SessionStatus};
 use lune_dict::DictionaryManager;
-use lune_dict::corrector::HeuristicCorrector;
+use lune_dict::corrector::LexicalGate;
 use lune_persist::{Database, PersistResult};
 
 /// Configuration for the session pipeline.
@@ -73,7 +73,7 @@ pub struct SessionManager<A: AsrBackend> {
     post_processor: Arc<dyn TextPostProcessor>,
     dict: Arc<Mutex<DictionaryManager>>,
     persist: Arc<Mutex<Database>>,
-    heuristic: Arc<HeuristicCorrector>,
+    heuristic: Arc<LexicalGate>,
     config: SessionManagerConfig,
     settings: Arc<RwLock<UserSettings>>,
     active: Arc<Mutex<Option<ActiveHandle>>>,
@@ -88,7 +88,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         post_processor: Arc<dyn TextPostProcessor>,
         dict: Arc<Mutex<DictionaryManager>>,
         persist: Arc<Mutex<Database>>,
-        heuristic: Arc<HeuristicCorrector>,
+        heuristic: Arc<LexicalGate>,
         config: SessionManagerConfig,
         settings: Arc<RwLock<UserSettings>>,
     ) -> Self {
@@ -351,7 +351,7 @@ async fn run_session<A: AsrBackend + 'static>(
     post_processor: Arc<dyn TextPostProcessor>,
     dict: Arc<Mutex<DictionaryManager>>,
     persist: Arc<Mutex<Database>>,
-    heuristic: Arc<HeuristicCorrector>,
+    heuristic: Arc<LexicalGate>,
     config: SessionManagerConfig,
     style_preset: Arc<StylePreset>,
     event_tx: mpsc::Sender<SessionEvent>,
@@ -478,7 +478,7 @@ async fn process_and_deliver(
     post_processor: Arc<dyn TextPostProcessor>,
     dict: Arc<Mutex<DictionaryManager>>,
     persist: Arc<Mutex<Database>>,
-    heuristic: Arc<HeuristicCorrector>,
+    heuristic: Arc<LexicalGate>,
     config: SessionManagerConfig,
     mut style_preset: Arc<StylePreset>,
     event_tx: mpsc::Sender<SessionEvent>,
@@ -1028,7 +1028,7 @@ mod tests {
             post_processor,
             Arc::new(Mutex::new(dict)),
             Arc::clone(&db),
-            Arc::new(HeuristicCorrector::new()),
+            Arc::new(LexicalGate::new()),
             SessionManagerConfig::default(),
             settings,
         );

@@ -1,7 +1,4 @@
 use std::collections::HashMap;
-use std::sync::Arc;
-
-use crate::ngram::NGramModel;
 
 use crate::lexicon::{Lexicon, WordSource};
 
@@ -210,26 +207,19 @@ pub fn soften_forced_title_case(replacement: &str) -> Option<String> {
     wordnik_list::word_exists(&lower).then_some(lower)
 }
 
-pub struct HeuristicCorrector {
-    #[allow(dead_code)]
-    ngram: Arc<NGramModel>,
-}
+/// Lexical gate: applies the user dictionary + brand canonical casing and flags
+/// low-confidence words for the LLM. It does no spelling repair of its own.
+pub struct LexicalGate;
 
-impl Default for HeuristicCorrector {
+impl Default for LexicalGate {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl HeuristicCorrector {
-    pub fn from_ngram(ngram: Arc<NGramModel>) -> Self {
-        Self { ngram }
-    }
-
+impl LexicalGate {
     pub fn new() -> Self {
-        Self::from_ngram(Arc::new(
-            NGramModel::load_bundled().expect("bundled ngram model"),
-        ))
+        Self
     }
 
     pub fn correct<S: AsRef<str>>(
@@ -403,7 +393,7 @@ mod tests {
 
     #[test]
     fn dict_replacement_does_not_force_mid_sentence_capital() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         let dict = vec![("dev".to_string(), "Dev".to_string())];
         let result = c.correct("restart the dev box", NO_RISKS, &dict, "en");
         assert_eq!(result.corrected_text, "restart the dev box");
@@ -411,7 +401,7 @@ mod tests {
 
     #[test]
     fn dict_replacement_keeps_brand_casing() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         let dict = vec![("github".to_string(), "GitHub".to_string())];
         let result = c.correct("i use github daily", NO_RISKS, &dict, "en");
         assert_eq!(result.corrected_text, "i use GitHub daily");
@@ -419,14 +409,14 @@ mod tests {
 
     #[test]
     fn known_word_not_flagged_passes_through() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         let result = c.correct("the quick brown fox", NO_RISKS, &[], "en");
         assert_eq!(result.corrected_text, "the quick brown fox");
     }
 
     #[test]
     fn word_risk_positions_survive_heuristic() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         let scores = vec![("teh", 0.80)];
         let result = c.correct("teh quick", &scores, &[], "en");
         assert_eq!(result.word_risk_positions, vec![(0, 0.80)]);
@@ -434,7 +424,7 @@ mod tests {
 
     #[test]
     fn word_risk_positions_handle_duplicate_words_by_order() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         let scores = vec![("the", 0.10), ("the", 0.85)];
         let result = c.correct("the build fixed the deployment", &scores, &[], "en");
         assert_eq!(result.word_risk_positions, vec![(0, 0.10), (3, 0.85)]);
@@ -442,21 +432,21 @@ mod tests {
 
     #[test]
     fn proper_noun_skipped_when_not_flagged() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         let result = c.correct("London is great", NO_RISKS, &[], "en");
         assert!(result.corrected_text.contains("London"));
     }
 
     #[test]
     fn acronym_skipped_when_not_flagged() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         let result = c.correct("the NASA program", NO_RISKS, &[], "en");
         assert!(result.corrected_text.contains("NASA"));
     }
 
     #[test]
     fn dict_replacement_takes_priority() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         let dict = vec![("helo".into(), "hello".into())];
         let result = c.correct("helo world", NO_RISKS, &dict, "en");
         assert_eq!(result.corrected_text, "hello world");
@@ -464,21 +454,21 @@ mod tests {
 
     #[test]
     fn unsupported_lang_bypasses_corrector() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         let result = c.correct("jambo dunia", NO_RISKS, &[], "swahili");
         assert_eq!(result.corrected_text, "jambo dunia");
     }
 
     #[test]
     fn french_known_words_pass_through() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         let result = c.correct("bonjour le monde", NO_RISKS, &[], "fr");
         assert_eq!(result.corrected_text, "bonjour le monde");
     }
 
     #[test]
     fn unresolved_words_reported() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         let risks = vec![("xyzqqq".to_string(), 0.9)];
         let result = c.correct("the xyzqqq fox", &risks, &[], "en");
         assert!(!result.unresolved_words.is_empty());
@@ -487,21 +477,21 @@ mod tests {
 
     #[test]
     fn empty_input() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         let result = c.correct("", NO_RISKS, &[], "en");
         assert_eq!(result.corrected_text, "");
     }
 
     #[test]
     fn single_char_word_not_corrected() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         let result = c.correct("I a", NO_RISKS, &[], "en");
         assert_eq!(result.corrected_text, "I a");
     }
 
     #[test]
     fn flagged_curated_vocab_passes_through_without_correction() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         let risks = vec![("WebSocket".to_string(), 0.95)];
         let result = c.correct("WebSocket failed", &risks, &[], "en");
         assert_eq!(result.corrected_text, "WebSocket failed");
@@ -509,7 +499,7 @@ mod tests {
 
     #[test]
     fn dev_vocabulary_word_passes_through_at_high_risk() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         // "hotkey" is curated dev vocabulary (WordSource::Vocab): trusted and
         // preserved verbatim even above the risk ceiling, never sent to the LLM.
         let risks = vec![("hotkey", 0.95)];
@@ -524,7 +514,7 @@ mod tests {
 
     #[test]
     fn wordnik_word_preserved_under_risk_ceiling() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         // "unmounted" is valid English (Wordnik tier, freq 0). At moderate
         // risk it must pass through verbatim, not be flagged for the LLM.
         let risks = vec![("unmounted", 0.60)];
@@ -539,7 +529,7 @@ mod tests {
 
     #[test]
     fn wordnik_word_flagged_above_ceiling() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         // Above CANONICAL_OVERRIDE_RISK_CEIL even a valid word is surfaced.
         let risks = vec![("unmounted", 0.90)];
         let result = c.correct("the unmounted drive", &risks, &[], "en");
@@ -563,7 +553,7 @@ mod tests {
     fn sub_gate_risk_does_not_fire_llm() {
         // A risk just under the gate must neither flag the word nor trigger
         // a needs_llm decision (the session uses LLM_GATE_RISK).
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         let just_under = LLM_GATE_RISK - 0.05;
         let risks = vec![("the".to_string(), just_under)];
         let result = c.correct("the quick brown fox", &risks, &[], "en");
@@ -573,7 +563,7 @@ mod tests {
 
     #[test]
     fn custom_risk_threshold_controls_unresolved_words() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         let risks = vec![("xyzqqq".to_string(), 0.35)];
         let default_result = c.correct("the xyzqqq fox", &risks, &[], "en");
         assert!(default_result.unresolved_words.is_empty());
@@ -593,7 +583,7 @@ mod tests {
         // "iPhone" has only one uppercase char — under the old (≥2 upper)
         // predicate it would not have been recognized as a proper-shaped
         // token and could be marked unresolved.
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         let risks = vec![("iPhone".to_string(), 0.7)];
         let result = c.correct("the iPhone is new", &risks, &[], "en");
         assert!(result.corrected_text.contains("iPhone"));
@@ -606,7 +596,7 @@ mod tests {
     #[test]
     fn dropped_risks_counted() {
         // Risk word that doesn't appear in the text should be reported.
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         let risks = vec![("the".to_string(), 0.1), ("nonexistent".to_string(), 0.5)];
         let result = c.correct("the quick fox", &risks, &[], "en");
         assert_eq!(result.dropped_risk_entries, 1);
@@ -614,7 +604,7 @@ mod tests {
 
     #[test]
     fn no_dropped_risks_on_full_match() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         let risks = vec![("the".to_string(), 0.1), ("fox".to_string(), 0.2)];
         let result = c.correct("the quick fox", &risks, &[], "en");
         assert_eq!(result.dropped_risk_entries, 0);
@@ -622,7 +612,7 @@ mod tests {
 
     #[test]
     fn flagged_sentence_initial_capital_preserved() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         // High risk on "All" used to force-lowercase it via the canonical
         // override because freq-dict canonicals fall back to lowercase.
         let risks = vec![("All".to_string(), 0.85)];
@@ -636,7 +626,7 @@ mod tests {
 
     #[test]
     fn title_case_vocab_entry_does_not_capitalize_common_word() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         // "Calibration" appears title-cased in harvested vocab data; flagged
         // mid-sentence occurrences must not inherit that casing.
         let risks = vec![("calibration".to_string(), 0.55)];
@@ -646,7 +636,7 @@ mod tests {
 
     #[test]
     fn vocab_word_gets_canonical_casing() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         let risks = vec![("github".to_string(), 0.5)];
         let result = c.correct("push to github", &risks, &[], "en");
         assert_eq!(result.corrected_text, "push to GitHub");
@@ -675,26 +665,15 @@ mod tests {
 
     #[test]
     fn punctuation_preserved_with_dict() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         let dict = vec![("teh".into(), "the".into())];
         let result = c.correct("teh, quick", NO_RISKS, &dict, "en");
         assert!(result.corrected_text.contains("the,"));
     }
 
     #[test]
-    fn from_ngram_constructor_works() {
-        use crate::ngram::{NGramModel, ScoringConfig};
-        use std::sync::Arc;
-
-        let model = NGramModel::new(ScoringConfig::trigram_default()).unwrap();
-        let c = HeuristicCorrector::from_ngram(Arc::new(model));
-        let result = c.correct("the quick", NO_RISKS, &[], "en");
-        assert_eq!(result.corrected_text, "the quick");
-    }
-
-    #[test]
     fn qd_002_no_false_positives() {
-        let c = HeuristicCorrector::new();
+        let c = LexicalGate::new();
         let text = "The memory leak was traced back to the event listener on the WebSocket connection. It wasn't being cleaned up when the component unmounted. I pushed a fix to the dev branch and it looks stable now.";
         let result = c.correct(text, NO_RISKS, &[], "en");
         assert!(
