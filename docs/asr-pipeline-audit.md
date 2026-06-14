@@ -4,7 +4,7 @@
 **Method:** Source read of every stage with `file:line` grounding; key claims independently verified by grep.
 **Pipeline (actual):** `Mic (cpal) → downmix/resample → ring buffer → VAD (Earshot + PCEN) → preroll/pause-injection gate → ASR (Qwen3-ASR ONNX, batch greedy) → voice-command routing → dictionary + heuristic correction → punctuation → bypass gate → LLM correct/style (Qwen3-0.6B ONNX, greedy) → sentence-cap backstop → delivery (uinput type / clipboard paste) → persist`.
 
-All paths relative to repo root. Line citations were exact at audit time (`main` @ `98e782d`).
+All paths relative to repo root. Citations re-verified against `main` @ `fc5eb1e` (the audit was first written at `98e782d`). Line numbers in the changed stages are exact; deeper internal citations in unchanged stages may be ±4 from intervening edits. Changes since the first cut are folded in: streaming trait surface removed, orphaned dict scorer/candidate files deleted, cross-utterance LLM context removed, non-ASCII delivery fixed, and a homophone resolver + conformal calibration subsystem added (built, not yet live-wired).
 
 ---
 
@@ -12,7 +12,7 @@ All paths relative to repo root. Line citations were exact at audit time (`main`
 
 `SessionManager<A: AsrBackend>` is the conductor. Only **one session active at a time**; enforced by `active: Arc<Mutex<Option<ActiveHandle>>>` (`session.rs:81`, guard at `:176-179`).
 
-**Lifecycle.** `start()` / `start_with_audio()` / `start_with_handle()` all funnel into `start_inner` (`:142-250`):
+**Lifecycle.** `start()` / `start_with_audio()` / `start_with_handle()` all funnel into `start_inner` (`:137`):
 1. Resolve style preset **before** taking the active lock — a missing style is a config error, not a session-state error (`:147-166`). Fallback chain: requested id → custom styles → `"minimal"` → hard error.
 2. Take active lock; reject if already `Some` (`:176-179`).
 3. Insert session row into sqlite (`:184-197`); persist failure is surfaced as a non-fatal `Warning`, not fatal.
@@ -22,12 +22,12 @@ All paths relative to repo root. Line citations were exact at audit time (`main`
 **Control plane.** `stop()` (graceful), `stop_and_wait()` (registers the `Notify` *before* sending Stop to avoid a TOCTOU race, `:271-280`), `cancel()` (discard). Signals travel over an unbounded mpsc to the session task.
 
 **Constants in the spine:**
-- `MAX_SEGMENTS = 500` (`:308`) — ring of accepted ASR segments; oldest dropped past the cap.
-- `GARBAGE_DROP_THRESHOLD = 0.25` (`:310`) — segments with `confidence < 0.25` are dropped in `append_segments` (`:372-381`).
-- `PREROLL_CHUNKS = 4` (`:317`) — ~320 ms of pre-speech audio kept to recover hard word onsets ("hello" → "ello" without it).
-- `PAUSE_TOTAL_MIN_SAMPLES = SAMPLE_RATE` = 1000 ms (`:325`) — gaps shorter than this are breaths, not deliberate pauses.
-- `PAUSE_TOTAL_CAP_SAMPLES = 1.5·SAMPLE_RATE` = 1500 ms (`:328`) — ceiling on injected pause.
-- `ASR_START_TIMEOUT = 15s` (`:448`) — hard ceiling on backend init.
+- `MAX_SEGMENTS = 500` (`:301`) — ring of accepted ASR segments; oldest dropped past the cap.
+- `GARBAGE_DROP_THRESHOLD = 0.25` (`:303`) — segments with `confidence < 0.25` are dropped in `append_segments` (`:352`).
+- `PREROLL_CHUNKS = 4` (`:310`) — ~320 ms of pre-speech audio kept to recover hard word onsets ("hello" → "ello" without it).
+- `PAUSE_TOTAL_MIN_SAMPLES = SAMPLE_RATE` = 1000 ms (`:318`) — gaps shorter than this are breaths, not deliberate pauses.
+- `PAUSE_TOTAL_CAP_SAMPLES = 1.5·SAMPLE_RATE` = 1500 ms (`:321`) — ceiling on injected pause.
+- `ASR_START_TIMEOUT = 15s` (`:441`) — hard ceiling on backend init.
 
 ---
 
@@ -49,7 +49,7 @@ All paths relative to repo root. Line citations were exact at audit time (`main`
 `target_sample_rate = 16_000`, `chunk_duration_ms = 80`, `buffer_capacity = 128` (~10 s) (`:13-36`). **Chunk = 16000·80/1000 = 1280 samples / 80 ms.** Zero/overflow configs rejected by `validate_config` (`:49-70`).
 
 ### 1.4 Tail flush
-`request_flush()` sets an atomic; the callback then `mem::take`s the sub-chunk remainder (< 1280 samples) and pushes it as a short final chunk (`:607-614`). Recovers the last phonemes on session stop. The session calls this after the capture loop, then waits 30 ms for one callback cycle (`session.rs:744-755`).
+`request_flush()` sets an atomic; the callback then `mem::take`s the sub-chunk remainder (< 1280 samples) and pushes it as a short final chunk (`:607-614`). Recovers the last phonemes on session stop. The session calls this just after the capture loop, then waits 30 ms for one callback cycle (`session.rs`).
 
 ### 1.5 Ring buffer (`ring.rs`)
 - `crossbeam_channel::bounded(capacity)` + `tokio::sync::Notify` for async wakeups (`:6-23`).
@@ -101,11 +101,11 @@ Pure function `recommend(CalibrationInput) → CalibrationResult` over two pre-r
 
 ---
 
-## 3. The VAD Gate / Pause Injection (`session.rs` capture loop, `:606-755`)
+## 3. The VAD Gate / Pause Injection (`session.rs` capture loop, `:598` onward)
 
 This is the most subtle stage: the capture loop streams VAD-passed audio to ASR while reconstructing the pauses VAD strips, so Qwen3 still hears prosody for punctuation.
 
-**Loop structure** — `tokio::select!` with `biased` priority (`:606-737`):
+**Loop structure** — `tokio::select!` with `biased` priority (`'capture: loop` at `:598`):
 1. `control_rx` (highest) — Stop/Cancel break promptly even mid-stream (regression test `stop_breaks_capture_loop_promptly` `:1538`).
 2. `session_deadline` wall-clock guard = `3 × max_speech_seconds` (`:580-581`).
 3. `audio_poll_tick` every 10 ms (Skip on miss) — drains all available chunks.
@@ -115,7 +115,7 @@ This is the most subtle stage: the capture loop streams VAD-passed audio to ASR 
 - **Not speech:** if speech already started, accumulate `silence_samples`; push chunk into the `preroll` ring (cap `PREROLL_CHUNKS=4`); `was_speech=false` (`:646-656`).
 - **Speech:**
   - Hangover-tail accounting: if `vad_score < speech_threshold_end`, this chunk is silence fed live as "speech" → add to `gap_fed_samples` (`:666-671`).
-  - **On speech onset** (`!was_speech`): compute `pause_injection_samples(silence, preroll_len, gap_fed)` and push that many **zero samples** to ASR so the model hears the gated pause, then flush the preroll ring to ASR (`:672-689`). Pause math (`:340-357`) makes the *heard* pause exactly `min(true_gap, 1500 ms)` sample-for-sample: injects `silence − preroll`, capped by `1500 ms − already_heard`, and **zero if total gap < 1000 ms** (breaths skipped). Verified exact by tests `:1257-1282`.
+  - **On speech onset** (`!was_speech`): compute `pause_injection_samples(silence, preroll_len, gap_fed)` and push that many **zero samples** to ASR so the model hears the gated pause, then flush the preroll ring to ASR (`:672-689`). Pause math (`pause_injection_samples` `:333`) makes the *heard* pause exactly `min(true_gap, 1500 ms)` sample-for-sample: injects `silence − preroll`, capped by `1500 ms − already_heard`, and **zero if total gap < 1000 ms** (breaths skipped). Verified exact by tests `:1257-1282`.
   - Push the speech chunk to ASR via `asr.push_audio` (`:694`). push errors are recorded (`first_asr_error`) but the loop continues.
   - `speech_samples += len`; break if `≥ max_speech_samples` (`:701-708`).
 - **Level meter:** `AudioLevel(min(peak_rms·6, 1.0))` emitted at ~15 fps via `try_send` (`:711-719`).
@@ -130,12 +130,12 @@ This is the most subtle stage: the capture loop streams VAD-passed audio to ASR 
 ## 4. ASR — Qwen3-ASR ONNX (`crates/lune-asr/`)
 
 ### 4.1 Trait & buffering model
-`AsrBackend` (`lune-core/src/asr.rs:139-182`). Qwen3 impl (`backend/qwen3.rs:297-363`):
+`AsrBackend` (`lune-core/src/asr.rs`) is **batch-only by design**: `poll_final` (`:152`) is the single required transcription entry point — the earlier `poll_results` / `supports_streaming` streaming surface has been **removed**. Methods: `push_audio` (`:146`), `poll_final` (`:152`), `end_session` (`:154`), defaulted `reset_context` (`:159`), `segment_capacity_hint`. Qwen3 impl (`backend/qwen3.rs`):
 - `SessionHandle = Mutex<Qwen3Session>` holding `pending: Vec<f32>`, `total_samples`, `sample_rate`, `next_id`, `forced_language`.
-- `push_audio` **appends raw PCM** to `pending`; trims oldest beyond `MAX_WINDOW_SAMPLES = 300·16000 = 4_800_000` (5 min) (`:318-327`).
-- ⚠️ **`poll_results` always returns `vec![]`** (`:329-331`) — *pure batch*. *(Verified.)* All transcription happens in `poll_final` (`:333-352`): `mem::take`s the whole buffer, decodes once via `transcribe_pcm`. `reset_context` clears `pending`; `end_session` is a no-op. `supports_streaming` = false (registry `:114-119`).
+- `push_audio` **appends raw PCM** to `pending`; trims oldest beyond `MAX_WINDOW_SAMPLES = 300·16000 = 4_800_000` (5 min) (`:55`, push `:318-327`).
+- `poll_final` (`:329`) `mem::take`s the whole buffer and decodes once via `transcribe_pcm`. `reset_context` clears `pending`; `end_session` is a no-op.
 
-So the session streams audio in but ASR produces **one segment per utterance** at finalize. No partial/incremental text reaches the UI from Qwen3.
+So the session streams audio in but ASR produces **one segment per utterance** at finalize. No partial/incremental text reaches the UI from Qwen3 — and there is no longer any dormant streaming machinery behind it (the trait was slimmed to match).
 
 ### 4.2 Models & session options
 Three ONNX sessions (`qwen3.rs:161-198`): `qwen3-asr-encoder.onnx`, `qwen3-asr-embed-tokens.onnx`, `qwen3-asr-decoder.onnx` + HF `tokenizer.json`. Model dir `qwen3-asr-0.6b` (`lune-core/src/models.rs:1`). Decoder weights **FP16**. Constants: `VOCAB_SIZE 151_936`, `NUM_LAYERS 28`, `NUM_KV_HEADS 8`, `HEAD_DIM 128` (`:26-47`).
@@ -169,7 +169,7 @@ Generation (`:886-1006`): **greedy argmax only** — no sampling/temperature/top
 Qwen3 emits **no internal timestamps**: segment carries `start_ms = None`, `end_ms = total_samples·1000/sample_rate`. Boost (`set_boost_phrases`): dual-layer — phrases in the system prompt as "Preferred terms" **and** prefix-constrained additive logit bias (entry token at `score`, continuation at `2×score` on prefix match). Controlled by `word_boost_enabled` / `word_boost_score` (default off / 1.0 for Qwen3 per registry).
 
 ### 4.8 OpenAI-compatible ASR backend (`backend/openai.rs`)
-Thin retrying HTTP client. Buffers f32; `poll_results` flushes at ≥ 8000 samples (0.5 s), `poll_final` force-flushes. Encodes 16-bit mono WAV in memory, posts multipart `/audio/transcriptions` with `response_format=verbose_json`; 3 attempts, 2 s doubling backoff on 5xx/429; restores audio on error for retry. Per-segment `start/end` → ms; **no confidence/word signal** (no logprobs). Non-HTTPS rejected unless loopback.
+Thin retrying HTTP client. Buffers f32; `poll_final` (`:143`) force-flushes the buffer (the incremental `poll_results` path was removed with the trait slimming). Encodes 16-bit mono WAV in memory, posts multipart `/audio/transcriptions` with `response_format=verbose_json`; 3 attempts, 2 s doubling backoff on 5xx/429; restores audio on error for retry. Per-segment `start/end` → ms; **no confidence/word signal** (no logprobs). Non-HTTPS rejected unless loopback.
 
 ### 4.9 Registry & pipeline defaults (`backend/registry.rs`)
 2-variant enum (`Qwen3 | OpenAi`). `from_config` resolves `use_gpu`/`cuda_required` from `DevicePolicy`. `default_pipeline_config`:
@@ -178,7 +178,7 @@ Thin retrying HTTP client. Buffers f32; `poll_results` flushes at ≥ 8000 sampl
 
 ---
 
-## 5. Post-Capture Processing (`session.rs::process_and_deliver`, `:859-1171`)
+## 5. Post-Capture Processing (`session.rs::process_and_deliver`, `:850`)
 
 Runs once per session on `(raw_text, segments)`. Order: voice commands → dictionary scan + heuristic correction → punctuation → bypass gate → LLM → sentence-cap backstop → deliver + persist.
 
@@ -196,11 +196,11 @@ Runs once per session on `(raw_text, segments)`. Order: voice commands → dicti
 - `scan(text)` → `Vec<(matched, replacement)>` without mutating; multi-word = exact CI window match, single-word = Levenshtein-≤1 CI (`lev_le1_ci`, an O(n) early-exit primitive).
 
 **HeuristicCorrector** (`corrector.rs`), `correct_with_risk_threshold(text, word_risk_scores, dict_replacements, lang, flag_threshold)`:
-- ⚠️ **No spelling-candidate generation in the live path.** It does dictionary replacement, canonical-casing, proper-noun/known-word preservation, and *flagging* only — it never rewrites a flagged word to a guessed candidate (it emits the original verbatim and marks it for the LLM). The weighted-edit-distance scorer (`scorer.rs`) and candidate enumerator (`candidate_source.rs`) are **orphaned files — not declared in `lib.rs`, not compiled.** *(Verified: `lib.rs` declares only `corrector, freq, lexicon, punctuation, vocab`; the only `scorer` hit is the unrelated `lune-ngram` crate.)*
+- ⚠️ **No spelling-candidate generation in the live path.** It does dictionary replacement, canonical-casing, proper-noun/known-word preservation, and *flagging* only — it never rewrites a flagged word to a guessed candidate (it emits the original verbatim and marks it for the LLM). The dormant weighted-edit-distance scorer and candidate enumerator (`scorer.rs`, `candidate_source.rs`) flagged in the first audit have since been **deleted**. `lune-dict` now declares `corrector, freq, homophone, homophone_calib, lexicon, punctuation, vocab` (`lib.rs:1-7`); the `homophone*` modules are the new resolver subsystem (§5.5), separate from the live `HeuristicCorrector`.
 - Decision order per word (`process_single_word` `:60-180`): digit/empty passthrough → dictionary replacement (case-insensitive exact phrase, highest priority) → known&unflagged passthrough → canonical-casing override (github→GitHub, guarded against flattening sentence caps / force-capping common nouns) → known-word verbatim under `CANONICAL_OVERRIDE_RISK_CEIL 0.75` (Vocab words pass even above) → proper-noun/acronym/camelCase preservation under `PROPER_NOUN_RISK_CEIL 0.80` → else flag as unresolved if `risk ≥ flag_threshold`.
 - Thresholds: `HWCE_FLAG_THRESHOLD 0.40`, canonical ceiling `0.75`, proper-noun ceiling `0.80`. `risk` is `word_error_risk` from HWCE (the `1 − threshold` form, `session.rs:964-968`).
 - Result: `CorrectionResult { corrected_text, word_risk_positions, unresolved_words, all_resolved, dropped_risk_entries }`. Word↔risk alignment is a greedy forward cursor; entries that don't align count as `dropped`.
-- `HeuristicCorrector.ngram` (loaded `NGramModel`) is `#[allow(dead_code)]` — **unused** in correction.
+- `HeuristicCorrector.ngram` (`corrector.rs:214-215`) is still `#[allow(dead_code)]` — **unused by the corrector**. The model is no longer wasted, though: the same trained n-gram now powers homophone calibration at startup (§5.5).
 
 Lexicon (`lexicon.rs`): tiered `lookup` over a frequency dict (`CONFIDENT_FREQ 5000`), curated supplemental vocab (`Vocab`, freq floor 10000, dev terms), and English Wordnik membership. 11 bundled frequency dictionaries (en/de/es/fr/it/ja/ko/nl/pt/ru/zh).
 
@@ -223,11 +223,23 @@ Final: `needs_correction = signal1 || signal2 || conf_attention`; `wants_styling
 
 The text that goes forward is `text_after_heuristic` (heuristic-corrected + Tier-1 punctuation). If `!needs_llm`, this is the final output (fast path).
 
+### 5.5 Homophone resolver + conformal calibration (`lune-dict/{homophone,homophone_calib}.rs`) — built, NOT yet live-wired
+
+A self-evaluating homophone disambiguator exists but is **not called from the live correction path** — `process_and_deliver`/`HeuristicCorrector` never invoke it. It is fully built, tested, and exercised at startup (calibration is computed and logged), pending integration.
+
+- **Resolver** (`homophone.rs`): 15 curated, tokenizer-distinct confusion sets (`CONFUSION_SETS` `:52` — e.g. `there/their/they're`, `to/too/two`; apostrophe-colliding pairs like `it's/its` deliberately excluded). `ResolverPolicy` (`:102`): `Off`, `RerankArgmax` (the lune-ngram blend, ungated — over-corrects), and `MarginGate { tau }` (default **2.0**). A flip fires only when **all** gates pass: confusion-set membership, n-gram avg-log-prob margin > τ, sufficient trigram **context support**, word HWCE risk below `max_word_risk` (0.85), and an optional **contextual-gain** gate. Scoring shares `best_member_margin` with the calibrator so offline and live decisions match exactly. `resolve_words` carries the **observed (ASR)** left-context forward — byte-for-byte what the calibrator replays.
+- **Calibration** (`homophone_calib.rs`): per-user, per-set self-evaluation over `(raw → final)` history pairs.
+  - `calibrate` (`:44`) replays the resolver counterfactually and, per set, sets the margin threshold via **Conformal Risk Control** (`conformal_threshold` `:137`; Angelopoulos et al., arXiv:2208.02814): τ̂ = the smallest threshold whose expected over-correction rate is provably ≤ a target α (default 0.01). Over-correction is monotone in τ, so split-conformal calibration applies directly.
+  - **Selective enablement** (reject option): a set is enabled only if its net benefit is positive under a Wilson lower bound (Chow 1970; Geifman & El-Yaniv 2017) — sets with no learnable per-user signal auto-disable. An **isotonic** margin→P(correct) reliability curve is fitted alongside.
+  - Feeds on the `correction_pairs` table (§7.5). `NGramModel` gained `context_support` + `unigram_avg_logprob` for the gates.
+- **Wiring today:** `runtime.rs:886` trains the n-gram on history, then calls `calibrate` and **logs** the per-set enable/τ/net decisions at startup. The resolver is not yet placed in the correction path.
+- **Benchmarks:** `benchmarks/homophone_tune.rs` (synthetic, seed-averaged, empirically validates the conformal α-guarantee) and `benchmarks/homophone_pipeline.rs` (runs on the real sqlite DB; compares integration strategies — PreLLM static/conformal, PostLLM safety-net, gate-signal).
+
 ---
 
 ## 6. LLM Correction & Styling (`crates/lune-llm/`)
 
-Invoked only when the gate sets `needs_llm` (`session.rs:1062-1117`). Wrapped in `tokio::time::timeout(llm_timeout_secs)` (default 30 s); on timeout or `Err`, the pipeline **falls back to `text_after_heuristic`** — output is never worse than the heuristic fast path. The LLM input carries `raw_text` (heuristic output), the resolved style preset, up to 20 dictionary entries, cross-utterance `context` (rolling 400-char tail, `session.rs:1142-1159`), detected language, and `correction_needed`.
+Invoked only when the gate sets `needs_llm`. Wrapped in `tokio::time::timeout(llm_timeout_secs)` (default 30 s); on timeout or `Err`, the pipeline **falls back to `text_after_heuristic`** — output is never worse than the heuristic fast path. The LLM input (`PostProcessInput`, `lune-core/src/llm.rs:12-26`) carries `raw_text` (heuristic output), the resolved style preset, up to 20 dictionary entries, detected `language`, and `correction_needed`. The former cross-utterance `context` field (a rolling 400-char tail of prior transcripts) has been **removed** end-to-end — the LLM now sees only the current utterance.
 
 ### 6.1 Two-pass transform (`pipeline.rs:115-194`)
 `CorrectionPipeline` wraps any `LlmService` and runs:
@@ -237,7 +249,7 @@ Invoked only when the gate sets `needs_llm` (`session.rs:1062-1117`). Wrapped in
 
 ### 6.2 Prompts (`config/style_llm.rs`, `backend/ort_llm.rs`)
 - `BASE_SYSTEM_PROMPT`: fixed, language-agnostic ASR-corrector instruction ("smallest edits", homophones only when unambiguous, preserve punctuation, no translate/paraphrase/reorder, no censoring profanity, no conversational replies) + 6 inline few-shot examples. Dictionary terms appended as `"- {phrase} → {replacement}"`.
-- **Correction user prompt:** `"Correct the following {Language} transcript:"` + optional context block ("do not repeat or correct it") + up to 6 dictionary carrier-sentence examples + transcript + `"\n\n/no_think"`.
+- **Correction user prompt:** `"Correct the following {Language} transcript:"` + up to 6 dictionary carrier-sentence examples + transcript + `"\n\n/no_think"`. (The earlier "Earlier dictation (context only…)" block was removed with the context field.)
 - **Styling user prompt:** self-contained, no system prompt — `"Rewrite … Output only the rewritten text."` + style name + rules + few-shot pairs + transcript + `"\n/no_think"`.
 
 ### 6.3 ONNX backend (`backend/ort_llm.rs`) — Qwen3-0.6B
@@ -274,11 +286,13 @@ Produces the `word_error_risk ∈ [0,1]` consumed by the corrector and gate. Per
 ## 7. Finalize & Delivery
 
 ### 7.1 Sentence-cap backstop & finalize (`session.rs:1098-1170`)
-After the LLM, `capitalize_sentence_starts` runs as a **deterministic backstop** (`:1103`) so any sentence the model left lowercase still gets its initial capital. Then:
-- `FinalizedText(post_llm_text)` event emitted (`:1136`) — this is the authoritative delivery payload.
-- The text is rolled into the shared `recent_text` cross-utterance context (tail capped at 400 chars, char-boundary safe).
-- `finalize_db` awaited **inline** (`:1166`) so a runtime shutdown can't drop the transcript; the sqlite row gets status/`ended_at`/transcript.
+After the LLM, `capitalize_sentence_starts` runs as a **deterministic backstop** so any sentence the model left lowercase still gets its initial capital. Then:
+- `FinalizedText(post_llm_text)` event emitted (`:1118`) — this is the authoritative delivery payload.
+- The `(raw_text, final)` pair is written to the `correction_pairs` table (`:1133`, best-effort) as labelled calibration data for the homophone subsystem (§5.5, §7.5).
+- `finalize_db` awaited **inline** so a runtime shutdown can't drop the transcript; the sqlite row gets status/`ended_at`/transcript.
 - `Stopped` event + `clear_active`.
+
+(The shared `recent_text` rolling-context buffer that previously lived here was removed alongside the LLM context field.)
 
 Cancellation is re-checked via `drain_processing_controls` at two points (after the gate, after the LLM); `Stop` during processing means "wrap up and deliver", only `Cancel` discards (`:404-413`, regression tests `:1730-1757`).
 
@@ -294,7 +308,7 @@ Cancellation is re-checked via `drain_processing_controls` at two points (after 
 
 ### 7.3 uinput typer (`uinput_typer.rs`, Linux)
 - **Device:** `evdev` `VirtualDevice` named `"lune-voice"`, key codes 1–254; 200 ms post-create settle. `/dev/uinput` access: if not writable, installs a udev `uaccess` rule via `pkexec` (GUI prompt), reloads/triggers udev, 500 ms settle, re-checks — one-time, then permanent.
-- **Keymap:** US-QWERTY ASCII tables (letters with shift for upper, digits/symbols with shift variants, space/enter/tab). ⚠️ **ASCII-only — any unmapped char (incl. all non-ASCII Unicode) is silently dropped** (`:759,957-960`). No Unicode/compose path on Linux.
+- **Keymap:** US-QWERTY ASCII tables (letters with shift for upper, digits/symbols with shift variants, space/enter/tab). Non-ASCII is handled by **falling back to the clipboard-paste path**: `is_keystroke_typeable` (`:767`) tests the string, and `type_str_keys` (`:966`) routes any text containing an unmappable char (accents, CJK, emoji, smart quotes) through `do_clipboard_paste` instead of dropping it. The raw per-key emitter is the last resort only when the clipboard itself is unavailable, where an unmappable char is logged and skipped (`type_char` `:986`).
 - **Per-key path:** 30 ms modifier settle, then key press/release + **2 ms per char**.
 - **Paste chord:** clipboard set (`wl-copy` / `xclip`, 2 s timeout) timed for an adaptive EMA delay (`clamp(rtt_ema·2, 40, 300) ms`), then Ctrl+V (or **Ctrl+Shift+V** in terminal mode). Clipboard failure falls back to per-key typing.
 
@@ -302,7 +316,7 @@ Cancellation is re-checked via `drain_processing_controls` at two points (after 
 `capture_focus_target()` runs at **session start** (off the critical path via `spawn_blocking`; the COSMIC/Wayland probes block ~400-500 ms) and is stored, then reused at delivery. Probe order: Hyprland → Sway → generic Wayland (`wlr-foreign-toplevel`, `wayland_toplevel.rs`) → COSMIC (`zcosmic-toplevel-info`, `cosmic_toplevel.rs`) → X11. ⚠️ The generic-Wayland and COSMIC paths carry **no `focus_token`**, so `restore_focus` is a no-op there. Terminal detection normalizes the app-id/class against ~46 known terminals → drives Ctrl+Shift+V.
 
 ### 7.5 Persistence (`crates/lune-persist/`)
-sqlite-backed `Database`. Session rows written on start (`insert_session`) and finalize (`update_session`). All persist failures during a session are non-fatal `Warning` events — the transcript still reaches the active app. `session_history_days` (default 30) bounds retention.
+sqlite-backed `Database`. Session rows written on start (`insert_session` `:284`) and finalize (`update_session` `:402`). A separate **`correction_pairs`** table (migration `00000000000003`) stores `(raw ASR, final delivered)` per session: `insert_correction_pair` (`:423`) caps the table at the newest 5000 rows, and `list_correction_pairs` (`:452`) feeds the homophone calibrator. Both `delete_session` and the day-based `prune_sessions` cascade to `correction_pairs`, so deleting/pruning history leaves no transcript text behind. All persist failures during a session are non-fatal `Warning` events — the transcript still reaches the active app. `session_history_days` (default 30) bounds retention.
 
 ---
 
@@ -337,9 +351,9 @@ hotkey
 
 **Correctness / behavior**
 1. **VAD is Earshot (energy/GMM-style, pure Rust)** — intentional; there is no learned/ONNX VAD model and the repo never referenced Silero. (An earlier "contradicts the documented pipeline" read was wrong — CLAUDE.md never claims a VAD model.) (`vad.rs:3`)
-2. **Qwen3 ASR is fully batch** — `poll_results` returns empty; no streaming/partial text despite the streaming-shaped capture loop. (`qwen3.rs:329-331`)
-3. **No live spelling correction** — `scorer.rs` (WED) and `candidate_source.rs` are orphaned/uncompiled; the heuristic only replaces dictionary terms, fixes casing, and *flags* low-confidence words for the LLM. Correction quality on non-dictionary mishears rests entirely on the LLM pass. (`lib.rs:1-5`)
-4. **ASCII-only output on Linux** — non-ASCII characters are silently dropped at the uinput typer; multilingual ASR output (the model supports ~20 languages) cannot be typed in `TypeInPlace`/`Both` modes. (`uinput_typer.rs:759`)
+2. **Qwen3 ASR is fully batch (by design)** — the `poll_results`/`supports_streaming` trait surface was removed, leaving `poll_final` (`qwen3.rs:329`) as the single decode entry point. No partial/incremental text reaches the UI. The capture loop is still chunk-by-chunk "streaming-shaped," but the backend only decodes at finalize.
+3. **No live spelling correction** — the orphaned `scorer.rs`/`candidate_source.rs` were **deleted**; the heuristic only replaces dictionary terms, fixes casing, and *flags* low-confidence words for the LLM. Correction quality on non-dictionary mishears rests entirely on the LLM pass. The new homophone resolver (§5.5) targets this gap but is not yet wired into the live path. (`lune-dict/lib.rs:1-7`)
+4. ~~**ASCII-only output on Linux**~~ **(fixed)** — the uinput typer now routes any non-ASCII text through the clipboard-paste path (`is_keystroke_typeable` / `type_str_keys`, `uinput_typer.rs:767,966`) instead of dropping characters, so multilingual output types correctly.
 5. **`AudioStreamHandle::is_offline()` hardcoded false** — a handle over an offline stream can't signal drain-complete. (`lib.rs:75-77`)
 
 **Robustness**
@@ -348,12 +362,13 @@ hotkey
 8. `timestamp_ms` is processing-time, not capture-time.
 
 **Dead / inconsistent code (low risk, hygiene)**
-9. `HeuristicCorrector.ngram` loaded but `#[allow(dead_code)]`.
+9. `HeuristicCorrector.ngram` is still loaded into the corrector as `#[allow(dead_code)]` (`corrector.rs:214-215`) — but the trained model is no longer wasted: it now drives homophone calibration at startup (§5.5).
 10. `lune-core::AudioCaptureConfig` / `AudioFrame` parallel/legacy types disagree with the live capture path (480 vs 1280 samples, 0.01 vs 0.5 thresholds).
 11. Stale test names: `default_has_skip_threshold_at_0_95` asserts `Some(0.65)`; a pipeline comment says "40% LCS gate" while code is 55%; `BASE_SYSTEM_PROMPT` `{lang}` token removed but `.replace("{lang}", …)` callers remain (no-ops).
 12. `LlmBackendConfig::default() = Local` vs `UserSettings::default() = Disabled` — divergent defaults reconciled only by the checked-in TOML (`Local`).
 
 **Strengths worth noting**
+- The homophone resolver's per-user **conformal calibration** (§5.5) bounds over-correction with a finite-sample guarantee and auto-disables sets that don't help a given user — a principled answer to "when is it safe to correct." (Built, not yet live-wired.)
 - The bypass gate + skip-when-broken design (arXiv:2509.25048) and the layered `validate_and_merge` guards make the LLM strictly safe — output never degrades below the heuristic fast path.
 - Cancellation safety is carefully engineered (active-slot assignment last; `stop_and_wait` TOCTOU fix; Stop-vs-Cancel semantics during processing) and regression-tested.
 - Pause re-injection reconstructs exact prosody gaps (proven sample-accurate by tests) so VAD gating doesn't cost the model its punctuation evidence.
@@ -362,10 +377,9 @@ hotkey
 
 ## 10. Verification
 
-- Orchestration spine (`session.rs`, 1801 lines) read in full directly.
-- Each leaf stage read in full by a dedicated investigator with `file:line` citations.
-- Load-bearing/surprising claims independently grep-verified: VAD=Earshot; `lune-dict` module set (scorer/candidate_source absent); Qwen3 `poll_results` empty (batch); Qwen3 greedy argmax + `MAX_NEW_TOKENS 512` + `EOS_IDS`; LLM sampler greedy (`top_k 1`, `temperature 1.0`, `repetition_penalty 1.0`).
-- No source files were modified.
+- This revision re-grounds the changed stages against `fc5eb1e`: ASR trait slimmed to `poll_final` (`asr.rs:152`); `lune-dict` modules `corrector/freq/homophone/homophone_calib/lexicon/punctuation/vocab` with `scorer.rs`/`candidate_source.rs` deleted; `PostProcessInput` has no `context` field (`llm.rs:12-26`); uinput non-ASCII clipboard fallback (`:767,966`); `correction_pairs` table + `insert_correction_pair` (`:423`).
+- Unchanged stages (audio capture, VAD/PCEN, mel front-end, decoder internals) retain their original citations; deep qwen3 internal anchors are within ~4 lines after the `poll_results` removal.
+- Qwen3 still greedy argmax + `MAX_NEW_TOKENS 512` (`:35`) + `EOS_IDS` (`:37`); LLM sampler still greedy (`top_k 1`, `temperature 1.0`, `repetition_penalty 1.0`). The conformal over-correction bound is empirically verified by `homophone_tune` EXP 4.
 ```
-VERIFICATION: rg cross-checks on vad.rs / lune-dict/lib.rs / qwen3.rs / ort_llm.rs → all five surprising claims confirmed against source.
+VERIFICATION: grep cross-checks at `fc5eb1e` — asr.rs (poll_final only), lune-dict/lib.rs (homophone modules; scorer/candidate_source absent), qwen3.rs (poll_final:329, greedy), llm.rs (no context field), uinput_typer.rs (is_keystroke_typeable), persist/db/mod.rs (correction_pairs) → all confirmed.
 ```
