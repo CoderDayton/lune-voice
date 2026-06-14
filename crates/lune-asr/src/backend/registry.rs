@@ -95,10 +95,6 @@ impl AsrBackend for AsrRegistry {
         dispatch!(self, session, push_audio, pcm)
     }
 
-    async fn poll_results(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>> {
-        dispatch!(self, session, poll_results)
-    }
-
     async fn poll_final(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>> {
         dispatch!(self, session, poll_final)
     }
@@ -109,13 +105,6 @@ impl AsrBackend for AsrRegistry {
 
     async fn reset_context(&self, session: &Self::SessionHandle) -> Result<()> {
         dispatch!(self, session, reset_context)
-    }
-
-    fn supports_streaming(&self) -> bool {
-        match self {
-            Self::Qwen3(_) => false,
-            Self::OpenAi(_) => false,
-        }
     }
 }
 

@@ -1,5 +1,6 @@
 pub mod corrector;
 pub mod freq;
+pub mod homophone;
 pub mod lexicon;
 pub mod punctuation;
 pub mod vocab;

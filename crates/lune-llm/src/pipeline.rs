@@ -50,7 +50,6 @@ impl CorrectionPipeline {
             raw_text,
             &input.language,
             &examples,
-            input.context.as_deref(),
         )
     }
 }
@@ -360,7 +359,6 @@ mod tests {
             style_preset: Arc::new(StylePreset::minimal()),
             app_category: None,
             dictionary: vec![],
-            context: None,
             language: "en".into(),
             correction_needed: true,
         };
@@ -382,7 +380,6 @@ mod tests {
             style_preset: Arc::new(StylePreset::casual()),
             app_category: None,
             dictionary: vec![],
-            context: None,
             language: "en".into(),
             correction_needed: true,
         };
@@ -409,7 +406,6 @@ mod tests {
             style_preset: Arc::new(StylePreset::minimal()),
             app_category: None,
             dictionary: vec![],
-            context: None,
             language: "en".into(),
             correction_needed: true,
         };
@@ -429,7 +425,6 @@ mod tests {
                 replacement: "Boorloo".into(),
                 priority: 10,
             }],
-            context: None,
             language: "en".into(),
             correction_needed: true,
         };
@@ -468,7 +463,6 @@ mod tests {
                 replacement: "Bordo".into(),
                 priority: 10,
             }],
-            context: None,
             language: "fr".into(),
             correction_needed: true,
         };

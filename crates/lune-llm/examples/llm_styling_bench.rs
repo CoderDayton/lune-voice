@@ -74,7 +74,6 @@ fn main() {
         style_preset: Arc::new(StylePreset::minimal()),
         app_category: None,
         dictionary: vec![],
-        context: None,
         language: "en".into(),
         correction_needed: true,
     };

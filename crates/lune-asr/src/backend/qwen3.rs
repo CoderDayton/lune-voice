@@ -326,10 +326,6 @@ impl AsrBackend for Qwen3AsrBackend {
         Ok(())
     }
 
-    async fn poll_results(&self, _session: &Self::SessionHandle) -> Result<Vec<AsrSegment>> {
-        Ok(vec![]) // Batch backend — no incremental results.
-    }
-
     async fn poll_final(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>> {
         let (pcm, ts_ms, id, language) = {
             let mut sess = session.lock().map_err(|e| lock_err("session", e))?;

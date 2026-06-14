@@ -47,7 +47,6 @@ mod tests {
             style_preset: Arc::new(StylePreset::casual()),
             app_category: None,
             dictionary: vec![],
-            context: None,
             language: "en".into(),
             correction_needed: true,
         };

@@ -145,16 +145,13 @@ pub trait AsrBackend: Send + Sync {
 
     async fn push_audio(&self, session: &Self::SessionHandle, pcm: &[f32]) -> Result<()>;
 
-    async fn poll_results(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>>;
+    /// Run transcription over all audio buffered since the session started
+    /// (or since the last `reset_context`) and return the resulting segments.
+    /// Called once per utterance after capture ends. This is a batch pipeline:
+    /// there is no incremental/streaming result path.
+    async fn poll_final(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>>;
 
     async fn end_session(&self, session: Self::SessionHandle) -> Result<()>;
-
-    /// Final poll that commits all rollback-buffered tokens.
-    /// Default: delegates to `poll_results`. Streaming backends override
-    /// to pass `finalize=true` through the decode loop.
-    async fn poll_final(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>> {
-        self.poll_results(session).await
-    }
 
     /// Clear the audio buffer and segment state so the next inference starts
     /// fresh. Called after finalizing an utterance to prevent re-transcribing
@@ -164,20 +161,10 @@ pub trait AsrBackend: Send + Sync {
         Ok(())
     }
 
-    /// Optional hint: expected maximum number of segments per `poll_results`
+    /// Optional hint: expected maximum number of segments per `poll_final`
     /// call. Callers may use this to pre-allocate buffers.
     fn segment_capacity_hint(&self) -> usize {
         4
-    }
-
-    /// Whether this backend supports streaming (partial results during audio
-    /// push). When true, `poll_results` returns incremental text. When false,
-    /// all transcription happens in `poll_final` (batch mode).
-    ///
-    /// The session loop uses this to decide whether to deliver text
-    /// progressively or wait for the final batch result.
-    fn supports_streaming(&self) -> bool {
-        false
     }
 }
 

@@ -364,6 +364,21 @@ impl NGramModel {
         self.score_candidate("", phrase).avg_log_prob
     }
 
+    /// How many times the 2-word context formed by the last two tokens of
+    /// `prefix` was observed during training (trigram context total).
+    ///
+    /// Callers gate context-dependent decisions on this: a context with little
+    /// support carries no evidence beyond unigram/bigram frequency, so trusting
+    /// the trigram there would merely echo global word frequency. `prefix` is
+    /// expected to be already-tokenized (see [`tokenize`](crate::tokenize)).
+    pub fn context_support(&self, prefix: &[String]) -> usize {
+        let [w1, w2] = last_two_or_start(prefix);
+        self.trigram_context_totals
+            .get(&[w1, w2])
+            .copied()
+            .unwrap_or(0)
+    }
+
     // ─── Private helpers ──────────────────────────────────────────────────────
 
     fn smoothed_prob(&self, count: usize, context_total: usize) -> f64 {

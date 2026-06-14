@@ -15,9 +15,6 @@ pub struct PostProcessInput {
     /// Target application category hint.
     pub app_category: Option<AppCategory>,
     pub dictionary: Vec<DictionaryEntry>,
-    /// Recent session text for cross-utterance disambiguation.
-    /// Tail of `session_text` truncated to 500 chars (125 words, 5 utterances).
-    pub context: Option<String>,
     /// BCP-47 language code from ASR detection (e.g. "en", "eng", "fr").
     /// Defaults to "en" if not set by pipeline.
     pub language: String,
@@ -94,7 +91,6 @@ mod tests {
             style_preset: Arc::new(StylePreset::casual()),
             app_category: Some(AppCategory::Email),
             dictionary: vec![],
-            context: None,
             language: "en".into(),
             correction_needed: true,
         };

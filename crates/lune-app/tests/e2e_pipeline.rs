@@ -29,7 +29,7 @@ impl AsrBackend for NoopAsr {
     async fn push_audio(&self, _: &(), _: &[f32]) -> Result<()> {
         Ok(())
     }
-    async fn poll_results(&self, _: &()) -> Result<Vec<AsrSegment>> {
+    async fn poll_final(&self, _: &()) -> Result<Vec<AsrSegment>> {
         Ok(vec![])
     }
     async fn end_session(&self, _: ()) -> Result<()> {

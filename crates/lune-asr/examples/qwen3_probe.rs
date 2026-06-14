@@ -180,7 +180,6 @@ fn main() {
                     style_preset: Arc::clone(&style),
                     app_category: None,
                     dictionary: vec![],
-                    context: None,
                     language: "en".into(),
                     correction_needed: true,
                 };

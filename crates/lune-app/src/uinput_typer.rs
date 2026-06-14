@@ -761,6 +761,13 @@ fn char_to_key(ch: char) -> Option<(KeyCode, bool)> {
     Some(pair)
 }
 
+/// True when every character in `text` can be emitted as a US-QWERTY
+/// keystroke. Anything else (accents, CJK, emoji, smart quotes) must be
+/// delivered via the clipboard rather than silently dropped.
+fn is_keystroke_typeable(text: &str) -> bool {
+    text.chars().all(|c| char_to_key(c).is_some())
+}
+
 // ─── Adaptive paste timing ───────────────────────────────────────────────────
 
 /// Minimum post-paste delay — floor even on the fastest systems.
@@ -899,13 +906,19 @@ impl UinputTyper {
     /// The post-paste delay adapts to system speed by tracking an EMA of
     /// clipboard operation latency. Fast systems converge toward 40ms;
     /// slow systems (Electron, heavy toolkits) grow up to 300ms.
-    pub fn type_str(&mut self, text: &str) {
-        let is_terminal = match self.terminal_mode {
+    /// Resolve whether the focused window should receive a terminal-style
+    /// paste chord, honoring the configured `terminal_mode`.
+    fn resolve_terminal(&self) -> bool {
+        match self.terminal_mode {
             TerminalMode::Auto => focused_is_terminal(),
             TerminalMode::Terminal => true,
             TerminalMode::Normal => false,
             _ => focused_is_terminal(),
-        };
+        }
+    }
+
+    pub fn type_str(&mut self, text: &str) {
+        let is_terminal = self.resolve_terminal();
         self.do_clipboard_paste(text, is_terminal, "emitting paste");
     }
 
@@ -926,7 +939,7 @@ impl UinputTyper {
         let rtt_start = Instant::now();
         if let Err(e) = set_clipboard(text) {
             warn!(error = %e, "clipboard set failed, falling back to per-key typing");
-            self.type_str_keys(text);
+            self.type_keys_raw(text);
             return;
         }
         self.paste_delay.record_rtt(rtt_start.elapsed());
@@ -945,8 +958,24 @@ impl UinputTyper {
         std::thread::sleep(self.paste_delay.delay());
     }
 
-    /// Fallback per-key typing. ASCII-only, ~2ms/char.
+    /// Per-key typing entry point. Keystrokes are US-QWERTY/ASCII only, so if
+    /// `text` contains any character that can't be represented as a keystroke
+    /// (accented, CJK, emoji, smart quotes) the whole string is delivered via
+    /// the clipboard instead — non-ASCII transcripts are never silently
+    /// dropped.
     pub fn type_str_keys(&mut self, text: &str) {
+        if !is_keystroke_typeable(text) {
+            let is_terminal = self.resolve_terminal();
+            self.do_clipboard_paste(text, is_terminal, "non-ASCII text — emitting paste");
+            return;
+        }
+        self.type_keys_raw(text);
+    }
+
+    /// Raw per-key emitter (~2ms/char). Used once `text` is known to be
+    /// keystroke-typeable, and as the last resort when the clipboard itself is
+    /// unavailable — in that case any non-typeable char is unavoidably skipped.
+    fn type_keys_raw(&mut self, text: &str) {
         std::thread::sleep(Duration::from_millis(MODIFIER_SETTLE_MS));
         for ch in text.chars() {
             self.type_char(ch);
@@ -956,6 +985,7 @@ impl UinputTyper {
 
     fn type_char(&mut self, ch: char) {
         let Some((key, needs_shift)) = char_to_key(ch) else {
+            warn!(%ch, "uinput: no US-QWERTY keystroke for char, skipping (clipboard unavailable)");
             return;
         };
         if needs_shift {

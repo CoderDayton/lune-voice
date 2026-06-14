@@ -42,7 +42,7 @@ struct SessionState {
     config: AsrSessionConfig,
     /// Raw PCM f32 samples accumulated via `push_audio`.
     audio_buf: Vec<f32>,
-    /// Finalized segments ready to be drained by `poll_results`.
+    /// Finalized segments ready to be drained by `poll_final`.
     pending: Vec<AsrSegment>,
     next_id: u64,
 }
@@ -55,8 +55,8 @@ pub struct OpenAiAsrSession {
 /// OpenAI-compatible ASR backend.
 ///
 /// Buffers PCM audio in each session and sends it to
-/// `POST /v1/audio/transcriptions` when `poll_results` is called (if
-/// enough audio has accumulated). Encodes audio as 16-bit PCM WAV.
+/// `POST /v1/audio/transcriptions` when `poll_final` is called. Encodes
+/// audio as 16-bit PCM WAV.
 ///
 /// On transient HTTP errors, retries up to 3 times with 2 s initial
 /// exponential backoff. On persistent failure, returns raw empty segments
@@ -138,18 +138,6 @@ impl AsrBackend for OpenAiCompatibleAsrBackend {
         let mut state = lock_err(session.state.lock())?;
         state.audio_buf.extend_from_slice(pcm);
         Ok(())
-    }
-
-    async fn poll_results(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>> {
-        // Snapshot buffer length without holding the lock during the HTTP call.
-        let samples_len = lock_err(session.state.lock())?.audio_buf.len();
-
-        if samples_len >= self.config.min_samples_before_request {
-            self.flush_audio(session, false).await?;
-        }
-
-        let mut state = lock_err(session.state.lock())?;
-        Ok(std::mem::take(&mut state.pending))
     }
 
     async fn poll_final(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>> {
@@ -519,8 +507,8 @@ mod tests {
             .unwrap();
 
         backend.push_audio(&session, &[0.0f32; 100]).await.unwrap();
-        // poll_results should not panic or propagate the error — it logs WARN.
-        let segs = backend.poll_results(&session).await.unwrap();
+        // poll_final should not panic or propagate the error — it logs WARN.
+        let segs = backend.poll_final(&session).await.unwrap();
         assert!(segs.is_empty());
     }
 

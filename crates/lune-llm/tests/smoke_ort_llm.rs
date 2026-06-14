@@ -106,7 +106,6 @@ fn dictionary_example_correction_smoke() {
             replacement: "Boorloo".into(),
             priority: 10,
         }],
-        context: None,
         language: "en".into(),
         correction_needed: true,
     };

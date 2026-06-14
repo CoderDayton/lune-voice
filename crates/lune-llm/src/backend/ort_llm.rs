@@ -354,7 +354,6 @@ impl OrtStyleLlm {
         transcript: &str,
         language: &str,
         examples: &[(String, String)],
-        context: Option<&str>,
     ) -> String {
         // The `language` field arrives in inconsistent forms — the runtime
         // sometimes hands us a BCP-47 code ("en") and sometimes a full
@@ -369,15 +368,6 @@ impl OrtStyleLlm {
         };
         let mut prompt = String::with_capacity(header.len() + transcript.len() + 128);
         prompt.push_str(&header);
-        if let Some(ctx) = context.filter(|c| !c.trim().is_empty()) {
-            // Cross-utterance context: lets the model keep names, spellings,
-            // and topic vocabulary consistent with what the user just
-            // dictated. Reference-only — the validator discards any of it
-            // that leaks into the output.
-            prompt
-                .push_str("\n\nEarlier dictation (context only — do not repeat or correct it):\n");
-            prompt.push_str(ctx);
-        }
         if !examples.is_empty() {
             prompt.push_str("\n\nExamples:");
             for (input, output) in examples {
@@ -396,7 +386,7 @@ impl OrtStyleLlm {
     pub fn apply_correction(&self, transcript: &str, language: &str) -> Result<String> {
         use std::hash::{Hash, Hasher};
         let system = lune_core::config::BASE_SYSTEM_PROMPT.replace("{lang}", language);
-        let user_text = Self::user_prompt_with_examples(transcript, language, &[], None);
+        let user_text = Self::user_prompt_with_examples(transcript, language, &[]);
 
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         system.hash(&mut hasher);
@@ -1573,7 +1563,7 @@ mod tests {
 
     #[test]
     fn user_prompt_appends_no_think() {
-        let prompt = OrtStyleLlm::user_prompt_with_examples("hello world", "en", &[], None);
+        let prompt = OrtStyleLlm::user_prompt_with_examples("hello world", "en", &[]);
         assert!(prompt.contains("hello world"));
         assert!(prompt.contains("English"));
         assert!(prompt.ends_with("/no_think"));
@@ -1581,7 +1571,7 @@ mod tests {
 
     #[test]
     fn user_prompt_preserves_transcript() {
-        let prompt = OrtStyleLlm::user_prompt_with_examples("das ist ein test", "de", &[], None);
+        let prompt = OrtStyleLlm::user_prompt_with_examples("das ist ein test", "de", &[]);
         assert!(prompt.contains("das ist ein test"));
         assert!(prompt.contains("German"));
         assert!(prompt.ends_with("/no_think"));
@@ -1589,21 +1579,20 @@ mod tests {
 
     #[test]
     fn user_prompt_normalizes_full_english_name_from_asr() {
-        let prompt =
-            OrtStyleLlm::user_prompt_with_examples("das ist ein test", "German", &[], None);
+        let prompt = OrtStyleLlm::user_prompt_with_examples("das ist ein test", "German", &[]);
         assert!(prompt.contains("German transcript"));
     }
 
     #[test]
     fn user_prompt_drops_language_when_auto_or_unknown() {
-        let auto = OrtStyleLlm::user_prompt_with_examples("hello", "auto", &[], None);
+        let auto = OrtStyleLlm::user_prompt_with_examples("hello", "auto", &[]);
         assert!(auto.contains("Correct the following transcript:"));
         assert!(!auto.contains("auto"));
 
-        let empty = OrtStyleLlm::user_prompt_with_examples("hello", "", &[], None);
+        let empty = OrtStyleLlm::user_prompt_with_examples("hello", "", &[]);
         assert!(empty.contains("Correct the following transcript:"));
 
-        let unknown = OrtStyleLlm::user_prompt_with_examples("hello", "klingon", &[], None);
+        let unknown = OrtStyleLlm::user_prompt_with_examples("hello", "klingon", &[]);
         assert!(unknown.contains("Correct the following transcript:"));
         assert!(!unknown.contains("klingon"));
     }
@@ -1618,29 +1607,12 @@ mod tests {
             "I went the store and brought some wrld",
             "en",
             &examples,
-            None,
         );
         assert!(prompt.contains("I went the store"));
         assert!(prompt.ends_with("/no_think"));
         assert!(prompt.contains("Examples:"));
         assert!(prompt.contains("Input: I said Barolo in the meeting."));
         assert!(prompt.contains("Output: I said Boorloo in the meeting."));
-    }
-
-    #[test]
-    fn user_prompt_includes_context_block_when_provided() {
-        let prompt = OrtStyleLlm::user_prompt_with_examples(
-            "send it to dayton",
-            "en",
-            &[],
-            Some("My colleague Dayton joined the project."),
-        );
-        assert!(prompt.contains("Earlier dictation"));
-        assert!(prompt.contains("My colleague Dayton joined the project."));
-        assert!(prompt.ends_with("/no_think"));
-        // Empty/whitespace context must not emit the block.
-        let no_ctx = OrtStyleLlm::user_prompt_with_examples("hi", "en", &[], Some("  "));
-        assert!(!no_ctx.contains("Earlier dictation"));
     }
 
     // ── strip_think_tags ─────────────────────────────────────────────────
