@@ -129,8 +129,8 @@ fn delivery_thread(
         if text.is_empty() {
             continue;
         }
-        // Busy from dequeue until the driver returns; typing can take
-        // seconds (~2 ms/char), and senders only see the queue, not this.
+        // Busy from dequeue until the driver returns; per-key typing is paced
+        // (~8 ms/char) and can take seconds, and senders only see the queue.
         *busy_until.lock().unwrap_or_else(|e| e.into_inner()) =
             Some(Instant::now() + Duration::from_secs(3600));
         #[cfg(unix)]

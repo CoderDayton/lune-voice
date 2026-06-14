@@ -786,6 +786,15 @@ const RTT_MULTIPLIER: f64 = 2.0;
 /// Settle delay: let modifier keys from hotkey release settle before emitting paste.
 const MODIFIER_SETTLE_MS: u64 = 30;
 
+/// Gap between the key-down/up/modifier events *within* one synthetic
+/// character. Without it a fast shift release races the next key (stray
+/// mid-word capitals) and a too-brief key press is coalesced away (dropped
+/// spaces) on busy Wayland/X11 input pipelines.
+const KEY_EVENT_GAP_MS: u64 = 2;
+/// Gap *between* characters in per-key typing. The old 2 ms was fast enough
+/// that the compositor dropped keys (notably SPACE); this gives it headroom.
+const PER_CHAR_GAP_MS: u64 = 6;
+
 /// Tracks clipboard operation latency and adapts the post-paste delay.
 struct AdaptivePasteDelay {
     /// EMA of clipboard set+get round-trip in ms.
@@ -972,14 +981,17 @@ impl UinputTyper {
         self.type_keys_raw(text);
     }
 
-    /// Raw per-key emitter (~2ms/char). Used once `text` is known to be
-    /// keystroke-typeable, and as the last resort when the clipboard itself is
-    /// unavailable — in that case any non-typeable char is unavoidably skipped.
+    /// Raw per-key emitter. Paced (see `KEY_EVENT_GAP_MS` / `PER_CHAR_GAP_MS`)
+    /// so the compositor reliably registers each key in order — at speed the
+    /// pipeline drops spaces and leaks the shift modifier into later letters.
+    /// Used once `text` is known to be keystroke-typeable, and as the last
+    /// resort when the clipboard itself is unavailable — in that case any
+    /// non-typeable char is unavoidably skipped.
     fn type_keys_raw(&mut self, text: &str) {
         std::thread::sleep(Duration::from_millis(MODIFIER_SETTLE_MS));
         for ch in text.chars() {
             self.type_char(ch);
-            std::thread::sleep(Duration::from_millis(2));
+            std::thread::sleep(Duration::from_millis(PER_CHAR_GAP_MS));
         }
     }
 
@@ -988,12 +1000,16 @@ impl UinputTyper {
             warn!(%ch, "uinput: no US-QWERTY keystroke for char, skipping (clipboard unavailable)");
             return;
         };
+        let gap = Duration::from_millis(KEY_EVENT_GAP_MS);
         if needs_shift {
             self.emit_raw(EventType::KEY, KeyCode::KEY_LEFTSHIFT.0, 1);
+            std::thread::sleep(gap); // shift must register before the key
         }
         self.emit_raw(EventType::KEY, key.0, 1);
+        std::thread::sleep(gap); // hold the key down long enough to register
         self.emit_raw(EventType::KEY, key.0, 0);
         if needs_shift {
+            std::thread::sleep(gap); // key must release before shift, or shift leaks
             self.emit_raw(EventType::KEY, KeyCode::KEY_LEFTSHIFT.0, 0);
         }
     }
