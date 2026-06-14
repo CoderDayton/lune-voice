@@ -37,8 +37,8 @@ pub struct VadPipelineConfig {
     /// Hard cap — force-finalize a span once it reaches this length.
     pub max_chunk_ms: u32,
     /// Minimum voiced length to KEEP a whole span (contiguous-span gate). Spans
-    /// with less verified speech than this are dropped as noise. Replaces the
-    /// per-segment `min_chunk_ms`.
+    /// with less verified speech than this are dropped as noise. Supersedes the
+    /// old chunked gate's per-segment minimum-length threshold.
     pub min_speech_ms: u32,
     /// A trailing-silence run this long closes the current span (an intentional
     /// stop). Sub-`long_gap` pauses are KEPT inside the span so Qwen3-ASR sees

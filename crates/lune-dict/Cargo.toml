@@ -8,6 +8,10 @@ license.workspace = true
 workspace = true
 
 [features]
+default = ["dictionary"]
+# User dictionary (DictionaryManager) — pulls lune-persist (SQLite). On by
+# default; lune-llm opts out, needing only the lexical tables, not the DB.
+dictionary = ["dep:lune-persist"]
 # Offline ngram model training tool only (`--features training`); the bundled
 # model ships prebuilt, so the default build never pulls these.
 training = ["dep:reqwest", "dep:futures", "dep:tokio", "dep:urlencoding", "dep:serde_json"]
@@ -15,7 +19,7 @@ training = ["dep:reqwest", "dep:futures", "dep:tokio", "dep:urlencoding", "dep:s
 [dependencies]
 bincode = { version = "2", features = ["serde"] }
 lune-core.workspace = true
-lune-persist.workspace = true
+lune-persist = { workspace = true, optional = true }
 serde = { version = "1", features = ["derive"] }
 strsim = "0.11"
 tracing.workspace = true

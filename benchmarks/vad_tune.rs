@@ -569,25 +569,10 @@ fn main() {
                 .collect(),
         );
 
-        best = sweep(
-            &harness,
-            &fixtures,
-            pcen,
-            best,
-            "long_gap_ms",
-            [1_000u32, 1_500, 2_000, 3_000]
-                .iter()
-                .map(|&v| {
-                    (
-                        format!("long_gap={v}ms"),
-                        VadPipelineConfig {
-                            long_gap_ms: v,
-                            ..best
-                        },
-                    )
-                })
-                .collect(),
-        );
+        // `long_gap_ms` is deliberately NOT swept: WER is blind to the word
+        // fusion it controls (see DEFAULT_VAD_CONFIG in vad/config.rs), so a WER
+        // sweep would shrink it back toward the old splice behaviour. It stays
+        // pinned at the shipped default.
     }
 
     // ── Winner ─────────────────────────────────────────────────────────────

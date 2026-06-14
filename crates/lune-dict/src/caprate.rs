@@ -29,7 +29,7 @@ impl CapRateDict {
         }
         let (entries, _): (Vec<(String, f32)>, _) =
             bincode::serde::decode_from_slice(bytes, bincode::config::standard())
-                .expect("decode caprate bin");
+                .unwrap_or_else(|e| panic!("decode en_caprate.bin ({} bytes): {e}", bytes.len()));
         let mut pcap = HashMap::with_capacity(entries.len());
         for (word, p) in entries {
             pcap.insert(word.into_boxed_str(), p);

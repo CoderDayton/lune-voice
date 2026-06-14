@@ -8,18 +8,22 @@ pub mod ngram;
 pub mod punctuation;
 pub mod vocab;
 
+#[cfg(feature = "dictionary")]
 use lune_core::dict::DictionaryEntry;
+#[cfg(feature = "dictionary")]
 use lune_persist::{Database, PersistResult};
 
 /// Manages the user dictionary: in-memory cache + DB persistence.
 ///
 /// Applies corrections to ASR text (multi-word exact match, single-word fuzzy
 /// with Levenshtein distance ≤ 1) and selects relevant entries for LLM prompts.
+#[cfg(feature = "dictionary")]
 pub struct DictionaryManager {
     db: Database,
     cache: Vec<DictionaryEntry>,
 }
 
+#[cfg(feature = "dictionary")]
 impl DictionaryManager {
     /// Create a manager and load the initial cache from the database.
     pub fn new(mut db: Database) -> PersistResult<Self> {
@@ -201,6 +205,7 @@ impl DictionaryManager {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+#[cfg(feature = "dictionary")]
 fn apply_multi_word(text: &str, entry: &DictionaryEntry) -> String {
     // Borrow phrase words directly — eq_ignore_ascii_case avoids Vec<String>.
     let phrase_words: Vec<&str> = entry.phrase.split_whitespace().collect();
@@ -232,6 +237,7 @@ fn apply_multi_word(text: &str, entry: &DictionaryEntry) -> String {
     out.join(" ")
 }
 
+#[cfg(feature = "dictionary")]
 fn apply_single_words(text: &str, singles: &[&DictionaryEntry]) -> String {
     let words: Vec<&str> = text.split_whitespace().collect();
     let mut out = Vec::with_capacity(words.len());
@@ -256,12 +262,14 @@ fn apply_single_words(text: &str, singles: &[&DictionaryEntry]) -> String {
 }
 
 /// Strip trailing ASCII punctuation for comparison purposes.
+#[cfg(feature = "dictionary")]
 #[inline]
 fn strip_trailing_punct(s: &str) -> &str {
     s.trim_end_matches(['.', ',', '!', '?', ';', ':'])
 }
 
 /// ASCII case-insensitive substring search with no heap allocation.
+#[cfg(feature = "dictionary")]
 #[inline]
 fn contains_ascii_ci(haystack: &str, needle: &str) -> bool {
     let h = haystack.as_bytes();
@@ -279,6 +287,7 @@ fn contains_ascii_ci(haystack: &str, needle: &str) -> bool {
 ///
 /// Replaces the `levenshtein(a.to_lowercase(), b.to_lowercase()) <= 1` pattern
 /// in hot paths: no allocation, no full DP table, early exit.
+#[cfg(feature = "dictionary")]
 #[inline]
 fn lev_le1_ci(a: &[u8], b: &[u8]) -> bool {
     // Orient so `short` ≤ `long_s`.
@@ -351,7 +360,7 @@ pub fn levenshtein(a: &str, b: &str) -> usize {
     prev[n]
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "dictionary"))]
 mod tests {
     use super::*;
     use lune_persist::Database;

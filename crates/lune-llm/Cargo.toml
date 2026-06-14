@@ -12,7 +12,9 @@ default = []
 cuda = ["ort/cuda", "lune-asr/cuda"]
 
 [dependencies]
-lune-dict.workspace = true
+# Direct path dep (not workspace-inherited) so default-features can be disabled:
+# lune-llm needs only the lexical tables (caprate), not the dictionary DB / SQLite.
+lune-dict = { path = "../lune-dict", default-features = false }
 async-trait.workspace = true
 lune-core.workspace = true
 lune-asr.workspace = true

@@ -1,6 +1,6 @@
 //! Personalized homophone resolution.
 //!
-//! Curated confusion sets plus the per-user n-gram LM (`lune-ngram`,
+//! Curated confusion sets plus the per-user n-gram LM (`lune_dict::ngram`,
 //! trained on the user's own transcripts) disambiguate homophones the
 //! acoustic model cannot — "there"/"their"/"they're", "to"/"too"/"two".
 //!
@@ -102,7 +102,7 @@ pub static CONFUSION_SETS: &[ConfusionSet] = &[
 pub enum ResolverPolicy {
     /// Never rewrite. The resolver is a no-op.
     Off,
-    /// Rewrite to the argmax of the blended rerank score (lune-ngram's
+    /// Rewrite to the argmax of the blended rerank score (lune_dict::ngram's
     /// `rerank_asr_candidates`). Ungated — kept for benchmark comparison; it
     /// over-corrects because min-max normalization discards confidence on
     /// small candidate sets.

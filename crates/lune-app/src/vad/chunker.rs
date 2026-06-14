@@ -30,7 +30,7 @@ pub(crate) enum SpanEvent {
     Close { keep: bool },
 }
 
-/// Contiguous-span gate — the stage-3 replacement for [`Chunker`].
+/// Contiguous-span gate — the stage-3 replacement for the old chunked gate.
 ///
 /// Where `Chunker` ends a segment after a short hangover and lets the
 /// orchestrator drop the silence between segments, `SpanGate` keeps a span

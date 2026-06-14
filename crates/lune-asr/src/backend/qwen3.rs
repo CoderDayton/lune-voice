@@ -479,7 +479,7 @@ fn argmax_on_logits(
 /// produced in this utterance. This kills the runaway repetition loops ASR
 /// models fall into on noisy or silent tails, without the indiscriminate WER
 /// cost a flat repetition penalty imposes on legitimate word reuse. Distinct
-/// from `lune-ngram` (a word-level correction LM): this is a decode-time mask
+/// from `lune_dict::ngram` (a word-level correction LM): this is a decode-time mask
 /// over raw decoder token ids, not a probabilistic model.
 const REPEAT_GUARD_ORDER: usize = 3;
 

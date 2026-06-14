@@ -58,6 +58,8 @@ impl WordnikClient {
             self.base_url, encoded_word
         ))?;
 
+        // Wordnik authenticates via an `api_key` query parameter (its documented
+        // form); the key is caller-supplied and is not logged by this client.
         url.query_pairs_mut()
             .append_pair("includeDuplicates", "false")
             .append_pair("useCanonical", "true")
