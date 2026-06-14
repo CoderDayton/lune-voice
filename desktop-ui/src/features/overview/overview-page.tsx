@@ -41,6 +41,7 @@ export function OverviewPage() {
   const sessionsCount = useCountUp(stats.count);
   const todayWords = useCountUp(today.words);
   const wpm = stats.totalMinutes > 0 ? Math.round(stats.totalWords / stats.totalMinutes) : 0;
+  const avgWordsPerSession = stats.count > 0 ? Math.round(stats.totalWords / stats.count) : 0;
   const wpmCount = useCountUp(wpm);
   // Today's speaking pace vs the all-time average — a quick trending-up/down
   // read on the hero card, mirroring the all-time/today split on the left.
@@ -124,7 +125,7 @@ export function OverviewPage() {
             </div>
             <p className="mt-2 text-sm text-content-muted tabular-nums">
               {t`all-time`}
-              {today.words > 0 ? ` · ↑ ${todayWords.toLocaleString()} ${t`today`}` : ''}
+              {` · ${today.words > 0 ? '↑ ' : ''}${todayWords.toLocaleString()} ${t`today`}`}
             </p>
           </div>
           <div
@@ -137,9 +138,7 @@ export function OverviewPage() {
             </div>
             <p className="mt-2 text-sm text-content-muted tabular-nums">
               {t`all-time avg`}
-              {wpmDelta !== null && wpmDelta !== 0
-                ? ` · ${wpmDelta > 0 ? '↑' : '↓'} ${Math.abs(wpmDelta)} ${t`today`}`
-                : ''}
+              {` · ${wpmDelta && wpmDelta > 0 ? '↑ ' : wpmDelta && wpmDelta < 0 ? '↓ ' : ''}${Math.abs(wpmDelta ?? 0)} ${t`today`}`}
             </p>
           </div>
         </div>
@@ -151,8 +150,13 @@ export function OverviewPage() {
           <span className="section-label">{t`Speaking Time`}</span>
           <Clock size={20} strokeWidth={1.5} className="text-secondary/55" />
         </div>
-        <div className="mt-auto text-3xl font-semibold tracking-tight tabular-nums text-content-strong">
-          {minutesCount.toLocaleString()}
+        <div className="mt-auto">
+          <div className="text-3xl font-semibold tracking-tight tabular-nums text-content-strong">
+            {minutesCount.toLocaleString()}
+          </div>
+          <p className="mt-1 text-sm text-content-muted tabular-nums">
+            {stats.totalMinutes === 1 ? t`minute` : t`minutes`}
+          </p>
         </div>
       </div>
 
@@ -161,8 +165,13 @@ export function OverviewPage() {
           <span className="section-label">{t`Sessions`}</span>
           <MessageSquareText size={20} strokeWidth={1.5} className="text-accent/60" />
         </div>
-        <div className="mt-auto text-3xl font-semibold tracking-tight tabular-nums text-content-strong">
-          {sessionsCount.toLocaleString()}
+        <div className="mt-auto">
+          <div className="text-3xl font-semibold tracking-tight tabular-nums text-content-strong">
+            {sessionsCount.toLocaleString()}
+          </div>
+          <p className="mt-1 text-sm text-content-muted tabular-nums">
+            {avgWordsPerSession > 0 ? t`~${avgWordsPerSession} words each` : t`per session`}
+          </p>
         </div>
       </div>
 

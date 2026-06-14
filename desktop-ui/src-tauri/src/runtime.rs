@@ -461,8 +461,13 @@ impl AppRuntime {
                             delivered = runtime.inner.delivery.deliver(&text, mode);
                         }
                         if !delivered {
+                            // Non-fatal: surface as a warning toast, not a
+                            // SessionError. SessionError flips serviceStatus to
+                            // 'error' and is then immediately overwritten by the
+                            // FinalizedText below (serviceStatus 'ready'), which
+                            // made the status badge flash red for one frame.
                             runtime
-                                .push_session_event(SessionStreamEvent::SessionError {
+                                .push_session_event(SessionStreamEvent::SessionWarning {
                                     message: "Text delivery failed — output service is unavailable"
                                         .into(),
                                 })

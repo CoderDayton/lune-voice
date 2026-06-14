@@ -514,6 +514,11 @@ function reduceSessionEvent(
         audioLevel: 0,
         error: event.message,
       };
+    case 'sessionWarning':
+      // Non-fatal: surface the message in the toast but leave serviceStatus
+      // (the status badge) untouched, so it never flashes red. Session keeps
+      // running, so activeSessionId is not cleared.
+      return { ...runtime, error: event.message };
     case 'audioLevel':
       return { ...runtime, audioLevel: Math.max(0, Math.min(1, event.level)) };
     case 'partialText':

@@ -102,4 +102,5 @@ export type SessionStreamEvent =
   | { type: 'audioLevel'; level: number }
   | { type: 'commandDetected'; payload: string }
   | { type: 'sessionStopped' }
-  | { type: 'sessionError'; message: string };
+  | { type: 'sessionError'; message: string }
+  | { type: 'sessionWarning'; message: string };
