@@ -1,3 +1,4 @@
+pub mod caprate;
 pub mod corrector;
 pub mod freq;
 pub mod homophone;

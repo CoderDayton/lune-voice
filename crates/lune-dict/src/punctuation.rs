@@ -226,6 +226,149 @@ pub fn capitalize_sentence_starts(text: &str) -> String {
     out
 }
 
+/// Lowercase the leading capital of a mid-sentence word the lexicon knows to be
+/// a common word (low capitalization rate). Fixes ASR/heuristic over-caps like
+/// "Make Sure" → "Make sure" and "So Make" → "So make" while leaving sentence
+/// starts, proper nouns ("John"), brands ("GitHub"), and acronyms ("NASA")
+/// untouched. English only — the caller gates on language. This runs on the
+/// always-on (fast-path + LLM-input) text so casing is normalized once,
+/// regardless of whether the gated LLM pass runs.
+pub fn decase_common_words(text: &str) -> String {
+    if !is_latin(text) {
+        return text.to_owned();
+    }
+    let mut out = String::with_capacity(text.len());
+    let mut at_sentence_start = true;
+    let mut rest = text;
+    while !rest.is_empty() {
+        let ws_end = rest
+            .find(|c: char| !c.is_whitespace())
+            .unwrap_or(rest.len());
+        out.push_str(&rest[..ws_end]);
+        rest = &rest[ws_end..];
+        if rest.is_empty() {
+            break;
+        }
+        let tok_end = rest.find(char::is_whitespace).unwrap_or(rest.len());
+        let token = &rest[..tok_end];
+        if at_sentence_start {
+            // The sentence-initial capital is legitimate and owned by
+            // capitalize_sentence_starts — never touch it here.
+            out.push_str(token);
+        } else {
+            out.push_str(&decase_token(token));
+        }
+        at_sentence_start = token_ends_sentence(token);
+        rest = &rest[tok_end..];
+    }
+    out
+}
+
+/// Lowercase a single token's leading capital iff it is a plain Capitalized
+/// common word: first alphabetic char uppercase, NO interior uppercase (so
+/// "iPhone"/"GitHub"/"NASA" are spared), and `en_p_cap` positively classifies
+/// the word as common (below the keep threshold). Unknown words (a proper noun
+/// the table does not know) are left capitalized.
+fn decase_token(token: &str) -> String {
+    let core = word_core(token);
+    if core.is_empty() {
+        return token.to_string();
+    }
+    let mut alphas = core.chars().filter(|c| c.is_alphabetic());
+    if !alphas.next().is_some_and(|c| c.is_uppercase()) {
+        return token.to_string(); // not a leading capital
+    }
+    if alphas.any(|c| c.is_uppercase()) {
+        return token.to_string(); // interior uppercase = brand/acronym
+    }
+    let is_common =
+        crate::caprate::en_p_cap(core).is_some_and(|p| p < crate::caprate::CAP_KEEP_THRESHOLD);
+    if !is_common {
+        return token.to_string();
+    }
+    // Lowercase only the first alphabetic character, preserving punctuation.
+    let mut done = false;
+    let mut result = String::with_capacity(token.len());
+    for c in token.chars() {
+        if !done && c.is_alphabetic() {
+            result.extend(c.to_lowercase());
+            done = true;
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
+/// Restore words an ASR fused inconsistently — the `MakeSure` / `Makesure`
+/// artifact where a *repeated* phrase is rendered run-together once. Split a
+/// single token into two ONLY when (1) the fused form is not itself a real word
+/// (freq guard, so "into"/"cannot" are never touched), and (2) the two pieces
+/// appear as an adjacent word pair ELSEWHERE in the same text (self-consistency,
+/// so "GitHub" and one-off fusions are left alone). This is deliberately
+/// conservative: it fixes only fusions the speaker themselves disambiguated.
+/// English only — the caller gates on language.
+pub fn defuse_inconsistent(text: &str) -> String {
+    use std::collections::HashMap;
+    let words: Vec<&str> = text.split_whitespace().collect();
+    if words.len() < 3 {
+        return text.to_owned();
+    }
+    let cores: Vec<String> = words.iter().map(|w| fusion_core(w)).collect();
+    // Adjacent word-pair concatenations → their two lowercase pieces. A fused
+    // token matches only a pair that occurs as two SEPARATE adjacent tokens
+    // somewhere; a single fused token never contributes its own split.
+    let mut bigrams: HashMap<String, (String, String)> = HashMap::new();
+    for i in 0..words.len() - 1 {
+        let (a, b) = (&cores[i], &cores[i + 1]);
+        if a.is_empty() || b.is_empty() {
+            continue;
+        }
+        bigrams
+            .entry(format!("{a}{b}"))
+            .or_insert_with(|| (a.clone(), b.clone()));
+    }
+    let en = crate::freq::dict_for("en");
+    let mut out: Vec<String> = Vec::with_capacity(words.len() + 4);
+    for (i, w) in words.iter().enumerate() {
+        let core = &cores[i];
+        let split = (core.len() >= 4 && !en.contains(core))
+            .then(|| bigrams.get(core))
+            .flatten();
+        if let Some((a, b)) = split {
+            let (prefix, suffix) = edge_punct(w);
+            out.push(format!("{prefix}{a}"));
+            out.push(format!("{b}{suffix}"));
+        } else {
+            out.push((*w).to_string());
+        }
+    }
+    out.join(" ")
+}
+
+/// Lowercase, alphanumeric-only form of a token ("Make," → "make").
+fn fusion_core(word: &str) -> String {
+    word.chars()
+        .filter(|c| c.is_alphanumeric())
+        .collect::<String>()
+        .to_lowercase()
+}
+
+/// Leading and trailing non-alphanumeric runs of a token, so a split can carry
+/// the original edge punctuation: "Makesure!" → ("", "!").
+fn edge_punct(word: &str) -> (&str, &str) {
+    let start = word
+        .char_indices()
+        .find(|(_, c)| c.is_alphanumeric())
+        .map_or(word.len(), |(i, _)| i);
+    let end = word
+        .char_indices()
+        .rev()
+        .find(|(_, c)| c.is_alphanumeric())
+        .map_or(start, |(i, c)| i + c.len_utf8());
+    (&word[..start], &word[end..])
+}
+
 /// Append `token` with its first alphabetic character uppercased — unless the
 /// token already contains any uppercase, in which case its casing is treated
 /// as deliberate (brand/proper casing) and preserved verbatim.
@@ -319,6 +462,132 @@ mod tests {
         let out = normalize("turn on the light");
         assert_eq!(out.text, "Turn on the light.");
         assert!(!out.needs_llm);
+    }
+
+    #[test]
+    fn decase_lowercases_midsentence_common_word() {
+        assert_eq!(
+            decase_common_words("I want to Make Sure"),
+            "I want to make sure"
+        );
+    }
+
+    #[test]
+    fn decase_fixes_double_cap_after_sentence_break() {
+        assert_eq!(
+            decase_common_words("Make sure it works. Make Sure it holds."),
+            "Make sure it works. Make sure it holds."
+        );
+    }
+
+    #[test]
+    fn decase_preserves_proper_noun() {
+        assert_eq!(decase_common_words("I met John today"), "I met John today");
+    }
+
+    #[test]
+    fn decase_preserves_brand_and_acronym() {
+        assert_eq!(
+            decase_common_words("I use GitHub at NASA"),
+            "I use GitHub at NASA"
+        );
+    }
+
+    #[test]
+    fn decase_preserves_sentence_start_common_word() {
+        assert_eq!(decase_common_words("Sure it works."), "Sure it works.");
+    }
+
+    #[test]
+    fn decase_preserves_pronoun_i() {
+        assert_eq!(decase_common_words("you and I agree"), "you and I agree");
+    }
+
+    #[test]
+    fn decase_leaves_unknown_capitalized_word() {
+        assert_eq!(
+            decase_common_words("I saw Zylestra there"),
+            "I saw Zylestra there"
+        );
+    }
+
+    #[test]
+    fn decase_handles_trailing_punctuation() {
+        assert_eq!(
+            decase_common_words("we should, Make sure."),
+            "we should, make sure."
+        );
+    }
+
+    #[test]
+    fn defuse_splits_camel_fusion_when_phrase_recurs() {
+        // "make sure" appears unfused, so the run-together "MakeSure" is the
+        // ASR's own inconsistency and is restored.
+        assert_eq!(
+            defuse_inconsistent("make sure it works. MakeSure it holds."),
+            "make sure it works. make sure it holds."
+        );
+    }
+
+    #[test]
+    fn defuse_splits_lowercase_fusion_when_phrase_recurs() {
+        assert_eq!(
+            defuse_inconsistent("please make sure of it. makesure of that."),
+            "please make sure of it. make sure of that."
+        );
+    }
+
+    #[test]
+    fn defuse_preserves_real_word_even_if_split_recurs() {
+        // "in to" appears adjacent, but "into" is a real word — never split it.
+        assert_eq!(
+            defuse_inconsistent("walk in to the room then go into it"),
+            "walk in to the room then go into it"
+        );
+    }
+
+    #[test]
+    fn defuse_preserves_brand_without_recurrence() {
+        assert_eq!(
+            defuse_inconsistent("I use GitHub every day at work today"),
+            "I use GitHub every day at work today"
+        );
+    }
+
+    #[test]
+    fn defuse_preserves_lone_fusion() {
+        // No unfused "make sure" elsewhere — no evidence, so leave it.
+        assert_eq!(
+            defuse_inconsistent("just MakeSure it works fine"),
+            "just MakeSure it works fine"
+        );
+    }
+
+    #[test]
+    fn defuse_keeps_trailing_punctuation_on_split() {
+        assert_eq!(
+            defuse_inconsistent("make sure of it. makesure!"),
+            "make sure of it. make sure!"
+        );
+    }
+
+    /// End-to-end proof of the Qwen3-ASR "Make Sure" fix: the pipeline order
+    /// from session.rs (defuse → normalize → decase) turns every inconsistent
+    /// rendering of a repeated phrase back into the clean form. Covers all four
+    /// artifact shapes observed in the DB: correct, double-cap, CamelCase
+    /// fusion, and lowercase fusion.
+    #[test]
+    fn full_pipeline_fixes_all_makesure_variants() {
+        let raw = "make sure it works. Make Sure it holds. \
+                   MakeSure it ends. makesure it stops.";
+        let defused = defuse_inconsistent(raw);
+        let normalized = normalize(&defused).text;
+        let final_text = decase_common_words(&normalized);
+        assert_eq!(
+            final_text,
+            "Make sure it works. Make sure it holds. \
+             Make sure it ends. Make sure it stops."
+        );
     }
 
     #[test]

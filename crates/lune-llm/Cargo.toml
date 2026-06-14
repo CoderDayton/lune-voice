@@ -12,6 +12,7 @@ default = []
 cuda = ["ort/cuda", "lune-asr/cuda"]
 
 [dependencies]
+lune-dict.workspace = true
 async-trait.workspace = true
 lune-core.workspace = true
 lune-asr.workspace = true

@@ -588,8 +588,24 @@ async fn process_and_deliver(
     // Apply deterministic punctuation (leading capital, terminal period) and
     // detect whether residual punctuation is ambiguous. The returned text is
     // both the fast-path output and the LLM input.
-    let punctuation = lune_dict::punctuation::normalize(&heuristic_result.corrected_text);
-    let text_after_heuristic = punctuation.text;
+    // De-fuse words the ASR ran together inconsistently ("MakeSure" while "make
+    // sure" also appears) before punctuation/casing, so a split sentence-start
+    // capitalizes correctly. English only — the p_cap/freq guards are English.
+    let corrected = if detected_lang == "English" {
+        lune_dict::punctuation::defuse_inconsistent(&heuristic_result.corrected_text)
+    } else {
+        heuristic_result.corrected_text.clone()
+    };
+    let punctuation = lune_dict::punctuation::normalize(&corrected);
+    // Downcase mid-sentence common-word capitals (the "Make Sure" ASR artifact,
+    // and any over-capitalization the heuristic left) on the always-on path, so
+    // casing is normalized once whether or not the gated LLM pass runs. English
+    // only — p_cap is an English table and other languages capitalize nouns.
+    let text_after_heuristic = if detected_lang == "English" {
+        lune_dict::punctuation::decase_common_words(&punctuation.text)
+    } else {
+        punctuation.text
+    };
 
     let unresolved_count = heuristic_result.unresolved_words.len();
     let dropped_risks = heuristic_result.dropped_risk_entries;

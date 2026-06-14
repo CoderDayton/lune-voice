@@ -3159,6 +3159,7 @@ dependencies = [
  "half",
  "lune-asr",
  "lune-core",
+ "lune-dict",
  "ndarray",
  "ort",
  "rand 0.9.3",

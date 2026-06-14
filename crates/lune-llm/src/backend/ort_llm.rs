@@ -1309,14 +1309,39 @@ pub(crate) fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> S
                 // downcasing of the now-mid-sentence word is legitimate, so we
                 // must not restore the input's sentence-initial capital.
                 let legit_debreak = prev_inp_terminated && !prev_out_terminated;
-                let emitted = if has_interior_uppercase(inp_w)
-                    || (starts_uppercase_alpha(inp_w)
-                        && starts_lowercase_alpha(out_w)
-                        && !legit_debreak)
+                // p_cap is the lexical authority on whether a capital belongs to
+                // a word: proper nouns ("John", "Paris") are ~always capitalized
+                // mid-sentence; common words ("make", "sure", "so") almost never
+                // are. Frequency can't separate them (`let's` < `john`), so the
+                // capitalization-rate table decides. English only.
+                let proper_cap = is_en && lune_dict::caprate::en_is_proper_cap(out_w);
+                let asr_cap_spurious = is_en
+                    && lune_dict::caprate::en_p_cap(inp_w)
+                        .is_some_and(|p| p < lune_dict::caprate::CAP_KEEP_THRESHOLD);
+
+                // The LLM stamped a mid-sentence capital onto a word the ASR had
+                // lowercase ("so let's" → "So Let's"). Revert it — UNLESS the
+                // word is a known proper noun, where the LLM's capital is right
+                // ("i met john" → "I met John").
+                let unjustified_upcase = starts_lowercase_alpha(inp_w)
+                    && starts_uppercase_alpha(out_w)
+                    && !has_interior_uppercase(out_w)
+                    && !prev_out_terminated
+                    && !proper_cap;
+                // The ASR capitalized a word mid-sentence and the LLM lowercased
+                // it. Keep the ASR capital — proper nouns the table may not know
+                // ("Dayton") — UNLESS the table positively says it's a common
+                // word: the "Make Sure" ASR artifact, where the LLM is right.
+                let keep_asr_cap = starts_uppercase_alpha(inp_w)
+                    && starts_lowercase_alpha(out_w)
+                    && !legit_debreak
+                    && !asr_cap_spurious;
+                let emitted = if has_interior_uppercase(inp_w) || keep_asr_cap || unjustified_upcase
                 {
                     // ASR casing is the source of truth for acronyms, brands,
                     // and proper nouns — never let the LLM flatten "GitHub"
-                    // to "github" or "Dayton" to "dayton".
+                    // to "github" or "Dayton" to "dayton", nor stamp a spurious
+                    // mid-sentence capital onto an ordinary word.
                     transplant_case(inp_w, out_w)
                 } else {
                     (*out_w).to_string()
@@ -1777,6 +1802,23 @@ mod tests {
     }
 
     #[test]
+    fn merge_rejects_unjustified_midsentence_upcase() {
+        // Tiny models capitalize discourse words mid-sentence ("so make" →
+        // "So Make"). With no preceding terminator the ASR's lowercase wins, so
+        // the spurious capital is reverted.
+        assert_eq!(
+            validate_and_merge("we should so make it", "We should so Make it", "en"),
+            "We should so make it"
+        );
+        // ...but a capital the model adds right after a terminator it introduced
+        // is its job and is kept.
+        assert_eq!(
+            validate_and_merge("do this so make that", "Do this. So make that.", "en"),
+            "Do this. So make that."
+        );
+    }
+
+    #[test]
     fn merge_preserves_legitimate_sentence_initial_cap() {
         // Input has its own sentence terminator — the LLM's capitalization
         // of the next sentence is correct and must survive.
@@ -1790,6 +1832,23 @@ mod tests {
         // break before it) is legitimate and must survive.
         let merged = validate_and_merge("i met john today", "I met John today.", "en");
         assert_eq!(merged, "I met John today.");
+    }
+
+    #[test]
+    fn merge_reverts_asr_spurious_cap_on_common_word() {
+        // The Qwen3-ASR "Make Sure" artifact: the ASR capitalized a common word
+        // mid-sentence. When the LLM lowercases it, p_cap (low for "sure") lets
+        // the correction win instead of transplanting the ASR's stray capital.
+        assert_eq!(
+            validate_and_merge("Make Sure it works", "Make sure it works", "en"),
+            "Make sure it works"
+        );
+        // But an unknown word the ASR capitalized (a proper noun the table does
+        // not know) keeps its capital — we only downcase KNOWN common words.
+        assert_eq!(
+            validate_and_merge("i saw Zylestra there", "I saw zylestra there", "en"),
+            "I saw Zylestra there"
+        );
     }
 
     #[test]
