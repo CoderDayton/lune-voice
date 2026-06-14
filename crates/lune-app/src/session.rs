@@ -630,38 +630,25 @@ async fn process_and_deliver(
     // mishears ("no"/"know"). Skip-when-broken vetoes correction when the
     // transcript is shaky across the board — correction degrades quality in
     // that regime (arXiv:2509.25048).
-    let max_risk = word_risk_scores
-        .iter()
-        .map(|(_, r)| *r)
-        .fold(0.0_f32, f32::max);
-    let min_conf = 1.0 - max_risk;
-    let conf_attention = config
-        .pipeline
-        .llm_skip_threshold
-        .is_some_and(|t| min_conf < t);
-    // Skip-when-broken is a SEGMENT-AVERAGE property: one garbled word in an
-    // otherwise clean utterance is the prime correction case, while a
-    // transcript that is shaky across the board is the regime where
-    // correction degrades quality (arXiv:2509.25048).
-    let word_count = text_after_commands.split_whitespace().count().max(1);
-    let mean_risk = heuristic_result
-        .word_risk_positions
-        .iter()
-        .map(|(_, r)| *r)
-        .sum::<f32>()
-        / word_count as f32;
-    let avg_conf = 1.0 - mean_risk;
-    let too_broken = config
-        .pipeline
-        .llm_skip_noisy_threshold
-        .is_some_and(|t| avg_conf < t);
-    let needs_correction =
-        !heuristic_result.all_resolved || punctuation.needs_llm || conf_attention;
     // Styling is orthogonal to correction: a clean transcript still gets the
-    // style pass when the preset asks for it, so a predicted correction
-    // no-op only skips the correction pass, never styling.
+    // style pass when the preset asks for it, so a predicted correction no-op
+    // only skips the correction pass, never styling.
     let wants_styling = style_preset.needs_styling();
-    let needs_llm = (needs_correction || wants_styling) && !too_broken;
+    let crate::gate::GateOutcome {
+        needs_correction,
+        needs_llm,
+        min_conf,
+        avg_conf,
+        ..
+    } = crate::gate::decide(crate::gate::GateInputs {
+        pipeline: &config.pipeline,
+        all_resolved: heuristic_result.all_resolved,
+        needs_punct: punctuation.needs_llm,
+        wants_styling,
+        word_risk_scores: &word_risk_scores,
+        word_risk_positions: &heuristic_result.word_risk_positions,
+        word_count: text_after_commands.split_whitespace().count(),
+    });
 
     info!(%session_id, "[ASR] raw: {raw_text}");
     info!(

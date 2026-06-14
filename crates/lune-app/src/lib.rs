@@ -2,6 +2,7 @@ pub mod calibration;
 mod capture;
 pub mod delivery;
 pub mod events;
+mod gate;
 pub mod session;
 #[cfg(unix)]
 mod uinput_typer;
