@@ -5,6 +5,7 @@ import type {
   DictationModeValue,
   PillVisibilityValue,
 } from '../features/settings/data/settings-data';
+import type { FormatTogglesDto } from '../lib/backend/types';
 
 export interface WorkspaceSettings {
   activationMode: ActivationModeValue;
@@ -61,6 +62,7 @@ export interface StylePreset {
   description: string;
   isBuiltin: boolean;
   instructions: string;
+  formatting: FormatTogglesDto;
 }
 
 export interface SessionTotals {

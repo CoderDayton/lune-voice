@@ -6,7 +6,12 @@
 // below describe client-side interfaces and tagged enums that have no Rust
 // counterpart yet.
 
-import type { PillSnapshotDto, SaveWorkspaceSettingsInput, WorkspaceSnapshot } from './generated';
+import type {
+  FormatTogglesDto,
+  PillSnapshotDto,
+  SaveWorkspaceSettingsInput,
+  WorkspaceSnapshot,
+} from './generated';
 
 export type {
   ActivationModeDto,
@@ -14,6 +19,7 @@ export type {
   DevicePolicyDto,
   DictationModeDto,
   DictionaryItemDto,
+  FormatTogglesDto,
   HistoryItemDto,
   PillSnapshotDto,
   PillVisibilityDto,
@@ -76,12 +82,14 @@ export interface BackendClient {
     name: string,
     description: string,
     instructions: string,
+    formatting: FormatTogglesDto,
   ): Promise<WorkspaceSnapshot>;
   updateCustomStyle(
     id: string,
     name: string,
     description: string,
     instructions: string,
+    formatting: FormatTogglesDto,
   ): Promise<WorkspaceSnapshot>;
   deleteCustomStyle(styleId: string): Promise<WorkspaceSnapshot>;
   generateStyleExamples(styleId: string): Promise<WorkspaceSnapshot>;

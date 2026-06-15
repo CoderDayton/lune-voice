@@ -97,9 +97,15 @@ function createMockSnapshot(): WorkspaceSnapshot {
       {
         id: 'minimal',
         name: 'Minimal',
-        description: 'Fix errors only. No style changes.',
+        description: 'Error fixes only, no AI styling.',
         isBuiltin: true,
         instructions: '',
+        formatting: {
+          keybinds: true,
+          titleAbbreviations: true,
+          autoCapitalization: true,
+          brandCasing: true,
+        },
       },
       {
         id: 'casual',
@@ -107,6 +113,12 @@ function createMockSnapshot(): WorkspaceSnapshot {
         description: 'Relaxed, conversational tone.',
         isBuiltin: true,
         instructions: '',
+        formatting: {
+          keybinds: true,
+          titleAbbreviations: true,
+          autoCapitalization: true,
+          brandCasing: true,
+        },
       },
       {
         id: 'professional',
@@ -114,6 +126,12 @@ function createMockSnapshot(): WorkspaceSnapshot {
         description: 'Polished and clear.',
         isBuiltin: true,
         instructions: '',
+        formatting: {
+          keybinds: true,
+          titleAbbreviations: true,
+          autoCapitalization: true,
+          brandCasing: true,
+        },
       },
       {
         id: 'formal',
@@ -121,6 +139,12 @@ function createMockSnapshot(): WorkspaceSnapshot {
         description: 'Official correspondence.',
         isBuiltin: true,
         instructions: '',
+        formatting: {
+          keybinds: true,
+          titleAbbreviations: true,
+          autoCapitalization: true,
+          brandCasing: true,
+        },
       },
       {
         id: 'technical',
@@ -128,6 +152,12 @@ function createMockSnapshot(): WorkspaceSnapshot {
         description: 'Code and engineering.',
         isBuiltin: true,
         instructions: '',
+        formatting: {
+          keybinds: true,
+          titleAbbreviations: true,
+          autoCapitalization: true,
+          brandCasing: true,
+        },
       },
       {
         id: 'writing',
@@ -135,6 +165,12 @@ function createMockSnapshot(): WorkspaceSnapshot {
         description: 'Long-form content.',
         isBuiltin: true,
         instructions: '',
+        formatting: {
+          keybinds: true,
+          titleAbbreviations: true,
+          autoCapitalization: true,
+          brandCasing: true,
+        },
       },
     ],
   };
@@ -241,21 +277,28 @@ export const mockBackendClient: BackendClient = {
     return structuredClone(mockSnapshot);
   },
 
-  async createCustomStyle(name, description, instructions) {
+  async createCustomStyle(name, description, instructions, formatting) {
     mockSnapshot = {
       ...mockSnapshot,
       stylePresets: [
         ...mockSnapshot.stylePresets,
-        { id: `custom-${nextStyleId++}`, name, description, instructions, isBuiltin: false },
+        {
+          id: `custom-${nextStyleId++}`,
+          name,
+          description,
+          instructions,
+          isBuiltin: false,
+          formatting,
+        },
       ],
     };
     return structuredClone(mockSnapshot);
   },
-  async updateCustomStyle(id, name, description, instructions) {
+  async updateCustomStyle(id, name, description, instructions, formatting) {
     mockSnapshot = {
       ...mockSnapshot,
       stylePresets: mockSnapshot.stylePresets.map((p) =>
-        p.id === id ? { ...p, name, description, instructions } : p,
+        p.id === id ? { ...p, name, description, instructions, formatting } : p,
       ),
     };
     return structuredClone(mockSnapshot);

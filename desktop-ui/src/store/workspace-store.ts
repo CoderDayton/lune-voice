@@ -1,6 +1,6 @@
 import { Store } from '@tanstack/store';
 import { backendClient } from '../lib/backend/client';
-import type { SessionStreamEvent, WorkspaceSnapshot } from '../lib/backend/types';
+import type { FormatTogglesDto, SessionStreamEvent, WorkspaceSnapshot } from '../lib/backend/types';
 import {
   mapDictionaryEntry,
   mapHistoryEntry,
@@ -283,6 +283,7 @@ export async function createCustomStyle(
   name: string,
   description: string,
   instructions: string,
+  formatting: FormatTogglesDto,
 ): Promise<boolean> {
   if (!name.trim()) return false;
   try {
@@ -290,6 +291,7 @@ export async function createCustomStyle(
       name.trim(),
       description.trim(),
       instructions.trim(),
+      formatting,
     );
     workspaceActions.hydrate(snapshot);
     return true;
@@ -304,6 +306,7 @@ export async function updateCustomStyle(
   name: string,
   description: string,
   instructions: string,
+  formatting: FormatTogglesDto,
 ): Promise<boolean> {
   if (!name.trim()) return false;
   try {
@@ -312,6 +315,7 @@ export async function updateCustomStyle(
       name.trim(),
       description.trim(),
       instructions.trim(),
+      formatting,
     );
     workspaceActions.hydrate(snapshot);
     return true;

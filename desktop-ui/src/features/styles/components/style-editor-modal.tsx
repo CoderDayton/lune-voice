@@ -1,6 +1,7 @@
 import { useLingui } from '@lingui/react/macro';
 import { Copy } from 'lucide-react';
 import type { RefObject } from 'react';
+import type { FormatTogglesDto } from '../../../lib/backend/types';
 
 interface StyleEditorModalProps {
   dialogRef: RefObject<HTMLDialogElement | null>;
@@ -13,6 +14,8 @@ interface StyleEditorModalProps {
   onNameChange: (v: string) => void;
   onDescriptionChange: (v: string) => void;
   onInstructionsChange: (v: string) => void;
+  formatting: FormatTogglesDto;
+  onFormattingChange: (key: keyof FormatTogglesDto, value: boolean) => void;
   onClose: () => void;
   onSave: () => void;
   onDuplicate: () => void;
@@ -29,11 +32,19 @@ export function StyleEditorModal({
   onNameChange,
   onDescriptionChange,
   onInstructionsChange,
+  formatting,
+  onFormattingChange,
   onClose,
   onSave,
   onDuplicate,
 }: StyleEditorModalProps) {
   const { t } = useLingui();
+  const formatToggleRows: { key: keyof FormatTogglesDto; label: string }[] = [
+    { key: 'keybinds', label: t`Keyboard shortcuts ("Super H" → "Super+H")` },
+    { key: 'titleAbbreviations', label: t`Title abbreviations ("Mister" → "Mr.")` },
+    { key: 'autoCapitalization', label: t`Auto-capitalize sentences` },
+    { key: 'brandCasing', label: t`Brand casing ("github" → "GitHub")` },
+  ];
   const isViewOnly = mode === 'view';
   const isEdit = mode === 'edit';
   const instrLen = instructions.length;
@@ -42,11 +53,11 @@ export function StyleEditorModal({
 
   return (
     <dialog ref={dialogRef} className="modal" onClose={onClose}>
-      <div className="modal-box max-w-lg overflow-hidden border border-surface-border p-5 sm:p-6">
-        <h3 className="font-semibold text-lg mb-4">
+      <div className="modal-box flex max-h-[85vh] max-w-lg flex-col overflow-hidden border border-surface-border p-5 sm:p-6">
+        <h3 className="mb-4 shrink-0 font-semibold text-lg">
           {isViewOnly ? t`View style` : isEdit ? t`Edit style` : t`Create style`}
         </h3>
-        <div className="flex flex-col gap-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
           <label className="flex flex-col gap-1.5">
             <span className="text-sm font-medium text-content-default">{t`Name`}</span>
             <input
@@ -89,8 +100,29 @@ export function StyleEditorModal({
               onChange={(e) => onInstructionsChange(e.target.value)}
             />
           </label>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium text-content-default">{t`Formatting`}</span>
+            <p className="text-xs text-content-dim">
+              {t`Deterministic fixes applied before any AI styling.`}
+            </p>
+            <div className="flex flex-col divide-y divide-surface-border rounded-box border border-surface-border">
+              {formatToggleRows.map(({ key, label }) => (
+                <label key={key} className="flex items-center justify-between gap-3 px-3 py-2">
+                  <span className="text-sm text-content-default">{label}</span>
+                  <input
+                    type="checkbox"
+                    className="toggle toggle-primary toggle-sm"
+                    checked={formatting[key]}
+                    disabled={isViewOnly}
+                    onChange={(e) => onFormattingChange(key, e.target.checked)}
+                    aria-label={label}
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
         </div>
-        <div className="modal-action mt-6">
+        <div className="modal-action mt-6 shrink-0">
           {isViewOnly ? (
             <>
               <button type="button" className="btn btn-soft" onClick={onClose}>

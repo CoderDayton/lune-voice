@@ -1,0 +1,78 @@
+import { useLingui } from '@lingui/react/macro';
+import { Lock, Pencil } from 'lucide-react';
+import type { StylePreset } from '../../../store/workspace-types';
+import { styleIcon } from '../style-icons';
+
+interface StyleHeroProps {
+  preset: StylePreset;
+  onEdit: () => void;
+  onView: () => void;
+}
+
+export function StyleHero({ preset, onEdit, onView }: StyleHeroProps) {
+  const { t } = useLingui();
+  const Icon = styleIcon(preset);
+  const fmt = preset.formatting;
+  const chips = [
+    { on: fmt.keybinds, label: t`Shortcuts` },
+    { on: fmt.autoCapitalization, label: t`Capitals` },
+    { on: fmt.titleAbbreviations, label: t`Titles` },
+    { on: fmt.brandCasing, label: t`Brands` },
+  ];
+
+  return (
+    <section className="relative overflow-hidden rounded-box border border-primary/30 bg-linear-to-br from-primary/12 via-surface-card to-surface-card p-5 shadow-glow sm:p-6">
+      <div className="pointer-events-none absolute -top-20 -right-16 size-52 rounded-full bg-primary/15 blur-3xl" />
+
+      <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-4">
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/20 text-primary shadow-glow">
+            <Icon size={22} strokeWidth={1.75} />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="section-label text-primary">{t`Active style`}</span>
+              {preset.isBuiltin && (
+                <span className="badge badge-soft badge-xs gap-1">
+                  <Lock size={9} /> {t`Built-in`}
+                </span>
+              )}
+            </div>
+            <h2 className="mt-1 truncate font-display text-2xl font-semibold tracking-display text-content-strong">
+              {preset.name}
+            </h2>
+            <p className="mt-1 max-w-prose text-sm text-content-muted">{preset.description}</p>
+          </div>
+        </div>
+
+        <div className="relative shrink-0">
+          {preset.isBuiltin ? (
+            <button type="button" className="btn btn-soft btn-sm gap-2" onClick={onView}>
+              <Lock size={14} /> {t`View`}
+            </button>
+          ) : (
+            <button type="button" className="btn btn-primary btn-sm gap-2" onClick={onEdit}>
+              <Pencil size={14} /> {t`Edit`}
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="relative mt-5 flex flex-wrap items-center gap-2">
+        <span className="mr-1 text-xs text-content-dim">{t`Formatting`}</span>
+        {chips.map((c) => (
+          <span
+            key={c.label}
+            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs transition-colors ${
+              c.on
+                ? 'border-primary/30 bg-primary/10 text-primary'
+                : 'border-surface-border bg-surface-inset text-content-dim line-through'
+            }`}
+          >
+            {c.label}
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+}

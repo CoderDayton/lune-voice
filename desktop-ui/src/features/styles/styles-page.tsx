@@ -2,6 +2,7 @@ import { useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';
 import { Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
+import type { FormatTogglesDto } from '../../lib/backend/types';
 import {
   createCustomStyle,
   deleteCustomStyle,
@@ -12,6 +13,7 @@ import {
 } from '../../store/workspace-store';
 import type { StylePreset } from '../../store/workspace-types';
 import { StyleEditorModal } from './components/style-editor-modal';
+import { StyleHero } from './components/style-hero';
 import { StylePresetCard } from './components/style-preset-card';
 
 type ModalMode = 'create' | 'edit' | 'view';
@@ -23,9 +25,17 @@ interface ModalState {
   name: string;
   description: string;
   instructions: string;
+  formatting: FormatTogglesDto;
   saving: boolean;
   generating: boolean;
 }
+
+const DEFAULT_FORMATTING: FormatTogglesDto = {
+  keybinds: true,
+  titleAbbreviations: true,
+  autoCapitalization: true,
+  brandCasing: true,
+};
 
 const CLOSED_MODAL: ModalState = {
   open: false,
@@ -34,6 +44,7 @@ const CLOSED_MODAL: ModalState = {
   name: '',
   description: '',
   instructions: '',
+  formatting: DEFAULT_FORMATTING,
   saving: false,
   generating: false,
 };
@@ -58,6 +69,7 @@ export function StylesPage() {
       name: preset?.name ?? '',
       description: preset?.description ?? '',
       instructions: preset?.instructions ?? '',
+      formatting: preset?.formatting ?? DEFAULT_FORMATTING,
     });
     requestAnimationFrame(() => dialogRef.current?.showModal());
   }
@@ -84,9 +96,15 @@ export function StylesPage() {
         modal.name,
         modal.description,
         modal.instructions,
+        modal.formatting,
       );
     } else {
-      ok = await createCustomStyle(modal.name, modal.description, modal.instructions);
+      ok = await createCustomStyle(
+        modal.name,
+        modal.description,
+        modal.instructions,
+        modal.formatting,
+      );
     }
 
     if (!ok) {
@@ -121,20 +139,37 @@ export function StylesPage() {
     setDeletingId(null);
   }
 
+  const activeStyle = presets.find((p) => p.id === activePreset) ?? null;
+  const others = presets.filter((p) => p.id !== activeStyle?.id);
+
   return (
     <div className="page-stack">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {loading && presets.length === 0
-          ? [0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className="card border rounded-box p-5 border-surface-border bg-surface-card"
-              >
-                <div className="skeleton h-5 w-24 mb-2" />
-                <div className="skeleton h-3 w-full" />
-              </div>
-            ))
-          : presets.map((preset) => (
+      {loading && presets.length === 0 ? (
+        <>
+          <div className="skeleton h-32 w-full rounded-box" />
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="skeleton h-[9.75rem] w-full rounded-box" />
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          {activeStyle && (
+            <StyleHero
+              preset={activeStyle}
+              onEdit={() => openModal('edit', activeStyle)}
+              onView={() => openModal('view', activeStyle)}
+            />
+          )}
+
+          <div className="flex items-center justify-between pt-1">
+            <span className="section-label">{t`Switch style`}</span>
+            <span className="text-xs text-content-dim">{t`${presets.length} presets`}</span>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {others.map((preset) => (
               <StylePresetCard
                 key={preset.id}
                 preset={preset}
@@ -149,19 +184,24 @@ export function StylesPage() {
               />
             ))}
 
-        <button
-          type="button"
-          className="card border border-dashed rounded-box p-5 text-left border-surface-border bg-surface-inset hover:border-primary/50 hover:bg-surface-card-hover transition-[background,border-color] duration-fast ease-standard cursor-pointer group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-          onClick={() => openModal('create')}
-        >
-          <div className="flex items-center gap-3 text-content-dim group-hover:text-content-muted transition-colors">
-            <div className="flex size-7 shrink-0 items-center justify-center rounded-md border border-dashed border-current">
-              <Plus size={14} />
-            </div>
-            <span className="text-sm font-medium">{t`Create new style`}</span>
+            <button
+              type="button"
+              className="group flex min-h-[9.75rem] flex-col items-center justify-center gap-3 rounded-box border border-dashed border-surface-border bg-surface-inset/50 p-4 transition-[transform,border-color,background-color,box-shadow] duration-fast ease-standard hover:-translate-y-0.5 hover:border-primary/50 hover:bg-surface-card-hover hover:shadow-elevated focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:p-5"
+              onClick={() => openModal('create')}
+            >
+              <div className="flex size-10 items-center justify-center rounded-xl border border-dashed border-current text-content-dim transition-colors group-hover:border-primary group-hover:text-primary">
+                <Plus size={18} />
+              </div>
+              <div className="text-center">
+                <div className="text-sm font-medium text-content-muted transition-colors group-hover:text-content-default">
+                  {t`Create new style`}
+                </div>
+                <div className="mt-0.5 text-xs text-content-dim">{t`Your own formatting preset`}</div>
+              </div>
+            </button>
           </div>
-        </button>
-      </div>
+        </>
+      )}
       <StyleEditorModal
         dialogRef={dialogRef}
         mode={modal.mode}
@@ -173,6 +213,10 @@ export function StylesPage() {
         onNameChange={(v) => setModal((m) => ({ ...m, name: v }))}
         onDescriptionChange={(v) => setModal((m) => ({ ...m, description: v }))}
         onInstructionsChange={(v) => setModal((m) => ({ ...m, instructions: v }))}
+        formatting={modal.formatting}
+        onFormattingChange={(key, value) =>
+          setModal((m) => ({ ...m, formatting: { ...m.formatting, [key]: value } }))
+        }
         onClose={closeModal}
         onSave={() => void handleSave()}
         onDuplicate={duplicateFromView}
