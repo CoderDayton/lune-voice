@@ -11,7 +11,9 @@ pub use modes::{ActivationMode, DictationMode, PillVisibility, PrivacyMode, Term
 pub use pipeline::{PipelineConfig, PipelineOverrides};
 pub use redacted::RedactedString;
 pub use settings::{AsrBackendConfig, DevicePolicy, LlmBackendConfig, StreamingMode, UserSettings};
-pub use style_llm::{BASE_SYSTEM_PROMPT, StyleId, StylePreset, StyleRegistry, builtin_registry};
+pub use style_llm::{
+    BASE_SYSTEM_PROMPT, FormatToggles, StyleId, StylePreset, StyleRegistry, builtin_registry,
+};
 
 #[cfg(test)]
 mod tests {

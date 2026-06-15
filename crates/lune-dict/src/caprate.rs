@@ -16,6 +16,14 @@ use std::sync::LazyLock;
 /// sitting in a wide gap (common ≤0.71, proper ≥0.96).
 pub const CAP_KEEP_THRESHOLD: f32 = 0.75;
 
+/// Stricter threshold for *removing* a capital (decasing mid-sentence).
+/// Reverting a capital is riskier than keeping one — many proper nouns are
+/// spelled like common words ("Code", "Voice", "Apple") — so only decase a word
+/// that is capitalized less than half the time mid-sentence. Discourse over-caps
+/// ("make" 0.04, "sure" 0.04, "so" 0.12) sit far below this; proper-noun-capable
+/// words ("firefox" 0.73, "okay" 0.54) sit at or above it and are spared.
+pub const CAP_DECASE_THRESHOLD: f32 = 0.5;
+
 /// On-disk format version for `en_caprate.bin`. The payload is
 /// `(CAPRATE_FORMAT_VERSION, Vec<(word, p_cap)>)`; a mismatch (a future bincode
 /// or schema change) is rejected into the empty-table fallback instead of

@@ -80,6 +80,45 @@ pub enum PillVisibilityDto {
 
 // ── Read DTOs (Serialize → frontend) ─────────────────────────────────────
 
+/// Per-style deterministic formatting toggles, surfaced to the styles page.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct FormatTogglesDto {
+    pub keybinds: bool,
+    pub title_abbreviations: bool,
+    pub auto_capitalization: bool,
+    pub brand_casing: bool,
+}
+
+impl Default for FormatTogglesDto {
+    fn default() -> Self {
+        lune_core::config::FormatToggles::default().into()
+    }
+}
+
+impl From<lune_core::config::FormatToggles> for FormatTogglesDto {
+    fn from(f: lune_core::config::FormatToggles) -> Self {
+        Self {
+            keybinds: f.keybinds,
+            title_abbreviations: f.title_abbreviations,
+            auto_capitalization: f.auto_capitalization,
+            brand_casing: f.brand_casing,
+        }
+    }
+}
+
+impl From<FormatTogglesDto> for lune_core::config::FormatToggles {
+    fn from(d: FormatTogglesDto) -> Self {
+        Self {
+            keybinds: d.keybinds,
+            title_abbreviations: d.title_abbreviations,
+            auto_capitalization: d.auto_capitalization,
+            brand_casing: d.brand_casing,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export, export_to = "../../src/lib/backend/generated/")]
 #[serde(rename_all = "camelCase")]
@@ -89,6 +128,7 @@ pub struct StylePresetDto {
     pub description: String,
     pub is_builtin: bool,
     pub instructions: String,
+    pub formatting: FormatTogglesDto,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]
@@ -235,6 +275,8 @@ pub struct CreateCustomStyleInput {
     pub name: String,
     pub description: String,
     pub instructions: String,
+    #[serde(default)]
+    pub formatting: FormatTogglesDto,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -244,6 +286,8 @@ pub struct UpdateCustomStyleInput {
     pub name: String,
     pub description: String,
     pub instructions: String,
+    #[serde(default)]
+    pub formatting: FormatTogglesDto,
 }
 
 // ── Stream events ────────────────────────────────────────────────────────

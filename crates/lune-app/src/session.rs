@@ -578,12 +578,14 @@ async fn process_and_deliver(
         .word_confidence_threshold
         .map(|threshold| 1.0 - threshold)
         .unwrap_or(lune_dict::corrector::HWCE_FLAG_THRESHOLD);
+    let fmt = style_preset.formatting;
     let heuristic_result = heuristic.correct_with_risk_threshold(
         &text_after_commands,
         &word_risk_scores,
         &dict_replacements,
         detected_lang,
         heuristic_flag_risk,
+        fmt.brand_casing,
     );
     // Apply deterministic punctuation (leading capital, terminal period) and
     // detect whether residual punctuation is ambiguous. The returned text is
@@ -596,7 +598,7 @@ async fn process_and_deliver(
     } else {
         heuristic_result.corrected_text.clone()
     };
-    let punctuation = lune_dict::punctuation::normalize(&corrected);
+    let punctuation = lune_dict::punctuation::normalize_with(&corrected, &fmt);
     // Downcase mid-sentence common-word capitals (the "Make Sure" ASR artifact,
     // and any over-capitalization the heuristic left) on the always-on path, so
     // casing is normalized once whether or not the gated LLM pass runs. English
@@ -709,8 +711,12 @@ async fn process_and_deliver(
                 debug!(%session_id, llm_ms = llm_t0.elapsed().as_millis() as u64, "[LLM] output ready, len={}", output.cleaned_text.len());
                 // Deterministic backstop: any sentence the model left
                 // uncapitalized (or that the merge reverted to input casing)
-                // still gets its sentence-initial capital.
-                lune_dict::punctuation::capitalize_sentence_starts(&output.cleaned_text)
+                // still gets its sentence-initial capital (when the style enables it).
+                if fmt.auto_capitalization {
+                    lune_dict::punctuation::capitalize_sentence_starts(&output.cleaned_text)
+                } else {
+                    output.cleaned_text
+                }
             }
             Ok(Err(e)) => {
                 warn!(error = %e, llm_ms = llm_t0.elapsed().as_millis() as u64, "LLM correction failed, using text as-is");

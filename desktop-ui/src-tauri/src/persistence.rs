@@ -207,6 +207,7 @@ pub fn create_custom_style(input: CreateCustomStyleInput) -> Result<WorkspaceSna
         user_prompt_template: "{raw_text}".into(),
         few_shot_pairs: Vec::new(),
         skip_styling: false,
+        formatting: input.formatting.into(),
     });
     save_settings(&paths, &settings)?;
     let mut database = open_database(&paths)?;
@@ -228,6 +229,7 @@ pub fn update_custom_style(input: UpdateCustomStyleInput) -> Result<WorkspaceSna
     settings.custom_styles[idx].name = name;
     settings.custom_styles[idx].description = description;
     settings.custom_styles[idx].style_instructions = instructions;
+    settings.custom_styles[idx].formatting = input.formatting.into();
     save_settings(&paths, &settings)?;
     let mut database = open_database(&paths)?;
     build_snapshot(settings, &mut database)
@@ -303,6 +305,7 @@ fn build_snapshot(
             description: p.description.clone(),
             is_builtin: true,
             instructions: String::new(),
+            formatting: p.formatting.into(),
         })
         .collect();
     for custom in &settings.custom_styles {
@@ -312,6 +315,7 @@ fn build_snapshot(
             description: custom.description.clone(),
             is_builtin: false,
             instructions: custom.style_instructions.clone(),
+            formatting: custom.formatting.into(),
         });
     }
 

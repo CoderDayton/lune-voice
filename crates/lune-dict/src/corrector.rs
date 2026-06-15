@@ -54,6 +54,7 @@ pub struct CorrectionResult {
 ///
 /// Returns the word to include in the output and optionally a `WordScore`
 /// for unresolved words that will be passed to the LLM.
+#[allow(clippy::too_many_arguments)] // per-word inputs + the brand-casing toggle
 fn process_single_word(
     word: &str,
     i: usize,
@@ -62,6 +63,7 @@ fn process_single_word(
     risk_score: f32,
     flag_threshold: f32,
     dict_replacements: &[(String, String)],
+    brand_casing: bool,
 ) -> ProcessedWord {
     // Empty or digit-containing words pass through unchanged
     if stripped.is_empty() || stripped.chars().any(|c| c.is_ascii_digit()) {
@@ -131,7 +133,8 @@ fn process_single_word(
                     || wordnik_list::word_exists(&stripped.to_lowercase())
             }
         };
-        if canonical_has_upper
+        if brand_casing
+            && canonical_has_upper
             && info.canonical.as_ref() != stripped
             && !(title_case_only && lowercase_is_common)
         {
@@ -245,6 +248,7 @@ impl LexicalGate {
             dict_replacements,
             lang,
             HWCE_FLAG_THRESHOLD,
+            true,
         )
     }
 
@@ -255,6 +259,7 @@ impl LexicalGate {
         dict_replacements: &[(String, String)],
         lang: &str,
         flag_threshold: f32,
+        brand_casing: bool,
     ) -> CorrectionResult {
         let words: Vec<&str> = text.split_whitespace().collect();
         let aligned = align_word_risk_positions(&words, word_risk_scores);
@@ -294,6 +299,7 @@ impl LexicalGate {
                 risk_score,
                 flag_threshold,
                 dict_replacements,
+                brand_casing,
             );
 
             if i > 0 {
@@ -579,7 +585,7 @@ mod tests {
         assert!(default_result.unresolved_words.is_empty());
 
         let custom_result =
-            c.correct_with_risk_threshold("the xyzqqq fox", &risks, &[], "en", 0.30);
+            c.correct_with_risk_threshold("the xyzqqq fox", &risks, &[], "en", 0.30, true);
         assert!(
             custom_result
                 .unresolved_words
@@ -662,6 +668,38 @@ mod tests {
         let risks = vec![("github".to_string(), 0.5)];
         let result = c.correct("push to github", &risks, &[], "en");
         assert_eq!(result.corrected_text, "push to GitHub");
+    }
+
+    #[test]
+    fn brand_casing_toggle_controls_canonical_casing() {
+        let c = LexicalGate::new();
+        let risks = vec![("github".to_string(), 0.5)];
+        // Off: the input casing is preserved.
+        assert_eq!(
+            c.correct_with_risk_threshold(
+                "push to github",
+                &risks,
+                &[],
+                "en",
+                HWCE_FLAG_THRESHOLD,
+                false
+            )
+            .corrected_text,
+            "push to github"
+        );
+        // On: canonical brand casing is applied.
+        assert_eq!(
+            c.correct_with_risk_threshold(
+                "push to github",
+                &risks,
+                &[],
+                "en",
+                HWCE_FLAG_THRESHOLD,
+                true
+            )
+            .corrected_text,
+            "push to GitHub"
+        );
     }
 
     #[test]

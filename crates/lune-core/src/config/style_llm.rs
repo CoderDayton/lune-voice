@@ -49,6 +49,40 @@ Output: I finished the report. Send it over when you get a sec. I'll be at lunch
 Input: hey just checking in on the deploy did the migration finish if not we should roll back before the demo at three im on slack let me know\n\
 Output: Hey, just checking in on the deploy. Did the migration finish? If not, we should roll back before the demo at three. I'm on Slack, let me know.";
 
+/// Per-style toggles for the deterministic formatting transforms that run in
+/// the correction path, before and independently of the LLM styling pass. All
+/// default on; a style can switch any of them off.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FormatToggles {
+    /// Join spoken keyboard chords: "Super H" -> "Super+H".
+    #[serde(default = "default_format_toggle")]
+    pub keybinds: bool,
+    /// Abbreviate spoken titles: "Mister Thompson" -> "Mr. Thompson".
+    #[serde(default = "default_format_toggle")]
+    pub title_abbreviations: bool,
+    /// Capitalize the first word of each sentence.
+    #[serde(default = "default_format_toggle")]
+    pub auto_capitalization: bool,
+    /// Apply canonical brand casing: "github" -> "GitHub", "iphone" -> "iPhone".
+    #[serde(default = "default_format_toggle")]
+    pub brand_casing: bool,
+}
+
+fn default_format_toggle() -> bool {
+    true
+}
+
+impl Default for FormatToggles {
+    fn default() -> Self {
+        Self {
+            keybinds: true,
+            title_abbreviations: true,
+            auto_capitalization: true,
+            brand_casing: true,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StylePreset {
     pub id: StyleId,
@@ -65,6 +99,10 @@ pub struct StylePreset {
     /// Decouples behavior from the historical `id == "minimal"` sentinel.
     #[serde(default)]
     pub skip_styling: bool,
+    /// Per-style deterministic formatting toggles (keybinds, title
+    /// abbreviations, auto-capitalization, brand casing). Default: all on.
+    #[serde(default)]
+    pub formatting: FormatToggles,
 }
 
 /// O(1) lookup registry for style presets.
@@ -183,6 +221,7 @@ impl StylePreset {
                 ),
             ],
             skip_styling: false,
+            formatting: FormatToggles::default(),
         }
     }
 
@@ -209,6 +248,7 @@ impl StylePreset {
                 ),
             ],
             skip_styling: false,
+            formatting: FormatToggles::default(),
         }
     }
 
@@ -235,6 +275,7 @@ impl StylePreset {
                 ),
             ],
             skip_styling: false,
+            formatting: FormatToggles::default(),
         }
     }
 
@@ -243,7 +284,7 @@ impl StylePreset {
         Self {
             id: "minimal".into(),
             name: "Minimal".into(),
-            description: "Fix errors only — no style changes".into(),
+            description: "Error fixes only, no AI styling".into(),
             style_instructions:
                 "Only fix clearly wrong words. Do not add, remove, or rephrase anything.".into(),
             user_prompt_template: "{raw_text}".into(),
@@ -262,6 +303,7 @@ impl StylePreset {
                 ),
             ],
             skip_styling: true,
+            formatting: FormatToggles::default(),
         }
     }
 
@@ -288,6 +330,7 @@ impl StylePreset {
                 ),
             ],
             skip_styling: false,
+            formatting: FormatToggles::default(),
         }
     }
 
@@ -310,6 +353,7 @@ impl StylePreset {
                 ),
             ],
             skip_styling: false,
+            formatting: FormatToggles::default(),
         }
     }
 }

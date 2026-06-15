@@ -89,3 +89,7 @@ path = "../../benchmarks/homophone_pipeline.rs"
 [[example]]
 name = "vad_tune"
 path = "../../benchmarks/vad_tune.rs"
+
+[[example]]
+name = "punctuation_ab"
+path = "../../benchmarks/punctuation_ab.rs"

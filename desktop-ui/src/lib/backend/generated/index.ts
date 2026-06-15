@@ -7,6 +7,7 @@ export type { AsrBackendTypeDto } from './AsrBackendTypeDto';
 export type { DevicePolicyDto } from './DevicePolicyDto';
 export type { DictationModeDto } from './DictationModeDto';
 export type { DictionaryItemDto } from './DictionaryItemDto';
+export type { FormatTogglesDto } from './FormatTogglesDto';
 export type { HistoryItemDto } from './HistoryItemDto';
 export type { PillSnapshotDto } from './PillSnapshotDto';
 export type { PillVisibilityDto } from './PillVisibilityDto';

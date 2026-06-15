@@ -21,6 +21,8 @@
 //! Non-Latin scripts (CJK, Hangul, etc.) use different punctuation and casing
 //! conventions, so they pass through untouched and never trip the gate.
 
+use lune_core::config::FormatToggles;
+
 /// Word count at or above which a separator-free segment is treated as a
 /// run-on candidate the deterministic pass cannot safely punctuate. Tuned for
 /// the "balanced" sensitivity: high enough to ignore ordinary short sentences,
@@ -83,6 +85,14 @@ pub struct PunctuationOutcome {
 /// punctuation should be handed to the LLM. The returned text is always safe to
 /// emit as-is *and* safe to feed to the LLM as input.
 pub fn normalize(text: &str) -> PunctuationOutcome {
+    normalize_with(text, &FormatToggles::default())
+}
+
+/// Like [`normalize`], but with per-style control over the deterministic
+/// formatting transforms — keybind joins, title abbreviations, and
+/// auto-capitalization. The terminal-period fix and the run-on/interrogative LLM
+/// gate are always applied.
+pub fn normalize_with(text: &str, fmt: &FormatToggles) -> PunctuationOutcome {
     let trimmed = text.trim();
     if trimmed.is_empty() || !is_latin(trimmed) {
         return PunctuationOutcome {
@@ -91,8 +101,17 @@ pub fn normalize(text: &str) -> PunctuationOutcome {
         };
     }
 
-    let abbreviated = abbreviate_titles(trimmed);
-    let trimmed = abbreviated.as_str();
+    let abbreviated = if fmt.title_abbreviations {
+        abbreviate_titles(trimmed)
+    } else {
+        trimmed.to_owned()
+    };
+    let hotkeyed = if fmt.keybinds {
+        join_hotkey_chords(&abbreviated)
+    } else {
+        abbreviated
+    };
+    let trimmed = hotkeyed.as_str();
 
     let words: Vec<&str> = trimmed.split_whitespace().collect();
     let ends_terminal = ends_with_terminal(trimmed);
@@ -110,7 +129,11 @@ pub fn normalize(text: &str) -> PunctuationOutcome {
     // Tier 1: capitalize the first word of the segment and of every internal
     // sentence (ASR emits sentence breaks from pause prosody, and the words
     // after them arrive lowercase).
-    let mut out = capitalize_sentence_starts(trimmed);
+    let mut out = if fmt.auto_capitalization {
+        capitalize_sentence_starts(trimmed)
+    } else {
+        trimmed.to_owned()
+    };
 
     // Tier 1: append a terminal period only for resolved declaratives. When
     // `needs_llm` is set the interrogative/run-on branch owns the end mark.
@@ -152,6 +175,110 @@ fn abbreviate_titles(text: &str) -> String {
         out.push(abbrev.map_or_else(|| (*w).to_string(), |a| a.to_string()));
     }
     out.join(" ")
+}
+
+/// Modifier words that begin a keyboard chord. Matched case-insensitively but
+/// only fire when written capitalized, which keeps ordinary prose ("control
+/// room", "shift focus") from being joined.
+const HOTKEY_MODIFIERS: &[&str] = &[
+    "super", "control", "ctrl", "alt", "shift", "command", "cmd", "meta", "win", "windows",
+    "option", "hyper", "fn",
+];
+
+/// Single-token named keys that can terminate a chord. Matched only when written
+/// capitalized (like the modifiers), so ordinary prose words stay untouched.
+const HOTKEY_NAMED_KEYS: &[&str] = &[
+    "tab",
+    "enter",
+    "return",
+    "escape",
+    "esc",
+    "space",
+    "spacebar",
+    "delete",
+    "del",
+    "backspace",
+    "home",
+    "end",
+    "insert",
+    "up",
+    "down",
+    "left",
+    "right",
+];
+
+/// Join spoken keyboard chords into `Modifier+Key` notation: "Super H" →
+/// "Super+H", "Control Shift P" → "Control+Shift+P", "Alt Tab" → "Alt+Tab".
+///
+/// Deliberately conservative: a chord is one or more *capitalized* modifier
+/// words followed by exactly one terminal key — a single uppercase letter, a
+/// digit, a function key (F1–F24), or a *capitalized* named key (Tab, Enter,
+/// Escape, Space, Delete, Backspace, Home, End, Insert, the arrows). The
+/// capitalization requirement keeps ordinary prose ("Shift focus", "Command
+/// line", "alt tab") from being joined. Trailing punctuation on the key
+/// ("Super H." → "Super+H.") is preserved.
+fn join_hotkey_chords(text: &str) -> String {
+    let words: Vec<&str> = text.split_whitespace().collect();
+    let mut out: Vec<String> = Vec::with_capacity(words.len());
+    let mut i = 0;
+    while i < words.len() {
+        let mut j = i;
+        while j < words.len() && is_hotkey_modifier(words[j]) {
+            j += 1;
+        }
+        // Need at least one modifier (j > i) and exactly one terminal key after.
+        if j > i && j < words.len() {
+            let (key_core, suffix) = split_trailing_punct(words[j]);
+            if is_hotkey_key(key_core) {
+                let mut chord = words[i..j].join("+");
+                chord.push('+');
+                chord.push_str(key_core);
+                chord.push_str(suffix);
+                out.push(chord);
+                i = j + 1;
+                continue;
+            }
+        }
+        out.push(words[i].to_string());
+        i += 1;
+    }
+    out.join(" ")
+}
+
+/// A capitalized, punctuation-free modifier word.
+fn is_hotkey_modifier(word: &str) -> bool {
+    word.starts_with(|c: char| c.is_ascii_uppercase())
+        && HOTKEY_MODIFIERS.contains(&word.to_ascii_lowercase().as_str())
+}
+
+/// Split a token into its alphanumeric core and trailing punctuation
+/// ("H." → ("H", ".")).
+fn split_trailing_punct(word: &str) -> (&str, &str) {
+    let end = word
+        .char_indices()
+        .rev()
+        .find(|(_, c)| c.is_alphanumeric())
+        .map_or(0, |(i, c)| i + c.len_utf8());
+    word.split_at(end)
+}
+
+/// A chord-terminating key: a single uppercase letter or digit, a function key
+/// F1–F24, or a capitalized named key (Tab, Enter, the arrows, …). Requiring
+/// capitalization on named keys keeps common words from being mistaken for keys.
+fn is_hotkey_key(core: &str) -> bool {
+    if core.len() == 1 {
+        let b = core.as_bytes()[0];
+        return b.is_ascii_uppercase() || b.is_ascii_digit();
+    }
+    if let Some(rest) = core.strip_prefix('F')
+        && (1..=2).contains(&rest.len())
+        && rest.bytes().all(|b| b.is_ascii_digit())
+        && rest.parse::<u8>().is_ok_and(|n| (1..=24).contains(&n))
+    {
+        return true;
+    }
+    core.starts_with(|c: char| c.is_ascii_uppercase())
+        && HOTKEY_NAMED_KEYS.contains(&core.to_ascii_lowercase().as_str())
 }
 
 /// True when every alphabetic character is in a Latin range. Accented European
@@ -237,38 +364,71 @@ pub fn decase_common_words(text: &str) -> String {
     if !is_latin(text) {
         return text.to_owned();
     }
-    let mut out = String::with_capacity(text.len());
-    let mut at_sentence_start = true;
+    // (leading-whitespace, token) segments, so a casing decision can see its
+    // neighbours; whitespace is preserved byte-for-byte.
+    let mut segs: Vec<(&str, &str)> = Vec::new();
     let mut rest = text;
     while !rest.is_empty() {
         let ws_end = rest
             .find(|c: char| !c.is_whitespace())
             .unwrap_or(rest.len());
-        out.push_str(&rest[..ws_end]);
+        let ws = &rest[..ws_end];
         rest = &rest[ws_end..];
         if rest.is_empty() {
+            segs.push((ws, ""));
             break;
         }
         let tok_end = rest.find(char::is_whitespace).unwrap_or(rest.len());
-        let token = &rest[..tok_end];
-        if at_sentence_start {
-            // The sentence-initial capital is legitimate and owned by
-            // capitalize_sentence_starts — never touch it here.
+        segs.push((ws, &rest[..tok_end]));
+        rest = &rest[tok_end..];
+    }
+
+    // Sentence-start flag per token: a sentence-initial capital is legitimate
+    // (owned by capitalize_sentence_starts) and is never a proper-noun-run cue.
+    let mut starts = vec![false; segs.len()];
+    let mut at_start = true;
+    for (i, (_, token)) in segs.iter().enumerate() {
+        starts[i] = at_start;
+        if !token.is_empty() {
+            at_start = token_ends_sentence(token);
+        }
+    }
+
+    let mut out = String::with_capacity(text.len());
+    for i in 0..segs.len() {
+        let (ws, token) = segs[i];
+        out.push_str(ws);
+        if token.is_empty() {
+            continue;
+        }
+        // Proper-noun-run guard: a capital flanked by ANOTHER (non-sentence-
+        // initial) capital — "Visual Studio Code", "Lune Voice" — is almost
+        // always a multi-word proper noun, so never lowercase it. Neighbours are
+        // read in the original casing.
+        let prev_cap = i > 0 && !starts[i - 1] && starts_upper(segs[i - 1].1);
+        let next_cap = i + 1 < segs.len() && !starts[i + 1] && starts_upper(segs[i + 1].1);
+        if starts[i] || prev_cap || next_cap {
             out.push_str(token);
         } else {
             out.push_str(&decase_token(token));
         }
-        at_sentence_start = token_ends_sentence(token);
-        rest = &rest[tok_end..];
     }
     out
+}
+
+/// Whether `token`'s first alphabetic character is uppercase.
+fn starts_upper(token: &str) -> bool {
+    token
+        .chars()
+        .find(|c| c.is_alphabetic())
+        .is_some_and(|c| c.is_uppercase())
 }
 
 /// Lowercase a single token's leading capital iff it is a plain Capitalized
 /// common word: first alphabetic char uppercase, NO interior uppercase (so
 /// "iPhone"/"GitHub"/"NASA" are spared), and `en_p_cap` positively classifies
-/// the word as common (below the keep threshold). Unknown words (a proper noun
-/// the table does not know) are left capitalized.
+/// the word as common (below the stricter decase threshold). Unknown words (a
+/// proper noun the table does not know) are left capitalized.
 fn decase_token(token: &str) -> String {
     let core = word_core(token);
     if core.is_empty() {
@@ -282,7 +442,7 @@ fn decase_token(token: &str) -> String {
         return token.to_string(); // interior uppercase = brand/acronym
     }
     let is_common =
-        crate::caprate::en_p_cap(core).is_some_and(|p| p < crate::caprate::CAP_KEEP_THRESHOLD);
+        crate::caprate::en_p_cap(core).is_some_and(|p| p < crate::caprate::CAP_DECASE_THRESHOLD);
     if !is_common {
         return token.to_string();
     }
@@ -465,10 +625,117 @@ mod tests {
     }
 
     #[test]
-    fn decase_lowercases_midsentence_common_word() {
+    fn decase_lowercases_isolated_midsentence_common_word() {
+        // An isolated over-capitalized common word is still reverted.
         assert_eq!(
-            decase_common_words("I want to Make Sure"),
-            "I want to make sure"
+            decase_common_words("I want to Make dinner"),
+            "I want to make dinner"
+        );
+    }
+
+    #[test]
+    fn decase_preserves_multiword_proper_noun() {
+        // A capital flanked by another capital is a proper-noun run — keep it,
+        // even though "visual"/"studio"/"code" are individually common words.
+        assert_eq!(
+            decase_common_words("Open Visual Studio Code today"),
+            "Open Visual Studio Code today"
+        );
+    }
+
+    #[test]
+    fn decase_spares_high_caprate_word() {
+        // "Firefox" (p_cap ~0.73) is above the decase threshold even isolated.
+        assert_eq!(
+            decase_common_words("Then open Firefox now"),
+            "Then open Firefox now"
+        );
+    }
+
+    #[test]
+    fn hotkey_joins_modifier_and_letter() {
+        assert_eq!(
+            join_hotkey_chords("set the hotkey to Super H"),
+            "set the hotkey to Super+H"
+        );
+    }
+
+    #[test]
+    fn hotkey_joins_multiple_modifiers() {
+        assert_eq!(
+            join_hotkey_chords("press Control Shift P"),
+            "press Control+Shift+P"
+        );
+    }
+
+    #[test]
+    fn hotkey_joins_function_key_and_keeps_trailing_punct() {
+        assert_eq!(join_hotkey_chords("hit Alt F4 now."), "hit Alt+F4 now.");
+        assert_eq!(
+            join_hotkey_chords("bind it to Super H."),
+            "bind it to Super+H."
+        );
+    }
+
+    #[test]
+    fn hotkey_leaves_prose_alone() {
+        // Common words after a modifier are not keys; a lowercase modifier and
+        // the article "a" never trigger a chord.
+        for s in [
+            "Control room access",
+            "Shift focus to the goal",
+            "super heroes assemble",
+            "Control a list of items",
+        ] {
+            assert_eq!(join_hotkey_chords(s), s, "should be unchanged: {s}");
+        }
+    }
+
+    #[test]
+    fn hotkey_join_runs_inside_normalize() {
+        assert_eq!(
+            normalize("set the hotkey to Super H").text,
+            "Set the hotkey to Super+H."
+        );
+    }
+
+    #[test]
+    fn hotkey_joins_named_keys() {
+        assert_eq!(join_hotkey_chords("press Alt Tab"), "press Alt+Tab");
+        assert_eq!(join_hotkey_chords("Control Enter"), "Control+Enter");
+        assert_eq!(join_hotkey_chords("Super Space"), "Super+Space");
+        assert_eq!(join_hotkey_chords("Control Shift Up"), "Control+Shift+Up");
+    }
+
+    #[test]
+    fn hotkey_named_key_requires_capital() {
+        // A lowercase named key after a capitalized modifier is left alone, so
+        // ordinary phrasing ("shift down a gear", "control end of file") is safe.
+        assert_eq!(join_hotkey_chords("Shift down a gear"), "Shift down a gear");
+        assert_eq!(
+            join_hotkey_chords("Control end of file"),
+            "Control end of file"
+        );
+    }
+
+    #[test]
+    fn normalize_with_respects_toggles() {
+        // All formatting transforms off: no keybind join, no title abbreviation,
+        // no auto-capitalization. (The terminal period is not a toggle.)
+        let off = FormatToggles {
+            keybinds: false,
+            title_abbreviations: false,
+            auto_capitalization: false,
+            brand_casing: false,
+        };
+        assert_eq!(
+            normalize_with("set the hotkey to Super H", &off).text,
+            "set the hotkey to Super H."
+        );
+        // Default (all on) joins the chord and capitalizes.
+        assert_eq!(
+            normalize_with("set the hotkey to Super H", &FormatToggles::default()).text,
+            "Set the hotkey to Super+H."
         );
     }
 
