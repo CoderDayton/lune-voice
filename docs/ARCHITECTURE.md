@@ -102,7 +102,7 @@ The sequence is:
 
 1. Voice commands are stripped from the ASR text.
 2. The dictionary manager scans the remaining text.
-3. `HeuristicCorrector` applies dictionary replacements and spelling fixes.
+3. `LexicalGate` applies dictionary replacements and spelling fixes.
 4. The corrector returns `word_risk_positions`, mapped to the corrected word positions.
 5. `build_correction_spans` expands high-risk words into short editable spans.
 6. The bypass gate decides whether to call the LLM.
@@ -322,7 +322,7 @@ lune-audio (cpal)
 Session task
   |
   |-- ASR push + poll
-  |-- HeuristicCorrector
+  |-- LexicalGate
   |-- correction spans + word risks
   |-- LLM gate
   |-- TextPostProcessor or passthrough

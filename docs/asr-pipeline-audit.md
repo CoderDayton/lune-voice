@@ -195,12 +195,12 @@ Runs once per session on `(raw_text, segments)`. Order: voice commands → dicti
 - `top_relevant(text, 20)` → up to 20 entries for the LLM prompt (CI substring or Levenshtein-≤1 single-word match). Forced-title-case replacements ("Dev", "Server") are **softened to lowercase before the prompt/seed** so the sentence-cap backstop can re-capitalize correctly (`session.rs:944-949`).
 - `scan(text)` → `Vec<(matched, replacement)>` without mutating; multi-word = exact CI window match, single-word = Levenshtein-≤1 CI (`lev_le1_ci`, an O(n) early-exit primitive).
 
-**HeuristicCorrector** (`corrector.rs`), `correct_with_risk_threshold(text, word_risk_scores, dict_replacements, lang, flag_threshold)`:
-- ⚠️ **No spelling-candidate generation in the live path.** It does dictionary replacement, canonical-casing, proper-noun/known-word preservation, and *flagging* only — it never rewrites a flagged word to a guessed candidate (it emits the original verbatim and marks it for the LLM). The dormant weighted-edit-distance scorer and candidate enumerator (`scorer.rs`, `candidate_source.rs`) flagged in the first audit have since been **deleted**. `lune-dict` now declares `corrector, freq, homophone, homophone_calib, lexicon, punctuation, vocab` (`lib.rs:1-7`); the `homophone*` modules are the new resolver subsystem (§5.5), separate from the live `HeuristicCorrector`.
+**LexicalGate** (`corrector.rs`), `correct_with_risk_threshold(text, word_risk_scores, dict_replacements, lang, flag_threshold)`:
+- ⚠️ **No spelling-candidate generation in the live path.** It does dictionary replacement, canonical-casing, proper-noun/known-word preservation, and *flagging* only — it never rewrites a flagged word to a guessed candidate (it emits the original verbatim and marks it for the LLM). The dormant weighted-edit-distance scorer and candidate enumerator (`scorer.rs`, `candidate_source.rs`) flagged in the first audit have since been **deleted**. `lune-dict` now declares `caprate, corrector, freq, homophone, homophone_calib, lexicon, ngram, punctuation, vocab` (`lib.rs:1-9`); the `homophone*` modules are the new resolver subsystem (§5.5), separate from the live `LexicalGate`.
 - Decision order per word (`process_single_word` `:60-180`): digit/empty passthrough → dictionary replacement (case-insensitive exact phrase, highest priority) → known&unflagged passthrough → canonical-casing override (github→GitHub, guarded against flattening sentence caps / force-capping common nouns) → known-word verbatim under `CANONICAL_OVERRIDE_RISK_CEIL 0.75` (Vocab words pass even above) → proper-noun/acronym/camelCase preservation under `PROPER_NOUN_RISK_CEIL 0.80` → else flag as unresolved if `risk ≥ flag_threshold`.
 - Thresholds: `HWCE_FLAG_THRESHOLD 0.40`, canonical ceiling `0.75`, proper-noun ceiling `0.80`. `risk` is `word_error_risk` from HWCE (the `1 − threshold` form, `session.rs:964-968`).
 - Result: `CorrectionResult { corrected_text, word_risk_positions, unresolved_words, all_resolved, dropped_risk_entries }`. Word↔risk alignment is a greedy forward cursor; entries that don't align count as `dropped`.
-- `HeuristicCorrector.ngram` (`corrector.rs:214-215`) is still `#[allow(dead_code)]` — **unused by the corrector**. The model is no longer wasted, though: the same trained n-gram now powers homophone calibration at startup (§5.5).
+- The corrector no longer holds the n-gram model — the former `#[allow(dead_code)]` field was removed and `HeuristicCorrector` renamed `LexicalGate`. The trained n-gram still powers homophone calibration at startup (§5.5).
 
 Lexicon (`lexicon.rs`): tiered `lookup` over a frequency dict (`CONFIDENT_FREQ 5000`), curated supplemental vocab (`Vocab`, freq floor 10000, dev terms), and English Wordnik membership. 11 bundled frequency dictionaries (en/de/es/fr/it/ja/ko/nl/pt/ru/zh).
 
@@ -225,7 +225,7 @@ The text that goes forward is `text_after_heuristic` (heuristic-corrected + Tier
 
 ### 5.5 Homophone resolver + conformal calibration (`lune-dict/{homophone,homophone_calib}.rs`) — built, NOT yet live-wired
 
-A self-evaluating homophone disambiguator exists but is **not called from the live correction path** — `process_and_deliver`/`HeuristicCorrector` never invoke it. It is fully built, tested, and exercised at startup (calibration is computed and logged), pending integration.
+A self-evaluating homophone disambiguator exists but is **not called from the live correction path** — `process_and_deliver`/`LexicalGate` never invoke it. It is fully built, tested, and exercised at startup (calibration is computed and logged), pending integration.
 
 - **Resolver** (`homophone.rs`): 15 curated, tokenizer-distinct confusion sets (`CONFUSION_SETS` `:52` — e.g. `there/their/they're`, `to/too/two`; apostrophe-colliding pairs like `it's/its` deliberately excluded). `ResolverPolicy` (`:102`): `Off`, `RerankArgmax` (the lune-ngram blend, ungated — over-corrects), and `MarginGate { tau }` (default **2.0**). A flip fires only when **all** gates pass: confusion-set membership, n-gram avg-log-prob margin > τ, sufficient trigram **context support**, word HWCE risk below `max_word_risk` (0.85), and an optional **contextual-gain** gate. Scoring shares `best_member_margin` with the calibrator so offline and live decisions match exactly. `resolve_words` carries the **observed (ASR)** left-context forward — byte-for-byte what the calibrator replays.
 - **Calibration** (`homophone_calib.rs`): per-user, per-set self-evaluation over `(raw → final)` history pairs.
@@ -335,7 +335,7 @@ hotkey
        → AsrSegment{text, mean/min conf, word_error_risk via HWCE, lang}
   → append_segments (drop conf<0.25)
   → router.route_full → strip commands (apply SwitchStyle live)
-  → dict.scan + HeuristicCorrector (replace/case/flag; no candidate gen)
+  → dict.scan + LexicalGate (replace/case/flag; no candidate gen)
   → punctuation.normalize (Tier-1 caps+period; set needs_llm)
   → bypass gate: needs_llm = (unresolved | punct-ambiguous | min_conf<0.65 | wants_style) & avg_conf≥0.30
        no  → text_after_heuristic (fast path)
@@ -362,7 +362,7 @@ hotkey
 8. `timestamp_ms` is processing-time, not capture-time.
 
 **Dead / inconsistent code (low risk, hygiene)**
-9. `HeuristicCorrector.ngram` is still loaded into the corrector as `#[allow(dead_code)]` (`corrector.rs:214-215`) — but the trained model is no longer wasted: it now drives homophone calibration at startup (§5.5).
+9. The corrector no longer carries the n-gram model — the dead `#[allow(dead_code)]` field was removed (and `HeuristicCorrector` is now `LexicalGate`); the trained model still drives homophone calibration at startup (§5.5).
 10. `lune-core::AudioCaptureConfig` / `AudioFrame` parallel/legacy types disagree with the live capture path (480 vs 1280 samples, 0.01 vs 0.5 thresholds).
 11. Stale test names: `default_has_skip_threshold_at_0_95` asserts `Some(0.65)`; a pipeline comment says "40% LCS gate" while code is 55%; `BASE_SYSTEM_PROMPT` `{lang}` token removed but `.replace("{lang}", …)` callers remain (no-ops).
 12. `LlmBackendConfig::default() = Local` vs `UserSettings::default() = Disabled` — divergent defaults reconciled only by the checked-in TOML (`Local`).

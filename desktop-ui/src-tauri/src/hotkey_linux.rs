@@ -575,6 +575,40 @@ fn key_name_to_code(name: &str) -> Option<KeyCode> {
     })
 }
 
+// ─── Pressed-key bitset ──────────────────────────────────────────────────────
+
+const LIMIT: usize = 1024;
+const WORDS: usize = LIMIT / 64;
+
+struct PressedCodes {
+    w: [u64; WORDS],
+}
+
+impl Default for PressedCodes {
+    fn default() -> Self {
+        Self { w: [0; WORDS] }
+    }
+}
+
+impl PressedCodes {
+    fn insert(&mut self, c: KeyCode) {
+        let i = c.code() as usize;
+        if i < LIMIT {
+            self.w[i / 64] |= 1u64 << (i % 64);
+        }
+    }
+    fn remove(&mut self, c: KeyCode) {
+        let i = c.code() as usize;
+        if i < LIMIT {
+            self.w[i / 64] &= !(1u64 << (i % 64));
+        }
+    }
+    fn contains(&self, c: KeyCode) -> bool {
+        let i = c.code() as usize;
+        i < LIMIT && (self.w[i / 64] >> (i % 64)) & 1 != 0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -673,39 +707,5 @@ mod tests {
             s.handle(KeyCode::KEY_SPACE, false, ActivationMode::Hold)
                 .is_none()
         );
-    }
-}
-
-// ─── Pressed-key bitset ──────────────────────────────────────────────────────
-
-const LIMIT: usize = 1024;
-const WORDS: usize = LIMIT / 64;
-
-struct PressedCodes {
-    w: [u64; WORDS],
-}
-
-impl Default for PressedCodes {
-    fn default() -> Self {
-        Self { w: [0; WORDS] }
-    }
-}
-
-impl PressedCodes {
-    fn insert(&mut self, c: KeyCode) {
-        let i = c.code() as usize;
-        if i < LIMIT {
-            self.w[i / 64] |= 1u64 << (i % 64);
-        }
-    }
-    fn remove(&mut self, c: KeyCode) {
-        let i = c.code() as usize;
-        if i < LIMIT {
-            self.w[i / 64] &= !(1u64 << (i % 64));
-        }
-    }
-    fn contains(&self, c: KeyCode) -> bool {
-        let i = c.code() as usize;
-        i < LIMIT && (self.w[i / 64] >> (i % 64)) & 1 != 0
     }
 }

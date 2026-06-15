@@ -9,7 +9,7 @@
 use lune_core::config::PipelineConfig;
 
 /// Everything the gate decision reads.
-pub struct GateInputs<'a> {
+pub(crate) struct GateInputs<'a> {
     pub pipeline: &'a PipelineConfig,
     /// `CorrectionResult::all_resolved`.
     pub all_resolved: bool,
@@ -27,7 +27,7 @@ pub struct GateInputs<'a> {
 
 /// The gate's decision plus the confidence signals it derived (for logging).
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct GateOutcome {
+pub(crate) struct GateOutcome {
     pub needs_correction: bool,
     pub needs_llm: bool,
     pub conf_attention: bool,
@@ -38,7 +38,7 @@ pub struct GateOutcome {
 
 /// Decide whether the LLM correction/styling pass should run. The arithmetic is
 /// byte-for-byte the prior inline gate — do not "simplify" the f32 folds.
-pub fn decide(g: GateInputs<'_>) -> GateOutcome {
+pub(crate) fn decide(g: GateInputs<'_>) -> GateOutcome {
     let max_risk = g
         .word_risk_scores
         .iter()
@@ -141,5 +141,24 @@ mod tests {
         let c = cfg(Some(0.5), Some(0.3));
         let out = decide(inputs(&c, true, false, true, &[("ok", 0.1)], &[(0, 0.1)]));
         assert!(!out.needs_correction && out.needs_llm);
+    }
+
+    #[test]
+    fn empty_scores_clamp_word_count() {
+        // word_count is the pre-correction whitespace split; the gate clamps it
+        // to 1 so an empty risk set never divides by zero.
+        let c = cfg(Some(0.5), Some(0.3));
+        let out = decide(GateInputs {
+            pipeline: &c,
+            all_resolved: true,
+            needs_punct: false,
+            wants_styling: false,
+            word_risk_scores: &[],
+            word_risk_positions: &[],
+            word_count: 0,
+        });
+        assert_eq!(out.min_conf, 1.0); // max_risk over empty = 0
+        assert_eq!(out.avg_conf, 1.0); // mean_risk = 0 / max(1) = 0
+        assert!(!out.needs_llm);
     }
 }

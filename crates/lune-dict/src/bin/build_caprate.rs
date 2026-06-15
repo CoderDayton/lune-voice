@@ -37,13 +37,17 @@ fn main() {
         entries.push((word.to_string(), pcap));
     }
 
+    // Versioned payload: the loader rejects a mismatched version into its
+    // empty-table fallback instead of misdecoding a future format.
+    let n = entries.len();
+    let payload = (lune_dict::caprate::CAPRATE_FORMAT_VERSION, entries);
     let bytes =
-        bincode::serde::encode_to_vec(&entries, bincode::config::standard()).expect("encode");
+        bincode::serde::encode_to_vec(&payload, bincode::config::standard()).expect("encode");
     std::fs::write(&out_path, &bytes).expect("write bin");
 
     println!(
         "  ✓ en_caprate.bin: {} entries, {:.1} KB",
-        entries.len(),
+        n,
         bytes.len() as f64 / 1024.0
     );
 }

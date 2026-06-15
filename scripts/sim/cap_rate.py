@@ -112,7 +112,7 @@ GOLD_POSITIVE = [  # proper nouns / always-capitalized — KEEP the capital
 ]
 GOLD_NEGATIVE = [  # common/discourse — REVERT a mid-sentence capital
     "the", "and", "so", "make", "sure", "now", "just", "really", "very",
-    "that", "this", "well", "good", "thing", "people", "make", "let's",
+    "that", "this", "well", "good", "thing", "people", "let's",
     "okay", "yes", "because", "should",
 ]
 HOMOGRAPHS = ["will", "may", "mark", "rose", "bill", "april", "frank",

@@ -58,7 +58,7 @@ impl Lexicon {
         let lower = word.to_lowercase();
         let p_cap = self
             .is_english()
-            .then(|| crate::caprate::en_p_cap(&lower))
+            .then(|| crate::caprate::en_p_cap_lower(&lower))
             .flatten();
         if let Some(freq) = self.dict.get(&lower) {
             let canonical = VOCAB_INDEX

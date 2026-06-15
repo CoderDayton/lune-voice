@@ -329,6 +329,8 @@ fn lev_le1_ci(a: &[u8], b: &[u8]) -> bool {
 }
 
 /// Wagner-Fischer Levenshtein distance (byte-level; fine for ASCII ASR text).
+/// Only the dictionary path uses it, so it is gated with its sole caller.
+#[cfg(feature = "dictionary")]
 pub fn levenshtein(a: &str, b: &str) -> usize {
     // Operate on bytes — avoids char collection, valid for ASCII input.
     let a = a.as_bytes();

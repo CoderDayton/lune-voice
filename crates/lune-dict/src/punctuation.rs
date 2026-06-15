@@ -499,6 +499,25 @@ mod tests {
     }
 
     #[test]
+    fn decase_keeps_pronoun_contractions() {
+        // Regression: "I'm"/"I'll"/"I'd"/"I've" mid-sentence must stay
+        // capitalized — the apostrophe-stripping key bug lowercased them.
+        assert_eq!(
+            decase_common_words("yes I'm sure and I'll go once I'd know and I've seen"),
+            "yes I'm sure and I'll go once I'd know and I've seen"
+        );
+    }
+
+    #[test]
+    fn decase_lowercases_midsentence_lowercase_contractions() {
+        // Contractions that are normally lowercase mid-sentence still revert.
+        assert_eq!(
+            decase_common_words("I know It's fine and we Don't care"),
+            "I know it's fine and we don't care"
+        );
+    }
+
+    #[test]
     fn decase_preserves_pronoun_i() {
         assert_eq!(decase_common_words("you and I agree"), "you and I agree");
     }

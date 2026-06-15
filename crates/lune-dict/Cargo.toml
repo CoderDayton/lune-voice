@@ -23,6 +23,8 @@ lune-persist = { workspace = true, optional = true }
 serde = { version = "1", features = ["derive"] }
 strsim = "0.11"
 tracing.workspace = true
+# Core dependency: the corrector and lexicon call wordnik_list::word_exists on
+# the always-compiled path (not training-only), so it stays unconditional.
 wordnik_list = "0.2"
 
 # ngram training-only deps, gated behind the `training` feature.

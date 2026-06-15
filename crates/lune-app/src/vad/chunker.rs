@@ -32,7 +32,8 @@ pub(crate) enum SpanEvent {
 
 /// Contiguous-span gate — the stage-3 replacement for the old chunked gate.
 ///
-/// Where `Chunker` ends a segment after a short hangover and lets the
+/// Where the old hangover-based chunker ended a segment after a short hangover
+/// and let the
 /// orchestrator drop the silence between segments, `SpanGate` keeps a span
 /// open through short pauses and closes only on a `long_gap_frames` run of
 /// trailing silence. The orchestrator appends every in-span frame (speech and
@@ -61,7 +62,9 @@ impl SpanGate {
             // A 0-frame long-gap would close a span the instant any silence
             // appeared, collapsing back to the old splice behaviour.
             long_gap_frames: cfg.long_gap_frames().max(1),
-            min_speech_frames: cfg.min_speech_frames(),
+            // A 0-frame min-speech would keep every span (incl. noise blips);
+            // require at least one voiced frame, like the guards around it.
+            min_speech_frames: cfg.min_speech_frames().max(1),
             max_frames: cfg.max_chunk_frames().max(1),
             in_span: false,
             voiced_frames: 0,
@@ -240,6 +243,25 @@ mod span_tests {
         }
         assert_eq!(g.step(0.90), SpanEvent::Close { keep: true });
         assert!(!g.in_span());
+    }
+
+    /// A new onset on the frame right after a close opens a fresh span with
+    /// clean counters — no voiced/silence state leaks across the boundary.
+    #[test]
+    fn onset_right_after_close_opens_fresh_span() {
+        let mut g = test_gate();
+        g.step(0.90); // Open, voiced 1
+        g.step(0.90); // Append, voiced 2 (>= min)
+        for _ in 0..9 {
+            g.step(0.10); // 9 silence frames -> Append
+        }
+        assert_eq!(g.step(0.10), SpanEvent::Close { keep: true }); // 10th: long gap
+        // Immediately onset again: a brand-new span, not a resumption.
+        assert_eq!(g.step(0.90), SpanEvent::Open);
+        assert!(g.in_span());
+        // It must drop as a short blip (voiced 1 < min 2), proving voiced_frames
+        // reset to 1 rather than carrying over the prior span's count.
+        assert_eq!(g.finish(), SpanEvent::Close { keep: false });
     }
 
     #[test]

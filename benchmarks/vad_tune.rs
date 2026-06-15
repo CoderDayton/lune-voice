@@ -165,6 +165,9 @@ fn load_bench_fixtures(root: &Path) -> Vec<Fixture> {
                 .trim()
                 .to_string();
             let audio_secs = pcm.len() as f64 / 16_000.0;
+            // Leaked intentionally: load_* runs once in main() and the Fixture
+            // name lives for the whole run, so the bounded leak is simpler than
+            // threading a string arena through the harness.
             let name: &'static str = Box::leak(format!("{category}/{stem}").into_boxed_str());
             out.push(Fixture {
                 name,
@@ -209,6 +212,7 @@ fn load_noisy_audio_fixtures(root: &Path) -> Vec<Fixture> {
             .trim()
             .to_string();
         let audio_secs = pcm.len() as f64 / 16_000.0;
+        // Bounded leak — see load_bench_fixtures; runs once, lives the whole run.
         let name: &'static str = Box::leak(format!("noisy/{stem}").into_boxed_str());
         out.push(Fixture {
             name,
@@ -251,7 +255,7 @@ fn fixture_score(
     let hyp = transcribe(&harness.asr, &harness.rt, &audio, lang);
     // LUNE_BENCH_PRINT=1 dumps the raw transcript per fixture — the only way to
     // eyeball case/spacing artifacts (MakeSure) the scalar metrics summarize.
-    if std::env::var("LUNE_BENCH_PRINT").is_ok() {
+    if std::env::var("LUNE_BENCH_PRINT").is_ok_and(|v| v != "0") {
         println!("      [{}] {:?}", fx.name, hyp);
     }
     FixtureScore {
@@ -332,12 +336,13 @@ fn report_by_category(
         by_cat.entry(category_of(fx.name)).or_default().push(r);
     }
     for (cat, rs) in by_cat {
-        let n = rs.len() as f64;
+        let n = rs.len().max(1) as f64;
         let wer = rs.iter().map(|r| r.wer).sum::<f64>() / n;
         let cer = rs.iter().map(|r| r.cased_cer).sum::<f64>() / n;
         let concat = rs.iter().map(|r| r.concat as f64).sum::<f64>() / n;
+        let spacing = rs.iter().map(|r| r.spacing as f64).sum::<f64>() / n;
         println!(
-            "      {cat:<16} WER {wer:>5.1}%  cer {cer:>5.1}%  concat {concat:>4.1}  ({} clips)",
+            "      {cat:<16} WER {wer:>5.1}%  cer {cer:>5.1}%  concat {concat:>4.1}  spc {spacing:>+5.1}  ({} clips)",
             rs.len()
         );
     }

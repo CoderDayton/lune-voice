@@ -3,50 +3,55 @@ use lune_core::command::VoiceCommand;
 /// Result of routing a text through the command recognizer.
 #[derive(Debug, Clone)]
 pub struct RouteResult {
-    /// Commands detected in the text, in order of appearance.
+    /// Detected command, if the whole utterance was one (at most one).
     pub commands: Vec<VoiceCommand>,
-    /// Remaining text after stripping command phrases.
+    /// The dictation text. Empty when the utterance was a command; otherwise
+    /// the original text, unchanged.
     pub remaining: String,
 }
 
 /// Routes raw ASR text to built-in voice commands before LLM post-processing.
 ///
-/// Performs case-insensitive exact phrase matching. Matched phrases are stripped
-/// from the text; the cleaned remainder is returned for LLM post-processing.
+/// A command is recognized **only when the entire utterance is that command**,
+/// compared word-for-word and ignoring case and surrounding punctuation
+/// (`"Stop, dictation!"` == `"stop dictation"`). Anything else passes through
+/// untouched, so ordinary words like `"stop"` in `"tell him to stop"` are never
+/// stripped from dictation.
+///
+/// Parametric commands (`"switch to <preset>"`, `"insert <snippet>"`) match when
+/// the utterance *begins* with the exact command words and has at least one more
+/// word; the remainder is the argument.
 pub struct VoiceCommandRouter {
-    /// Additional user-defined phrase → command mappings loaded from settings.
-    custom: Vec<(String, VoiceCommand)>,
+    /// User-defined phrase → command mappings, stored as normalized word lists.
+    custom: Vec<(Vec<String>, VoiceCommand)>,
 }
 
-// Static builtin patterns — sorted longest-first to prevent short-match shadowing.
-// "stop dictation" must precede "stop" so the longer match wins.
+// Fixed commands. Each matches only when it is the entire utterance. Bare
+// "stop" is intentionally absent — it collided with the ordinary word "stop"
+// in dictation; stop the session with "stop dictation" / "stop listening".
 static BUILTINS: &[(&str, VoiceCommand)] = &[
-    ("stop listening", VoiceCommand::StopDictation),
     ("stop dictation", VoiceCommand::StopDictation),
+    ("stop listening", VoiceCommand::StopDictation),
     ("new paragraph", VoiceCommand::NewParagraph),
     ("scratch that", VoiceCommand::ScratchThat),
     ("list item", VoiceCommand::ListItem),
     ("new line", VoiceCommand::NewLine),
-    ("stop", VoiceCommand::StopDictation),
 ];
 
-// Parametric prefix tables — stored as (prefix_str, prefix_len, variant_tag).
-// Enum tag avoids dynamic dispatch / Box overhead in the hot loop.
 #[derive(Copy, Clone)]
 enum ParametricKind {
     SwitchStyle,
     InsertSnippet,
 }
 
+// Parametric command prefixes, matched only at the very start of an utterance.
+// Longer prefixes first so "switch preset to" wins over "switch to".
 static PARAMETRIC_PREFIXES: &[(&str, ParametricKind)] = &[
-    ("switch preset to ", ParametricKind::SwitchStyle),
-    ("switch to ", ParametricKind::SwitchStyle),
-    ("expand snippet ", ParametricKind::InsertSnippet),
-    ("insert ", ParametricKind::InsertSnippet),
+    ("switch preset to", ParametricKind::SwitchStyle),
+    ("switch to", ParametricKind::SwitchStyle),
+    ("expand snippet", ParametricKind::InsertSnippet),
+    ("insert", ParametricKind::InsertSnippet),
 ];
-
-// Delimiter set used by parametric scanning — avoids repeated char array construction.
-const PARAM_DELIMITERS: [char; 3] = [',', '.', ';'];
 
 impl VoiceCommandRouter {
     pub fn new() -> Self {
@@ -54,80 +59,76 @@ impl VoiceCommandRouter {
     }
 
     pub fn add_custom(&mut self, phrase: impl Into<String>, command: VoiceCommand) {
-        self.custom.push((phrase.into().to_lowercase(), command));
+        let words = normalize_words(&phrase.into());
+        if !words.is_empty() {
+            self.custom.push((words, command));
+        }
     }
 
-    /// Route `text`, returning detected commands and the remaining text.
-    /// Commands are detected left-to-right; each matched span is removed once.
+    /// Route `text`, returning the detected command (if the whole utterance is
+    /// one) and the remaining dictation text.
     pub fn route(&self, text: &str) -> RouteResult {
         self.route_inner(text, false)
     }
 
-    /// Full route including parametric patterns.
+    /// Full route, including parametric commands.
     pub fn route_full(&self, text: &str) -> RouteResult {
         self.route_inner(text, true)
     }
 
     fn route_inner(&self, text: &str, parametric: bool) -> RouteResult {
-        let lower = text.to_lowercase();
-        let cap = BUILTINS.len()
-            + self.custom.len()
-            + if parametric {
-                PARAMETRIC_PREFIXES.len()
-            } else {
-                0
-            };
-        let mut commands: Vec<VoiceCommand> = Vec::with_capacity(cap);
-        let mut removals: Vec<(usize, usize)> = Vec::with_capacity(cap);
+        let words = normalize_words(text);
+        let passthrough = || RouteResult {
+            commands: Vec::new(),
+            remaining: text.trim().to_string(),
+        };
+        if words.is_empty() {
+            return passthrough();
+        }
 
+        // Parametric: the utterance must begin with the exact command words and
+        // carry at least one argument word after them.
         if parametric {
-            parametric_matches(&lower, &mut commands, &mut removals);
-        }
-        self.match_exact(&lower, &mut commands, &mut removals);
-
-        removals.sort_unstable_by_key(|&(s, _)| s);
-        let remaining = rebuild_remaining(text, &removals);
-
-        RouteResult {
-            commands,
-            remaining,
-        }
-    }
-
-    fn match_exact(
-        &self,
-        lower: &str,
-        commands: &mut Vec<VoiceCommand>,
-        removals: &mut Vec<(usize, usize)>,
-    ) {
-        for (phrase, cmd) in self.all_patterns() {
-            let plen = phrase.len();
-            let mut search_from = 0usize;
-            while search_from + plen <= lower.len() {
-                match lower[search_from..].find(phrase) {
-                    None => break,
-                    Some(pos) => {
-                        let start = search_from + pos;
-                        let end = start + plen;
-                        // Overlap check — linear over removals; expected small (<16).
-                        if span_overlaps(removals, start, end) {
-                            search_from = end;
-                            continue;
-                        }
-                        commands.push(cmd.clone());
-                        removals.push((start, end));
-                        search_from = end;
-                    }
+            for &(prefix, kind) in PARAMETRIC_PREFIXES {
+                let pre: Vec<&str> = prefix.split_whitespace().collect();
+                if words.len() > pre.len()
+                    && words[..pre.len()].iter().zip(&pre).all(|(w, p)| w == p)
+                {
+                    let arg = words[pre.len()..].join(" ");
+                    let cmd = match kind {
+                        ParametricKind::SwitchStyle => VoiceCommand::SwitchStyle(arg),
+                        ParametricKind::InsertSnippet => VoiceCommand::InsertSnippet(arg),
+                    };
+                    return RouteResult {
+                        commands: vec![cmd],
+                        remaining: String::new(),
+                    };
                 }
             }
         }
+
+        // Fixed/custom commands: the whole utterance must equal the command.
+        for (phrase, cmd) in self.all_patterns() {
+            if words.iter().map(String::as_str).eq(phrase.iter().copied()) {
+                return RouteResult {
+                    commands: vec![cmd.clone()],
+                    remaining: String::new(),
+                };
+            }
+        }
+
+        passthrough()
     }
 
-    fn all_patterns(&self) -> impl Iterator<Item = (&str, VoiceCommand)> + '_ {
+    fn all_patterns(&self) -> impl Iterator<Item = (Vec<&str>, &VoiceCommand)> + '_ {
         BUILTINS
             .iter()
-            .map(|(p, c)| (*p, c.clone()))
-            .chain(self.custom.iter().map(|(p, c)| (p.as_str(), c.clone())))
+            .map(|(p, c)| (p.split_whitespace().collect::<Vec<_>>(), c))
+            .chain(
+                self.custom
+                    .iter()
+                    .map(|(words, c)| (words.iter().map(String::as_str).collect::<Vec<_>>(), c)),
+            )
     }
 }
 
@@ -137,116 +138,22 @@ impl Default for VoiceCommandRouter {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Free functions — kept out of impl to allow inlining across call sites.
-// ---------------------------------------------------------------------------
-
-/// Returns true iff [start, end) overlaps any existing removal span.
-#[inline(always)]
-fn span_overlaps(removals: &[(usize, usize)], start: usize, end: usize) -> bool {
-    removals.iter().any(|&(rs, re)| rs < end && re > start)
-}
-
-/// Scan `lower` for all parametric patterns; push matched spans + commands.
-fn parametric_matches(
-    lower: &str,
-    commands: &mut Vec<VoiceCommand>,
-    removals: &mut Vec<(usize, usize)>,
-) {
-    for &(prefix, kind) in PARAMETRIC_PREFIXES {
-        let plen = prefix.len();
-        let mut pos = 0usize;
-        while pos + plen <= lower.len() {
-            match lower[pos..].find(prefix) {
-                None => break,
-                Some(idx) => {
-                    let start = pos + idx;
-                    let arg_start = start + plen;
-                    let arg_end = lower[arg_start..]
-                        .find(PARAM_DELIMITERS)
-                        .map(|i| arg_start + i)
-                        .unwrap_or(lower.len());
-                    let arg = lower[arg_start..arg_end].trim();
-                    if !arg.is_empty() && !span_overlaps(removals, start, arg_end) {
-                        let cmd = match kind {
-                            ParametricKind::SwitchStyle => {
-                                VoiceCommand::SwitchStyle(arg.to_string())
-                            }
-                            ParametricKind::InsertSnippet => {
-                                VoiceCommand::InsertSnippet(arg.to_string())
-                            }
-                        };
-                        commands.push(cmd);
-                        removals.push((start, arg_end));
-                    }
-                    pos = arg_end;
-                }
-            }
-        }
-    }
-}
-
-/// Reconstruct the non-removed portions of `text` and collapse whitespace in
-/// a single pass, avoiding an extra allocation for the intermediate string.
-fn rebuild_remaining(text: &str, sorted_removals: &[(usize, usize)]) -> String {
-    // Estimate capacity: full text minus removed bytes is a tight upper bound.
-    let removed: usize = sorted_removals.iter().map(|(s, e)| e - s).sum();
-    let cap = text.len().saturating_sub(removed);
-    let mut out = String::with_capacity(cap);
-    let mut cursor = 0usize;
-
-    for &(start, end) in sorted_removals {
-        if start > cursor {
-            collapse_push(&mut out, &text[cursor..start]);
-        }
-        cursor = end;
-    }
-    if cursor < text.len() {
-        collapse_push(&mut out, &text[cursor..]);
-    }
-
-    // Trim trailing space that collapse_push may have left.
-    if out.ends_with(' ') {
-        out.pop();
-    }
-    // Trim leading space.
-    if out.starts_with(' ') {
-        out.remove(0);
-    }
-    out
-}
-
-/// Push `s` into `out` collapsing runs of whitespace to a single space,
-/// tracking whether `out` already ends with a space to avoid doubling.
-#[inline]
-fn collapse_push(out: &mut String, s: &str) {
-    let prev_space = out.ends_with(' ');
-    let mut in_space = prev_space;
-    for c in s.chars() {
-        if c.is_whitespace() {
-            if !in_space {
-                out.push(' ');
-                in_space = true;
-            }
-        } else {
-            out.push(c);
-            in_space = false;
-        }
-    }
-}
-
-/// Collapse whitespace in a standalone string (used by tests).
-#[cfg(test)]
-fn collapse_whitespace(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    collapse_push(&mut out, s);
-    if out.ends_with(' ') {
-        out.pop();
-    }
-    if out.starts_with(' ') {
-        out.remove(0);
-    }
-    out
+/// Normalize an utterance to lowercase, punctuation-free words for command
+/// comparison. Each whitespace token is reduced to its alphanumeric characters
+/// (so `"Stop,"` and `"stop"` compare equal); tokens with no alphanumerics are
+/// dropped. Used only for *matching* — the passed-through dictation keeps its
+/// original casing and punctuation.
+fn normalize_words(text: &str) -> Vec<String> {
+    text.split_whitespace()
+        .filter_map(|tok| {
+            let w: String = tok
+                .chars()
+                .filter(|c| c.is_alphanumeric())
+                .flat_map(char::to_lowercase)
+                .collect();
+            (!w.is_empty()).then_some(w)
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -258,59 +165,103 @@ mod tests {
     }
 
     #[test]
-    fn stop_dictation_full() {
-        let r = router().route_full("please stop dictation now");
-        assert!(r.commands.contains(&VoiceCommand::StopDictation));
-        assert!(!r.remaining.to_lowercase().contains("stop dictation"));
-    }
-
-    #[test]
-    fn stop_alone() {
-        let r = router().route_full("stop");
+    fn stop_dictation_exact() {
+        let r = router().route_full("stop dictation");
         assert!(r.commands.contains(&VoiceCommand::StopDictation));
         assert!(r.remaining.is_empty());
     }
 
     #[test]
-    fn new_line_command() {
+    fn stop_dictation_ignores_case_and_punctuation() {
+        let r = router().route_full("Stop, Dictation!");
+        assert!(r.commands.contains(&VoiceCommand::StopDictation));
+        assert!(r.remaining.is_empty());
+    }
+
+    #[test]
+    fn stop_listening_exact() {
+        let r = router().route_full("stop listening");
+        assert!(r.commands.contains(&VoiceCommand::StopDictation));
+    }
+
+    #[test]
+    fn midsentence_stop_is_kept_as_dictation() {
+        // Regression: the bare-"stop" substring command used to strip the word.
+        let r = router().route_full("tell him to stop now");
+        assert!(r.commands.is_empty());
+        assert_eq!(r.remaining, "tell him to stop now");
+    }
+
+    #[test]
+    fn bare_stop_is_not_a_command() {
+        let r = router().route_full("stop");
+        assert!(r.commands.is_empty());
+        assert_eq!(r.remaining, "stop");
+    }
+
+    #[test]
+    fn word_containing_command_is_not_matched() {
+        // "nonstop" / "stopwatch" must not trip the stop command.
+        let r = router().route_full("we ran nonstop");
+        assert!(r.commands.is_empty());
+        assert_eq!(r.remaining, "we ran nonstop");
+    }
+
+    #[test]
+    fn command_only_when_whole_utterance() {
         let r = router().route_full("hello new line world");
+        assert!(r.commands.is_empty());
+        assert_eq!(r.remaining, "hello new line world");
+    }
+
+    #[test]
+    fn new_line_exact() {
+        let r = router().route_full("new line");
         assert!(r.commands.contains(&VoiceCommand::NewLine));
-        assert_eq!(r.remaining, "hello world");
+        assert!(r.remaining.is_empty());
     }
 
     #[test]
-    fn new_paragraph_command() {
-        let r = router().route_full("end of section new paragraph continue here");
+    fn new_paragraph_exact() {
+        let r = router().route_full("New paragraph.");
         assert!(r.commands.contains(&VoiceCommand::NewParagraph));
-        assert!(!r.remaining.to_lowercase().contains("new paragraph"));
     }
 
     #[test]
-    fn list_item_command() {
-        let r = router().route_full("list item fix the bug");
+    fn list_item_exact() {
+        let r = router().route_full("list item");
         assert!(r.commands.contains(&VoiceCommand::ListItem));
-        assert_eq!(r.remaining, "fix the bug");
     }
 
     #[test]
-    fn scratch_that_command() {
-        let r = router().route_full("I made a mistake scratch that");
+    fn scratch_that_exact() {
+        let r = router().route_full("scratch that");
         assert!(r.commands.contains(&VoiceCommand::ScratchThat));
-        assert_eq!(r.remaining, "I made a mistake");
     }
 
     #[test]
-    fn switch_style_command() {
-        let r = router().route_full("switch to email, please clean this up");
+    fn switch_style_takes_rest_as_argument() {
+        let r = router().route_full("switch to email");
         assert!(
             r.commands
                 .iter()
                 .any(|c| matches!(c, VoiceCommand::SwitchStyle(s) if s == "email"))
         );
+        assert!(r.remaining.is_empty());
     }
 
     #[test]
-    fn insert_snippet_command() {
+    fn switch_preset_to_multiword_argument() {
+        let r = router().route_full("switch preset to formal email");
+        assert!(
+            r.commands
+                .iter()
+                .any(|c| matches!(c, VoiceCommand::SwitchStyle(s) if s == "formal email"))
+        );
+    }
+
+    #[test]
+    fn insert_snippet_takes_rest_as_argument() {
         let r = router().route_full("insert greeting here");
         assert!(
             r.commands
@@ -320,15 +271,11 @@ mod tests {
     }
 
     #[test]
-    fn multiple_commands_in_one_utterance() {
-        let r = router().route_full("new line list item fix the bug new line");
-        let new_line_count = r
-            .commands
-            .iter()
-            .filter(|c| **c == VoiceCommand::NewLine)
-            .count();
-        assert!(new_line_count >= 1);
-        assert!(r.commands.contains(&VoiceCommand::ListItem));
+    fn parametric_prefix_alone_is_not_a_command() {
+        // "insert" with no argument is ordinary dictation, not a snippet command.
+        let r = router().route_full("insert");
+        assert!(r.commands.is_empty());
+        assert_eq!(r.remaining, "insert");
     }
 
     #[test]
@@ -339,23 +286,15 @@ mod tests {
     }
 
     #[test]
-    fn case_insensitive_match() {
-        let r = router().route_full("STOP DICTATION right now");
-        assert!(r.commands.contains(&VoiceCommand::StopDictation));
-    }
-
-    #[test]
-    fn custom_command() {
+    fn custom_command_exact_only() {
         let mut r = VoiceCommandRouter::new();
         r.add_custom("send message", VoiceCommand::StopDictation);
-        let result = r.route_full("please send message now");
-        assert!(result.commands.contains(&VoiceCommand::StopDictation));
-    }
-
-    #[test]
-    fn collapse_whitespace_fn() {
-        assert_eq!(collapse_whitespace("  hello   world  "), "hello world");
-        assert_eq!(collapse_whitespace(""), "");
-        assert_eq!(collapse_whitespace("no extra"), "no extra");
+        assert!(
+            r.route_full("send message")
+                .commands
+                .contains(&VoiceCommand::StopDictation)
+        );
+        // Not the whole utterance → not a command.
+        assert!(r.route_full("please send message now").commands.is_empty());
     }
 }

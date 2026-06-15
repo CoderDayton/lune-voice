@@ -637,9 +637,10 @@ async fn process_and_deliver(
     let crate::gate::GateOutcome {
         needs_correction,
         needs_llm,
+        conf_attention,
+        too_broken,
         min_conf,
         avg_conf,
-        ..
     } = crate::gate::decide(crate::gate::GateInputs {
         pipeline: &config.pipeline,
         all_resolved: heuristic_result.all_resolved,
@@ -658,6 +659,8 @@ async fn process_and_deliver(
         dropped_risks,
         needs_llm,
         needs_correction,
+        conf_attention,
+        too_broken,
         wants_styling,
         needs_punct = punctuation.needs_llm,
         min_conf,
@@ -1163,9 +1166,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn final_text_strips_voice_commands() {
+    async fn non_exact_command_words_pass_through() {
         local_set()
             .run_until(async {
+                // "new line" mid-utterance is dictation, not a command: commands
+                // match only when they are the whole utterance.
                 let responses = vec![Ok(vec![make_segment("hello new line world", false)])];
                 let (mgr, db) = make_manager(scripted_asr(responses), Arc::new(EchoPostProcessor));
                 let (tx, rx) = mpsc::channel(32);
@@ -1179,10 +1184,10 @@ mod tests {
                         _ => None,
                     })
                     .collect();
-                assert_eq!(finalized.last().copied(), Some("Hello world."));
+                assert_eq!(finalized.last().copied(), Some("Hello new line world."));
 
                 let session = db.lock().await.get_session(session_id).unwrap().unwrap();
-                assert_eq!(session.transcript.as_deref(), Some("Hello world."));
+                assert_eq!(session.transcript.as_deref(), Some("Hello new line world."));
             })
             .await;
     }

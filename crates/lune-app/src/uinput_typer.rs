@@ -886,24 +886,28 @@ impl UinputTyper {
     fn emit_paste(&mut self, terminal: bool) {
         // Settle after hotkey modifier release
         std::thread::sleep(Duration::from_millis(MODIFIER_SETTLE_MS));
+        let gap = Duration::from_millis(KEY_EVENT_GAP_MS);
 
-        // Press Ctrl
+        // Press the modifiers, each given time to register before V — the same
+        // chord race `type_char` guards against (without the gaps a composited
+        // system can drop V or apply it without the modifier).
         self.emit_raw(EventType::KEY, KeyCode::KEY_LEFTCTRL.0, 1);
-
+        std::thread::sleep(gap);
         if terminal {
-            // Press Shift for terminal paste
             self.emit_raw(EventType::KEY, KeyCode::KEY_LEFTSHIFT.0, 1);
+            std::thread::sleep(gap); // shift must register before the key
         }
 
-        // Press+release V
+        // Press+release V, holding it down long enough to register.
         self.emit_raw(EventType::KEY, KeyCode::KEY_V.0, 1);
+        std::thread::sleep(gap);
         self.emit_raw(EventType::KEY, KeyCode::KEY_V.0, 0);
+        std::thread::sleep(gap); // V must release before the modifiers, or they leak
 
+        // Release the modifiers in reverse order.
         if terminal {
             self.emit_raw(EventType::KEY, KeyCode::KEY_LEFTSHIFT.0, 0);
         }
-
-        // Release Ctrl
         self.emit_raw(EventType::KEY, KeyCode::KEY_LEFTCTRL.0, 0);
     }
 

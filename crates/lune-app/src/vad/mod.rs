@@ -217,7 +217,21 @@ impl HybridVad {
                     self.trailing_silence_samples = 0;
                 }
             }
-            SpanEvent::Close { keep } => self.close_span(keep, &[], actions),
+            SpanEvent::Close { keep } => {
+                // Append the frame that triggered the close. On a max-length
+                // force-close it is voiced speech the gate already counted, so
+                // dropping it would clip the final ~32 ms (the pre-span-gate
+                // chunker appended it too). On a long-gap close it is a silence
+                // frame; mirroring the Append arm's trailing-silence bookkeeping
+                // lets close_span's trim remove it, so that path stays identical.
+                self.span.extend_from_slice(frame);
+                if prob <= self.config.silero_offset {
+                    self.trailing_silence_samples += frame.len();
+                } else {
+                    self.trailing_silence_samples = 0;
+                }
+                self.close_span(keep, &[], actions);
+            }
         }
     }
 

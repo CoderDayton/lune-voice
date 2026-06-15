@@ -645,6 +645,18 @@ mod tests {
     }
 
     #[test]
+    fn high_caprate_proper_noun_keeps_canonical_capital() {
+        let c = LexicalGate::new();
+        // "Amazon" is a title-cased vocab entry with a high capitalization rate
+        // (~0.85). This exercises the `Some(p)` p_cap branch (p >= keep ->
+        // not common), so the canonical capital is applied where the old
+        // dictionary-membership fallback would have dropped it.
+        let risks = vec![("amazon".to_string(), 0.5)];
+        let result = c.correct("i deployed it on amazon today", &risks, &[], "en");
+        assert_eq!(result.corrected_text, "i deployed it on Amazon today");
+    }
+
+    #[test]
     fn vocab_word_gets_canonical_casing() {
         let c = LexicalGate::new();
         let risks = vec![("github".to_string(), 0.5)];

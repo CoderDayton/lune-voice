@@ -350,9 +350,10 @@ pub fn concat_errors(hyp: &str, ref_: &str) -> usize {
     fused_boundaries(hyp).saturating_sub(fused_boundaries(ref_))
 }
 
-/// Signed word-count difference (`hyp − ref_`) after de-punctuation only (no
-/// lowercasing). Negative means `hyp` merged words (`MakeSure`); positive means
-/// it split them. Punctuation never adds or removes a word.
+/// Signed word-count difference (`hyp − ref_`), counting whitespace tokens that
+/// contain at least one alphanumeric character (so trailing punctuation like
+/// `world.` is never counted as a separate word). Negative means `hyp` merged
+/// words (`MakeSure`); positive means it split them.
 pub fn spacing_delta(hyp: &str, ref_: &str) -> i64 {
     /// Count whitespace-separated tokens carrying at least one alphanumeric
     /// char, so trailing punctuation (`world.`) never changes the tally.
