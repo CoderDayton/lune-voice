@@ -17,827 +17,838 @@ msgstr ""
 #. placeholder {1}: entries.length
 #: src/features/dictionary/components/dictionary-table.tsx:243
 msgid "{0} of {1}"
-msgstr ""
+msgstr "{0} из {1}"
+
+#. placeholder {0}: presets.length
+#: src/features/styles/styles-page.tsx:168
+msgid "{0} presets"
+msgstr "{0} пресеты"
 
 #. placeholder {0}: entries.length
 #: src/features/dictionary/components/dictionary-table.tsx:243
 msgid "{0} rules"
-msgstr ""
+msgstr "{0} правила"
+
+#: src/features/styles/components/style-preset-card.tsx:81
+msgid "{onCount} of 4 formatting fixes on"
+msgstr "{onCount} из 4 исправлений форматирования"
 
 #: src/features/history/components/history-pagination.tsx:45
 #: src/features/history/components/history-table.tsx:173
 msgid "{page} / {totalPages}"
-msgstr ""
+msgstr "{page} / {totalPages}"
 
 #: src/features/history/components/history-pagination.tsx:29
 #: src/features/history/components/history-table.tsx:157
 msgid "{start}–{end} of {visibleCount}"
-msgstr ""
+msgstr "{start}–{end} из {visibleCount}"
 
 #: src/features/history/components/history-table.tsx:105
 #: src/features/history/components/history-toolbar.tsx:37
 msgid "{totalCount} sessions"
-msgstr ""
+msgstr "{totalCount} сеансов"
 
 #: src/features/history/components/history-table.tsx:105
 msgid "{visibleCount} / {totalCount}"
-msgstr ""
+msgstr "{visibleCount} / {totalCount}"
 
 #: src/features/history/components/history-toolbar.tsx:36
 msgid "{visibleCount} of {totalCount} sessions"
-msgstr ""
+msgstr "{visibleCount} из {totalCount} сеансов"
+
+#: src/features/overview/overview-page.tsx:173
+msgid "~{avgWordsPerSession} words each"
+msgstr "~{avgWordsPerSession} слов каждый"
 
 #: src/features/shell/components/sidebar.tsx:199
 msgid "Account"
-msgstr ""
+msgstr "Счет"
 
 #: src/features/shell/components/sidebar.tsx:187
 msgid "Account and status"
-msgstr ""
+msgstr "Аккаунт и статус"
 
 #: src/features/dictionary/components/dictionary-table.tsx:266
 msgid "Action"
-msgstr ""
+msgstr "Действие"
+
+#: src/features/styles/components/style-preset-card.tsx:75
+msgid "Active"
+msgstr "Активный"
+
+#: src/features/styles/components/style-hero.tsx:34
+msgid "Active style"
+msgstr "Активный стиль"
 
 #: src/features/settings/sections/input-section.tsx:117
 #: src/features/settings/sections/input-section.tsx:125
 msgid "Adaptive gain control"
-msgstr ""
-
-#: src/features/dictionary/components/dictionary-form.tsx:113
-#~ msgid "Add"
-#~ msgstr ""
+msgstr "Адаптивная регулировка усиления"
 
 #: src/features/dictionary/components/dictionary-form.tsx:57
 msgid "Add a correction"
-msgstr ""
-
-#: src/features/dictionary/components/dictionary-table.tsx:168
-#~ msgid "Add a fix and Lune applies it every time you dictate. Try a starter below or add your own above."
-#~ msgstr ""
+msgstr "Добавить исправление"
 
 #: src/features/dictionary/components/dictionary-table.tsx:168
 msgid "Add a fix and Lune Voice applies it every time you dictate. Try a starter below or add your own above."
-msgstr ""
+msgstr "Добавьте исправление, и Lune Voice применяет его каждый раз, когда вы диктуете. Попробуйте стартер ниже или добавьте свой выше."
 
 #: src/features/dictionary/components/dictionary-form.tsx:159
 msgid "Add correction"
-msgstr ""
-
-#: src/features/dictionary/components/dictionary-form.tsx:44
-#~ msgid "Add correction rule"
-#~ msgstr ""
+msgstr "Добавить исправление"
 
 #: src/features/settings/components/calibrate-modal.tsx:96
 msgid "Adjust manually"
-msgstr ""
+msgstr "Отрегулируйте вручную"
 
 #: src/features/settings/sections/advanced-section.tsx:21
 #: src/features/settings/settings-page.tsx:75
 msgid "Advanced"
-msgstr ""
+msgstr "Передовой"
 
 #: src/features/settings/sections/models-section.tsx:139
 msgid "AI models stored on your device."
-msgstr ""
+msgstr "Модели AI, хранящиеся на вашем устройстве."
 
 #: src/features/welcome/welcome-page.tsx:131
 msgid "All required models are already installed. Continue when you're ready."
-msgstr ""
+msgstr "Все необходимые модели уже установлены. Продолжайте, когда будете готовы."
 
-#: src/features/overview/overview-page.tsx:126
+#: src/features/overview/overview-page.tsx:127
 msgid "all-time"
-msgstr ""
+msgstr "все время"
 
-#: src/features/overview/overview-page.tsx:139
+#: src/features/overview/overview-page.tsx:140
 msgid "all-time avg"
-msgstr ""
+msgstr "среднее значение за все время"
 
 #: src/features/settings/components/openai-fields.tsx:35
 msgid "API endpoint"
-msgstr ""
+msgstr "конечная точка API"
 
 #: src/features/settings/components/openai-fields.tsx:47
 msgid "API key"
-msgstr ""
+msgstr "API-ключ"
 
 #: src/features/settings/sections/appearance-section.tsx:35
 #: src/features/settings/settings-page.tsx:69
 msgid "Appearance"
-msgstr ""
+msgstr "Появление"
 
 #: src/features/settings/sections/general-section.tsx:24
 msgid "Application behavior and startup preferences."
-msgstr ""
+msgstr "Поведение приложения и настройки запуска."
 
 #: src/features/settings/components/calibrate-modal.tsx:95
 msgid "Apply"
-msgstr ""
+msgstr "Применять"
 
-#: src/features/overview/overview-page.tsx:187
+#: src/features/overview/overview-page.tsx:196
 msgid "Audio"
-msgstr ""
+msgstr "Аудио"
 
 #: src/features/dictation/audio-dots.tsx:17
 msgid "Audio activity"
-msgstr ""
+msgstr "Аудио активность"
+
+#: src/features/styles/components/style-editor-modal.tsx:45
+msgid "Auto-capitalize sentences"
+msgstr "Автоматически писать предложения с заглавной буквы"
+
+#: src/features/styles/components/style-editor-modal.tsx:46
+msgid "Brand casing (\"github\" → \"GitHub\")"
+msgstr "Оформление бренда («github» → «GitHub»)"
+
+#: src/features/styles/components/style-hero.tsx:20
+msgid "Brands"
+msgstr "Бренды"
 
 #: src/features/settings/components/theme-picker.tsx:321
 msgid "Browse themes"
-msgstr ""
+msgstr "Просмотр тем"
 
-#: src/features/styles/components/style-preset-card.tsx:51
+#: src/features/styles/components/style-hero.tsx:37
+#: src/features/styles/components/style-preset-card.tsx:66
 msgid "Built-in"
-msgstr ""
+msgstr "Встроенный"
 
 #: src/features/settings/sections/input-section.tsx:58
 msgid "Calibrate"
-msgstr ""
+msgstr "Калибровка"
 
 #: src/features/settings/components/calibrate-modal.tsx:59
 #: src/features/settings/sections/input-section.tsx:55
 msgid "Calibrate microphone"
-msgstr ""
+msgstr "Калибровка микрофона"
 
 #: src/components/feedback/confirm-dialog.tsx:52
 #: src/features/dictionary/components/dictionary-table.tsx:96
 #: src/features/settings/components/calibrate-modal.tsx:115
 #: src/features/settings/sections/models-section.tsx:352
-#: src/features/styles/components/style-editor-modal.tsx:106
-#: src/features/styles/components/style-preset-card.tsx:69
+#: src/features/styles/components/style-editor-modal.tsx:138
 msgid "Cancel"
-msgstr ""
+msgstr "Отмена"
 
 #: src/features/settings/sections/shortcuts-section.tsx:31
 msgid "Cancel current recording"
-msgstr ""
+msgstr "Отменить текущую запись"
 
 #: src/features/dictation/dictation-pill.tsx:71
 msgid "Cancel dictation"
 msgstr "Отменить диктовку"
 
+#: src/features/styles/components/style-hero.tsx:18
+msgid "Capitals"
+msgstr "Столицы"
+
 #: src/features/welcome/welcome-page.tsx:125
 msgid "Check your network and we'll pick up where we left off."
-msgstr ""
+msgstr "Проверьте свою сеть, и мы продолжим с того места, на котором остановились."
 
 #: src/features/welcome/welcome-page.tsx:50
 msgid "Checking installed models…"
-msgstr ""
+msgstr "Проверка установленных моделей…"
 
 #: src/features/settings/components/theme-picker.tsx:337
 msgid "Choose a theme"
-msgstr ""
+msgstr "Выберите тему"
 
 #: src/features/settings/sections/output-section.tsx:13
 msgid "Choose how finished text is inserted into the app you are currently using."
-msgstr ""
+msgstr "Выберите, как готовый текст будет вставлен в приложение, которое вы сейчас используете."
 
 #: src/features/settings/sections/appearance-section.tsx:36
 msgid "Choose how Lune Voice looks."
-msgstr ""
+msgstr "Выберите, как будет выглядеть Lune Voice."
 
 #: src/features/settings/sections/input-section.tsx:29
 msgid "Choose how quickly you want to enter and leave voice typing."
-msgstr ""
+msgstr "Выберите, как быстро вы хотите вводить и прекращать голосовой ввод."
 
 #: src/features/welcome/welcome-page.tsx:128
 #: src/features/welcome/welcome-page.tsx:134
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
-msgstr ""
+msgstr "Выберите модели искусственного интеллекта для установки. Все работает в автономном режиме — ни облака, ни учетных записей."
 
 #: src/features/dictionary/components/dictionary-table.tsx:236
 msgid "Clear filter"
-msgstr ""
+msgstr "Очистить фильтр"
 
 #: src/features/history/components/history-table.tsx:97
 #: src/features/history/components/history-toolbar.tsx:57
 msgid "Clear search"
-msgstr ""
+msgstr "Очистить поиск"
 
-#: src/features/styles/components/style-editor-modal.tsx:123
+#: src/features/styles/components/style-editor-modal.tsx:155
 msgid "close"
-msgstr ""
+msgstr "закрывать"
 
 #: src/features/history/components/session-detail-modal.tsx:209
 #: src/features/settings/sections/models-section.tsx:364
-#: src/features/styles/components/style-editor-modal.tsx:97
+#: src/features/styles/components/style-editor-modal.tsx:129
 msgid "Close"
-msgstr ""
+msgstr "Закрывать"
 
 #: src/features/shell/components/app-shell.tsx:136
 msgid "Close sidebar"
-msgstr ""
+msgstr "Закрыть боковую панель"
 
 #: src/features/shell/components/sidebar.tsx:68
 msgid "Collapse sidebar"
-msgstr ""
+msgstr "Свернуть боковую панель"
 
 #: src/features/history/components/session-detail-modal.tsx:169
 msgid "Completed"
-msgstr ""
+msgstr "Завершенный"
 
-#: src/features/overview/overview-page.tsx:105
+#: src/features/overview/overview-page.tsx:106
 #: src/features/shell/components/app-shell.tsx:156
 #: src/features/shell/components/sidebar-widgets.tsx:43
 #: src/features/shell/components/sidebar.tsx:166
 #: src/features/shell/components/sidebar.tsx:224
 msgid "Connecting"
-msgstr ""
+msgstr "Подключение"
 
 #: src/features/welcome/welcome-page.tsx:243
 msgid "Continue"
-msgstr ""
+msgstr "Продолжать"
 
 #: src/features/settings/sections/transcription-section.tsx:15
 msgid "Control how your speech is turned into text."
-msgstr ""
+msgstr "Контролируйте, как ваша речь превращается в текст."
 
 #: src/features/history/components/history-table.tsx:291
 msgid "Copied"
-msgstr ""
+msgstr "Скопировано"
 
 #: src/features/history/components/history-table.tsx:291
 msgid "Copy"
-msgstr ""
+msgstr "Копировать"
 
 #: src/features/history/components/session-detail-modal.tsx:132
 msgid "Copy transcript"
-msgstr ""
+msgstr "Копировать стенограмму"
 
 #: src/features/settings/sections/advanced-section.tsx:26
 #: src/features/settings/sections/advanced-section.tsx:38
 msgid "Correction level"
-msgstr ""
+msgstr "Уровень коррекции"
 
 #: src/features/settings/sections/models-section.tsx:149
 msgid "Correction LLM"
-msgstr ""
+msgstr "Коррекция LLM"
 
 #: src/features/dictionary/components/dictionary-form.tsx:41
 msgid "Couldn't add that rule. Try again."
-msgstr ""
+msgstr "Не удалось добавить это правило. Попробуйте еще раз."
 
-#: src/features/styles/styles-page.tsx:161
+#: src/features/styles/styles-page.tsx:197
 msgid "Create new style"
-msgstr ""
+msgstr "Создать новый стиль"
 
-#: src/features/styles/components/style-editor-modal.tsx:47
+#: src/features/styles/components/style-editor-modal.tsx:58
 msgid "Create style"
-msgstr ""
+msgstr "Создать стиль"
 
 #: src/features/settings/components/calibrate-modal.tsx:100
 msgid "Current"
-msgstr ""
+msgstr "Текущий"
 
 #: src/features/settings/components/theme-picker.tsx:417
 #: src/features/settings/sections/appearance-section.tsx:45
 msgid "Dark"
-msgstr ""
+msgstr "Темный"
 
 #: src/components/feedback/confirm-dialog.tsx:63
 #: src/features/dictionary/components/dictionary-table.tsx:146
 #: src/features/history/components/history-table.tsx:300
 #: src/features/history/components/session-detail-modal.tsx:202
 #: src/features/settings/sections/models-section.tsx:300
-#: src/features/styles/components/style-preset-card.tsx:66
 msgid "Delete"
-msgstr ""
+msgstr "Удалить"
+
+#. placeholder {0}: preset.name
+#: src/features/styles/components/style-preset-card.tsx:119
+msgid "Delete {0}"
+msgstr "Удалить {0}"
 
 #. placeholder {0}: model.name
 #: src/features/settings/sections/models-section.tsx:337
 msgid "Delete {0}?"
-msgstr ""
+msgstr "Удалить {0}?"
 
 #: src/features/settings/sections/models-section.tsx:355
 msgid "Delete model"
-msgstr ""
+msgstr "Удалить модель"
 
 #: src/features/history/components/history-table.tsx:298
 #: src/features/history/components/session-detail-modal.tsx:200
 msgid "Delete session?"
-msgstr ""
-
-#: src/features/styles/components/style-preset-card.tsx:64
-msgid "Delete this style?"
-msgstr ""
+msgstr "Удалить сеанс?"
 
 #: src/features/dictionary/components/dictionary-table.tsx:144
 msgid "Delete this word fix?"
-msgstr ""
+msgstr "Удалить это слово, исправить?"
 
-#: src/features/styles/components/style-editor-modal.tsx:86
+#: src/features/styles/components/style-preset-card.tsx:94
+msgid "Delete?"
+msgstr "Удалить?"
+
+#: src/features/styles/components/style-editor-modal.tsx:97
 msgid "Describe how text should be formatted. E.g., \"Use bullet points. Keep sentences short. Avoid jargon.\""
-msgstr ""
+msgstr "Опишите, как должен быть отформатирован текст. Например: «Используйте пункты списка. Делайте предложения короткими. Избегайте жаргона»."
 
-#: src/features/styles/components/style-editor-modal.tsx:63
+#: src/features/styles/components/style-editor-modal.tsx:74
 msgid "Description"
-msgstr ""
+msgstr "Описание"
+
+#: src/features/styles/components/style-editor-modal.tsx:106
+msgid "Deterministic fixes applied before any AI styling."
+msgstr "Детерминированные исправления применяются перед любым стилем ИИ."
 
 #: src/features/settings/sections/transcription-section.tsx:44
 #: src/features/settings/sections/transcription-section.tsx:50
 msgid "Dictation language"
-msgstr ""
+msgstr "Язык диктанта"
 
 #: src/features/settings/sections/models-section.tsx:154
 msgid "Disabled — transcripts are delivered raw, and the LLM model is hidden from the list below."
-msgstr ""
+msgstr "Отключено — расшифровки доставляются в необработанном виде, а модель LLM скрыта из списка ниже."
 
 #: src/features/settings/sections/shortcuts-section.tsx:32
 msgid "Discard the current draft and return to idle. Click the binding to change it."
-msgstr ""
+msgstr "Отмените текущий черновик и вернитесь в режим ожидания. Нажмите на привязку, чтобы изменить ее."
 
-#: src/features/overview/overview-page.tsx:105
+#: src/features/overview/overview-page.tsx:106
 msgid "Disconnected"
-msgstr ""
+msgstr "Отключено"
 
 #: src/components/feedback/error-toast.tsx:24
 msgid "Dismiss error"
-msgstr ""
+msgstr "Ошибка закрытия"
 
 #: src/features/history/components/history-table.tsx:294
 #: src/features/settings/sections/models-section.tsx:314
 msgid "Download"
-msgstr ""
+msgstr "Скачать"
 
 #: src/features/welcome/welcome-page.tsx:235
 msgid "Download {pendingCount} models"
-msgstr ""
+msgstr "Скачать модели {pendingCount}"
 
 #: src/features/welcome/welcome-page.tsx:235
 msgid "Download 1 model"
-msgstr ""
+msgstr "Скачать 1 модель"
 
 #: src/features/welcome/welcome-page.tsx:85
 msgid "Download failed"
-msgstr ""
+msgstr "Загрузка не удалась"
 
 #: src/features/welcome/welcome-page.tsx:124
 msgid "Download interrupted"
-msgstr ""
+msgstr "Загрузка прервана"
 
 #: src/features/settings/sections/models-section.tsx:273
 #: src/features/welcome/components/model-card.tsx:99
 msgid "Download progress"
-msgstr ""
+msgstr "Прогресс загрузки"
 
 #: src/features/history/components/session-detail-modal.tsx:124
 msgid "Download transcript"
-msgstr ""
+msgstr "Скачать расшифровку"
 
 #: src/features/welcome/welcome-page.tsx:121
 msgid "Downloading models"
-msgstr ""
+msgstr "Загрузка моделей"
 
 #: src/features/settings/sections/models-section.tsx:314
 #: src/features/welcome/welcome-page.tsx:196
 msgid "Downloading…"
-msgstr ""
+msgstr "Загрузка…"
 
-#: src/features/styles/components/style-editor-modal.tsx:100
+#: src/features/styles/components/style-editor-modal.tsx:132
 msgid "Duplicate"
-msgstr ""
+msgstr "Дублировать"
 
 #: src/features/history/components/session-detail-modal.tsx:161
 msgid "Duration"
-msgstr ""
+msgstr "Продолжительность"
 
-#: src/features/dictionary/components/dictionary-form.tsx:71
-#~ msgid "e.g. github"
-#~ msgstr ""
-
-#: src/features/dictionary/components/dictionary-form.tsx:91
-#~ msgid "e.g. GitHub"
-#~ msgstr ""
-
-#: src/features/dictionary/components/dictionary-form.tsx:58
-#~ msgid "e.g. github…"
-#~ msgstr ""
-
-#: src/features/dictionary/components/dictionary-form.tsx:76
-#~ msgid "e.g. GitHub…"
-#~ msgstr ""
-
-#: src/features/styles/components/style-editor-modal.tsx:56
+#: src/features/styles/components/style-editor-modal.tsx:67
 msgid "e.g. Meeting notes"
-msgstr ""
+msgstr "например Заметки о встрече"
 
-#: src/features/styles/components/style-preset-card.tsx:83
+#: src/features/styles/components/style-hero.tsx:55
+#: src/features/styles/components/style-preset-card.tsx:113
 msgid "Edit"
-msgstr ""
+msgstr "Редактировать"
 
 #. placeholder {0}: entry.phrase
 #: src/features/dictionary/components/dictionary-table.tsx:139
 msgid "Edit {0}"
-msgstr ""
+msgstr "Изменить {0}"
 
-#: src/features/styles/components/style-editor-modal.tsx:47
+#: src/features/styles/components/style-editor-modal.tsx:58
 msgid "Edit style"
-msgstr ""
+msgstr "Изменить стиль"
 
 #: src/features/history/components/history-session-list.tsx:28
 #: src/features/history/components/history-table.tsx:253
-#: src/features/overview/overview-page.tsx:262
+#: src/features/overview/overview-page.tsx:271
 msgid "Empty session"
-msgstr ""
+msgstr "Пустая сессия"
 
 #: src/features/settings/sections/models-section.tsx:163
 msgid "Enable correction LLM"
-msgstr ""
+msgstr "Включить коррекцию LLM"
 
 #: src/features/history/components/history-table.tsx:130
 #: src/features/history/components/session-detail-modal.tsx:162
 msgid "Engine"
-msgstr ""
+msgstr "Двигатель"
 
 #: src/features/welcome/welcome-page.tsx:222
 msgid "Enter Lune Voice"
-msgstr ""
+msgstr "Введите Лунный Голос"
 
 #: src/features/shell/components/sidebar.tsx:36
 msgid "Expand sidebar"
-msgstr ""
+msgstr "Развернуть боковую панель"
 
 #: src/features/dictionary/components/dictionary-form.tsx:140
 msgid "Fill both fields to see the correction."
-msgstr ""
+msgstr "Заполните оба поля, чтобы увидеть исправление."
 
 #: src/features/dictionary/components/dictionary-table.tsx:228
 msgid "Filter rules"
-msgstr ""
+msgstr "Правила фильтрации"
 
 #: src/features/dictionary/components/dictionary-table.tsx:227
 msgid "Filter rules…"
-msgstr ""
+msgstr "Правила фильтрации…"
+
+#: src/features/styles/components/style-preset-card.tsx:89
+msgid "formatting"
+msgstr "форматирование"
+
+#: src/features/styles/components/style-editor-modal.tsx:104
+#: src/features/styles/components/style-hero.tsx:62
+msgid "Formatting"
+msgstr "Форматирование"
 
 #: src/features/settings/sections/general-section.tsx:23
 #: src/features/settings/settings-page.tsx:68
 msgid "General"
-msgstr ""
+msgstr "Общий"
 
-#: src/features/styles/components/style-editor-modal.tsx:115
+#: src/features/styles/components/style-editor-modal.tsx:147
 msgid "Generating examples…"
-msgstr ""
+msgstr "Создание примеров…"
 
 #: src/features/dictionary/components/dictionary-form.tsx:82
 msgid "github"
-msgstr ""
+msgstr "github"
 
 #: src/features/dictionary/components/dictionary-form.tsx:113
 msgid "GitHub"
-msgstr ""
+msgstr "GitHub"
 
-#: src/features/overview/overview-page.tsx:62
+#: src/features/overview/overview-page.tsx:63
 msgid "Good afternoon"
-msgstr ""
+msgstr "Добрый день"
 
-#: src/features/overview/overview-page.tsx:62
+#: src/features/overview/overview-page.tsx:63
 msgid "Good evening"
-msgstr ""
+msgstr "Добрый вечер"
 
-#: src/features/overview/overview-page.tsx:62
+#: src/features/overview/overview-page.tsx:63
 msgid "Good morning"
-msgstr ""
+msgstr "Доброе утро"
 
-#: src/features/overview/overview-page.tsx:100
+#: src/features/overview/overview-page.tsx:101
 msgid "hold the hotkey and speak, your words land where your cursor is."
-msgstr ""
-
-#: src/features/settings/sections/input-section.tsx:65
-#~ msgid "How easily Lune triggers on speech. Higher = picks up quieter onsets."
-#~ msgstr ""
+msgstr "удерживайте горячую клавишу и говорите, ваши слова попадут туда, где находится курсор."
 
 #: src/features/settings/sections/input-section.tsx:65
 msgid "How easily Lune Voice triggers on speech. Higher = picks up quieter onsets."
-msgstr ""
-
-#: src/features/settings/sections/input-section.tsx:92
-#~ msgid "How quickly Lune decides you're done speaking. Higher = ends sooner on a pause."
-#~ msgstr ""
+msgstr "Как легко Lune Voice срабатывает на речь. Выше = начинается более тихо."
 
 #: src/features/settings/sections/input-section.tsx:92
 msgid "How quickly Lune Voice decides you're done speaking. Higher = ends sooner on a pause."
-msgstr ""
+msgstr "Как быстро Lune Voice решит, что вы закончили говорить. Выше = заканчивается раньше на паузе."
 
-#: src/features/overview/overview-page.tsx:212
+#: src/features/overview/overview-page.tsx:221
 msgid "Idle"
-msgstr ""
+msgstr "Праздный"
 
 #: src/features/settings/settings-page.tsx:71
 msgid "Input"
-msgstr ""
+msgstr "Вход"
 
 #: src/features/settings/sections/models-section.tsx:260
 #: src/features/welcome/components/model-card.tsx:89
 msgid "Installed"
-msgstr ""
+msgstr "Установлено"
 
-#: src/features/styles/components/style-editor-modal.tsx:76
+#: src/features/styles/components/style-editor-modal.tsx:87
 msgid "Instructions"
-msgstr ""
-
-#: src/features/settings/sections/input-section.tsx:132
-#~ msgid "Keep the mic open in the background so dictation starts ~70ms sooner. The OS may show a recording indicator while Lune is running."
-#~ msgstr ""
+msgstr "Инструкции"
 
 #: src/features/settings/sections/input-section.tsx:132
 msgid "Keep the mic open in the background so dictation starts ~70ms sooner. The OS may show a recording indicator while Lune Voice is running."
-msgstr ""
+msgstr "Держите микрофон открытым в фоновом режиме, чтобы диктовка началась примерно на 70 мс раньше. ОС может отображать индикатор записи во время работы Lune Voice."
 
 #: src/features/settings/sections/shortcuts-section.tsx:16
 msgid "Keyboard controls"
-msgstr ""
+msgstr "Управление с клавиатуры"
+
+#: src/features/styles/components/style-editor-modal.tsx:43
+msgid "Keyboard shortcuts (\"Super H\" → \"Super+H\")"
+msgstr "Сочетания клавиш («Super H» → «Super+H»)"
 
 #: src/features/settings/sections/general-section.tsx:29
 #: src/features/settings/sections/general-section.tsx:33
 msgid "Language"
-msgstr ""
-
-#: src/features/settings/sections/general-section.tsx:45
-#~ msgid "Launch into the system tray instead of opening the main window. Useful when Lune autostarts on login."
-#~ msgstr ""
+msgstr "Язык"
 
 #: src/features/settings/sections/general-section.tsx:45
 msgid "Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login."
-msgstr ""
+msgstr "Запустите в системном трее вместо открытия главного окна. Полезно, когда Lune Voice автоматически запускается при входе в систему."
 
 #: src/features/history/components/history-table.tsx:129
 msgid "Length"
-msgstr ""
+msgstr "Длина"
 
 #: src/features/settings/components/theme-picker.tsx:402
 #: src/features/settings/sections/appearance-section.tsx:46
 msgid "Light"
-msgstr ""
+msgstr "Свет"
 
 #: src/features/dictation/dictation-pill.tsx:64
 #: src/features/shell/components/app-shell.tsx:160
 #: src/features/shell/components/sidebar.tsx:164
 msgid "Listening"
-msgstr ""
+msgstr "Прослушивание"
 
-#: src/features/overview/overview-page.tsx:212
+#: src/features/overview/overview-page.tsx:221
 #: src/features/shell/components/sidebar-widgets.tsx:50
 msgid "Listening…"
-msgstr ""
+msgstr "Слушаю…"
 
 #: src/features/settings/sections/advanced-section.tsx:47
 #: src/features/settings/sections/advanced-section.tsx:59
 msgid "LLM sensitivity"
-msgstr ""
+msgstr "Чувствительность к ЛЛМ"
 
 #: src/features/shell/components/sidebar.tsx:201
 msgid "Local"
-msgstr ""
+msgstr "Местный"
 
 #: src/features/settings/components/theme-picker.tsx:348
 msgid "Lune"
-msgstr ""
+msgstr "Лунь"
 
 #: src/features/dictionary/components/dictionary-form.tsx:105
 msgid "Lune Voice writes"
-msgstr ""
-
-#: src/features/dictionary/components/dictionary-form.tsx:105
-#~ msgid "Lune writes"
-#~ msgstr ""
+msgstr "Lune Voice пишет"
 
 #: src/features/settings/sections/models-section.tsx:114
 msgid "Manage AI models stored on your device."
-msgstr ""
-
-#: src/features/dictionary/dictionary-page.tsx:49
-#~ msgid "Map what you say to how it should be written."
-#~ msgstr ""
+msgstr "Управляйте моделями искусственного интеллекта, хранящимися на вашем устройстве."
 
 #: src/features/settings/sections/input-section.tsx:49
 msgid "Measure your room and voice to set both sensitivities automatically."
-msgstr ""
+msgstr "Измерьте свою комнату и голос, чтобы автоматически настроить обе чувствительности."
 
 #: src/features/settings/sections/input-section.tsx:48
 msgid "Microphone calibration"
-msgstr ""
+msgstr "Калибровка микрофона"
 
-#: src/features/overview/overview-page.tsx:190
+#: src/features/overview/overview-page.tsx:199
 msgid "Microphone input level"
-msgstr ""
+msgstr "Входной уровень микрофона"
 
-#: src/features/overview/overview-page.tsx:116
-#~ msgid "Minutes"
-#~ msgstr ""
+#: src/features/overview/overview-page.tsx:158
+msgid "minute"
+msgstr "минута"
+
+#: src/features/overview/overview-page.tsx:158
+msgid "minutes"
+msgstr "минуты"
 
 #: src/features/settings/sections/appearance-section.tsx:41
 msgid "Mode"
-msgstr ""
+msgstr "Режим"
 
 #: src/features/settings/sections/models-section.tsx:113
 #: src/features/settings/sections/models-section.tsx:138
 #: src/features/settings/settings-page.tsx:74
 msgid "Models"
-msgstr ""
+msgstr "Модели"
 
 #: src/features/welcome/welcome-page.tsx:259
 msgid "Models are stored locally. No telemetry, no accounts."
-msgstr ""
+msgstr "Модели хранятся локально. Никакой телеметрии, никаких учетных записей."
 
-#: src/features/styles/components/style-editor-modal.tsx:51
+#: src/features/styles/components/style-editor-modal.tsx:62
 msgid "Name"
-msgstr ""
+msgstr "Имя"
 
 #: src/features/history/components/history-pagination.tsx:54
 #: src/features/history/components/history-table.tsx:182
 msgid "Next"
-msgstr ""
+msgstr "Следующий"
 
 #: src/features/history/components/history-pagination.tsx:52
 #: src/features/history/components/history-table.tsx:180
 msgid "Next page"
-msgstr ""
+msgstr "Следующая страница"
 
-#: src/features/dictionary/components/dictionary-table.tsx:156
-#~ msgid "No entries yet. Add your first correction rule above."
-#~ msgstr ""
+#: src/features/styles/components/style-preset-card.tsx:99
+msgid "No"
+msgstr "Нет"
 
 #: src/features/dictionary/components/dictionary-table.tsx:249
 msgid "No rules match “{query}”."
-msgstr ""
+msgstr "Нет правил, соответствующих «{query}»."
 
 #: src/features/history/components/history-session-list.tsx:131
 #: src/features/history/components/history-table.tsx:118
 msgid "No sessions found."
-msgstr ""
+msgstr "Сеансы не найдены."
 
 #. placeholder {0}: search.trim()
 #: src/features/history/components/history-table.tsx:115
 msgid "No sessions match \"{0}\"."
-msgstr ""
+msgstr "Нет сеансов, соответствующих \"{0}\"."
 
 #. placeholder {0}: searchQuery.trim()
 #: src/features/history/components/history-session-list.tsx:128
 msgid "No sessions match \"{0}\". Try a different search."
-msgstr ""
+msgstr "Нет сеансов, соответствующих \"{0}\". Попробуйте другой поиск."
 
-#: src/features/overview/overview-page.tsx:236
+#: src/features/overview/overview-page.tsx:245
 msgid "No sessions yet"
-msgstr ""
+msgstr "Сеансов пока нет"
 
 #: src/features/history/components/history-session-list.tsx:130
 #: src/features/history/components/history-table.tsx:117
 msgid "No sessions yet. Start dictating to see your transcripts here."
-msgstr ""
+msgstr "Сеансов пока нет. Начните диктовать, чтобы увидеть свои стенограммы здесь."
 
 #: src/features/history/components/history-table.tsx:272
 #: src/features/history/components/session-detail-modal.tsx:153
 msgid "No transcript"
-msgstr ""
+msgstr "Нет расшифровки"
 
 #: src/features/settings/sections/input-section.tsx:118
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
-msgstr ""
+msgstr "Нормализует уровень микрофона перед обнаружением голоса. Помогает заглушить микрофоны и шумные комнаты. Рекомендуется."
 
 #: src/features/settings/sections/models-section.tsx:263
 msgid "Not installed"
-msgstr ""
+msgstr "Не установлено"
 
-#: src/features/overview/overview-page.tsx:212
+#: src/features/overview/overview-page.tsx:221
 #: src/features/shell/components/app-shell.tsx:163
 #: src/features/shell/components/sidebar.tsx:169
 msgid "Offline"
-msgstr ""
+msgstr "Офлайн"
 
 #: src/features/shell/components/sidebar.tsx:63
 msgid "Offline dictation"
-msgstr ""
+msgstr "Оффлайн диктант"
 
-#: src/features/styles/components/style-editor-modal.tsx:68
+#: src/features/styles/components/style-editor-modal.tsx:79
 msgid "One-line summary shown on the card"
-msgstr ""
+msgstr "Однострочное резюме, отображаемое на карточке"
 
 #: src/features/shell/components/app-shell.tsx:104
 msgid "Open menu"
-msgstr ""
+msgstr "Открыть меню"
 
 #: src/features/history/components/history-session-list.tsx:80
 msgid "Open session details"
-msgstr ""
+msgstr "Открыть детали сеанса"
 
-#: src/features/overview/overview-page.tsx:257
+#: src/features/overview/overview-page.tsx:266
 msgid "Open session from {time}"
-msgstr ""
+msgstr "Открытая сессия от {time}"
 
 #: src/features/settings/sections/models-section.tsx:257
 #: src/features/welcome/components/model-card.tsx:86
 msgid "Optional"
-msgstr ""
+msgstr "Необязательный"
 
-#: src/features/overview/overview-page.tsx:109
+#: src/features/overview/overview-page.tsx:110
 #: src/features/settings/settings-page.tsx:73
 msgid "Output"
-msgstr ""
-
-#: src/features/overview/overview-page.tsx:135
-#~ msgid "over 24h"
-#~ msgstr ""
+msgstr "Выход"
 
 #: src/features/welcome/welcome-page.tsx:169
 msgid "Overall progress"
-msgstr ""
+msgstr "Общий прогресс"
 
 #: src/features/history/components/history-pagination.tsx:25
 #: src/features/history/components/history-table.tsx:153
 msgid "Pagination"
-msgstr ""
+msgstr "Пагинация"
 
 #: src/features/settings/sections/output-section.tsx:18
 msgid "Paste is simplest. Typing keystrokes can work better in some apps."
-msgstr ""
+msgstr "Паста самая простая. В некоторых приложениях ввод клавиш может работать лучше."
 
 #: src/features/settings/components/calibrate-modal.tsx:99
 #: src/features/settings/sections/input-section.tsx:91
 #: src/features/settings/sections/input-section.tsx:107
 msgid "Pause sensitivity"
-msgstr ""
+msgstr "Пауза чувствительности"
+
+#: src/features/overview/overview-page.tsx:173
+msgid "per session"
+msgstr "за сеанс"
 
 #: src/features/dictionary/components/dictionary-table.tsx:61
 #: src/features/dictionary/components/dictionary-table.tsx:257
 msgid "Phrase"
-msgstr ""
+msgstr "Фраза"
 
 #: src/features/settings/components/calibrate-modal.tsx:18
 msgid "Please call Stella. Ask her to bring these things with her from the store: six spoons of fresh snow peas, five thick slabs of blue cheese, and maybe a snack for her brother Bob."
-msgstr ""
+msgstr "Пожалуйста, позвони Стелле. Попросите ее принести с собой из магазина следующие вещи: шесть ложек свежего горошка, пять толстых кусков голубого сыра и, возможно, перекус для ее брата Боба."
 
 #: src/features/welcome/welcome-page.tsx:199
 msgid "Please keep the app open until downloads finish"
-msgstr ""
+msgstr "Пожалуйста, оставьте приложение открытым до завершения загрузки."
 
 #: src/features/settings/sections/models-section.tsx:153
 msgid "Polishes punctuation and fixes obvious ASR errors after transcription."
-msgstr ""
+msgstr "Улучшает пунктуацию и исправляет очевидные ошибки ASR после транскрипции."
 
 #: src/features/settings/sections/input-section.tsx:131
 #: src/features/settings/sections/input-section.tsx:139
 msgid "Pre-warm microphone"
-msgstr ""
+msgstr "Предварительный прогрев микрофона"
 
-#: src/features/overview/overview-page.tsx:238
+#: src/features/overview/overview-page.tsx:247
 msgid "Press"
-msgstr ""
+msgstr "Нажимать"
 
 #: src/features/history/components/history-pagination.tsx:39
 #: src/features/history/components/history-table.tsx:167
 msgid "Prev"
-msgstr ""
+msgstr "Предыдущий"
 
 #: src/features/dictionary/components/dictionary-form.tsx:130
 msgid "Preview"
-msgstr ""
+msgstr "Предварительный просмотр"
 
 #: src/features/history/components/history-pagination.tsx:37
 #: src/features/history/components/history-table.tsx:165
 msgid "Previous page"
-msgstr ""
+msgstr "Предыдущая страница"
 
 #: src/features/dictionary/components/dictionary-form.tsx:149
 #: src/features/dictionary/components/dictionary-table.tsx:263
 #: src/features/dictionary/components/priority-picker.tsx:47
 msgid "Priority"
-msgstr ""
+msgstr "Приоритет"
 
 #: src/features/dictation/dictation-pill.tsx:64
 #: src/features/dictation/dictation-pill.tsx:79
 #: src/features/shell/components/app-shell.tsx:158
 msgid "Processing"
-msgstr ""
+msgstr "Обработка"
 
 #: src/features/shell/components/sidebar-widgets.tsx:50
 msgid "Processing…"
-msgstr ""
+msgstr "Обработка…"
 
 #: src/features/settings/sections/transcription-section.tsx:20
 msgid "Qwen3-ASR runs locally with automatic language detection."
-msgstr ""
+msgstr "Qwen3-ASR работает локально с автоматическим определением языка."
 
 #: src/features/settings/components/calibrate-modal.tsx:86
 msgid "Read aloud. Don't worry about pace — just speak naturally."
-msgstr ""
+msgstr "Прочтите вслух. Не беспокойтесь о темпе — просто говорите естественно."
 
-#: src/features/overview/overview-page.tsx:105
+#: src/features/overview/overview-page.tsx:106
 #: src/features/shell/components/app-shell.tsx:162
 #: src/features/shell/components/sidebar.tsx:168
 msgid "Ready"
-msgstr ""
+msgstr "Готовый"
 
 #: src/features/settings/components/calibrate-modal.tsx:97
 msgid "Recalibrate"
-msgstr ""
+msgstr "Перекалибровать"
 
-#: src/features/overview/overview-page.tsx:220
+#: src/features/overview/overview-page.tsx:229
 msgid "Recent"
-msgstr ""
+msgstr "Недавний"
 
 #: src/features/settings/components/calibrate-modal.tsx:101
 msgid "Recommended"
-msgstr ""
+msgstr "Рекомендуется"
 
 #: src/features/settings/sections/input-section.tsx:33
 #: src/features/settings/sections/input-section.tsx:39
@@ -846,17 +857,17 @@ msgstr "Режим записи"
 
 #: src/features/settings/sections/shortcuts-section.tsx:41
 msgid "Recording style"
-msgstr ""
+msgstr "Стиль записи"
 
 #: src/components/feedback/confirm-dialog.tsx:33
 msgid "Remove"
-msgstr ""
+msgstr "Удалять"
 
 #. placeholder {0}: entry.phrase
 #. placeholder {1}: entry.replacement
 #: src/features/dictionary/components/dictionary-table.tsx:145
 msgid "Remove the saved correction for \"{0}\" → \"{1}\"."
-msgstr ""
+msgstr "Удалите сохраненное исправление для «{0}» → «{1}»."
 
 #: src/features/dictionary/components/dictionary-table.tsx:72
 #: src/features/dictionary/components/dictionary-table.tsx:73
@@ -864,135 +875,127 @@ msgstr ""
 #: src/features/dictionary/components/dictionary-table.tsx:86
 #: src/features/dictionary/components/dictionary-table.tsx:260
 msgid "Replacement"
-msgstr ""
+msgstr "Замена"
 
 #: src/features/settings/sections/models-section.tsx:254
 #: src/features/welcome/components/model-card.tsx:83
 msgid "Required"
-msgstr ""
+msgstr "Необходимый"
 
 #: src/features/settings/components/calibrate-modal.tsx:114
 msgid "Retry"
-msgstr ""
+msgstr "Повторить попытку"
 
 #: src/features/welcome/welcome-page.tsx:210
 msgid "Retry download"
-msgstr ""
+msgstr "Повторить загрузку"
 
 #: src/features/history/components/history-session-list.tsx:36
-#: src/features/overview/overview-page.tsx:270
+#: src/features/overview/overview-page.tsx:279
 msgid "s"
-msgstr ""
+msgstr "с"
 
 #: src/features/dictionary/components/dictionary-table.tsx:105
-#: src/features/styles/components/style-editor-modal.tsx:115
+#: src/features/styles/components/style-editor-modal.tsx:147
 msgid "Save"
-msgstr ""
+msgstr "Сохранять"
 
 #: src/features/history/components/history-table.tsx:222
 #: src/features/history/components/session-detail-modal.tsx:70
 msgid "Save Transcript"
-msgstr ""
+msgstr "Сохранить стенограмму"
 
 #: src/features/history/components/history-table.tsx:90
 #: src/features/history/components/history-toolbar.tsx:50
 msgid "Search transcripts"
-msgstr ""
+msgstr "Поиск транскриптов"
 
 #: src/features/history/components/history-table.tsx:88
 #: src/features/history/components/history-toolbar.tsx:48
 msgid "Search transcripts…"
-msgstr ""
-
-#. placeholder {0}: preset.name
-#: src/features/styles/components/style-preset-card.tsx:41
-msgid "Select {0} style"
-msgstr ""
-
-#: src/features/history/history-page.tsx:103
-#~ msgid "Select a session to view its transcript"
-#~ msgstr ""
+msgstr "Поиск стенограмм…"
 
 #: src/features/welcome/welcome-page.tsx:239
 msgid "Select required models"
-msgstr ""
+msgstr "Выберите необходимые модели"
 
 #: src/features/settings/sections/output-section.tsx:17
 #: src/features/settings/sections/output-section.tsx:23
 msgid "Send method"
-msgstr ""
+msgstr "Метод отправки"
 
-#: src/features/overview/overview-page.tsx:179
-#: src/features/overview/overview-page.tsx:222
+#: src/features/overview/overview-page.tsx:188
+#: src/features/overview/overview-page.tsx:231
 msgid "session"
-msgstr ""
+msgstr "сессия"
 
 #: src/features/history/components/session-detail-modal.tsx:193
 msgid "Session details"
-msgstr ""
+msgstr "Детали сеанса"
 
-#: src/features/overview/overview-page.tsx:179
-#: src/features/overview/overview-page.tsx:222
+#: src/features/overview/overview-page.tsx:188
+#: src/features/overview/overview-page.tsx:231
 msgid "sessions"
-msgstr ""
+msgstr "сессии"
 
-#: src/features/overview/overview-page.tsx:161
+#: src/features/overview/overview-page.tsx:165
 msgid "Sessions"
-msgstr ""
+msgstr "Сессии"
 
 #: src/features/shell/components/sidebar-widgets.tsx:54
 msgid "Set hotkey"
-msgstr ""
+msgstr "Установить горячую клавишу"
 
 #: src/features/settings/sections/transcription-section.tsx:45
 msgid "Set the language you speak. Auto uses detection from speech."
-msgstr ""
+msgstr "Установите язык, на котором вы говорите. Авто использует обнаружение по речи."
 
 #: src/features/settings/sections/advanced-section.tsx:48
 msgid "Sets the clean-segment bypass cutoff. Higher values send more otherwise-resolved segments to the LLM; lower values skip the LLM more often."
-msgstr ""
+msgstr "Устанавливает отсечку обхода чистого сегмента. Более высокие значения отправляют в LLM больше сегментов, разрешенных в противном случае; более низкие значения чаще пропускают LLM."
 
 #: src/features/settings/sections/advanced-section.tsx:27
 msgid "Sets the per-word confidence cutoff for correction. Higher values mark more words as uncertain; lower values trust more words as-is."
-msgstr ""
+msgstr "Устанавливает порог достоверности для каждого слова для исправления. Более высокие значения отмечают больше слов как неопределенные; более низкие значения доверяют большему количеству слов как есть."
 
 #: src/features/shell/components/sidebar.tsx:242
 msgid "Settings"
-msgstr ""
+msgstr "Настройки"
 
 #: src/features/settings/settings-page.tsx:93
 msgid "Settings sections"
-msgstr ""
+msgstr "Разделы настроек"
 
 #: src/features/settings/settings-page.tsx:70
+#: src/features/styles/components/style-hero.tsx:17
 msgid "Shortcuts"
-msgstr ""
+msgstr "Ярлыки"
 
 #: src/features/welcome/welcome-page.tsx:213
 #: src/features/welcome/welcome-page.tsx:248
 msgid "Skip for now"
-msgstr ""
+msgstr "Пропустить сейчас"
 
 #: src/features/shell/components/app-shell.tsx:97
 msgid "Skip to main content"
-msgstr ""
+msgstr "Перейти к основному содержанию"
 
 #: src/features/settings/components/calibrate-modal.tsx:113
 msgid "Something went wrong."
-msgstr ""
+msgstr "Что-то пошло не так."
 
-#: src/features/overview/overview-page.tsx:151
+#: src/features/overview/overview-page.tsx:150
 msgid "Speaking Time"
 msgstr "Время речи"
 
 #: src/features/dictionary/components/dictionary-table.tsx:62
 msgid "Spoken phrase"
-msgstr ""
+msgstr "Разговорная фраза"
 
 #: src/features/shell/components/sidebar-widgets.tsx:43
 #: src/features/shell/components/sidebar.tsx:224
 msgid "Start dictating"
-msgstr ""
+msgstr "Начать диктовать"
 
 #: src/features/dictation/dictation-pill.tsx:55
 msgid "Start dictation"
@@ -1001,34 +1004,34 @@ msgstr "Начать диктовку"
 #: src/features/settings/sections/general-section.tsx:43
 #: src/features/settings/sections/general-section.tsx:53
 msgid "Start minimized"
-msgstr ""
+msgstr "Начать сворачивать"
 
 #: src/features/settings/sections/shortcuts-section.tsx:21
 msgid "Start or stop recording"
-msgstr ""
+msgstr "Начать или остановить запись"
 
 #: src/features/settings/components/calibrate-modal.tsx:77
 msgid "Start reading"
-msgstr ""
+msgstr "Начать читать"
 
 #: src/features/settings/components/calibrate-modal.tsx:98
 #: src/features/settings/sections/input-section.tsx:64
 #: src/features/settings/sections/input-section.tsx:81
 msgid "Start sensitivity"
-msgstr ""
+msgstr "Старт чувствительности"
 
 #: src/features/settings/components/calibrate-modal.tsx:121
 msgid "Starting…"
-msgstr ""
+msgstr "Начало…"
 
 #: src/features/settings/components/calibrate-modal.tsx:69
 msgid "Stay quiet — measuring background noise."
-msgstr ""
+msgstr "Соблюдайте тишину — измеряйте фоновый шум."
 
 #: src/features/shell/components/sidebar-widgets.tsx:43
 #: src/features/shell/components/sidebar.tsx:224
 msgid "Stop dictating"
-msgstr ""
+msgstr "Хватит диктовать"
 
 #: src/features/dictation/dictation-pill.tsx:93
 msgid "Stop dictation"
@@ -1036,120 +1039,130 @@ msgstr "Остановить диктовку"
 
 #: src/features/history/components/session-detail-modal.tsx:163
 msgid "Style"
-msgstr ""
+msgstr "Стиль"
+
+#: src/features/styles/styles-page.tsx:167
+msgid "Switch style"
+msgstr "Переключить стиль"
 
 #: src/features/settings/components/theme-picker.tsx:381
 #: src/features/settings/sections/appearance-section.tsx:22
 #: src/features/settings/sections/appearance-section.tsx:47
 msgid "System"
-msgstr ""
-
-#: src/features/dictionary/components/dictionary-form.tsx:60
-#~ msgid "Teach Lune the right spelling for a word it mishears."
-#~ msgstr ""
+msgstr "Система"
 
 #: src/features/dictionary/components/dictionary-form.tsx:60
 msgid "Teach Lune Voice the right spelling for a word it mishears."
-msgstr ""
+msgstr "Научите Lune Voice правильному написанию слова, которое он неправильно слышит."
 
 #: src/features/dictionary/components/dictionary-table.tsx:165
 msgid "Teach Lune Voice your words"
-msgstr ""
-
-#: src/features/dictionary/components/dictionary-table.tsx:165
-#~ msgid "Teach Lune your words"
-#~ msgstr ""
+msgstr "Научите Луне озвучивать свои слова"
 
 #: src/features/settings/sections/output-section.tsx:12
 msgid "Text output"
-msgstr ""
+msgstr "Вывод текста"
 
 #: src/features/settings/sections/shortcuts-section.tsx:22
 msgid "The main shortcut used for voice typing. Click the binding to change it."
-msgstr ""
+msgstr "Основной ярлык, используемый для голосового набора. Нажмите на привязку, чтобы изменить ее."
 
 #: src/features/settings/sections/appearance-section.tsx:71
 msgid "Theme"
-msgstr ""
+msgstr "Тема"
 
 #: src/features/settings/sections/models-section.tsx:347
 msgid "This is a required model. Dictation will not work without it."
-msgstr ""
+msgstr "Это обязательная модель. Без него диктант не получится."
 
 #: src/features/welcome/welcome-page.tsx:122
 msgid "This only happens once. You can keep using your computer in the meantime."
-msgstr ""
+msgstr "Это происходит только один раз. Тем временем вы можете продолжать пользоваться компьютером."
 
 #: src/features/history/components/history-table.tsx:299
 #: src/features/history/components/session-detail-modal.tsx:201
 msgid "This will permanently remove this dictation session and its transcript."
-msgstr ""
+msgstr "Этот сеанс диктовки и его стенограмма будут удалены без возможности восстановления."
 
 #: src/features/history/components/history-table.tsx:126
 msgid "Time"
-msgstr ""
+msgstr "Время"
 
-#: src/features/overview/overview-page.tsx:239
+#: src/features/styles/components/style-editor-modal.tsx:44
+msgid "Title abbreviations (\"Mister\" → \"Mr.\")"
+msgstr "Сокращения названий («Мистер» → «Мистер»)"
+
+#: src/features/styles/components/style-hero.tsx:19
+msgid "Titles"
+msgstr "Титулы"
+
+#: src/features/overview/overview-page.tsx:248
 msgid "to start dictating"
-msgstr ""
+msgstr "начать диктовать"
 
-#: src/features/overview/overview-page.tsx:127
+#: src/features/overview/overview-page.tsx:128
 #: src/features/overview/overview-page.tsx:141
 msgid "today"
-msgstr ""
+msgstr "сегодня"
 
-#: src/features/overview/overview-page.tsx:171
+#: src/features/overview/overview-page.tsx:180
 msgid "Today"
-msgstr ""
+msgstr "Сегодня"
 
 #: src/features/settings/sections/shortcuts-section.tsx:54
 msgid "Toggle and cancel are bound to the same key combo. One will override the other."
-msgstr ""
+msgstr "Переключение и отмена привязаны к одной и той же комбинации клавиш. Одно будет перекрывать другое."
 
 #: src/features/settings/sections/input-section.tsx:34
 msgid "Toggle is easiest for longer dictation. Hold is better for quick bursts."
-msgstr ""
+msgstr "Переключить проще всего для более продолжительной диктовки. Удерживать лучше для быстрых очередей."
 
 #: src/features/shell/components/sidebar.tsx:236
 msgid "Toggle theme"
-msgstr ""
+msgstr "Переключить тему"
 
-#: src/features/overview/overview-page.tsx:117
+#: src/features/overview/overview-page.tsx:118
 msgid "Total Words"
 msgstr "Всего слов"
 
 #: src/features/history/components/history-table.tsx:127
 msgid "Transcript"
-msgstr ""
+msgstr "Стенограмма"
 
 #: src/features/settings/settings-page.tsx:72
 msgid "Transcription"
-msgstr ""
+msgstr "Транскрипция"
 
 #: src/features/settings/sections/advanced-section.tsx:22
 msgid "Tune low-level recognition and correction behavior."
-msgstr ""
+msgstr "Настройте поведение низкоуровневого распознавания и коррекции."
 
 #: src/features/settings/sections/shortcuts-section.tsx:17
 msgid "Use fast commands without opening menus in the middle of work."
-msgstr ""
+msgstr "Используйте быстрые команды, не открывая меню в середине работы."
 
 #: src/features/settings/sections/transcription-section.tsx:61
 #: src/features/settings/sections/transcription-section.tsx:69
 msgid "Use hardware acceleration"
-msgstr ""
+msgstr "Используйте аппаратное ускорение"
 
-#: src/features/styles/components/style-preset-card.tsx:78
+#. placeholder {0}: preset.name
+#: src/features/styles/components/style-preset-card.tsx:46
+msgid "Use the {0} style"
+msgstr "Используйте стиль {0}"
+
+#: src/features/styles/components/style-hero.tsx:51
+#: src/features/styles/components/style-preset-card.tsx:108
 msgid "View"
-msgstr ""
+msgstr "Вид"
 
-#: src/features/overview/overview-page.tsx:227
+#: src/features/overview/overview-page.tsx:236
 msgid "View all"
-msgstr ""
+msgstr "Посмотреть все"
 
-#: src/features/styles/components/style-editor-modal.tsx:47
+#: src/features/styles/components/style-editor-modal.tsx:58
 msgid "View style"
-msgstr ""
+msgstr "Посмотреть стиль"
 
 #: src/features/settings/sections/input-section.tsx:28
 msgid "Voice input"
@@ -1158,60 +1171,68 @@ msgstr "Голосовой ввод"
 #: src/features/settings/sections/transcription-section.tsx:19
 #: src/features/settings/sections/transcription-section.tsx:25
 msgid "Voice model"
-msgstr ""
+msgstr "Модель голоса"
 
 #: src/features/welcome/welcome-page.tsx:130
 msgid "Welcome back"
-msgstr ""
+msgstr "Добро пожаловать"
 
 #: src/features/welcome/welcome-page.tsx:127
 #: src/features/welcome/welcome-page.tsx:133
 msgid "Welcome to Lune Voice"
-msgstr ""
+msgstr "Добро пожаловать в Lune Voice"
 
 #: src/features/settings/sections/transcription-section.tsx:62
 msgid "When available, this can make transcription finish faster."
-msgstr ""
+msgstr "Если это возможно, это может ускорить завершение транскрипции."
 
 #: src/features/settings/components/calibrate-modal.tsx:78
 msgid "When you're ready, click Start and read the sentence aloud at your normal pace."
-msgstr ""
+msgstr "Когда вы будете готовы, нажмите «Начать» и прочитайте предложение вслух в обычном темпе."
 
 #: src/features/settings/sections/shortcuts-section.tsx:42
 msgid "Whether the shortcut toggles recording or only works while held. Change in Voice input."
-msgstr ""
+msgstr "Включает ли ярлык запись или работает только во время удержания. Изменение голосового ввода."
 
 #: src/features/history/components/history-session-list.tsx:33
 #: src/features/history/components/history-table.tsx:277
-#: src/features/overview/overview-page.tsx:266
+#: src/features/overview/overview-page.tsx:275
 msgid "words"
-msgstr ""
+msgstr "слова"
 
 #: src/features/history/components/history-table.tsx:128
 #: src/features/history/components/session-detail-modal.tsx:160
 msgid "Words"
-msgstr ""
+msgstr "Слова"
 
-#: src/features/overview/overview-page.tsx:118
+#: src/features/overview/overview-page.tsx:119
 msgid "Words Per Minute"
 msgstr "Слов в минуту"
 
+#: src/features/styles/components/style-preset-card.tsx:96
+msgid "Yes"
+msgstr "Да"
+
 #: src/features/dictionary/components/dictionary-form.tsx:73
 msgid "You say"
-msgstr ""
+msgstr "Вы говорите"
 
 #: src/features/welcome/welcome-page.tsx:118
 msgid "You're all set"
-msgstr ""
+msgstr "Все готово"
 
 #: src/features/settings/components/openai-fields.tsx:48
 msgid "Your API key. Leave it blank to keep the saved key."
-msgstr ""
+msgstr "Ваш API-ключ. Оставьте это поле пустым, чтобы сохранить сохраненный ключ."
 
-#: src/features/overview/overview-page.tsx:238
+#: src/features/overview/overview-page.tsx:247
 msgid "your hotkey"
-msgstr ""
+msgstr "твоя горячая клавиша"
 
 #: src/features/welcome/welcome-page.tsx:119
 msgid "Your models are ready. Everything stays on this machine."
-msgstr ""
+msgstr "Ваши модели готовы. Все остается на этой машине."
+
+#: src/features/styles/styles-page.tsx:199
+msgid "Your own formatting preset"
+msgstr "Ваш собственный набор настроек форматирования"
