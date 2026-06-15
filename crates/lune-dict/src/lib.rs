@@ -1,11 +1,12 @@
 pub mod caprate;
+pub mod commands;
 pub mod corrector;
+pub mod formatting;
 pub mod freq;
 pub mod homophone;
 pub mod homophone_calib;
 pub mod lexicon;
 pub mod ngram;
-pub mod punctuation;
 pub mod vocab;
 
 #[cfg(feature = "dictionary")]

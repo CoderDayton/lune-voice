@@ -23,7 +23,6 @@ serde_json = "1"
 lune-app = { path = "../../crates/lune-app" }
 lune-asr = { path = "../../crates/lune-asr" }
 lune-audio = { path = "../../crates/lune-audio" }
-lune-commands = { path = "../../crates/lune-commands" }
 lune-core = { path = "../../crates/lune-core" }
 lune-dict = { path = "../../crates/lune-dict" }
 lune-llm = { path = "../../crates/lune-llm" }

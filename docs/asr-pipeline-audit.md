@@ -182,8 +182,8 @@ Thin retrying HTTP client. Buffers f32; `poll_final` (`:143`) force-flushes the 
 
 Runs once per session on `(raw_text, segments)`. Order: voice commands → dictionary scan + heuristic correction → punctuation → bypass gate → LLM → sentence-cap backstop → deliver + persist.
 
-### 5.1 Voice command routing (`crates/lune-commands/`)
-`router.route_full(&raw_text)` → `RouteResult { commands, remaining }`. Grammar (`lib.rs:23-50`):
+### 5.1 Voice command routing (`crates/lune-dict/src/commands.rs`)
+`router.route_full(&raw_text)` → `RouteResult { commands, remaining }`. Grammar (`commands.rs:23-50`):
 - **Exact builtins, sorted longest-first** so short matches don't shadow: `stop listening`/`stop dictation`/`stop` → StopDictation, `new paragraph` → NewParagraph, `scratch that` → ScratchThat, `list item` → ListItem, `new line` → NewLine.
 - **Parametric prefixes** (run first, claim their span before exact matching): `switch preset to `/`switch to ` → `SwitchStyle(arg)`, `expand snippet `/`insert ` → `InsertSnippet(arg)`; arg terminated by `, . ;`.
 - Matching is case-insensitive on a lowercased copy; `remaining` is rebuilt from the **original-case** text with command spans removed and whitespace collapsed.
@@ -204,7 +204,7 @@ Runs once per session on `(raw_text, segments)`. Order: voice commands → dicti
 
 Lexicon (`lexicon.rs`): tiered `lookup` over a frequency dict (`CONFIDENT_FREQ 5000`), curated supplemental vocab (`Vocab`, freq floor 10000, dev terms), and English Wordnik membership. 11 bundled frequency dictionaries (en/de/es/fr/it/ja/ko/nl/pt/ru/zh).
 
-### 5.3 Punctuation (`punctuation.rs`)
+### 5.3 Punctuation (`formatting.rs`)
 `normalize(text) → { text, needs_llm }`:
 - Non-Latin → verbatim. Title abbreviations (mister→Mr.) applied when followed by a capitalized word.
 - **Tier-1 deterministic:** `capitalize_sentence_starts` + append a terminal `.` for **declaratives only**.

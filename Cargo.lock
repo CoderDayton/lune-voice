@@ -3054,7 +3054,6 @@ dependencies = [
  "hound",
  "lune-asr",
  "lune-audio",
- "lune-commands",
  "lune-core",
  "lune-dict",
  "lune-llm",
@@ -3109,14 +3108,6 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "lune-commands"
-version = "0.1.0"
-dependencies = [
- "lune-core",
- "tracing",
 ]
 
 [[package]]
@@ -3211,7 +3202,6 @@ dependencies = [
  "lune-app",
  "lune-asr",
  "lune-audio",
- "lune-commands",
  "lune-core",
  "lune-dict",
  "lune-llm",

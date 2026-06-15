@@ -6,12 +6,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use lune_app::{SessionManager, SessionManagerConfig};
-use lune_commands::VoiceCommandRouter;
 use lune_core::Result;
 use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
 use lune_core::llm::{PostProcessInput, PostProcessOutput, TextPostProcessor};
 use lune_core::session::SessionEvent;
 use lune_dict::DictionaryManager;
+use lune_dict::commands::VoiceCommandRouter;
 use lune_persist::Database;
 use tokio::sync::{Mutex, RwLock, mpsc};
 

@@ -36,7 +36,7 @@ use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
 use lune_core::config::{PipelineConfig, StylePreset};
 use lune_core::llm::PostProcessInput;
 use lune_dict::corrector::{HWCE_FLAG_THRESHOLD, LexicalGate};
-use lune_dict::punctuation::{decase_common_words, defuse_inconsistent, normalize};
+use lune_dict::formatting::{decase_common_words, defuse_inconsistent, normalize};
 
 /// One fixture's cached gate inputs + both-arm scores.
 struct Probe {
@@ -140,7 +140,7 @@ fn run_llm(
         correction_needed: true,
     };
     match harness.rt.block_on(harness.llm.transform(&input)) {
-        Ok(o) => lune_dict::punctuation::capitalize_sentence_starts(&o.cleaned_text),
+        Ok(o) => lune_dict::formatting::capitalize_sentence_starts(&o.cleaned_text),
         Err(_) => text.to_owned(),
     }
 }

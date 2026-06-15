@@ -8,7 +8,6 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use lune_audio::{AudioStream, AudioStreamHandle};
-use lune_commands::VoiceCommandRouter;
 use lune_core::Result;
 use lune_core::asr::{AsrBackend, AsrBackendKind, AsrSegment, AsrSessionConfig};
 use lune_core::config::{PipelineConfig, StylePreset, UserSettings, builtin_registry};
@@ -16,6 +15,7 @@ use lune_core::error::Error;
 use lune_core::llm::TextPostProcessor;
 use lune_core::session::{DictationSession, SessionEvent, SessionStatus};
 use lune_dict::DictionaryManager;
+use lune_dict::commands::VoiceCommandRouter;
 use lune_dict::corrector::LexicalGate;
 use lune_persist::{Database, PersistResult};
 
@@ -594,17 +594,17 @@ async fn process_and_deliver(
     // sure" also appears) before punctuation/casing, so a split sentence-start
     // capitalizes correctly. English only — the p_cap/freq guards are English.
     let corrected = if detected_lang == "English" {
-        lune_dict::punctuation::defuse_inconsistent(&heuristic_result.corrected_text)
+        lune_dict::formatting::defuse_inconsistent(&heuristic_result.corrected_text)
     } else {
         heuristic_result.corrected_text.clone()
     };
-    let punctuation = lune_dict::punctuation::normalize_with(&corrected, &fmt);
+    let punctuation = lune_dict::formatting::normalize_with(&corrected, &fmt);
     // Downcase mid-sentence common-word capitals (the "Make Sure" ASR artifact,
     // and any over-capitalization the heuristic left) on the always-on path, so
     // casing is normalized once whether or not the gated LLM pass runs. English
     // only — p_cap is an English table and other languages capitalize nouns.
     let text_after_heuristic = if detected_lang == "English" {
-        lune_dict::punctuation::decase_common_words(&punctuation.text)
+        lune_dict::formatting::decase_common_words(&punctuation.text)
     } else {
         punctuation.text
     };
@@ -713,7 +713,7 @@ async fn process_and_deliver(
                 // uncapitalized (or that the merge reverted to input casing)
                 // still gets its sentence-initial capital (when the style enables it).
                 if fmt.auto_capitalization {
-                    lune_dict::punctuation::capitalize_sentence_starts(&output.cleaned_text)
+                    lune_dict::formatting::capitalize_sentence_starts(&output.cleaned_text)
                 } else {
                     output.cleaned_text
                 }

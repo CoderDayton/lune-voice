@@ -580,7 +580,7 @@ impl BenchmarkHarness {
 
         lune_app::SessionManager::new(
             Arc::clone(&self.asr),
-            Arc::new(lune_commands::VoiceCommandRouter::new()),
+            Arc::new(lune_dict::commands::VoiceCommandRouter::new()),
             Arc::clone(&self.llm),
             Arc::new(Mutex::new(dict)),
             Arc::new(Mutex::new(db)),

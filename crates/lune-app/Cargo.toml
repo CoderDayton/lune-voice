@@ -16,7 +16,6 @@ lune-core.workspace = true
 lune-audio.workspace = true
 lune-asr.workspace = true
 lune-llm.workspace = true
-lune-commands.workspace = true
 lune-dict.workspace = true
 lune-persist.workspace = true
 async-trait.workspace = true

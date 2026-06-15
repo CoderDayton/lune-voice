@@ -36,7 +36,7 @@ use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
 use lune_core::config::{PipelineConfig, StylePreset};
 use lune_core::llm::PostProcessInput;
 use lune_dict::corrector::{HWCE_FLAG_THRESHOLD, LexicalGate};
-use lune_dict::punctuation::{
+use lune_dict::formatting::{
     capitalize_sentence_starts, decase_common_words, defuse_inconsistent, normalize,
 };
 

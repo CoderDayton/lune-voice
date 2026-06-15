@@ -404,7 +404,7 @@ async fn run_pipeline(
 
     let mgr = lune_app::SessionManager::new(
         Arc::clone(&harness.asr),
-        Arc::new(lune_commands::VoiceCommandRouter::new()),
+        Arc::new(lune_dict::commands::VoiceCommandRouter::new()),
         Arc::clone(&harness.llm),
         Arc::new(Mutex::new(dict)),
         Arc::new(Mutex::new(db)),

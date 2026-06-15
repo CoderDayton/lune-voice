@@ -146,7 +146,7 @@ async fn run_full_pipeline(
 
     let mgr = SessionManager::new(
         asr,
-        Arc::new(lune_commands::VoiceCommandRouter::new()),
+        Arc::new(lune_dict::commands::VoiceCommandRouter::new()),
         llm,
         Arc::new(Mutex::new(dict)),
         Arc::new(Mutex::new(db)),

@@ -46,8 +46,7 @@ lune-app (binary)
 |   `-- lune-core    Shared traits + types
 |-- lune-llm         Text post-processing (local ONNX or OpenAI-compatible)
 |   `-- lune-core
-|-- lune-commands    Voice command detection
-|-- lune-dict        User dictionary
+|-- lune-dict        User dictionary + voice command detection
 `-- lune-persist     Settings, DB (SQLite), model downloads
     `-- lune-core
 ```
