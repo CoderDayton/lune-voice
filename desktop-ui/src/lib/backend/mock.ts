@@ -29,7 +29,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
       asrBackendType: 'Qwen3Asr',
       llmEnabled: true,
       confidenceThreshold: 0.55,
-      llmSkipThreshold: 0.65,
+      llmSkipThreshold: 0.4,
       adaptiveVad: false,
       speechThreshold: 0.5,
       speechThresholdEnd: 0.3,

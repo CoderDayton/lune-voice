@@ -36,8 +36,9 @@ pub(crate) struct GateOutcome {
     pub avg_conf: f32,
 }
 
-/// Decide whether the LLM correction/styling pass should run. The arithmetic is
-/// byte-for-byte the prior inline gate — do not "simplify" the f32 folds.
+/// Decide whether the LLM correction/styling pass should run. The confidence
+/// "attention" band fires only when >=2 words fall below `llm_skip_threshold`
+/// (see the field doc); the segment-average "too broken" veto is unchanged.
 pub(crate) fn decide(g: GateInputs<'_>) -> GateOutcome {
     let max_risk = g
         .word_risk_scores
@@ -45,7 +46,21 @@ pub(crate) fn decide(g: GateInputs<'_>) -> GateOutcome {
         .map(|(_, r)| *r)
         .fold(0.0_f32, f32::max);
     let min_conf = 1.0 - max_risk;
-    let conf_attention = g.pipeline.llm_skip_threshold.is_some_and(|t| min_conf < t);
+    // Attention requires at least TWO low-confidence words, not one. A single
+    // dipping word is almost always a correctly-transcribed rare word (a proper
+    // noun or brand); escalating on it routed clean dictation to the LLM, and a
+    // text-only corrector cannot recover a proper-noun mishear anyway, so the
+    // call was wasted. Two uncertain words is a far better proxy for a genuinely
+    // shaky transcript correction can help. Validated by benchmarks/gate_sweep.rs
+    // on the domain corpus: gate accuracy 45%->91%, LLM calls 13->4, routed WER
+    // 5.23%->4.96% (within 0.07pp of the oracle).
+    let conf_attention = g.pipeline.llm_skip_threshold.is_some_and(|t| {
+        g.word_risk_scores
+            .iter()
+            .filter(|(_, r)| 1.0 - *r < t)
+            .count()
+            >= 2
+    });
 
     let word_count = g.word_count.max(1);
     let mean_risk = g.word_risk_positions.iter().map(|(_, r)| *r).sum::<f32>() / word_count as f32;
@@ -121,10 +136,34 @@ mod tests {
     }
 
     #[test]
-    fn low_confidence_word_triggers_attention() {
-        // max_risk 0.6 -> min_conf 0.4 < 0.5 -> conf_attention.
+    fn single_low_confidence_word_does_not_trigger_attention() {
+        // One dipping word (a rare proper noun) is not enough — the gate now
+        // requires two uncertain words before escalating a resolved transcript.
         let c = cfg(Some(0.5), None);
-        let out = decide(inputs(&c, true, false, false, &[("a", 0.6)], &[(0, 0.6)]));
+        let out = decide(inputs(
+            &c,
+            true,
+            false,
+            false,
+            &[("a", 0.6), ("clean", 0.1)],
+            &[(0, 0.6), (1, 0.1)],
+        ));
+        assert!(!out.conf_attention && !out.needs_llm);
+    }
+
+    #[test]
+    fn two_low_confidence_words_trigger_attention() {
+        // Two words below the confidence threshold signal a genuinely shaky
+        // transcript, so the correction pass runs.
+        let c = cfg(Some(0.5), None);
+        let out = decide(inputs(
+            &c,
+            true,
+            false,
+            false,
+            &[("a", 0.6), ("b", 0.7)],
+            &[(0, 0.6), (1, 0.7)],
+        ));
         assert!(out.conf_attention && out.needs_llm);
     }
 

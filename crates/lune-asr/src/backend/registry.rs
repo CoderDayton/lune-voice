@@ -191,7 +191,9 @@ impl AsrRegistry {
                 word_boost_enabled: false,
                 word_boost_score: 1.0,
                 word_confidence_threshold: Some(0.55),
-                llm_skip_threshold: Some(0.65),
+                // Attention band requires >=2 sub-threshold words; 0.40 matched
+                // oracle routing on the domain corpus (benchmarks/gate_sweep.rs).
+                llm_skip_threshold: Some(0.40),
                 llm_skip_noisy_threshold: Some(0.30),
                 max_speech_samples: 300 * 16_000,
                 llm_timeout_secs: 30,

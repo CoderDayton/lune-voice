@@ -91,7 +91,7 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   useGpu: true,
   devicePolicy: 'Auto',
   confidenceThreshold: '0.55',
-  llmSkipThreshold: '0.65',
+  llmSkipThreshold: '0.40',
   dictationMode: 'Clipboard',
   stylePreset: 'casual',
   adaptiveVad: false,

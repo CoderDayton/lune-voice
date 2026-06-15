@@ -98,10 +98,7 @@ export function settingsToSaveInput(settings: WorkspaceSettings): SaveWorkspaceS
     devicePolicy: settings.devicePolicy,
     asrBackendType: settings.asrBackend,
     confidenceThreshold: Number(settings.confidenceThreshold),
-    llmSkipThreshold: Math.max(
-      Number(settings.llmSkipThreshold),
-      Number(settings.confidenceThreshold),
-    ),
+    llmSkipThreshold: Number(settings.llmSkipThreshold),
     adaptiveVad: settings.adaptiveVad,
     speechThreshold: Number(settings.speechThreshold),
     speechThresholdEnd: Number(settings.speechThresholdEnd),

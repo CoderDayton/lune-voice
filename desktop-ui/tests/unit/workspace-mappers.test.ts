@@ -197,13 +197,13 @@ describe("workspace mappers", () => {
     expect(result.confidenceThreshold).toBe("0.55");
   });
 
-  test("null llmSkipThreshold defaults to 0.65", () => {
+  test("null llmSkipThreshold defaults to 0.40", () => {
     const snapshot = {
       settings: { ...makeBackendSettings(), llmSkipThreshold: null },
     } as WorkspaceSnapshot;
 
     const result = mapWorkspaceSettings(snapshot);
-    expect(result.llmSkipThreshold).toBe("0.65");
+    expect(result.llmSkipThreshold).toBe("0.40");
   });
 
   // ── settingsToSaveInput ─────────────────────────────────────────────
@@ -214,15 +214,15 @@ describe("workspace mappers", () => {
 
     expect(input.activationMode).toBe("Toggle");
     expect(input.confidenceThreshold).toBe(0.55);
-    expect(input.llmSkipThreshold).toBe(0.65);
+    expect(input.llmSkipThreshold).toBe(0.4);
     expect(input.speechThreshold).toBe(0.5);
     expect(input.openaiAsrApiKey).toBeNull();
   });
 
-  test("clamps llmSkipThreshold to confidenceThreshold on save", () => {
-    const settings = { ...DEFAULT_SETTINGS, confidenceThreshold: "0.75", llmSkipThreshold: "0.65" };
+  test("preserves llmSkipThreshold below confidenceThreshold on save", () => {
+    const settings = { ...DEFAULT_SETTINGS, confidenceThreshold: "0.75", llmSkipThreshold: "0.40" };
     const input = settingsToSaveInput(settings);
-    expect(input.llmSkipThreshold).toBe(0.75);
+    expect(input.llmSkipThreshold).toBe(0.4);
   });
 
   test("does not send masked API key back to backend", () => {

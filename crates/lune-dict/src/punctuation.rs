@@ -210,7 +210,7 @@ const HOTKEY_NAMED_KEYS: &[&str] = &[
 ];
 
 /// Join spoken keyboard chords into canonical `Modifier+Key` notation: "Super H"
-/// → "Super+H", "control shift p" → "Control+Shift+P", "alt f4" → "Alt+F4",
+/// → "Super+H", "control shift p" → "Ctrl+Shift+P", "alt f4" → "Alt+F4",
 /// "Alt Tab" → "Alt+Tab".
 ///
 /// A chord is one or more modifier words followed by exactly one terminal key.
@@ -242,7 +242,7 @@ fn join_hotkey_chords(text: &str) -> String {
                     if k > 0 {
                         chord.push('+');
                     }
-                    chord.push_str(&title_case_ascii(w));
+                    chord.push_str(&canonical_modifier(w));
                 }
                 chord.push('+');
                 chord.push_str(&canonical_key(key_core, kind));
@@ -339,6 +339,15 @@ fn chord_fires(modifier_count: usize, first_modifier: &str, key_core: &str, kind
         KeyKind::Digit | KeyKind::Function => true,
     };
     modifier_capitalized && key_capitalized
+}
+
+/// The canonical printed form of a modifier word. "control"/"ctrl" always
+/// collapse to the short "Ctrl"; every other modifier is Title-cased as spoken.
+fn canonical_modifier(word: &str) -> String {
+    if word.eq_ignore_ascii_case("control") || word.eq_ignore_ascii_case("ctrl") {
+        return "Ctrl".to_owned();
+    }
+    title_case_ascii(word)
 }
 
 /// The canonical printed form of a chord key: letters upper-cased, function keys
@@ -774,7 +783,7 @@ mod tests {
     fn hotkey_joins_multiple_modifiers() {
         assert_eq!(
             join_hotkey_chords("press Control Shift P"),
-            "press Control+Shift+P"
+            "press Ctrl+Shift+P"
         );
     }
 
@@ -812,9 +821,9 @@ mod tests {
     #[test]
     fn hotkey_joins_named_keys() {
         assert_eq!(join_hotkey_chords("press Alt Tab"), "press Alt+Tab");
-        assert_eq!(join_hotkey_chords("Control Enter"), "Control+Enter");
+        assert_eq!(join_hotkey_chords("Control Enter"), "Ctrl+Enter");
         assert_eq!(join_hotkey_chords("Super Space"), "Super+Space");
-        assert_eq!(join_hotkey_chords("Control Shift Up"), "Control+Shift+Up");
+        assert_eq!(join_hotkey_chords("Control Shift Up"), "Ctrl+Shift+Up");
     }
 
     #[test]
@@ -834,12 +843,9 @@ mod tests {
         // the common real-ASR case the capital gate used to miss.
         assert_eq!(
             join_hotkey_chords("press control shift p"),
-            "press Control+Shift+P"
+            "press Ctrl+Shift+P"
         );
-        assert_eq!(
-            join_hotkey_chords("control alt delete"),
-            "Control+Alt+Delete"
-        );
+        assert_eq!(join_hotkey_chords("control alt delete"), "Ctrl+Alt+Delete");
         assert_eq!(join_hotkey_chords("ctrl alt del"), "Ctrl+Alt+Del");
         // A function key is unmistakable, so a single lowercase modifier joins.
         assert_eq!(join_hotkey_chords("hit alt f4"), "hit Alt+F4");
@@ -849,9 +855,17 @@ mod tests {
     #[test]
     fn hotkey_canonicalizes_output_casing() {
         // Whatever the input casing, the chord prints canonically.
-        assert_eq!(join_hotkey_chords("CONTROL SHIFT P"), "Control+Shift+P");
+        assert_eq!(join_hotkey_chords("CONTROL SHIFT P"), "Ctrl+Shift+P");
         assert_eq!(join_hotkey_chords("ctrl shift tab"), "Ctrl+Shift+Tab");
         assert_eq!(join_hotkey_chords("ALT F4"), "Alt+F4");
+    }
+
+    #[test]
+    fn hotkey_control_always_shortens_to_ctrl() {
+        // "control"/"ctrl"/"CONTROL" all collapse to the short "Ctrl".
+        assert_eq!(join_hotkey_chords("control shift p"), "Ctrl+Shift+P");
+        assert_eq!(join_hotkey_chords("Control Enter"), "Ctrl+Enter");
+        assert_eq!(join_hotkey_chords("CONTROL ALT DELETE"), "Ctrl+Alt+Delete");
     }
 
     #[test]
@@ -872,7 +886,7 @@ mod tests {
         assert_eq!(join_hotkey_chords("control command a"), "control command a");
         assert_eq!(join_hotkey_chords("control shift i"), "control shift i");
         // An explicit capital letter is a genuine key reference.
-        assert_eq!(join_hotkey_chords("hit Control A"), "hit Control+A");
+        assert_eq!(join_hotkey_chords("hit Control A"), "hit Ctrl+A");
     }
 
     #[test]
@@ -888,7 +902,7 @@ mod tests {
     fn hotkey_preserves_trailing_punct_on_lowercase_chord() {
         assert_eq!(
             join_hotkey_chords("press control shift p."),
-            "press Control+Shift+P."
+            "press Ctrl+Shift+P."
         );
     }
 

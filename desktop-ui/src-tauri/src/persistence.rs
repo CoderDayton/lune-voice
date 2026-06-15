@@ -441,17 +441,10 @@ fn apply_settings_dto(
     {
         return Err(format!("confidenceThreshold must be 0.0–1.0, got {ct}"));
     }
-    if let Some(threshold) = input.llm_skip_threshold {
-        if !threshold.is_finite() || !(0.0..=1.0).contains(&threshold) {
-            return Err(format!("llmSkipThreshold must be 0.0–1.0, got {threshold}"));
-        }
-        if let Some(confidence_threshold) = input.confidence_threshold
-            && threshold < confidence_threshold
-        {
-            return Err(format!(
-                "llmSkipThreshold ({threshold}) must be >= confidenceThreshold ({confidence_threshold})"
-            ));
-        }
+    if let Some(threshold) = input.llm_skip_threshold
+        && (!threshold.is_finite() || !(0.0..=1.0).contains(&threshold))
+    {
+        return Err(format!("llmSkipThreshold must be 0.0–1.0, got {threshold}"));
     }
     if !input.speech_threshold.is_finite() || !(0.0..=1.0).contains(&input.speech_threshold) {
         return Err(format!(
@@ -824,9 +817,17 @@ mod tests {
         apply_settings_dto(&mut settings, input).unwrap();
         assert_eq!(settings.pipeline.llm_skip_threshold, Some(0.75));
 
+        // A skip threshold below the marking threshold is valid: the gate's
+        // attention band fires on >=2 low-confidence words, not on ordering.
         let mut input = default_save_input();
-        input.confidence_threshold = Some(0.8);
-        input.llm_skip_threshold = Some(0.7);
+        input.confidence_threshold = Some(0.55);
+        input.llm_skip_threshold = Some(0.40);
+        apply_settings_dto(&mut settings, input).unwrap();
+        assert_eq!(settings.pipeline.llm_skip_threshold, Some(0.40));
+
+        // Out-of-range is still rejected.
+        let mut input = default_save_input();
+        input.llm_skip_threshold = Some(1.5);
         assert!(apply_settings_dto(&mut settings, input).is_err());
     }
 

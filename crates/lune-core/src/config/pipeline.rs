@@ -73,17 +73,17 @@ pub struct PipelineConfig {
     /// Skip-when-clean LLM bypass threshold (HWCE confidence scale,
     /// `1 − word_error_risk`).
     ///
-    /// When every word in a segment has confidence at or above this value
-    /// the LLM correction pass is skipped, protecting clean segments from
-    /// over-correction (the dominant failure mode per arXiv:2509.25048).
-    /// Below it, the segment enters the LLM attention band even when the
-    /// heuristic resolved every word deterministically.
+    /// The LLM correction pass enters its "attention band" when at least TWO
+    /// words in a segment fall below this confidence, protecting clean segments
+    /// from over-correction (the dominant failure mode per arXiv:2509.25048).
+    /// A single low-confidence word is almost always a correctly-transcribed
+    /// rare word (a proper noun or brand), not an error the text-only corrector
+    /// could fix — so one dipping word no longer escalates; two do.
     ///
     /// The scale is HWCE's sigmoid output: a perfectly confident word floors
-    /// at risk ≈ 0.226 (confidence ≈ 0.774), so thresholds near 1.0 can
-    /// never bypass and values above ~0.77 force the LLM on every segment.
-    /// Default `Some(0.65)` puts the attention band at `max risk > 0.35` —
-    /// between the confident floor and the 0.40 heuristic flag threshold.
+    /// at risk ≈ 0.226 (confidence ≈ 0.774), so thresholds near 1.0 can never
+    /// bypass. Default `Some(0.40)` — empirically the point that matched oracle
+    /// routing on the domain corpus (benchmarks/gate_sweep.rs).
     ///
     /// `None` disables the band gate — the LLM then runs only for unresolved
     /// words or ambiguous punctuation.
@@ -248,11 +248,6 @@ impl PipelineConfig {
         {
             issues.push("llm_skip_noisy_threshold must be < llm_skip_threshold");
         }
-        if let (Some(mark), Some(skip)) = (self.word_confidence_threshold, self.llm_skip_threshold)
-            && skip < mark
-        {
-            issues.push("llm_skip_threshold must be >= word_confidence_threshold");
-        }
         if self.max_speech_samples == 0 {
             issues.push("max_speech_samples must be > 0");
         }
@@ -278,7 +273,7 @@ impl Default for PipelineConfig {
             // overrides in `lune_asr::AsrRegistry::pipeline_config` for the
             // reasoning behind these values.
             word_confidence_threshold: Some(0.55),
-            llm_skip_threshold: Some(0.65),
+            llm_skip_threshold: Some(0.40),
             llm_skip_noisy_threshold: Some(0.30),
             max_speech_samples: 60 * SAMPLE_RATE,
             itn_enabled: false,
@@ -370,24 +365,6 @@ mod tests {
     }
 
     #[test]
-    fn llm_skip_threshold_must_be_at_least_mark_threshold() {
-        // skip < mark is a semantic inversion — clean bypass must be stricter
-        // than (or equal to) the marking gate.
-        let cfg = PipelineConfig {
-            word_confidence_threshold: Some(0.65),
-            llm_skip_threshold: Some(0.50),
-            ..PipelineConfig::default()
-        };
-        let issues = cfg.validate();
-        assert!(
-            issues
-                .iter()
-                .any(|i| i.contains("llm_skip_threshold must be >=")),
-            "expected ordering violation, got {issues:?}"
-        );
-    }
-
-    #[test]
     fn llm_skip_threshold_override_applies() {
         let base = PipelineConfig::default();
         let overrides = PipelineOverrides {
@@ -399,10 +376,10 @@ mod tests {
     }
 
     #[test]
-    fn default_has_skip_threshold_at_0_95() {
-        // Matches the per-backend registry overrides for Parakeet.
+    fn default_has_skip_threshold_at_0_40() {
+        // Matches the per-backend registry override for the local ASR backend.
         let cfg = PipelineConfig::default();
-        assert_eq!(cfg.llm_skip_threshold, Some(0.65));
+        assert_eq!(cfg.llm_skip_threshold, Some(0.40));
         assert_eq!(cfg.word_confidence_threshold, Some(0.55));
         assert!(cfg.validate().is_empty(), "default must validate");
     }

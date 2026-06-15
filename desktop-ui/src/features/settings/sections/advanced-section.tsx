@@ -14,7 +14,7 @@ export function AdvancedSection({ settings }: SettingsProps) {
     settings.llmSkipThreshold,
   );
   const confidenceValue = Number(confidence);
-  const threshold = Math.max(Number(llmSkipThreshold), confidenceValue);
+  const threshold = Number(llmSkipThreshold);
 
   return (
     <SettingsSection
@@ -51,7 +51,7 @@ export function AdvancedSection({ settings }: SettingsProps) {
             <input
               type="range"
               className="range range-primary range-sm w-28 sm:w-36"
-              min={confidenceValue}
+              min={0.1}
               max={0.95}
               step={0.05}
               value={threshold.toFixed(2)}
