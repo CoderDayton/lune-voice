@@ -177,16 +177,18 @@ fn abbreviate_titles(text: &str) -> String {
     out.join(" ")
 }
 
-/// Modifier words that begin a keyboard chord. Matched case-insensitively but
-/// only fire when written capitalized, which keeps ordinary prose ("control
-/// room", "shift focus") from being joined.
+/// Modifier words that begin a keyboard chord, matched case-insensitively.
+/// Whether a match actually joins is decided by [`chord_fires`]: unambiguous
+/// chords join regardless of casing, while a single modifier + an ordinary key
+/// needs the writer's capitalization to avoid joining prose ("control room").
 const HOTKEY_MODIFIERS: &[&str] = &[
     "super", "control", "ctrl", "alt", "shift", "command", "cmd", "meta", "win", "windows",
     "option", "hyper", "fn",
 ];
 
-/// Single-token named keys that can terminate a chord. Matched only when written
-/// capitalized (like the modifiers), so ordinary prose words stay untouched.
+/// Single-token named keys that can terminate a chord, matched case-insensitively.
+/// After a *single* modifier a named key still requires capitalization (via
+/// [`chord_fires`]) so prose like "shift down a gear" is left untouched.
 const HOTKEY_NAMED_KEYS: &[&str] = &[
     "tab",
     "enter",
@@ -207,32 +209,43 @@ const HOTKEY_NAMED_KEYS: &[&str] = &[
     "right",
 ];
 
-/// Join spoken keyboard chords into `Modifier+Key` notation: "Super H" →
-/// "Super+H", "Control Shift P" → "Control+Shift+P", "Alt Tab" → "Alt+Tab".
+/// Join spoken keyboard chords into canonical `Modifier+Key` notation: "Super H"
+/// → "Super+H", "control shift p" → "Control+Shift+P", "alt f4" → "Alt+F4",
+/// "Alt Tab" → "Alt+Tab".
 ///
-/// Deliberately conservative: a chord is one or more *capitalized* modifier
-/// words followed by exactly one terminal key — a single uppercase letter, a
-/// digit, a function key (F1–F24), or a *capitalized* named key (Tab, Enter,
-/// Escape, Space, Delete, Backspace, Home, End, Insert, the arrows). The
-/// capitalization requirement keeps ordinary prose ("Shift focus", "Command
-/// line", "alt tab") from being joined. Trailing punctuation on the key
-/// ("Super H." → "Super+H.") is preserved.
+/// A chord is one or more modifier words followed by exactly one terminal key.
+/// Firing is split by ambiguity (see [`chord_fires`]): unambiguous chords — two
+/// or more modifiers, or a function key — join regardless of casing (ASR emits
+/// them lowercase), while a single modifier + an ordinary key still needs the
+/// writer's capitalization so prose ("Control a list", "shift focus") is left
+/// alone. The joined chord is canonicalized — modifiers Title-cased, letters
+/// upper-cased, named keys Title-cased — so the output is uniform whatever the
+/// input casing. Trailing punctuation on the key ("Super H." → "Super+H.") is
+/// preserved.
 fn join_hotkey_chords(text: &str) -> String {
     let words: Vec<&str> = text.split_whitespace().collect();
     let mut out: Vec<String> = Vec::with_capacity(words.len());
     let mut i = 0;
     while i < words.len() {
         let mut j = i;
-        while j < words.len() && is_hotkey_modifier(words[j]) {
+        while j < words.len() && is_modifier_word(words[j]) {
             j += 1;
         }
-        // Need at least one modifier (j > i) and exactly one terminal key after.
+        // One-or-more modifiers (j > i) followed by exactly one terminal key.
         if j > i && j < words.len() {
             let (key_core, suffix) = split_trailing_punct(words[j]);
-            if is_hotkey_key(key_core) {
-                let mut chord = words[i..j].join("+");
+            if let Some(kind) = classify_key(key_core)
+                && chord_fires(j - i, words[i], key_core, kind)
+            {
+                let mut chord = String::new();
+                for (k, w) in words[i..j].iter().enumerate() {
+                    if k > 0 {
+                        chord.push('+');
+                    }
+                    chord.push_str(&title_case_ascii(w));
+                }
                 chord.push('+');
-                chord.push_str(key_core);
+                chord.push_str(&canonical_key(key_core, kind));
                 chord.push_str(suffix);
                 out.push(chord);
                 i = j + 1;
@@ -245,9 +258,21 @@ fn join_hotkey_chords(text: &str) -> String {
     out.join(" ")
 }
 
-/// A capitalized, punctuation-free modifier word.
-fn is_hotkey_modifier(word: &str) -> bool {
-    word.starts_with(|c: char| c.is_ascii_uppercase())
+/// The kind of token that can terminate a keyboard chord.
+#[derive(Clone, Copy, PartialEq)]
+enum KeyKind {
+    Letter,
+    Digit,
+    Function,
+    Named,
+}
+
+/// A punctuation-free modifier word, matched case-insensitively ("Control",
+/// "ctrl", "shift"). Any edge punctuation ("Control,") disqualifies it and ends
+/// the modifier run.
+fn is_modifier_word(word: &str) -> bool {
+    !word.is_empty()
+        && word.bytes().all(|b| b.is_ascii_alphabetic())
         && HOTKEY_MODIFIERS.contains(&word.to_ascii_lowercase().as_str())
 }
 
@@ -262,23 +287,84 @@ fn split_trailing_punct(word: &str) -> (&str, &str) {
     word.split_at(end)
 }
 
-/// A chord-terminating key: a single uppercase letter or digit, a function key
-/// F1–F24, or a capitalized named key (Tab, Enter, the arrows, …). Requiring
-/// capitalization on named keys keeps common words from being mistaken for keys.
-fn is_hotkey_key(core: &str) -> bool {
+/// Classify a chord-terminating key, or `None` when the token is not key-shaped:
+/// a single letter, a single digit, a function key (F1–F24), or a named key
+/// (Tab, Enter, the arrows, …). Casing is ignored here — [`chord_fires`] applies
+/// any capitalization requirement.
+fn classify_key(core: &str) -> Option<KeyKind> {
     if core.len() == 1 {
         let b = core.as_bytes()[0];
-        return b.is_ascii_uppercase() || b.is_ascii_digit();
+        if b.is_ascii_alphabetic() {
+            return Some(KeyKind::Letter);
+        }
+        if b.is_ascii_digit() {
+            return Some(KeyKind::Digit);
+        }
+        return None;
     }
-    if let Some(rest) = core.strip_prefix('F')
-        && (1..=2).contains(&rest.len())
+    if is_function_key(core) {
+        return Some(KeyKind::Function);
+    }
+    HOTKEY_NAMED_KEYS
+        .contains(&core.to_ascii_lowercase().as_str())
+        .then_some(KeyKind::Named)
+}
+
+/// A function key F1–F24, case-insensitive on the leading `F`.
+fn is_function_key(core: &str) -> bool {
+    let Some(rest) = core.strip_prefix(['F', 'f']) else {
+        return false;
+    };
+    (1..=2).contains(&rest.len())
         && rest.bytes().all(|b| b.is_ascii_digit())
         && rest.parse::<u8>().is_ok_and(|n| (1..=24).contains(&n))
-    {
+}
+
+/// Whether a modifier run + terminal key should join. Unambiguous chords — two
+/// or more modifiers, or a function key — fire regardless of casing, since they
+/// never form English prose and ASR emits them lowercase. A single modifier plus
+/// an ordinary key stays ambiguous with prose ("control a list", "shift up a
+/// gear"), so it requires the writer's own capitalization as the cue. A lowercase
+/// "a"/"i" is the article/pronoun and is never treated as a key.
+fn chord_fires(modifier_count: usize, first_modifier: &str, key_core: &str, kind: KeyKind) -> bool {
+    if kind == KeyKind::Letter && matches!(key_core, "a" | "i") {
+        return false;
+    }
+    if modifier_count >= 2 || kind == KeyKind::Function {
         return true;
     }
-    core.starts_with(|c: char| c.is_ascii_uppercase())
-        && HOTKEY_NAMED_KEYS.contains(&core.to_ascii_lowercase().as_str())
+    let modifier_capitalized = first_modifier.starts_with(|c: char| c.is_ascii_uppercase());
+    let key_capitalized = match kind {
+        KeyKind::Letter | KeyKind::Named => key_core.starts_with(|c: char| c.is_ascii_uppercase()),
+        KeyKind::Digit | KeyKind::Function => true,
+    };
+    modifier_capitalized && key_capitalized
+}
+
+/// The canonical printed form of a chord key: letters upper-cased, function keys
+/// `F`+digits, named keys Title-cased, digits unchanged.
+fn canonical_key(core: &str, kind: KeyKind) -> String {
+    match kind {
+        KeyKind::Letter => core.to_ascii_uppercase(),
+        KeyKind::Digit => core.to_owned(),
+        KeyKind::Function => format!("F{}", &core[1..]),
+        KeyKind::Named => title_case_ascii(core),
+    }
+}
+
+/// ASCII Title-case: first character upper, the rest lower ("ctrl" → "Ctrl",
+/// "ENTER" → "Enter").
+fn title_case_ascii(word: &str) -> String {
+    let mut chars = word.chars();
+    match chars.next() {
+        Some(first) => {
+            let mut s = String::with_capacity(word.len());
+            s.push(first.to_ascii_uppercase());
+            s.push_str(&chars.as_str().to_ascii_lowercase());
+            s
+        }
+        None => String::new(),
+    }
 }
 
 /// True when every alphabetic character is in a Latin range. Accented European
@@ -426,9 +512,10 @@ fn starts_upper(token: &str) -> bool {
 
 /// Lowercase a single token's leading capital iff it is a plain Capitalized
 /// common word: first alphabetic char uppercase, NO interior uppercase (so
-/// "iPhone"/"GitHub"/"NASA" are spared), and `en_p_cap` positively classifies
-/// the word as common (below the stricter decase threshold). Unknown words (a
-/// proper noun the table does not know) are left capitalized.
+/// "iPhone"/"GitHub"/"NASA" are spared), NOT a curated brand (so "React"/"Rust"
+/// are spared), and `en_p_cap` positively classifies the word as common (below
+/// the stricter decase threshold). Unknown words (a proper noun the table does
+/// not know) are left capitalized.
 fn decase_token(token: &str) -> String {
     let core = word_core(token);
     if core.is_empty() {
@@ -440,6 +527,12 @@ fn decase_token(token: &str) -> String {
     }
     if alphas.any(|c| c.is_uppercase()) {
         return token.to_string(); // interior uppercase = brand/acronym
+    }
+    // A curated brand whose canonical is capitalized (React, Rust, Redux) keeps
+    // its casing even though the bare word is a common English word — p_cap alone
+    // cannot tell brand "React" from verb "react", so the vocab is the authority.
+    if crate::lexicon::is_capitalized_brand(&core.to_lowercase()) {
+        return token.to_string();
     }
     let is_common =
         crate::caprate::en_p_cap(core).is_some_and(|p| p < crate::caprate::CAP_DECASE_THRESHOLD);
@@ -653,6 +746,23 @@ mod tests {
     }
 
     #[test]
+    fn decase_spares_known_brand_collision() {
+        // Common-word dev brands (React, Rust) sit in the vocab with a
+        // capitalized canonical, so decase keeps their casing mid-sentence even
+        // though p_cap classifies the bare word as common (react=0.08, rust=0.10).
+        assert_eq!(
+            decase_common_words("we use React and Rust here"),
+            "we use React and Rust here"
+        );
+        // The brand spare is targeted, not blanket: an ordinary over-capitalized
+        // common word is still reverted.
+        assert_eq!(
+            decase_common_words("I want to Make dinner"),
+            "I want to make dinner"
+        );
+    }
+
+    #[test]
     fn hotkey_joins_modifier_and_letter() {
         assert_eq!(
             join_hotkey_chords("set the hotkey to Super H"),
@@ -715,6 +825,70 @@ mod tests {
         assert_eq!(
             join_hotkey_chords("Control end of file"),
             "Control end of file"
+        );
+    }
+
+    #[test]
+    fn hotkey_joins_lowercase_unambiguous_chords() {
+        // Two-plus modifiers never form prose, so they join even all-lowercase —
+        // the common real-ASR case the capital gate used to miss.
+        assert_eq!(
+            join_hotkey_chords("press control shift p"),
+            "press Control+Shift+P"
+        );
+        assert_eq!(
+            join_hotkey_chords("control alt delete"),
+            "Control+Alt+Delete"
+        );
+        assert_eq!(join_hotkey_chords("ctrl alt del"), "Ctrl+Alt+Del");
+        // A function key is unmistakable, so a single lowercase modifier joins.
+        assert_eq!(join_hotkey_chords("hit alt f4"), "hit Alt+F4");
+        assert_eq!(join_hotkey_chords("super f1"), "Super+F1");
+    }
+
+    #[test]
+    fn hotkey_canonicalizes_output_casing() {
+        // Whatever the input casing, the chord prints canonically.
+        assert_eq!(join_hotkey_chords("CONTROL SHIFT P"), "Control+Shift+P");
+        assert_eq!(join_hotkey_chords("ctrl shift tab"), "Ctrl+Shift+Tab");
+        assert_eq!(join_hotkey_chords("ALT F4"), "Alt+F4");
+    }
+
+    #[test]
+    fn hotkey_single_lowercase_modifier_stays_prose() {
+        // A single lowercase modifier + an ordinary key is ambiguous with prose,
+        // so without the writer's capitalization it is left untouched.
+        for s in ["press control p now", "super 2 birds", "shift tab order"] {
+            assert_eq!(join_hotkey_chords(s), s, "should be unchanged: {s}");
+        }
+        // The writer's capital is the cue that promotes it to a chord.
+        assert_eq!(join_hotkey_chords("press Super 2"), "press Super+2");
+    }
+
+    #[test]
+    fn hotkey_guards_lowercase_article_and_pronoun() {
+        // A lone lowercase "a"/"i" is the article/pronoun, never a key — even
+        // with multiple modifiers in front of it.
+        assert_eq!(join_hotkey_chords("control command a"), "control command a");
+        assert_eq!(join_hotkey_chords("control shift i"), "control shift i");
+        // An explicit capital letter is a genuine key reference.
+        assert_eq!(join_hotkey_chords("hit Control A"), "hit Control+A");
+    }
+
+    #[test]
+    fn hotkey_function_key_bounds() {
+        assert_eq!(join_hotkey_chords("super f24"), "Super+F24");
+        // Out-of-range / malformed F-keys are not keys, so nothing joins.
+        for s in ["Super F25", "Super F0", "Super FA"] {
+            assert_eq!(join_hotkey_chords(s), s, "should be unchanged: {s}");
+        }
+    }
+
+    #[test]
+    fn hotkey_preserves_trailing_punct_on_lowercase_chord() {
+        assert_eq!(
+            join_hotkey_chords("press control shift p."),
+            "press Control+Shift+P."
         );
     }
 

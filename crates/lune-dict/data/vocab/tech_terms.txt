@@ -1,6 +1,7 @@
 API
 APIs
 AJAX
+Angular
 AWS
 Azure
 Bluetooth
@@ -19,6 +20,7 @@ Dockerfile
 ESLint
 FastAPI
 Firebase
+Flask
 GCP
 GPU
 gRPC
@@ -59,6 +61,7 @@ PostgreSQL
 PowerShell
 PyTorch
 RAM
+React
 Redis
 Redux
 REST
@@ -66,6 +69,7 @@ RESTful
 regex
 RPM
 RSA
+Rust
 SDK
 SMTP
 SQL
@@ -75,7 +79,9 @@ SSH
 SSL
 SSO
 SSR
+Svelte
 SVG
+Swift
 TCP
 TensorFlow
 Terraform

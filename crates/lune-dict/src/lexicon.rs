@@ -147,6 +147,18 @@ pub fn warm() {
     let _ = VOCAB_INDEX.canonical_by_lower.len();
 }
 
+/// Whether the curated vocab knows `lower` (an already-lowercased word) as a
+/// brand whose canonical form carries an uppercase letter — "react" → "React",
+/// "github" → "GitHub", "redux" → "Redux". Lets the deterministic decasing in
+/// [`crate::punctuation::decase_common_words`] spare brand names that happen to
+/// be ordinary English words, which `p_cap` cannot distinguish on its own.
+pub fn is_capitalized_brand(lower: &str) -> bool {
+    VOCAB_INDEX
+        .canonical_by_lower
+        .get(lower)
+        .is_some_and(|canonical| canonical.chars().any(|c| c.is_ascii_uppercase()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
