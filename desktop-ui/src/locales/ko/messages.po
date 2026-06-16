@@ -76,7 +76,7 @@ msgstr "작업"
 msgid "Active"
 msgstr "활성"
 
-#: src/features/styles/components/style-hero.tsx:34
+#: src/features/styles/components/style-hero.tsx:32
 msgid "Active style"
 msgstr "활성 스타일"
 
@@ -163,11 +163,11 @@ msgstr "브랜드 표기(\"github\" → \"GitHub\")"
 msgid "Brands"
 msgstr "브랜드"
 
-#: src/features/settings/components/theme-picker.tsx:321
+#: src/features/settings/components/theme-picker.tsx:101
 msgid "Browse themes"
 msgstr "테마 찾아보기"
 
-#: src/features/styles/components/style-hero.tsx:37
+#: src/features/styles/components/style-hero.tsx:35
 #: src/features/styles/components/style-preset-card.tsx:66
 msgid "Built-in"
 msgstr "내장"
@@ -209,7 +209,7 @@ msgstr "네트워크를 확인하면 중단한 부분부터 다시 시작하겠�
 msgid "Checking installed models…"
 msgstr "설치된 모델을 확인하는 중…"
 
-#: src/features/settings/components/theme-picker.tsx:337
+#: src/features/settings/components/theme-picker.tsx:117
 msgid "Choose a theme"
 msgstr "테마를 선택하세요"
 
@@ -314,7 +314,7 @@ msgstr "스타일 만들기"
 msgid "Current"
 msgstr "현재"
 
-#: src/features/settings/components/theme-picker.tsx:417
+#: src/features/settings/components/theme-picker.tsx:179
 #: src/features/settings/sections/appearance-section.tsx:45
 msgid "Dark"
 msgstr "어둡게"
@@ -438,7 +438,7 @@ msgstr "기간"
 msgid "e.g. Meeting notes"
 msgstr "예: 회의록"
 
-#: src/features/styles/components/style-hero.tsx:55
+#: src/features/styles/components/style-hero.tsx:53
 #: src/features/styles/components/style-preset-card.tsx:113
 msgid "Edit"
 msgstr "편집"
@@ -492,7 +492,7 @@ msgid "formatting"
 msgstr "서식 지정"
 
 #: src/features/styles/components/style-editor-modal.tsx:104
-#: src/features/styles/components/style-hero.tsx:62
+#: src/features/styles/components/style-hero.tsx:60
 msgid "Formatting"
 msgstr "서식 지정"
 
@@ -579,7 +579,7 @@ msgstr "기본 창을 여는 대신 시스템 트레이를 실행하세요. 로�
 msgid "Length"
 msgstr "길이"
 
-#: src/features/settings/components/theme-picker.tsx:402
+#: src/features/settings/components/theme-picker.tsx:164
 #: src/features/settings/sections/appearance-section.tsx:46
 msgid "Light"
 msgstr "밝게"
@@ -604,7 +604,7 @@ msgstr "LLM 민감도"
 msgid "Local"
 msgstr "로컬"
 
-#: src/features/settings/components/theme-picker.tsx:348
+#: src/features/settings/components/theme-picker.tsx:128
 msgid "Lune"
 msgstr "Lune"
 
@@ -1045,7 +1045,7 @@ msgstr "스타일"
 msgid "Switch style"
 msgstr "스타일 전환"
 
-#: src/features/settings/components/theme-picker.tsx:381
+#: src/features/settings/components/theme-picker.tsx:149
 #: src/features/settings/sections/appearance-section.tsx:22
 #: src/features/settings/sections/appearance-section.tsx:47
 msgid "System"
@@ -1151,7 +1151,7 @@ msgstr "하드웨어 가속 사용"
 msgid "Use the {0} style"
 msgstr "{0} 스타일을 사용하세요"
 
-#: src/features/styles/components/style-hero.tsx:51
+#: src/features/styles/components/style-hero.tsx:49
 #: src/features/styles/components/style-preset-card.tsx:108
 msgid "View"
 msgstr "보기"

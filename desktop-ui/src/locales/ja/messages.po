@@ -76,7 +76,7 @@ msgstr "操作"
 msgid "Active"
 msgstr "アクティブ"
 
-#: src/features/styles/components/style-hero.tsx:34
+#: src/features/styles/components/style-hero.tsx:32
 msgid "Active style"
 msgstr "アクティブスタイル"
 
@@ -163,11 +163,11 @@ msgstr "ブランド表記（「github」→「GitHub」）"
 msgid "Brands"
 msgstr "ブランド"
 
-#: src/features/settings/components/theme-picker.tsx:321
+#: src/features/settings/components/theme-picker.tsx:101
 msgid "Browse themes"
 msgstr "テーマを参照する"
 
-#: src/features/styles/components/style-hero.tsx:37
+#: src/features/styles/components/style-hero.tsx:35
 #: src/features/styles/components/style-preset-card.tsx:66
 msgid "Built-in"
 msgstr "組み込み"
@@ -209,7 +209,7 @@ msgstr "ネットワークをチェックしてください。中断したとこ
 msgid "Checking installed models…"
 msgstr "インストールされているモデルを確認しています…"
 
-#: src/features/settings/components/theme-picker.tsx:337
+#: src/features/settings/components/theme-picker.tsx:117
 msgid "Choose a theme"
 msgstr "テーマを選択してください"
 
@@ -314,7 +314,7 @@ msgstr "スタイルの作成"
 msgid "Current"
 msgstr "現在"
 
-#: src/features/settings/components/theme-picker.tsx:417
+#: src/features/settings/components/theme-picker.tsx:179
 #: src/features/settings/sections/appearance-section.tsx:45
 msgid "Dark"
 msgstr "暗い"
@@ -438,7 +438,7 @@ msgstr "時間"
 msgid "e.g. Meeting notes"
 msgstr "例: 会議メモ"
 
-#: src/features/styles/components/style-hero.tsx:55
+#: src/features/styles/components/style-hero.tsx:53
 #: src/features/styles/components/style-preset-card.tsx:113
 msgid "Edit"
 msgstr "編集"
@@ -492,7 +492,7 @@ msgid "formatting"
 msgstr "書式設定"
 
 #: src/features/styles/components/style-editor-modal.tsx:104
-#: src/features/styles/components/style-hero.tsx:62
+#: src/features/styles/components/style-hero.tsx:60
 msgid "Formatting"
 msgstr "書式設定"
 
@@ -579,7 +579,7 @@ msgstr "メイン ウィンドウを開く代わりに、システム トレイ�
 msgid "Length"
 msgstr "長さ"
 
-#: src/features/settings/components/theme-picker.tsx:402
+#: src/features/settings/components/theme-picker.tsx:164
 #: src/features/settings/sections/appearance-section.tsx:46
 msgid "Light"
 msgstr "ライト"
@@ -604,7 +604,7 @@ msgstr "LLM 感度"
 msgid "Local"
 msgstr "ローカル"
 
-#: src/features/settings/components/theme-picker.tsx:348
+#: src/features/settings/components/theme-picker.tsx:128
 msgid "Lune"
 msgstr "Lune"
 
@@ -1045,7 +1045,7 @@ msgstr "スタイル"
 msgid "Switch style"
 msgstr "スタイルを切り替え"
 
-#: src/features/settings/components/theme-picker.tsx:381
+#: src/features/settings/components/theme-picker.tsx:149
 #: src/features/settings/sections/appearance-section.tsx:22
 #: src/features/settings/sections/appearance-section.tsx:47
 msgid "System"
@@ -1151,7 +1151,7 @@ msgstr "ハードウェアアクセラレーションを使用"
 msgid "Use the {0} style"
 msgstr "{0} スタイルを使用する"
 
-#: src/features/styles/components/style-hero.tsx:51
+#: src/features/styles/components/style-hero.tsx:49
 #: src/features/styles/components/style-preset-card.tsx:108
 msgid "View"
 msgstr "ビュー"

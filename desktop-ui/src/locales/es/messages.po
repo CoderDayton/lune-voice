@@ -76,7 +76,7 @@ msgstr "Acción"
 msgid "Active"
 msgstr "Activo"
 
-#: src/features/styles/components/style-hero.tsx:34
+#: src/features/styles/components/style-hero.tsx:32
 msgid "Active style"
 msgstr "Estilo activo"
 
@@ -163,11 +163,11 @@ msgstr "Carcasa de marca (\"github\" → \"GitHub\")"
 msgid "Brands"
 msgstr "Marcas"
 
-#: src/features/settings/components/theme-picker.tsx:321
+#: src/features/settings/components/theme-picker.tsx:101
 msgid "Browse themes"
 msgstr "Explorar temas"
 
-#: src/features/styles/components/style-hero.tsx:37
+#: src/features/styles/components/style-hero.tsx:35
 #: src/features/styles/components/style-preset-card.tsx:66
 msgid "Built-in"
 msgstr "Incorporado"
@@ -209,7 +209,7 @@ msgstr "Verifique su red y continuaremos donde lo dejamos."
 msgid "Checking installed models…"
 msgstr "Comprobando modelos instalados..."
 
-#: src/features/settings/components/theme-picker.tsx:337
+#: src/features/settings/components/theme-picker.tsx:117
 msgid "Choose a theme"
 msgstr "Elige un tema"
 
@@ -314,7 +314,7 @@ msgstr "Crear estilo"
 msgid "Current"
 msgstr "Actual"
 
-#: src/features/settings/components/theme-picker.tsx:417
+#: src/features/settings/components/theme-picker.tsx:179
 #: src/features/settings/sections/appearance-section.tsx:45
 msgid "Dark"
 msgstr "Oscuro"
@@ -438,7 +438,7 @@ msgstr "Duración"
 msgid "e.g. Meeting notes"
 msgstr "p.ej. notas de la reunión"
 
-#: src/features/styles/components/style-hero.tsx:55
+#: src/features/styles/components/style-hero.tsx:53
 #: src/features/styles/components/style-preset-card.tsx:113
 msgid "Edit"
 msgstr "Editar"
@@ -492,7 +492,7 @@ msgid "formatting"
 msgstr "formateo"
 
 #: src/features/styles/components/style-editor-modal.tsx:104
-#: src/features/styles/components/style-hero.tsx:62
+#: src/features/styles/components/style-hero.tsx:60
 msgid "Formatting"
 msgstr "Formato"
 
@@ -579,7 +579,7 @@ msgstr "Inicie en la bandeja del sistema en lugar de abrir la ventana principal.
 msgid "Length"
 msgstr "Longitud"
 
-#: src/features/settings/components/theme-picker.tsx:402
+#: src/features/settings/components/theme-picker.tsx:164
 #: src/features/settings/sections/appearance-section.tsx:46
 msgid "Light"
 msgstr "Luz"
@@ -604,7 +604,7 @@ msgstr "Sensibilidad LLM"
 msgid "Local"
 msgstr "Local"
 
-#: src/features/settings/components/theme-picker.tsx:348
+#: src/features/settings/components/theme-picker.tsx:128
 msgid "Lune"
 msgstr "luna"
 
@@ -1045,7 +1045,7 @@ msgstr "Estilo"
 msgid "Switch style"
 msgstr "Cambiar estilo"
 
-#: src/features/settings/components/theme-picker.tsx:381
+#: src/features/settings/components/theme-picker.tsx:149
 #: src/features/settings/sections/appearance-section.tsx:22
 #: src/features/settings/sections/appearance-section.tsx:47
 msgid "System"
@@ -1151,7 +1151,7 @@ msgstr "Usar aceleración por hardware"
 msgid "Use the {0} style"
 msgstr "Utilice el estilo {0}"
 
-#: src/features/styles/components/style-hero.tsx:51
+#: src/features/styles/components/style-hero.tsx:49
 #: src/features/styles/components/style-preset-card.tsx:108
 msgid "View"
 msgstr "Vista"
