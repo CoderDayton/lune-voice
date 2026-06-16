@@ -114,9 +114,9 @@ impl DeliveryService {
     }
 
     pub fn is_alive(&self) -> bool {
-        // A zero-capacity test: if the receiver is dropped, send returns Err.
-        // We send empty text which `deliver()` guards against, but the thread
-        // harmlessly ignores if it somehow arrives.
+        // Liveness probe: if the delivery thread (the receiver) has exited,
+        // `send` returns Err. The empty text means the thread harmlessly
+        // skips it (the loop `continue`s on empty text) if it does arrive.
         self.tx
             .send(DeliveryMsg {
                 session_id: None,
@@ -158,10 +158,6 @@ fn delivery_thread(
         // (~8-12 ms/char) and can take seconds, and senders only see the queue.
         *busy_until.lock().unwrap_or_else(|e| e.into_inner()) =
             Some(Instant::now() + Duration::from_secs(3600));
-        #[cfg(unix)]
-        let has_target = msg.target.is_some();
-        #[cfg(not(unix))]
-        let has_target = false;
 
         match msg.mode {
             DictationMode::TypeInPlace => driver.type_keys(text),
@@ -182,7 +178,6 @@ fn delivery_thread(
                 driver.type_text(text);
             }
         }
-        let _ = has_target;
         *busy_until.lock().unwrap_or_else(|e| e.into_inner()) =
             Some(Instant::now() + DELIVERY_SETTLE);
     }

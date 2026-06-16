@@ -202,7 +202,6 @@ impl StylePreset {
         prompt
     }
 
-    /// Default preset: everyday speech with minimal formatting.
     /// Casual — texting, messaging, chat. Lowercase, contractions, minimal punctuation.
     pub fn casual() -> Self {
         Self {

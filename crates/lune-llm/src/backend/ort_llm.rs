@@ -79,7 +79,7 @@ pub struct OrtStyleLlm {
     /// Declared before `session`: fields drop in declaration order, and these
     /// ORT-owned device values must be released while their session's
     /// allocator still exists.
-    device_prefix: std::sync::Mutex<Option<DevicePrefix>>,
+    device_prefix: Mutex<Option<DevicePrefix>>,
     session: Mutex<Session>,
     /// Session output names in declaration order: `[0]` = logits, `[1..]` =
     /// present-KV tensors matching the past-KV input order. Captured once at
@@ -90,8 +90,8 @@ pub struct OrtStyleLlm {
     max_new_tokens: usize,
     params: ModelParams,
     sampling_params: super::sampler::SamplingParams,
-    kv_cache: std::sync::Mutex<super::kv_cache::KvCache>,
-    cached_prefix_hash: std::sync::Mutex<u64>,
+    kv_cache: Mutex<super::kv_cache::KvCache>,
+    cached_prefix_hash: Mutex<u64>,
     use_gpu: bool,
 }
 
@@ -332,9 +332,9 @@ impl OrtStyleLlm {
             max_new_tokens: config.max_new_tokens,
             params,
             sampling_params,
-            kv_cache: std::sync::Mutex::new(kv_cache),
-            device_prefix: std::sync::Mutex::new(None),
-            cached_prefix_hash: std::sync::Mutex::new(0),
+            kv_cache: Mutex::new(kv_cache),
+            device_prefix: Mutex::new(None),
+            cached_prefix_hash: Mutex::new(0),
             use_gpu: gpu_active,
         })
     }
@@ -628,8 +628,7 @@ impl OrtStyleLlm {
         let prefix_ids = &prompt_ids[..sys_prefix_len];
         let pn = prefix_ids.len();
 
-        let logits_name = self.output_names[0].clone();
-        let present_names: Vec<String> = self.output_names[1..].to_vec();
+        let (logits_name, present_names) = self.split_output_names();
 
         let mut binding = session.create_binding().map_err(e)?;
         let ids_val;
@@ -695,8 +694,7 @@ impl OrtStyleLlm {
 
         let p = &self.params;
         let split = self.embed_session.is_some();
-        let logits_name = self.output_names[0].clone();
-        let present_names: Vec<String> = self.output_names[1..].to_vec();
+        let (logits_name, present_names) = self.split_output_names();
 
         // Hold the guard across the run: binding borrows the prefix values.
         let dp_guard = self.device_prefix.lock().map_err(e)?;
@@ -901,8 +899,7 @@ impl OrtStyleLlm {
 
         let p = &self.params;
         let split = self.embed_session.is_some();
-        let logits_name = self.output_names[0].clone();
-        let present_names: Vec<String> = self.output_names[1..].to_vec();
+        let (logits_name, present_names) = self.split_output_names();
         if present_names.len() != kv.len() {
             return Err(e(format!(
                 "present outputs ({}) != past inputs ({})",
@@ -1006,6 +1003,16 @@ impl OrtStyleLlm {
                 .map_err(e)?;
         }
         Ok(())
+    }
+
+    /// Split the captured output names into `(logits_name, present_kv_names)`:
+    /// `[0]` is the logits output, `[1..]` the present-KV tensors. Cloned so
+    /// the names can outlive the borrow of `self` taken to run the session.
+    fn split_output_names(&self) -> (String, Vec<String>) {
+        (
+            self.output_names[0].clone(),
+            self.output_names[1..].to_vec(),
+        )
     }
 }
 

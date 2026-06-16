@@ -51,8 +51,7 @@ impl Default for Config {
             w_proper_noun: -1.0 / IR_TOTAL,
             // σ(scale·(x − midpoint)) = 0.5 when x = midpoint.
             // scale controls steepness: at midpoint ± 1/scale, output ≈ 0.27/0.73.
-            // scale = 4·ln(3) ≈ 4.39 gives 10%/90% at midpoint ± 0.5
-            // We use 2·ln(3)/midpoint to tie steepness to the operating point.
+            // scale = 4·ln(3) ≈ 4.39 gives 10%/90% at midpoint ± 0.5.
             scale: 4.0 * 3.0_f32.ln(),
             // Operating point: expected score for a "neutral" word.
             // Continuous features (entropy, margin, min_entropy) contribute

@@ -75,9 +75,7 @@ fn query(started: Instant) -> Option<String> {
             }
         };
 
-    let mut state = State {
-        toplevels: HashMap::new(),
-    };
+    let mut state = State::default();
 
     // Roundtrip 1: compositor fires `toplevel` for each existing toplevel.
     queue.roundtrip(&mut state).ok()?;
@@ -112,6 +110,7 @@ struct ToplevelInfo {
     done: bool,
 }
 
+#[derive(Default)]
 struct State {
     toplevels: HashMap<u32, ToplevelInfo>,
 }

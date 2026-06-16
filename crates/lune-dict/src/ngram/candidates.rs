@@ -15,8 +15,9 @@ pub struct CandidateScore {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AsrCandidateInput {
     pub text: String,
-    /// Optional ASR model score. Higher is better. Log-probability, confidence, or margin are all fine
-    /// because the reranker min-max normalizes scores within each candidate set.
+    /// Optional ASR model score (higher is better). A log-probability,
+    /// confidence, or margin all work, because the reranker min-max normalizes
+    /// scores within each candidate set.
     pub acoustic_score: Option<f64>,
 }
 

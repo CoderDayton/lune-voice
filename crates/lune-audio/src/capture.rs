@@ -227,7 +227,7 @@ impl AudioStream {
             .description()
             .map(|d| d.name().to_owned())
             .unwrap_or_else(|_| "Unknown".into());
-        debug!("Using audio device: {}", device_name);
+        debug!("Using audio device: {device_name}");
 
         // Query supported configs and pick the best one
         let supported_config = device
@@ -238,9 +238,7 @@ impl AudioStream {
         let channels = supported_config.channels();
 
         debug!(
-            "Native format: {}Hz, {} channels, {:?}",
-            native_sample_rate,
-            channels,
+            "Native format: {native_sample_rate}Hz, {channels} channels, {:?}",
             supported_config.sample_format()
         );
 
@@ -282,9 +280,10 @@ impl AudioStream {
             None
         };
 
+        // Scratch buffers pre-allocated once and reused every callback —
+        // avoids per-frame heap allocation on the real-time audio thread.
         let mut input_resample_buf = Vec::with_capacity(chunk_samples * 2);
         let mut output_buf = Vec::with_capacity(chunk_samples * 2);
-        // Pre-allocated scratch buffers reused every callback — avoids per-frame heap alloc.
         let mut mono_buf = Vec::<f32>::with_capacity(chunk_samples * 4);
         let mut resample_input_slice = Vec::<f32>::with_capacity(chunk_samples * 2);
 
@@ -314,7 +313,7 @@ impl AudioStream {
                                 &flush_cb,
                             );
                         },
-                        |err| warn!("Audio stream error: {}", err),
+                        |err| warn!("Audio stream error: {err}"),
                         None,
                     )
                     .map_err(|e| AudioError::StreamBuild(e.to_string()))?
@@ -341,7 +340,7 @@ impl AudioStream {
                                 &flush_cb,
                             );
                         },
-                        |err| warn!("Audio stream error: {}", err),
+                        |err| warn!("Audio stream error: {err}"),
                         None,
                     )
                     .map_err(|e| AudioError::StreamBuild(e.to_string()))?
@@ -354,8 +353,7 @@ impl AudioStream {
             SampleFormat::U16 => build_stream!(u16, convert_u16_samples_into),
             format => {
                 return Err(AudioError::StreamBuild(format!(
-                    "Unsupported sample format: {:?}",
-                    format
+                    "Unsupported sample format: {format:?}"
                 )));
             }
         };
@@ -565,16 +563,13 @@ fn process_audio_callback(
             else {
                 // Adapter construction shouldn't fail with valid contiguous input,
                 // but never panic in the audio thread — drop this iteration's frames.
-                warn!(
-                    "SequentialSlice construction failed; skipping {} frames",
-                    frames
-                );
+                warn!("SequentialSlice construction failed; skipping {frames} frames");
                 continue;
             };
             match r.process(&adapter, 0, None) {
                 Ok(output) => output_buf.extend_from_slice(&output.take_data()),
                 Err(e) => {
-                    warn!("Resampling error: {}", e);
+                    warn!("Resampling error: {e}");
                     // Reset internal pending data so a transient resampler error
                     // doesn't keep us in a degraded state forever.
                     input_resample_buf.clear();

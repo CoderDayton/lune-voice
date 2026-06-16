@@ -1,7 +1,7 @@
 //! Qwen3-ASR 0.6B ONNX backend — encoder-decoder with autoregressive greedy decoding.
 //!
 //! Model: custom ONNX export via `scripts/export_onnx.py` (encoder + embed_tokens + decoder).
-//! Mel: Whisper-compatible 128-bin log-mel at 16 kHz (see `whisper_mel.rs`).
+//! Mel: Whisper-compatible 128-bin log-mel at 16 kHz (see `mel/whisper.rs`).
 //! Decoding: greedy argmax with per-token softmax confidence.
 
 use std::collections::{HashMap, HashSet};
@@ -584,11 +584,11 @@ fn append_empty_kv(inputs: &mut Vec<OrtInput<'_>>) -> Result<()> {
         let v = ndarray::ArrayD::from_elem(IxDyn(&[1, NUM_KV_HEADS, 0, HEAD_DIM]), f16::ZERO);
         inputs.push((
             std::borrow::Cow::Borrowed(kv_name(i, true)),
-            Value::from_array(k).ctx("empty k{i}")?.into(),
+            Value::from_array(k).ctx(&format!("empty k{i}"))?.into(),
         ));
         inputs.push((
             std::borrow::Cow::Borrowed(kv_name(i, false)),
-            Value::from_array(v).ctx("empty v{i}")?.into(),
+            Value::from_array(v).ctx(&format!("empty v{i}"))?.into(),
         ));
     }
     Ok(())
@@ -601,7 +601,7 @@ fn append_cached_kv(inputs: &mut Vec<OrtInput<'_>>, kv_cache: Vec<ArrayD<f16>>) 
         inputs.push((
             std::borrow::Cow::Borrowed(kv_name(layer, is_key)),
             Value::from_array(arr)
-                .ctx("cached kv layer {layer}")?
+                .ctx(&format!("cached kv layer {layer}"))?
                 .into(),
         ));
     }
@@ -614,18 +614,18 @@ fn bind_empty_kv(binding: &mut ort::session::IoBinding) -> Result<()> {
             IxDyn(&[1, NUM_KV_HEADS, 0, HEAD_DIM]),
             f16::ZERO,
         ))
-        .ctx("empty k{i}")?;
+        .ctx(&format!("empty k{i}"))?;
         let v = Value::from_array(ndarray::ArrayD::from_elem(
             IxDyn(&[1, NUM_KV_HEADS, 0, HEAD_DIM]),
             f16::ZERO,
         ))
-        .ctx("empty v{i}")?;
+        .ctx(&format!("empty v{i}"))?;
         binding
             .bind_input(kv_name(i, true), &k)
-            .ctx("bind empty key layer {i}")?;
+            .ctx(&format!("bind empty key layer {i}"))?;
         binding
             .bind_input(kv_name(i, false), &v)
-            .ctx("bind empty value layer {i}")?;
+            .ctx(&format!("bind empty value layer {i}"))?;
     }
     Ok(())
 }
@@ -649,7 +649,7 @@ fn kv_cache_names() -> &'static [String] {
 
 fn kv_name(layer: usize, is_key: bool) -> &'static str {
     let idx = layer * 4 + if is_key { 0 } else { 1 };
-    // Safety: kv_cache_names() returns &'static [String], element .as_str() is 'static.
+    // SAFETY: kv_cache_names() returns &'static [String], element .as_str() is 'static.
     unsafe { &*(kv_cache_names()[idx].as_str() as *const str) }
 }
 
@@ -692,10 +692,10 @@ fn bind_decoder_outputs_to_device(
     for i in 0..NUM_LAYERS {
         binding
             .bind_output_to_device(present_kv_name(i, true), &kv_mem)
-            .ctx("bind present key layer {i}")?;
+            .ctx(&format!("bind present key layer {i}"))?;
         binding
             .bind_output_to_device(present_kv_name(i, false), &kv_mem)
-            .ctx("bind present value layer {i}")?;
+            .ctx(&format!("bind present value layer {i}"))?;
     }
     Ok(())
 }
@@ -966,7 +966,7 @@ impl Qwen3AsrBackend {
                             let is_key = i % 2 == 0;
                             binding
                                 .bind_input(kv_name(layer, is_key), &v)
-                                .ctx("bind kv layer {layer}")?;
+                                .ctx(&format!("bind kv layer {layer}"))?;
                         }
                         bind_decoder_outputs_to_device(binding, self.use_gpu)?;
 

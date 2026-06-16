@@ -2,7 +2,6 @@ use futures::{StreamExt, stream};
 use reqwest::{Client, Url};
 use serde_json::Value;
 use std::collections::HashSet;
-use urlencoding;
 use wordnik_list::word_exists;
 
 use super::{AnyError, NGramModel, ScoringConfig, tokenize};

@@ -175,7 +175,7 @@ impl AsrBackendConfig {
 #[serde(tag = "type")]
 #[non_exhaustive]
 pub enum LlmBackendConfig {
-    /// Use the local ONNX style LLM (Llama 3.2 1B) if downloaded.
+    /// Use the local ONNX style LLM (Qwen3 0.6B) if downloaded.
     Local {},
     OpenAiCompatible {
         base_url: Url,

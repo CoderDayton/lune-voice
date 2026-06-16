@@ -209,29 +209,27 @@ impl HybridVad {
                 self.span.extend_from_slice(frame);
                 self.trailing_silence_samples = 0;
             }
-            SpanEvent::Append => {
-                self.span.extend_from_slice(frame);
-                if prob <= self.config.silero_offset {
-                    self.trailing_silence_samples += frame.len();
-                } else {
-                    self.trailing_silence_samples = 0;
-                }
-            }
+            SpanEvent::Append => self.append_frame(frame, prob),
             SpanEvent::Close { keep } => {
-                // Append the frame that triggered the close. On a max-length
-                // force-close it is voiced speech the gate already counted, so
-                // dropping it would clip the final ~32 ms (the pre-span-gate
-                // chunker appended it too). On a long-gap close it is a silence
-                // frame; mirroring the Append arm's trailing-silence bookkeeping
-                // lets close_span's trim remove it, so that path stays identical.
-                self.span.extend_from_slice(frame);
-                if prob <= self.config.silero_offset {
-                    self.trailing_silence_samples += frame.len();
-                } else {
-                    self.trailing_silence_samples = 0;
-                }
+                // The closing frame is appended like any other in-span frame: on a
+                // max-length close it is voiced speech the gate counted (dropping it
+                // would clip the final ~32 ms); on a long-gap close it is the
+                // silence frame `close_span`'s hangover trim then removes.
+                self.append_frame(frame, prob);
                 self.close_span(keep, &[], actions);
             }
+        }
+    }
+
+    /// Append an in-span frame, tracking the trailing-silence run that
+    /// `close_span` trims to the hangover window: a frame at or below
+    /// `silero_offset` extends the run, a louder one resets it.
+    fn append_frame(&mut self, frame: &[f32], prob: f32) {
+        self.span.extend_from_slice(frame);
+        if prob <= self.config.silero_offset {
+            self.trailing_silence_samples += frame.len();
+        } else {
+            self.trailing_silence_samples = 0;
         }
     }
 

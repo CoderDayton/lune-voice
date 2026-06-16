@@ -2,10 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::Result;
 
-/// A segment of recognized speech.
-///
-/// Fields are ordered hot-first: `id`, `confidence`, `is_final` land on the
-/// same cache line so routing decisions don't pay for a `text` load.
+/// Per-word confidence emitted alongside an [`AsrSegment`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WordConfidence {
     pub word: String,
@@ -14,6 +11,10 @@ pub struct WordConfidence {
     pub word_error_risk: f32,
 }
 
+/// A segment of recognized speech.
+///
+/// Fields are ordered hot-first: `id`, `confidence`, `is_final` land on the
+/// same cache line so routing decisions don't pay for a `text` load.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AsrSegment {
     pub id: u64,

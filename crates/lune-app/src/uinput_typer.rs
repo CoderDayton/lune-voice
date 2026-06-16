@@ -911,14 +911,6 @@ impl UinputTyper {
         self.emit_raw(EventType::KEY, KeyCode::KEY_LEFTCTRL.0, 0);
     }
 
-    /// Primary delivery: clipboard paste with terminal detection.
-    ///
-    /// Sets clipboard → emits paste chord (Ctrl+V or Ctrl+Shift+V) → leaves
-    /// text on clipboard so the user can re-paste manually if needed.
-    ///
-    /// The post-paste delay adapts to system speed by tracking an EMA of
-    /// clipboard operation latency. Fast systems converge toward 40ms;
-    /// slow systems (Electron, heavy toolkits) grow up to 300ms.
     /// Resolve whether the focused window should receive a terminal-style
     /// paste chord, honoring the configured `terminal_mode`.
     fn resolve_terminal(&self) -> bool {

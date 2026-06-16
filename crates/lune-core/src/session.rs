@@ -47,9 +47,6 @@ pub enum SessionStatus {
 }
 
 /// Events emitted during a dictation session.
-///
-/// Uses `Box<str>` for immutable payloads to avoid excess heap re-allocation
-/// when cloning and to reduce per-event allocation size.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum SessionEvent {
