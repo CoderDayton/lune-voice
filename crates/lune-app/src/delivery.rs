@@ -168,36 +168,89 @@ fn delivery_thread(
 // ─── Linux: uinput (existing battle-tested path) ─────────────────────────────
 
 #[cfg(unix)]
+enum LinuxBackend {
+    /// In-process IBus engine — preferred on Linux when IBus is the active input
+    /// method. Commits Unicode straight into the focused input context, so it
+    /// needs no terminal detection or paste chord (fixes GNOME Wayland). See
+    /// `ibus.rs`. Linux-only; absent on macOS-as-unix.
+    #[cfg(target_os = "linux")]
+    Ibus(crate::ibus::IbusTyper),
+    /// uinput keystroke / clipboard-paste path — the universal fallback.
+    Uinput(UinputTyper),
+}
+
+#[cfg(unix)]
 struct PlatformDriver {
-    typer: UinputTyper,
+    backend: LinuxBackend,
 }
 
 #[cfg(unix)]
 impl PlatformDriver {
     fn new(terminal_mode: TerminalMode) -> Result<Self, String> {
+        // Prefer IBus when it's the active input method. On GNOME Wayland the
+        // uinput path can't detect terminals (so it can't pick Ctrl+Shift+V),
+        // but IBus commits directly to the focused input context. Fall back to
+        // the battle-tested uinput path when IBus is unavailable.
+        #[cfg(target_os = "linux")]
+        if crate::ibus::is_active_im() {
+            match crate::ibus::IbusTyper::try_new() {
+                Ok(typer) => {
+                    typer.warm_up();
+                    info!("delivery: IBus engine active");
+                    return Ok(Self {
+                        backend: LinuxBackend::Ibus(typer),
+                    });
+                }
+                Err(e) => warn!(error = %e, "ibus init failed; falling back to uinput"),
+            }
+        }
+
         let typer = UinputTyper::with_terminal_mode(terminal_mode)?;
         typer.warm_up();
         debug!("delivery: uinput clipboard-paste active");
-        Ok(Self { typer })
+        Ok(Self {
+            backend: LinuxBackend::Uinput(typer),
+        })
     }
 
     fn platform_name(&self) -> &'static str {
-        "linux-uinput"
+        match &self.backend {
+            #[cfg(target_os = "linux")]
+            LinuxBackend::Ibus(_) => "linux-ibus",
+            LinuxBackend::Uinput(_) => "linux-uinput",
+        }
     }
 
     fn type_text(&mut self, text: &str) {
-        self.typer.type_str(text);
+        match &mut self.backend {
+            #[cfg(target_os = "linux")]
+            LinuxBackend::Ibus(t) => t.commit_text(text),
+            LinuxBackend::Uinput(t) => t.type_str(text),
+        }
     }
 
     fn type_text_to(&mut self, text: &str, target: &crate::uinput_typer::WindowTarget) {
-        self.typer.type_str_to(text, target);
+        match &mut self.backend {
+            // IBus commits to the focused input context directly; the captured
+            // WindowTarget (for focus restoration) is only needed by uinput.
+            #[cfg(target_os = "linux")]
+            LinuxBackend::Ibus(t) => t.commit_text(text),
+            LinuxBackend::Uinput(t) => t.type_str_to(text, target),
+        }
     }
 
     fn type_keys(&mut self, text: &str) {
-        self.typer.type_str_keys(text);
+        match &mut self.backend {
+            // IBus commits Unicode directly — no US-QWERTY restriction, so
+            // type-in-place of accented/CJK text "just works".
+            #[cfg(target_os = "linux")]
+            LinuxBackend::Ibus(t) => t.commit_text(text),
+            LinuxBackend::Uinput(t) => t.type_str_keys(text),
+        }
     }
 
     fn copy_to_clipboard(&mut self, text: &str) -> Result<(), String> {
+        // Clipboard is backend-independent; reuse the existing helper.
         crate::uinput_typer::set_clipboard(text)
     }
 }

@@ -36,6 +36,11 @@ wayland-client = { workspace = true }
 wayland-protocols-wlr = { workspace = true }
 cosmic-protocols = { workspace = true }
 
+# IBus input-method delivery backend (src/ibus.rs) — Linux only. Windows/macOS
+# use the arboard+enigo path and must not pull D-Bus.
+[target.'cfg(target_os = "linux")'.dependencies]
+zbus = { workspace = true }
+
 [dev-dependencies]
 hound = "3.5"
 cpal.workspace = true

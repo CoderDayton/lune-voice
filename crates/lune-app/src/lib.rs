@@ -6,6 +6,10 @@ mod gate;
 pub mod session;
 #[cfg(unix)]
 mod uinput_typer;
+// IBus input-method delivery backend — Linux only (Windows/macOS have their own
+// delivery path in delivery.rs). See ibus.rs.
+#[cfg(target_os = "linux")]
+mod ibus;
 pub mod vad;
 
 #[cfg(unix)]
