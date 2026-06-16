@@ -37,6 +37,14 @@ inherits = "release"
 strip = "none"
 debug = true
 
+# Optimize dependencies even in dev builds. The workspace's own crates stay at
+# opt-level 0 for fast incremental builds and clean backtraces, while heavy
+# dependencies (ONNX Runtime wrapper, ndarray, audio, sampler math) compile
+# optimized — closing most of the dev-vs-release speed gap so local inference
+# doesn't trip the LLM timeout fallback.
+[profile.dev.package."*"]
+opt-level = 3
+
 [workspace.dependencies]
 # Internal crates
 lune-core = { path = "crates/lune-core" }
