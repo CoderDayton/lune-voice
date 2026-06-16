@@ -428,8 +428,10 @@ async fn run_pipeline(
 
             loop {
                 match tokio::time::timeout_at(deadline, event_rx.recv()).await {
-                    Ok(Some(SessionEvent::FinalizedText(t))) => final_text.push_str(&t),
-                    Ok(Some(SessionEvent::CommandDetected(payload))) => {
+                    Ok(Some(SessionEvent::FinalizedText { text: t, .. })) => {
+                        final_text.push_str(&t)
+                    }
+                    Ok(Some(SessionEvent::CommandDetected { payload, .. })) => {
                         if command_text.is_none() {
                             command_text = command_text_from_payload(&payload);
                         }

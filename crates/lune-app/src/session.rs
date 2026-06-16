@@ -190,34 +190,30 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         }
 
         let asr = Arc::clone(&self.asr);
-        let router = Arc::clone(&self.router);
-        let post_processor = Arc::clone(&self.post_processor);
-        let dict = Arc::clone(&self.dict);
-        let persist = Arc::clone(&self.persist);
-        let config = self.config.clone();
         let active_arc = Arc::clone(&self.active);
         let idle_notify = Arc::clone(&self.idle_notify);
-        let settings = Arc::clone(&self.settings);
-        let heuristic = Arc::clone(&self.heuristic);
         let active_arc_guard = Arc::clone(&active_arc);
         let idle_notify_guard = Arc::clone(&idle_notify);
         let event_tx_guard = event_tx.clone();
-        let handle = tokio::task::spawn(run_session(
+        let deps = SessionDeps {
             session_id,
-            asr,
-            router,
-            post_processor,
-            dict,
-            persist,
-            heuristic,
-            config,
-            style_preset,
+            router: Arc::clone(&self.router),
+            post_processor: Arc::clone(&self.post_processor),
+            dict: Arc::clone(&self.dict),
+            persist: Arc::clone(&self.persist),
+            heuristic: Arc::clone(&self.heuristic),
+            config: self.config.clone(),
             event_tx,
-            control_rx,
             active_arc,
             idle_notify,
+            settings: Arc::clone(&self.settings),
+        };
+        let handle = tokio::task::spawn(run_session(
+            deps,
+            asr,
+            style_preset,
+            control_rx,
             audio_override,
-            settings,
         ));
         tokio::task::spawn(async move {
             if handle.await.is_err() {
@@ -343,35 +339,43 @@ async fn notify_persist_failure<T>(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn run_session<A: AsrBackend + 'static>(
+/// Per-session shared handles threaded through the session task. Bundling
+/// them keeps `run_session`/`process_and_deliver` from each carrying a dozen
+/// positional args — and a new dependency becomes one field, not two threaded
+/// params.
+struct SessionDeps {
     session_id: Uuid,
-    asr: Arc<A>,
     router: Arc<VoiceCommandRouter>,
     post_processor: Arc<dyn TextPostProcessor>,
     dict: Arc<Mutex<DictionaryManager>>,
     persist: Arc<Mutex<Database>>,
     heuristic: Arc<LexicalGate>,
     config: SessionManagerConfig,
-    style_preset: Arc<StylePreset>,
     event_tx: mpsc::Sender<SessionEvent>,
-    mut control_rx: mpsc::UnboundedReceiver<SessionControl>,
     active_arc: Arc<Mutex<Option<ActiveHandle>>>,
     idle_notify: Arc<Notify>,
+    settings: Arc<RwLock<UserSettings>>,
+}
+
+async fn run_session<A: AsrBackend + 'static>(
+    deps: SessionDeps,
+    asr: Arc<A>,
+    style_preset: Arc<StylePreset>,
+    mut control_rx: mpsc::UnboundedReceiver<SessionControl>,
     audio_override: SessionAudio,
-    _settings: Arc<RwLock<UserSettings>>,
 ) {
-    let vad_pcen_enabled = _settings.read().await.vad_pcen;
+    let session_id = deps.session_id;
+    let vad_pcen_enabled = deps.settings.read().await.vad_pcen;
 
     let capture = match crate::capture::run_capture(
         session_id,
         &*asr,
-        config.asr_config.clone(),
+        deps.config.asr_config.clone(),
         audio_override,
-        &config.pipeline,
+        &deps.config.pipeline,
         vad_pcen_enabled,
         asr.segment_capacity_hint(),
-        &event_tx,
+        &deps.event_tx,
         &mut control_rx,
     )
     .await
@@ -381,10 +385,10 @@ async fn run_session<A: AsrBackend + 'static>(
             fail_init(
                 &e,
                 session_id,
-                &event_tx,
-                &persist,
-                &active_arc,
-                &idle_notify,
+                &deps.event_tx,
+                &deps.persist,
+                &deps.active_arc,
+                &deps.idle_notify,
             )
             .await;
             return;
@@ -404,10 +408,10 @@ async fn run_session<A: AsrBackend + 'static>(
         stop_session(
             session_id,
             SessionStatus::Cancelled,
-            &event_tx,
-            &persist,
-            &active_arc,
-            &idle_notify,
+            &deps.event_tx,
+            &deps.persist,
+            &deps.active_arc,
+            &deps.idle_notify,
         )
         .await;
         return;
@@ -416,7 +420,7 @@ async fn run_session<A: AsrBackend + 'static>(
     if speech_samples == 0 || segments.is_empty() || raw_text.is_empty() {
         if let Some(error) = first_asr_error.take().filter(|_| !saw_asr_success) {
             status = SessionStatus::Failed(error.clone());
-            let _ = event_tx.send(SessionEvent::Error(error)).await;
+            let _ = deps.event_tx.send(SessionEvent::Error(error)).await;
         } else if speech_samples > 0 {
             info!(%session_id, "speech detected but ASR produced no output, discarding");
             status = SessionStatus::Cancelled;
@@ -426,35 +430,124 @@ async fn run_session<A: AsrBackend + 'static>(
         stop_session(
             session_id,
             status,
-            &event_tx,
-            &persist,
-            &active_arc,
-            &idle_notify,
+            &deps.event_tx,
+            &deps.persist,
+            &deps.active_arc,
+            &deps.idle_notify,
         )
         .await;
         return;
     }
 
     process_and_deliver(
-        session_id,
+        deps,
         raw_text,
         segments,
         status,
-        router,
-        post_processor,
-        dict,
-        persist,
-        heuristic,
-        config,
         style_preset,
-        event_tx,
         control_rx,
-        active_arc,
-        idle_notify,
-        _settings,
         cancelled,
     )
     .await;
+}
+
+/// Output of the deterministic correction + formatting stage.
+struct Shaped {
+    /// Heuristic-corrected, punctuated, de-cased text — the fast-path output
+    /// and the LLM input.
+    text_after_heuristic: String,
+    detected_lang: &'static str,
+    /// Residual ambiguous punctuation (a gate signal; surfaced in the log).
+    needs_punct: bool,
+    gate: crate::gate::GateOutcome,
+    /// Words the corrector could neither resolve nor confidently preserve.
+    unresolved_words: Vec<(String, usize)>,
+    /// Risk entries that didn't align to a text token (diagnostic).
+    dropped_risks: usize,
+}
+
+/// Deterministic correction + formatting + bypass-gate decision.
+///
+/// Pure and synchronous: heuristic correction, then English-only de-fusing,
+/// punctuation/casing normalization, and the gate that decides whether the LLM
+/// pass runs. The dictionary scan (an async lock) stays with the caller, which
+/// passes the pre-scanned `dict_replacements` in.
+fn correct_and_format(
+    text: &str,
+    segments: &[AsrSegment],
+    dict_replacements: &[(String, String)],
+    heuristic: &LexicalGate,
+    pipeline: &PipelineConfig,
+    fmt: &lune_core::config::FormatToggles,
+    wants_styling: bool,
+) -> Shaped {
+    let word_risk_scores: Vec<(&str, f32)> = segments
+        .iter()
+        .flat_map(|s| s.word_confidences.iter())
+        .map(|wc| (wc.word.as_str(), wc.word_error_risk))
+        .collect();
+
+    let detected_lang = segments
+        .first()
+        .and_then(|s| s.detected_language.as_deref())
+        .and_then(lune_core::lang::display_name)
+        .unwrap_or("English");
+    let heuristic_flag_risk = pipeline
+        .word_confidence_threshold
+        .map(|threshold| 1.0 - threshold)
+        .unwrap_or(lune_dict::corrector::HWCE_FLAG_THRESHOLD);
+    let heuristic_result = heuristic.correct_with_risk_threshold(
+        text,
+        &word_risk_scores,
+        dict_replacements,
+        detected_lang,
+        heuristic_flag_risk,
+        fmt.brand_casing,
+    );
+    // De-fuse words the ASR ran together inconsistently before punctuation /
+    // casing, so a split sentence-start capitalizes correctly. English only —
+    // the p_cap/freq guards are English.
+    let corrected = if detected_lang == "English" {
+        lune_dict::formatting::defuse_inconsistent(&heuristic_result.corrected_text)
+    } else {
+        heuristic_result.corrected_text.clone()
+    };
+    let punctuation = lune_dict::formatting::normalize_with(&corrected, fmt);
+    // Downcase mid-sentence common-word capitals on the always-on path so casing
+    // is normalized once whether or not the gated LLM pass runs. English only.
+    let text_after_heuristic = if detected_lang == "English" {
+        lune_dict::formatting::decase_common_words(&punctuation.text)
+    } else {
+        punctuation.text
+    };
+
+    // Words the corrector could neither resolve nor confidently preserve —
+    // surfaced in the gate UI and the reason the correction pass runs. They are
+    // deliberately NOT fed to the LLM prompt as hints.
+    let unresolved_words: Vec<(String, usize)> = heuristic_result
+        .unresolved_words
+        .iter()
+        .map(|ws| (ws.word.clone(), ws.position))
+        .collect();
+
+    let gate = crate::gate::decide(crate::gate::GateInputs {
+        pipeline,
+        all_resolved: heuristic_result.all_resolved,
+        needs_punct: punctuation.needs_llm,
+        wants_styling,
+        word_risk_scores: &word_risk_scores,
+        word_risk_positions: &heuristic_result.word_risk_positions,
+        word_count: text.split_whitespace().count(),
+    });
+
+    Shaped {
+        text_after_heuristic,
+        detected_lang,
+        needs_punct: punctuation.needs_llm,
+        gate,
+        unresolved_words,
+        dropped_risks: heuristic_result.dropped_risk_entries,
+    }
 }
 
 /// Post-capture pipeline: voice command routing, heuristic correction,
@@ -468,26 +561,28 @@ async fn run_session<A: AsrBackend + 'static>(
 /// `cancelled` carries the cancel signal observed during capture; this
 /// function may flip it to true if a later signal arrives via
 /// `control_rx`.
-#[allow(clippy::too_many_arguments)]
 async fn process_and_deliver(
-    session_id: Uuid,
+    deps: SessionDeps,
     raw_text: String,
     segments: Vec<AsrSegment>,
     status: SessionStatus,
-    router: Arc<VoiceCommandRouter>,
-    post_processor: Arc<dyn TextPostProcessor>,
-    dict: Arc<Mutex<DictionaryManager>>,
-    persist: Arc<Mutex<Database>>,
-    heuristic: Arc<LexicalGate>,
-    config: SessionManagerConfig,
     mut style_preset: Arc<StylePreset>,
-    event_tx: mpsc::Sender<SessionEvent>,
     mut control_rx: mpsc::UnboundedReceiver<SessionControl>,
-    active_arc: Arc<Mutex<Option<ActiveHandle>>>,
-    idle_notify: Arc<Notify>,
-    settings: Arc<RwLock<UserSettings>>,
     mut cancelled: bool,
 ) {
+    let SessionDeps {
+        session_id,
+        router,
+        post_processor,
+        dict,
+        persist,
+        heuristic,
+        config,
+        event_tx,
+        active_arc,
+        idle_notify,
+        settings,
+    } = deps;
     debug!(%session_id, "[ASR] output ready, len={}", raw_text.len());
 
     let route = router.route_full(&raw_text);
@@ -521,7 +616,10 @@ async fn process_and_deliver(
             }
         }
         let payload = serde_json::to_string(cmd).unwrap_or_else(|_| format!("{cmd:?}"));
-        let _ = event_tx.try_send(SessionEvent::CommandDetected(payload));
+        let _ = event_tx.try_send(SessionEvent::CommandDetected {
+            session_id,
+            payload,
+        });
     }
     let text_after_commands = route.remaining.trim().to_owned();
     if text_after_commands.is_empty() {
@@ -562,80 +660,29 @@ async fn process_and_deliver(
         let replacements = guard.scan(&text_after_commands);
         (entries, replacements)
     };
-    let word_risk_scores: Vec<(&str, f32)> = segments
-        .iter()
-        .flat_map(|s| s.word_confidences.iter())
-        .map(|wc| (wc.word.as_str(), wc.word_error_risk))
-        .collect();
-
-    let detected_lang = segments
-        .first()
-        .and_then(|s| s.detected_language.as_deref())
-        .and_then(lune_core::lang::display_name)
-        .unwrap_or("English");
-    let heuristic_flag_risk = config
-        .pipeline
-        .word_confidence_threshold
-        .map(|threshold| 1.0 - threshold)
-        .unwrap_or(lune_dict::corrector::HWCE_FLAG_THRESHOLD);
     let fmt = style_preset.formatting;
-    let heuristic_result = heuristic.correct_with_risk_threshold(
-        &text_after_commands,
-        &word_risk_scores,
-        &dict_replacements,
-        detected_lang,
-        heuristic_flag_risk,
-        fmt.brand_casing,
-    );
-    // Apply deterministic punctuation (leading capital, terminal period) and
-    // detect whether residual punctuation is ambiguous. The returned text is
-    // both the fast-path output and the LLM input.
-    // De-fuse words the ASR ran together inconsistently ("MakeSure" while "make
-    // sure" also appears) before punctuation/casing, so a split sentence-start
-    // capitalizes correctly. English only — the p_cap/freq guards are English.
-    let corrected = if detected_lang == "English" {
-        lune_dict::formatting::defuse_inconsistent(&heuristic_result.corrected_text)
-    } else {
-        heuristic_result.corrected_text.clone()
-    };
-    let punctuation = lune_dict::formatting::normalize_with(&corrected, &fmt);
-    // Downcase mid-sentence common-word capitals (the "Make Sure" ASR artifact,
-    // and any over-capitalization the heuristic left) on the always-on path, so
-    // casing is normalized once whether or not the gated LLM pass runs. English
-    // only — p_cap is an English table and other languages capitalize nouns.
-    let text_after_heuristic = if detected_lang == "English" {
-        lune_dict::formatting::decase_common_words(&punctuation.text)
-    } else {
-        punctuation.text
-    };
-
-    let unresolved_count = heuristic_result.unresolved_words.len();
-    let dropped_risks = heuristic_result.dropped_risk_entries;
-
-    // Words the corrector could neither resolve nor confidently preserve —
-    // shown in the gate UI and the reason the correction pass runs. They are
-    // deliberately NOT fed to the LLM prompt as hints: risk-based hint lists
-    // flagged ordinary words ("am", "our", "a") and biased the model into
-    // wrong edits and hint-echo punctuation.
-    let unresolved_words: Vec<(String, usize)> = heuristic_result
-        .unresolved_words
-        .iter()
-        .map(|ws| (ws.word.clone(), ws.position))
-        .collect();
-
-    // Gate on three signals: (1) residual heuristic uncertainty — a word the
-    // corrector could neither resolve nor confidently preserve; (2) ambiguous
-    // punctuation (run-on, interrogative without an end mark); (3) the
-    // confidence band — when the weakest word's confidence falls below
-    // `llm_skip_threshold`, the correction pass runs even if the heuristic
-    // resolved everything, since trust-resolved words can still be homophone
-    // mishears ("no"/"know"). Skip-when-broken vetoes correction when the
-    // transcript is shaky across the board — correction degrades quality in
-    // that regime (arXiv:2509.25048).
-    // Styling is orthogonal to correction: a clean transcript still gets the
-    // style pass when the preset asks for it, so a predicted correction no-op
-    // only skips the correction pass, never styling.
     let wants_styling = style_preset.needs_styling();
+    // Deterministic correction + formatting + bypass-gate, as one span so a
+    // single dictation request shows its shaping cost end-to-end.
+    let Shaped {
+        text_after_heuristic,
+        detected_lang,
+        needs_punct,
+        gate,
+        unresolved_words,
+        dropped_risks,
+    } = {
+        let _span = tracing::info_span!("correct_format", %session_id).entered();
+        correct_and_format(
+            &text_after_commands,
+            &segments,
+            &dict_replacements,
+            &heuristic,
+            &config.pipeline,
+            &fmt,
+            wants_styling,
+        )
+    };
     let crate::gate::GateOutcome {
         needs_correction,
         needs_llm,
@@ -643,15 +690,8 @@ async fn process_and_deliver(
         too_broken,
         min_conf,
         avg_conf,
-    } = crate::gate::decide(crate::gate::GateInputs {
-        pipeline: &config.pipeline,
-        all_resolved: heuristic_result.all_resolved,
-        needs_punct: punctuation.needs_llm,
-        wants_styling,
-        word_risk_scores: &word_risk_scores,
-        word_risk_positions: &heuristic_result.word_risk_positions,
-        word_count: text_after_commands.split_whitespace().count(),
-    });
+    } = gate;
+    let unresolved_count = unresolved_words.len();
 
     info!(%session_id, "[ASR] raw: {raw_text}");
     info!(
@@ -664,7 +704,7 @@ async fn process_and_deliver(
         conf_attention,
         too_broken,
         wants_styling,
-        needs_punct = punctuation.needs_llm,
+        needs_punct,
         min_conf,
         avg_conf,
         "bypass gate"
@@ -749,7 +789,10 @@ async fn process_and_deliver(
     info!(%session_id, pipeline_ms = pipeline_t0.elapsed().as_millis() as u64, "post-processing complete");
 
     let _ = event_tx
-        .send(SessionEvent::FinalizedText(post_llm_text.clone()))
+        .send(SessionEvent::FinalizedText {
+            session_id,
+            text: post_llm_text.clone(),
+        })
         .await;
 
     let transcript = if post_llm_text.is_empty() {
@@ -1137,7 +1180,7 @@ mod tests {
                 assert!(
                     !events
                         .iter()
-                        .any(|e| matches!(e, SessionEvent::FinalizedText(_))),
+                        .any(|e| matches!(e, SessionEvent::FinalizedText { .. })),
                     "no speech was produced; FinalizedText should not fire"
                 );
 
@@ -1186,7 +1229,7 @@ mod tests {
                 let finalized: Vec<&str> = events
                     .iter()
                     .filter_map(|event| match event {
-                        SessionEvent::FinalizedText(text) => Some(text.as_str()),
+                        SessionEvent::FinalizedText { text, .. } => Some(text.as_str()),
                         _ => None,
                     })
                     .collect();
@@ -1194,6 +1237,61 @@ mod tests {
 
                 let session = db.lock().await.get_session(session_id).unwrap().unwrap();
                 assert_eq!(session.transcript.as_deref(), Some("Hello new line world."));
+            })
+            .await;
+    }
+
+    #[test]
+    fn correct_and_format_capitalizes_and_punctuates_clean_english() {
+        // The deterministic shaping stage: a clean lowercase utterance gets a
+        // leading capital and terminal period, detected language defaults to
+        // English, and nothing is left unresolved.
+        lune_dict::lexicon::warm();
+        let heuristic = LexicalGate::new();
+        let pipeline = PipelineConfig::default();
+        let fmt = lune_core::config::FormatToggles::default();
+        let segments = vec![make_segment("hello world", false)];
+
+        let shaped = correct_and_format(
+            "hello world",
+            &segments,
+            &[] as &[(String, String)],
+            &heuristic,
+            &pipeline,
+            &fmt,
+            false,
+        );
+
+        assert_eq!(shaped.text_after_heuristic, "Hello world.");
+        assert_eq!(shaped.detected_lang, "English");
+        assert!(shaped.unresolved_words.is_empty());
+    }
+
+    #[tokio::test]
+    async fn command_detected_carries_session_id() {
+        local_set()
+            .run_until(async {
+                // A whole-utterance voice command emits CommandDetected; it must
+                // carry the session id so the delivery path stays correlated.
+                let responses = vec![Ok(vec![make_segment("new line", false)])];
+                let (mgr, _) = make_manager(scripted_asr(responses), Arc::new(EchoPostProcessor));
+                let (tx, rx) = mpsc::channel(32);
+                let session_id = mgr.start_with_audio(tx, speech_stream()).await.unwrap();
+
+                let events = collect_events(rx).await;
+                let detected = events.iter().find_map(|e| match e {
+                    SessionEvent::CommandDetected {
+                        session_id: id,
+                        payload,
+                    } => Some((*id, payload.clone())),
+                    _ => None,
+                });
+                let (evt_session_id, _payload) =
+                    detected.expect("a whole-utterance command must emit CommandDetected");
+                assert_eq!(
+                    evt_session_id, session_id,
+                    "CommandDetected must carry the originating session id"
+                );
             })
             .await;
     }
@@ -1214,7 +1312,7 @@ mod tests {
                 assert!(
                     !events
                         .iter()
-                        .any(|event| matches!(event, SessionEvent::FinalizedText(_)))
+                        .any(|event| matches!(event, SessionEvent::FinalizedText { .. }))
                 );
 
                 let session = db.lock().await.get_session(session_id).unwrap().unwrap();
@@ -1278,7 +1376,7 @@ mod tests {
                 assert!(
                     !events
                         .iter()
-                        .any(|event| matches!(event, SessionEvent::FinalizedText(_)))
+                        .any(|event| matches!(event, SessionEvent::FinalizedText { .. }))
                 );
 
                 let session = db.lock().await.get_session(session_id).unwrap().unwrap();

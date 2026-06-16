@@ -519,7 +519,9 @@ async fn run_pipeline(
 
             loop {
                 match tokio::time::timeout_at(deadline, event_rx.recv()).await {
-                    Ok(Some(SessionEvent::FinalizedText(t))) => final_text.push_str(&t),
+                    Ok(Some(SessionEvent::FinalizedText { text: t, .. })) => {
+                        final_text.push_str(&t)
+                    }
                     Ok(Some(SessionEvent::GateDecision {
                         used_llm,
                         lang,

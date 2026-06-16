@@ -24,6 +24,7 @@ use tokio::sync::{Mutex, RwLock, mpsc};
 #[cfg(unix)]
 use tracing::info;
 use tracing::{debug, warn};
+use uuid::Uuid;
 
 use crate::dto::{CalibrationDiagnosticsDto, CalibrationStreamEvent, SessionStreamEvent};
 
@@ -443,7 +444,7 @@ impl AppRuntime {
                             .push_session_event(SessionStreamEvent::Processing)
                             .await;
                     }
-                    SessionEvent::FinalizedText(text) => {
+                    SessionEvent::FinalizedText { session_id, text } => {
                         saw_text = true;
                         let mode = runtime.inner.settings.read().await.dictation_mode;
                         let delivered;
@@ -451,14 +452,24 @@ impl AppRuntime {
                         {
                             let target = runtime.inner.pipeline.lock().await.focus_target.clone();
                             delivered = if let Some(ref t) = target {
-                                runtime.inner.delivery.deliver_to(&text, mode, t)
+                                runtime
+                                    .inner
+                                    .delivery
+                                    .deliver_to(Some(session_id), &text, mode, t)
                             } else {
-                                runtime.inner.delivery.deliver(&text, mode)
+                                runtime
+                                    .inner
+                                    .delivery
+                                    .deliver(Some(session_id), &text, mode)
                             };
                         }
                         #[cfg(not(unix))]
                         {
-                            delivered = runtime.inner.delivery.deliver(&text, mode);
+                            delivered =
+                                runtime
+                                    .inner
+                                    .delivery
+                                    .deliver(Some(session_id), &text, mode);
                         }
                         if !delivered {
                             // Non-fatal: surface as a warning toast, not a
@@ -494,12 +505,13 @@ impl AppRuntime {
                         // the main window's channel)
                         let _ = app.emit_to("pill", "lune://audio-level", level);
                     }
-                    SessionEvent::CommandDetected(ref payload) => {
-                        runtime.handle_voice_command(payload).await;
+                    SessionEvent::CommandDetected {
+                        session_id,
+                        payload,
+                    } => {
+                        runtime.handle_voice_command(session_id, &payload).await;
                         runtime
-                            .push_session_event(SessionStreamEvent::CommandDetected {
-                                payload: payload.clone(),
-                            })
+                            .push_session_event(SessionStreamEvent::CommandDetected { payload })
                             .await;
                     }
                     SessionEvent::Error(message) => {
@@ -550,7 +562,7 @@ impl AppRuntime {
     /// - Other commands (e.g. `SwitchStyle`, `InsertSnippet`, `ScratchThat`) →
     ///   logged and skipped; higher-level handling belongs in the frontend or a
     ///   future command handler.
-    async fn handle_voice_command(&self, payload: &str) {
+    async fn handle_voice_command(&self, session_id: Uuid, payload: &str) {
         let cmd: VoiceCommand = match serde_json::from_str(payload) {
             Ok(c) => c,
             Err(e) => {
@@ -569,34 +581,40 @@ impl AppRuntime {
                 debug!("CommandDetected: NewLine → delivering \\n");
                 #[cfg(unix)]
                 if let Some(ref t) = focus_target {
-                    self.inner.delivery.deliver_to("\n", mode, t);
+                    self.inner
+                        .delivery
+                        .deliver_to(Some(session_id), "\n", mode, t);
                 } else {
-                    self.inner.delivery.deliver("\n", mode);
+                    self.inner.delivery.deliver(Some(session_id), "\n", mode);
                 }
                 #[cfg(not(unix))]
-                self.inner.delivery.deliver("\n", mode);
+                self.inner.delivery.deliver(Some(session_id), "\n", mode);
             }
             VoiceCommand::NewParagraph => {
                 debug!("CommandDetected: NewParagraph → delivering \\n\\n");
                 #[cfg(unix)]
                 if let Some(ref t) = focus_target {
-                    self.inner.delivery.deliver_to("\n\n", mode, t);
+                    self.inner
+                        .delivery
+                        .deliver_to(Some(session_id), "\n\n", mode, t);
                 } else {
-                    self.inner.delivery.deliver("\n\n", mode);
+                    self.inner.delivery.deliver(Some(session_id), "\n\n", mode);
                 }
                 #[cfg(not(unix))]
-                self.inner.delivery.deliver("\n\n", mode);
+                self.inner.delivery.deliver(Some(session_id), "\n\n", mode);
             }
             VoiceCommand::ListItem => {
                 debug!("CommandDetected: ListItem → delivering \\n- ");
                 #[cfg(unix)]
                 if let Some(ref t) = focus_target {
-                    self.inner.delivery.deliver_to("\n- ", mode, t);
+                    self.inner
+                        .delivery
+                        .deliver_to(Some(session_id), "\n- ", mode, t);
                 } else {
-                    self.inner.delivery.deliver("\n- ", mode);
+                    self.inner.delivery.deliver(Some(session_id), "\n- ", mode);
                 }
                 #[cfg(not(unix))]
-                self.inner.delivery.deliver("\n- ", mode);
+                self.inner.delivery.deliver(Some(session_id), "\n- ", mode);
             }
             VoiceCommand::StopDictation => {
                 debug!("CommandDetected: StopDictation → stopping session");

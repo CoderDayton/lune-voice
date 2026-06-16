@@ -62,13 +62,13 @@ fn main() {
                             SessionEvent::Started => "Started",
                             SessionEvent::PartialText => "PartialText",
                             SessionEvent::Processing => "Processing",
-                            SessionEvent::FinalizedText(t) => {
+                            SessionEvent::FinalizedText { text: t, .. } => {
                                 final_text.push_str(t);
                                 "FinalizedText"
                             }
                             SessionEvent::CorrectedText(_) => "CorrectedText",
                             SessionEvent::AudioLevel(_) => continue,
-                            SessionEvent::CommandDetected(_) => "CommandDetected",
+                            SessionEvent::CommandDetected { .. } => "CommandDetected",
                             SessionEvent::Error(_) => "Error",
                             SessionEvent::Stopped => {
                                 events.push(("Stopped", elapsed_ms));

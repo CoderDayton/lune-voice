@@ -56,7 +56,12 @@ pub enum SessionEvent {
     Started,
     /// Partial in-flight transcription notification.
     PartialText,
-    FinalizedText(String),
+    /// Final delivered transcript for a dictation request. Carries the
+    /// session id so the delivery path stays correlated end-to-end.
+    FinalizedText {
+        session_id: Uuid,
+        text: String,
+    },
     /// Async LLM correction for a previously-delivered low-confidence utterance.
     CorrectedText(String),
     /// Pipeline is processing accumulated audio (batch ASR + LLM).
@@ -64,7 +69,10 @@ pub enum SessionEvent {
     /// RMS audio energy level, normalized to [0.0, 1.0]. Emitted at ~15 fps
     /// while recording so the UI can show a live audio visualization.
     AudioLevel(f32),
-    CommandDetected(String),
+    CommandDetected {
+        session_id: Uuid,
+        payload: String,
+    },
     /// Gate decision: true = LLM was used, false = bypassed.
     GateDecision {
         used_llm: bool,
@@ -83,11 +91,9 @@ impl SessionEvent {
     /// Returns the text payload if this event carries one, avoiding a match at call sites.
     pub fn text(&self) -> Option<&str> {
         match self {
-            Self::FinalizedText(s)
-            | Self::CorrectedText(s)
-            | Self::CommandDetected(s)
-            | Self::Error(s)
-            | Self::Warning(s) => Some(s.as_str()),
+            Self::FinalizedText { text, .. } => Some(text.as_str()),
+            Self::CommandDetected { payload, .. } => Some(payload.as_str()),
+            Self::CorrectedText(s) | Self::Error(s) | Self::Warning(s) => Some(s.as_str()),
             Self::Started
             | Self::PartialText
             | Self::Processing
@@ -171,7 +177,11 @@ mod tests {
     #[test]
     fn session_event_text_accessor() {
         assert_eq!(
-            SessionEvent::FinalizedText("hello".into()).text(),
+            (SessionEvent::FinalizedText {
+                session_id: Uuid::nil(),
+                text: "hello".into(),
+            })
+            .text(),
             Some("hello")
         );
         assert_eq!(SessionEvent::Started.text(), None);
@@ -192,7 +202,13 @@ mod tests {
     fn session_event_terminal_predicate() {
         assert!(SessionEvent::Stopped.is_terminal());
         assert!(SessionEvent::Error("oops".into()).is_terminal());
-        assert!(!SessionEvent::FinalizedText("hi".into()).is_terminal());
+        assert!(
+            !(SessionEvent::FinalizedText {
+                session_id: Uuid::nil(),
+                text: "hi".into(),
+            })
+            .is_terminal()
+        );
         assert!(!SessionEvent::Started.is_terminal());
     }
 }

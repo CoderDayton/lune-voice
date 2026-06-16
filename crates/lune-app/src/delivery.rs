@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 
 use lune_core::config::{DictationMode, TerminalMode};
 use tracing::{debug, info, warn};
+use uuid::Uuid;
 
 #[cfg(unix)]
 use crate::uinput_typer::WindowTarget;
@@ -12,6 +13,9 @@ use crate::uinput_typer::UinputTyper;
 
 /// Message sent to the persistent delivery thread.
 struct DeliveryMsg {
+    /// Dictation request this delivery belongs to, for end-to-end tracing.
+    /// `None` for ad-hoc injections (newline/bullet commands) and liveness probes.
+    session_id: Option<Uuid>,
     text: Box<str>,
     mode: DictationMode,
     #[cfg(unix)]
@@ -41,12 +45,13 @@ impl DeliveryService {
         Ok(Self { tx, busy_until })
     }
 
-    pub fn deliver(&self, text: &str, mode: DictationMode) -> bool {
+    pub fn deliver(&self, session_id: Option<Uuid>, text: &str, mode: DictationMode) -> bool {
         if text.is_empty() {
             return true;
         }
-        debug!(?mode, text_len = text.len(), "delivering text");
+        debug!(?session_id, ?mode, text_len = text.len(), "delivering text");
         if let Err(e) = self.tx.send(DeliveryMsg {
+            session_id,
             text: text.into(),
             mode,
             #[cfg(unix)]
@@ -59,12 +64,24 @@ impl DeliveryService {
     }
 
     #[cfg(unix)]
-    pub fn deliver_to(&self, text: &str, mode: DictationMode, target: &WindowTarget) -> bool {
+    pub fn deliver_to(
+        &self,
+        session_id: Option<Uuid>,
+        text: &str,
+        mode: DictationMode,
+        target: &WindowTarget,
+    ) -> bool {
         if text.is_empty() {
             return true;
         }
-        debug!(?mode, text_len = text.len(), "delivering text to target");
+        debug!(
+            ?session_id,
+            ?mode,
+            text_len = text.len(),
+            "delivering text to target"
+        );
         if let Err(e) = self.tx.send(DeliveryMsg {
+            session_id,
             text: text.into(),
             mode,
             target: Some(target.clone()),
@@ -75,8 +92,13 @@ impl DeliveryService {
         true
     }
 
-    pub fn deliver_owned(&self, text: String, mode: DictationMode) -> bool {
-        self.deliver(&text, mode)
+    pub fn deliver_owned(
+        &self,
+        session_id: Option<Uuid>,
+        text: String,
+        mode: DictationMode,
+    ) -> bool {
+        self.deliver(session_id, &text, mode)
     }
 
     /// True while queued text is being typed/pasted, plus a short settle
@@ -97,6 +119,7 @@ impl DeliveryService {
         // harmlessly ignores if it somehow arrives.
         self.tx
             .send(DeliveryMsg {
+                session_id: None,
                 text: "".into(),
                 mode: DictationMode::TypeInPlace,
                 #[cfg(unix)]
@@ -129,6 +152,8 @@ fn delivery_thread(
         if text.is_empty() {
             continue;
         }
+        // Correlated with the upstream pipeline via session_id (see DeliveryMsg).
+        debug!(session_id = ?msg.session_id, ?msg.mode, text_len = text.len(), "delivery: typing");
         // Busy from dequeue until the driver returns; per-key typing is paced
         // (~8-12 ms/char) and can take seconds, and senders only see the queue.
         *busy_until.lock().unwrap_or_else(|e| e.into_inner()) =

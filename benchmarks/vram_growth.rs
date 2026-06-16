@@ -298,7 +298,9 @@ async fn run_full_pipeline(
 
             loop {
                 match tokio::time::timeout_at(deadline, event_rx.recv()).await {
-                    Ok(Some(SessionEvent::FinalizedText(t))) => final_text.push_str(&t),
+                    Ok(Some(SessionEvent::FinalizedText { text: t, .. })) => {
+                        final_text.push_str(&t)
+                    }
                     Ok(Some(SessionEvent::Stopped)) => break,
                     Ok(Some(_)) => {}
                     Ok(None) => break,

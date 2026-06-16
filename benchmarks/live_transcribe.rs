@@ -159,10 +159,10 @@ fn main() {
                             // Show partial text in gray, overwrite line
                             eprint!("\r\x1b[2K  \x1b[90m(processing...)\x1b[0m");
                         }
-                        Some(SessionEvent::FinalizedText(t)) => {
+                        Some(SessionEvent::FinalizedText { text: t, .. }) => {
                             eprint!("\r\x1b[2K  {t}\n");
                             if let Some(svc) = &delivery {
-                                svc.deliver(&t, lune_core::config::DictationMode::TypeInPlace);
+                                svc.deliver(None, &t, lune_core::config::DictationMode::TypeInPlace);
                             }
                             if !transcript.is_empty() {
                                 transcript.push(' ');
