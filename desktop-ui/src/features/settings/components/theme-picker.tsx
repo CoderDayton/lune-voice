@@ -8,248 +8,47 @@ import {
   themeLabel,
 } from '../../../lib/theme';
 
-const SWATCH_COLORS = ['primary', 'secondary', 'accent', 'neutral'] as const;
+/**
+ * A small app-window mockup rendered inside a `data-theme` scope, so every
+ * surface uses the theme's own DaisyUI tokens — no hardcoded colors, and the
+ * preview can never drift from the real theme.
+ */
+function MiniWindow() {
+  return (
+    <div className="overflow-hidden rounded-md border border-base-300">
+      <div className="flex items-center gap-1 border-b border-base-300 bg-base-200 px-1.5 py-1">
+        <span className="size-1.5 rounded-full bg-primary" />
+        <span className="size-1.5 rounded-full bg-secondary" />
+        <span className="size-1.5 rounded-full bg-accent" />
+      </div>
+      <div className="flex gap-1.5 bg-base-100 p-1.5">
+        <div className="w-1/4 shrink-0 rounded-sm bg-neutral" />
+        <div className="flex flex-1 flex-col gap-1 py-0.5">
+          <div className="h-1.5 w-2/3 rounded-full bg-primary" />
+          <div className="h-1.5 w-full rounded-full bg-base-content/30" />
+          <div className="h-1.5 w-4/5 rounded-full bg-base-content/15" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
-const THEME_PREVIEWS: Record<
-  string,
-  { bg: string; text: string; border: string; colors: string[] }
-> = {
-  lune: {
-    bg: 'oklch(0.135 0 0)',
-    text: 'oklch(0.94 0 0)',
-    border: 'oklch(1 0 0 / 0.16)',
-    colors: [
-      'oklch(0.74 0.14 295)',
-      'oklch(0.62 0.07 295)',
-      'oklch(0.74 0.10 185)',
-      'oklch(0.245 0 0)',
-    ],
-  },
-  'lune-light': {
-    bg: 'oklch(0.99 0 0)',
-    text: 'oklch(0.20 0 0)',
-    border: 'oklch(0 0 0 / 0.20)',
-    colors: [
-      'oklch(0.50 0.18 295)',
-      'oklch(0.48 0.10 295)',
-      'oklch(0.50 0.13 185)',
-      'oklch(0.88 0 0)',
-    ],
-  },
-  light: {
-    bg: '#ffffff',
-    text: '#1f2937',
-    border: '#d1d5db',
-    colors: ['#570df8', '#f000b8', '#37cdbe', '#3d4451'],
-  },
-  cupcake: {
-    bg: '#faf7f5',
-    text: '#291334',
-    border: '#e7d8d3',
-    colors: ['#65c3c8', '#ef9fbc', '#eeaf3a', '#291334'],
-  },
-  bumblebee: {
-    bg: '#ffffff',
-    text: '#181830',
-    border: '#e5e7eb',
-    colors: ['#e0a82e', '#f9d72f', '#181830', '#181830'],
-  },
-  emerald: {
-    bg: '#ffffff',
-    text: '#333c4d',
-    border: '#d7dde5',
-    colors: ['#66cc8a', '#377cfb', '#ea5234', '#333c4d'],
-  },
-  corporate: {
-    bg: '#ffffff',
-    text: '#181a2a',
-    border: '#d5d9e2',
-    colors: ['#4b6bfb', '#7b92b2', '#67cba0', '#181a2a'],
-  },
-  retro: {
-    bg: '#ece3ca',
-    text: '#282425',
-    border: '#c6b98f',
-    colors: ['#ef9995', '#a4cbb4', '#dc8850', '#2e282a'],
-  },
-  valentine: {
-    bg: '#f0d6e8',
-    text: '#632c3b',
-    border: '#e6b6d5',
-    colors: ['#e96d7b', '#a991f7', '#88dbdd', '#af4670'],
-  },
-  garden: {
-    bg: '#e9e7e7',
-    text: '#100f0f',
-    border: '#cfcaca',
-    colors: ['#5c7f67', '#ecf4e7', '#fae5e5', '#5d5656'],
-  },
-  lofi: {
-    bg: '#ffffff',
-    text: '#000000',
-    border: '#d5d5d5',
-    colors: ['#0d0d0d', '#1a1919', '#262626', '#000000'],
-  },
-  pastel: {
-    bg: '#ffffff',
-    text: '#1f2937',
-    border: '#e5e7eb',
-    colors: ['#d1c1d7', '#f6cbd1', '#b4e9d6', '#70acc7'],
-  },
-  fantasy: {
-    bg: '#ffffff',
-    text: '#1f2937',
-    border: '#d2d6de',
-    colors: ['#6e0b75', '#007ebd', '#f8860d', '#1f2937'],
-  },
-  wireframe: {
-    bg: '#ffffff',
-    text: '#1f2937',
-    border: '#c8c8c8',
-    colors: ['#b8b8b8', '#b8b8b8', '#b8b8b8', '#1f2937'],
-  },
-  cmyk: {
-    bg: '#ffffff',
-    text: '#171717',
-    border: '#d8d8d8',
-    colors: ['#45aeee', '#e8488a', '#fff232', '#1a1a1a'],
-  },
-  autumn: {
-    bg: '#f1f1f1',
-    text: '#1f2937',
-    border: '#cfcfcf',
-    colors: ['#8c0327', '#d85251', '#f28c18', '#2f2f2f'],
-  },
-  acid: {
-    bg: '#fbfbfb',
-    text: '#191a3f',
-    border: '#d8d8d8',
-    colors: ['#ff00f4', '#ff7400', '#cbff00', '#191a3f'],
-  },
-  lemonade: {
-    bg: '#ffffff',
-    text: '#1f2937',
-    border: '#d9ddc4',
-    colors: ['#519903', '#e9e92e', '#f7f9ca', '#1f2937'],
-  },
-  winter: {
-    bg: '#ffffff',
-    text: '#394e6a',
-    border: '#d7dce4',
-    colors: ['#047aff', '#463aa1', '#c148ac', '#394e6a'],
-  },
-  nord: {
-    bg: '#eceff4',
-    text: '#2e3440',
-    border: '#c9d0dc',
-    colors: ['#5e81ac', '#81a1c1', '#88c0d0', '#4c566a'],
-  },
-  caramellatte: {
-    bg: '#fff8f0',
-    text: '#3d2b1f',
-    border: '#e5c7a3',
-    colors: ['#d2691e', '#8b4513', '#f4a460', '#5c4033'],
-  },
-  silk: {
-    bg: '#ffffff',
-    text: '#1f2937',
-    border: '#d8d5cf',
-    colors: ['#343232', '#8a7f8d', '#d6c3a5', '#1f2937'],
-  },
-  dark: {
-    bg: '#1d232a',
-    text: '#f8f8f2',
-    border: '#3a424d',
-    colors: ['#661ae6', '#d926a9', '#1fb2a5', '#191d24'],
-  },
-  synthwave: {
-    bg: '#2d1b69',
-    text: '#f9f7fd',
-    border: '#5d4aa5',
-    colors: ['#e779c1', '#58c7f3', '#f3cc30', '#20134e'],
-  },
-  cyberpunk: {
-    bg: '#ffee00',
-    text: '#111111',
-    border: '#d7c900',
-    colors: ['#ff7598', '#75d1f0', '#c07eec', '#111111'],
-  },
-  halloween: {
-    bg: '#212121',
-    text: '#f9f7fd',
-    border: '#4a3a2d',
-    colors: ['#f28c18', '#6d3a9c', '#51a800', '#1b1d1d'],
-  },
-  forest: {
-    bg: '#171212',
-    text: '#e5e7eb',
-    border: '#394236',
-    colors: ['#1eb854', '#1fd65f', '#d99330', '#19362d'],
-  },
-  aqua: {
-    bg: '#193549',
-    text: '#d4f1f4',
-    border: '#2d6277',
-    colors: ['#09ecf3', '#966fb3', '#ffe999', '#2a323c'],
-  },
-  black: {
-    bg: '#000000',
-    text: '#ffffff',
-    border: '#333333',
-    colors: ['#343232', '#343232', '#343232', '#181818'],
-  },
-  luxury: {
-    bg: '#171618',
-    text: '#e2d9c3',
-    border: '#4b4134',
-    colors: ['#ffffff', '#152747', '#513448', '#2b211e'],
-  },
-  dracula: {
-    bg: '#282a36',
-    text: '#f8f8f2',
-    border: '#44475a',
-    colors: ['#ff79c6', '#bd93f9', '#ffb86c', '#414558'],
-  },
-  business: {
-    bg: '#202020',
-    text: '#f5f5f5',
-    border: '#3f3f46',
-    colors: ['#1c4e80', '#7c909a', '#ea6947', '#1f2937'],
-  },
-  night: {
-    bg: '#0f172a',
-    text: '#e5e7eb',
-    border: '#25314f',
-    colors: ['#38bdf8', '#818cf8', '#f471b5', '#1e293b'],
-  },
-  coffee: {
-    bg: '#20161f',
-    text: '#f5e6d3',
-    border: '#4b3621',
-    colors: ['#db924b', '#263e3f', '#10576d', '#2a1f1d'],
-  },
-  dim: {
-    bg: '#2a303c',
-    text: '#d7dde4',
-    border: '#465064',
-    colors: ['#9fe88d', '#ff7d5c', '#c792ea', '#1c212b'],
-  },
-  sunset: {
-    bg: '#1e1e2e',
-    text: '#f5e0dc',
-    border: '#45475a',
-    colors: ['#f38ba8', '#fab387', '#f9e2af', '#313244'],
-  },
-  abyss: {
-    bg: '#000617',
-    text: '#dbeafe',
-    border: '#172554',
-    colors: ['#2563eb', '#7c3aed', '#06b6d4', '#0f172a'],
-  },
-};
+/** One light/dark half of the System swatch preview (wrapped in its own theme). */
+function SystemHalf() {
+  return (
+    <div className="flex flex-col gap-1 bg-base-100 p-2">
+      <div className="h-1.5 w-3/4 rounded-full bg-primary" />
+      <div className="h-1.5 w-full rounded-full bg-accent" />
+      <div className="h-1.5 w-2/3 rounded-full bg-base-content/25" />
+    </div>
+  );
+}
 
-function getThemePreview(theme: string) {
-  return THEME_PREVIEWS[theme] ?? THEME_PREVIEWS.lune;
+const SWATCH_BASE =
+  'group relative flex flex-col gap-2 rounded-field border-2 bg-base-100 p-2 text-left text-base-content transition-all hover:-translate-y-0.5 hover:shadow-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:p-2.5';
+
+function selectionClasses(active: boolean) {
+  return active ? 'border-primary ring-2 ring-primary/30' : 'border-base-300';
 }
 
 function ThemeSwatch({
@@ -261,37 +60,20 @@ function ThemeSwatch({
   active: boolean;
   onSelect: () => void;
 }) {
-  const preview = getThemePreview(theme);
-
   return (
     <button
       type="button"
+      data-theme={theme}
       onClick={onSelect}
-      className="group relative flex flex-col gap-1.5 rounded-field border-2 p-2 text-left transition-all hover:-translate-y-0.5 hover:shadow-card sm:p-3"
-      style={{
-        background: preview.bg,
-        borderColor: active ? 'var(--color-primary)' : preview.border,
-        boxShadow: active
-          ? '0 0 0 2px color-mix(in oklab, var(--color-primary) 25%, transparent)'
-          : undefined,
-        color: preview.text,
-      }}
+      className={`${SWATCH_BASE} ${selectionClasses(active)}`}
     >
       {active && (
-        <div className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-primary text-primary-content">
+        <div className="absolute -top-1.5 -right-1.5 z-10 flex size-5 items-center justify-center rounded-full bg-primary text-primary-content shadow-sm">
           <Check size={12} strokeWidth={3} />
         </div>
       )}
-      <span className="text-sm font-medium truncate">{themeLabel(theme)}</span>
-      <div className="flex gap-1">
-        {SWATCH_COLORS.map((color, index) => (
-          <div
-            key={color}
-            className="size-4 rounded-selector border border-black/10 sm:size-5"
-            style={{ backgroundColor: preview.colors[index] }}
-          />
-        ))}
-      </div>
+      <span className="truncate text-sm font-medium">{themeLabel(theme)}</span>
+      <MiniWindow />
     </button>
   );
 }
@@ -306,8 +88,6 @@ export function ThemePicker() {
     setThemePreference(theme);
     setCurrent(theme);
   }
-
-  const systemPreview = getThemePreview('lune');
 
   return (
     <>
@@ -347,51 +127,33 @@ export function ThemePicker() {
             <div>
               <p className="section-label mb-2 sm:mb-3">{t`Lune`}</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
-                {THEME_GROUPS.custom.map((t) => (
+                {THEME_GROUPS.custom.map((theme) => (
                   <ThemeSwatch
-                    key={t}
-                    theme={t}
-                    active={current === t}
-                    onSelect={() => handleSelect(t)}
+                    key={theme}
+                    theme={theme}
+                    active={current === theme}
+                    onSelect={() => handleSelect(theme)}
                   />
                 ))}
                 <button
                   type="button"
+                  data-theme="lune"
                   onClick={() => handleSelect('system')}
-                  className="relative flex flex-col gap-1.5 rounded-field border-2 p-2 text-left transition-all hover:-translate-y-0.5 hover:shadow-card sm:p-3"
-                  style={{
-                    background:
-                      'linear-gradient(135deg, oklch(0.145 0.013 238) 0 50%, oklch(0.985 0.006 225) 50% 100%)',
-                    borderColor:
-                      current === 'system'
-                        ? 'var(--color-primary)'
-                        : 'var(--surface-border-strong)',
-                    boxShadow:
-                      current === 'system'
-                        ? '0 0 0 2px color-mix(in oklab, var(--color-primary) 25%, transparent)'
-                        : undefined,
-                    color: systemPreview.text,
-                  }}
+                  className={`${SWATCH_BASE} ${selectionClasses(current === 'system')}`}
                 >
                   {current === 'system' && (
-                    <div className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-primary text-primary-content">
+                    <div className="absolute -top-1.5 -right-1.5 z-10 flex size-5 items-center justify-center rounded-full bg-primary text-primary-content shadow-sm">
                       <Check size={12} strokeWidth={3} />
                     </div>
                   )}
-                  <span className="text-sm font-medium">{t`System`}</span>
-                  <div className="flex gap-1">
-                    {[
-                      'oklch(0.74 0.14 295)',
-                      'oklch(0.62 0.07 295)',
-                      'oklch(0.74 0.10 185)',
-                      'oklch(0.88 0 0)',
-                    ].map((color) => (
-                      <div
-                        key={color}
-                        className="size-4 rounded-selector border border-black/10 sm:size-5"
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
+                  <span className="truncate text-sm font-medium">{t`System`}</span>
+                  <div className="grid grid-cols-2 overflow-hidden rounded-md border border-base-300">
+                    <div data-theme="lune">
+                      <SystemHalf />
+                    </div>
+                    <div data-theme="lune-light">
+                      <SystemHalf />
+                    </div>
                   </div>
                 </button>
               </div>
@@ -401,12 +163,12 @@ export function ThemePicker() {
             <div>
               <p className="section-label mb-2 sm:mb-3">{t`Light`}</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
-                {THEME_GROUPS.light.map((t) => (
+                {THEME_GROUPS.light.map((theme) => (
                   <ThemeSwatch
-                    key={t}
-                    theme={t}
-                    active={current === t}
-                    onSelect={() => handleSelect(t)}
+                    key={theme}
+                    theme={theme}
+                    active={current === theme}
+                    onSelect={() => handleSelect(theme)}
                   />
                 ))}
               </div>
@@ -416,12 +178,12 @@ export function ThemePicker() {
             <div>
               <p className="section-label mb-2 sm:mb-3">{t`Dark`}</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
-                {THEME_GROUPS.dark.map((t) => (
+                {THEME_GROUPS.dark.map((theme) => (
                   <ThemeSwatch
-                    key={t}
-                    theme={t}
-                    active={current === t}
-                    onSelect={() => handleSelect(t)}
+                    key={theme}
+                    theme={theme}
+                    active={current === theme}
+                    onSelect={() => handleSelect(theme)}
                   />
                 ))}
               </div>
