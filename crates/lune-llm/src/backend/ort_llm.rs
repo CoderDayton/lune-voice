@@ -369,7 +369,7 @@ impl OrtStyleLlm {
         let mut prompt = String::with_capacity(header.len() + transcript.len() + 128);
         prompt.push_str(&header);
         if !examples.is_empty() {
-            prompt.push_str("\n\nExamples:");
+            prompt.push_str("\n\nExamples (reference only — do not copy these into the output):");
             for (input, output) in examples {
                 prompt.push_str("\nInput: ");
                 prompt.push_str(input);
@@ -1397,11 +1397,13 @@ impl lune_core::llm::LlmService for OrtStyleLlm {
     async fn complete(&self, system: &str, user: &str) -> Result<String> {
         let (ids, sys_prefix_len) = self.build_chat_ids(system, user)?;
         // Reuse the frozen system-prefix KV across calls — the correction
-        // system prompt is ~700 tokens of rules/examples/dictionary and
-        // dominates prefill cost. Hash-invalidate when the system text
-        // changes (e.g. dictionary edits). The styling pass sends an empty
-        // system; bypass the cache there so it can't evict the correction
-        // prefix between corrections.
+        // system prompt is a few hundred tokens of rules and examples and
+        // dominates prefill cost. It is now static (the dictionary is applied
+        // upstream and never enters this prompt), so the hash stays constant
+        // and the prefix is prefilled once; the hash check remains only as a
+        // cheap safeguard. The styling pass sends an empty system; bypass the
+        // cache there so it can't evict the correction prefix between
+        // corrections.
         let prefix_len = if system.is_empty() {
             0
         } else {
@@ -1635,7 +1637,7 @@ mod tests {
         );
         assert!(prompt.contains("I went the store"));
         assert!(prompt.ends_with("/no_think"));
-        assert!(prompt.contains("Examples:"));
+        assert!(prompt.contains("Examples (reference only"));
         assert!(prompt.contains("Input: I said Barolo in the meeting."));
         assert!(prompt.contains("Output: I said Boorloo in the meeting."));
     }

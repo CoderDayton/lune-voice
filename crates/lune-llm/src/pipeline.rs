@@ -28,85 +28,28 @@ impl CorrectionPipeline {
 
     /// Build the base system prompt with language and dictionary substitution.
     fn build_system_prompt(&self, input: &PostProcessInput) -> String {
-        let mut system_content = BASE_SYSTEM_PROMPT.replace("{lang}", &input.language);
-
-        if !input.dictionary.is_empty() {
-            system_content.push_str("\nDictionary terms (use these exact spellings):");
-            for entry in &input.dictionary {
-                system_content.push_str("\n- ");
-                system_content.push_str(&entry.phrase);
-                system_content.push_str(" → ");
-                system_content.push_str(&entry.replacement);
-            }
-        }
-
-        system_content
+        // Kept static across calls so the model's system-prefix KV cache always
+        // hits (see OrtStyleLlm::complete). The dictionary is applied
+        // heuristically upstream and seeded into the user prompt — it must never
+        // enter the system prompt, or every dictionary edit would invalidate the
+        // prefill cache.
+        BASE_SYSTEM_PROMPT.replace("{lang}", &input.language)
     }
 
     /// Build the user prompt for the correction pass.
     fn build_correction_prompt(&self, input: &PostProcessInput, raw_text: &str) -> String {
-        let examples = dictionary_examples(input);
+        // No few-shot examples in the correction user prompt. The dictionary is
+        // applied upstream (apply_dictionary_seed + heuristic scan) and
+        // validate_and_merge backstops it, so per-term "carrier" examples were
+        // redundant — and worse, the small model echoed them verbatim into the
+        // output (benchmarks/dict_carrier_ab.rs). Few-shot examples live only in
+        // the static system prompt.
         crate::backend::ort_llm::OrtStyleLlm::user_prompt_with_examples(
             raw_text,
             &input.language,
-            &examples,
+            &[],
         )
     }
-}
-
-fn dictionary_examples(input: &PostProcessInput) -> Vec<(String, String)> {
-    let use_english_carrier = matches!(
-        lune_core::lang::display_name(&input.language),
-        Some("English")
-    );
-    input
-        .dictionary
-        .iter()
-        .take(6)
-        .filter_map(|entry| {
-            let phrase = clean_example_fragment(&entry.phrase);
-            let replacement = clean_example_fragment(&entry.replacement);
-            if phrase.is_empty() || replacement.is_empty() {
-                return None;
-            }
-            if use_english_carrier {
-                Some((
-                    format!("I said {phrase} in the meeting."),
-                    format!("I said {replacement} in the meeting."),
-                ))
-            } else {
-                // For any other language we hand the LLM bare phrase pairs
-                // rather than ship an English carrier sentence into a
-                // non-English correction prompt.
-                Some((phrase, replacement))
-            }
-        })
-        .collect()
-}
-
-fn clean_example_fragment(s: &str) -> String {
-    const MAX_CHARS: usize = 80;
-    let mut out = String::with_capacity(s.len().min(MAX_CHARS * 4));
-    let mut chars_taken = 0usize;
-    let mut first = true;
-    for tok in s.split_whitespace() {
-        if !first {
-            if chars_taken >= MAX_CHARS {
-                break;
-            }
-            out.push(' ');
-            chars_taken += 1;
-        }
-        for c in tok.chars() {
-            if chars_taken >= MAX_CHARS {
-                return out;
-            }
-            out.push(c);
-            chars_taken += 1;
-        }
-        first = false;
-    }
-    out
 }
 
 #[async_trait]
@@ -415,31 +358,6 @@ mod tests {
     }
 
     #[test]
-    fn dictionary_entries_become_correction_examples() {
-        let input = PostProcessInput {
-            raw_text: "I visited Barolo yesterday".into(),
-            style_preset: Arc::new(StylePreset::minimal()),
-            app_category: None,
-            dictionary: vec![DictionaryEntry {
-                phrase: "Barolo".into(),
-                replacement: "Boorloo".into(),
-                priority: 10,
-            }],
-            language: "en".into(),
-            correction_needed: true,
-        };
-
-        let examples = dictionary_examples(&input);
-        assert_eq!(
-            examples,
-            vec![(
-                "I said Barolo in the meeting.".to_string(),
-                "I said Boorloo in the meeting.".to_string()
-            )]
-        );
-    }
-
-    #[test]
     fn dictionary_seed_applies_single_word_replacements() {
         let dictionary = vec![DictionaryEntry {
             phrase: "Barolo".into(),
@@ -449,27 +367,6 @@ mod tests {
         assert_eq!(
             apply_dictionary_seed("I visited Barolo.", &dictionary),
             "I visited Boorloo."
-        );
-    }
-
-    #[test]
-    fn dictionary_examples_drop_english_carrier_for_non_english() {
-        let input = PostProcessInput {
-            raw_text: "...".into(),
-            style_preset: Arc::new(StylePreset::minimal()),
-            app_category: None,
-            dictionary: vec![DictionaryEntry {
-                phrase: "Bordeaux".into(),
-                replacement: "Bordo".into(),
-                priority: 10,
-            }],
-            language: "fr".into(),
-            correction_needed: true,
-        };
-        let examples = dictionary_examples(&input);
-        assert_eq!(
-            examples,
-            vec![("Bordeaux".to_string(), "Bordo".to_string())]
         );
     }
 

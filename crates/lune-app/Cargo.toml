@@ -86,6 +86,10 @@ name = "gate_sweep"
 path = "../../benchmarks/gate_sweep.rs"
 
 [[example]]
+name = "dict_carrier_ab"
+path = "../../benchmarks/dict_carrier_ab.rs"
+
+[[example]]
 name = "homophone_pipeline"
 path = "../../benchmarks/homophone_pipeline.rs"
 

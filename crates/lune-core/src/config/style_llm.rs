@@ -20,8 +20,7 @@ Make the smallest edits that yield natural written text.\n\n\
 Apply when clearly warranted:\n\
 - Fix misspellings, fused or split words, and obvious ASR substitutions.\n\
 - Fix homophones only when the surrounding context makes the right word unambiguous.\n\
-- Insert short missing function words and fix simple agreement, plurals, and contractions.\n\
-- If a dictionary list is provided below, use the exact target spelling for any matched phrase.\n\n\
+- Insert short missing function words and fix simple agreement, plurals, and contractions.\n\n\
 Punctuation rules:\n\
 - Preserve any punctuation already present in the input.\n\
 - Inside one sentence, use commas for clause boundaries, list separators, and natural pauses — not periods.\n\
@@ -180,18 +179,24 @@ impl StylePreset {
         let mut prompt = String::with_capacity(512);
         let _ = writeln!(
             prompt,
-            "Rewrite the transcription with the following style. Output only the rewritten text."
+            "Rewrite the transcript below in the given style. Output only your rewritten version of that transcript. The examples illustrate the style only — never copy, repeat, or merge them into your answer."
         );
         let _ = writeln!(prompt, "\nStyle: {}", self.name);
         let _ = writeln!(prompt, "Rules: {}", self.style_instructions);
         if !self.few_shot_pairs.is_empty() {
-            let _ = writeln!(prompt, "\nExamples:");
+            let _ = writeln!(
+                prompt,
+                "\nExamples (style illustration only — do not echo these):"
+            );
             for (input, output) in &self.few_shot_pairs {
                 let _ = writeln!(prompt, "Input: \"{input}\"");
                 let _ = writeln!(prompt, "Output: \"{output}\"");
             }
         }
-        let _ = writeln!(prompt, "\nTranscript:");
+        let _ = writeln!(
+            prompt,
+            "\nNow rewrite only this transcript in the style above:"
+        );
         let _ = writeln!(prompt, "{corrected_text}");
         prompt.push_str("\n/no_think");
         prompt
@@ -323,10 +328,6 @@ impl StylePreset {
                 (
                     "The user profile class needs a get by ID method that returns an optional user.".into(),
                     "The `UserProfile` class needs a `get_by_id` method that returns an `Optional<User>`.".into(),
-                ),
-                (
-                    "If the boolean is true then we push to the state array and trigger a re-render.".into(),
-                    "If the `boolean` is `true` then we push to the `state` array and trigger a re-render.".into(),
                 ),
             ],
             skip_styling: false,
