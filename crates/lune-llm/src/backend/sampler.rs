@@ -21,15 +21,24 @@ pub struct SamplingParams {
 }
 
 impl Default for SamplingParams {
+    /// Penalized greedy: deterministic argmax (temperature 0, top_k 1) taken
+    /// *after* the repetition/presence penalties reshape the logits.
+    ///
+    /// A grid search over the sampling space (`benchmarks/sampling_tune.rs`)
+    /// found no config that reliably beats greedy on correction quality — a
+    /// sampled generation was ~3x more likely to hurt than help. So we keep
+    /// greedy's quality and determinism, while the mild penalties still demote
+    /// already-emitted tokens to break any repeat/echo loop. (rep > ~1.1 starts
+    /// to degrade quality, so 1.1 is the ceiling here.)
     fn default() -> Self {
         Self {
-            temperature: 0.7,
-            top_p: 0.8,
-            top_k: 20,
+            temperature: 0.0,
+            top_p: 1.0,
+            top_k: 1,
             min_p: 0.0,
-            repetition_penalty: 1.0,
+            repetition_penalty: 1.1,
             frequency_penalty: 0.0,
-            presence_penalty: 1.5,
+            presence_penalty: 0.5,
             eos_token_id: None,
             stop_token_ids: Box::new([]),
         }

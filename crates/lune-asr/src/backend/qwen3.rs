@@ -51,6 +51,21 @@ const AUDIO_END: i64 = 151_670; // <|audio_end|>
 /// increases hallucination and translation drift on noisy audio.
 const SYSTEM_PROMPT: &str = "You are an ASR engine. Transcribe spoken audio exactly in the spoken language. Do not translate. Do not add words not clearly present.";
 
+/// True when `text` is the ASR model echoing its own system prompt instead of
+/// transcribing (happens on silent / very short / noisy audio). Genuine speech
+/// essentially never opens this way. Keep these openers in sync with
+/// `SYSTEM_PROMPT`.
+fn is_prompt_echo(text: &str) -> bool {
+    let t = text.trim_start();
+    [
+        "You are an ASR engine",
+        "You are an automatic speech recognition",
+        "Transcribe spoken audio",
+    ]
+    .iter()
+    .any(|opener| t.starts_with(opener))
+}
+
 /// Maximum audio buffer (5 min at 16 kHz).
 const MAX_WINDOW_SAMPLES: usize = 300 * whisper::SAMPLE_RATE;
 
@@ -1163,10 +1178,14 @@ impl Qwen3AsrBackend {
         if !parsed_text.is_empty() {
             text = parsed_text;
         }
-        for prefix in ["You are an automatic speech recognition system"] {
-            if let Some(rest) = text.strip_prefix(prefix) {
-                text = rest.trim_start_matches(['.', '\n', ' ']).to_string();
-            }
+        // Drop a pure prompt echo: on silent / very short / noisy audio the
+        // model sometimes regurgitates its own system instruction instead of
+        // transcribing. The previous guard stripped a stale prefix ("You are an
+        // automatic speech recognition system") that never matched the real
+        // SYSTEM_PROMPT ("You are an ASR engine …"); drop the whole segment
+        // instead, since the model stutters ("Do do not …") mid-regurgitation.
+        if is_prompt_echo(&text) {
+            return (String::new(), detected_language, None, None, Vec::new());
         }
 
         let confs: Vec<f32> = content.iter().map(|(_, c, _)| *c).collect();
@@ -1359,6 +1378,19 @@ fn lock_err<T>(what: &str, e: std::sync::PoisonError<T>) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn prompt_echo_detected_and_real_speech_kept() {
+        // The exact leak the user hit, including the model's "Do do" stutter.
+        assert!(is_prompt_echo(
+            "You are an ASR engine. Transcribe spoken audio exactly in the spoken language. Do do not add words not clearly present."
+        ));
+        assert!(is_prompt_echo(SYSTEM_PROMPT));
+        // Genuine transcripts must be kept.
+        assert!(!is_prompt_echo("You are amazing at this."));
+        assert!(!is_prompt_echo("Transcribe the meeting notes for me."));
+        assert!(!is_prompt_echo("Hello world."));
+    }
 
     #[test]
     fn parse_auto_output_with_asr_text_marker() {

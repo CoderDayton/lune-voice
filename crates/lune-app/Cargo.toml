@@ -95,6 +95,14 @@ name = "dict_carrier_ab"
 path = "../../benchmarks/dict_carrier_ab.rs"
 
 [[example]]
+name = "sampling_ab"
+path = "../../benchmarks/sampling_ab.rs"
+
+[[example]]
+name = "sampling_tune"
+path = "../../benchmarks/sampling_tune.rs"
+
+[[example]]
 name = "homophone_pipeline"
 path = "../../benchmarks/homophone_pipeline.rs"
 

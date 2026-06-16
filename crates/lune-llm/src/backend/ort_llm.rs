@@ -298,23 +298,12 @@ impl OrtStyleLlm {
 
         let params = probe_model_params(&session, &tokenizer);
 
-        // Transcript correction is a copy-edit task, not chat: decode greedily
-        // and deterministically. The chat defaults (temp 0.7, top-p 0.8,
-        // presence_penalty 1.5) are actively destructive here — presence
-        // penalty in particular punishes the model for re-emitting the input's
-        // own tokens, forcing paraphrase drift that grows with utterance
-        // length. top_k=1 + identity penalties also hits the sampler's fused
-        // argmax fast path (no softmax workspace per step).
+        // Use the model's tuned sampling defaults (see `SamplingParams::default`);
+        // only the stop tokens come from the probed model.
         let sampling_params = super::sampler::SamplingParams {
-            temperature: 1.0,
-            top_p: 1.0,
-            top_k: 1,
-            min_p: 0.0,
-            repetition_penalty: 1.0,
-            frequency_penalty: 0.0,
-            presence_penalty: 0.0,
             eos_token_id: params.eos_ids.first().copied(),
             stop_token_ids: params.eos_ids.clone().into_boxed_slice(),
+            ..Default::default()
         };
 
         let kv_cache = super::kv_cache::KvCache::new(super::kv_cache::KvCacheConfig {
@@ -348,6 +337,18 @@ impl OrtStyleLlm {
             cached_prefix_hash: std::sync::Mutex::new(0),
             use_gpu: gpu_active,
         })
+    }
+
+    /// Current decode sampling params — read to derive a variant that keeps the
+    /// model-probed EOS/stop tokens (used by the `sampling_ab` benchmark).
+    pub fn sampling_params(&self) -> &super::sampler::SamplingParams {
+        &self.sampling_params
+    }
+
+    /// Override the decode sampling params (tuning / benchmarks). The caller
+    /// must keep valid EOS/stop tokens or decode won't terminate.
+    pub fn set_sampling_params(&mut self, params: super::sampler::SamplingParams) {
+        self.sampling_params = params;
     }
 
     pub fn user_prompt_with_examples(
