@@ -21,9 +21,7 @@ export function StyleHero({ preset, onEdit, onView }: StyleHeroProps) {
   ];
 
   return (
-    <section className="relative overflow-hidden rounded-box border border-primary/30 bg-linear-to-br from-primary/12 via-surface-card to-surface-card p-5 shadow-glow sm:p-6">
-      <div className="pointer-events-none absolute -top-20 -right-16 size-52 rounded-full bg-primary/15 blur-3xl" />
-
+    <section className="relative overflow-hidden rounded-box border border-primary/30 bg-surface-card p-5 shadow-glow sm:p-6">
       <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-start gap-4">
           <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/20 text-primary shadow-glow">

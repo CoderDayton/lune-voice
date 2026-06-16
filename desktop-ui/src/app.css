@@ -454,9 +454,9 @@
     background: oklch(0.5 0 0 / 0.25);
   }
 
-  /* Cards — defined by border + bg, not by drop shadow. Shadows are
-     reserved for genuinely floating elements (popovers, modals, the pill).
-     Interactive cards lift only via border-strong + a subtle bg shift. */
+  /* Default cards are defined by border + bg, not by drop shadow. Shadows are
+     reserved for genuinely floating elements, persistent command surfaces, and
+     deliberately featured cards such as active style treatments. */
   .card {
     transition: background-color var(--duration-base) var(--ease-standard),
                 border-color var(--duration-base) var(--ease-standard),

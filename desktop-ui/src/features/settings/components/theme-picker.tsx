@@ -15,25 +15,25 @@ const THEME_PREVIEWS: Record<
   { bg: string; text: string; border: string; colors: string[] }
 > = {
   lune: {
-    bg: 'oklch(0.145 0.013 238)',
-    text: 'oklch(0.93 0.007 238)',
-    border: 'oklch(0.90 0.008 238 / 0.20)',
+    bg: 'oklch(0.135 0 0)',
+    text: 'oklch(0.94 0 0)',
+    border: 'oklch(1 0 0 / 0.16)',
     colors: [
-      'oklch(0.74 0.018 245)',
-      'oklch(0.62 0.025 250)',
-      'oklch(0.68 0.035 70)',
-      'oklch(0.24 0.014 238)',
+      'oklch(0.74 0.14 295)',
+      'oklch(0.62 0.07 295)',
+      'oklch(0.74 0.10 185)',
+      'oklch(0.245 0 0)',
     ],
   },
   'lune-light': {
-    bg: 'oklch(0.985 0.006 225)',
-    text: 'oklch(0.20 0.016 235)',
-    border: 'oklch(0.20 0.010 265 / 0.16)',
+    bg: 'oklch(0.99 0 0)',
+    text: 'oklch(0.20 0 0)',
+    border: 'oklch(0 0 0 / 0.20)',
     colors: [
-      'oklch(0.42 0.020 245)',
-      'oklch(0.50 0.024 250)',
-      'oklch(0.50 0.040 70)',
-      'oklch(0.88 0.008 225)',
+      'oklch(0.50 0.18 295)',
+      'oklch(0.48 0.10 295)',
+      'oklch(0.50 0.13 185)',
+      'oklch(0.88 0 0)',
     ],
   },
   light: {
@@ -381,10 +381,10 @@ export function ThemePicker() {
                   <span className="text-sm font-medium">{t`System`}</span>
                   <div className="flex gap-1">
                     {[
-                      'oklch(0.74 0.018 245)',
-                      'oklch(0.62 0.025 250)',
-                      'oklch(0.68 0.035 70)',
-                      'oklch(0.88 0.008 225)',
+                      'oklch(0.74 0.14 295)',
+                      'oklch(0.62 0.07 295)',
+                      'oklch(0.74 0.10 185)',
+                      'oklch(0.88 0 0)',
                     ].map((color) => (
                       <div
                         key={color}

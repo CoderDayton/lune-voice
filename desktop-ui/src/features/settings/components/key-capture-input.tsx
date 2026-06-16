@@ -83,12 +83,12 @@ export function KeyCaptureInput({
         aria-invalid={validationError ? 'true' : undefined}
         aria-describedby={validationError ? 'key-capture-error' : undefined}
         className={cn(
-          'inline-flex h-9 min-w-28 select-none items-center justify-center gap-2 rounded-lg border px-4 font-mono text-sm font-semibold tracking-[0.02em] transition-[background,border-color,box-shadow,color,transform]',
+          'inline-flex h-9 min-w-28 select-none items-center justify-center gap-2 rounded-field border px-4 font-mono text-sm font-semibold tracking-[0.02em] transition-[background,border-color,box-shadow,color,transform]',
           'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
           'sm:min-w-36',
           listening
-            ? 'animate-pulse border-primary/55 bg-primary/18 text-content-strong shadow-[inset_0_1px_0_oklch(1_0_0_/_0.12)]'
-            : 'border-surface-border-strong bg-surface-elevated text-content hover:border-surface-border-strong hover:bg-surface-card-hover active:translate-y-px shadow-[inset_0_1px_0_oklch(1_0_0_/_0.08),0_1px_2px_oklch(0_0_0_/_0.28)]',
+            ? 'animate-pulse border-primary/55 bg-primary/18 text-content-strong shadow-glow'
+            : 'border-surface-border-strong bg-surface-elevated text-content shadow-soft hover:border-surface-border-strong hover:bg-surface-card-hover active:translate-y-px',
           disabled && 'cursor-not-allowed opacity-50',
         )}
       >
