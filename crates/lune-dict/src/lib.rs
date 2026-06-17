@@ -1,10 +1,10 @@
 pub mod caprate;
 pub mod commands;
 pub mod corrector;
+pub(crate) mod crc;
+pub mod edit_calib;
 pub mod formatting;
 pub mod freq;
-pub mod homophone;
-pub mod homophone_calib;
 pub mod lexicon;
 pub mod ngram;
 pub mod vocab;

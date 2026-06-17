@@ -18,12 +18,28 @@ use std::sync::Arc;
 /// - Graceful degradation: raw text on any LLM failure
 pub struct CorrectionPipeline {
     llm: Arc<dyn LlmService>,
+    /// Open-vocab edit gate, refreshed at runtime from recomputed calibration.
+    /// Disabled by default (cold start) → the merge is byte-identical to the
+    /// pure rule-based validator.
+    edit_gate: std::sync::RwLock<crate::backend::ort_llm::EditGate>,
 }
 
 impl CorrectionPipeline {
-    /// Create a new pipeline wrapping an LLM service.
+    /// Create a new pipeline wrapping an LLM service (edit gate disabled).
     pub fn new(llm: Arc<dyn LlmService>) -> Self {
-        Self { llm }
+        Self {
+            llm,
+            edit_gate: std::sync::RwLock::new(crate::backend::ort_llm::EditGate::disabled()),
+        }
+    }
+
+    /// Refresh the open-vocab edit gate from a recomputed calibration. Pass the
+    /// channel's `enabled` flag and conformal `tau`; cold-start callers pass
+    /// `enabled = false` to keep the gate inert.
+    pub fn update_edit_gate(&self, enabled: bool, tau: f32) {
+        if let Ok(mut g) = self.edit_gate.write() {
+            *g = crate::backend::ort_llm::EditGate { enabled, tau };
+        }
     }
 
     /// Build the base system prompt with language and dictionary substitution.
@@ -62,39 +78,49 @@ impl TextPostProcessor for CorrectionPipeline {
         // punctuation). Styling below runs either way, and a FAILED
         // correction no longer aborts the pipeline: styling still gets its
         // chance on the raw text.
+        let mut edit_observations: Vec<(bool, Option<f32>, bool)> = Vec::new();
         let mut text = if !input.correction_needed {
             tracing::debug!("correction pass skipped by gate; styling only");
             seeded_raw_text.clone()
         } else {
             let system = self.build_system_prompt(input);
             let user = self.build_correction_prompt(input, &seeded_raw_text);
-            match self.llm.complete(&system, &user).await {
-                Ok(corrected) => {
+            // `complete_scored` carries the per-output-word decode margins that
+            // the open-vocab edit gate needs; backends without token access
+            // return empty margins, leaving the gate inert.
+            match self.llm.complete_scored(&system, &user).await {
+                Ok((corrected, word_margins)) => {
                     tracing::debug!(corrected_len = corrected.len(), "correction pass complete");
                     // Hardening: number-space repair + forbidden-meta-output
-                    // guard + alignment-based merge against the raw input.
-                    // Previously duplicated in OrtStyleLlm::transform; lifted
-                    // here so every backend benefits.
+                    // guard + calibrated alignment-based merge against the raw
+                    // input.
                     let corrected = crate::prompt::fix_all_number_spaces(&corrected);
                     if crate::backend::ort_llm::contains_forbidden_output(&corrected) {
                         tracing::warn!(output = %corrected, "LLM produced meta-text, falling back to raw");
                         seeded_raw_text.clone()
                     } else {
-                        let merged = crate::backend::ort_llm::validate_and_merge(
+                        let gate = self
+                            .edit_gate
+                            .read()
+                            .map(|g| *g)
+                            .unwrap_or_else(|_| crate::backend::ort_llm::EditGate::disabled());
+                        let (merged, obs) = crate::backend::ort_llm::validate_and_merge_scored(
                             &seeded_raw_text,
                             &corrected,
                             &input.language,
+                            &word_margins,
+                            gate,
                         );
-                        // Make validator rejections observable: a downstream
-                        // "LLM made no changes" can mean the model proposed
-                        // nothing OR everything it proposed was reverted here
-                        // — opposite tuning problems.
+                        edit_observations = obs;
+                        // Make merge adjustments observable: a downstream "LLM
+                        // made no changes" can mean the model proposed nothing
+                        // OR everything it proposed was reverted here.
                         if merged != corrected {
                             tracing::info!(
                                 fully_reverted = merged == seeded_raw_text,
                                 proposed_len = corrected.len(),
                                 merged_len = merged.len(),
-                                "validator rejected some LLM edits"
+                                "edit gate / validator adjusted LLM edits"
                             );
                         }
                         merged
@@ -132,6 +158,7 @@ impl TextPostProcessor for CorrectionPipeline {
         Ok(PostProcessOutput {
             cleaned_text: text,
             metadata: None,
+            edit_observations,
         })
     }
 }
@@ -329,6 +356,84 @@ mod tests {
 
         let output = pipeline.transform(&input).await.unwrap();
         assert_eq!(output.cleaned_text, "Styled text");
+    }
+
+    /// Mock that returns a fixed correction plus per-word decode margins.
+    struct MarginLlm {
+        correction: String,
+        margins: Vec<(&'static str, f32)>,
+    }
+
+    #[async_trait]
+    impl LlmService for MarginLlm {
+        async fn complete(&self, _system: &str, _user: &str) -> Result<String> {
+            Ok(self.correction.clone())
+        }
+        async fn complete_scored(
+            &self,
+            _system: &str,
+            _user: &str,
+        ) -> Result<(String, Vec<lune_core::llm::WordMargin>)> {
+            let wm = self
+                .margins
+                .iter()
+                .map(|(w, m)| lune_core::llm::WordMargin {
+                    word: (*w).to_string(),
+                    margin: *m,
+                })
+                .collect();
+            Ok((self.correction.clone(), wm))
+        }
+    }
+
+    fn margin_input() -> PostProcessInput {
+        PostProcessInput {
+            // "cat"→"dog" is unrelated (rules reject it): a clean gate target.
+            raw_text: "the cat sat".into(),
+            style_preset: Arc::new(StylePreset::minimal()),
+            app_category: None,
+            dictionary: vec![],
+            language: "en".into(),
+            correction_needed: true,
+        }
+    }
+
+    #[tokio::test]
+    async fn edit_gate_disabled_keeps_rule_rejection() {
+        let mock = Arc::new(MarginLlm {
+            correction: "the dog sat".into(),
+            margins: vec![("the", 9.0), ("dog", 9.0), ("sat", 9.0)],
+        });
+        let pipeline = CorrectionPipeline::new(mock);
+        // Default gate is disabled → the unrelated substitution is reverted.
+        let out = pipeline.transform(&margin_input()).await.unwrap();
+        assert_eq!(out.cleaned_text, "the cat sat");
+        // Observations are still recorded (labelled vs the rule decision).
+        assert!(!out.edit_observations.is_empty());
+    }
+
+    #[tokio::test]
+    async fn edit_gate_enabled_admits_high_margin_edit() {
+        let mock = Arc::new(MarginLlm {
+            correction: "the dog sat".into(),
+            margins: vec![("the", 9.0), ("dog", 9.0), ("sat", 9.0)],
+        });
+        let pipeline = CorrectionPipeline::new(mock);
+        pipeline.update_edit_gate(true, 1.0); // tau=1.0; "dog" margin 9.0 clears it
+        let out = pipeline.transform(&margin_input()).await.unwrap();
+        assert_eq!(out.cleaned_text, "the dog sat");
+    }
+
+    #[tokio::test]
+    async fn edit_gate_enabled_rejects_low_margin_edit() {
+        let mock = Arc::new(MarginLlm {
+            correction: "the dog sat".into(),
+            margins: vec![("the", 9.0), ("dog", 0.1), ("sat", 9.0)],
+        });
+        let pipeline = CorrectionPipeline::new(mock);
+        pipeline.update_edit_gate(true, 1.0); // "dog" margin 0.1 < tau → reverted
+        let out = pipeline.transform(&margin_input()).await.unwrap();
+        assert_eq!(out.cleaned_text, "the cat sat");
     }
 
     #[tokio::test]

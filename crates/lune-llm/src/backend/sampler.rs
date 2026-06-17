@@ -49,12 +49,17 @@ impl Default for SamplingParams {
 pub struct DecodeState {
     pub generated: Vec<u32>,
     pub token_counts: HashMap<u32, u16>,
+    /// Per-emitted-token decision margin, populated only when the caller opts
+    /// in (see `OrtStyleLlm::generate_scored`). Stays empty on the default
+    /// path. Invariant: `margins.is_empty() || margins.len() == generated.len()`.
+    pub margins: Vec<f32>,
 }
 
 impl DecodeState {
     pub fn clear(&mut self) {
         self.generated.clear();
         self.token_counts.clear();
+        self.margins.clear();
     }
 
     pub fn push(&mut self, token_id: u32) {
@@ -450,4 +455,322 @@ fn argmax_finite(logits: &[f32]) -> usize {
         }
     }
     best_finite_i.unwrap_or_else(|| argmax(logits))
+}
+
+// ─── scored decode: emit the per-token decision margin alongside the token ───
+//
+// The margin is `logit(emitted) − max logit(other)` in logit space, on the
+// exact logits used for the decision. It is observational: every scored path
+// below selects the *same* token as its unscored twin for the same inputs and
+// rng (enforced by `selection_identity` test). The downstream conformal gate
+// only uses margin *ordering*, so no normalization is needed.
+
+/// Margin when there is no runner-up (single finite candidate): treated as
+/// maximally confident by the calibrator.
+const SATURATED_MARGIN: f32 = 1.0e4;
+
+fn margin_or_saturated(top1: f32, top2: f32) -> f32 {
+    if top2.is_finite() {
+        top1 - top2
+    } else {
+        SATURATED_MARGIN
+    }
+}
+
+/// Top-1 index + margin, raw (no finiteness filter) — mirrors [`argmax`].
+fn argmax2_raw(logits: &[f32]) -> (usize, f32) {
+    let (mut bi, mut b1, mut b2) = (0usize, f32::NEG_INFINITY, f32::NEG_INFINITY);
+    for (i, &v) in logits.iter().enumerate() {
+        if v > b1 {
+            b2 = b1;
+            b1 = v;
+            bi = i;
+        } else if v > b2 {
+            b2 = v;
+        }
+    }
+    (bi, margin_or_saturated(b1, b2))
+}
+
+/// Top-1 index + margin, finite-aware — mirrors [`argmax_finite`].
+fn argmax2_finite(logits: &[f32]) -> (usize, f32) {
+    let (mut bi, mut b1, mut b2) = (0usize, f32::NEG_INFINITY, f32::NEG_INFINITY);
+    let mut any = false;
+    for (i, &v) in logits.iter().enumerate() {
+        if !v.is_finite() {
+            continue;
+        }
+        any = true;
+        if v > b1 {
+            b2 = b1;
+            b1 = v;
+            bi = i;
+        } else if v > b2 {
+            b2 = v;
+        }
+    }
+    if !any {
+        return (argmax(logits), SATURATED_MARGIN);
+    }
+    (bi, margin_or_saturated(b1, b2))
+}
+
+fn argmax2_last_logits_f32(shape: &[i64], data: &[f32]) -> Result<(u32, f32)> {
+    let range = last_logits_range(shape, data.len())?;
+    let (idx, m) = argmax2_finite(&data[range]);
+    Ok((idx as u32, m))
+}
+
+fn argmax2_last_logits_f16(shape: &[i64], data: &[f16]) -> Result<(u32, f32)> {
+    let range = last_logits_range(shape, data.len())?;
+    let slice = &data[range];
+    let (mut bi, mut b1, mut b2) = (0usize, f32::NEG_INFINITY, f32::NEG_INFINITY);
+    let mut any = false;
+    for (i, &v) in slice.iter().enumerate() {
+        let f = v.to_f32();
+        if !f.is_finite() {
+            continue;
+        }
+        any = true;
+        if f > b1 {
+            b2 = b1;
+            b1 = f;
+            bi = i;
+        } else if f > b2 {
+            b2 = f;
+        }
+    }
+    if !any {
+        // Mirror argmax_last_logits_f16's non-finite fallback (raw argmax).
+        let mut max_idx = 0usize;
+        let mut max_val = f32::NEG_INFINITY;
+        for (i, &v) in slice.iter().enumerate() {
+            let f = v.to_f32();
+            if f > max_val {
+                max_val = f;
+                max_idx = i;
+            }
+        }
+        return Ok((max_idx as u32, SATURATED_MARGIN));
+    }
+    Ok((bi as u32, margin_or_saturated(b1, b2)))
+}
+
+/// Scored twin of [`sample_last_token`]: returns `(token_id, decision_margin)`.
+/// Selects identically to `sample_last_token` for the same value/params/state/rng.
+pub fn sample_last_token_scored(
+    value: &DynValue,
+    params: &SamplingParams,
+    state: &DecodeState,
+    ws: &mut SamplerWorkspace,
+    rng: &mut impl Rng,
+) -> Result<(u32, f32)> {
+    if params.top_k == 1 && penalties_are_identity(params) {
+        if let Ok((shape, data)) = value.try_extract_tensor::<f32>() {
+            return argmax2_last_logits_f32(shape.as_ref(), data);
+        }
+        let (shape, data) = value.try_extract_tensor::<f16>().map_err(e)?;
+        return argmax2_last_logits_f16(shape.as_ref(), data);
+    }
+
+    if let Ok((shape, data)) = value.try_extract_tensor::<f32>() {
+        copy_last_logits_f32(shape.as_ref(), data, &mut ws.last_logits)?;
+        return sample_from_logits_scored(
+            &mut ws.last_logits,
+            params,
+            state,
+            &mut ws.probs,
+            &mut ws.kept,
+            rng,
+        );
+    }
+
+    let (shape, data) = value.try_extract_tensor::<f16>().map_err(e)?;
+    copy_last_logits_f16(shape.as_ref(), data, &mut ws.last_logits)?;
+    sample_from_logits_scored(
+        &mut ws.last_logits,
+        params,
+        state,
+        &mut ws.probs,
+        &mut ws.kept,
+        rng,
+    )
+}
+
+/// Scored twin of [`sample_from_logits`]. Replays the exact same control flow
+/// and rng draws (so the chosen id matches), then derives the emitted token's
+/// margin against the best alternative.
+fn sample_from_logits_scored(
+    logits: &mut [f32],
+    params: &SamplingParams,
+    state: &DecodeState,
+    probs: &mut Vec<f32>,
+    kept: &mut Vec<Candidate>,
+    rng: &mut impl Rng,
+) -> Result<(u32, f32)> {
+    apply_penalties(logits, state, params);
+
+    if params.temperature <= 0.0 {
+        let (idx, m) = argmax2_raw(logits);
+        return Ok((idx as u32, m));
+    }
+
+    build_candidates(logits, params.top_k, kept);
+
+    if kept.is_empty() {
+        let (idx, m) = argmax2_raw(logits);
+        return Ok((idx as u32, m));
+    }
+    if kept.len() == 1 {
+        return Ok((kept[0].id, SATURATED_MARGIN));
+    }
+
+    softmax_candidates(kept, params.temperature, probs);
+
+    if params.min_p > 0.0 {
+        apply_min_p(probs, params.min_p);
+    }
+    if params.top_p > 0.0 && params.top_p < 1.0 {
+        apply_top_p(probs, params.top_p);
+    }
+    renormalize(probs);
+
+    // `kept` is sorted by descending logit (build_candidates), so the emitted
+    // token's best alternative is kept[0] (or kept[1] when it *is* kept[0]).
+    let emitted_pos = if probs.iter().all(|&p| p <= 0.0 || !p.is_finite()) {
+        0 // mirrors `return Ok(kept[0].id)`
+    } else {
+        let r = rng.random::<f32>();
+        let mut cdf = 0.0f32;
+        let mut pos = 0usize;
+        for (i, &p) in probs.iter().enumerate() {
+            cdf += p;
+            if r <= cdf {
+                pos = i;
+                break;
+            }
+        }
+        pos // CDF-underflow fallback lands on 0, matching kept.first()
+    };
+
+    let emit_logit = kept[emitted_pos].logit;
+    let best_other = if emitted_pos == 0 {
+        kept.get(1).map(|c| c.logit)
+    } else {
+        Some(kept[0].logit)
+    };
+    let margin = best_other.map_or(SATURATED_MARGIN, |o| emit_logit - o);
+    Ok((kept[emitted_pos].id, margin))
+}
+
+#[cfg(test)]
+mod scored_tests {
+    use super::*;
+    use rand::SeedableRng;
+    use rand::rngs::StdRng;
+
+    fn lcg(seed: &mut u64) -> f32 {
+        *seed = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        ((*seed >> 33) as f32 / (1u64 << 31) as f32) - 1.0
+    }
+
+    fn random_logits(seed: u64, n: usize) -> Vec<f32> {
+        let mut s = seed;
+        (0..n).map(|_| lcg(&mut s) * 8.0).collect()
+    }
+
+    #[test]
+    fn argmax2_matches_argmax() {
+        for seed in 0..200u64 {
+            let v = random_logits(seed + 1, 64);
+            assert_eq!(
+                argmax2_raw(&v).0,
+                argmax(&v),
+                "raw idx mismatch seed {seed}"
+            );
+            assert_eq!(
+                argmax2_finite(&v).0,
+                argmax_finite(&v),
+                "finite idx mismatch seed {seed}"
+            );
+        }
+    }
+
+    #[test]
+    fn margin_equals_top1_minus_top2() {
+        for seed in 0..200u64 {
+            let v = random_logits(seed + 7, 48);
+            let mut sorted = v.clone();
+            sorted.sort_by(|a, b| b.total_cmp(a));
+            let (_, m) = argmax2_raw(&v);
+            assert!(
+                (m - (sorted[0] - sorted[1])).abs() < 1e-4,
+                "margin mismatch seed {seed}"
+            );
+        }
+    }
+
+    #[test]
+    fn finite_aware_skips_inf_and_nan() {
+        let v = vec![f32::NEG_INFINITY, 2.0, f32::NAN, 5.0, 1.0];
+        assert_eq!(argmax2_finite(&v).0, 3);
+        assert!((argmax2_finite(&v).1 - (5.0 - 2.0)).abs() < 1e-4);
+    }
+
+    #[test]
+    fn single_finite_candidate_saturates() {
+        let v = vec![f32::NEG_INFINITY, 3.0, f32::NEG_INFINITY];
+        assert_eq!(argmax2_finite(&v).1, SATURATED_MARGIN);
+    }
+
+    /// The core no-downgrade proof: the scored sampler picks the same token as
+    /// the plain sampler across greedy and sampling configs, for the same rng.
+    #[test]
+    fn selection_identity() {
+        let state = DecodeState::default();
+        let configs = [
+            SamplingParams::default(), // penalized greedy
+            SamplingParams {
+                temperature: 0.0,
+                top_k: 1,
+                repetition_penalty: 1.0,
+                presence_penalty: 0.0,
+                frequency_penalty: 0.0,
+                ..SamplingParams::default()
+            }, // pure greedy fast path
+            SamplingParams {
+                temperature: 0.8,
+                top_k: 40,
+                top_p: 0.95,
+                min_p: 0.02,
+                ..SamplingParams::default()
+            }, // sampling
+        ];
+        for cfg in &configs {
+            for seed in 0..300u64 {
+                let base = random_logits(seed + 11, 128);
+                let mut a = base.clone();
+                let mut b = base.clone();
+                let mut wa = SamplerWorkspace::default();
+                let mut wb = SamplerWorkspace::default();
+                let mut ra = StdRng::seed_from_u64(seed);
+                let mut rb = StdRng::seed_from_u64(seed);
+                let plain =
+                    sample_from_logits(&mut a, cfg, &state, &mut wa.probs, &mut wa.kept, &mut ra)
+                        .unwrap();
+                let (scored, _m) = sample_from_logits_scored(
+                    &mut b,
+                    cfg,
+                    &state,
+                    &mut wb.probs,
+                    &mut wb.kept,
+                    &mut rb,
+                )
+                .unwrap();
+                assert_eq!(plain, scored, "selection diverged: cfg={cfg:?} seed={seed}");
+            }
+        }
+    }
 }

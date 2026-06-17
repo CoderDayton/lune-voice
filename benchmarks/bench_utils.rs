@@ -541,6 +541,19 @@ where
 /// Build via [`BenchmarkHarness::builder()`]. Owns the tokio runtime, loaded
 /// ASR and LLM backends, and the pre-filtered fixture list. All fields are
 /// `pub` for direct use in benchmark code.
+/// `GATE=<tau>` enables the open-vocab LLM-edit gate at threshold `tau` (any
+/// parseable f32, including 0 to admit every above-zero-margin edit); unset,
+/// empty, or `off` leaves it disabled. The gate lives in the correction
+/// pipeline, so every benchmark routing through `harness.llm` honours it.
+fn edit_gate_tau() -> Option<f32> {
+    let v = std::env::var("GATE").ok()?;
+    let v = v.trim();
+    if v.is_empty() || v.eq_ignore_ascii_case("off") {
+        return None;
+    }
+    v.parse::<f32>().ok()
+}
+
 pub struct BenchmarkHarness {
     pub rt: tokio::runtime::Runtime,
     pub asr: Arc<lune_asr::AsrRegistry>,
@@ -681,9 +694,16 @@ impl HarnessBuilder {
                     use_gpu: has_gpu,
                     ..Default::default()
                 }) {
-                    Ok(ort_llm) => Arc::new(lune_llm::CorrectionPipeline::new(
-                        Arc::new(ort_llm) as Arc<dyn lune_core::llm::LlmService>
-                    )),
+                    Ok(ort_llm) => {
+                        let pipeline = lune_llm::CorrectionPipeline::new(
+                            Arc::new(ort_llm) as Arc<dyn lune_core::llm::LlmService>
+                        );
+                        if let Some(tau) = edit_gate_tau() {
+                            pipeline.update_edit_gate(true, tau);
+                            eprintln!("[bench] LLM-edit gate ENABLED (tau={tau})");
+                        }
+                        Arc::new(pipeline) as Arc<dyn TextPostProcessor>
+                    }
                     Err(e) => {
                         eprintln!("[warn] LLM load failed ({e}), using NullPostProcessor");
                         Arc::new(lune_llm::NullPostProcessor::new())

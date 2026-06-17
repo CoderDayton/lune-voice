@@ -83,8 +83,12 @@ name = "vram_growth"
 path = "../../benchmarks/vram_growth.rs"
 
 [[example]]
-name = "homophone_tune"
-path = "../../benchmarks/homophone_tune.rs"
+name = "llm_edit_gate"
+path = "../../benchmarks/llm_edit_gate.rs"
+
+[[example]]
+name = "seed_edit_calib"
+path = "../../benchmarks/seed_edit_calib.rs"
 
 [[example]]
 name = "gate_sweep"
@@ -101,10 +105,6 @@ path = "../../benchmarks/sampling_ab.rs"
 [[example]]
 name = "sampling_tune"
 path = "../../benchmarks/sampling_tune.rs"
-
-[[example]]
-name = "homophone_pipeline"
-path = "../../benchmarks/homophone_pipeline.rs"
 
 [[example]]
 name = "vad_tune"

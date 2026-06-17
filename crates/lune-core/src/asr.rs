@@ -114,15 +114,6 @@ pub enum AsrBackendKind {
 }
 
 impl AsrBackendKind {
-    /// Recommended `max_segment_ms` for the pipeline.
-    ///
-    /// All backends handle long audio natively. This is a safety ceiling,
-    /// not an encoder limit.
-    #[deprecated(note = "use AsrRegistry::pipeline_config().max_segment_ms instead")]
-    pub fn suggested_max_segment_ms(&self) -> u32 {
-        30_000
-    }
-
     /// Short stable identifier used for per-backend filenames like
     /// `calibrator_{slug}.json`. Must stay lowercase, ASCII, no spaces.
     ///

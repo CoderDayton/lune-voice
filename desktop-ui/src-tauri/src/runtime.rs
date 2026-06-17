@@ -834,7 +834,8 @@ async fn build_pipeline(
     let asr = AsrRegistry::from_config(&settings.asr_backend, settings.device, &paths.models_dir())
         .map_err(|e| format!("build asr backend: {e}"))?;
     let (llm_service, local_llm) = build_llm_service(&settings, &paths.models_dir()).await?;
-    let post_processor = Arc::new(lune_llm::CorrectionPipeline::new(Arc::clone(&llm_service)));
+    let correction = Arc::new(lune_llm::CorrectionPipeline::new(Arc::clone(&llm_service)));
+    let post_processor: Arc<dyn lune_core::llm::TextPostProcessor> = correction.clone();
     let router = Arc::new(VoiceCommandRouter::new());
     let dict = Arc::new(Mutex::new(
         DictionaryManager::new(
@@ -882,45 +883,44 @@ async fn build_pipeline(
             .with_overrides(&settings.read().await.pipeline),
     };
 
-    let heuristic = {
-        let mut ngram = lune_dict::ngram::NGramModel::load_bundled().unwrap_or_else(|e| {
-            tracing::warn!("Failed to load bundled ngram model: {e}, using empty");
-            lune_dict::ngram::NGramModel::new(lune_dict::ngram::ScoringConfig::trigram_default())
-                .unwrap()
-        });
-        if let Ok(sessions) = db.lock().await.list_sessions(500) {
-            let transcripts: Vec<&str> = sessions
-                .iter()
-                .filter(|s| matches!(s.status, lune_core::session::SessionStatus::Completed))
-                .filter_map(|s| s.transcript.as_deref())
-                .collect();
-            ngram.train_sentences(transcripts);
-        }
-        // Self-evaluating homophone calibration: replay the resolver over the
-        // user's own (raw → final) history and conformally bound over-correction
-        // per confusion set (Angelopoulos et al., arXiv:2208.02814). Logged now;
-        // consumed once the resolver is wired into the correction path.
-        match db.lock().await.list_correction_pairs(1000) {
-            Ok(pairs) if !pairs.is_empty() => {
-                let cal = lune_dict::homophone_calib::calibrate(
-                    &ngram,
-                    &pairs,
-                    lune_dict::homophone_calib::DEFAULT_ALPHA,
-                    1,
-                );
+    let heuristic = Arc::new(lune_dict::corrector::LexicalGate::new());
+
+    // Channel B: open-vocab LLM-edit calibration from stored per-edit
+    // observations, recomputed cheaply at startup. No data → gate stays off.
+    {
+        let obs: Vec<lune_dict::edit_calib::EditObs> = db
+            .lock()
+            .await
+            .list_edit_observations(lune_persist::EDIT_OBSERVATION_CAP)
+            .unwrap_or_default()
+            .into_iter()
+            .map(
+                |(observed_correct, margin, flip_fixes)| lune_dict::edit_calib::EditObs {
+                    observed_correct,
+                    margin: margin.map(f64::from),
+                    flip_fixes,
+                },
+            )
+            .collect();
+        // ALPHA + TAU_FLOOR are the gate's single source of truth (lune_dict).
+        match lune_dict::edit_calib::calibrate_edits(
+            &obs,
+            lune_dict::edit_calib::ALPHA,
+            lune_dict::edit_calib::TAU_FLOOR,
+        ) {
+            Some(c) => {
                 tracing::info!(
-                    "homophone calibration ({} pairs):\n{}",
-                    pairs.len(),
-                    lune_dict::homophone_calib::summarize(&cal),
+                    enabled = c.enabled,
+                    tau = c.tau,
+                    n_correct = c.n_correct,
+                    n_error = c.n_error,
+                    "llm-edit calibration"
                 );
+                correction.update_edit_gate(c.enabled, c.tau as f32);
             }
-            Ok(_) => tracing::debug!("homophone calibration: no correction pairs yet"),
-            Err(e) => tracing::warn!(error = %e, "homophone calibration: could not load pairs"),
+            None => tracing::debug!("llm-edit calibration: no observations yet (gate off)"),
         }
-        // The trained ngram above still feeds homophone calibration; the
-        // lexical gate no longer holds it.
-        Arc::new(lune_dict::corrector::LexicalGate::new())
-    };
+    }
 
     let manager = SessionManager::new(
         Arc::new(asr),
@@ -1223,6 +1223,24 @@ impl LlmService for LazyLocalLlm {
         };
         match llm {
             Some(llm) => llm.complete(system, user).await,
+            None => Err(lune_core::Error::llm("local LLM not ready")),
+        }
+    }
+
+    async fn complete_scored(
+        &self,
+        system: &str,
+        user: &str,
+    ) -> lune_core::Result<(String, Vec<lune_core::llm::WordMargin>)> {
+        let llm = {
+            let state = self.state.lock().await;
+            match &*state {
+                LazyLlmState::Ready(llm) => Some(Arc::clone(llm)),
+                LazyLlmState::Empty | LazyLlmState::Loading(_) => None,
+            }
+        };
+        match llm {
+            Some(llm) => llm.complete_scored(system, user).await,
             None => Err(lune_core::Error::llm("local LLM not ready")),
         }
     }

@@ -466,8 +466,6 @@ struct Shaped {
     dropped_risks: usize,
 }
 
-/// Deterministic correction + formatting + bypass-gate decision.
-///
 /// Pure and synchronous: heuristic correction, then English-only de-fusing,
 /// punctuation/casing normalization, and the gate that decides whether the LLM
 /// pass runs. The dictionary scan (an async lock) stays with the caller, which
@@ -719,6 +717,10 @@ async fn process_and_deliver(
         .await;
 
     drain_processing_controls(&mut control_rx, &mut cancelled);
+    // Per-edit calibration observations from the LLM gate (empty unless the
+    // correction pass ran with decode margins). Persisted below for the next
+    // calibration; best-effort, never affects delivery.
+    let mut edit_observations: Vec<(bool, Option<f32>, bool)> = Vec::new();
     let post_llm_text = if cancelled {
         info!(%session_id, "session cancelled during processing, skipping LLM");
         String::new()
@@ -749,6 +751,7 @@ async fn process_and_deliver(
         match llm_result {
             Ok(Ok(output)) => {
                 debug!(%session_id, llm_ms = llm_t0.elapsed().as_millis() as u64, "[LLM] output ready, len={}", output.cleaned_text.len());
+                edit_observations = output.edit_observations;
                 // Deterministic backstop: any sentence the model left
                 // uncapitalized (or that the merge reverted to input casing)
                 // still gets its sentence-initial capital (when the style enables it).
@@ -801,15 +804,16 @@ async fn process_and_deliver(
         Some(post_llm_text)
     };
 
-    // Record (raw ASR, final delivered) as labelled data for the homophone
-    // calibrator. Best-effort — a write failure never affects delivery.
+    // Record (raw ASR, final delivered) plus the per-edit calibration
+    // observations as labelled data for the LLM-edit calibrator.
+    // Best-effort — a write failure never affects delivery.
     if let Some(final_text) = transcript.as_deref() {
-        let result = persist
-            .lock()
-            .await
-            .insert_correction_pair(session_id, &raw_text, final_text);
-        if let Err(e) = result {
+        let mut db = persist.lock().await;
+        if let Err(e) = db.insert_correction_pair(session_id, &raw_text, final_text) {
             warn!(error = %e, %session_id, "failed to persist correction pair");
+        }
+        if let Err(e) = db.insert_edit_observations(session_id, &edit_observations) {
+            warn!(error = %e, %session_id, "failed to persist edit observations");
         }
     }
 
@@ -969,6 +973,7 @@ mod tests {
             Ok(PostProcessOutput {
                 cleaned_text: input.raw_text.clone(),
                 metadata: None,
+                edit_observations: Vec::new(),
             })
         }
     }
@@ -986,6 +991,7 @@ mod tests {
             Ok(PostProcessOutput {
                 cleaned_text: input.raw_text.clone(),
                 metadata: None,
+                edit_observations: Vec::new(),
             })
         }
     }

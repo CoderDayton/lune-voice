@@ -7,12 +7,20 @@ use chrono::{DateTime, Utc};
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
+
+/// Row cap for `edit_observations` (the CSC calibration history). Enforced at
+/// insert and used as the read window, so the trim and the read can't drift.
+/// One row per edit slot per dictation, so the retained dictation window scales
+/// inversely with utterance length.
+pub const EDIT_OBSERVATION_CAP: u32 = 20_000;
 use uuid::Uuid;
 
 use lune_core::asr::AsrBackendKind;
 use lune_core::session::{DictationSession, SessionStatus};
 
-use self::models::{NewCorrectionPair, NewDictionaryEntry, NewSession, NewSnippet};
+use self::models::{
+    NewCorrectionPair, NewDictionaryEntry, NewEditObservation, NewSession, NewSnippet,
+};
 use self::schema::{dictionary, sessions, snippets};
 use crate::error::{PersistError, PersistResult};
 
@@ -418,8 +426,8 @@ impl Database {
     }
 
     /// Record the raw ASR text and final delivered text for a session — the
-    /// labelled data the homophone calibrator replays. Best-effort; the caller
-    /// treats failure as non-fatal.
+    /// labelled `(raw → final)` history. Best-effort; the caller treats failure
+    /// as non-fatal.
     pub fn insert_correction_pair(
         &mut self,
         session_id: Uuid,
@@ -431,25 +439,32 @@ impl Database {
         const CAP: i64 = 5000;
         let sid = session_id.to_string();
         let now = Utc::now().to_rfc3339();
-        diesel::insert_into(cp::correction_pairs)
-            .values(NewCorrectionPair {
-                session_id: &sid,
-                raw,
-                final_text,
-                created_at: &now,
-            })
-            .execute(&mut self.conn)?;
-        diesel::sql_query(
-            "DELETE FROM correction_pairs \
-             WHERE id <= (SELECT MAX(id) FROM correction_pairs) - ?",
-        )
-        .bind::<diesel::sql_types::BigInt, _>(CAP)
-        .execute(&mut self.conn)?;
-        Ok(())
+        // Insert + cap-trim atomically: a failed trim can't leave the table
+        // over CAP.
+        self.conn.transaction(|conn| {
+            diesel::insert_into(cp::correction_pairs)
+                .values(NewCorrectionPair {
+                    session_id: &sid,
+                    raw,
+                    final_text,
+                    created_at: &now,
+                })
+                .execute(conn)?;
+            diesel::sql_query(
+                "DELETE FROM correction_pairs \
+                 WHERE id <= (SELECT MAX(id) FROM correction_pairs) - ?",
+            )
+            .bind::<diesel::sql_types::BigInt, _>(CAP)
+            .execute(conn)?;
+            Ok(())
+        })
     }
 
-    /// Most recent `(raw, final)` correction pairs, newest first.
-    pub fn list_correction_pairs(&mut self, limit: u32) -> PersistResult<Vec<(String, String)>> {
+    /// Most recent `(raw, final)` correction pairs, newest first. Test-only:
+    /// `correction_pairs` is still written for retention/cascade but has no
+    /// production reader since the homophone calibrator was removed.
+    #[cfg(test)]
+    fn list_correction_pairs(&mut self, limit: u32) -> PersistResult<Vec<(String, String)>> {
         use self::schema::correction_pairs::dsl as cp;
         let rows = cp::correction_pairs
             .select((cp::raw, cp::final_text))
@@ -459,8 +474,76 @@ impl Database {
         Ok(rows)
     }
 
+    /// Record per-edit observations `(observed_correct, margin, flip_fixes)` for
+    /// the open-vocab LLM-edit calibrator. Best-effort; the caller treats
+    /// failure as non-fatal. Capped at [`EDIT_OBSERVATION_CAP`] rows (one per
+    /// edit slot per dictation) so it can't grow without bound.
+    pub fn insert_edit_observations(
+        &mut self,
+        session_id: Uuid,
+        obs: &[(bool, Option<f32>, bool)],
+    ) -> PersistResult<()> {
+        if obs.is_empty() {
+            return Ok(());
+        }
+        use self::schema::edit_observations::dsl as eo;
+        let sid = session_id.to_string();
+        let now = Utc::now().to_rfc3339();
+        let rows: Vec<NewEditObservation<'_>> = obs
+            .iter()
+            .map(
+                |(observed_correct, margin, flip_fixes)| NewEditObservation {
+                    session_id: &sid,
+                    observed_correct: i32::from(*observed_correct),
+                    margin: *margin,
+                    flip_fixes: i32::from(*flip_fixes),
+                    created_at: &now,
+                },
+            )
+            .collect();
+        // Insert + cap-trim atomically: a failed trim can't leave the table
+        // over CAP.
+        self.conn.transaction(|conn| {
+            diesel::insert_into(eo::edit_observations)
+                .values(&rows)
+                .execute(conn)?;
+            diesel::sql_query(
+                "DELETE FROM edit_observations \
+                 WHERE id <= (SELECT MAX(id) FROM edit_observations) - ?",
+            )
+            .bind::<diesel::sql_types::BigInt, _>(i64::from(EDIT_OBSERVATION_CAP))
+            .execute(conn)?;
+            Ok(())
+        })
+    }
+
+    /// Most recent edit observations `(observed_correct, margin, flip_fixes)`,
+    /// newest first — the input to `edit_calib::calibrate_edits`.
+    pub fn list_edit_observations(
+        &mut self,
+        limit: u32,
+    ) -> PersistResult<Vec<(bool, Option<f32>, bool)>> {
+        use self::schema::edit_observations::dsl as eo;
+        let rows = eo::edit_observations
+            .select((eo::observed_correct, eo::margin, eo::flip_fixes))
+            .order(eo::id.desc())
+            .limit(i64::from(limit))
+            .load::<(i32, Option<f32>, i32)>(&mut self.conn)?;
+        Ok(rows
+            .into_iter()
+            .map(|(oc, m, ff)| (oc != 0, m, ff != 0))
+            .collect())
+    }
+
     pub fn delete_session(&mut self, session_id: &str) -> PersistResult<bool> {
         use self::schema::sessions::dsl::*;
+
+        // The nil UUID is the seed-calibration sentinel (see the seed_edit_calib
+        // example), not a real session — never cascade-delete its observations.
+        // Real sessions are always v4 UUIDs, so this rejects only the sentinel.
+        if session_id == "00000000-0000-0000-0000-000000000000" {
+            return Ok(false);
+        }
 
         // Cascade: drop the session's calibration pairs so deleting a session
         // leaves no transcript text behind. There is no SQL foreign key and the
@@ -468,6 +551,11 @@ impl Database {
         {
             use self::schema::correction_pairs::dsl as cp;
             diesel::delete(cp::correction_pairs.filter(cp::session_id.eq(session_id)))
+                .execute(&mut self.conn)?;
+        }
+        {
+            use self::schema::edit_observations::dsl as eo;
+            diesel::delete(eo::edit_observations.filter(eo::session_id.eq(session_id)))
                 .execute(&mut self.conn)?;
         }
 
@@ -488,6 +576,11 @@ impl Database {
         {
             use self::schema::correction_pairs::dsl as cp;
             diesel::delete(cp::correction_pairs.filter(cp::created_at.lt(&cutoff)))
+                .execute(&mut self.conn)?;
+        }
+        {
+            use self::schema::edit_observations::dsl as eo;
+            diesel::delete(eo::edit_observations.filter(eo::created_at.lt(&cutoff)))
                 .execute(&mut self.conn)?;
         }
         Ok(count)
@@ -856,6 +949,33 @@ mod tests {
         assert!(
             db.list_correction_pairs(10).unwrap().is_empty(),
             "deleting the session must remove its correction pairs"
+        );
+    }
+
+    #[test]
+    fn edit_observations_roundtrip_order_and_cascade() {
+        let mut db = Database::open_in_memory().unwrap();
+        let sid = Uuid::new_v4();
+        db.insert_edit_observations(sid, &[(true, None, false), (false, Some(2.5), true)])
+            .unwrap();
+        db.insert_edit_observations(sid, &[(true, Some(0.1), false)])
+            .unwrap();
+
+        let all = db.list_edit_observations(10).unwrap();
+        assert_eq!(all.len(), 3);
+        // Newest first.
+        assert_eq!(all[0], (true, Some(0.1), false));
+        assert_eq!(db.list_edit_observations(1).unwrap().len(), 1);
+
+        // Empty insert is a no-op.
+        db.insert_edit_observations(sid, &[]).unwrap();
+        assert_eq!(db.list_edit_observations(10).unwrap().len(), 3);
+
+        // delete_session cascades to the session's observations.
+        assert!(!db.delete_session(&sid.to_string()).unwrap());
+        assert!(
+            db.list_edit_observations(10).unwrap().is_empty(),
+            "deleting the session must remove its edit observations"
         );
     }
 

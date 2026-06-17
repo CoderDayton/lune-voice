@@ -41,3 +41,14 @@ diesel::table! {
         created_at -> Text,
     }
 }
+
+diesel::table! {
+    edit_observations (id) {
+        id -> Integer,
+        session_id -> Text,
+        observed_correct -> Integer,
+        margin -> Nullable<Float>,
+        flip_fixes -> Integer,
+        created_at -> Text,
+    }
+}

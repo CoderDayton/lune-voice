@@ -512,6 +512,103 @@ impl OrtStyleLlm {
     }
 
     fn generate(&self, prompt_ids: &[i64], sys_prefix_len: usize) -> Result<Vec<u32>> {
+        Ok(self
+            .run_decode(prompt_ids, sys_prefix_len, false)?
+            .generated)
+    }
+
+    /// Like [`Self::generate`] but also returns each emitted token's decision
+    /// margin `logit(emitted) − max logit(other)` (logit space), one per token.
+    /// Selection is byte-identical to `generate` (sampler `selection_identity`
+    /// test); margins are observational. Feeds the conformal LLM-edit gate.
+    pub fn generate_scored(
+        &self,
+        prompt_ids: &[i64],
+        sys_prefix_len: usize,
+    ) -> Result<(Vec<u32>, Vec<f32>)> {
+        let st = self.run_decode(prompt_ids, sys_prefix_len, true)?;
+        Ok((st.generated, st.margins))
+    }
+
+    /// Resolve the system-prefix KV length, refreshing the frozen prefix when
+    /// the system prompt changed. Shared by `complete` and `complete_scored`.
+    fn resolve_prefix_len(&self, system: &str, sys_prefix_len: usize) -> Result<usize> {
+        if system.is_empty() {
+            return Ok(0);
+        }
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        system.hash(&mut hasher);
+        let sys_hash = hasher.finish();
+        let mut prev = self.cached_prefix_hash.lock().map_err(e)?;
+        if *prev != sys_hash {
+            self.kv_cache.lock().map_err(e)?.clear_prefix();
+            self.device_prefix.lock().map_err(e)?.take();
+            *prev = sys_hash;
+        }
+        Ok(sys_prefix_len)
+    }
+
+    /// Attribute per-token decode margins to the whitespace words of
+    /// `final_text` (the post-`strip_think_tags` output). Tokens are grouped
+    /// into words by the byte-level-BPE space marker; each word's margin is the
+    /// MIN over its sub-tokens (weakest token bounds the word). The model's
+    /// (empty) think block is a leading prefix that `strip_think_tags` removed,
+    /// so the answer words are the trailing `final_words.len()` groups. The
+    /// trailing groups are validated against `final_text` word-by-word; on any
+    /// mismatch this returns `Vec::new()` — the gate then sees no margins for
+    /// the utterance and stays disabled (fail-safe).
+    fn attribute_word_margins(
+        &self,
+        ids: &[u32],
+        margins: &[f32],
+        final_text: &str,
+    ) -> Vec<lune_core::llm::WordMargin> {
+        if margins.len() != ids.len() {
+            return Vec::new();
+        }
+        let toks: Vec<(String, f32)> = ids
+            .iter()
+            .zip(margins)
+            .map(|(&id, &m)| (self.tokenizer.id_to_token(id).unwrap_or_default(), m))
+            .collect();
+        word_margins_from_tokens(&toks, final_text)
+    }
+
+    /// Decide one token: the plain sampler when `emit_margins` is false (codegen
+    /// identical to before this signal existed), the scored sampler when true.
+    /// `emit_margins` is constant for a whole decode (threaded from
+    /// `generate`/`generate_scored`), so the branch is loop-invariant.
+    fn sample_next(
+        &self,
+        value: &DynValue,
+        state: &super::sampler::DecodeState,
+        ws: &mut super::sampler::SamplerWorkspace,
+        rng: &mut rand::rngs::ThreadRng,
+        emit_margins: bool,
+    ) -> Result<(u32, Option<f32>)> {
+        if emit_margins {
+            let (id, m) = super::sampler::sample_last_token_scored(
+                value,
+                &self.sampling_params,
+                state,
+                ws,
+                rng,
+            )?;
+            Ok((id, Some(m)))
+        } else {
+            let id =
+                super::sampler::sample_last_token(value, &self.sampling_params, state, ws, rng)?;
+            Ok((id, None))
+        }
+    }
+
+    fn run_decode(
+        &self,
+        prompt_ids: &[i64],
+        sys_prefix_len: usize,
+        emit_margins: bool,
+    ) -> Result<super::sampler::DecodeState> {
         use super::sampler::{DecodeState, SamplerWorkspace};
 
         let p = &self.params;
@@ -531,9 +628,10 @@ impl OrtStyleLlm {
             &mut state,
             &mut ws,
             &mut rng,
+            emit_margins,
         )?
         else {
-            return Ok(vec![]);
+            return Ok(state);
         };
         // Copy-edit budget: the output of a correction/styling pass is
         // bounded by its input, so cap decode at the user-portion length
@@ -552,6 +650,7 @@ impl OrtStyleLlm {
             &mut state,
             &mut ws,
             &mut rng,
+            emit_margins,
         )?;
         // No arena janitor here, deliberately: the LLM's decode ladder lives
         // in its private arena, which is destroyed wholesale at TTL unload
@@ -559,7 +658,7 @@ impl OrtStyleLlm {
         // measured +0.35 s on long corrections for ~0.5 GB that is only held
         // during the short loaded window — a bad trade. The ASR decoder,
         // which is resident forever, does run a post-utterance janitor.
-        Ok(state.generated)
+        Ok(state)
     }
 
     /// Phase 1: on first call, prefill the system prefix alone and freeze
@@ -689,9 +788,8 @@ impl OrtStyleLlm {
         state: &mut super::sampler::DecodeState,
         ws: &mut super::sampler::SamplerWorkspace,
         rng: &mut rand::rngs::ThreadRng,
+        emit_margins: bool,
     ) -> Result<Option<(Vec<DynValue>, usize)>> {
-        use super::sampler::sample_last_token;
-
         let p = &self.params;
         let split = self.embed_session.is_some();
         let (logits_name, present_names) = self.split_output_names();
@@ -750,17 +848,15 @@ impl OrtStyleLlm {
             .map_err(e)?;
         drop(dp_guard);
 
-        let first = sample_last_token(
-            &out[logits_name.as_str()],
-            &self.sampling_params,
-            state,
-            ws,
-            rng,
-        )?;
+        let (first, first_margin) =
+            self.sample_next(&out[logits_name.as_str()], state, ws, rng, emit_margins)?;
         if state.should_stop(first, &self.sampling_params) {
             return Ok(None);
         }
         state.push(first);
+        if let Some(m) = first_margin {
+            state.margins.push(m);
+        }
 
         let mut kv = Vec::with_capacity(present_names.len());
         for name in &present_names {
@@ -787,9 +883,8 @@ impl OrtStyleLlm {
         state: &mut super::sampler::DecodeState,
         ws: &mut super::sampler::SamplerWorkspace,
         rng: &mut rand::rngs::ThreadRng,
+        emit_margins: bool,
     ) -> Result<Option<(Vec<DynValue>, usize)>> {
-        use super::sampler::sample_last_token;
-
         let p = &self.params;
         let split = self.embed_session.is_some();
 
@@ -802,6 +897,7 @@ impl OrtStyleLlm {
                 state,
                 ws,
                 rng,
+                emit_margins,
             );
         }
 
@@ -860,11 +956,14 @@ impl OrtStyleLlm {
         // shrink/grow churn.
         let prefill_opts = make_shrink_run_options(self.use_gpu)?;
         let outputs = session.run_with_options(inputs, &prefill_opts).map_err(e)?;
-        let first = sample_last_token(&outputs[0], &self.sampling_params, state, ws, rng)?;
+        let (first, first_margin) = self.sample_next(&outputs[0], state, ws, rng, emit_margins)?;
         if state.should_stop(first, &self.sampling_params) {
             return Ok(None);
         }
         state.push(first);
+        if let Some(m) = first_margin {
+            state.margins.push(m);
+        }
 
         // Reused across the decode loop to avoid reallocating `Vec<DynValue>`
         // every step (28 layers × 2 = 56 entries × up to ~448 tokens).
@@ -894,9 +993,8 @@ impl OrtStyleLlm {
         state: &mut super::sampler::DecodeState,
         ws: &mut super::sampler::SamplerWorkspace,
         rng: &mut rand::rngs::ThreadRng,
+        emit_margins: bool,
     ) -> Result<()> {
-        use super::sampler::sample_last_token;
-
         let p = &self.params;
         let split = self.embed_session.is_some();
         let (logits_name, present_names) = self.split_output_names();
@@ -945,17 +1043,15 @@ impl OrtStyleLlm {
             self.bind_outputs(&mut binding, &logits_name, &present_names)?;
 
             let mut out = session.run_binding(&binding).map_err(e)?;
-            let next = sample_last_token(
-                &out[logits_name.as_str()],
-                &self.sampling_params,
-                state,
-                ws,
-                rng,
-            )?;
+            let (next, next_margin) =
+                self.sample_next(&out[logits_name.as_str()], state, ws, rng, emit_margins)?;
             if state.should_stop(next, &self.sampling_params) {
                 break;
             }
             state.push(next);
+            if let Some(m) = next_margin {
+                state.margins.push(m);
+            }
             // kv was emptied by drain above; refill in place from this step's
             // present outputs (still on device when use_gpu).
             for name in &present_names {
@@ -1104,6 +1200,136 @@ fn norm_word(w: &str) -> String {
         .to_lowercase()
 }
 
+/// Split a byte-level-BPE token surface into `(opens_new_word, surface)`.
+/// The space marker is `Ġ` (U+0120, GPT-2/Qwen) or `▁` (U+2581,
+/// SentencePiece); a leading marker means the token starts a new word.
+fn split_word_marker(tok: &str) -> (bool, String) {
+    if let Some(rest) = tok.strip_prefix('\u{0120}') {
+        (true, rest.to_string())
+    } else if let Some(rest) = tok.strip_prefix('\u{2581}') {
+        (true, rest.to_string())
+    } else {
+        (false, tok.to_string())
+    }
+}
+
+/// Group `(token_surface, margin)` pairs into the whitespace words of
+/// `final_text`, min-aggregating each word's sub-token margins. The model's
+/// (empty) think block is a leading prefix that `strip_think_tags` removed, so
+/// the answer words are the trailing `final_words.len()` groups. Those groups
+/// are validated against `final_text` word-by-word; any mismatch (or too few
+/// groups) returns `Vec::new()` so the gate sees no margins and stays disabled.
+fn word_margins_from_tokens(
+    toks: &[(String, f32)],
+    final_text: &str,
+) -> Vec<lune_core::llm::WordMargin> {
+    let final_words: Vec<&str> = final_text.split_whitespace().collect();
+    if final_words.is_empty() || toks.is_empty() {
+        return Vec::new();
+    }
+
+    let mut group_margin: Vec<f32> = Vec::new();
+    let mut group_surface: Vec<String> = Vec::new();
+    for (i, (tok, m)) in toks.iter().enumerate() {
+        let (opens, surface) = split_word_marker(tok);
+        if i == 0 || opens || group_margin.is_empty() {
+            group_margin.push(*m);
+            group_surface.push(surface);
+        } else {
+            let last = group_margin.len() - 1;
+            group_margin[last] = group_margin[last].min(*m);
+            group_surface[last].push_str(&surface);
+        }
+    }
+
+    if group_margin.len() < final_words.len() {
+        return Vec::new();
+    }
+    let start = group_margin.len() - final_words.len();
+    for (w, surf) in final_words.iter().zip(&group_surface[start..]) {
+        if norm_word(surf) != norm_word(w) {
+            return Vec::new();
+        }
+    }
+    final_words
+        .iter()
+        .zip(&group_margin[start..])
+        .map(|(w, &margin)| lune_core::llm::WordMargin {
+            word: (*w).to_string(),
+            margin,
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod word_margin_tests {
+    use super::word_margins_from_tokens;
+
+    /// Build a token surface with the byte-level-BPE space marker (Ġ).
+    fn sp(s: &str) -> String {
+        format!("\u{0120}{s}")
+    }
+
+    fn run(toks: &[(String, f32)], final_text: &str) -> Vec<(String, f32)> {
+        word_margins_from_tokens(toks, final_text)
+            .into_iter()
+            .map(|w| (w.word, w.margin))
+            .collect()
+    }
+
+    #[test]
+    fn simple_one_token_per_word() {
+        let toks = [(sp("Hello"), 0.9), (sp("world"), 0.8)];
+        assert_eq!(
+            run(&toks, "Hello world"),
+            vec![("Hello".into(), 0.9), ("world".into(), 0.8)]
+        );
+    }
+
+    #[test]
+    fn multi_token_word_takes_min() {
+        // "Hello" = ĠHel + lo ; weakest sub-token bounds the word.
+        let toks = [(sp("Hel"), 0.9), ("lo".into(), 0.3), (sp("world"), 0.8)];
+        assert_eq!(
+            run(&toks, "Hello world"),
+            vec![("Hello".into(), 0.3), ("world".into(), 0.8)]
+        );
+    }
+
+    #[test]
+    fn trailing_punctuation_continues_word() {
+        let toks = [(sp("Hello"), 0.9), (",".into(), 0.4), (sp("world"), 0.8)];
+        assert_eq!(
+            run(&toks, "Hello, world"),
+            vec![("Hello,".into(), 0.4), ("world".into(), 0.8)]
+        );
+    }
+
+    #[test]
+    fn leading_think_block_is_skipped() {
+        // strip_think_tags removed the think prefix from final_text; the answer
+        // words are the trailing groups.
+        let toks = [
+            ("<think>".into(), 5.0),
+            ("</think>".into(), 5.0),
+            (sp("Hi"), 0.7),
+        ];
+        assert_eq!(run(&toks, "Hi"), vec![("Hi".into(), 0.7)]);
+    }
+
+    #[test]
+    fn surface_mismatch_yields_empty_fail_safe() {
+        let toks = [(sp("foo"), 0.9)];
+        assert!(run(&toks, "bar").is_empty());
+    }
+
+    #[test]
+    fn too_few_groups_yields_empty() {
+        let toks = [(sp("one"), 0.5)];
+        assert!(run(&toks, "one two").is_empty());
+    }
+}
+
 /// Whether `s` ends with a sentence-terminating punctuation mark.
 /// Trailing closing quotes/brackets are stripped before checking.
 fn ends_sentence(s: &str) -> bool {
@@ -1210,6 +1436,45 @@ pub(crate) fn contains_forbidden_output(text: &str) -> bool {
     .any(|m| lower.contains(m))
 }
 
+/// A calibrated open-vocab edit gate: re-admit a rule-rejected LLM edit when
+/// its decode margin clears `tau`. Disabled at cold start (no certified
+/// calibration), where the merge is byte-identical to the pure rule behaviour.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct EditGate {
+    pub enabled: bool,
+    pub tau: f32,
+}
+
+impl EditGate {
+    pub(crate) fn disabled() -> Self {
+        Self {
+            enabled: false,
+            tau: f32::INFINITY,
+        }
+    }
+    fn admits(&self, margin: Option<f32>) -> bool {
+        self.enabled && margin.is_some_and(|m| m > self.tau)
+    }
+}
+
+#[cfg(test)]
+mod edit_gate_tests {
+    use super::EditGate;
+
+    #[test]
+    fn admits_is_strict_above_tau_and_requires_a_margin() {
+        let on = EditGate {
+            enabled: true,
+            tau: 2.0,
+        };
+        assert!(on.admits(Some(2.5))); // above tau
+        assert!(!on.admits(Some(2.0))); // strict >: equal is rejected
+        assert!(!on.admits(Some(1.5))); // below tau
+        assert!(!on.admits(None)); // no margin → never admit
+        assert!(!EditGate::disabled().admits(Some(100.0))); // disabled → never admit
+    }
+}
+
 /// Token-level validator: align input/output words via LCS, accept safe
 /// edits (case, punctuation, function-word insertions, known substitutions,
 /// spelling repairs), reject everything else.
@@ -1217,15 +1482,46 @@ pub(crate) fn contains_forbidden_output(text: &str) -> bool {
 /// Dictionary-mandated substitutions are not handled here — the pipeline
 /// pre-seeds those into the input before the LLM runs, so they arrive at
 /// this validator as `Op::Match` already.
+///
+/// Test-only: production always runs through [`validate_and_merge_scored`]
+/// (even with empty margins / a disabled gate), so this rule-only wrapper
+/// exists for the `merge_*` unit tests that assert the baseline behaviour.
+#[cfg(test)]
 pub(crate) fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> String {
+    merge_core(input, llm_output, lang, &[], EditGate::disabled()).0
+}
+
+/// Like [`validate_and_merge`] but also applies the calibrated edit `gate`
+/// (re-admitting rule-rejected edits whose margin clears `tau`) and returns the
+/// per-edit observations `(observed_correct, margin, flip_fixes)` labelled
+/// against the RULE-merged decision — gate-independent, so the calibration it
+/// feeds can't chase its own tail. `word_margins` are the per-output-word
+/// decode margins from `complete_scored`.
+pub(crate) fn validate_and_merge_scored(
+    input: &str,
+    llm_output: &str,
+    lang: &str,
+    word_margins: &[lune_core::llm::WordMargin],
+    gate: EditGate,
+) -> (String, Vec<(bool, Option<f32>, bool)>) {
+    merge_core(input, llm_output, lang, word_margins, gate)
+}
+
+fn merge_core(
+    input: &str,
+    llm_output: &str,
+    lang: &str,
+    word_margins: &[lune_core::llm::WordMargin],
+    gate: EditGate,
+) -> (String, Vec<(bool, Option<f32>, bool)>) {
     let inp: Vec<&str> = input.split_whitespace().collect();
     let out: Vec<&str> = llm_output.split_whitespace().collect();
 
     if inp.is_empty() {
-        return llm_output.to_string();
+        return (llm_output.to_string(), Vec::new());
     }
     if out.is_empty() {
-        return input.to_string();
+        return (input.to_string(), Vec::new());
     }
 
     let m = inp.len();
@@ -1260,10 +1556,10 @@ pub(crate) fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> S
     // local; they never legitimately rewrite half the utterance.
     let lcs_len = dp_at(&dp, m, n) as usize;
     if lcs_len * 100 / m.max(1) < 55 {
-        return input.to_string();
+        return (input.to_string(), Vec::new());
     }
     if n > m + m / 2 + 2 || m > n + n / 2 + 2 {
-        return input.to_string();
+        return (input.to_string(), Vec::new());
     }
 
     // Backtrack into an alignment (reversed, then flipped).
@@ -1291,6 +1587,20 @@ pub(crate) fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> S
     }
     ops.reverse();
 
+    // Per-output-word decode margins, popped in output order, keyed by the
+    // normalized word so a number-space fix between decode and here degrades to
+    // "no margin" (conservative) rather than a misaligned one.
+    let mut margin_q: std::collections::HashMap<String, std::collections::VecDeque<f32>> =
+        std::collections::HashMap::new();
+    for wm in word_margins {
+        margin_q
+            .entry(norm_word(&wm.word))
+            .or_default()
+            .push_back(wm.margin);
+    }
+    let mut pop_margin =
+        |w: &str| -> Option<f32> { margin_q.get_mut(&norm_word(w)).and_then(|q| q.pop_front()) };
+
     let is_en = matches!(lune_core::lang::display_name(lang), Some("English"));
 
     // Trust the model's sentence segmentation and capitalization. Splitting an
@@ -1301,6 +1611,8 @@ pub(crate) fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> S
     // (`legit_debreak`) — so we don't fight the model by re-capitalizing a word
     // it deliberately downcased.
     let mut result: Vec<String> = Vec::with_capacity(ops.len());
+    // Per-edit observations, labelled against the rule decision (gate-independent).
+    let mut obs: Vec<(bool, Option<f32>, bool)> = Vec::with_capacity(ops.len());
     let mut prev_inp_terminated = true; // utterance start = sentence-initial
     let mut prev_out_terminated = true;
     // Precompute the last op that consumes an input token. Any Insert past
@@ -1356,37 +1668,62 @@ pub(crate) fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> S
                 };
                 prev_inp_terminated = ends_sentence(inp_w);
                 prev_out_terminated = ends_sentence(out_w);
+                // No open-vocab flip at a Match (same word, casing aside): a
+                // correct word left alone, counted in the conformal denominator.
+                let _ = pop_margin(out_w);
+                obs.push((true, None, false));
                 result.push(emitted);
                 idx += 1;
             }
             Op::Delete(inp_w) => {
-                // Check if next op is Insert (potential replacement).
+                // Substitution = Delete followed by Insert.
                 if let Some(Op::Insert(out_w)) = ops.get(idx + 1) {
                     let from = norm_word(inp_w);
                     let to = norm_word(out_w);
-                    if is_en
-                        && !is_blocked_sub(&from, &to)
-                        && (is_allowed_sub(&from, &to) || looks_like_spelling_repair(&from, &to))
-                    {
-                        // Trust the model's casing on the replacement too,
-                        // including a capital that follows a sentence break the
-                        // model introduced.
+                    // The blocklist is an ABSOLUTE veto: a known-bad substitution
+                    // (e.g. your→youre) is never applied — not by the rules and
+                    // not by the gate. Model confidence is not correctness for a
+                    // systematic error.
+                    let blocked = is_blocked_sub(&from, &to);
+                    let rule_accept = is_en
+                        && !blocked
+                        && (is_allowed_sub(&from, &to) || looks_like_spelling_repair(&from, &to));
+                    let margin = pop_margin(out_w);
+                    // Truth = the rule decision (gate-independent label).
+                    let truth = if rule_accept { &to } else { &from };
+                    obs.push((&from == truth, margin, &to == truth));
+                    if !blocked && (rule_accept || gate.admits(margin)) {
+                        // Trust the model's casing on an accepted replacement,
+                        // including a capital after a model-introduced break.
                         prev_inp_terminated = ends_sentence(inp_w);
                         prev_out_terminated = ends_sentence(out_w);
                         result.push((*out_w).to_string());
-                        idx += 2;
-                        continue;
+                    } else {
+                        result.push((*inp_w).to_string());
+                        prev_inp_terminated = ends_sentence(inp_w);
+                        prev_out_terminated = ends_sentence(inp_w);
                     }
+                    idx += 2;
+                    continue;
                 }
+                // Deletion with no replacement: the rules always keep the word.
                 result.push((*inp_w).to_string());
+                obs.push((true, None, false));
                 prev_inp_terminated = ends_sentence(inp_w);
                 prev_out_terminated = ends_sentence(inp_w);
                 idx += 1;
             }
             Op::Insert(w) => {
                 let has_following_input = last_input_op_idx.is_some_and(|last| idx < last);
-                if is_en && has_following_input && SAFE_INSERTIONS.contains(&norm_word(w).as_str())
-                {
+                let rule_accept = is_en
+                    && has_following_input
+                    && SAFE_INSERTIONS.contains(&norm_word(w).as_str());
+                let margin = pop_margin(w);
+                // Truth = rule decision: a rule-rejected insertion means the
+                // word should not be there (correct as-is); a rule-accepted one
+                // is a beneficial flip.
+                obs.push((!rule_accept, margin, rule_accept));
+                if rule_accept || gate.admits(margin) {
                     // Inserted function words ("the", "a", "to", …) are never
                     // sentence-initial in any meaningful sense — keep as-is.
                     result.push((*w).to_string());
@@ -1397,13 +1734,12 @@ pub(crate) fn validate_and_merge(input: &str, llm_output: &str, lang: &str) -> S
         }
     }
 
-    result.join(" ")
+    (result.join(" "), obs)
 }
 
 #[async_trait::async_trait]
 impl lune_core::llm::LlmService for OrtStyleLlm {
     async fn complete(&self, system: &str, user: &str) -> Result<String> {
-        let (ids, sys_prefix_len) = self.build_chat_ids(system, user)?;
         // Reuse the frozen system-prefix KV across calls — the correction
         // system prompt is a few hundred tokens of rules and examples and
         // dominates prefill cost. It is now static (the dictionary is applied
@@ -1412,27 +1748,31 @@ impl lune_core::llm::LlmService for OrtStyleLlm {
         // cheap safeguard. The styling pass sends an empty system; bypass the
         // cache there so it can't evict the correction prefix between
         // corrections.
-        let prefix_len = if system.is_empty() {
-            0
-        } else {
-            use std::hash::{Hash, Hasher};
-            let mut hasher = std::collections::hash_map::DefaultHasher::new();
-            system.hash(&mut hasher);
-            let sys_hash = hasher.finish();
-            let mut prev = self.cached_prefix_hash.lock().map_err(e)?;
-            if *prev != sys_hash {
-                self.kv_cache.lock().map_err(e)?.clear_prefix();
-                self.device_prefix.lock().map_err(e)?.take();
-                *prev = sys_hash;
-            }
-            sys_prefix_len
-        };
+        let (ids, sys_prefix_len) = self.build_chat_ids(system, user)?;
+        let prefix_len = self.resolve_prefix_len(system, sys_prefix_len)?;
         let out_ids = self.generate(&ids, prefix_len)?;
         let text = self
             .tokenizer
             .decode(&out_ids, true)
             .map_err(|e| Error::llm(format!("decode: {e}")))?;
         Ok(strip_think_tags(&text).trim().to_owned())
+    }
+
+    async fn complete_scored(
+        &self,
+        system: &str,
+        user: &str,
+    ) -> Result<(String, Vec<lune_core::llm::WordMargin>)> {
+        let (ids, sys_prefix_len) = self.build_chat_ids(system, user)?;
+        let prefix_len = self.resolve_prefix_len(system, sys_prefix_len)?;
+        let (out_ids, margins) = self.generate_scored(&ids, prefix_len)?;
+        let raw = self
+            .tokenizer
+            .decode(&out_ids, true)
+            .map_err(|e| Error::llm(format!("decode: {e}")))?;
+        let text = strip_think_tags(&raw).trim().to_owned();
+        let word_margins = self.attribute_word_margins(&out_ids, &margins, &text);
+        Ok((text, word_margins))
     }
 }
 
@@ -1752,6 +2092,27 @@ mod tests {
         assert_eq!(
             validate_and_merge("i went to the storee", "I went to the store.", "en"),
             "I went to the store."
+        );
+    }
+
+    #[test]
+    fn gate_never_readmits_a_blocked_sub() {
+        use lune_core::llm::WordMargin;
+        // "your"→"youre" is a BLOCKED_SUB. Even with the gate enabled at tau=0
+        // and a huge decode margin, the blocklist vetoes it: "your" survives.
+        let gate = EditGate {
+            enabled: true,
+            tau: 0.0,
+        };
+        let margins = vec![WordMargin {
+            word: "youre".into(),
+            margin: 99.0,
+        }];
+        let (merged, _obs) =
+            validate_and_merge_scored("i like your car", "i like youre car", "en", &margins, gate);
+        assert_eq!(
+            merged, "i like your car",
+            "blocked sub must never be re-admitted by the gate"
         );
     }
 

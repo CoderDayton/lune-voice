@@ -831,11 +831,6 @@ pub struct UinputTyper {
 }
 
 impl UinputTyper {
-    #[allow(dead_code)]
-    pub fn new() -> Result<Self, String> {
-        Self::with_terminal_mode(TerminalMode::Auto)
-    }
-
     pub fn with_terminal_mode(terminal_mode: TerminalMode) -> Result<Self, String> {
         ensure_kernel_access()?;
 

@@ -121,3 +121,77 @@ fn dictionary_example_correction_smoke() {
         output.cleaned_text
     );
 }
+
+/// Decisive check for the open-vocab edit gate: a real Qwen3 decode must hand
+/// back NON-EMPTY, per-word-aligned decode margins. If `complete_scored`
+/// returned empty margins on real output, the gate's `admits(None)` is always
+/// false and the whole channel is a silent no-op — indistinguishable from "the
+/// gate didn't help." This test rules that out by exercising the production
+/// scored path and asserting one margin per output word.
+#[test]
+fn complete_scored_emits_aligned_word_margins() {
+    // Runs whenever the real model is present, so default `cargo test` exercises
+    // the production margin path; skips cleanly when models aren't on disk.
+    if model_dir().is_none() {
+        eprintln!("[skip] qwen3-0.6b model not present");
+        return;
+    }
+    let _ = tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .with_test_writer()
+        .try_init();
+
+    let llm = make_llm();
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("tokio runtime");
+
+    // Static system + the public production user-prompt builder. The system
+    // text does not affect margin attribution — only the decoded answer's
+    // token→word structure does — so a representative prompt is faithful.
+    let system = "You correct speech-to-text transcripts for language en. \
+                  Fix spelling, spacing, and punctuation. Output only the \
+                  corrected transcript, nothing else."
+        .to_string();
+
+    let cases = [
+        "i dont no why the computor isnt working",
+        "let go to the mall and bye some cloth",
+        "The quick brown fox jumps over the lazy dog.",
+    ];
+
+    for input in cases {
+        let user = OrtStyleLlm::user_prompt_with_examples(input, "en", &[]);
+        let (out, margins) = rt
+            .block_on(llm.complete_scored(&system, &user))
+            .expect("complete_scored failed");
+        let out_words = out.split_whitespace().count();
+        println!("INPUT:   {input}");
+        println!("OUTPUT:  {out}");
+        println!(
+            "MARGINS: {} words; {:?}",
+            margins.len(),
+            margins
+                .iter()
+                .map(|m| (m.word.as_str(), m.margin))
+                .collect::<Vec<_>>()
+        );
+        println!("---");
+
+        assert!(!out.is_empty(), "empty output for {input:?}");
+        assert!(
+            !margins.is_empty(),
+            "EMPTY word_margins (silent no-op) for {input:?} -> {out:?}"
+        );
+        // word_margins_from_tokens returns exactly one margin per output word on
+        // success, so equality here also proves the token→word alignment held.
+        assert_eq!(
+            margins.len(),
+            out_words,
+            "margin count {} != output word count {} for {out:?}",
+            margins.len(),
+            out_words
+        );
+    }
+}

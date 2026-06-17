@@ -30,6 +30,12 @@ pub struct PostProcessInput {
 pub struct PostProcessOutput {
     pub cleaned_text: String,
     pub metadata: Option<OutputMetadata>,
+    /// Per-edit calibration observations `(observed_correct, margin, flip_fixes)`
+    /// from the open-vocab edit gate, labelled against the rule-merged decision.
+    /// Empty unless the backend produced decode margins. The session persists
+    /// these (it owns the `session_id`) to feed the next calibration.
+    #[serde(default)]
+    pub edit_observations: Vec<(bool, Option<f32>, bool)>,
 }
 
 /// Hints about output formatting.
@@ -50,6 +56,18 @@ pub enum AppCategory {
     Terminal,
 }
 
+/// One output word paired with the decode decision margin that produced it.
+///
+/// `margin` is `logit(emitted) − max logit(other)` in logit space (≥ 0 under
+/// greedy decode), min-aggregated over the word's sub-tokens — the weakest
+/// token bounds confidence in the whole word. Consumed by the conformal
+/// LLM-edit gate to decide whether a proposed edit clears the calibrated `tau`.
+#[derive(Debug, Clone)]
+pub struct WordMargin {
+    pub word: String,
+    pub margin: f32,
+}
+
 /// Simple completion service: system prompt + user message → response text.
 ///
 /// Intended for application-level tasks (e.g. generating few-shot examples)
@@ -57,6 +75,16 @@ pub enum AppCategory {
 #[async_trait]
 pub trait LlmService: Send + Sync {
     async fn complete(&self, system: &str, user: &str) -> Result<String>;
+
+    /// Like [`complete`](Self::complete) but also returns the per-output-word
+    /// decode margins. The default returns the completion with no margins, so
+    /// backends without token-level access (remote APIs, the null backend)
+    /// degrade safely: an empty margin vector yields no decisive observations,
+    /// leaving the conformal edit gate disabled. Only the local ORT backend
+    /// overrides this with real margins.
+    async fn complete_scored(&self, system: &str, user: &str) -> Result<(String, Vec<WordMargin>)> {
+        Ok((self.complete(system, user).await?, Vec::new()))
+    }
 }
 
 /// Trait for LLM-based text post-processing.
@@ -107,9 +135,11 @@ mod tests {
                 has_bullets: false,
                 has_headings: false,
             }),
+            edit_observations: vec![(true, None, false), (false, Some(2.0), true)],
         };
         let json = serde_json::to_string(&output).unwrap();
         let parsed: PostProcessOutput = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.cleaned_text, "Hello, world.");
+        assert_eq!(parsed.edit_observations.len(), 2);
     }
 }
