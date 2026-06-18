@@ -59,7 +59,7 @@ pre-push:
           echo "Skipping real-model E2E tests (set LUNE_E2E_MODELS=1 to enable)"
           exit 0
         fi
-        CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-1} cargo test -p lune-app --test e2e_ort_models -- --ignored --nocapture
+        CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-1} cargo test -p lune-llm --test smoke_ort_llm --test kv_cache_integration -- --ignored --nocapture
       fail_text: "Real-model E2E tests failed"
 
     audit:
