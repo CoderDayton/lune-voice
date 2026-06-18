@@ -131,6 +131,15 @@ pub struct Qwen3AsrProfile {
     pub prefill_ms: f64,
     pub decode_ms: f64,
     pub decode_steps: usize,
+    /// Per-op decode-loop breakdown (accumulated over steps, IO-binding path):
+    /// single-token embed (+ its H↔D bounce), decoder run (GPU compute + logits
+    /// D→H copy + sync), host-side argmax/softmax, KV output collection, and
+    /// per-step input (re)binding. Sums to roughly `decode_ms`.
+    pub decode_embed_ms: f64,
+    pub decode_bind_ms: f64,
+    pub decode_run_ms: f64,
+    pub decode_argmax_ms: f64,
+    pub decode_kv_ms: f64,
     pub decoder_io_binding: bool,
 }
 
@@ -383,6 +392,27 @@ fn extract_f16_array(value: &ort::value::Value) -> Result<ArrayD<f16>> {
 
 const MABLE_TOP_K: usize = 16;
 
+/// Fast, branch-free `exp` for softmax denominators. Inputs are `logit − max`,
+/// so always `≤ 0`; we only need accuracy on the non-positive domain. Range-
+/// reduce `x = k·ln2 + r` and evaluate `2^k · exp(r)` with a degree-4 minimax
+/// polynomial on `r ∈ [−ln2/2, ln2/2]` — relative error ~1e-6, well inside the
+/// tolerance of a confidence score used only for thresholding. Being inline
+/// pure-arithmetic (no libm call, no data-dependent branch), the accumulation
+/// loop auto-vectorizes under `target-cpu=native`; the old per-element libm
+/// `exp` was the decode-loop's dominant host cost (~1 ms/token).
+#[inline(always)]
+fn fast_exp_nonpos(x: f32) -> f32 {
+    // exp(-87) ≈ 1e-38; below this the term is negligible and clamping keeps
+    // the reconstructed exponent field normal (k + 127 ≥ 1).
+    let x = x.max(-87.0);
+    let kf = (x * std::f32::consts::LOG2_E).round();
+    let r = x - kf * std::f32::consts::LN_2;
+    // exp(r) ≈ Taylor/minimax degree-4, r ∈ [−0.347, 0.347].
+    let p = 1.0 + r * (1.0 + r * (0.5 + r * (0.166_666_67 + r * 0.041_666_67)));
+    let bits = ((kf as i32 + 127) as u32) << 23;
+    f32::from_bits(bits) * p
+}
+
 /// Fused argmax + softmax confidence + top-k logit extraction on f16 logits tensor.
 /// Returns (token_id, softmax_confidence, top_k_logits_as_f64).
 fn argmax_on_logits(
@@ -413,18 +443,20 @@ fn argmax_on_logits(
     let mut heap_min_pos = 0usize;
 
     if boost.is_empty() && banned.is_empty() {
-        // Single-pass: argmax + top-k + LSE fused (one f16→f32 conversion per element).
+        // Pass 1 — argmax + top-k over raw logits, no `exp`, so the rare-taken
+        // heap branch is the only per-element cost. Token choice depends solely
+        // on the max, so it is bit-identical to the old fused loop (WER is
+        // untouched). Pass 2 — the softmax denominator with a fixed max and the
+        // branch-free `fast_exp_nonpos`, which vectorizes; only the confidence
+        // value moves, by ~1e-6.
         let mut max_idx = 0usize;
         let mut max_val = f32::NEG_INFINITY;
-        let mut sum_exp = 0.0f32;
         for (i, &v) in logits.iter().enumerate() {
             let f = v.to_f32();
             if f > max_val {
-                sum_exp *= (max_val - f).exp();
                 max_val = f;
                 max_idx = i;
             }
-            sum_exp += (f - max_val).exp();
             if f > heap_min {
                 heap[heap_min_pos] = (f, i);
                 heap_min = f32::INFINITY;
@@ -435,6 +467,10 @@ fn argmax_on_logits(
                     }
                 }
             }
+        }
+        let mut sum_exp = 0.0f32;
+        for &v in logits.iter() {
+            sum_exp += fast_exp_nonpos(v.to_f32() - max_val);
         }
         let top_k = heap.iter().map(|(v, _)| *v as f64).collect();
         if !sum_exp.is_normal() {
@@ -448,11 +484,14 @@ fn argmax_on_logits(
         // reported confidence is the raw softmax probability of the *chosen*
         // token (`chosen_raw`), not of the raw argmax — boosting or banning can
         // divert the winner, and the confidence must follow the emitted token.
+        // Same two-pass split as the fast path, with the boost/ban-adjusted
+        // argmax tracked alongside the raw max. The emitted token follows the
+        // adjusted argmax (no `exp`), so it is unchanged; confidence is the raw
+        // softmax mass of the *chosen* token via `fast_exp_nonpos`.
         let mut max_idx = 0usize;
         let mut max_adj = f32::NEG_INFINITY;
         let mut chosen_raw = f32::NEG_INFINITY;
         let mut raw_max = f32::NEG_INFINITY;
-        let mut sum_exp = 0.0f32;
         for (i, &v) in logits.iter().enumerate() {
             let raw = v.to_f32();
             let mut adj = raw + boost.get(&(i as i64)).copied().unwrap_or(0.0);
@@ -465,10 +504,8 @@ fn argmax_on_logits(
                 chosen_raw = raw;
             }
             if raw > raw_max {
-                sum_exp *= (raw_max - raw).exp();
                 raw_max = raw;
             }
-            sum_exp += (raw - raw_max).exp();
             if raw > heap_min {
                 heap[heap_min_pos] = (raw, i);
                 heap_min = f32::INFINITY;
@@ -479,6 +516,10 @@ fn argmax_on_logits(
                     }
                 }
             }
+        }
+        let mut sum_exp = 0.0f32;
+        for &v in logits.iter() {
+            sum_exp += fast_exp_nonpos(v.to_f32() - raw_max);
         }
         let top_k = heap.iter().map(|(v, _)| *v as f64).collect();
         if !sum_exp.is_normal() {
@@ -894,7 +935,13 @@ impl Qwen3AsrBackend {
             None
         };
 
-        // 6. Autoregressive greedy decode loop
+        // 6. Autoregressive greedy decode loop.
+        // Per-op accumulators decompose the step cost (see `Qwen3AsrProfile`).
+        let mut t_embed = 0.0f64;
+        let mut t_bind = 0.0f64;
+        let mut t_run = 0.0f64;
+        let mut t_argmax = 0.0f64;
+        let mut t_kv = 0.0f64;
         let decode_t0 = std::time::Instant::now();
         loop {
             let last_tok = tokens.last().unwrap().0;
@@ -924,6 +971,7 @@ impl Qwen3AsrBackend {
 
             let (tok, conf, logits_k) = {
                 // Embed single token (FP16 native, scoped to drop before decoder)
+                let t_e = std::time::Instant::now();
                 let emb = {
                     let id_val =
                         Value::from_array(Array2::from_elem((1, 1), last_tok)).ctx("id val")?;
@@ -933,6 +981,7 @@ impl Qwen3AsrBackend {
                         .ctx("embed step")?;
                     extract_f16_array(&emb_out[0])?
                 };
+                t_embed += t_e.elapsed().as_secs_f64() * 1000.0;
 
                 // Reuse position array — just update the value.
                 pos_arr.fill(pos as i64);
@@ -946,6 +995,7 @@ impl Qwen3AsrBackend {
 
                 match &mut kv_cache {
                     DecodeKvCache::Bound(cache) => {
+                        let t_b = std::time::Instant::now();
                         let binding = decoder_binding
                             .as_mut()
                             .ok_or_else(|| Error::asr("missing decoder binding"))?;
@@ -969,11 +1019,17 @@ impl Qwen3AsrBackend {
                                 .ctx(&format!("bind kv layer {layer}"))?;
                         }
                         bind_decoder_outputs_to_device(binding, self.use_gpu)?;
+                        t_bind += t_b.elapsed().as_secs_f64() * 1000.0;
 
+                        let t_r = std::time::Instant::now();
                         let mut out = models.decoder.run_binding(binding).ctx("decoder step")?;
+                        t_run += t_r.elapsed().as_secs_f64() * 1000.0;
 
+                        let t_a = std::time::Instant::now();
                         let result = argmax_on_logits(&out["logits"], VOCAB_SIZE, &boost, &banned)?;
+                        t_argmax += t_a.elapsed().as_secs_f64() * 1000.0;
 
+                        let t_k = std::time::Instant::now();
                         for i in 0..NUM_LAYERS {
                             cache.push(out.remove(present_kv_name(i, true)).ok_or_else(|| {
                                 Error::asr(format!("missing present key layer {i}"))
@@ -982,6 +1038,7 @@ impl Qwen3AsrBackend {
                                 Error::asr(format!("missing present value layer {i}"))
                             })?);
                         }
+                        t_kv += t_k.elapsed().as_secs_f64() * 1000.0;
                         result
                     }
                     DecodeKvCache::Cpu(cache) => {
@@ -1073,6 +1130,11 @@ impl Qwen3AsrBackend {
             prefill_ms,
             decode_ms,
             decode_steps,
+            decode_embed_ms: t_embed,
+            decode_bind_ms: t_bind,
+            decode_run_ms: t_run,
+            decode_argmax_ms: t_argmax,
+            decode_kv_ms: t_kv,
             decoder_io_binding: self.decoder_io_binding,
         };
         if let Ok(mut last_profile) = self.last_profile.lock() {

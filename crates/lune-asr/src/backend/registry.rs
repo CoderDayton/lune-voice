@@ -222,6 +222,16 @@ impl AsrRegistry {
         }
     }
 
+    /// Per-transcription sub-stage profile (mel / encoder / prefill / decode
+    /// timing and decode-step count) recorded by the most recent `poll_final`.
+    /// Only the Qwen3 backend instruments this; other backends return `None`.
+    pub fn last_profile(&self) -> Option<crate::Qwen3AsrProfile> {
+        match self {
+            Self::Qwen3(b) => b.last_profile(),
+            Self::OpenAi(_) => None,
+        }
+    }
+
     /// Set word boost phrases on the underlying ASR backend.
     /// No-op for backends that don't support token-level boosting.
     pub fn set_boost_phrases(&self, phrases: &[String], score: f32) {
