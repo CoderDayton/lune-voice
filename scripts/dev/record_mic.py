@@ -5,7 +5,7 @@
 # ///
 """Record default mic to a 16kHz mono float32 WAV file.
 
-Usage: uv run scripts/record_mic.py [--output-file FILE] [--seconds N]
+Usage: uv run scripts/dev/record_mic.py [--output-file FILE] [--seconds N]
   Press Ctrl+C to stop early.
 """
 import argparse

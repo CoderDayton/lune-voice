@@ -76,7 +76,7 @@ The active ASR choices are local Qwen3-ASR and OpenAI-compatible remote ASR. Bot
 
 **Files:** `backend/qwen3.rs`, `mel/whisper.rs`
 
-The Qwen path uses a three-part ONNX export produced by `scripts/export_onnx.py`:
+The Qwen path uses a three-part ONNX export produced by `scripts/build/export_onnx.py`:
 
 1. `qwen3-asr-encoder.onnx` for the audio tower / projector
 2. `qwen3-asr-embed-tokens.onnx` for token embeddings

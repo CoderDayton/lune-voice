@@ -1,6 +1,6 @@
 //! Qwen3-ASR 0.6B ONNX backend — encoder-decoder with autoregressive greedy decoding.
 //!
-//! Model: custom ONNX export via `scripts/export_onnx.py` (encoder + embed_tokens + decoder).
+//! Model: custom ONNX export via `scripts/build/export_onnx.py` (encoder + embed_tokens + decoder).
 //! Mel: Whisper-compatible 128-bin log-mel at 16 kHz (see `mel/whisper.rs`).
 //! Decoding: greedy argmax with per-token softmax confidence.
 
@@ -47,7 +47,7 @@ const AUDIO_START: i64 = 151_669; // <|audio_start|>
 const AUDIO_END: i64 = 151_670; // <|audio_end|>
 
 /// Base ASR instruction, matching the reference deployment
-/// (`scripts/test_asr_reference.py`). An empty system prompt measurably
+/// (`scripts/dev/test_asr_reference.py`). An empty system prompt measurably
 /// increases hallucination and translation drift on noisy audio.
 const SYSTEM_PROMPT: &str = "You are an ASR engine. Transcribe spoken audio exactly in the spoken language. Do not translate. Do not add words not clearly present.";
 

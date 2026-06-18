@@ -95,14 +95,14 @@ cargo run --release -p lune-audio --example vad_inspect -- "$WAV"
 info = "VAD timeline analysis on a WAV file (--env WAV=path)"
 
 [scripts.record]
-command = "uv run scripts/record_mic.py"
+command = "uv run scripts/dev/record_mic.py"
 info = "Record mic to float32 WAV (16kHz mono)"
 requires = ["uv"]
 
 [scripts.package]
 interpreter = "bash"
 command = '''
-bash scripts/package-all.sh "${TYPE:-all}"
+bash scripts/release/package-all.sh "${TYPE:-all}"
 '''
 info = "Build .deb/.AppImage/.rpm via Docker (--env TYPE=all|deb-appimage|rpm)"
 
@@ -131,6 +131,6 @@ info = "Clean build artifacts (--env ALL=1 includes .venv)"
 # ── ONNX model export ───────────────────────────────────────────────────────
 
 [scripts.export]
-command = "uv run scripts/export_onnx.py --asr"
+command = "uv run scripts/build/export_onnx.py --asr"
 info = "Export Qwen3-ASR ONNX model"
 requires = ["uv"]

@@ -7,11 +7,11 @@ SwiGLU, tied embeddings) and produce clean FP16 graphs with proper KV cache
 I/O.
 
 Usage:
-    python scripts/export_onnx.py --asr --output-dir models/qwen3-asr-0.6b-onnx
-    python scripts/export_onnx.py --asr --quant-policy balanced
-    python scripts/export_onnx.py --asr --revision <commit-sha> --quant-policy safe
-    python scripts/export_onnx.py --asr --quant-policy compact
-    python scripts/export_onnx.py --asr --no-quantize
+    python scripts/build/export_onnx.py --asr --output-dir models/qwen3-asr-0.6b-onnx
+    python scripts/build/export_onnx.py --asr --quant-policy balanced
+    python scripts/build/export_onnx.py --asr --revision <commit-sha> --quant-policy safe
+    python scripts/build/export_onnx.py --asr --quant-policy compact
+    python scripts/build/export_onnx.py --asr --no-quantize
 
 Requirements:
     pip install torch transformers onnx onnxscript onnxruntime
@@ -348,7 +348,7 @@ def _check_quant_quality(
     """Hard-gate quantized probe drift per profile; abort toward the fallback.
 
     The probe is text-only (no audio conditioning), so passing is necessary
-    but not sufficient — fixture transcription via scripts/test_asr_reference.py
+    but not sufficient — fixture transcription via scripts/dev/test_asr_reference.py
     remains the authoritative quality check before shipping.
     """
     if stats is None:

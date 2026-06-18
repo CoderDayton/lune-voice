@@ -1,5 +1,5 @@
 //! Per-word capitalization rate: `P(capitalized | the word is not at a
-//! sentence start)`, built from cased corpora by `scripts/sim/cap_rate.py` +
+//! sentence start)`, built from cased corpora by `scripts/build/cap_rate.py` +
 //! the `build_caprate` bin.
 //!
 //! The merge uses it to tell genuine proper nouns (`john`, p_cap≈1.0) from

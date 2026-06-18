@@ -1870,7 +1870,7 @@ struct ModelFiles {
 
 fn find_model(dir: &Path) -> Result<ModelFiles> {
     // q4f16 deliberately outranks int8: probing the Qwen3-0.6B exports with
-    // the production correction prompt (scripts/probe_llm_quant.py) showed
+    // the production correction prompt (a one-off quantization probe) showed
     // the int8 variant ignores `/no_think` — it streams `<think>` reasoning
     // into the transcript and leaks few-shot examples — while q4f16 follows
     // the contract. Quantization level is not the quality axis here;

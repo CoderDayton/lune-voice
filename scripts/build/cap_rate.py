@@ -15,7 +15,7 @@ This script:
   4. reports residual error on the homograph set (will/may/mark/rose),
   5. writes the full word -> p_cap table to scripts/sim/en_caprate.tsv.
 
-Run: uv run --with nltk python3 scripts/sim/cap_rate.py
+Run: uv run --with nltk python3 scripts/build/cap_rate.py
 """
 
 import collections

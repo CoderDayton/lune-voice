@@ -3,9 +3,9 @@ set -euo pipefail
 
 # Build .deb / .AppImage / .rpm bundles via containerized cross-distro builds.
 # Usage:
-#   bash scripts/package-all.sh                 # all targets
-#   bash scripts/package-all.sh deb-appimage    # Ubuntu 22.04 only
-#   bash scripts/package-all.sh rpm             # Fedora 40 only
+#   bash scripts/release/package-all.sh                 # all targets
+#   bash scripts/release/package-all.sh deb-appimage    # Ubuntu 22.04 only
+#   bash scripts/release/package-all.sh rpm             # Fedora 40 only
 #
 # Honors $CONTAINER_ENGINE (docker|podman). Auto-detects if unset.
 # Caches Rust toolchains, cargo registry, target/, and Bun across runs in

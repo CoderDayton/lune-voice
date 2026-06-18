@@ -10,10 +10,10 @@
  * - Harmonic hue relationships (analogous, split-complementary)
  *
  * Usage:
- *   npx tsx scripts/generate-palette.ts                    # default (hue 270, purple)
- *   npx tsx scripts/generate-palette.ts --hue 280          # custom brand hue
- *   npx tsx scripts/generate-palette.ts --hue 200 --css    # output as CSS
- *   npx tsx scripts/generate-palette.ts --hue 280 --json   # output as JSON
+ *   npx tsx scripts/dev/generate-palette.ts                    # default (hue 270, purple)
+ *   npx tsx scripts/dev/generate-palette.ts --hue 280          # custom brand hue
+ *   npx tsx scripts/dev/generate-palette.ts --hue 200 --css    # output as CSS
+ *   npx tsx scripts/dev/generate-palette.ts --hue 280 --json   # output as JSON
  */
 
 // ── OKLCh Math ──────────────────────────────────────────────────────────
