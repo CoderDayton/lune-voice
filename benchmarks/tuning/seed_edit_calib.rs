@@ -299,11 +299,11 @@ fn main() {
         };
         match rt.block_on(pipeline.transform(&input)) {
             Ok(out) => {
-                for (observed_correct, margin, flip_fixes) in out.edit_observations {
+                for ob in out.edit_observations {
                     obs.push(EditObs {
-                        observed_correct,
-                        margin: margin.map(f64::from),
-                        flip_fixes,
+                        observed_correct: ob.observed_correct,
+                        margin: ob.margin.map(f64::from),
+                        flip_fixes: ob.flip_fixes,
                     });
                 }
             }

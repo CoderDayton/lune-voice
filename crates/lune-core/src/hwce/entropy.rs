@@ -5,12 +5,15 @@ pub(crate) fn softmax(logits: &[f64]) -> Vec<f64> {
         return Vec::new();
     }
     let max = logits.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-    let exps: Vec<f64> = logits.iter().map(|&x| (x - max).exp()).collect();
-    let sum: f64 = exps.iter().sum();
+    let mut probs: Vec<f64> = logits.iter().map(|&x| (x - max).exp()).collect();
+    let sum: f64 = probs.iter().sum();
     if sum <= 0.0 {
         return vec![1.0 / logits.len() as f64; logits.len()];
     }
-    exps.into_iter().map(|e| e / sum).collect()
+    for p in &mut probs {
+        *p /= sum;
+    }
+    probs
 }
 
 /// Normalized Shannon entropy from precomputed softmax probabilities.
@@ -71,60 +74,40 @@ pub(crate) fn top_margin_from_probs(probs: &[f64]) -> f64 {
     (top1 - top2).clamp(0.0, 1.0)
 }
 
-/// Normalized Shannon entropy ∈ [0, 1].
-/// 0 = peaked (confident), 1 = uniform (uncertain).
-#[cfg(test)]
-pub(crate) fn shannon_entropy(logits: &[f64]) -> f64 {
-    shannon_entropy_from_probs(&softmax(logits))
-}
-
-/// Tsallis entropy confidence ∈ [0, 1] (exponentially normalized, α = 1/3).
-/// 1 = peaked (confident), 0 = uniform (uncertain).
-#[cfg(test)]
-pub(crate) fn tsallis_confidence(logits: &[f64]) -> f64 {
-    tsallis_confidence_from_probs(&softmax(logits))
-}
-
-/// Margin between top-1 and top-2 softmax probabilities ∈ [0, 1].
-/// Higher = more confident.
-#[cfg(test)]
-pub(crate) fn top_margin(logits: &[f64]) -> f64 {
-    top_margin_from_probs(&softmax(logits))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn peaked_distribution_high_confidence() {
-        let logits = vec![10.0, -5.0, -5.0, -5.0];
-        assert!(tsallis_confidence(&logits) > 0.95);
-        assert!(shannon_entropy(&logits) < 0.05);
-        assert!(top_margin(&logits) > 0.95);
+        let p = softmax(&[10.0, -5.0, -5.0, -5.0]);
+        assert!(tsallis_confidence_from_probs(&p) > 0.95);
+        assert!(shannon_entropy_from_probs(&p) < 0.05);
+        assert!(top_margin_from_probs(&p) > 0.95);
     }
 
     #[test]
     fn uniform_distribution_low_confidence() {
-        let logits = vec![0.0, 0.0, 0.0, 0.0];
-        assert!(tsallis_confidence(&logits) < 0.05);
-        assert!(shannon_entropy(&logits) > 0.95);
-        assert!(top_margin(&logits) < 0.05);
+        let p = softmax(&[0.0, 0.0, 0.0, 0.0]);
+        assert!(tsallis_confidence_from_probs(&p) < 0.05);
+        assert!(shannon_entropy_from_probs(&p) > 0.95);
+        assert!(top_margin_from_probs(&p) < 0.05);
     }
 
     #[test]
     fn moderate_distribution() {
-        let logits = vec![3.0, 1.0, -1.0, -3.0];
-        let tc = tsallis_confidence(&logits);
-        let se = shannon_entropy(&logits);
+        let p = softmax(&[3.0, 1.0, -1.0, -3.0]);
+        let tc = tsallis_confidence_from_probs(&p);
+        let se = shannon_entropy_from_probs(&p);
         assert!(tc > 0.1 && tc < 0.95, "tsallis={tc}");
         assert!(se > 0.1 && se < 0.7, "shannon={se}");
     }
 
     #[test]
     fn empty_logits() {
-        assert_eq!(shannon_entropy(&[]), 0.0);
-        assert_eq!(tsallis_confidence(&[]), 1.0);
-        assert_eq!(top_margin(&[]), 1.0);
+        let p = softmax(&[]);
+        assert_eq!(shannon_entropy_from_probs(&p), 0.0);
+        assert_eq!(tsallis_confidence_from_probs(&p), 1.0);
+        assert_eq!(top_margin_from_probs(&p), 1.0);
     }
 }

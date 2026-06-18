@@ -39,34 +39,32 @@ pub enum Error {
     Other(String),
 }
 
+macro_rules! string_constructors {
+    ($($method:ident => $variant:ident),+ $(,)?) => {
+        impl Error {
+            $(
+                #[doc = concat!("Construct an [`Error::", stringify!($variant), "`] from a context message.")]
+                pub fn $method(context: impl Into<String>) -> Self {
+                    Self::$variant(context.into())
+                }
+            )+
+        }
+    };
+}
+
+string_constructors! {
+    audio => Audio,
+    asr => Asr,
+    llm => Llm,
+    persistence => Persistence,
+    config => Config,
+    session => Session,
+    command => Command,
+    output => Output,
+    other => Other,
+}
+
 impl Error {
-    pub fn audio(context: impl Into<String>) -> Self {
-        Self::Audio(context.into())
-    }
-    pub fn asr(context: impl Into<String>) -> Self {
-        Self::Asr(context.into())
-    }
-    pub fn llm(context: impl Into<String>) -> Self {
-        Self::Llm(context.into())
-    }
-    pub fn persistence(context: impl Into<String>) -> Self {
-        Self::Persistence(context.into())
-    }
-    pub fn config(context: impl Into<String>) -> Self {
-        Self::Config(context.into())
-    }
-    pub fn session(context: impl Into<String>) -> Self {
-        Self::Session(context.into())
-    }
-    pub fn command(context: impl Into<String>) -> Self {
-        Self::Command(context.into())
-    }
-    pub fn output(context: impl Into<String>) -> Self {
-        Self::Output(context.into())
-    }
-    pub fn other(context: impl Into<String>) -> Self {
-        Self::Other(context.into())
-    }
     pub fn model_not_found(path: impl Into<PathBuf>) -> Self {
         Self::ModelNotFound(path.into())
     }

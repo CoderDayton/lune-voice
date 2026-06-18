@@ -12,7 +12,7 @@ use lune_core::Result;
 use lune_core::asr::{AsrBackend, AsrBackendKind, AsrSegment, AsrSessionConfig};
 use lune_core::config::{PipelineConfig, StylePreset, UserSettings, builtin_registry};
 use lune_core::error::Error;
-use lune_core::llm::TextPostProcessor;
+use lune_core::llm::{EditObservation, TextPostProcessor};
 use lune_core::session::{DictationSession, SessionEvent, SessionStatus};
 use lune_dict::DictionaryManager;
 use lune_dict::commands::VoiceCommandRouter;
@@ -720,7 +720,7 @@ async fn process_and_deliver(
     // Per-edit calibration observations from the LLM gate (empty unless the
     // correction pass ran with decode margins). Persisted below for the next
     // calibration; best-effort, never affects delivery.
-    let mut edit_observations: Vec<(bool, Option<f32>, bool)> = Vec::new();
+    let mut edit_observations: Vec<EditObservation> = Vec::new();
     let post_llm_text = if cancelled {
         info!(%session_id, "session cancelled during processing, skipping LLM");
         String::new()
@@ -812,7 +812,11 @@ async fn process_and_deliver(
         if let Err(e) = db.insert_correction_pair(session_id, &raw_text, final_text) {
             warn!(error = %e, %session_id, "failed to persist correction pair");
         }
-        if let Err(e) = db.insert_edit_observations(session_id, &edit_observations) {
+        let observation_rows: Vec<(bool, Option<f32>, bool)> = edit_observations
+            .iter()
+            .map(|o| (o.observed_correct, o.margin, o.flip_fixes))
+            .collect();
+        if let Err(e) = db.insert_edit_observations(session_id, &observation_rows) {
             warn!(error = %e, %session_id, "failed to persist edit observations");
         }
     }

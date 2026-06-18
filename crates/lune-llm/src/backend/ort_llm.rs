@@ -1503,7 +1503,7 @@ pub(crate) fn validate_and_merge_scored(
     lang: &str,
     word_margins: &[lune_core::llm::WordMargin],
     gate: EditGate,
-) -> (String, Vec<(bool, Option<f32>, bool)>) {
+) -> (String, Vec<lune_core::llm::EditObservation>) {
     merge_core(input, llm_output, lang, word_margins, gate)
 }
 
@@ -1513,7 +1513,7 @@ fn merge_core(
     lang: &str,
     word_margins: &[lune_core::llm::WordMargin],
     gate: EditGate,
-) -> (String, Vec<(bool, Option<f32>, bool)>) {
+) -> (String, Vec<lune_core::llm::EditObservation>) {
     let inp: Vec<&str> = input.split_whitespace().collect();
     let out: Vec<&str> = llm_output.split_whitespace().collect();
 
@@ -1612,7 +1612,8 @@ fn merge_core(
     // it deliberately downcased.
     let mut result: Vec<String> = Vec::with_capacity(ops.len());
     // Per-edit observations, labelled against the rule decision (gate-independent).
-    let mut obs: Vec<(bool, Option<f32>, bool)> = Vec::with_capacity(ops.len());
+    use lune_core::llm::EditObservation;
+    let mut obs: Vec<EditObservation> = Vec::with_capacity(ops.len());
     let mut prev_inp_terminated = true; // utterance start = sentence-initial
     let mut prev_out_terminated = true;
     // Precompute the last op that consumes an input token. Any Insert past
@@ -1671,7 +1672,11 @@ fn merge_core(
                 // No open-vocab flip at a Match (same word, casing aside): a
                 // correct word left alone, counted in the conformal denominator.
                 let _ = pop_margin(out_w);
-                obs.push((true, None, false));
+                obs.push(EditObservation {
+                    observed_correct: true,
+                    margin: None,
+                    flip_fixes: false,
+                });
                 result.push(emitted);
                 idx += 1;
             }
@@ -1691,7 +1696,11 @@ fn merge_core(
                     let margin = pop_margin(out_w);
                     // Truth = the rule decision (gate-independent label).
                     let truth = if rule_accept { &to } else { &from };
-                    obs.push((&from == truth, margin, &to == truth));
+                    obs.push(EditObservation {
+                        observed_correct: &from == truth,
+                        margin,
+                        flip_fixes: &to == truth,
+                    });
                     if !blocked && (rule_accept || gate.admits(margin)) {
                         // Trust the model's casing on an accepted replacement,
                         // including a capital after a model-introduced break.
@@ -1708,7 +1717,11 @@ fn merge_core(
                 }
                 // Deletion with no replacement: the rules always keep the word.
                 result.push((*inp_w).to_string());
-                obs.push((true, None, false));
+                obs.push(EditObservation {
+                    observed_correct: true,
+                    margin: None,
+                    flip_fixes: false,
+                });
                 prev_inp_terminated = ends_sentence(inp_w);
                 prev_out_terminated = ends_sentence(inp_w);
                 idx += 1;
@@ -1722,7 +1735,11 @@ fn merge_core(
                 // Truth = rule decision: a rule-rejected insertion means the
                 // word should not be there (correct as-is); a rule-accepted one
                 // is a beneficial flip.
-                obs.push((!rule_accept, margin, rule_accept));
+                obs.push(EditObservation {
+                    observed_correct: !rule_accept,
+                    margin,
+                    flip_fixes: rule_accept,
+                });
                 if rule_accept || gate.admits(margin) {
                     // Inserted function words ("the", "a", "to", …) are never
                     // sentence-initial in any meaningful sense — keep as-is.

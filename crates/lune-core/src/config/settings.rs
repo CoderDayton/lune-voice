@@ -77,11 +77,11 @@ pub struct UserSettings {
     /// chunk arrives ~70 ms sooner after a hotkey press. The mic remains
     /// powered/visible to the OS while the app runs; turn this off if you
     /// prefer the indicator only appearing during dictation.
-    #[serde(default = "default_mic_prewarm")]
+    #[serde(default = "default_true")]
     pub mic_prewarm: bool,
     /// Enable the PCEN-style adaptive AGC frontend before the VAD.
     /// Improves robustness on quiet mics and noisy environments. Default on.
-    #[serde(default = "default_vad_pcen")]
+    #[serde(default = "default_true")]
     pub vad_pcen: bool,
     /// Launch the desktop app with the main window hidden to the system
     /// tray instead of shown. Useful when Lune is autostarted on login.
@@ -89,11 +89,7 @@ pub struct UserSettings {
     pub start_minimized: bool,
 }
 
-fn default_vad_pcen() -> bool {
-    true
-}
-
-fn default_mic_prewarm() -> bool {
+fn default_true() -> bool {
     true
 }
 

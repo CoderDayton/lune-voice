@@ -17,32 +17,55 @@ pub fn display_name(raw: &str) -> Option<&'static str> {
     if lang.is_empty() || lang.eq_ignore_ascii_case("auto") {
         return None;
     }
-    let primary = lang
-        .split(['-', '_'])
-        .next()
-        .unwrap_or(lang)
-        .to_ascii_lowercase();
-    Some(match primary.as_str() {
-        "en" | "english" => "English",
-        "fr" | "french" => "French",
-        "de" | "german" => "German",
-        "es" | "spanish" => "Spanish",
-        "it" | "italian" => "Italian",
-        "pt" | "portuguese" => "Portuguese",
-        "nl" | "dutch" => "Dutch",
-        "ja" | "japanese" => "Japanese",
-        "zh" | "cmn" | "yue" | "chinese" | "mandarin" => "Chinese",
-        "ko" | "korean" => "Korean",
-        "ru" | "russian" => "Russian",
-        "pl" | "polish" => "Polish",
-        "ar" | "arabic" => "Arabic",
-        "hi" | "hindi" => "Hindi",
-        "vi" | "vietnamese" => "Vietnamese",
-        "th" | "thai" => "Thai",
-        "id" | "indonesian" => "Indonesian",
-        "tr" | "turkish" => "Turkish",
-        _ => return None,
-    })
+    let primary = lang.split(['-', '_']).next().unwrap_or(lang);
+    // `(alias, display name)` pairs matched case-insensitively, so the primary
+    // subtag never has to be lowercased into a heap `String`. One table is the
+    // canonical mapping for both BCP-47 codes and Qwen3-ASR's English names.
+    const TABLE: &[(&str, &str)] = &[
+        ("en", "English"),
+        ("english", "English"),
+        ("fr", "French"),
+        ("french", "French"),
+        ("de", "German"),
+        ("german", "German"),
+        ("es", "Spanish"),
+        ("spanish", "Spanish"),
+        ("it", "Italian"),
+        ("italian", "Italian"),
+        ("pt", "Portuguese"),
+        ("portuguese", "Portuguese"),
+        ("nl", "Dutch"),
+        ("dutch", "Dutch"),
+        ("ja", "Japanese"),
+        ("japanese", "Japanese"),
+        ("zh", "Chinese"),
+        ("cmn", "Chinese"),
+        ("yue", "Chinese"),
+        ("chinese", "Chinese"),
+        ("mandarin", "Chinese"),
+        ("ko", "Korean"),
+        ("korean", "Korean"),
+        ("ru", "Russian"),
+        ("russian", "Russian"),
+        ("pl", "Polish"),
+        ("polish", "Polish"),
+        ("ar", "Arabic"),
+        ("arabic", "Arabic"),
+        ("hi", "Hindi"),
+        ("hindi", "Hindi"),
+        ("vi", "Vietnamese"),
+        ("vietnamese", "Vietnamese"),
+        ("th", "Thai"),
+        ("thai", "Thai"),
+        ("id", "Indonesian"),
+        ("indonesian", "Indonesian"),
+        ("tr", "Turkish"),
+        ("turkish", "Turkish"),
+    ];
+    TABLE
+        .iter()
+        .find(|(alias, _)| primary.eq_ignore_ascii_case(alias))
+        .map(|(_, name)| *name)
 }
 
 /// Same as [`display_name`] but returns the original input verbatim when no

@@ -52,23 +52,16 @@ Output: Hey, just checking in on the deploy. Did the migration finish? If not, w
 /// the correction path, before and independently of the LLM styling pass. All
 /// default on; a style can switch any of them off.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct FormatToggles {
     /// Join spoken keyboard chords: "Super H" -> "Super+H".
-    #[serde(default = "default_format_toggle")]
     pub keybinds: bool,
     /// Abbreviate spoken titles: "Mister Thompson" -> "Mr. Thompson".
-    #[serde(default = "default_format_toggle")]
     pub title_abbreviations: bool,
     /// Capitalize the first word of each sentence.
-    #[serde(default = "default_format_toggle")]
     pub auto_capitalization: bool,
     /// Apply canonical brand casing: "github" -> "GitHub", "iphone" -> "iPhone".
-    #[serde(default = "default_format_toggle")]
     pub brand_casing: bool,
-}
-
-fn default_format_toggle() -> bool {
-    true
 }
 
 impl Default for FormatToggles {

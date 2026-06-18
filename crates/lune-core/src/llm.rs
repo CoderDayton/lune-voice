@@ -25,17 +25,32 @@ pub struct PostProcessInput {
     pub correction_needed: bool,
 }
 
+/// One open-vocab edit-gate calibration observation, labelled against the
+/// rule-merged decision. The session persists these to feed the next
+/// calibration.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct EditObservation {
+    /// The raw word already matched the delivered (truth) word — editing it
+    /// would risk over-correction.
+    pub observed_correct: bool,
+    /// Decode margin of the LLM's proposed word; `None` when no edit was
+    /// proposed at this slot.
+    pub margin: Option<f32>,
+    /// The LLM's proposed word equals the delivered word (a beneficial flip).
+    pub flip_fixes: bool,
+}
+
 /// Output from the text post-processor.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PostProcessOutput {
     pub cleaned_text: String,
     pub metadata: Option<OutputMetadata>,
-    /// Per-edit calibration observations `(observed_correct, margin, flip_fixes)`
-    /// from the open-vocab edit gate, labelled against the rule-merged decision.
-    /// Empty unless the backend produced decode margins. The session persists
-    /// these (it owns the `session_id`) to feed the next calibration.
+    /// Per-edit calibration observations from the open-vocab edit gate,
+    /// labelled against the rule-merged decision. Empty unless the backend
+    /// produced decode margins. The session persists these (it owns the
+    /// `session_id`) to feed the next calibration.
     #[serde(default)]
-    pub edit_observations: Vec<(bool, Option<f32>, bool)>,
+    pub edit_observations: Vec<EditObservation>,
 }
 
 /// Hints about output formatting.
@@ -135,7 +150,18 @@ mod tests {
                 has_bullets: false,
                 has_headings: false,
             }),
-            edit_observations: vec![(true, None, false), (false, Some(2.0), true)],
+            edit_observations: vec![
+                EditObservation {
+                    observed_correct: true,
+                    margin: None,
+                    flip_fixes: false,
+                },
+                EditObservation {
+                    observed_correct: false,
+                    margin: Some(2.0),
+                    flip_fixes: true,
+                },
+            ],
         };
         let json = serde_json::to_string(&output).unwrap();
         let parsed: PostProcessOutput = serde_json::from_str(&json).unwrap();

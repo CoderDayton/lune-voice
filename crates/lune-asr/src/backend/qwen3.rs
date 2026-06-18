@@ -1367,44 +1367,24 @@ fn parse_auto_asr_output(raw: &str) -> (Option<String>, String) {
 /// tags so the model falls back to auto-detection rather than receiving
 /// a malformed hint.
 fn bcp47_to_qwen3_language(tag: &str) -> Option<String> {
-    let t = tag.trim().to_ascii_lowercase();
-    if t.is_empty() || t == "auto" {
+    // The known-language table lives in `lune_core::lang`; reuse it so the
+    // BCP-47/English-name mapping is maintained in exactly one place.
+    if let Some(name) = lune_core::lang::display_name(tag) {
+        return Some(name.to_string());
+    }
+    // `display_name` dropped it: auto/empty, a malformed tag, or an unknown
+    // name-like word. Only pass through values that look like a spelled-out
+    // language name (a single all-alphabetic word) — anything carrying a
+    // region/script subtag, digits, or separators is a malformed hint, so
+    // fall back to auto-detection (`None`) per the documented contract.
+    let trimmed = tag.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("auto") {
         return None;
     }
-    let primary = t.split(['-', '_']).next().unwrap_or(&t);
-    let name = match primary {
-        "en" => "English",
-        "zh" | "cmn" | "yue" => "Chinese",
-        "ja" => "Japanese",
-        "ko" => "Korean",
-        "es" => "Spanish",
-        "fr" => "French",
-        "de" => "German",
-        "it" => "Italian",
-        "pt" => "Portuguese",
-        "ru" => "Russian",
-        "ar" => "Arabic",
-        "hi" => "Hindi",
-        "vi" => "Vietnamese",
-        "th" => "Thai",
-        "id" => "Indonesian",
-        "nl" => "Dutch",
-        "pl" => "Polish",
-        "tr" => "Turkish",
-        // Unknown tag. Only pass through values that look like a spelled-out
-        // language name (a single all-alphabetic word) — anything carrying a
-        // region/script subtag, digits, or separators is a malformed hint, so
-        // fall back to auto-detection (`None`) per the documented contract.
-        _ => {
-            let trimmed = tag.trim();
-            return if !trimmed.is_empty() && trimmed.chars().all(|c| c.is_alphabetic()) {
-                Some(title_case(trimmed))
-            } else {
-                None
-            };
-        }
-    };
-    Some(name.to_string())
+    trimmed
+        .chars()
+        .all(|c| c.is_alphabetic())
+        .then(|| title_case(trimmed))
 }
 
 fn title_case(s: &str) -> String {

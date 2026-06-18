@@ -6,7 +6,9 @@
 use async_trait::async_trait;
 use lune_core::Result;
 use lune_core::config::BASE_SYSTEM_PROMPT;
-use lune_core::llm::{LlmService, PostProcessInput, PostProcessOutput, TextPostProcessor};
+use lune_core::llm::{
+    EditObservation, LlmService, PostProcessInput, PostProcessOutput, TextPostProcessor,
+};
 use std::sync::Arc;
 
 /// Unified correction and styling pipeline.
@@ -78,7 +80,7 @@ impl TextPostProcessor for CorrectionPipeline {
         // punctuation). Styling below runs either way, and a FAILED
         // correction no longer aborts the pipeline: styling still gets its
         // chance on the raw text.
-        let mut edit_observations: Vec<(bool, Option<f32>, bool)> = Vec::new();
+        let mut edit_observations: Vec<EditObservation> = Vec::new();
         let mut text = if !input.correction_needed {
             tracing::debug!("correction pass skipped by gate; styling only");
             seeded_raw_text.clone()
