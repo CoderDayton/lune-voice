@@ -58,7 +58,7 @@ impl CorrectionPipeline {
         // applied upstream (apply_dictionary_seed + heuristic scan) and
         // validate_and_merge backstops it, so per-term "carrier" examples were
         // redundant — and worse, the small model echoed them verbatim into the
-        // output (benchmarks/dict_carrier_ab.rs). Few-shot examples live only in
+        // output (benchmarks/tuning/dict_carrier_ab.rs). Few-shot examples live only in
         // the static system prompt.
         crate::backend::ort_llm::OrtStyleLlm::user_prompt_with_examples(
             raw_text,

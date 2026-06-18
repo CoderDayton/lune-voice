@@ -17,7 +17,7 @@
 //!      (LUNE_BENCH_PRINT=1 dumps each arm's full output.)
 
 #[allow(dead_code)]
-#[path = "bench_utils.rs"]
+#[path = "../bench_utils.rs"]
 mod bench_utils;
 
 use bench_utils::{init_ort, models_dir};

@@ -20,7 +20,7 @@
 //! Requires: nvidia-smi on $PATH and a CUDA-capable GPU.
 
 #[allow(dead_code)]
-#[path = "bench_utils.rs"]
+#[path = "../bench_utils.rs"]
 mod bench_utils;
 
 use std::process::Command;

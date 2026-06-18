@@ -48,68 +48,68 @@ tempfile = "3.27.0"
 
 [[example]]
 name = "pipeline_real"
-path = "../../benchmarks/pipeline_real.rs"
+path = "../../benchmarks/pipeline/pipeline_real.rs"
 
 [[example]]
 name = "live_transcribe"
-path = "../../benchmarks/live_transcribe.rs"
+path = "../../benchmarks/tools/live_transcribe.rs"
 
 [[example]]
 name = "noisify_fixtures"
-path = "../../benchmarks/noisify_fixtures.rs"
+path = "../../benchmarks/tools/noisify_fixtures.rs"
 
 [[example]]
 name = "confusion_mine"
-path = "../../benchmarks/confusion_mine.rs"
+path = "../../benchmarks/quality/confusion_mine.rs"
 
 [[example]]
 name = "pipeline_stages"
-path = "../../benchmarks/pipeline_stages.rs"
+path = "../../benchmarks/pipeline/pipeline_stages.rs"
 
 [[example]]
 name = "session_latency"
-path = "../../benchmarks/session_latency.rs"
+path = "../../benchmarks/pipeline/session_latency.rs"
 
 [[example]]
 name = "llm_quality"
-path = "../../benchmarks/llm_quality.rs"
+path = "../../benchmarks/quality/llm_quality.rs"
 
 [[example]]
 name = "bench_domain"
-path = "../../benchmarks/bench_domain.rs"
+path = "../../benchmarks/quality/bench_domain.rs"
 
 [[example]]
 name = "vram_growth"
-path = "../../benchmarks/vram_growth.rs"
+path = "../../benchmarks/pipeline/vram_growth.rs"
 
 [[example]]
 name = "llm_edit_gate"
-path = "../../benchmarks/llm_edit_gate.rs"
+path = "../../benchmarks/tuning/llm_edit_gate.rs"
 
 [[example]]
 name = "seed_edit_calib"
-path = "../../benchmarks/seed_edit_calib.rs"
+path = "../../benchmarks/tuning/seed_edit_calib.rs"
 
 [[example]]
 name = "gate_sweep"
-path = "../../benchmarks/gate_sweep.rs"
+path = "../../benchmarks/tuning/gate_sweep.rs"
 
 [[example]]
 name = "dict_carrier_ab"
-path = "../../benchmarks/dict_carrier_ab.rs"
+path = "../../benchmarks/tuning/dict_carrier_ab.rs"
 
 [[example]]
 name = "sampling_ab"
-path = "../../benchmarks/sampling_ab.rs"
+path = "../../benchmarks/tuning/sampling_ab.rs"
 
 [[example]]
 name = "sampling_tune"
-path = "../../benchmarks/sampling_tune.rs"
+path = "../../benchmarks/tuning/sampling_tune.rs"
 
 [[example]]
 name = "vad_tune"
-path = "../../benchmarks/vad_tune.rs"
+path = "../../benchmarks/tuning/vad_tune.rs"
 
 [[example]]
 name = "punctuation_ab"
-path = "../../benchmarks/punctuation_ab.rs"
+path = "../../benchmarks/tuning/punctuation_ab.rs"

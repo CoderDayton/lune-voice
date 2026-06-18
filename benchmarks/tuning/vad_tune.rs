@@ -22,7 +22,7 @@
 //! restricts the panel (e.g. `=quiet`); `VAD_PCEN=0` disables Earshot PCEN.
 
 #[allow(dead_code)]
-#[path = "bench_utils.rs"]
+#[path = "../bench_utils.rs"]
 mod bench_utils;
 
 use std::path::Path;

@@ -9,7 +9,7 @@
 //! from start to `FinalizedText` event — the same path as real dictation.
 
 #[allow(dead_code)]
-#[path = "bench_utils.rs"]
+#[path = "../bench_utils.rs"]
 mod bench_utils;
 
 use std::sync::Arc;

@@ -18,7 +18,7 @@
 //! output — reproducible WAVs mean reproducible WER ablations.
 
 #[allow(dead_code)]
-#[path = "bench_utils.rs"]
+#[path = "../bench_utils.rs"]
 mod bench_utils;
 
 use std::path::{Path, PathBuf};

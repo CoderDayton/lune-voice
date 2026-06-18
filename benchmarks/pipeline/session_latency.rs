@@ -4,7 +4,7 @@
 //! Run: cargo run --release --example session_latency -p lune-app
 
 #[allow(dead_code)]
-#[path = "bench_utils.rs"]
+#[path = "../bench_utils.rs"]
 mod bench_utils;
 
 use std::time::Instant;

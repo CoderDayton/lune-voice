@@ -12,7 +12,7 @@
 //! writing output files.
 
 #[allow(dead_code)]
-#[path = "bench_utils.rs"]
+#[path = "../bench_utils.rs"]
 mod bench_utils;
 
 use std::sync::{Arc, Mutex as StdMutex};

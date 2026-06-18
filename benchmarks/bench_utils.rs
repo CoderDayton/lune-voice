@@ -1,6 +1,7 @@
 //! Shared helpers for pipeline benchmarks.
 //!
-//! Included via `#[path = "bench_utils.rs"] mod bench_utils;` from each example.
+//! Included via `#[path = "../bench_utils.rs"] mod bench_utils;` from each
+//! example (benchmarks live in pipeline/, quality/, tuning/, and tools/).
 
 use std::path::PathBuf;
 use std::sync::Arc;

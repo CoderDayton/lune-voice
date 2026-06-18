@@ -29,7 +29,7 @@
 //! Run: cargo run --release --features cuda --example sampling_tune -p lune-app
 
 #[allow(dead_code)]
-#[path = "bench_utils.rs"]
+#[path = "../bench_utils.rs"]
 mod bench_utils;
 
 use bench_utils::{init_ort, models_dir};

@@ -24,7 +24,7 @@ impl Default for SamplingParams {
     /// Penalized greedy: deterministic argmax (temperature 0, top_k 1) taken
     /// *after* the repetition/presence penalties reshape the logits.
     ///
-    /// A grid search over the sampling space (`benchmarks/sampling_tune.rs`)
+    /// A grid search over the sampling space (`benchmarks/tuning/sampling_tune.rs`)
     /// found no config that reliably beats greedy on correction quality — a
     /// sampled generation was ~3x more likely to hurt than help. So we keep
     /// greedy's quality and determinism, while the mild penalties still demote

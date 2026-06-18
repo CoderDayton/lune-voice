@@ -83,7 +83,7 @@ pub struct PipelineConfig {
     /// The scale is HWCE's sigmoid output: a perfectly confident word floors
     /// at risk ≈ 0.226 (confidence ≈ 0.774), so thresholds near 1.0 can never
     /// bypass. Default `Some(0.40)` — empirically the point that matched oracle
-    /// routing on the domain corpus (benchmarks/gate_sweep.rs).
+    /// routing on the domain corpus (benchmarks/tuning/gate_sweep.rs).
     ///
     /// `None` disables the band gate — the LLM then runs only for unresolved
     /// words or ambiguous punctuation.

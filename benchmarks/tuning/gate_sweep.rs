@@ -24,7 +24,7 @@
 //! threshold as a starting point to confirm on the live path.
 
 #[allow(dead_code)]
-#[path = "bench_utils.rs"]
+#[path = "../bench_utils.rs"]
 mod bench_utils;
 
 use std::path::Path;

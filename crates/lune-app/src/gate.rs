@@ -51,7 +51,7 @@ pub(crate) fn decide(g: GateInputs<'_>) -> GateOutcome {
     // noun or brand); escalating on it routed clean dictation to the LLM, and a
     // text-only corrector cannot recover a proper-noun mishear anyway, so the
     // call was wasted. Two uncertain words is a far better proxy for a genuinely
-    // shaky transcript correction can help. Validated by benchmarks/gate_sweep.rs
+    // shaky transcript correction can help. Validated by benchmarks/tuning/gate_sweep.rs
     // on the domain corpus: gate accuracy 45%->91%, LLM calls 13->4, routed WER
     // 5.23%->4.96% (within 0.07pp of the oracle).
     let conf_attention = g.pipeline.llm_skip_threshold.is_some_and(|t| {

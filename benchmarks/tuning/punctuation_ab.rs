@@ -19,7 +19,7 @@
 //!      (LUNE_BENCH_PRINT=1 dumps per-fixture text; LUNE_BENCH_FIXTURE=<sub> filters.)
 
 #[allow(dead_code)]
-#[path = "bench_utils.rs"]
+#[path = "../bench_utils.rs"]
 mod bench_utils;
 
 use std::collections::{BTreeMap, HashMap};
