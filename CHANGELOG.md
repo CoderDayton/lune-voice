@@ -24,6 +24,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 - Reused mel scratch buffers in `WhisperMelF16` to amortize per-call allocations
 - Shared a single softmax across HWCE entropy, Tsallis, and top-margin features
+- Vectorized the ASR decoder's argmax softmax (~2.2× faster argmax, ~8% lower dictation latency, identical output)
+- Expanded the pipeline-stages benchmark with per-stage timings, decode-loop op breakdown, and a profiling loop mode
 - 4-bit KV-cache quantization rewritten with row-major min/max for SIMD-friendly access
 - ORT LLM input vectors built into preallocated buffers
 - Session statistics aggregated across the full database instead of capped history

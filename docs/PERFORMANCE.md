@@ -59,31 +59,37 @@ Current benchmarked emphasis:
 
 ### Pipeline Stages
 
-Measures isolated ASR, LLM, and VAD stages on real WAV fixtures. This is the best benchmark for comparing backend speed, quality, and memory use in isolation, but it is not the full dictation pipeline.
+Times every stage of the dictation pipeline on real WAV fixtures and breaks the ASR stage down into its sub-stages — the best benchmark for finding which stage dominates. Each fixture runs `WARMUP` discarded passes then `ITERS` timed passes, so the reported P50/P95 reflect steady state (CUDA arenas warm, `.onnx.opt` cached), not first-call cost.
 
 ```bash
 cargo run --example pipeline_stages -p lune-app --release
+# GPU:   cargo run --release --features cuda --example pipeline_stages -p lune-app
+# Knobs: ITERS=N WARMUP=N STYLE=<preset> LUNE_LLM=off
+# Flame: PROFILE=1 PROFILE_SECS=30 samply record -- \
+#          target/release/examples/pipeline_stages
 ```
 
 #### What It Measures
 
 | Stage | Description |
 |-------|-------------|
-| Stage 1 | Whisper-style mel extraction on real fixtures |
-| Stage 2 | Real Qwen3-ASR inference |
-| Stage 3 | Confidence gate behavior |
-| Stage 4 | Threshold sweep for LLM cleanup routing |
-| Stage 5 | VAD timing sweep |
-| Stage 6 | Adaptive VAD sweep |
+| Session create | `start_session` setup cost |
+| Push audio | Buffer fill / ingest |
+| ASR `poll_final` | Real Qwen3-ASR transcription, split into mel → encoder → prompt → prefill → decode |
+| Decode-loop ops | Per-token split of the autoregressive loop: embed, decoder run, argmax, KV collect, bind |
+| LLM correction | Real post-processing pass over the ASR output |
 
 #### Output Fields
 
 | Field | Meaning |
 |-------|---------|
-| `RTF` | Real-time factor. Lower is faster. |
+| `Sess` / `Push` / `Mel` / `Encoder` / `Decode` / `LLM` / `Total` | Per-stage wall time (ms) |
+| `RTF` | Real-time factor (wall / audio). Lower is faster. |
+| `tokens/s` | Decode steps per second (autoregressive throughput) |
 | `WER` / `CER` | Word / character error rate against fixture references |
-| `RSS` | Current resident memory from `/proc/self/status` |
-| `Peak` | Process high-water memory mark from `/proc/self/status` |
+| Decode-loop op breakdown | Share and µs/token of each per-token decode op |
+| Time distribution | Share of total wall clock per stage |
+| `RSS` / `Peak` | Current / high-water resident memory from `/proc/self/status` |
 
 ### Real Pipeline
 
@@ -104,19 +110,27 @@ cargo run --release --example pipeline_real -p lune-app
 
 ### Recent Benchmark Snapshot
 
-Qwen3-ASR 0.6B (INT4) is the only local backend. Representative numbers
-from `pipeline_stages` runs on this repository:
+Qwen3-ASR 0.6B (INT4) is the only local backend. Representative
+aggregate from `pipeline_stages` (24 fixtures, RTX 4090, P50):
 
-| Fixture | Total | RTF | WER | CER |
-|---------|-------|-----|-----|-----|
-| `librispeech_clean` | `1.091s` | `0.047x` | `1.6%` | `0.3%` |
-| `librispeech_40744` | `1.755s` | `0.059x` | `4.8%` | `4.3%` |
-| `custom_recording` | `1.581s` | `0.046x` | `2.5%` | `1.1%` |
+| Metric | P50 | P95 |
+|--------|-----|-----|
+| Total wall | `0.80s` | `1.13s` |
+| RTF | `0.034x` | `0.050x` |
+| Decode tokens/s | `140` | `143` |
+| WER | `9.3%` | `35.7%` |
+| CER | `3.1%` | `21.7%` |
 
-Aggregate `pipeline_real` end-to-end wall time hovers around 1.5–2.5s
-for short utterances, dominated by ASR inference. Peak resident memory
-sits near 2.7 GB once the LLM correction model is loaded alongside
-ASR.
+Clean-audio fixtures (`librispeech_clean`) land near `0.85s` / `0.037x`
+with `0%` WER; the WER/CER P95 is driven by the noisy and multilingual
+fixtures in the suite.
+
+Where the wall clock goes: **ASR decode ~66%**, LLM correction ~24%,
+prefill ~7%, mel + encoder ~1.5%. Within decode, the autoregressive
+`decoder.run` is ~90% — a GPU launch/occupancy-bound forward pass at
+batch=1/seq=1 (GPU at ~46% power, 33% memory bandwidth during decode),
+the natural target for CUDA-graph capture. Peak resident memory sits
+near 2.0 GB once the LLM correction model is loaded alongside ASR.
 
 ---
 
@@ -144,6 +158,7 @@ ASR.
 | Technique | Location | Impact |
 |-----------|----------|--------|
 | **Shared softmax for HWCE** | `lune-core/src/hwce/features.rs` | Computes softmax once per token and feeds the probability slice to entropy/Tsallis/margin instead of paying for three independent passes |
+| **Vectorized ASR argmax softmax** | `lune-asr/src/backend/qwen3.rs` | A branch-free range-reduced `fast_exp_nonpos` replaces the per-element libm `exp` across the 151,936-logit vocab; the LSE pass auto-vectorizes under `target-cpu=native`. ~2.2× faster argmax (1.37 → 0.62 ms/token), ~8% lower end-to-end latency, token output bit-identical |
 | **Sequential-write 4-bit quant** | `lune-llm/src/backend/kv_cache.rs` | Row-major `(t, d)` min/max scan with stride-1 reads lets the auto-vectorizer emit SIMD min/max instead of stride-`dim` scalar loads |
 | **O(1) risk lookup in corrector** | `lune-dict/src/corrector.rs` | Risk positions indexed in a `HashMap`, replacing a per-word linear scan that was O(words²) overall |
 | **norm_sqr() vs norm()*norm()** | `mel/whisper.rs` | Eliminates a `sqrt()` call per bin per frame in the STFT power spectrum |
@@ -214,12 +229,27 @@ perf record -g --call-graph dwarf ./target/release/lune-voice daemon
 perf report --hierarchy
 ```
 
-### Flamegraph
+### Flamegraph (samply)
+
+`samply` needs no root, but it does need `perf_event_paranoid <= 1`:
 
 ```bash
-cargo install flamegraph
-flamegraph -- ./target/release/lune-voice daemon
+cargo install samply
+echo '1' | sudo tee /proc/sys/kernel/perf_event_paranoid   # reverts on reboot
+
+# Build with symbols + frame pointers (keeps the release optimization level)
+RUSTFLAGS="-C target-cpu=native -C force-frame-pointers=yes" \
+CARGO_PROFILE_RELEASE_STRIP=none CARGO_PROFILE_RELEASE_DEBUG=line-tables-only \
+  cargo build --release --features cuda --example pipeline_stages -p lune-app
+
+# The benchmark's PROFILE mode loops the full pipeline for a sampler to capture
+PROFILE=1 PROFILE_SECS=30 samply record -- \
+  ./target/release/examples/pipeline_stages
 ```
+
+When `perf_event_paranoid` can't be lowered, the benchmark's built-in
+decode-loop op breakdown (deterministic per-op timers) attributes the
+decode stage without a sampler.
 
 ### Tracing
 

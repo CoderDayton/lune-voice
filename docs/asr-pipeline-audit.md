@@ -154,12 +154,12 @@ Prompt layout (`build_prompt_ids` `:260-307`): ChatML `system` (`SYSTEM_PROMPT` 
 **`SYSTEM_PROMPT`** (`:52`), verbatim:
 > You are an ASR engine. Transcribe spoken audio exactly in the spoken language. Do not translate. Do not add words not clearly present.
 
-Generation (`:888+`): **greedy argmax only** — no sampling/temperature/top-p (`argmax_on_logits` `:388-489`; fast single-pass branch when boost+ban are empty, constrained branch otherwise). KV-cached autoregressive, one token/step. **Stop:** `last ∈ EOS_IDS {151643,151645}` or `tokens ≥ MAX_NEW_TOKENS (512)` (`:901`; consts `:35,:37`).
+Generation (`:888+`): **greedy argmax only** — no sampling/temperature/top-p (`argmax_on_logits` `:418-546`; two-pass path — argmax + top-k, then a vectorized log-sum-exp — with a fast branch when boost+ban are empty, constrained branch otherwise). KV-cached autoregressive, one token/step. **Stop:** `last ∈ EOS_IDS {151643,151645}` or `tokens ≥ MAX_NEW_TOKENS (512)` (`:901`; consts `:35,:37`).
 
 **Prompt-echo drop** (changed): on low-information audio the model can regurgitate its own instruction. `is_prompt_echo(text)` (`:58-67`) trims leading whitespace and returns true if the text *starts with* `"You are an ASR engine"`, `"You are an automatic speech recognition"`, or `"Transcribe spoken audio"`. When `decode_output` (`:1114-1264`) sees an echo (`:1187`) it **drops the whole segment** (returns empty text → `Ok(vec![])`), rather than the old behavior of stripping a leaked prefix (which targeted a stale string that never matched the real prompt). Otherwise it splits on `<asr_text>` via `parse_auto_asr_output` (`:1269`) → `(detected_language, text)`; `bcp47_to_qwen3_language` (`:1307`) maps BCP-47 → Qwen labels.
 
 ### 4.5 Confidence
-- **Per token:** `argmax_on_logits` fuses argmax + log-sum-exp softmax + top-16 logits in one f16→f32 pass over the last position (`MABLE_TOP_K = 16`, `:384`). Confidence = softmax prob of the chosen token (raw even on the boost/ban path).
+- **Per token:** `argmax_on_logits` runs two passes over the last position's logits — a max + argmax + top-16 pass over raw f16 logits, then a vectorized log-sum-exp pass using a branch-free `fast_exp_nonpos` (`:404`) that auto-vectorizes under `target-cpu=native` (`MABLE_TOP_K = 16`, `:393`). Token choice uses no `exp`, so it is bit-identical to the old fused loop. Confidence = softmax prob of the chosen token (raw even on the boost/ban path).
 - **Per segment:** `mean_conf → AsrSegment.confidence`; `min_conf → min_token_confidence` (`:1191-1193`). The session layer is documented to later apply an isotonic calibrator turning these into `P(correct)` (`asr.rs:38-57`).
 - **Per word (HWCE):** word spans built from token boundaries (space / `▁`), then `hwce::estimate` (`:1247`) produces `word_error_risk`; `WordConfidence.confidence = 1 − risk` (`:1258`). No CTC/attention aligner. (HWCE detail in §6.7.)
 
@@ -194,7 +194,7 @@ Runs once per session on `(raw_text, segments)`. Order: voice commands → dicti
 `SwitchStyle` is applied **live**: the session swaps `style_preset` mid-pipeline (`session.rs:589-616`). Each command is emitted as `SessionEvent::CommandDetected { session_id, payload }` (`:619-622`). If `remaining` is empty after a whole-utterance command, the session finalizes with no delivery (`:625-638`).
 
 ### 5.2 Dictionary scan + heuristic correction
-**Dictionary** (`lune-dict/src/lib.rs`; modules: `caprate, commands, corrector, formatting, freq, homophone, homophone_calib, lexicon, ngram, vocab`, `lib.rs:1-10`). `DictionaryManager` holds a priority-DESC-sorted cache of `{phrase, replacement, priority}`.
+**Dictionary** (`lune-dict/src/lib.rs`; modules: `caprate, commands, corrector, edit_calib, formatting, freq, lexicon, ngram, vocab`, `lib.rs:1-10`). `DictionaryManager` holds a priority-DESC-sorted cache of `{phrase, replacement, priority}`.
 - `top_relevant(text, 20)` → up to 20 entries (CI substring or Levenshtein-≤1 single-word). Forced-title-case replacements ("Dev", "Server") are **softened to lowercase before the prompt/seed** (`soften_forced_title_case`) so the sentence-cap backstop can re-capitalize correctly (`session.rs` dict block).
 - `scan(text)` → `Vec<(matched, replacement)>` without mutating; multi-word = exact CI window match, single-word = Levenshtein-≤1 CI.
 
