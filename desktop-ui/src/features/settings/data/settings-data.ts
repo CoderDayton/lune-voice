@@ -117,6 +117,38 @@ export const dictationLanguages: DescriptiveOptionData<DictationLanguageValue>[]
   { value: 'zh', label: '中文' },
 ];
 
+export type TerminalModeValue = 'Auto' | 'Terminal' | 'Normal';
+
+export const terminalModes: DescriptiveOptionData<TerminalModeValue>[] = [
+  {
+    value: 'Auto',
+    label: 'Automatic',
+    description:
+      'Detects terminals and picks the matching paste shortcut. Works on most compositors.',
+  },
+  {
+    value: 'Normal',
+    label: 'Always Ctrl+V',
+    description: 'Force the standard paste shortcut for every app.',
+  },
+  {
+    value: 'Terminal',
+    label: 'Always Ctrl+Shift+V',
+    description:
+      'Force the terminal paste shortcut. Use on COSMIC if you mostly dictate into terminals.',
+  },
+];
+
+export type HistoryRetentionValue = 'off' | '7' | '30' | '90' | '365';
+
+export const historyRetentionOptions: Option<HistoryRetentionValue>[] = [
+  { value: 'off', label: "Don't save history" },
+  { value: '7', label: '7 days' },
+  { value: '30', label: '30 days' },
+  { value: '90', label: '90 days' },
+  { value: '365', label: '1 year' },
+];
+
 export function labelFor<V extends string>(options: Option<V>[], value: V): string {
   return options.find((o) => o.value === value)?.label ?? value;
 }

@@ -2,18 +2,16 @@ import { useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';
 import {
   AudioLines,
-  Boxes,
   Keyboard,
   type LucideIcon,
   Mic,
   Palette,
   Send,
   SlidersHorizontal,
-  Wrench,
+  Wand2,
 } from 'lucide-react';
 import { useState } from 'react';
 import { workspaceStore } from '../../store/workspace-store';
-import { AdvancedSection } from './sections/advanced-section';
 import { AppearanceSection } from './sections/appearance-section';
 import { GeneralSection } from './sections/general-section';
 import { InputSection } from './sections/input-section';
@@ -29,8 +27,7 @@ type SectionId =
   | 'input'
   | 'transcription'
   | 'output'
-  | 'models'
-  | 'advanced';
+  | 'models';
 
 export function SettingsPage() {
   const { t } = useLingui();
@@ -71,8 +68,7 @@ export function SettingsPage() {
     { id: 'input', label: t`Input`, icon: Mic },
     { id: 'transcription', label: t`Transcription`, icon: AudioLines },
     { id: 'output', label: t`Output`, icon: Send },
-    { id: 'models', label: t`Models`, icon: Boxes },
-    { id: 'advanced', label: t`Advanced`, icon: Wrench },
+    { id: 'models', label: t`Correction`, icon: Wand2 },
   ];
 
   const content: Record<SectionId, React.ReactNode> = {
@@ -83,7 +79,6 @@ export function SettingsPage() {
     transcription: <TranscriptionSection settings={settings} />,
     output: <OutputSection settings={settings} />,
     models: <ModelsSection />,
-    advanced: <AdvancedSection settings={settings} />,
   };
 
   return (

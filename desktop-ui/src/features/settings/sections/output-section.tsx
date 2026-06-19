@@ -3,7 +3,7 @@ import { TextCursorInput } from 'lucide-react';
 import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown';
 import { saveWorkspaceSetting } from '../../../store/workspace-store';
 import { type SettingsProps, SettingsRow, SettingsSection } from '../components/section';
-import { deliveryMethods } from '../data/settings-data';
+import { deliveryMethods, terminalModes } from '../data/settings-data';
 
 export function OutputSection({ settings }: SettingsProps) {
   const { t } = useLingui();
@@ -27,6 +27,22 @@ export function OutputSection({ settings }: SettingsProps) {
           />
         }
       />
+      {settings.dictationMode !== 'TypeInPlace' && (
+        <SettingsRow
+          label={t`Paste compatibility`}
+          description={t`Which paste shortcut to send. Automatic detects terminals; override if paste lands in the wrong place.`}
+          control={
+            <DescriptiveDropdown
+              value={settings.terminalMode}
+              options={terminalModes}
+              ariaLabel={t`Paste compatibility`}
+              onChange={(next) =>
+                void saveWorkspaceSetting('terminalMode', next as typeof settings.terminalMode)
+              }
+            />
+          }
+        />
+      )}
     </SettingsSection>
   );
 }

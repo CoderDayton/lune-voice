@@ -2,7 +2,7 @@ use lune_asr::AsrRegistry;
 use lune_core::config::{
     ActivationMode, AsrBackendConfig, DevicePolicy, DictationMode, HotkeyConfig, KeyCombo,
     LlmBackendConfig, Modifier, PillVisibility, RedactedString, StreamingMode, StylePreset,
-    UserSettings, builtin_registry,
+    TerminalMode, UserSettings, builtin_registry,
 };
 use lune_core::session::SessionStatus;
 use lune_persist::{AppPaths, Database, SettingsStore, StoredDictionaryEntry};
@@ -10,8 +10,8 @@ use lune_persist::{AppPaths, Database, SettingsStore, StoredDictionaryEntry};
 use crate::dto::{
     ActivationModeDto, AsrBackendTypeDto, CreateCustomStyleInput, CreateDictionaryEntryInput,
     DevicePolicyDto, DictationModeDto, DictionaryItemDto, HistoryItemDto, PillVisibilityDto,
-    SaveWorkspaceSettingsInput, SessionStatsDto, StylePresetDto, UpdateCustomStyleInput,
-    UpdateDictionaryEntryInput, WorkspaceSettingsDto, WorkspaceSnapshot,
+    SaveWorkspaceSettingsInput, SessionStatsDto, StylePresetDto, TerminalModeDto,
+    UpdateCustomStyleInput, UpdateDictionaryEntryInput, WorkspaceSettingsDto, WorkspaceSnapshot,
 };
 
 const HISTORY_LIMIT: u32 = 200;
@@ -34,6 +34,13 @@ pub fn load_workspace_snapshot() -> Result<WorkspaceSnapshot, String> {
     let paths = resolve_paths()?;
     let settings = load_settings(&paths)?;
     let mut database = open_database(&paths)?;
+    // Enforce history retention at load time. `None` keeps history forever;
+    // a prune failure is non-fatal — we still serve the snapshot.
+    if let Some(days) = settings.session_history_days
+        && let Err(e) = database.prune_sessions(days)
+    {
+        tracing::warn!(error = %e, days, "history retention prune failed");
+    }
     build_snapshot(settings, &mut database)
 }
 
@@ -417,6 +424,8 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
         mic_prewarm: settings.mic_prewarm,
         vad_pcen: settings.vad_pcen,
         start_minimized: settings.start_minimized,
+        session_history_days: settings.session_history_days,
+        terminal_mode: terminal_mode_to_dto(settings.terminal_mode),
         llm_enabled: !matches!(settings.llm_backend, LlmBackendConfig::Disabled),
         openai_asr_base_url,
         openai_asr_model,
@@ -509,6 +518,15 @@ fn apply_settings_dto(
     settings.mic_prewarm = input.mic_prewarm;
     settings.vad_pcen = input.vad_pcen;
     settings.start_minimized = input.start_minimized;
+    settings.terminal_mode = terminal_mode_from_dto(input.terminal_mode);
+    if let Some(days) = input.session_history_days
+        && !(1..=3650).contains(&days)
+    {
+        return Err(format!(
+            "sessionHistoryDays must be between 1 and 3650, got {days}"
+        ));
+    }
+    settings.session_history_days = input.session_history_days;
     settings.llm_backend = if input.llm_enabled {
         match std::mem::take(&mut settings.llm_backend) {
             // Re-enabling from Disabled lands on the local ONNX LLM; an
@@ -588,6 +606,23 @@ fn pill_visibility_from_dto(dto: PillVisibilityDto) -> PillVisibility {
         PillVisibilityDto::Always => PillVisibility::Always,
         PillVisibilityDto::WhenDictating => PillVisibility::WhenDictating,
         PillVisibilityDto::Never => PillVisibility::Never,
+    }
+}
+
+fn terminal_mode_to_dto(mode: TerminalMode) -> TerminalModeDto {
+    match mode {
+        TerminalMode::Auto => TerminalModeDto::Auto,
+        TerminalMode::Terminal => TerminalModeDto::Terminal,
+        TerminalMode::Normal => TerminalModeDto::Normal,
+        _ => TerminalModeDto::Auto,
+    }
+}
+
+fn terminal_mode_from_dto(dto: TerminalModeDto) -> TerminalMode {
+    match dto {
+        TerminalModeDto::Auto => TerminalMode::Auto,
+        TerminalModeDto::Terminal => TerminalMode::Terminal,
+        TerminalModeDto::Normal => TerminalMode::Normal,
     }
 }
 
@@ -787,6 +822,8 @@ mod tests {
             mic_prewarm: dto.mic_prewarm,
             vad_pcen: dto.vad_pcen,
             start_minimized: dto.start_minimized,
+            session_history_days: dto.session_history_days,
+            terminal_mode: dto.terminal_mode,
             llm_enabled: dto.llm_enabled,
             openai_asr_base_url: dto.openai_asr_base_url,
             openai_asr_api_key: None,

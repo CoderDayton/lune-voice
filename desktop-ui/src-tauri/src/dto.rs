@@ -78,6 +78,15 @@ pub enum PillVisibilityDto {
     Never,
 }
 
+/// Paste-shortcut selection strategy for the output stage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+pub enum TerminalModeDto {
+    Auto,
+    Terminal,
+    Normal,
+}
+
 // ── Read DTOs (Serialize → frontend) ─────────────────────────────────────
 
 /// Per-style deterministic formatting toggles, surfaced to the styles page.
@@ -178,6 +187,10 @@ pub struct WorkspaceSettingsDto {
     pub mic_prewarm: bool,
     pub vad_pcen: bool,
     pub start_minimized: bool,
+    /// How long to keep dictation history, in days. `None` disables history.
+    pub session_history_days: Option<u32>,
+    /// Paste-shortcut selection strategy for the output stage.
+    pub terminal_mode: TerminalModeDto,
     /// Whether the correction LLM backend is enabled (Local or remote).
     pub llm_enabled: bool,
     // OpenAI ASR fields (populated when asr_backend_type == OpenAiCompatible)
@@ -244,6 +257,10 @@ pub struct SaveWorkspaceSettingsInput {
     pub mic_prewarm: bool,
     pub vad_pcen: bool,
     pub start_minimized: bool,
+    /// How long to keep dictation history, in days. `None` disables history.
+    pub session_history_days: Option<u32>,
+    /// Paste-shortcut selection strategy for the output stage.
+    pub terminal_mode: TerminalModeDto,
     /// Whether the correction LLM backend should be enabled.
     pub llm_enabled: bool,
     // OpenAI ASR fields (sent when asr_backend_type == OpenAiCompatible)

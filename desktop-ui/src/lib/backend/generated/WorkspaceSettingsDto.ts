@@ -4,12 +4,21 @@ import type { AsrBackendTypeDto } from "./AsrBackendTypeDto";
 import type { DevicePolicyDto } from "./DevicePolicyDto";
 import type { DictationModeDto } from "./DictationModeDto";
 import type { PillVisibilityDto } from "./PillVisibilityDto";
+import type { TerminalModeDto } from "./TerminalModeDto";
 
 export type WorkspaceSettingsDto = { activationMode: ActivationModeDto, dictationMode: DictationModeDto, useGpu: boolean, devicePolicy: DevicePolicyDto, asrBackendType: AsrBackendTypeDto, confidenceThreshold: number | null, 
 /**
  * Clean-segment confidence bound for bypassing the correction LLM.
  */
 llmSkipThreshold: number | null, adaptiveVad: boolean, speechThreshold: number, speechThresholdEnd: number, stylePreset: string, hotkeyToggle: string, hotkeyCancel: string, pillVisibility: PillVisibilityDto, language: string, dictationLanguage: string, micPrewarm: boolean, vadPcen: boolean, startMinimized: boolean, 
+/**
+ * How long to keep dictation history, in days. `None` disables history.
+ */
+sessionHistoryDays: number | null, 
+/**
+ * Paste-shortcut selection strategy for the output stage.
+ */
+terminalMode: TerminalModeDto, 
 /**
  * Whether the correction LLM backend is enabled (Local or remote).
  */

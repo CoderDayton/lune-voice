@@ -16,7 +16,8 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { saveWorkspaceSetting, workspaceStore } from '../../../store/workspace-store';
-import { SettingsSection } from '../components/section';
+import { SettingsRow, SettingsSection } from '../components/section';
+import { useDebouncedSetting } from '../hooks/use-debounced-setting';
 
 interface ModelStatus {
   name: string;
@@ -41,7 +42,13 @@ function modelIcon(localName: string): LucideIcon {
 
 export function ModelsSection() {
   const { t } = useLingui();
-  const llmEnabled = useStore(workspaceStore, (s) => s.settings.llmEnabled);
+  const settings = useStore(workspaceStore, (s) => s.settings);
+  const llmEnabled = settings.llmEnabled;
+  const [confidence, setConfidence] = useDebouncedSetting(
+    'confidenceThreshold',
+    settings.confidenceThreshold,
+  );
+  const [llmSkip, setLlmSkip] = useDebouncedSetting('llmSkipThreshold', settings.llmSkipThreshold);
 
   const [models, setModels] = useState<ModelStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -163,6 +170,53 @@ export function ModelsSection() {
             aria-label={t`Enable correction LLM`}
           />
         </div>
+
+        {llmEnabled && (
+          <>
+            <SettingsRow
+              label={t`Correction sensitivity`}
+              description={t`Words the recognizer is unsure about are sent to the LLM. Higher corrects more aggressively; lower trusts the raw transcription.`}
+              control={
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    className="range range-primary range-sm w-28 sm:w-36"
+                    min={0.1}
+                    max={0.95}
+                    step={0.05}
+                    value={confidence}
+                    onChange={(e) => setConfidence(e.target.value)}
+                    aria-label={t`Correction sensitivity`}
+                  />
+                  <span className="text-sm tabular-nums text-content-muted w-12 text-right">
+                    {Number(confidence).toFixed(2)}
+                  </span>
+                </div>
+              }
+            />
+            <SettingsRow
+              label={t`Correction frequency`}
+              description={t`How readily the LLM runs on clean speech. Higher polishes more segments; lower skips more often for speed.`}
+              control={
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    className="range range-primary range-sm w-28 sm:w-36"
+                    min={0.1}
+                    max={0.95}
+                    step={0.05}
+                    value={Number(llmSkip).toFixed(2)}
+                    onChange={(e) => setLlmSkip(e.target.value)}
+                    aria-label={t`Correction frequency`}
+                  />
+                  <span className="text-sm tabular-nums text-content-muted w-12 text-right">
+                    {Number(llmSkip).toFixed(2)}
+                  </span>
+                </div>
+              }
+            />
+          </>
+        )}
 
         {models.map((model) => (
           <ModelManagementCard

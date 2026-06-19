@@ -4,6 +4,7 @@ import type {
   AsrBackendValue,
   DictationModeValue,
   PillVisibilityValue,
+  TerminalModeValue,
 } from '../features/settings/data/settings-data';
 import type { FormatTogglesDto } from '../lib/backend/types';
 
@@ -27,6 +28,8 @@ export interface WorkspaceSettings {
   micPrewarm: boolean;
   vadPcen: boolean;
   startMinimized: boolean;
+  sessionHistoryDays: number | null;
+  terminalMode: TerminalModeValue;
   llmEnabled: boolean;
   openaiAsrBaseUrl: string;
   openaiAsrApiKey: string;
@@ -105,6 +108,8 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   micPrewarm: true,
   vadPcen: true,
   startMinimized: false,
+  sessionHistoryDays: 30,
+  terminalMode: 'Auto',
   llmEnabled: true,
   openaiAsrBaseUrl: 'https://api.openai.com/v1',
   openaiAsrApiKey: '',

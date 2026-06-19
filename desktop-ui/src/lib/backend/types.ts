@@ -26,6 +26,7 @@ export type {
   SaveWorkspaceSettingsInput,
   SessionStatsDto,
   StylePresetDto,
+  TerminalModeDto,
   WorkspaceSettingsDto,
   WorkspaceSnapshot,
 } from './generated';

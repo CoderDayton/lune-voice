@@ -5,7 +5,11 @@ import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown
 import { activateLocale, type LocaleKey, locales } from '../../../i18n';
 import { saveWorkspaceSetting, type WorkspaceSettings } from '../../../store/workspace-store';
 import { SettingsSection } from '../components/section';
-import type { DescriptiveOptionData } from '../data/settings-data';
+import {
+  type DescriptiveOptionData,
+  type HistoryRetentionValue,
+  historyRetentionOptions,
+} from '../data/settings-data';
 
 export function GeneralSection({ settings }: { settings: WorkspaceSettings }) {
   const { t } = useLingui();
@@ -51,6 +55,27 @@ export function GeneralSection({ settings }: { settings: WorkspaceSettings }) {
             checked={settings.startMinimized}
             onChange={() => void saveWorkspaceSetting('startMinimized', !settings.startMinimized)}
             aria-label={t`Start minimized`}
+          />
+        </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col">
+            <span className="text-sm font-medium">{t`History retention`}</span>
+            <span className="text-xs text-content-muted">
+              {t`How long finished dictations are kept on this device.`}
+            </span>
+          </div>
+          <DescriptiveDropdown
+            value={
+              (settings.sessionHistoryDays == null
+                ? 'off'
+                : String(settings.sessionHistoryDays)) as HistoryRetentionValue
+            }
+            options={historyRetentionOptions}
+            ariaLabel={t`History retention`}
+            onChange={(next) =>
+              void saveWorkspaceSetting('sessionHistoryDays', next === 'off' ? null : Number(next))
+            }
           />
         </div>
       </div>

@@ -42,6 +42,8 @@ function createMockSnapshot(): WorkspaceSnapshot {
       micPrewarm: true,
       vadPcen: true,
       startMinimized: false,
+      sessionHistoryDays: 30,
+      terminalMode: 'Auto',
       openaiAsrBaseUrl: null,
       openaiAsrModel: null,
       openaiAsrApiKeySet: false,

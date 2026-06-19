@@ -1,6 +1,8 @@
 import { useLingui } from '@lingui/react/macro';
+import { useStore } from '@tanstack/react-store';
 import { Monitor, Moon, Palette, Sun } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown';
 import {
   getThemePreference,
   isDarkTheme,
@@ -8,12 +10,15 @@ import {
   themeLabel,
   watchSystemTheme,
 } from '../../../lib/theme';
+import { saveWorkspaceSetting, workspaceStore } from '../../../store/workspace-store';
 import { SettingsSection } from '../components/section';
 import { ThemePicker } from '../components/theme-picker';
+import { pillVisibilityOptions } from '../data/settings-data';
 
 export function AppearanceSection() {
   const { t } = useLingui();
   const [theme, setTheme] = useState(getThemePreference);
+  const pillVisibility = useStore(workspaceStore, (s) => s.settings.pillVisibility);
 
   useEffect(() => {
     return watchSystemTheme(() => setTheme(getThemePreference()));
@@ -79,6 +84,23 @@ export function AppearanceSection() {
               <span className="text-sm text-content-muted">{currentLabel}</span>
             </div>
             <ThemePicker />
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">{t`Dictation pill`}</span>
+          <div className="flex items-center justify-between rounded-field border border-surface-border bg-base-200/40 px-4 py-3">
+            <span className="text-sm text-content-muted">
+              {t`When to show the floating status pill while you dictate.`}
+            </span>
+            <DescriptiveDropdown
+              value={pillVisibility}
+              options={pillVisibilityOptions}
+              ariaLabel={t`Dictation pill visibility`}
+              onChange={(next) =>
+                void saveWorkspaceSetting('pillVisibility', next as typeof pillVisibility)
+              }
+            />
           </div>
         </div>
       </div>

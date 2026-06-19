@@ -128,6 +128,20 @@ export function InputSection({ settings }: SettingsProps) {
       />
 
       <SettingsRow
+        label={t`Adaptive pause detection`}
+        description={t`Learns your speaking rhythm and adjusts how long a pause ends a phrase. Helps if you pause mid-sentence to think.`}
+        control={
+          <input
+            type="checkbox"
+            className="toggle toggle-primary"
+            checked={settings.adaptiveVad}
+            onChange={() => void saveWorkspaceSetting('adaptiveVad', !settings.adaptiveVad)}
+            aria-label={t`Adaptive pause detection`}
+          />
+        }
+      />
+
+      <SettingsRow
         label={t`Pre-warm microphone`}
         description={t`Keep the mic open in the background so dictation starts ~70ms sooner. The OS may show a recording indicator while Lune Voice is running.`}
         control={
