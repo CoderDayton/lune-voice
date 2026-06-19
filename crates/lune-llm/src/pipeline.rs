@@ -9,6 +9,7 @@ use lune_core::config::BASE_SYSTEM_PROMPT;
 use lune_core::llm::{
     EditObservation, LlmService, PostProcessInput, PostProcessOutput, TextPostProcessor,
 };
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Unified correction and styling pipeline.
@@ -196,6 +197,18 @@ fn apply_dictionary_seed(text: &str, dictionary: &[lune_core::dict::DictionaryEn
         })
         .collect();
     phrases.sort_by_key(|(toks, _)| std::cmp::Reverse(toks.len()));
+    // Index phrases by their first token: a phrase can only match at a position
+    // whose token equals `phrase_toks[0]`, so the matcher consults just that
+    // bucket instead of every phrase — O(tokens × phrases) → O(tokens ×
+    // phrases-sharing-first-token). Insertion order is preserved, so each
+    // bucket stays longest-first (a longer phrase still wins on overlap).
+    let mut by_first: HashMap<&str, Vec<(&[String], &str)>> = HashMap::new();
+    for (toks, repl) in &phrases {
+        by_first
+            .entry(toks[0].as_str())
+            .or_default()
+            .push((toks.as_slice(), repl));
+    }
 
     let tokens = tokenize_word_spans(text);
     // Lowercase each token's alphanumeric core once up front. The matcher
@@ -209,17 +222,19 @@ fn apply_dictionary_seed(text: &str, dictionary: &[lune_core::dict::DictionaryEn
     let mut last_end = 0usize;
     let mut t = 0usize;
     while t < tokens.len() {
-        let matched = phrases.iter().find_map(|(phrase_toks, replacement)| {
-            let n = phrase_toks.len();
-            if t + n > tokens.len() {
-                return None;
-            }
-            let all_match = (0..n).all(|k| lowered_cores[t + k] == phrase_toks[k]);
-            if all_match {
-                Some((n, *replacement))
-            } else {
-                None
-            }
+        let matched = by_first.get(lowered_cores[t].as_str()).and_then(|bucket| {
+            bucket.iter().find_map(|(phrase_toks, replacement)| {
+                let n = phrase_toks.len();
+                if t + n > tokens.len() {
+                    return None;
+                }
+                let all_match = (0..n).all(|k| lowered_cores[t + k] == phrase_toks[k]);
+                if all_match {
+                    Some((n, *replacement))
+                } else {
+                    None
+                }
+            })
         });
 
         if let Some((n, replacement)) = matched {

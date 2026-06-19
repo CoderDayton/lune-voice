@@ -758,7 +758,14 @@ impl OrtStyleLlm {
         for (i, v) in empties.iter().enumerate() {
             binding.bind_input(names[i].as_str(), v).map_err(e)?;
         }
-        self.bind_outputs(&mut binding, &logits_name, &present_names)?;
+        let (cpu_mem, kv_mem) = self.output_memory()?;
+        self.bind_outputs(
+            &mut binding,
+            &logits_name,
+            &present_names,
+            &cpu_mem,
+            &kv_mem,
+        )?;
 
         let prefill_opts = make_shrink_run_options(self.use_gpu)?;
         let mut out = session
@@ -840,7 +847,14 @@ impl OrtStyleLlm {
                 binding.bind_input(names[i].as_str(), v).map_err(e)?;
             }
         }
-        self.bind_outputs(&mut binding, &logits_name, &present_names)?;
+        let (cpu_mem, kv_mem) = self.output_memory()?;
+        self.bind_outputs(
+            &mut binding,
+            &logits_name,
+            &present_names,
+            &cpu_mem,
+            &kv_mem,
+        )?;
 
         let prefill_opts = make_shrink_run_options(self.use_gpu)?;
         let mut out = session
@@ -1010,6 +1024,9 @@ impl OrtStyleLlm {
         let mask_ones = Array2::<i64>::ones((1, total_prefill + max_tokens + 1));
         let mut pos_arr = Array2::<i64>::zeros((1, 1));
         let mut binding = session.create_binding().map_err(e)?;
+        // Output memory descriptors are loop-invariant — build once and reuse
+        // across every decoded token instead of reconstructing them per step.
+        let (cpu_mem, kv_mem) = self.output_memory()?;
 
         for _ in 1..max_tokens {
             let tok = *state.generated.last().unwrap() as i64;
@@ -1040,7 +1057,13 @@ impl OrtStyleLlm {
             for (i, v) in kv.drain(..).enumerate() {
                 binding.bind_input(names[i].as_str(), &v).map_err(e)?;
             }
-            self.bind_outputs(&mut binding, &logits_name, &present_names)?;
+            self.bind_outputs(
+                &mut binding,
+                &logits_name,
+                &present_names,
+                &cpu_mem,
+                &kv_mem,
+            )?;
 
             let mut out = session.run_binding(&binding).map_err(e)?;
             let (next, next_margin) =
@@ -1066,12 +1089,10 @@ impl OrtStyleLlm {
 
     /// Bind logits to host (the sampler reads them) and present-KV outputs to
     /// device memory when running on GPU, so the cache never crosses PCIe.
-    fn bind_outputs(
-        &self,
-        binding: &mut ort::session::IoBinding,
-        logits_name: &str,
-        present_names: &[String],
-    ) -> Result<()> {
+    /// Output memory descriptors `(logits, kv)`. They depend only on
+    /// `self.use_gpu`, so the decode hot path builds them once and reuses them
+    /// across every token instead of reconstructing them per step.
+    fn output_memory(&self) -> Result<(MemoryInfo, MemoryInfo)> {
         let cpu = MemoryInfo::new(
             AllocationDevice::CPU,
             0,
@@ -1079,9 +1100,6 @@ impl OrtStyleLlm {
             MemoryType::Default,
         )
         .map_err(e)?;
-        binding
-            .bind_output_to_device(logits_name, &cpu)
-            .map_err(e)?;
         let kv_mem = if self.use_gpu {
             MemoryInfo::new(
                 AllocationDevice::CUDA,
@@ -1091,11 +1109,29 @@ impl OrtStyleLlm {
             )
             .map_err(e)?
         } else {
-            cpu
+            MemoryInfo::new(
+                AllocationDevice::CPU,
+                0,
+                AllocatorType::Device,
+                MemoryType::Default,
+            )
+            .map_err(e)?
         };
+        Ok((cpu, kv_mem))
+    }
+
+    fn bind_outputs(
+        &self,
+        binding: &mut ort::session::IoBinding,
+        logits_name: &str,
+        present_names: &[String],
+        cpu: &MemoryInfo,
+        kv_mem: &MemoryInfo,
+    ) -> Result<()> {
+        binding.bind_output_to_device(logits_name, cpu).map_err(e)?;
         for name in present_names {
             binding
-                .bind_output_to_device(name.as_str(), &kv_mem)
+                .bind_output_to_device(name.as_str(), kv_mem)
                 .map_err(e)?;
         }
         Ok(())
