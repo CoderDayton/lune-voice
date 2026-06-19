@@ -160,7 +160,7 @@ const TITLE_ABBREVIATIONS: &[(&str, &str)] =
 /// which dictation text already uses.
 fn abbreviate_titles(text: &str) -> String {
     let words: Vec<&str> = text.split_whitespace().collect();
-    let mut out: Vec<String> = Vec::with_capacity(words.len());
+    let mut out: Vec<&str> = Vec::with_capacity(words.len());
     for (i, w) in words.iter().enumerate() {
         let next_capitalized = words.get(i + 1).is_some_and(|n| {
             n.chars()
@@ -172,7 +172,7 @@ fn abbreviate_titles(text: &str) -> String {
             .find(|(spoken, _)| w.eq_ignore_ascii_case(spoken))
             .filter(|_| next_capitalized)
             .map(|(_, abbr)| *abbr);
-        out.push(abbrev.map_or_else(|| (*w).to_string(), |a| a.to_string()));
+        out.push(abbrev.unwrap_or(w));
     }
     out.join(" ")
 }
@@ -612,8 +612,8 @@ pub fn defuse_inconsistent(text: &str) -> String {
 fn fusion_core(word: &str) -> String {
     word.chars()
         .filter(|c| c.is_alphanumeric())
-        .collect::<String>()
-        .to_lowercase()
+        .flat_map(char::to_lowercase)
+        .collect()
 }
 
 /// Leading and trailing non-alphanumeric runs of a token, so a split can carry

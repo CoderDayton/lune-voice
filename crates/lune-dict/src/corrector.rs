@@ -10,11 +10,6 @@ pub fn has_dict(language: &str) -> bool {
 /// as "uncertain" for the session gate and gate-decision event.
 pub const HWCE_FLAG_THRESHOLD: f32 = 0.40;
 
-/// Risk score that triggers the LLM correction pass. Aliased to
-/// [`HWCE_FLAG_THRESHOLD`] so unresolved-word reporting and the
-/// `needs_llm=true` gate stay consistent.
-pub const LLM_GATE_RISK: f32 = HWCE_FLAG_THRESHOLD;
-
 /// Maximum risk at which a known high-frequency word is allowed to pass
 /// through unchanged. Above this, the word is marked uncertain even if the
 /// lexicon recognizes it.
@@ -62,7 +57,7 @@ fn process_single_word(
     lexicon_info: &Option<crate::lexicon::WordInfo>,
     risk_score: f32,
     flag_threshold: f32,
-    dict_replacements: &[(String, String)],
+    dict_lookup: &HashMap<String, &str>,
     brand_casing: bool,
 ) -> ProcessedWord {
     // Empty or digit-containing words pass through unchanged
@@ -78,11 +73,16 @@ fn process_single_word(
     });
     let flagged = risk_score >= flag_threshold;
 
-    // Dictionary replacements take priority
-    if let Some((_, repl)) = dict_replacements
-        .iter()
-        .find(|(phrase, _)| phrase.eq_ignore_ascii_case(stripped))
-    {
+    // Dictionary replacements take priority. An empty dictionary (the common
+    // case) skips the per-word lowercase + probe entirely.
+    let dict_repl = (!dict_lookup.is_empty())
+        .then(|| {
+            dict_lookup
+                .get(stripped.to_ascii_lowercase().as_str())
+                .copied()
+        })
+        .flatten();
+    if let Some(repl) = dict_repl {
         // Title-case-only replacements of ordinary words ("Dev", "Server")
         // must not force a mid-sentence capital: apply the spelling in
         // lowercase and let the sentence-initial capitalizer own position
@@ -280,6 +280,15 @@ impl LexicalGate {
         // Index risk positions for O(1) lookup. The original linear scan was
         // O(words) inside the per-word loop → O(words²) overall.
         let risk_lookup: HashMap<usize, f32> = word_risk_positions.iter().copied().collect();
+        // Index replacements for O(1) case-insensitive lookup, mirroring
+        // risk_lookup. The per-word scan in process_single_word was
+        // O(words × replacements); `.rev()` makes the first phrase win on a
+        // case-insensitive collision, matching the old `iter().find()`.
+        let dict_lookup: HashMap<String, &str> = dict_replacements
+            .iter()
+            .rev()
+            .map(|(phrase, repl)| (phrase.to_ascii_lowercase(), repl.as_str()))
+            .collect();
         // Estimate output capacity: input length plus a small slack for
         // expansions (e.g. "im" → "I'm"). Slightly oversize beats reallocs.
         let approx_cap = text.len() + words.len() * 2 + 8;
@@ -298,7 +307,7 @@ impl LexicalGate {
                 &lexicon_info,
                 risk_score,
                 flag_threshold,
-                dict_replacements,
+                &dict_lookup,
                 brand_casing,
             );
 
@@ -559,22 +568,15 @@ mod tests {
     }
 
     #[test]
-    fn llm_gate_risk_matches_flag_threshold() {
-        // Invariant: if the session-level gate fires, at least one word must
-        // also qualify as uncertain — otherwise the LLM gets no hint.
-        assert!((LLM_GATE_RISK - HWCE_FLAG_THRESHOLD).abs() < f32::EPSILON);
-    }
-
-    #[test]
     fn sub_gate_risk_does_not_fire_llm() {
         // A risk just under the gate must neither flag the word nor trigger
-        // a needs_llm decision (the session uses LLM_GATE_RISK).
+        // a needs_llm decision (the session uses HWCE_FLAG_THRESHOLD).
         let c = LexicalGate::new();
-        let just_under = LLM_GATE_RISK - 0.05;
+        let just_under = HWCE_FLAG_THRESHOLD - 0.05;
         let risks = vec![("the".to_string(), just_under)];
         let result = c.correct("the quick brown fox", &risks, &[], "en");
         assert!(result.unresolved_words.is_empty());
-        assert!(!risks.iter().any(|(_, r)| *r >= LLM_GATE_RISK));
+        assert!(!risks.iter().any(|(_, r)| *r >= HWCE_FLAG_THRESHOLD));
     }
 
     #[test]

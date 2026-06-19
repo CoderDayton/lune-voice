@@ -97,11 +97,13 @@ impl DictionaryManager {
             .partition(|e| e.phrase.contains(char::is_whitespace));
 
         let mut replacements = Vec::new();
+        // `text` is not mutated across the loop, so split it once instead of
+        // re-splitting per multi-word entry (was O(entries × text length)).
+        let text_words: Vec<&str> = text.split_whitespace().collect();
 
         for entry in &multi {
             let phrase_words: Vec<&str> = entry.phrase.split_whitespace().collect();
             let n = phrase_words.len();
-            let text_words: Vec<&str> = text.split_whitespace().collect();
             let mut i = 0;
             while i + n <= text_words.len() {
                 let window_match = text_words[i..i + n]

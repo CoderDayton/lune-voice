@@ -100,7 +100,7 @@ impl NGramModel {
         for token in &tokens {
             self.vocab.insert(token.clone());
         }
-        self.vocab.insert(END.to_owned());
+        // `END` is inserted once in `new()`; the sequence below counts it.
 
         let mut sequence = Vec::with_capacity(tokens.len() + 3);
         sequence.push(START.to_owned());
