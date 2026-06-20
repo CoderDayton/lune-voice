@@ -146,12 +146,8 @@ near 2.0 GB once the LLM correction model is loaded alongside ASR.
 | **ORT input pre-allocation** | `lune-llm/src/backend/ort_llm.rs` | `Inputs<'static>` is built into a `Vec::with_capacity(input_capacity(...))` instead of being constructed and then extended |
 | **Corrector single-buffer output** | `lune-dict/src/corrector.rs` | Builds the corrected text directly into a sized `String` instead of a `Vec<String>` + `join(" ")` |
 | **Pre-allocated audio snapshot** | `lune-asr/src/backend/qwen3.rs` | `mem::take` swaps a pre-allocated `Vec` in/out of the session — zero heap allocation during steady-state inference |
-| **Persistent partial buffers** | `session.rs` | `partial_buf` and `audio_batch` are allocated once and reused across all iterations of the main loop |
-| **Pre-computed capacity** | `confidence_router.rs`, `prompt.rs` | String builders compute exact capacity before allocation (context joins, ChatML prompts) |
-| **Segment tracker drain** | `segment.rs` | `mem::replace` with a pre-allocated `Vec::with_capacity(8)` avoids reallocation on the next burst |
+| **ChatML prompt capacity** | `lune-llm/src/prompt.rs` | The correction-output buffer is sized to the input length (`String::with_capacity(input.len())`) before filling |
 | **Static caches** | `mel/whisper.rs` | `OnceLock<Array2<f32>>` for the mel filterbank and Hann window — computed once, shared immutably |
-| **Batch vec reuse** | `llm_worker.rs` | The `batch: Vec<LlmRequest>` is allocated once and cleared each iteration |
-| **Pending buffer** | `confidence_router.rs` | 128-byte pre-allocated `String` with incremental word counting |
 
 ### Compute
 
@@ -163,9 +159,7 @@ near 2.0 GB once the LLM correction model is loaded alongside ASR.
 | **O(1) risk lookup in corrector** | `lune-dict/src/corrector.rs` | Risk positions indexed in a `HashMap`, replacing a per-word linear scan that was O(words²) overall |
 | **norm_sqr() vs norm()*norm()** | `mel/whisper.rs` | Eliminates a `sqrt()` call per bin per frame in the STFT power spectrum |
 | **Sequential-write transpose** | `mel/whisper.rs` | Outer loop over time gives stride-1 writes (cache-friendly for L1) |
-| **PCEN AGC frontend** | `lune-audio/src/vad.rs` | Default-on adaptive gain (`vad_pcen = true`) flattens loudness drift before VAD scoring; warmup holds unity gain while envelopes settle |
-| **Incremental word counting** | `confidence_router.rs` | Counts only new words per accumulation, not the whole buffer |
-| **Bit-shift length check** | `confidence_router.rs` | `(corr_len << 1) >= orig_len` for the default 0.5/2.0 thresholds |
+| **PCEN AGC frontend** | `lune-audio/src/pcen.rs` | Default-on adaptive gain (`vad_pcen = true`) flattens loudness drift before VAD scoring; warmup holds unity gain while envelopes settle |
 
 ### Concurrency
 
@@ -173,42 +167,42 @@ near 2.0 GB once the LLM correction model is loaded alongside ASR.
 |-----------|----------|--------|
 | **Split-phase locking** | `lune-asr/src/backend/qwen3.rs:poll_results` | Session lock held only during snapshot copy; released before mel extraction and inference. Allows `push_audio` to make progress concurrently |
 | **Audio frame coalescing** | `session.rs` | Initial frame + `try_recv()` batch reduces await-point count during microphone bursts |
-| **spawn_blocking for LLM** | `ort_backend.rs` | Inference runs on the blocking thread pool, never starving the async runtime |
-| **recv_many batch drain** | `llm_worker.rs` | Single lock acquisition to drain all queued LLM requests |
-| **State write elision** | `main.rs:update_state` | Skips the write lock when state string is already correct (avoids cache-line dirty on every PartialText) |
+| **Blocking-pool inference** | `lune-asr/src/backend/qwen3.rs`, `lune-llm/src/backend/ort_llm.rs` | ORT sessions are wrapped in `Arc<Mutex<Session>>` and dispatched via `spawn_blocking`, so model execution never starves the async runtime |
 
 ---
 
 ## Tuning Parameters
 
+These live in the `[pipeline]` section of `settings.toml` (`PipelineOverrides`); each overrides the ASR backend's resolved default.
+
 | Parameter | Default | Effect | Tradeoff |
 |-----------|---------|--------|----------|
-| `silence_timeout` | 800ms | Time after last ASR update before finalizing | Lower = faster delivery, but may split mid-sentence pauses |
-| `context_secs` | 30.0 | ASR sliding window size | Larger = better context for long dictation, more memory |
-| `n_ctx` | 2048 | LLM context window (tokens) | Larger = handles longer prompts, more VRAM/RAM |
-| `max_output_tokens` | 512 | Max generated tokens per LLM call | Lower = faster, but may truncate long corrections |
-| `high_threshold` | 0.82 | Confidence above which text still goes to LLM | Higher = more text gets batched for LLM context |
-| `mid_threshold` | 0.50 | Boundary between low/mid word thresholds | Adjusts accumulation aggressiveness |
-| `low_word_threshold` | 8 | Words needed before dispatching low-confidence batch | Lower = faster dispatch, less context for LLM |
-| `mid_word_threshold` | 12 | Words needed before dispatching mid-confidence batch | Lower = faster dispatch, less context for LLM |
-| `finalize_after_ms` | 500 | Segment tracker silence threshold | Lower = faster segment finalization |
-| `temperature` | 0.0 | LLM sampling temperature | 0.0 = greedy/deterministic, higher = creative variation |
+| `sentence_close_ms` | 776 | VAD silence before closing a sentence-level segment | Lower = snappier segmentation, may split natural pauses |
+| `hard_close_ms` | 1552 | VAD silence forcing a hard close / topic break (must be ≥ `sentence_close_ms`) | Lower = faster finalization, risk of premature cut |
+| `speech_threshold` / `speech_threshold_end` | 0.5 / 0.3 | VAD enter / leave probabilities (hysteresis) | Lower `_end` holds speech open through brief score dips |
+| `min_speech_ms` | 150 | Minimum speech duration accepted | Higher rejects more noise but may drop short words |
+| `max_speech_secs` | 60 | Speech-time cap before auto-ending the session | Higher allows longer single dictations |
+| `word_confidence_threshold` | 0.55 | Per-word confidence for correction spans and LLM gating | Lower routes more words to the LLM |
+| `llm_skip_threshold` | 0.40 | Skip-when-clean band — ≥2 words below this confidence trigger correction | Higher escalates to the LLM more readily |
+| `llm_skip_noisy_threshold` | 0.30 | Skip-when-broken — segment-average below this vetoes the LLM | Higher skips the LLM on more degraded audio |
+| `llm_timeout_secs` | 30 | Fall back to heuristic text if the LLM pass exceeds this | Lower bounds worst-case latency |
+| `word_boost_score` | 1.0 | Additive logit bias for dictionary tokens in the ASR decoder | Higher forces dictionary spellings harder |
 
 ### Recommended Profiles
 
 **Low-latency (short commands):**
 ```toml
-silence_timeout = 200    # ms
-low_word_threshold = 4
-mid_word_threshold = 6
+[pipeline]
+sentence_close_ms = 400
+hard_close_ms = 800
 ```
 
 **High-quality (long dictation):**
 ```toml
-silence_timeout = 1000   # ms
-low_word_threshold = 12
-mid_word_threshold = 20
-context_secs = 60.0
+[pipeline]
+sentence_close_ms = 900
+hard_close_ms = 1800
+max_speech_secs = 120
 ```
 
 ---
@@ -261,9 +255,9 @@ RUST_LOG=lune_asr=debug,lune_llm=debug,lune_app=debug ./target/release/lune-voic
 
 Key trace points:
 - `lune_asr::backend::qwen3` — `inference` with `elapsed_ms`
-- `lune_llm::ort_backend` — `LLM post-process request` with `prompt_len`, `raw_text_len`
-- `lune_llm::ort_backend` — `LLM post-process complete` with `output_len`
-- `lune_app::llm_worker` — `LLM batch: combined N requests`
+- `lune_llm::backend::ort_llm` — `LLM post-process request` with `prompt_len`, `raw_text_len`
+- `lune_llm::backend::ort_llm` — `LLM post-process complete` with `output_len`
+- `lune_app::gate` — gate decision with `needs_llm`, `min_conf`, `avg_conf`
 
 ### Memory profiling
 

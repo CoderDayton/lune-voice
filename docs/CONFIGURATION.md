@@ -469,8 +469,9 @@ Lune decides whether to call the LLM after dictionary and heuristic correction. 
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `word_confidence_threshold` | `0.65` | Per-word threshold used for LLM review |
-| `llm_skip_noisy_threshold` | `0.30` | Skip LLM when the transcript is too degraded to be useful |
+| `word_confidence_threshold` | `0.55` | Per-word confidence for correction spans and LLM gating |
+| `llm_skip_threshold` | `0.40` | Skip-when-clean band: at least two words below this confidence trigger correction |
+| `llm_skip_noisy_threshold` | `0.30` | Skip-when-broken: skip the LLM when the segment-average confidence is too degraded |
 | `llm_timeout_secs` | `30` | Fall back to heuristic text if post-processing takes too long |
 
 The gate sends structured data to the LLM:
