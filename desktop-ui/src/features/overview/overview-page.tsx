@@ -1,7 +1,7 @@
 import { useLingui } from '@lingui/react/macro';
 import { Link } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { Activity, CalendarDays, Clock, MessageSquareText, Mic } from 'lucide-react';
+import { Activity, CalendarDays, Clock, Gauge, Mic } from 'lucide-react';
 import { InfoBadge, StatusBadge } from '../../components/ui/status-badge';
 import {
   getSessionStats,
@@ -38,10 +38,8 @@ export function OverviewPage() {
   // prefers-reduced-motion inside the hook.
   const wordsCount = useCountUp(stats.totalWords);
   const minutesCount = useCountUp(stats.totalMinutes);
-  const sessionsCount = useCountUp(stats.count);
   const todayWords = useCountUp(today.words);
   const wpm = stats.totalMinutes > 0 ? Math.round(stats.totalWords / stats.totalMinutes) : 0;
-  const avgWordsPerSession = stats.count > 0 ? Math.round(stats.totalWords / stats.count) : 0;
   const wpmCount = useCountUp(wpm);
   // Today's speaking pace vs the all-time average — a quick trending-up/down
   // read on the hero card, mirroring the all-time/today split on the left.
@@ -116,31 +114,15 @@ export function OverviewPage() {
       <div className="bento-cell interactive-card col-span-12 p-space-lg md:col-span-6 md:row-span-2">
         <div className="flex items-center justify-between text-content-subtle">
           <span className="section-label">{t`Total Words`}</span>
-          <span className="section-label">{t`Words Per Minute`}</span>
         </div>
-        <div className="mt-auto flex items-end justify-between gap-4 pt-6">
-          <div className="min-w-0">
-            <div className="font-display text-display-2xl font-semibold tracking-display tabular-nums text-content-strong">
-              {wordsCount.toLocaleString()}
-            </div>
-            <p className="mt-2 text-sm text-content-muted tabular-nums">
-              {t`all-time`}
-              {` · ${today.words > 0 ? '↑ ' : ''}${todayWords.toLocaleString()} ${t`today`}`}
-            </p>
+        <div className="mt-auto pt-6">
+          <div className="font-display text-display-2xl font-semibold tracking-display tabular-nums text-content-strong">
+            {wordsCount.toLocaleString()}
           </div>
-          <div
-            aria-hidden="true"
-            className="w-px self-stretch bg-linear-to-b from-transparent via-surface-border-strong to-transparent"
-          />
-          <div className="shrink-0 text-right">
-            <div className="font-display text-display-2xl font-semibold tracking-display tabular-nums text-content-strong">
-              {wpmCount.toLocaleString()}
-            </div>
-            <p className="mt-2 text-sm text-content-muted tabular-nums">
-              {t`all-time avg`}
-              {` · ${wpmDelta && wpmDelta > 0 ? '↑ ' : wpmDelta && wpmDelta < 0 ? '↓ ' : ''}${Math.abs(wpmDelta ?? 0)} ${t`today`}`}
-            </p>
-          </div>
+          <p className="mt-2 text-sm text-content-muted tabular-nums">
+            {t`all-time`}
+            {` · ${today.words > 0 ? '↑ ' : ''}${todayWords.toLocaleString()} ${t`today`}`}
+          </p>
         </div>
       </div>
 
@@ -162,15 +144,16 @@ export function OverviewPage() {
 
       <div className="bento-cell-elevated interactive-card col-span-12 gap-4 p-space-md md:col-span-3">
         <div className="flex items-center justify-between text-content-subtle">
-          <span className="section-label">{t`Sessions`}</span>
-          <MessageSquareText size={20} strokeWidth={1.5} className="text-accent/60" />
+          <span className="section-label">{t`WPM`}</span>
+          <Gauge size={20} strokeWidth={1.5} className="text-accent/60" />
         </div>
         <div className="mt-auto">
           <div className="text-3xl font-semibold tracking-tight tabular-nums text-content-strong">
-            {sessionsCount.toLocaleString()}
+            {wpmCount.toLocaleString()}
           </div>
           <p className="mt-1 text-sm text-content-muted tabular-nums">
-            {avgWordsPerSession > 0 ? t`~${avgWordsPerSession} words each` : t`per session`}
+            {t`all-time avg`}
+            {` · ${wpmDelta && wpmDelta > 0 ? '↑ ' : wpmDelta && wpmDelta < 0 ? '↓ ' : ''}${Math.abs(wpmDelta ?? 0)} ${t`today`}`}
           </p>
         </div>
       </div>
@@ -224,7 +207,7 @@ export function OverviewPage() {
 
       {/* Recent feed — dense rows */}
       <section className="bento-cell col-span-12 overflow-hidden">
-        <div className="flex items-center justify-between px-5 pb-3 pt-5">
+        <div className="flex items-center justify-between border-b border-surface-border bg-surface-recessed px-5 py-4">
           <div>
             <h2 className="section-label">{t`Recent`}</h2>
             <p className="mt-1 text-sm text-content-subtle tabular-nums">

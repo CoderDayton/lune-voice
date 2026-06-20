@@ -105,6 +105,8 @@
   --surface-border: oklch(1 0 0 / 0.08);
   --surface-border-strong: oklch(1 0 0 / 0.16);
   --surface-inset: oklch(0.10 0 0);
+  /* Recessed band — darker than panel (0.16), lighter than inset (0.10). */
+  --surface-recessed: oklch(0.13 0 0);
   --ring-focus: oklch(0.74 0.14 295 / 0.50);
   --surface-success-tint: oklch(0.72 0.14 148 / 0.14);
   --surface-warning-tint: oklch(0.80 0.13 72 / 0.14);
@@ -161,6 +163,7 @@
   --surface-border: oklch(0 0 0 / 0.10);
   --surface-border-strong: oklch(0 0 0 / 0.20);
   --surface-inset: oklch(0.94 0 0);
+  --surface-recessed: oklch(0.965 0 0);
   --ring-focus: oklch(0.50 0.18 295 / 0.40);
   --surface-success-tint: oklch(0.55 0.16 148 / 0.10);
   --surface-warning-tint: oklch(0.72 0.16 72 / 0.12);
@@ -261,6 +264,7 @@
   --color-surface-border: var(--surface-border);
   --color-surface-border-strong: var(--surface-border-strong);
   --color-surface-inset: var(--surface-inset);
+  --color-surface-recessed: var(--surface-recessed);
 
   /* Spacing scale — usable as p-space-xs, gap-space-md, etc. */
   --spacing-space-xs: 0.375rem;
