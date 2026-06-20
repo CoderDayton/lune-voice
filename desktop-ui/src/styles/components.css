@@ -1,0 +1,289 @@
+/* ── Shell layout ──────────────────────────────────────────────────── */
+
+@utility app-shell-root {
+  @apply relative h-dvh overflow-hidden;
+}
+
+@utility app-shell-backdrop {
+  @apply pointer-events-none absolute inset-0;
+  background-image: var(--surface-backdrop);
+}
+
+@utility app-main {
+  @apply relative z-0 flex min-w-0 flex-1 flex-col overflow-hidden;
+}
+
+@utility app-scroll {
+  @apply flex-1 overflow-y-auto;
+  padding:
+    var(--space-page-y)
+    var(--space-page-x-mobile)
+    var(--space-page-bottom);
+}
+
+/* Desktop reading scale: everything in the app is rem-based, so raising the
+   root font on wide viewports scales type, spacing, and controls together.
+   Fixes the "everything looks tiny at 1080p+" effect without per-component
+   size overrides. */
+@media (min-width: 100rem) {
+  :root {
+    font-size: 17px;
+  }
+}
+
+@utility app-frame {
+  @apply w-full animate-page-in;
+  max-width: 76rem;
+  margin-inline: auto;
+}
+
+@utility page-stack {
+  @apply flex flex-col;
+  gap: var(--space-page-stack);
+}
+
+@media (min-width: 48rem) {
+  .app-scroll {
+    padding:
+      var(--space-page-y)
+      var(--space-page-x-desktop)
+      var(--space-page-bottom);
+  }
+}
+
+/* ── Sidebar ───────────────────────────────────────────────────────── */
+
+@utility sidebar-surface {
+  @apply border-r border-surface-border bg-surface-glass;
+  box-shadow: inset -1px 0 0 oklch(1 0 0 / 0.025);
+}
+
+@utility brand-title {
+  @apply truncate font-bold;
+  font-size: 1.1rem;
+  letter-spacing: -0.03em;
+}
+
+@utility section-label {
+  @apply text-sm font-semibold uppercase tracking-[0.16em] text-base-content/55 select-none;
+}
+
+@utility panel-surface {
+  @apply rounded-box border border-surface-border bg-surface-panel;
+}
+
+@utility toolbar-surface {
+  @apply rounded-box border border-surface-border bg-surface-panel p-4;
+}
+
+@utility token-icon {
+  @apply flex shrink-0 items-center justify-center rounded-field border border-surface-border bg-surface-wash text-primary;
+}
+
+@utility metric-card {
+  @apply rounded-box border border-surface-border bg-surface-panel p-4;
+  @apply cursor-pointer transition-[background,border-color,transform] duration-150;
+}
+
+.interactive-row:hover {
+  background: var(--surface-hover);
+  border-color: var(--surface-border-strong);
+}
+
+.interactive-row:active {
+  transform: scale(0.995);
+}
+
+@utility settings-row {
+  @apply flex flex-col gap-3 rounded-field px-4 py-4 transition-colors sm:flex-row sm:items-center sm:justify-between;
+}
+
+/* ── Bento board ───────────────────────────────────────────────────── */
+
+/* Asymmetric command-center grid. Cells span varying columns/rows via
+   Tailwind `col-span-*` / `row-span-*` utilities. The board exposes a
+   single column on small screens and 12 columns at >=48rem, so a cell
+   marked `col-span-12 md:col-span-6` collapses cleanly on mobile. This
+   replaces the old vertical `.page-stack` of full-width panels. */
+@utility bento-board {
+  @apply grid gap-space-md;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  grid-auto-rows: minmax(6.5rem, auto);
+}
+
+@media (min-width: 48rem) {
+  .bento-board {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+}
+
+/* Base cell — a panel surface that fills its grid track. Density (padding
+   + type scale) is applied per-cell with spacing utilities in the markup,
+   which is what produces the intentional asymmetry between hero and stat
+   cells. `min-w-0` lets long content truncate instead of blowing out the
+   track. */
+@utility bento-cell {
+  @apply flex min-w-0 flex-col rounded-box border border-surface-border bg-surface-panel;
+}
+
+@utility bento-cell-elevated {
+  @apply flex min-w-0 flex-col rounded-box border border-surface-border bg-surface-panel;
+}
+
+/* Slim status ribbon — a full-width header strip, deliberately short so it
+   reads as a status bar rather than another stacked section. */
+@utility bento-ribbon {
+  @apply flex flex-wrap items-center gap-3 rounded-box border border-surface-border bg-surface-panel px-5 py-3.5;
+}
+
+/* ── Audio meter ───────────────────────────────────────────────────── */
+
+/* Segmented input-level meter. Bars are data-driven (height set inline,
+   lit state via `data-on`) rather than keyframe-animated, so it stays
+   honest under prefers-reduced-motion — the global reduced-motion rule
+   collapses the 80ms transitions to ~0 without freezing a fake animation. */
+@utility audio-meter {
+  @apply flex items-end gap-1;
+  height: 2.5rem;
+}
+
+@utility audio-meter-bar {
+  @apply w-1.5 shrink-0 rounded-full bg-surface-border-strong;
+  transition: background-color 80ms var(--ease-standard),
+              opacity 80ms var(--ease-standard);
+}
+
+.audio-meter-bar[data-on="true"] {
+  @apply bg-primary;
+}
+
+/* ── Skeleton loading ──────────────────────────────────────────────── */
+
+@utility skeleton-shimmer {
+  @apply block rounded-field;
+  background: linear-gradient(
+    90deg,
+    var(--surface-hover) 0%,
+    var(--surface-border) 40%,
+    var(--surface-hover) 80%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* ── Status pulse ──────────────────────────────────────────────────── */
+
+/* status-pulse adds an animated halo via ::after. The host element must
+   already establish a positioning context (position: absolute/relative);
+   we don't add `position: relative` here because it would clobber an
+   `absolute`-positioned host (e.g. the corner status dot on the brand
+   logo) and make the host reflow in normal document order. */
+@utility status-pulse {
+  isolation: isolate;
+}
+
+.status-pulse::after {
+  content: "";
+  @apply absolute inset-0 rounded-full;
+  animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  background: inherit;
+}
+
+/* ── Dictation pill ────────────────────────────────────────────────── */
+
+.pill-root {
+  @apply flex items-center justify-center p-3;
+  min-width: 5rem;
+  min-height: 5rem;
+  background: transparent;
+}
+
+.pill-shell {
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.pill-root:not([data-visible]) .pill-shell {
+  opacity: 0;
+  transform: translateY(8px) scale(0.95);
+  pointer-events: none;
+}
+
+.pill-cancelled .pill-active {
+  @apply border-error/40;
+  animation: pill-cancel-flash 280ms ease;
+}
+
+@utility pill-shell {
+  @apply inline-flex items-center justify-center rounded-full p-2;
+  background: radial-gradient(
+    circle at center,
+    color-mix(in oklab, var(--color-primary) 24%, transparent),
+    transparent 62%
+  );
+}
+
+@utility pill-idle {
+  @apply btn btn-circle btn-lg flex items-center justify-center border-surface-border-strong bg-surface-elevated text-base-content;
+  box-shadow: var(--shadow-floating);
+  transition: background-color var(--duration-base) var(--ease-standard),
+              border-color var(--duration-base) var(--ease-standard),
+              box-shadow var(--duration-base) var(--ease-standard);
+}
+
+.pill-idle:hover {
+  @apply border-primary/55;
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-glow);
+}
+
+@utility pill-active {
+  @apply inline-flex min-h-14 items-center gap-2 rounded-full border border-surface-border-strong bg-surface-elevated px-2 py-2;
+  box-shadow: var(--shadow-floating);
+  animation: pill-expand var(--duration-base) var(--ease-standard);
+}
+
+@utility pill-processing {
+  @apply border-warning/25;
+}
+
+@keyframes pill-cancel-flash {
+  0%   { opacity: 1; }
+  40%  { opacity: 0.5; border-color: oklch(0.66 0.18 22 / 0.6); }
+  100% { opacity: 0; transform: translateY(4px) scale(0.97); }
+}
+
+@utility pill-center {
+  @apply flex min-w-14 flex-1 items-center justify-center rounded-full bg-surface-elevated px-4;
+}
+
+@utility pill-btn {
+  @apply btn btn-circle btn-soft btn-sm border border-transparent text-base-content/60;
+  transition: color 150ms ease, background-color 150ms ease;
+}
+
+.pill-btn:hover {
+  @apply border-base-300/35 text-base-content;
+}
+
+.pill-btn-cancel:hover {
+  @apply bg-error/15;
+}
+
+.pill-btn-stop:hover {
+  @apply bg-error/15;
+}
+
+@utility audio-dots {
+  @apply flex items-center gap-1;
+}
+
+@utility audio-dot {
+  @apply block rounded-full size-1.5 bg-primary;
+  animation: dot-bounce 1.2s ease-in-out infinite;
+  transition: transform 60ms ease-out, opacity 60ms ease-out;
+}
+
+@utility pill-pulse {
+  @apply block rounded-full size-2.5 bg-warning;
+  animation: pulse-glow 1.4s ease-in-out infinite;
+}

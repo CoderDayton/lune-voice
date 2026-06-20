@@ -1,0 +1,78 @@
+@plugin "daisyui" {
+  themes: light, dark, cupcake, bumblebee, emerald, corporate, synthwave, retro, cyberpunk, valentine, halloween, garden, forest, aqua, lofi, pastel, fantasy, wireframe, black, luxury, dracula, cmyk, autumn, business, acid, lemonade, night, coffee, winter, dim, nord, sunset, caramellatte, abyss, silk;
+}
+
+/* ── Lune theme: local audio console dark ──────────────────────────── */
+
+@plugin "daisyui/theme" {
+  name: "lune";
+  default: true;
+  color-scheme: dark;
+  /* Surfaces neutral grey. Primary/secondary carry a violet identity
+     (H=295). Accent is a complementary soft teal (H=185). */
+  --color-base-100: oklch(0.135 0 0);
+  --color-base-200: oklch(0.175 0 0);
+  --color-base-300: oklch(0.225 0 0);
+  --color-base-content: oklch(0.94 0 0);
+  --color-primary: oklch(0.74 0.14 295);
+  --color-primary-content: oklch(0.16 0.04 295);
+  --color-secondary: oklch(0.62 0.07 295);
+  --color-secondary-content: oklch(0.14 0.03 295);
+  --color-accent: oklch(0.74 0.10 185);
+  --color-accent-content: oklch(0.16 0.04 185);
+  --color-neutral: oklch(0.245 0 0);
+  --color-neutral-content: oklch(0.89 0 0);
+  --color-info: oklch(0.72 0.13 232);
+  --color-info-content: oklch(0.13 0.030 232);
+  --color-success: oklch(0.72 0.14 148);
+  --color-success-content: oklch(0.14 0.040 148);
+  --color-warning: oklch(0.80 0.13 72);
+  --color-warning-content: oklch(0.20 0.04 72);
+  --color-error: oklch(0.66 0.18 22);
+  --color-error-content: oklch(0.98 0.005 22);
+  --radius-selector: 0.5rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.3rem;
+  --size-field: 0.3rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+/* ── Lune Light theme ──────────────────────────────────────────────── */
+
+@plugin "daisyui/theme" {
+  name: "lune-light";
+  default: false;
+  color-scheme: light;
+  /* Light variant of the violet identity. */
+  --color-base-100: oklch(0.99 0 0);
+  --color-base-200: oklch(0.96 0 0);
+  --color-base-300: oklch(0.92 0 0);
+  --color-base-content: oklch(0.20 0 0);
+  --color-primary: oklch(0.50 0.18 295);
+  --color-primary-content: oklch(0.99 0.005 295);
+  --color-secondary: oklch(0.48 0.10 295);
+  --color-secondary-content: oklch(0.99 0.005 295);
+  --color-accent: oklch(0.50 0.13 185);
+  --color-accent-content: oklch(0.99 0.005 185);
+  --color-neutral: oklch(0.88 0 0);
+  --color-neutral-content: oklch(0.26 0 0);
+  --color-info: oklch(0.55 0.16 232);
+  --color-info-content: oklch(0.99 0.005 232);
+  --color-success: oklch(0.55 0.16 148);
+  --color-success-content: oklch(0.99 0.005 148);
+  --color-warning: oklch(0.72 0.16 72);
+  --color-warning-content: oklch(0.20 0.04 72);
+  --color-error: oklch(0.56 0.22 22);
+  --color-error-content: oklch(0.99 0.005 22);
+  --radius-selector: 0.5rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.3rem;
+  --size-field: 0.3rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}

@@ -1,0 +1,277 @@
+/* ── Base ──────────────────────────────────────────────────────────── */
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    @apply box-border;
+  }
+
+  html,
+  body,
+  #root {
+    @apply min-h-dvh;
+  }
+
+  body {
+    @apply m-0 font-sans antialiased;
+  }
+
+  body:not(.pill-window) {
+    background: var(--color-base-100);
+    background-image: var(--surface-grid), var(--surface-body);
+    background-size: 24px 24px, auto;
+  }
+
+  html.pill-window,
+  body.pill-window {
+    @apply min-h-0;
+    background: transparent;
+    background-image: none;
+  }
+
+  body.pill-window {
+    overflow: hidden;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role="button"][aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display;
+    letter-spacing: var(--tracking-heading);
+  }
+
+  h1 {
+    letter-spacing: var(--tracking-display);
+  }
+
+  /* Warm, subtle scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.5 0 0 / 0.15);
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.5 0 0 / 0.25);
+  }
+
+  /* Default cards are defined by border + bg, not by drop shadow. Shadows are
+     reserved for genuinely floating elements, persistent command surfaces, and
+     deliberately featured cards such as active style treatments. */
+  .card {
+    transition: background-color var(--duration-base) var(--ease-standard),
+                border-color var(--duration-base) var(--ease-standard),
+                transform var(--duration-base) var(--ease-standard);
+  }
+
+  .interactive-card:hover,
+  .card:has(a:hover, button:hover):hover {
+    border-color: var(--surface-border-strong);
+    background-color: var(--surface-card-hover);
+  }
+
+  /* Button micro-interactions */
+  .btn {
+    transition: background-color var(--duration-fast) var(--ease-standard),
+                border-color var(--duration-fast) var(--ease-standard),
+                opacity var(--duration-fast) var(--ease-standard),
+                transform var(--duration-instant) var(--ease-standard);
+  }
+
+  .btn:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  /* Strip every default focus indicator (outline + DaisyUI box-shadow
+     rings). Scoped to the focused element itself — parents using
+     :focus-within keep their own shadows. */
+  *:focus,
+  *:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Polished keyboard focus on textual fields: 1px primary-tinted border
+     plus a soft halo glow. No chunky outline, no offset gap. Only fires
+     for keyboard navigation (:focus-visible). */
+  .input:focus-visible,
+  .textarea:focus-visible {
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 0 0 3px var(--ring-focus) !important;
+  }
+
+  /* Toggle gets just the halo — its track already shows on/off state. */
+  .toggle:focus-visible {
+    box-shadow: 0 0 0 3px var(--ring-focus) !important;
+  }
+
+  .input,
+  .select,
+  .textarea {
+    background: var(--surface-field);
+    border-color: var(--surface-border);
+  }
+
+  /* Lock the select's border on focus/open — DaisyUI brightens it,
+     which reads as a chunky outline. Selects use the dropdown chevron
+     for affordance, no need to highlight the border. */
+  .select:focus,
+  .select:focus-visible,
+  .select:focus-within,
+  .select:hover {
+    border-color: var(--surface-border) !important;
+  }
+
+  /* UI chrome should not be selectable — only content text */
+  .sidebar-surface,
+  .brand-title,
+  .stat-title,
+  .stat-desc,
+  .badge,
+  .btn,
+  .label-text,
+  .fieldset-legend,
+  .status {
+    user-select: none;
+  }
+
+  /* Warmer alert */
+  .alert {
+    @apply border-base-300/30 bg-base-200/60;
+  }
+
+  /* Stat card hover */
+  .stat {
+    transition: background-color 150ms ease;
+  }
+
+  .stats .stat:hover {
+    background: var(--surface-hover);
+  }
+
+  /* Softer list rows */
+  .list-row {
+    transition: background 150ms ease;
+  }
+
+  .list-row:hover {
+    background: var(--surface-hover);
+  }
+
+  /* Warm table hover */
+  .table tr.hover:hover td {
+    background: var(--surface-hover);
+  }
+}
+
+/* ── Keyframes ─────────────────────────────────────────────────────── */
+
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pulse-ring {
+  0%, 100% { opacity: 0; transform: scale(0.8); }
+  50%      { opacity: 1; transform: scale(1); }
+}
+
+@keyframes dot-bounce {
+  0%, 80%, 100% { transform: scaleY(1); opacity: 0.35; }
+  40%           { transform: scaleY(2); opacity: 0.9; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.35; transform: scale(0.8); }
+  50%      { opacity: 0.9; transform: scale(1.2); }
+}
+
+@keyframes pill-expand {
+  from { opacity: 0.5; transform: scaleX(0.6); }
+  to   { opacity: 1; transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── btn-soft fix: DaisyUI's default 8% mix is invisible on dark themes
+   and the same 30% override looks too dark on light themes. Tune per
+   scheme so the tint reads as "subtle button" in both. Must be unlayered
+   to beat DaisyUI's @layer daisyui.l1 specificity. */
+:root .btn-soft:not(
+  .btn-active, :hover, :active:focus, :focus-visible,
+  input:checked:not(.filter .btn),
+  :disabled, [disabled], .btn-disabled
+),
+[data-color-scheme="dark"] .btn-soft:not(
+  .btn-active, :hover, :active:focus, :focus-visible,
+  input:checked:not(.filter .btn),
+  :disabled, [disabled], .btn-disabled
+) {
+  --btn-bg: color-mix(
+    in oklab,
+    var(--btn-color, var(--color-base-content)) 30%,
+    var(--color-base-100)
+  );
+  --btn-border: color-mix(
+    in oklab,
+    var(--btn-color, var(--color-base-content)) 35%,
+    var(--color-base-100)
+  );
+}
+
+[data-color-scheme="light"] .btn-soft:not(
+  .btn-active, :hover, :active:focus, :focus-visible,
+  input:checked:not(.filter .btn),
+  :disabled, [disabled], .btn-disabled
+) {
+  --btn-bg: color-mix(
+    in oklab,
+    var(--btn-color, var(--color-base-content)) 6%,
+    var(--color-base-100)
+  );
+  --btn-border: color-mix(
+    in oklab,
+    var(--btn-color, var(--color-base-content)) 11%,
+    var(--color-base-100)
+  );
+}

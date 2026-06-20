@@ -1,0 +1,291 @@
+/* ── Theme-adaptive token values ───────────────────────────────────── */
+
+/* Dark scheme tokens (default) — applies to lune + all dark DaisyUI themes */
+:root, [data-color-scheme="dark"] {
+  --content-strong: oklch(0.95 0 0);
+  --content-default: oklch(0.87 0 0);
+  --content-muted: oklch(0.69 0 0);
+  --content-subtle: oklch(0.54 0 0);
+  --content-dim: oklch(0.41 0 0);
+  /* Solid surfaces — no alpha, no glass */
+  --surface-card: oklch(0.18 0 0);
+  --surface-elevated: oklch(0.22 0 0);
+  --surface-glass: oklch(0.155 0 0);
+  --surface-panel: oklch(0.16 0 0);
+  --surface-field: oklch(0.14 0 0);
+  /* Hover/wash/border kept as alpha overlays — they layer on solid surfaces */
+  --surface-wash: oklch(1 0 0 / 0.06);
+  --surface-nav-active: oklch(1 0 0 / 0.08);
+  --surface-hover: oklch(1 0 0 / 0.04);
+  --surface-card-hover: oklch(0.22 0 0);
+  --surface-border: oklch(1 0 0 / 0.08);
+  --surface-border-strong: oklch(1 0 0 / 0.16);
+  --surface-inset: oklch(0.10 0 0);
+  /* Recessed band — darker than panel (0.16), lighter than inset (0.10). */
+  --surface-recessed: oklch(0.13 0 0);
+  --ring-focus: oklch(0.74 0.14 295 / 0.50);
+  --surface-success-tint: oklch(0.72 0.14 148 / 0.14);
+  --surface-warning-tint: oklch(0.80 0.13 72 / 0.14);
+  --surface-error-tint: oklch(0.66 0.18 22 / 0.16);
+  --surface-info-tint: oklch(0.72 0.13 232 / 0.14);
+
+  /* Elevation — dark scheme: subtle inner rim + moderate drop shadow.
+     The inner rim catches "light from above" against dark surfaces. */
+  --elev-soft:
+    inset 0 1px 0 oklch(1 0 0 / 0.04),
+    0 1px 2px oklch(0 0 0 / 0.24);
+  --elev-card:
+    inset 0 1px 0 oklch(1 0 0 / 0.05),
+    0 1px 2px oklch(0 0 0 / 0.20),
+    0 4px 12px -2px oklch(0 0 0 / 0.24);
+  --elev-raised:
+    inset 0 1px 0 oklch(1 0 0 / 0.06),
+    0 2px 4px oklch(0 0 0 / 0.24),
+    0 8px 20px -4px oklch(0 0 0 / 0.32);
+  --elev-glow:
+    inset 0 1px 0 oklch(1 0 0 / 0.08),
+    0 4px 12px oklch(0 0 0 / 0.32);
+  --elev-overlay:
+    inset 0 1px 0 oklch(1 0 0 / 0.06),
+    0 4px 8px oklch(0 0 0 / 0.28),
+    0 16px 32px -4px oklch(0 0 0 / 0.36);
+  --elev-modal:
+    inset 0 1px 0 oklch(1 0 0 / 0.08),
+    0 8px 16px oklch(0 0 0 / 0.32),
+    0 32px 64px -12px oklch(0 0 0 / 0.48);
+  --elev-floating:
+    inset 0 1px 0 oklch(1 0 0 / 0.10),
+    0 8px 24px oklch(0 0 0 / 0.40),
+    0 24px 48px -8px oklch(0 0 0 / 0.50);
+}
+
+/* Light scheme tokens — applies to lune-light + all light DaisyUI themes */
+[data-color-scheme="light"] {
+  --content-strong: oklch(0.18 0 0);
+  --content-default: oklch(0.26 0 0);
+  --content-muted: oklch(0.42 0 0);
+  --content-subtle: oklch(0.55 0 0);
+  --content-dim: oklch(0.70 0 0);
+  /* Solid surfaces */
+  --surface-card: oklch(1 0 0);
+  --surface-elevated: oklch(1 0 0);
+  --surface-glass: oklch(0.99 0 0);
+  --surface-panel: oklch(1 0 0);
+  --surface-field: oklch(0.97 0 0);
+  --surface-wash: oklch(0 0 0 / 0.06);
+  --surface-nav-active: oklch(0 0 0 / 0.08);
+  --surface-hover: oklch(0 0 0 / 0.05);
+  --surface-card-hover: oklch(0.97 0 0);
+  --surface-border: oklch(0 0 0 / 0.10);
+  --surface-border-strong: oklch(0 0 0 / 0.20);
+  --surface-inset: oklch(0.94 0 0);
+  --surface-recessed: oklch(0.965 0 0);
+  --ring-focus: oklch(0.50 0.18 295 / 0.40);
+  --surface-success-tint: oklch(0.55 0.16 148 / 0.10);
+  --surface-warning-tint: oklch(0.72 0.16 72 / 0.12);
+  --surface-error-tint: oklch(0.56 0.22 22 / 0.10);
+  --surface-info-tint: oklch(0.55 0.16 232 / 0.10);
+
+  /* Elevation — light scheme: dramatically lower opacity to avoid
+     muddy bands and dark halos on bright surfaces. */
+  --elev-soft: 0 1px 2px oklch(0 0 0 / 0.04);
+  --elev-card:
+    0 1px 2px oklch(0 0 0 / 0.04),
+    0 2px 4px oklch(0 0 0 / 0.04);
+  --elev-raised:
+    0 1px 3px oklch(0 0 0 / 0.06),
+    0 4px 8px -2px oklch(0 0 0 / 0.06);
+  --elev-glow:
+    0 2px 6px oklch(0 0 0 / 0.06),
+    0 8px 16px -4px oklch(0 0 0 / 0.08);
+  --elev-overlay:
+    0 2px 4px oklch(0 0 0 / 0.04),
+    0 8px 16px oklch(0 0 0 / 0.08),
+    0 16px 32px -8px oklch(0 0 0 / 0.10);
+  --elev-modal:
+    0 4px 8px oklch(0 0 0 / 0.06),
+    0 16px 32px oklch(0 0 0 / 0.10),
+    0 32px 64px -12px oklch(0 0 0 / 0.14);
+  --elev-floating:
+    0 4px 12px oklch(0 0 0 / 0.08),
+    0 16px 32px oklch(0 0 0 / 0.10),
+    0 32px 64px -8px oklch(0 0 0 / 0.16);
+}
+
+/* ── A11y: high-contrast & reduced-transparency (WCAG 2.2 / 2026) ──── */
+
+@media (prefers-contrast: more) {
+  :root, [data-color-scheme="dark"] {
+    --surface-border: oklch(1 0 0 / 0.20);
+    --surface-border-strong: oklch(1 0 0 / 0.36);
+    --content-muted: oklch(0.79 0 0);
+    --content-subtle: oklch(0.67 0 0);
+  }
+  [data-color-scheme="light"] {
+    --surface-border: oklch(0 0 0 / 0.20);
+    --surface-border-strong: oklch(0 0 0 / 0.36);
+    --content-muted: oklch(0.32 0 0);
+    --content-subtle: oklch(0.45 0 0);
+  }
+}
+
+/* Surfaces are already opaque; this block exists so token consumers
+   relying on prefers-reduced-transparency still get sensible fallbacks. */
+@media (prefers-reduced-transparency) {
+  :root, [data-color-scheme="dark"] {
+    --surface-hover: oklch(0.20 0 0);
+    --surface-wash: oklch(0.30 0 0);
+    --surface-nav-active: oklch(0.32 0 0);
+    --surface-border: oklch(0.30 0 0);
+    --surface-border-strong: oklch(0.40 0 0);
+  }
+  [data-color-scheme="light"] {
+    --surface-hover: oklch(0.94 0 0);
+    --surface-wash: oklch(0.90 0 0);
+    --surface-nav-active: oklch(0.88 0 0);
+    --surface-border: oklch(0.78 0 0);
+    --surface-border-strong: oklch(0.65 0 0);
+  }
+}
+
+/* ── Design tokens (Tailwind v4 @theme) ────────────────────────────── */
+
+@theme {
+  /* Typography */
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Manrope", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+
+  /* Brand palette — violet ramp (200..700), H=295 */
+  --color-brand-200: oklch(0.88 0.06 295);
+  --color-brand-300: oklch(0.80 0.10 295);
+  --color-brand-400: oklch(0.70 0.13 295);
+  --color-brand-500: oklch(0.55 0.18 295);
+  --color-brand-600: oklch(0.42 0.18 295);
+  --color-brand-700: oklch(0.32 0.13 295);
+
+  /* Text + surface tokens — theme-adaptive values set in :root / [data-theme] */
+  --color-content-strong: var(--content-strong);
+  --color-content-DEFAULT: var(--content-default);
+  --color-content-muted: var(--content-muted);
+  --color-content-subtle: var(--content-subtle);
+  --color-content-dim: var(--content-dim);
+  --color-surface-card: var(--surface-card);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-glass: var(--surface-glass);
+  --color-surface-panel: var(--surface-panel);
+  --color-surface-field: var(--surface-field);
+  --color-surface-wash: var(--surface-wash);
+  --color-surface-nav-active: var(--surface-nav-active);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-border: var(--surface-border);
+  --color-surface-border-strong: var(--surface-border-strong);
+  --color-surface-inset: var(--surface-inset);
+  --color-surface-recessed: var(--surface-recessed);
+
+  /* Spacing scale — usable as p-space-xs, gap-space-md, etc. */
+  --spacing-space-xs: 0.375rem;
+  --spacing-space-sm: 0.625rem;
+  --spacing-space-md: 1.125rem;
+  --spacing-space-lg: 1.75rem;
+  --spacing-space-xl: 2.25rem;
+  --spacing-space-2xl: 3.5rem;
+  --spacing-space-section: 1.75rem;
+  --spacing-space-page: 3rem;
+
+  /* Shadows — theme-adaptive. Actual values defined per [data-color-scheme].
+     Light mode uses much lower opacity than dark to avoid muddy bands. */
+  --shadow-soft: var(--elev-soft);
+  --shadow-card: var(--elev-card);
+  --shadow-elevated: var(--elev-raised);
+  --shadow-glow: var(--elev-glow);
+  --shadow-focus: 0 0 0 3px var(--ring-focus);
+
+  /* Animations — usable as animate-page-in, animate-shimmer, etc. */
+  --animate-page-in: page-in 280ms ease;
+  --animate-shimmer: shimmer 1.8s ease-in-out infinite;
+  --animate-pulse-ring: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-dot-bounce: dot-bounce 1.2s ease-in-out infinite;
+  --animate-pulse-glow: pulse-glow 1.4s ease-in-out infinite;
+  --animate-pill-expand: pill-expand 200ms ease;
+
+  /* Motion (2026) — durations + standardized easings.
+     Surfaces as `duration-fast`, `ease-standard`, etc. via Tailwind v4. */
+  --duration-instant: 75ms;
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --duration-slower: 500ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
+  --ease-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+
+  /* Fluid typography — clamp()-driven type scale (2026 convention) */
+  --text-display-2xl: clamp(2.5rem, 4vw + 1rem, 4rem);
+  --text-display-xl: clamp(2rem, 3vw + 1rem, 3rem);
+  --text-display-lg: clamp(1.5rem, 2vw + 0.75rem, 2.25rem);
+  --text-h1: clamp(1.5rem, 1.4vw + 0.875rem, 1.875rem);
+  --text-h2: clamp(1.25rem, 0.9vw + 0.875rem, 1.5rem);
+  --text-h3: clamp(1.125rem, 0.5vw + 0.875rem, 1.25rem);
+  --tracking-display: -0.035em;
+  --tracking-heading: -0.02em;
+  --tracking-uppercase: 0.14em;
+
+  /* Z-index scale */
+  --z-base: 0;
+  --z-raised: 10;
+  --z-dropdown: 50;
+  --z-sticky: 100;
+  --z-overlay: 200;
+  --z-modal: 300;
+  --z-popover: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
+
+  /* Semantic elevation tiers — theme-adaptive */
+  --shadow-rest: var(--elev-soft);
+  --shadow-raised: var(--elev-card);
+  --shadow-overlay: var(--elev-overlay);
+  --shadow-modal: var(--elev-modal);
+  --shadow-floating: var(--elev-floating);
+
+  /* Status surface tints — bridged to theme-adaptive vars */
+  --color-surface-success-tint: var(--surface-success-tint);
+  --color-surface-warning-tint: var(--surface-warning-tint);
+  --color-surface-error-tint: var(--surface-error-tint);
+  --color-surface-info-tint: var(--surface-info-tint);
+}
+
+/* ── Computed tokens (not Tailwind utilities — used by surfaces/layouts) */
+
+:root {
+  --size-sidebar: 18.5rem;
+  --size-sidebar-collapsed: 5rem;
+  --size-nav-icon: 1.125rem;
+
+  --space-page-stack: 2rem;
+  --space-page-x-mobile: 1.75rem;
+  --space-page-x-desktop: 3rem;
+  --space-page-y: 1.75rem;
+  --space-page-bottom: 3.5rem;
+
+  --surface-body:
+    linear-gradient(170deg, oklch(0.135 0 0), oklch(0.105 0 0));
+  --surface-backdrop:
+    linear-gradient(135deg, oklch(0.74 0.14 295 / 0.05), transparent 42%),
+    linear-gradient(320deg, oklch(0.74 0.10 185 / 0.03), transparent 48%);
+  --surface-grid:
+    radial-gradient(circle, oklch(1 0 0 / 0.055) 1px, transparent 1px);
+  --surface-brand:
+    linear-gradient(135deg, oklch(0.74 0.14 295), oklch(0.50 0.18 295));
+}
+
+[data-color-scheme="light"] {
+  --surface-body:
+    linear-gradient(170deg, oklch(0.97 0 0), oklch(0.93 0 0));
+  --surface-backdrop:
+    linear-gradient(135deg, oklch(0.50 0.18 295 / 0.05), transparent 42%),
+    linear-gradient(320deg, oklch(0.50 0.13 185 / 0.03), transparent 48%);
+  --surface-grid:
+    radial-gradient(circle, oklch(0 0 0 / 0.04) 1px, transparent 1px);
+}
