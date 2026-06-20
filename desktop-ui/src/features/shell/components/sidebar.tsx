@@ -1,17 +1,18 @@
 import { useLingui } from '@lingui/react/macro';
 import { Link, useRouterState } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
+import { invoke } from '@tauri-apps/api/core';
 import {
   ChevronsUpDown,
   CircleUser,
   PanelLeftClose,
   PanelLeftOpen,
-  Settings,
+  Power,
   SunMoon,
 } from 'lucide-react';
 import luneLogo from '../../../assets/lune-voice-logo.png';
 import { setThemePreference } from '../../../lib/theme';
-import { toggleDictation, workspaceStore } from '../../../store/workspace-store';
+import { workspaceStore } from '../../../store/workspace-store';
 import { navigationGroups } from '../config/navigation';
 import { DRAWER_ID } from './app-shell';
 import { SidebarQuickStart } from './sidebar-widgets';
@@ -51,7 +52,7 @@ export function SidebarContent() {
             <PanelLeftOpen size={20} strokeWidth={2} />
           </span>
           <span
-            className={`absolute -bottom-0.5 -right-0.5 block size-2.5 rounded-full ring-2 ring-base-100 ${isActive ? 'bg-success status-pulse' : isConnecting ? 'bg-warning' : isConnected ? 'bg-success/50' : 'bg-base-content/20'}`}
+            className={`absolute -bottom-0.5 -right-0.5 block size-2.5 rounded-full ring-2 ring-base-100 ${isActive ? 'bg-success status-pulse' : isConnecting ? 'bg-warning' : isConnected ? 'bg-success/60' : 'bg-base-content/25'}`}
             aria-hidden="true"
           />
         </label>
@@ -87,14 +88,12 @@ export function SidebarContent() {
         ))}
       </nav>
 
-      {/* Primary action (expanded only) */}
-      <div className="is-drawer-close:hidden">
-        <SidebarQuickStart />
-      </div>
+      {/* Primary action — full button when expanded, compact mic tile when collapsed */}
+      <SidebarQuickStart />
 
       {/* Account / status card */}
-      <div className="mx-2 mb-2 mt-1 sm:mx-3 sm:mb-3">
-        <div className="mb-2 border-t border-surface-border" />
+      <div className="mx-3 mb-2 sm:mx-3.5 sm:mb-3">
+        <div className="mb-3 border-t border-surface-border" />
         <SidebarUserCard
           isActive={isActive}
           isConnected={isConnected}
@@ -129,7 +128,7 @@ function NavRow({
         {active ? (
           <span
             aria-hidden="true"
-            className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary"
+            className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary is-drawer-close:hidden"
           />
         ) : null}
         <Icon
@@ -154,7 +153,7 @@ function SidebarUserCard({
 }) {
   const { t } = useLingui();
   const dotClass = isActive
-    ? 'bg-success'
+    ? 'bg-success status-pulse'
     : isConnecting
       ? 'bg-warning'
       : isConnected
@@ -179,12 +178,26 @@ function SidebarUserCard({
     setThemePreference(scheme === 'light' ? 'lune' : 'lune-light');
   };
 
+  const quitApp = () => {
+    void invoke('quit_app').catch(() => {});
+  };
+
   return (
     <div className="dropdown dropdown-top w-full is-drawer-close:dropdown-right is-drawer-close:dropdown-end">
       <button
         type="button"
         className="flex w-full items-center gap-3 rounded-field border border-surface-border bg-surface-elevated px-2.5 py-2.5 text-left transition-colors hover:bg-surface-card-hover hover:border-surface-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary is-drawer-close:mx-auto is-drawer-close:size-10 is-drawer-close:justify-center is-drawer-close:gap-0 is-drawer-close:p-0 sm:px-3 is-drawer-close:sm:p-0"
         aria-label={t`Account and status`}
+        onMouseDown={(e) => {
+          // DaisyUI dropdowns open on focus, so a second click on the
+          // already-open trigger wouldn't close it (it stays focused).
+          // If it's focused, blur and swallow the click so it can't
+          // immediately re-focus and reopen.
+          if (document.activeElement === e.currentTarget) {
+            e.preventDefault();
+            e.currentTarget.blur();
+          }
+        }}
       >
         <span className="relative shrink-0">
           <span className="flex size-8 items-center justify-center rounded-field bg-surface-wash text-content-muted ring-1 ring-surface-border-strong">
@@ -196,7 +209,7 @@ function SidebarUserCard({
           />
         </span>
         <span className="min-w-0 flex-1 is-drawer-close:hidden">
-          <span className="block truncate text-sm font-medium text-content">{t`Account`}</span>
+          <span className="block truncate text-sm font-medium text-content">{t`Lune Voice`}</span>
           <span className="block truncate text-xs text-content-subtle">
             {t`Local`} · {statusLabel}
           </span>
@@ -207,23 +220,7 @@ function SidebarUserCard({
           className="shrink-0 text-content-subtle is-drawer-close:hidden"
         />
       </button>
-      <ul className="dropdown-content menu z-popover mb-2 w-56 gap-0.5 rounded-box border border-surface-border bg-surface-elevated p-2 shadow-overlay is-drawer-close:mb-0 is-drawer-close:ml-2 is-drawer-close:top-auto is-drawer-close:bottom-0">
-        <li>
-          <button
-            type="button"
-            disabled={isConnecting}
-            onClick={(e) => {
-              // Drop focus: dictated text typed into this window must not
-              // re-activate the button via Space/Enter and re-toggle sessions.
-              e.currentTarget.blur();
-              closeDropdown();
-              void toggleDictation();
-            }}
-          >
-            <span className={`size-2 shrink-0 rounded-full ${dotClass}`} aria-hidden="true" />
-            {isActive ? t`Stop dictating` : isConnecting ? t`Connecting` : t`Start dictating`}
-          </button>
-        </li>
+      <ul className="dropdown-content menu z-popover mb-2 w-full gap-0.5 rounded-box border border-surface-border bg-surface-elevated p-2 shadow-overlay is-drawer-close:mb-0 is-drawer-close:ml-2 is-drawer-close:w-56 is-drawer-close:top-auto is-drawer-close:bottom-0">
         <li>
           <button
             type="button"
@@ -236,11 +233,19 @@ function SidebarUserCard({
             {t`Toggle theme`}
           </button>
         </li>
+        <div aria-hidden="true" className="mx-2 my-1 border-t border-surface-border" />
         <li>
-          <Link to="/settings" onClick={closeDropdown}>
-            <Settings size={16} strokeWidth={1.8} />
-            {t`Settings`}
-          </Link>
+          <button
+            type="button"
+            className="text-error hover:bg-error/10"
+            onClick={() => {
+              closeDropdown();
+              quitApp();
+            }}
+          >
+            <Power size={16} strokeWidth={1.8} />
+            {t`Quit Lune Voice`}
+          </button>
         </li>
       </ul>
     </div>

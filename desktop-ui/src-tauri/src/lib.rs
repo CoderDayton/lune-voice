@@ -20,6 +20,14 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 /// quits apart from window-closes, and we'd block both.
 static QUIT_REQUESTED: AtomicBool = AtomicBool::new(false);
 
+/// Frontend-invokable quit. Mirrors the tray "Quit" path: set the intent
+/// flag so the ExitRequested handler honors the exit, then terminate.
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle) {
+    QUIT_REQUESTED.store(true, Ordering::SeqCst);
+    app.exit(0);
+}
+
 /// Bring the main window to front, creating it on demand if it doesn't exist.
 /// We don't keep the window alive while minimized — closing destroys the
 /// webview to free its memory, and the next call here rebuilds it.
@@ -149,7 +157,8 @@ pub fn run() {
             commands::check_model_status,
             commands::download_model_cmd,
             commands::delete_model_cmd,
-            commands::initialize_pipeline
+            commands::initialize_pipeline,
+            quit_app
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|e| {
