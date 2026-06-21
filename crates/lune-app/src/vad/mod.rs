@@ -27,6 +27,7 @@
 
 mod chunker;
 mod config;
+mod pace;
 mod silero;
 
 use std::collections::VecDeque;
@@ -209,8 +210,11 @@ impl HybridVad {
                 self.span.extend_from_slice(frame);
                 self.trailing_silence_samples = 0;
             }
-            SpanEvent::Append => self.append_frame(frame, prob),
-            SpanEvent::Close { keep } => {
+            // A resumed sub-gap pause is audio-identical to Append; its length
+            // (the `silence_frames` payload) is the per-pause signal the adaptive
+            // endpoint learner will consume in Stage B.
+            SpanEvent::Append | SpanEvent::Resumed { .. } => self.append_frame(frame, prob),
+            SpanEvent::Close { keep, reason: _ } => {
                 // The closing frame is appended like any other in-span frame: on a
                 // max-length close it is voiced speech the gate counted (dropping it
                 // would clip the final ~32 ms); on a long-gap close it is a silence
@@ -289,7 +293,7 @@ impl HybridVad {
     pub fn finish(&mut self) -> Vec<GateAction> {
         let mut actions = Vec::new();
         let tail = std::mem::take(&mut self.sample_buf);
-        if let SpanEvent::Close { keep } = self.span_gate.finish() {
+        if let SpanEvent::Close { keep, reason: _ } = self.span_gate.finish() {
             self.close_span(keep, &tail, &mut actions);
         }
         actions
