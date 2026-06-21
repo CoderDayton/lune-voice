@@ -42,6 +42,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Window lifecycle, button system, focus styles, and layout polish
 - VAD init failure now propagates gracefully instead of panicking
 - Mid-utterance pauses no longer fragment dictation into spurious sentences — the VAD caps the silence the recognizer hears, so a 0.5–1s breath isn't read as a sentence end
+- Filler words ("um", "uh", and the like) are stripped from dictation output, including mid-sentence (English only)
+- Long sentences now get a terminal period even when the LLM is skipped (minimal style); one-word dictations stay bare
 - Hotkey toggle, session, and IPC pipeline hardened against races and silent failures
 - Qwen3 ASR model readiness and language parsing
 - Gate false positives via case-insensitive lang detection and proper noun bypass

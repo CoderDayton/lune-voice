@@ -506,7 +506,11 @@ fn correct_and_format(
     // casing, so a split sentence-start capitalizes correctly. English only —
     // the p_cap/freq guards are English.
     let corrected = if detected_lang == "English" {
-        lune_dict::formatting::defuse_inconsistent(&heuristic_result.corrected_text)
+        // De-fuse run-together words, then drop hesitation fillers ("um"/"uh")
+        // before punctuation/casing — English-only, so the multilingual ASR and
+        // languages where "um" is a real word are untouched.
+        let defused = lune_dict::formatting::defuse_inconsistent(&heuristic_result.corrected_text);
+        lune_dict::formatting::strip_fillers(&defused)
     } else {
         heuristic_result.corrected_text.clone()
     };

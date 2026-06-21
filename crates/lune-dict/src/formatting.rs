@@ -135,9 +135,13 @@ pub fn normalize_with(text: &str, fmt: &FormatToggles) -> PunctuationOutcome {
         trimmed.to_owned()
     };
 
-    // Tier 1: append a terminal period only for resolved declaratives. When
-    // `needs_llm` is set the interrogative/run-on branch owns the end mark.
-    if !ends_terminal && !needs_llm {
+    // Tier 1: append a terminal period for resolved declaratives — including
+    // run-ons, so the deterministic (no-LLM) path is never left without an end
+    // mark (`needs_llm` is unchanged: a run-on still routes to the LLM for
+    // internal commas when it runs). Two guards: a one-word dictation (a bare
+    // word, command, or fragment) gets no period, and an interrogative lead with
+    // no end mark is deferred to the LLM (`?` vs `.` can't be guessed safely).
+    if words.len() > 1 && !ends_terminal && !interrogative {
         out.push('.');
     }
 
@@ -448,6 +452,34 @@ pub fn capitalize_sentence_starts(text: &str) -> String {
     out
 }
 
+/// Disfluency fillers stripped as whole tokens. English-only: "um" is a real
+/// word in other languages (Portuguese "one/a"), so the caller language-gates
+/// this and the multilingual ASR is never touched.
+const FILLERS: &[&str] = &["um", "umm", "uhm", "uh", "uhh", "er", "erm", "hmm", "hm"];
+
+/// Remove standalone hesitation fillers ("um", "uh", …) that Qwen3-ASR
+/// transcribes verbatim, including mid-sentence ("the sidebar um, in its open
+/// state" → "the sidebar in its open state"). A token is dropped only when its
+/// punctuation-stripped, lowercased core is exactly a filler, so "umbrella",
+/// "uh-huh", and ordinary words are never touched. Whitespace is rejoined with
+/// single spaces (dictation text already uses them). If stripping would empty
+/// the text — a pure-filler utterance — the original is returned unchanged.
+/// English-only; the caller language-gates. Runs on the always-on text (fast
+/// path + LLM input) so fillers are gone whether or not the LLM pass runs.
+pub fn strip_fillers(text: &str) -> String {
+    if !is_latin(text) {
+        return text.to_owned();
+    }
+    let kept: Vec<&str> = text
+        .split_whitespace()
+        .filter(|tok| !FILLERS.contains(&word_core(tok).to_ascii_lowercase().as_str()))
+        .collect();
+    if kept.is_empty() {
+        return text.to_owned();
+    }
+    kept.join(" ")
+}
+
 /// Lowercase the leading capital of a mid-sentence word the lexicon knows to be
 /// a common word (low capitalization rate). Fixes ASR/heuristic over-caps like
 /// "Make Sure" → "Make sure" and "So Make" → "So make" while leaving sentence
@@ -724,6 +756,60 @@ mod tests {
         let out = normalize("turn on the light");
         assert_eq!(out.text, "Turn on the light.");
         assert!(!out.needs_llm);
+    }
+
+    #[test]
+    fn one_word_dictation_gets_no_period() {
+        // A bare word / command / fragment is left without a terminal period.
+        assert_eq!(normalize("voice").text, "Voice");
+        assert_eq!(normalize("okay").text, "Okay");
+    }
+
+    #[test]
+    fn run_on_declarative_still_gets_terminal_period() {
+        // A long comma-less declarative still routes to the LLM (needs_llm) for
+        // internal commas, but the deterministic path now closes it so the
+        // no-LLM (minimal) output isn't left period-less.
+        let out =
+            normalize("you might have to make a new token that is in between those two colors");
+        assert!(
+            out.needs_llm,
+            "long comma-less declarative must still route to the LLM"
+        );
+        assert!(
+            out.text.ends_with('.'),
+            "deterministic path must still close the run-on: {:?}",
+            out.text
+        );
+    }
+
+    #[test]
+    fn strip_fillers_removes_standalone_disfluencies() {
+        // Real transcripts from dictation history (leading + mid-sentence).
+        assert_eq!(
+            strip_fillers("Um, yeah, you should have had it there"),
+            "yeah, you should have had it there"
+        );
+        assert_eq!(
+            strip_fillers("the sidebar um, in its open state"),
+            "the sidebar in its open state"
+        );
+        assert_eq!(
+            strip_fillers("you might have to uh make a new token"),
+            "you might have to make a new token"
+        );
+    }
+
+    #[test]
+    fn strip_fillers_spares_real_words_and_pure_filler() {
+        // Substrings and hyphenated agreement are not fillers.
+        assert_eq!(
+            strip_fillers("the umbrella is huge"),
+            "the umbrella is huge"
+        );
+        assert_eq!(strip_fillers("uh-huh I agree"), "uh-huh I agree");
+        // A pure-filler utterance is left intact rather than emptied.
+        assert_eq!(strip_fillers("um uh"), "um uh");
     }
 
     #[test]
