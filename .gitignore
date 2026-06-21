@@ -6,7 +6,7 @@ desktop-ui/src-tauri/onnx-libs/
 *.swo
 .env
 *.db
-/scripts/__pycache__/
+/scripts/
 
 .ralph-logs/
 models/
