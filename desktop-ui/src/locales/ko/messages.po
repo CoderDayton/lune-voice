@@ -38,6 +38,10 @@ msgstr "서식 수정 4개 중 {onCount}개 켜짐"
 msgid "{page} / {totalPages}"
 msgstr "{page} / {totalPages}"
 
+#: src/features/settings/sections/input-section.tsx:55
+msgid "{saved} (unavailable)"
+msgstr ""
+
 #: src/features/history/components/history-pagination.tsx:29
 #: src/features/history/components/history-table.tsx:157
 msgid "{start}–{end} of {visibleCount}"
@@ -68,21 +72,22 @@ msgstr "작업"
 msgid "Active"
 msgstr "활성"
 
-#: src/features/styles/components/style-hero.tsx:32
+#: src/features/styles/components/style-hero.tsx:30
 msgid "Active style"
 msgstr "활성 스타일"
 
-#: src/features/settings/sections/input-section.tsx:117
-#: src/features/settings/sections/input-section.tsx:125
+#: src/features/settings/sections/input-section.tsx:163
+#: src/features/settings/sections/input-section.tsx:171
 msgid "Adaptive gain control"
 msgstr "적응형 이득 제어"
 
-#: src/features/settings/sections/input-section.tsx:131
-#: src/features/settings/sections/input-section.tsx:139
+#: src/features/settings/sections/input-section.tsx:177
+#: src/features/settings/sections/input-section.tsx:185
 msgid "Adaptive pause detection"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-form.tsx:57
+#: src/features/dictionary/components/dictionary-form.tsx:47
+#: src/features/dictionary/components/dictionary-form.tsx:50
 msgid "Add a correction"
 msgstr "수정 추가"
 
@@ -90,7 +95,7 @@ msgstr "수정 추가"
 msgid "Add a fix and Lune Voice applies it every time you dictate. Try a starter below or add your own above."
 msgstr "수정 규칙을 추가하면 Lune Voice가 받아쓰기할 때마다 적용합니다. 아래 예시를 사용해 보거나 위에서 직접 추가하세요."
 
-#: src/features/dictionary/components/dictionary-form.tsx:159
+#: src/features/dictionary/components/dictionary-form.tsx:148
 msgid "Add correction"
 msgstr "수정 추가"
 
@@ -98,7 +103,7 @@ msgstr "수정 추가"
 msgid "Adjust manually"
 msgstr "수동으로 조정"
 
-#: src/features/settings/sections/models-section.tsx:146
+#: src/features/settings/sections/models-section.tsx:150
 msgid "AI models stored on your device."
 msgstr "기기에 저장된 AI 모델입니다."
 
@@ -151,7 +156,7 @@ msgstr "문장 자동 대문자화"
 msgid "Brand casing (\"github\" → \"GitHub\")"
 msgstr "브랜드 표기(\"github\" → \"GitHub\")"
 
-#: src/features/styles/components/style-hero.tsx:20
+#: src/features/styles/components/style-hero.tsx:21
 msgid "Brands"
 msgstr "브랜드"
 
@@ -159,17 +164,17 @@ msgstr "브랜드"
 msgid "Browse themes"
 msgstr "테마 찾아보기"
 
-#: src/features/styles/components/style-hero.tsx:35
+#: src/features/styles/components/style-hero.tsx:33
 #: src/features/styles/components/style-preset-card.tsx:66
 msgid "Built-in"
 msgstr "내장"
 
-#: src/features/settings/sections/input-section.tsx:58
+#: src/features/settings/sections/input-section.tsx:104
 msgid "Calibrate"
 msgstr "교정"
 
 #: src/features/settings/components/calibrate-modal.tsx:59
-#: src/features/settings/sections/input-section.tsx:55
+#: src/features/settings/sections/input-section.tsx:101
 msgid "Calibrate microphone"
 msgstr "마이크 교정"
 
@@ -189,7 +194,7 @@ msgstr "현재 녹음 취소"
 msgid "Cancel dictation"
 msgstr "받아쓰기 취소"
 
-#: src/features/styles/components/style-hero.tsx:18
+#: src/features/styles/components/style-hero.tsx:19
 msgid "Capitals"
 msgstr "대문자"
 
@@ -212,10 +217,6 @@ msgstr "현재 사용 중인 앱에 완성된 텍스트를 삽입하는 방법�
 #: src/features/settings/sections/appearance-section.tsx:41
 msgid "Choose how Lune Voice looks."
 msgstr "Lune Voice의 모양을 선택하세요."
-
-#: src/features/settings/sections/input-section.tsx:29
-msgid "Choose how quickly you want to enter and leave voice typing."
-msgstr "음성 입력을 시작하고 끝내는 속도를 선택하세요."
 
 #: src/features/welcome/welcome-page.tsx:128
 #: src/features/welcome/welcome-page.tsx:134
@@ -268,11 +269,11 @@ msgstr "계속"
 msgid "Control how your speech is turned into text."
 msgstr "음성이 텍스트로 변환되는 방식을 제어하세요."
 
-#: src/features/history/components/history-table.tsx:291
+#: src/features/history/components/history-table.tsx:300
 msgid "Copied"
 msgstr "복사됨"
 
-#: src/features/history/components/history-table.tsx:291
+#: src/features/history/components/history-table.tsx:300
 msgid "Copy"
 msgstr "복사"
 
@@ -280,25 +281,25 @@ msgstr "복사"
 msgid "Copy transcript"
 msgstr "받아쓰기 텍스트 복사"
 
-#: src/features/settings/settings-page.tsx:71
+#: src/features/settings/sections/models-section.tsx:158
 msgid "Correction"
 msgstr ""
 
-#: src/features/settings/sections/models-section.tsx:198
-#: src/features/settings/sections/models-section.tsx:210
+#: src/features/settings/sections/models-section.tsx:211
+#: src/features/settings/sections/models-section.tsx:223
 msgid "Correction frequency"
 msgstr ""
 
-#: src/features/settings/sections/models-section.tsx:156
+#: src/features/settings/sections/models-section.tsx:169
 msgid "Correction LLM"
 msgstr "교정 LLM"
 
-#: src/features/settings/sections/models-section.tsx:177
-#: src/features/settings/sections/models-section.tsx:189
+#: src/features/settings/sections/models-section.tsx:190
+#: src/features/settings/sections/models-section.tsx:202
 msgid "Correction sensitivity"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-form.tsx:41
+#: src/features/dictionary/components/dictionary-form.tsx:42
 msgid "Couldn't add that rule. Try again."
 msgstr "해당 규칙을 추가할 수 없습니다. 다시 시도해 보세요."
 
@@ -321,7 +322,7 @@ msgstr "어둡게"
 
 #: src/components/feedback/confirm-dialog.tsx:63
 #: src/features/dictionary/components/dictionary-table.tsx:146
-#: src/features/history/components/history-table.tsx:300
+#: src/features/history/components/history-table.tsx:309
 #: src/features/history/components/session-detail-modal.tsx:202
 #: src/features/settings/sections/models-section.tsx:354
 msgid "Delete"
@@ -341,7 +342,7 @@ msgstr "{0}을(를) 삭제하시겠습니까?"
 msgid "Delete model"
 msgstr "모델 삭제"
 
-#: src/features/history/components/history-table.tsx:298
+#: src/features/history/components/history-table.tsx:307
 #: src/features/history/components/session-detail-modal.tsx:200
 msgid "Delete session?"
 msgstr "세션을 삭제하시겠습니까?"
@@ -379,9 +380,9 @@ msgstr ""
 msgid "Dictation pill visibility"
 msgstr ""
 
-#: src/features/settings/sections/models-section.tsx:161
-msgid "Disabled — transcripts are delivered raw, and the LLM model is hidden from the list below."
-msgstr "비활성화됨 - 받아쓰기 텍스트가 원본 그대로 전달되고 LLM 모델은 아래 목록에서 숨겨집니다."
+#: src/features/settings/sections/models-section.tsx:174
+msgid "Disabled — transcripts are delivered raw, and the LLM model is hidden from the list above."
+msgstr ""
 
 #: src/features/settings/sections/shortcuts-section.tsx:32
 msgid "Discard the current draft and return to idle. Click the binding to change it."
@@ -395,7 +396,7 @@ msgstr "연결이 끊김"
 msgid "Dismiss error"
 msgstr "오류 무시"
 
-#: src/features/history/components/history-table.tsx:294
+#: src/features/history/components/history-table.tsx:303
 #: src/features/settings/sections/models-section.tsx:368
 msgid "Download"
 msgstr "다운로드"
@@ -446,7 +447,7 @@ msgstr "기간"
 msgid "e.g. Meeting notes"
 msgstr "예: 회의록"
 
-#: src/features/styles/components/style-hero.tsx:53
+#: src/features/styles/components/style-hero.tsx:47
 #: src/features/styles/components/style-preset-card.tsx:113
 msgid "Edit"
 msgstr "편집"
@@ -461,12 +462,12 @@ msgid "Edit style"
 msgstr "스타일 편집"
 
 #: src/features/history/components/history-session-list.tsx:28
-#: src/features/history/components/history-table.tsx:253
+#: src/features/history/components/history-table.tsx:262
 #: src/features/overview/overview-page.tsx:254
 msgid "Empty session"
 msgstr "빈 세션"
 
-#: src/features/settings/sections/models-section.tsx:170
+#: src/features/settings/sections/models-section.tsx:183
 msgid "Enable correction LLM"
 msgstr "교정 LLM 활성화"
 
@@ -483,7 +484,7 @@ msgstr "Lune Voice 열기"
 msgid "Expand sidebar"
 msgstr "사이드바 확장"
 
-#: src/features/dictionary/components/dictionary-form.tsx:140
+#: src/features/dictionary/components/dictionary-form.tsx:129
 msgid "Fill both fields to see the correction."
 msgstr "수정 사항을 보려면 두 필드를 모두 채우세요."
 
@@ -500,7 +501,7 @@ msgid "formatting"
 msgstr "서식 지정"
 
 #: src/features/styles/components/style-editor-modal.tsx:104
-#: src/features/styles/components/style-hero.tsx:60
+#: src/features/styles/components/style-hero.tsx:54
 msgid "Formatting"
 msgstr "서식 지정"
 
@@ -513,11 +514,11 @@ msgstr "일반"
 msgid "Generating examples…"
 msgstr "예시 생성 중…"
 
-#: src/features/dictionary/components/dictionary-form.tsx:82
+#: src/features/dictionary/components/dictionary-form.tsx:71
 msgid "github"
 msgstr "github"
 
-#: src/features/dictionary/components/dictionary-form.tsx:113
+#: src/features/dictionary/components/dictionary-form.tsx:102
 msgid "GitHub"
 msgstr "GitHub"
 
@@ -533,8 +534,8 @@ msgstr "좋은 저녁이에요"
 msgid "Good morning"
 msgstr "좋은 아침이에요"
 
-#: src/features/settings/sections/general-section.tsx:63
-#: src/features/settings/sections/general-section.tsx:75
+#: src/features/settings/sections/general-section.tsx:61
+#: src/features/settings/sections/general-section.tsx:71
 msgid "History retention"
 msgstr ""
 
@@ -542,26 +543,31 @@ msgstr ""
 msgid "hold the hotkey and speak, your words land where your cursor is."
 msgstr "단축키를 누른 채 말을 하면 커서가 있는 곳에 단어가 표시됩니다."
 
-#: src/features/settings/sections/input-section.tsx:65
+#: src/features/settings/sections/input-section.tsx:111
 msgid "How easily Lune Voice triggers on speech. Higher = picks up quieter onsets."
 msgstr "말하기 시작할 때 Lune Voice가 얼마나 쉽게 반응하는지입니다. 값이 높을수록 더 작은 시작음도 감지합니다."
 
-#: src/features/settings/sections/general-section.tsx:65
+#: src/features/settings/sections/general-section.tsx:62
 msgid "How long finished dictations are kept on this device."
 msgstr ""
 
-#: src/features/settings/sections/input-section.tsx:92
+#: src/features/settings/sections/input-section.tsx:138
 msgid "How quickly Lune Voice decides you're done speaking. Higher = ends sooner on a pause."
 msgstr "Lune Voice가 말하기가 끝났다고 판단하는 속도입니다. 값이 높을수록 멈췄을 때 더 빨리 종료합니다."
 
-#: src/features/settings/sections/models-section.tsx:199
+#: src/features/settings/sections/models-section.tsx:212
 msgid "How readily the LLM runs on clean speech. Higher polishes more segments; lower skips more often for speed."
+msgstr ""
+
+#: src/features/settings/sections/input-section.tsx:61
+msgid "How recording starts and stops, plus microphone tuning."
 msgstr ""
 
 #: src/features/overview/overview-page.tsx:204
 msgid "Idle"
 msgstr "대기"
 
+#: src/features/settings/sections/input-section.tsx:60
 #: src/features/settings/settings-page.tsx:68
 msgid "Input"
 msgstr "입력"
@@ -575,28 +581,24 @@ msgstr "설치됨"
 msgid "Instructions"
 msgstr "지침"
 
-#: src/features/settings/sections/input-section.tsx:146
+#: src/features/settings/sections/input-section.tsx:192
 msgid "Keep the mic open in the background so dictation starts ~70ms sooner. The OS may show a recording indicator while Lune Voice is running."
 msgstr "받아쓰기가 최대 70ms 더 빨리 시작되도록 백그라운드에서 마이크를 열어 두세요. Lune Voice가 실행되는 동안 OS에서 녹음 표시가 나타날 수 있습니다."
-
-#: src/features/settings/sections/shortcuts-section.tsx:16
-msgid "Keyboard controls"
-msgstr "키보드 컨트롤"
 
 #: src/features/styles/components/style-editor-modal.tsx:43
 msgid "Keyboard shortcuts (\"Super H\" → \"Super+H\")"
 msgstr "키보드 단축키(\"Super H\" → \"Super+H\")"
 
-#: src/features/settings/sections/general-section.tsx:33
+#: src/features/settings/sections/general-section.tsx:32
 #: src/features/settings/sections/general-section.tsx:37
 msgid "Language"
 msgstr "언어"
 
-#: src/features/settings/sections/general-section.tsx:49
+#: src/features/settings/sections/general-section.tsx:48
 msgid "Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login."
 msgstr "기본 창을 여는 대신 시스템 트레이를 실행하세요. 로그인 시 Lune Voice가 자동으로 시작될 때 유용합니다."
 
-#: src/features/settings/sections/input-section.tsx:132
+#: src/features/settings/sections/input-section.tsx:178
 msgid "Learns your speaking rhythm and adjusts how long a pause ends a phrase. Helps if you pause mid-sentence to think."
 msgstr ""
 
@@ -632,19 +634,20 @@ msgstr "Lune"
 msgid "Lune Voice"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-form.tsx:105
+#: src/features/dictionary/components/dictionary-form.tsx:94
 msgid "Lune Voice writes"
 msgstr "Lune Voice 출력"
 
-#: src/features/settings/sections/models-section.tsx:121
-msgid "Manage AI models stored on your device."
-msgstr "기기에 저장된 AI 모델을 관리하세요."
-
-#: src/features/settings/sections/input-section.tsx:49
+#: src/features/settings/sections/input-section.tsx:95
 msgid "Measure your room and voice to set both sensitivities automatically."
 msgstr "방과 음성을 측정하여 두 감도를 자동으로 설정하세요."
 
-#: src/features/settings/sections/input-section.tsx:48
+#: src/features/settings/sections/input-section.tsx:65
+#: src/features/settings/sections/input-section.tsx:71
+msgid "Microphone"
+msgstr ""
+
+#: src/features/settings/sections/input-section.tsx:94
 msgid "Microphone calibration"
 msgstr "마이크 교정"
 
@@ -664,8 +667,8 @@ msgstr "분"
 msgid "Mode"
 msgstr "모드"
 
-#: src/features/settings/sections/models-section.tsx:120
-#: src/features/settings/sections/models-section.tsx:145
+#: src/features/settings/sections/models-section.tsx:149
+#: src/features/settings/settings-page.tsx:71
 msgid "Models"
 msgstr "모델"
 
@@ -719,12 +722,12 @@ msgstr "아직 세션이 없습니다."
 msgid "No sessions yet. Start dictating to see your transcripts here."
 msgstr "아직 세션이 없습니다. 받아쓰기를 시작하면 여기에 텍스트가 표시됩니다."
 
-#: src/features/history/components/history-table.tsx:272
+#: src/features/history/components/history-table.tsx:281
 #: src/features/history/components/session-detail-modal.tsx:153
 msgid "No transcript"
 msgstr "텍스트 없음"
 
-#: src/features/settings/sections/input-section.tsx:118
+#: src/features/settings/sections/input-section.tsx:164
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
 msgstr "음성 감지 전에 마이크 레벨을 표준화합니다. 조용한 마이크와 시끄러운 방을 도와줍니다. 추천합니다."
 
@@ -764,6 +767,7 @@ msgid "Optional"
 msgstr "선택 과목"
 
 #: src/features/overview/overview-page.tsx:108
+#: src/features/settings/sections/output-section.tsx:12
 #: src/features/settings/settings-page.tsx:70
 msgid "Output"
 msgstr "산출"
@@ -787,8 +791,8 @@ msgid "Paste is simplest. Typing keystrokes can work better in some apps."
 msgstr "붙여넣기가 가장 간단합니다. 일부 앱에서는 키 입력이 더 잘 작동할 수 있습니다."
 
 #: src/features/settings/components/calibrate-modal.tsx:99
-#: src/features/settings/sections/input-section.tsx:91
-#: src/features/settings/sections/input-section.tsx:107
+#: src/features/settings/sections/input-section.tsx:137
+#: src/features/settings/sections/input-section.tsx:153
 msgid "Pause sensitivity"
 msgstr "일시 정지 감도"
 
@@ -805,12 +809,12 @@ msgstr "스텔라에게 전화해주세요. 그녀에게 가게에서 신선한 
 msgid "Please keep the app open until downloads finish"
 msgstr "다운로드가 완료될 때까지 앱을 열어두세요."
 
-#: src/features/settings/sections/models-section.tsx:160
+#: src/features/settings/sections/models-section.tsx:173
 msgid "Polishes punctuation and fixes obvious ASR errors after transcription."
 msgstr "구두점을 다듬고 전사 후 명백한 ASR 오류를 수정합니다."
 
-#: src/features/settings/sections/input-section.tsx:145
-#: src/features/settings/sections/input-section.tsx:153
+#: src/features/settings/sections/input-section.tsx:191
+#: src/features/settings/sections/input-section.tsx:199
 msgid "Pre-warm microphone"
 msgstr "사전 예열 마이크"
 
@@ -823,7 +827,7 @@ msgstr "누르다"
 msgid "Prev"
 msgstr "이전"
 
-#: src/features/dictionary/components/dictionary-form.tsx:130
+#: src/features/dictionary/components/dictionary-form.tsx:119
 msgid "Preview"
 msgstr "미리보기"
 
@@ -832,7 +836,7 @@ msgstr "미리보기"
 msgid "Previous page"
 msgstr "이전 페이지"
 
-#: src/features/dictionary/components/dictionary-form.tsx:149
+#: src/features/dictionary/components/dictionary-form.tsx:138
 #: src/features/dictionary/components/dictionary-table.tsx:263
 #: src/features/dictionary/components/priority-picker.tsx:47
 msgid "Priority"
@@ -878,8 +882,8 @@ msgstr "최근"
 msgid "Recommended"
 msgstr "추천"
 
-#: src/features/settings/sections/input-section.tsx:33
-#: src/features/settings/sections/input-section.tsx:39
+#: src/features/settings/sections/input-section.tsx:79
+#: src/features/settings/sections/input-section.tsx:85
 msgid "Recording mode"
 msgstr "녹음 모드"
 
@@ -928,7 +932,7 @@ msgstr "초"
 msgid "Save"
 msgstr "저장"
 
-#: src/features/history/components/history-table.tsx:222
+#: src/features/history/components/history-table.tsx:231
 #: src/features/history/components/session-detail-modal.tsx:70
 msgid "Save Transcript"
 msgstr "받아쓰기 텍스트 저장"
@@ -978,8 +982,9 @@ msgstr "사용하는 언어를 설정하세요. 자동은 음성 감지를 사�
 msgid "Settings sections"
 msgstr "설정 섹션"
 
+#: src/features/settings/sections/shortcuts-section.tsx:16
 #: src/features/settings/settings-page.tsx:67
-#: src/features/styles/components/style-hero.tsx:17
+#: src/features/styles/components/style-hero.tsx:18
 msgid "Shortcuts"
 msgstr "단축키"
 
@@ -1015,7 +1020,7 @@ msgid "Start dictation"
 msgstr "받아쓰기 시작"
 
 #: src/features/settings/sections/general-section.tsx:47
-#: src/features/settings/sections/general-section.tsx:57
+#: src/features/settings/sections/general-section.tsx:55
 msgid "Start minimized"
 msgstr "최소화된 상태로 시작"
 
@@ -1028,8 +1033,8 @@ msgid "Start reading"
 msgstr "읽기 시작"
 
 #: src/features/settings/components/calibrate-modal.tsx:98
-#: src/features/settings/sections/input-section.tsx:64
-#: src/features/settings/sections/input-section.tsx:81
+#: src/features/settings/sections/input-section.tsx:110
+#: src/features/settings/sections/input-section.tsx:127
 msgid "Start sensitivity"
 msgstr "시작감도"
 
@@ -1065,17 +1070,17 @@ msgstr "스타일 전환"
 msgid "System"
 msgstr "시스템"
 
-#: src/features/dictionary/components/dictionary-form.tsx:60
+#: src/features/settings/sections/input-section.tsx:48
+msgid "System default"
+msgstr ""
+
+#: src/features/dictionary/components/dictionary-form.tsx:51
 msgid "Teach Lune Voice the right spelling for a word it mishears."
 msgstr "Lune Voice가 잘못 듣는 단어의 올바른 철자를 가르쳐주세요."
 
 #: src/features/dictionary/components/dictionary-table.tsx:165
 msgid "Teach Lune Voice your words"
 msgstr "Lune Voice에게 당신의 말을 가르쳐주세요"
-
-#: src/features/settings/sections/output-section.tsx:12
-msgid "Text output"
-msgstr "텍스트 출력"
 
 #: src/features/settings/sections/shortcuts-section.tsx:22
 msgid "The main shortcut used for voice typing. Click the binding to change it."
@@ -1093,7 +1098,7 @@ msgstr "필수 모델입니다. 이 모델이 없으면 받아쓰기가 작동�
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "이것은 한 번만 발생합니다. 그동안 컴퓨터를 계속 사용할 수 있습니다."
 
-#: src/features/history/components/history-table.tsx:299
+#: src/features/history/components/history-table.tsx:308
 #: src/features/history/components/session-detail-modal.tsx:201
 msgid "This will permanently remove this dictation session and its transcript."
 msgstr "이 받아쓰기 세션과 텍스트가 영구적으로 삭제됩니다."
@@ -1106,7 +1111,7 @@ msgstr "시간"
 msgid "Title abbreviations (\"Mister\" → \"Mr.\")"
 msgstr "호칭 약어(\"Mister\" → \"Mr.\")"
 
-#: src/features/styles/components/style-hero.tsx:19
+#: src/features/styles/components/style-hero.tsx:20
 msgid "Titles"
 msgstr "호칭"
 
@@ -1127,7 +1132,7 @@ msgstr "오늘"
 msgid "Toggle and cancel are bound to the same key combo. One will override the other."
 msgstr "전환 및 취소는 동일한 키 콤보에 바인딩됩니다. 하나는 다른 것보다 우선합니다."
 
-#: src/features/settings/sections/input-section.tsx:34
+#: src/features/settings/sections/input-section.tsx:80
 msgid "Toggle is easiest for longer dictation. Hold is better for quick bursts."
 msgstr "긴 받아쓰기에는 전환 방식이 가장 쉽습니다. 짧게 말할 때는 길게 누르기가 더 좋습니다."
 
@@ -1143,9 +1148,14 @@ msgstr "전체 단어 수"
 msgid "Transcript"
 msgstr "받아쓰기 텍스트"
 
+#: src/features/settings/sections/transcription-section.tsx:14
 #: src/features/settings/settings-page.tsx:69
 msgid "Transcription"
 msgstr "전사"
+
+#: src/features/settings/sections/models-section.tsx:159
+msgid "Tune how the local LLM polishes transcripts after transcription."
+msgstr ""
 
 #: src/features/settings/sections/shortcuts-section.tsx:17
 msgid "Use fast commands without opening menus in the middle of work."
@@ -1161,7 +1171,7 @@ msgstr "하드웨어 가속 사용"
 msgid "Use the {0} style"
 msgstr "{0} 스타일을 사용하세요"
 
-#: src/features/styles/components/style-hero.tsx:49
+#: src/features/styles/components/style-hero.tsx:43
 #: src/features/styles/components/style-preset-card.tsx:108
 msgid "View"
 msgstr "보기"
@@ -1173,10 +1183,6 @@ msgstr "모두 보기"
 #: src/features/styles/components/style-editor-modal.tsx:58
 msgid "View style"
 msgstr "스타일 보기"
-
-#: src/features/settings/sections/input-section.tsx:28
-msgid "Voice input"
-msgstr "음성 입력"
 
 #: src/features/settings/sections/transcription-section.tsx:19
 #: src/features/settings/sections/transcription-section.tsx:25
@@ -1205,15 +1211,19 @@ msgid "When you're ready, click Start and read the sentence aloud at your normal
 msgstr "준비가 되면 시작을 클릭하고 평소 속도로 문장을 큰 소리로 읽으세요."
 
 #: src/features/settings/sections/shortcuts-section.tsx:42
-msgid "Whether the shortcut toggles recording or only works while held. Change in Voice input."
-msgstr "단축키가 녹음을 전환하는지 아니면 누르고 있는 동안에만 작동하는지 여부입니다. 음성 입력 변경."
+msgid "Whether the shortcut toggles recording or only works while held. Change in Input."
+msgstr ""
+
+#: src/features/settings/sections/input-section.tsx:66
+msgid "Which input device dictation captures from. Changes apply right away."
+msgstr ""
 
 #: src/features/settings/sections/output-section.tsx:33
 msgid "Which paste shortcut to send. Automatic detects terminals; override if paste lands in the wrong place."
 msgstr ""
 
 #: src/features/history/components/history-session-list.tsx:33
-#: src/features/history/components/history-table.tsx:277
+#: src/features/history/components/history-table.tsx:286
 #: src/features/overview/overview-page.tsx:258
 msgid "words"
 msgstr "단어"
@@ -1223,7 +1233,7 @@ msgstr "단어"
 msgid "Words"
 msgstr "단어"
 
-#: src/features/settings/sections/models-section.tsx:178
+#: src/features/settings/sections/models-section.tsx:191
 msgid "Words the recognizer is unsure about are sent to the LLM. Higher corrects more aggressively; lower trusts the raw transcription."
 msgstr ""
 
@@ -1235,7 +1245,7 @@ msgstr ""
 msgid "Yes"
 msgstr "예"
 
-#: src/features/dictionary/components/dictionary-form.tsx:73
+#: src/features/dictionary/components/dictionary-form.tsx:62
 msgid "You say"
 msgstr "말할 내용"
 
