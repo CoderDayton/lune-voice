@@ -58,7 +58,7 @@ struct RuntimeInner {
     /// Long-lived microphone capture stream when `mic_prewarm` is enabled.
     /// Sessions consume via `AudioStreamHandle` so the cpal::Stream stays
     /// open across hotkey presses and the first chunk arrives ~70 ms sooner.
-    prewarmed_audio: Mutex<Option<AudioStream>>,
+    prewarmed_audio: Mutex<Option<PrewarmedStream>>,
 }
 
 struct LivePipeline {
@@ -75,6 +75,13 @@ struct LivePipeline {
 struct SessionStreamSlot {
     id: u64,
     channel: Channel<SessionStreamEvent>,
+}
+
+/// A prewarmed capture stream paired with the device it was opened on, so a
+/// later device-preference change can be detected and the stream rebuilt live.
+struct PrewarmedStream {
+    stream: AudioStream,
+    device: Option<String>,
 }
 
 impl AppRuntime {
@@ -128,39 +135,62 @@ impl AppRuntime {
             }),
         };
 
-        runtime.sync_mic_prewarm(None).await;
+        runtime.sync_mic_prewarm(None, None).await;
         Ok(runtime)
     }
 
     /// Reconcile the long-lived audio stream with the desired `mic_prewarm`
-    /// state. Pass `None` to read the current in-memory setting (suitable for
-    /// startup); pass `Some(value)` after a settings save when in-memory
-    /// settings may be stale.
-    pub async fn sync_mic_prewarm(&self, want: Option<bool>) {
-        let want = match want {
-            Some(w) => w,
-            None => self.inner.settings.read().await.mic_prewarm,
+    /// state and input device. For each argument, `None` reads the current
+    /// in-memory setting (suitable for startup); a `Some(_)` override is used
+    /// after a settings save, when `inner.settings` is stale until the next
+    /// pipeline rebuild. `device` is `Option<Option<String>>`: the outer
+    /// `None` reads the setting, `Some(d)` overrides with device `d` (where
+    /// the inner `None` means the system default).
+    pub async fn sync_mic_prewarm(&self, want: Option<bool>, device: Option<Option<String>>) {
+        let (want, input_device) = {
+            let settings = self.inner.settings.read().await;
+            (
+                want.unwrap_or(settings.mic_prewarm),
+                device.unwrap_or_else(|| settings.input_device.clone()),
+            )
         };
         let mut slot = self.inner.prewarmed_audio.lock().await;
-        match (want, slot.is_some()) {
-            (true, false) => match AudioStream::new(AudioConfig::default()) {
-                Ok(s) => {
-                    debug!("mic prewarm: capture stream opened");
-                    *slot = Some(s);
-                }
-                Err(e) => warn!("mic prewarm: failed to open capture stream: {e}"),
-            },
-            (false, true) => {
+        let open = slot.as_ref().map(|p| p.device.as_deref());
+        let action = reconcile_prewarm(open, want, input_device.as_deref());
+        match action {
+            PrewarmAction::Keep => {}
+            PrewarmAction::Close => {
                 debug!("mic prewarm: closing capture stream");
                 *slot = None;
             }
-            _ => {}
+            PrewarmAction::Open | PrewarmAction::Reopen => {
+                if action == PrewarmAction::Reopen {
+                    debug!("mic prewarm: input device changed, rebuilding capture stream");
+                }
+                // Drop any existing stream first so its device handle is freed
+                // before we open the new one.
+                *slot = None;
+                let config = AudioConfig {
+                    input_device: input_device.clone(),
+                    ..AudioConfig::default()
+                };
+                match AudioStream::new(config) {
+                    Ok(stream) => {
+                        debug!("mic prewarm: capture stream opened");
+                        *slot = Some(PrewarmedStream {
+                            stream,
+                            device: input_device,
+                        });
+                    }
+                    Err(e) => warn!("mic prewarm: failed to open capture stream: {e}"),
+                }
+            }
         }
     }
 
     async fn prewarmed_handle(&self) -> Option<lune_audio::AudioStreamHandle> {
         let slot = self.inner.prewarmed_audio.lock().await;
-        slot.as_ref().map(|s| s.handle())
+        slot.as_ref().map(|p| p.stream.handle())
     }
 
     /// Return the persisted `start_minimized` preference. Read at app
@@ -227,19 +257,24 @@ impl AppRuntime {
         &self,
         channel: Channel<CalibrationStreamEvent>,
     ) -> Result<(), String> {
-        {
+        let paths = {
             let pipeline = self.inner.pipeline.lock().await;
             if pipeline.active {
                 return Err("cannot calibrate while a dictation session is active".into());
             }
-        }
+            pipeline.paths.clone()
+        };
+        // Calibrate the device the user actually dictates with. Read it from the
+        // persisted settings: `inner.settings` is only refreshed on a pipeline
+        // rebuild, so it can be stale right after a device change is saved.
+        let input_device = load_settings(&paths).ok().and_then(|s| s.input_device);
         {
             let mut slot = self.inner.calibration.lock().await;
             if slot.is_some() {
                 return Err("a calibration session is already running".into());
             }
             let (tx, rx) = mpsc::channel::<CalibrationFrame>(64);
-            let session = CalibrationSession::start(tx);
+            let session = CalibrationSession::start(tx, input_device);
             *slot = Some(session);
             tokio::spawn(forward_calibration(rx, channel));
         }
@@ -1264,6 +1299,38 @@ fn sanitize_error_for_frontend(raw: &str) -> String {
     PATH_RE.replace_all(&capped, "[path]").into_owned()
 }
 
+/// What to do with the long-lived prewarm capture stream when reconciling the
+/// desired state against what's currently open.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PrewarmAction {
+    /// Leave the current state untouched.
+    Keep,
+    /// Open a fresh stream on the desired device.
+    Open,
+    /// Tear down the open stream.
+    Close,
+    /// Close and reopen on the desired device — the device changed under us.
+    Reopen,
+}
+
+/// Decide the prewarm stream action. `open` describes the currently open
+/// stream: `None` = nothing open; `Some(dev)` = open on `dev`, where `dev` is
+/// `None` for the system default. Comparing the open device against `desired`
+/// is what makes a device change rebuild the stream live (no restart needed).
+fn reconcile_prewarm(
+    open: Option<Option<&str>>,
+    want: bool,
+    desired: Option<&str>,
+) -> PrewarmAction {
+    match (want, open) {
+        (false, Some(_)) => PrewarmAction::Close,
+        (false, None) => PrewarmAction::Keep,
+        (true, None) => PrewarmAction::Open,
+        (true, Some(current)) if current == desired => PrewarmAction::Keep,
+        (true, Some(_)) => PrewarmAction::Reopen,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -1271,7 +1338,51 @@ mod tests {
 
     use lune_core::llm::LlmService;
 
-    use super::{LazyLocalLlm, sanitize_error_for_frontend};
+    use super::{LazyLocalLlm, PrewarmAction, reconcile_prewarm, sanitize_error_for_frontend};
+
+    /// The follow-up behavior: when the chosen device changes while prewarm
+    /// stays enabled, the open stream must be rebuilt (Reopen), not left on the
+    /// stale device.
+    #[test]
+    fn reconcile_reopens_when_device_changes_while_enabled() {
+        let action =
+            reconcile_prewarm(Some(Some("Built-in Microphone")), true, Some("USB Headset"));
+        assert_eq!(action, PrewarmAction::Reopen);
+    }
+
+    #[test]
+    fn reconcile_keeps_when_device_unchanged() {
+        assert_eq!(
+            reconcile_prewarm(Some(Some("USB Headset")), true, Some("USB Headset")),
+            PrewarmAction::Keep
+        );
+        // Default ↔ default is also unchanged.
+        assert_eq!(
+            reconcile_prewarm(Some(None), true, None),
+            PrewarmAction::Keep
+        );
+    }
+
+    #[test]
+    fn reconcile_opens_when_enabled_and_nothing_open() {
+        assert_eq!(
+            reconcile_prewarm(None, true, Some("USB Headset")),
+            PrewarmAction::Open
+        );
+    }
+
+    #[test]
+    fn reconcile_closes_when_disabled_with_stream_open() {
+        assert_eq!(
+            reconcile_prewarm(Some(None), false, Some("USB Headset")),
+            PrewarmAction::Close
+        );
+    }
+
+    #[test]
+    fn reconcile_keeps_when_disabled_and_nothing_open() {
+        assert_eq!(reconcile_prewarm(None, false, None), PrewarmAction::Keep);
+    }
 
     #[test]
     fn sanitize_error_handles_non_ascii_without_panicking() {

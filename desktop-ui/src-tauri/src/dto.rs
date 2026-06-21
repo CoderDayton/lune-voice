@@ -185,6 +185,8 @@ pub struct WorkspaceSettingsDto {
     pub language: String,
     pub dictation_language: String,
     pub mic_prewarm: bool,
+    /// Preferred microphone input device by name; null = system default.
+    pub input_device: Option<String>,
     pub vad_pcen: bool,
     pub start_minimized: bool,
     /// How long to keep dictation history, in days. `None` disables history.
@@ -255,6 +257,9 @@ pub struct SaveWorkspaceSettingsInput {
     pub language: String,
     pub dictation_language: String,
     pub mic_prewarm: bool,
+    /// Preferred microphone input device by name; null = system default.
+    #[serde(default)]
+    pub input_device: Option<String>,
     pub vad_pcen: bool,
     pub start_minimized: bool,
     /// How long to keep dictation history, in days. `None` disables history.

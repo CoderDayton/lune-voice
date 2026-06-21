@@ -422,6 +422,7 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
         language: settings.language.clone(),
         dictation_language: settings.dictation_language.clone(),
         mic_prewarm: settings.mic_prewarm,
+        input_device: settings.input_device.clone(),
         vad_pcen: settings.vad_pcen,
         start_minimized: settings.start_minimized,
         session_history_days: settings.session_history_days,
@@ -516,6 +517,7 @@ fn apply_settings_dto(
     }
     settings.dictation_language = dictation_language.to_owned();
     settings.mic_prewarm = input.mic_prewarm;
+    settings.input_device = input.input_device.clone();
     settings.vad_pcen = input.vad_pcen;
     settings.start_minimized = input.start_minimized;
     settings.terminal_mode = terminal_mode_from_dto(input.terminal_mode);
@@ -820,6 +822,7 @@ mod tests {
             language: dto.language,
             dictation_language: dto.dictation_language,
             mic_prewarm: dto.mic_prewarm,
+            input_device: dto.input_device,
             vad_pcen: dto.vad_pcen,
             start_minimized: dto.start_minimized,
             session_history_days: dto.session_history_days,

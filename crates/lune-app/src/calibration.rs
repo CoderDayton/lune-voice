@@ -87,16 +87,18 @@ pub struct CalibrationSession {
 impl CalibrationSession {
     /// Spawn the calibration task with a freshly-opened mic. Frames are sent
     /// on `event_tx`; the task closes the channel when finalized.
-    pub fn start(event_tx: mpsc::Sender<CalibrationFrame>) -> Self {
-        Self::start_with(event_tx, None, CalibrationTimings::default())
+    pub fn start(event_tx: mpsc::Sender<CalibrationFrame>, input_device: Option<String>) -> Self {
+        Self::start_with(event_tx, None, CalibrationTimings::default(), input_device)
     }
 
     /// Spawn the calibration task using a caller-supplied `AudioStream`.
-    /// Used by tests to inject a file-backed stream.
+    /// Used by tests to inject a file-backed stream. `input_device` selects the
+    /// capture device when `stream` is `None` (ignored when a stream is given).
     pub fn start_with(
         event_tx: mpsc::Sender<CalibrationFrame>,
         stream: Option<AudioStream>,
         timings: CalibrationTimings,
+        input_device: Option<String>,
     ) -> Self {
         let advance = Arc::new(Notify::new());
         let cancel = Arc::new(Notify::new());
@@ -104,7 +106,15 @@ impl CalibrationSession {
         let cancel_task = Arc::clone(&cancel);
 
         let handle = tokio::spawn(async move {
-            run_calibration(event_tx, advance_task, cancel_task, stream, timings).await;
+            run_calibration(
+                event_tx,
+                advance_task,
+                cancel_task,
+                stream,
+                timings,
+                input_device,
+            )
+            .await;
         });
 
         Self {
@@ -142,8 +152,12 @@ async fn run_calibration(
     cancel: Arc<Notify>,
     stream: Option<AudioStream>,
     timings: CalibrationTimings,
+    input_device: Option<String>,
 ) {
-    let audio_config = AudioConfig::default();
+    let audio_config = AudioConfig {
+        input_device,
+        ..AudioConfig::default()
+    };
     let frame_duration_ms = audio_config.chunk_duration_ms;
     let stream = match stream {
         Some(s) => s,
@@ -375,7 +389,7 @@ mod tests {
         }
         let stream = make_stream(&samples);
         let (tx, mut rx) = mpsc::channel(128);
-        let session = CalibrationSession::start_with(tx, Some(stream), fast_timings());
+        let session = CalibrationSession::start_with(tx, Some(stream), fast_timings(), None);
 
         // Wait for Waiting, then advance.
         let pre = collect_until(&mut rx, |f| {
@@ -415,6 +429,7 @@ mod tests {
                 noise: Duration::from_secs(60),
                 speech: Duration::from_secs(60),
             },
+            None,
         );
 
         // Wait for the Noise phase to be entered.

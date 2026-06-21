@@ -10,7 +10,11 @@ export type SaveWorkspaceSettingsInput = { activationMode: ActivationModeDto, di
 /**
  * Clean-segment confidence bound for bypassing the correction LLM.
  */
-llmSkipThreshold: number | null, adaptiveVad: boolean, speechThreshold: number, speechThresholdEnd: number, stylePreset: string, hotkeyToggle: string, hotkeyCancel: string, pillVisibility: PillVisibilityDto, language: string, dictationLanguage: string, micPrewarm: boolean, vadPcen: boolean, startMinimized: boolean, 
+llmSkipThreshold: number | null, adaptiveVad: boolean, speechThreshold: number, speechThresholdEnd: number, stylePreset: string, hotkeyToggle: string, hotkeyCancel: string, pillVisibility: PillVisibilityDto, language: string, dictationLanguage: string, micPrewarm: boolean, 
+/**
+ * Preferred microphone input device by name; null = system default.
+ */
+inputDevice: string | null, vadPcen: boolean, startMinimized: boolean, 
 /**
  * How long to keep dictation history, in days. `None` disables history.
  */

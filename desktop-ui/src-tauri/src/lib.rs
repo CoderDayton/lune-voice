@@ -154,6 +154,7 @@ pub fn run() {
             pill::show_pill_window,
             pill::hide_pill_window,
             pill::reposition_pill_center,
+            commands::list_audio_input_devices,
             commands::check_model_status,
             commands::download_model_cmd,
             commands::delete_model_cmd,

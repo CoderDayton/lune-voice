@@ -79,6 +79,11 @@ pub struct UserSettings {
     /// prefer the indicator only appearing during dictation.
     #[serde(default = "default_true")]
     pub mic_prewarm: bool,
+    /// Preferred microphone input device, by name. `None` (default) uses the
+    /// system default input. A saved device that is no longer present falls
+    /// back to the default at capture-open time — never fatal.
+    #[serde(default)]
+    pub input_device: Option<String>,
     /// Enable the PCEN-style adaptive AGC frontend before the VAD.
     /// Improves robustness on quiet mics and noisy environments. Default on.
     #[serde(default = "default_true")]
@@ -137,6 +142,7 @@ impl Default for UserSettings {
             adaptive_vad: false,
             pipeline: PipelineOverrides::default(),
             mic_prewarm: true,
+            input_device: None,
             vad_pcen: true,
             start_minimized: false,
         }

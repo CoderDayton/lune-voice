@@ -23,6 +23,10 @@ pub struct AudioConfig {
 
     /// Ring buffer capacity (number of chunks). Default: 128 (~10 seconds at 80ms)
     pub buffer_capacity: usize,
+
+    /// Preferred input device by name. `None` (default) uses the host default
+    /// input. A name that is no longer present falls back to the default.
+    pub input_device: Option<String>,
 }
 
 impl Default for AudioConfig {
@@ -31,7 +35,58 @@ impl Default for AudioConfig {
             target_sample_rate: 16_000,
             chunk_duration_ms: 80,
             buffer_capacity: 128,
+            input_device: None,
         }
+    }
+}
+
+/// Outcome of matching a saved input-device preference against the devices
+/// actually present on the host.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceSelection {
+    /// The device name to open, or `None` to fall back to the host default.
+    pub device: Option<String>,
+    /// `true` when a specific device was requested but is no longer present —
+    /// the caller should surface a non-fatal warning and use the default.
+    pub fell_back: bool,
+}
+
+/// Names of the input devices cpal currently reports on the default host, in
+/// enumeration order. Empty if enumeration fails (the default device is still
+/// usable). Used to populate the device picker and to validate a saved choice.
+pub fn list_input_devices() -> Vec<String> {
+    let host = cpal::default_host();
+    match host.input_devices() {
+        Ok(devices) => devices
+            .filter_map(|d| d.description().ok().map(|desc| desc.name().to_owned()))
+            .collect(),
+        Err(e) => {
+            warn!("enumerating input devices failed: {e}");
+            Vec::new()
+        }
+    }
+}
+
+/// Resolve a persisted input-device preference against the devices currently
+/// available. `requested` is the saved device name (`None` = host default);
+/// `available` is the list of present input-device names.
+///
+/// Device identity on Linux is by name (cpal exposes no portable persistent
+/// id), so a renamed or unplugged device won't match and we fall back.
+pub fn resolve_input_device(requested: Option<&str>, available: &[String]) -> DeviceSelection {
+    match requested {
+        None => DeviceSelection {
+            device: None,
+            fell_back: false,
+        },
+        Some(name) if available.iter().any(|d| d == name) => DeviceSelection {
+            device: Some(name.to_string()),
+            fell_back: false,
+        },
+        Some(_) => DeviceSelection {
+            device: None,
+            fell_back: true,
+        },
     }
 }
 
@@ -221,7 +276,40 @@ impl AudioStream {
     pub fn new(config: AudioConfig) -> Result<Self, AudioError> {
         validate_config(&config)?;
         let host = cpal::default_host();
-        let device = host.default_input_device().ok_or(AudioError::NoDevice)?;
+
+        // Enumerate inputs once and keep the device handles, so the saved-device
+        // resolution and the actual selection are derived from the same list —
+        // they can't disagree, and we avoid enumerating twice.
+        let devices = host
+            .input_devices()
+            .map(|it| it.collect::<Vec<_>>())
+            .unwrap_or_default();
+        let available: Vec<String> = devices
+            .iter()
+            .filter_map(|d| d.description().ok().map(|desc| desc.name().to_owned()))
+            .collect();
+
+        // Honor the saved device preference, falling back to the host default
+        // when it's absent (unplugged/renamed) — never fatal.
+        let selection = resolve_input_device(config.input_device.as_deref(), &available);
+        if selection.fell_back {
+            warn!(
+                "saved input device {:?} not found; using system default",
+                config.input_device
+            );
+        }
+        let device = match &selection.device {
+            Some(name) => devices
+                .into_iter()
+                .find(|d| {
+                    d.description()
+                        .map(|desc| desc.name() == name)
+                        .unwrap_or(false)
+                })
+                .or_else(|| host.default_input_device())
+                .ok_or(AudioError::NoDevice)?,
+            None => host.default_input_device().ok_or(AudioError::NoDevice)?,
+        };
 
         let device_name = device
             .description()
@@ -672,6 +760,48 @@ mod tests {
         assert!(
             msg.contains("chunk_samples"),
             "expected message to mention chunk_samples; got: {msg}"
+        );
+    }
+
+    /// The prompt's named edge case: a saved device that has since been
+    /// unplugged or renamed must NOT be opened — resolution falls back to the
+    /// host default and flags it so the caller can warn (never panic/error).
+    #[test]
+    fn resolve_input_device_falls_back_when_requested_missing() {
+        let available = vec!["Built-in Microphone".to_string(), "HDMI".to_string()];
+        let sel = resolve_input_device(Some("USB Headset"), &available);
+        assert_eq!(
+            sel,
+            DeviceSelection {
+                device: None,
+                fell_back: true,
+            }
+        );
+    }
+
+    #[test]
+    fn resolve_input_device_selects_requested_when_present() {
+        let available = vec!["Built-in Microphone".to_string(), "USB Headset".to_string()];
+        let sel = resolve_input_device(Some("USB Headset"), &available);
+        assert_eq!(
+            sel,
+            DeviceSelection {
+                device: Some("USB Headset".to_string()),
+                fell_back: false,
+            }
+        );
+    }
+
+    #[test]
+    fn resolve_input_device_uses_default_when_none_requested() {
+        let available = vec!["Built-in Microphone".to_string()];
+        let sel = resolve_input_device(None, &available);
+        assert_eq!(
+            sel,
+            DeviceSelection {
+                device: None,
+                fell_back: false,
+            }
         );
     }
 

@@ -106,6 +106,7 @@ struct SessionRuntime<H> {
 /// Open audio capture; not async because all current variants are sync.
 fn init_audio_source(
     audio_override: SessionAudio,
+    input_device: Option<String>,
 ) -> std::result::Result<Box<dyn AudioPull>, String> {
     let source: Box<dyn AudioPull> = match audio_override {
         SessionAudio::Owned(stream) => Box::new(stream),
@@ -115,9 +116,13 @@ fn init_audio_source(
             handle.drain_keep_last(6);
             Box::new(handle)
         }
-        SessionAudio::Open => Box::new(
-            AudioStream::new(AudioConfig::default()).map_err(|e| format!("audio init: {e}"))?,
-        ),
+        SessionAudio::Open => {
+            let config = AudioConfig {
+                input_device,
+                ..AudioConfig::default()
+            };
+            Box::new(AudioStream::new(config).map_err(|e| format!("audio init: {e}"))?)
+        }
     };
     Ok(source)
 }
@@ -142,8 +147,9 @@ async fn init_session_runtime<A: AsrBackend + 'static>(
     audio_override: SessionAudio,
     pipeline: &PipelineConfig,
     vad_pcen_enabled: bool,
+    input_device: Option<String>,
 ) -> std::result::Result<SessionRuntime<A::SessionHandle>, String> {
-    let audio_source = init_audio_source(audio_override)?;
+    let audio_source = init_audio_source(audio_override, input_device)?;
     let asr_session = init_asr_session(asr, asr_config).await?;
     let hybrid = HybridVad::new(pipeline, vad_pcen_enabled)?;
     Ok(SessionRuntime {
@@ -177,6 +183,7 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
     audio_override: SessionAudio,
     pipeline: &PipelineConfig,
     vad_pcen_enabled: bool,
+    input_device: Option<String>,
     segment_capacity_hint: usize,
     event_tx: &mpsc::Sender<SessionEvent>,
     control_rx: &mut mpsc::UnboundedReceiver<SessionControl>,
@@ -188,7 +195,15 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
         audio_source,
         asr_session,
         mut hybrid,
-    } = init_session_runtime(asr, asr_config, audio_override, pipeline, vad_pcen_enabled).await?;
+    } = init_session_runtime(
+        asr,
+        asr_config,
+        audio_override,
+        pipeline,
+        vad_pcen_enabled,
+        input_device,
+    )
+    .await?;
     let _ = event_tx.send(SessionEvent::Started).await;
 
     let mut segments = Vec::with_capacity(segment_capacity_hint);

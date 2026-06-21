@@ -30,7 +30,10 @@ mod ring;
 mod vad;
 
 pub use calibrate::{CalibrationError, CalibrationInput, CalibrationResult};
-pub use capture::{AudioConfig, AudioStream, AudioStreamHandle};
+pub use capture::{
+    AudioConfig, AudioStream, AudioStreamHandle, DeviceSelection, list_input_devices,
+    resolve_input_device,
+};
 pub use pcen::{
     DEFAULT_NOISE_CEILING_RMS, EXPECTED_OUTPUT_RMS, PcenAgc, PcenAgcConfig, PcenFrameStats,
 };

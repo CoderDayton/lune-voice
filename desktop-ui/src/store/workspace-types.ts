@@ -26,6 +26,8 @@ export interface WorkspaceSettings {
   language: string;
   dictationLanguage: string;
   micPrewarm: boolean;
+  /** Preferred microphone device name; null = system default. */
+  inputDevice: string | null;
   vadPcen: boolean;
   startMinimized: boolean;
   sessionHistoryDays: number | null;
@@ -106,6 +108,7 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   language: 'en',
   dictationLanguage: 'auto',
   micPrewarm: true,
+  inputDevice: null,
   vadPcen: true,
   startMinimized: false,
   sessionHistoryDays: 30,

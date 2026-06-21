@@ -40,6 +40,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
       language: 'en',
       dictationLanguage: 'auto',
       micPrewarm: true,
+      inputDevice: null,
       vadPcen: true,
       startMinimized: false,
       sessionHistoryDays: 30,

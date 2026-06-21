@@ -1,12 +1,19 @@
 import { useLingui } from '@lingui/react/macro';
+import { invoke } from '@tauri-apps/api/core';
 import { Mic, Wand2 } from 'lucide-react';
-import { useState } from 'react';
-import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown';
+import { useEffect, useState } from 'react';
+import {
+  DescriptiveDropdown,
+  type DescriptiveOption,
+} from '../../../components/ui/descriptive-dropdown';
 import { saveWorkspaceSetting } from '../../../store/workspace-store';
 import { CalibrateModal } from '../components/calibrate-modal';
 import { type SettingsProps, SettingsRow, SettingsSection } from '../components/section';
 import { activationModes } from '../data/settings-data';
 import { useDebouncedSetting } from '../hooks/use-debounced-setting';
+
+/** Empty string is the picker's sentinel for "use the system default input". */
+const DEFAULT_DEVICE = '';
 
 export function InputSection({ settings }: SettingsProps) {
   const { t } = useLingui();
@@ -23,12 +30,51 @@ export function InputSection({ settings }: SettingsProps) {
   const endNum = Number(endThreshold);
   const [calibrateOpen, setCalibrateOpen] = useState(false);
 
+  // `null` until enumeration resolves, so we don't flag a valid saved device as
+  // "unavailable" before the list has loaded.
+  const [devices, setDevices] = useState<string[] | null>(null);
+  useEffect(() => {
+    invoke<string[]>('list_audio_input_devices')
+      .then(setDevices)
+      .catch((e) => {
+        console.error('list_audio_input_devices:', e);
+        setDevices([]);
+      });
+  }, []);
+
+  const saved = settings.inputDevice;
+  const available = devices ?? [];
+  const deviceOptions: DescriptiveOption<string>[] = [
+    { value: DEFAULT_DEVICE, label: t`System default`, icon: Mic },
+    ...available.map((d) => ({ value: d, label: d })),
+  ];
+  // Keep the saved device selectable even when it isn't in the enumerated list:
+  // while still loading, show it plainly; once loaded and still missing, mark it
+  // unavailable (the backend falls back to the default to capture).
+  if (saved && !available.includes(saved)) {
+    deviceOptions.push({ value: saved, label: devices ? t`${saved} (unavailable)` : saved });
+  }
+
   return (
     <SettingsSection
       title={t`Input`}
       description={t`How recording starts and stops, plus microphone tuning.`}
       icon={Mic}
     >
+      <SettingsRow
+        label={t`Microphone`}
+        description={t`Which input device dictation captures from. Changes apply right away.`}
+        control={
+          <DescriptiveDropdown
+            value={saved ?? DEFAULT_DEVICE}
+            options={deviceOptions}
+            ariaLabel={t`Microphone`}
+            onChange={(next) =>
+              void saveWorkspaceSetting('inputDevice', next === DEFAULT_DEVICE ? null : next)
+            }
+          />
+        }
+      />
       <SettingsRow
         label={t`Recording mode`}
         description={t`Toggle is easiest for longer dictation. Hold is better for quick bursts.`}

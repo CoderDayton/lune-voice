@@ -114,9 +114,14 @@ pub async fn save_workspace_settings(
             }
         }
     }
-    // Reconcile long-lived audio capture with the new mic_prewarm setting.
+    // Reconcile long-lived audio capture with the freshly-saved mic_prewarm and
+    // input-device settings. Both are taken from the returned snapshot rather
+    // than `inner.settings`, which stays stale until the next pipeline rebuild.
     runtime
-        .sync_mic_prewarm(Some(snapshot.settings.mic_prewarm))
+        .sync_mic_prewarm(
+            Some(snapshot.settings.mic_prewarm),
+            Some(snapshot.settings.input_device.clone()),
+        )
         .await;
     // Notify pill of settings changes (activation mode, pill visibility)
     if let Err(e) = runtime.app_handle().emit_to(
@@ -299,6 +304,14 @@ pub async fn detach_session_stream(
     require_window_access(&window, &["main"])?;
     runtime.clear_session_stream(subscription_id).await;
     Ok(())
+}
+
+/// Enumerate the microphone input devices cpal currently reports, by name, for
+/// the settings picker. An empty list means only the system default is offered.
+#[tauri::command]
+pub fn list_audio_input_devices(window: WebviewWindow) -> Result<Vec<String>, String> {
+    require_window_access(&window, &["main"])?;
+    Ok(lune_audio::list_input_devices())
 }
 
 #[tauri::command]
