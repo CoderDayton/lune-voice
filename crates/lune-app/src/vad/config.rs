@@ -44,6 +44,22 @@ pub struct VadPipelineConfig {
     /// stop). Sub-`long_gap` pauses are KEPT inside the span so Qwen3-ASR sees
     /// the real speech rhythm — this is what stops adjacent words fusing.
     pub long_gap_ms: u32,
+    /// Cap on the silence a single intra-utterance pause contributes to the
+    /// span audio. The pause is still KEPT (it marks a word boundary), but once
+    /// its run reaches this length the excess silence is dropped before the
+    /// recognizer hears it — so a 0.5–1s breath no longer reads as
+    /// sentence-ending prosody, and Qwen3 stops emitting the spurious `. ` / `, `
+    /// that fragment a single utterance into clauses. `0` disables the cap
+    /// (preserve every pause in full — the pre-cap behaviour). This is the
+    /// floor between "enough pause to keep a word boundary" and "enough pause to
+    /// look like a sentence end"; `cgs bench TYPE=vad` sweeps it.
+    ///
+    /// Effective resolution is one Silero frame (~32 ms), so the cap rounds UP
+    /// to the next frame boundary (240 ms caps at 256 ms in practice). When this
+    /// is smaller than `hangover_ms`, the cap already bounds a span's trailing
+    /// silence below the hangover window, so `close_span`'s hangover trim never
+    /// fires and the effective closing tail is `min(cap, hangover)`.
+    pub max_intra_silence_ms: u32,
 }
 
 /// Gate defaults for the contiguous-span gate. The acoustic thresholds
@@ -71,6 +87,13 @@ pub const DEFAULT_VAD_CONFIG: VadPipelineConfig = VadPipelineConfig {
     max_chunk_ms: 20_000,
     min_speech_ms: 100,
     long_gap_ms: 2_000,
+    // 240 ms: the floor `cgs bench TYPE=vad` picked on the pause-fragmentation
+    // fixtures (fixtures/bench/pause_repro). Below it (160 ms) WER/noise rise;
+    // above it (320 ms+) the model hears enough pause to fragment again. At
+    // 240 ms cerCASE drops 2.6→1.1% on the repro set and 6.5→6.1% on the full
+    // panel, with word-fusion (`concat`) flat at 0 — a 0.5–1s breath no longer
+    // reads as a sentence end (e.g. "app dot css" → `app.css`, not `app. CSS`).
+    max_intra_silence_ms: 240,
 };
 
 impl Default for VadPipelineConfig {
@@ -97,7 +120,9 @@ impl VadPipelineConfig {
     }
 
     fn ms_to_samples(&self, ms: u32) -> usize {
-        (ms as usize * self.sample_rate) / 1_000
+        // `saturating_mul` guards the product on 32-bit targets (where `usize`
+        // is `u32`); a no-op on the 64-bit production build.
+        (ms as usize).saturating_mul(self.sample_rate) / 1_000
     }
 
     fn ms_to_frames(&self, ms: u32) -> usize {
@@ -137,6 +162,11 @@ impl VadPipelineConfig {
     /// Force-finalize length, in whole Silero frames.
     pub fn max_chunk_frames(&self) -> usize {
         self.ms_to_frames(self.max_chunk_ms)
+    }
+
+    /// Intra-utterance silence cap in samples. `0` = disabled (no cap).
+    pub fn max_intra_silence_samples(&self) -> usize {
+        self.ms_to_samples(self.max_intra_silence_ms)
     }
 }
 

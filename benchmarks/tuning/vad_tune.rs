@@ -461,6 +461,33 @@ fn main() {
         ),
     );
 
+    // ── Intra-utterance silence cap A/B (opt-in: VAD_CAP_AB=1) ──────────────
+    // Off by default — it adds 5 full ASR passes over the panel. The cap
+    // collapses long mid-utterance pauses so Qwen3 stops punctuating them; the
+    // payoff lands in cased-CER (case+spacing+PUNCT), which WER erases, so it is
+    // shown as an explicit table rather than folded into the WER-driven
+    // coordinate descent below (that would never adopt it). Read it as: cer
+    // should drop while concat (word fusion) and quiet WER stay flat. Focus a
+    // category with `LUNE_BENCH_FIXTURE=pause_repro` (or `=long_pause`).
+    if std::env::var("VAD_CAP_AB").is_ok_and(|v| v != "0") {
+        println!("\n── intra-utterance silence cap A/B (want: cer ↓, concat/quiet flat) ──");
+        for cap in [0u32, 160, 240, 320, 480] {
+            let cfg = VadPipelineConfig {
+                max_intra_silence_ms: cap,
+                ..DEFAULT_VAD_CONFIG
+            };
+            let label = if cap == 0 {
+                "cap=off (baseline)".to_string()
+            } else {
+                format!("cap={cap}ms")
+            };
+            print_row(
+                &label,
+                evaluate(&harness, &fixtures, Gating::Hybrid(cfg), pcen),
+            );
+        }
+    }
+
     // ── Coordinate descent ─────────────────────────────────────────────────
     let mut best = DEFAULT_VAD_CONFIG;
     for round in 1..=rounds {
@@ -607,7 +634,8 @@ fn main() {
          \n    hangover_ms: {},\
          \n    max_chunk_ms: {},\
          \n    min_speech_ms: {},\
-         \n    long_gap_ms: {},",
+         \n    long_gap_ms: {},\
+         \n    max_intra_silence_ms: {},",
         best.earshot_prefilter,
         best.earshot_activity_threshold,
         best.silero_onset,
@@ -617,6 +645,7 @@ fn main() {
         best.max_chunk_ms,
         best.min_speech_ms,
         best.long_gap_ms,
+        best.max_intra_silence_ms,
     );
     println!();
 }

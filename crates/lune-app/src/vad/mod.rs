@@ -213,8 +213,9 @@ impl HybridVad {
             SpanEvent::Close { keep } => {
                 // The closing frame is appended like any other in-span frame: on a
                 // max-length close it is voiced speech the gate counted (dropping it
-                // would clip the final ~32 ms); on a long-gap close it is the
-                // silence frame `close_span`'s hangover trim then removes.
+                // would clip the final ~32 ms); on a long-gap close it is a silence
+                // frame that `append_frame` drops when the intra-silence cap is
+                // already saturated, otherwise `close_span`'s hangover trim removes it.
                 self.append_frame(frame, prob);
                 self.close_span(keep, &[], actions);
             }
@@ -224,11 +225,25 @@ impl HybridVad {
     /// Append an in-span frame, tracking the trailing-silence run that
     /// `close_span` trims to the hangover window: a frame at or below
     /// `silero_offset` extends the run, a louder one resets it.
+    ///
+    /// Intra-utterance silence cap: once the current silence run reaches
+    /// `max_intra_silence_ms`, further silence frames in that run are dropped
+    /// rather than appended, so the recognizer hears a word-boundary pause but
+    /// not a sentence-length one (which Qwen3 would punctuate). The cap shapes
+    /// only the *audio*; the span gate still sees every frame's probability and
+    /// owns the open/close (`long_gap`) decision. `0` disables the cap.
     fn append_frame(&mut self, frame: &[f32], prob: f32) {
-        self.span.extend_from_slice(frame);
         if prob <= self.config.silero_offset {
+            let cap = self.config.max_intra_silence_samples();
+            if cap > 0 && self.trailing_silence_samples >= cap {
+                // This pause already contributed `cap` of silence — drop the
+                // excess instead of feeding the model sentence-end prosody.
+                return;
+            }
+            self.span.extend_from_slice(frame);
             self.trailing_silence_samples += frame.len();
         } else {
+            self.span.extend_from_slice(frame);
             self.trailing_silence_samples = 0;
         }
     }
@@ -246,6 +261,10 @@ impl HybridVad {
     /// Close the open span: trim its trailing silence to the hangover window,
     /// append any end-of-stream `tail`, and emit the audio if it cleared
     /// `min_speech` (the [`SpanGate`] already folded that into `keep`).
+    ///
+    /// When `max_intra_silence_ms < hangover_ms`, `append_frame` has already
+    /// bounded the trailing run below the hangover window, so the trim below is
+    /// inert and the effective tail is the cap — see `max_intra_silence_ms`.
     fn close_span(&mut self, keep: bool, tail: &[f32], actions: &mut Vec<GateAction>) {
         let hangover = self.config.hangover_samples();
         if self.trailing_silence_samples > hangover {
@@ -400,5 +419,90 @@ mod tests {
         }
         assert_eq!(pushed, 0, "silence must not be pushed to ASR as speech");
         assert!(!hybrid.in_segment());
+    }
+
+    /// Drive a long silence run through the private `append_frame` seam with
+    /// explicit probabilities (no model) and close the span: the cap must bound
+    /// the silence kept in the emitted audio so the recognizer hears a
+    /// word-boundary pause, not a sentence-length one.
+    #[test]
+    fn intra_silence_cap_bounds_emitted_span() {
+        let cfg = VadPipelineConfig {
+            silero_enabled: false,
+            max_intra_silence_ms: 240,
+            // Larger than the cap, so the hangover trim can't mask the cap effect.
+            hangover_ms: 2_000,
+            min_speech_ms: 0,
+            ..DEFAULT_VAD_CONFIG
+        };
+        let mut vad = HybridVad::with_config(cfg, false).expect("build hybrid vad");
+        let voiced = vec![0.2f32; SILERO_FRAME];
+        let silent = vec![0.0f32; SILERO_FRAME];
+
+        // Open a span with one voiced frame, then feed a 40-frame silence run.
+        vad.span.extend_from_slice(&voiced);
+        vad.trailing_silence_samples = 0;
+        for _ in 0..40 {
+            vad.append_frame(&silent, 0.0); // 0.0 <= silero_offset -> silence
+        }
+
+        let mut actions = Vec::new();
+        vad.close_span(true, &[], &mut actions);
+        let pushed: usize = actions
+            .iter()
+            .filter_map(|a| match a {
+                GateAction::PushSamples(s) => Some(s.len()),
+                GateAction::SegmentFinalized => None,
+            })
+            .sum();
+
+        // Silence is appended only until the run reaches the cap; with 512-sample
+        // frames that is the first frame boundary >= cap (240 ms -> 256 ms).
+        let cap_samples = (240usize * 16_000) / 1_000;
+        let max_silence = cap_samples.div_ceil(SILERO_FRAME) * SILERO_FRAME;
+        assert_eq!(
+            pushed,
+            SILERO_FRAME + max_silence,
+            "cap must bound the silence kept in the emitted span"
+        );
+        assert!(
+            pushed < SILERO_FRAME + 40 * SILERO_FRAME,
+            "excess silence beyond the cap must be dropped, not appended"
+        );
+    }
+
+    /// `max_intra_silence_ms = 0` disables the cap: every silence frame in the
+    /// span is retained (the pre-cap behaviour).
+    #[test]
+    fn intra_silence_cap_zero_retains_all_silence() {
+        let cfg = VadPipelineConfig {
+            silero_enabled: false,
+            max_intra_silence_ms: 0,
+            hangover_ms: 2_000,
+            min_speech_ms: 0,
+            ..DEFAULT_VAD_CONFIG
+        };
+        let mut vad = HybridVad::with_config(cfg, false).expect("build hybrid vad");
+        let voiced = vec![0.2f32; SILERO_FRAME];
+        let silent = vec![0.0f32; SILERO_FRAME];
+        vad.span.extend_from_slice(&voiced);
+        vad.trailing_silence_samples = 0;
+        for _ in 0..40 {
+            vad.append_frame(&silent, 0.0);
+        }
+        let mut actions = Vec::new();
+        vad.close_span(true, &[], &mut actions);
+        let pushed: usize = actions
+            .iter()
+            .filter_map(|a| match a {
+                GateAction::PushSamples(s) => Some(s.len()),
+                GateAction::SegmentFinalized => None,
+            })
+            .sum();
+        assert_eq!(
+            pushed,
+            SILERO_FRAME + 40 * SILERO_FRAME,
+            "cap=0 must retain every silence frame"
+        );
     }
 }

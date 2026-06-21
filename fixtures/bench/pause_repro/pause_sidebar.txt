@@ -1,0 +1,1 @@
+If you look at the sidebar again and look at the bottom left, the two elements have a separator in between and it is not centered, so they have different spacings.
