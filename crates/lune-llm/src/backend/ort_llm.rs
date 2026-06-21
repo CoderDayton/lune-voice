@@ -1764,13 +1764,32 @@ fn merge_core(
             }
             Op::Insert(w) => {
                 let has_following_input = last_input_op_idx.is_some_and(|last| idx < last);
+                let margin = pop_margin(w);
+                // The SAFE_INSERTIONS heuristic (re-add an ASR-dropped function
+                // word) is a cold-start fallback for backends WITHOUT token
+                // scores. When the backend DOES score the decode, a well-trained
+                // ASR rarely drops function words, so an inserted "the"/"by" is
+                // usually a hallucination ("The we need…", "up by 12") — defer to
+                // the calibrated conformal edit gate below instead of admitting it
+                // by blanket rule. On the domain corpus this removed the LLM's
+                // entire net WER regression (5.1%→4.8%) with no category
+                // regression, while keeping every punctuation/casing edit.
+                // Cold start (gate disabled) therefore reverts ALL scored
+                // function-word insertions; once the conformal gate is calibrated
+                // and enabled (see `runtime.rs` update_edit_gate), confident ones
+                // (margin > tau) are re-admitted via the `gate.admits` path below.
                 let rule_accept = is_en
                     && has_following_input
+                    && margin.is_none()
                     && SAFE_INSERTIONS.contains(&norm_word(w).as_str());
-                let margin = pop_margin(w);
                 // Truth = rule decision: a rule-rejected insertion means the
                 // word should not be there (correct as-is); a rule-accepted one
-                // is a beneficial flip.
+                // is a beneficial flip. Side effect of the `margin.is_none()`
+                // guard above: on a SCORED backend every function-word insertion
+                // is now labelled "raw was correct" (observed_correct = true),
+                // which trains the conformal edit-gate calibration to stay
+                // conservative about insertions — deliberate, and consistent with
+                // the corpus finding that scored re-insertions are net-harmful.
                 obs.push(EditObservation {
                     observed_correct: !rule_accept,
                     margin,
@@ -2166,6 +2185,58 @@ mod tests {
         assert_eq!(
             merged, "i like your car",
             "blocked sub must never be re-admitted by the gate"
+        );
+    }
+
+    #[test]
+    fn scored_function_word_insertion_reverted_when_gate_disabled() {
+        use lune_core::llm::WordMargin;
+        // Production always runs the SCORED merge. With the conformal edit gate
+        // disabled (cold start), a function-word insertion the model proposed
+        // ("a") is treated as a possible hallucination and reverted to the raw
+        // transcript — the blanket SAFE_INSERTIONS rule no longer admits an
+        // insertion once a decode score is present. (The score-less
+        // `validate_and_merge` path — test-only — still keeps it: see
+        // `merge_accepts_function_word_insertion`.)
+        let margins = vec![WordMargin {
+            word: "a".into(),
+            margin: 2.0,
+        }];
+        let (merged, _obs) = validate_and_merge_scored(
+            "i saw dog",
+            "I saw a dog",
+            "en",
+            &margins,
+            EditGate::disabled(),
+        );
+        assert_eq!(
+            merged, "I saw dog",
+            "scored insertion reverted when gate off"
+        );
+    }
+
+    #[test]
+    fn scored_function_word_insertion_readmitted_when_margin_clears_tau() {
+        use lune_core::llm::WordMargin;
+        // The same insertion is re-admitted once the calibrated gate is enabled
+        // and the decode margin (2.0) clears tau (1.0).
+        let margins = vec![WordMargin {
+            word: "a".into(),
+            margin: 2.0,
+        }];
+        let (merged, _obs) = validate_and_merge_scored(
+            "i saw dog",
+            "I saw a dog",
+            "en",
+            &margins,
+            EditGate {
+                enabled: true,
+                tau: 1.0,
+            },
+        );
+        assert_eq!(
+            merged, "I saw a dog",
+            "confident scored insertion re-admitted by the gate"
         );
     }
 
