@@ -50,7 +50,11 @@ pre-push:
       fail_text: "Tests must pass before pushing"
 
     frontend-build:
-      run: cd desktop-ui && bun run build
+      # build:ci = tsc + vite build, WITHOUT `lingui extract --clean`. Extract
+      # mutates the committed src/locales/ catalogs (a dev action, not a push
+      # gate) and has wedged at 100% CPU on push; the vite lingui plugin compiles
+      # the already-committed .po catalogs at build time, so the gate doesn't need it.
+      run: cd desktop-ui && bun run build:ci
       fail_text: "Desktop UI build failed"
 
     e2e-models:
