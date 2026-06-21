@@ -25,8 +25,8 @@ export function InputSection({ settings }: SettingsProps) {
 
   return (
     <SettingsSection
-      title={t`Voice input`}
-      description={t`Choose how quickly you want to enter and leave voice typing.`}
+      title={t`Input`}
+      description={t`How recording starts and stops, plus microphone tuning.`}
       icon={Mic}
     >
       <SettingsRow

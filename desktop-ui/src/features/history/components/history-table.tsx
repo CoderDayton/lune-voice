@@ -197,6 +197,15 @@ interface SessionRowsProps {
 function SessionRows({ session, expanded, onToggle }: SessionRowsProps) {
   const { t } = useLingui();
   const [copied, setCopied] = useState(false);
+  const detailRef = useRef<HTMLTableRowElement>(null);
+
+  // When a row expands, the detail panel unfolds *below* the summary row. For
+  // rows near the bottom of the scroll region that lands off-screen, so pull it
+  // into view — `nearest` is position-aware: it does nothing when already
+  // visible and scrolls the minimum needed otherwise (no jump for top rows).
+  useEffect(() => {
+    if (expanded) detailRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [expanded]);
 
   const startDate = new Date(session.startedAt);
   const time = startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -265,7 +274,7 @@ function SessionRows({ session, expanded, onToggle }: SessionRowsProps) {
         <td className="py-3 pr-3" />
       </tr>
       {expanded && (
-        <tr className="border-b border-surface-border bg-surface-inset/40">
+        <tr ref={detailRef} className="border-b border-surface-border bg-surface-inset/40">
           <td colSpan={7} className="px-4 py-4 sm:px-6">
             <div className="rounded-field border border-surface-border bg-surface-inset p-4">
               <p className="max-h-60 overflow-y-auto whitespace-pre-wrap break-words text-[0.95rem] leading-7 text-content">

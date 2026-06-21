@@ -2,13 +2,13 @@ import { useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';
 import {
   AudioLines,
+  HardDrive,
   Keyboard,
   type LucideIcon,
   Mic,
   Palette,
   Send,
   SlidersHorizontal,
-  Wand2,
 } from 'lucide-react';
 import { useState } from 'react';
 import { workspaceStore } from '../../store/workspace-store';
@@ -68,7 +68,7 @@ export function SettingsPage() {
     { id: 'input', label: t`Input`, icon: Mic },
     { id: 'transcription', label: t`Transcription`, icon: AudioLines },
     { id: 'output', label: t`Output`, icon: Send },
-    { id: 'models', label: t`Correction`, icon: Wand2 },
+    { id: 'models', label: t`Models`, icon: HardDrive },
   ];
 
   const content: Record<SectionId, React.ReactNode> = {

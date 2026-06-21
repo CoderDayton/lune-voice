@@ -1,5 +1,6 @@
 import { useLingui } from '@lingui/react/macro';
 import { Lock, Pencil } from 'lucide-react';
+import { PanelHeader } from '../../../components/ui/panel-header';
 import type { StylePreset } from '../../../store/workspace-types';
 import { styleIcon } from '../style-icons';
 
@@ -22,29 +23,22 @@ export function StyleHero({ preset, onEdit, onView }: StyleHeroProps) {
 
   return (
     <section className="relative overflow-hidden rounded-box border border-primary/30 bg-surface-card p-5 shadow-glow sm:p-6">
-      <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 items-start gap-4">
-          <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/20 text-primary shadow-glow">
-            <Icon size={22} strokeWidth={1.75} />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="section-label text-primary">{t`Active style`}</span>
-              {preset.isBuiltin && (
-                <span className="badge badge-soft badge-xs gap-1">
-                  <Lock size={9} /> {t`Built-in`}
-                </span>
-              )}
-            </div>
-            <h2 className="mt-1 truncate font-display text-2xl font-semibold tracking-display text-content-strong">
-              {preset.name}
-            </h2>
-            <p className="mt-1 max-w-prose text-sm text-content-muted">{preset.description}</p>
-          </div>
-        </div>
-
-        <div className="relative shrink-0">
-          {preset.isBuiltin ? (
+      <PanelHeader
+        icon={Icon}
+        eyebrow={
+          <>
+            <span className="section-label text-primary">{t`Active style`}</span>
+            {preset.isBuiltin && (
+              <span className="badge badge-soft badge-xs gap-1">
+                <Lock size={9} /> {t`Built-in`}
+              </span>
+            )}
+          </>
+        }
+        title={preset.name}
+        description={preset.description}
+        actions={
+          preset.isBuiltin ? (
             <button type="button" className="btn btn-soft btn-sm gap-2" onClick={onView}>
               <Lock size={14} /> {t`View`}
             </button>
@@ -52,9 +46,9 @@ export function StyleHero({ preset, onEdit, onView }: StyleHeroProps) {
             <button type="button" className="btn btn-primary btn-sm gap-2" onClick={onEdit}>
               <Pencil size={14} /> {t`Edit`}
             </button>
-          )}
-        </div>
-      </div>
+          )
+        }
+      />
 
       <div className="relative mt-5 flex flex-wrap items-center gap-2">
         <span className="mr-1 text-xs text-content-dim">{t`Formatting`}</span>

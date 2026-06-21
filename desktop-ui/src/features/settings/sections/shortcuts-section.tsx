@@ -13,7 +13,7 @@ export function ShortcutsSection({ settings }: SettingsProps) {
   return (
     <>
       <SettingsSection
-        title={t`Keyboard controls`}
+        title={t`Shortcuts`}
         description={t`Use fast commands without opening menus in the middle of work.`}
         icon={Keyboard}
       >
@@ -39,7 +39,7 @@ export function ShortcutsSection({ settings }: SettingsProps) {
         />
         <SettingsRow
           label={t`Recording style`}
-          description={t`Whether the shortcut toggles recording or only works while held. Change in Voice input.`}
+          description={t`Whether the shortcut toggles recording or only works while held. Change in Input.`}
           control={
             <span className="badge badge-outline badge-sm">
               {labelFor(activationModes, settings.activationMode).split(' ')[0]}

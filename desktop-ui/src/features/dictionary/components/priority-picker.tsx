@@ -52,7 +52,7 @@ export function PriorityPicker({
             key={level.value}
             type="button"
             aria-pressed={active}
-            className={`join-item btn gap-1.5 grow sm:grow-0 ${sizeClass} ${active ? 'btn-primary' : 'btn-soft'}`}
+            className={`join-item btn grow gap-1.5 sm:grow-0 sm:min-w-20 ${sizeClass} ${active ? 'btn-primary' : 'btn-soft'}`}
             onClick={() => onChange(level.value)}
           >
             <span

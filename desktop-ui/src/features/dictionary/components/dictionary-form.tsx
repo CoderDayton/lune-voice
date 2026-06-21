@@ -1,6 +1,7 @@
 import { Trans, useLingui } from '@lingui/react/macro';
 import { ArrowRight, Plus, Wand2 } from 'lucide-react';
 import { type FormEvent, useId, useRef, useState } from 'react';
+import { PanelHeader } from '../../../components/ui/panel-header';
 import { addDictionaryEntry } from '../../../store/workspace-store';
 import { PriorityPicker } from './priority-picker';
 
@@ -43,24 +44,12 @@ export function QuickAddRule() {
   }
 
   return (
-    <section className="panel-surface p-5 sm:p-6" aria-labelledby="vocab-add-heading">
-      {/* Header */}
-      <div className="flex items-start gap-3">
-        <span className="token-icon grid size-10 shrink-0 place-items-center rounded-field">
-          <Wand2 size={19} strokeWidth={1.6} />
-        </span>
-        <div className="min-w-0">
-          <h2
-            id="vocab-add-heading"
-            className="text-lg font-semibold tracking-tight text-content-strong"
-          >
-            <Trans>Add a correction</Trans>
-          </h2>
-          <p className="text-sm text-content-subtle">
-            <Trans>Teach Lune Voice the right spelling for a word it mishears.</Trans>
-          </p>
-        </div>
-      </div>
+    <section className="panel-surface p-5 sm:p-6" aria-label={t`Add a correction`}>
+      <PanelHeader
+        icon={Wand2}
+        title={t`Add a correction`}
+        description={t`Teach Lune Voice the right spelling for a word it mishears.`}
+      />
 
       <form onSubmit={handleSubmit} className="mt-5 flex flex-col gap-4">
         {/* Mapping: you say → Lune Voice writes */}

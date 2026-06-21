@@ -1,10 +1,10 @@
 import { useLingui } from '@lingui/react/macro';
-import { Settings2 } from 'lucide-react';
+import { SlidersHorizontal } from 'lucide-react';
 import { useMemo } from 'react';
 import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown';
 import { activateLocale, type LocaleKey, locales } from '../../../i18n';
 import { saveWorkspaceSetting, type WorkspaceSettings } from '../../../store/workspace-store';
-import { SettingsSection } from '../components/section';
+import { SettingsRow, SettingsSection } from '../components/section';
 import {
   type DescriptiveOptionData,
   type HistoryRetentionValue,
@@ -26,11 +26,11 @@ export function GeneralSection({ settings }: { settings: WorkspaceSettings }) {
     <SettingsSection
       title={t`General`}
       description={t`Application behavior and startup preferences.`}
-      icon={Settings2}
+      icon={SlidersHorizontal}
     >
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-sm font-medium">{t`Language`}</span>
+      <SettingsRow
+        label={t`Language`}
+        control={
           <DescriptiveDropdown
             value={settings.language}
             options={localeOptions}
@@ -40,15 +40,13 @@ export function GeneralSection({ settings }: { settings: WorkspaceSettings }) {
               void activateLocale(lang);
             }}
           />
-        </div>
+        }
+      />
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-col">
-            <span className="text-sm font-medium">{t`Start minimized`}</span>
-            <span className="text-xs text-content-muted">
-              {t`Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login.`}
-            </span>
-          </div>
+      <SettingsRow
+        label={t`Start minimized`}
+        description={t`Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login.`}
+        control={
           <input
             type="checkbox"
             className="toggle toggle-primary"
@@ -56,15 +54,13 @@ export function GeneralSection({ settings }: { settings: WorkspaceSettings }) {
             onChange={() => void saveWorkspaceSetting('startMinimized', !settings.startMinimized)}
             aria-label={t`Start minimized`}
           />
-        </div>
+        }
+      />
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-col">
-            <span className="text-sm font-medium">{t`History retention`}</span>
-            <span className="text-xs text-content-muted">
-              {t`How long finished dictations are kept on this device.`}
-            </span>
-          </div>
+      <SettingsRow
+        label={t`History retention`}
+        description={t`How long finished dictations are kept on this device.`}
+        control={
           <DescriptiveDropdown
             value={
               (settings.sessionHistoryDays == null
@@ -77,8 +73,8 @@ export function GeneralSection({ settings }: { settings: WorkspaceSettings }) {
               void saveWorkspaceSetting('sessionHistoryDays', next === 'off' ? null : Number(next))
             }
           />
-        </div>
-      </div>
+        }
+      />
     </SettingsSection>
   );
 }

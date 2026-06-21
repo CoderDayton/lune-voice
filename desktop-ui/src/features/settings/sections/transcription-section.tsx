@@ -1,5 +1,5 @@
 import { useLingui } from '@lingui/react/macro';
-import { AudioWaveform } from 'lucide-react';
+import { AudioLines } from 'lucide-react';
 import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown';
 import { saveWorkspaceSetting } from '../../../store/workspace-store';
 import { OpenAiFields } from '../components/openai-fields';
@@ -11,9 +11,9 @@ export function TranscriptionSection({ settings }: SettingsProps) {
 
   return (
     <SettingsSection
-      title="Recognition"
+      title={t`Transcription`}
       description={t`Control how your speech is turned into text.`}
-      icon={AudioWaveform}
+      icon={AudioLines}
     >
       <SettingsRow
         label={t`Voice model`}

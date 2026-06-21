@@ -114,38 +114,51 @@ export function ModelsSection() {
       .catch((e) => console.error('delete_model_cmd:', e));
   }
 
-  if (loading) {
-    return (
-      <SettingsSection
-        title={t`Models`}
-        description={t`Manage AI models stored on your device.`}
-        icon={HardDrive}
-      >
-        {[0, 1].map((i) => (
-          <div
-            key={i}
-            className="rounded-box border border-surface-border bg-base-200/60 p-4 flex items-center gap-3"
-          >
-            <div className="skeleton size-10 rounded-field shrink-0" />
-            <div className="flex-1 space-y-2">
-              <div className="skeleton h-4 w-32" />
-              <div className="skeleton h-3 w-56" />
-            </div>
-            <div className="skeleton h-8 w-24 rounded-field" />
+  const modelCards = loading
+    ? [0, 1].map((i) => (
+        <div
+          key={i}
+          className="rounded-box border border-surface-border bg-base-200/60 p-4 flex items-center gap-3"
+        >
+          <div className="skeleton size-10 rounded-field shrink-0" />
+          <div className="flex-1 space-y-2">
+            <div className="skeleton h-4 w-32" />
+            <div className="skeleton h-3 w-56" />
           </div>
-        ))}
-      </SettingsSection>
-    );
-  }
+          <div className="skeleton h-8 w-24 rounded-field" />
+        </div>
+      ))
+    : models.map((model) => (
+        <ModelManagementCard
+          key={model.localName}
+          model={model}
+          icon={modelIcon(model.localName)}
+          isDownloading={downloading === model.localName}
+          anyDownloading={!!downloading}
+          progress={downloading === model.localName ? progress : null}
+          onDownload={() => handleDownload(model.localName)}
+          onDelete={() => handleDeleteClick(model)}
+        />
+      ));
 
   return (
-    <>
+    <div className="flex flex-col gap-space-md">
+      {/* The models themselves — download / delete the on-device ONNX files. */}
       <SettingsSection
         icon={HardDrive}
         title={t`Models`}
         description={t`AI models stored on your device.`}
       >
-        {/* Correction LLM enable — a disabled backend hides its model below */}
+        {modelCards}
+      </SettingsSection>
+
+      {/* Correction — the LLM toggle and the knobs that tune its behavior. */}
+      <SettingsSection
+        icon={Wand2}
+        title={t`Correction`}
+        description={t`Tune how the local LLM polishes transcripts after transcription.`}
+      >
+        {/* Correction LLM enable — a disabled backend hides its model above */}
         <div className="flex items-center justify-between gap-4 rounded-box border border-surface-border bg-base-200/60 p-4">
           <div className="flex items-start gap-3">
             <div className="flex size-10 shrink-0 items-center justify-center rounded-field bg-base-300 text-content-subtle">
@@ -158,7 +171,7 @@ export function ModelsSection() {
               <p className="mt-1 text-xs leading-snug text-content-subtle sm:text-sm">
                 {llmEnabled
                   ? t`Polishes punctuation and fixes obvious ASR errors after transcription.`
-                  : t`Disabled — transcripts are delivered raw, and the LLM model is hidden from the list below.`}
+                  : t`Disabled — transcripts are delivered raw, and the LLM model is hidden from the list above.`}
               </p>
             </div>
           </div>
@@ -217,19 +230,6 @@ export function ModelsSection() {
             />
           </>
         )}
-
-        {models.map((model) => (
-          <ModelManagementCard
-            key={model.localName}
-            model={model}
-            icon={modelIcon(model.localName)}
-            isDownloading={downloading === model.localName}
-            anyDownloading={!!downloading}
-            progress={downloading === model.localName ? progress : null}
-            onDownload={() => handleDownload(model.localName)}
-            onDelete={() => handleDeleteClick(model)}
-          />
-        ))}
       </SettingsSection>
 
       <DeleteConfirmModal
@@ -241,7 +241,7 @@ export function ModelsSection() {
         }}
         onConfirm={handleDeleteConfirm}
       />
-    </>
+    </div>
   );
 }
 

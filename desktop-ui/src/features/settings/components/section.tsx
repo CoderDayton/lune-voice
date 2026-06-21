@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from 'react';
+import { PanelHeader } from '../../../components/ui/panel-header';
 import type { WorkspaceSettings } from '../../../store/workspace-store';
 
 export interface SettingsProps {
@@ -27,17 +28,7 @@ export function SettingsSection({
   return (
     <section className="panel-surface">
       <div className="p-5 sm:p-6 pb-0 sm:pb-0">
-        <div className="flex items-center gap-3">
-          {Icon && (
-            <div className="token-icon size-9">
-              <Icon size={18} strokeWidth={1.8} />
-            </div>
-          )}
-          <div>
-            <h3 className="text-xl font-semibold tracking-tight">{title}</h3>
-            <p className="text-sm text-content-subtle mt-0.5">{description}</p>
-          </div>
-        </div>
+        <PanelHeader icon={Icon} title={title} description={description} />
       </div>
       <div className="p-5 sm:p-6 flex flex-col gap-3">{children}</div>
     </section>
