@@ -65,6 +65,8 @@ Each crate has a single responsibility. `lune-core` defines shared types and tra
 - Captures 16 kHz mono PCM in frames of 480 samples (30ms each)
 - Frames are sent over an `mpsc` channel to the session loop
 - The session loop coalesces back-to-back frames into a single batch before pushing to ASR, reducing await-point overhead during microphone bursts
+- A hybrid VAD (Earshot energy gate → Silero neural verify → contiguous-span gate, in `crates/lune-app/src/vad/`) decides which audio reaches the ASR. A span stays open through short pauses and closes only on a long (~2s) silence run, so intra-utterance word boundaries survive instead of fusing adjacent words
+- Silence *inside* a span is capped (`max_intra_silence_ms`, ~240ms): a brief pause is kept so word boundaries hold, but the excess is dropped before the recognizer hears it — a 0.5–1s breath no longer reads as sentence-ending prosody, which otherwise made Qwen3-ASR emit spurious periods/commas mid-utterance
 
 ### 2. ASR
 
