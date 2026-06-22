@@ -277,6 +277,11 @@ msgstr "Copied"
 msgid "Copy"
 msgstr "Copy"
 
+#: src/features/settings/sections/output-section.tsx:31
+#: src/features/settings/sections/output-section.tsx:39
+msgid "Copy to clipboard"
+msgstr "Copy to clipboard"
+
 #: src/features/history/components/session-detail-modal.tsx:132
 msgid "Copy transcript"
 msgstr "Copy transcript"
@@ -581,6 +586,10 @@ msgstr "Installed"
 msgid "Instructions"
 msgstr "Instructions"
 
+#: src/features/settings/sections/output-section.tsx:32
+msgid "Keep the dictated text on the clipboard after every dictation, so you can paste it again yourself."
+msgstr "Keep the dictated text on the clipboard after every dictation, so you can paste it again yourself."
+
 #: src/features/settings/sections/input-section.tsx:192
 msgid "Keep the mic open in the background so dictation starts ~70ms sooner. The OS may show a recording indicator while Lune Voice is running."
 msgstr "Keep the mic open in the background so dictation starts ~70ms sooner. The OS may show a recording indicator while Lune Voice is running."
@@ -781,8 +790,8 @@ msgstr "Overall progress"
 msgid "Pagination"
 msgstr "Pagination"
 
-#: src/features/settings/sections/output-section.tsx:32
-#: src/features/settings/sections/output-section.tsx:38
+#: src/features/settings/sections/output-section.tsx:45
+#: src/features/settings/sections/output-section.tsx:51
 msgid "Paste compatibility"
 msgstr "Paste compatibility"
 
@@ -1218,7 +1227,7 @@ msgstr "Whether the shortcut toggles recording or only works while held. Change 
 msgid "Which input device dictation captures from. Changes apply right away."
 msgstr "Which input device dictation captures from. Changes apply right away."
 
-#: src/features/settings/sections/output-section.tsx:33
+#: src/features/settings/sections/output-section.tsx:46
 msgid "Which paste shortcut to send. Automatic detects terminals; override if paste lands in the wrong place."
 msgstr "Which paste shortcut to send. Automatic detects terminals; override if paste lands in the wrong place."
 

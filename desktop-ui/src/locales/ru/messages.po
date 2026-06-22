@@ -40,7 +40,7 @@ msgstr "{page} / {totalPages}"
 
 #: src/features/settings/sections/input-section.tsx:55
 msgid "{saved} (unavailable)"
-msgstr ""
+msgstr "{saved} (недоступно)"
 
 #: src/features/history/components/history-pagination.tsx:29
 #: src/features/history/components/history-table.tsx:157
@@ -84,7 +84,7 @@ msgstr "Адаптивная регулировка усиления"
 #: src/features/settings/sections/input-section.tsx:177
 #: src/features/settings/sections/input-section.tsx:185
 msgid "Adaptive pause detection"
-msgstr ""
+msgstr "Адаптивное определение пауз"
 
 #: src/features/dictionary/components/dictionary-form.tsx:47
 #: src/features/dictionary/components/dictionary-form.tsx:50
@@ -277,18 +277,23 @@ msgstr "Скопировано"
 msgid "Copy"
 msgstr "Копировать"
 
+#: src/features/settings/sections/output-section.tsx:31
+#: src/features/settings/sections/output-section.tsx:39
+msgid "Copy to clipboard"
+msgstr "Копировать в буфер обмена"
+
 #: src/features/history/components/session-detail-modal.tsx:132
 msgid "Copy transcript"
 msgstr "Копировать стенограмму"
 
 #: src/features/settings/sections/models-section.tsx:158
 msgid "Correction"
-msgstr ""
+msgstr "Исправление"
 
 #: src/features/settings/sections/models-section.tsx:211
 #: src/features/settings/sections/models-section.tsx:223
 msgid "Correction frequency"
-msgstr ""
+msgstr "Частота исправлений"
 
 #: src/features/settings/sections/models-section.tsx:169
 msgid "Correction LLM"
@@ -297,7 +302,7 @@ msgstr "Коррекция LLM"
 #: src/features/settings/sections/models-section.tsx:190
 #: src/features/settings/sections/models-section.tsx:202
 msgid "Correction sensitivity"
-msgstr ""
+msgstr "Чувствительность исправления"
 
 #: src/features/dictionary/components/dictionary-form.tsx:42
 msgid "Couldn't add that rule. Try again."
@@ -374,15 +379,15 @@ msgstr "Язык диктанта"
 
 #: src/features/settings/sections/appearance-section.tsx:91
 msgid "Dictation pill"
-msgstr ""
+msgstr "Индикатор диктовки"
 
 #: src/features/settings/sections/appearance-section.tsx:99
 msgid "Dictation pill visibility"
-msgstr ""
+msgstr "Видимость индикатора диктовки"
 
 #: src/features/settings/sections/models-section.tsx:174
 msgid "Disabled — transcripts are delivered raw, and the LLM model is hidden from the list above."
-msgstr ""
+msgstr "Отключено — транскрипты выдаются без обработки, а модель LLM скрыта из списка выше."
 
 #: src/features/settings/sections/shortcuts-section.tsx:32
 msgid "Discard the current draft and return to idle. Click the binding to change it."
@@ -537,7 +542,7 @@ msgstr "Доброе утро"
 #: src/features/settings/sections/general-section.tsx:61
 #: src/features/settings/sections/general-section.tsx:71
 msgid "History retention"
-msgstr ""
+msgstr "Хранение истории"
 
 #: src/features/overview/overview-page.tsx:99
 msgid "hold the hotkey and speak, your words land where your cursor is."
@@ -549,7 +554,7 @@ msgstr "Как легко Lune Voice срабатывает на речь. Вы�
 
 #: src/features/settings/sections/general-section.tsx:62
 msgid "How long finished dictations are kept on this device."
-msgstr ""
+msgstr "Как долго завершённые диктовки хранятся на этом устройстве."
 
 #: src/features/settings/sections/input-section.tsx:138
 msgid "How quickly Lune Voice decides you're done speaking. Higher = ends sooner on a pause."
@@ -557,11 +562,11 @@ msgstr "Как быстро Lune Voice решит, что вы закончил�
 
 #: src/features/settings/sections/models-section.tsx:212
 msgid "How readily the LLM runs on clean speech. Higher polishes more segments; lower skips more often for speed."
-msgstr ""
+msgstr "Насколько охотно LLM запускается на чистой речи. Выше — обрабатывает больше сегментов; ниже — чаще пропускает ради скорости."
 
 #: src/features/settings/sections/input-section.tsx:61
 msgid "How recording starts and stops, plus microphone tuning."
-msgstr ""
+msgstr "Как начинается и останавливается запись, а также настройка микрофона."
 
 #: src/features/overview/overview-page.tsx:204
 msgid "Idle"
@@ -580,6 +585,10 @@ msgstr "Установлено"
 #: src/features/styles/components/style-editor-modal.tsx:87
 msgid "Instructions"
 msgstr "Инструкции"
+
+#: src/features/settings/sections/output-section.tsx:32
+msgid "Keep the dictated text on the clipboard after every dictation, so you can paste it again yourself."
+msgstr "Сохранять продиктованный текст в буфере обмена после каждой диктовки, чтобы вы могли вставить его снова сами."
 
 #: src/features/settings/sections/input-section.tsx:192
 msgid "Keep the mic open in the background so dictation starts ~70ms sooner. The OS may show a recording indicator while Lune Voice is running."
@@ -600,7 +609,7 @@ msgstr "Запустите в системном трее вместо откр�
 
 #: src/features/settings/sections/input-section.tsx:178
 msgid "Learns your speaking rhythm and adjusts how long a pause ends a phrase. Helps if you pause mid-sentence to think."
-msgstr ""
+msgstr "Изучает ваш ритм речи и регулирует, какая пауза завершает фразу. Помогает, если вы делаете паузу посреди предложения, чтобы подумать."
 
 #: src/features/history/components/history-table.tsx:129
 msgid "Length"
@@ -632,7 +641,7 @@ msgstr "Лунь"
 
 #: src/features/shell/components/sidebar.tsx:212
 msgid "Lune Voice"
-msgstr ""
+msgstr "Lune Voice"
 
 #: src/features/dictionary/components/dictionary-form.tsx:94
 msgid "Lune Voice writes"
@@ -645,7 +654,7 @@ msgstr "Измерьте свою комнату и голос, чтобы ав�
 #: src/features/settings/sections/input-section.tsx:65
 #: src/features/settings/sections/input-section.tsx:71
 msgid "Microphone"
-msgstr ""
+msgstr "Микрофон"
 
 #: src/features/settings/sections/input-section.tsx:94
 msgid "Microphone calibration"
@@ -781,10 +790,10 @@ msgstr "Общий прогресс"
 msgid "Pagination"
 msgstr "Пагинация"
 
-#: src/features/settings/sections/output-section.tsx:32
-#: src/features/settings/sections/output-section.tsx:38
+#: src/features/settings/sections/output-section.tsx:45
+#: src/features/settings/sections/output-section.tsx:51
 msgid "Paste compatibility"
-msgstr ""
+msgstr "Совместимость вставки"
 
 #: src/features/settings/sections/output-section.tsx:18
 msgid "Paste is simplest. Typing keystrokes can work better in some apps."
@@ -854,7 +863,7 @@ msgstr "Обработка…"
 
 #: src/features/shell/components/sidebar.tsx:247
 msgid "Quit Lune Voice"
-msgstr ""
+msgstr "Выйти из Lune Voice"
 
 #: src/features/settings/sections/transcription-section.tsx:20
 msgid "Qwen3-ASR runs locally with automatic language detection."
@@ -1072,7 +1081,7 @@ msgstr "Система"
 
 #: src/features/settings/sections/input-section.tsx:48
 msgid "System default"
-msgstr ""
+msgstr "Системное значение по умолчанию"
 
 #: src/features/dictionary/components/dictionary-form.tsx:51
 msgid "Teach Lune Voice the right spelling for a word it mishears."
@@ -1155,7 +1164,7 @@ msgstr "Транскрипция"
 
 #: src/features/settings/sections/models-section.tsx:159
 msgid "Tune how the local LLM polishes transcripts after transcription."
-msgstr ""
+msgstr "Настройте, как локальная LLM улучшает транскрипты после транскрибирования."
 
 #: src/features/settings/sections/shortcuts-section.tsx:17
 msgid "Use fast commands without opening menus in the middle of work."
@@ -1204,7 +1213,7 @@ msgstr "Если это возможно, это может ускорить з�
 
 #: src/features/settings/sections/appearance-section.tsx:94
 msgid "When to show the floating status pill while you dictate."
-msgstr ""
+msgstr "Когда показывать плавающий индикатор состояния во время диктовки."
 
 #: src/features/settings/components/calibrate-modal.tsx:78
 msgid "When you're ready, click Start and read the sentence aloud at your normal pace."
@@ -1212,15 +1221,15 @@ msgstr "Когда вы будете готовы, нажмите «Начать
 
 #: src/features/settings/sections/shortcuts-section.tsx:42
 msgid "Whether the shortcut toggles recording or only works while held. Change in Input."
-msgstr ""
+msgstr "Переключает ли сочетание клавиш запись или работает только при удержании. Измените в разделе «Ввод»."
 
 #: src/features/settings/sections/input-section.tsx:66
 msgid "Which input device dictation captures from. Changes apply right away."
-msgstr ""
+msgstr "С какого устройства ввода ведётся захват диктовки. Изменения применяются сразу."
 
-#: src/features/settings/sections/output-section.tsx:33
+#: src/features/settings/sections/output-section.tsx:46
 msgid "Which paste shortcut to send. Automatic detects terminals; override if paste lands in the wrong place."
-msgstr ""
+msgstr "Какое сочетание клавиш вставки отправлять. «Автоматически» определяет терминалы; переопределите, если вставка попадает не туда."
 
 #: src/features/history/components/history-session-list.tsx:33
 #: src/features/history/components/history-table.tsx:286
@@ -1235,11 +1244,11 @@ msgstr "Слова"
 
 #: src/features/settings/sections/models-section.tsx:191
 msgid "Words the recognizer is unsure about are sent to the LLM. Higher corrects more aggressively; lower trusts the raw transcription."
-msgstr ""
+msgstr "Слова, в которых распознаватель не уверен, отправляются в LLM. Выше — исправляет агрессивнее; ниже — больше доверяет необработанной транскрипции."
 
 #: src/features/overview/overview-page.tsx:147
 msgid "WPM"
-msgstr ""
+msgstr "WPM"
 
 #: src/features/styles/components/style-preset-card.tsx:96
 msgid "Yes"

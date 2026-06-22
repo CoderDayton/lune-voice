@@ -40,7 +40,7 @@ msgstr "{page} / {totalPages}"
 
 #: src/features/settings/sections/input-section.tsx:55
 msgid "{saved} (unavailable)"
-msgstr ""
+msgstr "{saved} (사용 불가)"
 
 #: src/features/history/components/history-pagination.tsx:29
 #: src/features/history/components/history-table.tsx:157
@@ -84,7 +84,7 @@ msgstr "적응형 이득 제어"
 #: src/features/settings/sections/input-section.tsx:177
 #: src/features/settings/sections/input-section.tsx:185
 msgid "Adaptive pause detection"
-msgstr ""
+msgstr "적응형 일시정지 감지"
 
 #: src/features/dictionary/components/dictionary-form.tsx:47
 #: src/features/dictionary/components/dictionary-form.tsx:50
@@ -277,18 +277,23 @@ msgstr "복사됨"
 msgid "Copy"
 msgstr "복사"
 
+#: src/features/settings/sections/output-section.tsx:31
+#: src/features/settings/sections/output-section.tsx:39
+msgid "Copy to clipboard"
+msgstr "클립보드에 복사"
+
 #: src/features/history/components/session-detail-modal.tsx:132
 msgid "Copy transcript"
 msgstr "받아쓰기 텍스트 복사"
 
 #: src/features/settings/sections/models-section.tsx:158
 msgid "Correction"
-msgstr ""
+msgstr "교정"
 
 #: src/features/settings/sections/models-section.tsx:211
 #: src/features/settings/sections/models-section.tsx:223
 msgid "Correction frequency"
-msgstr ""
+msgstr "교정 빈도"
 
 #: src/features/settings/sections/models-section.tsx:169
 msgid "Correction LLM"
@@ -297,7 +302,7 @@ msgstr "교정 LLM"
 #: src/features/settings/sections/models-section.tsx:190
 #: src/features/settings/sections/models-section.tsx:202
 msgid "Correction sensitivity"
-msgstr ""
+msgstr "교정 민감도"
 
 #: src/features/dictionary/components/dictionary-form.tsx:42
 msgid "Couldn't add that rule. Try again."
@@ -374,15 +379,15 @@ msgstr "받아쓰기 언어"
 
 #: src/features/settings/sections/appearance-section.tsx:91
 msgid "Dictation pill"
-msgstr ""
+msgstr "받아쓰기 표시기"
 
 #: src/features/settings/sections/appearance-section.tsx:99
 msgid "Dictation pill visibility"
-msgstr ""
+msgstr "받아쓰기 표시기 표시 여부"
 
 #: src/features/settings/sections/models-section.tsx:174
 msgid "Disabled — transcripts are delivered raw, and the LLM model is hidden from the list above."
-msgstr ""
+msgstr "비활성화됨 — 전사가 그대로 전달되며, LLM 모델이 위 목록에서 숨겨집니다."
 
 #: src/features/settings/sections/shortcuts-section.tsx:32
 msgid "Discard the current draft and return to idle. Click the binding to change it."
@@ -537,7 +542,7 @@ msgstr "좋은 아침이에요"
 #: src/features/settings/sections/general-section.tsx:61
 #: src/features/settings/sections/general-section.tsx:71
 msgid "History retention"
-msgstr ""
+msgstr "기록 보존"
 
 #: src/features/overview/overview-page.tsx:99
 msgid "hold the hotkey and speak, your words land where your cursor is."
@@ -549,7 +554,7 @@ msgstr "말하기 시작할 때 Lune Voice가 얼마나 쉽게 반응하는지�
 
 #: src/features/settings/sections/general-section.tsx:62
 msgid "How long finished dictations are kept on this device."
-msgstr ""
+msgstr "완료된 받아쓰기를 이 기기에 보관하는 기간입니다."
 
 #: src/features/settings/sections/input-section.tsx:138
 msgid "How quickly Lune Voice decides you're done speaking. Higher = ends sooner on a pause."
@@ -557,11 +562,11 @@ msgstr "Lune Voice가 말하기가 끝났다고 판단하는 속도입니다. �
 
 #: src/features/settings/sections/models-section.tsx:212
 msgid "How readily the LLM runs on clean speech. Higher polishes more segments; lower skips more often for speed."
-msgstr ""
+msgstr "깨끗한 음성에서 LLM이 얼마나 적극적으로 실행되는지. 높을수록 더 많은 구간을 다듬고, 낮을수록 속도를 위해 더 자주 건너뜁니다."
 
 #: src/features/settings/sections/input-section.tsx:61
 msgid "How recording starts and stops, plus microphone tuning."
-msgstr ""
+msgstr "녹음이 시작되고 멈추는 방식과 마이크 조정."
 
 #: src/features/overview/overview-page.tsx:204
 msgid "Idle"
@@ -580,6 +585,10 @@ msgstr "설치됨"
 #: src/features/styles/components/style-editor-modal.tsx:87
 msgid "Instructions"
 msgstr "지침"
+
+#: src/features/settings/sections/output-section.tsx:32
+msgid "Keep the dictated text on the clipboard after every dictation, so you can paste it again yourself."
+msgstr "받아쓰기를 할 때마다 받아쓴 텍스트를 클립보드에 유지하여 직접 다시 붙여넣을 수 있도록 합니다."
 
 #: src/features/settings/sections/input-section.tsx:192
 msgid "Keep the mic open in the background so dictation starts ~70ms sooner. The OS may show a recording indicator while Lune Voice is running."
@@ -600,7 +609,7 @@ msgstr "기본 창을 여는 대신 시스템 트레이를 실행하세요. 로�
 
 #: src/features/settings/sections/input-section.tsx:178
 msgid "Learns your speaking rhythm and adjusts how long a pause ends a phrase. Helps if you pause mid-sentence to think."
-msgstr ""
+msgstr "말하는 리듬을 학습하여 어느 정도의 일시정지가 구문을 끝내는지 조정합니다. 문장 중간에 생각하기 위해 멈추는 경우에 유용합니다."
 
 #: src/features/history/components/history-table.tsx:129
 msgid "Length"
@@ -632,7 +641,7 @@ msgstr "Lune"
 
 #: src/features/shell/components/sidebar.tsx:212
 msgid "Lune Voice"
-msgstr ""
+msgstr "Lune Voice"
 
 #: src/features/dictionary/components/dictionary-form.tsx:94
 msgid "Lune Voice writes"
@@ -645,7 +654,7 @@ msgstr "방과 음성을 측정하여 두 감도를 자동으로 설정하세요
 #: src/features/settings/sections/input-section.tsx:65
 #: src/features/settings/sections/input-section.tsx:71
 msgid "Microphone"
-msgstr ""
+msgstr "마이크"
 
 #: src/features/settings/sections/input-section.tsx:94
 msgid "Microphone calibration"
@@ -781,10 +790,10 @@ msgstr "전반적인 진행 상황"
 msgid "Pagination"
 msgstr "쪽수 매기기"
 
-#: src/features/settings/sections/output-section.tsx:32
-#: src/features/settings/sections/output-section.tsx:38
+#: src/features/settings/sections/output-section.tsx:45
+#: src/features/settings/sections/output-section.tsx:51
 msgid "Paste compatibility"
-msgstr ""
+msgstr "붙여넣기 호환성"
 
 #: src/features/settings/sections/output-section.tsx:18
 msgid "Paste is simplest. Typing keystrokes can work better in some apps."
@@ -854,7 +863,7 @@ msgstr "처리 중…"
 
 #: src/features/shell/components/sidebar.tsx:247
 msgid "Quit Lune Voice"
-msgstr ""
+msgstr "Lune Voice 종료"
 
 #: src/features/settings/sections/transcription-section.tsx:20
 msgid "Qwen3-ASR runs locally with automatic language detection."
@@ -1072,7 +1081,7 @@ msgstr "시스템"
 
 #: src/features/settings/sections/input-section.tsx:48
 msgid "System default"
-msgstr ""
+msgstr "시스템 기본값"
 
 #: src/features/dictionary/components/dictionary-form.tsx:51
 msgid "Teach Lune Voice the right spelling for a word it mishears."
@@ -1155,7 +1164,7 @@ msgstr "전사"
 
 #: src/features/settings/sections/models-section.tsx:159
 msgid "Tune how the local LLM polishes transcripts after transcription."
-msgstr ""
+msgstr "전사 후 로컬 LLM이 전사 결과를 다듬는 방식을 조정합니다."
 
 #: src/features/settings/sections/shortcuts-section.tsx:17
 msgid "Use fast commands without opening menus in the middle of work."
@@ -1204,7 +1213,7 @@ msgstr "가능한 경우 전사를 더 빠르게 완료할 수 있습니다."
 
 #: src/features/settings/sections/appearance-section.tsx:94
 msgid "When to show the floating status pill while you dictate."
-msgstr ""
+msgstr "받아쓰는 동안 떠 있는 상태 표시기를 표시할 시점입니다."
 
 #: src/features/settings/components/calibrate-modal.tsx:78
 msgid "When you're ready, click Start and read the sentence aloud at your normal pace."
@@ -1212,15 +1221,15 @@ msgstr "준비가 되면 시작을 클릭하고 평소 속도로 문장을 큰 �
 
 #: src/features/settings/sections/shortcuts-section.tsx:42
 msgid "Whether the shortcut toggles recording or only works while held. Change in Input."
-msgstr ""
+msgstr "단축키가 녹음을 전환하는지 아니면 누르고 있는 동안에만 작동하는지. '입력'에서 변경하세요."
 
 #: src/features/settings/sections/input-section.tsx:66
 msgid "Which input device dictation captures from. Changes apply right away."
-msgstr ""
+msgstr "받아쓰기가 캡처하는 입력 장치. 변경 사항은 즉시 적용됩니다."
 
-#: src/features/settings/sections/output-section.tsx:33
+#: src/features/settings/sections/output-section.tsx:46
 msgid "Which paste shortcut to send. Automatic detects terminals; override if paste lands in the wrong place."
-msgstr ""
+msgstr "보낼 붙여넣기 단축키. '자동'은 터미널을 감지합니다. 붙여넣기가 잘못된 위치에 들어가면 재정의하세요."
 
 #: src/features/history/components/history-session-list.tsx:33
 #: src/features/history/components/history-table.tsx:286
@@ -1235,11 +1244,11 @@ msgstr "단어"
 
 #: src/features/settings/sections/models-section.tsx:191
 msgid "Words the recognizer is unsure about are sent to the LLM. Higher corrects more aggressively; lower trusts the raw transcription."
-msgstr ""
+msgstr "인식기가 확신하지 못하는 단어는 LLM으로 전송됩니다. 높을수록 더 적극적으로 교정하고, 낮을수록 원본 전사를 더 신뢰합니다."
 
 #: src/features/overview/overview-page.tsx:147
 msgid "WPM"
-msgstr ""
+msgstr "WPM"
 
 #: src/features/styles/components/style-preset-card.tsx:96
 msgid "Yes"
