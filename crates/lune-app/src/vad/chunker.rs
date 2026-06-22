@@ -14,20 +14,6 @@
 
 use super::config::VadPipelineConfig;
 
-/// Why a span closed — lets a consumer tell an *endpoint* (the speaker stopped)
-/// from a non-pause close. Only [`CloseReason::LongGap`] is a real silence
-/// endpoint; `MaxLen`/`Finish` close on length / end-of-stream while speech may
-/// still be ongoing, and must NOT be treated as a pause observation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum CloseReason {
-    /// A `long_gap_frames` run of trailing silence — an intentional stop.
-    LongGap,
-    /// The `max_frames` safety cap force-closed an unbroken span.
-    MaxLen,
-    /// End-of-stream flush ([`SpanGate::finish`]).
-    Finish,
-}
-
 /// One boundary decision per frame for the contiguous-span gate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SpanEvent {
@@ -39,23 +25,9 @@ pub(crate) enum SpanEvent {
     /// the fix: intra-utterance pauses stay inside the span, so the word
     /// boundaries Qwen3-ASR reads from them are never spliced away.
     Append,
-    /// A voiced frame ended a sub-`long_gap` pause: `silence_frames` is the
-    /// length (in frames) of the pause that just resumed. The frame is appended
-    /// exactly like [`SpanEvent::Append`]; the count is the per-pause signal an
-    /// adaptive endpoint learner observes (a pause of known length that
-    /// resumed). `silence_frames` is the gate's *uncapped* decision run — the
-    /// single source of truth for the pause length (distinct from the
-    /// orchestrator's capped trailing-silence audio counter).
-    Resumed {
-        // Consumed by the Stage-B adaptive-endpoint wiring; until then only the
-        // chunker's own tests read it.
-        #[allow(dead_code)]
-        silence_frames: usize,
-    },
-    /// The span closed. `keep` is `false` for spans with less voiced audio than
-    /// `min_speech` (noise blips). `reason` distinguishes a silence endpoint
-    /// (`LongGap`) from a length/EOS close.
-    Close { keep: bool, reason: CloseReason },
+    /// A long gap (intentional stop) closed the span. `keep` is `false` for
+    /// spans with less voiced audio than `min_speech` (noise blips).
+    Close { keep: bool },
 }
 
 /// Contiguous-span gate — the stage-3 replacement for the old chunked gate.
@@ -120,72 +92,27 @@ impl SpanGate {
         }
 
         self.span_frames += 1;
-
         if prob <= self.offset {
-            // Silence frame — extend the trailing-silence run.
             self.silence_run += 1;
-
-            // A long trailing-silence run is an intentional stop → close. The
-            // first `long_gap_frames - 1` silence frames returned `Append` (and
-            // were appended by the orchestrator); THIS frame is the threshold
-            // crossing, so the run length at a long-gap close is exactly
-            // `long_gap_frames`.
-            if self.silence_run >= self.long_gap_frames {
-                let keep = self.voiced_frames >= self.min_speech_frames;
-                self.reset();
-                return SpanEvent::Close {
-                    keep,
-                    reason: CloseReason::LongGap,
-                };
-            }
-
-            // Safety cap on a span whose silence never reaches `long_gap`.
-            // Invariant: reaching `max_frames` requires a voiced frame at least
-            // every `long_gap_frames` (else a long-gap close fires first), so
-            // `voiced_frames >> min_speech_frames` — `keep: true` is always
-            // correct here.
-            if self.span_frames >= self.max_frames {
-                self.reset();
-                return SpanEvent::Close {
-                    keep: true,
-                    reason: CloseReason::MaxLen,
-                };
-            }
-
-            return SpanEvent::Append;
+        } else {
+            self.silence_run = 0;
+            self.voiced_frames += 1;
         }
 
-        // Voiced frame — resets the long-gap timer; a pause (if any) just ended.
-        let resumed_after = self.silence_run; // 0 during continuous speech
-        self.silence_run = 0;
-        self.voiced_frames += 1;
+        // A long trailing-silence run is an intentional stop → close the span.
+        if self.silence_run >= self.long_gap_frames {
+            let keep = self.voiced_frames >= self.min_speech_frames;
+            self.reset();
+            return SpanEvent::Close { keep };
+        }
 
-        // Same length-cap safety as above (a span of pure speech never trips the
-        // long-gap path, so the cap is its only bound).
+        // Safety cap: force-close a span that never stops (always real speech).
         if self.span_frames >= self.max_frames {
             self.reset();
-            return SpanEvent::Close {
-                keep: true,
-                reason: CloseReason::MaxLen,
-            };
+            return SpanEvent::Close { keep: true };
         }
 
-        if resumed_after > 0 {
-            SpanEvent::Resumed {
-                silence_frames: resumed_after,
-            }
-        } else {
-            SpanEvent::Append
-        }
-    }
-
-    /// Set the trailing-silence run length (in frames) that closes a span. Used
-    /// to drive an adaptive, per-pause endpoint threshold; floored at 1 frame so
-    /// a span can never collapse the instant any silence appears.
-    // Called by the Stage-B adaptive-endpoint wiring; tests exercise it now.
-    #[allow(dead_code)]
-    pub(crate) fn set_long_gap_frames(&mut self, frames: usize) {
-        self.long_gap_frames = frames.max(1);
+        SpanEvent::Append
     }
 
     /// Close any open span at end of stream.
@@ -195,10 +122,7 @@ impl SpanGate {
         }
         let keep = self.voiced_frames >= self.min_speech_frames;
         self.reset();
-        SpanEvent::Close {
-            keep,
-            reason: CloseReason::Finish,
-        }
+        SpanEvent::Close { keep }
     }
 
     /// Drop all span state (back to `Idle`).
@@ -257,8 +181,8 @@ mod span_tests {
             assert_eq!(g.step(0.10), SpanEvent::Append, "silence frame {i}");
         }
         assert!(g.in_span(), "span must survive a sub-long-gap pause");
-        // Speech resumes — same span, and the 9-frame pause is reported.
-        assert_eq!(g.step(0.90), SpanEvent::Resumed { silence_frames: 9 });
+        // Speech resumes — still the same span.
+        assert_eq!(g.step(0.90), SpanEvent::Append);
     }
 
     #[test]
@@ -271,13 +195,7 @@ mod span_tests {
         for _ in 0..9 {
             assert_eq!(g.step(0.10), SpanEvent::Append);
         }
-        assert_eq!(
-            g.step(0.10),
-            SpanEvent::Close {
-                keep: true,
-                reason: CloseReason::LongGap
-            }
-        );
+        assert_eq!(g.step(0.10), SpanEvent::Close { keep: true });
         assert!(!g.in_span());
     }
 
@@ -288,13 +206,7 @@ mod span_tests {
         for _ in 0..9 {
             g.step(0.10);
         }
-        assert_eq!(
-            g.step(0.10),
-            SpanEvent::Close {
-                keep: false,
-                reason: CloseReason::LongGap
-            }
-        );
+        assert_eq!(g.step(0.10), SpanEvent::Close { keep: false });
     }
 
     /// A voiced frame mid-pause resets the long-gap timer — proving only a
@@ -306,8 +218,7 @@ mod span_tests {
         for _ in 0..9 {
             g.step(0.10); // 9 silence (one short of the long gap)
         }
-        // Voiced frame resets the run and reports the 9-frame pause.
-        assert_eq!(g.step(0.90), SpanEvent::Resumed { silence_frames: 9 });
+        assert_eq!(g.step(0.90), SpanEvent::Append); // voiced resets the run
         for _ in 0..9 {
             assert_eq!(g.step(0.10), SpanEvent::Append); // run restarts, still open
         }
@@ -330,13 +241,7 @@ mod span_tests {
         for i in 2..10 {
             assert_eq!(g.step(0.90), SpanEvent::Append, "frame {i}");
         }
-        assert_eq!(
-            g.step(0.90),
-            SpanEvent::Close {
-                keep: true,
-                reason: CloseReason::MaxLen
-            }
-        );
+        assert_eq!(g.step(0.90), SpanEvent::Close { keep: true });
         assert!(!g.in_span());
     }
 
@@ -350,25 +255,13 @@ mod span_tests {
         for _ in 0..9 {
             g.step(0.10); // 9 silence frames -> Append
         }
-        assert_eq!(
-            g.step(0.10),
-            SpanEvent::Close {
-                keep: true,
-                reason: CloseReason::LongGap
-            }
-        ); // 10th: long gap
+        assert_eq!(g.step(0.10), SpanEvent::Close { keep: true }); // 10th: long gap
         // Immediately onset again: a brand-new span, not a resumption.
         assert_eq!(g.step(0.90), SpanEvent::Open);
         assert!(g.in_span());
         // It must drop as a short blip (voiced 1 < min 2), proving voiced_frames
         // reset to 1 rather than carrying over the prior span's count.
-        assert_eq!(
-            g.finish(),
-            SpanEvent::Close {
-                keep: false,
-                reason: CloseReason::Finish
-            }
-        );
+        assert_eq!(g.finish(), SpanEvent::Close { keep: false });
     }
 
     #[test]
@@ -376,13 +269,7 @@ mod span_tests {
         let mut g = test_gate();
         g.step(0.90); // Open, voiced 1
         g.step(0.90); // Append, voiced 2
-        assert_eq!(
-            g.finish(),
-            SpanEvent::Close {
-                keep: true,
-                reason: CloseReason::Finish
-            }
-        );
+        assert_eq!(g.finish(), SpanEvent::Close { keep: true });
         assert!(!g.in_span());
         assert_eq!(g.finish(), SpanEvent::Idle); // idempotent
     }
@@ -397,48 +284,6 @@ mod span_tests {
     fn finish_drops_short_span() {
         let mut g = test_gate();
         g.step(0.90); // Open, voiced 1 < min 2
-        assert_eq!(
-            g.finish(),
-            SpanEvent::Close {
-                keep: false,
-                reason: CloseReason::Finish
-            }
-        );
-    }
-
-    /// Each resumed pause reports its exact (uncapped) length — the per-pause
-    /// signal an adaptive endpoint learner consumes.
-    #[test]
-    fn resumed_reports_each_pause_length() {
-        let mut g = test_gate();
-        g.step(0.90); // Open
-        for _ in 0..3 {
-            assert_eq!(g.step(0.10), SpanEvent::Append); // 3-frame pause
-        }
-        assert_eq!(g.step(0.90), SpanEvent::Resumed { silence_frames: 3 });
-        for _ in 0..5 {
-            assert_eq!(g.step(0.10), SpanEvent::Append); // 5-frame pause
-        }
-        assert_eq!(g.step(0.90), SpanEvent::Resumed { silence_frames: 5 });
-    }
-
-    /// `set_long_gap_frames` retunes the close threshold live (drives an
-    /// adaptive, per-pause endpoint).
-    #[test]
-    fn set_long_gap_frames_changes_close_threshold() {
-        let mut g = test_gate();
-        g.set_long_gap_frames(4); // close after 4 silence frames now
-        g.step(0.90); // Open
-        g.step(0.90); // voiced 2 (>= min)
-        assert_eq!(g.step(0.10), SpanEvent::Append); // run 1
-        assert_eq!(g.step(0.10), SpanEvent::Append); // run 2
-        assert_eq!(g.step(0.10), SpanEvent::Append); // run 3
-        assert_eq!(
-            g.step(0.10),
-            SpanEvent::Close {
-                keep: true,
-                reason: CloseReason::LongGap
-            }
-        ); // run 4 closes
+        assert_eq!(g.finish(), SpanEvent::Close { keep: false });
     }
 }
