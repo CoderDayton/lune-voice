@@ -111,5 +111,13 @@ name = "vad_tune"
 path = "../../benchmarks/tuning/vad_tune.rs"
 
 [[example]]
+name = "vad_knob_ab"
+path = "../../benchmarks/tuning/vad_knob_ab.rs"
+
+[[example]]
+name = "vad_chunk_ab"
+path = "../../benchmarks/tuning/vad_chunk_ab.rs"
+
+[[example]]
 name = "punctuation_ab"
 path = "../../benchmarks/tuning/punctuation_ab.rs"
