@@ -119,5 +119,9 @@ name = "vad_chunk_ab"
 path = "../../benchmarks/tuning/vad_chunk_ab.rs"
 
 [[example]]
+name = "vad_fp_probe"
+path = "../../benchmarks/tuning/vad_fp_probe.rs"
+
+[[example]]
 name = "punctuation_ab"
 path = "../../benchmarks/tuning/punctuation_ab.rs"

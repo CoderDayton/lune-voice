@@ -160,6 +160,27 @@ impl HybridVad {
         actions
     }
 
+    /// Diagnostic: per-frame raw stage scores `(earshot_vad_score, silero_prob)`
+    /// for every 512-sample frame in `chunk` (plus buffered leftovers). Unlike
+    /// the live path, Silero runs UNCONDITIONALLY (no Earshot pre-filter) so both
+    /// stages' independent opinions are visible — for measuring agreement and
+    /// false-positive rates, not for gating. Mutates Earshot/Silero rolling
+    /// context like the real path, so call [`reset`](Self::reset) between clips.
+    pub fn debug_stage_scores(&mut self, chunk: &AudioChunk) -> Vec<(f32, f32)> {
+        let mut out = Vec::new();
+        self.sample_buf.extend_from_slice(&chunk.samples);
+        while self.sample_buf.len() >= SILERO_FRAME {
+            let frame: Vec<f32> = self.sample_buf.drain(..SILERO_FRAME).collect();
+            let er = self.earshot.process_chunk(&frame);
+            let prob = match self.silero.as_mut() {
+                Some(s) => s.predict(&frame).unwrap_or(0.0),
+                None => 0.0,
+            };
+            out.push((er.vad_score, prob));
+        }
+        out
+    }
+
     fn process_frame(&mut self, frame: &[f32], actions: &mut Vec<GateAction>) {
         // Stage 1 — Earshot acoustic gate (also feeds the level meter). It opens
         // on raw activity and holds open for `gate_hold_frames`, handing Silero a
