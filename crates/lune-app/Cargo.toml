@@ -129,3 +129,7 @@ path = "../../benchmarks/tuning/punctuation_ab.rs"
 [[example]]
 name = "asr_probe"
 path = "../../benchmarks/tools/asr_probe.rs"
+
+[[example]]
+name = "live_bench"
+path = "../../benchmarks/tools/live_bench.rs"
