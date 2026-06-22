@@ -21,7 +21,6 @@ pub enum ActivationModeDto {
 pub enum DictationModeDto {
     TypeInPlace,
     Clipboard,
-    Both,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -169,6 +168,9 @@ pub struct SessionStatsDto {
 pub struct WorkspaceSettingsDto {
     pub activation_mode: ActivationModeDto,
     pub dictation_mode: DictationModeDto,
+    /// Keep the dictated text on the clipboard after delivery (orthogonal to the
+    /// send method).
+    pub copy_to_clipboard: bool,
     pub use_gpu: bool,
     pub device_policy: DevicePolicyDto,
     pub asr_backend_type: AsrBackendTypeDto,
@@ -241,6 +243,9 @@ pub struct DictionaryItemDto {
 pub struct SaveWorkspaceSettingsInput {
     pub activation_mode: ActivationModeDto,
     pub dictation_mode: DictationModeDto,
+    /// Keep the dictated text on the clipboard after delivery (orthogonal to the
+    /// send method).
+    pub copy_to_clipboard: bool,
     pub use_gpu: bool,
     pub device_policy: DevicePolicyDto,
     pub asr_backend_type: AsrBackendTypeDto,

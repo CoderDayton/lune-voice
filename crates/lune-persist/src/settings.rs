@@ -8,6 +8,15 @@ use crate::error::PersistResult;
 
 static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
+/// True when raw settings TOML still carries the removed `dictation_mode = "Both"`
+/// (the legacy "type and copy" mode), so its copy intent can be migrated.
+fn dictation_mode_was_both(content: &str) -> bool {
+    content.lines().any(|line| {
+        let line = line.trim();
+        line.starts_with("dictation_mode") && line.contains("\"Both\"")
+    })
+}
+
 /// Read/write `UserSettings` as TOML with atomic writes.
 pub struct SettingsStore {
     path: PathBuf,
@@ -28,7 +37,14 @@ impl SettingsStore {
             return Ok(UserSettings::default());
         }
         let content = fs::read_to_string(&self.path)?;
-        Ok(toml::from_str(&content)?)
+        let mut settings: UserSettings = toml::from_str(&content)?;
+        // Migrate the removed "type and copy" (`Both`) mode: the mode itself
+        // deserializes to `TypeInPlace`, but its clipboard-copy intent is now the
+        // separate `copy_to_clipboard` toggle, so set that for legacy configs.
+        if dictation_mode_was_both(&content) {
+            settings.copy_to_clipboard = true;
+        }
+        Ok(settings)
     }
 
     /// Save settings atomically (write to temp, then rename).
@@ -71,6 +87,37 @@ mod tests {
         let reloaded = store.load().unwrap();
         assert_eq!(reloaded.language, settings.language);
         assert_eq!(reloaded.session_history_days, settings.session_history_days);
+    }
+
+    #[test]
+    fn legacy_both_mode_migrates_to_type_plus_copy() {
+        use lune_core::config::DictationMode;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        let store = SettingsStore::new(&path);
+
+        // Write a valid config, then force the removed legacy `Both` value.
+        store.save(&UserSettings::default()).unwrap();
+        let legacy = fs::read_to_string(&path)
+            .unwrap()
+            .lines()
+            .map(|l| {
+                if l.trim_start().starts_with("dictation_mode") {
+                    "dictation_mode = \"Both\"".to_string()
+                } else {
+                    l.to_string()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        fs::write(&path, legacy).unwrap();
+
+        // `Both` is gone, so it must not crash the load, and its copy intent is
+        // carried over to the new toggle.
+        let loaded = store.load().unwrap();
+        assert_eq!(loaded.dictation_mode, DictationMode::TypeInPlace);
+        assert!(loaded.copy_to_clipboard, "legacy Both must enable copy");
     }
 
     #[test]

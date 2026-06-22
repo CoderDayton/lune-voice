@@ -481,21 +481,27 @@ impl AppRuntime {
                     }
                     SessionEvent::FinalizedText { session_id, text } => {
                         saw_text = true;
-                        let mode = runtime.inner.settings.read().await.dictation_mode;
+                        let (mode, copy) = {
+                            let s = runtime.inner.settings.read().await;
+                            (s.dictation_mode, s.copy_to_clipboard)
+                        };
                         let delivered;
                         #[cfg(unix)]
                         {
                             let target = runtime.inner.pipeline.lock().await.focus_target.clone();
                             delivered = if let Some(ref t) = target {
-                                runtime
-                                    .inner
-                                    .delivery
-                                    .deliver_to(Some(session_id), &text, mode, t)
+                                runtime.inner.delivery.deliver_to(
+                                    Some(session_id),
+                                    &text,
+                                    mode,
+                                    copy,
+                                    t,
+                                )
                             } else {
                                 runtime
                                     .inner
                                     .delivery
-                                    .deliver(Some(session_id), &text, mode)
+                                    .deliver(Some(session_id), &text, mode, copy)
                             };
                         }
                         #[cfg(not(unix))]
@@ -504,7 +510,7 @@ impl AppRuntime {
                                 runtime
                                     .inner
                                     .delivery
-                                    .deliver(Some(session_id), &text, mode);
+                                    .deliver(Some(session_id), &text, mode, copy);
                         }
                         if !delivered {
                             // Non-fatal: surface as a warning toast, not a
@@ -618,12 +624,16 @@ impl AppRuntime {
                 if let Some(ref t) = focus_target {
                     self.inner
                         .delivery
-                        .deliver_to(Some(session_id), "\n", mode, t);
+                        .deliver_to(Some(session_id), "\n", mode, false, t);
                 } else {
-                    self.inner.delivery.deliver(Some(session_id), "\n", mode);
+                    self.inner
+                        .delivery
+                        .deliver(Some(session_id), "\n", mode, false);
                 }
                 #[cfg(not(unix))]
-                self.inner.delivery.deliver(Some(session_id), "\n", mode);
+                self.inner
+                    .delivery
+                    .deliver(Some(session_id), "\n", mode, false);
             }
             VoiceCommand::NewParagraph => {
                 debug!("CommandDetected: NewParagraph → delivering \\n\\n");
@@ -631,12 +641,16 @@ impl AppRuntime {
                 if let Some(ref t) = focus_target {
                     self.inner
                         .delivery
-                        .deliver_to(Some(session_id), "\n\n", mode, t);
+                        .deliver_to(Some(session_id), "\n\n", mode, false, t);
                 } else {
-                    self.inner.delivery.deliver(Some(session_id), "\n\n", mode);
+                    self.inner
+                        .delivery
+                        .deliver(Some(session_id), "\n\n", mode, false);
                 }
                 #[cfg(not(unix))]
-                self.inner.delivery.deliver(Some(session_id), "\n\n", mode);
+                self.inner
+                    .delivery
+                    .deliver(Some(session_id), "\n\n", mode, false);
             }
             VoiceCommand::ListItem => {
                 debug!("CommandDetected: ListItem → delivering \\n- ");
@@ -644,12 +658,16 @@ impl AppRuntime {
                 if let Some(ref t) = focus_target {
                     self.inner
                         .delivery
-                        .deliver_to(Some(session_id), "\n- ", mode, t);
+                        .deliver_to(Some(session_id), "\n- ", mode, false, t);
                 } else {
-                    self.inner.delivery.deliver(Some(session_id), "\n- ", mode);
+                    self.inner
+                        .delivery
+                        .deliver(Some(session_id), "\n- ", mode, false);
                 }
                 #[cfg(not(unix))]
-                self.inner.delivery.deliver(Some(session_id), "\n- ", mode);
+                self.inner
+                    .delivery
+                    .deliver(Some(session_id), "\n- ", mode, false);
             }
             VoiceCommand::StopDictation => {
                 debug!("CommandDetected: StopDictation → stopping session");

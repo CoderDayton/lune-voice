@@ -1,18 +1,10 @@
-import {
-  ClipboardCopy,
-  ClipboardPaste,
-  Cloud,
-  Cpu,
-  Hand,
-  Keyboard,
-  ToggleLeft,
-} from 'lucide-react';
+import { ClipboardPaste, Cloud, Cpu, Hand, Keyboard, ToggleLeft } from 'lucide-react';
 import type { ComponentType } from 'react';
 
 export type ActivationModeValue = 'Toggle' | 'Hold';
 export type AsrBackendValue = 'Qwen3Asr' | 'OpenAiCompatible';
 
-export type DictationModeValue = 'TypeInPlace' | 'Clipboard' | 'Both';
+export type DictationModeValue = 'TypeInPlace' | 'Clipboard';
 export type PillVisibilityValue = 'Always' | 'WhenDictating' | 'Never';
 
 export interface Option<Value extends string> {
@@ -73,7 +65,7 @@ export const deliveryMethods: DescriptiveOptionData<DictationModeValue>[] = [
   {
     value: 'Clipboard',
     label: 'Paste into app',
-    description: 'Sets the clipboard, then sends a paste shortcut. Fastest for long dictations.',
+    description: 'Sends a paste shortcut into the focused app. Fastest for long dictations.',
     icon: ClipboardPaste,
   },
   {
@@ -81,12 +73,6 @@ export const deliveryMethods: DescriptiveOptionData<DictationModeValue>[] = [
     label: 'Type into app',
     description: 'Simulates keystrokes one character at a time. Works where paste is blocked.',
     icon: Keyboard,
-  },
-  {
-    value: 'Both',
-    label: 'Type into app and copy',
-    description: 'Types the text into the focused app and keeps it on the clipboard for re-use.',
-    icon: ClipboardCopy,
   },
 ];
 

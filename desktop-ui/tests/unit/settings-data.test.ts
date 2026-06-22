@@ -20,11 +20,11 @@ describe("settings data", () => {
     expect(values).toContain("OpenAiCompatible");
   });
 
-  test("deliveryMethods has all three modes", () => {
+  test("deliveryMethods has both send methods", () => {
     const values = deliveryMethods.map((o) => o.value);
     expect(values).toContain("Clipboard");
     expect(values).toContain("TypeInPlace");
-    expect(values).toContain("Both");
+    expect(values).not.toContain("Both");
   });
 
   test("pillVisibilityOptions has all three modes", () => {

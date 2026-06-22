@@ -17,11 +17,11 @@ pub enum DictationMode {
     /// Type finalized text into focused input via wtype.
     #[default]
     TypeInPlace,
-    /// Copy finalized text to clipboard via wl-copy.
+    /// Deliver finalized text by setting the clipboard and sending a paste
+    /// shortcut (the "Paste into app" method). Despite the name, this is a
+    /// delivery method, not a copy-only mode; whether a copy is *kept* is the
+    /// orthogonal `UserSettings::copy_to_clipboard` toggle.
     Clipboard,
-    /// Type keystrokes into the focused app AND copy text to the clipboard.
-    /// Lets the user re-paste the dictation later without overwriting it.
-    Both,
 }
 
 impl std::fmt::Display for DictationMode {
@@ -29,7 +29,6 @@ impl std::fmt::Display for DictationMode {
         match self {
             Self::TypeInPlace => f.write_str("TypeInPlace"),
             Self::Clipboard => f.write_str("Clipboard"),
-            Self::Both => f.write_str("Both"),
         }
     }
 }
@@ -40,7 +39,9 @@ impl std::str::FromStr for DictationMode {
         match s {
             "TypeInPlace" => Ok(Self::TypeInPlace),
             "Clipboard" => Ok(Self::Clipboard),
-            "Both" => Ok(Self::Both),
+            // Legacy: the removed "type and copy" mode migrates to type-in-place
+            // (the copy is now the separate `copy_to_clipboard` toggle).
+            "Both" => Ok(Self::TypeInPlace),
             _ => Err(dictation_mode_parse_err(s)),
         }
     }
@@ -49,7 +50,7 @@ impl std::str::FromStr for DictationMode {
 #[cold]
 #[inline(never)]
 fn dictation_mode_parse_err(s: &str) -> String {
-    format!("unknown dictation mode: {s} (expected TypeInPlace|Clipboard|Both)")
+    format!("unknown dictation mode: {s} (expected TypeInPlace|Clipboard)")
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]

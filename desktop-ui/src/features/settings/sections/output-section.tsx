@@ -27,6 +27,19 @@ export function OutputSection({ settings }: SettingsProps) {
           />
         }
       />
+      <SettingsRow
+        label={t`Copy to clipboard`}
+        description={t`Keep the dictated text on the clipboard after every dictation, so you can paste it again yourself.`}
+        control={
+          <input
+            type="checkbox"
+            className="toggle toggle-primary"
+            checked={settings.copyToClipboard}
+            onChange={() => void saveWorkspaceSetting('copyToClipboard', !settings.copyToClipboard)}
+            aria-label={t`Copy to clipboard`}
+          />
+        }
+      />
       {settings.dictationMode !== 'TypeInPlace' && (
         <SettingsRow
           label={t`Paste compatibility`}

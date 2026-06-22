@@ -16,6 +16,7 @@ export interface WorkspaceSettings {
   confidenceThreshold: string;
   llmSkipThreshold: string;
   dictationMode: DictationModeValue;
+  copyToClipboard: boolean;
   stylePreset: string;
   adaptiveVad: boolean;
   speechThreshold: string;
@@ -98,6 +99,7 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   confidenceThreshold: '0.55',
   llmSkipThreshold: '0.40',
   dictationMode: 'Clipboard',
+  copyToClipboard: false,
   stylePreset: 'casual',
   adaptiveVad: false,
   speechThreshold: '0.50',

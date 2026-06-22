@@ -18,6 +18,9 @@ struct DeliveryMsg {
     session_id: Option<Uuid>,
     text: Box<str>,
     mode: DictationMode,
+    /// Leave the dictated text on the clipboard after delivery (orthogonal to
+    /// `mode`). Structural injections (newline/bullet) pass `false`.
+    copy_to_clipboard: bool,
     #[cfg(unix)]
     target: Option<WindowTarget>,
 }
@@ -45,7 +48,13 @@ impl DeliveryService {
         Ok(Self { tx, busy_until })
     }
 
-    pub fn deliver(&self, session_id: Option<Uuid>, text: &str, mode: DictationMode) -> bool {
+    pub fn deliver(
+        &self,
+        session_id: Option<Uuid>,
+        text: &str,
+        mode: DictationMode,
+        copy_to_clipboard: bool,
+    ) -> bool {
         if text.is_empty() {
             return true;
         }
@@ -54,6 +63,7 @@ impl DeliveryService {
             session_id,
             text: text.into(),
             mode,
+            copy_to_clipboard,
             #[cfg(unix)]
             target: None,
         }) {
@@ -69,6 +79,7 @@ impl DeliveryService {
         session_id: Option<Uuid>,
         text: &str,
         mode: DictationMode,
+        copy_to_clipboard: bool,
         target: &WindowTarget,
     ) -> bool {
         if text.is_empty() {
@@ -84,6 +95,7 @@ impl DeliveryService {
             session_id,
             text: text.into(),
             mode,
+            copy_to_clipboard,
             target: Some(target.clone()),
         }) {
             warn!(error = %e, "delivery thread dead — text will not be typed");
@@ -97,8 +109,9 @@ impl DeliveryService {
         session_id: Option<Uuid>,
         text: String,
         mode: DictationMode,
+        copy_to_clipboard: bool,
     ) -> bool {
-        self.deliver(session_id, &text, mode)
+        self.deliver(session_id, &text, mode, copy_to_clipboard)
     }
 
     /// True while queued text is being typed/pasted, plus a short settle
@@ -122,6 +135,7 @@ impl DeliveryService {
                 session_id: None,
                 text: "".into(),
                 mode: DictationMode::TypeInPlace,
+                copy_to_clipboard: false,
                 #[cfg(unix)]
                 target: None,
             })
@@ -161,12 +175,6 @@ fn delivery_thread(
 
         match msg.mode {
             DictationMode::TypeInPlace => driver.type_keys(text),
-            DictationMode::Both => {
-                if let Err(e) = driver.copy_to_clipboard(text) {
-                    warn!(error = %e, "clipboard copy failed in Both mode");
-                }
-                driver.type_keys(text);
-            }
             _ => {
                 #[cfg(unix)]
                 if let Some(ref target) = msg.target {
@@ -176,6 +184,15 @@ fn delivery_thread(
                 }
                 #[cfg(not(unix))]
                 driver.type_text(text);
+            }
+        }
+        // Orthogonal copy toggle: leave the dictated text on the clipboard after
+        // delivery, regardless of send method. (The paste path already sets it on
+        // the uinput backend; this makes it explicit and backend-agnostic — e.g.
+        // IBus commits directly and never touches the clipboard otherwise.)
+        if msg.copy_to_clipboard {
+            if let Err(e) = driver.copy_to_clipboard(text) {
+                warn!(error = %e, "clipboard copy failed");
             }
         }
         *busy_until.lock().unwrap_or_else(|e| e.into_inner()) =

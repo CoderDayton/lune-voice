@@ -7,6 +7,19 @@ use super::pipeline::PipelineOverrides;
 use super::redacted::RedactedString;
 use super::style_llm::{StyleId, StylePreset};
 
+/// Deserialize `dictation_mode`, tolerating the removed legacy `"Both"` value
+/// (the old "type and copy" mode) by mapping it to `TypeInPlace` via `FromStr`.
+/// The copy behaviour is restored separately by the `copy_to_clipboard`
+/// migration in `lune-persist`, so old configs neither break nor silently lose
+/// their intent.
+fn deserialize_dictation_mode<'de, D>(d: D) -> Result<DictationMode, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(d)?;
+    s.parse().map_err(serde::de::Error::custom)
+}
+
 /// Top-level user settings, persisted as TOML.
 ///
 /// # Layering rule (where does a new field belong?)
@@ -44,7 +57,12 @@ pub struct UserSettings {
     #[serde(default = "default_dictation_language")]
     pub dictation_language: String,
     pub privacy_mode: PrivacyMode,
+    #[serde(deserialize_with = "deserialize_dictation_mode")]
     pub dictation_mode: DictationMode,
+    /// Keep the dictated text on the clipboard after delivery. Orthogonal to
+    /// `dictation_mode` (works with either Paste or Type). Off by default.
+    #[serde(default)]
+    pub copy_to_clipboard: bool,
     pub activation_mode: ActivationMode,
     /// When to show the floating dictation pill overlay.
     #[serde(default)]
@@ -133,6 +151,7 @@ impl Default for UserSettings {
             dictation_language: default_dictation_language(),
             privacy_mode: PrivacyMode::LocalOnly,
             dictation_mode: DictationMode::default(),
+            copy_to_clipboard: false,
             activation_mode: ActivationMode::default(),
             pill_visibility: PillVisibility::default(),
             terminal_mode: TerminalMode::default(),

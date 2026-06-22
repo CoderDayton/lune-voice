@@ -130,7 +130,7 @@ mod tests {
     #[test]
     fn dictation_mode_fromstr_err_is_cold() {
         let err = "bad".parse::<DictationMode>().unwrap_err();
-        assert!(err.contains("TypeInPlace|Clipboard|Both"));
+        assert!(err.contains("TypeInPlace|Clipboard"));
     }
 
     #[test]

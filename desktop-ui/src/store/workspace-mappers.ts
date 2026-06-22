@@ -53,6 +53,7 @@ export function mapWorkspaceSettings(snapshot: WorkspaceSnapshot): WorkspaceSett
       snapshot.settings.llmSkipThreshold ?? Number(DEFAULT_SETTINGS.llmSkipThreshold),
     ),
     dictationMode: snapshot.settings.dictationMode,
+    copyToClipboard: snapshot.settings.copyToClipboard ?? DEFAULT_SETTINGS.copyToClipboard,
     stylePreset: snapshot.settings.stylePreset,
     adaptiveVad: snapshot.settings.adaptiveVad,
     speechThreshold: formatThreshold(snapshot.settings.speechThreshold),
@@ -97,6 +98,7 @@ export function settingsToSaveInput(settings: WorkspaceSettings): SaveWorkspaceS
   return {
     activationMode: settings.activationMode,
     dictationMode: settings.dictationMode,
+    copyToClipboard: settings.copyToClipboard,
     useGpu: settings.useGpu,
     devicePolicy: settings.devicePolicy,
     asrBackendType: settings.asrBackend,

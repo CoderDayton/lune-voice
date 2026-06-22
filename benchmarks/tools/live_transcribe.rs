@@ -162,7 +162,12 @@ fn main() {
                         Some(SessionEvent::FinalizedText { text: t, .. }) => {
                             eprint!("\r\x1b[2K  {t}\n");
                             if let Some(svc) = &delivery {
-                                svc.deliver(None, &t, lune_core::config::DictationMode::TypeInPlace);
+                                svc.deliver(
+                                    None,
+                                    &t,
+                                    lune_core::config::DictationMode::TypeInPlace,
+                                    false,
+                                );
                             }
                             if !transcript.is_empty() {
                                 transcript.push(' ');

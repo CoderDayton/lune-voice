@@ -6,7 +6,12 @@ import type { DictationModeDto } from "./DictationModeDto";
 import type { PillVisibilityDto } from "./PillVisibilityDto";
 import type { TerminalModeDto } from "./TerminalModeDto";
 
-export type SaveWorkspaceSettingsInput = { activationMode: ActivationModeDto, dictationMode: DictationModeDto, useGpu: boolean, devicePolicy: DevicePolicyDto, asrBackendType: AsrBackendTypeDto, confidenceThreshold: number | null, 
+export type SaveWorkspaceSettingsInput = { activationMode: ActivationModeDto, dictationMode: DictationModeDto, 
+/**
+ * Keep the dictated text on the clipboard after delivery (orthogonal to the
+ * send method).
+ */
+copyToClipboard: boolean, useGpu: boolean, devicePolicy: DevicePolicyDto, asrBackendType: AsrBackendTypeDto, confidenceThreshold: number | null, 
 /**
  * Clean-segment confidence bound for bypassing the correction LLM.
  */

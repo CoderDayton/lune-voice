@@ -392,6 +392,7 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
     WorkspaceSettingsDto {
         activation_mode: activation_mode_to_dto(settings.activation_mode),
         dictation_mode: dictation_mode_to_dto(settings.dictation_mode),
+        copy_to_clipboard: settings.copy_to_clipboard,
         use_gpu: !matches!(settings.device, DevicePolicy::Cpu),
         device_policy: device_policy_to_dto(settings.device),
         asr_backend_type: settings.asr_backend.kind().into(),
@@ -441,6 +442,7 @@ fn apply_settings_dto(
     settings.activation_mode = activation_mode_from_dto(input.activation_mode);
     settings.pill_visibility = pill_visibility_from_dto(input.pill_visibility);
     settings.dictation_mode = dictation_mode_from_dto(input.dictation_mode);
+    settings.copy_to_clipboard = input.copy_to_clipboard;
     settings.device = resolve_device_policy(input.use_gpu, input.device_policy);
     settings.asr_backend =
         asr_backend_from_type(input.asr_backend_type, &settings.asr_backend, &input)?;
@@ -563,7 +565,6 @@ fn dictation_mode_to_dto(mode: DictationMode) -> DictationModeDto {
     match mode {
         DictationMode::TypeInPlace => DictationModeDto::TypeInPlace,
         DictationMode::Clipboard => DictationModeDto::Clipboard,
-        DictationMode::Both => DictationModeDto::Both,
         _ => DictationModeDto::Clipboard,
     }
 }
@@ -572,7 +573,6 @@ fn dictation_mode_from_dto(dto: DictationModeDto) -> DictationMode {
     match dto {
         DictationModeDto::TypeInPlace => DictationMode::TypeInPlace,
         DictationModeDto::Clipboard => DictationMode::Clipboard,
-        DictationModeDto::Both => DictationMode::Both,
     }
 }
 
@@ -807,6 +807,7 @@ mod tests {
         SaveWorkspaceSettingsInput {
             activation_mode: dto.activation_mode,
             dictation_mode: dto.dictation_mode,
+            copy_to_clipboard: dto.copy_to_clipboard,
             use_gpu: dto.use_gpu,
             device_policy: dto.device_policy,
             asr_backend_type: dto.asr_backend_type,
