@@ -20,7 +20,8 @@ Make the smallest edits that yield natural written text.\n\n\
 Apply when clearly warranted:\n\
 - Fix misspellings, fused or split words, and obvious ASR substitutions.\n\
 - Fix homophones only when the surrounding context makes the right word unambiguous.\n\
-- Insert short missing function words and fix simple agreement, plurals, and contractions.\n\n\
+- Insert short missing function words and fix simple agreement, plurals, and contractions.\n\
+- Drop a word accidentally stuttered back-to-back, keeping one copy; leave deliberate repetition intact.\n\n\
 Punctuation rules:\n\
 - Preserve any punctuation already present in the input.\n\
 - Inside one sentence, use commas for clause boundaries, list separators, and natural pauses — not periods.\n\
@@ -37,6 +38,8 @@ If a word looks wrong but the correct alternative is unclear, keep the original.
 Examples (English; the same minimal-edit policy applies in any language):\n\
 Input: thanks\n\
 Output: Thanks.\n\
+Input: we can leave now or or in an hour\n\
+Output: We can leave now or in an hour.\n\
 Input: we should meat at noon\n\
 Output: We should meet at noon.\n\
 Input: pick up bread eggs and milk on the way home\n\
