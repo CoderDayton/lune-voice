@@ -125,3 +125,7 @@ path = "../../benchmarks/tuning/vad_fp_probe.rs"
 [[example]]
 name = "punctuation_ab"
 path = "../../benchmarks/tuning/punctuation_ab.rs"
+
+[[example]]
+name = "asr_probe"
+path = "../../benchmarks/tools/asr_probe.rs"

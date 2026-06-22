@@ -35,6 +35,13 @@ const HEAD_DIM: usize = 128;
 const MAX_NEW_TOKENS: usize = 512;
 
 const EOS_IDS: [i64; 2] = [151_643, 151_645];
+/// Minimum content tokens to force after `<asr_text>` before EOS is permitted.
+/// On short utterances the model otherwise argmaxes EOS at the first content
+/// position and returns an empty transcript despite real speech; forcing one
+/// real token recovers the word. No-op for normal utterances, which never argmax
+/// EOS there — so this only ever turns an empty result into a word, and never
+/// rewrites a transcription the model would have produced on its own.
+const MIN_CONTENT_TOKENS: usize = 1;
 const AUDIO_PAD_ID: i64 = 151_676;
 /// `<asr_text>` special token.
 const ASR_TEXT_ID: i64 = 151_704;
@@ -569,6 +576,24 @@ fn phrase_boost_tokens(
     }
 }
 
+/// Whether EOS must be banned this decode step to satisfy the
+/// [`MIN_CONTENT_TOKENS`] guard: true once `<asr_text>` has been emitted but
+/// fewer than `MIN_CONTENT_TOKENS` content (non-EOS) tokens have followed it.
+/// False before `<asr_text>` (the structural prefix must finish) and once enough
+/// content has been emitted (EOS is allowed again so the utterance can end).
+fn force_content_after_asr_text(gen_ids: &[i64]) -> bool {
+    match gen_ids.iter().position(|&id| id == ASR_TEXT_ID) {
+        Some(p) => {
+            gen_ids[p + 1..]
+                .iter()
+                .filter(|&&id| !EOS_IDS.contains(&id))
+                .count()
+                < MIN_CONTENT_TOKENS
+        }
+        None => false,
+    }
+}
+
 /// Fill `out` with the token ids that would re-complete a length-`n` block
 /// given the tail of `generated`. Empty in the common case, so the hot argmax
 /// path stays on its single-pass fast branch.
@@ -773,6 +798,11 @@ impl Qwen3AsrBackend {
         //    WhisperFeatureExtractor. The encoder's chunked attention windows
         //    were trained on this geometry. Pads at mel level to avoid
         //    computing FFT on silence.
+        //
+        //    Load-bearing: this export takes only `mel` (no feature_attention_mask),
+        //    so the model expects the full 30s window. Feeding unpadded mel takes
+        //    it out of distribution — measured WER 5.1%→8.1% (numbers/symbols stop
+        //    normalizing, LLM edit-gate stops firing). Do not "optimize" this away.
         const MEL_MIN_FRAMES: usize = 3000;
         let mel_t0 = std::time::Instant::now();
         let spec = self.mel.extract_from_f32_padded(&pcm, MEL_MIN_FRAMES);
@@ -964,6 +994,15 @@ impl Qwen3AsrBackend {
             // Repeat-guard mask for the upcoming token (empty in the common
             // case, so the argmax fast path is preserved).
             banned_next_tokens(&gen_ids, REPEAT_GUARD_ORDER, &mut banned);
+            // Min-content guard: ban EOS until at least one content token has
+            // been emitted after `<asr_text>`, so the model can't bail to an
+            // empty transcript on a short utterance (see `MIN_CONTENT_TOKENS`).
+            // Fires unconditionally whenever the model would emit nothing; it
+            // trades empty for a (possibly low-confidence) word and only acts
+            // before the first content token, so it never rewrites a real one.
+            if force_content_after_asr_text(&gen_ids) {
+                banned.extend(EOS_IDS);
+            }
             // Refresh the prefix-constrained phrase bias for this step.
             if !boost_seqs.is_empty() {
                 phrase_boost_tokens(&gen_ids, &boost_seqs, boost_score, &mut boost);
@@ -1573,6 +1612,35 @@ mod tests {
         assert!(out.is_empty(), "no repeated bigram → nothing banned");
         banned_next_tokens(&[1, 2], 3, &mut out);
         assert!(out.is_empty(), "too short → nothing banned");
+    }
+
+    // Predicate-level coverage only; the empty→word behaviour it drives needs a
+    // real model, so the domain bench (`cgs bench TYPE=domain`) is the
+    // regression guard for the end-to-end effect.
+    #[test]
+    fn min_content_guard_forces_until_first_content() {
+        // `<asr_text>` emitted, nothing after → force (ban EOS).
+        assert!(force_content_after_asr_text(&[IM_START, ASR_TEXT_ID]));
+        // `<asr_text>` then only EOS → still force; EOS is not content.
+        assert!(force_content_after_asr_text(&[ASR_TEXT_ID, EOS_IDS[0]]));
+    }
+
+    #[test]
+    fn min_content_guard_releases_after_one_content_token() {
+        // One real token after `<asr_text>` → EOS allowed again.
+        assert!(!force_content_after_asr_text(&[ASR_TEXT_ID, 1234]));
+        assert!(!force_content_after_asr_text(&[
+            ASR_TEXT_ID,
+            1234,
+            EOS_IDS[0]
+        ]));
+    }
+
+    #[test]
+    fn min_content_guard_inactive_before_asr_text() {
+        // Structural prefix not finished → never force.
+        assert!(!force_content_after_asr_text(&[]));
+        assert!(!force_content_after_asr_text(&[IM_START, NEWLINE]));
     }
 
     #[test]
