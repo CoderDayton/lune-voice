@@ -210,12 +210,25 @@ impl HybridVad {
                 self.trailing_silence_samples = 0;
             }
             SpanEvent::Append => self.append_frame(frame, prob),
+            SpanEvent::Flush => {
+                // Length cap: emit the audio so far to bound memory, but the span
+                // CONTINUES. No hangover trim, no pre-roll re-prepend, no
+                // `SegmentFinalized` — and `trailing_silence_samples` is preserved
+                // so the intra-silence cap stays continuous across the boundary.
+                // This keeps a length split transparent to the recognizer instead
+                // of injecting a ~700 ms tail+pre-roll silence that reads as a
+                // sentence break.
+                self.append_frame(frame, prob);
+                let span = std::mem::take(&mut self.span);
+                if !span.is_empty() {
+                    actions.push(GateAction::PushSamples(span));
+                }
+            }
             SpanEvent::Close { keep } => {
-                // The closing frame is appended like any other in-span frame: on a
-                // max-length close it is voiced speech the gate counted (dropping it
-                // would clip the final ~32 ms); on a long-gap close it is a silence
-                // frame that `append_frame` drops when the intra-silence cap is
-                // already saturated, otherwise `close_span`'s hangover trim removes it.
+                // The closing frame is a silence frame (only a long-gap run or EOS
+                // reaches `Close` now): `append_frame` drops it when the
+                // intra-silence cap is already saturated, otherwise `close_span`'s
+                // hangover trim removes it.
                 self.append_frame(frame, prob);
                 self.close_span(keep, &[], actions);
             }

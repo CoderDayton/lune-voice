@@ -28,6 +28,14 @@ pub(crate) enum SpanEvent {
     /// A long gap (intentional stop) closed the span. `keep` is `false` for
     /// spans with less voiced audio than `min_speech` (noise blips).
     Close { keep: bool },
+    /// The `max_chunk` length cap was hit. A memory FLUSH, not an endpoint: the
+    /// orchestrator emits the audio accumulated so far but keeps building the
+    /// *same* span — no trailing-silence trim, no pre-roll re-prepend on the
+    /// continuation, no segment finalize. A length split therefore rejoins
+    /// seamlessly and never injects a spurious silence boundary (which would
+    /// bypass the intra-silence cap and read as a sentence break). The span only
+    /// truly ends on `Close`.
+    Flush,
 }
 
 /// Contiguous-span gate — the stage-3 replacement for the old chunked gate.
@@ -106,10 +114,13 @@ impl SpanGate {
             return SpanEvent::Close { keep };
         }
 
-        // Safety cap: force-close a span that never stops (always real speech).
+        // Length cap reached. This is a memory FLUSH, not an endpoint: emit the
+        // audio so far but keep the span open (reset only the per-flush frame
+        // count) so the utterance rejoins seamlessly. A real endpoint is still
+        // the long-gap run above or `finish`.
         if self.span_frames >= self.max_frames {
-            self.reset();
-            return SpanEvent::Close { keep: true };
+            self.span_frames = 0;
+            return SpanEvent::Flush;
         }
 
         SpanEvent::Append
@@ -225,8 +236,11 @@ mod span_tests {
         assert!(g.in_span());
     }
 
+    /// The length cap FLUSHES (emits audio for memory) but keeps the span open,
+    /// so a long utterance rejoins seamlessly instead of getting an artificial
+    /// endpoint that would inject a spurious silence boundary.
     #[test]
-    fn max_length_force_closes() {
+    fn max_length_flushes_but_keeps_span_open() {
         let cfg = VadPipelineConfig {
             sample_rate: 16_000,
             silero_onset: 0.6,
@@ -241,7 +255,41 @@ mod span_tests {
         for i in 2..10 {
             assert_eq!(g.step(0.90), SpanEvent::Append, "frame {i}");
         }
-        assert_eq!(g.step(0.90), SpanEvent::Close { keep: true });
+        // 10th frame hits the cap: a flush, not a close — the span stays open.
+        assert_eq!(g.step(0.90), SpanEvent::Flush);
+        assert!(g.in_span(), "a length flush must not end the span");
+        // Accumulation continues; another `max_frames` later flushes again.
+        for i in 1..10 {
+            assert_eq!(g.step(0.90), SpanEvent::Append, "post-flush frame {i}");
+        }
+        assert_eq!(g.step(0.90), SpanEvent::Flush);
+        assert!(g.in_span());
+    }
+
+    /// A real endpoint still fires after a flush: the long-gap silence run is
+    /// tracked across the flush boundary (only the per-flush frame count resets).
+    #[test]
+    fn long_gap_after_flush_still_closes() {
+        let cfg = VadPipelineConfig {
+            sample_rate: 16_000,
+            silero_onset: 0.6,
+            silero_offset: 0.35,
+            min_speech_ms: 64,
+            long_gap_ms: 320,  // 10 frames
+            max_chunk_ms: 320, // 10 frames
+            ..VadPipelineConfig::default()
+        };
+        let mut g = SpanGate::new(&cfg);
+        assert_eq!(g.step(0.90), SpanEvent::Open);
+        for _ in 2..10 {
+            g.step(0.90);
+        }
+        assert_eq!(g.step(0.90), SpanEvent::Flush); // 10th voiced frame → flush
+        // Now a long-gap run of silence: the 10th silence frame closes for real.
+        for _ in 0..9 {
+            assert_eq!(g.step(0.10), SpanEvent::Append);
+        }
+        assert_eq!(g.step(0.10), SpanEvent::Close { keep: true });
         assert!(!g.in_span());
     }
 
