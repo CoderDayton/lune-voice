@@ -753,11 +753,25 @@ fn word_core(word: &str) -> &str {
         .trim_end_matches(|c: char| !c.is_alphanumeric())
 }
 
-/// Coordinating conjunctions safe to splice a preceding sentence onto with a
-/// comma. "for" (preposition-ambiguous: "For the profile, we…") and "nor"
-/// (needs subject-aux inversion) are excluded — demoting across them risks
-/// mangling a real sentence break.
-const COORD_CONJUNCTIONS: &[&str] = &["and", "but", "so", "or", "yet"];
+/// Words that, opening a pause-split fragment, continue the previous thought
+/// rather than start a new sentence — so a period the recognizer inserted before
+/// them is demoted to a comma. Two grammatically comma-joinable groups:
+///   - coordinating conjunctions: and, but, so, or, yet
+///   - concessive / contrast subordinators: though, although, whereas
+///
+/// Deliberately excluded — adding these would be *wrong*, not just cautious:
+///   - "for" / "nor": comma-joinable in theory, but "For"/"Nor" almost always
+///     open a real sentence (preposition / negative-inversion), so demoting
+///     would fuse unrelated sentences.
+///   - conjunctive adverbs (however, therefore, then, thus, hence, moreover,
+///     furthermore, nevertheless, nonetheless, meanwhile, otherwise, instead,
+///     besides, consequently, accordingly, anyway, still, also): joining two
+///     clauses with a *comma* before these is a comma splice — they require a
+///     period or semicolon — and "then"/"meanwhile" mark genuine sequences that
+///     must stay separate.
+const CONTINUATION_WORDS: &[&str] = &[
+    "and", "but", "so", "or", "yet", "though", "although", "whereas",
+];
 
 /// Upper bound on how many words one sentence may grow to via demotion. Past
 /// this, a candidate break is kept rather than spliced, so an adversarial or
@@ -767,7 +781,7 @@ const COORD_CONJUNCTIONS: &[&str] = &["and", "but", "so", "or", "yet"];
 const MAX_CLAUSE_WORDS: usize = 48;
 
 /// Demote an over-split sentence break back to a comma when the ASR turned a
-/// thinking pause into a period right before a coordinating conjunction that
+/// thinking pause into a period right before a [`CONTINUATION_WORDS`] token that
 /// continues the thought ("…so far. But I want…" → "…so far, but I want…").
 ///
 /// The acoustic pause length the model uses to choose `.` vs `,` is baked into
@@ -776,7 +790,7 @@ const MAX_CLAUSE_WORDS: usize = 48;
 /// a single period qualifies as the break, so abbreviations ("etc."), dotted
 /// forms ("U.S."), initials ("J."), and acronym sentence-ends ("NASA.") are
 /// left intact; and a genuine new sentence opens on "Then"/"Finally"/a fresh
-/// subject — never a coordinating conjunction — so real breaks stay split.
+/// subject — never a continuation word — so real breaks stay split.
 ///
 /// Two linear passes over borrowed token spans (no per-token allocation): one
 /// marks the boundaries to demote while tracking the running sentence length
@@ -823,7 +837,7 @@ fn demote_oversplit_conjunctions(text: &str) -> String {
             .map(|s| s.1)
             .filter(|n| !n.is_empty())
             .is_some_and(|n| {
-                COORD_CONJUNCTIONS.contains(&word_core(n).to_ascii_lowercase().as_str())
+                CONTINUATION_WORDS.contains(&word_core(n).to_ascii_lowercase().as_str())
             });
         if oversplit && next_is_conj && clause_words < MAX_CLAUSE_WORDS {
             demote[i + 1] = true; // splice: the clause continues, do not reset
@@ -980,6 +994,50 @@ mod tests {
             out.text.contains("ready, and I'll review"),
             "{:?}",
             out.text
+        );
+    }
+
+    #[test]
+    fn demotes_trailing_concessive_though() {
+        // "though" trailing a clause continues the thought — "It's nice. Though."
+        // is a pause artifact, not two sentences. Demote to "It's nice, though."
+        let out = normalize("the toggle is pretty nice. Though.");
+        assert!(out.text.contains("nice, though"), "{:?}", out.text);
+        assert!(!out.text.contains("nice. Though"), "{:?}", out.text);
+    }
+
+    #[test]
+    fn demotes_concessive_subordinators() {
+        // "although"/"whereas" take a comma when the clause follows.
+        let out = normalize("the api works fine. Although it is a little slow today");
+        assert!(out.text.contains("fine, although it"), "{:?}", out.text);
+        let out = normalize("sales rose in the north. Whereas the south stayed flat");
+        assert!(out.text.contains("north, whereas the"), "{:?}", out.text);
+    }
+
+    #[test]
+    fn demotion_excludes_conjunctive_adverbs() {
+        // A comma before a conjunctive adverb is a comma splice, and "then"
+        // marks a real sequence — these breaks must survive untouched.
+        assert!(
+            normalize("it failed. However we recovered quickly")
+                .text
+                .contains(". However"),
+        );
+        assert!(
+            normalize("do this first. Then run the install script")
+                .text
+                .contains(". Then"),
+        );
+        assert!(
+            normalize("it is getting late. Therefore we should stop now")
+                .text
+                .contains(". Therefore"),
+        );
+        assert!(
+            normalize("we tried really hard. Anyway it did not work out")
+                .text
+                .contains(". Anyway"),
         );
     }
 
