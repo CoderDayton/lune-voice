@@ -10,8 +10,9 @@
 //! philosophy of the corrector, applied to punctuation:
 //!
 //! * **Tier 1 — deterministic, no LLM:** capitalize the first letter; append a
-//!   terminal period when the segment is a single resolved declarative. These
-//!   fixes are unambiguous, so they never need the model.
+//!   terminal period when the segment is a single resolved declarative; and
+//!   demote a pause-driven over-split (`. But` → `, but`) back to a comma.
+//!   These fixes are unambiguous, so they never need the model.
 //! * **Tier 2 — ambiguous, trips the LLM gate:** comma-less run-ons and
 //!   interrogative-leading segments with no end mark. The right fix here
 //!   (internal commas, a sentence split, `?` vs `.` vs `!`) cannot be guessed
@@ -144,6 +145,11 @@ pub fn normalize_with(text: &str, fmt: &FormatToggles) -> PunctuationOutcome {
     if words.len() > 1 && !ends_terminal && !interrogative {
         out.push('.');
     }
+
+    // Undo pause-driven over-splitting: a thinking pause the ASR read as a
+    // sentence break before a coordinating conjunction ("…so far. But I…")
+    // becomes a comma ("…so far, but I…"). Always applied — gate-independent.
+    let out = demote_oversplit_conjunctions(&out);
 
     PunctuationOutcome {
         text: out,
@@ -747,6 +753,136 @@ fn word_core(word: &str) -> &str {
         .trim_end_matches(|c: char| !c.is_alphanumeric())
 }
 
+/// Coordinating conjunctions safe to splice a preceding sentence onto with a
+/// comma. "for" (preposition-ambiguous: "For the profile, we…") and "nor"
+/// (needs subject-aux inversion) are excluded — demoting across them risks
+/// mangling a real sentence break.
+const COORD_CONJUNCTIONS: &[&str] = &["and", "but", "so", "or", "yet"];
+
+/// Upper bound on how many words one sentence may grow to via demotion. Past
+/// this, a candidate break is kept rather than spliced, so an adversarial or
+/// rambling dictation ("…. So …. So …. So …" without end) can never fuse into a
+/// single unbounded comma-spliced wall. Set well above any natural sentence
+/// (~40 words) so it never constrains real dictation — purely a safety guard.
+const MAX_CLAUSE_WORDS: usize = 48;
+
+/// Demote an over-split sentence break back to a comma when the ASR turned a
+/// thinking pause into a period right before a coordinating conjunction that
+/// continues the thought ("…so far. But I want…" → "…so far, but I want…").
+///
+/// The acoustic pause length the model uses to choose `.` vs `,` is baked into
+/// the ASR weights — there is no threshold of ours to raise — so this corrects
+/// the over-read deterministically after the fact. Only a plain word ending in
+/// a single period qualifies as the break, so abbreviations ("etc."), dotted
+/// forms ("U.S."), initials ("J."), and acronym sentence-ends ("NASA.") are
+/// left intact; and a genuine new sentence opens on "Then"/"Finally"/a fresh
+/// subject — never a coordinating conjunction — so real breaks stay split.
+///
+/// Two linear passes over borrowed token spans (no per-token allocation): one
+/// marks the boundaries to demote while tracking the running sentence length
+/// for the [`MAX_CLAUSE_WORDS`] guard, one rebuilds the string. O(n) in input.
+fn demote_oversplit_conjunctions(text: &str) -> String {
+    if !is_latin(text) {
+        return text.to_owned();
+    }
+
+    // Borrowed (leading-whitespace, token) spans so exact spacing survives the
+    // rewrite with no String allocated per token. A trailing whitespace-only
+    // run is captured as a final span with an empty token.
+    let mut segs: Vec<(&str, &str)> = Vec::new();
+    let mut rest = text;
+    while !rest.is_empty() {
+        let ws_end = rest
+            .find(|c: char| !c.is_whitespace())
+            .unwrap_or(rest.len());
+        let ws = &rest[..ws_end];
+        rest = &rest[ws_end..];
+        if rest.is_empty() {
+            segs.push((ws, ""));
+            break;
+        }
+        let tok_end = rest.find(char::is_whitespace).unwrap_or(rest.len());
+        segs.push((ws, &rest[..tok_end]));
+        rest = &rest[tok_end..];
+    }
+
+    // Pass 1: mark each conjunction token whose preceding token's terminal
+    // period should become a comma. `clause_words` accumulates across demoted
+    // boundaries (the clause keeps growing) and resets at every kept break.
+    let mut demote = vec![false; segs.len()];
+    let mut clause_words = 0usize;
+    for i in 0..segs.len() {
+        let tok = segs[i].1;
+        if tok.is_empty() {
+            continue;
+        }
+        clause_words += 1;
+        let oversplit = is_oversplit_period_word(tok);
+        let next_is_conj = segs
+            .get(i + 1)
+            .map(|s| s.1)
+            .filter(|n| !n.is_empty())
+            .is_some_and(|n| {
+                COORD_CONJUNCTIONS.contains(&word_core(n).to_ascii_lowercase().as_str())
+            });
+        if oversplit && next_is_conj && clause_words < MAX_CLAUSE_WORDS {
+            demote[i + 1] = true; // splice: the clause continues, do not reset
+        } else if oversplit || token_ends_sentence(tok) {
+            clause_words = 0; // a kept sentence break starts a new clause
+        }
+    }
+
+    // Pass 2: rebuild. A token preceding a demoted conjunction loses its
+    // terminal period to a comma; a demoted conjunction is fully lowercased
+    // ("But," / "SO" → "but" / "so") with a now-redundant trailing comma dropped.
+    let mut out = String::with_capacity(text.len() + 4);
+    for (idx, (ws, tok)) in segs.iter().enumerate() {
+        out.push_str(ws);
+        if tok.is_empty() {
+            continue;
+        }
+        let demote_this = demote[idx];
+        let comma_after = demote.get(idx + 1).copied().unwrap_or(false);
+        if !demote_this && !comma_after {
+            out.push_str(tok);
+            continue;
+        }
+        let mut piece = if demote_this {
+            let lowered = tok.to_lowercase();
+            lowered
+                .strip_suffix(',')
+                .map(str::to_owned)
+                .unwrap_or(lowered)
+        } else {
+            (*tok).to_owned()
+        };
+        if comma_after && piece.ends_with('.') {
+            piece.pop();
+            piece.push(',');
+        }
+        out.push_str(&piece);
+    }
+    out
+}
+
+/// Whether `tok` is a plain word ending in exactly one sentence period — the
+/// only shape treated as an over-split break. Requires a lowercase Latin letter
+/// immediately before the `.`, no interior `.`, and not a known non-terminal
+/// abbreviation, so "U.S.", "etc.", "J.", and "NASA." never qualify.
+fn is_oversplit_period_word(tok: &str) -> bool {
+    let Some(stem) = tok.strip_suffix('.') else {
+        return false;
+    };
+    if stem.is_empty() || stem.contains('.') {
+        return false;
+    }
+    let last = stem.chars().next_back().unwrap();
+    if !(last.is_alphabetic() && last.is_lowercase()) {
+        return false;
+    }
+    !NON_TERMINAL_ABBREVIATIONS.contains(&stem.to_ascii_lowercase().as_str())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -780,6 +916,137 @@ mod tests {
             out.text.ends_with('.'),
             "deterministic path must still close the run-on: {:?}",
             out.text
+        );
+    }
+
+    #[test]
+    fn demotes_oversplit_coordinating_conjunction_to_comma() {
+        // A pause the ASR over-read as a sentence break leaves ". But" / ". So"
+        // where the thought continues — demote the period to a comma.
+        let out = normalize("everything looks stable so far. But I want to keep an eye on it");
+        assert!(
+            out.text.contains("so far, but I want"),
+            "expected period->comma demotion: {:?}",
+            out.text
+        );
+        assert!(!out.text.contains("so far. But"), "{:?}", out.text);
+
+        let out = normalize("we should weigh both. So we decided to wait a bit");
+        assert!(out.text.contains("both, so we decided"), "{:?}", out.text);
+    }
+
+    #[test]
+    fn demotion_leaves_genuine_sentence_breaks_intact() {
+        // "Then" is not a coordinating conjunction — a real break stays split.
+        let out = normalize("run the start script. Then open the config file");
+        assert!(
+            out.text.contains("script. Then open"),
+            "genuine break must stay split: {:?}",
+            out.text
+        );
+    }
+
+    #[test]
+    fn demotion_excludes_for_and_nor() {
+        // "for"/"nor" are too ambiguous (preposition / inversion) to splice.
+        let out = normalize("i waited a while. For the bus was running late again");
+        assert!(out.text.contains(". For the bus"), "{:?}", out.text);
+    }
+
+    #[test]
+    fn demotion_skips_abbreviations_and_acronyms() {
+        // A trailing-period abbreviation or an acronym sentence-end is not a
+        // plain-word period, so the break is left intact.
+        let out = normalize("bring pens, paper, etc. And the laptop too please");
+        assert!(out.text.contains("etc. And the"), "{:?}", out.text);
+
+        let out = normalize("i used to work at NASA. And i miss it sometimes now");
+        assert!(out.text.contains("NASA. And i"), "{:?}", out.text);
+    }
+
+    #[test]
+    fn demotion_collapses_redundant_conjunction_comma() {
+        // "…it. But, it failed" → one comma, not "…it, but, it failed".
+        let out = normalize("we shipped it. But, it failed badly in production");
+        assert!(out.text.contains("it, but it failed"), "{:?}", out.text);
+        assert!(!out.text.contains("but,"), "{:?}", out.text);
+    }
+
+    #[test]
+    fn demotion_no_op_when_already_comma_joined() {
+        // No period before the conjunction — nothing to demote.
+        let out = normalize("send it over whenever you're ready, and I'll review it later");
+        assert!(
+            out.text.contains("ready, and I'll review"),
+            "{:?}",
+            out.text
+        );
+    }
+
+    #[test]
+    fn demotion_allows_multiple_within_one_normal_sentence() {
+        // Two over-splits in one ordinary-length sentence both demote.
+        let out = normalize("we shipped it. But it broke. So we rolled back quickly");
+        assert!(
+            out.text.contains("it, but it broke, so we rolled back"),
+            "{:?}",
+            out.text
+        );
+    }
+
+    #[test]
+    fn demotion_lowercases_all_caps_conjunction() {
+        // An all-caps conjunction must fully lowercase ("SO" → "so"), not "sO".
+        let out = normalize("we waited a while. SO we left without them");
+        assert!(out.text.contains("while, so we left"), "{:?}", out.text);
+        assert!(!out.text.contains("sO"), "{:?}", out.text);
+    }
+
+    #[test]
+    fn demotion_bounds_pathological_chaining() {
+        // Adversarial: dozens of clauses each ending ". So <x>". The clause-length
+        // guard must keep some breaks rather than fuse everything into one
+        // unbounded comma-spliced wall.
+        let mut s = String::from("alpha beta gamma");
+        for _ in 0..40 {
+            s.push_str(". So delta epsilon");
+        }
+        let out = normalize(&s).text;
+        assert!(
+            out.contains(". So"),
+            "clause-length cap must keep some sentence breaks"
+        );
+    }
+
+    #[test]
+    fn demotion_handles_adversarial_inputs_without_panicking() {
+        // None of these may panic (slicing, UTF-8 boundaries, empty stems).
+        for s in [
+            "",
+            "   ",
+            ". . . And . So .",
+            "but",
+            "So",
+            "done. So",
+            ".And",
+            "café. So déjà vu continúa",
+            "a. SO b",
+            "...... and",
+            "U.S. And the rest",
+            "wait. Nor did I agree",
+        ] {
+            let _ = normalize(s);
+        }
+        // Acronym/abbreviation period is never spliced; unicode stems survive.
+        assert!(
+            normalize("i used to work at U.S. And the rest of it now")
+                .text
+                .contains("U.S. And"),
+        );
+        assert!(
+            normalize("café looks good so far. But déjà vu sets in now")
+                .text
+                .contains("far, but déjà"),
         );
     }
 

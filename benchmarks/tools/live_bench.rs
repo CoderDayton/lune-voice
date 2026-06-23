@@ -33,23 +33,15 @@ use tokio::sync::{Mutex, RwLock, mpsc};
 /// produces that, so WER reflects the real end-to-end result. Override with a
 /// `LUNE_REFS` file.
 const DEFAULT_REFS: &[&str] = &[
-    "Hello.",
-    "Open the settings.",
-    "Commit this change.",
-    "Let's meet at noon tomorrow.",
-    "Please send me the report when you get a chance.",
-    "The quick brown fox jumps over the lazy dog by the river.",
+    // Coordinating-conjunction clause boundaries — the surface the punctuation
+    // fix touches. A pause the ASR over-reads as a sentence break turns one of
+    // these commas into a period (". But", ". So"), so WER here tracks exactly
+    // that. No digits, so the score reflects punctuation, not number formatting.
     "I finished the report, so send it over whenever you're ready and I'll review it after lunch.",
-    "Schedule a call with the design team on Thursday afternoon to walk through the new dashboard layout and the onboarding flow.",
-    // Long-form, ONE sentence each (comma-joined clauses): these surface the
-    // over-segmentation bug — if pauses turn into sentence breaks, the periods
-    // here won't match and WER jumps. No digits, so WER tracks punctuation, not
-    // number formatting.
-    "I was thinking we could start the meeting a little earlier than usual, so we have time to go through the quarterly numbers, review the open action items, and still wrap up before lunch.",
     "The deployment went out last night and everything looks stable so far, but I want to keep an eye on the error rates for the next little while, just in case something slips through around the payment flow.",
     "Honestly, I'm not sure which approach is better, because the first one is simpler to build but harder to scale, while the second takes more work up front and pays off later, so we should weigh both before deciding.",
-    // Long-form, a GENUINE multi-sentence passage: the breaks here are real, so
-    // this checks the pipeline splits correctly without adding extra periods.
+    // A GENUINE multi-sentence passage: the breaks here are real, so this checks
+    // the pipeline still splits correctly without adding extra periods.
     "First, clone the repository and install the dependencies. Then open the config file and set your key. Finally, run the start script and the server should come up.",
 ];
 
