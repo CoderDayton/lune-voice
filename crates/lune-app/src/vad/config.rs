@@ -79,7 +79,14 @@ pub const DEFAULT_VAD_CONFIG: VadPipelineConfig = VadPipelineConfig {
     sample_rate: 16_000,
     silero_enabled: true,
     earshot_prefilter: true,
-    earshot_activity_threshold: 0.35,
+    // 0.15 (was 0.35): the Earshot energy pre-gate decides whether Silero even
+    // runs on a frame. At 0.35 it vetoed soft/quiet speakers' words before the
+    // neural verifier could weigh in (a near-silent "you know" got dropped,
+    // making the live output worse than the whole-buffer decode). 0.15 still
+    // pre-filters true silence/noise but lets Silero judge quiet speech — it
+    // recovers the dropped words with no domain-WER cost (4.6%→4.5%), whereas
+    // disabling the pre-gate entirely admitted noise and regressed WER to 5.2%.
+    earshot_activity_threshold: 0.15,
     silero_onset: 0.30,
     silero_offset: 0.20,
     preroll_ms: 500,
