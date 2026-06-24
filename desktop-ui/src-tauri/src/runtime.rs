@@ -149,6 +149,17 @@ impl AppRuntime {
         Ok(runtime)
     }
 
+    /// Push saved sound-cue settings into `inner.settings` immediately so the
+    /// next dictation honors them. The optimistic "listening" status (and its
+    /// Start cue) fires before `prepare_manager_for_start` refreshes
+    /// `inner.settings` on rebuild, so without this a toggle/volume change
+    /// would be off by one dictation.
+    pub async fn sync_sound_cues(&self, enabled: bool, volume: f32) {
+        let mut settings = self.inner.settings.write().await;
+        settings.sound_cues_enabled = enabled;
+        settings.sound_cue_volume = volume.clamp(0.0, 1.0);
+    }
+
     /// Reconcile the long-lived audio stream with the desired `mic_prewarm`
     /// state and input device. For each argument, `None` reads the current
     /// in-memory setting (suitable for startup); a `Some(_)` override is used
@@ -732,7 +743,21 @@ impl AppRuntime {
     }
 
     async fn publish_status(&self, status: &str) {
-        *self.inner.status.write().await = status.to_owned();
+        let prev = std::mem::replace(&mut *self.inner.status.write().await, status.to_owned());
+
+        // Sound cues, played from the backend because it is the only surface
+        // guaranteed to be alive: the main window is destroyed on close (and
+        // absent when started minimized) and the pill may not exist.
+        if let Some(cue) = cue_for_transition(&prev, status) {
+            let (enabled, volume) = {
+                let s = self.inner.settings.read().await;
+                (s.sound_cues_enabled, s.sound_cue_volume)
+            };
+            if enabled {
+                lune_app::sound::play(cue, volume);
+            }
+        }
+
         self.push_session_event(SessionStreamEvent::ServiceStatus {
             status: status.to_owned(),
         })
@@ -1369,6 +1394,20 @@ fn reconcile_prewarm(
     }
 }
 
+/// Map a service-status transition to the sound cue that should play, or
+/// `None`. Dedups on the previous status so each cue fires once — "listening"
+/// is published both optimistically and again on `SessionEvent::Started`, and
+/// "ready"/"error" can repeat without a fresh dictation.
+fn cue_for_transition(prev: &str, status: &str) -> Option<lune_app::sound::Cue> {
+    use lune_app::sound::Cue;
+    match status {
+        "listening" if prev != "listening" => Some(Cue::Start),
+        "ready" if prev == "listening" || prev == "processing" => Some(Cue::Stop),
+        "error" if prev != "error" => Some(Cue::Error),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -1376,7 +1415,41 @@ mod tests {
 
     use lune_core::llm::LlmService;
 
-    use super::{LazyLocalLlm, PrewarmAction, reconcile_prewarm, sanitize_error_for_frontend};
+    use super::{
+        LazyLocalLlm, PrewarmAction, cue_for_transition, reconcile_prewarm,
+        sanitize_error_for_frontend,
+    };
+
+    #[test]
+    fn start_cue_fires_once_despite_double_listening() {
+        use lune_app::sound::Cue;
+        // Optimistic publish enters "listening" from idle.
+        assert_eq!(cue_for_transition("ready", "listening"), Some(Cue::Start));
+        // SessionEvent::Started republishes "listening" — must not replay.
+        assert_eq!(cue_for_transition("listening", "listening"), None);
+    }
+
+    #[test]
+    fn stop_cue_only_when_leaving_an_active_state() {
+        use lune_app::sound::Cue;
+        assert_eq!(cue_for_transition("processing", "ready"), Some(Cue::Stop));
+        assert_eq!(cue_for_transition("listening", "ready"), Some(Cue::Stop));
+        // "ready" from idle/startup (or repeated) is silent.
+        assert_eq!(cue_for_transition("ready", "ready"), None);
+    }
+
+    #[test]
+    fn error_cue_fires_once() {
+        use lune_app::sound::Cue;
+        assert_eq!(cue_for_transition("processing", "error"), Some(Cue::Error));
+        assert_eq!(cue_for_transition("error", "error"), None);
+    }
+
+    #[test]
+    fn no_cue_for_processing_or_unknown_status() {
+        assert_eq!(cue_for_transition("listening", "processing"), None);
+        assert_eq!(cue_for_transition("ready", "calibrating"), None);
+    }
 
     /// The follow-up behavior: when the chosen device changes while prewarm
     /// stays enabled, the open stream must be rebuilt (Reopen), not left on the

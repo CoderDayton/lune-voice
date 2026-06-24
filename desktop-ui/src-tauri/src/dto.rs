@@ -171,6 +171,10 @@ pub struct WorkspaceSettingsDto {
     /// Keep the dictated text on the clipboard after delivery (orthogonal to the
     /// send method).
     pub copy_to_clipboard: bool,
+    /// Play short sound cues on dictation start/stop/error.
+    pub sound_cues_enabled: bool,
+    /// Sound cue playback volume in [0.0, 1.0].
+    pub sound_cue_volume: f32,
     pub use_gpu: bool,
     pub device_policy: DevicePolicyDto,
     pub asr_backend_type: AsrBackendTypeDto,
@@ -246,6 +250,10 @@ pub struct SaveWorkspaceSettingsInput {
     /// Keep the dictated text on the clipboard after delivery (orthogonal to the
     /// send method).
     pub copy_to_clipboard: bool,
+    /// Play short sound cues on dictation start/stop/error.
+    pub sound_cues_enabled: bool,
+    /// Sound cue playback volume in [0.0, 1.0].
+    pub sound_cue_volume: f32,
     pub use_gpu: bool,
     pub device_policy: DevicePolicyDto,
     pub asr_backend_type: AsrBackendTypeDto,

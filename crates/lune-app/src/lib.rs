@@ -4,6 +4,7 @@ pub mod delivery;
 pub mod events;
 mod gate;
 pub mod session;
+pub mod sound;
 #[cfg(unix)]
 mod uinput_typer;
 // IBus input-method delivery backend — Linux only (Windows/macOS have their own

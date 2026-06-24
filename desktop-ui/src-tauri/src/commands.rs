@@ -123,6 +123,14 @@ pub async fn save_workspace_settings(
             Some(snapshot.settings.input_device.clone()),
         )
         .await;
+    // Apply sound-cue settings live — they're played from the backend and must
+    // not lag a dictation behind a toggle/volume change.
+    runtime
+        .sync_sound_cues(
+            snapshot.settings.sound_cues_enabled,
+            snapshot.settings.sound_cue_volume,
+        )
+        .await;
     // Notify pill of settings changes (activation mode, pill visibility)
     if let Err(e) = runtime.app_handle().emit_to(
         "pill",

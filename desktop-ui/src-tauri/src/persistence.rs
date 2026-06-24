@@ -393,6 +393,8 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
         activation_mode: activation_mode_to_dto(settings.activation_mode),
         dictation_mode: dictation_mode_to_dto(settings.dictation_mode),
         copy_to_clipboard: settings.copy_to_clipboard,
+        sound_cues_enabled: settings.sound_cues_enabled,
+        sound_cue_volume: settings.sound_cue_volume,
         use_gpu: !matches!(settings.device, DevicePolicy::Cpu),
         device_policy: device_policy_to_dto(settings.device),
         asr_backend_type: settings.asr_backend.kind().into(),
@@ -443,6 +445,8 @@ fn apply_settings_dto(
     settings.pill_visibility = pill_visibility_from_dto(input.pill_visibility);
     settings.dictation_mode = dictation_mode_from_dto(input.dictation_mode);
     settings.copy_to_clipboard = input.copy_to_clipboard;
+    settings.sound_cues_enabled = input.sound_cues_enabled;
+    settings.sound_cue_volume = input.sound_cue_volume.clamp(0.0, 1.0);
     settings.device = resolve_device_policy(input.use_gpu, input.device_policy);
     settings.asr_backend =
         asr_backend_from_type(input.asr_backend_type, &settings.asr_backend, &input)?;
@@ -808,6 +812,8 @@ mod tests {
             activation_mode: dto.activation_mode,
             dictation_mode: dto.dictation_mode,
             copy_to_clipboard: dto.copy_to_clipboard,
+            sound_cues_enabled: dto.sound_cues_enabled,
+            sound_cue_volume: dto.sound_cue_volume,
             use_gpu: dto.use_gpu,
             device_policy: dto.device_policy,
             asr_backend_type: dto.asr_backend_type,

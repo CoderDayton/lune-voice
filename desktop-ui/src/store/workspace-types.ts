@@ -17,6 +17,8 @@ export interface WorkspaceSettings {
   llmSkipThreshold: string;
   dictationMode: DictationModeValue;
   copyToClipboard: boolean;
+  soundCuesEnabled: boolean;
+  soundCueVolume: number;
   stylePreset: string;
   adaptiveVad: boolean;
   speechThreshold: string;
@@ -100,6 +102,8 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   llmSkipThreshold: '0.40',
   dictationMode: 'Clipboard',
   copyToClipboard: false,
+  soundCuesEnabled: true,
+  soundCueVolume: 1.0,
   stylePreset: 'casual',
   adaptiveVad: false,
   speechThreshold: '0.50',

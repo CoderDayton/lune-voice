@@ -31,3 +31,6 @@ unsloth/asr_uncertainty_correction.jsonl
 .playwright-mcp/
 docs/daisyui-llms.txt
 confusion_bank.json
+
+# Scratch dictation recordings dumped at the repo root
+/recording_*.wav

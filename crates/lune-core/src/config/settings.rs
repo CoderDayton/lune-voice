@@ -63,6 +63,12 @@ pub struct UserSettings {
     /// `dictation_mode` (works with either Paste or Type). Off by default.
     #[serde(default)]
     pub copy_to_clipboard: bool,
+    /// Play short sound cues when dictation starts, finishes, or errors.
+    #[serde(default = "default_true")]
+    pub sound_cues_enabled: bool,
+    /// Sound cue playback volume in [0.0, 1.0].
+    #[serde(default = "default_sound_cue_volume")]
+    pub sound_cue_volume: f32,
     pub activation_mode: ActivationMode,
     /// When to show the floating dictation pill overlay.
     #[serde(default)]
@@ -152,6 +158,8 @@ impl Default for UserSettings {
             privacy_mode: PrivacyMode::LocalOnly,
             dictation_mode: DictationMode::default(),
             copy_to_clipboard: false,
+            sound_cues_enabled: true,
+            sound_cue_volume: 1.0,
             activation_mode: ActivationMode::default(),
             pill_visibility: PillVisibility::default(),
             terminal_mode: TerminalMode::default(),
@@ -216,6 +224,10 @@ impl Default for LlmBackendConfig {
 
 fn default_dictation_language() -> String {
     "auto".into()
+}
+
+fn default_sound_cue_volume() -> f32 {
+    1.0
 }
 
 fn default_word_confidence_threshold() -> f32 {

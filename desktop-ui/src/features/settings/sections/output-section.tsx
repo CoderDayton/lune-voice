@@ -4,9 +4,11 @@ import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown
 import { saveWorkspaceSetting } from '../../../store/workspace-store';
 import { type SettingsProps, SettingsRow, SettingsSection } from '../components/section';
 import { deliveryMethods, terminalModes } from '../data/settings-data';
+import { useDebouncedSetting } from '../hooks/use-debounced-setting';
 
 export function OutputSection({ settings }: SettingsProps) {
   const { t } = useLingui();
+  const [cueVolume, setCueVolume] = useDebouncedSetting('soundCueVolume', settings.soundCueVolume);
   return (
     <SettingsSection
       title={t`Output`}
@@ -40,6 +42,44 @@ export function OutputSection({ settings }: SettingsProps) {
           />
         }
       />
+      <SettingsRow
+        label={t`Sound cues`}
+        description={t`Play a short sound when dictation starts, finishes, or runs into an error.`}
+        control={
+          <input
+            type="checkbox"
+            className="toggle toggle-primary"
+            checked={settings.soundCuesEnabled}
+            onChange={() =>
+              void saveWorkspaceSetting('soundCuesEnabled', !settings.soundCuesEnabled)
+            }
+            aria-label={t`Sound cues`}
+          />
+        }
+      />
+      {settings.soundCuesEnabled && (
+        <SettingsRow
+          label={t`Cue volume`}
+          description={t`How loud the dictation sounds play.`}
+          control={
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                className="range range-primary range-sm w-28 sm:w-36"
+                min={0}
+                max={1}
+                step={0.05}
+                value={cueVolume}
+                onChange={(e) => setCueVolume(Number(e.target.value))}
+                aria-label={t`Cue volume`}
+              />
+              <span className="text-sm tabular-nums text-content-muted w-12 text-right">
+                {Math.round(cueVolume * 100)}%
+              </span>
+            </div>
+          }
+        />
+      )}
       {settings.dictationMode !== 'TypeInPlace' && (
         <SettingsRow
           label={t`Paste compatibility`}

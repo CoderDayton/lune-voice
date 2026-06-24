@@ -25,6 +25,8 @@ function createMockSnapshot(): WorkspaceSnapshot {
       activationMode: 'Toggle',
       dictationMode: 'Clipboard',
       copyToClipboard: false,
+      soundCuesEnabled: true,
+      soundCueVolume: 1.0,
       useGpu: true,
       devicePolicy: 'Auto',
       asrBackendType: 'Qwen3Asr',

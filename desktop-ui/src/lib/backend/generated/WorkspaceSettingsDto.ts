@@ -11,7 +11,15 @@ export type WorkspaceSettingsDto = { activationMode: ActivationModeDto, dictatio
  * Keep the dictated text on the clipboard after delivery (orthogonal to the
  * send method).
  */
-copyToClipboard: boolean, useGpu: boolean, devicePolicy: DevicePolicyDto, asrBackendType: AsrBackendTypeDto, confidenceThreshold: number | null, 
+copyToClipboard: boolean, 
+/**
+ * Play short sound cues on dictation start/stop/error.
+ */
+soundCuesEnabled: boolean, 
+/**
+ * Sound cue playback volume in [0.0, 1.0].
+ */
+soundCueVolume: number, useGpu: boolean, devicePolicy: DevicePolicyDto, asrBackendType: AsrBackendTypeDto, confidenceThreshold: number | null, 
 /**
  * Clean-segment confidence bound for bypassing the correction LLM.
  */
