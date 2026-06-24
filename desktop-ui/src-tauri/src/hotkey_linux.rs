@@ -6,7 +6,9 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock, mpsc as std_mpsc};
 
-use evdev::{AttributeSet, Device, EventType, InputEvent, KeyCode, uinput::VirtualDevice};
+use evdev::{
+    AttributeSet, Device, EventType, InputEvent, KeyCode, RelativeAxisCode, uinput::VirtualDevice,
+};
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
@@ -295,16 +297,47 @@ fn enumerate_keyboards() -> Vec<Device> {
                 debug!(path = %path.display(), "skipping self device");
                 return None;
             }
-            let is_kb = dev
-                .supported_keys()
-                .is_some_and(|k| k.contains(KeyCode::KEY_A) && k.contains(KeyCode::KEY_SPACE));
-            if !is_kb {
+            let keys = dev.supported_keys()?;
+            // A pointer (mouse) is never a typing keyboard, even when it
+            // advertises a macro keyboard interface. Gate on pointer *movement*
+            // (REL_X) or mouse buttons — NOT any relative axis, or a keyboard's
+            // rotary knob / volume wheel (REL_WHEEL / REL_DIAL) would wrongly
+            // mark the keyboard a pointer and we'd drop it.
+            let is_pointer = keys.contains(KeyCode::BTN_LEFT)
+                || dev
+                    .supported_relative_axes()
+                    .is_some_and(|a| a.contains(RelativeAxisCode::REL_X));
+            if !is_typing_keyboard_caps(
+                keys.contains(KeyCode::KEY_A),
+                keys.contains(KeyCode::KEY_SPACE),
+                keys.contains(KeyCode::KEY_LEFTSHIFT) || keys.contains(KeyCode::KEY_RIGHTSHIFT),
+                keys.contains(KeyCode::KEY_ENTER),
+                is_pointer,
+            ) {
+                debug!(name = ?dev.name(), path = %path.display(), "skipping non-typing-keyboard node");
                 return None;
             }
             info!(name = ?dev.name(), path = %path.display(), "found keyboard");
             Some(dev)
         })
         .collect()
+}
+
+/// Whether a device's capabilities mark it a real typing keyboard: letters,
+/// space, a Shift, and Enter, and not a pointer. Pure so the rule is
+/// unit-tested. The old filter accepted any device exposing `A`+`Space`, which
+/// also matched a QMK board's secondary consumer-control node and a gaming
+/// mouse's macro interface — so a single keyboard got grabbed twice and a mouse
+/// got grabbed at all. Requiring Shift+Enter (and rejecting pointers) leaves
+/// exactly the real keyboard nodes, each grabbed once.
+fn is_typing_keyboard_caps(
+    has_a: bool,
+    has_space: bool,
+    has_shift: bool,
+    has_enter: bool,
+    is_pointer: bool,
+) -> bool {
+    has_a && has_space && has_shift && has_enter && !is_pointer
 }
 
 fn read_device(mut dev: Device, tx: std_mpsc::Sender<(InputEvent, bool)>) {
@@ -707,5 +740,19 @@ mod tests {
             s.handle(KeyCode::KEY_SPACE, false, ActivationMode::Hold)
                 .is_none()
         );
+    }
+
+    #[test]
+    fn typing_keyboard_filter_rejects_secondary_nodes_and_pointers() {
+        // A real keyboard: letters, space, shift, enter, not a pointer.
+        assert!(is_typing_keyboard_caps(true, true, true, true, false));
+        // The Keychron's secondary node (event7): A+Space but no Shift → reject,
+        // so the keyboard is no longer grabbed twice.
+        assert!(!is_typing_keyboard_caps(true, true, false, true, false));
+        // A gaming mouse's macro interface that advertises a full keyboard but
+        // carries pointer axes → reject.
+        assert!(!is_typing_keyboard_caps(true, true, true, true, true));
+        // A media/macro pad without Enter → reject.
+        assert!(!is_typing_keyboard_caps(true, true, true, false, false));
     }
 }
