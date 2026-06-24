@@ -136,6 +136,16 @@ impl AppRuntime {
         };
 
         runtime.sync_mic_prewarm(None, None).await;
+
+        // Pre-build the neural VAD's ONNX session off the hot path so the FIRST
+        // dictation doesn't pay the graph-optimization cost. Fire-and-forget on
+        // a blocking thread; it parks itself in the pool when ready, and the
+        // first `Silero::new` reuses it.
+        tokio::task::spawn_blocking(|| match lune_app::vad::prewarm() {
+            Ok(()) => debug!("VAD prewarm: silero session built"),
+            Err(e) => warn!(error = %e, "VAD prewarm failed"),
+        });
+
         Ok(runtime)
     }
 
@@ -348,6 +358,17 @@ impl AppRuntime {
         // Reverted on failure so the pill doesn't stick in "listening" state.
         self.publish_status("listening").await;
 
+        // Anchor the pre-roll to the key-press: drain the hot capture ring NOW,
+        // before the (possibly slow) manager prep, keeping ~480 ms of lead-in.
+        // Audio spoken during warmup then accumulates in the ring and still
+        // reaches the recognizer, so a long startup no longer eats the first
+        // words. Draining inside the capture task instead would anchor the
+        // window to post-warmup time and discard that lead-in.
+        let prewarmed = self.prewarmed_handle().await;
+        if let Some(handle) = &prewarmed {
+            handle.drain_keep_last(6);
+        }
+
         // Capture focus off the start path: the value is only consumed at
         // delivery time (many seconds later), but the underlying Wayland /
         // subprocess probes are synchronous and block the tokio worker for
@@ -364,8 +385,7 @@ impl AppRuntime {
             }
         };
         let (event_tx, event_rx) = mpsc::channel(256);
-        let prewarm = self.prewarmed_handle().await;
-        let start_result = match prewarm {
+        let start_result = match prewarmed {
             Some(handle) => manager.start_with_handle(event_tx, handle).await,
             None => manager.start(event_tx).await,
         };

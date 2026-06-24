@@ -38,6 +38,13 @@ use lune_audio::{AudioChunk, Vad, VadConfig};
 use self::chunker::{SpanEvent, SpanGate};
 use self::silero::{SILERO_FRAME, Silero};
 
+/// Pre-build the neural VAD's ONNX session at startup so the first dictation
+/// doesn't pay the graph-optimization cost on its hot path. Off the hot path —
+/// call from a background thread. No-op once the session is warm.
+pub fn prewarm() -> Result<(), String> {
+    silero::prewarm()
+}
+
 pub use self::config::{DEFAULT_VAD_CONFIG, VadPipelineConfig};
 
 /// What the gate decided the capture loop should do with the ASR stream.

@@ -111,9 +111,20 @@ fn init_audio_source(
     let source: Box<dyn AudioPull> = match audio_override {
         SessionAudio::Owned(stream) => Box::new(stream),
         SessionAudio::Shared(handle) => {
-            // Keep ~500ms of pre-session audio so speech captured between
-            // hotkey press and this task scheduling isn't lost.
-            handle.drain_keep_last(6);
+            // The ring is drained at key-press time (see runtime.rs start path),
+            // anchoring the pre-roll to the press rather than to this task's
+            // scheduling. Draining again here would re-trim to the last ~480 ms
+            // and discard audio captured during pipeline warmup — exactly the
+            // lead-in we want to keep — so we deliberately don't. A large
+            // backlog here means the caller skipped that drain and we'd
+            // transcribe stale idle audio, so surface the contract violation.
+            let fill = handle.buffer_fill();
+            if fill > 0.75 {
+                warn!(
+                    buffer_fill = fill,
+                    "shared audio handle backlogged at session start; caller did not drain — stale audio may be transcribed"
+                );
+            }
             Box::new(handle)
         }
         SessionAudio::Open => {
