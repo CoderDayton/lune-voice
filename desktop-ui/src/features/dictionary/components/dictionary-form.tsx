@@ -81,7 +81,7 @@ export function QuickAddRule() {
             className="flex shrink-0 items-center justify-center self-center pb-0 sm:mb-1.5 sm:self-end"
             aria-hidden="true"
           >
-            <span className="grid size-8 place-items-center rounded-full border border-surface-border bg-surface-panel text-content-dim">
+            <span className="grid size-8 place-items-center rounded-full border border-surface-border bg-surface-panel text-content-subtle">
               <ArrowRight size={15} strokeWidth={2.2} className="rotate-90 sm:rotate-0" />
             </span>
           </div>
@@ -115,17 +115,17 @@ export function QuickAddRule() {
         >
           {ready ? (
             <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-content-muted">
-              <span className="text-xs uppercase tracking-wider text-content-dim">
+              <span className="text-xs uppercase tracking-wider text-content-subtle">
                 <Trans>Preview</Trans>
               </span>
               <span className="text-content-subtle line-through decoration-content-dim/60">
                 {phrase}
               </span>
-              <ArrowRight size={13} strokeWidth={2} className="text-content-dim" />
+              <ArrowRight size={13} strokeWidth={2} className="text-content-subtle" />
               <span className="font-medium text-primary">{replacement}</span>
             </span>
           ) : (
-            <span className="text-content-dim">
+            <span className="text-content-subtle">
               <Trans>Fill both fields to see the correction.</Trans>
             </span>
           )}

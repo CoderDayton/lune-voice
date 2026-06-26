@@ -109,25 +109,49 @@
     transform: scale(0.97);
   }
 
-  /* Strip every default focus indicator (outline + DaisyUI box-shadow
-     rings). Scoped to the focused element itself — parents using
-     :focus-within keep their own shadows. */
-  *:focus,
-  *:focus-visible {
+  /* Focus model:
+     • Pointer / programmatic focus shows no ring (no ring on a plain click).
+     • Keyboard focus (:focus-visible) always shows one — a consistent primary
+       outline by default, which components may override with their own
+       `focus-visible:outline-*` utilities (e.g. the inset rings on list rows).
+       Form controls opt out just below in favor of a softer halo.
+     • DaisyUI paints some default rings as box-shadow; we standardize on
+       outline, so box-shadow is cleared on focus. The field/select/toggle
+       halos re-assert their own box-shadow with higher specificity.
+     Earlier this forced `outline: none !important` on *every* :focus-visible,
+     which silently erased the component outline rings above — keyboard focus
+     was invisible across cards, rows, tabs and nav. */
+  *:focus:not(:focus-visible) {
     outline: none !important;
+  }
+
+  *:focus {
     box-shadow: none !important;
   }
 
-  /* Polished keyboard focus on textual fields: 1px primary-tinted border
-     plus a soft halo glow. No chunky outline, no offset gap. Only fires
-     for keyboard navigation (:focus-visible). */
+  *:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  /* Text fields, selects and toggles use a soft border + halo instead of the
+     outline ring. Only fires for keyboard navigation (:focus-visible). */
+  .input:focus-visible,
+  .textarea:focus-visible,
+  .select:focus-visible,
+  .toggle:focus-visible {
+    outline: none !important;
+  }
+
   .input:focus-visible,
   .textarea:focus-visible {
     border-color: var(--color-primary) !important;
     box-shadow: 0 0 0 3px var(--ring-focus) !important;
   }
 
-  /* Toggle gets just the halo — its track already shows on/off state. */
+  /* Select keeps its locked neutral border (below); toggle keeps its track
+     state. Both get just the halo so keyboard focus stays visible. */
+  .select:focus-visible,
   .toggle:focus-visible {
     box-shadow: 0 0 0 3px var(--ring-focus) !important;
   }

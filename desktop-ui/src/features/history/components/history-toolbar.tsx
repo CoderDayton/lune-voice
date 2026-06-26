@@ -46,7 +46,7 @@ export function HistoryToolbar() {
           value={search}
           onChange={(e) => workspaceActions.setHistorySearch(e.target.value)}
           placeholder={t`Search transcripts…`}
-          className="h-full min-w-0 grow bg-transparent text-sm text-content outline-none placeholder:text-content-dim"
+          className="h-full min-w-0 grow bg-transparent text-sm text-content outline-none placeholder:text-content-subtle"
           aria-label={t`Search transcripts`}
         />
         {filtered ? (
@@ -59,7 +59,7 @@ export function HistoryToolbar() {
             <X size={14} />
           </button>
         ) : (
-          <kbd className="kbd kbd-sm hidden sm:inline-flex text-content-dim">/</kbd>
+          <kbd className="kbd kbd-sm hidden sm:inline-flex text-content-subtle">/</kbd>
         )}
       </label>
       <div className="flex items-center justify-between gap-2 sm:justify-end">

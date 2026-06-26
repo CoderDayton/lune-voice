@@ -8,7 +8,7 @@ interface Level {
 }
 
 const PRIORITY_LEVELS: readonly Level[] = [
-  { value: 1, label: 'Low', dot: 'bg-content-dim' },
+  { value: 1, label: 'Low', dot: 'bg-content-subtle' },
   { value: 5, label: 'Med', dot: 'bg-info' },
   { value: 9, label: 'High', dot: 'bg-warning' },
 ] as const;

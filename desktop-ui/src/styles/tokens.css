@@ -5,7 +5,11 @@
   --content-strong: oklch(0.95 0 0);
   --content-default: oklch(0.87 0 0);
   --content-muted: oklch(0.69 0 0);
-  --content-subtle: oklch(0.54 0 0);
+  /* 0.60 (was 0.54) clears WCAG AA 4.5:1 for small text on the panel/field
+     surfaces; 0.54 sat at ~3.8:1. */
+  --content-subtle: oklch(0.60 0 0);
+  /* Decorative only (hairlines, strike-throughs, the lowest priority dot).
+     Too low-contrast for text — text usages were migrated to content-subtle. */
   --content-dim: oklch(0.41 0 0);
   /* Solid surfaces — no alpha, no glass */
   --surface-card: oklch(0.18 0 0);
@@ -64,7 +68,9 @@
   --content-strong: oklch(0.18 0 0);
   --content-default: oklch(0.26 0 0);
   --content-muted: oklch(0.42 0 0);
-  --content-subtle: oklch(0.55 0 0);
+  /* 0.52 (was 0.55) clears 4.5:1 on the field/recessed light surfaces;
+     0.55 dipped to ~4.4:1 there. */
+  --content-subtle: oklch(0.52 0 0);
   --content-dim: oklch(0.70 0 0);
   /* Solid surfaces */
   --surface-card: oklch(1 0 0);

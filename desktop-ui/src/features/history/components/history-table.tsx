@@ -86,7 +86,7 @@ export function HistoryTable() {
           value={search}
           onChange={(e) => workspaceActions.setHistorySearch(e.target.value)}
           placeholder={t`Search transcripts…`}
-          className="h-9 min-w-0 grow bg-transparent text-sm text-content outline-none placeholder:text-content-dim"
+          className="h-9 min-w-0 grow bg-transparent text-sm text-content placeholder:text-content-subtle"
           aria-label={t`Search transcripts`}
         />
         {hasSearch ? (
@@ -99,7 +99,7 @@ export function HistoryTable() {
             <X size={14} />
           </button>
         ) : (
-          <kbd className="kbd kbd-sm hidden text-content-dim sm:inline-flex">/</kbd>
+          <kbd className="kbd kbd-sm hidden text-content-subtle sm:inline-flex">/</kbd>
         )}
         <span className="hidden shrink-0 text-sm tabular-nums text-content-subtle sm:inline">
           {hasSearch ? t`${visibleCount} / ${totalCount}` : t`${totalCount} sessions`}
@@ -121,7 +121,7 @@ export function HistoryTable() {
         ) : (
           <table className="w-full border-collapse text-sm">
             <thead className="sticky top-0 z-10 bg-surface-panel">
-              <tr className="border-b border-surface-border text-left text-xs uppercase tracking-wider text-content-dim">
+              <tr className="border-b border-surface-border text-left text-xs uppercase tracking-wider text-content-subtle">
                 <th className="w-px py-2 pl-3" />
                 <th className="px-2 py-2 font-medium">{t`Time`}</th>
                 <th className="px-2 py-2 font-medium">{t`Transcript`}</th>
@@ -250,12 +250,12 @@ function SessionRows({ session, expanded, onToggle }: SessionRowsProps) {
         <td className="py-3 pl-3">
           <ChevronDown
             size={15}
-            className={`text-content-dim transition-transform ${expanded ? 'rotate-180' : ''}`}
+            className={`text-content-subtle transition-transform ${expanded ? 'rotate-180' : ''}`}
           />
         </td>
         <td className="whitespace-nowrap px-2 py-3 tabular-nums">
           <div className="text-content">{time}</div>
-          <div className="text-xs text-content-dim">{date}</div>
+          <div className="text-xs text-content-subtle">{date}</div>
         </td>
         <td className="px-2 py-3 text-content">
           <p className={expanded ? '' : 'line-clamp-1 sm:line-clamp-2'}>

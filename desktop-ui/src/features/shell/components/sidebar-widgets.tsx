@@ -52,7 +52,7 @@ export function SidebarQuickStart() {
               {serviceStatus === 'processing' ? t`Processing…` : t`Listening…`}
             </span>
           ) : (
-            <span className="flex min-w-0 items-center gap-1 text-xs text-content-dim">
+            <span className="flex min-w-0 items-center gap-1 text-xs text-content-subtle">
               <kbd className="kbd kbd-xs truncate">{hotkeyToggle || t`Set hotkey`}</kbd>
             </span>
           )}

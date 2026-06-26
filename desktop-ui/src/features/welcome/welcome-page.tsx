@@ -195,7 +195,7 @@ function Actions({ phase, requiredOk, pendingCount, onStart, onRetry, onFinish }
           <Loader2 size={16} className="animate-spin" />
           {t`Downloading…`}
         </button>
-        <p className="text-xs text-content-dim">
+        <p className="text-xs text-content-subtle">
           {t`Please keep the app open until downloads finish`}
         </p>
       </div>
@@ -254,7 +254,7 @@ function Actions({ phase, requiredOk, pendingCount, onStart, onRetry, onFinish }
 function Footer() {
   const { t } = useLingui();
   return (
-    <p className="flex items-center justify-center gap-1.5 text-xs text-content-dim">
+    <p className="flex items-center justify-center gap-1.5 text-xs text-content-subtle">
       <ShieldCheck size={12} strokeWidth={1.8} />
       {t`Models are stored locally. No telemetry, no accounts.`}
     </p>

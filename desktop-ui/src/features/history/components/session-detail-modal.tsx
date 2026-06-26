@@ -229,9 +229,9 @@ function MetaItem({
 }) {
   return (
     <div className="flex min-w-0 items-center gap-2 rounded-field border border-surface-border/70 bg-surface-elevated px-3 py-2">
-      <Icon size={14} strokeWidth={1.6} className="shrink-0 text-content-dim" />
+      <Icon size={14} strokeWidth={1.6} className="shrink-0 text-content-subtle" />
       <div className="min-w-0">
-        <p className="text-[0.68rem] uppercase tracking-[0.12em] text-content-dim">{label}</p>
+        <p className="text-[0.68rem] uppercase tracking-[0.12em] text-content-subtle">{label}</p>
         <p className="truncate text-sm font-medium text-content">{value}</p>
       </div>
     </div>

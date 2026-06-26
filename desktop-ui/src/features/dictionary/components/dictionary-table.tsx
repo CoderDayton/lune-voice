@@ -119,7 +119,7 @@ function ViewRow({ entry, onEdit }: { entry: DictionaryEntry; onEdit: () => void
     <tr className="group hover:bg-surface-hover">
       <td className="py-3">
         <div className="font-medium text-content">{entry.phrase}</div>
-        <div className="mt-0.5 flex items-center gap-1 text-xs text-content-dim sm:hidden">
+        <div className="mt-0.5 flex items-center gap-1 text-xs text-content-subtle sm:hidden">
           <ArrowRight size={11} strokeWidth={2} /> {entry.replacement}
         </div>
       </td>
@@ -190,7 +190,7 @@ function EmptyState() {
                 ) : (
                   <span className="text-content">{preset.phrase}</span>
                 )}
-                <ArrowRight size={12} strokeWidth={2} className="text-content-dim" />
+                <ArrowRight size={12} strokeWidth={2} className="text-content-subtle" />
                 <span className="font-medium text-content">{preset.replacement}</span>
               </button>
             </li>
@@ -226,7 +226,7 @@ export function VocabularyList() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t`Filter rules…`}
             aria-label={t`Filter rules`}
-            className="h-full min-w-0 grow bg-transparent text-sm text-content outline-none placeholder:text-content-dim"
+            className="h-full min-w-0 grow bg-transparent text-sm text-content outline-none placeholder:text-content-subtle"
           />
           {query && (
             <button
@@ -252,7 +252,7 @@ export function VocabularyList() {
         <div className="overflow-x-auto rounded-box border border-surface-border bg-surface-card">
           <table className="table">
             <thead>
-              <tr className="text-content-dim">
+              <tr className="text-content-subtle">
                 <th>
                   <Trans>Phrase</Trans>
                 </th>

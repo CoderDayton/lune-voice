@@ -165,7 +165,7 @@ export function StylesPage() {
 
           <div className="flex items-center justify-between pt-1">
             <span className="section-label">{t`Switch style`}</span>
-            <span className="text-xs text-content-dim">{t`${presets.length} presets`}</span>
+            <span className="text-xs text-content-subtle">{t`${presets.length} presets`}</span>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -189,14 +189,14 @@ export function StylesPage() {
               className="group flex min-h-[9.75rem] flex-col items-center justify-center gap-3 rounded-box border border-dashed border-surface-border bg-surface-inset/50 p-4 transition-[transform,border-color,background-color,box-shadow] duration-fast ease-standard hover:-translate-y-0.5 hover:border-primary/50 hover:bg-surface-card-hover hover:shadow-elevated focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:p-5"
               onClick={() => openModal('create')}
             >
-              <div className="flex size-10 items-center justify-center rounded-xl border border-dashed border-current text-content-dim transition-colors group-hover:border-primary group-hover:text-primary">
+              <div className="flex size-10 items-center justify-center rounded-xl border border-dashed border-current text-content-subtle transition-colors group-hover:border-primary group-hover:text-primary">
                 <Plus size={18} />
               </div>
               <div className="text-center">
                 <div className="text-sm font-medium text-content-muted transition-colors group-hover:text-content-default">
                   {t`Create new style`}
                 </div>
-                <div className="mt-0.5 text-xs text-content-dim">{t`Your own formatting preset`}</div>
+                <div className="mt-0.5 text-xs text-content-subtle">{t`Your own formatting preset`}</div>
               </div>
             </button>
           </div>

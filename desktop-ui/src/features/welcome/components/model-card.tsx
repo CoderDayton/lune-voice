@@ -83,7 +83,7 @@ export function ModelCard({
                 {t`Required`}
               </span>
             ) : (
-              <span className="badge badge-xs badge-soft text-content-dim">{t`Optional`}</span>
+              <span className="badge badge-xs badge-soft text-content-subtle">{t`Optional`}</span>
             )}
             {ready && !active && (
               <span className="badge badge-xs badge-soft badge-success">{t`Installed`}</span>

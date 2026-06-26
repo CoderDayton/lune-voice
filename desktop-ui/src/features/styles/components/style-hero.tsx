@@ -51,14 +51,14 @@ export function StyleHero({ preset, onEdit, onView }: StyleHeroProps) {
       />
 
       <div className="relative mt-5 flex flex-wrap items-center gap-2">
-        <span className="mr-1 text-xs text-content-dim">{t`Formatting`}</span>
+        <span className="mr-1 text-xs text-content-subtle">{t`Formatting`}</span>
         {chips.map((c) => (
           <span
             key={c.label}
             className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs transition-colors ${
               c.on
                 ? 'border-primary/30 bg-primary/10 text-primary'
-                : 'border-surface-border bg-surface-inset text-content-dim line-through'
+                : 'border-surface-border bg-surface-inset text-content-subtle line-through'
             }`}
           >
             {c.label}

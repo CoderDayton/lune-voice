@@ -86,7 +86,7 @@ export function StylePresetCard({
               className={`size-1.5 rounded-full ${on ? 'bg-primary/70' : 'bg-surface-border-strong'}`}
             />
           ))}
-          <span className="ml-1 text-[0.6875rem] text-content-dim">{t`formatting`}</span>
+          <span className="ml-1 text-[0.6875rem] text-content-subtle">{t`formatting`}</span>
         </div>
 
         {isConfirmingDelete ? (
@@ -102,7 +102,7 @@ export function StylePresetCard({
         ) : preset.isBuiltin ? (
           <button
             type="button"
-            className="pointer-events-auto flex items-center gap-1 text-xs text-content-dim opacity-0 transition-opacity hover:text-content-subtle group-hover:opacity-100"
+            className="pointer-events-auto flex items-center gap-1 text-xs text-content-subtle opacity-0 transition-opacity hover:text-content-subtle group-hover:opacity-100"
             onClick={onView}
           >
             <Lock size={11} /> {t`View`}

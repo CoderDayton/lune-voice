@@ -86,7 +86,7 @@ export function StyleEditorModal({
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-content-default">{t`Instructions`}</span>
               <span
-                className={`text-xs tabular-nums ${instrLen > 1900 ? 'text-warning' : 'text-content-dim'}`}
+                className={`text-xs tabular-nums ${instrLen > 1900 ? 'text-warning' : 'text-content-subtle'}`}
               >
                 {instrLen}/2048
               </span>
@@ -102,7 +102,7 @@ export function StyleEditorModal({
           </label>
           <div className="flex flex-col gap-1.5">
             <span className="text-sm font-medium text-content-default">{t`Formatting`}</span>
-            <p className="text-xs text-content-dim">
+            <p className="text-xs text-content-subtle">
               {t`Deterministic fixes applied before any AI styling.`}
             </p>
             <div className="flex flex-col divide-y divide-surface-border rounded-box border border-surface-border">
