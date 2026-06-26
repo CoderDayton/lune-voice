@@ -30,6 +30,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
       useGpu: true,
       devicePolicy: 'Auto',
       asrBackendType: 'Qwen3Asr',
+      whisperModel: 'Medium',
       llmEnabled: true,
       confidenceThreshold: 0.55,
       llmSkipThreshold: 0.4,
@@ -216,6 +217,7 @@ function applySettings(input: SaveWorkspaceSettingsInput) {
       ...mockSnapshot.settings,
       ...fields,
       devicePolicy: fields.useGpu ? fields.devicePolicy : 'Cpu',
+      whisperModel: fields.whisperModel ?? mockSnapshot.settings.whisperModel,
       openaiAsrApiKeySet: !!_openaiAsrApiKey,
     },
   };

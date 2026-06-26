@@ -41,9 +41,12 @@ function modelIcon(localName: string): LucideIcon {
 
 export function ModelsSection() {
   const { t } = useLingui();
-  // Toggling the correction LLM (in the Transcription tab) hides or reveals its
-  // model here, so re-check status whenever that flag flips.
+  // The model list is config-dependent: the correction LLM toggle and the ASR
+  // backend/model selection (both on the Transcription tab) decide which cards
+  // belong here, so we re-check status whenever any of them changes.
   const llmEnabled = useStore(workspaceStore, (s) => s.settings.llmEnabled);
+  const asrBackend = useStore(workspaceStore, (s) => s.settings.asrBackend);
+  const whisperModel = useStore(workspaceStore, (s) => s.settings.whisperModel);
 
   const [models, setModels] = useState<ModelStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,12 +62,11 @@ export function ModelsSection() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Flipping the correction LLM (Transcription tab) shows or hides its model here,
-  // so re-check status when it changes — not just on mount.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: llmEnabled is a deliberate re-run trigger, not used in the body.
+  // These settings change which models belong in the list, so re-check on each.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: llmEnabled/asrBackend/whisperModel are deliberate re-run triggers, not used in the body.
   useEffect(() => {
     refresh();
-  }, [refresh, llmEnabled]);
+  }, [refresh, llmEnabled, asrBackend, whisperModel]);
 
   useEffect(() => {
     const unlisten = listen<DownloadProgress>('lune://download-progress', (event) => {

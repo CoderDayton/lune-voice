@@ -111,6 +111,7 @@ pub enum AsrBackendKind {
     #[serde(alias = "OrtQwenAsr")]
     Qwen3Asr,
     OpenAiCompatible,
+    WhisperCpp,
 }
 
 impl AsrBackendKind {
@@ -124,6 +125,7 @@ impl AsrBackendKind {
         match self {
             Self::Qwen3Asr => "qwen3asr",
             Self::OpenAiCompatible => "openai",
+            Self::WhisperCpp => "whispercpp",
         }
     }
 }

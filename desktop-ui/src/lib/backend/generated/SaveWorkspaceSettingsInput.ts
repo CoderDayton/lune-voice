@@ -5,6 +5,7 @@ import type { DevicePolicyDto } from "./DevicePolicyDto";
 import type { DictationModeDto } from "./DictationModeDto";
 import type { PillVisibilityDto } from "./PillVisibilityDto";
 import type { TerminalModeDto } from "./TerminalModeDto";
+import type { WhisperModelDto } from "./WhisperModelDto";
 
 export type SaveWorkspaceSettingsInput = { activationMode: ActivationModeDto, dictationMode: DictationModeDto, 
 /**
@@ -39,4 +40,8 @@ terminalMode: TerminalModeDto,
 /**
  * Whether the correction LLM backend should be enabled.
  */
-llmEnabled: boolean, openaiAsrBaseUrl: string | null, openaiAsrApiKey: string | null, openaiAsrModel: string | null, };
+llmEnabled: boolean, openaiAsrBaseUrl: string | null, openaiAsrApiKey: string | null, openaiAsrModel: string | null, 
+/**
+ * Selected local whisper model (sent when asr_backend_type == WhisperCpp).
+ */
+whisperModel: WhisperModelDto | null, };

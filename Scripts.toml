@@ -20,14 +20,6 @@ cd desktop-ui && bun tauri dev
 info = "Launch Tauri app in dev mode (hot-reload)"
 requires = ["bun"]
 
-[scripts.ui-build]
-interpreter = "bash"
-command = '''
-cd desktop-ui && APPIMAGE_EXTRACT_AND_RUN=1 bun tauri build
-'''
-info = "Production build of desktop app"
-requires = ["bun"]
-
 # ── Quick iteration ──────────────────────────────────────────────────────────
 
 [scripts.check]
@@ -82,8 +74,18 @@ info = "Benchmark (--env TYPE=stages|real|latency|confusion|llm|live|domain|vram
 # ── Build ────────────────────────────────────────────────────────────────────
 
 [scripts.build]
-command = "cargo build --release"
-info = "Release build (CUDA default)"
+interpreter = "bash"
+# Production desktop app. `tauri build` does the release Rust compile + UI build
+# + bundle in one step. `--features whisper-cpp` compiles the local whisper.cpp
+# backend into the shipped binary (users never compile it themselves). The GGML_*
+# flags force a portable AVX2 CPU baseline instead of ggml's default
+# `-march=native`, which would SIGILL on any user CPU older than the build host.
+# Build host needs: cmake, a C++ toolchain, and libclang (for bindgen).
+command = '''
+cd desktop-ui && GGML_NATIVE=OFF GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON APPIMAGE_EXTRACT_AND_RUN=1 bun tauri build --features whisper-cpp
+'''
+info = "Production desktop app (ships whisper.cpp; portable CPU baseline)"
+requires = ["bun"]
 
 # ── Tools ────────────────────────────────────────────────────────────────────
 

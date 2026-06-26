@@ -10,7 +10,9 @@ pub use hotkey::{HotkeyConfig, KeyCombo, Modifier};
 pub use modes::{ActivationMode, DictationMode, PillVisibility, PrivacyMode, TerminalMode};
 pub use pipeline::{PipelineConfig, PipelineOverrides};
 pub use redacted::RedactedString;
-pub use settings::{AsrBackendConfig, DevicePolicy, LlmBackendConfig, StreamingMode, UserSettings};
+pub use settings::{
+    AsrBackendConfig, DevicePolicy, LlmBackendConfig, StreamingMode, UserSettings, WhisperModel,
+};
 pub use style_llm::{
     BASE_SYSTEM_PROMPT, FormatToggles, StyleId, StylePreset, StyleRegistry, builtin_registry,
 };

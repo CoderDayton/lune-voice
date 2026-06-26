@@ -2,7 +2,9 @@ import { ClipboardPaste, Cloud, Cpu, Hand, Keyboard, ToggleLeft } from 'lucide-r
 import type { ComponentType } from 'react';
 
 export type ActivationModeValue = 'Toggle' | 'Hold';
-export type AsrBackendValue = 'Qwen3Asr' | 'OpenAiCompatible';
+export type AsrBackendValue = 'Qwen3Asr' | 'OpenAiCompatible' | 'WhisperCpp';
+
+export type WhisperModelValue = 'Small' | 'Medium' | 'LargeV3Turbo';
 
 export type DictationModeValue = 'TypeInPlace' | 'Clipboard';
 export type PillVisibilityValue = 'Always' | 'WhenDictating' | 'Never';
@@ -54,10 +56,35 @@ export const asrBackends: DescriptiveOptionData<AsrBackendValue>[] = [
     icon: Cpu,
   },
   {
+    value: 'WhisperCpp',
+    label: 'Whisper (local)',
+    description: 'Runs whisper.cpp on-device. Choose a model size below.',
+    icon: Cpu,
+  },
+  {
     value: 'OpenAiCompatible',
     label: 'Cloud API (OpenAI-compatible)',
     description: 'Sends audio to a remote OpenAI-compatible endpoint you configure.',
     icon: Cloud,
+  },
+];
+
+/** whisper.cpp GGML model options (q8_0 multilingual), smallest to largest. */
+export const whisperModels: DescriptiveOptionData<WhisperModelValue>[] = [
+  {
+    value: 'Small',
+    label: 'Small',
+    description: '~264 MB. Fastest, lowest accuracy.',
+  },
+  {
+    value: 'Medium',
+    label: 'Medium',
+    description: '~823 MB. Balanced accuracy and speed.',
+  },
+  {
+    value: 'LargeV3Turbo',
+    label: 'Large v3 Turbo',
+    description: '~874 MB. Best accuracy; turbo decoder keeps it fast.',
   },
 ];
 

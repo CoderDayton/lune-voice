@@ -29,6 +29,9 @@
     "shortDescription": "Offline voice dictation powered by local AI",
     "longDescription": "Lune Voice turns speech into text locally on your computer. No cloud, no accounts, no internet required. Press a hotkey, speak, and text appears in any app.",
     "copyright": "© 2026 Lune Voice",
+    "resources": {
+      "../../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md"
+    },
     "linux": {
       "deb": {
         "depends": [

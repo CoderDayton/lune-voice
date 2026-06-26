@@ -11,7 +11,10 @@ use lune_core::asr::{AsrBackend, AsrBackendKind, AsrSegment, AsrSessionConfig};
 use lune_core::config::{AsrBackendConfig, DevicePolicy, PipelineConfig};
 use lune_core::error::{Error, Result};
 
-use crate::{OpenAiAsrConfig, OpenAiCompatibleAsrBackend, Qwen3AsrBackend, Qwen3AsrConfig};
+use crate::{
+    OpenAiAsrConfig, OpenAiCompatibleAsrBackend, Qwen3AsrBackend, Qwen3AsrConfig,
+    WhisperCppBackend, WhisperCppConfig,
+};
 
 // ── Dispatch helpers ────────────────────────────────────────────────────────
 //
@@ -50,6 +53,10 @@ macro_rules! dispatch {
                 AsrSessionHandle::OpenAi(s) => b.$method(s $(, $arg)*).await,
                 _ => Err(mismatch_err()),
             },
+            AsrRegistry::WhisperCpp(b) => match $session {
+                AsrSessionHandle::WhisperCpp(s) => b.$method(s $(, $arg)*).await,
+                _ => Err(mismatch_err()),
+            },
         }
     };
 }
@@ -61,6 +68,9 @@ macro_rules! dispatch_new {
         match $self {
             AsrRegistry::Qwen3(b) => Ok(AsrSessionHandle::Qwen3(b.$method($($arg),*).await?)),
             AsrRegistry::OpenAi(b) => Ok(AsrSessionHandle::OpenAi(b.$method($($arg),*).await?)),
+            AsrRegistry::WhisperCpp(b) => {
+                Ok(AsrSessionHandle::WhisperCpp(b.$method($($arg),*).await?))
+            }
         }
     };
 }
@@ -72,6 +82,7 @@ macro_rules! dispatch_new {
 pub enum AsrRegistry {
     Qwen3(Qwen3AsrBackend),
     OpenAi(OpenAiCompatibleAsrBackend),
+    WhisperCpp(WhisperCppBackend),
 }
 
 /// Runtime-dispatched ASR session handle.
@@ -79,6 +90,7 @@ pub enum AsrRegistry {
 pub enum AsrSessionHandle {
     Qwen3(<Qwen3AsrBackend as AsrBackend>::SessionHandle),
     OpenAi(<OpenAiCompatibleAsrBackend as AsrBackend>::SessionHandle),
+    WhisperCpp(<WhisperCppBackend as AsrBackend>::SessionHandle),
 }
 
 // ── AsrBackend impl ─────────────────────────────────────────────────────────
@@ -147,6 +159,13 @@ impl AsrRegistry {
                 })?;
                 Ok(Self::OpenAi(backend))
             }
+            AsrBackendConfig::WhisperCpp { model } => {
+                let backend = WhisperCppBackend::new(WhisperCppConfig {
+                    model_path: models_dir.join(model.dir()).join(model.ggml_file()),
+                    use_gpu: device.use_gpu(cfg!(feature = "whisper-cuda")),
+                })?;
+                Ok(Self::WhisperCpp(backend))
+            }
             #[allow(unreachable_patterns)]
             _ => Err(Error::config("unknown ASR backend type")),
         }
@@ -157,6 +176,7 @@ impl AsrRegistry {
         match self {
             Self::Qwen3(_) => AsrBackendKind::Qwen3Asr,
             Self::OpenAi(_) => AsrBackendKind::OpenAiCompatible,
+            Self::WhisperCpp(_) => AsrBackendKind::WhisperCpp,
         }
     }
 
@@ -217,6 +237,29 @@ impl AsrRegistry {
                 max_speech_samples: 120 * 16_000,
                 llm_timeout_secs: 30,
             },
+            AsrBackendKind::WhisperCpp => PipelineConfig {
+                // Batch decoder like Qwen3 — one full utterance per decode, flushed
+                // by the dictation toggle/hold release, not by silence. Keep the
+                // silence windows huge so the VAD never cuts mid-utterance.
+                max_segment_ms: 300_000,
+                sentence_close_ms: 300_000,
+                hard_close_ms: 300_000,
+                speech_threshold: 0.5,
+                speech_threshold_end: 0.3,
+                min_speech_ms: 200,
+                adaptive_vad: false,
+                itn_enabled: true,
+                word_boost_enabled: false,
+                word_boost_score: 1.0,
+                // whisper token probs feed the gate, but they're uncalibrated
+                // (no per-backend isotonic file), so route a touch more eagerly
+                // than Qwen3 rather than trust a hard cutoff.
+                word_confidence_threshold: Some(0.50),
+                llm_skip_threshold: Some(0.40),
+                llm_skip_noisy_threshold: Some(0.30),
+                max_speech_samples: 300 * 16_000,
+                llm_timeout_secs: 30,
+            },
             // Fallback for any future variants — start from PipelineConfig::default().
             _ => PipelineConfig::default(),
         }
@@ -228,7 +271,7 @@ impl AsrRegistry {
     pub fn last_profile(&self) -> Option<crate::Qwen3AsrProfile> {
         match self {
             Self::Qwen3(b) => b.last_profile(),
-            Self::OpenAi(_) => None,
+            Self::OpenAi(_) | Self::WhisperCpp(_) => None,
         }
     }
 
@@ -237,7 +280,7 @@ impl AsrRegistry {
     pub fn set_boost_phrases(&self, phrases: &[String], score: f32) {
         match self {
             Self::Qwen3(b) => b.set_boost_phrases(phrases, score),
-            Self::OpenAi(_) => {}
+            Self::OpenAi(_) | Self::WhisperCpp(_) => {}
         }
     }
 }

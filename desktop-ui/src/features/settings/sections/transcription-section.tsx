@@ -4,7 +4,7 @@ import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown
 import { saveWorkspaceSetting } from '../../../store/workspace-store';
 import { OpenAiFields } from '../components/openai-fields';
 import { type SettingsProps, SettingsRow, SettingsSection } from '../components/section';
-import { asrBackends, dictationLanguages } from '../data/settings-data';
+import { asrBackends, dictationLanguages, whisperModels } from '../data/settings-data';
 import { useDebouncedSetting } from '../hooks/use-debounced-setting';
 
 export function TranscriptionSection({ settings }: SettingsProps) {
@@ -38,6 +38,22 @@ export function TranscriptionSection({ settings }: SettingsProps) {
             />
           }
         />
+        {settings.asrBackend === 'WhisperCpp' && (
+          <SettingsRow
+            label={t`Whisper model`}
+            description={t`Larger models are more accurate but slower and use more disk. The selected model downloads from the Models tab.`}
+            control={
+              <DescriptiveDropdown
+                value={settings.whisperModel}
+                options={whisperModels}
+                ariaLabel={t`Whisper model`}
+                onChange={(next) =>
+                  void saveWorkspaceSetting('whisperModel', next as typeof settings.whisperModel)
+                }
+              />
+            }
+          />
+        )}
         {settings.asrBackend === 'OpenAiCompatible' && (
           <OpenAiFields
             settings={settings}

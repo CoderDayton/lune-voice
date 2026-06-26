@@ -8,8 +8,19 @@ license.workspace = true
 workspace = true
 
 [features]
+# whisper-cpp is OFF by default so routine `cargo check`/clippy/test stay fast
+# and need no C++ toolchain (the backend falls back to a stub). It is compiled
+# into the shipped binary by `cgs build`, which passes `--features whisper-cpp`.
 default = []
 cuda = ["ort/cuda"]
+# Local whisper.cpp backend. Compiles whisper.cpp (C++) via whisper-rs-sys —
+# needs cmake + a C++ toolchain + libclang at build time. Disable with
+# --no-default-features for a fast ONNX-only build.
+whisper-cpp = ["dep:whisper-rs"]
+# GPU whisper.cpp. Source-compiles whisper.cpp with CUDA, which additionally
+# needs the CUDA toolkit (nvcc). Deliberately separate from `cuda` (which only
+# toggles ONNX Runtime's prebuilt CUDA execution provider, no compiler needed).
+whisper-cuda = ["whisper-cpp", "whisper-rs/cuda"]
 
 [dependencies]
 async-trait.workspace = true
@@ -17,6 +28,9 @@ lune-core.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 ort.workspace = true
+whisper-rs = { version = "0.16", optional = true, default-features = false, features = [
+    "tracing_backend",
+] }
 half = "2"
 ndarray.workspace = true
 rustfft.workspace = true

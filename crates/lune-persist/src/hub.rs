@@ -3,7 +3,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use hf_hub::api::sync::{Api, ApiBuilder, ApiRepo};
-use lune_core::config::AsrBackendConfig;
+use lune_core::config::{AsrBackendConfig, WhisperModel};
 use sha2::{Digest, Sha256};
 use tracing::{info, warn};
 
@@ -75,6 +75,20 @@ impl ModelSpec {
         }
     }
 
+    /// One whisper.cpp GGML model — a single `ggml-*.bin` file. Reuses the
+    /// directory download path with exactly one required file.
+    pub fn whisper(model: WhisperModel) -> Self {
+        Self::Directory {
+            repo_id: WhisperModel::REPO_ID.into(),
+            required_files: vec![model.ggml_file().into()],
+            suffix_patterns: vec![],
+            local_name: model.dir().into(),
+            description: "On-device Whisper speech-to-text (whisper.cpp). \
+                          Audio never leaves your machine.",
+            required: false,
+        }
+    }
+
     pub fn style_llm() -> Self {
         Self::Directory {
             repo_id: "onnx-community/Qwen3-0.6B-ONNX".into(),
@@ -92,6 +106,9 @@ impl ModelSpec {
         match local_name.as_str() {
             model_dirs::DIR_QWEN3_ASR => "Qwen3-ASR 0.6B ONNX",
             model_dirs::DIR_STYLE_LLM => "Qwen3 0.6B ONNX",
+            model_dirs::DIR_WHISPER_SMALL => WhisperModel::Small.display_name(),
+            model_dirs::DIR_WHISPER_MEDIUM => WhisperModel::Medium.display_name(),
+            model_dirs::DIR_WHISPER_LARGE_V3_TURBO => WhisperModel::LargeV3Turbo.display_name(),
             _ => local_name,
         }
     }
@@ -128,7 +145,9 @@ impl ModelSpec {
     }
 
     pub fn all() -> Vec<Self> {
-        vec![Self::qwen3_asr(), Self::style_llm()]
+        let mut specs = vec![Self::qwen3_asr(), Self::style_llm()];
+        specs.extend(WhisperModel::ALL.map(Self::whisper));
+        specs
     }
 
     fn to_status(&self, models_dir: &Path) -> ModelStatus {
@@ -185,7 +204,12 @@ fn spec_needed(
     match spec.local_name() {
         n if n == model_dirs::DIR_QWEN3_ASR => matches!(asr, AsrBackendConfig::Qwen3Asr { .. }),
         n if n == model_dirs::DIR_STYLE_LLM => matches!(llm, LlmBackendConfig::Local { .. }),
-        _ => spec.required(),
+        // A whisper spec is needed only when the WhisperCpp backend is active AND
+        // this is the selected model — so the UI offers exactly one whisper card.
+        n => {
+            matches!(asr, AsrBackendConfig::WhisperCpp { model } if model.dir() == n)
+                || spec.required()
+        }
     }
 }
 
@@ -569,6 +593,39 @@ mod tests {
         assert!(
             statuses.is_empty(),
             "no local models needed when ASR is remote and LLM is disabled, got {statuses:?}"
+        );
+    }
+
+    #[test]
+    fn check_model_status_surfaces_only_the_selected_whisper_model() {
+        let tmp = tempfile::tempdir().unwrap();
+        let statuses = check_model_status(
+            tmp.path(),
+            &AsrBackendConfig::WhisperCpp {
+                model: WhisperModel::Medium,
+            },
+            &LlmBackendConfig::Disabled,
+        );
+        let names: Vec<&str> = statuses.iter().map(|s| s.local_name.as_str()).collect();
+        assert_eq!(
+            names,
+            vec![WhisperModel::Medium.dir()],
+            "only the selected whisper model is offered, not the other sizes or the Qwen3 ASR model: {names:?}"
+        );
+    }
+
+    #[test]
+    fn check_model_status_hides_whisper_models_when_asr_is_qwen3() {
+        let tmp = tempfile::tempdir().unwrap();
+        let statuses = check_model_status(
+            tmp.path(),
+            &AsrBackendConfig::Qwen3Asr {},
+            &LlmBackendConfig::Disabled,
+        );
+        let names: Vec<&str> = statuses.iter().map(|s| s.local_name.as_str()).collect();
+        assert!(
+            names.iter().all(|n| !n.starts_with("whisper-")),
+            "no whisper model should be offered under the Qwen3 backend: {names:?}"
         );
     }
 

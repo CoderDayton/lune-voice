@@ -10,6 +10,9 @@ workspace = true
 [features]
 default = ["cuda"]
 cuda = ["lune-llm/cuda", "lune-asr/cuda", "ort/cuda"]
+# Local whisper.cpp backend — propagated to the shipped binary by `cgs build`.
+whisper-cpp = ["lune-asr/whisper-cpp"]
+whisper-cuda = ["lune-asr/whisper-cuda"]
 
 [dependencies]
 lune-core.workspace = true

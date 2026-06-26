@@ -10,6 +10,10 @@ workspace = true
 [features]
 default = ["cuda"]
 cuda = ["lune-app/cuda", "ort/cuda"]
+# Local whisper.cpp backend. Off by default; `cgs build` enables it (with a
+# portable GGML CPU baseline) so the shipped app includes it prebuilt.
+whisper-cpp = ["lune-app/whisper-cpp"]
+whisper-cuda = ["lune-app/whisper-cuda"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

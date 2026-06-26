@@ -176,6 +176,61 @@ impl Default for UserSettings {
     }
 }
 
+/// Which whisper.cpp GGML model the local Whisper backend loads.
+///
+/// This is the single source of truth tying a user-facing selection to its
+/// on-disk directory, its HuggingFace filename, and its display name; both the
+/// downloader (`lune-persist`) and the backend loader (`lune-asr`) read it so
+/// the mapping never drifts. All three are the multilingual q8_0 quantizations
+/// from `ggerganov/whisper.cpp`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[non_exhaustive]
+pub enum WhisperModel {
+    /// ~264 MB. Fast, lowest accuracy of the three.
+    Small,
+    /// ~823 MB. Balanced accuracy/speed.
+    #[default]
+    Medium,
+    /// ~874 MB. Best accuracy; turbo decoder keeps it fast.
+    LargeV3Turbo,
+}
+
+impl WhisperModel {
+    /// The HuggingFace repo hosting every GGML whisper model.
+    pub const REPO_ID: &'static str = "ggerganov/whisper.cpp";
+
+    /// Every selectable model, in ascending size order. Drives the downloader's
+    /// spec list and the settings selector.
+    pub const ALL: [WhisperModel; 3] = [Self::Small, Self::Medium, Self::LargeV3Turbo];
+
+    /// Local `models/` subdirectory holding this model's GGML file.
+    pub fn dir(self) -> &'static str {
+        match self {
+            Self::Small => crate::models::DIR_WHISPER_SMALL,
+            Self::Medium => crate::models::DIR_WHISPER_MEDIUM,
+            Self::LargeV3Turbo => crate::models::DIR_WHISPER_LARGE_V3_TURBO,
+        }
+    }
+
+    /// Filename to download from [`WhisperModel::REPO_ID`] and to load from disk.
+    pub fn ggml_file(self) -> &'static str {
+        match self {
+            Self::Small => "ggml-small-q8_0.bin",
+            Self::Medium => "ggml-medium-q8_0.bin",
+            Self::LargeV3Turbo => "ggml-large-v3-turbo-q8_0.bin",
+        }
+    }
+
+    /// Human-readable name for UI and model-status cards.
+    pub fn display_name(self) -> &'static str {
+        match self {
+            Self::Small => "Whisper Small (q8_0)",
+            Self::Medium => "Whisper Medium (q8_0)",
+            Self::LargeV3Turbo => "Whisper Large v3 Turbo (q8_0)",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 #[non_exhaustive]
@@ -187,6 +242,11 @@ pub enum AsrBackendConfig {
         model: String,
         streaming: StreamingMode,
     },
+    /// Local whisper.cpp inference via the bundled GGML model `model`.
+    WhisperCpp {
+        #[serde(default)]
+        model: WhisperModel,
+    },
 }
 
 impl AsrBackendConfig {
@@ -196,6 +256,7 @@ impl AsrBackendConfig {
         match self {
             Self::Qwen3Asr { .. } => AsrBackendKind::Qwen3Asr,
             Self::OpenAiCompatible { .. } => AsrBackendKind::OpenAiCompatible,
+            Self::WhisperCpp { .. } => AsrBackendKind::WhisperCpp,
         }
     }
 }

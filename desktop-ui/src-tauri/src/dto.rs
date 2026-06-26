@@ -36,6 +36,7 @@ pub enum DevicePolicyDto {
 pub enum AsrBackendTypeDto {
     Qwen3Asr,
     OpenAiCompatible,
+    WhisperCpp,
 }
 
 impl From<lune_core::asr::AsrBackendKind> for AsrBackendTypeDto {
@@ -44,6 +45,7 @@ impl From<lune_core::asr::AsrBackendKind> for AsrBackendTypeDto {
         match kind {
             AsrBackendKind::Qwen3Asr => Self::Qwen3Asr,
             AsrBackendKind::OpenAiCompatible => Self::OpenAiCompatible,
+            AsrBackendKind::WhisperCpp => Self::WhisperCpp,
             // `AsrBackendKind` is `#[non_exhaustive]`. The catch-all fires only
             // when a new lune-core variant ships without a matching
             // `AsrBackendTypeDto` variant + arm here. Loud in dev, fall back to
@@ -65,6 +67,45 @@ impl From<AsrBackendTypeDto> for lune_core::asr::AsrBackendKind {
         match dto {
             AsrBackendTypeDto::Qwen3Asr => Self::Qwen3Asr,
             AsrBackendTypeDto::OpenAiCompatible => Self::OpenAiCompatible,
+            AsrBackendTypeDto::WhisperCpp => Self::WhisperCpp,
+        }
+    }
+}
+
+/// Which local whisper.cpp model the WhisperCpp backend uses. Mirrors
+/// [`lune_core::config::WhisperModel`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+pub enum WhisperModelDto {
+    Small,
+    #[default]
+    Medium,
+    LargeV3Turbo,
+}
+
+impl From<lune_core::config::WhisperModel> for WhisperModelDto {
+    fn from(model: lune_core::config::WhisperModel) -> Self {
+        use lune_core::config::WhisperModel;
+        match model {
+            WhisperModel::Small => Self::Small,
+            WhisperModel::Medium => Self::Medium,
+            WhisperModel::LargeV3Turbo => Self::LargeV3Turbo,
+            // `WhisperModel` is `#[non_exhaustive]`: fall back loudly in dev,
+            // safely in release if a new variant ships without an arm here.
+            other => {
+                debug_assert!(false, "unhandled WhisperModel variant {other:?}");
+                Self::Medium
+            }
+        }
+    }
+}
+
+impl From<WhisperModelDto> for lune_core::config::WhisperModel {
+    fn from(dto: WhisperModelDto) -> Self {
+        match dto {
+            WhisperModelDto::Small => Self::Small,
+            WhisperModelDto::Medium => Self::Medium,
+            WhisperModelDto::LargeV3Turbo => Self::LargeV3Turbo,
         }
     }
 }
@@ -205,6 +246,8 @@ pub struct WorkspaceSettingsDto {
     pub openai_asr_base_url: Option<String>,
     pub openai_asr_model: Option<String>,
     pub openai_asr_api_key_set: bool,
+    /// Selected local whisper model (meaningful when asr_backend_type == WhisperCpp).
+    pub whisper_model: WhisperModelDto,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
@@ -285,6 +328,9 @@ pub struct SaveWorkspaceSettingsInput {
     pub openai_asr_base_url: Option<String>,
     pub openai_asr_api_key: Option<String>,
     pub openai_asr_model: Option<String>,
+    /// Selected local whisper model (sent when asr_backend_type == WhisperCpp).
+    #[serde(default)]
+    pub whisper_model: Option<WhisperModelDto>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
