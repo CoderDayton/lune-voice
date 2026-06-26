@@ -236,6 +236,10 @@ The pill receives targeted events so it can react without owning the main sessio
 
 Rust also shows or hides the pill directly on status changes. That avoids a frontend roundtrip for the common start/stop path.
 
+### Sound Cues
+
+Short audio cues play from the Rust backend on the same status transitions — Start on `listening`, Stop when leaving an active state, Error on `error` — deduplicated on the previous status so each fires once. They live in the backend rather than a webview because the main window is destroyed on close (and absent when started minimized) and the pill may not exist; the daemon process is the only surface guaranteed to be alive. Embedded 16-bit mono WAVs are decoded and played through a short-lived `cpal` output stream on a detached thread, with an explicit buffer size to avoid ALSA underruns. Playback is gated by `sound_cues_enabled` / `sound_cue_volume` and every failure is swallowed, so audio never disrupts dictation.
+
 ---
 
 ## D-Bus Interface

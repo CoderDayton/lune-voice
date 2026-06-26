@@ -631,6 +631,115 @@ pub fn set_clipboard(text: &str) -> Result<(), String> {
     pipe_text_to_command(cmd, args, text, CLIPBOARD_TIMEOUT)
 }
 
+/// A byte-for-byte snapshot of the clipboard: the source's preferred MIME type
+/// and its exact bytes.
+///
+/// Wayland/X11 clipboards aren't buffers you can hold a handle to — the data is
+/// served live by the owning app, and the instant we set our own text we seize
+/// ownership with no protocol way to hand it back. So preserving the user's
+/// clipboard means copying its bytes out and re-serving them ourselves.
+/// Capturing the raw bytes of the source's preferred format (rather than
+/// forcing text/plain) round-trips images and other binary content intact. The
+/// one case CLI tooling can't fully reproduce is a single clipboard offering
+/// several independent formats at once — we re-serve only the primary one.
+struct ClipboardSnapshot {
+    /// Empty on X11 — xclip restores the default selection without a target.
+    mime: String,
+    bytes: Vec<u8>,
+}
+
+/// Capture the current clipboard so it can be restored after a paste.
+///
+/// `Ok(None)` means the clipboard is genuinely empty — safe to clear on
+/// restore. `Err` means we couldn't read it reliably: a timeout (e.g. a
+/// multi-MB image exceeding `CLIPBOARD_TIMEOUT`) or a missing tool. The caller
+/// must NOT clear in that case, or it would destroy content it failed to
+/// snapshot. Uses `wl-paste` on Wayland, `xclip -o` on X11.
+fn get_clipboard() -> Result<Option<ClipboardSnapshot>, String> {
+    if is_wayland() {
+        // Pick the source's preferred (first-listed) offered type. A killed or
+        // timed-out child yields None from output_with_timeout → propagate as
+        // Err (don't clear); a clean non-success exit means nothing is copied.
+        let types = output_with_timeout("wl-paste", &["--list-types"], CLIPBOARD_TIMEOUT)
+            .ok_or("wl-paste --list-types failed or timed out")?;
+        if !types.status.success() {
+            return Ok(None);
+        }
+        let mime = match String::from_utf8_lossy(&types.stdout)
+            .lines()
+            .map(str::trim)
+            .find(|l| !l.is_empty())
+        {
+            Some(m) => m.to_owned(),
+            None => return Ok(None),
+        };
+        // Strip wl-paste's appended trailing newline for text only — doing so to
+        // binary (an image whose last byte happens to be 0x0a) would corrupt it.
+        let mut read_args: Vec<&str> = Vec::new();
+        if mime.starts_with("text/") {
+            read_args.push("--no-newline");
+        }
+        read_args.push("--type");
+        read_args.push(&mime);
+        let out = output_with_timeout("wl-paste", &read_args, CLIPBOARD_TIMEOUT)
+            .ok_or("wl-paste --type read failed or timed out")?;
+        if !out.status.success() || out.stdout.is_empty() {
+            return Ok(None);
+        }
+        Ok(Some(ClipboardSnapshot {
+            mime,
+            bytes: out.stdout,
+        }))
+    } else {
+        let out = output_with_timeout(
+            "xclip",
+            &["-selection", "clipboard", "-o"],
+            CLIPBOARD_TIMEOUT,
+        )
+        .ok_or("xclip -o failed or timed out")?;
+        if !out.status.success() || out.stdout.is_empty() {
+            return Ok(None);
+        }
+        Ok(Some(ClipboardSnapshot {
+            mime: String::new(),
+            bytes: out.stdout,
+        }))
+    }
+}
+
+/// Restore a captured clipboard snapshot verbatim.
+fn set_clipboard_snapshot(snap: &ClipboardSnapshot) -> Result<(), String> {
+    if is_wayland() {
+        pipe_bytes_to_command(
+            "wl-copy",
+            &["--type", &snap.mime],
+            &snap.bytes,
+            CLIPBOARD_TIMEOUT,
+        )
+    } else {
+        pipe_bytes_to_command(
+            "xclip",
+            &["-selection", "clipboard"],
+            &snap.bytes,
+            CLIPBOARD_TIMEOUT,
+        )
+    }
+}
+
+/// Empty the clipboard — the restore-to-nothing path when there was no prior
+/// text to put back. `wl-copy --clear` on Wayland; an empty selection on X11.
+fn clear_clipboard() -> Result<(), String> {
+    if is_wayland() {
+        match status_with_timeout("wl-copy", &["--clear"], CLIPBOARD_TIMEOUT) {
+            Some(s) if s.success() => Ok(()),
+            Some(s) => Err(format!("wl-copy --clear exited with {s}")),
+            None => Err("wl-copy --clear failed or timed out".into()),
+        }
+    } else {
+        pipe_text_to_command("xclip", &["-selection", "clipboard"], "", CLIPBOARD_TIMEOUT)
+    }
+}
+
 /// Spawn `cmd` with a piped stdin, write `text`, close the pipe so the
 /// child sees EOF, then poll for exit up to `timeout`. On timeout the
 /// child is killed and an error is returned.
@@ -638,6 +747,17 @@ fn pipe_text_to_command(
     cmd: &str,
     args: &[&str],
     text: &str,
+    timeout: Duration,
+) -> Result<(), String> {
+    pipe_bytes_to_command(cmd, args, text.as_bytes(), timeout)
+}
+
+/// Byte-exact variant of `pipe_text_to_command` — used to restore a captured
+/// clipboard snapshot verbatim, including binary payloads like images.
+fn pipe_bytes_to_command(
+    cmd: &str,
+    args: &[&str],
+    bytes: &[u8],
     timeout: Duration,
 ) -> Result<(), String> {
     let mut child = Command::new(cmd)
@@ -652,7 +772,7 @@ fn pipe_text_to_command(
     // EOF — without this, wl-copy/xclip read forever and we always time out.
     use std::io::Write;
     if let Some(mut stdin) = child.stdin.take() {
-        if let Err(e) = stdin.write_all(text.as_bytes()) {
+        if let Err(e) = stdin.write_all(bytes) {
             // Reap the child explicitly: `Child` does not kill on drop,
             // so without this a misbehaving wl-copy/xclip keeps running.
             let _ = child.kill();
@@ -917,30 +1037,66 @@ impl UinputTyper {
         }
     }
 
-    pub fn type_str(&mut self, text: &str) {
+    /// Returns whether the dictated text is left on the clipboard afterwards
+    /// (true only when `keep_clipboard` and the paste succeeded).
+    pub fn type_str(&mut self, text: &str, keep_clipboard: bool) -> bool {
         let is_terminal = self.resolve_terminal();
-        self.do_clipboard_paste(text, is_terminal, "emitting paste");
+        self.do_clipboard_paste(text, is_terminal, "emitting paste", keep_clipboard)
     }
 
-    pub fn type_str_to(&mut self, text: &str, target: &WindowTarget) {
+    pub fn type_str_to(&mut self, text: &str, target: &WindowTarget, keep_clipboard: bool) -> bool {
         if let Some(ref token) = target.focus_token {
             if !restore_focus(token) {
                 warn!("could not restore focus to original window");
             }
             std::thread::sleep(Duration::from_millis(50));
         }
-        self.do_clipboard_paste(text, target.is_terminal, "emitting paste to target");
+        self.do_clipboard_paste(
+            text,
+            target.is_terminal,
+            "emitting paste to target",
+            keep_clipboard,
+        )
     }
 
     /// Set clipboard, emit the appropriate paste chord, and wait for the
     /// target app to consume it.  Falls back to per-key typing on clipboard
     /// failure.  `label` is passed through to the info log.
-    fn do_clipboard_paste(&mut self, text: &str, is_terminal: bool, label: &str) {
+    ///
+    /// Returns whether the dictated text is left on the clipboard afterwards.
+    fn do_clipboard_paste(
+        &mut self,
+        text: &str,
+        is_terminal: bool,
+        label: &str,
+        keep_clipboard: bool,
+    ) -> bool {
+        // The clipboard is only a transport for the paste chord. Unless the user
+        // opted to keep the dictated text (copy_to_clipboard), snapshot whatever
+        // they had on the clipboard first so we can put it back after the paste —
+        // otherwise every dictation silently overwrites the clipboard. The two
+        // wl-paste calls are bounded by CLIPBOARD_TIMEOUT each; trace the cost so
+        // a slow compositor's snapshot latency is observable.
+        let prior = if keep_clipboard {
+            Ok(None)
+        } else {
+            let snap_start = Instant::now();
+            let snap = get_clipboard();
+            debug!(
+                snapshot_ms = snap_start.elapsed().as_millis() as u64,
+                captured = matches!(snap, Ok(Some(_))),
+                "clipboard snapshot taken"
+            );
+            snap
+        };
+
         let rtt_start = Instant::now();
         if let Err(e) = set_clipboard(text) {
             warn!(error = %e, "clipboard set failed, falling back to per-key typing");
+            // set_clipboard failed, so the prior contents are still intact and
+            // our text never reached the clipboard — nothing to restore.
             self.type_keys_raw(text);
-            return;
+            return false;
         }
         self.paste_delay.record_rtt(rtt_start.elapsed());
 
@@ -956,6 +1112,32 @@ impl UinputTyper {
         );
         self.emit_paste(is_terminal);
         std::thread::sleep(self.paste_delay.delay());
+
+        // Restore the user's clipboard now that the target app has had the
+        // post-paste window to read our text.
+        if !keep_clipboard {
+            match prior {
+                // Had content — put it back byte-for-byte.
+                Ok(Some(prev)) => {
+                    if let Err(e) = set_clipboard_snapshot(&prev) {
+                        warn!(error = %e, "clipboard restore failed; dictated text left on clipboard");
+                    }
+                }
+                // Genuinely empty before — clear our staged text back to empty.
+                Ok(None) => {
+                    if let Err(e) = clear_clipboard() {
+                        warn!(error = %e, "clipboard clear failed; dictated text left on clipboard");
+                    }
+                }
+                // Couldn't read it (timeout / missing tool) — must NOT clear, or
+                // we'd destroy content we failed to snapshot; leave our text.
+                Err(e) => {
+                    warn!(error = %e, "clipboard snapshot failed; dictated text left on clipboard");
+                }
+            }
+        }
+
+        keep_clipboard
     }
 
     /// Per-key typing entry point. Keystrokes are US-QWERTY/ASCII only, so if
@@ -963,13 +1145,19 @@ impl UinputTyper {
     /// (accented, CJK, emoji, smart quotes) the whole string is delivered via
     /// the clipboard instead — non-ASCII transcripts are never silently
     /// dropped.
-    pub fn type_str_keys(&mut self, text: &str) {
+    pub fn type_str_keys(&mut self, text: &str, keep_clipboard: bool) -> bool {
         if !is_keystroke_typeable(text) {
             let is_terminal = self.resolve_terminal();
-            self.do_clipboard_paste(text, is_terminal, "non-ASCII text — emitting paste");
-            return;
+            return self.do_clipboard_paste(
+                text,
+                is_terminal,
+                "non-ASCII text — emitting paste",
+                keep_clipboard,
+            );
         }
+        // Per-key typing never touches the clipboard.
         self.type_keys_raw(text);
+        false
     }
 
     /// Raw per-key emitter. Paced (see `KEY_EVENT_GAP_MS` / `PER_CHAR_GAP_MS`)

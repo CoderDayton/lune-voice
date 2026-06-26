@@ -210,7 +210,7 @@ msgstr "स्थापित मॉडलों की जाँच की ज�
 msgid "Choose a theme"
 msgstr "एक थीम चुनें"
 
-#: src/features/settings/sections/output-section.tsx:13
+#: src/features/settings/sections/output-section.tsx:15
 msgid "Choose how finished text is inserted into the app you are currently using."
 msgstr "चुनें कि आपके द्वारा वर्तमान में उपयोग किए जा रहे ऐप में पूरा टेक्स्ट कैसे डाला जाए।"
 
@@ -277,8 +277,8 @@ msgstr "कॉपी किया गया"
 msgid "Copy"
 msgstr "कॉपी करें"
 
-#: src/features/settings/sections/output-section.tsx:31
-#: src/features/settings/sections/output-section.tsx:39
+#: src/features/settings/sections/output-section.tsx:33
+#: src/features/settings/sections/output-section.tsx:41
 msgid "Copy to clipboard"
 msgstr "क्लिपबोर्ड पर कॉपी करें"
 
@@ -315,6 +315,11 @@ msgstr "नई शैली बनाएं"
 #: src/features/styles/components/style-editor-modal.tsx:58
 msgid "Create style"
 msgstr "शैली बनाएं"
+
+#: src/features/settings/sections/output-section.tsx:62
+#: src/features/settings/sections/output-section.tsx:74
+msgid "Cue volume"
+msgstr ""
 
 #: src/features/settings/components/calibrate-modal.tsx:100
 msgid "Current"
@@ -556,6 +561,10 @@ msgstr "Lune Voice बोलना शुरू होने पर कितन
 msgid "How long finished dictations are kept on this device."
 msgstr "पूर्ण किए गए श्रुतलेख इस डिवाइस पर कितने समय तक रखे जाते हैं।"
 
+#: src/features/settings/sections/output-section.tsx:63
+msgid "How loud the dictation sounds play."
+msgstr ""
+
 #: src/features/settings/sections/input-section.tsx:138
 msgid "How quickly Lune Voice decides you're done speaking. Higher = ends sooner on a pause."
 msgstr "Lune Voice कितनी जल्दी मानता है कि आपने बोलना समाप्त कर दिया है। अधिक मान = विराम पर जल्दी समाप्त होगा।"
@@ -586,7 +595,7 @@ msgstr "स्थापित"
 msgid "Instructions"
 msgstr "निर्देश"
 
-#: src/features/settings/sections/output-section.tsx:32
+#: src/features/settings/sections/output-section.tsx:34
 msgid "Keep the dictated text on the clipboard after every dictation, so you can paste it again yourself."
 msgstr "हर श्रुतलेख के बाद बोले गए पाठ को क्लिपबोर्ड पर रखें, ताकि आप उसे स्वयं फिर से चिपका सकें।"
 
@@ -776,7 +785,7 @@ msgid "Optional"
 msgstr "वैकल्पिक"
 
 #: src/features/overview/overview-page.tsx:108
-#: src/features/settings/sections/output-section.tsx:12
+#: src/features/settings/sections/output-section.tsx:14
 #: src/features/settings/settings-page.tsx:70
 msgid "Output"
 msgstr "आउटपुट"
@@ -790,12 +799,12 @@ msgstr "समग्र प्रगति"
 msgid "Pagination"
 msgstr "पृष्ठ पर अंक लगाना"
 
-#: src/features/settings/sections/output-section.tsx:45
-#: src/features/settings/sections/output-section.tsx:51
+#: src/features/settings/sections/output-section.tsx:85
+#: src/features/settings/sections/output-section.tsx:91
 msgid "Paste compatibility"
 msgstr "चिपकाने की अनुकूलता"
 
-#: src/features/settings/sections/output-section.tsx:18
+#: src/features/settings/sections/output-section.tsx:20
 msgid "Paste is simplest. Typing keystrokes can work better in some apps."
 msgstr "पेस्ट सबसे सरल है. कुछ ऐप्स में कीस्ट्रोक्स टाइप करना बेहतर काम कर सकता है।"
 
@@ -809,6 +818,10 @@ msgstr "विराम संवेदनशीलता"
 #: src/features/dictionary/components/dictionary-table.tsx:257
 msgid "Phrase"
 msgstr "वाक्यांश"
+
+#: src/features/settings/sections/output-section.tsx:47
+msgid "Play a short sound when dictation starts, finishes, or runs into an error."
+msgstr ""
 
 #: src/features/settings/components/calibrate-modal.tsx:18
 msgid "Please call Stella. Ask her to bring these things with her from the store: six spoons of fresh snow peas, five thick slabs of blue cheese, and maybe a snack for her brother Bob."
@@ -960,8 +973,8 @@ msgstr "प्रतिलेख खोजें..."
 msgid "Select required models"
 msgstr "आवश्यक मॉडल चुनें"
 
-#: src/features/settings/sections/output-section.tsx:17
-#: src/features/settings/sections/output-section.tsx:23
+#: src/features/settings/sections/output-section.tsx:19
+#: src/features/settings/sections/output-section.tsx:25
 msgid "Send method"
 msgstr "भेजने की विधि"
 
@@ -1009,6 +1022,11 @@ msgstr "मुख्य सामग्री पर जाएँ"
 #: src/features/settings/components/calibrate-modal.tsx:113
 msgid "Something went wrong."
 msgstr "कुछ गलत हो गया।"
+
+#: src/features/settings/sections/output-section.tsx:46
+#: src/features/settings/sections/output-section.tsx:56
+msgid "Sound cues"
+msgstr ""
 
 #: src/features/overview/overview-page.tsx:132
 msgid "Speaking Time"
@@ -1227,7 +1245,7 @@ msgstr "क्या शॉर्टकट रिकॉर्डिंग को
 msgid "Which input device dictation captures from. Changes apply right away."
 msgstr "श्रुतलेख किस इनपुट डिवाइस से कैप्चर करता है। बदलाव तुरंत लागू होते हैं।"
 
-#: src/features/settings/sections/output-section.tsx:46
+#: src/features/settings/sections/output-section.tsx:86
 msgid "Which paste shortcut to send. Automatic detects terminals; override if paste lands in the wrong place."
 msgstr "कौन सा पेस्ट शॉर्टकट भेजना है। 'स्वचालित' टर्मिनलों का पता लगाता है; यदि पेस्ट गलत जगह पहुँचे तो ओवरराइड करें।"
 

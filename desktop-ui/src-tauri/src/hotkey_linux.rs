@@ -139,13 +139,14 @@ fn run_listener(live: Arc<LiveHotkeyConfig>, cmd_tx: mpsc::Sender<HotkeyAction>)
         "keyboard devices opened for hotkey detection"
     );
 
-    let mut passthrough = match build_passthrough_device() {
+    let passthrough = match build_passthrough_device() {
         Ok(dev) => dev,
         Err(e) => {
             warn!(error = %e, "failed to create passthrough device; hotkey grab disabled");
             return;
         }
     };
+    let mut fwd = Forwarder::new(passthrough);
 
     let (event_tx, event_rx) = std_mpsc::channel::<(InputEvent, bool)>();
 
@@ -177,7 +178,7 @@ fn run_listener(live: Arc<LiveHotkeyConfig>, cmd_tx: mpsc::Sender<HotkeyAction>)
     for (raw, grabbed) in event_rx {
         if raw.event_type() != EventType::KEY {
             if grabbed {
-                forward(&mut passthrough, raw);
+                fwd.forward(raw);
             }
             continue;
         }
@@ -188,7 +189,7 @@ fn run_listener(live: Arc<LiveHotkeyConfig>, cmd_tx: mpsc::Sender<HotkeyAction>)
         // Auto-repeat
         if value == 2 {
             if grabbed && !consumed.contains(code) && !combo_mod_codes.contains(code) {
-                forward(&mut passthrough, raw);
+                fwd.forward(raw);
             }
             continue;
         }
@@ -219,51 +220,21 @@ fn run_listener(live: Arc<LiveHotkeyConfig>, cmd_tx: mpsc::Sender<HotkeyAction>)
             continue;
         }
 
-        // Defer combo modifier presses. If the modifier press itself
-        // completes a hotkey (trigger key was already down), drop the
-        // deferred queue and dispatch the action instead of forwarding
-        // the modifier through to apps. Without this, the Start action
-        // is silently dropped and the next release emits a stray Stop.
-        if pressed && combo_mod_codes.contains(code) {
-            deferred.push(raw);
-            if let Some(action) = state.handle(code, pressed, activation_mode) {
-                deferred.clear();
-                consumed.insert(code);
-                dispatch(action, &cmd_tx);
-            }
-            continue;
-        }
-
-        let action = state.handle(code, pressed, activation_mode);
-
-        match action {
-            Some(HotkeyAction::Cancel) => {
-                flush(&mut passthrough, &mut deferred);
-                dispatch(HotkeyAction::Cancel, &cmd_tx);
-                forward(&mut passthrough, raw);
-            }
-            Some(a) => {
-                deferred.clear();
-                if pressed {
-                    consumed.insert(code);
-                } else {
-                    consumed.remove(code);
-                }
-                dispatch(a, &cmd_tx);
-            }
-            None if !pressed && consumed.contains(code) => {
-                consumed.remove(code);
-            }
-            None if !pressed && combo_mod_codes.contains(code) => {
-                flush(&mut passthrough, &mut deferred);
-                forward(&mut passthrough, raw);
-            }
-            None => {
-                flush(&mut passthrough, &mut deferred);
-                forward(&mut passthrough, raw);
-            }
+        if let Some(action) = process_grabbed_key(
+            raw,
+            code,
+            pressed,
+            &mut state,
+            &mut fwd,
+            &mut consumed,
+            &mut deferred,
+            &combo_mod_codes,
+            activation_mode,
+        ) {
+            dispatch(action, &cmd_tx);
         }
     }
+    fwd.release_all();
     info!("all keyboard devices disconnected; hotkey listener exiting");
 }
 
@@ -274,16 +245,139 @@ fn dispatch(action: HotkeyAction, tx: &mpsc::Sender<HotkeyAction>) {
     }
 }
 
-#[inline]
-fn flush(passthrough: &mut VirtualDevice, deferred: &mut Vec<InputEvent>) {
-    for ev in deferred.drain(..) {
-        forward(passthrough, ev);
+/// A destination for re-injected key events: the real uinput `VirtualDevice`
+/// in production, a recorder in tests.
+trait KeySink {
+    fn send_event(&mut self, event: InputEvent);
+}
+
+impl KeySink for VirtualDevice {
+    fn send_event(&mut self, event: InputEvent) {
+        let _ = self.emit(&[event, InputEvent::new(EventType::SYNCHRONIZATION.0, 0, 0)]);
     }
 }
 
-#[inline]
-fn forward(passthrough: &mut VirtualDevice, event: InputEvent) {
-    let _ = passthrough.emit(&[event, InputEvent::new(EventType::SYNCHRONIZATION.0, 0, 0)]);
+/// Wraps the passthrough sink and tracks which key codes were forwarded as
+/// currently-down. This guards two invariants:
+///   1. A release is never swallowed for a key whose press we forwarded — that
+///      would strand the key down in apps (a stuck modifier).
+///   2. On listener exit, every still-down forwarded key gets a synthetic
+///      release, so a teardown mid-hold can't leave a key wedged.
+struct Forwarder<S: KeySink> {
+    sink: S,
+    down: PressedCodes,
+}
+
+impl<S: KeySink> Forwarder<S> {
+    fn new(sink: S) -> Self {
+        Self {
+            sink,
+            down: PressedCodes::default(),
+        }
+    }
+
+    /// Forward an event, recording key press/release in the forwarded-down set.
+    fn forward(&mut self, event: InputEvent) {
+        if event.event_type() == EventType::KEY {
+            let code = KeyCode(event.code());
+            match event.value() {
+                1 => self.down.insert(code),
+                0 => self.down.remove(code),
+                _ => {}
+            }
+        }
+        self.sink.send_event(event);
+    }
+
+    fn flush(&mut self, deferred: &mut Vec<InputEvent>) {
+        for ev in deferred.drain(..) {
+            self.forward(ev);
+        }
+    }
+
+    /// Whether a press for `code` was forwarded without a matching release.
+    fn is_down(&self, code: KeyCode) -> bool {
+        self.down.contains(code)
+    }
+
+    /// Emit a synthetic release for every still-down forwarded key. Called on
+    /// listener exit so a teardown while keys are held can't strand them.
+    fn release_all(&mut self) {
+        for code in self.down.drain_codes() {
+            self.sink
+                .send_event(InputEvent::new(EventType::KEY.0, code.code(), 0));
+        }
+    }
+}
+
+/// Handle one non-repeat key event from a grabbed device: drive the state
+/// machine and forward or swallow the raw event through `fwd`. Returns the
+/// action to dispatch, if any.
+#[allow(clippy::too_many_arguments)]
+fn process_grabbed_key<S: KeySink>(
+    raw: InputEvent,
+    code: KeyCode,
+    pressed: bool,
+    state: &mut HotkeyState,
+    fwd: &mut Forwarder<S>,
+    consumed: &mut PressedCodes,
+    deferred: &mut Vec<InputEvent>,
+    combo_mod_codes: &PressedCodes,
+    mode: ActivationMode,
+) -> Option<HotkeyAction> {
+    // Defer combo modifier presses. If the modifier press itself completes a
+    // hotkey (trigger key was already down), drop the deferred queue and
+    // dispatch the action instead of forwarding the modifier through to apps.
+    // Without this, the Start action is silently dropped and the next release
+    // emits a stray Stop.
+    if pressed && combo_mod_codes.contains(code) {
+        deferred.push(raw);
+        if let Some(action) = state.handle(code, pressed, mode) {
+            deferred.clear();
+            consumed.insert(code);
+            return Some(action);
+        }
+        return None;
+    }
+
+    match state.handle(code, pressed, mode) {
+        Some(HotkeyAction::Cancel) => {
+            fwd.flush(deferred);
+            fwd.forward(raw);
+            Some(HotkeyAction::Cancel)
+        }
+        Some(a) => {
+            deferred.clear();
+            if pressed {
+                consumed.insert(code);
+            } else {
+                consumed.remove(code);
+                // Keep apps balanced: if this key's press reached them, its
+                // release must too, or the action just stranded it down.
+                if fwd.is_down(code) {
+                    fwd.forward(raw);
+                }
+            }
+            Some(a)
+        }
+        None if !pressed && consumed.contains(code) => {
+            consumed.remove(code);
+            if fwd.is_down(code) {
+                fwd.forward(raw);
+            }
+            None
+        }
+        None if !pressed && combo_mod_codes.contains(code) => {
+            fwd.flush(deferred);
+            fwd.forward(raw);
+            None
+        }
+        None => {
+            fwd.flush(deferred);
+            fwd.forward(raw);
+            None
+        }
+    }
 }
 
 // ─── Device enumeration ──────────────────────────────────────────────────────
@@ -640,11 +734,42 @@ impl PressedCodes {
         let i = c.code() as usize;
         i < LIMIT && (self.w[i / 64] >> (i % 64)) & 1 != 0
     }
+    /// Drain all set codes, clearing the set. Used to release every key still
+    /// marked down on listener exit.
+    fn drain_codes(&mut self) -> Vec<KeyCode> {
+        let mut codes = Vec::new();
+        for (wi, word) in self.w.iter_mut().enumerate() {
+            let mut bits = *word;
+            while bits != 0 {
+                let b = bits.trailing_zeros() as usize;
+                bits &= bits - 1;
+                codes.push(KeyCode((wi * 64 + b) as u16));
+            }
+            *word = 0;
+        }
+        codes
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn ev(code: KeyCode, pressed: bool) -> InputEvent {
+        InputEvent::new(EventType::KEY.0, code.code(), if pressed { 1 } else { 0 })
+    }
+
+    /// A `KeySink` that records the (code, value) of every event it receives.
+    #[derive(Default)]
+    struct Recorder {
+        events: Vec<(u16, i32)>,
+    }
+
+    impl KeySink for Recorder {
+        fn send_event(&mut self, event: InputEvent) {
+            self.events.push((event.code(), event.value()));
+        }
+    }
 
     fn ctrl_space_state() -> HotkeyState {
         HotkeyState::new(
@@ -754,5 +879,104 @@ mod tests {
         assert!(!is_typing_keyboard_caps(true, true, true, true, true));
         // A media/macro pad without Enter → reject.
         assert!(!is_typing_keyboard_caps(true, true, true, false, false));
+    }
+
+    #[test]
+    fn forwarded_modifier_release_is_not_swallowed_by_action() {
+        // Hold mode, Ctrl+Space. The user holds Ctrl for an unrelated chord
+        // (Ctrl+X) — leaking Ctrl-down through to apps — then triggers
+        // dictation and releases Ctrl first. The Stop action must not eat the
+        // Ctrl release, or Ctrl stays stuck down in every app.
+        let m = ActivationMode::Hold;
+        let combo = build_combo_mods(&[Modifier::Ctrl]);
+        let mut state = ctrl_space_state();
+        let mut fwd = Forwarder::new(Recorder::default());
+        let mut consumed = PressedCodes::default();
+        let mut deferred: Vec<InputEvent> = Vec::new();
+
+        let ctrl = KeyCode::KEY_LEFTCTRL;
+        let x = KeyCode::KEY_X;
+        let space = KeyCode::KEY_SPACE;
+
+        let step = |code: KeyCode,
+                    pressed: bool,
+                    state: &mut HotkeyState,
+                    fwd: &mut Forwarder<Recorder>,
+                    consumed: &mut PressedCodes,
+                    deferred: &mut Vec<InputEvent>| {
+            process_grabbed_key(
+                ev(code, pressed),
+                code,
+                pressed,
+                state,
+                fwd,
+                consumed,
+                deferred,
+                &combo,
+                m,
+            )
+        };
+
+        // Ctrl down — deferred, not yet forwarded.
+        step(
+            ctrl,
+            true,
+            &mut state,
+            &mut fwd,
+            &mut consumed,
+            &mut deferred,
+        );
+        // X down — flushes the deferred Ctrl down, then X, to apps.
+        step(x, true, &mut state, &mut fwd, &mut consumed, &mut deferred);
+        assert!(fwd.is_down(ctrl), "Ctrl press should have reached apps");
+
+        // Space down — completes the combo: Start.
+        let start = step(
+            space,
+            true,
+            &mut state,
+            &mut fwd,
+            &mut consumed,
+            &mut deferred,
+        );
+        assert!(matches!(start, Some(HotkeyAction::Start)));
+
+        // Release Ctrl first — Hold mode emits Stop.
+        let stop = step(
+            ctrl,
+            false,
+            &mut state,
+            &mut fwd,
+            &mut consumed,
+            &mut deferred,
+        );
+        assert!(matches!(stop, Some(HotkeyAction::Stop)));
+
+        // The release must have reached apps, balancing the earlier press.
+        assert!(
+            !fwd.is_down(ctrl),
+            "Ctrl release was swallowed by Stop — Ctrl is stuck down"
+        );
+    }
+
+    #[test]
+    fn release_all_releases_every_forwarded_down_key() {
+        let mut fwd = Forwarder::new(Recorder::default());
+        fwd.forward(ev(KeyCode::KEY_LEFTCTRL, true));
+        fwd.forward(ev(KeyCode::KEY_A, true));
+        fwd.forward(ev(KeyCode::KEY_A, false));
+        assert!(fwd.is_down(KeyCode::KEY_LEFTCTRL));
+        assert!(!fwd.is_down(KeyCode::KEY_A));
+
+        fwd.release_all();
+
+        assert!(!fwd.is_down(KeyCode::KEY_LEFTCTRL));
+        assert!(
+            fwd.sink
+                .events
+                .iter()
+                .any(|&(c, v)| c == KeyCode::KEY_LEFTCTRL.code() && v == 0),
+            "expected a synthetic Ctrl release"
+        );
     }
 }

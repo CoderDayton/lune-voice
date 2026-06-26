@@ -46,6 +46,8 @@ First launch downloads ~1.8 GB of models to your machine. After that, the entire
 
 **Session history you can search** — Every dictation is logged with its transcript, timing, and style. Go back and find that thing you said yesterday.
 
+**Audio cues, if you want them** — A short sound when dictation starts, finishes, or hits an error, so you know the app's state without looking. Toggle it off or set the volume to taste.
+
 <br>
 
 ## Pricing

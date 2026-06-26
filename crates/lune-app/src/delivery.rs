@@ -173,24 +173,37 @@ fn delivery_thread(
         *busy_until.lock().unwrap_or_else(|e| e.into_inner()) =
             Some(Instant::now() + Duration::from_secs(3600));
 
-        match msg.mode {
-            DictationMode::TypeInPlace => driver.type_keys(text),
+        // Paste delivery borrows the clipboard as a transport for the Ctrl+V
+        // chord. Tell the driver whether to keep the dictated text afterwards
+        // (copy_to_clipboard) or restore the user's previous clipboard — without
+        // this the uinput path silently overwrites the clipboard on every
+        // dictation (the IBus path commits directly and never touches it).
+        let keep_clipboard = msg.copy_to_clipboard;
+        // Delivery returns whether the dictated text now sits on the clipboard,
+        // so the explicit copy below can skip re-setting it (the uinput paste
+        // path with copy_to_clipboard on already leaves it there).
+        let clipboard_has_text = match msg.mode {
+            DictationMode::TypeInPlace => driver.type_keys(text, keep_clipboard),
             _ => {
                 #[cfg(unix)]
-                if let Some(ref target) = msg.target {
-                    driver.type_text_to(text, target);
-                } else {
-                    driver.type_text(text);
+                {
+                    if let Some(ref target) = msg.target {
+                        driver.type_text_to(text, target, keep_clipboard)
+                    } else {
+                        driver.type_text(text, keep_clipboard)
+                    }
                 }
                 #[cfg(not(unix))]
-                driver.type_text(text);
+                {
+                    driver.type_text(text, keep_clipboard)
+                }
             }
-        }
-        // Orthogonal copy toggle: leave the dictated text on the clipboard after
-        // delivery, regardless of send method. (The paste path already sets it on
-        // the uinput backend; this makes it explicit and backend-agnostic — e.g.
-        // IBus commits directly and never touches the clipboard otherwise.)
-        if msg.copy_to_clipboard {
+        };
+        // Orthogonal copy toggle: ensure the dictated text lands on the clipboard
+        // when requested, for paths that didn't already place it there (IBus
+        // commit, per-key typing). Skipped when delivery already left it, so we
+        // don't redundantly re-set the clipboard (a wasted subprocess).
+        if msg.copy_to_clipboard && !clipboard_has_text {
             if let Err(e) = driver.copy_to_clipboard(text) {
                 warn!(error = %e, "clipboard copy failed");
             }
@@ -258,31 +271,48 @@ impl PlatformDriver {
         }
     }
 
-    fn type_text(&mut self, text: &str) {
+    /// Returns whether the dictated text is left on the clipboard afterwards.
+    fn type_text(&mut self, text: &str, keep_clipboard: bool) -> bool {
         match &mut self.backend {
+            // IBus commits directly to the input context — no clipboard, so the
+            // keep/restore flag is irrelevant and the text is never staged there.
             #[cfg(target_os = "linux")]
-            LinuxBackend::Ibus(t) => t.commit_text(text),
-            LinuxBackend::Uinput(t) => t.type_str(text),
+            LinuxBackend::Ibus(t) => {
+                t.commit_text(text);
+                false
+            }
+            LinuxBackend::Uinput(t) => t.type_str(text, keep_clipboard),
         }
     }
 
-    fn type_text_to(&mut self, text: &str, target: &crate::uinput_typer::WindowTarget) {
+    fn type_text_to(
+        &mut self,
+        text: &str,
+        target: &crate::uinput_typer::WindowTarget,
+        keep_clipboard: bool,
+    ) -> bool {
         match &mut self.backend {
             // IBus commits to the focused input context directly; the captured
             // WindowTarget (for focus restoration) is only needed by uinput.
             #[cfg(target_os = "linux")]
-            LinuxBackend::Ibus(t) => t.commit_text(text),
-            LinuxBackend::Uinput(t) => t.type_str_to(text, target),
+            LinuxBackend::Ibus(t) => {
+                t.commit_text(text);
+                false
+            }
+            LinuxBackend::Uinput(t) => t.type_str_to(text, target, keep_clipboard),
         }
     }
 
-    fn type_keys(&mut self, text: &str) {
+    fn type_keys(&mut self, text: &str, keep_clipboard: bool) -> bool {
         match &mut self.backend {
             // IBus commits Unicode directly — no US-QWERTY restriction, so
             // type-in-place of accented/CJK text "just works".
             #[cfg(target_os = "linux")]
-            LinuxBackend::Ibus(t) => t.commit_text(text),
-            LinuxBackend::Uinput(t) => t.type_str_keys(text),
+            LinuxBackend::Ibus(t) => {
+                t.commit_text(text);
+                false
+            }
+            LinuxBackend::Uinput(t) => t.type_str_keys(text, keep_clipboard),
         }
     }
 
@@ -318,18 +348,21 @@ impl PlatformDriver {
         }
     }
 
-    fn type_text(&mut self, text: &str) {
-        // Set clipboard, then emit paste keystroke
+    /// Returns whether the dictated text is left on the clipboard afterwards.
+    fn type_text(&mut self, text: &str, keep_clipboard: bool) -> bool {
+        // Set clipboard, then emit paste keystroke. (macOS/Windows keep the
+        // dictated text on the clipboard regardless; restore is Linux-only.)
         if let Err(e) = self.clipboard.set_text(text) {
             warn!(error = %e, "clipboard set failed, falling back to per-key typing");
-            self.type_keys(text);
-            return;
+            return self.type_keys(text, keep_clipboard);
         }
 
         // Small delay for clipboard to settle
         std::thread::sleep(std::time::Duration::from_millis(30));
 
         self.emit_paste();
+        // The dictated text remains on the clipboard as the paste source.
+        true
     }
 
     fn emit_paste(&mut self) {
@@ -347,13 +380,15 @@ impl PlatformDriver {
         let _ = self.enigo.key(modifier, Direction::Release);
     }
 
-    fn type_keys(&mut self, text: &str) {
+    /// Per-key typing never touches the clipboard, so it always returns `false`.
+    fn type_keys(&mut self, text: &str, _keep_clipboard: bool) -> bool {
         use enigo::Keyboard;
 
         // Fallback: type each character directly
         if let Err(e) = self.enigo.text(text) {
             warn!(error = %e, "per-key typing failed");
         }
+        false
     }
 
     fn copy_to_clipboard(&mut self, text: &str) -> Result<(), String> {

@@ -210,7 +210,7 @@ msgstr "설치된 모델을 확인하는 중…"
 msgid "Choose a theme"
 msgstr "테마를 선택하세요"
 
-#: src/features/settings/sections/output-section.tsx:13
+#: src/features/settings/sections/output-section.tsx:15
 msgid "Choose how finished text is inserted into the app you are currently using."
 msgstr "현재 사용 중인 앱에 완성된 텍스트를 삽입하는 방법을 선택하세요."
 
@@ -277,8 +277,8 @@ msgstr "복사됨"
 msgid "Copy"
 msgstr "복사"
 
-#: src/features/settings/sections/output-section.tsx:31
-#: src/features/settings/sections/output-section.tsx:39
+#: src/features/settings/sections/output-section.tsx:33
+#: src/features/settings/sections/output-section.tsx:41
 msgid "Copy to clipboard"
 msgstr "클립보드에 복사"
 
@@ -315,6 +315,11 @@ msgstr "새로운 스타일 만들기"
 #: src/features/styles/components/style-editor-modal.tsx:58
 msgid "Create style"
 msgstr "스타일 만들기"
+
+#: src/features/settings/sections/output-section.tsx:62
+#: src/features/settings/sections/output-section.tsx:74
+msgid "Cue volume"
+msgstr ""
 
 #: src/features/settings/components/calibrate-modal.tsx:100
 msgid "Current"
@@ -556,6 +561,10 @@ msgstr "말하기 시작할 때 Lune Voice가 얼마나 쉽게 반응하는지�
 msgid "How long finished dictations are kept on this device."
 msgstr "완료된 받아쓰기를 이 기기에 보관하는 기간입니다."
 
+#: src/features/settings/sections/output-section.tsx:63
+msgid "How loud the dictation sounds play."
+msgstr ""
+
 #: src/features/settings/sections/input-section.tsx:138
 msgid "How quickly Lune Voice decides you're done speaking. Higher = ends sooner on a pause."
 msgstr "Lune Voice가 말하기가 끝났다고 판단하는 속도입니다. 값이 높을수록 멈췄을 때 더 빨리 종료합니다."
@@ -586,7 +595,7 @@ msgstr "설치됨"
 msgid "Instructions"
 msgstr "지침"
 
-#: src/features/settings/sections/output-section.tsx:32
+#: src/features/settings/sections/output-section.tsx:34
 msgid "Keep the dictated text on the clipboard after every dictation, so you can paste it again yourself."
 msgstr "받아쓰기를 할 때마다 받아쓴 텍스트를 클립보드에 유지하여 직접 다시 붙여넣을 수 있도록 합니다."
 
@@ -776,7 +785,7 @@ msgid "Optional"
 msgstr "선택 과목"
 
 #: src/features/overview/overview-page.tsx:108
-#: src/features/settings/sections/output-section.tsx:12
+#: src/features/settings/sections/output-section.tsx:14
 #: src/features/settings/settings-page.tsx:70
 msgid "Output"
 msgstr "산출"
@@ -790,12 +799,12 @@ msgstr "전반적인 진행 상황"
 msgid "Pagination"
 msgstr "쪽수 매기기"
 
-#: src/features/settings/sections/output-section.tsx:45
-#: src/features/settings/sections/output-section.tsx:51
+#: src/features/settings/sections/output-section.tsx:85
+#: src/features/settings/sections/output-section.tsx:91
 msgid "Paste compatibility"
 msgstr "붙여넣기 호환성"
 
-#: src/features/settings/sections/output-section.tsx:18
+#: src/features/settings/sections/output-section.tsx:20
 msgid "Paste is simplest. Typing keystrokes can work better in some apps."
 msgstr "붙여넣기가 가장 간단합니다. 일부 앱에서는 키 입력이 더 잘 작동할 수 있습니다."
 
@@ -809,6 +818,10 @@ msgstr "일시 정지 감도"
 #: src/features/dictionary/components/dictionary-table.tsx:257
 msgid "Phrase"
 msgstr "구절"
+
+#: src/features/settings/sections/output-section.tsx:47
+msgid "Play a short sound when dictation starts, finishes, or runs into an error."
+msgstr ""
 
 #: src/features/settings/components/calibrate-modal.tsx:18
 msgid "Please call Stella. Ask her to bring these things with her from the store: six spoons of fresh snow peas, five thick slabs of blue cheese, and maybe a snack for her brother Bob."
@@ -960,8 +973,8 @@ msgstr "받아쓰기 텍스트 검색…"
 msgid "Select required models"
 msgstr "필수 모델 선택"
 
-#: src/features/settings/sections/output-section.tsx:17
-#: src/features/settings/sections/output-section.tsx:23
+#: src/features/settings/sections/output-section.tsx:19
+#: src/features/settings/sections/output-section.tsx:25
 msgid "Send method"
 msgstr "전송 방법"
 
@@ -1009,6 +1022,11 @@ msgstr "주요 콘텐츠로 건너뛰기"
 #: src/features/settings/components/calibrate-modal.tsx:113
 msgid "Something went wrong."
 msgstr "문제가 발생했습니다."
+
+#: src/features/settings/sections/output-section.tsx:46
+#: src/features/settings/sections/output-section.tsx:56
+msgid "Sound cues"
+msgstr ""
 
 #: src/features/overview/overview-page.tsx:132
 msgid "Speaking Time"
@@ -1227,7 +1245,7 @@ msgstr "단축키가 녹음을 전환하는지 아니면 누르고 있는 동안
 msgid "Which input device dictation captures from. Changes apply right away."
 msgstr "받아쓰기가 캡처하는 입력 장치. 변경 사항은 즉시 적용됩니다."
 
-#: src/features/settings/sections/output-section.tsx:46
+#: src/features/settings/sections/output-section.tsx:86
 msgid "Which paste shortcut to send. Automatic detects terminals; override if paste lands in the wrong place."
 msgstr "보낼 붙여넣기 단축키. '자동'은 터미널을 감지합니다. 붙여넣기가 잘못된 위치에 들어가면 재정의하세요."
 

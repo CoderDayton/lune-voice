@@ -48,7 +48,7 @@ Settings mutability tiers:
 
 | Tier | When Applied | Fields |
 |------|-------------|--------|
-| **Hot** | Immediately (watch channel) | `dictation_mode`, `activation_mode`, `pill_visibility`, `terminal_mode` |
+| **Hot** | Immediately (watch channel) | `dictation_mode`, `activation_mode`, `pill_visibility`, `terminal_mode`, `sound_cues_enabled`, `sound_cue_volume` |
 | **Warm** | Next session start | `default_style`, `language`, `dictation_language`, `vad_pcen`, `mic_prewarm` |
 | **Cold** | Persist only | `privacy_mode`, `session_history_days`, `start_minimized`, `hotkey` |
 | **Reload** | Before next session | `asr_backend`, `llm_backend`, `device` |
@@ -81,6 +81,8 @@ dictation_mode = "TypeInPlace"
 activation_mode = "Toggle"
 pill_visibility = "Always"
 terminal_mode = "Auto"
+sound_cues_enabled = true
+sound_cue_volume = 1.0
 session_history_days = 30
 mic_prewarm = true
 vad_pcen = true

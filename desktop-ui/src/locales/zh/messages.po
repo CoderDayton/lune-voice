@@ -210,7 +210,7 @@ msgstr "检查已安装的型号..."
 msgid "Choose a theme"
 msgstr "选择一个主题"
 
-#: src/features/settings/sections/output-section.tsx:13
+#: src/features/settings/sections/output-section.tsx:15
 msgid "Choose how finished text is inserted into the app you are currently using."
 msgstr "选择如何将完成的文本插入到您当前使用的应用程序中。"
 
@@ -277,8 +277,8 @@ msgstr "已复制"
 msgid "Copy"
 msgstr "复制"
 
-#: src/features/settings/sections/output-section.tsx:31
-#: src/features/settings/sections/output-section.tsx:39
+#: src/features/settings/sections/output-section.tsx:33
+#: src/features/settings/sections/output-section.tsx:41
 msgid "Copy to clipboard"
 msgstr "复制到剪贴板"
 
@@ -315,6 +315,11 @@ msgstr "创造新风格"
 #: src/features/styles/components/style-editor-modal.tsx:58
 msgid "Create style"
 msgstr "创造风格"
+
+#: src/features/settings/sections/output-section.tsx:62
+#: src/features/settings/sections/output-section.tsx:74
+msgid "Cue volume"
+msgstr ""
 
 #: src/features/settings/components/calibrate-modal.tsx:100
 msgid "Current"
@@ -556,6 +561,10 @@ msgstr "Lune Voice 在语音上触发的容易程度。较高 = 开始时较安�
 msgid "How long finished dictations are kept on this device."
 msgstr "已完成的听写在此设备上保留的时长。"
 
+#: src/features/settings/sections/output-section.tsx:63
+msgid "How loud the dictation sounds play."
+msgstr ""
+
 #: src/features/settings/sections/input-section.tsx:138
 msgid "How quickly Lune Voice decides you're done speaking. Higher = ends sooner on a pause."
 msgstr "Lune Voice 多快就能确定您已经讲完。更高=暂停时更快结束。"
@@ -586,7 +595,7 @@ msgstr "已安装"
 msgid "Instructions"
 msgstr "指示"
 
-#: src/features/settings/sections/output-section.tsx:32
+#: src/features/settings/sections/output-section.tsx:34
 msgid "Keep the dictated text on the clipboard after every dictation, so you can paste it again yourself."
 msgstr "每次听写后将听写的文本保留在剪贴板中，以便您自己再次粘贴。"
 
@@ -776,7 +785,7 @@ msgid "Optional"
 msgstr "选修的"
 
 #: src/features/overview/overview-page.tsx:108
-#: src/features/settings/sections/output-section.tsx:12
+#: src/features/settings/sections/output-section.tsx:14
 #: src/features/settings/settings-page.tsx:70
 msgid "Output"
 msgstr "输出"
@@ -790,12 +799,12 @@ msgstr "总体进展"
 msgid "Pagination"
 msgstr "分页"
 
-#: src/features/settings/sections/output-section.tsx:45
-#: src/features/settings/sections/output-section.tsx:51
+#: src/features/settings/sections/output-section.tsx:85
+#: src/features/settings/sections/output-section.tsx:91
 msgid "Paste compatibility"
 msgstr "粘贴兼容性"
 
-#: src/features/settings/sections/output-section.tsx:18
+#: src/features/settings/sections/output-section.tsx:20
 msgid "Paste is simplest. Typing keystrokes can work better in some apps."
 msgstr "粘贴最简单。在某些应用程序中，键入按键效果会更好。"
 
@@ -809,6 +818,10 @@ msgstr "暂停灵敏度"
 #: src/features/dictionary/components/dictionary-table.tsx:257
 msgid "Phrase"
 msgstr "短语"
+
+#: src/features/settings/sections/output-section.tsx:47
+msgid "Play a short sound when dictation starts, finishes, or runs into an error."
+msgstr ""
 
 #: src/features/settings/components/calibrate-modal.tsx:18
 msgid "Please call Stella. Ask her to bring these things with her from the store: six spoons of fresh snow peas, five thick slabs of blue cheese, and maybe a snack for her brother Bob."
@@ -960,8 +973,8 @@ msgstr "搜索成绩单..."
 msgid "Select required models"
 msgstr "选择需要的型号"
 
-#: src/features/settings/sections/output-section.tsx:17
-#: src/features/settings/sections/output-section.tsx:23
+#: src/features/settings/sections/output-section.tsx:19
+#: src/features/settings/sections/output-section.tsx:25
 msgid "Send method"
 msgstr "发送方式"
 
@@ -1009,6 +1022,11 @@ msgstr "跳至主要内容"
 #: src/features/settings/components/calibrate-modal.tsx:113
 msgid "Something went wrong."
 msgstr "出了点问题。"
+
+#: src/features/settings/sections/output-section.tsx:46
+#: src/features/settings/sections/output-section.tsx:56
+msgid "Sound cues"
+msgstr ""
 
 #: src/features/overview/overview-page.tsx:132
 msgid "Speaking Time"
@@ -1227,7 +1245,7 @@ msgstr "快捷键是切换录音还是仅在按住时有效。在「输入」中
 msgid "Which input device dictation captures from. Changes apply right away."
 msgstr "听写从哪个输入设备采集。更改会立即生效。"
 
-#: src/features/settings/sections/output-section.tsx:46
+#: src/features/settings/sections/output-section.tsx:86
 msgid "Which paste shortcut to send. Automatic detects terminals; override if paste lands in the wrong place."
 msgstr "发送哪个粘贴快捷键。「自动」会检测终端；如果粘贴出现在错误的位置，请覆盖。"
 

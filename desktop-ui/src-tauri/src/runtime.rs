@@ -742,20 +742,25 @@ impl AppRuntime {
         }
     }
 
+    /// Play a dictation sound cue if cues are enabled, at the saved volume.
+    async fn play_cue(&self, cue: lune_app::sound::Cue) {
+        let (enabled, volume) = {
+            let s = self.inner.settings.read().await;
+            (s.sound_cues_enabled, s.sound_cue_volume)
+        };
+        if enabled {
+            lune_app::sound::play(cue, volume);
+        }
+    }
+
     async fn publish_status(&self, status: &str) {
         let prev = std::mem::replace(&mut *self.inner.status.write().await, status.to_owned());
 
-        // Sound cues, played from the backend because it is the only surface
-        // guaranteed to be alive: the main window is destroyed on close (and
-        // absent when started minimized) and the pill may not exist.
+        // Sound cues play from the backend — the only surface guaranteed alive
+        // (the main window is destroyed on close / absent when minimized, and
+        // the pill may not exist).
         if let Some(cue) = cue_for_transition(&prev, status) {
-            let (enabled, volume) = {
-                let s = self.inner.settings.read().await;
-                (s.sound_cues_enabled, s.sound_cue_volume)
-            };
-            if enabled {
-                lune_app::sound::play(cue, volume);
-            }
+            self.play_cue(cue).await;
         }
 
         self.push_session_event(SessionStreamEvent::ServiceStatus {
@@ -1396,13 +1401,19 @@ fn reconcile_prewarm(
 
 /// Map a service-status transition to the sound cue that should play, or
 /// `None`. Dedups on the previous status so each cue fires once — "listening"
-/// is published both optimistically and again on `SessionEvent::Started`, and
-/// "ready"/"error" can repeat without a fresh dictation.
+/// is published both optimistically and again on `SessionEvent::Started`.
+///
+/// The Stop cue fires on `listening -> processing`, i.e. the moment recording
+/// ends. `SessionEvent::Processing` is emitted once by the session for every
+/// way capture can end — key release, toggle-off, max-speech cutoff — and
+/// never on cancel, so this single transition covers them all. It also lands
+/// well before ASR/LLM/delivery, so the cue is immediate, not "after the text
+/// appears" (which is the later "ready" transition).
 fn cue_for_transition(prev: &str, status: &str) -> Option<lune_app::sound::Cue> {
     use lune_app::sound::Cue;
     match status {
         "listening" if prev != "listening" => Some(Cue::Start),
-        "ready" if prev == "listening" || prev == "processing" => Some(Cue::Stop),
+        "processing" if prev == "listening" => Some(Cue::Stop),
         "error" if prev != "error" => Some(Cue::Error),
         _ => None,
     }
@@ -1430,11 +1441,21 @@ mod tests {
     }
 
     #[test]
-    fn stop_cue_only_when_leaving_an_active_state() {
+    fn stop_cue_fires_when_recording_ends() {
         use lune_app::sound::Cue;
-        assert_eq!(cue_for_transition("processing", "ready"), Some(Cue::Stop));
-        assert_eq!(cue_for_transition("listening", "ready"), Some(Cue::Stop));
-        // "ready" from idle/startup (or repeated) is silent.
+        // "processing" = capture ended (release, toggle-off, or max cutoff),
+        // emitted once by the session and never on cancel.
+        assert_eq!(
+            cue_for_transition("listening", "processing"),
+            Some(Cue::Stop)
+        );
+    }
+
+    #[test]
+    fn ready_status_emits_no_cue() {
+        // The Stop cue fires on `processing`, not the post-delivery "ready".
+        assert_eq!(cue_for_transition("processing", "ready"), None);
+        assert_eq!(cue_for_transition("listening", "ready"), None);
         assert_eq!(cue_for_transition("ready", "ready"), None);
     }
 
@@ -1446,9 +1467,10 @@ mod tests {
     }
 
     #[test]
-    fn no_cue_for_processing_or_unknown_status() {
-        assert_eq!(cue_for_transition("listening", "processing"), None);
+    fn no_cue_for_unknown_status_or_stray_processing() {
         assert_eq!(cue_for_transition("ready", "calibrating"), None);
+        // "processing" only cues when it directly follows "listening".
+        assert_eq!(cue_for_transition("ready", "processing"), None);
     }
 
     /// The follow-up behavior: when the chosen device changes while prewarm

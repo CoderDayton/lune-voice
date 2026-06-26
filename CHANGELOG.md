@@ -7,6 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Sound cues on dictation start, stop, and error, played from the backend, with an enable toggle and volume slider in Settings
 - mimalloc as the global allocator in the desktop shell
 - `start_minimized` setting to launch the app hidden to the system tray
 - Wayland focused-window detection on COSMIC and wlr-foreign-toplevel compositors

@@ -210,7 +210,7 @@ msgstr "Vérification des modèles installés…"
 msgid "Choose a theme"
 msgstr "Choisissez un thème"
 
-#: src/features/settings/sections/output-section.tsx:13
+#: src/features/settings/sections/output-section.tsx:15
 msgid "Choose how finished text is inserted into the app you are currently using."
 msgstr "Choisissez la manière dont le texte final est inséré dans l'application que vous utilisez actuellement."
 
@@ -277,8 +277,8 @@ msgstr "Copié"
 msgid "Copy"
 msgstr "Copie"
 
-#: src/features/settings/sections/output-section.tsx:31
-#: src/features/settings/sections/output-section.tsx:39
+#: src/features/settings/sections/output-section.tsx:33
+#: src/features/settings/sections/output-section.tsx:41
 msgid "Copy to clipboard"
 msgstr "Copier dans le presse-papiers"
 
@@ -315,6 +315,11 @@ msgstr "Créer un nouveau style"
 #: src/features/styles/components/style-editor-modal.tsx:58
 msgid "Create style"
 msgstr "Créer du style"
+
+#: src/features/settings/sections/output-section.tsx:62
+#: src/features/settings/sections/output-section.tsx:74
+msgid "Cue volume"
+msgstr ""
 
 #: src/features/settings/components/calibrate-modal.tsx:100
 msgid "Current"
@@ -556,6 +561,10 @@ msgstr "Avec quelle facilité Lune Voice se déclenche à la parole. Plus élev�
 msgid "How long finished dictations are kept on this device."
 msgstr "Combien de temps les dictées terminées sont conservées sur cet appareil."
 
+#: src/features/settings/sections/output-section.tsx:63
+msgid "How loud the dictation sounds play."
+msgstr ""
+
 #: src/features/settings/sections/input-section.tsx:138
 msgid "How quickly Lune Voice decides you're done speaking. Higher = ends sooner on a pause."
 msgstr "La rapidité avec laquelle Lune Voice décide que vous avez fini de parler. Plus haut = se termine plus tôt sur une pause."
@@ -586,7 +595,7 @@ msgstr "Installé"
 msgid "Instructions"
 msgstr "Instructions"
 
-#: src/features/settings/sections/output-section.tsx:32
+#: src/features/settings/sections/output-section.tsx:34
 msgid "Keep the dictated text on the clipboard after every dictation, so you can paste it again yourself."
 msgstr "Conserve le texte dicté dans le presse-papiers après chaque dictée, afin que vous puissiez le coller à nouveau vous-même."
 
@@ -776,7 +785,7 @@ msgid "Optional"
 msgstr "Facultatif"
 
 #: src/features/overview/overview-page.tsx:108
-#: src/features/settings/sections/output-section.tsx:12
+#: src/features/settings/sections/output-section.tsx:14
 #: src/features/settings/settings-page.tsx:70
 msgid "Output"
 msgstr "Sortir"
@@ -790,12 +799,12 @@ msgstr "Progrès global"
 msgid "Pagination"
 msgstr "Pagination"
 
-#: src/features/settings/sections/output-section.tsx:45
-#: src/features/settings/sections/output-section.tsx:51
+#: src/features/settings/sections/output-section.tsx:85
+#: src/features/settings/sections/output-section.tsx:91
 msgid "Paste compatibility"
 msgstr "Compatibilité du collage"
 
-#: src/features/settings/sections/output-section.tsx:18
+#: src/features/settings/sections/output-section.tsx:20
 msgid "Paste is simplest. Typing keystrokes can work better in some apps."
 msgstr "Coller est le plus simple. La frappe au clavier peut mieux fonctionner dans certaines applications."
 
@@ -809,6 +818,10 @@ msgstr "Sensibilité de pause"
 #: src/features/dictionary/components/dictionary-table.tsx:257
 msgid "Phrase"
 msgstr "Expression"
+
+#: src/features/settings/sections/output-section.tsx:47
+msgid "Play a short sound when dictation starts, finishes, or runs into an error."
+msgstr ""
 
 #: src/features/settings/components/calibrate-modal.tsx:18
 msgid "Please call Stella. Ask her to bring these things with her from the store: six spoons of fresh snow peas, five thick slabs of blue cheese, and maybe a snack for her brother Bob."
@@ -960,8 +973,8 @@ msgstr "Rechercher des transcriptions…"
 msgid "Select required models"
 msgstr "Sélectionnez les modèles requis"
 
-#: src/features/settings/sections/output-section.tsx:17
-#: src/features/settings/sections/output-section.tsx:23
+#: src/features/settings/sections/output-section.tsx:19
+#: src/features/settings/sections/output-section.tsx:25
 msgid "Send method"
 msgstr "Méthode d'envoi"
 
@@ -1009,6 +1022,11 @@ msgstr "Passer au contenu principal"
 #: src/features/settings/components/calibrate-modal.tsx:113
 msgid "Something went wrong."
 msgstr "Quelque chose s'est mal passé."
+
+#: src/features/settings/sections/output-section.tsx:46
+#: src/features/settings/sections/output-section.tsx:56
+msgid "Sound cues"
+msgstr ""
 
 #: src/features/overview/overview-page.tsx:132
 msgid "Speaking Time"
@@ -1227,7 +1245,7 @@ msgstr "Si le raccourci active ou désactive l'enregistrement ou ne fonctionne q
 msgid "Which input device dictation captures from. Changes apply right away."
 msgstr "De quel périphérique d'entrée la dictée capture. Les modifications s'appliquent immédiatement."
 
-#: src/features/settings/sections/output-section.tsx:46
+#: src/features/settings/sections/output-section.tsx:86
 msgid "Which paste shortcut to send. Automatic detects terminals; override if paste lands in the wrong place."
 msgstr "Quel raccourci de collage envoyer. « Automatique » détecte les terminaux ; remplacez-le si le collage se retrouve au mauvais endroit."
 
