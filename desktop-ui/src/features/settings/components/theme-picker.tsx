@@ -1,6 +1,6 @@
 import { useLingui } from '@lingui/react/macro';
 import { Check, Palette } from 'lucide-react';
-import { useId, useState } from 'react';
+import { memo, useCallback, useEffect, useId, useRef, useState } from 'react';
 import {
   getThemePreference,
   setThemePreference,
@@ -44,27 +44,33 @@ function SystemHalf() {
   );
 }
 
+/* `content-visibility:auto` lets the browser skip style/layout/paint for the
+   swatches scrolled out of view — critical here because each swatch is its own
+   `data-theme` scope, so every visible one forces a full DaisyUI variable
+   recompute. `contain-intrinsic-size` reserves the height so the scrollbar
+   stays stable. The transition is scoped to the properties that actually
+   animate (hover lift + selection ring), not `all`. */
 const SWATCH_BASE =
-  'group relative flex flex-col gap-2 rounded-field border-2 bg-base-100 p-2 text-left text-base-content transition-all hover:-translate-y-0.5 hover:shadow-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:p-2.5';
+  'group relative flex flex-col gap-2 rounded-field border-2 bg-base-100 p-2 text-left text-base-content transition-[transform,box-shadow,border-color] duration-fast [content-visibility:auto] [contain-intrinsic-size:auto_7.5rem] hover:-translate-y-0.5 hover:shadow-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:p-2.5';
 
 function selectionClasses(active: boolean) {
   return active ? 'border-primary ring-2 ring-primary/30' : 'border-base-300';
 }
 
-function ThemeSwatch({
+const ThemeSwatch = memo(function ThemeSwatch({
   theme,
   active,
   onSelect,
 }: {
   theme: string;
   active: boolean;
-  onSelect: () => void;
+  onSelect: (theme: string) => void;
 }) {
   return (
     <button
       type="button"
       data-theme={theme}
-      onClick={onSelect}
+      onClick={() => onSelect(theme)}
       className={`${SWATCH_BASE} ${selectionClasses(active)}`}
     >
       {active && (
@@ -76,18 +82,27 @@ function ThemeSwatch({
       <MiniWindow />
     </button>
   );
-}
+});
 
 export function ThemePicker() {
   const { t } = useLingui();
   const dialogId = useId();
-  const [dialog, setDialog] = useState<HTMLDialogElement | null>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  // Gate the heavy grid on `open`: 37 themes × a `data-theme`-scoped preview is a
+  // lot of style recalc. Mounting it only while the modal is open keeps it out of
+  // the DOM on page load and on the other (kept-mounted) settings tabs.
+  const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState(getThemePreference);
 
-  function handleSelect(theme: string) {
+  useEffect(() => {
+    const dlg = dialogRef.current;
+    if (open && dlg && !dlg.open) dlg.showModal();
+  }, [open]);
+
+  const handleSelect = useCallback((theme: string) => {
     setThemePreference(theme);
     setCurrent(theme);
-  }
+  }, []);
 
   return (
     <>
@@ -95,22 +110,20 @@ export function ThemePicker() {
         type="button"
         className="btn btn-sm btn-soft btn-primary gap-1.5"
         aria-haspopup="dialog"
-        onClick={() => dialog?.showModal()}
+        onClick={() => setOpen(true)}
       >
         <Palette size={14} strokeWidth={1.8} />
         {t`Browse themes`}
       </button>
 
       <dialog
-        ref={(el) => {
-          setDialog(el);
-          return () => setDialog(null);
-        }}
+        ref={dialogRef}
         className="modal"
         aria-labelledby={dialogId}
+        onClose={() => setOpen(false)}
       >
         <div className="modal-box max-w-2xl sm:max-w-3xl p-0 bg-surface-glass text-content">
-          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-surface-border bg-surface-glass px-4 py-3 backdrop-blur-xl sm:px-6 sm:py-4">
+          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-surface-border bg-surface-glass px-4 py-3 sm:px-6 sm:py-4">
             <h3
               id={dialogId}
               className="text-base sm:text-lg font-bold text-content-strong"
@@ -123,71 +136,75 @@ export function ThemePicker() {
           </div>
 
           <div className="overflow-y-auto max-h-[70vh] px-4 py-4 sm:px-6 sm:py-5 space-y-5 sm:space-y-6">
-            {/* Custom */}
-            <div>
-              <p className="section-label mb-2 sm:mb-3">{t`Lune`}</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
-                {THEME_GROUPS.custom.map((theme) => (
-                  <ThemeSwatch
-                    key={theme}
-                    theme={theme}
-                    active={current === theme}
-                    onSelect={() => handleSelect(theme)}
-                  />
-                ))}
-                <button
-                  type="button"
-                  data-theme="lune"
-                  onClick={() => handleSelect('system')}
-                  className={`${SWATCH_BASE} ${selectionClasses(current === 'system')}`}
-                >
-                  {current === 'system' && (
-                    <div className="absolute -top-1.5 -right-1.5 z-10 flex size-5 items-center justify-center rounded-full bg-primary text-primary-content shadow-sm">
-                      <Check size={12} strokeWidth={3} />
-                    </div>
-                  )}
-                  <span className="truncate text-sm font-medium">{t`System`}</span>
-                  <div className="grid grid-cols-2 overflow-hidden rounded-md border border-base-300">
-                    <div data-theme="lune">
-                      <SystemHalf />
-                    </div>
-                    <div data-theme="lune-light">
-                      <SystemHalf />
-                    </div>
+            {open && (
+              <>
+                {/* Custom */}
+                <div>
+                  <p className="section-label mb-2 sm:mb-3">{t`Lune`}</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
+                    {THEME_GROUPS.custom.map((theme) => (
+                      <ThemeSwatch
+                        key={theme}
+                        theme={theme}
+                        active={current === theme}
+                        onSelect={handleSelect}
+                      />
+                    ))}
+                    <button
+                      type="button"
+                      data-theme="lune"
+                      onClick={() => handleSelect('system')}
+                      className={`${SWATCH_BASE} ${selectionClasses(current === 'system')}`}
+                    >
+                      {current === 'system' && (
+                        <div className="absolute -top-1.5 -right-1.5 z-10 flex size-5 items-center justify-center rounded-full bg-primary text-primary-content shadow-sm">
+                          <Check size={12} strokeWidth={3} />
+                        </div>
+                      )}
+                      <span className="truncate text-sm font-medium">{t`System`}</span>
+                      <div className="grid grid-cols-2 overflow-hidden rounded-md border border-base-300">
+                        <div data-theme="lune">
+                          <SystemHalf />
+                        </div>
+                        <div data-theme="lune-light">
+                          <SystemHalf />
+                        </div>
+                      </div>
+                    </button>
                   </div>
-                </button>
-              </div>
-            </div>
+                </div>
 
-            {/* Light themes */}
-            <div>
-              <p className="section-label mb-2 sm:mb-3">{t`Light`}</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
-                {THEME_GROUPS.light.map((theme) => (
-                  <ThemeSwatch
-                    key={theme}
-                    theme={theme}
-                    active={current === theme}
-                    onSelect={() => handleSelect(theme)}
-                  />
-                ))}
-              </div>
-            </div>
+                {/* Light themes */}
+                <div>
+                  <p className="section-label mb-2 sm:mb-3">{t`Light`}</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+                    {THEME_GROUPS.light.map((theme) => (
+                      <ThemeSwatch
+                        key={theme}
+                        theme={theme}
+                        active={current === theme}
+                        onSelect={handleSelect}
+                      />
+                    ))}
+                  </div>
+                </div>
 
-            {/* Dark themes */}
-            <div>
-              <p className="section-label mb-2 sm:mb-3">{t`Dark`}</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
-                {THEME_GROUPS.dark.map((theme) => (
-                  <ThemeSwatch
-                    key={theme}
-                    theme={theme}
-                    active={current === theme}
-                    onSelect={() => handleSelect(theme)}
-                  />
-                ))}
-              </div>
-            </div>
+                {/* Dark themes */}
+                <div>
+                  <p className="section-label mb-2 sm:mb-3">{t`Dark`}</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+                    {THEME_GROUPS.dark.map((theme) => (
+                      <ThemeSwatch
+                        key={theme}
+                        theme={theme}
+                        active={current === theme}
+                        onSelect={handleSelect}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
         <form method="dialog" className="modal-backdrop">

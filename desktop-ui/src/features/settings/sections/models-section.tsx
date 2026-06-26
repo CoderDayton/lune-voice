@@ -15,9 +15,8 @@ import {
   Wand2,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { saveWorkspaceSetting, workspaceStore } from '../../../store/workspace-store';
-import { SettingsRow, SettingsSection } from '../components/section';
-import { useDebouncedSetting } from '../hooks/use-debounced-setting';
+import { workspaceStore } from '../../../store/workspace-store';
+import { SettingsSection } from '../components/section';
 
 interface ModelStatus {
   name: string;
@@ -42,13 +41,9 @@ function modelIcon(localName: string): LucideIcon {
 
 export function ModelsSection() {
   const { t } = useLingui();
-  const settings = useStore(workspaceStore, (s) => s.settings);
-  const llmEnabled = settings.llmEnabled;
-  const [confidence, setConfidence] = useDebouncedSetting(
-    'confidenceThreshold',
-    settings.confidenceThreshold,
-  );
-  const [llmSkip, setLlmSkip] = useDebouncedSetting('llmSkipThreshold', settings.llmSkipThreshold);
+  // Toggling the correction LLM (in the Transcription tab) hides or reveals its
+  // model here, so re-check status whenever that flag flips.
+  const llmEnabled = useStore(workspaceStore, (s) => s.settings.llmEnabled);
 
   const [models, setModels] = useState<ModelStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,9 +59,12 @@ export function ModelsSection() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Flipping the correction LLM (Transcription tab) shows or hides its model here,
+  // so re-check status when it changes — not just on mount.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: llmEnabled is a deliberate re-run trigger, not used in the body.
   useEffect(() => {
     refresh();
-  }, [refresh]);
+  }, [refresh, llmEnabled]);
 
   useEffect(() => {
     const unlisten = listen<DownloadProgress>('lune://download-progress', (event) => {
@@ -81,13 +79,6 @@ export function ModelsSection() {
       void unlisten.then((f) => f());
     };
   }, [refresh]);
-
-  async function handleLlmToggle(enabled: boolean) {
-    // The model list is config-dependent (disabled backends hide their
-    // models), so refresh after the save lands.
-    const ok = await saveWorkspaceSetting('llmEnabled', enabled);
-    if (ok) refresh();
-  }
 
   function handleDownload(localName: string) {
     setDownloading(localName);
@@ -118,7 +109,7 @@ export function ModelsSection() {
     ? [0, 1].map((i) => (
         <div
           key={i}
-          className="rounded-box border border-surface-border bg-base-200/60 p-4 flex items-center gap-3"
+          className="rounded-box border border-surface-border bg-surface-inset p-4 flex items-center gap-3"
         >
           <div className="skeleton size-10 rounded-field shrink-0" />
           <div className="flex-1 space-y-2">
@@ -150,86 +141,6 @@ export function ModelsSection() {
         description={t`AI models stored on your device.`}
       >
         {modelCards}
-      </SettingsSection>
-
-      {/* Correction — the LLM toggle and the knobs that tune its behavior. */}
-      <SettingsSection
-        icon={Wand2}
-        title={t`Correction`}
-        description={t`Tune how the local LLM polishes transcripts after transcription.`}
-      >
-        {/* Correction LLM enable — a disabled backend hides its model above */}
-        <div className="flex items-center justify-between gap-4 rounded-box border border-surface-border bg-base-200/60 p-4">
-          <div className="flex items-start gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-field bg-base-300 text-content-subtle">
-              <Wand2 size={18} strokeWidth={1.6} />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-content-default sm:text-base">
-                {t`Correction LLM`}
-              </p>
-              <p className="mt-1 text-xs leading-snug text-content-subtle sm:text-sm">
-                {llmEnabled
-                  ? t`Polishes punctuation and fixes obvious ASR errors after transcription.`
-                  : t`Disabled — transcripts are delivered raw, and the LLM model is hidden from the list above.`}
-              </p>
-            </div>
-          </div>
-          <input
-            type="checkbox"
-            className="toggle toggle-primary"
-            checked={llmEnabled}
-            onChange={(e) => void handleLlmToggle(e.target.checked)}
-            aria-label={t`Enable correction LLM`}
-          />
-        </div>
-
-        {llmEnabled && (
-          <>
-            <SettingsRow
-              label={t`Correction sensitivity`}
-              description={t`Words the recognizer is unsure about are sent to the LLM. Higher corrects more aggressively; lower trusts the raw transcription.`}
-              control={
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    className="range range-primary range-sm w-28 sm:w-36"
-                    min={0.1}
-                    max={0.95}
-                    step={0.05}
-                    value={confidence}
-                    onChange={(e) => setConfidence(e.target.value)}
-                    aria-label={t`Correction sensitivity`}
-                  />
-                  <span className="text-sm tabular-nums text-content-muted w-12 text-right">
-                    {Number(confidence).toFixed(2)}
-                  </span>
-                </div>
-              }
-            />
-            <SettingsRow
-              label={t`Correction frequency`}
-              description={t`How readily the LLM runs on clean speech. Higher polishes more segments; lower skips more often for speed.`}
-              control={
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    className="range range-primary range-sm w-28 sm:w-36"
-                    min={0.1}
-                    max={0.95}
-                    step={0.05}
-                    value={Number(llmSkip).toFixed(2)}
-                    onChange={(e) => setLlmSkip(e.target.value)}
-                    aria-label={t`Correction frequency`}
-                  />
-                  <span className="text-sm tabular-nums text-content-muted w-12 text-right">
-                    {Number(llmSkip).toFixed(2)}
-                  </span>
-                </div>
-              }
-            />
-          </>
-        )}
       </SettingsSection>
 
       <DeleteConfirmModal
@@ -274,13 +185,13 @@ function ModelManagementCard({
     ? 'border-success/40 bg-success/5'
     : isDownloading
       ? 'border-primary/50 bg-primary/8'
-      : 'border-surface-border bg-base-200/60';
+      : 'border-surface-border bg-surface-inset';
 
   const iconBg = model.ready
     ? 'bg-success/15 text-success'
     : isDownloading
       ? 'bg-primary/15 text-primary'
-      : 'bg-base-300 text-content-subtle';
+      : 'bg-surface-elevated text-content-subtle';
 
   return (
     <div className={`rounded-box border p-4 transition-colors ${stateClass}`}>

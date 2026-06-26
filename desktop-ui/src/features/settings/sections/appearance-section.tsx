@@ -61,7 +61,7 @@ export function AppearanceSection() {
                   className={`flex flex-col items-center gap-1 rounded-box border-2 px-3 py-2 transition-all ${
                     active
                       ? 'border-primary bg-primary/8 text-primary'
-                      : 'border-surface-border bg-base-200/30 text-content-muted hover:border-base-300 hover:text-content-default'
+                      : 'border-surface-border bg-surface-inset text-content-muted hover:border-surface-border-strong hover:text-content-default'
                   }`}
                 >
                   <Icon size={20} strokeWidth={1.6} />
@@ -74,7 +74,7 @@ export function AppearanceSection() {
 
         <div className="flex flex-col gap-1.5">
           <span className="text-sm font-medium">{t`Theme`}</span>
-          <div className="flex items-center justify-between rounded-field border border-surface-border bg-base-200/40 px-4 py-3">
+          <div className="flex items-center justify-between rounded-field border border-surface-border bg-surface-inset px-4 py-3">
             <div className="flex items-center gap-3">
               <div className="flex gap-1">
                 <div className="size-4 rounded-full bg-primary" />
@@ -89,7 +89,7 @@ export function AppearanceSection() {
 
         <div className="flex flex-col gap-1.5">
           <span className="text-sm font-medium">{t`Dictation pill`}</span>
-          <div className="flex items-center justify-between rounded-field border border-surface-border bg-base-200/40 px-4 py-3">
+          <div className="flex items-center justify-between rounded-field border border-surface-border bg-surface-inset px-4 py-3">
             <span className="text-sm text-content-muted">
               {t`When to show the floating status pill while you dictate.`}
             </span>

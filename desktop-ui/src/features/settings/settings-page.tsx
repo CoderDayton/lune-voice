@@ -3,7 +3,6 @@ import { useStore } from '@tanstack/react-store';
 import {
   AudioLines,
   HardDrive,
-  Keyboard,
   type LucideIcon,
   Mic,
   Palette,
@@ -13,21 +12,13 @@ import {
 import { useState } from 'react';
 import { workspaceStore } from '../../store/workspace-store';
 import { AppearanceSection } from './sections/appearance-section';
+import { DictationSection } from './sections/dictation-section';
 import { GeneralSection } from './sections/general-section';
-import { InputSection } from './sections/input-section';
 import { ModelsSection } from './sections/models-section';
 import { OutputSection } from './sections/output-section';
-import { ShortcutsSection } from './sections/shortcuts-section';
 import { TranscriptionSection } from './sections/transcription-section';
 
-type SectionId =
-  | 'general'
-  | 'appearance'
-  | 'shortcuts'
-  | 'input'
-  | 'transcription'
-  | 'output'
-  | 'models';
+type SectionId = 'general' | 'appearance' | 'dictation' | 'transcription' | 'output' | 'models';
 
 export function SettingsPage() {
   const { t } = useLingui();
@@ -64,8 +55,7 @@ export function SettingsPage() {
   const sections: { id: SectionId; label: string; icon: LucideIcon }[] = [
     { id: 'general', label: t`General`, icon: SlidersHorizontal },
     { id: 'appearance', label: t`Appearance`, icon: Palette },
-    { id: 'shortcuts', label: t`Shortcuts`, icon: Keyboard },
-    { id: 'input', label: t`Input`, icon: Mic },
+    { id: 'dictation', label: t`Dictation`, icon: Mic },
     { id: 'transcription', label: t`Transcription`, icon: AudioLines },
     { id: 'output', label: t`Output`, icon: Send },
     { id: 'models', label: t`Models`, icon: HardDrive },
@@ -74,8 +64,7 @@ export function SettingsPage() {
   const content: Record<SectionId, React.ReactNode> = {
     general: <GeneralSection settings={settings} />,
     appearance: <AppearanceSection />,
-    shortcuts: <ShortcutsSection settings={settings} />,
-    input: <InputSection settings={settings} />,
+    dictation: <DictationSection settings={settings} />,
     transcription: <TranscriptionSection settings={settings} />,
     output: <OutputSection settings={settings} />,
     models: <ModelsSection />,
