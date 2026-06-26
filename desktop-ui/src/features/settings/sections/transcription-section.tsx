@@ -2,9 +2,15 @@ import { useLingui } from '@lingui/react/macro';
 import { AudioLines, Wand2 } from 'lucide-react';
 import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown';
 import { saveWorkspaceSetting } from '../../../store/workspace-store';
+import { AsrEngineCards } from '../components/asr-engine-cards';
 import { OpenAiFields } from '../components/openai-fields';
-import { type SettingsProps, SettingsRow, SettingsSection } from '../components/section';
-import { asrBackends, dictationLanguages, whisperModels } from '../data/settings-data';
+import {
+  SettingsBlock,
+  type SettingsProps,
+  SettingsRow,
+  SettingsSection,
+} from '../components/section';
+import { dictationLanguages } from '../data/settings-data';
 import { useDebouncedSetting } from '../hooks/use-debounced-setting';
 
 export function TranscriptionSection({ settings }: SettingsProps) {
@@ -24,36 +30,12 @@ export function TranscriptionSection({ settings }: SettingsProps) {
         description={t`Control how your speech is turned into text.`}
         icon={AudioLines}
       >
-        <SettingsRow
+        <SettingsBlock
           label={t`Voice model`}
-          description={t`Qwen3-ASR runs locally with automatic language detection.`}
-          control={
-            <DescriptiveDropdown
-              value={settings.asrBackend}
-              options={asrBackends}
-              ariaLabel={t`Voice model`}
-              onChange={(next) =>
-                void saveWorkspaceSetting('asrBackend', next as typeof settings.asrBackend)
-              }
-            />
-          }
-        />
-        {settings.asrBackend === 'WhisperCpp' && (
-          <SettingsRow
-            label={t`Whisper model`}
-            description={t`Larger models are more accurate but slower and use more disk. The selected model downloads from the Models tab.`}
-            control={
-              <DescriptiveDropdown
-                value={settings.whisperModel}
-                options={whisperModels}
-                ariaLabel={t`Whisper model`}
-                onChange={(next) =>
-                  void saveWorkspaceSetting('whisperModel', next as typeof settings.whisperModel)
-                }
-              />
-            }
-          />
-        )}
+          description={t`Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes.`}
+        >
+          <AsrEngineCards settings={settings} />
+        </SettingsBlock>
         {settings.asrBackend === 'OpenAiCompatible' && (
           <OpenAiFields
             settings={settings}

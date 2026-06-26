@@ -1,7 +1,5 @@
 import { useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 import {
   AlertTriangle,
   Check,
@@ -14,29 +12,13 @@ import {
   Trash2,
   Wand2,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { workspaceStore } from '../../../store/workspace-store';
 import { SettingsSection } from '../components/section';
-
-interface ModelStatus {
-  name: string;
-  repoId: string;
-  localName: string;
-  ready: boolean;
-  description: string;
-  required: boolean;
-}
-
-interface DownloadProgress {
-  modelName: string;
-  fileName: string;
-  fileIndex: number;
-  fileCount: number;
-  done: boolean;
-}
+import { type DownloadProgress, type ModelStatus, useModelStatus } from '../hooks/use-model-status';
 
 function modelIcon(localName: string): LucideIcon {
-  return localName.includes('asr') ? Mic : Wand2;
+  return localName.includes('asr') || localName.includes('whisper') ? Mic : Wand2;
 }
 
 export function ModelsSection() {
@@ -48,49 +30,15 @@ export function ModelsSection() {
   const asrBackend = useStore(workspaceStore, (s) => s.settings.asrBackend);
   const whisperModel = useStore(workspaceStore, (s) => s.settings.whisperModel);
 
-  const [models, setModels] = useState<ModelStatus[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [downloading, setDownloading] = useState<string | null>(null);
-  const [progress, setProgress] = useState<DownloadProgress | null>(null);
+  const { models, loading, downloading, progress, refresh, download, remove } = useModelStatus();
   const [confirmDelete, setConfirmDelete] = useState<ModelStatus | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
-
-  const refresh = useCallback(() => {
-    invoke<ModelStatus[]>('check_model_status')
-      .then(setModels)
-      .catch((e) => console.error('check_model_status:', e))
-      .finally(() => setLoading(false));
-  }, []);
 
   // These settings change which models belong in the list, so re-check on each.
   // biome-ignore lint/correctness/useExhaustiveDependencies: llmEnabled/asrBackend/whisperModel are deliberate re-run triggers, not used in the body.
   useEffect(() => {
     refresh();
   }, [refresh, llmEnabled, asrBackend, whisperModel]);
-
-  useEffect(() => {
-    const unlisten = listen<DownloadProgress>('lune://download-progress', (event) => {
-      setProgress(event.payload);
-      if (event.payload.done) {
-        setDownloading(null);
-        setProgress(null);
-        refresh();
-      }
-    });
-    return () => {
-      void unlisten.then((f) => f());
-    };
-  }, [refresh]);
-
-  function handleDownload(localName: string) {
-    setDownloading(localName);
-    setProgress(null);
-    invoke('download_model_cmd', { localName }).catch((e) => {
-      console.error('download_model_cmd:', e);
-      setDownloading(null);
-      setProgress(null);
-    });
-  }
 
   function handleDeleteClick(model: ModelStatus) {
     setConfirmDelete(model);
@@ -102,9 +50,7 @@ export function ModelsSection() {
     const localName = confirmDelete.localName;
     dialogRef.current?.close();
     setConfirmDelete(null);
-    invoke('delete_model_cmd', { localName })
-      .then(() => refresh())
-      .catch((e) => console.error('delete_model_cmd:', e));
+    void remove(localName);
   }
 
   const modelCards = loading
@@ -129,7 +75,7 @@ export function ModelsSection() {
           isDownloading={downloading === model.localName}
           anyDownloading={!!downloading}
           progress={downloading === model.localName ? progress : null}
-          onDownload={() => handleDownload(model.localName)}
+          onDownload={() => download(model.localName)}
           onDelete={() => handleDeleteClick(model)}
         />
       ));

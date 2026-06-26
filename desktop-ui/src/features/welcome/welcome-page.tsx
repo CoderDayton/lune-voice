@@ -10,15 +10,17 @@ import {
   Sparkles,
   Wand2,
 } from 'lucide-react';
+import { EngineStep } from './components/engine-step';
 import { ModelCard } from './components/model-card';
-import { useModelSetup } from './use-model-setup';
+import { isSetupSatisfiable } from './setup-logic';
+import { type SetupPhase, useModelSetup } from './use-model-setup';
 
 interface WelcomePageProps {
   onFinish: () => void;
 }
 
 function modelIcon(localName: string) {
-  return localName.includes('asr') ? Mic : Wand2;
+  return localName.includes('asr') || localName.includes('whisper') ? Mic : Wand2;
 }
 
 export function WelcomePage({ onFinish }: WelcomePageProps) {
@@ -34,12 +36,19 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
     error,
     completed,
     totalToDownload,
+    engineBackend,
+    engineWhisper,
+    asrLocalName,
+    setEngineBackend,
+    setEngineWhisper,
+    confirmEngine,
+    backToEngine,
     toggleModel,
     startDownload,
     retry,
   } = setup;
 
-  const requiredOk = models.filter((m) => m.required).every((m) => selected.has(m.localName));
+  const requiredOk = isSetupSatisfiable(asrLocalName, models, selected);
   const pending = models.filter((m) => selected.has(m.localName) && !m.ready);
   const overallPct = totalToDownload > 0 ? Math.round((completed / totalToDownload) * 100) : 0;
 
@@ -60,23 +69,36 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
         <OverallProgress completed={completed} total={totalToDownload} pct={overallPct} />
       )}
 
-      <div className="flex flex-col gap-3">
-        {models.map((m) => (
-          <ModelCard
-            key={m.localName}
-            name={m.name}
-            description={m.description}
-            required={m.required}
-            icon={modelIcon(m.localName)}
-            ready={m.ready}
-            selected={selected.has(m.localName)}
-            active={currentModel === m.localName}
-            canToggle={!m.required && phase === 'choose'}
-            progress={currentModel === m.localName ? progress : null}
-            onToggle={() => toggleModel(m.localName)}
-          />
-        ))}
-      </div>
+      {phase === 'engine' ? (
+        <EngineStep
+          engineBackend={engineBackend}
+          engineWhisper={engineWhisper}
+          error={error}
+          onSelectEngine={setEngineBackend}
+          onSelectWhisper={setEngineWhisper}
+        />
+      ) : (
+        <div className="flex flex-col gap-3">
+          {models.map((m) => {
+            const essential = m.required || m.localName === asrLocalName;
+            return (
+              <ModelCard
+                key={m.localName}
+                name={m.name}
+                description={m.description}
+                required={essential}
+                icon={modelIcon(m.localName)}
+                ready={m.ready}
+                selected={selected.has(m.localName)}
+                active={currentModel === m.localName}
+                canToggle={!essential && phase === 'choose'}
+                progress={currentModel === m.localName ? progress : null}
+                onToggle={() => toggleModel(m.localName)}
+              />
+            );
+          })}
+        </div>
+      )}
 
       {phase === 'error' && error && (
         <div className="alert alert-error gap-2 text-sm" role="alert">
@@ -95,6 +117,8 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
         onStart={startDownload}
         onRetry={retry}
         onFinish={onFinish}
+        onConfirmEngine={confirmEngine}
+        onBack={backToEngine}
       />
 
       <Footer />
@@ -103,7 +127,7 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
 }
 
 interface HeaderProps {
-  phase: 'choose' | 'downloading' | 'error' | 'done';
+  phase: SetupPhase;
   requiredOk: boolean;
   pendingCount: number;
   error: string | null;
@@ -114,7 +138,10 @@ function Header({ phase, requiredOk, pendingCount, error: _error }: HeaderProps)
   let title: string;
   let subtitle: string;
 
-  if (phase === 'done') {
+  if (phase === 'engine') {
+    title = t`Welcome to Lune Voice`;
+    subtitle = t`Choose your speech engine. Everything runs offline — no cloud, no accounts.`;
+  } else if (phase === 'done') {
     title = t`You're all set`;
     subtitle = t`Your models are ready. Everything stays on this machine.`;
   } else if (phase === 'downloading') {
@@ -177,16 +204,41 @@ function OverallProgress({ completed, total, pct }: OverallProgressProps) {
 }
 
 interface ActionsProps {
-  phase: 'choose' | 'downloading' | 'error' | 'done';
+  phase: SetupPhase;
   requiredOk: boolean;
   pendingCount: number;
   onStart: () => void;
   onRetry: () => void;
   onFinish: () => void;
+  onConfirmEngine: () => void;
+  onBack: () => void;
 }
 
-function Actions({ phase, requiredOk, pendingCount, onStart, onRetry, onFinish }: ActionsProps) {
+function Actions({
+  phase,
+  requiredOk,
+  pendingCount,
+  onStart,
+  onRetry,
+  onFinish,
+  onConfirmEngine,
+  onBack,
+}: ActionsProps) {
   const { t } = useLingui();
+
+  if (phase === 'engine') {
+    return (
+      <div className="flex flex-col items-center gap-2">
+        <button type="button" className="btn btn-primary btn-wide" onClick={onConfirmEngine}>
+          {t`Continue`}
+          <ArrowRight size={16} />
+        </button>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onFinish}>
+          {t`Skip for now`}
+        </button>
+      </div>
+    );
+  }
 
   if (phase === 'downloading') {
     return (
@@ -244,9 +296,14 @@ function Actions({ phase, requiredOk, pendingCount, onStart, onRetry, onFinish }
           <ArrowRight size={16} />
         </button>
       )}
-      <button type="button" className="btn btn-ghost btn-sm" onClick={onFinish}>
-        {t`Skip for now`}
-      </button>
+      <div className="flex items-center gap-2">
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onBack}>
+          {t`Change engine`}
+        </button>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onFinish}>
+          {t`Skip for now`}
+        </button>
+      </div>
     </div>
   );
 }

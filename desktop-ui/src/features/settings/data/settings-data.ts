@@ -69,22 +69,38 @@ export const asrBackends: DescriptiveOptionData<AsrBackendValue>[] = [
   },
 ];
 
+/** On-disk directory for the Qwen3-ASR model (matches the backend ModelSpec). */
+export const QWEN3_ASR_LOCAL_NAME = 'qwen3-asr-0.6b';
+
+export interface WhisperModelOption extends DescriptiveOptionData<WhisperModelValue> {
+  /** On-disk model directory — matches the backend ModelSpec `local_name`. */
+  localName: string;
+  /** Approximate download size, e.g. "264 MB". */
+  size: string;
+}
+
 /** whisper.cpp GGML model options (q8_0 multilingual), smallest to largest. */
-export const whisperModels: DescriptiveOptionData<WhisperModelValue>[] = [
+export const whisperModels: WhisperModelOption[] = [
   {
     value: 'Small',
     label: 'Small',
-    description: '~264 MB. Fastest, lowest accuracy.',
+    description: 'Fastest, lowest accuracy.',
+    localName: 'whisper-small-q8_0',
+    size: '264 MB',
   },
   {
     value: 'Medium',
     label: 'Medium',
-    description: '~823 MB. Balanced accuracy and speed.',
+    description: 'Balanced accuracy and speed.',
+    localName: 'whisper-medium-q8_0',
+    size: '823 MB',
   },
   {
     value: 'LargeV3Turbo',
     label: 'Large v3 Turbo',
-    description: '~874 MB. Best accuracy; turbo decoder keeps it fast.',
+    description: 'Best accuracy; turbo decoder keeps it fast.',
+    localName: 'whisper-large-v3-turbo-q8_0',
+    size: '874 MB',
   },
 ];
 
