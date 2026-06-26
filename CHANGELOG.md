@@ -8,6 +8,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - Sound cues on dictation start, stop, and error, played from the backend, with an enable toggle and volume slider in Settings
+- Separate **Copy to clipboard** toggle in Output settings, independent of the Type / Paste delivery method
 - mimalloc as the global allocator in the desktop shell
 - `start_minimized` setting to launch the app hidden to the system tray
 - Wayland focused-window detection on COSMIC and wlr-foreign-toplevel compositors
@@ -36,6 +37,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - License field updated from MIT to LicenseRef-Proprietary (LICENSE file already proprietary)
 - ORT session builder optimized with refactored build_instructions
 - Local LLM kept warm briefly after dictation to reduce cold-start latency
+- Output settings split into a delivery method (`TypeInPlace` / `Clipboard`) and an independent `copy_to_clipboard` toggle; the combined `Both` mode was removed (legacy `Both` configs migrate to `TypeInPlace` with copy enabled)
+- Text delivery prefers the IBus input method when it is active — committing text directly with no clipboard — and falls back to the uinput keyboard path otherwise
 
 ### Fixed
 - Dict corrector risk lookup now O(1) per word (was O(words²) overall)
@@ -50,6 +53,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Gate false positives via case-insensitive lang detection and proper noun bypass
 - Words containing digits skipped in spell corrector
 - Clippy warnings in examples and benchmarks
+- Wayland clipboard no longer clobbered by dictation: with **Copy to clipboard** off, the `Clipboard` paste path restores the previous clipboard (text or images) byte-for-byte after pasting
+- Keyboard focus rings are visible again across cards, list rows, tabs, and navigation — a global focus reset had erased every component indicator; muted UI text raised to WCAG AA contrast
+- Hotkey capture grabs only real keyboards, ignoring virtual and non-keyboard input devices
+- Quietly-spoken words are no longer dropped from the transcript
+- Trailing "though" / "although" / "whereas" continuations are joined to their sentence instead of split into a fragment
+- Clauses are no longer over-split into separate sentences
 
 ### Security
 - Updated rustls-webpki to 0.103.13

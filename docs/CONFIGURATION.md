@@ -48,7 +48,7 @@ Settings mutability tiers:
 
 | Tier | When Applied | Fields |
 |------|-------------|--------|
-| **Hot** | Immediately (watch channel) | `dictation_mode`, `activation_mode`, `pill_visibility`, `terminal_mode`, `sound_cues_enabled`, `sound_cue_volume` |
+| **Hot** | Immediately (watch channel) | `dictation_mode`, `copy_to_clipboard`, `activation_mode`, `pill_visibility`, `terminal_mode`, `sound_cues_enabled`, `sound_cue_volume` |
 | **Warm** | Next session start | `default_style`, `language`, `dictation_language`, `vad_pcen`, `mic_prewarm` |
 | **Cold** | Persist only | `privacy_mode`, `session_history_days`, `start_minimized`, `hotkey` |
 | **Reload** | Before next session | `asr_backend`, `llm_backend`, `device` |
@@ -78,6 +78,7 @@ language = "auto"
 dictation_language = "auto"
 privacy_mode = "LocalOnly"
 dictation_mode = "TypeInPlace"
+copy_to_clipboard = false
 activation_mode = "Toggle"
 pill_visibility = "Always"
 terminal_mode = "Auto"
@@ -229,23 +230,37 @@ The daemon enforces privacy mode at startup. If a remote backend is configured b
 
 ## Dictation Modes
 
-Controls what happens with corrected text after LLM processing.
+`dictation_mode` selects how corrected text is delivered to the focused app after LLM processing. The orthogonal `copy_to_clipboard` toggle (below) decides whether a copy is also left on the clipboard.
 
 ```toml
 dictation_mode = "TypeInPlace"
+copy_to_clipboard = false
 ```
 
 | Mode | Behavior |
 |------|----------|
-| `TypeInPlace` | Pastes corrected text into the focused input field via clipboard + uinput paste chord (Ctrl+V or Ctrl+Shift+V for terminals). Adaptive delay, Unicode-safe. Falls back to per-key typing if clipboard tools are unavailable. **(default)** |
-| `Clipboard` | Copies corrected text to the system clipboard only (via `wl-copy` / `xclip`) |
-| `Both` | Pastes into focused field (same as TypeInPlace) AND leaves text on clipboard |
+| `TypeInPlace` | Types the text into the focused field, character by character, through a `uinput` virtual keyboard. Non-ASCII text (accents, CJK, emoji) is delivered via a clipboard paste instead, so nothing is dropped. **(default)** |
+| `Clipboard` | Delivers by setting the clipboard and sending a paste chord — `Ctrl+V`, or `Ctrl+Shift+V` when a terminal is focused. Uses an adaptive post-paste delay (EMA of clipboard round-trip) and falls back to per-key typing if `wl-copy` / `xclip` are missing. |
+
+> When IBus is the active input method (common on GNOME/Wayland), both modes commit text directly through IBus and never touch the clipboard. See [Architecture → Text Delivery](ARCHITECTURE.md#5-text-delivery).
+
+The combined `Both` mode was removed; configs that still set `dictation_mode = "Both"` migrate to `TypeInPlace` with `copy_to_clipboard = true`.
 
 Switch at runtime:
 
 ```bash
 lune-voice mode dictation Clipboard
 ```
+
+### Copy to Clipboard
+
+Independent of the delivery method — works with either `TypeInPlace` or `Clipboard`.
+
+```toml
+copy_to_clipboard = false
+```
+
+When `true`, the dictated text is left on the system clipboard after delivery. When `false` (default), the clipboard is preserved: if the `Clipboard` paste path borrowed it to send `Ctrl+V`, the previous contents — text or images — are snapshotted first and restored byte-for-byte afterward, so dictation never overwrites what you had copied.
 
 ---
 

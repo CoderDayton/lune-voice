@@ -144,20 +144,26 @@ Both pre-correction and post-styling hardening live in `CorrectionPipeline`, so 
 
 ### 5. Text Delivery
 
-**Crate:** `lune-app` | **File:** `crates/lune-app/src/delivery.rs`
+**Crate:** `lune-app` | **Files:** `crates/lune-app/src/delivery.rs`, `uinput_typer.rs`, `ibus.rs`
 
 The session emits two `SessionEvent` variants directly on the event channel:
 
 - `PartialText` - in-progress signal for live preview
 - `FinalizedText(String)` - corrected text for delivery
 
-Delivery modes:
+Delivery runs on a dedicated thread and picks a backend once at startup:
 
-| Mode | Implementation |
-|------|----------------|
-| TypeInPlace | Clipboard paste via uinput: `wl-copy`/`xclip` -> terminal detection -> Ctrl+V or Ctrl+Shift+V. Adaptive post-paste delay (EMA of clipboard RTT). Per-key fallback for paste-hostile apps. |
-| Clipboard | `wl-copy` (Wayland) / `xclip` (X11) - clipboard only, no paste chord |
-| Both | Clipboard paste (same as TypeInPlace; clipboard is set as side effect) |
+- **IBus** — used when IBus is the active input method (e.g. GNOME/Wayland; detected via `GTK_IM_MODULE` / `QT_IM_MODULE` / `XMODIFIERS`). Commits Unicode straight into the focused input context — no terminal detection, paste chord, or clipboard.
+- **uinput** — the universal fallback. Drives a virtual keyboard through `/dev/uinput`.
+
+`dictation_mode` selects the delivery method; `copy_to_clipboard` is an orthogonal toggle for whether a copy is *kept*:
+
+| Mode | uinput path | IBus path |
+|------|-------------|-----------|
+| `TypeInPlace` | Types each key (US-QWERTY). Non-ASCII text routes through the clipboard paste path so it is never dropped. | `commit_text` |
+| `Clipboard` | Sets the clipboard (`wl-copy`/`xclip`), detects terminals, sends Ctrl+V / Ctrl+Shift+V. Adaptive post-paste delay (EMA of clipboard RTT); per-key fallback for paste-hostile apps. | `commit_text` |
+
+**Clipboard preservation.** The `Clipboard` path borrows the system clipboard as a transport. When `copy_to_clipboard` is off, the prior clipboard is snapshotted before delivery (its preferred MIME type and raw bytes, so images survive) and restored afterward; an empty clipboard is cleared back to empty, and a read failure leaves the dictated text rather than risk wiping unreadable content. When `copy_to_clipboard` is on, the dictated text is kept and the otherwise-redundant re-copy is skipped. The IBus path never touches the clipboard, so the toggle there only adds an explicit copy.
 
 ---
 
@@ -262,7 +268,7 @@ Short audio cues play from the Rust backend on the same status transitions — S
 
 | Getter / Setter | Type | Scope |
 |----------------|------|-------|
-| `Get/SetDictationMode` | string (`TypeInPlace`\|`Clipboard`\|`Both`) | Immediate (watch channel) |
+| `Get/SetDictationMode` | string (`TypeInPlace`\|`Clipboard`; legacy `Both` maps to `TypeInPlace`) | Immediate (watch channel) |
 | `Get/SetActivationMode` | string (`Toggle`\|`Hold`) | Immediate (watch channel) |
 | `Get/SetDefaultStyle` | string (preset ID, validated against registry) | Next session start |
 | `Get/SetLanguage` | string (BCP-47, well-formedness validated) | Next session start |

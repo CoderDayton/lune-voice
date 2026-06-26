@@ -294,12 +294,12 @@ After the LLM, `capitalize_sentence_starts` runs as a **deterministic backstop**
 
 ### 7.2 DeliveryService (`crates/lune-app/src/delivery.rs`)
 ⚠️ **Push-based, not event-subscribing.** Owns a dedicated OS thread + an `mpsc` queue. The `SessionEvent::FinalizedText → deliver` wiring lives in `desktop-ui/src-tauri/src/runtime.rs:447-490`, which reads `dictation_mode` and passes the session-start-captured `focus_target`. `SessionEvent::CorrectedText` is **UI-only — explicitly NOT delivered** (`runtime.rs:491-497`).
-- **Session correlation (new):** `DeliveryMsg` carries `session_id: Option<Uuid>` (`:18`); `deliver(session_id, text, mode)` / `deliver_to(session_id, …)` / `deliver_owned(session_id, …)` take it (`:48,:67,:95`); the delivery thread logs `debug!(session_id = ?msg.session_id, …, "delivery: typing")` (`:156`). The runtime forwarder passes `Some(session_id)` for the dictation `FinalizedText` (`:458,:463,:472`) and for the command-injection newline/bullet deliveries (`:581-608`). So one dictation's `session_id` is traceable from "first audio chunk" through to the OS delivery thread.
+- **Session correlation (new):** `DeliveryMsg` carries `session_id: Option<Uuid>` (`:18`); `deliver(session_id, text, mode, copy_to_clipboard)` / `deliver_to(…)` / `deliver_owned(…)` take it (`:48,:67,:95`); the delivery thread logs `debug!(session_id = ?msg.session_id, …, "delivery: typing")` (`:156`). The runtime forwarder passes `Some(session_id)` for the dictation `FinalizedText` (`:458,:463,:472`) and for the command-injection newline/bullet deliveries (`:581-608`). So one dictation's `session_id` is traceable from "first audio chunk" through to the OS delivery thread.
 
-**Mode → method** (`delivery_thread` `:134-190`):
+**Mode → method** (`delivery_thread`):
 - `DictationMode::TypeInPlace` (the **default**) → `type_keys` = **per-key synthetic typing** (or IBus commit, below).
-- `DictationMode::Both` → clipboard copy + type.
-- `Clipboard` / catch-all → `type_text` = clipboard-paste chord (or IBus commit).
+- `DictationMode::Clipboard` / catch-all → `type_text` = clipboard-paste chord (or IBus commit).
+- Orthogonal `copy_to_clipboard` toggle (`DeliveryMsg.copy_to_clipboard`): when **off**, the clipboard-paste path snapshots the prior clipboard and restores it byte-for-byte (text or image) after pasting, so dictation never clobbers it; when **on**, the dictated text is kept and the redundant re-copy is skipped. The legacy `Both` mode was removed (it maps to `TypeInPlace` + copy).
 
 **Feedback-loop guard:** on dequeue `busy_until = now + 3600s`; reset to `now + DELIVERY_SETTLE (300ms)` after the driver returns (`:27,:158,:186`). `is_busy()` suppresses new dictation starts (runtime `:300-303,415-418`) so synthetic keystrokes landing on the focused toggle button can't drive a feedback loop.
 
