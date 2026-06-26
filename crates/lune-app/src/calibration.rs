@@ -185,7 +185,7 @@ async fn run_calibration(
     let _ = event_tx
         .send(CalibrationFrame::PhaseChanged(CalibrationPhase::Noise))
         .await;
-    let noise_scores = match collect_phase(
+    let PhaseOutcome::Done(noise_scores) = collect_phase(
         &stream,
         &mut vad,
         &event_tx,
@@ -194,12 +194,9 @@ async fn run_calibration(
         timings.noise,
     )
     .await
-    {
-        PhaseOutcome::Done(s) => s,
-        PhaseOutcome::Cancelled => {
-            finish_cancelled(&event_tx).await;
-            return;
-        }
+    else {
+        finish_cancelled(&event_tx).await;
+        return;
     };
 
     // Wait for the user to confirm they're ready to read.
@@ -218,7 +215,7 @@ async fn run_calibration(
     let _ = event_tx
         .send(CalibrationFrame::PhaseChanged(CalibrationPhase::Speech))
         .await;
-    let speech_scores = match collect_phase(
+    let PhaseOutcome::Done(speech_scores) = collect_phase(
         &stream,
         &mut vad,
         &event_tx,
@@ -227,12 +224,9 @@ async fn run_calibration(
         timings.speech,
     )
     .await
-    {
-        PhaseOutcome::Done(s) => s,
-        PhaseOutcome::Cancelled => {
-            finish_cancelled(&event_tx).await;
-            return;
-        }
+    else {
+        finish_cancelled(&event_tx).await;
+        return;
     };
 
     // Compute and emit recommendation.

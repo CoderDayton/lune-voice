@@ -494,9 +494,8 @@ impl OrtStyleLlm {
     }
 
     fn embed_ids(&self, ids: &[i64]) -> Result<Option<DynValue>> {
-        let embed = match &self.embed_session {
-            Some(s) => s,
-            None => return Ok(None),
+        let Some(embed) = &self.embed_session else {
+            return Ok(None);
         };
         let mut sess = embed.lock().map_err(e)?;
         let input_ids = Array2::from_shape_vec((1, ids.len()), ids.to_vec()).map_err(e)?;

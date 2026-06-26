@@ -93,9 +93,8 @@ fn detect_rare_casing(word: &str) -> bool {
 
 fn detect_proper_noun(word: &str) -> bool {
     let mut chars = word.chars();
-    let first = match chars.next() {
-        Some(c) => c,
-        None => return false,
+    let Some(first) = chars.next() else {
+        return false;
     };
     first.is_uppercase() && chars.all(|c| c.is_lowercase())
 }

@@ -144,9 +144,8 @@ fn read_ibus_address_file() -> Result<String, String> {
     let dir = std::path::Path::new(&config).join("ibus").join("bus");
     let entries = std::fs::read_dir(&dir).map_err(|e| format!("read {dir:?}: {e}"))?;
     for entry in entries.flatten() {
-        let text = match std::fs::read_to_string(entry.path()) {
-            Ok(t) => t,
-            Err(_) => continue,
+        let Ok(text) = std::fs::read_to_string(entry.path()) else {
+            continue;
         };
         for line in text.lines() {
             if let Some(addr) = line.strip_prefix("IBUS_ADDRESS=") {

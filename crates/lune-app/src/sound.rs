@@ -95,7 +95,7 @@ fn play_blocking(cue: Cue, volume: f32) -> Result<(), String> {
     };
     let fixed_config = cpal::StreamConfig {
         buffer_size: cpal::BufferSize::Fixed(fixed),
-        ..default_config.clone()
+        ..default_config
     };
     debug!(
         ?sample_format,

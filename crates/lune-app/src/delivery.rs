@@ -59,14 +59,20 @@ impl DeliveryService {
             return true;
         }
         debug!(?session_id, ?mode, text_len = text.len(), "delivering text");
-        if let Err(e) = self.tx.send(DeliveryMsg {
+        self.enqueue(DeliveryMsg {
             session_id,
             text: text.into(),
             mode,
             copy_to_clipboard,
             #[cfg(unix)]
             target: None,
-        }) {
+        })
+    }
+
+    /// Queue a delivery message, returning `false` if the delivery thread has
+    /// died (its receiver dropped, so `send` errors).
+    fn enqueue(&self, msg: DeliveryMsg) -> bool {
+        if let Err(e) = self.tx.send(msg) {
             warn!(error = %e, "delivery thread dead — text will not be typed");
             return false;
         }
@@ -91,17 +97,13 @@ impl DeliveryService {
             text_len = text.len(),
             "delivering text to target"
         );
-        if let Err(e) = self.tx.send(DeliveryMsg {
+        self.enqueue(DeliveryMsg {
             session_id,
             text: text.into(),
             mode,
             copy_to_clipboard,
             target: Some(target.clone()),
-        }) {
-            warn!(error = %e, "delivery thread dead — text will not be typed");
-            return false;
-        }
-        true
+        })
     }
 
     pub fn deliver_owned(
