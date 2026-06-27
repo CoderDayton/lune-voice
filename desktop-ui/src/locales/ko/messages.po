@@ -60,6 +60,10 @@ msgstr "{visibleCount} / {totalCount}"
 msgid "{visibleCount} of {totalCount} sessions"
 msgstr "{totalCount} 세션 중 {visibleCount}"
 
+#: src/features/welcome/components/engine-step.tsx:41
+msgid "A compact model with automatic language detection. The quickest way to get started."
+msgstr ""
+
 #: src/features/shell/components/sidebar.tsx:190
 msgid "Account and status"
 msgstr "계정 및 상태"
@@ -103,11 +107,11 @@ msgstr "수정 추가"
 msgid "Adjust manually"
 msgstr "수동으로 조정"
 
-#: src/features/settings/sections/models-section.tsx:141
+#: src/features/settings/sections/models-section.tsx:89
 msgid "AI models stored on your device."
 msgstr "기기에 저장된 AI 모델입니다."
 
-#: src/features/welcome/welcome-page.tsx:131
+#: src/features/welcome/welcome-page.tsx:158
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "필요한 모든 모델이 이미 설치되어 있습니다. 준비가 되면 계속하세요."
 
@@ -185,7 +189,7 @@ msgstr "마이크 교정"
 #: src/components/feedback/confirm-dialog.tsx:52
 #: src/features/dictionary/components/dictionary-table.tsx:96
 #: src/features/settings/components/calibrate-modal.tsx:115
-#: src/features/settings/sections/models-section.tsx:317
+#: src/features/settings/sections/models-section.tsx:265
 #: src/features/styles/components/style-editor-modal.tsx:138
 msgid "Cancel"
 msgstr "취소"
@@ -206,13 +210,21 @@ msgstr "대문자"
 msgid "Capture device and how recording detects when you speak."
 msgstr ""
 
-#: src/features/welcome/welcome-page.tsx:125
+#: src/features/welcome/welcome-page.tsx:301
+msgid "Change engine"
+msgstr ""
+
+#: src/features/welcome/welcome-page.tsx:152
 msgid "Check your network and we'll pick up where we left off."
 msgstr "네트워크를 확인하면 중단한 부분부터 다시 시작하겠습니다."
 
-#: src/features/welcome/welcome-page.tsx:50
+#: src/features/welcome/welcome-page.tsx:59
 msgid "Checking installed models…"
 msgstr "설치된 모델을 확인하는 중…"
+
+#: src/features/settings/components/asr-engine-cards.tsx:185
+msgid "Checking…"
+msgstr ""
 
 #: src/features/settings/components/theme-picker.tsx:130
 msgid "Choose a theme"
@@ -226,10 +238,18 @@ msgstr "현재 사용 중인 앱에 완성된 텍스트를 삽입하는 방법�
 msgid "Choose how Lune Voice looks."
 msgstr "Lune Voice의 모양을 선택하세요."
 
-#: src/features/welcome/welcome-page.tsx:128
-#: src/features/welcome/welcome-page.tsx:134
+#: src/features/welcome/welcome-page.tsx:155
+#: src/features/welcome/welcome-page.tsx:161
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "설치할 AI 모델을 선택하세요. 모든 것이 오프라인으로 실행됩니다. 클라우드나 계정이 없습니다."
+
+#: src/features/settings/sections/transcription-section.tsx:35
+msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
+msgstr ""
+
+#: src/features/welcome/welcome-page.tsx:143
+msgid "Choose your speech engine. Everything runs offline — no cloud, no accounts."
+msgstr ""
 
 #: src/features/dictionary/components/dictionary-table.tsx:236
 msgid "Clear filter"
@@ -245,7 +265,7 @@ msgid "close"
 msgstr "닫기"
 
 #: src/features/history/components/session-detail-modal.tsx:209
-#: src/features/settings/sections/models-section.tsx:329
+#: src/features/settings/sections/models-section.tsx:277
 #: src/features/styles/components/style-editor-modal.tsx:129
 msgid "Close"
 msgstr "닫기"
@@ -269,11 +289,12 @@ msgstr "완료"
 msgid "Connecting"
 msgstr "연결 중"
 
-#: src/features/welcome/welcome-page.tsx:243
+#: src/features/welcome/welcome-page.tsx:233
+#: src/features/welcome/welcome-page.tsx:295
 msgid "Continue"
 msgstr "계속"
 
-#: src/features/settings/sections/transcription-section.tsx:24
+#: src/features/settings/sections/transcription-section.tsx:30
 msgid "Control how your speech is turned into text."
 msgstr "음성이 텍스트로 변환되는 방식을 제어하세요."
 
@@ -294,21 +315,21 @@ msgstr "클립보드에 복사"
 msgid "Copy transcript"
 msgstr "받아쓰기 텍스트 복사"
 
-#: src/features/settings/sections/transcription-section.tsx:86
+#: src/features/settings/sections/transcription-section.tsx:84
 msgid "Correction"
 msgstr "교정"
 
-#: src/features/settings/sections/transcription-section.tsx:132
-#: src/features/settings/sections/transcription-section.tsx:144
+#: src/features/settings/sections/transcription-section.tsx:130
+#: src/features/settings/sections/transcription-section.tsx:142
 msgid "Correction frequency"
 msgstr "교정 빈도"
 
-#: src/features/settings/sections/transcription-section.tsx:91
+#: src/features/settings/sections/transcription-section.tsx:89
 msgid "Correction LLM"
 msgstr "교정 LLM"
 
-#: src/features/settings/sections/transcription-section.tsx:111
-#: src/features/settings/sections/transcription-section.tsx:123
+#: src/features/settings/sections/transcription-section.tsx:109
+#: src/features/settings/sections/transcription-section.tsx:121
 msgid "Correction sensitivity"
 msgstr "교정 민감도"
 
@@ -342,7 +363,7 @@ msgstr "어둡게"
 #: src/features/dictionary/components/dictionary-table.tsx:146
 #: src/features/history/components/history-table.tsx:309
 #: src/features/history/components/session-detail-modal.tsx:202
-#: src/features/settings/sections/models-section.tsx:265
+#: src/features/settings/sections/models-section.tsx:213
 msgid "Delete"
 msgstr "삭제"
 
@@ -352,11 +373,11 @@ msgid "Delete {0}"
 msgstr "{0} 삭제"
 
 #. placeholder {0}: model.name
-#: src/features/settings/sections/models-section.tsx:302
+#: src/features/settings/sections/models-section.tsx:250
 msgid "Delete {0}?"
 msgstr "{0}을(를) 삭제하시겠습니까?"
 
-#: src/features/settings/sections/models-section.tsx:320
+#: src/features/settings/sections/models-section.tsx:268
 msgid "Delete model"
 msgstr "모델 삭제"
 
@@ -389,8 +410,8 @@ msgstr "AI 스타일 지정 이전에 결정적 수정 사항이 적용되었습
 msgid "Dictation"
 msgstr ""
 
-#: src/features/settings/sections/transcription-section.tsx:53
-#: src/features/settings/sections/transcription-section.tsx:59
+#: src/features/settings/sections/transcription-section.tsx:51
+#: src/features/settings/sections/transcription-section.tsx:57
 msgid "Dictation language"
 msgstr "받아쓰기 언어"
 
@@ -402,7 +423,7 @@ msgstr "받아쓰기 표시기"
 msgid "Dictation pill visibility"
 msgstr "받아쓰기 표시기 표시 여부"
 
-#: src/features/settings/sections/transcription-section.tsx:95
+#: src/features/settings/sections/transcription-section.tsx:93
 msgid "Disabled — transcripts are delivered raw, and the LLM model is hidden from the Models tab."
 msgstr ""
 
@@ -419,27 +440,29 @@ msgid "Dismiss error"
 msgstr "오류 무시"
 
 #: src/features/history/components/history-table.tsx:303
-#: src/features/settings/sections/models-section.tsx:279
+#: src/features/settings/components/asr-engine-cards.tsx:199
+#: src/features/settings/sections/models-section.tsx:227
 msgid "Download"
 msgstr "다운로드"
 
-#: src/features/welcome/welcome-page.tsx:235
+#: src/features/welcome/welcome-page.tsx:287
 msgid "Download {pendingCount} models"
 msgstr "{pendingCount} 모델 다운로드"
 
-#: src/features/welcome/welcome-page.tsx:235
+#: src/features/welcome/welcome-page.tsx:287
 msgid "Download 1 model"
 msgstr "모델 1개 다운로드"
 
-#: src/features/welcome/welcome-page.tsx:85
+#: src/features/welcome/welcome-page.tsx:107
 msgid "Download failed"
 msgstr "다운로드 실패"
 
-#: src/features/welcome/welcome-page.tsx:124
+#: src/features/welcome/welcome-page.tsx:151
 msgid "Download interrupted"
 msgstr "다운로드가 중단되었습니다."
 
-#: src/features/settings/sections/models-section.tsx:238
+#: src/features/settings/components/asr-engine-cards.tsx:178
+#: src/features/settings/sections/models-section.tsx:186
 #: src/features/welcome/components/model-card.tsx:99
 msgid "Download progress"
 msgstr "다운로드 진행 상황"
@@ -448,12 +471,13 @@ msgstr "다운로드 진행 상황"
 msgid "Download transcript"
 msgstr "받아쓰기 텍스트 다운로드"
 
-#: src/features/welcome/welcome-page.tsx:121
+#: src/features/welcome/welcome-page.tsx:148
 msgid "Downloading models"
 msgstr "모델 다운로드 중"
 
-#: src/features/settings/sections/models-section.tsx:279
-#: src/features/welcome/welcome-page.tsx:196
+#: src/features/settings/components/asr-engine-cards.tsx:181
+#: src/features/settings/sections/models-section.tsx:227
+#: src/features/welcome/welcome-page.tsx:248
 msgid "Downloading…"
 msgstr "다운로드 중…"
 
@@ -489,7 +513,7 @@ msgstr "스타일 편집"
 msgid "Empty session"
 msgstr "빈 세션"
 
-#: src/features/settings/sections/transcription-section.tsx:103
+#: src/features/settings/sections/transcription-section.tsx:101
 msgid "Enable correction LLM"
 msgstr "교정 LLM 활성화"
 
@@ -498,13 +522,17 @@ msgstr "교정 LLM 활성화"
 msgid "Engine"
 msgstr "엔진"
 
-#: src/features/welcome/welcome-page.tsx:222
+#: src/features/welcome/welcome-page.tsx:274
 msgid "Enter Lune Voice"
 msgstr "Lune Voice 열기"
 
 #: src/features/shell/components/sidebar.tsx:37
 msgid "Expand sidebar"
 msgstr "사이드바 확장"
+
+#: src/features/welcome/components/engine-step.tsx:40
+msgid "Fast · 0.6B · auto language"
+msgstr ""
 
 #: src/features/dictionary/components/dictionary-form.tsx:129
 msgid "Fill both fields to see the correction."
@@ -581,7 +609,7 @@ msgstr ""
 msgid "How quickly Lune Voice decides you're done speaking. Higher = ends sooner on a pause."
 msgstr "Lune Voice가 말하기가 끝났다고 판단하는 속도입니다. 값이 높을수록 멈췄을 때 더 빨리 종료합니다."
 
-#: src/features/settings/sections/transcription-section.tsx:133
+#: src/features/settings/sections/transcription-section.tsx:131
 msgid "How readily the LLM runs on clean speech. Higher polishes more segments; lower skips more often for speed."
 msgstr "깨끗한 음성에서 LLM이 얼마나 적극적으로 실행되는지. 높을수록 더 많은 구간을 다듬고, 낮을수록 속도를 위해 더 자주 건너뜁니다."
 
@@ -589,7 +617,8 @@ msgstr "깨끗한 음성에서 LLM이 얼마나 적극적으로 실행되는지.
 msgid "Idle"
 msgstr "대기"
 
-#: src/features/settings/sections/models-section.tsx:225
+#: src/features/settings/components/asr-engine-cards.tsx:189
+#: src/features/settings/sections/models-section.tsx:173
 #: src/features/welcome/components/model-card.tsx:89
 msgid "Installed"
 msgstr "설치됨"
@@ -689,14 +718,18 @@ msgstr "분"
 msgid "Mode"
 msgstr "모드"
 
-#: src/features/settings/sections/models-section.tsx:140
+#: src/features/settings/sections/models-section.tsx:88
 #: src/features/settings/settings-page.tsx:61
 msgid "Models"
 msgstr "모델"
 
-#: src/features/welcome/welcome-page.tsx:259
+#: src/features/welcome/welcome-page.tsx:316
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "모델은 로컬에 저장됩니다. 원격 측정도 없고 계정도 없습니다."
+
+#: src/features/welcome/components/engine-step.tsx:47
+msgid "Multilingual · pick a size"
+msgstr ""
 
 #: src/features/styles/components/style-editor-modal.tsx:62
 msgid "Name"
@@ -753,7 +786,7 @@ msgstr "텍스트 없음"
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
 msgstr "음성 감지 전에 마이크 레벨을 표준화합니다. 조용한 마이크와 시끄러운 방을 도와줍니다. 추천합니다."
 
-#: src/features/settings/sections/models-section.tsx:228
+#: src/features/settings/sections/models-section.tsx:176
 msgid "Not installed"
 msgstr "설치되지 않음"
 
@@ -783,7 +816,7 @@ msgstr "세션 세부정보 열기"
 msgid "Open session from {time}"
 msgstr "{time}에서 세션 열기"
 
-#: src/features/settings/sections/models-section.tsx:222
+#: src/features/settings/sections/models-section.tsx:170
 #: src/features/welcome/components/model-card.tsx:86
 msgid "Optional"
 msgstr "선택 과목"
@@ -793,7 +826,7 @@ msgstr "선택 과목"
 msgid "Output"
 msgstr "산출"
 
-#: src/features/welcome/welcome-page.tsx:169
+#: src/features/welcome/welcome-page.tsx:196
 msgid "Overall progress"
 msgstr "전반적인 진행 상황"
 
@@ -830,11 +863,11 @@ msgstr ""
 msgid "Please call Stella. Ask her to bring these things with her from the store: six spoons of fresh snow peas, five thick slabs of blue cheese, and maybe a snack for her brother Bob."
 msgstr "스텔라에게 전화해주세요. 그녀에게 가게에서 신선한 눈콩 6숟가락, 두꺼운 블루 치즈 5조각, 그리고 어쩌면 그녀의 오빠 밥을 위한 간식 등을 가게에서 가져오라고 하십시오."
 
-#: src/features/welcome/welcome-page.tsx:199
+#: src/features/welcome/welcome-page.tsx:251
 msgid "Please keep the app open until downloads finish"
 msgstr "다운로드가 완료될 때까지 앱을 열어두세요."
 
-#: src/features/settings/sections/transcription-section.tsx:94
+#: src/features/settings/sections/transcription-section.tsx:92
 msgid "Polishes punctuation and fixes obvious recognizer errors after transcription."
 msgstr ""
 
@@ -881,9 +914,9 @@ msgstr "처리 중…"
 msgid "Quit Lune Voice"
 msgstr "Lune Voice 종료"
 
-#: src/features/settings/sections/transcription-section.tsx:29
-msgid "Qwen3-ASR runs locally with automatic language detection."
-msgstr "Qwen3-ASR은 자동 언어 감지를 통해 로컬로 실행됩니다."
+#: src/features/welcome/components/engine-step.tsx:39
+msgid "Qwen3-ASR"
+msgstr ""
 
 #: src/features/settings/components/calibrate-modal.tsx:86
 msgid "Read aloud. Don't worry about pace — just speak naturally."
@@ -930,7 +963,7 @@ msgstr "\"{0}\" → \"{1}\"에 대해 저장된 수정 사항을 제거합니다
 msgid "Replacement"
 msgstr "대체어"
 
-#: src/features/settings/sections/models-section.tsx:219
+#: src/features/settings/sections/models-section.tsx:167
 #: src/features/welcome/components/model-card.tsx:83
 msgid "Required"
 msgstr "필수"
@@ -939,7 +972,7 @@ msgstr "필수"
 msgid "Retry"
 msgstr "다시 시도"
 
-#: src/features/welcome/welcome-page.tsx:210
+#: src/features/welcome/welcome-page.tsx:262
 msgid "Retry download"
 msgstr "다운로드 다시 시도"
 
@@ -968,7 +1001,7 @@ msgstr "받아쓰기 텍스트 검색"
 msgid "Search transcripts…"
 msgstr "받아쓰기 텍스트 검색…"
 
-#: src/features/welcome/welcome-page.tsx:239
+#: src/features/welcome/welcome-page.tsx:291
 msgid "Select required models"
 msgstr "필수 모델 선택"
 
@@ -995,7 +1028,7 @@ msgstr "세션"
 msgid "Set hotkey"
 msgstr "단축키 설정"
 
-#: src/features/settings/sections/transcription-section.tsx:54
+#: src/features/settings/sections/transcription-section.tsx:52
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "사용하는 언어를 설정하세요. 자동은 음성 감지를 사용합니다."
 
@@ -1008,8 +1041,9 @@ msgstr "설정 섹션"
 msgid "Shortcuts"
 msgstr "단축키"
 
-#: src/features/welcome/welcome-page.tsx:213
-#: src/features/welcome/welcome-page.tsx:248
+#: src/features/welcome/welcome-page.tsx:237
+#: src/features/welcome/welcome-page.tsx:265
+#: src/features/welcome/welcome-page.tsx:304
 msgid "Skip for now"
 msgstr "지금은 건너뛰기"
 
@@ -1127,11 +1161,11 @@ msgstr "음성 입력에 사용되는 주요 단축키입니다. 바인딩을 �
 msgid "Theme"
 msgstr "테마"
 
-#: src/features/settings/sections/models-section.tsx:312
+#: src/features/settings/sections/models-section.tsx:260
 msgid "This is a required model. Dictation will not work without it."
 msgstr "필수 모델입니다. 이 모델이 없으면 받아쓰기가 작동하지 않습니다."
 
-#: src/features/welcome/welcome-page.tsx:122
+#: src/features/welcome/welcome-page.tsx:149
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "이것은 한 번만 발생합니다. 그동안 컴퓨터를 계속 사용할 수 있습니다."
 
@@ -1185,17 +1219,17 @@ msgstr "전체 단어 수"
 msgid "Transcript"
 msgstr "받아쓰기 텍스트"
 
-#: src/features/settings/sections/transcription-section.tsx:23
+#: src/features/settings/sections/transcription-section.tsx:29
 #: src/features/settings/settings-page.tsx:59
 msgid "Transcription"
 msgstr "전사"
 
-#: src/features/settings/sections/transcription-section.tsx:87
+#: src/features/settings/sections/transcription-section.tsx:85
 msgid "Tune how the local LLM polishes transcripts after transcription."
 msgstr "전사 후 로컬 LLM이 전사 결과를 다듬는 방식을 조정합니다."
 
-#: src/features/settings/sections/transcription-section.tsx:70
-#: src/features/settings/sections/transcription-section.tsx:78
+#: src/features/settings/sections/transcription-section.tsx:68
+#: src/features/settings/sections/transcription-section.tsx:76
 msgid "Use hardware acceleration"
 msgstr "하드웨어 가속 사용"
 
@@ -1217,21 +1251,21 @@ msgstr "모두 보기"
 msgid "View style"
 msgstr "스타일 보기"
 
-#: src/features/settings/sections/transcription-section.tsx:28
 #: src/features/settings/sections/transcription-section.tsx:34
 msgid "Voice model"
 msgstr "음성 모델"
 
-#: src/features/welcome/welcome-page.tsx:130
+#: src/features/welcome/welcome-page.tsx:157
 msgid "Welcome back"
 msgstr "돌아온 것을 환영합니다"
 
-#: src/features/welcome/welcome-page.tsx:127
-#: src/features/welcome/welcome-page.tsx:133
+#: src/features/welcome/welcome-page.tsx:142
+#: src/features/welcome/welcome-page.tsx:154
+#: src/features/welcome/welcome-page.tsx:160
 msgid "Welcome to Lune Voice"
 msgstr "Lune Voice에 오신 것을 환영합니다"
 
-#: src/features/settings/sections/transcription-section.tsx:71
+#: src/features/settings/sections/transcription-section.tsx:69
 msgid "When available, this can make transcription finish faster."
 msgstr "가능한 경우 전사를 더 빠르게 완료할 수 있습니다."
 
@@ -1251,6 +1285,19 @@ msgstr "받아쓰기가 캡처하는 입력 장치. 변경 사항은 즉시 적�
 msgid "Which paste shortcut to send. Automatic detects terminals; override if paste lands in the wrong place."
 msgstr "보낼 붙여넣기 단축키. '자동'은 터미널을 감지합니다. 붙여넣기가 잘못된 위치에 들어가면 재정의하세요."
 
+#: src/features/welcome/components/engine-step.tsx:46
+msgid "Whisper"
+msgstr ""
+
+#: src/features/settings/components/asr-engine-cards.tsx:102
+#: src/features/welcome/components/engine-step.tsx:69
+msgid "Whisper model size"
+msgstr ""
+
+#: src/features/welcome/components/engine-step.tsx:48
+msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
+msgstr ""
+
 #: src/features/history/components/history-session-list.tsx:33
 #: src/features/history/components/history-table.tsx:286
 #: src/features/overview/overview-page.tsx:258
@@ -1262,7 +1309,7 @@ msgstr "단어"
 msgid "Words"
 msgstr "단어"
 
-#: src/features/settings/sections/transcription-section.tsx:112
+#: src/features/settings/sections/transcription-section.tsx:110
 msgid "Words the recognizer is unsure about are sent to the LLM. Higher corrects more aggressively; lower trusts the raw transcription."
 msgstr "인식기가 확신하지 못하는 단어는 LLM으로 전송됩니다. 높을수록 더 적극적으로 교정하고, 낮을수록 원본 전사를 더 신뢰합니다."
 
@@ -1278,7 +1325,7 @@ msgstr "예"
 msgid "You say"
 msgstr "말할 내용"
 
-#: src/features/welcome/welcome-page.tsx:118
+#: src/features/welcome/welcome-page.tsx:145
 msgid "You're all set"
 msgstr "모든 준비가 완료되었습니다."
 
@@ -1290,7 +1337,7 @@ msgstr "API 키입니다. 저장된 키를 유지하려면 비워 두세요."
 msgid "your hotkey"
 msgstr "단축키"
 
-#: src/features/welcome/welcome-page.tsx:119
+#: src/features/welcome/welcome-page.tsx:146
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "모델이 준비되었습니다. 모든 것이 이 컴퓨터에 유지됩니다."
 
