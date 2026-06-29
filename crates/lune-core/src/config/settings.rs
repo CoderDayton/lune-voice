@@ -38,7 +38,7 @@ where
 /// the pipeline merge and are read straight from `UserSettings` in
 /// `SessionManager` / `AppRuntime`.
 ///
-/// When in doubt: if Qwen3 and OpenAI would want different defaults, it
+/// When in doubt: if two backends would want different defaults, it
 /// belongs in `PipelineOverrides`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserSettings {
@@ -148,7 +148,9 @@ impl Default for UserSettings {
     fn default() -> Self {
         Self {
             device: DevicePolicy::Auto,
-            asr_backend: AsrBackendConfig::Qwen3Asr {},
+            asr_backend: AsrBackendConfig::WhisperCpp {
+                model: WhisperModel::default(),
+            },
             llm_backend: LlmBackendConfig::Disabled,
             hotkey: HotkeyConfig::default(),
             default_style: "minimal".into(),
@@ -231,11 +233,10 @@ impl WhisperModel {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type")]
 #[non_exhaustive]
 pub enum AsrBackendConfig {
-    Qwen3Asr {},
     OpenAiCompatible {
         base_url: Url,
         api_key: RedactedString,
@@ -249,12 +250,57 @@ pub enum AsrBackendConfig {
     },
 }
 
+/// Forward/backward-compatible deserialize. An unknown `type` tag — notably
+/// the removed `"Qwen3Asr"` ONNX backend still written in older
+/// `settings.toml` files — maps to the current default (`WhisperCpp`) instead
+/// of failing the entire settings load.
+impl<'de> Deserialize<'de> for AsrBackendConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(tag = "type")]
+        enum Repr {
+            OpenAiCompatible {
+                base_url: Url,
+                api_key: RedactedString,
+                model: String,
+                streaming: StreamingMode,
+            },
+            WhisperCpp {
+                #[serde(default)]
+                model: WhisperModel,
+            },
+            #[serde(other)]
+            Unknown,
+        }
+
+        Ok(match Repr::deserialize(deserializer)? {
+            Repr::OpenAiCompatible {
+                base_url,
+                api_key,
+                model,
+                streaming,
+            } => AsrBackendConfig::OpenAiCompatible {
+                base_url,
+                api_key,
+                model,
+                streaming,
+            },
+            Repr::WhisperCpp { model } => AsrBackendConfig::WhisperCpp { model },
+            Repr::Unknown => AsrBackendConfig::WhisperCpp {
+                model: WhisperModel::default(),
+            },
+        })
+    }
+}
+
 impl AsrBackendConfig {
     /// Return the [`AsrBackendKind`] discriminant for this config.
     pub fn kind(&self) -> crate::asr::AsrBackendKind {
         use crate::asr::AsrBackendKind;
         match self {
-            Self::Qwen3Asr { .. } => AsrBackendKind::Qwen3Asr,
             Self::OpenAiCompatible { .. } => AsrBackendKind::OpenAiCompatible,
             Self::WhisperCpp { .. } => AsrBackendKind::WhisperCpp,
         }
@@ -345,5 +391,42 @@ impl DevicePolicy {
     /// `ep::CUDA::default().build().error_on_failure()`.
     pub fn strict_cuda(self) -> bool {
         matches!(self, Self::Cuda)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_qwen3_asr_backend_migrates_to_whisper_default() {
+        // Old persisted configs carry `type = "Qwen3Asr"`. With the ONNX backend
+        // removed, deserializing such a config must not fail — it falls back to
+        // the current default (`WhisperCpp`) so settings still load.
+        let cfg: AsrBackendConfig = serde_json::from_str(r#"{"type":"Qwen3Asr"}"#).unwrap();
+        match cfg {
+            AsrBackendConfig::WhisperCpp { model } => {
+                assert_eq!(model, WhisperModel::default());
+            }
+            other => panic!("expected WhisperCpp default, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn whisper_cpp_backend_round_trips() {
+        let cfg: AsrBackendConfig =
+            serde_json::from_str(r#"{"type":"WhisperCpp","model":"Small"}"#).unwrap();
+        match cfg {
+            AsrBackendConfig::WhisperCpp { model } => assert_eq!(model, WhisperModel::Small),
+            other => panic!("expected WhisperCpp, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn default_settings_use_whisper_cpp() {
+        assert_eq!(
+            UserSettings::default().asr_backend.kind(),
+            crate::asr::AsrBackendKind::WhisperCpp
+        );
     }
 }

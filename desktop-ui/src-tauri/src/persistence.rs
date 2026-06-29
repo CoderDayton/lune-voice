@@ -643,7 +643,6 @@ fn asr_backend_from_type(
     input: &SaveWorkspaceSettingsInput,
 ) -> Result<AsrBackendConfig, String> {
     Ok(match kind {
-        AsrBackendTypeDto::Qwen3Asr => AsrBackendConfig::Qwen3Asr {},
         AsrBackendTypeDto::WhisperCpp => {
             // Prefer the incoming selection; else keep the current whisper model
             // if already on WhisperCpp; else the default. The choice lives inside

@@ -60,10 +60,6 @@ msgstr "{visibleCount} / {totalCount}"
 msgid "{visibleCount} of {totalCount} sessions"
 msgstr "{visibleCount} из {totalCount} сеансов"
 
-#: src/features/welcome/components/engine-step.tsx:41
-msgid "A compact model with automatic language detection. The quickest way to get started."
-msgstr ""
-
 #: src/features/shell/components/sidebar.tsx:190
 msgid "Account and status"
 msgstr "Аккаунт и статус"
@@ -530,10 +526,6 @@ msgstr "Введите Лунный Голос"
 msgid "Expand sidebar"
 msgstr "Развернуть боковую панель"
 
-#: src/features/welcome/components/engine-step.tsx:40
-msgid "Fast · 0.6B · auto language"
-msgstr ""
-
 #: src/features/dictionary/components/dictionary-form.tsx:129
 msgid "Fill both fields to see the correction."
 msgstr "Заполните оба поля, чтобы увидеть исправление."
@@ -727,7 +719,7 @@ msgstr "Модели"
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "Модели хранятся локально. Никакой телеметрии, никаких учетных записей."
 
-#: src/features/welcome/components/engine-step.tsx:47
+#: src/features/welcome/components/engine-step.tsx:40
 msgid "Multilingual · pick a size"
 msgstr ""
 
@@ -913,10 +905,6 @@ msgstr "Обработка…"
 #: src/features/shell/components/sidebar.tsx:247
 msgid "Quit Lune Voice"
 msgstr "Выйти из Lune Voice"
-
-#: src/features/welcome/components/engine-step.tsx:39
-msgid "Qwen3-ASR"
-msgstr ""
 
 #: src/features/settings/components/calibrate-modal.tsx:86
 msgid "Read aloud. Don't worry about pace — just speak naturally."
@@ -1285,16 +1273,16 @@ msgstr "С какого устройства ввода ведётся захв�
 msgid "Which paste shortcut to send. Automatic detects terminals; override if paste lands in the wrong place."
 msgstr "Какое сочетание клавиш вставки отправлять. «Автоматически» определяет терминалы; переопределите, если вставка попадает не туда."
 
-#: src/features/welcome/components/engine-step.tsx:46
+#: src/features/welcome/components/engine-step.tsx:39
 msgid "Whisper"
 msgstr ""
 
 #: src/features/settings/components/asr-engine-cards.tsx:102
-#: src/features/welcome/components/engine-step.tsx:69
+#: src/features/welcome/components/engine-step.tsx:62
 msgid "Whisper model size"
 msgstr ""
 
-#: src/features/welcome/components/engine-step.tsx:48
+#: src/features/welcome/components/engine-step.tsx:41
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
 msgstr ""
 

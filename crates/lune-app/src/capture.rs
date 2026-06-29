@@ -73,7 +73,7 @@ fn rms_of(samples: &[f32]) -> f32 {
     (sum_sq / samples.len() as f32).sqrt()
 }
 
-/// Hard ceiling on ASR backend init. A hung Qwen3/Parakeet ONNX session
+/// Hard ceiling on ASR backend init. A hung local model session
 /// would otherwise block the session forever — caller would never see an
 /// error event, hotkey would feel broken until process restart.
 const ASR_START_TIMEOUT: Duration = Duration::from_secs(15);

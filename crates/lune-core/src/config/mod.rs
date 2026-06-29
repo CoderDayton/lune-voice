@@ -151,7 +151,10 @@ mod tests {
         assert_eq!(parsed.dictation_language, "auto");
         assert!(parsed.mic_prewarm);
         assert!(parsed.vad_pcen);
-        assert!(matches!(parsed.asr_backend, AsrBackendConfig::Qwen3Asr {}));
+        assert!(matches!(
+            parsed.asr_backend,
+            AsrBackendConfig::WhisperCpp { .. }
+        ));
         assert!(matches!(parsed.llm_backend, LlmBackendConfig::Local {}));
     }
 }

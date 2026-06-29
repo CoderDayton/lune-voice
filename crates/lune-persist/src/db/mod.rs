@@ -44,12 +44,12 @@ type SessionRow7 = (
 /// Decode a stored backend kind from its JSON column value.
 ///
 /// Returns `(kind, Some(reason))` when the value cannot be parsed — falls
-/// back to `Qwen3Asr` so history still loads after a backend is removed or
+/// back to `WhisperCpp` so history still loads after a backend is removed or
 /// renamed, but surfaces the raw decode failure so callers can log it.
 fn decode_backend_or_fallback(raw: &str) -> (AsrBackendKind, Option<String>) {
     match serde_json::from_str::<AsrBackendKind>(raw) {
         Ok(k) => (k, None),
-        Err(e) => (AsrBackendKind::Qwen3Asr, Some(e.to_string())),
+        Err(e) => (AsrBackendKind::WhisperCpp, Some(e.to_string())),
     }
 }
 
@@ -73,7 +73,7 @@ fn row_to_session(
             session_id = %sid,
             stored_backend = %back,
             error = %reason,
-            "session row stored an unknown backend kind; falling back to Qwen3Asr",
+            "session row stored an unknown backend kind; falling back to WhisperCpp",
         );
     }
     let status: SessionStatus =
@@ -608,19 +608,23 @@ mod tests {
     }
 
     #[test]
-    fn decode_backend_accepts_legacy_ort_qwen_alias() {
-        let (kind, fallback) = decode_backend_or_fallback("\"OrtQwenAsr\"");
-        assert_eq!(kind, AsrBackendKind::Qwen3Asr);
-        assert!(
-            fallback.is_none(),
-            "legacy OrtQwenAsr rows must decode without a fallback warning",
-        );
+    fn decode_backend_falls_back_on_legacy_qwen3() {
+        // The Qwen3-ASR backend and its `OrtQwenAsr` alias were removed; legacy
+        // session rows must still load by falling back to the current default.
+        for raw in ["\"Qwen3Asr\"", "\"OrtQwenAsr\""] {
+            let (kind, fallback) = decode_backend_or_fallback(raw);
+            assert_eq!(kind, AsrBackendKind::WhisperCpp);
+            assert!(
+                fallback.is_some(),
+                "legacy backend value {raw} must surface a fallback reason",
+            );
+        }
     }
 
     #[test]
     fn decode_backend_falls_back_on_unknown() {
         let (kind, fallback) = decode_backend_or_fallback("\"SomeRemovedBackend\"");
-        assert_eq!(kind, AsrBackendKind::Qwen3Asr);
+        assert_eq!(kind, AsrBackendKind::WhisperCpp);
         assert!(
             fallback.is_some(),
             "unknown backend JSON must surface a fallback reason",
@@ -634,7 +638,7 @@ mod tests {
             "2024-01-01T00:00:00Z".into(),
             None,
             "minimal".into(),
-            "\"Qwen3Asr\"".into(),
+            "\"WhisperCpp\"".into(),
             "\"Completed\"".into(),
             None,
         );
@@ -652,7 +656,7 @@ mod tests {
             "not-a-date".into(),
             None,
             "minimal".into(),
-            "\"Qwen3Asr\"".into(),
+            "\"WhisperCpp\"".into(),
             "\"Completed\"".into(),
             None,
         );
@@ -670,7 +674,7 @@ mod tests {
             "2024-01-01T00:00:00Z".into(),
             None,
             "minimal".into(),
-            "\"Qwen3Asr\"".into(),
+            "\"WhisperCpp\"".into(),
             "\"NotAStatus\"".into(),
             None,
         );
@@ -684,7 +688,7 @@ mod tests {
     #[test]
     fn decode_backend_falls_back_on_malformed_json() {
         let (kind, fallback) = decode_backend_or_fallback("not-valid-json");
-        assert_eq!(kind, AsrBackendKind::Qwen3Asr);
+        assert_eq!(kind, AsrBackendKind::WhisperCpp);
         assert!(fallback.is_some());
     }
 
@@ -764,7 +768,7 @@ mod tests {
             started_at: Utc::now(),
             ended_at: Some(Utc::now()),
             style: "casual".into(),
-            backend: AsrBackendKind::Qwen3Asr,
+            backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Completed,
             transcript: Some("Hello world.".into()),
         };
@@ -781,7 +785,7 @@ mod tests {
             started_at: Utc::now(),
             ended_at: None,
             style: "casual".into(),
-            backend: AsrBackendKind::Qwen3Asr,
+            backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Active,
             transcript: None,
         };
@@ -808,7 +812,7 @@ mod tests {
             started_at: Utc::now(),
             ended_at: None,
             style: "casual".into(),
-            backend: AsrBackendKind::Qwen3Asr,
+            backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Active,
             transcript: None,
         };
@@ -836,7 +840,7 @@ mod tests {
             started_at: old_time,
             ended_at: None,
             style: "casual".into(),
-            backend: AsrBackendKind::Qwen3Asr,
+            backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Completed,
             transcript: None,
         };
@@ -848,7 +852,7 @@ mod tests {
             started_at: Utc::now(),
             ended_at: None,
             style: "casual".into(),
-            backend: AsrBackendKind::Qwen3Asr,
+            backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Active,
             transcript: None,
         };
@@ -872,7 +876,7 @@ mod tests {
             started_at: Utc::now(),
             ended_at: Some(Utc::now()),
             style: "casual".into(),
-            backend: AsrBackendKind::Qwen3Asr,
+            backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Completed,
             transcript: Some("First session.".into()),
         };
@@ -881,7 +885,7 @@ mod tests {
             started_at: Utc::now(),
             ended_at: Some(Utc::now()),
             style: "formal".into(),
-            backend: AsrBackendKind::Qwen3Asr,
+            backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Completed,
             transcript: Some("Second session.".into()),
         };
@@ -917,7 +921,7 @@ mod tests {
             started_at: Utc::now(),
             ended_at: None,
             style: "casual".into(),
-            backend: AsrBackendKind::Qwen3Asr,
+            backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Active,
             transcript: None,
         };
@@ -991,7 +995,7 @@ mod tests {
             started_at: Utc::now() - chrono::Duration::seconds(10),
             ended_at: Some(Utc::now()),
             style: "casual".into(),
-            backend: AsrBackendKind::Qwen3Asr,
+            backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Completed,
             transcript: Some("two words".into()),
         };
@@ -1000,7 +1004,7 @@ mod tests {
         // Inject a session row with a malformed started_at, bypassing the API.
         diesel::sql_query(
             "INSERT INTO sessions (id, started_at, ended_at, style, backend, status, transcript, created_at) \
-             VALUES ('bad-uuid', 'not-a-date', '2024-01-01T00:00:00Z', 'casual', '\"Qwen3Asr\"', '\"Completed\"', 'three words here', datetime('now'))",
+             VALUES ('bad-uuid', 'not-a-date', '2024-01-01T00:00:00Z', 'casual', '\"WhisperCpp\"', '\"Completed\"', 'three words here', datetime('now'))",
         )
         .execute(&mut db.conn)
         .unwrap();

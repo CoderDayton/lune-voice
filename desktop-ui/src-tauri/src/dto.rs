@@ -34,7 +34,6 @@ pub enum DevicePolicyDto {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../src/lib/backend/generated/")]
 pub enum AsrBackendTypeDto {
-    Qwen3Asr,
     OpenAiCompatible,
     WhisperCpp,
 }
@@ -43,20 +42,19 @@ impl From<lune_core::asr::AsrBackendKind> for AsrBackendTypeDto {
     fn from(kind: lune_core::asr::AsrBackendKind) -> Self {
         use lune_core::asr::AsrBackendKind;
         match kind {
-            AsrBackendKind::Qwen3Asr => Self::Qwen3Asr,
             AsrBackendKind::OpenAiCompatible => Self::OpenAiCompatible,
             AsrBackendKind::WhisperCpp => Self::WhisperCpp,
             // `AsrBackendKind` is `#[non_exhaustive]`. The catch-all fires only
             // when a new lune-core variant ships without a matching
             // `AsrBackendTypeDto` variant + arm here. Loud in dev, fall back to
-            // Qwen3 in release so end users keep a working selector.
+            // WhisperCpp in release so end users keep a working selector.
             other => {
                 debug_assert!(
                     false,
                     "unhandled AsrBackendKind variant {other:?}: add a matching \
                      AsrBackendTypeDto variant and From arm before shipping"
                 );
-                Self::Qwen3Asr
+                Self::WhisperCpp
             }
         }
     }
@@ -65,7 +63,6 @@ impl From<lune_core::asr::AsrBackendKind> for AsrBackendTypeDto {
 impl From<AsrBackendTypeDto> for lune_core::asr::AsrBackendKind {
     fn from(dto: AsrBackendTypeDto) -> Self {
         match dto {
-            AsrBackendTypeDto::Qwen3Asr => Self::Qwen3Asr,
             AsrBackendTypeDto::OpenAiCompatible => Self::OpenAiCompatible,
             AsrBackendTypeDto::WhisperCpp => Self::WhisperCpp,
         }
@@ -511,7 +508,7 @@ mod tests {
     #[test]
     fn asr_backend_kind_dto_round_trip() {
         use lune_core::asr::AsrBackendKind;
-        for kind in [AsrBackendKind::Qwen3Asr, AsrBackendKind::OpenAiCompatible] {
+        for kind in [AsrBackendKind::WhisperCpp, AsrBackendKind::OpenAiCompatible] {
             let dto: AsrBackendTypeDto = kind.into();
             let back: AsrBackendKind = dto.into();
             assert_eq!(back, kind);

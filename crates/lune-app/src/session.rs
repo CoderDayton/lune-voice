@@ -36,7 +36,7 @@ impl Default for SessionManagerConfig {
     fn default() -> Self {
         Self {
             asr_config: AsrSessionConfig::default(),
-            asr_backend_kind: AsrBackendKind::Qwen3Asr,
+            asr_backend_kind: AsrBackendKind::WhisperCpp,
             pipeline: PipelineConfig::default(),
         }
     }

@@ -1,6 +1,5 @@
 import {
   type AsrBackendValue,
-  QWEN3_ASR_LOCAL_NAME,
   type WhisperModelValue,
   whisperModels,
 } from '../settings/data/settings-data';
@@ -18,11 +17,9 @@ export interface ModelStatus {
  * On-disk model directory for a chosen engine + Whisper size. Pure so the
  * onboarding selection logic can be unit-tested without the Tauri/store deps.
  */
-export function asrModelLocalName(backend: AsrBackendValue, whisper: WhisperModelValue): string {
-  if (backend === 'WhisperCpp') {
-    return whisperModels.find((m) => m.value === whisper)?.localName ?? QWEN3_ASR_LOCAL_NAME;
-  }
-  return QWEN3_ASR_LOCAL_NAME;
+export function asrModelLocalName(_backend: AsrBackendValue, whisper: WhisperModelValue): string {
+  const fallback = whisperModels[0]?.localName ?? '';
+  return whisperModels.find((m) => m.value === whisper)?.localName ?? fallback;
 }
 
 /**

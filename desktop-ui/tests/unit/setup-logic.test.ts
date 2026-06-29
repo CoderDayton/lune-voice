@@ -17,10 +17,6 @@ const model = (localName: string, opts: Partial<ModelStatus> = {}): ModelStatus 
 });
 
 describe('asrModelLocalName', () => {
-  test('maps Qwen3 to its model directory', () => {
-    expect(asrModelLocalName('Qwen3Asr', 'Medium')).toBe('qwen3-asr-0.6b');
-  });
-
   test('maps each Whisper size to its model directory', () => {
     expect(asrModelLocalName('WhisperCpp', 'Small')).toBe('whisper-small-q8_0');
     expect(asrModelLocalName('WhisperCpp', 'Medium')).toBe('whisper-medium-q8_0');

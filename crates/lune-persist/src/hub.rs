@@ -59,22 +59,6 @@ pub struct DownloadProgress {
 }
 
 impl ModelSpec {
-    pub fn qwen3_asr() -> Self {
-        Self::Directory {
-            repo_id: "Qwen/Qwen3-ASR-0.6B".into(),
-            required_files: vec![
-                "tokenizer.json".into(),
-                "qwen3-asr-encoder.onnx".into(),
-                "qwen3-asr-embed-tokens.onnx".into(),
-                "qwen3-asr-decoder.onnx".into(),
-            ],
-            suffix_patterns: vec![".onnx_data".into()],
-            local_name: model_dirs::DIR_QWEN3_ASR.into(),
-            description: "Speech-to-text engine. Encoder-decoder ONNX model with SmoothQuant.",
-            required: true,
-        }
-    }
-
     /// One whisper.cpp GGML model — a single `ggml-*.bin` file. Reuses the
     /// directory download path with exactly one required file.
     pub fn whisper(model: WhisperModel) -> Self {
@@ -104,7 +88,6 @@ impl ModelSpec {
     pub fn display_name(&self) -> &str {
         let Self::Directory { local_name, .. } = self;
         match local_name.as_str() {
-            model_dirs::DIR_QWEN3_ASR => "Qwen3-ASR 0.6B ONNX",
             model_dirs::DIR_STYLE_LLM => "Qwen3 0.6B ONNX",
             model_dirs::DIR_WHISPER_SMALL => WhisperModel::Small.display_name(),
             model_dirs::DIR_WHISPER_MEDIUM => WhisperModel::Medium.display_name(),
@@ -145,7 +128,7 @@ impl ModelSpec {
     }
 
     pub fn all() -> Vec<Self> {
-        let mut specs = vec![Self::qwen3_asr(), Self::style_llm()];
+        let mut specs = vec![Self::style_llm()];
         specs.extend(WhisperModel::ALL.map(Self::whisper));
         specs
     }
@@ -202,7 +185,6 @@ fn spec_needed(
     use lune_core::config::LlmBackendConfig;
 
     match spec.local_name() {
-        n if n == model_dirs::DIR_QWEN3_ASR => matches!(asr, AsrBackendConfig::Qwen3Asr { .. }),
         n if n == model_dirs::DIR_STYLE_LLM => matches!(llm, LlmBackendConfig::Local { .. }),
         // A whisper spec is needed only when the WhisperCpp backend is active AND
         // this is the selected model — so the UI offers exactly one whisper card.
@@ -610,22 +592,7 @@ mod tests {
         assert_eq!(
             names,
             vec![WhisperModel::Medium.dir()],
-            "only the selected whisper model is offered, not the other sizes or the Qwen3 ASR model: {names:?}"
-        );
-    }
-
-    #[test]
-    fn check_model_status_hides_whisper_models_when_asr_is_qwen3() {
-        let tmp = tempfile::tempdir().unwrap();
-        let statuses = check_model_status(
-            tmp.path(),
-            &AsrBackendConfig::Qwen3Asr {},
-            &LlmBackendConfig::Disabled,
-        );
-        let names: Vec<&str> = statuses.iter().map(|s| s.local_name.as_str()).collect();
-        assert!(
-            names.iter().all(|n| !n.starts_with("whisper-")),
-            "no whisper model should be offered under the Qwen3 backend: {names:?}"
+            "only the selected whisper model is offered, not the other sizes: {names:?}"
         );
     }
 
@@ -634,11 +601,13 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let statuses = check_model_status(
             tmp.path(),
-            &AsrBackendConfig::Qwen3Asr {},
+            &AsrBackendConfig::WhisperCpp {
+                model: WhisperModel::Medium,
+            },
             &LlmBackendConfig::Disabled,
         );
         assert_eq!(statuses.len(), 1);
-        assert_eq!(statuses[0].local_name, lune_core::models::DIR_QWEN3_ASR);
+        assert_eq!(statuses[0].local_name, WhisperModel::Medium.dir());
     }
 
     #[test]
@@ -646,12 +615,14 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let statuses = check_model_status(
             tmp.path(),
-            &AsrBackendConfig::Qwen3Asr {},
+            &AsrBackendConfig::WhisperCpp {
+                model: WhisperModel::Medium,
+            },
             &LlmBackendConfig::Local {},
         );
         let names: Vec<&str> = statuses.iter().map(|s| s.local_name.as_str()).collect();
         assert!(
-            names.contains(&lune_core::models::DIR_QWEN3_ASR),
+            names.contains(&WhisperModel::Medium.dir()),
             "{names:?}"
         );
         assert!(

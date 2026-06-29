@@ -81,11 +81,12 @@ start_minimized = false
 # ── ASR backend ───────────────────────────────────────────────────────────────
 #
 # Supported types:
-#   "Qwen3Asr"          — Qwen3-ASR-ONNX (encoder + embed-tokens + decoder). (default, local)
+#   "WhisperCpp"        — Local whisper.cpp GGML model. (default, local)
+#                         Optional `model = "Small" | "Medium" | "LargeV3Turbo"` (default Medium).
 #   "OpenAiCompatible"  — Remote Whisper-compatible HTTP endpoint.
 #
 [asr_backend]
-type = "Qwen3Asr"
+type = "WhisperCpp"
 
 # Example remote ASR (uncomment + fill to use):
 # [asr_backend]

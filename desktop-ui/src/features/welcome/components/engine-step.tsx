@@ -1,5 +1,5 @@
 import { useLingui } from '@lingui/react/macro';
-import { Check, CircleAlert, Cpu, type LucideIcon, Mic } from 'lucide-react';
+import { Check, CircleAlert, type LucideIcon, Mic } from 'lucide-react';
 import type { AsrBackendValue, WhisperModelValue } from '../../settings/data/settings-data';
 import { whisperModels } from '../../settings/data/settings-data';
 
@@ -12,7 +12,7 @@ interface EngineStepProps {
 }
 
 interface EngineOption {
-  value: Extract<AsrBackendValue, 'Qwen3Asr' | 'WhisperCpp'>;
+  value: Extract<AsrBackendValue, 'WhisperCpp'>;
   label: string;
   tagline: string;
   detail: string;
@@ -34,13 +34,6 @@ export function EngineStep({
   const { t } = useLingui();
 
   const engines: EngineOption[] = [
-    {
-      value: 'Qwen3Asr',
-      label: t`Qwen3-ASR`,
-      tagline: t`Fast · 0.6B · auto language`,
-      detail: t`A compact model with automatic language detection. The quickest way to get started.`,
-      icon: Cpu,
-    },
     {
       value: 'WhisperCpp',
       label: t`Whisper`,

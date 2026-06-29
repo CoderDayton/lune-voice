@@ -2,7 +2,7 @@ import { ClipboardPaste, Cloud, Cpu, Hand, Keyboard, ToggleLeft } from 'lucide-r
 import type { ComponentType } from 'react';
 
 export type ActivationModeValue = 'Toggle' | 'Hold';
-export type AsrBackendValue = 'Qwen3Asr' | 'OpenAiCompatible' | 'WhisperCpp';
+export type AsrBackendValue = 'OpenAiCompatible' | 'WhisperCpp';
 
 export type WhisperModelValue = 'Small' | 'Medium' | 'LargeV3Turbo';
 
@@ -50,12 +50,6 @@ export const pillVisibilityOptions: Option<PillVisibilityValue>[] = [
 
 export const asrBackends: DescriptiveOptionData<AsrBackendValue>[] = [
   {
-    value: 'Qwen3Asr',
-    label: 'Qwen3-ASR 0.6B (local)',
-    description: 'Runs on-device. Audio never leaves your machine.',
-    icon: Cpu,
-  },
-  {
     value: 'WhisperCpp',
     label: 'Whisper (local)',
     description: 'Runs whisper.cpp on-device. Choose a model size below.',
@@ -68,9 +62,6 @@ export const asrBackends: DescriptiveOptionData<AsrBackendValue>[] = [
     icon: Cloud,
   },
 ];
-
-/** On-disk directory for the Qwen3-ASR model (matches the backend ModelSpec). */
-export const QWEN3_ASR_LOCAL_NAME = 'qwen3-asr-0.6b';
 
 export interface WhisperModelOption extends DescriptiveOptionData<WhisperModelValue> {
   /** On-disk model directory — matches the backend ModelSpec `local_name`. */

@@ -14,10 +14,11 @@ describe("settings data", () => {
     expect(values).toContain("Hold");
   });
 
-  test("asrBackends has Qwen3Asr and OpenAiCompatible", () => {
+  test("asrBackends has WhisperCpp and OpenAiCompatible", () => {
     const values = asrBackends.map((o) => o.value);
-    expect(values).toContain("Qwen3Asr");
+    expect(values).toContain("WhisperCpp");
     expect(values).toContain("OpenAiCompatible");
+    expect(values).not.toContain("Qwen3Asr");
   });
 
   test("deliveryMethods has both send methods", () => {
@@ -36,7 +37,7 @@ describe("settings data", () => {
 
   test("labelFor returns the label for a known value", () => {
     expect(labelFor(activationModes, "Toggle")).toContain("Toggle");
-    expect(labelFor(asrBackends, "Qwen3Asr")).toContain("Qwen3");
+    expect(labelFor(asrBackends, "WhisperCpp")).toContain("Whisper");
     expect(labelFor(deliveryMethods, "Clipboard")).toContain("Paste");
   });
 

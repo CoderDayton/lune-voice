@@ -106,10 +106,6 @@ impl Default for AsrSessionConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum AsrBackendKind {
-    // `OrtQwenAsr` is the pre-rename name still present in older session
-    // rows; accept it as an alias so history loads without a fallback warning.
-    #[serde(alias = "OrtQwenAsr")]
-    Qwen3Asr,
     OpenAiCompatible,
     WhisperCpp,
 }
@@ -123,7 +119,6 @@ impl AsrBackendKind {
     /// changing existing slugs.
     pub fn slug(&self) -> &'static str {
         match self {
-            Self::Qwen3Asr => "qwen3asr",
             Self::OpenAiCompatible => "openai",
             Self::WhisperCpp => "whispercpp",
         }
@@ -200,10 +195,10 @@ mod tests {
 
     #[test]
     fn asr_backend_kind_round_trip() {
-        let kind = AsrBackendKind::Qwen3Asr;
+        let kind = AsrBackendKind::WhisperCpp;
         let json = serde_json::to_string(&kind).unwrap();
         let parsed: AsrBackendKind = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed, AsrBackendKind::Qwen3Asr);
+        assert_eq!(parsed, AsrBackendKind::WhisperCpp);
     }
 
     #[test]

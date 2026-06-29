@@ -97,7 +97,7 @@ export interface WorkspaceState {
 
 export const DEFAULT_SETTINGS: WorkspaceSettings = {
   activationMode: 'Toggle',
-  asrBackend: 'Qwen3Asr',
+  asrBackend: 'WhisperCpp',
   whisperModel: 'Medium',
   useGpu: true,
   devicePolicy: 'Auto',

@@ -8,11 +8,7 @@ import {
   workspaceActions,
   workspaceStore,
 } from '../../store/workspace-store';
-import {
-  type AsrBackendValue,
-  QWEN3_ASR_LOCAL_NAME,
-  type WhisperModelValue,
-} from '../settings/data/settings-data';
+import type { AsrBackendValue, WhisperModelValue } from '../settings/data/settings-data';
 import { asrModelLocalName, buildInitialSelection, type ModelStatus } from './setup-logic';
 
 export type { ModelStatus };
@@ -122,9 +118,11 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
   const [error, setError] = useState<string | null>(null);
   const [completed, setCompleted] = useState(0);
   const [totalToDownload, setTotalToDownload] = useState(0);
-  const [engineBackend, setEngineBackend] = useState<AsrBackendValue>('Qwen3Asr');
+  const [engineBackend, setEngineBackend] = useState<AsrBackendValue>('WhisperCpp');
   const [engineWhisper, setEngineWhisper] = useState<WhisperModelValue>('Medium');
-  const [asrLocalName, setAsrLocalName] = useState<string>(QWEN3_ASR_LOCAL_NAME);
+  const [asrLocalName, setAsrLocalName] = useState<string>(() =>
+    asrModelLocalName('WhisperCpp', 'Medium'),
+  );
 
   const queueRef = useRef<string[]>([]);
   const currentRef = useRef<string | null>(null);
@@ -153,8 +151,9 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
         }
         if (cancelled) return;
         const cur = workspaceStore.state.settings;
-        const backend: AsrBackendValue =
-          cur.asrBackend === 'WhisperCpp' ? 'WhisperCpp' : 'Qwen3Asr';
+        // Onboarding only offers on-device engines; whisper.cpp is the sole
+        // local backend (the remote OpenAI option lives in Settings).
+        const backend: AsrBackendValue = 'WhisperCpp';
         setEngineBackend(backend);
         setEngineWhisper(cur.whisperModel);
         const asrName = asrModelLocalName(backend, cur.whisperModel);
