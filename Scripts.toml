@@ -75,20 +75,26 @@ interpreter = "bash"
 # CPU-only app, a CUDA host produces a GPU-accelerated one. The GGML_* flags
 # force a portable AVX2 CPU baseline instead of ggml's default `-march=native`,
 # which would SIGILL on any user CPU older than the build host.
+#
+# Backend is EXPLICIT per release target (`--env BACKEND=cpu|cuda`), never
+# auto-detected: releases are prebuilt per platform/backend on CI/build runners,
+# not compiled on end-user machines. CPU is the portable default; CUDA targets
+# NVIDIA systems. macOS Metal and the full Windows/Linux/macOS release matrix are
+# documented in docs/RELEASE.md.
 # Build host needs: cmake, a C++ toolchain, and libclang (for bindgen); plus the
-# CUDA toolkit for a GPU build.
+# CUDA toolkit for a `cuda` build.
 command = '''
 cd desktop-ui
-FEATURES="whisper-cpp llama-cpp"
-if command -v nvcc >/dev/null 2>&1 && command -v nvidia-smi >/dev/null 2>&1; then
-  FEATURES="whisper-cuda llama-cuda"
-  echo "CUDA toolchain detected — building with GPU acceleration ($FEATURES)"
-else
-  echo "No CUDA toolchain — building CPU-only ($FEATURES)"
-fi
+BACKEND="${BACKEND:-cpu}"
+case "$BACKEND" in
+  cpu)  FEATURES="whisper-cpp llama-cpp" ;;
+  cuda) FEATURES="whisper-cuda llama-cuda" ;;
+  *)    echo "BACKEND must be cpu|cuda (macOS Metal: see docs/RELEASE.md)"; exit 1 ;;
+esac
+echo "Building $BACKEND release: --features \"$FEATURES\""
 GGML_NATIVE=OFF GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON APPIMAGE_EXTRACT_AND_RUN=1 bun tauri build --features "$FEATURES"
 '''
-info = "Production desktop app (ships whisper.cpp + llama.cpp; auto-detects CUDA)"
+info = "Production desktop app (--env BACKEND=cpu|cuda; ships whisper.cpp + llama.cpp). See docs/RELEASE.md"
 requires = ["bun"]
 
 # ── Tools ────────────────────────────────────────────────────────────────────

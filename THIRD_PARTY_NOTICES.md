@@ -35,6 +35,12 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## llama.cpp (and ggml)
+
+Compiled into the application when the local styling LLM backend is enabled.
+Source: https://github.com/ggml-org/llama.cpp — MIT License, Copyright (c) 2023
+The ggml authors / Georgi Gerganov. Same MIT terms as whisper.cpp/ggml above.
+
 ## whisper-rs
 
 Rust bindings to whisper.cpp. Source: https://codeberg.org/tazz4843/whisper-rs
@@ -42,9 +48,28 @@ Rust bindings to whisper.cpp. Source: https://codeberg.org/tazz4843/whisper-rs
 Released into the public domain under the Unlicense. No attribution required;
 listed here for completeness.
 
+## llama-cpp-2 (llama-cpp-sys-2)
+
+Rust bindings to llama.cpp. Source: https://github.com/utilityai/llama-cpp-rs —
+dual-licensed MIT OR Apache-2.0.
+
 ## Whisper GGML models
 
 The `ggml-*.bin` models downloaded on demand from
 https://huggingface.co/ggerganov/whisper.cpp are conversions of OpenAI's Whisper
 models, released by OpenAI under the MIT License (Copyright (c) 2022 OpenAI). The
 models are downloaded by the user at runtime and are not bundled with the binary.
+
+## Styling LLM model (Qwen3.5)
+
+The styling LLM GGUF downloaded on demand from
+https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF is a quantization of Qwen3.5
+(Alibaba Cloud / Qwen team, Apache-2.0), quantized by Unsloth. Downloaded by the
+user at runtime; not bundled with the binary.
+
+## Whisper VAD model (silero)
+
+The `ggml-silero-*.bin` voice-activity-detection model downloaded on demand from
+https://huggingface.co/ggml-org/whisper-vad is a conversion of the Silero VAD
+model (MIT License, Copyright (c) Silero Team). Downloaded by the user at
+runtime; not bundled with the binary.
