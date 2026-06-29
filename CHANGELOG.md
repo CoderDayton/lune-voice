@@ -14,7 +14,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Wayland focused-window detection on COSMIC and wlr-foreign-toplevel compositors
 - Descriptive dropdown component for settings selects
 - Dictionary inline editing and priority control in the UI
-- Correction spans for targeted LLM text editing
 - 10-language corpus frequency maps for spell correction
 - Categorized supplemental vocabulary with bincode embedding
 - N-gram language model replacing the old bigram model
@@ -24,18 +23,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `rustfmt.toml` and `clippy.toml` for consistent tooling
 
 ### Changed
-- Reused mel scratch buffers in `WhisperMelF16` to amortize per-call allocations
 - Shared a single softmax across HWCE entropy, Tsallis, and top-margin features
-- Vectorized the ASR decoder's argmax softmax (~2.2× faster argmax, ~8% lower dictation latency, identical output)
-- Expanded the pipeline-stages benchmark with per-stage timings, decode-loop op breakdown, and a profiling loop mode
-- 4-bit KV-cache quantization rewritten with row-major min/max for SIMD-friendly access
-- ORT LLM input vectors built into preallocated buffers
 - Session statistics aggregated across the full database instead of capped history
-- Style LLM swapped to Qwen3-0.6B with dynamic model registry
-- Corrector restructured as LLM intelligence feed with token-level validator
 - Benchmarks moved from `examples/` to `benches/` with `harness = false`
 - License field updated from MIT to LicenseRef-Proprietary (LICENSE file already proprietary)
-- ORT session builder optimized with refactored build_instructions
 - Local LLM kept warm briefly after dictation to reduce cold-start latency
 - Output settings split into a delivery method (`TypeInPlace` / `Clipboard`) and an independent `copy_to_clipboard` toggle; the combined `Both` mode was removed (legacy `Both` configs migrate to `TypeInPlace` with copy enabled)
 - Text delivery prefers the IBus input method when it is active — committing text directly with no clipboard — and falls back to the uinput keyboard path otherwise
@@ -49,7 +40,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Filler words ("um", "uh", and the like) are stripped from dictation output, including mid-sentence (English only)
 - Long sentences now get a terminal period even when the LLM is skipped (minimal style); one-word dictations stay bare
 - Hotkey toggle, session, and IPC pipeline hardened against races and silent failures
-- Qwen3 ASR model readiness and language parsing
 - Gate false positives via case-insensitive lang detection and proper noun bypass
 - Words containing digits skipped in spell corrector
 - Clippy warnings in examples and benchmarks
@@ -59,6 +49,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Quietly-spoken words are no longer dropped from the transcript
 - Trailing "though" / "although" / "whereas" continuations are joined to their sentence instead of split into a fragment
 - Clauses are no longer over-split into separate sentences
+
+### Removed
+- ONNX Runtime (`ort`) and every ONNX model.
+- The local Qwen3-ASR backend (superseded by whisper.cpp).
+- The standalone streaming Silero VAD gate (whisper's built-in VAD replaces it).
+- The LLM grammar-correction pass, calibrated edit gate, and the token sampler / KV-cache code — the styling LLM no longer corrects text (Whisper output is already punctuated).
+- The full benchmark suite, which exercised the removed ONNX/Qwen architecture (preserved on the `archive/onnx-qwen` branch).
 
 ### Security
 - Updated rustls-webpki to 0.103.13
