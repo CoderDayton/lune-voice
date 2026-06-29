@@ -163,6 +163,11 @@ impl AsrRegistry {
                 let backend = WhisperCppBackend::new(WhisperCppConfig {
                     model_path: models_dir.join(model.dir()).join(model.ggml_file()),
                     use_gpu: device.use_gpu(cfg!(feature = "whisper-cuda")),
+                    vad_model_path: Some(
+                        models_dir
+                            .join(lune_core::models::DIR_WHISPER_VAD)
+                            .join(lune_core::models::WHISPER_VAD_GGML),
+                    ),
                 })?;
                 Ok(Self::WhisperCpp(backend))
             }

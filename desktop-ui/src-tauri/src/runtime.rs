@@ -136,15 +136,6 @@ impl AppRuntime {
 
         runtime.sync_mic_prewarm(None, None).await;
 
-        // Pre-build the neural VAD's ONNX session off the hot path so the FIRST
-        // dictation doesn't pay the graph-optimization cost. Fire-and-forget on
-        // a blocking thread; it parks itself in the pool when ready, and the
-        // first `Silero::new` reuses it.
-        tokio::task::spawn_blocking(|| match lune_app::vad::prewarm() {
-            Ok(()) => debug!("VAD prewarm: silero session built"),
-            Err(e) => warn!(error = %e, "VAD prewarm failed"),
-        });
-
         Ok(runtime)
     }
 

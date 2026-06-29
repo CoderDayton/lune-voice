@@ -365,9 +365,9 @@ async fn run_session<A: AsrBackend + 'static>(
     audio_override: SessionAudio,
 ) {
     let session_id = deps.session_id;
-    let (vad_pcen_enabled, input_device) = {
+    let input_device = {
         let settings = deps.settings.read().await;
-        (settings.vad_pcen, settings.input_device.clone())
+        settings.input_device.clone()
     };
 
     let capture = match crate::capture::run_capture(
@@ -376,7 +376,6 @@ async fn run_session<A: AsrBackend + 'static>(
         deps.config.asr_config.clone(),
         audio_override,
         &deps.config.pipeline,
-        vad_pcen_enabled,
         input_device,
         asr.segment_capacity_hint(),
         &deps.event_tx,
@@ -421,15 +420,19 @@ async fn run_session<A: AsrBackend + 'static>(
         return;
     }
 
-    if speech_samples == 0 || segments.is_empty() || raw_text.is_empty() {
+    if segments.is_empty() || raw_text.is_empty() {
         if let Some(error) = first_asr_error.take().filter(|_| !saw_asr_success) {
             status = SessionStatus::Failed(error.clone());
             let _ = deps.event_tx.send(SessionEvent::Error(error)).await;
-        } else if speech_samples > 0 {
-            info!(%session_id, "speech detected but ASR produced no output, discarding");
-            status = SessionStatus::Cancelled;
         } else {
-            info!(%session_id, "no speech detected, ending session");
+            // whisper.cpp's VAD gates speech at decode time, so an empty result
+            // means no speech was found (silence/noise) — a graceful no-op, not
+            // a failure. (Raw captured-sample count is no longer a speech signal.)
+            info!(
+                %session_id,
+                captured_samples = speech_samples,
+                "no speech detected, ending session"
+            );
         }
         stop_session(
             session_id,

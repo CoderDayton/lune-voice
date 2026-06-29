@@ -11,7 +11,6 @@ mod uinput_typer;
 // delivery path in delivery.rs). See ibus.rs.
 #[cfg(target_os = "linux")]
 mod ibus;
-pub mod vad;
 
 #[cfg(unix)]
 mod cosmic_toplevel;

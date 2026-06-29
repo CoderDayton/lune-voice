@@ -28,6 +28,10 @@ pub struct WhisperCppConfig {
     /// Offload to GPU. Only meaningful when built with `whisper-cuda`; on a
     /// CPU-only build whisper-rs ignores it and runs on the CPU.
     pub use_gpu: bool,
+    /// Path to the ggml silero VAD model. When set and present, whisper.cpp's
+    /// built-in VAD gates the buffer before decode (drops non-speech); when
+    /// `None` or missing, the raw buffer is decoded as-is.
+    pub vad_model_path: Option<PathBuf>,
 }
 
 #[cfg(feature = "whisper-cpp")]
@@ -40,6 +44,7 @@ mod imp {
     use lune_core::error::Error;
     use whisper_rs::{
         FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperState,
+        WhisperVadParams,
     };
 
     /// Cap decode threads. whisper.cpp scales sub-linearly past a handful of
@@ -49,6 +54,9 @@ mod imp {
     pub struct WhisperCppBackend {
         ctx: WhisperContext,
         n_threads: i32,
+        /// Validated ggml VAD model path (already confirmed to exist), or `None`
+        /// to decode without VAD.
+        vad_model_path: Option<std::path::PathBuf>,
     }
 
     /// Mutable per-session state behind the handle's `Mutex`.
@@ -76,7 +84,20 @@ mod imp {
             let n_threads = std::thread::available_parallelism()
                 .map(|n| n.get().min(MAX_THREADS) as i32)
                 .unwrap_or(4);
-            Ok(Self { ctx, n_threads })
+            // Validate the VAD model once up front: a configured-but-missing
+            // path degrades to raw decode (warn) instead of failing per-utterance.
+            let vad_model_path = config.vad_model_path.filter(|p| {
+                let ok = p.exists();
+                if !ok {
+                    tracing::warn!(path = %p.display(), "whisper VAD model missing; decoding without VAD");
+                }
+                ok
+            });
+            Ok(Self {
+                ctx,
+                n_threads,
+                vad_model_path,
+            })
         }
     }
 
@@ -138,6 +159,17 @@ mod imp {
             params.set_print_progress(false);
             params.set_print_realtime(false);
             params.set_print_timestamps(false);
+
+            // whisper.cpp's built-in (silero ggml) VAD: gate the buffer to speech
+            // spans before decode. The path is validated at construction.
+            // `set_vad_model_path` must precede `enable_vad` (which panics on a
+            // null path).
+            if let Some(vad_path) = self.vad_model_path.as_deref() {
+                let vad_str = vad_path.to_string_lossy();
+                params.set_vad_model_path(Some(&vad_str));
+                params.enable_vad(true);
+                params.set_vad_params(WhisperVadParams::default());
+            }
 
             state
                 .full(params, audio.as_slice())
