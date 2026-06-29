@@ -70,21 +70,21 @@ export interface WhisperModelOption extends DescriptiveOptionData<WhisperModelVa
   size: string;
 }
 
-/** whisper.cpp GGML model options (q8_0 multilingual), smallest to largest. */
+/** whisper.cpp GGML model options (quantized multilingual), smallest to largest. */
 export const whisperModels: WhisperModelOption[] = [
   {
     value: 'Small',
     label: 'Small',
     description: 'Fastest, lowest accuracy.',
-    localName: 'whisper-small-q8_0',
-    size: '264 MB',
+    localName: 'whisper-small-q5_1',
+    size: '190 MB',
   },
   {
     value: 'Medium',
     label: 'Medium',
     description: 'Balanced accuracy and speed.',
-    localName: 'whisper-medium-q8_0',
-    size: '823 MB',
+    localName: 'whisper-medium-q5_0',
+    size: '539 MB',
   },
   {
     value: 'LargeV3Turbo',

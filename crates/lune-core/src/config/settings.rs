@@ -188,9 +188,9 @@ impl Default for UserSettings {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[non_exhaustive]
 pub enum WhisperModel {
-    /// ~264 MB. Fast, lowest accuracy of the three.
+    /// ~190 MB. Fast, lowest accuracy of the three.
     Small,
-    /// ~823 MB. Balanced accuracy/speed.
+    /// ~539 MB. Balanced accuracy/speed.
     #[default]
     Medium,
     /// ~874 MB. Best accuracy; turbo decoder keeps it fast.
@@ -217,8 +217,8 @@ impl WhisperModel {
     /// Filename to download from [`WhisperModel::REPO_ID`] and to load from disk.
     pub fn ggml_file(self) -> &'static str {
         match self {
-            Self::Small => "ggml-small-q8_0.bin",
-            Self::Medium => "ggml-medium-q8_0.bin",
+            Self::Small => "ggml-small-q5_1.bin",
+            Self::Medium => "ggml-medium-q5_0.bin",
             Self::LargeV3Turbo => "ggml-large-v3-turbo-q8_0.bin",
         }
     }
@@ -226,8 +226,8 @@ impl WhisperModel {
     /// Human-readable name for UI and model-status cards.
     pub fn display_name(self) -> &'static str {
         match self {
-            Self::Small => "Whisper Small (q8_0)",
-            Self::Medium => "Whisper Medium (q8_0)",
+            Self::Small => "Whisper Small (q5_1)",
+            Self::Medium => "Whisper Medium (q5_0)",
             Self::LargeV3Turbo => "Whisper Large v3 Turbo (q8_0)",
         }
     }

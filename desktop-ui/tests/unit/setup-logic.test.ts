@@ -19,16 +19,16 @@ const model = (localName: string, opts: Partial<ModelStatus> = {}): ModelStatus 
 
 describe('asrModelLocalName', () => {
   test('maps each Whisper size to its model directory', () => {
-    expect(asrModelLocalName('WhisperCpp', 'Small')).toBe('whisper-small-q8_0');
-    expect(asrModelLocalName('WhisperCpp', 'Medium')).toBe('whisper-medium-q8_0');
+    expect(asrModelLocalName('WhisperCpp', 'Small')).toBe('whisper-small-q5_1');
+    expect(asrModelLocalName('WhisperCpp', 'Medium')).toBe('whisper-medium-q5_0');
     expect(asrModelLocalName('WhisperCpp', 'LargeV3Turbo')).toBe('whisper-large-v3-turbo-q8_0');
   });
 });
 
 describe('buildInitialSelection', () => {
   test('always includes the chosen engine model', () => {
-    const selected = buildInitialSelection('whisper-medium-q8_0', []);
-    expect(selected.has('whisper-medium-q8_0')).toBe(true);
+    const selected = buildInitialSelection('whisper-medium-q5_0', []);
+    expect(selected.has('whisper-medium-q5_0')).toBe(true);
   });
 
   test('includes installed and required models, skips the rest', () => {

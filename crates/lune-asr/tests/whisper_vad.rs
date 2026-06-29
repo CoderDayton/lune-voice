@@ -2,7 +2,7 @@
 //!
 //! Ignored by default (needs ggml models on disk + the C++ build). Run with:
 //!   LIBCLANG_PATH=/lib/x86_64-linux-gnu \
-//!   LUNE_TEST_WHISPER_GGML=$HOME/.local/share/lune-voice/models/whisper-small-q8_0/ggml-small-q8_0.bin \
+//!   LUNE_TEST_WHISPER_GGML=$HOME/.local/share/lune-voice/models/whisper-small-q5_1/ggml-small-q5_1.bin \
 //!   LUNE_TEST_VAD_GGML=/path/to/ggml-silero-v5.1.2.bin \
 //!   LUNE_TEST_SPEECH_WAV=fixtures/audio/librispeech_40744.wav \
 //!   cargo test -p lune-asr --features whisper-cpp --test whisper_vad -- --ignored --nocapture
