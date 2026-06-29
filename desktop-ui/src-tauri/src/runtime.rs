@@ -1082,7 +1082,7 @@ async fn build_llm_service(
                     // utterances never pay for the larger cap.
                     let llm = Arc::new(LazyLocalLlm::new(
                         model_path,
-                        settings.device.use_gpu(cfg!(feature = "cuda")),
+                        settings.device.use_gpu(cfg!(feature = "llama-cuda")),
                         512,
                     ));
                     Ok((llm.clone() as Arc<dyn LlmService>, Some(llm)))
@@ -1134,11 +1134,7 @@ enum LazyLlmState {
 }
 
 impl LazyLocalLlm {
-    fn new(
-        model_path: std::path::PathBuf,
-        use_gpu: bool,
-        max_new_tokens: usize,
-    ) -> Self {
+    fn new(model_path: std::path::PathBuf, use_gpu: bool, max_new_tokens: usize) -> Self {
         Self {
             model_path,
             use_gpu,

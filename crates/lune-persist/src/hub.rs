@@ -75,11 +75,25 @@ impl ModelSpec {
 
     pub fn style_llm() -> Self {
         Self::Directory {
-            repo_id: "onnx-community/Qwen3-0.6B-ONNX".into(),
-            required_files: vec!["tokenizer.json".into(), "model_q4f16.onnx".into()],
+            repo_id: "unsloth/Qwen3.5-0.8B-GGUF".into(),
+            required_files: vec!["Qwen3.5-0.8B-UD-Q5_K_XL.gguf".into()],
             suffix_patterns: vec![],
             local_name: model_dirs::DIR_STYLE_LLM.into(),
-            description: "Style & correction LLM. Fixes grammar and reformats transcripts.",
+            description: "Style LLM (llama.cpp). Rewrites transcripts in your chosen style.",
+            required: false,
+        }
+    }
+
+    /// whisper.cpp's built-in VAD model (silero ggml). The local whisper backend
+    /// uses it to gate speech before decoding; it degrades to raw decode when
+    /// absent, so it's optional.
+    pub fn vad_model() -> Self {
+        Self::Directory {
+            repo_id: "ggml-org/whisper-vad".into(),
+            required_files: vec![model_dirs::WHISPER_VAD_GGML.into()],
+            suffix_patterns: vec![],
+            local_name: model_dirs::DIR_WHISPER_VAD.into(),
+            description: "Voice-activity detector for the local Whisper backend.",
             required: false,
         }
     }
@@ -88,7 +102,8 @@ impl ModelSpec {
     pub fn display_name(&self) -> &str {
         let Self::Directory { local_name, .. } = self;
         match local_name.as_str() {
-            model_dirs::DIR_STYLE_LLM => "Qwen3 0.6B ONNX",
+            model_dirs::DIR_STYLE_LLM => "Qwen3.5 0.8B (style LLM)",
+            model_dirs::DIR_WHISPER_VAD => "Whisper VAD (silero)",
             model_dirs::DIR_WHISPER_SMALL => WhisperModel::Small.display_name(),
             model_dirs::DIR_WHISPER_MEDIUM => WhisperModel::Medium.display_name(),
             model_dirs::DIR_WHISPER_LARGE_V3_TURBO => WhisperModel::LargeV3Turbo.display_name(),
@@ -128,7 +143,7 @@ impl ModelSpec {
     }
 
     pub fn all() -> Vec<Self> {
-        let mut specs = vec![Self::style_llm()];
+        let mut specs = vec![Self::style_llm(), Self::vad_model()];
         specs.extend(WhisperModel::ALL.map(Self::whisper));
         specs
     }
@@ -621,10 +636,7 @@ mod tests {
             &LlmBackendConfig::Local {},
         );
         let names: Vec<&str> = statuses.iter().map(|s| s.local_name.as_str()).collect();
-        assert!(
-            names.contains(&WhisperModel::Medium.dir()),
-            "{names:?}"
-        );
+        assert!(names.contains(&WhisperModel::Medium.dir()), "{names:?}");
         assert!(
             names.contains(&lune_core::models::DIR_STYLE_LLM),
             "{names:?}"

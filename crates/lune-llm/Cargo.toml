@@ -9,7 +9,6 @@ workspace = true
 
 [features]
 default = []
-cuda = ["ort/cuda", "lune-asr/cuda"]
 # Local llama.cpp styling LLM. Compiles llama.cpp (C++) via llama-cpp-2-sys —
 # needs cmake + a C++ toolchain. Off by default so routine checks stay fast.
 llama-cpp = ["dep:llama-cpp-2", "dep:encoding_rs"]
@@ -22,7 +21,6 @@ llama-cuda = ["llama-cpp", "llama-cpp-2/cuda"]
 lune-dict = { path = "../lune-dict", default-features = false }
 async-trait.workspace = true
 lune-core.workspace = true
-lune-asr.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 async-openai.workspace = true
@@ -30,10 +28,6 @@ serde.workspace = true
 serde_json.workspace = true
 regex = "1.11"
 text-processing-rs = "0.1.0"
-half = { version = "2", features = ["num-traits"] }
-ort.workspace = true
-ndarray.workspace = true
-tokenizers.workspace = true
 rand = "0.9"
 llama-cpp-2 = { version = "0.1.150", optional = true }
 encoding_rs = { version = "0.8", optional = true }

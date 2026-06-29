@@ -105,6 +105,6 @@ mod tests {
         let json = serde_json::to_string(&output).unwrap();
         let parsed: PostProcessOutput = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.cleaned_text, "Hello, world.");
-        assert_eq!(parsed.metadata.unwrap().has_bullets, false);
+        assert!(!parsed.metadata.unwrap().has_bullets);
     }
 }

@@ -8,11 +8,16 @@ license.workspace = true
 workspace = true
 
 [features]
-default = ["cuda"]
-cuda = ["lune-llm/cuda", "lune-asr/cuda", "ort/cuda"]
-# Local whisper.cpp backend — propagated to the shipped binary by `cgs build`.
+default = []
+# Local native backends, compiled into the shipped binary by `cgs build`.
+# Off by default so routine checks need no C++ toolchain. The `-cuda` variants
+# source-compile CUDA kernels (need nvcc); `gpu` is the umbrella `cgs build`
+# enables when the build host has a CUDA toolchain.
 whisper-cpp = ["lune-asr/whisper-cpp"]
-whisper-cuda = ["lune-asr/whisper-cuda"]
+whisper-cuda = ["whisper-cpp", "lune-asr/whisper-cuda"]
+llama-cpp = ["lune-llm/llama-cpp"]
+llama-cuda = ["llama-cpp", "lune-llm/llama-cuda"]
+gpu = ["whisper-cuda", "llama-cuda"]
 
 [dependencies]
 lune-core.workspace = true
@@ -28,8 +33,6 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 uuid.workspace = true
 serde_json.workspace = true
-ort.workspace = true
-ndarray.workspace = true
 arboard.workspace = true
 enigo.workspace = true
 # Output sound cues (src/sound.rs): decode embedded WAVs and play via cpal.
@@ -49,91 +52,3 @@ zbus = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3.27.0"
-
-[[example]]
-name = "pipeline_real"
-path = "../../benchmarks/pipeline/pipeline_real.rs"
-
-[[example]]
-name = "live_transcribe"
-path = "../../benchmarks/tools/live_transcribe.rs"
-
-[[example]]
-name = "noisify_fixtures"
-path = "../../benchmarks/tools/noisify_fixtures.rs"
-
-[[example]]
-name = "confusion_mine"
-path = "../../benchmarks/quality/confusion_mine.rs"
-
-[[example]]
-name = "pipeline_stages"
-path = "../../benchmarks/pipeline/pipeline_stages.rs"
-
-[[example]]
-name = "session_latency"
-path = "../../benchmarks/pipeline/session_latency.rs"
-
-[[example]]
-name = "llm_quality"
-path = "../../benchmarks/quality/llm_quality.rs"
-
-[[example]]
-name = "bench_domain"
-path = "../../benchmarks/quality/bench_domain.rs"
-
-[[example]]
-name = "vram_growth"
-path = "../../benchmarks/pipeline/vram_growth.rs"
-
-[[example]]
-name = "llm_edit_gate"
-path = "../../benchmarks/tuning/llm_edit_gate.rs"
-
-[[example]]
-name = "seed_edit_calib"
-path = "../../benchmarks/tuning/seed_edit_calib.rs"
-
-[[example]]
-name = "gate_sweep"
-path = "../../benchmarks/tuning/gate_sweep.rs"
-
-[[example]]
-name = "dict_carrier_ab"
-path = "../../benchmarks/tuning/dict_carrier_ab.rs"
-
-[[example]]
-name = "sampling_ab"
-path = "../../benchmarks/tuning/sampling_ab.rs"
-
-[[example]]
-name = "sampling_tune"
-path = "../../benchmarks/tuning/sampling_tune.rs"
-
-[[example]]
-name = "vad_tune"
-path = "../../benchmarks/tuning/vad_tune.rs"
-
-[[example]]
-name = "vad_knob_ab"
-path = "../../benchmarks/tuning/vad_knob_ab.rs"
-
-[[example]]
-name = "vad_chunk_ab"
-path = "../../benchmarks/tuning/vad_chunk_ab.rs"
-
-[[example]]
-name = "vad_fp_probe"
-path = "../../benchmarks/tuning/vad_fp_probe.rs"
-
-[[example]]
-name = "punctuation_ab"
-path = "../../benchmarks/tuning/punctuation_ab.rs"
-
-[[example]]
-name = "asr_probe"
-path = "../../benchmarks/tools/asr_probe.rs"
-
-[[example]]
-name = "live_bench"
-path = "../../benchmarks/tools/live_bench.rs"

@@ -44,18 +44,10 @@
           "libcurand10",
           "libcudnn9-cuda-12"
         ],
-        "section": "utils",
-        "files": {
-          "/usr/lib/libonnxruntime_providers_cuda.so": "onnx-libs/libonnxruntime_providers_cuda.so",
-          "/usr/lib/libonnxruntime_providers_shared.so": "onnx-libs/libonnxruntime_providers_shared.so"
-        }
+        "section": "utils"
       },
       "appimage": {
-        "bundleMediaFramework": false,
-        "files": {
-          "/usr/lib/libonnxruntime_providers_cuda.so": "onnx-libs/libonnxruntime_providers_cuda.so",
-          "/usr/lib/libonnxruntime_providers_shared.so": "onnx-libs/libonnxruntime_providers_shared.so"
-        }
+        "bundleMediaFramework": false
       }
     },
     "macOS": {

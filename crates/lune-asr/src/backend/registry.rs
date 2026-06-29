@@ -11,9 +11,7 @@ use lune_core::asr::{AsrBackend, AsrBackendKind, AsrSegment, AsrSessionConfig};
 use lune_core::config::{AsrBackendConfig, DevicePolicy, PipelineConfig};
 use lune_core::error::{Error, Result};
 
-use crate::{
-    OpenAiAsrConfig, OpenAiCompatibleAsrBackend, WhisperCppBackend, WhisperCppConfig,
-};
+use crate::{OpenAiAsrConfig, OpenAiCompatibleAsrBackend, WhisperCppBackend, WhisperCppConfig};
 
 // ── Dispatch helpers ────────────────────────────────────────────────────────
 //
@@ -124,10 +122,8 @@ impl AsrRegistry {
         device: DevicePolicy,
         models_dir: &Path,
     ) -> Result<Self> {
-        let use_gpu = device.use_gpu(cfg!(feature = "cuda"));
-        let cuda_required = device.strict_cuda();
-
-        let _ = (use_gpu, cuda_required);
+        // Per-backend GPU decision is computed inline below (whisper gates on
+        // the `whisper-cuda` feature); the remote backend ignores it.
         match config {
             AsrBackendConfig::OpenAiCompatible {
                 base_url,

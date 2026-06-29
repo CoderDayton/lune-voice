@@ -55,36 +55,40 @@ info = "Run lightweight app pipeline integration tests"
 [scripts.bench]
 interpreter = "bash"
 command = '''
-case "${TYPE:-real}" in
-  stages)    cargo run --release --example pipeline_stages -p lune-app ;;
-  real)      cargo run --release --example pipeline_real -p lune-app ;;
-  latency)   cargo run --release --example session_latency -p lune-app ;;
-  confusion) cargo run --release --example confusion_mine -p lune-app ;;
-  llm)       cargo run --release --example llm_quality -p lune-app ;;
-  live)      cargo run --release --features cuda --example live_bench -p lune-app ;;
-  domain)    cargo run --release --features cuda --example bench_domain -p lune-app ;;
-  vram)      cargo run --release --features cuda --example vram_growth -p lune-app ;;
+case "${TYPE:-agc}" in
   agc)       cargo run --release --example agc_bench -p lune-audio ;;
-  vad)       cargo run --release --features cuda --example vad_tune -p lune-app ;;
-  *)         echo "TYPE must be stages|real|latency|confusion|llm|live|domain|vram|agc|vad"; exit 1 ;;
+  *)         echo "TYPE must be agc"; exit 1 ;;
 esac
 '''
-info = "Benchmark (--env TYPE=stages|real|latency|confusion|llm|live|domain|vram|agc|vad)"
+info = "Benchmark (--env TYPE=agc)"
 
 # ── Build ────────────────────────────────────────────────────────────────────
 
 [scripts.build]
 interpreter = "bash"
 # Production desktop app. `tauri build` does the release Rust compile + UI build
-# + bundle in one step. `--features whisper-cpp` compiles the local whisper.cpp
-# backend into the shipped binary (users never compile it themselves). The GGML_*
-# flags force a portable AVX2 CPU baseline instead of ggml's default
-# `-march=native`, which would SIGILL on any user CPU older than the build host.
-# Build host needs: cmake, a C++ toolchain, and libclang (for bindgen).
+# + bundle in one step. `--features whisper-cpp llama-cpp` compiles the local
+# whisper.cpp + llama.cpp backends into the shipped binary (users never compile
+# them themselves). CUDA is auto-enabled when the build host has the toolchain
+# (nvcc + an NVIDIA GPU): since these backends compile from source here, GPU
+# support is a build-host decision — a CPU-only host produces a portable
+# CPU-only app, a CUDA host produces a GPU-accelerated one. The GGML_* flags
+# force a portable AVX2 CPU baseline instead of ggml's default `-march=native`,
+# which would SIGILL on any user CPU older than the build host.
+# Build host needs: cmake, a C++ toolchain, and libclang (for bindgen); plus the
+# CUDA toolkit for a GPU build.
 command = '''
-cd desktop-ui && GGML_NATIVE=OFF GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON APPIMAGE_EXTRACT_AND_RUN=1 bun tauri build --features whisper-cpp
+cd desktop-ui
+FEATURES="whisper-cpp llama-cpp"
+if command -v nvcc >/dev/null 2>&1 && command -v nvidia-smi >/dev/null 2>&1; then
+  FEATURES="whisper-cuda llama-cuda"
+  echo "CUDA toolchain detected — building with GPU acceleration ($FEATURES)"
+else
+  echo "No CUDA toolchain — building CPU-only ($FEATURES)"
+fi
+GGML_NATIVE=OFF GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON APPIMAGE_EXTRACT_AND_RUN=1 bun tauri build --features "$FEATURES"
 '''
-info = "Production desktop app (ships whisper.cpp; portable CPU baseline)"
+info = "Production desktop app (ships whisper.cpp + llama.cpp; auto-detects CUDA)"
 requires = ["bun"]
 
 # ── Tools ────────────────────────────────────────────────────────────────────
@@ -131,9 +135,3 @@ fi
 '''
 info = "Clean build artifacts (--env ALL=1 includes .venv)"
 
-# ── ONNX model export ───────────────────────────────────────────────────────
-
-[scripts.export]
-command = "uv run scripts/build/export_onnx.py --asr"
-info = "Export Qwen3-ASR ONNX model"
-requires = ["uv"]
