@@ -12,7 +12,9 @@ use lune_llm::backend::ort_llm::{OrtStyleLlm, OrtStyleLlmConfig};
 
 fn model_dir() -> Option<PathBuf> {
     let home = std::env::var("HOME").ok()?;
-    let dir = PathBuf::from(home).join(".local/share/lune-voice/models/qwen3-0.6b");
+    let dir = PathBuf::from(home)
+        .join(".local/share/lune-voice/models")
+        .join(lune_core::models::DIR_STYLE_LLM);
     dir.exists().then_some(dir)
 }
 
@@ -133,7 +135,10 @@ fn complete_scored_emits_aligned_word_margins() {
     // Runs whenever the real model is present, so default `cargo test` exercises
     // the production margin path; skips cleanly when models aren't on disk.
     if model_dir().is_none() {
-        eprintln!("[skip] qwen3-0.6b model not present");
+        eprintln!(
+            "[skip] {} model not present",
+            lune_core::models::DIR_STYLE_LLM
+        );
         return;
     }
     let _ = tracing_subscriber::fmt()

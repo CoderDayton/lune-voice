@@ -9,7 +9,9 @@ use lune_llm::backend::ort_llm::{OrtStyleLlm, OrtStyleLlmConfig};
 
 fn model_dir() -> Option<PathBuf> {
     let home = std::env::var("HOME").ok()?;
-    let dir = PathBuf::from(home).join(".local/share/lune-voice/models/qwen3-0.6b");
+    let dir = PathBuf::from(home)
+        .join(".local/share/lune-voice/models")
+        .join(lune_core::models::DIR_STYLE_LLM);
     dir.exists().then_some(dir)
 }
 

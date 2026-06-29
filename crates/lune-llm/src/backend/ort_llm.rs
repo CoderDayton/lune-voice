@@ -1988,6 +1988,30 @@ fn find_model(dir: &Path) -> Result<ModelFiles> {
         }
     }
 
+    // Fallback for custom exports whose quantization suffix is not in the
+    // known list (e.g. a fine-tune exported as `model-q4q8.onnx`): take the
+    // sole `*.onnx` in the dir (or its `onnx/` subdir). Skipped when more than
+    // one exists, so split decoder/embed exports never resolve ambiguously
+    // here — those are matched by the loops above.
+    for base in [dir.to_path_buf(), dir.join("onnx")] {
+        let Ok(entries) = std::fs::read_dir(&base) else {
+            continue;
+        };
+        let mut onnx = entries.flatten().map(|e| e.path()).filter(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.ends_with(".onnx"))
+        });
+        if let Some(decoder) = onnx.next()
+            && onnx.next().is_none()
+        {
+            return Ok(ModelFiles {
+                decoder,
+                embed_tokens: None,
+            });
+        }
+    }
+
     Err(Error::config(format!("no ONNX model in {}", dir.display())))
 }
 
@@ -2004,6 +2028,62 @@ fn strip_think_tags(text: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── find_model ───────────────────────────────────────────────────────
+
+    /// Make a unique empty temp dir for a find_model case, cleaned by the
+    /// caller. Avoids a tempfile dev-dependency for these tiny checks.
+    fn scratch_dir(tag: &str) -> PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("lune_find_model_{tag}_{nanos}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn find_model_accepts_custom_hyphenated_export() {
+        // A fine-tune exported as `model-q4q8.onnx` — a quant suffix not in the
+        // known list and hyphen-joined — must still resolve via the fallback.
+        let dir = scratch_dir("custom");
+        std::fs::write(dir.join("model-q4q8.onnx"), b"").unwrap();
+        std::fs::write(dir.join("model-q4q8.onnx_data"), b"").unwrap();
+
+        let files = find_model(&dir).expect("custom export should resolve");
+        assert_eq!(files.decoder, dir.join("model-q4q8.onnx"));
+        assert!(files.embed_tokens.is_none());
+
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn find_model_prefers_known_name_over_fallback() {
+        // A known `model_q4f16.onnx` must win even alongside an unknown name,
+        // so the priority list still governs when it applies.
+        let dir = scratch_dir("known");
+        std::fs::write(dir.join("model_q4f16.onnx"), b"").unwrap();
+        std::fs::write(dir.join("model-custom.onnx"), b"").unwrap();
+
+        let files = find_model(&dir).expect("known name should resolve");
+        assert_eq!(files.decoder, dir.join("model_q4f16.onnx"));
+
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn find_model_rejects_ambiguous_unknown_exports() {
+        // Two unknown `*.onnx` with no recognized name is ambiguous — the
+        // fallback must not guess (it would risk picking an embed/encoder half).
+        let dir = scratch_dir("ambiguous");
+        std::fs::write(dir.join("foo.onnx"), b"").unwrap();
+        std::fs::write(dir.join("bar.onnx"), b"").unwrap();
+
+        assert!(find_model(&dir).is_err());
+
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     // ── user_prompt ──────────────────────────────────────────────────────
 

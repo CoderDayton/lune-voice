@@ -26,7 +26,9 @@ const INPUTS: &[&str] = &[
 
 fn model_dir() -> PathBuf {
     let home = std::env::var("HOME").expect("HOME");
-    let dir = PathBuf::from(home).join(".local/share/lune-voice/models/qwen3-0.6b");
+    let dir = PathBuf::from(home)
+        .join(".local/share/lune-voice/models")
+        .join(lune_core::models::DIR_STYLE_LLM);
     assert!(dir.exists(), "model not found at {}", dir.display());
     dir
 }

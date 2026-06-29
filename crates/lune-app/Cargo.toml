@@ -80,6 +80,10 @@ name = "bench_domain"
 path = "../../benchmarks/quality/bench_domain.rs"
 
 [[example]]
+name = "corrector_model_ab"
+path = "../../benchmarks/quality/corrector_model_ab.rs"
+
+[[example]]
 name = "vram_growth"
 path = "../../benchmarks/pipeline/vram_growth.rs"
 
