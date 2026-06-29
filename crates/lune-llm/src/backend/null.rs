@@ -22,7 +22,6 @@ impl TextPostProcessor for NullPostProcessor {
         Ok(PostProcessOutput {
             cleaned_text: input.raw_text.clone(),
             metadata: None,
-            edit_observations: Vec::new(),
         })
     }
 }
@@ -49,7 +48,6 @@ mod tests {
             app_category: None,
             dictionary: vec![],
             language: "en".into(),
-            correction_needed: true,
         };
         let out = processor.transform(&input).await.unwrap();
         assert_eq!(out.cleaned_text, "hello world");

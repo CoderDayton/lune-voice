@@ -45,7 +45,6 @@ impl TextPostProcessor for EchoPostProcessor {
         Ok(PostProcessOutput {
             cleaned_text: input.raw_text.clone(),
             metadata: None,
-            edit_observations: Vec::new(),
         })
     }
 }

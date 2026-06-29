@@ -123,6 +123,34 @@ fn skip_spaces(chars: &[char], start: usize) -> usize {
     j
 }
 
+/// True when the model emitted meta-commentary instead of clean text.
+pub fn contains_forbidden_output(text: &str) -> bool {
+    let lower = text.to_lowercase();
+    [
+        "here is",
+        "corrected transcript",
+        "the corrected",
+        "i changed",
+        "i fixed",
+        "input:",
+        "output:",
+        "possibly misheard",
+    ]
+    .iter()
+    .any(|m| lower.contains(m))
+}
+
+/// Strip a leading `<think>…</think>` reasoning block (Qwen thinking mode).
+pub fn strip_think_tags(text: &str) -> &str {
+    if let Some(end) = text.find("</think>") {
+        text[end + 8..].trim_start()
+    } else if text.starts_with("<think>") {
+        ""
+    } else {
+        text
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -153,5 +181,48 @@ mod tests {
             fix_all_number_spaces("hello , 2 apples"),
             "hello , 2 apples"
         );
+    }
+
+    #[test]
+    fn strip_think_tags_passthrough_when_no_tags() {
+        assert_eq!(strip_think_tags("just clean text"), "just clean text");
+    }
+
+    #[test]
+    fn strip_think_tags_removes_block() {
+        assert_eq!(
+            strip_think_tags("<think>reasoning here</think>Hello world"),
+            "Hello world"
+        );
+    }
+
+    #[test]
+    fn strip_think_tags_opening_only_is_empty() {
+        assert_eq!(strip_think_tags("<think>still thinking"), "");
+    }
+
+    #[test]
+    fn strip_think_tags_trims_leading_whitespace_after_close() {
+        assert_eq!(
+            strip_think_tags("<think>x</think>\n  Final answer"),
+            "Final answer"
+        );
+    }
+
+    #[test]
+    fn strip_think_tags_empty_string() {
+        assert_eq!(strip_think_tags(""), "");
+    }
+
+    #[test]
+    fn contains_forbidden_output_detects_meta() {
+        assert!(contains_forbidden_output("Here is the corrected text"));
+        assert!(contains_forbidden_output("Corrected transcript: hello"));
+        assert!(contains_forbidden_output("Output: hello"));
+    }
+
+    #[test]
+    fn contains_forbidden_output_allows_clean_text() {
+        assert!(!contains_forbidden_output("The quick brown fox jumps."));
     }
 }

@@ -10,6 +10,11 @@ workspace = true
 [features]
 default = []
 cuda = ["ort/cuda", "lune-asr/cuda"]
+# Local llama.cpp styling LLM. Compiles llama.cpp (C++) via llama-cpp-2-sys —
+# needs cmake + a C++ toolchain. Off by default so routine checks stay fast.
+llama-cpp = ["dep:llama-cpp-2", "dep:encoding_rs"]
+# GPU llama.cpp (source-compiles CUDA kernels; needs the CUDA toolkit).
+llama-cuda = ["llama-cpp", "llama-cpp-2/cuda"]
 
 [dependencies]
 # Direct path dep (not workspace-inherited) so default-features can be disabled:
@@ -30,6 +35,8 @@ ort.workspace = true
 ndarray.workspace = true
 tokenizers.workspace = true
 rand = "0.9"
+llama-cpp-2 = { version = "0.1.150", optional = true }
+encoding_rs = { version = "0.8", optional = true }
 
 [dev-dependencies]
 tracing-subscriber = "0.3"

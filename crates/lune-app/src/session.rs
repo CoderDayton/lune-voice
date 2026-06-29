@@ -12,7 +12,7 @@ use lune_core::Result;
 use lune_core::asr::{AsrBackend, AsrBackendKind, AsrSegment, AsrSessionConfig};
 use lune_core::config::{PipelineConfig, StylePreset, UserSettings, builtin_registry};
 use lune_core::error::Error;
-use lune_core::llm::{EditObservation, TextPostProcessor};
+use lune_core::llm::TextPostProcessor;
 use lune_core::session::{DictationSession, SessionEvent, SessionStatus};
 use lune_dict::DictionaryManager;
 use lune_dict::commands::VoiceCommandRouter;
@@ -725,10 +725,6 @@ async fn process_and_deliver(
         .await;
 
     drain_processing_controls(&mut control_rx, &mut cancelled);
-    // Per-edit calibration observations from the LLM gate (empty unless the
-    // correction pass ran with decode margins). Persisted below for the next
-    // calibration; best-effort, never affects delivery.
-    let mut edit_observations: Vec<EditObservation> = Vec::new();
     let post_llm_text = if cancelled {
         info!(%session_id, "session cancelled during processing, skipping LLM");
         String::new()
@@ -745,7 +741,6 @@ async fn process_and_deliver(
             app_category: None,
             dictionary: dictionary_entries.clone(),
             language: detected_lang.into(),
-            correction_needed: needs_correction,
         };
         let llm_result = if timeout_secs > 0 {
             tokio::time::timeout(
@@ -759,7 +754,6 @@ async fn process_and_deliver(
         match llm_result {
             Ok(Ok(output)) => {
                 debug!(%session_id, llm_ms = llm_t0.elapsed().as_millis() as u64, "[LLM] output ready, len={}", output.cleaned_text.len());
-                edit_observations = output.edit_observations;
                 // Deterministic backstop: any sentence the model left
                 // uncapitalized (or that the merge reverted to input casing)
                 // still gets its sentence-initial capital (when the style enables it).
@@ -812,20 +806,12 @@ async fn process_and_deliver(
         Some(post_llm_text)
     };
 
-    // Record (raw ASR, final delivered) plus the per-edit calibration
-    // observations as labelled data for the LLM-edit calibrator.
-    // Best-effort — a write failure never affects delivery.
+    // Record (raw ASR, final delivered) as labelled data. Best-effort — a
+    // write failure never affects delivery.
     if let Some(final_text) = transcript.as_deref() {
         let mut db = persist.lock().await;
         if let Err(e) = db.insert_correction_pair(session_id, &raw_text, final_text) {
             warn!(error = %e, %session_id, "failed to persist correction pair");
-        }
-        let observation_rows: Vec<(bool, Option<f32>, bool)> = edit_observations
-            .iter()
-            .map(|o| (o.observed_correct, o.margin, o.flip_fixes))
-            .collect();
-        if let Err(e) = db.insert_edit_observations(session_id, &observation_rows) {
-            warn!(error = %e, %session_id, "failed to persist edit observations");
         }
     }
 
@@ -985,7 +971,6 @@ mod tests {
             Ok(PostProcessOutput {
                 cleaned_text: input.raw_text.clone(),
                 metadata: None,
-                edit_observations: Vec::new(),
             })
         }
     }
@@ -1003,7 +988,6 @@ mod tests {
             Ok(PostProcessOutput {
                 cleaned_text: input.raw_text.clone(),
                 metadata: None,
-                edit_observations: Vec::new(),
             })
         }
     }
