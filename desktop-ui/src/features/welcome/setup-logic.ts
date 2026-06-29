@@ -36,6 +36,16 @@ export function buildInitialSelection(asrLocalName: string, models: ModelStatus[
 }
 
 /**
+ * Whether to surface the GPU-acceleration acceptance card during onboarding.
+ * GPU support is a build-time decision (CUDA is linked only in a CUDA build),
+ * so the card appears only when the backend reports a compiled-in CUDA feature;
+ * otherwise the onboarding flow is unchanged.
+ */
+export function shouldOfferGpuAcceleration(gpuCompiledIn: boolean): boolean {
+  return gpuCompiledIn;
+}
+
+/**
  * Setup can proceed once the engine's model and every backend-required model
  * are selected (or already present).
  */

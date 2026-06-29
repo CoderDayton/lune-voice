@@ -15,17 +15,17 @@ use lune_asr::{WhisperCppBackend, WhisperCppConfig};
 use lune_core::asr::{AsrBackend, AsrSessionConfig};
 
 fn env_path(key: &str) -> Option<PathBuf> {
-    std::env::var(key).ok().map(PathBuf::from).filter(|p| p.exists())
+    std::env::var(key)
+        .ok()
+        .map(PathBuf::from)
+        .filter(|p| p.exists())
 }
 
 fn load_wav_16k_mono(path: &PathBuf) -> Vec<f32> {
     let reader = hound::WavReader::open(path).expect("open wav");
     let spec = reader.spec();
     let mono: Vec<f32> = match spec.sample_format {
-        hound::SampleFormat::Float => reader
-            .into_samples::<f32>()
-            .map(|s| s.unwrap())
-            .collect(),
+        hound::SampleFormat::Float => reader.into_samples::<f32>().map(|s| s.unwrap()).collect(),
         hound::SampleFormat::Int => reader
             .into_samples::<i32>()
             .map(|s| s.unwrap() as f32 / i16::MAX as f32)
@@ -75,7 +75,12 @@ async fn transcribe(b: &WhisperCppBackend, pcm: &[f32]) -> Vec<lune_core::asr::A
 }
 
 fn joined(segs: &[lune_core::asr::AsrSegment]) -> String {
-    segs.iter().map(|s| s.text.as_str()).collect::<Vec<_>>().join(" ").trim().to_string()
+    segs.iter()
+        .map(|s| s.text.as_str())
+        .collect::<Vec<_>>()
+        .join(" ")
+        .trim()
+        .to_string()
 }
 
 #[tokio::test]
@@ -89,7 +94,10 @@ async fn vad_passes_speech_through() {
     let pcm = load_wav_16k_mono(&wav);
     let text = joined(&transcribe(&b, &pcm).await);
     eprintln!("SPEECH+VAD => {text:?}");
-    assert!(!text.is_empty(), "VAD should pass speech through to a transcript");
+    assert!(
+        !text.is_empty(),
+        "VAD should pass speech through to a transcript"
+    );
 }
 
 #[tokio::test]
@@ -108,9 +116,9 @@ async fn vad_drops_silence() {
     for s in &segs {
         eprintln!("SILENCE+VAD seg conf={:?} text={:?}", s.confidence, s.text);
     }
-    let surviving = segs
-        .iter()
-        .any(|s| !s.text.trim().is_empty() && s.confidence.unwrap_or(0.0) >= GARBAGE_DROP_THRESHOLD);
+    let surviving = segs.iter().any(|s| {
+        !s.text.trim().is_empty() && s.confidence.unwrap_or(0.0) >= GARBAGE_DROP_THRESHOLD
+    });
     assert!(
         !surviving,
         "silence produced a high-confidence segment the pipeline would keep: {:?}",

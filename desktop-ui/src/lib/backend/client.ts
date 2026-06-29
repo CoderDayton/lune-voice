@@ -5,6 +5,7 @@ import type {
   BackendClient,
   CalibrationHandle,
   CalibrationStreamEvent,
+  GpuSupportDto,
   PillSnapshotDto,
   WorkspaceSnapshot,
 } from './types';
@@ -76,6 +77,10 @@ const tauriBackendClient: BackendClient = {
 
   toggleDictation() {
     return invoke<string | null>('toggle_dictation');
+  },
+
+  gpuSupport() {
+    return invoke<GpuSupportDto>('gpu_support');
   },
 
   async calibrateStart(onEvent): Promise<CalibrationHandle> {

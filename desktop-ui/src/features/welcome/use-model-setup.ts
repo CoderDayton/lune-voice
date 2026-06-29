@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
+import { backendClient } from '../../lib/backend/client';
 import { isTauriRuntime } from '../../lib/backend/runtime';
 import {
   loadWorkspaceSnapshot,
@@ -96,6 +97,12 @@ interface ModelSetup {
   engineWhisper: WhisperModelValue;
   /** On-disk dir of the chosen engine's model — treated as required to finish. */
   asrLocalName: string;
+  /** True when this build compiled in CUDA — gates the GPU acceptance card. */
+  gpuCompiledIn: boolean;
+  /** Whether the user accepts GPU acceleration (mirrors the `useGpu` setting). */
+  useGpu: boolean;
+  /** Accept/decline GPU acceleration; persists via the shared settings path. */
+  setUseGpu: (next: boolean) => void;
   setEngineBackend: (backend: AsrBackendValue) => void;
   setEngineWhisper: (model: WhisperModelValue) => void;
   confirmEngine: () => void;
@@ -123,6 +130,8 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
   const [asrLocalName, setAsrLocalName] = useState<string>(() =>
     asrModelLocalName('WhisperCpp', 'Medium'),
   );
+  const [gpuCompiledIn, setGpuCompiledIn] = useState(false);
+  const [useGpu, setUseGpuState] = useState(true);
 
   const queueRef = useRef<string[]>([]);
   const currentRef = useRef<string | null>(null);
@@ -158,6 +167,12 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
         setEngineWhisper(cur.whisperModel);
         const asrName = asrModelLocalName(backend, cur.whisperModel);
         setAsrLocalName(asrName);
+        setUseGpuState(cur.useGpu);
+        // Build-time GPU support gates the acceptance card; default to no
+        // support so a probe failure never wrongly offers acceleration.
+        const gpu = await backendClient.gpuSupport().catch(() => ({ compiled_in: false }));
+        if (cancelled) return;
+        setGpuCompiledIn(gpu.compiled_in);
         const s = await invoke<ModelStatus[]>('check_model_status');
         if (cancelled) return;
         setModels(s);
@@ -266,6 +281,13 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
     setPhase('engine');
   }, []);
 
+  // Accept/decline GPU acceleration through the same settings path the
+  // Transcription settings toggle uses, so the choice persists identically.
+  const setUseGpu = useCallback((next: boolean) => {
+    setUseGpuState(next);
+    void saveWorkspaceSetting('useGpu', next);
+  }, []);
+
   const startDownload = useCallback(() => {
     const pending = models.filter((m) => selected.has(m.localName) && !m.ready);
     if (pending.length === 0) {
@@ -302,6 +324,9 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
     engineBackend,
     engineWhisper,
     asrLocalName,
+    gpuCompiledIn,
+    useGpu,
+    setUseGpu,
     setEngineBackend,
     setEngineWhisper,
     confirmEngine,

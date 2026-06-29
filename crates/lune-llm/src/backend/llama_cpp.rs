@@ -90,9 +90,7 @@ mod imp {
                 &config.model_path,
                 &LlamaModelParams::default().with_n_gpu_layers(n_gpu_layers),
             )
-            .map_err(|e| {
-                Error::config(format!("load LLM {}: {e}", config.model_path.display()))
-            })?;
+            .map_err(|e| Error::config(format!("load LLM {}: {e}", config.model_path.display())))?;
             tracing::info!(
                 model = %config.model_path.display(),
                 use_gpu = config.use_gpu,
@@ -201,11 +199,9 @@ mod imp {
             let system = system.to_owned();
             let user = user.to_owned();
             let max_new_tokens = self.max_new_tokens;
-            tokio::task::spawn_blocking(move || {
-                generate(&model, &system, &user, max_new_tokens)
-            })
-            .await
-            .map_err(|e| Error::config(format!("llama join: {e}")))?
+            tokio::task::spawn_blocking(move || generate(&model, &system, &user, max_new_tokens))
+                .await
+                .map_err(|e| Error::config(format!("llama join: {e}")))?
         }
     }
 }

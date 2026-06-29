@@ -8,6 +8,7 @@ export type { DevicePolicyDto } from './DevicePolicyDto';
 export type { DictationModeDto } from './DictationModeDto';
 export type { DictionaryItemDto } from './DictionaryItemDto';
 export type { FormatTogglesDto } from './FormatTogglesDto';
+export type { GpuSupportDto } from './GpuSupportDto';
 export type { HistoryItemDto } from './HistoryItemDto';
 export type { PillSnapshotDto } from './PillSnapshotDto';
 export type { PillVisibilityDto } from './PillVisibilityDto';

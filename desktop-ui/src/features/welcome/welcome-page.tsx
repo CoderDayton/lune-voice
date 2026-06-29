@@ -39,6 +39,9 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
     engineBackend,
     engineWhisper,
     asrLocalName,
+    gpuCompiledIn,
+    useGpu,
+    setUseGpu,
     setEngineBackend,
     setEngineWhisper,
     confirmEngine,
@@ -74,8 +77,11 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
           engineBackend={engineBackend}
           engineWhisper={engineWhisper}
           error={error}
+          gpuCompiledIn={gpuCompiledIn}
+          useGpu={useGpu}
           onSelectEngine={setEngineBackend}
           onSelectWhisper={setEngineWhisper}
+          onToggleGpu={setUseGpu}
         />
       ) : (
         <div className="flex flex-col gap-3">

@@ -34,13 +34,14 @@ impl TextPostProcessor for StylePipeline {
             let style_prompt = input.style_preset.build_styling_prompt(&text);
             match self.llm.complete("", &style_prompt).await {
                 Ok(styled)
-                    if !styled.is_empty()
-                        && !crate::prompt::contains_forbidden_output(&styled) =>
+                    if !styled.is_empty() && !crate::prompt::contains_forbidden_output(&styled) =>
                 {
                     text = crate::prompt::fix_all_number_spaces(&styled);
                 }
                 Ok(_) => {
-                    tracing::warn!("styling pass produced empty or forbidden output, keeping seeded text")
+                    tracing::warn!(
+                        "styling pass produced empty or forbidden output, keeping seeded text"
+                    )
                 }
                 Err(e) => tracing::warn!(error = %e, "styling pass failed, keeping seeded text"),
             }

@@ -1,14 +1,20 @@
 import { useLingui } from '@lingui/react/macro';
-import { Check, CircleAlert, type LucideIcon, Mic } from 'lucide-react';
+import { Check, CircleAlert, type LucideIcon, Mic, Zap } from 'lucide-react';
 import type { AsrBackendValue, WhisperModelValue } from '../../settings/data/settings-data';
 import { whisperModels } from '../../settings/data/settings-data';
+import { shouldOfferGpuAcceleration } from '../setup-logic';
 
 interface EngineStepProps {
   engineBackend: AsrBackendValue;
   engineWhisper: WhisperModelValue;
   error: string | null;
+  /** True when this build compiled in CUDA — gates the GPU acceptance card. */
+  gpuCompiledIn: boolean;
+  /** Whether GPU acceleration is currently accepted (mirrors `useGpu`). */
+  useGpu: boolean;
   onSelectEngine: (backend: AsrBackendValue) => void;
   onSelectWhisper: (model: WhisperModelValue) => void;
+  onToggleGpu: (next: boolean) => void;
 }
 
 interface EngineOption {
@@ -28,8 +34,11 @@ export function EngineStep({
   engineBackend,
   engineWhisper,
   error,
+  gpuCompiledIn,
+  useGpu,
   onSelectEngine,
   onSelectWhisper,
+  onToggleGpu,
 }: EngineStepProps) {
   const { t } = useLingui();
 
@@ -97,6 +106,31 @@ export function EngineStep({
             })}
           </div>
         </fieldset>
+      )}
+
+      {shouldOfferGpuAcceleration(gpuCompiledIn) && (
+        <label className="flex items-center justify-between gap-3 rounded-box border border-surface-border bg-surface-panel p-4">
+          <span className="flex min-w-0 items-start gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-field bg-primary/15 text-primary">
+              <Zap size={18} strokeWidth={1.8} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-content-strong">
+                {t`GPU acceleration`}
+              </span>
+              <span className="mt-0.5 block text-xs text-content-subtle">
+                {t`Your machine supports it — use it for faster transcription.`}
+              </span>
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            className="toggle toggle-primary shrink-0"
+            checked={useGpu}
+            onChange={(e) => onToggleGpu(e.target.checked)}
+            aria-label={t`Use GPU acceleration`}
+          />
+        </label>
       )}
 
       {error && (

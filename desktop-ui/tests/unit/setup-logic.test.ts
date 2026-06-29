@@ -4,6 +4,7 @@ import {
   buildInitialSelection,
   isSetupSatisfiable,
   type ModelStatus,
+  shouldOfferGpuAcceleration,
 } from '../../src/features/welcome/setup-logic';
 
 const model = (localName: string, opts: Partial<ModelStatus> = {}): ModelStatus => ({
@@ -38,6 +39,13 @@ describe('buildInitialSelection', () => {
     ];
     const selected = buildInitialSelection('engine', models);
     expect([...selected].sort()).toEqual(['engine', 'ready-one', 'required-one']);
+  });
+});
+
+describe('shouldOfferGpuAcceleration', () => {
+  test('offers the card only when a CUDA build is detected', () => {
+    expect(shouldOfferGpuAcceleration(true)).toBe(true);
+    expect(shouldOfferGpuAcceleration(false)).toBe(false);
   });
 });
 

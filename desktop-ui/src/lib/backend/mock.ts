@@ -338,6 +338,12 @@ export const mockBackendClient: BackendClient = {
     return 'mock-session';
   },
 
+  async gpuSupport() {
+    // The browser/mock runtime has no compiled-in CUDA, so the onboarding GPU
+    // affordance stays hidden outside a real CUDA build.
+    return { compiled_in: false };
+  },
+
   async calibrateStart(onEvent): Promise<CalibrationHandle> {
     let cancelled = false;
     let resolveAdvance: (() => void) | null = null;

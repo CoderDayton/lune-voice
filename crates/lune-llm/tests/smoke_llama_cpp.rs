@@ -20,8 +20,7 @@ fn backend() -> Option<LlamaCppBackend> {
     .ok()
 }
 
-const SYSTEM: &str =
-    "You rewrite the user's dictated text to be clear and well punctuated. Output only the rewritten text.";
+const SYSTEM: &str = "You rewrite the user's dictated text to be clear and well punctuated. Output only the rewritten text.";
 const USER: &str =
     "so um i was thinking we could like meet tomorrow maybe around noon if that works";
 
