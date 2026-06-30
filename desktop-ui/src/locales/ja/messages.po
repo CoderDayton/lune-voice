@@ -103,11 +103,11 @@ msgstr "修正を追加"
 msgid "Adjust manually"
 msgstr "手動で調整する"
 
-#: src/features/settings/sections/models-section.tsx:89
+#: src/features/settings/sections/models-section.tsx:105
 msgid "AI models stored on your device."
 msgstr "AI モデルはデバイスに保存されます。"
 
-#: src/features/welcome/welcome-page.tsx:158
+#: src/features/welcome/welcome-page.tsx:164
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "必要なモデルはすべてインストール済みです。準備ができたら続行してください。"
 
@@ -185,7 +185,7 @@ msgstr "マイクを調整する"
 #: src/components/feedback/confirm-dialog.tsx:52
 #: src/features/dictionary/components/dictionary-table.tsx:96
 #: src/features/settings/components/calibrate-modal.tsx:115
-#: src/features/settings/sections/models-section.tsx:265
+#: src/features/settings/sections/models-section.tsx:312
 #: src/features/styles/components/style-editor-modal.tsx:138
 msgid "Cancel"
 msgstr "キャンセル"
@@ -206,19 +206,19 @@ msgstr "大文字"
 msgid "Capture device and how recording detects when you speak."
 msgstr ""
 
-#: src/features/welcome/welcome-page.tsx:301
+#: src/features/welcome/welcome-page.tsx:307
 msgid "Change engine"
 msgstr ""
 
-#: src/features/welcome/welcome-page.tsx:152
+#: src/features/welcome/welcome-page.tsx:158
 msgid "Check your network and we'll pick up where we left off."
 msgstr "ネットワークをチェックしてください。中断したところから再開します。"
 
-#: src/features/welcome/welcome-page.tsx:59
+#: src/features/welcome/welcome-page.tsx:62
 msgid "Checking installed models…"
 msgstr "インストールされているモデルを確認しています…"
 
-#: src/features/settings/components/asr-engine-cards.tsx:185
+#: src/features/settings/components/asr-engine-cards.tsx:223
 msgid "Checking…"
 msgstr ""
 
@@ -234,16 +234,16 @@ msgstr "完成したテキストを現在使用しているアプリに挿入す
 msgid "Choose how Lune Voice looks."
 msgstr "Lune Voiceの見た目を選択します。"
 
-#: src/features/welcome/welcome-page.tsx:155
 #: src/features/welcome/welcome-page.tsx:161
+#: src/features/welcome/welcome-page.tsx:167
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "インストールする AI モデルを選択します。すべてがオフラインで実行されます。クラウドもアカウントもありません。"
 
-#: src/features/settings/sections/transcription-section.tsx:35
+#: src/features/settings/sections/transcription-section.tsx:38
 msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
 msgstr ""
 
-#: src/features/welcome/welcome-page.tsx:143
+#: src/features/welcome/welcome-page.tsx:149
 msgid "Choose your speech engine. Everything runs offline — no cloud, no accounts."
 msgstr ""
 
@@ -261,7 +261,7 @@ msgid "close"
 msgstr "閉じる"
 
 #: src/features/history/components/session-detail-modal.tsx:209
-#: src/features/settings/sections/models-section.tsx:277
+#: src/features/settings/sections/models-section.tsx:324
 #: src/features/styles/components/style-editor-modal.tsx:129
 msgid "Close"
 msgstr "閉じる"
@@ -285,12 +285,12 @@ msgstr "完了"
 msgid "Connecting"
 msgstr "接続中"
 
-#: src/features/welcome/welcome-page.tsx:233
-#: src/features/welcome/welcome-page.tsx:295
+#: src/features/welcome/welcome-page.tsx:239
+#: src/features/welcome/welcome-page.tsx:301
 msgid "Continue"
 msgstr "続行"
 
-#: src/features/settings/sections/transcription-section.tsx:30
+#: src/features/settings/sections/transcription-section.tsx:33
 msgid "Control how your speech is turned into text."
 msgstr "音声をテキストに変換する方法を制御します。"
 
@@ -311,21 +311,21 @@ msgstr "クリップボードにコピー"
 msgid "Copy transcript"
 msgstr "文字起こしをコピー"
 
-#: src/features/settings/sections/transcription-section.tsx:84
+#: src/features/settings/sections/transcription-section.tsx:87
 msgid "Correction"
 msgstr "修正"
 
-#: src/features/settings/sections/transcription-section.tsx:130
-#: src/features/settings/sections/transcription-section.tsx:142
+#: src/features/settings/sections/transcription-section.tsx:133
+#: src/features/settings/sections/transcription-section.tsx:145
 msgid "Correction frequency"
 msgstr "修正の頻度"
 
-#: src/features/settings/sections/transcription-section.tsx:89
+#: src/features/settings/sections/transcription-section.tsx:92
 msgid "Correction LLM"
 msgstr "修正 LLM"
 
-#: src/features/settings/sections/transcription-section.tsx:109
-#: src/features/settings/sections/transcription-section.tsx:121
+#: src/features/settings/sections/transcription-section.tsx:112
+#: src/features/settings/sections/transcription-section.tsx:124
 msgid "Correction sensitivity"
 msgstr "修正の感度"
 
@@ -359,7 +359,7 @@ msgstr "暗い"
 #: src/features/dictionary/components/dictionary-table.tsx:146
 #: src/features/history/components/history-table.tsx:309
 #: src/features/history/components/session-detail-modal.tsx:202
-#: src/features/settings/sections/models-section.tsx:213
+#: src/features/settings/sections/models-section.tsx:260
 msgid "Delete"
 msgstr "削除"
 
@@ -369,11 +369,11 @@ msgid "Delete {0}"
 msgstr "{0}を削除"
 
 #. placeholder {0}: model.name
-#: src/features/settings/sections/models-section.tsx:250
+#: src/features/settings/sections/models-section.tsx:297
 msgid "Delete {0}?"
 msgstr "{0} を削除しますか?"
 
-#: src/features/settings/sections/models-section.tsx:268
+#: src/features/settings/sections/models-section.tsx:315
 msgid "Delete model"
 msgstr "モデルの削除"
 
@@ -406,8 +406,8 @@ msgstr "AI によるスタイル調整の前に、決定的な修正を適用し
 msgid "Dictation"
 msgstr ""
 
-#: src/features/settings/sections/transcription-section.tsx:51
-#: src/features/settings/sections/transcription-section.tsx:57
+#: src/features/settings/sections/transcription-section.tsx:54
+#: src/features/settings/sections/transcription-section.tsx:60
 msgid "Dictation language"
 msgstr "音声入力の言語"
 
@@ -419,7 +419,7 @@ msgstr "ディクテーションインジケーター"
 msgid "Dictation pill visibility"
 msgstr "ディクテーションインジケーターの表示"
 
-#: src/features/settings/sections/transcription-section.tsx:93
+#: src/features/settings/sections/transcription-section.tsx:96
 msgid "Disabled — transcripts are delivered raw, and the LLM model is hidden from the Models tab."
 msgstr ""
 
@@ -431,34 +431,42 @@ msgstr "現在のドラフトを破棄し、アイドル状態に戻ります。
 msgid "Disconnected"
 msgstr "切断されました"
 
+#: src/features/settings/sections/models-section.tsx:134
+msgid "Disk usage"
+msgstr ""
+
 #: src/components/feedback/error-toast.tsx:24
 msgid "Dismiss error"
 msgstr "エラーを無視する"
 
 #: src/features/history/components/history-table.tsx:303
-#: src/features/settings/components/asr-engine-cards.tsx:199
-#: src/features/settings/sections/models-section.tsx:227
+#: src/features/settings/sections/models-section.tsx:274
 msgid "Download"
 msgstr "ダウンロード"
 
-#: src/features/welcome/welcome-page.tsx:287
+#. placeholder {0}: selected.label
+#: src/features/settings/components/asr-engine-cards.tsx:163
+msgid "Download {0}"
+msgstr ""
+
+#: src/features/welcome/welcome-page.tsx:293
 msgid "Download {pendingCount} models"
 msgstr "{pendingCount} モデルをダウンロード"
 
-#: src/features/welcome/welcome-page.tsx:287
+#: src/features/welcome/welcome-page.tsx:293
 msgid "Download 1 model"
 msgstr "1 モデルをダウンロード"
 
-#: src/features/welcome/welcome-page.tsx:107
+#: src/features/welcome/welcome-page.tsx:113
 msgid "Download failed"
 msgstr "ダウンロードに失敗しました"
 
-#: src/features/welcome/welcome-page.tsx:151
+#: src/features/welcome/welcome-page.tsx:157
 msgid "Download interrupted"
 msgstr "ダウンロードが中断されました"
 
-#: src/features/settings/components/asr-engine-cards.tsx:178
-#: src/features/settings/sections/models-section.tsx:186
+#: src/features/settings/components/asr-engine-cards.tsx:148
+#: src/features/settings/sections/models-section.tsx:233
 #: src/features/welcome/components/model-card.tsx:99
 msgid "Download progress"
 msgstr "ダウンロード進行状況"
@@ -467,13 +475,13 @@ msgstr "ダウンロード進行状況"
 msgid "Download transcript"
 msgstr "文字起こしをダウンロード"
 
-#: src/features/welcome/welcome-page.tsx:148
+#: src/features/welcome/welcome-page.tsx:154
 msgid "Downloading models"
 msgstr "モデルをダウンロード中"
 
-#: src/features/settings/components/asr-engine-cards.tsx:181
-#: src/features/settings/sections/models-section.tsx:227
-#: src/features/welcome/welcome-page.tsx:248
+#: src/features/settings/components/asr-engine-cards.tsx:151
+#: src/features/settings/sections/models-section.tsx:274
+#: src/features/welcome/welcome-page.tsx:254
 msgid "Downloading…"
 msgstr "ダウンロード中…"
 
@@ -509,7 +517,7 @@ msgstr "スタイルの編集"
 msgid "Empty session"
 msgstr "空のセッション"
 
-#: src/features/settings/sections/transcription-section.tsx:101
+#: src/features/settings/sections/transcription-section.tsx:104
 msgid "Enable correction LLM"
 msgstr "補正LLMを有効にする"
 
@@ -518,7 +526,7 @@ msgstr "補正LLMを有効にする"
 msgid "Engine"
 msgstr "エンジン"
 
-#: src/features/welcome/welcome-page.tsx:274
+#: src/features/welcome/welcome-page.tsx:280
 msgid "Enter Lune Voice"
 msgstr "Lune Voice を開く"
 
@@ -576,6 +584,10 @@ msgstr "こんばんは"
 msgid "Good morning"
 msgstr "おはよう"
 
+#: src/features/welcome/components/engine-step.tsx:119
+msgid "GPU acceleration"
+msgstr ""
+
 #: src/features/settings/sections/general-section.tsx:61
 #: src/features/settings/sections/general-section.tsx:71
 msgid "History retention"
@@ -601,7 +613,7 @@ msgstr ""
 msgid "How quickly Lune Voice decides you're done speaking. Higher = ends sooner on a pause."
 msgstr "Lune Voice が話し終わりを判断する速さ。高いほど無音時に早く終了します。"
 
-#: src/features/settings/sections/transcription-section.tsx:131
+#: src/features/settings/sections/transcription-section.tsx:134
 msgid "How readily the LLM runs on clean speech. Higher polishes more segments; lower skips more often for speed."
 msgstr "クリアな音声でLLMをどれだけ積極的に実行するか。高いほど多くのセグメントを整え、低いほど速度のために頻繁にスキップします。"
 
@@ -609,8 +621,12 @@ msgstr "クリアな音声でLLMをどれだけ積極的に実行するか。高
 msgid "Idle"
 msgstr "アイドル状態"
 
-#: src/features/settings/components/asr-engine-cards.tsx:189
-#: src/features/settings/sections/models-section.tsx:173
+#: src/features/settings/sections/models-section.tsx:217
+msgid "In use"
+msgstr ""
+
+#: src/features/settings/components/asr-engine-cards.tsx:227
+#: src/features/settings/sections/models-section.tsx:220
 #: src/features/welcome/components/model-card.tsx:89
 msgid "Installed"
 msgstr "インストール済み"
@@ -680,6 +696,10 @@ msgstr "Lune Voice"
 msgid "Lune Voice writes"
 msgstr "Lune Voice の出力"
 
+#: src/features/settings/components/asr-engine-cards.tsx:171
+msgid "Manage in Models"
+msgstr ""
+
 #: src/features/settings/sections/dictation-section.tsx:140
 msgid "Measure your room and voice to set both sensitivities automatically."
 msgstr "部屋と声を測定して両方の感度を自動設定します。"
@@ -710,16 +730,16 @@ msgstr "分"
 msgid "Mode"
 msgstr "モード"
 
-#: src/features/settings/sections/models-section.tsx:88
+#: src/features/settings/sections/models-section.tsx:104
 #: src/features/settings/settings-page.tsx:61
 msgid "Models"
 msgstr "モデル"
 
-#: src/features/welcome/welcome-page.tsx:316
+#: src/features/welcome/welcome-page.tsx:322
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "モデルはローカルに保存されます。テレメトリもアカウントもありません。"
 
-#: src/features/welcome/components/engine-step.tsx:40
+#: src/features/welcome/components/engine-step.tsx:49
 msgid "Multilingual · pick a size"
 msgstr ""
 
@@ -778,9 +798,13 @@ msgstr "文字起こしなし"
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
 msgstr "音声検出前にマイクレベルを正規化します。小さい音のマイクや騒がしい部屋に役立ちます。推奨。"
 
-#: src/features/settings/sections/models-section.tsx:176
+#: src/features/settings/sections/models-section.tsx:223
 msgid "Not installed"
 msgstr "インストールされていません"
+
+#: src/features/settings/sections/models-section.tsx:136
+msgid "Nothing installed"
+msgstr ""
 
 #: src/features/overview/overview-page.tsx:204
 #: src/features/shell/components/app-shell.tsx:163
@@ -808,7 +832,6 @@ msgstr "セッションの詳細を開く"
 msgid "Open session from {time}"
 msgstr "{time} のセッションを開く"
 
-#: src/features/settings/sections/models-section.tsx:170
 #: src/features/welcome/components/model-card.tsx:86
 msgid "Optional"
 msgstr "オプション"
@@ -818,7 +841,7 @@ msgstr "オプション"
 msgid "Output"
 msgstr "出力"
 
-#: src/features/welcome/welcome-page.tsx:196
+#: src/features/welcome/welcome-page.tsx:202
 msgid "Overall progress"
 msgstr "全体の進捗"
 
@@ -855,11 +878,11 @@ msgstr ""
 msgid "Please call Stella. Ask her to bring these things with her from the store: six spoons of fresh snow peas, five thick slabs of blue cheese, and maybe a snack for her brother Bob."
 msgstr "ステラに電話してください。店から新鮮なスナップエンドウをスプーン6杯、厚切りのブルーチーズを5枚、それから弟のボブにおやつを持ってきてもらうよう頼んでください。"
 
-#: src/features/welcome/welcome-page.tsx:251
+#: src/features/welcome/welcome-page.tsx:257
 msgid "Please keep the app open until downloads finish"
 msgstr "ダウンロードが完了するまでアプリを開いたままにしてください"
 
-#: src/features/settings/sections/transcription-section.tsx:92
+#: src/features/settings/sections/transcription-section.tsx:95
 msgid "Polishes punctuation and fixes obvious recognizer errors after transcription."
 msgstr ""
 
@@ -951,7 +974,6 @@ msgstr "保存された「{0}」→「{1}」の修正を削除します。"
 msgid "Replacement"
 msgstr "置換"
 
-#: src/features/settings/sections/models-section.tsx:167
 #: src/features/welcome/components/model-card.tsx:83
 msgid "Required"
 msgstr "必須"
@@ -960,7 +982,7 @@ msgstr "必須"
 msgid "Retry"
 msgstr "リトライ"
 
-#: src/features/welcome/welcome-page.tsx:262
+#: src/features/welcome/welcome-page.tsx:268
 msgid "Retry download"
 msgstr "ダウンロードを再試行"
 
@@ -989,7 +1011,7 @@ msgstr "文字起こしを検索"
 msgid "Search transcripts…"
 msgstr "文字起こしを検索…"
 
-#: src/features/welcome/welcome-page.tsx:291
+#: src/features/welcome/welcome-page.tsx:297
 msgid "Select required models"
 msgstr "必要なモデルを選択"
 
@@ -1016,11 +1038,11 @@ msgstr "セッション"
 msgid "Set hotkey"
 msgstr "ホットキーを設定する"
 
-#: src/features/settings/sections/transcription-section.tsx:52
+#: src/features/settings/sections/transcription-section.tsx:55
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "話す言語を設定します。自動では音声からの検出を使用します。"
 
-#: src/features/settings/settings-page.tsx:77
+#: src/features/settings/settings-page.tsx:79
 msgid "Settings sections"
 msgstr "設定セクション"
 
@@ -1029,9 +1051,9 @@ msgstr "設定セクション"
 msgid "Shortcuts"
 msgstr "ショートカット"
 
-#: src/features/welcome/welcome-page.tsx:237
-#: src/features/welcome/welcome-page.tsx:265
-#: src/features/welcome/welcome-page.tsx:304
+#: src/features/welcome/welcome-page.tsx:243
+#: src/features/welcome/welcome-page.tsx:271
+#: src/features/welcome/welcome-page.tsx:310
 msgid "Skip for now"
 msgstr "今はスキップ"
 
@@ -1055,6 +1077,10 @@ msgstr ""
 #: src/features/overview/overview-page.tsx:132
 msgid "Speaking Time"
 msgstr "発話時間"
+
+#: src/features/settings/sections/models-section.tsx:75
+msgid "Speech-to-text"
+msgstr ""
 
 #: src/features/dictionary/components/dictionary-table.tsx:62
 msgid "Spoken phrase"
@@ -1115,6 +1141,10 @@ msgstr "音声入力を停止"
 msgid "Style"
 msgstr "スタイル"
 
+#: src/features/settings/sections/models-section.tsx:76
+msgid "Styling"
+msgstr ""
+
 #: src/features/styles/styles-page.tsx:167
 msgid "Switch style"
 msgstr "スタイルを切り替え"
@@ -1150,10 +1180,14 @@ msgid "Theme"
 msgstr "テーマ"
 
 #: src/features/settings/sections/models-section.tsx:260
-msgid "This is a required model. Dictation will not work without it."
-msgstr "これは必須モデルです。これがないと音声入力は動作しません。"
+#~ msgid "This is a required model. Dictation will not work without it."
+#~ msgstr "これは必須モデルです。これがないと音声入力は動作しません。"
 
-#: src/features/welcome/welcome-page.tsx:149
+#: src/features/settings/sections/models-section.tsx:307
+msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
+msgstr ""
+
+#: src/features/welcome/welcome-page.tsx:155
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "これは一度だけ起こります。その間、コンピュータを使い続けることができます。"
 
@@ -1207,17 +1241,21 @@ msgstr "合計単語数"
 msgid "Transcript"
 msgstr "文字起こし"
 
-#: src/features/settings/sections/transcription-section.tsx:29
+#: src/features/settings/sections/transcription-section.tsx:32
 #: src/features/settings/settings-page.tsx:59
 msgid "Transcription"
 msgstr "文字起こし"
 
-#: src/features/settings/sections/transcription-section.tsx:85
+#: src/features/settings/sections/transcription-section.tsx:88
 msgid "Tune how the local LLM polishes transcripts after transcription."
 msgstr "文字起こし後にローカルLLMが文字起こしをどのように整えるかを調整します。"
 
-#: src/features/settings/sections/transcription-section.tsx:68
-#: src/features/settings/sections/transcription-section.tsx:76
+#: src/features/welcome/components/engine-step.tsx:131
+msgid "Use GPU acceleration"
+msgstr ""
+
+#: src/features/settings/sections/transcription-section.tsx:71
+#: src/features/settings/sections/transcription-section.tsx:79
 msgid "Use hardware acceleration"
 msgstr "ハードウェアアクセラレーションを使用"
 
@@ -1239,21 +1277,21 @@ msgstr "すべて見る"
 msgid "View style"
 msgstr "スタイルを表示"
 
-#: src/features/settings/sections/transcription-section.tsx:34
+#: src/features/settings/sections/transcription-section.tsx:37
 msgid "Voice model"
 msgstr "音声モデル"
 
-#: src/features/welcome/welcome-page.tsx:157
+#: src/features/welcome/welcome-page.tsx:163
 msgid "Welcome back"
 msgstr "おかえり"
 
-#: src/features/welcome/welcome-page.tsx:142
-#: src/features/welcome/welcome-page.tsx:154
+#: src/features/welcome/welcome-page.tsx:148
 #: src/features/welcome/welcome-page.tsx:160
+#: src/features/welcome/welcome-page.tsx:166
 msgid "Welcome to Lune Voice"
 msgstr "Lune Voice へようこそ"
 
-#: src/features/settings/sections/transcription-section.tsx:69
+#: src/features/settings/sections/transcription-section.tsx:72
 msgid "When available, this can make transcription finish faster."
 msgstr "利用可能な場合、これにより文字起こしがより速く完了します。"
 
@@ -1273,16 +1311,16 @@ msgstr "ディクテーションがどの入力デバイスから取り込むか
 msgid "Which paste shortcut to send. Automatic detects terminals; override if paste lands in the wrong place."
 msgstr "送信する貼り付けショートカット。「自動」はターミナルを検出します。貼り付けが誤った場所に入る場合は上書きしてください。"
 
-#: src/features/welcome/components/engine-step.tsx:39
+#: src/features/welcome/components/engine-step.tsx:48
 msgid "Whisper"
 msgstr ""
 
-#: src/features/settings/components/asr-engine-cards.tsx:102
-#: src/features/welcome/components/engine-step.tsx:62
+#: src/features/settings/components/asr-engine-cards.tsx:121
+#: src/features/welcome/components/engine-step.tsx:71
 msgid "Whisper model size"
 msgstr ""
 
-#: src/features/welcome/components/engine-step.tsx:41
+#: src/features/welcome/components/engine-step.tsx:50
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
 msgstr ""
 
@@ -1297,7 +1335,7 @@ msgstr "言葉"
 msgid "Words"
 msgstr "言葉"
 
-#: src/features/settings/sections/transcription-section.tsx:110
+#: src/features/settings/sections/transcription-section.tsx:113
 msgid "Words the recognizer is unsure about are sent to the LLM. Higher corrects more aggressively; lower trusts the raw transcription."
 msgstr "認識器が確信を持てない単語はLLMに送信されます。高いほど積極的に修正し、低いほど元の文字起こしを信頼します。"
 
@@ -1313,7 +1351,7 @@ msgstr "はい"
 msgid "You say"
 msgstr "話す内容"
 
-#: src/features/welcome/welcome-page.tsx:145
+#: src/features/welcome/welcome-page.tsx:151
 msgid "You're all set"
 msgstr "準備は完了です"
 
@@ -1325,7 +1363,11 @@ msgstr "API キー。保存されたキーを保持するには、空白のま�
 msgid "your hotkey"
 msgstr "あなたのホットキー"
 
-#: src/features/welcome/welcome-page.tsx:146
+#: src/features/welcome/components/engine-step.tsx:122
+msgid "Your machine supports it — use it for faster transcription."
+msgstr ""
+
+#: src/features/welcome/welcome-page.tsx:152
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "モデルの準備ができました。すべてがこのマシン上に残ります。"
 
