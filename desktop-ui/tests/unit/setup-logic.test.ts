@@ -1,0 +1,83 @@
+import { describe, expect, test } from 'bun:test';
+import {
+  asrModelLocalName,
+  buildInitialSelection,
+  isSetupSatisfiable,
+  type ModelStatus,
+  relevantSetupModels,
+  shouldOfferGpuAcceleration,
+} from '../../src/features/welcome/setup-logic';
+
+const model = (localName: string, opts: Partial<ModelStatus> = {}): ModelStatus => ({
+  name: localName,
+  repoId: 'repo',
+  localName,
+  ready: false,
+  description: '',
+  required: false,
+  inUse: false,
+  ...opts,
+});
+
+describe('asrModelLocalName', () => {
+  test('maps each Whisper size to its model directory', () => {
+    expect(asrModelLocalName('WhisperCpp', 'Small')).toBe('whisper-small-q5_1');
+    expect(asrModelLocalName('WhisperCpp', 'Medium')).toBe('whisper-medium-q5_0');
+    expect(asrModelLocalName('WhisperCpp', 'LargeV3Turbo')).toBe('whisper-large-v3-turbo-q8_0');
+  });
+});
+
+describe('buildInitialSelection', () => {
+  test('always includes the chosen engine model', () => {
+    const selected = buildInitialSelection('whisper-medium-q5_0', []);
+    expect(selected.has('whisper-medium-q5_0')).toBe(true);
+  });
+
+  test('includes installed and required models, skips the rest', () => {
+    const models = [
+      model('ready-one', { ready: true }),
+      model('required-one', { required: true }),
+      model('optional-one'),
+    ];
+    const selected = buildInitialSelection('engine', models);
+    expect([...selected].sort()).toEqual(['engine', 'ready-one', 'required-one']);
+  });
+});
+
+describe('relevantSetupModels', () => {
+  test('keeps only the in-use models from the full library', () => {
+    const models = [
+      model('whisper-small-q5_1'),
+      model('whisper-medium-q5_0', { inUse: true }),
+      model('whisper-large-v3-turbo-q8_0'),
+      model('qwen3-styler-0.8b-gguf', { inUse: true }),
+    ];
+    const relevant = relevantSetupModels(models).map((m) => m.localName);
+    expect(relevant).toEqual(['whisper-medium-q5_0', 'qwen3-styler-0.8b-gguf']);
+  });
+});
+
+describe('shouldOfferGpuAcceleration', () => {
+  test('offers the card only when a CUDA build is detected', () => {
+    expect(shouldOfferGpuAcceleration(true)).toBe(true);
+    expect(shouldOfferGpuAcceleration(false)).toBe(false);
+  });
+});
+
+describe('isSetupSatisfiable', () => {
+  test('false until the engine model is selected', () => {
+    expect(isSetupSatisfiable('engine', [], new Set())).toBe(false);
+    expect(isSetupSatisfiable('engine', [], new Set(['engine']))).toBe(true);
+  });
+
+  test('requires every backend-required model to be selected', () => {
+    const models = [model('engine', { required: true }), model('llm', { required: true })];
+    expect(isSetupSatisfiable('engine', models, new Set(['engine']))).toBe(false);
+    expect(isSetupSatisfiable('engine', models, new Set(['engine', 'llm']))).toBe(true);
+  });
+
+  test('ignores optional models', () => {
+    const models = [model('engine'), model('optional')];
+    expect(isSetupSatisfiable('engine', models, new Set(['engine']))).toBe(true);
+  });
+});

@@ -1,12 +1,10 @@
-//! Audio capture + VAD gating stage.
+//! Audio capture stage.
 //!
-//! Owns the hybrid VAD gate ([`crate::vad::HybridVad`]: Earshot → Silero →
-//! chunker) and the capture loop that streams gate-verified audio into the ASR
-//! backend. The gate buffers each speech segment and emits [`GateAction`]s —
-//! verified-speech pushes plus optional reconstructed inter-segment pauses (so
-//! the batch model still hears prosody for punctuation). Extracted from
-//! `session.rs` so orchestration and the capture/VAD stage stay separable; the
-//! session calls [`run_capture`] and consumes its [`CaptureResult`].
+//! Streams raw microphone audio into the ASR backend, which buffers the whole
+//! utterance and gates it with whisper.cpp's built-in VAD at decode time — so
+//! this stage has no online VAD of its own. Extracted from `session.rs` so
+//! orchestration and the capture stage stay separable; the session calls
+//! [`run_capture`] and consumes its [`CaptureResult`].
 
 use std::time::Duration;
 
@@ -21,7 +19,6 @@ use lune_core::config::PipelineConfig;
 use lune_core::session::{SessionEvent, SessionStatus};
 
 use crate::session::{SessionAudio, SessionControl};
-use crate::vad::{GateAction, HybridVad};
 
 const MAX_SEGMENTS: usize = 500;
 
@@ -66,32 +63,17 @@ fn append_segments(
     appended
 }
 
-/// Apply the gate's actions to the ASR stream, returning how many speech
-/// samples were pushed (preroll + segment audio; injected pauses don't count).
-async fn apply_gate_actions<A: AsrBackend + 'static>(
-    asr: &A,
-    asr_session: &A::SessionHandle,
-    actions: Vec<GateAction>,
-    first_asr_error: &mut Option<String>,
-) -> usize {
-    let mut pushed = 0;
-    for action in actions {
-        match action {
-            GateAction::PushSamples(samples) => {
-                pushed += samples.len();
-                if let Err(e) = asr.push_audio(asr_session, &samples).await {
-                    let msg = e.to_string();
-                    warn!(error = %msg, "push_audio error during streaming ASR");
-                    first_asr_error.get_or_insert(msg);
-                }
-            }
-            GateAction::SegmentFinalized => {}
-        }
+/// Root-mean-square amplitude of a chunk, for the UI level meter. Typical
+/// speech RMS is 0.01–0.15.
+fn rms_of(samples: &[f32]) -> f32 {
+    if samples.is_empty() {
+        return 0.0;
     }
-    pushed
+    let sum_sq: f32 = samples.iter().map(|s| s * s).sum();
+    (sum_sq / samples.len() as f32).sqrt()
 }
 
-/// Hard ceiling on ASR backend init. A hung Qwen3/Parakeet ONNX session
+/// Hard ceiling on ASR backend init. A hung local model session
 /// would otherwise block the session forever — caller would never see an
 /// error event, hotkey would feel broken until process restart.
 const ASR_START_TIMEOUT: Duration = Duration::from_secs(15);
@@ -100,7 +82,6 @@ const ASR_START_TIMEOUT: Duration = Duration::from_secs(15);
 struct SessionRuntime<H> {
     audio_source: Box<dyn AudioPull>,
     asr_session: H,
-    hybrid: HybridVad,
 }
 
 /// Open audio capture; not async because all current variants are sync.
@@ -156,17 +137,13 @@ async fn init_session_runtime<A: AsrBackend + 'static>(
     asr: &A,
     asr_config: AsrSessionConfig,
     audio_override: SessionAudio,
-    pipeline: &PipelineConfig,
-    vad_pcen_enabled: bool,
     input_device: Option<String>,
 ) -> std::result::Result<SessionRuntime<A::SessionHandle>, String> {
     let audio_source = init_audio_source(audio_override, input_device)?;
     let asr_session = init_asr_session(asr, asr_config).await?;
-    let hybrid = HybridVad::new(pipeline, vad_pcen_enabled)?;
     Ok(SessionRuntime {
         audio_source,
         asr_session,
-        hybrid,
     })
 }
 
@@ -193,7 +170,6 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
     asr_config: AsrSessionConfig,
     audio_override: SessionAudio,
     pipeline: &PipelineConfig,
-    vad_pcen_enabled: bool,
     input_device: Option<String>,
     segment_capacity_hint: usize,
     event_tx: &mpsc::Sender<SessionEvent>,
@@ -205,16 +181,7 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
     let SessionRuntime {
         audio_source,
         asr_session,
-        mut hybrid,
-    } = init_session_runtime(
-        asr,
-        asr_config,
-        audio_override,
-        pipeline,
-        vad_pcen_enabled,
-        input_device,
-    )
-    .await?;
+    } = init_session_runtime(asr, asr_config, audio_override, input_device).await?;
     let _ = event_tx.send(SessionEvent::Started).await;
 
     let mut segments = Vec::with_capacity(segment_capacity_hint);
@@ -236,7 +203,6 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
     let mut last_audio_at = tokio::time::Instant::now();
     let session_start = tokio::time::Instant::now();
     let mut first_audio_logged = false;
-    let mut first_speech_logged = false;
     let audio_starvation_limit = Duration::from_secs(5);
     'capture: loop {
         tokio::select! {
@@ -277,23 +243,15 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
                         first_audio_logged = true;
                     }
 
-                    let pushed = apply_gate_actions(
-                        asr,
-                        &asr_session,
-                        hybrid.process_chunk(&chunk),
-                        &mut first_asr_error,
-                    )
-                    .await;
-                    speech_samples += pushed;
-                    if pushed > 0 && !first_speech_logged {
-                        info!(
-                            %session_id,
-                            elapsed_ms = session_start.elapsed().as_millis() as u64,
-                            "vad: first verified speech",
-                        );
-                        first_speech_logged = true;
+                    // Stream raw audio straight to the backend; whisper.cpp's
+                    // built-in VAD gates it to speech at decode time.
+                    if let Err(e) = asr.push_audio(&asr_session, &chunk.samples).await {
+                        let msg = e.to_string();
+                        warn!(error = %msg, "push_audio error during capture");
+                        first_asr_error.get_or_insert(msg);
                     }
-                    peak_rms = peak_rms.max(hybrid.take_peak_energy());
+                    speech_samples += chunk.samples.len();
+                    peak_rms = peak_rms.max(rms_of(&chunk.samples));
 
                     if speech_samples >= pipeline.max_speech_samples {
                         info!(
@@ -335,29 +293,18 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
     }
 
     // Recover the producer-side audio tail: the capture callback may hold up
-    // to one chunk (~80 ms) of audio past the last full-chunk boundary —
-    // often the final phonemes of the last word. Ask the producer to flush,
-    // give the audio thread one callback cycle to deliver, then run whatever
-    // arrives through the gate. Only worth doing when a segment is open.
-    if !cancelled && hybrid.in_segment() {
+    // to one chunk (~80 ms) of audio past the last full-chunk boundary — often
+    // the final phonemes of the last word. Ask the producer to flush, give the
+    // audio thread one callback cycle to deliver, then push whatever arrives.
+    if !cancelled {
         audio_source.request_flush();
         tokio::time::sleep(Duration::from_millis(30)).await;
         while let Some(chunk) = audio_source.try_next_chunk() {
-            speech_samples += apply_gate_actions(
-                asr,
-                &asr_session,
-                hybrid.process_chunk(&chunk),
-                &mut first_asr_error,
-            )
-            .await;
+            if let Err(e) = asr.push_audio(&asr_session, &chunk.samples).await {
+                first_asr_error.get_or_insert(e.to_string());
+            }
+            speech_samples += chunk.samples.len();
         }
-    }
-
-    // Flush any segment still open in the gate (the common case for a short
-    // utterance ended by Stop before the hangover elapses).
-    if !cancelled {
-        speech_samples +=
-            apply_gate_actions(asr, &asr_session, hybrid.finish(), &mut first_asr_error).await;
     }
 
     if !cancelled {

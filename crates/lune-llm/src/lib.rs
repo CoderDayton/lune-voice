@@ -4,6 +4,6 @@ pub mod pipeline;
 pub mod prompt;
 
 pub use backend::{
-    NullPostProcessor, OpenAiLlmBackend, OpenAiLlmConfig, OrtStyleLlm, OrtStyleLlmConfig,
+    LlamaCppBackend, LlamaCppConfig, NullPostProcessor, OpenAiLlmBackend, OpenAiLlmConfig,
 };
-pub use pipeline::CorrectionPipeline;
+pub use pipeline::StylePipeline;

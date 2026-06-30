@@ -1,8 +1,8 @@
 use tauri::{Emitter, Runtime, State, WebviewWindow, ipc::Channel};
 
 use crate::dto::{
-    CalibrationStreamEvent, CreateCustomStyleInput, CreateDictionaryEntryInput, PillSnapshotDto,
-    SaveWorkspaceSettingsInput, SessionStreamEvent, UpdateCustomStyleInput,
+    CalibrationStreamEvent, CreateCustomStyleInput, CreateDictionaryEntryInput, GpuSupportDto,
+    PillSnapshotDto, SaveWorkspaceSettingsInput, SessionStreamEvent, UpdateCustomStyleInput,
     UpdateDictionaryEntryInput, WorkspaceSnapshot,
 };
 use crate::runtime::AppRuntime;
@@ -454,6 +454,21 @@ pub async fn delete_model_cmd(window: WebviewWindow, local_name: String) -> Resu
     })
     .await?;
     Ok(())
+}
+
+/// Reports whether GPU (CUDA) acceleration was compiled into this build.
+///
+/// GPU support is decided at build time: the native whisper.cpp/llama.cpp
+/// backends only link CUDA when built with the `whisper-cuda`/`llama-cuda`
+/// features. At runtime "is the GPU usable" therefore reduces to "was a CUDA
+/// feature compiled in", which the onboarding flow uses to offer an
+/// acceleration opt-in.
+#[tauri::command]
+pub fn gpu_support(window: WebviewWindow) -> Result<GpuSupportDto, String> {
+    require_window_access(&window, &["main"])?;
+    Ok(GpuSupportDto {
+        compiled_in: cfg!(feature = "whisper-cuda") || cfg!(feature = "llama-cuda"),
+    })
 }
 
 #[tauri::command]

@@ -34,27 +34,27 @@ pub enum DevicePolicyDto {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../src/lib/backend/generated/")]
 pub enum AsrBackendTypeDto {
-    Qwen3Asr,
     OpenAiCompatible,
+    WhisperCpp,
 }
 
 impl From<lune_core::asr::AsrBackendKind> for AsrBackendTypeDto {
     fn from(kind: lune_core::asr::AsrBackendKind) -> Self {
         use lune_core::asr::AsrBackendKind;
         match kind {
-            AsrBackendKind::Qwen3Asr => Self::Qwen3Asr,
             AsrBackendKind::OpenAiCompatible => Self::OpenAiCompatible,
+            AsrBackendKind::WhisperCpp => Self::WhisperCpp,
             // `AsrBackendKind` is `#[non_exhaustive]`. The catch-all fires only
             // when a new lune-core variant ships without a matching
             // `AsrBackendTypeDto` variant + arm here. Loud in dev, fall back to
-            // Qwen3 in release so end users keep a working selector.
+            // WhisperCpp in release so end users keep a working selector.
             other => {
                 debug_assert!(
                     false,
                     "unhandled AsrBackendKind variant {other:?}: add a matching \
                      AsrBackendTypeDto variant and From arm before shipping"
                 );
-                Self::Qwen3Asr
+                Self::WhisperCpp
             }
         }
     }
@@ -63,8 +63,46 @@ impl From<lune_core::asr::AsrBackendKind> for AsrBackendTypeDto {
 impl From<AsrBackendTypeDto> for lune_core::asr::AsrBackendKind {
     fn from(dto: AsrBackendTypeDto) -> Self {
         match dto {
-            AsrBackendTypeDto::Qwen3Asr => Self::Qwen3Asr,
             AsrBackendTypeDto::OpenAiCompatible => Self::OpenAiCompatible,
+            AsrBackendTypeDto::WhisperCpp => Self::WhisperCpp,
+        }
+    }
+}
+
+/// Which local whisper.cpp model the WhisperCpp backend uses. Mirrors
+/// [`lune_core::config::WhisperModel`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+pub enum WhisperModelDto {
+    Small,
+    #[default]
+    Medium,
+    LargeV3Turbo,
+}
+
+impl From<lune_core::config::WhisperModel> for WhisperModelDto {
+    fn from(model: lune_core::config::WhisperModel) -> Self {
+        use lune_core::config::WhisperModel;
+        match model {
+            WhisperModel::Small => Self::Small,
+            WhisperModel::Medium => Self::Medium,
+            WhisperModel::LargeV3Turbo => Self::LargeV3Turbo,
+            // `WhisperModel` is `#[non_exhaustive]`: fall back loudly in dev,
+            // safely in release if a new variant ships without an arm here.
+            other => {
+                debug_assert!(false, "unhandled WhisperModel variant {other:?}");
+                Self::Medium
+            }
+        }
+    }
+}
+
+impl From<WhisperModelDto> for lune_core::config::WhisperModel {
+    fn from(dto: WhisperModelDto) -> Self {
+        match dto {
+            WhisperModelDto::Small => Self::Small,
+            WhisperModelDto::Medium => Self::Medium,
+            WhisperModelDto::LargeV3Turbo => Self::LargeV3Turbo,
         }
     }
 }
@@ -205,6 +243,8 @@ pub struct WorkspaceSettingsDto {
     pub openai_asr_base_url: Option<String>,
     pub openai_asr_model: Option<String>,
     pub openai_asr_api_key_set: bool,
+    /// Selected local whisper model (meaningful when asr_backend_type == WhisperCpp).
+    pub whisper_model: WhisperModelDto,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
@@ -237,6 +277,17 @@ pub struct DictionaryItemDto {
     pub phrase: String,
     pub replacement: String,
     pub priority: u8,
+}
+
+/// Whether GPU (CUDA) acceleration was compiled into this build. GPU support
+/// is a build-time decision — the native backends compile CUDA in only under
+/// the `whisper-cuda`/`llama-cuda` cargo features — so at runtime "GPU
+/// available" reduces to "was a CUDA feature compiled in". No `camelCase`
+/// rename: the single field stays `compiled_in` across the IPC boundary.
+#[derive(Debug, Clone, Copy, Serialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+pub struct GpuSupportDto {
+    pub compiled_in: bool,
 }
 
 // ── Write DTOs (Deserialize ← frontend) ──────────────────────────────────
@@ -285,6 +336,9 @@ pub struct SaveWorkspaceSettingsInput {
     pub openai_asr_base_url: Option<String>,
     pub openai_asr_api_key: Option<String>,
     pub openai_asr_model: Option<String>,
+    /// Selected local whisper model (sent when asr_backend_type == WhisperCpp).
+    #[serde(default)]
+    pub whisper_model: Option<WhisperModelDto>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -465,7 +519,7 @@ mod tests {
     #[test]
     fn asr_backend_kind_dto_round_trip() {
         use lune_core::asr::AsrBackendKind;
-        for kind in [AsrBackendKind::Qwen3Asr, AsrBackendKind::OpenAiCompatible] {
+        for kind in [AsrBackendKind::WhisperCpp, AsrBackendKind::OpenAiCompatible] {
             let dto: AsrBackendTypeDto = kind.into();
             let back: AsrBackendKind = dto.into();
             assert_eq!(back, kind);

@@ -2,12 +2,21 @@ import { useLingui } from '@lingui/react/macro';
 import { AudioLines, Wand2 } from 'lucide-react';
 import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown';
 import { saveWorkspaceSetting } from '../../../store/workspace-store';
+import { AsrEngineCards } from '../components/asr-engine-cards';
 import { OpenAiFields } from '../components/openai-fields';
-import { type SettingsProps, SettingsRow, SettingsSection } from '../components/section';
-import { asrBackends, dictationLanguages } from '../data/settings-data';
+import {
+  SettingsBlock,
+  type SettingsProps,
+  SettingsRow,
+  SettingsSection,
+} from '../components/section';
+import { dictationLanguages } from '../data/settings-data';
 import { useDebouncedSetting } from '../hooks/use-debounced-setting';
 
-export function TranscriptionSection({ settings }: SettingsProps) {
+export function TranscriptionSection({
+  settings,
+  onManageModels,
+}: SettingsProps & { onManageModels?: () => void }) {
   const { t } = useLingui();
   const llmEnabled = settings.llmEnabled;
   const [confidence, setConfidence] = useDebouncedSetting(
@@ -24,20 +33,12 @@ export function TranscriptionSection({ settings }: SettingsProps) {
         description={t`Control how your speech is turned into text.`}
         icon={AudioLines}
       >
-        <SettingsRow
+        <SettingsBlock
           label={t`Voice model`}
-          description={t`Qwen3-ASR runs locally with automatic language detection.`}
-          control={
-            <DescriptiveDropdown
-              value={settings.asrBackend}
-              options={asrBackends}
-              ariaLabel={t`Voice model`}
-              onChange={(next) =>
-                void saveWorkspaceSetting('asrBackend', next as typeof settings.asrBackend)
-              }
-            />
-          }
-        />
+          description={t`Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes.`}
+        >
+          <AsrEngineCards settings={settings} onManageModels={onManageModels} />
+        </SettingsBlock>
         {settings.asrBackend === 'OpenAiCompatible' && (
           <OpenAiFields
             settings={settings}

@@ -88,7 +88,6 @@ impl AppRuntime {
     pub async fn new(app: AppHandle) -> Result<Self, String> {
         let paths = resolve_paths()?;
         let settings = load_settings(&paths)?;
-        init_ort_runtime();
 
         let models_ready = lune_persist::has_required_models(
             &paths.models_dir(),
@@ -136,15 +135,6 @@ impl AppRuntime {
         };
 
         runtime.sync_mic_prewarm(None, None).await;
-
-        // Pre-build the neural VAD's ONNX session off the hot path so the FIRST
-        // dictation doesn't pay the graph-optimization cost. Fire-and-forget on
-        // a blocking thread; it parks itself in the pool when ready, and the
-        // first `Silero::new` reuses it.
-        tokio::task::spawn_blocking(|| match lune_app::vad::prewarm() {
-            Ok(()) => debug!("VAD prewarm: silero session built"),
-            Err(e) => warn!(error = %e, "VAD prewarm failed"),
-        });
 
         Ok(runtime)
     }
@@ -937,8 +927,8 @@ async fn build_pipeline(
     let asr = AsrRegistry::from_config(&settings.asr_backend, settings.device, &paths.models_dir())
         .map_err(|e| format!("build asr backend: {e}"))?;
     let (llm_service, local_llm) = build_llm_service(&settings, &paths.models_dir()).await?;
-    let correction = Arc::new(lune_llm::CorrectionPipeline::new(Arc::clone(&llm_service)));
-    let post_processor: Arc<dyn lune_core::llm::TextPostProcessor> = correction.clone();
+    let style_pipeline = Arc::new(lune_llm::StylePipeline::new(Arc::clone(&llm_service)));
+    let post_processor: Arc<dyn lune_core::llm::TextPostProcessor> = style_pipeline;
     let router = Arc::new(VoiceCommandRouter::new());
     let dict = Arc::new(Mutex::new(
         DictionaryManager::new(
@@ -987,43 +977,6 @@ async fn build_pipeline(
     };
 
     let heuristic = Arc::new(lune_dict::corrector::LexicalGate::new());
-
-    // Channel B: open-vocab LLM-edit calibration from stored per-edit
-    // observations, recomputed cheaply at startup. No data → gate stays off.
-    {
-        let obs: Vec<lune_dict::edit_calib::EditObs> = db
-            .lock()
-            .await
-            .list_edit_observations(lune_persist::EDIT_OBSERVATION_CAP)
-            .unwrap_or_default()
-            .into_iter()
-            .map(
-                |(observed_correct, margin, flip_fixes)| lune_dict::edit_calib::EditObs {
-                    observed_correct,
-                    margin: margin.map(f64::from),
-                    flip_fixes,
-                },
-            )
-            .collect();
-        // ALPHA + TAU_FLOOR are the gate's single source of truth (lune_dict).
-        match lune_dict::edit_calib::calibrate_edits(
-            &obs,
-            lune_dict::edit_calib::ALPHA,
-            lune_dict::edit_calib::TAU_FLOOR,
-        ) {
-            Some(c) => {
-                tracing::info!(
-                    enabled = c.enabled,
-                    tau = c.tau,
-                    n_correct = c.n_correct,
-                    n_error = c.n_error,
-                    "llm-edit calibration"
-                );
-                correction.update_edit_gate(c.enabled, c.tau as f32);
-            }
-            None => tracing::debug!("llm-edit calibration: no observations yet (gate off)"),
-        }
-    }
 
     let manager = SessionManager::new(
         Arc::new(asr),
@@ -1102,22 +1055,15 @@ fn load_settings(paths: &AppPaths) -> Result<UserSettings, String> {
     Ok(settings)
 }
 
-fn init_ort_runtime() {
-    // CPU-only global init. CUDA EP is registered per-session by
-    // build_ort_session in lune-asr — keeps VAD and other lightweight
-    // ORT consumers on CPU automatically.
-    let _ = ort::init().with_logger(quiet_ort_logger()).commit();
-}
-
-fn quiet_ort_logger() -> ort::logging::LoggerFunction {
-    Arc::new(|level, _category, id, location, message| {
-        if level >= ort::logging::LogLevel::Error {
-            tracing::error!(
-                target: "ort::logging",
-                ort_id = %id,
-                ort_location = %location,
-                "{message}"
-            );
+/// Find the first `*.gguf` file in `dir`, if the style model has been
+/// downloaded. The styling LLM ships as a single GGUF in `DIR_STYLE_LLM`.
+fn find_gguf(dir: &std::path::Path) -> Option<std::path::PathBuf> {
+    std::fs::read_dir(dir).ok()?.flatten().find_map(|e| {
+        let path = e.path();
+        if path.extension().and_then(|x| x.to_str()) == Some("gguf") {
+            Some(path)
+        } else {
+            None
         }
     })
 }
@@ -1129,26 +1075,25 @@ async fn build_llm_service(
     match &settings.llm_backend {
         LlmBackendConfig::Local { .. } => {
             let style_dir = models_dir.join(lune_core::models::DIR_STYLE_LLM);
-            if style_dir.join("tokenizer.json").exists() {
-                // Decode budget 512: the corrector must re-emit the whole
-                // transcript, and 128 tokens (~90 words) truncated every
-                // longer dictation's correction — the validator then threw
-                // the truncated output away. Greedy decode stops at EOS, so
-                // short utterances never pay for the larger cap. Matches the
-                // ASR decoder's own 512-token budget.
-                let llm = Arc::new(LazyLocalLlm::new(
-                    style_dir,
-                    settings.device.use_gpu(cfg!(feature = "cuda")),
-                    settings.device.strict_cuda(),
-                    512,
-                ));
-                Ok((llm.clone() as Arc<dyn LlmService>, Some(llm)))
-            } else {
-                tracing::info!("style LLM not downloaded yet, using passthrough");
-                Ok((
-                    Arc::new(NullPostProcessor::new()) as Arc<dyn LlmService>,
-                    None,
-                ))
+            match find_gguf(&style_dir) {
+                Some(model_path) => {
+                    // Decode budget 512: matches the ASR decoder's own
+                    // 512-token budget. Greedy decode stops at EOS, so short
+                    // utterances never pay for the larger cap.
+                    let llm = Arc::new(LazyLocalLlm::new(
+                        model_path,
+                        settings.device.use_gpu(cfg!(feature = "llama-cuda")),
+                        512,
+                    ));
+                    Ok((llm.clone() as Arc<dyn LlmService>, Some(llm)))
+                }
+                None => {
+                    tracing::info!("style LLM not downloaded yet, using passthrough");
+                    Ok((
+                        Arc::new(NullPostProcessor::new()) as Arc<dyn LlmService>,
+                        None,
+                    ))
+                }
             }
         }
         LlmBackendConfig::OpenAiCompatible {
@@ -1174,9 +1119,8 @@ async fn build_llm_service(
 }
 
 struct LazyLocalLlm {
-    model_dir: std::path::PathBuf,
+    model_path: std::path::PathBuf,
     use_gpu: bool,
-    cuda_required: bool,
     max_new_tokens: usize,
     generation: AtomicU64,
     unload_epoch: AtomicU64,
@@ -1186,20 +1130,14 @@ struct LazyLocalLlm {
 enum LazyLlmState {
     Empty,
     Loading(u64),
-    Ready(Arc<lune_llm::backend::ort_llm::OrtStyleLlm>),
+    Ready(Arc<lune_llm::backend::llama_cpp::LlamaCppBackend>),
 }
 
 impl LazyLocalLlm {
-    fn new(
-        model_dir: std::path::PathBuf,
-        use_gpu: bool,
-        cuda_required: bool,
-        max_new_tokens: usize,
-    ) -> Self {
+    fn new(model_path: std::path::PathBuf, use_gpu: bool, max_new_tokens: usize) -> Self {
         Self {
-            model_dir,
+            model_path,
             use_gpu,
-            cuda_required,
             max_new_tokens,
             generation: AtomicU64::new(0),
             unload_epoch: AtomicU64::new(0),
@@ -1218,16 +1156,14 @@ impl LazyLocalLlm {
         }
 
         let warmup_t0 = std::time::Instant::now();
-        let model_dir = self.model_dir.clone();
+        let model_path = self.model_path.clone();
         let use_gpu = self.use_gpu;
-        let cuda_required = self.cuda_required;
         let max_new_tokens = self.max_new_tokens;
         let loaded = tokio::task::spawn_blocking(move || {
-            lune_llm::backend::ort_llm::OrtStyleLlm::new(
-                lune_llm::backend::ort_llm::OrtStyleLlmConfig {
-                    model_dir,
+            lune_llm::backend::llama_cpp::LlamaCppBackend::new(
+                lune_llm::backend::llama_cpp::LlamaCppConfig {
+                    model_path,
                     use_gpu,
-                    cuda_required,
                     max_new_tokens,
                 },
             )
@@ -1246,21 +1182,8 @@ impl LazyLocalLlm {
 
         match loaded {
             Ok(Ok(llm)) => {
-                let weights_mib = std::fs::read_dir(&self.model_dir)
-                    .ok()
-                    .map(|rd| {
-                        rd.flatten()
-                            .filter(|e| {
-                                e.file_name().to_str().is_some_and(|n| {
-                                    n.ends_with(".onnx")
-                                        || n.ends_with(".onnx_data")
-                                        || n.ends_with(".opt")
-                                })
-                            })
-                            .filter_map(|e| e.metadata().ok().map(|m| m.len()))
-                            .sum::<u64>() as f64
-                            / (1024.0 * 1024.0)
-                    })
+                let weights_mib = std::fs::metadata(&self.model_path)
+                    .map(|m| m.len() as f64 / (1024.0 * 1024.0))
                     .unwrap_or(0.0);
                 tracing::info!(
                     target: "vram",
@@ -1326,24 +1249,6 @@ impl LlmService for LazyLocalLlm {
         };
         match llm {
             Some(llm) => llm.complete(system, user).await,
-            None => Err(lune_core::Error::llm("local LLM not ready")),
-        }
-    }
-
-    async fn complete_scored(
-        &self,
-        system: &str,
-        user: &str,
-    ) -> lune_core::Result<(String, Vec<lune_core::llm::WordMargin>)> {
-        let llm = {
-            let state = self.state.lock().await;
-            match &*state {
-                LazyLlmState::Ready(llm) => Some(Arc::clone(llm)),
-                LazyLlmState::Empty | LazyLlmState::Loading(_) => None,
-            }
-        };
-        match llm {
-            Some(llm) => llm.complete_scored(system, user).await,
             None => Err(lune_core::Error::llm("local LLM not ready")),
         }
     }
@@ -1526,7 +1431,7 @@ mod tests {
 
     #[tokio::test]
     async fn lazy_local_llm_errors_when_not_warmed() {
-        let llm = LazyLocalLlm::new(std::path::PathBuf::from("/missing/model"), false, false, 8);
+        let llm = LazyLocalLlm::new(std::path::PathBuf::from("/missing/model"), false, 8);
         let result = llm.complete("system", "user").await;
         assert!(result.is_err());
     }
@@ -1535,7 +1440,6 @@ mod tests {
     async fn lazy_local_llm_ttl_unloads_in_flight_warmup() {
         let llm = Arc::new(LazyLocalLlm::new(
             std::path::PathBuf::from("/missing/model"),
-            false,
             false,
             8,
         ));
@@ -1556,7 +1460,6 @@ mod tests {
     async fn lazy_local_llm_ttl_can_be_cancelled() {
         let llm = Arc::new(LazyLocalLlm::new(
             std::path::PathBuf::from("/missing/model"),
-            false,
             false,
             8,
         ));

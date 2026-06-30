@@ -3,13 +3,24 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use hf_hub::api::sync::{Api, ApiBuilder, ApiRepo};
-use lune_core::config::AsrBackendConfig;
+use lune_core::config::{AsrBackendConfig, WhisperModel};
 use sha2::{Digest, Sha256};
 use tracing::{info, warn};
 
 use lune_core::models as model_dirs;
 
 use crate::error::{PersistError, PersistResult};
+
+/// Which part of the pipeline a model serves. Drives how the model library
+/// groups entries in the UI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ModelRole {
+    /// Whisper speech-to-text models and their bundled VAD.
+    SpeechToText,
+    /// The style/correction LLM.
+    Styling,
+}
 
 /// What to download from a HuggingFace repository.
 pub enum ModelSpec {
@@ -26,6 +37,8 @@ pub enum ModelSpec {
         description: &'static str,
         /// Whether the core pipeline requires this model.
         required: bool,
+        /// Which pipeline stage this model serves.
+        role: ModelRole,
     },
 }
 
@@ -45,6 +58,12 @@ pub struct ModelStatus {
     pub description: String,
     /// Whether the pipeline requires this model to function
     pub required: bool,
+    /// Whether the active backend selection currently uses this model.
+    pub in_use: bool,
+    /// Which pipeline stage this model serves (for library grouping).
+    pub role: ModelRole,
+    /// Actual on-disk directory size in bytes when installed; `None` otherwise.
+    pub size_bytes: Option<u64>,
 }
 
 /// Progress update during model download.
@@ -59,30 +78,45 @@ pub struct DownloadProgress {
 }
 
 impl ModelSpec {
-    pub fn qwen3_asr() -> Self {
+    /// One whisper.cpp GGML model — a single `ggml-*.bin` file. Reuses the
+    /// directory download path with exactly one required file.
+    pub fn whisper(model: WhisperModel) -> Self {
         Self::Directory {
-            repo_id: "Qwen/Qwen3-ASR-0.6B".into(),
-            required_files: vec![
-                "tokenizer.json".into(),
-                "qwen3-asr-encoder.onnx".into(),
-                "qwen3-asr-embed-tokens.onnx".into(),
-                "qwen3-asr-decoder.onnx".into(),
-            ],
-            suffix_patterns: vec![".onnx_data".into()],
-            local_name: model_dirs::DIR_QWEN3_ASR.into(),
-            description: "Speech-to-text engine. Encoder-decoder ONNX model with SmoothQuant.",
-            required: true,
+            repo_id: WhisperModel::REPO_ID.into(),
+            required_files: vec![model.ggml_file().into()],
+            suffix_patterns: vec![],
+            local_name: model.dir().into(),
+            description: "On-device Whisper speech-to-text (whisper.cpp). \
+                          Audio never leaves your machine.",
+            required: false,
+            role: ModelRole::SpeechToText,
         }
     }
 
     pub fn style_llm() -> Self {
         Self::Directory {
-            repo_id: "onnx-community/Qwen3-0.6B-ONNX".into(),
-            required_files: vec!["tokenizer.json".into(), "model_q4f16.onnx".into()],
+            repo_id: "unsloth/Qwen3.5-0.8B-GGUF".into(),
+            required_files: vec!["Qwen3.5-0.8B-UD-Q5_K_XL.gguf".into()],
             suffix_patterns: vec![],
             local_name: model_dirs::DIR_STYLE_LLM.into(),
-            description: "Style & correction LLM. Fixes grammar and reformats transcripts.",
+            description: "Style LLM (llama.cpp). Rewrites transcripts in your chosen style.",
             required: false,
+            role: ModelRole::Styling,
+        }
+    }
+
+    /// whisper.cpp's built-in VAD model (silero ggml). The local whisper backend
+    /// uses it to gate speech before decoding; it degrades to raw decode when
+    /// absent, so it's optional.
+    pub fn vad_model() -> Self {
+        Self::Directory {
+            repo_id: "ggml-org/whisper-vad".into(),
+            required_files: vec![model_dirs::WHISPER_VAD_GGML.into()],
+            suffix_patterns: vec![],
+            local_name: model_dirs::DIR_WHISPER_VAD.into(),
+            description: "Voice-activity detector for the local Whisper backend.",
+            required: false,
+            role: ModelRole::SpeechToText,
         }
     }
 
@@ -90,8 +124,11 @@ impl ModelSpec {
     pub fn display_name(&self) -> &str {
         let Self::Directory { local_name, .. } = self;
         match local_name.as_str() {
-            model_dirs::DIR_QWEN3_ASR => "Qwen3-ASR 0.6B ONNX",
-            model_dirs::DIR_STYLE_LLM => "Qwen3 0.6B ONNX",
+            model_dirs::DIR_STYLE_LLM => "Qwen3.5 0.8B (style LLM)",
+            model_dirs::DIR_WHISPER_VAD => "Whisper VAD (silero)",
+            model_dirs::DIR_WHISPER_SMALL => WhisperModel::Small.display_name(),
+            model_dirs::DIR_WHISPER_MEDIUM => WhisperModel::Medium.display_name(),
+            model_dirs::DIR_WHISPER_LARGE_V3_TURBO => WhisperModel::LargeV3Turbo.display_name(),
             _ => local_name,
         }
     }
@@ -127,18 +164,34 @@ impl ModelSpec {
         *required
     }
 
-    pub fn all() -> Vec<Self> {
-        vec![Self::qwen3_asr(), Self::style_llm()]
+    /// Which pipeline stage this model serves.
+    pub fn role(&self) -> ModelRole {
+        let Self::Directory { role, .. } = self;
+        *role
     }
 
-    fn to_status(&self, models_dir: &Path) -> ModelStatus {
+    pub fn all() -> Vec<Self> {
+        let mut specs = vec![Self::style_llm(), Self::vad_model()];
+        specs.extend(WhisperModel::ALL.map(Self::whisper));
+        specs
+    }
+
+    fn to_status(&self, models_dir: &Path, in_use: bool) -> ModelStatus {
+        let ready = self.is_ready(models_dir);
         ModelStatus {
             name: self.display_name().to_string(),
             repo_id: self.repo_id().to_string(),
             local_name: self.local_name().to_string(),
-            ready: self.is_ready(models_dir),
+            ready,
             description: self.description().to_string(),
             required: self.required(),
+            in_use,
+            role: self.role(),
+            size_bytes: if ready {
+                installed_size_bytes(models_dir, self.local_name())
+            } else {
+                None
+            },
         }
     }
 }
@@ -158,10 +211,11 @@ pub fn has_required_models(
         .all(|s| s.is_ready(models_dir))
 }
 
-/// Check which models are needed for the current config. Returns status of each.
-/// Does NOT download anything. Specs whose backend is remote (or disabled) are
-/// excluded from the result so the UI doesn't push users to download models they
-/// won't use.
+/// Status of the full installable model library. Returns every spec EXCEPT the
+/// VAD model — that one is bundled with any Whisper size and never surfaced as
+/// its own entry. Each entry carries `ready`, `in_use` (whether the active
+/// backend selection uses it), `role`, and on-disk `size_bytes`. Does NOT
+/// download anything.
 pub fn check_model_status(
     models_dir: &Path,
     asr_backend: &AsrBackendConfig,
@@ -169,9 +223,30 @@ pub fn check_model_status(
 ) -> Vec<ModelStatus> {
     ModelSpec::all()
         .into_iter()
-        .filter(|spec| spec_needed(spec, asr_backend, llm_backend))
-        .map(|spec| spec.to_status(models_dir))
+        .filter(|spec| spec.local_name() != model_dirs::DIR_WHISPER_VAD)
+        .map(|spec| {
+            let in_use = spec_needed(&spec, asr_backend, llm_backend);
+            spec.to_status(models_dir, in_use)
+        })
         .collect()
+}
+
+/// Sum the byte sizes of the files directly under `models_dir/<local_name>`.
+/// Model directories are flat (download paths are flattened to basenames), so a
+/// single read of the directory is enough. Returns `None` when the directory is
+/// absent or unreadable.
+fn installed_size_bytes(models_dir: &Path, local_name: &str) -> Option<u64> {
+    let dir = models_dir.join(local_name);
+    let entries = std::fs::read_dir(&dir).ok()?;
+    let mut total = 0u64;
+    for entry in entries.flatten() {
+        if let Ok(meta) = entry.metadata() {
+            if meta.is_file() {
+                total += meta.len();
+            }
+        }
+    }
+    Some(total)
 }
 
 /// Whether `spec` corresponds to a local model the active backend selection uses.
@@ -183,9 +258,13 @@ fn spec_needed(
     use lune_core::config::LlmBackendConfig;
 
     match spec.local_name() {
-        n if n == model_dirs::DIR_QWEN3_ASR => matches!(asr, AsrBackendConfig::Qwen3Asr { .. }),
         n if n == model_dirs::DIR_STYLE_LLM => matches!(llm, LlmBackendConfig::Local { .. }),
-        _ => spec.required(),
+        // A whisper spec is needed only when the WhisperCpp backend is active AND
+        // this is the selected model — so the UI offers exactly one whisper card.
+        n => {
+            matches!(asr, AsrBackendConfig::WhisperCpp { model } if model.dir() == n)
+                || spec.required()
+        }
     }
 }
 
@@ -222,6 +301,26 @@ pub fn download_model(
 
     let hub_cache = models_dir.join(".hub-cache");
     let hub = ModelHub::new(&hub_cache)?;
+
+    // Bundle the VAD model with any Whisper size: the local whisper backend
+    // gates speech with it, but it's never offered as its own library entry.
+    // Fetched first (when absent) so the final `done` event below belongs to the
+    // requested model and the UI clears progress on the right name.
+    if spec.role() == ModelRole::SpeechToText && spec.local_name() != model_dirs::DIR_WHISPER_VAD {
+        let vad = ModelSpec::vad_model();
+        if !vad.is_ready(models_dir) {
+            let vad_name = vad.display_name().to_string();
+            ensure_directory_model_with_progress(&hub, &vad, models_dir, |file, idx, total| {
+                on_progress(DownloadProgress {
+                    model_name: vad_name.clone(),
+                    file_name: file.to_string(),
+                    file_index: idx,
+                    file_count: total,
+                    done: false,
+                });
+            })?;
+        }
+    }
 
     let name = spec.display_name().to_string();
     on_progress(DownloadProgress {
@@ -561,46 +660,108 @@ mod tests {
         }
     }
 
-    #[test]
-    fn check_model_status_returns_nothing_when_all_backends_are_remote() {
-        let tmp = tempfile::tempdir().unwrap();
-        let statuses =
-            check_model_status(tmp.path(), &fake_openai_asr(), &LlmBackendConfig::Disabled);
-        assert!(
-            statuses.is_empty(),
-            "no local models needed when ASR is remote and LLM is disabled, got {statuses:?}"
-        );
-    }
-
-    #[test]
-    fn check_model_status_includes_only_asr_when_llm_disabled() {
-        let tmp = tempfile::tempdir().unwrap();
-        let statuses = check_model_status(
-            tmp.path(),
-            &AsrBackendConfig::Qwen3Asr {},
-            &LlmBackendConfig::Disabled,
-        );
-        assert_eq!(statuses.len(), 1);
-        assert_eq!(statuses[0].local_name, lune_core::models::DIR_QWEN3_ASR);
-    }
-
-    #[test]
-    fn check_model_status_includes_both_when_local_asr_and_local_llm() {
-        let tmp = tempfile::tempdir().unwrap();
-        let statuses = check_model_status(
-            tmp.path(),
-            &AsrBackendConfig::Qwen3Asr {},
-            &LlmBackendConfig::Local {},
-        );
+    /// The library always lists every Whisper size plus the styling LLM, and
+    /// never the bundled VAD model.
+    fn assert_full_library(statuses: &[ModelStatus]) {
         let names: Vec<&str> = statuses.iter().map(|s| s.local_name.as_str()).collect();
+        assert!(names.contains(&WhisperModel::Small.dir()), "{names:?}");
+        assert!(names.contains(&WhisperModel::Medium.dir()), "{names:?}");
         assert!(
-            names.contains(&lune_core::models::DIR_QWEN3_ASR),
+            names.contains(&WhisperModel::LargeV3Turbo.dir()),
             "{names:?}"
         );
         assert!(
             names.contains(&lune_core::models::DIR_STYLE_LLM),
             "{names:?}"
         );
+        assert!(
+            !names.contains(&lune_core::models::DIR_WHISPER_VAD),
+            "VAD must stay out of the library: {names:?}"
+        );
+        // Whisper sizes (3) + styling LLM = 4 entries, no more.
+        assert_eq!(statuses.len(), 4, "{names:?}");
+    }
+
+    fn in_use_names(statuses: &[ModelStatus]) -> Vec<&str> {
+        statuses
+            .iter()
+            .filter(|s| s.in_use)
+            .map(|s| s.local_name.as_str())
+            .collect()
+    }
+
+    #[test]
+    fn check_model_status_lists_full_library_with_nothing_in_use_when_remote() {
+        let tmp = tempfile::tempdir().unwrap();
+        let statuses =
+            check_model_status(tmp.path(), &fake_openai_asr(), &LlmBackendConfig::Disabled);
+        assert_full_library(&statuses);
+        assert!(
+            in_use_names(&statuses).is_empty(),
+            "remote ASR + disabled LLM use no local models: {statuses:?}"
+        );
+    }
+
+    #[test]
+    fn check_model_status_marks_only_the_selected_whisper_in_use() {
+        let tmp = tempfile::tempdir().unwrap();
+        let statuses = check_model_status(
+            tmp.path(),
+            &AsrBackendConfig::WhisperCpp {
+                model: WhisperModel::Medium,
+            },
+            &LlmBackendConfig::Disabled,
+        );
+        assert_full_library(&statuses);
+        assert_eq!(
+            in_use_names(&statuses),
+            vec![WhisperModel::Medium.dir()],
+            "only the selected whisper size is in use when the LLM is disabled"
+        );
+    }
+
+    #[test]
+    fn check_model_status_marks_whisper_and_llm_in_use_when_both_local() {
+        let tmp = tempfile::tempdir().unwrap();
+        let statuses = check_model_status(
+            tmp.path(),
+            &AsrBackendConfig::WhisperCpp {
+                model: WhisperModel::Medium,
+            },
+            &LlmBackendConfig::Local {},
+        );
+        assert_full_library(&statuses);
+        let used = in_use_names(&statuses);
+        assert!(used.contains(&WhisperModel::Medium.dir()), "{used:?}");
+        assert!(used.contains(&lune_core::models::DIR_STYLE_LLM), "{used:?}");
+        assert_eq!(
+            used.len(),
+            2,
+            "exactly the selected whisper + LLM: {used:?}"
+        );
+    }
+
+    #[test]
+    fn check_model_status_reports_role_and_size() {
+        let tmp = tempfile::tempdir().unwrap();
+        let statuses = check_model_status(
+            tmp.path(),
+            &AsrBackendConfig::WhisperCpp {
+                model: WhisperModel::Small,
+            },
+            &LlmBackendConfig::Local {},
+        );
+        for s in &statuses {
+            // Nothing is installed in an empty models dir.
+            assert!(!s.ready, "{}", s.local_name);
+            assert!(s.size_bytes.is_none(), "{}", s.local_name);
+            let expected_role = if s.local_name == lune_core::models::DIR_STYLE_LLM {
+                ModelRole::Styling
+            } else {
+                ModelRole::SpeechToText
+            };
+            assert_eq!(s.role, expected_role, "{}", s.local_name);
+        }
     }
 
     #[test]

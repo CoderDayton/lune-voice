@@ -165,6 +165,33 @@ jobs:
             exit 1
           fi
 
+  # ── whisper.cpp backend (off-by-default real impl) ────────────────────────
+  # whisper-cpp is off by default, so the rest of CI compiles only the stub.
+  # This job builds the gated real backend so an upstream whisper-rs API change
+  # or a regression in the impl fails CI here instead of at the release build.
+  whisper-cpp:
+    name: whisper.cpp backend
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: whisper-cpp
+
+      - name: Install build deps (cmake + libclang for whisper.cpp/bindgen)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends cmake clang libclang-dev
+
+      - name: Clippy (whisper-cpp real impl)
+        run: cargo clippy -p lune-asr --no-default-features --features whisper-cpp --lib -- -D warnings
+
   # ── Security audit (push/PR + weekly schedule) ────────────────────────────
   audit:
     name: Security Audit

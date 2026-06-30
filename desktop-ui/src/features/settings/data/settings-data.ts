@@ -2,7 +2,9 @@ import { ClipboardPaste, Cloud, Cpu, Hand, Keyboard, ToggleLeft } from 'lucide-r
 import type { ComponentType } from 'react';
 
 export type ActivationModeValue = 'Toggle' | 'Hold';
-export type AsrBackendValue = 'Qwen3Asr' | 'OpenAiCompatible';
+export type AsrBackendValue = 'OpenAiCompatible' | 'WhisperCpp';
+
+export type WhisperModelValue = 'Small' | 'Medium' | 'LargeV3Turbo';
 
 export type DictationModeValue = 'TypeInPlace' | 'Clipboard';
 export type PillVisibilityValue = 'Always' | 'WhenDictating' | 'Never';
@@ -48,9 +50,9 @@ export const pillVisibilityOptions: Option<PillVisibilityValue>[] = [
 
 export const asrBackends: DescriptiveOptionData<AsrBackendValue>[] = [
   {
-    value: 'Qwen3Asr',
-    label: 'Qwen3-ASR 0.6B (local)',
-    description: 'Runs on-device. Audio never leaves your machine.',
+    value: 'WhisperCpp',
+    label: 'Whisper (local)',
+    description: 'Runs whisper.cpp on-device. Choose a model size below.',
     icon: Cpu,
   },
   {
@@ -60,6 +62,52 @@ export const asrBackends: DescriptiveOptionData<AsrBackendValue>[] = [
     icon: Cloud,
   },
 ];
+
+export interface WhisperModelOption extends DescriptiveOptionData<WhisperModelValue> {
+  /** On-disk model directory — matches the backend ModelSpec `local_name`. */
+  localName: string;
+  /** Approximate download size, e.g. "264 MB". */
+  size: string;
+}
+
+/** whisper.cpp GGML model options (quantized multilingual), smallest to largest. */
+export const whisperModels: WhisperModelOption[] = [
+  {
+    value: 'Small',
+    label: 'Small',
+    description: 'Fastest, lowest accuracy.',
+    localName: 'whisper-small-q5_1',
+    size: '190 MB',
+  },
+  {
+    value: 'Medium',
+    label: 'Medium',
+    description: 'Balanced accuracy and speed.',
+    localName: 'whisper-medium-q5_0',
+    size: '539 MB',
+  },
+  {
+    value: 'LargeV3Turbo',
+    label: 'Large v3 Turbo',
+    description: 'Best accuracy; turbo decoder keeps it fast.',
+    localName: 'whisper-large-v3-turbo-q8_0',
+    size: '874 MB',
+  },
+];
+
+/** On-disk directory of the styling/correction LLM — matches the backend `DIR_STYLE_LLM`. */
+export const STYLE_LLM_LOCAL_NAME = 'qwen3-styler-0.8b-gguf';
+
+/**
+ * Approximate download sizes keyed by on-disk model directory (`local_name`),
+ * shown in the Models library before a model is installed. Once present, the
+ * backend reports the actual on-disk byte size instead.
+ */
+export const modelDownloadSizes: Record<string, string> = {
+  ...Object.fromEntries(whisperModels.map((m) => [m.localName, m.size])),
+  // Qwen3.5-0.8B UD-Q5_K_XL GGUF ≈ 0.6 GB.
+  [STYLE_LLM_LOCAL_NAME]: '610 MB',
+};
 
 export const deliveryMethods: DescriptiveOptionData<DictationModeValue>[] = [
   {

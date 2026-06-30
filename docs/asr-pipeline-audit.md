@@ -1,4 +1,16 @@
-# Lune Voice — ASR Pipeline Audit
+> **HISTORICAL DOCUMENT — PRE-MIGRATION ARCHITECTURE**
+>
+> This audit describes the **Qwen3-ASR ONNX / Silero-streaming VAD / Qwen3-0.6B ONNX correction** pipeline
+> that was in production before the `feat/whisper-cpp-backend` migration. All code it references
+> (Qwen3-ASR ONNX, the `crates/lune-app/src/vad/` hybrid gate, `ort_llm.rs`, `kv_cache.rs`,
+> `sampler.rs`, `mel/`) has been **deleted** from the repository.
+>
+> For the current architecture, see [docs/ARCHITECTURE.md](ARCHITECTURE.md).
+> The pre-migration code is preserved on the `archive/onnx-qwen` branch.
+
+---
+
+# Lune Voice — ASR Pipeline Audit (Historical: Qwen3-ASR/ONNX)
 
 **Scope:** Full dictation pipeline, audio capture → output delivery. Offline, local, Linux.
 **Method:** Source read of every stage with `file:line` grounding; key claims independently verified by grep.

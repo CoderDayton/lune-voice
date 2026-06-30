@@ -20,14 +20,6 @@ cd desktop-ui && bun tauri dev
 info = "Launch Tauri app in dev mode (hot-reload)"
 requires = ["bun"]
 
-[scripts.ui-build]
-interpreter = "bash"
-command = '''
-cd desktop-ui && APPIMAGE_EXTRACT_AND_RUN=1 bun tauri build
-'''
-info = "Production build of desktop app"
-requires = ["bun"]
-
 # ── Quick iteration ──────────────────────────────────────────────────────────
 
 [scripts.check]
@@ -63,27 +55,47 @@ info = "Run lightweight app pipeline integration tests"
 [scripts.bench]
 interpreter = "bash"
 command = '''
-case "${TYPE:-real}" in
-  stages)    cargo run --release --example pipeline_stages -p lune-app ;;
-  real)      cargo run --release --example pipeline_real -p lune-app ;;
-  latency)   cargo run --release --example session_latency -p lune-app ;;
-  confusion) cargo run --release --example confusion_mine -p lune-app ;;
-  llm)       cargo run --release --example llm_quality -p lune-app ;;
-  live)      cargo run --release --features cuda --example live_bench -p lune-app ;;
-  domain)    cargo run --release --features cuda --example bench_domain -p lune-app ;;
-  vram)      cargo run --release --features cuda --example vram_growth -p lune-app ;;
+case "${TYPE:-agc}" in
   agc)       cargo run --release --example agc_bench -p lune-audio ;;
-  vad)       cargo run --release --features cuda --example vad_tune -p lune-app ;;
-  *)         echo "TYPE must be stages|real|latency|confusion|llm|live|domain|vram|agc|vad"; exit 1 ;;
+  *)         echo "TYPE must be agc"; exit 1 ;;
 esac
 '''
-info = "Benchmark (--env TYPE=stages|real|latency|confusion|llm|live|domain|vram|agc|vad)"
+info = "Benchmark (--env TYPE=agc)"
 
 # ── Build ────────────────────────────────────────────────────────────────────
 
 [scripts.build]
-command = "cargo build --release"
-info = "Release build (CUDA default)"
+interpreter = "bash"
+# Production desktop app. `tauri build` does the release Rust compile + UI build
+# + bundle in one step. `--features whisper-cpp llama-cpp` compiles the local
+# whisper.cpp + llama.cpp backends into the shipped binary (users never compile
+# them themselves). CUDA is auto-enabled when the build host has the toolchain
+# (nvcc + an NVIDIA GPU): since these backends compile from source here, GPU
+# support is a build-host decision — a CPU-only host produces a portable
+# CPU-only app, a CUDA host produces a GPU-accelerated one. The GGML_* flags
+# force a portable AVX2 CPU baseline instead of ggml's default `-march=native`,
+# which would SIGILL on any user CPU older than the build host.
+#
+# Backend is EXPLICIT per release target (`--env BACKEND=cpu|cuda`), never
+# auto-detected: releases are prebuilt per platform/backend on CI/build runners,
+# not compiled on end-user machines. CPU is the portable default; CUDA targets
+# NVIDIA systems. macOS Metal and the full Windows/Linux/macOS release matrix are
+# documented in docs/RELEASE.md.
+# Build host needs: cmake, a C++ toolchain, and libclang (for bindgen); plus the
+# CUDA toolkit for a `cuda` build.
+command = '''
+cd desktop-ui
+BACKEND="${BACKEND:-cpu}"
+case "$BACKEND" in
+  cpu)  FEATURES="whisper-cpp llama-cpp" ;;
+  cuda) FEATURES="whisper-cuda llama-cuda" ;;
+  *)    echo "BACKEND must be cpu|cuda (macOS Metal: see docs/RELEASE.md)"; exit 1 ;;
+esac
+echo "Building $BACKEND release: --features \"$FEATURES\""
+GGML_NATIVE=OFF GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON APPIMAGE_EXTRACT_AND_RUN=1 bun tauri build --features "$FEATURES"
+'''
+info = "Production desktop app (--env BACKEND=cpu|cuda; ships whisper.cpp + llama.cpp). See docs/RELEASE.md"
+requires = ["bun"]
 
 # ── Tools ────────────────────────────────────────────────────────────────────
 
@@ -129,9 +141,3 @@ fi
 '''
 info = "Clean build artifacts (--env ALL=1 includes .venv)"
 
-# ── ONNX model export ───────────────────────────────────────────────────────
-
-[scripts.export]
-command = "uv run scripts/build/export_onnx.py --asr"
-info = "Export Qwen3-ASR ONNX model"
-requires = ["uv"]

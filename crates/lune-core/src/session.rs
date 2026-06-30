@@ -117,7 +117,7 @@ mod tests {
             started_at: Utc::now(),
             ended_at: None,
             style: "casual".into(),
-            backend: AsrBackendKind::Qwen3Asr,
+            backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Active,
             transcript: None,
         };
@@ -145,7 +145,7 @@ mod tests {
             started_at: Utc::now(),
             ended_at: None,
             style: "casual".into(),
-            backend: AsrBackendKind::Qwen3Asr,
+            backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Active,
             transcript: None,
         };
@@ -164,7 +164,7 @@ mod tests {
             started_at: Utc::now(),
             ended_at: None,
             style: "casual".into(),
-            backend: AsrBackendKind::Qwen3Asr,
+            backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Active,
             transcript: None,
         };

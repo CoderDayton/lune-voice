@@ -25,7 +25,7 @@ import {
 } from '../../../store/workspace-store';
 
 function formatBackend(backend: string): string {
-  if (backend.toLowerCase().includes('qwen3')) return 'Qwen3-ASR';
+  if (backend.includes('WhisperCpp')) return 'Whisper';
   if (backend.includes('OpenAi')) return 'Cloud';
   return backend;
 }

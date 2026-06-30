@@ -5,12 +5,14 @@ import type {
   DictationModeValue,
   PillVisibilityValue,
   TerminalModeValue,
+  WhisperModelValue,
 } from '../features/settings/data/settings-data';
 import type { FormatTogglesDto } from '../lib/backend/types';
 
 export interface WorkspaceSettings {
   activationMode: ActivationModeValue;
   asrBackend: AsrBackendValue;
+  whisperModel: WhisperModelValue;
   useGpu: boolean;
   devicePolicy: 'Cpu' | 'Cuda' | 'Auto';
   confidenceThreshold: string;
@@ -95,7 +97,8 @@ export interface WorkspaceState {
 
 export const DEFAULT_SETTINGS: WorkspaceSettings = {
   activationMode: 'Toggle',
-  asrBackend: 'Qwen3Asr',
+  asrBackend: 'WhisperCpp',
+  whisperModel: 'Medium',
   useGpu: true,
   devicePolicy: 'Auto',
   confidenceThreshold: '0.55',

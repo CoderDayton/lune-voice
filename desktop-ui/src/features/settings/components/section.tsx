@@ -48,3 +48,27 @@ export function SettingsRow({ label, description, control }: SettingsRowProps) {
     </div>
   );
 }
+
+interface SettingsBlockProps {
+  label: string;
+  description?: string;
+  children: ReactNode;
+}
+
+/**
+ * Full-width settings entry: label/description stacked above a wide control
+ * (cards, grids) that the right-aligned `SettingsRow` slot is too narrow for.
+ */
+export function SettingsBlock({ label, description, children }: SettingsBlockProps) {
+  return (
+    <div className="settings-row flex-col items-stretch gap-3">
+      <div className="min-w-0">
+        <div className="text-base font-medium">{label}</div>
+        {description ? (
+          <div className="text-sm text-content-subtle mt-0.5 max-w-md">{description}</div>
+        ) : null}
+      </div>
+      {children}
+    </div>
+  );
+}

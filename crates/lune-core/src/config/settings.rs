@@ -38,7 +38,7 @@ where
 /// the pipeline merge and are read straight from `UserSettings` in
 /// `SessionManager` / `AppRuntime`.
 ///
-/// When in doubt: if Qwen3 and OpenAI would want different defaults, it
+/// When in doubt: if two backends would want different defaults, it
 /// belongs in `PipelineOverrides`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserSettings {
@@ -148,7 +148,9 @@ impl Default for UserSettings {
     fn default() -> Self {
         Self {
             device: DevicePolicy::Auto,
-            asr_backend: AsrBackendConfig::Qwen3Asr {},
+            asr_backend: AsrBackendConfig::WhisperCpp {
+                model: WhisperModel::default(),
+            },
             llm_backend: LlmBackendConfig::Disabled,
             hotkey: HotkeyConfig::default(),
             default_style: "minimal".into(),
@@ -176,17 +178,122 @@ impl Default for UserSettings {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Which whisper.cpp GGML model the local Whisper backend loads.
+///
+/// This is the single source of truth tying a user-facing selection to its
+/// on-disk directory, its HuggingFace filename, and its display name; both the
+/// downloader (`lune-persist`) and the backend loader (`lune-asr`) read it so
+/// the mapping never drifts. All three are the multilingual q8_0 quantizations
+/// from `ggerganov/whisper.cpp`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[non_exhaustive]
+pub enum WhisperModel {
+    /// ~190 MB. Fast, lowest accuracy of the three.
+    Small,
+    /// ~539 MB. Balanced accuracy/speed.
+    #[default]
+    Medium,
+    /// ~874 MB. Best accuracy; turbo decoder keeps it fast.
+    LargeV3Turbo,
+}
+
+impl WhisperModel {
+    /// The HuggingFace repo hosting every GGML whisper model.
+    pub const REPO_ID: &'static str = "ggerganov/whisper.cpp";
+
+    /// Every selectable model, in ascending size order. Drives the downloader's
+    /// spec list and the settings selector.
+    pub const ALL: [WhisperModel; 3] = [Self::Small, Self::Medium, Self::LargeV3Turbo];
+
+    /// Local `models/` subdirectory holding this model's GGML file.
+    pub fn dir(self) -> &'static str {
+        match self {
+            Self::Small => crate::models::DIR_WHISPER_SMALL,
+            Self::Medium => crate::models::DIR_WHISPER_MEDIUM,
+            Self::LargeV3Turbo => crate::models::DIR_WHISPER_LARGE_V3_TURBO,
+        }
+    }
+
+    /// Filename to download from [`WhisperModel::REPO_ID`] and to load from disk.
+    pub fn ggml_file(self) -> &'static str {
+        match self {
+            Self::Small => "ggml-small-q5_1.bin",
+            Self::Medium => "ggml-medium-q5_0.bin",
+            Self::LargeV3Turbo => "ggml-large-v3-turbo-q8_0.bin",
+        }
+    }
+
+    /// Human-readable name for UI and model-status cards.
+    pub fn display_name(self) -> &'static str {
+        match self {
+            Self::Small => "Whisper Small (q5_1)",
+            Self::Medium => "Whisper Medium (q5_0)",
+            Self::LargeV3Turbo => "Whisper Large v3 Turbo (q8_0)",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type")]
 #[non_exhaustive]
 pub enum AsrBackendConfig {
-    Qwen3Asr {},
     OpenAiCompatible {
         base_url: Url,
         api_key: RedactedString,
         model: String,
         streaming: StreamingMode,
     },
+    /// Local whisper.cpp inference via the bundled GGML model `model`.
+    WhisperCpp {
+        #[serde(default)]
+        model: WhisperModel,
+    },
+}
+
+/// Forward/backward-compatible deserialize. An unknown `type` tag — notably
+/// the removed `"Qwen3Asr"` ONNX backend still written in older
+/// `settings.toml` files — maps to the current default (`WhisperCpp`) instead
+/// of failing the entire settings load.
+impl<'de> Deserialize<'de> for AsrBackendConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(tag = "type")]
+        enum Repr {
+            OpenAiCompatible {
+                base_url: Url,
+                api_key: RedactedString,
+                model: String,
+                streaming: StreamingMode,
+            },
+            WhisperCpp {
+                #[serde(default)]
+                model: WhisperModel,
+            },
+            #[serde(other)]
+            Unknown,
+        }
+
+        Ok(match Repr::deserialize(deserializer)? {
+            Repr::OpenAiCompatible {
+                base_url,
+                api_key,
+                model,
+                streaming,
+            } => AsrBackendConfig::OpenAiCompatible {
+                base_url,
+                api_key,
+                model,
+                streaming,
+            },
+            Repr::WhisperCpp { model } => AsrBackendConfig::WhisperCpp { model },
+            Repr::Unknown => AsrBackendConfig::WhisperCpp {
+                model: WhisperModel::default(),
+            },
+        })
+    }
 }
 
 impl AsrBackendConfig {
@@ -194,8 +301,8 @@ impl AsrBackendConfig {
     pub fn kind(&self) -> crate::asr::AsrBackendKind {
         use crate::asr::AsrBackendKind;
         match self {
-            Self::Qwen3Asr { .. } => AsrBackendKind::Qwen3Asr,
             Self::OpenAiCompatible { .. } => AsrBackendKind::OpenAiCompatible,
+            Self::WhisperCpp { .. } => AsrBackendKind::WhisperCpp,
         }
     }
 }
@@ -284,5 +391,42 @@ impl DevicePolicy {
     /// `ep::CUDA::default().build().error_on_failure()`.
     pub fn strict_cuda(self) -> bool {
         matches!(self, Self::Cuda)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_qwen3_asr_backend_migrates_to_whisper_default() {
+        // Old persisted configs carry `type = "Qwen3Asr"`. With the ONNX backend
+        // removed, deserializing such a config must not fail — it falls back to
+        // the current default (`WhisperCpp`) so settings still load.
+        let cfg: AsrBackendConfig = serde_json::from_str(r#"{"type":"Qwen3Asr"}"#).unwrap();
+        match cfg {
+            AsrBackendConfig::WhisperCpp { model } => {
+                assert_eq!(model, WhisperModel::default());
+            }
+            other => panic!("expected WhisperCpp default, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn whisper_cpp_backend_round_trips() {
+        let cfg: AsrBackendConfig =
+            serde_json::from_str(r#"{"type":"WhisperCpp","model":"Small"}"#).unwrap();
+        match cfg {
+            AsrBackendConfig::WhisperCpp { model } => assert_eq!(model, WhisperModel::Small),
+            other => panic!("expected WhisperCpp, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn default_settings_use_whisper_cpp() {
+        assert_eq!(
+            UserSettings::default().asr_backend.kind(),
+            crate::asr::AsrBackendKind::WhisperCpp
+        );
     }
 }

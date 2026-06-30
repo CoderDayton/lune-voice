@@ -1,94 +1,56 @@
 import { useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 import {
   AlertTriangle,
   Check,
   Download,
   HardDrive,
   Loader2,
-  Lock,
   type LucideIcon,
   Mic,
   Trash2,
   Wand2,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { workspaceStore } from '../../../store/workspace-store';
 import { SettingsSection } from '../components/section';
-
-interface ModelStatus {
-  name: string;
-  repoId: string;
-  localName: string;
-  ready: boolean;
-  description: string;
-  required: boolean;
-}
-
-interface DownloadProgress {
-  modelName: string;
-  fileName: string;
-  fileIndex: number;
-  fileCount: number;
-  done: boolean;
-}
+import { modelDownloadSizes } from '../data/settings-data';
+import { type DownloadProgress, type ModelStatus, useModelStatus } from '../hooks/use-model-status';
 
 function modelIcon(localName: string): LucideIcon {
-  return localName.includes('asr') ? Mic : Wand2;
+  return localName.includes('asr') || localName.includes('whisper') ? Mic : Wand2;
+}
+
+/** Human-readable byte size, e.g. `192 MB` / `1.2 GB`. */
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  const mb = bytes / (1024 * 1024);
+  if (mb < 1024) return `${Math.round(mb)} MB`;
+  return `${(mb / 1024).toFixed(1)} GB`;
+}
+
+/** Size label for a row: actual on-disk size when installed, else the download estimate. */
+function sizeLabel(model: ModelStatus): string {
+  if (model.ready && model.sizeBytes != null) return formatBytes(model.sizeBytes);
+  return modelDownloadSizes[model.localName] ?? '';
 }
 
 export function ModelsSection() {
   const { t } = useLingui();
-  // Toggling the correction LLM (in the Transcription tab) hides or reveals its
-  // model here, so re-check status whenever that flag flips.
+  // `inUse` flags depend on the ASR backend / Whisper size / correction-LLM
+  // toggle (all on the Transcription tab), so re-check status when they change.
   const llmEnabled = useStore(workspaceStore, (s) => s.settings.llmEnabled);
+  const asrBackend = useStore(workspaceStore, (s) => s.settings.asrBackend);
+  const whisperModel = useStore(workspaceStore, (s) => s.settings.whisperModel);
 
-  const [models, setModels] = useState<ModelStatus[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [downloading, setDownloading] = useState<string | null>(null);
-  const [progress, setProgress] = useState<DownloadProgress | null>(null);
+  const { models, loading, downloading, progress, refresh, download, remove } = useModelStatus();
   const [confirmDelete, setConfirmDelete] = useState<ModelStatus | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
 
-  const refresh = useCallback(() => {
-    invoke<ModelStatus[]>('check_model_status')
-      .then(setModels)
-      .catch((e) => console.error('check_model_status:', e))
-      .finally(() => setLoading(false));
-  }, []);
-
-  // Flipping the correction LLM (Transcription tab) shows or hides its model here,
-  // so re-check status when it changes — not just on mount.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: llmEnabled is a deliberate re-run trigger, not used in the body.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: llmEnabled/asrBackend/whisperModel are deliberate re-run triggers, not used in the body.
   useEffect(() => {
     refresh();
-  }, [refresh, llmEnabled]);
-
-  useEffect(() => {
-    const unlisten = listen<DownloadProgress>('lune://download-progress', (event) => {
-      setProgress(event.payload);
-      if (event.payload.done) {
-        setDownloading(null);
-        setProgress(null);
-        refresh();
-      }
-    });
-    return () => {
-      void unlisten.then((f) => f());
-    };
-  }, [refresh]);
-
-  function handleDownload(localName: string) {
-    setDownloading(localName);
-    setProgress(null);
-    invoke('download_model_cmd', { localName }).catch((e) => {
-      console.error('download_model_cmd:', e);
-      setDownloading(null);
-      setProgress(null);
-    });
-  }
+  }, [refresh, llmEnabled, asrBackend, whisperModel]);
 
   function handleDeleteClick(model: ModelStatus) {
     setConfirmDelete(model);
@@ -100,47 +62,82 @@ export function ModelsSection() {
     const localName = confirmDelete.localName;
     dialogRef.current?.close();
     setConfirmDelete(null);
-    invoke('delete_model_cmd', { localName })
-      .then(() => refresh())
-      .catch((e) => console.error('delete_model_cmd:', e));
+    void remove(localName);
   }
 
-  const modelCards = loading
-    ? [0, 1].map((i) => (
-        <div
-          key={i}
-          className="rounded-box border border-surface-border bg-surface-inset p-4 flex items-center gap-3"
-        >
-          <div className="skeleton size-10 rounded-field shrink-0" />
-          <div className="flex-1 space-y-2">
-            <div className="skeleton h-4 w-32" />
-            <div className="skeleton h-3 w-56" />
-          </div>
-          <div className="skeleton h-8 w-24 rounded-field" />
-        </div>
-      ))
-    : models.map((model) => (
-        <ModelManagementCard
-          key={model.localName}
-          model={model}
-          icon={modelIcon(model.localName)}
-          isDownloading={downloading === model.localName}
-          anyDownloading={!!downloading}
-          progress={downloading === model.localName ? progress : null}
-          onDownload={() => handleDownload(model.localName)}
-          onDelete={() => handleDeleteClick(model)}
-        />
-      ));
+  const installedBytes = models.reduce(
+    (sum, m) => sum + (m.ready && m.sizeBytes != null ? m.sizeBytes : 0),
+    0,
+  );
+
+  // Library grouped by role, headers in pipeline order. Speech-to-text first.
+  const groups: { role: string; label: string; items: ModelStatus[] }[] = [
+    { role: 'speech-to-text', label: t`Speech-to-text`, items: [] },
+    { role: 'styling', label: t`Styling`, items: [] },
+  ];
+  for (const m of models) {
+    const group = groups.find((g) => g.role === m.role);
+    if (group) group.items.push(m);
+    else groups.push({ role: m.role, label: m.role, items: [m] });
+  }
+
+  function renderCard(model: ModelStatus) {
+    return (
+      <ModelManagementCard
+        key={model.localName}
+        model={model}
+        size={sizeLabel(model)}
+        icon={modelIcon(model.localName)}
+        isDownloading={downloading === model.localName}
+        anyDownloading={!!downloading}
+        progress={downloading === model.localName ? progress : null}
+        onDownload={() => download(model.localName)}
+        onDelete={() => handleDeleteClick(model)}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col gap-space-md">
-      {/* The models themselves — download / delete the on-device ONNX files. */}
       <SettingsSection
         icon={HardDrive}
         title={t`Models`}
         description={t`AI models stored on your device.`}
       >
-        {modelCards}
+        {loading ? (
+          [0, 1].map((i) => (
+            <div
+              key={i}
+              className="rounded-box border border-surface-border bg-surface-inset p-4 flex items-center gap-3"
+            >
+              <div className="skeleton size-10 rounded-field shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="skeleton h-4 w-32" />
+                <div className="skeleton h-3 w-56" />
+              </div>
+              <div className="skeleton h-8 w-24 rounded-field" />
+            </div>
+          ))
+        ) : (
+          <>
+            {groups
+              .filter((g) => g.items.length > 0)
+              .map((group) => (
+                <div key={group.role} className="flex flex-col gap-2">
+                  <h3 className="text-xs font-medium uppercase tracking-wider text-content-subtle">
+                    {group.label}
+                  </h3>
+                  {group.items.map(renderCard)}
+                </div>
+              ))}
+            <div className="flex items-center justify-between border-t border-surface-border pt-3 text-sm">
+              <span className="text-content-subtle">{t`Disk usage`}</span>
+              <span className="font-medium tabular-nums text-content">
+                {installedBytes > 0 ? formatBytes(installedBytes) : t`Nothing installed`}
+              </span>
+            </div>
+          </>
+        )}
       </SettingsSection>
 
       <DeleteConfirmModal
@@ -158,6 +155,7 @@ export function ModelsSection() {
 
 interface ModelManagementCardProps {
   model: ModelStatus;
+  size: string;
   icon: LucideIcon;
   isDownloading: boolean;
   anyDownloading: boolean;
@@ -168,6 +166,7 @@ interface ModelManagementCardProps {
 
 function ModelManagementCard({
   model,
+  size,
   icon: Icon,
   isDownloading,
   anyDownloading,
@@ -213,19 +212,15 @@ function ModelManagementCard({
             <p className="font-medium text-sm sm:text-base text-content-default truncate">
               {model.name}
             </p>
-            {model.required ? (
-              <span className="badge badge-xs badge-soft gap-1 text-content-subtle">
-                <Lock size={9} strokeWidth={2.2} />
-                {t`Required`}
-              </span>
-            ) : (
-              <span className="badge badge-xs badge-soft text-content-subtle">{t`Optional`}</span>
+            {size && <span className="text-xs tabular-nums text-content-subtle">{size}</span>}
+            {model.inUse && (
+              <span className="badge badge-xs badge-soft badge-primary">{t`In use`}</span>
             )}
             {model.ready && !isDownloading && (
               <span className="badge badge-xs badge-soft badge-success">{t`Installed`}</span>
             )}
             {!model.ready && !isDownloading && (
-              <span className="badge badge-xs badge-soft badge-error">{t`Not installed`}</span>
+              <span className="badge badge-xs badge-soft text-content-subtle">{t`Not installed`}</span>
             )}
           </div>
 
@@ -306,10 +301,10 @@ function DeleteConfirmModal({ dialogRef, model, onCancel, onConfirm }: DeleteCon
                 {model.description}
               </p>
             )}
-            {model.required && (
-              <p className="py-2 text-sm text-error flex gap-2 items-start">
+            {model.inUse && (
+              <p className="py-2 text-sm text-warning flex gap-2 items-start">
                 <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                {t`This is a required model. Dictation will not work without it.`}
+                {t`This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another.`}
               </p>
             )}
             <div className="modal-action">

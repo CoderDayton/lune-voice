@@ -11,8 +11,8 @@ Lune Voice has one dictation pipeline and two control surfaces. The CLI talks to
 - [Pipeline Walkthrough](#pipeline-walkthrough)
   - [Audio Capture](#1-audio-capture)
   - [ASR](#2-asr)
-  - [Correction and LLM Gate](#3-correction-and-llm-gate)
-  - [LLM Post-Processing](#4-llm-post-processing)
+  - [Dictionary Application](#3-dictionary-application)
+  - [LLM Styling](#4-llm-styling)
   - [Text Delivery](#5-text-delivery)
 - [Session Lifecycle](#session-lifecycle)
 - [Desktop Bridge](#desktop-bridge)
@@ -24,14 +24,18 @@ Lune Voice has one dictation pipeline and two control surfaces. The CLI talks to
 
 ## System Overview
 
-Lune Voice turns microphone audio into corrected text, then delivers that text to the focused app. The runtime keeps one active session at a time. Everything else exists to feed that session, configure it, or show its state.
+Lune Voice turns microphone audio into styled text, then delivers that text to the focused app. The runtime keeps one active session at a time. Everything else exists to feed that session, configure it, or show its state.
 
-The runtime pipeline is split into interchangeable backends:
+Dictation is **hotkey-bounded**: the session collects audio for as long as the hotkey is held (Hold mode) or until the hotkey is pressed again (Toggle mode). There is no online VAD gate during recording. The Whisper backend applies its built-in Silero VAD to the buffered audio at decode time.
 
-| Component | Primary Backends | Format | Runtime |
-|-----------|------------------|--------|---------|
-| ASR | Qwen3-ASR 0.6B, OpenAI-compatible remote ASR | ONNX / remote API | ONNX Runtime / HTTP |
-| LLM | Local style model, OpenAI-compatible remote LLM, disabled passthrough | ONNX / remote API | ONNX Runtime / HTTP |
+The runtime pipeline uses interchangeable backends:
+
+| Component | Backends | Model format | Runtime |
+|-----------|----------|--------------|---------|
+| ASR | WhisperCpp (local), OpenAI-compatible (remote) | GGML `.bin` / remote API | whisper-rs (whisper.cpp) / HTTP |
+| LLM | LlamaCpp (local), OpenAI-compatible (remote), disabled | GGUF `.gguf` / remote API | llama-cpp-2 (llama.cpp) / HTTP |
+
+Both native backends compile their C/C++ libraries from source at build time via `*-sys` crates. GPU (CUDA) support is selected at **build time** via Cargo features (`whisper-cuda`, `llama-cuda`); there is no runtime backend autodetection. See [docs/RELEASE.md](RELEASE.md) for the full build matrix.
 
 Backend selection is centralized through registries and DTO mappers. The desktop UI never builds model paths or backend structs itself; it sends typed settings and receives snapshots.
 
@@ -40,15 +44,14 @@ Backend selection is centralized through registries and DTO mappers. The desktop
 ## Crate Dependency Graph
 
 ```
-lune-app (binary)
-|-- lune-audio       Microphone capture (cpal)
-|-- lune-asr         Speech recognition (ONNX Runtime)
-|   `-- lune-core    Shared traits + types
-|-- lune-llm         Text post-processing (local ONNX or OpenAI-compatible)
-|   `-- lune-core
-|-- lune-dict        User dictionary + voice command detection
-`-- lune-persist     Settings, DB (SQLite), model downloads
-    `-- lune-core
+lune-core (types, config, errors, hwce confidence)
+├─ lune-audio (mic, resample, ringbuf, vad, pcen)
+├─ lune-asr (whisper.cpp, openai remote, registry)
+├─ lune-llm (llama.cpp, openai remote, null passthrough, style pipeline, prompt, few-shot)
+├─ lune-dict (corrector, ngram, vocab, voice commands)
+└─ lune-persist (settings.toml, sqlite, model hub)
+     └─ lune-app (session, gate, factory, hotkey, dbus, delivery, sound cues)
+          └─ desktop-ui/src-tauri (tauri IPC, pill, persistence bridge)
 ```
 
 Each crate has a single responsibility. `lune-core` defines shared types and traits but contains no runtime logic. All inter-crate communication flows through trait objects and channels.
@@ -59,88 +62,83 @@ Each crate has a single responsibility. `lune-core` defines shared types and tra
 
 ### 1. Audio Capture
 
-**Crate:** `lune-audio` | **File:** `crates/lune-audio/src/lib.rs`
+**Crate:** `lune-audio` | **File:** `crates/lune-audio/src/lib.rs`  
+**Orchestration:** `crates/lune-app/src/capture.rs`
 
 - Uses `cpal` for cross-platform microphone access (ALSA/PipeWire on Linux, CoreAudio on macOS, WASAPI on Windows)
-- Captures 16 kHz mono PCM in frames of 480 samples (30ms each)
-- Frames are sent over an `mpsc` channel to the session loop
-- The session loop coalesces back-to-back frames into a single batch before pushing to ASR, reducing await-point overhead during microphone bursts
-- A hybrid VAD (Earshot energy gate → Silero neural verify → contiguous-span gate, in `crates/lune-app/src/vad/`) decides which audio reaches the ASR. A span stays open through short pauses and closes only on a long (~2s) silence run, so intra-utterance word boundaries survive instead of fusing adjacent words
-- Silence *inside* a span is capped (`max_intra_silence_ms`, ~240ms): a brief pause is kept so word boundaries hold, but the excess is dropped before the recognizer hears it — a 0.5–1s breath no longer reads as sentence-ending prosody, which otherwise made Qwen3-ASR emit spurious periods/commas mid-utterance
+- Captures 16 kHz mono PCM in frames of 480 samples (30 ms each) — already in whisper.cpp's native input format; no resample or conversion needed
+- Raw audio chunks are pushed straight to the ASR backend via `push_audio` as they arrive; there is no online VAD gate at this stage
+- The session loop handles Stop/Cancel/deadline/max-speech control signals and terminates the capture loop accordingly
+- After Stop, a 30 ms flush recovers the final callback buffer (last phonemes of the final word), then `poll_final` decodes the full buffer
 
 ### 2. ASR
 
 **Crate:** `lune-asr`
 
-The active ASR choices are local Qwen3-ASR and OpenAI-compatible remote ASR. Both feed the same `AsrBackend` trait, so the session code does not branch on backend type.
+Both backends implement the same `AsrBackend` trait, so the session code does not branch on backend type.
 
-#### 2a. Qwen3-ASR ONNX
+#### 2a. WhisperCpp (local, default)
 
-**Files:** `backend/qwen3.rs`, `mel/whisper.rs`
+**File:** `crates/lune-asr/src/backend/whisper_cpp.rs`
 
-The Qwen path uses a three-part ONNX export produced by `scripts/build/export_onnx.py`:
+The `WhisperCppBackend` wraps `whisper-rs`, which vendors and compiles `whisper.cpp`:
 
-1. `qwen3-asr-encoder.onnx` for the audio tower / projector
-2. `qwen3-asr-embed-tokens.onnx` for token embeddings
-3. `qwen3-asr-decoder.onnx` for the decoder with KV cache
+- The `WhisperContext` (model weights) is loaded **once** at backend construction and shared across all sessions. Per-session `WhisperState` is lightweight (a decode context).
+- `push_audio` appends PCM to a per-session buffer pre-allocated for 30 s of audio (grows once for longer utterances; reset without freeing after each decode).
+- `poll_final` decodes the entire buffer in one shot using **BeamSearch** (beam size 5) — whisper.cpp's accuracy-oriented default. Decoding is one-shot per utterance, so the extra compute is worthwhile.
+- **Built-in Silero VAD:** when the VAD model path is set (`models/whisper-vad-silero/ggml-silero-v5.1.2.bin`), `poll_final` calls `FullParams::set_vad_model_path` + `enable_vad` + `set_vad_params` before decode. Whisper gates the buffer to speech spans internally before running the transformer. If the VAD model file is missing at construction, the backend logs a warning and decodes without VAD.
+- **Per-token confidence:** whisper exposes per-token probabilities. `poll_final` folds them into `AsrSegment::confidence` (mean) and `min_token_confidence` (minimum), excluding special tokens. Segments whose mean confidence falls below `GARBAGE_DROP_THRESHOLD` (0.25) are dropped by the capture layer before reaching the session.
+- Language detection: the `language` field from `AsrSessionConfig` is passed to `set_language`; `None` uses `"auto"` (whisper detects from audio).
 
-The runtime feeds whole-clip or chunked mel features through the encoder, injects the exported prompt contract via the token embedder, and steps the decoder autoregressively while maintaining cache tensors between decode steps.
+Three GGML model sizes are available, all from `ggerganov/whisper.cpp` as q8_0 quantizations:
 
-The decoder also emits word confidence data when available. Session correction uses those word risks to decide which spans should be sent to the LLM.
+| Variant | File | Size | Directory |
+|---------|------|------|-----------|
+| `Small` | `ggml-small-q8_0.bin` | ~264 MB | `whisper-small-q8_0` |
+| `Medium` *(default)* | `ggml-medium-q8_0.bin` | ~823 MB | `whisper-medium-q8_0` |
+| `LargeV3Turbo` | `ggml-large-v3-turbo-q8_0.bin` | ~874 MB | `whisper-large-v3-turbo-q8_0` |
 
-#### 2b. OpenAI-Compatible ASR
+#### 2b. OpenAI-Compatible (remote)
 
-Remote ASR is useful when the user explicitly allows remote processing. It returns transcript text through the same segment type, but it may not include per-word confidence. Missing confidence is treated conservatively by the LLM gate.
+Remote ASR is useful when the user explicitly allows remote processing. It returns transcript text through the same `AsrSegment` type but does not expose per-token confidence. Missing confidence disables LLM routing confidence gates; the styling call is still driven by the style preset.
 
-### 3. Correction and LLM Gate
+### 3. Dictionary Application
 
-**Crates:** `lune-app`, `lune-dict`
+**Crates:** `lune-app`, `lune-dict`  
 **Files:** `crates/lune-app/src/session.rs`, `crates/lune-dict/src/corrector.rs`
 
-The session first gives cheap deterministic code the chance to fix the transcript. The LLM only receives text when the remaining risk justifies it.
+After ASR segments are collected, the session runs a deterministic text pass:
 
-The sequence is:
+1. Voice commands are stripped from the ASR text (whole-utterance matching).
+2. `apply_dictionary_seed` (in `lune-llm/src/pipeline.rs`, called before the LLM prompt) pre-substitutes dictionary phrases directly in the transcript. Matching is Unicode case-insensitive on the alphanumeric core of each whitespace-delimited token; longest match wins at each position.
+3. The processed text and the top dictionary entries are packaged into `PostProcessInput` for the LLM stage.
 
-1. Voice commands are stripped from the ASR text.
-2. The dictionary manager scans the remaining text.
-3. `LexicalGate` applies dictionary replacements and spelling fixes.
-4. The corrector returns `word_risk_positions`, mapped to the corrected word positions.
-5. `build_correction_spans` expands high-risk words into short editable spans.
-6. The bypass gate decides whether to call the LLM.
+There is no confidence-gating bypass between ASR and the LLM in this stage. The decision to run styling is made by the style preset (`needs_styling()` on the `StylePreset`), not by word confidence scores.
 
-The risk mapping lives in the corrector because that is the only point where original ASR words and corrected words are still paired. This keeps scores attached when `teh` becomes `the`, and it keeps duplicate words ordered by position instead of by string match.
-
-The LLM gate uses two signals:
-
-| Signal | Effect |
-|--------|--------|
-| `unresolved_words` | Heuristic could not safely fix a flagged word |
-| `correction_spans` | A word risk crossed the LLM span threshold |
-
-Unsupported dictionaries are handled conservatively. If the language has no bundled dictionary, high ASR risk can still force LLM review.
-
-### 4. LLM Post-Processing
+### 4. LLM Styling
 
 **Crate:** `lune-llm` | **File:** `crates/lune-llm/src/pipeline.rs`
 
-The session calls `TextPostProcessor::transform()` inline. There is no LLM worker queue in the current desktop runtime.
+The session calls `StylePipeline::transform()` for LLM post-processing.
 
-`PostProcessInput` carries structured data:
+`PostProcessInput` carries:
 
 | Field | Meaning |
-|-------|---------|
-| `raw_text` | Heuristic-corrected transcript |
-| `dictionary` | Relevant user dictionary entries |
-| `correction_spans` | Editable ranges around high-risk words |
-| `uncertain_words` | Words the heuristic left unresolved |
+|-------|---------| 
+| `raw_text` | ASR transcript after dictionary substitution |
+| `dictionary` | Top dictionary entries (injected into the prompt) |
 | `style_preset` | Output style contract |
 
-The shared `CorrectionPipeline` wraps any `LlmService` (local ONNX or remote OpenAI-compatible) and runs up to two passes:
+`StylePipeline` runs two steps:
 
-1. **Correction pass** — system prompt + transcript + dictionary + uncertain words. Output is run through number-space repair, a forbidden-meta-output filter, and an LCS-based `validate_and_merge` that rejects outputs diverging too far from the raw input.
-2. **Styling pass** — gated by `style_preset.skip_styling`. The `minimal` preset sets this to `true` and bypasses styling entirely. Styling output that fails the same forbidden-meta filter is dropped, keeping the corrected text.
+1. **Dictionary seed** — `apply_dictionary_seed` replaces dictionary phrases in the raw text (Unicode case-insensitive, longest-match). This happens before the LLM ever sees the text.
+2. **Styling pass** — gated by `style_preset.needs_styling()`. The `minimal` preset returns `false` and bypasses the LLM entirely. For all other presets, the LLM is called via `llm.complete()`. Output is run through `fix_all_number_spaces` and a `contains_forbidden_output` filter; a failing or empty output keeps the seeded text.
 
-Both pre-correction and post-styling hardening live in `CorrectionPipeline`, so every backend behaves identically. If the local ONNX model is missing or fails to load, the runtime falls back to `NullPostProcessor` and returns the heuristic-corrected text unchanged.
+**Qwen3.5 "thinking" suppression:** the prompt prefills the assistant turn with an empty `<think>\n\n</think>` block. This prevents the model's chain-of-thought from appearing in output.
+
+If the local model files are missing or fail to load, the runtime falls back to `NullPostProcessor`, which returns the seeded text unchanged.
+
+The LLM backend (`LlamaCppBackend`) holds a shared `Arc<LlamaModel>` and creates a fresh `LlamaContext` per call, executed on the blocking thread pool via `spawn_blocking`. This keeps model execution off the async runtime without holding a long-lived per-session context.
 
 ### 5. Text Delivery
 
@@ -148,8 +146,8 @@ Both pre-correction and post-styling hardening live in `CorrectionPipeline`, so 
 
 The session emits two `SessionEvent` variants directly on the event channel:
 
-- `PartialText` - in-progress signal for live preview
-- `FinalizedText(String)` - corrected text for delivery
+- `PartialText` — in-progress signal for live preview
+- `FinalizedText(String)` — styled text for delivery
 
 Delivery runs on a dedicated thread and picks a backend once at startup:
 
@@ -163,7 +161,7 @@ Delivery runs on a dedicated thread and picks a backend once at startup:
 | `TypeInPlace` | Types each key (US-QWERTY). Non-ASCII text routes through the clipboard paste path so it is never dropped. | `commit_text` |
 | `Clipboard` | Sets the clipboard (`wl-copy`/`xclip`), detects terminals, sends Ctrl+V / Ctrl+Shift+V. Adaptive post-paste delay (EMA of clipboard RTT); per-key fallback for paste-hostile apps. | `commit_text` |
 
-**Clipboard preservation.** The `Clipboard` path borrows the system clipboard as a transport. When `copy_to_clipboard` is off, the prior clipboard is snapshotted before delivery (its preferred MIME type and raw bytes, so images survive) and restored afterward; an empty clipboard is cleared back to empty, and a read failure leaves the dictated text rather than risk wiping unreadable content. When `copy_to_clipboard` is on, the dictated text is kept and the otherwise-redundant re-copy is skipped. The IBus path never touches the clipboard, so the toggle there only adds an explicit copy.
+**Clipboard preservation.** The `Clipboard` path borrows the system clipboard as a transport. When `copy_to_clipboard` is off, the prior clipboard is snapshotted before delivery (its preferred MIME type and raw bytes, so images survive) and restored afterward. When `copy_to_clipboard` is on, the dictated text is kept and the otherwise-redundant re-copy is skipped. The IBus path never touches the clipboard.
 
 ---
 
@@ -174,11 +172,11 @@ Idle
   |
   | start()
   v
-Active      audio flowing, ASR running
+Active      audio flowing, ASR buffering
   |
   | stop() / cancel() / audio closed
   v
-Teardown    poll final ASR, correct, finalize DB
+Teardown    poll final ASR, apply dictionary, style, finalize DB
   |
   v
 Stopped     SessionEvent::Stopped emitted
@@ -189,14 +187,13 @@ Only one session may be active at a time (enforced by `Arc<Mutex<Option<ActiveHa
 **Teardown sequence:**
 
 1. Stop or cancel drains recording control messages.
-2. Final ASR segments are polled unless the session was cancelled.
+2. Final ASR segments are polled (batch decode via `poll_final`) unless the session was cancelled.
 3. Empty sessions finish without transcript output.
-4. Voice commands are routed before correction.
-5. Dictionary and heuristic correction run.
-6. LLM post-processing runs only when the gate asks for it.
-7. Final text is emitted, delivered, and persisted.
+4. Voice commands are routed before dictionary application.
+5. Dictionary seed and `StylePipeline` run on the transcript.
+6. Final text is emitted, delivered, and persisted.
 
-Cancellation is checked before LLM work and again before final output. A cancellation during LLM work marks the session cancelled and skips `FinalizedText`.
+Cancellation is checked before LLM styling and again before final output. A cancellation during styling marks the session cancelled and skips `FinalizedText`.
 
 ---
 
@@ -215,8 +212,7 @@ The desktop app does not scrape logs or poll for session state. It uses typed Ta
 | `start_dictation` / `stop_dictation` / `cancel_dictation` / `toggle_dictation` | `main`, `pill` | Session control |
 | `load_pill_snapshot` | `pill` | Minimal state for the overlay |
 | `show_pill_window` / `hide_pill_window` / `reposition_pill_center` | `pill` | Overlay window control |
-
-The main window can start and stop dictation because its sidebar has a first-class dictation control. Pill-only commands stay pill-only.
+| `gpu_support` | `main` | Returns `{ compiled_in: bool }` — true when built with `whisper-cuda` or `llama-cuda` |
 
 ### Session Stream
 
@@ -235,16 +231,16 @@ The frontend store treats this stream as the source of truth for live runtime st
 The pill receives targeted events so it can react without owning the main session channel:
 
 | Event | Payload |
-|-------|---------|
+|-------|---------| 
 | `lune://pill-state` | `"ready"`, `"listening"`, `"processing"`, or `"error"` |
 | `lune://audio-level` | Float in `[0, 1]` |
 | `lune://pill-settings` | Activation mode and pill visibility |
 
-Rust also shows or hides the pill directly on status changes. That avoids a frontend roundtrip for the common start/stop path.
+Rust also shows or hides the pill directly on status changes to avoid a frontend roundtrip for the common start/stop path.
 
 ### Sound Cues
 
-Short audio cues play from the Rust backend on the same status transitions — Start on `listening`, Stop when leaving an active state, Error on `error` — deduplicated on the previous status so each fires once. They live in the backend rather than a webview because the main window is destroyed on close (and absent when started minimized) and the pill may not exist; the daemon process is the only surface guaranteed to be alive. Embedded 16-bit mono WAVs are decoded and played through a short-lived `cpal` output stream on a detached thread, with an explicit buffer size to avoid ALSA underruns. Playback is gated by `sound_cues_enabled` / `sound_cue_volume` and every failure is swallowed, so audio never disrupts dictation.
+Short audio cues play from the Rust backend on status transitions — Start on `listening`, Stop when leaving an active state, Error on `error` — deduplicated on the previous status so each fires once. Embedded 16-bit mono WAVs are decoded and played through a short-lived `cpal` output stream on a detached thread. Playback is gated by `sound_cues_enabled` / `sound_cue_volume` and every failure is swallowed, so audio never disrupts dictation.
 
 ---
 
@@ -279,7 +275,7 @@ Short audio cues play from the Rust backend on the same status transitions — S
 | `Get/SetLlmBackend` | JSON string of `LlmBackendConfig` | Daemon restart required |
 | `GetAllSettings` | TOML string (read-only dump) | - |
 
-All setters persist changes to disk immediately via fire-and-forget `spawn_local`. Settings are stored in `Arc<RwLock<UserSettings>>` - the runtime source of truth.
+All setters persist changes to disk immediately via fire-and-forget `spawn_local`. Settings are stored in `Arc<RwLock<UserSettings>>` — the runtime source of truth.
 
 ### Signals
 
@@ -301,15 +297,16 @@ Main Thread (tokio current_thread + LocalSet)
 |-- D-Bus connection (zbus) - initialized outside LocalSet
 |-- Command loop - receives AppCommand from D-Bus
 |-- Session task (spawn_local) - !Send due to cpal stream
-|   |-- Audio coalescing (VAD-gated)
-|   |-- ASR push + poll (streaming encoder-decoder)
-|   |-- Per-word confidence marking
-|   |-- LLM transform (inline in session loop)
+|   |-- Audio push loop (raw PCM to ASR buffer)
+|   |-- poll_final (batch decode; blocking call dispatched to spawn_blocking)
+|   |-- Dictionary + voice command pass
+|   |-- StylePipeline transform (LLM call dispatched to spawn_blocking)
 |   `-- Text delivery
 `-- Event forwarder (spawn_local) - routes SessionEvents to delivery
 
 spawn_blocking pool (tokio default)
-`-- ASR / local LLM inference - runs under Mutex, CUDA or CPU
+|-- whisper.cpp inference (WhisperContext shared; per-call WhisperState via Mutex)
+`-- llama.cpp inference  (LlamaModel Arc-shared; fresh LlamaContext per call)
 ```
 
 Why `current_thread` instead of `multi_thread`:
@@ -317,7 +314,9 @@ Why `current_thread` instead of `multi_thread`:
 - All hot paths stay on one core (cache-friendly)
 - `spawn_local` support for `!Send` futures (cpal stream)
 
-ORT sessions are wrapped in `Arc<Mutex<Session>>` for `Send` safety across `spawn_blocking`. Session control stays on the async side; model execution moves to the blocking pool.
+The `WhisperContext` is wrapped in an `Arc` and shared across all sessions. Each session creates a lightweight `WhisperState` via `ctx.create_state()`. The state is held behind a `Mutex<WhisperCppSession>` so the async and blocking layers can both access it safely.
+
+The `LlamaModel` is held in an `Arc` loaded via `OnceLock<LlamaBackend>`. A fresh `LlamaContext` is created per completion call inside `spawn_blocking`, so no per-session context is held between calls.
 
 ---
 
@@ -328,15 +327,16 @@ ORT sessions are wrapped in `Arc<Mutex<Session>>` for `Send` safety across `spaw
 
 lune-audio (cpal)
   |
-  | AudioFrame over mpsc
+  | AudioFrame over mpsc (raw PCM, 16 kHz mono f32)
   v
-Session task
+Session task (capture.rs)
   |
-  |-- ASR push + poll
-  |-- LexicalGate
-  |-- correction spans + word risks
-  |-- LLM gate
-  |-- TextPostProcessor or passthrough
+  |-- push_audio → ASR buffer accumulates
+  |-- [stop signal] → poll_final → whisper.cpp decode
+  |   (built-in Silero VAD gates speech spans at decode time)
+  |-- voice command routing
+  |-- apply_dictionary_seed
+  |-- StylePipeline::transform (LLM styling, optional)
   `-- FinalizedText
         |
         v

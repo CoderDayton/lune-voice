@@ -239,7 +239,7 @@ function MetaItem({
 }
 
 function formatBackend(backend: string): string {
-  if (backend.includes('Qwen3') || backend.includes('qwen3')) return 'Qwen3-ASR';
+  if (backend.includes('WhisperCpp')) return 'Whisper';
   if (backend.includes('OpenAi')) return 'Cloud';
   return backend;
 }

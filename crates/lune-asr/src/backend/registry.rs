@@ -11,7 +11,7 @@ use lune_core::asr::{AsrBackend, AsrBackendKind, AsrSegment, AsrSessionConfig};
 use lune_core::config::{AsrBackendConfig, DevicePolicy, PipelineConfig};
 use lune_core::error::{Error, Result};
 
-use crate::{OpenAiAsrConfig, OpenAiCompatibleAsrBackend, Qwen3AsrBackend, Qwen3AsrConfig};
+use crate::{OpenAiAsrConfig, OpenAiCompatibleAsrBackend, WhisperCppBackend, WhisperCppConfig};
 
 // ── Dispatch helpers ────────────────────────────────────────────────────────
 //
@@ -42,12 +42,12 @@ fn mismatch_err() -> Error {
 macro_rules! dispatch {
     ($self:ident, $session:ident, $method:ident $(, $arg:expr)*) => {
         match $self {
-            AsrRegistry::Qwen3(b) => match $session {
-                AsrSessionHandle::Qwen3(s) => b.$method(s $(, $arg)*).await,
-                _ => Err(mismatch_err()),
-            },
             AsrRegistry::OpenAi(b) => match $session {
                 AsrSessionHandle::OpenAi(s) => b.$method(s $(, $arg)*).await,
+                _ => Err(mismatch_err()),
+            },
+            AsrRegistry::WhisperCpp(b) => match $session {
+                AsrSessionHandle::WhisperCpp(s) => b.$method(s $(, $arg)*).await,
                 _ => Err(mismatch_err()),
             },
         }
@@ -59,8 +59,10 @@ macro_rules! dispatch {
 macro_rules! dispatch_new {
     ($self:ident, $method:ident $(, $arg:expr)*) => {
         match $self {
-            AsrRegistry::Qwen3(b) => Ok(AsrSessionHandle::Qwen3(b.$method($($arg),*).await?)),
             AsrRegistry::OpenAi(b) => Ok(AsrSessionHandle::OpenAi(b.$method($($arg),*).await?)),
+            AsrRegistry::WhisperCpp(b) => {
+                Ok(AsrSessionHandle::WhisperCpp(b.$method($($arg),*).await?))
+            }
         }
     };
 }
@@ -70,15 +72,15 @@ macro_rules! dispatch_new {
 /// Runtime-dispatched ASR backend. Construct via [`AsrRegistry::from_config`].
 #[allow(clippy::large_enum_variant)]
 pub enum AsrRegistry {
-    Qwen3(Qwen3AsrBackend),
     OpenAi(OpenAiCompatibleAsrBackend),
+    WhisperCpp(WhisperCppBackend),
 }
 
 /// Runtime-dispatched ASR session handle.
 #[allow(clippy::large_enum_variant)]
 pub enum AsrSessionHandle {
-    Qwen3(<Qwen3AsrBackend as AsrBackend>::SessionHandle),
     OpenAi(<OpenAiCompatibleAsrBackend as AsrBackend>::SessionHandle),
+    WhisperCpp(<WhisperCppBackend as AsrBackend>::SessionHandle),
 }
 
 // ── AsrBackend impl ─────────────────────────────────────────────────────────
@@ -120,18 +122,9 @@ impl AsrRegistry {
         device: DevicePolicy,
         models_dir: &Path,
     ) -> Result<Self> {
-        let use_gpu = device.use_gpu(cfg!(feature = "cuda"));
-        let cuda_required = device.strict_cuda();
-
+        // Per-backend GPU decision is computed inline below (whisper gates on
+        // the `whisper-cuda` feature); the remote backend ignores it.
         match config {
-            AsrBackendConfig::Qwen3Asr { .. } => {
-                let backend = Qwen3AsrBackend::new(Qwen3AsrConfig {
-                    model_dir: models_dir.join(lune_core::models::DIR_QWEN3_ASR),
-                    use_gpu,
-                    cuda_required,
-                })?;
-                Ok(Self::Qwen3(backend))
-            }
             AsrBackendConfig::OpenAiCompatible {
                 base_url,
                 api_key,
@@ -147,6 +140,18 @@ impl AsrRegistry {
                 })?;
                 Ok(Self::OpenAi(backend))
             }
+            AsrBackendConfig::WhisperCpp { model } => {
+                let backend = WhisperCppBackend::new(WhisperCppConfig {
+                    model_path: models_dir.join(model.dir()).join(model.ggml_file()),
+                    use_gpu: device.use_gpu(cfg!(feature = "whisper-cuda")),
+                    vad_model_path: Some(
+                        models_dir
+                            .join(lune_core::models::DIR_WHISPER_VAD)
+                            .join(lune_core::models::WHISPER_VAD_GGML),
+                    ),
+                })?;
+                Ok(Self::WhisperCpp(backend))
+            }
             #[allow(unreachable_patterns)]
             _ => Err(Error::config("unknown ASR backend type")),
         }
@@ -155,8 +160,8 @@ impl AsrRegistry {
     /// Returns the backend kind for this registry entry.
     pub fn kind(&self) -> AsrBackendKind {
         match self {
-            Self::Qwen3(_) => AsrBackendKind::Qwen3Asr,
             Self::OpenAi(_) => AsrBackendKind::OpenAiCompatible,
+            Self::WhisperCpp(_) => AsrBackendKind::WhisperCpp,
         }
     }
 
@@ -175,29 +180,6 @@ impl AsrRegistry {
     /// the runtime would apply, but cannot construct the heavy backend.
     pub fn default_pipeline_config(kind: AsrBackendKind) -> PipelineConfig {
         match kind {
-            AsrBackendKind::Qwen3Asr => PipelineConfig {
-                // Qwen3 is a batch decoder — one complete utterance per decode.
-                // Flushing is controlled by the dictation toggle/hold release,
-                // not by silence. Set silence thresholds extremely high so the
-                // VAD never triggers a mid-utterance flush.
-                max_segment_ms: 300_000,
-                sentence_close_ms: 300_000,
-                hard_close_ms: 300_000,
-                speech_threshold: 0.5,
-                speech_threshold_end: 0.3,
-                min_speech_ms: 200,
-                adaptive_vad: false,
-                itn_enabled: true,
-                word_boost_enabled: false,
-                word_boost_score: 1.0,
-                word_confidence_threshold: Some(0.55),
-                // Attention band requires >=2 sub-threshold words; 0.40 matched
-                // oracle routing on the domain corpus (benchmarks/tuning/gate_sweep.rs).
-                llm_skip_threshold: Some(0.40),
-                llm_skip_noisy_threshold: Some(0.30),
-                max_speech_samples: 300 * 16_000,
-                llm_timeout_secs: 30,
-            },
             AsrBackendKind::OpenAiCompatible => PipelineConfig {
                 max_segment_ms: 30_000,
                 sentence_close_ms: 800,
@@ -217,27 +199,40 @@ impl AsrRegistry {
                 max_speech_samples: 120 * 16_000,
                 llm_timeout_secs: 30,
             },
+            AsrBackendKind::WhisperCpp => PipelineConfig {
+                // Batch decoder — one full utterance per decode, flushed by the
+                // dictation toggle/hold release, not by silence. Keep the silence
+                // windows huge so the VAD never cuts mid-utterance.
+                max_segment_ms: 300_000,
+                sentence_close_ms: 300_000,
+                hard_close_ms: 300_000,
+                speech_threshold: 0.5,
+                speech_threshold_end: 0.3,
+                min_speech_ms: 200,
+                adaptive_vad: false,
+                itn_enabled: true,
+                word_boost_enabled: false,
+                word_boost_score: 1.0,
+                // whisper token probs feed the gate, but they're uncalibrated
+                // (no per-backend isotonic file), so route a touch more eagerly
+                // rather than trust a hard cutoff.
+                word_confidence_threshold: Some(0.50),
+                llm_skip_threshold: Some(0.40),
+                llm_skip_noisy_threshold: Some(0.30),
+                max_speech_samples: 300 * 16_000,
+                llm_timeout_secs: 30,
+            },
             // Fallback for any future variants — start from PipelineConfig::default().
             _ => PipelineConfig::default(),
-        }
-    }
-
-    /// Per-transcription sub-stage profile (mel / encoder / prefill / decode
-    /// timing and decode-step count) recorded by the most recent `poll_final`.
-    /// Only the Qwen3 backend instruments this; other backends return `None`.
-    pub fn last_profile(&self) -> Option<crate::Qwen3AsrProfile> {
-        match self {
-            Self::Qwen3(b) => b.last_profile(),
-            Self::OpenAi(_) => None,
         }
     }
 
     /// Set word boost phrases on the underlying ASR backend.
     /// No-op for backends that don't support token-level boosting.
     pub fn set_boost_phrases(&self, phrases: &[String], score: f32) {
+        let _ = (phrases, score);
         match self {
-            Self::Qwen3(b) => b.set_boost_phrases(phrases, score),
-            Self::OpenAi(_) => {}
+            Self::OpenAi(_) | Self::WhisperCpp(_) => {}
         }
     }
 }

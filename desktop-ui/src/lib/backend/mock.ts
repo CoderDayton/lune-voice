@@ -29,7 +29,8 @@ function createMockSnapshot(): WorkspaceSnapshot {
       soundCueVolume: 1.0,
       useGpu: true,
       devicePolicy: 'Auto',
-      asrBackendType: 'Qwen3Asr',
+      asrBackendType: 'WhisperCpp',
+      whisperModel: 'Medium',
       llmEnabled: true,
       confidenceThreshold: 0.55,
       llmSkipThreshold: 0.4,
@@ -59,7 +60,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
         endedAt: new Date(Date.now() - 38_000).toISOString(),
         transcript:
           "Uh yeah it is working right now but obviously this isn't a very good approach. In particular, the way the data flows through the system needs significant improvement.",
-        backend: 'Qwen3Asr',
+        backend: 'WhisperCpp',
         style: 'casual',
         status: 'completed',
       },
@@ -68,7 +69,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
         startedAt: new Date(Date.now() - 300_000).toISOString(),
         endedAt: new Date(Date.now() - 298_000).toISOString(),
         transcript: 'Will this work now?',
-        backend: 'Qwen3Asr',
+        backend: 'WhisperCpp',
         style: 'casual',
         status: 'completed',
       },
@@ -77,7 +78,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
         startedAt: new Date(Date.now() - 600_000).toISOString(),
         endedAt: new Date(Date.now() - 598_000).toISOString(),
         transcript: 'Oh that was exactly right.',
-        backend: 'Qwen3Asr',
+        backend: 'WhisperCpp',
         style: 'casual',
         status: 'completed',
       },
@@ -87,7 +88,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
         endedAt: new Date(Date.now() - 894_000).toISOString(),
         transcript:
           "This really needs some quality control. It doesn't understand my voice very well.",
-        backend: 'Qwen3Asr',
+        backend: 'WhisperCpp',
         style: 'casual',
         status: 'completed',
       },
@@ -216,6 +217,7 @@ function applySettings(input: SaveWorkspaceSettingsInput) {
       ...mockSnapshot.settings,
       ...fields,
       devicePolicy: fields.useGpu ? fields.devicePolicy : 'Cpu',
+      whisperModel: fields.whisperModel ?? mockSnapshot.settings.whisperModel,
       openaiAsrApiKeySet: !!_openaiAsrApiKey,
     },
   };
@@ -334,6 +336,12 @@ export const mockBackendClient: BackendClient = {
 
   async toggleDictation() {
     return 'mock-session';
+  },
+
+  async gpuSupport() {
+    // The browser/mock runtime has no compiled-in CUDA, so the onboarding GPU
+    // affordance stays hidden outside a real CUDA build.
+    return { compiled_in: false };
   },
 
   async calibrateStart(onEvent): Promise<CalibrationHandle> {

@@ -29,6 +29,9 @@
     "shortDescription": "Offline voice dictation powered by local AI",
     "longDescription": "Lune Voice turns speech into text locally on your computer. No cloud, no accounts, no internet required. Press a hotkey, speak, and text appears in any app.",
     "copyright": "© 2026 Lune Voice",
+    "resources": {
+      "../../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md"
+    },
     "linux": {
       "deb": {
         "depends": [
@@ -41,18 +44,10 @@
           "libcurand10",
           "libcudnn9-cuda-12"
         ],
-        "section": "utils",
-        "files": {
-          "/usr/lib/libonnxruntime_providers_cuda.so": "onnx-libs/libonnxruntime_providers_cuda.so",
-          "/usr/lib/libonnxruntime_providers_shared.so": "onnx-libs/libonnxruntime_providers_shared.so"
-        }
+        "section": "utils"
       },
       "appimage": {
-        "bundleMediaFramework": false,
-        "files": {
-          "/usr/lib/libonnxruntime_providers_cuda.so": "onnx-libs/libonnxruntime_providers_cuda.so",
-          "/usr/lib/libonnxruntime_providers_shared.so": "onnx-libs/libonnxruntime_providers_shared.so"
-        }
+        "bundleMediaFramework": false
       }
     },
     "macOS": {

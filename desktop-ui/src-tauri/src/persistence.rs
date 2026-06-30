@@ -11,7 +11,8 @@ use crate::dto::{
     ActivationModeDto, AsrBackendTypeDto, CreateCustomStyleInput, CreateDictionaryEntryInput,
     DevicePolicyDto, DictationModeDto, DictionaryItemDto, HistoryItemDto, PillVisibilityDto,
     SaveWorkspaceSettingsInput, SessionStatsDto, StylePresetDto, TerminalModeDto,
-    UpdateCustomStyleInput, UpdateDictionaryEntryInput, WorkspaceSettingsDto, WorkspaceSnapshot,
+    UpdateCustomStyleInput, UpdateDictionaryEntryInput, WhisperModelDto, WorkspaceSettingsDto,
+    WorkspaceSnapshot,
 };
 
 const HISTORY_LIMIT: u32 = 200;
@@ -434,6 +435,10 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
         openai_asr_base_url,
         openai_asr_model,
         openai_asr_api_key_set,
+        whisper_model: match &settings.asr_backend {
+            AsrBackendConfig::WhisperCpp { model } => (*model).into(),
+            _ => WhisperModelDto::default(),
+        },
     }
 }
 
@@ -638,7 +643,22 @@ fn asr_backend_from_type(
     input: &SaveWorkspaceSettingsInput,
 ) -> Result<AsrBackendConfig, String> {
     Ok(match kind {
-        AsrBackendTypeDto::Qwen3Asr => AsrBackendConfig::Qwen3Asr {},
+        AsrBackendTypeDto::WhisperCpp => {
+            // Prefer the incoming selection; else keep the current whisper model
+            // if already on WhisperCpp; else the default. The choice lives inside
+            // the WhisperCpp variant, so a switch away and back within one session
+            // is preserved via `current`, but it is not persisted across a
+            // different backend.
+            let model = input
+                .whisper_model
+                .map(Into::into)
+                .or(match current {
+                    AsrBackendConfig::WhisperCpp { model } => Some(*model),
+                    _ => None,
+                })
+                .unwrap_or_default();
+            AsrBackendConfig::WhisperCpp { model }
+        }
         AsrBackendTypeDto::OpenAiCompatible => {
             // Prefer incoming DTO fields; fall back to current config values if already OpenAI.
             let (cur_url, cur_key, cur_model) = match current {
@@ -835,6 +855,7 @@ mod tests {
             session_history_days: dto.session_history_days,
             terminal_mode: dto.terminal_mode,
             llm_enabled: dto.llm_enabled,
+            whisper_model: Some(dto.whisper_model),
             openai_asr_base_url: dto.openai_asr_base_url,
             openai_asr_api_key: None,
             openai_asr_model: dto.openai_asr_model,

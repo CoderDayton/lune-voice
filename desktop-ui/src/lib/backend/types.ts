@@ -8,6 +8,7 @@
 
 import type {
   FormatTogglesDto,
+  GpuSupportDto,
   PillSnapshotDto,
   SaveWorkspaceSettingsInput,
   WorkspaceSnapshot,
@@ -20,6 +21,7 @@ export type {
   DictationModeDto,
   DictionaryItemDto,
   FormatTogglesDto,
+  GpuSupportDto,
   HistoryItemDto,
   PillSnapshotDto,
   PillVisibilityDto,
@@ -98,6 +100,8 @@ export interface BackendClient {
   stopDictation(): Promise<void>;
   cancelDictation(): Promise<void>;
   toggleDictation(): Promise<string | null>;
+  /** Whether a CUDA feature was compiled into this build (build-time GPU support). */
+  gpuSupport(): Promise<GpuSupportDto>;
   calibrateStart(onEvent: (event: CalibrationStreamEvent) => void): Promise<CalibrationHandle>;
 }
 

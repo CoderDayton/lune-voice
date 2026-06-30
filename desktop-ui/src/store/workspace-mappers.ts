@@ -44,6 +44,7 @@ export function mapWorkspaceSettings(snapshot: WorkspaceSnapshot): WorkspaceSett
   return {
     activationMode: snapshot.settings.activationMode,
     asrBackend: snapshot.settings.asrBackendType,
+    whisperModel: snapshot.settings.whisperModel,
     useGpu: snapshot.settings.useGpu,
     devicePolicy: snapshot.settings.devicePolicy,
     confidenceThreshold: formatThreshold(
@@ -106,6 +107,7 @@ export function settingsToSaveInput(settings: WorkspaceSettings): SaveWorkspaceS
     useGpu: settings.useGpu,
     devicePolicy: settings.devicePolicy,
     asrBackendType: settings.asrBackend,
+    whisperModel: settings.whisperModel,
     confidenceThreshold: Number(settings.confidenceThreshold),
     llmSkipThreshold: Number(settings.llmSkipThreshold),
     adaptiveVad: settings.adaptiveVad,

@@ -8,8 +8,15 @@ default-run = "lune-app"
 workspace = true
 
 [features]
-default = ["cuda"]
-cuda = ["lune-app/cuda", "ort/cuda"]
+default = []
+# Native backends are compiled into the shipped app by `cgs build`. Off by
+# default so routine checks need no C++ toolchain; `gpu` (CUDA) is added by
+# `cgs build` when the build host has a CUDA toolchain.
+whisper-cpp = ["lune-app/whisper-cpp"]
+whisper-cuda = ["lune-app/whisper-cuda"]
+llama-cpp = ["lune-app/llama-cpp"]
+llama-cuda = ["lune-app/llama-cuda"]
+gpu = ["lune-app/gpu"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -27,7 +34,6 @@ lune-core = { path = "../../crates/lune-core" }
 lune-dict = { path = "../../crates/lune-dict" }
 lune-llm = { path = "../../crates/lune-llm" }
 lune-persist = { path = "../../crates/lune-persist" }
-ort = { workspace = true }
 uuid.workspace = true
 tokio = { workspace = true }
 tracing.workspace = true
