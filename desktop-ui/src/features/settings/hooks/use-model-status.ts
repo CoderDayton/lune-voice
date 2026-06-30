@@ -10,6 +10,12 @@ export interface ModelStatus {
   ready: boolean;
   description: string;
   required: boolean;
+  /** Whether the active backend selection currently uses this model. */
+  inUse: boolean;
+  /** Pipeline role for library grouping: `'speech-to-text'` | `'styling'`. */
+  role: string;
+  /** Actual on-disk size in bytes when installed; `null` otherwise. */
+  sizeBytes: number | null;
 }
 
 export interface DownloadProgress {
@@ -38,9 +44,9 @@ export interface ModelStatusApi {
  * progress, and downloads/deletes by `local_name`. Used by the Models tab and
  * the Transcription engine cards so the two never drift on download wiring.
  *
- * `check_model_status` reports status only for the models the current settings
- * need (e.g. the *selected* Whisper size), so call `refresh` when the backend
- * or selected model changes to keep `byName` accurate.
+ * `check_model_status` reports the full installable library (every Whisper size
+ * plus the styling LLM), each flagged with `inUse` for the active config. Call
+ * `refresh` when the backend or selected model changes to keep `inUse` current.
  */
 export function useModelStatus(): ModelStatusApi {
   const [models, setModels] = useState<ModelStatus[]>([]);

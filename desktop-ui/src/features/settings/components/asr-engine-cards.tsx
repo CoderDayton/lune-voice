@@ -1,5 +1,5 @@
 import { useLingui } from '@lingui/react/macro';
-import { Check, Cloud, Cpu, Download, type LucideIcon, Mic } from 'lucide-react';
+import { ArrowRight, Check, Cloud, Cpu, Download, type LucideIcon, Mic } from 'lucide-react';
 import { useEffect } from 'react';
 import { saveWorkspaceSetting, type WorkspaceSettings } from '../../../store/workspace-store';
 import { asrBackends, whisperModels } from '../data/settings-data';
@@ -12,17 +12,24 @@ function engineIcon(value: string): LucideIcon {
   return Cpu;
 }
 
+interface AsrEngineCardsProps {
+  settings: WorkspaceSettings;
+  /** Navigate to the Models tab (for the "Manage in Models" shortcut). */
+  onManageModels?: () => void;
+}
+
 /**
  * Card-based ASR engine picker for the Transcription tab. Selecting an engine
- * persists it immediately; choosing Whisper reveals model-size cards with
- * inline download / installed status for the selected size.
+ * persists it immediately; choosing Whisper reveals a model-size selector with
+ * a per-size readiness badge. The full library / download manager lives on the
+ * Models tab — here we only offer an inline download for the active size.
  */
-export function AsrEngineCards({ settings }: { settings: WorkspaceSettings }) {
+export function AsrEngineCards({ settings, onManageModels }: AsrEngineCardsProps) {
   const status = useModelStatus();
   const isWhisper = settings.asrBackend === 'WhisperCpp';
 
-  // Status is reported only for the *selected* Whisper size, so re-check when
-  // the engine or size changes to keep the badge/button current.
+  // Re-check status when the engine or size changes so `inUse`/`ready` stay
+  // current for the active selection.
   // biome-ignore lint/correctness/useExhaustiveDependencies: asrBackend/whisperModel are deliberate re-run triggers.
   useEffect(() => {
     status.refresh();
@@ -43,7 +50,9 @@ export function AsrEngineCards({ settings }: { settings: WorkspaceSettings }) {
         ))}
       </div>
 
-      {isWhisper && <WhisperModelPicker settings={settings} status={status} />}
+      {isWhisper && (
+        <WhisperModelPicker settings={settings} status={status} onManageModels={onManageModels} />
+      )}
     </div>
   );
 }
@@ -91,10 +100,20 @@ function EngineCard({ label, description, icon: Icon, active, onSelect }: Engine
 interface WhisperPickerProps {
   settings: WorkspaceSettings;
   status: ModelStatusApi;
+  onManageModels?: () => void;
 }
 
-function WhisperModelPicker({ settings, status }: WhisperPickerProps) {
+function WhisperModelPicker({ settings, status, onManageModels }: WhisperPickerProps) {
   const { t } = useLingui();
+  const selected = whisperModels.find((m) => m.value === settings.whisperModel);
+  const selectedStatus = selected ? status.byName.get(selected.localName) : undefined;
+  const selectedReady = selectedStatus?.ready ?? false;
+  const isDownloadingSelected = !!selected && status.downloading === selected.localName;
+  const pct =
+    status.progress && status.progress.fileCount > 0
+      ? Math.round(((status.progress.fileIndex + 1) / status.progress.fileCount) * 100)
+      : 0;
+
   return (
     <div className="rounded-box border border-surface-border bg-surface-inset/60 p-3">
       <div className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-content-subtle">
@@ -115,6 +134,48 @@ function WhisperModelPicker({ settings, status }: WhisperPickerProps) {
           />
         ))}
       </div>
+
+      {/* The active size isn't installed: offer one inline download + a link to
+          the full manager. Everything else is managed on the Models tab. */}
+      {selected && !selectedReady && !status.loading && (
+        <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-surface-border/60 pt-3">
+          {isDownloadingSelected ? (
+            <div className="flex-1 min-w-40 space-y-1">
+              <progress
+                className="progress progress-primary h-1.5 w-full"
+                value={(status.progress?.fileIndex ?? 0) + 1}
+                max={status.progress?.fileCount ?? 1}
+                aria-label={t`Download progress`}
+              />
+              <span className="text-xs font-medium tabular-nums text-primary">
+                {t`Downloading…`} {pct}%
+              </span>
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm gap-1.5"
+                onClick={() => status.download(selected.localName)}
+                disabled={!!status.downloading}
+              >
+                <Download size={13} />
+                {t`Download ${selected.label}`}
+              </button>
+              {onManageModels && (
+                <button
+                  type="button"
+                  className="btn btn-link btn-sm gap-1 px-0 text-content-subtle no-underline hover:text-primary"
+                  onClick={onManageModels}
+                >
+                  {t`Manage in Models`}
+                  <ArrowRight size={13} />
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -139,68 +200,37 @@ function WhisperSizeCard({
   onSelect,
 }: WhisperSizeCardProps) {
   const { t } = useLingui();
-  // Status is only reported for the selected size (see useModelStatus).
-  const st = active ? status.byName.get(localName) : undefined;
-  const isDownloading = status.downloading === localName;
-  const pct =
-    status.progress && status.progress.fileCount > 0
-      ? Math.round(((status.progress.fileIndex + 1) / status.progress.fileCount) * 100)
-      : 0;
+  const st = status.byName.get(localName);
+  const ready = st?.ready ?? false;
 
   return (
-    <div
-      className={`flex flex-col rounded-field border p-2.5 transition-colors ${
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onSelect}
+      className={`flex flex-col rounded-field border p-2.5 text-left transition-colors ${
         active ? 'border-primary/50 bg-primary/8' : 'border-surface-border bg-surface-elevated'
       }`}
     >
-      <button type="button" aria-pressed={active} onClick={onSelect} className="text-left">
-        <span className="flex items-center justify-between gap-2">
-          <span
-            className={`text-sm font-medium ${active ? 'text-content-strong' : 'text-content'}`}
-          >
-            {label}
+      <span className="flex items-center justify-between gap-2">
+        <span className={`text-sm font-medium ${active ? 'text-content-strong' : 'text-content'}`}>
+          {label}
+        </span>
+        {active && <Check size={14} strokeWidth={2.5} className="shrink-0 text-primary" />}
+      </span>
+      <span className="mt-1">
+        {status.loading ? (
+          <span className="text-xs text-content-subtle">{t`Checking…`}</span>
+        ) : ready ? (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-success">
+            <Check size={12} strokeWidth={2.5} />
+            {t`Installed`}
           </span>
-          {active && <Check size={14} strokeWidth={2.5} className="shrink-0 text-primary" />}
-        </span>
-        <span className="mt-0.5 block text-xs text-content-subtle">
-          {size} · {description}
-        </span>
-      </button>
-
-      {active && (
-        <div className="mt-2 border-t border-surface-border/60 pt-2">
-          {isDownloading ? (
-            <div className="space-y-1">
-              <progress
-                className="progress progress-primary h-1 w-full"
-                value={(status.progress?.fileIndex ?? 0) + 1}
-                max={status.progress?.fileCount ?? 1}
-                aria-label={t`Download progress`}
-              />
-              <span className="text-xs font-medium tabular-nums text-primary">
-                {t`Downloading…`} {pct}%
-              </span>
-            </div>
-          ) : status.loading || st === undefined ? (
-            <span className="text-xs text-content-subtle">{t`Checking…`}</span>
-          ) : st.ready ? (
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-success">
-              <Check size={12} strokeWidth={2.5} />
-              {t`Installed`}
-            </span>
-          ) : (
-            <button
-              type="button"
-              className="btn btn-primary btn-xs gap-1"
-              onClick={() => status.download(localName)}
-              disabled={!!status.downloading}
-            >
-              <Download size={11} />
-              {t`Download`}
-            </button>
-          )}
-        </div>
-      )}
-    </div>
+        ) : (
+          <span className="text-xs tabular-nums text-content-subtle">{size}</span>
+        )}
+      </span>
+      <span className="mt-0.5 block text-xs text-content-subtle">{description}</span>
+    </button>
   );
 }

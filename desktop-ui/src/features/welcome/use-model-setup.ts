@@ -10,7 +10,12 @@ import {
   workspaceStore,
 } from '../../store/workspace-store';
 import type { AsrBackendValue, WhisperModelValue } from '../settings/data/settings-data';
-import { asrModelLocalName, buildInitialSelection, type ModelStatus } from './setup-logic';
+import {
+  asrModelLocalName,
+  buildInitialSelection,
+  type ModelStatus,
+  relevantSetupModels,
+} from './setup-logic';
 
 export type { ModelStatus };
 
@@ -173,7 +178,7 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
         const gpu = await backendClient.gpuSupport().catch(() => ({ compiled_in: false }));
         if (cancelled) return;
         setGpuCompiledIn(gpu.compiled_in);
-        const s = await invoke<ModelStatus[]>('check_model_status');
+        const s = relevantSetupModels(await invoke<ModelStatus[]>('check_model_status'));
         if (cancelled) return;
         setModels(s);
         setSelected(buildInitialSelection(asrName, s));
@@ -265,7 +270,7 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
         await saveWorkspaceSetting('asrBackend', engineBackend);
       }
       setAsrLocalName(asrName);
-      const s = await invoke<ModelStatus[]>('check_model_status');
+      const s = relevantSetupModels(await invoke<ModelStatus[]>('check_model_status'));
       setModels(s);
       setSelected(buildInitialSelection(asrName, s));
       setPhase('choose');

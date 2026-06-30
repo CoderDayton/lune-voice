@@ -65,7 +65,9 @@ export function SettingsPage() {
     general: <GeneralSection settings={settings} />,
     appearance: <AppearanceSection />,
     dictation: <DictationSection settings={settings} />,
-    transcription: <TranscriptionSection settings={settings} />,
+    transcription: (
+      <TranscriptionSection settings={settings} onManageModels={() => setActive('models')} />
+    ),
     output: <OutputSection settings={settings} />,
     models: <ModelsSection />,
   };

@@ -13,7 +13,10 @@ import {
 import { dictationLanguages } from '../data/settings-data';
 import { useDebouncedSetting } from '../hooks/use-debounced-setting';
 
-export function TranscriptionSection({ settings }: SettingsProps) {
+export function TranscriptionSection({
+  settings,
+  onManageModels,
+}: SettingsProps & { onManageModels?: () => void }) {
   const { t } = useLingui();
   const llmEnabled = settings.llmEnabled;
   const [confidence, setConfidence] = useDebouncedSetting(
@@ -34,7 +37,7 @@ export function TranscriptionSection({ settings }: SettingsProps) {
           label={t`Voice model`}
           description={t`Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes.`}
         >
-          <AsrEngineCards settings={settings} />
+          <AsrEngineCards settings={settings} onManageModels={onManageModels} />
         </SettingsBlock>
         {settings.asrBackend === 'OpenAiCompatible' && (
           <OpenAiFields

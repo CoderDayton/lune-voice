@@ -4,6 +4,7 @@ import {
   buildInitialSelection,
   isSetupSatisfiable,
   type ModelStatus,
+  relevantSetupModels,
   shouldOfferGpuAcceleration,
 } from '../../src/features/welcome/setup-logic';
 
@@ -14,6 +15,7 @@ const model = (localName: string, opts: Partial<ModelStatus> = {}): ModelStatus 
   ready: false,
   description: '',
   required: false,
+  inUse: false,
   ...opts,
 });
 
@@ -39,6 +41,19 @@ describe('buildInitialSelection', () => {
     ];
     const selected = buildInitialSelection('engine', models);
     expect([...selected].sort()).toEqual(['engine', 'ready-one', 'required-one']);
+  });
+});
+
+describe('relevantSetupModels', () => {
+  test('keeps only the in-use models from the full library', () => {
+    const models = [
+      model('whisper-small-q5_1'),
+      model('whisper-medium-q5_0', { inUse: true }),
+      model('whisper-large-v3-turbo-q8_0'),
+      model('qwen3-styler-0.8b-gguf', { inUse: true }),
+    ];
+    const relevant = relevantSetupModels(models).map((m) => m.localName);
+    expect(relevant).toEqual(['whisper-medium-q5_0', 'qwen3-styler-0.8b-gguf']);
   });
 });
 
