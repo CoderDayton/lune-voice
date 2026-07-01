@@ -77,7 +77,7 @@ export function SettingsPage() {
       {/* Section rail — horizontal scroll on mobile, vertical on desktop */}
       <nav
         aria-label={t`Settings sections`}
-        className="bento-cell col-span-12 flex-row gap-1 overflow-x-auto p-space-sm md:col-span-3 md:flex-col md:self-start"
+        className="bento-cell sticky top-0 z-20 col-span-12 flex-row gap-1 overflow-x-auto p-space-sm md:col-span-3 md:flex-col md:self-start"
       >
         {sections.map(({ id, label, icon: Icon }) => {
           const isActive = id === active;
@@ -87,17 +87,33 @@ export function SettingsPage() {
               type="button"
               onClick={() => setActive(id)}
               aria-current={isActive ? 'page' : undefined}
-              className={`flex shrink-0 items-center gap-3 rounded-field px-3.5 py-3 text-left text-[0.95rem] transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary md:w-full ${
+              className={`relative flex shrink-0 items-center gap-3 rounded-field py-2.5 pl-2.5 pr-3.5 text-left text-[0.95rem] transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary md:w-full ${
                 isActive
                   ? 'bg-surface-nav-active font-medium text-content-strong'
                   : 'text-content-muted hover:bg-surface-hover hover:text-content'
               }`}
             >
-              <Icon
-                size={19}
-                strokeWidth={isActive ? 2.1 : 1.6}
-                className={isActive ? 'text-content-strong' : 'text-content-subtle'}
-              />
+              {isActive && (
+                <>
+                  {/* Active accent: a left bar on the vertical desktop rail, a
+                      bottom bar on the horizontal mobile row. */}
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-y-2 left-0 hidden w-[3px] rounded-full bg-primary md:block"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-x-3 bottom-0 h-[3px] rounded-full bg-primary md:hidden"
+                  />
+                </>
+              )}
+              <span
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-field transition-colors ${
+                  isActive ? 'bg-primary/12 text-primary' : 'text-content-subtle'
+                }`}
+              >
+                <Icon size={18} strokeWidth={isActive ? 2.1 : 1.7} />
+              </span>
               {label}
             </button>
           );
