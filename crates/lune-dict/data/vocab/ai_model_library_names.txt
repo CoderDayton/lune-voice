@@ -38,13 +38,10 @@ C#
 C++
 Cassandra
 CatBoost
-Causal Language Model
 cerebras
 chainlit
 Chakra UI
 Character AI
-Chat Model
-Chat Template
 Chatbot Arena
 chroma
 ckpt
@@ -75,9 +72,6 @@ Command R
 Command R Plus
 Common Crawl
 CommonsenseQA
-Consistency Model
-Constrained Decoding
-Context Window
 contriever
 ControlNet
 ConvNeXt
@@ -86,12 +80,8 @@ Coqui TTS
 Core ML
 Core ML Model
 CoreWeave
-Cosine Scheduler
 Crates.io
 CrewAI
-Cross Encoder
-Cross-Attention
-Cross-Encoder
 CSS
 CUDA
 cuDNN
@@ -103,10 +93,8 @@ dask
 Databricks
 Databricks Mosaic AI
 datadog
-Dataset Card
 datasets
 DDP
-Decoder-Only
 DeepEval
 DeepFace
 deepgram
@@ -116,10 +104,8 @@ demucs
 deno
 Detectron2
 devbox
-Developer Message
 devin
 diffusers
-Diffusion Model
 DigitalOcean
 DINOv2
 direnv
@@ -127,7 +113,6 @@ Distil-Whisper
 DoRA
 DPR
 DreamBooth
-DROP
 DS-1000
 DSPy
 DVC
@@ -139,8 +124,6 @@ EfficientNet
 elastic
 EleutherAI Eval Harness
 ElevenLabs
-Embedding Model
-Encoder-Decoder
 ensembling
 equinox
 Erlang
@@ -149,7 +132,6 @@ ESLint
 ESRGAN
 ExLlama
 ExLlamaV2
-Expert Choice
 F#
 FaceNet
 fairseq
@@ -162,7 +144,6 @@ Fish Shell
 FlashAttention
 FlashAttention 2
 FlashAttention 3
-Flow Matching
 Flux Pro
 Flux Schnell
 flux
@@ -172,9 +153,7 @@ FP16
 FP32
 FP8
 Framer Motion
-Frequency Penalty
 FSDP
-Function Calling
 GAIA
 GAN
 GeGLU
@@ -184,19 +163,14 @@ GFPGAN
 ggml
 GGUF
 gitea
-GLUE
 Google AI
 Google AI Studio
 Google DeepMind
 Google Research
 Google Vertex AI
 GPQA
-Gradient Accumulation
-Gradient Checkpointing
 gradio
-Grammar Sampling
 GraphRAG
-Greedy Decoding
 groq
 Groq API
 GroqCloud
@@ -212,7 +186,6 @@ Haskell
 hebbia
 helicone
 HellaSwag
-HELM
 HNSW
 HNSWlib
 horovod
@@ -223,7 +196,6 @@ hudi
 Hugging Face
 Hugging Face Hub
 HumanEval
-Hybrid Search
 HyDE
 hyperopt
 IA3
@@ -234,8 +206,6 @@ Imagen 2
 Imagen 3
 ImageNet
 Inflection AI
-Instruct Model
-Instruction Tuning
 INT4
 INT8
 IP-Adapter
@@ -247,7 +217,6 @@ JavaScript
 JAX
 Jina Embeddings
 Jina Reranker
-Jinja Template
 JSON
 JSON Mode
 jsonformer
@@ -257,8 +226,6 @@ JupyterLab
 jurassic
 Jurassic-2
 Keras
-Keyword Search
-Knowledge Distillation
 KServe
 KTO
 Kubeflow
@@ -276,7 +243,6 @@ LangFuse
 LangGraph
 LangServe
 LangSmith
-Latent Diffusion
 LayerNorm
 Le Chat
 LightGBM
@@ -297,7 +263,6 @@ magicoder
 mamba
 MarianNMT
 Material UI
-MATH
 maturin
 MBPP
 MedMCQA
@@ -321,8 +286,6 @@ MLX
 MMLU
 MMLU Pro
 MMMU
-Model Card
-Model Soups
 MoE
 MosaicML
 MPNet
@@ -333,7 +296,6 @@ MusicLM
 MuZero
 mypy
 NATS
-Natural Questions
 NCCL
 neptune
 NF4
@@ -393,9 +355,6 @@ PowerShell
 PPO
 PQ
 predibase
-Prefix Tuning
-Presence Penalty
-Prompt Tuning
 promptfoo
 PromptLayer
 Protocol Buffers
@@ -418,9 +377,6 @@ Ray Train
 Ray Tune
 React Native
 Real-ESRGAN
-Reasoning Model
-Reciprocal Rank Fusion
-Rectified Flow
 RedPajama
 RedPajama Dataset
 redshift
@@ -428,7 +384,6 @@ RefinedWeb
 ReFT
 Reka AI
 ReLU
-Repetition Penalty
 ResNet
 REST
 Rev AI
@@ -458,10 +413,7 @@ seaborn
 Seamless Communication
 SeamlessM4T
 SeaORM
-Segment Anything
-Self-Attention
 Semantic Kernel
-Semantic Search
 Sentence Transformers
 Sentence-BERT
 SentencePiece
@@ -478,7 +430,6 @@ sora
 Sourcegraph Cody
 space
 spaCy
-Speculative Decoding
 speechmatics
 SPLADE
 SQL
@@ -506,7 +457,6 @@ SWE-bench
 SwiGLU
 Swin Transformer
 Switch Transformer
-System Prompt
 tabnine
 TensorRT
 TensorRT-LLM
@@ -519,15 +469,12 @@ Three.js
 tiktoken
 Together AI
 Together Inference
-Token Budget
-Token Limit
 tokenizer
 Tokenizer JSON
 tokenizers
 tokenmonster
 tokio
 TOML
-Tool Call
 ToolBench
 ToolLLM
 Top-k Sampling
@@ -557,12 +504,10 @@ VAE
 valkey
 VALL-E X
 VALL-E
-Vector Search
 Vercel AI SDK
 Vertex AI API
 vespa
 VideoPoet
-Vision Transformer
 vitest
 vLLM
 Voyage AI
@@ -573,7 +518,6 @@ Vue
 weaviate
 WebArena
 WebStorm
-Weight Quantization
 Weights & Biases
 wikitext
 Wikitext-103

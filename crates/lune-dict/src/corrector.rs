@@ -736,6 +736,26 @@ mod tests {
     }
 
     #[test]
+    fn pruned_generic_phrases_are_not_force_capitalized() {
+        // Generic Title-Case ML jargon ("Context Window", "System Prompt",
+        // "Vector Search", "Greedy Decoding", ...) was removed from the bundled
+        // vocab: exact multi-word phrase re-casing is applied UNCONDITIONALLY
+        // (only fuzzy matches are risk-gated), so those common noun phrases got
+        // force-capitalized in ordinary speech. They must pass through exactly
+        // as spoken now — re-adding any to data/vocab/ should fail here.
+        let c = LexicalGate::new();
+        for text in [
+            "the context window is too small",
+            "check the system prompt first",
+            "we ran a vector search over the notes",
+            "greedy decoding was noticeably faster",
+        ] {
+            let result = c.correct(text, NO_RISKS, &[], "en");
+            assert_eq!(result.corrected_text, text, "must not re-case: {text}");
+        }
+    }
+
+    #[test]
     fn internal_punctuation_splits_and_corrects_each_span() {
         // Whisper sometimes glues a trailing-thought ellipsis directly onto
         // the next word with no whitespace: "is...Clayten." is ONE

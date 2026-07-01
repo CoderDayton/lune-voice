@@ -10,11 +10,12 @@
 //! philosophy of the corrector, applied to punctuation:
 //!
 //! * **Tier 1 — deterministic, no LLM:** capitalize the first letter; append a
-//!   terminal period when the segment is a single resolved declarative; and
-//!   demote a pause-driven over-split (`. But` → `, but`) back to a comma.
+//!   terminal period when the segment is a single resolved declarative; append
+//!   a `?` when it is a subject-auxiliary inversion question ("did we ship it");
+//!   and demote a pause-driven over-split (`. But` → `, but`) back to a comma.
 //!   These fixes are unambiguous, so they never need the model.
 //! * **Tier 2 — ambiguous, trips the LLM gate:** comma-less run-ons and
-//!   interrogative-leading segments with no end mark. The right fix here
+//!   bare wh-leading segments with no end mark. The right fix here
 //!   (internal commas, a sentence split, `?` vs `.` vs `!`) cannot be guessed
 //!   safely, so [`PunctuationOutcome::needs_llm`] is set and the caller routes
 //!   the text through the LLM punctuation pass.
@@ -127,9 +128,17 @@ pub fn normalize_with(text: &str, fmt: &FormatToggles) -> PunctuationOutcome {
     // can only touch the ends, so escalate it.
     let run_on = words.len() >= RUN_ON_WORD_THRESHOLD && !has_internal_separator(trimmed);
 
-    // Interrogative lead without an end mark is ambiguous (`?` vs `.` vs `!`),
-    // so let the LLM decide rather than guessing a question mark.
-    let needs_llm = run_on || (interrogative && !ends_terminal);
+    // A subject-auxiliary inversion ("did we ship it", "is there time") is
+    // grammatically unambiguous, so resolve it to `?` deterministically: the
+    // styling LLM is optional and off by default, so a question must not depend
+    // on it for punctuation. A bare wh-lead ("what a mess" vs "what time is it")
+    // stays ambiguous and is still deferred.
+    let confident_question =
+        interrogative && !ends_terminal && !ends_colon && is_aux_inversion_question(&words);
+
+    // A remaining interrogative lead without an end mark is ambiguous
+    // (`?` vs `.` vs `!`), so let the LLM decide rather than guessing.
+    let needs_llm = run_on || (interrogative && !ends_terminal && !confident_question);
 
     // Tier 1: capitalize the first word of the segment and of every internal
     // sentence (ASR emits sentence breaks from pause prosody, and the words
@@ -149,8 +158,13 @@ pub fn normalize_with(text: &str, fmt: &FormatToggles) -> PunctuationOutcome {
     // A trailing colon (`ends_colon`) is left exactly as the ASR produced it: no
     // period is appended, so we never emit the double mark ":." and never force
     // a period where the true terminator might be a question mark.
-    if words.len() > 1 && !ends_terminal && !ends_colon && !interrogative {
-        out.push('.');
+    if words.len() > 1 && !ends_terminal && !ends_colon {
+        if confident_question {
+            out.push('?');
+        } else if !interrogative {
+            out.push('.');
+        }
+        // An ambiguous interrogative lead gets no mark here — `needs_llm` owns it.
     }
 
     // Undo pause-driven over-splitting: a thinking pause the ASR read as a
@@ -766,17 +780,29 @@ fn is_interrogative_lead(words: &[&str]) -> bool {
     if WH_LEADS.iter().any(|lead| first.eq_ignore_ascii_case(lead)) {
         return true;
     }
-    if AUX_LEADS
+    is_aux_inversion_question(words)
+}
+
+/// Whether the segment is a subject-auxiliary inversion question ("did we ship
+/// it", "is there time") — an auxiliary lead immediately followed by a question
+/// subject. Inversion unambiguously marks a question, so unlike a bare wh-lead
+/// this can be resolved to a terminal `?` deterministically rather than deferred
+/// to the (optional) LLM.
+fn is_aux_inversion_question(words: &[&str]) -> bool {
+    let Some(first) = words.first().map(|w| word_core(w)) else {
+        return false;
+    };
+    if !AUX_LEADS
         .iter()
         .any(|lead| first.eq_ignore_ascii_case(lead))
     {
-        return words.get(1).map(|w| word_core(w)).is_some_and(|second| {
-            QUESTION_SUBJECTS
-                .iter()
-                .any(|s| second.eq_ignore_ascii_case(s))
-        });
+        return false;
     }
-    false
+    words.get(1).map(|w| word_core(w)).is_some_and(|second| {
+        QUESTION_SUBJECTS
+            .iter()
+            .any(|s| second.eq_ignore_ascii_case(s))
+    })
 }
 
 /// `word` with edge punctuation stripped ("you," → "you").
@@ -1658,7 +1684,10 @@ mod tests {
     }
 
     #[test]
-    fn aux_with_question_subject_defers_to_llm() {
+    fn aux_inversion_questions_get_deterministic_question_mark() {
+        // Subject-auxiliary inversion is unambiguously a question, so it is
+        // resolved to `?` deterministically (no LLM) instead of being left
+        // unpunctuated when the optional styling LLM is off.
         for text in [
             "can you hear me",
             "do you want coffee",
@@ -1667,11 +1696,8 @@ mod tests {
             "am i wrong about this",
         ] {
             let out = normalize(text);
-            assert!(out.needs_llm, "question not escalated: {text}");
-            assert!(
-                !out.text.ends_with('.'),
-                "period forced on question: {text}"
-            );
+            assert!(!out.needs_llm, "resolved deterministically: {text}");
+            assert!(out.text.ends_with('?'), "no question mark: {text}");
         }
     }
 

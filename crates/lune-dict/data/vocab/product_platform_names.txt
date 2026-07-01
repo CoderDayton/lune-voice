@@ -227,7 +227,6 @@ GitKraken
 GitLab
 GitLab CI
 Gmail
-Go
 GoFundMe
 Google Ads
 Google Ads Manager
@@ -289,7 +288,6 @@ Hulu
 iCloud Drive
 iCloud Keychain
 iCloud
-If This Then That
 iMessage
 InDesign
 Instacart
