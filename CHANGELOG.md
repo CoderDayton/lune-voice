@@ -16,6 +16,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Dictionary inline editing and priority control in the UI
 - 10-language corpus frequency maps for spell correction
 - Categorized supplemental vocabulary with bincode embedding
+- Built-in corrections for the app's own names and a few common mishears (applied unconditionally), replacing the per-user `personal.txt` word list
+- Quotes Whisper wraps around a whole read-aloud utterance are stripped from the output
 - N-gram language model replacing the old bigram model
 - Domain benchmark suite and RTF metrics
 - `cargo-deny` configuration for license/advisory auditing
@@ -24,6 +26,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 - Shared a single softmax across HWCE entropy, Tsallis, and top-margin features
+- The built-in word lists now only fix the capitalization of correctly-spoken terms; the fuzzy matching that could rewrite already-correct words was removed, and the lists were de-duplicated
 - Session statistics aggregated across the full database instead of capped history
 - Benchmarks moved from `examples/` to `benches/` with `harness = false`
 - License field updated from MIT to LicenseRef-Proprietary (LICENSE file already proprietary)
@@ -38,7 +41,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - VAD init failure now propagates gracefully instead of panicking
 - Mid-utterance pauses no longer fragment dictation into spurious sentences — the VAD caps the silence the recognizer hears, so a 0.5–1s breath isn't read as a sentence end
 - Filler words ("um", "uh", and the like) are stripped from dictation output, including mid-sentence (English only)
-- Long sentences now get a terminal period even when the LLM is skipped (minimal style); one-word dictations stay bare
+- Long sentences now get a terminal period even when the LLM is skipped; one-word dictations stay bare
+- A dictation ending in a colon keeps the colon instead of gaining a stray period
 - Hotkey toggle, session, and IPC pipeline hardened against races and silent failures
 - Gate false positives via case-insensitive lang detection and proper noun bypass
 - Words containing digits skipped in spell corrector
@@ -56,6 +60,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The standalone streaming Silero VAD gate (whisper's built-in VAD replaces it).
 - The LLM grammar-correction pass, calibrated edit gate, and the token sampler / KV-cache code — the styling LLM no longer corrects text (Whisper output is already punctuated).
 - The full benchmark suite, which exercised the removed ONNX/Qwen architecture (preserved on the `archive/onnx-qwen` branch).
+- Fuzzy matching from the built-in word lists (single- and multi-word) and the unused n-gram reranker — the built-in lists are capitalization-only now.
 
 ### Security
 - Updated rustls-webpki to 0.103.13

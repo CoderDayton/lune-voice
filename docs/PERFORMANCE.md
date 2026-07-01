@@ -29,8 +29,8 @@ After-speech wait = poll_final (whisper.cpp decode + built-in VAD) + optional LL
 |-------|-------------|-------|
 | Audio flush | Negligible | 30 ms tail flush after hotkey release |
 | whisper.cpp decode (`poll_final`) | **Primary fixed cost** | Batch decode of the full utterance; scales with audio length and model size |
-| Built-in Silero VAD | Folded into decode | whisper.cpp gates speech internally before the transformer; no separate stage |
-| LLM styling | Variable; skipped for `minimal` | One completion call via llama.cpp; `spawn_blocking` so it does not stall the runtime |
+| Standalone Silero VAD | Separate endpoint-trim stage | Whisper's VAD trims leading/trailing silence before decode and keeps internal pauses (a punctuation cue); NOT the in-decode `enable_vad` |
+| LLM styling | Variable; skipped when no style preset is selected | One completion call via llama.cpp; `spawn_blocking` so it does not stall the runtime |
 | Delivery | Small | Dominated by decode/styling |
 
 ### What Does NOT Add to After-Speech Wait
@@ -44,7 +44,7 @@ After-speech wait = poll_final (whisper.cpp decode + built-in VAD) + optional LL
 | Rank | Bottleneck | Why it matters |
 |------|------------|----------------|
 | 1 | whisper.cpp decode time | Scales with utterance length and model size; dominates on CPU |
-| 2 | LLM styling call | A few hundred milliseconds per utterance; skipped entirely for `minimal` preset |
+| 2 | LLM styling call | A few hundred milliseconds per utterance; skipped entirely when no style preset is selected |
 | 3 | Memory footprint | whisper.cpp + llama.cpp hold model weights in VRAM/RAM simultaneously |
 
 **GPU impact:** a CUDA build (`whisper-cuda`, `llama-cuda`) moves both inference calls to the GPU and substantially reduces decode time. CPU builds use whisper.cpp's AVX2-optimized GGML kernels (portable baseline; compile flags: `GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON`).

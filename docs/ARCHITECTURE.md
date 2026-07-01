@@ -48,9 +48,9 @@ lune-core (types, config, errors, hwce confidence)
 ├─ lune-audio (mic, resample, ringbuf, vad, pcen)
 ├─ lune-asr (whisper.cpp, openai remote, registry)
 ├─ lune-llm (llama.cpp, openai remote, null passthrough, style pipeline, prompt, few-shot)
-├─ lune-dict (corrector, ngram, vocab, voice commands)
+├─ lune-dict (corrector, vocab, voice commands)
 └─ lune-persist (settings.toml, sqlite, model hub)
-     └─ lune-app (session, gate, factory, hotkey, dbus, delivery, sound cues)
+     └─ lune-app (session, factory, hotkey, dbus, delivery, sound cues)
           └─ desktop-ui/src-tauri (tauri IPC, pill, persistence bridge)
 ```
 
@@ -110,10 +110,10 @@ Remote ASR is useful when the user explicitly allows remote processing. It retur
 After ASR segments are collected, the session runs a deterministic text pass:
 
 1. Voice commands are stripped from the ASR text (whole-utterance matching).
-2. `apply_dictionary_seed` (in `lune-llm/src/pipeline.rs`, called before the LLM prompt) pre-substitutes dictionary phrases directly in the transcript. Matching is Unicode case-insensitive on the alphanumeric core of each whitespace-delimited token; longest match wins at each position.
-3. The processed text and the top dictionary entries are packaged into `PostProcessInput` for the LLM stage.
+2. The deterministic corrector (`LexicalGate::correct_with_risk_threshold` in `corrector.rs`, via `correct_and_format` in `session.rs`) rewrites the transcript: user-dictionary matches (exact, plus single-word fuzzy gated by `FUZZY_DICT_RISK_GATE`), bundled-vocab recognition (exact case-insensitive re-casing only — no fuzzy guessing), and the `ALWAYS_REPLACE` built-in mishear→canonical table. `formatting` then applies capitalization, terminal punctuation, filler stripping, and wrapping-quote removal.
+3. The corrected text and the top dictionary entries are packaged into `PostProcessInput` for the optional LLM styling stage.
 
-There is no confidence-gating bypass between ASR and the LLM in this stage. The decision to run styling is made by the style preset (`needs_styling()` on the `StylePreset`), not by word confidence scores.
+Styling is not gated on word confidence. It runs only when a style preset is selected: when `default_style` is `None`, the LLM is skipped and the deterministic output is delivered as-is. (`apply_dictionary_seed`, below, is a secondary pass inside the styling stage — it only affects the text sent to the LLM, not this deterministic output.)
 
 ### 4. LLM Styling
 
@@ -132,7 +132,7 @@ The session calls `StylePipeline::transform()` for LLM post-processing.
 `StylePipeline` runs two steps:
 
 1. **Dictionary seed** — `apply_dictionary_seed` replaces dictionary phrases in the raw text (Unicode case-insensitive, longest-match). This happens before the LLM ever sees the text.
-2. **Styling pass** — gated by `style_preset.needs_styling()`. The `minimal` preset returns `false` and bypasses the LLM entirely. For all other presets, the LLM is called via `llm.complete()`. Output is run through `fix_all_number_spaces` and a `contains_forbidden_output` filter; a failing or empty output keeps the seeded text.
+2. **Styling pass** — runs only when a style preset is selected. When `default_style` is `None` the LLM is skipped and the seeded text is returned; for any selected preset the LLM is called via `llm.complete()`. Output is run through `fix_all_number_spaces` and a `contains_forbidden_output` filter; a failing or empty output keeps the seeded text.
 
 **Qwen3.5 "thinking" suppression:** the prompt prefills the assistant turn with an empty `<think>\n\n</think>` block. This prevents the model's chain-of-thought from appearing in output.
 

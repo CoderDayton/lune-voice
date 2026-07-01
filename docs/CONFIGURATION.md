@@ -74,7 +74,8 @@ If the file doesn't exist or fails to parse, defaults are used and a warning is 
 
 ```toml
 device = "auto"
-default_style = "minimal"
+# default_style is optional — omit for no styling (raw transcript, the default).
+# Set it to a preset id (e.g. "casual") to enable the LLM style pass.
 language = "auto"
 dictation_language = "auto"
 privacy_mode = "LocalOnly"
@@ -181,7 +182,7 @@ Runs the bundled local style model (Qwen3.5-0.8B GGUF via llama.cpp) when it has
 type = "Local"
 ```
 
-The local backend applies the dictionary seed and, for non-minimal style presets, rewrites the text in the chosen style. It does not perform grammar correction — Whisper already emits punctuated text.
+The local backend applies the dictionary seed and, if a style preset is selected, rewrites the text in the chosen style; dictionary substitution runs regardless of styling. It does not perform grammar correction — Whisper already emits punctuated text.
 
 Model: `unsloth/Qwen3.5-0.8B-GGUF`, file `Qwen3.5-0.8B-UD-Q5_K_XL.gguf`, stored under `models/qwen3-styler-0.8b-gguf/`.
 
@@ -359,17 +360,16 @@ System Settings -> Shortcuts -> Custom Shortcuts
 
 | ID | Name | Description | Behavior |
 |----|------|-------------|----------|
-| `minimal` | Minimal | Dictionary substitution only — no rephrasing | LLM skipped (`needs_styling` = false) |
 | `casual` | Casual | Texting, messaging, chat | Lowercase, contractions, comma-joined clauses |
 | `professional` | Professional | Clear workplace communication | Standard capitalization, broken run-ons, no contractions |
 | `formal` | Formal | Official correspondence and documents | Formal register, expanded contractions, structured sentences |
 | `technical` | Technical | Code and developer communication | Wraps identifiers/keywords in backticks; preserves jargon |
 | `writing` | Writing | Long-form content — articles, docs, essays | Polished prose, varied sentence length, filler words removed |
 
-Set the default style:
+Set the default style (omit the key entirely for no styling):
 
 ```toml
-default_style = "minimal"
+default_style = "casual"
 ```
 
 Switch at runtime:
@@ -489,9 +489,9 @@ Database location:
 
 | Platform | Path |
 |----------|------|
-| Linux | `~/.local/share/lune-voice/lune-voice.db` |
-| macOS | `~/Library/Application Support/lune-voice/lune-voice.db` |
-| Windows | `%APPDATA%\lune-voice\lune-voice.db` |
+| Linux | `~/.local/share/lune-voice/lune.db` |
+| macOS | `~/Library/Application Support/lune-voice/lune.db` |
+| Windows | `%APPDATA%\lune-voice\lune.db` |
 
 ---
 

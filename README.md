@@ -36,7 +36,7 @@ First launch downloads ~1.5 GB of models (Whisper speech-to-text, its voice-acti
 
 **A dictation pill that stays out of your way** — A floating overlay shows live audio levels and session state. Stop or cancel without ever leaving the app you're working in.
 
-**Style presets that match how you write** — "Professional" tightens prose for workplace messages. "Technical" preserves jargon and code formatting. "Minimal" applies your dictionary and leaves your phrasing untouched. Roll your own with custom prompts and few-shot examples that teach the LLM your voice.
+**Style presets that match how you write** — "Professional" tightens prose for workplace messages. "Technical" preserves jargon and code formatting. Prefer your words untouched? Leave styling off — your dictionary and punctuation still apply, the LLM just stays out of it. Roll your own with custom prompts and few-shot examples that teach the LLM your voice.
 
 **A dictionary that learns your world** — Names, acronyms, slang — anything the ASR has never heard. Entries are fuzzy-matched and priority-ranked, so corrections land even when pronunciation is rough.
 
