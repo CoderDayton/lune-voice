@@ -20,8 +20,8 @@ use lune_dict::DictionaryManager;
 use lune_dict::commands::VoiceCommandRouter;
 use lune_llm::{NullPostProcessor, OpenAiLlmBackend, OpenAiLlmConfig};
 use lune_persist::{AppPaths, Database, SettingsStore};
-use tauri::{AppHandle, Emitter, ipc::Channel};
-use tokio::sync::{Mutex, RwLock, mpsc};
+use tauri::{AppHandle, Emitter, Manager, ipc::Channel};
+use tokio::sync::{Mutex, Notify, RwLock, mpsc};
 #[cfg(unix)]
 use tracing::info;
 use tracing::{debug, warn};
@@ -305,7 +305,13 @@ impl AppRuntime {
             return Err("text delivery in progress".into());
         }
 
-        if self.inner.session_stream.read().await.is_none() {
+        // No subscriber is expected — not a bug — when the main window was
+        // never created (`start_minimized`/tray-only operation has no UI to
+        // reflect state into). Only warn when the window exists but hasn't
+        // subscribed yet, which is the real race worth flagging.
+        if self.inner.session_stream.read().await.is_none()
+            && self.inner.app.get_webview_window("main").is_some()
+        {
             warn!(
                 "starting dictation with no IPC stream subscriber — UI will not reflect session state"
             );
@@ -1063,6 +1069,10 @@ struct LazyLocalLlm {
     generation: AtomicU64,
     unload_epoch: AtomicU64,
     state: Mutex<LazyLlmState>,
+    /// Signaled on every transition out of `Loading`, so `complete()` can
+    /// wait out an in-flight warm-up instead of failing a race it didn't
+    /// need to lose.
+    state_changed: Notify,
 }
 
 enum LazyLlmState {
@@ -1080,6 +1090,7 @@ impl LazyLocalLlm {
             generation: AtomicU64::new(0),
             unload_epoch: AtomicU64::new(0),
             state: Mutex::new(LazyLlmState::Empty),
+            state_changed: Notify::new(),
         }
     }
 
@@ -1115,6 +1126,8 @@ impl LazyLocalLlm {
             && matches!(*state, LazyLlmState::Loading(g) if g == generation);
         if !still_current {
             *state = LazyLlmState::Empty;
+            drop(state);
+            self.state_changed.notify_waiters();
             return;
         }
 
@@ -1141,6 +1154,8 @@ impl LazyLocalLlm {
                 *state = LazyLlmState::Empty;
             }
         }
+        drop(state);
+        self.state_changed.notify_waiters();
     }
 
     async fn unload(&self) {
@@ -1150,6 +1165,8 @@ impl LazyLocalLlm {
             tracing::info!("local style LLM unloaded");
         }
         *state = LazyLlmState::Empty;
+        drop(state);
+        self.state_changed.notify_waiters();
     }
 
     fn cancel_scheduled_unload(&self) {
@@ -1178,16 +1195,26 @@ impl LazyLocalLlm {
 #[async_trait::async_trait]
 impl LlmService for LazyLocalLlm {
     async fn complete(&self, system: &str, user: &str) -> lune_core::Result<String> {
-        let llm = {
-            let state = self.state.lock().await;
-            match &*state {
-                LazyLlmState::Ready(llm) => Some(Arc::clone(llm)),
-                LazyLlmState::Empty | LazyLlmState::Loading(_) => None,
+        // A short utterance can finish transcription before a warm-up
+        // triggered at session start has loaded the model. Wait out an
+        // in-flight load rather than failing the race — the outer
+        // `llm_timeout_secs` in session.rs still bounds the total wait.
+        loop {
+            let notified = self.state_changed.notified();
+            let llm = {
+                let state = self.state.lock().await;
+                match &*state {
+                    LazyLlmState::Ready(llm) => Some(Arc::clone(llm)),
+                    LazyLlmState::Empty => {
+                        return Err(lune_core::Error::llm("local LLM not ready"));
+                    }
+                    LazyLlmState::Loading(_) => None,
+                }
+            };
+            match llm {
+                Some(llm) => return llm.complete(system, user).await,
+                None => notified.await,
             }
-        };
-        match llm {
-            Some(llm) => llm.complete(system, user).await,
-            None => Err(lune_core::Error::llm("local LLM not ready")),
         }
     }
 }
@@ -1392,6 +1419,28 @@ mod tests {
             *llm.state.lock().await,
             super::LazyLlmState::Empty
         ));
+    }
+
+    #[tokio::test]
+    async fn complete_waits_for_in_flight_warmup_instead_of_failing_fast() {
+        let llm = Arc::new(LazyLocalLlm::new(
+            std::path::PathBuf::from("/missing/model"),
+            false,
+            8,
+        ));
+        *llm.state.lock().await = super::LazyLlmState::Loading(0);
+
+        let waiting = Arc::clone(&llm);
+        let handle = tokio::spawn(async move { waiting.complete("system", "user").await });
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        assert!(
+            !handle.is_finished(),
+            "complete() must wait out an in-flight warm-up instead of failing fast"
+        );
+
+        llm.unload().await;
+        let result = handle.await.unwrap();
+        assert!(result.is_err());
     }
 
     #[tokio::test]
