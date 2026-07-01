@@ -1,12 +1,5 @@
-Activation Quantization
-actix
 AdaLoRA
 AdamW
-Adapter Fusion
-Adapter Model
-Adept AI
-AGIEval
-AI21 Labs
 aider
 AIME
 albumentations
@@ -16,115 +9,45 @@ ALiBi
 all-MiniLM-L6-v2
 AllenNLP
 AlpacaEval
-AlphaCode
-AlphaCode 2
-AlphaFold
-AlphaFold 2
-AlphaFold 3
-AlphaGeometry
-AlphaGo
-AlphaTensor
-AlphaZero
-altair
 Amazon AGI
-Amazon Bedrock
 Amazon CodeWhisperer
 Amazon Q
-Amazon SageMaker
-Ansible
 Anthropic
-Anthropic API
-anyscale
 Apache Pulsar
 Apple Machine Learning
-APPS
 ARC Challenge
 ARC Easy
-Arena Elo
-arrow
 AssemblyAI
-astro
 AudioCraft
 AudioLM
 AutoGen
 AutoGPTQ
-Autoregressive Model
 AWQ
 AWQ Quantization
-AWS
 Ax Platform
 axum
-Azure
-Azure OpenAI Service
-babel
-baichuan
 bard
-Base Model
-baseten
-bazel
-Beam Search
-Beautiful Soup
-BentoML
 BF16
-BFCL
-BGE Base
-BGE Large
-BGE M3
-BGE Small
-BGE
 bge-reranker
-Bi Encoder
-BIG-bench Hard
-Big-Bench
-BigQuery
-BioASQ
-bitbucket
 BitsAndBytes
-black
-BLIP
-BLIP-2
 BM25
-bokeh
 BookCorpus
-BoolQ
 BPE
 braintrust
-bruno
-Byte Pair Encoding
-C
 C#
 C++
-C4
-candle
 Cassandra
 CatBoost
 Causal Language Model
 cerebras
-CEval
 chainlit
 Chakra UI
 Character AI
 Chat Model
 Chat Template
 Chatbot Arena
-ChatGLM
-ChatGPT
 chroma
 ckpt
-Claude
-Claude 2
-Claude 3
-Claude 3 Haiku
-Claude 3 Opus
-Claude 3 Sonnet
-Claude 3.5 Haiku
-Claude 3.5 Sonnet
-Claude 3.7 Sonnet
-Claude Code
-Claude Desktop
-Claude Haiku
-Claude Opus
-Claude Sonnet
 ClearML
 ClickHouse
 CLion
@@ -135,16 +58,9 @@ CMake
 CMMLU
 CNN
 COCO
-Code Llama
 codeforces
 CodeGeeX
-CodeGemma
-CodeGen
 codeium
-CodeQwen
-codestral
-CodeT5
-CodeT5 Plus
 Cohere
 Cohere API
 Cohere Command
@@ -159,7 +75,6 @@ Command R
 Command R Plus
 Common Crawl
 CommonsenseQA
-conda
 Consistency Model
 Constrained Decoding
 Context Window
@@ -184,26 +99,17 @@ Cursor Composer
 Dagster
 DALL-E 2
 DALL-E 3
-DALL-E
 dask
 Databricks
 Databricks Mosaic AI
 datadog
 Dataset Card
 datasets
-DBRX
-dbt
 DDP
 Decoder-Only
 DeepEval
 DeepFace
 deepgram
-DeepSeek
-DeepSeek Coder
-DeepSeek Coder V2
-DeepSeek R1
-DeepSeek V2
-DeepSeek V3
 DeepSpeed
 Delta Lake
 demucs
@@ -216,19 +122,14 @@ diffusers
 Diffusion Model
 DigitalOcean
 DINOv2
-Direct Preference Optimization
 direnv
 Distil-Whisper
-Django
-Docker
-Docker Compose
 DoRA
 DPR
 DreamBooth
 DROP
 DS-1000
 DSPy
-DuckDB
 DVC
 DynamoDB
 E5
@@ -238,15 +139,11 @@ EfficientNet
 elastic
 EleutherAI Eval Harness
 ElevenLabs
-emacs
 Embedding Model
 Encoder-Decoder
 ensembling
 equinox
 Erlang
-ERNIE
-ERNIE 4.0
-ERNIE Bot
 esbuild
 ESLint
 ESRGAN
@@ -257,21 +154,14 @@ F#
 FaceNet
 fairseq
 FAISS
-Falcon 180B
-Falcon 40B
-Falcon 7B
-FastAPI
 FastText
 FineWeb
 FineWeb-Edu
-Firebase
 Fireworks AI
 Fish Shell
 FlashAttention
 FlashAttention 2
 FlashAttention 3
-florence
-Florence-2
 Flow Matching
 Flux Pro
 Flux Schnell
@@ -285,65 +175,28 @@ Framer Motion
 Frequency Penalty
 FSDP
 Function Calling
-fuyu
 GAIA
 GAN
-GCP
 GeGLU
 GELU
-Gemini
-Gemini API
-Gemini Code Assist
-Gemini Flash
-Gemini Nano
-Gemini Pro
-Gemini Ultra
-Gemma
-Gemma 2
-Gemma 3
 gensim
 GFPGAN
 ggml
 GGUF
-GGUF
-Git
 gitea
-GitHub
-GitHub Copilot
-GitLab
-GLM
-GLM-4
 GLUE
-Go
 Google AI
 Google AI Studio
 Google DeepMind
 Google Research
 Google Vertex AI
 GPQA
-GPT
-GPT-2
-GPT-3
-GPT-3.5
-GPT-4
-GPT-4.1
-GPT-4o
-GPT-5
-GPTQ
-GPTQ Quantization
 Gradient Accumulation
 Gradient Checkpointing
 gradio
-gradle
-Grafana
 Grammar Sampling
-GraphQL
 GraphRAG
 Greedy Decoding
-grok
-Grok-1
-Grok-2
-Grok-3
 groq
 Groq API
 GroqCloud
@@ -360,7 +213,6 @@ hebbia
 helicone
 HellaSwag
 HELM
-Heroku
 HNSW
 HNSWlib
 horovod
@@ -375,9 +227,7 @@ Hybrid Search
 HyDE
 hyperopt
 IA3
-IBM Granite
 iceberg
-IDEFICS
 IFEval
 imagen
 Imagen 2
@@ -388,13 +238,9 @@ Instruct Model
 Instruction Tuning
 INT4
 INT8
-IntelliJ IDEA
-InternLM
 IP-Adapter
 IPO
 IVF Index
-jamba
-Jamba Instruct
 jasper
 Java
 JavaScript
@@ -402,7 +248,6 @@ JAX
 Jina Embeddings
 Jina Reranker
 Jinja Template
-jira
 JSON
 JSON Mode
 jsonformer
@@ -411,17 +256,12 @@ Jupyter
 JupyterLab
 jurassic
 Jurassic-2
-Kafka
 Keras
 Keyword Search
 Knowledge Distillation
-kosmos
-Kosmos-2
-Kotlin
 KServe
 KTO
 Kubeflow
-Kubernetes
 kustomize
 KV Cache
 KV Cache Quantization
@@ -443,20 +283,6 @@ LightGBM
 Lion Optimizer
 LiteLLM
 LiveCodeBench
-Llama 2
-Llama 3
-Llama 3.1
-Llama 3.2
-Llama 3.3
-Llama
-llama-cpp-python
-llama-cpp-rs
-llama.cpp server
-llama.cpp
-llamafile
-LlamaIndex
-LLaVA
-LLaVA-NeXT
 LM Studio
 lm-evaluation-harness
 LMQL
@@ -465,22 +291,13 @@ LocalAI
 logprob
 LoRA
 LoRA Adapter
-LoRA
 LSTM
 Lua
-Luma Dream Machine
 magicoder
-Make-A-Video
 mamba
-MariaDB
 MarianNMT
-markdown
-Mask R-CNN
-Masked Language Model
 Material UI
 MATH
-MATLAB
-Matplotlib
 maturin
 MBPP
 MedMCQA
@@ -491,26 +308,11 @@ MergeKit
 Meta AI
 Meta Llama
 metaflow
-Metal Performance Shaders
 Microsoft AI
 Midjourney
-Midjourney V6
 milvus
-MiniCPM
-MiniGPT-4
 MiniLM
-ministral
 MiniWoB
-Mistral
-Mistral 7B
-Mistral AI
-Mistral API
-Mistral Large
-Mistral Small
-Mixed Precision
-Mixtral
-Mixtral 8x22B
-Mixtral 8x7B
 MLC LLM
 MLflow
 MLIR
@@ -522,7 +324,6 @@ MMMU
 Model Card
 Model Soups
 MoE
-MongoDB
 MosaicML
 MPNet
 MT-Bench
@@ -531,59 +332,31 @@ MusicGen
 MusicLM
 MuZero
 mypy
-MySQL
-MythoMax
 NATS
 Natural Questions
 NCCL
-nemotron
-neovim
 neptune
-netlify
-New Relic
-Next.js
 NF4
 ngrok
-NixOS
 NLTK
-Node.js
 Nomic AI
-Nous Hermes 2
-Nous Hermes 3
-Nous Hermes
 NousResearch
 npm
-NumPy
-nuxt
 NVIDIA AI
-o1
-o1-mini
-o3
-o3-mini
-o4-mini
 OCaml
 OctoAI
 ollama
-OLMo
-OLMoE
 ONNX
 ONNX Runtime Server
 ONNX Runtime
 OpenAI
-OpenAI API
 OpenAI compatible API
-OpenAI Embeddings
 OpenAI Evals
-OpenAPI
 OpenBookQA
-OpenChat
 OpenCLIP
 OpenCode
 OpenCoder
-OpenCV
 OpenDevin
-OpenELM
-OpenHermes
 OpenNMT
 OpenRouter
 OpenSearch
@@ -591,24 +364,18 @@ OpenTelemetry
 OpenVINO
 OpenWebText
 optuna
-Oracle Cloud
 ORPO
 ort
 OSCAR
 P-Tuning
 PagedAttention
 PagerDuty
-PaliGemma
 PaLM 2
 PaLM
 parquet
 parti
 PEFT
 Perl
-Phi-2
-Phi-3 Mini
-Phi-3
-Phi-4
 Phind CodeLlama
 phoenix
 PHP
@@ -619,48 +386,29 @@ pillow
 pip
 PIQA
 pixi
-pixtral
-PlanetScale
 plotly
 pnpm
-podman
 polars
-PostgreSQL
 PowerShell
 PPO
 PQ
 predibase
 Prefix Tuning
 Presence Penalty
-Prometheus
 Prompt Tuning
 promptfoo
 PromptLayer
 Protocol Buffers
 PubMedQA
-pulumi
-PyCharm
 Pydantic
 PydanticAI
 PyO3
-PyPI
 pyright
 pytest
-Python
-PyTorch
 PyTorch Checkpoint
 qdrant
 QLoRA
-Qwen
-Qwen ASR
-Qwen Audio
-Qwen Coder
-Qwen VL
-Qwen2
-Qwen2.5
-Qwen3
 QwQ
-R
 RabbitMQ
 Radix UI
 RAG
@@ -673,8 +421,6 @@ Real-ESRGAN
 Reasoning Model
 Reciprocal Rank Fusion
 Rectified Flow
-RecurrentGemma
-Redis
 RedPajama
 RedPajama Dataset
 redshift
@@ -683,9 +429,6 @@ ReFT
 Reka AI
 ReLU
 Repetition Penalty
-Replit Agent
-reqwest
-reranker
 ResNet
 REST
 Rev AI
@@ -694,7 +437,6 @@ RLHF
 RMSNorm
 RNN
 ROCm
-rollup
 ROOTS
 RoPE
 rsLoRA
@@ -704,15 +446,12 @@ Runway Gen-2
 Runway Gen-3
 RVC
 SafeTensors
-SafeTensors
 SAM 2
 SAM
 SantaCoder
 SavedModel
-Scala
 Scale AI
 ScaNN
-Scikit-learn
 SciPy
 SDXL
 seaborn
@@ -733,10 +472,7 @@ SGLang
 shadcn/ui
 SigLIP
 SIQA
-SmolLM
-SmolVLM
 SmoothQuant
-Snowflake Arctic
 SolidJS
 sora
 Sourcegraph Cody
@@ -747,7 +483,6 @@ speechmatics
 SPLADE
 SQL
 SQLAlchemy
-SQLite
 SQLx
 SQuAD
 SQuAD 2.0
@@ -757,18 +492,12 @@ Stable Diffusion
 Stable Diffusion 3
 Stable Diffusion XL
 Stable Video Diffusion
-StableLM
-StarCoder
-StarCoder2
 starlette
 statsmodels
 streamlit
-Structured Outputs
-Structured Sparsity
 supabase
 SuperGLUE
-Supervised Fine-Tuning
-Svelte
+fine-tuning
 SvelteKit
 SWC
 SWE-agent
@@ -779,16 +508,9 @@ Swin Transformer
 Switch Transformer
 System Prompt
 tabnine
-Tailwind CSS
-tauri
-TensorFlow
 TensorRT
 TensorRT-LLM
-Terraform
 Text Generation Inference
-text-embedding-3-large
-text-embedding-3-small
-text-embedding-ada-002
 Textual Inversion
 TFLite
 TGI
@@ -801,7 +523,6 @@ Token Budget
 Token Limit
 tokenizer
 Tokenizer JSON
-tokenizers
 tokenizers
 tokenmonster
 tokio
@@ -826,7 +547,6 @@ ts-node
 tsx
 turso
 TVM
-TypeScript
 TypeScript Compiler
 typesense
 U-Net
@@ -838,16 +558,11 @@ valkey
 VALL-E X
 VALL-E
 Vector Search
-vercel
 Vercel AI SDK
 Vertex AI API
 vespa
-vicuna
 VideoPoet
-vim
 Vision Transformer
-Visual Studio
-vite
 vitest
 vLLM
 Voyage AI
@@ -857,26 +572,13 @@ VS Code
 Vue
 weaviate
 WebArena
-webpack
 WebStorm
 Weight Quantization
 Weights & Biases
-Whisper API
-Whisper Base
-Whisper Large
-Whisper Large V2
-Whisper Large V3
-Whisper Medium
-Whisper Small
-Whisper Tiny
-Whisper.cpp
 wikitext
 Wikitext-103
 WikiText-2
-windsurf
 winogrande
-WizardCoder
-WizardLM
 WordPiece
 xAI
 XGBoost
@@ -886,8 +588,6 @@ XTTS
 YAML
 YaRN
 yi
-Yi Coder
-Yi Large
 YOLO
 YOLOv10
 YOLOv5

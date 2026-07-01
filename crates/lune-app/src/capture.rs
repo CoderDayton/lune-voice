@@ -1,8 +1,10 @@
 //! Audio capture stage.
 //!
-//! Streams raw microphone audio into the ASR backend, which buffers the whole
-//! utterance and gates it with whisper.cpp's built-in VAD at decode time — so
-//! this stage has no online VAD of its own. Extracted from `session.rs` so
+//! Streams microphone audio into the ASR backend, which buffers the whole
+//! utterance and decodes it on stop. An optional PCEN adaptive-gain frontend
+//! (the `vad_pcen` setting) boosts quiet mics toward a target speech level
+//! before the audio reaches the recognizer; there is no online VAD in this
+//! stage. Extracted from `session.rs` so
 //! orchestration and the capture stage stay separable; the session calls
 //! [`run_capture`] and consumes its [`CaptureResult`].
 
@@ -12,7 +14,7 @@ use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-use lune_audio::{AudioConfig, AudioPull, AudioStream};
+use lune_audio::{AudioConfig, AudioPull, AudioStream, PcenAgc, PcenAgcConfig};
 use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
 use lune_core::audio::SAMPLE_RATE;
 use lune_core::config::PipelineConfig;
@@ -23,6 +25,37 @@ use crate::session::{SessionAudio, SessionControl};
 const MAX_SEGMENTS: usize = 500;
 
 const GARBAGE_DROP_THRESHOLD: f32 = 0.25;
+
+/// Hop size for the adaptive-gain frontend: 256 samples = 16 ms at 16 kHz.
+const AGC_HOP: usize = 256;
+
+/// Minimum fraction of "speech-like" characters (letters, digits, and the
+/// punctuation that occurs in real speech) a segment must contain to be kept.
+const MIN_SPEECH_CONTENT_RATIO: f32 = 0.3;
+
+/// Reject ASR segments that are almost certainly hallucinations on silence: a
+/// segment with no alphanumerics ("...", "[BLANK_AUDIO]"-style residue, lone
+/// punctuation) or one that is mostly symbols. Mirrors vocalinux's non-speech
+/// filter. Pure-text and ordinary punctuated speech always pass.
+fn is_speech_content(text: &str) -> bool {
+    let probe = text.trim();
+    if probe.is_empty() {
+        return false;
+    }
+    // No letters or digits at all → not speech.
+    if !probe.chars().any(char::is_alphanumeric) {
+        return false;
+    }
+    let non_space = probe.chars().filter(|c| !c.is_whitespace()).count();
+    if non_space == 0 {
+        return false;
+    }
+    let speechy = probe
+        .chars()
+        .filter(|c| c.is_alphanumeric() || ".,!?-'\"".contains(*c))
+        .count();
+    (speechy as f32 / non_space as f32) >= MIN_SPEECH_CONTENT_RATIO
+}
 
 fn append_segments(
     all_segments: &mut Vec<AsrSegment>,
@@ -45,6 +78,11 @@ fn append_segments(
                 text = trimmed,
                 "dropping garbage segment"
             );
+            continue;
+        }
+
+        if !is_speech_content(trimmed) {
+            warn!(text = trimmed, "dropping non-speech segment");
             continue;
         }
 
@@ -85,6 +123,62 @@ struct SessionRuntime<H> {
 }
 
 /// Open audio capture; not async because all current variants are sync.
+/// Optional PCEN adaptive-gain frontend applied to mic audio before it reaches
+/// the recognizer. Quiet mics are boosted toward a target speech level so soft
+/// word onsets (notably the first word) aren't lost. Disabled => passthrough.
+///
+/// PCEN updates its envelopes per fixed hop, so variable-length input chunks are
+/// re-framed to [`AGC_HOP`]; the sub-hop remainder is held until the next
+/// `push` and emitted by [`MicAgc::flush`] at end of utterance.
+struct MicAgc {
+    agc: Option<PcenAgc>,
+    pending: Vec<f32>,
+}
+
+impl MicAgc {
+    fn new(enabled: bool) -> Self {
+        let agc = enabled
+            .then(|| PcenAgc::new(PcenAgcConfig::default(), SAMPLE_RATE as u32, AGC_HOP))
+            .transpose()
+            .unwrap_or_else(|e| {
+                warn!(error = %e, "failed to init PCEN AGC; using raw mic audio");
+                None
+            });
+        Self {
+            agc,
+            pending: Vec::with_capacity(AGC_HOP * 4),
+        }
+    }
+
+    /// Append gain-adjusted samples for `input` to `out`. Passthrough when disabled.
+    fn push(&mut self, input: &[f32], out: &mut Vec<f32>) {
+        let Some(agc) = self.agc.as_mut() else {
+            out.extend_from_slice(input);
+            return;
+        };
+        self.pending.extend_from_slice(input);
+        let mut frame = [0f32; AGC_HOP];
+        while self.pending.len() >= AGC_HOP {
+            frame.copy_from_slice(&self.pending[..AGC_HOP]);
+            agc.process_frame(&mut frame);
+            out.extend_from_slice(&frame);
+            self.pending.drain(..AGC_HOP);
+        }
+    }
+
+    /// Emit the held sub-hop remainder, scaled by the last applied gain so the
+    /// final phonemes match the level of the preceding audio.
+    fn flush(&mut self, out: &mut Vec<f32>) {
+        match self.agc.as_ref() {
+            Some(agc) => {
+                let g = agc.last_gain();
+                out.extend(self.pending.drain(..).map(|s| s * g));
+            }
+            None => out.append(&mut self.pending),
+        }
+    }
+}
+
 fn init_audio_source(
     audio_override: SessionAudio,
     input_device: Option<String>,
@@ -170,6 +264,7 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
     asr_config: AsrSessionConfig,
     audio_override: SessionAudio,
     pipeline: &PipelineConfig,
+    vad_pcen: bool,
     input_device: Option<String>,
     segment_capacity_hint: usize,
     event_tx: &mpsc::Sender<SessionEvent>,
@@ -191,6 +286,11 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
     let mut first_asr_error: Option<String> = None;
     let mut saw_asr_success = false;
     let mut cancelled = false;
+
+    // Adaptive-gain frontend (PCEN): boosts quiet mics so soft onsets aren't
+    // lost. Disabled => passthrough. `framed` is the reusable output scratch.
+    let mut agc = MicAgc::new(vad_pcen);
+    let mut framed: Vec<f32> = Vec::with_capacity(AGC_HOP * 8);
 
     let session_deadline = tokio::time::Instant::now()
         + Duration::from_secs((pipeline.max_speech_samples / SAMPLE_RATE) as u64 * 3);
@@ -243,15 +343,20 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
                         first_audio_logged = true;
                     }
 
-                    // Stream raw audio straight to the backend; whisper.cpp's
-                    // built-in VAD gates it to speech at decode time.
-                    if let Err(e) = asr.push_audio(&asr_session, &chunk.samples).await {
+                    // Adaptive-gain (if enabled) before the recognizer; whisper
+                    // decodes the full buffer (no online VAD in this stage).
+                    framed.clear();
+                    agc.push(&chunk.samples, &mut framed);
+                    if let Err(e) = asr.push_audio(&asr_session, &framed).await {
                         let msg = e.to_string();
                         warn!(error = %msg, "push_audio error during capture");
                         first_asr_error.get_or_insert(msg);
                     }
                     speech_samples += chunk.samples.len();
-                    peak_rms = peak_rms.max(rms_of(&chunk.samples));
+                    // Meter the POST-AGC signal (`framed`) so the bar reflects
+                    // what the recognizer hears — a quiet mic that the AGC boosts
+                    // now reads correctly instead of barely moving.
+                    peak_rms = peak_rms.max(rms_of(&framed));
 
                     if speech_samples >= pipeline.max_speech_samples {
                         info!(
@@ -266,8 +371,14 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
                 // Throttled audio level emission (~15 fps)
                 let now = tokio::time::Instant::now();
                 if now >= next_level_emit && peak_rms > 0.0 {
-                    // Clamp to [0, 1] — typical speech RMS is 0.01–0.15
-                    let normalized = (peak_rms * 6.0).min(1.0);
+                    // Map the post-AGC level onto [0, 1] relative to the AGC's
+                    // target RMS: subtract the noise floor so silence reads empty,
+                    // and scale so normal speech (≈ target) nearly fills the bar
+                    // with headroom for louder peaks. (With AGC off this meters
+                    // the raw signal, so a quiet mic legitimately reads low.)
+                    let floor = lune_audio::DEFAULT_NOISE_CEILING_RMS;
+                    let span = (lune_audio::EXPECTED_OUTPUT_RMS - floor).max(f32::EPSILON);
+                    let normalized = ((peak_rms - floor) / span * 0.9).clamp(0.0, 1.0);
                     let _ = event_tx.try_send(SessionEvent::AudioLevel(normalized));
                     peak_rms = 0.0;
                     next_level_emit = now + level_emit_interval;
@@ -300,10 +411,20 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
         audio_source.request_flush();
         tokio::time::sleep(Duration::from_millis(30)).await;
         while let Some(chunk) = audio_source.try_next_chunk() {
-            if let Err(e) = asr.push_audio(&asr_session, &chunk.samples).await {
+            framed.clear();
+            agc.push(&chunk.samples, &mut framed);
+            if let Err(e) = asr.push_audio(&asr_session, &framed).await {
                 first_asr_error.get_or_insert(e.to_string());
             }
             speech_samples += chunk.samples.len();
+        }
+        // Emit the AGC's held sub-hop remainder so the final phonemes survive.
+        framed.clear();
+        agc.flush(&mut framed);
+        if !framed.is_empty()
+            && let Err(e) = asr.push_audio(&asr_session, &framed).await
+        {
+            first_asr_error.get_or_insert(e.to_string());
         }
     }
 
@@ -348,4 +469,29 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
         saw_asr_success,
         status,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_speech_content;
+
+    #[test]
+    fn keeps_ordinary_speech() {
+        assert!(is_speech_content("Hello, world."));
+        assert!(is_speech_content(
+            "That's not even a GPU, it's pretty fast, huh?"
+        ));
+        assert!(is_speech_content("testing123"));
+        assert!(is_speech_content("ok"));
+    }
+
+    #[test]
+    fn drops_hallucinations_on_silence() {
+        assert!(!is_speech_content(""));
+        assert!(!is_speech_content("   "));
+        assert!(!is_speech_content("..."));
+        assert!(!is_speech_content("?!"));
+        assert!(!is_speech_content("[ ... ]"));
+        assert!(!is_speech_content("- -- ---"));
+    }
 }

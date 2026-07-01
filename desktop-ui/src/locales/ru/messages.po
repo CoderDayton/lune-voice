@@ -20,7 +20,7 @@ msgid "{0} of {1}"
 msgstr "{0} из {1}"
 
 #. placeholder {0}: presets.length
-#: src/features/styles/styles-page.tsx:168
+#: src/features/styles/styles-page.tsx:190
 msgid "{0} presets"
 msgstr "{0} пресеты"
 
@@ -333,7 +333,7 @@ msgstr "Чувствительность исправления"
 msgid "Couldn't add that rule. Try again."
 msgstr "Не удалось добавить это правило. Попробуйте еще раз."
 
-#: src/features/styles/styles-page.tsx:197
+#: src/features/styles/styles-page.tsx:222
 msgid "Create new style"
 msgstr "Создать новый стиль"
 
@@ -520,6 +520,10 @@ msgstr "Пустая сессия"
 #: src/features/settings/sections/transcription-section.tsx:104
 msgid "Enable correction LLM"
 msgstr "Включить коррекцию LLM"
+
+#: src/features/styles/styles-page.tsx:163
+msgid "Enable styling"
+msgstr ""
 
 #: src/features/history/components/history-table.tsx:130
 #: src/features/history/components/session-detail-modal.tsx:162
@@ -794,6 +798,11 @@ msgstr "Сеансов пока нет. Начните диктовать, чт�
 msgid "No transcript"
 msgstr "Нет расшифровки"
 
+#: src/features/history/components/history-table.tsx:293
+#: src/features/history/components/session-detail-modal.tsx:163
+msgid "None"
+msgstr ""
+
 #: src/features/settings/sections/dictation-section.tsx:209
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
 msgstr "Нормализует уровень микрофона перед обнаружением голоса. Помогает заглушить микрофоны и шумные комнаты. Рекомендуется."
@@ -986,6 +995,10 @@ msgstr "Повторить попытку"
 msgid "Retry download"
 msgstr "Повторить загрузку"
 
+#: src/features/styles/styles-page.tsx:165
+msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
+msgstr ""
+
 #: src/features/history/components/history-session-list.tsx:36
 #: src/features/overview/overview-page.tsx:262
 msgid "s"
@@ -1145,7 +1158,7 @@ msgstr "Стиль"
 msgid "Styling"
 msgstr ""
 
-#: src/features/styles/styles-page.tsx:167
+#: src/features/styles/styles-page.tsx:189
 msgid "Switch style"
 msgstr "Переключить стиль"
 
@@ -1178,10 +1191,6 @@ msgstr "Основной ярлык, используемый для голос�
 #: src/features/settings/sections/appearance-section.tsx:76
 msgid "Theme"
 msgstr "Тема"
-
-#: src/features/settings/sections/models-section.tsx:260
-#~ msgid "This is a required model. Dictation will not work without it."
-#~ msgstr "Это обязательная модель. Без него диктант не получится."
 
 #: src/features/settings/sections/models-section.tsx:307
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
@@ -1371,6 +1380,6 @@ msgstr ""
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "Ваши модели готовы. Все остается на этой машине."
 
-#: src/features/styles/styles-page.tsx:199
+#: src/features/styles/styles-page.tsx:224
 msgid "Your own formatting preset"
 msgstr "Ваш собственный набор настроек форматирования"

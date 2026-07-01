@@ -30,21 +30,22 @@ impl StylePipeline {
 impl TextPostProcessor for StylePipeline {
     async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput> {
         let mut text = apply_dictionary_seed(&input.raw_text, &input.dictionary);
-        if input.style_preset.needs_styling() {
-            let style_prompt = input.style_preset.build_styling_prompt(&text);
-            match self.llm.complete("", &style_prompt).await {
-                Ok(styled)
-                    if !styled.is_empty() && !crate::prompt::contains_forbidden_output(&styled) =>
-                {
-                    text = crate::prompt::fix_all_number_spaces(&styled);
-                }
-                Ok(_) => {
-                    tracing::warn!(
-                        "styling pass produced empty or forbidden output, keeping seeded text"
-                    )
-                }
-                Err(e) => tracing::warn!(error = %e, "styling pass failed, keeping seeded text"),
+        // The caller invokes this pass only when a style is selected (styling is
+        // gated by the presence of a selection, not a per-preset flag), so the
+        // styling LLM always runs here.
+        let style_prompt = input.style_preset.build_styling_prompt(&text);
+        match self.llm.complete("", &style_prompt).await {
+            Ok(styled)
+                if !styled.is_empty() && !crate::prompt::contains_forbidden_output(&styled) =>
+            {
+                text = crate::prompt::fix_all_number_spaces(&styled);
             }
+            Ok(_) => {
+                tracing::warn!(
+                    "styling pass produced empty or forbidden output, keeping seeded text"
+                )
+            }
+            Err(e) => tracing::warn!(error = %e, "styling pass failed, keeping seeded text"),
         }
         Ok(PostProcessOutput {
             cleaned_text: text,
@@ -210,25 +211,6 @@ mod tests {
         async fn complete(&self, _system: &str, _user: &str) -> Result<String> {
             Ok(self.styling_output.clone())
         }
-    }
-
-    #[tokio::test]
-    async fn minimal_preset_skips_styling_and_returns_seeded_text() {
-        let mock = Arc::new(StylingLlm {
-            styling_output: "Should not be used".to_string(),
-        });
-        let pipeline = StylePipeline::new(mock);
-        let input = PostProcessInput {
-            raw_text: "raw text".into(),
-            style_preset: Arc::new(StylePreset::minimal()),
-            app_category: None,
-            dictionary: vec![],
-            language: "en".into(),
-        };
-
-        let output = pipeline.transform(&input).await.unwrap();
-        // minimal → no styling → seeded raw is returned verbatim.
-        assert_eq!(output.cleaned_text, "raw text");
     }
 
     #[tokio::test]

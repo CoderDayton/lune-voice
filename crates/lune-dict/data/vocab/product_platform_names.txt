@@ -166,7 +166,6 @@ dbt
 Debezium
 Debian
 Deezer
-deno
 Dependabot
 DigitalOcean Droplets
 DigitalOcean Spaces
@@ -184,7 +183,6 @@ Dropbox Paper
 Drupal
 DuckDB
 Duolingo
-edge
 Elastic Stack
 ElasticSearch
 emacs
@@ -206,7 +204,6 @@ Firefox
 Fitbit
 Fivetran
 FlutterFlow
-Fortnite
 framer
 FreeBSD
 FreshBooks
@@ -320,7 +317,6 @@ Kotlin
 Krita
 Kubernetes
 Laravel
-League of Legends
 LinkedIn
 Linode
 Linux
@@ -360,11 +356,9 @@ Microsoft To Do
 Microsoft Visio
 Microsoft Windows
 Microsoft Word
-Minecraft
 Minecraft Bedrock Edition
 Minecraft Java Edition
 Minikube
-miro
 Miro Boards
 Mixpanel
 MobX
@@ -376,7 +370,6 @@ MySQL
 Namecheap
 Neo4j
 neovim
-nest
 NestJS
 NetBeans
 Netflix
@@ -390,7 +383,6 @@ NixOS
 Node.js
 NordVPN
 Notepad++
-npm
 NumPy
 nuxt
 Nvidia CUDA
@@ -410,7 +402,6 @@ Opera Browser
 Oracle Cloud
 Oracle Database
 Outlook
-Overwatch
 pandora
 Patreon
 PayPal
@@ -442,7 +433,6 @@ Python
 PyTorch
 QuickBooks
 Quora
-R
 Raycast
 Reddit
 Redis
@@ -451,7 +441,6 @@ reels
 Replit
 retool
 RingCentral
-Roblox
 Rocky Linux
 Roku
 rollup
@@ -546,11 +535,9 @@ WordPress
 Xamarin
 Xbox Game Pass
 Xbox Live
-Xbox
 Xcode
 Xero
 Yahoo Mail
-yammer
 YouTube Kids
 YouTube Music
 YouTube Shorts

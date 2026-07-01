@@ -1,7 +1,5 @@
 //! Tokenization, acoustic shape hashing, and string similarity helpers.
 
-use strsim::{jaro_winkler, normalized_damerau_levenshtein};
-
 use super::{END, START};
 
 pub fn tokenize(text: &str) -> Vec<String> {
@@ -66,52 +64,4 @@ pub(crate) fn last_two_or_start(prefix: &[String]) -> [String; 2] {
         1 => [START.to_owned(), prefix[0].clone()],
         len => [prefix[len - 2].clone(), prefix[len - 1].clone()],
     }
-}
-
-pub(crate) fn minmax_normalize(values: &[f64]) -> Vec<f64> {
-    let mut min = f64::INFINITY;
-    let mut max = f64::NEG_INFINITY;
-    for &v in values {
-        if v.is_finite() {
-            min = min.min(v);
-            max = max.max(v);
-        }
-    }
-    if !min.is_finite() {
-        return vec![0.0; values.len()];
-    }
-    let span = max - min;
-
-    values
-        .iter()
-        .map(|value| {
-            if !value.is_finite() {
-                0.0
-            } else if span <= f64::EPSILON {
-                0.5
-            } else {
-                ((value - min) / span).clamp(0.0, 1.0)
-            }
-        })
-        .collect()
-}
-
-pub(crate) fn normalize_similarity_text(text: &str) -> String {
-    text.to_ascii_lowercase()
-        .chars()
-        .filter(|c| c.is_ascii_alphanumeric())
-        .collect()
-}
-
-pub(crate) fn lexical_similarity(a: &str, b: &str) -> f64 {
-    if a.is_empty() && b.is_empty() {
-        return 1.0;
-    }
-    if a.is_empty() || b.is_empty() {
-        return 0.0;
-    }
-
-    let jaro = jaro_winkler(a, b);
-    let damerau = normalized_damerau_levenshtein(a, b);
-    (0.60 * jaro + 0.40 * damerau).clamp(0.0, 1.0)
 }

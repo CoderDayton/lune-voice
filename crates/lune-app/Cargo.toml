@@ -52,3 +52,62 @@ zbus = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3.27.0"
+
+# ── Benchmarks (benchmarks/*.rs, restored for the whisper.cpp/llama.cpp stack) ──
+# Each needs `whisper-cpp` for the real ASR; those that exercise the styling LLM
+# also need `llama-cpp`. Build/run with, e.g.:
+#   cargo run --release --example asr_probe -p lune-app --features "whisper-cpp llama-cpp" -- <wav>
+
+[[example]]
+name = "asr_probe"
+path = "../../benchmarks/tools/asr_probe.rs"
+required-features = ["whisper-cpp", "llama-cpp"]
+
+[[example]]
+name = "live_transcribe"
+path = "../../benchmarks/tools/live_transcribe.rs"
+required-features = ["whisper-cpp"]
+
+[[example]]
+name = "live_bench"
+path = "../../benchmarks/tools/live_bench.rs"
+required-features = ["whisper-cpp", "llama-cpp"]
+
+[[example]]
+name = "noisify_fixtures"
+path = "../../benchmarks/tools/noisify_fixtures.rs"
+
+[[example]]
+name = "bench_domain"
+path = "../../benchmarks/quality/bench_domain.rs"
+required-features = ["whisper-cpp", "llama-cpp"]
+
+[[example]]
+name = "confusion_mine"
+path = "../../benchmarks/quality/confusion_mine.rs"
+required-features = ["whisper-cpp"]
+
+[[example]]
+name = "pipeline_real"
+path = "../../benchmarks/pipeline/pipeline_real.rs"
+required-features = ["whisper-cpp", "llama-cpp"]
+
+[[example]]
+name = "pipeline_stages"
+path = "../../benchmarks/pipeline/pipeline_stages.rs"
+required-features = ["whisper-cpp", "llama-cpp"]
+
+[[example]]
+name = "session_latency"
+path = "../../benchmarks/pipeline/session_latency.rs"
+required-features = ["whisper-cpp"]
+
+[[example]]
+name = "punctuation_ab"
+path = "../../benchmarks/tuning/punctuation_ab.rs"
+required-features = ["whisper-cpp", "llama-cpp"]
+
+[[example]]
+name = "dict_carrier_ab"
+path = "../../benchmarks/tuning/dict_carrier_ab.rs"
+required-features = ["llama-cpp"]

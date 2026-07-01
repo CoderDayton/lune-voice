@@ -110,7 +110,9 @@ fn row_to_session(
         id,
         started_at,
         ended_at,
-        style: sty,
+        // The `style` column is non-null TEXT; the empty string is the on-disk
+        // representation of "no styling" (`None`).
+        style: if sty.is_empty() { None } else { Some(sty) },
         backend,
         status,
         transcript: trans,
@@ -337,7 +339,8 @@ impl Database {
             id: &id_str,
             started_at: &started,
             ended_at: ended.as_deref(),
-            style: &session.style,
+            // Persist "no styling" (`None`) as the empty string (column is non-null).
+            style: session.style.as_deref().unwrap_or(""),
             backend: &backend_str,
             status: &status_str,
             transcript: session.transcript.as_deref(),
@@ -803,7 +806,7 @@ mod tests {
             id: Uuid::new_v4(),
             started_at: Utc::now(),
             ended_at: Some(Utc::now()),
-            style: "casual".into(),
+            style: Some("casual".into()),
             backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Completed,
             transcript: Some("Hello world.".into()),
@@ -820,7 +823,7 @@ mod tests {
             id: Uuid::new_v4(),
             started_at: Utc::now(),
             ended_at: None,
-            style: "casual".into(),
+            style: Some("casual".into()),
             backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Active,
             transcript: None,
@@ -833,7 +836,7 @@ mod tests {
 
         let fetched = db.get_session(s1.id).unwrap().unwrap();
         assert_eq!(fetched.id, s1.id);
-        assert_eq!(fetched.style, "casual");
+        assert_eq!(fetched.style.as_deref(), Some("casual"));
 
         let not_found = db.get_session(Uuid::new_v4()).unwrap();
         assert!(not_found.is_none());
@@ -847,7 +850,7 @@ mod tests {
             id: Uuid::new_v4(),
             started_at: Utc::now(),
             ended_at: None,
-            style: "casual".into(),
+            style: Some("casual".into()),
             backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Active,
             transcript: None,
@@ -875,7 +878,7 @@ mod tests {
             id: Uuid::new_v4(),
             started_at: old_time,
             ended_at: None,
-            style: "casual".into(),
+            style: Some("casual".into()),
             backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Completed,
             transcript: None,
@@ -887,7 +890,7 @@ mod tests {
             id: Uuid::new_v4(),
             started_at: Utc::now(),
             ended_at: None,
-            style: "casual".into(),
+            style: Some("casual".into()),
             backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Active,
             transcript: None,
@@ -911,7 +914,7 @@ mod tests {
             id: Uuid::new_v4(),
             started_at: Utc::now(),
             ended_at: Some(Utc::now()),
-            style: "casual".into(),
+            style: Some("casual".into()),
             backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Completed,
             transcript: Some("First session.".into()),
@@ -920,7 +923,7 @@ mod tests {
             id: Uuid::new_v4(),
             started_at: Utc::now(),
             ended_at: Some(Utc::now()),
-            style: "formal".into(),
+            style: Some("formal".into()),
             backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Completed,
             transcript: Some("Second session.".into()),
@@ -956,7 +959,7 @@ mod tests {
             id: Uuid::new_v4(),
             started_at: Utc::now(),
             ended_at: None,
-            style: "casual".into(),
+            style: Some("casual".into()),
             backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Active,
             transcript: None,
@@ -1030,7 +1033,7 @@ mod tests {
             id: Uuid::new_v4(),
             started_at: Utc::now() - chrono::Duration::seconds(10),
             ended_at: Some(Utc::now()),
-            style: "casual".into(),
+            style: Some("casual".into()),
             backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Completed,
             transcript: Some("two words".into()),

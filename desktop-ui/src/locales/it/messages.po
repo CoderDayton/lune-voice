@@ -20,7 +20,7 @@ msgid "{0} of {1}"
 msgstr "{0} di {1}"
 
 #. placeholder {0}: presets.length
-#: src/features/styles/styles-page.tsx:168
+#: src/features/styles/styles-page.tsx:190
 msgid "{0} presets"
 msgstr "{0} preimpostazioni"
 
@@ -333,7 +333,7 @@ msgstr "Sensibilità di correzione"
 msgid "Couldn't add that rule. Try again."
 msgstr "Impossibile aggiungere quella regola. Riprova."
 
-#: src/features/styles/styles-page.tsx:197
+#: src/features/styles/styles-page.tsx:222
 msgid "Create new style"
 msgstr "Crea un nuovo stile"
 
@@ -520,6 +520,10 @@ msgstr "Sessione vuota"
 #: src/features/settings/sections/transcription-section.tsx:104
 msgid "Enable correction LLM"
 msgstr "Abilita correzione LLM"
+
+#: src/features/styles/styles-page.tsx:163
+msgid "Enable styling"
+msgstr ""
 
 #: src/features/history/components/history-table.tsx:130
 #: src/features/history/components/session-detail-modal.tsx:162
@@ -794,6 +798,11 @@ msgstr "Nessuna sessione ancora. Inizia a dettare per vedere le tue trascrizioni
 msgid "No transcript"
 msgstr "Nessuna trascrizione"
 
+#: src/features/history/components/history-table.tsx:293
+#: src/features/history/components/session-detail-modal.tsx:163
+msgid "None"
+msgstr ""
+
 #: src/features/settings/sections/dictation-section.tsx:209
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
 msgstr "Normalizza il livello del microfono prima del rilevamento vocale. Aiuta microfoni silenziosi e stanze rumorose. Raccomandato."
@@ -986,6 +995,10 @@ msgstr "Riprova"
 msgid "Retry download"
 msgstr "Riprovare a scaricare"
 
+#: src/features/styles/styles-page.tsx:165
+msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
+msgstr ""
+
 #: src/features/history/components/history-session-list.tsx:36
 #: src/features/overview/overview-page.tsx:262
 msgid "s"
@@ -1145,7 +1158,7 @@ msgstr "Stile"
 msgid "Styling"
 msgstr ""
 
-#: src/features/styles/styles-page.tsx:167
+#: src/features/styles/styles-page.tsx:189
 msgid "Switch style"
 msgstr "Cambia stile"
 
@@ -1178,10 +1191,6 @@ msgstr "La scorciatoia principale utilizzata per la digitazione vocale. Fare cli
 #: src/features/settings/sections/appearance-section.tsx:76
 msgid "Theme"
 msgstr "Tema"
-
-#: src/features/settings/sections/models-section.tsx:260
-#~ msgid "This is a required model. Dictation will not work without it."
-#~ msgstr "Questo è un modello richiesto. La dettatura non funzionerà senza di essa."
 
 #: src/features/settings/sections/models-section.tsx:307
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
@@ -1371,6 +1380,6 @@ msgstr ""
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "I tuoi modelli sono pronti. Tutto rimane su questa macchina."
 
-#: src/features/styles/styles-page.tsx:199
+#: src/features/styles/styles-page.tsx:224
 msgid "Your own formatting preset"
 msgstr "La tua preimpostazione di formattazione"

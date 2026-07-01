@@ -147,16 +147,17 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
                 settings.custom_styles.clone(),
             )
         };
-        let style_preset = builtin_registry()
-            .get(&current_style_id)
-            .or_else(|| {
+        // `None` means no styling — the raw (heuristically-formatted) transcript
+        // is delivered as-is. A selected id that no longer resolves (e.g. a
+        // deleted custom style) also degrades to no styling rather than erroring.
+        let style_preset: Option<Arc<StylePreset>> = current_style_id.and_then(|id| {
+            builtin_registry().get(&id).or_else(|| {
                 custom_styles
                     .iter()
-                    .find(|s| s.id == current_style_id)
+                    .find(|s| s.id == id)
                     .map(|s| Arc::new(s.clone()))
             })
-            .or_else(|| builtin_registry().get("minimal"))
-            .ok_or_else(|| Error::config("no usable style preset found"))?;
+        });
 
         // Hold the active lock across persist + spawn and only assign
         // `*lock = Some(...)` at the very end. Cancellation safety
@@ -179,7 +180,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
                 id: session_id,
                 started_at: Utc::now(),
                 ended_at: None,
-                style: style_preset.id.clone(),
+                style: style_preset.as_ref().map(|p| p.id.clone()),
                 backend: self.config.asr_backend_kind,
                 status: SessionStatus::Active,
                 transcript: None,
@@ -360,14 +361,14 @@ struct SessionDeps {
 async fn run_session<A: AsrBackend + 'static>(
     deps: SessionDeps,
     asr: Arc<A>,
-    style_preset: Arc<StylePreset>,
+    style_preset: Option<Arc<StylePreset>>,
     mut control_rx: mpsc::UnboundedReceiver<SessionControl>,
     audio_override: SessionAudio,
 ) {
     let session_id = deps.session_id;
-    let input_device = {
+    let (input_device, vad_pcen) = {
         let settings = deps.settings.read().await;
-        settings.input_device.clone()
+        (settings.input_device.clone(), settings.vad_pcen)
     };
 
     let capture = match crate::capture::run_capture(
@@ -376,6 +377,7 @@ async fn run_session<A: AsrBackend + 'static>(
         deps.config.asr_config.clone(),
         audio_override,
         &deps.config.pipeline,
+        vad_pcen,
         input_device,
         asr.segment_capacity_hint(),
         &deps.event_tx,
@@ -461,12 +463,12 @@ async fn run_session<A: AsrBackend + 'static>(
 /// Output of the deterministic correction + formatting stage.
 struct Shaped {
     /// Heuristic-corrected, punctuated, de-cased text — the fast-path output
-    /// and the LLM input.
+    /// and the styling-LLM input.
     text_after_heuristic: String,
     detected_lang: &'static str,
-    /// Residual ambiguous punctuation (a gate signal; surfaced in the log).
-    needs_punct: bool,
-    gate: crate::gate::GateOutcome,
+    /// Whether the styling LLM pass should run. The LLM does styling only, so
+    /// this is simply "a non-default style is selected" — no correction gating.
+    needs_llm: bool,
     /// Words the corrector could neither resolve nor confidently preserve.
     unresolved_words: Vec<(String, usize)>,
     /// Risk entries that didn't align to a text token (diagnostic).
@@ -480,16 +482,16 @@ struct Shaped {
 fn correct_and_format(
     text: &str,
     segments: &[AsrSegment],
-    dict_replacements: &[(String, String)],
+    dict_replacements: &[lune_dict::DictMatch],
     heuristic: &LexicalGate,
     pipeline: &PipelineConfig,
     fmt: &lune_core::config::FormatToggles,
     wants_styling: bool,
 ) -> Shaped {
-    let word_risk_scores: Vec<(&str, f32)> = segments
+    let word_risk_scores: Vec<(&str, f32, f32)> = segments
         .iter()
         .flat_map(|s| s.word_confidences.iter())
-        .map(|wc| (wc.word.as_str(), wc.word_error_risk))
+        .map(|wc| (wc.word.as_str(), wc.word_error_risk, wc.mean_confidence))
         .collect();
 
     let detected_lang = segments
@@ -521,6 +523,12 @@ fn correct_and_format(
     } else {
         heuristic_result.corrected_text.clone()
     };
+    // Whisper sometimes wraps a whole read-aloud utterance in quotes; the user
+    // dictated the content, not the quote marks. Strip a single wrapping pair
+    // BEFORE punctuation normalization — otherwise normalize appends terminal
+    // punctuation OUTSIDE the closing quote (`"…".`), and the strip (which
+    // requires the quote to be the final char) can no longer detect the pair.
+    let corrected = lune_dict::formatting::strip_wrapping_quotes(&corrected);
     let punctuation = lune_dict::formatting::normalize_with(&corrected, fmt);
     // Downcase mid-sentence common-word capitals on the always-on path so casing
     // is normalized once whether or not the gated LLM pass runs. English only.
@@ -539,21 +547,14 @@ fn correct_and_format(
         .map(|ws| (ws.word.clone(), ws.position))
         .collect();
 
-    let gate = crate::gate::decide(crate::gate::GateInputs {
-        pipeline,
-        all_resolved: heuristic_result.all_resolved,
-        needs_punct: punctuation.needs_llm,
-        wants_styling,
-        word_risk_scores: &word_risk_scores,
-        word_risk_positions: &heuristic_result.word_risk_positions,
-        word_count: text.split_whitespace().count(),
-    });
-
+    // The LLM does styling only (no correction), so the pass runs iff the user
+    // selected a non-default style — no confidence / punctuation / correction
+    // gating. The per-word risk scores still drive the deterministic heuristic
+    // above; they no longer route the LLM.
     Shaped {
         text_after_heuristic,
         detected_lang,
-        needs_punct: punctuation.needs_llm,
-        gate,
+        needs_llm: wants_styling,
         unresolved_words,
         dropped_risks: heuristic_result.dropped_risk_entries,
     }
@@ -575,7 +576,7 @@ async fn process_and_deliver(
     raw_text: String,
     segments: Vec<AsrSegment>,
     status: SessionStatus,
-    mut style_preset: Arc<StylePreset>,
+    mut style_preset: Option<Arc<StylePreset>>,
     mut control_rx: mpsc::UnboundedReceiver<SessionControl>,
     mut cancelled: bool,
 ) {
@@ -616,12 +617,12 @@ async fn process_and_deliver(
                         }
                     });
             if let Some(next_preset) = next_preset {
-                style_preset = next_preset;
                 info!(
                     %session_id,
-                    style = %style_preset.id,
+                    style = %next_preset.id,
                     "switched style preset via voice command"
                 );
+                style_preset = Some(next_preset);
             }
         }
         let payload = serde_json::to_string(cmd).unwrap_or_else(|_| format!("{cmd:?}"));
@@ -669,15 +670,17 @@ async fn process_and_deliver(
         let replacements = guard.scan(&text_after_commands);
         (entries, replacements)
     };
-    let fmt = style_preset.formatting;
-    let wants_styling = style_preset.needs_styling();
+    let fmt = style_preset
+        .as_ref()
+        .map(|p| p.formatting)
+        .unwrap_or_default();
+    let wants_styling = style_preset.is_some();
     // Deterministic correction + formatting + bypass-gate, as one span so a
     // single dictation request shows its shaping cost end-to-end.
     let Shaped {
         text_after_heuristic,
         detected_lang,
-        needs_punct,
-        gate,
+        needs_llm,
         unresolved_words,
         dropped_risks,
     } = {
@@ -692,14 +695,6 @@ async fn process_and_deliver(
             wants_styling,
         )
     };
-    let crate::gate::GateOutcome {
-        needs_correction,
-        needs_llm,
-        conf_attention,
-        too_broken,
-        min_conf,
-        avg_conf,
-    } = gate;
     let unresolved_count = unresolved_words.len();
 
     info!(%session_id, "[ASR] raw: {raw_text}");
@@ -709,14 +704,7 @@ async fn process_and_deliver(
         unresolved = unresolved_count,
         dropped_risks,
         needs_llm,
-        needs_correction,
-        conf_attention,
-        too_broken,
-        wants_styling,
-        needs_punct,
-        min_conf,
-        avg_conf,
-        "bypass gate"
+        "style gate"
     );
 
     let _ = event_tx
@@ -732,7 +720,7 @@ async fn process_and_deliver(
         info!(%session_id, "session cancelled during processing, skipping LLM");
         String::new()
     } else if !needs_llm {
-        info!(%session_id, "ASR confidence high — bypassing LLM");
+        info!(%session_id, "no style selected — skipping styling LLM");
         text_after_heuristic.clone()
     } else {
         info!(%session_id, "[LLM] input: {text_after_heuristic}");
@@ -740,7 +728,11 @@ async fn process_and_deliver(
         let timeout_secs = config.pipeline.llm_timeout_secs;
         let input = lune_core::llm::PostProcessInput {
             raw_text: text_after_heuristic.clone(),
-            style_preset: Arc::clone(&style_preset),
+            style_preset: Arc::clone(
+                style_preset
+                    .as_ref()
+                    .expect("needs_llm implies a selected style preset"),
+            ),
             app_category: None,
             dictionary: dictionary_entries.clone(),
             language: detected_lang.into(),
@@ -767,7 +759,7 @@ async fn process_and_deliver(
                 }
             }
             Ok(Err(e)) => {
-                warn!(error = %e, llm_ms = llm_t0.elapsed().as_millis() as u64, "LLM correction failed, using text as-is");
+                warn!(error = %e, llm_ms = llm_t0.elapsed().as_millis() as u64, "LLM styling failed, using text as-is");
                 text_after_heuristic
             }
             Err(_) => {
@@ -1058,12 +1050,27 @@ mod tests {
         asr: A,
         post_processor: Arc<dyn TextPostProcessor>,
     ) -> (SessionManager<A>, Arc<Mutex<Database>>) {
+        make_manager_with_settings(
+            asr,
+            post_processor,
+            lune_core::config::UserSettings::default(),
+        )
+    }
+
+    /// Like [`make_manager`] but with caller-supplied settings — used by tests
+    /// that need the styling LLM to run (it runs iff a style is selected, i.e.
+    /// `default_style` is `Some`).
+    fn make_manager_with_settings<A: AsrBackend + 'static>(
+        asr: A,
+        post_processor: Arc<dyn TextPostProcessor>,
+        user_settings: lune_core::config::UserSettings,
+    ) -> (SessionManager<A>, Arc<Mutex<Database>>) {
         lune_dict::lexicon::warm();
         let db = lune_persist::Database::open_in_memory().unwrap();
         let dict =
             lune_dict::DictionaryManager::new(lune_persist::Database::open_in_memory().unwrap())
                 .unwrap();
-        let settings = Arc::new(RwLock::new(lune_core::config::UserSettings::default()));
+        let settings = Arc::new(RwLock::new(user_settings));
         let db = Arc::new(Mutex::new(db));
 
         let manager = SessionManager::new(
@@ -1260,7 +1267,7 @@ mod tests {
         let shaped = correct_and_format(
             "hello world",
             &segments,
-            &[] as &[(String, String)],
+            &[] as &[lune_dict::DictMatch],
             &heuristic,
             &pipeline,
             &fmt,
@@ -1365,9 +1372,14 @@ mod tests {
                     word: "qxvtm".into(),
                     confidence: 0.2,
                     word_error_risk: 0.9,
+                    mean_confidence: 0.2,
                 }];
                 let responses = vec![Ok(vec![segment])];
-                let (mgr, db) = make_manager(scripted_asr(responses), post);
+                // The styling LLM runs only when a style is selected; setting
+                // "casual" enables it, so the cancel-during-LLM path is exercised.
+                let mut settings = lune_core::config::UserSettings::default();
+                settings.default_style = Some("casual".into());
+                let (mgr, db) = make_manager_with_settings(scripted_asr(responses), post, settings);
                 let (tx, rx) = mpsc::channel(32);
                 let session_id = mgr.start_with_audio(tx, speech_stream()).await.unwrap();
 

@@ -9,7 +9,10 @@ const DEFAULT_MEASURE_ITERS: usize = 10;
 struct Workload {
     name: &'static str,
     text: &'static str,
-    risks: &'static [(&'static str, f32)],
+    // (word, risk, mean_confidence). `mean_confidence = 1.0 - risk` keeps
+    // the mean-vs-min corroboration in corrector.rs a no-op for these
+    // synthetic workloads (matches today's pre-corroboration behavior).
+    risks: &'static [(&'static str, f32, f32)],
     replacements: &'static [(&'static str, &'static str)],
     lang: &'static str,
 }
@@ -125,17 +128,21 @@ fn percentile(samples: &[Duration], percentile: usize) -> Duration {
     samples[idx]
 }
 
-fn owned_pairs_f32(pairs: &[(&str, f32)]) -> Vec<(String, f32)> {
+fn owned_pairs_f32(pairs: &[(&str, f32, f32)]) -> Vec<(String, f32, f32)> {
     pairs
         .iter()
-        .map(|(word, score)| ((*word).to_owned(), *score))
+        .map(|(word, risk, mean)| ((*word).to_owned(), *risk, *mean))
         .collect()
 }
 
-fn owned_pairs_str(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
+fn owned_pairs_str(pairs: &[(&str, &str)]) -> Vec<lune_dict::DictMatch> {
     pairs
         .iter()
-        .map(|(from, to)| ((*from).to_owned(), (*to).to_owned()))
+        .map(|(from, to)| lune_dict::DictMatch {
+            matched: (*from).to_owned(),
+            replacement: (*to).to_owned(),
+            fuzzy: false,
+        })
         .collect()
 }
 
@@ -159,10 +166,10 @@ fn workloads() -> [Workload; 5] {
             name: "flagged_domain",
             text: "the websocket conection failed after roblox refreshed the auth token for lune voice",
             risks: &[
-                ("websocket", 0.75),
-                ("conection", 0.90),
-                ("roblox", 0.70),
-                ("lune", 0.65),
+                ("websocket", 0.75, 0.25),
+                ("conection", 0.90, 0.10),
+                ("roblox", 0.70, 0.30),
+                ("lune", 0.65, 0.35),
             ],
             replacements: &[],
             lang: "en",
@@ -170,7 +177,7 @@ fn workloads() -> [Workload; 5] {
         Workload {
             name: "dict_replacements",
             text: "helo world please open teh github issue and tag lune voice in the summary",
-            risks: &[("helo", 0.82), ("teh", 0.78)],
+            risks: &[("helo", 0.82, 0.18), ("teh", 0.78, 0.22)],
             replacements: &[("helo", "hello"), ("github", "GitHub")],
             lang: "en",
         },

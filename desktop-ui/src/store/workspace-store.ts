@@ -472,7 +472,11 @@ export function getTodayStats(state: WorkspaceState): TodayStats {
 // ── Internal helpers ──────────────────────────────────────────────────
 
 function formatError(error: unknown) {
-  return error instanceof Error ? error.message : 'Unable to reach the desktop backend.';
+  // Tauri rejects a backend `Err(String)` as a plain string (not an Error), so
+  // surface those directly instead of masking them with the generic fallback.
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string' && error.trim().length > 0) return error;
+  return 'Unable to reach the desktop backend.';
 }
 
 function reduceSessionEvent(

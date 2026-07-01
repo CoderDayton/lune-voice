@@ -89,11 +89,6 @@ pub struct StylePreset {
     /// Template with `{raw_text}` slot.
     pub user_prompt_template: String,
     pub few_shot_pairs: Vec<(String, String)>,
-    /// When `true`, the styling LLM pass is skipped — only the correction pass
-    /// runs. The natural carrier for "this preset is correction-only".
-    /// Decouples behavior from the historical `id == "minimal"` sentinel.
-    #[serde(default)]
-    pub skip_styling: bool,
     /// Per-style deterministic formatting toggles (keybinds, title
     /// abbreviations, auto-capitalization, brand casing). Default: all on.
     #[serde(default)]
@@ -134,7 +129,6 @@ impl StyleRegistry {
 
 static REGISTRY: LazyLock<StyleRegistry> = LazyLock::new(|| {
     let builtins = [
-        StylePreset::minimal(),
         StylePreset::casual(),
         StylePreset::professional(),
         StylePreset::formal(),
@@ -160,12 +154,6 @@ impl StylePreset {
     /// Backward-compat shim: returns all builtin presets as a static slice of Arcs.
     pub fn all_builtin() -> &'static [Arc<StylePreset>] {
         builtin_registry().all()
-    }
-
-    /// Whether this preset requires a separate styling pass.
-    /// Driven by `skip_styling` so behavior is not coupled to a magic ID.
-    pub fn needs_styling(&self) -> bool {
-        !self.skip_styling
     }
 
     /// Build a self-contained user prompt for the styling-only pass.
@@ -220,7 +208,6 @@ impl StylePreset {
                     "he asked if i was coming. i said yes.".into(),
                 ),
             ],
-            skip_styling: false,
             formatting: FormatToggles::default(),
         }
     }
@@ -247,7 +234,6 @@ impl StylePreset {
                     "The deploy broke last night due to a configuration issue. Mike fixed it around 2 AM.".into(),
                 ),
             ],
-            skip_styling: false,
             formatting: FormatToggles::default(),
         }
     }
@@ -274,35 +260,6 @@ impl StylePreset {
                     "I am writing to inquire about the current status of the project.".into(),
                 ),
             ],
-            skip_styling: false,
-            formatting: FormatToggles::default(),
-        }
-    }
-
-    /// Minimal — fix only clearly wrong words, preserve everything else verbatim.
-    pub fn minimal() -> Self {
-        Self {
-            id: "minimal".into(),
-            name: "Minimal".into(),
-            description: "Error fixes only, no AI styling".into(),
-            style_instructions:
-                "Only fix clearly wrong words. Do not add, remove, or rephrase anything.".into(),
-            user_prompt_template: "{raw_text}".into(),
-            few_shot_pairs: vec![
-                (
-                    "I was going to the store and I seen a dog".into(),
-                    "I was going to the store and I saw a dog.".into(),
-                ),
-                (
-                    "she don't even know what happened its crazy".into(),
-                    "She don't even know what happened, it's crazy.".into(),
-                ),
-                (
-                    "the whether is nice today I think we should go outside".into(),
-                    "The weather is nice today, I think we should go outside.".into(),
-                ),
-            ],
-            skip_styling: true,
             formatting: FormatToggles::default(),
         }
     }
@@ -325,7 +282,6 @@ impl StylePreset {
                     "The `UserProfile` class needs a `get_by_id` method that returns an `Optional<User>`.".into(),
                 ),
             ],
-            skip_styling: false,
             formatting: FormatToggles::default(),
         }
     }
@@ -348,7 +304,6 @@ impl StylePreset {
                     "The problem is that it scales poorly. Once you hit ten thousand users, things start to break down.".into(),
                 ),
             ],
-            skip_styling: false,
             formatting: FormatToggles::default(),
         }
     }

@@ -214,7 +214,6 @@ pub fn create_custom_style(input: CreateCustomStyleInput) -> Result<WorkspaceSna
         style_instructions: instructions,
         user_prompt_template: "{raw_text}".into(),
         few_shot_pairs: Vec::new(),
-        skip_styling: false,
         formatting: input.formatting.into(),
     });
     save_settings(&paths, &settings)?;
@@ -252,8 +251,8 @@ pub fn delete_custom_style(style_id: String) -> Result<WorkspaceSnapshot, String
         .position(|s| s.id == style_id)
         .ok_or_else(|| format!("custom style not found: {style_id}"))?;
     settings.custom_styles.remove(idx);
-    if settings.default_style == style_id {
-        settings.default_style = "casual".into();
+    if settings.default_style.as_deref() == Some(style_id.as_str()) {
+        settings.default_style = None;
     }
     save_settings(&paths, &settings)?;
     let mut database = open_database(&paths)?;
@@ -291,7 +290,8 @@ fn build_snapshot(
             ended_at: session.ended_at.map(|ended| ended.to_rfc3339()),
             transcript: session.transcript.unwrap_or_default(),
             backend: format!("{:?}", session.backend),
-            style: session.style,
+            // Empty string = no styling (the session's `style` was `None`).
+            style: session.style.unwrap_or_default(),
             status: session_status_label(&session.status),
         })
         .collect();
@@ -495,17 +495,22 @@ fn apply_settings_dto(
     settings.pipeline.speech_threshold = Some(input.speech_threshold);
     settings.pipeline.speech_threshold_end = Some(input.speech_threshold_end);
 
-    // Validate style_preset — reject empty or excessively long values.
-    let style = input.style_preset.trim();
-    if style.is_empty() || style.len() > 128 {
-        return Err("stylePreset must be 1–128 characters".into());
-    }
-    let is_known = builtin_registry().get(style).is_some()
-        || settings.custom_styles.iter().any(|s| s.id == style);
-    if !is_known {
-        return Err(format!("unknown stylePreset: {style}"));
-    }
-    settings.default_style = style.to_owned();
+    // Validate style_preset — `None`/empty means no styling (raw transcript);
+    // any present value must be a known builtin or custom style.
+    settings.default_style = match input.style_preset.as_deref().map(str::trim) {
+        None | Some("") => None,
+        Some(style) => {
+            if style.len() > 128 {
+                return Err("stylePreset must be 1–128 characters".into());
+            }
+            let is_known = builtin_registry().get(style).is_some()
+                || settings.custom_styles.iter().any(|s| s.id == style);
+            if !is_known {
+                return Err(format!("unknown stylePreset: {style}"));
+            }
+            Some(style.to_owned())
+        }
+    };
 
     settings.hotkey = HotkeyConfig {
         toggle_dictation: parse_key_combo(&input.hotkey_toggle)?,
@@ -867,7 +872,7 @@ mod tests {
         let mut settings = UserSettings::default();
 
         let mut input = default_save_input();
-        input.style_preset = "not-a-style".into();
+        input.style_preset = Some("not-a-style".into());
         assert!(apply_settings_dto(&mut settings, input).is_err());
 
         let mut input = default_save_input();

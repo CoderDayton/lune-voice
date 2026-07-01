@@ -160,7 +160,7 @@ export function SessionDetailContent({ session }: { session: HistorySession }) {
           <MetaItem icon={Hash} label={t`Words`} value={String(session.words)} />
           <MetaItem icon={Clock} label={t`Duration`} value={formatDuration(session.seconds)} />
           <MetaItem icon={Mic} label={t`Engine`} value={formatBackend(session.backend)} />
-          <MetaItem icon={Palette} label={t`Style`} value={session.style} />
+          <MetaItem icon={Palette} label={t`Style`} value={session.style || t`None`} />
         </div>
         <div className="mt-3 flex items-center gap-3 text-sm text-content-subtle">
           {isCompleted ? (

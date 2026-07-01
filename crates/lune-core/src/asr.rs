@@ -6,9 +6,24 @@ use crate::Result;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WordConfidence {
     pub word: String,
+    /// MIN token probability across this word's underlying ASR tokens.
     pub confidence: f32,
     #[serde(default)]
     pub word_error_risk: f32,
+    /// MEAN (not min) token confidence across the same tokens — the same
+    /// mean-vs-min pairing [`AsrSegment::is_confident_gated`] uses at the
+    /// segment level (arXiv:2407.21414: a sentence-mean threshold plus a
+    /// min-token threshold catches one bad token dragging down an otherwise
+    /// confident span), here at word granularity. Lets a downstream consumer
+    /// corroborate a high `word_error_risk` (which is MIN-derived): if the
+    /// mean is comfortably confident while the min is risky, a single
+    /// outlier token (e.g. ASR gluing a punctuation token onto the word with
+    /// no surrounding whitespace) likely caused the dip, not the word's own
+    /// content. Defaults to `0.0` (maximally risky) for older
+    /// callers/fixtures that never set it, which safely degrades any
+    /// mean-vs-min comparison back to min-only behavior.
+    #[serde(default)]
+    pub mean_confidence: f32,
 }
 
 /// A segment of recognized speech.

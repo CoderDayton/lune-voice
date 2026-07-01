@@ -60,12 +60,11 @@ mod tests {
     #[test]
     fn builtin_presets_unique_ids() {
         let presets = StylePreset::all_builtin();
-        assert_eq!(presets.len(), 6);
+        assert_eq!(presets.len(), 5);
         let ids: Vec<&str> = presets.iter().map(|p| p.id.as_str()).collect();
         assert!(ids.contains(&"casual"));
         assert!(ids.contains(&"professional"));
         assert!(ids.contains(&"formal"));
-        assert!(ids.contains(&"minimal"));
         assert!(ids.contains(&"technical"));
         assert!(ids.contains(&"writing"));
         // All IDs are unique.
@@ -102,31 +101,8 @@ mod tests {
     #[test]
     fn registry_len() {
         let reg = builtin_registry();
-        assert_eq!(reg.len(), 6);
+        assert_eq!(reg.len(), 5);
         assert!(!reg.is_empty());
-    }
-
-    #[test]
-    fn needs_styling_driven_by_skip_styling_field() {
-        assert!(!StylePreset::minimal().needs_styling());
-        assert!(StylePreset::casual().needs_styling());
-        assert!(StylePreset::technical().needs_styling());
-        // Non-"minimal" id with skip_styling=true also skips.
-        let mut p = StylePreset::casual();
-        p.skip_styling = true;
-        assert!(!p.needs_styling());
-    }
-
-    #[test]
-    fn skip_styling_defaults_to_false_on_missing_field() {
-        let json = r#"{
-            "id":"x","name":"X","description":"",
-            "style_instructions":"","user_prompt_template":"{raw_text}",
-            "few_shot_pairs":[]
-        }"#;
-        let parsed: StylePreset = serde_json::from_str(json).unwrap();
-        assert!(!parsed.skip_styling);
-        assert!(parsed.needs_styling());
     }
 
     #[test]
@@ -146,7 +122,7 @@ mod tests {
         let example = include_str!("../../../../config/settings.toml");
         let parsed: UserSettings = toml::from_str(example)
             .expect("config/settings.toml must parse against current schema");
-        assert_eq!(parsed.default_style, "minimal");
+        assert_eq!(parsed.default_style, None);
         assert_eq!(parsed.language, "auto");
         assert_eq!(parsed.dictation_language, "auto");
         assert!(parsed.mic_prewarm);

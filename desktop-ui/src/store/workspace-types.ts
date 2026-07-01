@@ -21,7 +21,8 @@ export interface WorkspaceSettings {
   copyToClipboard: boolean;
   soundCuesEnabled: boolean;
   soundCueVolume: number;
-  stylePreset: string;
+  /** Selected style preset id, or `null` for no styling (raw transcript). */
+  stylePreset: string | null;
   adaptiveVad: boolean;
   speechThreshold: string;
   speechThresholdEnd: string;
@@ -107,7 +108,7 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   copyToClipboard: false,
   soundCuesEnabled: true,
   soundCueVolume: 1.0,
-  stylePreset: 'casual',
+  stylePreset: null,
   adaptiveVad: false,
   speechThreshold: '0.50',
   speechThresholdEnd: '0.30',

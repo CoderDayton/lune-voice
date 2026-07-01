@@ -2,7 +2,6 @@ pub mod calibration;
 mod capture;
 pub mod delivery;
 pub mod events;
-mod gate;
 pub mod session;
 pub mod sound;
 #[cfg(unix)]

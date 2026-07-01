@@ -116,6 +116,10 @@ pub fn normalize_with(text: &str, fmt: &FormatToggles) -> PunctuationOutcome {
 
     let words: Vec<&str> = trimmed.split_whitespace().collect();
     let ends_terminal = ends_with_terminal(trimmed);
+    // A colon ending the segment (ignoring trailing closing quotes/brackets) is
+    // the ASR's own mark; keep it verbatim and never force a period on top of it
+    // — see the terminal block below.
+    let ends_colon = trimmed.trim_end_matches(CLOSING).ends_with(':');
     let interrogative = is_interrogative_lead(&words);
 
     // Run-on: long stretch with no internal separator or sentence break. Such a
@@ -142,7 +146,10 @@ pub fn normalize_with(text: &str, fmt: &FormatToggles) -> PunctuationOutcome {
     // internal commas when it runs). Two guards: a one-word dictation (a bare
     // word, command, or fragment) gets no period, and an interrogative lead with
     // no end mark is deferred to the LLM (`?` vs `.` can't be guessed safely).
-    if words.len() > 1 && !ends_terminal && !interrogative {
+    // A trailing colon (`ends_colon`) is left exactly as the ASR produced it: no
+    // period is appended, so we never emit the double mark ":." and never force
+    // a period where the true terminator might be a question mark.
+    if words.len() > 1 && !ends_terminal && !ends_colon && !interrogative {
         out.push('.');
     }
 
@@ -484,6 +491,31 @@ pub fn strip_fillers(text: &str) -> String {
         return text.to_owned();
     }
     kept.join(" ")
+}
+
+/// If the ENTIRE text is wrapped in a single matched pair of double quotes —
+/// straight (`"…"`) or curly (`“…”`) — remove them. Whisper sometimes quotes a
+/// whole utterance when it detects the speaker is reading/quoting aloud; the
+/// speaker dictated the content, not the quote marks. Conservative: only a
+/// matched wrapping pair with non-empty content and NO further copy of the
+/// closing quote inside is stripped, so `"a" and "b"` and one-sided quotes are
+/// left alone. Single quotes are intentionally excluded (apostrophes).
+pub fn strip_wrapping_quotes(text: &str) -> String {
+    let t = text.trim();
+    let (open, close) = match (t.chars().next(), t.chars().next_back()) {
+        (Some(o @ '"'), Some(c @ '"')) => (o, c),
+        (Some(o @ '\u{201C}'), Some(c @ '\u{201D}')) => (o, c),
+        _ => return text.to_owned(),
+    };
+    // Slice bounds from each quote's OWN byte width, so an open/close pair with
+    // differing lengths would still land on char boundaries.
+    let start = open.len_utf8();
+    let end = t.len() - close.len_utf8();
+    if end > start && !t[start..end].contains(close) {
+        t[start..end].trim().to_owned()
+    } else {
+        text.to_owned()
+    }
 }
 
 /// Lowercase the leading capital of a mid-sentence word the lexicon knows to be
@@ -902,6 +934,44 @@ mod tests {
     use super::*;
 
     #[test]
+    fn strip_wrapping_quotes_removes_whole_text_pair() {
+        assert_eq!(strip_wrapping_quotes("\"Hello world.\""), "Hello world.");
+        assert_eq!(
+            strip_wrapping_quotes(" \"Read this aloud\" "),
+            "Read this aloud"
+        );
+        // Curly quotes.
+        assert_eq!(strip_wrapping_quotes("\u{201C}Quoted\u{201D}"), "Quoted");
+    }
+
+    #[test]
+    fn strip_wrapping_quotes_leaves_partial_or_internal_quotes() {
+        // Not wrapped.
+        assert_eq!(strip_wrapping_quotes("no quotes here"), "no quotes here");
+        // One-sided.
+        assert_eq!(strip_wrapping_quotes("\"only open"), "\"only open");
+        // Internal quotes: not a single wrapping span, so left intact.
+        assert_eq!(strip_wrapping_quotes("\"a\" and \"b\""), "\"a\" and \"b\"");
+        // A quoted phrase mid-sentence is untouched (doesn't wrap the whole text).
+        assert_eq!(
+            strip_wrapping_quotes("she said \"hi\" to me"),
+            "she said \"hi\" to me"
+        );
+        // Degenerate inputs.
+        assert_eq!(strip_wrapping_quotes("\"\""), "\"\"");
+        assert_eq!(strip_wrapping_quotes("\""), "\"");
+    }
+
+    #[test]
+    fn wrapping_quotes_must_be_stripped_before_normalize() {
+        // Ordering contract: strip runs BEFORE punctuation normalization.
+        // If it ran after, normalize appends the terminal period outside the
+        // closing quote (`"…".`) and the pair is no longer detectable.
+        let corrected = strip_wrapping_quotes("\"the results were mixed\"");
+        assert_eq!(normalize(&corrected).text, "The results were mixed.");
+    }
+
+    #[test]
     fn capitalizes_and_periods_plain_declarative() {
         let out = normalize("turn on the light");
         assert_eq!(out.text, "Turn on the light.");
@@ -913,6 +983,20 @@ mod tests {
         // A bare word / command / fragment is left without a terminal period.
         assert_eq!(normalize("voice").text, "Voice");
         assert_eq!(normalize("okay").text, "Okay");
+    }
+
+    #[test]
+    fn trailing_colon_is_kept_without_added_period() {
+        // A colon ending an utterance is the ASR's own mark: keep it verbatim,
+        // with no appended period (which could be wrong — the true terminator is
+        // sometimes a question mark) and no double mark ":.".
+        assert_eq!(
+            normalize("here are the reasons:").text,
+            "Here are the reasons:"
+        );
+        assert_eq!(normalize("the reasons:").text, "The reasons:");
+        assert_eq!(normalize("how do we fix this:").text, "How do we fix this:");
+        assert_eq!(normalize("note:").text, "Note:");
     }
 
     #[test]

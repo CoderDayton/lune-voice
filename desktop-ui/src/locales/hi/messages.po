@@ -20,7 +20,7 @@ msgid "{0} of {1}"
 msgstr "{0} का {1}"
 
 #. placeholder {0}: presets.length
-#: src/features/styles/styles-page.tsx:168
+#: src/features/styles/styles-page.tsx:190
 msgid "{0} presets"
 msgstr "{0} प्रीसेट"
 
@@ -333,7 +333,7 @@ msgstr "सुधार संवेदनशीलता"
 msgid "Couldn't add that rule. Try again."
 msgstr "वह नियम नहीं जोड़ा जा सका. पुनः प्रयास करें।"
 
-#: src/features/styles/styles-page.tsx:197
+#: src/features/styles/styles-page.tsx:222
 msgid "Create new style"
 msgstr "नई शैली बनाएं"
 
@@ -520,6 +520,10 @@ msgstr "ख़ाली सत्र"
 #: src/features/settings/sections/transcription-section.tsx:104
 msgid "Enable correction LLM"
 msgstr "सुधार एलएलएम सक्षम करें"
+
+#: src/features/styles/styles-page.tsx:163
+msgid "Enable styling"
+msgstr ""
 
 #: src/features/history/components/history-table.tsx:130
 #: src/features/history/components/session-detail-modal.tsx:162
@@ -794,6 +798,11 @@ msgstr "अभी तक कोई सत्र नहीं। यहाँ अ
 msgid "No transcript"
 msgstr "कोई टेक्स्ट नहीं"
 
+#: src/features/history/components/history-table.tsx:293
+#: src/features/history/components/session-detail-modal.tsx:163
+msgid "None"
+msgstr ""
+
 #: src/features/settings/sections/dictation-section.tsx:209
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
 msgstr "आवाज का पता लगाने से पहले माइक्रोफोन स्तर को सामान्य करता है। माइक और शोर वाले कमरों को शांत करने में मदद करता है। अनुशंसित।"
@@ -986,6 +995,10 @@ msgstr "पुन: प्रयास करें"
 msgid "Retry download"
 msgstr "पुनः डाउनलोड करने का प्रयास करें"
 
+#: src/features/styles/styles-page.tsx:165
+msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
+msgstr ""
+
 #: src/features/history/components/history-session-list.tsx:36
 #: src/features/overview/overview-page.tsx:262
 msgid "s"
@@ -1145,7 +1158,7 @@ msgstr "शैली"
 msgid "Styling"
 msgstr ""
 
-#: src/features/styles/styles-page.tsx:167
+#: src/features/styles/styles-page.tsx:189
 msgid "Switch style"
 msgstr "शैली बदलें"
 
@@ -1178,10 +1191,6 @@ msgstr "ध्वनि टाइपिंग के लिए उपयोग �
 #: src/features/settings/sections/appearance-section.tsx:76
 msgid "Theme"
 msgstr "विषय"
-
-#: src/features/settings/sections/models-section.tsx:260
-#~ msgid "This is a required model. Dictation will not work without it."
-#~ msgstr "यह एक आवश्यक मॉडल है. इसके बिना डिक्टेशन काम नहीं करेगा."
 
 #: src/features/settings/sections/models-section.tsx:307
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
@@ -1371,6 +1380,6 @@ msgstr ""
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "आपके मॉडल तैयार हैं. सब कुछ इस मशीन पर रहता है."
 
-#: src/features/styles/styles-page.tsx:199
+#: src/features/styles/styles-page.tsx:224
 msgid "Your own formatting preset"
 msgstr "आपका अपना फ़ॉर्मेटिंग प्रीसेट"

@@ -17,8 +17,9 @@
 device = "auto"
 
 # Built-in style preset applied by default.
-# Options: "casual" | "professional" | "formal" | "minimal" | "technical" | "writing"
-default_style = "minimal"
+# Options: "casual" | "professional" | "formal" | "technical" | "writing"
+# Omit (or leave unset) for no styling — the raw transcript is delivered as-is.
+# default_style = "casual"
 
 # UI language tag (BCP-47, hint only).
 # "auto" lets the app pick from system locale.

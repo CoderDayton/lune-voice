@@ -141,6 +141,9 @@ export function StylesPage() {
 
   const activeStyle = presets.find((p) => p.id === activePreset) ?? null;
   const others = presets.filter((p) => p.id !== activeStyle?.id);
+  const stylingEnabled = activePreset !== null;
+  // Style applied when the user flips styling on. Prefer a builtin so it always resolves.
+  const defaultStyleId = presets.find((p) => p.isBuiltin)?.id ?? presets[0]?.id ?? 'casual';
 
   return (
     <div className="page-stack">
@@ -155,7 +158,24 @@ export function StylesPage() {
         </>
       ) : (
         <>
-          {activeStyle && (
+          <label className="flex cursor-pointer items-center justify-between rounded-box border border-surface-border bg-surface-inset/50 p-4">
+            <div>
+              <div className="text-sm font-medium text-content-strong">{t`Enable styling`}</div>
+              <div className="mt-0.5 text-xs text-content-subtle">
+                {t`Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is.`}
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              className="toggle toggle-primary"
+              checked={stylingEnabled}
+              onChange={(e) =>
+                void saveWorkspaceSetting('stylePreset', e.target.checked ? defaultStyleId : null)
+              }
+            />
+          </label>
+
+          {stylingEnabled && activeStyle && (
             <StyleHero
               preset={activeStyle}
               onEdit={() => openModal('edit', activeStyle)}
@@ -163,12 +183,17 @@ export function StylesPage() {
             />
           )}
 
-          <div className="flex items-center justify-between pt-1">
+          <div
+            className={`flex items-center justify-between pt-1 transition-opacity ${stylingEnabled ? '' : 'opacity-40'}`}
+          >
             <span className="section-label">{t`Switch style`}</span>
             <span className="text-xs text-content-subtle">{t`${presets.length} presets`}</span>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div
+            className={`grid gap-4 transition-opacity sm:grid-cols-2 xl:grid-cols-3 ${stylingEnabled ? '' : 'pointer-events-none opacity-40'}`}
+            aria-disabled={!stylingEnabled}
+          >
             {others.map((preset) => (
               <StylePresetCard
                 key={preset.id}

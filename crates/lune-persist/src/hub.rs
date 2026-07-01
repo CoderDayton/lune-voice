@@ -86,8 +86,7 @@ impl ModelSpec {
             required_files: vec![model.ggml_file().into()],
             suffix_patterns: vec![],
             local_name: model.dir().into(),
-            description: "On-device Whisper speech-to-text (whisper.cpp). \
-                          Audio never leaves your machine.",
+            description: model.description(),
             required: false,
             role: ModelRole::SpeechToText,
         }

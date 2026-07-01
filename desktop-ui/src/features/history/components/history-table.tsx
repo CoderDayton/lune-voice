@@ -290,7 +290,7 @@ function SessionRows({ session, expanded, onToggle }: SessionRowsProps) {
               <span aria-hidden="true">·</span>
               <span>{formatBackend(session.backend)}</span>
               <span aria-hidden="true">·</span>
-              <span className="capitalize">{session.style}</span>
+              <span className="capitalize">{session.style || t`None`}</span>
               <span aria-hidden="true">·</span>
               <span>{session.status}</span>
             </div>

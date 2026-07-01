@@ -37,7 +37,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
       adaptiveVad: false,
       speechThreshold: 0.5,
       speechThresholdEnd: 0.3,
-      stylePreset: 'casual',
+      stylePreset: null,
       hotkeyToggle: 'Ctrl+Space',
       hotkeyCancel: 'Escape',
       pillVisibility: 'Always',
@@ -101,19 +101,6 @@ function createMockSnapshot(): WorkspaceSnapshot {
     })),
     stats: { sessions: 0, words: 0, seconds: 0 },
     stylePresets: [
-      {
-        id: 'minimal',
-        name: 'Minimal',
-        description: 'Error fixes only, no AI styling.',
-        isBuiltin: true,
-        instructions: '',
-        formatting: {
-          keybinds: true,
-          titleAbbreviations: true,
-          autoCapitalization: true,
-          brandCasing: true,
-        },
-      },
       {
         id: 'casual',
         name: 'Casual',
@@ -316,9 +303,7 @@ export const mockBackendClient: BackendClient = {
     mockSnapshot = {
       ...mockSnapshot,
       stylePresets: mockSnapshot.stylePresets.filter((p) => p.id !== styleId),
-      settings: wasActive
-        ? { ...mockSnapshot.settings, stylePreset: 'casual' }
-        : mockSnapshot.settings,
+      settings: wasActive ? { ...mockSnapshot.settings, stylePreset: null } : mockSnapshot.settings,
     };
     return structuredClone(mockSnapshot);
   },

@@ -20,7 +20,7 @@ msgid "{0} of {1}"
 msgstr "{1} 중 {0}"
 
 #. placeholder {0}: presets.length
-#: src/features/styles/styles-page.tsx:168
+#: src/features/styles/styles-page.tsx:190
 msgid "{0} presets"
 msgstr "{0} 사전 설정"
 
@@ -333,7 +333,7 @@ msgstr "교정 민감도"
 msgid "Couldn't add that rule. Try again."
 msgstr "해당 규칙을 추가할 수 없습니다. 다시 시도해 보세요."
 
-#: src/features/styles/styles-page.tsx:197
+#: src/features/styles/styles-page.tsx:222
 msgid "Create new style"
 msgstr "새로운 스타일 만들기"
 
@@ -520,6 +520,10 @@ msgstr "빈 세션"
 #: src/features/settings/sections/transcription-section.tsx:104
 msgid "Enable correction LLM"
 msgstr "교정 LLM 활성화"
+
+#: src/features/styles/styles-page.tsx:163
+msgid "Enable styling"
+msgstr ""
 
 #: src/features/history/components/history-table.tsx:130
 #: src/features/history/components/session-detail-modal.tsx:162
@@ -794,6 +798,11 @@ msgstr "아직 세션이 없습니다. 받아쓰기를 시작하면 여기에 �
 msgid "No transcript"
 msgstr "텍스트 없음"
 
+#: src/features/history/components/history-table.tsx:293
+#: src/features/history/components/session-detail-modal.tsx:163
+msgid "None"
+msgstr ""
+
 #: src/features/settings/sections/dictation-section.tsx:209
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
 msgstr "음성 감지 전에 마이크 레벨을 표준화합니다. 조용한 마이크와 시끄러운 방을 도와줍니다. 추천합니다."
@@ -986,6 +995,10 @@ msgstr "다시 시도"
 msgid "Retry download"
 msgstr "다운로드 다시 시도"
 
+#: src/features/styles/styles-page.tsx:165
+msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
+msgstr ""
+
 #: src/features/history/components/history-session-list.tsx:36
 #: src/features/overview/overview-page.tsx:262
 msgid "s"
@@ -1145,7 +1158,7 @@ msgstr "스타일"
 msgid "Styling"
 msgstr ""
 
-#: src/features/styles/styles-page.tsx:167
+#: src/features/styles/styles-page.tsx:189
 msgid "Switch style"
 msgstr "스타일 전환"
 
@@ -1178,10 +1191,6 @@ msgstr "음성 입력에 사용되는 주요 단축키입니다. 바인딩을 �
 #: src/features/settings/sections/appearance-section.tsx:76
 msgid "Theme"
 msgstr "테마"
-
-#: src/features/settings/sections/models-section.tsx:260
-#~ msgid "This is a required model. Dictation will not work without it."
-#~ msgstr "필수 모델입니다. 이 모델이 없으면 받아쓰기가 작동하지 않습니다."
 
 #: src/features/settings/sections/models-section.tsx:307
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
@@ -1371,6 +1380,6 @@ msgstr ""
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "모델이 준비되었습니다. 모든 것이 이 컴퓨터에 유지됩니다."
 
-#: src/features/styles/styles-page.tsx:199
+#: src/features/styles/styles-page.tsx:224
 msgid "Your own formatting preset"
 msgstr "나만의 서식 사전 설정"

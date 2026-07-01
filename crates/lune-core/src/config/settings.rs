@@ -48,7 +48,10 @@ pub struct UserSettings {
     #[serde(default)]
     pub llm_backend: LlmBackendConfig,
     pub hotkey: HotkeyConfig,
-    pub default_style: StyleId,
+    /// Selected styling preset id, or `None` for no styling (raw transcript).
+    /// Legacy configs storing the removed `"minimal"` sentinel migrate to `None`.
+    #[serde(default)]
+    pub default_style: Option<StyleId>,
     #[serde(default)]
     pub custom_styles: Vec<StylePreset>,
     /// BCP-47 tag, e.g. "en-US"
@@ -141,6 +144,11 @@ impl UserSettings {
         if self.adaptive_vad {
             self.pipeline.adaptive_vad = Some(true);
         }
+        // The "minimal" preset (a styling-off sentinel) was removed; "off" is now
+        // the absence of a selection. Map the legacy value to `None`.
+        if self.default_style.as_deref() == Some("minimal") {
+            self.default_style = None;
+        }
     }
 }
 
@@ -153,7 +161,7 @@ impl Default for UserSettings {
             },
             llm_backend: LlmBackendConfig::Disabled,
             hotkey: HotkeyConfig::default(),
-            default_style: "minimal".into(),
+            default_style: None,
             custom_styles: Vec::new(),
             language: "auto".into(),
             dictation_language: default_dictation_language(),
@@ -229,6 +237,29 @@ impl WhisperModel {
             Self::Small => "Whisper Small (q5_1)",
             Self::Medium => "Whisper Medium (q5_0)",
             Self::LargeV3Turbo => "Whisper Large v3 Turbo (q8_0)",
+        }
+    }
+
+    /// Size/accuracy-specific blurb for model-status cards. All three run
+    /// fully on-device via whisper.cpp; audio never leaves the machine.
+    pub fn description(self) -> &'static str {
+        match self {
+            Self::Small => {
+                "Fastest, lightest Whisper model (~190 MB). \
+                            Lowest accuracy of the three — best for quick \
+                            notes or low-end hardware. Runs fully on-device."
+            }
+            Self::Medium => {
+                "Balanced Whisper model (~539 MB). Good accuracy \
+                             at moderate speed — the recommended default for \
+                             most machines. Runs fully on-device."
+            }
+            Self::LargeV3Turbo => {
+                "Most accurate Whisper model (~874 MB). The \
+                                   turbo decoder keeps it fast despite its \
+                                   size — best for accents, jargon, or noisy \
+                                   audio. Runs fully on-device."
+            }
         }
     }
 }

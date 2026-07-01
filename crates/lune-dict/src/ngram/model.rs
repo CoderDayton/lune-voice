@@ -1,16 +1,13 @@
-//! N-gram language model: training, scoring, persistence, ASR rerank.
+//! N-gram language model: training, scoring, persistence.
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 
-use super::candidates::{AsrCandidateInput, AsrCandidateScore, AsrRerankWeights, CandidateScore};
+use super::candidates::CandidateScore;
 use super::scoring::{InterpolationWeights, ScoringConfig};
-use super::tokenize::{
-    acoustic_shape, last_or_start, last_two_or_start, lexical_similarity, minmax_normalize,
-    normalize_similarity_text, normalize_word_or_boundary, tokenize,
-};
+use super::tokenize::{last_or_start, last_two_or_start, normalize_word_or_boundary, tokenize};
 #[cfg(feature = "training")]
 use super::training::{CorpusConfig, CorpusFetch, fetch_wordnik_corpus};
 use super::{AnyError, END, MODEL_FORMAT_VERSION, START};
@@ -257,109 +254,6 @@ impl NGramModel {
         self.rank_candidates(prefix, candidates).into_iter().next()
     }
 
-    pub fn rerank_asr_candidates<I, C>(
-        &self,
-        prefix: &str,
-        observed_slot: &str,
-        candidates: I,
-        weights: AsrRerankWeights,
-    ) -> Result<Vec<AsrCandidateScore>, AnyError>
-    where
-        I: IntoIterator<Item = C>,
-        C: Into<AsrCandidateInput>,
-    {
-        let weights = weights.validate()?;
-        let inputs: Vec<AsrCandidateInput> = candidates.into_iter().map(Into::into).collect();
-        if inputs.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        let ngram_scores: Vec<CandidateScore> = inputs
-            .iter()
-            .map(|candidate| self.score_candidate(prefix, &candidate.text))
-            .collect();
-        let raw_ngram: Vec<f64> = ngram_scores
-            .iter()
-            .map(|score| score.avg_log_prob)
-            .collect();
-        let normalized_ngram = minmax_normalize(&raw_ngram);
-
-        let acoustic_available = inputs
-            .iter()
-            .any(|candidate| candidate.acoustic_score.is_some());
-        let acoustic_values: Vec<f64> = inputs
-            .iter()
-            .map(|candidate| candidate.acoustic_score.unwrap_or(f64::NEG_INFINITY))
-            .collect();
-        let normalized_acoustic = if acoustic_available {
-            Some(minmax_normalize(&acoustic_values))
-        } else {
-            None
-        };
-
-        let observed_norm = normalize_similarity_text(observed_slot);
-        let observed_key = acoustic_shape(observed_slot);
-
-        let active_acoustic_weight = if acoustic_available {
-            weights.acoustic
-        } else {
-            0.0
-        };
-        let total_weight = weights.ngram + active_acoustic_weight + weights.edit + weights.phonetic;
-
-        let mut scores = Vec::with_capacity(inputs.len());
-        for (idx, input) in inputs.into_iter().enumerate() {
-            let candidate_norm = normalize_similarity_text(&input.text);
-            let candidate_key = acoustic_shape(&input.text);
-            let edit_similarity = lexical_similarity(&observed_norm, &candidate_norm);
-            let phonetic_similarity = lexical_similarity(&observed_key, &candidate_key);
-            let acoustic_component = normalized_acoustic
-                .as_ref()
-                .map(|scores| scores[idx])
-                .unwrap_or(0.0);
-
-            let final_score = ((weights.ngram * normalized_ngram[idx])
-                + (active_acoustic_weight * acoustic_component)
-                + (weights.edit * edit_similarity)
-                + (weights.phonetic * phonetic_similarity))
-                / total_weight.max(f64::MIN_POSITIVE);
-
-            scores.push(AsrCandidateScore {
-                candidate: input.text,
-                tokens: ngram_scores[idx].tokens.clone(),
-                final_score,
-                ngram_log_prob: ngram_scores[idx].log_prob,
-                ngram_avg_log_prob: ngram_scores[idx].avg_log_prob,
-                normalized_ngram: normalized_ngram[idx],
-                acoustic_score: input.acoustic_score,
-                normalized_acoustic: normalized_acoustic.as_ref().map(|scores| scores[idx]),
-                edit_similarity,
-                phonetic_similarity,
-                candidate_phonetic_key: candidate_key,
-            });
-        }
-
-        scores.sort_by(|a, b| b.final_score.total_cmp(&a.final_score));
-        Ok(scores)
-    }
-
-    pub fn best_asr_candidate<I, C>(
-        &self,
-        prefix: &str,
-        observed_slot: &str,
-        candidates: I,
-        weights: AsrRerankWeights,
-    ) -> Result<Option<AsrCandidateScore>, AnyError>
-    where
-        I: IntoIterator<Item = C>,
-        C: Into<AsrCandidateInput>,
-    {
-        Ok(self
-            .rerank_asr_candidates(prefix, observed_slot, candidates, weights)?
-            .into_iter()
-            .next())
-    }
-
     pub fn score_phrase_avg_logprob(&self, phrase: &str) -> f64 {
         self.score_candidate("", phrase).avg_log_prob
     }
@@ -504,50 +398,11 @@ mod tests {
     }
 
     #[test]
-    fn asr_reranker_blends_ngram_and_similarity_features() {
-        let model = trained_test_model();
-        let ranked = model
-            .rerank_asr_candidates(
-                "play some",
-                "black",
-                ["black", "roblox"],
-                AsrRerankWeights::transcript_default(),
-            )
-            .unwrap();
-
-        assert_eq!(ranked[0].candidate, "roblox");
-        assert!(ranked[0].final_score >= ranked[1].final_score);
-    }
-
-    #[test]
     fn load_bundled_model() {
         let model = NGramModel::load_bundled().unwrap();
         assert!(model.vocabulary_size() > 100);
         let prob = model.interpolated_prob(&["the".to_string()], "quick");
         assert!(prob > 0.0);
-    }
-
-    #[test]
-    fn acoustic_score_can_override_when_weighted_heavily() {
-        let model = trained_test_model();
-        let ranked = model
-            .rerank_asr_candidates(
-                "play some",
-                "black",
-                [
-                    AsrCandidateInput::with_acoustic_score("black", 0.95),
-                    AsrCandidateInput::with_acoustic_score("roblox", 0.10),
-                ],
-                AsrRerankWeights {
-                    ngram: 0.10,
-                    acoustic: 0.80,
-                    edit: 0.05,
-                    phonetic: 0.05,
-                },
-            )
-            .unwrap();
-
-        assert_eq!(ranked[0].candidate, "black");
     }
 
     #[test]

@@ -28,9 +28,9 @@ pub struct WhisperCppConfig {
     /// Offload to GPU. Only meaningful when built with `whisper-cuda`; on a
     /// CPU-only build whisper-rs ignores it and runs on the CPU.
     pub use_gpu: bool,
-    /// Path to the ggml silero VAD model. When set and present, whisper.cpp's
-    /// built-in VAD gates the buffer before decode (drops non-speech); when
-    /// `None` or missing, the raw buffer is decoded as-is.
+    /// Path to the standalone silero VAD ggml model, used to endpoint-trim the
+    /// buffer (drop leading/trailing silence) before decode. `None`/missing =>
+    /// the full buffer is decoded.
     pub vad_model_path: Option<PathBuf>,
 }
 
@@ -40,23 +40,71 @@ mod imp {
 
     use std::sync::Mutex;
 
-    use lune_core::asr::{AsrBackend, AsrSegment};
+    use lune_core::asr::{AsrBackend, AsrSegment, WordConfidence};
     use lune_core::error::Error;
     use whisper_rs::{
         FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperState,
-        WhisperVadParams,
+        WhisperVadContext, WhisperVadContextParams, WhisperVadParams,
     };
+
+    /// Primes the decoder's preceding-context with a short, well-punctuated
+    /// sample so it carries that style into the transcript. whisper infers
+    /// punctuation partly from this context; without it, long dictations decode
+    /// as run-ons. Generic on purpose so it never leaks into short utterances.
+    const PUNCTUATION_PROMPT: &str =
+        "Okay, let's begin. Here are my notes, thoughts, and questions:";
 
     /// Cap decode threads. whisper.cpp scales sub-linearly past a handful of
     /// threads and we don't want to starve the audio/UI threads.
     const MAX_THREADS: usize = 8;
 
+    /// Sample rate of whisper input audio (16 kHz mono f32).
+    const SAMPLE_RATE: usize = 16_000;
+
+    /// Padding kept on each side of the VAD speech span when endpoint-trimming,
+    /// so soft onsets/offsets aren't clipped and the first word keeps lead-in.
+    const VAD_PAD_MS: usize = 240;
+
+    /// Push a finished word's confidence — both the weakest token in the word
+    /// (so a single garbled token flags the whole word) and the mean across
+    /// the same tokens (so a downstream consumer can tell a uniformly-risky
+    /// word apart from one outlier token dragging an otherwise-fine word
+    /// down, e.g. a glued punctuation token — see `WordConfidence::mean_confidence`)
+    /// — and reset the accumulators. Whitespace-only words are dropped.
+    fn flush_word(
+        words: &mut Vec<WordConfidence>,
+        word: &mut String,
+        word_min: &mut f32,
+        word_sum: &mut f32,
+        word_count: &mut u32,
+    ) {
+        let trimmed = word.trim();
+        if !trimmed.is_empty() {
+            let confidence = (*word_min).clamp(0.0, 1.0);
+            let mean_confidence = if *word_count > 0 {
+                (*word_sum / *word_count as f32).clamp(0.0, 1.0)
+            } else {
+                confidence
+            };
+            words.push(WordConfidence {
+                word: trimmed.to_string(),
+                confidence,
+                word_error_risk: 1.0 - confidence,
+                mean_confidence,
+            });
+        }
+        word.clear();
+        *word_min = 1.0;
+        *word_sum = 0.0;
+        *word_count = 0;
+    }
+
     pub struct WhisperCppBackend {
         ctx: WhisperContext,
         n_threads: i32,
-        /// Validated ggml VAD model path (already confirmed to exist), or `None`
-        /// to decode without VAD.
-        vad_model_path: Option<std::path::PathBuf>,
+        /// Standalone silero VAD for endpoint trimming (loaded once, reused).
+        /// `None` => decode the full buffer (model absent or failed to load).
+        vad: Option<Mutex<WhisperVadContext>>,
     }
 
     /// Mutable per-session state behind the handle's `Mutex`.
@@ -73,6 +121,12 @@ mod imp {
     impl WhisperCppBackend {
         #[cold]
         pub fn new(config: WhisperCppConfig) -> Result<Self> {
+            // Route whisper.cpp + ggml native logs into `tracing` (whisper-rs
+            // `tracing_backend`) instead of raw stderr, so they obey the global
+            // log filter (quiet by default). Idempotent; runs once per process.
+            static LOG_HOOK: std::sync::Once = std::sync::Once::new();
+            LOG_HOOK.call_once(whisper_rs::install_logging_hooks);
+
             let mut params = WhisperContextParameters::default();
             params.use_gpu(config.use_gpu);
             let ctx = WhisperContext::new_with_params(&config.model_path, params).map_err(|e| {
@@ -84,19 +138,30 @@ mod imp {
             let n_threads = std::thread::available_parallelism()
                 .map(|n| n.get().min(MAX_THREADS) as i32)
                 .unwrap_or(4);
-            // Validate the VAD model once up front: a configured-but-missing
-            // path degrades to raw decode (warn) instead of failing per-utterance.
-            let vad_model_path = config.vad_model_path.filter(|p| {
-                let ok = p.exists();
-                if !ok {
-                    tracing::warn!(path = %p.display(), "whisper VAD model missing; decoding without VAD");
+            // Load the standalone silero VAD once for endpoint trimming. A
+            // missing/failed model degrades to full-buffer decode (warn once).
+            let vad = config.vad_model_path.and_then(|path| {
+                if !path.exists() {
+                    tracing::warn!(path = %path.display(), "whisper VAD model missing; decoding without endpoint trim");
+                    return None;
                 }
-                ok
+                let mut vp = WhisperVadContextParams::default();
+                // Always run the VAD on CPU: silero is tiny (no GPU benefit) and
+                // standing up a second CUDA context at init is a crash source.
+                vp.set_use_gpu(false);
+                vp.set_n_threads(n_threads);
+                match WhisperVadContext::new(&path.to_string_lossy(), vp) {
+                    Ok(v) => Some(Mutex::new(v)),
+                    Err(e) => {
+                        tracing::warn!(error = %e, "failed to load whisper VAD; decoding without endpoint trim");
+                        None
+                    }
+                }
             });
             Ok(Self {
                 ctx,
                 n_threads,
-                vad_model_path,
+                vad,
             })
         }
     }
@@ -159,20 +224,57 @@ mod imp {
             params.set_print_progress(false);
             params.set_print_realtime(false);
             params.set_print_timestamps(false);
+            // Prime punctuation/casing style.
+            params.set_initial_prompt(PUNCTUATION_PROMPT);
 
-            // whisper.cpp's built-in (silero ggml) VAD: gate the buffer to speech
-            // spans before decode. The path is validated at construction.
-            // `set_vad_model_path` must precede `enable_vad` (which panics on a
-            // null path).
-            if let Some(vad_path) = self.vad_model_path.as_deref() {
-                let vad_str = vad_path.to_string_lossy();
-                params.set_vad_model_path(Some(&vad_str));
-                params.enable_vad(true);
-                params.set_vad_params(WhisperVadParams::default());
+            // Endpoint-trim with whisper's own (standalone) silero VAD: decode
+            // only [first speech onset .. last offset] + padding as ONE
+            // contiguous slice. Drops leading/trailing silence (less
+            // hallucination; anchors the decode at the first word) while
+            // preserving every INTERNAL pause — the cue whisper uses for
+            // punctuation. We deliberately avoid the in-decode `enable_vad`,
+            // which concatenates speech spans and strips those pauses → run-ons.
+            enum VadTrim {
+                Speech(usize, usize),
+                Silence,
+                Full,
             }
+            let trim = self
+                .vad
+                .as_ref()
+                .and_then(|m| m.lock().ok())
+                .map(|mut vad| {
+                    match vad.segments_from_samples(WhisperVadParams::default(), audio.as_slice()) {
+                        Ok(segs) if segs.num_segments() > 0 => {
+                            let last = segs.num_segments() - 1;
+                            let start_cs = segs.get_segment_start_timestamp(0).unwrap_or(0.0);
+                            let end_cs = segs.get_segment_end_timestamp(last).unwrap_or(0.0);
+                            let to_sample = |cs: f32| (cs * SAMPLE_RATE as f32 / 100.0) as isize;
+                            let pad = (VAD_PAD_MS * SAMPLE_RATE / 1000) as isize;
+                            let start = (to_sample(start_cs) - pad).max(0) as usize;
+                            let end = ((to_sample(end_cs) + pad).max(0) as usize).min(audio.len());
+                            VadTrim::Speech(start, end)
+                        }
+                        Ok(_) => VadTrim::Silence,
+                        Err(e) => {
+                            tracing::warn!(error = %e, "whisper VAD failed; decoding full buffer");
+                            VadTrim::Full
+                        }
+                    }
+                })
+                .unwrap_or(VadTrim::Full);
+
+            let decode_slice: &[f32] = match trim {
+                VadTrim::Speech(start, end) if start < end => &audio[start..end],
+                VadTrim::Silence => {
+                    audio.clear();
+                    return Ok(Vec::new());
+                }
+                _ => audio.as_slice(),
+            };
 
             state
-                .full(params, audio.as_slice())
+                .full(params, decode_slice)
                 .map_err(|e| Error::asr(format!("whisper inference: {e}")))?;
             // Drain the decoded audio so a repeat poll can't re-emit it (matches
             // Qwen3's take-on-poll contract); capacity is retained for reuse.
@@ -192,24 +294,57 @@ mod imp {
                     continue;
                 }
 
-                // Fold per-token probabilities into the gate's confidence fields.
-                // Skip whisper's special tokens (rendered "[_...]"): their p≈1.0
-                // would inflate the mean.
+                // Fold per-token probabilities into the segment confidence AND
+                // group tokens into per-word confidences — whisper marks a new
+                // word with a leading-space token. Per-word values feed the
+                // corrector's risk gating (which protects uncertain words and
+                // drives `unresolved_words`); leaving them empty made that gating
+                // inert. Special tokens ("[_...]", p≈1.0) are skipped so they
+                // don't inflate the mean.
                 let mut sum = 0.0f32;
                 let mut count = 0u32;
                 let mut min_p = 1.0f32;
+                let mut word_confidences: Vec<WordConfidence> = Vec::new();
+                let mut cur_word = String::new();
+                let mut cur_min = 1.0f32;
+                let mut cur_sum = 0.0f32;
+                let mut cur_count = 0u32;
                 for j in 0..seg.n_tokens() {
                     let Some(tok) = seg.get_token(j) else {
                         continue;
                     };
-                    if matches!(tok.to_str_lossy(), Ok(s) if s.starts_with("[_")) {
+                    let Ok(piece) = tok.to_str_lossy() else {
+                        continue;
+                    };
+                    if piece.starts_with("[_") {
                         continue;
                     }
                     let p = tok.token_probability();
                     sum += p;
                     min_p = min_p.min(p);
                     count += 1;
+                    // A leading space begins a new word — flush the previous one.
+                    if piece.starts_with(' ') {
+                        flush_word(
+                            &mut word_confidences,
+                            &mut cur_word,
+                            &mut cur_min,
+                            &mut cur_sum,
+                            &mut cur_count,
+                        );
+                    }
+                    cur_word.push_str(&piece);
+                    cur_min = cur_min.min(p);
+                    cur_sum += p;
+                    cur_count += 1;
                 }
+                flush_word(
+                    &mut word_confidences,
+                    &mut cur_word,
+                    &mut cur_min,
+                    &mut cur_sum,
+                    &mut cur_count,
+                );
                 let (confidence, min_token_confidence) = if count == 0 {
                     (None, None)
                 } else {
@@ -222,7 +357,7 @@ mod imp {
                     id,
                     confidence,
                     min_token_confidence,
-                    word_confidences: Vec::new(),
+                    word_confidences,
                     is_final: true,
                     // whisper timestamps are in centiseconds (10 ms units).
                     start_ms: Some((seg.start_timestamp().max(0) as u64) * 10),

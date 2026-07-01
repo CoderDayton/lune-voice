@@ -16,7 +16,9 @@ backend autodetection and no external inference server** (no `llama-server`).
 Releases are **prebuilt per platform + backend** and shipped as finished Tauri
 bundles. **End users never compile** anything. Each artifact is built on a runner
 that has the matching toolchain (and, for GPU artifacts, the matching SDK), with
-the backend feature set **explicitly** — never auto-detected from the build host.
+the backend feature set **pinned explicitly per target** — release runners pass
+`--env BACKEND` so each artifact is reproducible. (A bare local `cgs build`
+instead auto-detects the build host; see Build commands.)
 
 Models are **external assets**: GGUF / GGML files are downloaded at runtime into
 the application models directory (`~/.local/share/lune-voice/models/` on Linux)
@@ -52,32 +54,41 @@ build and the platform's Tauri/WebView prerequisites.
 
 ## Build commands
 
-CPU and CUDA builds are wired into `cgs build` (explicit, no autodetection):
+`cgs build` has two profiles. The default is a **native** build tuned to the
+build host (fast, low memory); **release artifacts** must add `--env PORTABLE=1`.
+Backend (CPU vs CUDA) auto-detects unless pinned with `--env BACKEND`.
 
 ```bash
-# Linux/Windows CPU (portable AVX2 baseline) — the default:
-cgs build                       # == BACKEND=cpu
-cgs build --env BACKEND=cpu
+# Local build (default): NATIVE — ggml targets only this machine's CPU + GPU
+# arch. ~8x smaller CUDA compile, won't exhaust RAM. NOT portable to other HW.
+cgs build
 
-# Linux/Windows CUDA (NVIDIA; build host needs the CUDA Toolkit):
-cgs build --env BACKEND=cuda
+# Distributable release artifact (what CI uses, per target): PORTABLE —
+# AVX2 CPU baseline + every common NVIDIA CUDA arch (heavy; needs lots of RAM).
+cgs build --env PORTABLE=1 --env BACKEND=cpu
+cgs build --env PORTABLE=1 --env BACKEND=cuda
 ```
+
+> **Why two profiles:** with `GGML_NATIVE=OFF` (PORTABLE) ggml compiles ~8 CUDA
+> architectures; at high `-j` each `nvcc`/`cicc` job needs several GB and the
+> build can exhaust RAM and crash (`cicc` SIGSEGV). Native builds one arch and
+> avoids this. For PORTABLE on a many-core host, cap jobs with `CARGO_BUILD_JOBS`.
 
 Under the hood that runs, from `desktop-ui/`:
 
 ```bash
-# CPU
-GGML_NATIVE=OFF GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON \
-  bun tauri build --features "whisper-cpp llama-cpp"
+# Native (default): tuned to this machine's CPU + GPU
+GGML_NATIVE=ON bun tauri build --features "whisper-cuda llama-cuda"
 
-# CUDA
+# Portable (PORTABLE=1): portable CPU baseline + all common CUDA archs
 GGML_NATIVE=OFF GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON \
   bun tauri build --features "whisper-cuda llama-cuda"
 ```
 
-`GGML_NATIVE=OFF` + the explicit AVX2/FMA/F16C flags force a portable CPU
-baseline instead of ggml's default `-march=native`, which would `SIGILL` on any
-user CPU older than the build host.
+For PORTABLE, `GGML_NATIVE=OFF` + the explicit AVX2/FMA/F16C flags force a
+portable CPU baseline instead of ggml's default `-march=native` (which would
+`SIGILL` on any user CPU older than the build host) and make ggml build all
+common CUDA archs. The native default skips both — one CPU target, one GPU arch.
 
 ### Windows specifics
 

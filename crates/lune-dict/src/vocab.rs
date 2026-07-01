@@ -28,16 +28,6 @@ impl SupplementalVocab {
     pub fn word_count(&self) -> usize {
         self.words.len()
     }
-
-    pub fn candidates_by_len(&self, lo: usize, hi: usize) -> impl Iterator<Item = &str> {
-        self.words
-            .keys()
-            .filter(move |w| {
-                let len = w.len();
-                len >= lo && len < hi
-            })
-            .map(|s| s.as_str())
-    }
 }
 
 static BUNDLED: LazyLock<SupplementalVocab> = LazyLock::new(|| {
@@ -74,7 +64,7 @@ mod tests {
         let v = bundled();
         assert!(v.is_known("WebSocket") || v.is_known("websocket"));
         assert!(v.is_known("Roblox") || v.is_known("roblox"));
-        assert!(v.category_of("lune").is_some());
+        assert!(v.category_of("websocket").is_some());
         assert!(!v.is_known("xyznonexistent"));
     }
 }

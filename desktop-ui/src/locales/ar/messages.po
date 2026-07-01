@@ -20,7 +20,7 @@ msgid "{0} of {1}"
 msgstr "{0} من {1}"
 
 #. placeholder {0}: presets.length
-#: src/features/styles/styles-page.tsx:168
+#: src/features/styles/styles-page.tsx:190
 msgid "{0} presets"
 msgstr "{0} إعدادات مسبقة"
 
@@ -333,7 +333,7 @@ msgstr "حساسية التصحيح"
 msgid "Couldn't add that rule. Try again."
 msgstr "تعذرت إضافة هذه القاعدة. حاول ثانية."
 
-#: src/features/styles/styles-page.tsx:197
+#: src/features/styles/styles-page.tsx:222
 msgid "Create new style"
 msgstr "إنشاء نمط جديد"
 
@@ -520,6 +520,10 @@ msgstr "جلسة فارغة"
 #: src/features/settings/sections/transcription-section.tsx:104
 msgid "Enable correction LLM"
 msgstr "تمكين التصحيح LLM"
+
+#: src/features/styles/styles-page.tsx:163
+msgid "Enable styling"
+msgstr ""
 
 #: src/features/history/components/history-table.tsx:130
 #: src/features/history/components/session-detail-modal.tsx:162
@@ -794,6 +798,11 @@ msgstr "لا توجد جلسات بعد. ابدأ في الإملاء لرؤية
 msgid "No transcript"
 msgstr "لا يوجد نص"
 
+#: src/features/history/components/history-table.tsx:293
+#: src/features/history/components/session-detail-modal.tsx:163
+msgid "None"
+msgstr ""
+
 #: src/features/settings/sections/dictation-section.tsx:209
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
 msgstr "يضبط مستوى الميكروفون قبل اكتشاف الصوت. يساعد مع الميكروفونات الهادئة والغرف الصاخبة. موصى به."
@@ -986,6 +995,10 @@ msgstr "أعد المحاولة"
 msgid "Retry download"
 msgstr "أعد محاولة التنزيل"
 
+#: src/features/styles/styles-page.tsx:165
+msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
+msgstr ""
+
 #: src/features/history/components/history-session-list.tsx:36
 #: src/features/overview/overview-page.tsx:262
 msgid "s"
@@ -1145,7 +1158,7 @@ msgstr "أسلوب"
 msgid "Styling"
 msgstr ""
 
-#: src/features/styles/styles-page.tsx:167
+#: src/features/styles/styles-page.tsx:189
 msgid "Switch style"
 msgstr "تبديل النمط"
 
@@ -1178,10 +1191,6 @@ msgstr "الاختصار الرئيسي المستخدم للكتابة الصو
 #: src/features/settings/sections/appearance-section.tsx:76
 msgid "Theme"
 msgstr "سمة"
-
-#: src/features/settings/sections/models-section.tsx:260
-#~ msgid "This is a required model. Dictation will not work without it."
-#~ msgstr "هذا هو النموذج المطلوب. الإملاء لن يعمل بدونه."
 
 #: src/features/settings/sections/models-section.tsx:307
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
@@ -1371,6 +1380,6 @@ msgstr ""
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "النماذج الخاصة بك جاهزة. كل شيء يبقى على هذا الجهاز."
 
-#: src/features/styles/styles-page.tsx:199
+#: src/features/styles/styles-page.tsx:224
 msgid "Your own formatting preset"
 msgstr "التنسيق المسبق الخاص بك"

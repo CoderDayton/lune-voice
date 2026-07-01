@@ -1,8 +1,6 @@
 pub mod caprate;
 pub mod commands;
 pub mod corrector;
-pub(crate) mod crc;
-pub mod edit_calib;
 pub mod formatting;
 pub mod freq;
 pub mod lexicon;
@@ -90,7 +88,7 @@ impl DictionaryManager {
         apply_single_words(&current, &single)
     }
 
-    pub fn scan(&self, text: &str) -> Vec<(String, String)> {
+    pub fn scan(&self, text: &str) -> Vec<DictMatch> {
         let (multi, single): (Vec<&DictionaryEntry>, Vec<&DictionaryEntry>) = self
             .cache
             .iter()
@@ -112,7 +110,12 @@ impl DictionaryManager {
                     .all(|(tw, pw)| strip_trailing_punct(tw).eq_ignore_ascii_case(pw));
                 if window_match {
                     let matched: String = text_words[i..i + n].join(" ");
-                    replacements.push((matched, entry.replacement.clone()));
+                    // Multi-word phrase matches are word-boundary-exact, never fuzzy.
+                    replacements.push(DictMatch {
+                        matched,
+                        replacement: entry.replacement.clone(),
+                        fuzzy: false,
+                    });
                     i += n;
                 } else {
                     i += 1;
@@ -120,14 +123,32 @@ impl DictionaryManager {
             }
         }
 
-        let text_words: Vec<&str> = text.split_whitespace().collect();
-        for word in &text_words {
-            let bare = strip_trailing_punct(word);
-            if let Some(entry) = single
-                .iter()
-                .find(|e| lev_le1_ci(bare.as_bytes(), e.phrase.as_bytes()))
-            {
-                replacements.push((bare.to_owned(), entry.replacement.clone()));
+        // Single-word matching is span-aware (`split_internal_punctuation`),
+        // not just whitespace-split, so a word ASR glues to a neighbor with
+        // no whitespace (e.g. an ellipsis: "is...Tayton.") still gets its
+        // own lookup — the same tokenization `Lexicon::vocab_fuzzy_matches`
+        // uses, so the user dictionary and the bundled vocab agree on what
+        // counts as a word.
+        for word in text.split_whitespace() {
+            let (_, spans) = crate::corrector::split_internal_punctuation(word);
+            for (span, _) in &spans {
+                if span.is_empty() {
+                    continue;
+                }
+                if let Some(entry) = single
+                    .iter()
+                    .find(|e| lev_le1_ci(span.as_bytes(), e.phrase.as_bytes()))
+                {
+                    // Exact (case-insensitive) match is trusted; an off-by-one
+                    // match is fuzzy and will be gated on low confidence by
+                    // the corrector.
+                    let fuzzy = !span.eq_ignore_ascii_case(entry.phrase.as_str());
+                    replacements.push(DictMatch {
+                        matched: (*span).to_owned(),
+                        replacement: entry.replacement.clone(),
+                        fuzzy,
+                    });
+                }
             }
         }
 
@@ -139,8 +160,14 @@ impl DictionaryManager {
     /// Relevance: entries whose phrase matches (exact or fuzzy Levenshtein ≤ 1)
     /// a word in `text`. Sorted by priority DESC; truncated to `limit`.
     pub fn top_relevant<'a>(&'a self, text: &str, limit: usize) -> Vec<&'a DictionaryEntry> {
-        // Keep original-case words; lev_le1_ci handles case-insensitivity below.
-        let text_words: Vec<&str> = text.split_whitespace().collect();
+        // Pre-split once into spans (not just whitespace tokens), same
+        // tokenization as `scan`, so a glued-without-whitespace word is still
+        // considered. Keep original case; lev_le1_ci handles CI below.
+        let spans: Vec<&str> = text
+            .split_whitespace()
+            .flat_map(|w| crate::corrector::split_internal_punctuation(w).1)
+            .map(|(span, _)| span)
+            .collect();
 
         let mut relevant: Vec<&DictionaryEntry> = self
             .cache
@@ -152,7 +179,7 @@ impl DictionaryManager {
                 }
                 // Fuzzy single-word match (no to_lowercase allocation).
                 if !e.phrase.contains(char::is_whitespace) {
-                    return text_words
+                    return spans
                         .iter()
                         .any(|w| lev_le1_ci(w.as_bytes(), e.phrase.as_bytes()));
                 }
@@ -264,6 +291,20 @@ fn apply_single_words(text: &str, singles: &[&DictionaryEntry]) -> String {
     out.join(" ")
 }
 
+/// One dictionary match found by [`DictionaryManager::scan`]. `fuzzy` is true
+/// for single-word edit-distance-1 matches (not exact and not multi-word
+/// phrase matches), which the corrector gates on low word confidence so a
+/// garbled ASR onset isn't rewritten into a coincidentally-near dictionary term.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DictMatch {
+    /// The text span that matched (as it appeared in the transcript).
+    pub matched: String,
+    /// The dictionary replacement to substitute.
+    pub replacement: String,
+    /// True only for fuzzy (edit-distance-1) single-word matches.
+    pub fuzzy: bool,
+}
+
 /// Strip trailing ASCII punctuation for comparison purposes.
 #[cfg(feature = "dictionary")]
 #[inline]
@@ -289,10 +330,11 @@ fn contains_ascii_ci(haystack: &str, needle: &str) -> bool {
 /// O(n) Levenshtein distance ≤ 1 check (byte-level, ASCII, case-insensitive).
 ///
 /// Replaces the `levenshtein(a.to_lowercase(), b.to_lowercase()) <= 1` pattern
-/// in hot paths: no allocation, no full DP table, early exit.
-#[cfg(feature = "dictionary")]
+/// in hot paths: no allocation, no full DP table, early exit. Unconditional
+/// (not gated behind the `dictionary` feature) because `lexicon::Lexicon`
+/// also uses it to fuzzy-match the always-compiled bundled vocab.
 #[inline]
-fn lev_le1_ci(a: &[u8], b: &[u8]) -> bool {
+pub(crate) fn lev_le1_ci(a: &[u8], b: &[u8]) -> bool {
     // Orient so `short` ≤ `long_s`.
     let (short, long_s) = if a.len() <= b.len() { (a, b) } else { (b, a) };
     match long_s.len() - short.len() {
@@ -435,6 +477,38 @@ mod tests {
     #[test]
     fn lev_le1_ci_length_diff_gt1_rejected() {
         assert!(!lev_le1_ci(b"abc", b"abcde"));
+    }
+
+    // ── scan / top_relevant: internal-punctuation tokenization ─────────────
+
+    #[test]
+    fn scan_finds_fuzzy_match_glued_by_internal_punctuation() {
+        let mut mgr = manager();
+        mgr.insert("dayton", "Dayton", 10).unwrap();
+
+        // Whisper sometimes glues a trailing-thought ellipsis directly onto
+        // the next word with no whitespace: "is...Tayton." is ONE
+        // split_whitespace token. The user dictionary must still find
+        // "Tayton" as a near-match of the "dayton" entry, same as the
+        // bundled vocab's fuzzy matching does.
+        let matches = mgr.scan("hello my name is...Tayton.");
+        assert!(
+            matches
+                .iter()
+                .any(|m| m.matched.eq_ignore_ascii_case("tayton")
+                    && m.replacement == "Dayton"
+                    && m.fuzzy),
+            "expected a fuzzy match for the glued word, got {matches:?}"
+        );
+    }
+
+    #[test]
+    fn top_relevant_finds_match_glued_by_internal_punctuation() {
+        let mut mgr = manager();
+        mgr.insert("dayton", "Dayton", 10).unwrap();
+
+        let relevant = mgr.top_relevant("hello my name is...Tayton.", 10);
+        assert!(relevant.iter().any(|e| e.phrase == "dayton"));
     }
 
     // ── apply ─────────────────────────────────────────────────────────────

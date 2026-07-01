@@ -14,10 +14,32 @@ info = "List all available scripts"
 
 [scripts.dev]
 interpreter = "bash"
+# Dev app needs the native backends compiled in, otherwise the ASR/LLM stubs
+# return "backend not compiled in" and dictation fails. `default = []` keeps
+# routine `cargo check` toolchain-light, so the features are passed here
+# explicitly (mirroring `cgs build`). BACKEND auto-detects: if unset, a CUDA
+# build is used when both nvcc and nvidia-smi are present, else CPU. Force
+# either with `--env BACKEND=cpu|cuda`. Unlike release builds GGML_NATIVE is
+# left on so the dev build tunes for THIS machine's CPU.
 command = '''
-cd desktop-ui && bun tauri dev
+cd desktop-ui
+BACKEND="${BACKEND:-}"
+if [ -z "$BACKEND" ]; then
+  if command -v nvcc >/dev/null 2>&1 && command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1; then
+    BACKEND=cuda
+  else
+    BACKEND=cpu
+  fi
+fi
+case "$BACKEND" in
+  cpu)  FEATURES="whisper-cpp llama-cpp" ;;
+  cuda) FEATURES="whisper-cuda llama-cuda" ;;
+  *)    echo "BACKEND must be cpu|cuda"; exit 1 ;;
+esac
+echo "Dev ($BACKEND): --features \"$FEATURES\""
+bun tauri dev --features "$FEATURES"
 '''
-info = "Launch Tauri app in dev mode (hot-reload)"
+info = "Launch Tauri app in dev mode (hot-reload; CUDA auto-detected, --env BACKEND=cpu|cuda to force)"
 requires = ["bun"]
 
 # ── Quick iteration ──────────────────────────────────────────────────────────
@@ -54,47 +76,90 @@ info = "Run lightweight app pipeline integration tests"
 
 [scripts.bench]
 interpreter = "bash"
+# Real-pipeline benchmarks. Model-backed ones build whisper.cpp + llama.cpp and
+# need a model on disk; CUDA features auto-detect (mirrors cgs build/dev).
+# `transcribe` runs the whole capture→AGC→VAD→whisper(+styling) pipeline on a
+# WAV/f32/dir and prints the hypothesis — the GUI-free way to test ASR quality.
 command = '''
-case "${TYPE:-agc}" in
-  agc)       cargo run --release --example agc_bench -p lune-audio ;;
-  *)         echo "TYPE must be agc"; exit 1 ;;
+TYPE="${TYPE:-agc}"
+if command -v nvcc >/dev/null 2>&1 && command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1; then
+  FEATURES="whisper-cuda llama-cuda"
+else
+  FEATURES="whisper-cpp llama-cpp"
+fi
+[ -d /lib/x86_64-linux-gnu ] && export LIBCLANG_PATH="${LIBCLANG_PATH:-/lib/x86_64-linux-gnu}"
+run() { cargo run --release --example "$1" -p lune-app --features "$FEATURES" "${@:2}"; }
+case "$TYPE" in
+  agc)         cargo run --release --example agc_bench -p lune-audio ;;
+  transcribe)  [ -z "$WAV" ] && { echo "set --env WAV=path (.wav/.f32/dir)"; exit 1; }; run asr_probe -- "$WAV" ;;
+  domain)      run bench_domain ;;
+  pipeline)    run pipeline_real ;;
+  stages)      run pipeline_stages ;;
+  latency)     run session_latency ;;
+  punctuation) run punctuation_ab ;;
+  dict)        run dict_carrier_ab ;;
+  live)        run live_transcribe ;;
+  *) echo "TYPE must be: agc | transcribe(WAV=) | domain | pipeline | stages | latency | punctuation | dict | live"; exit 1 ;;
 esac
 '''
-info = "Benchmark (--env TYPE=agc)"
+info = "Benchmarks (--env TYPE=agc|transcribe|domain|pipeline|stages|latency|punctuation|dict|live; transcribe needs WAV=)"
 
 # ── Build ────────────────────────────────────────────────────────────────────
 
 [scripts.build]
 interpreter = "bash"
-# Production desktop app. `tauri build` does the release Rust compile + UI build
-# + bundle in one step. `--features whisper-cpp llama-cpp` compiles the local
-# whisper.cpp + llama.cpp backends into the shipped binary (users never compile
-# them themselves). CUDA is auto-enabled when the build host has the toolchain
-# (nvcc + an NVIDIA GPU): since these backends compile from source here, GPU
-# support is a build-host decision — a CPU-only host produces a portable
-# CPU-only app, a CUDA host produces a GPU-accelerated one. The GGML_* flags
-# force a portable AVX2 CPU baseline instead of ggml's default `-march=native`,
-# which would SIGILL on any user CPU older than the build host.
+# Desktop app: `tauri build` does the release Rust compile + UI build + bundle
+# in one step, compiling whisper.cpp + llama.cpp into the binary (users never
+# compile anything — this produces the artifact they'd run).
 #
-# Backend is EXPLICIT per release target (`--env BACKEND=cpu|cuda`), never
-# auto-detected: releases are prebuilt per platform/backend on CI/build runners,
-# not compiled on end-user machines. CPU is the portable default; CUDA targets
-# NVIDIA systems. macOS Metal and the full Windows/Linux/macOS release matrix are
-# documented in docs/RELEASE.md.
+# TWO build profiles:
+#   • Default (NATIVE): `GGML_NATIVE=ON` tunes ggml to THIS machine's CPU and,
+#     for CUDA, only the build host's GPU arch (e.g. sm_89). The CUDA compile is
+#     ~8x smaller and won't exhaust RAM. The binary runs great here but is NOT
+#     portable to other CPUs/GPUs. This is the right local build.
+#   • PORTABLE (`--env PORTABLE=1`): a distributable artifact — portable AVX2 CPU
+#     baseline + every common NVIDIA CUDA arch. Much heavier: ggml compiles ~8
+#     CUDA archs, so build on a runner with plenty of RAM (or cap CARGO_BUILD_JOBS
+#     to avoid OOM). This is what release/CI uses per target.
+#
+# Backend AUTO-DETECTS: if `BACKEND` is unset and both nvcc and a working
+# nvidia-smi are present, CUDA is built; otherwise CPU. Force with
+# `--env BACKEND=cpu|cuda`. macOS Metal and the full release matrix: docs/RELEASE.md.
 # Build host needs: cmake, a C++ toolchain, and libclang (for bindgen); plus the
 # CUDA toolkit for a `cuda` build.
 command = '''
 cd desktop-ui
-BACKEND="${BACKEND:-cpu}"
+BACKEND="${BACKEND:-}"
+if [ -z "$BACKEND" ]; then
+  if command -v nvcc >/dev/null 2>&1 && command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1; then
+    BACKEND=cuda
+  else
+    BACKEND=cpu
+  fi
+fi
 case "$BACKEND" in
   cpu)  FEATURES="whisper-cpp llama-cpp" ;;
   cuda) FEATURES="whisper-cuda llama-cuda" ;;
   *)    echo "BACKEND must be cpu|cuda (macOS Metal: see docs/RELEASE.md)"; exit 1 ;;
 esac
-echo "Building $BACKEND release: --features \"$FEATURES\""
-GGML_NATIVE=OFF GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON APPIMAGE_EXTRACT_AND_RUN=1 bun tauri build --features "$FEATURES"
+if [ -n "${PORTABLE:-}" ]; then
+  # Distributable: portable AVX2 CPU baseline + every common NVIDIA CUDA arch (~8).
+  # Bundles per tauri.conf.json (deb, rpm, appimage).
+  GGML_FLAGS="GGML_NATIVE=OFF GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON"
+  BUNDLE_ARGS=""
+  echo "Building PORTABLE $BACKEND release: --features \"$FEATURES\""
+else
+  # Local (default): native to this machine — ggml targets only the build host's
+  # CPU and GPU arch, so the CUDA compile stays small and won't exhaust RAM.
+  # Only deb + appimage: rpm bundling xz-compresses the (large) CUDA binary and
+  # is slow + useless on Debian/Pop!_OS. Override with `--env BUNDLES="deb"` etc.
+  GGML_FLAGS="GGML_NATIVE=ON"
+  BUNDLE_ARGS="--bundles ${BUNDLES:-deb appimage}"
+  echo "Building NATIVE $BACKEND build (this machine only): --features \"$FEATURES\""
+fi
+env $GGML_FLAGS APPIMAGE_EXTRACT_AND_RUN=1 bun tauri build --features "$FEATURES" $BUNDLE_ARGS
 '''
-info = "Production desktop app (--env BACKEND=cpu|cuda; ships whisper.cpp + llama.cpp). See docs/RELEASE.md"
+info = "Desktop app — native to this machine (CUDA auto-detected). --env PORTABLE=1 for a distributable build; --env BACKEND=cpu|cuda to force. See docs/RELEASE.md"
 requires = ["bun"]
 
 # ── Tools ────────────────────────────────────────────────────────────────────

@@ -26,7 +26,7 @@ pub mod training;
 #[cfg(feature = "training")]
 pub use training::{CorpusConfig, CorpusFetch, fetch_wordnik_corpus};
 
-pub use candidates::{AsrCandidateInput, AsrCandidateScore, AsrRerankWeights, CandidateScore};
+pub use candidates::CandidateScore;
 pub use model::NGramModel;
 pub use scoring::{InterpolationWeights, ScoringConfig};
 pub use tokenize::{acoustic_shape, tokenize};

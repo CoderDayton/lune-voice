@@ -11,7 +11,8 @@ pub struct DictationSession {
     pub id: Uuid,
     pub started_at: DateTime<Utc>,
     pub ended_at: Option<DateTime<Utc>>,
-    pub style: StyleId,
+    /// Styling preset used for this session, or `None` for no styling.
+    pub style: Option<StyleId>,
     pub backend: AsrBackendKind,
     pub status: SessionStatus,
     /// Final post-processed text.
@@ -116,7 +117,7 @@ mod tests {
             id: Uuid::new_v4(),
             started_at: Utc::now(),
             ended_at: None,
-            style: "casual".into(),
+            style: Some("casual".into()),
             backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Active,
             transcript: None,
@@ -124,7 +125,7 @@ mod tests {
         let json = serde_json::to_string(&session).unwrap();
         let parsed: DictationSession = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.id, session.id);
-        assert_eq!(parsed.style, "casual");
+        assert_eq!(parsed.style.as_deref(), Some("casual"));
     }
 
     #[test]
@@ -144,7 +145,7 @@ mod tests {
             id: Uuid::new_v4(),
             started_at: Utc::now(),
             ended_at: None,
-            style: "casual".into(),
+            style: Some("casual".into()),
             backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Active,
             transcript: None,
@@ -163,7 +164,7 @@ mod tests {
             id: Uuid::new_v4(),
             started_at: Utc::now(),
             ended_at: None,
-            style: "casual".into(),
+            style: Some("casual".into()),
             backend: AsrBackendKind::WhisperCpp,
             status: SessionStatus::Active,
             transcript: None,

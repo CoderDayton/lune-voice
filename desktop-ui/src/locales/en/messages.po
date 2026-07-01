@@ -20,7 +20,7 @@ msgid "{0} of {1}"
 msgstr "{0} of {1}"
 
 #. placeholder {0}: presets.length
-#: src/features/styles/styles-page.tsx:168
+#: src/features/styles/styles-page.tsx:190
 msgid "{0} presets"
 msgstr "{0} presets"
 
@@ -333,7 +333,7 @@ msgstr "Correction sensitivity"
 msgid "Couldn't add that rule. Try again."
 msgstr "Couldn't add that rule. Try again."
 
-#: src/features/styles/styles-page.tsx:197
+#: src/features/styles/styles-page.tsx:222
 msgid "Create new style"
 msgstr "Create new style"
 
@@ -520,6 +520,10 @@ msgstr "Empty session"
 #: src/features/settings/sections/transcription-section.tsx:104
 msgid "Enable correction LLM"
 msgstr "Enable correction LLM"
+
+#: src/features/styles/styles-page.tsx:163
+msgid "Enable styling"
+msgstr "Enable styling"
 
 #: src/features/history/components/history-table.tsx:130
 #: src/features/history/components/session-detail-modal.tsx:162
@@ -794,6 +798,11 @@ msgstr "No sessions yet. Start dictating to see your transcripts here."
 msgid "No transcript"
 msgstr "No transcript"
 
+#: src/features/history/components/history-table.tsx:293
+#: src/features/history/components/session-detail-modal.tsx:163
+msgid "None"
+msgstr "None"
+
 #: src/features/settings/sections/dictation-section.tsx:209
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
 msgstr "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
@@ -986,6 +995,10 @@ msgstr "Retry"
 msgid "Retry download"
 msgstr "Retry download"
 
+#: src/features/styles/styles-page.tsx:165
+msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
+msgstr "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
+
 #: src/features/history/components/history-session-list.tsx:36
 #: src/features/overview/overview-page.tsx:262
 msgid "s"
@@ -1145,7 +1158,7 @@ msgstr "Style"
 msgid "Styling"
 msgstr "Styling"
 
-#: src/features/styles/styles-page.tsx:167
+#: src/features/styles/styles-page.tsx:189
 msgid "Switch style"
 msgstr "Switch style"
 
@@ -1178,10 +1191,6 @@ msgstr "The main shortcut used for voice typing. Click the binding to change it.
 #: src/features/settings/sections/appearance-section.tsx:76
 msgid "Theme"
 msgstr "Theme"
-
-#: src/features/settings/sections/models-section.tsx:260
-#~ msgid "This is a required model. Dictation will not work without it."
-#~ msgstr "This is a required model. Dictation will not work without it."
 
 #: src/features/settings/sections/models-section.tsx:307
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
@@ -1371,6 +1380,6 @@ msgstr "Your machine supports it — use it for faster transcription."
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "Your models are ready. Everything stays on this machine."
 
-#: src/features/styles/styles-page.tsx:199
+#: src/features/styles/styles-page.tsx:224
 msgid "Your own formatting preset"
 msgstr "Your own formatting preset"
