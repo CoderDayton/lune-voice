@@ -915,6 +915,13 @@ const KEY_EVENT_GAP_MS: u64 = 2;
 /// that the compositor dropped keys (notably SPACE); this gives it headroom.
 const PER_CHAR_GAP_MS: u64 = 6;
 
+/// Gap between the key events of the one-shot paste chord (`emit_paste`). Uses
+/// the same drop-safe headroom as `PER_CHAR_GAP_MS` rather than the tighter
+/// `KEY_EVENT_GAP_MS`: the chord fires once per dictation, so the few extra
+/// milliseconds are free, and a dropped modifier *release* here strands
+/// Shift/Ctrl logically down across the desktop (a stuck modifier).
+const CHORD_GAP_MS: u64 = 6;
+
 /// Tracks clipboard operation latency and adapts the post-paste delay.
 struct AdaptivePasteDelay {
     /// EMA of clipboard set+get round-trip in ms.
@@ -948,6 +955,10 @@ pub struct UinputTyper {
     device: VirtualDevice,
     terminal_mode: TerminalMode,
     paste_delay: AdaptivePasteDelay,
+    /// Clipboard captured at dictation start (see `prime_clipboard`) so the
+    /// snapshot's up-to-2s subprocess round-trip overlaps ASR instead of
+    /// freezing the paste. Consumed once by the next `do_clipboard_paste`.
+    primed_clipboard: Option<Result<Option<ClipboardSnapshot>, String>>,
 }
 
 impl UinputTyper {
@@ -975,7 +986,29 @@ impl UinputTyper {
             device,
             terminal_mode,
             paste_delay: AdaptivePasteDelay::new(),
+            primed_clipboard: None,
         })
+    }
+
+    /// Snapshot the clipboard ahead of the paste so the restore-after-paste
+    /// read doesn't sit on the delivery hot path. Called at dictation start
+    /// (via the delivery thread's `Prime` job), it overlaps the seconds of
+    /// recording + ASR that follow — by paste time the bytes are already
+    /// captured. Overwrites any prior prime; only the latest dictation matters.
+    ///
+    /// Because the capture happens at start, a clipboard change the user makes
+    /// *during* the dictation is not preserved on restore — an accepted trade
+    /// for keeping the paste responsive (the snapshot's up-to-2s read no longer
+    /// blocks it).
+    pub fn prime_clipboard(&mut self) {
+        let start = Instant::now();
+        let snap = get_clipboard();
+        debug!(
+            prime_ms = start.elapsed().as_millis() as u64,
+            captured = matches!(snap, Ok(Some(_))),
+            "clipboard primed at dictation start"
+        );
+        self.primed_clipboard = Some(snap);
     }
 
     /// Pre-warm compositor detection so the first `type_str()` call has no
@@ -1001,7 +1034,7 @@ impl UinputTyper {
     fn emit_paste(&mut self, terminal: bool) {
         // Settle after hotkey modifier release
         std::thread::sleep(Duration::from_millis(MODIFIER_SETTLE_MS));
-        let gap = Duration::from_millis(KEY_EVENT_GAP_MS);
+        let gap = Duration::from_millis(CHORD_GAP_MS);
 
         // Press the modifiers, each given time to register before V — the same
         // chord race `type_char` guards against (without the gaps a composited
@@ -1019,9 +1052,13 @@ impl UinputTyper {
         self.emit_raw(EventType::KEY, KeyCode::KEY_V.0, 0);
         std::thread::sleep(gap); // V must release before the modifiers, or they leak
 
-        // Release the modifiers in reverse order.
+        // Release the modifiers in reverse order, each spaced by `gap`. The gap
+        // BETWEEN the two releases matters as much as the rest: without it a
+        // busy compositor can coalesce or drop the Shift release and strand
+        // Shift logically down — a stuck modifier that outlives the dictation.
         if terminal {
             self.emit_raw(EventType::KEY, KeyCode::KEY_LEFTSHIFT.0, 0);
+            std::thread::sleep(gap);
         }
         self.emit_raw(EventType::KEY, KeyCode::KEY_LEFTCTRL.0, 0);
     }
@@ -1072,20 +1109,28 @@ impl UinputTyper {
         keep_clipboard: bool,
     ) -> bool {
         // The clipboard is only a transport for the paste chord. Unless the user
-        // opted to keep the dictated text (copy_to_clipboard), snapshot whatever
-        // they had on the clipboard first so we can put it back after the paste —
-        // otherwise every dictation silently overwrites the clipboard. The two
-        // wl-paste calls are bounded by CLIPBOARD_TIMEOUT each; trace the cost so
-        // a slow compositor's snapshot latency is observable.
+        // opted to keep the dictated text (copy_to_clipboard), preserve whatever
+        // they had on the clipboard so we can put it back after the paste —
+        // otherwise every dictation silently overwrites it. The snapshot is
+        // normally captured ahead of time at dictation start (see
+        // `prime_clipboard`) to keep its wl-paste cost off this hot path.
+        //
+        // Prefer that primed snapshot; always `take()` so a primed-but-unused
+        // one (when keeping our text) can't leak into a later structural
+        // injection's restore. Fall back to a synchronous read only when this
+        // paste wasn't primed (e.g. newline/bullet injections).
+        let primed = self.primed_clipboard.take();
         let prior = if keep_clipboard {
             Ok(None)
+        } else if let Some(snap) = primed {
+            snap
         } else {
             let snap_start = Instant::now();
             let snap = get_clipboard();
             debug!(
                 snapshot_ms = snap_start.elapsed().as_millis() as u64,
                 captured = matches!(snap, Ok(Some(_))),
-                "clipboard snapshot taken"
+                "clipboard snapshot taken (unprimed fallback)"
             );
             snap
         };

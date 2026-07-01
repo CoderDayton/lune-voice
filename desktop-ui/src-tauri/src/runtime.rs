@@ -12,7 +12,9 @@ use lune_asr::AsrRegistry;
 use lune_audio::{AudioConfig, AudioStream};
 use lune_core::asr::AsrSessionConfig;
 use lune_core::command::VoiceCommand;
-use lune_core::config::{ActivationMode, LlmBackendConfig, PillVisibility, UserSettings};
+use lune_core::config::{
+    ActivationMode, DictationMode, LlmBackendConfig, PillVisibility, UserSettings,
+};
 use lune_core::llm::LlmService;
 use lune_core::session::SessionEvent;
 use lune_dict::DictionaryManager;
@@ -377,6 +379,24 @@ impl AppRuntime {
         // unblocks the first VAD chunk by the same amount.
         #[cfg(unix)]
         let focus_capture = tokio::task::spawn_blocking(capture_focus_target);
+
+        // Snapshot the clipboard now, off the paste hot path: on the uinput
+        // paste backend the restore-after-paste read can block up to 2s on a
+        // slow clipboard owner, so priming here overlaps it with recording +
+        // ASR (mirrors the focus capture above). Only the clipboard delivery
+        // path borrows the clipboard, so skip the wl-paste round trip for
+        // per-key typing that keeps no copy; the rare non-ASCII fallback there
+        // still snapshots synchronously. No-op anyway on backends that never
+        // touch the clipboard (IBus, macOS/Windows).
+        {
+            let (mode, copy) = {
+                let s = self.inner.settings.read().await;
+                (s.dictation_mode, s.copy_to_clipboard)
+            };
+            if copy || !matches!(mode, DictationMode::TypeInPlace) {
+                self.inner.delivery.prime_clipboard();
+            }
+        }
 
         let manager = match self.prepare_manager_for_start().await {
             Ok(m) => m,

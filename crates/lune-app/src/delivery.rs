@@ -25,6 +25,19 @@ struct DeliveryMsg {
     target: Option<WindowTarget>,
 }
 
+/// A unit of work for the delivery thread. `Prime` and `Probe` carry no
+/// payload; only `Deliver` types text.
+enum DeliveryJob {
+    /// Snapshot the clipboard ahead of an imminent paste — sent at dictation
+    /// start so the up-to-2s `wl-paste` round-trip overlaps recording + ASR
+    /// instead of freezing the paste. See `DeliveryService::prime_clipboard`.
+    Prime,
+    /// Liveness probe — the thread drops it without registering as busy.
+    Probe,
+    /// Deliver dictated (or structural) text.
+    Deliver(DeliveryMsg),
+}
+
 /// Tail after a delivery finishes during which it still reports busy — lets
 /// in-flight synthetic key events drain out of the compositor and app queues.
 const DELIVERY_SETTLE: Duration = Duration::from_millis(300);
@@ -32,13 +45,13 @@ const DELIVERY_SETTLE: Duration = Duration::from_millis(300);
 /// Handle to the background delivery thread.
 #[derive(Clone)]
 pub struct DeliveryService {
-    tx: mpsc::Sender<DeliveryMsg>,
+    tx: mpsc::Sender<DeliveryJob>,
     busy_until: Arc<Mutex<Option<Instant>>>,
 }
 
 impl DeliveryService {
     pub fn new(terminal_mode: TerminalMode) -> Result<Self, String> {
-        let (tx, rx) = mpsc::channel::<DeliveryMsg>();
+        let (tx, rx) = mpsc::channel::<DeliveryJob>();
         let busy_until = Arc::new(Mutex::new(None));
         let busy = Arc::clone(&busy_until);
         std::thread::Builder::new()
@@ -72,11 +85,23 @@ impl DeliveryService {
     /// Queue a delivery message, returning `false` if the delivery thread has
     /// died (its receiver dropped, so `send` errors).
     fn enqueue(&self, msg: DeliveryMsg) -> bool {
-        if let Err(e) = self.tx.send(msg) {
+        if let Err(e) = self.tx.send(DeliveryJob::Deliver(msg)) {
             warn!(error = %e, "delivery thread dead — text will not be typed");
             return false;
         }
         true
+    }
+
+    /// Snapshot the clipboard ahead of delivery. Called at dictation start so
+    /// the restore-after-paste read (up to 2s of `wl-paste` on a slow clipboard
+    /// owner) overlaps recording + ASR instead of freezing the paste. The
+    /// delivery thread processes this before the paste it precedes (single
+    /// ordered queue), so the snapshot is ready by delivery time. Best-effort:
+    /// a dead thread just means the paste falls back to a synchronous snapshot.
+    pub fn prime_clipboard(&self) {
+        if let Err(e) = self.tx.send(DeliveryJob::Prime) {
+            debug!(error = %e, "clipboard prime skipped — delivery thread unavailable");
+        }
     }
 
     #[cfg(unix)]
@@ -132,23 +157,14 @@ impl DeliveryService {
         // Liveness probe: if the delivery thread (the receiver) has exited,
         // `send` returns Err. The empty text means the thread harmlessly
         // skips it (the loop `continue`s on empty text) if it does arrive.
-        self.tx
-            .send(DeliveryMsg {
-                session_id: None,
-                text: "".into(),
-                mode: DictationMode::TypeInPlace,
-                copy_to_clipboard: false,
-                #[cfg(unix)]
-                target: None,
-            })
-            .is_ok()
+        self.tx.send(DeliveryJob::Probe).is_ok()
     }
 }
 
 // ─── Platform-specific delivery ──────────────────────────────────────────────
 
 fn delivery_thread(
-    rx: mpsc::Receiver<DeliveryMsg>,
+    rx: mpsc::Receiver<DeliveryJob>,
     terminal_mode: TerminalMode,
     busy_until: Arc<Mutex<Option<Instant>>>,
 ) {
@@ -162,9 +178,21 @@ fn delivery_thread(
 
     info!(platform = driver.platform_name(), "delivery thread ready");
 
-    while let Ok(msg) = rx.recv() {
+    while let Ok(job) = rx.recv() {
+        let msg = match job {
+            // Liveness probe — nothing to do, and must not register as busy.
+            DeliveryJob::Probe => continue,
+            // Pre-snapshot the clipboard (dictation start). Runs on this
+            // background thread during the ASR window, so its subprocess cost
+            // never reaches the paste hot path.
+            DeliveryJob::Prime => {
+                driver.prime_clipboard();
+                continue;
+            }
+            DeliveryJob::Deliver(msg) => msg,
+        };
         let text: &str = &msg.text;
-        // Empty `is_alive` probes must not register as busy.
+        // Defensive: empty text carries no output (probes no longer arrive here).
         if text.is_empty() {
             continue;
         }
@@ -273,6 +301,17 @@ impl PlatformDriver {
         }
     }
 
+    /// Snapshot the clipboard now so the post-paste restore doesn't read it on
+    /// the delivery hot path. Only the uinput paste path borrows the clipboard;
+    /// IBus commits directly and never touches it, so priming is a no-op there.
+    fn prime_clipboard(&mut self) {
+        match &mut self.backend {
+            #[cfg(target_os = "linux")]
+            LinuxBackend::Ibus(_) => {}
+            LinuxBackend::Uinput(t) => t.prime_clipboard(),
+        }
+    }
+
     /// Returns whether the dictated text is left on the clipboard afterwards.
     fn type_text(&mut self, text: &str, keep_clipboard: bool) -> bool {
         match &mut self.backend {
@@ -349,6 +388,10 @@ impl PlatformDriver {
             "windows-arboard-enigo"
         }
     }
+
+    /// No-op: macOS/Windows leave the dictated text on the clipboard and never
+    /// restore the prior contents, so there is nothing to snapshot ahead.
+    fn prime_clipboard(&mut self) {}
 
     /// Returns whether the dictated text is left on the clipboard afterwards.
     fn type_text(&mut self, text: &str, keep_clipboard: bool) -> bool {
