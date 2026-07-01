@@ -61,9 +61,35 @@ mod imp {
     /// Sample rate of whisper input audio (16 kHz mono f32).
     const SAMPLE_RATE: usize = 16_000;
 
-    /// Padding kept on each side of the VAD speech span when endpoint-trimming,
-    /// so soft onsets/offsets aren't clipped and the first word keeps lead-in.
-    const VAD_PAD_MS: usize = 240;
+    /// Padding kept around the VAD speech span when endpoint-trimming, so soft
+    /// onsets/offsets aren't clipped. Asymmetric on purpose: the onset gets more
+    /// lead-in than the tail — a bit of silence before the first word lets
+    /// whisper anchor the opening phrase, which measurably recovers softly-spoken
+    /// opening words (A/B: recovered a dropped opening word across quiet/loud and
+    /// with pre-roll lead-in). The tail keeps the original margin; the
+    /// producer-side flush in `capture.rs` already guards the very last phonemes.
+    const VAD_PAD_LEAD_MS: usize = 400;
+    const VAD_PAD_TAIL_MS: usize = 240;
+
+    /// silero VAD probability threshold. Below whisper.cpp's 0.5 default so a
+    /// soft first-word onset (fricatives/plosives, or audio still inside the
+    /// AGC warm-up) is detected earlier and not clipped mid-word.
+    const VAD_THRESHOLD: f32 = 0.35;
+
+    /// Minimum voiced duration for a VAD segment (ms). Below whisper.cpp's 250
+    /// default so short commands ("yes", "no", "stop", "undo") aren't discarded
+    /// wholesale — that path returns zero segments and drops the whole utterance.
+    const VAD_MIN_SPEECH_MS: i32 = 100;
+
+    /// Padding whisper's own VAD keeps around each segment (ms). Raised from the
+    /// 30 default for extra onset/offset lead-in; stacks with `VAD_PAD_MS`.
+    const VAD_SPEECH_PAD_MS: i32 = 120;
+
+    /// Skip the punctuation-priming prompt below this much decoded audio: the
+    /// run-on problem it fixes only appears on long, multi-sentence dictation,
+    /// while on a short clip the prompt is a strong bias that can inject a
+    /// spurious continuation. 16 kHz mono → 6 s.
+    const PROMPT_MIN_SAMPLES: usize = 6 * SAMPLE_RATE;
 
     /// Push a finished word's confidence — both the weakest token in the word
     /// (so a single garbled token flags the whole word) and the mean across
@@ -224,8 +250,9 @@ mod imp {
             params.set_print_progress(false);
             params.set_print_realtime(false);
             params.set_print_timestamps(false);
-            // Prime punctuation/casing style.
-            params.set_initial_prompt(PUNCTUATION_PROMPT);
+            // Suppress non-speech tokens ("[music]", "(wind)") — pure hallucination
+            // residue on quiet/short clips. (`suppress_blank` is already default-true.)
+            params.set_suppress_nst(true);
 
             // Endpoint-trim with whisper's own (standalone) silero VAD: decode
             // only [first speech onset .. last offset] + padding as ONE
@@ -244,15 +271,21 @@ mod imp {
                 .as_ref()
                 .and_then(|m| m.lock().ok())
                 .map(|mut vad| {
-                    match vad.segments_from_samples(WhisperVadParams::default(), audio.as_slice()) {
+                    let mut vad_params = WhisperVadParams::default();
+                    vad_params.set_threshold(VAD_THRESHOLD);
+                    vad_params.set_min_speech_duration(VAD_MIN_SPEECH_MS);
+                    vad_params.set_speech_pad(VAD_SPEECH_PAD_MS);
+                    match vad.segments_from_samples(vad_params, audio.as_slice()) {
                         Ok(segs) if segs.num_segments() > 0 => {
                             let last = segs.num_segments() - 1;
                             let start_cs = segs.get_segment_start_timestamp(0).unwrap_or(0.0);
                             let end_cs = segs.get_segment_end_timestamp(last).unwrap_or(0.0);
                             let to_sample = |cs: f32| (cs * SAMPLE_RATE as f32 / 100.0) as isize;
-                            let pad = (VAD_PAD_MS * SAMPLE_RATE / 1000) as isize;
-                            let start = (to_sample(start_cs) - pad).max(0) as usize;
-                            let end = ((to_sample(end_cs) + pad).max(0) as usize).min(audio.len());
+                            let pad_lead = (VAD_PAD_LEAD_MS * SAMPLE_RATE / 1000) as isize;
+                            let pad_tail = (VAD_PAD_TAIL_MS * SAMPLE_RATE / 1000) as isize;
+                            let start = (to_sample(start_cs) - pad_lead).max(0) as usize;
+                            let end =
+                                ((to_sample(end_cs) + pad_tail).max(0) as usize).min(audio.len());
                             VadTrim::Speech(start, end)
                         }
                         Ok(_) => VadTrim::Silence,
@@ -272,6 +305,13 @@ mod imp {
                 }
                 _ => audio.as_slice(),
             };
+
+            // Prime punctuation/casing style only for longer dictation, where
+            // whisper otherwise runs sentences together; on a short clip the
+            // prompt biases the decode toward a spurious continuation, so skip it.
+            if decode_slice.len() >= PROMPT_MIN_SAMPLES {
+                params.set_initial_prompt(PUNCTUATION_PROMPT);
+            }
 
             state
                 .full(params, decode_slice)
