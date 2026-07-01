@@ -9,6 +9,7 @@
 import type {
   FormatTogglesDto,
   GpuSupportDto,
+  HistoryPageDto,
   PillSnapshotDto,
   SaveWorkspaceSettingsInput,
   WorkspaceSnapshot,
@@ -23,6 +24,7 @@ export type {
   FormatTogglesDto,
   GpuSupportDto,
   HistoryItemDto,
+  HistoryPageDto,
   PillSnapshotDto,
   PillVisibilityDto,
   SaveWorkspaceSettingsInput,
@@ -81,6 +83,7 @@ export interface BackendClient {
   ): Promise<WorkspaceSnapshot>;
   deleteDictionaryEntry(id: number): Promise<WorkspaceSnapshot>;
   deleteSession(sessionId: string): Promise<WorkspaceSnapshot>;
+  listHistoryPage(page: number, pageSize: number, search: string): Promise<HistoryPageDto>;
   createCustomStyle(
     name: string,
     description: string,

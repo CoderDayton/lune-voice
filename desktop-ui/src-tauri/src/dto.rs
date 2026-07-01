@@ -269,6 +269,17 @@ pub struct HistoryItemDto {
     pub status: String,
 }
 
+/// One page of session history plus the total number of sessions matching the
+/// query (ignoring the page window), so the UI can render "N of TOTAL" and the
+/// page count without loading every row.
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryPageDto {
+    pub sessions: Vec<HistoryItemDto>,
+    pub total: u32,
+}
+
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export, export_to = "../../src/lib/backend/generated/")]
 #[serde(rename_all = "camelCase")]

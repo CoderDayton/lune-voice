@@ -9,10 +9,10 @@ use lune_persist::{AppPaths, Database, SettingsStore, StoredDictionaryEntry};
 
 use crate::dto::{
     ActivationModeDto, AsrBackendTypeDto, CreateCustomStyleInput, CreateDictionaryEntryInput,
-    DevicePolicyDto, DictationModeDto, DictionaryItemDto, HistoryItemDto, PillVisibilityDto,
-    SaveWorkspaceSettingsInput, SessionStatsDto, StylePresetDto, TerminalModeDto,
-    UpdateCustomStyleInput, UpdateDictionaryEntryInput, WhisperModelDto, WorkspaceSettingsDto,
-    WorkspaceSnapshot,
+    DevicePolicyDto, DictationModeDto, DictionaryItemDto, HistoryItemDto, HistoryPageDto,
+    PillVisibilityDto, SaveWorkspaceSettingsInput, SessionStatsDto, StylePresetDto,
+    TerminalModeDto, UpdateCustomStyleInput, UpdateDictionaryEntryInput, WhisperModelDto,
+    WorkspaceSettingsDto, WorkspaceSnapshot,
 };
 
 const HISTORY_LIMIT: u32 = 200;
@@ -106,6 +106,47 @@ pub fn delete_session(session_id: String) -> Result<WorkspaceSnapshot, String> {
 
     let settings = load_settings(&paths)?;
     build_snapshot(settings, &mut database)
+}
+
+/// Fetch one page of session history from the database. Unlike the workspace
+/// snapshot (which caps history at `HISTORY_LIMIT` for aggregate stats), this
+/// pages through the entire table so the History tab can reach every session.
+/// `page` is 1-based; `search`, when non-empty, filters by transcript substring.
+pub fn list_history_page(
+    page: u32,
+    page_size: u32,
+    search: Option<String>,
+) -> Result<HistoryPageDto, String> {
+    let page = page.max(1);
+    let page_size = page_size.clamp(1, HISTORY_LIMIT);
+    let offset = (page - 1).saturating_mul(page_size);
+    let query = search.as_deref().map(str::trim).filter(|s| !s.is_empty());
+
+    let paths = resolve_paths()?;
+    let mut database = open_database(&paths)?;
+
+    let total = database
+        .count_sessions(query)
+        .map_err(|e| format!("count sessions: {e}"))?;
+    let sessions = database
+        .list_sessions_page(page_size, offset, query)
+        .map_err(|e| format!("list sessions page: {e}"))?
+        .into_iter()
+        .map(|session| HistoryItemDto {
+            id: session.id.to_string(),
+            started_at: session.started_at.to_rfc3339(),
+            ended_at: session.ended_at.map(|ended| ended.to_rfc3339()),
+            transcript: session.transcript.unwrap_or_default(),
+            backend: format!("{:?}", session.backend),
+            style: session.style.unwrap_or_default(),
+            status: session_status_label(&session.status),
+        })
+        .collect();
+
+    Ok(HistoryPageDto {
+        sessions,
+        total: total.clamp(0, i64::from(u32::MAX)) as u32,
+    })
 }
 
 pub fn delete_dictionary_entry(entry_id: i32) -> Result<WorkspaceSnapshot, String> {

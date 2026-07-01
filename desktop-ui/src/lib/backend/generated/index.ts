@@ -10,6 +10,7 @@ export type { DictionaryItemDto } from './DictionaryItemDto';
 export type { FormatTogglesDto } from './FormatTogglesDto';
 export type { GpuSupportDto } from './GpuSupportDto';
 export type { HistoryItemDto } from './HistoryItemDto';
+export type { HistoryPageDto } from './HistoryPageDto';
 export type { PillSnapshotDto } from './PillSnapshotDto';
 export type { PillVisibilityDto } from './PillVisibilityDto';
 export type { SaveWorkspaceSettingsInput } from './SaveWorkspaceSettingsInput';

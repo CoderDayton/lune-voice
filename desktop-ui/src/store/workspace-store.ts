@@ -35,6 +35,9 @@ export const workspaceStore = new Store<WorkspaceState>({
   historyPageSize: 20,
   dictionaryEntries: [],
   historySessions: [],
+  historyPageItems: [],
+  historyTotal: 0,
+  historyLoading: false,
   sessionTotals: { sessions: 0, words: 0, seconds: 0 },
   stylePresets: [],
   settings: { ...DEFAULT_SETTINGS },
@@ -60,15 +63,20 @@ export const workspaceActions = {
 
   setHistorySearch(value: string) {
     workspaceStore.setState((s) => ({ ...s, historySearch: value, historyPage: 1 }));
+    // Debounce: one backend query per pause in typing, not per keystroke.
+    if (_historySearchDebounce) clearTimeout(_historySearchDebounce);
+    _historySearchDebounce = setTimeout(() => {
+      void fetchHistoryPage();
+    }, 250);
   },
 
   setHistoryPage(page: number) {
     workspaceStore.setState((s) => {
-      const visible = getVisibleHistorySessions(s);
-      const totalPages = Math.max(1, Math.ceil(visible.length / s.historyPageSize));
+      const totalPages = Math.max(1, Math.ceil(s.historyTotal / s.historyPageSize));
       const clamped = Math.min(Math.max(1, Math.floor(page)), totalPages);
       return clamped === s.historyPage ? s : { ...s, historyPage: clamped };
     });
+    void fetchHistoryPage();
   },
 
   updateSetting<Key extends keyof WorkspaceSettings>(key: Key, value: WorkspaceSettings[Key]) {
@@ -265,8 +273,53 @@ export async function removeHistorySession(sessionId: string) {
   try {
     const snapshot = await backendClient.deleteSession(sessionId);
     workspaceActions.hydrate(snapshot);
+    // The snapshot refreshes the capped `historySessions`/stats, but the
+    // server-paged view is separate — refetch so the current page and total
+    // reflect the deletion.
+    void fetchHistoryPage();
   } catch (error) {
     workspaceActions.setError(formatError(error));
+  }
+}
+
+// ── History pagination (server-side) ──────────────────────────────────
+// The History tab pages the full sessions table on the backend
+// (`list_history_page`) instead of the capped snapshot slice, so it can reach
+// every session. `_historyReqSeq` discards out-of-order responses when the user
+// pages or types quickly.
+let _historyReqSeq = 0;
+let _historySearchDebounce: ReturnType<typeof setTimeout> | null = null;
+
+export async function fetchHistoryPage() {
+  const { historyPage, historyPageSize, historySearch } = workspaceStore.state;
+  const seq = ++_historyReqSeq;
+  workspaceStore.setState((s) => ({ ...s, historyLoading: true }));
+  try {
+    const res = await backendClient.listHistoryPage(
+      historyPage,
+      historyPageSize,
+      historySearch.trim(),
+    );
+    if (seq !== _historyReqSeq) return; // superseded by a newer request
+    // The current page can fall past the end (e.g. deleting the last row on the
+    // last page). Clamp and refetch so the user never lands on a blank page.
+    const maxPage = Math.max(1, Math.ceil(res.total / historyPageSize));
+    if (res.total > 0 && historyPage > maxPage) {
+      workspaceStore.setState((s) => ({ ...s, historyPage: maxPage }));
+      void fetchHistoryPage();
+      return;
+    }
+    const items = res.sessions.map(mapHistoryEntry).filter((e): e is HistorySession => e !== null);
+    workspaceStore.setState((s) => ({
+      ...s,
+      historyPageItems: items,
+      historyTotal: res.total,
+      historyLoading: false,
+    }));
+  } catch (error) {
+    if (seq !== _historyReqSeq) return;
+    workspaceActions.setError(formatError(error));
+    workspaceStore.setState((s) => ({ ...s, historyLoading: false }));
   }
 }
 
@@ -389,37 +442,9 @@ export async function toggleDictation() {
 
 // ── Selectors ─────────────────────────────────────────────────────────
 
-let _visibleCache: { sessions: HistorySession[]; query: string; result: HistorySession[] } | null =
-  null;
-
-export function getVisibleHistorySessions(state: WorkspaceState) {
-  const query = state.historySearch.trim().toLowerCase();
-  if (!query) return state.historySessions;
-  if (
-    _visibleCache &&
-    _visibleCache.sessions === state.historySessions &&
-    _visibleCache.query === query
-  ) {
-    return _visibleCache.result;
-  }
-  const result = state.historySessions.filter((s) => s.transcript.toLowerCase().includes(query));
-  _visibleCache = { sessions: state.historySessions, query, result };
-  return result;
-}
-
-export function getVisibleSessionCount(state: WorkspaceState) {
-  return getVisibleHistorySessions(state).length;
-}
-
-export function getHistoryPageCount(state: WorkspaceState) {
-  const total = getVisibleHistorySessions(state).length;
-  return Math.max(1, Math.ceil(total / state.historyPageSize));
-}
-
-export function getPaginatedHistorySessions(state: WorkspaceState) {
-  const all = getVisibleHistorySessions(state);
-  const start = (state.historyPage - 1) * state.historyPageSize;
-  return all.slice(start, start + state.historyPageSize);
+// Page count derived from the server-reported total (History tab).
+export function getHistoryServerPageCount(state: WorkspaceState) {
+  return Math.max(1, Math.ceil(state.historyTotal / state.historyPageSize));
 }
 
 // Memoized aggregate stats — recomputed only when historySessions reference changes.

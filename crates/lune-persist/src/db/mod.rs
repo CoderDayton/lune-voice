@@ -127,6 +127,31 @@ fn row_to_snippet((i, tp, b): (String, String, String)) -> lune_core::dict::Snip
     }
 }
 
+/// Escape the LIKE metacharacters `%`, `_`, and `\` in a user search term so it
+/// matches literally. Paired with `ESCAPE '\'` in the query.
+fn escape_like(term: &str) -> String {
+    let mut out = String::with_capacity(term.len());
+    for ch in term.chars() {
+        if matches!(ch, '\\' | '%' | '_') {
+            out.push('\\');
+        }
+        out.push(ch);
+    }
+    out
+}
+
+/// The single row predicate deciding whether a session "counts", shared by
+/// `session_stats`, `count_sessions`, and `list_sessions_page` so the overview
+/// total, the History total, and the paged rows are computed from the exact
+/// same set and can never disagree. A session counts when it has a transcript
+/// with non-whitespace content and a parseable start timestamp. The trim set
+/// enumerates the ASCII whitespace bytes (space, tab, LF, VT, FF, CR) so a
+/// whitespace-only transcript is dropped exactly as `str::split_whitespace`
+/// treats it as wordless.
+const COUNTABLE_WHERE: &str = "transcript IS NOT NULL \
+     AND length(trim(transcript, char(32, 9, 10, 11, 12, 13))) > 0 \
+     AND julianday(started_at) IS NOT NULL";
+
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
 #[derive(Debug, Clone)]
@@ -364,44 +389,31 @@ impl Database {
         struct Row {
             #[diesel(sql_type = Text)]
             transcript: String,
-            // NULL when ended_at is NULL OR either timestamp is malformed.
+            // NULL when ended_at is missing/malformed; else the clamped duration.
             #[diesel(sql_type = Nullable<BigInt>)]
             secs: Option<i64>,
-            // 0 when started_at is malformed; non-zero otherwise.
-            #[diesel(sql_type = BigInt)]
-            started_valid: i64,
         }
 
-        let rows: Vec<Row> = diesel::sql_query(
+        // COUNTABLE_WHERE already excludes malformed `started_at` and
+        // whitespace-only transcripts, so this walks the exact same rows as
+        // `count_sessions` — the sessions total is identical by construction.
+        let rows: Vec<Row> = diesel::sql_query(format!(
             "SELECT \
                  transcript, \
                  CASE \
-                     WHEN ended_at IS NULL \
-                          OR julianday(ended_at) IS NULL \
-                          OR julianday(started_at) IS NULL \
-                         THEN NULL \
+                     WHEN ended_at IS NULL OR julianday(ended_at) IS NULL THEN NULL \
                      ELSE CAST(MAX(1, (julianday(ended_at) - julianday(started_at)) * 86400) AS INTEGER) \
-                 END AS secs, \
-                 CASE WHEN julianday(started_at) IS NULL THEN 0 ELSE 1 END AS started_valid \
-             FROM sessions \
-             WHERE transcript IS NOT NULL \
-               AND length(trim(transcript)) > 0",
-        )
+                 END AS secs \
+             FROM sessions WHERE {COUNTABLE_WHERE}"
+        ))
         .load(&mut self.conn)?;
 
         let mut stats = SessionStats::default();
         for row in rows {
-            if row.started_valid == 0 {
-                continue;
-            }
-            let words = row.transcript.split_whitespace().count() as u32;
-            if words == 0 {
-                continue;
-            }
             stats.sessions += 1;
-            stats.words += words;
+            stats.words += row.transcript.split_whitespace().count() as u32;
             if let Some(secs) = row.secs {
-                let bounded = secs.max(0).min(i64::from(u32::MAX)) as u32;
+                let bounded = secs.clamp(0, i64::from(u32::MAX)) as u32;
                 stats.seconds = stats.seconds.saturating_add(bounded);
             }
         }
@@ -421,6 +433,99 @@ impl Database {
         let mut out = Vec::with_capacity(rows.len());
         for row in rows {
             out.push(row_to_session(row)?);
+        }
+        Ok(out)
+    }
+
+    /// Count sessions with a non-empty transcript, optionally filtered by a
+    /// case-insensitive transcript substring. The unfiltered count uses the
+    /// same predicate as `session_stats`, so the History total matches the
+    /// overview's lifetime session count.
+    pub fn count_sessions(&mut self, query: Option<&str>) -> PersistResult<i64> {
+        use diesel::sql_types::{BigInt, Text};
+
+        #[derive(diesel::QueryableByName)]
+        struct Count {
+            #[diesel(sql_type = BigInt)]
+            n: i64,
+        }
+
+        let row: Count = match query.map(str::trim).filter(|q| !q.is_empty()) {
+            // `LIKE` is case-insensitive for ASCII only — SQLite has no Unicode
+            // case folding without the ICU extension or FTS, which would be
+            // disproportionate here; adequate for transcript substring search.
+            Some(q) => diesel::sql_query(format!(
+                "SELECT COUNT(*) AS n FROM sessions WHERE {COUNTABLE_WHERE} AND transcript LIKE ? ESCAPE '\\'"
+            ))
+            .bind::<Text, _>(format!("%{}%", escape_like(q)))
+            .get_result(&mut self.conn)?,
+            None => diesel::sql_query(format!(
+                "SELECT COUNT(*) AS n FROM sessions WHERE {COUNTABLE_WHERE}"
+            ))
+            .get_result(&mut self.conn)?,
+        };
+        Ok(row.n)
+    }
+
+    /// A page of sessions (newest first) using the same non-empty-transcript
+    /// predicate as `count_sessions`, so pages and totals stay consistent.
+    /// `query` filters by a case-insensitive transcript substring.
+    pub fn list_sessions_page(
+        &mut self,
+        limit: u32,
+        offset: u32,
+        query: Option<&str>,
+    ) -> PersistResult<Vec<DictationSession>> {
+        use diesel::sql_types::{BigInt, Nullable, Text};
+
+        #[derive(diesel::QueryableByName)]
+        struct Row {
+            #[diesel(sql_type = Text)]
+            id: String,
+            #[diesel(sql_type = Text)]
+            started_at: String,
+            #[diesel(sql_type = Nullable<Text>)]
+            ended_at: Option<String>,
+            #[diesel(sql_type = Text)]
+            style: String,
+            #[diesel(sql_type = Text)]
+            backend: String,
+            #[diesel(sql_type = Text)]
+            status: String,
+            #[diesel(sql_type = Nullable<Text>)]
+            transcript: Option<String>,
+        }
+
+        let cols = format!(
+            "SELECT id, started_at, ended_at, style, backend, status, transcript \
+             FROM sessions WHERE {COUNTABLE_WHERE}"
+        );
+        const TAIL: &str = " ORDER BY started_at DESC LIMIT ? OFFSET ?";
+
+        let rows: Vec<Row> = match query.map(str::trim).filter(|q| !q.is_empty()) {
+            // ASCII-only case folding, as in `count_sessions`.
+            Some(q) => diesel::sql_query(format!("{cols} AND transcript LIKE ? ESCAPE '\\'{TAIL}"))
+                .bind::<Text, _>(format!("%{}%", escape_like(q)))
+                .bind::<BigInt, _>(i64::from(limit))
+                .bind::<BigInt, _>(i64::from(offset))
+                .load(&mut self.conn)?,
+            None => diesel::sql_query(format!("{cols}{TAIL}"))
+                .bind::<BigInt, _>(i64::from(limit))
+                .bind::<BigInt, _>(i64::from(offset))
+                .load(&mut self.conn)?,
+        };
+
+        let mut out = Vec::with_capacity(rows.len());
+        for r in rows {
+            out.push(row_to_session((
+                r.id,
+                r.started_at,
+                r.ended_at,
+                r.style,
+                r.backend,
+                r.status,
+                r.transcript,
+            ))?);
         }
         Ok(out)
     }
@@ -1056,6 +1161,81 @@ mod tests {
             stats.seconds >= 1,
             "seconds from well-formed session counted"
         );
+    }
+
+    #[test]
+    fn history_pagination_counts_pages_and_filters() {
+        let mut db = Database::open_in_memory().unwrap();
+
+        let base = Utc::now() - chrono::Duration::seconds(600);
+        // Five well-formed sessions, staggered so DESC-by-start order is
+        // deterministic (index 0 oldest, index 4 newest).
+        let transcripts = [
+            "alpha hello world",
+            "bravo hello there",
+            "charlie unrelated text",
+            "delta hello again",
+            "echo final entry",
+        ];
+        for (i, text) in transcripts.iter().enumerate() {
+            let started = base + chrono::Duration::seconds(i as i64 * 10);
+            db.insert_session(&DictationSession {
+                id: Uuid::new_v4(),
+                started_at: started,
+                ended_at: Some(started + chrono::Duration::seconds(2)),
+                style: None,
+                backend: AsrBackendKind::WhisperCpp,
+                status: SessionStatus::Completed,
+                transcript: Some((*text).into()),
+            })
+            .unwrap();
+        }
+        // Rows with no usable transcript (empty, spaces, or other ASCII
+        // whitespace) must be excluded from counts and pages.
+        for empty in ["", "   ", "\t\n"] {
+            db.insert_session(&DictationSession {
+                id: Uuid::new_v4(),
+                started_at: Utc::now(),
+                ended_at: Some(Utc::now()),
+                style: None,
+                backend: AsrBackendKind::WhisperCpp,
+                status: SessionStatus::Completed,
+                transcript: Some(empty.into()),
+            })
+            .unwrap();
+        }
+
+        // Total excludes the three whitespace-only rows, and — critically —
+        // count_sessions and session_stats agree on the very same row set, so
+        // the History total can never drift from the overview total.
+        assert_eq!(db.count_sessions(None).unwrap(), 5);
+        assert_eq!(db.session_stats().unwrap().sessions, 5);
+
+        // Page 1 (limit 2) is the two newest, in DESC started_at order.
+        let page1 = db.list_sessions_page(2, 0, None).unwrap();
+        let texts: Vec<_> = page1
+            .iter()
+            .map(|s| s.transcript.clone().unwrap())
+            .collect();
+        assert_eq!(texts, vec!["echo final entry", "delta hello again"]);
+
+        // Page 3 (offset 4) holds the single oldest remaining row.
+        let page3 = db.list_sessions_page(2, 4, None).unwrap();
+        assert_eq!(page3.len(), 1);
+        assert_eq!(page3[0].transcript.as_deref(), Some("alpha hello world"));
+
+        // Search filters by transcript substring, case-insensitively, and its
+        // count agrees with the returned rows.
+        assert_eq!(db.count_sessions(Some("hello")).unwrap(), 3);
+        let hits = db.list_sessions_page(10, 0, Some("HELLO")).unwrap();
+        assert_eq!(hits.len(), 3);
+        assert!(
+            hits.iter()
+                .all(|s| s.transcript.as_deref().unwrap().contains("hello"))
+        );
+
+        // A LIKE metacharacter in the query matches literally, not as a wildcard.
+        assert_eq!(db.count_sessions(Some("%")).unwrap(), 0);
     }
 
     #[test]

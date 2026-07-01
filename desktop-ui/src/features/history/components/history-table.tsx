@@ -15,9 +15,8 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { ConfirmDialog } from '../../../components/feedback/confirm-dialog';
 import {
-  getHistoryPageCount,
-  getPaginatedHistorySessions,
-  getVisibleSessionCount,
+  fetchHistoryPage,
+  getHistoryServerPageCount,
   type HistorySession,
   removeHistorySession,
   workspaceActions,
@@ -44,15 +43,25 @@ function formatDuration(seconds: number): string {
  */
 export function HistoryTable() {
   const { t } = useLingui();
-  const sessions = useStore(workspaceStore, getPaginatedHistorySessions);
-  const visibleCount = useStore(workspaceStore, getVisibleSessionCount);
-  const totalCount = useStore(workspaceStore, (s) => s.historySessions.length);
+  const sessions = useStore(workspaceStore, (s) => s.historyPageItems);
+  // `visibleCount` = sessions matching the query (server total for this page
+  // set); `totalCount` = the lifetime session count (unfiltered), matching the
+  // overview. They coincide when the search box is empty.
+  const visibleCount = useStore(workspaceStore, (s) => s.historyTotal);
+  const totalCount = useStore(workspaceStore, (s) => s.sessionTotals.sessions);
+  const loading = useStore(workspaceStore, (s) => s.historyLoading);
   const search = useStore(workspaceStore, (s) => s.historySearch);
   const page = useStore(workspaceStore, (s) => s.historyPage);
   const pageSize = useStore(workspaceStore, (s) => s.historyPageSize);
-  const totalPages = useStore(workspaceStore, getHistoryPageCount);
+  const totalPages = useStore(workspaceStore, getHistoryServerPageCount);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // Load the first page on mount; page/search changes refetch via their store
+  // actions (`setHistoryPage` / `setHistorySearch`).
+  useEffect(() => {
+    void fetchHistoryPage();
+  }, []);
 
   // "/" focuses the search field, matching the rest of the app.
   useEffect(() => {
@@ -110,13 +119,17 @@ export function HistoryTable() {
       <div className="min-h-0 flex-1 overflow-y-auto">
         {sessions.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center px-6 py-16 text-center">
-            <p className="text-sm text-content-muted">
-              {hasSearch
-                ? t`No sessions match "${search.trim()}".`
-                : totalCount === 0
-                  ? t`No sessions yet. Start dictating to see your transcripts here.`
-                  : t`No sessions found.`}
-            </p>
+            {loading ? (
+              <span className="loading loading-spinner loading-md text-content-subtle" />
+            ) : (
+              <p className="text-sm text-content-muted">
+                {hasSearch
+                  ? t`No sessions match "${search.trim()}".`
+                  : totalCount === 0
+                    ? t`No sessions yet. Start dictating to see your transcripts here.`
+                    : t`No sessions found.`}
+              </p>
+            )}
           </div>
         ) : (
           <table className="w-full border-collapse text-sm">

@@ -2,8 +2,6 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import {
   getSessionStats,
   getTodayStats,
-  getVisibleHistorySessions,
-  getVisibleSessionCount,
   loadWorkspaceSnapshot,
   workspaceActions,
   workspaceStore,
@@ -96,53 +94,18 @@ describe("workspace selectors", () => {
       sidebarCollapsed: false,
       mobileMenuOpen: false,
       historySearch: "",
+      historyPage: 1,
+      historyPageSize: 20,
       dictionaryEntries: [],
       historySessions: [],
+      historyPageItems: [],
+      historyTotal: 0,
+      historyLoading: false,
       sessionTotals: { sessions: 0, words: 0, seconds: 0 },
       stylePresets: [],
       settings: { ...DEFAULT_SETTINGS },
       runtime: { ...DEFAULT_RUNTIME },
     }));
-  });
-
-  // ── getVisibleHistorySessions ─────────────────────────────────────────
-
-  test("returns all sessions when search is empty", () => {
-    workspaceActions.hydrate(makeSnapshot());
-    const visible = getVisibleHistorySessions(workspaceStore.state);
-    expect(visible).toHaveLength(3);
-  });
-
-  test("filters sessions by transcript text (case insensitive)", () => {
-    workspaceActions.hydrate(makeSnapshot());
-
-    workspaceActions.setHistorySearch("search");
-    const visible = getVisibleHistorySessions(workspaceStore.state);
-    expect(visible).toHaveLength(1);
-    expect(visible[0]!.id).toBe("s2");
-  });
-
-  test("returns empty array when no sessions match search", () => {
-    workspaceActions.hydrate(makeSnapshot());
-
-    workspaceActions.setHistorySearch("zzzzzznotfound");
-    const visible = getVisibleHistorySessions(workspaceStore.state);
-    expect(visible).toHaveLength(0);
-  });
-
-  test("getVisibleSessionCount matches filtered length", () => {
-    workspaceActions.hydrate(makeSnapshot());
-
-    workspaceActions.setHistorySearch("hello");
-    expect(getVisibleSessionCount(workspaceStore.state)).toBe(1);
-  });
-
-  test("search trims whitespace", () => {
-    workspaceActions.hydrate(makeSnapshot());
-
-    workspaceActions.setHistorySearch("  hello  ");
-    const visible = getVisibleHistorySessions(workspaceStore.state);
-    expect(visible).toHaveLength(1);
   });
 
   // ── getSessionStats ───────────────────────────────────────────────────

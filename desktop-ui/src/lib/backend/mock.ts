@@ -272,6 +272,19 @@ export const mockBackendClient: BackendClient = {
     return structuredClone(mockSnapshot);
   },
 
+  async listHistoryPage(page, pageSize, search) {
+    const q = search.trim().toLowerCase();
+    const matched = mockSnapshot.history
+      .filter((entry) => entry.transcript)
+      .filter((entry) => (q ? entry.transcript.toLowerCase().includes(q) : true))
+      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+    const start = Math.max(0, (page - 1) * pageSize);
+    return {
+      sessions: structuredClone(matched.slice(start, start + pageSize)),
+      total: matched.length,
+    };
+  },
+
   async createCustomStyle(name, description, instructions, formatting) {
     mockSnapshot = {
       ...mockSnapshot,

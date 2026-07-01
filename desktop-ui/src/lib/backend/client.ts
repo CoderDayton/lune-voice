@@ -6,6 +6,7 @@ import type {
   CalibrationHandle,
   CalibrationStreamEvent,
   GpuSupportDto,
+  HistoryPageDto,
   PillSnapshotDto,
   WorkspaceSnapshot,
 } from './types';
@@ -45,6 +46,10 @@ const tauriBackendClient: BackendClient = {
 
   deleteSession(sessionId) {
     return invoke<WorkspaceSnapshot>('delete_session', { sessionId });
+  },
+
+  listHistoryPage(page, pageSize, search) {
+    return invoke<HistoryPageDto>('list_history_page', { page, pageSize, search });
   },
 
   createCustomStyle(name, description, instructions, formatting) {

@@ -2,8 +2,8 @@ use tauri::{Emitter, Runtime, State, WebviewWindow, ipc::Channel};
 
 use crate::dto::{
     CalibrationStreamEvent, CreateCustomStyleInput, CreateDictionaryEntryInput, GpuSupportDto,
-    PillSnapshotDto, SaveWorkspaceSettingsInput, SessionStreamEvent, UpdateCustomStyleInput,
-    UpdateDictionaryEntryInput, WorkspaceSnapshot,
+    HistoryPageDto, PillSnapshotDto, SaveWorkspaceSettingsInput, SessionStreamEvent,
+    UpdateCustomStyleInput, UpdateDictionaryEntryInput, WorkspaceSnapshot,
 };
 use crate::runtime::AppRuntime;
 
@@ -175,6 +175,20 @@ pub async fn delete_session(
     .await?;
     snapshot.service_status = runtime.service_status().await;
     Ok(snapshot)
+}
+
+#[tauri::command]
+pub async fn list_history_page(
+    window: WebviewWindow,
+    page: u32,
+    page_size: u32,
+    search: Option<String>,
+) -> Result<HistoryPageDto, String> {
+    require_window_access(&window, &["main"])?;
+    run_persist("list history page", move || {
+        crate::persistence::list_history_page(page, page_size, search)
+    })
+    .await
 }
 
 #[tauri::command]

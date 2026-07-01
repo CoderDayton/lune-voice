@@ -90,6 +90,11 @@ export interface WorkspaceState {
   historyPageSize: number;
   dictionaryEntries: DictionaryEntry[];
   historySessions: HistorySession[];
+  // Server-paged view for the History tab (fetched via `list_history_page`),
+  // independent of the capped `historySessions` snapshot slice.
+  historyPageItems: HistorySession[];
+  historyTotal: number;
+  historyLoading: boolean;
   sessionTotals: SessionTotals;
   stylePresets: StylePreset[];
   settings: WorkspaceSettings;

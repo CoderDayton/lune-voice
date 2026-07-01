@@ -28,6 +28,42 @@ fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
 
+/// Smallest usable window. Also the OS-enforced minimum and the floor for the
+/// adaptive default, so the UI never opens below its designed layout width.
+const MIN_WINDOW_W: f64 = 1280.0;
+const MIN_WINDOW_H: f64 = 720.0;
+/// Upper bound on the adaptive default — caps ultrawide and 4K monitors so the
+/// window opens at a comfortable size instead of a sprawling one.
+const MAX_WINDOW_W: f64 = 1600.0;
+const MAX_WINDOW_H: f64 = 1100.0;
+/// Fraction of the monitor the default window aims to fill (~70%, mid the
+/// desired 60–75% range).
+const WINDOW_SCREEN_FRACTION: f64 = 0.70;
+
+/// Adaptive default window size: ~70% of the primary monitor's logical size,
+/// clamped to `[MIN, MAX]` per axis. The width cap keeps ultrawides from
+/// opening an absurdly wide window; the floor keeps small laptops at the UI's
+/// designed minimum. Falls back to the min size if the monitor can't be read.
+fn adaptive_window_size(app: &tauri::AppHandle) -> (f64, f64) {
+    let Ok(Some(monitor)) = app.primary_monitor() else {
+        return (MIN_WINDOW_W, MIN_WINDOW_H);
+    };
+    // Guard against a bogus scale (0 / NaN / inf) so the division can't yield a
+    // non-finite size the builder would choke on.
+    let raw_scale = monitor.scale_factor();
+    let scale = if raw_scale.is_finite() && raw_scale > 0.0 {
+        raw_scale
+    } else {
+        1.0
+    };
+    let size = monitor.size();
+    let logical_w = size.width as f64 / scale;
+    let logical_h = size.height as f64 / scale;
+    let width = (logical_w * WINDOW_SCREEN_FRACTION).clamp(MIN_WINDOW_W, MAX_WINDOW_W);
+    let height = (logical_h * WINDOW_SCREEN_FRACTION).clamp(MIN_WINDOW_H, MAX_WINDOW_H);
+    (width, height)
+}
+
 /// Bring the main window to front, creating it on demand if it doesn't exist.
 /// We don't keep the window alive while minimized — closing destroys the
 /// webview to free its memory, and the next call here rebuilds it.
@@ -38,12 +74,14 @@ fn create_or_focus_main_window(app: &tauri::AppHandle) {
         let _ = w.set_focus();
         return;
     }
+    let (width, height) = adaptive_window_size(app);
     if let Err(e) = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
         .title("Lune Voice")
-        .inner_size(1280.0, 720.0)
-        .min_inner_size(1280.0, 720.0)
+        .inner_size(width, height)
+        .min_inner_size(MIN_WINDOW_W, MIN_WINDOW_H)
         .resizable(true)
         .decorations(true)
+        .center()
         .build()
     {
         tracing::error!(error = %e, "failed to create main window");
@@ -136,6 +174,7 @@ pub fn run() {
             commands::save_workspace_settings,
             commands::create_dictionary_entry,
             commands::delete_session,
+            commands::list_history_page,
             commands::delete_dictionary_entry,
             commands::update_dictionary_entry,
             commands::create_custom_style,
