@@ -4,7 +4,6 @@ use std::time::Duration;
 
 use tokio::time::Instant;
 
-use lune_app::calibration::{CalibrationFrame, CalibrationSession};
 use lune_app::{DeliveryService, SessionManager, SessionManagerConfig};
 #[cfg(unix)]
 use lune_app::{WindowTarget, capture_focus_target};
@@ -28,7 +27,7 @@ use tracing::info;
 use tracing::{debug, warn};
 use uuid::Uuid;
 
-use crate::dto::{CalibrationDiagnosticsDto, CalibrationStreamEvent, SessionStreamEvent};
+use crate::dto::SessionStreamEvent;
 
 const LOCAL_LLM_IDLE_TTL: Duration = Duration::from_secs(8);
 const HOLD_WARMUP_GRACE: Duration = Duration::from_millis(250);
@@ -55,8 +54,6 @@ struct RuntimeInner {
     last_toggle_at: Mutex<Instant>,
     /// Separate debounce for cancel so it isn't blocked by a recent toggle.
     last_cancel_at: Mutex<Instant>,
-    /// Active microphone-calibration session (mutually exclusive with dictation).
-    calibration: Mutex<Option<CalibrationSession>>,
     /// Long-lived microphone capture stream when `mic_prewarm` is enabled.
     /// Sessions consume via `AudioStreamHandle` so the cpal::Stream stays
     /// open across hotkey presses and the first chunk arrives ~70 ms sooner.
@@ -131,7 +128,6 @@ impl AppRuntime {
                 delivery,
                 last_toggle_at: Mutex::new(Instant::now() - TOGGLE_DEBOUNCE),
                 last_cancel_at: Mutex::new(Instant::now() - CANCEL_DEBOUNCE),
-                calibration: Mutex::new(None),
                 prewarmed_audio: Mutex::new(None),
             }),
         };
@@ -264,48 +260,6 @@ impl AppRuntime {
         {
             *slot = None;
         }
-    }
-
-    pub async fn calibrate_start(
-        &self,
-        channel: Channel<CalibrationStreamEvent>,
-    ) -> Result<(), String> {
-        let paths = {
-            let pipeline = self.inner.pipeline.lock().await;
-            if pipeline.active {
-                return Err("cannot calibrate while a dictation session is active".into());
-            }
-            pipeline.paths.clone()
-        };
-        // Calibrate the device the user actually dictates with. Read it from the
-        // persisted settings: `inner.settings` is only refreshed on a pipeline
-        // rebuild, so it can be stale right after a device change is saved.
-        let input_device = load_settings(&paths).ok().and_then(|s| s.input_device);
-        {
-            let mut slot = self.inner.calibration.lock().await;
-            if slot.is_some() {
-                return Err("a calibration session is already running".into());
-            }
-            let (tx, rx) = mpsc::channel::<CalibrationFrame>(64);
-            let session = CalibrationSession::start(tx, input_device);
-            *slot = Some(session);
-            tokio::spawn(forward_calibration(rx, channel));
-        }
-        Ok(())
-    }
-
-    pub async fn calibrate_advance(&self) -> Result<(), String> {
-        let slot = self.inner.calibration.lock().await;
-        let session = slot
-            .as_ref()
-            .ok_or_else(|| "no active calibration session".to_string())?;
-        session.advance_to_speech();
-        Ok(())
-    }
-
-    pub async fn calibrate_cancel(&self) {
-        // Drop notifies the cancel signal and aborts the spawned task.
-        let _ = self.inner.calibration.lock().await.take();
     }
 
     pub async fn mark_reload_required(&self) {
@@ -1021,42 +975,6 @@ async fn build_pipeline(
     };
 
     Ok((pipeline, llm_service, settings))
-}
-
-async fn forward_calibration(
-    mut rx: mpsc::Receiver<CalibrationFrame>,
-    channel: Channel<CalibrationStreamEvent>,
-) {
-    while let Some(frame) = rx.recv().await {
-        let event = match frame {
-            CalibrationFrame::PhaseChanged(phase) => CalibrationStreamEvent::PhaseChanged {
-                phase: phase.as_str().to_owned(),
-            },
-            CalibrationFrame::Frame {
-                phase,
-                vad_score,
-                energy,
-            } => CalibrationStreamEvent::Frame {
-                phase: phase.as_str().to_owned(),
-                vad_score,
-                energy,
-            },
-            CalibrationFrame::Result(r) => CalibrationStreamEvent::Result {
-                speech_threshold: r.speech_threshold,
-                speech_threshold_end: r.speech_threshold_end,
-                diagnostics: CalibrationDiagnosticsDto {
-                    noise_p95: r.noise_p95,
-                    speech_p10: r.speech_p10,
-                    pause_p20: r.pause_p20,
-                },
-            },
-            CalibrationFrame::Error(message) => CalibrationStreamEvent::Error { message },
-        };
-        if let Err(e) = channel.send(event) {
-            warn!(error = %e, "calibration channel send failed; dropping subscription");
-            break;
-        }
-    }
 }
 
 fn resolve_paths() -> Result<AppPaths, String> {

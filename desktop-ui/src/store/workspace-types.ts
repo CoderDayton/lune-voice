@@ -23,9 +23,6 @@ export interface WorkspaceSettings {
   soundCueVolume: number;
   /** Selected style preset id, or `null` for no styling (raw transcript). */
   stylePreset: string | null;
-  adaptiveVad: boolean;
-  speechThreshold: string;
-  speechThresholdEnd: string;
   hotkeyToggle: string;
   hotkeyCancel: string;
   pillVisibility: PillVisibilityValue;
@@ -114,9 +111,6 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   soundCuesEnabled: true,
   soundCueVolume: 1.0,
   stylePreset: null,
-  adaptiveVad: false,
-  speechThreshold: '0.50',
-  speechThresholdEnd: '0.30',
   hotkeyToggle: 'Ctrl+Space',
   hotkeyCancel: 'Escape',
   pillVisibility: 'Always',

@@ -1,10 +1,8 @@
-import { Channel, invoke } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
 import { mockBackendClient } from './mock';
 import { isTauriRuntime } from './runtime';
 import type {
   BackendClient,
-  CalibrationHandle,
-  CalibrationStreamEvent,
   GpuSupportDto,
   HistoryPageDto,
   PillSnapshotDto,
@@ -86,21 +84,6 @@ const tauriBackendClient: BackendClient = {
 
   gpuSupport() {
     return invoke<GpuSupportDto>('gpu_support');
-  },
-
-  async calibrateStart(onEvent): Promise<CalibrationHandle> {
-    const channel = new Channel<CalibrationStreamEvent>((event) => {
-      try {
-        onEvent(event);
-      } catch (e) {
-        console.error('[calibrate] event handler threw', e);
-      }
-    });
-    await invoke<void>('calibrate_start', { channel });
-    return {
-      advance: () => invoke<void>('calibrate_advance'),
-      cancel: () => invoke<void>('calibrate_cancel'),
-    };
   },
 };
 

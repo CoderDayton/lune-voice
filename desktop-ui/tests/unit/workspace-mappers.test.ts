@@ -19,9 +19,6 @@ function makeBackendSettings() {
     asrBackendType: "Qwen3Asr" as const,
     confidenceThreshold: 0.75,
     llmSkipThreshold: 0.8,
-    adaptiveVad: false,
-    speechThreshold: 0.6,
-    speechThresholdEnd: 0.3,
     stylePreset: "professional",
     hotkeyToggle: "Ctrl+Space",
     hotkeyCancel: "Escape",
@@ -150,7 +147,6 @@ describe("workspace mappers", () => {
     expect(result.asrBackend).toBe("Qwen3Asr");
     expect(result.confidenceThreshold).toBe("0.75");
     expect(result.llmSkipThreshold).toBe("0.80");
-    expect(result.speechThreshold).toBe("0.60");
     expect(result.pillVisibility).toBe("WhenDictating");
   });
 
@@ -215,7 +211,6 @@ describe("workspace mappers", () => {
     expect(input.activationMode).toBe("Toggle");
     expect(input.confidenceThreshold).toBe(0.55);
     expect(input.llmSkipThreshold).toBe(0.4);
-    expect(input.speechThreshold).toBe(0.5);
     expect(input.openaiAsrApiKey).toBeNull();
   });
 

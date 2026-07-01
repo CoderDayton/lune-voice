@@ -24,7 +24,7 @@ soundCueVolume: number, useGpu: boolean, devicePolicy: DevicePolicyDto, asrBacke
 /**
  * Clean-segment confidence bound for bypassing the correction LLM.
  */
-llmSkipThreshold: number | null, adaptiveVad: boolean, speechThreshold: number, speechThresholdEnd: number, stylePreset: string | null, hotkeyToggle: string, hotkeyCancel: string, pillVisibility: PillVisibilityDto, language: string, dictationLanguage: string, micPrewarm: boolean, 
+llmSkipThreshold: number | null, stylePreset: string | null, hotkeyToggle: string, hotkeyCancel: string, pillVisibility: PillVisibilityDto, language: string, dictationLanguage: string, micPrewarm: boolean, 
 /**
  * Preferred microphone input device by name; null = system default.
  */

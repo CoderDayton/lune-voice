@@ -448,18 +448,6 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
             .pipeline
             .llm_skip_threshold
             .or(backend_defaults.llm_skip_threshold),
-        adaptive_vad: settings
-            .pipeline
-            .adaptive_vad
-            .unwrap_or(settings.adaptive_vad),
-        speech_threshold: settings
-            .pipeline
-            .speech_threshold
-            .unwrap_or(backend_defaults.speech_threshold),
-        speech_threshold_end: settings
-            .pipeline
-            .speech_threshold_end
-            .unwrap_or(backend_defaults.speech_threshold_end),
         style_preset: settings.default_style.clone(),
         hotkey_toggle: format_key_combo(&settings.hotkey.toggle_dictation),
         hotkey_cancel: format_key_combo(&settings.hotkey.cancel_dictation),
@@ -508,33 +496,9 @@ fn apply_settings_dto(
     {
         return Err(format!("llmSkipThreshold must be 0.0–1.0, got {threshold}"));
     }
-    if !input.speech_threshold.is_finite() || !(0.0..=1.0).contains(&input.speech_threshold) {
-        return Err(format!(
-            "speechThreshold must be 0.0–1.0, got {}",
-            input.speech_threshold
-        ));
-    }
-    if !input.speech_threshold_end.is_finite() || !(0.0..=1.0).contains(&input.speech_threshold_end)
-    {
-        return Err(format!(
-            "speechThresholdEnd must be 0.0–1.0, got {}",
-            input.speech_threshold_end
-        ));
-    }
-    if input.speech_threshold_end > input.speech_threshold {
-        return Err(format!(
-            "speechThresholdEnd ({}) must be <= speechThreshold ({})",
-            input.speech_threshold_end, input.speech_threshold
-        ));
-    }
-
     settings.pipeline.word_confidence_threshold = input.confidence_threshold;
     settings.pipeline.llm_skip_threshold = input.llm_skip_threshold;
     settings.word_confidence_threshold = input.confidence_threshold.unwrap_or(0.5);
-    settings.pipeline.adaptive_vad = Some(input.adaptive_vad);
-    settings.adaptive_vad = input.adaptive_vad;
-    settings.pipeline.speech_threshold = Some(input.speech_threshold);
-    settings.pipeline.speech_threshold_end = Some(input.speech_threshold_end);
 
     // Validate style_preset — `None`/empty means no styling (raw transcript);
     // any present value must be a known builtin or custom style.
@@ -885,9 +849,6 @@ mod tests {
             asr_backend_type: dto.asr_backend_type,
             confidence_threshold: dto.confidence_threshold,
             llm_skip_threshold: dto.llm_skip_threshold,
-            adaptive_vad: dto.adaptive_vad,
-            speech_threshold: dto.speech_threshold,
-            speech_threshold_end: dto.speech_threshold_end,
             style_preset: dto.style_preset,
             hotkey_toggle: dto.hotkey_toggle,
             hotkey_cancel: dto.hotkey_cancel,

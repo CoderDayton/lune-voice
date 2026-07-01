@@ -35,37 +35,6 @@ export type {
   WorkspaceSnapshot,
 } from './generated';
 
-export type CalibrationPhase =
-  | 'idle'
-  | 'noise'
-  | 'waiting'
-  | 'speech'
-  | 'done'
-  | 'cancelled'
-  | 'failed';
-
-export interface CalibrationDiagnostics {
-  noiseP95: number;
-  speechP10: number;
-  pauseP20: number;
-}
-
-export type CalibrationStreamEvent =
-  | { type: 'phaseChanged'; phase: CalibrationPhase }
-  | { type: 'frame'; phase: CalibrationPhase; vadScore: number; energy: number }
-  | {
-      type: 'result';
-      speechThreshold: number;
-      speechThresholdEnd: number;
-      diagnostics: CalibrationDiagnostics;
-    }
-  | { type: 'error'; message: string };
-
-export interface CalibrationHandle {
-  advance(): Promise<void>;
-  cancel(): Promise<void>;
-}
-
 export interface BackendClient {
   loadWorkspaceSnapshot(): Promise<WorkspaceSnapshot>;
   loadPillSnapshot(): Promise<PillSnapshotDto>;
@@ -105,7 +74,6 @@ export interface BackendClient {
   toggleDictation(): Promise<string | null>;
   /** Whether a CUDA feature was compiled into this build (build-time GPU support). */
   gpuSupport(): Promise<GpuSupportDto>;
-  calibrateStart(onEvent: (event: CalibrationStreamEvent) => void): Promise<CalibrationHandle>;
 }
 
 export type SessionStreamEvent =
