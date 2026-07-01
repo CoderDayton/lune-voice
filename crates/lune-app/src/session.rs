@@ -1377,8 +1377,10 @@ mod tests {
                 let responses = vec![Ok(vec![segment])];
                 // The styling LLM runs only when a style is selected; setting
                 // "casual" enables it, so the cancel-during-LLM path is exercised.
-                let mut settings = lune_core::config::UserSettings::default();
-                settings.default_style = Some("casual".into());
+                let settings = lune_core::config::UserSettings {
+                    default_style: Some("casual".into()),
+                    ..Default::default()
+                };
                 let (mgr, db) = make_manager_with_settings(scripted_asr(responses), post, settings);
                 let (tx, rx) = mpsc::channel(32);
                 let session_id = mgr.start_with_audio(tx, speech_stream()).await.unwrap();
