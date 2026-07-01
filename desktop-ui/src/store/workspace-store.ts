@@ -236,6 +236,33 @@ export async function saveWorkspaceSetting<Key extends keyof WorkspaceSettings>(
   }
 }
 
+/// Update several settings and persist them in a single save. Used when two
+/// fields must move together (e.g. the styling switch enables both the style
+/// preset and the local engine) so they never land in the store desynced.
+export async function saveWorkspaceSettings(patch: Partial<WorkspaceSettings>): Promise<boolean> {
+  const previousSettings = workspaceStore.state.settings;
+  for (const [key, value] of Object.entries(patch)) {
+    workspaceActions.updateSetting(key as keyof WorkspaceSettings, value as never);
+  }
+  try {
+    const snapshot = await backendClient.saveWorkspaceSettings(
+      settingsToSaveInput(workspaceStore.state.settings),
+    );
+    workspaceActions.hydrate(snapshot);
+    return true;
+  } catch (error) {
+    try {
+      const snapshot = await backendClient.loadWorkspaceSnapshot();
+      workspaceActions.hydrate(snapshot);
+    } catch (reloadError) {
+      console.warn('[workspace] failed to reload snapshot after save failure', reloadError);
+      workspaceStore.setState((s) => ({ ...s, settings: previousSettings }));
+    }
+    workspaceActions.setError(formatError(error));
+    return false;
+  }
+}
+
 export async function addDictionaryEntry(phrase: string, replacement: string, priority = 5) {
   const p = phrase.trim();
   const r = replacement.trim();

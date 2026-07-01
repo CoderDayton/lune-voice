@@ -1,7 +1,7 @@
 import { useLingui } from '@lingui/react/macro';
 import { AudioLines, Wand2 } from 'lucide-react';
 import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown';
-import { saveWorkspaceSetting } from '../../../store/workspace-store';
+import { saveWorkspaceSetting, saveWorkspaceSettings } from '../../../store/workspace-store';
 import { AsrEngineCards } from '../components/asr-engine-cards';
 import { OpenAiFields } from '../components/openai-fields';
 import {
@@ -100,7 +100,15 @@ export function TranscriptionSection({
               type="checkbox"
               className="toggle toggle-primary"
               checked={llmEnabled}
-              onChange={(e) => void saveWorkspaceSetting('llmEnabled', e.target.checked)}
+              onChange={(e) =>
+                void saveWorkspaceSettings({
+                  llmEnabled: e.target.checked,
+                  // Disabling here must also drop the remembered style — otherwise
+                  // it sits selected with the engine off, which the settings
+                  // migration then "heals" back to enabled on the next load.
+                  stylePreset: e.target.checked ? settings.stylePreset : null,
+                })
+              }
               aria-label={t`Enable correction LLM`}
             />
           }

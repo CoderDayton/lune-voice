@@ -133,4 +133,27 @@ mod tests {
         ));
         assert!(matches!(parsed.llm_backend, LlmBackendConfig::Local {}));
     }
+
+    #[test]
+    fn migration_heals_selected_style_with_disabled_engine() {
+        // A style selected while the engine was left Disabled (a legacy/desynced
+        // config) must heal to the local styling engine so styling actually runs
+        // and the LLM warms up on hotkey.
+        let mut settings = UserSettings {
+            default_style: Some("casual".into()),
+            llm_backend: LlmBackendConfig::Disabled,
+            ..UserSettings::default()
+        };
+        settings.migrate_pipeline_fields();
+        assert!(matches!(settings.llm_backend, LlmBackendConfig::Local {}));
+
+        // No style selected → engine stays Disabled (styling off).
+        let mut off = UserSettings {
+            default_style: None,
+            llm_backend: LlmBackendConfig::Disabled,
+            ..UserSettings::default()
+        };
+        off.migrate_pipeline_fields();
+        assert!(matches!(off.llm_backend, LlmBackendConfig::Disabled));
+    }
 }

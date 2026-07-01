@@ -7,7 +7,7 @@ import {
   createCustomStyle,
   deleteCustomStyle,
   generateStyleExamples,
-  saveWorkspaceSetting,
+  saveWorkspaceSettings,
   updateCustomStyle,
   workspaceStore,
 } from '../../store/workspace-store';
@@ -170,7 +170,10 @@ export function StylesPage() {
               className="toggle toggle-primary"
               checked={stylingEnabled}
               onChange={(e) =>
-                void saveWorkspaceSetting('stylePreset', e.target.checked ? defaultStyleId : null)
+                void saveWorkspaceSettings({
+                  stylePreset: e.target.checked ? defaultStyleId : null,
+                  llmEnabled: e.target.checked,
+                })
               }
             />
           </label>
@@ -200,7 +203,9 @@ export function StylesPage() {
                 preset={preset}
                 isActive={activePreset === preset.id}
                 isConfirmingDelete={deletingId === preset.id}
-                onSelect={() => void saveWorkspaceSetting('stylePreset', preset.id)}
+                onSelect={() =>
+                  void saveWorkspaceSettings({ stylePreset: preset.id, llmEnabled: true })
+                }
                 onView={() => openModal('view', preset)}
                 onEdit={() => openModal('edit', preset)}
                 onRequestDelete={() => setDeletingId(preset.id)}
