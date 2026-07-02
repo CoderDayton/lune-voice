@@ -2,9 +2,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use lune_core::config::UserSettings;
+use lune_core::config::{AsrBackendConfig, LlmBackendConfig, RedactedString, UserSettings};
 
 use crate::error::PersistResult;
+use crate::secrets::{KeyringVault, SecretSlot, SecretVault};
 
 static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -17,14 +18,46 @@ fn dictation_mode_was_both(content: &str) -> bool {
     })
 }
 
+/// True when the raw settings TOML carries a non-empty `api_key = "..."` line —
+/// i.e. a plaintext secret that should be migrated into the keyring. Empty
+/// (`api_key = ""`, the blanked/keyring-backed state) does not count.
+fn has_inline_api_key(content: &str) -> bool {
+    content.lines().any(|line| {
+        let line = line.trim_start();
+        line.strip_prefix("api_key")
+            .and_then(|rest| rest.trim_start().strip_prefix('='))
+            .map(str::trim)
+            .is_some_and(|value| value.starts_with('"') && value != "\"\"")
+    })
+}
+
 /// Read/write `UserSettings` as TOML with atomic writes.
+///
+/// API keys are kept out of the plaintext TOML: on `save` they are written to
+/// the OS keyring (via [`SecretVault`]) and blanked in the file; on `load` they
+/// are restored from the keyring back into the in-memory `UserSettings`. The
+/// rest of the app therefore always sees real keys and needs no changes.
 pub struct SettingsStore {
     path: PathBuf,
+    vault: Box<dyn SecretVault>,
 }
 
 impl SettingsStore {
     pub fn new(path: impl Into<PathBuf>) -> Self {
-        Self { path: path.into() }
+        Self {
+            path: path.into(),
+            vault: Box::new(KeyringVault),
+        }
+    }
+
+    /// Construct with an explicit secret vault. Used by tests to inject an
+    /// in-memory backend instead of touching the real OS keyring.
+    #[cfg(test)]
+    pub fn with_vault(path: impl Into<PathBuf>, vault: Box<dyn SecretVault>) -> Self {
+        Self {
+            path: path.into(),
+            vault,
+        }
     }
 
     /// Load settings from disk. Returns defaults when the file doesn't exist.
@@ -44,14 +77,132 @@ impl SettingsStore {
         if dictation_mode_was_both(&content) {
             settings.copy_to_clipboard = true;
         }
+        self.restore_secrets(&mut settings);
         Ok(settings)
     }
 
     /// Save settings atomically (write to temp, then rename).
+    ///
+    /// API keys are stored in the keyring and blanked in the written TOML. When
+    /// the keyring is unavailable the key stays inline (best-effort security),
+    /// so a save never loses it.
     pub fn save(&self, settings: &UserSettings) -> PersistResult<()> {
-        let content = toml::to_string_pretty(settings)?;
+        let scrubbed = self.persist_secrets(settings);
+        let content = toml::to_string_pretty(&scrubbed)?;
         atomic_write(&self.path, content.as_bytes())?;
         Ok(())
+    }
+
+    /// Lift any plaintext API keys out of `settings.toml` into the OS keyring.
+    ///
+    /// Called once at startup so a key never lingers in the file until the
+    /// user's next settings change. Idempotent and cheap: it does nothing when
+    /// the file holds no inline key (the steady state after migration) and
+    /// rewrites the file only when a key actually moved. If the keyring is
+    /// unavailable the key stays inline — the file is left as-is, so this is
+    /// always safe to call.
+    pub fn migrate_secrets_to_keyring(&self) -> PersistResult<()> {
+        if !self.path.exists() {
+            return Ok(());
+        }
+        let raw = fs::read_to_string(&self.path)?;
+        if !has_inline_api_key(&raw) {
+            return Ok(());
+        }
+        let settings = self.load()?;
+        let scrubbed = self.persist_secrets(&settings);
+        let new_content = toml::to_string_pretty(&scrubbed)?;
+        if new_content != raw {
+            atomic_write(&self.path, new_content.as_bytes())?;
+            tracing::info!("migrated plaintext API key(s) from settings.toml into the OS keyring");
+        }
+        Ok(())
+    }
+
+    /// Populate blanked API keys from the keyring. An inline (non-empty) key in
+    /// the TOML always wins — it is either a legacy plaintext config or the
+    /// fallback written when no keyring was available — and gets migrated into
+    /// the keyring on the next save.
+    fn restore_secrets(&self, settings: &mut UserSettings) {
+        // ── Remote ASR key ──
+        if let AsrBackendConfig::OpenAiCompatible { api_key, .. } = &mut settings.asr_backend
+            && api_key.expose().is_empty()
+            && let Some(stored) = self.vault.get(SecretSlot::AsrApiKey)
+        {
+            *api_key = RedactedString::new(stored);
+        }
+
+        // ── Remote styling-LLM key ──
+        // Canonical home is `llm_openai`; the active `llm_backend` holds a copy
+        // when remote. Resolve the provider key first, then mirror it into the
+        // active backend so `styling_llm_readiness` and the client builder see it.
+        if settings.llm_openai.api_key.expose().is_empty()
+            && let Some(stored) = self.vault.get(SecretSlot::LlmApiKey)
+        {
+            settings.llm_openai.api_key = RedactedString::new(stored);
+        }
+        let llm_key = {
+            let k = settings.llm_openai.api_key.expose();
+            (!k.is_empty()).then(|| k.to_owned())
+        };
+        if let LlmBackendConfig::OpenAiCompatible { api_key, .. } = &mut settings.llm_backend
+            && api_key.expose().is_empty()
+            && let Some(k) = llm_key
+        {
+            *api_key = RedactedString::new(k);
+        }
+    }
+
+    /// Store API keys in the keyring and return a clone with those keys blanked
+    /// for TOML serialization. A key the keyring rejects is left inline so it is
+    /// never lost; a genuinely empty key clears its keyring slot.
+    fn persist_secrets(&self, settings: &UserSettings) -> UserSettings {
+        let mut out = settings.clone();
+
+        // ── Remote ASR key ──
+        let asr_key = match &out.asr_backend {
+            AsrBackendConfig::OpenAiCompatible { api_key, .. } => Some(api_key.expose().to_owned()),
+            _ => None,
+        };
+        match asr_key {
+            Some(key) if !key.is_empty() => {
+                if self.vault.set(SecretSlot::AsrApiKey, &key)
+                    && let AsrBackendConfig::OpenAiCompatible { api_key, .. } = &mut out.asr_backend
+                {
+                    *api_key = RedactedString::new("");
+                }
+            }
+            // Empty key or no remote ASR backend: drop any stale keyring entry.
+            _ => self.vault.delete(SecretSlot::AsrApiKey),
+        }
+
+        // ── Remote styling-LLM key ──
+        // Canonical home is `llm_openai`, but a legacy config (predating that
+        // field) may carry the key only under an `OpenAiCompatible`
+        // `llm_backend`. Fall back to it so startup migration never leaves that
+        // key in plaintext; blank both once it is safely in the vault.
+        let llm_key = {
+            let canonical = out.llm_openai.api_key.expose();
+            if !canonical.is_empty() {
+                canonical.to_owned()
+            } else if let LlmBackendConfig::OpenAiCompatible { api_key, .. } = &out.llm_backend {
+                api_key.expose().to_owned()
+            } else {
+                String::new()
+            }
+        };
+        if !llm_key.is_empty() {
+            if self.vault.set(SecretSlot::LlmApiKey, &llm_key) {
+                out.llm_openai.api_key = RedactedString::new("");
+                if let LlmBackendConfig::OpenAiCompatible { api_key, .. } = &mut out.llm_backend {
+                    *api_key = RedactedString::new("");
+                }
+            }
+        } else {
+            self.vault.delete(SecretSlot::LlmApiKey);
+        }
+
+        out
     }
 }
 
@@ -180,5 +331,228 @@ mod tests {
 
         let persisted = store.load().unwrap();
         assert_eq!(persisted.language, UserSettings::default().language);
+    }
+
+    #[test]
+    fn api_keys_go_to_vault_not_toml() {
+        use lune_core::config::{OpenAiLlmProvider, StreamingMode};
+        use url::Url;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        // One store instance holds the in-memory vault, so save() then load()
+        // share the same secret state — exactly like the real keyring.
+        let store =
+            SettingsStore::with_vault(&path, Box::new(crate::secrets::InMemoryVault::default()));
+
+        let settings = UserSettings {
+            asr_backend: AsrBackendConfig::OpenAiCompatible {
+                base_url: Url::parse("https://api.example.com/v1").unwrap(),
+                api_key: RedactedString::new("secret-asr"),
+                model: "whisper-1".into(),
+                streaming: StreamingMode::HttpPolling,
+            },
+            llm_openai: OpenAiLlmProvider {
+                base_url: "https://api.example.com/v1".into(),
+                api_key: RedactedString::new("secret-llm"),
+                model: "gpt-4o-mini".into(),
+                max_tokens: 512,
+            },
+            llm_backend: LlmBackendConfig::OpenAiCompatible {
+                base_url: Url::parse("https://api.example.com/v1").unwrap(),
+                api_key: RedactedString::new("secret-llm"),
+                model: "gpt-4o-mini".into(),
+                max_tokens: 512,
+            },
+            ..UserSettings::default()
+        };
+
+        store.save(&settings).unwrap();
+
+        // Neither secret may appear in the plaintext TOML.
+        let on_disk = fs::read_to_string(&path).unwrap();
+        assert!(
+            !on_disk.contains("secret-asr"),
+            "ASR key leaked into settings.toml:\n{on_disk}"
+        );
+        assert!(
+            !on_disk.contains("secret-llm"),
+            "LLM key leaked into settings.toml:\n{on_disk}"
+        );
+
+        // Reloading restores both keys from the vault into memory.
+        let loaded = store.load().unwrap();
+        match &loaded.asr_backend {
+            AsrBackendConfig::OpenAiCompatible { api_key, .. } => {
+                assert_eq!(api_key.expose(), "secret-asr");
+            }
+            other => panic!("asr backend changed shape: {other:?}"),
+        }
+        assert_eq!(loaded.llm_openai.api_key.expose(), "secret-llm");
+        match &loaded.llm_backend {
+            LlmBackendConfig::OpenAiCompatible { api_key, .. } => {
+                assert_eq!(api_key.expose(), "secret-llm");
+            }
+            other => panic!("llm backend changed shape: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unavailable_keyring_keeps_key_inline() {
+        // A vault that refuses every write models a headless/locked keyring;
+        // the key must stay inline in the TOML so it is never lost.
+        struct RejectingVault;
+        impl SecretVault for RejectingVault {
+            fn get(&self, _: SecretSlot) -> Option<String> {
+                None
+            }
+            fn set(&self, _: SecretSlot, _: &str) -> bool {
+                false
+            }
+            fn delete(&self, _: SecretSlot) {}
+        }
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        let store = SettingsStore::with_vault(&path, Box::new(RejectingVault));
+
+        let settings = UserSettings {
+            llm_openai: lune_core::config::OpenAiLlmProvider {
+                api_key: RedactedString::new("inline-secret"),
+                ..Default::default()
+            },
+            ..UserSettings::default()
+        };
+        store.save(&settings).unwrap();
+
+        let on_disk = fs::read_to_string(&path).unwrap();
+        assert!(
+            on_disk.contains("inline-secret"),
+            "key must stay inline when the keyring is unavailable:\n{on_disk}"
+        );
+
+        let loaded = store.load().unwrap();
+        assert_eq!(loaded.llm_openai.api_key.expose(), "inline-secret");
+    }
+
+    #[test]
+    fn migrate_lifts_plaintext_key_into_keyring_and_is_idempotent() {
+        use lune_core::config::OpenAiLlmProvider;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+
+        // Emulate a pre-migration file: a plaintext key written straight to TOML
+        // (RedactedString serializes transparently, so the key is inline).
+        let legacy = UserSettings {
+            llm_openai: OpenAiLlmProvider {
+                api_key: RedactedString::new("plaintext-key"),
+                ..Default::default()
+            },
+            ..UserSettings::default()
+        };
+        let raw = toml::to_string_pretty(&legacy).unwrap();
+        assert!(raw.contains("plaintext-key"));
+        assert!(has_inline_api_key(&raw));
+        fs::write(&path, &raw).unwrap();
+
+        let store =
+            SettingsStore::with_vault(&path, Box::new(crate::secrets::InMemoryVault::default()));
+        store.migrate_secrets_to_keyring().unwrap();
+
+        // The plaintext key is gone from disk but restored on load.
+        let after = fs::read_to_string(&path).unwrap();
+        assert!(
+            !after.contains("plaintext-key"),
+            "plaintext key must be removed from settings.toml:\n{after}"
+        );
+        assert!(!has_inline_api_key(&after));
+        assert_eq!(
+            store.load().unwrap().llm_openai.api_key.expose(),
+            "plaintext-key"
+        );
+
+        // Idempotent: a second migration finds nothing inline and rewrites nothing.
+        store.migrate_secrets_to_keyring().unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), after);
+    }
+
+    #[test]
+    fn migrate_lifts_legacy_llm_backend_key_into_keyring() {
+        use lune_core::config::OpenAiLlmProvider;
+        use url::Url;
+
+        // Legacy config: the styling key lives only under `llm_backend`, while
+        // `llm_openai` (the newer canonical provider) is blank — the exact shape
+        // that regressed (key left in plaintext while "migrated" was logged).
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        let legacy = UserSettings {
+            llm_backend: LlmBackendConfig::OpenAiCompatible {
+                base_url: Url::parse("https://api.example.com/v1").unwrap(),
+                api_key: RedactedString::new("sk-legacy"),
+                model: "gpt-4o-mini".into(),
+                max_tokens: 512,
+            },
+            llm_openai: OpenAiLlmProvider {
+                api_key: RedactedString::new(""),
+                ..Default::default()
+            },
+            ..UserSettings::default()
+        };
+        let raw = toml::to_string_pretty(&legacy).unwrap();
+        assert!(raw.contains("sk-legacy"));
+        fs::write(&path, &raw).unwrap();
+
+        let store =
+            SettingsStore::with_vault(&path, Box::new(crate::secrets::InMemoryVault::default()));
+        store.migrate_secrets_to_keyring().unwrap();
+
+        let after = fs::read_to_string(&path).unwrap();
+        assert!(
+            !after.contains("sk-legacy"),
+            "legacy llm_backend key must leave the plaintext file:\n{after}"
+        );
+
+        // Restored into the canonical provider AND the active backend on reload.
+        let loaded = store.load().unwrap();
+        assert_eq!(loaded.llm_openai.api_key.expose(), "sk-legacy");
+        match &loaded.llm_backend {
+            LlmBackendConfig::OpenAiCompatible { api_key, .. } => {
+                assert_eq!(api_key.expose(), "sk-legacy");
+            }
+            other => panic!("llm backend changed shape: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn llm_key_persists_when_styling_disabled() {
+        use lune_core::config::OpenAiLlmProvider;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        let store =
+            SettingsStore::with_vault(&path, Box::new(crate::secrets::InMemoryVault::default()));
+
+        // Styling turned OFF (Disabled backend) but a saved remote provider key —
+        // the "provider persists across turning styling off" contract.
+        let settings = UserSettings {
+            llm_backend: LlmBackendConfig::Disabled,
+            llm_openai: OpenAiLlmProvider {
+                api_key: RedactedString::new("saved-key"),
+                ..Default::default()
+            },
+            ..UserSettings::default()
+        };
+        store.save(&settings).unwrap();
+        assert!(!fs::read_to_string(&path).unwrap().contains("saved-key"));
+
+        let loaded = store.load().unwrap();
+        assert!(matches!(loaded.llm_backend, LlmBackendConfig::Disabled));
+        assert_eq!(
+            loaded.llm_openai.api_key.expose(),
+            "saved-key",
+            "saved provider key must survive styling being off"
+        );
     }
 }

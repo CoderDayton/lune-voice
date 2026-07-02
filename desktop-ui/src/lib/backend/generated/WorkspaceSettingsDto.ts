@@ -40,7 +40,12 @@ terminalMode: TerminalModeDto,
 /**
  * Whether the correction LLM backend is enabled (Local or remote).
  */
-llmEnabled: boolean, openaiAsrBaseUrl: string | null, openaiAsrModel: string | null, openaiAsrApiKeySet: boolean, 
+llmEnabled: boolean, openaiAsrBaseUrl: string | null, openaiAsrModel: string | null, openaiAsrApiKeySet: boolean, openaiLlmBaseUrl: string | null, openaiLlmModel: string | null, openaiLlmApiKeySet: boolean, 
+/**
+ * Whether the *active* styling backend is the remote provider (the fields
+ * above are the saved provider and persist even when it isn't active).
+ */
+openaiLlmActive: boolean, 
 /**
  * Selected local whisper model (meaningful when asr_backend_type == WhisperCpp).
  */

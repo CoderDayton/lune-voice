@@ -11,7 +11,8 @@ pub use modes::{ActivationMode, DictationMode, PillVisibility, PrivacyMode, Term
 pub use pipeline::{PipelineConfig, PipelineOverrides};
 pub use redacted::RedactedString;
 pub use settings::{
-    AsrBackendConfig, DevicePolicy, LlmBackendConfig, StreamingMode, UserSettings, WhisperModel,
+    AsrBackendConfig, DevicePolicy, LlmBackendConfig, OpenAiLlmProvider, StreamingMode,
+    UserSettings, WhisperModel,
 };
 pub use style_llm::{
     BASE_SYSTEM_PROMPT, FormatToggles, StyleId, StylePreset, StyleRegistry, builtin_registry,

@@ -163,7 +163,7 @@ impl StylePreset {
         let mut prompt = String::with_capacity(512);
         let _ = writeln!(
             prompt,
-            "Rewrite the transcript below in the given style. Output only your rewritten version of that transcript. The examples illustrate the style only — never copy, repeat, or merge them into your answer."
+            "Apply the style below to the transcript. Change only what the style requires; keep the original wording, content, and meaning everywhere else. Output only the transcript with the style applied. The examples illustrate the style only — never copy, repeat, or merge them into your answer."
         );
         let _ = writeln!(prompt, "\nStyle: {}", self.name);
         let _ = writeln!(prompt, "Rules: {}", self.style_instructions);
@@ -192,12 +192,12 @@ impl StylePreset {
             id: "casual".into(),
             name: "Casual".into(),
             description: "Texting, messaging, chat".into(),
-            style_instructions: "Replace every colon with a comma. Replace every semicolon with a period. Remove all quotation marks. Remove exclamation marks and dashes. Lowercase everything except proper nouns. Use contractions.".into(),
+            style_instructions: "Replace every colon with a comma. Replace semicolons with a comma or period, whichever reads more naturally. Remove all quotation marks. Remove exclamation marks and dashes. Lowercase everything except proper nouns. Use contractions. Keep the original phrasing; do not convert quotes into reported speech.".into(),
             user_prompt_template: "{raw_text}".into(),
             few_shot_pairs: vec![
                 (
                     "She said: \"I will be there\"; however, I do not think she meant it.".into(),
-                    "she said she'd be there, but i don't think she meant it.".into(),
+                    "she said, i'll be there. however, i don't think she meant it.".into(),
                 ),
                 (
                     "The plan was simple: cut costs; raise prices; hire fewer people.".into(),
@@ -205,7 +205,7 @@ impl StylePreset {
                 ),
                 (
                     "He asked: \"Are you coming?\" I replied -- \"Yes!\"".into(),
-                    "he asked if i was coming. i said yes.".into(),
+                    "he asked, are you coming? i replied, yes.".into(),
                 ),
             ],
             formatting: FormatToggles::default(),

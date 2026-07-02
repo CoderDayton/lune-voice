@@ -47,6 +47,10 @@ function createMockSnapshot(): WorkspaceSnapshot {
       openaiAsrBaseUrl: null,
       openaiAsrModel: null,
       openaiAsrApiKeySet: false,
+      openaiLlmBaseUrl: 'https://api.openai.com/v1',
+      openaiLlmModel: 'gpt-4o-mini',
+      openaiLlmApiKeySet: false,
+      openaiLlmActive: false,
     },
     history: [
       {
@@ -102,6 +106,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
         description: 'Relaxed, conversational tone.',
         isBuiltin: true,
         instructions: '',
+        fewShotDirty: false,
         formatting: {
           keybinds: true,
           titleAbbreviations: true,
@@ -115,6 +120,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
         description: 'Polished and clear.',
         isBuiltin: true,
         instructions: '',
+        fewShotDirty: false,
         formatting: {
           keybinds: true,
           titleAbbreviations: true,
@@ -128,6 +134,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
         description: 'Official correspondence.',
         isBuiltin: true,
         instructions: '',
+        fewShotDirty: false,
         formatting: {
           keybinds: true,
           titleAbbreviations: true,
@@ -141,6 +148,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
         description: 'Code and engineering.',
         isBuiltin: true,
         instructions: '',
+        fewShotDirty: false,
         formatting: {
           keybinds: true,
           titleAbbreviations: true,
@@ -154,6 +162,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
         description: 'Long-form content.',
         isBuiltin: true,
         instructions: '',
+        fewShotDirty: false,
         formatting: {
           keybinds: true,
           titleAbbreviations: true,
@@ -192,7 +201,17 @@ let nextDictionaryId = 1000;
 let nextStyleId = 1000;
 
 function applySettings(input: SaveWorkspaceSettingsInput) {
-  const { openaiAsrApiKey: _openaiAsrApiKey, ...fields } = input;
+  const {
+    openaiAsrApiKey: _openaiAsrApiKey,
+    openaiLlmApiKey: _openaiLlmApiKey,
+    openaiLlmBaseUrl: _openaiLlmBaseUrl,
+    openaiLlmModel: _openaiLlmModel,
+    llmBackendType,
+    ...fields
+  } = input;
+  // Mirror settings_to_dto: the remote LLM fields are populated only for a
+  // remote backend; local/disabled leave them null/false.
+  const remote = input.llmEnabled && llmBackendType === 'OpenAiCompatible';
   mockSnapshot = {
     ...mockSnapshot,
     settings: {
@@ -201,6 +220,20 @@ function applySettings(input: SaveWorkspaceSettingsInput) {
       devicePolicy: fields.useGpu ? fields.devicePolicy : 'Cpu',
       whisperModel: fields.whisperModel ?? mockSnapshot.settings.whisperModel,
       openaiAsrApiKeySet: !!_openaiAsrApiKey,
+      // Provider persists regardless of the active engine (blank keeps saved).
+      openaiLlmBaseUrl:
+        _openaiLlmBaseUrl && _openaiLlmBaseUrl.length > 0
+          ? _openaiLlmBaseUrl
+          : mockSnapshot.settings.openaiLlmBaseUrl,
+      openaiLlmModel:
+        _openaiLlmModel && _openaiLlmModel.length > 0
+          ? _openaiLlmModel
+          : mockSnapshot.settings.openaiLlmModel,
+      openaiLlmApiKeySet:
+        _openaiLlmApiKey && _openaiLlmApiKey.length > 0
+          ? true
+          : mockSnapshot.settings.openaiLlmApiKeySet,
+      openaiLlmActive: remote,
     },
   };
 }
@@ -291,6 +324,7 @@ export const mockBackendClient: BackendClient = {
           description,
           instructions,
           isBuiltin: false,
+          fewShotDirty: false,
           formatting,
         },
       ],

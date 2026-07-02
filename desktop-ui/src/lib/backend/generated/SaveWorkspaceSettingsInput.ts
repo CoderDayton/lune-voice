@@ -3,6 +3,7 @@ import type { ActivationModeDto } from "./ActivationModeDto";
 import type { AsrBackendTypeDto } from "./AsrBackendTypeDto";
 import type { DevicePolicyDto } from "./DevicePolicyDto";
 import type { DictationModeDto } from "./DictationModeDto";
+import type { LlmBackendTypeDto } from "./LlmBackendTypeDto";
 import type { PillVisibilityDto } from "./PillVisibilityDto";
 import type { TerminalModeDto } from "./TerminalModeDto";
 import type { WhisperModelDto } from "./WhisperModelDto";
@@ -40,7 +41,11 @@ terminalMode: TerminalModeDto,
 /**
  * Whether the correction LLM backend should be enabled.
  */
-llmEnabled: boolean, openaiAsrBaseUrl: string | null, openaiAsrApiKey: string | null, openaiAsrModel: string | null, 
+llmEnabled: boolean, 
+/**
+ * Which styling engine to use when enabled (local vs remote).
+ */
+llmBackendType: LlmBackendTypeDto, openaiAsrBaseUrl: string | null, openaiAsrApiKey: string | null, openaiAsrModel: string | null, openaiLlmBaseUrl: string | null, openaiLlmApiKey: string | null, openaiLlmModel: string | null, 
 /**
  * Selected local whisper model (sent when asr_backend_type == WhisperCpp).
  */

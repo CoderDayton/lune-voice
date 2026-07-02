@@ -210,6 +210,68 @@ pub fn has_required_models(
         .all(|s| s.is_ready(models_dir))
 }
 
+/// What the user still needs to set up before the styling LLM can serve a
+/// request. Each variant maps to a concrete setup step surfaced by the UI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LlmUnavailable {
+    /// Styling is turned off — no engine is selected.
+    NoProvider,
+    /// The local styling engine is selected but its model isn't downloaded.
+    ModelMissing,
+    /// A remote styling provider is selected but not fully configured.
+    ProviderNotConfigured,
+}
+
+impl LlmUnavailable {
+    /// A short, user-facing explanation of the setup step still required.
+    pub fn user_message(self) -> &'static str {
+        match self {
+            Self::NoProvider => {
+                "Styling is turned off. Enable a styling engine in Settings before generating examples."
+            }
+            Self::ModelMissing => {
+                "The styling model isn't downloaded yet. Download it in Settings → Models before generating examples."
+            }
+            Self::ProviderNotConfigured => {
+                "Your styling provider isn't fully configured. Add its API key and model in Settings before generating examples."
+            }
+        }
+    }
+}
+
+/// Whether the configured styling LLM is ready to serve a request. `Ok(())`
+/// means a request can proceed; `Err(reason)` names the setup step the user
+/// still needs. This is the guard the app runs before asking the LLM to
+/// (re)generate few-shot examples — the local engine needs its model on disk;
+/// a remote engine needs an API key and model configured.
+pub fn styling_llm_readiness(
+    models_dir: &Path,
+    llm_backend: &lune_core::config::LlmBackendConfig,
+) -> Result<(), LlmUnavailable> {
+    use lune_core::config::LlmBackendConfig;
+    match llm_backend {
+        LlmBackendConfig::Local { .. } => {
+            let ready = ModelSpec::all()
+                .iter()
+                .find(|s| s.local_name() == model_dirs::DIR_STYLE_LLM)
+                .is_some_and(|s| s.is_ready(models_dir));
+            if ready {
+                Ok(())
+            } else {
+                Err(LlmUnavailable::ModelMissing)
+            }
+        }
+        LlmBackendConfig::OpenAiCompatible { api_key, model, .. } => {
+            if api_key.expose().trim().is_empty() || model.trim().is_empty() {
+                Err(LlmUnavailable::ProviderNotConfigured)
+            } else {
+                Ok(())
+            }
+        }
+        _ => Err(LlmUnavailable::NoProvider),
+    }
+}
+
 /// Status of the full installable model library. Returns every spec EXCEPT the
 /// VAD model — that one is bundled with any Whisper size and never surfaced as
 /// its own entry. Each entry carries `ready`, `in_use` (whether the active

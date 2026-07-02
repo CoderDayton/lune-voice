@@ -1,4 +1,4 @@
-import { ClipboardPaste, Cloud, Cpu, Hand, Keyboard, ToggleLeft } from 'lucide-react';
+import { ClipboardPaste, Cloud, Cpu, Hand, Keyboard, PowerOff, ToggleLeft } from 'lucide-react';
 import type { ComponentType } from 'react';
 
 export type ActivationModeValue = 'Toggle' | 'Hold';
@@ -59,6 +59,33 @@ export const asrBackends: DescriptiveOptionData<AsrBackendValue>[] = [
     value: 'OpenAiCompatible',
     label: 'Cloud API (OpenAI-compatible)',
     description: 'Sends audio to a remote OpenAI-compatible endpoint you configure.',
+    icon: Cloud,
+  },
+];
+
+/** The two enabled styling-LLM engines (Off is carried separately). */
+export type LlmBackendValue = 'Local' | 'OpenAiCompatible';
+
+/** Engine selector shown in the Styling-engine settings section. */
+export type LlmEngineValue = 'Disabled' | 'Local' | 'OpenAiCompatible';
+
+export const llmEngines: DescriptiveOptionData<LlmEngineValue>[] = [
+  {
+    value: 'Disabled',
+    label: 'Off',
+    description: 'No styling — transcripts are delivered exactly as transcribed.',
+    icon: PowerOff,
+  },
+  {
+    value: 'Local',
+    label: 'On-device',
+    description: 'Runs the local styling model on-device. Fully offline.',
+    icon: Cpu,
+  },
+  {
+    value: 'OpenAiCompatible',
+    label: 'Cloud API (OpenAI-compatible)',
+    description: 'Sends transcripts to a remote OpenAI-compatible endpoint you configure.',
     icon: Cloud,
   },
 ];

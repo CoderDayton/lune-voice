@@ -38,6 +38,15 @@ pub enum AsrBackendTypeDto {
     WhisperCpp,
 }
 
+/// Which styling-LLM engine the user picked. `Disabled` is carried by
+/// `llm_enabled == false`, so this only distinguishes the two enabled engines.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+pub enum LlmBackendTypeDto {
+    Local,
+    OpenAiCompatible,
+}
+
 impl From<lune_core::asr::AsrBackendKind> for AsrBackendTypeDto {
     fn from(kind: lune_core::asr::AsrBackendKind) -> Self {
         use lune_core::asr::AsrBackendKind;
@@ -175,6 +184,9 @@ pub struct StylePresetDto {
     pub is_builtin: bool,
     pub instructions: String,
     pub formatting: FormatTogglesDto,
+    /// Custom styles only: their few-shot examples are stale (prompt/name
+    /// changed since last generated). Always false for builtins.
+    pub few_shot_dirty: bool,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]
@@ -240,6 +252,15 @@ pub struct WorkspaceSettingsDto {
     pub openai_asr_base_url: Option<String>,
     pub openai_asr_model: Option<String>,
     pub openai_asr_api_key_set: bool,
+    // Remote styling LLM fields, populated only when the LLM backend is a
+    // remote OpenAI-compatible provider (`None`/`false` for local or disabled).
+    // Let the UI gate example generation on a fully-configured remote provider.
+    pub openai_llm_base_url: Option<String>,
+    pub openai_llm_model: Option<String>,
+    pub openai_llm_api_key_set: bool,
+    /// Whether the *active* styling backend is the remote provider (the fields
+    /// above are the saved provider and persist even when it isn't active).
+    pub openai_llm_active: bool,
     /// Selected local whisper model (meaningful when asr_backend_type == WhisperCpp).
     pub whisper_model: WhisperModelDto,
 }
@@ -337,10 +358,17 @@ pub struct SaveWorkspaceSettingsInput {
     pub terminal_mode: TerminalModeDto,
     /// Whether the correction LLM backend should be enabled.
     pub llm_enabled: bool,
+    /// Which styling engine to use when enabled (local vs remote).
+    pub llm_backend_type: LlmBackendTypeDto,
     // OpenAI ASR fields (sent when asr_backend_type == OpenAiCompatible)
     pub openai_asr_base_url: Option<String>,
     pub openai_asr_api_key: Option<String>,
     pub openai_asr_model: Option<String>,
+    // OpenAI styling-LLM fields (sent when llm_backend_type == OpenAiCompatible).
+    // A `None` api key means "keep the saved key".
+    pub openai_llm_base_url: Option<String>,
+    pub openai_llm_api_key: Option<String>,
+    pub openai_llm_model: Option<String>,
     /// Selected local whisper model (sent when asr_backend_type == WhisperCpp).
     #[serde(default)]
     pub whisper_model: Option<WhisperModelDto>,

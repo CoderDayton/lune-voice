@@ -278,6 +278,17 @@ pub async fn generate_style_examples(
     style_id: String,
 ) -> Result<WorkspaceSnapshot, String> {
     require_window_access(&window, &["main"])?;
+    // Preflight: refuse to (re)generate unless the styling provider — and, for
+    // the local engine, its model — is set up. Returns a user-facing message.
+    run_persist("check styling llm readiness", || {
+        let paths = lune_persist::AppPaths::resolve().ok_or("resolve application paths")?;
+        let settings = lune_persist::SettingsStore::new(paths.settings_file())
+            .load()
+            .map_err(|e| format!("load settings: {e}"))?;
+        lune_persist::styling_llm_readiness(&paths.models_dir(), &settings.llm_backend)
+            .map_err(|u| u.user_message().to_string())
+    })
+    .await?;
     let llm = runtime.llm_service().await;
     let (name, instructions) = run_persist("load custom style for examples", {
         let sid = style_id.clone();

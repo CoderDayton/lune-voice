@@ -75,6 +75,15 @@ export function mapWorkspaceSettings(snapshot: WorkspaceSnapshot): WorkspaceSett
       ? '••••••••'
       : DEFAULT_SETTINGS.openaiAsrApiKey,
     openaiAsrModel: snapshot.settings.openaiAsrModel ?? DEFAULT_SETTINGS.openaiAsrModel,
+    // `openaiLlmActive` reports whether the remote provider is the active
+    // engine; the provider fields below persist even when it isn't. The key is
+    // masked when one is saved.
+    llmBackend: snapshot.settings.openaiLlmActive ? 'OpenAiCompatible' : 'Local',
+    openaiLlmBaseUrl: snapshot.settings.openaiLlmBaseUrl ?? DEFAULT_SETTINGS.openaiLlmBaseUrl,
+    openaiLlmApiKey: snapshot.settings.openaiLlmApiKeySet
+      ? '••••••••'
+      : DEFAULT_SETTINGS.openaiLlmApiKey,
+    openaiLlmModel: snapshot.settings.openaiLlmModel ?? DEFAULT_SETTINGS.openaiLlmModel,
   };
 }
 
@@ -126,5 +135,12 @@ export function settingsToSaveInput(settings: WorkspaceSettings): SaveWorkspaceS
         ? settings.openaiAsrApiKey
         : null,
     openaiAsrModel: settings.openaiAsrModel || null,
+    llmBackendType: settings.llmBackend,
+    openaiLlmBaseUrl: settings.openaiLlmBaseUrl || null,
+    openaiLlmApiKey:
+      settings.openaiLlmApiKey && !settings.openaiLlmApiKey.startsWith('•')
+        ? settings.openaiLlmApiKey
+        : null,
+    openaiLlmModel: settings.openaiLlmModel || null,
   };
 }

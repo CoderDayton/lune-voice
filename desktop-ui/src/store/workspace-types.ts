@@ -3,6 +3,7 @@ import type {
   ActivationModeValue,
   AsrBackendValue,
   DictationModeValue,
+  LlmBackendValue,
   PillVisibilityValue,
   TerminalModeValue,
   WhisperModelValue,
@@ -39,6 +40,14 @@ export interface WorkspaceSettings {
   openaiAsrBaseUrl: string;
   openaiAsrApiKey: string;
   openaiAsrModel: string;
+  // Styling LLM engine + remote provider config (editable via the Styling
+  // engine settings section). `llmBackend` is the engine used when styling is
+  // enabled; the openaiLlm* fields apply when it is `OpenAiCompatible`. The API
+  // key is masked ('••••••••') when a key is saved.
+  llmBackend: LlmBackendValue;
+  openaiLlmBaseUrl: string;
+  openaiLlmApiKey: string;
+  openaiLlmModel: string;
 }
 
 export interface HistorySession {
@@ -71,6 +80,7 @@ export interface StylePreset {
   isBuiltin: boolean;
   instructions: string;
   formatting: FormatTogglesDto;
+  fewShotDirty: boolean;
 }
 
 export interface SessionTotals {
@@ -126,6 +136,10 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   openaiAsrBaseUrl: 'https://api.openai.com/v1',
   openaiAsrApiKey: '',
   openaiAsrModel: 'whisper-1',
+  llmBackend: 'Local',
+  openaiLlmBaseUrl: 'https://api.openai.com/v1',
+  openaiLlmApiKey: '',
+  openaiLlmModel: 'gpt-4o-mini',
 };
 
 export const DEFAULT_RUNTIME: WorkspaceRuntimeState = {

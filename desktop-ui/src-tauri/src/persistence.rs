@@ -1,8 +1,8 @@
 use lune_asr::AsrRegistry;
 use lune_core::config::{
     ActivationMode, AsrBackendConfig, DevicePolicy, DictationMode, HotkeyConfig, KeyCombo,
-    LlmBackendConfig, Modifier, PillVisibility, RedactedString, StreamingMode, StylePreset,
-    TerminalMode, UserSettings, builtin_registry,
+    LlmBackendConfig, Modifier, OpenAiLlmProvider, PillVisibility, RedactedString, StreamingMode,
+    StylePreset, TerminalMode, UserSettings, builtin_registry,
 };
 use lune_core::session::SessionStatus;
 use lune_persist::{AppPaths, Database, SettingsStore, StoredDictionaryEntry};
@@ -10,9 +10,9 @@ use lune_persist::{AppPaths, Database, SettingsStore, StoredDictionaryEntry};
 use crate::dto::{
     ActivationModeDto, AsrBackendTypeDto, CreateCustomStyleInput, CreateDictionaryEntryInput,
     DevicePolicyDto, DictationModeDto, DictionaryItemDto, HistoryItemDto, HistoryPageDto,
-    PillVisibilityDto, SaveWorkspaceSettingsInput, SessionStatsDto, StylePresetDto,
-    TerminalModeDto, UpdateCustomStyleInput, UpdateDictionaryEntryInput, WhisperModelDto,
-    WorkspaceSettingsDto, WorkspaceSnapshot,
+    LlmBackendTypeDto, PillVisibilityDto, SaveWorkspaceSettingsInput, SessionStatsDto,
+    StylePresetDto, TerminalModeDto, UpdateCustomStyleInput, UpdateDictionaryEntryInput,
+    WhisperModelDto, WorkspaceSettingsDto, WorkspaceSnapshot,
 };
 
 const HISTORY_LIMIT: u32 = 200;
@@ -249,7 +249,7 @@ pub fn create_custom_style(input: CreateCustomStyleInput) -> Result<WorkspaceSna
     }
     let id = format!("custom-{}", uuid::Uuid::new_v4().as_hyphenated());
     settings.custom_styles.push(StylePreset {
-        id,
+        id: id.clone(),
         name,
         description,
         style_instructions: instructions,
@@ -257,6 +257,11 @@ pub fn create_custom_style(input: CreateCustomStyleInput) -> Result<WorkspaceSna
         few_shot_pairs: Vec::new(),
         formatting: input.formatting.into(),
     });
+    // A new style has no examples yet — mark it stale so the UI prompts a
+    // generation. The create flow clears this by generating immediately when the
+    // styling engine is ready; if it isn't, the flag persists so the refresh
+    // button stays highlighted until the user generates them.
+    settings.few_shot_dirty.insert(id);
     save_settings(&paths, &settings)?;
     let mut database = open_database(&paths)?;
     build_snapshot(settings, &mut database)
@@ -274,10 +279,18 @@ pub fn update_custom_style(input: UpdateCustomStyleInput) -> Result<WorkspaceSna
         .iter()
         .position(|s| s.id == input.id)
         .ok_or_else(|| format!("custom style not found: {}", input.id))?;
+    // The generated examples are seeded from the name + instructions, so mark
+    // them stale when either changes; a formatting/description-only edit leaves
+    // them valid.
+    let few_shot_stale = settings.custom_styles[idx].name != name
+        || settings.custom_styles[idx].style_instructions != instructions;
     settings.custom_styles[idx].name = name;
     settings.custom_styles[idx].description = description;
     settings.custom_styles[idx].style_instructions = instructions;
     settings.custom_styles[idx].formatting = input.formatting.into();
+    if few_shot_stale {
+        settings.few_shot_dirty.insert(input.id.clone());
+    }
     save_settings(&paths, &settings)?;
     let mut database = open_database(&paths)?;
     build_snapshot(settings, &mut database)
@@ -292,6 +305,7 @@ pub fn delete_custom_style(style_id: String) -> Result<WorkspaceSnapshot, String
         .position(|s| s.id == style_id)
         .ok_or_else(|| format!("custom style not found: {style_id}"))?;
     settings.custom_styles.remove(idx);
+    settings.few_shot_dirty.remove(&style_id);
     if settings.default_style.as_deref() == Some(style_id.as_str()) {
         settings.default_style = None;
     }
@@ -312,6 +326,8 @@ pub fn save_style_few_shot_pairs(
         .position(|s| s.id == style_id)
         .ok_or_else(|| format!("custom style not found: {style_id}"))?;
     settings.custom_styles[idx].few_shot_pairs = pairs;
+    // Freshly (re)generated — no longer stale.
+    settings.few_shot_dirty.remove(style_id);
     save_settings(&paths, &settings)?;
     let mut database = open_database(&paths)?;
     build_snapshot(settings, &mut database)
@@ -353,8 +369,11 @@ fn build_snapshot(
             name: p.name.clone(),
             description: p.description.clone(),
             is_builtin: true,
-            instructions: String::new(),
+            // Surface the builtin's real prompt so the read-only view — and
+            // duplicating it into a new custom style — shows the actual text.
+            instructions: p.style_instructions.clone(),
             formatting: p.formatting.into(),
+            few_shot_dirty: false,
         })
         .collect();
     for custom in &settings.custom_styles {
@@ -365,6 +384,7 @@ fn build_snapshot(
             is_builtin: false,
             instructions: custom.style_instructions.clone(),
             formatting: custom.formatting.into(),
+            few_shot_dirty: settings.few_shot_dirty.contains(&custom.id),
         });
     }
 
@@ -430,6 +450,16 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
             ),
             _ => (None, None, false),
         };
+    // Display the saved remote provider regardless of the active backend, so the
+    // settings UI keeps showing it after Off / engine switches. `openai_llm_active`
+    // reports whether that provider is the currently-active backend.
+    let openai_llm_base_url = Some(settings.llm_openai.base_url.clone());
+    let openai_llm_model = Some(settings.llm_openai.model.clone());
+    let openai_llm_api_key_set = !settings.llm_openai.api_key.expose().is_empty();
+    let openai_llm_active = matches!(
+        settings.llm_backend,
+        LlmBackendConfig::OpenAiCompatible { .. }
+    );
 
     WorkspaceSettingsDto {
         activation_mode: activation_mode_to_dto(settings.activation_mode),
@@ -464,6 +494,10 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
         openai_asr_base_url,
         openai_asr_model,
         openai_asr_api_key_set,
+        openai_llm_base_url,
+        openai_llm_model,
+        openai_llm_api_key_set,
+        openai_llm_active,
         whisper_model: match &settings.asr_backend {
             AsrBackendConfig::WhisperCpp { model } => (*model).into(),
             _ => WhisperModelDto::default(),
@@ -550,13 +584,30 @@ fn apply_settings_dto(
         ));
     }
     settings.session_history_days = input.session_history_days;
+    // Persist the remote provider config independently of the active backend so
+    // it survives Off / switching engines. A blank incoming field keeps the saved
+    // value (the api key uses the same "blank = keep the saved key" rule as ASR).
+    if let Some(u) = input
+        .openai_llm_base_url
+        .as_deref()
+        .filter(|s| !s.is_empty())
+    {
+        settings.llm_openai.base_url = u.to_owned();
+    }
+    if let Some(m) = input.openai_llm_model.as_deref().filter(|s| !s.is_empty()) {
+        settings.llm_openai.model = m.to_owned();
+    }
+    if let Some(k) = input
+        .openai_llm_api_key
+        .as_deref()
+        .filter(|s| !s.is_empty())
+    {
+        settings.llm_openai.api_key = RedactedString::new(k);
+    }
+    // Off ⇒ Disabled; otherwise build the chosen engine from the saved provider.
+    // Enabling styling honors the selected engine (local vs remote), not just Local.
     settings.llm_backend = if input.llm_enabled {
-        match std::mem::take(&mut settings.llm_backend) {
-            // Re-enabling from Disabled lands on the local ONNX LLM; an
-            // already-configured Local/remote backend is preserved as-is.
-            LlmBackendConfig::Disabled => LlmBackendConfig::Local {},
-            other => other,
-        }
+        llm_backend_from_type(input.llm_backend_type, &settings.llm_openai)?
     } else {
         LlmBackendConfig::Disabled
     };
@@ -700,6 +751,32 @@ fn asr_backend_from_type(
                 api_key: RedactedString::new(api_key_str),
                 model: model_str.to_owned(),
                 streaming: StreamingMode::HttpPolling,
+            }
+        }
+    })
+}
+
+/// Build the styling LLM backend for the selected engine. Mirrors
+/// `asr_backend_from_type`: for a remote provider, incoming DTO fields win and
+/// fall back to the current config, so a `None` (blank/unchanged) api key keeps
+/// the saved key.
+fn llm_backend_from_type(
+    kind: LlmBackendTypeDto,
+    provider: &OpenAiLlmProvider,
+) -> Result<LlmBackendConfig, String> {
+    Ok(match kind {
+        LlmBackendTypeDto::Local => LlmBackendConfig::Local {},
+        LlmBackendTypeDto::OpenAiCompatible => {
+            let base_url: url::Url = provider
+                .base_url
+                .parse()
+                .map_err(|e| format!("invalid openaiLlmBaseUrl: {e}"))?;
+            validate_api_url(&base_url, "openaiLlmBaseUrl")?;
+            LlmBackendConfig::OpenAiCompatible {
+                base_url,
+                api_key: provider.api_key.clone(),
+                model: provider.model.clone(),
+                max_tokens: provider.max_tokens,
             }
         }
     })
@@ -862,10 +939,14 @@ mod tests {
             session_history_days: dto.session_history_days,
             terminal_mode: dto.terminal_mode,
             llm_enabled: dto.llm_enabled,
+            llm_backend_type: LlmBackendTypeDto::Local,
             whisper_model: Some(dto.whisper_model),
             openai_asr_base_url: dto.openai_asr_base_url,
             openai_asr_api_key: None,
             openai_asr_model: dto.openai_asr_model,
+            openai_llm_base_url: dto.openai_llm_base_url,
+            openai_llm_api_key: None,
+            openai_llm_model: dto.openai_llm_model,
         }
     }
 

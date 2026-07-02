@@ -1,5 +1,5 @@
 import { useLingui } from '@lingui/react/macro';
-import { Copy } from 'lucide-react';
+import { Copy, RefreshCw } from 'lucide-react';
 import type { RefObject } from 'react';
 import type { FormatTogglesDto } from '../../../lib/backend/types';
 
@@ -11,6 +11,10 @@ interface StyleEditorModalProps {
   instructions: string;
   saving: boolean;
   generating: boolean;
+  refreshing: boolean;
+  fewShotDirty: boolean;
+  llmReady: boolean;
+  llmReason: string | null;
   onNameChange: (v: string) => void;
   onDescriptionChange: (v: string) => void;
   onInstructionsChange: (v: string) => void;
@@ -18,6 +22,7 @@ interface StyleEditorModalProps {
   onFormattingChange: (key: keyof FormatTogglesDto, value: boolean) => void;
   onClose: () => void;
   onSave: () => void;
+  onRefreshExamples: () => void;
   onDuplicate: () => void;
 }
 
@@ -29,6 +34,10 @@ export function StyleEditorModal({
   instructions,
   saving,
   generating,
+  refreshing,
+  fewShotDirty,
+  llmReady,
+  llmReason,
   onNameChange,
   onDescriptionChange,
   onInstructionsChange,
@@ -36,6 +45,7 @@ export function StyleEditorModal({
   onFormattingChange,
   onClose,
   onSave,
+  onRefreshExamples,
   onDuplicate,
 }: StyleEditorModalProps) {
   const { t } = useLingui();
@@ -48,7 +58,7 @@ export function StyleEditorModal({
   const isViewOnly = mode === 'view';
   const isEdit = mode === 'edit';
   const instrLen = instructions.length;
-  const busy = saving || generating;
+  const busy = saving || generating || refreshing;
   const canSave = !!name.trim() && !!instructions.trim() && !busy;
 
   return (
@@ -92,7 +102,9 @@ export function StyleEditorModal({
               </span>
             </div>
             <textarea
-              className="textarea w-full min-h-32 resize-y leading-relaxed"
+              className={`textarea w-full min-h-32 resize-y leading-relaxed ${
+                isViewOnly ? 'cursor-default bg-surface-inset/40 text-content-muted opacity-70' : ''
+              }`}
               maxLength={2048}
               placeholder={t`Describe how text should be formatted. E.g., "Use bullet points. Keep sentences short. Avoid jargon."`}
               value={instructions}
@@ -121,6 +133,40 @@ export function StyleEditorModal({
               ))}
             </div>
           </div>
+          {!isViewOnly && (isEdit || !llmReady) && (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium text-content-default">{t`Few-shot examples`}</span>
+              {isEdit && (
+                <p className="text-xs text-content-subtle">
+                  {t`Examples teach the styling engine your style. Regenerate them after editing the prompt.`}
+                </p>
+              )}
+              {isEdit && (
+                <button
+                  type="button"
+                  className={`btn btn-sm gap-2 self-start ${
+                    fewShotDirty && llmReady ? 'btn-primary' : 'btn-soft'
+                  }`}
+                  onClick={onRefreshExamples}
+                  disabled={busy || !llmReady}
+                  aria-busy={refreshing}
+                >
+                  {refreshing ? (
+                    <span className="loading loading-spinner loading-sm" />
+                  ) : (
+                    <RefreshCw size={14} />
+                  )}
+                  {refreshing ? t`Generating examples…` : t`Refresh few-shot examples`}
+                </button>
+              )}
+              {isEdit && fewShotDirty && llmReady && !refreshing && (
+                <span className="text-xs text-warning">
+                  {t`Examples are out of date since you edited the prompt.`}
+                </span>
+              )}
+              {!llmReady && llmReason && <span className="text-xs text-warning">{llmReason}</span>}
+            </div>
+          )}
         </div>
         <div className="modal-action mt-6 shrink-0">
           {isViewOnly ? (
@@ -143,7 +189,7 @@ export function StyleEditorModal({
                 disabled={!canSave}
                 onClick={onSave}
               >
-                {busy && <span className="loading loading-spinner loading-sm" />}
+                {(saving || generating) && <span className="loading loading-spinner loading-sm" />}
                 {generating ? t`Generating examples…` : t`Save`}
               </button>
             </>

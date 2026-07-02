@@ -8,6 +8,7 @@ import {
   Palette,
   Send,
   SlidersHorizontal,
+  Wand2,
 } from 'lucide-react';
 import { useState } from 'react';
 import { workspaceStore } from '../../store/workspace-store';
@@ -16,9 +17,17 @@ import { DictationSection } from './sections/dictation-section';
 import { GeneralSection } from './sections/general-section';
 import { ModelsSection } from './sections/models-section';
 import { OutputSection } from './sections/output-section';
+import { StylingEngineSection } from './sections/styling-engine-section';
 import { TranscriptionSection } from './sections/transcription-section';
 
-type SectionId = 'general' | 'appearance' | 'dictation' | 'transcription' | 'output' | 'models';
+type SectionId =
+  | 'general'
+  | 'appearance'
+  | 'dictation'
+  | 'transcription'
+  | 'styling'
+  | 'output'
+  | 'models';
 
 export function SettingsPage() {
   const { t } = useLingui();
@@ -57,6 +66,7 @@ export function SettingsPage() {
     { id: 'appearance', label: t`Appearance`, icon: Palette },
     { id: 'dictation', label: t`Dictation`, icon: Mic },
     { id: 'transcription', label: t`Transcription`, icon: AudioLines },
+    { id: 'styling', label: t`Styling`, icon: Wand2 },
     { id: 'output', label: t`Output`, icon: Send },
     { id: 'models', label: t`Models`, icon: HardDrive },
   ];
@@ -68,6 +78,7 @@ export function SettingsPage() {
     transcription: (
       <TranscriptionSection settings={settings} onManageModels={() => setActive('models')} />
     ),
+    styling: <StylingEngineSection settings={settings} />,
     output: <OutputSection settings={settings} />,
     models: <ModelsSection />,
   };

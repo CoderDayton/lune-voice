@@ -2,6 +2,7 @@ import { useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';
 import { Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { getLlmReadiness } from '../../lib/backend/llm';
 import type { FormatTogglesDto } from '../../lib/backend/types';
 import {
   createCustomStyle,
@@ -28,6 +29,10 @@ interface ModalState {
   formatting: FormatTogglesDto;
   saving: boolean;
   generating: boolean;
+  refreshing: boolean;
+  fewShotDirty: boolean;
+  llmReady: boolean;
+  llmReason: string | null;
 }
 
 const DEFAULT_FORMATTING: FormatTogglesDto = {
@@ -47,6 +52,10 @@ const CLOSED_MODAL: ModalState = {
   formatting: DEFAULT_FORMATTING,
   saving: false,
   generating: false,
+  refreshing: false,
+  fewShotDirty: false,
+  llmReady: true,
+  llmReason: null,
 };
 
 export function StylesPage() {
@@ -54,6 +63,18 @@ export function StylesPage() {
   const activePreset = useStore(workspaceStore, (s) => s.settings.stylePreset);
   const presets = useStore(workspaceStore, (s) => s.stylePresets);
   const loading = useStore(workspaceStore, (s) => s.runtime.loading);
+  // Read the current styling-provider fields for readiness checks. Read from
+  // the store at call time (not via a subscription) so checks always see the
+  // latest saved values.
+  const readLlmSettings = () => {
+    const s = workspaceStore.state.settings;
+    return {
+      llmEnabled: s.llmEnabled,
+      llmBackend: s.llmBackend,
+      openaiLlmApiKey: s.openaiLlmApiKey,
+      openaiLlmModel: s.openaiLlmModel,
+    };
+  };
 
   const [modal, setModal] = useState<ModalState>(CLOSED_MODAL);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -70,8 +91,16 @@ export function StylesPage() {
       description: preset?.description ?? '',
       instructions: preset?.instructions ?? '',
       formatting: preset?.formatting ?? DEFAULT_FORMATTING,
+      fewShotDirty: preset?.fewShotDirty ?? false,
     });
     requestAnimationFrame(() => dialogRef.current?.showModal());
+    // Resolve styling-engine readiness in the background so the editor can gate
+    // example generation (disable refresh + explain what to set up).
+    if (mode !== 'view') {
+      void getLlmReadiness(readLlmSettings()).then((r) =>
+        setModal((m) => ({ ...m, llmReady: r.ready, llmReason: r.reason })),
+      );
+    }
   }
 
   function closeModal() {
@@ -85,53 +114,72 @@ export function StylesPage() {
   }
 
   async function handleSave() {
-    if (modal.saving || modal.generating) return;
+    if (modal.saving || modal.generating || modal.refreshing) return;
     setModal((m) => ({ ...m, saving: true }));
-    previousPresetsRef.current = presets;
 
-    let ok: boolean;
+    // Editing an existing style: save only. Changing the prompt marks its
+    // examples stale (backend); the user refreshes them via the button.
     if (modal.mode === 'edit' && modal.preset) {
-      ok = await updateCustomStyle(
+      const ok = await updateCustomStyle(
         modal.preset.id,
         modal.name,
         modal.description,
         modal.instructions,
         modal.formatting,
       );
-    } else {
-      ok = await createCustomStyle(
-        modal.name,
-        modal.description,
-        modal.instructions,
-        modal.formatting,
-      );
+      if (!ok) {
+        setModal((m) => ({ ...m, saving: false }));
+        return;
+      }
+      closeModal();
+      return;
     }
 
+    // Creating a new style.
+    previousPresetsRef.current = presets;
+    const ok = await createCustomStyle(
+      modal.name,
+      modal.description,
+      modal.instructions,
+      modal.formatting,
+    );
     if (!ok) {
       setModal((m) => ({ ...m, saving: false }));
       return;
     }
 
-    let targetId: string | null = null;
-    if (modal.mode === 'edit' && modal.preset) {
-      targetId = modal.preset.id;
-    } else {
-      const cur = workspaceStore.state.stylePresets;
-      targetId =
-        cur.find(
-          (p: StylePreset) =>
-            !p.isBuiltin && !previousPresetsRef.current.some((ex) => ex.id === p.id),
-        )?.id ?? null;
-    }
-
-    if (targetId) {
+    const created = workspaceStore.state.stylePresets.find(
+      (p: StylePreset) => !p.isBuiltin && !previousPresetsRef.current.some((ex) => ex.id === p.id),
+    );
+    // A new style auto-generates examples once — but only when the styling
+    // engine is set up (re-checked here, not at open time). Otherwise the style
+    // is still created (and stays marked dirty) so the user can refresh examples
+    // later from the editor once they've set it up.
+    if (created && (await getLlmReadiness(readLlmSettings())).ready) {
       setModal((m) => ({ ...m, saving: false, generating: true }));
-      const genOk = await generateStyleExamples(targetId);
+      const genOk = await generateStyleExamples(created.id);
       setModal((m) => ({ ...m, generating: false }));
+      // Keep the editor open if generation failed so the user notices and can
+      // retry via the refresh button; the style is created and stays dirty.
       if (!genOk) return;
     }
 
     closeModal();
+  }
+
+  async function handleRefresh() {
+    const preset = modal.preset;
+    if (!preset || modal.refreshing) return;
+    // Re-check readiness at click time — settings may have changed since open.
+    const readiness = await getLlmReadiness(readLlmSettings());
+    if (!readiness.ready) {
+      setModal((m) => ({ ...m, llmReady: false, llmReason: readiness.reason }));
+      return;
+    }
+    setModal((m) => ({ ...m, refreshing: true, llmReady: true, llmReason: null }));
+    await generateStyleExamples(preset.id);
+    const updated = workspaceStore.state.stylePresets.find((p: StylePreset) => p.id === preset.id);
+    setModal((m) => ({ ...m, refreshing: false, fewShotDirty: updated?.fewShotDirty ?? false }));
   }
 
   async function handleDelete(id: string) {
@@ -240,6 +288,10 @@ export function StylesPage() {
         instructions={modal.instructions}
         saving={modal.saving}
         generating={modal.generating}
+        refreshing={modal.refreshing}
+        fewShotDirty={modal.fewShotDirty}
+        llmReady={modal.llmReady}
+        llmReason={modal.llmReason}
         onNameChange={(v) => setModal((m) => ({ ...m, name: v }))}
         onDescriptionChange={(v) => setModal((m) => ({ ...m, description: v }))}
         onInstructionsChange={(v) => setModal((m) => ({ ...m, instructions: v }))}
@@ -249,6 +301,7 @@ export function StylesPage() {
         }
         onClose={closeModal}
         onSave={() => void handleSave()}
+        onRefreshExamples={() => void handleRefresh()}
         onDuplicate={duplicateFromView}
       />
     </div>

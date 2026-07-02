@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -47,6 +49,11 @@ pub struct UserSettings {
     pub asr_backend: AsrBackendConfig,
     #[serde(default)]
     pub llm_backend: LlmBackendConfig,
+    /// Saved remote styling-LLM provider, kept independently of `llm_backend`
+    /// so the endpoint/key/model persist across turning styling off or
+    /// switching engines. Applied when the active backend is `OpenAiCompatible`.
+    #[serde(default)]
+    pub llm_openai: OpenAiLlmProvider,
     pub hotkey: HotkeyConfig,
     /// Selected styling preset id, or `None` for no styling (raw transcript).
     /// Legacy configs storing the removed `"minimal"` sentinel migrate to `None`.
@@ -54,6 +61,11 @@ pub struct UserSettings {
     pub default_style: Option<StyleId>,
     #[serde(default)]
     pub custom_styles: Vec<StylePreset>,
+    /// Ids of custom styles whose few-shot examples are stale — the prompt or
+    /// name changed since they were last generated. Drives the "refresh
+    /// examples" affordance in the styles UI. Builtins never appear here.
+    #[serde(default)]
+    pub few_shot_dirty: BTreeSet<StyleId>,
     /// BCP-47 tag, e.g. "en-US"
     pub language: String,
     /// Dictation language for ASR/correction. "auto" = detect from speech.
@@ -157,6 +169,22 @@ impl UserSettings {
         if self.default_style.is_some() && matches!(self.llm_backend, LlmBackendConfig::Disabled) {
             self.llm_backend = LlmBackendConfig::Local {};
         }
+        // Back-fill the saved provider from a remote backend that was configured
+        // before `llm_openai` existed, so it survives being toggled off later.
+        if let LlmBackendConfig::OpenAiCompatible {
+            base_url,
+            api_key,
+            model,
+            max_tokens,
+        } = &self.llm_backend
+        {
+            self.llm_openai = OpenAiLlmProvider {
+                base_url: base_url.to_string(),
+                api_key: api_key.clone(),
+                model: model.clone(),
+                max_tokens: *max_tokens,
+            };
+        }
     }
 }
 
@@ -168,9 +196,11 @@ impl Default for UserSettings {
                 model: WhisperModel::default(),
             },
             llm_backend: LlmBackendConfig::Disabled,
+            llm_openai: OpenAiLlmProvider::default(),
             hotkey: HotkeyConfig::default(),
             default_style: None,
             custom_styles: Vec::new(),
+            few_shot_dirty: BTreeSet::new(),
             language: "auto".into(),
             dictation_language: default_dictation_language(),
             privacy_mode: PrivacyMode::LocalOnly,
@@ -365,6 +395,28 @@ pub enum LlmBackendConfig {
 impl Default for LlmBackendConfig {
     fn default() -> Self {
         Self::Local {}
+    }
+}
+
+/// Remote OpenAI-compatible styling-LLM provider settings, persisted
+/// independently of the active `llm_backend` so the endpoint/key/model survive
+/// turning styling off or switching to the local engine.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenAiLlmProvider {
+    pub base_url: String,
+    pub api_key: RedactedString,
+    pub model: String,
+    pub max_tokens: u32,
+}
+
+impl Default for OpenAiLlmProvider {
+    fn default() -> Self {
+        Self {
+            base_url: "https://api.openai.com/v1".into(),
+            api_key: RedactedString::new(""),
+            model: "gpt-4o-mini".into(),
+            max_tokens: 512,
+        }
     }
 }
 

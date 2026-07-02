@@ -86,6 +86,12 @@ struct PrewarmedStream {
 impl AppRuntime {
     pub async fn new(app: AppHandle) -> Result<Self, String> {
         let paths = resolve_paths()?;
+        // One-time on boot: lift any plaintext API keys still sitting in
+        // settings.toml into the OS keyring. Non-fatal — a failure just leaves
+        // the keys where they are.
+        if let Err(e) = SettingsStore::new(paths.settings_file()).migrate_secrets_to_keyring() {
+            tracing::warn!(error = %e, "API key keyring migration failed; keys remain in settings.toml");
+        }
         let settings = load_settings(&paths)?;
 
         let models_ready = lune_persist::has_required_models(
