@@ -1,6 +1,39 @@
 use diesel::prelude::*;
 
-use super::schema::{correction_pairs, dictionary, edit_observations, sessions, snippets};
+use super::schema::{
+    correction_pairs, custom_styles, dictionary, edit_observations, sessions, snippets,
+};
+
+// ── Custom styles ────────────────────────────────────────────────────────────
+
+#[derive(Queryable, Selectable, Debug)]
+#[diesel(table_name = custom_styles)]
+#[allow(dead_code)]
+pub struct CustomStyleRow {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub style_instructions: String,
+    /// JSON-serialized `FormatToggles`.
+    pub formatting: String,
+    /// JSON-serialized `Vec<(String, String)>` of few-shot pairs.
+    pub few_shot_pairs: String,
+    pub few_shot_dirty: i32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Insertable)]
+#[diesel(table_name = custom_styles)]
+pub struct NewCustomStyle<'a> {
+    pub id: &'a str,
+    pub name: &'a str,
+    pub description: &'a str,
+    pub style_instructions: &'a str,
+    pub formatting: &'a str,
+    pub few_shot_pairs: &'a str,
+    pub few_shot_dirty: i32,
+}
 
 // ── Dictionary ───────────────────────────────────────────────────────────────
 

@@ -687,13 +687,35 @@ fn process_audio_callback(
     // isn't clipped at the last full-chunk boundary. Consumers accept
     // arbitrary chunk lengths (VAD carries partial frames; ASR appends raw
     // samples), so a short final chunk is safe.
-    if flush.swap(false, Ordering::AcqRel) && !output_buf.is_empty() {
-        let samples = std::mem::take(output_buf);
-        let timestamp_ms = start_time.elapsed().as_millis() as u64;
-        ring.push(AudioChunk {
-            samples,
-            timestamp_ms,
-        });
+    if flush.swap(false, Ordering::AcqRel) {
+        // Drain the resampler backlog first: on a non-16 kHz device the
+        // partial input frame held here (up to ~27 ms on a 48 kHz mic —
+        // often the last phonemes) would otherwise never reach the ring.
+        // Zero-padding to a full frame costs a brief silent tail, which the
+        // downstream VAD endpoint-trim removes.
+        if let Some(r) = resampler
+            && !input_resample_buf.is_empty()
+        {
+            let required_input = r.input_frames_next();
+            input_resample_buf.resize(required_input, 0.0);
+            let frames = input_resample_buf.len();
+            match SequentialSlice::new(input_resample_buf.as_slice(), 1, frames) {
+                Ok(adapter) => match r.process(&adapter, 0, None) {
+                    Ok(output) => output_buf.extend_from_slice(&output.take_data()),
+                    Err(e) => warn!("Flush resampling error: {e}"),
+                },
+                Err(_) => warn!("SequentialSlice construction failed during flush"),
+            }
+            input_resample_buf.clear();
+        }
+        if !output_buf.is_empty() {
+            let samples = std::mem::take(output_buf);
+            let timestamp_ms = start_time.elapsed().as_millis() as u64;
+            ring.push(AudioChunk {
+                samples,
+                timestamp_ms,
+            });
+        }
     }
 }
 

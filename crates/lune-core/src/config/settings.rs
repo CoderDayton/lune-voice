@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -7,7 +5,7 @@ use super::hotkey::HotkeyConfig;
 use super::modes::{ActivationMode, DictationMode, PillVisibility, PrivacyMode, TerminalMode};
 use super::pipeline::PipelineOverrides;
 use super::redacted::RedactedString;
-use super::style_llm::{StyleId, StylePreset};
+use super::style_llm::StyleId;
 
 /// Deserialize `dictation_mode`, tolerating the removed legacy `"Both"` value
 /// (the old "type and copy" mode) by mapping it to `TypeInPlace` via `FromStr`.
@@ -59,13 +57,6 @@ pub struct UserSettings {
     /// Legacy configs storing the removed `"minimal"` sentinel migrate to `None`.
     #[serde(default)]
     pub default_style: Option<StyleId>,
-    #[serde(default)]
-    pub custom_styles: Vec<StylePreset>,
-    /// Ids of custom styles whose few-shot examples are stale — the prompt or
-    /// name changed since they were last generated. Drives the "refresh
-    /// examples" affordance in the styles UI. Builtins never appear here.
-    #[serde(default)]
-    pub few_shot_dirty: BTreeSet<StyleId>,
     /// BCP-47 tag, e.g. "en-US"
     pub language: String,
     /// Dictation language for ASR/correction. "auto" = detect from speech.
@@ -199,8 +190,6 @@ impl Default for UserSettings {
             llm_openai: OpenAiLlmProvider::default(),
             hotkey: HotkeyConfig::default(),
             default_style: None,
-            custom_styles: Vec::new(),
-            few_shot_dirty: BTreeSet::new(),
             language: "auto".into(),
             dictation_language: default_dictation_language(),
             privacy_mode: PrivacyMode::LocalOnly,

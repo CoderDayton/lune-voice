@@ -1,8 +1,8 @@
 use lune_asr::AsrRegistry;
 use lune_core::config::{
-    ActivationMode, AsrBackendConfig, DevicePolicy, DictationMode, HotkeyConfig, KeyCombo,
-    LlmBackendConfig, Modifier, OpenAiLlmProvider, PillVisibility, RedactedString, StreamingMode,
-    StylePreset, TerminalMode, UserSettings, builtin_registry,
+    ActivationMode, AsrBackendConfig, DevicePolicy, DictationMode, FormatToggles, HotkeyConfig,
+    KeyCombo, LlmBackendConfig, Modifier, OpenAiLlmProvider, PillVisibility, RedactedString,
+    StreamingMode, StylePreset, TerminalMode, UserSettings, builtin_registry,
 };
 use lune_core::session::SessionStatus;
 use lune_persist::{AppPaths, Database, SettingsStore, StoredDictionaryEntry};
@@ -50,8 +50,8 @@ pub fn save_workspace_settings(
 ) -> Result<WorkspaceSnapshot, String> {
     let paths = resolve_paths()?;
     let mut settings = load_settings(&paths)?;
-    apply_settings_dto(&mut settings, input)?;
     let mut database = open_database(&paths)?;
+    apply_settings_dto(&mut settings, input, &mut database)?;
     save_settings(&paths, &settings)?;
     build_snapshot(settings, &mut database)
 }
@@ -237,79 +237,86 @@ fn validate_style_fields(name: &str, description: &str, instructions: &str) -> R
 
 pub fn create_custom_style(input: CreateCustomStyleInput) -> Result<WorkspaceSnapshot, String> {
     let paths = resolve_paths()?;
-    let mut settings = load_settings(&paths)?;
+    let settings = load_settings(&paths)?;
+    let mut database = open_database(&paths)?;
     let name = input.name.trim().to_owned();
     let description = input.description.trim().to_owned();
     let instructions = input.instructions.trim().to_owned();
     validate_style_fields(&name, &description, &instructions)?;
-    if settings.custom_styles.len() >= CUSTOM_STYLE_MAX {
+    let count = database
+        .count_custom_styles()
+        .map_err(|e| format!("count custom styles: {e}"))?;
+    if count as usize >= CUSTOM_STYLE_MAX {
         return Err(format!(
             "maximum of {CUSTOM_STYLE_MAX} custom styles reached"
         ));
     }
-    let id = format!("custom-{}", uuid::Uuid::new_v4().as_hyphenated());
-    settings.custom_styles.push(StylePreset {
-        id: id.clone(),
+    let preset = StylePreset {
+        id: format!("custom-{}", uuid::Uuid::new_v4().as_hyphenated()),
         name,
         description,
         style_instructions: instructions,
         few_shot_pairs: Vec::new(),
         formatting: input.formatting.into(),
-    });
-    // A new style has no examples yet — mark it stale so the UI prompts a
-    // generation. The create flow clears this by generating immediately when the
-    // styling engine is ready; if it isn't, the flag persists so the refresh
-    // button stays highlighted until the user generates them.
-    settings.few_shot_dirty.insert(id);
-    save_settings(&paths, &settings)?;
-    let mut database = open_database(&paths)?;
+    };
+    // A new style has no examples yet — mark it stale (`dirty = true`) so the UI
+    // prompts a generation. The create flow clears this by generating
+    // immediately when the styling engine is ready; otherwise the flag persists
+    // so the refresh button stays highlighted until the user generates them.
+    database
+        .insert_custom_style(&preset, true)
+        .map_err(|e| format!("insert custom style: {e}"))?;
     build_snapshot(settings, &mut database)
 }
 
 pub fn update_custom_style(input: UpdateCustomStyleInput) -> Result<WorkspaceSnapshot, String> {
     let paths = resolve_paths()?;
-    let mut settings = load_settings(&paths)?;
+    let settings = load_settings(&paths)?;
+    let mut database = open_database(&paths)?;
     let name = input.name.trim().to_owned();
     let description = input.description.trim().to_owned();
     let instructions = input.instructions.trim().to_owned();
     validate_style_fields(&name, &description, &instructions)?;
-    let idx = settings
-        .custom_styles
-        .iter()
-        .position(|s| s.id == input.id)
+    let existing = database
+        .get_custom_style(&input.id)
+        .map_err(|e| format!("load custom style: {e}"))?
         .ok_or_else(|| format!("custom style not found: {}", input.id))?;
     // The generated examples are seeded from the name + instructions, so mark
-    // them stale when either changes; a formatting/description-only edit leaves
-    // them valid.
-    let few_shot_stale = settings.custom_styles[idx].name != name
-        || settings.custom_styles[idx].style_instructions != instructions;
-    settings.custom_styles[idx].name = name;
-    settings.custom_styles[idx].description = description;
-    settings.custom_styles[idx].style_instructions = instructions;
-    settings.custom_styles[idx].formatting = input.formatting.into();
-    if few_shot_stale {
-        settings.few_shot_dirty.insert(input.id.clone());
-    }
-    save_settings(&paths, &settings)?;
-    let mut database = open_database(&paths)?;
+    // them stale when either changes; a formatting/description-only edit keeps
+    // the existing state (already-stale stays stale).
+    let few_shot_stale = existing.preset.name != name
+        || existing.preset.style_instructions != instructions
+        || existing.few_shot_dirty;
+    let formatting: FormatToggles = input.formatting.into();
+    database
+        .update_custom_style_fields(
+            &input.id,
+            &name,
+            &description,
+            &instructions,
+            &formatting,
+            few_shot_stale,
+        )
+        .map_err(|e| format!("update custom style: {e}"))?;
     build_snapshot(settings, &mut database)
 }
 
 pub fn delete_custom_style(style_id: String) -> Result<WorkspaceSnapshot, String> {
     let paths = resolve_paths()?;
     let mut settings = load_settings(&paths)?;
-    let idx = settings
-        .custom_styles
-        .iter()
-        .position(|s| s.id == style_id)
-        .ok_or_else(|| format!("custom style not found: {style_id}"))?;
-    settings.custom_styles.remove(idx);
-    settings.few_shot_dirty.remove(&style_id);
+    let mut database = open_database(&paths)?;
+    let removed = database
+        .delete_custom_style(&style_id)
+        .map_err(|e| format!("delete custom style: {e}"))?;
+    if !removed {
+        return Err(format!("custom style not found: {style_id}"));
+    }
+    // If the deleted style was the active selection, clear it — that is a
+    // settings change, so persist the TOML too.
     if settings.default_style.as_deref() == Some(style_id.as_str()) {
         settings.default_style = None;
+        save_settings(&paths, &settings)?;
     }
-    save_settings(&paths, &settings)?;
-    let mut database = open_database(&paths)?;
     build_snapshot(settings, &mut database)
 }
 
@@ -318,17 +325,15 @@ pub fn save_style_few_shot_pairs(
     pairs: Vec<(String, String)>,
 ) -> Result<WorkspaceSnapshot, String> {
     let paths = resolve_paths()?;
-    let mut settings = load_settings(&paths)?;
-    let idx = settings
-        .custom_styles
-        .iter()
-        .position(|s| s.id == style_id)
-        .ok_or_else(|| format!("custom style not found: {style_id}"))?;
-    settings.custom_styles[idx].few_shot_pairs = pairs;
-    // Freshly (re)generated — no longer stale.
-    settings.few_shot_dirty.remove(style_id);
-    save_settings(&paths, &settings)?;
+    let settings = load_settings(&paths)?;
     let mut database = open_database(&paths)?;
+    // Freshly (re)generated — clear the stale flag.
+    let updated = database
+        .set_custom_style_few_shot_pairs(style_id, &pairs, false)
+        .map_err(|e| format!("save few-shot pairs: {e}"))?;
+    if !updated {
+        return Err(format!("custom style not found: {style_id}"));
+    }
     build_snapshot(settings, &mut database)
 }
 
@@ -375,15 +380,18 @@ fn build_snapshot(
             few_shot_dirty: false,
         })
         .collect();
-    for custom in &settings.custom_styles {
+    let custom_styles = database
+        .list_custom_styles()
+        .map_err(|e| format!("list custom styles: {e}"))?;
+    for custom in &custom_styles {
         style_presets.push(StylePresetDto {
-            id: custom.id.clone(),
-            name: custom.name.clone(),
-            description: custom.description.clone(),
+            id: custom.preset.id.clone(),
+            name: custom.preset.name.clone(),
+            description: custom.preset.description.clone(),
             is_builtin: false,
-            instructions: custom.style_instructions.clone(),
-            formatting: custom.formatting.into(),
-            few_shot_dirty: settings.few_shot_dirty.contains(&custom.id),
+            instructions: custom.preset.style_instructions.clone(),
+            formatting: custom.preset.formatting.into(),
+            few_shot_dirty: custom.few_shot_dirty,
         });
     }
 
@@ -507,6 +515,7 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
 fn apply_settings_dto(
     settings: &mut UserSettings,
     input: SaveWorkspaceSettingsInput,
+    database: &mut Database,
 ) -> Result<(), String> {
     settings.activation_mode = activation_mode_from_dto(input.activation_mode);
     settings.pill_visibility = pill_visibility_from_dto(input.pill_visibility);
@@ -541,8 +550,19 @@ fn apply_settings_dto(
             if style.len() > 128 {
                 return Err("stylePreset must be 1–128 characters".into());
             }
-            let is_known = builtin_registry().get(style).is_some()
-                || settings.custom_styles.iter().any(|s| s.id == style);
+            // Skip re-validation when the selection is unchanged from what is
+            // already persisted: it was validated when first set, and querying
+            // the DB on every unrelated settings save (e.g. a hotkey toggle)
+            // would couple all saves to the database. Only a *changed* value
+            // needs a fresh lookup. `settings.default_style` still holds the
+            // pre-mutation value here (the assignment happens after this match).
+            let unchanged = settings.default_style.as_deref() == Some(style);
+            let is_known = unchanged
+                || builtin_registry().get(style).is_some()
+                || database
+                    .get_custom_style(style)
+                    .map_err(|e| format!("check custom style: {e}"))?
+                    .is_some();
             if !is_known {
                 return Err(format!("unknown stylePreset: {style}"));
             }
@@ -952,24 +972,26 @@ mod tests {
     #[test]
     fn apply_settings_rejects_invalid_style_and_language() {
         let mut settings = UserSettings::default();
+        let mut db = Database::open_in_memory().expect("db");
 
         let mut input = default_save_input();
         input.style_preset = Some("not-a-style".into());
-        assert!(apply_settings_dto(&mut settings, input).is_err());
+        assert!(apply_settings_dto(&mut settings, input, &mut db).is_err());
 
         let mut input = default_save_input();
         input.language = "bad tag".into();
-        assert!(apply_settings_dto(&mut settings, input).is_err());
+        assert!(apply_settings_dto(&mut settings, input, &mut db).is_err());
     }
 
     #[test]
     fn apply_settings_persists_llm_skip_threshold() {
         let mut settings = UserSettings::default();
+        let mut db = Database::open_in_memory().expect("db");
 
         let mut input = default_save_input();
         input.confidence_threshold = Some(0.55);
         input.llm_skip_threshold = Some(0.75);
-        apply_settings_dto(&mut settings, input).unwrap();
+        apply_settings_dto(&mut settings, input, &mut db).unwrap();
         assert_eq!(settings.pipeline.llm_skip_threshold, Some(0.75));
 
         // A skip threshold below the marking threshold is valid: the gate's
@@ -977,42 +999,44 @@ mod tests {
         let mut input = default_save_input();
         input.confidence_threshold = Some(0.55);
         input.llm_skip_threshold = Some(0.40);
-        apply_settings_dto(&mut settings, input).unwrap();
+        apply_settings_dto(&mut settings, input, &mut db).unwrap();
         assert_eq!(settings.pipeline.llm_skip_threshold, Some(0.40));
 
         // Out-of-range is still rejected.
         let mut input = default_save_input();
         input.llm_skip_threshold = Some(1.5);
-        assert!(apply_settings_dto(&mut settings, input).is_err());
+        assert!(apply_settings_dto(&mut settings, input, &mut db).is_err());
     }
 
     #[test]
     fn dictation_language_accepts_auto_and_bcp47() {
         let mut settings = UserSettings::default();
+        let mut db = Database::open_in_memory().expect("db");
 
         let mut input = default_save_input();
         input.dictation_language = "auto".into();
-        apply_settings_dto(&mut settings, input).unwrap();
+        apply_settings_dto(&mut settings, input, &mut db).unwrap();
         assert_eq!(settings.dictation_language, "auto");
 
         let mut input = default_save_input();
         input.dictation_language = "en".into();
-        apply_settings_dto(&mut settings, input).unwrap();
+        apply_settings_dto(&mut settings, input, &mut db).unwrap();
         assert_eq!(settings.dictation_language, "en");
 
         let mut input = default_save_input();
         input.dictation_language = "zh".into();
-        apply_settings_dto(&mut settings, input).unwrap();
+        apply_settings_dto(&mut settings, input, &mut db).unwrap();
         assert_eq!(settings.dictation_language, "zh");
     }
 
     #[test]
     fn dictation_language_rejects_invalid_tag() {
         let mut settings = UserSettings::default();
+        let mut db = Database::open_in_memory().expect("db");
 
         let mut input = default_save_input();
         input.dictation_language = "not valid".into();
-        assert!(apply_settings_dto(&mut settings, input).is_err());
+        assert!(apply_settings_dto(&mut settings, input, &mut db).is_err());
     }
 
     #[test]
@@ -1032,11 +1056,12 @@ mod tests {
             device: DevicePolicy::Cuda,
             ..UserSettings::default()
         };
+        let mut db = Database::open_in_memory().expect("db");
         let mut input = default_save_input();
         input.use_gpu = true;
         input.device_policy = DevicePolicyDto::Cuda;
 
-        apply_settings_dto(&mut settings, input).unwrap();
+        apply_settings_dto(&mut settings, input, &mut db).unwrap();
         assert!(matches!(settings.device, DevicePolicy::Cuda));
     }
 

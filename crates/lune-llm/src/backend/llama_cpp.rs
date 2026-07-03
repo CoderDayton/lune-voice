@@ -13,9 +13,10 @@
 //!   is not `Send`, so it must never cross the async boundary.
 //! - All inference runs on a blocking thread (`spawn_blocking`); no llama handle
 //!   is held across `.await`.
-//! - The styling model (Qwen3.5) defaults to "thinking" mode; we append
-//!   `/no_think` to the prompt and strip any `<think>…</think>` block so styling
-//!   stays fast and emits only the rewritten text.
+//! - The styling model (Qwen3.5) defaults to "thinking" mode; thinking is
+//!   hard-disabled by pre-filling an empty `<think></think>` block in the
+//!   assistant turn (see [`build_chatml`]), and any residual think block is
+//!   stripped from the output so styling emits only the rewritten text.
 
 use std::path::PathBuf;
 
@@ -47,6 +48,7 @@ mod imp {
     use llama_cpp_2::model::params::LlamaModelParams;
     use llama_cpp_2::model::{AddBos, LlamaModel};
     use llama_cpp_2::sampling::LlamaSampler;
+    use llama_cpp_2::token::logit_bias::LlamaLogitBias;
 
     /// Context window. Dictation styling prompts are short; 4k is ample and
     /// keeps per-call context allocation small.
@@ -164,7 +166,38 @@ mod imp {
         ctx.decode(&mut batch)
             .map_err(|e| Error::config(format!("decode prompt: {e}")))?;
 
-        let mut sampler = LlamaSampler::greedy();
+        // The empty `<think></think>` prefill above only pre-fills the prompt;
+        // nothing stops the model from *generating* a fresh `<think>` token as
+        // its first real output, re-entering reasoning mode with no matching
+        // close before the token budget runs out (CPU inference isn't
+        // bit-exact across runs, so this isn't reliably reproducible — the
+        // model can tip into it on some decodes and not others). A closed
+        // reasoning block gets stripped by `strip_think_tags`, but a reopened,
+        // never-closed one swallows the real answer along with it. Hard-ban
+        // the `<think>` token itself so generation can't re-enter thinking at
+        // all, rather than trying to clean it up after the fact.
+        let think_open_token = model
+            .str_to_token("<think>", AddBos::Never)
+            .ok()
+            .filter(|toks| toks.len() == 1)
+            .map(|toks| toks[0]);
+        let mut chain_samplers = Vec::with_capacity(3);
+        if let Some(tok) = think_open_token {
+            chain_samplers.push(LlamaSampler::logit_bias(
+                model.n_vocab(),
+                &[LlamaLogitBias::new(tok, f32::NEG_INFINITY)],
+            ));
+        }
+        // Mild repetition penalty (llama.cpp's historical 1.1 default over the
+        // last 64 generated tokens). Pure greedy makes the small styler
+        // collapse into degenerate repetition loops on free-form generation
+        // (few-shot example synthesis burned its whole token budget on one
+        // repeated phrase). Only generated tokens are penalized — the prompt
+        // is never `accept`ed — so legit repetition in the user's text is
+        // unaffected, and the decode stays deterministic.
+        chain_samplers.push(LlamaSampler::penalties(64, 1.1, 0.0, 0.0));
+        chain_samplers.push(LlamaSampler::greedy());
+        let mut sampler = LlamaSampler::chain_simple(chain_samplers);
         let mut out = String::new();
         let mut n_cur = tokens.len() as i32;
         // Shared decoder so multi-byte UTF-8 split across tokens reassembles.

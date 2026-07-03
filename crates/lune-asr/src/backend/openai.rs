@@ -59,8 +59,10 @@ pub struct OpenAiAsrSession {
 /// audio as 16-bit PCM WAV.
 ///
 /// On transient HTTP errors, retries up to 3 times with 2 s initial
-/// exponential backoff. On persistent failure, returns raw empty segments
-/// with a WARN log rather than propagating the error.
+/// exponential backoff. An opportunistic flush that still fails re-buffers
+/// the audio with a WARN log; a forced flush (`poll_final`, the batch
+/// pipeline's one transcription shot) propagates the error so the session
+/// reports a failure instead of a silent "no speech detected".
 #[derive(Debug)]
 pub struct OpenAiCompatibleAsrBackend {
     client: reqwest::Client,
@@ -187,6 +189,13 @@ impl OpenAiCompatibleAsrBackend {
                 } else {
                     pcm.append(&mut state.audio_buf);
                     state.audio_buf = pcm;
+                }
+                // A forced flush is the utterance's only transcription shot:
+                // swallowing the failure surfaces upstream as "no speech
+                // detected". Propagate it so the session reports the error.
+                if force {
+                    drop(state);
+                    return Err(e);
                 }
             }
         }
@@ -493,7 +502,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn graceful_degradation_on_unreachable() {
+    async fn unreachable_api_surfaces_error_from_poll_final() {
         let config = OpenAiAsrConfig {
             base_url: "http://127.0.0.1:1/v1".parse().unwrap(),
             timeout: Duration::from_millis(100),
@@ -507,9 +516,10 @@ mod tests {
             .unwrap();
 
         backend.push_audio(&session, &[0.0f32; 100]).await.unwrap();
-        // poll_final should not panic or propagate the error — it logs WARN.
-        let segs = backend.poll_final(&session).await.unwrap();
-        assert!(segs.is_empty());
+        // poll_final must propagate the failure — Ok(empty) would read as
+        // "no speech detected" upstream and hide the API outage.
+        let err = backend.poll_final(&session).await.unwrap_err();
+        assert!(err.to_string().contains("ASR failed"), "got: {err}");
     }
 
     #[tokio::test]
@@ -527,8 +537,9 @@ mod tests {
             .unwrap();
 
         backend.push_audio(&session, &[0.0f32; 100]).await.unwrap();
-        let segs = backend.poll_final(&session).await.unwrap();
-        assert!(segs.is_empty());
+        // The failure propagates, but the audio must be re-buffered so a
+        // caller-driven retry still has the full utterance.
+        assert!(backend.poll_final(&session).await.is_err());
         assert_eq!(session.state.lock().unwrap().audio_buf.len(), 100);
     }
 }

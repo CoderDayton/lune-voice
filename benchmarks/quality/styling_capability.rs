@@ -40,7 +40,7 @@ use lune_core::llm::LlmService;
 use lune_llm::few_shot::generate_few_shot_examples;
 use lune_llm::prompt::{contains_forbidden_output, fix_all_number_spaces};
 use lune_llm::{LlamaCppBackend, LlamaCppConfig};
-use lune_persist::{AppPaths, SettingsStore};
+use lune_persist::AppPaths;
 
 // ─── Test inputs (raw ASR-style: lowercase, no punctuation, fillers) ─────────
 
@@ -479,14 +479,14 @@ fn main() {
 /// the first custom style if none matches but some exist. Returns `None` when
 /// there are no custom styles (or settings can't be read).
 fn load_enhance(paths: &AppPaths) -> Option<StylePreset> {
-    let store = SettingsStore::new(paths.settings_file());
-    let settings = store.load().ok()?;
-    let styles = settings.custom_styles;
+    let mut db = lune_persist::Database::open(&paths.database_file()).ok()?;
+    let styles = db.list_custom_styles().ok()?;
     styles
         .iter()
         .find(|s| {
-            s.name.to_lowercase().contains("enhance") || s.id.to_lowercase().contains("enhance")
+            s.preset.name.to_lowercase().contains("enhance")
+                || s.preset.id.to_lowercase().contains("enhance")
         })
-        .cloned()
-        .or_else(|| styles.first().cloned())
+        .or_else(|| styles.first())
+        .map(|s| s.preset.clone())
 }

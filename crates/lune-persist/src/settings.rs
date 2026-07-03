@@ -31,6 +31,12 @@ fn has_inline_api_key(content: &str) -> bool {
     })
 }
 
+/// True when the raw settings TOML still carries the legacy `[[custom_styles]]`
+/// table or its companion `few_shot_dirty` set — data that now lives in the DB.
+fn raw_has_legacy_custom_styles(raw: &str) -> bool {
+    raw.contains("[[custom_styles]]") || raw.contains("few_shot_dirty")
+}
+
 /// Read/write `UserSettings` as TOML with atomic writes.
 ///
 /// API keys are kept out of the plaintext TOML: on `save` they are written to
@@ -117,6 +123,87 @@ impl SettingsStore {
             tracing::info!("migrated plaintext API key(s) from settings.toml into the OS keyring");
         }
         Ok(())
+    }
+
+    /// One-time migration: lift legacy `[[custom_styles]]` (and the companion
+    /// `few_shot_dirty` set) out of `settings.toml` into the `custom_styles` DB
+    /// table, then strip them from the file. Idempotent and convergent — the DB
+    /// insert is `INSERT OR IGNORE` inside one transaction, so a retry after a
+    /// partial run never errors or duplicates. Mirrors
+    /// [`Self::migrate_secrets_to_keyring`]; safe to call on every boot.
+    ///
+    /// Ordering is load-bearing for data safety: the styles are committed to the
+    /// DB *before* the file is rewritten. `UserSettings` no longer carries these
+    /// fields, so any `save` drops them — the file therefore must not be
+    /// rewritten until the DB durably holds the data. A DB-insert failure
+    /// returns `Err` (the caller treats it as fatal) rather than risk a later
+    /// save clobbering the un-migrated styles. Stripping the file afterwards is
+    /// best-effort: the data is already safe, so a strip failure just retries on
+    /// the next boot.
+    pub fn migrate_custom_styles_to_db(&self, db: &mut crate::Database) -> PersistResult<()> {
+        if !self.path.exists() {
+            return Ok(());
+        }
+        let raw = fs::read_to_string(&self.path)?;
+        if !raw_has_legacy_custom_styles(&raw) {
+            return Ok(());
+        }
+        // Parse only the two legacy fields; every other TOML key is ignored, and
+        // `StylePreset`'s own removed fields (e.g. `user_prompt_template`) are
+        // tolerated since it does not deny unknown fields.
+        #[derive(serde::Deserialize, Default)]
+        struct LegacyStyles {
+            #[serde(default)]
+            custom_styles: Vec<lune_core::config::StylePreset>,
+            #[serde(default)]
+            few_shot_dirty: std::collections::BTreeSet<String>,
+        }
+        let legacy: LegacyStyles = toml::from_str(&raw)?;
+        let batch: Vec<(lune_core::config::StylePreset, bool)> = legacy
+            .custom_styles
+            .into_iter()
+            .map(|style| {
+                let dirty = legacy.few_shot_dirty.contains(&style.id);
+                (style, dirty)
+            })
+            .collect();
+        // Atomic + convergent: the whole batch lands or nothing does, and ids
+        // already copied by a prior partial run are skipped. Any failure here is
+        // propagated (fatal) so the file is never stripped with data at risk.
+        let inserted = db.insert_custom_styles_migration(&batch)?;
+        // The styles are now durably in the DB, so it is safe to rewrite the
+        // file without them. A `load → save` round-trip strips the legacy keys
+        // (the current `UserSettings` has no field for them). Best-effort: the
+        // data is already safe and a re-run just retries, so a write failure is
+        // logged, not fatal.
+        if let Err(e) = self.load().and_then(|settings| self.save(&settings)) {
+            tracing::warn!(
+                error = %e,
+                "custom styles migrated into the database, but stripping settings.toml failed; will retry next boot"
+            );
+            return Ok(());
+        }
+        if inserted > 0 {
+            tracing::info!(
+                count = inserted,
+                "migrated custom styles from settings.toml into the database"
+            );
+        }
+        Ok(())
+    }
+
+    /// True when `settings.toml` still carries legacy `[[custom_styles]]` /
+    /// `few_shot_dirty` blocks that must be migrated into the DB before the file
+    /// can be safely rewritten (a rewrite drops them — they are no longer a
+    /// `UserSettings` field). Lets the boot path decide whether a failed DB open
+    /// is fatal (legacy data at risk) or harmless (nothing to migrate).
+    pub fn has_legacy_custom_styles(&self) -> PersistResult<bool> {
+        if !self.path.exists() {
+            return Ok(false);
+        }
+        Ok(raw_has_legacy_custom_styles(&fs::read_to_string(
+            &self.path,
+        )?))
     }
 
     /// Populate blanked API keys from the keyring. An inline (non-empty) key in
@@ -238,6 +325,89 @@ mod tests {
         let reloaded = store.load().unwrap();
         assert_eq!(reloaded.language, settings.language);
         assert_eq!(reloaded.session_history_days, settings.session_history_days);
+    }
+
+    #[test]
+    fn migrate_custom_styles_moves_toml_into_db_and_strips_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        let store =
+            SettingsStore::with_vault(&path, Box::new(crate::secrets::InMemoryVault::default()));
+
+        // Start from a full valid config, then splice in the legacy fields that
+        // used to live in the TOML: top-level `few_shot_dirty` and a custom
+        // style block (with the removed `user_prompt_template` key, to prove the
+        // parser tolerates it).
+        store.save(&UserSettings::default()).unwrap();
+        let base = fs::read_to_string(&path).unwrap();
+        let with_dirty = base.replacen(
+            "language = \"auto\"",
+            "language = \"auto\"\nfew_shot_dirty = [\"custom-abc\"]",
+            1,
+        );
+        let legacy = format!(
+            "{with_dirty}\n[[custom_styles]]\n\
+             id = \"custom-abc\"\n\
+             name = \"Enhance Prompt\"\n\
+             description = \"d\"\n\
+             style_instructions = \"Make it better.\"\n\
+             user_prompt_template = \"{{raw_text}}\"\n\
+             few_shot_pairs = []\n\n\
+             [custom_styles.formatting]\n\
+             keybinds = true\n\
+             title_abbreviations = false\n\
+             auto_capitalization = false\n\
+             brand_casing = false\n"
+        );
+        fs::write(&path, &legacy).unwrap();
+
+        let mut db = crate::Database::open_in_memory().unwrap();
+        store.migrate_custom_styles_to_db(&mut db).unwrap();
+
+        // Landed in the DB with its stale flag and formatting preserved.
+        let styles = db.list_custom_styles().unwrap();
+        assert_eq!(styles.len(), 1);
+        assert_eq!(styles[0].preset.id, "custom-abc");
+        assert_eq!(styles[0].preset.name, "Enhance Prompt");
+        assert!(styles[0].few_shot_dirty);
+        assert!(!styles[0].preset.formatting.auto_capitalization);
+
+        // Stripped from the TOML.
+        let rewritten = fs::read_to_string(&path).unwrap();
+        assert!(!rewritten.contains("[[custom_styles]]"));
+        assert!(!rewritten.contains("few_shot_dirty"));
+
+        // Idempotent: a second run is a no-op and does not duplicate.
+        store.migrate_custom_styles_to_db(&mut db).unwrap();
+        assert_eq!(db.list_custom_styles().unwrap().len(), 1);
+
+        // After a successful migration the file is legacy-free, so the boot
+        // path treats a later DB-open failure as harmless.
+        assert!(!store.has_legacy_custom_styles().unwrap());
+    }
+
+    #[test]
+    fn has_legacy_custom_styles_detects_unmigrated_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        let store =
+            SettingsStore::with_vault(&path, Box::new(crate::secrets::InMemoryVault::default()));
+
+        // No file yet → nothing to migrate.
+        assert!(!store.has_legacy_custom_styles().unwrap());
+
+        // A clean save (no legacy keys) → still nothing to migrate.
+        store.save(&UserSettings::default()).unwrap();
+        assert!(!store.has_legacy_custom_styles().unwrap());
+
+        // Splice in a legacy block → detected, so a failed DB open is fatal.
+        let base = fs::read_to_string(&path).unwrap();
+        fs::write(
+            &path,
+            format!("{base}\n[[custom_styles]]\nid = \"custom-x\"\n"),
+        )
+        .unwrap();
+        assert!(store.has_legacy_custom_styles().unwrap());
     }
 
     #[test]

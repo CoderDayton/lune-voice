@@ -140,24 +140,32 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         // Resolve style preset BEFORE touching the active lock — a missing
         // style is a config error, not a session-state error, and we don't
         // want to mark the session active just to fail validation.
-        let (current_style_id, custom_styles) = {
-            let settings = self.settings.read().await;
-            (
-                settings.default_style.clone(),
-                settings.custom_styles.clone(),
-            )
-        };
+        let current_style_id = { self.settings.read().await.default_style.clone() };
         // `None` means no styling — the raw (heuristically-formatted) transcript
         // is delivered as-is. A selected id that no longer resolves (e.g. a
         // deleted custom style) also degrades to no styling rather than erroring.
-        let style_preset: Option<Arc<StylePreset>> = current_style_id.and_then(|id| {
-            builtin_registry().get(&id).or_else(|| {
-                custom_styles
-                    .iter()
-                    .find(|s| s.id == id)
-                    .map(|s| Arc::new(s.clone()))
-            })
-        });
+        // Custom styles live in the database (the source of truth); builtins are
+        // the static registry.
+        let style_preset: Option<Arc<StylePreset>> = match current_style_id {
+            None => None,
+            Some(id) => match builtin_registry().get(&id) {
+                Some(preset) => Some(preset),
+                None => match self.persist.lock().await.get_custom_style(&id) {
+                    Ok(found) => found.map(|s| Arc::new(s.preset)),
+                    Err(e) => {
+                        // A genuine DB/deserialize error is not the same as a
+                        // missing style — surface it, then degrade to no styling
+                        // (optional) rather than failing the whole session.
+                        tracing::warn!(
+                            style = %id,
+                            error = %e,
+                            "failed to load custom style from database; delivering unstyled transcript"
+                        );
+                        None
+                    }
+                },
+            },
+        };
 
         // Hold the active lock across persist + spawn and only assign
         // `*lock = Some(...)` at the very end. Cancellation safety
@@ -591,31 +599,39 @@ async fn process_and_deliver(
         event_tx,
         active_arc,
         idle_notify,
-        settings,
+        // Custom styles now resolve from the DB (`persist`), not settings.
+        settings: _,
     } = deps;
     debug!(%session_id, "[ASR] output ready, len={}", raw_text.len());
 
     let route = router.route_full(&raw_text);
     for cmd in &route.commands {
         if let lune_core::command::VoiceCommand::SwitchStyle(style_id) = cmd {
-            let next_preset =
-                builtin_registry()
-                    .get(style_id)
-                    .or_else(|| match settings.try_read() {
-                        Ok(s) => s
-                            .custom_styles
-                            .iter()
-                            .find(|cs| cs.id.as_str() == style_id.as_str())
-                            .map(|cs| Arc::new(cs.clone())),
-                        Err(_) => {
+            let next_preset = match builtin_registry().get(style_id) {
+                Some(preset) => Some(preset),
+                None => match persist.try_lock() {
+                    Ok(mut db) => match db.get_custom_style(style_id) {
+                        Ok(found) => found.map(|cs| Arc::new(cs.preset)),
+                        Err(e) => {
                             tracing::warn!(
                                 %session_id,
                                 style = %style_id,
-                                "settings locked during style switch, skipping custom lookup"
+                                error = %e,
+                                "failed to load custom style during voice-command style switch"
                             );
                             None
                         }
-                    });
+                    },
+                    Err(_) => {
+                        tracing::warn!(
+                            %session_id,
+                            style = %style_id,
+                            "database busy during style switch, skipping custom lookup"
+                        );
+                        None
+                    }
+                },
+            };
             if let Some(next_preset) = next_preset {
                 info!(
                     %session_id,

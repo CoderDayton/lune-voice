@@ -10,6 +10,20 @@ diesel::table! {
 }
 
 diesel::table! {
+    custom_styles (id) {
+        id -> Text,
+        name -> Text,
+        description -> Text,
+        style_instructions -> Text,
+        formatting -> Text,
+        few_shot_pairs -> Text,
+        few_shot_dirty -> Integer,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
     snippets (id) {
         id -> Text,
         trigger_phrase -> Text,

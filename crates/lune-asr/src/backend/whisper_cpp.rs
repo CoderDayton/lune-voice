@@ -125,6 +125,21 @@ mod imp {
         *word_count = 0;
     }
 
+    /// Run CPU/GPU-heavy whisper work without stalling the async runtime.
+    /// On a multi-thread runtime the worker is handed off via
+    /// `block_in_place` so other tasks keep running during the multi-second
+    /// decode; on a current-thread runtime (tests) or outside a runtime the
+    /// closure runs inline (`block_in_place` would panic there).
+    fn run_blocking<T>(f: impl FnOnce() -> T) -> T {
+        use tokio::runtime::{Handle, RuntimeFlavor};
+        match Handle::try_current() {
+            Ok(h) if h.runtime_flavor() == RuntimeFlavor::MultiThread => {
+                tokio::task::block_in_place(f)
+            }
+            _ => f(),
+        }
+    }
+
     pub struct WhisperCppBackend {
         ctx: WhisperContext,
         n_threads: i32,
@@ -197,9 +212,9 @@ mod imp {
         type SessionHandle = Mutex<WhisperCppSession>;
 
         async fn start_session(&self, config: AsrSessionConfig) -> Result<Self::SessionHandle> {
-            let state = self
-                .ctx
-                .create_state()
+            // State allocation (KV cache and scratch buffers) is not cheap on
+            // the larger models — keep it off the async workers too.
+            let state = run_blocking(|| self.ctx.create_state())
                 .map_err(|e| Error::asr(format!("whisper create_state: {e}")))?;
             Ok(Mutex::new(WhisperCppSession {
                 state,
@@ -235,38 +250,41 @@ mod imp {
                 return Ok(Vec::new());
             }
 
-            // BeamSearch is whisper.cpp's accuracy-oriented default (beam 5).
-            // Worth the extra CPU here: decoding is one-shot per utterance, and
-            // accuracy is the whole reason for offering the larger models.
-            let mut params = FullParams::new(SamplingStrategy::BeamSearch {
-                beam_size: 5,
-                patience: -1.0,
-            });
-            params.set_n_threads(self.n_threads);
-            // "auto" detects; explicit short codes (en, de, …) match the app's
-            // dictation-language values one-to-one.
-            params.set_language(Some(language.as_deref().unwrap_or("auto")));
-            params.set_print_special(false);
-            params.set_print_progress(false);
-            params.set_print_realtime(false);
-            params.set_print_timestamps(false);
-            // Suppress non-speech tokens ("[music]", "(wind)") — pure hallucination
-            // residue on quiet/short clips. (`suppress_blank` is already default-true.)
-            params.set_suppress_nst(true);
+            // VAD + decode are seconds of blocking compute; hand the worker
+            // off so the UI/event tasks stay responsive during inference.
+            run_blocking(|| {
+                // BeamSearch is whisper.cpp's accuracy-oriented default (beam 5).
+                // Worth the extra CPU here: decoding is one-shot per utterance, and
+                // accuracy is the whole reason for offering the larger models.
+                let mut params = FullParams::new(SamplingStrategy::BeamSearch {
+                    beam_size: 5,
+                    patience: -1.0,
+                });
+                params.set_n_threads(self.n_threads);
+                // "auto" detects; explicit short codes (en, de, …) match the app's
+                // dictation-language values one-to-one.
+                params.set_language(Some(language.as_deref().unwrap_or("auto")));
+                params.set_print_special(false);
+                params.set_print_progress(false);
+                params.set_print_realtime(false);
+                params.set_print_timestamps(false);
+                // Suppress non-speech tokens ("[music]", "(wind)") — pure hallucination
+                // residue on quiet/short clips. (`suppress_blank` is already default-true.)
+                params.set_suppress_nst(true);
 
-            // Endpoint-trim with whisper's own (standalone) silero VAD: decode
-            // only [first speech onset .. last offset] + padding as ONE
-            // contiguous slice. Drops leading/trailing silence (less
-            // hallucination; anchors the decode at the first word) while
-            // preserving every INTERNAL pause — the cue whisper uses for
-            // punctuation. We deliberately avoid the in-decode `enable_vad`,
-            // which concatenates speech spans and strips those pauses → run-ons.
-            enum VadTrim {
-                Speech(usize, usize),
-                Silence,
-                Full,
-            }
-            let trim = self
+                // Endpoint-trim with whisper's own (standalone) silero VAD: decode
+                // only [first speech onset .. last offset] + padding as ONE
+                // contiguous slice. Drops leading/trailing silence (less
+                // hallucination; anchors the decode at the first word) while
+                // preserving every INTERNAL pause — the cue whisper uses for
+                // punctuation. We deliberately avoid the in-decode `enable_vad`,
+                // which concatenates speech spans and strips those pauses → run-ons.
+                enum VadTrim {
+                    Speech(usize, usize),
+                    Silence,
+                    Full,
+                }
+                let trim = self
                 .vad
                 .as_ref()
                 .and_then(|m| m.lock().ok())
@@ -297,116 +315,117 @@ mod imp {
                 })
                 .unwrap_or(VadTrim::Full);
 
-            let decode_slice: &[f32] = match trim {
-                VadTrim::Speech(start, end) if start < end => &audio[start..end],
-                VadTrim::Silence => {
-                    audio.clear();
-                    return Ok(Vec::new());
-                }
-                _ => audio.as_slice(),
-            };
-
-            // Prime punctuation/casing style only for longer dictation, where
-            // whisper otherwise runs sentences together; on a short clip the
-            // prompt biases the decode toward a spurious continuation, so skip it.
-            if decode_slice.len() >= PROMPT_MIN_SAMPLES {
-                params.set_initial_prompt(PUNCTUATION_PROMPT);
-            }
-
-            state
-                .full(params, decode_slice)
-                .map_err(|e| Error::asr(format!("whisper inference: {e}")))?;
-            // Drain the decoded audio so a repeat poll can't re-emit it (matches
-            // Qwen3's take-on-poll contract); capacity is retained for reuse.
-            audio.clear();
-
-            let detected =
-                whisper_rs::get_lang_str(state.full_lang_id_from_state()).map(str::to_string);
-
-            let n = state.full_n_segments();
-            let mut out = Vec::with_capacity(n.max(0) as usize);
-            for i in 0..n {
-                let Some(seg) = state.get_segment(i) else {
-                    continue;
-                };
-                let text = seg.to_str_lossy().unwrap_or_default().trim().to_string();
-                if text.is_empty() {
-                    continue;
-                }
-
-                // Fold per-token probabilities into the segment confidence AND
-                // group tokens into per-word confidences — whisper marks a new
-                // word with a leading-space token. Per-word values feed the
-                // corrector's risk gating (which protects uncertain words and
-                // drives `unresolved_words`); leaving them empty made that gating
-                // inert. Special tokens ("[_...]", p≈1.0) are skipped so they
-                // don't inflate the mean.
-                let mut sum = 0.0f32;
-                let mut count = 0u32;
-                let mut min_p = 1.0f32;
-                let mut word_confidences: Vec<WordConfidence> = Vec::new();
-                let mut cur_word = String::new();
-                let mut cur_min = 1.0f32;
-                let mut cur_sum = 0.0f32;
-                let mut cur_count = 0u32;
-                for j in 0..seg.n_tokens() {
-                    let Some(tok) = seg.get_token(j) else {
-                        continue;
-                    };
-                    let Ok(piece) = tok.to_str_lossy() else {
-                        continue;
-                    };
-                    if piece.starts_with("[_") {
-                        continue;
+                let decode_slice: &[f32] = match trim {
+                    VadTrim::Speech(start, end) if start < end => &audio[start..end],
+                    VadTrim::Silence => {
+                        audio.clear();
+                        return Ok(Vec::new());
                     }
-                    let p = tok.token_probability();
-                    sum += p;
-                    min_p = min_p.min(p);
-                    count += 1;
-                    // A leading space begins a new word — flush the previous one.
-                    if piece.starts_with(' ') {
-                        flush_word(
-                            &mut word_confidences,
-                            &mut cur_word,
-                            &mut cur_min,
-                            &mut cur_sum,
-                            &mut cur_count,
-                        );
-                    }
-                    cur_word.push_str(&piece);
-                    cur_min = cur_min.min(p);
-                    cur_sum += p;
-                    cur_count += 1;
-                }
-                flush_word(
-                    &mut word_confidences,
-                    &mut cur_word,
-                    &mut cur_min,
-                    &mut cur_sum,
-                    &mut cur_count,
-                );
-                let (confidence, min_token_confidence) = if count == 0 {
-                    (None, None)
-                } else {
-                    (Some(sum / count as f32), Some(min_p))
+                    _ => audio.as_slice(),
                 };
 
-                let id = *next_id;
-                *next_id += 1;
-                out.push(AsrSegment {
-                    id,
-                    confidence,
-                    min_token_confidence,
-                    word_confidences,
-                    is_final: true,
-                    // whisper timestamps are in centiseconds (10 ms units).
-                    start_ms: Some((seg.start_timestamp().max(0) as u64) * 10),
-                    end_ms: Some((seg.end_timestamp().max(0) as u64) * 10),
-                    text,
-                    detected_language: detected.clone(),
-                });
-            }
-            Ok(out)
+                // Prime punctuation/casing style only for longer dictation, where
+                // whisper otherwise runs sentences together; on a short clip the
+                // prompt biases the decode toward a spurious continuation, so skip it.
+                if decode_slice.len() >= PROMPT_MIN_SAMPLES {
+                    params.set_initial_prompt(PUNCTUATION_PROMPT);
+                }
+
+                state
+                    .full(params, decode_slice)
+                    .map_err(|e| Error::asr(format!("whisper inference: {e}")))?;
+                // Drain the decoded audio so a repeat poll can't re-emit it (matches
+                // Qwen3's take-on-poll contract); capacity is retained for reuse.
+                audio.clear();
+
+                let detected =
+                    whisper_rs::get_lang_str(state.full_lang_id_from_state()).map(str::to_string);
+
+                let n = state.full_n_segments();
+                let mut out = Vec::with_capacity(n.max(0) as usize);
+                for i in 0..n {
+                    let Some(seg) = state.get_segment(i) else {
+                        continue;
+                    };
+                    let text = seg.to_str_lossy().unwrap_or_default().trim().to_string();
+                    if text.is_empty() {
+                        continue;
+                    }
+
+                    // Fold per-token probabilities into the segment confidence AND
+                    // group tokens into per-word confidences — whisper marks a new
+                    // word with a leading-space token. Per-word values feed the
+                    // corrector's risk gating (which protects uncertain words and
+                    // drives `unresolved_words`); leaving them empty made that gating
+                    // inert. Special tokens ("[_...]", p≈1.0) are skipped so they
+                    // don't inflate the mean.
+                    let mut sum = 0.0f32;
+                    let mut count = 0u32;
+                    let mut min_p = 1.0f32;
+                    let mut word_confidences: Vec<WordConfidence> = Vec::new();
+                    let mut cur_word = String::new();
+                    let mut cur_min = 1.0f32;
+                    let mut cur_sum = 0.0f32;
+                    let mut cur_count = 0u32;
+                    for j in 0..seg.n_tokens() {
+                        let Some(tok) = seg.get_token(j) else {
+                            continue;
+                        };
+                        let Ok(piece) = tok.to_str_lossy() else {
+                            continue;
+                        };
+                        if piece.starts_with("[_") {
+                            continue;
+                        }
+                        let p = tok.token_probability();
+                        sum += p;
+                        min_p = min_p.min(p);
+                        count += 1;
+                        // A leading space begins a new word — flush the previous one.
+                        if piece.starts_with(' ') {
+                            flush_word(
+                                &mut word_confidences,
+                                &mut cur_word,
+                                &mut cur_min,
+                                &mut cur_sum,
+                                &mut cur_count,
+                            );
+                        }
+                        cur_word.push_str(&piece);
+                        cur_min = cur_min.min(p);
+                        cur_sum += p;
+                        cur_count += 1;
+                    }
+                    flush_word(
+                        &mut word_confidences,
+                        &mut cur_word,
+                        &mut cur_min,
+                        &mut cur_sum,
+                        &mut cur_count,
+                    );
+                    let (confidence, min_token_confidence) = if count == 0 {
+                        (None, None)
+                    } else {
+                        (Some(sum / count as f32), Some(min_p))
+                    };
+
+                    let id = *next_id;
+                    *next_id += 1;
+                    out.push(AsrSegment {
+                        id,
+                        confidence,
+                        min_token_confidence,
+                        word_confidences,
+                        is_final: true,
+                        // whisper timestamps are in centiseconds (10 ms units).
+                        start_ms: Some((seg.start_timestamp().max(0) as u64) * 10),
+                        end_ms: Some((seg.end_timestamp().max(0) as u64) * 10),
+                        text,
+                        detected_language: detected.clone(),
+                    });
+                }
+                Ok(out)
+            })
         }
 
         async fn reset_context(&self, session: &Self::SessionHandle) -> Result<()> {

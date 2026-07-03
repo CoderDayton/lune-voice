@@ -51,15 +51,29 @@ const PROVIDER_NOT_CONFIGURED: LlmReadiness = {
  * Never throws — on any uncertainty (non-Tauri dev runtime, failed status
  * probe) it reports ready and lets the backend preflight have the final say.
  */
-export async function getLlmReadiness(settings: LlmSettings): Promise<LlmReadiness> {
+/**
+ * The configuration checks that need no backend round-trip: styling disabled,
+ * or a remote provider missing its key/model. Returns a not-ready reason, or
+ * `null` when configuration is fine and only the (async) engine/model state is
+ * left to decide. Shared by `getLlmReadiness` and `ensureLlmInitialized` so
+ * neither pays a redundant IPC for these cases.
+ */
+function configReason(settings: LlmSettings): LlmReadiness | null {
   if (!settings.llmEnabled) return STYLING_OFF;
-  // Remote provider: gate on a configured API key + model (no local model).
-  if (settings.llmBackend === 'OpenAiCompatible') {
-    if (settings.openaiLlmApiKey.trim() === '' || settings.openaiLlmModel.trim() === '') {
-      return PROVIDER_NOT_CONFIGURED;
-    }
-    return { ready: true, reason: null };
+  if (
+    settings.llmBackend === 'OpenAiCompatible' &&
+    (settings.openaiLlmApiKey.trim() === '' || settings.openaiLlmModel.trim() === '')
+  ) {
+    return PROVIDER_NOT_CONFIGURED;
   }
+  return null;
+}
+
+export async function getLlmReadiness(settings: LlmSettings): Promise<LlmReadiness> {
+  const configIssue = configReason(settings);
+  if (configIssue) return configIssue;
+  // Remote provider needs no local model — configuration is the whole check.
+  if (settings.llmBackend === 'OpenAiCompatible') return { ready: true, reason: null };
   // Local engine: gate on the styling model being downloaded.
   if (!isTauriRuntime()) return { ready: true, reason: null };
   try {
@@ -70,4 +84,29 @@ export async function getLlmReadiness(settings: LlmSettings): Promise<LlmReadine
     return { ready: true, reason: null };
   }
   return { ready: true, reason: null };
+}
+
+/**
+ * Ensure the styling engine is fully initialized — provider configured AND,
+ * for the local engine, the model actually loaded into memory and able to
+ * serve. Unlike `getLlmReadiness` (a cheap configuration check), this blocks
+ * until the load completes (seconds on a cold engine), so callers must show a
+ * busy state while awaiting it. Never throws.
+ */
+export async function ensureLlmInitialized(settings: LlmSettings): Promise<LlmReadiness> {
+  // The cheap, IPC-free config checks first — a disabled or unconfigured
+  // provider needs no round-trip and gets a friendly message.
+  const configIssue = configReason(settings);
+  if (configIssue) return configIssue;
+  if (!isTauriRuntime()) return { ready: true, reason: null };
+  // `warm_up_styling_llm` already re-checks configuration and validates the
+  // local model end-to-end (loading it into memory), so the separate
+  // `getLlmReadiness` model probe would be a duplicate round-trip — skip it and
+  // let warm-up be the single authority.
+  try {
+    await invoke('warm_up_styling_llm');
+    return { ready: true, reason: null };
+  } catch (e) {
+    return { ready: false, reason: String(e) };
+  }
 }

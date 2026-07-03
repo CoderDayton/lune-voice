@@ -92,6 +92,31 @@ impl AppRuntime {
         if let Err(e) = SettingsStore::new(paths.settings_file()).migrate_secrets_to_keyring() {
             tracing::warn!(error = %e, "API key keyring migration failed; keys remain in settings.toml");
         }
+        // One-time on boot: move any legacy custom styles out of settings.toml
+        // into the database, the source of truth for user-created styles. Fatal
+        // on failure *when legacy styles are present*: they are no longer a
+        // `UserSettings` field, so continuing past a failed migration would let
+        // the next settings save rewrite the file without them and lose them
+        // permanently. With nothing to migrate it stays harmless.
+        {
+            let store = SettingsStore::new(paths.settings_file());
+            match Database::open(&paths.database_file()) {
+                Ok(mut db) => store
+                    .migrate_custom_styles_to_db(&mut db)
+                    .map_err(|e| format!("custom-styles migration failed: {e}"))?,
+                Err(e) => {
+                    // Couldn't open the DB. Only fatal when legacy styles remain
+                    // in the TOML (at risk of a clobbering save). If that check
+                    // itself can't read the file, assume the worst and refuse.
+                    if store.has_legacy_custom_styles().unwrap_or(true) {
+                        return Err(format!(
+                            "cannot migrate custom styles into the database (open failed): {e}"
+                        ));
+                    }
+                    tracing::warn!(error = %e, "open DB for custom-styles migration failed; no legacy styles to migrate, continuing");
+                }
+            }
+        }
         let settings = load_settings(&paths)?;
 
         let models_ready = lune_persist::has_required_models(
@@ -856,6 +881,69 @@ impl AppRuntime {
         Ok(Arc::clone(mgr))
     }
 
+    /// Rebuild the pipeline now when a settings change is pending, so callers
+    /// that consume `llm_service()` outside a dictation session (style example
+    /// generation) don't run against a stale service — e.g. the Null
+    /// passthrough kept from before the styling model was downloaded. Skipped
+    /// while a session is active; the lazy rebuild on the next dictation start
+    /// covers that case. A failed rebuild is logged, not fatal: the styling
+    /// path's own readiness checks produce the user-facing error.
+    async fn reload_pipeline_if_required(&self) {
+        let reload_paths = {
+            let pipeline = self.inner.pipeline.lock().await;
+            if pipeline.active {
+                return;
+            }
+            if pipeline.reload_required || pipeline.manager.is_none() {
+                Some(pipeline.paths.clone())
+            } else {
+                None
+            }
+        };
+        let Some(paths) = reload_paths else {
+            return;
+        };
+        let settings = match load_settings(&paths) {
+            Ok(s) => s,
+            Err(error) => {
+                warn!(%error, "styles: settings load failed; keeping current pipeline");
+                return;
+            }
+        };
+        match build_pipeline(paths, settings).await {
+            Ok((rebuilt, new_llm_service, new_settings)) => {
+                let mut pipeline = self.inner.pipeline.lock().await;
+                if pipeline.active {
+                    // A session started while we rebuilt; drop this rebuild and
+                    // let the next dictation start redo it.
+                    return;
+                }
+                *pipeline = rebuilt;
+                *self.inner.llm_service.write().await = new_llm_service;
+                let new_settings_val = new_settings.read().await.clone();
+                *self.inner.settings.write().await = new_settings_val;
+            }
+            Err(error) => {
+                warn!(%error, "styles: pipeline rebuild failed; keeping current pipeline");
+            }
+        }
+    }
+
+    /// Ensure the styling engine can actually serve a generation request:
+    /// apply any pending pipeline reload, then load the local model into
+    /// memory and wait for it (no-op for the remote provider, whose readiness
+    /// is configuration-only). Returns a user-facing message on failure.
+    /// Configuration-level checks (`styling_llm_readiness`) are the caller's
+    /// preflight — this validates initialization, not setup.
+    pub async fn ensure_styling_llm_ready(&self) -> Result<(), String> {
+        self.reload_pipeline_if_required().await;
+        let local_llm = { self.inner.pipeline.lock().await.local_llm.clone() };
+        if let Some(local_llm) = local_llm {
+            local_llm.ensure_ready().await?;
+        }
+        Ok(())
+    }
+
     async fn set_pipeline_session(&self, session_id: Option<String>, active: bool) {
         let mut pipeline = self.inner.pipeline.lock().await;
         pipeline.session_id = session_id;
@@ -887,7 +975,7 @@ impl AppRuntime {
         });
     }
 
-    async fn schedule_local_llm_unload(&self) {
+    pub(crate) async fn schedule_local_llm_unload(&self) {
         let local_llm = {
             let pipeline = self.inner.pipeline.lock().await;
             pipeline.local_llm.clone()
@@ -910,8 +998,19 @@ async fn build_pipeline(
     paths: AppPaths,
     settings: UserSettings,
 ) -> Result<(LivePipeline, Arc<dyn LlmService>, Arc<RwLock<UserSettings>>), String> {
-    let asr = AsrRegistry::from_config(&settings.asr_backend, settings.device, &paths.models_dir())
-        .map_err(|e| format!("build asr backend: {e}"))?;
+    // Whisper model load takes seconds on the larger models; keep it off the
+    // async workers so IPC and the UI stay responsive during startup/reload.
+    let asr = {
+        let backend_config = settings.asr_backend.clone();
+        let device = settings.device;
+        let models_dir = paths.models_dir();
+        tokio::task::spawn_blocking(move || {
+            AsrRegistry::from_config(&backend_config, device, &models_dir)
+        })
+        .await
+        .map_err(|e| format!("asr build task: {e}"))?
+        .map_err(|e| format!("build asr backend: {e}"))?
+    };
     let (llm_service, local_llm) = build_llm_service(&settings, &paths.models_dir()).await?;
     let style_pipeline = Arc::new(lune_llm::StylePipeline::new(Arc::clone(&llm_service)));
     let post_processor: Arc<dyn lune_core::llm::TextPostProcessor> = style_pipeline;
@@ -925,9 +1024,16 @@ async fn build_pipeline(
     let db = Arc::new(Mutex::new(
         Database::open(&paths.database_file()).map_err(|e| format!("open session db: {e}"))?,
     ));
+    // Resolve backend defaults + user TOML overrides once, and surface any
+    // invariant violations — a bad override otherwise degrades sessions
+    // silently (e.g. an instant wall-clock deadline).
+    let pipeline_config = asr.pipeline_config().with_overrides(&settings.pipeline);
+    for issue in pipeline_config.validate() {
+        tracing::warn!(issue, "pipeline configuration violates invariant");
+    }
     // Wire dictionary replacement strings into the ASR decoder as boost phrases.
     {
-        let pipeline = asr.pipeline_config().with_overrides(&settings.pipeline);
+        let pipeline = &pipeline_config;
         if pipeline.word_boost_enabled {
             let phrases: Vec<String> = dict
                 .lock()
@@ -957,9 +1063,7 @@ async fn build_pipeline(
             },
             ..Default::default()
         },
-        pipeline: asr
-            .pipeline_config()
-            .with_overrides(&settings.read().await.pipeline),
+        pipeline: pipeline_config,
     };
 
     let heuristic = Arc::new(lune_dict::corrector::LexicalGate::new());
@@ -1162,6 +1266,38 @@ impl LazyLocalLlm {
         }
         drop(state);
         self.state_changed.notify_waiters();
+    }
+
+    /// Load the model if needed and wait until it can serve. Unlike `warm_up`
+    /// (fire-and-forget on dictation start, returns without waiting for an
+    /// in-flight load), this gives the styles-page validation path a
+    /// definitive ready/failed answer before example generation is allowed.
+    async fn ensure_ready(&self) -> Result<(), String> {
+        self.cancel_scheduled_unload();
+        let mut attempted = false;
+        loop {
+            // Register before reading state so a transition between the read
+            // and the await can't be missed.
+            let notified = self.state_changed.notified();
+            let loading = {
+                let state = self.state.lock().await;
+                match &*state {
+                    LazyLlmState::Ready(_) => return Ok(()),
+                    LazyLlmState::Loading(_) => true,
+                    LazyLlmState::Empty => false,
+                }
+            };
+            if loading {
+                notified.await;
+            } else if attempted {
+                // warm_up ran and the state fell back to Empty — the load
+                // failed (details already logged by warm_up).
+                return Err("The styling model failed to load. Check the application logs.".into());
+            } else {
+                attempted = true;
+                self.warm_up().await;
+            }
+        }
     }
 
     async fn unload(&self) {
@@ -1447,6 +1583,16 @@ mod tests {
         llm.unload().await;
         let result = handle.await.unwrap();
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn ensure_ready_reports_failed_load_instead_of_hanging() {
+        // A bad model path (or a stub build) makes warm_up fall back to Empty;
+        // ensure_ready must surface that as a definitive error so the styles
+        // page can show it, rather than spinning or reporting ready.
+        let llm = LazyLocalLlm::new(std::path::PathBuf::from("/missing/model"), false, 8);
+        let err = llm.ensure_ready().await.unwrap_err();
+        assert!(err.contains("failed to load"), "got: {err}");
     }
 
     #[tokio::test]

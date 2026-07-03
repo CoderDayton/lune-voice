@@ -2,7 +2,7 @@ import { useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';
 import { Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { getLlmReadiness } from '../../lib/backend/llm';
+import { ensureLlmInitialized, getLlmReadiness } from '../../lib/backend/llm';
 import type { FormatTogglesDto } from '../../lib/backend/types';
 import {
   createCustomStyle,
@@ -151,18 +151,44 @@ export function StylesPage() {
     const created = workspaceStore.state.stylePresets.find(
       (p: StylePreset) => !p.isBuiltin && !previousPresetsRef.current.some((ex) => ex.id === p.id),
     );
-    // A new style auto-generates examples once — but only when the styling
-    // engine is set up (re-checked here, not at open time). Otherwise the style
-    // is still created (and stays marked dirty) so the user can refresh examples
-    // later from the editor once they've set it up.
-    if (created && (await getLlmReadiness(readLlmSettings())).ready) {
-      setModal((m) => ({ ...m, saving: false, generating: true }));
-      const genOk = await generateStyleExamples(created.id);
-      setModal((m) => ({ ...m, generating: false }));
-      // Keep the editor open if generation failed so the user notices and can
-      // retry via the refresh button; the style is created and stays dirty.
-      if (!genOk) return;
+    if (!created) {
+      closeModal();
+      return;
     }
+
+    // The style now exists — flip the editor to edit mode over the persisted
+    // preset. The Regenerate button becomes available exactly when the style
+    // is created, and stays disabled (llmReady=false) until the engine
+    // validates below.
+    setModal((m) => ({
+      ...m,
+      saving: false,
+      generating: true,
+      mode: 'edit',
+      preset: created,
+      fewShotDirty: true,
+      llmReady: false,
+      llmReason: null,
+    }));
+
+    // Validate the engine is fully initialized (model loaded, able to serve)
+    // before generating and applying the style. Configuration readiness alone
+    // is not enough — a cold engine fails generation with "not ready".
+    const readiness = await ensureLlmInitialized(readLlmSettings());
+    if (!readiness.ready) {
+      // Style is created but stays dirty; Regenerate remains disabled with the
+      // reason shown until the engine is set up and initialized.
+      setModal((m) => ({ ...m, generating: false, llmReady: false, llmReason: readiness.reason }));
+      return;
+    }
+    setModal((m) => ({ ...m, llmReady: true }));
+
+    const genOk = await generateStyleExamples(created.id);
+    const updated = workspaceStore.state.stylePresets.find((p: StylePreset) => p.id === created.id);
+    setModal((m) => ({ ...m, generating: false, fewShotDirty: updated?.fewShotDirty ?? true }));
+    // Keep the editor open if generation failed so the user notices and can
+    // retry via the now-enabled Regenerate button (created + validated).
+    if (!genOk) return;
 
     closeModal();
   }
@@ -170,13 +196,16 @@ export function StylesPage() {
   async function handleRefresh() {
     const preset = modal.preset;
     if (!preset || modal.refreshing) return;
-    // Re-check readiness at click time — settings may have changed since open.
-    const readiness = await getLlmReadiness(readLlmSettings());
+    // Re-validate full initialization at click time — the engine may have
+    // unloaded (idle TTL) or settings changed since open. This waits for the
+    // model load, so the busy spinner covers it.
+    setModal((m) => ({ ...m, refreshing: true }));
+    const readiness = await ensureLlmInitialized(readLlmSettings());
     if (!readiness.ready) {
-      setModal((m) => ({ ...m, llmReady: false, llmReason: readiness.reason }));
+      setModal((m) => ({ ...m, refreshing: false, llmReady: false, llmReason: readiness.reason }));
       return;
     }
-    setModal((m) => ({ ...m, refreshing: true, llmReady: true, llmReason: null }));
+    setModal((m) => ({ ...m, llmReady: true, llmReason: null }));
     await generateStyleExamples(preset.id);
     const updated = workspaceStore.state.stylePresets.find((p: StylePreset) => p.id === preset.id);
     setModal((m) => ({ ...m, refreshing: false, fewShotDirty: updated?.fewShotDirty ?? false }));

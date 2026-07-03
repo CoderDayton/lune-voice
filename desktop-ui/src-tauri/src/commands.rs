@@ -36,6 +36,22 @@ fn require_window_access_for_label(label: &str, allowed: &[&str]) -> Result<(), 
     }
 }
 
+/// Configuration-level styling preflight: provider selected and set up
+/// (local model downloaded / remote key+model present). Returns the
+/// user-facing reason when not. Initialization (model actually loaded) is
+/// validated separately by `AppRuntime::ensure_styling_llm_ready`.
+async fn check_styling_llm_configured() -> Result<(), String> {
+    run_persist("check styling llm readiness", || {
+        let paths = lune_persist::AppPaths::resolve().ok_or("resolve application paths")?;
+        let settings = lune_persist::SettingsStore::new(paths.settings_file())
+            .load()
+            .map_err(|e| format!("load settings: {e}"))?;
+        lune_persist::styling_llm_readiness(&paths.models_dir(), &settings.llm_backend)
+            .map_err(|u| u.user_message().to_string())
+    })
+    .await
+}
+
 fn validate_local_name(local_name: &str) -> Result<(), String> {
     if local_name.contains('/')
         || local_name.contains('\\')
@@ -280,28 +296,21 @@ pub async fn generate_style_examples(
     require_window_access(&window, &["main"])?;
     // Preflight: refuse to (re)generate unless the styling provider — and, for
     // the local engine, its model — is set up. Returns a user-facing message.
-    run_persist("check styling llm readiness", || {
-        let paths = lune_persist::AppPaths::resolve().ok_or("resolve application paths")?;
-        let settings = lune_persist::SettingsStore::new(paths.settings_file())
-            .load()
-            .map_err(|e| format!("load settings: {e}"))?;
-        lune_persist::styling_llm_readiness(&paths.models_dir(), &settings.llm_backend)
-            .map_err(|u| u.user_message().to_string())
-    })
-    .await?;
+    check_styling_llm_configured().await?;
+    // Then make sure the engine is actually initialized (pending pipeline
+    // reload applied, local model loaded into memory) — a configured-but-cold
+    // engine would otherwise fail generation with "local LLM not ready".
+    runtime.ensure_styling_llm_ready().await?;
     let llm = runtime.llm_service().await;
     let (name, instructions) = run_persist("load custom style for examples", {
         let sid = style_id.clone();
         move || {
             let paths = lune_persist::AppPaths::resolve().ok_or("failed to resolve paths")?;
-            let settings = lune_persist::SettingsStore::new(paths.settings_file())
-                .load()
-                .map_err(|e| format!("load settings: {e}"))?;
-            settings
-                .custom_styles
-                .iter()
-                .find(|s| s.id == sid)
-                .map(|s| (s.name.clone(), s.style_instructions.clone()))
+            let mut db = lune_persist::Database::open(&paths.database_file())
+                .map_err(|e| format!("open database: {e}"))?;
+            db.get_custom_style(&sid)
+                .map_err(|e| format!("load custom style: {e}"))?
+                .map(|s| (s.preset.name, s.preset.style_instructions))
                 .ok_or_else(|| format!("custom style not found: {sid}"))
         }
     })
@@ -309,6 +318,9 @@ pub async fn generate_style_examples(
     let pairs = lune_llm::few_shot::generate_few_shot_examples(llm.as_ref(), &name, &instructions)
         .await
         .map_err(|e| e.to_string())?;
+    // The generation call warmed the local model; give it the same idle TTL a
+    // dictation gets so a styles-page visit doesn't pin VRAM indefinitely.
+    runtime.schedule_local_llm_unload().await;
     let mut snapshot = run_persist("save style few-shot pairs", move || {
         crate::persistence::save_style_few_shot_pairs(&style_id, pairs)
     })
@@ -316,6 +328,21 @@ pub async fn generate_style_examples(
     runtime.mark_reload_required().await;
     snapshot.service_status = runtime.service_status().await;
     Ok(snapshot)
+}
+
+/// Validate the styling engine end-to-end for the Styles page: provider
+/// configured AND — for the local engine — the model loaded into memory and
+/// able to serve. Blocks until the load completes (seconds on first call), so
+/// the UI can gate style creation and the Regenerate button on a definitive
+/// answer. Returns the user-facing reason on failure.
+#[tauri::command]
+pub async fn warm_up_styling_llm(
+    window: WebviewWindow,
+    runtime: State<'_, AppRuntime>,
+) -> Result<(), String> {
+    require_window_access(&window, &["main"])?;
+    check_styling_llm_configured().await?;
+    runtime.ensure_styling_llm_ready().await
 }
 
 #[tauri::command]

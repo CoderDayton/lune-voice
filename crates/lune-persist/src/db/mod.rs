@@ -16,12 +16,14 @@ pub const EDIT_OBSERVATION_CAP: u32 = 20_000;
 use uuid::Uuid;
 
 use lune_core::asr::AsrBackendKind;
+use lune_core::config::{FormatToggles, StylePreset};
 use lune_core::session::{DictationSession, SessionStatus};
 
 use self::models::{
-    NewCorrectionPair, NewDictionaryEntry, NewEditObservation, NewSession, NewSnippet,
+    CustomStyleRow, NewCorrectionPair, NewCustomStyle, NewDictionaryEntry, NewEditObservation,
+    NewSession, NewSnippet,
 };
-use self::schema::{dictionary, sessions, snippets};
+use self::schema::{custom_styles, dictionary, sessions, snippets};
 use crate::error::{PersistError, PersistResult};
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -160,6 +162,40 @@ pub struct StoredDictionaryEntry {
     pub phrase: String,
     pub replacement: String,
     pub priority: u8,
+}
+
+/// A user-created styling preset loaded from the `custom_styles` table, paired
+/// with its `few_shot_dirty` flag (the preset itself carries no such field).
+#[derive(Debug, Clone)]
+pub struct StoredCustomStyle {
+    pub preset: StylePreset,
+    pub few_shot_dirty: bool,
+}
+
+/// SQLite `datetime('now')`-style UTC timestamp for `updated_at` writes, so an
+/// UPDATE stamps the same format the column's insert default uses.
+fn sqlite_now() -> String {
+    Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()
+}
+
+/// Decode a `custom_styles` row, deserializing its JSON `formatting` and
+/// `few_shot_pairs` columns back into the in-memory `StylePreset`.
+fn row_to_custom_style(row: CustomStyleRow) -> PersistResult<StoredCustomStyle> {
+    let formatting: FormatToggles = serde_json::from_str(&row.formatting)
+        .map_err(|e| PersistError::RowDecode(format!("custom_style formatting: {e}")))?;
+    let few_shot_pairs: Vec<(String, String)> = serde_json::from_str(&row.few_shot_pairs)
+        .map_err(|e| PersistError::RowDecode(format!("custom_style few_shot_pairs: {e}")))?;
+    Ok(StoredCustomStyle {
+        preset: StylePreset {
+            id: row.id,
+            name: row.name,
+            description: row.description,
+            style_instructions: row.style_instructions,
+            few_shot_pairs,
+            formatting,
+        },
+        few_shot_dirty: row.few_shot_dirty != 0,
+    })
 }
 
 /// SQLite database for dictionary, snippets, session history.
@@ -338,6 +374,155 @@ impl Database {
 
     pub fn delete_snippet(&mut self, snippet_id: &str) -> PersistResult<bool> {
         let count = diesel::delete(snippets::table.filter(snippets::id.eq(snippet_id)))
+            .execute(&mut self.conn)?;
+        Ok(count > 0)
+    }
+
+    // ── Custom style presets ─────────────────────────────────────────────
+
+    /// All custom styles in stable display order (insertion order).
+    pub fn list_custom_styles(&mut self) -> PersistResult<Vec<StoredCustomStyle>> {
+        use self::schema::custom_styles::dsl::*;
+        custom_styles
+            .select(CustomStyleRow::as_select())
+            // Insertion order (stable display order). `created_at` alone is not
+            // enough: its `datetime('now')` default is whole-second, so styles
+            // migrated in a tight loop share a timestamp and would then sort by
+            // random UUID. The implicit rowid is strictly monotonic per insert,
+            // and this app never VACUUMs, so rowids never renumber.
+            .order(diesel::dsl::sql::<diesel::sql_types::BigInt>("rowid"))
+            .load::<CustomStyleRow>(&mut self.conn)?
+            .into_iter()
+            .map(row_to_custom_style)
+            .collect()
+    }
+
+    /// Look up a single custom style by id.
+    pub fn get_custom_style(&mut self, style_id: &str) -> PersistResult<Option<StoredCustomStyle>> {
+        use self::schema::custom_styles::dsl::*;
+        custom_styles
+            .select(CustomStyleRow::as_select())
+            .filter(id.eq(style_id))
+            .first::<CustomStyleRow>(&mut self.conn)
+            .optional()?
+            .map(row_to_custom_style)
+            .transpose()
+    }
+
+    /// Current number of stored custom styles (for the per-user cap).
+    pub fn count_custom_styles(&mut self) -> PersistResult<i64> {
+        Ok(custom_styles::table.count().get_result(&mut self.conn)?)
+    }
+
+    /// Insert a new custom style. `dirty` marks its few-shot examples as stale.
+    pub fn insert_custom_style(&mut self, preset: &StylePreset, dirty: bool) -> PersistResult<()> {
+        let fmt = serde_json::to_string(&preset.formatting)
+            .map_err(|e| PersistError::RowDecode(format!("serialize formatting: {e}")))?;
+        let pairs = serde_json::to_string(&preset.few_shot_pairs)
+            .map_err(|e| PersistError::RowDecode(format!("serialize few_shot_pairs: {e}")))?;
+        let new = NewCustomStyle {
+            id: &preset.id,
+            name: &preset.name,
+            description: &preset.description,
+            style_instructions: &preset.style_instructions,
+            formatting: &fmt,
+            few_shot_pairs: &pairs,
+            few_shot_dirty: dirty as i32,
+        };
+        diesel::insert_into(custom_styles::table)
+            .values(&new)
+            .execute(&mut self.conn)?;
+        Ok(())
+    }
+
+    /// Insert legacy styles during the one-time `settings.toml` → DB migration.
+    /// `INSERT OR IGNORE` skips any id already present (from a prior partial
+    /// run), so the migration is convergent and safe to retry without erroring
+    /// or duplicating. The whole batch runs in one transaction: any error rolls
+    /// it back and leaves the DB untouched, so the source TOML stays
+    /// authoritative until the migration fully succeeds. Returns the number of
+    /// rows actually inserted.
+    pub fn insert_custom_styles_migration(
+        &mut self,
+        styles: &[(StylePreset, bool)],
+    ) -> PersistResult<usize> {
+        self.conn.transaction(|conn| {
+            let mut inserted = 0usize;
+            for (preset, dirty) in styles {
+                let fmt = serde_json::to_string(&preset.formatting)
+                    .map_err(|e| PersistError::RowDecode(format!("serialize formatting: {e}")))?;
+                let pairs = serde_json::to_string(&preset.few_shot_pairs).map_err(|e| {
+                    PersistError::RowDecode(format!("serialize few_shot_pairs: {e}"))
+                })?;
+                let new = NewCustomStyle {
+                    id: &preset.id,
+                    name: &preset.name,
+                    description: &preset.description,
+                    style_instructions: &preset.style_instructions,
+                    formatting: &fmt,
+                    few_shot_pairs: &pairs,
+                    few_shot_dirty: *dirty as i32,
+                };
+                inserted += diesel::insert_or_ignore_into(custom_styles::table)
+                    .values(&new)
+                    .execute(conn)?;
+            }
+            Ok(inserted)
+        })
+    }
+
+    /// Update a custom style's editable fields (name/description/instructions/
+    /// formatting) and its stale flag. Few-shot pairs are updated separately via
+    /// [`set_custom_style_few_shot_pairs`]. Returns `false` if the id is unknown.
+    pub fn update_custom_style_fields(
+        &mut self,
+        style_id: &str,
+        name_val: &str,
+        description_val: &str,
+        instructions_val: &str,
+        formatting_val: &FormatToggles,
+        dirty: bool,
+    ) -> PersistResult<bool> {
+        use self::schema::custom_styles::dsl::*;
+        let fmt = serde_json::to_string(formatting_val)
+            .map_err(|e| PersistError::RowDecode(format!("serialize formatting: {e}")))?;
+        let count = diesel::update(custom_styles.filter(id.eq(style_id)))
+            .set((
+                name.eq(name_val),
+                description.eq(description_val),
+                style_instructions.eq(instructions_val),
+                formatting.eq(fmt),
+                few_shot_dirty.eq(dirty as i32),
+                updated_at.eq(sqlite_now()),
+            ))
+            .execute(&mut self.conn)?;
+        Ok(count > 0)
+    }
+
+    /// Replace a custom style's few-shot pairs and set its stale flag. Returns
+    /// `false` if the id is unknown.
+    pub fn set_custom_style_few_shot_pairs(
+        &mut self,
+        style_id: &str,
+        pairs_val: &[(String, String)],
+        dirty: bool,
+    ) -> PersistResult<bool> {
+        use self::schema::custom_styles::dsl::*;
+        let json = serde_json::to_string(pairs_val)
+            .map_err(|e| PersistError::RowDecode(format!("serialize few_shot_pairs: {e}")))?;
+        let count = diesel::update(custom_styles.filter(id.eq(style_id)))
+            .set((
+                few_shot_pairs.eq(json),
+                few_shot_dirty.eq(dirty as i32),
+                updated_at.eq(sqlite_now()),
+            ))
+            .execute(&mut self.conn)?;
+        Ok(count > 0)
+    }
+
+    /// Delete a custom style. Returns `false` if the id was not present.
+    pub fn delete_custom_style(&mut self, style_id: &str) -> PersistResult<bool> {
+        let count = diesel::delete(custom_styles::table.filter(custom_styles::id.eq(style_id)))
             .execute(&mut self.conn)?;
         Ok(count > 0)
     }
@@ -734,6 +919,136 @@ mod tests {
     #[test]
     fn migration_from_empty() {
         let _db = Database::open_in_memory().unwrap();
+    }
+
+    #[test]
+    fn custom_style_crud() {
+        use lune_core::config::{FormatToggles, StylePreset};
+        let mut db = Database::open_in_memory().unwrap();
+
+        let preset = StylePreset {
+            id: "custom-1".into(),
+            name: "My Style".into(),
+            description: "desc".into(),
+            style_instructions: "Be terse.".into(),
+            few_shot_pairs: vec![("in".into(), "out".into())],
+            formatting: FormatToggles {
+                auto_capitalization: false,
+                ..FormatToggles::default()
+            },
+        };
+        db.insert_custom_style(&preset, true).unwrap();
+
+        // list/get round-trip, including the JSON formatting + few_shot columns.
+        let all = db.list_custom_styles().unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].preset.id, "custom-1");
+        assert!(all[0].few_shot_dirty);
+        assert_eq!(
+            all[0].preset.few_shot_pairs,
+            vec![("in".to_string(), "out".to_string())]
+        );
+        assert!(!all[0].preset.formatting.auto_capitalization);
+        assert_eq!(db.count_custom_styles().unwrap(), 1);
+
+        // Field update sets the stale flag and rewrites formatting.
+        assert!(
+            db.update_custom_style_fields(
+                "custom-1",
+                "Renamed",
+                "desc2",
+                "Be verbose.",
+                &FormatToggles::default(),
+                false,
+            )
+            .unwrap()
+        );
+        let got = db.get_custom_style("custom-1").unwrap().unwrap();
+        assert_eq!(got.preset.name, "Renamed");
+        assert_eq!(got.preset.style_instructions, "Be verbose.");
+        assert!(!got.few_shot_dirty);
+        assert!(got.preset.formatting.auto_capitalization);
+
+        // Few-shot pairs replace independently.
+        assert!(
+            db.set_custom_style_few_shot_pairs("custom-1", &[("a".into(), "b".into())], false)
+                .unwrap()
+        );
+        let got = db.get_custom_style("custom-1").unwrap().unwrap();
+        assert_eq!(
+            got.preset.few_shot_pairs,
+            vec![("a".to_string(), "b".to_string())]
+        );
+
+        // Unknown ids report `false`, never error.
+        assert!(
+            !db.update_custom_style_fields("nope", "n", "d", "i", &FormatToggles::default(), false)
+                .unwrap()
+        );
+        assert!(
+            !db.set_custom_style_few_shot_pairs("nope", &[], false)
+                .unwrap()
+        );
+
+        // Delete is idempotent.
+        assert!(db.delete_custom_style("custom-1").unwrap());
+        assert!(!db.delete_custom_style("custom-1").unwrap());
+        assert_eq!(db.count_custom_styles().unwrap(), 0);
+        assert!(db.get_custom_style("custom-1").unwrap().is_none());
+    }
+
+    /// Build a minimal `StylePreset` with the given id for ordering/migration
+    /// tests (name mirrors the id; everything else is default).
+    fn style_with_id(id: &str) -> StylePreset {
+        StylePreset {
+            id: id.into(),
+            name: id.into(),
+            description: String::new(),
+            style_instructions: "x".into(),
+            few_shot_pairs: Vec::new(),
+            formatting: FormatToggles::default(),
+        }
+    }
+
+    #[test]
+    fn list_custom_styles_preserves_insertion_order_within_one_second() {
+        let mut db = Database::open_in_memory().unwrap();
+        // Insert with ids whose lexical order is the REVERSE of insertion order,
+        // so a fallback to `ORDER BY id` (the old bug) would reshuffle them.
+        // All land in the same whole second, defeating a `created_at` tiebreak.
+        for id in ["zeta", "mike", "alpha"] {
+            db.insert_custom_style(&style_with_id(id), false).unwrap();
+        }
+        let ids: Vec<_> = db
+            .list_custom_styles()
+            .unwrap()
+            .into_iter()
+            .map(|s| s.preset.id)
+            .collect();
+        assert_eq!(ids, vec!["zeta", "mike", "alpha"]);
+    }
+
+    #[test]
+    fn migration_insert_is_atomic_and_convergent() {
+        let mut db = Database::open_in_memory().unwrap();
+        let batch = vec![
+            (style_with_id("custom-a"), true),
+            (style_with_id("custom-b"), false),
+        ];
+        // First run inserts both, preserving the dirty flag per row.
+        assert_eq!(db.insert_custom_styles_migration(&batch).unwrap(), 2);
+        assert_eq!(db.count_custom_styles().unwrap(), 2);
+        assert!(
+            db.get_custom_style("custom-a")
+                .unwrap()
+                .unwrap()
+                .few_shot_dirty
+        );
+
+        // A re-run (e.g. after a prior strip failure) is a no-op: INSERT OR
+        // IGNORE skips the present ids, so it neither errors nor duplicates.
+        assert_eq!(db.insert_custom_styles_migration(&batch).unwrap(), 0);
+        assert_eq!(db.count_custom_styles().unwrap(), 2);
     }
 
     #[test]

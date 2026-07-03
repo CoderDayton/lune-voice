@@ -90,7 +90,11 @@ impl lune_core::llm::LlmService for OpenAiLlmBackend {
             .choices
             .first()
             .and_then(|c| c.message.content.as_deref())
-            .map(|s| s.trim().to_owned())
+            // A Qwen-style endpoint may emit an inline <think>…</think> block
+            // (reasoning must never reach the user's document); an unclosed
+            // block collapses to "", which the pipeline treats as "keep the
+            // input text".
+            .map(|s| crate::prompt::strip_think_tags(s).trim().to_owned())
             .ok_or_else(|| lune_core::Error::llm("empty response"))
     }
 }

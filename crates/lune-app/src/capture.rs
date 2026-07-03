@@ -292,8 +292,10 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
     let mut agc = MicAgc::new(vad_pcen);
     let mut framed: Vec<f32> = Vec::with_capacity(AGC_HOP * 8);
 
+    // `.max(1)`: a misconfigured max_speech_samples below one second of audio
+    // would otherwise yield a zero deadline and end every session instantly.
     let session_deadline = tokio::time::Instant::now()
-        + Duration::from_secs((pipeline.max_speech_samples / SAMPLE_RATE) as u64 * 3);
+        + Duration::from_secs((pipeline.max_speech_samples / SAMPLE_RATE).max(1) as u64 * 3);
 
     let mut audio_poll_tick = tokio::time::interval(Duration::from_millis(10));
     audio_poll_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
