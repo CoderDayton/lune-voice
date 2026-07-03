@@ -385,7 +385,6 @@ Each style preset defines a full prompt template:
 | Component | Purpose |
 |-----------|---------| 
 | `system_prompt` | Instructions for the LLM's role and behavior |
-| `user_prompt_template` | Template with `{raw_text}` placeholder for the input |
 | `few_shot_pairs` | Example input/output pairs for in-context learning |
 
 The final prompt is assembled as ChatML. The assistant turn is prefilled with an empty `<think>\n\n</think>` block to suppress Qwen3.5's chain-of-thought output:

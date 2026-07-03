@@ -253,7 +253,6 @@ pub fn create_custom_style(input: CreateCustomStyleInput) -> Result<WorkspaceSna
         name,
         description,
         style_instructions: instructions,
-        user_prompt_template: "{raw_text}".into(),
         few_shot_pairs: Vec::new(),
         formatting: input.formatting.into(),
     });

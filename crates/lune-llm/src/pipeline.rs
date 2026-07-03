@@ -33,8 +33,8 @@ impl TextPostProcessor for StylePipeline {
         // The caller invokes this pass only when a style is selected (styling is
         // gated by the presence of a selection, not a per-preset flag), so the
         // styling LLM always runs here.
-        let style_prompt = input.style_preset.build_styling_prompt(&text);
-        match self.llm.complete("", &style_prompt).await {
+        let (system, user) = input.style_preset.build_styling_prompt(&text);
+        match self.llm.complete(&system, &user).await {
             Ok(styled)
                 if !styled.is_empty() && !crate::prompt::contains_forbidden_output(&styled) =>
             {

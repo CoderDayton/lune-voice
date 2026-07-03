@@ -111,3 +111,13 @@ required-features = ["whisper-cpp", "llama-cpp"]
 name = "dict_carrier_ab"
 path = "../../benchmarks/tuning/dict_carrier_ab.rs"
 required-features = ["llama-cpp"]
+
+[[example]]
+name = "styling_capability"
+path = "../../benchmarks/quality/styling_capability.rs"
+required-features = ["llama-cpp"]
+
+[[example]]
+name = "styling_rulecmp"
+path = "../../benchmarks/quality/styling_rulecmp.rs"
+required-features = ["llama-cpp"]
