@@ -147,6 +147,14 @@ pub async fn save_workspace_settings(
             snapshot.settings.sound_cue_volume,
         )
         .await;
+    // Create or destroy the pill overlay window to match the new visibility.
+    // "Never" must free the webview process, not merely hide it; switching back
+    // recreates it without an app restart. Runs before the settings emit below —
+    // a freshly created pill reads current settings from its snapshot on load.
+    crate::pill::set_pill_enabled(
+        runtime.app_handle(),
+        snapshot.settings.pill_visibility != crate::dto::PillVisibilityDto::Never,
+    );
     // Notify pill of settings changes (activation mode, pill visibility)
     if let Err(e) = runtime.app_handle().emit_to(
         "pill",

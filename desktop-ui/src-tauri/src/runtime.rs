@@ -239,6 +239,18 @@ impl AppRuntime {
         self.inner.settings.read().await.start_minimized
     }
 
+    /// Return the persisted pill-visibility preference. Read at app startup to
+    /// decide whether to create the pill overlay window at all (Never = none).
+    pub async fn pill_visibility(&self) -> PillVisibility {
+        self.inner.settings.read().await.pill_visibility
+    }
+
+    /// Return the persisted pill position, if the user has dragged it. Read at
+    /// startup to seed the overlay's placement before its first show.
+    pub async fn pill_position(&self) -> Option<lune_core::config::PillPosition> {
+        self.inner.settings.read().await.pill_position
+    }
+
     pub async fn service_status(&self) -> String {
         self.inner.status.read().await.clone()
     }
@@ -776,17 +788,16 @@ impl AppRuntime {
         {
             tracing::debug!(error = %e, "pill state emit skipped (pill window may not exist)");
         }
-        // Direct pill show/hide bypasses the frontend IPC roundtrip so the
-        // window reacts in the same main-thread tick as the status emission.
+        // Pill visibility is decided entirely here — the single source of truth,
+        // from the live status + the setting — then the window is mapped/unmapped
+        // directly (bypassing the frontend IPC roundtrip for instant response).
+        // The frontend only renders content, so the mapped window and its content
+        // can't desync.
         let vis = self.inner.settings.read().await.pill_visibility;
-        match status {
-            "listening" | "processing" if vis != PillVisibility::Never => {
-                crate::pill::show_pill_direct(&self.inner.app);
-            }
-            "ready" | "error" if vis == PillVisibility::WhenDictating => {
-                crate::pill::hide_pill_direct(&self.inner.app);
-            }
-            _ => {}
+        if crate::pill::should_show_pill(vis, status) {
+            crate::pill::show_pill_direct(&self.inner.app);
+        } else {
+            crate::pill::hide_pill_direct(&self.inner.app);
         }
     }
 

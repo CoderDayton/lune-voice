@@ -540,15 +540,16 @@ impl HotkeyState {
             self.pressed.remove(code);
         }
 
-        // Cancel — only in Toggle mode while actively dictating.
-        // In Hold mode, releasing the key already stops; in Toggle mode
-        // while idle, Escape should pass through to apps.
+        // Cancel (Escape) in any activation mode. A session can be started by
+        // clicking the pill — which has no key to release — so Escape must be
+        // able to stop it even in Hold mode. Emitting Cancel here is harmless
+        // when idle: the dispatcher no-ops unless a session is active, and the
+        // raw Escape is still forwarded on to apps either way.
         if pressed
             && code == self.cancel_trigger
             && self.cancel_trigger != KeyCode::KEY_RESERVED
             && self.mods_down(&self.cancel_mods)
             && !self.extra_mods(&self.cancel_mods)
-            && mode == ActivationMode::Toggle
         {
             return Some(HotkeyAction::Cancel);
         }
@@ -865,6 +866,23 @@ mod tests {
             s.handle(KeyCode::KEY_SPACE, false, ActivationMode::Hold)
                 .is_none()
         );
+    }
+
+    #[test]
+    fn escape_cancels_in_both_activation_modes() {
+        // A pill-started session has no held key to release, so the cancel key
+        // (Escape) must emit Cancel regardless of activation mode — the
+        // dispatcher gates on an active session, not on the mode.
+        for mode in [ActivationMode::Toggle, ActivationMode::Hold] {
+            let mut s = ctrl_space_state(); // cancel = bare Escape
+            assert!(
+                matches!(
+                    s.handle(KeyCode::KEY_ESC, true, mode),
+                    Some(HotkeyAction::Cancel)
+                ),
+                "Escape should cancel in {mode:?} mode"
+            );
+        }
     }
 
     #[test]

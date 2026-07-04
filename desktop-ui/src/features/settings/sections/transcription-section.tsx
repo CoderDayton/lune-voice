@@ -1,7 +1,7 @@
 import { useLingui } from '@lingui/react/macro';
-import { AudioLines, Wand2 } from 'lucide-react';
+import { AudioLines, SpellCheck } from 'lucide-react';
 import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown';
-import { saveWorkspaceSetting, saveWorkspaceSettings } from '../../../store/workspace-store';
+import { saveWorkspaceSetting } from '../../../store/workspace-store';
 import { AsrEngineCards } from '../components/asr-engine-cards';
 import { OpenAiFields } from '../components/openai-fields';
 import {
@@ -18,12 +18,15 @@ export function TranscriptionSection({
   onManageModels,
 }: SettingsProps & { onManageModels?: () => void }) {
   const { t } = useLingui();
-  const llmEnabled = settings.llmEnabled;
   const [confidence, setConfidence] = useDebouncedSetting(
     'confidenceThreshold',
     settings.confidenceThreshold,
   );
-  const [llmSkip, setLlmSkip] = useDebouncedSetting('llmSkipThreshold', settings.llmSkipThreshold);
+
+  // Confidence-gated correction needs per-word probabilities, which only the
+  // local recognizer provides — the remote (OpenAI-compatible) backend reports
+  // none, so the sensitivity control has no effect there and the section hides.
+  const hasWordConfidence = settings.asrBackend !== 'OpenAiCompatible';
 
   return (
     <div className="flex flex-col gap-space-md">
@@ -82,85 +85,39 @@ export function TranscriptionSection({
         />
       </SettingsSection>
 
-      {/* Text → polished text — the local LLM that cleans up transcripts. */}
-      <SettingsSection
-        title={t`Correction`}
-        description={t`Tune how the local LLM polishes transcripts after transcription.`}
-        icon={Wand2}
-      >
-        <SettingsRow
-          label={t`Correction LLM`}
-          description={
-            llmEnabled
-              ? t`Polishes punctuation and fixes obvious recognizer errors after transcription.`
-              : t`Disabled — transcripts are delivered raw, and the LLM model is hidden from the Models tab.`
-          }
-          control={
-            <input
-              type="checkbox"
-              className="toggle toggle-primary"
-              checked={llmEnabled}
-              onChange={(e) =>
-                void saveWorkspaceSettings({
-                  llmEnabled: e.target.checked,
-                  // Disabling here must also drop the remembered style — otherwise
-                  // it sits selected with the engine off, which the settings
-                  // migration then "heals" back to enabled on the next load.
-                  stylePreset: e.target.checked ? settings.stylePreset : null,
-                })
-              }
-              aria-label={t`Enable correction LLM`}
-            />
-          }
-        />
-
-        {llmEnabled && (
-          <>
-            <SettingsRow
-              label={t`Correction sensitivity`}
-              description={t`Words the recognizer is unsure about are sent to the LLM. Higher corrects more aggressively; lower trusts the raw transcription.`}
-              control={
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    className="range range-primary range-sm w-28 sm:w-36"
-                    min={0.1}
-                    max={0.95}
-                    step={0.05}
-                    value={confidence}
-                    onChange={(e) => setConfidence(e.target.value)}
-                    aria-label={t`Correction sensitivity`}
-                  />
-                  <span className="text-sm tabular-nums text-content-muted w-12 text-right">
-                    {Number(confidence).toFixed(2)}
-                  </span>
-                </div>
-              }
-            />
-            <SettingsRow
-              label={t`Correction frequency`}
-              description={t`How readily the LLM runs on clean speech. Higher polishes more segments; lower skips more often for speed.`}
-              control={
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    className="range range-primary range-sm w-28 sm:w-36"
-                    min={0.1}
-                    max={0.95}
-                    step={0.05}
-                    value={Number(llmSkip).toFixed(2)}
-                    onChange={(e) => setLlmSkip(e.target.value)}
-                    aria-label={t`Correction frequency`}
-                  />
-                  <span className="text-sm tabular-nums text-content-muted w-12 text-right">
-                    {Number(llmSkip).toFixed(2)}
-                  </span>
-                </div>
-              }
-            />
-          </>
-        )}
-      </SettingsSection>
+      {/* Words → corrected words — an on-device heuristic corrector. It matches
+          against your dictionary and known vocabulary and re-cases known terms;
+          per-word confidence decides which uncertain words to check. No AI
+          model and no rewriting — it never invents text, only fixes it. */}
+      {hasWordConfidence && (
+        <SettingsSection
+          title={t`Correction`}
+          description={t`Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said.`}
+          icon={SpellCheck}
+        >
+          <SettingsRow
+            label={t`Correction sensitivity`}
+            description={t`The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription.`}
+            control={
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  className="range range-primary range-sm w-28 sm:w-36"
+                  min={0.1}
+                  max={0.95}
+                  step={0.05}
+                  value={confidence}
+                  onChange={(e) => setConfidence(e.target.value)}
+                  aria-label={t`Correction sensitivity`}
+                />
+                <span className="text-sm tabular-nums text-content-muted w-12 text-right">
+                  {Number(confidence).toFixed(2)}
+                </span>
+              </div>
+            }
+          />
+        </SettingsSection>
+      )}
     </div>
   );
 }

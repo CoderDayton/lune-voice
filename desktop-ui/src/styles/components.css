@@ -191,99 +191,118 @@
 
 /* ── Dictation pill ────────────────────────────────────────────────── */
 
-.pill-root {
-  @apply flex items-center justify-center p-3;
-  min-width: 5rem;
-  min-height: 5rem;
+/* Wide, short pill bar. The window is transparent so the rounded corners show
+   (an opaque window is a hard rectangle whose corner pixels would just be more
+   surface colour). The bar itself (.pill-root) is fully opaque and only the four
+   corner triangles are transparent — the combination that renders cleanly on
+   this Nvidia + WebKitGTK stack. Avoid soft shadows or a partially-transparent
+   fill: both ghost here. The window height follows this content's intrinsic
+   height (layer-shell can't force it smaller), so .pill-root's fixed height
+   mirrors PILL_H in pill.rs. */
+html.pill-window,
+body.pill-window {
   background: transparent;
 }
 
-.pill-shell {
-  transition: opacity 180ms ease, transform 180ms ease;
+.pill-root {
+  @apply relative flex w-full items-center justify-center;
+  height: 32px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-surface-border);
+  border-radius: 10px;
+  /* Clip every child (surface + cancel hover fills, waveform) to the rounded
+     shape so no hover background shows square corners past the radius. */
+  overflow: hidden;
+  /* The whole bar is draggable: keep the cursor honest and stop text-selection
+     flicker mid-drag. */
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-.pill-root:not([data-visible]) .pill-shell {
-  opacity: 0;
-  transform: translateY(8px) scale(0.95);
-  pointer-events: none;
+.pill-root:active {
+  cursor: grabbing;
 }
 
-.pill-cancelled .pill-active {
-  @apply border-error/40;
+/* Idle "ready" mark — a static short bar in a dim primary, so idle → listening
+   reads as one accent hue brightening (no animation; no audio to visualise). */
+@utility pill-idle-mark {
+  @apply block rounded-full bg-primary/40;
+  width: 18px;
+  height: 5px;
+  animation: pill-content-in 180ms var(--ease-standard);
+}
+
+.pill-cancelled {
   animation: pill-cancel-flash 280ms ease;
 }
 
-@utility pill-shell {
-  @apply inline-flex items-center justify-center rounded-full p-2;
-  background: radial-gradient(
-    circle at center,
-    color-mix(in oklab, var(--color-primary) 24%, transparent),
-    transparent 62%
-  );
+/* Full-bleed surface: the whole bar is the start/stop control while idle or
+   toggle-listening, and a passive status read-out in hold mode / processing. */
+@utility pill-surface {
+  @apply flex h-full w-full items-center justify-center border-0 bg-transparent px-3;
+  transition: background-color var(--duration-base) var(--ease-standard);
 }
 
-@utility pill-idle {
-  @apply btn btn-circle btn-lg flex items-center justify-center border-surface-border-strong bg-surface-elevated text-base-content;
-  box-shadow: var(--shadow-floating);
-  transition: background-color var(--duration-base) var(--ease-standard),
-              border-color var(--duration-base) var(--ease-standard),
-              box-shadow var(--duration-base) var(--ease-standard);
+button.pill-surface {
+  /* Inherit the bar's grab/grabbing cursor so clicking and dragging share one
+     honest affordance. */
+  cursor: inherit;
 }
 
-.pill-idle:hover {
-  @apply border-primary/55;
-  background: var(--color-surface-elevated);
-  box-shadow: var(--shadow-glow);
+button.pill-surface:hover {
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
 }
 
-@utility pill-active {
-  @apply inline-flex min-h-14 items-center gap-2 rounded-full border border-surface-border-strong bg-surface-elevated px-2 py-2;
-  box-shadow: var(--shadow-floating);
-  animation: pill-expand var(--duration-base) var(--ease-standard);
+/* Discard control — kept out of the resting layout and revealed on hover so the
+   bar stays a clean waveform until the user reaches for it. */
+@utility pill-cancel {
+  @apply absolute inset-y-0 right-0 flex w-6 items-center justify-center border-0 bg-transparent text-base-content/45;
+  border-radius: 0 10px 10px 0;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 150ms ease, color 150ms ease, background-color 150ms ease;
 }
 
-@utility pill-processing {
-  @apply border-warning/25;
+.pill-root:hover .pill-cancel {
+  opacity: 1;
+}
+
+.pill-cancel:hover {
+  @apply bg-error/15 text-error;
 }
 
 @keyframes pill-cancel-flash {
   0%   { opacity: 1; }
-  40%  { opacity: 0.5; border-color: oklch(0.66 0.18 22 / 0.6); }
-  100% { opacity: 0; transform: translateY(4px) scale(0.97); }
+  40%  { opacity: 0.5; }
+  100% { opacity: 0; transform: translateY(3px) scale(0.98); }
 }
 
-@utility pill-center {
-  @apply flex min-w-14 flex-1 items-center justify-center rounded-full bg-surface-elevated px-4;
-}
-
-@utility pill-btn {
-  @apply btn btn-circle btn-soft btn-sm border border-transparent text-base-content/60;
-  transition: color 150ms ease, background-color 150ms ease;
-}
-
-.pill-btn:hover {
-  @apply border-base-300/35 text-base-content;
-}
-
-.pill-btn-cancel:hover {
-  @apply bg-error/15;
-}
-
-.pill-btn-stop:hover {
-  @apply bg-error/15;
+/* Gentle entrance when the pill's content swaps between states. Runs on inner
+   content over the opaque bar (not the transparent window), so it composites
+   normally and doesn't ghost. */
+@keyframes pill-content-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
 @utility audio-dots {
-  @apply flex items-center gap-1;
+  @apply flex h-full items-center justify-center gap-[4px];
+  animation: pill-content-in 180ms var(--ease-standard);
 }
 
 @utility audio-dot {
-  @apply block rounded-full size-1.5 bg-primary;
+  @apply block w-[4px] rounded-full bg-primary;
+  height: 8px;
+  transform-origin: center;
   animation: dot-bounce 1.2s ease-in-out infinite;
   transition: transform 60ms ease-out, opacity 60ms ease-out;
+  /* Own compositing layer: WebKitGTK otherwise repaints the whole overlay
+     window for every bar transform change. */
+  will-change: transform, opacity;
 }
 
 @utility pill-pulse {
-  @apply block rounded-full size-2.5 bg-warning;
+  @apply block rounded-full size-2 bg-warning;
   animation: pulse-glow 1.4s ease-in-out infinite;
 }

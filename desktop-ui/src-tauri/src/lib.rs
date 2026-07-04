@@ -102,6 +102,12 @@ pub fn run() {
                 tauri::async_runtime::block_on(runtime::AppRuntime::new(app.handle().clone()))
                     .map_err(|error| -> Box<dyn std::error::Error> { error.into() })?;
             let start_minimized = tauri::async_runtime::block_on(runtime.start_minimized());
+            let pill_vis = tauri::async_runtime::block_on(runtime.pill_visibility());
+            // Seed the saved pill position (if the user dragged it) before the
+            // overlay's first configure/show, so it reopens where they left it.
+            if let Some(pos) = tauri::async_runtime::block_on(runtime.pill_position()) {
+                pill::set_saved_position(pos.x, pos.y);
+            }
             app.manage(runtime);
 
             // Build the main window only when not starting minimized. While
@@ -110,6 +116,21 @@ pub fn run() {
             // builds it via create_or_focus_main_window.
             if !start_minimized {
                 create_or_focus_main_window(app.handle());
+            }
+
+            // Pill overlay window — created hidden UNLESS the user disabled it
+            // (pill_visibility = Never), so "Never" spawns no webview process at
+            // all. A later visibility change recreates/destroys it live via
+            // save_workspace_settings → pill::set_pill_enabled. Dictation status
+            // changes show/hide it (runtime::publish_status → pill.rs).
+            if pill_vis != lune_core::config::PillVisibility::Never {
+                pill::create_pill_window(app.handle());
+                // Reconcile initial visibility against the startup status
+                // ("ready"): "Always" shows the idle pill now; "WhenDictating"
+                // waits for the first dictation, which publish_status handles.
+                if pill::should_show_pill(pill_vis, "ready") {
+                    pill::show_pill_direct(app.handle());
+                }
             }
 
             // ── Global hotkeys ─────────────────────────────────────────────
@@ -191,6 +212,8 @@ pub fn run() {
             pill::show_pill_window,
             pill::hide_pill_window,
             pill::reposition_pill_center,
+            pill::nudge_pill,
+            pill::save_pill_position,
             commands::list_audio_input_devices,
             commands::check_model_status,
             commands::download_model_cmd,

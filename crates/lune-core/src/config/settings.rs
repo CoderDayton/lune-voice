@@ -7,6 +7,15 @@ use super::pipeline::PipelineOverrides;
 use super::redacted::RedactedString;
 use super::style_llm::StyleId;
 
+/// Persisted pill overlay position, in logical pixels from the monitor's
+/// top-left corner. Stored when the user drags the pill so it reopens where
+/// they left it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PillPosition {
+    pub x: i32,
+    pub y: i32,
+}
+
 /// Deserialize `dictation_mode`, tolerating the removed legacy `"Both"` value
 /// (the old "type and copy" mode) by mapping it to `TypeInPlace` via `FromStr`.
 /// The copy behaviour is restored separately by the `copy_to_clipboard`
@@ -79,6 +88,11 @@ pub struct UserSettings {
     /// When to show the floating dictation pill overlay.
     #[serde(default)]
     pub pill_visibility: PillVisibility,
+    /// Persisted pill overlay position (logical px from the monitor's
+    /// top-left). `None` = default bottom-centre placement; set when the user
+    /// drags the pill.
+    #[serde(default)]
+    pub pill_position: Option<PillPosition>,
     /// How to detect terminal windows for paste chord selection.
     /// `Auto` probes the compositor (works on Hyprland, Sway, KDE, GNOME).
     /// Set `Terminal` on COSMIC or other compositors without focus detection.
@@ -199,6 +213,7 @@ impl Default for UserSettings {
             sound_cue_volume: 1.0,
             activation_mode: ActivationMode::default(),
             pill_visibility: PillVisibility::default(),
+            pill_position: None,
             terminal_mode: TerminalMode::default(),
             session_history_days: Some(30),
             word_confidence_threshold: default_word_confidence_threshold(),

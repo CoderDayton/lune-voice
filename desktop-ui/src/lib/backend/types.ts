@@ -72,6 +72,10 @@ export interface BackendClient {
   stopDictation(): Promise<void>;
   cancelDictation(): Promise<void>;
   toggleDictation(): Promise<string | null>;
+  /** Move the pill overlay by a drag delta (logical px). */
+  nudgePill(dx: number, dy: number): Promise<void>;
+  /** Persist the pill overlay's current position so it reopens there. */
+  savePillPosition(): Promise<void>;
   /** Whether a CUDA feature was compiled into this build (build-time GPU support). */
   gpuSupport(): Promise<GpuSupportDto>;
 }

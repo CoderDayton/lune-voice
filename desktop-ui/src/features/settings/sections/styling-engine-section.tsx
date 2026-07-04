@@ -23,8 +23,8 @@ export function StylingEngineSection({ settings }: SettingsProps) {
 
   function selectEngine(value: LlmEngineValue) {
     if (value === 'Disabled') {
-      // Turning styling off also drops the selected preset (mirrors the
-      // Correction toggle) — otherwise the settings migration re-heals it on.
+      // Turning styling off also drops the selected preset — otherwise the
+      // settings migration re-heals it back on the next load.
       void saveWorkspaceSettings({ llmEnabled: false, stylePreset: null });
     } else {
       void saveWorkspaceSettings({ llmEnabled: true, llmBackend: value });

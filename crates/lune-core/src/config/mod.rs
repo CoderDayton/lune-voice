@@ -10,6 +10,7 @@ pub use hotkey::{HotkeyConfig, KeyCombo, Modifier};
 pub use modes::{ActivationMode, DictationMode, PillVisibility, PrivacyMode, TerminalMode};
 pub use pipeline::{PipelineConfig, PipelineOverrides};
 pub use redacted::RedactedString;
+pub use settings::PillPosition;
 pub use settings::{
     AsrBackendConfig, DevicePolicy, LlmBackendConfig, OpenAiLlmProvider, StreamingMode,
     UserSettings, WhisperModel,

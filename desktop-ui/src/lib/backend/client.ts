@@ -82,6 +82,14 @@ const tauriBackendClient: BackendClient = {
     return invoke<string | null>('toggle_dictation');
   },
 
+  nudgePill(dx, dy) {
+    return invoke<void>('nudge_pill', { dx, dy });
+  },
+
+  savePillPosition() {
+    return invoke<void>('save_pill_position');
+  },
+
   gpuSupport() {
     return invoke<GpuSupportDto>('gpu_support');
   },
