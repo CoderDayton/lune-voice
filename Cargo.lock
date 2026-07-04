@@ -3252,16 +3252,11 @@ name = "lune-dict"
 version = "0.1.0"
 dependencies = [
  "bincode",
- "futures",
  "lune-core",
  "lune-persist",
- "reqwest 0.13.2",
  "serde",
- "serde_json",
  "strsim",
- "tokio",
  "tracing",
- "urlencoding",
  "wordnik_list",
 ]
 
@@ -6888,12 +6883,6 @@ dependencies = [
  "serde",
  "serde_derive",
 ]
-
-[[package]]
-name = "urlencoding"
-version = "2.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "daf8dba3b7eb870caf1ddeed7bc9d2a049f3cfdfae7cb521b087cc33ae4c49da"
 
 [[package]]
 name = "urlpattern"
