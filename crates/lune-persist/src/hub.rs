@@ -450,7 +450,7 @@ impl ModelHub {
 /// hash when the file is LFS-tracked (typically the large model files we most
 /// care about validating). Both are optional — non-LFS small files like
 /// `config.json` are reported by HF with `size` but no sha256.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 struct FileMetadata {
     size: Option<u64>,
     sha256: Option<String>,
@@ -495,11 +495,142 @@ fn sha256_of_file(path: &Path) -> std::io::Result<String> {
     Ok(format!("{:x}", hasher.finalize()))
 }
 
+/// `Write` adapter that counts bytes and sha256-hashes them on the way to the
+/// inner writer, so a direct download can be verified without re-reading the
+/// multi-GB file afterwards.
+struct HashingWriter<W: std::io::Write> {
+    inner: W,
+    hasher: Sha256,
+    written: u64,
+}
+
+impl<W: std::io::Write> HashingWriter<W> {
+    fn new(inner: W) -> Self {
+        Self {
+            inner,
+            hasher: Sha256::new(),
+            written: 0,
+        }
+    }
+
+    /// Total bytes written and their lowercase-hex sha256.
+    fn finish(self) -> (u64, String) {
+        (self.written, format!("{:x}", self.hasher.finalize()))
+    }
+}
+
+impl<W: std::io::Write> std::io::Write for HashingWriter<W> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let n = self.inner.write(buf)?;
+        self.hasher.update(&buf[..n]);
+        self.written += n as u64;
+        Ok(n)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+/// Per-model integrity manifest: local basename → last verified size/sha,
+/// written next to the model files after every successful ensure. It keeps
+/// integrity checks meaningful when the HF tree fetch fails (offline,
+/// rate-limited) — without it, one failed metadata fetch used to downgrade
+/// verification to "any non-empty file passes", letting a truncated model be
+/// cached as complete forever.
+const INTEGRITY_MANIFEST: &str = ".integrity.json";
+
+fn load_integrity_manifest(dir: &Path) -> HashMap<String, FileMetadata> {
+    let path = dir.join(INTEGRITY_MANIFEST);
+    let Ok(bytes) = std::fs::read(&path) else {
+        return HashMap::new();
+    };
+    match serde_json::from_slice(&bytes) {
+        Ok(map) => map,
+        Err(e) => {
+            warn!(path = %path.display(), error = %e, "unreadable integrity manifest; ignoring");
+            HashMap::new()
+        }
+    }
+}
+
+/// Best-effort atomic write (tmp + rename). A failure only degrades future
+/// offline verification, so it warns instead of failing the download.
+fn save_integrity_manifest(dir: &Path, manifest: &HashMap<String, FileMetadata>) {
+    let path = dir.join(INTEGRITY_MANIFEST);
+    let tmp = dir.join(".integrity.json.tmp");
+    let Ok(json) = serde_json::to_vec_pretty(manifest) else {
+        return;
+    };
+    let result = std::fs::write(&tmp, &json).and_then(|()| std::fs::rename(&tmp, &path));
+    if let Err(e) = result {
+        warn!(path = %path.display(), error = %e, "could not persist integrity manifest");
+    }
+}
+
+/// Expected metadata for `filename`, in trust order: the HF tree API
+/// (authoritative, repo-path keyed) → the persisted manifest from the last
+/// verified download (basename keyed) → empty (legacy non-empty acceptance,
+/// only for files that have never been verified).
+fn effective_meta(
+    remote: &HashMap<String, FileMetadata>,
+    manifest: &HashMap<String, FileMetadata>,
+    filename: &str,
+) -> FileMetadata {
+    remote
+        .get(filename)
+        .or_else(|| manifest.get(file_basename(filename)))
+        .cloned()
+        .unwrap_or_default()
+}
+
+/// Copy newly-learned authoritative values into the manifest so a
+/// pre-manifest install becomes offline-verifiable once HF is reachable.
+/// Returns whether anything changed.
+fn refresh_manifest(
+    manifest: &mut HashMap<String, FileMetadata>,
+    remote: &HashMap<String, FileMetadata>,
+    files: &[String],
+) -> bool {
+    let mut changed = false;
+    for f in files {
+        if let Some(meta) = remote.get(f.as_str()) {
+            let key = file_basename(f);
+            if manifest.get(key) != Some(meta) {
+                manifest.insert(key.to_owned(), meta.clone());
+                changed = true;
+            }
+        }
+    }
+    changed
+}
+
+/// Record a now-verified file into the manifest: prefer the expected
+/// (authoritative) values, fall back to what the direct download observed
+/// (length checked against Content-Length, sha computed in-stream), and
+/// finally to the on-disk length.
+fn record_verified(
+    manifest: &mut HashMap<String, FileMetadata>,
+    basename: &str,
+    expected: &FileMetadata,
+    dst: &Path,
+    observed: Option<FileMetadata>,
+) {
+    let fallback = observed.unwrap_or_default();
+    let size = expected
+        .size
+        .or(fallback.size)
+        .or_else(|| dst.metadata().ok().map(|m| m.len()));
+    let sha256 = expected.sha256.clone().or(fallback.sha256);
+    manifest.insert(basename.to_owned(), FileMetadata { size, sha256 });
+}
+
 /// Fetch per-file size + LFS sha256 from the HF tree API.
 ///
-/// Returns an empty map on any failure — callers fall back to the size-less
-/// behaviour rather than blocking downloads when HF is unreachable or rate-limits
-/// us. We log the failure once per repo at WARN so it's visible in support logs.
+/// Returns an empty map on any failure — callers then fall back to the
+/// persisted integrity manifest (values from the last verified download)
+/// rather than blocking downloads when HF is unreachable or rate-limits us.
+/// We log the failure once per repo at WARN so it's visible in support logs.
 fn fetch_repo_file_metadata(repo_id: &str) -> HashMap<String, FileMetadata> {
     let url = format!("https://huggingface.co/api/models/{repo_id}/tree/main?recursive=true");
     let mut req = ureq::get(&url);
@@ -565,8 +696,12 @@ fn link_or_copy(src: &Path, dst: &Path) -> std::io::Result<()> {
 ///
 /// Uses the resolve endpoint which redirects to the actual blob URL.
 /// Streams to a temp file, then renames atomically to avoid partial files.
-/// Reads `HF_TOKEN` from env for gated/private repos.
-fn download_file_direct(repo_id: &str, filename: &str, dst: &Path) -> PersistResult<()> {
+/// The stream is length-checked against the response's Content-Length and
+/// sha256-hashed as it is written, so a truncated body (a cleanly-closed
+/// short response) is rejected here even when the HF tree metadata was
+/// unavailable; the observed values are returned for the caller's integrity
+/// manifest. Reads `HF_TOKEN` from env for gated/private repos.
+fn download_file_direct(repo_id: &str, filename: &str, dst: &Path) -> PersistResult<FileMetadata> {
     let url = format!("https://huggingface.co/{repo_id}/resolve/main/{filename}");
     let mut req = ureq::get(&url);
     if let Ok(token) = std::env::var("HF_TOKEN") {
@@ -576,17 +711,55 @@ fn download_file_direct(repo_id: &str, filename: &str, dst: &Path) -> PersistRes
         .call()
         .map_err(|e| PersistError::ModelDownload(format!("{repo_id}/{filename}: {e}")))?;
 
+    // Content-Length only equals the bytes we write when the body isn't
+    // transparently decompressed — ureq's default `gzip` feature decodes
+    // Content-Encoding: gzip on the fly (possible on small text files; CDN
+    // model blobs are served identity). Skip the check in that case.
+    let content_encoded = resp
+        .headers()
+        .get("content-encoding")
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| !v.eq_ignore_ascii_case("identity"));
+    let expected_len: Option<u64> = if content_encoded {
+        None
+    } else {
+        resp.headers()
+            .get("content-length")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse().ok())
+    };
+
     let tmp = dst.with_extension("dl.tmp");
-    {
-        let mut file = std::fs::File::create(&tmp)
+    let (written, sha256) = {
+        let file = std::fs::File::create(&tmp)
             .map_err(|e| PersistError::ModelDownload(format!("create tmp: {e}")))?;
-        std::io::copy(&mut resp.into_body().as_reader(), &mut file)
-            .map_err(|e| PersistError::ModelDownload(format!("{filename}: stream: {e}")))?;
+        let mut writer = HashingWriter::new(file);
+        std::io::copy(&mut resp.into_body().as_reader(), &mut writer).map_err(|e| {
+            let _ = std::fs::remove_file(&tmp);
+            PersistError::ModelDownload(format!("{filename}: stream: {e}"))
+        })?;
+        writer.finish()
+    };
+    if let Some(expected) = expected_len {
+        if written != expected {
+            let _ = std::fs::remove_file(&tmp);
+            return Err(PersistError::ModelDownload(format!(
+                "{repo_id}/{filename}: truncated download ({written} of {expected} bytes)"
+            )));
+        }
     }
     std::fs::rename(&tmp, dst)
         .map_err(|e| PersistError::ModelDownload(format!("{filename}: rename: {e}")))?;
-    info!(repo_id, filename, "direct download complete");
-    Ok(())
+    info!(
+        repo_id,
+        filename,
+        bytes = written,
+        "direct download complete"
+    );
+    Ok(FileMetadata {
+        size: Some(written),
+        sha256: Some(sha256),
+    })
 }
 
 /// Ensure a directory-type model is present at `models_dir/<local_name>/`,
@@ -607,14 +780,26 @@ fn ensure_directory_model_with_progress(
 
     let local_dir = models_dir.join(local_name);
 
-    // Fetch authoritative size + LFS sha256 once per ensure call. Empty on failure.
+    // Expected size/sha come from two sources, in trust order: the HF tree API
+    // (authoritative, refreshed every ensure; empty on failure) and the
+    // persisted per-model manifest from the last verified download. The
+    // manifest keeps verification meaningful offline and across HF outages —
+    // a truncated file can't be accepted just because the metadata fetch
+    // failed this time.
+    let mut manifest = load_integrity_manifest(&local_dir);
     let remote_meta = fetch_repo_file_metadata(repo_id);
 
     if local_dir.exists()
         && required_files.iter().all(|f| {
-            local_file_complete(&local_dir.join(file_basename(f)), meta_for(&remote_meta, f))
+            local_file_complete(
+                &local_dir.join(file_basename(f)),
+                &effective_meta(&remote_meta, &manifest, f),
+            )
         })
     {
+        if refresh_manifest(&mut manifest, &remote_meta, required_files) {
+            save_integrity_manifest(&local_dir, &manifest);
+        }
         info!(path = %local_dir.display(), "model directory already present");
         return Ok(local_dir);
     }
@@ -639,8 +824,9 @@ fn ensure_directory_model_with_progress(
         // Flatten nested paths: "onnx/model.onnx" → "model.onnx" locally.
         let basename = file_basename(filename);
         let dst = local_dir.join(basename);
-        let meta = meta_for(&remote_meta, filename);
-        if local_file_complete(&dst, meta) {
+        let meta = effective_meta(&remote_meta, &manifest, filename);
+        if local_file_complete(&dst, &meta) {
+            record_verified(&mut manifest, basename, &meta, &dst, None);
             on_file(filename, idx, total);
             continue;
         }
@@ -653,24 +839,33 @@ fn ensure_directory_model_with_progress(
             .get(filename)
             .ok()
             .and_then(|p| p.canonicalize().ok())
-            .filter(|src| local_file_complete(src, meta))
+            .filter(|src| local_file_complete(src, &meta))
             .and_then(|src| link_or_copy(&src, &dst).ok())
             .is_some();
-        if !linked {
+        let observed = if linked {
+            None
+        } else {
             let _ = std::fs::remove_file(&dst);
-            download_file_direct(repo_id, filename, &dst)?;
-        }
+            Some(download_file_direct(repo_id, filename, &dst)?)
+        };
 
-        // Post-download verification — if we have remote metadata, the final file
-        // must match. Mismatch indicates a corrupted CDN response or a mid-stream
-        // failure that left bytes on disk; refuse rather than ship a broken model.
-        if !local_file_complete(&dst, meta) {
+        // Post-download verification — if we have expected metadata, the final
+        // file must match. Mismatch indicates a corrupted CDN response or a
+        // mid-stream failure that left bytes on disk; refuse rather than ship a
+        // broken model. (Without metadata, a truncated direct download has
+        // already been rejected against the response's Content-Length.)
+        if !local_file_complete(&dst, &meta) {
             let _ = std::fs::remove_file(&dst);
             return Err(PersistError::ModelDownload(format!(
                 "{repo_id}/{filename}: downloaded file failed integrity check (size/sha mismatch)"
             )));
         }
+        record_verified(&mut manifest, basename, &meta, &dst, observed);
     }
+
+    // Persist what was just verified so later runs (possibly offline) check
+    // against real expectations instead of the size-less fallback.
+    save_integrity_manifest(&local_dir, &manifest);
 
     let missing: Vec<&str> = required_files
         .iter()
@@ -697,14 +892,6 @@ fn file_basename(filename: &str) -> &str {
         .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or(filename)
-}
-
-fn meta_for<'a>(map: &'a HashMap<String, FileMetadata>, filename: &str) -> &'a FileMetadata {
-    static EMPTY: FileMetadata = FileMetadata {
-        size: None,
-        sha256: None,
-    };
-    map.get(filename).unwrap_or(&EMPTY)
 }
 
 #[cfg(test)]
@@ -889,6 +1076,181 @@ mod tests {
         let empty = tmp.path().join("empty.bin");
         std::fs::write(&empty, b"").unwrap();
         assert!(!local_file_complete(&empty, &meta), "empty file rejected");
+    }
+
+    #[test]
+    fn hashing_writer_reports_len_and_sha() {
+        let mut out = Vec::new();
+        let mut w = HashingWriter::new(&mut out);
+        std::io::Write::write_all(&mut w, b"hello").unwrap();
+        let (n, sha) = w.finish();
+        assert_eq!(n, 5);
+        assert_eq!(
+            sha,
+            "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        );
+        assert_eq!(out, b"hello");
+    }
+
+    #[test]
+    fn integrity_manifest_round_trips() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut m = HashMap::new();
+        m.insert(
+            "a.bin".to_string(),
+            FileMetadata {
+                size: Some(5),
+                sha256: Some("abc".into()),
+            },
+        );
+        save_integrity_manifest(tmp.path(), &m);
+        assert_eq!(load_integrity_manifest(tmp.path()), m);
+    }
+
+    #[test]
+    fn corrupt_manifest_is_ignored() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join(INTEGRITY_MANIFEST), b"{not json").unwrap();
+        assert!(load_integrity_manifest(tmp.path()).is_empty());
+    }
+
+    #[test]
+    fn effective_meta_prefers_remote_then_manifest() {
+        let mut remote = HashMap::new();
+        remote.insert(
+            "onnx/model.onnx".to_string(),
+            FileMetadata {
+                size: Some(10),
+                sha256: None,
+            },
+        );
+        let mut manifest = HashMap::new();
+        manifest.insert(
+            "model.onnx".to_string(),
+            FileMetadata {
+                size: Some(20),
+                sha256: None,
+            },
+        );
+        // Remote (repo-path keyed) wins when present.
+        assert_eq!(
+            effective_meta(&remote, &manifest, "onnx/model.onnx").size,
+            Some(10)
+        );
+        // Manifest (basename keyed) fills in when the remote fetch failed.
+        assert_eq!(
+            effective_meta(&HashMap::new(), &manifest, "onnx/model.onnx").size,
+            Some(20)
+        );
+        // Neither → default (legacy non-empty acceptance).
+        assert_eq!(
+            effective_meta(&HashMap::new(), &HashMap::new(), "other").size,
+            None
+        );
+    }
+
+    #[test]
+    fn manifest_pins_size_after_metadata_loss() {
+        // A file verified once (manifest knows its size) must be rejected when
+        // truncated later, even with no remote metadata available.
+        let tmp = tempfile::tempdir().unwrap();
+        let p = tmp.path().join("model.bin");
+        std::fs::write(&p, b"0123456789").unwrap();
+        let mut manifest = HashMap::new();
+        manifest.insert(
+            "model.bin".to_string(),
+            FileMetadata {
+                size: Some(10),
+                sha256: None,
+            },
+        );
+        let no_remote = HashMap::new();
+        assert!(local_file_complete(
+            &p,
+            &effective_meta(&no_remote, &manifest, "model.bin")
+        ));
+        std::fs::write(&p, b"01234").unwrap(); // truncated
+        assert!(!local_file_complete(
+            &p,
+            &effective_meta(&no_remote, &manifest, "model.bin")
+        ));
+    }
+
+    #[test]
+    fn record_verified_prefers_expected_then_observed_then_disk() {
+        let tmp = tempfile::tempdir().unwrap();
+        let p = tmp.path().join("a.bin");
+        std::fs::write(&p, b"hello").unwrap();
+        let mut manifest = HashMap::new();
+
+        // Expected values win.
+        record_verified(
+            &mut manifest,
+            "a.bin",
+            &FileMetadata {
+                size: Some(5),
+                sha256: Some("expected".into()),
+            },
+            &p,
+            Some(FileMetadata {
+                size: Some(99),
+                sha256: Some("observed".into()),
+            }),
+        );
+        assert_eq!(manifest["a.bin"].size, Some(5));
+        assert_eq!(manifest["a.bin"].sha256.as_deref(), Some("expected"));
+
+        // Observed fills in when nothing was expected.
+        record_verified(
+            &mut manifest,
+            "a.bin",
+            &FileMetadata::default(),
+            &p,
+            Some(FileMetadata {
+                size: Some(5),
+                sha256: Some("observed".into()),
+            }),
+        );
+        assert_eq!(manifest["a.bin"].size, Some(5));
+        assert_eq!(manifest["a.bin"].sha256.as_deref(), Some("observed"));
+
+        // Disk length is the last resort.
+        record_verified(&mut manifest, "a.bin", &FileMetadata::default(), &p, None);
+        assert_eq!(manifest["a.bin"].size, Some(5));
+        assert_eq!(manifest["a.bin"].sha256, None);
+    }
+
+    /// Real-network end-to-end: `download_model` writes the integrity
+    /// manifest, and a truncated model file is detected and re-downloaded on
+    /// the next run. Opt-in (network + ~1 MB):
+    /// `cargo test -p lune-persist -- --ignored network_`
+    #[test]
+    #[ignore = "downloads ~1 MB from huggingface.co"]
+    fn network_download_writes_manifest_and_heals_truncation() {
+        let tmp = tempfile::tempdir().unwrap();
+        let models_dir = tmp.path();
+
+        let path = download_model(models_dir, lune_core::models::DIR_WHISPER_VAD, |_| {}).unwrap();
+        let file = path.join(lune_core::models::WHISPER_VAD_GGML);
+        let full_len = file.metadata().unwrap().len();
+        assert!(full_len > 100_000, "real model expected, got {full_len}B");
+
+        // Manifest pins the verified size.
+        let manifest = load_integrity_manifest(&path);
+        assert_eq!(
+            manifest[lune_core::models::WHISPER_VAD_GGML].size,
+            Some(full_len)
+        );
+
+        // Truncate → the next ensure must reject the file and re-download it.
+        let half = std::fs::read(&file).unwrap()[..(full_len / 2) as usize].to_vec();
+        std::fs::write(&file, half).unwrap();
+        download_model(models_dir, lune_core::models::DIR_WHISPER_VAD, |_| {}).unwrap();
+        assert_eq!(
+            file.metadata().unwrap().len(),
+            full_len,
+            "truncated file must be healed"
+        );
     }
 
     #[test]

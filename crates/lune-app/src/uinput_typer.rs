@@ -631,6 +631,34 @@ pub fn set_clipboard(text: &str) -> Result<(), String> {
     pipe_text_to_command(cmd, args, text, CLIPBOARD_TIMEOUT)
 }
 
+/// Set the clipboard to `text` for a *transient* paste, tagged with the
+/// `x-kde-passwordManagerHint` exclusion MIME so clipboard-history managers
+/// (Klipper, cliphist, clipman, wl-clip-persist, …) don't durably record the
+/// dictated text during the brief set → paste → restore window.
+///
+/// Uses `arboard` (native `wlr-data-control` on Wayland, X11 selections
+/// otherwise) — the only Linux clipboard path here that can co-advertise the
+/// exclusion hint *alongside* the text. `wl-copy`/`xclip` serve a single target
+/// and can't (co-advertising via `wl-copy --type … --type …` drops the text
+/// target entirely), which is why the transient path can't reuse `set_clipboard`.
+///
+/// The returned owner MUST be kept alive until the paste has been consumed: on
+/// X11 its background thread serves the selection for exactly as long as the
+/// value lives; on Wayland a detached daemon is forked to serve it and the
+/// value is incidental. Callers fall back to `set_clipboard` on `Err` so
+/// delivery still works when arboard can't initialise (e.g. no display).
+fn set_clipboard_excluded(text: &str) -> Result<arboard::Clipboard, String> {
+    use arboard::SetExtLinux;
+    let mut clipboard =
+        arboard::Clipboard::new().map_err(|e| format!("arboard init failed: {e}"))?;
+    clipboard
+        .set()
+        .exclude_from_history()
+        .text(text.to_owned())
+        .map_err(|e| format!("arboard set failed: {e}"))?;
+    Ok(clipboard)
+}
+
 /// A byte-for-byte snapshot of the clipboard: the source's preferred MIME type
 /// and its exact bytes.
 ///
@@ -1136,13 +1164,37 @@ impl UinputTyper {
         };
 
         let rtt_start = Instant::now();
-        if let Err(e) = set_clipboard(text) {
-            warn!(error = %e, "clipboard set failed, falling back to per-key typing");
-            // set_clipboard failed, so the prior contents are still intact and
-            // our text never reached the clipboard — nothing to restore.
-            self.type_keys_raw(text);
-            return false;
-        }
+        // On the transient path (dictated text not kept) set the clipboard via
+        // arboard with the history-exclusion hint so clipboard-history managers
+        // skip recording it, and hold the returned owner alive until after the
+        // paste+restore below — on X11 the selection is served only while it
+        // lives. On the keep path the user wants the text on their clipboard, so
+        // set it plainly (and let it be recorded). Either set failing falls back
+        // to per-key typing; an arboard-specific failure first retries the plain
+        // CLI set so a missing display never drops the paste.
+        let _excluded_owner = if keep_clipboard {
+            if let Err(e) = set_clipboard(text) {
+                warn!(error = %e, "clipboard set failed, falling back to per-key typing");
+                // Prior contents are still intact and our text never reached the
+                // clipboard — nothing to restore.
+                self.type_keys_raw(text);
+                return false;
+            }
+            None
+        } else {
+            match set_clipboard_excluded(text) {
+                Ok(owner) => Some(owner),
+                Err(e) => {
+                    warn!(error = %e, "history-excluded clipboard set failed, falling back to plain set");
+                    if let Err(e) = set_clipboard(text) {
+                        warn!(error = %e, "clipboard set failed, falling back to per-key typing");
+                        self.type_keys_raw(text);
+                        return false;
+                    }
+                    None
+                }
+            }
+        };
         self.paste_delay.record_rtt(rtt_start.elapsed());
 
         let chord = if is_terminal {

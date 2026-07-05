@@ -207,7 +207,12 @@ body.pill-window {
 .pill-root {
   @apply relative flex w-full items-center justify-center;
   height: 32px;
-  background: var(--color-surface-elevated);
+  /* Lightened a touch past the base token (already the lightest solid
+     surface) so the bar reads distinct from panels behind it; mixed
+     toward white rather than swapped so it stays a no-op in light mode
+     (already pure white) and fully opaque (a translucent fill ghosts on
+     this Nvidia + WebKitGTK stack). */
+  background: color-mix(in oklab, var(--color-surface-elevated) 92%, white 8%);
   border: 1px solid var(--color-surface-border);
   border-radius: 10px;
   /* Clip every child (surface + cancel hover fills, waveform) to the rounded

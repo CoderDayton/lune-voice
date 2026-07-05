@@ -75,7 +75,11 @@ tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 
 # Cross-platform I/O
-arboard = "3.6"
+# `wayland-data-control` (Linux-only, target-gated dep) lets arboard advertise
+# the `x-kde-passwordManagerHint` exclusion MIME alongside the pasted text so
+# transient dictation pastes stay out of clipboard-history managers — the CLI
+# `wl-copy`/`xclip` serve only a single target and can't co-advertise it.
+arboard = { version = "3.6", features = ["wayland-data-control"] }
 enigo = "0.6.1"
 chrono = { version = "0.4", features = ["serde"] }
 url = { version = "2", features = ["serde"] }
