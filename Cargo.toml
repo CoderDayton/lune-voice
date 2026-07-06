@@ -84,7 +84,7 @@ diesel = { version = "2", features = ["sqlite", "returning_clauses_for_sqlite_3_
 diesel_migrations = "2"
 dirs = "6"
 cpal = "0.17"
-rubato = "1.0.1"
+rubato = "3.0.0"
 audioadapter-buffers = "2"
 mimalloc = { version = "0.1", default-features = false }
 ndarray = "0.17"
