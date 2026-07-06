@@ -17,7 +17,7 @@ cpal = "0.17"
 
 # Resampling (adaptive rate conversion)
 rubato = "1.0"
-audioadapter-buffers = "2.0"
+audioadapter-buffers = "4.0"
 
 # Lock-free ring buffer
 crossbeam-channel = "0.5"

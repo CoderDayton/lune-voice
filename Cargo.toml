@@ -85,7 +85,7 @@ diesel_migrations = "2"
 dirs = "6"
 cpal = "0.17"
 rubato = "1.0.1"
-audioadapter-buffers = "2"
+audioadapter-buffers = "4"
 mimalloc = { version = "0.1", default-features = false }
 ndarray = "0.17"
 rustfft = "6.4"
