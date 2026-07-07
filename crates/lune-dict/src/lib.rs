@@ -53,7 +53,7 @@ impl DictionaryManager {
         });
         // Re-sort by priority DESC to maintain invariant.
         self.cache
-            .sort_unstable_by(|a, b| b.priority.cmp(&a.priority));
+            .sort_unstable_by_key(|e| std::cmp::Reverse(e.priority));
         Ok(id)
     }
 

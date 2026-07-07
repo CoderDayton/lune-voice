@@ -200,6 +200,17 @@ let mockSnapshot: WorkspaceSnapshot = snapshotWithStats(createMockSnapshot());
 let nextDictionaryId = 1000;
 let nextStyleId = 1000;
 
+/// Reset the mock backend to its seeded initial state. `mockSnapshot` and the id
+/// counters are module-level mutable state shared across every test file in a run,
+/// so a test that creates/deletes dictionary or style entries otherwise leaks into
+/// later files. Call this in a test's `beforeEach` for deterministic,
+/// order-independent state.
+export function resetMockBackend() {
+  mockSnapshot = snapshotWithStats(createMockSnapshot());
+  nextDictionaryId = 1000;
+  nextStyleId = 1000;
+}
+
 function applySettings(input: SaveWorkspaceSettingsInput) {
   const {
     openaiAsrApiKey: _openaiAsrApiKey,

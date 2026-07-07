@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { backendClient } from "../../src/lib/backend/client";
+import { resetMockBackend } from "../../src/lib/backend/mock";
 import {
   addDictionaryEntry,
   loadWorkspaceSnapshot,
@@ -50,6 +51,7 @@ describe("workspace store", () => {
   const originalToggleDictation = backendClient.toggleDictation;
 
   beforeEach(async () => {
+    resetMockBackend();
     backendClient.saveWorkspaceSettings = originalSaveWorkspaceSettings;
     backendClient.loadWorkspaceSnapshot = originalLoadWorkspaceSnapshot;
     backendClient.toggleDictation = originalToggleDictation;
