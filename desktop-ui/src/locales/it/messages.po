@@ -124,7 +124,7 @@ msgstr "Comportamento dell'applicazione e preferenze di avvio."
 msgid "Audio"
 msgstr "Audio"
 
-#: src/features/dictation/audio-dots.tsx:17
+#: src/features/dictation/audio-dots.tsx:12
 msgid "Audio activity"
 msgstr "Attività audio"
 
@@ -164,7 +164,7 @@ msgstr "Cancellare"
 msgid "Cancel current recording"
 msgstr "Annulla la registrazione corrente"
 
-#: src/features/dictation/dictation-pill.tsx:71
+#: src/features/dictation/dictation-pill.tsx:99
 msgid "Cancel dictation"
 msgstr "Annulla dettatura"
 
@@ -213,7 +213,7 @@ msgstr ""
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "Scegli i modelli AI da installare. Tutto funziona offline: niente cloud, niente account."
 
-#: src/features/settings/sections/transcription-section.tsx:38
+#: src/features/settings/sections/transcription-section.tsx:41
 msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
 msgstr ""
 
@@ -263,7 +263,7 @@ msgstr "Connessione"
 msgid "Continue"
 msgstr "Continuare"
 
-#: src/features/settings/sections/transcription-section.tsx:33
+#: src/features/settings/sections/transcription-section.tsx:36
 msgid "Control how your speech is turned into text."
 msgstr "Controlla come il tuo discorso viene trasformato in testo."
 
@@ -284,21 +284,12 @@ msgstr "Copia negli appunti"
 msgid "Copy transcript"
 msgstr "Copia la trascrizione"
 
-#: src/features/settings/sections/transcription-section.tsx:87
+#: src/features/settings/sections/transcription-section.tsx:94
 msgid "Correction"
 msgstr "Correzione"
 
-#: src/features/settings/sections/transcription-section.tsx:141
-#: src/features/settings/sections/transcription-section.tsx:153
-msgid "Correction frequency"
-msgstr "Frequenza di correzione"
-
-#: src/features/settings/sections/transcription-section.tsx:92
-msgid "Correction LLM"
-msgstr "Correzione LLM"
-
-#: src/features/settings/sections/transcription-section.tsx:120
-#: src/features/settings/sections/transcription-section.tsx:132
+#: src/features/settings/sections/transcription-section.tsx:99
+#: src/features/settings/sections/transcription-section.tsx:111
 msgid "Correction sensitivity"
 msgstr "Sensibilità di correzione"
 
@@ -375,8 +366,8 @@ msgstr "Correzioni deterministiche applicate prima di qualsiasi stile dell'IA."
 msgid "Dictation"
 msgstr ""
 
-#: src/features/settings/sections/transcription-section.tsx:54
-#: src/features/settings/sections/transcription-section.tsx:60
+#: src/features/settings/sections/transcription-section.tsx:57
+#: src/features/settings/sections/transcription-section.tsx:63
 msgid "Dictation language"
 msgstr "Linguaggio di dettatura"
 
@@ -387,10 +378,6 @@ msgstr "Indicatore di dettatura"
 #: src/features/settings/sections/appearance-section.tsx:99
 msgid "Dictation pill visibility"
 msgstr "Visibilità dell'indicatore di dettatura"
-
-#: src/features/settings/sections/transcription-section.tsx:96
-msgid "Disabled — transcripts are delivered raw, and the LLM model is hidden from the Models tab."
-msgstr ""
 
 #: src/features/settings/sections/dictation-section.tsx:68
 msgid "Discard the current draft and return to idle. Click the binding to change it."
@@ -485,10 +472,6 @@ msgstr "Modifica stile"
 msgid "Empty session"
 msgstr "Sessione vuota"
 
-#: src/features/settings/sections/transcription-section.tsx:112
-msgid "Enable correction LLM"
-msgstr "Abilita correzione LLM"
-
 #: src/features/styles/styles-page.tsx:240
 msgid "Enable styling"
 msgstr ""
@@ -530,6 +513,10 @@ msgstr "Regole di filtro"
 #: src/features/dictionary/components/dictionary-table.tsx:227
 msgid "Filter rules…"
 msgstr "Filtra regole..."
+
+#: src/features/settings/sections/transcription-section.tsx:95
+msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
+msgstr ""
 
 #: src/features/styles/components/style-preset-card.tsx:89
 msgid "formatting"
@@ -591,10 +578,6 @@ msgstr "Per quanto tempo le dettature completate vengono conservate su questo di
 msgid "How loud the dictation sounds play."
 msgstr ""
 
-#: src/features/settings/sections/transcription-section.tsx:142
-msgid "How readily the LLM runs on clean speech. Higher polishes more segments; lower skips more often for speed."
-msgstr "Con quale prontezza l'LLM viene eseguito sul parlato pulito. Più alto perfeziona più segmenti; più basso li salta più spesso per guadagnare velocità."
-
 #: src/features/overview/overview-page.tsx:204
 msgid "Idle"
 msgstr "Oziare"
@@ -643,7 +626,6 @@ msgstr "Lunghezza"
 msgid "Light"
 msgstr "Leggero"
 
-#: src/features/dictation/dictation-pill.tsx:64
 #: src/features/shell/components/app-shell.tsx:160
 #: src/features/shell/components/sidebar.tsx:163
 msgid "Listening"
@@ -833,10 +815,6 @@ msgstr ""
 msgid "Please keep the app open until downloads finish"
 msgstr "Tieni l'app aperta fino al termine dei download"
 
-#: src/features/settings/sections/transcription-section.tsx:95
-msgid "Polishes punctuation and fixes obvious recognizer errors after transcription."
-msgstr ""
-
 #: src/features/settings/sections/dictation-section.tsx:138
 #: src/features/settings/sections/dictation-section.tsx:146
 msgid "Pre-warm microphone"
@@ -864,8 +842,8 @@ msgstr "Pagina precedente"
 msgid "Priority"
 msgstr "Priorità"
 
-#: src/features/dictation/dictation-pill.tsx:64
-#: src/features/dictation/dictation-pill.tsx:79
+#: src/features/dictation/dictation-pill.tsx:61
+#: src/features/dictation/dictation-pill.tsx:67
 #: src/features/shell/components/app-shell.tsx:158
 msgid "Processing"
 msgstr "Elaborazione"
@@ -976,7 +954,7 @@ msgstr "sessioni"
 msgid "Set hotkey"
 msgstr "Imposta il tasto di scelta rapida"
 
-#: src/features/settings/sections/transcription-section.tsx:55
+#: src/features/settings/sections/transcription-section.tsx:58
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "Imposta la lingua che parli. Auto utilizza il rilevamento dalla voce."
 
@@ -1026,7 +1004,7 @@ msgstr "Frase parlata"
 msgid "Start dictating"
 msgstr "Inizia a dettare"
 
-#: src/features/dictation/dictation-pill.tsx:55
+#: src/features/dictation/dictation-pill.tsx:59
 msgid "Start dictation"
 msgstr "Avvia dettatura"
 
@@ -1049,7 +1027,7 @@ msgstr ""
 msgid "Stop dictating"
 msgstr "Smettila di dettare"
 
-#: src/features/dictation/dictation-pill.tsx:93
+#: src/features/dictation/dictation-pill.tsx:62
 msgid "Stop dictation"
 msgstr "Ferma dettatura"
 
@@ -1095,6 +1073,10 @@ msgstr ""
 #: src/features/settings/sections/dictation-section.tsx:58
 msgid "The main shortcut used for voice typing. Click the binding to change it."
 msgstr "La scorciatoia principale utilizzata per la digitazione vocale. Fare clic sull'associazione per modificarla."
+
+#: src/features/settings/sections/transcription-section.tsx:100
+msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
+msgstr ""
 
 #: src/features/settings/sections/appearance-section.tsx:76
 msgid "Theme"
@@ -1158,21 +1140,17 @@ msgstr "Parole totali"
 msgid "Transcript"
 msgstr "Trascrizione"
 
-#: src/features/settings/sections/transcription-section.tsx:32
+#: src/features/settings/sections/transcription-section.tsx:35
 #: src/features/settings/settings-page.tsx:68
 msgid "Transcription"
 msgstr "Trascrizione"
-
-#: src/features/settings/sections/transcription-section.tsx:88
-msgid "Tune how the local LLM polishes transcripts after transcription."
-msgstr "Regola come l'LLM locale perfeziona le trascrizioni dopo la trascrizione."
 
 #: src/features/welcome/components/engine-step.tsx:131
 msgid "Use GPU acceleration"
 msgstr ""
 
-#: src/features/settings/sections/transcription-section.tsx:71
-#: src/features/settings/sections/transcription-section.tsx:79
+#: src/features/settings/sections/transcription-section.tsx:74
+#: src/features/settings/sections/transcription-section.tsx:82
 msgid "Use hardware acceleration"
 msgstr "Utilizza l'accelerazione hardware"
 
@@ -1194,7 +1172,7 @@ msgstr "Visualizza tutto"
 msgid "View style"
 msgstr "Visualizza stile"
 
-#: src/features/settings/sections/transcription-section.tsx:37
+#: src/features/settings/sections/transcription-section.tsx:40
 msgid "Voice model"
 msgstr "Modello vocale"
 
@@ -1208,7 +1186,7 @@ msgstr "Bentornato"
 msgid "Welcome to Lune Voice"
 msgstr "Benvenuti in Lune Voice"
 
-#: src/features/settings/sections/transcription-section.tsx:72
+#: src/features/settings/sections/transcription-section.tsx:75
 msgid "When available, this can make transcription finish faster."
 msgstr "Se disponibile, questo può velocizzare il completamento della trascrizione."
 
@@ -1246,10 +1224,6 @@ msgstr "parole"
 #: src/features/history/components/session-detail-modal.tsx:160
 msgid "Words"
 msgstr "Parole"
-
-#: src/features/settings/sections/transcription-section.tsx:121
-msgid "Words the recognizer is unsure about are sent to the LLM. Higher corrects more aggressively; lower trusts the raw transcription."
-msgstr "Le parole di cui il riconoscitore non è sicuro vengono inviate all'LLM. Più alto corregge in modo più aggressivo; più basso si fida della trascrizione grezza."
 
 #: src/features/overview/overview-page.tsx:147
 msgid "WPM"

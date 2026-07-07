@@ -98,7 +98,7 @@ fn resolve_pill_position(pill: &tauri::WebviewWindow) -> (i32, i32) {
 /// `set_position` on X11/Windows/macOS. Must run on the main thread.
 fn apply_pill_position(pill: &tauri::WebviewWindow, x: i32, y: i32) -> Result<(), String> {
     #[cfg(target_os = "linux")]
-    if is_wayland() {
+    if use_layer_shell() {
         use gtk::prelude::*;
         use gtk_layer_shell::LayerShell;
         let gtk_window: gtk::Window = pill.gtk_window().map_err(|e| e.to_string())?.upcast();
@@ -176,9 +176,9 @@ pub async fn reposition_pill_center(window: WebviewWindow, app: AppHandle) -> Re
     run_pill_window_on_main_thread(&app, move |pill| {
         #[cfg(target_os = "linux")]
         {
-            // On Wayland layer shell, repositioning is handled by anchors — no-op.
-            // On X11, fall back to standard positioning.
-            if !is_wayland() {
+            // Layer-shell repositioning is handled by anchors — no-op. Otherwise
+            // (X11, or Wayland without layer-shell) fall back to standard positioning.
+            if !use_layer_shell() {
                 reposition_standard(&pill)?;
             }
         }
@@ -366,6 +366,19 @@ fn is_wayland() -> bool {
     std::env::var("WAYLAND_DISPLAY").is_ok()
 }
 
+/// Whether to drive the pill as a Wayland layer-shell overlay. True only when
+/// running on Wayland AND the compositor actually implements the
+/// `wlr-layer-shell` protocol. GNOME/Mutter is Wayland but ships no layer-shell,
+/// so calling `init_layer_shell()` there spams "compositor does not support Layer
+/// Shell" CRITICALs, falls back to a plain XDG toplevel, and then silently
+/// ignores our anchors/margins (breaking placement + drag). In that case we take
+/// the standard XDG positioning path instead. Must run on the main thread
+/// (`is_supported` asserts it).
+#[cfg(target_os = "linux")]
+fn use_layer_shell() -> bool {
+    is_wayland() && gtk_layer_shell::is_supported()
+}
+
 /// Configure the pill as a layer shell overlay on Wayland, or use standard
 /// positioning on X11.
 #[cfg(target_os = "linux")]
@@ -373,7 +386,7 @@ fn configure_linux_pill(pill: &tauri::WebviewWindow) -> Result<(), String> {
     use gtk::prelude::*;
     use gtk_layer_shell::LayerShell;
 
-    if !is_wayland() {
+    if !use_layer_shell() {
         return reposition_standard(pill);
     }
 

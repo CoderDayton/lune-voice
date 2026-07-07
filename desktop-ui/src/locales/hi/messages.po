@@ -124,7 +124,7 @@ msgstr "एप्लिकेशन व्यवहार और स्टार
 msgid "Audio"
 msgstr "ऑडियो"
 
-#: src/features/dictation/audio-dots.tsx:17
+#: src/features/dictation/audio-dots.tsx:12
 msgid "Audio activity"
 msgstr "ऑडियो गतिविधि"
 
@@ -164,7 +164,7 @@ msgstr "रद्द करें"
 msgid "Cancel current recording"
 msgstr "वर्तमान रिकॉर्डिंग रद्द करें"
 
-#: src/features/dictation/dictation-pill.tsx:71
+#: src/features/dictation/dictation-pill.tsx:99
 msgid "Cancel dictation"
 msgstr "डिक्टेशन रद्द करें"
 
@@ -213,7 +213,7 @@ msgstr ""
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "इंस्टॉल करने के लिए AI मॉडल चुनें. सब कुछ ऑफ़लाइन चलता है - कोई क्लाउड नहीं, कोई खाता नहीं।"
 
-#: src/features/settings/sections/transcription-section.tsx:38
+#: src/features/settings/sections/transcription-section.tsx:41
 msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
 msgstr ""
 
@@ -263,7 +263,7 @@ msgstr "कनेक्ट हो रहा है"
 msgid "Continue"
 msgstr "जारी रखें"
 
-#: src/features/settings/sections/transcription-section.tsx:33
+#: src/features/settings/sections/transcription-section.tsx:36
 msgid "Control how your speech is turned into text."
 msgstr "नियंत्रित करें कि आपका भाषण पाठ में कैसे परिवर्तित होता है।"
 
@@ -284,21 +284,12 @@ msgstr "क्लिपबोर्ड पर कॉपी करें"
 msgid "Copy transcript"
 msgstr "प्रतिलेख कॉपी करें"
 
-#: src/features/settings/sections/transcription-section.tsx:87
+#: src/features/settings/sections/transcription-section.tsx:94
 msgid "Correction"
 msgstr "सुधार"
 
-#: src/features/settings/sections/transcription-section.tsx:141
-#: src/features/settings/sections/transcription-section.tsx:153
-msgid "Correction frequency"
-msgstr "सुधार आवृत्ति"
-
-#: src/features/settings/sections/transcription-section.tsx:92
-msgid "Correction LLM"
-msgstr "सुधार एलएलएम"
-
-#: src/features/settings/sections/transcription-section.tsx:120
-#: src/features/settings/sections/transcription-section.tsx:132
+#: src/features/settings/sections/transcription-section.tsx:99
+#: src/features/settings/sections/transcription-section.tsx:111
 msgid "Correction sensitivity"
 msgstr "सुधार संवेदनशीलता"
 
@@ -375,8 +366,8 @@ msgstr "किसी भी एआई स्टाइलिंग से पह�
 msgid "Dictation"
 msgstr ""
 
-#: src/features/settings/sections/transcription-section.tsx:54
-#: src/features/settings/sections/transcription-section.tsx:60
+#: src/features/settings/sections/transcription-section.tsx:57
+#: src/features/settings/sections/transcription-section.tsx:63
 msgid "Dictation language"
 msgstr "श्रुतलेख भाषा"
 
@@ -387,10 +378,6 @@ msgstr "श्रुतलेख संकेतक"
 #: src/features/settings/sections/appearance-section.tsx:99
 msgid "Dictation pill visibility"
 msgstr "श्रुतलेख संकेतक दृश्यता"
-
-#: src/features/settings/sections/transcription-section.tsx:96
-msgid "Disabled — transcripts are delivered raw, and the LLM model is hidden from the Models tab."
-msgstr ""
 
 #: src/features/settings/sections/dictation-section.tsx:68
 msgid "Discard the current draft and return to idle. Click the binding to change it."
@@ -485,10 +472,6 @@ msgstr "शैली संपादित करें"
 msgid "Empty session"
 msgstr "ख़ाली सत्र"
 
-#: src/features/settings/sections/transcription-section.tsx:112
-msgid "Enable correction LLM"
-msgstr "सुधार एलएलएम सक्षम करें"
-
 #: src/features/styles/styles-page.tsx:240
 msgid "Enable styling"
 msgstr ""
@@ -530,6 +513,10 @@ msgstr "फ़िल्टर नियम"
 #: src/features/dictionary/components/dictionary-table.tsx:227
 msgid "Filter rules…"
 msgstr "फ़िल्टर नियम…"
+
+#: src/features/settings/sections/transcription-section.tsx:95
+msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
+msgstr ""
 
 #: src/features/styles/components/style-preset-card.tsx:89
 msgid "formatting"
@@ -591,10 +578,6 @@ msgstr "पूर्ण किए गए श्रुतलेख इस डि�
 msgid "How loud the dictation sounds play."
 msgstr ""
 
-#: src/features/settings/sections/transcription-section.tsx:142
-msgid "How readily the LLM runs on clean speech. Higher polishes more segments; lower skips more often for speed."
-msgstr "साफ़ भाषण पर LLM कितनी तत्परता से चलता है। अधिक होने पर अधिक खंडों को निखारता है; कम होने पर गति के लिए अधिक बार छोड़ देता है।"
-
 #: src/features/overview/overview-page.tsx:204
 msgid "Idle"
 msgstr "निष्क्रिय"
@@ -643,7 +626,6 @@ msgstr "लंबाई"
 msgid "Light"
 msgstr "रोशनी"
 
-#: src/features/dictation/dictation-pill.tsx:64
 #: src/features/shell/components/app-shell.tsx:160
 #: src/features/shell/components/sidebar.tsx:163
 msgid "Listening"
@@ -833,10 +815,6 @@ msgstr ""
 msgid "Please keep the app open until downloads finish"
 msgstr "कृपया डाउनलोड समाप्त होने तक ऐप को खुला रखें"
 
-#: src/features/settings/sections/transcription-section.tsx:95
-msgid "Polishes punctuation and fixes obvious recognizer errors after transcription."
-msgstr ""
-
 #: src/features/settings/sections/dictation-section.tsx:138
 #: src/features/settings/sections/dictation-section.tsx:146
 msgid "Pre-warm microphone"
@@ -864,8 +842,8 @@ msgstr "पिछला पृष्ठ"
 msgid "Priority"
 msgstr "प्राथमिकता"
 
-#: src/features/dictation/dictation-pill.tsx:64
-#: src/features/dictation/dictation-pill.tsx:79
+#: src/features/dictation/dictation-pill.tsx:61
+#: src/features/dictation/dictation-pill.tsx:67
 #: src/features/shell/components/app-shell.tsx:158
 msgid "Processing"
 msgstr "प्रोसेसिंग"
@@ -976,7 +954,7 @@ msgstr "सत्र"
 msgid "Set hotkey"
 msgstr "हॉटकी सेट करें"
 
-#: src/features/settings/sections/transcription-section.tsx:55
+#: src/features/settings/sections/transcription-section.tsx:58
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "आप जो भाषा बोलते हैं उसे सेट करें. स्वतः वाणी से पता लगाने का उपयोग करता है।"
 
@@ -1026,7 +1004,7 @@ msgstr "बोला हुआ मुहावरा"
 msgid "Start dictating"
 msgstr "डिक्टेशन शुरू करें"
 
-#: src/features/dictation/dictation-pill.tsx:55
+#: src/features/dictation/dictation-pill.tsx:59
 msgid "Start dictation"
 msgstr "डिक्टेशन शुरू करें"
 
@@ -1049,7 +1027,7 @@ msgstr ""
 msgid "Stop dictating"
 msgstr "डिक्टेशन रोकें"
 
-#: src/features/dictation/dictation-pill.tsx:93
+#: src/features/dictation/dictation-pill.tsx:62
 msgid "Stop dictation"
 msgstr "डिक्टेशन रोकें"
 
@@ -1095,6 +1073,10 @@ msgstr ""
 #: src/features/settings/sections/dictation-section.tsx:58
 msgid "The main shortcut used for voice typing. Click the binding to change it."
 msgstr "ध्वनि टाइपिंग के लिए उपयोग किया जाने वाला मुख्य शॉर्टकट। इसे बदलने के लिए बाइंडिंग पर क्लिक करें।"
+
+#: src/features/settings/sections/transcription-section.tsx:100
+msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
+msgstr ""
 
 #: src/features/settings/sections/appearance-section.tsx:76
 msgid "Theme"
@@ -1158,21 +1140,17 @@ msgstr "कुल शब्द"
 msgid "Transcript"
 msgstr "टेक्स्ट"
 
-#: src/features/settings/sections/transcription-section.tsx:32
+#: src/features/settings/sections/transcription-section.tsx:35
 #: src/features/settings/settings-page.tsx:68
 msgid "Transcription"
 msgstr "ट्रांसक्रिप्शन"
-
-#: src/features/settings/sections/transcription-section.tsx:88
-msgid "Tune how the local LLM polishes transcripts after transcription."
-msgstr "समायोजित करें कि स्थानीय LLM ट्रांसक्रिप्शन के बाद ट्रांसक्रिप्ट को कैसे निखारता है।"
 
 #: src/features/welcome/components/engine-step.tsx:131
 msgid "Use GPU acceleration"
 msgstr ""
 
-#: src/features/settings/sections/transcription-section.tsx:71
-#: src/features/settings/sections/transcription-section.tsx:79
+#: src/features/settings/sections/transcription-section.tsx:74
+#: src/features/settings/sections/transcription-section.tsx:82
 msgid "Use hardware acceleration"
 msgstr "हार्डवेयर त्वरण का प्रयोग करें"
 
@@ -1194,7 +1172,7 @@ msgstr "सभी को देखें"
 msgid "View style"
 msgstr "शैली देखें"
 
-#: src/features/settings/sections/transcription-section.tsx:37
+#: src/features/settings/sections/transcription-section.tsx:40
 msgid "Voice model"
 msgstr "आवाज मॉडल"
 
@@ -1208,7 +1186,7 @@ msgstr "वापसी पर स्वागत है"
 msgid "Welcome to Lune Voice"
 msgstr "Lune Voice में आपका स्वागत है"
 
-#: src/features/settings/sections/transcription-section.tsx:72
+#: src/features/settings/sections/transcription-section.tsx:75
 msgid "When available, this can make transcription finish faster."
 msgstr "उपलब्ध होने पर, यह प्रतिलेखन को तेजी से पूरा कर सकता है।"
 
@@ -1246,10 +1224,6 @@ msgstr "शब्द"
 #: src/features/history/components/session-detail-modal.tsx:160
 msgid "Words"
 msgstr "शब्द"
-
-#: src/features/settings/sections/transcription-section.tsx:121
-msgid "Words the recognizer is unsure about are sent to the LLM. Higher corrects more aggressively; lower trusts the raw transcription."
-msgstr "जिन शब्दों के बारे में पहचानकर्ता अनिश्चित होता है उन्हें LLM को भेजा जाता है। अधिक होने पर अधिक आक्रामक रूप से सुधार करता है; कम होने पर कच्चे ट्रांसक्रिप्शन पर अधिक भरोसा करता है।"
 
 #: src/features/overview/overview-page.tsx:147
 msgid "WPM"
