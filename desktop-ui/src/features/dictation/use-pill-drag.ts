@@ -41,8 +41,12 @@ interface DragState {
  * On pointer-up after a real drag the position is persisted
  * (`savePillPosition`) and the interaction is flagged via `suppressClickRef`
  * so the surface's click handler doesn't also toggle dictation.
+ *
+ * `locked` (the "Lock position" setting) disables dragging entirely — pointer
+ * interactions stay plain clicks. The backend refuses nudges/drags too, so a
+ * stale flag can't move the pill.
  */
-export function usePillDrag() {
+export function usePillDrag(locked = false) {
   const stateRef = useRef<DragState | null>(null);
   const pendingRef = useRef({ dx: 0, dy: 0 });
   const frameRef = useRef<number | null>(null);
@@ -88,6 +92,7 @@ export function usePillDrag() {
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return; // primary button / touch only
+    if (locked) return; // position locked — leave the interaction a plain click
     suppressClickRef.current = false;
     // Don't capture the pointer yet: capturing on down redirects the pointer to
     // this element, so the subsequent `click` never reaches the inner surface

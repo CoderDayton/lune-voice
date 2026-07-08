@@ -124,6 +124,61 @@ pub enum PillVisibilityDto {
     Never,
 }
 
+/// Default placement anchor for the pill overlay.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+pub enum PillAnchorDto {
+    TopLeft,
+    TopCenter,
+    TopRight,
+    BottomLeft,
+    #[default]
+    BottomCenter,
+    BottomRight,
+}
+
+/// Footprint of the pill bar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+pub enum PillSizeDto {
+    Compact,
+    #[default]
+    Standard,
+    Large,
+}
+
+/// Long-axis direction of the pill bar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+pub enum PillOrientationDto {
+    #[default]
+    Horizontal,
+    Vertical,
+}
+
+/// Corner rounding of the pill bar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+pub enum PillCornerDto {
+    Pill,
+    #[default]
+    Rounded,
+    Square,
+}
+
+/// One connected monitor, for the pill's monitor picker.
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct MonitorInfoDto {
+    /// Connector name (e.g. "DP-1") — the persisted pin key.
+    pub name: String,
+    /// Logical size, for the picker label.
+    pub width: u32,
+    pub height: u32,
+    pub is_primary: bool,
+}
+
 /// Paste-shortcut selection strategy for the output stage.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../src/lib/backend/generated/")]
@@ -235,6 +290,15 @@ pub struct WorkspaceSettingsDto {
     pub hotkey_toggle: String,
     pub hotkey_cancel: String,
     pub pill_visibility: PillVisibilityDto,
+    pub pill_anchor: PillAnchorDto,
+    pub pill_locked: bool,
+    pub pill_edge_margin: u32,
+    /// Monitor connector name the pill is pinned to; null = automatic.
+    pub pill_monitor: Option<String>,
+    pub pill_all_workspaces: bool,
+    pub pill_size: PillSizeDto,
+    pub pill_orientation: PillOrientationDto,
+    pub pill_corner: PillCornerDto,
     pub language: String,
     pub dictation_language: String,
     pub mic_prewarm: bool,
@@ -272,6 +336,8 @@ pub struct PillSnapshotDto {
     pub service_status: String,
     pub activation_mode: ActivationModeDto,
     pub pill_visibility: PillVisibilityDto,
+    /// Dragging disabled — the pill webview skips its drag handlers.
+    pub pill_locked: bool,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]
@@ -344,6 +410,23 @@ pub struct SaveWorkspaceSettingsInput {
     pub hotkey_toggle: String,
     pub hotkey_cancel: String,
     pub pill_visibility: PillVisibilityDto,
+    #[serde(default)]
+    pub pill_anchor: PillAnchorDto,
+    #[serde(default)]
+    pub pill_locked: bool,
+    #[serde(default = "default_pill_edge_margin_dto")]
+    pub pill_edge_margin: u32,
+    /// Monitor connector name to pin the pill to; null = automatic.
+    #[serde(default)]
+    pub pill_monitor: Option<String>,
+    #[serde(default = "default_true_dto")]
+    pub pill_all_workspaces: bool,
+    #[serde(default)]
+    pub pill_size: PillSizeDto,
+    #[serde(default)]
+    pub pill_orientation: PillOrientationDto,
+    #[serde(default)]
+    pub pill_corner: PillCornerDto,
     pub language: String,
     pub dictation_language: String,
     pub mic_prewarm: bool,
@@ -372,6 +455,14 @@ pub struct SaveWorkspaceSettingsInput {
     /// Selected local whisper model (sent when asr_backend_type == WhisperCpp).
     #[serde(default)]
     pub whisper_model: Option<WhisperModelDto>,
+}
+
+fn default_pill_edge_margin_dto() -> u32 {
+    72
+}
+
+fn default_true_dto() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Deserialize)]

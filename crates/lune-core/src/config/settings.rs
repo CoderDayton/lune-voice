@@ -16,6 +16,53 @@ pub struct PillPosition {
     pub y: i32,
 }
 
+/// Where the pill's *default* placement anchors on the monitor. Only applies
+/// while the user hasn't dragged it (`pill_position: None`); picking a new
+/// anchor clears any dragged position so the change is visible immediately.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[non_exhaustive]
+pub enum PillAnchor {
+    TopLeft,
+    TopCenter,
+    TopRight,
+    BottomLeft,
+    #[default]
+    BottomCenter,
+    BottomRight,
+}
+
+/// Overall footprint of the pill bar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[non_exhaustive]
+pub enum PillSize {
+    Compact,
+    #[default]
+    Standard,
+    Large,
+}
+
+/// Long-axis direction of the pill bar. `Vertical` swaps width and height.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[non_exhaustive]
+pub enum PillOrientation {
+    #[default]
+    Horizontal,
+    Vertical,
+}
+
+/// Corner rounding of the pill bar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[non_exhaustive]
+pub enum PillCorner {
+    /// Fully round end caps (radius = half the short side).
+    Pill,
+    /// Softly rounded rectangle (the original look).
+    #[default]
+    Rounded,
+    /// Nearly-square corners.
+    Square,
+}
+
 /// Deserialize `dictation_mode`, tolerating the removed legacy `"Both"` value
 /// (the old "type and copy" mode) by mapping it to `TypeInPlace` via `FromStr`.
 /// The copy behaviour is restored separately by the `copy_to_clipboard`
@@ -89,10 +136,37 @@ pub struct UserSettings {
     #[serde(default)]
     pub pill_visibility: PillVisibility,
     /// Persisted pill overlay position (logical px from the monitor's
-    /// top-left). `None` = default bottom-centre placement; set when the user
+    /// top-left). `None` = default anchor placement; set when the user
     /// drags the pill.
     #[serde(default)]
     pub pill_position: Option<PillPosition>,
+    /// Default placement anchor for the pill when it hasn't been dragged.
+    #[serde(default)]
+    pub pill_anchor: PillAnchor,
+    /// Prevent repositioning the pill by dragging.
+    #[serde(default)]
+    pub pill_locked: bool,
+    /// Gap (logical px) between the pill and the screen edge in its default
+    /// anchor placement — clears docks/taskbars.
+    #[serde(default = "default_pill_edge_margin")]
+    pub pill_edge_margin: u32,
+    /// Pin the pill to a specific monitor by connector name (e.g. "DP-1").
+    /// `None` = automatic (current/primary monitor).
+    #[serde(default)]
+    pub pill_monitor: Option<String>,
+    /// Show the pill on every workspace/virtual desktop instead of only the
+    /// one it was opened on.
+    #[serde(default = "default_true")]
+    pub pill_all_workspaces: bool,
+    /// Footprint of the pill bar.
+    #[serde(default)]
+    pub pill_size: PillSize,
+    /// Long-axis direction of the pill bar.
+    #[serde(default)]
+    pub pill_orientation: PillOrientation,
+    /// Corner rounding of the pill bar.
+    #[serde(default)]
+    pub pill_corner: PillCorner,
     /// How to detect terminal windows for paste chord selection.
     /// `Auto` probes the compositor (works on Hyprland, Sway, KDE, GNOME).
     /// Set `Terminal` on COSMIC or other compositors without focus detection.
@@ -214,6 +288,14 @@ impl Default for UserSettings {
             activation_mode: ActivationMode::default(),
             pill_visibility: PillVisibility::default(),
             pill_position: None,
+            pill_anchor: PillAnchor::default(),
+            pill_locked: false,
+            pill_edge_margin: default_pill_edge_margin(),
+            pill_monitor: None,
+            pill_all_workspaces: true,
+            pill_size: PillSize::default(),
+            pill_orientation: PillOrientation::default(),
+            pill_corner: PillCorner::default(),
             terminal_mode: TerminalMode::default(),
             session_history_days: Some(30),
             word_confidence_threshold: default_word_confidence_threshold(),
@@ -426,6 +508,12 @@ impl Default for OpenAiLlmProvider {
 
 fn default_dictation_language() -> String {
     "auto".into()
+}
+
+/// Matches the pill's original hard-coded bottom gap so existing installs
+/// keep their exact placement.
+fn default_pill_edge_margin() -> u32 {
+    72
 }
 
 fn default_sound_cue_volume() -> f32 {

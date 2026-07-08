@@ -4,6 +4,10 @@ import type {
   AsrBackendValue,
   DictationModeValue,
   LlmBackendValue,
+  PillAnchorValue,
+  PillCornerValue,
+  PillOrientationValue,
+  PillSizeValue,
   PillVisibilityValue,
   TerminalModeValue,
   WhisperModelValue,
@@ -27,6 +31,15 @@ export interface WorkspaceSettings {
   hotkeyToggle: string;
   hotkeyCancel: string;
   pillVisibility: PillVisibilityValue;
+  pillAnchor: PillAnchorValue;
+  pillLocked: boolean;
+  pillEdgeMargin: number;
+  /** Monitor connector name the pill is pinned to; null = automatic. */
+  pillMonitor: string | null;
+  pillAllWorkspaces: boolean;
+  pillSize: PillSizeValue;
+  pillOrientation: PillOrientationValue;
+  pillCorner: PillCornerValue;
   language: string;
   dictationLanguage: string;
   micPrewarm: boolean;
@@ -124,6 +137,14 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   hotkeyToggle: 'Ctrl+Space',
   hotkeyCancel: 'Escape',
   pillVisibility: 'Always',
+  pillAnchor: 'BottomCenter',
+  pillLocked: false,
+  pillEdgeMargin: 72,
+  pillMonitor: null,
+  pillAllWorkspaces: true,
+  pillSize: 'Standard',
+  pillOrientation: 'Horizontal',
+  pillCorner: 'Rounded',
   language: 'en',
   dictationLanguage: 'auto',
   micPrewarm: true,

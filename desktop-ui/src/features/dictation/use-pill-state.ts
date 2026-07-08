@@ -14,6 +14,7 @@ function modeFromStatus(status: string): PillMode {
 interface PillSettings {
   activationMode: string;
   pillVisibility: string;
+  pillLocked?: boolean;
 }
 
 /**
@@ -30,6 +31,7 @@ interface PillSettings {
 export function usePillState() {
   const [mode, setMode] = useState<PillMode>('idle');
   const [recordingMode, setRecordingMode] = useState<'Toggle' | 'Hold'>('Toggle');
+  const [locked, setLocked] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const smootherRef = useRef<LevelSmoother | null>(null);
   smootherRef.current ??= new LevelSmoother(setAudioLevel);
@@ -41,6 +43,7 @@ export function usePillState() {
       (snapshot) => {
         if (cancelled) return;
         setRecordingMode(snapshot.activationMode);
+        setLocked(snapshot.pillLocked);
         setMode(modeFromStatus(snapshot.serviceStatus));
       },
       (e) => {
@@ -60,6 +63,9 @@ export function usePillState() {
   const onPillSettings = useEffectEvent((s: PillSettings) => {
     if (s.activationMode === 'Toggle' || s.activationMode === 'Hold') {
       setRecordingMode(s.activationMode);
+    }
+    if (typeof s.pillLocked === 'boolean') {
+      setLocked(s.pillLocked);
     }
   });
 
@@ -96,5 +102,5 @@ export function usePillState() {
   // Cancel a pending level frame on unmount.
   useEffect(() => () => smootherRef.current?.cancelPending(), []);
 
-  return { mode, recordingMode, audioLevel };
+  return { mode, recordingMode, audioLevel, locked };
 }

@@ -5,6 +5,7 @@ import type {
   BackendClient,
   GpuSupportDto,
   HistoryPageDto,
+  MonitorInfoDto,
   PillSnapshotDto,
   WorkspaceSnapshot,
 } from './types';
@@ -100,6 +101,14 @@ const tauriBackendClient: BackendClient = {
 
   savePillPosition() {
     return invoke<void>('save_pill_position');
+  },
+
+  resetPillPosition() {
+    return invoke<void>('reset_pill_position');
+  },
+
+  listMonitors() {
+    return invoke<MonitorInfoDto[]>('list_monitors');
   },
 
   gpuSupport() {

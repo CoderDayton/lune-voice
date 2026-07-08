@@ -3,6 +3,10 @@ import type { ActivationModeDto } from "./ActivationModeDto";
 import type { AsrBackendTypeDto } from "./AsrBackendTypeDto";
 import type { DevicePolicyDto } from "./DevicePolicyDto";
 import type { DictationModeDto } from "./DictationModeDto";
+import type { PillAnchorDto } from "./PillAnchorDto";
+import type { PillCornerDto } from "./PillCornerDto";
+import type { PillOrientationDto } from "./PillOrientationDto";
+import type { PillSizeDto } from "./PillSizeDto";
 import type { PillVisibilityDto } from "./PillVisibilityDto";
 import type { TerminalModeDto } from "./TerminalModeDto";
 import type { WhisperModelDto } from "./WhisperModelDto";
@@ -24,7 +28,11 @@ soundCueVolume: number, useGpu: boolean, devicePolicy: DevicePolicyDto, asrBacke
 /**
  * Clean-segment confidence bound for bypassing the correction LLM.
  */
-llmSkipThreshold: number | null, stylePreset: string | null, hotkeyToggle: string, hotkeyCancel: string, pillVisibility: PillVisibilityDto, language: string, dictationLanguage: string, micPrewarm: boolean, 
+llmSkipThreshold: number | null, stylePreset: string | null, hotkeyToggle: string, hotkeyCancel: string, pillVisibility: PillVisibilityDto, pillAnchor: PillAnchorDto, pillLocked: boolean, pillEdgeMargin: number, 
+/**
+ * Monitor connector name the pill is pinned to; null = automatic.
+ */
+pillMonitor: string | null, pillAllWorkspaces: boolean, pillSize: PillSizeDto, pillOrientation: PillOrientationDto, pillCorner: PillCornerDto, language: string, dictationLanguage: string, micPrewarm: boolean, 
 /**
  * Preferred microphone input device by name; null = system default.
  */

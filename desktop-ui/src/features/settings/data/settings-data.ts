@@ -8,6 +8,16 @@ export type WhisperModelValue = 'Small' | 'Medium' | 'LargeV3Turbo';
 
 export type DictationModeValue = 'TypeInPlace' | 'Clipboard';
 export type PillVisibilityValue = 'Always' | 'WhenDictating' | 'Never';
+export type PillAnchorValue =
+  | 'TopLeft'
+  | 'TopCenter'
+  | 'TopRight'
+  | 'BottomLeft'
+  | 'BottomCenter'
+  | 'BottomRight';
+export type PillSizeValue = 'Compact' | 'Standard' | 'Large';
+export type PillOrientationValue = 'Horizontal' | 'Vertical';
+export type PillCornerValue = 'Pill' | 'Rounded' | 'Square';
 
 export interface Option<Value extends string> {
   value: Value;
@@ -46,6 +56,32 @@ export const pillVisibilityOptions: Option<PillVisibilityValue>[] = [
   { value: 'Always', label: 'Always' },
   { value: 'WhenDictating', label: 'When dictating' },
   { value: 'Never', label: 'Never' },
+];
+
+export const pillAnchorOptions: Option<PillAnchorValue>[] = [
+  { value: 'TopLeft', label: 'Top left' },
+  { value: 'TopCenter', label: 'Top center' },
+  { value: 'TopRight', label: 'Top right' },
+  { value: 'BottomLeft', label: 'Bottom left' },
+  { value: 'BottomCenter', label: 'Bottom center' },
+  { value: 'BottomRight', label: 'Bottom right' },
+];
+
+export const pillSizeOptions: Option<PillSizeValue>[] = [
+  { value: 'Compact', label: 'Compact' },
+  { value: 'Standard', label: 'Standard' },
+  { value: 'Large', label: 'Large' },
+];
+
+export const pillOrientationOptions: Option<PillOrientationValue>[] = [
+  { value: 'Horizontal', label: 'Horizontal' },
+  { value: 'Vertical', label: 'Vertical' },
+];
+
+export const pillCornerOptions: Option<PillCornerValue>[] = [
+  { value: 'Pill', label: 'Fully round' },
+  { value: 'Rounded', label: 'Rounded' },
+  { value: 'Square', label: 'Square' },
 ];
 
 export const asrBackends: DescriptiveOptionData<AsrBackendValue>[] = [

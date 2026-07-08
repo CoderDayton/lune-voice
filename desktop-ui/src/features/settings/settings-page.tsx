@@ -6,6 +6,7 @@ import {
   type LucideIcon,
   Mic,
   Palette,
+  Pill,
   Send,
   SlidersHorizontal,
   Wand2,
@@ -17,6 +18,7 @@ import { DictationSection } from './sections/dictation-section';
 import { GeneralSection } from './sections/general-section';
 import { ModelsSection } from './sections/models-section';
 import { OutputSection } from './sections/output-section';
+import { PillSection } from './sections/pill-section';
 import { StylingEngineSection } from './sections/styling-engine-section';
 import { TranscriptionSection } from './sections/transcription-section';
 
@@ -24,6 +26,7 @@ type SectionId =
   | 'general'
   | 'appearance'
   | 'dictation'
+  | 'pill'
   | 'transcription'
   | 'styling'
   | 'output'
@@ -65,6 +68,7 @@ export function SettingsPage() {
     { id: 'general', label: t`General`, icon: SlidersHorizontal },
     { id: 'appearance', label: t`Appearance`, icon: Palette },
     { id: 'dictation', label: t`Dictation`, icon: Mic },
+    { id: 'pill', label: t`Pill`, icon: Pill },
     { id: 'transcription', label: t`Transcription`, icon: AudioLines },
     { id: 'styling', label: t`Styling`, icon: Wand2 },
     { id: 'output', label: t`Output`, icon: Send },
@@ -75,6 +79,7 @@ export function SettingsPage() {
     general: <GeneralSection settings={settings} />,
     appearance: <AppearanceSection />,
     dictation: <DictationSection settings={settings} />,
+    pill: <PillSection />,
     transcription: (
       <TranscriptionSection settings={settings} onManageModels={() => setActive('models')} />
     ),

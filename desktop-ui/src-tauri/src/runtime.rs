@@ -266,6 +266,12 @@ impl AppRuntime {
         self.inner.settings.read().await.pill_position
     }
 
+    /// The pill overlay config derived from persisted settings. Read at startup
+    /// to seed the overlay's geometry/placement before the window is created.
+    pub async fn pill_overlay_config(&self) -> crate::pill::PillOverlayConfig {
+        crate::pill::PillOverlayConfig::from_settings(&*self.inner.settings.read().await)
+    }
+
     pub async fn service_status(&self) -> String {
         self.inner.status.read().await.clone()
     }

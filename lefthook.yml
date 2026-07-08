@@ -2,8 +2,13 @@ pre-commit:
   parallel: false
   commands:
     fmt:
-      run: cargo fmt --all
-      stage_fixed: true
+      # Check-only (no --write): never modifies or stages files, so lefthook
+      # doesn't stash unstaged changes. stage_fixed auto-staging was what forced
+      # the stash/restore — which could orphan a `lefthook auto backup` and drop
+      # work if interrupted. On failure, run `cargo fmt --all` (or `cgs fmt
+      # --env FIX=1`) and restage.
+      run: cargo fmt --all --check
+      fail_text: "formatting needed — run `cargo fmt --all` then restage"
 
     check:
       run: CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-4} cargo check --workspace --all-targets

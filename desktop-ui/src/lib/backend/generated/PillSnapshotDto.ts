@@ -2,4 +2,8 @@
 import type { ActivationModeDto } from "./ActivationModeDto";
 import type { PillVisibilityDto } from "./PillVisibilityDto";
 
-export type PillSnapshotDto = { serviceStatus: string, activationMode: ActivationModeDto, pillVisibility: PillVisibilityDto, };
+export type PillSnapshotDto = { serviceStatus: string, activationMode: ActivationModeDto, pillVisibility: PillVisibilityDto, 
+/**
+ * Dragging disabled — the pill webview skips its drag handlers.
+ */
+pillLocked: boolean, };

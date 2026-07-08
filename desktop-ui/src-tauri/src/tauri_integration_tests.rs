@@ -30,6 +30,7 @@ fn test_load_pill_snapshot(window: WebviewWindow<MockRuntime>) -> Result<PillSna
         service_status: "ready".into(),
         activation_mode: ActivationModeDto::Toggle,
         pill_visibility: PillVisibilityDto::Always,
+        pill_locked: false,
     })
 }
 

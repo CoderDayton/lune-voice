@@ -207,9 +207,11 @@ body.pill-window {
 .pill-root {
   @apply relative flex items-center justify-center;
   /* Explicit footprint (not w-full) so the intrinsic content size the window
-     follows is exactly PILL_W × PILL_H from pill.rs — keep all three in sync. */
-  width: 132px;
-  height: 40px;
+     follows is exactly the Rust-side PillOverlayConfig. The vars are set by
+     pill-entry from the injected `__PILL_GEOM`; the fallbacks mirror the
+     Standard-horizontal default so the browser/mock still renders sanely. */
+  width: var(--pill-w, 132px);
+  height: var(--pill-h, 40px);
   /* Lightened a touch past the base token (already the lightest solid
      surface) so the bar reads distinct from panels behind it; mixed
      toward white rather than swapped so it stays a no-op in light mode
@@ -217,7 +219,7 @@ body.pill-window {
      this Nvidia + WebKitGTK stack). */
   background: color-mix(in oklab, var(--color-surface-elevated) 92%, white 8%);
   border: 1px solid var(--color-surface-border);
-  border-radius: 12px;
+  border-radius: var(--pill-r, 12px);
   /* Clip every child (surface + cancel hover fills, waveform) to the rounded
      shape so no hover background shows square corners past the radius. */
   overflow: hidden;
@@ -230,6 +232,12 @@ body.pill-window {
 
 .pill-root:active {
   cursor: grabbing;
+}
+
+/* Position locked — dragging is off, so don't advertise a grab. */
+.pill-root.pill-locked,
+.pill-root.pill-locked:active {
+  cursor: default;
 }
 
 /* Brand mark — crescent in the primary accent, pinned to the left cap.
@@ -276,7 +284,7 @@ button.pill-surface:hover {
    bar stays a clean waveform until the user reaches for it. */
 @utility pill-cancel {
   @apply absolute inset-y-0 right-0 flex w-7 items-center justify-center border-0 bg-transparent text-base-content/45;
-  border-radius: 0 12px 12px 0;
+  border-radius: 0 var(--pill-r, 12px) var(--pill-r, 12px) 0;
   opacity: 0;
   transform: translateX(4px);
   cursor: pointer;
@@ -298,6 +306,35 @@ button.pill-surface:hover {
   0%   { opacity: 1; }
   40%  { opacity: 0.5; }
   100% { opacity: 0; transform: translateY(3px) scale(0.98); }
+}
+
+/* ── Vertical pill variant ─────────────────────────────────────────────
+   `.pill-vertical` is set on <html> by pill-entry when the window is taller
+   than wide. The bar keeps its horizontal internals and re-arranges the caps:
+   logo moves to the top cap, cancel to the bottom cap, and the status content
+   (idle mark / waveform / pulse) rotates 90° — `rotate` composes with the
+   content animations' `transform`s instead of fighting them. */
+.pill-vertical .pill-logo {
+  inset: 0 0 auto 0;
+  width: 100%;
+  height: 32px;
+}
+
+.pill-vertical .pill-surface > :first-child {
+  rotate: 90deg;
+}
+
+.pill-vertical .pill-cancel {
+  inset: auto 0 0 0;
+  width: 100%;
+  height: 28px;
+  border-radius: 0 0 var(--pill-r, 12px) var(--pill-r, 12px);
+  transform: translateY(4px);
+}
+
+.pill-vertical .pill-root:hover .pill-cancel,
+.pill-vertical .pill-cancel:focus-visible {
+  transform: translateY(0);
 }
 
 /* Gentle entrance when the pill's content swaps between states. Runs on inner

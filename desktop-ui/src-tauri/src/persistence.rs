@@ -1,8 +1,9 @@
 use lune_asr::AsrRegistry;
 use lune_core::config::{
     ActivationMode, AsrBackendConfig, DevicePolicy, DictationMode, FormatToggles, HotkeyConfig,
-    KeyCombo, LlmBackendConfig, Modifier, OpenAiLlmProvider, PillVisibility, RedactedString,
-    StreamingMode, StylePreset, TerminalMode, UserSettings, builtin_registry,
+    KeyCombo, LlmBackendConfig, Modifier, OpenAiLlmProvider, PillAnchor, PillCorner,
+    PillOrientation, PillSize, PillVisibility, RedactedString, StreamingMode, StylePreset,
+    TerminalMode, UserSettings, builtin_registry,
 };
 use lune_core::session::SessionStatus;
 use lune_persist::{AppPaths, Database, SettingsStore, StoredDictionaryEntry};
@@ -10,9 +11,10 @@ use lune_persist::{AppPaths, Database, SettingsStore, StoredDictionaryEntry};
 use crate::dto::{
     ActivationModeDto, AsrBackendTypeDto, CreateCustomStyleInput, CreateDictionaryEntryInput,
     DevicePolicyDto, DictationModeDto, DictionaryItemDto, HistoryItemDto, HistoryPageDto,
-    LlmBackendTypeDto, PillVisibilityDto, SaveWorkspaceSettingsInput, SessionStatsDto,
-    StylePresetDto, TerminalModeDto, UpdateCustomStyleInput, UpdateDictionaryEntryInput,
-    WhisperModelDto, WorkspaceSettingsDto, WorkspaceSnapshot,
+    LlmBackendTypeDto, PillAnchorDto, PillCornerDto, PillOrientationDto, PillSizeDto,
+    PillVisibilityDto, SaveWorkspaceSettingsInput, SessionStatsDto, StylePresetDto,
+    TerminalModeDto, UpdateCustomStyleInput, UpdateDictionaryEntryInput, WhisperModelDto,
+    WorkspaceSettingsDto, WorkspaceSnapshot,
 };
 
 const HISTORY_LIMIT: u32 = 200;
@@ -489,6 +491,14 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
         hotkey_toggle: format_key_combo(&settings.hotkey.toggle_dictation),
         hotkey_cancel: format_key_combo(&settings.hotkey.cancel_dictation),
         pill_visibility: pill_visibility_to_dto(settings.pill_visibility),
+        pill_anchor: pill_anchor_to_dto(settings.pill_anchor),
+        pill_locked: settings.pill_locked,
+        pill_edge_margin: settings.pill_edge_margin,
+        pill_monitor: settings.pill_monitor.clone(),
+        pill_all_workspaces: settings.pill_all_workspaces,
+        pill_size: pill_size_to_dto(settings.pill_size),
+        pill_orientation: pill_orientation_to_dto(settings.pill_orientation),
+        pill_corner: pill_corner_to_dto(settings.pill_corner),
         language: settings.language.clone(),
         dictation_language: settings.dictation_language.clone(),
         mic_prewarm: settings.mic_prewarm,
@@ -519,6 +529,24 @@ fn apply_settings_dto(
 ) -> Result<(), String> {
     settings.activation_mode = activation_mode_from_dto(input.activation_mode);
     settings.pill_visibility = pill_visibility_from_dto(input.pill_visibility);
+    // A placement change (anchor / edge margin / pinned monitor) clears any
+    // dragged position so the new placement is applied visibly, not shadowed
+    // by the old drag. Size/orientation/corner keep the dragged spot.
+    let edge_margin = input.pill_edge_margin.min(512);
+    let placement_changed = pill_anchor_from_dto(input.pill_anchor) != settings.pill_anchor
+        || edge_margin != settings.pill_edge_margin
+        || input.pill_monitor != settings.pill_monitor;
+    settings.pill_anchor = pill_anchor_from_dto(input.pill_anchor);
+    settings.pill_locked = input.pill_locked;
+    settings.pill_edge_margin = edge_margin;
+    settings.pill_monitor = input.pill_monitor.clone();
+    settings.pill_all_workspaces = input.pill_all_workspaces;
+    settings.pill_size = pill_size_from_dto(input.pill_size);
+    settings.pill_orientation = pill_orientation_from_dto(input.pill_orientation);
+    settings.pill_corner = pill_corner_from_dto(input.pill_corner);
+    if placement_changed {
+        settings.pill_position = None;
+    }
     settings.dictation_mode = dictation_mode_from_dto(input.dictation_mode);
     settings.copy_to_clipboard = input.copy_to_clipboard;
     settings.sound_cues_enabled = input.sound_cues_enabled;
@@ -697,6 +725,78 @@ pub(crate) fn pill_visibility_from_dto(dto: PillVisibilityDto) -> PillVisibility
         PillVisibilityDto::Always => PillVisibility::Always,
         PillVisibilityDto::WhenDictating => PillVisibility::WhenDictating,
         PillVisibilityDto::Never => PillVisibility::Never,
+    }
+}
+
+fn pill_anchor_to_dto(a: PillAnchor) -> PillAnchorDto {
+    match a {
+        PillAnchor::TopLeft => PillAnchorDto::TopLeft,
+        PillAnchor::TopCenter => PillAnchorDto::TopCenter,
+        PillAnchor::TopRight => PillAnchorDto::TopRight,
+        PillAnchor::BottomLeft => PillAnchorDto::BottomLeft,
+        PillAnchor::BottomCenter => PillAnchorDto::BottomCenter,
+        PillAnchor::BottomRight => PillAnchorDto::BottomRight,
+        _ => PillAnchorDto::BottomCenter,
+    }
+}
+
+fn pill_anchor_from_dto(dto: PillAnchorDto) -> PillAnchor {
+    match dto {
+        PillAnchorDto::TopLeft => PillAnchor::TopLeft,
+        PillAnchorDto::TopCenter => PillAnchor::TopCenter,
+        PillAnchorDto::TopRight => PillAnchor::TopRight,
+        PillAnchorDto::BottomLeft => PillAnchor::BottomLeft,
+        PillAnchorDto::BottomCenter => PillAnchor::BottomCenter,
+        PillAnchorDto::BottomRight => PillAnchor::BottomRight,
+    }
+}
+
+fn pill_size_to_dto(s: PillSize) -> PillSizeDto {
+    match s {
+        PillSize::Compact => PillSizeDto::Compact,
+        PillSize::Standard => PillSizeDto::Standard,
+        PillSize::Large => PillSizeDto::Large,
+        _ => PillSizeDto::Standard,
+    }
+}
+
+fn pill_size_from_dto(dto: PillSizeDto) -> PillSize {
+    match dto {
+        PillSizeDto::Compact => PillSize::Compact,
+        PillSizeDto::Standard => PillSize::Standard,
+        PillSizeDto::Large => PillSize::Large,
+    }
+}
+
+fn pill_orientation_to_dto(o: PillOrientation) -> PillOrientationDto {
+    match o {
+        PillOrientation::Horizontal => PillOrientationDto::Horizontal,
+        PillOrientation::Vertical => PillOrientationDto::Vertical,
+        _ => PillOrientationDto::Horizontal,
+    }
+}
+
+fn pill_orientation_from_dto(dto: PillOrientationDto) -> PillOrientation {
+    match dto {
+        PillOrientationDto::Horizontal => PillOrientation::Horizontal,
+        PillOrientationDto::Vertical => PillOrientation::Vertical,
+    }
+}
+
+fn pill_corner_to_dto(c: PillCorner) -> PillCornerDto {
+    match c {
+        PillCorner::Pill => PillCornerDto::Pill,
+        PillCorner::Rounded => PillCornerDto::Rounded,
+        PillCorner::Square => PillCornerDto::Square,
+        _ => PillCornerDto::Rounded,
+    }
+}
+
+fn pill_corner_from_dto(dto: PillCornerDto) -> PillCorner {
+    match dto {
+        PillCornerDto::Pill => PillCorner::Pill,
+        PillCornerDto::Rounded => PillCorner::Rounded,
+        PillCornerDto::Square => PillCorner::Square,
     }
 }
 
@@ -949,6 +1049,14 @@ mod tests {
             hotkey_toggle: dto.hotkey_toggle,
             hotkey_cancel: dto.hotkey_cancel,
             pill_visibility: dto.pill_visibility,
+            pill_anchor: dto.pill_anchor,
+            pill_locked: dto.pill_locked,
+            pill_edge_margin: dto.pill_edge_margin,
+            pill_monitor: dto.pill_monitor,
+            pill_all_workspaces: dto.pill_all_workspaces,
+            pill_size: dto.pill_size,
+            pill_orientation: dto.pill_orientation,
+            pill_corner: dto.pill_corner,
             language: dto.language,
             dictation_language: dto.dictation_language,
             mic_prewarm: dto.mic_prewarm,

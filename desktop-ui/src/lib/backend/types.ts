@@ -10,6 +10,7 @@ import type {
   FormatTogglesDto,
   GpuSupportDto,
   HistoryPageDto,
+  MonitorInfoDto,
   PillSnapshotDto,
   SaveWorkspaceSettingsInput,
   WorkspaceSnapshot,
@@ -25,6 +26,11 @@ export type {
   GpuSupportDto,
   HistoryItemDto,
   HistoryPageDto,
+  MonitorInfoDto,
+  PillAnchorDto,
+  PillCornerDto,
+  PillOrientationDto,
+  PillSizeDto,
   PillSnapshotDto,
   PillVisibilityDto,
   SaveWorkspaceSettingsInput,
@@ -81,6 +87,10 @@ export interface BackendClient {
   endPillDrag(): Promise<void>;
   /** Persist the pill overlay's current position so it reopens there. */
   savePillPosition(): Promise<void>;
+  /** Clear the saved pill position and re-place it at its default anchor. */
+  resetPillPosition(): Promise<void>;
+  /** Connected monitors, for the pill's monitor picker. */
+  listMonitors(): Promise<MonitorInfoDto[]>;
   /** Whether a CUDA feature was compiled into this build (build-time GPU support). */
   gpuSupport(): Promise<GpuSupportDto>;
 }

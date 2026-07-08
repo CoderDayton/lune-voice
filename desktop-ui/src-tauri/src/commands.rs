@@ -93,6 +93,7 @@ pub async fn load_pill_snapshot(
         service_status: snapshot.service_status,
         activation_mode: snapshot.settings.activation_mode,
         pill_visibility: snapshot.settings.pill_visibility,
+        pill_locked: snapshot.settings.pill_locked,
     })
 }
 
@@ -147,6 +148,22 @@ pub async fn save_workspace_settings(
             snapshot.settings.sound_cue_volume,
         )
         .await;
+    // Push pill overlay settings (geometry/placement/lock/pinning) into the
+    // live window BEFORE create/destroy below, so a window created by
+    // set_pill_enabled is built from the fresh config. A geometry change
+    // rebuilds an existing window; `show_after` re-maps it per the same
+    // visibility rule reconcile uses.
+    {
+        let vis = crate::persistence::pill_visibility_from_dto(snapshot.settings.pill_visibility);
+        let status = runtime.service_status().await;
+        let show_after = crate::pill::should_show_pill(vis, &status);
+        if let Some(paths) = lune_persist::AppPaths::resolve() {
+            match lune_persist::SettingsStore::new(paths.settings_file()).load() {
+                Ok(s) => crate::pill::apply_pill_settings(runtime.app_handle(), &s, show_after),
+                Err(e) => tracing::warn!(error = %e, "settings reload for pill update failed"),
+            }
+        }
+    }
     // Create or destroy the pill overlay window to match the new visibility.
     // "Never" must free the webview process, not merely hide it; switching back
     // recreates it without an app restart. Runs before the settings emit below —
@@ -171,6 +188,7 @@ pub async fn save_workspace_settings(
         serde_json::json!({
             "activationMode": &snapshot.settings.activation_mode,
             "pillVisibility": &snapshot.settings.pill_visibility,
+            "pillLocked": snapshot.settings.pill_locked,
         }),
     ) {
         tracing::debug!(error = %e, "pill settings emit skipped (pill window may not exist)");

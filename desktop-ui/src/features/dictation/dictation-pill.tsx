@@ -14,8 +14,8 @@ function fire(fn: () => Promise<unknown>, tag: string) {
 
 export function DictationPill() {
   const { t } = useLingui();
-  const { mode, audioLevel } = usePillState();
-  const { suppressClickRef, dragHandlers } = usePillDrag();
+  const { mode, audioLevel, locked } = usePillState();
+  const { suppressClickRef, dragHandlers } = usePillDrag(locked);
   const cancelRef = useRef(false);
   const lastFireRef = useRef(0);
 
@@ -71,7 +71,7 @@ export function DictationPill() {
     <AudioDots level={audioLevel} />
   );
 
-  const rootClass = `pill-root${cancelRef.current ? ' pill-cancelled' : ''}`;
+  const rootClass = `pill-root${cancelRef.current ? ' pill-cancelled' : ''}${locked ? ' pill-locked' : ''}`;
   const showCancel = !isIdle && !isProcessing;
 
   return (

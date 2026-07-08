@@ -53,6 +53,10 @@ msgstr "{totalCount} सत्र"
 msgid "{visibleCount} / {totalCount}"
 msgstr "{visibleCount} / {totalCount}"
 
+#: src/features/settings/sections/pill-section.tsx:212
+msgid "A vertical pill hugs the side of the screen."
+msgstr ""
+
 #: src/features/shell/components/sidebar.tsx:190
 msgid "Account and status"
 msgstr "खाता और स्थिति"
@@ -111,8 +115,8 @@ msgstr "API एंडपॉइंट"
 msgid "API key"
 msgstr "API कुंजी"
 
-#: src/features/settings/sections/appearance-section.tsx:40
-#: src/features/settings/settings-page.tsx:66
+#: src/features/settings/sections/appearance-section.tsx:35
+#: src/features/settings/settings-page.tsx:69
 msgid "Appearance"
 msgstr "उपस्थिति"
 
@@ -135,6 +139,10 @@ msgstr "डिक्टेशन शुरू होने, पूरा हो�
 #: src/features/styles/components/style-editor-modal.tsx:55
 msgid "Auto-capitalize sentences"
 msgstr "वाक्यों की शुरुआत अपने-आप बड़े अक्षर से करें"
+
+#: src/features/settings/sections/pill-section.tsx:50
+msgid "Automatic"
+msgstr ""
 
 #: src/features/styles/components/style-editor-modal.tsx:56
 msgid "Brand casing (\"github\" → \"GitHub\")"
@@ -200,7 +208,7 @@ msgstr "एक थीम चुनें"
 msgid "Choose how finished text is inserted into the app you are currently using."
 msgstr "चुनें कि आपके द्वारा वर्तमान में उपयोग किए जा रहे ऐप में पूरा टेक्स्ट कैसे डाला जाए।"
 
-#: src/features/settings/sections/appearance-section.tsx:41
+#: src/features/settings/sections/appearance-section.tsx:36
 msgid "Choose how Lune Voice looks."
 msgstr "चुनें कि Lune Voice कैसा दिखता है।"
 
@@ -284,6 +292,14 @@ msgstr "क्लिपबोर्ड पर कॉपी करें"
 msgid "Copy transcript"
 msgstr "प्रतिलेख कॉपी करें"
 
+#: src/features/settings/sections/pill-section.tsx:229
+msgid "Corner rounding of the pill bar."
+msgstr ""
+
+#: src/features/settings/sections/pill-section.tsx:228
+msgid "Corners"
+msgstr ""
+
 #: src/features/settings/sections/transcription-section.tsx:94
 msgid "Correction"
 msgstr "सुधार"
@@ -311,7 +327,7 @@ msgid "Cue volume"
 msgstr "क्यू वॉल्यूम"
 
 #: src/features/settings/components/theme-picker.tsx:194
-#: src/features/settings/sections/appearance-section.tsx:50
+#: src/features/settings/sections/appearance-section.tsx:45
 msgid "Dark"
 msgstr "डार्क"
 
@@ -362,7 +378,7 @@ msgstr "विवरण"
 msgid "Deterministic fixes applied before any AI styling."
 msgstr "किसी भी एआई स्टाइलिंग से पहले नियतात्मक सुधार लागू किए जाते हैं।"
 
-#: src/features/settings/settings-page.tsx:67
+#: src/features/settings/settings-page.tsx:70
 msgid "Dictation"
 msgstr "डिक्टेशन"
 
@@ -371,11 +387,11 @@ msgstr "डिक्टेशन"
 msgid "Dictation language"
 msgstr "श्रुतलेख भाषा"
 
-#: src/features/settings/sections/appearance-section.tsx:91
+#: src/features/settings/sections/pill-section.tsx:68
 msgid "Dictation pill"
 msgstr "श्रुतलेख संकेतक"
 
-#: src/features/settings/sections/appearance-section.tsx:99
+#: src/features/settings/sections/pill-section.tsx:79
 msgid "Dictation pill visibility"
 msgstr "श्रुतलेख संकेतक दृश्यता"
 
@@ -453,6 +469,14 @@ msgstr "अवधि"
 msgid "e.g. Meeting notes"
 msgstr "जैसे मीटिंग नोट्स"
 
+#: src/features/settings/sections/pill-section.tsx:123
+msgid "Edge distance"
+msgstr ""
+
+#: src/features/settings/sections/pill-section.tsx:139
+msgid "Edge distance in pixels"
+msgstr ""
+
 #: src/features/styles/components/style-hero.tsx:47
 #: src/features/styles/components/style-preset-card.tsx:113
 msgid "Edit"
@@ -518,6 +542,10 @@ msgstr "फ़िल्टर नियम…"
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "अपने डिवाइस पर, अपनी डिक्शनरी और ज्ञात शब्दावली से रिकग्नाइज़र की त्रुटियाँ ठीक करें। यह प्रति-शब्द कॉन्फ़िडेंस और सांख्यिकीय पैटर्न का उपयोग करता है — कोई AI मॉडल नहीं, और यह आपकी कही बात को कभी दोबारा नहीं लिखता।"
 
+#: src/features/settings/sections/pill-section.tsx:174
+msgid "Forget where you dragged the pill and return it to its preset spot."
+msgstr ""
+
 #: src/features/styles/components/style-preset-card.tsx:89
 msgid "formatting"
 msgstr "फ़ॉर्मेटिंग"
@@ -527,8 +555,12 @@ msgstr "फ़ॉर्मेटिंग"
 msgid "Formatting"
 msgstr "फ़ॉर्मेटिंग"
 
+#: src/features/settings/sections/pill-section.tsx:124
+msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock."
+msgstr ""
+
 #: src/features/settings/sections/general-section.tsx:27
-#: src/features/settings/settings-page.tsx:65
+#: src/features/settings/settings-page.tsx:68
 msgid "General"
 msgstr "सामान्य"
 
@@ -578,6 +610,10 @@ msgstr "पूर्ण किए गए श्रुतलेख इस डि�
 msgid "How loud the dictation sounds play."
 msgstr "डिक्टेशन की ध्वनियाँ कितनी तेज़ बजें।"
 
+#: src/features/settings/sections/pill-section.tsx:193
+msgid "How the pill bar looks. Changes apply immediately."
+msgstr ""
+
 #: src/features/overview/overview-page.tsx:204
 msgid "Idle"
 msgstr "निष्क्रिय"
@@ -604,6 +640,10 @@ msgstr "हर श्रुतलेख के बाद बोले गए प
 msgid "Keep the mic open in the background so dictation starts ~70ms sooner. The OS may show a recording indicator while Lune Voice is running."
 msgstr "माइक को बैकग्राउंड में खुला रखें ताकि डिक्टेशन ~70 एमएस पहले शुरू हो जाए। Lune Voice चलते समय OS रिकॉर्डिंग संकेतक दिखा सकता है।"
 
+#: src/features/settings/sections/pill-section.tsx:88
+msgid "Keep the pill with you when you switch workspaces or virtual desktops."
+msgstr ""
+
 #: src/features/styles/components/style-editor-modal.tsx:53
 msgid "Keyboard shortcuts (\"Super H\" → \"Super+H\")"
 msgstr "कीबोर्ड शॉर्टकट (\"सुपर एच\" → \"सुपर+एच\")"
@@ -622,7 +662,7 @@ msgid "Length"
 msgstr "लंबाई"
 
 #: src/features/settings/components/theme-picker.tsx:179
-#: src/features/settings/sections/appearance-section.tsx:51
+#: src/features/settings/sections/appearance-section.tsx:46
 msgid "Light"
 msgstr "रोशनी"
 
@@ -639,6 +679,11 @@ msgstr "सुन रहा है…"
 #: src/features/shell/components/sidebar.tsx:214
 msgid "Local"
 msgstr "स्थानीय"
+
+#: src/features/settings/sections/pill-section.tsx:160
+#: src/features/settings/sections/pill-section.tsx:168
+msgid "Lock position"
+msgstr ""
 
 #: src/features/settings/components/theme-picker.tsx:143
 msgid "Lune"
@@ -674,18 +719,22 @@ msgstr "मिनट"
 msgid "minutes"
 msgstr "मिनट"
 
-#: src/features/settings/sections/appearance-section.tsx:46
+#: src/features/settings/sections/appearance-section.tsx:41
 msgid "Mode"
 msgstr "तरीका"
 
 #: src/features/settings/sections/models-section.tsx:104
-#: src/features/settings/settings-page.tsx:71
+#: src/features/settings/settings-page.tsx:75
 msgid "Models"
 msgstr "मॉडल"
 
 #: src/features/welcome/welcome-page.tsx:322
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "मॉडल स्थानीय रूप से सहेजे जाते हैं। कोई टेलीमेट्री नहीं, कोई खाते नहीं।"
+
+#: src/features/settings/sections/pill-section.tsx:146
+msgid "Monitor"
+msgstr ""
 
 #: src/features/welcome/components/engine-step.tsx:49
 msgid "Multilingual · pick a size"
@@ -742,6 +791,10 @@ msgstr "कोई नहीं"
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
 msgstr "आवाज का पता लगाने से पहले माइक्रोफोन स्तर को सामान्य करता है। माइक और शोर वाले कमरों को शांत करने में मदद करता है। अनुशंसित।"
 
+#: src/features/settings/sections/pill-section.tsx:61
+msgid "not connected"
+msgstr ""
+
 #: src/features/settings/sections/models-section.tsx:223
 msgid "Not installed"
 msgstr "इंस्टॉल नहीं है"
@@ -780,10 +833,18 @@ msgstr "{time} का सत्र खोलें"
 msgid "Optional"
 msgstr "वैकल्पिक"
 
+#: src/features/settings/sections/pill-section.tsx:211
+msgid "Orientation"
+msgstr ""
+
 #: src/features/overview/overview-page.tsx:108
-#: src/features/settings/settings-page.tsx:70
+#: src/features/settings/settings-page.tsx:74
 msgid "Output"
 msgstr "आउटपुट"
+
+#: src/features/settings/sections/pill-section.tsx:198
+msgid "Overall footprint of the pill bar."
+msgstr ""
 
 #: src/features/welcome/welcome-page.tsx:202
 msgid "Overall progress"
@@ -807,6 +868,34 @@ msgstr "पेस्ट सबसे सरल है. कुछ ऐप्स �
 msgid "Phrase"
 msgstr "वाक्यांश"
 
+#: src/features/settings/settings-page.tsx:71
+msgid "Pill"
+msgstr "संकेतक"
+
+#: src/features/settings/sections/pill-section.tsx:234
+msgid "Pill corners"
+msgstr ""
+
+#: src/features/settings/sections/pill-section.tsx:152
+msgid "Pill monitor"
+msgstr ""
+
+#: src/features/settings/sections/pill-section.tsx:217
+msgid "Pill orientation"
+msgstr ""
+
+#: src/features/settings/sections/pill-section.tsx:115
+msgid "Pill position preset"
+msgstr ""
+
+#: src/features/settings/sections/pill-section.tsx:203
+msgid "Pill size"
+msgstr ""
+
+#: src/features/settings/sections/pill-section.tsx:104
+msgid "Placement"
+msgstr ""
+
 #: src/features/settings/sections/output-section.tsx:77
 msgid "Play a short sound when dictation starts, finishes, or runs into an error."
 msgstr "डिक्टेशन शुरू होने, पूरा होने या किसी त्रुटि में आने पर एक छोटी ध्वनि बजाएँ।"
@@ -815,10 +904,18 @@ msgstr "डिक्टेशन शुरू होने, पूरा हो�
 msgid "Please keep the app open until downloads finish"
 msgstr "कृपया डाउनलोड समाप्त होने तक ऐप को खुला रखें"
 
+#: src/features/settings/sections/pill-section.tsx:109
+msgid "Position"
+msgstr ""
+
 #: src/features/settings/sections/dictation-section.tsx:138
 #: src/features/settings/sections/dictation-section.tsx:146
 msgid "Pre-warm microphone"
 msgstr "प्री-वार्म माइक्रोफोन"
+
+#: src/features/settings/sections/pill-section.tsx:110
+msgid "Preset corner or edge the pill starts at."
+msgstr ""
 
 #: src/features/overview/overview-page.tsx:230
 msgid "Press"
@@ -828,6 +925,10 @@ msgstr "दबाएँ"
 msgid "Prev"
 msgstr "पिछला"
 
+#: src/features/settings/sections/pill-section.tsx:161
+msgid "Prevent moving the pill by dragging it."
+msgstr ""
+
 #: src/features/dictionary/components/dictionary-form.tsx:119
 msgid "Preview"
 msgstr "पूर्व दर्शन"
@@ -835,6 +936,10 @@ msgstr "पूर्व दर्शन"
 #: src/features/history/components/history-table.tsx:178
 msgid "Previous page"
 msgstr "पिछला पृष्ठ"
+
+#: src/features/settings/sections/pill-section.tsx:53
+msgid "primary"
+msgstr ""
 
 #: src/features/dictionary/components/dictionary-form.tsx:138
 #: src/features/dictionary/components/dictionary-table.tsx:263
@@ -897,6 +1002,14 @@ msgstr "प्रतिस्थापन"
 msgid "Required"
 msgstr "आवश्यक"
 
+#: src/features/settings/sections/pill-section.tsx:185
+msgid "Reset"
+msgstr ""
+
+#: src/features/settings/sections/pill-section.tsx:173
+msgid "Reset position"
+msgstr ""
+
 #: src/features/welcome/welcome-page.tsx:268
 msgid "Retry download"
 msgstr "पुनः डाउनलोड करने का प्रयास करें"
@@ -958,7 +1071,7 @@ msgstr "हॉटकी सेट करें"
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "आप जो भाषा बोलते हैं उसे सेट करें. स्वतः वाणी से पता लगाने का उपयोग करता है।"
 
-#: src/features/settings/settings-page.tsx:90
+#: src/features/settings/settings-page.tsx:95
 msgid "Settings sections"
 msgstr "सेटिंग्स अनुभाग"
 
@@ -966,6 +1079,19 @@ msgstr "सेटिंग्स अनुभाग"
 #: src/features/styles/components/style-hero.tsx:18
 msgid "Shortcuts"
 msgstr "शॉर्टकट"
+
+#: src/features/settings/sections/pill-section.tsx:87
+#: src/features/settings/sections/pill-section.tsx:97
+msgid "Show on all workspaces"
+msgstr ""
+
+#: src/features/settings/sections/pill-section.tsx:197
+msgid "Size"
+msgstr ""
+
+#: src/features/settings/sections/pill-section.tsx:192
+msgid "Size & shape"
+msgstr ""
 
 #: src/features/welcome/welcome-page.tsx:243
 #: src/features/welcome/welcome-page.tsx:271
@@ -1036,7 +1162,7 @@ msgid "Style"
 msgstr "शैली"
 
 #: src/features/settings/sections/models-section.tsx:76
-#: src/features/settings/settings-page.tsx:69
+#: src/features/settings/settings-page.tsx:73
 msgid "Styling"
 msgstr "स्टाइलिंग"
 
@@ -1049,8 +1175,8 @@ msgid "Switch style"
 msgstr "शैली बदलें"
 
 #: src/features/settings/components/theme-picker.tsx:164
-#: src/features/settings/sections/appearance-section.tsx:27
-#: src/features/settings/sections/appearance-section.tsx:52
+#: src/features/settings/sections/appearance-section.tsx:22
+#: src/features/settings/sections/appearance-section.tsx:47
 msgid "System"
 msgstr "प्रणाली"
 
@@ -1070,6 +1196,10 @@ msgstr "Lune Voice को अपने शब्द सिखाएँ"
 msgid "Text delivery"
 msgstr "टेक्स्ट डिलीवरी"
 
+#: src/features/settings/sections/pill-section.tsx:69
+msgid "The floating status pill you see while dictating."
+msgstr "श्रुतलेख के दौरान दिखने वाला तैरता हुआ स्थिति संकेतक।"
+
 #: src/features/settings/sections/dictation-section.tsx:58
 msgid "The main shortcut used for voice typing. Click the binding to change it."
 msgstr "ध्वनि टाइपिंग के लिए उपयोग किया जाने वाला मुख्य शॉर्टकट। इसे बदलने के लिए बाइंडिंग पर क्लिक करें।"
@@ -1078,7 +1208,7 @@ msgstr "ध्वनि टाइपिंग के लिए उपयोग �
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
 msgstr "जिन शब्दों को लेकर रिकग्नाइज़र सबसे कम आश्वस्त होता है, उन्हें आपकी डिक्शनरी और शब्दावली से मिलाया जाता है। अधिक सेटिंग ज़्यादा शब्द जाँचती है; कम सेटिंग कच्चे ट्रांसक्रिप्शन पर भरोसा करती है।"
 
-#: src/features/settings/sections/appearance-section.tsx:76
+#: src/features/settings/sections/appearance-section.tsx:71
 msgid "Theme"
 msgstr "विषय"
 
@@ -1141,7 +1271,7 @@ msgid "Transcript"
 msgstr "टेक्स्ट"
 
 #: src/features/settings/sections/transcription-section.tsx:35
-#: src/features/settings/settings-page.tsx:68
+#: src/features/settings/settings-page.tsx:72
 msgid "Transcription"
 msgstr "ट्रांसक्रिप्शन"
 
@@ -1172,6 +1302,10 @@ msgstr "सभी को देखें"
 msgid "View style"
 msgstr "शैली देखें"
 
+#: src/features/settings/sections/pill-section.tsx:73
+msgid "Visibility"
+msgstr "दृश्यता"
+
 #: src/features/settings/sections/transcription-section.tsx:40
 msgid "Voice model"
 msgstr "आवाज मॉडल"
@@ -1190,9 +1324,17 @@ msgstr "Lune Voice में आपका स्वागत है"
 msgid "When available, this can make transcription finish faster."
 msgstr "उपलब्ध होने पर, यह प्रतिलेखन को तेजी से पूरा कर सकता है।"
 
+#: src/features/settings/sections/pill-section.tsx:74
+msgid "When the pill appears while you dictate."
+msgstr "श्रुतलेख के दौरान संकेतक कब दिखाई देता है।"
+
 #: src/features/settings/sections/appearance-section.tsx:94
-msgid "When to show the floating status pill while you dictate."
-msgstr "श्रुतलेख करते समय तैरता हुआ स्थिति संकेतक कब दिखाना है।"
+#~ msgid "When to show the floating status pill while you dictate."
+#~ msgstr "श्रुतलेख करते समय तैरता हुआ स्थिति संकेतक कब दिखाना है।"
+
+#: src/features/settings/sections/pill-section.tsx:105
+msgid "Where the pill sits on screen. Dragging it overrides the preset until you reset."
+msgstr ""
 
 #: src/features/settings/sections/dictation-section.tsx:110
 msgid "Which input device dictation captures from. Changes apply right away."
@@ -1201,6 +1343,10 @@ msgstr "श्रुतलेख किस इनपुट डिवाइस �
 #: src/features/settings/sections/output-section.tsx:39
 msgid "Which paste shortcut to send. Automatic detects terminals; override if paste lands in the wrong place."
 msgstr "कौन सा पेस्ट शॉर्टकट भेजना है। 'स्वचालित' टर्मिनलों का पता लगाता है; यदि पेस्ट गलत जगह पहुँचे तो ओवरराइड करें।"
+
+#: src/features/settings/sections/pill-section.tsx:147
+msgid "Which screen the pill appears on."
+msgstr ""
 
 #: src/features/welcome/components/engine-step.tsx:48
 msgid "Whisper"

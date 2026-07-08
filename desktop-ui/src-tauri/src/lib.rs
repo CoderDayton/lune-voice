@@ -120,8 +120,13 @@ pub fn run() {
                     .map_err(|error| -> Box<dyn std::error::Error> { error.into() })?;
             let start_minimized = tauri::async_runtime::block_on(runtime.start_minimized());
             let pill_vis = tauri::async_runtime::block_on(runtime.pill_visibility());
-            // Seed the saved pill position (if the user dragged it) before the
-            // overlay's first configure/show, so it reopens where they left it.
+            // Seed the pill's geometry/placement config and saved position (if
+            // the user dragged it) before the overlay's first configure/show,
+            // so the window is created with the user's size/anchor and reopens
+            // where they left it.
+            pill::seed_pill_config(tauri::async_runtime::block_on(
+                runtime.pill_overlay_config(),
+            ));
             if let Some(pos) = tauri::async_runtime::block_on(runtime.pill_position()) {
                 pill::set_saved_position(pos.x, pos.y);
             }
@@ -234,6 +239,8 @@ pub fn run() {
             pill::drag_pill_tick,
             pill::end_pill_drag,
             pill::save_pill_position,
+            pill::reset_pill_position,
+            pill::list_monitors,
             commands::list_audio_input_devices,
             commands::check_model_status,
             commands::download_model_cmd,

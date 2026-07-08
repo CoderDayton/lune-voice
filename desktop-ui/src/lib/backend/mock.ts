@@ -36,6 +36,14 @@ function createMockSnapshot(): WorkspaceSnapshot {
       hotkeyToggle: 'Ctrl+Space',
       hotkeyCancel: 'Escape',
       pillVisibility: 'Always',
+      pillAnchor: 'BottomCenter',
+      pillLocked: false,
+      pillEdgeMargin: 72,
+      pillMonitor: null,
+      pillAllWorkspaces: true,
+      pillSize: 'Standard',
+      pillOrientation: 'Horizontal',
+      pillCorner: 'Rounded',
       language: 'en',
       dictationLanguage: 'auto',
       micPrewarm: true,
@@ -259,6 +267,7 @@ export const mockBackendClient: BackendClient = {
       serviceStatus: mockSnapshot.serviceStatus,
       activationMode: mockSnapshot.settings.activationMode,
       pillVisibility: mockSnapshot.settings.pillVisibility,
+      pillLocked: mockSnapshot.settings.pillLocked,
     };
   },
 
@@ -389,6 +398,13 @@ export const mockBackendClient: BackendClient = {
   async endPillDrag() {},
 
   async savePillPosition() {},
+
+  async resetPillPosition() {},
+
+  // One believable monitor so the picker renders in the browser mock.
+  async listMonitors() {
+    return [{ name: 'Mock-1', width: 1920, height: 1080, isPrimary: true }];
+  },
 
   async gpuSupport() {
     // The browser/mock runtime has no compiled-in CUDA, so the onboarding GPU
