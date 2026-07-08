@@ -130,7 +130,7 @@ msgstr "오디오 활동"
 
 #: src/features/settings/sections/output-section.tsx:72
 msgid "Audio feedback played as dictation starts, finishes, or errors."
-msgstr ""
+msgstr "받아쓰기가 시작, 완료 또는 오류가 발생할 때 재생되는 오디오 피드백입니다."
 
 #: src/features/styles/components/style-editor-modal.tsx:55
 msgid "Auto-capitalize sentences"
@@ -164,7 +164,7 @@ msgstr "취소"
 msgid "Cancel current recording"
 msgstr "현재 녹음 취소"
 
-#: src/features/dictation/dictation-pill.tsx:99
+#: src/features/dictation/dictation-pill.tsx:105
 msgid "Cancel dictation"
 msgstr "받아쓰기 취소"
 
@@ -174,11 +174,11 @@ msgstr "대문자"
 
 #: src/features/settings/sections/dictation-section.tsx:105
 msgid "Capture device and how recording detects when you speak."
-msgstr ""
+msgstr "캡처 장치와 녹음이 말하는 시점을 감지하는 방식입니다."
 
 #: src/features/welcome/welcome-page.tsx:307
 msgid "Change engine"
-msgstr ""
+msgstr "엔진 변경"
 
 #: src/features/welcome/welcome-page.tsx:158
 msgid "Check your network and we'll pick up where we left off."
@@ -190,7 +190,7 @@ msgstr "설치된 모델을 확인하는 중…"
 
 #: src/features/settings/components/asr-engine-cards.tsx:223
 msgid "Checking…"
-msgstr ""
+msgstr "확인 중…"
 
 #: src/features/settings/components/theme-picker.tsx:130
 msgid "Choose a theme"
@@ -206,7 +206,7 @@ msgstr "Lune Voice의 모양을 선택하세요."
 
 #: src/features/settings/sections/styling-engine-section.tsx:38
 msgid "Choose how transcripts are restyled. On-device runs a local model; the cloud option sends transcripts to a remote OpenAI-compatible endpoint you configure."
-msgstr ""
+msgstr "받아쓰기 텍스트에 스타일을 다시 적용하는 방법을 선택하세요. 온디바이스는 로컬 모델을 실행하고, 클라우드 옵션은 직접 구성한 원격 OpenAI 호환 엔드포인트로 텍스트를 전송합니다."
 
 #: src/features/welcome/welcome-page.tsx:161
 #: src/features/welcome/welcome-page.tsx:167
@@ -215,11 +215,11 @@ msgstr "설치할 AI 모델을 선택하세요. 모든 것이 오프라인으로
 
 #: src/features/settings/sections/transcription-section.tsx:41
 msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
-msgstr ""
+msgstr "음성을 텍스트로 변환하는 엔진을 선택하세요. 로컬 엔진은 완전히 온디바이스로 실행되며, Whisper는 다국어를 지원하고 모델 크기를 선택할 수 있습니다."
 
 #: src/features/welcome/welcome-page.tsx:149
 msgid "Choose your speech engine. Everything runs offline — no cloud, no accounts."
-msgstr ""
+msgstr "음성 엔진을 선택하세요. 모든 것이 오프라인으로 실행됩니다 — 클라우드도 계정도 없습니다."
 
 #: src/features/dictionary/components/dictionary-table.tsx:236
 msgid "Clear filter"
@@ -308,7 +308,7 @@ msgstr "스타일 만들기"
 #: src/features/settings/sections/output-section.tsx:92
 #: src/features/settings/sections/output-section.tsx:104
 msgid "Cue volume"
-msgstr ""
+msgstr "신호 볼륨"
 
 #: src/features/settings/components/theme-picker.tsx:194
 #: src/features/settings/sections/appearance-section.tsx:50
@@ -364,7 +364,7 @@ msgstr "AI 스타일 지정 이전에 결정적 수정 사항이 적용되었습
 
 #: src/features/settings/settings-page.tsx:67
 msgid "Dictation"
-msgstr ""
+msgstr "받아쓰기"
 
 #: src/features/settings/sections/transcription-section.tsx:57
 #: src/features/settings/sections/transcription-section.tsx:63
@@ -389,7 +389,7 @@ msgstr "연결이 끊김"
 
 #: src/features/settings/sections/models-section.tsx:134
 msgid "Disk usage"
-msgstr ""
+msgstr "디스크 사용량"
 
 #: src/components/feedback/error-toast.tsx:24
 msgid "Dismiss error"
@@ -403,7 +403,7 @@ msgstr "다운로드"
 #. placeholder {0}: selected.label
 #: src/features/settings/components/asr-engine-cards.tsx:163
 msgid "Download {0}"
-msgstr ""
+msgstr "{0} 다운로드"
 
 #: src/features/welcome/welcome-page.tsx:293
 msgid "Download {pendingCount} models"
@@ -474,7 +474,7 @@ msgstr "빈 세션"
 
 #: src/features/styles/styles-page.tsx:240
 msgid "Enable styling"
-msgstr ""
+msgstr "스타일 지정 사용"
 
 #: src/features/history/components/history-table.tsx:143
 #: src/features/history/components/session-detail-modal.tsx:162
@@ -488,11 +488,11 @@ msgstr "Lune Voice 열기"
 
 #: src/features/styles/components/style-editor-modal.tsx:164
 msgid "Examples are out of date since you edited the prompt."
-msgstr ""
+msgstr "프롬프트를 편집했으므로 예시가 최신 상태가 아닙니다."
 
 #: src/features/styles/components/style-editor-modal.tsx:141
 msgid "Examples teach the styling engine your style. Regenerate them after editing the prompt."
-msgstr ""
+msgstr "예시는 스타일 지정 엔진에 사용자의 스타일을 학습시킵니다. 프롬프트를 편집한 후 다시 생성하세요."
 
 #: src/features/shell/components/sidebar.tsx:37
 msgid "Expand sidebar"
@@ -500,7 +500,7 @@ msgstr "사이드바 확장"
 
 #: src/features/styles/components/style-editor-modal.tsx:138
 msgid "Few-shot examples"
-msgstr ""
+msgstr "퓨샷 예시"
 
 #: src/features/dictionary/components/dictionary-form.tsx:129
 msgid "Fill both fields to see the correction."
@@ -516,7 +516,7 @@ msgstr "필터 규칙…"
 
 #: src/features/settings/sections/transcription-section.tsx:95
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
-msgstr ""
+msgstr "사전과 알려진 어휘를 사용하여 인식기 오류를 기기에서 수정합니다. 단어별 신뢰도와 통계 패턴을 사용하며 — AI 모델이 없고, 사용자가 말한 내용을 절대 다시 쓰지 않습니다."
 
 #: src/features/styles/components/style-preset-card.tsx:89
 msgid "formatting"
@@ -559,7 +559,7 @@ msgstr "좋은 아침이에요"
 
 #: src/features/welcome/components/engine-step.tsx:119
 msgid "GPU acceleration"
-msgstr ""
+msgstr "GPU 가속"
 
 #: src/features/settings/sections/general-section.tsx:61
 #: src/features/settings/sections/general-section.tsx:71
@@ -576,7 +576,7 @@ msgstr "완료된 받아쓰기를 이 기기에 보관하는 기간입니다."
 
 #: src/features/settings/sections/output-section.tsx:93
 msgid "How loud the dictation sounds play."
-msgstr ""
+msgstr "받아쓰기 소리가 재생되는 크기입니다."
 
 #: src/features/overview/overview-page.tsx:204
 msgid "Idle"
@@ -584,7 +584,7 @@ msgstr "대기"
 
 #: src/features/settings/sections/models-section.tsx:217
 msgid "In use"
-msgstr ""
+msgstr "사용 중"
 
 #: src/features/settings/components/asr-engine-cards.tsx:227
 #: src/features/settings/sections/models-section.tsx:220
@@ -654,7 +654,7 @@ msgstr "Lune Voice 출력"
 
 #: src/features/settings/components/asr-engine-cards.tsx:171
 msgid "Manage in Models"
-msgstr ""
+msgstr "모델에서 관리"
 
 #: src/features/settings/sections/dictation-section.tsx:104
 #: src/features/settings/sections/dictation-section.tsx:109
@@ -689,7 +689,7 @@ msgstr "모델은 로컬에 저장됩니다. 원격 측정도 없고 계정도 �
 
 #: src/features/welcome/components/engine-step.tsx:49
 msgid "Multilingual · pick a size"
-msgstr ""
+msgstr "다국어 · 크기 선택"
 
 #: src/features/styles/components/style-editor-modal.tsx:72
 msgid "Name"
@@ -736,7 +736,7 @@ msgstr "텍스트 없음"
 #: src/features/history/components/history-table.tsx:306
 #: src/features/history/components/session-detail-modal.tsx:163
 msgid "None"
-msgstr ""
+msgstr "없음"
 
 #: src/features/settings/sections/dictation-section.tsx:125
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
@@ -748,11 +748,11 @@ msgstr "설치되지 않음"
 
 #: src/features/settings/sections/models-section.tsx:136
 msgid "Nothing installed"
-msgstr ""
+msgstr "설치된 항목 없음"
 
 #: src/features/settings/sections/styling-engine-section.tsx:43
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
-msgstr ""
+msgstr "끄면 원본 텍스트가 전달됩니다. 적용할 스타일은 스타일 탭에서 선택합니다."
 
 #: src/features/overview/overview-page.tsx:204
 #: src/features/shell/components/app-shell.tsx:163
@@ -809,7 +809,7 @@ msgstr "구절"
 
 #: src/features/settings/sections/output-section.tsx:77
 msgid "Play a short sound when dictation starts, finishes, or runs into an error."
-msgstr ""
+msgstr "받아쓰기가 시작, 완료되거나 오류가 발생할 때 짧은 소리를 재생합니다."
 
 #: src/features/welcome/welcome-page.tsx:257
 msgid "Please keep the app open until downloads finish"
@@ -873,7 +873,7 @@ msgstr "녹음 모드"
 
 #: src/features/styles/components/style-editor-modal.tsx:159
 msgid "Refresh few-shot examples"
-msgstr ""
+msgstr "퓨샷 예시 새로고침"
 
 #: src/components/feedback/confirm-dialog.tsx:33
 msgid "Remove"
@@ -903,7 +903,7 @@ msgstr "다운로드 다시 시도"
 
 #: src/features/styles/styles-page.tsx:242
 msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
-msgstr ""
+msgstr "각 받아쓰기 텍스트를 선택한 스타일로 다시 씁니다. 끄면 원본 텍스트가 그대로 전달됩니다."
 
 #: src/features/overview/overview-page.tsx:262
 msgid "s"
@@ -979,12 +979,12 @@ msgstr "주요 콘텐츠로 건너뛰기"
 
 #: src/features/settings/sections/output-section.tsx:71
 msgid "Sound"
-msgstr ""
+msgstr "소리"
 
 #: src/features/settings/sections/output-section.tsx:76
 #: src/features/settings/sections/output-section.tsx:86
 msgid "Sound cues"
-msgstr ""
+msgstr "소리 신호"
 
 #: src/features/overview/overview-page.tsx:132
 msgid "Speaking Time"
@@ -992,7 +992,7 @@ msgstr "발화 시간"
 
 #: src/features/settings/sections/models-section.tsx:75
 msgid "Speech-to-text"
-msgstr ""
+msgstr "음성 텍스트 변환"
 
 #: src/features/dictionary/components/dictionary-table.tsx:62
 msgid "Spoken phrase"
@@ -1019,7 +1019,7 @@ msgstr "녹음 시작 또는 중지"
 
 #: src/features/settings/sections/dictation-section.tsx:53
 msgid "Start, stop, and cancel dictation without leaving your work."
-msgstr ""
+msgstr "작업을 벗어나지 않고 받아쓰기를 시작, 중지, 취소하세요."
 
 #: src/features/shell/components/sidebar-widgets.tsx:24
 #: src/features/shell/components/sidebar-widgets.tsx:25
@@ -1038,11 +1038,11 @@ msgstr "스타일"
 #: src/features/settings/sections/models-section.tsx:76
 #: src/features/settings/settings-page.tsx:69
 msgid "Styling"
-msgstr ""
+msgstr "스타일 지정"
 
 #: src/features/settings/sections/styling-engine-section.tsx:37
 msgid "Styling engine"
-msgstr ""
+msgstr "스타일 지정 엔진"
 
 #: src/features/styles/styles-page.tsx:269
 msgid "Switch style"
@@ -1068,7 +1068,7 @@ msgstr "Lune Voice에게 당신의 말을 가르쳐주세요"
 
 #: src/features/settings/sections/output-section.tsx:18
 msgid "Text delivery"
-msgstr ""
+msgstr "텍스트 전달"
 
 #: src/features/settings/sections/dictation-section.tsx:58
 msgid "The main shortcut used for voice typing. Click the binding to change it."
@@ -1076,7 +1076,7 @@ msgstr "음성 입력에 사용되는 주요 단축키입니다. 바인딩을 �
 
 #: src/features/settings/sections/transcription-section.tsx:100
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
-msgstr ""
+msgstr "인식기가 가장 확신하지 못하는 단어를 사전과 어휘에 대조하여 확인합니다. 높을수록 더 많은 단어를 확인하고, 낮을수록 원본 전사를 신뢰합니다."
 
 #: src/features/settings/sections/appearance-section.tsx:76
 msgid "Theme"
@@ -1084,7 +1084,7 @@ msgstr "테마"
 
 #: src/features/settings/sections/models-section.tsx:307
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
-msgstr ""
+msgstr "이 모델은 현재 구성에서 사용 중입니다. 다시 설치하거나 다른 모델을 선택하기 전까지 받아쓰기가 작동하지 않을 수 있습니다."
 
 #: src/features/welcome/welcome-page.tsx:155
 msgid "This only happens once. You can keep using your computer in the meantime."
@@ -1147,7 +1147,7 @@ msgstr "전사"
 
 #: src/features/welcome/components/engine-step.tsx:131
 msgid "Use GPU acceleration"
-msgstr ""
+msgstr "GPU 가속 사용"
 
 #: src/features/settings/sections/transcription-section.tsx:74
 #: src/features/settings/sections/transcription-section.tsx:82
@@ -1204,16 +1204,16 @@ msgstr "보낼 붙여넣기 단축키. '자동'은 터미널을 감지합니다.
 
 #: src/features/welcome/components/engine-step.tsx:48
 msgid "Whisper"
-msgstr ""
+msgstr "Whisper"
 
 #: src/features/settings/components/asr-engine-cards.tsx:121
 #: src/features/welcome/components/engine-step.tsx:71
 msgid "Whisper model size"
-msgstr ""
+msgstr "Whisper 모델 크기"
 
 #: src/features/welcome/components/engine-step.tsx:50
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
-msgstr ""
+msgstr "기기에서 실행되는 whisper.cpp입니다. 속도와 정확도를 절충할 크기를 선택하세요."
 
 #: src/features/history/components/history-table.tsx:299
 #: src/features/overview/overview-page.tsx:258
@@ -1251,7 +1251,7 @@ msgstr "단축키"
 
 #: src/features/welcome/components/engine-step.tsx:122
 msgid "Your machine supports it — use it for faster transcription."
-msgstr ""
+msgstr "사용 중인 기기가 이를 지원합니다 — 더 빠른 전사를 위해 사용하세요."
 
 #: src/features/welcome/welcome-page.tsx:152
 msgid "Your models are ready. Everything stays on this machine."

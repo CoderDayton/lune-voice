@@ -130,7 +130,7 @@ msgstr "音声アクティビティ"
 
 #: src/features/settings/sections/output-section.tsx:72
 msgid "Audio feedback played as dictation starts, finishes, or errors."
-msgstr ""
+msgstr "音声入力の開始・完了・エラー時に再生される音声フィードバック。"
 
 #: src/features/styles/components/style-editor-modal.tsx:55
 msgid "Auto-capitalize sentences"
@@ -164,7 +164,7 @@ msgstr "キャンセル"
 msgid "Cancel current recording"
 msgstr "現在の録音をキャンセル"
 
-#: src/features/dictation/dictation-pill.tsx:99
+#: src/features/dictation/dictation-pill.tsx:105
 msgid "Cancel dictation"
 msgstr "音声入力をキャンセル"
 
@@ -174,11 +174,11 @@ msgstr "大文字"
 
 #: src/features/settings/sections/dictation-section.tsx:105
 msgid "Capture device and how recording detects when you speak."
-msgstr ""
+msgstr "キャプチャデバイスと、録音があなたの発話を検出する方法。"
 
 #: src/features/welcome/welcome-page.tsx:307
 msgid "Change engine"
-msgstr ""
+msgstr "エンジンを変更"
 
 #: src/features/welcome/welcome-page.tsx:158
 msgid "Check your network and we'll pick up where we left off."
@@ -190,7 +190,7 @@ msgstr "インストールされているモデルを確認しています…"
 
 #: src/features/settings/components/asr-engine-cards.tsx:223
 msgid "Checking…"
-msgstr ""
+msgstr "確認中…"
 
 #: src/features/settings/components/theme-picker.tsx:130
 msgid "Choose a theme"
@@ -206,7 +206,7 @@ msgstr "Lune Voiceの見た目を選択します。"
 
 #: src/features/settings/sections/styling-engine-section.tsx:38
 msgid "Choose how transcripts are restyled. On-device runs a local model; the cloud option sends transcripts to a remote OpenAI-compatible endpoint you configure."
-msgstr ""
+msgstr "文字起こしをどのようにスタイル調整するかを選択します。オンデバイスはローカルモデルで実行され、クラウドオプションは設定した OpenAI 互換のリモートエンドポイントに文字起こしを送信します。"
 
 #: src/features/welcome/welcome-page.tsx:161
 #: src/features/welcome/welcome-page.tsx:167
@@ -215,11 +215,11 @@ msgstr "インストールする AI モデルを選択します。すべてが�
 
 #: src/features/settings/sections/transcription-section.tsx:41
 msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
-msgstr ""
+msgstr "音声をテキストに変換するエンジンを選択します。ローカルエンジンは完全にオンデバイスで実行され、Whisper は多言語対応でモデルサイズを選択できます。"
 
 #: src/features/welcome/welcome-page.tsx:149
 msgid "Choose your speech engine. Everything runs offline — no cloud, no accounts."
-msgstr ""
+msgstr "音声エンジンを選択します。すべてがオフラインで実行されます — クラウドもアカウントもありません。"
 
 #: src/features/dictionary/components/dictionary-table.tsx:236
 msgid "Clear filter"
@@ -278,7 +278,7 @@ msgstr "コピー"
 #: src/features/settings/sections/output-section.tsx:53
 #: src/features/settings/sections/output-section.tsx:63
 msgid "Copy to clipboard"
-msgstr "クリップボードにコピー"
+msgstr "クリッ���ボードにコピー"
 
 #: src/features/history/components/session-detail-modal.tsx:132
 msgid "Copy transcript"
@@ -308,7 +308,7 @@ msgstr "スタイルの作成"
 #: src/features/settings/sections/output-section.tsx:92
 #: src/features/settings/sections/output-section.tsx:104
 msgid "Cue volume"
-msgstr ""
+msgstr "キュー音量"
 
 #: src/features/settings/components/theme-picker.tsx:194
 #: src/features/settings/sections/appearance-section.tsx:50
@@ -364,7 +364,7 @@ msgstr "AI によるスタイル調整の前に、決定的な修正を適用し
 
 #: src/features/settings/settings-page.tsx:67
 msgid "Dictation"
-msgstr ""
+msgstr "音声入力"
 
 #: src/features/settings/sections/transcription-section.tsx:57
 #: src/features/settings/sections/transcription-section.tsx:63
@@ -389,7 +389,7 @@ msgstr "切断されました"
 
 #: src/features/settings/sections/models-section.tsx:134
 msgid "Disk usage"
-msgstr ""
+msgstr "ディスク使用量"
 
 #: src/components/feedback/error-toast.tsx:24
 msgid "Dismiss error"
@@ -403,7 +403,7 @@ msgstr "ダウンロード"
 #. placeholder {0}: selected.label
 #: src/features/settings/components/asr-engine-cards.tsx:163
 msgid "Download {0}"
-msgstr ""
+msgstr "{0} をダウンロード"
 
 #: src/features/welcome/welcome-page.tsx:293
 msgid "Download {pendingCount} models"
@@ -470,11 +470,11 @@ msgstr "スタイルの編集"
 #: src/features/history/components/history-table.tsx:275
 #: src/features/overview/overview-page.tsx:254
 msgid "Empty session"
-msgstr "空のセッション"
+msgstr "空のセッ���ョン"
 
 #: src/features/styles/styles-page.tsx:240
 msgid "Enable styling"
-msgstr ""
+msgstr "スタイル調整を有効にする"
 
 #: src/features/history/components/history-table.tsx:143
 #: src/features/history/components/session-detail-modal.tsx:162
@@ -488,11 +488,11 @@ msgstr "Lune Voice を開く"
 
 #: src/features/styles/components/style-editor-modal.tsx:164
 msgid "Examples are out of date since you edited the prompt."
-msgstr ""
+msgstr "プロンプトを編集したため、サンプルが古くなっています。"
 
 #: src/features/styles/components/style-editor-modal.tsx:141
 msgid "Examples teach the styling engine your style. Regenerate them after editing the prompt."
-msgstr ""
+msgstr "サンプルはスタイル調整エンジンにあなたのスタイルを学習させます。プロンプトを編集したら再生成してください。"
 
 #: src/features/shell/components/sidebar.tsx:37
 msgid "Expand sidebar"
@@ -500,7 +500,7 @@ msgstr "サイドバーを展開する"
 
 #: src/features/styles/components/style-editor-modal.tsx:138
 msgid "Few-shot examples"
-msgstr ""
+msgstr "Few-shot サンプル"
 
 #: src/features/dictionary/components/dictionary-form.tsx:129
 msgid "Fill both fields to see the correction."
@@ -516,7 +516,7 @@ msgstr "ルールを絞り込み…"
 
 #: src/features/settings/sections/transcription-section.tsx:95
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
-msgstr ""
+msgstr "認識エラーを、お使いのデバイス上で辞書と既知の語彙を使って修正します。単語ごとの信頼度と統計的パターンを利用します — AI モデルは使わず、あなたが話した内容を書き換えることは決してありません。"
 
 #: src/features/styles/components/style-preset-card.tsx:89
 msgid "formatting"
@@ -559,7 +559,7 @@ msgstr "おはよう"
 
 #: src/features/welcome/components/engine-step.tsx:119
 msgid "GPU acceleration"
-msgstr ""
+msgstr "GPU アクセラレーション"
 
 #: src/features/settings/sections/general-section.tsx:61
 #: src/features/settings/sections/general-section.tsx:71
@@ -576,7 +576,7 @@ msgstr "完了したディクテーションをこのデバイスに保持する
 
 #: src/features/settings/sections/output-section.tsx:93
 msgid "How loud the dictation sounds play."
-msgstr ""
+msgstr "音声入力の通知音を再生する音量。"
 
 #: src/features/overview/overview-page.tsx:204
 msgid "Idle"
@@ -584,7 +584,7 @@ msgstr "アイドル状態"
 
 #: src/features/settings/sections/models-section.tsx:217
 msgid "In use"
-msgstr ""
+msgstr "使用中"
 
 #: src/features/settings/components/asr-engine-cards.tsx:227
 #: src/features/settings/sections/models-section.tsx:220
@@ -598,7 +598,7 @@ msgstr "指示"
 
 #: src/features/settings/sections/output-section.tsx:54
 msgid "Keep the dictated text on the clipboard after every dictation, so you can paste it again yourself."
-msgstr "ディクテーションのたびに、書き取ったテキストをクリップボードに保持し、自分で再度貼り付けられるようにします。"
+msgstr "ディクテーションのたびに、書き取ったテキストをクリッ���ボードに保持し、自分で再度貼り付けられるようにします。"
 
 #: src/features/settings/sections/dictation-section.tsx:139
 msgid "Keep the mic open in the background so dictation starts ~70ms sooner. The OS may show a recording indicator while Lune Voice is running."
@@ -654,7 +654,7 @@ msgstr "Lune Voice の出力"
 
 #: src/features/settings/components/asr-engine-cards.tsx:171
 msgid "Manage in Models"
-msgstr ""
+msgstr "「モデル」で管理"
 
 #: src/features/settings/sections/dictation-section.tsx:104
 #: src/features/settings/sections/dictation-section.tsx:109
@@ -689,7 +689,7 @@ msgstr "モデルはローカルに保存されます。テレメトリもアカ
 
 #: src/features/welcome/components/engine-step.tsx:49
 msgid "Multilingual · pick a size"
-msgstr ""
+msgstr "多言語対応 · サイズを選択"
 
 #: src/features/styles/components/style-editor-modal.tsx:72
 msgid "Name"
@@ -726,7 +726,7 @@ msgstr "まだセッションはありません"
 
 #: src/features/history/components/history-table.tsx:129
 msgid "No sessions yet. Start dictating to see your transcripts here."
-msgstr "まだセッションはありません。音声入力を開始すると、ここに文字起こしが表示されます。"
+msgstr "まだセッ���ョンはありません。音声入力を開始すると、ここに文字起こしが表示されます。"
 
 #: src/features/history/components/history-table.tsx:294
 #: src/features/history/components/session-detail-modal.tsx:153
@@ -736,7 +736,7 @@ msgstr "文字起こしなし"
 #: src/features/history/components/history-table.tsx:306
 #: src/features/history/components/session-detail-modal.tsx:163
 msgid "None"
-msgstr ""
+msgstr "なし"
 
 #: src/features/settings/sections/dictation-section.tsx:125
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
@@ -748,11 +748,11 @@ msgstr "インストールされていません"
 
 #: src/features/settings/sections/models-section.tsx:136
 msgid "Nothing installed"
-msgstr ""
+msgstr "何もインストールされていません"
 
 #: src/features/settings/sections/styling-engine-section.tsx:43
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
-msgstr ""
+msgstr "オフでは生の文字起こしがそのまま出力されます。どのスタイルを適用するかは「スタイル」タブで選択します。"
 
 #: src/features/overview/overview-page.tsx:204
 #: src/features/shell/components/app-shell.tsx:163
@@ -809,7 +809,7 @@ msgstr "フレーズ"
 
 #: src/features/settings/sections/output-section.tsx:77
 msgid "Play a short sound when dictation starts, finishes, or runs into an error."
-msgstr ""
+msgstr "音声入力の開始時・完了時・エラー時に短い音を再生します。"
 
 #: src/features/welcome/welcome-page.tsx:257
 msgid "Please keep the app open until downloads finish"
@@ -873,7 +873,7 @@ msgstr "録音モード"
 
 #: src/features/styles/components/style-editor-modal.tsx:159
 msgid "Refresh few-shot examples"
-msgstr ""
+msgstr "Few-shot サンプルを更新"
 
 #: src/components/feedback/confirm-dialog.tsx:33
 msgid "Remove"
@@ -903,7 +903,7 @@ msgstr "ダウンロードを再試行"
 
 #: src/features/styles/styles-page.tsx:242
 msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
-msgstr ""
+msgstr "各文字起こしを選択したスタイルで書き換えます。オフの場合、生の文字起こしがそのまま出力されます。"
 
 #: src/features/overview/overview-page.tsx:262
 msgid "s"
@@ -939,7 +939,7 @@ msgstr "送信方法"
 #: src/features/overview/overview-page.tsx:171
 #: src/features/overview/overview-page.tsx:214
 msgid "session"
-msgstr "セッション"
+msgstr "セッ���ョン"
 
 #: src/features/history/components/session-detail-modal.tsx:193
 msgid "Session details"
@@ -979,12 +979,12 @@ msgstr "メインコンテンツにスキップ"
 
 #: src/features/settings/sections/output-section.tsx:71
 msgid "Sound"
-msgstr ""
+msgstr "サウンド"
 
 #: src/features/settings/sections/output-section.tsx:76
 #: src/features/settings/sections/output-section.tsx:86
 msgid "Sound cues"
-msgstr ""
+msgstr "サウンドキュー"
 
 #: src/features/overview/overview-page.tsx:132
 msgid "Speaking Time"
@@ -992,7 +992,7 @@ msgstr "発話時間"
 
 #: src/features/settings/sections/models-section.tsx:75
 msgid "Speech-to-text"
-msgstr ""
+msgstr "音声認識"
 
 #: src/features/dictionary/components/dictionary-table.tsx:62
 msgid "Spoken phrase"
@@ -1019,7 +1019,7 @@ msgstr "録音の開始または停止"
 
 #: src/features/settings/sections/dictation-section.tsx:53
 msgid "Start, stop, and cancel dictation without leaving your work."
-msgstr ""
+msgstr "作業を中断せずに、音声入力の開始・停止・キャンセルを行えます。"
 
 #: src/features/shell/components/sidebar-widgets.tsx:24
 #: src/features/shell/components/sidebar-widgets.tsx:25
@@ -1038,11 +1038,11 @@ msgstr "スタイル"
 #: src/features/settings/sections/models-section.tsx:76
 #: src/features/settings/settings-page.tsx:69
 msgid "Styling"
-msgstr ""
+msgstr "スタイル調整"
 
 #: src/features/settings/sections/styling-engine-section.tsx:37
 msgid "Styling engine"
-msgstr ""
+msgstr "スタイル調整エンジン"
 
 #: src/features/styles/styles-page.tsx:269
 msgid "Switch style"
@@ -1068,7 +1068,7 @@ msgstr "Lune Voice に単語を教える"
 
 #: src/features/settings/sections/output-section.tsx:18
 msgid "Text delivery"
-msgstr ""
+msgstr "テキストの送信"
 
 #: src/features/settings/sections/dictation-section.tsx:58
 msgid "The main shortcut used for voice typing. Click the binding to change it."
@@ -1076,7 +1076,7 @@ msgstr "音声入力に使用される主なショートカット。バインデ
 
 #: src/features/settings/sections/transcription-section.tsx:100
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
-msgstr ""
+msgstr "認識エンジンが最も自信のない単語を、辞書と語彙と照合します。高くするとより多くの単語をチェックし、低くすると生の文字起こしを信頼します。"
 
 #: src/features/settings/sections/appearance-section.tsx:76
 msgid "Theme"
@@ -1084,7 +1084,7 @@ msgstr "テーマ"
 
 #: src/features/settings/sections/models-section.tsx:307
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
-msgstr ""
+msgstr "このモデルは現在の設定で使用中です。再インストールするか別のモデルを選択するまで、音声入力が機能しない場合があります。"
 
 #: src/features/welcome/welcome-page.tsx:155
 msgid "This only happens once. You can keep using your computer in the meantime."
@@ -1147,7 +1147,7 @@ msgstr "文字起こし"
 
 #: src/features/welcome/components/engine-step.tsx:131
 msgid "Use GPU acceleration"
-msgstr ""
+msgstr "GPU アクセラレーションを使用する"
 
 #: src/features/settings/sections/transcription-section.tsx:74
 #: src/features/settings/sections/transcription-section.tsx:82
@@ -1200,20 +1200,20 @@ msgstr "ディクテーションがどの入力デバイスから取り込むか
 
 #: src/features/settings/sections/output-section.tsx:39
 msgid "Which paste shortcut to send. Automatic detects terminals; override if paste lands in the wrong place."
-msgstr "送信する貼り付けショートカット。「自動」はターミナルを検出します。貼り付けが誤った場所に入る場合は上書きしてください。"
+msgstr "送信する貼り付けショートカッ���。「自動」はターミナルを検出します。貼り付けが誤った場所に入る場合は上書きしてください。"
 
 #: src/features/welcome/components/engine-step.tsx:48
 msgid "Whisper"
-msgstr ""
+msgstr "Whisper"
 
 #: src/features/settings/components/asr-engine-cards.tsx:121
 #: src/features/welcome/components/engine-step.tsx:71
 msgid "Whisper model size"
-msgstr ""
+msgstr "Whisper モデルサイズ"
 
 #: src/features/welcome/components/engine-step.tsx:50
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
-msgstr ""
+msgstr "whisper.cpp をオンデバイスで実行します。速度と精度のバランスを取るサイズを選択してください。"
 
 #: src/features/history/components/history-table.tsx:299
 #: src/features/overview/overview-page.tsx:258
@@ -1251,7 +1251,7 @@ msgstr "あなたのホットキー"
 
 #: src/features/welcome/components/engine-step.tsx:122
 msgid "Your machine supports it — use it for faster transcription."
-msgstr ""
+msgstr "お使いのマシンが対応しています — 文字起こしを高速化するために使用しましょう。"
 
 #: src/features/welcome/welcome-page.tsx:152
 msgid "Your models are ready. Everything stays on this machine."

@@ -130,7 +130,7 @@ msgstr "ऑडियो गतिविधि"
 
 #: src/features/settings/sections/output-section.tsx:72
 msgid "Audio feedback played as dictation starts, finishes, or errors."
-msgstr ""
+msgstr "डिक्टेशन शुरू होने, पूरा होने या त्रुटि होने पर बजने वाली ऑडियो प्रतिक्रिया।"
 
 #: src/features/styles/components/style-editor-modal.tsx:55
 msgid "Auto-capitalize sentences"
@@ -164,7 +164,7 @@ msgstr "रद्द करें"
 msgid "Cancel current recording"
 msgstr "वर्तमान रिकॉर्डिंग रद्द करें"
 
-#: src/features/dictation/dictation-pill.tsx:99
+#: src/features/dictation/dictation-pill.tsx:105
 msgid "Cancel dictation"
 msgstr "डिक्टेशन रद्द करें"
 
@@ -174,11 +174,11 @@ msgstr "बड़े अक्षर"
 
 #: src/features/settings/sections/dictation-section.tsx:105
 msgid "Capture device and how recording detects when you speak."
-msgstr ""
+msgstr "कैप्चर डिवाइस और रिकॉर्डिंग यह कैसे पहचानती है कि आप कब बोल रहे हैं।"
 
 #: src/features/welcome/welcome-page.tsx:307
 msgid "Change engine"
-msgstr ""
+msgstr "इंजन बदलें"
 
 #: src/features/welcome/welcome-page.tsx:158
 msgid "Check your network and we'll pick up where we left off."
@@ -190,7 +190,7 @@ msgstr "स्थापित मॉडलों की जाँच की ज�
 
 #: src/features/settings/components/asr-engine-cards.tsx:223
 msgid "Checking…"
-msgstr ""
+msgstr "जाँच हो रही है…"
 
 #: src/features/settings/components/theme-picker.tsx:130
 msgid "Choose a theme"
@@ -206,7 +206,7 @@ msgstr "चुनें कि Lune Voice कैसा दिखता है।
 
 #: src/features/settings/sections/styling-engine-section.tsx:38
 msgid "Choose how transcripts are restyled. On-device runs a local model; the cloud option sends transcripts to a remote OpenAI-compatible endpoint you configure."
-msgstr ""
+msgstr "चुनें कि ट्रांसक्रिप्ट को कैसे रिस्टाइल किया जाए। ऑन-डिवाइस एक लोकल मॉडल चलाता है; क्लाउड विकल्प ट्रांसक्रिप्ट को आपके द्वारा कॉन्फ़िगर किए गए किसी रिमोट OpenAI-संगत एंडपॉइंट पर भेजता है।"
 
 #: src/features/welcome/welcome-page.tsx:161
 #: src/features/welcome/welcome-page.tsx:167
@@ -215,11 +215,11 @@ msgstr "इंस्टॉल करने के लिए AI मॉडल च�
 
 #: src/features/settings/sections/transcription-section.tsx:41
 msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
-msgstr ""
+msgstr "वह इंजन चुनें जो आपकी बोली को टेक्स्ट में बदलता है। लोकल इंजन पूरी तरह डिवाइस पर चलते हैं; Whisper बहुभाषी है और इसमें चुनने योग्य मॉडल आकार हैं।"
 
 #: src/features/welcome/welcome-page.tsx:149
 msgid "Choose your speech engine. Everything runs offline — no cloud, no accounts."
-msgstr ""
+msgstr "अपना स्पीच इंजन चुनें। सब कुछ ऑफ़लाइन चलता है — न कोई क्लाउड, न कोई अकाउंट।"
 
 #: src/features/dictionary/components/dictionary-table.tsx:236
 msgid "Clear filter"
@@ -308,7 +308,7 @@ msgstr "शैली बनाएं"
 #: src/features/settings/sections/output-section.tsx:92
 #: src/features/settings/sections/output-section.tsx:104
 msgid "Cue volume"
-msgstr ""
+msgstr "क्यू वॉल्यूम"
 
 #: src/features/settings/components/theme-picker.tsx:194
 #: src/features/settings/sections/appearance-section.tsx:50
@@ -364,7 +364,7 @@ msgstr "किसी भी एआई स्टाइलिंग से पह�
 
 #: src/features/settings/settings-page.tsx:67
 msgid "Dictation"
-msgstr ""
+msgstr "डिक्टेशन"
 
 #: src/features/settings/sections/transcription-section.tsx:57
 #: src/features/settings/sections/transcription-section.tsx:63
@@ -389,7 +389,7 @@ msgstr "डिस्कनेक्टेड"
 
 #: src/features/settings/sections/models-section.tsx:134
 msgid "Disk usage"
-msgstr ""
+msgstr "डिस्क उपयोग"
 
 #: src/components/feedback/error-toast.tsx:24
 msgid "Dismiss error"
@@ -403,7 +403,7 @@ msgstr "डाउनलोड"
 #. placeholder {0}: selected.label
 #: src/features/settings/components/asr-engine-cards.tsx:163
 msgid "Download {0}"
-msgstr ""
+msgstr "{0} डाउनलोड करें"
 
 #: src/features/welcome/welcome-page.tsx:293
 msgid "Download {pendingCount} models"
@@ -474,7 +474,7 @@ msgstr "ख़ाली सत्र"
 
 #: src/features/styles/styles-page.tsx:240
 msgid "Enable styling"
-msgstr ""
+msgstr "स्टाइलिंग सक्षम करें"
 
 #: src/features/history/components/history-table.tsx:143
 #: src/features/history/components/session-detail-modal.tsx:162
@@ -488,11 +488,11 @@ msgstr "Lune Voice खोलें"
 
 #: src/features/styles/components/style-editor-modal.tsx:164
 msgid "Examples are out of date since you edited the prompt."
-msgstr ""
+msgstr "प्रॉम्प्ट संपादित करने के बाद से उदाहरण पुराने हो चुके हैं।"
 
 #: src/features/styles/components/style-editor-modal.tsx:141
 msgid "Examples teach the styling engine your style. Regenerate them after editing the prompt."
-msgstr ""
+msgstr "उदाहरण स्टाइलिंग इंजन को आपकी शैली सिखाते हैं। प्रॉम्प्ट संपादित करने के बाद उन्हें दोबारा जनरेट करें।"
 
 #: src/features/shell/components/sidebar.tsx:37
 msgid "Expand sidebar"
@@ -500,7 +500,7 @@ msgstr "साइडबार का विस्तार करें"
 
 #: src/features/styles/components/style-editor-modal.tsx:138
 msgid "Few-shot examples"
-msgstr ""
+msgstr "फ़्यू-शॉट उदाहरण"
 
 #: src/features/dictionary/components/dictionary-form.tsx:129
 msgid "Fill both fields to see the correction."
@@ -516,7 +516,7 @@ msgstr "फ़िल्टर नियम…"
 
 #: src/features/settings/sections/transcription-section.tsx:95
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
-msgstr ""
+msgstr "अपने डिवाइस पर, अपनी डिक्शनरी और ज्ञात शब्दावली से रिकग्नाइज़र की त्रुटियाँ ठीक करें। यह प्रति-शब्द कॉन्फ़िडेंस और सांख्यिकीय पैटर्न का उपयोग करता है — कोई AI मॉडल नहीं, और यह आपकी कही बात को कभी दोबारा नहीं लिखता।"
 
 #: src/features/styles/components/style-preset-card.tsx:89
 msgid "formatting"
@@ -559,7 +559,7 @@ msgstr "शुभ प्रभात"
 
 #: src/features/welcome/components/engine-step.tsx:119
 msgid "GPU acceleration"
-msgstr ""
+msgstr "GPU त्वरण"
 
 #: src/features/settings/sections/general-section.tsx:61
 #: src/features/settings/sections/general-section.tsx:71
@@ -576,7 +576,7 @@ msgstr "पूर्ण किए गए श्रुतलेख इस डि�
 
 #: src/features/settings/sections/output-section.tsx:93
 msgid "How loud the dictation sounds play."
-msgstr ""
+msgstr "डिक्टेशन की ध्वनियाँ कितनी तेज़ बजें।"
 
 #: src/features/overview/overview-page.tsx:204
 msgid "Idle"
@@ -584,7 +584,7 @@ msgstr "निष्क्रिय"
 
 #: src/features/settings/sections/models-section.tsx:217
 msgid "In use"
-msgstr ""
+msgstr "उपयोग में"
 
 #: src/features/settings/components/asr-engine-cards.tsx:227
 #: src/features/settings/sections/models-section.tsx:220
@@ -654,7 +654,7 @@ msgstr "Lune Voice लिखेगा"
 
 #: src/features/settings/components/asr-engine-cards.tsx:171
 msgid "Manage in Models"
-msgstr ""
+msgstr "Models में प्रबंधित करें"
 
 #: src/features/settings/sections/dictation-section.tsx:104
 #: src/features/settings/sections/dictation-section.tsx:109
@@ -689,7 +689,7 @@ msgstr "मॉडल स्थानीय रूप से सहेजे ज�
 
 #: src/features/welcome/components/engine-step.tsx:49
 msgid "Multilingual · pick a size"
-msgstr ""
+msgstr "बहुभाषी · एक आकार चुनें"
 
 #: src/features/styles/components/style-editor-modal.tsx:72
 msgid "Name"
@@ -736,7 +736,7 @@ msgstr "कोई टेक्स्ट नहीं"
 #: src/features/history/components/history-table.tsx:306
 #: src/features/history/components/session-detail-modal.tsx:163
 msgid "None"
-msgstr ""
+msgstr "कोई नहीं"
 
 #: src/features/settings/sections/dictation-section.tsx:125
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
@@ -748,11 +748,11 @@ msgstr "इंस्टॉल नहीं है"
 
 #: src/features/settings/sections/models-section.tsx:136
 msgid "Nothing installed"
-msgstr ""
+msgstr "कुछ भी इंस्टॉल नहीं है"
 
 #: src/features/settings/sections/styling-engine-section.tsx:43
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
-msgstr ""
+msgstr "बंद रहने पर कच्चे ट्रांसक्रिप्ट दिए जाते हैं। कौन-सी शैली लागू हो, यह Styles टैब पर चुना जाता है।"
 
 #: src/features/overview/overview-page.tsx:204
 #: src/features/shell/components/app-shell.tsx:163
@@ -809,7 +809,7 @@ msgstr "वाक्यांश"
 
 #: src/features/settings/sections/output-section.tsx:77
 msgid "Play a short sound when dictation starts, finishes, or runs into an error."
-msgstr ""
+msgstr "डिक्टेशन शुरू होने, पूरा होने या किसी त्रुटि में आने पर एक छोटी ध्वनि बजाएँ।"
 
 #: src/features/welcome/welcome-page.tsx:257
 msgid "Please keep the app open until downloads finish"
@@ -873,7 +873,7 @@ msgstr "रिकॉर्डिंग मोड"
 
 #: src/features/styles/components/style-editor-modal.tsx:159
 msgid "Refresh few-shot examples"
-msgstr ""
+msgstr "फ़्यू-शॉट उदाहरण रिफ़्रेश करें"
 
 #: src/components/feedback/confirm-dialog.tsx:33
 msgid "Remove"
@@ -903,7 +903,7 @@ msgstr "पुनः डाउनलोड करने का प्रया�
 
 #: src/features/styles/styles-page.tsx:242
 msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
-msgstr ""
+msgstr "प्रत्येक ट्रांसक्रिप्ट को चुनी गई शैली में दोबारा लिखें। बंद होने पर कच्चा ट्रांसक्रिप्ट ज्यों-का-त्यों दिया जाता है।"
 
 #: src/features/overview/overview-page.tsx:262
 msgid "s"
@@ -979,12 +979,12 @@ msgstr "मुख्य सामग्री पर जाएँ"
 
 #: src/features/settings/sections/output-section.tsx:71
 msgid "Sound"
-msgstr ""
+msgstr "ध्वनि"
 
 #: src/features/settings/sections/output-section.tsx:76
 #: src/features/settings/sections/output-section.tsx:86
 msgid "Sound cues"
-msgstr ""
+msgstr "ध्वनि संकेत"
 
 #: src/features/overview/overview-page.tsx:132
 msgid "Speaking Time"
@@ -992,7 +992,7 @@ msgstr "बोलने का समय"
 
 #: src/features/settings/sections/models-section.tsx:75
 msgid "Speech-to-text"
-msgstr ""
+msgstr "स्पीच-टू-टेक्स्ट"
 
 #: src/features/dictionary/components/dictionary-table.tsx:62
 msgid "Spoken phrase"
@@ -1019,7 +1019,7 @@ msgstr "रिकॉर्डिंग प्रारंभ या बंद �
 
 #: src/features/settings/sections/dictation-section.tsx:53
 msgid "Start, stop, and cancel dictation without leaving your work."
-msgstr ""
+msgstr "अपना काम छोड़े बिना डिक्टेशन शुरू करें, रोकें और रद्द करें।"
 
 #: src/features/shell/components/sidebar-widgets.tsx:24
 #: src/features/shell/components/sidebar-widgets.tsx:25
@@ -1038,11 +1038,11 @@ msgstr "शैली"
 #: src/features/settings/sections/models-section.tsx:76
 #: src/features/settings/settings-page.tsx:69
 msgid "Styling"
-msgstr ""
+msgstr "स्टाइलिंग"
 
 #: src/features/settings/sections/styling-engine-section.tsx:37
 msgid "Styling engine"
-msgstr ""
+msgstr "स्टाइलिंग इंजन"
 
 #: src/features/styles/styles-page.tsx:269
 msgid "Switch style"
@@ -1068,7 +1068,7 @@ msgstr "Lune Voice को अपने शब्द सिखाएँ"
 
 #: src/features/settings/sections/output-section.tsx:18
 msgid "Text delivery"
-msgstr ""
+msgstr "टेक्स्ट डिलीवरी"
 
 #: src/features/settings/sections/dictation-section.tsx:58
 msgid "The main shortcut used for voice typing. Click the binding to change it."
@@ -1076,7 +1076,7 @@ msgstr "ध्वनि टाइपिंग के लिए उपयोग �
 
 #: src/features/settings/sections/transcription-section.tsx:100
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
-msgstr ""
+msgstr "जिन शब्दों को लेकर रिकग्नाइज़र सबसे कम आश्वस्त होता है, उन्हें आपकी डिक्शनरी और शब्दावली से मिलाया जाता है। अधिक सेटिंग ज़्यादा शब्द जाँचती है; कम सेटिंग कच्चे ट्रांसक्रिप्शन पर भरोसा करती है।"
 
 #: src/features/settings/sections/appearance-section.tsx:76
 msgid "Theme"
@@ -1084,7 +1084,7 @@ msgstr "विषय"
 
 #: src/features/settings/sections/models-section.tsx:307
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
-msgstr ""
+msgstr "यह मॉडल आपके मौजूदा कॉन्फ़िगरेशन द्वारा उपयोग में है। जब तक आप इसे दोबारा इंस्टॉल न करें या कोई दूसरा न चुनें, तब तक डिक्टेशन काम नहीं कर सकता।"
 
 #: src/features/welcome/welcome-page.tsx:155
 msgid "This only happens once. You can keep using your computer in the meantime."
@@ -1147,7 +1147,7 @@ msgstr "ट्रांसक्रिप्शन"
 
 #: src/features/welcome/components/engine-step.tsx:131
 msgid "Use GPU acceleration"
-msgstr ""
+msgstr "GPU त्वरण का उपयोग करें"
 
 #: src/features/settings/sections/transcription-section.tsx:74
 #: src/features/settings/sections/transcription-section.tsx:82
@@ -1204,16 +1204,16 @@ msgstr "कौन सा पेस्ट शॉर्टकट भेजना �
 
 #: src/features/welcome/components/engine-step.tsx:48
 msgid "Whisper"
-msgstr ""
+msgstr "Whisper"
 
 #: src/features/settings/components/asr-engine-cards.tsx:121
 #: src/features/welcome/components/engine-step.tsx:71
 msgid "Whisper model size"
-msgstr ""
+msgstr "Whisper मॉडल आकार"
 
 #: src/features/welcome/components/engine-step.tsx:50
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
-msgstr ""
+msgstr "whisper.cpp डिवाइस पर चल रहा है। गति और सटीकता के बीच संतुलन के लिए एक आकार चुनें।"
 
 #: src/features/history/components/history-table.tsx:299
 #: src/features/overview/overview-page.tsx:258
@@ -1251,7 +1251,7 @@ msgstr "आपकी हॉटकी"
 
 #: src/features/welcome/components/engine-step.tsx:122
 msgid "Your machine supports it — use it for faster transcription."
-msgstr ""
+msgstr "आपकी मशीन इसका समर्थन करती है — तेज़ ट्रांसक्रिप्शन के लिए इसका उपयोग करें।"
 
 #: src/features/welcome/welcome-page.tsx:152
 msgid "Your models are ready. Everything stays on this machine."

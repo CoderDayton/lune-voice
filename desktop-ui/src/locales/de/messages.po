@@ -130,7 +130,7 @@ msgstr "Audioaktivität"
 
 #: src/features/settings/sections/output-section.tsx:72
 msgid "Audio feedback played as dictation starts, finishes, or errors."
-msgstr ""
+msgstr "Audio-Feedback beim Start, Ende oder bei Fehlern des Diktats."
 
 #: src/features/styles/components/style-editor-modal.tsx:55
 msgid "Auto-capitalize sentences"
@@ -164,7 +164,7 @@ msgstr "Stornieren"
 msgid "Cancel current recording"
 msgstr "Aktuelle Aufnahme abbrechen"
 
-#: src/features/dictation/dictation-pill.tsx:99
+#: src/features/dictation/dictation-pill.tsx:105
 msgid "Cancel dictation"
 msgstr "Diktat abbrechen"
 
@@ -174,11 +174,11 @@ msgstr "Hauptstädte"
 
 #: src/features/settings/sections/dictation-section.tsx:105
 msgid "Capture device and how recording detects when you speak."
-msgstr ""
+msgstr "Aufnahmegerät und wie die Aufnahme erkennt, wenn Sie sprechen."
 
 #: src/features/welcome/welcome-page.tsx:307
 msgid "Change engine"
-msgstr ""
+msgstr "Engine wechseln"
 
 #: src/features/welcome/welcome-page.tsx:158
 msgid "Check your network and we'll pick up where we left off."
@@ -190,7 +190,7 @@ msgstr "Installierte Modelle prüfen…"
 
 #: src/features/settings/components/asr-engine-cards.tsx:223
 msgid "Checking…"
-msgstr ""
+msgstr "Wird geprüft…"
 
 #: src/features/settings/components/theme-picker.tsx:130
 msgid "Choose a theme"
@@ -206,7 +206,7 @@ msgstr "Wählen Sie, wie Lune Voice aussehen soll."
 
 #: src/features/settings/sections/styling-engine-section.tsx:38
 msgid "Choose how transcripts are restyled. On-device runs a local model; the cloud option sends transcripts to a remote OpenAI-compatible endpoint you configure."
-msgstr ""
+msgstr "Wählen Sie, wie Transkripte umformuliert werden. Auf dem Gerät läuft ein lokales Modell; die Cloud-Option sendet Transkripte an einen von Ihnen konfigurierten, OpenAI-kompatiblen Remote-Endpunkt."
 
 #: src/features/welcome/welcome-page.tsx:161
 #: src/features/welcome/welcome-page.tsx:167
@@ -215,11 +215,11 @@ msgstr "Wählen Sie die zu installierenden KI-Modelle aus. Alles läuft offline 
 
 #: src/features/settings/sections/transcription-section.tsx:41
 msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
-msgstr ""
+msgstr "Wählen Sie die Engine, die Ihre Sprache in Text umwandelt. Lokale Engines laufen vollständig auf dem Gerät; Whisper ist mehrsprachig mit wählbaren Modellgrößen."
 
 #: src/features/welcome/welcome-page.tsx:149
 msgid "Choose your speech engine. Everything runs offline — no cloud, no accounts."
-msgstr ""
+msgstr "Wählen Sie Ihre Sprach-Engine. Alles läuft offline — keine Cloud, keine Konten."
 
 #: src/features/dictionary/components/dictionary-table.tsx:236
 msgid "Clear filter"
@@ -308,7 +308,7 @@ msgstr "Stil kreieren"
 #: src/features/settings/sections/output-section.tsx:92
 #: src/features/settings/sections/output-section.tsx:104
 msgid "Cue volume"
-msgstr ""
+msgstr "Signaltonlautstärke"
 
 #: src/features/settings/components/theme-picker.tsx:194
 #: src/features/settings/sections/appearance-section.tsx:50
@@ -364,7 +364,7 @@ msgstr "Deterministische Korrekturen werden vor jedem KI-Styling angewendet."
 
 #: src/features/settings/settings-page.tsx:67
 msgid "Dictation"
-msgstr ""
+msgstr "Diktat"
 
 #: src/features/settings/sections/transcription-section.tsx:57
 #: src/features/settings/sections/transcription-section.tsx:63
@@ -389,7 +389,7 @@ msgstr "Getrennt"
 
 #: src/features/settings/sections/models-section.tsx:134
 msgid "Disk usage"
-msgstr ""
+msgstr "Speicherplatznutzung"
 
 #: src/components/feedback/error-toast.tsx:24
 msgid "Dismiss error"
@@ -403,7 +403,7 @@ msgstr "Herunterladen"
 #. placeholder {0}: selected.label
 #: src/features/settings/components/asr-engine-cards.tsx:163
 msgid "Download {0}"
-msgstr ""
+msgstr "{0} herunterladen"
 
 #: src/features/welcome/welcome-page.tsx:293
 msgid "Download {pendingCount} models"
@@ -474,7 +474,7 @@ msgstr "Leere Sitzung"
 
 #: src/features/styles/styles-page.tsx:240
 msgid "Enable styling"
-msgstr ""
+msgstr "Styling aktivieren"
 
 #: src/features/history/components/history-table.tsx:143
 #: src/features/history/components/session-detail-modal.tsx:162
@@ -488,11 +488,11 @@ msgstr "Geben Sie Lune Voice ein"
 
 #: src/features/styles/components/style-editor-modal.tsx:164
 msgid "Examples are out of date since you edited the prompt."
-msgstr ""
+msgstr "Die Beispiele sind veraltet, seit Sie den Prompt bearbeitet haben."
 
 #: src/features/styles/components/style-editor-modal.tsx:141
 msgid "Examples teach the styling engine your style. Regenerate them after editing the prompt."
-msgstr ""
+msgstr "Beispiele bringen der Styling-Engine Ihren Stil bei. Erzeugen Sie sie nach dem Bearbeiten des Prompts neu."
 
 #: src/features/shell/components/sidebar.tsx:37
 msgid "Expand sidebar"
@@ -500,7 +500,7 @@ msgstr "Seitenleiste erweitern"
 
 #: src/features/styles/components/style-editor-modal.tsx:138
 msgid "Few-shot examples"
-msgstr ""
+msgstr "Few-Shot-Beispiele"
 
 #: src/features/dictionary/components/dictionary-form.tsx:129
 msgid "Fill both fields to see the correction."
@@ -516,7 +516,7 @@ msgstr "Filterregeln…"
 
 #: src/features/settings/sections/transcription-section.tsx:95
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
-msgstr ""
+msgstr "Beheben Sie Erkennungsfehler mit Ihrem Wörterbuch und bekanntem Vokabular, direkt auf Ihrem Gerät. Es nutzt die Konfidenz pro Wort und statistische Muster — kein KI-Modell, und es formuliert niemals um, was Sie gesagt haben."
 
 #: src/features/styles/components/style-preset-card.tsx:89
 msgid "formatting"
@@ -559,7 +559,7 @@ msgstr "Guten Morgen"
 
 #: src/features/welcome/components/engine-step.tsx:119
 msgid "GPU acceleration"
-msgstr ""
+msgstr "GPU-Beschleunigung"
 
 #: src/features/settings/sections/general-section.tsx:61
 #: src/features/settings/sections/general-section.tsx:71
@@ -576,7 +576,7 @@ msgstr "Wie lange fertige Diktate auf diesem Gerät aufbewahrt werden."
 
 #: src/features/settings/sections/output-section.tsx:93
 msgid "How loud the dictation sounds play."
-msgstr ""
+msgstr "Wie laut die Diktattöne abgespielt werden."
 
 #: src/features/overview/overview-page.tsx:204
 msgid "Idle"
@@ -584,7 +584,7 @@ msgstr "Leerlauf"
 
 #: src/features/settings/sections/models-section.tsx:217
 msgid "In use"
-msgstr ""
+msgstr "In Verwendung"
 
 #: src/features/settings/components/asr-engine-cards.tsx:227
 #: src/features/settings/sections/models-section.tsx:220
@@ -654,7 +654,7 @@ msgstr "Lune Voice schreibt"
 
 #: src/features/settings/components/asr-engine-cards.tsx:171
 msgid "Manage in Models"
-msgstr ""
+msgstr "In „Modelle“ verwalten"
 
 #: src/features/settings/sections/dictation-section.tsx:104
 #: src/features/settings/sections/dictation-section.tsx:109
@@ -689,7 +689,7 @@ msgstr "Modelle werden lokal gespeichert. Keine Telemetrie, keine Konten."
 
 #: src/features/welcome/components/engine-step.tsx:49
 msgid "Multilingual · pick a size"
-msgstr ""
+msgstr "Mehrsprachig · Größe wählen"
 
 #: src/features/styles/components/style-editor-modal.tsx:72
 msgid "Name"
@@ -736,7 +736,7 @@ msgstr "Kein Transkript"
 #: src/features/history/components/history-table.tsx:306
 #: src/features/history/components/session-detail-modal.tsx:163
 msgid "None"
-msgstr ""
+msgstr "Keine"
 
 #: src/features/settings/sections/dictation-section.tsx:125
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
@@ -748,11 +748,11 @@ msgstr "Nicht installiert"
 
 #: src/features/settings/sections/models-section.tsx:136
 msgid "Nothing installed"
-msgstr ""
+msgstr "Nichts installiert"
 
 #: src/features/settings/sections/styling-engine-section.tsx:43
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
-msgstr ""
+msgstr "„Aus“ liefert Rohtranskripte. Welcher Stil angewendet wird, legen Sie im Tab „Stile“ fest."
 
 #: src/features/overview/overview-page.tsx:204
 #: src/features/shell/components/app-shell.tsx:163
@@ -809,7 +809,7 @@ msgstr "Ausdruck"
 
 #: src/features/settings/sections/output-section.tsx:77
 msgid "Play a short sound when dictation starts, finishes, or runs into an error."
-msgstr ""
+msgstr "Spielt einen kurzen Ton ab, wenn das Diktat startet, endet oder auf einen Fehler stößt."
 
 #: src/features/welcome/welcome-page.tsx:257
 msgid "Please keep the app open until downloads finish"
@@ -873,7 +873,7 @@ msgstr "Aufnahmemodus"
 
 #: src/features/styles/components/style-editor-modal.tsx:159
 msgid "Refresh few-shot examples"
-msgstr ""
+msgstr "Few-Shot-Beispiele aktualisieren"
 
 #: src/components/feedback/confirm-dialog.tsx:33
 msgid "Remove"
@@ -903,7 +903,7 @@ msgstr "Versuchen Sie den Download erneut"
 
 #: src/features/styles/styles-page.tsx:242
 msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
-msgstr ""
+msgstr "Formuliert jedes Transkript in einem gewählten Stil um. Ist die Option aus, wird das Rohtranskript unverändert geliefert."
 
 #: src/features/overview/overview-page.tsx:262
 msgid "s"
@@ -979,12 +979,12 @@ msgstr "Zum Hauptinhalt springen"
 
 #: src/features/settings/sections/output-section.tsx:71
 msgid "Sound"
-msgstr ""
+msgstr "Ton"
 
 #: src/features/settings/sections/output-section.tsx:76
 #: src/features/settings/sections/output-section.tsx:86
 msgid "Sound cues"
-msgstr ""
+msgstr "Signaltöne"
 
 #: src/features/overview/overview-page.tsx:132
 msgid "Speaking Time"
@@ -992,7 +992,7 @@ msgstr "Sprechzeit"
 
 #: src/features/settings/sections/models-section.tsx:75
 msgid "Speech-to-text"
-msgstr ""
+msgstr "Sprache-zu-Text"
 
 #: src/features/dictionary/components/dictionary-table.tsx:62
 msgid "Spoken phrase"
@@ -1019,7 +1019,7 @@ msgstr "Aufnahme starten oder stoppen"
 
 #: src/features/settings/sections/dictation-section.tsx:53
 msgid "Start, stop, and cancel dictation without leaving your work."
-msgstr ""
+msgstr "Starten, stoppen und brechen Sie das Diktat ab, ohne Ihre Arbeit zu unterbrechen."
 
 #: src/features/shell/components/sidebar-widgets.tsx:24
 #: src/features/shell/components/sidebar-widgets.tsx:25
@@ -1038,11 +1038,11 @@ msgstr "Stil"
 #: src/features/settings/sections/models-section.tsx:76
 #: src/features/settings/settings-page.tsx:69
 msgid "Styling"
-msgstr ""
+msgstr "Styling"
 
 #: src/features/settings/sections/styling-engine-section.tsx:37
 msgid "Styling engine"
-msgstr ""
+msgstr "Styling-Engine"
 
 #: src/features/styles/styles-page.tsx:269
 msgid "Switch style"
@@ -1068,7 +1068,7 @@ msgstr "Bringen Sie Lune Voice Ihre Worte bei"
 
 #: src/features/settings/sections/output-section.tsx:18
 msgid "Text delivery"
-msgstr ""
+msgstr "Textübergabe"
 
 #: src/features/settings/sections/dictation-section.tsx:58
 msgid "The main shortcut used for voice typing. Click the binding to change it."
@@ -1076,7 +1076,7 @@ msgstr "Die wichtigste Tastenkombination für die Spracheingabe. Klicken Sie auf
 
 #: src/features/settings/sections/transcription-section.tsx:100
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
-msgstr ""
+msgstr "Die Wörter, bei denen die Erkennung am unsichersten ist, werden mit Ihrem Wörterbuch und Vokabular abgeglichen. Höher prüft mehr Wörter; niedriger vertraut der Rohtranskription."
 
 #: src/features/settings/sections/appearance-section.tsx:76
 msgid "Theme"
@@ -1084,7 +1084,7 @@ msgstr "Thema"
 
 #: src/features/settings/sections/models-section.tsx:307
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
-msgstr ""
+msgstr "Dieses Modell wird von Ihrer aktuellen Konfiguration verwendet. Das Diktat funktioniert möglicherweise erst wieder, wenn Sie es neu installieren oder ein anderes wählen."
 
 #: src/features/welcome/welcome-page.tsx:155
 msgid "This only happens once. You can keep using your computer in the meantime."
@@ -1147,7 +1147,7 @@ msgstr "Transkription"
 
 #: src/features/welcome/components/engine-step.tsx:131
 msgid "Use GPU acceleration"
-msgstr ""
+msgstr "GPU-Beschleunigung verwenden"
 
 #: src/features/settings/sections/transcription-section.tsx:74
 #: src/features/settings/sections/transcription-section.tsx:82
@@ -1204,16 +1204,16 @@ msgstr "Welche Einfügen-Tastenkombination gesendet wird. „Automatisch“ erke
 
 #: src/features/welcome/components/engine-step.tsx:48
 msgid "Whisper"
-msgstr ""
+msgstr "Whisper"
 
 #: src/features/settings/components/asr-engine-cards.tsx:121
 #: src/features/welcome/components/engine-step.tsx:71
 msgid "Whisper model size"
-msgstr ""
+msgstr "Whisper-Modellgröße"
 
 #: src/features/welcome/components/engine-step.tsx:50
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
-msgstr ""
+msgstr "whisper.cpp läuft auf dem Gerät. Wählen Sie eine Größe, um Geschwindigkeit gegen Genauigkeit abzuwägen."
 
 #: src/features/history/components/history-table.tsx:299
 #: src/features/overview/overview-page.tsx:258
@@ -1251,7 +1251,7 @@ msgstr "Ihr Hotkey"
 
 #: src/features/welcome/components/engine-step.tsx:122
 msgid "Your machine supports it — use it for faster transcription."
-msgstr ""
+msgstr "Ihr Gerät unterstützt es — nutzen Sie es für eine schnellere Transkription."
 
 #: src/features/welcome/welcome-page.tsx:152
 msgid "Your models are ready. Everything stays on this machine."

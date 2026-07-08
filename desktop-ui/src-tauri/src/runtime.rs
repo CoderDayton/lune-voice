@@ -245,6 +245,21 @@ impl AppRuntime {
         self.inner.settings.read().await.pill_visibility
     }
 
+    /// Immediately map or unmap the pill to match a (possibly just-changed)
+    /// visibility setting against the live service status — so toggling the
+    /// setting takes effect at once instead of waiting for the next status
+    /// transition (i.e. the next dictation). Mirrors the show/hide decision in
+    /// `publish_status`. Takes `vis` explicitly because `inner.settings` stays
+    /// stale after a save until the next pipeline rebuild.
+    pub async fn reconcile_pill_visibility(&self, vis: PillVisibility) {
+        let status = self.inner.status.read().await.clone();
+        if crate::pill::should_show_pill(vis, &status) {
+            crate::pill::show_pill_direct(&self.inner.app);
+        } else {
+            crate::pill::hide_pill_direct(&self.inner.app);
+        }
+    }
+
     /// Return the persisted pill position, if the user has dragged it. Read at
     /// startup to seed the overlay's placement before its first show.
     pub async fn pill_position(&self) -> Option<lune_core::config::PillPosition> {

@@ -155,6 +155,15 @@ pub async fn save_workspace_settings(
         runtime.app_handle(),
         snapshot.settings.pill_visibility != crate::dto::PillVisibilityDto::Never,
     );
+    // Map/unmap the pill to the new visibility right now, against the live
+    // status — otherwise a switch to "Always" (or away from it) wouldn't take
+    // effect until the next dictation republished the status. Runs after
+    // set_pill_enabled so the window exists (Never -> enabled) before we show it.
+    runtime
+        .reconcile_pill_visibility(crate::persistence::pill_visibility_from_dto(
+            snapshot.settings.pill_visibility,
+        ))
+        .await;
     // Notify pill of settings changes (activation mode, pill visibility)
     if let Err(e) = runtime.app_handle().emit_to(
         "pill",

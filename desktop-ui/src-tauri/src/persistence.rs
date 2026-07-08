@@ -692,7 +692,7 @@ fn pill_visibility_to_dto(vis: PillVisibility) -> PillVisibilityDto {
     }
 }
 
-fn pill_visibility_from_dto(dto: PillVisibilityDto) -> PillVisibility {
+pub(crate) fn pill_visibility_from_dto(dto: PillVisibilityDto) -> PillVisibility {
     match dto {
         PillVisibilityDto::Always => PillVisibility::Always,
         PillVisibilityDto::WhenDictating => PillVisibility::WhenDictating,
