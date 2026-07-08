@@ -86,6 +86,18 @@ const tauriBackendClient: BackendClient = {
     return invoke<void>('nudge_pill', { dx, dy });
   },
 
+  beginPillDrag(dx, dy) {
+    return invoke<boolean>('begin_pill_drag', { dx, dy });
+  },
+
+  dragPillTick() {
+    return invoke<void>('drag_pill_tick');
+  },
+
+  endPillDrag() {
+    return invoke<void>('end_pill_drag');
+  },
+
   savePillPosition() {
     return invoke<void>('save_pill_position');
   },

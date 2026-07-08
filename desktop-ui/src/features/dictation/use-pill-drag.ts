@@ -15,34 +15,75 @@ interface DragState {
   // must be tested against this running total, not each event in isolation.
   accDx: number;
   accDy: number;
+  // Tracking mode: null while begin_pill_drag is resolving; true = native
+  // cursor-pinned ticks (X11/XWayland — Rust re-derives the position from the
+  // live pointer each tick, so nothing can drift); false = incremental
+  // movementX/Y fallback (layer-shell Wayland exposes no global pointer).
+  native: boolean | null;
+  begin: Promise<boolean> | null;
 }
 
 /**
- * Makes the pill overlay draggable. The pill window is a Wayland layer-shell
- * surface that the compositor can't move, so pointer movement is translated
- * into incremental margin nudges on the Rust side (`backendClient.nudgePill`),
- * coalesced to one call per animation frame. On pointer-up after a real drag
- * the position is persisted (`savePillPosition`) and the interaction is flagged
- * via `suppressClickRef` so the surface's click handler doesn't also toggle
- * dictation.
+ * Makes the pill overlay draggable.
  *
- * Per-event `movementX/Y` deltas are used rather than absolute coordinates: the
- * window follows the cursor during a drag (so absolute client coordinates
- * barely change), but the deltas keep accumulating correctly.
+ * Two tracking modes, negotiated per drag via `begin_pill_drag`:
+ *
+ * - **Native (X11/XWayland):** Rust anchors the drag to the pointer's root
+ *   position and, on every `drag_pill_tick`, places the window at that anchor
+ *   offset from the *current* pointer. Ticks are absolute, so IPC latency and
+ *   coalesced events cost at most transient lag — never cumulative drift. The
+ *   old delta-only path integrated integer-truncated `movementX/Y` through
+ *   async IPC, which visibly wandered off the cursor over a long drag.
+ * - **Fallback (Wayland layer-shell):** the compositor gives no global pointer
+ *   position, so per-event `movementX/Y` deltas are accumulated and flushed as
+ *   `nudge_pill` margin nudges, one per animation frame, as before.
+ *
+ * On pointer-up after a real drag the position is persisted
+ * (`savePillPosition`) and the interaction is flagged via `suppressClickRef`
+ * so the surface's click handler doesn't also toggle dictation.
  */
 export function usePillDrag() {
   const stateRef = useRef<DragState | null>(null);
   const pendingRef = useRef({ dx: 0, dy: 0 });
   const frameRef = useRef<number | null>(null);
+  const tickBusyRef = useRef(false);
   const suppressClickRef = useRef(false);
 
-  const flush = () => {
-    frameRef.current = null;
+  const flushDeltas = () => {
     const { dx, dy } = pendingRef.current;
     pendingRef.current = { dx: 0, dy: 0 };
-    if (dx !== 0 || dy !== 0) {
-      backendClient.nudgePill(dx, dy).catch((e) => console.error('[pill] nudge failed', e));
+    if (dx === 0 && dy === 0) return Promise.resolve();
+    return backendClient.nudgePill(dx, dy);
+  };
+
+  const onFrame = () => {
+    frameRef.current = null;
+    const st = stateRef.current;
+    if (!st?.moved) return;
+    if (st.native === true) {
+      // Rust reads the live pointer itself; this call is just the heartbeat
+      // that paces it. Serialize — a queued backlog adds lag without adding
+      // information, since every tick is absolute.
+      if (tickBusyRef.current) {
+        schedule();
+        return;
+      }
+      tickBusyRef.current = true;
+      backendClient
+        .dragPillTick()
+        .catch((e) => console.error('[pill] drag tick failed', e))
+        .finally(() => {
+          tickBusyRef.current = false;
+        });
+    } else if (st.native === false) {
+      flushDeltas().catch((e) => console.error('[pill] nudge failed', e));
     }
+    // native === null: begin_pill_drag is still resolving — its handler
+    // reschedules once the mode is known.
+  };
+
+  const schedule = () => {
+    frameRef.current ??= requestAnimationFrame(onFrame);
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -58,6 +99,8 @@ export function usePillDrag() {
       captured: false,
       accDx: 0,
       accDy: 0,
+      native: null,
+      begin: null,
     };
   };
 
@@ -78,16 +121,35 @@ export function usePillDrag() {
       // leaves the small pill window.
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       st.captured = true;
-      // Catch the pill up to the accumulated pre-threshold movement so it
-      // doesn't lag behind the cursor by the threshold amount.
+      // Seed the fallback with the pre-threshold movement, and hand the same
+      // displacement to begin_pill_drag as catch-up for the native anchor.
       pendingRef.current.dx += st.accDx;
       pendingRef.current.dy += st.accDy;
-      frameRef.current ??= requestAnimationFrame(flush);
+      st.begin = backendClient
+        .beginPillDrag(st.accDx, st.accDy)
+        .catch((err) => {
+          console.error('[pill] begin drag failed', err);
+          return false;
+        })
+        .then((ok) => {
+          if (stateRef.current === st) {
+            st.native = ok;
+            // Native anchor already includes the catch-up; drop the seed so a
+            // later fallback flush can't double-apply it.
+            if (ok) pendingRef.current = { dx: 0, dy: 0 };
+            schedule();
+          }
+          return ok;
+        });
+      return;
+    }
+    if (st.native === true) {
+      schedule();
       return;
     }
     pendingRef.current.dx += dx;
     pendingRef.current.dy += dy;
-    frameRef.current ??= requestAnimationFrame(flush);
+    if (st.native === false) schedule();
   };
 
   const endDrag = (e: React.PointerEvent) => {
@@ -97,18 +159,18 @@ export function usePillDrag() {
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
     }
     stateRef.current = null;
-    // Flush any pending delta immediately before persisting.
     if (frameRef.current !== null) {
       cancelAnimationFrame(frameRef.current);
       frameRef.current = null;
     }
-    flush();
-    if (st.moved) {
-      suppressClickRef.current = true;
-      backendClient
-        .savePillPosition()
-        .catch((err) => console.error('[pill] save position failed', err));
-    }
+    if (!st.moved) return;
+    suppressClickRef.current = true;
+    // Settle exactly, then persist the resting spot: native mode ends with a
+    // final anchored tick in Rust; the fallback flushes any remaining delta.
+    (st.begin ?? Promise.resolve(false))
+      .then((native) => (native ? backendClient.endPillDrag() : flushDeltas()))
+      .then(() => backendClient.savePillPosition())
+      .catch((err) => console.error('[pill] end drag failed', err));
   };
 
   // Cancel any pending frame on unmount.

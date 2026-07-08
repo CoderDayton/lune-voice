@@ -7,10 +7,19 @@ use std::sync::atomic::{AtomicI32, Ordering};
 /// Fixed pill overlay footprint — a wide, short rounded bar. Fixed for all modes
 /// to avoid compositor ghost artifacts on Wayland windows during resize (wry
 /// #1667, tauri #14924). The window IS the pill's footprint; the webview content
-/// fills it edge-to-edge (`.pill-root` is a fixed 32px tall), and the layer-shell
+/// fills it edge-to-edge (`.pill-root` is a fixed 40px tall), and the layer-shell
 /// surface height follows that intrinsic content height, so PILL_H must match it.
-const PILL_W: f64 = 104.0;
-const PILL_H: f64 = 32.0;
+const PILL_W: f64 = 132.0;
+const PILL_H: f64 = 40.0;
+
+/// Corner radius of the pill bar (logical px) — must match `.pill-root`'s
+/// `border-radius` in components.css. Used to clip the X11 window shape to the
+/// rounded bar (see `configure_linux_pill`).
+const PILL_RADIUS: i32 = 12;
+
+/// Gap (logical px) left below the pill in its default bottom-centre placement,
+/// so it clears a bottom taskbar/dock instead of sitting flush to the edge.
+const PILL_DEFAULT_BOTTOM_GAP: i32 = 72;
 
 /// Live pill position (logical px from the monitor's top-left). `i32::MIN` =
 /// uninitialised — `resolve_pill_position` then loads the saved value or
@@ -21,6 +30,12 @@ static PILL_Y: AtomicI32 = AtomicI32::new(i32::MIN);
 /// Cached logical monitor size, for clamping drags on-screen (0 = unknown).
 static MON_W: AtomicI32 = AtomicI32::new(0);
 static MON_H: AtomicI32 = AtomicI32::new(0);
+/// Cached logical origin of that monitor in the global coordinate space (0 on
+/// the layer-shell path, whose margins are per-output). Lets placement/clamping
+/// honour monitors offset from (0, 0) — e.g. a primary screen stacked below a
+/// secondary one, where clamping to (0, 0) would push the pill off-screen.
+static MON_X: AtomicI32 = AtomicI32::new(0);
+static MON_Y: AtomicI32 = AtomicI32::new(0);
 
 /// Seed the saved pill position at startup (from settings) so the pill reopens
 /// where the user last dragged it, ahead of the first show/configure.
@@ -36,34 +51,124 @@ pub fn current_pill_position() -> Option<(i32, i32)> {
     (x != i32::MIN && y != i32::MIN).then_some((x, y))
 }
 
-/// Clamp a position so the whole pill stays on the cached monitor. An unknown
-/// monitor size (0) leaves that axis unbounded.
+/// Clamp a position so the whole pill stays on the cached monitor, honouring
+/// the monitor's origin (nonzero on multi-monitor layouts). An unknown monitor
+/// size (0) leaves that axis unbounded.
 fn clamp_pill_pos(x: i32, y: i32) -> (i32, i32) {
+    let mon_x = MON_X.load(Ordering::Acquire);
+    let mon_y = MON_Y.load(Ordering::Acquire);
     let mon_w = MON_W.load(Ordering::Acquire);
     let mon_h = MON_H.load(Ordering::Acquire);
-    let max_x = if mon_w > 0 {
-        (mon_w - PILL_W as i32).max(0)
+    let (min_x, max_x) = if mon_w > 0 {
+        (mon_x, mon_x + (mon_w - PILL_W as i32).max(0))
     } else {
-        i32::MAX
+        (i32::MIN, i32::MAX)
     };
-    let max_y = if mon_h > 0 {
-        (mon_h - PILL_H as i32).max(0)
+    let (min_y, max_y) = if mon_h > 0 {
+        (mon_y, mon_y + (mon_h - PILL_H as i32).max(0))
     } else {
-        i32::MAX
+        (i32::MIN, i32::MAX)
     };
-    (x.clamp(0, max_x), y.clamp(0, max_y))
+    (x.clamp(min_x, max_x), y.clamp(min_y, max_y))
 }
 
-/// Logical size of the monitor the pill is on (physical size ÷ scale factor).
-fn monitor_logical_size(pill: &tauri::WebviewWindow) -> Option<(i32, i32)> {
+/// Logical bounds of the monitor whose area contains the pill's centre at
+/// (x, y), or the nearest monitor if none does. `None` if the monitor list
+/// can't be read. Main thread (enumerates monitors).
+fn monitor_bounds_at(pill: &tauri::WebviewWindow, x: i32, y: i32) -> Option<(i32, i32, i32, i32)> {
+    let cx = x + PILL_W as i32 / 2;
+    let cy = y + PILL_H as i32 / 2;
+    let mut contained: Option<(i32, i32, i32, i32)> = None;
+    let mut nearest: Option<(i64, (i32, i32, i32, i32))> = None;
+    for m in pill.available_monitors().ok()? {
+        let p = m.position();
+        let s = m.size();
+        let scale = m.scale_factor();
+        let scale = if scale.is_finite() && scale > 0.0 {
+            scale
+        } else {
+            1.0
+        };
+        let b = (
+            (p.x as f64 / scale) as i32,
+            (p.y as f64 / scale) as i32,
+            (s.width as f64 / scale) as i32,
+            (s.height as f64 / scale) as i32,
+        );
+        let (mx, my, mw, mh) = b;
+        if cx >= mx && cx < mx + mw && cy >= my && cy < my + mh {
+            contained = Some(b);
+            break;
+        }
+        let ccx = mx + mw / 2;
+        let ccy = my + mh / 2;
+        let d = ((cx - ccx) as i64).pow(2) + ((cy - ccy) as i64).pow(2);
+        if nearest.is_none_or(|(bd, _)| d < bd) {
+            nearest = Some((d, b));
+        }
+    }
+    contained.or_else(|| nearest.map(|(_, b)| b))
+}
+
+/// Clamp so the pill stays fully within the monitor its centre is over (or the
+/// nearest one) — letting it cross freely between monitors in a multi-head
+/// layout without vanishing into the gap between them. No clamp if the monitor
+/// layout is unreadable. Global-coordinate path only; main thread.
+fn clamp_to_current_monitor(pill: &tauri::WebviewWindow, x: i32, y: i32) -> (i32, i32) {
+    let Some((mx, my, mw, mh)) = monitor_bounds_at(pill, x, y) else {
+        return (x, y);
+    };
+    let max_x = (mx + (mw - PILL_W as i32)).max(mx);
+    let max_y = (my + (mh - PILL_H as i32)).max(my);
+    (x.clamp(mx, max_x), y.clamp(my, max_y))
+}
+
+/// Clamp a desired pill position on-screen. On the global-coordinate path
+/// (X11/XWayland, Windows, macOS) uses the live monitor layout so drags cross
+/// monitors cleanly; on the layer-shell path uses the cached per-output bounds.
+/// Main thread.
+fn clamp_pill_target(pill: &tauri::WebviewWindow, x: i32, y: i32) -> (i32, i32) {
+    if global_coords() {
+        clamp_to_current_monitor(pill, x, y)
+    } else {
+        clamp_pill_pos(x, y)
+    }
+}
+
+/// Whether pill positions are in the compositor's global coordinate space
+/// (X11/XWayland, Windows, macOS — `set_position`), as opposed to per-output
+/// layer-shell margins (COSMIC/wlroots). The Linux check touches GTK, so
+/// main-thread only.
+fn global_coords() -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        !use_layer_shell()
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        true
+    }
+}
+
+/// Logical bounds (origin + size) of the monitor the pill is on, in the global
+/// multi-monitor coordinate space `set_position` uses. Physical values ÷ scale.
+fn monitor_logical_bounds(pill: &tauri::WebviewWindow) -> Option<(i32, i32, i32, i32)> {
     let monitor = pill
         .current_monitor()
         .ok()
         .flatten()
         .or_else(|| pill.primary_monitor().ok().flatten())?;
+    let pos = monitor.position();
     let size = monitor.size();
     let scale = monitor.scale_factor();
+    let scale = if scale.is_finite() && scale > 0.0 {
+        scale
+    } else {
+        1.0
+    };
     Some((
+        (pos.x as f64 / scale) as i32,
+        (pos.y as f64 / scale) as i32,
         (size.width as f64 / scale) as i32,
         (size.height as f64 / scale) as i32,
     ))
@@ -73,19 +178,27 @@ fn monitor_logical_size(pill: &tauri::WebviewWindow) -> Option<(i32, i32)> {
 /// default bottom-centre placement computed from the monitor. Caches the
 /// monitor size for later drag clamping and stores the resolved position.
 fn resolve_pill_position(pill: &tauri::WebviewWindow) -> (i32, i32) {
-    if let Some((w, h)) = monitor_logical_size(pill) {
-        MON_W.store(w, Ordering::Release);
-        MON_H.store(h, Ordering::Release);
+    if let Some((mx, my, mw, mh)) = monitor_logical_bounds(pill) {
+        // Layer-shell margins are per-output (origin 0); global coords keep the
+        // monitor's offset so multi-monitor placement lands on the right screen.
+        let (ox, oy) = if global_coords() { (mx, my) } else { (0, 0) };
+        MON_X.store(ox, Ordering::Release);
+        MON_Y.store(oy, Ordering::Release);
+        MON_W.store(mw, Ordering::Release);
+        MON_H.store(mh, Ordering::Release);
     }
     let (x, y) = match current_pill_position() {
-        Some((x, y)) => clamp_pill_pos(x, y),
+        Some((x, y)) => clamp_pill_target(pill, x, y),
         None => {
-            // Default placement: horizontally centred, and vertically a little
-            // above the screen centre.
+            // Default placement: horizontally centred, near the bottom with a
+            // gap so it clears a taskbar/dock — offset by the monitor origin so
+            // it lands on the intended screen in a multi-monitor layout.
+            let mon_x = MON_X.load(Ordering::Acquire);
+            let mon_y = MON_Y.load(Ordering::Acquire);
             let mon_w = MON_W.load(Ordering::Acquire);
             let mon_h = MON_H.load(Ordering::Acquire);
-            let x = ((mon_w - PILL_W as i32) / 2).max(0);
-            let y = (((mon_h - PILL_H as i32) / 2) - mon_h / 10).max(0);
+            let x = mon_x + ((mon_w - PILL_W as i32) / 2).max(0);
+            let y = (mon_y + mon_h - PILL_H as i32 - PILL_DEFAULT_BOTTOM_GAP).max(mon_y);
             (x, y)
         }
     };
@@ -202,13 +315,147 @@ pub async fn nudge_pill(
     app: AppHandle,
 ) -> Result<(), String> {
     require_window_access(&window, &["pill"])?;
-    let (x, y) = clamp_pill_pos(
-        PILL_X.load(Ordering::Acquire).saturating_add(dx),
-        PILL_Y.load(Ordering::Acquire).saturating_add(dy),
-    );
+    let desired_x = PILL_X.load(Ordering::Acquire).saturating_add(dx);
+    let desired_y = PILL_Y.load(Ordering::Acquire).saturating_add(dy);
+    run_pill_window_on_main_thread(&app, move |pill| {
+        // Clamp against the live monitor layout (needs the main thread) so a
+        // drag across monitors stays on-screen instead of vanishing into the
+        // gap between them, then apply.
+        let (x, y) = clamp_pill_target(&pill, desired_x, desired_y);
+        PILL_X.store(x, Ordering::Release);
+        PILL_Y.store(y, Ordering::Release);
+        apply_pill_position(&pill, x, y)
+    })
+    .await
+}
+
+/// Anchor for a cursor-pinned drag on the X11/XWayland path: the pointer's
+/// root position and the pill's logical position at drag start, plus the
+/// window scale. Every `drag_pill_tick` re-derives the pill position
+/// *absolutely* from the live pointer against this anchor, so per-event
+/// rounding and dropped events can never accumulate into drift — the failure
+/// mode of the incremental `nudge_pill` path, whose integer `movementX/Y`
+/// deltas made the pill wander off the cursor over a long drag.
+#[cfg(target_os = "linux")]
+#[derive(Clone, Copy)]
+struct DragAnchor {
+    pointer: (i32, i32),
+    pill: (i32, i32),
+    scale: f64,
+}
+
+#[cfg(target_os = "linux")]
+static DRAG_ANCHOR: std::sync::Mutex<Option<DragAnchor>> = std::sync::Mutex::new(None);
+
+/// Pointer position in root (device) coordinates via the default GDK seat.
+/// Meaningful only on X11/XWayland — Wayland exposes no global pointer, which
+/// is why the layer-shell path keeps the incremental fallback. Main thread.
+#[cfg(target_os = "linux")]
+fn pointer_root_position() -> Option<(i32, i32)> {
+    use gtk::gdk::prelude::*;
+    let seat = gtk::gdk::Display::default()?.default_seat()?;
+    let (_screen, x, y) = seat.pointer()?.position();
+    Some((x, y))
+}
+
+/// Begin a cursor-pinned drag. `dx`/`dy` carry the displacement accumulated
+/// before the drag threshold was crossed, folded into the anchor so the pill
+/// first catches up to the original grab point. Returns whether native
+/// pointer tracking is active; `false` (layer-shell, no pointer device, or an
+/// uninitialised position) tells the frontend to keep the incremental
+/// `nudge_pill` fallback.
+#[tauri::command]
+pub async fn begin_pill_drag(
+    dx: i32,
+    dy: i32,
+    window: WebviewWindow,
+    app: AppHandle,
+) -> Result<bool, String> {
+    require_window_access(&window, &["pill"])?;
+    #[cfg(target_os = "linux")]
+    {
+        let handle = app.clone();
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        app.run_on_main_thread(move || {
+            let anchor = (|| {
+                if use_layer_shell() {
+                    return None;
+                }
+                let pointer = pointer_root_position()?;
+                let (px, py) = current_pill_position()?;
+                let scale = handle
+                    .get_webview_window("pill")?
+                    .scale_factor()
+                    .ok()
+                    .filter(|s| s.is_finite() && *s > 0.0)
+                    .unwrap_or(1.0);
+                Some(DragAnchor {
+                    pointer,
+                    pill: (px.saturating_add(dx), py.saturating_add(dy)),
+                    scale,
+                })
+            })();
+            let native = anchor.is_some();
+            *DRAG_ANCHOR.lock().unwrap() = anchor;
+            let _ = tx.send(native);
+        })
+        .map_err(|e| e.to_string())?;
+        rx.await
+            .map_err(|_| "begin pill drag did not complete".to_string())
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (dx, dy, app);
+        Ok(false)
+    }
+}
+
+/// One tracking step of a cursor-pinned drag: place the pill at its anchor
+/// offset from the *current* pointer position. Absolute, not incremental — a
+/// missed or delayed tick leaves no residual error, the next tick lands
+/// exactly. No-op when no drag is active.
+#[tauri::command]
+pub async fn drag_pill_tick(window: WebviewWindow, app: AppHandle) -> Result<(), String> {
+    require_window_access(&window, &["pill"])?;
+    run_pill_window_on_main_thread(&app, move |pill| apply_drag_tick(&pill)).await
+}
+
+/// Finish a cursor-pinned drag: one final settle tick so the release position
+/// is exact, then drop the anchor. The frontend persists the position via
+/// `save_pill_position` afterwards.
+#[tauri::command]
+pub async fn end_pill_drag(window: WebviewWindow, app: AppHandle) -> Result<(), String> {
+    require_window_access(&window, &["pill"])?;
+    run_pill_window_on_main_thread(&app, move |pill| {
+        let result = apply_drag_tick(&pill);
+        #[cfg(target_os = "linux")]
+        {
+            *DRAG_ANCHOR.lock().unwrap() = None;
+        }
+        result
+    })
+    .await
+}
+
+#[cfg(target_os = "linux")]
+fn apply_drag_tick(pill: &tauri::WebviewWindow) -> Result<(), String> {
+    let Some(anchor) = *DRAG_ANCHOR.lock().unwrap() else {
+        return Ok(());
+    };
+    let Some((px, py)) = pointer_root_position() else {
+        return Ok(());
+    };
+    let dx = (f64::from(px - anchor.pointer.0) / anchor.scale).round() as i32;
+    let dy = (f64::from(py - anchor.pointer.1) / anchor.scale).round() as i32;
+    let (x, y) = clamp_pill_target(pill, anchor.pill.0 + dx, anchor.pill.1 + dy);
     PILL_X.store(x, Ordering::Release);
     PILL_Y.store(y, Ordering::Release);
-    run_pill_window_on_main_thread(&app, move |pill| apply_pill_position(&pill, x, y)).await
+    apply_pill_position(pill, x, y)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn apply_drag_tick(_pill: &tauri::WebviewWindow) -> Result<(), String> {
+    Ok(())
 }
 
 /// Persist the pill's current position to settings so it reopens there. Called
@@ -387,6 +634,20 @@ fn configure_linux_pill(pill: &tauri::WebviewWindow) -> Result<(), String> {
     use gtk_layer_shell::LayerShell;
 
     if !use_layer_shell() {
+        // X11 / XWayland path (native Wayland without layer-shell runs under
+        // XWayland — see run()). Pin the window to the pill footprint so
+        // WebKitGTK can't grow it to the web content's natural height — a tall
+        // transparent area renders black on this Nvidia + WebKitGTK stack.
+        // always_on_top / skip_taskbar from the builder are honoured under X11.
+        let gtk_window: gtk::Window = pill.gtk_window().map_err(|e| e.to_string())?.upcast();
+        gtk_window.set_size_request(PILL_W as i32, PILL_H as i32);
+        // WebKitGTK also loses page alpha entirely under XWayland on this GPU
+        // stack, so the "transparent" corner pixels around the rounded bar
+        // paint opaque black. Clip the window itself to the bar's rounded rect
+        // (XShape) so those pixels never reach the screen. Realize first — the
+        // shape is applied to the widget's realized GDK window.
+        gtk_window.realize();
+        gtk_window.shape_combine_region(Some(&rounded_pill_region()));
         return reposition_standard(pill);
     }
 
@@ -424,6 +685,33 @@ fn configure_linux_pill(pill: &tauri::WebviewWindow) -> Result<(), String> {
     gtk_window.set_layer_shell_margin(gtk_layer_shell::Edge::Top, y);
 
     Ok(())
+}
+
+/// The pill bar's rounded-rect footprint as a cairo region: one 1px-tall span
+/// per row, with corner rows inset by the circle equation. `ceil` biases the
+/// clip inward so no black corner pixel survives at the antialiased edge.
+#[cfg(target_os = "linux")]
+fn rounded_pill_region() -> gtk::cairo::Region {
+    use gtk::cairo::{RectangleInt, Region};
+    let (w, h, r) = (PILL_W as i32, PILL_H as i32, PILL_RADIUS);
+    let region = Region::create();
+    for y in 0..h {
+        let cy = f64::from(y) + 0.5;
+        let d = if cy < f64::from(r) {
+            f64::from(r) - cy
+        } else if cy > f64::from(h - r) {
+            cy - f64::from(h - r)
+        } else {
+            0.0
+        };
+        let inset = if d > 0.0 {
+            (f64::from(r) - (f64::from(r * r) - d * d).max(0.0).sqrt()).ceil() as i32
+        } else {
+            0
+        };
+        let _ = region.union_rectangle(&RectangleInt::new(inset, y, w - 2 * inset, 1));
+    }
+    region
 }
 
 #[cfg(test)]

@@ -11,7 +11,9 @@
   </style>
   </head>
   <body>
-    <div id="pill-root" class="pill-root"></div>
+    <!-- Plain mount point: DictationPill renders its own .pill-root; keeping the
+         class here too would paint a second bar (border-in-border) around it. -->
+    <div id="pill-root"></div>
     <script type="module" src="/src/pill-entry.tsx"></script>
   </body>
 </html>

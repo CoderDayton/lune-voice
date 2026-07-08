@@ -34,6 +34,23 @@ export function MicIcon({ className }: IconProps = {}) {
   );
 }
 
+/** Brand mark — a filled crescent (Lune). Solid fill so it reads as a logo at
+ *  16px, where the stroke icons above would look wiry. */
+export function MoonIcon({ className }: IconProps = {}) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className ?? 'size-4'}
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M12 3a6.364 6.364 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+    </svg>
+  );
+}
+
 export function XIcon({ className }: IconProps = {}) {
   return (
     <PillSvg className={className ?? 'size-4'}>

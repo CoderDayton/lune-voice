@@ -378,6 +378,16 @@ export const mockBackendClient: BackendClient = {
 
   async nudgePill() {},
 
+  // Browser mock has no window to move — report no native tracking so the
+  // drag hook stays on the (equally mocked) nudge path.
+  async beginPillDrag() {
+    return false;
+  },
+
+  async dragPillTick() {},
+
+  async endPillDrag() {},
+
   async savePillPosition() {},
 
   async gpuSupport() {

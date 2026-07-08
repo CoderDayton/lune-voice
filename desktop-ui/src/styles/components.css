@@ -205,8 +205,11 @@ body.pill-window {
 }
 
 .pill-root {
-  @apply relative flex w-full items-center justify-center;
-  height: 32px;
+  @apply relative flex items-center justify-center;
+  /* Explicit footprint (not w-full) so the intrinsic content size the window
+     follows is exactly PILL_W × PILL_H from pill.rs — keep all three in sync. */
+  width: 132px;
+  height: 40px;
   /* Lightened a touch past the base token (already the lightest solid
      surface) so the bar reads distinct from panels behind it; mixed
      toward white rather than swapped so it stays a no-op in light mode
@@ -214,7 +217,7 @@ body.pill-window {
      this Nvidia + WebKitGTK stack). */
   background: color-mix(in oklab, var(--color-surface-elevated) 92%, white 8%);
   border: 1px solid var(--color-surface-border);
-  border-radius: 10px;
+  border-radius: 12px;
   /* Clip every child (surface + cancel hover fills, waveform) to the rounded
      shape so no hover background shows square corners past the radius. */
   overflow: hidden;
@@ -229,13 +232,23 @@ body.pill-window {
   cursor: grabbing;
 }
 
-/* Idle "ready" mark — a static short bar in a dim primary, so idle → listening
-   reads as one accent hue brightening (no animation; no audio to visualise). */
+/* Brand mark — crescent in the primary accent, pinned to the left cap.
+   pointer-events off so the full-bleed surface below keeps the whole bar
+   clickable and draggable. */
+@utility pill-logo {
+  @apply pointer-events-none absolute inset-y-0 left-0 flex w-8 items-center justify-center text-primary;
+}
+
+/* Idle "ready" mark — a short bar in a dim primary with a slow breathe, so
+   idle → listening reads as the same accent hue waking up. Starts the breathe
+   at full opacity so the entrance animation hands off without a jump. */
 @utility pill-idle-mark {
-  @apply block rounded-full bg-primary/40;
-  width: 18px;
+  @apply block rounded-full bg-primary/60;
+  width: 20px;
   height: 5px;
-  animation: pill-content-in 180ms var(--ease-standard);
+  animation:
+    pill-content-in 180ms var(--ease-standard),
+    pill-idle-breathe 3.2s ease-in-out 180ms infinite;
 }
 
 .pill-cancelled {
@@ -262,15 +275,19 @@ button.pill-surface:hover {
 /* Discard control — kept out of the resting layout and revealed on hover so the
    bar stays a clean waveform until the user reaches for it. */
 @utility pill-cancel {
-  @apply absolute inset-y-0 right-0 flex w-6 items-center justify-center border-0 bg-transparent text-base-content/45;
-  border-radius: 0 10px 10px 0;
+  @apply absolute inset-y-0 right-0 flex w-7 items-center justify-center border-0 bg-transparent text-base-content/45;
+  border-radius: 0 12px 12px 0;
   opacity: 0;
+  transform: translateX(4px);
   cursor: pointer;
-  transition: opacity 150ms ease, color 150ms ease, background-color 150ms ease;
+  transition: opacity 160ms var(--ease-standard), transform 160ms var(--ease-standard),
+              color 160ms var(--ease-standard), background-color 160ms var(--ease-standard);
 }
 
-.pill-root:hover .pill-cancel {
+.pill-root:hover .pill-cancel,
+.pill-cancel:focus-visible {
   opacity: 1;
+  transform: translateX(0);
 }
 
 .pill-cancel:hover {
@@ -292,22 +309,43 @@ button.pill-surface:hover {
 }
 
 @utility audio-dots {
-  @apply flex h-full items-center justify-center gap-[4px];
+  @apply flex h-full items-center justify-center gap-[5px];
   animation: pill-content-in 180ms var(--ease-standard);
 }
 
 @utility audio-dot {
   @apply block w-[4px] rounded-full bg-primary;
-  height: 8px;
+  height: 9px;
   transform-origin: center;
-  animation: dot-bounce 1.2s ease-in-out infinite;
+  animation: pill-dot-bounce 1.2s ease-in-out infinite;
   transition: transform 60ms ease-out, opacity 60ms ease-out;
   /* Own compositing layer: WebKitGTK otherwise repaints the whole overlay
      window for every bar transform change. */
   will-change: transform, opacity;
 }
 
+/* Processing shifts to the teal secondary — a deliberate hue change from the
+   violet idle/listening accents, so "thinking" reads at a glance. */
 @utility pill-pulse {
-  @apply block rounded-full size-2 bg-warning;
-  animation: pulse-glow 1.4s ease-in-out infinite;
+  @apply block rounded-full bg-secondary;
+  width: 10px;
+  height: 10px;
+  animation: pill-pulse-beat 1.3s ease-in-out infinite;
+}
+
+/* Pill-local keyframes — transform/opacity only, running on content over the
+   opaque bar, so they composite cleanly on the Nvidia + WebKitGTK stack. */
+@keyframes pill-idle-breathe {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+
+@keyframes pill-dot-bounce {
+  0%, 80%, 100% { transform: scaleY(1); opacity: 0.35; }
+  40%           { transform: scaleY(2.1); opacity: 0.95; }
+}
+
+@keyframes pill-pulse-beat {
+  0%, 100% { opacity: 0.4; transform: scale(0.78); }
+  50%      { opacity: 1; transform: scale(1.08); }
 }

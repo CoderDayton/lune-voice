@@ -89,6 +89,23 @@ fn create_or_focus_main_window(app: &tauri::AppHandle) {
 }
 
 pub fn run() {
+    // On a Wayland session whose compositor lacks wlr-layer-shell (GNOME/Mutter,
+    // most KDE), a native Wayland window can neither position itself nor stay
+    // always-on-top — both of which the dictation pill needs. Run the whole app
+    // under XWayland there so set_position + _NET_WM_STATE_ABOVE work again.
+    // COSMIC and other wlroots compositors keep native Wayland + layer-shell.
+    // Must happen before the Tauri builder touches GTK/GDK.
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("GDK_BACKEND").is_none() && lune_app::should_use_xwayland_fallback() {
+        // SAFETY: single-threaded here — main() has only initialised tracing
+        // before calling run(); no other thread reads the environment yet.
+        unsafe { std::env::set_var("GDK_BACKEND", "x11") };
+        tracing::info!(
+            "Wayland without layer-shell detected — running under XWayland \
+             (GDK_BACKEND=x11) so the pill can position and stay on top"
+        );
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             create_or_focus_main_window(app);
@@ -213,6 +230,9 @@ pub fn run() {
             pill::hide_pill_window,
             pill::reposition_pill_center,
             pill::nudge_pill,
+            pill::begin_pill_drag,
+            pill::drag_pill_tick,
+            pill::end_pill_drag,
             pill::save_pill_position,
             commands::list_audio_input_devices,
             commands::check_model_status,

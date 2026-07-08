@@ -2,7 +2,7 @@ import { useLingui } from '@lingui/react/macro';
 import { useCallback, useRef } from 'react';
 import { backendClient } from '../../lib/backend/client';
 import { AudioDots } from './audio-dots';
-import { PulseIndicator, XIcon } from './pill-icons';
+import { MoonIcon, PulseIndicator, XIcon } from './pill-icons';
 import { usePillDrag } from './use-pill-drag';
 import { usePillState } from './use-pill-state';
 
@@ -76,6 +76,12 @@ export function DictationPill() {
 
   return (
     <div className={rootClass} {...dragHandlers}>
+      {/* Decorative brand mark on the left cap; pointer-events off in CSS so the
+          full-bleed surface below keeps the whole bar clickable/draggable. */}
+      <span className="pill-logo" aria-hidden="true">
+        <MoonIcon />
+      </span>
+
       {isButton ? (
         <button
           type="button"
