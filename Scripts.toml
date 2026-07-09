@@ -98,13 +98,14 @@ case "$TYPE" in
   latency)     run session_latency ;;
   punctuation) run punctuation_ab ;;
   dict)        run dict_carrier_ab ;;
+  snippets)    cargo run --release --example snippet_bench -p lune-app ;;
   styling)     run styling_capability ;;
   rulecmp)     run styling_rulecmp ;;
   live)        run live_transcribe ;;
-  *) echo "TYPE must be: agc | transcribe(WAV=) | domain | pipeline | stages | latency | punctuation | dict | styling | rulecmp | live"; exit 1 ;;
+  *) echo "TYPE must be: agc | transcribe(WAV=) | domain | pipeline | stages | latency | punctuation | dict | snippets | styling | rulecmp | live"; exit 1 ;;
 esac
 '''
-info = "Benchmarks (--env TYPE=agc|transcribe|domain|pipeline|stages|latency|punctuation|dict|styling|live; transcribe needs WAV=)"
+info = "Benchmarks (--env TYPE=agc|transcribe|domain|pipeline|stages|latency|punctuation|dict|snippets|styling|live; transcribe needs WAV=)"
 
 # ── Build ────────────────────────────────────────────────────────────────────
 

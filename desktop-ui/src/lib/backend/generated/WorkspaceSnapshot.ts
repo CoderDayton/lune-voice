@@ -2,7 +2,8 @@
 import type { DictionaryItemDto } from "./DictionaryItemDto";
 import type { HistoryItemDto } from "./HistoryItemDto";
 import type { SessionStatsDto } from "./SessionStatsDto";
+import type { SnippetItemDto } from "./SnippetItemDto";
 import type { StylePresetDto } from "./StylePresetDto";
 import type { WorkspaceSettingsDto } from "./WorkspaceSettingsDto";
 
-export type WorkspaceSnapshot = { ipcFlavor: string, serviceStatus: string, settings: WorkspaceSettingsDto, history: Array<HistoryItemDto>, dictionary: Array<DictionaryItemDto>, stylePresets: Array<StylePresetDto>, stats: SessionStatsDto, };
+export type WorkspaceSnapshot = { ipcFlavor: string, serviceStatus: string, settings: WorkspaceSettingsDto, history: Array<HistoryItemDto>, dictionary: Array<DictionaryItemDto>, snippets: Array<SnippetItemDto>, stylePresets: Array<StylePresetDto>, stats: SessionStatsDto, };

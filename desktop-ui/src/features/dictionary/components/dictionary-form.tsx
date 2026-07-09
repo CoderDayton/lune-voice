@@ -2,6 +2,7 @@ import { Trans, useLingui } from '@lingui/react/macro';
 import { ArrowRight, Plus, Wand2 } from 'lucide-react';
 import { type FormEvent, useId, useRef, useState } from 'react';
 import { PanelHeader } from '../../../components/ui/panel-header';
+import { VoiceCaptureField } from '../../../components/ui/voice-capture-field';
 import { addDictionaryEntry } from '../../../store/workspace-store';
 import { PriorityPicker } from './priority-picker';
 
@@ -61,19 +62,16 @@ export function QuickAddRule() {
             >
               <Trans>You say</Trans>
             </label>
-            <input
+            {/* Voice capture stores the phrase exactly as the ASR hears it —
+                the misheard form is precisely what this field wants. */}
+            <VoiceCaptureField
               id={phraseId}
-              ref={phraseRef}
-              type="text"
               value={phrase}
-              onChange={(e) => setPhrase(e.target.value)}
-              className="input input-lg w-full text-base"
+              onValueChange={setPhrase}
               placeholder={t`github`}
-              autoComplete="off"
-              autoCapitalize="off"
-              spellCheck={false}
+              inputRef={phraseRef}
+              lowercase
               required
-              aria-required="true"
             />
           </div>
 

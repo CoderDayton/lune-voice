@@ -2,8 +2,8 @@ use tauri::{Emitter, Runtime, State, WebviewWindow, ipc::Channel};
 
 use crate::dto::{
     CreateCustomStyleInput, CreateDictionaryEntryInput, GpuSupportDto, HistoryPageDto,
-    PillSnapshotDto, SaveWorkspaceSettingsInput, SessionStreamEvent, UpdateCustomStyleInput,
-    UpdateDictionaryEntryInput, WorkspaceSnapshot,
+    PillSnapshotDto, SaveSnippetInput, SaveWorkspaceSettingsInput, SessionStreamEvent,
+    UpdateCustomStyleInput, UpdateDictionaryEntryInput, WorkspaceSnapshot,
 };
 use crate::runtime::AppRuntime;
 
@@ -258,6 +258,38 @@ pub async fn delete_dictionary_entry(
     Ok(snapshot)
 }
 
+/// Create or update a voice snippet. No pipeline reload: snippets are read
+/// fresh from the database on every utterance.
+#[tauri::command]
+pub async fn save_snippet(
+    window: WebviewWindow,
+    runtime: State<'_, AppRuntime>,
+    input: SaveSnippetInput,
+) -> Result<WorkspaceSnapshot, String> {
+    require_window_access(&window, &["main"])?;
+    let mut snapshot = run_persist("save snippet", move || {
+        crate::persistence::save_snippet(input)
+    })
+    .await?;
+    snapshot.service_status = runtime.service_status().await;
+    Ok(snapshot)
+}
+
+#[tauri::command]
+pub async fn delete_snippet(
+    window: WebviewWindow,
+    runtime: State<'_, AppRuntime>,
+    snippet_id: String,
+) -> Result<WorkspaceSnapshot, String> {
+    require_window_access(&window, &["main"])?;
+    let mut snapshot = run_persist("delete snippet", move || {
+        crate::persistence::delete_snippet(snippet_id)
+    })
+    .await?;
+    snapshot.service_status = runtime.service_status().await;
+    Ok(snapshot)
+}
+
 #[tauri::command]
 pub async fn update_dictionary_entry(
     window: WebviewWindow,
@@ -416,6 +448,18 @@ pub async fn start_dictation(
 ) -> Result<String, String> {
     require_window_access(&window, &["main", "pill"])?;
     runtime.inner().clone().start_dictation().await
+}
+
+/// Start a capture-only session: transcribes speech and streams the raw text
+/// back as a `CaptureText` event instead of typing it anywhere. Used by the
+/// snippet trigger recorder.
+#[tauri::command]
+pub async fn start_trigger_capture(
+    window: WebviewWindow,
+    runtime: State<'_, AppRuntime>,
+) -> Result<String, String> {
+    require_window_access(&window, &["main"])?;
+    runtime.start_trigger_capture().await
 }
 
 #[tauri::command]

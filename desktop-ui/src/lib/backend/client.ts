@@ -43,6 +43,16 @@ const tauriBackendClient: BackendClient = {
     return invoke<WorkspaceSnapshot>('delete_dictionary_entry', { entryId: id });
   },
 
+  saveSnippet(id, triggerPhrase, body) {
+    return invoke<WorkspaceSnapshot>('save_snippet', {
+      input: { id, triggerPhrase, body },
+    });
+  },
+
+  deleteSnippet(id) {
+    return invoke<WorkspaceSnapshot>('delete_snippet', { snippetId: id });
+  },
+
   deleteSession(sessionId) {
     return invoke<WorkspaceSnapshot>('delete_session', { sessionId });
   },
@@ -69,6 +79,10 @@ const tauriBackendClient: BackendClient = {
   },
   startDictation() {
     return invoke<string>('start_dictation');
+  },
+
+  startTriggerCapture() {
+    return invoke<string>('start_trigger_capture');
   },
 
   stopDictation() {

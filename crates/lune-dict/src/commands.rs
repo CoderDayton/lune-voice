@@ -143,7 +143,7 @@ impl Default for VoiceCommandRouter {
 /// (so `"Stop,"` and `"stop"` compare equal); tokens with no alphanumerics are
 /// dropped. Used only for *matching* — the passed-through dictation keeps its
 /// original casing and punctuation.
-fn normalize_words(text: &str) -> Vec<String> {
+pub(crate) fn normalize_words(text: &str) -> Vec<String> {
     text.split_whitespace()
         .filter_map(|tok| {
             let w: String = tok

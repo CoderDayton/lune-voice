@@ -20,6 +20,7 @@ export type { PillSnapshotDto } from './PillSnapshotDto';
 export type { PillVisibilityDto } from './PillVisibilityDto';
 export type { SaveWorkspaceSettingsInput } from './SaveWorkspaceSettingsInput';
 export type { SessionStatsDto } from './SessionStatsDto';
+export type { SnippetItemDto } from './SnippetItemDto';
 export type { StylePresetDto } from './StylePresetDto';
 export type { TerminalModeDto } from './TerminalModeDto';
 export type { WorkspaceSettingsDto } from './WorkspaceSettingsDto';

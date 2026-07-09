@@ -12,7 +12,7 @@ import type {
   TerminalModeValue,
   WhisperModelValue,
 } from '../features/settings/data/settings-data';
-import type { FormatTogglesDto } from '../lib/backend/types';
+import type { FormatTogglesDto, SnippetItemDto } from '../lib/backend/types';
 
 export interface WorkspaceSettings {
   activationMode: ActivationModeValue;
@@ -81,6 +81,12 @@ export interface WorkspaceRuntimeState {
   activeSessionId: string | null;
   liveTranscript: string;
   audioLevel: number;
+  /** Active capture-only session (snippet trigger recorder), if any. */
+  captureSessionId: string | null;
+  /** Last raw transcript returned by a capture session ('' = heard nothing). */
+  captureText: string | null;
+  /** Bumps on every capture result so equal texts still notify consumers. */
+  captureSeq: number;
   loaded: boolean;
   loading: boolean;
   error: string | null;
@@ -109,6 +115,7 @@ export interface WorkspaceState {
   historyPage: number;
   historyPageSize: number;
   dictionaryEntries: DictionaryEntry[];
+  snippets: SnippetItemDto[];
   historySessions: HistorySession[];
   // Server-paged view for the History tab (fetched via `list_history_page`),
   // independent of the capped `historySessions` snapshot slice.
@@ -169,6 +176,9 @@ export const DEFAULT_RUNTIME: WorkspaceRuntimeState = {
   activeSessionId: null,
   liveTranscript: '',
   audioLevel: 0,
+  captureSessionId: null,
+  captureText: null,
+  captureSeq: 0,
   loaded: false,
   loading: false,
   error: null,

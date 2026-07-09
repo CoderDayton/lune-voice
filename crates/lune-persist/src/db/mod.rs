@@ -372,6 +372,21 @@ impl Database {
         Ok(row.map(row_to_snippet))
     }
 
+    /// Update an existing snippet's trigger and body. Returns `false` when no
+    /// snippet has that id.
+    pub fn update_snippet(
+        &mut self,
+        snippet_id: &str,
+        new_trigger: &str,
+        new_body: &str,
+    ) -> PersistResult<bool> {
+        use self::schema::snippets::dsl::*;
+        let count = diesel::update(snippets.filter(id.eq(snippet_id)))
+            .set((trigger_phrase.eq(new_trigger), body.eq(new_body)))
+            .execute(&mut self.conn)?;
+        Ok(count > 0)
+    }
+
     pub fn delete_snippet(&mut self, snippet_id: &str) -> PersistResult<bool> {
         let count = diesel::delete(snippets::table.filter(snippets::id.eq(snippet_id)))
             .execute(&mut self.conn)?;

@@ -1,10 +1,10 @@
 import type { LucideIcon } from 'lucide-react';
-import { BookText, Clock, House, Paintbrush, Settings } from 'lucide-react';
+import { BookText, Clock, House, Paintbrush, ScrollText, Settings } from 'lucide-react';
 
 export type NavigationGroupLabel = 'Workspace' | 'System';
 
 export interface NavigationItem {
-  to: '/' | '/history' | '/dictionary' | '/styles' | '/settings';
+  to: '/' | '/history' | '/dictionary' | '/snippets' | '/styles' | '/settings';
   label: string;
   /** Short subtitle shown under the page title in the desktop command bar. */
   description: string;
@@ -34,6 +34,13 @@ export const navigationItems: NavigationItem[] = [
     description: 'Custom phrases and corrections',
     group: 'Workspace',
     icon: BookText,
+  },
+  {
+    to: '/snippets',
+    label: 'Snippets',
+    description: 'Templates you expand by voice',
+    group: 'Workspace',
+    icon: ScrollText,
   },
   {
     to: '/styles',

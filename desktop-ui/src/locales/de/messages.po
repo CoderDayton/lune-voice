@@ -13,6 +13,15 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#. placeholder {0}: snippet.triggerPhrase
+#: src/features/snippets/snippets-page.tsx:327
+msgid "“{0}” will stop expanding. The template text is not recoverable."
+msgstr ""
+
+#: src/features/snippets/snippets-page.tsx:253
+msgid "(clipboard contents)"
+msgstr ""
+
 #. placeholder {0}: filtered.length
 #. placeholder {1}: entries.length
 #: src/features/dictionary/components/dictionary-table.tsx:243
@@ -53,6 +62,18 @@ msgstr "{totalCount} Sitzungen"
 msgid "{visibleCount} / {totalCount}"
 msgstr "{visibleCount} / {totalCount}"
 
+#: src/features/snippets/snippets-page.tsx:235
+msgid ""
+"## Meeting — {date}\n"
+"\n"
+"Attendees:\n"
+"- "
+msgstr ""
+
+#: src/features/snippets/snippets-page.tsx:163
+msgid "A block of text Lune Voice types for you when you speak its trigger phrase."
+msgstr ""
+
 #: src/features/settings/sections/pill-section.tsx:212
 msgid "A vertical pill hugs the side of the screen."
 msgstr ""
@@ -78,8 +99,8 @@ msgstr "Aktiver Stil"
 msgid "Adaptive gain control"
 msgstr "Adaptive Verstärkungsregelung"
 
-#: src/features/dictionary/components/dictionary-form.tsx:47
-#: src/features/dictionary/components/dictionary-form.tsx:50
+#: src/features/dictionary/components/dictionary-form.tsx:48
+#: src/features/dictionary/components/dictionary-form.tsx:51
 msgid "Add a correction"
 msgstr "Fügen Sie eine Korrektur hinzu"
 
@@ -87,9 +108,13 @@ msgstr "Fügen Sie eine Korrektur hinzu"
 msgid "Add a fix and Lune Voice applies it every time you dictate. Try a starter below or add your own above."
 msgstr "Fügen Sie einen Fix hinzu und Lune Voice wendet ihn jedes Mal an, wenn Sie diktieren. Probieren Sie unten einen Starter aus oder fügen Sie oben Ihren eigenen hinzu."
 
-#: src/features/dictionary/components/dictionary-form.tsx:148
+#: src/features/dictionary/components/dictionary-form.tsx:146
 msgid "Add correction"
 msgstr "Korrektur hinzufügen"
+
+#: src/features/snippets/snippets-page.tsx:272
+msgid "Add snippet"
+msgstr ""
 
 #: src/features/settings/sections/models-section.tsx:105
 msgid "AI models stored on your device."
@@ -176,9 +201,18 @@ msgstr "Aktuelle Aufnahme abbrechen"
 msgid "Cancel dictation"
 msgstr "Diktat abbrechen"
 
+#: src/features/snippets/snippets-page.tsx:168
+msgid "Cancel edit"
+msgstr ""
+
 #: src/features/styles/components/style-hero.tsx:19
 msgid "Capitals"
 msgstr "Hauptstädte"
+
+#: src/components/ui/voice-capture-field.tsx:148
+#: src/components/ui/voice-capture-field.tsx:154
+msgid "Capture by voice"
+msgstr ""
 
 #: src/features/settings/sections/dictation-section.tsx:105
 msgid "Capture device and how recording detects when you speak."
@@ -275,11 +309,11 @@ msgstr "Weitermachen"
 msgid "Control how your speech is turned into text."
 msgstr "Steuern Sie, wie Ihre Rede in Text umgewandelt wird."
 
-#: src/features/history/components/history-table.tsx:313
+#: src/features/history/components/history-table.tsx:378
 msgid "Copied"
 msgstr "Kopiert"
 
-#: src/features/history/components/history-table.tsx:313
+#: src/features/history/components/history-table.tsx:378
 msgid "Copy"
 msgstr "Kopie"
 
@@ -309,9 +343,18 @@ msgstr "Korrektur"
 msgid "Correction sensitivity"
 msgstr "Korrekturempfindlichkeit"
 
-#: src/features/dictionary/components/dictionary-form.tsx:42
+#: src/features/dictionary/components/dictionary-form.tsx:43
 msgid "Couldn't add that rule. Try again."
 msgstr "Diese Regel konnte nicht hinzugefügt werden. Versuchen Sie es erneut."
+
+#: src/features/snippets/snippets-page.tsx:130
+msgid "Couldn't save that snippet. Try again."
+msgstr ""
+
+#: src/features/snippets/snippets-page.tsx:158
+#: src/features/snippets/snippets-page.tsx:162
+msgid "Create a snippet"
+msgstr ""
 
 #: src/features/styles/styles-page.tsx:304
 msgid "Create new style"
@@ -333,9 +376,10 @@ msgstr "Dunkel"
 
 #: src/components/feedback/confirm-dialog.tsx:63
 #: src/features/dictionary/components/dictionary-table.tsx:146
-#: src/features/history/components/history-table.tsx:322
+#: src/features/history/components/history-table.tsx:387
 #: src/features/history/components/session-detail-modal.tsx:202
 #: src/features/settings/sections/models-section.tsx:260
+#: src/features/snippets/snippets-page.tsx:328
 msgid "Delete"
 msgstr "Löschen"
 
@@ -353,10 +397,14 @@ msgstr "{0} löschen?"
 msgid "Delete model"
 msgstr "Modell löschen"
 
-#: src/features/history/components/history-table.tsx:320
+#: src/features/history/components/history-table.tsx:385
 #: src/features/history/components/session-detail-modal.tsx:200
 msgid "Delete session?"
 msgstr "Sitzung löschen?"
+
+#: src/features/snippets/snippets-page.tsx:326
+msgid "Delete snippet?"
+msgstr ""
 
 #: src/features/dictionary/components/dictionary-table.tsx:144
 msgid "Delete this word fix?"
@@ -395,6 +443,10 @@ msgstr "Diktieranzeige"
 msgid "Dictation pill visibility"
 msgstr "Sichtbarkeit der Diktieranzeige"
 
+#: src/components/ui/voice-capture-field.tsx:191
+msgid "Didn't catch anything — try again, a little closer to the mic."
+msgstr ""
+
 #: src/features/settings/sections/dictation-section.tsx:68
 msgid "Discard the current draft and return to idle. Click the binding to change it."
 msgstr "Verwerfen Sie den aktuellen Entwurf und kehren Sie in den Leerlauf zurück. Klicken Sie auf die Bindung, um sie zu ändern."
@@ -411,7 +463,7 @@ msgstr "Speicherplatznutzung"
 msgid "Dismiss error"
 msgstr "Fehler schließen"
 
-#: src/features/history/components/history-table.tsx:316
+#: src/features/history/components/history-table.tsx:381
 #: src/features/settings/sections/models-section.tsx:274
 msgid "Download"
 msgstr "Herunterladen"
@@ -477,6 +529,7 @@ msgstr ""
 msgid "Edge distance in pixels"
 msgstr ""
 
+#: src/features/snippets/snippets-page.tsx:323
 #: src/features/styles/components/style-hero.tsx:47
 #: src/features/styles/components/style-preset-card.tsx:113
 msgid "Edit"
@@ -487,11 +540,16 @@ msgstr "Bearbeiten"
 msgid "Edit {0}"
 msgstr "Bearbeiten {0}"
 
+#: src/features/snippets/snippets-page.tsx:158
+#: src/features/snippets/snippets-page.tsx:162
+msgid "Edit snippet"
+msgstr ""
+
 #: src/features/styles/components/style-editor-modal.tsx:68
 msgid "Edit style"
 msgstr "Stil bearbeiten"
 
-#: src/features/history/components/history-table.tsx:275
+#: src/features/history/components/history-table.tsx:338
 #: src/features/overview/overview-page.tsx:254
 msgid "Empty session"
 msgstr "Leere Sitzung"
@@ -526,7 +584,7 @@ msgstr "Seitenleiste erweitern"
 msgid "Few-shot examples"
 msgstr "Few-Shot-Beispiele"
 
-#: src/features/dictionary/components/dictionary-form.tsx:129
+#: src/features/dictionary/components/dictionary-form.tsx:127
 msgid "Fill both fields to see the correction."
 msgstr "Füllen Sie beide Felder aus, um die Korrektur anzuzeigen."
 
@@ -573,7 +631,7 @@ msgstr "Beispiele generieren…"
 msgid "github"
 msgstr "Github"
 
-#: src/features/dictionary/components/dictionary-form.tsx:102
+#: src/features/dictionary/components/dictionary-form.tsx:100
 msgid "GitHub"
 msgstr "GitHub"
 
@@ -621,6 +679,14 @@ msgstr "Leerlauf"
 #: src/features/settings/sections/models-section.tsx:217
 msgid "In use"
 msgstr "In Verwendung"
+
+#: src/features/snippets/snippets-page.tsx:221
+msgid "Insert at cursor"
+msgstr ""
+
+#: src/features/snippets/snippets-page.tsx:214
+msgid "Insert placeholder"
+msgstr ""
 
 #: src/features/settings/components/asr-engine-cards.tsx:227
 #: src/features/settings/sections/models-section.tsx:220
@@ -671,6 +737,14 @@ msgstr "Licht"
 msgid "Listening"
 msgstr "Hören"
 
+#: src/components/ui/voice-capture-field.tsx:187
+msgid "Listening — say the phrase, then click again to stop."
+msgstr ""
+
+#: src/components/ui/voice-capture-field.tsx:131
+msgid "Listening — say the phrase…"
+msgstr ""
+
 #: src/features/overview/overview-page.tsx:204
 #: src/features/shell/components/sidebar-widgets.tsx:52
 msgid "Listening…"
@@ -693,13 +767,17 @@ msgstr "Lune"
 msgid "Lune Voice"
 msgstr "Lune Voice"
 
-#: src/features/dictionary/components/dictionary-form.tsx:94
+#: src/features/dictionary/components/dictionary-form.tsx:92
 msgid "Lune Voice writes"
 msgstr "Lune Voice schreibt"
 
 #: src/features/settings/components/asr-engine-cards.tsx:171
 msgid "Manage in Models"
 msgstr "In „Modelle“ verwalten"
+
+#: src/features/snippets/snippets-page.tsx:186
+msgid "meeting header"
+msgstr ""
 
 #: src/features/settings/sections/dictation-section.tsx:104
 #: src/features/settings/sections/dictation-section.tsx:109
@@ -777,12 +855,16 @@ msgstr "Noch keine Sitzungen"
 msgid "No sessions yet. Start dictating to see your transcripts here."
 msgstr "Noch keine Sitzungen. Beginnen Sie mit dem Diktieren, um Ihre Transkripte hier anzuzeigen."
 
-#: src/features/history/components/history-table.tsx:294
+#: src/features/snippets/snippets-page.tsx:289
+msgid "No snippets yet."
+msgstr ""
+
+#: src/features/history/components/history-table.tsx:359
 #: src/features/history/components/session-detail-modal.tsx:153
 msgid "No transcript"
 msgstr "Kein Transkript"
 
-#: src/features/history/components/history-table.tsx:306
+#: src/features/history/components/history-table.tsx:371
 #: src/features/history/components/session-detail-modal.tsx:163
 msgid "None"
 msgstr "Keine"
@@ -929,7 +1011,7 @@ msgstr "Vorher"
 msgid "Prevent moving the pill by dragging it."
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-form.tsx:119
+#: src/features/dictionary/components/dictionary-form.tsx:117
 msgid "Preview"
 msgstr "Vorschau"
 
@@ -941,7 +1023,7 @@ msgstr "Vorherige Seite"
 msgid "primary"
 msgstr ""
 
-#: src/features/dictionary/components/dictionary-form.tsx:138
+#: src/features/dictionary/components/dictionary-form.tsx:136
 #: src/features/dictionary/components/dictionary-table.tsx:263
 #: src/features/dictionary/components/priority-picker.tsx:47
 msgid "Priority"
@@ -1027,10 +1109,26 @@ msgstr "S"
 msgid "Save"
 msgstr "Speichern"
 
-#: src/features/history/components/history-table.tsx:244
+#: src/features/snippets/snippets-page.tsx:268
+msgid "Save changes"
+msgstr ""
+
+#: src/features/history/components/history-table.tsx:307
 #: src/features/history/components/session-detail-modal.tsx:70
 msgid "Save Transcript"
 msgstr "Transkript speichern"
+
+#: src/features/snippets/snippets-page.tsx:292
+msgid "Save your signature, a meeting header, or anything you type often — then speak its trigger to drop it into any app."
+msgstr ""
+
+#: src/features/snippets/snippets-page.tsx:284
+msgid "Saved snippets"
+msgstr ""
+
+#: src/features/snippets/snippets-page.tsx:191
+msgid "Say <0>“{spokenTrigger}”</0> as the whole utterance — or <1>“insert {spokenTrigger}”</1> — to type this snippet."
+msgstr ""
 
 #: src/features/history/components/history-table.tsx:99
 msgid "Search transcripts"
@@ -1103,6 +1201,10 @@ msgstr "Überspringen Sie es vorerst"
 msgid "Skip to main content"
 msgstr "Zum Hauptinhalt springen"
 
+#: src/features/snippets/snippets-page.tsx:212
+msgid "Snippet text"
+msgstr ""
+
 #: src/features/settings/sections/output-section.tsx:71
 msgid "Sound"
 msgstr "Ton"
@@ -1147,6 +1249,11 @@ msgstr "Aufnahme starten oder stoppen"
 msgid "Start, stop, and cancel dictation without leaving your work."
 msgstr "Starten, stoppen und brechen Sie das Diktat ab, ohne Ihre Arbeit zu unterbrechen."
 
+#: src/components/ui/voice-capture-field.tsx:148
+#: src/components/ui/voice-capture-field.tsx:153
+msgid "Stop capturing"
+msgstr ""
+
 #: src/features/shell/components/sidebar-widgets.tsx:24
 #: src/features/shell/components/sidebar-widgets.tsx:25
 #: src/features/shell/components/sidebar-widgets.tsx:45
@@ -1184,7 +1291,7 @@ msgstr "System"
 msgid "System default"
 msgstr "Systemstandard"
 
-#: src/features/dictionary/components/dictionary-form.tsx:51
+#: src/features/dictionary/components/dictionary-form.tsx:52
 msgid "Teach Lune Voice the right spelling for a word it mishears."
 msgstr "Bringen Sie Lune Voice die richtige Schreibweise für ein Wort bei, das es falsch versteht."
 
@@ -1204,6 +1311,14 @@ msgstr "Die schwebende Statusanzeige, die beim Diktieren erscheint."
 msgid "The main shortcut used for voice typing. Click the binding to change it."
 msgstr "Die wichtigste Tastenkombination für die Spracheingabe. Klicken Sie auf die Bindung, um sie zu ändern."
 
+#: src/components/ui/voice-capture-field.tsx:151
+msgid "The microphone is in use"
+msgstr ""
+
+#: src/features/snippets/snippets-page.tsx:258
+msgid "The snippet text appears here with placeholders filled in."
+msgstr ""
+
 #: src/features/settings/sections/transcription-section.tsx:100
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
 msgstr "Die Wörter, bei denen die Erkennung am unsichersten ist, werden mit Ihrem Wörterbuch und Vokabular abgeglichen. Höher prüft mehr Wörter; niedriger vertraut der Rohtranskription."
@@ -1220,7 +1335,7 @@ msgstr "Dieses Modell wird von Ihrer aktuellen Konfiguration verwendet. Das Dikt
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "Dies geschieht nur einmal. Sie können Ihren Computer in der Zwischenzeit weiterhin verwenden."
 
-#: src/features/history/components/history-table.tsx:321
+#: src/features/history/components/history-table.tsx:386
 #: src/features/history/components/session-detail-modal.tsx:201
 msgid "This will permanently remove this dictation session and its transcript."
 msgstr "Dadurch werden diese Diktatsitzung und ihr Transkript dauerhaft entfernt."
@@ -1266,6 +1381,14 @@ msgstr "Thema umschalten"
 msgid "Total Words"
 msgstr "Wörter insgesamt"
 
+#: src/components/ui/voice-capture-field.tsx:189
+msgid "Transcribing what you said…"
+msgstr ""
+
+#: src/components/ui/voice-capture-field.tsx:133
+msgid "Transcribing…"
+msgstr ""
+
 #: src/features/history/components/history-table.tsx:140
 msgid "Transcript"
 msgstr "Transkript"
@@ -1274,6 +1397,18 @@ msgstr "Transkript"
 #: src/features/settings/settings-page.tsx:72
 msgid "Transcription"
 msgstr "Transkription"
+
+#: src/features/snippets/snippets-page.tsx:180
+msgid "Trigger phrase"
+msgstr ""
+
+#: src/features/snippets/snippets-page.tsx:198
+msgid "Type a phrase, or tap the mic to capture it exactly as Lune Voice hears it."
+msgstr ""
+
+#: src/features/snippets/snippets-page.tsx:250
+msgid "Types as"
+msgstr ""
 
 #: src/features/welcome/components/engine-step.tsx:131
 msgid "Use GPU acceleration"
@@ -1328,10 +1463,6 @@ msgstr "Sofern verfügbar, kann die Transkription dadurch schneller abgeschlosse
 msgid "When the pill appears while you dictate."
 msgstr "Wann die Anzeige beim Diktieren erscheint."
 
-#: src/features/settings/sections/appearance-section.tsx:94
-#~ msgid "When to show the floating status pill while you dictate."
-#~ msgstr "Wann die schwebende Statusanzeige während des Diktierens angezeigt wird."
-
 #: src/features/settings/sections/pill-section.tsx:105
 msgid "Where the pill sits on screen. Dragging it overrides the preset until you reset."
 msgstr ""
@@ -1361,7 +1492,7 @@ msgstr "Whisper-Modellgröße"
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
 msgstr "whisper.cpp läuft auf dem Gerät. Wählen Sie eine Größe, um Geschwindigkeit gegen Genauigkeit abzuwägen."
 
-#: src/features/history/components/history-table.tsx:299
+#: src/features/history/components/history-table.tsx:364
 #: src/features/overview/overview-page.tsx:258
 msgid "words"
 msgstr "Worte"
@@ -1379,7 +1510,7 @@ msgstr "WPM"
 msgid "Yes"
 msgstr "Ja"
 
-#: src/features/dictionary/components/dictionary-form.tsx:62
+#: src/features/dictionary/components/dictionary-form.tsx:63
 msgid "You say"
 msgstr "Du sagst"
 

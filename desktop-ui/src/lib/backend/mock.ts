@@ -106,6 +106,14 @@ function createMockSnapshot(): WorkspaceSnapshot {
       replacement: entry.replacement,
       priority: entry.priority,
     })),
+    snippets: [
+      { id: 'snip-1', triggerPhrase: 'signature', body: 'Best regards,\nDayton' },
+      {
+        id: 'snip-2',
+        triggerPhrase: 'meeting header',
+        body: '## Meeting — {date}\n\nAttendees:\n- ',
+      },
+    ],
     stats: { sessions: 0, words: 0, seconds: 0 },
     stylePresets: [
       {
@@ -207,6 +215,7 @@ function snapshotWithStats(s: WorkspaceSnapshot): WorkspaceSnapshot {
 let mockSnapshot: WorkspaceSnapshot = snapshotWithStats(createMockSnapshot());
 let nextDictionaryId = 1000;
 let nextStyleId = 1000;
+let nextSnippetId = 1000;
 
 /// Reset the mock backend to its seeded initial state. `mockSnapshot` and the id
 /// counters are module-level mutable state shared across every test file in a run,
@@ -217,6 +226,7 @@ export function resetMockBackend() {
   mockSnapshot = snapshotWithStats(createMockSnapshot());
   nextDictionaryId = 1000;
   nextStyleId = 1000;
+  nextSnippetId = 1000;
 }
 
 function applySettings(input: SaveWorkspaceSettingsInput) {
@@ -312,6 +322,35 @@ export const mockBackendClient: BackendClient = {
     return structuredClone(mockSnapshot);
   },
 
+  async saveSnippet(id, triggerPhrase, body) {
+    const trigger = triggerPhrase.trim();
+    // Mirror the backend's case-insensitive trigger-collision rejection.
+    const clash = mockSnapshot.snippets.some(
+      (s) => s.id !== id && s.triggerPhrase.trim().toLowerCase() === trigger.toLowerCase(),
+    );
+    if (clash) throw new Error('another snippet already uses this trigger phrase');
+    mockSnapshot = {
+      ...mockSnapshot,
+      snippets: id
+        ? mockSnapshot.snippets.map((s) =>
+            s.id === id ? { ...s, triggerPhrase: trigger, body } : s,
+          )
+        : [
+            ...mockSnapshot.snippets,
+            { id: `snip-${nextSnippetId++}`, triggerPhrase: trigger, body },
+          ],
+    };
+    return structuredClone(mockSnapshot);
+  },
+
+  async deleteSnippet(id) {
+    mockSnapshot = {
+      ...mockSnapshot,
+      snippets: mockSnapshot.snippets.filter((s) => s.id !== id),
+    };
+    return structuredClone(mockSnapshot);
+  },
+
   async deleteSession(sessionId) {
     mockSnapshot = snapshotWithStats({
       ...mockSnapshot,
@@ -375,6 +414,12 @@ export const mockBackendClient: BackendClient = {
 
   async startDictation() {
     return 'mock-session';
+  },
+
+  // The store simulates the capture event sequence in mock mode (it owns the
+  // event pipeline); this only hands back a session id.
+  async startTriggerCapture() {
+    return 'mock-capture';
   },
 
   async stopDictation() {},

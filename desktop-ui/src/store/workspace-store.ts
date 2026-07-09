@@ -34,6 +34,7 @@ export const workspaceStore = new Store<WorkspaceState>({
   historyPage: 1,
   historyPageSize: 20,
   dictionaryEntries: [],
+  snippets: [],
   historySessions: [],
   historyPageItems: [],
   historyTotal: 0,
@@ -116,6 +117,7 @@ export const workspaceActions = {
     workspaceStore.setState((s) => ({
       ...s,
       dictionaryEntries: snapshot.dictionary.map(mapDictionaryEntry),
+      snippets: snapshot.snippets ?? [],
       stylePresets: snapshot.stylePresets ?? [],
       historySessions: snapshot.history
         .filter((entry) => entry.transcript)
@@ -137,6 +139,12 @@ export const workspaceActions = {
           ? s.runtime.liveTranscript
           : '',
         audioLevel: isActiveServiceStatus(snapshot.serviceStatus) ? s.runtime.audioLevel : 0,
+        captureSessionId: isActiveServiceStatus(snapshot.serviceStatus)
+          ? s.runtime.captureSessionId
+          : null,
+        // Capture results are consumed by seq, not liveness — always carry.
+        captureText: s.runtime.captureText,
+        captureSeq: s.runtime.captureSeq,
         loaded: true,
         loading: false,
         error: null,
@@ -350,6 +358,29 @@ export async function fetchHistoryPage() {
   }
 }
 
+/** Create (`id: null`) or update (`id` set) a voice snippet. */
+export async function saveSnippet(id: string | null, triggerPhrase: string, body: string) {
+  const trigger = triggerPhrase.trim();
+  if (!trigger || !body.trim()) return false;
+  try {
+    const snapshot = await backendClient.saveSnippet(id, trigger, body);
+    workspaceActions.hydrate(snapshot);
+    return true;
+  } catch (error) {
+    workspaceActions.setError(formatError(error));
+    return false;
+  }
+}
+
+export async function removeSnippet(id: string) {
+  try {
+    const snapshot = await backendClient.deleteSnippet(id);
+    workspaceActions.hydrate(snapshot);
+  } catch (error) {
+    workspaceActions.setError(formatError(error));
+  }
+}
+
 export async function removeDictionaryEntry(id: number) {
   try {
     const snapshot = await backendClient.deleteDictionaryEntry(id);
@@ -443,6 +474,48 @@ export async function startDictation() {
     workspaceActions.applySessionEvent({ type: 'sessionStarted', sessionId });
   }
   return sessionId;
+}
+
+/**
+ * Start a capture-only session for the snippet trigger recorder. The raw
+ * transcript arrives as a `captureText` stream event; nothing is delivered.
+ * In the browser mock (no Tauri stream) the event sequence is simulated so
+ * the recorder is fully exercisable outside the app.
+ */
+export async function startTriggerCapture() {
+  const sessionId = await dictationAction(() => backendClient.startTriggerCapture(), null);
+  if (!sessionId) return null;
+  workspaceActions.applySessionEvent({ type: 'sessionStarted', sessionId });
+  workspaceStore.setState((s) => ({
+    ...s,
+    runtime: { ...s.runtime, captureSessionId: sessionId },
+  }));
+  if (workspaceStore.state.runtime.ipcFlavor === 'mock') simulateMockCapture();
+  return sessionId;
+}
+
+// The second phrase carries a sentence capital + terminal period, the way raw
+// whisper output actually looks, so the field's normalization is exercisable
+// in the browser mock.
+const MOCK_CAPTURE_PHRASES = ['meeting header', 'Standup note.', 'signature'];
+let mockCaptureTimers: ReturnType<typeof setTimeout>[] = [];
+let mockCaptureIndex = 0;
+
+function simulateMockCapture() {
+  for (const timer of mockCaptureTimers) clearTimeout(timer);
+  mockCaptureTimers = [];
+  const emit = (delay: number, event: SessionStreamEvent) => {
+    mockCaptureTimers.push(setTimeout(() => workspaceActions.applySessionEvent(event), delay));
+  };
+  // A believable level envelope while "listening", then transcription.
+  for (let t = 80; t < 1500; t += 90) {
+    const level = 0.25 + 0.55 * Math.abs(Math.sin(t / 180)) * (0.7 + 0.3 * Math.random());
+    emit(t, { type: 'audioLevel', level });
+  }
+  emit(1500, { type: 'processing' });
+  const phrase = MOCK_CAPTURE_PHRASES[mockCaptureIndex++ % MOCK_CAPTURE_PHRASES.length];
+  emit(2200, { type: 'captureText', text: phrase });
+  emit(2250, { type: 'sessionStopped' });
 }
 
 export async function stopDictation() {
@@ -559,10 +632,18 @@ function reduceSessionEvent(
       };
     case 'correctedText':
       return { ...runtime, liveTranscript: event.text };
+    case 'captureText':
+      return {
+        ...runtime,
+        serviceStatus: 'ready',
+        captureText: event.text,
+        captureSeq: runtime.captureSeq + 1,
+      };
     case 'sessionStopped':
       return {
         ...runtime,
         activeSessionId: null,
+        captureSessionId: null,
         serviceStatus: runtime.serviceStatus === 'error' ? 'error' : 'ready',
         audioLevel: 0,
       };
@@ -570,6 +651,7 @@ function reduceSessionEvent(
       return {
         ...runtime,
         activeSessionId: null,
+        captureSessionId: null,
         serviceStatus: 'error',
         audioLevel: 0,
         error: event.message,

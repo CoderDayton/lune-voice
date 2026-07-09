@@ -35,6 +35,7 @@ export type {
   PillVisibilityDto,
   SaveWorkspaceSettingsInput,
   SessionStatsDto,
+  SnippetItemDto,
   StylePresetDto,
   TerminalModeDto,
   WorkspaceSettingsDto,
@@ -57,6 +58,9 @@ export interface BackendClient {
     priority: number,
   ): Promise<WorkspaceSnapshot>;
   deleteDictionaryEntry(id: number): Promise<WorkspaceSnapshot>;
+  /** Create (`id: null`) or update (`id` set) a voice snippet. */
+  saveSnippet(id: string | null, triggerPhrase: string, body: string): Promise<WorkspaceSnapshot>;
+  deleteSnippet(id: string): Promise<WorkspaceSnapshot>;
   deleteSession(sessionId: string): Promise<WorkspaceSnapshot>;
   listHistoryPage(page: number, pageSize: number, search: string): Promise<HistoryPageDto>;
   createCustomStyle(
@@ -75,6 +79,9 @@ export interface BackendClient {
   deleteCustomStyle(styleId: string): Promise<WorkspaceSnapshot>;
   generateStyleExamples(styleId: string): Promise<WorkspaceSnapshot>;
   startDictation(): Promise<string>;
+  /** Start a capture-only session: speech is transcribed and streamed back as
+   *  a `captureText` event; nothing is typed into the focused app. */
+  startTriggerCapture(): Promise<string>;
   stopDictation(): Promise<void>;
   cancelDictation(): Promise<void>;
   toggleDictation(): Promise<string | null>;
@@ -102,6 +109,7 @@ export type SessionStreamEvent =
   | { type: 'processing' }
   | { type: 'finalizedText'; text: string }
   | { type: 'correctedText'; text: string }
+  | { type: 'captureText'; text: string }
   | { type: 'audioLevel'; level: number }
   | { type: 'commandDetected'; payload: string }
   | { type: 'sessionStopped' }

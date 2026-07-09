@@ -254,6 +254,7 @@ pub struct WorkspaceSnapshot {
     pub settings: WorkspaceSettingsDto,
     pub history: Vec<HistoryItemDto>,
     pub dictionary: Vec<DictionaryItemDto>,
+    pub snippets: Vec<SnippetItemDto>,
     pub style_presets: Vec<StylePresetDto>,
     pub stats: SessionStatsDto,
 }
@@ -364,6 +365,17 @@ pub struct HistoryPageDto {
     pub total: u32,
 }
 
+/// A voice snippet: a spoken trigger phrase that expands to a text template
+/// (with `{date}`, `{time}`, `{datetime}`, `{clipboard}` placeholders).
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct SnippetItemDto {
+    pub id: String,
+    pub trigger_phrase: String,
+    pub body: String,
+}
+
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export, export_to = "../../src/lib/backend/generated/")]
 #[serde(rename_all = "camelCase")]
@@ -467,6 +479,15 @@ fn default_true_dto() -> bool {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct SaveSnippetInput {
+    /// `None` creates a new snippet; `Some(id)` updates the existing one.
+    pub id: Option<String>,
+    pub trigger_phrase: String,
+    pub body: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateDictionaryEntryInput {
     pub phrase: String,
     pub replacement: String,
@@ -521,6 +542,11 @@ pub enum SessionStreamEvent {
         text: String,
     },
     CorrectedText {
+        text: String,
+    },
+    /// Raw transcript from a capture-only session (snippet trigger recorder).
+    /// Never delivered to the focused app; empty text = no speech heard.
+    CaptureText {
         text: String,
     },
     AudioLevel {

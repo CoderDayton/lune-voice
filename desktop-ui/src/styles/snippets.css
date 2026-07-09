@@ -1,0 +1,110 @@
+/* ── Snippet trigger voice capture ─────────────────────────────────────
+   The trigger input and its capture control act as one instrument: the
+   wrapper carries the live/success treatments as overlay pseudo-elements so
+   they can't be clobbered by the global focus box-shadow reset, and the
+   button morphs idle → live bars → spinner in place. Everything animates
+   transform/opacity/box-shadow only. */
+
+@utility capture-field {
+  @apply relative;
+}
+
+/* While recording, the field reads live: primary border + a breathing halo. */
+.capture-field-live > .input {
+  border-color: var(--color-primary) !important;
+}
+
+.capture-field-live::before {
+  content: "";
+  @apply pointer-events-none absolute inset-0;
+  border-radius: var(--radius-field, 0.5rem);
+  animation: capture-halo 2s ease-in-out infinite;
+}
+
+/* One-shot success ring when the captured phrase lands in the field. */
+.capture-field-hit::after {
+  content: "";
+  @apply pointer-events-none absolute inset-0;
+  border-radius: var(--radius-field, 0.5rem);
+  animation: capture-hit 1.1s var(--ease-decelerate) both;
+}
+
+/* Round capture control pinned inside the field's right edge. */
+@utility capture-btn {
+  @apply absolute inset-y-0 right-2 my-auto flex size-9 items-center justify-center rounded-full border border-surface-border bg-surface-wash text-primary;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-instant) var(--ease-standard);
+}
+
+.capture-btn:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--color-primary) 16%, transparent);
+  border-color: var(--color-primary);
+}
+
+.capture-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.capture-btn:disabled {
+  @apply text-content-dim;
+}
+
+/* Live state: filled tint + an expanding ring that radiates while listening. */
+.capture-btn-listening {
+  border-color: var(--color-primary);
+  background: color-mix(in oklab, var(--color-primary) 14%, transparent);
+  isolation: isolate;
+}
+
+.capture-btn-listening::after {
+  content: "";
+  @apply absolute inset-0 -z-10 rounded-full;
+  background: color-mix(in oklab, var(--color-primary) 35%, transparent);
+  animation: capture-ring 1.6s var(--ease-decelerate) infinite;
+}
+
+/* Mini level meter inside the live button — bar heights are data-driven from
+   the session's audio level (inline scaleY), so it stays honest under
+   prefers-reduced-motion: the 80ms transition collapses, the levels remain. */
+@utility capture-bars {
+  @apply flex h-4 items-center gap-[3px];
+}
+
+@utility capture-bar {
+  @apply block h-full w-[3px] rounded-full bg-primary;
+  transform-origin: center;
+  transition: transform 80ms var(--ease-standard);
+  will-change: transform;
+}
+
+@keyframes capture-halo {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-primary) 22%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 7px color-mix(in oklab, var(--color-primary) 9%, transparent);
+  }
+}
+
+@keyframes capture-hit {
+  0% {
+    box-shadow: 0 0 0 6px color-mix(in oklab, var(--color-primary) 45%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@keyframes capture-ring {
+  0% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}

@@ -4,6 +4,7 @@ pub mod corrector;
 pub mod formatting;
 pub mod freq;
 pub mod lexicon;
+pub mod snippets;
 pub mod vocab;
 
 #[cfg(feature = "dictionary")]

@@ -459,7 +459,61 @@ impl AppRuntime {
             self.inner.pipeline.lock().await.focus_target = focus_target;
         }
 
-        self.spawn_event_forwarder(event_rx);
+        self.spawn_event_forwarder(event_rx, false);
+
+        Ok(session_id)
+    }
+
+    /// Start a capture-only session for the snippet trigger recorder. Speech
+    /// is transcribed exactly like dictation, but the *raw* transcript is
+    /// streamed back to the UI as `CaptureText` — nothing is typed into the
+    /// focused app and no history row is written. Stopped/cancelled through
+    /// the ordinary `stop_dictation` / `cancel_dictation` paths.
+    pub async fn start_trigger_capture(&self) -> Result<String, String> {
+        // A previous dictation's synthetic keystrokes could re-activate the
+        // capture button; refuse to start until delivery has settled (same
+        // feedback-loop guard as start_dictation).
+        if self.inner.delivery.is_busy() {
+            debug!("start_trigger_capture suppressed — text delivery in progress");
+            return Err("text delivery in progress".into());
+        }
+
+        self.publish_status("listening").await;
+
+        let prewarmed = self.prewarmed_handle().await;
+        if let Some(handle) = &prewarmed {
+            handle.drain_keep_last(6);
+        }
+
+        let manager = match self.prepare_manager_for_start().await {
+            Ok(m) => m,
+            Err(e) => {
+                self.publish_status("ready").await;
+                return Err(e);
+            }
+        };
+        let (event_tx, event_rx) = mpsc::channel(256);
+        let start_result = match prewarmed {
+            Some(handle) => manager.start_capture_with_handle(event_tx, handle).await,
+            None => manager.start_capture(event_tx).await,
+        };
+        let session_id = match start_result {
+            Ok(session_id) => session_id,
+            Err(error) => {
+                self.set_pipeline_session(None, false).await;
+                self.publish_status("error").await;
+                return Err(format!("start trigger capture: {error}"));
+            }
+        };
+
+        let session_id = session_id.to_string();
+        self.set_pipeline_session(Some(session_id.clone()), true)
+            .await;
+        self.push_session_event(SessionStreamEvent::SessionStarted {
+            session_id: session_id.clone(),
+        })
+        .await;
+        self.spawn_event_forwarder(event_rx, true);
 
         Ok(session_id)
     }
@@ -521,7 +575,10 @@ impl AppRuntime {
         }
     }
 
-    fn spawn_event_forwarder(&self, mut event_rx: mpsc::Receiver<SessionEvent>) {
+    /// `capture` marks a capture-only session: `FinalizedText` is routed to
+    /// the UI as `CaptureText` instead of being delivered, and no
+    /// history-changed invalidation fires (nothing was persisted).
+    fn spawn_event_forwarder(&self, mut event_rx: mpsc::Receiver<SessionEvent>, capture: bool) {
         let app = self.inner.app.clone();
         let runtime = self.clone();
 
@@ -546,6 +603,12 @@ impl AppRuntime {
                     }
                     SessionEvent::FinalizedText { session_id, text } => {
                         saw_text = true;
+                        if capture {
+                            runtime
+                                .push_session_event(SessionStreamEvent::CaptureText { text })
+                                .await;
+                            continue;
+                        }
                         let (mode, copy) = {
                             let s = runtime.inner.settings.read().await;
                             (s.dictation_mode, s.copy_to_clipboard)
@@ -649,8 +712,12 @@ impl AppRuntime {
                             .push_session_event(SessionStreamEvent::SessionStopped)
                             .await;
                         // Only reload history if the session produced text —
-                        // empty/cancelled sessions shouldn't trigger UI churn
-                        if saw_text && let Err(e) = app.emit("lune://history-changed", ()) {
+                        // empty/cancelled sessions shouldn't trigger UI churn.
+                        // Capture sessions never persist, so never invalidate.
+                        if saw_text
+                            && !capture
+                            && let Err(e) = app.emit("lune://history-changed", ())
+                        {
                             warn!(error = %e, "failed to emit history-changed event");
                         }
                     }
@@ -665,7 +732,7 @@ impl AppRuntime {
     /// - `NewLine` / `NewParagraph` / `ListItem` → deliver the corresponding
     ///   whitespace/punctuation text.
     /// - `StopDictation` → stop the active session.
-    /// - Other commands (e.g. `SwitchStyle`, `InsertSnippet`, `ScratchThat`) →
+    /// - Other commands (e.g. `SwitchStyle`, `ScratchThat`) →
     ///   logged and skipped; higher-level handling belongs in the frontend or a
     ///   future command handler.
     async fn handle_voice_command(&self, session_id: Uuid, payload: &str) {

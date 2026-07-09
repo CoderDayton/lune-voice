@@ -52,6 +52,19 @@ pub(crate) enum SessionControl {
     Cancel,
 }
 
+/// What the session does with the transcript once capture ends.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SessionKind {
+    /// Full dictation: commands, snippets, correction, styling, delivery,
+    /// history.
+    Dictate,
+    /// Transcribe-only: emits the *raw* ASR text (the exact string snippet
+    /// matching runs on) as `FinalizedText` and leaves no database trace.
+    /// The runtime routes it back to the UI instead of delivering it — used
+    /// by the snippet trigger recorder.
+    CaptureRaw,
+}
+
 /// How the session should obtain audio.
 pub(crate) enum SessionAudio {
     /// Open a fresh `AudioStream` inside the session task (default path).
@@ -108,7 +121,8 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
 
     /// Start a new session. Returns `Err` if one is already active.
     pub async fn start(&self, event_tx: mpsc::Sender<SessionEvent>) -> Result<Uuid> {
-        self.start_inner(event_tx, SessionAudio::Open).await
+        self.start_inner(event_tx, SessionAudio::Open, SessionKind::Dictate)
+            .await
     }
 
     /// Start a session with a pre-built audio stream (e.g. from a file).
@@ -117,7 +131,8 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         event_tx: mpsc::Sender<SessionEvent>,
         audio: AudioStream,
     ) -> Result<Uuid> {
-        self.start_inner(event_tx, SessionAudio::Owned(audio)).await
+        self.start_inner(event_tx, SessionAudio::Owned(audio), SessionKind::Dictate)
+            .await
     }
 
     /// Start a session reading from a pre-warmed shared audio stream.
@@ -128,19 +143,60 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         event_tx: mpsc::Sender<SessionEvent>,
         handle: AudioStreamHandle,
     ) -> Result<Uuid> {
-        self.start_inner(event_tx, SessionAudio::Shared(handle))
+        self.start_inner(event_tx, SessionAudio::Shared(handle), SessionKind::Dictate)
             .await
+    }
+
+    /// Start a capture-only session (see [`SessionKind::CaptureRaw`]): records
+    /// and transcribes like dictation but delivers nothing, persists nothing,
+    /// and emits the raw transcript as `FinalizedText`.
+    pub async fn start_capture(&self, event_tx: mpsc::Sender<SessionEvent>) -> Result<Uuid> {
+        self.start_inner(event_tx, SessionAudio::Open, SessionKind::CaptureRaw)
+            .await
+    }
+
+    /// Capture-only session on a pre-warmed shared audio stream.
+    pub async fn start_capture_with_handle(
+        &self,
+        event_tx: mpsc::Sender<SessionEvent>,
+        handle: AudioStreamHandle,
+    ) -> Result<Uuid> {
+        self.start_inner(
+            event_tx,
+            SessionAudio::Shared(handle),
+            SessionKind::CaptureRaw,
+        )
+        .await
+    }
+
+    /// Capture-only session with a pre-built audio stream (tests, benches).
+    pub async fn start_capture_with_audio(
+        &self,
+        event_tx: mpsc::Sender<SessionEvent>,
+        audio: AudioStream,
+    ) -> Result<Uuid> {
+        self.start_inner(
+            event_tx,
+            SessionAudio::Owned(audio),
+            SessionKind::CaptureRaw,
+        )
+        .await
     }
 
     async fn start_inner(
         &self,
         event_tx: mpsc::Sender<SessionEvent>,
         audio_override: SessionAudio,
+        kind: SessionKind,
     ) -> Result<Uuid> {
         // Resolve style preset BEFORE touching the active lock — a missing
         // style is a config error, not a session-state error, and we don't
         // want to mark the session active just to fail validation.
-        let current_style_id = { self.settings.read().await.default_style.clone() };
+        let current_style_id = if kind == SessionKind::CaptureRaw {
+            None // capture never styles — skip the lookup entirely
+        } else {
+            self.settings.read().await.default_style.clone()
+        };
         // `None` means no styling — the raw (heuristically-formatted) transcript
         // is delivered as-is. A selected id that no longer resolves (e.g. a
         // deleted custom style) also degrades to no styling rather than erroring.
@@ -183,7 +239,9 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let session_id = Uuid::new_v4();
         let (control_tx, control_rx) = mpsc::unbounded_channel();
 
-        {
+        // Capture-only sessions leave no history: no row at start, nothing to
+        // finalize at the end.
+        if kind == SessionKind::Dictate {
             let session = DictationSession {
                 id: session_id,
                 started_at: Utc::now(),
@@ -223,6 +281,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             style_preset,
             control_rx,
             audio_override,
+            kind,
         ));
         tokio::task::spawn(async move {
             if handle.await.is_err() {
@@ -372,6 +431,7 @@ async fn run_session<A: AsrBackend + 'static>(
     style_preset: Option<Arc<StylePreset>>,
     mut control_rx: mpsc::UnboundedReceiver<SessionControl>,
     audio_override: SessionAudio,
+    kind: SessionKind,
 ) {
     let session_id = deps.session_id;
     let (input_device, vad_pcen) = {
@@ -395,6 +455,13 @@ async fn run_session<A: AsrBackend + 'static>(
     {
         Ok(c) => c,
         Err(e) => {
+            if kind == SessionKind::CaptureRaw {
+                // No DB row exists for a capture — end without finalize.
+                let _ = deps.event_tx.send(SessionEvent::Error(e)).await;
+                let _ = deps.event_tx.send(SessionEvent::Stopped).await;
+                clear_active(&deps.active_arc, &deps.idle_notify).await;
+                return;
+            }
             fail_init(
                 &e,
                 session_id,
@@ -418,6 +485,11 @@ async fn run_session<A: AsrBackend + 'static>(
     } = capture;
 
     if cancelled {
+        if kind == SessionKind::CaptureRaw {
+            let _ = deps.event_tx.send(SessionEvent::Stopped).await;
+            clear_active(&deps.active_arc, &deps.idle_notify).await;
+            return;
+        }
         stop_session(
             session_id,
             SessionStatus::Cancelled,
@@ -427,6 +499,29 @@ async fn run_session<A: AsrBackend + 'static>(
             &deps.idle_notify,
         )
         .await;
+        return;
+    }
+
+    // Capture-only sessions end here: the raw transcript — the exact text the
+    // snippet matcher will compare against at expansion time — goes back to
+    // the caller as `FinalizedText` (routed to the UI, never delivered), with
+    // no correction, no commands/snippet expansion, and no history. Empty
+    // text (silence) is emitted too so the UI can say "didn't catch that".
+    if kind == SessionKind::CaptureRaw {
+        if let Some(error) = first_asr_error.take().filter(|_| !saw_asr_success) {
+            let _ = deps.event_tx.send(SessionEvent::Error(error)).await;
+        } else {
+            info!(%session_id, "capture session finished, raw len={}", raw_text.len());
+            let _ = deps
+                .event_tx
+                .send(SessionEvent::FinalizedText {
+                    session_id,
+                    text: raw_text.trim().to_owned(),
+                })
+                .await;
+        }
+        let _ = deps.event_tx.send(SessionEvent::Stopped).await;
+        clear_active(&deps.active_arc, &deps.idle_notify).await;
         return;
     }
 
@@ -605,7 +700,17 @@ async fn process_and_deliver(
     debug!(%session_id, "[ASR] output ready, len={}", raw_text.len());
 
     let route = router.route_full(&raw_text);
+    // `insert <name>` is handled below by the snippet expander (and falls back
+    // to ordinary dictation when nothing matches), so it is not re-emitted as
+    // a CommandDetected event for the runtime to log and skip.
+    let snippet_name = route.commands.iter().find_map(|cmd| match cmd {
+        lune_core::command::VoiceCommand::InsertSnippet(name) => Some(name.clone()),
+        _ => None,
+    });
     for cmd in &route.commands {
+        if matches!(cmd, lune_core::command::VoiceCommand::InsertSnippet(_)) {
+            continue;
+        }
         if let lune_core::command::VoiceCommand::SwitchStyle(style_id) = cmd {
             let next_preset = match builtin_registry().get(style_id) {
                 Some(preset) => Some(preset),
@@ -647,7 +752,66 @@ async fn process_and_deliver(
             payload,
         });
     }
-    let text_after_commands = route.remaining.trim().to_owned();
+    // ── Voice snippets ──────────────────────────────────────────────────
+    // Two spoken forms expand a user-defined template: the parametric
+    // `insert <name>` command, or the bare trigger phrase as the whole
+    // utterance. The rendered body is delivered verbatim — no correction, no
+    // styling — because the template already is exactly the text the user
+    // wants typed. An `insert <name>` that names no snippet is put back as
+    // ordinary dictation ("insert the disk…" must still type) instead of
+    // consuming the utterance and typing nothing.
+    let mut snippet_fallback_raw = false;
+    if snippet_name.is_some() || route.commands.is_empty() {
+        let snippets = persist.lock().await.list_snippets().unwrap_or_else(|e| {
+            warn!(error = %e, %session_id, "failed to load snippets");
+            Vec::new()
+        });
+        let matched = match &snippet_name {
+            Some(name) => lune_dict::snippets::resolve_name(&snippets, name),
+            None => lune_dict::snippets::match_utterance(&snippets, route.remaining.trim()),
+        };
+        if let Some(snippet) = matched {
+            info!(
+                %session_id,
+                snippet = %snippet.id,
+                trigger = %snippet.trigger_phrase,
+                "expanding voice snippet"
+            );
+            let rendered = render_snippet_body(&snippet.body).await;
+            drain_processing_controls(&mut control_rx, &mut cancelled);
+            if cancelled {
+                stop_session(
+                    session_id,
+                    SessionStatus::Cancelled,
+                    &event_tx,
+                    &persist,
+                    &active_arc,
+                    &idle_notify,
+                )
+                .await;
+                return;
+            }
+            deliver_final_text(
+                session_id,
+                &raw_text,
+                rendered,
+                status,
+                &event_tx,
+                persist,
+                &active_arc,
+                &idle_notify,
+            )
+            .await;
+            return;
+        }
+        snippet_fallback_raw = snippet_name.is_some();
+    }
+
+    let text_after_commands = if snippet_fallback_raw {
+        raw_text.trim().to_owned()
+    } else {
+        route.remaining.trim().to_owned()
+    };
     if text_after_commands.is_empty() {
         info!(%session_id, "all text was voice commands");
         finalize_db(
@@ -804,24 +968,51 @@ async fn process_and_deliver(
 
     info!(%session_id, pipeline_ms = pipeline_t0.elapsed().as_millis() as u64, "post-processing complete");
 
+    deliver_final_text(
+        session_id,
+        &raw_text,
+        post_llm_text,
+        status,
+        &event_tx,
+        persist,
+        &active_arc,
+        &idle_notify,
+    )
+    .await;
+}
+
+/// Emit the finalized text, persist the (raw → final) pair and transcript,
+/// and close the session — shared by the normal pipeline exit and the voice
+/// snippet fast path (which skips correction and styling entirely).
+#[allow(clippy::too_many_arguments)] // the session-teardown bundle plus the two texts
+async fn deliver_final_text(
+    session_id: Uuid,
+    raw_text: &str,
+    final_text: String,
+    status: SessionStatus,
+    event_tx: &mpsc::Sender<SessionEvent>,
+    persist: Arc<Mutex<Database>>,
+    active_arc: &Arc<Mutex<Option<ActiveHandle>>>,
+    idle_notify: &Arc<Notify>,
+) {
     let _ = event_tx
         .send(SessionEvent::FinalizedText {
             session_id,
-            text: post_llm_text.clone(),
+            text: final_text.clone(),
         })
         .await;
 
-    let transcript = if post_llm_text.is_empty() {
+    let transcript = if final_text.is_empty() {
         None
     } else {
-        Some(post_llm_text)
+        Some(final_text)
     };
 
     // Record (raw ASR, final delivered) as labelled data. Best-effort — a
     // write failure never affects delivery.
     if let Some(final_text) = transcript.as_deref() {
         let mut db = persist.lock().await;
-        if let Err(e) = db.insert_correction_pair(session_id, &raw_text, final_text) {
+        if let Err(e) = db.insert_correction_pair(session_id, raw_text, final_text) {
             warn!(error = %e, %session_id, "failed to persist correction pair");
         }
     }
@@ -833,8 +1024,44 @@ async fn process_and_deliver(
     finalize_db(session_id, persist, status, ended_at, transcript).await;
 
     let _ = event_tx.send(SessionEvent::Stopped).await;
-    clear_active(&active_arc, &idle_notify).await;
+    clear_active(active_arc, idle_notify).await;
     info!(%session_id, "session stopped");
+}
+
+/// Resolve placeholder values and render a snippet body. Date and time come
+/// from the local clock; `{clipboard}` triggers a clipboard read only when
+/// the body references it (the read shells out and can take a moment).
+async fn render_snippet_body(body: &str) -> String {
+    use lune_dict::snippets::{PlaceholderValues, needs_clipboard, render_body};
+
+    let clipboard = if needs_clipboard(body) {
+        read_clipboard_text().await
+    } else {
+        None
+    };
+    let now = chrono::Local::now();
+    let values = PlaceholderValues {
+        date: now.format("%B %-d, %Y").to_string(),
+        time: now.format("%H:%M").to_string(),
+        datetime: now.format("%B %-d, %Y at %H:%M").to_string(),
+        clipboard,
+    };
+    render_body(body, &values)
+}
+
+/// Best-effort clipboard text for `{clipboard}` placeholders. The read shells
+/// out to `wl-paste`/`xclip`, so it runs on the blocking pool.
+#[cfg(unix)]
+async fn read_clipboard_text() -> Option<String> {
+    tokio::task::spawn_blocking(crate::uinput_typer::clipboard_text)
+        .await
+        .ok()
+        .flatten()
+}
+
+#[cfg(not(unix))]
+async fn read_clipboard_text() -> Option<String> {
+    None
 }
 
 #[cold]
@@ -1265,6 +1492,135 @@ mod tests {
 
                 let session = db.lock().await.get_session(session_id).unwrap().unwrap();
                 assert_eq!(session.transcript.as_deref(), Some("Hello new line world."));
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn insert_snippet_command_expands_template() {
+        local_set()
+            .run_until(async {
+                let responses = vec![Ok(vec![make_segment("Insert greeting.", false)])];
+                let (mgr, db) = make_manager(scripted_asr(responses), Arc::new(EchoPostProcessor));
+                db.lock()
+                    .await
+                    .insert_snippet("greet", "greeting", "Hello from Lune!\nSecond line.")
+                    .unwrap();
+                let (tx, rx) = mpsc::channel(32);
+                let session_id = mgr.start_with_audio(tx, speech_stream()).await.unwrap();
+
+                let events = collect_events(rx).await;
+                let finalized: Vec<&str> = events
+                    .iter()
+                    .filter_map(|event| match event {
+                        SessionEvent::FinalizedText { text, .. } => Some(text.as_str()),
+                        _ => None,
+                    })
+                    .collect();
+                // The template is delivered verbatim — multiline, no correction,
+                // no terminal-period formatting.
+                assert_eq!(
+                    finalized.last().copied(),
+                    Some("Hello from Lune!\nSecond line.")
+                );
+
+                let session = db.lock().await.get_session(session_id).unwrap().unwrap();
+                assert_eq!(
+                    session.transcript.as_deref(),
+                    Some("Hello from Lune!\nSecond line.")
+                );
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn bare_trigger_expands_snippet_with_placeholders() {
+        local_set()
+            .run_until(async {
+                let responses = vec![Ok(vec![make_segment("Meeting header!", false)])];
+                let (mgr, db) = make_manager(scripted_asr(responses), Arc::new(EchoPostProcessor));
+                db.lock()
+                    .await
+                    .insert_snippet("mh", "meeting header", "## Meeting — {date}")
+                    .unwrap();
+                let (tx, rx) = mpsc::channel(32);
+                let _ = mgr.start_with_audio(tx, speech_stream()).await.unwrap();
+
+                let events = collect_events(rx).await;
+                let text = events
+                    .iter()
+                    .find_map(|event| match event {
+                        SessionEvent::FinalizedText { text, .. } => Some(text.clone()),
+                        _ => None,
+                    })
+                    .expect("snippet delivered");
+                let expected =
+                    format!("## Meeting — {}", chrono::Local::now().format("%B %-d, %Y"));
+                assert_eq!(text, expected);
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn capture_session_returns_raw_text_without_side_effects() {
+        local_set()
+            .run_until(async {
+                let responses = vec![Ok(vec![make_segment("Signature.", false)])];
+                let (mgr, db) = make_manager(scripted_asr(responses), Arc::new(EchoPostProcessor));
+                // A matching snippet must NOT expand during capture — capture
+                // returns the raw phrase itself for the trigger recorder.
+                db.lock()
+                    .await
+                    .insert_snippet("sig", "signature", "Best regards,\nDayton")
+                    .unwrap();
+                let (tx, rx) = mpsc::channel(32);
+                let session_id = mgr
+                    .start_capture_with_audio(tx, speech_stream())
+                    .await
+                    .unwrap();
+
+                let events = collect_events(rx).await;
+                let text = events
+                    .iter()
+                    .find_map(|event| match event {
+                        SessionEvent::FinalizedText { text, .. } => Some(text.clone()),
+                        _ => None,
+                    })
+                    .expect("capture emits raw text");
+                assert_eq!(text, "Signature.");
+
+                // Capture leaves no history: no session row was ever written.
+                assert!(db.lock().await.get_session(session_id).unwrap().is_none());
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn insert_with_unknown_name_falls_back_to_dictation() {
+        local_set()
+            .run_until(async {
+                // Regression: "insert …" used to be consumed as a command and
+                // type nothing. With no matching snippet it must dictate.
+                let responses = vec![Ok(vec![make_segment(
+                    "insert the disk into the drive",
+                    false,
+                )])];
+                let (mgr, _db) = make_manager(scripted_asr(responses), Arc::new(EchoPostProcessor));
+                let (tx, rx) = mpsc::channel(32);
+                let _ = mgr.start_with_audio(tx, speech_stream()).await.unwrap();
+
+                let events = collect_events(rx).await;
+                let finalized: Vec<&str> = events
+                    .iter()
+                    .filter_map(|event| match event {
+                        SessionEvent::FinalizedText { text, .. } => Some(text.as_str()),
+                        _ => None,
+                    })
+                    .collect();
+                assert_eq!(
+                    finalized.last().copied(),
+                    Some("Insert the disk into the drive.")
+                );
             })
             .await;
     }

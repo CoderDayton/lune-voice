@@ -736,6 +736,19 @@ fn get_clipboard() -> Result<Option<ClipboardSnapshot>, String> {
 }
 
 /// Restore a captured clipboard snapshot verbatim.
+/// Current clipboard contents as text, if the clipboard holds text — used by
+/// snippet `{clipboard}` placeholders. Best-effort: `None` when the clipboard
+/// is empty, unreadable, or holds non-text content (e.g. an image).
+pub fn clipboard_text() -> Option<String> {
+    let snap = get_clipboard().ok().flatten()?;
+    // Empty mime = X11 default selection (text); Wayland reports a text/* type.
+    if !(snap.mime.is_empty() || snap.mime.starts_with("text/")) {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&snap.bytes).into_owned();
+    (!text.is_empty()).then_some(text)
+}
+
 fn set_clipboard_snapshot(snap: &ClipboardSnapshot) -> Result<(), String> {
     if is_wayland() {
         pipe_bytes_to_command(

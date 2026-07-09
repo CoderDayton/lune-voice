@@ -78,6 +78,10 @@ name = "noisify_fixtures"
 path = "../../benchmarks/tools/noisify_fixtures.rs"
 
 [[example]]
+name = "snippet_bench"
+path = "../../benchmarks/quality/snippet_bench.rs"
+
+[[example]]
 name = "bench_domain"
 path = "../../benchmarks/quality/bench_domain.rs"
 required-features = ["whisper-cpp", "llama-cpp"]

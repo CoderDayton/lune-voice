@@ -12,9 +12,9 @@ use crate::dto::{
     ActivationModeDto, AsrBackendTypeDto, CreateCustomStyleInput, CreateDictionaryEntryInput,
     DevicePolicyDto, DictationModeDto, DictionaryItemDto, HistoryItemDto, HistoryPageDto,
     LlmBackendTypeDto, PillAnchorDto, PillCornerDto, PillOrientationDto, PillSizeDto,
-    PillVisibilityDto, SaveWorkspaceSettingsInput, SessionStatsDto, StylePresetDto,
-    TerminalModeDto, UpdateCustomStyleInput, UpdateDictionaryEntryInput, WhisperModelDto,
-    WorkspaceSettingsDto, WorkspaceSnapshot,
+    PillVisibilityDto, SaveSnippetInput, SaveWorkspaceSettingsInput, SessionStatsDto,
+    SnippetItemDto, StylePresetDto, TerminalModeDto, UpdateCustomStyleInput,
+    UpdateDictionaryEntryInput, WhisperModelDto, WorkspaceSettingsDto, WorkspaceSnapshot,
 };
 
 const HISTORY_LIMIT: u32 = 200;
@@ -60,6 +60,90 @@ pub fn save_workspace_settings(
 
 /// Maximum length for dictionary phrase/replacement strings.
 const DICT_ENTRY_MAX_LEN: usize = 1024;
+
+/// Maximum length for a snippet trigger phrase.
+const SNIPPET_TRIGGER_MAX_LEN: usize = 256;
+/// Maximum length for a snippet body template.
+const SNIPPET_BODY_MAX_LEN: usize = 16_384;
+
+/// Create (`id: None`) or update (`id: Some`) a voice snippet.
+pub fn save_snippet(input: SaveSnippetInput) -> Result<WorkspaceSnapshot, String> {
+    let paths = resolve_paths()?;
+    let trigger = input.trigger_phrase.trim();
+    let body = input.body.as_str();
+    if trigger.is_empty() || body.trim().is_empty() {
+        return Err("trigger phrase and body are required".into());
+    }
+    if trigger.len() > SNIPPET_TRIGGER_MAX_LEN {
+        return Err(format!(
+            "snippet triggers must be at most {SNIPPET_TRIGGER_MAX_LEN} characters"
+        ));
+    }
+    if body.len() > SNIPPET_BODY_MAX_LEN {
+        return Err(format!(
+            "snippet bodies must be at most {SNIPPET_BODY_MAX_LEN} characters"
+        ));
+    }
+    // A trigger with no alphanumerics would normalize to nothing and could
+    // never be spoken.
+    if !trigger.chars().any(|c| c.is_alphanumeric()) {
+        return Err("snippet triggers need at least one letter or digit".into());
+    }
+    // Reject control characters (newline/tab stay legal in the body) to
+    // prevent injection into the delivery path.
+    if trigger.chars().any(|c| c.is_control())
+        || body
+            .chars()
+            .any(|c| c.is_control() && c != '\n' && c != '\t')
+    {
+        return Err("snippets must not contain control characters".into());
+    }
+
+    let mut database = open_database(&paths)?;
+    // Spoken matching is case-insensitive, so two snippets must not share a
+    // trigger that differs only in case — the collision would silently shadow
+    // one of them.
+    let existing = database
+        .list_snippets()
+        .map_err(|e| format!("list snippets: {e}"))?;
+    let clash = existing.iter().any(|s| {
+        input.id.as_deref() != Some(s.id.as_str())
+            && s.trigger_phrase.trim().eq_ignore_ascii_case(trigger)
+    });
+    if clash {
+        return Err("another snippet already uses this trigger phrase".into());
+    }
+
+    match input.id {
+        Some(id) => {
+            let updated = database
+                .update_snippet(&id, trigger, body)
+                .map_err(|e| format!("update snippet: {e}"))?;
+            if !updated {
+                return Err("snippet not found".into());
+            }
+        }
+        None => {
+            let id = uuid::Uuid::new_v4().to_string();
+            database
+                .insert_snippet(&id, trigger, body)
+                .map_err(|e| format!("insert snippet: {e}"))?;
+        }
+    }
+
+    let settings = load_settings(&paths)?;
+    build_snapshot(settings, &mut database)
+}
+
+pub fn delete_snippet(snippet_id: String) -> Result<WorkspaceSnapshot, String> {
+    let paths = resolve_paths()?;
+    let mut database = open_database(&paths)?;
+    database
+        .delete_snippet(&snippet_id)
+        .map_err(|e| format!("delete snippet: {e}"))?;
+    let settings = load_settings(&paths)?;
+    build_snapshot(settings, &mut database)
+}
 
 pub fn create_dictionary_entry(
     input: CreateDictionaryEntryInput,
@@ -367,6 +451,17 @@ fn build_snapshot(
         .map(map_dictionary_entry)
         .collect();
 
+    let snippets: Vec<_> = database
+        .list_snippets()
+        .map_err(|e| format!("list snippets: {e}"))?
+        .into_iter()
+        .map(|s| SnippetItemDto {
+            id: s.id,
+            trigger_phrase: s.trigger_phrase,
+            body: s.body,
+        })
+        .collect();
+
     let mut style_presets: Vec<StylePresetDto> = builtin_registry()
         .all()
         .iter()
@@ -412,6 +507,7 @@ fn build_snapshot(
         settings: settings_to_dto(&settings),
         history,
         dictionary,
+        snippets,
         style_presets,
         stats,
     })
