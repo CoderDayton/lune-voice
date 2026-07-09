@@ -12,7 +12,7 @@ import {
   Search,
   X,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ConfirmDialog } from '../../../components/feedback/confirm-dialog';
 import {
   fetchHistoryPage,
@@ -210,15 +210,78 @@ interface SessionRowsProps {
 function SessionRows({ session, expanded, onToggle }: SessionRowsProps) {
   const { t } = useLingui();
   const [copied, setCopied] = useState(false);
+  // Keeps the detail row mounted through the fold-up animation, so closing can
+  // finish animating before the row leaves the DOM.
+  const [shown, setShown] = useState(expanded);
   const detailRef = useRef<HTMLTableRowElement>(null);
+  const foldRef = useRef<HTMLDivElement>(null);
+  const animRef = useRef<Animation | null>(null);
+  const followRef = useRef(0);
 
-  // When a row expands, the detail panel unfolds *below* the summary row. For
-  // rows near the bottom of the scroll region that lands off-screen, so pull it
-  // into view — `nearest` is position-aware: it does nothing when already
-  // visible and scrolls the minimum needed otherwise (no jump for top rows).
-  useEffect(() => {
-    if (expanded) detailRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }, [expanded]);
+  // Unfold / fold the detail panel. The row is conditionally rendered, so a CSS
+  // transition never sees both states — instead the wrapper's height is
+  // animated with WAAPI, starting from whatever height an in-flight animation
+  // left it at, so toggling mid-motion reverses smoothly instead of jumping.
+  // While unfolding, a per-frame `scrollIntoView({ block: 'nearest' })` keeps
+  // the growing panel in view — rows near the bottom of the scroll region
+  // scroll in step with the unfold instead of landing off-screen (`nearest` is
+  // position-aware: it does nothing once the panel is fully visible).
+  useLayoutEffect(() => {
+    if (expanded && !shown) {
+      setShown(true); // mount first; the next pass runs the unfold
+      return;
+    }
+    const el = foldRef.current;
+    if (!shown || !el) return;
+
+    const midFlight = animRef.current?.playState === 'running';
+    const fromHeight = midFlight
+      ? el.getBoundingClientRect().height
+      : expanded
+        ? 0
+        : el.offsetHeight;
+    const fromOpacity = midFlight ? Number(getComputedStyle(el).opacity) : expanded ? 0 : 1;
+    animRef.current?.cancel();
+    cancelAnimationFrame(followRef.current);
+
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const root = getComputedStyle(document.documentElement);
+
+    if (expanded) {
+      const anim = el.animate(
+        [
+          { height: `${fromHeight}px`, opacity: fromOpacity },
+          { height: `${el.offsetHeight}px`, opacity: 1 },
+        ],
+        {
+          duration: reduced ? 0 : 260,
+          easing: root.getPropertyValue('--ease-decelerate').trim() || 'ease-out',
+        },
+      );
+      animRef.current = anim;
+      const follow = () => {
+        detailRef.current?.scrollIntoView({ block: 'nearest' });
+        if (anim.playState === 'running') followRef.current = requestAnimationFrame(follow);
+      };
+      follow();
+    } else {
+      const anim = el.animate(
+        [
+          { height: `${fromHeight}px`, opacity: fromOpacity },
+          { height: '0px', opacity: 0 },
+        ],
+        {
+          duration: reduced ? 0 : 190,
+          easing: root.getPropertyValue('--ease-accelerate').trim() || 'ease-in',
+          fill: 'forwards',
+        },
+      );
+      animRef.current = anim;
+      anim.onfinish = () => setShown(false);
+    }
+
+    return () => cancelAnimationFrame(followRef.current);
+  }, [expanded, shown]);
 
   const startDate = new Date(session.startedAt);
   const time = startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -263,7 +326,7 @@ function SessionRows({ session, expanded, onToggle }: SessionRowsProps) {
         <td className="py-3 pl-3">
           <ChevronDown
             size={15}
-            className={`text-content-subtle transition-transform ${expanded ? 'rotate-180' : ''}`}
+            className={`text-content-subtle transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
           />
         </td>
         <td className="whitespace-nowrap px-2 py-3 tabular-nums">
@@ -286,42 +349,46 @@ function SessionRows({ session, expanded, onToggle }: SessionRowsProps) {
         </td>
         <td className="py-3 pr-3" />
       </tr>
-      {expanded && (
+      {shown && (
         <tr ref={detailRef} className="border-b border-surface-border bg-surface-inset/40">
-          <td colSpan={7} className="px-4 py-4 sm:px-6">
-            <div className="rounded-field border border-surface-border bg-surface-inset p-4">
-              <p className="max-h-60 overflow-y-auto whitespace-pre-wrap break-words text-[0.95rem] leading-7 text-content">
-                {session.transcript || t`No transcript`}
-              </p>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs tabular-nums text-content-subtle">
-              <span>
-                {session.words} {t`words`}
-              </span>
-              <span aria-hidden="true">·</span>
-              <span>{formatDuration(session.seconds)}</span>
-              <span aria-hidden="true">·</span>
-              <span>{formatBackend(session.backend)}</span>
-              <span aria-hidden="true">·</span>
-              <span className="capitalize">{session.style || t`None`}</span>
-              <span aria-hidden="true">·</span>
-              <span>{session.status}</span>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <button type="button" onClick={copy} className="btn btn-soft btn-sm gap-1.5">
-                {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
-                {copied ? t`Copied` : t`Copy`}
-              </button>
-              <button type="button" onClick={download} className="btn btn-soft btn-sm gap-1.5">
-                <Download size={14} /> {t`Download`}
-              </button>
-              <div className="ml-auto">
-                <ConfirmDialog
-                  title={t`Delete session?`}
-                  description={t`This will permanently remove this dictation session and its transcript.`}
-                  triggerLabel={t`Delete`}
-                  onConfirm={() => removeHistorySession(session.id)}
-                />
+          <td colSpan={7} className="p-0">
+            <div ref={foldRef} className="overflow-hidden">
+              <div className="px-4 py-4 sm:px-6">
+                <div className="rounded-field border border-surface-border bg-surface-inset p-4">
+                  <p className="max-h-60 overflow-y-auto whitespace-pre-wrap break-words text-[0.95rem] leading-7 text-content">
+                    {session.transcript || t`No transcript`}
+                  </p>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs tabular-nums text-content-subtle">
+                  <span>
+                    {session.words} {t`words`}
+                  </span>
+                  <span aria-hidden="true">·</span>
+                  <span>{formatDuration(session.seconds)}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{formatBackend(session.backend)}</span>
+                  <span aria-hidden="true">·</span>
+                  <span className="capitalize">{session.style || t`None`}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{session.status}</span>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button type="button" onClick={copy} className="btn btn-soft btn-sm gap-1.5">
+                    {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+                    {copied ? t`Copied` : t`Copy`}
+                  </button>
+                  <button type="button" onClick={download} className="btn btn-soft btn-sm gap-1.5">
+                    <Download size={14} /> {t`Download`}
+                  </button>
+                  <div className="ml-auto">
+                    <ConfirmDialog
+                      title={t`Delete session?`}
+                      description={t`This will permanently remove this dictation session and its transcript.`}
+                      triggerLabel={t`Delete`}
+                      onConfirm={() => removeHistorySession(session.id)}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </td>
