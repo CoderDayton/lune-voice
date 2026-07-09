@@ -212,6 +212,9 @@ The desktop app does not scrape logs or poll for session state. It uses typed Ta
 | `start_dictation` / `stop_dictation` / `cancel_dictation` / `toggle_dictation` | `main`, `pill` | Session control |
 | `load_pill_snapshot` | `pill` | Minimal state for the overlay |
 | `show_pill_window` / `hide_pill_window` / `reposition_pill_center` | `pill` | Overlay window control |
+| `begin_pill_drag` / `drag_pill_tick` / `end_pill_drag` / `nudge_pill` | `pill` | Drag and fine-position the overlay |
+| `save_pill_position` / `reset_pill_position` | `pill` | Persist a dragged position or clear it back to the anchor default |
+| `list_monitors` | `main` | Connected displays for the pill's monitor picker |
 | `gpu_support` | `main` | Returns `{ compiled_in: bool }` — true when built with `whisper-cuda` or `llama-cuda` |
 
 ### Session Stream

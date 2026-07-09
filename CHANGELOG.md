@@ -7,6 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Configurable dictation-pill placement from a new **Pill** section in Settings: target monitor, screen anchor (six corner/center positions), size (Compact / Standard / Large), orientation (Horizontal / Vertical), corner style (Pill / Rounded / Square), edge margin, and whether it shows on all workspaces
+- Draggable pill — drag it anywhere and it reopens where you left it, with lock-position and reset-to-default controls and a monitor picker for pinning it to a specific display
 - Sound cues on dictation start, stop, and error, played from the backend, with an enable toggle and volume slider in Settings
 - Separate **Copy to clipboard** toggle in Output settings, independent of the Type / Paste delivery method
 - mimalloc as the global allocator in the desktop shell
@@ -25,6 +27,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `rustfmt.toml` and `clippy.toml` for consistent tooling
 
 ### Changed
+- Pill visibility changes now apply instantly instead of taking effect on the next launch
+- Release builds switched to thin LTO for faster linking at comparable runtime performance
 - Shared a single softmax across HWCE entropy, Tsallis, and top-margin features
 - The built-in word lists now only fix the capitalization of correctly-spoken terms; the fuzzy matching that could rewrite already-correct words was removed, and the lists were de-duplicated
 - Session statistics aggregated across the full database instead of capped history
@@ -35,6 +39,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Text delivery prefers the IBus input method when it is active — committing text directly with no clipboard — and falls back to the uinput keyboard path otherwise
 
 ### Fixed
+- Pill overlay works on GNOME/Mutter and other compositors without `wlr-layer-shell` — the app falls back to XWayland so the overlay can position itself and stay on top
+- Settings dropdowns flip upward when they would otherwise overflow the bottom of the screen
+- The pill's cancel button no longer paints a red background on hover — it keeps only the red ✕
 - Dict corrector risk lookup now O(1) per word (was O(words²) overall)
 - Dictation startup latency, language detection, and hotkey state bugs
 - Window lifecycle, button system, focus styles, and layout polish
@@ -63,5 +70,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Fuzzy matching from the built-in word lists (single- and multi-word) and the unused n-gram reranker — the built-in lists are capitalization-only now.
 
 ### Security
+- Model downloads verified against `Content-Length` with a per-model integrity manifest, so a truncated model file is detected even when the HuggingFace metadata fetch fails or the app is offline
+- Transient dictation pastes tagged with the clipboard-history exclusion hint so dictated text stays out of clipboard managers
 - Updated rustls-webpki to 0.103.13
 - Added SAFETY comments to all unsafe blocks

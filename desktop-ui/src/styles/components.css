@@ -299,7 +299,7 @@ button.pill-surface:hover {
 }
 
 .pill-cancel:hover {
-  @apply bg-error/15 text-error;
+  @apply text-error;
 }
 
 @keyframes pill-cancel-flash {

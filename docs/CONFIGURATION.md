@@ -19,6 +19,7 @@ Lune Voice stores user settings as TOML, exposes the same settings through the d
 - [Privacy Mode](#privacy-mode)
 - [Dictation Modes](#dictation-modes)
 - [Activation Modes](#activation-modes)
+- [Pill Overlay](#pill-overlay)
 - [Hotkey Configuration](#hotkey-configuration)
 - [Style Presets](#style-presets)
   - [Built-in Presets](#built-in-presets)
@@ -83,6 +84,16 @@ dictation_mode = "TypeInPlace"
 copy_to_clipboard = false
 activation_mode = "Toggle"
 pill_visibility = "Always"
+pill_anchor = "BottomCenter"
+pill_size = "Standard"
+pill_orientation = "Horizontal"
+pill_corner = "Rounded"
+pill_edge_margin = 72
+pill_all_workspaces = true
+pill_locked = false
+# pill_monitor is optional — omit to follow the active monitor, or set a
+# connector name (e.g. "DP-1") to pin the pill to one display.
+# pill_position is set automatically when you drag the pill; omit for the anchor default.
 terminal_mode = "Auto"
 sound_cues_enabled = true
 sound_cue_volume = 1.0
@@ -316,6 +327,43 @@ lune-voice mode activation Hold
 |------|-------|---------| 
 | Toggle | `lune-voice toggle` | — |
 | Hold | `lune-voice start` | `lune-voice stop` |
+
+---
+
+## Pill Overlay
+
+The floating dictation pill shows live audio levels and session state and can be
+placed anywhere. All fields are edited from the **Pill** section in Settings and
+take effect on save.
+
+```toml
+pill_visibility = "Always"       # Always | WhenDictating | Never
+pill_anchor = "BottomCenter"     # default position when not dragged
+pill_size = "Standard"           # Compact | Standard | Large
+pill_orientation = "Horizontal"  # Horizontal | Vertical
+pill_corner = "Rounded"          # Pill | Rounded | Square
+pill_edge_margin = 72            # gap (px) from the screen edge for the anchor
+pill_all_workspaces = true       # follow you across virtual desktops
+pill_locked = false              # true disables dragging
+# pill_monitor = "DP-1"          # pin to a connector; omit to follow the active monitor
+# pill_position = { x = 40, y = 900 }  # set automatically when you drag the pill
+```
+
+| Field | Values | Notes |
+|-------|--------|-------|
+| `pill_visibility` | `Always`, `WhenDictating`, `Never` | Applies instantly |
+| `pill_anchor` | `TopLeft`, `TopCenter`, `TopRight`, `BottomLeft`, `BottomCenter`, `BottomRight` | Default placement; only used while `pill_position` is unset |
+| `pill_size` | `Compact`, `Standard`, `Large` | Overall footprint |
+| `pill_orientation` | `Horizontal`, `Vertical` | `Vertical` swaps width and height |
+| `pill_corner` | `Pill`, `Rounded`, `Square` | Corner rounding of the bar |
+| `pill_edge_margin` | `0`–`512` | Distance from the anchored screen edge |
+| `pill_all_workspaces` | `true` / `false` | Show on every workspace |
+| `pill_locked` | `true` / `false` | Lock the pill against dragging |
+| `pill_monitor` | connector name or unset | Pin to a specific display |
+| `pill_position` | `{ x, y }` or unset | Written when you drag the pill; clears when you pick a new anchor |
+
+On GNOME/Mutter and other compositors without `wlr-layer-shell`, the app runs the
+overlay under XWayland so it can position itself and stay on top.
 
 ---
 
