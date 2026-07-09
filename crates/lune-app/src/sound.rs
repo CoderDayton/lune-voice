@@ -75,9 +75,10 @@ fn play_blocking(cue: Cue, volume: f32) -> Result<(), String> {
     let default_config: cpal::StreamConfig = supported.into();
 
     let mut samples = resample_linear(&mono.samples, mono.sample_rate, dst_rate);
-    if volume < 1.0 {
+    let gain = perceptual_gain(volume);
+    if gain < 1.0 {
         for s in &mut samples {
-            *s *= volume;
+            *s *= gain;
         }
     }
     let duration = Duration::from_secs_f64(samples.len() as f64 / dst_rate.max(1) as f64);
@@ -118,6 +119,19 @@ fn play_blocking(cue: Cue, volume: f32) -> Result<(), String> {
     // known clip length plus a short tail so the device drains before drop.
     std::thread::sleep(duration + Duration::from_millis(150));
     Ok(())
+}
+
+/// Map the volume slider position (0.0–1.0) to an amplitude gain.
+///
+/// The slider is perceptual but the DAC is linear: scaling samples by the raw
+/// slider value leaves 50% at only −6 dB — barely quieter — with the whole
+/// useful range crammed into the bottom fifth of the travel. Squaring the
+/// position puts half-slider at −12 dB, close to the ≈−10 dB listeners judge
+/// as "half as loud", while keeping the endpoints exact (0 → silence,
+/// 1 → unity, so the default volume is bit-identical to before).
+fn perceptual_gain(volume: f32) -> f32 {
+    let v = volume.clamp(0.0, 1.0);
+    v * v
 }
 
 /// Decoded mono PCM, normalized to f32 in [-1.0, 1.0].
@@ -247,6 +261,32 @@ mod tests {
                 "{cue:?} samples out of range"
             );
         }
+    }
+
+    #[test]
+    fn perceptual_gain_keeps_endpoints_exact() {
+        assert_eq!(perceptual_gain(0.0), 0.0);
+        assert_eq!(perceptual_gain(1.0), 1.0);
+    }
+
+    #[test]
+    fn perceptual_gain_puts_half_slider_near_half_loudness() {
+        // −12 dB at 50% travel (vs −6 dB linear), near the −10 dB "half as
+        // loud" psychoacoustic mark.
+        let db = 20.0 * perceptual_gain(0.5).log10();
+        assert!((db + 12.0).abs() < 0.1, "got {db} dB");
+    }
+
+    #[test]
+    fn perceptual_gain_is_monotonic_and_clamps_out_of_range() {
+        let mut prev = -1.0;
+        for i in 0..=20 {
+            let g = perceptual_gain(i as f32 / 20.0);
+            assert!(g >= prev, "gain not monotonic at step {i}");
+            prev = g;
+        }
+        assert_eq!(perceptual_gain(-0.5), 0.0);
+        assert_eq!(perceptual_gain(1.5), 1.0);
     }
 
     #[test]
