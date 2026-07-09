@@ -1,0 +1,17 @@
+# cargo-audit configuration.
+#
+# Ignored advisories, with rationale. Revisit whenever Tauri (or another parent
+# that pins quick-xml) is upgraded — once the tree can reach quick-xml >= 0.41.0
+# these entries should be removed rather than left to rot.
+[advisories]
+ignore = [
+    # quick-xml quadratic run time on duplicate attribute names (DoS). Reaches
+    # us only transitively (0.38.x / 0.39.x pulled by Tauri's config/bundle
+    # handling); the fixed 0.41.0 is unreachable without a major Tauri bump.
+    # Lune Voice parses no untrusted XML at runtime, so real-world exposure is
+    # negligible for a local-first desktop app.
+    "RUSTSEC-2026-0194",
+    # quick-xml unbounded namespace-declaration allocation in NsReader (DoS).
+    # Same transitive source and same reasoning as RUSTSEC-2026-0194.
+    "RUSTSEC-2026-0195",
+]
