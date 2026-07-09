@@ -90,12 +90,30 @@ export function DescriptiveDropdown<Value extends string>({
           ? Math.min(Math.max(gutter, rect.right - width), window.innerWidth - width - gutter)
           : Math.min(Math.max(gutter, rect.left), window.innerWidth - width - gutter);
 
+      // Flip up when there isn't enough room below the trigger and there's
+      // more room above — otherwise the menu gets clamped tiny or runs off the
+      // bottom of the screen.
+      const spaceBelow = window.innerHeight - rect.bottom - gutter;
+      const spaceAbove = rect.top - gutter;
+      // Prefer the measured height once the portal is mounted; on first open it
+      // isn't rendered yet, so estimate from the option list.
+      const estRow = options.some((opt) => opt.description) ? 60 : 44;
+      const estContent = options.length * estRow + 12;
+      const desired = menuRef.current?.scrollHeight || estContent;
+      const cap = Math.round(window.innerHeight * 0.6);
+      const needed = Math.min(desired, cap);
+      const openUp = spaceBelow < needed && spaceAbove > spaceBelow;
+      const available = openUp ? spaceAbove : spaceBelow;
+      const maxHeight = Math.max(160, Math.min(cap, available));
+
       setMenuStyle({
         position: 'fixed',
-        top: rect.bottom + gutter,
+        ...(openUp
+          ? { bottom: window.innerHeight - rect.top + gutter }
+          : { top: rect.bottom + gutter }),
         left,
         width,
-        maxHeight: `min(60vh, ${Math.max(160, window.innerHeight - rect.bottom - gutter * 2)}px)`,
+        maxHeight: `${maxHeight}px`,
       });
     }
 
@@ -106,7 +124,7 @@ export function DescriptiveDropdown<Value extends string>({
       window.removeEventListener('resize', updateMenuPosition);
       window.removeEventListener('scroll', updateMenuPosition, true);
     };
-  }, [open, align]);
+  }, [open, align, options]);
 
   function pick(next: Value) {
     onChange(next);
