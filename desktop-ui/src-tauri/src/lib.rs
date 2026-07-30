@@ -226,7 +226,6 @@ pub fn run() {
             commands::update_custom_style,
             commands::delete_custom_style,
             commands::generate_style_examples,
-            commands::warm_up_styling_llm,
             commands::subscribe_session_stream,
             commands::detach_session_stream,
             commands::start_dictation,

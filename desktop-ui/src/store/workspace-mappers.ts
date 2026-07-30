@@ -83,10 +83,9 @@ export function mapWorkspaceSettings(snapshot: WorkspaceSnapshot): WorkspaceSett
       ? '••••••••'
       : DEFAULT_SETTINGS.openaiAsrApiKey,
     openaiAsrModel: snapshot.settings.openaiAsrModel ?? DEFAULT_SETTINGS.openaiAsrModel,
-    // `openaiLlmActive` reports whether the remote provider is the active
-    // engine; the provider fields below persist even when it isn't. The key is
-    // masked when one is saved.
-    llmBackend: snapshot.settings.openaiLlmActive ? 'OpenAiCompatible' : 'Local',
+    // OpenAI-compatible is the only styling engine now — the provider fields
+    // below persist regardless of `llmEnabled`. The key is masked when saved.
+    llmBackend: 'OpenAiCompatible',
     openaiLlmBaseUrl: snapshot.settings.openaiLlmBaseUrl ?? DEFAULT_SETTINGS.openaiLlmBaseUrl,
     openaiLlmApiKey: snapshot.settings.openaiLlmApiKeySet
       ? '••••••••'

@@ -1,7 +1,7 @@
 //! Styling-LLM capability benchmark.
 //!
-//! Answers one question: **is the local styling model (Qwen3.5-0.8B GGUF) good
-//! enough to drive the styling presets we ship?**
+//! Answers one question: **is the configured remote styling LLM good enough
+//! to drive the styling presets we ship?**
 //!
 //! It exercises the exact production path — `StylePreset::build_styling_prompt`
 //! → `LlmService::complete("", prompt)` → `fix_all_number_spaces` /
@@ -19,8 +19,8 @@
 //! echoed example / no-op) plus a per-style heuristic "did it obey the rule"
 //! check. A summary table and an overall verdict close it out.
 //!
-//! Run (from repo root; picks up the real model under
-//! `~/.local/share/lune-voice/models/qwen3-styler-0.8b-gguf/`):
+//! Run (from repo root; needs LUNE_BENCH_LLM_BASE_URL / _MODEL set, pointing
+//! at Ollama, llama-server, LM Studio, or a hosted API):
 //!
 //!   cgs bench --env TYPE=styling
 //!
@@ -30,16 +30,17 @@
 //!   STYLING_VERBOSE=1       print the full prompt sent for the first case
 //!   GEN_FEWSHOT=0           skip generating few-shot pairs for Enhance Prompt
 
-#![cfg(feature = "llama-cpp")]
+#[allow(dead_code)]
+#[path = "../bench_utils.rs"]
+mod bench_utils;
 
-use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use lune_core::config::StylePreset;
 use lune_core::llm::LlmService;
+use lune_llm::OpenAiLlmBackend;
 use lune_llm::few_shot::generate_few_shot_examples;
 use lune_llm::prompt::{contains_forbidden_output, fix_all_number_spaces};
-use lune_llm::{LlamaCppBackend, LlamaCppConfig};
 use lune_persist::AppPaths;
 
 // ─── Test inputs (raw ASR-style: lowercase, no punctuation, fillers) ─────────
@@ -90,13 +91,6 @@ fn env_flag(name: &str, default: bool) -> bool {
     std::env::var(name)
         .map(|v| !(v == "0" || v.eq_ignore_ascii_case("off") || v.eq_ignore_ascii_case("false")))
         .unwrap_or(default)
-}
-
-fn find_gguf(dir: &Path) -> Option<PathBuf> {
-    std::fs::read_dir(dir).ok()?.flatten().find_map(|e| {
-        let p = e.path();
-        (p.extension().and_then(|x| x.to_str()) == Some("gguf")).then_some(p)
-    })
 }
 
 /// Automatic red flags — the failure modes production silently discards
@@ -222,7 +216,7 @@ fn green_check(kind: &str, input: &str, out: &str) -> Option<bool> {
 /// text and the wall-clock latency.
 fn style_once(
     rt: &tokio::runtime::Runtime,
-    llm: &LlamaCppBackend,
+    llm: &OpenAiLlmBackend,
     preset: &StylePreset,
     input: &str,
 ) -> (String, u128) {
@@ -247,7 +241,7 @@ struct ArmStat {
 
 fn run_arm(
     rt: &tokio::runtime::Runtime,
-    llm: &LlamaCppBackend,
+    llm: &OpenAiLlmBackend,
     kind: &str,
     arm: &str,
     preset: &StylePreset,
@@ -299,17 +293,20 @@ fn run_arm(
 
 fn main() {
     let paths = AppPaths::resolve().expect("resolve XDG paths");
-    let style_dir = paths.models_dir().join(lune_core::models::DIR_STYLE_LLM);
-    let Some(gguf) = find_gguf(&style_dir) else {
-        eprintln!("no .gguf under {style_dir:?} — install the styling model first");
-        std::process::exit(1);
+    let Some(mut config) = bench_utils::remote_llm_config_from_env() else {
+        println!(
+            "  [skip] {}/{} not set — point them at Ollama, llama-server, LM Studio, or a hosted API",
+            bench_utils::LUNE_BENCH_LLM_BASE_URL,
+            bench_utils::LUNE_BENCH_LLM_MODEL,
+        );
+        return;
     };
 
     let max_tokens: usize = std::env::var("MAX_TOKENS")
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(512);
-    let use_gpu = cfg!(feature = "llama-cuda");
+    config.max_tokens = max_tokens as u32;
     let style_filter: Option<Vec<String>> = std::env::var("STYLES").ok().map(|v| {
         v.split(',')
             .map(|s| s.trim().to_lowercase())
@@ -320,19 +317,14 @@ fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
     println!("║  Styling-LLM capability benchmark                            ║");
     println!("╚══════════════════════════════════════════════════════════════╝");
-    println!("model      : {}", gguf.display());
+    println!("endpoint   : {}", config.base_url);
     println!(
-        "gpu        : {}   max_new_tokens: {max_tokens}",
-        if use_gpu { "on (llama-cuda)" } else { "cpu" }
+        "model      : {}   max_new_tokens: {max_tokens}",
+        config.model
     );
 
     let load = Instant::now();
-    let llm = LlamaCppBackend::new(LlamaCppConfig {
-        model_path: gguf,
-        use_gpu,
-        max_new_tokens: max_tokens,
-    })
-    .expect("load styling LLM");
+    let llm = OpenAiLlmBackend::new(config);
     println!("load time  : {} ms", load.elapsed().as_millis());
 
     let rt = tokio::runtime::Runtime::new().expect("tokio runtime");

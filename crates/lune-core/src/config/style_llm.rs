@@ -159,10 +159,8 @@ impl StylePreset {
     /// Format matches the fine-tune training schema: the style **instruction and
     /// rules go in the system role**, the **transcript alone in the user role**,
     /// and the model's rewrite is the assistant turn (loss is masked there at
-    /// train time). The chat-template *token* rendering — ChatML for the current
-    /// Qwen model, Llama-3 once the fine-tune ships — lives in the backend's
-    /// `build_chatml`, not here. Keeping the transcript isolated in the user
-    /// turn is what makes train == inference.
+    /// train time). Keeping the transcript isolated in the user turn is what
+    /// makes train == inference.
     pub fn build_styling_prompt(&self, corrected_text: &str) -> (String, String) {
         use std::fmt::Write;
         let mut system = String::with_capacity(512);
@@ -182,9 +180,8 @@ impl StylePreset {
                 let _ = writeln!(system, "Output: \"{output}\"");
             }
         }
-        // Thinking suppression is per-backend (llama.cpp pre-fills an empty
-        // <think></think> block; the remote backend strips think tags), so no
-        // directive is embedded here.
+        // The remote backend strips any <think>...</think> reasoning block from
+        // the response, so no suppression directive is embedded here.
         (system, corrected_text.to_string())
     }
 

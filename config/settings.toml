@@ -7,7 +7,7 @@
 
 # ── Compute device ────────────────────────────────────────────────────────────
 #
-# Controls which execution provider ORT uses for ASR + local LLM inference.
+# Controls whether the local whisper.cpp ASR backend uses CUDA.
 #
 #   "auto"  — Try CUDA at startup; fall back to CPU if unavailable. (default)
 #   "cuda"  — Prefer CUDA; still falls back gracefully if CUDA init fails.
@@ -100,16 +100,16 @@ type = "WhisperCpp"
 
 # ── LLM backend ──────────────────────────────────────────────────────────────
 #
-# Used for low-confidence ASR correction + style polishing. Only invoked
-# when the per-word confidence gate flags risky words.
+# Optional style-rewrite pass applied to the transcript when a style preset is
+# selected. There is no local styling model; point this at Ollama,
+# llama-server, LM Studio, or a hosted API.
 #
 # Supported types:
-#   "Local"             — Local Qwen3-0.6B style LLM (auto-downloaded). (default when omitted)
 #   "OpenAiCompatible"  — Remote OpenAI-compatible endpoint.
-#   "Disabled"          — Skip LLM post-processing entirely (heuristic correction only).
+#   "Disabled"          — No styling; deliver the raw transcript. (default when omitted)
 #
 [llm_backend]
-type = "Local"
+type = "Disabled"
 
 # Example remote LLM (uncomment + fill to use):
 # [llm_backend]

@@ -2,7 +2,7 @@ import { useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';
 import { Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { ensureLlmInitialized, getLlmReadiness } from '../../lib/backend/llm';
+import { getLlmReadiness } from '../../lib/backend/llm';
 import type { FormatTogglesDto } from '../../lib/backend/types';
 import {
   createCustomStyle,
@@ -70,7 +70,6 @@ export function StylesPage() {
     const s = workspaceStore.state.settings;
     return {
       llmEnabled: s.llmEnabled,
-      llmBackend: s.llmBackend,
       openaiLlmApiKey: s.openaiLlmApiKey,
       openaiLlmModel: s.openaiLlmModel,
     };
@@ -97,9 +96,8 @@ export function StylesPage() {
     // Resolve styling-engine readiness in the background so the editor can gate
     // example generation (disable refresh + explain what to set up).
     if (mode !== 'view') {
-      void getLlmReadiness(readLlmSettings()).then((r) =>
-        setModal((m) => ({ ...m, llmReady: r.ready, llmReason: r.reason })),
-      );
+      const r = getLlmReadiness(readLlmSettings());
+      setModal((m) => ({ ...m, llmReady: r.ready, llmReason: r.reason }));
     }
   }
 
@@ -171,10 +169,9 @@ export function StylesPage() {
       llmReason: null,
     }));
 
-    // Validate the engine is fully initialized (model loaded, able to serve)
-    // before generating and applying the style. Configuration readiness alone
-    // is not enough — a cold engine fails generation with "not ready".
-    const readiness = await ensureLlmInitialized(readLlmSettings());
+    // Validate the provider is configured before generating and applying the
+    // style.
+    const readiness = getLlmReadiness(readLlmSettings());
     if (!readiness.ready) {
       // Style is created but stays dirty; Regenerate remains disabled with the
       // reason shown until the engine is set up and initialized.
@@ -196,11 +193,10 @@ export function StylesPage() {
   async function handleRefresh() {
     const preset = modal.preset;
     if (!preset || modal.refreshing) return;
-    // Re-validate full initialization at click time — the engine may have
-    // unloaded (idle TTL) or settings changed since open. This waits for the
-    // model load, so the busy spinner covers it.
+    // Re-validate configuration at click time — settings may have changed
+    // since the modal opened.
     setModal((m) => ({ ...m, refreshing: true }));
-    const readiness = await ensureLlmInitialized(readLlmSettings());
+    const readiness = getLlmReadiness(readLlmSettings());
     if (!readiness.ready) {
       setModal((m) => ({ ...m, refreshing: false, llmReady: false, llmReason: readiness.reason }));
       return;

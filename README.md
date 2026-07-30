@@ -26,9 +26,9 @@ Speech flows through a pipeline that gets smarter at each stage:
 Mic → Whisper (speech-to-text + built-in VAD) → Dictionary → LLM Style Pass → Paste
 ```
 
-Raw transcription is rarely ready to use. Lune runs it through your custom dictionary to fix names and jargon, then hands it to a local LLM that reformats the result to match a style you pick — casual, professional, technical, or one you define yourself.
+Raw transcription is rarely ready to use. Lune runs it through your custom dictionary to fix names and jargon, then — if you've turned styling on — hands it to an LLM that reformats the result to match a style you pick: casual, professional, technical, or one you define yourself. Point styling at a local Ollama or llama-server instance to keep it fully on-machine, or at a hosted API if you'd rather not run one.
 
-First launch downloads ~1.5 GB of models (Whisper speech-to-text, its voice-activity model, and the styling LLM) to your machine. After that, the entire pipeline is air-gapped.
+First launch downloads ~1 GB of Whisper speech-to-text models (plus its voice-activity model) to your machine. After that, the ASR + dictionary pipeline is air-gapped; styling only reaches the network if you enable it and point it at a remote endpoint.
 
 <br>
 
@@ -36,7 +36,7 @@ First launch downloads ~1.5 GB of models (Whisper speech-to-text, its voice-acti
 
 **A dictation pill that stays out of your way** — A floating overlay shows live audio levels and session state. Stop or cancel without ever leaving the app you're working in.
 
-**Style presets that match how you write** — "Professional" tightens prose for workplace messages. "Technical" preserves jargon and code formatting. Prefer your words untouched? Leave styling off — your dictionary and punctuation still apply, the LLM just stays out of it. Roll your own with custom prompts and few-shot examples that teach the LLM your voice.
+**Style presets that match how you write** — "Professional" tightens prose for workplace messages. "Technical" preserves jargon and code formatting. Prefer your words untouched? Leave styling off — your dictionary and punctuation still apply, no LLM call is made. Roll your own with custom prompts and few-shot examples that teach the LLM your voice.
 
 **A dictionary that learns your world** — Names, acronyms, slang — anything the ASR has never heard. Entries are fuzzy-matched and priority-ranked, so corrections land even when pronunciation is rough.
 
@@ -68,7 +68,7 @@ A one-time activation ping confirms your key — after that, everything runs off
 
 ## Privacy, for Real
 
-This isn't a marketing claim with asterisks. The dictation pipeline has zero network calls. Your audio never leaves your sound card. Your transcripts never leave your disk. The only time the app talks to the internet is model download and license activation — both happen once.
+This isn't a marketing claim with asterisks. Speech-to-text and your dictionary run with zero network calls — your audio never leaves your sound card. Styling is off by default; if you turn it on, point it at a local Ollama/llama-server instance and transcripts still never leave your machine, or at a hosted API if you'd rather not run one yourself. Model download and license activation are the only other times the app talks to the internet — both happen once.
 
 There is no telemetry. There are no analytics. There is nothing to opt out of because there is nothing to opt into.
 

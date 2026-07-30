@@ -14,8 +14,6 @@ default = []
 # `cgs build` when the build host has a CUDA toolchain.
 whisper-cpp = ["lune-app/whisper-cpp"]
 whisper-cuda = ["lune-app/whisper-cuda"]
-llama-cpp = ["lune-app/llama-cpp"]
-llama-cuda = ["lune-app/llama-cuda"]
 gpu = ["lune-app/gpu"]
 
 [build-dependencies]

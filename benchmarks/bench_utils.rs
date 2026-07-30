@@ -3,9 +3,11 @@
 //! Included via `#[path = "../bench_utils.rs"] mod bench_utils;` from each
 //! example (benchmarks live in pipeline/, quality/, tuning/, and tools/).
 //!
-//! Post-ONNX stack: ASR is whisper.cpp (`AsrBackendConfig::WhisperCpp`) and the
-//! LLM is the llama.cpp styling backend wrapped in [`lune_llm::StylePipeline`].
-//! There is no ORT runtime and no correction/edit gate anymore.
+//! ASR is whisper.cpp (`AsrBackendConfig::WhisperCpp`). The styling LLM is a
+//! remote OpenAI-compatible endpoint (`LUNE_BENCH_LLM_*` env vars — point it
+//! at Ollama, llama-server, LM Studio, or a hosted API) wrapped in
+//! [`lune_llm::StylePipeline`]. There is no ORT runtime and no
+//! correction/edit gate anymore.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -75,15 +77,15 @@ pub fn process_memory_usage() -> Option<MemoryUsage> {
 // ─── GPU detection ───────────────────────────────────────────────────────────
 
 /// Whether this build can offload to CUDA. There is no ORT runtime probe
-/// anymore — whisper.cpp / llama.cpp CUDA are compile-time decisions gated on
-/// the `whisper-cuda` / `llama-cuda` features. Returns `true` when either is
-/// compiled in; backends still fall back to CPU at runtime if CUDA is absent.
+/// anymore — whisper.cpp CUDA is a compile-time decision gated on the
+/// `whisper-cuda` feature. Returns `true` when compiled in; the backend still
+/// falls back to CPU at runtime if CUDA is absent.
 pub fn detect_gpu() -> bool {
-    let has_gpu = cfg!(feature = "whisper-cuda") || cfg!(feature = "llama-cuda");
+    let has_gpu = cfg!(feature = "whisper-cuda");
     if has_gpu {
-        println!("  [info] CUDA features compiled in (whisper/llama offload enabled)");
+        println!("  [info] CUDA feature compiled in (whisper offload enabled)");
     } else {
-        println!("  [info] CPU-only build (no CUDA features)");
+        println!("  [info] CPU-only build (no CUDA feature)");
     }
     has_gpu
 }
@@ -510,8 +512,9 @@ where
 /// Consolidated setup for benchmark binaries.
 ///
 /// Build via [`BenchmarkHarness::builder()`]. Owns the tokio runtime, loaded
-/// whisper.cpp ASR and (optional) llama.cpp styling LLM, and the pre-filtered
-/// fixture list. All fields are `pub` for direct use in benchmark code.
+/// whisper.cpp ASR and (optional) remote OpenAI-compatible styling LLM, and
+/// the pre-filtered fixture list. All fields are `pub` for direct use in
+/// benchmark code.
 pub struct BenchmarkHarness {
     pub rt: tokio::runtime::Runtime,
     pub asr: Arc<lune_asr::AsrRegistry>,
@@ -521,15 +524,26 @@ pub struct BenchmarkHarness {
     pub models_dir: PathBuf,
 }
 
-/// Locate the single styling GGUF in the style-LLM model directory.
-fn find_gguf(dir: &std::path::Path) -> Option<std::path::PathBuf> {
-    std::fs::read_dir(dir).ok()?.flatten().find_map(|e| {
-        let path = e.path();
-        if path.extension().and_then(|x| x.to_str()) == Some("gguf") {
-            Some(path)
-        } else {
-            None
-        }
+/// Env vars that configure the remote OpenAI-compatible styling LLM the
+/// benchmarks talk to — point them at Ollama, llama-server, LM Studio, or a
+/// hosted API. Named consts so the required configuration lives in one place.
+pub const LUNE_BENCH_LLM_BASE_URL: &str = "LUNE_BENCH_LLM_BASE_URL";
+pub const LUNE_BENCH_LLM_MODEL: &str = "LUNE_BENCH_LLM_MODEL";
+pub const LUNE_BENCH_LLM_API_KEY: &str = "LUNE_BENCH_LLM_API_KEY";
+
+/// Build a remote styling-LLM config from the `LUNE_BENCH_LLM_*` env vars.
+/// Returns `None` when the endpoint or model is unset, so callers can skip
+/// the styling pass with an explicit message instead of failing the run.
+pub fn remote_llm_config_from_env() -> Option<lune_llm::OpenAiLlmConfig> {
+    let base_url = std::env::var(LUNE_BENCH_LLM_BASE_URL).ok()?;
+    let model = std::env::var(LUNE_BENCH_LLM_MODEL).ok()?;
+    let api_key = std::env::var(LUNE_BENCH_LLM_API_KEY).unwrap_or_default();
+    Some(lune_llm::OpenAiLlmConfig {
+        base_url,
+        api_key,
+        model,
+        max_tokens: 512,
+        temperature: 0.2,
     })
 }
 
@@ -604,9 +618,10 @@ pub struct HarnessBuilder {
 }
 
 impl HarnessBuilder {
-    /// Load the llama.cpp styling LLM wrapped in [`lune_llm::StylePipeline`]
-    /// (falls back to `NullPostProcessor` on error or missing model). Without
-    /// this the harness uses `NullPostProcessor`.
+    /// Load the remote OpenAI-compatible styling LLM (configured via
+    /// `LUNE_BENCH_LLM_*` env vars) wrapped in [`lune_llm::StylePipeline`]
+    /// (falls back to `NullPostProcessor` when unset). Without this the
+    /// harness uses `NullPostProcessor`.
     pub fn with_llm(mut self) -> Self {
         self.with_llm = true;
         self
@@ -637,9 +652,9 @@ impl HarnessBuilder {
         }
 
         let has_gpu = detect_gpu();
-        // whisper.cpp / llama.cpp decide CUDA from their own compile-time
-        // features; `Auto` lets `from_config` honour `whisper-cuda` while
-        // staying safe on a CPU-only build.
+        // whisper.cpp decides CUDA from its own compile-time feature; `Auto`
+        // lets `from_config` honour `whisper-cuda` while staying safe on a
+        // CPU-only build.
         let device = DevicePolicy::Auto;
 
         let models_dir = models_dir();
@@ -652,32 +667,20 @@ impl HarnessBuilder {
             .unwrap_or_else(|e| panic!("BenchmarkHarness: ASR load failed — {e}"));
         let asr = Arc::new(asr);
 
-        // LLM — llama.cpp styling backend behind StylePipeline.
+        // LLM — remote OpenAI-compatible styling backend behind StylePipeline.
         let llm: Arc<dyn TextPostProcessor> = if self.with_llm {
-            let style_dir = models_dir.join(lune_core::models::DIR_STYLE_LLM);
             let llm_off = std::env::var("LUNE_LLM")
                 .map(|v| v == "off" || v == "0")
                 .unwrap_or(false);
-            match (llm_off, find_gguf(&style_dir)) {
-                (false, Some(model_path)) => {
-                    match lune_llm::LlamaCppBackend::new(lune_llm::LlamaCppConfig {
-                        model_path,
-                        use_gpu: has_gpu,
-                        max_new_tokens: 512,
-                    }) {
-                        Ok(backend) => {
-                            let svc: Arc<dyn LlmService> = Arc::new(backend);
-                            Arc::new(lune_llm::StylePipeline::new(svc))
-                        }
-                        Err(e) => {
-                            eprintln!("[warn] LLM load failed ({e}), using NullPostProcessor");
-                            Arc::new(lune_llm::NullPostProcessor::new())
-                        }
-                    }
+            match (llm_off, remote_llm_config_from_env()) {
+                (false, Some(config)) => {
+                    let svc: Arc<dyn LlmService> =
+                        Arc::new(lune_llm::OpenAiLlmBackend::new(config));
+                    Arc::new(lune_llm::StylePipeline::new(svc))
                 }
                 (false, None) => {
                     eprintln!(
-                        "[warn] no styling GGUF under {style_dir:?}, using NullPostProcessor"
+                        "[warn] {LUNE_BENCH_LLM_BASE_URL}/{LUNE_BENCH_LLM_MODEL} not set, using NullPostProcessor"
                     );
                     Arc::new(lune_llm::NullPostProcessor::new())
                 }

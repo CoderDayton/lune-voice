@@ -29,7 +29,7 @@ msgid "{0} of {1}"
 msgstr "{0} из {1}"
 
 #. placeholder {0}: presets.length
-#: src/features/styles/styles-page.tsx:270
+#: src/features/styles/styles-page.tsx:266
 msgid "{0} presets"
 msgstr "{0} пресеты"
 
@@ -116,7 +116,7 @@ msgstr "Добавить исправление"
 msgid "Add snippet"
 msgstr ""
 
-#: src/features/settings/sections/models-section.tsx:105
+#: src/features/settings/sections/models-section.tsx:104
 msgid "AI models stored on your device."
 msgstr "Модели AI, хранящиеся на вашем устройстве."
 
@@ -188,7 +188,7 @@ msgstr "Встроенный"
 
 #: src/components/feedback/confirm-dialog.tsx:52
 #: src/features/dictionary/components/dictionary-table.tsx:96
-#: src/features/settings/sections/models-section.tsx:312
+#: src/features/settings/sections/models-section.tsx:311
 #: src/features/styles/components/style-editor-modal.tsx:184
 msgid "Cancel"
 msgstr "Отмена"
@@ -246,9 +246,9 @@ msgstr "Выберите, как готовый текст будет встав
 msgid "Choose how Lune Voice looks."
 msgstr "Выберите, как будет выглядеть Lune Voice."
 
-#: src/features/settings/sections/styling-engine-section.tsx:38
-msgid "Choose how transcripts are restyled. On-device runs a local model; the cloud option sends transcripts to a remote OpenAI-compatible endpoint you configure."
-msgstr "Выберите, как переоформляются расшифровки. Локальный режим использует модель на устройстве; облачный вариант отправляет расшифровки на удалённую OpenAI-совместимую конечную точку, которую вы настраиваете."
+#: src/features/settings/sections/styling-engine-section.tsx:37
+msgid "Choose how transcripts are restyled — sent to a remote OpenAI-compatible endpoint you configure, or left off entirely."
+msgstr "Выберите, как переоформляются расшифровки — отправляются на удалённую OpenAI-совместимую конечную точку, которую вы настраиваете, или полностью отключено."
 
 #: src/features/welcome/welcome-page.tsx:161
 #: src/features/welcome/welcome-page.tsx:167
@@ -276,7 +276,7 @@ msgid "close"
 msgstr "закрывать"
 
 #: src/features/history/components/session-detail-modal.tsx:209
-#: src/features/settings/sections/models-section.tsx:324
+#: src/features/settings/sections/models-section.tsx:323
 #: src/features/styles/components/style-editor-modal.tsx:175
 msgid "Close"
 msgstr "Закрывать"
@@ -356,7 +356,7 @@ msgstr ""
 msgid "Create a snippet"
 msgstr ""
 
-#: src/features/styles/styles-page.tsx:304
+#: src/features/styles/styles-page.tsx:300
 msgid "Create new style"
 msgstr "Создать новый стиль"
 
@@ -378,7 +378,7 @@ msgstr "Темный"
 #: src/features/dictionary/components/dictionary-table.tsx:146
 #: src/features/history/components/history-table.tsx:387
 #: src/features/history/components/session-detail-modal.tsx:202
-#: src/features/settings/sections/models-section.tsx:260
+#: src/features/settings/sections/models-section.tsx:259
 #: src/features/snippets/snippets-page.tsx:328
 msgid "Delete"
 msgstr "Удалить"
@@ -389,11 +389,11 @@ msgid "Delete {0}"
 msgstr "Удалить {0}"
 
 #. placeholder {0}: model.name
-#: src/features/settings/sections/models-section.tsx:297
+#: src/features/settings/sections/models-section.tsx:296
 msgid "Delete {0}?"
 msgstr "Удалить {0}?"
 
-#: src/features/settings/sections/models-section.tsx:315
+#: src/features/settings/sections/models-section.tsx:314
 msgid "Delete model"
 msgstr "Удалить модель"
 
@@ -455,7 +455,7 @@ msgstr "Отмените текущий черновик и вернитесь �
 msgid "Disconnected"
 msgstr "Отключено"
 
-#: src/features/settings/sections/models-section.tsx:134
+#: src/features/settings/sections/models-section.tsx:133
 msgid "Disk usage"
 msgstr "Использование диска"
 
@@ -464,7 +464,7 @@ msgid "Dismiss error"
 msgstr "Ошибка закрытия"
 
 #: src/features/history/components/history-table.tsx:381
-#: src/features/settings/sections/models-section.tsx:274
+#: src/features/settings/sections/models-section.tsx:273
 msgid "Download"
 msgstr "Скачать"
 
@@ -490,7 +490,7 @@ msgid "Download interrupted"
 msgstr "Загрузка прервана"
 
 #: src/features/settings/components/asr-engine-cards.tsx:148
-#: src/features/settings/sections/models-section.tsx:233
+#: src/features/settings/sections/models-section.tsx:232
 #: src/features/welcome/components/model-card.tsx:99
 msgid "Download progress"
 msgstr "Прогресс загрузки"
@@ -504,7 +504,7 @@ msgid "Downloading models"
 msgstr "Загрузка моделей"
 
 #: src/features/settings/components/asr-engine-cards.tsx:151
-#: src/features/settings/sections/models-section.tsx:274
+#: src/features/settings/sections/models-section.tsx:273
 #: src/features/welcome/welcome-page.tsx:254
 msgid "Downloading…"
 msgstr "Загрузка…"
@@ -554,13 +554,13 @@ msgstr "Изменить стиль"
 msgid "Empty session"
 msgstr "Пустая сессия"
 
-#: src/features/styles/styles-page.tsx:240
+#: src/features/styles/styles-page.tsx:236
 msgid "Enable styling"
 msgstr "Включить стилизацию"
 
 #: src/features/history/components/history-table.tsx:143
 #: src/features/history/components/session-detail-modal.tsx:162
-#: src/features/settings/sections/styling-engine-section.tsx:42
+#: src/features/settings/sections/styling-engine-section.tsx:41
 msgid "Engine"
 msgstr "Двигатель"
 
@@ -676,7 +676,7 @@ msgstr ""
 msgid "Idle"
 msgstr "Праздный"
 
-#: src/features/settings/sections/models-section.tsx:217
+#: src/features/settings/sections/models-section.tsx:216
 msgid "In use"
 msgstr "Используется"
 
@@ -689,7 +689,7 @@ msgid "Insert placeholder"
 msgstr ""
 
 #: src/features/settings/components/asr-engine-cards.tsx:227
-#: src/features/settings/sections/models-section.tsx:220
+#: src/features/settings/sections/models-section.tsx:219
 #: src/features/welcome/components/model-card.tsx:89
 msgid "Installed"
 msgstr "Установлено"
@@ -801,7 +801,7 @@ msgstr "минуты"
 msgid "Mode"
 msgstr "Режим"
 
-#: src/features/settings/sections/models-section.tsx:104
+#: src/features/settings/sections/models-section.tsx:103
 #: src/features/settings/settings-page.tsx:75
 msgid "Models"
 msgstr "Модели"
@@ -877,15 +877,15 @@ msgstr "Нормализует уровень микрофона перед об
 msgid "not connected"
 msgstr ""
 
-#: src/features/settings/sections/models-section.tsx:223
+#: src/features/settings/sections/models-section.tsx:222
 msgid "Not installed"
 msgstr "Не установлено"
 
-#: src/features/settings/sections/models-section.tsx:136
+#: src/features/settings/sections/models-section.tsx:135
 msgid "Nothing installed"
 msgstr "Ничего не установлено"
 
-#: src/features/settings/sections/styling-engine-section.tsx:43
+#: src/features/settings/sections/styling-engine-section.tsx:42
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 msgstr "В положении «Выкл.» доставляются необработанные расшифровки. Применяемый стиль выбирается на вкладке «Стили»."
 
@@ -1096,7 +1096,7 @@ msgstr ""
 msgid "Retry download"
 msgstr "Повторить загрузку"
 
-#: src/features/styles/styles-page.tsx:242
+#: src/features/styles/styles-page.tsx:238
 msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
 msgstr "Переписывать каждую расшифровку в выбранном стиле. Когда выключено, необработанная расшифровка доставляется как есть."
 
@@ -1268,16 +1268,15 @@ msgstr "Остановить диктовку"
 msgid "Style"
 msgstr "Стиль"
 
-#: src/features/settings/sections/models-section.tsx:76
 #: src/features/settings/settings-page.tsx:73
 msgid "Styling"
 msgstr "Стилизация"
 
-#: src/features/settings/sections/styling-engine-section.tsx:37
+#: src/features/settings/sections/styling-engine-section.tsx:36
 msgid "Styling engine"
 msgstr "Движок стилизации"
 
-#: src/features/styles/styles-page.tsx:269
+#: src/features/styles/styles-page.tsx:265
 msgid "Switch style"
 msgstr "Переключить стиль"
 
@@ -1327,7 +1326,7 @@ msgstr "Слова, в которых распознаватель менее в
 msgid "Theme"
 msgstr "Тема"
 
-#: src/features/settings/sections/models-section.tsx:307
+#: src/features/settings/sections/models-section.tsx:306
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "Эта модель используется в вашей текущей конфигурации. Диктовка может не работать, пока вы не переустановите её или не выберете другую."
 
@@ -1534,6 +1533,6 @@ msgstr "Ваше устройство это поддерживает — исп
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "Ваши модели готовы. Все остается на этой машине."
 
-#: src/features/styles/styles-page.tsx:306
+#: src/features/styles/styles-page.tsx:302
 msgid "Your own formatting preset"
 msgstr "Ваш собственный набор настроек форматирования"

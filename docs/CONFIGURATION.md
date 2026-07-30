@@ -12,7 +12,6 @@ Lune Voice stores user settings as TOML, exposes the same settings through the d
   - [WhisperCpp (Local, default)](#whispercpp-local-default)
   - [OpenAI-Compatible (Remote)](#openai-compatible-remote-asr)
 - [LLM Backends](#llm-backends)
-  - [Local Style LLM](#local-style-llm)
   - [Disabled](#disabled-llm)
   - [OpenAI-Compatible (Remote)](#openai-compatible-remote-llm)
 - [GPU / Device Settings](#gpu--device-settings)
@@ -184,19 +183,6 @@ streaming = "HttpPolling"
 
 ## LLM Backends
 
-### Local Style LLM
-
-Runs the bundled local style model (Qwen3.5-0.8B GGUF via llama.cpp) when it has been downloaded. If the model files are missing or fail to load, Lune uses passthrough mode for that session.
-
-```toml
-[llm_backend]
-type = "Local"
-```
-
-The local backend applies the dictionary seed and, if a style preset is selected, rewrites the text in the chosen style; dictionary substitution runs regardless of styling. It does not perform grammar correction — Whisper already emits punctuated text.
-
-Model: `unsloth/Qwen3.5-0.8B-GGUF`, file `Qwen3.5-0.8B-UD-Q5_K_XL.gguf`, stored under `models/qwen3-styler-0.8b-gguf/`.
-
 ### Disabled LLM
 
 Disables LLM post-processing. Dictionary substitutions still run (applied via the dictionary seed before any LLM call). This is the default.
@@ -238,11 +224,11 @@ device = "auto"
 
 | Value | Behavior |
 |-------|----------|
-| `"auto"` | Use CUDA when compiled with `whisper-cuda` / `llama-cuda`; fall back to CPU otherwise. **(default)** |
+| `"auto"` | Use CUDA when compiled with `whisper-cuda`; fall back to CPU otherwise. **(default)** |
 | `"cuda"` | Require CUDA. Runtime falls back to CPU if CUDA is unavailable even when explicitly requested. |
 | `"cpu"` | Force CPU-only inference. |
 
-**GPU support is a build-time choice.** The `device` setting only takes effect when the binary was compiled with the matching CUDA features (`whisper-cuda`, `llama-cuda`). A CPU build (`whisper-cpp`, `llama-cpp`) ignores `device = "cuda"` and runs on CPU regardless. The onboarding GPU acceptance card is only shown when `gpu_support.compiled_in` is true.
+**GPU support is a build-time choice.** The `device` setting only takes effect when the binary was compiled with the matching `whisper-cuda` feature. A CPU build (`whisper-cpp`) ignores `device = "cuda"` and runs on CPU regardless. The onboarding GPU acceptance card is only shown when `gpu_support.compiled_in` is true.
 
 See [docs/RELEASE.md](RELEASE.md) for the full build matrix and how to build CPU vs CUDA artifacts.
 
@@ -428,37 +414,14 @@ lune-voice settings style technical
 
 ### Prompt Structure
 
-Each style preset defines a full prompt template:
+Each style preset builds a `(system, user)` message pair via `StylePreset::build_styling_prompt`:
 
-| Component | Purpose |
-|-----------|---------| 
-| `system_prompt` | Instructions for the LLM's role and behavior |
-| `few_shot_pairs` | Example input/output pairs for in-context learning |
+| Role | Content |
+|------|---------|
+| `system` | Style name, rules, and few-shot examples (when the preset has any) |
+| `user` | The transcript to rewrite |
 
-The final prompt is assembled as ChatML. The assistant turn is prefilled with an empty `<think>\n\n</think>` block to suppress Qwen3.5's chain-of-thought output:
-
-```
-<|im_start|>system
-{system_prompt}
-
-Dictionary terms (always use these exact spellings):
-- lunevoice -> Lune Voice
-- ...
-
-Preceding context: {previous utterances}<|im_end|>
-<|im_start|>user
-{few_shot_input_1}<|im_end|>
-<|im_start|>assistant
-<think>
-</think>
-{few_shot_output_1}<|im_end|>
-...
-<|im_start|>user
-{raw_text}<|im_end|>
-<|im_start|>assistant
-<think>
-</think>
-```
+These are sent as standard `system` + `user` chat-completion messages to the configured OpenAI-compatible endpoint — no custom prompt templating or chat-template rendering happens client-side. A Qwen-style endpoint may emit an inline `<think>…</think>` reasoning block in its response; the backend strips it before the text reaches the pipeline.
 
 ### Few-Shot Examples
 
@@ -579,7 +542,6 @@ Models are downloaded automatically on first run from HuggingFace Hub.
 | Whisper Medium *(default)* | `ggerganov/whisper.cpp` | `whisper-medium-q8_0` | `ggml-medium-q8_0.bin` | ~823 MB |
 | Whisper Large v3 Turbo | `ggerganov/whisper.cpp` | `whisper-large-v3-turbo-q8_0` | `ggml-large-v3-turbo-q8_0.bin` | ~874 MB |
 | Whisper VAD | `ggml-org/whisper-vad` | `whisper-vad-silero` | `ggml-silero-v5.1.2.bin` | ~9 MB |
-| Style LLM | `unsloth/Qwen3.5-0.8B-GGUF` | `qwen3-styler-0.8b-gguf` | `Qwen3.5-0.8B-UD-Q5_K_XL.gguf` | ~600 MB |
 
 Models are stored in:
 
@@ -589,7 +551,7 @@ Models are stored in:
 | macOS | `~/Library/Application Support/lune-voice/models/` |
 | Windows | `%APPDATA%\lune-voice\models\` |
 
-Custom model paths are not part of the current public settings surface. To use a remote LLM instead of the local model:
+There is no bundled local styling model — custom model paths are not part of the current public settings surface. To use a remote OpenAI-compatible styling LLM:
 
 ```toml
 [llm_backend]

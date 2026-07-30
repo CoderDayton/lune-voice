@@ -17,9 +17,9 @@ export interface ModelStatus {
 
 /**
  * Onboarding manages only the models the chosen configuration actually uses —
- * the selected Whisper size plus the styling LLM when enabled. `check_model_status`
- * now returns the full installable library, so filter to the in-use entries to
- * keep the setup flow focused on what the user just chose.
+ * the selected Whisper size. `check_model_status` returns the full
+ * installable library, so filter to the in-use entries to keep the setup
+ * flow focused on what the user just chose.
  */
 export function relevantSetupModels(models: ModelStatus[]): ModelStatus[] {
   return models.filter((m) => m.inUse);

@@ -2,6 +2,6 @@
 
 /**
  * Which styling-LLM engine the user picked. `Disabled` is carried by
- * `llm_enabled == false`, so this only distinguishes the two enabled engines.
+ * `llm_enabled == false`. Remote (OpenAI-compatible) is the only engine.
  */
-export type LlmBackendTypeDto = "Local" | "OpenAiCompatible";
+export type LlmBackendTypeDto = "OpenAiCompatible";

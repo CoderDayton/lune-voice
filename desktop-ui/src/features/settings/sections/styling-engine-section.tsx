@@ -1,5 +1,5 @@
 import { useLingui } from '@lingui/react/macro';
-import { Check, Cloud, Cpu, type LucideIcon, PowerOff, Wand2 } from 'lucide-react';
+import { Check, Cloud, type LucideIcon, PowerOff, Wand2 } from 'lucide-react';
 import { saveWorkspaceSettings } from '../../../store/workspace-store';
 import { OpenAiFields } from '../components/openai-fields';
 import { SettingsBlock, type SettingsProps, SettingsSection } from '../components/section';
@@ -7,15 +7,14 @@ import { type LlmEngineValue, llmEngines } from '../data/settings-data';
 
 function engineIcon(value: LlmEngineValue): LucideIcon {
   if (value === 'OpenAiCompatible') return Cloud;
-  if (value === 'Local') return Cpu;
   return PowerOff;
 }
 
 /**
- * Styling-engine picker: Off / On-device / OpenAI-compatible (remote). This is
- * the single source of truth for the styling LLM backend — selecting an engine
- * enables styling with it; Off disables styling entirely. The Styles tab toggle
- * is a shortcut that maps onto the same settings.
+ * Styling-engine picker: Off / OpenAI-compatible (remote). This is the single
+ * source of truth for the styling LLM backend — selecting an engine enables
+ * styling with it; Off disables styling entirely. The Styles tab toggle is a
+ * shortcut that maps onto the same settings.
  */
 export function StylingEngineSection({ settings }: SettingsProps) {
   const { t } = useLingui();
@@ -35,14 +34,14 @@ export function StylingEngineSection({ settings }: SettingsProps) {
     <div className="flex flex-col gap-space-md">
       <SettingsSection
         title={t`Styling engine`}
-        description={t`Choose how transcripts are restyled. On-device runs a local model; the cloud option sends transcripts to a remote OpenAI-compatible endpoint you configure.`}
+        description={t`Choose how transcripts are restyled — sent to a remote OpenAI-compatible endpoint you configure, or left off entirely.`}
         icon={Wand2}
       >
         <SettingsBlock
           label={t`Engine`}
           description={t`Off delivers raw transcripts. Which style is applied is chosen on the Styles tab.`}
         >
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-2">
             {llmEngines.map((engine) => (
               <EngineCard
                 key={engine.value}

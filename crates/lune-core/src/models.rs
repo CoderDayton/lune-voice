@@ -1,5 +1,3 @@
-pub const DIR_STYLE_LLM: &str = "qwen3-styler-0.8b-gguf";
-
 // whisper.cpp GGML model directories. Each holds a single `ggml-*.bin` file
 // downloaded from the `ggerganov/whisper.cpp` HuggingFace repo. Small and Medium
 // ship as q5 (q5_1 / q5_0) for a smaller footprint; Large v3 Turbo stays q8_0.

@@ -1,4 +1,4 @@
-//! Prompt-strategy A/B for the tiny styling model (Qwen3.5-0.8B GGUF).
+//! Prompt-strategy A/B for the configured remote styling LLM.
 //!
 //! Tests the folk claim that tiny models do better with **explicit numbered
 //! rules** than with **few-shot examples** (examples "distract" a 0.8B model
@@ -9,29 +9,30 @@
 //!   • rule PLACEMENT — all-in-user (production, empty system) vs a system role
 //!
 //! Four arms per (style, input):
-//!   1. prose-user     production path: empty system, prose rules in the user
-//!                     message (== `build_styling_prompt` with no examples).
-//!   2. numbered-user  same framing + text, rules as a numbered list, empty
-//!                     system. Isolates FORMAT vs arm 1.
-//!   3. numbered-system same content as arm 2, but framing + rules moved into
-//!                     the system role. Isolates PLACEMENT vs arm 2.
-//!   4. few-shot       production few-shot path (`build_styling_prompt` with
-//!                     the preset's built-in pairs). The baseline the claim
-//!                     says should lose. Skipped for styles with no pairs.
+//!   1. prose-user: production path: empty system, prose rules in the user
+//!      message (== `build_styling_prompt` with no examples).
+//!   2. numbered-user: same framing + text, rules as a numbered list, empty
+//!      system. Isolates FORMAT vs arm 1.
+//!   3. numbered-system: same content as arm 2, but framing + rules moved
+//!      into the system role. Isolates PLACEMENT vs arm 2.
+//!   4. few-shot: production few-shot path (`build_styling_prompt` with the
+//!      preset's built-in pairs). The baseline the claim says should lose.
+//!      Skipped for styles with no pairs.
 //!
-//! Run:  cgs bench --env TYPE=rulecmp
+//! Run:  cgs bench --env TYPE=rulecmp (needs LUNE_BENCH_LLM_BASE_URL / _MODEL)
 //! Env:  STYLES=casual,technical   MAX_TOKENS=512   STYLING_VERBOSE=1
 
-#![cfg(feature = "llama-cpp")]
+#[allow(dead_code)]
+#[path = "../bench_utils.rs"]
+mod bench_utils;
 
 use std::fmt::Write as _;
-use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use lune_core::config::StylePreset;
 use lune_core::llm::LlmService;
+use lune_llm::OpenAiLlmBackend;
 use lune_llm::prompt::{contains_forbidden_output, fix_all_number_spaces};
-use lune_llm::{LlamaCppBackend, LlamaCppConfig};
 use lune_persist::AppPaths;
 
 // ─── Inputs (shared with styling_capability) ─────────────────────────────────
@@ -248,13 +249,6 @@ struct Stat {
 
 // ─── Runner ──────────────────────────────────────────────────────────────────
 
-fn find_gguf(dir: &Path) -> Option<PathBuf> {
-    std::fs::read_dir(dir).ok()?.flatten().find_map(|e| {
-        let p = e.path();
-        (p.extension().and_then(|x| x.to_str()) == Some("gguf")).then_some(p)
-    })
-}
-
 fn load_enhance(paths: &AppPaths) -> Option<StylePreset> {
     let mut db = lune_persist::Database::open(&paths.database_file()).ok()?;
     let styles = db.list_custom_styles().ok()?;
@@ -270,16 +264,19 @@ fn load_enhance(paths: &AppPaths) -> Option<StylePreset> {
 
 fn main() {
     let paths = AppPaths::resolve().expect("resolve XDG paths");
-    let style_dir = paths.models_dir().join(lune_core::models::DIR_STYLE_LLM);
-    let Some(gguf) = find_gguf(&style_dir) else {
-        eprintln!("no .gguf under {style_dir:?}");
-        std::process::exit(1);
+    let Some(mut config) = bench_utils::remote_llm_config_from_env() else {
+        println!(
+            "  [skip] {}/{} not set — point them at Ollama, llama-server, LM Studio, or a hosted API",
+            bench_utils::LUNE_BENCH_LLM_BASE_URL,
+            bench_utils::LUNE_BENCH_LLM_MODEL,
+        );
+        return;
     };
     let max_tokens: usize = std::env::var("MAX_TOKENS")
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(512);
-    let use_gpu = cfg!(feature = "llama-cuda");
+    config.max_tokens = max_tokens as u32;
     let filter: Option<Vec<String>> = std::env::var("STYLES").ok().map(|v| {
         v.split(',')
             .map(|s| s.trim().to_lowercase())
@@ -291,18 +288,10 @@ fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
     println!("║  Prompt-strategy A/B: numbered rules vs few-shot            ║");
     println!("╚══════════════════════════════════════════════════════════════╝");
-    println!("model : {}", gguf.display());
-    println!(
-        "gpu   : {}   max_new_tokens: {max_tokens}",
-        if use_gpu { "on (llama-cuda)" } else { "cpu" }
-    );
+    println!("model : {}   max_new_tokens: {max_tokens}", config.model);
+    println!("endpoint : {}", config.base_url);
     let load = Instant::now();
-    let llm = LlamaCppBackend::new(LlamaCppConfig {
-        model_path: gguf,
-        use_gpu,
-        max_new_tokens: max_tokens,
-    })
-    .expect("load LLM");
+    let llm = OpenAiLlmBackend::new(config);
     println!("load  : {} ms", load.elapsed().as_millis());
     let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
 

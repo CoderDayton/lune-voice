@@ -33,9 +33,9 @@ The runtime pipeline uses interchangeable backends:
 | Component | Backends | Model format | Runtime |
 |-----------|----------|--------------|---------|
 | ASR | WhisperCpp (local), OpenAI-compatible (remote) | GGML `.bin` / remote API | whisper-rs (whisper.cpp) / HTTP |
-| LLM | LlamaCpp (local), OpenAI-compatible (remote), disabled | GGUF `.gguf` / remote API | llama-cpp-2 (llama.cpp) / HTTP |
+| LLM | OpenAI-compatible (remote), disabled | remote API | HTTP |
 
-Both native backends compile their C/C++ libraries from source at build time via `*-sys` crates. GPU (CUDA) support is selected at **build time** via Cargo features (`whisper-cuda`, `llama-cuda`); there is no runtime backend autodetection. See [docs/RELEASE.md](RELEASE.md) for the full build matrix.
+The native ASR backend compiles its C/C++ library from source at build time via a `*-sys` crate. GPU (CUDA) support is selected at **build time** via the `whisper-cuda` Cargo feature; there is no runtime backend autodetection. The styling LLM is remote-only — point it at Ollama, llama-server, LM Studio, or a hosted API. See [docs/RELEASE.md](RELEASE.md) for the full build matrix.
 
 Backend selection is centralized through registries and DTO mappers. The desktop UI never builds model paths or backend structs itself; it sends typed settings and receives snapshots.
 
@@ -47,7 +47,7 @@ Backend selection is centralized through registries and DTO mappers. The desktop
 lune-core (types, config, errors, hwce confidence)
 ├─ lune-audio (mic, resample, ringbuf, vad, pcen)
 ├─ lune-asr (whisper.cpp, openai remote, registry)
-├─ lune-llm (llama.cpp, openai remote, null passthrough, style pipeline, prompt, few-shot)
+├─ lune-llm (openai remote, null passthrough, style pipeline, prompt, few-shot)
 ├─ lune-dict (corrector, vocab, voice commands)
 └─ lune-persist (settings.toml, sqlite, model hub)
      └─ lune-app (session, factory, hotkey, dbus, delivery, sound cues)
@@ -134,11 +134,11 @@ The session calls `StylePipeline::transform()` for LLM post-processing.
 1. **Dictionary seed** — `apply_dictionary_seed` replaces dictionary phrases in the raw text (Unicode case-insensitive, longest-match). This happens before the LLM ever sees the text.
 2. **Styling pass** — runs only when a style preset is selected. When `default_style` is `None` the LLM is skipped and the seeded text is returned; for any selected preset the LLM is called via `llm.complete()`. Output is run through `fix_all_number_spaces` and a `contains_forbidden_output` filter; a failing or empty output keeps the seeded text.
 
-**Qwen3.5 "thinking" suppression:** the prompt prefills the assistant turn with an empty `<think>\n\n</think>` block. This prevents the model's chain-of-thought from appearing in output.
+**Thinking suppression:** a Qwen-style remote endpoint may emit an inline `<think>…</think>` reasoning block; the backend strips it from the response before it reaches the pipeline.
 
-If the local model files are missing or fail to load, the runtime falls back to `NullPostProcessor`, which returns the seeded text unchanged.
+When no styling engine is configured (`llm_backend` is `Disabled`), the runtime uses `NullPostProcessor`, which returns the seeded text unchanged. When the configured remote engine's request fails, `StylePipeline` keeps the seeded (dictionary-substituted) text instead of failing the session.
 
-The LLM backend (`LlamaCppBackend`) holds a shared `Arc<LlamaModel>` and creates a fresh `LlamaContext` per call, executed on the blocking thread pool via `spawn_blocking`. This keeps model execution off the async runtime without holding a long-lived per-session context.
+The LLM backend (`OpenAiLlmBackend`) wraps an `async-openai` `Client` and makes one chat-completion HTTP request per call, directly on the async runtime — no local model, no blocking thread pool.
 
 ### 5. Text Delivery
 
@@ -215,7 +215,7 @@ The desktop app does not scrape logs or poll for session state. It uses typed Ta
 | `begin_pill_drag` / `drag_pill_tick` / `end_pill_drag` / `nudge_pill` | `pill` | Drag and fine-position the overlay |
 | `save_pill_position` / `reset_pill_position` | `pill` | Persist a dragged position or clear it back to the anchor default |
 | `list_monitors` | `main` | Connected displays for the pill's monitor picker |
-| `gpu_support` | `main` | Returns `{ compiled_in: bool }` — true when built with `whisper-cuda` or `llama-cuda` |
+| `gpu_support` | `main` | Returns `{ compiled_in: bool }` — true when built with `whisper-cuda` |
 
 ### Session Stream
 
@@ -308,9 +308,10 @@ Main Thread (tokio current_thread + LocalSet)
 `-- Event forwarder (spawn_local) - routes SessionEvents to delivery
 
 spawn_blocking pool (tokio default)
-|-- whisper.cpp inference (WhisperContext shared; per-call WhisperState via Mutex)
-`-- llama.cpp inference  (LlamaModel Arc-shared; fresh LlamaContext per call)
+`-- whisper.cpp inference (WhisperContext shared; per-call WhisperState via Mutex)
 ```
+
+The remote LLM call is a plain async HTTP request (via `async-openai`), so it runs directly on the async runtime rather than `spawn_blocking`.
 
 Why `current_thread` instead of `multi_thread`:
 - Avoids work-stealing overhead for this single-pipeline daemon
@@ -318,8 +319,6 @@ Why `current_thread` instead of `multi_thread`:
 - `spawn_local` support for `!Send` futures (cpal stream)
 
 The `WhisperContext` is wrapped in an `Arc` and shared across all sessions. Each session creates a lightweight `WhisperState` via `ctx.create_state()`. The state is held behind a `Mutex<WhisperCppSession>` so the async and blocking layers can both access it safely.
-
-The `LlamaModel` is held in an `Arc` loaded via `OnceLock<LlamaBackend>`. A fresh `LlamaContext` is created per completion call inside `spawn_blocking`, so no per-session context is held between calls.
 
 ---
 

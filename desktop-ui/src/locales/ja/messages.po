@@ -29,7 +29,7 @@ msgid "{0} of {1}"
 msgstr "{0}/{1}"
 
 #. placeholder {0}: presets.length
-#: src/features/styles/styles-page.tsx:270
+#: src/features/styles/styles-page.tsx:266
 msgid "{0} presets"
 msgstr "{0} プリセット"
 
@@ -116,7 +116,7 @@ msgstr "修正を追加"
 msgid "Add snippet"
 msgstr ""
 
-#: src/features/settings/sections/models-section.tsx:105
+#: src/features/settings/sections/models-section.tsx:104
 msgid "AI models stored on your device."
 msgstr "AI モデルはデバイスに保存されます。"
 
@@ -188,7 +188,7 @@ msgstr "組み込み"
 
 #: src/components/feedback/confirm-dialog.tsx:52
 #: src/features/dictionary/components/dictionary-table.tsx:96
-#: src/features/settings/sections/models-section.tsx:312
+#: src/features/settings/sections/models-section.tsx:311
 #: src/features/styles/components/style-editor-modal.tsx:184
 msgid "Cancel"
 msgstr "キャンセル"
@@ -246,9 +246,9 @@ msgstr "完成したテキストを現在使用しているアプリに挿入す
 msgid "Choose how Lune Voice looks."
 msgstr "Lune Voiceの見た目を選択します。"
 
-#: src/features/settings/sections/styling-engine-section.tsx:38
-msgid "Choose how transcripts are restyled. On-device runs a local model; the cloud option sends transcripts to a remote OpenAI-compatible endpoint you configure."
-msgstr "文字起こしをどのようにスタイル調整するかを選択します。オンデバイスはローカルモデルで実行され、クラウドオプションは設定した OpenAI 互換のリモートエンドポイントに文字起こしを送信します。"
+#: src/features/settings/sections/styling-engine-section.tsx:37
+msgid "Choose how transcripts are restyled — sent to a remote OpenAI-compatible endpoint you configure, or left off entirely."
+msgstr "文字起こしをどのようにスタイル調整するかを選択します。設定した OpenAI 互換のリモートエンドポイントに送信するか、完全にオフにできます。"
 
 #: src/features/welcome/welcome-page.tsx:161
 #: src/features/welcome/welcome-page.tsx:167
@@ -276,7 +276,7 @@ msgid "close"
 msgstr "閉じる"
 
 #: src/features/history/components/session-detail-modal.tsx:209
-#: src/features/settings/sections/models-section.tsx:324
+#: src/features/settings/sections/models-section.tsx:323
 #: src/features/styles/components/style-editor-modal.tsx:175
 msgid "Close"
 msgstr "閉じる"
@@ -356,7 +356,7 @@ msgstr ""
 msgid "Create a snippet"
 msgstr ""
 
-#: src/features/styles/styles-page.tsx:304
+#: src/features/styles/styles-page.tsx:300
 msgid "Create new style"
 msgstr "新しいスタイルを作成する"
 
@@ -378,7 +378,7 @@ msgstr "暗い"
 #: src/features/dictionary/components/dictionary-table.tsx:146
 #: src/features/history/components/history-table.tsx:387
 #: src/features/history/components/session-detail-modal.tsx:202
-#: src/features/settings/sections/models-section.tsx:260
+#: src/features/settings/sections/models-section.tsx:259
 #: src/features/snippets/snippets-page.tsx:328
 msgid "Delete"
 msgstr "削除"
@@ -389,11 +389,11 @@ msgid "Delete {0}"
 msgstr "{0}を削除"
 
 #. placeholder {0}: model.name
-#: src/features/settings/sections/models-section.tsx:297
+#: src/features/settings/sections/models-section.tsx:296
 msgid "Delete {0}?"
 msgstr "{0} を削除しますか?"
 
-#: src/features/settings/sections/models-section.tsx:315
+#: src/features/settings/sections/models-section.tsx:314
 msgid "Delete model"
 msgstr "モデルの削除"
 
@@ -455,7 +455,7 @@ msgstr "現在のドラフトを破棄し、アイドル状態に戻ります。
 msgid "Disconnected"
 msgstr "切断されました"
 
-#: src/features/settings/sections/models-section.tsx:134
+#: src/features/settings/sections/models-section.tsx:133
 msgid "Disk usage"
 msgstr "ディスク使用量"
 
@@ -464,7 +464,7 @@ msgid "Dismiss error"
 msgstr "エラーを無視する"
 
 #: src/features/history/components/history-table.tsx:381
-#: src/features/settings/sections/models-section.tsx:274
+#: src/features/settings/sections/models-section.tsx:273
 msgid "Download"
 msgstr "ダウンロード"
 
@@ -490,7 +490,7 @@ msgid "Download interrupted"
 msgstr "ダウンロードが中断されました"
 
 #: src/features/settings/components/asr-engine-cards.tsx:148
-#: src/features/settings/sections/models-section.tsx:233
+#: src/features/settings/sections/models-section.tsx:232
 #: src/features/welcome/components/model-card.tsx:99
 msgid "Download progress"
 msgstr "ダウンロード進行状況"
@@ -504,7 +504,7 @@ msgid "Downloading models"
 msgstr "モデルをダウンロード中"
 
 #: src/features/settings/components/asr-engine-cards.tsx:151
-#: src/features/settings/sections/models-section.tsx:274
+#: src/features/settings/sections/models-section.tsx:273
 #: src/features/welcome/welcome-page.tsx:254
 msgid "Downloading…"
 msgstr "ダウンロード中…"
@@ -554,13 +554,13 @@ msgstr "スタイルの編集"
 msgid "Empty session"
 msgstr "空のセッ���ョン"
 
-#: src/features/styles/styles-page.tsx:240
+#: src/features/styles/styles-page.tsx:236
 msgid "Enable styling"
 msgstr "スタイル調整を有効にする"
 
 #: src/features/history/components/history-table.tsx:143
 #: src/features/history/components/session-detail-modal.tsx:162
-#: src/features/settings/sections/styling-engine-section.tsx:42
+#: src/features/settings/sections/styling-engine-section.tsx:41
 msgid "Engine"
 msgstr "エンジン"
 
@@ -676,7 +676,7 @@ msgstr ""
 msgid "Idle"
 msgstr "アイドル状態"
 
-#: src/features/settings/sections/models-section.tsx:217
+#: src/features/settings/sections/models-section.tsx:216
 msgid "In use"
 msgstr "使用中"
 
@@ -689,7 +689,7 @@ msgid "Insert placeholder"
 msgstr ""
 
 #: src/features/settings/components/asr-engine-cards.tsx:227
-#: src/features/settings/sections/models-section.tsx:220
+#: src/features/settings/sections/models-section.tsx:219
 #: src/features/welcome/components/model-card.tsx:89
 msgid "Installed"
 msgstr "インストール済み"
@@ -801,7 +801,7 @@ msgstr "分"
 msgid "Mode"
 msgstr "モード"
 
-#: src/features/settings/sections/models-section.tsx:104
+#: src/features/settings/sections/models-section.tsx:103
 #: src/features/settings/settings-page.tsx:75
 msgid "Models"
 msgstr "モデル"
@@ -877,15 +877,15 @@ msgstr "音声検出前にマイクレベルを正規化します。小さい音
 msgid "not connected"
 msgstr ""
 
-#: src/features/settings/sections/models-section.tsx:223
+#: src/features/settings/sections/models-section.tsx:222
 msgid "Not installed"
 msgstr "インストールされていません"
 
-#: src/features/settings/sections/models-section.tsx:136
+#: src/features/settings/sections/models-section.tsx:135
 msgid "Nothing installed"
 msgstr "何もインストールされていません"
 
-#: src/features/settings/sections/styling-engine-section.tsx:43
+#: src/features/settings/sections/styling-engine-section.tsx:42
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 msgstr "オフでは生の文字起こしがそのまま出力されます。どのスタイルを適用するかは「スタイル」タブで選択します。"
 
@@ -1096,7 +1096,7 @@ msgstr ""
 msgid "Retry download"
 msgstr "ダウンロードを再試行"
 
-#: src/features/styles/styles-page.tsx:242
+#: src/features/styles/styles-page.tsx:238
 msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
 msgstr "各文字起こしを選択したスタイルで書き換えます。オフの場合、生の文字起こしがそのまま出力されます。"
 
@@ -1268,16 +1268,15 @@ msgstr "音声入力を停止"
 msgid "Style"
 msgstr "スタイル"
 
-#: src/features/settings/sections/models-section.tsx:76
 #: src/features/settings/settings-page.tsx:73
 msgid "Styling"
 msgstr "スタイル調整"
 
-#: src/features/settings/sections/styling-engine-section.tsx:37
+#: src/features/settings/sections/styling-engine-section.tsx:36
 msgid "Styling engine"
 msgstr "スタイル調整エンジン"
 
-#: src/features/styles/styles-page.tsx:269
+#: src/features/styles/styles-page.tsx:265
 msgid "Switch style"
 msgstr "スタイルを切り替え"
 
@@ -1327,7 +1326,7 @@ msgstr "認識エンジンが最も自信のない単語を、辞書と語彙と
 msgid "Theme"
 msgstr "テーマ"
 
-#: src/features/settings/sections/models-section.tsx:307
+#: src/features/settings/sections/models-section.tsx:306
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "このモデルは現在の設定で使用中です。再インストールするか別のモデルを選択するまで、音声入力が機能しない場合があります。"
 
@@ -1534,6 +1533,6 @@ msgstr "お使いのマシンが対応しています — 文字起こしを高�
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "モデルの準備ができました。すべてがこのマシン上に残ります。"
 
-#: src/features/styles/styles-page.tsx:306
+#: src/features/styles/styles-page.tsx:302
 msgid "Your own formatting preset"
 msgstr "独自の書式設定プリセット"

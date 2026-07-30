@@ -50,10 +50,9 @@ describe('relevantSetupModels', () => {
       model('whisper-small-q5_1'),
       model('whisper-medium-q5_0', { inUse: true }),
       model('whisper-large-v3-turbo-q8_0'),
-      model('qwen3-styler-0.8b-gguf', { inUse: true }),
     ];
     const relevant = relevantSetupModels(models).map((m) => m.localName);
-    expect(relevant).toEqual(['whisper-medium-q5_0', 'qwen3-styler-0.8b-gguf']);
+    expect(relevant).toEqual(['whisper-medium-q5_0']);
   });
 });
 

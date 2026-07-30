@@ -1,15 +1,14 @@
 # Release & build matrix
 
-Lune Voice runs speech-to-text and the styling LLM **in-process** through native
-libraries:
+Lune Voice runs speech-to-text **in-process** through a native library. The
+styling LLM is remote-only (OpenAI-compatible HTTP) — no native build step.
 
 - ASR — [`whisper-rs`](https://github.com/tazz4843/whisper-rs) → bundled `whisper.cpp`
-- LLM — [`llama-cpp-2`](https://github.com/utilityai/llama-cpp-rs) → bundled `llama.cpp` (via `llama-cpp-sys-2`)
 
-Both `*-sys` crates **vendor and compile the native C/C++ library from source at
-`cargo build` time** (CMake + a C++ toolchain + `libclang` for bindgen). The GPU
-backend is selected at **build time** by a Cargo feature; there is **no runtime
-backend autodetection and no external inference server** (no `llama-server`).
+The `whisper-rs` `*-sys` crate **vendors and compiles the native C/C++ library
+from source at `cargo build` time** (CMake + a C++ toolchain + `libclang` for
+bindgen). The GPU backend is selected at **build time** by a Cargo feature;
+there is **no runtime backend autodetection**.
 
 ## Distribution model
 
@@ -20,24 +19,25 @@ the backend feature set **pinned explicitly per target** — release runners pas
 `--env BACKEND` so each artifact is reproducible. (A bare local `cgs build`
 instead auto-detects the build host; see Build commands.)
 
-Models are **external assets**: GGUF / GGML files are downloaded at runtime into
-the application models directory (`~/.local/share/lune-voice/models/` on Linux)
-and loaded from disk. They are **not** embedded in the executable or the bundle.
+Whisper models are **external assets**: GGML files are downloaded at runtime
+into the application models directory (`~/.local/share/lune-voice/models/` on
+Linux) and loaded from disk. They are **not** embedded in the executable or the
+bundle.
 
 ## Release matrix
 
 | Target | OS / arch | Backend | Cargo features | Status |
 |---|---|---|---|---|
-| Linux CPU | Linux x86_64 | CPU (AVX2 baseline) | `whisper-cpp llama-cpp` | **Supported** |
-| Linux CUDA | Linux x86_64 + NVIDIA | CUDA | `whisper-cuda llama-cuda` | **Supported** |
-| Windows CPU | Windows x86_64 | CPU (AVX2 baseline) | `whisper-cpp llama-cpp` | **Supported** |
-| Windows CUDA | Windows x86_64 + NVIDIA | CUDA | `whisper-cuda llama-cuda` | **Supported** |
-| macOS Metal | macOS arm64 (Apple Silicon) | Metal | `whisper-metal llama-metal` | **Planned** (see below) |
+| Linux CPU | Linux x86_64 | CPU (AVX2 baseline) | `whisper-cpp` | **Supported** |
+| Linux CUDA | Linux x86_64 + NVIDIA | CUDA | `whisper-cuda` | **Supported** |
+| Windows CPU | Windows x86_64 | CPU (AVX2 baseline) | `whisper-cpp` | **Supported** |
+| Windows CUDA | Windows x86_64 + NVIDIA | CUDA | `whisper-cuda` | **Supported** |
+| macOS Metal | macOS arm64 (Apple Silicon) | Metal | `whisper-metal` | **Planned** (see below) |
 
-The `whisper-cuda`/`llama-cuda` features forward to `whisper-rs/cuda` and
-`llama-cpp-2/cuda`; the CPU features just compile the libraries without a GPU
-backend. The Cargo feature graph is cross-platform — the same `--features` flags
-work on Linux and Windows; only the build toolchain differs per OS.
+The `whisper-cuda` feature forwards to `whisper-rs/cuda`; the CPU feature just
+compiles the library without a GPU backend. The Cargo feature graph is
+cross-platform — the same `--features` flag works on Linux and Windows; only
+the build toolchain differs per OS.
 
 ## Toolchain per runner
 
@@ -78,11 +78,11 @@ Under the hood that runs, from `desktop-ui/`:
 
 ```bash
 # Native (default): tuned to this machine's CPU + GPU
-GGML_NATIVE=ON bun tauri build --features "whisper-cuda llama-cuda"
+GGML_NATIVE=ON bun tauri build --features "whisper-cuda"
 
 # Portable (PORTABLE=1): portable CPU baseline + all common CUDA archs
 GGML_NATIVE=OFF GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON \
-  bun tauri build --features "whisper-cuda llama-cuda"
+  bun tauri build --features "whisper-cuda"
 ```
 
 For PORTABLE, `GGML_NATIVE=OFF` + the explicit AVX2/FMA/F16C flags force a
@@ -96,8 +96,8 @@ On Windows, run the equivalent in PowerShell from `desktop-ui\`:
 
 ```powershell
 $env:GGML_NATIVE="OFF"; $env:GGML_AVX2="ON"; $env:GGML_FMA="ON"; $env:GGML_F16C="ON"
-bun tauri build --features "whisper-cpp llama-cpp"     # CPU
-bun tauri build --features "whisper-cuda llama-cuda"   # CUDA (needs CUDA Toolkit)
+bun tauri build --features "whisper-cpp"     # CPU
+bun tauri build --features "whisper-cuda"    # CUDA (needs CUDA Toolkit)
 ```
 
 Tauri produces the `.msi`/`.exe` (NSIS) installers configured in
@@ -113,21 +113,19 @@ through `BACKEND` as above when invoking the production build inside it.
 
 To add the macOS Apple-Silicon artifact:
 
-1. Add `metal` passthrough features mirroring the CUDA ones:
+1. Add a `metal` passthrough feature mirroring the CUDA one:
    - `crates/lune-asr/Cargo.toml`: `whisper-metal = ["whisper-cpp", "whisper-rs/metal"]`
-   - `crates/lune-llm/Cargo.toml`: `llama-metal = ["llama-cpp", "llama-cpp-2/metal"]`
-   - `crates/lune-app` + `desktop-ui/src-tauri`: `whisper-metal`/`llama-metal`
+   - `crates/lune-app` + `desktop-ui/src-tauri`: `whisper-metal`
      passthrough + a `metal` umbrella (mirroring `gpu`).
-2. Gate the runtime `use_gpu` decision on `cfg!(feature = "llama-metal")` /
-   `cfg!(feature = "whisper-metal")` alongside the existing CUDA `cfg!`s
-   (`desktop-ui/src-tauri/src/runtime.rs`, `crates/lune-asr/src/backend/registry.rs`).
+2. Gate the runtime `use_gpu` decision on `cfg!(feature = "whisper-metal")`
+   alongside the existing CUDA `cfg!`s
+   (`crates/lune-asr/src/backend/registry.rs`).
 3. Build on a macOS arm64 runner:
-   `bun tauri build --features "whisper-metal llama-metal"` → `.dmg`.
+   `bun tauri build --features "whisper-metal"` → `.dmg`.
 
-`whisper-rs` and `llama-cpp-2` both expose a `metal` feature, so no upstream work
-is required — only the passthrough wiring above. (`coreml` for whisper and
-`vulkan`/`rocm` for either are available too, but are out of scope unless an
-explicit product requirement.)
+`whisper-rs` exposes a `metal` feature, so no upstream work is required — only
+the passthrough wiring above. (`coreml` for whisper and `vulkan`/`rocm` are
+available too, but are out of scope unless an explicit product requirement.)
 
 ## CI release matrix (planned)
 
@@ -139,11 +137,11 @@ to its backend. Sketch:
 strategy:
   matrix:
     include:
-      - { name: linux-cpu,    os: ubuntu-22.04,  features: "whisper-cpp llama-cpp",   cuda: false }
-      - { name: linux-cuda,   os: ubuntu-22.04,  features: "whisper-cuda llama-cuda", cuda: true  }
-      - { name: windows-cpu,  os: windows-2022,  features: "whisper-cpp llama-cpp",   cuda: false }
-      - { name: windows-cuda, os: windows-2022,  features: "whisper-cuda llama-cuda", cuda: true  }
-      - { name: macos-metal,  os: macos-14,      features: "whisper-metal llama-metal", cuda: false }
+      - { name: linux-cpu,    os: ubuntu-22.04,  features: "whisper-cpp",    cuda: false }
+      - { name: linux-cuda,   os: ubuntu-22.04,  features: "whisper-cuda",   cuda: true  }
+      - { name: windows-cpu,  os: windows-2022,  features: "whisper-cpp",    cuda: false }
+      - { name: windows-cuda, os: windows-2022,  features: "whisper-cuda",   cuda: true  }
+      - { name: macos-metal,  os: macos-14,      features: "whisper-metal",  cuda: false }
 ```
 
 Each leg: install Rust + CMake + LLVM (+ Bun + platform WebView deps), install the
@@ -158,6 +156,6 @@ for the Linux containerized bundles) as a release asset.
 
 ## Third-party notices
 
-`whisper.cpp`, `llama.cpp`, and `ggml` are MIT-licensed and statically linked
-into the shipped binary. Keep `THIRD_PARTY_NOTICES.md` in sync with the bundled
-upstreams when their versions change.
+`whisper.cpp` and `ggml` are MIT-licensed and statically linked into the shipped
+binary. Keep `THIRD_PARTY_NOTICES.md` in sync with the bundled upstream when its
+version changes.

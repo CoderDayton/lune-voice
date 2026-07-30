@@ -99,11 +99,11 @@ export const asrBackends: DescriptiveOptionData<AsrBackendValue>[] = [
   },
 ];
 
-/** The two enabled styling-LLM engines (Off is carried separately). */
-export type LlmBackendValue = 'Local' | 'OpenAiCompatible';
+/** The one enabled styling-LLM engine (Off is carried separately). */
+export type LlmBackendValue = 'OpenAiCompatible';
 
 /** Engine selector shown in the Styling-engine settings section. */
-export type LlmEngineValue = 'Disabled' | 'Local' | 'OpenAiCompatible';
+export type LlmEngineValue = 'Disabled' | 'OpenAiCompatible';
 
 export const llmEngines: DescriptiveOptionData<LlmEngineValue>[] = [
   {
@@ -111,12 +111,6 @@ export const llmEngines: DescriptiveOptionData<LlmEngineValue>[] = [
     label: 'Off',
     description: 'No styling — transcripts are delivered exactly as transcribed.',
     icon: PowerOff,
-  },
-  {
-    value: 'Local',
-    label: 'On-device',
-    description: 'Runs the local styling model on-device. Fully offline.',
-    icon: Cpu,
   },
   {
     value: 'OpenAiCompatible',
@@ -158,19 +152,14 @@ export const whisperModels: WhisperModelOption[] = [
   },
 ];
 
-/** On-disk directory of the styling/correction LLM — matches the backend `DIR_STYLE_LLM`. */
-export const STYLE_LLM_LOCAL_NAME = 'qwen3-styler-0.8b-gguf';
-
 /**
  * Approximate download sizes keyed by on-disk model directory (`local_name`),
  * shown in the Models library before a model is installed. Once present, the
  * backend reports the actual on-disk byte size instead.
  */
-export const modelDownloadSizes: Record<string, string> = {
-  ...Object.fromEntries(whisperModels.map((m) => [m.localName, m.size])),
-  // Qwen3.5-0.8B UD-Q5_K_XL GGUF ≈ 0.6 GB.
-  [STYLE_LLM_LOCAL_NAME]: '610 MB',
-};
+export const modelDownloadSizes: Record<string, string> = Object.fromEntries(
+  whisperModels.map((m) => [m.localName, m.size]),
+);
 
 export const deliveryMethods: DescriptiveOptionData<DictationModeValue>[] = [
   {

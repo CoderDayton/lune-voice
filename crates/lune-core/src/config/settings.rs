@@ -240,14 +240,6 @@ impl UserSettings {
         if self.default_style.as_deref() == Some("minimal") {
             self.default_style = None;
         }
-        // Post styling-only migration, `default_style` is the user-facing styling
-        // switch; the styles UI enables the local engine alongside it. Heal a
-        // legacy/desynced config where a style is selected but the engine was
-        // left `Disabled` (which silently no-ops styling and skips warm-up): a
-        // selected style implies the local styling engine.
-        if self.default_style.is_some() && matches!(self.llm_backend, LlmBackendConfig::Disabled) {
-            self.llm_backend = LlmBackendConfig::Local {};
-        }
         // Back-fill the saved provider from a remote backend that was configured
         // before `llm_openai` existed, so it survives being toggled off later.
         if let LlmBackendConfig::OpenAiCompatible {
@@ -462,12 +454,10 @@ impl AsrBackendConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(tag = "type")]
 #[non_exhaustive]
 pub enum LlmBackendConfig {
-    /// Use the local ONNX style LLM (Qwen3 0.6B) if downloaded.
-    Local {},
     OpenAiCompatible {
         base_url: Url,
         api_key: RedactedString,
@@ -475,18 +465,13 @@ pub enum LlmBackendConfig {
         max_tokens: u32,
     },
     #[serde(other)]
+    #[default]
     Disabled,
-}
-
-impl Default for LlmBackendConfig {
-    fn default() -> Self {
-        Self::Local {}
-    }
 }
 
 /// Remote OpenAI-compatible styling-LLM provider settings, persisted
 /// independently of the active `llm_backend` so the endpoint/key/model survive
-/// turning styling off or switching to the local engine.
+/// turning styling off.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenAiLlmProvider {
     pub base_url: String,

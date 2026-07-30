@@ -40,10 +40,7 @@
           "libgtk-3-0",
           "libayatana-appindicator3-1",
           "libcudart12",
-          "libcublas12",
-          "libcufft11",
-          "libcurand10",
-          "libcudnn9-cuda-12"
+          "libcublas12"
         ],
         "section": "utils"
       },

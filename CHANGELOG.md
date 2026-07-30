@@ -34,7 +34,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Session statistics aggregated across the full database instead of capped history
 - Benchmarks moved from `examples/` to `benches/` with `harness = false`
 - License field updated from MIT to LicenseRef-Proprietary (LICENSE file already proprietary)
-- Local LLM kept warm briefly after dictation to reduce cold-start latency
 - Output settings split into a delivery method (`TypeInPlace` / `Clipboard`) and an independent `copy_to_clipboard` toggle; the combined `Both` mode was removed (legacy `Both` configs migrate to `TypeInPlace` with copy enabled)
 - Text delivery prefers the IBus input method when it is active — committing text directly with no clipboard — and falls back to the uinput keyboard path otherwise
 
@@ -68,6 +67,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The LLM grammar-correction pass, calibrated edit gate, and the token sampler / KV-cache code — the styling LLM no longer corrects text (Whisper output is already punctuated).
 - The full benchmark suite, which exercised the removed ONNX/Qwen architecture (preserved on the `archive/onnx-qwen` branch).
 - Fuzzy matching from the built-in word lists (single- and multi-word) and the unused n-gram reranker — the built-in lists are capitalization-only now.
+- llama.cpp and the bundled local styling LLM (Qwen3.5-0.8B GGUF) — styling is now served solely by the OpenAI-compatible remote backend (point it at Ollama, llama-server, LM Studio, or a hosted API). A previously-downloaded `~/.local/share/lune-voice/models/qwen3-styler-0.8b-gguf/` (~610 MB) is no longer used and can be deleted manually.
 
 ### Security
 - Model downloads verified against `Content-Length` with a per-model integrity manifest, so a truncated model file is detected even when the HuggingFace metadata fetch fails or the app is offline

@@ -1,6 +1,6 @@
 # Performance
 
-> Latency profile and optimization techniques for the whisper.cpp + llama.cpp pipeline. For a quick overview, see the [README](../README.md).
+> Latency profile and optimization techniques for the whisper.cpp pipeline (the styling LLM runs against a remote OpenAI-compatible endpoint). For a quick overview, see the [README](../README.md).
 
 ---
 
@@ -30,7 +30,7 @@ After-speech wait = poll_final (whisper.cpp decode + built-in VAD) + optional LL
 | Audio flush | Negligible | 30 ms tail flush after hotkey release |
 | whisper.cpp decode (`poll_final`) | **Primary fixed cost** | Batch decode of the full utterance; scales with audio length and model size |
 | Standalone Silero VAD | Separate endpoint-trim stage | Whisper's VAD trims leading/trailing silence before decode and keeps internal pauses (a punctuation cue); NOT the in-decode `enable_vad` |
-| LLM styling | Variable; skipped when no style preset is selected | One completion call via llama.cpp; `spawn_blocking` so it does not stall the runtime |
+| LLM styling | Variable; skipped when no style preset is selected | One completion call to the configured remote OpenAI-compatible endpoint; plain async HTTP, so it does not stall the runtime |
 | Delivery | Small | Dominated by decode/styling |
 
 ### What Does NOT Add to After-Speech Wait
@@ -45,9 +45,9 @@ After-speech wait = poll_final (whisper.cpp decode + built-in VAD) + optional LL
 |------|------------|----------------|
 | 1 | whisper.cpp decode time | Scales with utterance length and model size; dominates on CPU |
 | 2 | LLM styling call | A few hundred milliseconds per utterance; skipped entirely when no style preset is selected |
-| 3 | Memory footprint | whisper.cpp + llama.cpp hold model weights in VRAM/RAM simultaneously |
+| 3 | Memory footprint | whisper.cpp holds its model weights in VRAM/RAM; the remote styling LLM adds no local memory footprint |
 
-**GPU impact:** a CUDA build (`whisper-cuda`, `llama-cuda`) moves both inference calls to the GPU and substantially reduces decode time. CPU builds use whisper.cpp's AVX2-optimized GGML kernels (portable baseline; compile flags: `GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON`).
+**GPU impact:** a CUDA build (`whisper-cuda`) moves ASR inference to the GPU and substantially reduces decode time. CPU builds use whisper.cpp's AVX2-optimized GGML kernels (portable baseline; compile flags: `GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON`).
 
 **Model size trade-off:** `Small` (~264 MB) is fastest; `LargeV3Turbo` (~874 MB) provides the best accuracy with whisper's turbo decoder keeping latency closer to `Medium` (~823 MB) than to the full `Large` model.
 
@@ -55,7 +55,7 @@ After-speech wait = poll_final (whisper.cpp decode + built-in VAD) + optional LL
 
 ## Benchmark Status
 
-The benchmark suite for the whisper.cpp + llama.cpp stack is **pending**. The prior suite (`pipeline_stages`, `pipeline_real`, and related examples) was written against the removed Qwen3-ASR ONNX backend and has been deleted from this branch. The old benchmarks and their numbers are preserved on `archive/onnx-qwen` for historical reference.
+The benchmark suite for the whisper.cpp stack is **pending** (the styling-LLM benchmarks talk to a remote endpoint configured via `LUNE_BENCH_LLM_*` env vars — see `benchmarks/bench_utils.rs`). The prior suite (`pipeline_stages`, `pipeline_real`, and related examples) was written against the removed Qwen3-ASR ONNX backend and has been deleted from this branch. The old benchmarks and their numbers are preserved on `archive/onnx-qwen` for historical reference.
 
 The only currently active benchmark target is the AGC frontend:
 
@@ -63,7 +63,7 @@ The only currently active benchmark target is the AGC frontend:
 cgs bench --env TYPE=agc
 ```
 
-Re-authoring a stage-latency and real-pipeline benchmark for the whisper+llama stack is a planned follow-up. Until then, use the profiling guide below for ad-hoc measurement.
+Re-authoring a stage-latency and real-pipeline benchmark for the whisper.cpp stack is a planned follow-up. Until then, use the profiling guide below for ad-hoc measurement.
 
 ---
 
@@ -76,7 +76,7 @@ Re-authoring a stage-latency and real-pipeline benchmark for the whisper+llama s
 | **Global mimalloc allocator** | `desktop-ui/src-tauri/src/main.rs` | Replaces glibc malloc; faster small-alloc paths and lower fragmentation across the desktop shell and pipeline crates |
 | **whisper.cpp audio buffer reuse** | `crates/lune-asr/src/backend/whisper_cpp.rs` | The per-session `Vec<f32>` audio buffer is pre-allocated for 30 s of audio (`Vec::with_capacity(16_000 * 30)`) and cleared without freeing after each `poll_final` — zero heap allocation during steady-state recording |
 | **Corrector single-buffer output** | `crates/lune-dict/src/corrector.rs` | Builds the corrected text directly into a sized `String` instead of a `Vec<String>` + `join(" ")` |
-| **ChatML prompt capacity** | `crates/lune-llm/src/prompt.rs` | The output buffer is sized to the input length (`String::with_capacity(input.len())`) before filling |
+| **Output buffer preallocation** | `crates/lune-llm/src/prompt.rs` | `fix_all_number_spaces` sizes its output buffer to the input length (`String::with_capacity(input.len())`) before filling |
 
 ### Compute
 
@@ -90,9 +90,9 @@ Re-authoring a stage-latency and real-pipeline benchmark for the whisper+llama s
 
 | Technique | Location | Impact |
 |-----------|----------|--------|
-| **Blocking-pool inference** | `crates/lune-asr/src/backend/whisper_cpp.rs`, `crates/lune-llm/src/backend/llama_cpp.rs` | Both whisper decode and llama styling run via `spawn_blocking`, so model execution never starves the async runtime or the audio capture loop |
-| **Shared model, per-call context (LLM)** | `crates/lune-llm/src/backend/llama_cpp.rs` | `LlamaModel` is held in `Arc` (loaded once via `OnceLock`); a fresh `LlamaContext` is created per completion call — no long-lived per-session lock |
+| **Blocking-pool inference** | `crates/lune-asr/src/backend/whisper_cpp.rs` | Whisper decode runs via `spawn_blocking`, so model execution never starves the async runtime or the audio capture loop |
 | **Shared model, per-session state (ASR)** | `crates/lune-asr/src/backend/whisper_cpp.rs` | `WhisperContext` (model weights) is `Arc`-shared; `WhisperState` (decode scratch) is lightweight and per-session |
+| **Plain async HTTP (LLM)** | `crates/lune-llm/src/backend/openai.rs` | The remote styling call is a single `async-openai` request on the async runtime — no local model, no blocking pool |
 
 ---
 
@@ -147,13 +147,13 @@ echo '1' | sudo tee /proc/sys/kernel/perf_event_paranoid   # reverts on reboot
 # Build with symbols + frame pointers
 RUSTFLAGS="-C force-frame-pointers=yes" \
 CARGO_PROFILE_RELEASE_STRIP=none CARGO_PROFILE_RELEASE_DEBUG=line-tables-only \
-  cargo build --release --features "whisper-cpp llama-cpp" -p lune-app
+  cargo build --release --features "whisper-cpp" -p lune-app
 
 samply record -- ./target/release/lune-voice daemon
 # then trigger a dictation session; Ctrl+C to stop recording
 ```
 
-For GPU builds, substitute `--features "whisper-cuda llama-cuda"`.
+For GPU builds, substitute `--features "whisper-cuda"`.
 
 ### Tracing
 
@@ -165,7 +165,7 @@ RUST_LOG=lune_asr=debug,lune_llm=debug,lune_app=debug ./target/release/lune-voic
 
 Key trace points:
 - `lune_asr::backend::whisper_cpp` — `poll_final` with `poll_final_ms`
-- `lune_llm::backend::llama_cpp` — completion call timing
+- `lune_llm::backend::openai` — completion call timing
 - `lune_app::capture` — `asr: poll_final complete` with `poll_final_ms`
 
 ### Memory profiling

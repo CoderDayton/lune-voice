@@ -29,7 +29,7 @@ msgid "{0} of {1}"
 msgstr "{0} का {1}"
 
 #. placeholder {0}: presets.length
-#: src/features/styles/styles-page.tsx:270
+#: src/features/styles/styles-page.tsx:266
 msgid "{0} presets"
 msgstr "{0} प्रीसेट"
 
@@ -116,7 +116,7 @@ msgstr "सुधार जोड़ें"
 msgid "Add snippet"
 msgstr ""
 
-#: src/features/settings/sections/models-section.tsx:105
+#: src/features/settings/sections/models-section.tsx:104
 msgid "AI models stored on your device."
 msgstr "आपके डिवाइस पर संग्रहीत AI मॉडल।"
 
@@ -188,7 +188,7 @@ msgstr "अंतर्निहित"
 
 #: src/components/feedback/confirm-dialog.tsx:52
 #: src/features/dictionary/components/dictionary-table.tsx:96
-#: src/features/settings/sections/models-section.tsx:312
+#: src/features/settings/sections/models-section.tsx:311
 #: src/features/styles/components/style-editor-modal.tsx:184
 msgid "Cancel"
 msgstr "रद्द करें"
@@ -246,9 +246,9 @@ msgstr "चुनें कि आपके द्वारा वर्तम�
 msgid "Choose how Lune Voice looks."
 msgstr "चुनें कि Lune Voice कैसा दिखता है।"
 
-#: src/features/settings/sections/styling-engine-section.tsx:38
-msgid "Choose how transcripts are restyled. On-device runs a local model; the cloud option sends transcripts to a remote OpenAI-compatible endpoint you configure."
-msgstr "चुनें कि ट्रांसक्रिप्ट को कैसे रिस्टाइल किया जाए। ऑन-डिवाइस एक लोकल मॉडल चलाता है; क्लाउड विकल्प ट्रांसक्रिप्ट को आपके द्वारा कॉन्फ़िगर किए गए किसी रिमोट OpenAI-संगत एंडपॉइंट पर भेजता है।"
+#: src/features/settings/sections/styling-engine-section.tsx:37
+msgid "Choose how transcripts are restyled — sent to a remote OpenAI-compatible endpoint you configure, or left off entirely."
+msgstr "चुनें कि ट्रांसक्रिप्ट को कैसे रिस्टाइल किया जाए — इसे आपके द्वारा कॉन्फ़िगर किए गए रिमोट OpenAI-संगत एंडपॉइंट पर भेजा जाए, या पूरी तरह बंद रखा जाए।"
 
 #: src/features/welcome/welcome-page.tsx:161
 #: src/features/welcome/welcome-page.tsx:167
@@ -276,7 +276,7 @@ msgid "close"
 msgstr "बंद करना"
 
 #: src/features/history/components/session-detail-modal.tsx:209
-#: src/features/settings/sections/models-section.tsx:324
+#: src/features/settings/sections/models-section.tsx:323
 #: src/features/styles/components/style-editor-modal.tsx:175
 msgid "Close"
 msgstr "बंद करना"
@@ -356,7 +356,7 @@ msgstr ""
 msgid "Create a snippet"
 msgstr ""
 
-#: src/features/styles/styles-page.tsx:304
+#: src/features/styles/styles-page.tsx:300
 msgid "Create new style"
 msgstr "नई शैली बनाएं"
 
@@ -378,7 +378,7 @@ msgstr "डार्क"
 #: src/features/dictionary/components/dictionary-table.tsx:146
 #: src/features/history/components/history-table.tsx:387
 #: src/features/history/components/session-detail-modal.tsx:202
-#: src/features/settings/sections/models-section.tsx:260
+#: src/features/settings/sections/models-section.tsx:259
 #: src/features/snippets/snippets-page.tsx:328
 msgid "Delete"
 msgstr "हटाएँ"
@@ -389,11 +389,11 @@ msgid "Delete {0}"
 msgstr "{0} हटाएँ"
 
 #. placeholder {0}: model.name
-#: src/features/settings/sections/models-section.tsx:297
+#: src/features/settings/sections/models-section.tsx:296
 msgid "Delete {0}?"
 msgstr "{0} हटाएँ?"
 
-#: src/features/settings/sections/models-section.tsx:315
+#: src/features/settings/sections/models-section.tsx:314
 msgid "Delete model"
 msgstr "मॉडल हटाएँ"
 
@@ -455,7 +455,7 @@ msgstr "वर्तमान ड्राफ्ट को त्यागें
 msgid "Disconnected"
 msgstr "डिस्कनेक्टेड"
 
-#: src/features/settings/sections/models-section.tsx:134
+#: src/features/settings/sections/models-section.tsx:133
 msgid "Disk usage"
 msgstr "डिस्क उपयोग"
 
@@ -464,7 +464,7 @@ msgid "Dismiss error"
 msgstr "त्रुटि ख़ारिज करें"
 
 #: src/features/history/components/history-table.tsx:381
-#: src/features/settings/sections/models-section.tsx:274
+#: src/features/settings/sections/models-section.tsx:273
 msgid "Download"
 msgstr "डाउनलोड"
 
@@ -490,7 +490,7 @@ msgid "Download interrupted"
 msgstr "डाउनलोड बाधित"
 
 #: src/features/settings/components/asr-engine-cards.tsx:148
-#: src/features/settings/sections/models-section.tsx:233
+#: src/features/settings/sections/models-section.tsx:232
 #: src/features/welcome/components/model-card.tsx:99
 msgid "Download progress"
 msgstr "डाउनलोड प्रगति"
@@ -504,7 +504,7 @@ msgid "Downloading models"
 msgstr "मॉडल डाउनलोड हो रहे हैं"
 
 #: src/features/settings/components/asr-engine-cards.tsx:151
-#: src/features/settings/sections/models-section.tsx:274
+#: src/features/settings/sections/models-section.tsx:273
 #: src/features/welcome/welcome-page.tsx:254
 msgid "Downloading…"
 msgstr "डाउनलोड हो रहा है..."
@@ -554,13 +554,13 @@ msgstr "शैली संपादित करें"
 msgid "Empty session"
 msgstr "ख़ाली सत्र"
 
-#: src/features/styles/styles-page.tsx:240
+#: src/features/styles/styles-page.tsx:236
 msgid "Enable styling"
 msgstr "स्टाइलिंग सक्षम करें"
 
 #: src/features/history/components/history-table.tsx:143
 #: src/features/history/components/session-detail-modal.tsx:162
-#: src/features/settings/sections/styling-engine-section.tsx:42
+#: src/features/settings/sections/styling-engine-section.tsx:41
 msgid "Engine"
 msgstr "इंजन"
 
@@ -676,7 +676,7 @@ msgstr ""
 msgid "Idle"
 msgstr "निष्क्रिय"
 
-#: src/features/settings/sections/models-section.tsx:217
+#: src/features/settings/sections/models-section.tsx:216
 msgid "In use"
 msgstr "उपयोग में"
 
@@ -689,7 +689,7 @@ msgid "Insert placeholder"
 msgstr ""
 
 #: src/features/settings/components/asr-engine-cards.tsx:227
-#: src/features/settings/sections/models-section.tsx:220
+#: src/features/settings/sections/models-section.tsx:219
 #: src/features/welcome/components/model-card.tsx:89
 msgid "Installed"
 msgstr "स्थापित"
@@ -801,7 +801,7 @@ msgstr "मिनट"
 msgid "Mode"
 msgstr "तरीका"
 
-#: src/features/settings/sections/models-section.tsx:104
+#: src/features/settings/sections/models-section.tsx:103
 #: src/features/settings/settings-page.tsx:75
 msgid "Models"
 msgstr "मॉडल"
@@ -877,15 +877,15 @@ msgstr "आवाज का पता लगाने से पहले मा
 msgid "not connected"
 msgstr ""
 
-#: src/features/settings/sections/models-section.tsx:223
+#: src/features/settings/sections/models-section.tsx:222
 msgid "Not installed"
 msgstr "इंस्टॉल नहीं है"
 
-#: src/features/settings/sections/models-section.tsx:136
+#: src/features/settings/sections/models-section.tsx:135
 msgid "Nothing installed"
 msgstr "कुछ भी इंस्टॉल नहीं है"
 
-#: src/features/settings/sections/styling-engine-section.tsx:43
+#: src/features/settings/sections/styling-engine-section.tsx:42
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 msgstr "बंद रहने पर कच्चे ट्रांसक्रिप्ट दिए जाते हैं। कौन-सी शैली लागू हो, यह Styles टैब पर चुना जाता है।"
 
@@ -1096,7 +1096,7 @@ msgstr ""
 msgid "Retry download"
 msgstr "पुनः डाउनलोड करने का प्रयास करें"
 
-#: src/features/styles/styles-page.tsx:242
+#: src/features/styles/styles-page.tsx:238
 msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
 msgstr "प्रत्येक ट्रांसक्रिप्ट को चुनी गई शैली में दोबारा लिखें। बंद होने पर कच्चा ट्रांसक्रिप्ट ज्यों-का-त्यों दिया जाता है।"
 
@@ -1268,16 +1268,15 @@ msgstr "डिक्टेशन रोकें"
 msgid "Style"
 msgstr "शैली"
 
-#: src/features/settings/sections/models-section.tsx:76
 #: src/features/settings/settings-page.tsx:73
 msgid "Styling"
 msgstr "स्टाइलिंग"
 
-#: src/features/settings/sections/styling-engine-section.tsx:37
+#: src/features/settings/sections/styling-engine-section.tsx:36
 msgid "Styling engine"
 msgstr "स्टाइलिंग इंजन"
 
-#: src/features/styles/styles-page.tsx:269
+#: src/features/styles/styles-page.tsx:265
 msgid "Switch style"
 msgstr "शैली बदलें"
 
@@ -1327,7 +1326,7 @@ msgstr "जिन शब्दों को लेकर रिकग्ना�
 msgid "Theme"
 msgstr "विषय"
 
-#: src/features/settings/sections/models-section.tsx:307
+#: src/features/settings/sections/models-section.tsx:306
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "यह मॉडल आपके मौजूदा कॉन्फ़िगरेशन द्वारा उपयोग में है। जब तक आप इसे दोबारा इंस्टॉल न करें या कोई दूसरा न चुनें, तब तक डिक्टेशन काम नहीं कर सकता।"
 
@@ -1534,6 +1533,6 @@ msgstr "आपकी मशीन इसका समर्थन करती �
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "आपके मॉडल तैयार हैं. सब कुछ इस मशीन पर रहता है."
 
-#: src/features/styles/styles-page.tsx:306
+#: src/features/styles/styles-page.tsx:302
 msgid "Your own formatting preset"
 msgstr "आपका अपना फ़ॉर्मेटिंग प्रीसेट"

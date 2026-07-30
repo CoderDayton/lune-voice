@@ -747,8 +747,7 @@ fn apply_settings_dto(
     {
         settings.llm_openai.api_key = RedactedString::new(k);
     }
-    // Off ⇒ Disabled; otherwise build the chosen engine from the saved provider.
-    // Enabling styling honors the selected engine (local vs remote), not just Local.
+    // Off ⇒ Disabled; otherwise build the remote engine from the saved provider.
     settings.llm_backend = if input.llm_enabled {
         llm_backend_from_type(input.llm_backend_type, &settings.llm_openai)?
     } else {
@@ -980,7 +979,6 @@ fn llm_backend_from_type(
     provider: &OpenAiLlmProvider,
 ) -> Result<LlmBackendConfig, String> {
     Ok(match kind {
-        LlmBackendTypeDto::Local => LlmBackendConfig::Local {},
         LlmBackendTypeDto::OpenAiCompatible => {
             let base_url: url::Url = provider
                 .base_url
@@ -1162,7 +1160,7 @@ mod tests {
             session_history_days: dto.session_history_days,
             terminal_mode: dto.terminal_mode,
             llm_enabled: dto.llm_enabled,
-            llm_backend_type: LlmBackendTypeDto::Local,
+            llm_backend_type: LlmBackendTypeDto::OpenAiCompatible,
             whisper_model: Some(dto.whisper_model),
             openai_asr_base_url: dto.openai_asr_base_url,
             openai_asr_api_key: None,

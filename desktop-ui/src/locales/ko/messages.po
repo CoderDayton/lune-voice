@@ -29,7 +29,7 @@ msgid "{0} of {1}"
 msgstr "{1} 중 {0}"
 
 #. placeholder {0}: presets.length
-#: src/features/styles/styles-page.tsx:270
+#: src/features/styles/styles-page.tsx:266
 msgid "{0} presets"
 msgstr "{0} 사전 설정"
 
@@ -116,7 +116,7 @@ msgstr "수정 추가"
 msgid "Add snippet"
 msgstr ""
 
-#: src/features/settings/sections/models-section.tsx:105
+#: src/features/settings/sections/models-section.tsx:104
 msgid "AI models stored on your device."
 msgstr "기기에 저장된 AI 모델입니다."
 
@@ -188,7 +188,7 @@ msgstr "내장"
 
 #: src/components/feedback/confirm-dialog.tsx:52
 #: src/features/dictionary/components/dictionary-table.tsx:96
-#: src/features/settings/sections/models-section.tsx:312
+#: src/features/settings/sections/models-section.tsx:311
 #: src/features/styles/components/style-editor-modal.tsx:184
 msgid "Cancel"
 msgstr "취소"
@@ -246,9 +246,9 @@ msgstr "현재 사용 중인 앱에 완성된 텍스트를 삽입하는 방법�
 msgid "Choose how Lune Voice looks."
 msgstr "Lune Voice의 모양을 선택하세요."
 
-#: src/features/settings/sections/styling-engine-section.tsx:38
-msgid "Choose how transcripts are restyled. On-device runs a local model; the cloud option sends transcripts to a remote OpenAI-compatible endpoint you configure."
-msgstr "받아쓰기 텍스트에 스타일을 다시 적용하는 방법을 선택하세요. 온디바이스는 로컬 모델을 실행하고, 클라우드 옵션은 직접 구성한 원격 OpenAI 호환 엔드포인트로 텍스트를 전송합니다."
+#: src/features/settings/sections/styling-engine-section.tsx:37
+msgid "Choose how transcripts are restyled — sent to a remote OpenAI-compatible endpoint you configure, or left off entirely."
+msgstr "받아쓰기 텍스트에 스타일을 다시 적용하는 방법을 선택하세요 — 직접 구성한 원격 OpenAI 호환 엔드포인트로 전송하거나, 완전히 꺼둘 수 있습니다."
 
 #: src/features/welcome/welcome-page.tsx:161
 #: src/features/welcome/welcome-page.tsx:167
@@ -276,7 +276,7 @@ msgid "close"
 msgstr "닫기"
 
 #: src/features/history/components/session-detail-modal.tsx:209
-#: src/features/settings/sections/models-section.tsx:324
+#: src/features/settings/sections/models-section.tsx:323
 #: src/features/styles/components/style-editor-modal.tsx:175
 msgid "Close"
 msgstr "닫기"
@@ -356,7 +356,7 @@ msgstr ""
 msgid "Create a snippet"
 msgstr ""
 
-#: src/features/styles/styles-page.tsx:304
+#: src/features/styles/styles-page.tsx:300
 msgid "Create new style"
 msgstr "새로운 스타일 만들기"
 
@@ -378,7 +378,7 @@ msgstr "어둡게"
 #: src/features/dictionary/components/dictionary-table.tsx:146
 #: src/features/history/components/history-table.tsx:387
 #: src/features/history/components/session-detail-modal.tsx:202
-#: src/features/settings/sections/models-section.tsx:260
+#: src/features/settings/sections/models-section.tsx:259
 #: src/features/snippets/snippets-page.tsx:328
 msgid "Delete"
 msgstr "삭제"
@@ -389,11 +389,11 @@ msgid "Delete {0}"
 msgstr "{0} 삭제"
 
 #. placeholder {0}: model.name
-#: src/features/settings/sections/models-section.tsx:297
+#: src/features/settings/sections/models-section.tsx:296
 msgid "Delete {0}?"
 msgstr "{0}을(를) 삭제하시겠습니까?"
 
-#: src/features/settings/sections/models-section.tsx:315
+#: src/features/settings/sections/models-section.tsx:314
 msgid "Delete model"
 msgstr "모델 삭제"
 
@@ -455,7 +455,7 @@ msgstr "현재 초안을 삭제하고 유휴 상태로 돌아갑니다. 바인�
 msgid "Disconnected"
 msgstr "연결이 끊김"
 
-#: src/features/settings/sections/models-section.tsx:134
+#: src/features/settings/sections/models-section.tsx:133
 msgid "Disk usage"
 msgstr "디스크 사용량"
 
@@ -464,7 +464,7 @@ msgid "Dismiss error"
 msgstr "오류 무시"
 
 #: src/features/history/components/history-table.tsx:381
-#: src/features/settings/sections/models-section.tsx:274
+#: src/features/settings/sections/models-section.tsx:273
 msgid "Download"
 msgstr "다운로드"
 
@@ -490,7 +490,7 @@ msgid "Download interrupted"
 msgstr "다운로드가 중단되었습니다."
 
 #: src/features/settings/components/asr-engine-cards.tsx:148
-#: src/features/settings/sections/models-section.tsx:233
+#: src/features/settings/sections/models-section.tsx:232
 #: src/features/welcome/components/model-card.tsx:99
 msgid "Download progress"
 msgstr "다운로드 진행 상황"
@@ -504,7 +504,7 @@ msgid "Downloading models"
 msgstr "모델 다운로드 중"
 
 #: src/features/settings/components/asr-engine-cards.tsx:151
-#: src/features/settings/sections/models-section.tsx:274
+#: src/features/settings/sections/models-section.tsx:273
 #: src/features/welcome/welcome-page.tsx:254
 msgid "Downloading…"
 msgstr "다운로드 중…"
@@ -554,13 +554,13 @@ msgstr "스타일 편집"
 msgid "Empty session"
 msgstr "빈 세션"
 
-#: src/features/styles/styles-page.tsx:240
+#: src/features/styles/styles-page.tsx:236
 msgid "Enable styling"
 msgstr "스타일 지정 사용"
 
 #: src/features/history/components/history-table.tsx:143
 #: src/features/history/components/session-detail-modal.tsx:162
-#: src/features/settings/sections/styling-engine-section.tsx:42
+#: src/features/settings/sections/styling-engine-section.tsx:41
 msgid "Engine"
 msgstr "엔진"
 
@@ -676,7 +676,7 @@ msgstr ""
 msgid "Idle"
 msgstr "대기"
 
-#: src/features/settings/sections/models-section.tsx:217
+#: src/features/settings/sections/models-section.tsx:216
 msgid "In use"
 msgstr "사용 중"
 
@@ -689,7 +689,7 @@ msgid "Insert placeholder"
 msgstr ""
 
 #: src/features/settings/components/asr-engine-cards.tsx:227
-#: src/features/settings/sections/models-section.tsx:220
+#: src/features/settings/sections/models-section.tsx:219
 #: src/features/welcome/components/model-card.tsx:89
 msgid "Installed"
 msgstr "설치됨"
@@ -801,7 +801,7 @@ msgstr "분"
 msgid "Mode"
 msgstr "모드"
 
-#: src/features/settings/sections/models-section.tsx:104
+#: src/features/settings/sections/models-section.tsx:103
 #: src/features/settings/settings-page.tsx:75
 msgid "Models"
 msgstr "모델"
@@ -877,15 +877,15 @@ msgstr "음성 감지 전에 마이크 레벨을 표준화합니다. 조용한 �
 msgid "not connected"
 msgstr ""
 
-#: src/features/settings/sections/models-section.tsx:223
+#: src/features/settings/sections/models-section.tsx:222
 msgid "Not installed"
 msgstr "설치되지 않음"
 
-#: src/features/settings/sections/models-section.tsx:136
+#: src/features/settings/sections/models-section.tsx:135
 msgid "Nothing installed"
 msgstr "설치된 항목 없음"
 
-#: src/features/settings/sections/styling-engine-section.tsx:43
+#: src/features/settings/sections/styling-engine-section.tsx:42
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 msgstr "끄면 원본 텍스트가 전달됩니다. 적용할 스타일은 스타일 탭에서 선택합니다."
 
@@ -1096,7 +1096,7 @@ msgstr ""
 msgid "Retry download"
 msgstr "다운로드 다시 시도"
 
-#: src/features/styles/styles-page.tsx:242
+#: src/features/styles/styles-page.tsx:238
 msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
 msgstr "각 받아쓰기 텍스트를 선택한 스타일로 다시 씁니다. 끄면 원본 텍스트가 그대로 전달됩니다."
 
@@ -1268,16 +1268,15 @@ msgstr "받아쓰기 중지"
 msgid "Style"
 msgstr "스타일"
 
-#: src/features/settings/sections/models-section.tsx:76
 #: src/features/settings/settings-page.tsx:73
 msgid "Styling"
 msgstr "스타일 지정"
 
-#: src/features/settings/sections/styling-engine-section.tsx:37
+#: src/features/settings/sections/styling-engine-section.tsx:36
 msgid "Styling engine"
 msgstr "스타일 지정 엔진"
 
-#: src/features/styles/styles-page.tsx:269
+#: src/features/styles/styles-page.tsx:265
 msgid "Switch style"
 msgstr "스타일 전환"
 
@@ -1327,7 +1326,7 @@ msgstr "인식기가 가장 확신하지 못하는 단어를 사전과 어휘에
 msgid "Theme"
 msgstr "테마"
 
-#: src/features/settings/sections/models-section.tsx:307
+#: src/features/settings/sections/models-section.tsx:306
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "이 모델은 현재 구성에서 사용 중입니다. 다시 설치하거나 다른 모델을 선택하기 전까지 받아쓰기가 작동하지 않을 수 있습니다."
 
@@ -1534,6 +1533,6 @@ msgstr "사용 중인 기기가 이를 지원합니다 — 더 빠른 전사를 
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "모델이 준비되었습니다. 모든 것이 이 컴퓨터에 유지됩니다."
 
-#: src/features/styles/styles-page.tsx:306
+#: src/features/styles/styles-page.tsx:302
 msgid "Your own formatting preset"
 msgstr "나만의 서식 사전 설정"

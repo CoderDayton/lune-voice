@@ -54,8 +54,7 @@ export interface WorkspaceSettings {
   openaiAsrApiKey: string;
   openaiAsrModel: string;
   // Styling LLM engine + remote provider config (editable via the Styling
-  // engine settings section). `llmBackend` is the engine used when styling is
-  // enabled; the openaiLlm* fields apply when it is `OpenAiCompatible`. The API
+  // engine settings section). OpenAI-compatible is the only engine; the API
   // key is masked ('••••••••') when a key is saved.
   llmBackend: LlmBackendValue;
   openaiLlmBaseUrl: string;
@@ -164,7 +163,7 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   openaiAsrBaseUrl: 'https://api.openai.com/v1',
   openaiAsrApiKey: '',
   openaiAsrModel: 'whisper-1',
-  llmBackend: 'Local',
+  llmBackend: 'OpenAiCompatible',
   openaiLlmBaseUrl: 'https://api.openai.com/v1',
   openaiLlmApiKey: '',
   openaiLlmModel: 'gpt-4o-mini',

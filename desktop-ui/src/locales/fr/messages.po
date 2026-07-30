@@ -29,7 +29,7 @@ msgid "{0} of {1}"
 msgstr "{0} de {1}"
 
 #. placeholder {0}: presets.length
-#: src/features/styles/styles-page.tsx:270
+#: src/features/styles/styles-page.tsx:266
 msgid "{0} presets"
 msgstr "Préréglages {0}"
 
@@ -116,7 +116,7 @@ msgstr "Ajouter une correction"
 msgid "Add snippet"
 msgstr ""
 
-#: src/features/settings/sections/models-section.tsx:105
+#: src/features/settings/sections/models-section.tsx:104
 msgid "AI models stored on your device."
 msgstr "Modèles d'IA stockés sur votre appareil."
 
@@ -188,7 +188,7 @@ msgstr "Intégré"
 
 #: src/components/feedback/confirm-dialog.tsx:52
 #: src/features/dictionary/components/dictionary-table.tsx:96
-#: src/features/settings/sections/models-section.tsx:312
+#: src/features/settings/sections/models-section.tsx:311
 #: src/features/styles/components/style-editor-modal.tsx:184
 msgid "Cancel"
 msgstr "Annuler"
@@ -246,9 +246,9 @@ msgstr "Choisissez la manière dont le texte final est inséré dans l'applicati
 msgid "Choose how Lune Voice looks."
 msgstr "Choisissez à quoi ressemble Lune Voice."
 
-#: src/features/settings/sections/styling-engine-section.tsx:38
-msgid "Choose how transcripts are restyled. On-device runs a local model; the cloud option sends transcripts to a remote OpenAI-compatible endpoint you configure."
-msgstr "Choisissez comment les transcriptions sont retravaillées. Le mode sur l'appareil exécute un modèle local ; l'option cloud envoie les transcriptions vers un point d'accès distant compatible OpenAI que vous configurez."
+#: src/features/settings/sections/styling-engine-section.tsx:37
+msgid "Choose how transcripts are restyled — sent to a remote OpenAI-compatible endpoint you configure, or left off entirely."
+msgstr "Choisissez comment les transcriptions sont retravaillées : envoyées vers un point d'accès distant compatible OpenAI que vous configurez, ou entièrement désactivé."
 
 #: src/features/welcome/welcome-page.tsx:161
 #: src/features/welcome/welcome-page.tsx:167
@@ -276,7 +276,7 @@ msgid "close"
 msgstr "fermer"
 
 #: src/features/history/components/session-detail-modal.tsx:209
-#: src/features/settings/sections/models-section.tsx:324
+#: src/features/settings/sections/models-section.tsx:323
 #: src/features/styles/components/style-editor-modal.tsx:175
 msgid "Close"
 msgstr "Fermer"
@@ -356,7 +356,7 @@ msgstr ""
 msgid "Create a snippet"
 msgstr ""
 
-#: src/features/styles/styles-page.tsx:304
+#: src/features/styles/styles-page.tsx:300
 msgid "Create new style"
 msgstr "Créer un nouveau style"
 
@@ -378,7 +378,7 @@ msgstr "Sombre"
 #: src/features/dictionary/components/dictionary-table.tsx:146
 #: src/features/history/components/history-table.tsx:387
 #: src/features/history/components/session-detail-modal.tsx:202
-#: src/features/settings/sections/models-section.tsx:260
+#: src/features/settings/sections/models-section.tsx:259
 #: src/features/snippets/snippets-page.tsx:328
 msgid "Delete"
 msgstr "Supprimer"
@@ -389,11 +389,11 @@ msgid "Delete {0}"
 msgstr "Supprimer {0}"
 
 #. placeholder {0}: model.name
-#: src/features/settings/sections/models-section.tsx:297
+#: src/features/settings/sections/models-section.tsx:296
 msgid "Delete {0}?"
 msgstr "Supprimer {0} ?"
 
-#: src/features/settings/sections/models-section.tsx:315
+#: src/features/settings/sections/models-section.tsx:314
 msgid "Delete model"
 msgstr "Supprimer le modèle"
 
@@ -455,7 +455,7 @@ msgstr "Supprimez le brouillon actuel et revenez au mode veille. Cliquez sur la 
 msgid "Disconnected"
 msgstr "Déconnecté"
 
-#: src/features/settings/sections/models-section.tsx:134
+#: src/features/settings/sections/models-section.tsx:133
 msgid "Disk usage"
 msgstr "Espace disque utilisé"
 
@@ -464,7 +464,7 @@ msgid "Dismiss error"
 msgstr "Ignorer l'erreur"
 
 #: src/features/history/components/history-table.tsx:381
-#: src/features/settings/sections/models-section.tsx:274
+#: src/features/settings/sections/models-section.tsx:273
 msgid "Download"
 msgstr "Télécharger"
 
@@ -490,7 +490,7 @@ msgid "Download interrupted"
 msgstr "Téléchargement interrompu"
 
 #: src/features/settings/components/asr-engine-cards.tsx:148
-#: src/features/settings/sections/models-section.tsx:233
+#: src/features/settings/sections/models-section.tsx:232
 #: src/features/welcome/components/model-card.tsx:99
 msgid "Download progress"
 msgstr "Progression du téléchargement"
@@ -504,7 +504,7 @@ msgid "Downloading models"
 msgstr "Téléchargement de modèles"
 
 #: src/features/settings/components/asr-engine-cards.tsx:151
-#: src/features/settings/sections/models-section.tsx:274
+#: src/features/settings/sections/models-section.tsx:273
 #: src/features/welcome/welcome-page.tsx:254
 msgid "Downloading…"
 msgstr "Téléchargement…"
@@ -554,13 +554,13 @@ msgstr "Modifier le style"
 msgid "Empty session"
 msgstr "Session vide"
 
-#: src/features/styles/styles-page.tsx:240
+#: src/features/styles/styles-page.tsx:236
 msgid "Enable styling"
 msgstr "Activer la stylisation"
 
 #: src/features/history/components/history-table.tsx:143
 #: src/features/history/components/session-detail-modal.tsx:162
-#: src/features/settings/sections/styling-engine-section.tsx:42
+#: src/features/settings/sections/styling-engine-section.tsx:41
 msgid "Engine"
 msgstr "Moteur"
 
@@ -676,7 +676,7 @@ msgstr "L'apparence de la barre de l'indicateur. Les modifications s'appliquent 
 msgid "Idle"
 msgstr "Inactif"
 
-#: src/features/settings/sections/models-section.tsx:217
+#: src/features/settings/sections/models-section.tsx:216
 msgid "In use"
 msgstr "Utilisé"
 
@@ -689,7 +689,7 @@ msgid "Insert placeholder"
 msgstr ""
 
 #: src/features/settings/components/asr-engine-cards.tsx:227
-#: src/features/settings/sections/models-section.tsx:220
+#: src/features/settings/sections/models-section.tsx:219
 #: src/features/welcome/components/model-card.tsx:89
 msgid "Installed"
 msgstr "Installé"
@@ -801,7 +801,7 @@ msgstr "minutes"
 msgid "Mode"
 msgstr "Mode"
 
-#: src/features/settings/sections/models-section.tsx:104
+#: src/features/settings/sections/models-section.tsx:103
 #: src/features/settings/settings-page.tsx:75
 msgid "Models"
 msgstr "Modèles"
@@ -877,15 +877,15 @@ msgstr "Normalise le niveau du microphone avant la détection vocale. Aide les m
 msgid "not connected"
 msgstr "non connecté"
 
-#: src/features/settings/sections/models-section.tsx:223
+#: src/features/settings/sections/models-section.tsx:222
 msgid "Not installed"
 msgstr "Non installé"
 
-#: src/features/settings/sections/models-section.tsx:136
+#: src/features/settings/sections/models-section.tsx:135
 msgid "Nothing installed"
 msgstr "Rien d'installé"
 
-#: src/features/settings/sections/styling-engine-section.tsx:43
+#: src/features/settings/sections/styling-engine-section.tsx:42
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 msgstr "« Désactivé » fournit les transcriptions brutes. Le style appliqué se choisit dans l'onglet Styles."
 
@@ -1096,7 +1096,7 @@ msgstr "Réinitialiser la position"
 msgid "Retry download"
 msgstr "Réessayez le téléchargement"
 
-#: src/features/styles/styles-page.tsx:242
+#: src/features/styles/styles-page.tsx:238
 msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
 msgstr "Réécrivez chaque transcription dans un style choisi. Lorsque cette option est désactivée, la transcription brute est fournie telle quelle."
 
@@ -1268,16 +1268,15 @@ msgstr "Arrêter la dictée"
 msgid "Style"
 msgstr "Style"
 
-#: src/features/settings/sections/models-section.tsx:76
 #: src/features/settings/settings-page.tsx:73
 msgid "Styling"
 msgstr "Stylisation"
 
-#: src/features/settings/sections/styling-engine-section.tsx:37
+#: src/features/settings/sections/styling-engine-section.tsx:36
 msgid "Styling engine"
 msgstr "Moteur de stylisation"
 
-#: src/features/styles/styles-page.tsx:269
+#: src/features/styles/styles-page.tsx:265
 msgid "Switch style"
 msgstr "Changer de style"
 
@@ -1327,7 +1326,7 @@ msgstr "Les mots dont le système de reconnaissance est le moins sûr sont véri
 msgid "Theme"
 msgstr "Thème"
 
-#: src/features/settings/sections/models-section.tsx:307
+#: src/features/settings/sections/models-section.tsx:306
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "Ce modèle est utilisé par votre configuration actuelle. La dictée pourrait ne pas fonctionner tant que vous ne l'aurez pas réinstallé ou choisi un autre."
 
@@ -1534,6 +1533,6 @@ msgstr "Votre machine le prend en charge — utilisez-le pour une transcription 
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "Vos modèles sont prêts. Tout reste sur cette machine."
 
-#: src/features/styles/styles-page.tsx:306
+#: src/features/styles/styles-page.tsx:302
 msgid "Your own formatting preset"
 msgstr "Votre propre préréglage de formatage"

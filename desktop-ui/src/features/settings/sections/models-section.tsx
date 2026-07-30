@@ -73,7 +73,6 @@ export function ModelsSection() {
   // Library grouped by role, headers in pipeline order. Speech-to-text first.
   const groups: { role: string; label: string; items: ModelStatus[] }[] = [
     { role: 'speech-to-text', label: t`Speech-to-text`, items: [] },
-    { role: 'styling', label: t`Styling`, items: [] },
   ];
   for (const m of models) {
     const group = groups.find((g) => g.role === m.role);

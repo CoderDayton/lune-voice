@@ -5,7 +5,7 @@
 //! three-layer dictionary-protection stack: `apply_dictionary_seed` already
 //! writes the replacement into the text before the LLM sees it, and
 //! `validate_and_merge` rejects divergent edits afterward. This benchmark
-//! isolates the carriers' marginal value: it runs the REAL local LLM on
+//! isolates the carriers' marginal value: it runs the configured remote LLM on
 //! pre-seeded transcripts twice — arm A WITH carriers, arm B WITHOUT — straight
 //! through `complete()` (no `validate_and_merge`), and reports whether the
 //! seeded dictionary term survives verbatim in each arm.
@@ -13,30 +13,18 @@
 //! Because production adds `validate_and_merge` on top, "survives in arm B
 //! here" is a CONSERVATIVE lower bound on production safety.
 //!
-//! Run: cargo run --release --features cuda --example dict_carrier_ab -p lune-app
+//! Run: LUNE_BENCH_LLM_BASE_URL=... LUNE_BENCH_LLM_MODEL=... \
+//!      cargo run --release --example dict_carrier_ab -p lune-app
 //!      (LUNE_BENCH_PRINT=1 dumps each arm's full output.)
 
 #[allow(dead_code)]
 #[path = "../bench_utils.rs"]
 mod bench_utils;
 
-use bench_utils::{detect_gpu, models_dir};
 use lune_core::config::BASE_SYSTEM_PROMPT;
 use lune_core::dict::DictionaryEntry;
 use lune_core::llm::LlmService;
-use lune_llm::{LlamaCppBackend, LlamaCppConfig};
-
-/// Locate the single styling GGUF in the style-LLM model directory.
-fn find_gguf(dir: &std::path::Path) -> Option<std::path::PathBuf> {
-    std::fs::read_dir(dir).ok()?.flatten().find_map(|e| {
-        let path = e.path();
-        if path.extension().and_then(|x| x.to_str()) == Some("gguf") {
-            Some(path)
-        } else {
-            None
-        }
-    })
-}
+use lune_llm::OpenAiLlmBackend;
 
 /// Build a few-shot prompt: each `(input, output)` carrier pair shown as an
 /// example, then the transcript to rewrite. Reconstructs the shape of the
@@ -135,26 +123,15 @@ fn yn(b: bool) -> &'static str {
 }
 
 fn main() {
-    let has_gpu = detect_gpu();
-    let llm_dir = models_dir().join(lune_core::models::DIR_STYLE_LLM);
-    let model_path = match find_gguf(&llm_dir) {
-        Some(p) => p,
-        None => {
-            println!("  [skip] no style LLM GGUF at {llm_dir:?}");
-            return;
-        }
+    let Some(config) = bench_utils::remote_llm_config_from_env() else {
+        println!(
+            "  [skip] {}/{} not set — point them at Ollama, llama-server, LM Studio, or a hosted API",
+            bench_utils::LUNE_BENCH_LLM_BASE_URL,
+            bench_utils::LUNE_BENCH_LLM_MODEL,
+        );
+        return;
     };
-    let llm = match LlamaCppBackend::new(LlamaCppConfig {
-        model_path,
-        use_gpu: has_gpu,
-        max_new_tokens: 512,
-    }) {
-        Ok(l) => l,
-        Err(e) => {
-            println!("  [skip] LLM load failed: {e}");
-            return;
-        }
-    };
+    let llm = OpenAiLlmBackend::new(config);
     let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
     let print = std::env::var("LUNE_BENCH_PRINT").is_ok_and(|v| v != "0");
 

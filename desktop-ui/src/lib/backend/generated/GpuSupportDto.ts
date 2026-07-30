@@ -2,9 +2,9 @@
 
 /**
  * Whether GPU (CUDA) acceleration was compiled into this build. GPU support
- * is a build-time decision — the native backends compile CUDA in only under
- * the `whisper-cuda`/`llama-cuda` cargo features — so at runtime "GPU
- * available" reduces to "was a CUDA feature compiled in". No `camelCase`
+ * is a build-time decision — the native whisper.cpp backend compiles CUDA in
+ * only under the `whisper-cuda` cargo feature — so at runtime "GPU
+ * available" reduces to "was the CUDA feature compiled in". No `camelCase`
  * rename: the single field stays `compiled_in` across the IPC boundary.
  */
 export type GpuSupportDto = { compiled_in: boolean, };

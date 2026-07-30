@@ -48,8 +48,8 @@ pre-push:
   commands:
     clippy:
       # Default features (stubs) — deliberately NOT --all-features. The `-cuda`
-      # backend features that --all-features turns on source-compile whisper.cpp /
-      # llama.cpp CUDA kernels via nvcc, and the ggml-cuda template-instance
+      # backend feature that --all-features turns on source-compiles whisper.cpp
+      # CUDA kernels via nvcc, and the ggml-cuda template-instance
       # compiles OOM/segfault (Error 139) on this machine, which made the gate
       # unpassable (the branch sat 22 commits unpushed). Routine gates stay
       # toolchain-light on stubs by design; the real native backends are built and

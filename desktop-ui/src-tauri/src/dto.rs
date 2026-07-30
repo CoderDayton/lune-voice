@@ -39,11 +39,10 @@ pub enum AsrBackendTypeDto {
 }
 
 /// Which styling-LLM engine the user picked. `Disabled` is carried by
-/// `llm_enabled == false`, so this only distinguishes the two enabled engines.
+/// `llm_enabled == false`. Remote (OpenAI-compatible) is the only engine.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../src/lib/backend/generated/")]
 pub enum LlmBackendTypeDto {
-    Local,
     OpenAiCompatible,
 }
 
@@ -387,9 +386,9 @@ pub struct DictionaryItemDto {
 }
 
 /// Whether GPU (CUDA) acceleration was compiled into this build. GPU support
-/// is a build-time decision — the native backends compile CUDA in only under
-/// the `whisper-cuda`/`llama-cuda` cargo features — so at runtime "GPU
-/// available" reduces to "was a CUDA feature compiled in". No `camelCase`
+/// is a build-time decision — the native whisper.cpp backend compiles CUDA in
+/// only under the `whisper-cuda` cargo feature — so at runtime "GPU
+/// available" reduces to "was the CUDA feature compiled in". No `camelCase`
 /// rename: the single field stays `compiled_in` across the IPC boundary.
 #[derive(Debug, Clone, Copy, Serialize, TS)]
 #[ts(export, export_to = "../../src/lib/backend/generated/")]

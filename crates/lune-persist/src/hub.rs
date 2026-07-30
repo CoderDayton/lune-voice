@@ -18,8 +18,6 @@ use crate::error::{PersistError, PersistResult};
 pub enum ModelRole {
     /// Whisper speech-to-text models and their bundled VAD.
     SpeechToText,
-    /// The style/correction LLM.
-    Styling,
 }
 
 /// What to download from a HuggingFace repository.
@@ -92,18 +90,6 @@ impl ModelSpec {
         }
     }
 
-    pub fn style_llm() -> Self {
-        Self::Directory {
-            repo_id: "unsloth/Qwen3.5-0.8B-GGUF".into(),
-            required_files: vec!["Qwen3.5-0.8B-UD-Q5_K_XL.gguf".into()],
-            suffix_patterns: vec![],
-            local_name: model_dirs::DIR_STYLE_LLM.into(),
-            description: "Style LLM (llama.cpp). Rewrites transcripts in your chosen style.",
-            required: false,
-            role: ModelRole::Styling,
-        }
-    }
-
     /// whisper.cpp's built-in VAD model (silero ggml). The local whisper backend
     /// uses it to gate speech before decoding; it degrades to raw decode when
     /// absent, so it's optional.
@@ -123,7 +109,6 @@ impl ModelSpec {
     pub fn display_name(&self) -> &str {
         let Self::Directory { local_name, .. } = self;
         match local_name.as_str() {
-            model_dirs::DIR_STYLE_LLM => "Qwen3.5 0.8B (style LLM)",
             model_dirs::DIR_WHISPER_VAD => "Whisper VAD (silero)",
             model_dirs::DIR_WHISPER_SMALL => WhisperModel::Small.display_name(),
             model_dirs::DIR_WHISPER_MEDIUM => WhisperModel::Medium.display_name(),
@@ -170,7 +155,7 @@ impl ModelSpec {
     }
 
     pub fn all() -> Vec<Self> {
-        let mut specs = vec![Self::style_llm(), Self::vad_model()];
+        let mut specs = vec![Self::vad_model()];
         specs.extend(WhisperModel::ALL.map(Self::whisper));
         specs
     }
@@ -199,14 +184,10 @@ impl ModelSpec {
 ///
 /// Remote backends (e.g. OpenAI-compatible) need no local files, so a fully-remote
 /// configuration trivially satisfies this check even with an empty models directory.
-pub fn has_required_models(
-    models_dir: &Path,
-    asr_backend: &AsrBackendConfig,
-    llm_backend: &lune_core::config::LlmBackendConfig,
-) -> bool {
+pub fn has_required_models(models_dir: &Path, asr_backend: &AsrBackendConfig) -> bool {
     ModelSpec::all()
         .iter()
-        .filter(|s| spec_needed(s, asr_backend, llm_backend))
+        .filter(|s| spec_needed(s, asr_backend))
         .all(|s| s.is_ready(models_dir))
 }
 
@@ -216,8 +197,6 @@ pub fn has_required_models(
 pub enum LlmUnavailable {
     /// Styling is turned off — no engine is selected.
     NoProvider,
-    /// The local styling engine is selected but its model isn't downloaded.
-    ModelMissing,
     /// A remote styling provider is selected but not fully configured.
     ProviderNotConfigured,
 }
@@ -228,9 +207,6 @@ impl LlmUnavailable {
         match self {
             Self::NoProvider => {
                 "Styling is turned off. Enable a styling engine in Settings before generating examples."
-            }
-            Self::ModelMissing => {
-                "The styling model isn't downloaded yet. Download it in Settings → Models before generating examples."
             }
             Self::ProviderNotConfigured => {
                 "Your styling provider isn't fully configured. Add its API key and model in Settings before generating examples."
@@ -245,22 +221,10 @@ impl LlmUnavailable {
 /// (re)generate few-shot examples — the local engine needs its model on disk;
 /// a remote engine needs an API key and model configured.
 pub fn styling_llm_readiness(
-    models_dir: &Path,
     llm_backend: &lune_core::config::LlmBackendConfig,
 ) -> Result<(), LlmUnavailable> {
     use lune_core::config::LlmBackendConfig;
     match llm_backend {
-        LlmBackendConfig::Local { .. } => {
-            let ready = ModelSpec::all()
-                .iter()
-                .find(|s| s.local_name() == model_dirs::DIR_STYLE_LLM)
-                .is_some_and(|s| s.is_ready(models_dir));
-            if ready {
-                Ok(())
-            } else {
-                Err(LlmUnavailable::ModelMissing)
-            }
-        }
         LlmBackendConfig::OpenAiCompatible { api_key, model, .. } => {
             if api_key.expose().trim().is_empty() || model.trim().is_empty() {
                 Err(LlmUnavailable::ProviderNotConfigured)
@@ -277,16 +241,12 @@ pub fn styling_llm_readiness(
 /// its own entry. Each entry carries `ready`, `in_use` (whether the active
 /// backend selection uses it), `role`, and on-disk `size_bytes`. Does NOT
 /// download anything.
-pub fn check_model_status(
-    models_dir: &Path,
-    asr_backend: &AsrBackendConfig,
-    llm_backend: &lune_core::config::LlmBackendConfig,
-) -> Vec<ModelStatus> {
+pub fn check_model_status(models_dir: &Path, asr_backend: &AsrBackendConfig) -> Vec<ModelStatus> {
     ModelSpec::all()
         .into_iter()
         .filter(|spec| spec.local_name() != model_dirs::DIR_WHISPER_VAD)
         .map(|spec| {
-            let in_use = spec_needed(&spec, asr_backend, llm_backend);
+            let in_use = spec_needed(&spec, asr_backend);
             spec.to_status(models_dir, in_use)
         })
         .collect()
@@ -311,22 +271,11 @@ fn installed_size_bytes(models_dir: &Path, local_name: &str) -> Option<u64> {
 }
 
 /// Whether `spec` corresponds to a local model the active backend selection uses.
-fn spec_needed(
-    spec: &ModelSpec,
-    asr: &AsrBackendConfig,
-    llm: &lune_core::config::LlmBackendConfig,
-) -> bool {
-    use lune_core::config::LlmBackendConfig;
-
-    match spec.local_name() {
-        n if n == model_dirs::DIR_STYLE_LLM => matches!(llm, LlmBackendConfig::Local { .. }),
-        // A whisper spec is needed only when the WhisperCpp backend is active AND
-        // this is the selected model — so the UI offers exactly one whisper card.
-        n => {
-            matches!(asr, AsrBackendConfig::WhisperCpp { model } if model.dir() == n)
-                || spec.required()
-        }
-    }
+/// A whisper spec is needed only when the WhisperCpp backend is active AND this
+/// is the selected model — so the UI offers exactly one whisper card.
+fn spec_needed(spec: &ModelSpec, asr: &AsrBackendConfig) -> bool {
+    matches!(asr, AsrBackendConfig::WhisperCpp { model } if model.dir() == spec.local_name())
+        || spec.required()
 }
 
 /// Delete a downloaded model by local_name. Returns Ok(true) if removed,
@@ -897,7 +846,7 @@ fn file_basename(filename: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lune_core::config::{AsrBackendConfig, LlmBackendConfig};
+    use lune_core::config::AsrBackendConfig;
 
     fn fake_openai_asr() -> AsrBackendConfig {
         AsrBackendConfig::OpenAiCompatible {
@@ -908,8 +857,7 @@ mod tests {
         }
     }
 
-    /// The library always lists every Whisper size plus the styling LLM, and
-    /// never the bundled VAD model.
+    /// The library always lists every Whisper size and never the bundled VAD model.
     fn assert_full_library(statuses: &[ModelStatus]) {
         let names: Vec<&str> = statuses.iter().map(|s| s.local_name.as_str()).collect();
         assert!(names.contains(&WhisperModel::Small.dir()), "{names:?}");
@@ -919,15 +867,11 @@ mod tests {
             "{names:?}"
         );
         assert!(
-            names.contains(&lune_core::models::DIR_STYLE_LLM),
-            "{names:?}"
-        );
-        assert!(
             !names.contains(&lune_core::models::DIR_WHISPER_VAD),
             "VAD must stay out of the library: {names:?}"
         );
-        // Whisper sizes (3) + styling LLM = 4 entries, no more.
-        assert_eq!(statuses.len(), 4, "{names:?}");
+        // Whisper sizes only, no more.
+        assert_eq!(statuses.len(), 3, "{names:?}");
     }
 
     fn in_use_names(statuses: &[ModelStatus]) -> Vec<&str> {
@@ -941,12 +885,11 @@ mod tests {
     #[test]
     fn check_model_status_lists_full_library_with_nothing_in_use_when_remote() {
         let tmp = tempfile::tempdir().unwrap();
-        let statuses =
-            check_model_status(tmp.path(), &fake_openai_asr(), &LlmBackendConfig::Disabled);
+        let statuses = check_model_status(tmp.path(), &fake_openai_asr());
         assert_full_library(&statuses);
         assert!(
             in_use_names(&statuses).is_empty(),
-            "remote ASR + disabled LLM use no local models: {statuses:?}"
+            "remote ASR uses no local models: {statuses:?}"
         );
     }
 
@@ -958,34 +901,12 @@ mod tests {
             &AsrBackendConfig::WhisperCpp {
                 model: WhisperModel::Medium,
             },
-            &LlmBackendConfig::Disabled,
         );
         assert_full_library(&statuses);
         assert_eq!(
             in_use_names(&statuses),
             vec![WhisperModel::Medium.dir()],
-            "only the selected whisper size is in use when the LLM is disabled"
-        );
-    }
-
-    #[test]
-    fn check_model_status_marks_whisper_and_llm_in_use_when_both_local() {
-        let tmp = tempfile::tempdir().unwrap();
-        let statuses = check_model_status(
-            tmp.path(),
-            &AsrBackendConfig::WhisperCpp {
-                model: WhisperModel::Medium,
-            },
-            &LlmBackendConfig::Local {},
-        );
-        assert_full_library(&statuses);
-        let used = in_use_names(&statuses);
-        assert!(used.contains(&WhisperModel::Medium.dir()), "{used:?}");
-        assert!(used.contains(&lune_core::models::DIR_STYLE_LLM), "{used:?}");
-        assert_eq!(
-            used.len(),
-            2,
-            "exactly the selected whisper + LLM: {used:?}"
+            "only the selected whisper size is in use"
         );
     }
 
@@ -997,18 +918,12 @@ mod tests {
             &AsrBackendConfig::WhisperCpp {
                 model: WhisperModel::Small,
             },
-            &LlmBackendConfig::Local {},
         );
         for s in &statuses {
             // Nothing is installed in an empty models dir.
             assert!(!s.ready, "{}", s.local_name);
             assert!(s.size_bytes.is_none(), "{}", s.local_name);
-            let expected_role = if s.local_name == lune_core::models::DIR_STYLE_LLM {
-                ModelRole::Styling
-            } else {
-                ModelRole::SpeechToText
-            };
-            assert_eq!(s.role, expected_role, "{}", s.local_name);
+            assert_eq!(s.role, ModelRole::SpeechToText, "{}", s.local_name);
         }
     }
 

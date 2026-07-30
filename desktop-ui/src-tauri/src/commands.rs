@@ -46,7 +46,7 @@ async fn check_styling_llm_configured() -> Result<(), String> {
         let settings = lune_persist::SettingsStore::new(paths.settings_file())
             .load()
             .map_err(|e| format!("load settings: {e}"))?;
-        lune_persist::styling_llm_readiness(&paths.models_dir(), &settings.llm_backend)
+        lune_persist::styling_llm_readiness(&settings.llm_backend)
             .map_err(|u| u.user_message().to_string())
     })
     .await
@@ -385,9 +385,6 @@ pub async fn generate_style_examples(
     let pairs = lune_llm::few_shot::generate_few_shot_examples(llm.as_ref(), &name, &instructions)
         .await
         .map_err(|e| e.to_string())?;
-    // The generation call warmed the local model; give it the same idle TTL a
-    // dictation gets so a styles-page visit doesn't pin VRAM indefinitely.
-    runtime.schedule_local_llm_unload().await;
     let mut snapshot = run_persist("save style few-shot pairs", move || {
         crate::persistence::save_style_few_shot_pairs(&style_id, pairs)
     })
@@ -395,21 +392,6 @@ pub async fn generate_style_examples(
     runtime.mark_reload_required().await;
     snapshot.service_status = runtime.service_status().await;
     Ok(snapshot)
-}
-
-/// Validate the styling engine end-to-end for the Styles page: provider
-/// configured AND — for the local engine — the model loaded into memory and
-/// able to serve. Blocks until the load completes (seconds on first call), so
-/// the UI can gate style creation and the Regenerate button on a definitive
-/// answer. Returns the user-facing reason on failure.
-#[tauri::command]
-pub async fn warm_up_styling_llm(
-    window: WebviewWindow,
-    runtime: State<'_, AppRuntime>,
-) -> Result<(), String> {
-    require_window_access(&window, &["main"])?;
-    check_styling_llm_configured().await?;
-    runtime.ensure_styling_llm_ready().await
 }
 
 #[tauri::command]
@@ -501,7 +483,6 @@ pub async fn check_model_status(
         Ok(lune_persist::check_model_status(
             &paths.models_dir(),
             &settings.asr_backend,
-            &settings.llm_backend,
         ))
     })
     .await
@@ -516,7 +497,7 @@ pub async fn download_model_cmd(
     require_window_access(&window, &["main"])?;
     validate_local_name(&local_name)?;
     let app_handle = app.clone();
-    let (models_dir, asr_backend, llm_backend) = run_persist("download model", move || {
+    let (models_dir, asr_backend) = run_persist("download model", move || {
         let paths = lune_persist::AppPaths::resolve().ok_or("resolve application paths")?;
         let models_dir = paths.models_dir();
         let settings = lune_persist::SettingsStore::new(paths.settings_file())
@@ -528,7 +509,7 @@ pub async fn download_model_cmd(
         }) {
             Ok(_) => {
                 tracing::info!(local_name, "download complete");
-                Ok((models_dir, settings.asr_backend, settings.llm_backend))
+                Ok((models_dir, settings.asr_backend))
             }
             Err(e) => {
                 tracing::error!(local_name, error = %e, "download failed");
@@ -538,7 +519,7 @@ pub async fn download_model_cmd(
     })
     .await?;
 
-    if lune_persist::has_required_models(&models_dir, &asr_backend, &llm_backend) {
+    if lune_persist::has_required_models(&models_dir, &asr_backend) {
         runtime.eager_rebuild().await.ok();
     }
     Ok(())
@@ -560,16 +541,15 @@ pub async fn delete_model_cmd(window: WebviewWindow, local_name: String) -> Resu
 
 /// Reports whether GPU (CUDA) acceleration was compiled into this build.
 ///
-/// GPU support is decided at build time: the native whisper.cpp/llama.cpp
-/// backends only link CUDA when built with the `whisper-cuda`/`llama-cuda`
-/// features. At runtime "is the GPU usable" therefore reduces to "was a CUDA
-/// feature compiled in", which the onboarding flow uses to offer an
-/// acceleration opt-in.
+/// GPU support is decided at build time: the native whisper.cpp backend only
+/// links CUDA when built with the `whisper-cuda` feature. At runtime "is the
+/// GPU usable" therefore reduces to "was the CUDA feature compiled in", which
+/// the onboarding flow uses to offer an acceleration opt-in.
 #[tauri::command]
 pub fn gpu_support(window: WebviewWindow) -> Result<GpuSupportDto, String> {
     require_window_access(&window, &["main"])?;
     Ok(GpuSupportDto {
-        compiled_in: cfg!(feature = "whisper-cuda") || cfg!(feature = "llama-cuda"),
+        compiled_in: cfg!(feature = "whisper-cuda"),
     })
 }
 

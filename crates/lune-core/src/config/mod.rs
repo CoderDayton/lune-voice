@@ -133,29 +133,19 @@ mod tests {
             parsed.asr_backend,
             AsrBackendConfig::WhisperCpp { .. }
         ));
-        assert!(matches!(parsed.llm_backend, LlmBackendConfig::Local {}));
+        assert!(matches!(parsed.llm_backend, LlmBackendConfig::Disabled));
     }
 
     #[test]
-    fn migration_heals_selected_style_with_disabled_engine() {
-        // A style selected while the engine was left Disabled (a legacy/desynced
-        // config) must heal to the local styling engine so styling actually runs
-        // and the LLM warms up on hotkey.
+    fn migration_leaves_llm_backend_untouched_when_style_selected() {
+        // With the local styling engine removed, selecting a style must not
+        // implicitly change the (now purely OpenAI-or-off) llm_backend.
         let mut settings = UserSettings {
             default_style: Some("casual".into()),
             llm_backend: LlmBackendConfig::Disabled,
             ..UserSettings::default()
         };
         settings.migrate_pipeline_fields();
-        assert!(matches!(settings.llm_backend, LlmBackendConfig::Local {}));
-
-        // No style selected → engine stays Disabled (styling off).
-        let mut off = UserSettings {
-            default_style: None,
-            llm_backend: LlmBackendConfig::Disabled,
-            ..UserSettings::default()
-        };
-        off.migrate_pipeline_fields();
-        assert!(matches!(off.llm_backend, LlmBackendConfig::Disabled));
+        assert!(matches!(settings.llm_backend, LlmBackendConfig::Disabled));
     }
 }

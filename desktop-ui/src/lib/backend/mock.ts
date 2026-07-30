@@ -235,12 +235,12 @@ function applySettings(input: SaveWorkspaceSettingsInput) {
     openaiLlmApiKey: _openaiLlmApiKey,
     openaiLlmBaseUrl: _openaiLlmBaseUrl,
     openaiLlmModel: _openaiLlmModel,
-    llmBackendType,
+    llmBackendType: _llmBackendType,
     ...fields
   } = input;
-  // Mirror settings_to_dto: the remote LLM fields are populated only for a
-  // remote backend; local/disabled leave them null/false.
-  const remote = input.llmEnabled && llmBackendType === 'OpenAiCompatible';
+  // Mirror settings_to_dto: the remote LLM fields are populated whenever
+  // styling is enabled — OpenAI-compatible is the only engine now.
+  const remote = input.llmEnabled;
   mockSnapshot = {
     ...mockSnapshot,
     settings: {

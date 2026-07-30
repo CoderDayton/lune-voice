@@ -14,9 +14,9 @@ info = "List all available scripts"
 
 [scripts.dev]
 interpreter = "bash"
-# Dev app needs the native backends compiled in, otherwise the ASR/LLM stubs
-# return "backend not compiled in" and dictation fails. `default = []` keeps
-# routine `cargo check` toolchain-light, so the features are passed here
+# Dev app needs the native whisper.cpp backend compiled in, otherwise the ASR
+# stub returns "backend not compiled in" and dictation fails. `default = []`
+# keeps routine `cargo check` toolchain-light, so the features are passed here
 # explicitly (mirroring `cgs build`). BACKEND auto-detects: if unset, a CUDA
 # build is used when both nvcc and nvidia-smi are present, else CPU. Force
 # either with `--env BACKEND=cpu|cuda`. Unlike release builds GGML_NATIVE is
@@ -32,8 +32,8 @@ if [ -z "$BACKEND" ]; then
   fi
 fi
 case "$BACKEND" in
-  cpu)  FEATURES="whisper-cpp llama-cpp" ;;
-  cuda) FEATURES="whisper-cuda llama-cuda" ;;
+  cpu)  FEATURES="whisper-cpp" ;;
+  cuda) FEATURES="whisper-cuda" ;;
   *)    echo "BACKEND must be cpu|cuda"; exit 1 ;;
 esac
 echo "Dev ($BACKEND): --features \"$FEATURES\""
@@ -76,16 +76,17 @@ info = "Run lightweight app pipeline integration tests"
 
 [scripts.bench]
 interpreter = "bash"
-# Real-pipeline benchmarks. Model-backed ones build whisper.cpp + llama.cpp and
-# need a model on disk; CUDA features auto-detect (mirrors cgs build/dev).
+# Real-pipeline benchmarks. Model-backed ones build whisper.cpp and need a
+# model on disk; the styling pass talks to a remote OpenAI-compatible endpoint
+# (LUNE_BENCH_LLM_* env vars). CUDA features auto-detect (mirrors cgs build/dev).
 # `transcribe` runs the whole capture→AGC→VAD→whisper(+styling) pipeline on a
 # WAV/f32/dir and prints the hypothesis — the GUI-free way to test ASR quality.
 command = '''
 TYPE="${TYPE:-agc}"
 if command -v nvcc >/dev/null 2>&1 && command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1; then
-  FEATURES="whisper-cuda llama-cuda"
+  FEATURES="whisper-cuda"
 else
-  FEATURES="whisper-cpp llama-cpp"
+  FEATURES="whisper-cpp"
 fi
 [ -d /lib/x86_64-linux-gnu ] && export LIBCLANG_PATH="${LIBCLANG_PATH:-/lib/x86_64-linux-gnu}"
 run() { cargo run --release --example "$1" -p lune-app --features "$FEATURES" "${@:2}"; }
@@ -112,8 +113,8 @@ info = "Benchmarks (--env TYPE=agc|transcribe|domain|pipeline|stages|latency|pun
 [scripts.build]
 interpreter = "bash"
 # Desktop app: `tauri build` does the release Rust compile + UI build + bundle
-# in one step, compiling whisper.cpp + llama.cpp into the binary (users never
-# compile anything — this produces the artifact they'd run).
+# in one step, compiling whisper.cpp into the binary (users never compile
+# anything — this produces the artifact they'd run).
 #
 # TWO build profiles:
 #   • Default (NATIVE): `GGML_NATIVE=ON` tunes ggml to THIS machine's CPU and,
@@ -141,8 +142,8 @@ if [ -z "$BACKEND" ]; then
   fi
 fi
 case "$BACKEND" in
-  cpu)  FEATURES="whisper-cpp llama-cpp" ;;
-  cuda) FEATURES="whisper-cuda llama-cuda" ;;
+  cpu)  FEATURES="whisper-cpp" ;;
+  cuda) FEATURES="whisper-cuda" ;;
   *)    echo "BACKEND must be cpu|cuda (macOS Metal: see docs/RELEASE.md)"; exit 1 ;;
 esac
 if [ -n "${PORTABLE:-}" ]; then
