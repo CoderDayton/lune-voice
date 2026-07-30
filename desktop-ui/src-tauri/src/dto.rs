@@ -310,14 +310,14 @@ pub struct WorkspaceSettingsDto {
     pub session_history_days: Option<u32>,
     /// Paste-shortcut selection strategy for the output stage.
     pub terminal_mode: TerminalModeDto,
-    /// Whether the correction LLM backend is enabled (Local or remote).
+    /// Whether the remote styling LLM backend is enabled.
     pub llm_enabled: bool,
     // OpenAI ASR fields (populated when asr_backend_type == OpenAiCompatible)
     pub openai_asr_base_url: Option<String>,
     pub openai_asr_model: Option<String>,
     pub openai_asr_api_key_set: bool,
     // Remote styling LLM fields, populated only when the LLM backend is a
-    // remote OpenAI-compatible provider (`None`/`false` for local or disabled).
+    // remote OpenAI-compatible provider (`None`/`false` when styling is off).
     // Let the UI gate example generation on a fully-configured remote provider.
     pub openai_llm_base_url: Option<String>,
     pub openai_llm_model: Option<String>,

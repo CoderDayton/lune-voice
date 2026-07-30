@@ -245,8 +245,8 @@ export async function saveWorkspaceSetting<Key extends keyof WorkspaceSettings>(
 }
 
 /// Update several settings and persist them in a single save. Used when two
-/// fields must move together (e.g. the styling switch enables both the style
-/// preset and the local engine) so they never land in the store desynced.
+/// fields must move together (e.g. the styling switch sets both the style
+/// preset and the LLM backend) so they never land in the store desynced.
 export async function saveWorkspaceSettings(patch: Partial<WorkspaceSettings>): Promise<boolean> {
   const previousSettings = workspaceStore.state.settings;
   for (const [key, value] of Object.entries(patch)) {

@@ -218,8 +218,8 @@ impl LlmUnavailable {
 /// Whether the configured styling LLM is ready to serve a request. `Ok(())`
 /// means a request can proceed; `Err(reason)` names the setup step the user
 /// still needs. This is the guard the app runs before asking the LLM to
-/// (re)generate few-shot examples — the local engine needs its model on disk;
-/// a remote engine needs an API key and model configured.
+/// (re)generate few-shot examples — the remote engine needs an API key and
+/// model configured.
 pub fn styling_llm_readiness(
     llm_backend: &lune_core::config::LlmBackendConfig,
 ) -> Result<(), LlmUnavailable> {

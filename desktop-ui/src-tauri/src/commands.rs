@@ -36,10 +36,10 @@ fn require_window_access_for_label(label: &str, allowed: &[&str]) -> Result<(), 
     }
 }
 
-/// Configuration-level styling preflight: provider selected and set up
-/// (local model downloaded / remote key+model present). Returns the
-/// user-facing reason when not. Initialization (model actually loaded) is
-/// validated separately by `AppRuntime::ensure_styling_llm_ready`.
+/// Configuration-level styling preflight: a remote provider is selected and
+/// set up (endpoint key + model present). Returns the user-facing reason when
+/// not. Applying a pending pipeline reload is handled separately by
+/// `AppRuntime::ensure_styling_llm_ready`.
 async fn check_styling_llm_configured() -> Result<(), String> {
     run_persist("check styling llm readiness", || {
         let paths = lune_persist::AppPaths::resolve().ok_or("resolve application paths")?;
@@ -361,12 +361,11 @@ pub async fn generate_style_examples(
     style_id: String,
 ) -> Result<WorkspaceSnapshot, String> {
     require_window_access(&window, &["main"])?;
-    // Preflight: refuse to (re)generate unless the styling provider — and, for
-    // the local engine, its model — is set up. Returns a user-facing message.
+    // Preflight: refuse to (re)generate unless the remote styling provider is
+    // set up. Returns a user-facing message.
     check_styling_llm_configured().await?;
-    // Then make sure the engine is actually initialized (pending pipeline
-    // reload applied, local model loaded into memory) — a configured-but-cold
-    // engine would otherwise fail generation with "local LLM not ready".
+    // Then make sure the live pipeline reflects the saved settings — a pending
+    // reload would otherwise send the request to the previous engine.
     runtime.ensure_styling_llm_ready().await?;
     let llm = runtime.llm_service().await;
     let (name, instructions) = run_persist("load custom style for examples", {
