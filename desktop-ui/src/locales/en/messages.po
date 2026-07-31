@@ -42,7 +42,7 @@ msgstr "{0} rules"
 msgid "{onCount} of 4 formatting fixes on"
 msgstr "{onCount} of 4 formatting fixes on"
 
-#: src/features/history/components/history-table.tsx:186
+#: src/features/history/components/history-table.tsx:187
 msgid "{page} / {totalPages}"
 msgstr "{page} / {totalPages}"
 
@@ -50,15 +50,15 @@ msgstr "{page} / {totalPages}"
 msgid "{saved} (unavailable)"
 msgstr "{saved} (unavailable)"
 
-#: src/features/history/components/history-table.tsx:170
+#: src/features/history/components/history-table.tsx:171
 msgid "{start}–{end} of {visibleCount}"
 msgstr "{start}–{end} of {visibleCount}"
 
-#: src/features/history/components/history-table.tsx:114
+#: src/features/history/components/history-table.tsx:115
 msgid "{totalCount} sessions"
 msgstr "{totalCount} sessions"
 
-#: src/features/history/components/history-table.tsx:114
+#: src/features/history/components/history-table.tsx:115
 msgid "{visibleCount} / {totalCount}"
 msgstr "{visibleCount} / {totalCount}"
 
@@ -234,7 +234,7 @@ msgstr "Check your network and we'll pick up where we left off."
 msgid "Checking installed models…"
 msgstr "Checking installed models…"
 
-#: src/features/settings/components/asr-engine-cards.tsx:223
+#: src/features/settings/components/asr-engine-cards.tsx:224
 msgid "Checking…"
 msgstr "Checking…"
 
@@ -251,8 +251,12 @@ msgid "Choose how Lune Voice looks."
 msgstr "Choose how Lune Voice looks."
 
 #: src/features/settings/sections/styling-engine-section.tsx:37
-msgid "Choose how transcripts are restyled — sent to a remote OpenAI-compatible endpoint you configure, or left off entirely."
-msgstr "Choose how transcripts are restyled — sent to a remote OpenAI-compatible endpoint you configure, or left off entirely."
+#~ msgid "Choose how transcripts are restyled — sent to a remote OpenAI-compatible endpoint you configure, or left off entirely."
+#~ msgstr "Choose how transcripts are restyled — sent to a remote OpenAI-compatible endpoint you configure, or left off entirely."
+
+#: src/features/settings/sections/styling-engine-section.tsx:38
+msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
+msgstr "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
 
 #: src/features/welcome/welcome-page.tsx:161
 #: src/features/welcome/welcome-page.tsx:167
@@ -271,7 +275,7 @@ msgstr "Choose your speech engine. Everything runs offline — no cloud, no acco
 msgid "Clear filter"
 msgstr "Clear filter"
 
-#: src/features/history/components/history-table.tsx:106
+#: src/features/history/components/history-table.tsx:107
 msgid "Clear search"
 msgstr "Clear search"
 
@@ -313,11 +317,11 @@ msgstr "Continue"
 msgid "Control how your speech is turned into text."
 msgstr "Control how your speech is turned into text."
 
-#: src/features/history/components/history-table.tsx:378
+#: src/features/history/components/history-table.tsx:379
 msgid "Copied"
 msgstr "Copied"
 
-#: src/features/history/components/history-table.tsx:378
+#: src/features/history/components/history-table.tsx:379
 msgid "Copy"
 msgstr "Copy"
 
@@ -380,7 +384,7 @@ msgstr "Dark"
 
 #: src/components/feedback/confirm-dialog.tsx:63
 #: src/features/dictionary/components/dictionary-table.tsx:146
-#: src/features/history/components/history-table.tsx:387
+#: src/features/history/components/history-table.tsx:388
 #: src/features/history/components/session-detail-modal.tsx:202
 #: src/features/settings/sections/models-section.tsx:259
 #: src/features/snippets/snippets-page.tsx:293
@@ -401,7 +405,7 @@ msgstr "Delete {0}?"
 msgid "Delete model"
 msgstr "Delete model"
 
-#: src/features/history/components/history-table.tsx:385
+#: src/features/history/components/history-table.tsx:386
 #: src/features/history/components/session-detail-modal.tsx:200
 msgid "Delete session?"
 msgstr "Delete session?"
@@ -467,13 +471,13 @@ msgstr "Disk usage"
 msgid "Dismiss error"
 msgstr "Dismiss error"
 
-#: src/features/history/components/history-table.tsx:381
+#: src/features/history/components/history-table.tsx:382
 #: src/features/settings/sections/models-section.tsx:273
 msgid "Download"
 msgstr "Download"
 
 #. placeholder {0}: selected.label
-#: src/features/settings/components/asr-engine-cards.tsx:163
+#: src/features/settings/components/asr-engine-cards.tsx:164
 msgid "Download {0}"
 msgstr "Download {0}"
 
@@ -498,7 +502,7 @@ msgstr "Download GPU support ({0})"
 msgid "Download interrupted"
 msgstr "Download interrupted"
 
-#: src/features/settings/components/asr-engine-cards.tsx:148
+#: src/features/settings/components/asr-engine-cards.tsx:149
 #: src/features/settings/sections/models-section.tsx:232
 #: src/features/welcome/components/model-card.tsx:99
 msgid "Download progress"
@@ -512,7 +516,7 @@ msgstr "Download transcript"
 msgid "Downloading models"
 msgstr "Downloading models"
 
-#: src/features/settings/components/asr-engine-cards.tsx:151
+#: src/features/settings/components/asr-engine-cards.tsx:152
 #: src/features/settings/sections/gpu-section.tsx:53
 #: src/features/settings/sections/models-section.tsx:273
 #: src/features/welcome/welcome-page.tsx:254
@@ -559,7 +563,7 @@ msgstr "Edit snippet"
 msgid "Edit style"
 msgstr "Edit style"
 
-#: src/features/history/components/history-table.tsx:338
+#: src/features/history/components/history-table.tsx:339
 #: src/features/overview/overview-page.tsx:254
 msgid "Empty session"
 msgstr "Empty session"
@@ -568,9 +572,9 @@ msgstr "Empty session"
 msgid "Enable styling"
 msgstr "Enable styling"
 
-#: src/features/history/components/history-table.tsx:143
+#: src/features/history/components/history-table.tsx:144
 #: src/features/history/components/session-detail-modal.tsx:162
-#: src/features/settings/sections/styling-engine-section.tsx:41
+#: src/features/settings/sections/styling-engine-section.tsx:42
 msgid "Engine"
 msgstr "Engine"
 
@@ -711,7 +715,7 @@ msgstr "Insert at cursor"
 msgid "Insert placeholder"
 msgstr "Insert placeholder"
 
-#: src/features/settings/components/asr-engine-cards.tsx:227
+#: src/features/settings/components/asr-engine-cards.tsx:228
 #: src/features/settings/sections/models-section.tsx:219
 #: src/features/welcome/components/model-card.tsx:89
 msgid "Installed"
@@ -746,7 +750,7 @@ msgstr "Language"
 msgid "Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login."
 msgstr "Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login."
 
-#: src/features/history/components/history-table.tsx:142
+#: src/features/history/components/history-table.tsx:143
 msgid "Length"
 msgstr "Length"
 
@@ -794,7 +798,7 @@ msgstr "Lune Voice"
 msgid "Lune Voice writes"
 msgstr "Lune Voice writes"
 
-#: src/features/settings/components/asr-engine-cards.tsx:171
+#: src/features/settings/components/asr-engine-cards.tsx:172
 msgid "Manage in Models"
 msgstr "Manage in Models"
 
@@ -849,11 +853,11 @@ msgstr "Multilingual · pick a size"
 msgid "Name"
 msgstr "Name"
 
-#: src/features/history/components/history-table.tsx:195
+#: src/features/history/components/history-table.tsx:196
 msgid "Next"
 msgstr "Next"
 
-#: src/features/history/components/history-table.tsx:193
+#: src/features/history/components/history-table.tsx:194
 msgid "Next page"
 msgstr "Next page"
 
@@ -865,12 +869,12 @@ msgstr "No"
 msgid "No rules match “{query}”."
 msgstr "No rules match “{query}”."
 
-#: src/features/history/components/history-table.tsx:130
+#: src/features/history/components/history-table.tsx:131
 msgid "No sessions found."
 msgstr "No sessions found."
 
 #. placeholder {0}: search.trim()
-#: src/features/history/components/history-table.tsx:127
+#: src/features/history/components/history-table.tsx:128
 msgid "No sessions match \"{0}\"."
 msgstr "No sessions match \"{0}\"."
 
@@ -878,7 +882,7 @@ msgstr "No sessions match \"{0}\"."
 msgid "No sessions yet"
 msgstr "No sessions yet"
 
-#: src/features/history/components/history-table.tsx:129
+#: src/features/history/components/history-table.tsx:130
 msgid "No sessions yet. Start dictating to see your transcripts here."
 msgstr "No sessions yet. Start dictating to see your transcripts here."
 
@@ -886,12 +890,12 @@ msgstr "No sessions yet. Start dictating to see your transcripts here."
 msgid "No snippets yet."
 msgstr "No snippets yet."
 
-#: src/features/history/components/history-table.tsx:359
+#: src/features/history/components/history-table.tsx:360
 #: src/features/history/components/session-detail-modal.tsx:153
 msgid "No transcript"
 msgstr "No transcript"
 
-#: src/features/history/components/history-table.tsx:371
+#: src/features/history/components/history-table.tsx:372
 #: src/features/history/components/session-detail-modal.tsx:163
 msgid "None"
 msgstr "None"
@@ -912,7 +916,7 @@ msgstr "Not installed"
 msgid "Nothing installed"
 msgstr "Nothing installed"
 
-#: src/features/settings/sections/styling-engine-section.tsx:42
+#: src/features/settings/sections/styling-engine-section.tsx:43
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 msgstr "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 
@@ -959,7 +963,7 @@ msgstr "Overall footprint of the pill bar."
 msgid "Overall progress"
 msgstr "Overall progress"
 
-#: src/features/history/components/history-table.tsx:166
+#: src/features/history/components/history-table.tsx:167
 msgid "Pagination"
 msgstr "Pagination"
 
@@ -1030,7 +1034,7 @@ msgstr "Preset corner or edge the pill starts at."
 msgid "Press"
 msgstr "Press"
 
-#: src/features/history/components/history-table.tsx:180
+#: src/features/history/components/history-table.tsx:181
 msgid "Prev"
 msgstr "Prev"
 
@@ -1042,7 +1046,7 @@ msgstr "Prevent moving the pill by dragging it."
 msgid "Preview"
 msgstr "Preview"
 
-#: src/features/history/components/history-table.tsx:178
+#: src/features/history/components/history-table.tsx:179
 msgid "Previous page"
 msgstr "Previous page"
 
@@ -1153,7 +1157,7 @@ msgstr "Save"
 msgid "Save changes"
 msgstr "Save changes"
 
-#: src/features/history/components/history-table.tsx:307
+#: src/features/history/components/history-table.tsx:308
 #: src/features/history/components/session-detail-modal.tsx:70
 msgid "Save Transcript"
 msgstr "Save Transcript"
@@ -1170,11 +1174,11 @@ msgstr "Saved snippets"
 msgid "Say <0>“{spokenTrigger}”</0> as the whole utterance — or <1>“insert {spokenTrigger}”</1> — to type this snippet."
 msgstr "Say <0>“{spokenTrigger}”</0> as the whole utterance — or <1>“insert {spokenTrigger}”</1> — to type this snippet."
 
-#: src/features/history/components/history-table.tsx:99
+#: src/features/history/components/history-table.tsx:100
 msgid "Search transcripts"
 msgstr "Search transcripts"
 
-#: src/features/history/components/history-table.tsx:97
+#: src/features/history/components/history-table.tsx:98
 msgid "Search transcripts…"
 msgstr "Search transcripts…"
 
@@ -1316,7 +1320,7 @@ msgstr "Style"
 msgid "Styling"
 msgstr "Styling"
 
-#: src/features/settings/sections/styling-engine-section.tsx:36
+#: src/features/settings/sections/styling-engine-section.tsx:37
 msgid "Styling engine"
 msgstr "Styling engine"
 
@@ -1378,12 +1382,12 @@ msgstr "This model is in use by your current configuration. Dictation may not wo
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "This only happens once. You can keep using your computer in the meantime."
 
-#: src/features/history/components/history-table.tsx:386
+#: src/features/history/components/history-table.tsx:387
 #: src/features/history/components/session-detail-modal.tsx:201
 msgid "This will permanently remove this dictation session and its transcript."
 msgstr "This will permanently remove this dictation session and its transcript."
 
-#: src/features/history/components/history-table.tsx:139
+#: src/features/history/components/history-table.tsx:140
 msgid "Time"
 msgstr "Time"
 
@@ -1432,7 +1436,7 @@ msgstr "Transcribing what you said…"
 msgid "Transcribing…"
 msgstr "Transcribing…"
 
-#: src/features/history/components/history-table.tsx:140
+#: src/features/history/components/history-table.tsx:141
 msgid "Transcript"
 msgstr "Transcript"
 
@@ -1530,7 +1534,7 @@ msgstr "Which screen the pill appears on."
 msgid "Whisper"
 msgstr "Whisper"
 
-#: src/features/settings/components/asr-engine-cards.tsx:121
+#: src/features/settings/components/asr-engine-cards.tsx:122
 #: src/features/welcome/components/engine-step.tsx:71
 msgid "Whisper model size"
 msgstr "Whisper model size"
@@ -1539,12 +1543,12 @@ msgstr "Whisper model size"
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
 msgstr "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
 
-#: src/features/history/components/history-table.tsx:364
+#: src/features/history/components/history-table.tsx:365
 #: src/features/overview/overview-page.tsx:258
 msgid "words"
 msgstr "words"
 
-#: src/features/history/components/history-table.tsx:141
+#: src/features/history/components/history-table.tsx:142
 #: src/features/history/components/session-detail-modal.tsx:160
 msgid "Words"
 msgstr "Words"
@@ -1566,8 +1570,12 @@ msgid "You're all set"
 msgstr "You're all set"
 
 #: src/features/settings/components/openai-fields.tsx:48
-msgid "Your API key. Leave it blank to keep the saved key."
-msgstr "Your API key. Leave it blank to keep the saved key."
+msgid "Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none."
+msgstr "Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none."
+
+#: src/features/settings/components/openai-fields.tsx:48
+#~ msgid "Your API key. Leave it blank to keep the saved key."
+#~ msgstr "Your API key. Leave it blank to keep the saved key."
 
 #: src/features/welcome/components/engine-step.tsx:126
 msgid "Your GPU is ready — use it for faster transcription."

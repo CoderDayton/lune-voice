@@ -42,7 +42,7 @@ msgstr "{0} 규칙"
 msgid "{onCount} of 4 formatting fixes on"
 msgstr "서식 수정 4개 중 {onCount}개 켜짐"
 
-#: src/features/history/components/history-table.tsx:186
+#: src/features/history/components/history-table.tsx:187
 msgid "{page} / {totalPages}"
 msgstr "{page} / {totalPages}"
 
@@ -50,15 +50,15 @@ msgstr "{page} / {totalPages}"
 msgid "{saved} (unavailable)"
 msgstr "{saved} (사용 불가)"
 
-#: src/features/history/components/history-table.tsx:170
+#: src/features/history/components/history-table.tsx:171
 msgid "{start}–{end} of {visibleCount}"
 msgstr "{visibleCount} 중 {start}~{end}"
 
-#: src/features/history/components/history-table.tsx:114
+#: src/features/history/components/history-table.tsx:115
 msgid "{totalCount} sessions"
 msgstr "{totalCount} 세션"
 
-#: src/features/history/components/history-table.tsx:114
+#: src/features/history/components/history-table.tsx:115
 msgid "{visibleCount} / {totalCount}"
 msgstr "{visibleCount} / {totalCount}"
 
@@ -230,7 +230,7 @@ msgstr "네트워크를 확인하면 중단한 부분부터 다시 시작하겠�
 msgid "Checking installed models…"
 msgstr "설치된 모델을 확인하는 중…"
 
-#: src/features/settings/components/asr-engine-cards.tsx:223
+#: src/features/settings/components/asr-engine-cards.tsx:224
 msgid "Checking…"
 msgstr "확인 중…"
 
@@ -247,8 +247,12 @@ msgid "Choose how Lune Voice looks."
 msgstr "Lune Voice의 모양을 선택하세요."
 
 #: src/features/settings/sections/styling-engine-section.tsx:37
-msgid "Choose how transcripts are restyled — sent to a remote OpenAI-compatible endpoint you configure, or left off entirely."
-msgstr "받아쓰기 텍스트에 스타일을 다시 적용하는 방법을 선택하세요 — 직접 구성한 원격 OpenAI 호환 엔드포인트로 전송하거나, 완전히 꺼둘 수 있습니다."
+#~ msgid "Choose how transcripts are restyled — sent to a remote OpenAI-compatible endpoint you configure, or left off entirely."
+#~ msgstr "받아쓰기 텍스트에 스타일을 다시 적용하는 방법을 선택하세요 — 직접 구성한 원격 OpenAI 호환 엔드포인트로 전송하거나, 완전히 꺼둘 수 있습니다."
+
+#: src/features/settings/sections/styling-engine-section.tsx:38
+msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
+msgstr ""
 
 #: src/features/welcome/welcome-page.tsx:161
 #: src/features/welcome/welcome-page.tsx:167
@@ -267,7 +271,7 @@ msgstr "음성 엔진을 선택하세요. 모든 것이 오프라인으로 실�
 msgid "Clear filter"
 msgstr "필터 지우기"
 
-#: src/features/history/components/history-table.tsx:106
+#: src/features/history/components/history-table.tsx:107
 msgid "Clear search"
 msgstr "검색 지우기"
 
@@ -309,11 +313,11 @@ msgstr "계속"
 msgid "Control how your speech is turned into text."
 msgstr "음성이 텍스트로 변환되는 방식을 제어하세요."
 
-#: src/features/history/components/history-table.tsx:378
+#: src/features/history/components/history-table.tsx:379
 msgid "Copied"
 msgstr "복사됨"
 
-#: src/features/history/components/history-table.tsx:378
+#: src/features/history/components/history-table.tsx:379
 msgid "Copy"
 msgstr "복사"
 
@@ -376,7 +380,7 @@ msgstr "어둡게"
 
 #: src/components/feedback/confirm-dialog.tsx:63
 #: src/features/dictionary/components/dictionary-table.tsx:146
-#: src/features/history/components/history-table.tsx:387
+#: src/features/history/components/history-table.tsx:388
 #: src/features/history/components/session-detail-modal.tsx:202
 #: src/features/settings/sections/models-section.tsx:259
 #: src/features/snippets/snippets-page.tsx:293
@@ -397,7 +401,7 @@ msgstr "{0}을(를) 삭제하시겠습니까?"
 msgid "Delete model"
 msgstr "모델 삭제"
 
-#: src/features/history/components/history-table.tsx:385
+#: src/features/history/components/history-table.tsx:386
 #: src/features/history/components/session-detail-modal.tsx:200
 msgid "Delete session?"
 msgstr "세션을 삭제하시겠습니까?"
@@ -463,13 +467,13 @@ msgstr "디스크 사용량"
 msgid "Dismiss error"
 msgstr "오류 무시"
 
-#: src/features/history/components/history-table.tsx:381
+#: src/features/history/components/history-table.tsx:382
 #: src/features/settings/sections/models-section.tsx:273
 msgid "Download"
 msgstr "다운로드"
 
 #. placeholder {0}: selected.label
-#: src/features/settings/components/asr-engine-cards.tsx:163
+#: src/features/settings/components/asr-engine-cards.tsx:164
 msgid "Download {0}"
 msgstr "{0} 다운로드"
 
@@ -494,7 +498,7 @@ msgstr ""
 msgid "Download interrupted"
 msgstr "다운로드가 중단되었습니다."
 
-#: src/features/settings/components/asr-engine-cards.tsx:148
+#: src/features/settings/components/asr-engine-cards.tsx:149
 #: src/features/settings/sections/models-section.tsx:232
 #: src/features/welcome/components/model-card.tsx:99
 msgid "Download progress"
@@ -508,7 +512,7 @@ msgstr "받아쓰기 텍스트 다운로드"
 msgid "Downloading models"
 msgstr "모델 다운로드 중"
 
-#: src/features/settings/components/asr-engine-cards.tsx:151
+#: src/features/settings/components/asr-engine-cards.tsx:152
 #: src/features/settings/sections/gpu-section.tsx:53
 #: src/features/settings/sections/models-section.tsx:273
 #: src/features/welcome/welcome-page.tsx:254
@@ -555,7 +559,7 @@ msgstr ""
 msgid "Edit style"
 msgstr "스타일 편집"
 
-#: src/features/history/components/history-table.tsx:338
+#: src/features/history/components/history-table.tsx:339
 #: src/features/overview/overview-page.tsx:254
 msgid "Empty session"
 msgstr "빈 세션"
@@ -564,9 +568,9 @@ msgstr "빈 세션"
 msgid "Enable styling"
 msgstr "스타일 지정 사용"
 
-#: src/features/history/components/history-table.tsx:143
+#: src/features/history/components/history-table.tsx:144
 #: src/features/history/components/session-detail-modal.tsx:162
-#: src/features/settings/sections/styling-engine-section.tsx:41
+#: src/features/settings/sections/styling-engine-section.tsx:42
 msgid "Engine"
 msgstr "엔진"
 
@@ -707,7 +711,7 @@ msgstr ""
 msgid "Insert placeholder"
 msgstr ""
 
-#: src/features/settings/components/asr-engine-cards.tsx:227
+#: src/features/settings/components/asr-engine-cards.tsx:228
 #: src/features/settings/sections/models-section.tsx:219
 #: src/features/welcome/components/model-card.tsx:89
 msgid "Installed"
@@ -742,7 +746,7 @@ msgstr "언어"
 msgid "Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login."
 msgstr "기본 창을 여는 대신 시스템 트레이를 실행하세요. 로그인 시 Lune Voice가 자동으로 시작될 때 유용합니다."
 
-#: src/features/history/components/history-table.tsx:142
+#: src/features/history/components/history-table.tsx:143
 msgid "Length"
 msgstr "길이"
 
@@ -790,7 +794,7 @@ msgstr "Lune Voice"
 msgid "Lune Voice writes"
 msgstr "Lune Voice 출력"
 
-#: src/features/settings/components/asr-engine-cards.tsx:171
+#: src/features/settings/components/asr-engine-cards.tsx:172
 msgid "Manage in Models"
 msgstr "모델에서 관리"
 
@@ -845,11 +849,11 @@ msgstr "다국어 · 크기 선택"
 msgid "Name"
 msgstr "이름"
 
-#: src/features/history/components/history-table.tsx:195
+#: src/features/history/components/history-table.tsx:196
 msgid "Next"
 msgstr "다음"
 
-#: src/features/history/components/history-table.tsx:193
+#: src/features/history/components/history-table.tsx:194
 msgid "Next page"
 msgstr "다음 페이지"
 
@@ -861,12 +865,12 @@ msgstr "아니요"
 msgid "No rules match “{query}”."
 msgstr "“{query}”과(와) 일치하는 규칙이 없습니다."
 
-#: src/features/history/components/history-table.tsx:130
+#: src/features/history/components/history-table.tsx:131
 msgid "No sessions found."
 msgstr "세션을 찾을 수 없습니다."
 
 #. placeholder {0}: search.trim()
-#: src/features/history/components/history-table.tsx:127
+#: src/features/history/components/history-table.tsx:128
 msgid "No sessions match \"{0}\"."
 msgstr "\"{0}\"과(와) 일치하는 세션이 없습니다."
 
@@ -874,7 +878,7 @@ msgstr "\"{0}\"과(와) 일치하는 세션이 없습니다."
 msgid "No sessions yet"
 msgstr "아직 세션이 없습니다."
 
-#: src/features/history/components/history-table.tsx:129
+#: src/features/history/components/history-table.tsx:130
 msgid "No sessions yet. Start dictating to see your transcripts here."
 msgstr "아직 세션이 없습니다. 받아쓰기를 시작하면 여기에 텍스트가 표시됩니다."
 
@@ -882,12 +886,12 @@ msgstr "아직 세션이 없습니다. 받아쓰기를 시작하면 여기에 �
 msgid "No snippets yet."
 msgstr ""
 
-#: src/features/history/components/history-table.tsx:359
+#: src/features/history/components/history-table.tsx:360
 #: src/features/history/components/session-detail-modal.tsx:153
 msgid "No transcript"
 msgstr "텍스트 없음"
 
-#: src/features/history/components/history-table.tsx:371
+#: src/features/history/components/history-table.tsx:372
 #: src/features/history/components/session-detail-modal.tsx:163
 msgid "None"
 msgstr "없음"
@@ -908,7 +912,7 @@ msgstr "설치되지 않음"
 msgid "Nothing installed"
 msgstr "설치된 항목 없음"
 
-#: src/features/settings/sections/styling-engine-section.tsx:42
+#: src/features/settings/sections/styling-engine-section.tsx:43
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 msgstr "끄면 원본 텍스트가 전달됩니다. 적용할 스타일은 스타일 탭에서 선택합니다."
 
@@ -955,7 +959,7 @@ msgstr ""
 msgid "Overall progress"
 msgstr "전반적인 진행 상황"
 
-#: src/features/history/components/history-table.tsx:166
+#: src/features/history/components/history-table.tsx:167
 msgid "Pagination"
 msgstr "쪽수 매기기"
 
@@ -1026,7 +1030,7 @@ msgstr ""
 msgid "Press"
 msgstr "누르다"
 
-#: src/features/history/components/history-table.tsx:180
+#: src/features/history/components/history-table.tsx:181
 msgid "Prev"
 msgstr "이전"
 
@@ -1038,7 +1042,7 @@ msgstr ""
 msgid "Preview"
 msgstr "미리보기"
 
-#: src/features/history/components/history-table.tsx:178
+#: src/features/history/components/history-table.tsx:179
 msgid "Previous page"
 msgstr "이전 페이지"
 
@@ -1149,7 +1153,7 @@ msgstr "저장"
 msgid "Save changes"
 msgstr ""
 
-#: src/features/history/components/history-table.tsx:307
+#: src/features/history/components/history-table.tsx:308
 #: src/features/history/components/session-detail-modal.tsx:70
 msgid "Save Transcript"
 msgstr "받아쓰기 텍스트 저장"
@@ -1166,11 +1170,11 @@ msgstr ""
 msgid "Say <0>“{spokenTrigger}”</0> as the whole utterance — or <1>“insert {spokenTrigger}”</1> — to type this snippet."
 msgstr ""
 
-#: src/features/history/components/history-table.tsx:99
+#: src/features/history/components/history-table.tsx:100
 msgid "Search transcripts"
 msgstr "받아쓰기 텍스트 검색"
 
-#: src/features/history/components/history-table.tsx:97
+#: src/features/history/components/history-table.tsx:98
 msgid "Search transcripts…"
 msgstr "받아쓰기 텍스트 검색…"
 
@@ -1312,7 +1316,7 @@ msgstr "스타일"
 msgid "Styling"
 msgstr "스타일 지정"
 
-#: src/features/settings/sections/styling-engine-section.tsx:36
+#: src/features/settings/sections/styling-engine-section.tsx:37
 msgid "Styling engine"
 msgstr "스타일 지정 엔진"
 
@@ -1374,12 +1378,12 @@ msgstr "이 모델은 현재 구성에서 사용 중입니다. 다시 설치하�
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "이것은 한 번만 발생합니다. 그동안 컴퓨터를 계속 사용할 수 있습니다."
 
-#: src/features/history/components/history-table.tsx:386
+#: src/features/history/components/history-table.tsx:387
 #: src/features/history/components/session-detail-modal.tsx:201
 msgid "This will permanently remove this dictation session and its transcript."
 msgstr "이 받아쓰기 세션과 텍스트가 영구적으로 삭제됩니다."
 
-#: src/features/history/components/history-table.tsx:139
+#: src/features/history/components/history-table.tsx:140
 msgid "Time"
 msgstr "시간"
 
@@ -1428,7 +1432,7 @@ msgstr ""
 msgid "Transcribing…"
 msgstr ""
 
-#: src/features/history/components/history-table.tsx:140
+#: src/features/history/components/history-table.tsx:141
 msgid "Transcript"
 msgstr "받아쓰기 텍스트"
 
@@ -1526,7 +1530,7 @@ msgstr ""
 msgid "Whisper"
 msgstr "Whisper"
 
-#: src/features/settings/components/asr-engine-cards.tsx:121
+#: src/features/settings/components/asr-engine-cards.tsx:122
 #: src/features/welcome/components/engine-step.tsx:71
 msgid "Whisper model size"
 msgstr "Whisper 모델 크기"
@@ -1535,12 +1539,12 @@ msgstr "Whisper 모델 크기"
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
 msgstr "기기에서 실행되는 whisper.cpp입니다. 속도와 정확도를 절충할 크기를 선택하세요."
 
-#: src/features/history/components/history-table.tsx:364
+#: src/features/history/components/history-table.tsx:365
 #: src/features/overview/overview-page.tsx:258
 msgid "words"
 msgstr "단어"
 
-#: src/features/history/components/history-table.tsx:141
+#: src/features/history/components/history-table.tsx:142
 #: src/features/history/components/session-detail-modal.tsx:160
 msgid "Words"
 msgstr "단어"
@@ -1562,8 +1566,12 @@ msgid "You're all set"
 msgstr "모든 준비가 완료되었습니다."
 
 #: src/features/settings/components/openai-fields.tsx:48
-msgid "Your API key. Leave it blank to keep the saved key."
-msgstr "API 키입니다. 저장된 키를 유지하려면 비워 두세요."
+msgid "Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none."
+msgstr ""
+
+#: src/features/settings/components/openai-fields.tsx:48
+#~ msgid "Your API key. Leave it blank to keep the saved key."
+#~ msgstr "API 키입니다. 저장된 키를 유지하려면 비워 두세요."
 
 #: src/features/welcome/components/engine-step.tsx:126
 msgid "Your GPU is ready — use it for faster transcription."

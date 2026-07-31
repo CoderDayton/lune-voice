@@ -25,7 +25,8 @@ import {
 
 function formatBackend(backend: string): string {
   if (backend.includes('WhisperCpp')) return 'Whisper';
-  if (backend.includes('OpenAi')) return 'Cloud';
+  // "API", not "Cloud" — the endpoint may have been a server on this machine.
+  if (backend.includes('OpenAi')) return 'API';
   return backend;
 }
 

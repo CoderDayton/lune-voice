@@ -45,7 +45,7 @@ export function OpenAiFields({
       />
       <SettingsRow
         label={t`API key`}
-        description={t`Your API key. Leave it blank to keep the saved key.`}
+        description={t`Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none.`}
         control={
           <input
             type="password"

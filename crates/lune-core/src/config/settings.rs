@@ -469,6 +469,40 @@ pub enum LlmBackendConfig {
     Disabled,
 }
 
+/// Whether `url` points at the user's own machine or network rather than a
+/// third-party service.
+///
+/// This is the line an API key is protecting. A hosted provider needs one, and
+/// sending transcripts to one without a key means shipping them off the machine
+/// to get a 401 back. A self-hosted OpenAI-compatible server — Ollama,
+/// llama-server, LM Studio — usually has no key at all, and requiring one there
+/// would block the setup this app is built around.
+///
+/// Loopback and the RFC 1918 / RFC 4193 private ranges count, as do `.local`
+/// and `.localhost` names: a box on the user's LAN is still theirs. Anything
+/// that resolves through DNS to the public internet does not.
+pub fn is_local_endpoint(url: &Url) -> bool {
+    use url::Host;
+    match url.host() {
+        Some(Host::Domain(name)) => {
+            let name = name.trim_end_matches('.').to_ascii_lowercase();
+            name == "localhost" || name.ends_with(".localhost") || name.ends_with(".local")
+        }
+        Some(Host::Ipv4(ip)) => {
+            ip.is_loopback() || ip.is_private() || ip.is_link_local() || ip.is_unspecified()
+        }
+        // `Ipv6Addr::is_unique_local` is still unstable, so match fc00::/7 by
+        // hand; `fe80::/10` is link-local.
+        Some(Host::Ipv6(ip)) => {
+            ip.is_loopback()
+                || ip.is_unspecified()
+                || (ip.segments()[0] & 0xfe00) == 0xfc00
+                || (ip.segments()[0] & 0xffc0) == 0xfe80
+        }
+        None => false,
+    }
+}
+
 /// Remote OpenAI-compatible styling-LLM provider settings, persisted
 /// independently of the active `llm_backend` so the endpoint/key/model survive
 /// turning styling off.
@@ -565,6 +599,44 @@ impl DevicePolicy {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn local(url: &str) -> bool {
+        is_local_endpoint(&Url::parse(url).expect("valid url"))
+    }
+
+    #[test]
+    fn self_hosted_endpoints_are_local() {
+        // The setups this app is usually pointed at: Ollama, llama-server,
+        // LM Studio — on this machine or elsewhere on the user's own network.
+        for url in [
+            "http://localhost:11434/v1",
+            "http://LOCALHOST:8080/v1",
+            "http://127.0.0.1:1234/v1",
+            "http://[::1]:8080/v1",
+            "http://192.168.1.50:11434/v1",
+            "http://10.0.0.4:8080/v1",
+            "http://172.16.3.9:8080/v1",
+            "http://workstation.local:11434/v1",
+            "http://ollama.localhost/v1",
+        ] {
+            assert!(local(url), "{url} should be local");
+        }
+    }
+
+    #[test]
+    fn hosted_providers_are_not_local() {
+        for url in [
+            "https://api.openai.com/v1",
+            "https://openrouter.ai/api/v1",
+            // Close to a private range but routable, so it is a third party.
+            "http://172.32.0.1/v1",
+            "http://11.0.0.1/v1",
+            // A public host whose name merely mentions localhost.
+            "https://localhost.example.com/v1",
+        ] {
+            assert!(!local(url), "{url} should not be local");
+        }
+    }
 
     #[test]
     fn legacy_qwen3_asr_backend_migrates_to_whisper_default() {

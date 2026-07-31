@@ -1,4 +1,4 @@
-import { ClipboardPaste, Cloud, Cpu, Hand, Keyboard, PowerOff, ToggleLeft } from 'lucide-react';
+import { ClipboardPaste, Cpu, Hand, Keyboard, PowerOff, Server, ToggleLeft } from 'lucide-react';
 import type { ComponentType } from 'react';
 
 export type ActivationModeValue = 'Toggle' | 'Hold';
@@ -93,9 +93,12 @@ export const asrBackends: DescriptiveOptionData<AsrBackendValue>[] = [
   },
   {
     value: 'OpenAiCompatible',
-    label: 'Cloud API (OpenAI-compatible)',
-    description: 'Sends audio to a remote OpenAI-compatible endpoint you configure.',
-    icon: Cloud,
+    // Not "Cloud": the endpoint is whatever the user points it at, and a
+    // self-hosted server on localhost is a supported — and common — choice.
+    label: 'OpenAI-compatible API',
+    description:
+      'Sends audio to an OpenAI-compatible endpoint you configure — a server on your own machine, or a hosted API.',
+    icon: Server,
   },
 ];
 
@@ -114,9 +117,10 @@ export const llmEngines: DescriptiveOptionData<LlmEngineValue>[] = [
   },
   {
     value: 'OpenAiCompatible',
-    label: 'Cloud API (OpenAI-compatible)',
-    description: 'Sends transcripts to a remote OpenAI-compatible endpoint you configure.',
-    icon: Cloud,
+    label: 'OpenAI-compatible API',
+    description:
+      'Sends transcripts to an OpenAI-compatible endpoint you configure — Ollama, llama-server or LM Studio locally, or a hosted API.',
+    icon: Server,
   },
 ];
 

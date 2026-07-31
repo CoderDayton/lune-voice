@@ -1144,11 +1144,13 @@ async fn build_llm_service(settings: &UserSettings) -> Result<Arc<dyn LlmService
             // provider — defaulted to api.openai.com. Building a live backend
             // from a half-filled provider would POST every transcript to a
             // third party the user never configured (and get a 401 back), so
-            // an unconfigured provider degrades to passthrough instead. Mirrors
-            // `lune_persist::styling_llm_readiness`, which already calls this
-            // combination "not configured".
-            if api_key.expose().trim().is_empty() || model.trim().is_empty() {
-                tracing::info!("styling provider is not fully configured, using passthrough");
+            // an unconfigured provider degrades to passthrough instead.
+            //
+            // Deferring to the same readiness check the UI shows, rather than
+            // repeating its conditions: a copy that drifts would have the app
+            // reporting styling as unconfigured while quietly using it.
+            if let Err(reason) = lune_persist::styling_llm_readiness(&settings.llm_backend) {
+                tracing::info!(reason = ?reason, "styling provider is not ready, using passthrough");
                 return Ok(Arc::new(NullPostProcessor::new()) as Arc<dyn LlmService>);
             }
             let backend = Arc::new(OpenAiLlmBackend::new(OpenAiLlmConfig {

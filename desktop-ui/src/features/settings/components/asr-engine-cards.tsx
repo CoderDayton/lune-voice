@@ -1,5 +1,5 @@
 import { useLingui } from '@lingui/react/macro';
-import { ArrowRight, Check, Cloud, Cpu, Download, type LucideIcon, Mic } from 'lucide-react';
+import { ArrowRight, Check, Cpu, Download, type LucideIcon, Mic, Server } from 'lucide-react';
 import { useEffect } from 'react';
 import { saveWorkspaceSetting, type WorkspaceSettings } from '../../../store/workspace-store';
 import { asrBackends, whisperModels } from '../data/settings-data';
@@ -8,7 +8,8 @@ import { type ModelStatusApi, useModelStatus } from '../hooks/use-model-status';
 /** Per-engine icon — Whisper gets a mic, cloud a cloud, everything else a chip. */
 function engineIcon(value: string): LucideIcon {
   if (value === 'WhisperCpp') return Mic;
-  if (value === 'OpenAiCompatible') return Cloud;
+  // A server, not a cloud: the endpoint may well be on localhost.
+  if (value === 'OpenAiCompatible') return Server;
   return Cpu;
 }
 

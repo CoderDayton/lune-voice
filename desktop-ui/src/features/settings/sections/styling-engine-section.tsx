@@ -1,12 +1,13 @@
 import { useLingui } from '@lingui/react/macro';
-import { Check, Cloud, type LucideIcon, PowerOff, Wand2 } from 'lucide-react';
+import { Check, type LucideIcon, PowerOff, Server, Wand2 } from 'lucide-react';
 import { saveWorkspaceSettings } from '../../../store/workspace-store';
 import { OpenAiFields } from '../components/openai-fields';
 import { SettingsBlock, type SettingsProps, SettingsSection } from '../components/section';
 import { type LlmEngineValue, llmEngines } from '../data/settings-data';
 
 function engineIcon(value: LlmEngineValue): LucideIcon {
-  if (value === 'OpenAiCompatible') return Cloud;
+  // A server, not a cloud: the endpoint may well be on localhost.
+  if (value === 'OpenAiCompatible') return Server;
   return PowerOff;
 }
 
@@ -34,7 +35,7 @@ export function StylingEngineSection({ settings }: SettingsProps) {
     <div className="flex flex-col gap-space-md">
       <SettingsSection
         title={t`Styling engine`}
-        description={t`Choose how transcripts are restyled — sent to a remote OpenAI-compatible endpoint you configure, or left off entirely.`}
+        description={t`Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely.`}
         icon={Wand2}
       >
         <SettingsBlock

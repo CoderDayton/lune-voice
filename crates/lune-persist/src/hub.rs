@@ -209,7 +209,7 @@ impl LlmUnavailable {
                 "Styling is turned off. Enable a styling engine in Settings before generating examples."
             }
             Self::ProviderNotConfigured => {
-                "Your styling provider isn't fully configured. Add its API key and model in Settings before generating examples."
+                "Your styling provider isn't fully configured. Set its model in Settings — plus an API key, unless the endpoint runs on your own machine or network — before generating examples."
             }
         }
     }
@@ -218,19 +218,32 @@ impl LlmUnavailable {
 /// Whether the configured styling LLM is ready to serve a request. `Ok(())`
 /// means a request can proceed; `Err(reason)` names the setup step the user
 /// still needs. This is the guard the app runs before asking the LLM to
-/// (re)generate few-shot examples — the remote engine needs an API key and
-/// model configured.
+/// (re)generate few-shot examples, and the same one the dictation pipeline
+/// consults before building a live backend — the two must agree, or the app
+/// tells the user styling is unconfigured while quietly using it anyway.
+///
+/// A model is always required. An API key is required only for an endpoint off
+/// this machine: a self-hosted server usually has none, and demanding one would
+/// break the local setups this is mostly pointed at. See
+/// [`lune_core::config::is_local_endpoint`].
 pub fn styling_llm_readiness(
     llm_backend: &lune_core::config::LlmBackendConfig,
 ) -> Result<(), LlmUnavailable> {
-    use lune_core::config::LlmBackendConfig;
+    use lune_core::config::{LlmBackendConfig, is_local_endpoint};
     match llm_backend {
-        LlmBackendConfig::OpenAiCompatible { api_key, model, .. } => {
-            if api_key.expose().trim().is_empty() || model.trim().is_empty() {
-                Err(LlmUnavailable::ProviderNotConfigured)
-            } else {
-                Ok(())
+        LlmBackendConfig::OpenAiCompatible {
+            base_url,
+            api_key,
+            model,
+            ..
+        } => {
+            if model.trim().is_empty() {
+                return Err(LlmUnavailable::ProviderNotConfigured);
             }
+            if api_key.expose().trim().is_empty() && !is_local_endpoint(base_url) {
+                return Err(LlmUnavailable::ProviderNotConfigured);
+            }
+            Ok(())
         }
         _ => Err(LlmUnavailable::NoProvider),
     }
@@ -846,7 +859,65 @@ fn file_basename(filename: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lune_core::config::AsrBackendConfig;
+    use lune_core::config::{AsrBackendConfig, LlmBackendConfig};
+
+    fn styling_provider(base_url: &str, api_key: &str, model: &str) -> LlmBackendConfig {
+        LlmBackendConfig::OpenAiCompatible {
+            base_url: base_url.parse().unwrap(),
+            api_key: lune_core::config::RedactedString::new(api_key),
+            model: model.into(),
+            max_tokens: 256,
+        }
+    }
+
+    #[test]
+    fn a_hosted_provider_needs_an_api_key() {
+        assert_eq!(
+            styling_llm_readiness(&styling_provider("https://api.openai.com/v1", "", "gpt-4o")),
+            Err(LlmUnavailable::ProviderNotConfigured)
+        );
+        assert!(
+            styling_llm_readiness(&styling_provider(
+                "https://api.openai.com/v1",
+                "sk-test",
+                "gpt-4o"
+            ))
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn a_self_hosted_provider_does_not() {
+        // Ollama and llama-server ship with no authentication, so demanding a
+        // key would make the local setup impossible to complete.
+        assert!(
+            styling_llm_readiness(&styling_provider(
+                "http://localhost:11434/v1",
+                "",
+                "llama3.1"
+            ))
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn a_model_is_required_wherever_the_endpoint_lives() {
+        for base in ["https://api.openai.com/v1", "http://localhost:11434/v1"] {
+            assert_eq!(
+                styling_llm_readiness(&styling_provider(base, "sk-test", "  ")),
+                Err(LlmUnavailable::ProviderNotConfigured),
+                "{base} with no model should be unconfigured"
+            );
+        }
+    }
+
+    #[test]
+    fn styling_turned_off_is_not_a_configuration_problem() {
+        assert_eq!(
+            styling_llm_readiness(&LlmBackendConfig::Disabled),
+            Err(LlmUnavailable::NoProvider)
+        );
+    }
 
     fn fake_openai_asr() -> AsrBackendConfig {
         AsrBackendConfig::OpenAiCompatible {
