@@ -42,6 +42,9 @@
         ],
         "section": "utils"
       },
+      "rpm": {
+        "depends": ["webkit2gtk4.1", "gtk3", "libappindicator-gtk3"]
+      },
       "appimage": {
         "bundleMediaFramework": false
       }

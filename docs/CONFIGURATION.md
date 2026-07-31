@@ -34,16 +34,10 @@ Lune Voice stores user settings as TOML, exposes the same settings through the d
 
 ## Runtime Settings
 
-Most settings apply through the runtime settings channel or on the next dictation session. Backend changes are persisted immediately and the desktop runtime rebuilds the pipeline before the next start when needed.
-
-```bash
-lune-voice settings                     # dump all settings as TOML
-lune-voice settings style technical     # switch style preset
-lune-voice settings language en-GB      # change language (BCP-47 validated)
-lune-voice settings privacy AllowRemote # change privacy mode
-lune-voice settings history 90          # set retention to 90 days
-lune-voice settings history -1          # disable session history
-```
+Settings are edited in the desktop UI or by hand in `settings.toml`. There is no
+command-line interface. Most changes apply through the runtime settings channel
+or on the next dictation session; backend changes are persisted immediately and
+the desktop runtime rebuilds the pipeline before the next start when needed.
 
 Settings mutability tiers:
 
@@ -60,13 +54,8 @@ All changes are persisted to disk immediately. The desktop app reloads a workspa
 
 ## Settings File
 
-Settings are persisted as TOML. Location depends on platform:
-
-| Platform | Path |
-|----------|------|
-| Linux | `~/.config/lune-voice/settings.toml` |
-| macOS | `~/Library/Application Support/lune-voice/settings.toml` |
-| Windows | `%APPDATA%\lune-voice\settings.toml` |
+Lune Voice is Linux-only. Settings are persisted as TOML at
+`~/.config/lune-voice/settings.toml`.
 
 If the file doesn't exist or fails to parse, defaults are used and a warning is logged. The daemon never crashes on invalid settings — it falls back gracefully.
 
@@ -98,6 +87,7 @@ sound_cues_enabled = true
 sound_cue_volume = 1.0
 session_history_days = 30
 mic_prewarm = true
+vad_pcen = true
 start_minimized = false
 
 [asr_backend]
@@ -136,24 +126,22 @@ model = "Medium"
 |-------|--------|---------|-------------|
 | `model` | `Small`, `Medium`, `LargeV3Turbo` | `Medium` | Which GGML model to load |
 
-**Available models** (all q8_0 quantizations, multilingual):
+**Available models** (multilingual):
 
 | `model` value | File | Size | Speed / Accuracy |
 |---------------|------|------|-----------------|
-| `Small` | `ggml-small-q8_0.bin` | ~264 MB | Fastest; lowest accuracy |
-| `Medium` | `ggml-medium-q8_0.bin` | ~823 MB | Balanced (recommended) |
+| `Small` | `ggml-small-q5_1.bin` | ~190 MB | Fastest; lowest accuracy |
+| `Medium` | `ggml-medium-q5_0.bin` | ~539 MB | Balanced (recommended) |
 | `LargeV3Turbo` | `ggml-large-v3-turbo-q8_0.bin` | ~874 MB | Best accuracy; turbo decoder keeps it fast |
 
 Device choice (CPU vs CUDA) comes from the top-level `device` field. GPU inference requires a registered CUDA device, which on Linux means the downloadable GPU plugin (or a build compiled with `whisper-cuda`) — see [GPU / Device Settings](#gpu--device-settings).
 
-**VAD:** the backend uses whisper.cpp's built-in Silero VAD at decode time. The VAD model (`ggml-silero-v5.1.2.bin`, downloaded to `models/whisper-vad-silero/`) is loaded automatically when present. If it is missing, the backend decodes without VAD and logs a warning.
+**VAD:** Silero runs as a standalone endpoint-trim pass *before* decoding — it trims leading and trailing silence and keeps internal pauses, which whisper reads as a punctuation cue. whisper.cpp's in-decode `enable_vad` is deliberately not used: it concatenates speech spans and strips those pauses, producing run-on sentences. The VAD model (`ggml-silero-v5.1.2.bin`, downloaded to `models/whisper-vad-silero/`) is loaded automatically when present and always runs on CPU. If it is missing, the backend decodes without it and logs a warning.
 
 **Inference details:**
 - Input: 16 kHz mono PCM (already in whisper's native format — no conversion)
 - Decoding: BeamSearch (beam size 5) for accuracy; one-shot per utterance (no streaming autoregressive loop)
 - Confidence: per-token probabilities folded into segment `confidence` (mean) and `min_token_confidence` (minimum); segments below the garbage threshold (0.25) are dropped before the session sees them
-
-**Migration from old configs:** settings files that still contain `type = "Qwen3Asr"` are automatically migrated to `WhisperCpp` with the `Medium` model on first load — the daemon does not fail on the unknown type.
 
 ### OpenAI-Compatible (Remote ASR)
 
@@ -171,7 +159,7 @@ streaming = "HttpPolling"
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `base_url` | URL | — | API base URL |
-| `api_key` | string | — | API key (stored in settings file; redacted in logs, zeroized on drop) |
+| `api_key` | string | — | API key (kept in the OS keyring when one is available, inline in `settings.toml` otherwise; redacted in logs, zeroized on drop) |
 | `model` | string | — | Model identifier |
 | `streaming` | enum | — | `"WebSocket"` or `"HttpPolling"` |
 
@@ -208,7 +196,7 @@ max_tokens = 512
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `base_url` | URL | — | API base URL |
-| `api_key` | string | — | API key (redacted in logs, zeroized on drop) |
+| `api_key` | string | — | API key (kept in the OS keyring when one is available, inline in `settings.toml` otherwise; redacted in logs, zeroized on drop) |
 | `model` | string | — | Model identifier |
 | `max_tokens` | u32 | — | Maximum output tokens |
 
@@ -246,11 +234,13 @@ privacy_mode = "LocalOnly"
 
 | Mode | Behavior |
 |------|----------|
-| `LocalOnly` | Reject any remote backend usage. Only local models allowed. **(default)** |
-| `LocalPreferred` | Use local backends when available; allow remote if explicitly configured and consented |
+| `LocalOnly` | Intended to reject any remote backend. **(default)** |
+| `LocalPreferred` | Intended to prefer local backends, allowing remote when explicitly configured |
 | `AllowRemote` | Use whatever is configured — no restrictions |
 
-The daemon enforces privacy mode at startup. If a remote backend is configured but privacy mode is `LocalOnly`, the daemon will refuse to start and log an error.
+> **Not enforced.** The field is validated and persisted, but nothing in the
+> runtime reads it: configuring a remote backend under `LocalOnly` is currently
+> allowed. Treat it as a stored preference, not a guardrail.
 
 ---
 
@@ -269,14 +259,6 @@ copy_to_clipboard = false
 | `Clipboard` | Delivers by setting the clipboard and sending a paste chord — `Ctrl+V`, or `Ctrl+Shift+V` when a terminal is focused. Uses an adaptive post-paste delay (EMA of clipboard round-trip) and falls back to per-key typing if `wl-copy` / `xclip` are missing. |
 
 > When IBus is the active input method (common on GNOME/Wayland), both modes commit text directly through IBus and never touch the clipboard. See [Architecture → Text Delivery](ARCHITECTURE.md#5-text-delivery).
-
-The combined `Both` mode was removed; configs that still set `dictation_mode = "Both"` migrate to `TypeInPlace` with `copy_to_clipboard = true`.
-
-Switch at runtime:
-
-```bash
-lune-voice mode dictation Clipboard
-```
 
 ### Copy to Clipboard
 
@@ -302,19 +284,6 @@ activation_mode = "Toggle"
 |------|----------|
 | `Toggle` | Press hotkey once to start, press again to stop **(default)** |
 | `Hold` | Hold hotkey to dictate, release to stop |
-
-Switch at runtime:
-
-```bash
-lune-voice mode activation Hold
-```
-
-**Recommended hotkey bindings:**
-
-| Mode | Press | Release |
-|------|-------|---------| 
-| Toggle | `lune-voice toggle` | — |
-| Hold | `lune-voice start` | `lune-voice stop` |
 
 ---
 
@@ -357,7 +326,9 @@ overlay under XWayland so it can position itself and stay on top.
 
 ## Hotkey Configuration
 
-Hotkeys are configured in settings but must be bound externally in your desktop environment's keyboard settings.
+The app reads the keyboard devices directly (evdev), so its hotkeys are global
+and need no desktop-environment binding. Record a combination from Settings
+rather than editing this by hand.
 
 ```toml
 [hotkey]
@@ -369,24 +340,6 @@ cancel_dictation = { modifiers = [], key = "Escape" }
 |-------|------|-------------|
 | `modifiers` | list | Combination of `"Ctrl"`, `"Shift"`, `"Alt"`, `"Meta"` |
 | `key` | string | Key name (e.g., `"Space"`, `"Escape"`, `"F5"`) |
-
-The daemon itself does not capture global hotkeys. Instead, bind your OS keyboard shortcuts to invoke the CLI subcommands:
-
-**COSMIC / GNOME:**
-```
-Settings -> Keyboard -> Custom Shortcuts
-  Name: Lune Toggle
-  Command: lune-voice toggle
-  Shortcut: Ctrl+Space
-```
-
-**KDE:**
-```
-System Settings -> Shortcuts -> Custom Shortcuts
-  Add -> Command/URL
-  Trigger: Ctrl+Space
-  Action: lune-voice toggle
-```
 
 ---
 
@@ -408,12 +361,6 @@ Set the default style (omit the key entirely for no styling):
 default_style = "casual"
 ```
 
-Switch at runtime:
-
-```bash
-lune-voice settings style technical
-```
-
 ### Prompt Structure
 
 Each style preset builds a `(system, user)` message pair via `StylePreset::build_styling_prompt`:
@@ -423,7 +370,7 @@ Each style preset builds a `(system, user)` message pair via `StylePreset::build
 | `system` | Style name, rules, and few-shot examples (when the preset has any) |
 | `user` | The transcript to rewrite |
 
-These are sent as standard `system` + `user` chat-completion messages to the configured OpenAI-compatible endpoint — no custom prompt templating or chat-template rendering happens client-side. A Qwen-style endpoint may emit an inline `<think>…</think>` reasoning block in its response; the backend strips it before the text reaches the pipeline.
+These are sent as standard `system` + `user` chat-completion messages to the configured OpenAI-compatible endpoint — no custom prompt templating or chat-template rendering happens client-side. A reasoning model's private thinking never reaches your document: reasoning returned in a separate `reasoning_content` field is not read at all, and reasoning inlined into the response is stripped — `<think>` / `<thinking>` / `<reasoning>` / `<thought>` blocks in any case, an unwrapped block ending at one of those closing tags, and harmony channels, of which only the final one is kept. A response that is nothing but unclosed reasoning is discarded and the unstyled text is delivered instead.
 
 ### Few-Shot Examples
 
@@ -432,7 +379,7 @@ Each preset includes 2 input/output pairs that teach the LLM the expected transf
 **Casual:**
 ```
 Input:  She said: "I will be there"; however, I do not think she meant it.
-Output: she said she'd be there, but i don't think she meant it.
+Output: she said, i'll be there. however, i don't think she meant it.
 ```
 
 **Professional:**
@@ -459,7 +406,7 @@ Output: The problem is that it scales poorly. Once you hit ten thousand users, t
 
 The dictionary provides substitution rules applied before the LLM ever sees the transcript. Useful for proper nouns, brand names, and domain-specific terms.
 
-`apply_dictionary_seed` performs Unicode case-insensitive matching on the alphanumeric core of each whitespace-delimited token, with longest-match wins at each position. Dictionary entries are also injected into the LLM prompt as "Dictionary terms (always use these exact spellings)" to reinforce correct spelling during styling.
+`apply_dictionary_seed` performs Unicode case-insensitive matching on the alphanumeric core of each whitespace-delimited token, with longest-match wins at each position.
 
 Each entry has:
 
@@ -469,7 +416,7 @@ Each entry has:
 | `replacement` | string | The correct written form |
 | `priority` | int | Higher priority entries are matched first |
 
-The top 20 most relevant dictionary entries (by fuzzy match against the current text) are included in each LLM prompt.
+Dictionary entries are not sent to the styling LLM — the substitution happens before the call, so the model only ever sees the corrected text.
 
 ---
 
@@ -497,13 +444,7 @@ Each session record contains:
 | `status` | enum | Completed / Failed(reason) |
 | `transcript` | string | Final styled transcript (null if empty) |
 
-Database location:
-
-| Platform | Path |
-|----------|------|
-| Linux | `~/.local/share/lune-voice/lune.db` |
-| macOS | `~/Library/Application Support/lune-voice/lune.db` |
-| Windows | `%APPDATA%\lune-voice\lune.db` |
+Database location: `~/.local/share/lune-voice/lune.db`.
 
 ---
 
@@ -540,20 +481,14 @@ Models are downloaded automatically on first run from HuggingFace Hub.
 
 | Model | HuggingFace repo | Directory | Files | Size |
 |-------|-----------------|-----------|-------|------|
-| Whisper Small | `ggerganov/whisper.cpp` | `whisper-small-q8_0` | `ggml-small-q8_0.bin` | ~264 MB |
-| Whisper Medium *(default)* | `ggerganov/whisper.cpp` | `whisper-medium-q8_0` | `ggml-medium-q8_0.bin` | ~823 MB |
+| Whisper Small | `ggerganov/whisper.cpp` | `whisper-small-q5_1` | `ggml-small-q5_1.bin` | ~190 MB |
+| Whisper Medium *(default)* | `ggerganov/whisper.cpp` | `whisper-medium-q5_0` | `ggml-medium-q5_0.bin` | ~539 MB |
 | Whisper Large v3 Turbo | `ggerganov/whisper.cpp` | `whisper-large-v3-turbo-q8_0` | `ggml-large-v3-turbo-q8_0.bin` | ~874 MB |
 | Whisper VAD | `ggml-org/whisper-vad` | `whisper-vad-silero` | `ggml-silero-v5.1.2.bin` | ~9 MB |
 
-Models are stored in:
+Models are stored in `~/.local/share/lune-voice/models/`.
 
-| Platform | Path |
-|----------|------|
-| Linux | `~/.local/share/lune-voice/models/` |
-| macOS | `~/Library/Application Support/lune-voice/models/` |
-| Windows | `%APPDATA%\lune-voice\models\` |
-
-There is no bundled local styling model — custom model paths are not part of the current public settings surface. To use a remote OpenAI-compatible styling LLM:
+Styling runs against a remote OpenAI-compatible endpoint; custom model paths are not part of the public settings surface. To configure one:
 
 ```toml
 [llm_backend]
@@ -571,7 +506,6 @@ max_tokens = 512
 | Variable | Purpose |
 |----------|---------| 
 | `RUST_LOG` | Tracing filter (e.g., `lune_asr=debug,lune_llm=info`) |
-| `LUNE_VOICE_CONFIG` | Override settings file path |
-| `HF_HOME` | Override HuggingFace cache directory (affects model downloads) |
-| `CUDA_VISIBLE_DEVICES` | Control which GPU is used for inference (when a CUDA device is registered) |
+| `LUNE_LOG_TRANSCRIPTS` | Set to `1` to include transcript text in logs. Redacted by default — leave it unset outside recognition debugging |
+| `LUNE_DISABLE_IBUS` | Set to any value to skip the IBus delivery path and always type through `uinput` |
 | `LIBCLANG_PATH` | Required at build time for bindgen (e.g., `/lib/x86_64-linux-gnu`); not a runtime variable |

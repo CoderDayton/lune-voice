@@ -4,83 +4,45 @@ All notable changes to Lune Voice are documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.1.0]
 
-### Added
-- GPU acceleration as an optional download instead of a separate build: the CUDA backend is a `dlopen`-able ggml plugin the app fetches on request, verifies against a pinned SHA-256, and loads from the user's data directory. One Linux build now serves every machine, and it starts on hosts with no NVIDIA driver at all
-- A **GPU acceleration** section in Settings under Transcription, showing whether the driver is present, offering the download with its size and live progress, and naming the active device once it works
-- `cgs gpu-plugin` and `cgs stage-runtime` for building, packaging, and locally staging the GPU plugin, plus `docs/GPU_PLUGIN.md` covering the design, publishing flow, and troubleshooting
-- Configurable dictation-pill placement from a new **Pill** section in Settings: target monitor, screen anchor (six corner/center positions), size (Compact / Standard / Large), orientation (Horizontal / Vertical), corner style (Pill / Rounded / Square), edge margin, and whether it shows on all workspaces
-- Draggable pill — drag it anywhere and it reopens where you left it, with lock-position and reset-to-default controls and a monitor picker for pinning it to a specific display
-- Sound cues on dictation start, stop, and error, played from the backend, with an enable toggle and volume slider in Settings
-- Separate **Copy to clipboard** toggle in Output settings, independent of the Type / Paste delivery method
-- mimalloc as the global allocator in the desktop shell
-- `start_minimized` setting to launch the app hidden to the system tray
-- Wayland focused-window detection on COSMIC and wlr-foreign-toplevel compositors
-- Descriptive dropdown component for settings selects
-- Dictionary inline editing and priority control in the UI
-- 10-language corpus frequency maps for spell correction
-- Categorized supplemental vocabulary with bincode embedding
-- Built-in corrections for the app's own names and a few common mishears (applied unconditionally), replacing the per-user `personal.txt` word list
-- Quotes Whisper wraps around a whole read-aloud utterance are stripped from the output
-- N-gram language model replacing the old bigram model
-- Domain benchmark suite and RTF metrics
-- `cargo-deny` configuration for license/advisory auditing
-- Content Security Policy for Tauri webview
-- `rustfmt.toml` and `clippy.toml` for consistent tooling
+First release.
 
-### Changed
-- Pill visibility changes now apply instantly instead of taking effect on the next launch
-- Release builds switched to thin LTO for faster linking at comparable runtime performance
-- Shared a single softmax across HWCE entropy, Tsallis, and top-margin features
-- The built-in word lists now only fix the capitalization of correctly-spoken terms; the fuzzy matching that could rewrite already-correct words was removed, and the lists were de-duplicated
-- Session statistics aggregated across the full database instead of capped history
-- Benchmarks moved from `examples/` to `benches/` with `harness = false`
-- Relicensed under the GNU GPL v3 or later: the proprietary LICENSE text was replaced with the verbatim GPL-3.0 text and the workspace `license` field set to `GPL-3.0-or-later`
-- Renamed the `lune-app` crate and the shipped binary to `lune-voice`
-- Replaced the GPL-3.0-only `cosmic-protocols` dependency with client bindings generated in-tree from the vendored, permissively licensed COSMIC protocol XML, so COSMIC focus detection is unchanged while the "or later" in the project's own license stays effective
-- `cargo deny check licenses` runs again: the config used `unlicensed` and `copyleft` keys removed in cargo-deny 0.18, so the license audit had been failing to parse rather than passing
-- Output settings split into a delivery method (`TypeInPlace` / `Clipboard`) and an independent `copy_to_clipboard` toggle; the combined `Both` mode was removed (legacy `Both` configs migrate to `TypeInPlace` with copy enabled)
-- Text delivery prefers the IBus input method when it is active — committing text directly with no clipboard — and falls back to the uinput keyboard path otherwise
-- GPU support is reported at runtime rather than at build time: the `gpu_support` command (which only ever answered "was CUDA compiled in") was replaced by `gpu_backend_status`, which distinguishes no driver, driver but no plugin, working, and failed
-- `whisper-rs-sys` is vendored under `vendor/` with a single modified file, adding the `GGML_BACKEND_DL` support the plugin architecture needs
+### Dictation
 
-### Fixed
-- The onboarding GPU acceleration card was never shown, because it was gated on a build-time CUDA check that is always false once the backend is a downloadable plugin
-- The `.deb` declared `libcudart12` and `libcublas12` as dependencies — a wrong major version, and names matching no real Debian or Ubuntu package, which would have blocked installation on CPU-only machines
-- Pill overlay works on GNOME/Mutter and other compositors without `wlr-layer-shell` — the app falls back to XWayland so the overlay can position itself and stay on top
-- Settings dropdowns flip upward when they would otherwise overflow the bottom of the screen
-- The pill's cancel button no longer paints a red background on hover — it keeps only the red ✕
-- Dict corrector risk lookup now O(1) per word (was O(words²) overall)
-- Dictation startup latency, language detection, and hotkey state bugs
-- Window lifecycle, button system, focus styles, and layout polish
-- VAD init failure now propagates gracefully instead of panicking
-- Mid-utterance pauses no longer fragment dictation into spurious sentences — the VAD caps the silence the recognizer hears, so a 0.5–1s breath isn't read as a sentence end
-- Filler words ("um", "uh", and the like) are stripped from dictation output, including mid-sentence (English only)
-- Long sentences now get a terminal period even when the LLM is skipped; one-word dictations stay bare
-- A dictation ending in a colon keeps the colon instead of gaining a stray period
-- Hotkey toggle, session, and IPC pipeline hardened against races and silent failures
-- Gate false positives via case-insensitive lang detection and proper noun bypass
-- Words containing digits skipped in spell corrector
-- Clippy warnings in examples and benchmarks
-- Wayland clipboard no longer clobbered by dictation: with **Copy to clipboard** off, the `Clipboard` paste path restores the previous clipboard (text or images) byte-for-byte after pasting
-- Keyboard focus rings are visible again across cards, list rows, tabs, and navigation — a global focus reset had erased every component indicator; muted UI text raised to WCAG AA contrast
-- Hotkey capture grabs only real keyboards, ignoring virtual and non-keyboard input devices
-- Quietly-spoken words are no longer dropped from the transcript
-- Trailing "though" / "although" / "whereas" continuations are joined to their sentence instead of split into a fragment
-- Clauses are no longer over-split into separate sentences
+- Hotkey-bounded dictation, toggle or push-to-talk hold, `Ctrl+Space` by default. The hotkey is global and the text lands in whatever window has focus
+- whisper.cpp transcription on your own machine, in three model sizes
+- Silero endpoint trim before decode: silence is cut off both ends and internal pauses are kept, because whisper reads them as punctuation
+- PCEN automatic gain control on the capture path, so a quiet microphone still reaches the recognizer at a usable level
+- Correction pass over the transcript — user dictionary (exact matches, plus single-word near misses when the recognizer was unsure), bundled vocabulary for capitalization, and a curated table of common mishears
+- Formatting pass — capitalization, terminal punctuation, filler-word removal, and the quotes whisper wraps around a read-aloud utterance
+- Optional styling through any OpenAI-compatible endpoint, local or hosted: five built-in presets, or your own with custom prompts and few-shot examples
+- Voice commands: new line, new paragraph, list item, scratch that, stop dictation — each recognized only as a whole utterance, so the same words inside a sentence are dictated normally
+- Text delivery through IBus when it is the active input method, otherwise a `uinput` virtual keyboard, with a clipboard paste path for non-ASCII. With **Copy to clipboard** off, the previous clipboard — text or images — is restored byte-for-byte
+- Remote OpenAI-compatible transcription as an alternative to local whisper
 
-### Removed
-- ONNX Runtime (`ort`) and every ONNX model.
-- The local Qwen3-ASR backend (superseded by whisper.cpp).
-- The standalone streaming Silero VAD gate (whisper's built-in VAD replaces it).
-- The LLM grammar-correction pass, calibrated edit gate, and the token sampler / KV-cache code — the styling LLM no longer corrects text (Whisper output is already punctuated).
-- The full benchmark suite, which exercised the removed ONNX/Qwen architecture (preserved on the `archive/onnx-qwen` branch).
-- Fuzzy matching from the built-in word lists (single- and multi-word) and the unused n-gram reranker — the built-in lists are capitalization-only now.
-- llama.cpp and the bundled local styling LLM (Qwen3.5-0.8B GGUF) — styling is now served solely by the OpenAI-compatible remote backend (point it at Ollama, llama-server, LM Studio, or a hosted API). A previously-downloaded `~/.local/share/lune-voice/models/qwen3-styler-0.8b-gguf/` (~610 MB) is no longer used and can be deleted manually.
+### Interface
 
-### Security
-- Model downloads verified against `Content-Length` with a per-model integrity manifest, so a truncated model file is detected even when the HuggingFace metadata fetch fails or the app is offline
-- Transient dictation pastes tagged with the clipboard-history exclusion hint so dictated text stays out of clipboard managers
-- Updated rustls-webpki to 0.103.13
-- Added SAFETY comments to all unsafe blocks
+- Dictation pill overlay with live audio levels and session state: choose its monitor, anchor, size, orientation, corner style and edge margin, drag it anywhere, lock it in place, and keep it across workspaces. Runs under XWayland on compositors without `wlr-layer-shell`
+- Searchable session history with per-session transcript, timing, and the style applied
+- Dictionary management with inline editing and priority ranking
+- Custom style presets, with generated few-shot examples
+- Sound cues on start, stop, and error, with a volume slider and an off switch
+- Wayland focused-window detection on COSMIC and `wlr-foreign-toplevel` compositors
+- Start minimized to the system tray
+- Localized interface (Lingui), keyboard-navigable with visible focus rings and WCAG AA contrast
+
+### Performance
+
+- GPU acceleration as an optional download rather than a separate build: the CUDA backend is a `dlopen`-able ggml plugin, verified against a pinned SHA-256 and installed beside your settings. One Linux build serves every machine, including those with no NVIDIA driver at all
+- mimalloc as the global allocator; thin LTO release builds
+- Steady-state recording allocates nothing on the audio path, and the whisper model is loaded once and shared across sessions
+
+### Security and privacy
+
+- Transcript text is redacted from logs by default; `LUNE_LOG_TRANSCRIPTS=1` opts in while debugging recognition
+- API keys are kept in the OS keyring where one is available, and `settings.toml` is created owner-only for the fallback case
+- Model downloads are checked against a per-model integrity manifest, so a truncated file is caught even when the metadata fetch fails
+- Dictated text carries the clipboard-history exclusion hint, so it stays out of clipboard managers
+- Content Security Policy on the Tauri webview
+- GPL-3.0-or-later, with `cargo deny` gating licenses and advisories across the dependency tree

@@ -24,7 +24,7 @@ Whisper handles transcription on your machine. Your dictionary corrects the name
 
 Styling is optional and off by default. When you enable it, an LLM rewrites the transcript in a tone you select: casual, professional, technical, or one you write yourself. Point it at a local Ollama or llama-server instance to keep transcripts on your machine, or at a hosted API if you would rather not run a model.
 
-First launch downloads roughly 1 GB of Whisper models. After that, dictation needs no network access.
+First launch downloads about 540 MB of Whisper models. After that, dictation needs no network access.
 
 ## Features
 
@@ -32,11 +32,11 @@ First launch downloads roughly 1 GB of Whisper models. After that, dictation nee
 
 **Style presets.** "Professional" tightens up loose phrasing. "Technical" preserves jargon and code formatting. You can define your own with custom prompts and few-shot examples, or leave styling off and keep only the dictionary and punctuation passes.
 
-**Custom dictionary.** Add the names, acronyms, and terms specific to your work. Exact matches always apply, near misses in pronunciation are caught as well, and priority ranking decides between competing entries.
+**Custom dictionary.** Add the names, acronyms, and terms specific to your work. Exact matches always apply, close single-word misses are caught when the recognizer was unsure of the word, and priority ranking decides between competing entries.
 
-**Voice commands.** "New line." "Scratch that." "Stop dictation." These work mid-sentence, and you can map additional phrases to your own actions.
+**Voice commands.** "New line." "New paragraph." "List item." "Scratch that." "Stop dictation." Each is recognized only when it is the whole utterance, so the same words inside a sentence are dictated normally.
 
-**Hold or toggle.** Hold the hotkey for short corrections, or toggle it for longer passages. Hotkeys are global and work in any application.
+**Hold or toggle.** Hold the hotkey for short corrections, or toggle it for longer passages. `Ctrl+Space` by default, global, and works in any application.
 
 **Searchable history.** Every session is recorded with its transcript, timing, and the style applied.
 
@@ -44,17 +44,26 @@ First launch downloads roughly 1 GB of Whisper models. After that, dictation nee
 
 ## Privacy
 
-The app makes exactly one kind of network request on its own: downloading the Whisper models on first launch. Transcription, dictionary correction, and formatting never reach the network.
+On its own the app makes two kinds of network request: the Whisper model download on first launch, and the CUDA plugin download if you ask for GPU acceleration. Local transcription, dictionary correction, and formatting never reach the network.
 
-Styling is the one feature that can, and only after you turn it on. Pointing it at a local endpoint keeps transcripts on your machine.
+Two settings can send your words out, and only once you pick them: remote styling, and a remote transcription backend in place of local Whisper. Pointing either at a local endpoint keeps transcripts on your machine.
 
 The app collects no telemetry and no analytics. Since the source is public, you do not have to take that on faith.
 
-## Building from source
+## Install
 
-You need Rust, [Bun](https://bun.sh), CMake, and LLVM. On Linux, install the Tauri WebView dependencies as well. A CUDA toolkit is only needed if you want to build the GPU plugin yourself.
+Download the `.deb`, `.rpm`, or `.AppImage` from the [releases page](https://github.com/CoderDayton/lune-voice/releases).
 
 ```bash
+sudo apt install ./lune-voice_*_amd64.deb
+```
+
+## Building from source
+
+You need Rust, [Bun](https://bun.sh), CMake, LLVM, the Tauri WebView dependencies, and the `cgs` task runner that drives the build scripts. A CUDA toolkit is only needed if you want to build the GPU plugin yourself.
+
+```bash
+cargo install cargo-run   # provides the `cgs` command
 git clone https://github.com/CoderDayton/lune-voice
 cd lune-voice
 cgs dev      # run the app with hot reload
@@ -66,8 +75,9 @@ Both commands detect CUDA automatically and fall back to CPU. You can force eith
 | | |
 |---|---|
 | **OS** | Linux (X11 or Wayland) |
+| **Typing** | IBus when it is your input method, otherwise `/dev/uinput` — the first run asks for a polkit password to install a udev rule. `wl-copy` or `xclip` for the paste path. |
 | **GPU** | Optional. If you have an NVIDIA card, the app offers a one-time download that moves transcription onto it. CPU-only works, just slower. |
-| **Disk** | Roughly 2 GB for models |
+| **Disk** | ~540 MB for the default model, ~1.6 GB for all three |
 | **Internet** | Once, for the model download |
 
 ### GPU acceleration

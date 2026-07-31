@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { cn } from '../../../lib/cn';
 import { buildCombo, validateCombo } from './hotkey-utils';
 
+/** How long a bare Escape must be held before it aborts the capture. */
+const CANCEL_HOLD_MS = 600;
+
 interface KeyCaptureInputProps {
   value: string;
   onChange: (combo: string) => void;
@@ -18,33 +21,20 @@ export function KeyCaptureInput({
   const [listening, setListening] = useState(false);
   const [pendingCombo, setPendingCombo] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const prevValueRef = useRef(value);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Keep prevValueRef up to date when not in listening mode.
-  useEffect(() => {
-    if (!listening) {
-      prevValueRef.current = value;
-    }
-  }, [value, listening]);
+  const cancelHoldRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!listening) return;
 
-    function handleKeyDown(event: KeyboardEvent) {
-      event.preventDefault();
-      event.stopPropagation();
+    function clearHold() {
+      if (cancelHoldRef.current === null) return;
+      window.clearTimeout(cancelHoldRef.current);
+      cancelHoldRef.current = null;
+    }
 
-      if (event.key === 'Escape') {
-        // Cancel: restore previous value without persisting.
-        setPendingCombo(null);
-        setValidationError(null);
-        setListening(false);
-        return;
-      }
-
-      const combo = buildCombo(event);
-      if (!combo) return;
-
+    function commit(combo: string) {
       const error = validateCombo(combo);
       if (error) {
         setValidationError(error);
@@ -58,27 +48,84 @@ export function KeyCaptureInput({
       onChange(combo);
     }
 
+    function handleKeyDown(event: KeyboardEvent) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.repeat) return;
+
+      const combo = buildCombo(event);
+      if (!combo) return;
+
+      // Escape stays bindable — it is the default for cancelling a recording —
+      // so it cannot simply mean "abort capture". A tap binds it; holding it
+      // aborts. That hold is the keyboard-only way out, since every key here is
+      // swallowed and the other two exits (click the button again, click away)
+      // are mouse-only.
+      if (combo === 'Escape') {
+        setValidationError(null);
+        setPendingCombo(combo);
+        clearHold();
+        cancelHoldRef.current = window.setTimeout(() => {
+          cancelHoldRef.current = null;
+          setPendingCombo(null);
+          setListening(false);
+        }, CANCEL_HOLD_MS);
+        return;
+      }
+
+      commit(combo);
+    }
+
+    function handleKeyUp(event: KeyboardEvent) {
+      if (event.key !== 'Escape' || cancelHoldRef.current === null) return;
+      clearHold();
+      commit('Escape');
+    }
+
     window.addEventListener('keydown', handleKeyDown, { capture: true });
-    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
+    window.addEventListener('keyup', handleKeyUp, { capture: true });
+    return () => {
+      clearHold();
+      window.removeEventListener('keydown', handleKeyDown, { capture: true });
+      window.removeEventListener('keyup', handleKeyUp, { capture: true });
+    };
   }, [listening, onChange]);
+
+  // Clicking anywhere outside the control abandons the capture — the pointer
+  // equivalent of holding Escape.
+  useEffect(() => {
+    if (!listening) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      if (containerRef.current?.contains(event.target as Node)) return;
+      setPendingCombo(null);
+      setValidationError(null);
+      setListening(false);
+    }
+
+    window.addEventListener('pointerdown', handlePointerDown, { capture: true });
+    return () => window.removeEventListener('pointerdown', handlePointerDown, { capture: true });
+  }, [listening]);
 
   function handleClick() {
     if (disabled) return;
     setPendingCombo(null);
     setValidationError(null);
-    setListening(true);
+    setListening((active) => !active);
   }
 
   const displayValue = listening ? (pendingCombo ?? '…') : value;
 
   return (
-    <div className={cn('flex flex-col items-end gap-1 sm:gap-1.5', className)}>
+    <div ref={containerRef} className={cn('flex flex-col items-end gap-1 sm:gap-1.5', className)}>
       <button
         type="button"
         onClick={handleClick}
         disabled={disabled}
         aria-label={
-          listening ? 'Press keys to set hotkey' : `Current binding: ${value}. Click to change.`
+          listening
+            ? 'Press keys to set hotkey. Hold Escape to cancel, or click again to keep the current one'
+            : `Current binding: ${value}. Click to change.`
         }
         aria-invalid={validationError ? 'true' : undefined}
         aria-describedby={validationError ? 'key-capture-error' : undefined}
@@ -104,7 +151,7 @@ export function KeyCaptureInput({
 
       {listening && !validationError && (
         <p className="text-sm text-content-subtle">
-          Press your combo — <kbd className="kbd kbd-sm">Esc</kbd> to cancel
+          Press your combo — hold Esc or click away to cancel
         </p>
       )}
 

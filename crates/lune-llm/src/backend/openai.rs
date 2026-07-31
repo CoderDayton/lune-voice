@@ -94,11 +94,13 @@ impl lune_core::llm::LlmService for OpenAiLlmBackend {
             .choices
             .first()
             .and_then(|c| c.message.content.as_deref())
-            // A Qwen-style endpoint may emit an inline <think>…</think> block
-            // (reasoning must never reach the user's document); an unclosed
-            // block collapses to "", which the pipeline treats as "keep the
-            // input text".
-            .map(|s| crate::prompt::strip_think_tags(s).trim().to_owned())
+            // Read `content` only: an endpoint that returns its reasoning in a
+            // separate `reasoning_content` field is handled by never looking at
+            // it. Reasoning inlined *into* the content — think tags, harmony
+            // channels — is stripped here, because it must never reach the
+            // user's document. Reasoning that never closed collapses to "",
+            // which the pipeline treats as "keep the input text".
+            .map(|s| crate::prompt::strip_reasoning(s).trim().to_owned())
             .ok_or_else(|| lune_core::Error::llm("empty response"))
     }
 }

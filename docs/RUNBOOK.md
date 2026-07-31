@@ -101,7 +101,8 @@ Styling is a remote call, so it inherits your endpoint's latency.
 
 ## API key problems
 
-Keys live in the OS keyring, not in `settings.toml`.
+Keys live in the OS keyring when one is available; otherwise they stay inline in
+`settings.toml`.
 
 - Headless, or a locked session? The keyring is unavailable, and the key stays
   inline in `settings.toml` as a documented fallback. That file is written
@@ -116,8 +117,9 @@ Keys live in the OS keyring, not in `settings.toml`.
 ## GPU plugin will not install
 
 - **"no published GPU backend for this platform yet"** — the release is
-  unpublished (its SHA-256 is still the `UNPUBLISHED` sentinel). Nothing to fix
-  locally; the plugin has not shipped.
+  unpublished (its SHA-256 is still the `UNPUBLISHED` sentinel in
+  `crates/lune-persist/src/gpu_plugin.rs`). Nothing to fix locally; the plugin
+  has not shipped. Build one yourself with `cgs gpu-plugin`.
 - **"failed verification"** — the download did not match the pinned digest.
   Treated as hostile and discarded. Retry; if it persists, do not work around it.
 - **"exceeded the N bytes expected"** — the server sent more than the release

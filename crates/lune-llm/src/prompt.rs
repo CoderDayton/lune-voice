@@ -140,15 +140,108 @@ pub fn contains_forbidden_output(text: &str) -> bool {
     .any(|m| lower.contains(m))
 }
 
-/// Strip a leading `<think>…</think>` reasoning block (Qwen thinking mode).
-pub fn strip_think_tags(text: &str) -> &str {
-    if let Some(end) = text.find("</think>") {
-        text[end + 8..].trim_start()
-    } else if text.starts_with("<think>") {
-        ""
-    } else {
-        text
+/// Tag pairs a reasoning model may wrap its private thinking in. Matched
+/// without ASCII case, so `<THINK>` counts too.
+const REASONING_TAGS: [(&str, &str); 4] = [
+    ("<think>", "</think>"),
+    ("<thinking>", "</thinking>"),
+    ("<reasoning>", "</reasoning>"),
+    ("<thought>", "</thought>"),
+];
+
+/// Harmony (gpt-oss) splits a response into channels and marks the answer as
+/// the `final` one; everything in the other channels is reasoning.
+const HARMONY_FINAL: &str = "<|channel|>final<|message|>";
+const HARMONY_CHANNEL: &str = "<|channel|>";
+
+/// Byte offset of `needle` in `hay`, compared without ASCII case. Every marker
+/// here is ASCII, so a match can never land inside a multi-byte character.
+fn find_ascii_ci(hay: &str, needle: &str) -> Option<usize> {
+    let (hay, needle) = (hay.as_bytes(), needle.as_bytes());
+    if needle.is_empty() || hay.len() < needle.len() {
+        return None;
     }
+    (0..=hay.len() - needle.len()).find(|&i| hay[i..i + needle.len()].eq_ignore_ascii_case(needle))
+}
+
+/// Byte offset just past the close tag that ends the block opened immediately
+/// before `body`. Nested openers of the same spelling raise the depth, so an
+/// inner close does not end the outer block — a model that re-opens `<think>`
+/// inside its own reasoning would otherwise leak the tail of it. `None` means
+/// the block never closed.
+fn find_block_end(body: &str, open: &str, close: &str) -> Option<usize> {
+    let mut depth = 1usize;
+    let mut pos = 0usize;
+    while depth > 0 {
+        let next_close = find_ascii_ci(&body[pos..], close)?;
+        match find_ascii_ci(&body[pos..], open) {
+            Some(next_open) if next_open < next_close => {
+                depth += 1;
+                pos += next_open + open.len();
+            }
+            _ => {
+                depth -= 1;
+                pos += next_close + close.len();
+            }
+        }
+    }
+    Some(pos)
+}
+
+/// Strip a model's private reasoning, leaving only the answer.
+///
+/// Reasoning delivered in a separate `reasoning_content` field never reaches
+/// this function — the backend reads `message.content` alone, so that shape is
+/// discarded by construction. Within the content there are three shapes:
+///
+/// - a wrapped block: `<think>…</think>` and its `<thinking>` / `<reasoning>` /
+///   `<thought>` spellings, in any case, repeated if the model emits several;
+/// - an unwrapped block ending at the closing tag, which is what a chat template
+///   that pre-fills the opening tag produces — the model never emits the opener;
+/// - harmony channels, where only `<|channel|>final<|message|>` is the answer.
+///
+/// Reasoning that never closes yields `""`, which the pipeline treats as "keep
+/// the text we already had" rather than delivering half a thought.
+pub fn strip_reasoning(text: &str) -> &str {
+    let text = text.trim();
+
+    if let Some(i) = find_ascii_ci(text, HARMONY_FINAL) {
+        let answer = &text[i + HARMONY_FINAL.len()..];
+        // The final channel runs to the next control token, when the endpoint
+        // leaves one on the end (`<|end|>`, `<|return|>`).
+        return match answer.find("<|") {
+            Some(end) => answer[..end].trim(),
+            None => answer.trim(),
+        };
+    }
+    if find_ascii_ci(text, HARMONY_CHANNEL).is_some() {
+        // Channels, but no final one: nothing here is an answer.
+        return "";
+    }
+
+    let mut rest = text;
+    while let Some((open, close)) = REASONING_TAGS.iter().copied().find(|(open, _)| {
+        rest.get(..open.len())
+            .is_some_and(|head| head.eq_ignore_ascii_case(open))
+    }) {
+        let Some(end) = find_block_end(&rest[open.len()..], open, close) else {
+            return "";
+        };
+        rest = rest[open.len() + end..].trim_start();
+    }
+
+    if rest.len() == text.len()
+        && let Some((i, close_len)) = REASONING_TAGS
+            .iter()
+            .filter_map(|(_, close)| find_ascii_ci(rest, close).map(|i| (i, close.len())))
+            .min_by_key(|&(i, _)| i)
+    {
+        // No opening tag, but the reasoning closed: a pre-filled template. Drop
+        // everything up to that close.
+        rest = rest[i + close_len..].trim_start();
+    }
+
+    rest.trim_end()
 }
 
 #[cfg(test)]
@@ -184,34 +277,103 @@ mod tests {
     }
 
     #[test]
-    fn strip_think_tags_passthrough_when_no_tags() {
-        assert_eq!(strip_think_tags("just clean text"), "just clean text");
+    fn strip_reasoning_passthrough_when_no_tags() {
+        assert_eq!(strip_reasoning("just clean text"), "just clean text");
     }
 
     #[test]
-    fn strip_think_tags_removes_block() {
+    fn strip_reasoning_removes_block() {
         assert_eq!(
-            strip_think_tags("<think>reasoning here</think>Hello world"),
+            strip_reasoning("<think>reasoning here</think>Hello world"),
             "Hello world"
         );
     }
 
     #[test]
-    fn strip_think_tags_opening_only_is_empty() {
-        assert_eq!(strip_think_tags("<think>still thinking"), "");
+    fn strip_reasoning_accepts_every_tag_spelling() {
+        for (open, close) in REASONING_TAGS {
+            assert_eq!(
+                strip_reasoning(&format!("{open}private{close}Answer")),
+                "Answer",
+                "{open}"
+            );
+        }
     }
 
     #[test]
-    fn strip_think_tags_trims_leading_whitespace_after_close() {
+    fn strip_reasoning_ignores_tag_case() {
+        assert_eq!(strip_reasoning("<THINK>private</Think>Answer"), "Answer");
+    }
+
+    #[test]
+    fn strip_reasoning_removes_repeated_blocks() {
         assert_eq!(
-            strip_think_tags("<think>x</think>\n  Final answer"),
+            strip_reasoning("<think>one</think>\n<thinking>two</thinking>\nAnswer"),
+            "Answer"
+        );
+    }
+
+    #[test]
+    fn strip_reasoning_removes_nested_blocks() {
+        // A model that re-opens the tag inside its own reasoning: the inner
+        // close must not be mistaken for the end of the outer block.
+        assert_eq!(
+            strip_reasoning("<think>one<think>two</think>three</think>Answer"),
+            "Answer"
+        );
+    }
+
+    #[test]
+    fn strip_reasoning_unclosed_nested_block_is_empty() {
+        assert_eq!(strip_reasoning("<think>one<think>two</think>three"), "");
+    }
+
+    #[test]
+    fn strip_reasoning_handles_prefilled_opening_tag() {
+        // A chat template that pre-fills `<think>` means the model only ever
+        // emits the close.
+        assert_eq!(
+            strip_reasoning("weighing the options</think>Answer"),
+            "Answer"
+        );
+    }
+
+    #[test]
+    fn strip_reasoning_opening_only_is_empty() {
+        assert_eq!(strip_reasoning("<think>still thinking"), "");
+        assert_eq!(strip_reasoning("<reasoning>still thinking"), "");
+    }
+
+    #[test]
+    fn strip_reasoning_keeps_only_harmony_final_channel() {
+        assert_eq!(
+            strip_reasoning(
+                "<|channel|>analysis<|message|>weighing it<|end|>\
+                 <|start|>assistant<|channel|>final<|message|>Answer<|return|>"
+            ),
+            "Answer"
+        );
+    }
+
+    #[test]
+    fn strip_reasoning_harmony_without_final_channel_is_empty() {
+        assert_eq!(
+            strip_reasoning("<|channel|>analysis<|message|>still weighing it"),
+            ""
+        );
+    }
+
+    #[test]
+    fn strip_reasoning_trims_whitespace_around_answer() {
+        assert_eq!(
+            strip_reasoning("  <think>x</think>\n  Final answer  "),
             "Final answer"
         );
     }
 
     #[test]
-    fn strip_think_tags_empty_string() {
-        assert_eq!(strip_think_tags(""), "");
+    fn strip_reasoning_empty_string() {
+        assert_eq!(strip_reasoning(""), "");
     }
 
     #[test]

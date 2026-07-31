@@ -12,17 +12,18 @@ with a single modified file (`build.rs`) that adds `GGML_BACKEND_DL` support.
 
 ## Distribution model
 
-Releases are **prebuilt per platform** and shipped as finished Tauri bundles.
-**End users never compile** anything.
+Releases ship as finished Tauri bundles (`.deb`, `.rpm`, `.AppImage`), so **end
+users never compile** anything.
 
 GPU support is **not** a separate artifact on Linux. The CUDA backend is a
 `dlopen`-able plugin the user downloads from the app, so one CPU bundle serves
 every Linux user and a machine with an NVIDIA driver opts in at runtime. See
 [GPU_PLUGIN.md](GPU_PLUGIN.md) for how that works and how to publish the archive.
 
-Windows still builds a pinned CPU and CUDA artifact per target; release runners
-pass `--env BACKEND` so each is reproducible. (A bare local `cgs build` instead
-auto-detects the build host; see Build commands.)
+Only Linux is built and tested. Audio capture and text delivery are Linux-only
+(ALSA/PipeWire, `uinput`, IBus, evdev hotkeys), which is why CI's Windows job
+excludes `lune-audio`, `lune-voice` and `lune-ui`, and why there is no macOS job
+at all. A bare local `cgs build` auto-detects the build host; see Build commands.
 
 Whisper models are **external assets**: GGML files are downloaded at runtime
 into the application models directory (`~/.local/share/lune-voice/models/` on
@@ -35,14 +36,15 @@ bundle.
 |---|---|---|---|---|
 | Linux | Linux x86_64 | CPU (AVX2 baseline) | `whisper-cpp` | **Supported** |
 | Linux GPU plugin | Linux x86_64 + NVIDIA | CUDA, downloaded at runtime | — (built by `cgs gpu-plugin`) | **Supported** |
-| Windows CPU | Windows x86_64 | CPU (AVX2 baseline) | `whisper-cpp` | **Supported** |
-| Windows CUDA | Windows x86_64 + NVIDIA | CUDA | `whisper-cuda` | **Supported** |
+| Windows CPU | Windows x86_64 | CPU (AVX2 baseline) | `whisper-cpp` | **Not built** |
+| Windows CUDA | Windows x86_64 + NVIDIA | CUDA | `whisper-cuda` | **Not built** |
 | macOS Metal | macOS arm64 (Apple Silicon) | Metal | `whisper-metal` | **Planned** (see below) |
 
 The `whisper-cuda` feature forwards to `whisper-rs/cuda`; the CPU feature just
 compiles the library without a GPU backend. The Cargo feature graph is
-cross-platform — the same `--features` flag works on Linux and Windows; only
-the build toolchain differs per OS.
+cross-platform — the same `--features` flag works on Linux and Windows — but that
+feature graph is the only cross-platform part; the crates a desktop app needs on
+top of it are not.
 
 The Linux GPU plugin is not a Cargo feature at all. It is built separately with
 `cgs gpu-plugin` and published as a standalone `.tar.gz` on the GitHub release;
@@ -101,6 +103,9 @@ common CUDA archs. The native default skips both — one CPU target, one GPU arc
 
 ### Windows specifics
 
+> Not buildable end to end today (see the matrix note above). Kept for when the
+> Linux-only capture and delivery layers grow a Windows path.
+
 On Windows, run the equivalent in PowerShell from `desktop-ui\`:
 
 ```powershell
@@ -155,13 +160,13 @@ strategy:
 
 Each leg: install Rust + CMake + LLVM (+ Bun + platform WebView deps), install the
 CUDA Toolkit on `cuda: true` legs, then run the per-target build above and upload
-the bundle from `desktop-ui/src-tauri/target/release/bundle/` (and `release-artifacts/`
-for the Linux containerized bundles) as a release asset.
+the bundle from `target/release/bundle/` (and `release-artifacts/` for the Linux
+containerized bundles) as a release asset.
 
-> Status: the build commands and Cargo features for **Linux/Windows × CPU/CUDA**
-> are in place today. The macOS-Metal feature wiring and the CI workflow above are
-> documented here and remain to be implemented (they require macOS/Windows CI
-> runners to validate).
+> Status: only the **Linux** build is exercised today. The Windows CPU/CUDA Cargo
+> features exist, but the Linux-only audio and delivery crates do not compile
+> there, so no Windows artifact is produced. The macOS-Metal wiring and the
+> release workflow above remain to be implemented.
 
 ## GPU plugin
 

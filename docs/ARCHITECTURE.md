@@ -1,6 +1,6 @@
 # Architecture
 
-Lune Voice has one dictation pipeline and two control surfaces. The CLI talks to the daemon through D-Bus. The desktop app talks to the same runtime through Tauri commands and a typed session stream.
+Lune Voice has one dictation pipeline and one control surface: the desktop app, which drives the runtime through typed Tauri commands and a session event stream.
 
 ---
 
@@ -17,7 +17,6 @@ Lune Voice has one dictation pipeline and two control surfaces. The CLI talks to
   - [Text Delivery](#5-text-delivery)
 - [Session Lifecycle](#session-lifecycle)
 - [Desktop Bridge](#desktop-bridge)
-- [D-Bus Interface](#d-bus-interface)
 - [Threading Model](#threading-model)
 - [Data Flow Diagram](#data-flow-diagram)
 
@@ -27,7 +26,7 @@ Lune Voice has one dictation pipeline and two control surfaces. The CLI talks to
 
 Lune Voice turns microphone audio into styled text, then delivers that text to the focused app. The runtime keeps one active session at a time. Everything else exists to feed that session, configure it, or show its state.
 
-Dictation is **hotkey-bounded**: the session collects audio for as long as the hotkey is held (Hold mode) or until the hotkey is pressed again (Toggle mode). There is no online VAD gate during recording. The Whisper backend applies its built-in Silero VAD to the buffered audio at decode time.
+Dictation is **hotkey-bounded**: the session collects audio for as long as the hotkey is held (Hold mode) or until the hotkey is pressed again (Toggle mode). There is no online VAD gate during recording; Silero trims silence off the ends of the buffered audio in a separate pass just before decode.
 
 The runtime pipeline uses interchangeable backends:
 
@@ -51,7 +50,7 @@ lune-core (types, config, errors, hwce confidence)
 ├─ lune-llm (openai remote, null passthrough, style pipeline, prompt, few-shot)
 ├─ lune-dict (corrector, vocab, voice commands)
 └─ lune-persist (settings.toml, sqlite, model hub)
-     └─ lune-voice (session, factory, hotkey, dbus, delivery, sound cues)
+     └─ lune-voice (session, capture + AGC, factory, hotkey, delivery, sound cues)
           └─ desktop-ui/src-tauri (tauri IPC, pill, persistence bridge)
 ```
 
@@ -66,11 +65,12 @@ Each crate has a single responsibility. `lune-core` defines shared types and tra
 **Crate:** `lune-audio` | **File:** `crates/lune-audio/src/lib.rs`  
 **Orchestration:** `crates/lune-voice/src/capture.rs`
 
-- Uses `cpal` for cross-platform microphone access (ALSA/PipeWire on Linux, CoreAudio on macOS, WASAPI on Windows)
-- Captures 16 kHz mono PCM in frames of 480 samples (30 ms each) — already in whisper.cpp's native input format; no resample or conversion needed
-- Raw audio chunks are pushed straight to the ASR backend via `push_audio` as they arrive; there is no online VAD gate at this stage
+- Uses `cpal` for microphone access (ALSA/PipeWire)
+- Delivers 16 kHz mono PCM in 80 ms chunks (1280 samples). Most hardware captures at 44.1 or 48 kHz, so a `rubato` async resampler converts to 16 kHz in the capture path whenever the device's native rate differs
+- `MicAgc` (PCEN) normalizes each frame toward a target RMS before it leaves the capture loop, gated by the `vad_pcen` setting (default on). The volume meter reads the **post-AGC** signal, so it reflects what the recognizer hears
+- Chunks are pushed to the ASR backend via `push_audio` as they arrive; there is no online VAD gate at this stage
 - The session loop handles Stop/Cancel/deadline/max-speech control signals and terminates the capture loop accordingly
-- After Stop, a 30 ms flush recovers the final callback buffer (last phonemes of the final word), then `poll_final` decodes the full buffer
+- After Stop, the producer is asked to flush and given a 30 ms grace period to hand over the chunk it still holds (up to ~80 ms — the last phonemes of the final word), followed by the AGC's held sub-hop remainder; then `poll_final` decodes the buffer
 
 ### 2. ASR
 
@@ -87,16 +87,16 @@ The `WhisperCppBackend` wraps `whisper-rs`, which vendors and compiles `whisper.
 - The `WhisperContext` (model weights) is loaded **once** at backend construction and shared across all sessions. Per-session `WhisperState` is lightweight (a decode context).
 - `push_audio` appends PCM to a per-session buffer pre-allocated for 30 s of audio (grows once for longer utterances; reset without freeing after each decode).
 - `poll_final` decodes the entire buffer in one shot using **BeamSearch** (beam size 5) — whisper.cpp's accuracy-oriented default. Decoding is one-shot per utterance, so the extra compute is worthwhile.
-- **Built-in Silero VAD:** when the VAD model path is set (`models/whisper-vad-silero/ggml-silero-v5.1.2.bin`), `poll_final` calls `FullParams::set_vad_model_path` + `enable_vad` + `set_vad_params` before decode. Whisper gates the buffer to speech spans internally before running the transformer. If the VAD model file is missing at construction, the backend logs a warning and decodes without VAD.
+- **Silero endpoint trim:** when the VAD model is present (`models/whisper-vad-silero/ggml-silero-v5.1.2.bin`), `poll_final` first runs `WhisperVadContext::segments_from_samples` over the buffer and decodes only the span between the first and last speech segment. Internal pauses are kept, because whisper reads them as punctuation cues. whisper.cpp's in-decode `enable_vad` is deliberately **not** used — it concatenates speech spans and strips those pauses, producing run-ons. The VAD context always runs on CPU (silero is tiny, and a GPU context crashed at init). If the model file is missing, the backend logs a warning and decodes the whole buffer.
 - **Per-token confidence:** whisper exposes per-token probabilities. `poll_final` folds them into `AsrSegment::confidence` (mean) and `min_token_confidence` (minimum), excluding special tokens. Segments whose mean confidence falls below `GARBAGE_DROP_THRESHOLD` (0.25) are dropped by the capture layer before reaching the session.
 - Language detection: the `language` field from `AsrSessionConfig` is passed to `set_language`; `None` uses `"auto"` (whisper detects from audio).
 
-Three GGML model sizes are available, all from `ggerganov/whisper.cpp` as q8_0 quantizations:
+Three GGML model sizes are available, all from `ggerganov/whisper.cpp`:
 
 | Variant | File | Size | Directory |
 |---------|------|------|-----------|
-| `Small` | `ggml-small-q8_0.bin` | ~264 MB | `whisper-small-q8_0` |
-| `Medium` *(default)* | `ggml-medium-q8_0.bin` | ~823 MB | `whisper-medium-q8_0` |
+| `Small` | `ggml-small-q5_1.bin` | ~190 MB | `whisper-small-q5_1` |
+| `Medium` *(default)* | `ggml-medium-q5_0.bin` | ~539 MB | `whisper-medium-q5_0` |
 | `LargeV3Turbo` | `ggml-large-v3-turbo-q8_0.bin` | ~874 MB | `whisper-large-v3-turbo-q8_0` |
 
 #### 2a-i. Compute backend selection
@@ -124,7 +124,7 @@ After ASR segments are collected, the session runs a deterministic text pass:
 
 1. Voice commands are stripped from the ASR text (whole-utterance matching).
 2. The deterministic corrector (`LexicalGate::correct_with_risk_threshold` in `corrector.rs`, via `correct_and_format` in `session.rs`) rewrites the transcript: user-dictionary matches (exact, plus single-word fuzzy gated by `FUZZY_DICT_RISK_GATE`), bundled-vocab recognition (exact case-insensitive re-casing only — no fuzzy guessing), and the `ALWAYS_REPLACE` built-in mishear→canonical table. `formatting` then applies capitalization, terminal punctuation, filler stripping, and wrapping-quote removal.
-3. The corrected text and the top dictionary entries are packaged into `PostProcessInput` for the optional LLM styling stage.
+3. The corrected text and the dictionary entries are packaged into `PostProcessInput` for the optional LLM styling stage.
 
 Styling is not gated on word confidence. It runs only when a style preset is selected: when `default_style` is `None`, the LLM is skipped and the deterministic output is delivered as-is. (`apply_dictionary_seed`, below, is a secondary pass inside the styling stage — it only affects the text sent to the LLM, not this deterministic output.)
 
@@ -139,7 +139,7 @@ The session calls `StylePipeline::transform()` for LLM post-processing.
 | Field | Meaning |
 |-------|---------| 
 | `raw_text` | ASR transcript after dictionary substitution |
-| `dictionary` | Top dictionary entries (injected into the prompt) |
+| `dictionary` | Entries for the pre-LLM seed substitution; never sent to the model |
 | `style_preset` | Output style contract |
 
 `StylePipeline` runs two steps:
@@ -147,7 +147,7 @@ The session calls `StylePipeline::transform()` for LLM post-processing.
 1. **Dictionary seed** — `apply_dictionary_seed` replaces dictionary phrases in the raw text (Unicode case-insensitive, longest-match). This happens before the LLM ever sees the text.
 2. **Styling pass** — runs only when a style preset is selected. When `default_style` is `None` the LLM is skipped and the seeded text is returned; for any selected preset the LLM is called via `llm.complete()`. Output is run through `fix_all_number_spaces` and a `contains_forbidden_output` filter; a failing or empty output keeps the seeded text.
 
-**Thinking suppression:** a Qwen-style remote endpoint may emit an inline `<think>…</think>` reasoning block; the backend strips it from the response before it reaches the pipeline.
+**Reasoning suppression:** a reasoning model puts its private thinking somewhere in the response, and none of it may reach the user's document. The backend reads `message.content` alone, so reasoning returned in a separate `reasoning_content` field is discarded by construction; reasoning inlined into the content is stripped by `strip_reasoning` — a wrapped `<think>` / `<thinking>` / `<reasoning>` / `<thought>` block in any case and repeated any number of times, an unwrapped block ending at one of those closing tags (what a template that pre-fills the opening tag produces), or harmony channels, of which only `<|channel|>final<|message|>` is kept. Reasoning that never closes collapses to an empty string, which the pipeline treats as "keep the text we already had".
 
 When no styling engine is configured (`llm_backend` is `Disabled`), the runtime uses `NullPostProcessor`, which returns the seeded text unchanged. When the configured remote engine's request fails, `StylePipeline` keeps the seeded (dictionary-substituted) text instead of failing the session.
 
@@ -230,6 +230,14 @@ The desktop app does not scrape logs or poll for session state. It uses typed Ta
 | `list_monitors` | `main` | Connected displays for the pill's monitor picker |
 | `gpu_backend_status` | `main` | Runtime GPU state: `unsupported`, `driver-missing`, `not-installed`, `ready`, `failed` |
 | `install_gpu_backend` | `main` | Downloads and verifies the CUDA plugin, streaming progress over a channel |
+| `list_history_page` / `delete_session` | `main` | History paging and deletion |
+| `update_dictionary_entry` | `main` | Edit a dictionary entry in place |
+| `save_snippet` / `delete_snippet` | `main` | Snippet management |
+| `create_custom_style` / `update_custom_style` / `delete_custom_style` / `generate_style_examples` | `main` | Custom style presets |
+| `list_audio_input_devices` | `main` | Input device picker |
+| `start_trigger_capture` | `main` | Capture-only session for the snippet voice-trigger recorder (transcript streamed back, nothing typed, no history row) |
+| `check_model_status` / `download_model_cmd` / `delete_model_cmd` | `main` | Model management |
+| `initialize_pipeline` / `quit_app` | `main` | Runtime lifecycle |
 
 ### Session Stream
 
@@ -261,58 +269,11 @@ Short audio cues play from the Rust backend on status transitions — Start on `
 
 ---
 
-## D-Bus Interface
-
-**Service:** `com.lunevoice.Daemon1` on the session bus  
-**Object path:** `/com/lunevoice/Daemon1`
-
-### Commands
-
-| Method | Effect |
-|--------|--------|
-| `Toggle` | Start if idle, stop if active |
-| `Start` | Begin dictation |
-| `Stop` | End dictation gracefully |
-| `Cancel` | Discard current session |
-| `Quit` | Shut down daemon |
-| `Status` | Returns `"idle"` / `"listening"` / `"error"` |
-
-### Settings (all runtime-mutable via D-Bus)
-
-| Getter / Setter | Type | Scope |
-|----------------|------|-------|
-| `Get/SetDictationMode` | string (`TypeInPlace`\|`Clipboard`; legacy `Both` maps to `TypeInPlace`) | Immediate (watch channel) |
-| `Get/SetActivationMode` | string (`Toggle`\|`Hold`) | Immediate (watch channel) |
-| `Get/SetDefaultStyle` | string (preset ID, validated against registry) | Next session start |
-| `Get/SetLanguage` | string (BCP-47, well-formedness validated) | Next session start |
-| `Get/SetPrivacyMode` | string (`LocalOnly`\|`LocalPreferred`\|`AllowRemote`) | Persist only |
-| `Get/SetSessionHistoryDays` | i32 (-1 = disabled, 0+ = days) | Persist only |
-| `Get/SetHotkey` | JSON string of `HotkeyConfig` | Persist only (external DE bindings) |
-| `Get/SetAsrBackend` | JSON string of `AsrBackendConfig` | Daemon restart required |
-| `Get/SetLlmBackend` | JSON string of `LlmBackendConfig` | Daemon restart required |
-| `GetAllSettings` | TOML string (read-only dump) | - |
-
-All setters persist changes to disk immediately via fire-and-forget `spawn_local`. Settings are stored in `Arc<RwLock<UserSettings>>` — the runtime source of truth.
-
-### Signals
-
-| Signal | Payload | Emitted when |
-|--------|---------|-------------|
-| `StateChanged` | `state: &str` | Pipeline state changes (idle/listening/error) |
-| `DictationModeChanged` | `mode: &str` | Dictation mode setter called |
-| `ActivationModeChanged` | `mode: &str` | Activation mode setter called |
-| `SettingsChanged` | `key: &str` | Any setter changes a setting (key = field name) |
-
-CLI subcommands (`lune-voice toggle`, `lune-voice settings style email`, etc.) are thin D-Bus proxy calls.
-
----
-
 ## Threading Model
 
 ```
 Main Thread (tokio current_thread + LocalSet)
-|-- D-Bus connection (zbus) - initialized outside LocalSet
-|-- Command loop - receives AppCommand from D-Bus
+|-- Command loop - receives AppCommand from the Tauri IPC layer
 |-- Session task (spawn_local) - !Send due to cpal stream
 |   |-- Audio push loop (raw PCM to ASR buffer)
 |   |-- poll_final (batch decode; blocking call dispatched to spawn_blocking)
@@ -343,13 +304,12 @@ The `WhisperContext` is wrapped in an `Arc` and shared across all sessions. Each
 
 lune-audio (cpal)
   |
-  | AudioFrame over mpsc (raw PCM, 16 kHz mono f32)
+  | AudioFrame over mpsc (PCM, 16 kHz mono f32, post-AGC)
   v
 Session task (capture.rs)
   |
   |-- push_audio → ASR buffer accumulates
-  |-- [stop signal] → poll_final → whisper.cpp decode
-  |   (built-in Silero VAD gates speech spans at decode time)
+  |-- [stop signal] → poll_final → Silero endpoint trim → whisper.cpp decode
   |-- voice command routing
   |-- apply_dictionary_seed
   |-- StylePipeline::transform (LLM styling, optional)
@@ -362,7 +322,7 @@ Event forwarder
   |-- Tauri session stream
   `-- history-changed event
 
-D-Bus / Tauri UI
+Tauri UI
   |
   `-- start, stop, cancel, settings
 

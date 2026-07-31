@@ -10,10 +10,9 @@ archive, and what to check when it misbehaves.
 ## Why a plugin
 
 The obvious design is two release artifacts, one linked against CUDA and one
-not. That is what this project used to do, and it has two costs: the CUDA build
-refuses to start on a machine with no NVIDIA driver (a hard `DT_NEEDED` on
-`libcudart` is resolved before `main` runs), and every user has to pick the
-right download.
+not. That has two costs: the CUDA build refuses to start on a machine with no
+NVIDIA driver (a hard `DT_NEEDED` on `libcudart` is resolved before `main`
+runs), and every user has to pick the right download.
 
 The equally obvious fix, shipping the CUDA libraries and pointing
 `LD_LIBRARY_PATH` at them from inside the process, does not work. glibc reads
@@ -101,10 +100,10 @@ Two things to know:
   is therefore satisfied by `sm_120a`, and the build's verification step allows
   that suffix.
 - CMake **caches** `CMAKE_CUDA_ARCHITECTURES`. Reusing a build directory that was
-  configured for a narrower list silently keeps producing that narrower plugin;
-  this shipped an `sm_89`-only archive once. The script now reconfigures from
-  scratch whenever the list changes, and verifies the built binary with
-  `cuobjdump` rather than trusting the configure step.
+  configured for a narrower list silently keeps producing that narrower plugin —
+  an easy way to ship an `sm_89`-only archive by accident. The script
+  reconfigures from scratch whenever the list changes, and verifies the built
+  binary with `cuobjdump` rather than trusting the configure step.
 
 ## Building and publishing
 

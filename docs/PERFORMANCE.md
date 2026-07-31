@@ -22,7 +22,7 @@
 The user-perceived latency is the **after-speech wait**: time from when the user releases the hotkey (or presses it to stop) to when finished text lands in the focused app.
 
 ```
-After-speech wait = poll_final (whisper.cpp decode + built-in VAD) + optional LLM styling + delivery
+After-speech wait = poll_final (Silero endpoint trim + whisper.cpp decode) + optional LLM styling + delivery
 ```
 
 | Stage | Cost profile | Notes |
@@ -49,21 +49,24 @@ After-speech wait = poll_final (whisper.cpp decode + built-in VAD) + optional LL
 
 **GPU impact:** a registered CUDA device moves ASR inference to the GPU and substantially reduces decode time. On Linux that comes from the downloadable GPU plugin ([docs/GPU_PLUGIN.md](GPU_PLUGIN.md)); a `whisper-cuda` build does the same thing statically. Without one, whisper.cpp uses its AVX2-optimized GGML kernels (portable baseline; compile flags: `GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON`). Plugin builds instead use `GGML_CPU_ALL_VARIANTS=ON`, which compiles per-microarchitecture CPU backends and picks the best one at runtime.
 
-**Model size trade-off:** `Small` (~264 MB) is fastest; `LargeV3Turbo` (~874 MB) provides the best accuracy with whisper's turbo decoder keeping latency closer to `Medium` (~823 MB) than to the full `Large` model.
+**Model size trade-off:** `Small` (~190 MB) is fastest; `LargeV3Turbo` (~874 MB) provides the best accuracy with whisper's turbo decoder keeping latency closer to `Medium` (~539 MB) than to the full `Large` model.
 
 ---
 
 ## Benchmark Status
 
-The benchmark suite for the whisper.cpp stack is **pending** (the styling-LLM benchmarks talk to a remote endpoint configured via `LUNE_BENCH_LLM_*` env vars — see `benchmarks/bench_utils.rs`). The prior suite (`pipeline_stages`, `pipeline_real`, and related examples) was written against the removed Qwen3-ASR ONNX backend and has been deleted from this branch. The old benchmarks and their numbers are preserved on `archive/onnx-qwen` for historical reference.
+`cgs bench --env TYPE=<type>` runs the suite under `benchmarks/`:
 
-The only currently active benchmark target is the AGC frontend:
+| Type | Measures |
+|---|---|
+| `agc` | PCEN AGC frontend |
+| `transcribe` | Whole capture → AGC → VAD → whisper (+ styling) pipeline on a WAV/f32/dir (`--env WAV=`) |
+| `pipeline` / `stages` / `latency` | Real pipeline, per-stage timings, session latency |
+| `domain` / `punctuation` / `dict` / `snippets` | Output-quality A/Bs |
+| `styling` / `rulecmp` | Remote styling capability and rule comparison (endpoint via `LUNE_BENCH_LLM_*`, see `benchmarks/bench_utils.rs`) |
+| `live` | Live microphone transcription |
 
-```bash
-cgs bench --env TYPE=agc
-```
-
-Re-authoring a stage-latency and real-pipeline benchmark for the whisper.cpp stack is a planned follow-up. Until then, use the profiling guide below for ad-hoc measurement.
+Model-backed targets compile whisper.cpp and need a model on disk. Numbers are not checked into the repository — decode time swings by an order of magnitude across CPU, GPU, model size and utterance length, so run the targets on the hardware you care about, or use the profiling guide below.
 
 ---
 
@@ -84,7 +87,7 @@ Re-authoring a stage-latency and real-pipeline benchmark for the whisper.cpp sta
 |-----------|----------|--------|
 | **Shared softmax for HWCE** | `crates/lune-core/src/hwce/features.rs` | Computes softmax once per token and feeds the probability slice to entropy/Tsallis/margin instead of three independent passes |
 | **O(1) risk lookup in corrector** | `crates/lune-dict/src/corrector.rs` | Risk positions indexed in a `HashMap`, replacing a per-word linear scan that was O(words²) overall |
-| **PCEN AGC frontend** | `crates/lune-audio/src/pcen.rs` | Adaptive gain normalization available in `lune-audio`; not currently wired into the dictation pipeline (whisper.cpp handles input normalization internally) |
+| **PCEN AGC frontend** | `crates/lune-audio/src/pcen.rs`, `crates/lune-voice/src/capture.rs` | Adaptive gain normalization applied to every captured frame through `MicAgc`, gated by the `vad_pcen` setting (default on); lifts a quiet mic toward a target RMS before the recognizer sees it |
 
 ### Concurrency
 
@@ -127,10 +130,10 @@ max_speech_secs = 120
 
 ```bash
 # Build with debug symbols
-RUSTFLAGS="-C force-frame-pointers=yes" cargo build --release -p lune-voice
+RUSTFLAGS="-C force-frame-pointers=yes" cargo build --release -p lune-ui --features "whisper-cpp"
 
 # Record
-perf record -g --call-graph dwarf ./target/release/lune-voice daemon
+perf record -g --call-graph dwarf ./target/release/lune-voice
 
 # Analyze
 perf report --hierarchy
@@ -147,9 +150,9 @@ echo '1' | sudo tee /proc/sys/kernel/perf_event_paranoid   # reverts on reboot
 # Build with symbols + frame pointers
 RUSTFLAGS="-C force-frame-pointers=yes" \
 CARGO_PROFILE_RELEASE_STRIP=none CARGO_PROFILE_RELEASE_DEBUG=line-tables-only \
-  cargo build --release --features "whisper-cpp" -p lune-voice
+  cargo build --release --features "whisper-cpp" -p lune-ui
 
-samply record -- ./target/release/lune-voice daemon
+samply record -- ./target/release/lune-voice
 # then trigger a dictation session; Ctrl+C to stop recording
 ```
 
@@ -160,7 +163,7 @@ For a statically linked GPU build, substitute `--features "whisper-cuda"`. To be
 Set `RUST_LOG` to see per-component timing:
 
 ```bash
-RUST_LOG=lune_asr=debug,lune_llm=debug,lune_voice=debug ./target/release/lune-voice daemon
+RUST_LOG=lune_asr=debug,lune_llm=debug,lune_voice=debug ./target/release/lune-voice
 ```
 
 Key trace points:
@@ -172,12 +175,12 @@ Key trace points:
 
 ```bash
 # With heaptrack
-heaptrack ./target/release/lune-voice daemon
+heaptrack ./target/release/lune-voice
 heaptrack_gui heaptrack.lune-voice.*.gz
 
 # With valgrind/DHAT
-cargo build --release -p lune-voice
-valgrind --tool=dhat ./target/release/lune-voice daemon
+cargo build --release -p lune-ui --features "whisper-cpp"
+valgrind --tool=dhat ./target/release/lune-voice
 ```
 
 ### Running tests
