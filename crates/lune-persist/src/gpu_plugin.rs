@@ -193,6 +193,34 @@ where
     Ok(written)
 }
 
+/// How long to wait for the TCP/TLS handshake before giving up.
+const CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// How long a single read may stall before the download is abandoned.
+///
+/// Deliberately a *read* timeout rather than a total-request timeout: this is a
+/// ~500 MB transfer, and any whole-request deadline generous enough for a slow
+/// connection is too generous to catch a server that accepts the connection and
+/// then goes silent — which is the failure this exists to bound.
+const READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// Headroom over the pinned size before a download is treated as hostile.
+/// The archive is a fixed, known artifact; anything past this is a server
+/// streaming us bytes we will never accept, so stop rather than fill the disk.
+const SIZE_TOLERANCE_PERCENT: u64 = 10;
+
+/// Ceiling on bytes written to disk for `release`.
+fn max_download_bytes(release: &GpuPluginRelease) -> u64 {
+    // Checked, not saturating: `saturating_mul` would clamp to `u64::MAX` and
+    // the following `/ 100` would then yield a ceiling *below* the release size,
+    // rejecting every legitimate byte. On overflow there is no meaningful cap to
+    // impose, and the SHA-256 pin still gates what gets installed.
+    release
+        .download_bytes
+        .checked_mul(100 + SIZE_TOLERANCE_PERCENT)
+        .map_or(u64::MAX, |scaled| scaled / 100)
+}
+
 /// How much has to arrive before another progress event is emitted. Every
 /// event crosses the IPC boundary, and a several-hundred-megabyte download
 /// yields tens of thousands of chunks — reporting each one floods the channel
@@ -211,13 +239,40 @@ where
     use futures_util::StreamExt;
     use std::io::Write;
 
-    let response = reqwest::get(release.url)
+    // A default client has no timeouts at all, so a server that accepts the
+    // connection and then stalls would hang this `await` forever — with the UI
+    // parked on a progress bar that never moves and no way to cancel.
+    let client = reqwest::Client::builder()
+        .connect_timeout(CONNECT_TIMEOUT)
+        .read_timeout(READ_TIMEOUT)
+        .build()
+        .map_err(|e| {
+            PersistError::Io(std::io::Error::other(format!(
+                "GPU backend http client: {e}"
+            )))
+        })?;
+
+    let response = client
+        .get(release.url)
+        .send()
         .await
         .map_err(|e| PersistError::Io(std::io::Error::other(format!("GPU backend fetch: {e}"))))?
         .error_for_status()
         .map_err(|e| PersistError::Io(std::io::Error::other(format!("GPU backend fetch: {e}"))))?;
 
-    let total = response.content_length().unwrap_or(release.download_bytes);
+    let declared = response.content_length();
+    let total = declared.unwrap_or(release.download_bytes);
+    let max_bytes = max_download_bytes(release);
+    // Reject an oversized body from the advertised length before transferring
+    // any of it, when the server is honest enough to declare one.
+    if let Some(len) = declared
+        && len > max_bytes
+    {
+        return Err(PersistError::Io(std::io::Error::other(format!(
+            "GPU backend archive declares {len} bytes, more than the {max_bytes} expected for \
+             this release; refusing to download it"
+        ))));
+    }
     let mut file = std::fs::File::create(path)?;
     let mut hasher = Sha256::new();
     let mut downloaded = 0u64;
@@ -228,9 +283,18 @@ where
         let chunk = chunk.map_err(|e| {
             PersistError::Io(std::io::Error::other(format!("GPU backend download: {e}")))
         })?;
+        downloaded += chunk.len() as u64;
+        // The digest is only checked once the whole body has arrived, so
+        // without this a server could stream unbounded bytes into the user's
+        // data directory before verification ever runs.
+        if downloaded > max_bytes {
+            return Err(PersistError::Io(std::io::Error::other(format!(
+                "GPU backend archive exceeded the {max_bytes} bytes expected for this release; \
+                 aborting download"
+            ))));
+        }
         hasher.update(&chunk);
         file.write_all(&chunk)?;
-        downloaded += chunk.len() as u64;
         if downloaded - reported >= PROGRESS_STEP_BYTES {
             reported = downloaded;
             on_progress(GpuInstallProgress {
@@ -487,6 +551,35 @@ mod tests {
     /// straight into a directory, so check the marker file directly.
     fn plugin_installed_at(dir: &Path) -> bool {
         dir.join(CUDA_PLUGIN_FILE).is_file()
+    }
+
+    #[test]
+    fn the_download_ceiling_allows_headroom_but_not_a_runaway_body() {
+        let release = GpuPluginRelease {
+            url: "https://example.invalid/plugin.tar.gz",
+            sha256: UNPUBLISHED,
+            download_bytes: 1_000_000,
+            cuda_major: 13,
+        };
+        let max = max_download_bytes(&release);
+        // A little over the pinned size is fine — servers and recompression
+        // wobble — but an order of magnitude is not.
+        assert_eq!(max, 1_100_000);
+        assert!(max > release.download_bytes);
+        assert!(max < release.download_bytes * 2);
+    }
+
+    #[test]
+    fn the_download_ceiling_does_not_overflow_on_an_absurd_release_size() {
+        let release = GpuPluginRelease {
+            url: "https://example.invalid/plugin.tar.gz",
+            sha256: UNPUBLISHED,
+            download_bytes: u64::MAX,
+            cuda_major: 13,
+        };
+        // Saturating rather than wrapping: a wrapped ceiling would be tiny and
+        // would reject every legitimate byte.
+        assert!(max_download_bytes(&release) >= release.download_bytes / 2);
     }
 
     #[tokio::test]

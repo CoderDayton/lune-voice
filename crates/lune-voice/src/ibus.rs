@@ -53,6 +53,75 @@ const ENGINE_IFACE: &str = "org.freedesktop.IBus.Engine";
 /// callback never stalls delivery for long.
 const FOCUS_WAIT: Duration = Duration::from_millis(200);
 
+// ─── Crash recovery ──────────────────────────────────────────────────────────
+
+/// File recording the engine we displaced, written before we make ours global
+/// and removed once the user's engine is back.
+///
+/// Restoring is otherwise `Drop`-only, and `Drop` does not run on `SIGTERM`
+/// (logout, `systemctl stop`), on `SIGKILL`, or on a panic — the release profile
+/// sets `panic = "abort"`. Without this file a death inside the ~200 ms commit
+/// window leaves IBus pointed at our no-op engine, and since `try_new` refuses
+/// to treat `lune-voice` as a restore target, *restarting the app would not fix
+/// it either*: the user is left unable to type in any application.
+const DISPLACED_ENGINE_FILE: &str = "displaced-input-engine";
+
+fn displaced_engine_path() -> Option<std::path::PathBuf> {
+    lune_persist::AppPaths::resolve().map(|p| p.data_dir().join(DISPLACED_ENGINE_FILE))
+}
+
+/// Record `name` as the engine to restore if this process dies before it can.
+/// Best-effort: failing to write must never block a commit.
+fn record_displaced_engine(name: &str) {
+    if let Some(path) = displaced_engine_path() {
+        record_displaced_engine_at(&path, name);
+    }
+}
+
+fn record_displaced_engine_at(path: &std::path::Path, name: &str) {
+    if let Some(parent) = path.parent()
+        && let Err(e) = std::fs::create_dir_all(parent)
+    {
+        debug!(error = %e, "ibus: could not create state dir for engine recovery");
+        return;
+    }
+    if let Err(e) = std::fs::write(path, name) {
+        debug!(error = %e, "ibus: could not record displaced engine");
+    }
+}
+
+/// Drop the recovery record — the user's engine is back where it belongs.
+fn clear_displaced_engine() {
+    if let Some(path) = displaced_engine_path() {
+        clear_displaced_engine_at(&path);
+    }
+}
+
+fn clear_displaced_engine_at(path: &std::path::Path) {
+    match std::fs::remove_file(path) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => debug!(error = %e, "ibus: could not clear displaced-engine record"),
+    }
+}
+
+/// Read back a recorded engine name, if a previous run left one.
+fn recorded_displaced_engine() -> Option<String> {
+    recorded_displaced_engine_at(&displaced_engine_path()?)
+}
+
+fn recorded_displaced_engine_at(path: &std::path::Path) -> Option<String> {
+    let name = std::fs::read_to_string(path).ok()?;
+    let name = name.trim();
+    // Never hand back our own engine as a restore target — that is the state we
+    // are recovering *from*. A record naming it would send the next launch
+    // straight back into the lockout it is trying to escape.
+    if name.is_empty() || name == ENGINE_NAME {
+        return None;
+    }
+    Some(name.to_owned())
+}
+
 // ─── Active-IM gate ──────────────────────────────────────────────────────────
 
 /// True only when IBus is the active input method for this session, and the
@@ -400,16 +469,57 @@ impl IbusTyper {
             original_engine: None,
         };
         // Remember the engine in effect now so we can always restore it later.
-        typer.original_engine = typer.global_engine_name().filter(|p| p != ENGINE_NAME);
+        //
+        // Finding *our* engine already global means a previous run died mid-commit
+        // without restoring. Simply filtering it out would leave `original_engine`
+        // at `None`, so nothing would ever put the user back — the lockout would
+        // survive the restart. Fall back to what that run recorded.
+        typer.original_engine = match typer.global_engine_name() {
+            Some(name) if name != ENGINE_NAME => Some(name),
+            Some(_) => {
+                let recovered = recorded_displaced_engine();
+                match &recovered {
+                    Some(name) => warn!(
+                        engine = %name,
+                        "ibus: previous run left our engine active; recovering the user's engine"
+                    ),
+                    None => warn!(
+                        "ibus: our engine is active with no recorded engine to restore; \
+                         the user may need to reselect their input method"
+                    ),
+                }
+                recovered
+            }
+            None => None,
+        };
 
         // Pre-pay the CreateEngine/FocusIn round-trip and verify activation
         // works; restore immediately so the user's engine is unchanged at rest.
+        //
+        // Record first: the self-check below displaces the user's engine for the
+        // whole `FOCUS_WAIT` window, and a death inside *that* window is exactly
+        // as unrecoverable as one inside a commit.
+        if let Some(orig) = &typer.original_engine {
+            record_displaced_engine(orig);
+        }
         typer
             .set_global_engine(ENGINE_NAME)
             .map_err(|e| format!("activation self-check failed: {e}"))?;
         typer.state.wait_active(FOCUS_WAIT);
-        if let Some(orig) = typer.original_engine.clone() {
-            let _ = typer.set_global_engine(&orig);
+        match typer.original_engine.clone() {
+            // Only drop the record once the user's engine is actually back.
+            // Clearing it after a failed restore would throw away the one thing
+            // that can undo the lockout — including the record we just
+            // recovered from a previous run.
+            Some(orig) => {
+                if let Err(e) = typer.set_global_engine(&orig) {
+                    warn!(error = %e, "ibus: self-check restore failed; recovery record kept");
+                } else {
+                    clear_displaced_engine();
+                }
+            }
+            // Nothing was displaced, so any record on disk is stale debris.
+            None => clear_displaced_engine(),
         }
 
         info!("ibus: engine registered and activation verified");
@@ -433,9 +543,16 @@ impl IbusTyper {
             .filter(|p| p != ENGINE_NAME)
             .or_else(|| self.original_engine.clone());
 
+        // Persist the restore target *before* displacing anything, so a death
+        // anywhere in the window below is recoverable on the next launch.
+        if let Some(target) = &restore_to {
+            record_displaced_engine(target);
+        }
+
         self.state.reset();
         if let Err(e) = self.set_global_engine(ENGINE_NAME) {
             warn!(error = %e, "ibus: SetGlobalEngine failed; commit skipped");
+            clear_displaced_engine();
             return;
         }
         // Wait for IBus to focus/enable our engine so the commit lands.
@@ -455,10 +572,14 @@ impl IbusTyper {
         }
 
         // Restore the user's previous engine (never leave ours active).
-        if let Some(restore_to) = restore_to
-            && let Err(e) = self.set_global_engine(&restore_to)
-        {
-            warn!(error = %e, "ibus: failed to restore previous engine");
+        match &restore_to {
+            Some(target) => match self.set_global_engine(target) {
+                Ok(()) => clear_displaced_engine(),
+                // Leave the record in place: the next launch is now the only
+                // thing that can put the user back.
+                Err(e) => warn!(error = %e, "ibus: failed to restore previous engine"),
+            },
+            None => clear_displaced_engine(),
         }
     }
 
@@ -494,13 +615,50 @@ impl IbusTyper {
     }
 }
 
+/// Restore the displaced engine now, outside the normal `Drop` path.
+///
+/// For the shutdown-signal handler: `Drop` never runs on `SIGTERM`, and the
+/// typer itself lives on the delivery thread where a signal task cannot reach
+/// it. Opening a fresh connection is the cost of not stranding the user until
+/// their next launch. Returns whether something needed restoring *and* the
+/// restore succeeded.
+pub fn restore_displaced_engine_now() -> bool {
+    let Some(target) = recorded_displaced_engine() else {
+        return false;
+    };
+    let Ok(address) = discover_ibus_address() else {
+        return false;
+    };
+    let Ok(conn) = connection::Builder::address(address.as_str()).and_then(|b| b.build()) else {
+        return false;
+    };
+    let restored = conn
+        .call_method(
+            Some(IBUS_SERVICE),
+            IBUS_PATH,
+            Some(IBUS_IFACE),
+            "SetGlobalEngine",
+            &(target.as_str(),),
+        )
+        .is_ok();
+    if restored {
+        info!(engine = %target, "ibus: restored the user's engine on shutdown");
+        clear_displaced_engine();
+    }
+    restored
+}
+
 impl Drop for IbusTyper {
     /// On shutdown, restore the engine we displaced so we never strand the user
     /// on our no-op engine.
     fn drop(&mut self) {
-        if let Some(orig) = self.original_engine.clone() {
-            let _ = self.set_global_engine(&orig);
+        if let Some(orig) = self.original_engine.clone()
+            && self.set_global_engine(&orig).is_err()
+        {
+            // Keep the recovery record so the next launch can finish the job.
+            return;
         }
+        clear_displaced_engine();
     }
 }
 
@@ -527,6 +685,66 @@ fn engine_name_from_desc(desc: &Value<'_>) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The whole point of the record: a run that dies mid-commit must leave
+    /// enough behind for the next launch to put the user's engine back.
+    #[test]
+    fn a_recorded_engine_survives_for_the_next_launch() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("state").join(DISPLACED_ENGINE_FILE);
+
+        record_displaced_engine_at(&path, "xkb:us::eng");
+        assert_eq!(
+            recorded_displaced_engine_at(&path).as_deref(),
+            Some("xkb:us::eng")
+        );
+
+        clear_displaced_engine_at(&path);
+        assert_eq!(recorded_displaced_engine_at(&path), None);
+    }
+
+    /// Recovering *to* our own engine would leave the user exactly as stuck as
+    /// before, so a record naming it must read back as "nothing to restore".
+    #[test]
+    fn our_own_engine_is_never_a_restore_target() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join(DISPLACED_ENGINE_FILE);
+
+        record_displaced_engine_at(&path, ENGINE_NAME);
+        assert_eq!(recorded_displaced_engine_at(&path), None);
+    }
+
+    #[test]
+    fn a_blank_or_missing_record_yields_nothing() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let missing = dir.path().join(DISPLACED_ENGINE_FILE);
+        assert_eq!(recorded_displaced_engine_at(&missing), None);
+
+        record_displaced_engine_at(&missing, "   \n ");
+        assert_eq!(recorded_displaced_engine_at(&missing), None);
+    }
+
+    /// Engine names round-trip verbatim apart from the trailing newline an
+    /// editor or `echo` would add.
+    #[test]
+    fn a_recorded_name_is_trimmed_not_mangled() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join(DISPLACED_ENGINE_FILE);
+
+        record_displaced_engine_at(&path, "anthy\n");
+        assert_eq!(
+            recorded_displaced_engine_at(&path).as_deref(),
+            Some("anthy")
+        );
+    }
+
+    /// Clearing a record that was never written is the common case (most
+    /// commits restore cleanly), so it must not be an error path.
+    #[test]
+    fn clearing_a_missing_record_is_not_an_error() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        clear_displaced_engine_at(&dir.path().join(DISPLACED_ENGINE_FILE));
+    }
 
     #[test]
     fn ibus_text_has_expected_signature() {

@@ -19,6 +19,8 @@ use lune_dict::commands::VoiceCommandRouter;
 use lune_dict::corrector::LexicalGate;
 use lune_persist::{Database, PersistResult};
 
+use crate::redact::Transcript;
+
 /// Configuration for the session pipeline.
 ///
 /// The `pipeline` field holds fully resolved per-backend settings (VAD
@@ -877,7 +879,7 @@ async fn process_and_deliver(
     };
     let unresolved_count = unresolved_words.len();
 
-    info!(%session_id, "[ASR] raw: {raw_text}");
+    info!(%session_id, raw = %Transcript::new(&raw_text), "[ASR] raw");
     info!(
         %session_id,
         lang = detected_lang,
@@ -903,7 +905,7 @@ async fn process_and_deliver(
         info!(%session_id, "no style selected — skipping styling LLM");
         text_after_heuristic.clone()
     } else {
-        info!(%session_id, "[LLM] input: {text_after_heuristic}");
+        info!(%session_id, input = %Transcript::new(&text_after_heuristic), "[LLM] input");
         let llm_t0 = tokio::time::Instant::now();
         let timeout_secs = config.pipeline.llm_timeout_secs;
         let input = lune_core::llm::PostProcessInput {

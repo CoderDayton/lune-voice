@@ -540,7 +540,7 @@ pub fn remote_llm_config_from_env() -> Option<lune_llm::OpenAiLlmConfig> {
     let api_key = std::env::var(LUNE_BENCH_LLM_API_KEY).unwrap_or_default();
     Some(lune_llm::OpenAiLlmConfig {
         base_url,
-        api_key,
+        api_key: lune_core::config::RedactedString::new(api_key),
         model,
         max_tokens: 512,
         temperature: 0.2,

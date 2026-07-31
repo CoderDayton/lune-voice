@@ -15,36 +15,40 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@fontsource-variable/manrope": "^5.2.8",
-    "@fontsource/ibm-plex-sans": "^5.2.8",
-    "@lingui/core": "^6.0.0",
-    "@lingui/react": "^6.0.0",
+    "@fontsource-variable/manrope": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@lingui/core": "^6.6.0",
+    "@lingui/react": "^6.6.0",
     "@tanstack/react-hotkeys": "^0.9.1",
-    "@tanstack/react-router": "^1.168.24",
+    "@tanstack/react-router": "^1.170.18",
     "@tanstack/react-store": "^0.11.0",
     "@tanstack/store": "^0.11.0",
-    "@tauri-apps/api": "^2.10.1",
-    "@tauri-apps/plugin-dialog": "^2.7.1",
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-dialog": "^2.7.2",
     "@tauri-apps/plugin-fs": "^2.5.1",
-    "lucide-react": "^1.11.0",
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "lucide-react": "^1.28.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.14",
-    "@lingui/babel-plugin-lingui-macro": "^6.0.0",
-    "@lingui/cli": "^6.0.0",
-    "@lingui/vite-plugin": "^6.0.0",
-    "@tailwindcss/vite": "^4.2.4",
-    "@tanstack/router-plugin": "^1.167.26",
-    "@tauri-apps/cli": "^2.10.1",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.1.4",
+    "@biomejs/biome": "^2.5.6",
+    "@lingui/babel-plugin-lingui-macro": "^6.6.0",
+    "@lingui/cli": "^6.6.0",
+    "@lingui/vite-plugin": "^6.6.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/router-plugin": "^1.168.23",
+    "@tauri-apps/cli": "^2.11.4",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^5.2.0",
     "babel-plugin-react-compiler": "^1.0.0",
-    "daisyui": "^5.5.19",
-    "tailwindcss": "^4.2.4",
+    "daisyui": "^5.7.9",
+    "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
-    "vite": "^7.3.1"
+    "vite": "^7.3.6"
+  },
+  "_comment_overrides": "postcss: vite still resolves <=8.5.11, which carries two high sourceMappingURL file-disclosure advisories (GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849). Same-major pin, satisfies every consumer's range. Drop this once vite ships a fixed postcss range. Verified by the frontend-audit CI job.",
+  "overrides": {
+    "postcss": "^8.5.25"
   }
 }

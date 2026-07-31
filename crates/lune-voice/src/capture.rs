@@ -20,6 +20,7 @@ use lune_core::audio::SAMPLE_RATE;
 use lune_core::config::PipelineConfig;
 use lune_core::session::{SessionEvent, SessionStatus};
 
+use crate::redact::Transcript;
 use crate::session::{SessionAudio, SessionControl};
 
 const MAX_SEGMENTS: usize = 500;
@@ -75,14 +76,14 @@ fn append_segments(
         {
             warn!(
                 confidence = conf,
-                text = trimmed,
+                text = %Transcript::new(trimmed),
                 "dropping garbage segment"
             );
             continue;
         }
 
         if !is_speech_content(trimmed) {
-            warn!(text = trimmed, "dropping non-speech segment");
+            warn!(text = %Transcript::new(trimmed), "dropping non-speech segment");
             continue;
         }
 

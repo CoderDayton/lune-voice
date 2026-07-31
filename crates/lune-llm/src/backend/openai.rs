@@ -1,3 +1,5 @@
+use lune_core::config::RedactedString;
+
 use async_openai::{
     Client,
     config::OpenAIConfig,
@@ -11,7 +13,9 @@ use async_openai::{
 #[derive(Debug, Clone)]
 pub struct OpenAiLlmConfig {
     pub base_url: String,
-    pub api_key: String,
+    /// Held redacted so a `{:?}` of this config — or of anything embedding it —
+    /// cannot put the key in a log line. Zeroized on drop.
+    pub api_key: RedactedString,
     pub model: String,
     pub max_tokens: u32,
     pub temperature: f32,
@@ -21,7 +25,7 @@ impl Default for OpenAiLlmConfig {
     fn default() -> Self {
         Self {
             base_url: "https://api.openai.com/v1".into(),
-            api_key: String::new(),
+            api_key: RedactedString::new(""),
             model: "gpt-4o-mini".into(),
             max_tokens: 512,
             temperature: 0.2,
@@ -39,7 +43,7 @@ pub struct OpenAiLlmBackend {
 impl OpenAiLlmBackend {
     pub fn new(config: OpenAiLlmConfig) -> Self {
         let openai_config = OpenAIConfig::new()
-            .with_api_key(&config.api_key)
+            .with_api_key(config.api_key.expose())
             .with_api_base(&config.base_url);
         let client = Client::with_config(openai_config);
 
@@ -104,6 +108,21 @@ mod tests {
     use super::*;
     use lune_core::llm::LlmService;
 
+    /// The styling key must not be reachable through the config's `Debug`.
+    /// Every peer config already uses `RedactedString`; this one held a plain
+    /// `String` behind a derived `Debug`, which is one stray `{:?}` away from a
+    /// key in the logs.
+    #[test]
+    fn debug_does_not_leak_the_api_key() {
+        let config = OpenAiLlmConfig {
+            api_key: RedactedString::new("sk-live-do-not-log-me"),
+            ..Default::default()
+        };
+        let rendered = format!("{config:?}");
+        assert!(!rendered.contains("sk-live"), "key leaked: {rendered}");
+        assert!(rendered.contains("[REDACTED]"), "{rendered}");
+    }
+
     #[test]
     fn config_defaults() {
         let cfg = OpenAiLlmConfig::default();
@@ -121,7 +140,7 @@ mod tests {
     async fn complete_errors_on_unreachable_endpoint() {
         let config = OpenAiLlmConfig {
             base_url: "http://127.0.0.1:1".into(),
-            api_key: "test-key".into(),
+            api_key: RedactedString::new("test-key"),
             ..Default::default()
         };
         let backend = OpenAiLlmBackend::new(config);

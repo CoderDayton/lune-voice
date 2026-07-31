@@ -67,13 +67,18 @@ jobs:
             librsvg2-dev \
             pkg-config
 
+      # The whole workspace, including lune-voice (the orchestration core),
+      # lune-llm, lune-audio and the Tauri crate. These were previously excluded,
+      # which left session.rs and the delivery path with no lint gate on a PR.
       - name: Clippy (all crates)
         if: matrix.os == 'ubuntu-latest'
-        run: cargo clippy --workspace --exclude lune-llm --exclude lune-voice --exclude lune-ui --exclude lune-audio --lib --tests --no-default-features -- -D warnings
+        run: cargo clippy --workspace --all-targets --no-default-features -- -D warnings
 
+      # Windows has no ALSA/uinput/IBus, so the audio + Linux delivery crates
+      # genuinely cannot build there — unlike on Linux, this exclusion is real.
       - name: Clippy (core crates, no desktop UI or audio)
         if: matrix.os == 'windows-latest'
-        run: cargo clippy --workspace --exclude lune-ui --exclude lune-audio --exclude lune-voice --exclude lune-llm --lib --tests --no-default-features -- -D warnings
+        run: cargo clippy --workspace --exclude lune-ui --exclude lune-audio --exclude lune-voice --lib --tests --no-default-features -- -D warnings
 
   # ── Tests ─────────────────────────────────────────────────────────────────
   test:
@@ -111,13 +116,15 @@ jobs:
             librsvg2-dev \
             pkg-config
 
-      - name: Test (all crates)
+      # No `--lib`: that flag was skipping every `tests/` suite in the repo,
+      # so the e2e pipeline and whisper-VAD integration tests never ran here.
+      - name: Test (all crates, unit + integration)
         if: matrix.os == 'ubuntu-latest'
-        run: cargo test --workspace --exclude lune-llm --exclude lune-voice --exclude lune-ui --exclude lune-audio --no-default-features --lib
+        run: cargo test --workspace --no-default-features
 
       - name: Test (core crates, no desktop UI or audio)
         if: matrix.os == 'windows-latest'
-        run: cargo test --workspace --exclude lune-ui --exclude lune-audio --exclude lune-voice --exclude lune-llm --no-default-features --lib
+        run: cargo test --workspace --exclude lune-ui --exclude lune-audio --exclude lune-voice --no-default-features
 
   # ── DTO drift guard ───────────────────────────────────────────────────────
   # Ensure ts-rs-generated TypeScript bindings stay in sync with their Rust
@@ -210,6 +217,60 @@ jobs:
       - name: Install cargo-deny
         run: cargo install cargo-deny --locked
 
-      # Advisory ignores and license policy live in deny.toml.
+      # Advisory ignores and license policy live in deny.toml. `licenses`,
+      # `bans` and `sources` were configured there but never actually checked,
+      # so a copyleft or unknown-registry dependency could land unnoticed.
       # Next review: 2026-09-01 — check if upstream GTK3/Tauri advisories are resolved.
-      - run: cargo deny check advisories
+      - run: cargo deny check advisories licenses bans sources
+
+  # ── Frontend (lint, unit tests, production build) ─────────────────────────
+  # The desktop UI is ~117 TypeScript files and had no CI coverage at all;
+  # biome and the frontend tests only ran in the local lefthook hook, which a
+  # `--no-verify` commit skips entirely.
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    defaults:
+      run:
+        working-directory: desktop-ui
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.10'
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bunx @biomejs/biome check src/
+
+      - name: Unit tests
+        run: bun test tests/unit src
+
+      - name: Type-check and build
+        run: bun run build:ci
+
+  # ── Frontend dependency audit ─────────────────────────────────────────────
+  # Mirrors the Rust `audit` job: runs on PRs and on the weekly schedule so a
+  # newly-published advisory is caught even without a commit.
+  frontend-audit:
+    name: Frontend Audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop-ui
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.10'
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Audit
+        run: bun audit --audit-level=high

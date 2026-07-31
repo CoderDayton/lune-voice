@@ -20,6 +20,50 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 /// quits apart from window-closes, and we'd block both.
 static QUIT_REQUESTED: AtomicBool = AtomicBool::new(false);
 
+/// Restore the user's IBus engine on a shutdown signal, then exit.
+///
+/// `IbusTyper`'s `Drop` is the normal restore path, but it does not run for a
+/// `SIGTERM` — which is exactly how a session ends on logout or `systemctl
+/// stop`. Without this, quitting that way while a commit is in flight leaves
+/// IBus on our no-op engine and the user unable to type. The on-disk record
+/// still covers `SIGKILL` and panics by recovering at the next launch; this
+/// just avoids making the user wait for that.
+#[cfg(target_os = "linux")]
+const SHUTDOWN_RESTORE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
+
+#[cfg(target_os = "linux")]
+fn install_shutdown_signal_handler() {
+    use tokio::signal::unix::{SignalKind, signal};
+
+    tauri::async_runtime::spawn(async move {
+        let (Ok(mut term), Ok(mut int)) = (
+            signal(SignalKind::terminate()),
+            signal(SignalKind::interrupt()),
+        ) else {
+            tracing::debug!("could not install shutdown signal handlers");
+            return;
+        };
+        tokio::select! {
+            _ = term.recv() => {}
+            _ = int.recv() => {}
+        }
+        tracing::info!("shutdown signal received; restoring input method");
+        // Blocking D-Bus work: keep it off the async worker, and bound it. The
+        // call has no timeout of its own, so an ibus-daemon that accepts the
+        // connection and stops answering would turn SIGTERM into a process that
+        // never exits — the user's `kill` (or logout) would appear to do
+        // nothing until systemd's stop timeout escalated to SIGKILL.
+        let restore = tokio::task::spawn_blocking(lune_voice::restore_displaced_engine_now);
+        if tokio::time::timeout(SHUTDOWN_RESTORE_TIMEOUT, restore)
+            .await
+            .is_err()
+        {
+            tracing::warn!("input-method restore timed out; exiting anyway");
+        }
+        std::process::exit(0);
+    });
+}
+
 /// Frontend-invokable quit. Mirrors the tray "Quit" path: set the intent
 /// flag so the ExitRequested handler honors the exit, then terminate.
 #[tauri::command]
@@ -127,6 +171,8 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            #[cfg(target_os = "linux")]
+            install_shutdown_signal_handler();
             let runtime =
                 tauri::async_runtime::block_on(runtime::AppRuntime::new(app.handle().clone()))
                     .map_err(|error| -> Box<dyn std::error::Error> { error.into() })?;

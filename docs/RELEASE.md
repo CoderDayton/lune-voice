@@ -188,3 +188,82 @@ changes.
 
 Lune Voice itself is GPL-3.0-or-later; `cargo deny check licenses` gates the
 dependency tree against the allow-list in `deny.toml`.
+
+## Rollback
+
+Rolling back is reinstalling the previous package. There is no server side and
+no coordinated migration, so the only real question is what the newer version
+did to on-disk state before you rolled back.
+
+### What a rollback has to survive
+
+| State | Rollback-safe? | Why |
+|---|---|---|
+| `settings.toml` | Mostly | Unknown keys are ignored on load, so a newer file loads on an older build. Fields the older build does not know are **dropped on its next save**. |
+| `lune.db` | Only within the same schema version | Diesel records applied migrations. An older binary will not downgrade the schema on its own. |
+| Models | Yes | Plain files, keyed by directory name. |
+| GPU plugin | Yes | Independent of the app version; delete the directory to revert to CPU. |
+| Keyring secrets | Yes | Slot names are stable and versionless. |
+
+### Procedure
+
+1. **Back up state first** — this is the step that makes the rollback reversible:
+
+   ```sh
+   cp -r ~/.local/share/lune-voice ~/.local/share/lune-voice.bak
+   cp -r ~/.config/lune-voice      ~/.config/lune-voice.bak
+   ```
+
+2. **Reinstall the previous package.**
+
+   ```sh
+   sudo apt install --allow-downgrades ./lune-voice_<old>_amd64.deb   # deb
+   sudo dnf downgrade ./lune-voice-<old>.x86_64.rpm                   # rpm
+   ```
+
+   For an AppImage, just run the older file.
+
+3. **Check whether the schema moved.** Compare the migrations the old binary
+   embeds against what the DB has applied:
+
+   ```sh
+   sqlite3 ~/.local/share/lune-voice/lune.db \
+     "SELECT version FROM __diesel_schema_migrations ORDER BY version;"
+   ```
+
+   Versions newer than anything in the old build's `crates/lune-persist/migrations/`
+   mean the DB is ahead of the binary. Additive migrations (every one shipped so
+   far) are tolerated — the old code simply ignores the new columns. If the old
+   build fails to start, revert the extra migrations explicitly rather than
+   deleting the database:
+
+   ```sh
+   diesel migration revert --migration-dir crates/lune-persist/migrations
+   ```
+
+   Each migration's `down.sql` is exercised by
+   `migrations_revert_and_reapply_cleanly` in `crates/lune-persist/src/db/mod.rs`,
+   so reverting is a tested path, not a hope.
+
+4. **Verify** dictation end-to-end before declaring it done:
+
+   ```sh
+   cgs bench --env TYPE=transcribe --env WAV=fixtures/<clip>.wav
+   ```
+
+### If the rollback itself goes wrong
+
+Restore the backups from step 1 and reinstall the newer package:
+
+```sh
+rm -rf ~/.local/share/lune-voice ~/.config/lune-voice
+mv ~/.local/share/lune-voice.bak ~/.local/share/lune-voice
+mv ~/.config/lune-voice.bak      ~/.config/lune-voice
+```
+
+### Release-side rule
+
+Because an older build silently drops settings fields it does not know, a
+release that **removes or renames** a `settings.toml` field is not
+rollback-safe. Migrate such fields in a release that still reads both spellings,
+and only drop the old one a release later.

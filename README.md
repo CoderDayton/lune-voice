@@ -80,7 +80,8 @@ There is no separate GPU build to pick. The app detects an NVIDIA driver and off
 - **[Configuration](docs/CONFIGURATION.md)**: settings, backends, hotkeys, style presets
 - **[Performance](docs/PERFORMANCE.md)**: benchmarks, latency breakdowns, tuning
 - **[GPU plugin](docs/GPU_PLUGIN.md)**: how CUDA support is detected, downloaded, and published
-- **[Release](docs/RELEASE.md)**: build matrix, packaging, third-party notices
+- **[Release](docs/RELEASE.md)**: build matrix, packaging, rollback, third-party notices
+- **[Runbook](docs/RUNBOOK.md)**: common failure modes and how to recover
 
 ## License
 

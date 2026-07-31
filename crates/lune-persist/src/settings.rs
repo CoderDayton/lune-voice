@@ -111,6 +111,14 @@ impl SettingsStore {
         if !self.path.exists() {
             return Ok(());
         }
+        // Harden on every boot, before the inline-key check. `atomic_write`
+        // covers files this version wrote, but a config created by an older
+        // build (or by a user's editor) still sits at the default umask, and
+        // the key it may hold is exactly what this function exists to handle.
+        // Best-effort: a permission failure must not stop the app from booting.
+        if let Err(e) = restrict_to_owner(&self.path) {
+            tracing::debug!(error = %e, "could not restrict settings.toml permissions");
+        }
         let raw = fs::read_to_string(&self.path)?;
         if !has_inline_api_key(&raw) {
             return Ok(());
@@ -301,8 +309,57 @@ fn atomic_write(target: &Path, data: &[u8]) -> std::io::Result<()> {
     let pid = std::process::id();
     let seq = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
     let tmp = target.with_extension(format!("toml.tmp.{pid}.{seq}"));
-    fs::write(&tmp, data)?;
-    fs::rename(&tmp, target)?;
+    // Create owner-only rather than writing and then chmod-ing: this file holds
+    // an inline API key whenever the keyring was unavailable, and `fs::write`
+    // would publish it at the default umask for the window between the write
+    // and the chmod.
+    let publish = write_owner_only(&tmp, data).and_then(|()| fs::rename(&tmp, target));
+    if publish.is_err() {
+        // Never leave a temp file holding a key behind on a failed write; the
+        // rename is what makes it the caller's to clean up.
+        let _ = fs::remove_file(&tmp);
+    }
+    publish
+}
+
+/// Create `path` with mode `0600` and write `data` to it.
+///
+/// Fails if the path already exists — the caller's temp names are per-process
+/// and per-call, so a collision means something else is writing there and
+/// reusing its permissions would defeat the point.
+#[cfg(unix)]
+fn write_owner_only(path: &Path, data: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(path)?;
+    file.write_all(data)?;
+    // `mode` is masked by the umask, so a restrictive umask could land us below
+    // 0600; set it exactly once the bytes are down.
+    restrict_to_owner(path)
+}
+
+#[cfg(not(unix))]
+fn write_owner_only(path: &Path, data: &[u8]) -> std::io::Result<()> {
+    fs::write(path, data)
+}
+
+/// Owner-only permissions (`0600`) for a file that may hold an API key.
+///
+/// No-op off Unix: Windows and macOS keyrings are effectively always available,
+/// so the inline-key fallback that makes this matter is a Linux concern.
+#[cfg(unix)]
+fn restrict_to_owner(path: &Path) -> std::io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+}
+
+#[cfg(not(unix))]
+fn restrict_to_owner(_path: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
@@ -462,6 +519,42 @@ mod tests {
             })
             .count();
         assert_eq!(leftovers, 0);
+    }
+
+    /// The inline-key fallback (no keyring available) leaves a real API key in
+    /// this file, so it must never be written at the default umask.
+    #[cfg(unix)]
+    #[test]
+    fn written_settings_are_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        let store = SettingsStore::new(&path);
+        store.save(&UserSettings::default()).unwrap();
+
+        let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "settings.toml mode was {mode:o}, want 600");
+    }
+
+    /// A config written by an older build sits at the default umask. Boot must
+    /// tighten it rather than leave a pre-existing key world-readable.
+    #[cfg(unix)]
+    #[test]
+    fn boot_hardens_a_preexisting_loose_settings_file() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        fs::write(&path, "language = \"auto\"\n").unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+
+        SettingsStore::new(&path)
+            .migrate_secrets_to_keyring()
+            .unwrap();
+
+        let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "settings.toml mode was {mode:o}, want 600");
     }
 
     #[test]

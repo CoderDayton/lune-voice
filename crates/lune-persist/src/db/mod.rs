@@ -931,6 +931,87 @@ mod tests {
     use lune_core::session::{DictationSession, SessionStatus};
     use uuid::Uuid;
 
+    /// Every migration ships a `down.sql`, but nothing exercised them — a
+    /// `down` that does not actually reverse its `up` is only discovered during
+    /// an emergency rollback, which is the worst possible time to find out.
+    ///
+    /// Reverting to empty and re-applying proves each `down` undoes its `up`
+    /// cleanly and that the resulting schema still accepts real writes.
+    #[test]
+    fn migrations_revert_and_reapply_cleanly() {
+        let mut db = Database::open_in_memory().expect("open");
+
+        db.conn
+            .revert_all_migrations(MIGRATIONS)
+            .expect("every down.sql should reverse its up.sql");
+
+        // Re-applying onto the reverted schema must work — a `down` that left
+        // a table or index behind would collide here.
+        db.run_migrations().expect("re-apply after revert");
+
+        // And the round-tripped schema must still be usable, not merely present.
+        let session = DictationSession {
+            id: Uuid::new_v4(),
+            started_at: Utc::now(),
+            ended_at: None,
+            style: Some("casual".into()),
+            backend: AsrBackendKind::WhisperCpp,
+            status: SessionStatus::Completed,
+            transcript: Some("Round trip.".into()),
+        };
+        db.insert_session(&session)
+            .expect("schema is usable after a revert/re-apply cycle");
+    }
+
+    /// A corrupt database file must surface as a typed error the caller can
+    /// act on, not a panic. The DB lives in the user's data dir where a power
+    /// loss mid-write or a bad restore can leave garbage behind, and the app
+    /// has to be able to report that instead of dying at startup.
+    #[test]
+    fn a_corrupt_database_file_errors_instead_of_panicking() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("lune.db");
+        // Valid SQLite header magic followed by garbage: gets past the initial
+        // format sniff, then fails once pages are actually read.
+        let mut bytes = b"SQLite format 3\0".to_vec();
+        bytes.extend(std::iter::repeat_n(0xAB, 4096));
+        std::fs::write(&path, &bytes).expect("write corrupt db");
+
+        let result = Database::open(&path);
+        assert!(
+            result.is_err(),
+            "a corrupt database should be reported, not opened"
+        );
+    }
+
+    /// An unreadable path (a directory where the file should be) must also be
+    /// an error rather than a panic — this is what a botched install or a
+    /// stale mount point looks like.
+    #[test]
+    fn an_unopenable_database_path_errors() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("lune.db");
+        std::fs::create_dir(&path).expect("create dir in the db's place");
+
+        assert!(
+            Database::open(&path).is_err(),
+            "a directory in the database's place should be reported"
+        );
+    }
+
+    /// Reverting one migration at a time must also work: a partial rollback is
+    /// the realistic emergency, not an all-or-nothing one.
+    #[test]
+    fn the_most_recent_migration_reverts_on_its_own() {
+        let mut db = Database::open_in_memory().expect("open");
+
+        db.conn
+            .revert_last_migration(MIGRATIONS)
+            .expect("the latest down.sql should apply on its own");
+        db.run_migrations()
+            .expect("re-apply the reverted migration");
+    }
+
     #[test]
     fn migration_from_empty() {
         let _db = Database::open_in_memory().unwrap();

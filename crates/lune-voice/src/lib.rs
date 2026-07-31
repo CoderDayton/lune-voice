@@ -1,6 +1,7 @@
 mod capture;
 pub mod delivery;
 pub mod events;
+mod redact;
 pub mod session;
 pub mod sound;
 #[cfg(unix)]
@@ -9,6 +10,8 @@ mod uinput_typer;
 // delivery path in delivery.rs). See ibus.rs.
 #[cfg(target_os = "linux")]
 mod ibus;
+#[cfg(target_os = "linux")]
+pub use ibus::restore_displaced_engine_now;
 
 #[cfg(unix)]
 mod cosmic_protocol;

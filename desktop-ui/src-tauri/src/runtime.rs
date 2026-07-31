@@ -1155,7 +1155,7 @@ async fn build_llm_service(settings: &UserSettings) -> Result<Arc<dyn LlmService
             }
             let backend = Arc::new(OpenAiLlmBackend::new(OpenAiLlmConfig {
                 base_url: base_url.to_string(),
-                api_key: api_key.expose().to_owned(),
+                api_key: api_key.clone(),
                 model: model.clone(),
                 max_tokens: *max_tokens,
                 temperature: 0.2,
