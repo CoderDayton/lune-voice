@@ -12,7 +12,7 @@
 //! 0.5–0.8 range so the marking threshold, calibrator, runner-up alternates,
 //! and LLM corrector actually fire during benchmarks.
 //!
-//! Run: `cargo run --release --example noisify_fixtures -p lune-app`
+//! Run: `cargo run --release --example noisify_fixtures -p lune-voice`
 //!
 //! The PRNG is seeded deterministically so re-running produces bit-identical
 //! output — reproducible WAVs mean reproducible WER ablations.

@@ -15,7 +15,7 @@
 //! Metrics vs reference: WER, cased-CER (casing), punct-F1 (punctuation marks),
 //! cat (fused words), spc (spacing). LLM arms also report %bypass + latency.
 //!
-//! Run: cargo run --release --example punctuation_ab -p lune-app
+//! Run: cargo run --release --example punctuation_ab -p lune-voice
 //!      (LUNE_BENCH_PRINT=1 dumps per-fixture text; LUNE_BENCH_FIXTURE=<sub> filters.)
 
 #[allow(dead_code)]

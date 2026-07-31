@@ -7,14 +7,14 @@ members = [
     "crates/lune-llm",
     "crates/lune-dict",
     "crates/lune-persist",
-    "crates/lune-app",
+    "crates/lune-voice",
     "desktop-ui/src-tauri",
 ]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-license = "LicenseRef-Proprietary"
+license = "GPL-3.0-or-later"
 
 [workspace.lints.clippy]
 dbg_macro = "deny"
@@ -102,4 +102,10 @@ evdev = "0.13"
 smallvec = { version = "1", features = ["union"] }
 wayland-client = "0.31"
 wayland-protocols-wlr = { version = "0.3", features = ["client"] }
-cosmic-protocols = { version = "0.2", default-features = false, features = ["client"] }
+# `staging` supplies the `ext_foreign_toplevel_list` / `ext_workspace`
+# interfaces that the vendored COSMIC toplevel-info XML references.
+wayland-protocols = { version = "0.32", features = ["client", "staging"] }
+# Proc-macro codegen for that vendored XML — see lune-voice/src/cosmic_protocol.rs.
+wayland-scanner = "0.31"
+# Referenced by the code `wayland-scanner` emits.
+wayland-backend = "0.3"

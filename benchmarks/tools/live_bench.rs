@@ -5,7 +5,7 @@
 //! overall WER/CER against the reference. A real-voice accuracy harness — unlike
 //! the fixture benchmarks, it measures your mic, your room, and your speech.
 //!
-//! Run (GPU): cargo run --release --features cuda --example live_bench -p lune-app
+//! Run (GPU): cargo run --release --features whisper-cuda --example live_bench -p lune-voice
 //!   Quieter prompts: append `2>/dev/null` to hide model-load logs.
 //!   Custom references: LUNE_REFS=path/to/lines.txt (one reference per line).
 
@@ -19,12 +19,12 @@ use std::sync::{Arc, Mutex as StdMutex};
 use bench_utils::{BenchmarkHarness, char_error_rate, word_error_rate};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{BufferSize, StreamConfig};
-use lune_app::SessionManager;
 use lune_asr::AsrRegistry;
 use lune_audio::{AudioConfig, AudioStream};
 use lune_core::config::UserSettings;
 use lune_core::llm::TextPostProcessor;
 use lune_core::session::SessionEvent;
+use lune_voice::SessionManager;
 use tokio::sync::{Mutex, RwLock, mpsc};
 
 /// Default reference set, spanning one word to a long multi-clause sentence so
@@ -193,7 +193,7 @@ async fn run_full_pipeline(
     let dict = lune_dict::DictionaryManager::new(lune_persist::Database::open_in_memory().unwrap())
         .unwrap();
 
-    let config = lune_app::SessionManagerConfig {
+    let config = lune_voice::SessionManagerConfig {
         asr_backend_kind: asr.kind(),
         pipeline,
         ..Default::default()

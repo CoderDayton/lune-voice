@@ -11,6 +11,8 @@ mod uinput_typer;
 mod ibus;
 
 #[cfg(unix)]
+mod cosmic_protocol;
+#[cfg(unix)]
 mod cosmic_toplevel;
 #[cfg(unix)]
 mod wayland_toplevel;

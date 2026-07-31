@@ -2,7 +2,7 @@
 //! for WAVs, the full VAD+ASR+LLM pipeline) and print the hypothesis.
 //! Throwaway diagnostic for the quiet short-utterance investigation.
 //!
-//! Run (GPU): cargo run --release --features cuda --example asr_probe -p lune-app -- <path>
+//! Run (GPU): cargo run --release --features whisper-cuda --example asr_probe -p lune-voice -- <path>
 //!   <path> may be a single .wav, a single .f32 (raw LE f32, 16 kHz mono — the
 //!   `LUNE_ASR_DUMP_DIR` dump format), or a DIRECTORY (all .f32/.wav in it).
 //!   .f32 dumps are already post-VAD, so they default to DIRECT (push whole
@@ -17,13 +17,13 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use bench_utils::BenchmarkHarness;
-use lune_app::SessionManager;
 use lune_asr::AsrRegistry;
 use lune_audio::{AudioConfig, AudioStream};
 use lune_core::asr::{AsrBackend, AsrSessionConfig};
 use lune_core::config::UserSettings;
 use lune_core::llm::TextPostProcessor;
 use lune_core::session::SessionEvent;
+use lune_voice::SessionManager;
 use tokio::sync::{Mutex, RwLock, mpsc};
 
 fn main() {
@@ -176,7 +176,7 @@ async fn run_full_pipeline(
     let dict = lune_dict::DictionaryManager::new(lune_persist::Database::open_in_memory().unwrap())
         .unwrap();
 
-    let config = lune_app::SessionManagerConfig {
+    let config = lune_voice::SessionManagerConfig {
         asr_backend_kind: asr.kind(),
         pipeline,
         ..Default::default()

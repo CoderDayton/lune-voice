@@ -46,7 +46,7 @@ function normalizeKey(key: string): string {
 }
 
 // Keys the Rust evdev hotkey listener can resolve (key_name_to_code).
-// Must stay in sync with crates/lune-app/src/hotkey_listener.rs.
+// Must stay in sync with crates/lune-voice/src/hotkey_listener.rs.
 const SUPPORTED_KEYS = new Set([
   'space',
   'escape',

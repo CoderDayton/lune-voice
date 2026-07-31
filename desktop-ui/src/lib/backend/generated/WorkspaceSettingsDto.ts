@@ -46,7 +46,7 @@ sessionHistoryDays: number | null,
  */
 terminalMode: TerminalModeDto, 
 /**
- * Whether the correction LLM backend is enabled (Local or remote).
+ * Whether the remote styling LLM backend is enabled.
  */
 llmEnabled: boolean, openaiAsrBaseUrl: string | null, openaiAsrModel: string | null, openaiAsrApiKeySet: boolean, openaiLlmBaseUrl: string | null, openaiLlmModel: string | null, openaiLlmApiKeySet: boolean, 
 /**

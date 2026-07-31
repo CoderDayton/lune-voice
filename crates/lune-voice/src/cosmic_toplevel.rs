@@ -21,7 +21,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-use cosmic_protocols::toplevel_info::v1::client::{
+use crate::cosmic_protocol::toplevel_info::client::{
     zcosmic_toplevel_handle_v1::{self, ZcosmicToplevelHandleV1},
     zcosmic_toplevel_info_v1::{self, ZcosmicToplevelInfoV1},
 };

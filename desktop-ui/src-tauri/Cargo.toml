@@ -2,7 +2,8 @@
 name = "lune-ui"
 version = "0.1.0"
 edition = "2024"
-default-run = "lune-app"
+license.workspace = true
+default-run = "lune-voice"
 
 [lints]
 workspace = true
@@ -12,9 +13,9 @@ default = []
 # Native backends are compiled into the shipped app by `cgs build`. Off by
 # default so routine checks need no C++ toolchain; `gpu` (CUDA) is added by
 # `cgs build` when the build host has a CUDA toolchain.
-whisper-cpp = ["lune-app/whisper-cpp"]
-whisper-cuda = ["lune-app/whisper-cuda"]
-gpu = ["lune-app/gpu"]
+whisper-cpp = ["lune-voice/whisper-cpp"]
+whisper-cuda = ["lune-voice/whisper-cuda"]
+gpu = ["lune-voice/gpu"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -25,7 +26,7 @@ tauri = { version = "2", features = ["macos-private-api", "test", "tray-icon"] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-lune-app = { path = "../../crates/lune-app" }
+lune-voice = { path = "../../crates/lune-voice" }
 lune-asr = { path = "../../crates/lune-asr" }
 lune-audio = { path = "../../crates/lune-audio" }
 lune-core = { path = "../../crates/lune-core" }
@@ -51,7 +52,7 @@ gtk-layer-shell = { version = "0.8", features = ["v0_6"] }
 evdev = "0.13"
 
 [[bin]]
-name = "lune-app"
+name = "lune-voice"
 path = "src/main.rs"
 
 [dev-dependencies]

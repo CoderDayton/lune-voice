@@ -115,7 +115,7 @@ To add the macOS Apple-Silicon artifact:
 
 1. Add a `metal` passthrough feature mirroring the CUDA one:
    - `crates/lune-asr/Cargo.toml`: `whisper-metal = ["whisper-cpp", "whisper-rs/metal"]`
-   - `crates/lune-app` + `desktop-ui/src-tauri`: `whisper-metal`
+   - `crates/lune-voice` + `desktop-ui/src-tauri`: `whisper-metal`
      passthrough + a `metal` umbrella (mirroring `gpu`).
 2. Gate the runtime `use_gpu` decision on `cfg!(feature = "whisper-metal")`
    alongside the existing CUDA `cfg!`s

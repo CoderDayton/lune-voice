@@ -2,7 +2,7 @@
 //! and reports per-category WER, command exact-match, proper-noun accuracy,
 //! and long-form truncation.
 //!
-//! cargo run --release --features cuda --example bench_domain -p lune-app
+//! cargo run --release --features whisper-cuda --example bench_domain -p lune-voice
 
 #[allow(dead_code)]
 #[path = "../bench_utils.rs"]
@@ -383,8 +383,8 @@ async fn run_pipeline(
     fixture: &DomainFixture,
     harness: &BenchmarkHarness,
 ) -> Option<PipelineOutcome> {
-    use lune_app::SessionManagerConfig;
     use lune_core::config::UserSettings;
+    use lune_voice::SessionManagerConfig;
     use tokio::sync::{Mutex, RwLock};
 
     let audio_stream =
@@ -402,7 +402,7 @@ async fn run_pipeline(
 
     let settings = Arc::new(RwLock::new(UserSettings::default()));
 
-    let mgr = lune_app::SessionManager::new(
+    let mgr = lune_voice::SessionManager::new(
         Arc::clone(&harness.asr),
         Arc::new(lune_dict::commands::VoiceCommandRouter::new()),
         Arc::clone(&harness.llm),

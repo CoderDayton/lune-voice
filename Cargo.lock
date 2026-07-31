@@ -916,20 +916,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cosmic-protocols"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa7c156d3b5815830a795eb35d6bac833a72cede4861e9eda935d4ffa37415ff"
-dependencies = [
- "bitflags 2.11.0",
- "wayland-backend",
- "wayland-client",
- "wayland-protocols",
- "wayland-protocols-wlr",
- "wayland-scanner",
-]
-
-[[package]]
 name = "cpal"
 version = "0.17.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3158,35 +3144,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
-name = "lune-app"
-version = "0.1.0"
-dependencies = [
- "arboard",
- "async-trait",
- "chrono",
- "cosmic-protocols",
- "cpal",
- "enigo",
- "evdev",
- "hound",
- "lune-asr",
- "lune-audio",
- "lune-core",
- "lune-dict",
- "lune-llm",
- "lune-persist",
- "serde_json",
- "tempfile",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
- "wayland-client",
- "wayland-protocols-wlr",
- "zbus 5.14.0",
-]
-
-[[package]]
 name = "lune-asr"
 version = "0.1.0"
 dependencies = [
@@ -3304,13 +3261,13 @@ dependencies = [
  "evdev",
  "gtk",
  "gtk-layer-shell",
- "lune-app",
  "lune-asr",
  "lune-audio",
  "lune-core",
  "lune-dict",
  "lune-llm",
  "lune-persist",
+ "lune-voice",
  "mimalloc",
  "regex",
  "serde",
@@ -3329,6 +3286,37 @@ dependencies = [
  "ts-rs",
  "url",
  "uuid",
+]
+
+[[package]]
+name = "lune-voice"
+version = "0.1.0"
+dependencies = [
+ "arboard",
+ "async-trait",
+ "chrono",
+ "cpal",
+ "enigo",
+ "evdev",
+ "hound",
+ "lune-asr",
+ "lune-audio",
+ "lune-core",
+ "lune-dict",
+ "lune-llm",
+ "lune-persist",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "wayland-backend",
+ "wayland-client",
+ "wayland-protocols",
+ "wayland-protocols-wlr",
+ "wayland-scanner",
+ "zbus 5.14.0",
 ]
 
 [[package]]

@@ -4,9 +4,9 @@
 //! delivers finalized text into the focused window via clipboard paste.
 //! Also saves a .wav file (16kHz mono f32) and a .txt transcript.
 //!
-//! Run: cargo run --release --example live_transcribe -p lune-app
-//! GPU: cargo run --release --features cuda --example live_transcribe -p lune-app
-//! No delivery: DELIVER=0 cargo run --release --example live_transcribe -p lune-app
+//! Run: cargo run --release --example live_transcribe -p lune-voice
+//! GPU: cargo run --release --features whisper-cuda --example live_transcribe -p lune-voice
+//! No delivery: DELIVER=0 cargo run --release --example live_transcribe -p lune-voice
 //!
 //! Press Ctrl+C to stop. The pipeline processes any remaining audio before
 //! writing output files.
@@ -21,12 +21,12 @@ use std::time::Instant;
 use bench_utils::{benchmark_asr_entry, detect_gpu, workspace_root};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{BufferSize, StreamConfig};
-use lune_app::{DeliveryService, SessionManager, SessionManagerConfig};
 use lune_asr::AsrRegistry;
 use lune_core::config::{DevicePolicy, UserSettings};
 use lune_core::llm::TextPostProcessor;
 use lune_core::session::SessionEvent;
 use lune_llm::NullPostProcessor;
+use lune_voice::{DeliveryService, SessionManager, SessionManagerConfig};
 use tokio::sync::{Mutex, RwLock, mpsc};
 
 fn main() {

@@ -1,8 +1,8 @@
 //! Confusion mining — decode fixtures, word-align against references, extract
 //! substitution pairs where model picked wrong BPE path.
 //!
-//! Run:   cargo run --release --example confusion_mine -p lune-app
-//! GPU:   cargo run --release --features cuda --example confusion_mine -p lune-app
+//! Run:   cargo run --release --example confusion_mine -p lune-voice
+//! GPU:   cargo run --release --features whisper-cuda --example confusion_mine -p lune-voice
 //! Filter: LUNE_BENCH_FIXTURE=librispeech_40744 cargo run...
 //!
 //! Output: prints JSON report to stdout and writes `confusion_bank.json`

@@ -559,7 +559,7 @@ impl BenchmarkHarness {
     pub fn session_manager(
         &self,
         pipeline: lune_core::config::PipelineConfig,
-    ) -> lune_app::SessionManager<lune_asr::AsrRegistry> {
+    ) -> lune_voice::SessionManager<lune_asr::AsrRegistry> {
         use std::sync::Arc;
         use tokio::sync::{Mutex, RwLock};
 
@@ -569,13 +569,13 @@ impl BenchmarkHarness {
         )
         .expect("DictionaryManager");
 
-        let config = lune_app::SessionManagerConfig {
+        let config = lune_voice::SessionManagerConfig {
             asr_backend_kind: self.asr.kind(),
             pipeline,
             ..Default::default()
         };
 
-        lune_app::SessionManager::new(
+        lune_voice::SessionManager::new(
             Arc::clone(&self.asr),
             Arc::new(lune_dict::commands::VoiceCommandRouter::new()),
             Arc::clone(&self.llm),

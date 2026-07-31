@@ -33,7 +33,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The built-in word lists now only fix the capitalization of correctly-spoken terms; the fuzzy matching that could rewrite already-correct words was removed, and the lists were de-duplicated
 - Session statistics aggregated across the full database instead of capped history
 - Benchmarks moved from `examples/` to `benches/` with `harness = false`
-- License field updated from MIT to LicenseRef-Proprietary (LICENSE file already proprietary)
+- Relicensed under the GNU GPL v3 or later: the proprietary LICENSE text was replaced with the verbatim GPL-3.0 text and the workspace `license` field set to `GPL-3.0-or-later`
+- Renamed the `lune-app` crate and the shipped binary to `lune-voice`
+- Replaced the GPL-3.0-only `cosmic-protocols` dependency with client bindings generated in-tree from the vendored, permissively licensed COSMIC protocol XML, so COSMIC focus detection is unchanged while the "or later" in the project's own license stays effective
+- `cargo deny check licenses` runs again: the config used `unlicensed` and `copyleft` keys removed in cargo-deny 0.18, so the license audit had been failing to parse rather than passing
 - Output settings split into a delivery method (`TypeInPlace` / `Clipboard`) and an independent `copy_to_clipboard` toggle; the combined `Both` mode was removed (legacy `Both` configs migrate to `TypeInPlace` with copy enabled)
 - Text delivery prefers the IBus input method when it is active — committing text directly with no clipboard — and falls back to the uinput keyboard path otherwise
 

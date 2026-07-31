@@ -560,7 +560,7 @@ mod tests {
     /// activate→restore handshake must succeed (this exercises the IBusComponent
     /// serialization, the served Factory/Engine objects, and SetGlobalEngine).
     /// It does NOT commit any text, so it won't inject into a focused window.
-    /// Run with: `cargo test -p lune-app --lib ibus::tests::live -- --ignored --nocapture`.
+    /// Run with: `cargo test -p lune-voice --lib ibus::tests::live -- --ignored --nocapture`.
     #[test]
     #[ignore = "requires a live IBus daemon"]
     fn live_register_and_restore() {

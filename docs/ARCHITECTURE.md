@@ -50,7 +50,7 @@ lune-core (types, config, errors, hwce confidence)
 ├─ lune-llm (openai remote, null passthrough, style pipeline, prompt, few-shot)
 ├─ lune-dict (corrector, vocab, voice commands)
 └─ lune-persist (settings.toml, sqlite, model hub)
-     └─ lune-app (session, factory, hotkey, dbus, delivery, sound cues)
+     └─ lune-voice (session, factory, hotkey, dbus, delivery, sound cues)
           └─ desktop-ui/src-tauri (tauri IPC, pill, persistence bridge)
 ```
 
@@ -63,7 +63,7 @@ Each crate has a single responsibility. `lune-core` defines shared types and tra
 ### 1. Audio Capture
 
 **Crate:** `lune-audio` | **File:** `crates/lune-audio/src/lib.rs`  
-**Orchestration:** `crates/lune-app/src/capture.rs`
+**Orchestration:** `crates/lune-voice/src/capture.rs`
 
 - Uses `cpal` for cross-platform microphone access (ALSA/PipeWire on Linux, CoreAudio on macOS, WASAPI on Windows)
 - Captures 16 kHz mono PCM in frames of 480 samples (30 ms each) — already in whisper.cpp's native input format; no resample or conversion needed
@@ -104,8 +104,8 @@ Remote ASR is useful when the user explicitly allows remote processing. It retur
 
 ### 3. Dictionary Application
 
-**Crates:** `lune-app`, `lune-dict`  
-**Files:** `crates/lune-app/src/session.rs`, `crates/lune-dict/src/corrector.rs`
+**Crates:** `lune-voice`, `lune-dict`  
+**Files:** `crates/lune-voice/src/session.rs`, `crates/lune-dict/src/corrector.rs`
 
 After ASR segments are collected, the session runs a deterministic text pass:
 
@@ -142,7 +142,7 @@ The LLM backend (`OpenAiLlmBackend`) wraps an `async-openai` `Client` and makes 
 
 ### 5. Text Delivery
 
-**Crate:** `lune-app` | **Files:** `crates/lune-app/src/delivery.rs`, `uinput_typer.rs`, `ibus.rs`
+**Crate:** `lune-voice` | **Files:** `crates/lune-voice/src/delivery.rs`, `uinput_typer.rs`, `ibus.rs`
 
 The session emits two `SessionEvent` variants directly on the event channel:
 
@@ -325,7 +325,7 @@ The `WhisperContext` is wrapped in an `Arc` and shared across all sessions. Each
 ## Data Flow Diagram
 
 ```
-                 lune-app runtime
+                 lune-voice runtime
 
 lune-audio (cpal)
   |

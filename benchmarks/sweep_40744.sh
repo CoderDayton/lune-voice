@@ -24,7 +24,7 @@ MARGIN_VALUES=(0.0 2.5 5.0 10.0 999.0)
 
 # Pre-build once so iterations don't pay compile cost.
 echo ">>> Building pipeline_real (release, cuda) ..."
-cargo build --release --features cuda --example pipeline_real -p lune-app >/dev/null 2>&1
+cargo build --release --features whisper-cuda --example pipeline_real -p lune-voice >/dev/null 2>&1
 
 total=$(( ${#MARK_VALUES[@]} * ${#SKIP_VALUES[@]} * ${#MARGIN_VALUES[@]} ))
 echo ">>> Sweeping ${total} combinations against ${FIXTURE} on ASR=${ASR} ..."
@@ -43,7 +43,7 @@ for mark in "${MARK_VALUES[@]}"; do
             LUNE_SKIP_THRESHOLD="$skip" \
             LUNE_RERANKER_MARGIN="$margin" \
             ASR="$ASR" \
-            cargo run --release --features cuda --example pipeline_real -p lune-app 2>&1)
+            cargo run --release --features whisper-cuda --example pipeline_real -p lune-voice 2>&1)
 
       wer=$(printf '%s\n' "$out" | grep -m1 'WER:' | awk '{print $2}' | tr -d '%')
       if [[ -z "$wer" ]]; then

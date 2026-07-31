@@ -4,9 +4,6 @@ use std::time::Duration;
 
 use tokio::time::Instant;
 
-use lune_app::{DeliveryService, SessionManager, SessionManagerConfig};
-#[cfg(unix)]
-use lune_app::{WindowTarget, capture_focus_target};
 use lune_asr::AsrRegistry;
 use lune_audio::{AudioConfig, AudioStream};
 use lune_core::asr::AsrSessionConfig;
@@ -18,6 +15,9 @@ use lune_dict::DictionaryManager;
 use lune_dict::commands::VoiceCommandRouter;
 use lune_llm::{NullPostProcessor, OpenAiLlmBackend, OpenAiLlmConfig};
 use lune_persist::{AppPaths, Database, SettingsStore};
+use lune_voice::{DeliveryService, SessionManager, SessionManagerConfig};
+#[cfg(unix)]
+use lune_voice::{WindowTarget, capture_focus_target};
 use tauri::{AppHandle, Emitter, Manager, ipc::Channel};
 use tokio::sync::{Mutex, RwLock, mpsc};
 #[cfg(unix)]
@@ -808,13 +808,13 @@ impl AppRuntime {
     }
 
     /// Play a dictation sound cue if cues are enabled, at the saved volume.
-    async fn play_cue(&self, cue: lune_app::sound::Cue) {
+    async fn play_cue(&self, cue: lune_voice::sound::Cue) {
         let (enabled, volume) = {
             let s = self.inner.settings.read().await;
             (s.sound_cues_enabled, s.sound_cue_volume)
         };
         if enabled {
-            lune_app::sound::play(cue, volume);
+            lune_voice::sound::play(cue, volume);
         }
     }
 
@@ -1212,8 +1212,8 @@ fn reconcile_prewarm(
 /// never on cancel, so this single transition covers them all. It also lands
 /// well before ASR/LLM/delivery, so the cue is immediate, not "after the text
 /// appears" (which is the later "ready" transition).
-fn cue_for_transition(prev: &str, status: &str) -> Option<lune_app::sound::Cue> {
-    use lune_app::sound::Cue;
+fn cue_for_transition(prev: &str, status: &str) -> Option<lune_voice::sound::Cue> {
+    use lune_voice::sound::Cue;
     match status {
         "listening" if prev != "listening" => Some(Cue::Start),
         "processing" if prev == "listening" => Some(Cue::Stop),
@@ -1230,7 +1230,7 @@ mod tests {
 
     #[test]
     fn start_cue_fires_once_despite_double_listening() {
-        use lune_app::sound::Cue;
+        use lune_voice::sound::Cue;
         // Optimistic publish enters "listening" from idle.
         assert_eq!(cue_for_transition("ready", "listening"), Some(Cue::Start));
         // SessionEvent::Started republishes "listening" — must not replay.
@@ -1239,7 +1239,7 @@ mod tests {
 
     #[test]
     fn stop_cue_fires_when_recording_ends() {
-        use lune_app::sound::Cue;
+        use lune_voice::sound::Cue;
         // "processing" = capture ended (release, toggle-off, or max cutoff),
         // emitted once by the session and never on cancel.
         assert_eq!(
@@ -1258,7 +1258,7 @@ mod tests {
 
     #[test]
     fn error_cue_fires_once() {
-        use lune_app::sound::Cue;
+        use lune_voice::sound::Cue;
         assert_eq!(cue_for_transition("processing", "error"), Some(Cue::Error));
         assert_eq!(cue_for_transition("error", "error"), None);
     }

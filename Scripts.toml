@@ -68,7 +68,7 @@ info = "Run unit tests (no real models)"
 [scripts.test-e2e]
 interpreter = "bash"
 command = '''
-cargo test -p lune-app --test e2e_pipeline -- --nocapture
+cargo test -p lune-voice --test e2e_pipeline -- --nocapture
 '''
 info = "Run lightweight app pipeline integration tests"
 
@@ -89,7 +89,7 @@ else
   FEATURES="whisper-cpp"
 fi
 [ -d /lib/x86_64-linux-gnu ] && export LIBCLANG_PATH="${LIBCLANG_PATH:-/lib/x86_64-linux-gnu}"
-run() { cargo run --release --example "$1" -p lune-app --features "$FEATURES" "${@:2}"; }
+run() { cargo run --release --example "$1" -p lune-voice --features "$FEATURES" "${@:2}"; }
 case "$TYPE" in
   agc)         cargo run --release --example agc_bench -p lune-audio ;;
   transcribe)  [ -z "$WAV" ] && { echo "set --env WAV=path (.wav/.f32/dir)"; exit 1; }; run asr_probe -- "$WAV" ;;
@@ -99,7 +99,7 @@ case "$TYPE" in
   latency)     run session_latency ;;
   punctuation) run punctuation_ab ;;
   dict)        run dict_carrier_ab ;;
-  snippets)    cargo run --release --example snippet_bench -p lune-app ;;
+  snippets)    cargo run --release --example snippet_bench -p lune-voice ;;
   styling)     run styling_capability ;;
   rulecmp)     run styling_rulecmp ;;
   live)        run live_transcribe ;;

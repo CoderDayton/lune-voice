@@ -17,7 +17,7 @@
 //! so it doubles as a regression harness.
 //!
 //! Run: cgs bench --env TYPE=snippets
-//!      (cargo run --release --example snippet_bench -p lune-app)
+//!      (cargo run --release --example snippet_bench -p lune-voice)
 
 use std::hint::black_box;
 use std::time::Instant;

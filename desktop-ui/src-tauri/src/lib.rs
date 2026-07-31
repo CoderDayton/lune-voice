@@ -96,7 +96,7 @@ pub fn run() {
     // COSMIC and other wlroots compositors keep native Wayland + layer-shell.
     // Must happen before the Tauri builder touches GTK/GDK.
     #[cfg(target_os = "linux")]
-    if std::env::var_os("GDK_BACKEND").is_none() && lune_app::should_use_xwayland_fallback() {
+    if std::env::var_os("GDK_BACKEND").is_none() && lune_voice::should_use_xwayland_fallback() {
         // SAFETY: single-threaded here — main() has only initialised tracing
         // before calling run(); no other thread reads the environment yet.
         unsafe { std::env::set_var("GDK_BACKEND", "x11") };

@@ -127,7 +127,7 @@ max_speech_secs = 120
 
 ```bash
 # Build with debug symbols
-RUSTFLAGS="-C force-frame-pointers=yes" cargo build --release -p lune-app
+RUSTFLAGS="-C force-frame-pointers=yes" cargo build --release -p lune-voice
 
 # Record
 perf record -g --call-graph dwarf ./target/release/lune-voice daemon
@@ -147,7 +147,7 @@ echo '1' | sudo tee /proc/sys/kernel/perf_event_paranoid   # reverts on reboot
 # Build with symbols + frame pointers
 RUSTFLAGS="-C force-frame-pointers=yes" \
 CARGO_PROFILE_RELEASE_STRIP=none CARGO_PROFILE_RELEASE_DEBUG=line-tables-only \
-  cargo build --release --features "whisper-cpp" -p lune-app
+  cargo build --release --features "whisper-cpp" -p lune-voice
 
 samply record -- ./target/release/lune-voice daemon
 # then trigger a dictation session; Ctrl+C to stop recording
@@ -160,13 +160,13 @@ For GPU builds, substitute `--features "whisper-cuda"`.
 Set `RUST_LOG` to see per-component timing:
 
 ```bash
-RUST_LOG=lune_asr=debug,lune_llm=debug,lune_app=debug ./target/release/lune-voice daemon
+RUST_LOG=lune_asr=debug,lune_llm=debug,lune_voice=debug ./target/release/lune-voice daemon
 ```
 
 Key trace points:
 - `lune_asr::backend::whisper_cpp` — `poll_final` with `poll_final_ms`
 - `lune_llm::backend::openai` — completion call timing
-- `lune_app::capture` — `asr: poll_final complete` with `poll_final_ms`
+- `lune_voice::capture` — `asr: poll_final complete` with `poll_final_ms`
 
 ### Memory profiling
 
@@ -176,7 +176,7 @@ heaptrack ./target/release/lune-voice daemon
 heaptrack_gui heaptrack.lune-voice.*.gz
 
 # With valgrind/DHAT
-cargo build --release -p lune-app
+cargo build --release -p lune-voice
 valgrind --tool=dhat ./target/release/lune-voice daemon
 ```
 

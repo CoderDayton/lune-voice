@@ -1,7 +1,7 @@
 //! End-to-end session latency benchmark — timestamps every SessionEvent to
 //! show per-phase timing, especially the gap between FinalizedText and Stopped.
 //!
-//! Run: cargo run --release --example session_latency -p lune-app
+//! Run: cargo run --release --example session_latency -p lune-voice
 
 #[allow(dead_code)]
 #[path = "../bench_utils.rs"]

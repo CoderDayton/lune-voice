@@ -21,7 +21,7 @@
 //!                   sampling profiler this build.
 //!   PROFILE_SECS=N  duration of the profiling loop          (default 25)
 //!
-//! Run:   cargo run --release --example pipeline_stages -p lune-app --features whisper-cpp
+//! Run:   cargo run --release --example pipeline_stages -p lune-voice --features whisper-cpp
 //! Flame: PROFILE=1 samply record -- target/release/examples/pipeline_stages
 
 #[allow(dead_code)]

@@ -14,7 +14,7 @@
 //! here" is a CONSERVATIVE lower bound on production safety.
 //!
 //! Run: LUNE_BENCH_LLM_BASE_URL=... LUNE_BENCH_LLM_MODEL=... \
-//!      cargo run --release --example dict_carrier_ab -p lune-app
+//!      cargo run --release --example dict_carrier_ab -p lune-voice
 //!      (LUNE_BENCH_PRINT=1 dumps each arm's full output.)
 
 #[allow(dead_code)]

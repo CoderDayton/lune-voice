@@ -57,7 +57,7 @@ fn backend(use_vad: bool) -> Option<WhisperCppBackend> {
 }
 
 /// The capture pipeline drops any segment below this confidence as garbage
-/// (see `lune_app::capture::GARBAGE_DROP_THRESHOLD`).
+/// (see `lune_voice::capture::GARBAGE_DROP_THRESHOLD`).
 const GARBAGE_DROP_THRESHOLD: f32 = 0.25;
 
 async fn transcribe(b: &WhisperCppBackend, pcm: &[f32]) -> Vec<lune_core::asr::AsrSegment> {

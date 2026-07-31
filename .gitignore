@@ -35,5 +35,5 @@ confusion_bank.json
 # Scratch dictation recordings dumped at the repo root
 /recording_*.wav
 
-# Sound-cue preview files (not the real assets under crates/lune-app/assets/)
+# Sound-cue preview files (not the real assets under crates/lune-voice/assets/)
 /sound-previews/

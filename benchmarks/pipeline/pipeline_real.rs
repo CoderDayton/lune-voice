@@ -2,9 +2,9 @@
 //! and ASR, through the production style gate (LLM is skipped by default —
 //! no style selected, same as production's `UserSettings::default()`).
 //!
-//! Run: cargo run --release --example pipeline_real -p lune-app
-//! GPU: cargo run --release --features cuda --example pipeline_real -p lune-app
-//! Force backend: cargo run --release --example pipeline_real -p lune-app -- --asr qwen3
+//! Run: cargo run --release --example pipeline_real -p lune-voice
+//! GPU: cargo run --release --features whisper-cuda --example pipeline_real -p lune-voice
+//! Force backend: cargo run --release --example pipeline_real -p lune-voice -- --asr qwen3
 //!
 //! Unlike `pipeline_stages` (which calls stages individually), this feeds
 //! audio through `SessionManager::start_with_audio()` and measures wall-time
@@ -20,12 +20,12 @@ use std::time::Instant;
 use bench_utils::{
     BenchmarkHarness, Fixture, char_error_rate, process_memory_usage, word_error_rate, wrap_print,
 };
-use lune_app::SessionManager;
 use lune_asr::AsrRegistry;
 use lune_audio::{AudioConfig, AudioStream};
 use lune_core::config::UserSettings;
 use lune_core::llm::TextPostProcessor;
 use lune_core::session::SessionEvent;
+use lune_voice::SessionManager;
 use tokio::sync::{Mutex, RwLock, mpsc};
 
 // ─── Main ───────────────────────────────────────────────────────────────────
@@ -131,7 +131,7 @@ async fn run_full_pipeline(
     let dict = lune_dict::DictionaryManager::new(lune_persist::Database::open_in_memory().unwrap())
         .unwrap();
 
-    let config = lune_app::SessionManagerConfig {
+    let config = lune_voice::SessionManagerConfig {
         asr_backend_kind: asr.kind(),
         pipeline,
         ..Default::default()
