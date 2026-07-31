@@ -185,7 +185,7 @@ set -euo pipefail
 # Assemble the runtime layout a GGML_BACKEND_DL build needs beside the binary:
 #
 #   <bin dir>/libwhisper.so.1, libggml.so.0, libggml-base.so.0   (DT_NEEDED)
-#   <bin dir>/backends/libggml-cpu-*.so                          (dlopen-ed)
+#   <bin dir>/backends/libggml-cpu-*.so, libggml-cuda.so         (dlopen-ed)
 #
 # The executable carries RUNPATH=$ORIGIN (desktop-ui/src-tauri/build.rs), so the
 # core libraries resolve from its own directory with no LD_LIBRARY_PATH.
@@ -209,18 +209,28 @@ if ! ls "$SRC_DIR"/out/lib/libggml-base.so* >/dev/null 2>&1; then
   exit 1
 fi
 
-mkdir -p "$BIN_DIR/backends"
-cp -a "$SRC_DIR"/out/lib/libwhisper.so* "$SRC_DIR"/out/lib/libggml*.so* "$BIN_DIR/"
-cp -a "$SRC_DIR"/out/bin/libggml-cpu-*.so "$BIN_DIR/backends/"
+# The test harness runs binaries from target/<profile>/deps, so stage there too.
+mkdir -p "$BIN_DIR/backends" "$BIN_DIR/deps/backends"
+for dest in "$BIN_DIR" "$BIN_DIR/deps"; do
+  cp -a "$SRC_DIR"/out/lib/libwhisper.so* "$SRC_DIR"/out/lib/libggml*.so* "$dest/"
+  cp -a "$SRC_DIR"/out/bin/libggml-cpu-*.so "$dest/backends/"
+  # A `whisper-cuda` build emits the CUDA backend as a plugin as well, and ggml
+  # only ever dlopen-s it from a backends dir — without this, `cgs dev --env
+  # BACKEND=cuda` compiles CUDA and then silently runs on the CPU. A CPU build
+  # has no such file, so this stays optional.
+  if [ -e "$SRC_DIR/out/bin/libggml-cuda.so" ]; then
+    cp -a "$SRC_DIR"/out/bin/libggml-cuda.so "$dest/backends/"
+  fi
+done
 
-# The test harness runs binaries from target/<profile>/deps, so mirror there too.
-mkdir -p "$BIN_DIR/deps/backends"
-cp -a "$SRC_DIR"/out/lib/libwhisper.so* "$SRC_DIR"/out/lib/libggml*.so* "$BIN_DIR/deps/"
-cp -a "$SRC_DIR"/out/bin/libggml-cpu-*.so "$BIN_DIR/deps/backends/"
-
-echo "staged $(ls "$BIN_DIR"/backends | wc -l) CPU backend plugins into $BIN_DIR/backends"
+COUNT=$(ls "$BIN_DIR"/backends | wc -l)
+if [ -e "$BIN_DIR/backends/libggml-cuda.so" ]; then
+  echo "staged $COUNT backend plugins into $BIN_DIR/backends (CPU + CUDA)"
+else
+  echo "staged $COUNT backend plugins into $BIN_DIR/backends (CPU only — build with the whisper-cuda feature for GPU)"
+fi
 '''
-info = "Copy the ggml shared libraries and CPU backend plugins next to the built binary (--env PROFILE=release)"
+info = "Copy the ggml shared libraries and backend plugins (CPU, plus CUDA when built) next to the built binary (--env PROFILE=release)"
 
 [scripts.gpu-plugin]
 interpreter = "bash"

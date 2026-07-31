@@ -169,7 +169,7 @@ Built and packaged separately from the application bundle:
 
 ```bash
 cgs gpu-plugin        # -> release-artifacts/lune-voice-gpu-cuda13-linux-x86_64.tar.gz + .sha256
-cgs stage-runtime     # copy ggml shared objects + CPU plugins next to a built binary
+cgs stage-runtime     # copy ggml shared objects + backend plugins next to a built binary
 ```
 
 Upload both files to the GitHub release, then record the digest and byte size in

@@ -202,3 +202,18 @@ directory rather than the bin directory. Until that is wired and a bundle is
 verified end to end, `cgs build` keeps producing the known-good static build.
 
 `cgs dev` and `cgs stage-runtime` do exercise the plugin path.
+
+## Running a dev build on the GPU
+
+`cgs dev` sets `GGML_BACKEND_DL=ON`, so a CUDA dev build emits the CUDA backend
+as a plugin rather than linking it in — and a plugin ggml never finds is a
+plugin it never uses. Build it, then stage it:
+
+```bash
+cgs dev --env BACKEND=cuda   # once, to produce libggml-cuda.so
+cgs stage-runtime            # copies it into target/debug/backends/
+```
+
+`stage-runtime` reports whether CUDA was among the plugins it staged. This is
+only needed for `cgs dev`; `cgs build` links CUDA in statically and needs no
+staging.
