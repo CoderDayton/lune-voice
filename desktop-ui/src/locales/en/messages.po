@@ -63,13 +63,11 @@ msgid "{visibleCount} / {totalCount}"
 msgstr "{visibleCount} / {totalCount}"
 
 #: src/features/snippets/snippets-page.tsx:200
-msgid ""
-"## Meeting — {date}\n"
+msgid "## Meeting — {date}\n"
 "\n"
 "Attendees:\n"
 "- "
-msgstr ""
-"## Meeting — {date}\n"
+msgstr "## Meeting — {date}\n"
 "\n"
 "Attendees:\n"
 "- "
@@ -249,10 +247,6 @@ msgstr "Choose how finished text is inserted into the app you are currently usin
 #: src/features/settings/sections/appearance-section.tsx:36
 msgid "Choose how Lune Voice looks."
 msgstr "Choose how Lune Voice looks."
-
-#: src/features/settings/sections/styling-engine-section.tsx:37
-#~ msgid "Choose how transcripts are restyled — sent to a remote OpenAI-compatible endpoint you configure, or left off entirely."
-#~ msgstr "Choose how transcripts are restyled — sent to a remote OpenAI-compatible endpoint you configure, or left off entirely."
 
 #: src/features/settings/sections/styling-engine-section.tsx:38
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
@@ -1573,10 +1567,6 @@ msgstr "You're all set"
 msgid "Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none."
 msgstr "Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none."
 
-#: src/features/settings/components/openai-fields.tsx:48
-#~ msgid "Your API key. Leave it blank to keep the saved key."
-#~ msgstr "Your API key. Leave it blank to keep the saved key."
-
 #: src/features/welcome/components/engine-step.tsx:126
 msgid "Your GPU is ready — use it for faster transcription."
 msgstr "Your GPU is ready — use it for faster transcription."
@@ -1588,10 +1578,6 @@ msgstr "Your GPU qualifies. Keep this on, then finish the one-time setup in Sett
 #: src/features/overview/overview-page.tsx:230
 msgid "your hotkey"
 msgstr "your hotkey"
-
-#: src/features/welcome/components/engine-step.tsx:122
-#~ msgid "Your machine supports it — use it for faster transcription."
-#~ msgstr "Your machine supports it — use it for faster transcription."
 
 #: src/features/welcome/welcome-page.tsx:152
 msgid "Your models are ready. Everything stays on this machine."

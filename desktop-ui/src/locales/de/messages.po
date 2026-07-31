@@ -63,8 +63,7 @@ msgid "{visibleCount} / {totalCount}"
 msgstr "{visibleCount} / {totalCount}"
 
 #: src/features/snippets/snippets-page.tsx:200
-msgid ""
-"## Meeting — {date}\n"
+msgid "## Meeting — {date}\n"
 "\n"
 "Attendees:\n"
 "- "
@@ -245,10 +244,6 @@ msgstr "Wählen Sie aus, wie fertiger Text in die App eingefügt wird, die Sie g
 #: src/features/settings/sections/appearance-section.tsx:36
 msgid "Choose how Lune Voice looks."
 msgstr "Wählen Sie, wie Lune Voice aussehen soll."
-
-#: src/features/settings/sections/styling-engine-section.tsx:37
-#~ msgid "Choose how transcripts are restyled — sent to a remote OpenAI-compatible endpoint you configure, or left off entirely."
-#~ msgstr "Wählen Sie, wie Transkripte umformuliert werden — gesendet an einen von Ihnen konfigurierten, OpenAI-kompatiblen Remote-Endpunkt, oder ganz deaktiviert."
 
 #: src/features/settings/sections/styling-engine-section.tsx:38
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
@@ -1569,10 +1564,6 @@ msgstr "Sie sind bereit"
 msgid "Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none."
 msgstr ""
 
-#: src/features/settings/components/openai-fields.tsx:48
-#~ msgid "Your API key. Leave it blank to keep the saved key."
-#~ msgstr "Ihr API-Schlüssel. Lassen Sie das Feld leer, um den gespeicherten Schlüssel zu behalten."
-
 #: src/features/welcome/components/engine-step.tsx:126
 msgid "Your GPU is ready — use it for faster transcription."
 msgstr ""
@@ -1584,10 +1575,6 @@ msgstr ""
 #: src/features/overview/overview-page.tsx:230
 msgid "your hotkey"
 msgstr "Ihr Hotkey"
-
-#: src/features/welcome/components/engine-step.tsx:122
-#~ msgid "Your machine supports it — use it for faster transcription."
-#~ msgstr "Ihr Gerät unterstützt es — nutzen Sie es für eine schnellere Transkription."
 
 #: src/features/welcome/welcome-page.tsx:152
 msgid "Your models are ready. Everything stays on this machine."

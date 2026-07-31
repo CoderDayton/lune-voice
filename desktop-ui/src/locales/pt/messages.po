@@ -63,8 +63,7 @@ msgid "{visibleCount} / {totalCount}"
 msgstr "{visibleCount} / {totalCount}"
 
 #: src/features/snippets/snippets-page.tsx:200
-msgid ""
-"## Meeting — {date}\n"
+msgid "## Meeting — {date}\n"
 "\n"
 "Attendees:\n"
 "- "
@@ -245,10 +244,6 @@ msgstr "Escolha como o texto finalizado será inserido no aplicativo que você e
 #: src/features/settings/sections/appearance-section.tsx:36
 msgid "Choose how Lune Voice looks."
 msgstr "Escolha a aparência do Lune Voice."
-
-#: src/features/settings/sections/styling-engine-section.tsx:37
-#~ msgid "Choose how transcripts are restyled — sent to a remote OpenAI-compatible endpoint you configure, or left off entirely."
-#~ msgstr "Escolha como as transcrições são reestilizadas — enviadas para um endpoint remoto compatível com OpenAI que você configurar, ou desativado por completo."
 
 #: src/features/settings/sections/styling-engine-section.tsx:38
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
@@ -1569,10 +1564,6 @@ msgstr "Você está pronto"
 msgid "Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none."
 msgstr ""
 
-#: src/features/settings/components/openai-fields.tsx:48
-#~ msgid "Your API key. Leave it blank to keep the saved key."
-#~ msgstr "Sua chave de API. Deixe em branco para manter a chave salva."
-
 #: src/features/welcome/components/engine-step.tsx:126
 msgid "Your GPU is ready — use it for faster transcription."
 msgstr ""
@@ -1584,10 +1575,6 @@ msgstr ""
 #: src/features/overview/overview-page.tsx:230
 msgid "your hotkey"
 msgstr "sua tecla de atalho"
-
-#: src/features/welcome/components/engine-step.tsx:122
-#~ msgid "Your machine supports it — use it for faster transcription."
-#~ msgstr "Sua máquina é compatível — use para transcrever mais rápido."
 
 #: src/features/welcome/welcome-page.tsx:152
 msgid "Your models are ready. Everything stays on this machine."

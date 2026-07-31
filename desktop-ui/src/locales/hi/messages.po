@@ -63,8 +63,7 @@ msgid "{visibleCount} / {totalCount}"
 msgstr "{visibleCount} / {totalCount}"
 
 #: src/features/snippets/snippets-page.tsx:200
-msgid ""
-"## Meeting — {date}\n"
+msgid "## Meeting — {date}\n"
 "\n"
 "Attendees:\n"
 "- "
@@ -245,10 +244,6 @@ msgstr "चुनें कि आपके द्वारा वर्तम�
 #: src/features/settings/sections/appearance-section.tsx:36
 msgid "Choose how Lune Voice looks."
 msgstr "चुनें कि Lune Voice कैसा दिखता है।"
-
-#: src/features/settings/sections/styling-engine-section.tsx:37
-#~ msgid "Choose how transcripts are restyled — sent to a remote OpenAI-compatible endpoint you configure, or left off entirely."
-#~ msgstr "चुनें कि ट्रांसक्रिप्ट को कैसे रिस्टाइल किया जाए — इसे आपके द्वारा कॉन्फ़िगर किए गए रिमोट OpenAI-संगत एंडपॉइंट पर भेजा जाए, या पूरी तरह बंद रखा जाए।"
 
 #: src/features/settings/sections/styling-engine-section.tsx:38
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
@@ -1569,10 +1564,6 @@ msgstr "सब तैयार है"
 msgid "Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none."
 msgstr ""
 
-#: src/features/settings/components/openai-fields.tsx:48
-#~ msgid "Your API key. Leave it blank to keep the saved key."
-#~ msgstr "आपकी एपीआई कुंजी. सहेजी गई कुंजी को रखने के लिए इसे खाली छोड़ दें।"
-
 #: src/features/welcome/components/engine-step.tsx:126
 msgid "Your GPU is ready — use it for faster transcription."
 msgstr ""
@@ -1584,10 +1575,6 @@ msgstr ""
 #: src/features/overview/overview-page.tsx:230
 msgid "your hotkey"
 msgstr "आपकी हॉटकी"
-
-#: src/features/welcome/components/engine-step.tsx:122
-#~ msgid "Your machine supports it — use it for faster transcription."
-#~ msgstr "आपकी मशीन इसका समर्थन करती है — तेज़ ट्रांसक्रिप्शन के लिए इसका उपयोग करें।"
 
 #: src/features/welcome/welcome-page.tsx:152
 msgid "Your models are ready. Everything stays on this machine."

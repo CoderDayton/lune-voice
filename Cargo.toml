@@ -16,8 +16,8 @@ version = "0.1.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
 
-# Vendored fork of `whisper-rs-sys` 0.15.0. The only file that differs from the
-# published crate is `build.rs`; every change there is marked `LUNE FORK`.
+# Vendored fork of `whisper-rs-sys` 0.15.0. Two files differ from the published
+# crate — `build.rs` and `src/lib.rs`; every change is marked `LUNE FORK`.
 # Upstream pins `BUILD_SHARED_LIBS=OFF` and decides the link kind from the
 # `intel-sycl` feature, which makes ggml's dlopen-able backends
 # (`GGML_BACKEND_DL`) impossible to build. The fork routes both off that one

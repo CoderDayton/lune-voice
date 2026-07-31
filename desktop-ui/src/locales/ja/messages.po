@@ -63,8 +63,7 @@ msgid "{visibleCount} / {totalCount}"
 msgstr "{visibleCount} / {totalCount}"
 
 #: src/features/snippets/snippets-page.tsx:200
-msgid ""
-"## Meeting — {date}\n"
+msgid "## Meeting — {date}\n"
 "\n"
 "Attendees:\n"
 "- "
@@ -245,10 +244,6 @@ msgstr "完成したテキストを現在使用しているアプリに挿入す
 #: src/features/settings/sections/appearance-section.tsx:36
 msgid "Choose how Lune Voice looks."
 msgstr "Lune Voiceの見た目を選択します。"
-
-#: src/features/settings/sections/styling-engine-section.tsx:37
-#~ msgid "Choose how transcripts are restyled — sent to a remote OpenAI-compatible endpoint you configure, or left off entirely."
-#~ msgstr "文字起こしをどのようにスタイル調整するかを選択します。設定した OpenAI 互換のリモートエンドポイントに送信するか、完全にオフにできます。"
 
 #: src/features/settings/sections/styling-engine-section.tsx:38
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
@@ -1569,10 +1564,6 @@ msgstr "準備は完了です"
 msgid "Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none."
 msgstr ""
 
-#: src/features/settings/components/openai-fields.tsx:48
-#~ msgid "Your API key. Leave it blank to keep the saved key."
-#~ msgstr "API キー。保存されたキーを保持するには、空白のままにします。"
-
 #: src/features/welcome/components/engine-step.tsx:126
 msgid "Your GPU is ready — use it for faster transcription."
 msgstr ""
@@ -1584,10 +1575,6 @@ msgstr ""
 #: src/features/overview/overview-page.tsx:230
 msgid "your hotkey"
 msgstr "あなたのホットキー"
-
-#: src/features/welcome/components/engine-step.tsx:122
-#~ msgid "Your machine supports it — use it for faster transcription."
-#~ msgstr "お使いのマシンが対応しています — 文字起こしを高速化するために使用しましょう。"
 
 #: src/features/welcome/welcome-page.tsx:152
 msgid "Your models are ready. Everything stays on this machine."

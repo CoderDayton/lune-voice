@@ -154,6 +154,9 @@ fn main() {
         .map_err(|v| v.to_string())
         .unwrap();
 
+        // LUNE FORK: only the metal/vulkan blocks below reassign this; without
+        // them the `mut` is dead and warns on every build.
+        #[allow(unused_mut)]
         let mut bindings = bindgen::Builder::default()
             .rust_edition(bindgen::RustEdition::Edition2021)
             .rust_target(package_msrv)

@@ -77,6 +77,15 @@ fn invoke_no_args(webview: &WebviewWindow<MockRuntime>, cmd: &str) -> Result<Str
     invoke_command::<String>(webview, cmd)
 }
 
+/// Origin the IPC authority matches invocations against. Windows and Android
+/// serve the app over http; everywhere else it is the custom protocol. Getting
+/// this wrong makes every command fail the ACL check as "Plugin not found".
+const IPC_ORIGIN: &str = if cfg!(any(windows, target_os = "android")) {
+    "http://tauri.localhost"
+} else {
+    "tauri://localhost"
+};
+
 fn invoke_command<T: serde::de::DeserializeOwned>(
     webview: &WebviewWindow<MockRuntime>,
     cmd: &str,
@@ -85,7 +94,7 @@ fn invoke_command<T: serde::de::DeserializeOwned>(
         cmd: cmd.into(),
         callback: tauri::ipc::CallbackFn(0),
         error: tauri::ipc::CallbackFn(1),
-        url: "http://tauri.localhost".parse().unwrap(),
+        url: IPC_ORIGIN.parse().unwrap(),
         body: InvokeBody::default(),
         headers: Default::default(),
         invoke_key: tauri::test::INVOKE_KEY.to_string(),
