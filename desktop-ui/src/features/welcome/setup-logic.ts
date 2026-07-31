@@ -49,17 +49,31 @@ export function buildInitialSelection(asrLocalName: string, models: ModelStatus[
 }
 
 /**
- * Whether to surface the GPU-acceleration acceptance card during onboarding.
+ * What the onboarding GPU-acceleration card should say, or `null` to hide it.
  *
- * The question is "does this machine have an NVIDIA GPU we could use", not "was
- * CUDA compiled in" — the CUDA backend is a downloadable plugin, so a plain CPU
- * build can still end up accelerated. Only two states rule it out: a build with
- * no native backend at all, and a machine with no driver, which no download can
- * fix. `failed` still offers, because the common cause is a plugin installed
- * this session that needs a restart, and Settings explains the rest.
+ * The toggle sets the `useGpu` preference, which is meaningful before the
+ * plugin exists — it decides whether the GPU gets used once one does. What is
+ * not meaningful is claiming the machine is accelerated when it is not, so the
+ * two cases are told apart:
+ *
+ * - `active` — a CUDA device is registered right now.
+ * - `after-download` — the hardware qualifies but the plugin still has to be
+ *   fetched from Settings, which onboarding does not do.
+ *
+ * Hidden entirely when no download could help: no native backend (`unsupported`),
+ * no driver (`driver-missing`, and the driver is not redistributable), or a
+ * build whose plugin archive has not been published yet — offering setup the
+ * user cannot complete is worse than staying quiet.
  */
-export function shouldOfferGpuAcceleration(state: GpuBackendStateDto): boolean {
-  return state !== 'unsupported' && state !== 'driver-missing';
+export type GpuAccelerationOffer = 'active' | 'after-download';
+
+export function gpuAccelerationOffer(
+  state: GpuBackendStateDto,
+  downloadAvailable: boolean,
+): GpuAccelerationOffer | null {
+  if (state === 'ready') return 'active';
+  if (state === 'unsupported' || state === 'driver-missing') return null;
+  return downloadAvailable ? 'after-download' : null;
 }
 
 /**

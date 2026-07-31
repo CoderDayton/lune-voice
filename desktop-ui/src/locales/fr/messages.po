@@ -14,11 +14,11 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. placeholder {0}: snippet.triggerPhrase
-#: src/features/snippets/snippets-page.tsx:327
+#: src/features/snippets/snippets-page.tsx:292
 msgid "“{0}” will stop expanding. The template text is not recoverable."
 msgstr ""
 
-#: src/features/snippets/snippets-page.tsx:253
+#: src/features/snippets/snippets-page.tsx:218
 msgid "(clipboard contents)"
 msgstr ""
 
@@ -62,7 +62,7 @@ msgstr "{totalCount} séances"
 msgid "{visibleCount} / {totalCount}"
 msgstr "{visibleCount} / {totalCount}"
 
-#: src/features/snippets/snippets-page.tsx:235
+#: src/features/snippets/snippets-page.tsx:200
 msgid ""
 "## Meeting — {date}\n"
 "\n"
@@ -70,7 +70,7 @@ msgid ""
 "- "
 msgstr ""
 
-#: src/features/snippets/snippets-page.tsx:163
+#: src/features/snippets/snippets-page.tsx:128
 msgid "A block of text Lune Voice types for you when you speak its trigger phrase."
 msgstr ""
 
@@ -112,7 +112,7 @@ msgstr "Ajoutez un correctif et Lune Voice l'appliquera à chaque fois que vous 
 msgid "Add correction"
 msgstr "Ajouter une correction"
 
-#: src/features/snippets/snippets-page.tsx:272
+#: src/features/snippets/snippets-page.tsx:237
 msgid "Add snippet"
 msgstr ""
 
@@ -201,7 +201,7 @@ msgstr "Annuler l'enregistrement en cours"
 msgid "Cancel dictation"
 msgstr "Annuler la dictée"
 
-#: src/features/snippets/snippets-page.tsx:168
+#: src/features/snippets/snippets-page.tsx:133
 msgid "Cancel edit"
 msgstr ""
 
@@ -347,12 +347,12 @@ msgstr "Sensibilité de correction"
 msgid "Couldn't add that rule. Try again."
 msgstr "Impossible d'ajouter cette règle. Essayer à nouveau."
 
-#: src/features/snippets/snippets-page.tsx:130
+#: src/features/snippets/snippets-page.tsx:95
 msgid "Couldn't save that snippet. Try again."
 msgstr ""
 
-#: src/features/snippets/snippets-page.tsx:158
-#: src/features/snippets/snippets-page.tsx:162
+#: src/features/snippets/snippets-page.tsx:123
+#: src/features/snippets/snippets-page.tsx:127
 msgid "Create a snippet"
 msgstr ""
 
@@ -379,7 +379,7 @@ msgstr "Sombre"
 #: src/features/history/components/history-table.tsx:387
 #: src/features/history/components/session-detail-modal.tsx:202
 #: src/features/settings/sections/models-section.tsx:259
-#: src/features/snippets/snippets-page.tsx:328
+#: src/features/snippets/snippets-page.tsx:293
 msgid "Delete"
 msgstr "Supprimer"
 
@@ -402,7 +402,7 @@ msgstr "Supprimer le modèle"
 msgid "Delete session?"
 msgstr "Supprimer la séance ?"
 
-#: src/features/snippets/snippets-page.tsx:326
+#: src/features/snippets/snippets-page.tsx:291
 msgid "Delete snippet?"
 msgstr ""
 
@@ -486,7 +486,7 @@ msgid "Download failed"
 msgstr "Le téléchargement a échoué"
 
 #. placeholder {0}: formatBytes(status.downloadBytes)
-#: src/features/settings/sections/gpu-section.tsx:55
+#: src/features/settings/sections/gpu-section.tsx:54
 msgid "Download GPU support ({0})"
 msgstr ""
 
@@ -509,7 +509,7 @@ msgid "Downloading models"
 msgstr "Téléchargement de modèles"
 
 #: src/features/settings/components/asr-engine-cards.tsx:151
-#: src/features/settings/sections/gpu-section.tsx:54
+#: src/features/settings/sections/gpu-section.tsx:53
 #: src/features/settings/sections/models-section.tsx:273
 #: src/features/welcome/welcome-page.tsx:254
 msgid "Downloading…"
@@ -535,7 +535,7 @@ msgstr "Distance au bord"
 msgid "Edge distance in pixels"
 msgstr "Distance au bord en pixels"
 
-#: src/features/snippets/snippets-page.tsx:323
+#: src/features/snippets/snippets-page.tsx:288
 #: src/features/styles/components/style-hero.tsx:47
 #: src/features/styles/components/style-preset-card.tsx:113
 msgid "Edit"
@@ -546,8 +546,8 @@ msgstr "Modifier"
 msgid "Edit {0}"
 msgstr "Modifier {0}"
 
-#: src/features/snippets/snippets-page.tsx:158
-#: src/features/snippets/snippets-page.tsx:162
+#: src/features/snippets/snippets-page.tsx:123
+#: src/features/snippets/snippets-page.tsx:127
 msgid "Edit snippet"
 msgstr ""
 
@@ -658,15 +658,15 @@ msgstr "Bonjour"
 msgid "GPU acceleration"
 msgstr "Accélération GPU"
 
-#: src/features/settings/sections/gpu-section.tsx:93
+#: src/features/settings/sections/gpu-section.tsx:92
 msgid "GPU acceleration is active."
 msgstr ""
 
-#: src/features/settings/sections/gpu-section.tsx:39
+#: src/features/settings/sections/gpu-section.tsx:43
 msgid "GPU support"
 msgstr ""
 
-#: src/features/settings/sections/gpu-section.tsx:109
+#: src/features/settings/sections/gpu-section.tsx:108
 msgid "GPU support is installed but not working."
 msgstr ""
 
@@ -699,11 +699,11 @@ msgstr "Inactif"
 msgid "In use"
 msgstr "Utilisé"
 
-#: src/features/snippets/snippets-page.tsx:221
+#: src/features/snippets/snippets-page.tsx:186
 msgid "Insert at cursor"
 msgstr ""
 
-#: src/features/snippets/snippets-page.tsx:214
+#: src/features/snippets/snippets-page.tsx:179
 msgid "Insert placeholder"
 msgstr ""
 
@@ -794,7 +794,7 @@ msgstr "Lune Voice écrit"
 msgid "Manage in Models"
 msgstr "Gérer dans Modèles"
 
-#: src/features/snippets/snippets-page.tsx:186
+#: src/features/snippets/snippets-page.tsx:151
 msgid "meeting header"
 msgstr ""
 
@@ -833,7 +833,7 @@ msgstr "Les modèles sont stockés localement. Pas de télémétrie, pas de comp
 msgid "Monitor"
 msgstr "Écran"
 
-#: src/features/settings/sections/gpu-section.tsx:40
+#: src/features/settings/sections/gpu-section.tsx:44
 msgid "Most of the download is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
 msgstr ""
 
@@ -878,7 +878,7 @@ msgstr "Aucune séance pour l'instant"
 msgid "No sessions yet. Start dictating to see your transcripts here."
 msgstr "Aucune séance pour l'instant. Commencez à dicter pour voir vos relevés de notes ici."
 
-#: src/features/snippets/snippets-page.tsx:289
+#: src/features/snippets/snippets-page.tsx:254
 msgid "No snippets yet."
 msgstr ""
 
@@ -1124,15 +1124,15 @@ msgid "Rewrite each transcript in a chosen style. When off, the raw transcript i
 msgstr "Réécrivez chaque transcription dans un style choisi. Lorsque cette option est désactivée, la transcription brute est fournie telle quelle."
 
 #. placeholder {0}: status.devices.join(', ')
-#: src/features/settings/sections/gpu-section.tsx:92
+#: src/features/settings/sections/gpu-section.tsx:91
 msgid "Running on {0}."
 msgstr ""
 
-#: src/features/settings/sections/gpu-section.tsx:116
+#: src/features/settings/sections/gpu-section.tsx:118
 msgid "Running on the CPU."
 msgstr ""
 
-#: src/features/settings/sections/gpu-section.tsx:101
+#: src/features/settings/sections/gpu-section.tsx:100
 msgid "Running on the CPU. No NVIDIA driver was found — install the driver for your GPU and Lune Voice will offer GPU support here."
 msgstr ""
 
@@ -1145,7 +1145,7 @@ msgstr "s"
 msgid "Save"
 msgstr "Sauvegarder"
 
-#: src/features/snippets/snippets-page.tsx:268
+#: src/features/snippets/snippets-page.tsx:233
 msgid "Save changes"
 msgstr ""
 
@@ -1154,15 +1154,15 @@ msgstr ""
 msgid "Save Transcript"
 msgstr "Enregistrer la transcription"
 
-#: src/features/snippets/snippets-page.tsx:292
+#: src/features/snippets/snippets-page.tsx:257
 msgid "Save your signature, a meeting header, or anything you type often — then speak its trigger to drop it into any app."
 msgstr ""
 
-#: src/features/snippets/snippets-page.tsx:284
+#: src/features/snippets/snippets-page.tsx:249
 msgid "Saved snippets"
 msgstr ""
 
-#: src/features/snippets/snippets-page.tsx:191
+#: src/features/snippets/snippets-page.tsx:156
 msgid "Say <0>“{spokenTrigger}”</0> as the whole utterance — or <1>“insert {spokenTrigger}”</1> — to type this snippet."
 msgstr ""
 
@@ -1237,7 +1237,7 @@ msgstr "Passer pour l'instant"
 msgid "Skip to main content"
 msgstr "Passer au contenu principal"
 
-#: src/features/snippets/snippets-page.tsx:212
+#: src/features/snippets/snippets-page.tsx:177
 msgid "Snippet text"
 msgstr ""
 
@@ -1354,7 +1354,7 @@ msgstr "Le raccourci principal utilisé pour la saisie vocale. Cliquez sur la li
 msgid "The microphone is in use"
 msgstr ""
 
-#: src/features/snippets/snippets-page.tsx:258
+#: src/features/snippets/snippets-page.tsx:223
 msgid "The snippet text appears here with placeholders filled in."
 msgstr ""
 
@@ -1441,19 +1441,19 @@ msgstr "Transcription"
 msgid "Transcription runs on the CPU by default. If you have an NVIDIA GPU, an optional download moves it to the GPU for noticeably lower latency."
 msgstr ""
 
-#: src/features/snippets/snippets-page.tsx:180
+#: src/features/snippets/snippets-page.tsx:145
 msgid "Trigger phrase"
 msgstr ""
 
-#: src/features/snippets/snippets-page.tsx:198
+#: src/features/snippets/snippets-page.tsx:163
 msgid "Type a phrase, or tap the mic to capture it exactly as Lune Voice hears it."
 msgstr ""
 
-#: src/features/snippets/snippets-page.tsx:250
+#: src/features/snippets/snippets-page.tsx:215
 msgid "Types as"
 msgstr ""
 
-#: src/features/welcome/components/engine-step.tsx:131
+#: src/features/welcome/components/engine-step.tsx:136
 msgid "Use GPU acceleration"
 msgstr "Utiliser l'accélération GPU"
 
@@ -1565,13 +1565,21 @@ msgstr "Vous êtes prêt"
 msgid "Your API key. Leave it blank to keep the saved key."
 msgstr "Votre clé API. Laissez-le vide pour conserver la clé enregistrée."
 
+#: src/features/welcome/components/engine-step.tsx:126
+msgid "Your GPU is ready — use it for faster transcription."
+msgstr ""
+
+#: src/features/welcome/components/engine-step.tsx:127
+msgid "Your GPU qualifies. Keep this on, then finish the one-time setup in Settings."
+msgstr ""
+
 #: src/features/overview/overview-page.tsx:230
 msgid "your hotkey"
 msgstr "votre raccourci clavier"
 
 #: src/features/welcome/components/engine-step.tsx:122
-msgid "Your machine supports it — use it for faster transcription."
-msgstr "Votre machine le prend en charge — utilisez-le pour une transcription plus rapide."
+#~ msgid "Your machine supports it — use it for faster transcription."
+#~ msgstr "Votre machine le prend en charge — utilisez-le pour une transcription plus rapide."
 
 #: src/features/welcome/welcome-page.tsx:152
 msgid "Your models are ready. Everything stays on this machine."

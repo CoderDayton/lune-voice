@@ -39,7 +39,7 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
     engineBackend,
     engineWhisper,
     asrLocalName,
-    gpuAvailable,
+    gpuOffer,
     useGpu,
     setUseGpu,
     setEngineBackend,
@@ -77,7 +77,7 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
           engineBackend={engineBackend}
           engineWhisper={engineWhisper}
           error={error}
-          gpuAvailable={gpuAvailable}
+          gpuOffer={gpuOffer}
           useGpu={useGpu}
           onSelectEngine={setEngineBackend}
           onSelectWhisper={setEngineWhisper}

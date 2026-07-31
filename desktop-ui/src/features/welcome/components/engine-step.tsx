@@ -2,13 +2,14 @@ import { useLingui } from '@lingui/react/macro';
 import { Check, CircleAlert, type LucideIcon, Mic, Zap } from 'lucide-react';
 import type { AsrBackendValue, WhisperModelValue } from '../../settings/data/settings-data';
 import { whisperModels } from '../../settings/data/settings-data';
+import type { GpuAccelerationOffer } from '../setup-logic';
 
 interface EngineStepProps {
   engineBackend: AsrBackendValue;
   engineWhisper: WhisperModelValue;
   error: string | null;
-  /** True when this machine could use an NVIDIA GPU — gates the acceptance card. */
-  gpuAvailable: boolean;
+  /** What the GPU acceptance card should offer, or `null` to hide it. */
+  gpuOffer: GpuAccelerationOffer | null;
   /** Whether GPU acceleration is currently accepted (mirrors `useGpu`). */
   useGpu: boolean;
   onSelectEngine: (backend: AsrBackendValue) => void;
@@ -33,7 +34,7 @@ export function EngineStep({
   engineBackend,
   engineWhisper,
   error,
-  gpuAvailable,
+  gpuOffer,
   useGpu,
   onSelectEngine,
   onSelectWhisper,
@@ -107,7 +108,7 @@ export function EngineStep({
         </fieldset>
       )}
 
-      {gpuAvailable && (
+      {gpuOffer && (
         <label className="flex items-center justify-between gap-3 rounded-box border border-surface-border bg-surface-panel p-4">
           <span className="flex min-w-0 items-start gap-3">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-field bg-primary/15 text-primary">
@@ -118,7 +119,12 @@ export function EngineStep({
                 {t`GPU acceleration`}
               </span>
               <span className="mt-0.5 block text-xs text-content-subtle">
-                {t`Your machine supports it — use it for faster transcription.`}
+                {/* Onboarding never installs the plugin, so promising speed the
+                    user does not have yet would be a lie the first dictation
+                    exposes. Say which of the two situations this is. */}
+                {gpuOffer === 'active'
+                  ? t`Your GPU is ready — use it for faster transcription.`
+                  : t`Your GPU qualifies. Keep this on, then finish the one-time setup in Settings.`}
               </span>
             </span>
           </span>

@@ -35,6 +35,21 @@ pub struct GpuPluginRelease {
     pub cuda_major: u32,
 }
 
+impl GpuPluginRelease {
+    /// Whether this release can actually be downloaded. False while `sha256` is
+    /// still [`UNPUBLISHED`]: [`install`] refuses in that state, so offering the
+    /// download would be a button that cannot succeed.
+    pub fn is_published(&self) -> bool {
+        self.sha256 != UNPUBLISHED
+    }
+}
+
+/// Shared-object name of the CUDA compute backend. Mirrors
+/// `lune_asr::gpu_backend::CUDA_PLUGIN_FILE` — this crate cannot depend on
+/// `lune-asr`, and it is the file whose presence means "installed", so the
+/// install publishes it last.
+const CUDA_PLUGIN_FILE: &str = "libggml-cuda.so";
+
 /// Digest placeholder for a release that has not been published yet. Kept as a
 /// recognisable sentinel so [`install`] can fail with an actionable message
 /// instead of downloading something it cannot verify.
@@ -90,10 +105,31 @@ fn is_permitted_member(name: &Path) -> bool {
     let Some(file) = file.to_str() else {
         return false;
     };
-    file.starts_with("libggml-cuda.so")
-        || file.starts_with("libcudart.so")
-        || file.starts_with("libcublas.so")
-        || file.starts_with("libcublasLt.so")
+    is_versioned_soname(file, CUDA_PLUGIN_FILE)
+        || is_versioned_soname(file, "libcudart.so")
+        || is_versioned_soname(file, "libcublas.so")
+        || is_versioned_soname(file, "libcublasLt.so")
+}
+
+/// Whether `file` is exactly `soname`, or `soname` followed by nothing but a
+/// numeric version suffix (`libcublas.so.13`, `libcublas.so.13.1.0`).
+///
+/// A plain `starts_with` would also admit `libcublas.so.evil`, and every
+/// permitted member is written executable into a directory the app `dlopen`s.
+/// The SHA-256 pin already gates the archive's contents, so this is the second
+/// lock rather than the first — but the cost of holding the shape exactly is a
+/// dozen lines.
+fn is_versioned_soname(file: &str, soname: &str) -> bool {
+    let Some(rest) = file.strip_prefix(soname) else {
+        return false;
+    };
+    if rest.is_empty() {
+        return true;
+    }
+    let Some(version) = rest.strip_prefix('.') else {
+        return false;
+    };
+    !version.is_empty() && version.chars().all(|c| c.is_ascii_digit() || c == '.')
 }
 
 /// Download, verify, and unpack the GPU backend into `dest_dir`.
@@ -137,9 +173,17 @@ where
         ))));
     }
 
-    let written = unpack(&archive, dest_dir);
+    // Decompressing ~660 MB of shared objects is seconds of pure CPU and
+    // blocking file I/O. Run it off the async runtime: `install` is awaited
+    // straight from a Tauri command, so doing it inline would freeze the IPC
+    // worker — and the window with it — for the whole unpack.
+    let archive_path = archive.clone();
+    let dest = dest_dir.to_path_buf();
+    let written = tokio::task::spawn_blocking(move || unpack(&archive_path, &dest))
+        .await
+        .map_err(|e| PersistError::Io(std::io::Error::other(format!("GPU backend unpack: {e}"))));
     let _ = std::fs::remove_file(&archive);
-    let written = written?;
+    let written = written??;
 
     on_progress(GpuInstallProgress {
         downloaded_bytes: release.download_bytes,
@@ -148,6 +192,12 @@ where
     });
     Ok(written)
 }
+
+/// How much has to arrive before another progress event is emitted. Every
+/// event crosses the IPC boundary, and a several-hundred-megabyte download
+/// yields tens of thousands of chunks — reporting each one floods the channel
+/// and janks the UI it is meant to inform.
+const PROGRESS_STEP_BYTES: u64 = 4 * 1024 * 1024;
 
 /// Stream the archive to `path`, hashing as it goes. Returns the hex digest.
 async fn stream_to_file<F>(
@@ -171,6 +221,7 @@ where
     let mut file = std::fs::File::create(path)?;
     let mut hasher = Sha256::new();
     let mut downloaded = 0u64;
+    let mut reported = 0u64;
     let mut stream = response.bytes_stream();
 
     while let Some(chunk) = stream.next().await {
@@ -180,6 +231,18 @@ where
         hasher.update(&chunk);
         file.write_all(&chunk)?;
         downloaded += chunk.len() as u64;
+        if downloaded - reported >= PROGRESS_STEP_BYTES {
+            reported = downloaded;
+            on_progress(GpuInstallProgress {
+                downloaded_bytes: downloaded,
+                total_bytes: total,
+                done: false,
+            });
+        }
+    }
+    // The last partial step still has to be shown, or the bar stops short of
+    // the end while the (long) unpack runs.
+    if downloaded != reported {
         on_progress(GpuInstallProgress {
             downloaded_bytes: downloaded,
             total_bytes: total,
@@ -190,11 +253,57 @@ where
     Ok(hex(&hasher.finalize()))
 }
 
+/// Suffix each member is written under before the set is published. Anything
+/// left with this suffix is debris from a failed install, never a library the
+/// app would load: ggml only ever `dlopen`s files ending in `.so`.
+const PART_SUFFIX: &str = ".lune-part";
+
 /// Unpack the verified archive, writing only permitted members.
+///
+/// Two-phase on purpose. A half-extracted set is worse than none: the presence
+/// of `libggml-cuda.so` alone is what [`plugin_installed`] reads as "installed",
+/// so an install interrupted after that member would report itself installed,
+/// fail to `dlopen` for want of the CUDA runtime beside it, and leave the UI
+/// showing a permanent failure with no download button to retry. So every
+/// member lands under a `.lune-part` name first and is renamed into place only
+/// once the whole archive has been extracted — with the plugin itself last, so
+/// the "installed" marker is the final step rather than the first.
 fn unpack(archive: &Path, dest_dir: &Path) -> PersistResult<Vec<PathBuf>> {
+    let mut staged: Vec<(PathBuf, PathBuf)> = Vec::new();
+    if let Err(e) = extract_members(archive, dest_dir, &mut staged) {
+        for (part, _) in &staged {
+            let _ = std::fs::remove_file(part);
+        }
+        return Err(e);
+    }
+
+    if staged.is_empty() {
+        return Err(PersistError::Io(std::io::Error::other(
+            "GPU backend archive contained no libraries",
+        )));
+    }
+
+    // The plugin file is the installation marker, so publish it last.
+    staged.sort_by_key(|(_, out)| out.file_name().is_some_and(|n| n == CUDA_PLUGIN_FILE));
+
+    let mut written = Vec::with_capacity(staged.len());
+    for (part, out) in staged {
+        std::fs::rename(&part, &out)?;
+        written.push(out);
+    }
+    Ok(written)
+}
+
+/// Extract every permitted member to its `.lune-part` staging name, recording
+/// `(staged, final)` pairs in `staged` as it goes so a failure can clean up
+/// exactly what it created.
+fn extract_members(
+    archive: &Path,
+    dest_dir: &Path,
+    staged: &mut Vec<(PathBuf, PathBuf)>,
+) -> PersistResult<()> {
     let file = std::fs::File::open(archive)?;
     let mut tar = tar::Archive::new(flate2::read::GzDecoder::new(file));
-    let mut written = Vec::new();
 
     for entry in tar.entries()? {
         let mut entry = entry?;
@@ -208,26 +317,25 @@ fn unpack(archive: &Path, dest_dir: &Path) -> PersistResult<Vec<PathBuf>> {
                 path.display()
             ))));
         }
-        let out = dest_dir.join(
-            path.file_name()
-                .expect("permitted members have a file name"),
-        );
+        let name = path
+            .file_name()
+            .expect("permitted members have a file name")
+            .to_owned();
+        let out = dest_dir.join(&name);
+        let mut part_name = name;
+        part_name.push(PART_SUFFIX);
+        let part = dest_dir.join(part_name);
+
         // Streamed rather than buffered: cuBLASLt alone unpacks to ~479 MB, and
         // reading it into a `Vec` first would double the peak memory for no gain.
-        let mut out_file = std::fs::File::create(&out)?;
+        let mut out_file = std::fs::File::create(&part)?;
+        staged.push((part.clone(), out));
         std::io::copy(&mut entry, &mut out_file)?;
         out_file.sync_all()?;
         drop(out_file);
-        set_executable(&out)?;
-        written.push(out);
+        set_executable(&part)?;
     }
-
-    if written.is_empty() {
-        return Err(PersistError::Io(std::io::Error::other(
-            "GPU backend archive contained no libraries",
-        )));
-    }
-    Ok(written)
+    Ok(())
 }
 
 #[cfg(unix)]
@@ -276,12 +384,109 @@ mod tests {
             "../libggml-cuda.so",
             "/libggml-cuda.so",
             "libcuda.so.1",
+            // A permitted name with anything appended is a different file, and
+            // every member that gets through is written executable.
+            "libggml-cuda.soevil",
+            "libcublas.so.evil",
+            "libcublas.so.",
+            "libcublas.so-13",
         ] {
             assert!(
                 !is_permitted_member(Path::new(bad)),
                 "{bad} should be refused"
             );
         }
+    }
+
+    #[test]
+    fn a_release_is_unpublished_until_its_digest_is_pinned() {
+        let mut release = GpuPluginRelease {
+            url: "https://example.invalid/plugin.tar.gz",
+            sha256: UNPUBLISHED,
+            download_bytes: 1,
+            cuda_major: 13,
+        };
+        assert!(!release.is_published());
+        release.sha256 = "0000000000000000000000000000000000000000000000000000000000000000";
+        assert!(release.is_published());
+    }
+
+    /// Build a gzipped tar of `(name, bytes)` members at `path`.
+    fn write_archive(path: &Path, members: &[(&str, &[u8])]) {
+        let file = std::fs::File::create(path).expect("create archive");
+        let mut builder = tar::Builder::new(flate2::write::GzEncoder::new(
+            file,
+            flate2::Compression::none(),
+        ));
+        for (name, bytes) in members {
+            let mut header = tar::Header::new_gnu();
+            header.set_size(bytes.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            builder
+                .append_data(&mut header, name, *bytes)
+                .expect("append member");
+        }
+        builder
+            .into_inner()
+            .expect("finish tar")
+            .finish()
+            .expect("finish gzip");
+    }
+
+    #[test]
+    fn a_rejected_member_leaves_no_half_installation_behind() {
+        // The plugin file is extracted before the bad member is reached. If it
+        // were published as it went, `plugin_installed` would report an install
+        // that cannot load — and the UI offers no way back from that state.
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let archive = tmp.path().join("gpu.tar.gz");
+        write_archive(
+            &archive,
+            &[
+                ("./libggml-cuda.so", b"plugin"),
+                ("./libcudart.so.13", b"runtime"),
+                ("./evil.so", b"nope"),
+            ],
+        );
+
+        let err = unpack(&archive, tmp.path()).expect_err("must refuse the archive");
+        assert!(err.to_string().contains("unexpected member"), "{err}");
+        assert!(!plugin_installed_at(tmp.path()));
+        let leftovers: Vec<_> = std::fs::read_dir(tmp.path())
+            .expect("read dir")
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|n| n != "gpu.tar.gz")
+            .collect();
+        assert!(
+            leftovers.is_empty(),
+            "staged files were left behind: {leftovers:?}"
+        );
+    }
+
+    #[test]
+    fn a_clean_archive_publishes_every_member() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let archive = tmp.path().join("gpu.tar.gz");
+        write_archive(
+            &archive,
+            &[
+                ("./libcudart.so.13", b"runtime"),
+                ("./libggml-cuda.so", b"plugin"),
+            ],
+        );
+
+        let written = unpack(&archive, tmp.path()).expect("unpack");
+        assert_eq!(written.len(), 2);
+        assert!(plugin_installed_at(tmp.path()));
+        assert!(tmp.path().join("libcudart.so.13").is_file());
+    }
+
+    /// `plugin_installed` resolves `<data dir>/backends`; these tests unpack
+    /// straight into a directory, so check the marker file directly.
+    fn plugin_installed_at(dir: &Path) -> bool {
+        dir.join(CUDA_PLUGIN_FILE).is_file()
     }
 
     #[tokio::test]

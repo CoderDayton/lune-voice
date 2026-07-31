@@ -2,10 +2,10 @@ import { describe, expect, test } from 'bun:test';
 import {
   asrModelLocalName,
   buildInitialSelection,
+  gpuAccelerationOffer,
   isSetupSatisfiable,
   type ModelStatus,
   relevantSetupModels,
-  shouldOfferGpuAcceleration,
 } from '../../src/features/welcome/setup-logic';
 
 const model = (localName: string, opts: Partial<ModelStatus> = {}): ModelStatus => ({
@@ -56,19 +56,29 @@ describe('relevantSetupModels', () => {
   });
 });
 
-describe('shouldOfferGpuAcceleration', () => {
-  test('offers whenever this machine has an NVIDIA GPU to use', () => {
-    // The plugin is downloadable, so "not installed yet" is the whole point of
-    // the card, and an already-working GPU still needs the accept toggle.
-    expect(shouldOfferGpuAcceleration('not-installed')).toBe(true);
-    expect(shouldOfferGpuAcceleration('ready')).toBe(true);
+describe('gpuAccelerationOffer', () => {
+  test('claims acceleration is active only when a CUDA device is registered', () => {
+    expect(gpuAccelerationOffer('ready', true)).toBe('active');
+    // Already working, so it stays offered even where no download is available.
+    expect(gpuAccelerationOffer('ready', false)).toBe('active');
+  });
+
+  test('promises setup rather than speed while the plugin is missing', () => {
+    expect(gpuAccelerationOffer('not-installed', true)).toBe('after-download');
     // Usually a plugin installed this session that needs a restart.
-    expect(shouldOfferGpuAcceleration('failed')).toBe(true);
+    expect(gpuAccelerationOffer('failed', true)).toBe('after-download');
   });
 
   test('hides the card when no download could make the GPU work', () => {
-    expect(shouldOfferGpuAcceleration('unsupported')).toBe(false);
-    expect(shouldOfferGpuAcceleration('driver-missing')).toBe(false);
+    expect(gpuAccelerationOffer('unsupported', true)).toBeNull();
+    expect(gpuAccelerationOffer('driver-missing', true)).toBeNull();
+  });
+
+  test('hides the card when the plugin archive is not published', () => {
+    // Settings hides the download button in the same state, so pointing the
+    // user there would be a dead end.
+    expect(gpuAccelerationOffer('not-installed', false)).toBeNull();
+    expect(gpuAccelerationOffer('failed', false)).toBeNull();
   });
 });
 

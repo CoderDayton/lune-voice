@@ -437,6 +437,11 @@ pub struct GpuBackendStatusDto {
     /// `u32` for the same reason as [`GpuInstallProgressDto`]: `number`, not
     /// `bigint`, on the TypeScript side.
     pub download_bytes: u32,
+    /// Whether the plugin archive for this platform has actually been
+    /// published. False on a build whose release digest is still the
+    /// `UNPUBLISHED` sentinel, where the install would refuse — the UI hides
+    /// the download rather than offering a button that cannot succeed.
+    pub download_available: bool,
 }
 
 // ── Write DTOs (Deserialize ← frontend) ──────────────────────────────────

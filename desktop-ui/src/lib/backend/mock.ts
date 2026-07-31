@@ -459,6 +459,7 @@ export const mockBackendClient: BackendClient = {
       devices: [],
       reason: null,
       downloadBytes: 0,
+      downloadAvailable: false,
     };
   },
 };

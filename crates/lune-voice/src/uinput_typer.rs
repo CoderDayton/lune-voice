@@ -735,7 +735,6 @@ fn get_clipboard() -> Result<Option<ClipboardSnapshot>, String> {
     }
 }
 
-/// Restore a captured clipboard snapshot verbatim.
 /// Current clipboard contents as text, if the clipboard holds text — used by
 /// snippet `{clipboard}` placeholders. Best-effort: `None` when the clipboard
 /// is empty, unreadable, or holds non-text content (e.g. an image).
@@ -749,6 +748,7 @@ pub fn clipboard_text() -> Option<String> {
     (!text.is_empty()).then_some(text)
 }
 
+/// Restore a captured clipboard snapshot verbatim.
 fn set_clipboard_snapshot(snap: &ClipboardSnapshot) -> Result<(), String> {
     if is_wayland() {
         pipe_bytes_to_command(

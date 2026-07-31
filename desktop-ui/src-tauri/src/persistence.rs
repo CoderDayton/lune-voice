@@ -100,15 +100,16 @@ pub fn save_snippet(input: SaveSnippetInput) -> Result<WorkspaceSnapshot, String
     }
 
     let mut database = open_database(&paths)?;
-    // Spoken matching is case-insensitive, so two snippets must not share a
-    // trigger that differs only in case — the collision would silently shadow
-    // one of them.
+    // Spoken matching normalizes case, punctuation and whitespace, so the
+    // collision test has to normalize too: comparing the stored strings would
+    // let "Meeting, header." and "meeting header" both exist, and matching
+    // would then silently shadow one of them.
     let existing = database
         .list_snippets()
         .map_err(|e| format!("list snippets: {e}"))?;
     let clash = existing.iter().any(|s| {
         input.id.as_deref() != Some(s.id.as_str())
-            && s.trigger_phrase.trim().eq_ignore_ascii_case(trigger)
+            && lune_dict::snippets::triggers_collide(&s.trigger_phrase, trigger)
     });
     if clash {
         return Err("another snippet already uses this trigger phrase".into());

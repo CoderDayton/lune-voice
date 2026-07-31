@@ -14,11 +14,11 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. placeholder {0}: snippet.triggerPhrase
-#: src/features/snippets/snippets-page.tsx:327
+#: src/features/snippets/snippets-page.tsx:292
 msgid "“{0}” will stop expanding. The template text is not recoverable."
 msgstr ""
 
-#: src/features/snippets/snippets-page.tsx:253
+#: src/features/snippets/snippets-page.tsx:218
 msgid "(clipboard contents)"
 msgstr ""
 
@@ -62,7 +62,7 @@ msgstr "{totalCount} 会话"
 msgid "{visibleCount} / {totalCount}"
 msgstr "{visibleCount} / {totalCount}"
 
-#: src/features/snippets/snippets-page.tsx:235
+#: src/features/snippets/snippets-page.tsx:200
 msgid ""
 "## Meeting — {date}\n"
 "\n"
@@ -70,7 +70,7 @@ msgid ""
 "- "
 msgstr ""
 
-#: src/features/snippets/snippets-page.tsx:163
+#: src/features/snippets/snippets-page.tsx:128
 msgid "A block of text Lune Voice types for you when you speak its trigger phrase."
 msgstr ""
 
@@ -112,7 +112,7 @@ msgstr "添加修复后，Lune Voice 会在您每次听写时应用它。尝试�
 msgid "Add correction"
 msgstr "添加修正"
 
-#: src/features/snippets/snippets-page.tsx:272
+#: src/features/snippets/snippets-page.tsx:237
 msgid "Add snippet"
 msgstr ""
 
@@ -201,7 +201,7 @@ msgstr "取消当前录音"
 msgid "Cancel dictation"
 msgstr "取消听写"
 
-#: src/features/snippets/snippets-page.tsx:168
+#: src/features/snippets/snippets-page.tsx:133
 msgid "Cancel edit"
 msgstr ""
 
@@ -347,12 +347,12 @@ msgstr "校正灵敏度"
 msgid "Couldn't add that rule. Try again."
 msgstr "无法添加该规则。再试一次。"
 
-#: src/features/snippets/snippets-page.tsx:130
+#: src/features/snippets/snippets-page.tsx:95
 msgid "Couldn't save that snippet. Try again."
 msgstr ""
 
-#: src/features/snippets/snippets-page.tsx:158
-#: src/features/snippets/snippets-page.tsx:162
+#: src/features/snippets/snippets-page.tsx:123
+#: src/features/snippets/snippets-page.tsx:127
 msgid "Create a snippet"
 msgstr ""
 
@@ -379,7 +379,7 @@ msgstr "黑暗的"
 #: src/features/history/components/history-table.tsx:387
 #: src/features/history/components/session-detail-modal.tsx:202
 #: src/features/settings/sections/models-section.tsx:259
-#: src/features/snippets/snippets-page.tsx:328
+#: src/features/snippets/snippets-page.tsx:293
 msgid "Delete"
 msgstr "删除"
 
@@ -402,7 +402,7 @@ msgstr "删除模型"
 msgid "Delete session?"
 msgstr "删除会话？"
 
-#: src/features/snippets/snippets-page.tsx:326
+#: src/features/snippets/snippets-page.tsx:291
 msgid "Delete snippet?"
 msgstr ""
 
@@ -486,7 +486,7 @@ msgid "Download failed"
 msgstr "下载失败"
 
 #. placeholder {0}: formatBytes(status.downloadBytes)
-#: src/features/settings/sections/gpu-section.tsx:55
+#: src/features/settings/sections/gpu-section.tsx:54
 msgid "Download GPU support ({0})"
 msgstr ""
 
@@ -509,7 +509,7 @@ msgid "Downloading models"
 msgstr "下载模型"
 
 #: src/features/settings/components/asr-engine-cards.tsx:151
-#: src/features/settings/sections/gpu-section.tsx:54
+#: src/features/settings/sections/gpu-section.tsx:53
 #: src/features/settings/sections/models-section.tsx:273
 #: src/features/welcome/welcome-page.tsx:254
 msgid "Downloading…"
@@ -535,7 +535,7 @@ msgstr ""
 msgid "Edge distance in pixels"
 msgstr ""
 
-#: src/features/snippets/snippets-page.tsx:323
+#: src/features/snippets/snippets-page.tsx:288
 #: src/features/styles/components/style-hero.tsx:47
 #: src/features/styles/components/style-preset-card.tsx:113
 msgid "Edit"
@@ -546,8 +546,8 @@ msgstr "编辑"
 msgid "Edit {0}"
 msgstr "编辑 {0}"
 
-#: src/features/snippets/snippets-page.tsx:158
-#: src/features/snippets/snippets-page.tsx:162
+#: src/features/snippets/snippets-page.tsx:123
+#: src/features/snippets/snippets-page.tsx:127
 msgid "Edit snippet"
 msgstr ""
 
@@ -658,15 +658,15 @@ msgstr "早上好"
 msgid "GPU acceleration"
 msgstr "GPU 加速"
 
-#: src/features/settings/sections/gpu-section.tsx:93
+#: src/features/settings/sections/gpu-section.tsx:92
 msgid "GPU acceleration is active."
 msgstr ""
 
-#: src/features/settings/sections/gpu-section.tsx:39
+#: src/features/settings/sections/gpu-section.tsx:43
 msgid "GPU support"
 msgstr ""
 
-#: src/features/settings/sections/gpu-section.tsx:109
+#: src/features/settings/sections/gpu-section.tsx:108
 msgid "GPU support is installed but not working."
 msgstr ""
 
@@ -699,11 +699,11 @@ msgstr "闲置的"
 msgid "In use"
 msgstr "使用中"
 
-#: src/features/snippets/snippets-page.tsx:221
+#: src/features/snippets/snippets-page.tsx:186
 msgid "Insert at cursor"
 msgstr ""
 
-#: src/features/snippets/snippets-page.tsx:214
+#: src/features/snippets/snippets-page.tsx:179
 msgid "Insert placeholder"
 msgstr ""
 
@@ -794,7 +794,7 @@ msgstr "月光之声写道"
 msgid "Manage in Models"
 msgstr "在“型号”中管理"
 
-#: src/features/snippets/snippets-page.tsx:186
+#: src/features/snippets/snippets-page.tsx:151
 msgid "meeting header"
 msgstr ""
 
@@ -833,7 +833,7 @@ msgstr "模型存储在本地。没有遥测，没有账户。"
 msgid "Monitor"
 msgstr ""
 
-#: src/features/settings/sections/gpu-section.tsx:40
+#: src/features/settings/sections/gpu-section.tsx:44
 msgid "Most of the download is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
 msgstr ""
 
@@ -878,7 +878,7 @@ msgstr "还没有会议"
 msgid "No sessions yet. Start dictating to see your transcripts here."
 msgstr "还没有会议。开始听写并在此处查看您的成绩单。"
 
-#: src/features/snippets/snippets-page.tsx:289
+#: src/features/snippets/snippets-page.tsx:254
 msgid "No snippets yet."
 msgstr ""
 
@@ -1124,15 +1124,15 @@ msgid "Rewrite each transcript in a chosen style. When off, the raw transcript i
 msgstr "以选定的风格改写每份转录文本。关闭时，原始转录文本将按原样传递。"
 
 #. placeholder {0}: status.devices.join(', ')
-#: src/features/settings/sections/gpu-section.tsx:92
+#: src/features/settings/sections/gpu-section.tsx:91
 msgid "Running on {0}."
 msgstr ""
 
-#: src/features/settings/sections/gpu-section.tsx:116
+#: src/features/settings/sections/gpu-section.tsx:118
 msgid "Running on the CPU."
 msgstr ""
 
-#: src/features/settings/sections/gpu-section.tsx:101
+#: src/features/settings/sections/gpu-section.tsx:100
 msgid "Running on the CPU. No NVIDIA driver was found — install the driver for your GPU and Lune Voice will offer GPU support here."
 msgstr ""
 
@@ -1145,7 +1145,7 @@ msgstr "s"
 msgid "Save"
 msgstr "节省"
 
-#: src/features/snippets/snippets-page.tsx:268
+#: src/features/snippets/snippets-page.tsx:233
 msgid "Save changes"
 msgstr ""
 
@@ -1154,15 +1154,15 @@ msgstr ""
 msgid "Save Transcript"
 msgstr "保存成绩单"
 
-#: src/features/snippets/snippets-page.tsx:292
+#: src/features/snippets/snippets-page.tsx:257
 msgid "Save your signature, a meeting header, or anything you type often — then speak its trigger to drop it into any app."
 msgstr ""
 
-#: src/features/snippets/snippets-page.tsx:284
+#: src/features/snippets/snippets-page.tsx:249
 msgid "Saved snippets"
 msgstr ""
 
-#: src/features/snippets/snippets-page.tsx:191
+#: src/features/snippets/snippets-page.tsx:156
 msgid "Say <0>“{spokenTrigger}”</0> as the whole utterance — or <1>“insert {spokenTrigger}”</1> — to type this snippet."
 msgstr ""
 
@@ -1237,7 +1237,7 @@ msgstr "暂时跳过"
 msgid "Skip to main content"
 msgstr "跳至主要内容"
 
-#: src/features/snippets/snippets-page.tsx:212
+#: src/features/snippets/snippets-page.tsx:177
 msgid "Snippet text"
 msgstr ""
 
@@ -1354,7 +1354,7 @@ msgstr "用于语音输入的主要快捷方式。单击绑定以更改它。"
 msgid "The microphone is in use"
 msgstr ""
 
-#: src/features/snippets/snippets-page.tsx:258
+#: src/features/snippets/snippets-page.tsx:223
 msgid "The snippet text appears here with placeholders filled in."
 msgstr ""
 
@@ -1441,19 +1441,19 @@ msgstr "转录"
 msgid "Transcription runs on the CPU by default. If you have an NVIDIA GPU, an optional download moves it to the GPU for noticeably lower latency."
 msgstr ""
 
-#: src/features/snippets/snippets-page.tsx:180
+#: src/features/snippets/snippets-page.tsx:145
 msgid "Trigger phrase"
 msgstr ""
 
-#: src/features/snippets/snippets-page.tsx:198
+#: src/features/snippets/snippets-page.tsx:163
 msgid "Type a phrase, or tap the mic to capture it exactly as Lune Voice hears it."
 msgstr ""
 
-#: src/features/snippets/snippets-page.tsx:250
+#: src/features/snippets/snippets-page.tsx:215
 msgid "Types as"
 msgstr ""
 
-#: src/features/welcome/components/engine-step.tsx:131
+#: src/features/welcome/components/engine-step.tsx:136
 msgid "Use GPU acceleration"
 msgstr "使用 GPU 加速"
 
@@ -1565,13 +1565,21 @@ msgstr "你已经准备好了"
 msgid "Your API key. Leave it blank to keep the saved key."
 msgstr "您的 API 密钥。将其留空以保留保存的密钥。"
 
+#: src/features/welcome/components/engine-step.tsx:126
+msgid "Your GPU is ready — use it for faster transcription."
+msgstr ""
+
+#: src/features/welcome/components/engine-step.tsx:127
+msgid "Your GPU qualifies. Keep this on, then finish the one-time setup in Settings."
+msgstr ""
+
 #: src/features/overview/overview-page.tsx:230
 msgid "your hotkey"
 msgstr "你的热键"
 
 #: src/features/welcome/components/engine-step.tsx:122
-msgid "Your machine supports it — use it for faster transcription."
-msgstr "您的设备支持它——使用它可加快转录速度。"
+#~ msgid "Your machine supports it — use it for faster transcription."
+#~ msgstr "您的设备支持它——使用它可加快转录速度。"
 
 #: src/features/welcome/welcome-page.tsx:152
 msgid "Your models are ready. Everything stays on this machine."

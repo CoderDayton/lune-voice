@@ -7,42 +7,7 @@ import { PanelHeader } from '../../components/ui/panel-header';
 import { VoiceCaptureField } from '../../components/ui/voice-capture-field';
 import type { SnippetItemDto } from '../../lib/backend/types';
 import { removeSnippet, saveSnippet, workspaceStore } from '../../store/workspace-store';
-
-/**
- * Placeholders the backend substitutes at expansion time (see
- * `lune-dict::snippets::render_body`). The preview below mirrors the same
- * semantics: known tokens are replaced, anything else in braces passes
- * through verbatim.
- */
-const PLACEHOLDERS = ['date', 'time', 'datetime', 'clipboard'] as const;
-
-function previewBody(body: string, clipboardLabel: string): string {
-  const now = new Date();
-  const date = now.toLocaleDateString(undefined, {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
-  const time = now.toLocaleTimeString(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-  return body.replace(/\{([^{}]*)\}/g, (raw, token: string) => {
-    switch (token.toLowerCase()) {
-      case 'date':
-        return date;
-      case 'time':
-        return time;
-      case 'datetime':
-        return `${date} at ${time}`;
-      case 'clipboard':
-        return clipboardLabel;
-      default:
-        return raw;
-    }
-  });
-}
+import { PLACEHOLDERS, previewBody } from './snippet-preview';
 
 /**
  * Snippets page. The composer (create or edit one voice-triggered template)

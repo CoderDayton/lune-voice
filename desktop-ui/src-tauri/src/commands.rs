@@ -579,6 +579,7 @@ fn current_gpu_status() -> Result<GpuBackendStatusDto, String> {
         devices,
         reason,
         download_bytes: archive_bytes(),
+        download_available: lune_persist::gpu_plugin::CUDA_LINUX_X86_64.is_published(),
     })
 }
 

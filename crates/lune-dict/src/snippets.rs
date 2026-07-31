@@ -29,6 +29,19 @@ pub fn match_utterance<'a>(snippets: &'a [Snippet], utterance: &str) -> Option<&
         .find(|s| normalize_words(&s.trigger_phrase) == words)
 }
 
+/// Whether two trigger phrases would match the same spoken utterance.
+///
+/// Matching normalizes (lowercase, punctuation dropped, whitespace collapsed),
+/// so a plain string comparison is not enough to decide whether a new trigger
+/// shadows an existing one: `"Meeting, header."` and `"meeting header"` are
+/// different strings but the same phrase, and [`match_utterance`] would
+/// silently pick whichever came first. This is what the uniqueness check on
+/// the save path has to use.
+pub fn triggers_collide(a: &str, b: &str) -> bool {
+    let a = normalize_words(a);
+    !a.is_empty() && a == normalize_words(b)
+}
+
 /// Resolve the argument of an `insert <name>` command to a snippet.
 ///
 /// Exact normalized match wins. Failing that, a fuzzy pass accepts triggers
@@ -199,6 +212,18 @@ mod tests {
         // "nose" is one edit from both "note" and "nope" — ambiguous, so it
         // must not expand either.
         assert!(resolve_name(&lib, "nose").is_none());
+    }
+
+    #[test]
+    fn triggers_collide_across_punctuation_and_case() {
+        // Both normalize to ["meeting", "header"], so saving the second would
+        // shadow the first at match time.
+        assert!(triggers_collide("Meeting, header.", "meeting header"));
+        assert!(triggers_collide("signature", "  Signature!  "));
+        assert!(!triggers_collide("meeting header", "meeting footer"));
+        // A trigger that normalizes to nothing can never be spoken, so it
+        // collides with nothing (the save path rejects it separately).
+        assert!(!triggers_collide("!!!", "!!!"));
     }
 
     #[test]

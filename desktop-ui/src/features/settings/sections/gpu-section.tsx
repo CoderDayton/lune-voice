@@ -34,7 +34,11 @@ export function GpuSection() {
         <StatusRow status={status} />
       </SettingsBlock>
 
-      {status.state === 'not-installed' && (
+      {/* `downloadAvailable` is false on a build whose plugin archive has not
+          been published yet, where the install refuses outright. Showing the
+          button anyway would offer a several-hundred-megabyte download that
+          can only end in a developer-facing error. */}
+      {status.state === 'not-installed' && status.downloadAvailable && (
         <SettingsBlock
           label={t`GPU support`}
           description={t`Most of the download is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form.`}
