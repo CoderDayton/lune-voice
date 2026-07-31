@@ -56,6 +56,20 @@ https://huggingface.co/ggml-org/whisper-vad is a conversion of the Silero VAD
 model (MIT License, Copyright (c) Silero Team). Downloaded by the user at
 runtime; not bundled with the binary.
 
+## NVIDIA CUDA runtime libraries
+
+The optional GPU plugin archive
+(`lune-voice-gpu-cuda<major>-linux-x86_64.tar.gz`, downloaded by the user at
+runtime and not bundled with the binary) contains `libcudart.so`,
+`libcublas.so`, and `libcublasLt.so` from the NVIDIA CUDA Toolkit. These are
+redistributed under the redistributable-software terms of the NVIDIA CUDA
+Toolkit End User License Agreement:
+https://docs.nvidia.com/cuda/eula/
+
+The NVIDIA display driver, including `libcuda.so.1`, is **not** redistributed
+and is not part of any Lune Voice artifact. It must be installed separately by
+the user through their distribution or NVIDIA.
+
 ## COSMIC Wayland protocol definitions
 
 `crates/lune-voice/protocols/cosmic-toplevel-info-unstable-v1.xml` and

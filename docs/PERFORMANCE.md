@@ -47,7 +47,7 @@ After-speech wait = poll_final (whisper.cpp decode + built-in VAD) + optional LL
 | 2 | LLM styling call | A few hundred milliseconds per utterance; skipped entirely when no style preset is selected |
 | 3 | Memory footprint | whisper.cpp holds its model weights in VRAM/RAM; the remote styling LLM adds no local memory footprint |
 
-**GPU impact:** a CUDA build (`whisper-cuda`) moves ASR inference to the GPU and substantially reduces decode time. CPU builds use whisper.cpp's AVX2-optimized GGML kernels (portable baseline; compile flags: `GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON`).
+**GPU impact:** a registered CUDA device moves ASR inference to the GPU and substantially reduces decode time. On Linux that comes from the downloadable GPU plugin ([docs/GPU_PLUGIN.md](GPU_PLUGIN.md)); a `whisper-cuda` build does the same thing statically. Without one, whisper.cpp uses its AVX2-optimized GGML kernels (portable baseline; compile flags: `GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON`). Plugin builds instead use `GGML_CPU_ALL_VARIANTS=ON`, which compiles per-microarchitecture CPU backends and picks the best one at runtime.
 
 **Model size trade-off:** `Small` (~264 MB) is fastest; `LargeV3Turbo` (~874 MB) provides the best accuracy with whisper's turbo decoder keeping latency closer to `Medium` (~823 MB) than to the full `Large` model.
 
@@ -153,7 +153,7 @@ samply record -- ./target/release/lune-voice daemon
 # then trigger a dictation session; Ctrl+C to stop recording
 ```
 
-For GPU builds, substitute `--features "whisper-cuda"`.
+For a statically linked GPU build, substitute `--features "whisper-cuda"`. To benchmark the plugin path instead, install the GPU plugin and run the CPU build — the backend is chosen at runtime.
 
 ### Tracing
 

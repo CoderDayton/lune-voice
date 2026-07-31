@@ -144,7 +144,7 @@ model = "Medium"
 | `Medium` | `ggml-medium-q8_0.bin` | ~823 MB | Balanced (recommended) |
 | `LargeV3Turbo` | `ggml-large-v3-turbo-q8_0.bin` | ~874 MB | Best accuracy; turbo decoder keeps it fast |
 
-Device choice (CPU vs CUDA) comes from the top-level `device` field. GPU inference requires a build compiled with `whisper-cuda` — see [GPU / Device Settings](#gpu--device-settings).
+Device choice (CPU vs CUDA) comes from the top-level `device` field. GPU inference requires a registered CUDA device, which on Linux means the downloadable GPU plugin (or a build compiled with `whisper-cuda`) — see [GPU / Device Settings](#gpu--device-settings).
 
 **VAD:** the backend uses whisper.cpp's built-in Silero VAD at decode time. The VAD model (`ggml-silero-v5.1.2.bin`, downloaded to `models/whisper-vad-silero/`) is loaded automatically when present. If it is missing, the backend decodes without VAD and logs a warning.
 
@@ -230,7 +230,9 @@ device = "auto"
 
 **GPU support is a runtime capability.** The CUDA backend is a plugin the app downloads on request, so `device = "cuda"` can start working on a binary that was never built with CUDA linked in. What it needs is an NVIDIA driver, which is not redistributable and so has to be installed by you. Query the current state with the `gpu_backend_status` command, or read it in Settings under Transcription; the onboarding acceleration card appears whenever that state is anything other than `unsupported` or `driver-missing`.
 
-See [docs/RELEASE.md](RELEASE.md) for the full build matrix and how to build CPU vs CUDA artifacts.
+The plugin installs into `~/.local/share/lune-voice/backends/`, so removing that directory reverts to CPU. Because ggml builds its device registry once per process, a freshly installed plugin only takes effect after a restart — the UI says so rather than silently doing nothing.
+
+See [docs/GPU_PLUGIN.md](GPU_PLUGIN.md) for how detection and installation work, and [docs/RELEASE.md](RELEASE.md) for the build matrix.
 
 ---
 
@@ -571,5 +573,5 @@ max_tokens = 512
 | `RUST_LOG` | Tracing filter (e.g., `lune_asr=debug,lune_llm=info`) |
 | `LUNE_VOICE_CONFIG` | Override settings file path |
 | `HF_HOME` | Override HuggingFace cache directory (affects model downloads) |
-| `CUDA_VISIBLE_DEVICES` | Control which GPU is used for inference (CUDA builds only) |
+| `CUDA_VISIBLE_DEVICES` | Control which GPU is used for inference (when a CUDA device is registered) |
 | `LIBCLANG_PATH` | Required at build time for bindgen (e.g., `/lib/x86_64-linux-gnu`); not a runtime variable |

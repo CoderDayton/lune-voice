@@ -52,7 +52,7 @@ The app collects no telemetry and no analytics. Since the source is public, you 
 
 ## Building from source
 
-You need Rust, [Bun](https://bun.sh), CMake, and LLVM. On Linux, install the Tauri WebView dependencies as well. A CUDA toolkit is optional and enables GPU transcription.
+You need Rust, [Bun](https://bun.sh), CMake, and LLVM. On Linux, install the Tauri WebView dependencies as well. A CUDA toolkit is only needed if you want to build the GPU plugin yourself.
 
 ```bash
 git clone https://github.com/CoderDayton/lune-voice
@@ -66,15 +66,20 @@ Both commands detect CUDA automatically and fall back to CPU. You can force eith
 | | |
 |---|---|
 | **OS** | Linux (X11 or Wayland) |
-| **GPU** | Optional. CUDA gives the lowest latency; CPU-only works but is slower. |
+| **GPU** | Optional. If you have an NVIDIA card, the app offers a one-time download that moves transcription onto it. CPU-only works, just slower. |
 | **Disk** | Roughly 2 GB for models |
 | **Internet** | Once, for the model download |
+
+### GPU acceleration
+
+There is no separate GPU build to pick. The app detects an NVIDIA driver and offers to download the CUDA backend, which installs alongside your settings rather than into the application. You need a driver new enough for CUDA 13 (r580 or later); the toolkit itself is not required. See [docs/GPU_PLUGIN.md](docs/GPU_PLUGIN.md).
 
 ## Documentation
 
 - **[Architecture](docs/ARCHITECTURE.md)**: pipeline internals, session lifecycle, threading model
 - **[Configuration](docs/CONFIGURATION.md)**: settings, backends, hotkeys, style presets
 - **[Performance](docs/PERFORMANCE.md)**: benchmarks, latency breakdowns, tuning
+- **[GPU plugin](docs/GPU_PLUGIN.md)**: how CUDA support is detected, downloaded, and published
 - **[Release](docs/RELEASE.md)**: build matrix, packaging, third-party notices
 
 ## License

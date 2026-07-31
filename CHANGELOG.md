@@ -7,6 +7,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- GPU acceleration as an optional download instead of a separate build: the CUDA backend is a `dlopen`-able ggml plugin the app fetches on request, verifies against a pinned SHA-256, and loads from the user's data directory. One Linux build now serves every machine, and it starts on hosts with no NVIDIA driver at all
+- A **GPU acceleration** section in Settings under Transcription, showing whether the driver is present, offering the download with its size and live progress, and naming the active device once it works
+- `cgs gpu-plugin` and `cgs stage-runtime` for building, packaging, and locally staging the GPU plugin, plus `docs/GPU_PLUGIN.md` covering the design, publishing flow, and troubleshooting
 - Configurable dictation-pill placement from a new **Pill** section in Settings: target monitor, screen anchor (six corner/center positions), size (Compact / Standard / Large), orientation (Horizontal / Vertical), corner style (Pill / Rounded / Square), edge margin, and whether it shows on all workspaces
 - Draggable pill — drag it anywhere and it reopens where you left it, with lock-position and reset-to-default controls and a monitor picker for pinning it to a specific display
 - Sound cues on dictation start, stop, and error, played from the backend, with an enable toggle and volume slider in Settings
@@ -39,8 +42,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `cargo deny check licenses` runs again: the config used `unlicensed` and `copyleft` keys removed in cargo-deny 0.18, so the license audit had been failing to parse rather than passing
 - Output settings split into a delivery method (`TypeInPlace` / `Clipboard`) and an independent `copy_to_clipboard` toggle; the combined `Both` mode was removed (legacy `Both` configs migrate to `TypeInPlace` with copy enabled)
 - Text delivery prefers the IBus input method when it is active — committing text directly with no clipboard — and falls back to the uinput keyboard path otherwise
+- GPU support is reported at runtime rather than at build time: the `gpu_support` command (which only ever answered "was CUDA compiled in") was replaced by `gpu_backend_status`, which distinguishes no driver, driver but no plugin, working, and failed
+- `whisper-rs-sys` is vendored under `vendor/` with a single modified file, adding the `GGML_BACKEND_DL` support the plugin architecture needs
 
 ### Fixed
+- The onboarding GPU acceleration card was never shown, because it was gated on a build-time CUDA check that is always false once the backend is a downloadable plugin
+- The `.deb` declared `libcudart12` and `libcublas12` as dependencies — a wrong major version, and names matching no real Debian or Ubuntu package, which would have blocked installation on CPU-only machines
 - Pill overlay works on GNOME/Mutter and other compositors without `wlr-layer-shell` — the app falls back to XWayland so the overlay can position itself and stay on top
 - Settings dropdowns flip upward when they would otherwise overflow the bottom of the screen
 - The pill's cancel button no longer paints a red background on hover — it keeps only the red ✕

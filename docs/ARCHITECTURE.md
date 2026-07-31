@@ -11,6 +11,7 @@ Lune Voice has one dictation pipeline and two control surfaces. The CLI talks to
 - [Pipeline Walkthrough](#pipeline-walkthrough)
   - [Audio Capture](#1-audio-capture)
   - [ASR](#2-asr)
+    - [Compute backend selection](#2a-i-compute-backend-selection)
   - [Dictionary Application](#3-dictionary-application)
   - [LLM Styling](#4-llm-styling)
   - [Text Delivery](#5-text-delivery)
@@ -35,7 +36,7 @@ The runtime pipeline uses interchangeable backends:
 | ASR | WhisperCpp (local), OpenAI-compatible (remote) | GGML `.bin` / remote API | whisper-rs (whisper.cpp) / HTTP |
 | LLM | OpenAI-compatible (remote), disabled | remote API | HTTP |
 
-The native ASR backend compiles its C/C++ library from source at build time via a `*-sys` crate. GPU (CUDA) support is selected at **build time** via the `whisper-cuda` Cargo feature; there is no runtime backend autodetection. The styling LLM is remote-only — point it at Ollama, llama-server, LM Studio, or a hosted API. See [docs/RELEASE.md](RELEASE.md) for the full build matrix.
+The native ASR backend compiles its C/C++ library from source at build time via a `*-sys` crate. GPU (CUDA) support on Linux is a **runtime** capability: ggml's compute backends are built as `dlopen`-able plugins (`GGML_BACKEND_DL`), so the CUDA backend is downloaded on request rather than linked in — see [docs/GPU_PLUGIN.md](GPU_PLUGIN.md). The styling LLM is remote-only — point it at Ollama, llama-server, LM Studio, or a hosted API. See [docs/RELEASE.md](RELEASE.md) for the full build matrix.
 
 Backend selection is centralized through registries and DTO mappers. The desktop UI never builds model paths or backend structs itself; it sends typed settings and receives snapshots.
 
@@ -97,6 +98,18 @@ Three GGML model sizes are available, all from `ggerganov/whisper.cpp` as q8_0 q
 | `Small` | `ggml-small-q8_0.bin` | ~264 MB | `whisper-small-q8_0` |
 | `Medium` *(default)* | `ggml-medium-q8_0.bin` | ~823 MB | `whisper-medium-q8_0` |
 | `LargeV3Turbo` | `ggml-large-v3-turbo-q8_0.bin` | ~874 MB | `whisper-large-v3-turbo-q8_0` |
+
+#### 2a-i. Compute backend selection
+
+**File:** `crates/lune-asr/src/gpu_backend.rs`
+
+ggml's compute backends are built as `dlopen`-able plugins (`GGML_BACKEND_DL`), so the executable carries no `DT_NEEDED` on the CUDA runtime and starts on a machine with no NVIDIA driver at all. Two directories are scanned at startup: `<exe dir>/backends/` for the bundled CPU backends, and `<data dir>/backends/` for the CUDA plugin the user downloads.
+
+`load_plugins` **must run before the first `WhisperContext` is created** — ggml selects a device from whatever is in the backend registry at context-creation time, which is why `desktop-ui/src-tauri/src/lib.rs` calls it before the Tauri builder. It is idempotent via a `OnceLock`, because the registry is process-global and has no unload.
+
+Each plugin carries `RUNPATH=$ORIGIN` so it resolves its own CUDA libraries from its own directory. Setting `LD_LIBRARY_PATH` in-process would not work: glibc caches the search path at startup.
+
+See [docs/GPU_PLUGIN.md](GPU_PLUGIN.md) for the states, the archive contents, and the publishing flow.
 
 #### 2b. OpenAI-Compatible (remote)
 

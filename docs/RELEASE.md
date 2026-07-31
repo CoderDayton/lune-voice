@@ -7,17 +7,22 @@ styling LLM is remote-only (OpenAI-compatible HTTP) — no native build step.
 
 The `whisper-rs` `*-sys` crate **vendors and compiles the native C/C++ library
 from source at `cargo build` time** (CMake + a C++ toolchain + `libclang` for
-bindgen). The GPU backend is selected at **build time** by a Cargo feature;
-there is **no runtime backend autodetection**.
+bindgen). It is vendored under `vendor/whisper-rs-sys/` via `[patch.crates-io]`,
+with a single modified file (`build.rs`) that adds `GGML_BACKEND_DL` support.
 
 ## Distribution model
 
-Releases are **prebuilt per platform + backend** and shipped as finished Tauri
-bundles. **End users never compile** anything. Each artifact is built on a runner
-that has the matching toolchain (and, for GPU artifacts, the matching SDK), with
-the backend feature set **pinned explicitly per target** — release runners pass
-`--env BACKEND` so each artifact is reproducible. (A bare local `cgs build`
-instead auto-detects the build host; see Build commands.)
+Releases are **prebuilt per platform** and shipped as finished Tauri bundles.
+**End users never compile** anything.
+
+GPU support is **not** a separate artifact on Linux. The CUDA backend is a
+`dlopen`-able plugin the user downloads from the app, so one CPU bundle serves
+every Linux user and a machine with an NVIDIA driver opts in at runtime. See
+[GPU_PLUGIN.md](GPU_PLUGIN.md) for how that works and how to publish the archive.
+
+Windows still builds a pinned CPU and CUDA artifact per target; release runners
+pass `--env BACKEND` so each is reproducible. (A bare local `cgs build` instead
+auto-detects the build host; see Build commands.)
 
 Whisper models are **external assets**: GGML files are downloaded at runtime
 into the application models directory (`~/.local/share/lune-voice/models/` on
@@ -28,8 +33,8 @@ bundle.
 
 | Target | OS / arch | Backend | Cargo features | Status |
 |---|---|---|---|---|
-| Linux CPU | Linux x86_64 | CPU (AVX2 baseline) | `whisper-cpp` | **Supported** |
-| Linux CUDA | Linux x86_64 + NVIDIA | CUDA | `whisper-cuda` | **Supported** |
+| Linux | Linux x86_64 | CPU (AVX2 baseline) | `whisper-cpp` | **Supported** |
+| Linux GPU plugin | Linux x86_64 + NVIDIA | CUDA, downloaded at runtime | — (built by `cgs gpu-plugin`) | **Supported** |
 | Windows CPU | Windows x86_64 | CPU (AVX2 baseline) | `whisper-cpp` | **Supported** |
 | Windows CUDA | Windows x86_64 + NVIDIA | CUDA | `whisper-cuda` | **Supported** |
 | macOS Metal | macOS arm64 (Apple Silicon) | Metal | `whisper-metal` | **Planned** (see below) |
@@ -38,6 +43,10 @@ The `whisper-cuda` feature forwards to `whisper-rs/cuda`; the CPU feature just
 compiles the library without a GPU backend. The Cargo feature graph is
 cross-platform — the same `--features` flag works on Linux and Windows; only
 the build toolchain differs per OS.
+
+The Linux GPU plugin is not a Cargo feature at all. It is built separately with
+`cgs gpu-plugin` and published as a standalone `.tar.gz` on the GitHub release;
+the application downloads and verifies it on request.
 
 ## Toolchain per runner
 
@@ -154,8 +163,28 @@ for the Linux containerized bundles) as a release asset.
 > documented here and remain to be implemented (they require macOS/Windows CI
 > runners to validate).
 
+## GPU plugin
+
+Built and packaged separately from the application bundle:
+
+```bash
+cgs gpu-plugin        # -> release-artifacts/lune-voice-gpu-cuda13-linux-x86_64.tar.gz + .sha256
+cgs stage-runtime     # copy ggml shared objects + CPU plugins next to a built binary
+```
+
+Upload both files to the GitHub release, then record the digest and byte size in
+`CUDA_LINUX_X86_64` (`crates/lune-persist/src/gpu_plugin.rs`). Until that digest
+is filled in, the in-app install refuses rather than fetching something it
+cannot verify. Full details in [GPU_PLUGIN.md](GPU_PLUGIN.md).
+
 ## Third-party notices
 
-`whisper.cpp` and `ggml` are MIT-licensed and statically linked into the shipped
-binary. Keep `THIRD_PARTY_NOTICES.md` in sync with the bundled upstream when its
-version changes.
+`whisper.cpp` and `ggml` are MIT-licensed. They are statically linked into the
+Windows and default `cgs build` artifacts, and shipped as separate shared
+objects wherever `GGML_BACKEND_DL` is enabled. The GPU plugin archive also
+carries NVIDIA's redistributable CUDA runtime libraries. Keep
+`THIRD_PARTY_NOTICES.md` in sync with the bundled upstream when its version
+changes.
+
+Lune Voice itself is GPL-3.0-or-later; `cargo deny check licenses` gates the
+dependency tree against the allow-list in `deny.toml`.
