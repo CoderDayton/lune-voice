@@ -23,6 +23,11 @@ hf-hub.workspace = true
 libsqlite3-sys = { version = "0.35", features = ["bundled"] }
 ureq = { version = "3.3.0", features = ["json"] }
 sha2 = "0.10"
+# Fetching + unpacking the optional GPU backend archive (src/gpu_plugin.rs).
+reqwest = { workspace = true }
+futures-util = { workspace = true }
+tar = { workspace = true }
+flate2 = { workspace = true }
 # OS keyring for API-key storage (Secret Service on Linux via zbus, Credential
 # Manager on Windows, Keychain on macOS). `crypto-rust` keeps the Secret
 # Service session encryption pure-Rust — no OpenSSL system dependency.

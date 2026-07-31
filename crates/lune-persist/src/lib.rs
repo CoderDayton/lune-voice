@@ -1,5 +1,6 @@
 mod db;
 mod error;
+pub mod gpu_plugin;
 pub mod hub;
 mod paths;
 mod secrets;

@@ -37,3 +37,6 @@ confusion_bank.json
 
 # Sound-cue preview files (not the real assets under crates/lune-voice/assets/)
 /sound-previews/
+
+# GPU backend plugin tarballs built by `cgs gpu-plugin` (hundreds of MB)
+/release-artifacts/

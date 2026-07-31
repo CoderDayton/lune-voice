@@ -26,8 +26,12 @@ async-trait.workspace = true
 lune-core.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+# `raw-api` re-exports `whisper_rs_sys`, which `gpu_backend.rs` needs for the
+# ggml backend-registry calls (`ggml_backend_load_all_from_path` and friends);
+# the safe wrapper does not expose them.
 whisper-rs = { version = "0.16", optional = true, default-features = false, features = [
     "tracing_backend",
+    "raw-api",
 ] }
 rustfft.workspace = true
 serde.workspace = true
@@ -36,7 +40,11 @@ base64 = "0.22"
 reqwest.workspace = true
 url.workspace = true
 
+[target.'cfg(unix)'.dependencies]
+libc = { workspace = true }
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 hound = "3.5"
+tempfile = "3.27.0"
 lune-llm = { path = "../lune-llm" }

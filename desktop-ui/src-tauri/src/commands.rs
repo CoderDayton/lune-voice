@@ -1,9 +1,10 @@
 use tauri::{Emitter, Runtime, State, WebviewWindow, ipc::Channel};
 
 use crate::dto::{
-    CreateCustomStyleInput, CreateDictionaryEntryInput, GpuSupportDto, HistoryPageDto,
-    PillSnapshotDto, SaveSnippetInput, SaveWorkspaceSettingsInput, SessionStreamEvent,
-    UpdateCustomStyleInput, UpdateDictionaryEntryInput, WorkspaceSnapshot,
+    CreateCustomStyleInput, CreateDictionaryEntryInput, GpuBackendStateDto, GpuBackendStatusDto,
+    GpuInstallProgressDto, GpuSupportDto, HistoryPageDto, PillSnapshotDto, SaveSnippetInput,
+    SaveWorkspaceSettingsInput, SessionStreamEvent, UpdateCustomStyleInput,
+    UpdateDictionaryEntryInput, WorkspaceSnapshot,
 };
 use crate::runtime::AppRuntime;
 
@@ -550,6 +551,94 @@ pub fn gpu_support(window: WebviewWindow) -> Result<GpuSupportDto, String> {
     Ok(GpuSupportDto {
         compiled_in: cfg!(feature = "whisper-cuda"),
     })
+}
+
+/// Runtime GPU status: driver present, plugin installed, device registered.
+///
+/// Unlike [`gpu_support`], this can change on the same binary — the CUDA
+/// backend is a downloadable plugin, so the answer depends on what the user
+/// has installed rather than on how the app was compiled.
+#[tauri::command]
+pub fn gpu_backend_status(window: WebviewWindow) -> Result<GpuBackendStatusDto, String> {
+    require_window_access(&window, &["main"])?;
+    current_gpu_status()
+}
+
+/// The one place a [`GpuBackendStatusDto`] is built, so a status read and the
+/// value returned by an install can never disagree about the same machine.
+fn current_gpu_status() -> Result<GpuBackendStatusDto, String> {
+    let paths = lune_persist::AppPaths::resolve().ok_or("failed to resolve application paths")?;
+
+    let (state, devices, reason) = match lune_asr::gpu_backend::state(paths.data_dir()) {
+        lune_asr::gpu_backend::GpuPluginState::Unsupported => {
+            (GpuBackendStateDto::Unsupported, Vec::new(), None)
+        }
+        lune_asr::gpu_backend::GpuPluginState::DriverMissing => {
+            (GpuBackendStateDto::DriverMissing, Vec::new(), None)
+        }
+        lune_asr::gpu_backend::GpuPluginState::NotInstalled => {
+            (GpuBackendStateDto::NotInstalled, Vec::new(), None)
+        }
+        lune_asr::gpu_backend::GpuPluginState::Ready { devices } => {
+            (GpuBackendStateDto::Ready, devices, None)
+        }
+        lune_asr::gpu_backend::GpuPluginState::Failed { reason } => {
+            (GpuBackendStateDto::Failed, Vec::new(), Some(reason))
+        }
+    };
+
+    Ok(GpuBackendStatusDto {
+        state,
+        devices,
+        reason,
+        download_bytes: archive_bytes(),
+    })
+}
+
+/// Archive size narrowed for the IPC boundary. Saturating rather than wrapping:
+/// a wrong-but-large number degrades the progress bar, a wrapped one would show
+/// a nonsensical download size.
+fn archive_bytes() -> u32 {
+    u32::try_from(lune_persist::gpu_plugin::CUDA_LINUX_X86_64.download_bytes).unwrap_or(u32::MAX)
+}
+
+/// Download and install the CUDA backend plugin.
+///
+/// Refuses when no NVIDIA driver is present: the driver is not redistributable,
+/// so the download would install libraries that cannot load. Progress is
+/// reported to the caller's channel as the archive streams.
+#[tauri::command]
+pub async fn install_gpu_backend(
+    window: WebviewWindow,
+    on_progress: Channel<GpuInstallProgressDto>,
+) -> Result<GpuBackendStatusDto, String> {
+    require_window_access(&window, &["main"])?;
+    if !lune_asr::gpu_backend::nvidia_driver_present() {
+        return Err(
+            "No NVIDIA driver was found. Install the driver for your GPU first — it is not \
+             something Lune Voice can download for you."
+                .to_owned(),
+        );
+    }
+    let paths = lune_persist::AppPaths::resolve().ok_or("failed to resolve application paths")?;
+    let dest = lune_asr::gpu_backend::downloaded_plugin_dir(paths.data_dir());
+
+    lune_persist::gpu_plugin::install(&lune_persist::gpu_plugin::CUDA_LINUX_X86_64, &dest, |p| {
+        let _ = on_progress.send(GpuInstallProgressDto {
+            downloaded_bytes: u32::try_from(p.downloaded_bytes).unwrap_or(u32::MAX),
+            total_bytes: u32::try_from(p.total_bytes).unwrap_or(u32::MAX),
+            done: p.done,
+        });
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    // Re-read rather than assert: the freshly installed plugin cannot register
+    // in this process (ggml's backend registry is built once at startup and has
+    // no unload), and `gpu_backend::state` is what knows that, reporting the
+    // restart-required reason. Returning a hand-rolled `not-installed` here
+    // would put the download button back in front of the user.
+    current_gpu_status()
 }
 
 #[tauri::command]

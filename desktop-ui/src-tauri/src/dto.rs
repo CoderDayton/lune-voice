@@ -396,6 +396,59 @@ pub struct GpuSupportDto {
     pub compiled_in: bool,
 }
 
+/// What GPU acceleration can do on this machine right now.
+///
+/// This is a *runtime* question, unlike `GpuSupportDto`. The CUDA backend is a
+/// dlopen-ed plugin the user downloads, so the same binary reports different
+/// answers on different machines: no driver, driver but no plugin, or a working
+/// GPU. Each variant maps to exactly one thing the setup UI can offer.
+#[derive(Debug, Clone, Copy, Serialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+#[serde(rename_all = "kebab-case")]
+pub enum GpuBackendStateDto {
+    /// Built without the native ASR backend; there is nothing to accelerate.
+    Unsupported,
+    /// No NVIDIA driver here. A download cannot fix this — the driver is not
+    /// redistributable, so the user has to install it themselves.
+    DriverMissing,
+    /// Driver present, plugin not downloaded yet. The offer state.
+    NotInstalled,
+    /// Plugin loaded and a CUDA device registered.
+    Ready,
+    /// Plugin installed but no CUDA device appeared.
+    Failed,
+}
+
+/// Streamed while the GPU plugin archive downloads.
+#[derive(Debug, Clone, Copy, Serialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct GpuInstallProgressDto {
+    /// `u32` rather than `u64` so ts-rs emits `number` instead of `bigint`:
+    /// the archive is a few hundred MB, nowhere near the 4 GB ceiling, and
+    /// `bigint` would force the progress arithmetic in the UI to be awkward.
+    pub downloaded_bytes: u32,
+    /// `0` when the server sends no `Content-Length`.
+    pub total_bytes: u32,
+    pub done: bool,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct GpuBackendStatusDto {
+    pub state: GpuBackendStateDto,
+    /// Compute devices ggml registered, so the UI can name the GPU rather than
+    /// claim success generically. Empty unless `state` is `ready`.
+    pub devices: Vec<String>,
+    /// User-facing explanation when `state` is `failed`.
+    pub reason: Option<String>,
+    /// Download size of the GPU plugin archive, for the confirmation prompt.
+    /// `u32` for the same reason as [`GpuInstallProgressDto`]: `number`, not
+    /// `bigint`, on the TypeScript side.
+    pub download_bytes: u32,
+}
+
 // ── Write DTOs (Deserialize ← frontend) ──────────────────────────────────
 
 #[derive(Debug, Clone, Deserialize, TS)]

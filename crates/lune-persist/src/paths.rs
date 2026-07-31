@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Resolved XDG-compliant application paths.
 #[derive(Debug, Clone)]
@@ -38,6 +38,13 @@ impl AppPaths {
 
     pub fn models_dir(&self) -> PathBuf {
         self.data_dir.join("models")
+    }
+
+    /// Root of the application data directory, for callers that derive their
+    /// own layout under it — e.g. `lune_asr::gpu_backend`, which puts the
+    /// dlopen-able ggml compute backends in `<data dir>/backends/`.
+    pub fn data_dir(&self) -> &Path {
+        &self.data_dir
     }
 
     pub fn adaptive_vad_file(&self) -> PathBuf {

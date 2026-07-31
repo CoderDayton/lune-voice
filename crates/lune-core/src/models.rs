@@ -9,4 +9,9 @@ pub const DIR_WHISPER_LARGE_V3_TURBO: &str = "whisper-large-v3-turbo-q8_0";
 // `ggml-org/whisper-vad` HuggingFace repo and passed to `FullParams::enable_vad`
 // so the whisper backend gates each utterance to speech before decoding.
 pub const DIR_WHISPER_VAD: &str = "whisper-vad-silero";
+
+/// Directory under the data dir holding dlopen-able ggml compute backends: the
+/// CPU variants shipped with the app, plus the CUDA plugin the user can add
+/// after install. See `lune_asr::gpu_backend`.
+pub const DIR_GPU_BACKEND: &str = "backends";
 pub const WHISPER_VAD_GGML: &str = "ggml-silero-v5.1.2.bin";

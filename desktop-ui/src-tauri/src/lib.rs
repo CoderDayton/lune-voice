@@ -106,6 +106,18 @@ pub fn run() {
         );
     }
 
+    // Register ggml's compute backends before anything can build a
+    // WhisperContext: ggml picks a device from whatever is in the registry at
+    // context-creation time, so a late load would silently leave the app on
+    // the CPU. Bundled CPU plugins and the optional downloaded CUDA plugin are
+    // both picked up here.
+    if let Some(paths) = lune_persist::AppPaths::resolve() {
+        let devices = lune_asr::gpu_backend::load_plugins(paths.data_dir());
+        tracing::info!(?devices, "ggml compute backends available");
+    } else {
+        tracing::warn!("could not resolve application paths; GPU plugins not loaded");
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             create_or_focus_main_window(app);
@@ -249,6 +261,8 @@ pub fn run() {
             commands::delete_model_cmd,
             commands::initialize_pipeline,
             commands::gpu_support,
+            commands::gpu_backend_status,
+            commands::install_gpu_backend,
             quit_app
         ])
         .build(tauri::generate_context!())

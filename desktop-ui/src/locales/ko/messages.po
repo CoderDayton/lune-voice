@@ -141,7 +141,7 @@ msgid "API key"
 msgstr "API 키"
 
 #: src/features/settings/sections/appearance-section.tsx:35
-#: src/features/settings/settings-page.tsx:69
+#: src/features/settings/settings-page.tsx:70
 msgid "Appearance"
 msgstr "모양"
 
@@ -426,7 +426,7 @@ msgstr "설명"
 msgid "Deterministic fixes applied before any AI styling."
 msgstr "AI 스타일 지정 이전에 결정적 수정 사항이 적용되었습니다."
 
-#: src/features/settings/settings-page.tsx:70
+#: src/features/settings/settings-page.tsx:71
 msgid "Dictation"
 msgstr "받아쓰기"
 
@@ -485,6 +485,11 @@ msgstr "모델 1개 다운로드"
 msgid "Download failed"
 msgstr "다운로드 실패"
 
+#. placeholder {0}: formatBytes(status.downloadBytes)
+#: src/features/settings/sections/gpu-section.tsx:55
+msgid "Download GPU support ({0})"
+msgstr ""
+
 #: src/features/welcome/welcome-page.tsx:157
 msgid "Download interrupted"
 msgstr "다운로드가 중단되었습니다."
@@ -504,6 +509,7 @@ msgid "Downloading models"
 msgstr "모델 다운로드 중"
 
 #: src/features/settings/components/asr-engine-cards.tsx:151
+#: src/features/settings/sections/gpu-section.tsx:54
 #: src/features/settings/sections/models-section.tsx:273
 #: src/features/welcome/welcome-page.tsx:254
 msgid "Downloading…"
@@ -618,7 +624,7 @@ msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock.
 msgstr ""
 
 #: src/features/settings/sections/general-section.tsx:27
-#: src/features/settings/settings-page.tsx:68
+#: src/features/settings/settings-page.tsx:69
 msgid "General"
 msgstr "일반"
 
@@ -647,9 +653,22 @@ msgstr "좋은 저녁이에요"
 msgid "Good morning"
 msgstr "좋은 아침이에요"
 
+#: src/features/settings/sections/gpu-section.tsx:29
 #: src/features/welcome/components/engine-step.tsx:119
 msgid "GPU acceleration"
 msgstr "GPU 가속"
+
+#: src/features/settings/sections/gpu-section.tsx:93
+msgid "GPU acceleration is active."
+msgstr ""
+
+#: src/features/settings/sections/gpu-section.tsx:39
+msgid "GPU support"
+msgstr ""
+
+#: src/features/settings/sections/gpu-section.tsx:109
+msgid "GPU support is installed but not working."
+msgstr ""
 
 #: src/features/settings/sections/general-section.tsx:61
 #: src/features/settings/sections/general-section.tsx:71
@@ -802,7 +821,7 @@ msgid "Mode"
 msgstr "모드"
 
 #: src/features/settings/sections/models-section.tsx:103
-#: src/features/settings/settings-page.tsx:75
+#: src/features/settings/settings-page.tsx:76
 msgid "Models"
 msgstr "모델"
 
@@ -812,6 +831,10 @@ msgstr "모델은 로컬에 저장됩니다. 원격 측정도 없고 계정도 �
 
 #: src/features/settings/sections/pill-section.tsx:146
 msgid "Monitor"
+msgstr ""
+
+#: src/features/settings/sections/gpu-section.tsx:40
+msgid "Most of the download is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
 msgstr ""
 
 #: src/features/welcome/components/engine-step.tsx:49
@@ -920,7 +943,7 @@ msgid "Orientation"
 msgstr ""
 
 #: src/features/overview/overview-page.tsx:108
-#: src/features/settings/settings-page.tsx:74
+#: src/features/settings/settings-page.tsx:75
 msgid "Output"
 msgstr "산출"
 
@@ -950,7 +973,7 @@ msgstr "붙여넣기가 가장 간단합니다. 일부 앱에서는 키 입력�
 msgid "Phrase"
 msgstr "구절"
 
-#: src/features/settings/settings-page.tsx:71
+#: src/features/settings/settings-page.tsx:72
 msgid "Pill"
 msgstr "표시기"
 
@@ -1100,6 +1123,19 @@ msgstr "다운로드 다시 시도"
 msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
 msgstr "각 받아쓰기 텍스트를 선택한 스타일로 다시 씁니다. 끄면 원본 텍스트가 그대로 전달됩니다."
 
+#. placeholder {0}: status.devices.join(', ')
+#: src/features/settings/sections/gpu-section.tsx:92
+msgid "Running on {0}."
+msgstr ""
+
+#: src/features/settings/sections/gpu-section.tsx:116
+msgid "Running on the CPU."
+msgstr ""
+
+#: src/features/settings/sections/gpu-section.tsx:101
+msgid "Running on the CPU. No NVIDIA driver was found — install the driver for your GPU and Lune Voice will offer GPU support here."
+msgstr ""
+
 #: src/features/overview/overview-page.tsx:262
 msgid "s"
 msgstr "초"
@@ -1169,7 +1205,7 @@ msgstr "단축키 설정"
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "사용하는 언어를 설정하세요. 자동은 음성 감지를 사용합니다."
 
-#: src/features/settings/settings-page.tsx:95
+#: src/features/settings/settings-page.tsx:102
 msgid "Settings sections"
 msgstr "설정 섹션"
 
@@ -1249,6 +1285,10 @@ msgstr "녹음 시작 또는 중지"
 msgid "Start, stop, and cancel dictation without leaving your work."
 msgstr "작업을 벗어나지 않고 받아쓰기를 시작, 중지, 취소하세요."
 
+#: src/features/settings/sections/gpu-section.tsx:33
+msgid "Status"
+msgstr ""
+
 #: src/components/ui/voice-capture-field.tsx:148
 #: src/components/ui/voice-capture-field.tsx:153
 msgid "Stop capturing"
@@ -1268,7 +1308,7 @@ msgstr "받아쓰기 중지"
 msgid "Style"
 msgstr "스타일"
 
-#: src/features/settings/settings-page.tsx:73
+#: src/features/settings/settings-page.tsx:74
 msgid "Styling"
 msgstr "스타일 지정"
 
@@ -1393,9 +1433,13 @@ msgid "Transcript"
 msgstr "받아쓰기 텍스트"
 
 #: src/features/settings/sections/transcription-section.tsx:35
-#: src/features/settings/settings-page.tsx:72
+#: src/features/settings/settings-page.tsx:73
 msgid "Transcription"
 msgstr "전사"
+
+#: src/features/settings/sections/gpu-section.tsx:30
+msgid "Transcription runs on the CPU by default. If you have an NVIDIA GPU, an optional download moves it to the GPU for noticeably lower latency."
+msgstr ""
 
 #: src/features/snippets/snippets-page.tsx:180
 msgid "Trigger phrase"

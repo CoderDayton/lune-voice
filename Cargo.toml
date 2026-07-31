@@ -16,6 +16,16 @@ version = "0.1.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
 
+# Vendored fork of `whisper-rs-sys` 0.15.0. The only file that differs from the
+# published crate is `build.rs`; every change there is marked `LUNE FORK`.
+# Upstream pins `BUILD_SHARED_LIBS=OFF` and decides the link kind from the
+# `intel-sycl` feature, which makes ggml's dlopen-able backends
+# (`GGML_BACKEND_DL`) impossible to build. The fork routes both off that one
+# switch so the CUDA backend can ship as a downloadable plugin instead of a
+# hard `DT_NEEDED` on the CUDA runtime. See docs/GPU_PLUGIN.md.
+[patch.crates-io]
+whisper-rs-sys = { path = "vendor/whisper-rs-sys" }
+
 [workspace.lints.clippy]
 dbg_macro = "deny"
 todo = "warn"
@@ -96,10 +106,17 @@ rustfft = "6.4"
 hf-hub = "0.5"
 tokenizers = { version = "0.22", default-features = false, features = ["onig"] }
 async-openai = { version = "0.33", features = ["chat-completion"] }
-reqwest = { version = "0.13", features = ["json", "multipart"] }
+reqwest = { version = "0.13", features = ["json", "multipart", "stream"] }
+# Streaming + unpacking the downloadable GPU backend archive
+# (crates/lune-persist/src/gpu_plugin.rs).
+tar = "0.4"
+flate2 = "1.1"
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
 zbus = "5"
 evdev = "0.13"
 smallvec = { version = "1", features = ["union"] }
+# `dlopen` for NVIDIA-driver detection (crates/lune-asr/src/gpu_backend.rs).
+libc = "0.2"
 wayland-client = "0.31"
 wayland-protocols-wlr = { version = "0.3", features = ["client"] }
 # `staging` supplies the `ext_foreign_toplevel_list` / `ext_workspace`

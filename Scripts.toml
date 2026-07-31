@@ -36,8 +36,13 @@ case "$BACKEND" in
   cuda) FEATURES="whisper-cuda" ;;
   *)    echo "BACKEND must be cpu|cuda"; exit 1 ;;
 esac
-echo "Dev ($BACKEND): --features \"$FEATURES\""
-bun tauri dev --features "$FEATURES"
+# ggml compute backends are dlopen-ed plugins, so the CUDA backend can ship as
+# an optional download instead of a load-time dependency. GGML_NATIVE is
+# incompatible with it (ggml needs ARCH_DEFINITIONS for the feature check), so
+# CPU dispatch comes from the per-microarchitecture variants instead.
+GGML_FLAGS="GGML_BACKEND_DL=ON GGML_NATIVE=OFF GGML_CPU_ALL_VARIANTS=ON"
+echo "Dev ($BACKEND): --features \"$FEATURES\" ($GGML_FLAGS)"
+env $GGML_FLAGS bun tauri dev --features "$FEATURES"
 '''
 info = "Launch Tauri app in dev mode (hot-reload; CUDA auto-detected, --env BACKEND=cpu|cuda to force)"
 requires = ["bun"]
@@ -149,6 +154,12 @@ esac
 if [ -n "${PORTABLE:-}" ]; then
   # Distributable: portable AVX2 CPU baseline + every common NVIDIA CUDA arch (~8).
   # Bundles per tauri.conf.json (deb, rpm, appimage).
+  # NOTE: deliberately still a static build. The GGML_BACKEND_DL layout needs
+  # the ggml shared objects and backend plugins staged into the bundle next to
+  # the executable ($ORIGIN), which tauri's `resources` does not do — it stages
+  # into the resource dir, not the bin dir. Until that is wired and a bundle is
+  # verified end to end, `cgs build` keeps producing the known-good static
+  # artifact. `cgs dev` + `cgs stage-runtime` exercise the plugin path.
   GGML_FLAGS="GGML_NATIVE=OFF GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON"
   BUNDLE_ARGS=""
   echo "Building PORTABLE $BACKEND release: --features \"$FEATURES\""
@@ -157,6 +168,7 @@ else
   # CPU and GPU arch, so the CUDA compile stays small and won't exhaust RAM.
   # Only deb + appimage: rpm bundling xz-compresses the (large) CUDA binary and
   # is slow + useless on Debian/Pop!_OS. Override with `--env BUNDLES="deb"` etc.
+  # Static, for the same reason as the PORTABLE branch above.
   GGML_FLAGS="GGML_NATIVE=ON"
   BUNDLE_ARGS="--bundles ${BUNDLES:-deb appimage}"
   echo "Building NATIVE $BACKEND build (this machine only): --features \"$FEATURES\""
@@ -165,6 +177,129 @@ env $GGML_FLAGS APPIMAGE_EXTRACT_AND_RUN=1 bun tauri build --features "$FEATURES
 '''
 info = "Desktop app — native to this machine (CUDA auto-detected). --env PORTABLE=1 for a distributable build; --env BACKEND=cpu|cuda to force. See docs/RELEASE.md"
 requires = ["bun"]
+
+[scripts.stage-runtime]
+interpreter = "bash"
+command = '''
+set -euo pipefail
+# Assemble the runtime layout a GGML_BACKEND_DL build needs beside the binary:
+#
+#   <bin dir>/libwhisper.so.1, libggml.so.0, libggml-base.so.0   (DT_NEEDED)
+#   <bin dir>/backends/libggml-cpu-*.so                          (dlopen-ed)
+#
+# The executable carries RUNPATH=$ORIGIN (desktop-ui/src-tauri/build.rs), so the
+# core libraries resolve from its own directory with no LD_LIBRARY_PATH.
+PROFILE="${PROFILE:-debug}"
+BIN_DIR="target/$PROFILE"
+# Cargo keeps two `whisper-rs-sys-*` directories — the compiled build script and
+# the directory its run produced — and only the latter has `out/lib`. Newest
+# first, but filtered, so a freshly recompiled build script cannot shadow the
+# real output and make this look like an unbuilt tree.
+SRC_DIR=""
+for d in $(ls -dt target/$PROFILE/build/whisper-rs-sys-*/ 2>/dev/null || true); do
+  if [ -d "$d/out/lib" ]; then SRC_DIR="$d"; break; fi
+done
+
+if [ -z "$SRC_DIR" ] || [ ! -d "$SRC_DIR/out/lib" ]; then
+  echo "no whisper-rs-sys build output under target/$PROFILE — build with the whisper-cpp feature first" >&2
+  exit 1
+fi
+if ! ls "$SRC_DIR"/out/lib/libggml-base.so* >/dev/null 2>&1; then
+  echo "whisper-rs-sys built static libraries — rebuild with GGML_BACKEND_DL=ON" >&2
+  exit 1
+fi
+
+mkdir -p "$BIN_DIR/backends"
+cp -a "$SRC_DIR"/out/lib/libwhisper.so* "$SRC_DIR"/out/lib/libggml*.so* "$BIN_DIR/"
+cp -a "$SRC_DIR"/out/bin/libggml-cpu-*.so "$BIN_DIR/backends/"
+
+# The test harness runs binaries from target/<profile>/deps, so mirror there too.
+mkdir -p "$BIN_DIR/deps/backends"
+cp -a "$SRC_DIR"/out/lib/libwhisper.so* "$SRC_DIR"/out/lib/libggml*.so* "$BIN_DIR/deps/"
+cp -a "$SRC_DIR"/out/bin/libggml-cpu-*.so "$BIN_DIR/deps/backends/"
+
+echo "staged $(ls "$BIN_DIR"/backends | wc -l) CPU backend plugins into $BIN_DIR/backends"
+'''
+info = "Copy the ggml shared libraries and CPU backend plugins next to the built binary (--env PROFILE=release)"
+
+[scripts.gpu-plugin]
+interpreter = "bash"
+command = '''
+set -euo pipefail
+# Build the downloadable CUDA backend plugin and package it for GitHub Releases.
+#
+# The archive is deliberately self-contained apart from the NVIDIA *driver*:
+# libcudart/libcublas/libcublasLt are redistributable under the CUDA EULA,
+# libcuda.so.1 ships with the driver and is not ours to distribute. The plugin
+# is linked with RUNPATH=$ORIGIN so it resolves those runtime libraries from its
+# own directory — LD_LIBRARY_PATH cannot be used here, because glibc caches the
+# search path at process start and the app sets nothing before dlopen.
+OUT="${OUT:-release-artifacts}"
+BUILD_DIR="${BUILD_DIR:-target/gpu-plugin}"
+SRC="vendor/whisper-rs-sys/whisper.cpp"
+CUDA_LIB="${CUDA_LIB:-/usr/local/cuda/targets/x86_64-linux/lib}"
+# Common consumer + datacentre architectures. Override for a smaller/faster build.
+CUDA_ARCHS="${CUDA_ARCHS:-75;80;86;89;90}"
+
+command -v cmake >/dev/null || { echo "cmake is required" >&2; exit 1; }
+command -v nvcc  >/dev/null || { echo "the CUDA toolkit (nvcc) is required" >&2; exit 1; }
+[ -d "$SRC" ] || { echo "missing $SRC" >&2; exit 1; }
+
+CUDA_VER=$(basename "$(readlink -f "$CUDA_LIB"/libcudart.so.* | head -1)" | sed 's/libcudart\.so\.//' | cut -d. -f1)
+[ -n "$CUDA_VER" ] || { echo "could not determine the CUDA runtime soname version" >&2; exit 1; }
+echo "Building CUDA $CUDA_VER backend plugin for archs $CUDA_ARCHS"
+
+cmake -S "$SRC" -B "$BUILD_DIR" \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_SHARED_LIBS=ON \
+  -DGGML_BACKEND_DL=ON \
+  -DGGML_NATIVE=OFF \
+  -DGGML_CUDA=ON \
+  -DCMAKE_CUDA_ARCHITECTURES="$CUDA_ARCHS" \
+  -DWHISPER_BUILD_TESTS=OFF \
+  -DWHISPER_BUILD_EXAMPLES=OFF \
+  -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+  -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
+  -DCMAKE_INSTALL_RPATH='$ORIGIN' >/dev/null
+cmake --build "$BUILD_DIR" --target ggml-cuda -j "${JOBS:-$(nproc)}"
+
+PLUGIN=$(find "$BUILD_DIR" -name 'libggml-cuda.so' -type f | head -1)
+[ -n "$PLUGIN" ] || { echo "libggml-cuda.so was not produced" >&2; exit 1; }
+
+STAGE="$BUILD_DIR/stage"
+rm -rf "$STAGE" && mkdir -p "$STAGE"
+cp -a "$PLUGIN" "$STAGE/"
+for lib in libcudart libcublas libcublasLt; do
+  src=$(ls "$CUDA_LIB/$lib.so.$CUDA_VER" 2>/dev/null | head -1)
+  [ -n "$src" ] || { echo "missing $lib.so.$CUDA_VER in $CUDA_LIB" >&2; exit 1; }
+  cp -aL "$src" "$STAGE/"
+done
+
+# Debug info in the plugin is dead weight in a download; NVIDIA's libraries
+# arrive stripped already. nvprune cannot help with the rest: it only operates
+# on relocatable device code, and the shipped cuBLAS objects are final.
+strip --strip-unneeded "$STAGE/libggml-cuda.so" 2>/dev/null || true
+
+# The whole scheme rests on this: without $ORIGIN the plugin cannot find the
+# CUDA runtime sitting beside it, and dlopen fails at load.
+if ! readelf -d "$STAGE/libggml-cuda.so" | grep -qE 'R(UN)?PATH.*\$ORIGIN'; then
+  echo "libggml-cuda.so has no \$ORIGIN runpath — it would not resolve its CUDA runtime" >&2
+  exit 1
+fi
+
+mkdir -p "$OUT"
+NAME="lune-voice-gpu-cuda${CUDA_VER}-linux-x86_64"
+tar -czf "$OUT/$NAME.tar.gz" -C "$STAGE" .
+( cd "$OUT" && sha256sum "$NAME.tar.gz" > "$NAME.tar.gz.sha256" )
+
+echo
+echo "  $OUT/$NAME.tar.gz  ($(du -h "$OUT/$NAME.tar.gz" | cut -f1))"
+cat "$OUT/$NAME.tar.gz.sha256"
+echo
+echo "Upload both files to the GitHub release, then record the sha256 in"
+echo "crates/lune-asr/src/gpu_backend.rs so the download is verified."
+'''
+info = "Build + package the downloadable CUDA backend plugin for GitHub Releases (--env CUDA_ARCHS=... to narrow)"
 
 # ── Tools ────────────────────────────────────────────────────────────────────
 

@@ -141,7 +141,7 @@ msgid "API key"
 msgstr "Clé API"
 
 #: src/features/settings/sections/appearance-section.tsx:35
-#: src/features/settings/settings-page.tsx:69
+#: src/features/settings/settings-page.tsx:70
 msgid "Appearance"
 msgstr "Apparence"
 
@@ -426,7 +426,7 @@ msgstr "Description"
 msgid "Deterministic fixes applied before any AI styling."
 msgstr "Correctifs déterministes appliqués avant tout style d'IA."
 
-#: src/features/settings/settings-page.tsx:70
+#: src/features/settings/settings-page.tsx:71
 msgid "Dictation"
 msgstr "Dictée"
 
@@ -485,6 +485,11 @@ msgstr "Télécharger 1 modèle"
 msgid "Download failed"
 msgstr "Le téléchargement a échoué"
 
+#. placeholder {0}: formatBytes(status.downloadBytes)
+#: src/features/settings/sections/gpu-section.tsx:55
+msgid "Download GPU support ({0})"
+msgstr ""
+
 #: src/features/welcome/welcome-page.tsx:157
 msgid "Download interrupted"
 msgstr "Téléchargement interrompu"
@@ -504,6 +509,7 @@ msgid "Downloading models"
 msgstr "Téléchargement de modèles"
 
 #: src/features/settings/components/asr-engine-cards.tsx:151
+#: src/features/settings/sections/gpu-section.tsx:54
 #: src/features/settings/sections/models-section.tsx:273
 #: src/features/welcome/welcome-page.tsx:254
 msgid "Downloading…"
@@ -618,7 +624,7 @@ msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock.
 msgstr "Espace entre l'indicateur et le bord de l'écran, pour éviter une barre des tâches ou un dock."
 
 #: src/features/settings/sections/general-section.tsx:27
-#: src/features/settings/settings-page.tsx:68
+#: src/features/settings/settings-page.tsx:69
 msgid "General"
 msgstr "Général"
 
@@ -647,9 +653,22 @@ msgstr "Bonne soirée"
 msgid "Good morning"
 msgstr "Bonjour"
 
+#: src/features/settings/sections/gpu-section.tsx:29
 #: src/features/welcome/components/engine-step.tsx:119
 msgid "GPU acceleration"
 msgstr "Accélération GPU"
+
+#: src/features/settings/sections/gpu-section.tsx:93
+msgid "GPU acceleration is active."
+msgstr ""
+
+#: src/features/settings/sections/gpu-section.tsx:39
+msgid "GPU support"
+msgstr ""
+
+#: src/features/settings/sections/gpu-section.tsx:109
+msgid "GPU support is installed but not working."
+msgstr ""
 
 #: src/features/settings/sections/general-section.tsx:61
 #: src/features/settings/sections/general-section.tsx:71
@@ -802,7 +821,7 @@ msgid "Mode"
 msgstr "Mode"
 
 #: src/features/settings/sections/models-section.tsx:103
-#: src/features/settings/settings-page.tsx:75
+#: src/features/settings/settings-page.tsx:76
 msgid "Models"
 msgstr "Modèles"
 
@@ -813,6 +832,10 @@ msgstr "Les modèles sont stockés localement. Pas de télémétrie, pas de comp
 #: src/features/settings/sections/pill-section.tsx:146
 msgid "Monitor"
 msgstr "Écran"
+
+#: src/features/settings/sections/gpu-section.tsx:40
+msgid "Most of the download is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
+msgstr ""
 
 #: src/features/welcome/components/engine-step.tsx:49
 msgid "Multilingual · pick a size"
@@ -920,7 +943,7 @@ msgid "Orientation"
 msgstr "Orientation"
 
 #: src/features/overview/overview-page.tsx:108
-#: src/features/settings/settings-page.tsx:74
+#: src/features/settings/settings-page.tsx:75
 msgid "Output"
 msgstr "Sortir"
 
@@ -950,7 +973,7 @@ msgstr "Coller est le plus simple. La frappe au clavier peut mieux fonctionner d
 msgid "Phrase"
 msgstr "Expression"
 
-#: src/features/settings/settings-page.tsx:71
+#: src/features/settings/settings-page.tsx:72
 msgid "Pill"
 msgstr "Indicateur"
 
@@ -1100,6 +1123,19 @@ msgstr "Réessayez le téléchargement"
 msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
 msgstr "Réécrivez chaque transcription dans un style choisi. Lorsque cette option est désactivée, la transcription brute est fournie telle quelle."
 
+#. placeholder {0}: status.devices.join(', ')
+#: src/features/settings/sections/gpu-section.tsx:92
+msgid "Running on {0}."
+msgstr ""
+
+#: src/features/settings/sections/gpu-section.tsx:116
+msgid "Running on the CPU."
+msgstr ""
+
+#: src/features/settings/sections/gpu-section.tsx:101
+msgid "Running on the CPU. No NVIDIA driver was found — install the driver for your GPU and Lune Voice will offer GPU support here."
+msgstr ""
+
 #: src/features/overview/overview-page.tsx:262
 msgid "s"
 msgstr "s"
@@ -1169,7 +1205,7 @@ msgstr "Définir le raccourci clavier"
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "Définissez la langue que vous parlez. Auto utilise la détection de la parole."
 
-#: src/features/settings/settings-page.tsx:95
+#: src/features/settings/settings-page.tsx:102
 msgid "Settings sections"
 msgstr "Sections de paramètres"
 
@@ -1249,6 +1285,10 @@ msgstr "Démarrer ou arrêter l'enregistrement"
 msgid "Start, stop, and cancel dictation without leaving your work."
 msgstr "Démarrez, arrêtez et annulez la dictée sans quitter votre travail."
 
+#: src/features/settings/sections/gpu-section.tsx:33
+msgid "Status"
+msgstr ""
+
 #: src/components/ui/voice-capture-field.tsx:148
 #: src/components/ui/voice-capture-field.tsx:153
 msgid "Stop capturing"
@@ -1268,7 +1308,7 @@ msgstr "Arrêter la dictée"
 msgid "Style"
 msgstr "Style"
 
-#: src/features/settings/settings-page.tsx:73
+#: src/features/settings/settings-page.tsx:74
 msgid "Styling"
 msgstr "Stylisation"
 
@@ -1393,9 +1433,13 @@ msgid "Transcript"
 msgstr "Transcription"
 
 #: src/features/settings/sections/transcription-section.tsx:35
-#: src/features/settings/settings-page.tsx:72
+#: src/features/settings/settings-page.tsx:73
 msgid "Transcription"
 msgstr "Transcription"
+
+#: src/features/settings/sections/gpu-section.tsx:30
+msgid "Transcription runs on the CPU by default. If you have an NVIDIA GPU, an optional download moves it to the GPU for noticeably lower latency."
+msgstr ""
 
 #: src/features/snippets/snippets-page.tsx:180
 msgid "Trigger phrase"
