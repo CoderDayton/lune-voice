@@ -2,7 +2,7 @@ use tauri::{Emitter, Runtime, State, WebviewWindow, ipc::Channel};
 
 use crate::dto::{
     CreateCustomStyleInput, CreateDictionaryEntryInput, GpuBackendStateDto, GpuBackendStatusDto,
-    GpuInstallProgressDto, GpuSupportDto, HistoryPageDto, PillSnapshotDto, SaveSnippetInput,
+    GpuInstallProgressDto, HistoryPageDto, PillSnapshotDto, SaveSnippetInput,
     SaveWorkspaceSettingsInput, SessionStreamEvent, UpdateCustomStyleInput,
     UpdateDictionaryEntryInput, WorkspaceSnapshot,
 };
@@ -539,25 +539,12 @@ pub async fn delete_model_cmd(window: WebviewWindow, local_name: String) -> Resu
     Ok(())
 }
 
-/// Reports whether GPU (CUDA) acceleration was compiled into this build.
-///
-/// GPU support is decided at build time: the native whisper.cpp backend only
-/// links CUDA when built with the `whisper-cuda` feature. At runtime "is the
-/// GPU usable" therefore reduces to "was the CUDA feature compiled in", which
-/// the onboarding flow uses to offer an acceleration opt-in.
-#[tauri::command]
-pub fn gpu_support(window: WebviewWindow) -> Result<GpuSupportDto, String> {
-    require_window_access(&window, &["main"])?;
-    Ok(GpuSupportDto {
-        compiled_in: cfg!(feature = "whisper-cuda"),
-    })
-}
-
 /// Runtime GPU status: driver present, plugin installed, device registered.
 ///
-/// Unlike [`gpu_support`], this can change on the same binary — the CUDA
-/// backend is a downloadable plugin, so the answer depends on what the user
-/// has installed rather than on how the app was compiled.
+/// This can change on the same binary — the CUDA backend is a downloadable
+/// plugin, so the answer depends on what the user has installed rather than on
+/// how the app was compiled. Both the onboarding acceleration card and the
+/// Settings GPU section read it.
 #[tauri::command]
 pub fn gpu_backend_status(window: WebviewWindow) -> Result<GpuBackendStatusDto, String> {
     require_window_access(&window, &["main"])?;

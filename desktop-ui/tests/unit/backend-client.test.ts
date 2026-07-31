@@ -122,9 +122,10 @@ describe("mock backend client", () => {
     expect(id).toBe("mock-session");
   });
 
-  test("gpuSupport reports no compiled-in CUDA outside a real build", async () => {
-    const support = await mockBackendClient.gpuSupport();
-    expect(support.compiled_in).toBe(false);
+  test("gpuBackendStatus reports no native backend outside a real build", async () => {
+    const status = await mockBackendClient.gpuBackendStatus();
+    expect(status.state).toBe("unsupported");
+    expect(status.devices).toEqual([]);
   });
 
   test("history entries have valid ISO timestamps and transcripts", async () => {

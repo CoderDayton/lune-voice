@@ -57,9 +57,18 @@ describe('relevantSetupModels', () => {
 });
 
 describe('shouldOfferGpuAcceleration', () => {
-  test('offers the card only when a CUDA build is detected', () => {
-    expect(shouldOfferGpuAcceleration(true)).toBe(true);
-    expect(shouldOfferGpuAcceleration(false)).toBe(false);
+  test('offers whenever this machine has an NVIDIA GPU to use', () => {
+    // The plugin is downloadable, so "not installed yet" is the whole point of
+    // the card, and an already-working GPU still needs the accept toggle.
+    expect(shouldOfferGpuAcceleration('not-installed')).toBe(true);
+    expect(shouldOfferGpuAcceleration('ready')).toBe(true);
+    // Usually a plugin installed this session that needs a restart.
+    expect(shouldOfferGpuAcceleration('failed')).toBe(true);
+  });
+
+  test('hides the card when no download could make the GPU work', () => {
+    expect(shouldOfferGpuAcceleration('unsupported')).toBe(false);
+    expect(shouldOfferGpuAcceleration('driver-missing')).toBe(false);
   });
 });
 

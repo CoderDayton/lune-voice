@@ -215,7 +215,8 @@ The desktop app does not scrape logs or poll for session state. It uses typed Ta
 | `begin_pill_drag` / `drag_pill_tick` / `end_pill_drag` / `nudge_pill` | `pill` | Drag and fine-position the overlay |
 | `save_pill_position` / `reset_pill_position` | `pill` | Persist a dragged position or clear it back to the anchor default |
 | `list_monitors` | `main` | Connected displays for the pill's monitor picker |
-| `gpu_support` | `main` | Returns `{ compiled_in: bool }` — true when built with `whisper-cuda` |
+| `gpu_backend_status` | `main` | Runtime GPU state: `unsupported`, `driver-missing`, `not-installed`, `ready`, `failed` |
+| `install_gpu_backend` | `main` | Downloads and verifies the CUDA plugin, streaming progress over a channel |
 
 ### Session Stream
 

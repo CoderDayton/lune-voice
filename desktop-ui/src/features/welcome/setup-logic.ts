@@ -1,3 +1,4 @@
+import type { GpuBackendStateDto } from '../../lib/backend/generated/GpuBackendStateDto';
 import {
   type AsrBackendValue,
   type WhisperModelValue,
@@ -49,12 +50,16 @@ export function buildInitialSelection(asrLocalName: string, models: ModelStatus[
 
 /**
  * Whether to surface the GPU-acceleration acceptance card during onboarding.
- * GPU support is a build-time decision (CUDA is linked only in a CUDA build),
- * so the card appears only when the backend reports a compiled-in CUDA feature;
- * otherwise the onboarding flow is unchanged.
+ *
+ * The question is "does this machine have an NVIDIA GPU we could use", not "was
+ * CUDA compiled in" — the CUDA backend is a downloadable plugin, so a plain CPU
+ * build can still end up accelerated. Only two states rule it out: a build with
+ * no native backend at all, and a machine with no driver, which no download can
+ * fix. `failed` still offers, because the common cause is a plugin installed
+ * this session that needs a restart, and Settings explains the rest.
  */
-export function shouldOfferGpuAcceleration(gpuCompiledIn: boolean): boolean {
-  return gpuCompiledIn;
+export function shouldOfferGpuAcceleration(state: GpuBackendStateDto): boolean {
+  return state !== 'unsupported' && state !== 'driver-missing';
 }
 
 /**

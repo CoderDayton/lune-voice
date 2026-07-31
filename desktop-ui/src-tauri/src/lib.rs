@@ -260,7 +260,6 @@ pub fn run() {
             commands::download_model_cmd,
             commands::delete_model_cmd,
             commands::initialize_pipeline,
-            commands::gpu_support,
             commands::gpu_backend_status,
             commands::install_gpu_backend,
             quit_app

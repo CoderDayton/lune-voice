@@ -238,12 +238,27 @@ OUT="${OUT:-release-artifacts}"
 BUILD_DIR="${BUILD_DIR:-target/gpu-plugin}"
 SRC="vendor/whisper-rs-sys/whisper.cpp"
 CUDA_LIB="${CUDA_LIB:-/usr/local/cuda/targets/x86_64-linux/lib}"
-# Common consumer + datacentre architectures. Override for a smaller/faster build.
-CUDA_ARCHS="${CUDA_ARCHS:-75;80;86;89;90}"
+# Native SASS for the four consumer generations CUDA 13 supports (Turing,
+# Ampere, Ada, Blackwell), plus compute_75 PTX as a floor. PTX JITs *forward*
+# only, so the oldest virtual arch covers every other supported GPU — A100,
+# H100, datacentre Blackwell — at the cost of a one-off JIT on first run.
+# Each extra -real arch adds its own SASS to the download; override to trade
+# coverage for size.
+CUDA_ARCHS="${CUDA_ARCHS:-75-real;86-real;89-real;120-real;75-virtual}"
 
-command -v cmake >/dev/null || { echo "cmake is required" >&2; exit 1; }
-command -v nvcc  >/dev/null || { echo "the CUDA toolkit (nvcc) is required" >&2; exit 1; }
+command -v cmake    >/dev/null || { echo "cmake is required" >&2; exit 1; }
+command -v nvcc     >/dev/null || { echo "the CUDA toolkit (nvcc) is required" >&2; exit 1; }
+command -v cuobjdump >/dev/null || { echo "cuobjdump (CUDA toolkit) is required" >&2; exit 1; }
 [ -d "$SRC" ] || { echo "missing $SRC" >&2; exit 1; }
+
+# CMake caches CMAKE_CUDA_ARCHITECTURES, so reusing a build dir configured for a
+# narrower list silently keeps producing that narrower plugin. This shipped an
+# sm_89-only archive once; reconfigure from scratch whenever the list changes.
+CACHED_ARCHS=$(grep -oP '^CMAKE_CUDA_ARCHITECTURES:[^=]*=\K.*' "$BUILD_DIR/CMakeCache.txt" 2>/dev/null || true)
+if [ -n "$CACHED_ARCHS" ] && [ "$CACHED_ARCHS" != "$CUDA_ARCHS" ]; then
+  echo "CUDA architectures changed ($CACHED_ARCHS -> $CUDA_ARCHS); reconfiguring"
+  rm -rf "$BUILD_DIR"
+fi
 
 CUDA_VER=$(basename "$(readlink -f "$CUDA_LIB"/libcudart.so.* | head -1)" | sed 's/libcudart\.so\.//' | cut -d. -f1)
 [ -n "$CUDA_VER" ] || { echo "could not determine the CUDA runtime soname version" >&2; exit 1; }
@@ -287,6 +302,26 @@ if ! readelf -d "$STAGE/libggml-cuda.so" | grep -qE 'R(UN)?PATH.*\$ORIGIN'; then
   exit 1
 fi
 
+# Assert against the built binary, not the configure step. A GPU whose arch is
+# absent from both the SASS and the PTX cannot run the plugin at all, and that
+# is invisible until a user with that card tries it.
+SASS=$(cuobjdump -lelf "$STAGE/libggml-cuda.so" 2>/dev/null | grep -oP 'sm_\K[0-9]+[a-z]*' | sort -u)
+PTX=$(cuobjdump  -lptx "$STAGE/libggml-cuda.so" 2>/dev/null | grep -oP 'sm_\K[0-9]+[a-z]*' | sort -u)
+MISSING=""
+IFS=';' read -ra WANT <<< "$CUDA_ARCHS"
+for arch in "${WANT[@]}"; do
+  # ggml rewrites 12X into the architecture-specific 12Xa (Blackwell's FP4
+  # tensor-core instructions are not forward-compatible), so a request for 120
+  # is satisfied by sm_120a. Match the number and allow that suffix.
+  case "$arch" in
+    *-virtual) want="${arch%-virtual}"; have="$PTX"  ;;
+    *)         want="${arch%-real}";    have="$SASS" ;;
+  esac
+  grep -qE "^${want%[a-z]}[a-z]?$" <<< "$have" || MISSING="$MISSING $arch"
+done
+[ -z "$MISSING" ] || { echo "plugin is missing requested architectures:$MISSING" >&2; exit 1; }
+echo "verified SASS: $(echo $SASS | tr '\n' ' ') | PTX: $(echo $PTX | tr '\n' ' ')"
+
 mkdir -p "$OUT"
 NAME="lune-voice-gpu-cuda${CUDA_VER}-linux-x86_64"
 tar -czf "$OUT/$NAME.tar.gz" -C "$STAGE" .
@@ -296,8 +331,9 @@ echo
 echo "  $OUT/$NAME.tar.gz  ($(du -h "$OUT/$NAME.tar.gz" | cut -f1))"
 cat "$OUT/$NAME.tar.gz.sha256"
 echo
-echo "Upload both files to the GitHub release, then record the sha256 in"
-echo "crates/lune-asr/src/gpu_backend.rs so the download is verified."
+echo "Upload both files to the GitHub release, then record the sha256 and the"
+echo "byte size in CUDA_LINUX_X86_64 (crates/lune-persist/src/gpu_plugin.rs)"
+echo "so the download is verified."
 '''
 info = "Build + package the downloadable CUDA backend plugin for GitHub Releases (--env CUDA_ARCHS=... to narrow)"
 

@@ -15,6 +15,7 @@ import {
   buildInitialSelection,
   type ModelStatus,
   relevantSetupModels,
+  shouldOfferGpuAcceleration,
 } from './setup-logic';
 
 export type { ModelStatus };
@@ -102,8 +103,8 @@ interface ModelSetup {
   engineWhisper: WhisperModelValue;
   /** On-disk dir of the chosen engine's model — treated as required to finish. */
   asrLocalName: string;
-  /** True when this build compiled in CUDA — gates the GPU acceptance card. */
-  gpuCompiledIn: boolean;
+  /** True when this machine could use an NVIDIA GPU — gates the acceptance card. */
+  gpuAvailable: boolean;
   /** Whether the user accepts GPU acceleration (mirrors the `useGpu` setting). */
   useGpu: boolean;
   /** Accept/decline GPU acceleration; persists via the shared settings path. */
@@ -135,7 +136,7 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
   const [asrLocalName, setAsrLocalName] = useState<string>(() =>
     asrModelLocalName('WhisperCpp', 'Medium'),
   );
-  const [gpuCompiledIn, setGpuCompiledIn] = useState(false);
+  const [gpuAvailable, setGpuAvailable] = useState(false);
   const [useGpu, setUseGpuState] = useState(true);
 
   const queueRef = useRef<string[]>([]);
@@ -173,11 +174,14 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
         const asrName = asrModelLocalName(backend, cur.whisperModel);
         setAsrLocalName(asrName);
         setUseGpuState(cur.useGpu);
-        // Build-time GPU support gates the acceptance card; default to no
-        // support so a probe failure never wrongly offers acceleration.
-        const gpu = await backendClient.gpuSupport().catch(() => ({ compiled_in: false }));
+        // Runtime GPU state gates the acceptance card; treat a probe failure as
+        // "no GPU" so a transient error never wrongly offers acceleration.
+        const gpuState = await backendClient
+          .gpuBackendStatus()
+          .then((s) => s.state)
+          .catch(() => 'unsupported' as const);
         if (cancelled) return;
-        setGpuCompiledIn(gpu.compiled_in);
+        setGpuAvailable(shouldOfferGpuAcceleration(gpuState));
         const s = relevantSetupModels(await invoke<ModelStatus[]>('check_model_status'));
         if (cancelled) return;
         setModels(s);
@@ -329,7 +333,7 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
     engineBackend,
     engineWhisper,
     asrLocalName,
-    gpuCompiledIn,
+    gpuAvailable,
     useGpu,
     setUseGpu,
     setEngineBackend,

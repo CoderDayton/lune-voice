@@ -2,14 +2,13 @@ import { useLingui } from '@lingui/react/macro';
 import { Check, CircleAlert, type LucideIcon, Mic, Zap } from 'lucide-react';
 import type { AsrBackendValue, WhisperModelValue } from '../../settings/data/settings-data';
 import { whisperModels } from '../../settings/data/settings-data';
-import { shouldOfferGpuAcceleration } from '../setup-logic';
 
 interface EngineStepProps {
   engineBackend: AsrBackendValue;
   engineWhisper: WhisperModelValue;
   error: string | null;
-  /** True when this build compiled in CUDA — gates the GPU acceptance card. */
-  gpuCompiledIn: boolean;
+  /** True when this machine could use an NVIDIA GPU — gates the acceptance card. */
+  gpuAvailable: boolean;
   /** Whether GPU acceleration is currently accepted (mirrors `useGpu`). */
   useGpu: boolean;
   onSelectEngine: (backend: AsrBackendValue) => void;
@@ -34,7 +33,7 @@ export function EngineStep({
   engineBackend,
   engineWhisper,
   error,
-  gpuCompiledIn,
+  gpuAvailable,
   useGpu,
   onSelectEngine,
   onSelectWhisper,
@@ -108,7 +107,7 @@ export function EngineStep({
         </fieldset>
       )}
 
-      {shouldOfferGpuAcceleration(gpuCompiledIn) && (
+      {gpuAvailable && (
         <label className="flex items-center justify-between gap-3 rounded-box border border-surface-border bg-surface-panel p-4">
           <span className="flex min-w-0 items-start gap-3">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-field bg-primary/15 text-primary">

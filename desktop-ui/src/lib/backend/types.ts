@@ -8,7 +8,7 @@
 
 import type {
   FormatTogglesDto,
-  GpuSupportDto,
+  GpuBackendStatusDto,
   HistoryPageDto,
   MonitorInfoDto,
   PillSnapshotDto,
@@ -23,7 +23,9 @@ export type {
   DictationModeDto,
   DictionaryItemDto,
   FormatTogglesDto,
-  GpuSupportDto,
+  GpuBackendStateDto,
+  GpuBackendStatusDto,
+  GpuInstallProgressDto,
   HistoryItemDto,
   HistoryPageDto,
   MonitorInfoDto,
@@ -98,8 +100,8 @@ export interface BackendClient {
   resetPillPosition(): Promise<void>;
   /** Connected monitors, for the pill's monitor picker. */
   listMonitors(): Promise<MonitorInfoDto[]>;
-  /** Whether a CUDA feature was compiled into this build (build-time GPU support). */
-  gpuSupport(): Promise<GpuSupportDto>;
+  /** Runtime GPU state: driver present, plugin installed, device registered. */
+  gpuBackendStatus(): Promise<GpuBackendStatusDto>;
 }
 
 export type SessionStreamEvent =

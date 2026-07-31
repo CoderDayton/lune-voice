@@ -49,10 +49,15 @@ pub const CUDA_LINUX_X86_64: GpuPluginRelease = GpuPluginRelease {
     url: "https://github.com/CoderDayton/lune-voice/releases/download/gpu-cuda13-v1/\
           lune-voice-gpu-cuda13-linux-x86_64.tar.gz",
     sha256: UNPUBLISHED,
-    // Measured from `cgs gpu-plugin` on CUDA 13.1. Nearly all of it is NVIDIA's
-    // cuBLASLt (479 MB unpacked); `nvprune` cannot trim it because it only
-    // operates on relocatable device code, not the final shared objects.
-    download_bytes: 438_434_520,
+    // Measured from `cgs gpu-plugin` on CUDA 13.1, covering sm_75/86/89/120a
+    // with compute_75 PTX. Two thirds of it is NVIDIA's cuBLASLt (502 MB
+    // unpacked) and that part is irreducible: ggml calls no cuBLASLt symbol
+    // directly, but libcublas declares it as DT_NEEDED and imports 76 symbols
+    // from it, so it cannot be dropped or stubbed. `nvprune` only rewrites
+    // relocatable device code, and static linking with --gc-sections was
+    // measured at 541 MB for the ten cuBLAS entry points ggml uses — the
+    // dispatcher reaches every kernel object, so nothing is prunable.
+    download_bytes: 493_568_081,
     cuda_major: 13,
 };
 

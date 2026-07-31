@@ -385,23 +385,13 @@ pub struct DictionaryItemDto {
     pub priority: u8,
 }
 
-/// Whether GPU (CUDA) acceleration was compiled into this build. GPU support
-/// is a build-time decision — the native whisper.cpp backend compiles CUDA in
-/// only under the `whisper-cuda` cargo feature — so at runtime "GPU
-/// available" reduces to "was the CUDA feature compiled in". No `camelCase`
-/// rename: the single field stays `compiled_in` across the IPC boundary.
-#[derive(Debug, Clone, Copy, Serialize, TS)]
-#[ts(export, export_to = "../../src/lib/backend/generated/")]
-pub struct GpuSupportDto {
-    pub compiled_in: bool,
-}
-
 /// What GPU acceleration can do on this machine right now.
 ///
-/// This is a *runtime* question, unlike `GpuSupportDto`. The CUDA backend is a
-/// dlopen-ed plugin the user downloads, so the same binary reports different
-/// answers on different machines: no driver, driver but no plugin, or a working
-/// GPU. Each variant maps to exactly one thing the setup UI can offer.
+/// Deliberately a *runtime* question. GPU support used to be reported as a
+/// build-time fact ("was the `whisper-cuda` feature compiled in"), which the
+/// downloadable CUDA plugin made wrong: the same binary reports different
+/// answers on different machines — no driver, driver but no plugin, or a
+/// working GPU. Each variant maps to exactly one thing the setup UI can offer.
 #[derive(Debug, Clone, Copy, Serialize, TS)]
 #[ts(export, export_to = "../../src/lib/backend/generated/")]
 #[serde(rename_all = "kebab-case")]

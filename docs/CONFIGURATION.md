@@ -224,11 +224,11 @@ device = "auto"
 
 | Value | Behavior |
 |-------|----------|
-| `"auto"` | Use CUDA when compiled with `whisper-cuda`; fall back to CPU otherwise. **(default)** |
+| `"auto"` | Use CUDA when a CUDA device is registered; fall back to CPU otherwise. **(default)** |
 | `"cuda"` | Require CUDA. Runtime falls back to CPU if CUDA is unavailable even when explicitly requested. |
 | `"cpu"` | Force CPU-only inference. |
 
-**GPU support is a build-time choice.** The `device` setting only takes effect when the binary was compiled with the matching `whisper-cuda` feature. A CPU build (`whisper-cpp`) ignores `device = "cuda"` and runs on CPU regardless. The onboarding GPU acceptance card is only shown when `gpu_support.compiled_in` is true.
+**GPU support is a runtime capability.** The CUDA backend is a plugin the app downloads on request, so `device = "cuda"` can start working on a binary that was never built with CUDA linked in. What it needs is an NVIDIA driver, which is not redistributable and so has to be installed by you. Query the current state with the `gpu_backend_status` command, or read it in Settings under Transcription; the onboarding acceleration card appears whenever that state is anything other than `unsupported` or `driver-missing`.
 
 See [docs/RELEASE.md](RELEASE.md) for the full build matrix and how to build CPU vs CUDA artifacts.
 

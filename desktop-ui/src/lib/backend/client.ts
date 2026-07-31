@@ -3,7 +3,7 @@ import { mockBackendClient } from './mock';
 import { isTauriRuntime } from './runtime';
 import type {
   BackendClient,
-  GpuSupportDto,
+  GpuBackendStatusDto,
   HistoryPageDto,
   MonitorInfoDto,
   PillSnapshotDto,
@@ -125,8 +125,8 @@ const tauriBackendClient: BackendClient = {
     return invoke<MonitorInfoDto[]>('list_monitors');
   },
 
-  gpuSupport() {
-    return invoke<GpuSupportDto>('gpu_support');
+  gpuBackendStatus() {
+    return invoke<GpuBackendStatusDto>('gpu_backend_status');
   },
 };
 

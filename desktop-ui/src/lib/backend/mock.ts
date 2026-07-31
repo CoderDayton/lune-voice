@@ -451,9 +451,14 @@ export const mockBackendClient: BackendClient = {
     return [{ name: 'Mock-1', width: 1920, height: 1080, isPrimary: true }];
   },
 
-  async gpuSupport() {
-    // The browser/mock runtime has no compiled-in CUDA, so the onboarding GPU
-    // affordance stays hidden outside a real CUDA build.
-    return { compiled_in: false };
+  async gpuBackendStatus() {
+    // The browser/mock runtime has no native backend at all, so the onboarding
+    // GPU affordance and the Settings GPU section both stay hidden.
+    return {
+      state: 'unsupported' as const,
+      devices: [],
+      reason: null,
+      downloadBytes: 0,
+    };
   },
 };

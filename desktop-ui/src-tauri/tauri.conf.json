@@ -38,9 +38,7 @@
         "depends": [
           "libwebkit2gtk-4.1-0",
           "libgtk-3-0",
-          "libayatana-appindicator3-1",
-          "libcudart12",
-          "libcublas12"
+          "libayatana-appindicator3-1"
         ],
         "section": "utils"
       },
