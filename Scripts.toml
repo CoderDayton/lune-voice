@@ -362,6 +362,13 @@ command = "uv run scripts/dev/record_mic.py"
 info = "Record mic to float32 WAV (16kHz mono)"
 requires = ["uv"]
 
+[scripts.desktop-entry]
+interpreter = "bash"
+command = '''
+bash scripts/dev/desktop-entry.sh
+'''
+info = "Install a user desktop entry so a build-tree binary gets a window icon on Wayland (--env PROFILE=debug, --env REMOVE=1)"
+
 [scripts.package]
 interpreter = "bash"
 command = '''

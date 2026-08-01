@@ -168,6 +168,40 @@ rm -f ~/.local/share/lune-voice/backends/.gpu-plugin.tar.gz.part
 
 ---
 
+## Window has no icon (tray icon is fine)
+
+Expected when running a binary straight out of `target/`, because the shell
+shows the icon of the *application* it matched the window to, and matching goes
+through an installed desktop entry. The tray is unaffected — appindicator takes
+the icon as bytes over DBus — which is why the two disagree.
+
+Tauri itself is not at fault: it applies `default_window_icon` to any window
+built without one, and on X11 that becomes `_NET_WM_ICON`. On GNOME the app
+runs under XWayland (`GDK_BACKEND=x11`, forced in `lib.rs` so the pill can
+position itself), so the window does carry an icon; GNOME just prefers the
+matched app's icon in the dash and overview. On a native-Wayland session
+(COSMIC, wlroots) there is no `_NET_WM_ICON` at all and the desktop entry is
+the only source.
+
+An installed `.deb` is fine: it ships `Lune Voice.desktop` carrying
+`StartupWMClass=lune-voice`, which is what gnome-shell matches X11 windows
+against. For a locally built binary, install a user-level entry:
+
+```sh
+cgs desktop-entry                      # points at target/release
+cgs desktop-entry --env PROFILE=debug  # for `cgs dev` builds
+cgs desktop-entry --env REMOVE=1       # uninstall
+```
+
+`StartupWMClass` and the entry's basename both have to be `lune-voice`: GTK
+derives WM_CLASS (and, on a Wayland session, `app_id`) from `g_get_prgname()`,
+the binary name, because Tauri only sets a GTK application id when
+`app.enableGtkAppId` is true and it is not. Turning that on would change the
+identity to the bundle identifier and break the match the bundled desktop entry
+relies on.
+
+---
+
 ## Escalating a bug
 
 Include: the `RUST_LOG=info` log (redacted by default — check it anyway), your
