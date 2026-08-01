@@ -105,7 +105,7 @@ ndarray = "0.17"
 rustfft = "6.4"
 hf-hub = "0.5"
 tokenizers = { version = "0.22", default-features = false, features = ["onig"] }
-async-openai = { version = "0.33", features = ["chat-completion"] }
+async-openai = { version = "0.41", features = ["chat-completion"] }
 reqwest = { version = "0.13", features = ["json", "multipart", "stream"] }
 # Streaming + unpacking the downloadable GPU backend archive
 # (crates/lune-persist/src/gpu_plugin.rs).
