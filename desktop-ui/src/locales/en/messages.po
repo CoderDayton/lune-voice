@@ -147,7 +147,7 @@ msgstr "API key"
 msgid "Appearance"
 msgstr "Appearance"
 
-#: src/features/settings/sections/general-section.tsx:28
+#: src/features/settings/sections/general-section.tsx:53
 msgid "Application behavior and startup preferences."
 msgstr "Application behavior and startup preferences."
 
@@ -224,6 +224,19 @@ msgstr "Capture device and how recording detects when you speak."
 msgid "Change engine"
 msgstr "Change engine"
 
+#: src/features/settings/sections/general-section.tsx:134
+msgid "Check for updates"
+msgstr "Check for updates"
+
+#: src/features/settings/sections/general-section.tsx:105
+#: src/features/settings/sections/general-section.tsx:115
+msgid "Check for updates on launch"
+msgstr "Check for updates on launch"
+
+#: src/features/settings/sections/general-section.tsx:125
+msgid "Check whether a newer version has been released."
+msgstr "Check whether a newer version has been released."
+
 #: src/features/welcome/welcome-page.tsx:158
 msgid "Check your network and we'll pick up where we left off."
 msgstr "Check your network and we'll pick up where we left off."
@@ -233,6 +246,7 @@ msgid "Checking installed models…"
 msgstr "Checking installed models…"
 
 #: src/features/settings/components/asr-engine-cards.tsx:224
+#: src/features/settings/sections/general-section.tsx:134
 msgid "Checking…"
 msgstr "Checking…"
 
@@ -301,6 +315,10 @@ msgstr "Completed"
 #: src/features/shell/components/sidebar.tsx:165
 msgid "Connecting"
 msgstr "Connecting"
+
+#: src/features/settings/sections/general-section.tsx:106
+msgid "Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network."
+msgstr "Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network."
 
 #: src/features/welcome/welcome-page.tsx:239
 #: src/features/welcome/welcome-page.tsx:301
@@ -625,7 +643,7 @@ msgstr "Formatting"
 msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock."
 msgstr "Gap between the pill and the screen edge, so it clears a taskbar or dock."
 
-#: src/features/settings/sections/general-section.tsx:27
+#: src/features/settings/sections/general-section.tsx:52
 #: src/features/settings/settings-page.tsx:69
 msgid "General"
 msgstr "General"
@@ -672,8 +690,8 @@ msgstr "GPU support"
 msgid "GPU support is installed but not working."
 msgstr "GPU support is installed but not working."
 
-#: src/features/settings/sections/general-section.tsx:61
-#: src/features/settings/sections/general-section.tsx:71
+#: src/features/settings/sections/general-section.tsx:86
+#: src/features/settings/sections/general-section.tsx:96
 msgid "History retention"
 msgstr "History retention"
 
@@ -681,7 +699,7 @@ msgstr "History retention"
 msgid "hold the hotkey and speak, your words land where your cursor is."
 msgstr "hold the hotkey and speak, your words land where your cursor is."
 
-#: src/features/settings/sections/general-section.tsx:62
+#: src/features/settings/sections/general-section.tsx:87
 msgid "How long finished dictations are kept on this device."
 msgstr "How long finished dictations are kept on this device."
 
@@ -735,12 +753,12 @@ msgstr "Keep the pill with you when you switch workspaces or virtual desktops."
 msgid "Keyboard shortcuts (\"Super H\" → \"Super+H\")"
 msgstr "Keyboard shortcuts (\"Super H\" → \"Super+H\")"
 
-#: src/features/settings/sections/general-section.tsx:32
-#: src/features/settings/sections/general-section.tsx:37
+#: src/features/settings/sections/general-section.tsx:57
+#: src/features/settings/sections/general-section.tsx:62
 msgid "Language"
 msgstr "Language"
 
-#: src/features/settings/sections/general-section.tsx:48
+#: src/features/settings/sections/general-section.tsx:73
 msgid "Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login."
 msgstr "Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login."
 
@@ -1274,8 +1292,8 @@ msgstr "Start dictating"
 msgid "Start dictation"
 msgstr "Start dictation"
 
-#: src/features/settings/sections/general-section.tsx:47
-#: src/features/settings/sections/general-section.tsx:55
+#: src/features/settings/sections/general-section.tsx:72
+#: src/features/settings/sections/general-section.tsx:80
 msgid "Start minimized"
 msgstr "Start minimized"
 
@@ -1455,6 +1473,10 @@ msgstr "Type a phrase, or tap the mic to capture it exactly as Lune Voice hears 
 msgid "Types as"
 msgstr "Types as"
 
+#: src/features/settings/sections/general-section.tsx:121
+msgid "Updates"
+msgstr "Updates"
+
 #: src/features/welcome/components/engine-step.tsx:136
 msgid "Use GPU acceleration"
 msgstr "Use GPU acceleration"
@@ -1554,6 +1576,10 @@ msgstr "WPM"
 #: src/features/styles/components/style-preset-card.tsx:96
 msgid "Yes"
 msgstr "Yes"
+
+#: src/features/settings/sections/general-section.tsx:124
+msgid "You are running version {version}."
+msgstr "You are running version {version}."
 
 #: src/features/dictionary/components/dictionary-form.tsx:63
 msgid "You say"

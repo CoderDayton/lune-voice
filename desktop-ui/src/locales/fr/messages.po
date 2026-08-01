@@ -16,11 +16,11 @@ msgstr ""
 #. placeholder {0}: snippet.triggerPhrase
 #: src/features/snippets/snippets-page.tsx:292
 msgid "“{0}” will stop expanding. The template text is not recoverable."
-msgstr ""
+msgstr "« {0} » ne sera plus développé. Le texte du modèle est irrécupérable."
 
 #: src/features/snippets/snippets-page.tsx:218
 msgid "(clipboard contents)"
-msgstr ""
+msgstr "(contenu du presse-papiers)"
 
 #. placeholder {0}: filtered.length
 #. placeholder {1}: entries.length
@@ -67,11 +67,11 @@ msgid "## Meeting — {date}\n"
 "\n"
 "Attendees:\n"
 "- "
-msgstr ""
+msgstr "## Réunion — {date}\n\nParticipants :\n- "
 
 #: src/features/snippets/snippets-page.tsx:128
 msgid "A block of text Lune Voice types for you when you speak its trigger phrase."
-msgstr ""
+msgstr "Un bloc de texte que Lune Voice saisit pour vous lorsque vous prononcez sa phrase de déclenchement."
 
 #: src/features/settings/sections/pill-section.tsx:212
 msgid "A vertical pill hugs the side of the screen."
@@ -113,7 +113,7 @@ msgstr "Ajouter une correction"
 
 #: src/features/snippets/snippets-page.tsx:237
 msgid "Add snippet"
-msgstr ""
+msgstr "Ajouter un extrait"
 
 #: src/features/settings/sections/models-section.tsx:104
 msgid "AI models stored on your device."
@@ -144,7 +144,7 @@ msgstr "Clé API"
 msgid "Appearance"
 msgstr "Apparence"
 
-#: src/features/settings/sections/general-section.tsx:28
+#: src/features/settings/sections/general-section.tsx:53
 msgid "Application behavior and startup preferences."
 msgstr "Comportement des applications et préférences de démarrage."
 
@@ -202,7 +202,7 @@ msgstr "Annuler la dictée"
 
 #: src/features/snippets/snippets-page.tsx:133
 msgid "Cancel edit"
-msgstr ""
+msgstr "Annuler la modification"
 
 #: src/features/styles/components/style-hero.tsx:19
 msgid "Capitals"
@@ -211,7 +211,7 @@ msgstr "Capitales"
 #: src/components/ui/voice-capture-field.tsx:148
 #: src/components/ui/voice-capture-field.tsx:154
 msgid "Capture by voice"
-msgstr ""
+msgstr "Capturer à la voix"
 
 #: src/features/settings/sections/dictation-section.tsx:105
 msgid "Capture device and how recording detects when you speak."
@@ -220,6 +220,19 @@ msgstr "Périphérique de capture et façon dont l'enregistrement détecte votre
 #: src/features/welcome/welcome-page.tsx:307
 msgid "Change engine"
 msgstr "Changer de moteur"
+
+#: src/features/settings/sections/general-section.tsx:134
+msgid "Check for updates"
+msgstr "Rechercher des mises à jour"
+
+#: src/features/settings/sections/general-section.tsx:105
+#: src/features/settings/sections/general-section.tsx:115
+msgid "Check for updates on launch"
+msgstr "Rechercher des mises à jour au démarrage"
+
+#: src/features/settings/sections/general-section.tsx:125
+msgid "Check whether a newer version has been released."
+msgstr "Vérifier si une version plus récente est disponible."
 
 #: src/features/welcome/welcome-page.tsx:158
 msgid "Check your network and we'll pick up where we left off."
@@ -230,6 +243,7 @@ msgid "Checking installed models…"
 msgstr "Vérification des modèles installés…"
 
 #: src/features/settings/components/asr-engine-cards.tsx:224
+#: src/features/settings/sections/general-section.tsx:134
 msgid "Checking…"
 msgstr "Vérification…"
 
@@ -247,7 +261,7 @@ msgstr "Choisissez à quoi ressemble Lune Voice."
 
 #: src/features/settings/sections/styling-engine-section.tsx:38
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
-msgstr ""
+msgstr "Choisissez comment les transcriptions sont reformulées — envoyées à un point de terminaison compatible OpenAI que vous configurez, local ou hébergé, ou désactivé entièrement."
 
 #: src/features/welcome/welcome-page.tsx:161
 #: src/features/welcome/welcome-page.tsx:167
@@ -299,6 +313,10 @@ msgstr "Complété"
 msgid "Connecting"
 msgstr "De liaison"
 
+#: src/features/settings/sections/general-section.tsx:106
+msgid "Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network."
+msgstr "Contacte le serveur de versions peu après le démarrage et ne vous prévient que si une version plus récente existe. Désactivé par défaut — la dictée elle-même n'a jamais besoin du réseau."
+
 #: src/features/welcome/welcome-page.tsx:239
 #: src/features/welcome/welcome-page.tsx:301
 msgid "Continue"
@@ -348,12 +366,12 @@ msgstr "Impossible d'ajouter cette règle. Essayer à nouveau."
 
 #: src/features/snippets/snippets-page.tsx:95
 msgid "Couldn't save that snippet. Try again."
-msgstr ""
+msgstr "Impossible d'enregistrer cet extrait. Réessayez."
 
 #: src/features/snippets/snippets-page.tsx:123
 #: src/features/snippets/snippets-page.tsx:127
 msgid "Create a snippet"
-msgstr ""
+msgstr "Créer un extrait"
 
 #: src/features/styles/styles-page.tsx:300
 msgid "Create new style"
@@ -403,7 +421,7 @@ msgstr "Supprimer la séance ?"
 
 #: src/features/snippets/snippets-page.tsx:291
 msgid "Delete snippet?"
-msgstr ""
+msgstr "Supprimer l'extrait ?"
 
 #: src/features/dictionary/components/dictionary-table.tsx:144
 msgid "Delete this word fix?"
@@ -444,7 +462,7 @@ msgstr "Visibilité de l'indicateur de dictée"
 
 #: src/components/ui/voice-capture-field.tsx:191
 msgid "Didn't catch anything — try again, a little closer to the mic."
-msgstr ""
+msgstr "Rien n'a été capté — réessayez, un peu plus près du micro."
 
 #: src/features/settings/sections/dictation-section.tsx:68
 msgid "Discard the current draft and return to idle. Click the binding to change it."
@@ -487,7 +505,7 @@ msgstr "Le téléchargement a échoué"
 #. placeholder {0}: formatBytes(status.downloadBytes)
 #: src/features/settings/sections/gpu-section.tsx:54
 msgid "Download GPU support ({0})"
-msgstr ""
+msgstr "Télécharger la prise en charge GPU ({0})"
 
 #: src/features/welcome/welcome-page.tsx:157
 msgid "Download interrupted"
@@ -548,7 +566,7 @@ msgstr "Modifier {0}"
 #: src/features/snippets/snippets-page.tsx:123
 #: src/features/snippets/snippets-page.tsx:127
 msgid "Edit snippet"
-msgstr ""
+msgstr "Modifier l'extrait"
 
 #: src/features/styles/components/style-editor-modal.tsx:68
 msgid "Edit style"
@@ -622,7 +640,7 @@ msgstr "Formatage"
 msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock."
 msgstr "Espace entre l'indicateur et le bord de l'écran, pour éviter une barre des tâches ou un dock."
 
-#: src/features/settings/sections/general-section.tsx:27
+#: src/features/settings/sections/general-section.tsx:52
 #: src/features/settings/settings-page.tsx:69
 msgid "General"
 msgstr "Général"
@@ -659,18 +677,18 @@ msgstr "Accélération GPU"
 
 #: src/features/settings/sections/gpu-section.tsx:92
 msgid "GPU acceleration is active."
-msgstr ""
+msgstr "L'accélération GPU est active."
 
 #: src/features/settings/sections/gpu-section.tsx:43
 msgid "GPU support"
-msgstr ""
+msgstr "Prise en charge GPU"
 
 #: src/features/settings/sections/gpu-section.tsx:108
 msgid "GPU support is installed but not working."
-msgstr ""
+msgstr "La prise en charge GPU est installée mais ne fonctionne pas."
 
-#: src/features/settings/sections/general-section.tsx:61
-#: src/features/settings/sections/general-section.tsx:71
+#: src/features/settings/sections/general-section.tsx:86
+#: src/features/settings/sections/general-section.tsx:96
 msgid "History retention"
 msgstr "Conservation de l'historique"
 
@@ -678,7 +696,7 @@ msgstr "Conservation de l'historique"
 msgid "hold the hotkey and speak, your words land where your cursor is."
 msgstr "maintenez le raccourci clavier et parlez, vos mots atterrissent là où se trouve votre curseur."
 
-#: src/features/settings/sections/general-section.tsx:62
+#: src/features/settings/sections/general-section.tsx:87
 msgid "How long finished dictations are kept on this device."
 msgstr "Combien de temps les dictées terminées sont conservées sur cet appareil."
 
@@ -700,11 +718,11 @@ msgstr "Utilisé"
 
 #: src/features/snippets/snippets-page.tsx:186
 msgid "Insert at cursor"
-msgstr ""
+msgstr "Insérer au curseur"
 
 #: src/features/snippets/snippets-page.tsx:179
 msgid "Insert placeholder"
-msgstr ""
+msgstr "Insérer un espace réservé"
 
 #: src/features/settings/components/asr-engine-cards.tsx:228
 #: src/features/settings/sections/models-section.tsx:219
@@ -732,12 +750,12 @@ msgstr "Gardez l'indicateur avec vous lorsque vous changez d'espace de travail o
 msgid "Keyboard shortcuts (\"Super H\" → \"Super+H\")"
 msgstr "Raccourcis clavier (\"Super H\" → \"Super+H\")"
 
-#: src/features/settings/sections/general-section.tsx:32
-#: src/features/settings/sections/general-section.tsx:37
+#: src/features/settings/sections/general-section.tsx:57
+#: src/features/settings/sections/general-section.tsx:62
 msgid "Language"
 msgstr "Langue"
 
-#: src/features/settings/sections/general-section.tsx:48
+#: src/features/settings/sections/general-section.tsx:73
 msgid "Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login."
 msgstr "Lancez-vous dans la barre d’état système au lieu d’ouvrir la fenêtre principale. Utile lorsque Lune Voice démarre automatiquement lors de la connexion."
 
@@ -757,11 +775,11 @@ msgstr "Écoute"
 
 #: src/components/ui/voice-capture-field.tsx:187
 msgid "Listening — say the phrase, then click again to stop."
-msgstr ""
+msgstr "Écoute — prononcez la phrase, puis cliquez à nouveau pour arrêter."
 
 #: src/components/ui/voice-capture-field.tsx:131
 msgid "Listening — say the phrase…"
-msgstr ""
+msgstr "Écoute — prononcez la phrase…"
 
 #: src/features/overview/overview-page.tsx:204
 #: src/features/shell/components/sidebar-widgets.tsx:52
@@ -795,7 +813,7 @@ msgstr "Gérer dans Modèles"
 
 #: src/features/snippets/snippets-page.tsx:151
 msgid "meeting header"
-msgstr ""
+msgstr "en-tête de réunion"
 
 #: src/features/settings/sections/dictation-section.tsx:104
 #: src/features/settings/sections/dictation-section.tsx:109
@@ -834,7 +852,7 @@ msgstr "Écran"
 
 #: src/features/settings/sections/gpu-section.tsx:44
 msgid "Most of the download is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
-msgstr ""
+msgstr "L'essentiel du téléchargement correspond aux bibliothèques mathématiques CUDA de NVIDIA, qui ne peuvent pas être redistribuées sous une forme plus compacte."
 
 #: src/features/welcome/components/engine-step.tsx:49
 msgid "Multilingual · pick a size"
@@ -879,7 +897,7 @@ msgstr "Aucune séance pour l'instant. Commencez à dicter pour voir vos relevé
 
 #: src/features/snippets/snippets-page.tsx:254
 msgid "No snippets yet."
-msgstr ""
+msgstr "Aucun extrait pour l'instant."
 
 #: src/features/history/components/history-table.tsx:360
 #: src/features/history/components/session-detail-modal.tsx:153
@@ -1125,15 +1143,15 @@ msgstr "Réécrivez chaque transcription dans un style choisi. Lorsque cette opt
 #. placeholder {0}: status.devices.join(', ')
 #: src/features/settings/sections/gpu-section.tsx:91
 msgid "Running on {0}."
-msgstr ""
+msgstr "Fonctionne sur {0}."
 
 #: src/features/settings/sections/gpu-section.tsx:118
 msgid "Running on the CPU."
-msgstr ""
+msgstr "Fonctionne sur le processeur."
 
 #: src/features/settings/sections/gpu-section.tsx:100
 msgid "Running on the CPU. No NVIDIA driver was found — install the driver for your GPU and Lune Voice will offer GPU support here."
-msgstr ""
+msgstr "Fonctionne sur le processeur. Aucun pilote NVIDIA n'a été trouvé — installez le pilote de votre GPU et Lune Voice proposera ici la prise en charge GPU."
 
 #: src/features/overview/overview-page.tsx:262
 msgid "s"
@@ -1146,7 +1164,7 @@ msgstr "Sauvegarder"
 
 #: src/features/snippets/snippets-page.tsx:233
 msgid "Save changes"
-msgstr ""
+msgstr "Enregistrer les modifications"
 
 #: src/features/history/components/history-table.tsx:308
 #: src/features/history/components/session-detail-modal.tsx:70
@@ -1155,15 +1173,15 @@ msgstr "Enregistrer la transcription"
 
 #: src/features/snippets/snippets-page.tsx:257
 msgid "Save your signature, a meeting header, or anything you type often — then speak its trigger to drop it into any app."
-msgstr ""
+msgstr "Enregistrez votre signature, un en-tête de réunion ou tout ce que vous tapez souvent — puis prononcez son déclencheur pour l'insérer dans n'importe quelle application."
 
 #: src/features/snippets/snippets-page.tsx:249
 msgid "Saved snippets"
-msgstr ""
+msgstr "Extraits enregistrés"
 
 #: src/features/snippets/snippets-page.tsx:156
 msgid "Say <0>“{spokenTrigger}”</0> as the whole utterance — or <1>“insert {spokenTrigger}”</1> — to type this snippet."
-msgstr ""
+msgstr "Dites <0>« {spokenTrigger} »</0> comme énoncé complet — ou <1>« insert {spokenTrigger} »</1> — pour saisir cet extrait."
 
 #: src/features/history/components/history-table.tsx:100
 msgid "Search transcripts"
@@ -1238,7 +1256,7 @@ msgstr "Passer au contenu principal"
 
 #: src/features/snippets/snippets-page.tsx:177
 msgid "Snippet text"
-msgstr ""
+msgstr "Texte de l'extrait"
 
 #: src/features/settings/sections/output-section.tsx:71
 msgid "Sound"
@@ -1271,8 +1289,8 @@ msgstr "Commencez à dicter"
 msgid "Start dictation"
 msgstr "Démarrer la dictée"
 
-#: src/features/settings/sections/general-section.tsx:47
-#: src/features/settings/sections/general-section.tsx:55
+#: src/features/settings/sections/general-section.tsx:72
+#: src/features/settings/sections/general-section.tsx:80
 msgid "Start minimized"
 msgstr "Démarrer réduit"
 
@@ -1286,12 +1304,12 @@ msgstr "Démarrez, arrêtez et annulez la dictée sans quitter votre travail."
 
 #: src/features/settings/sections/gpu-section.tsx:33
 msgid "Status"
-msgstr ""
+msgstr "État"
 
 #: src/components/ui/voice-capture-field.tsx:148
 #: src/components/ui/voice-capture-field.tsx:153
 msgid "Stop capturing"
-msgstr ""
+msgstr "Arrêter la capture"
 
 #: src/features/shell/components/sidebar-widgets.tsx:24
 #: src/features/shell/components/sidebar-widgets.tsx:25
@@ -1351,11 +1369,11 @@ msgstr "Le raccourci principal utilisé pour la saisie vocale. Cliquez sur la li
 
 #: src/components/ui/voice-capture-field.tsx:151
 msgid "The microphone is in use"
-msgstr ""
+msgstr "Le microphone est en cours d'utilisation"
 
 #: src/features/snippets/snippets-page.tsx:223
 msgid "The snippet text appears here with placeholders filled in."
-msgstr ""
+msgstr "Le texte de l'extrait apparaît ici avec les espaces réservés remplis."
 
 #: src/features/settings/sections/transcription-section.tsx:100
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
@@ -1421,11 +1439,11 @@ msgstr "Nombre total de mots"
 
 #: src/components/ui/voice-capture-field.tsx:189
 msgid "Transcribing what you said…"
-msgstr ""
+msgstr "Transcription de ce que vous avez dit…"
 
 #: src/components/ui/voice-capture-field.tsx:133
 msgid "Transcribing…"
-msgstr ""
+msgstr "Transcription…"
 
 #: src/features/history/components/history-table.tsx:141
 msgid "Transcript"
@@ -1438,19 +1456,23 @@ msgstr "Transcription"
 
 #: src/features/settings/sections/gpu-section.tsx:30
 msgid "Transcription runs on the CPU by default. If you have an NVIDIA GPU, an optional download moves it to the GPU for noticeably lower latency."
-msgstr ""
+msgstr "La transcription s'exécute sur le processeur par défaut. Si vous avez un GPU NVIDIA, un téléchargement facultatif la bascule sur le GPU pour une latence nettement plus faible."
 
 #: src/features/snippets/snippets-page.tsx:145
 msgid "Trigger phrase"
-msgstr ""
+msgstr "Phrase de déclenchement"
 
 #: src/features/snippets/snippets-page.tsx:163
 msgid "Type a phrase, or tap the mic to capture it exactly as Lune Voice hears it."
-msgstr ""
+msgstr "Saisissez une phrase, ou touchez le micro pour la capturer exactement telle que Lune Voice l'entend."
 
 #: src/features/snippets/snippets-page.tsx:215
 msgid "Types as"
-msgstr ""
+msgstr "Saisit"
+
+#: src/features/settings/sections/general-section.tsx:121
+msgid "Updates"
+msgstr "Mises à jour"
 
 #: src/features/welcome/components/engine-step.tsx:136
 msgid "Use GPU acceleration"
@@ -1552,6 +1574,10 @@ msgstr "WPM"
 msgid "Yes"
 msgstr "Oui"
 
+#: src/features/settings/sections/general-section.tsx:124
+msgid "You are running version {version}."
+msgstr "Vous utilisez la version {version}."
+
 #: src/features/dictionary/components/dictionary-form.tsx:63
 msgid "You say"
 msgstr "Tu dis"
@@ -1562,15 +1588,15 @@ msgstr "Vous êtes prêt"
 
 #: src/features/settings/components/openai-fields.tsx:48
 msgid "Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none."
-msgstr ""
+msgstr "Votre clé d'API. Laissez-la vide pour conserver la clé enregistrée — ou si le point de terminaison s'exécute sur votre propre machine ou réseau et n'en demande aucune."
 
 #: src/features/welcome/components/engine-step.tsx:126
 msgid "Your GPU is ready — use it for faster transcription."
-msgstr ""
+msgstr "Votre GPU est prêt — utilisez-le pour transcrire plus vite."
 
 #: src/features/welcome/components/engine-step.tsx:127
 msgid "Your GPU qualifies. Keep this on, then finish the one-time setup in Settings."
-msgstr ""
+msgstr "Votre GPU est compatible. Laissez ceci activé, puis terminez la configuration initiale dans les Paramètres."
 
 #: src/features/overview/overview-page.tsx:230
 msgid "your hotkey"
