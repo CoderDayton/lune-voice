@@ -191,7 +191,7 @@ dependencies = [
  "eventsource-stream",
  "futures",
  "getrandom 0.3.4",
- "rand 0.9.3",
+ "rand 0.9.5",
  "reqwest 0.12.28",
  "reqwest-eventsource",
  "secrecy",
@@ -2449,7 +2449,7 @@ dependencies = [
  "log",
  "native-tls",
  "num_cpus",
- "rand 0.9.3",
+ "rand 0.9.5",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
@@ -3271,7 +3271,7 @@ dependencies = [
  "async-trait",
  "lune-core",
  "lune-dict",
- "rand 0.9.3",
+ "rand 0.10.2",
  "regex",
  "serde",
  "serde_json",
@@ -4788,9 +4788,9 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.9.3"
+version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ec095654a25171c2124e9e3393a930bddbffdc939556c914957a4c3e0a87166"
+checksum = "b9ef1d0d795eb7d84685bca4f72f3649f064e6641543d3a8c415898726a57b41"
 dependencies = [
  "rand_chacha 0.9.0",
  "rand_core 0.9.5",
@@ -6268,7 +6268,7 @@ checksum = "01fc2c5ff41105bd1f7242d8201fdf3efd70749b82fa013a17f2126357d194cc"
 dependencies = [
  "log",
  "notify-rust",
- "rand 0.9.3",
+ "rand 0.9.5",
  "serde",
  "serde_json",
  "serde_repr",

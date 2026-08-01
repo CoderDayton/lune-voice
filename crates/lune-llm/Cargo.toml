@@ -20,7 +20,7 @@ serde.workspace = true
 serde_json.workspace = true
 regex = "1.11"
 text-processing-rs = "0.1.0"
-rand = "0.9"
+rand = "0.10"
 
 [dev-dependencies]
 tracing-subscriber = "0.3"
