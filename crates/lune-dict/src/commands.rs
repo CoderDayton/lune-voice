@@ -10,33 +10,23 @@ pub struct RouteResult {
     pub remaining: String,
 }
 
-/// Routes raw ASR text to built-in voice commands before LLM post-processing.
+/// Routes raw ASR text to voice commands before LLM post-processing.
 ///
-/// A command is recognized **only when the entire utterance is that command**,
-/// compared word-for-word and ignoring case and surrounding punctuation
-/// (`"Stop, dictation!"` == `"stop dictation"`). Anything else passes through
-/// untouched, so ordinary words like `"stop"` in `"tell him to stop"` are never
-/// stripped from dictation.
+/// There are no fixed built-in commands. Every phrase that once lived here was
+/// either unimplemented or a formatting shortcut, and each one cost more in
+/// swallowed dictation than it returned — a recognized command consumes the
+/// whole utterance, so a false positive types nothing at all.
 ///
-/// Parametric commands (`"switch to <preset>"`, `"insert <snippet>"`) match when
-/// the utterance *begins* with the exact command words and has at least one more
-/// word; the remainder is the argument.
+/// What remains is two parametric commands, `"switch to <preset>"` and
+/// `"insert <snippet>"`, which match when the utterance *begins* with the exact
+/// command words and has at least one more word; the remainder is the argument.
+/// Callers may register their own exact-match phrases with [`Self::add_custom`],
+/// which are recognized only when they are the entire utterance, compared
+/// word-for-word and ignoring case and surrounding punctuation.
 pub struct VoiceCommandRouter {
     /// User-defined phrase → command mappings, stored as normalized word lists.
     custom: Vec<(Vec<String>, VoiceCommand)>,
 }
-
-// Fixed commands. Each matches only when it is the entire utterance. Bare
-// "stop" is intentionally absent — it collided with the ordinary word "stop"
-// in dictation; stop the session with "stop dictation" / "stop listening".
-static BUILTINS: &[(&str, VoiceCommand)] = &[
-    ("stop dictation", VoiceCommand::StopDictation),
-    ("stop listening", VoiceCommand::StopDictation),
-    ("new paragraph", VoiceCommand::NewParagraph),
-    ("scratch that", VoiceCommand::ScratchThat),
-    ("list item", VoiceCommand::ListItem),
-    ("new line", VoiceCommand::NewLine),
-];
 
 #[derive(Copy, Clone)]
 enum ParametricKind {
@@ -107,9 +97,9 @@ impl VoiceCommandRouter {
             }
         }
 
-        // Fixed/custom commands: the whole utterance must equal the command.
-        for (phrase, cmd) in self.all_patterns() {
-            if words.iter().map(String::as_str).eq(phrase.iter().copied()) {
+        // Custom commands: the whole utterance must equal the command.
+        for (phrase, cmd) in &self.custom {
+            if words == *phrase {
                 return RouteResult {
                     commands: vec![cmd.clone()],
                     remaining: String::new(),
@@ -118,17 +108,6 @@ impl VoiceCommandRouter {
         }
 
         passthrough()
-    }
-
-    fn all_patterns(&self) -> impl Iterator<Item = (Vec<&str>, &VoiceCommand)> + '_ {
-        BUILTINS
-            .iter()
-            .map(|(p, c)| (p.split_whitespace().collect::<Vec<_>>(), c))
-            .chain(
-                self.custom
-                    .iter()
-                    .map(|(words, c)| (words.iter().map(String::as_str).collect::<Vec<_>>(), c)),
-            )
     }
 }
 
@@ -165,78 +144,26 @@ mod tests {
     }
 
     #[test]
-    fn stop_dictation_exact() {
-        let r = router().route_full("stop dictation");
-        assert!(r.commands.contains(&VoiceCommand::StopDictation));
-        assert!(r.remaining.is_empty());
+    fn no_phrase_is_a_command_on_its_own() {
+        // There are no fixed builtins left: an utterance is only ever a command
+        // if it starts with a parametric prefix or matches a custom phrase.
+        for utterance in ["scratch that", "stop dictation", "new line", "list item"] {
+            let r = router().route_full(utterance);
+            assert!(
+                r.commands.is_empty(),
+                "{utterance:?} must be dictated, not swallowed as a command"
+            );
+            assert_eq!(r.remaining, utterance);
+        }
     }
 
     #[test]
-    fn stop_dictation_ignores_case_and_punctuation() {
-        let r = router().route_full("Stop, Dictation!");
-        assert!(r.commands.contains(&VoiceCommand::StopDictation));
-        assert!(r.remaining.is_empty());
-    }
-
-    #[test]
-    fn stop_listening_exact() {
-        let r = router().route_full("stop listening");
-        assert!(r.commands.contains(&VoiceCommand::StopDictation));
-    }
-
-    #[test]
-    fn midsentence_stop_is_kept_as_dictation() {
-        // Regression: the bare-"stop" substring command used to strip the word.
-        let r = router().route_full("tell him to stop now");
+    fn parametric_command_must_start_the_utterance() {
+        // A prefix mid-sentence is ordinary dictation, so "please switch to
+        // decaf" types instead of silently changing the style preset.
+        let r = router().route_full("please switch to decaf");
         assert!(r.commands.is_empty());
-        assert_eq!(r.remaining, "tell him to stop now");
-    }
-
-    #[test]
-    fn bare_stop_is_not_a_command() {
-        let r = router().route_full("stop");
-        assert!(r.commands.is_empty());
-        assert_eq!(r.remaining, "stop");
-    }
-
-    #[test]
-    fn word_containing_command_is_not_matched() {
-        // "nonstop" / "stopwatch" must not trip the stop command.
-        let r = router().route_full("we ran nonstop");
-        assert!(r.commands.is_empty());
-        assert_eq!(r.remaining, "we ran nonstop");
-    }
-
-    #[test]
-    fn command_only_when_whole_utterance() {
-        let r = router().route_full("hello new line world");
-        assert!(r.commands.is_empty());
-        assert_eq!(r.remaining, "hello new line world");
-    }
-
-    #[test]
-    fn new_line_exact() {
-        let r = router().route_full("new line");
-        assert!(r.commands.contains(&VoiceCommand::NewLine));
-        assert!(r.remaining.is_empty());
-    }
-
-    #[test]
-    fn new_paragraph_exact() {
-        let r = router().route_full("New paragraph.");
-        assert!(r.commands.contains(&VoiceCommand::NewParagraph));
-    }
-
-    #[test]
-    fn list_item_exact() {
-        let r = router().route_full("list item");
-        assert!(r.commands.contains(&VoiceCommand::ListItem));
-    }
-
-    #[test]
-    fn scratch_that_exact() {
-        let r = router().route_full("scratch that");
-        assert!(r.commands.contains(&VoiceCommand::ScratchThat));
+        assert_eq!(r.remaining, "please switch to decaf");
     }
 
     #[test]
@@ -288,11 +215,11 @@ mod tests {
     #[test]
     fn custom_command_exact_only() {
         let mut r = VoiceCommandRouter::new();
-        r.add_custom("send message", VoiceCommand::StopDictation);
+        r.add_custom("send message", VoiceCommand::SwitchStyle("formal".into()));
         assert!(
             r.route_full("send message")
                 .commands
-                .contains(&VoiceCommand::StopDictation)
+                .contains(&VoiceCommand::SwitchStyle("formal".into()))
         );
         // Not the whole utterance → not a command.
         assert!(r.route_full("please send message now").commands.is_empty());

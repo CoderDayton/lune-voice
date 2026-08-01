@@ -1659,7 +1659,7 @@ mod tests {
             .run_until(async {
                 // A whole-utterance voice command emits CommandDetected; it must
                 // carry the session id so the delivery path stays correlated.
-                let responses = vec![Ok(vec![make_segment("new line", false)])];
+                let responses = vec![Ok(vec![make_segment("switch to formal", false)])];
                 let (mgr, _) = make_manager(scripted_asr(responses), Arc::new(EchoPostProcessor));
                 let (tx, rx) = mpsc::channel(32);
                 let session_id = mgr.start_with_audio(tx, speech_stream()).await.unwrap();

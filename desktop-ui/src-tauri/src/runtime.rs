@@ -23,7 +23,6 @@ use tokio::sync::{Mutex, RwLock, mpsc};
 #[cfg(unix)]
 use tracing::info;
 use tracing::{debug, warn};
-use uuid::Uuid;
 
 use crate::dto::SessionStreamEvent;
 
@@ -671,10 +670,10 @@ impl AppRuntime {
                         let _ = app.emit_to("pill", "lune://audio-level", level);
                     }
                     SessionEvent::CommandDetected {
-                        session_id,
+                        session_id: _,
                         payload,
                     } => {
-                        runtime.handle_voice_command(session_id, &payload).await;
+                        runtime.handle_voice_command(&payload).await;
                         runtime
                             .push_session_event(SessionStreamEvent::CommandDetected { payload })
                             .await;
@@ -725,86 +724,15 @@ impl AppRuntime {
 
     /// Dispatch a `VoiceCommand` payload string received from the pipeline.
     ///
-    /// - `NewLine` / `NewParagraph` / `ListItem` → deliver the corresponding
-    ///   whitespace/punctuation text.
-    /// - `StopDictation` → stop the active session.
-    /// - Other commands (e.g. `SwitchStyle`, `ScratchThat`) →
-    ///   logged and skipped; higher-level handling belongs in the frontend or a
-    ///   future command handler.
-    async fn handle_voice_command(&self, session_id: Uuid, payload: &str) {
-        let cmd: VoiceCommand = match serde_json::from_str(payload) {
-            Ok(c) => c,
+    /// Nothing is acted on here. Both commands are applied in the pipeline
+    /// itself (`session.rs`): `SwitchStyle` swaps the style preset,
+    /// `InsertSnippet` expands a snippet. The payload is still parsed so a
+    /// malformed one is reported rather than silently dropped.
+    async fn handle_voice_command(&self, payload: &str) {
+        match serde_json::from_str::<VoiceCommand>(payload) {
+            Ok(cmd) => debug!(?cmd, "CommandDetected: no runtime action for this command"),
             Err(e) => {
                 warn!(error = %e, payload, "CommandDetected: failed to parse VoiceCommand JSON");
-                return;
-            }
-        };
-
-        let mode = self.inner.settings.read().await.dictation_mode;
-
-        #[cfg(unix)]
-        let focus_target = self.inner.pipeline.lock().await.focus_target.clone();
-
-        match cmd {
-            VoiceCommand::NewLine => {
-                debug!("CommandDetected: NewLine → delivering \\n");
-                #[cfg(unix)]
-                if let Some(ref t) = focus_target {
-                    self.inner
-                        .delivery
-                        .deliver_to(Some(session_id), "\n", mode, false, t);
-                } else {
-                    self.inner
-                        .delivery
-                        .deliver(Some(session_id), "\n", mode, false);
-                }
-                #[cfg(not(unix))]
-                self.inner
-                    .delivery
-                    .deliver(Some(session_id), "\n", mode, false);
-            }
-            VoiceCommand::NewParagraph => {
-                debug!("CommandDetected: NewParagraph → delivering \\n\\n");
-                #[cfg(unix)]
-                if let Some(ref t) = focus_target {
-                    self.inner
-                        .delivery
-                        .deliver_to(Some(session_id), "\n\n", mode, false, t);
-                } else {
-                    self.inner
-                        .delivery
-                        .deliver(Some(session_id), "\n\n", mode, false);
-                }
-                #[cfg(not(unix))]
-                self.inner
-                    .delivery
-                    .deliver(Some(session_id), "\n\n", mode, false);
-            }
-            VoiceCommand::ListItem => {
-                debug!("CommandDetected: ListItem → delivering \\n- ");
-                #[cfg(unix)]
-                if let Some(ref t) = focus_target {
-                    self.inner
-                        .delivery
-                        .deliver_to(Some(session_id), "\n- ", mode, false, t);
-                } else {
-                    self.inner
-                        .delivery
-                        .deliver(Some(session_id), "\n- ", mode, false);
-                }
-                #[cfg(not(unix))]
-                self.inner
-                    .delivery
-                    .deliver(Some(session_id), "\n- ", mode, false);
-            }
-            VoiceCommand::StopDictation => {
-                debug!("CommandDetected: StopDictation → stopping session");
-                if let Some(manager) = self.active_manager().await {
-                    manager.stop().await;
-                }
-            }
-            other => {
-                debug!(cmd = ?other, "CommandDetected: no delivery action for this command");
             }
         }
     }

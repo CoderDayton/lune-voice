@@ -471,11 +471,6 @@ async fn run_pipeline(
 fn command_text_from_payload(payload: &str) -> Option<String> {
     let cmd: VoiceCommand = serde_json::from_str(payload).ok()?;
     Some(match cmd {
-        VoiceCommand::StopDictation => "stop listening".to_string(),
-        VoiceCommand::NewLine => "new line".to_string(),
-        VoiceCommand::NewParagraph => "new paragraph".to_string(),
-        VoiceCommand::ListItem => "list item".to_string(),
-        VoiceCommand::ScratchThat => "scratch that".to_string(),
         VoiceCommand::SwitchStyle(style) => format!("switch to {style}"),
         VoiceCommand::InsertSnippet(name) => format!("insert {name}"),
         _ => return None,

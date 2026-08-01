@@ -1,10 +1,15 @@
 <div align="center">
 
+<img src="https://raw.githubusercontent.com/CoderDayton/lune-voice/main/assets/lune-icon-512.png" alt="" width="75">
+
 # Lune Voice
 
 **Open source dictation for Linux that runs on your own hardware.**
 
-[Docs](docs/) · [Architecture](docs/ARCHITECTURE.md) · [GPLv3](LICENSE)
+[![Release](https://img.shields.io/github/v/release/CoderDayton/lune-voice?style=flat&label=release)](https://github.com/CoderDayton/lune-voice/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/CoderDayton/lune-voice/ci.yml?branch=main&style=flat&label=CI)](https://github.com/CoderDayton/lune-voice/actions/workflows/ci.yml)
+[![Downloads](https://img.shields.io/github/downloads/CoderDayton/lune-voice/total?style=flat&label=downloads)](https://github.com/CoderDayton/lune-voice/releases)
+[![License](https://img.shields.io/badge/license-GPLv3-blue?style=flat)](LICENSE)
 
 </div>
 
@@ -34,17 +39,13 @@ First launch downloads about 540 MB of Whisper models. After that, dictation nee
 
 **Custom dictionary.** Add the names, acronyms, and terms specific to your work. Exact matches always apply, close single-word misses are caught when the recognizer was unsure of the word, and priority ranking decides between competing entries.
 
-**Voice commands.** "New line." "New paragraph." "List item." "Scratch that." "Stop dictation." Each is recognized only when it is the whole utterance, so the same words inside a sentence are dictated normally.
-
 **Hold or toggle.** Hold the hotkey for short corrections, or toggle it for longer passages. `Ctrl+Space` by default, global, and works in any application.
 
 **Searchable history.** Every session is recorded with its transcript, timing, and the style applied.
 
-**Audio cues.** Short sounds mark the start, end, and failure of a session, so you can track state without watching the screen. Volume is adjustable, and the cues can be turned off.
-
 ## Privacy
 
-On its own the app makes two kinds of network request: the Whisper model download on first launch, and the CUDA plugin download if you ask for GPU acceleration. Local transcription, dictionary correction, and formatting never reach the network.
+On its own the app makes three kinds of network request: the Whisper model download on first launch, the CUDA plugin download if you ask for GPU acceleration, and the update check. The update check runs only when you ask for it — from the tray menu or Settings — unless you turn on "Check for updates on launch", which is off by default. Local transcription, dictionary correction, and formatting never reach the network.
 
 Two settings can send your words out, and only once you pick them: remote styling, and a remote transcription backend in place of local Whisper. Pointing either at a local endpoint keeps transcripts on your machine.
 
