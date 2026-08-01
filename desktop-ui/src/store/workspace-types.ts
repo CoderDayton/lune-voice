@@ -47,6 +47,8 @@ export interface WorkspaceSettings {
   inputDevice: string | null;
   vadPcen: boolean;
   startMinimized: boolean;
+  /** Contact the release endpoint for a newer version at startup. */
+  checkUpdatesOnLaunch: boolean;
   sessionHistoryDays: number | null;
   terminalMode: TerminalModeValue;
   llmEnabled: boolean;
@@ -157,6 +159,7 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   inputDevice: null,
   vadPcen: true,
   startMinimized: false,
+  checkUpdatesOnLaunch: false,
   sessionHistoryDays: 30,
   terminalMode: 'Auto',
   llmEnabled: true,

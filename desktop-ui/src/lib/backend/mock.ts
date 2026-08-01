@@ -50,6 +50,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
       inputDevice: null,
       vadPcen: true,
       startMinimized: false,
+      checkUpdatesOnLaunch: false,
       sessionHistoryDays: 30,
       terminalMode: 'Auto',
       openaiAsrBaseUrl: null,
@@ -450,6 +451,14 @@ export const mockBackendClient: BackendClient = {
   async listMonitors() {
     return [{ name: 'Mock-1', width: 1920, height: 1080, isPrimary: true }];
   },
+
+  // Nothing to update in the browser mock — there is no packaged app to
+  // replace, so the check is a no-op rather than a fake "up to date".
+  async appVersion() {
+    return '0.0.0-mock';
+  },
+
+  async startUpdateCheck() {},
 
   async gpuBackendStatus() {
     // The browser/mock runtime has no native backend at all, so the onboarding

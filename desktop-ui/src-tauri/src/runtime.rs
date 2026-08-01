@@ -230,6 +230,12 @@ impl AppRuntime {
         self.inner.settings.read().await.start_minimized
     }
 
+    /// Return the persisted `check_updates_on_launch` preference. Read at app
+    /// startup to decide whether to contact the release endpoint at all.
+    pub async fn check_updates_on_launch(&self) -> bool {
+        self.inner.settings.read().await.check_updates_on_launch
+    }
+
     /// Return the persisted pill-visibility preference. Read at app startup to
     /// decide whether to create the pill overlay window at all (Never = none).
     pub async fn pill_visibility(&self) -> PillVisibility {

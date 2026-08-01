@@ -306,6 +306,8 @@ pub struct WorkspaceSettingsDto {
     pub input_device: Option<String>,
     pub vad_pcen: bool,
     pub start_minimized: bool,
+    /// Check the release endpoint for a newer version at startup.
+    pub check_updates_on_launch: bool,
     /// How long to keep dictation history, in days. `None` disables history.
     pub session_history_days: Option<u32>,
     /// Paste-shortcut selection strategy for the output stage.
@@ -494,6 +496,9 @@ pub struct SaveWorkspaceSettingsInput {
     pub input_device: Option<String>,
     pub vad_pcen: bool,
     pub start_minimized: bool,
+    /// Check the release endpoint for a newer version at startup.
+    #[serde(default)]
+    pub check_updates_on_launch: bool,
     /// How long to keep dictation history, in days. `None` disables history.
     pub session_history_days: Option<u32>,
     /// Paste-shortcut selection strategy for the output stage.

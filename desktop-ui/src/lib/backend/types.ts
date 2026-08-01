@@ -45,6 +45,10 @@ export type {
 } from './generated';
 
 export interface BackendClient {
+  /** Version of the running build, as the updater compares it. */
+  appVersion(): Promise<string>;
+  /** Fire the update check. Resolves immediately; the outcome is a native dialog. */
+  startUpdateCheck(): Promise<void>;
   loadWorkspaceSnapshot(): Promise<WorkspaceSnapshot>;
   loadPillSnapshot(): Promise<PillSnapshotDto>;
   saveWorkspaceSettings(input: SaveWorkspaceSettingsInput): Promise<WorkspaceSnapshot>;

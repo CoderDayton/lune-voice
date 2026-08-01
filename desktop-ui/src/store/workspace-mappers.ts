@@ -75,6 +75,8 @@ export function mapWorkspaceSettings(snapshot: WorkspaceSnapshot): WorkspaceSett
     inputDevice: snapshot.settings.inputDevice ?? DEFAULT_SETTINGS.inputDevice,
     vadPcen: snapshot.settings.vadPcen ?? DEFAULT_SETTINGS.vadPcen,
     startMinimized: snapshot.settings.startMinimized ?? DEFAULT_SETTINGS.startMinimized,
+    checkUpdatesOnLaunch:
+      snapshot.settings.checkUpdatesOnLaunch ?? DEFAULT_SETTINGS.checkUpdatesOnLaunch,
     sessionHistoryDays: snapshot.settings.sessionHistoryDays ?? DEFAULT_SETTINGS.sessionHistoryDays,
     terminalMode: snapshot.settings.terminalMode ?? DEFAULT_SETTINGS.terminalMode,
     llmEnabled: snapshot.settings.llmEnabled ?? DEFAULT_SETTINGS.llmEnabled,
@@ -141,6 +143,7 @@ export function settingsToSaveInput(settings: WorkspaceSettings): SaveWorkspaceS
     inputDevice: settings.inputDevice,
     vadPcen: settings.vadPcen,
     startMinimized: settings.startMinimized,
+    checkUpdatesOnLaunch: settings.checkUpdatesOnLaunch,
     sessionHistoryDays: settings.sessionHistoryDays,
     terminalMode: settings.terminalMode,
     llmEnabled: settings.llmEnabled,

@@ -11,6 +11,14 @@ import type {
 } from './types';
 
 const tauriBackendClient: BackendClient = {
+  appVersion() {
+    return invoke<string>('app_version');
+  },
+
+  startUpdateCheck() {
+    return invoke<void>('start_update_check');
+  },
+
   loadWorkspaceSnapshot() {
     return invoke<WorkspaceSnapshot>('load_workspace_snapshot');
   },

@@ -65,6 +65,27 @@ fn validate_local_name(local_name: &str) -> Result<(), String> {
     }
 }
 
+/// Version this build reports — the same string the updater compares the
+/// release against, so what Settings shows is what the check acts on.
+#[tauri::command]
+pub async fn app_version(window: WebviewWindow, app: tauri::AppHandle) -> Result<String, String> {
+    require_window_access(&window, &["main"])?;
+    Ok(app.package_info().version.to_string())
+}
+
+/// Settings' **Check for updates**. Runs the same flow as the tray item,
+/// dialogs and all, and returns immediately — the single-flight guard around
+/// that flow means the button and the tray menu cannot race each other.
+#[tauri::command]
+pub async fn start_update_check(
+    window: WebviewWindow,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    require_window_access(&window, &["main"])?;
+    tauri::async_runtime::spawn(crate::check_for_updates(app));
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn load_workspace_snapshot(
     window: WebviewWindow,

@@ -1,8 +1,9 @@
 import { useLingui } from '@lingui/react/macro';
 import { SlidersHorizontal } from 'lucide-react';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown';
 import { activateLocale, type LocaleKey, locales } from '../../../i18n';
+import { backendClient } from '../../../lib/backend/client';
 import { saveWorkspaceSetting, type WorkspaceSettings } from '../../../store/workspace-store';
 import { SettingsRow, SettingsSection } from '../components/section';
 import {
@@ -13,6 +14,30 @@ import {
 
 export function GeneralSection({ settings }: { settings: WorkspaceSettings }) {
   const { t } = useLingui();
+  const [version, setVersion] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void backendClient.appVersion().then((v) => {
+      if (!cancelled) setVersion(v);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // The result arrives as a native dialog, so the button only has to report
+  // that the check started — and re-enable itself so a failed check can be
+  // retried without reopening Settings.
+  async function checkForUpdates() {
+    setChecking(true);
+    try {
+      await backendClient.startUpdateCheck();
+    } finally {
+      setChecking(false);
+    }
+  }
   const localeOptions = useMemo<DescriptiveOptionData<LocaleKey>[]>(
     () =>
       (Object.entries(locales) as [LocaleKey, string][]).map(([key, label]) => ({
@@ -73,6 +98,41 @@ export function GeneralSection({ settings }: { settings: WorkspaceSettings }) {
               void saveWorkspaceSetting('sessionHistoryDays', next === 'off' ? null : Number(next))
             }
           />
+        }
+      />
+
+      <SettingsRow
+        label={t`Check for updates on launch`}
+        description={t`Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network.`}
+        control={
+          <input
+            type="checkbox"
+            className="toggle toggle-primary"
+            checked={settings.checkUpdatesOnLaunch}
+            onChange={() =>
+              void saveWorkspaceSetting('checkUpdatesOnLaunch', !settings.checkUpdatesOnLaunch)
+            }
+            aria-label={t`Check for updates on launch`}
+          />
+        }
+      />
+
+      <SettingsRow
+        label={t`Updates`}
+        description={
+          version
+            ? t`You are running version ${version}.`
+            : t`Check whether a newer version has been released.`
+        }
+        control={
+          <button
+            type="button"
+            className="btn btn-sm"
+            disabled={checking}
+            onClick={() => void checkForUpdates()}
+          >
+            {checking ? t`Checking…` : t`Check for updates`}
+          </button>
         }
       />
     </SettingsSection>

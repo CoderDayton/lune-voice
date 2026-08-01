@@ -210,6 +210,11 @@ pub struct UserSettings {
     /// tray instead of shown. Useful when Lune is autostarted on login.
     #[serde(default)]
     pub start_minimized: bool,
+    /// Ask the release endpoint for a newer version at startup. Off by
+    /// default: dictation is fully local, so the app should not reach the
+    /// network unless the user asks it to.
+    #[serde(default)]
+    pub check_updates_on_launch: bool,
 }
 
 fn default_true() -> bool {
@@ -298,6 +303,7 @@ impl Default for UserSettings {
             input_device: None,
             vad_pcen: true,
             start_minimized: false,
+            check_updates_on_launch: false,
         }
     }
 }

@@ -16,6 +16,14 @@
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: https://asset.localhost; font-src 'self' data:; connect-src ipc: http://ipc.localhost"
     }
   },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/CoderDayton/lune-voice/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ4N0VEQTE4NDU2OTFGQzkKUldUSkgybEZHTnArMkJ1SFpmOThWNEhPUWFXRGdpUDlZVnFiZCtrUmw2Mm82NWF0ZERxWGh5ZGoK"
+    }
+  },
   "bundle": {
     "active": true,
     "targets": ["deb", "rpm", "appimage", "dmg", "nsis"],

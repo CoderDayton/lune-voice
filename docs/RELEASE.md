@@ -182,6 +182,116 @@ Upload both files to the GitHub release, then record the digest and byte size in
 is filled in, the in-app install refuses rather than fetching something it
 cannot verify. Full details in [GPU_PLUGIN.md](GPU_PLUGIN.md).
 
+## In-app updater
+
+The tray's **Check for Updates…** fetches `latest.json` from the latest GitHub
+release, verifies the signature against the public key pinned in
+`tauri.conf.json`, and installs: an AppImage is swapped in place, a `.deb`/`.rpm`
+goes through `pkexec` (a graphical password prompt). Nothing downloads before
+the user agrees, and the app restarts itself afterwards.
+
+**The signing key is the trust root.** It lives at
+`~/.tauri/lune-voice-updater.key` (mode 600), never in the repo. Anyone holding
+it can push a signed update to every user; lose it and no existing install can
+ever be updated again, because the public key is baked into shipped binaries.
+Back it up somewhere you would not lose, and keep it out of `git` and CI logs.
+
+Builds stay key-free on purpose. Turning on `createUpdaterArtifacts` would make
+the bundler demand the private key on **every** `cgs build` — a pinned `pubkey`
+without a matching private key aborts `tauri build` outright (*"A public key has
+been found, but no private key"*), which would break the build for anyone who
+does not hold it. So nothing is signed during bundling; `cgs updater-manifest`
+packs the AppImage into the `.tar.gz` the plugin expects and signs all three
+formats afterwards, in one place.
+
+Per release:
+
+```bash
+cgs package                                   # deb + AppImage + rpm
+cgs updater-manifest --env TAG=v0.2.0         # signs, writes release-artifacts/latest.json
+gh release upload v0.2.0 release-artifacts/latest.json release-artifacts/*.{deb,rpm,AppImage,tar.gz}
+```
+
+`latest.json` must be uploaded to the release whose tag the endpoint resolves
+to, or clients keep seeing the previous version. Bump `version` in
+`tauri.conf.json` before building — the plugin compares against the running
+app's own version, so a release built with a stale version is invisible.
+
+The manifest carries one key per package format —
+`linux-x86_64-{appimage,deb,rpm}` — because the plugin rejects bytes that do
+not match how the app was installed, so a single URL cannot serve all three.
+Those are the keys the plugin looks up on its own: it tries
+`{os}-{arch}-{installer}` for the format this install was packaged as and then
+falls back to the bare `{os}-{arch}` key, so the app pins no target of its own.
+The AppImage reaches clients as a `.tar.gz` (the plugin extracts it and looks
+for the `.AppImage` inside); `cgs updater-manifest` builds and signs that
+archive, and signs the deb and rpm, which the bundler would not sign even with
+`createUpdaterArtifacts` on.
+`cgs updater-manifest` also refuses to run when the tag disagrees with the
+`version` in `tauri.conf.json`.
+
+### Testing the updater
+
+Two layers, both local — nothing here needs a published release:
+
+```bash
+cargo test -p lune-ui --lib updater   # check + download + signature verification
+cgs updater-test                      # the install path, for real
+```
+
+The unit tests stand a local HTTP endpoint in front of a fixture signed by a
+throwaway key and assert three things: a correctly signed payload is accepted,
+a payload with one flipped byte is refused, and a payload signed by a
+*different valid key* is refused. The last two are the ones that matter — they
+show verification is key-specific rather than merely well-formed.
+
+`cgs updater-test` covers what those cannot: replacing the running app. It
+builds the current version and a `99.0.0` AppImage, serves a signed manifest on
+localhost, and prints the command to run the old one against it. Both bundles
+are `--debug` deliberately: release builds refuse plain-HTTP endpoints, so
+testing over HTTP needs no loosening of the shipped config, and the signature is
+still verified against the pinned key. `LUNE_UPDATER_ENDPOINT` is what points a
+build at the local manifest, and it is compiled out of release builds — a
+shipped binary always talks to the endpoint in `tauri.conf.json`.
+
+### How a found update is announced
+
+It depends on who asked.
+
+A check the user started — the tray's *Check for Updates…* or the button in
+Settings → General — answers in a modal dialog, every time, including *"you are
+on the latest version"* and every failure. A control that silently does nothing
+is indistinguishable from a broken one.
+
+A check started by **Check for updates on launch** (Settings → General, off by
+default) posts a **desktop notification** instead, via
+`tauri-plugin-notification` — libnotify on Linux, a WinRT toast on Windows,
+`NSUserNotification` on macOS, with no permission handshake needed off mobile.
+Twenty seconds into a session the user is working in another window, and a
+dialog that seizes focus there is more disruptive than the update is urgent.
+The notification announces and nothing more — *Lune Voice 1.4.0 is available* /
+*You're running 1.3.2.* None of the desktop backends expose a click callback
+(the plugin only wires notification actions up on Android and iOS), and
+spelling out where to click instead would be worse: a notification is a glance,
+not a manual. A launch check that finds *nothing*, or fails outright, stays
+silent: "no network yet" is the normal state a second after login.
+
+**Delivery is not confirmable.** Every desktop backend hands the notification to
+a spawned task and returns `Ok` immediately, discarding the result, so a session
+with no notification daemon looks identical to a delivered one. The dialog
+fallback in `notify_update_available` therefore only catches the plugin
+*rejecting* the call — it cannot catch a notification nobody saw. A user whose
+session has no notification daemon gets no launch announcement at all, and finds
+the update the next time they check by hand. Closing that hole properly needs a
+durable in-app marker (a tray item that reads *Install 1.4.0…* until acted on)
+rather than a better notification.
+
+`cargo test -p lune-ui --lib notification_tests` covers what is assertable
+without a daemon: the announcement text names the offered and installed versions
+the right way round, the plugin accepts the builder chain, and each `CheckMode`
+routes to the intended announcement. To see a real notification, turn the
+setting on and start the `cgs updater-test` build against the local endpoint.
+
 ## Third-party notices
 
 `whisper.cpp` and `ggml` are MIT-licensed. They are statically linked into the

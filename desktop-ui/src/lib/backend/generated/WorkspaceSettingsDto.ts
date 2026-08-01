@@ -38,6 +38,10 @@ pillMonitor: string | null, pillAllWorkspaces: boolean, pillSize: PillSizeDto, p
  */
 inputDevice: string | null, vadPcen: boolean, startMinimized: boolean, 
 /**
+ * Check the release endpoint for a newer version at startup.
+ */
+checkUpdatesOnLaunch: boolean, 
+/**
  * How long to keep dictation history, in days. `None` disables history.
  */
 sessionHistoryDays: number | null, 

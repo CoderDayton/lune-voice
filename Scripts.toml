@@ -362,6 +362,20 @@ command = "uv run scripts/dev/record_mic.py"
 info = "Record mic to float32 WAV (16kHz mono)"
 requires = ["uv"]
 
+[scripts.updater-test]
+interpreter = "bash"
+command = '''
+bash scripts/dev/updater-test.sh
+'''
+info = "End-to-end updater test on localhost: builds two AppImages and serves a signed manifest (--env KEEP=1, PORT=)"
+
+[scripts.updater-manifest]
+interpreter = "bash"
+command = '''
+bash scripts/release/updater-manifest.sh "${TAG:?set --env TAG=v0.2.0}"
+'''
+info = "Sign the release artifacts and write release-artifacts/latest.json for the updater (--env TAG=v0.2.0)"
+
 [scripts.desktop-entry]
 interpreter = "bash"
 command = '''

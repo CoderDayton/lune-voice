@@ -2,11 +2,15 @@ mod commands;
 mod dto;
 #[cfg(target_os = "linux")]
 mod hotkey_linux;
+#[cfg(test)]
+mod notification_tests;
 mod persistence;
 mod pill;
 mod runtime;
 #[cfg(test)]
 mod tauri_integration_tests;
+#[cfg(test)]
+mod updater_tests;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
@@ -108,6 +112,243 @@ fn adaptive_window_size(app: &tauri::AppHandle) -> (f64, f64) {
     (width, height)
 }
 
+/// At most one update check at a time: the menu item stays clickable while a
+/// check runs, and two concurrent `download_and_install` calls would race over
+/// the same binary (or raise two `pkexec` prompts).
+static UPDATE_CHECK_RUNNING: AtomicBool = AtomicBool::new(false);
+
+/// How long a launch check waits before touching the network, so startup and
+/// an autostarted session's network setup both finish first.
+const UPDATE_CHECK_LAUNCH_DELAY: std::time::Duration = std::time::Duration::from_secs(20);
+
+/// How loudly a check reports a non-event.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum CheckMode {
+    /// The user asked, so answer — including "you are up to date" and failures.
+    Requested,
+    /// Nobody asked. Only an actual update is worth interrupting for; being
+    /// current, or being offline at login, must stay silent.
+    OnLaunch,
+}
+
+impl CheckMode {
+    /// Whether a non-event — already current, or a check that failed outright —
+    /// is worth telling the user about. Only if they asked: "no network yet" is
+    /// the normal state a second after login.
+    fn reports_non_events(self) -> bool {
+        matches!(self, Self::Requested)
+    }
+
+    /// Whether a found update is announced by notification instead of by a
+    /// dialog. A user who just clicked *Check for Updates…* is waiting on an
+    /// answer and gets the dialog; nobody asked for the launch check, so it
+    /// must not seize focus out from under whatever they are actually doing.
+    fn announces_by_notification(self) -> bool {
+        matches!(self, Self::OnLaunch)
+    }
+}
+
+/// Tray "Check for Updates…" and the Settings button.
+async fn check_for_updates(app: tauri::AppHandle) {
+    guarded_update_check(app, CheckMode::Requested).await;
+}
+
+async fn guarded_update_check(app: tauri::AppHandle, mode: CheckMode) {
+    if UPDATE_CHECK_RUNNING.swap(true, Ordering::SeqCst) {
+        tracing::debug!("update check already in progress — ignoring the extra request");
+        return;
+    }
+    run_update_check(&app, mode).await;
+    UPDATE_CHECK_RUNNING.store(false, Ordering::SeqCst);
+}
+
+/// Title and body for the "an update is waiting" notification.
+///
+/// Split out from delivery so it can be asserted without a notification daemon.
+/// Both arguments are versions and either order reads plausibly, so getting
+/// them the wrong way round would ship a notification that tells the user they
+/// already have the version they are being offered.
+fn update_notification_text(version: &str, current: &str) -> (String, String) {
+    (
+        format!("Lune Voice {version} is available"),
+        format!("You're running {current}."),
+    )
+}
+
+/// Announce an available update without stealing focus.
+///
+/// Cross-platform by construction: `tauri-plugin-notification` fans out to
+/// libnotify on Linux, WinRT toasts on Windows and `NSUserNotification` on
+/// macOS, and its desktop `permission_state` is unconditionally `Granted`, so
+/// no permission handshake is needed off mobile.
+///
+/// It announces and nothing more. No desktop backend gives us a click callback
+/// — the plugin only wires notification actions up on Android and iOS — but
+/// spelling out where to click instead would be worse: notifications are a
+/// glance, not a manual.
+///
+/// **Delivery cannot be confirmed.** Every desktop platform hands the
+/// notification to a spawned task and returns `Ok` immediately, discarding the
+/// result (`tauri-plugin-notification`'s `desktop.rs`), so a session with no
+/// notification daemon is indistinguishable here from a delivered one. `false`
+/// therefore means only that the plugin rejected the call — which is worth a
+/// dialog fallback, but is not the same as "the user saw it".
+///
+/// Generic over the runtime so tests can post through a mock app.
+fn notify_update_available<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    version: &str,
+    current: &str,
+) -> bool {
+    use tauri_plugin_notification::NotificationExt;
+
+    let (title, body) = update_notification_text(version, current);
+
+    // The icon is deliberately left unset. The desktop backend then falls back
+    // to the executable's name (`lune-voice`), which is exactly the hicolor
+    // icon the .deb/.rpm and `scripts/dev/desktop-entry.sh` install — whereas a
+    // hardcoded name or path would only be right on one platform.
+    match app.notification().builder().title(title).body(body).show() {
+        Ok(()) => true,
+        Err(e) => {
+            tracing::warn!(error = %e, "the notification plugin refused the update notice");
+            false
+        }
+    }
+}
+
+/// Every outcome of a *requested* check reports back in a dialog, including
+/// "already current" and each failure: a menu item that silently does nothing
+/// is indistinguishable from a broken one. Nothing is downloaded before the
+/// user agrees.
+///
+/// All three Linux bundles are supported — the plugin swaps an AppImage in
+/// place and installs a .deb/.rpm through `pkexec` (a graphical password
+/// prompt). A binary run straight out of `target/` has no package to replace,
+/// so the install step fails and says so rather than pretending to work.
+///
+/// The manifest key is left to the plugin: it asks for
+/// `linux-x86_64-{deb,rpm,appimage}` matching how this install was packaged and
+/// falls back to the bare `linux-x86_64` key — exactly the per-format scheme
+/// `scripts/release/updater-manifest.sh` publishes, but without losing the
+/// fallback that pinning an explicit target would remove.
+async fn run_update_check(app: &tauri::AppHandle, mode: CheckMode) {
+    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+    use tauri_plugin_updater::UpdaterExt;
+
+    let current = app.package_info().version.to_string();
+
+    #[cfg_attr(not(debug_assertions), allow(unused_mut))]
+    let mut builder = app.updater_builder();
+
+    // Point the check at a local manifest to exercise download + install for
+    // real (`cgs updater-test`, which builds `--debug`).
+    //
+    // Debug builds only. A signature is still checked against the pinned public
+    // key, so this could never introduce an unsigned update — but in a shipped
+    // binary it would let anyone who controls the environment choose which host
+    // the update check talks to, and that is worth nothing to us and something
+    // to an attacker.
+    #[cfg(debug_assertions)]
+    if let Ok(endpoint) = std::env::var("LUNE_UPDATER_ENDPOINT") {
+        let overridden = url::Url::parse(&endpoint)
+            .map_err(|e| e.to_string())
+            .and_then(|url| builder.endpoints(vec![url]).map_err(|e| e.to_string()));
+        match overridden {
+            Ok(b) => {
+                tracing::warn!(%endpoint, "updater endpoint overridden for testing");
+                builder = b;
+            }
+            Err(e) => {
+                tracing::error!(error = %e, %endpoint, "endpoint override refused");
+                app.dialog()
+                    .message(format!(
+                        "LUNE_UPDATER_ENDPOINT is not a usable update endpoint.\n\n{endpoint}\n\n{e}"
+                    ))
+                    .title("Update check failed")
+                    .kind(MessageDialogKind::Error)
+                    .blocking_show();
+                return;
+            }
+        }
+    }
+    let found = match builder.build() {
+        Ok(updater) => updater.check().await,
+        Err(e) => Err(e),
+    };
+
+    let update = match found {
+        Ok(Some(update)) => update,
+        Ok(None) => {
+            if mode.reports_non_events() {
+                app.dialog()
+                    .message(format!("Lune Voice {current} is the latest version."))
+                    .title("No updates available")
+                    .kind(MessageDialogKind::Info)
+                    .blocking_show();
+            }
+            return;
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "update check failed");
+            // A launch check runs before anyone has asked for anything, and
+            // "no network yet" is the normal case a second after login.
+            if mode.reports_non_events() {
+                app.dialog()
+                    .message(format!("Could not check for updates.\n\n{e}"))
+                    .title("Update check failed")
+                    .kind(MessageDialogKind::Error)
+                    .blocking_show();
+            }
+            return;
+        }
+    };
+
+    let version = update.version.clone();
+
+    // A check nobody asked for gets a notification, not a modal. Twenty seconds
+    // into a session the user is working in another window, and a dialog that
+    // seizes focus there is far more disruptive than the update is urgent. If
+    // the notification cannot be delivered we still owe them the news, so fall
+    // through to the dialog.
+    if mode.announces_by_notification() && notify_update_available(app, &version, &current) {
+        tracing::info!(%version, "update available — notified");
+        return;
+    }
+
+    let install = app
+        .dialog()
+        .message(format!(
+            "Lune Voice {version} is available. You have {current}.\n\n\
+             Installing replaces the app and restarts it."
+        ))
+        .title("Update available")
+        .buttons(MessageDialogButtons::OkCancelCustom(
+            "Install and restart".into(),
+            "Later".into(),
+        ))
+        .blocking_show();
+
+    if !install {
+        return;
+    }
+
+    match update.download_and_install(|_, _| {}, || {}).await {
+        Ok(()) => {
+            tracing::info!(%version, "update installed — restarting");
+            app.restart();
+        }
+        Err(e) => {
+            tracing::error!(error = %e, %version, "update install failed");
+            app.dialog()
+                .message(format!("Could not install {version}.\n\n{e}"))
+                .title("Update failed")
+                .kind(MessageDialogKind::Error)
+                .blocking_show();
+        }
+    }
+}
+
 /// Bring the main window to front, creating it on demand if it doesn't exist.
 /// We don't keep the window alive while minimized — closing destroys the
 /// webview to free its memory, and the next call here rebuilds it.
@@ -167,7 +408,9 @@ pub fn run() {
             create_or_focus_main_window(app);
         }))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
@@ -178,6 +421,17 @@ pub fn run() {
                     .map_err(|error| -> Box<dyn std::error::Error> { error.into() })?;
             let start_minimized = tauri::async_runtime::block_on(runtime.start_minimized());
             let pill_vis = tauri::async_runtime::block_on(runtime.pill_visibility());
+            if tauri::async_runtime::block_on(runtime.check_updates_on_launch()) {
+                // Off the startup path entirely: a slow or unreachable endpoint
+                // must never delay the window or the hotkey. The wait also
+                // gives an autostarted session time to get its network up,
+                // since "offline one second after login" is the common case.
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(UPDATE_CHECK_LAUNCH_DELAY).await;
+                    guarded_update_check(handle, CheckMode::OnLaunch).await;
+                });
+            }
             // Seed the pill's geometry/placement config and saved position (if
             // the user dragged it) before the overlay's first configure/show,
             // so the window is created with the user's size/anchor and reopens
@@ -225,8 +479,15 @@ pub fn run() {
             let show_i = MenuItem::with_id(app, "show", "Open Lune Voice", true, None::<&str>)?;
             let toggle_i = MenuItem::with_id(app, "toggle", "Start Dictation", true, None::<&str>)?;
             let sep = PredefinedMenuItem::separator(app)?;
+            let updates_i = MenuItem::with_id(
+                app,
+                "check_updates",
+                "Check for Updates…",
+                true,
+                None::<&str>,
+            )?;
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_i, &toggle_i, &sep, &quit_i])?;
+            let menu = Menu::with_items(app, &[&show_i, &toggle_i, &sep, &updates_i, &quit_i])?;
 
             TrayIconBuilder::new()
                 .icon(
@@ -247,6 +508,9 @@ pub fn run() {
                         tauri::async_runtime::spawn(async move {
                             let _ = rt.toggle_dictation().await;
                         });
+                    }
+                    "check_updates" => {
+                        tauri::async_runtime::spawn(check_for_updates(app.clone()));
                     }
                     "quit" => {
                         QUIT_REQUESTED.store(true, Ordering::SeqCst);
@@ -270,6 +534,8 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::app_version,
+            commands::start_update_check,
             commands::load_workspace_snapshot,
             commands::load_pill_snapshot,
             commands::save_workspace_settings,

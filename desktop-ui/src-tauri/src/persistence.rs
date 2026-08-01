@@ -602,6 +602,7 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
         input_device: settings.input_device.clone(),
         vad_pcen: settings.vad_pcen,
         start_minimized: settings.start_minimized,
+        check_updates_on_launch: settings.check_updates_on_launch,
         session_history_days: settings.session_history_days,
         terminal_mode: terminal_mode_to_dto(settings.terminal_mode),
         llm_enabled: !matches!(settings.llm_backend, LlmBackendConfig::Disabled),
@@ -719,6 +720,7 @@ fn apply_settings_dto(
     settings.input_device = input.input_device.clone();
     settings.vad_pcen = input.vad_pcen;
     settings.start_minimized = input.start_minimized;
+    settings.check_updates_on_launch = input.check_updates_on_launch;
     settings.terminal_mode = terminal_mode_from_dto(input.terminal_mode);
     if let Some(days) = input.session_history_days
         && !(1..=3650).contains(&days)
@@ -1158,6 +1160,7 @@ mod tests {
             input_device: dto.input_device,
             vad_pcen: dto.vad_pcen,
             start_minimized: dto.start_minimized,
+            check_updates_on_launch: dto.check_updates_on_launch,
             session_history_days: dto.session_history_days,
             terminal_mode: dto.terminal_mode,
             llm_enabled: dto.llm_enabled,
