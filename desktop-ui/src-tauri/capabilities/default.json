@@ -8,7 +8,6 @@
     "core:tray:default",
     "core:menu:default",
     "opener:default",
-    "dialog:default",
-    "fs:write-files"
+    "dialog:default"
   ]
 }

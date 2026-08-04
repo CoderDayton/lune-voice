@@ -676,6 +676,34 @@ struct ClipboardSnapshot {
     bytes: Vec<u8>,
 }
 
+/// A clipboard MIME type is remote-controlled data (the owning app chooses it),
+/// and it is passed as a `--type` argument to `wl-paste`/`wl-copy`. It is never
+/// shell-expanded, so it cannot inject a command, but an unexpected value could
+/// still be a flag-like string or a malformed type. Accept only well-formed
+/// RFC 6838 MIME types (optionally with `;key=value` parameters): no leading
+/// `-`, no whitespace, no control or shell-interesting characters.
+fn is_safe_mime(mime: &str) -> bool {
+    if mime.is_empty() || mime.starts_with('-') {
+        return false;
+    }
+    // The base type must be `type/subtype` with exactly one `/` and non-empty
+    // sides (RFC 6838). `charset=utf-8` etc. live after the first `;`.
+    let base = mime.split(';').next().unwrap_or("");
+    let mut parts = base.split('/');
+    let (Some(t), Some(s)) = (parts.next(), parts.next()) else {
+        return false;
+    };
+    if t.is_empty() || s.is_empty() || parts.next().is_some() {
+        return false;
+    }
+    // No empty parameter separators/values: `;;`, trailing `;`, `=`, or `;=`.
+    if mime.contains(";;") || mime.ends_with(';') || mime.ends_with('=') || mime.contains(";=") {
+        return false;
+    }
+    mime.chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '.' | '_' | '+' | '-' | ';' | '='))
+}
+
 /// Capture the current clipboard so it can be restored after a paste.
 ///
 /// `Ok(None)` means the clipboard is genuinely empty — safe to clear on
@@ -698,8 +726,10 @@ fn get_clipboard() -> Result<Option<ClipboardSnapshot>, String> {
             .map(str::trim)
             .find(|l| !l.is_empty())
         {
-            Some(m) => m.to_owned(),
-            None => return Ok(None),
+            Some(m) if is_safe_mime(m) => m.to_owned(),
+            // Unreadable or unsafe advertised type: fall back to plain text so
+            // we never forward a hostile string into a `--type` argument.
+            _ => "text/plain".to_owned(),
         };
         // Strip wl-paste's appended trailing newline for text only — doing so to
         // binary (an image whose last byte happens to be 0x0a) would corrupt it.
@@ -1306,8 +1336,42 @@ impl UinputTyper {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_terminal_class, pipe_text_to_command};
+    use super::{is_safe_mime, is_terminal_class, pipe_text_to_command};
     use std::time::{Duration, Instant};
+
+    #[test]
+    fn safe_mimes_are_well_formed_rfc6838_types() {
+        for mime in [
+            "text/plain",
+            "text/plain;charset=utf-8",
+            "image/png",
+            "application/x-www-form-urlencoded",
+            "text/plain;charset=utf-8;q=0.9",
+        ] {
+            assert!(is_safe_mime(mime), "{mime} should be accepted");
+        }
+    }
+
+    #[test]
+    fn unsafe_mimes_are_rejected() {
+        for mime in [
+            "",
+            "-o",
+            "--type",
+            "text/plain --flag",
+            "text/plain;charset=utf-8\nimage/png",
+            "text/plain\nother",
+            "text/<script>",
+            "text/plain;charset=ü",
+            "image/png;",
+            "text/plain;;charset=utf-8",
+            "text/plain;charset=",
+            "text/plain;=utf-8",
+            "text/plain;charset=utf-8=",
+        ] {
+            assert!(!is_safe_mime(mime), "{mime:?} should be rejected");
+        }
+    }
 
     #[test]
     fn matches_bare_terminal_names() {

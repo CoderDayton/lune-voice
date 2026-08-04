@@ -16,6 +16,7 @@ lune-core.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 async-openai.workspace = true
+url.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 regex = "1.11"

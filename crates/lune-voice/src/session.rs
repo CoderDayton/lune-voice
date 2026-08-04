@@ -1360,6 +1360,40 @@ mod tests {
             .await;
     }
 
+    /// The decode window (capture ends → transcript delivered) is seconds of
+    /// inference, so the pill must show "processing" the whole time. That
+    /// depends on `SessionEvent::Processing` being emitted *before* the final
+    /// output — a regression here would leave the UI stuck on "listening"
+    /// through the decode. `capture.rs` emits `Processing` right before
+    /// `poll_final`.
+    #[tokio::test]
+    async fn processing_is_emitted_before_final_output() {
+        local_set()
+            .run_until(async {
+                let (mgr, _) = make_manager(
+                    scripted_asr(vec![Ok(vec![make_segment("hello", false)])]),
+                    Arc::new(EchoPostProcessor),
+                );
+                let (tx, rx) = mpsc::channel(16);
+                mgr.start_with_audio(tx, speech_stream()).await.unwrap();
+                mgr.stop().await;
+                let events = collect_events(rx).await;
+                let processing_idx = events
+                    .iter()
+                    .position(|e| matches!(e, SessionEvent::Processing));
+                let final_idx = events
+                    .iter()
+                    .position(|e| matches!(e, SessionEvent::FinalizedText { .. }));
+                assert!(processing_idx.is_some(), "Processing must be emitted");
+                assert!(final_idx.is_some(), "FinalizedText must be emitted");
+                assert!(
+                    processing_idx.unwrap() < final_idx.unwrap(),
+                    "Processing must precede FinalizedText; events: {events:?}"
+                );
+            })
+            .await;
+    }
+
     #[tokio::test]
     async fn double_start_errors() {
         local_set()

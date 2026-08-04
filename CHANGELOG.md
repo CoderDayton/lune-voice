@@ -4,6 +4,21 @@ All notable changes to Lune Voice are documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Security
+
+- The ASR and styling LLM endpoints both enforce HTTPS for anything but a local address (loopback, private LAN, `.local`/`.localhost`) — a plaintext public endpoint would otherwise send the API key and dictated text in cleartext. A refused LLM backend degrades to passthrough styling rather than failing startup
+- The session-history database (full dictated transcripts) is now created owner-only, with the same 0600 file permissions as `settings.toml`; the process umask is hardened so its WAL/SHM sidecars are protected too
+- Transcript export now writes through a Rust command (absolute-path, no-`..` validated) instead of the webview `fs` plugin; the broad `fs:write-files` capability is removed
+- The pre-formatted ASR `Authorization` header is held in a zeroizing `RedactedString` instead of a plain `String`
+- Clipboard MIME types (remote-controlled data) are validated against a well-formed MIME shape before being passed to `wl-paste`/`wl-copy`
+- The CUDA backend plugin archive's SHA-256 is now pinned for the `gpu-cuda13-v1` release, so the GPU install is actually enabled end to end
+
+### Performance
+
+- Whisper decode is documented as `block_in_place` on a multi-thread runtime (the app's actual configuration), and a decode on a current-thread runtime now warns loudly instead of silently stalling the async runtime
+
 ## [0.1.0]
 
 First release.

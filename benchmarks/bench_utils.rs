@@ -674,8 +674,10 @@ impl HarnessBuilder {
                 .unwrap_or(false);
             match (llm_off, remote_llm_config_from_env()) {
                 (false, Some(config)) => {
-                    let svc: Arc<dyn LlmService> =
-                        Arc::new(lune_llm::OpenAiLlmBackend::new(config));
+                    let svc: Arc<dyn LlmService> = Arc::new(
+                        lune_llm::OpenAiLlmBackend::new(config)
+                            .expect("bench LLM config must be valid"),
+                    );
                     Arc::new(lune_llm::StylePipeline::new(svc))
                 }
                 (false, None) => {

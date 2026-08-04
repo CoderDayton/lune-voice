@@ -93,7 +93,7 @@ Model-backed targets compile whisper.cpp and need a model on disk. Numbers are n
 
 | Technique | Location | Impact |
 |-----------|----------|--------|
-| **Blocking-pool inference** | `crates/lune-asr/src/backend/whisper_cpp.rs` | Whisper decode runs via `spawn_blocking`, so model execution never starves the async runtime or the audio capture loop |
+| **Blocking-pool inference** | `crates/lune-asr/src/backend/whisper_cpp.rs` | Whisper decode runs via `block_in_place` (the `!Send` session can't `spawn_blocking`), so model execution never starves the async runtime or the audio capture loop |
 | **Shared model, per-session state (ASR)** | `crates/lune-asr/src/backend/whisper_cpp.rs` | `WhisperContext` (model weights) is `Arc`-shared; `WhisperState` (decode scratch) is lightweight and per-session |
 | **Plain async HTTP (LLM)** | `crates/lune-llm/src/backend/openai.rs` | The remote styling call is a single `async-openai` request on the async runtime — no local model, no blocking pool |
 

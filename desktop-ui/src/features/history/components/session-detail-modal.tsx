@@ -1,6 +1,6 @@
 import { useLingui } from '@lingui/react/macro';
+import { invoke } from '@tauri-apps/api/core';
 import { save } from '@tauri-apps/plugin-dialog';
-import { writeTextFile } from '@tauri-apps/plugin-fs';
 import {
   Check,
   CircleCheck,
@@ -71,7 +71,7 @@ export function SessionDetailContent({ session }: { session: HistorySession }) {
         defaultPath: `lune-${stamp}.txt`,
         filters: [{ name: 'Text', extensions: ['txt'] }],
       });
-      if (path) await writeTextFile(path, session.transcript);
+      if (path) await invoke('export_transcript', { path, transcript: session.transcript });
     } catch (e) {
       console.warn('[transcript-download]', e);
     }

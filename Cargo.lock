@@ -3279,6 +3279,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "url",
 ]
 
 [[package]]
@@ -3318,6 +3319,7 @@ dependencies = [
  "evdev",
  "gtk",
  "gtk-layer-shell",
+ "libc",
  "lune-asr",
  "lune-audio",
  "lune-core",
@@ -3332,7 +3334,6 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
- "tauri-plugin-fs",
  "tauri-plugin-global-shortcut",
  "tauri-plugin-notification",
  "tauri-plugin-opener",

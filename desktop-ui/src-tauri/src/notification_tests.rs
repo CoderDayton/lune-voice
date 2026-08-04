@@ -38,6 +38,7 @@ fn the_notification_offers_the_new_version_and_names_the_installed_one() {
 }
 
 #[test]
+#[ignore = "posts a real notification through the desktop plugin; run manually with --include-ignored"]
 fn posting_an_update_notification_is_accepted_by_the_plugin() {
     // Exercises the real builder chain against a real plugin instance: catches
     // a renamed builder method or a desktop permission requirement appearing

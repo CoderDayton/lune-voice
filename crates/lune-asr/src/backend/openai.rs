@@ -70,19 +70,23 @@ pub struct OpenAiCompatibleAsrBackend {
     /// Pre-joined transcription URL, built once at construction time.
     transcription_url: Url,
     /// Pre-formatted Bearer token, built once to avoid per-request alloc.
-    auth_header: String,
+    /// Held as a `RedactedString` so a `Debug` of the backend — or a stray log
+    /// — cannot leak the key, and the buffer is zeroized on drop.
+    auth_header: RedactedString,
 }
 
 impl OpenAiCompatibleAsrBackend {
     pub fn new(config: OpenAiAsrConfig) -> Result<Self> {
-        // Reject plaintext (non-TLS) unless targeting loopback.
+        // Reject plaintext (non-TLS) unless targeting a local endpoint
+        // (loopback, private LAN, `.local`/`.localhost`). The ASR key
+        // requirement and the LLM backend use the same `is_local_endpoint`
+        // test, so a LAN Ollama/llama-server is plaintext-safe and a public
+        // host must use HTTPS.
         let scheme = config.base_url.scheme();
-        let host = config.base_url.host_str().unwrap_or("");
-        let is_loopback = host == "127.0.0.1" || host == "localhost" || host == "::1";
-        if scheme != "https" && !is_loopback {
+        if scheme != "https" && !lune_core::config::is_local_endpoint(&config.base_url) {
             return Err(Error::asr(format!(
                 "OpenAI ASR base_url must use HTTPS (got {scheme}://); \
-                 plaintext only allowed for loopback addresses"
+                 plaintext only allowed for loopback and private local addresses"
             )));
         }
 
@@ -90,7 +94,7 @@ impl OpenAiCompatibleAsrBackend {
         let transcription_url = build_transcription_url(&config.base_url)?;
 
         // Pre-format the auth header value once.
-        let auth_header = format!("Bearer {}", config.api_key.expose());
+        let auth_header = RedactedString::new(format!("Bearer {}", config.api_key.expose()));
 
         let client = reqwest::Client::builder()
             .timeout(config.timeout)
@@ -244,7 +248,7 @@ impl OpenAiCompatibleAsrBackend {
             let resp = self
                 .client
                 .post(self.transcription_url.clone())
-                .header("Authorization", &self.auth_header)
+                .header("Authorization", self.auth_header.expose())
                 .multipart(form)
                 .send()
                 .await;
@@ -599,6 +603,24 @@ mod tests {
     fn allows_plaintext_loopback() {
         let config = OpenAiAsrConfig {
             base_url: "http://127.0.0.1:8080/v1".parse().unwrap(),
+            ..Default::default()
+        };
+        assert!(OpenAiCompatibleAsrBackend::new(config).is_ok());
+        // IPv6 loopback must also be recognized (host_str returns `[::1]`).
+        let config = OpenAiAsrConfig {
+            base_url: "http://[::1]:8080/v1".parse().unwrap(),
+            ..Default::default()
+        };
+        assert!(OpenAiCompatibleAsrBackend::new(config).is_ok());
+    }
+
+    /// A private-LAN server is "local" by `is_local_endpoint` (the same test
+    /// the LLM backend uses), so plaintext there must be accepted — matching
+    /// the LLM guard and the keyless-readiness logic.
+    #[test]
+    fn allows_plaintext_private_lan() {
+        let config = OpenAiAsrConfig {
+            base_url: "http://192.168.1.50:8000/v1".parse().unwrap(),
             ..Default::default()
         };
         assert!(OpenAiCompatibleAsrBackend::new(config).is_ok());

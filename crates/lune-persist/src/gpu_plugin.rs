@@ -57,13 +57,14 @@ pub const UNPUBLISHED: &str = "UNPUBLISHED";
 
 /// The CUDA backend for Linux x86-64.
 ///
-/// `sha256` is [`UNPUBLISHED`] until the archive built by `cgs gpu-plugin` is
-/// uploaded to the GitHub release; fill in both fields from the generated
-/// `.sha256` file at that point.
+/// `sha256` is the digest of the published `gpu-cuda13-v1` archive (from the
+/// generated `.sha256` file), verified against the local build artifact. Keep
+/// it in sync with whatever is uploaded to the GitHub release — a tampered or
+/// mismatched archive is refused at install.
 pub const CUDA_LINUX_X86_64: GpuPluginRelease = GpuPluginRelease {
     url: "https://github.com/CoderDayton/lune-voice/releases/download/gpu-cuda13-v1/\
           lune-voice-gpu-cuda13-linux-x86_64.tar.gz",
-    sha256: UNPUBLISHED,
+    sha256: "c4fd2a60bd392a5d08a9f92fcf011880609bc40bf1ffd1654b60255036d57883",
     // Measured from `cgs gpu-plugin` on CUDA 13.1, covering sm_75/86/89/120a
     // with compute_75 PTX. Unpacked it is 664 MB, three quarters of which is
     // NVIDIA's cuBLASLt, and that part is irreducible: ggml calls no cuBLASLt symbol
@@ -585,12 +586,43 @@ mod tests {
     #[tokio::test]
     async fn an_unpublished_release_refuses_to_install() {
         let tmp = tempfile::tempdir().expect("tempdir");
-        let err = install(&CUDA_LINUX_X86_64, tmp.path(), |_| {})
+        let release = GpuPluginRelease {
+            url: "https://example.invalid/unpublished.tar.gz",
+            sha256: UNPUBLISHED,
+            download_bytes: 1,
+            cuda_major: 13,
+        };
+        let err = install(&release, tmp.path(), |_| {})
             .await
             .expect_err("must refuse an unpinned digest");
         assert!(
             err.to_string().contains("cgs gpu-plugin"),
             "error should say how to publish one: {err}"
+        );
+    }
+
+    /// The shipped Linux CUDA release must carry a real, well-formed digest —
+    /// a reversion to [`UNPUBLISHED`] (or a truncated paste) would silently
+    /// disable the GPU install that release advertises. Guards the release
+    /// process: when a new `gpu-cuda*` archive is published, update the pin
+    /// and this test keeps it honest.
+    #[test]
+    fn the_cuda_linux_release_has_a_pinned_digest() {
+        assert!(
+            CUDA_LINUX_X86_64.is_published(),
+            "the CUDA Linux release must be published (digest pinned)"
+        );
+        assert_eq!(
+            CUDA_LINUX_X86_64.sha256.len(),
+            64,
+            "expected a 64-char lowercase hex SHA-256"
+        );
+        assert!(
+            CUDA_LINUX_X86_64
+                .sha256
+                .chars()
+                .all(|c| c.is_ascii_hexdigit()),
+            "digest must be lowercase hex"
         );
     }
 }

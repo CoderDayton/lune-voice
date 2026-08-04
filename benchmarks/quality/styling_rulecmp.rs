@@ -291,7 +291,7 @@ fn main() {
     println!("model : {}   max_new_tokens: {max_tokens}", config.model);
     println!("endpoint : {}", config.base_url);
     let load = Instant::now();
-    let llm = OpenAiLlmBackend::new(config);
+    let llm = OpenAiLlmBackend::new(config).expect("bench LLM config must be valid");
     println!("load  : {} ms", load.elapsed().as_millis());
     let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
 

@@ -8,6 +8,45 @@ use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 
+/// The history DB holds full dictated transcripts, so the file must never be
+/// world-readable. `open` hardens the file (and its WAL/SHM sidecars, which
+/// carry the same content in WAL mode) to owner-only, mirroring the 0600
+/// `settings.rs` applies to the config file.
+#[cfg(unix)]
+fn restrict_to_owner(path: &Path) -> std::io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+}
+
+#[cfg(not(unix))]
+fn restrict_to_owner(_path: &Path) -> std::io::Result<()> {
+    Ok(())
+}
+
+/// Restrict the database file and its WAL/SHM sidecars to the owner. The
+/// sidecars are created lazily by SQLite and can be absent at open time, so
+/// only existing ones are touched; the process umask guard in `main` covers
+/// files created later.
+#[cfg(unix)]
+fn restrict_db_files(path: &Path) {
+    let mut candidates = vec![path.to_path_buf()];
+    let mut sidecar = path.as_os_str().to_owned();
+    sidecar.push("-wal");
+    candidates.push(sidecar.into());
+    let mut sidecar = path.as_os_str().to_owned();
+    sidecar.push("-shm");
+    candidates.push(sidecar.into());
+
+    for candidate in candidates {
+        if candidate.exists() {
+            let _ = restrict_to_owner(&candidate);
+        }
+    }
+}
+
+#[cfg(not(unix))]
+fn restrict_db_files(_path: &Path) {}
+
 /// Row cap for `edit_observations` (the CSC calibration history). Enforced at
 /// insert and used as the read window, so the trim and the read can't drift.
 /// One row per edit slot per dictation, so the retained dictation window scales
@@ -220,6 +259,9 @@ impl Database {
         diesel::sql_query("PRAGMA wal_autocheckpoint=1000").execute(&mut conn)?;
         let mut db = Self { conn };
         db.run_migrations()?;
+        // Migrations may have created the WAL/SHM sidecars; harden everything
+        // now that the schema is in place.
+        restrict_db_files(path);
         Ok(db)
     }
 
@@ -1663,5 +1705,30 @@ mod tests {
         let mut db2 = Database::open(&path).unwrap();
         let entries = db2.list_dictionary_entries().unwrap();
         assert_eq!(entries.len(), 1);
+    }
+
+    /// The history DB holds full dictated transcripts, so `open` must enforce
+    /// owner-only permissions even when the pre-existing file is world-readable
+    /// (e.g. created by an older build under a permissive umask). Mirrors the
+    /// 0600 hardening `settings.rs` applies to the config file.
+    #[cfg(unix)]
+    #[test]
+    fn open_restricts_database_file_to_owner() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("lune.db");
+        // Simulate a file created under a permissive umask (0644).
+        std::fs::write(&path, b"").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+
+        let _db = Database::open(&path).unwrap();
+
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+        assert_eq!(
+            mode & 0o077,
+            0,
+            "database file must not be readable/writable by group or other (mode {mode:o})"
+        );
     }
 }

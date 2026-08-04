@@ -37,6 +37,39 @@ fn require_window_access_for_label(label: &str, allowed: &[&str]) -> Result<(), 
     }
 }
 
+/// Export a transcript to a user-chosen file path. The frontend picks the path
+/// via the native save dialog and passes it here; the write happens in Rust so
+/// the webview never needs the broad `fs` plugin permission.
+#[tauri::command]
+pub async fn export_transcript(
+    window: WebviewWindow,
+    path: String,
+    transcript: String,
+) -> Result<(), String> {
+    require_window_access(&window, &["main"])?;
+    // Defense in depth: the path is user-chosen via the native save dialog,
+    // which returns an absolute path, but reject obviously-invalid input so a
+    // compromised frontend can't reach outside the chosen location.
+    let path = std::path::Path::new(&path);
+    if path.as_os_str().is_empty() {
+        return Err("export path is empty".into());
+    }
+    if !path.is_absolute() {
+        return Err("export path must be absolute".into());
+    }
+    if path
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return Err("export path must not contain '..'".into());
+    }
+    let path = path.to_path_buf();
+    run_persist("export transcript", move || {
+        std::fs::write(&path, transcript.as_bytes()).map_err(|e| format!("write transcript: {e}"))
+    })
+    .await
+}
+
 /// Configuration-level styling preflight: a remote provider is selected and
 /// set up (endpoint key + model present). Returns the user-facing reason when
 /// not. Applying a pending pipeline reload is handled separately by

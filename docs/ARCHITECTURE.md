@@ -195,7 +195,7 @@ Teardown    poll final ASR, apply dictionary, style, finalize DB
 Stopped     SessionEvent::Stopped emitted
 ```
 
-Only one session may be active at a time (enforced by `Arc<Mutex<Option<ActiveHandle>>>`). The session task runs on `spawn_local` because it holds a `!Send` cpal audio stream.
+Only one session may be active at a time (enforced by `Arc<Mutex<Option<ActiveHandle>>>`). The session task runs on the Tauri async runtime via `tokio::task::spawn`.
 
 **Teardown sequence:**
 
@@ -272,28 +272,49 @@ Short audio cues play from the Rust backend on status transitions — Start on `
 ## Threading Model
 
 ```
-Main Thread (tokio current_thread + LocalSet)
-|-- Command loop - receives AppCommand from the Tauri IPC layer
-|-- Session task (spawn_local) - !Send due to cpal stream
+Tauri async runtime (tokio multi_thread)
+|-- Tauri IPC commands (commands.rs) - typed command handlers
+|-- Session task (tokio::task::spawn) - orchestrates one session
 |   |-- Audio push loop (raw PCM to ASR buffer)
-|   |-- poll_final (batch decode; blocking call dispatched to spawn_blocking)
+|   |-- poll_final (batch decode; handed off via block_in_place)
 |   |-- Dictionary + voice command pass
-|   |-- StylePipeline transform (LLM call dispatched to spawn_blocking)
-|   `-- Text delivery
-`-- Event forwarder (spawn_local) - routes SessionEvents to delivery
+|   |-- StylePipeline transform (LLM call is a plain async HTTP request)
+|   `-- Text delivery (handed to the delivery thread)
+|-- Event forwarder (spawn) - routes SessionEvents to the UI stream
+`-- Hotkey listener (spawn) - reacts to the global shortcut
 
-spawn_blocking pool (tokio default)
-`-- whisper.cpp inference (WhisperContext shared; per-call WhisperState via Mutex)
+tokio blocking pool (block_in_place / spawn_blocking)
+|-- whisper.cpp inference (WhisperContext shared; per-session WhisperState via Mutex)
+|-- spellcheck / dictionary work
+`-- persistence I/O (run_persist, pill settings)
+
+dedicated OS threads
+|-- delivery thread (uinput / IBus / clipboard)
+`-- hotkey-evdev thread (global shortcut capture)
 ```
 
-The remote LLM call is a plain async HTTP request (via `async-openai`), so it runs directly on the async runtime rather than `spawn_blocking`.
+The runtime is **tokio multi-thread** (Tauri's default). The `WhisperContext` is
+wrapped in an `Arc` and shared across all sessions. Each session creates a
+lightweight `WhisperState` via `ctx.create_state()`. The state is held behind a
+`Mutex<WhisperCppSession>` so the async and blocking layers can both access it
+safely.
 
-Why `current_thread` instead of `multi_thread`:
-- Avoids work-stealing overhead for this single-pipeline daemon
-- All hot paths stay on one core (cache-friendly)
-- `spawn_local` support for `!Send` futures (cpal stream)
+Blocking work is dispatched as follows:
 
-The `WhisperContext` is wrapped in an `Arc` and shared across all sessions. Each session creates a lightweight `WhisperState` via `ctx.create_state()`. The state is held behind a `Mutex<WhisperCppSession>` so the async and blocking layers can both access it safely.
+- **whisper decode** (`poll_final`) uses `block_in_place`, not `spawn_blocking`:
+  the whisper session is `!Send` (it wraps raw C pointers) and cannot move to
+  the blocking pool. `block_in_place` hands the current worker thread off to
+  the blocking pool so other tasks keep running during the multi-second decode.
+  On a multi-thread runtime (the app) this is a true handoff; on a current-thread
+  runtime (unit tests) it runs inline and warns once.
+- **LLM styling** is a plain async HTTP request (via `async-openai`), so it runs
+  directly on the async runtime.
+- **Persistence** (settings, history DB) and the GPU-plugin unpack run through
+  `spawn_blocking` so they never stall the runtime.
+
+The audio capture callback runs on cpal's own high-priority thread and pushes
+into a lock-free ring buffer; the session loop polls it, so the real-time path
+does no allocation and takes no locks.
 
 ---
 

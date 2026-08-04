@@ -324,7 +324,7 @@ fn main() {
     );
 
     let load = Instant::now();
-    let llm = OpenAiLlmBackend::new(config);
+    let llm = OpenAiLlmBackend::new(config).expect("bench LLM config must be valid");
     println!("load time  : {} ms", load.elapsed().as_millis());
 
     let rt = tokio::runtime::Runtime::new().expect("tokio runtime");

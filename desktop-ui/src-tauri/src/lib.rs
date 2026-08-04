@@ -411,7 +411,6 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             #[cfg(target_os = "linux")]
@@ -546,6 +545,7 @@ pub fn run() {
             commands::update_dictionary_entry,
             commands::save_snippet,
             commands::delete_snippet,
+            commands::export_transcript,
             commands::create_custom_style,
             commands::update_custom_style,
             commands::delete_custom_style,

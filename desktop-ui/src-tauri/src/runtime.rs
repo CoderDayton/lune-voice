@@ -1087,13 +1087,23 @@ async fn build_llm_service(settings: &UserSettings) -> Result<Arc<dyn LlmService
                 tracing::info!(reason = ?reason, "styling provider is not ready, using passthrough");
                 return Ok(Arc::new(NullPostProcessor::new()) as Arc<dyn LlmService>);
             }
-            let backend = Arc::new(OpenAiLlmBackend::new(OpenAiLlmConfig {
+            // Styling is optional, so a backend that refuses to build (e.g. a
+            // plaintext public endpoint) must degrade to passthrough, not fail
+            // the whole app at startup — the readiness check above already
+            // routes unconfigured providers here, and this is the same path.
+            let backend = match OpenAiLlmBackend::new(OpenAiLlmConfig {
                 base_url: base_url.to_string(),
                 api_key: api_key.clone(),
                 model: model.clone(),
                 max_tokens: *max_tokens,
                 temperature: 0.2,
-            }));
+            }) {
+                Ok(b) => Arc::new(b),
+                Err(e) => {
+                    tracing::warn!(error = %e, "styling LLM refused; using passthrough");
+                    return Ok(Arc::new(NullPostProcessor::new()) as Arc<dyn LlmService>);
+                }
+            };
             Ok(backend as Arc<dyn LlmService>)
         }
         _ => Ok(Arc::new(NullPostProcessor::new()) as Arc<dyn LlmService>),

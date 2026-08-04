@@ -126,15 +126,34 @@ mod imp {
     }
 
     /// Run CPU/GPU-heavy whisper work without stalling the async runtime.
-    /// On a multi-thread runtime the worker is handed off via
-    /// `block_in_place` so other tasks keep running during the multi-second
-    /// decode; on a current-thread runtime (tests) or outside a runtime the
-    /// closure runs inline (`block_in_place` would panic there).
+    ///
+    /// Lune Voice runs on Tauri's multi-thread tokio runtime, so `block_in_place`
+    /// hands the worker off to the blocking pool and other tasks keep running
+    /// during the multi-second decode. There is no `spawn_blocking` here because
+    /// the whisper session is `!Send` (it wraps raw C pointers) and cannot move
+    /// to another thread. On a current-thread runtime (unit tests) or outside a
+    /// runtime the closure runs inline — a current-thread *production* runtime
+    /// would stall its single thread for the whole decode, so we warn loudly
+    /// rather than freezing silently.
     fn run_blocking<T>(f: impl FnOnce() -> T) -> T {
         use tokio::runtime::{Handle, RuntimeFlavor};
         match Handle::try_current() {
             Ok(h) if h.runtime_flavor() == RuntimeFlavor::MultiThread => {
                 tokio::task::block_in_place(f)
+            }
+            Ok(h) if h.runtime_flavor() == RuntimeFlavor::CurrentThread => {
+                // Reachable only in tests. A current-thread production runtime
+                // must not be used here — it would block its single thread for
+                // the whole decode. Warn once so this is visible, then run
+                // inline (block_in_place would panic on the current_thread flavor).
+                static WARNED: std::sync::Once = std::sync::Once::new();
+                WARNED.call_once(|| {
+                    tracing::warn!(
+                        "whisper decode running on a current-thread runtime blocks the async \
+                         runtime; Lune Voice must run on a multi-thread runtime"
+                    );
+                });
+                f()
             }
             _ => f(),
         }

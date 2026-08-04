@@ -131,7 +131,7 @@ fn main() {
         );
         return;
     };
-    let llm = OpenAiLlmBackend::new(config);
+    let llm = OpenAiLlmBackend::new(config).expect("bench LLM config must be valid");
     let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
     let print = std::env::var("LUNE_BENCH_PRINT").is_ok_and(|v| v != "0");
 

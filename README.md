@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/CoderDayton/lune-voice/main/assets/lune-icon-512.png" alt="" width="75">
+<img src="assets/lune-icon-512.png" alt="" width="75">
 
 # Lune Voice
 
