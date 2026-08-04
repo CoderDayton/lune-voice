@@ -209,17 +209,45 @@ body.pill-window {
   /* Explicit footprint (not w-full) so the intrinsic content size the window
      follows is exactly the Rust-side PillOverlayConfig. The vars are set by
      pill-entry from the injected `__PILL_GEOM`; the fallbacks mirror the
-     Standard-horizontal default so the browser/mock still renders sanely. */
-  width: var(--pill-w, 132px);
-  height: var(--pill-h, 40px);
+     Standard-horizontal default so the browser/mock still renders sanely.
+
+     `--pill-w` is the *window* width; the bar sits `--pill-gutter` short of it
+     on each horizontal side. Flush to the window edge, the border loses a pixel
+     or two on the left and right to fractional scaling and compositor edge
+     rounding, so the bar is narrower than its window rather than the window
+     being wider than the bar — growing the window would shift the pill relative
+     to its anchor. The height has no gutter; only the horizontal edges clip. */
+  width: calc(var(--pill-w, 168px) - 2 * var(--pill-gutter, 3px));
+  height: var(--pill-h, 50px);
   /* Lightened a touch past the base token (already the lightest solid
      surface) so the bar reads distinct from panels behind it; mixed
      toward white rather than swapped so it stays a no-op in light mode
      (already pure white) and fully opaque (a translucent fill ghosts on
      this Nvidia + WebKitGTK stack). */
-  background: color-mix(in oklab, var(--color-surface-elevated) 92%, white 8%);
-  border: 1px solid var(--color-surface-border);
-  border-radius: var(--pill-r, 12px);
+  /* Lifted further off the base surface than a panel would be: this floats
+     over arbitrary desktop content, much of it dark, and at 92% it read as a
+     hole rather than an object. Named so the hover/pressed fills can mix into
+     it instead of layering alpha over it. */
+  --pill-fill: color-mix(in oklab, var(--color-surface-elevated) 84%, white 16%);
+  background: var(--pill-fill);
+  /* The stronger border token, not the panel one — the ring is what separates
+     the bar from whatever is behind it, at 2px so it holds up against busy
+     desktop content. */
+  border: 2px solid var(--color-surface-border-strong);
+  /* Bevel: lighter top edge, darker bottom edge, so the bar reads as a raised
+     object rather than a flat rectangle. Border colours rather than a shadow or
+     a gradient fill — soft shadows ghost on this stack and gradients are out by
+     design; a 1px border is the one translucent thing here that composites
+     cleanly (the base border is already one).
+
+     Mixed against `transparent`, not against white/black: the base border is
+     itself translucent (8% white), so mixing toward an *opaque* colour raises
+     the alpha to ~37% and the top edge renders as a bright line next to
+     near-invisible sides. These mixes set alpha directly, keeping the bevel in
+     the same register as the border it sits next to. */
+  border-top-color: color-mix(in oklab, white 16%, transparent);
+  border-bottom-color: color-mix(in oklab, black 20%, transparent);
+  border-radius: var(--pill-r, 15px);
   /* Clip every child (surface + cancel hover fills, waveform) to the rounded
      shape so no hover background shows square corners past the radius. */
   overflow: hidden;
@@ -229,6 +257,7 @@ body.pill-window {
   user-select: none;
   -webkit-user-select: none;
 }
+
 
 .pill-root:active {
   cursor: grabbing;
@@ -240,20 +269,33 @@ body.pill-window {
   cursor: default;
 }
 
+/* Live states ring the bar in the same accent its contents use — violet while
+   listening, teal while finalising — so "it's on" is readable across the room
+   and not only from the 5px mark in the middle. The accent ring replaces the
+   neutral bevel rather than layering over it: one edge treatment at a time
+   keeps the shape clean, and the ring is the stronger signal. */
+.pill-root.pill-active {
+  border-color: color-mix(in oklab, var(--color-primary) 62%, transparent);
+}
+
+.pill-root.pill-processing {
+  border-color: color-mix(in oklab, var(--color-accent) 62%, transparent);
+}
+
 /* Brand mark — crescent in the primary accent, pinned to the left cap.
    pointer-events off so the full-bleed surface below keeps the whole bar
    clickable and draggable. */
 @utility pill-logo {
-  @apply pointer-events-none absolute inset-y-0 left-0 flex w-8 items-center justify-center text-primary;
+  @apply pointer-events-none absolute inset-y-0 left-0 flex w-10 items-center justify-center text-primary;
 }
 
 /* Idle "ready" mark — a short bar in a dim primary with a slow breathe, so
    idle → listening reads as the same accent hue waking up. Starts the breathe
    at full opacity so the entrance animation hands off without a jump. */
 @utility pill-idle-mark {
-  @apply block rounded-full bg-primary/60;
-  width: 20px;
-  height: 5px;
+  @apply block rounded-full bg-primary/70;
+  width: 26px;
+  height: 6px;
   animation:
     pill-content-in 180ms var(--ease-standard),
     pill-idle-breathe 3.2s ease-in-out 180ms infinite;
@@ -276,15 +318,32 @@ button.pill-surface {
   cursor: inherit;
 }
 
+/* Interactive fills are mixed into the bar's own colour, not layered as a
+   translucent tint over it. A `color-mix(primary N%, transparent)` fill depends
+   on the compositor blending its alpha, and this stack drops the alpha of a
+   promoted layer — a 12% tint then paints as solid violet and the whole pill
+   goes pink on hover. Mixing to an opaque colour cannot fail that way. */
 button.pill-surface:hover {
-  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+  background: color-mix(in oklab, var(--pill-fill) 88%, var(--color-primary) 12%);
 }
+
+/* Pressed: deepen the same mix rather than move the bar — a transform here
+   would fight the drag handler's positioning. */
+button.pill-surface:active {
+  background: color-mix(in oklab, var(--pill-fill) 78%, var(--color-primary) 22%);
+}
+
+/* No :focus-visible ring on the pill's controls. The surface deliberately
+   blurs itself on click (see dictation-pill.tsx) so dictated text can't
+   re-trigger it via Space/Enter, and WebKitGTK treats a plain click as
+   focus-visible — a ring here appears on ordinary use and reads as a stuck
+   hover state. Keyboard operation lives in the main window. */
 
 /* Discard control — kept out of the resting layout and revealed on hover so the
    bar stays a clean waveform until the user reaches for it. */
 @utility pill-cancel {
-  @apply absolute inset-y-0 right-0 flex w-7 items-center justify-center border-0 bg-transparent text-base-content/45;
-  border-radius: 0 var(--pill-r, 12px) var(--pill-r, 12px) 0;
+  @apply absolute inset-y-0 right-0 flex w-9 items-center justify-center border-0 bg-transparent text-base-content/55;
+  border-radius: 0 var(--pill-r, 15px) var(--pill-r, 15px) 0;
   opacity: 0;
   transform: translateX(4px);
   cursor: pointer;
@@ -300,6 +359,8 @@ button.pill-surface:hover {
 
 .pill-cancel:hover {
   @apply text-error;
+  /* Opaque mix, for the same reason as the surface fills above. */
+  background: color-mix(in oklab, var(--pill-fill) 84%, var(--color-error) 16%);
 }
 
 @keyframes pill-cancel-flash {
@@ -317,7 +378,7 @@ button.pill-surface:hover {
 .pill-vertical .pill-logo {
   inset: 0 0 auto 0;
   width: 100%;
-  height: 32px;
+  height: 40px;
 }
 
 .pill-vertical .pill-surface > :first-child {
@@ -327,8 +388,8 @@ button.pill-surface:hover {
 .pill-vertical .pill-cancel {
   inset: auto 0 0 0;
   width: 100%;
-  height: 28px;
-  border-radius: 0 0 var(--pill-r, 12px) var(--pill-r, 12px);
+  height: 36px;
+  border-radius: 0 0 var(--pill-r, 15px) var(--pill-r, 15px);
   transform: translateY(4px);
 }
 
@@ -346,13 +407,13 @@ button.pill-surface:hover {
 }
 
 @utility audio-dots {
-  @apply flex h-full items-center justify-center gap-[5px];
+  @apply flex h-full items-center justify-center gap-[6px];
   animation: pill-content-in 180ms var(--ease-standard);
 }
 
 @utility audio-dot {
-  @apply block w-[4px] rounded-full bg-primary;
-  height: 9px;
+  @apply block w-[5px] rounded-full bg-primary;
+  height: 11px;
   transform-origin: center;
   animation: pill-dot-bounce 1.2s ease-in-out infinite;
   transition: transform 60ms ease-out, opacity 60ms ease-out;
@@ -361,12 +422,17 @@ button.pill-surface:hover {
   will-change: transform, opacity;
 }
 
-/* Processing shifts to the teal secondary — a deliberate hue change from the
-   violet idle/listening accents, so "thinking" reads at a glance. */
+/* Processing shifts to teal — a deliberate hue change from the violet
+   idle/listening accents, so "thinking" reads at a glance.
+
+   This is `accent` (oklch 74% .1 185), not `secondary`: secondary is hue 295,
+   the same violet as primary at lower chroma, so the old `bg-secondary` here
+   rendered as a dimmed primary and the hue change the comment promised never
+   happened. */
 @utility pill-pulse {
-  @apply block rounded-full bg-secondary;
-  width: 10px;
-  height: 10px;
+  @apply block rounded-full bg-accent;
+  width: 14px;
+  height: 14px;
   animation: pill-pulse-beat 1.3s ease-in-out infinite;
 }
 
@@ -383,6 +449,8 @@ button.pill-surface:hover {
 }
 
 @keyframes pill-pulse-beat {
-  0%, 100% { opacity: 0.4; transform: scale(0.78); }
-  50%      { opacity: 1; transform: scale(1.08); }
+  /* Floor at 0.55: below that the mark all but vanishes on the lightened bar,
+     and "processing" looks like a dead pill mid-beat. */
+  0%, 100% { opacity: 0.55; transform: scale(0.8); }
+  50%      { opacity: 1; transform: scale(1.1); }
 }

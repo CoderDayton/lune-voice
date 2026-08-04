@@ -71,7 +71,9 @@ export function DictationPill() {
     <AudioDots level={audioLevel} />
   );
 
-  const rootClass = `pill-root${cancelRef.current ? ' pill-cancelled' : ''}${locked ? ' pill-locked' : ''}`;
+  // `pill-<mode>` drives the accent ring in CSS, so "listening" and
+  // "finalising" are readable from the bar's edge, not just its contents.
+  const rootClass = `pill-root pill-${mode}${cancelRef.current ? ' pill-cancelled' : ''}${locked ? ' pill-locked' : ''}`;
   const showCancel = !isIdle && !isProcessing;
 
   return (

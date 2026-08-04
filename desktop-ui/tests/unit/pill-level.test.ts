@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { dotStyle } from "../../src/features/dictation/dot-style";
+import { DOT_COUNT, dotStyle } from "../../src/features/dictation/dot-style";
 import {
   type FrameScheduler,
   LevelSmoother,
@@ -112,12 +112,30 @@ describe("dotStyle", () => {
     const style = dotStyle(undefined, 3);
     expect(style.animation).toBeUndefined();
     expect(style.transform).toBeUndefined();
-    expect(style.animationDelay).toBe("360ms");
+    // Index 3 is a centre bar, so it leads the ripple with no delay.
+    expect(style.animationDelay).toBe("0ms");
   });
 
   test("zero level keeps the idle bounce (silence before first event)", () => {
     const style = dotStyle(0, 1);
-    expect(style.animationDelay).toBe("120ms");
+    expect(style.animationDelay).toBe("110ms");
     expect(style.animation).toBeUndefined();
+  });
+
+  /** The idle ripple runs centre-out, matching the centre-weighted shape the
+   *  live level produces — a left-to-right ramp would make idle and speaking
+   *  look like two unrelated widgets. */
+  test("idle delays are symmetric about the centre", () => {
+    const delays = Array.from({ length: DOT_COUNT }, (_, i) => dotStyle(undefined, i).animationDelay);
+    expect(delays).toEqual([...delays].reverse());
+    expect(delays).toEqual(["220ms", "110ms", "0ms", "0ms", "110ms", "220ms"]);
+  });
+
+  test("idle delay grows with distance from the centre", () => {
+    const centre = Number.parseInt(String(dotStyle(undefined, 2).animationDelay), 10);
+    const mid = Number.parseInt(String(dotStyle(undefined, 1).animationDelay), 10);
+    const edge = Number.parseInt(String(dotStyle(undefined, 0).animationDelay), 10);
+    expect(centre).toBeLessThan(mid);
+    expect(mid).toBeLessThan(edge);
   });
 });

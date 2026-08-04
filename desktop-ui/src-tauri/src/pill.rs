@@ -7,6 +7,18 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder}
 use crate::commands::require_window_access;
 use std::sync::atomic::{AtomicI32, Ordering};
 
+/// Horizontal breathing room (logical px per side) between the window edge and
+/// the drawn bar. The window keeps its full footprint; the webview insets
+/// `.pill-root` by this much on each horizontal side (injected as `g` in
+/// `window.__PILL_GEOM`, so the two cannot drift).
+///
+/// Without it the bar's border sits exactly on the window edge, where
+/// fractional scaling and compositor edge rounding shave a pixel or two off the
+/// left and right sides. Taken out of the bar rather than added to the window:
+/// the window is also the placement footprint, the GTK size request and the X11
+/// shape mask, and growing it would move the pill relative to its anchor.
+pub const PILL_EDGE_GUTTER: i32 = 3;
+
 /// Live pill overlay configuration derived from user settings. The footprint
 /// is fixed *per configuration* — the window is never resized live (compositor
 /// ghost artifacts on Wayland during resize, wry #1667, tauri #14924); a
@@ -36,22 +48,32 @@ pub struct PillOverlayConfig {
 
 impl PillOverlayConfig {
     pub fn from_settings(s: &UserSettings) -> Self {
+        // Footprints are deliberately generous: the pill is a glanceable
+        // overlay on a busy desktop, and the previous set read as a thin strip
+        // that disappeared into dark backgrounds. Each step is ~1.2× the last
+        // so the three options stay visibly distinct.
         let (long, short) = match s.pill_size {
-            PillSize::Compact => (112, 34),
-            PillSize::Large => (156, 48),
-            _ => (132, 40),
+            PillSize::Compact => (140, 42),
+            PillSize::Large => (200, 60),
+            _ => (168, 50),
         };
-        let (w, h) = match s.pill_orientation {
+        let (bar_w, bar_h) = match s.pill_orientation {
             PillOrientation::Vertical => (short, long),
             _ => (long, short),
         };
+        // `w`/`h` are the window footprint, unchanged by the gutter: placement,
+        // the GTK size request and the X11 shape mask all key off them. The
+        // gutter is taken *out of the bar* inside the webview instead.
+        let (w, h) = (bar_w, bar_h);
         let radius = match s.pill_corner {
             PillCorner::Pill => short / 2,
             PillCorner::Square => 6,
+            // Rounded (non-pill, non-square): keep the radius near a third of
+            // the short side so the softness scales with the bar.
             _ => match s.pill_size {
-                PillSize::Compact => 10,
-                PillSize::Large => 14,
-                _ => 12,
+                PillSize::Compact => 13,
+                PillSize::Large => 18,
+                _ => 15,
             },
         };
         Self {
@@ -83,9 +105,9 @@ impl PillOverlayConfig {
 /// by `apply_pill_settings` on save. Defaults mirror `UserSettings::default()`
 /// so a read before seeding is still sane.
 static PILL_CFG: Mutex<PillOverlayConfig> = Mutex::new(PillOverlayConfig {
-    w: 132,
-    h: 40,
-    radius: 12,
+    w: 168,
+    h: 50,
+    radius: 15,
     anchor: PillAnchor::BottomCenter,
     edge_margin: 72,
     monitor: None,
@@ -671,10 +693,11 @@ pub fn create_pill_window(app: &AppHandle) {
     // CSS footprint matches the window from the first paint (no async snapshot
     // round-trip, no flash at the default size).
     let geom_script = format!(
-        "window.__PILL_GEOM={{w:{},h:{},r:{},vertical:{}}};",
+        "window.__PILL_GEOM={{w:{},h:{},r:{},g:{},vertical:{}}};",
         cfg.w,
         cfg.h,
         cfg.radius,
+        PILL_EDGE_GUTTER,
         cfg.h > cfg.w
     );
     match WebviewWindowBuilder::new(app, "pill", WebviewUrl::App("pill.html".into()))
@@ -1048,9 +1071,11 @@ mod tests {
     #[test]
     fn overlay_config_geometry_matches_size_orientation_and_corner() {
         let mut s = UserSettings::default();
-        // Defaults reproduce the original hard-coded window exactly.
+        // Standard horizontal, rounded corners — the shipped default.
         let d = PillOverlayConfig::from_settings(&s);
-        assert_eq!((d.w, d.h, d.radius), (132, 40, 12));
+        // The window footprint is the full size; the gutter comes out of the
+        // bar inside the webview, so it must not appear here.
+        assert_eq!((d.w, d.h, d.radius), (168, 50, 15));
         assert_eq!(d.edge_margin, 72);
 
         s.pill_size = PillSize::Compact;
@@ -1058,13 +1083,13 @@ mod tests {
         s.pill_corner = PillCorner::Pill;
         let c = PillOverlayConfig::from_settings(&s);
         // Vertical swaps the axes; pill corners use half the short side.
-        assert_eq!((c.w, c.h, c.radius), (34, 112, 17));
+        assert_eq!((c.w, c.h, c.radius), (42, 140, 21));
 
         s.pill_size = PillSize::Large;
         s.pill_orientation = PillOrientation::Horizontal;
         s.pill_corner = PillCorner::Square;
         let l = PillOverlayConfig::from_settings(&s);
-        assert_eq!((l.w, l.h, l.radius), (156, 48, 6));
+        assert_eq!((l.w, l.h, l.radius), (200, 60, 6));
     }
 
     #[test]

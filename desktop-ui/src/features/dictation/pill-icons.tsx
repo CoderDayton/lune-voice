@@ -42,7 +42,7 @@ export function MoonIcon({ className }: IconProps = {}) {
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 24 24"
       fill="currentColor"
-      className={className ?? 'size-4'}
+      className={className ?? 'size-5'}
       aria-hidden="true"
       focusable="false"
     >
@@ -53,7 +53,7 @@ export function MoonIcon({ className }: IconProps = {}) {
 
 export function XIcon({ className }: IconProps = {}) {
   return (
-    <PillSvg className={className ?? 'size-4'}>
+    <PillSvg className={className ?? 'size-[18px]'}>
       <line x1="18" y1="6" x2="6" y2="18" />
       <line x1="6" y1="6" x2="18" y2="18" />
     </PillSvg>

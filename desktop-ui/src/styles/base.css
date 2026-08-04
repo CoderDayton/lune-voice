@@ -34,6 +34,16 @@
     overflow: hidden;
   }
 
+  /* The bar is narrower than its window by a gutter per side
+     (PILL_EDGE_GUTTER), so it has to be centred or the whole gap lands on the
+     right. Height stays intrinsic: the layer-shell surface follows the
+     content's height, so nothing here may stretch it. */
+  body.pill-window > #pill-root {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+  }
+
   button,
   input,
   select,
