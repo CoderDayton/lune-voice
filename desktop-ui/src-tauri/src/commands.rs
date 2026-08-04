@@ -1,4 +1,5 @@
-use tauri::{Emitter, Runtime, State, WebviewWindow, ipc::Channel};
+use tauri::{AppHandle, Emitter, Runtime, State, WebviewWindow, ipc::Channel};
+use tauri_plugin_dialog::DialogExt;
 
 use crate::dto::{
     CreateCustomStyleInput, CreateDictionaryEntryInput, GpuBackendStateDto, GpuBackendStatusDto,
@@ -37,37 +38,65 @@ fn require_window_access_for_label(label: &str, allowed: &[&str]) -> Result<(), 
     }
 }
 
-/// Export a transcript to a user-chosen file path. The frontend picks the path
-/// via the native save dialog and passes it here; the write happens in Rust so
-/// the webview never needs the broad `fs` plugin permission.
+/// Fallback save-dialog file name, used when the frontend's suggestion is not
+/// a usable bare file name.
+const DEFAULT_TRANSCRIPT_FILENAME: &str = "lune-transcript.txt";
+/// Save-dialog file-type filter for exported transcripts.
+const TRANSCRIPT_FILTER_NAME: &str = "Text";
+const TRANSCRIPT_EXTENSIONS: [&str; 1] = ["txt"];
+
+/// Export a transcript to a user-chosen file. Returns `false` when the user
+/// cancels the dialog.
+///
+/// The native save dialog runs *here*, in Rust, and the chosen path is never
+/// round-tripped through the webview: the frontend supplies only a suggested
+/// file name. That is what makes the write safe — a path accepted from the
+/// frontend would be an arbitrary-file-write primitive with attacker-
+/// influenced contents (`~/.bashrc`, `~/.config/autostart/*.desktop`) no
+/// matter how it were validated, because nothing could tie it back to the
+/// path the user actually picked.
 #[tauri::command]
 pub async fn export_transcript(
+    app: AppHandle,
     window: WebviewWindow,
-    path: String,
     transcript: String,
-) -> Result<(), String> {
+    default_name: String,
+    title: String,
+) -> Result<bool, String> {
     require_window_access(&window, &["main"])?;
-    // Defense in depth: the path is user-chosen via the native save dialog,
-    // which returns an absolute path, but reject obviously-invalid input so a
-    // compromised frontend can't reach outside the chosen location.
-    let path = std::path::Path::new(&path);
-    if path.as_os_str().is_empty() {
-        return Err("export path is empty".into());
-    }
-    if !path.is_absolute() {
-        return Err("export path must be absolute".into());
-    }
-    if path
-        .components()
-        .any(|c| matches!(c, std::path::Component::ParentDir))
-    {
-        return Err("export path must not contain '..'".into());
-    }
-    let path = path.to_path_buf();
+    // The suggestion and title are frontend-supplied (the title is localized
+    // there). Keep only the suggestion's final component: a path fragment here
+    // would seed the dialog somewhere the user didn't choose.
+    let suggested = std::path::Path::new(&default_name)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(DEFAULT_TRANSCRIPT_FILENAME)
+        .to_owned();
+
+    // `blocking_save_file` must not run on the main thread — it drives the
+    // dialog there and waits for the reply.
+    let picked = run_persist("transcript save dialog", move || {
+        Ok(app
+            .dialog()
+            .file()
+            .set_title(title)
+            .set_file_name(suggested)
+            .add_filter(TRANSCRIPT_FILTER_NAME, &TRANSCRIPT_EXTENSIONS)
+            .blocking_save_file())
+    })
+    .await?;
+
+    let Some(picked) = picked else {
+        return Ok(false);
+    };
+    let path = picked
+        .into_path()
+        .map_err(|e| format!("export path is not a file path: {e}"))?;
     run_persist("export transcript", move || {
         std::fs::write(&path, transcript.as_bytes()).map_err(|e| format!("write transcript: {e}"))
     })
-    .await
+    .await?;
+    Ok(true)
 }
 
 /// Configuration-level styling preflight: a remote provider is selected and

@@ -1,6 +1,5 @@
 import { useLingui } from '@lingui/react/macro';
 import { invoke } from '@tauri-apps/api/core';
-import { save } from '@tauri-apps/plugin-dialog';
 import {
   Check,
   CircleCheck,
@@ -66,12 +65,13 @@ export function SessionDetailContent({ session }: { session: HistorySession }) {
     const d = new Date(session.startedAt);
     const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`;
     try {
-      const path = await save({
+      // The save dialog runs in Rust: the chosen path never passes through
+      // here, so this side can only suggest a name, never a destination.
+      await invoke('export_transcript', {
+        transcript: session.transcript,
+        defaultName: `lune-${stamp}.txt`,
         title: t`Save Transcript`,
-        defaultPath: `lune-${stamp}.txt`,
-        filters: [{ name: 'Text', extensions: ['txt'] }],
       });
-      if (path) await invoke('export_transcript', { path, transcript: session.transcript });
     } catch (e) {
       console.warn('[transcript-download]', e);
     }

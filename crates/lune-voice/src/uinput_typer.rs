@@ -727,9 +727,13 @@ fn get_clipboard() -> Result<Option<ClipboardSnapshot>, String> {
             .find(|l| !l.is_empty())
         {
             Some(m) if is_safe_mime(m) => m.to_owned(),
-            // Unreadable or unsafe advertised type: fall back to plain text so
-            // we never forward a hostile string into a `--type` argument.
-            _ => "text/plain".to_owned(),
+            // A type we refuse to forward means there IS content here that we
+            // cannot snapshot. That is the `Err` case, not `Ok(None)`: the
+            // caller clears the clipboard on `Ok(None)`, which would destroy
+            // the very content we just failed to read.
+            Some(_) => return Err("clipboard advertises an unsupported MIME type".into()),
+            // Nothing advertised at all: the clipboard is genuinely empty.
+            None => return Ok(None),
         };
         // Strip wl-paste's appended trailing newline for text only — doing so to
         // binary (an image whose last byte happens to be 0x0a) would corrupt it.

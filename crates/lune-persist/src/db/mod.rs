@@ -1730,5 +1730,23 @@ mod tests {
             0,
             "database file must not be readable/writable by group or other (mode {mode:o})"
         );
+
+        // The WAL/SHM sidecars carry the same transcript content in WAL mode,
+        // so any that exist must be locked down too — hardening only the main
+        // file would leave the live transcripts world-readable.
+        for suffix in ["-wal", "-shm"] {
+            let mut sidecar = path.as_os_str().to_owned();
+            sidecar.push(suffix);
+            let sidecar = std::path::PathBuf::from(sidecar);
+            if let Ok(meta) = std::fs::metadata(&sidecar) {
+                let mode = meta.permissions().mode();
+                assert_eq!(
+                    mode & 0o077,
+                    0,
+                    "{} must not be group/other accessible (mode {mode:o})",
+                    sidecar.display()
+                );
+            }
+        }
     }
 }

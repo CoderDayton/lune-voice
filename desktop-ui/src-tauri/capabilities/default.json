@@ -7,7 +7,6 @@
     "core:default",
     "core:tray:default",
     "core:menu:default",
-    "opener:default",
-    "dialog:default"
+    "opener:default"
   ]
 }
