@@ -117,7 +117,7 @@ impl lune_core::llm::LlmService for OpenAiLlmBackend {
             // channels — is stripped here, because it must never reach the
             // user's document. Reasoning that never closed collapses to "",
             // which the pipeline treats as "keep the input text".
-            .map(|s| crate::prompt::strip_reasoning(s).trim().to_owned())
+            .map(crate::prompt::strip_reasoning)
             .ok_or_else(|| lune_core::Error::llm("empty response"))
     }
 }

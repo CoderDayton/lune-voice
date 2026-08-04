@@ -4,7 +4,9 @@
 ///
 /// Handles:
 /// - Comma spacing: `2, 000` → `2,000`
-/// - European thousand sep: `2 000` → `2000` (when 3+ digit groups)
+/// - European thousand sep: `2 000 000` → `2000000` (only when the whole run
+///   groups as a number: 1-3 digits with no leading zero, then groups of
+///   exactly 3)
 /// - Decimal periods: `3 . 14` → `3.14`
 ///
 /// Spaces are preserved elsewhere in the text (e.g. `2 apples` remains unchanged).
@@ -92,19 +94,30 @@ pub fn fix_all_number_spaces(input: &str) -> String {
             continue;
         }
 
-        // Pattern 5: European thousand separator (digit + spaces + 3 digits)
-        if i + 1 < chars.len() && chars[i].is_ascii_digit() {
-            let j = skip_spaces(&chars, i + 1);
-            if j + 2 < chars.len()
-                && chars[j].is_ascii_digit()
-                && chars[j + 1].is_ascii_digit()
-                && chars[j + 2].is_ascii_digit()
-                && (j - i - 1) > 0
-            // there were spaces
-            {
-                result.push(chars[i]);
-                i = j;
-                continue;
+        // Pattern 5: European thousand separator (digit + single space +
+        // 3-digit groups). Only a run whose *whole* grouping is a valid number
+        // is collapsed — first group 1–3 digits with no leading zero, every
+        // later group exactly 3 — so a phone number / part number / ID like
+        // "555 123 4567" (3-3-4) or "0 800 123 456" (leading zero) is left
+        // untouched while "1 000 000" (1-3-3) collapses to "1000000".
+        if i + 1 < chars.len() && chars[i].is_ascii_digit() && is_digit_run_start(&chars, i) {
+            let run_end = find_digit_group_run(&chars, i);
+            if run_end > i {
+                let groups: Vec<&[char]> = chars[i..run_end].split(|&c| c == ' ').collect();
+                let valid_number = groups.len() >= 2
+                    && (1..=3).contains(&groups[0].len())
+                    // A written number never leads with a zero, but a dialling
+                    // prefix (`0 800 …`, `07 700 …`) always does — the only
+                    // signal separating the two shapes.
+                    && groups[0][0] != '0'
+                    && groups[1..].iter().all(|g| g.len() == 3);
+                if valid_number {
+                    for g in &groups {
+                        result.extend(g.iter().copied());
+                    }
+                    i = run_end;
+                    continue;
+                }
             }
         }
 
@@ -112,6 +125,37 @@ pub fn fix_all_number_spaces(input: &str) -> String {
         i += 1;
     }
     result
+}
+
+/// End (exclusive) of the maximal run of digit groups separated by *single*
+/// spaces starting at `start`. A double space is a word boundary, not a number
+/// grouping, so it stops the run.
+fn find_digit_group_run(chars: &[char], start: usize) -> usize {
+    let mut k = start;
+    while k < chars.len() && chars[k].is_ascii_digit() {
+        k += 1;
+    }
+    while k + 1 < chars.len() && chars[k] == ' ' && chars[k + 1].is_ascii_digit() {
+        k += 1;
+        while k < chars.len() && chars[k].is_ascii_digit() {
+            k += 1;
+        }
+    }
+    k
+}
+
+/// True when `start` begins a maximal digit-group run rather than sitting
+/// inside one. The grouping check above only means anything at the true start:
+/// re-entering one character later would let `1234 567` — a 4-digit lead group,
+/// so not a thousands separator — collapse anyway via its `234 567` suffix.
+fn is_digit_run_start(chars: &[char], start: usize) -> bool {
+    match start.checked_sub(1) {
+        None => true,
+        Some(p) => {
+            !chars[p].is_ascii_digit()
+                && !(chars[p] == ' ' && p > 0 && chars[p - 1].is_ascii_digit())
+        }
+    }
 }
 
 /// Skip whitespace characters, returning the index of the first non-space char.
@@ -126,18 +170,25 @@ fn skip_spaces(chars: &[char], start: usize) -> usize {
 /// True when the model emitted meta-commentary instead of clean text.
 pub fn contains_forbidden_output(text: &str) -> bool {
     let lower = text.to_lowercase();
-    [
+    // `input:`/`output:` are only treated as label echoes when they begin a
+    // line — the few-shot training format puts them at line start. A
+    // mid-sentence "input:" or "output:" in the user's own transcript (e.g.
+    // "I said input: the password") must not be rejected.
+    let label_echo = lower.lines().any(|line| {
+        let t = line.trim_start();
+        t.starts_with("input:") || t.starts_with("output:")
+    });
+    let phrase_echo = [
         "here is",
         "corrected transcript",
         "the corrected",
         "i changed",
         "i fixed",
-        "input:",
-        "output:",
         "possibly misheard",
     ]
     .iter()
-    .any(|m| lower.contains(m))
+    .any(|m| lower.contains(m));
+    label_echo || phrase_echo
 }
 
 /// Tag pairs a reasoning model may wrap its private thinking in. Matched
@@ -200,9 +251,12 @@ fn find_block_end(body: &str, open: &str, close: &str) -> Option<usize> {
 ///   that pre-fills the opening tag produces — the model never emits the opener;
 /// - harmony channels, where only `<|channel|>final<|message|>` is the answer.
 ///
+/// Wrapped blocks are removed wherever they sit: at the head, or spliced out of
+/// the middle of an answer.
+///
 /// Reasoning that never closes yields `""`, which the pipeline treats as "keep
 /// the text we already had" rather than delivering half a thought.
-pub fn strip_reasoning(text: &str) -> &str {
+pub fn strip_reasoning(text: &str) -> String {
     let text = text.trim();
 
     if let Some(i) = find_ascii_ci(text, HARMONY_FINAL) {
@@ -210,38 +264,69 @@ pub fn strip_reasoning(text: &str) -> &str {
         // The final channel runs to the next control token, when the endpoint
         // leaves one on the end (`<|end|>`, `<|return|>`).
         return match answer.find("<|") {
-            Some(end) => answer[..end].trim(),
-            None => answer.trim(),
+            Some(end) => answer[..end].trim().to_owned(),
+            None => answer.trim().to_owned(),
         };
     }
     if find_ascii_ci(text, HARMONY_CHANNEL).is_some() {
         // Channels, but no final one: nothing here is an answer.
-        return "";
+        return String::new();
     }
 
+    // Strip leading reasoning blocks (any spelling, repeated). A leading block
+    // that never closes means the model is still thinking: no answer.
     let mut rest = text;
     while let Some((open, close)) = REASONING_TAGS.iter().copied().find(|(open, _)| {
         rest.get(..open.len())
             .is_some_and(|head| head.eq_ignore_ascii_case(open))
     }) {
         let Some(end) = find_block_end(&rest[open.len()..], open, close) else {
-            return "";
+            return String::new();
         };
         rest = rest[open.len() + end..].trim_start();
     }
 
+    // No opener at the head, but a close tag present (and no angle opener
+    // anywhere): a chat template that pre-fills the opening tag, so the model
+    // only ever emits the close. Drop everything up to that first close.
     if rest.len() == text.len()
+        && !REASONING_TAGS
+            .iter()
+            .any(|(open, _)| find_ascii_ci(rest, open).is_some())
         && let Some((i, close_len)) = REASONING_TAGS
             .iter()
             .filter_map(|(_, close)| find_ascii_ci(rest, close).map(|i| (i, close.len())))
             .min_by_key(|&(i, _)| i)
     {
-        // No opening tag, but the reasoning closed: a pre-filled template. Drop
-        // everything up to that close.
         rest = rest[i + close_len..].trim_start();
     }
 
-    rest.trim_end()
+    // Splice reasoning blocks that appear anywhere in the answer, not just at
+    // the head. An unclosed block means the model never finished: nothing
+    // after it is an answer.
+    let mut out = String::with_capacity(rest.len());
+    let mut pos = 0usize;
+    while let Some((rel, open, close)) = REASONING_TAGS
+        .iter()
+        .copied()
+        .filter_map(|(open, close)| find_ascii_ci(&rest[pos..], open).map(|i| (i, open, close)))
+        .min_by_key(|&(i, _, _)| i)
+    {
+        let block_start = pos + rel;
+        out.push_str(&rest[pos..block_start]);
+        let Some(end) = find_block_end(&rest[block_start + open.len()..], open, close) else {
+            return out.trim().to_owned();
+        };
+        pos = block_start + open.len() + end;
+        // Cutting the block out must not leave the spaces that flanked it
+        // doubled up in the text we type into the user's document.
+        let kept = out.trim_end_matches(' ').len();
+        if kept < out.len() && rest[pos..].starts_with(' ') {
+            out.truncate(kept);
+        }
+    }
+    out.push_str(&rest[pos..]);
+    out.trim().to_owned()
 }
 
 #[cfg(test)]
@@ -262,8 +347,16 @@ mod tests {
 
     #[test]
     fn fix_all_number_spaces_european() {
-        // European: 2 000 = 2000
         assert_eq!(fix_all_number_spaces("2 000 000"), "2000000");
+        // Every group boundary in the run collapses, not just the first.
+        assert_eq!(fix_all_number_spaces("1 234 567 890"), "1234567890");
+        // The run is bounded by its surrounding text.
+        assert_eq!(
+            fix_all_number_spaces("we shipped 2 000 000 units"),
+            "we shipped 2000000 units"
+        );
+        // A double space is a word boundary, not a grouping separator.
+        assert_eq!(fix_all_number_spaces("2  000"), "2  000");
     }
 
     #[test]
@@ -386,5 +479,91 @@ mod tests {
     #[test]
     fn contains_forbidden_output_allows_clean_text() {
         assert!(!contains_forbidden_output("The quick brown fox jumps."));
+    }
+
+    #[test]
+    fn contains_forbidden_output_allows_label_like_text_mid_sentence() {
+        // A transcript that legitimately contains "input:" or "output:" in the
+        // middle of a sentence is not a model echoing the few-shot labels.
+        assert!(!contains_forbidden_output("I said input: the password"));
+        assert!(!contains_forbidden_output("the output: was correct"));
+        assert!(!contains_forbidden_output(
+            "Feed the input: and check the output:"
+        ));
+    }
+
+    #[test]
+    fn contains_forbidden_output_still_detects_line_started_labels() {
+        // The model echoing the few-shot `Input:`/`Output:` labels puts them at
+        // the start of a line, which is the shape we do want to reject.
+        assert!(contains_forbidden_output("Output: hello"));
+        assert!(contains_forbidden_output("some text\nInput: hello"));
+    }
+
+    #[test]
+    fn fix_all_number_spaces_keeps_phone_like_groups() {
+        // A spaced 3-digit group that is not a thousands separator (phone
+        // numbers, part numbers, IDs) must be left untouched.
+        assert_eq!(fix_all_number_spaces("555 123 4567"), "555 123 4567");
+        assert_eq!(
+            fix_all_number_spaces("My number is 555 123 4567."),
+            "My number is 555 123 4567."
+        );
+        assert_eq!(
+            fix_all_number_spaces("Call 1 800 555 0199 now"),
+            "Call 1 800 555 0199 now"
+        );
+        // A lead group longer than 3 digits is not a thousands separator, and
+        // must not collapse via one of its own suffixes either.
+        assert_eq!(fix_all_number_spaces("1234 567"), "1234 567");
+        // A leading-zero lead group is a dialling prefix, not a thousands
+        // group, even though 1-3-3-3 is otherwise a valid number shape.
+        assert_eq!(fix_all_number_spaces("0 800 123 456"), "0 800 123 456");
+        assert_eq!(
+            fix_all_number_spaces("Call 07 700 900 123 today"),
+            "Call 07 700 900 123 today"
+        );
+    }
+
+    #[test]
+    fn fix_all_number_spaces_keeps_valid_european_thousands() {
+        assert_eq!(fix_all_number_spaces("2 000"), "2000");
+        assert_eq!(fix_all_number_spaces("12 345 678"), "12345678");
+        assert_eq!(fix_all_number_spaces("1 000 000"), "1000000");
+    }
+
+    #[test]
+    fn strip_reasoning_removes_mid_answer_angle_blocks() {
+        // Reasoning can appear in the middle of a response, not just at the
+        // head; the angle-bracket forms are unambiguous and must be spliced out.
+        assert_eq!(
+            strip_reasoning("The answer is <thinking>secret</thinking> 42"),
+            "The answer is 42"
+        );
+        assert_eq!(
+            strip_reasoning("Left <reasoning>private</reasoning> right"),
+            "Left right"
+        );
+        // `<think>` is the most common spelling of all — a mid-answer block in
+        // that spelling must not leak into the user's document, and must not
+        // be mistaken for a pre-filled template that swallows the text before it.
+        assert_eq!(
+            strip_reasoning("The answer is <think>x</think> ok"),
+            "The answer is ok"
+        );
+        assert_eq!(
+            strip_reasoning("<think>a</think>Hello <think>b</think>World"),
+            "Hello World"
+        );
+    }
+
+    #[test]
+    fn strip_reasoning_drops_unclosed_mid_answer_block_tail() {
+        // An unclosed reasoning block in the middle of the answer means the
+        // model never finished; nothing after it is an answer.
+        assert_eq!(
+            strip_reasoning("The answer is <thinking>still thinking"),
+            "The answer is"
+        );
     }
 }

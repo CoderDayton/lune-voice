@@ -19,6 +19,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Whisper decode is documented as `block_in_place` on a multi-thread runtime (the app's actual configuration), and a decode on a current-thread runtime now warns loudly instead of silently stalling the async runtime
 
+### Fixed
+
+- The styling pass no longer collapses spaced digit groups that are not thousands separators — phone numbers and part/ID numbers like `555 123 4567`, and dialling prefixes like `0 800 123 456`, are left intact, while `1 000 000` still collapses to `1000000`
+- `input:`/`output:` in the middle of a styled transcript are no longer misread as the model echoing the few-shot labels (only a line-starting label is treated as an echo), so legitimate text like "I said input: the password" survives styling
+- Reasoning blocks in the middle of a styled answer (`<think>`/`<thinking>`/`<reasoning>`/`<thought>`) are now stripped, not just leading ones, and cutting one out no longer leaves a doubled space behind
+
 ## [0.1.0]
 
 First release.
