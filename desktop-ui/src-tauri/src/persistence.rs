@@ -89,6 +89,16 @@ pub fn save_snippet(input: SaveSnippetInput) -> Result<WorkspaceSnapshot, String
     if !trigger.chars().any(|c| c.is_alphanumeric()) {
         return Err("snippet triggers need at least one letter or digit".into());
     }
+    // A trigger starting with a parametric command prefix is unreachable: the
+    // router claims the prefix and looks up whatever follows it as the snippet
+    // *name*, so the trigger itself never matches. Reject it here rather than
+    // saving a snippet that can never fire.
+    if let Some(prefix) = lune_dict::commands::reserved_trigger_prefix(trigger) {
+        return Err(format!(
+            "snippet triggers cannot start with \"{prefix}\" — it is a reserved \
+             voice command; say \"{prefix} <name>\" to expand a snippet by name"
+        ));
+    }
     // Reject control characters (newline/tab stay legal in the body) to
     // prevent injection into the delivery path.
     if trigger.chars().any(|c| c.is_control())
@@ -139,9 +149,14 @@ pub fn save_snippet(input: SaveSnippetInput) -> Result<WorkspaceSnapshot, String
 pub fn delete_snippet(snippet_id: String) -> Result<WorkspaceSnapshot, String> {
     let paths = resolve_paths()?;
     let mut database = open_database(&paths)?;
-    database
+    let deleted = database
         .delete_snippet(&snippet_id)
         .map_err(|e| format!("delete snippet: {e}"))?;
+    // Match the `delete_session` contract below: a delete that removed nothing
+    // is an error, not a silent success (a stale id, or two windows racing).
+    if !deleted {
+        return Err("snippet not found".into());
+    }
     let settings = load_settings(&paths)?;
     build_snapshot(settings, &mut database)
 }

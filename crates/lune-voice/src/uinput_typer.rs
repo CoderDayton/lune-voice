@@ -963,6 +963,16 @@ fn is_keystroke_typeable(text: &str) -> bool {
     text.chars().all(|c| char_to_key(c).is_some())
 }
 
+/// True when per-key typing is unsafe or impossible for `text`, so delivery
+/// must go through a clipboard paste instead.
+///
+/// Two reasons: a character with no US-QWERTY keystroke (would be dropped), or
+/// a newline — `char_to_key` turns that into KEY_ENTER, which submits the form
+/// or runs the shell line being typed into instead of inserting a line break.
+fn needs_paste_delivery(text: &str) -> bool {
+    !is_keystroke_typeable(text) || text.contains('\n')
+}
+
 // ─── Adaptive paste timing ───────────────────────────────────────────────────
 
 /// Minimum post-paste delay — floor even on the fastest systems.
@@ -1290,14 +1300,16 @@ impl UinputTyper {
     /// the clipboard instead — non-ASCII transcripts are never silently
     /// dropped.
     pub fn type_str_keys(&mut self, text: &str, keep_clipboard: bool) -> bool {
-        if !is_keystroke_typeable(text) {
+        // Multi-line snippet bodies are the normal source of newlines here;
+        // see `needs_paste_delivery` for why they must not be typed per-key.
+        if needs_paste_delivery(text) {
             let is_terminal = self.resolve_terminal();
-            return self.do_clipboard_paste(
-                text,
-                is_terminal,
-                "non-ASCII text — emitting paste",
-                keep_clipboard,
-            );
+            let reason = if text.contains('\n') {
+                "multi-line text — emitting paste (Enter would submit)"
+            } else {
+                "non-ASCII text — emitting paste"
+            };
+            return self.do_clipboard_paste(text, is_terminal, reason, keep_clipboard);
         }
         // Per-key typing never touches the clipboard.
         self.type_keys_raw(text);
@@ -1340,8 +1352,34 @@ impl UinputTyper {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_safe_mime, is_terminal_class, pipe_text_to_command};
+    use super::{is_safe_mime, is_terminal_class, needs_paste_delivery, pipe_text_to_command};
     use std::time::{Duration, Instant};
+
+    /// A newline typed per-key is KEY_ENTER, which submits whatever the text
+    /// is going into — the multi-line snippet body "Best regards,\nDayton"
+    /// would send the message after the first line and type the rest into
+    /// whatever gained focus. Such text must go through the clipboard.
+    #[test]
+    fn multi_line_text_is_routed_to_the_clipboard() {
+        assert!(needs_paste_delivery("Best regards,\nDayton"));
+        assert!(needs_paste_delivery("line one\n"));
+        assert!(needs_paste_delivery("a\n\nb"));
+    }
+
+    #[test]
+    fn single_line_ascii_is_typed_per_key() {
+        assert!(!needs_paste_delivery("Best regards, Dayton"));
+        assert!(!needs_paste_delivery("tabs\tare fine"));
+        assert!(!needs_paste_delivery(""));
+    }
+
+    /// Unchanged by the newline rule: text with no US-QWERTY keystroke still
+    /// has to paste, or those characters would be dropped.
+    #[test]
+    fn non_ascii_still_requires_paste() {
+        assert!(needs_paste_delivery("café"));
+        assert!(needs_paste_delivery("日本語"));
+    }
 
     #[test]
     fn safe_mimes_are_well_formed_rfc6838_types() {

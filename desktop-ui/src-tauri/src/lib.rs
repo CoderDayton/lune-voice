@@ -70,10 +70,16 @@ fn install_shutdown_signal_handler() {
 
 /// Frontend-invokable quit. Mirrors the tray "Quit" path: set the intent
 /// flag so the ExitRequested handler honors the exit, then terminate.
+///
+/// Gated to the main window like every other command: Tauri's ACL does not
+/// cover app-defined commands, so `require_window_access` is the only thing
+/// keeping the pill webview from invoking this.
 #[tauri::command]
-fn quit_app(app: tauri::AppHandle) {
+fn quit_app(window: tauri::WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
+    commands::require_window_access(&window, &["main"])?;
     QUIT_REQUESTED.store(true, Ordering::SeqCst);
     app.exit(0);
+    Ok(())
 }
 
 /// Smallest usable window. Also the OS-enforced minimum and the floor for the

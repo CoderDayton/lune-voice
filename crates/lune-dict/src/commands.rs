@@ -43,6 +43,21 @@ static PARAMETRIC_PREFIXES: &[(&str, ParametricKind)] = &[
     ("insert", ParametricKind::InsertSnippet),
 ];
 
+/// The reserved prefix a trigger phrase starts with, if any.
+///
+/// A trigger beginning with one of these can never fire: `route_inner` claims
+/// the prefix at the start of the utterance and treats the remainder as the
+/// command's argument, so `"insert my signature"` is routed as "insert the
+/// snippet named *my signature*" and never matches the trigger itself. Callers
+/// that accept user-authored triggers must reject these at save time.
+pub fn reserved_trigger_prefix(trigger: &str) -> Option<&'static str> {
+    let words = normalize_words(trigger);
+    PARAMETRIC_PREFIXES.iter().find_map(|(prefix, _)| {
+        let prefix_words = normalize_words(prefix);
+        words.starts_with(&prefix_words[..]).then_some(*prefix)
+    })
+}
+
 impl VoiceCommandRouter {
     pub fn new() -> Self {
         Self { custom: Vec::new() }
@@ -141,6 +156,45 @@ mod tests {
 
     fn router() -> VoiceCommandRouter {
         VoiceCommandRouter::new()
+    }
+
+    /// A trigger starting with a parametric prefix is unreachable — the router
+    /// claims the prefix and looks the rest up as a snippet *name* — so save
+    /// paths must be able to detect and refuse it.
+    #[test]
+    fn reserved_prefixes_are_detected_in_triggers() {
+        for (trigger, expected) in [
+            ("insert my signature", "insert"),
+            ("Insert, My Signature!", "insert"),
+            ("expand snippet foo", "expand snippet"),
+            ("switch to work mode", "switch to"),
+            ("switch preset to casual", "switch preset to"),
+        ] {
+            assert_eq!(
+                reserved_trigger_prefix(trigger),
+                Some(expected),
+                "{trigger:?} should be refused"
+            );
+        }
+    }
+
+    /// The prefix is only reserved at the *start*, and only on a whole-word
+    /// boundary — refusing more than that would block ordinary triggers.
+    #[test]
+    fn ordinary_triggers_are_not_reserved() {
+        for trigger in [
+            "my signature",
+            "inserting the header",
+            "sign off insert",
+            "switch",
+            "meeting header",
+        ] {
+            assert_eq!(
+                reserved_trigger_prefix(trigger),
+                None,
+                "{trigger:?} should be allowed"
+            );
+        }
     }
 
     #[test]
