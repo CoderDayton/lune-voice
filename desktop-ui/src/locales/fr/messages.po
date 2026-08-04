@@ -42,7 +42,7 @@ msgstr "Règles {0}"
 msgid "{onCount} of 4 formatting fixes on"
 msgstr "{onCount} sur 4 correctifs de formatage sur"
 
-#: src/features/history/components/history-table.tsx:187
+#: src/features/history/components/history-table.tsx:186
 msgid "{page} / {totalPages}"
 msgstr "{page} / {totalPages}"
 
@@ -50,15 +50,15 @@ msgstr "{page} / {totalPages}"
 msgid "{saved} (unavailable)"
 msgstr "{saved} (indisponible)"
 
-#: src/features/history/components/history-table.tsx:171
+#: src/features/history/components/history-table.tsx:170
 msgid "{start}–{end} of {visibleCount}"
 msgstr "{start}–{end} de {visibleCount}"
 
-#: src/features/history/components/history-table.tsx:115
+#: src/features/history/components/history-table.tsx:114
 msgid "{totalCount} sessions"
 msgstr "{totalCount} séances"
 
-#: src/features/history/components/history-table.tsx:115
+#: src/features/history/components/history-table.tsx:114
 msgid "{visibleCount} / {totalCount}"
 msgstr "{visibleCount} / {totalCount}"
 
@@ -67,7 +67,10 @@ msgid "## Meeting — {date}\n"
 "\n"
 "Attendees:\n"
 "- "
-msgstr "## Réunion — {date}\n\nParticipants :\n- "
+msgstr "## Réunion — {date}\n"
+"\n"
+"Participants :\n"
+"- "
 
 #: src/features/snippets/snippets-page.tsx:128
 msgid "A block of text Lune Voice types for you when you speak its trigger phrase."
@@ -280,7 +283,7 @@ msgstr "Choisissez votre moteur vocal. Tout fonctionne hors ligne — pas de clo
 msgid "Clear filter"
 msgstr "Effacer le filtre"
 
-#: src/features/history/components/history-table.tsx:107
+#: src/features/history/components/history-table.tsx:106
 msgid "Clear search"
 msgstr "Effacer la recherche"
 
@@ -581,7 +584,7 @@ msgstr "Session vide"
 msgid "Enable styling"
 msgstr "Activer la stylisation"
 
-#: src/features/history/components/history-table.tsx:144
+#: src/features/history/components/history-table.tsx:143
 #: src/features/history/components/session-detail-modal.tsx:162
 #: src/features/settings/sections/styling-engine-section.tsx:42
 msgid "Engine"
@@ -759,7 +762,7 @@ msgstr "Langue"
 msgid "Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login."
 msgstr "Lancez-vous dans la barre d’état système au lieu d’ouvrir la fenêtre principale. Utile lorsque Lune Voice démarre automatiquement lors de la connexion."
 
-#: src/features/history/components/history-table.tsx:143
+#: src/features/history/components/history-table.tsx:142
 msgid "Length"
 msgstr "Longueur"
 
@@ -862,11 +865,11 @@ msgstr "Multilingue · choisissez une taille"
 msgid "Name"
 msgstr "Nom"
 
-#: src/features/history/components/history-table.tsx:196
+#: src/features/history/components/history-table.tsx:195
 msgid "Next"
 msgstr "Suivant"
 
-#: src/features/history/components/history-table.tsx:194
+#: src/features/history/components/history-table.tsx:193
 msgid "Next page"
 msgstr "Page suivante"
 
@@ -878,12 +881,12 @@ msgstr "Non"
 msgid "No rules match “{query}”."
 msgstr "Aucune règle ne correspond à « {query} »."
 
-#: src/features/history/components/history-table.tsx:131
+#: src/features/history/components/history-table.tsx:130
 msgid "No sessions found."
 msgstr "Aucune séance trouvée."
 
 #. placeholder {0}: search.trim()
-#: src/features/history/components/history-table.tsx:128
+#: src/features/history/components/history-table.tsx:127
 msgid "No sessions match \"{0}\"."
 msgstr "Aucune session ne correspond à \"{0}\"."
 
@@ -891,7 +894,7 @@ msgstr "Aucune session ne correspond à \"{0}\"."
 msgid "No sessions yet"
 msgstr "Aucune séance pour l'instant"
 
-#: src/features/history/components/history-table.tsx:130
+#: src/features/history/components/history-table.tsx:129
 msgid "No sessions yet. Start dictating to see your transcripts here."
 msgstr "Aucune séance pour l'instant. Commencez à dicter pour voir vos relevés de notes ici."
 
@@ -972,7 +975,7 @@ msgstr "Encombrement global de la barre de l'indicateur."
 msgid "Overall progress"
 msgstr "Progrès global"
 
-#: src/features/history/components/history-table.tsx:167
+#: src/features/history/components/history-table.tsx:166
 msgid "Pagination"
 msgstr "Pagination"
 
@@ -1043,7 +1046,7 @@ msgstr "Coin ou bord prédéfini où l'indicateur se place au départ."
 msgid "Press"
 msgstr "Presse"
 
-#: src/features/history/components/history-table.tsx:181
+#: src/features/history/components/history-table.tsx:180
 msgid "Prev"
 msgstr "Précédent"
 
@@ -1055,7 +1058,7 @@ msgstr "Empêcher de déplacer l'indicateur en le faisant glisser."
 msgid "Preview"
 msgstr "Aperçu"
 
-#: src/features/history/components/history-table.tsx:179
+#: src/features/history/components/history-table.tsx:178
 msgid "Previous page"
 msgstr "Page précédente"
 
@@ -1166,8 +1169,8 @@ msgstr "Sauvegarder"
 msgid "Save changes"
 msgstr "Enregistrer les modifications"
 
-#: src/features/history/components/history-table.tsx:308
-#: src/features/history/components/session-detail-modal.tsx:70
+#: src/features/history/components/history-table.tsx:311
+#: src/features/history/components/session-detail-modal.tsx:73
 msgid "Save Transcript"
 msgstr "Enregistrer la transcription"
 
@@ -1183,11 +1186,11 @@ msgstr "Extraits enregistrés"
 msgid "Say <0>“{spokenTrigger}”</0> as the whole utterance — or <1>“insert {spokenTrigger}”</1> — to type this snippet."
 msgstr "Dites <0>« {spokenTrigger} »</0> comme énoncé complet — ou <1>« insert {spokenTrigger} »</1> — pour saisir cet extrait."
 
-#: src/features/history/components/history-table.tsx:100
+#: src/features/history/components/history-table.tsx:99
 msgid "Search transcripts"
 msgstr "Rechercher des transcriptions"
 
-#: src/features/history/components/history-table.tsx:98
+#: src/features/history/components/history-table.tsx:97
 msgid "Search transcripts…"
 msgstr "Rechercher des transcriptions…"
 
@@ -1396,7 +1399,7 @@ msgstr "Cela n'arrive qu'une seule fois. En attendant, vous pouvez continuer à 
 msgid "This will permanently remove this dictation session and its transcript."
 msgstr "Cela supprimera définitivement cette session de dictée et sa transcription."
 
-#: src/features/history/components/history-table.tsx:140
+#: src/features/history/components/history-table.tsx:139
 msgid "Time"
 msgstr "Temps"
 
@@ -1445,7 +1448,7 @@ msgstr "Transcription de ce que vous avez dit…"
 msgid "Transcribing…"
 msgstr "Transcription…"
 
-#: src/features/history/components/history-table.tsx:141
+#: src/features/history/components/history-table.tsx:140
 msgid "Transcript"
 msgstr "Transcription"
 
@@ -1561,7 +1564,7 @@ msgstr "whisper.cpp fonctionnant sur l'appareil. Choisissez une taille pour arbi
 msgid "words"
 msgstr "mots"
 
-#: src/features/history/components/history-table.tsx:142
+#: src/features/history/components/history-table.tsx:141
 #: src/features/history/components/session-detail-modal.tsx:160
 msgid "Words"
 msgstr "Mots"

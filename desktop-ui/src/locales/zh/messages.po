@@ -42,7 +42,7 @@ msgstr "{0} 规则"
 msgid "{onCount} of 4 formatting fixes on"
 msgstr "{onCount} 的 4 个格式修复"
 
-#: src/features/history/components/history-table.tsx:187
+#: src/features/history/components/history-table.tsx:186
 msgid "{page} / {totalPages}"
 msgstr "{page} / {totalPages}"
 
@@ -50,15 +50,15 @@ msgstr "{page} / {totalPages}"
 msgid "{saved} (unavailable)"
 msgstr "{saved}（不可用）"
 
-#: src/features/history/components/history-table.tsx:171
+#: src/features/history/components/history-table.tsx:170
 msgid "{start}–{end} of {visibleCount}"
 msgstr "{start}–{end} 或 {visibleCount}"
 
-#: src/features/history/components/history-table.tsx:115
+#: src/features/history/components/history-table.tsx:114
 msgid "{totalCount} sessions"
 msgstr "{totalCount} 会话"
 
-#: src/features/history/components/history-table.tsx:115
+#: src/features/history/components/history-table.tsx:114
 msgid "{visibleCount} / {totalCount}"
 msgstr "{visibleCount} / {totalCount}"
 
@@ -67,7 +67,10 @@ msgid "## Meeting — {date}\n"
 "\n"
 "Attendees:\n"
 "- "
-msgstr "## 会议 — {date}\n\n与会者：\n- "
+msgstr "## 会议 — {date}\n"
+"\n"
+"与会者：\n"
+"- "
 
 #: src/features/snippets/snippets-page.tsx:128
 msgid "A block of text Lune Voice types for you when you speak its trigger phrase."
@@ -280,7 +283,7 @@ msgstr "选择您的语音引擎。一切都离线运行——没有云，没有
 msgid "Clear filter"
 msgstr "清除过滤器"
 
-#: src/features/history/components/history-table.tsx:107
+#: src/features/history/components/history-table.tsx:106
 msgid "Clear search"
 msgstr "清除搜索"
 
@@ -581,7 +584,7 @@ msgstr "空会话"
 msgid "Enable styling"
 msgstr "启用润色"
 
-#: src/features/history/components/history-table.tsx:144
+#: src/features/history/components/history-table.tsx:143
 #: src/features/history/components/session-detail-modal.tsx:162
 #: src/features/settings/sections/styling-engine-section.tsx:42
 msgid "Engine"
@@ -759,7 +762,7 @@ msgstr "语言"
 msgid "Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login."
 msgstr "启动到系统托盘而不是打开主窗口。当 Lune Voice 在登录时自动启动时很有用。"
 
-#: src/features/history/components/history-table.tsx:143
+#: src/features/history/components/history-table.tsx:142
 msgid "Length"
 msgstr "长度"
 
@@ -862,11 +865,11 @@ msgstr "多语言 · 选择大小"
 msgid "Name"
 msgstr "姓名"
 
-#: src/features/history/components/history-table.tsx:196
+#: src/features/history/components/history-table.tsx:195
 msgid "Next"
 msgstr "下一个"
 
-#: src/features/history/components/history-table.tsx:194
+#: src/features/history/components/history-table.tsx:193
 msgid "Next page"
 msgstr "下一页"
 
@@ -878,12 +881,12 @@ msgstr "不"
 msgid "No rules match “{query}”."
 msgstr "没有规则匹配“{query}”。"
 
-#: src/features/history/components/history-table.tsx:131
+#: src/features/history/components/history-table.tsx:130
 msgid "No sessions found."
 msgstr "未找到会话。"
 
 #. placeholder {0}: search.trim()
-#: src/features/history/components/history-table.tsx:128
+#: src/features/history/components/history-table.tsx:127
 msgid "No sessions match \"{0}\"."
 msgstr "没有会话匹配“{0}”。"
 
@@ -891,7 +894,7 @@ msgstr "没有会话匹配“{0}”。"
 msgid "No sessions yet"
 msgstr "还没有会议"
 
-#: src/features/history/components/history-table.tsx:130
+#: src/features/history/components/history-table.tsx:129
 msgid "No sessions yet. Start dictating to see your transcripts here."
 msgstr "还没有会议。开始听写并在此处查看您的成绩单。"
 
@@ -972,7 +975,7 @@ msgstr "指示器条的整体尺寸。"
 msgid "Overall progress"
 msgstr "总体进展"
 
-#: src/features/history/components/history-table.tsx:167
+#: src/features/history/components/history-table.tsx:166
 msgid "Pagination"
 msgstr "分页"
 
@@ -1043,7 +1046,7 @@ msgstr "指示器起始的预设边角或边缘。"
 msgid "Press"
 msgstr "按"
 
-#: src/features/history/components/history-table.tsx:181
+#: src/features/history/components/history-table.tsx:180
 msgid "Prev"
 msgstr "上一篇"
 
@@ -1055,7 +1058,7 @@ msgstr "禁止通过拖动移动指示器。"
 msgid "Preview"
 msgstr "预览"
 
-#: src/features/history/components/history-table.tsx:179
+#: src/features/history/components/history-table.tsx:178
 msgid "Previous page"
 msgstr "上一页"
 
@@ -1166,8 +1169,8 @@ msgstr "节省"
 msgid "Save changes"
 msgstr "保存更改"
 
-#: src/features/history/components/history-table.tsx:308
-#: src/features/history/components/session-detail-modal.tsx:70
+#: src/features/history/components/history-table.tsx:311
+#: src/features/history/components/session-detail-modal.tsx:73
 msgid "Save Transcript"
 msgstr "保存成绩单"
 
@@ -1183,11 +1186,11 @@ msgstr "已保存的片段"
 msgid "Say <0>“{spokenTrigger}”</0> as the whole utterance — or <1>“insert {spokenTrigger}”</1> — to type this snippet."
 msgstr "将 <0>“{spokenTrigger}”</0> 作为整句说出 — 或说 <1>“insert {spokenTrigger}”</1> — 即可输入此片段。"
 
-#: src/features/history/components/history-table.tsx:100
+#: src/features/history/components/history-table.tsx:99
 msgid "Search transcripts"
 msgstr "搜索成绩单"
 
-#: src/features/history/components/history-table.tsx:98
+#: src/features/history/components/history-table.tsx:97
 msgid "Search transcripts…"
 msgstr "搜索成绩单..."
 
@@ -1396,7 +1399,7 @@ msgstr "这只会发生一次。在此期间您可以继续使用您的计算机
 msgid "This will permanently remove this dictation session and its transcript."
 msgstr "这将永久删除该听写会话及其记录。"
 
-#: src/features/history/components/history-table.tsx:140
+#: src/features/history/components/history-table.tsx:139
 msgid "Time"
 msgstr "时间"
 
@@ -1445,7 +1448,7 @@ msgstr "正在转写你说的内容…"
 msgid "Transcribing…"
 msgstr "正在转写…"
 
-#: src/features/history/components/history-table.tsx:141
+#: src/features/history/components/history-table.tsx:140
 msgid "Transcript"
 msgstr "成绩单"
 
@@ -1561,7 +1564,7 @@ msgstr "whisper.cpp 在设备端运行。选择一个大小以在速度与准确
 msgid "words"
 msgstr "字"
 
-#: src/features/history/components/history-table.tsx:142
+#: src/features/history/components/history-table.tsx:141
 #: src/features/history/components/session-detail-modal.tsx:160
 msgid "Words"
 msgstr "字"

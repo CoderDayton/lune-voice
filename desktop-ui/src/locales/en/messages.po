@@ -42,7 +42,7 @@ msgstr "{0} rules"
 msgid "{onCount} of 4 formatting fixes on"
 msgstr "{onCount} of 4 formatting fixes on"
 
-#: src/features/history/components/history-table.tsx:187
+#: src/features/history/components/history-table.tsx:186
 msgid "{page} / {totalPages}"
 msgstr "{page} / {totalPages}"
 
@@ -50,15 +50,15 @@ msgstr "{page} / {totalPages}"
 msgid "{saved} (unavailable)"
 msgstr "{saved} (unavailable)"
 
-#: src/features/history/components/history-table.tsx:171
+#: src/features/history/components/history-table.tsx:170
 msgid "{start}–{end} of {visibleCount}"
 msgstr "{start}–{end} of {visibleCount}"
 
-#: src/features/history/components/history-table.tsx:115
+#: src/features/history/components/history-table.tsx:114
 msgid "{totalCount} sessions"
 msgstr "{totalCount} sessions"
 
-#: src/features/history/components/history-table.tsx:115
+#: src/features/history/components/history-table.tsx:114
 msgid "{visibleCount} / {totalCount}"
 msgstr "{visibleCount} / {totalCount}"
 
@@ -283,7 +283,7 @@ msgstr "Choose your speech engine. Everything runs offline — no cloud, no acco
 msgid "Clear filter"
 msgstr "Clear filter"
 
-#: src/features/history/components/history-table.tsx:107
+#: src/features/history/components/history-table.tsx:106
 msgid "Clear search"
 msgstr "Clear search"
 
@@ -584,7 +584,7 @@ msgstr "Empty session"
 msgid "Enable styling"
 msgstr "Enable styling"
 
-#: src/features/history/components/history-table.tsx:144
+#: src/features/history/components/history-table.tsx:143
 #: src/features/history/components/session-detail-modal.tsx:162
 #: src/features/settings/sections/styling-engine-section.tsx:42
 msgid "Engine"
@@ -762,7 +762,7 @@ msgstr "Language"
 msgid "Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login."
 msgstr "Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login."
 
-#: src/features/history/components/history-table.tsx:143
+#: src/features/history/components/history-table.tsx:142
 msgid "Length"
 msgstr "Length"
 
@@ -865,11 +865,11 @@ msgstr "Multilingual · pick a size"
 msgid "Name"
 msgstr "Name"
 
-#: src/features/history/components/history-table.tsx:196
+#: src/features/history/components/history-table.tsx:195
 msgid "Next"
 msgstr "Next"
 
-#: src/features/history/components/history-table.tsx:194
+#: src/features/history/components/history-table.tsx:193
 msgid "Next page"
 msgstr "Next page"
 
@@ -881,12 +881,12 @@ msgstr "No"
 msgid "No rules match “{query}”."
 msgstr "No rules match “{query}”."
 
-#: src/features/history/components/history-table.tsx:131
+#: src/features/history/components/history-table.tsx:130
 msgid "No sessions found."
 msgstr "No sessions found."
 
 #. placeholder {0}: search.trim()
-#: src/features/history/components/history-table.tsx:128
+#: src/features/history/components/history-table.tsx:127
 msgid "No sessions match \"{0}\"."
 msgstr "No sessions match \"{0}\"."
 
@@ -894,7 +894,7 @@ msgstr "No sessions match \"{0}\"."
 msgid "No sessions yet"
 msgstr "No sessions yet"
 
-#: src/features/history/components/history-table.tsx:130
+#: src/features/history/components/history-table.tsx:129
 msgid "No sessions yet. Start dictating to see your transcripts here."
 msgstr "No sessions yet. Start dictating to see your transcripts here."
 
@@ -975,7 +975,7 @@ msgstr "Overall footprint of the pill bar."
 msgid "Overall progress"
 msgstr "Overall progress"
 
-#: src/features/history/components/history-table.tsx:167
+#: src/features/history/components/history-table.tsx:166
 msgid "Pagination"
 msgstr "Pagination"
 
@@ -1046,7 +1046,7 @@ msgstr "Preset corner or edge the pill starts at."
 msgid "Press"
 msgstr "Press"
 
-#: src/features/history/components/history-table.tsx:181
+#: src/features/history/components/history-table.tsx:180
 msgid "Prev"
 msgstr "Prev"
 
@@ -1058,7 +1058,7 @@ msgstr "Prevent moving the pill by dragging it."
 msgid "Preview"
 msgstr "Preview"
 
-#: src/features/history/components/history-table.tsx:179
+#: src/features/history/components/history-table.tsx:178
 msgid "Previous page"
 msgstr "Previous page"
 
@@ -1169,8 +1169,8 @@ msgstr "Save"
 msgid "Save changes"
 msgstr "Save changes"
 
-#: src/features/history/components/history-table.tsx:308
-#: src/features/history/components/session-detail-modal.tsx:70
+#: src/features/history/components/history-table.tsx:311
+#: src/features/history/components/session-detail-modal.tsx:73
 msgid "Save Transcript"
 msgstr "Save Transcript"
 
@@ -1186,11 +1186,11 @@ msgstr "Saved snippets"
 msgid "Say <0>“{spokenTrigger}”</0> as the whole utterance — or <1>“insert {spokenTrigger}”</1> — to type this snippet."
 msgstr "Say <0>“{spokenTrigger}”</0> as the whole utterance — or <1>“insert {spokenTrigger}”</1> — to type this snippet."
 
-#: src/features/history/components/history-table.tsx:100
+#: src/features/history/components/history-table.tsx:99
 msgid "Search transcripts"
 msgstr "Search transcripts"
 
-#: src/features/history/components/history-table.tsx:98
+#: src/features/history/components/history-table.tsx:97
 msgid "Search transcripts…"
 msgstr "Search transcripts…"
 
@@ -1399,7 +1399,7 @@ msgstr "This only happens once. You can keep using your computer in the meantime
 msgid "This will permanently remove this dictation session and its transcript."
 msgstr "This will permanently remove this dictation session and its transcript."
 
-#: src/features/history/components/history-table.tsx:140
+#: src/features/history/components/history-table.tsx:139
 msgid "Time"
 msgstr "Time"
 
@@ -1448,7 +1448,7 @@ msgstr "Transcribing what you said…"
 msgid "Transcribing…"
 msgstr "Transcribing…"
 
-#: src/features/history/components/history-table.tsx:141
+#: src/features/history/components/history-table.tsx:140
 msgid "Transcript"
 msgstr "Transcript"
 
@@ -1564,7 +1564,7 @@ msgstr "whisper.cpp running on-device. Choose a size to trade speed for accuracy
 msgid "words"
 msgstr "words"
 
-#: src/features/history/components/history-table.tsx:142
+#: src/features/history/components/history-table.tsx:141
 #: src/features/history/components/session-detail-modal.tsx:160
 msgid "Words"
 msgstr "Words"

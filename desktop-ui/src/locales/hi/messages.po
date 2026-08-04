@@ -42,7 +42,7 @@ msgstr "{0} नियम"
 msgid "{onCount} of 4 formatting fixes on"
 msgstr "4 में से {onCount} फ़ॉर्मेटिंग सुधार चालू"
 
-#: src/features/history/components/history-table.tsx:187
+#: src/features/history/components/history-table.tsx:186
 msgid "{page} / {totalPages}"
 msgstr "{page} / {totalPages}"
 
@@ -50,15 +50,15 @@ msgstr "{page} / {totalPages}"
 msgid "{saved} (unavailable)"
 msgstr "{saved} (अनुपलब्ध)"
 
-#: src/features/history/components/history-table.tsx:171
+#: src/features/history/components/history-table.tsx:170
 msgid "{start}–{end} of {visibleCount}"
 msgstr "{visibleCount} में से {start}–{end}"
 
-#: src/features/history/components/history-table.tsx:115
+#: src/features/history/components/history-table.tsx:114
 msgid "{totalCount} sessions"
 msgstr "{totalCount} सत्र"
 
-#: src/features/history/components/history-table.tsx:115
+#: src/features/history/components/history-table.tsx:114
 msgid "{visibleCount} / {totalCount}"
 msgstr "{visibleCount} / {totalCount}"
 
@@ -67,7 +67,10 @@ msgid "## Meeting — {date}\n"
 "\n"
 "Attendees:\n"
 "- "
-msgstr "## बैठक — {date}\n\nउपस्थित:\n- "
+msgstr "## बैठक — {date}\n"
+"\n"
+"उपस्थित:\n"
+"- "
 
 #: src/features/snippets/snippets-page.tsx:128
 msgid "A block of text Lune Voice types for you when you speak its trigger phrase."
@@ -280,7 +283,7 @@ msgstr "अपना स्पीच इंजन चुनें। सब क�
 msgid "Clear filter"
 msgstr "फ़िल्टर साफ़ करें"
 
-#: src/features/history/components/history-table.tsx:107
+#: src/features/history/components/history-table.tsx:106
 msgid "Clear search"
 msgstr "खोज साफ़ करें"
 
@@ -581,7 +584,7 @@ msgstr "ख़ाली सत्र"
 msgid "Enable styling"
 msgstr "स्टाइलिंग सक्षम करें"
 
-#: src/features/history/components/history-table.tsx:144
+#: src/features/history/components/history-table.tsx:143
 #: src/features/history/components/session-detail-modal.tsx:162
 #: src/features/settings/sections/styling-engine-section.tsx:42
 msgid "Engine"
@@ -759,7 +762,7 @@ msgstr "भाषा"
 msgid "Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login."
 msgstr "मुख्य विंडो खोलने के बजाय सिस्टम ट्रे में लॉन्च करें। जब Lune Voice लॉगिन पर स्वतः प्रारंभ हो जाता है तो यह उपयोगी है।"
 
-#: src/features/history/components/history-table.tsx:143
+#: src/features/history/components/history-table.tsx:142
 msgid "Length"
 msgstr "लंबाई"
 
@@ -862,11 +865,11 @@ msgstr "बहुभाषी · एक आकार चुनें"
 msgid "Name"
 msgstr "नाम"
 
-#: src/features/history/components/history-table.tsx:196
+#: src/features/history/components/history-table.tsx:195
 msgid "Next"
 msgstr "अगला"
 
-#: src/features/history/components/history-table.tsx:194
+#: src/features/history/components/history-table.tsx:193
 msgid "Next page"
 msgstr "अगला पृष्ठ"
 
@@ -878,12 +881,12 @@ msgstr "नहीं"
 msgid "No rules match “{query}”."
 msgstr "कोई भी नियम \"{query}\" से मेल नहीं खाता।"
 
-#: src/features/history/components/history-table.tsx:131
+#: src/features/history/components/history-table.tsx:130
 msgid "No sessions found."
 msgstr "कोई सत्र नहीं मिला."
 
 #. placeholder {0}: search.trim()
-#: src/features/history/components/history-table.tsx:128
+#: src/features/history/components/history-table.tsx:127
 msgid "No sessions match \"{0}\"."
 msgstr "कोई भी सत्र \"{0}\" से मेल नहीं खाता।"
 
@@ -891,7 +894,7 @@ msgstr "कोई भी सत्र \"{0}\" से मेल नहीं ख�
 msgid "No sessions yet"
 msgstr "अभी तक कोई सत्र नहीं"
 
-#: src/features/history/components/history-table.tsx:130
+#: src/features/history/components/history-table.tsx:129
 msgid "No sessions yet. Start dictating to see your transcripts here."
 msgstr "अभी तक कोई सत्र नहीं। यहाँ अपना टेक्स्ट देखने के लिए डिक्टेशन शुरू करें।"
 
@@ -972,7 +975,7 @@ msgstr "संकेतक पट्टी का कुल आकार।"
 msgid "Overall progress"
 msgstr "समग्र प्रगति"
 
-#: src/features/history/components/history-table.tsx:167
+#: src/features/history/components/history-table.tsx:166
 msgid "Pagination"
 msgstr "पृष्ठ पर अंक लगाना"
 
@@ -1043,7 +1046,7 @@ msgstr "वह पूर्वनिर्धारित कोना या �
 msgid "Press"
 msgstr "दबाएँ"
 
-#: src/features/history/components/history-table.tsx:181
+#: src/features/history/components/history-table.tsx:180
 msgid "Prev"
 msgstr "पिछला"
 
@@ -1055,7 +1058,7 @@ msgstr "संकेतक को खींचकर हिलाने से �
 msgid "Preview"
 msgstr "पूर्व दर्शन"
 
-#: src/features/history/components/history-table.tsx:179
+#: src/features/history/components/history-table.tsx:178
 msgid "Previous page"
 msgstr "पिछला पृष्ठ"
 
@@ -1166,8 +1169,8 @@ msgstr "सहेजें"
 msgid "Save changes"
 msgstr "बदलाव सहेजें"
 
-#: src/features/history/components/history-table.tsx:308
-#: src/features/history/components/session-detail-modal.tsx:70
+#: src/features/history/components/history-table.tsx:311
+#: src/features/history/components/session-detail-modal.tsx:73
 msgid "Save Transcript"
 msgstr "प्रतिलेख सहेजें"
 
@@ -1183,11 +1186,11 @@ msgstr "सहेजे गए स्निपेट"
 msgid "Say <0>“{spokenTrigger}”</0> as the whole utterance — or <1>“insert {spokenTrigger}”</1> — to type this snippet."
 msgstr "इस स्निपेट को टाइप करने के लिए <0>“{spokenTrigger}”</0> को पूरे वाक्य के रूप में बोलें — या <1>“insert {spokenTrigger}”</1> कहें।"
 
-#: src/features/history/components/history-table.tsx:100
+#: src/features/history/components/history-table.tsx:99
 msgid "Search transcripts"
 msgstr "प्रतिलेख खोजें"
 
-#: src/features/history/components/history-table.tsx:98
+#: src/features/history/components/history-table.tsx:97
 msgid "Search transcripts…"
 msgstr "प्रतिलेख खोजें..."
 
@@ -1396,7 +1399,7 @@ msgstr "ऐसा केवल एक बार होता है. इस ब�
 msgid "This will permanently remove this dictation session and its transcript."
 msgstr "यह इस श्रुतलेख सत्र और इसकी प्रतिलेख को स्थायी रूप से हटा देगा।"
 
-#: src/features/history/components/history-table.tsx:140
+#: src/features/history/components/history-table.tsx:139
 msgid "Time"
 msgstr "समय"
 
@@ -1445,7 +1448,7 @@ msgstr "आपने जो कहा उसका प्रतिलेख ब�
 msgid "Transcribing…"
 msgstr "प्रतिलेख बन रहा है…"
 
-#: src/features/history/components/history-table.tsx:141
+#: src/features/history/components/history-table.tsx:140
 msgid "Transcript"
 msgstr "टेक्स्ट"
 
@@ -1561,7 +1564,7 @@ msgstr "whisper.cpp डिवाइस पर चल रहा है। गत�
 msgid "words"
 msgstr "शब्द"
 
-#: src/features/history/components/history-table.tsx:142
+#: src/features/history/components/history-table.tsx:141
 #: src/features/history/components/session-detail-modal.tsx:160
 msgid "Words"
 msgstr "शब्द"
