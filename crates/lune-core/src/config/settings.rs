@@ -487,6 +487,19 @@ pub enum LlmBackendConfig {
 /// Loopback and the RFC 1918 / RFC 4193 private ranges count, as do `.local`
 /// and `.localhost` names: a box on the user's LAN is still theirs. Anything
 /// that resolves through DNS to the public internet does not.
+///
+/// # Tradeoff: this also gates TLS
+///
+/// Both remote backends (`lune-asr` and `lune-llm`) reuse this test to decide
+/// whether plaintext `http://` is acceptable, so "local" here means the API key
+/// and every dictated transcript may cross the user's LAN in cleartext. That is
+/// deliberate: self-hosted inference servers ship without TLS, and demanding
+/// HTTPS would break the LAN-GPU-box setup this app is built around. The
+/// exposure is bounded by the LAN — anyone able to sniff it is already inside
+/// the user's network — and it never applies to a public host, which still
+/// requires HTTPS. Narrowing this to loopback-only is a deliberate posture
+/// change, not a bug fix: it would refuse ASR at construction and silently
+/// degrade styling to passthrough for anyone running a model on another box.
 pub fn is_local_endpoint(url: &Url) -> bool {
     use url::Host;
     match url.host() {

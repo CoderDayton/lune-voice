@@ -115,6 +115,14 @@ See [docs/GPU_PLUGIN.md](GPU_PLUGIN.md) for the states, the archive contents, an
 
 Remote ASR is useful when the user explicitly allows remote processing. It returns transcript text through the same `AsrSegment` type but does not expose per-token confidence. Missing confidence disables LLM routing confidence gates; the styling call is still driven by the style preset.
 
+##### Transport: when plaintext is allowed
+
+Both remote backends (`crates/lune-asr/src/backend/openai.rs`, `crates/lune-llm/src/backend/openai.rs`) refuse to construct against a plaintext `http://` endpoint unless it is *local* by `lune_core::config::is_local_endpoint` — loopback, the RFC 1918 / RFC 4193 private ranges, and `.local` / `.localhost` names. A public host must use HTTPS.
+
+That carve-out is wider than loopback on purpose, and it is a deliberate tradeoff worth stating plainly: **against a LAN endpoint, the API key and every dictated transcript cross the local network in cleartext.** Self-hosted inference servers (Ollama, llama-server, LM Studio) ship without TLS, so requiring HTTPS would break the common setup of running the model on another box on the same network. The exposure is bounded by the LAN, and the same predicate governs whether an endpoint may be used keyless, so the two decisions cannot drift apart.
+
+Users who do not accept that tradeoff should put the endpoint behind HTTPS (a reverse proxy with a local certificate) rather than relying on the private-range carve-out. Tightening the predicate to loopback-only would refuse remote ASR at construction and silently degrade styling to passthrough for every LAN user, so it is a posture change rather than a fix.
+
 ### 3. Dictionary Application
 
 **Crates:** `lune-voice`, `lune-dict`  
