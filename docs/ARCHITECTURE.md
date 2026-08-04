@@ -232,9 +232,8 @@ The desktop app does not scrape logs or poll for session state. It uses typed Ta
 | `subscribe_session_stream` / `detach_session_stream` | `main` | Live session event subscription |
 | `start_dictation` / `stop_dictation` / `cancel_dictation` / `toggle_dictation` | `main`, `pill` | Session control |
 | `load_pill_snapshot` | `pill` | Minimal state for the overlay |
-| `show_pill_window` / `hide_pill_window` / `reposition_pill_center` | `pill` | Overlay window control |
-| `begin_pill_drag` / `drag_pill_tick` / `end_pill_drag` / `nudge_pill` | `pill` | Drag and fine-position the overlay |
-| `save_pill_position` / `reset_pill_position` | `pill` | Persist a dragged position or clear it back to the anchor default |
+| `nudge_pill` / `save_pill_position` | `pill` | Drag the overlay and persist where it lands (webview pill only) |
+| `reset_pill_position` | `main` | Clear the saved position back to the anchor default |
 | `list_monitors` | `main` | Connected displays for the pill's monitor picker |
 | `gpu_backend_status` | `main` | Runtime GPU state: `unsupported`, `driver-missing`, `not-installed`, `ready`, `failed` |
 | `install_gpu_backend` | `main` | Downloads and verifies the CUDA plugin, streaming progress over a channel |
@@ -259,17 +258,24 @@ The stream uses a tagged enum serialized in camel case:
 
 The frontend store treats this stream as the source of truth for live runtime state. Workspace snapshots remain the source of truth for persisted data. When a completed session writes text, the backend emits `lune://history-changed`; the bridge reloads the snapshot once and updates history.
 
-### Pill Events
+### The Pill Overlay
 
-The pill receives targeted events so it can react without owning the main session channel:
+Two implementations, chosen at compile time, behind one interface in `pill.rs` — which owns the config, the saved position and the placement maths for both.
+
+- **Linux — native.** A bare `gtk::Window` with a 32-bit ARGB visual, drawn with cairo (`pill_native.rs` + `pill_paint.rs`). WebKitGTK's accelerated compositor loses the alpha channel on the Nvidia + GNOME stack, so a webview pill can only ever be a flat opaque rectangle; cairo draws through XRender and never enters that path. Not a Tauri window: every Tauri window carries a webview, and the pill needs none. tao *is* GTK3 on Linux and drives the one GTK main loop, so the window just joins it.
+- **Windows/macOS — webview.** A Tauri window rendering `pill.html` (`src/features/dictation/`), styled by the `.pill-*` rules in `components.css`.
+
+Both draw the same thing: a bar with a circular control at each end while listening — stop-and-transcribe on the left (top when vertical), discard on the right — and the level meter between them, each chip centred in the space between the bar's end and the meter. Outside a live session both caps are absent, and the bar itself starts a session. The two implementations are kept visually in step by hand; what is checked is the shared numbers. `pill_paint.rs` mirrors the theme's oklch tokens and the meter's geometry, and unit tests read `tokens.css`/`daisyui.css` and `dot-style.ts` back, failing if either side moves.
+
+State reaches the native pill by direct call (`pill::publish_status` / `publish_audio_level`), and the webview pill by targeted event, so it can react without owning the main session channel:
 
 | Event | Payload |
 |-------|---------| 
 | `lune://pill-state` | `"ready"`, `"listening"`, `"processing"`, or `"error"` |
 | `lune://audio-level` | Float in `[0, 1]` |
-| `lune://pill-settings` | Activation mode and pill visibility |
+| `lune://pill-settings` | `pillLocked` |
 
-Rust also shows or hides the pill directly on status changes to avoid a frontend roundtrip for the common start/stop path.
+Rust shows or hides the pill directly on status changes (`should_show_pill`) — the frontend never decides visibility, so the mapped window and its contents cannot desync.
 
 ### Sound Cues
 

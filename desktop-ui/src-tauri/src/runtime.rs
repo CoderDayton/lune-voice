@@ -664,10 +664,9 @@ impl AppRuntime {
                         runtime
                             .push_session_event(SessionStreamEvent::AudioLevel { level })
                             .await;
-                        // Send to pill overlay via targeted event (avoids needing
-                        // a second session stream subscription that would overwrite
-                        // the main window's channel)
-                        let _ = app.emit_to("pill", "lune://audio-level", level);
+                        // And into the pill overlay, which reads it separately
+                        // from the main window's session stream.
+                        crate::pill::publish_audio_level(&app, level);
                     }
                     SessionEvent::CommandDetected {
                         session_id: _,
@@ -766,14 +765,7 @@ impl AppRuntime {
             status: status.to_owned(),
         })
         .await;
-        // Notify the pill overlay window of the status change.
-        if let Err(e) = self
-            .inner
-            .app
-            .emit_to("pill", "lune://pill-state", status.to_owned())
-        {
-            tracing::debug!(error = %e, "pill state emit skipped (pill window may not exist)");
-        }
+        crate::pill::publish_status(&self.inner.app, status);
         // Pill visibility is decided entirely here — the single source of truth,
         // from the live status + the setting — then the window is mapped/unmapped
         // directly (bypassing the frontend IPC roundtrip for instant response).

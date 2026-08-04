@@ -94,14 +94,14 @@ describe("dotStyle", () => {
     // Regression guard: the dot-bounce animation beats inline styles in the
     // CSS cascade. If `animation: none` is dropped, the level-driven
     // transform never renders and the dots freeze in the idle loop.
-    const style = dotStyle(0.9, 2); // index 2 = centre bar, weight 1.0
+    const style = dotStyle(0.9, 3); // index 3 = centre bar, weight 1.0
     expect(style.animation).toBe("none");
     expect(style.transform).toBe(`scaleY(${1 + 0.9 * 1.0 * 2.0})`);
-    expect(style.opacity).toBeCloseTo(0.4 + 0.9 * 0.6, 5);
+    expect(style.opacity).toBeCloseTo(0.55 + 0.9 * 0.45, 5);
   });
 
   test("edge dots react less than the center dot", () => {
-    const center = dotStyle(1.0, 2);
+    const center = dotStyle(1.0, 3);
     const edge = dotStyle(1.0, 0);
     const scaleOf = (s: React.CSSProperties) =>
       Number(/scaleY\(([^)]+)\)/.exec(String(s.transform))?.[1]);
@@ -117,7 +117,7 @@ describe("dotStyle", () => {
   });
 
   test("zero level keeps the idle bounce (silence before first event)", () => {
-    const style = dotStyle(0, 1);
+    const style = dotStyle(0, 2);
     expect(style.animationDelay).toBe("110ms");
     expect(style.animation).toBeUndefined();
   });
@@ -128,7 +128,7 @@ describe("dotStyle", () => {
   test("idle delays are symmetric about the centre", () => {
     const delays = Array.from({ length: DOT_COUNT }, (_, i) => dotStyle(undefined, i).animationDelay);
     expect(delays).toEqual([...delays].reverse());
-    expect(delays).toEqual(["220ms", "110ms", "0ms", "0ms", "110ms", "220ms"]);
+    expect(delays).toEqual(["330ms", "220ms", "110ms", "0ms", "110ms", "220ms", "330ms"]);
   });
 
   test("idle delay grows with distance from the centre", () => {

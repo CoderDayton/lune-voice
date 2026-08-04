@@ -2,6 +2,7 @@ import { listen } from '@tauri-apps/api/event';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { backendClient } from '../../lib/backend/client';
 import { LevelSmoother } from './level-smoother';
+import { ModeGate } from './mode-gate';
 
 export type PillMode = 'idle' | 'active' | 'processing';
 
@@ -12,8 +13,6 @@ function modeFromStatus(status: string): PillMode {
 }
 
 interface PillSettings {
-  activationMode: string;
-  pillVisibility: string;
   pillLocked?: boolean;
 }
 
@@ -25,26 +24,28 @@ interface PillSettings {
  * `data-visible` opacity gate that could desync from the mapped window.
  *
  * This hook only tracks what to render inside the pill: the mode
- * (idle/active/processing), the recording mode (Toggle vs Hold, for the
- * buttons), and the smoothed audio level for the dots.
+ * (idle/active/processing), whether dragging is locked, and the smoothed audio
+ * level for the dots.
  */
 export function usePillState() {
   const [mode, setMode] = useState<PillMode>('idle');
-  const [recordingMode, setRecordingMode] = useState<'Toggle' | 'Hold'>('Toggle');
   const [locked, setLocked] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const smootherRef = useRef<LevelSmoother | null>(null);
   smootherRef.current ??= new LevelSmoother(setAudioLevel);
+  // Which mode is *rendered* — see ModeGate for why that isn't always the one
+  // the backend last published.
+  const gateRef = useRef<ModeGate | null>(null);
+  gateRef.current ??= new ModeGate(setMode);
 
-  // On mount: seed mode + recording mode from the current snapshot.
+  // On mount: seed mode + lock state from the current snapshot.
   useEffect(() => {
     let cancelled = false;
     backendClient.loadPillSnapshot().then(
       (snapshot) => {
         if (cancelled) return;
-        setRecordingMode(snapshot.activationMode);
         setLocked(snapshot.pillLocked);
-        setMode(modeFromStatus(snapshot.serviceStatus));
+        gateRef.current?.push(modeFromStatus(snapshot.serviceStatus));
       },
       (e) => {
         if (!cancelled) console.warn('[pill] snapshot load failed', e);
@@ -57,13 +58,10 @@ export function usePillState() {
 
   // Stable event handlers via useEffectEvent — no stale closure risk.
   const onPillState = useEffectEvent((status: string) => {
-    setMode(modeFromStatus(status));
+    gateRef.current?.push(modeFromStatus(status));
   });
 
   const onPillSettings = useEffectEvent((s: PillSettings) => {
-    if (s.activationMode === 'Toggle' || s.activationMode === 'Hold') {
-      setRecordingMode(s.activationMode);
-    }
     if (typeof s.pillLocked === 'boolean') {
       setLocked(s.pillLocked);
     }
@@ -99,8 +97,14 @@ export function usePillState() {
     }
   }, [mode]);
 
-  // Cancel a pending level frame on unmount.
-  useEffect(() => () => smootherRef.current?.cancelPending(), []);
+  // Cancel pending work on unmount.
+  useEffect(
+    () => () => {
+      smootherRef.current?.cancelPending();
+      gateRef.current?.cancelPending();
+    },
+    [],
+  );
 
-  return { mode, recordingMode, audioLevel, locked };
+  return { mode, audioLevel, locked };
 }

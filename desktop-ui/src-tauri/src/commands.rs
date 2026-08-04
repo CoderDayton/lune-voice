@@ -265,15 +265,12 @@ pub async fn save_workspace_settings(
             snapshot.settings.pill_visibility,
         ))
         .await;
-    // Notify pill of settings changes (activation mode, pill visibility)
+    // Notify the pill of the one setting it renders from. Everything else
+    // (geometry, placement, visibility) is applied to the window itself above.
     if let Err(e) = runtime.app_handle().emit_to(
         "pill",
         "lune://pill-settings",
-        serde_json::json!({
-            "activationMode": &snapshot.settings.activation_mode,
-            "pillVisibility": &snapshot.settings.pill_visibility,
-            "pillLocked": snapshot.settings.pill_locked,
-        }),
+        serde_json::json!({ "pillLocked": snapshot.settings.pill_locked }),
     ) {
         tracing::debug!(error = %e, "pill settings emit skipped (pill window may not exist)");
     }

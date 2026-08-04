@@ -191,14 +191,14 @@
 
 /* ── Dictation pill ────────────────────────────────────────────────── */
 
-/* Wide, short pill bar. The window is transparent so the rounded corners show
-   (an opaque window is a hard rectangle whose corner pixels would just be more
-   surface colour). The bar itself (.pill-root) is fully opaque and only the four
-   corner triangles are transparent — the combination that renders cleanly on
-   this Nvidia + WebKitGTK stack. Avoid soft shadows or a partially-transparent
-   fill: both ghost here. The window height follows this content's intrinsic
-   height (layer-shell can't force it smaller), so .pill-root's fixed height
-   mirrors PILL_H in pill.rs. */
+/* Wide, short pill bar — the webview pill (Windows/macOS). Linux draws the same
+   design natively with cairo; see pill_paint.rs, and keep the two in step.
+
+   The window is transparent so the rounded corners show (an opaque window is a
+   hard rectangle whose corner pixels would just be more surface colour), and
+   the window is exactly the bar's footprint: it is also the placement anchor,
+   so there is no room outside the bar for a drop shadow to fall into. Depth
+   comes from the bevel below instead. */
 html.pill-window,
 body.pill-window {
   background: transparent;
@@ -209,42 +209,33 @@ body.pill-window {
   /* Explicit footprint (not w-full) so the intrinsic content size the window
      follows is exactly the Rust-side PillOverlayConfig. The vars are set by
      pill-entry from the injected `__PILL_GEOM`; the fallbacks mirror the
-     Standard-horizontal default so the browser/mock still renders sanely.
-
-     `--pill-w` is the *window* width; the bar sits `--pill-gutter` short of it
-     on each horizontal side. Flush to the window edge, the border loses a pixel
-     or two on the left and right to fractional scaling and compositor edge
-     rounding, so the bar is narrower than its window rather than the window
-     being wider than the bar — growing the window would shift the pill relative
-     to its anchor. The height has no gutter; only the horizontal edges clip. */
-  width: calc(var(--pill-w, 168px) - 2 * var(--pill-gutter, 3px));
+     Standard-horizontal default so the browser/mock still renders sanely. */
+  width: var(--pill-w, 168px);
   height: var(--pill-h, 50px);
-  /* Lightened a touch past the base token (already the lightest solid
-     surface) so the bar reads distinct from panels behind it; mixed
-     toward white rather than swapped so it stays a no-op in light mode
-     (already pure white) and fully opaque (a translucent fill ghosts on
-     this Nvidia + WebKitGTK stack). */
-  /* Lifted further off the base surface than a panel would be: this floats
-     over arbitrary desktop content, much of it dark, and at 92% it read as a
-     hole rather than an object. Named so the hover/pressed fills can mix into
-     it instead of layering alpha over it. */
+  /* Lifted off the base surface (already the lightest solid one) so the bar
+     reads as an object rather than a hole: it floats over arbitrary desktop
+     content, much of it dark. Named so the interactive fills can tint it. */
   --pill-fill: color-mix(in oklab, var(--color-surface-elevated) 84%, white 16%);
   background: var(--pill-fill);
+  /* The overlay sits back a touch from whatever is behind it. On the whole
+     element, not the fill, so the bar, its border and its contents fade
+     together instead of showing through one another. Mirrors `WINDOW_ALPHA`
+     in pill_paint.rs. */
+  --pill-opacity: 0.975;
+  opacity: var(--pill-opacity);
   /* The stronger border token, not the panel one — the ring is what separates
      the bar from whatever is behind it, at 2px so it holds up against busy
      desktop content. */
   border: 2px solid var(--color-surface-border-strong);
   /* Bevel: lighter top edge, darker bottom edge, so the bar reads as a raised
-     object rather than a flat rectangle. Border colours rather than a shadow or
-     a gradient fill — soft shadows ghost on this stack and gradients are out by
-     design; a 1px border is the one translucent thing here that composites
-     cleanly (the base border is already one).
+     object rather than a flat rectangle. Border colours because CSS cannot put
+     a gradient on a border — the native pill draws this as a continuous
+     top-to-bottom gradient over the same base border.
 
      Mixed against `transparent`, not against white/black: the base border is
      itself translucent (8% white), so mixing toward an *opaque* colour raises
      the alpha to ~37% and the top edge renders as a bright line next to
-     near-invisible sides. These mixes set alpha directly, keeping the bevel in
-     the same register as the border it sits next to. */
+     near-invisible sides. */
   border-top-color: color-mix(in oklab, white 16%, transparent);
   border-bottom-color: color-mix(in oklab, black 20%, transparent);
   border-radius: var(--pill-r, 15px);
@@ -282,13 +273,6 @@ body.pill-window {
   border-color: color-mix(in oklab, var(--color-accent) 62%, transparent);
 }
 
-/* Brand mark — crescent in the primary accent, pinned to the left cap.
-   pointer-events off so the full-bleed surface below keeps the whole bar
-   clickable and draggable. */
-@utility pill-logo {
-  @apply pointer-events-none absolute inset-y-0 left-0 flex w-10 items-center justify-center text-primary;
-}
-
 /* Idle "ready" mark — a short bar in a dim primary with a slow breathe, so
    idle → listening reads as the same accent hue waking up. Starts the breathe
    at full opacity so the entrance animation hands off without a jump. */
@@ -318,19 +302,14 @@ button.pill-surface {
   cursor: inherit;
 }
 
-/* Interactive fills are mixed into the bar's own colour, not layered as a
-   translucent tint over it. A `color-mix(primary N%, transparent)` fill depends
-   on the compositor blending its alpha, and this stack drops the alpha of a
-   promoted layer — a 12% tint then paints as solid violet and the whole pill
-   goes pink on hover. Mixing to an opaque colour cannot fail that way. */
 button.pill-surface:hover {
-  background: color-mix(in oklab, var(--pill-fill) 88%, var(--color-primary) 12%);
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
 }
 
-/* Pressed: deepen the same mix rather than move the bar — a transform here
+/* Pressed: deepen the same tint rather than move the bar — a transform here
    would fight the drag handler's positioning. */
 button.pill-surface:active {
-  background: color-mix(in oklab, var(--pill-fill) 78%, var(--color-primary) 22%);
+  background: color-mix(in oklab, var(--color-primary) 22%, transparent);
 }
 
 /* No :focus-visible ring on the pill's controls. The surface deliberately
@@ -339,86 +318,124 @@ button.pill-surface:active {
    focus-visible — a ring here appears on ordinary use and reads as a stuck
    hover state. Keyboard operation lives in the main window. */
 
-/* Discard control — kept out of the resting layout and revealed on hover so the
-   bar stays a clean waveform until the user reaches for it. */
-@utility pill-cancel {
-  @apply absolute inset-y-0 right-0 flex w-9 items-center justify-center border-0 bg-transparent text-base-content/55;
-  border-radius: 0 var(--pill-r, 15px) var(--pill-r, 15px) 0;
-  opacity: 0;
-  transform: translateX(4px);
+/* The two end controls. Both are always present while listening rather than
+   revealed on hover: an action you can't see you can't plan, and the discard is
+   the one the user most needs to know is there before they start speaking.
+
+   Each is a circular chip, not a full-height region, so it reads as a button.
+   Its centre sits halfway between the bar's inner edge and the level meter —
+   derived rather than fixed, so it stays centred at any pill width. The hit box
+   runs from the bar's end to the chip's far side, which makes the rounded end
+   part of the target instead of a dead margin. Mirrors `cap_inset` /
+   `cap_reach` / `CHIP` in pill_paint.rs. */
+@utility pill-cap {
+  @apply absolute inset-y-0 flex items-center border-0 bg-transparent p-0;
+  /* The meter's own width: DOT_COUNT bars and the gaps between them, from
+     dot-style.ts and `audio-dots` below. */
+  --pill-band: calc(7 * 6px + 6 * 4px);
+  --pill-chip-size: 28px;
+  /* Free space between this end and the meter, then half of it — measured from
+     the padding box, which is where an absolutely positioned child starts. */
+  --pill-cap-gap: calc((var(--pill-w, 168px) - var(--pill-band)) / 2 - 2px);
+  width: calc(var(--pill-cap-gap) / 2 + var(--pill-chip-size) / 2);
   cursor: pointer;
-  transition: opacity 160ms var(--ease-standard), transform 160ms var(--ease-standard),
-              color 160ms var(--ease-standard), background-color 160ms var(--ease-standard);
+  animation: pill-content-in 180ms var(--ease-standard);
 }
 
-.pill-root:hover .pill-cancel,
-.pill-cancel:focus-visible {
-  opacity: 1;
-  transform: translateX(0);
+.pill-cap::before {
+  content: '';
+  position: absolute;
+  width: var(--pill-chip-size);
+  height: var(--pill-chip-size);
+  border-radius: 9999px;
+  background: var(--pill-chip);
+  transition: background-color 160ms var(--ease-standard);
 }
 
-.pill-cancel:hover {
-  @apply text-error;
-  /* Opaque mix, for the same reason as the surface fills above. */
-  background: color-mix(in oklab, var(--pill-fill) 84%, var(--color-error) 16%);
+.pill-cap > svg {
+  position: relative;
 }
 
+/* Sunk below the bar, so the destructive control reads as a hole in it. */
+.pill-cap-discard {
+  @apply right-0 justify-start text-base-content/75;
+  --pill-chip: color-mix(in oklab, var(--pill-fill) 50%, black);
+}
+
+.pill-cap-discard:hover {
+  @apply text-error-content;
+  --pill-chip: var(--color-error);
+}
+
+/* Raised to the full accent, so the confirming control reads as the one thing
+   to press. One chip below the bar and one above it is the contrast the two are
+   told apart by, before either icon is read. */
+.pill-cap-accept {
+  @apply left-0 justify-end text-primary-content;
+  --pill-chip: var(--color-primary);
+}
+
+.pill-cap-accept:hover {
+  --pill-chip: color-mix(in oklab, var(--color-primary) 82%, white);
+}
+
+/* Starts from `--pill-opacity`, not from 1: the animation beats the base rule
+   in the cascade, so hard-coding 1 here would flash the pill *brighter* than it
+   rests before discarding it. */
 @keyframes pill-cancel-flash {
-  0%   { opacity: 1; }
-  40%  { opacity: 0.5; }
+  0%   { opacity: var(--pill-opacity); }
+  40%  { opacity: calc(var(--pill-opacity) * 0.5); }
   100% { opacity: 0; transform: translateY(3px) scale(0.98); }
 }
 
 /* ── Vertical pill variant ─────────────────────────────────────────────
    `.pill-vertical` is set on <html> by pill-entry when the window is taller
    than wide. The bar keeps its horizontal internals and re-arranges the caps:
-   logo moves to the top cap, cancel to the bottom cap, and the status content
+   accept moves to the top cap, discard to the bottom, and the status content
    (idle mark / waveform / pulse) rotates 90° — `rotate` composes with the
    content animations' `transform`s instead of fighting them. */
-.pill-vertical .pill-logo {
-  inset: 0 0 auto 0;
-  width: 100%;
-  height: 40px;
-}
-
 .pill-vertical .pill-surface > :first-child {
   rotate: 90deg;
 }
 
-.pill-vertical .pill-cancel {
-  inset: auto 0 0 0;
+.pill-vertical .pill-cap {
+  inset: auto 0 auto 0;
+  --pill-cap-gap: calc((var(--pill-h, 168px) - var(--pill-band)) / 2 - 2px);
   width: 100%;
-  height: 36px;
-  border-radius: 0 0 var(--pill-r, 15px) var(--pill-r, 15px);
-  transform: translateY(4px);
+  height: calc(var(--pill-cap-gap) / 2 + var(--pill-chip-size) / 2);
+  flex-direction: column;
 }
 
-.pill-vertical .pill-root:hover .pill-cancel,
-.pill-vertical .pill-cancel:focus-visible {
-  transform: translateY(0);
+.pill-vertical .pill-cap-discard {
+  bottom: 0;
 }
 
-/* Gentle entrance when the pill's content swaps between states. Runs on inner
-   content over the opaque bar (not the transparent window), so it composites
-   normally and doesn't ghost. */
+.pill-vertical .pill-cap-accept {
+  top: 0;
+}
+
+/* Gentle entrance when the pill's content swaps between states. */
 @keyframes pill-content-in {
   from { opacity: 0; transform: scale(0.92); }
   to   { opacity: 1; transform: scale(1); }
 }
 
+/* Bar width taken from the brand mark (`lune-mark.svg`'s bars are 6 wide), so
+   the meter and the logo read as one visual language. The mark's 3-unit gap is
+   too tight at this height — the bars merge into a blob — so it opens to 4. */
 @utility audio-dots {
-  @apply flex h-full items-center justify-center gap-[6px];
+  @apply flex h-full items-center justify-center gap-[4px];
   animation: pill-content-in 180ms var(--ease-standard);
 }
 
 @utility audio-dot {
-  @apply block w-[5px] rounded-full bg-primary;
+  @apply block w-[6px] rounded-full bg-primary;
+  /* Per-bar resting height comes inline from `dotStyle`, which tapers it by the
+     bar's weight; this is only the fallback for a bar rendered without one. */
   height: 11px;
   transform-origin: center;
   animation: pill-dot-bounce 1.2s ease-in-out infinite;
   transition: transform 60ms ease-out, opacity 60ms ease-out;
-  /* Own compositing layer: WebKitGTK otherwise repaints the whole overlay
-     window for every bar transform change. */
   will-change: transform, opacity;
 }
 
@@ -436,16 +453,19 @@ button.pill-surface:active {
   animation: pill-pulse-beat 1.3s ease-in-out infinite;
 }
 
-/* Pill-local keyframes — transform/opacity only, running on content over the
-   opaque bar, so they composite cleanly on the Nvidia + WebKitGTK stack. */
+/* Pill-local keyframes — transform/opacity only, so they stay off the paint
+   path. */
 @keyframes pill-idle-breathe {
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.55; }
 }
 
+/* One opacity ramp for the whole band, floor shared with the processing pulse:
+   the live level drives the same 0.55 → 1 range, so the two don't step against
+   each other the moment the first level arrives. */
 @keyframes pill-dot-bounce {
-  0%, 80%, 100% { transform: scaleY(1); opacity: 0.35; }
-  40%           { transform: scaleY(2.1); opacity: 0.95; }
+  0%, 80%, 100% { transform: scaleY(1); opacity: 0.55; }
+  40%           { transform: scaleY(2.1); opacity: 1; }
 }
 
 @keyframes pill-pulse-beat {

@@ -2,7 +2,7 @@ import { useLingui } from '@lingui/react/macro';
 import { useCallback, useRef } from 'react';
 import { backendClient } from '../../lib/backend/client';
 import { AudioDots } from './audio-dots';
-import { MoonIcon, PulseIndicator, XIcon } from './pill-icons';
+import { ArrowUpIcon, PulseIndicator, XIcon } from './pill-icons';
 import { usePillDrag } from './use-pill-drag';
 import { usePillState } from './use-pill-state';
 
@@ -74,15 +74,22 @@ export function DictationPill() {
   // `pill-<mode>` drives the accent ring in CSS, so "listening" and
   // "finalising" are readable from the bar's edge, not just its contents.
   const rootClass = `pill-root pill-${mode}${cancelRef.current ? ' pill-cancelled' : ''}${locked ? ' pill-locked' : ''}`;
-  const showCancel = !isIdle && !isProcessing;
+  // Both end controls exist only while listening: idle has nothing to discard
+  // or accept, and processing can't be interrupted mid-finalise.
+  const showCaps = !isIdle && !isProcessing;
 
   return (
     <div className={rootClass} {...dragHandlers}>
-      {/* Decorative brand mark on the left cap; pointer-events off in CSS so the
-          full-bleed surface below keeps the whole bar clickable/draggable. */}
-      <span className="pill-logo" aria-hidden="true">
-        <MoonIcon />
-      </span>
+      {showCaps && (
+        <button
+          type="button"
+          className="pill-cap pill-cap-accept"
+          onClick={handleSurface}
+          aria-label={t`Stop and transcribe`}
+        >
+          <ArrowUpIcon />
+        </button>
+      )}
 
       {isButton ? (
         <button
@@ -99,12 +106,12 @@ export function DictationPill() {
         </div>
       )}
 
-      {showCancel && (
+      {showCaps && (
         <button
           type="button"
-          className="pill-cancel"
+          className="pill-cap pill-cap-discard"
           onClick={handleCancel}
-          aria-label={t`Cancel dictation`}
+          aria-label={t`Discard dictation`}
         >
           <XIcon />
         </button>

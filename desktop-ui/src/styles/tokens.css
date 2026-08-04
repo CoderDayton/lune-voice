@@ -28,7 +28,7 @@
   /* Recessed band — darker than panel (0.16), lighter than inset (0.10). */
   --surface-recessed: oklch(0.13 0 0);
   --ring-focus: oklch(0.74 0.14 295 / 0.50);
-  --surface-success-tint: oklch(0.72 0.14 148 / 0.14);
+  --surface-success-tint: oklch(0.72 0.14 165 / 0.14);
   --surface-warning-tint: oklch(0.80 0.13 72 / 0.14);
   --surface-error-tint: oklch(0.66 0.18 22 / 0.16);
   --surface-info-tint: oklch(0.72 0.13 232 / 0.14);
@@ -87,7 +87,7 @@
   --surface-inset: oklch(0.94 0 0);
   --surface-recessed: oklch(0.965 0 0);
   --ring-focus: oklch(0.50 0.18 295 / 0.40);
-  --surface-success-tint: oklch(0.55 0.16 148 / 0.10);
+  --surface-success-tint: oklch(0.55 0.16 165 / 0.10);
   --surface-warning-tint: oklch(0.72 0.16 72 / 0.12);
   --surface-error-tint: oklch(0.56 0.22 22 / 0.10);
   --surface-info-tint: oklch(0.55 0.16 232 / 0.10);

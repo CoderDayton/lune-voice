@@ -6,6 +6,10 @@ mod hotkey_linux;
 mod notification_tests;
 mod persistence;
 mod pill;
+#[cfg(target_os = "linux")]
+mod pill_native;
+#[cfg(target_os = "linux")]
+mod pill_paint;
 mod runtime;
 #[cfg(test)]
 mod tauri_integration_tests;
@@ -563,13 +567,7 @@ pub fn run() {
             commands::stop_dictation,
             commands::cancel_dictation,
             commands::toggle_dictation,
-            pill::show_pill_window,
-            pill::hide_pill_window,
-            pill::reposition_pill_center,
             pill::nudge_pill,
-            pill::begin_pill_drag,
-            pill::drag_pill_tick,
-            pill::end_pill_drag,
             pill::save_pill_position,
             pill::reset_pill_position,
             pill::list_monitors,

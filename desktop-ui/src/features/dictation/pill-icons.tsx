@@ -11,7 +11,7 @@ function PillSvg({ className = 'size-5', children }: IconProps & { children: Rea
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={2}
+      strokeWidth={2.4}
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
@@ -23,47 +23,23 @@ function PillSvg({ className = 'size-5', children }: IconProps & { children: Rea
   );
 }
 
-export function MicIcon({ className }: IconProps = {}) {
-  return (
-    <PillSvg className={className ?? 'size-5'}>
-      <rect x="9" y="2" width="6" height="11" rx="3" />
-      <path d="M5 10v1a7 7 0 0 0 14 0v-1" />
-      <line x1="12" y1="18" x2="12" y2="22" />
-      <line x1="9" y1="22" x2="15" y2="22" />
-    </PillSvg>
-  );
-}
-
-/** Brand mark — a filled crescent (Lune). Solid fill so it reads as a logo at
- *  16px, where the stroke icons above would look wiry. */
-export function MoonIcon({ className }: IconProps = {}) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      className={className ?? 'size-5'}
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path d="M12 3a6.364 6.364 0 0 0 9 9 9 9 0 1 1-9-9Z" />
-    </svg>
-  );
-}
-
+/** Discard. */
 export function XIcon({ className }: IconProps = {}) {
   return (
-    <PillSvg className={className ?? 'size-[18px]'}>
+    <PillSvg className={className ?? 'size-[15px]'}>
       <line x1="18" y1="6" x2="6" y2="18" />
       <line x1="6" y1="6" x2="18" y2="18" />
     </PillSvg>
   );
 }
 
-export function StopIcon({ className }: IconProps = {}) {
+/** Accept — stop and transcribe. An arrow rather than a tick: the utterance is
+ *  being sent somewhere (the focused app), not merely approved. */
+export function ArrowUpIcon({ className }: IconProps = {}) {
   return (
-    <PillSvg className={className ?? 'size-4'}>
-      <rect x="6" y="6" width="12" height="12" rx="1" />
+    <PillSvg className={className ?? 'size-[15px]'}>
+      <line x1="12" y1="19" x2="12" y2="5" />
+      <polyline points="5 12 12 5 19 12" />
     </PillSvg>
   );
 }

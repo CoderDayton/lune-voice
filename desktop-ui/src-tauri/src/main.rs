@@ -19,47 +19,14 @@ fn harden_file_permissions() {
 #[cfg(not(unix))]
 fn harden_file_permissions() {}
 
-/// WebKitGTK variables that restore correct alpha compositing for the pill
-/// overlay.
-///
-/// On the Nvidia proprietary driver the accelerated compositing path drops the
-/// alpha channel: a transparent window paints correctly for the first
-/// (software) frame and is then replaced by an opaque surface, and translucent
-/// fills ghost or pick up a colour cast from a channel-order mismatch. Measured
-/// on WebKitGTK 2.52 / Wayland / driver 595: neither variable alone is enough —
-/// `COMPOSITING_MODE` leaves interactive fills painting opaque, and
-/// `DMABUF_RENDERER` alone does not restore window alpha. Together the overlay
-/// composites correctly.
-///
-/// The cost is that CSS animation and compositing run on the CPU app-wide. That
-/// is negligible for the pill; if the main window's animations ever suffer, the
-/// alternative is giving the pill its own process with these set only there.
-///
-/// An explicit value from the environment always wins, so this can be overridden
-/// (or re-enabled) from the launcher without touching the binary.
-#[cfg(target_os = "linux")]
-fn configure_webkit_rendering() {
-    const WEBKIT_RENDERING_VARS: [(&str, &str); 2] = [
-        ("WEBKIT_DISABLE_COMPOSITING_MODE", "1"),
-        ("WEBKIT_DISABLE_DMABUF_RENDERER", "1"),
-    ];
-    for (key, value) in WEBKIT_RENDERING_VARS {
-        if std::env::var_os(key).is_none() {
-            // SAFETY: `set_var` is unsound only with concurrent env access. This
-            // is the first statement in `main`, before the tokio runtime, GTK,
-            // or the webview exist, so the process is still single-threaded.
-            unsafe { std::env::set_var(key, value) };
-        }
-    }
-}
-
-#[cfg(not(target_os = "linux"))]
-fn configure_webkit_rendering() {}
-
 fn main() {
-    // Must precede every other initialisation: WebKitGTK reads these when GTK
-    // starts up, so setting them later has no effect.
-    configure_webkit_rendering();
+    // No WebKitGTK rendering overrides. `WEBKIT_DISABLE_DMABUF_RENDERER` +
+    // `__NV_DISABLE_EXPLICIT_SYNC` used to be set here to coax an alpha channel
+    // out of the pill overlay's webview on the Nvidia driver; they cost the
+    // whole app its GPU compositing and still left the pill repainting in stale
+    // bands. The pill is drawn natively with cairo on Linux now
+    // (`pill_native.rs`), and the main window is fully opaque and never needed
+    // either flag.
     harden_file_permissions();
     tracing_subscriber::fmt()
         .with_env_filter(

@@ -93,11 +93,6 @@ export interface BackendClient {
   toggleDictation(): Promise<string | null>;
   /** Move the pill overlay by a drag delta (logical px). */
   nudgePill(dx: number, dy: number): Promise<void>;
-  /** Start a cursor-pinned drag; false = platform can't track the pointer
-   *  natively and the caller should fall back to incremental nudges. */
-  beginPillDrag(dx: number, dy: number): Promise<boolean>;
-  dragPillTick(): Promise<void>;
-  endPillDrag(): Promise<void>;
   /** Persist the pill overlay's current position so it reopens there. */
   savePillPosition(): Promise<void>;
   /** Clear the saved pill position and re-place it at its default anchor. */

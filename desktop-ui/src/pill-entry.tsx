@@ -18,7 +18,7 @@ function PillApp() {
  *  paint. Absent in the browser/mock — the CSS defaults apply. */
 declare global {
   interface Window {
-    __PILL_GEOM?: { w: number; h: number; r: number; g: number; vertical: boolean };
+    __PILL_GEOM?: { w: number; h: number; r: number; vertical: boolean };
   }
 }
 
@@ -28,12 +28,9 @@ function applyPillGeometry() {
   const geom = window.__PILL_GEOM;
   if (!geom) return;
   const rootStyle = document.documentElement.style;
-  // `w`/`h` are the *window*; the bar insets itself by `g` per horizontal side
-  // so compositor edge rounding can't clip its border (see PILL_EDGE_GUTTER).
   rootStyle.setProperty('--pill-w', `${geom.w}px`);
   rootStyle.setProperty('--pill-h', `${geom.h}px`);
   rootStyle.setProperty('--pill-r', `${geom.r}px`);
-  rootStyle.setProperty('--pill-gutter', `${geom.g ?? 0}px`);
   if (geom.vertical) document.documentElement.classList.add('pill-vertical');
 }
 

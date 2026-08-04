@@ -39,3 +39,6 @@ confusion_bank.json
 
 # GPU backend plugin tarballs built by `cgs gpu-plugin` (hundreds of MB)
 /release-artifacts/
+
+# Working implementation plans — intent, drafted per-session, not shared history
+/docs/plans/
