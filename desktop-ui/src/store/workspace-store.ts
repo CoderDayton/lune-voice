@@ -219,24 +219,36 @@ export async function loadWorkspaceSnapshot() {
   }
 }
 
+// Shared sequence for every settings save, single-key or patch. Saves persist
+// the *whole* settings object and hydrate from the response, so an older
+// in-flight save resolving last would overwrite a newer change with a snapshot
+// taken before it — and the next save would then re-persist that stale value.
+// Same guard as `_historyReqSeq`: only the newest save may hydrate.
+let _settingsSaveSeq = 0;
+
 export async function saveWorkspaceSetting<Key extends keyof WorkspaceSettings>(
   key: Key,
   value: WorkspaceSettings[Key],
 ): Promise<boolean> {
   const previousSettings = workspaceStore.state.settings;
   workspaceActions.updateSetting(key, value);
+  const seq = ++_settingsSaveSeq;
   try {
     const snapshot = await backendClient.saveWorkspaceSettings(
       settingsToSaveInput(workspaceStore.state.settings),
     );
+    if (seq !== _settingsSaveSeq) return true;
     workspaceActions.hydrate(snapshot);
     return true;
   } catch (error) {
+    if (seq !== _settingsSaveSeq) return false;
     try {
       const snapshot = await backendClient.loadWorkspaceSnapshot();
+      if (seq !== _settingsSaveSeq) return false;
       workspaceActions.hydrate(snapshot);
     } catch (reloadError) {
       console.warn('[workspace] failed to reload snapshot after save failure', reloadError);
+      if (seq !== _settingsSaveSeq) return false;
       workspaceStore.setState((s) => ({ ...s, settings: previousSettings }));
     }
     workspaceActions.setError(formatError(error));
@@ -244,26 +256,31 @@ export async function saveWorkspaceSetting<Key extends keyof WorkspaceSettings>(
   }
 }
 
-/// Update several settings and persist them in a single save. Used when two
-/// fields must move together (e.g. the styling switch sets both the style
-/// preset and the LLM backend) so they never land in the store desynced.
+// Update several settings and persist them in a single save. Used when two
+// fields must move together (e.g. the styling switch sets both the style
+// preset and the LLM backend) so they never land in the store desynced.
 export async function saveWorkspaceSettings(patch: Partial<WorkspaceSettings>): Promise<boolean> {
   const previousSettings = workspaceStore.state.settings;
   for (const [key, value] of Object.entries(patch)) {
     workspaceActions.updateSetting(key as keyof WorkspaceSettings, value as never);
   }
+  const seq = ++_settingsSaveSeq;
   try {
     const snapshot = await backendClient.saveWorkspaceSettings(
       settingsToSaveInput(workspaceStore.state.settings),
     );
+    if (seq !== _settingsSaveSeq) return true;
     workspaceActions.hydrate(snapshot);
     return true;
   } catch (error) {
+    if (seq !== _settingsSaveSeq) return false;
     try {
       const snapshot = await backendClient.loadWorkspaceSnapshot();
+      if (seq !== _settingsSaveSeq) return false;
       workspaceActions.hydrate(snapshot);
     } catch (reloadError) {
       console.warn('[workspace] failed to reload snapshot after save failure', reloadError);
+      if (seq !== _settingsSaveSeq) return false;
       workspaceStore.setState((s) => ({ ...s, settings: previousSettings }));
     }
     workspaceActions.setError(formatError(error));

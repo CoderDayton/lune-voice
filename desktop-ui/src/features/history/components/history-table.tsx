@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ConfirmDialog } from '../../../components/feedback/confirm-dialog';
+import { formatBackend } from '../../../store/workspace-mappers';
 import {
   fetchHistoryPage,
   getHistoryServerPageCount,
@@ -21,13 +22,6 @@ import {
   workspaceActions,
   workspaceStore,
 } from '../../../store/workspace-store';
-
-function formatBackend(backend: string): string {
-  if (backend.includes('WhisperCpp')) return 'Whisper';
-  // "API", not "Cloud" — the endpoint may have been a server on this machine.
-  if (backend.includes('OpenAi')) return 'API';
-  return backend;
-}
 
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);

@@ -37,6 +37,9 @@ rustfft.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 base64 = "0.22"
+# Already in the tree via reqwest; declared directly so the retry loop can
+# clone the encoded WAV as an Arc bump instead of a multi-MB deep copy.
+bytes = "1"
 reqwest.workspace = true
 url.workspace = true
 

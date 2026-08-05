@@ -242,6 +242,19 @@ fn notify_update_available<R: tauri::Runtime>(
 /// falls back to the bare `linux-x86_64` key — exactly the per-format scheme
 /// `scripts/release/updater-manifest.sh` publishes, but without losing the
 /// fallback that pinning an explicit target would remove.
+/// Show a message dialog without parking a Tokio worker.
+///
+/// `blocking_show()` blocks its calling thread until the dialog is dismissed —
+/// arbitrarily long for the install prompt. `run_update_check` always runs
+/// inside `tauri::async_runtime::spawn(...)`, so the raw call held a runtime
+/// worker for the whole interaction. Mirrors `commands::export_transcript`'s
+/// wrap of `blocking_save_file()`.
+async fn show_dialog(dialog: tauri_plugin_dialog::MessageDialogBuilder<tauri::Wry>) -> bool {
+    tauri::async_runtime::spawn_blocking(move || dialog.blocking_show())
+        .await
+        .unwrap_or(false)
+}
+
 async fn run_update_check(app: &tauri::AppHandle, mode: CheckMode) {
     use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
     use tauri_plugin_updater::UpdaterExt;
@@ -271,13 +284,15 @@ async fn run_update_check(app: &tauri::AppHandle, mode: CheckMode) {
             }
             Err(e) => {
                 tracing::error!(error = %e, %endpoint, "endpoint override refused");
-                app.dialog()
-                    .message(format!(
-                        "LUNE_UPDATER_ENDPOINT is not a usable update endpoint.\n\n{endpoint}\n\n{e}"
-                    ))
-                    .title("Update check failed")
-                    .kind(MessageDialogKind::Error)
-                    .blocking_show();
+                show_dialog(
+                    app.dialog()
+                        .message(format!(
+                            "LUNE_UPDATER_ENDPOINT is not a usable update endpoint.\n\n{endpoint}\n\n{e}"
+                        ))
+                        .title("Update check failed")
+                        .kind(MessageDialogKind::Error),
+                )
+                .await;
                 return;
             }
         }
@@ -291,11 +306,13 @@ async fn run_update_check(app: &tauri::AppHandle, mode: CheckMode) {
         Ok(Some(update)) => update,
         Ok(None) => {
             if mode.reports_non_events() {
-                app.dialog()
-                    .message(format!("Lune Voice {current} is the latest version."))
-                    .title("No updates available")
-                    .kind(MessageDialogKind::Info)
-                    .blocking_show();
+                show_dialog(
+                    app.dialog()
+                        .message(format!("Lune Voice {current} is the latest version."))
+                        .title("No updates available")
+                        .kind(MessageDialogKind::Info),
+                )
+                .await;
             }
             return;
         }
@@ -304,11 +321,13 @@ async fn run_update_check(app: &tauri::AppHandle, mode: CheckMode) {
             // A launch check runs before anyone has asked for anything, and
             // "no network yet" is the normal case a second after login.
             if mode.reports_non_events() {
-                app.dialog()
-                    .message(format!("Could not check for updates.\n\n{e}"))
-                    .title("Update check failed")
-                    .kind(MessageDialogKind::Error)
-                    .blocking_show();
+                show_dialog(
+                    app.dialog()
+                        .message(format!("Could not check for updates.\n\n{e}"))
+                        .title("Update check failed")
+                        .kind(MessageDialogKind::Error),
+                )
+                .await;
             }
             return;
         }
@@ -326,18 +345,19 @@ async fn run_update_check(app: &tauri::AppHandle, mode: CheckMode) {
         return;
     }
 
-    let install = app
-        .dialog()
-        .message(format!(
-            "Lune Voice {version} is available. You have {current}.\n\n\
-             Installing replaces the app and restarts it."
-        ))
-        .title("Update available")
-        .buttons(MessageDialogButtons::OkCancelCustom(
-            "Install and restart".into(),
-            "Later".into(),
-        ))
-        .blocking_show();
+    let install = show_dialog(
+        app.dialog()
+            .message(format!(
+                "Lune Voice {version} is available. You have {current}.\n\n\
+                 Installing replaces the app and restarts it."
+            ))
+            .title("Update available")
+            .buttons(MessageDialogButtons::OkCancelCustom(
+                "Install and restart".into(),
+                "Later".into(),
+            )),
+    )
+    .await;
 
     if !install {
         return;
@@ -350,11 +370,13 @@ async fn run_update_check(app: &tauri::AppHandle, mode: CheckMode) {
         }
         Err(e) => {
             tracing::error!(error = %e, %version, "update install failed");
-            app.dialog()
-                .message(format!("Could not install {version}.\n\n{e}"))
-                .title("Update failed")
-                .kind(MessageDialogKind::Error)
-                .blocking_show();
+            show_dialog(
+                app.dialog()
+                    .message(format!("Could not install {version}.\n\n{e}"))
+                    .title("Update failed")
+                    .kind(MessageDialogKind::Error),
+            )
+            .await;
         }
     }
 }

@@ -387,6 +387,12 @@ impl LexicalGate {
         for m in locate_multi_word_dict_matches(&words, dict_replacements) {
             phrase_matches.insert(m.start, m);
         }
+        // Matches at *different* start indices can still overlap ("new york" at
+        // 3 and "york times" at 4). The consumption loop below jumps past a
+        // consumed window, so the later entry would be silently skipped.
+        // Resolve it explicitly instead: earliest start wins, longest match
+        // breaks a tie.
+        prune_overlapping_phrase_matches(&mut phrase_matches);
         // Estimate output capacity: input length plus a small slack for
         // expansions (e.g. "im" → "I'm"). Slightly oversize beats reallocs.
         let approx_cap = text.len() + words.len() * 2 + 8;
@@ -414,13 +420,9 @@ impl LexicalGate {
                     let replacement = softened.as_deref().unwrap_or(&pm.replacement);
                     let first = words[i];
                     let last = words[i + pm.len - 1];
-                    let prefix = &first[..first.len()
-                        - first
-                            .trim_start_matches(|c: char| c.is_ascii_punctuation())
-                            .len()];
-                    let suffix = &last[last
-                        .trim_end_matches(|c: char| c.is_ascii_punctuation())
-                        .len()..];
+                    let prefix =
+                        &first[..first.len() - first.trim_start_matches(is_edge_punct).len()];
+                    let suffix = &last[last.trim_end_matches(is_edge_punct).len()..];
                     corrected_text.push_str(prefix);
                     corrected_text.push_str(replacement);
                     corrected_text.push_str(suffix);
@@ -541,7 +543,10 @@ pub(crate) fn split_internal_punctuation(word: &str) -> (&str, Vec<(&str, &str)>
         if c.is_alphanumeric() {
             return true;
         }
-        (c == '\'' || c == '-')
+        // U+2019 alongside the ASCII apostrophe: whisper and styling LLMs
+        // routinely emit the typographic form, and without it "don’t" split
+        // into "don"/"t" and each half was looked up as its own word.
+        (c == '\'' || c == '\u{2019}' || c == '-')
             && idx > 0
             && idx + 1 < n
             && chars[idx - 1].1.is_alphanumeric()
@@ -574,9 +579,40 @@ pub(crate) fn split_internal_punctuation(word: &str) -> (&str, Vec<(&str, &str)>
     (leading, spans)
 }
 
+/// Trim edge punctuation so the bare word can be used as a dictionary/vocab
+/// lookup key. Deliberately Unicode-wide, not `is_ascii_punctuation`: trimming
+/// stopped at the first non-ASCII char, so a typographic-quoted `“github”`
+/// never matched a `github` entry and passed through uncorrected.
 pub(crate) fn strip_punctuation(word: &str) -> &str {
-    let s = word.trim_start_matches(|c: char| c.is_ascii_punctuation());
-    s.trim_end_matches(|c: char| c.is_ascii_punctuation())
+    let s = word.trim_start_matches(is_edge_punct);
+    s.trim_end_matches(is_edge_punct)
+}
+
+/// Non-ASCII characters that wrap or terminate a word in transcript text —
+/// typographic quotes, guillemets, dashes and ellipsis. Whisper emits these
+/// routinely for quoted or read-aloud speech.
+const UNICODE_EDGE_PUNCT: &[char] = &[
+    '\u{2018}', '\u{2019}', // ‘ ’
+    '\u{201c}', '\u{201d}', // “ ”
+    '\u{201a}', '\u{201e}', // ‚ „
+    '\u{ab}', '\u{bb}', // « »
+    '\u{2039}', '\u{203a}', // ‹ ›
+    '\u{2013}', '\u{2014}', '\u{2015}', // – — ―
+    '\u{2026}', // …
+    '\u{00bf}', '\u{00a1}', // ¿ ¡
+];
+
+/// Edge punctuation for lookup-key purposes. Shared by `strip_punctuation` and
+/// every prefix/suffix reconstruction so what gets trimmed is always what gets
+/// put back — an ASCII-only predicate left curly quotes attached to the key,
+/// and `github` never matched `“github”`.
+///
+/// Deliberately an explicit list rather than "not alphanumeric": `char`'s
+/// alphanumeric test excludes combining marks, so the general predicate would
+/// trim the vowel signs off Devanagari, Thai and Arabic words and truncate
+/// their lookup keys.
+fn is_edge_punct(c: char) -> bool {
+    c.is_ascii_punctuation() || UNICODE_EDGE_PUNCT.contains(&c)
 }
 
 /// Aligned positions plus a count of risk entries that could not be matched
@@ -628,6 +664,30 @@ fn locate_multi_word_dict_matches(
     out
 }
 
+/// Drop any phrase match whose word window overlaps an earlier-starting
+/// surviving match, so overlap resolution is an explicit rule rather than a
+/// side effect of which start index the consumption loop happens to land on.
+/// Earliest start wins — the map is keyed by start, so starts are unique and
+/// no tie-break is possible or needed. This mirrors the consumption loop,
+/// which scans left to right and jumps past each window it applies.
+fn prune_overlapping_phrase_matches(phrase_matches: &mut HashMap<usize, PhraseMatch>) {
+    if phrase_matches.len() < 2 {
+        return;
+    }
+    let mut starts: Vec<usize> = phrase_matches.keys().copied().collect();
+    starts.sort_unstable();
+
+    let mut consumed_until = 0usize;
+    for start in starts {
+        let len = phrase_matches[&start].len;
+        if start < consumed_until {
+            phrase_matches.remove(&start);
+        } else {
+            consumed_until = start + len;
+        }
+    }
+}
+
 fn align_word_risk_positions<S: AsRef<str>>(
     words: &[&str],
     word_risk_scores: &[(S, f32, f32)],
@@ -664,13 +724,8 @@ fn align_word_risk_positions<S: AsRef<str>>(
 }
 
 fn restore_punctuation(original: &str, corrected: &str) -> String {
-    let prefix = &original[..original.len()
-        - original
-            .trim_start_matches(|c: char| c.is_ascii_punctuation())
-            .len()];
-    let suffix_start = original
-        .trim_end_matches(|c: char| c.is_ascii_punctuation())
-        .len();
+    let prefix = &original[..original.len() - original.trim_start_matches(is_edge_punct).len()];
+    let suffix_start = original.trim_end_matches(is_edge_punct).len();
     let suffix = &original[suffix_start..];
     format!("{prefix}{corrected}{suffix}")
 }
@@ -883,6 +938,68 @@ mod tests {
         let c = LexicalGate::new();
         let result = c.correct("the NASA program", NO_RISKS, &[], "en");
         assert!(result.corrected_text.contains("NASA"));
+    }
+
+    /// U+2019 is what whisper and styling LLMs usually emit; without it in the
+    /// glue set, "don’t" split into "don"/"t" and each half was looked up
+    /// independently.
+    #[test]
+    fn typographic_apostrophe_does_not_split_contractions() {
+        let c = LexicalGate::new();
+        let result = c.correct(
+            "i don\u{2019}t know what she\u{2019}s doing",
+            NO_RISKS,
+            &[],
+            "en",
+        );
+        assert_eq!(
+            result.corrected_text,
+            "i don\u{2019}t know what she\u{2019}s doing"
+        );
+    }
+
+    /// Trimming stopped at the first non-ASCII char, so a curly-quoted token
+    /// never matched its dictionary/vocab entry.
+    #[test]
+    fn typographic_quotes_are_stripped_before_lookup() {
+        assert_eq!(strip_punctuation("\u{201c}github\u{201d}"), "github");
+        assert_eq!(strip_punctuation("\u{ab}lune\u{bb}"), "lune");
+        // Unchanged for the ASCII cases it already handled.
+        assert_eq!(strip_punctuation("\"github\"."), "github");
+        // Combining marks are part of the word, not edge punctuation.
+        assert_eq!(strip_punctuation("\u{915}\u{93e}"), "\u{915}\u{93e}");
+        assert_eq!(strip_punctuation("caf\u{e9}."), "caf\u{e9}");
+
+        let c = LexicalGate::new();
+        let dict = vec![crate::DictMatch {
+            matched: "github".into(),
+            replacement: "GitHub".into(),
+            fuzzy: false,
+        }];
+        let result = c.correct("visit \u{201c}github\u{201d} now", NO_RISKS, &dict, "en");
+        assert_eq!(result.corrected_text, "visit \u{201c}GitHub\u{201d} now");
+    }
+
+    /// Two dictionary phrases can match at different, overlapping start
+    /// indices. The consumption loop jumps past a consumed window, so overlap
+    /// has to be resolved up front rather than left to which index it lands on.
+    #[test]
+    fn overlapping_phrase_matches_resolve_to_the_earliest() {
+        let c = LexicalGate::new();
+        let dict = vec![
+            crate::DictMatch {
+                matched: "new york".into(),
+                replacement: "New York".into(),
+                fuzzy: false,
+            },
+            crate::DictMatch {
+                matched: "york times".into(),
+                replacement: "NYT".into(),
+                fuzzy: false,
+            },
+        ];
+        let result = c.correct("i read the new york times today", NO_RISKS, &dict, "en");
+        assert_eq!(result.corrected_text, "i read the New York times today");
     }
 
     #[test]

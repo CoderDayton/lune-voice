@@ -69,24 +69,13 @@ impl DictionaryManager {
 
     // ── Text correction ──────────────────────────────────────────────────
 
-    /// Apply dictionary corrections to `text`.
-    ///
-    /// Multi-word entries are matched word-boundary-exact (case-insensitive)
-    /// and replaced first. Single-word entries use Levenshtein distance ≤ 1
-    /// fuzzy matching per word.
-    pub fn apply(&self, text: &str) -> String {
-        // Single-pass partition; cheaper than count()-based split_whitespace.
-        let (multi, single): (Vec<&DictionaryEntry>, Vec<&DictionaryEntry>) = self
-            .cache
-            .iter()
-            .partition(|e| e.phrase.contains(char::is_whitespace));
-
-        let mut current = text.to_owned();
-        for entry in &multi {
-            current = apply_multi_word(&current, entry);
-        }
-        apply_single_words(&current, &single)
-    }
+    // `apply()` was removed: it reimplemented dictionary correction
+    // independently of `scan()`, which is what the runtime pipeline actually
+    // calls, and the two had already drifted (it stripped only trailing
+    // punctuation and never split on internal glue punctuation). Nothing
+    // outside its own tests used it, and those tests gave false confidence
+    // that "dictionary correction" was covered end to end. Correction lives in
+    // `corrector.rs`, driven by `scan()` — one source of truth.
 
     pub fn scan(&self, text: &str) -> Vec<DictMatch> {
         let (multi, single): (Vec<&DictionaryEntry>, Vec<&DictionaryEntry>) = self
@@ -234,62 +223,6 @@ impl DictionaryManager {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-#[cfg(feature = "dictionary")]
-fn apply_multi_word(text: &str, entry: &DictionaryEntry) -> String {
-    // Borrow phrase words directly — eq_ignore_ascii_case avoids Vec<String>.
-    let phrase_words: Vec<&str> = entry.phrase.split_whitespace().collect();
-    let n = phrase_words.len();
-    let text_words: Vec<&str> = text.split_whitespace().collect();
-    let mut out = Vec::with_capacity(text_words.len());
-    let mut i = 0;
-    while i < text_words.len() {
-        if i + n <= text_words.len() {
-            let window_match = text_words[i..i + n]
-                .iter()
-                .zip(&phrase_words)
-                .all(|(tw, pw)| strip_trailing_punct(tw).eq_ignore_ascii_case(pw));
-            if window_match {
-                // Preserve any trailing punctuation from the last word of the window.
-                let last = text_words[i + n - 1];
-                let punct = &last[strip_trailing_punct(last).len()..];
-                let mut s = String::with_capacity(entry.replacement.len() + punct.len());
-                s.push_str(&entry.replacement);
-                s.push_str(punct);
-                out.push(s);
-                i += n;
-                continue;
-            }
-        }
-        out.push(text_words[i].to_owned());
-        i += 1;
-    }
-    out.join(" ")
-}
-
-#[cfg(feature = "dictionary")]
-fn apply_single_words(text: &str, singles: &[&DictionaryEntry]) -> String {
-    let words: Vec<&str> = text.split_whitespace().collect();
-    let mut out = Vec::with_capacity(words.len());
-    for word in words {
-        let bare = strip_trailing_punct(word);
-        let punct = &word[bare.len()..];
-        // lev_le1_ci: O(n) CI check with no allocation, replaces to_lowercase pair.
-        let replaced = singles
-            .iter()
-            .find(|e| lev_le1_ci(bare.as_bytes(), e.phrase.as_bytes()));
-        match replaced {
-            Some(e) => {
-                let mut s = String::with_capacity(e.replacement.len() + punct.len());
-                s.push_str(&e.replacement);
-                s.push_str(punct);
-                out.push(s);
-            }
-            None => out.push(word.to_owned()),
-        }
-    }
-    out.join(" ")
-}
 
 /// One dictionary match found by [`DictionaryManager::scan`]. `fuzzy` is true
 /// for single-word edit-distance-1 matches (not exact and not multi-word
@@ -509,50 +442,6 @@ mod tests {
 
         let relevant = mgr.top_relevant("hello my name is...Tayton.", 10);
         assert!(relevant.iter().any(|e| e.phrase == "dayton"));
-    }
-
-    // ── apply ─────────────────────────────────────────────────────────────
-
-    #[test]
-    fn apply_exact_single_word() {
-        let mut mgr = manager();
-        mgr.insert("rust lang", "Rust", 10).unwrap(); // multi-word — won't trigger here
-        mgr.insert("github", "GitHub", 5).unwrap();
-
-        let result = mgr.apply("I use github every day");
-        assert_eq!(result, "I use GitHub every day");
-    }
-
-    #[test]
-    fn apply_fuzzy_single_word() {
-        let mut mgr = manager();
-        mgr.insert("kubernetes", "Kubernetes", 10).unwrap();
-
-        // "kubirnites" has 2 substitutions (e→i at pos 3, e→i at pos 6) — should NOT match.
-        let result = mgr.apply("I use kubirnites");
-        assert_eq!(result, "I use kubirnites");
-
-        // "kubernetss" is 1 substitution away — should match.
-        let result2 = mgr.apply("I use kubernetss");
-        assert_eq!(result2, "I use Kubernetes");
-    }
-
-    #[test]
-    fn apply_multi_word_phrase() {
-        let mut mgr = manager();
-        mgr.insert("lune voice", "Lune Voice", 10).unwrap();
-
-        let result = mgr.apply("I am using lune voice today");
-        assert_eq!(result, "I am using Lune Voice today");
-    }
-
-    #[test]
-    fn apply_preserves_trailing_punct() {
-        let mut mgr = manager();
-        mgr.insert("github", "GitHub", 5).unwrap();
-
-        let result = mgr.apply("visit github.");
-        assert_eq!(result, "visit GitHub.");
     }
 
     // ── top_relevant ──────────────────────────────────────────────────────

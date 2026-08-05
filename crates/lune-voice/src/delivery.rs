@@ -11,6 +11,38 @@ use crate::uinput_typer::WindowTarget;
 #[cfg(unix)]
 use crate::uinput_typer::UinputTyper;
 
+/// What a driver's type call actually accomplished.
+///
+/// Two independent facts, previously conflated into one `bool`: whether the
+/// clipboard now holds the dictated text (so the explicit copy can be skipped)
+/// and whether the text reached the target application at all. The second one
+/// exists because `UinputTyper` refuses to type text per-key when the
+/// clipboard is unavailable and the text contains a newline — dropping the
+/// delivery is safer than pressing Enter, but the user has to be told.
+#[derive(Clone, Copy, Debug)]
+pub struct TypeOutcome {
+    /// The dictated text is left on the clipboard afterwards.
+    pub clipboard_has_text: bool,
+    /// The text actually reached the focused application.
+    pub delivered: bool,
+}
+
+impl TypeOutcome {
+    /// Delivered; `clipboard_has_text` says whether the text stayed behind.
+    pub(crate) const fn delivered(clipboard_has_text: bool) -> Self {
+        Self {
+            clipboard_has_text,
+            delivered: true,
+        }
+    }
+
+    /// Nothing reached the application and nothing was left on the clipboard.
+    pub(crate) const DROPPED: Self = Self {
+        clipboard_has_text: false,
+        delivered: false,
+    };
+}
+
 /// Message sent to the persistent delivery thread.
 struct DeliveryMsg {
     /// Dictation request this delivery belongs to, for end-to-end tracing.
@@ -23,6 +55,9 @@ struct DeliveryMsg {
     copy_to_clipboard: bool,
     #[cfg(unix)]
     target: Option<WindowTarget>,
+    /// Reports what the driver managed to do, once it has run. `None` for
+    /// callers that don't care (structural injections).
+    outcome: Option<mpsc::Sender<TypeOutcome>>,
 }
 
 /// A unit of work for the delivery thread. `Prime` and `Probe` carry no
@@ -79,7 +114,34 @@ impl DeliveryService {
             copy_to_clipboard,
             #[cfg(unix)]
             target: None,
+            outcome: None,
         })
+    }
+
+    /// Like [`deliver`](Self::deliver), but hands back a receiver that resolves
+    /// once the driver has actually run. Returns `None` when the delivery
+    /// thread is dead (nothing will ever be typed). Callers use it to tell the
+    /// user when text was dropped instead of typed — enqueueing successfully is
+    /// not the same as delivering.
+    pub fn deliver_tracked(
+        &self,
+        session_id: Option<Uuid>,
+        text: &str,
+        mode: DictationMode,
+        copy_to_clipboard: bool,
+    ) -> Option<mpsc::Receiver<TypeOutcome>> {
+        let (tx, rx) = mpsc::channel();
+        debug!(?session_id, ?mode, text_len = text.len(), "delivering text");
+        self.enqueue(DeliveryMsg {
+            session_id,
+            text: text.into(),
+            mode,
+            copy_to_clipboard,
+            #[cfg(unix)]
+            target: None,
+            outcome: Some(tx),
+        })
+        .then_some(rx)
     }
 
     /// Queue a delivery message, returning `false` if the delivery thread has
@@ -128,7 +190,37 @@ impl DeliveryService {
             mode,
             copy_to_clipboard,
             target: Some(target.clone()),
+            outcome: None,
         })
+    }
+
+    /// [`deliver_to`](Self::deliver_to) with the outcome receiver of
+    /// [`deliver_tracked`](Self::deliver_tracked).
+    #[cfg(unix)]
+    pub fn deliver_to_tracked(
+        &self,
+        session_id: Option<Uuid>,
+        text: &str,
+        mode: DictationMode,
+        copy_to_clipboard: bool,
+        target: &WindowTarget,
+    ) -> Option<mpsc::Receiver<TypeOutcome>> {
+        let (tx, rx) = mpsc::channel();
+        debug!(
+            ?session_id,
+            ?mode,
+            text_len = text.len(),
+            "delivering text to target"
+        );
+        self.enqueue(DeliveryMsg {
+            session_id,
+            text: text.into(),
+            mode,
+            copy_to_clipboard,
+            target: Some(target.clone()),
+            outcome: Some(tx),
+        })
+        .then_some(rx)
     }
 
     pub fn deliver_owned(
@@ -212,7 +304,7 @@ fn delivery_thread(
         // Delivery returns whether the dictated text now sits on the clipboard,
         // so the explicit copy below can skip re-setting it (the uinput paste
         // path with copy_to_clipboard on already leaves it there).
-        let clipboard_has_text = match msg.mode {
+        let outcome = match msg.mode {
             DictationMode::TypeInPlace => driver.type_keys(text, keep_clipboard),
             _ => {
                 #[cfg(unix)]
@@ -229,6 +321,17 @@ fn delivery_thread(
                 }
             }
         };
+        if !outcome.delivered {
+            warn!(
+                session_id = ?msg.session_id,
+                "delivery dropped — text reached neither the application nor the clipboard"
+            );
+        }
+        // Best-effort: a caller that stopped listening just doesn't hear back.
+        if let Some(tx) = msg.outcome {
+            let _ = tx.send(outcome);
+        }
+        let clipboard_has_text = outcome.clipboard_has_text;
         // Orthogonal copy toggle: ensure the dictated text lands on the clipboard
         // when requested, for paths that didn't already place it there (IBus
         // commit, per-key typing). Skipped when delivery already left it, so we
@@ -312,15 +415,14 @@ impl PlatformDriver {
         }
     }
 
-    /// Returns whether the dictated text is left on the clipboard afterwards.
-    fn type_text(&mut self, text: &str, keep_clipboard: bool) -> bool {
+    fn type_text(&mut self, text: &str, keep_clipboard: bool) -> TypeOutcome {
         match &mut self.backend {
             // IBus commits directly to the input context — no clipboard, so the
             // keep/restore flag is irrelevant and the text is never staged there.
             #[cfg(target_os = "linux")]
             LinuxBackend::Ibus(t) => {
                 t.commit_text(text);
-                false
+                TypeOutcome::delivered(false)
             }
             LinuxBackend::Uinput(t) => t.type_str(text, keep_clipboard),
         }
@@ -331,27 +433,27 @@ impl PlatformDriver {
         text: &str,
         target: &crate::uinput_typer::WindowTarget,
         keep_clipboard: bool,
-    ) -> bool {
+    ) -> TypeOutcome {
         match &mut self.backend {
             // IBus commits to the focused input context directly; the captured
             // WindowTarget (for focus restoration) is only needed by uinput.
             #[cfg(target_os = "linux")]
             LinuxBackend::Ibus(t) => {
                 t.commit_text(text);
-                false
+                TypeOutcome::delivered(false)
             }
             LinuxBackend::Uinput(t) => t.type_str_to(text, target, keep_clipboard),
         }
     }
 
-    fn type_keys(&mut self, text: &str, keep_clipboard: bool) -> bool {
+    fn type_keys(&mut self, text: &str, keep_clipboard: bool) -> TypeOutcome {
         match &mut self.backend {
             // IBus commits Unicode directly — no US-QWERTY restriction, so
             // type-in-place of accented/CJK text "just works".
             #[cfg(target_os = "linux")]
             LinuxBackend::Ibus(t) => {
                 t.commit_text(text);
-                false
+                TypeOutcome::delivered(false)
             }
             LinuxBackend::Uinput(t) => t.type_str_keys(text, keep_clipboard),
         }
@@ -393,8 +495,7 @@ impl PlatformDriver {
     /// restore the prior contents, so there is nothing to snapshot ahead.
     fn prime_clipboard(&mut self) {}
 
-    /// Returns whether the dictated text is left on the clipboard afterwards.
-    fn type_text(&mut self, text: &str, keep_clipboard: bool) -> bool {
+    fn type_text(&mut self, text: &str, keep_clipboard: bool) -> TypeOutcome {
         // Set clipboard, then emit paste keystroke. (macOS/Windows keep the
         // dictated text on the clipboard regardless; restore is Linux-only.)
         if let Err(e) = self.clipboard.set_text(text) {
@@ -407,7 +508,7 @@ impl PlatformDriver {
 
         self.emit_paste();
         // The dictated text remains on the clipboard as the paste source.
-        true
+        TypeOutcome::delivered(true)
     }
 
     fn emit_paste(&mut self) {
@@ -425,15 +526,18 @@ impl PlatformDriver {
         let _ = self.enigo.key(modifier, Direction::Release);
     }
 
-    /// Per-key typing never touches the clipboard, so it always returns `false`.
-    fn type_keys(&mut self, text: &str, _keep_clipboard: bool) -> bool {
+    /// Per-key typing never touches the clipboard. enigo types Unicode text
+    /// directly (no US-QWERTY keycode mapping), so there is no newline hazard
+    /// to guard against here — a failure is reported, not silently dropped.
+    fn type_keys(&mut self, text: &str, _keep_clipboard: bool) -> TypeOutcome {
         use enigo::Keyboard;
 
         // Fallback: type each character directly
         if let Err(e) = self.enigo.text(text) {
             warn!(error = %e, "per-key typing failed");
+            return TypeOutcome::DROPPED;
         }
-        false
+        TypeOutcome::delivered(false)
     }
 
     fn copy_to_clipboard(&mut self, text: &str) -> Result<(), String> {

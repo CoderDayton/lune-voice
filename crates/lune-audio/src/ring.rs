@@ -1,7 +1,9 @@
 //! Lock-free SPSC ring buffer for audio chunks.
 //!
 //! Guarantees: no audio is silently dropped. When full, the oldest
-//! chunk is evicted atomically before the new chunk is pushed.
+//! chunk is evicted atomically before the new chunk is pushed. `push`
+//! retries a bounded number of times and logs if it ever gives up, so a
+//! drop is always visible rather than silent.
 
 use crossbeam_channel::{Receiver, Sender, TryRecvError, TrySendError, bounded};
 use tokio::sync::Notify;
@@ -32,22 +34,37 @@ impl<T> RingBuffer<T> {
     /// Push an item. If full, evicts the oldest item first.
     /// Never silently drops the new item.
     pub fn push(&self, item: T) {
-        match self.tx.try_send(item) {
-            Ok(()) => {}
-            Err(TrySendError::Full(item)) => {
-                // Evict oldest, then retry. If the consumer popped between
-                // try_send and try_recv, the retry will succeed without eviction.
-                let _ = self.rx.try_recv();
-                // Retry — if still full (shouldn't happen in SPSC), force-drop oldest again
-                if let Err(TrySendError::Full(item)) = self.tx.try_send(item) {
+        let mut item = item;
+        // Evict-and-retry until the send lands. Bounded rather than unbounded:
+        // this runs on the cpal capture callback, where spinning is worse than
+        // losing one chunk, and `handle()` documents that several consumers can
+        // coexist — so a lost race is possible even though the producer is
+        // single. Each attempt frees a slot, so exhausting the budget means we
+        // lost the race MAX_EVICT_RETRIES times in a row.
+        const MAX_EVICT_RETRIES: usize = 8;
+        for _ in 0..MAX_EVICT_RETRIES {
+            match self.tx.try_send(item) {
+                Ok(()) => {
+                    self.notify.notify_one();
+                    return;
+                }
+                Err(TrySendError::Full(returned)) => {
+                    item = returned;
                     let _ = self.rx.try_recv();
-                    let _ = self.tx.try_send(item);
+                }
+                // Channel closed — consumer dropped. Nothing to do.
+                Err(TrySendError::Disconnected(_)) => {
+                    self.notify.notify_one();
+                    return;
                 }
             }
-            Err(TrySendError::Disconnected(_)) => {
-                // Channel closed — consumer dropped. Nothing to do.
-            }
         }
+        // Never silent: the module's no-drop guarantee failed, and a caller
+        // debugging audio gaps has to be able to see that.
+        tracing::warn!(
+            retries = MAX_EVICT_RETRIES,
+            "ring buffer push dropped a chunk after repeated eviction races"
+        );
         // Wake one parked consumer (if any). `notify_one` is non-blocking
         // and safe to call from a non-async producer thread.
         self.notify.notify_one();

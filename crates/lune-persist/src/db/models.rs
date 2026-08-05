@@ -104,6 +104,9 @@ pub struct NewSession<'a> {
     pub backend: &'a str,
     pub status: &'a str,
     pub transcript: Option<&'a str>,
+    /// Maintained alongside `transcript` so `session_stats` never has to read
+    /// the text back to count words.
+    pub word_count: i32,
 }
 
 // ── Correction pairs (raw → final history) ────────────────────────────

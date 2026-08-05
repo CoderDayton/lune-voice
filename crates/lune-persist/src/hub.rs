@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
+use std::time::Duration;
 
 use hf_hub::api::sync::{Api, ApiBuilder, ApiRepo};
 use lune_core::config::{AsrBackendConfig, WhisperModel};
@@ -587,6 +589,31 @@ fn record_verified(
     manifest.insert(basename.to_owned(), FileMetadata { size, sha256 });
 }
 
+/// Connect / response / body timeouts for every hub request.
+///
+/// ureq's default `Agent` has **no** timeouts at all, so a server that accepts
+/// the connection and then goes silent hangs the download thread forever with
+/// no way for the UI to cancel — the same failure `gpu_plugin.rs` guards
+/// against on its reqwest client. The body timeout is a *total* duration, not
+/// an idle one (ureq 3 exposes no idle bound), so it is generous: model files
+/// are hundreds of MB and a slow link must not be cut off mid-download.
+const HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+const HTTP_RESPONSE_TIMEOUT: Duration = Duration::from_secs(30);
+const HTTP_BODY_TIMEOUT: Duration = Duration::from_secs(60 * 60);
+
+/// Shared agent carrying those timeouts. Built once; cloning is cheap.
+fn http_agent() -> &'static ureq::Agent {
+    static AGENT: OnceLock<ureq::Agent> = OnceLock::new();
+    AGENT.get_or_init(|| {
+        ureq::Agent::config_builder()
+            .timeout_connect(Some(HTTP_CONNECT_TIMEOUT))
+            .timeout_recv_response(Some(HTTP_RESPONSE_TIMEOUT))
+            .timeout_recv_body(Some(HTTP_BODY_TIMEOUT))
+            .build()
+            .into()
+    })
+}
+
 /// Fetch per-file size + LFS sha256 from the HF tree API.
 ///
 /// Returns an empty map on any failure — callers then fall back to the
@@ -595,7 +622,7 @@ fn record_verified(
 /// We log the failure once per repo at WARN so it's visible in support logs.
 fn fetch_repo_file_metadata(repo_id: &str) -> HashMap<String, FileMetadata> {
     let url = format!("https://huggingface.co/api/models/{repo_id}/tree/main?recursive=true");
-    let mut req = ureq::get(&url);
+    let mut req = http_agent().get(&url);
     if let Ok(token) = std::env::var("HF_TOKEN") {
         req = req.header("Authorization", &format!("Bearer {token}"));
     }
@@ -637,24 +664,8 @@ struct TreeEntryLfs {
     oid: String,
 }
 
-/// Hard-link `src` → `dst`; on EXDEV fall back to byte copy.
-///
-/// Hard links are instantaneous and consume no additional disk space when
-/// source and destination are on the same filesystem (the common case when
-/// hf_hub cache lives under `models_dir`).
-#[inline]
-fn link_or_copy(src: &Path, dst: &Path) -> std::io::Result<()> {
-    match std::fs::hard_link(src, dst) {
-        Ok(()) => Ok(()),
-        Err(e) if e.kind() == std::io::ErrorKind::CrossesDevices => {
-            std::fs::copy(src, dst).map(|_| ())
-        }
-        Err(e) => Err(e),
-    }
-}
-
-/// Direct HTTPS download from HuggingFace CDN. Fallback for Xet-backed
-/// repos where the `hf_hub` crate's `repo.get()` fails.
+/// Direct HTTPS download from HuggingFace CDN — the only path that fetches
+/// model bytes, so every transfer carries `http_agent()`'s timeouts.
 ///
 /// Uses the resolve endpoint which redirects to the actual blob URL.
 /// Streams to a temp file, then renames atomically to avoid partial files.
@@ -665,7 +676,7 @@ fn link_or_copy(src: &Path, dst: &Path) -> std::io::Result<()> {
 /// manifest. Reads `HF_TOKEN` from env for gated/private repos.
 fn download_file_direct(repo_id: &str, filename: &str, dst: &Path) -> PersistResult<FileMetadata> {
     let url = format!("https://huggingface.co/{repo_id}/resolve/main/{filename}");
-    let mut req = ureq::get(&url);
+    let mut req = http_agent().get(&url);
     if let Ok(token) = std::env::var("HF_TOKEN") {
         req = req.header("Authorization", &format!("Bearer {token}"));
     }
@@ -766,9 +777,15 @@ fn ensure_directory_model_with_progress(
         return Ok(local_dir);
     }
 
-    // Determine which files to download
-    let repo = hub.api.repo(hf_hub::Repo::model(repo_id.clone()));
-    let all_files = hub.list_repo_files(&repo, repo_id)?;
+    // Determine which files to download. The tree call above already listed
+    // them and ran through `http_agent()`, so prefer its keys; hf_hub's
+    // `repo.info()` is only the fallback for when that call failed.
+    let all_files: Vec<String> = if remote_meta.is_empty() {
+        let repo = hub.api.repo(hf_hub::Repo::model(repo_id.clone()));
+        hub.list_repo_files(&repo, repo_id)?
+    } else {
+        remote_meta.keys().cloned().collect()
+    };
     let files_to_download: Vec<&str> = all_files
         .iter()
         .filter(|f| {
@@ -796,20 +813,13 @@ fn ensure_directory_model_with_progress(
         let _ = std::fs::remove_file(&dst);
         on_file(filename, idx, total);
 
-        // Try hf_hub cache; fall back to direct HTTPS for Xet-backed repos.
-        let linked = repo
-            .get(filename)
-            .ok()
-            .and_then(|p| p.canonicalize().ok())
-            .filter(|src| local_file_complete(src, &meta))
-            .and_then(|src| link_or_copy(&src, &dst).ok())
-            .is_some();
-        let observed = if linked {
-            None
-        } else {
-            let _ = std::fs::remove_file(&dst);
-            Some(download_file_direct(repo_id, filename, &dst)?)
-        };
+        // Always fetch through `download_file_direct`. hf_hub's `repo.get()`
+        // used to be tried first, but it runs on hf_hub's own agent, which has
+        // no timeouts at all — a server that accepts the connection and then
+        // goes silent hung this thread forever with no way to cancel, on the
+        // multi-hundred-MB model transfers. `http_agent()` bounds it, and this
+        // path was already the Xet-repo fallback, so it is well exercised.
+        let observed = Some(download_file_direct(repo_id, filename, &dst)?);
 
         // Post-download verification — if we have expected metadata, the final
         // file must match. Mismatch indicates a corrupted CDN response or a

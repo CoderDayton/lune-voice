@@ -94,7 +94,10 @@ pub fn estimate(
     spans: &[TokenSpan],
     config: Config,
 ) -> Vec<WordResult> {
-    if words.is_empty() || tokens.is_empty() {
+    // A spans/words length mismatch would index out of bounds below. Degrade
+    // (empty result) instead of panicking the dictation session — same intent
+    // as the per-span `word_error_risk: 0.5` fallback further down.
+    if words.is_empty() || tokens.is_empty() || spans.len() != words.len() {
         return Vec::new();
     }
 
@@ -224,6 +227,14 @@ mod tests {
     #[test]
     fn empty_input() {
         assert!(estimate(&[], &[], &[], Config::default()).is_empty());
+    }
+
+    #[test]
+    fn span_word_length_mismatch_degrades_instead_of_panicking() {
+        let words = vec!["hello".into(), "world".into()];
+        let tokens = vec![tok(1, 0.99, vec![10.0, -5.0, -5.0, -5.0])];
+        let spans = vec![TokenSpan::new(0, 1)];
+        assert!(estimate(&words, &tokens, &spans, Config::default()).is_empty());
     }
 
     #[test]

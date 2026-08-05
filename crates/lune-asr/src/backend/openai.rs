@@ -216,7 +216,10 @@ impl OpenAiCompatibleAsrBackend {
         base_id: u64,
     ) -> Result<Vec<AsrSegment>> {
         // Encode WAV once; cloned cheaply via Arc-backed Bytes on each attempt.
-        let wav = encode_wav_16bit(pcm, sample_rate);
+        // A `Vec<u8>` here really did deep-copy the whole (multi-MB, up to 120 s
+        // of audio) buffer on every retry.
+        let wav: bytes::Bytes = encode_wav_16bit(pcm, sample_rate).into();
+        let wav_len = wav.len() as u64;
 
         let mut last_err = String::new();
         let mut delay = INITIAL_BACKOFF;
@@ -231,7 +234,9 @@ impl OpenAiCompatibleAsrBackend {
                 delay *= 2;
             }
 
-            let part = reqwest::multipart::Part::bytes(wav.clone())
+            // `Bytes::clone` is an Arc bump; the explicit length keeps the part
+            // Content-Length-delimited exactly as `Part::bytes` did.
+            let part = reqwest::multipart::Part::stream_with_length(wav.clone(), wav_len)
                 .file_name("audio.wav")
                 .mime_str("audio/wav")
                 .map_err(|e| Error::asr(format!("mime: {e}")))?;

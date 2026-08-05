@@ -343,6 +343,17 @@ mod imp {
                     _ => audio.as_slice(),
                 };
 
+                // whisper's segment timestamps are relative to `decode_slice`.
+                // Endpoint trimming drops a lead-in (commonly hundreds of ms),
+                // so add it back to keep `start_ms`/`end_ms` relative to the
+                // original buffer the caller pushed.
+                let trim_offset_ms = match trim {
+                    VadTrim::Speech(start, end) if start < end => {
+                        (start as u64 * 1000) / SAMPLE_RATE as u64
+                    }
+                    _ => 0,
+                };
+
                 // Prime punctuation/casing style only for longer dictation, where
                 // whisper otherwise runs sentences together; on a short clip the
                 // prompt biases the decode toward a spurious continuation, so skip it.
@@ -436,9 +447,11 @@ mod imp {
                         min_token_confidence,
                         word_confidences,
                         is_final: true,
-                        // whisper timestamps are in centiseconds (10 ms units).
-                        start_ms: Some((seg.start_timestamp().max(0) as u64) * 10),
-                        end_ms: Some((seg.end_timestamp().max(0) as u64) * 10),
+                        // whisper timestamps are in centiseconds (10 ms units),
+                        // relative to `decode_slice` — add back the VAD-trim
+                        // offset so callers see original-buffer time.
+                        start_ms: Some(trim_offset_ms + (seg.start_timestamp().max(0) as u64) * 10),
+                        end_ms: Some(trim_offset_ms + (seg.end_timestamp().max(0) as u64) * 10),
                         text,
                         detected_language: detected.clone(),
                     });

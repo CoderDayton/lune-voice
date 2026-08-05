@@ -181,6 +181,15 @@ fn escape_like(term: &str) -> String {
     out
 }
 
+/// Word count stored in `sessions.word_count`. The one definition of "a word"
+/// for statistics — `split_whitespace`, exactly as the old in-memory count did,
+/// so the maintained column can never disagree with what it replaced.
+fn count_words(transcript: Option<&str>) -> i32 {
+    transcript
+        .map(|t| t.split_whitespace().count().min(i32::MAX as usize) as i32)
+        .unwrap_or(0)
+}
+
 /// The single row predicate deciding whether a session "counts", shared by
 /// `session_stats`, `count_sessions`, and `list_sessions_page` so the overview
 /// total, the History total, and the paged rows are computed from the exact
@@ -284,6 +293,57 @@ impl Database {
             .map_err(|e| PersistError::Migration(e.to_string()))?;
         if !applied.is_empty() {
             tracing::info!(count = applied.len(), "database migrations applied");
+        }
+        self.backfill_word_counts()?;
+        Ok(())
+    }
+
+    /// Fill `sessions.word_count` for rows written before the column existed.
+    ///
+    /// The column is maintained on insert/update, so this runs once: the probe
+    /// short-circuits on the first NULL and, after the backfill, finds none.
+    /// This is the only place transcript text is read to count words — the
+    /// point of the column is that `session_stats` never has to.
+    ///
+    /// Done in batches, never as one `load()`. A long-lived install with
+    /// retention disabled can hold tens of MB of transcripts, and this runs
+    /// inside `Database::open` — pulling all of it into one `Vec` would stall
+    /// startup and spike RSS, which is the very thing the column exists to
+    /// avoid. Each batch is its own transaction, so an interrupted run just
+    /// leaves fewer rows for the next open to finish.
+    #[cold]
+    #[inline(never)]
+    fn backfill_word_counts(&mut self) -> PersistResult<()> {
+        use self::schema::sessions::dsl::*;
+
+        /// Rows of transcript text held in memory at once.
+        const BATCH: i64 = 500;
+
+        let mut filled = 0usize;
+        loop {
+            // Always take the first NULL rows: each batch clears the ones it
+            // read, so the next query starts where this one finished — no
+            // OFFSET needed, and no row can be skipped.
+            let rows: Vec<(String, Option<String>)> = sessions
+                .filter(word_count.is_null())
+                .select((id, transcript))
+                .limit(BATCH)
+                .load(&mut self.conn)?;
+            if rows.is_empty() {
+                break;
+            }
+            filled += rows.len();
+            self.conn.transaction(|conn| {
+                for (row_id, text) in rows {
+                    diesel::update(sessions.filter(id.eq(&row_id)))
+                        .set(word_count.eq(count_words(text.as_deref())))
+                        .execute(conn)?;
+                }
+                Ok::<_, diesel::result::Error>(())
+            })?;
+        }
+        if filled > 0 {
+            tracing::info!(rows = filled, "backfilled session word counts");
         }
         Ok(())
     }
@@ -611,6 +671,7 @@ impl Database {
             backend: &backend_str,
             status: &status_str,
             transcript: session.transcript.as_deref(),
+            word_count: count_words(session.transcript.as_deref()),
         };
 
         diesel::insert_into(sessions::table)
@@ -624,42 +685,50 @@ impl Database {
     /// in the recent-sessions list. Rows with malformed timestamps are skipped entirely
     /// (no count, no words, no seconds) — `julianday()` returns NULL on parse failure,
     /// which propagates through the CASE and gives us a uniform skip path.
+    /// Lifetime totals for the overview screen. Deliberately not capped by the
+    /// history limits, which is why it aggregates entirely in SQL: loading
+    /// every transcript to count words was an unbounded full-table scan
+    /// pulling megabytes of text through the query layer for three integers.
+    /// `word_count` is maintained on insert/update, so no transcript text
+    /// crosses the query boundary here.
     pub fn session_stats(&mut self) -> PersistResult<SessionStats> {
-        use diesel::sql_types::{BigInt, Nullable, Text};
+        use diesel::sql_types::BigInt;
 
         #[derive(diesel::QueryableByName)]
         struct Row {
-            #[diesel(sql_type = Text)]
-            transcript: String,
-            // NULL when ended_at is missing/malformed; else the clamped duration.
-            #[diesel(sql_type = Nullable<BigInt>)]
-            secs: Option<i64>,
+            #[diesel(sql_type = BigInt)]
+            sessions: i64,
+            #[diesel(sql_type = BigInt)]
+            words: i64,
+            #[diesel(sql_type = BigInt)]
+            secs: i64,
         }
 
         // COUNTABLE_WHERE already excludes malformed `started_at` and
         // whitespace-only transcripts, so this walks the exact same rows as
         // `count_sessions` — the sessions total is identical by construction.
-        let rows: Vec<Row> = diesel::sql_query(format!(
+        // A session with no (or an unparseable) `ended_at` contributes 0
+        // seconds, matching the old per-row `None` skip.
+        let row: Row = diesel::sql_query(format!(
             "SELECT \
-                 transcript, \
-                 CASE \
-                     WHEN ended_at IS NULL OR julianday(ended_at) IS NULL THEN NULL \
-                     ELSE CAST(MAX(1, (julianday(ended_at) - julianday(started_at)) * 86400) AS INTEGER) \
-                 END AS secs \
+                 COUNT(*) AS sessions, \
+                 COALESCE(SUM(word_count), 0) AS words, \
+                 COALESCE(SUM( \
+                     CASE \
+                         WHEN ended_at IS NULL OR julianday(ended_at) IS NULL THEN 0 \
+                         ELSE CAST(MAX(1, (julianday(ended_at) - julianday(started_at)) * 86400) AS INTEGER) \
+                     END \
+                 ), 0) AS secs \
              FROM sessions WHERE {COUNTABLE_WHERE}"
         ))
-        .load(&mut self.conn)?;
+        .get_result(&mut self.conn)?;
 
-        let mut stats = SessionStats::default();
-        for row in rows {
-            stats.sessions += 1;
-            stats.words += row.transcript.split_whitespace().count() as u32;
-            if let Some(secs) = row.secs {
-                let bounded = secs.clamp(0, i64::from(u32::MAX)) as u32;
-                stats.seconds = stats.seconds.saturating_add(bounded);
-            }
-        }
-        Ok(stats)
+        let clamp_u32 = |v: i64| v.clamp(0, i64::from(u32::MAX)) as u32;
+        Ok(SessionStats {
+            sessions: clamp_u32(row.sessions),
+            words: clamp_u32(row.words),
+            seconds: clamp_u32(row.secs),
+        })
     }
 
     pub fn list_sessions(&mut self, limit: u32) -> PersistResult<Vec<DictationSession>> {
@@ -798,6 +867,9 @@ impl Database {
                 status.eq(&status_str),
                 ended_at.eq(ended.as_deref()),
                 transcript.eq(session.transcript.as_deref()),
+                // Kept in lockstep with `transcript` — the two must never
+                // disagree, or lifetime word totals silently drift.
+                word_count.eq(count_words(session.transcript.as_deref())),
             ))
             .execute(&mut self.conn)?;
         Ok(())
@@ -914,8 +986,6 @@ impl Database {
     }
 
     pub fn delete_session(&mut self, session_id: &str) -> PersistResult<bool> {
-        use self::schema::sessions::dsl::*;
-
         // The nil UUID is the seed-calibration sentinel (see the seed_edit_calib
         // example), not a real session — never cascade-delete its observations.
         // Real sessions are always v4 UUIDs, so this rejects only the sentinel.
@@ -926,42 +996,50 @@ impl Database {
         // Cascade: drop the session's calibration pairs so deleting a session
         // leaves no transcript text behind. There is no SQL foreign key and the
         // connection doesn't enable `PRAGMA foreign_keys`, so delete explicitly.
-        {
-            use self::schema::correction_pairs::dsl as cp;
-            diesel::delete(cp::correction_pairs.filter(cp::session_id.eq(session_id)))
-                .execute(&mut self.conn)?;
-        }
-        {
-            use self::schema::edit_observations::dsl as eo;
-            diesel::delete(eo::edit_observations.filter(eo::session_id.eq(session_id)))
-                .execute(&mut self.conn)?;
-        }
-
-        let count = diesel::delete(sessions.filter(id.eq(session_id))).execute(&mut self.conn)?;
-        Ok(count > 0)
+        // One transaction, so a crash mid-cascade can't leave the `sessions`
+        // row — which carries the transcript — behind after its pairs are gone.
+        self.conn.transaction(|conn| {
+            {
+                use self::schema::correction_pairs::dsl as cp;
+                diesel::delete(cp::correction_pairs.filter(cp::session_id.eq(session_id)))
+                    .execute(conn)?;
+            }
+            {
+                use self::schema::edit_observations::dsl as eo;
+                diesel::delete(eo::edit_observations.filter(eo::session_id.eq(session_id)))
+                    .execute(conn)?;
+            }
+            use self::schema::sessions::dsl::*;
+            let count = diesel::delete(sessions.filter(id.eq(session_id))).execute(conn)?;
+            Ok(count > 0)
+        })
     }
 
     /// Delete sessions whose `started_at` is older than `days` days ago.
     /// Returns the number of rows deleted.
     pub fn prune_sessions(&mut self, days: u32) -> PersistResult<usize> {
-        use self::schema::sessions::dsl::*;
-
         // RFC3339 strings sort lexicographically, so < comparison is safe.
         let cutoff = (Utc::now() - chrono::Duration::days(i64::from(days))).to_rfc3339();
-        let count =
-            diesel::delete(sessions.filter(started_at.lt(&cutoff))).execute(&mut self.conn)?;
-        // Prune calibration pairs in the same retention window.
-        {
-            use self::schema::correction_pairs::dsl as cp;
-            diesel::delete(cp::correction_pairs.filter(cp::created_at.lt(&cutoff)))
-                .execute(&mut self.conn)?;
-        }
-        {
-            use self::schema::edit_observations::dsl as eo;
-            diesel::delete(eo::edit_observations.filter(eo::created_at.lt(&cutoff)))
-                .execute(&mut self.conn)?;
-        }
-        Ok(count)
+        // Same atomicity discipline as `delete_session`: the retention sweep is
+        // one cascade, so it commits or rolls back as one.
+        self.conn.transaction(|conn| {
+            let count = {
+                use self::schema::sessions::dsl::*;
+                diesel::delete(sessions.filter(started_at.lt(&cutoff))).execute(conn)?
+            };
+            // Prune calibration pairs in the same retention window.
+            {
+                use self::schema::correction_pairs::dsl as cp;
+                diesel::delete(cp::correction_pairs.filter(cp::created_at.lt(&cutoff)))
+                    .execute(conn)?;
+            }
+            {
+                use self::schema::edit_observations::dsl as eo;
+                diesel::delete(eo::edit_observations.filter(eo::created_at.lt(&cutoff)))
+                    .execute(conn)?;
+            }
+            Ok(count)
+        })
     }
 }
 
@@ -1614,6 +1692,55 @@ mod tests {
             stats.seconds >= 1,
             "seconds from well-formed session counted"
         );
+    }
+
+    /// Rows written before the `word_count` column existed have NULL there and
+    /// contribute nothing to the SUM until the one-time backfill runs.
+    #[test]
+    fn word_count_backfill_fills_pre_migration_rows() {
+        use diesel::RunQueryDsl;
+
+        let mut db = Database::open_in_memory().unwrap();
+        diesel::sql_query(
+            "INSERT INTO sessions (id, started_at, ended_at, style, backend, status, transcript, created_at) \
+             VALUES ('legacy-row', '2024-01-01T00:00:00Z', '2024-01-01T00:00:10Z', '', '\"WhisperCpp\"', '\"Completed\"', ' one  two\tthree\nfour ', datetime('now'))",
+        )
+        .execute(&mut db.conn)
+        .unwrap();
+
+        let before = db.session_stats().unwrap();
+        assert_eq!(before.sessions, 1, "the row still counts as a session");
+        assert_eq!(before.words, 0, "NULL word_count contributes nothing");
+
+        db.backfill_word_counts().unwrap();
+        let after = db.session_stats().unwrap();
+        assert_eq!(after.words, 4, "backfill uses split_whitespace semantics");
+
+        // Idempotent: a second pass finds no NULLs and changes nothing.
+        db.backfill_word_counts().unwrap();
+        assert_eq!(db.session_stats().unwrap().words, 4);
+    }
+
+    /// `word_count` is maintained, so it has to track a transcript rewrite —
+    /// otherwise lifetime totals drift from the text actually stored.
+    #[test]
+    fn word_count_tracks_transcript_updates() {
+        let mut db = Database::open_in_memory().unwrap();
+        let mut session = DictationSession {
+            id: Uuid::new_v4(),
+            started_at: Utc::now() - chrono::Duration::seconds(5),
+            ended_at: Some(Utc::now()),
+            style: None,
+            backend: AsrBackendKind::WhisperCpp,
+            status: SessionStatus::Completed,
+            transcript: Some("one two three".into()),
+        };
+        db.insert_session(&session).unwrap();
+        assert_eq!(db.session_stats().unwrap().words, 3);
+
+        session.transcript = Some("only two".into());
+        db.update_session(&session).unwrap();
+        assert_eq!(db.session_stats().unwrap().words, 2);
     }
 
     #[test]

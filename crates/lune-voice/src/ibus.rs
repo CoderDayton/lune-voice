@@ -247,9 +247,16 @@ impl EngineState {
         self.cv.notify_all();
     }
     /// Block until the engine is marked active or `timeout` elapses.
-    fn wait_active(&self, timeout: Duration) {
+    /// Returns whether the engine actually became active — discarding this
+    /// let a commit be emitted into a context IBus never focused/enabled,
+    /// losing the dictated text with nothing logged.
+    #[must_use]
+    fn wait_active(&self, timeout: Duration) -> bool {
         let g = self.enabled.lock().unwrap_or_else(|e| e.into_inner());
-        let _ = self.cv.wait_timeout_while(g, timeout, |active| !*active);
+        match self.cv.wait_timeout_while(g, timeout, |active| !*active) {
+            Ok((_, result)) => !result.timed_out(),
+            Err(poisoned) => !poisoned.into_inner().1.timed_out(),
+        }
     }
     fn reset(&self) {
         let mut g = self.enabled.lock().unwrap_or_else(|e| e.into_inner());
@@ -505,7 +512,7 @@ impl IbusTyper {
         typer
             .set_global_engine(ENGINE_NAME)
             .map_err(|e| format!("activation self-check failed: {e}"))?;
-        typer.state.wait_active(FOCUS_WAIT);
+        let activated = typer.state.wait_active(FOCUS_WAIT);
         match typer.original_engine.clone() {
             // Only drop the record once the user's engine is actually back.
             // Clearing it after a failed restore would throw away the one thing
@@ -520,6 +527,16 @@ impl IbusTyper {
             }
             // Nothing was displaced, so any record on disk is stale debris.
             None => clear_displaced_engine(),
+        }
+
+        // The self-check only means something if activation was observed. Fail
+        // here (after restoring the user's engine) so delivery.rs falls back to
+        // UinputTyper rather than trusting a non-functional IBus session.
+        if !activated {
+            return Err(format!(
+                "activation self-check timed out after {}ms; IBus never enabled our engine",
+                FOCUS_WAIT.as_millis()
+            ));
         }
 
         info!("ibus: engine registered and activation verified");
@@ -555,8 +572,15 @@ impl IbusTyper {
             clear_displaced_engine();
             return;
         }
-        // Wait for IBus to focus/enable our engine so the commit lands.
-        self.state.wait_active(FOCUS_WAIT);
+        // Wait for IBus to focus/enable our engine so the commit lands. Emit
+        // anyway on timeout (the engine may enable a moment later), but say so
+        // — a silent stuck commit is otherwise invisible.
+        if !self.state.wait_active(FOCUS_WAIT) {
+            warn!(
+                timeout_ms = FOCUS_WAIT.as_millis() as u64,
+                "ibus: engine not activated before commit; text may be lost"
+            );
+        }
 
         // CommitText payload is `(v)` wrapping a serialized IBusText. A `Value`
         // signal arg is serialized as `v` automatically; don't double-wrap.

@@ -18,7 +18,9 @@ use std::{
 
 use evdev::{AttributeSet, EventType, InputEvent, KeyCode, uinput::VirtualDevice};
 use lune_core::config::TerminalMode;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
+
+use crate::delivery::TypeOutcome;
 
 // Hard ceiling on every compositor / IPC subprocess we spawn during delivery.
 // These tools normally return in single-digit ms; anything beyond means the
@@ -973,6 +975,16 @@ fn needs_paste_delivery(text: &str) -> bool {
     !is_keystroke_typeable(text) || text.contains('\n')
 }
 
+/// Whether `do_clipboard_paste`'s clipboard-failure fallback may type `text`
+/// per-key. Deliberately the inverse of `needs_paste_delivery`: text routed to
+/// the clipboard *because* it cannot be typed safely must not be typed anyway
+/// when the clipboard turns out to be unavailable (missing `wl-copy`/`xclip`,
+/// wedged clipboard daemon, no display) — a dropped delivery beats a literal
+/// Enter submitting the form or running the shell line.
+fn keystroke_fallback_allowed(text: &str) -> bool {
+    !needs_paste_delivery(text)
+}
+
 // ─── Adaptive paste timing ───────────────────────────────────────────────────
 
 /// Minimum post-paste delay — floor even on the fastest systems.
@@ -1159,14 +1171,17 @@ impl UinputTyper {
         }
     }
 
-    /// Returns whether the dictated text is left on the clipboard afterwards
-    /// (true only when `keep_clipboard` and the paste succeeded).
-    pub fn type_str(&mut self, text: &str, keep_clipboard: bool) -> bool {
+    pub fn type_str(&mut self, text: &str, keep_clipboard: bool) -> TypeOutcome {
         let is_terminal = self.resolve_terminal();
         self.do_clipboard_paste(text, is_terminal, "emitting paste", keep_clipboard)
     }
 
-    pub fn type_str_to(&mut self, text: &str, target: &WindowTarget, keep_clipboard: bool) -> bool {
+    pub fn type_str_to(
+        &mut self,
+        text: &str,
+        target: &WindowTarget,
+        keep_clipboard: bool,
+    ) -> TypeOutcome {
         if let Some(ref token) = target.focus_token {
             if !restore_focus(token) {
                 warn!("could not restore focus to original window");
@@ -1185,14 +1200,16 @@ impl UinputTyper {
     /// target app to consume it.  Falls back to per-key typing on clipboard
     /// failure.  `label` is passed through to the info log.
     ///
-    /// Returns whether the dictated text is left on the clipboard afterwards.
+    /// Reports both whether the text reached the app and whether it is left on
+    /// the clipboard afterwards (the latter true only when `keep_clipboard`
+    /// and the paste succeeded).
     fn do_clipboard_paste(
         &mut self,
         text: &str,
         is_terminal: bool,
         label: &str,
         keep_clipboard: bool,
-    ) -> bool {
+    ) -> TypeOutcome {
         // The clipboard is only a transport for the paste chord. Unless the user
         // opted to keep the dictated text (copy_to_clipboard), preserve whatever
         // they had on the clipboard so we can put it back after the paste —
@@ -1234,8 +1251,7 @@ impl UinputTyper {
                 warn!(error = %e, "clipboard set failed, falling back to per-key typing");
                 // Prior contents are still intact and our text never reached the
                 // clipboard — nothing to restore.
-                self.type_keys_raw(text);
-                return false;
+                return self.fallback_to_keys(text);
             }
             None
         } else {
@@ -1245,8 +1261,7 @@ impl UinputTyper {
                     warn!(error = %e, "history-excluded clipboard set failed, falling back to plain set");
                     if let Err(e) = set_clipboard(text) {
                         warn!(error = %e, "clipboard set failed, falling back to per-key typing");
-                        self.type_keys_raw(text);
-                        return false;
+                        return self.fallback_to_keys(text);
                     }
                     None
                 }
@@ -1291,7 +1306,7 @@ impl UinputTyper {
             }
         }
 
-        keep_clipboard
+        TypeOutcome::delivered(keep_clipboard)
     }
 
     /// Per-key typing entry point. Keystrokes are US-QWERTY/ASCII only, so if
@@ -1299,7 +1314,7 @@ impl UinputTyper {
     /// (accented, CJK, emoji, smart quotes) the whole string is delivered via
     /// the clipboard instead — non-ASCII transcripts are never silently
     /// dropped.
-    pub fn type_str_keys(&mut self, text: &str, keep_clipboard: bool) -> bool {
+    pub fn type_str_keys(&mut self, text: &str, keep_clipboard: bool) -> TypeOutcome {
         // Multi-line snippet bodies are the normal source of newlines here;
         // see `needs_paste_delivery` for why they must not be typed per-key.
         if needs_paste_delivery(text) {
@@ -1313,7 +1328,29 @@ impl UinputTyper {
         }
         // Per-key typing never touches the clipboard.
         self.type_keys_raw(text);
-        false
+        TypeOutcome::delivered(false)
+    }
+
+    /// Last-resort per-key typing when the clipboard itself is unavailable.
+    ///
+    /// Applies the same rule as `needs_paste_delivery`: text the clipboard was
+    /// chosen for because it *cannot* be typed per-key must not be typed
+    /// anyway. A `'\n'` maps to `KEY_ENTER`, which submits the form or runs the
+    /// shell line instead of inserting a line break — dropping the delivery is
+    /// strictly safer than that. The refusal is reported through the returned
+    /// [`TypeOutcome`] so `delivery.rs` can warn the user rather than let a
+    /// dropped dictation look like a successful one.
+    fn fallback_to_keys(&mut self, text: &str) -> TypeOutcome {
+        if !keystroke_fallback_allowed(text) {
+            error!(
+                multi_line = text.contains('\n'),
+                "clipboard unavailable and text cannot be typed per-key safely; \
+                 dictation not delivered"
+            );
+            return TypeOutcome::DROPPED;
+        }
+        self.type_keys_raw(text);
+        TypeOutcome::delivered(false)
     }
 
     /// Raw per-key emitter. Paced (see `KEY_EVENT_GAP_MS` / `PER_CHAR_GAP_MS`)
@@ -1352,8 +1389,26 @@ impl UinputTyper {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_safe_mime, is_terminal_class, needs_paste_delivery, pipe_text_to_command};
+    use super::{
+        is_safe_mime, is_terminal_class, keystroke_fallback_allowed, needs_paste_delivery,
+        pipe_text_to_command,
+    };
     use std::time::{Duration, Instant};
+
+    /// A clipboard failure must not reopen the Enter hazard: the fallback
+    /// `do_clipboard_paste` takes when `set_clipboard` fails refuses exactly
+    /// the text that was routed to the clipboard in the first place.
+    #[test]
+    fn clipboard_failure_fallback_refuses_paste_only_text() {
+        for text in ["Best regards,\nDayton", "line one\n", "café", "日本語"] {
+            assert!(needs_paste_delivery(text));
+            assert!(
+                !keystroke_fallback_allowed(text),
+                "{text:?} must never be typed per-key"
+            );
+        }
+        assert!(keystroke_fallback_allowed("plain single line"));
+    }
 
     /// A newline typed per-key is KEY_ENTER, which submits whatever the text
     /// is going into — the multi-line snippet body "Best regards,\nDayton"

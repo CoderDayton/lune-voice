@@ -199,8 +199,15 @@ pub async fn save_workspace_settings(
     {
         use tauri::Manager;
         if let Some(paths) = lune_persist::AppPaths::resolve() {
-            let store = lune_persist::SettingsStore::new(paths.settings_file());
-            match store.load() {
+            // TOML read + parse is blocking disk I/O; keep it off the Tokio
+            // worker running this command, like every other I/O in this file.
+            let loaded = run_persist("reload settings for hotkey update", move || {
+                lune_persist::SettingsStore::new(paths.settings_file())
+                    .load()
+                    .map_err(|e| e.to_string())
+            })
+            .await;
+            match loaded {
                 Ok(s) => {
                     if let Some(live) = runtime
                         .app_handle()
@@ -242,7 +249,13 @@ pub async fn save_workspace_settings(
         let status = runtime.service_status().await;
         let show_after = crate::pill::should_show_pill(vis, &status);
         if let Some(paths) = lune_persist::AppPaths::resolve() {
-            match lune_persist::SettingsStore::new(paths.settings_file()).load() {
+            let loaded = run_persist("reload settings for pill update", move || {
+                lune_persist::SettingsStore::new(paths.settings_file())
+                    .load()
+                    .map_err(|e| e.to_string())
+            })
+            .await;
+            match loaded {
                 Ok(s) => crate::pill::apply_pill_settings(runtime.app_handle(), &s, show_after),
                 Err(e) => tracing::warn!(error = %e, "settings reload for pill update failed"),
             }

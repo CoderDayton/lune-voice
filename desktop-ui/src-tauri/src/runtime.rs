@@ -36,6 +36,9 @@ pub struct AppRuntime {
 struct RuntimeInner {
     app: AppHandle,
     pipeline: Mutex<LivePipeline>,
+    /// Serializes `prepare_manager_for_start`'s check-then-rebuild, which
+    /// cannot hold `pipeline` across the (slow) `build_pipeline` call.
+    start_gate: Mutex<()>,
     status: RwLock<String>,
     session_stream: RwLock<Option<SessionStreamSlot>>,
     session_stream_seq: AtomicU64,
@@ -141,6 +144,7 @@ impl AppRuntime {
             inner: Arc::new(RuntimeInner {
                 app,
                 pipeline: Mutex::new(pipeline),
+                start_gate: Mutex::new(()),
                 status: RwLock::new("ready".into()),
                 session_stream: RwLock::new(None),
                 session_stream_seq: AtomicU64::new(0),
@@ -608,12 +612,12 @@ impl AppRuntime {
                             let s = runtime.inner.settings.read().await;
                             (s.dictation_mode, s.copy_to_clipboard)
                         };
-                        let delivered;
+                        let outcome_rx;
                         #[cfg(unix)]
                         {
                             let target = runtime.inner.pipeline.lock().await.focus_target.clone();
-                            delivered = if let Some(ref t) = target {
-                                runtime.inner.delivery.deliver_to(
+                            outcome_rx = if let Some(ref t) = target {
+                                runtime.inner.delivery.deliver_to_tracked(
                                     Some(session_id),
                                     &text,
                                     mode,
@@ -621,32 +625,70 @@ impl AppRuntime {
                                     t,
                                 )
                             } else {
-                                runtime
-                                    .inner
-                                    .delivery
-                                    .deliver(Some(session_id), &text, mode, copy)
+                                runtime.inner.delivery.deliver_tracked(
+                                    Some(session_id),
+                                    &text,
+                                    mode,
+                                    copy,
+                                )
                             };
                         }
                         #[cfg(not(unix))]
                         {
-                            delivered =
-                                runtime
-                                    .inner
-                                    .delivery
-                                    .deliver(Some(session_id), &text, mode, copy);
+                            outcome_rx = runtime.inner.delivery.deliver_tracked(
+                                Some(session_id),
+                                &text,
+                                mode,
+                                copy,
+                            );
                         }
-                        if !delivered {
-                            // Non-fatal: surface as a warning toast, not a
-                            // SessionError. SessionError flips serviceStatus to
-                            // 'error' and is then immediately overwritten by the
-                            // FinalizedText below (serviceStatus 'ready'), which
-                            // made the status badge flash red for one frame.
-                            runtime
-                                .push_session_event(SessionStreamEvent::SessionWarning {
-                                    message: "Text delivery failed — output service is unavailable"
-                                        .into(),
-                                })
-                                .await;
+                        match outcome_rx {
+                            // Enqueue failed — the delivery thread is gone, so
+                            // nothing will ever be typed.
+                            None => {
+                                // Non-fatal: surface as a warning toast, not a
+                                // SessionError. SessionError flips serviceStatus to
+                                // 'error' and is then immediately overwritten by the
+                                // FinalizedText below (serviceStatus 'ready'), which
+                                // made the status badge flash red for one frame.
+                                runtime
+                                    .push_session_event(SessionStreamEvent::SessionWarning {
+                                        message:
+                                            "Text delivery failed — output service is unavailable"
+                                                .into(),
+                                    })
+                                    .await;
+                            }
+                            // Queued. Typing is paced and can take seconds, so
+                            // wait for the real outcome off this loop and warn
+                            // only if the driver actually dropped the text
+                            // (clipboard tooling missing and the text is unsafe
+                            // to type key-by-key — see `fallback_to_keys`).
+                            Some(rx) => {
+                                let runtime = runtime.clone();
+                                tauri::async_runtime::spawn(async move {
+                                    let outcome = tauri::async_runtime::spawn_blocking(move || {
+                                        rx.recv().ok()
+                                    })
+                                    .await
+                                    .ok()
+                                    .flatten();
+                                    if let Some(outcome) = outcome {
+                                        if !outcome.delivered {
+                                            runtime
+                                                .push_session_event(
+                                                    SessionStreamEvent::SessionWarning {
+                                                        message: "Dictation was not delivered — \
+                                                                  the clipboard is unavailable and \
+                                                                  the text cannot be typed safely"
+                                                            .into(),
+                                                    },
+                                                )
+                                                .await;
+                                        }
+                                    }
+                                });
+                            }
                         }
                         runtime
                             .push_session_event(SessionStreamEvent::FinalizedText { text })
@@ -816,6 +858,15 @@ impl AppRuntime {
     }
 
     async fn prepare_manager_for_start(&self) -> Result<Arc<SessionManager<AsrRegistry>>, String> {
+        // Serialize the whole reload+activate section. The `pipeline` mutex is
+        // released across `build_pipeline` (seconds of model loading), so two
+        // concurrent starts — IPC from either window, or a Hold-mode key-down,
+        // none of which are mutually exclusive on their own — could both pass
+        // the Phase 1 check and both load the model. On CUDA that is two
+        // concurrent allocations of the same model and can OOM the GPU. The
+        // loser now waits here and takes the winner's freshly-built pipeline.
+        let _start_guard = self.inner.start_gate.lock().await;
+
         // Phase 1: Check if reload needed (short lock).
         let reload_paths = {
             let pipeline = self.inner.pipeline.lock().await;
@@ -878,6 +929,12 @@ impl AppRuntime {
     /// covers that case. A failed rebuild is logged, not fatal: the styling
     /// path's own readiness checks produce the user-facing error.
     async fn reload_pipeline_if_required(&self) {
+        // Same gate as `prepare_manager_for_start`: this is the second path
+        // that rebuilds outside the `pipeline` lock, so without it a style
+        // example generation racing a dictation start still produces two
+        // concurrent `build_pipeline` calls (two GPU model allocations).
+        let _start_guard = self.inner.start_gate.lock().await;
+
         let reload_paths = {
             let pipeline = self.inner.pipeline.lock().await;
             if pipeline.active {

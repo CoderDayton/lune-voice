@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ConfirmDialog } from '../../../components/feedback/confirm-dialog';
+import { formatBackend } from '../../../store/workspace-mappers';
 import { type HistorySession, removeHistorySession } from '../../../store/workspace-store';
 
 interface SessionDetailModalProps {
@@ -236,11 +237,4 @@ function MetaItem({
       </div>
     </div>
   );
-}
-
-function formatBackend(backend: string): string {
-  if (backend.includes('WhisperCpp')) return 'Whisper';
-  // "API", not "Cloud" — the endpoint may have been a server on this machine.
-  if (backend.includes('OpenAi')) return 'API';
-  return backend;
 }

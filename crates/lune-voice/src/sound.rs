@@ -12,6 +12,8 @@
 //! debug level — a missing output device must never disrupt dictation.
 
 use std::io::Cursor;
+use std::sync::OnceLock;
+use std::sync::mpsc;
 use std::time::Duration;
 
 use cpal::SampleFormat;
@@ -43,6 +45,35 @@ impl Cue {
     }
 }
 
+/// Serializes cue playback onto one long-lived worker thread. Spawning a
+/// thread per cue let Start/Stop/Error opens of the same default output device
+/// overlap (rapid hotkey taps, a session that starts then immediately errors),
+/// which on ALSA without dmix fails "device busy" or garbles the cues.
+///
+/// The queue is bounded: a cue is feedback about something that just happened,
+/// so if the worker is still playing when several more arrive, dropping them is
+/// right and queueing them is wrong — an unbounded channel would play a Stop
+/// chime seconds later, during the *next* utterance.
+static CUE_TX: OnceLock<mpsc::SyncSender<(Cue, f32)>> = OnceLock::new();
+
+/// Cues that may wait for the worker before new ones are dropped. One in
+/// flight plus a couple queued covers a normal start→stop→error burst.
+const CUE_QUEUE_DEPTH: usize = 2;
+
+fn cue_sender() -> &'static mpsc::SyncSender<(Cue, f32)> {
+    CUE_TX.get_or_init(|| {
+        let (tx, rx) = mpsc::sync_channel::<(Cue, f32)>(CUE_QUEUE_DEPTH);
+        std::thread::spawn(move || {
+            while let Ok((cue, volume)) = rx.recv() {
+                if let Err(e) = play_blocking(cue, volume) {
+                    debug!(?cue, error = %e, "sound cue playback skipped");
+                }
+            }
+        });
+        tx
+    })
+}
+
 /// Play a cue at `volume` (0.0–1.0) without blocking the caller. A volume at
 /// or below zero is silent and skips playback entirely. Failures are logged at
 /// debug and otherwise ignored.
@@ -50,11 +81,11 @@ pub fn play(cue: Cue, volume: f32) {
     if volume <= 0.0 {
         return;
     }
-    std::thread::spawn(move || {
-        if let Err(e) = play_blocking(cue, volume.min(1.0)) {
-            debug!(?cue, error = %e, "sound cue playback skipped");
-        }
-    });
+    // `try_send`, never `send`: this runs on the dictation path and must not
+    // block on the audio device. A full queue means the cue is already stale.
+    if cue_sender().try_send((cue, volume.min(1.0))).is_err() {
+        debug!(?cue, "sound cue dropped — playback queue full");
+    }
 }
 
 fn play_blocking(cue: Cue, volume: f32) -> Result<(), String> {
@@ -147,7 +178,10 @@ fn decode_mono(bytes: &[u8]) -> Result<MonoPcm, String> {
 
     let interleaved: Vec<f32> = match spec.sample_format {
         hound::SampleFormat::Int => {
-            let scale = (1i64 << (spec.bits_per_sample - 1)) as f32;
+            // Saturate/clamp: a malformed header with 0 bits/sample would
+            // otherwise overflow the subtract and shift out of range.
+            let shift = spec.bits_per_sample.saturating_sub(1).min(62);
+            let scale = (1i64 << shift) as f32;
             reader
                 .samples::<i32>()
                 .map(|s| s.map(|v| v as f32 / scale).unwrap_or(0.0))

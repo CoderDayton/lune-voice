@@ -15,11 +15,35 @@ import { useCountUp } from './use-count-up';
 
 const AUDIO_BARS = 7;
 
+// The only subscriber to `runtime.audioLevel`, which updates on every raw
+// audio-level stream event with no coalescing. Subscribing from OverviewPage
+// itself re-rendered the whole bento board — animated counters, recent-session
+// list and all — at the raw event rate for the sake of seven bars.
+function AudioMeter({ isActive, label }: { isActive: boolean; label: string }) {
+  const audioLevel = useStore(workspaceStore, (s) => s.runtime.audioLevel);
+  return (
+    <div className="audio-meter mt-auto" role="img" aria-label={label}>
+      {Array.from({ length: AUDIO_BARS }).map((_, i) => {
+        const on = isActive && audioLevel >= (i + 0.5) / AUDIO_BARS;
+        const height = 28 + (i / (AUDIO_BARS - 1)) * 72;
+        return (
+          <span
+            // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length meter, index is the identity
+            key={i}
+            className="audio-meter-bar"
+            data-on={on}
+            style={{ height: `${height}%` }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 export function OverviewPage() {
   const { t } = useLingui();
   const serviceStatus = useStore(workspaceStore, (s) => s.runtime.serviceStatus);
   const loading = useStore(workspaceStore, (s) => s.runtime.loading);
-  const audioLevel = useStore(workspaceStore, (s) => s.runtime.audioLevel);
   const asrBackend = useStore(workspaceStore, (s) => s.settings.asrBackend);
   const dictationMode = useStore(workspaceStore, (s) => s.settings.dictationMode);
   const hotkeyToggle = useStore(workspaceStore, (s) => s.settings.hotkeyToggle);
@@ -179,21 +203,7 @@ export function OverviewPage() {
           <span className="section-label">{t`Audio`}</span>
           <Activity size={20} strokeWidth={1.5} className="text-accent/60" />
         </div>
-        <div className="audio-meter mt-auto" role="img" aria-label={t`Microphone input level`}>
-          {Array.from({ length: AUDIO_BARS }).map((_, i) => {
-            const on = isActive && audioLevel >= (i + 0.5) / AUDIO_BARS;
-            const height = 28 + (i / (AUDIO_BARS - 1)) * 72;
-            return (
-              <span
-                // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length meter, index is the identity
-                key={i}
-                className="audio-meter-bar"
-                data-on={on}
-                style={{ height: `${height}%` }}
-              />
-            );
-          })}
-        </div>
+        <AudioMeter isActive={isActive} label={t`Microphone input level`} />
         <p className="flex items-center gap-2 text-sm text-content-muted">
           <span className="relative inline-flex size-2 items-center justify-center">
             {isActive && (

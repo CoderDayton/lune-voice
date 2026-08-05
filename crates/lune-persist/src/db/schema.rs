@@ -43,6 +43,9 @@ diesel::table! {
         status -> Text,
         transcript -> Nullable<Text>,
         created_at -> Text,
+        /// Words in `transcript`, maintained on insert/update. NULL only
+        /// before the one-time backfill for pre-migration rows.
+        word_count -> Nullable<Integer>,
     }
 }
 

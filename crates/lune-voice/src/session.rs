@@ -288,12 +288,11 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         tokio::task::spawn(async move {
             if handle.await.is_err() {
                 tracing::error!(%session_id, "session task panicked — forcing cleanup");
-                if let Err(e) = event_tx_guard
-                    .send(SessionEvent::Error("internal session panic".into()))
-                    .await
-                {
-                    warn!(error = %e, %session_id, "could not deliver panic error to listener");
-                }
+                send_terminal(
+                    &event_tx_guard,
+                    SessionEvent::Error("internal session panic".into()),
+                )
+                .await;
                 clear_active(&active_arc_guard, &idle_notify_guard).await;
             }
         });
@@ -384,6 +383,26 @@ async fn clear_active(active_arc: &Arc<Mutex<Option<ActiveHandle>>>, idle_notify
     idle_notify.notify_waiters();
 }
 
+/// Upper bound on a terminal event send. The channel is generously sized
+/// (`mpsc::channel(256)`) and a session emits a handful of events, so this
+/// only fires if the consumer stopped polling entirely.
+const TERMINAL_EVENT_SEND_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Send an event that precedes `clear_active`, bounded in time.
+///
+/// These sends are on a bounded channel: a stuck/panicked consumer that lets
+/// the buffer fill would otherwise block the send *and* `clear_active`
+/// forever, permanently wedging the "one session at a time" invariant. Giving
+/// up on the event is strictly better than never clearing the session.
+async fn send_terminal(event_tx: &mpsc::Sender<SessionEvent>, event: SessionEvent) {
+    if tokio::time::timeout(TERMINAL_EVENT_SEND_TIMEOUT, event_tx.send(event))
+        .await
+        .is_err()
+    {
+        warn!("session event consumer stalled; terminal event dropped so teardown can proceed");
+    }
+}
+
 /// Log a persist failure and surface it to the listener as a
 /// `SessionEvent::Warning`. Returns the inner value on success, `None` on
 /// failure — so the caller can keep going without taking the session down.
@@ -459,8 +478,8 @@ async fn run_session<A: AsrBackend + 'static>(
         Err(e) => {
             if kind == SessionKind::CaptureRaw {
                 // No DB row exists for a capture — end without finalize.
-                let _ = deps.event_tx.send(SessionEvent::Error(e)).await;
-                let _ = deps.event_tx.send(SessionEvent::Stopped).await;
+                send_terminal(&deps.event_tx, SessionEvent::Error(e)).await;
+                send_terminal(&deps.event_tx, SessionEvent::Stopped).await;
                 clear_active(&deps.active_arc, &deps.idle_notify).await;
                 return;
             }
@@ -488,7 +507,7 @@ async fn run_session<A: AsrBackend + 'static>(
 
     if cancelled {
         if kind == SessionKind::CaptureRaw {
-            let _ = deps.event_tx.send(SessionEvent::Stopped).await;
+            send_terminal(&deps.event_tx, SessionEvent::Stopped).await;
             clear_active(&deps.active_arc, &deps.idle_notify).await;
             return;
         }
@@ -511,18 +530,19 @@ async fn run_session<A: AsrBackend + 'static>(
     // text (silence) is emitted too so the UI can say "didn't catch that".
     if kind == SessionKind::CaptureRaw {
         if let Some(error) = first_asr_error.take().filter(|_| !saw_asr_success) {
-            let _ = deps.event_tx.send(SessionEvent::Error(error)).await;
+            send_terminal(&deps.event_tx, SessionEvent::Error(error)).await;
         } else {
             info!(%session_id, "capture session finished, raw len={}", raw_text.len());
-            let _ = deps
-                .event_tx
-                .send(SessionEvent::FinalizedText {
+            send_terminal(
+                &deps.event_tx,
+                SessionEvent::FinalizedText {
                     session_id,
                     text: raw_text.trim().to_owned(),
-                })
-                .await;
+                },
+            )
+            .await;
         }
-        let _ = deps.event_tx.send(SessionEvent::Stopped).await;
+        send_terminal(&deps.event_tx, SessionEvent::Stopped).await;
         clear_active(&deps.active_arc, &deps.idle_notify).await;
         return;
     }
@@ -824,7 +844,7 @@ async fn process_and_deliver(
             None,
         )
         .await;
-        let _ = event_tx.send(SessionEvent::Stopped).await;
+        send_terminal(&event_tx, SessionEvent::Stopped).await;
         clear_active(&active_arc, &idle_notify).await;
         return;
     }
@@ -997,12 +1017,14 @@ async fn deliver_final_text(
     active_arc: &Arc<Mutex<Option<ActiveHandle>>>,
     idle_notify: &Arc<Notify>,
 ) {
-    let _ = event_tx
-        .send(SessionEvent::FinalizedText {
+    send_terminal(
+        event_tx,
+        SessionEvent::FinalizedText {
             session_id,
             text: final_text.clone(),
-        })
-        .await;
+        },
+    )
+    .await;
 
     let transcript = if final_text.is_empty() {
         None
@@ -1025,7 +1047,7 @@ async fn deliver_final_text(
     let ended_at = Some(Utc::now());
     finalize_db(session_id, persist, status, ended_at, transcript).await;
 
-    let _ = event_tx.send(SessionEvent::Stopped).await;
+    send_terminal(event_tx, SessionEvent::Stopped).await;
     clear_active(active_arc, idle_notify).await;
     info!(%session_id, "session stopped");
 }
@@ -1099,7 +1121,7 @@ async fn fail_init(
     idle_notify: &Notify,
 ) {
     let msg = error.to_string();
-    let _ = event_tx.send(SessionEvent::Error(msg.clone())).await;
+    send_terminal(event_tx, SessionEvent::Error(msg.clone())).await;
     finalize_db(
         session_id,
         Arc::clone(persist),
@@ -1108,6 +1130,10 @@ async fn fail_init(
         None,
     )
     .await;
+    // Every other terminal path emits `Stopped`; the init-failure path must
+    // too, or runtime.rs never reaches its `SessionStopped` arm for a mic
+    // that was busy or failed to open.
+    send_terminal(event_tx, SessionEvent::Stopped).await;
     clear_active(active_arc, idle_notify).await;
 }
 
@@ -1128,7 +1154,7 @@ async fn stop_session(
         None,
     )
     .await;
-    let _ = event_tx.send(SessionEvent::Stopped).await;
+    send_terminal(event_tx, SessionEvent::Stopped).await;
     clear_active(active_arc, idle_notify).await;
 }
 

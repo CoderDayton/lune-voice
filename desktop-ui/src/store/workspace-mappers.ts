@@ -162,3 +162,13 @@ export function settingsToSaveInput(settings: WorkspaceSettings): SaveWorkspaceS
     openaiLlmModel: settings.openaiLlmModel || null,
   };
 }
+
+// Display label for a `HistorySession.backend` string. Shared so the history
+// table and the session detail modal cannot drift apart on what the same
+// session's engine is called.
+export function formatBackend(backend: string): string {
+  if (backend.includes('WhisperCpp')) return 'Whisper';
+  // "API", not "Cloud" — the endpoint may have been a server on this machine.
+  if (backend.includes('OpenAi')) return 'API';
+  return backend;
+}

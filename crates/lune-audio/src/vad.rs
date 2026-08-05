@@ -83,8 +83,11 @@ impl Vad {
                 config.threshold_end, config.threshold
             )));
         }
+        // Derive samples/ms from the caller's rate — hardcoding 16 assumed
+        // 16 kHz and silently shortened/lengthened the hangover elsewhere.
+        let samples_per_ms = (sample_rate as usize / 1000).max(1);
         let hangover_samples = (config.hangover_ms as usize)
-            .saturating_mul(16)
+            .saturating_mul(samples_per_ms)
             .max(HOP_SIZE);
         let pcen = match config.pcen {
             Some(cfg) => Some(PcenAgc::new(cfg, sample_rate, HOP_SIZE)?),
@@ -298,6 +301,18 @@ mod tests {
             16_000,
         );
         assert!(r.is_ok(), "huge hangover_ms must saturate, not panic/wrap");
+    }
+
+    #[test]
+    fn hangover_scales_with_sample_rate() {
+        let cfg = VadConfig {
+            hangover_ms: 100,
+            ..Default::default()
+        };
+        let at_16k = Vad::new(cfg.clone(), 16_000).unwrap();
+        let at_48k = Vad::new(cfg, 48_000).unwrap();
+        assert_eq!(at_16k.hangover_total, 100 * 16);
+        assert_eq!(at_48k.hangover_total, 100 * 48);
     }
 
     #[test]

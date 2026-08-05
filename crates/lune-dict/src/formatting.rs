@@ -754,7 +754,15 @@ fn token_ends_sentence(token: &str) -> bool {
     if bare.is_empty() {
         return true;
     }
-    if bare.contains('.') {
+    // An interior dot normally means an abbreviation ("U.S.", "e.g."), which
+    // does not end a sentence. An all-digit dotted token has the same shape
+    // but genuinely ends one — prices and ratings ("that's a 4.5. Overall…"),
+    // and by extension version numbers and IPs ("we shipped 1.2.3. The next…"),
+    // are common in dictation, and misreading them swallowed the break.
+    let is_dotted_number = bare
+        .split('.')
+        .all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()));
+    if bare.contains('.') && !is_dotted_number {
         return false;
     }
     if NON_TERMINAL_ABBREVIATIONS.contains(&bare.to_lowercase().as_str()) {
@@ -1726,6 +1734,20 @@ mod tests {
         assert_eq!(
             capitalize_sentence_starts("the U.S. team won. great job."),
             "The U.S. team won. Great job."
+        );
+    }
+
+    /// A decimal ending a sentence has the same shape as an abbreviation, but
+    /// it really is a sentence break — the next word must be capitalized.
+    #[test]
+    fn sentence_caps_break_after_a_sentence_final_decimal() {
+        assert_eq!(
+            capitalize_sentence_starts("the price is 3.5. next one is cheaper."),
+            "The price is 3.5. Next one is cheaper."
+        );
+        assert_eq!(
+            capitalize_sentence_starts("that's a 4.5. overall i'd recommend it."),
+            "That's a 4.5. Overall i'd recommend it."
         );
     }
 
