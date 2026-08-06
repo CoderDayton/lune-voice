@@ -28,6 +28,8 @@ use crate::dto::SessionStreamEvent;
 
 const TOGGLE_DEBOUNCE: Duration = Duration::from_millis(150);
 const CANCEL_DEBOUNCE: Duration = Duration::from_millis(80);
+/// Shown when a session reported failure but its error text never arrived.
+const DROPPED_ERROR_MESSAGE: &str = "Dictation failed, but the error details were lost.";
 
 pub struct AppRuntime {
     inner: Arc<RuntimeInner>,
@@ -739,8 +741,22 @@ impl AppRuntime {
                             })
                             .await;
                     }
-                    SessionEvent::Stopped => {
+                    SessionEvent::Stopped { error_dropped } => {
                         runtime.finish_session().await;
+                        // The session failed but its `Error` never reached us
+                        // (this consumer stalled past the send timeout).
+                        // Reporting "ready" here would show a failed dictation
+                        // as a clean one, so surface a generic failure instead.
+                        if error_dropped && !saw_error {
+                            saw_error = true;
+                            warn!("session ended in error but the error event was dropped");
+                            runtime.publish_status("error").await;
+                            runtime
+                                .push_session_event(SessionStreamEvent::SessionError {
+                                    message: DROPPED_ERROR_MESSAGE.to_owned(),
+                                })
+                                .await;
+                        }
                         if !saw_error {
                             runtime.publish_status("ready").await;
                         }

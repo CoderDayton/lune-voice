@@ -52,6 +52,9 @@ zbus = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3.27.0"
+# `test-util` gives paused-time tests, so the terminal-send timeout can be
+# exercised without a real 5 s wait.
+tokio = { workspace = true, features = ["test-util"] }
 
 # ── Benchmarks (benchmarks/*.rs, restored for the whisper.cpp stack) ──
 # Each needs `whisper-cpp` for the real ASR. Build/run with, e.g.:

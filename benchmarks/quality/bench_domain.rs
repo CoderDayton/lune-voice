@@ -444,7 +444,7 @@ async fn run_pipeline(
                         used_llm = u;
                         unresolved = w.into_iter().map(|(word, _)| word).collect();
                     }
-                    Ok(Some(SessionEvent::Stopped)) => break,
+                    Ok(Some(SessionEvent::Stopped { .. })) => break,
                     Ok(Some(_)) => {}
                     Ok(None) => break,
                     Err(_) => {

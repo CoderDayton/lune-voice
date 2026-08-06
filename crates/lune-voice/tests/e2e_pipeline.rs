@@ -98,7 +98,7 @@ async fn e2e_start_stop_emits_events() {
             // Drain remaining events — look for Stopped.
             let mut saw_stopped = false;
             while let Ok(ev) = rx.try_recv() {
-                if matches!(ev, SessionEvent::Stopped) {
+                if matches!(ev, SessionEvent::Stopped { .. }) {
                     saw_stopped = true;
                 }
             }

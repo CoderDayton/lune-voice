@@ -176,7 +176,7 @@ async fn run_full_pipeline(
                     Ok(Some(SessionEvent::FinalizedText { text: t, .. })) => {
                         final_text.push_str(&t);
                     }
-                    Ok(Some(SessionEvent::Stopped)) => break,
+                    Ok(Some(SessionEvent::Stopped { .. })) => break,
                     Ok(Some(_)) => {}
                     Ok(None) => break,
                     Err(_) => {

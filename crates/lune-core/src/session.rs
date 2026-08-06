@@ -82,7 +82,15 @@ pub enum SessionEvent {
     /// failed but the session itself is still progressing). Carries human
     /// text; never terminal.
     Warning(String),
-    Stopped,
+    /// Session teardown finished.
+    ///
+    /// `error_dropped` is true when a preceding `Error` could not be delivered
+    /// because the listener stalled: the session failed, but the listener never
+    /// saw why. A listener that tracks success/failure must treat such a
+    /// `Stopped` as a failure rather than a clean stop.
+    Stopped {
+        error_dropped: bool,
+    },
 }
 
 impl SessionEvent {
@@ -97,13 +105,20 @@ impl SessionEvent {
             | Self::Processing
             | Self::AudioLevel(_)
             | Self::GateDecision { .. }
-            | Self::Stopped => None,
+            | Self::Stopped { .. } => None,
+        }
+    }
+
+    /// A clean `Stopped`: no terminal error was lost on the way out.
+    pub const fn stopped() -> Self {
+        Self::Stopped {
+            error_dropped: false,
         }
     }
 
     /// True iff this event marks the logical end of a session.
     pub fn is_terminal(&self) -> bool {
-        matches!(self, Self::Stopped | Self::Error(_))
+        matches!(self, Self::Stopped { .. } | Self::Error(_))
     }
 }
 
@@ -183,7 +198,7 @@ mod tests {
             Some("hello")
         );
         assert_eq!(SessionEvent::Started.text(), None);
-        assert_eq!(SessionEvent::Stopped.text(), None);
+        assert_eq!(SessionEvent::stopped().text(), None);
     }
 
     #[test]
@@ -198,7 +213,13 @@ mod tests {
 
     #[test]
     fn session_event_terminal_predicate() {
-        assert!(SessionEvent::Stopped.is_terminal());
+        assert!(SessionEvent::stopped().is_terminal());
+        assert!(
+            SessionEvent::Stopped {
+                error_dropped: true
+            }
+            .is_terminal()
+        );
         assert!(SessionEvent::Error("oops".into()).is_terminal());
         assert!(
             !(SessionEvent::FinalizedText {

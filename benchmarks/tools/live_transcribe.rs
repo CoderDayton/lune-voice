@@ -177,7 +177,7 @@ fn main() {
                         Some(SessionEvent::Processing) => {
                             eprint!("\r\x1b[2K  \x1b[33m[processing...]\x1b[0m");
                         }
-                        Some(SessionEvent::Stopped) | None => break,
+                        Some(SessionEvent::Stopped { .. }) | None => break,
                         _ => {}
                     }
                 }

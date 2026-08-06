@@ -70,7 +70,7 @@ fn main() {
                             SessionEvent::AudioLevel(_) => continue,
                             SessionEvent::CommandDetected { .. } => "CommandDetected",
                             SessionEvent::Error(_) => "Error",
-                            SessionEvent::Stopped => {
+                            SessionEvent::Stopped { .. } => {
                                 events.push(("Stopped", elapsed_ms));
                                 break;
                             }
