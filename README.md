@@ -64,7 +64,7 @@ sudo apt install ./lune-voice_*_amd64.deb
 You need Rust, [Bun](https://bun.sh), CMake, LLVM, the Tauri WebView dependencies, and the `cgs` task runner that drives the build scripts. A CUDA toolkit is only needed if you want to build the GPU plugin yourself.
 
 ```bash
-cargo install cargo-run   # provides the `cgs` command
+cargo install cargo-script   # provides the `cgs` command
 git clone https://github.com/CoderDayton/lune-voice
 cd lune-voice
 cgs dev      # run the app with hot reload

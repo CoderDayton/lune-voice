@@ -64,7 +64,9 @@ path, which never touches your input method.
 Work down this list:
 
 1. **No model.** Check `~/.local/share/lune-voice/models/` has the model named
-   in settings. Re-download from Settings → Models.
+   in settings. Re-download from Settings → Models. A download that never
+   finishes gives up on its own — 30 s to connect, 30 s to respond, one hour
+   for the body.
 2. **Mic not captured.** `RUST_LOG=info` and look for capture logs; check the
    input device in Settings. The level meter reads *post-AGC*, so a silent meter
    means no audio is arriving at all.
@@ -72,6 +74,24 @@ Work down this list:
    `dropping garbage segment` at WARN. Usually a mic gain problem.
 4. **Backend not compiled in.** An error containing `not compiled in` means the
    binary was built without `whisper-cpp`. Rebuild with `cgs build`.
+5. **Remote transcription under local-only privacy.** An error naming
+   `privacy mode` means transcription points at a remote service while
+   `privacy_mode = "LocalOnly"`. Switch transcription back to Whisper, or
+   change the privacy mode.
+
+---
+
+## Transcript is recognized but never appears
+
+**Symptom:** the session completes and history shows the text, but nothing was
+inserted; the UI reports the dictation was not delivered.
+
+**Cause:** the clipboard is unavailable (`wl-copy` / `xclip` missing or
+failing) and the text is multi-line. Typing it key by key would press Enter
+into whatever has focus, so it is dropped instead.
+
+**Recovery:** install `wl-clipboard` (Wayland) or `xclip` (X11). The transcript
+is in history, so nothing is lost — copy it from there in the meantime.
 
 ---
 

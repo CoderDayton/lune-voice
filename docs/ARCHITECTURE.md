@@ -50,8 +50,8 @@ lune-core (types, config, errors, hwce confidence)
 ├─ lune-llm (openai remote, null passthrough, style pipeline, prompt, few-shot)
 ├─ lune-dict (corrector, vocab, voice commands)
 └─ lune-persist (settings.toml, sqlite, model hub)
-     └─ lune-voice (session, capture + AGC, factory, hotkey, delivery, sound cues)
-          └─ desktop-ui/src-tauri (tauri IPC, pill, persistence bridge)
+     └─ lune-voice (session, capture + AGC, delivery, sound cues)
+          └─ desktop-ui/src-tauri (tauri IPC, hotkey, backend registry wiring, pill, persistence bridge)
 ```
 
 Each crate has a single responsibility. `lune-core` defines shared types and traits but contains no runtime logic. All inter-crate communication flows through trait objects and channels.
@@ -149,6 +149,8 @@ The session calls `StylePipeline::transform()` for LLM post-processing.
 | `raw_text` | ASR transcript after dictionary substitution |
 | `dictionary` | Entries for the pre-LLM seed substitution; never sent to the model |
 | `style_preset` | Output style contract |
+| `app_category` | Focused-application hint |
+| `language` | BCP-47 code from ASR detection, `"en"` when unset |
 
 `StylePipeline` runs two steps:
 
@@ -168,7 +170,7 @@ The LLM backend (`OpenAiLlmBackend`) wraps an `async-openai` `Client` and makes 
 The session emits two `SessionEvent` variants directly on the event channel:
 
 - `PartialText` — in-progress signal for live preview
-- `FinalizedText(String)` — styled text for delivery
+- `FinalizedText { session_id, text }` — styled text for delivery
 
 Delivery runs on a dedicated thread and picks a backend once at startup:
 
@@ -181,6 +183,8 @@ Delivery runs on a dedicated thread and picks a backend once at startup:
 |------|-------------|-----------|
 | `TypeInPlace` | Types each key (US-QWERTY). Non-ASCII text routes through the clipboard paste path so it is never dropped. | `commit_text` |
 | `Clipboard` | Sets the clipboard (`wl-copy`/`xclip`), detects terminals, sends Ctrl+V / Ctrl+Shift+V. Adaptive post-paste delay (EMA of clipboard RTT); per-key fallback for paste-hostile apps. | `commit_text` |
+
+**Undeliverable text.** Delivery reports back whether the text reached the focused app. Multi-line text is never typed key-by-key — a newline would press Enter into whatever has focus — so if the clipboard is also unavailable the text is dropped rather than sent, and the session raises a warning instead of reporting success.
 
 **Clipboard preservation.** The `Clipboard` path borrows the system clipboard as a transport. When `copy_to_clipboard` is off, the prior clipboard is snapshotted before delivery (its preferred MIME type and raw bytes, so images survive) and restored afterward. When `copy_to_clipboard` is on, the dictated text is kept and the otherwise-redundant re-copy is skipped. The IBus path never touches the clipboard.
 
@@ -216,6 +220,8 @@ Only one session may be active at a time (enforced by `Arc<Mutex<Option<ActiveHa
 
 Cancellation is checked before LLM styling and again before final output. A cancellation during styling marks the session cancelled and skips `FinalizedText`.
 
+Terminal events are sent with a timeout so a stalled listener cannot wedge teardown. A `Stopped` that follows a dropped `Error` carries `error_dropped`, so the listener still reports the session as failed.
+
 ---
 
 ## Desktop Bridge
@@ -244,6 +250,8 @@ The desktop app does not scrape logs or poll for session state. It uses typed Ta
 | `list_audio_input_devices` | `main` | Input device picker |
 | `start_trigger_capture` | `main` | Capture-only session for the snippet voice-trigger recorder (transcript streamed back, nothing typed, no history row) |
 | `check_model_status` / `download_model_cmd` / `delete_model_cmd` | `main` | Model management |
+| `export_transcript` | `main` | Write a session transcript to a file |
+| `app_version` / `start_update_check` | `main` | Version string and on-demand update check |
 | `initialize_pipeline` / `quit_app` | `main` | Runtime lifecycle |
 
 ### Session Stream
@@ -279,7 +287,7 @@ Rust shows or hides the pill directly on status changes (`should_show_pill`) —
 
 ### Sound Cues
 
-Short audio cues play from the Rust backend on status transitions — Start on `listening`, Stop when leaving an active state, Error on `error` — deduplicated on the previous status so each fires once. Embedded 16-bit mono WAVs are decoded and played through a short-lived `cpal` output stream on a detached thread. Playback is gated by `sound_cues_enabled` / `sound_cue_volume` and every failure is swallowed, so audio never disrupts dictation.
+Short audio cues play from the Rust backend on status transitions — Start on `listening`, Stop when leaving an active state, Error on `error` — deduplicated on the previous status so each fires once. Embedded 16-bit mono WAVs are decoded and played through a short-lived `cpal` output stream on one serialized worker thread, behind a small bounded queue so a burst of transitions cannot pile up streams. Playback is gated by `sound_cues_enabled` / `sound_cue_volume` and every failure is swallowed, so audio never disrupts dictation.
 
 ---
 

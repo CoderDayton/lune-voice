@@ -8,6 +8,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Security
 
+- `privacy_mode` is enforced instead of merely stored: under the default `LocalOnly`, a remote transcription backend is refused with an actionable message and remote styling degrades to passthrough
 - The ASR and styling LLM endpoints both enforce HTTPS for anything but a local address (loopback, private LAN, `.local`/`.localhost`) — a plaintext public endpoint would otherwise send the API key and dictated text in cleartext. A refused LLM backend degrades to passthrough styling rather than failing startup
 - The session-history database (full dictated transcripts) is now created owner-only, with the same 0600 file permissions as `settings.toml`; the process umask is hardened so its WAL/SHM sidecars are protected too
 - Transcript export now writes through a Rust command (absolute-path, no-`..` validated) instead of the webview `fs` plugin; the broad `fs:write-files` capability is removed
@@ -17,10 +18,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Performance
 
+- History statistics read a maintained `word_count` column instead of loading every transcript, so the overview no longer slows down as history grows
 - Whisper decode is documented as `block_in_place` on a multi-thread runtime (the app's actual configuration), and a decode on a current-thread runtime now warns loudly instead of silently stalling the async runtime
 
 ### Fixed
 
+- When the clipboard is unavailable, multi-line text is no longer typed key by key — the newlines pressed Enter into the focused app. The dictation is dropped and reported as undelivered instead
+- A dictation that failed while the UI was busy is reported as failed rather than as a clean stop
+- Transcript timestamps are absolute again when silence is trimmed from the start of an utterance
+- Concurrent settings saves apply in order, so a fast second change is no longer reverted by the first
 - The styling pass no longer collapses spaced digit groups that are not thousands separators — phone numbers and part/ID numbers like `555 123 4567`, and dialling prefixes like `0 800 123 456`, are left intact, while `1 000 000` still collapses to `1000000`
 - `input:`/`output:` in the middle of a styled transcript are no longer misread as the model echoing the few-shot labels (only a line-starting label is treated as an echo), so legitimate text like "I said input: the password" survives styling
 - Reasoning blocks in the middle of a styled answer (`<think>`/`<thinking>`/`<reasoning>`/`<thought>`) are now stripped, not just leading ones, and cutting one out no longer leaves a doubled space behind

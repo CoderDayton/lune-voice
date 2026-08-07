@@ -8,7 +8,9 @@ use lune_asr::AsrRegistry;
 use lune_audio::{AudioConfig, AudioStream};
 use lune_core::asr::AsrSessionConfig;
 use lune_core::command::VoiceCommand;
-use lune_core::config::{DictationMode, LlmBackendConfig, PillVisibility, UserSettings};
+use lune_core::config::{
+    AsrBackendConfig, DictationMode, LlmBackendConfig, PillVisibility, PrivacyMode, UserSettings,
+};
 use lune_core::llm::LlmService;
 use lune_core::session::SessionEvent;
 use lune_dict::DictionaryManager;
@@ -1020,6 +1022,19 @@ async fn build_pipeline(
     paths: AppPaths,
     settings: UserSettings,
 ) -> Result<(LivePipeline, Arc<dyn LlmService>, Arc<RwLock<UserSettings>>), String> {
+    // `LocalOnly` is the default, so refusing here is the difference between a
+    // stated preference and an enforced one: a remote backend would ship every
+    // utterance's audio off the machine. Styling degrades to passthrough for
+    // the same reason (`build_llm_service`), but transcription has no local
+    // fallback to degrade to, so this fails the build with a fixable message.
+    if remote_backends_denied(settings.privacy_mode)
+        && matches!(
+            settings.asr_backend,
+            AsrBackendConfig::OpenAiCompatible { .. }
+        )
+    {
+        return Err("privacy mode is set to local-only, but transcription is configured to use a remote service. Switch transcription back to Whisper, or allow remote processing in Settings.".into());
+    }
     // Whisper model load takes seconds on the larger models; keep it off the
     // async workers so IPC and the UI stay responsive during startup/reload.
     let asr = {
@@ -1130,6 +1145,15 @@ fn load_settings(paths: &AppPaths) -> Result<UserSettings, String> {
     Ok(settings)
 }
 
+/// Whether `privacy_mode` forbids sending audio or text to a remote service.
+///
+/// Only `LocalOnly` denies. `LocalPreferred` treats configuring a remote
+/// backend as the explicit opt-in it describes, and `AllowRemote` imposes
+/// nothing.
+fn remote_backends_denied(mode: PrivacyMode) -> bool {
+    matches!(mode, PrivacyMode::LocalOnly)
+}
+
 async fn build_llm_service(settings: &UserSettings) -> Result<Arc<dyn LlmService>, String> {
     match &settings.llm_backend {
         LlmBackendConfig::OpenAiCompatible {
@@ -1138,6 +1162,12 @@ async fn build_llm_service(settings: &UserSettings) -> Result<Arc<dyn LlmService
             model,
             max_tokens,
         } => {
+            // Local-only means local-only: styling is optional, so a remote
+            // provider is dropped to passthrough rather than failing the app.
+            if remote_backends_denied(settings.privacy_mode) {
+                tracing::info!("privacy mode is local-only; styling stays off (passthrough)");
+                return Ok(Arc::new(NullPostProcessor::new()) as Arc<dyn LlmService>);
+            }
             // Selecting a style on the Styles page flips `llm_enabled` on, and
             // with the local engine gone that always resolves to this remote
             // provider — defaulted to api.openai.com. Building a live backend
@@ -1248,8 +1278,17 @@ fn cue_for_transition(prev: &str, status: &str) -> Option<lune_voice::sound::Cue
 #[cfg(test)]
 mod tests {
     use super::{
-        PrewarmAction, cue_for_transition, reconcile_prewarm, sanitize_error_for_frontend,
+        PrewarmAction, cue_for_transition, reconcile_prewarm, remote_backends_denied,
+        sanitize_error_for_frontend,
     };
+    use lune_core::config::PrivacyMode;
+
+    #[test]
+    fn only_local_only_denies_remote_backends() {
+        assert!(remote_backends_denied(PrivacyMode::LocalOnly));
+        assert!(!remote_backends_denied(PrivacyMode::LocalPreferred));
+        assert!(!remote_backends_denied(PrivacyMode::AllowRemote));
+    }
 
     #[test]
     fn start_cue_fires_once_despite_double_listening() {

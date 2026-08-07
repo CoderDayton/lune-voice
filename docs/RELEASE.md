@@ -120,8 +120,9 @@ Tauri produces the `.msi`/`.exe` (NSIS) installers configured in
 ### Linux bundles
 
 `scripts/release/package-all.sh` builds `.deb` / `.AppImage` / `.rpm` via
-containerized cross-distro builds (honors `$CONTAINER_ENGINE`). Pass the backend
-through `BACKEND` as above when invoking the production build inside it.
+containerized cross-distro builds (honors `$CONTAINER_ENGINE`). It builds the
+CPU backend (`--features whisper-cpp`); GPU support reaches those bundles as the
+downloadable CUDA plugin, not as a second artifact.
 
 ## macOS Metal (planned, not yet wired)
 

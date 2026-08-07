@@ -43,10 +43,10 @@ Settings mutability tiers:
 
 | Tier | When Applied | Fields |
 |------|-------------|--------|
-| **Hot** | Immediately (watch channel) | `dictation_mode`, `copy_to_clipboard`, `activation_mode`, `pill_visibility`, `terminal_mode`, `sound_cues_enabled`, `sound_cue_volume` |
-| **Warm** | Next session start | `default_style`, `language`, `dictation_language`, `mic_prewarm` |
-| **Cold** | Persist only | `privacy_mode`, `session_history_days`, `start_minimized`, `hotkey` |
-| **Reload** | Before next session | `asr_backend`, `llm_backend`, `device` |
+| **Hot** | On save | `hotkey`, `activation_mode`, `mic_prewarm`, `input_device`, `sound_cues_enabled`, `sound_cue_volume`, every `pill_*` field |
+| **Warm** | Next session start, when the pipeline rebuilds | `asr_backend`, `llm_backend`, `device`, `privacy_mode`, `default_style`, `language`, `dictation_language`, `vad_pcen`, `dictation_mode`, `copy_to_clipboard` |
+| **Cold** | Next app start | `terminal_mode`, `start_minimized`, `check_updates_on_launch` |
+| **Stored** | Read on demand, never cached | `session_history_days` |
 
 All changes are persisted to disk immediately. The desktop app reloads a workspace snapshot after save, so the UI reflects the stored settings rather than a local guess.
 
@@ -87,8 +87,10 @@ sound_cues_enabled = true
 sound_cue_volume = 1.0
 session_history_days = 30
 mic_prewarm = true
+# input_device is optional — omit to follow the system default input.
 vad_pcen = true
 start_minimized = false
+check_updates_on_launch = false
 
 [asr_backend]
 type = "WhisperCpp"
@@ -163,7 +165,7 @@ streaming = "HttpPolling"
 | `model` | string | — | Model identifier |
 | `streaming` | enum | — | `"WebSocket"` or `"HttpPolling"` |
 
-> **Privacy note:** Remote backends send audio data to external servers. Requires `privacy_mode = "AllowRemote"`.
+> **Privacy note:** Remote backends send audio data to external servers, so they require `privacy_mode = "LocalPreferred"` or `"AllowRemote"`. See [Privacy Mode](#privacy-mode).
 
 > **Confidence:** Remote backends do not expose per-token confidence. Styling is still applied based on the style preset.
 
@@ -200,7 +202,7 @@ max_tokens = 512
 | `model` | string | — | Model identifier |
 | `max_tokens` | u32 | — | Maximum output tokens |
 
-> Requires `privacy_mode = "AllowRemote"` or `"LocalPreferred"`.
+> Sends transcript text to the configured endpoint, so it requires `privacy_mode = "LocalPreferred"` or `"AllowRemote"`. See [Privacy Mode](#privacy-mode).
 
 ---
 
@@ -234,13 +236,14 @@ privacy_mode = "LocalOnly"
 
 | Mode | Behavior |
 |------|----------|
-| `LocalOnly` | Intended to reject any remote backend. **(default)** |
-| `LocalPreferred` | Intended to prefer local backends, allowing remote when explicitly configured |
+| `LocalOnly` | Rejects every remote backend. **(default)** |
+| `LocalPreferred` | Allows remote backends, which only run when explicitly configured |
 | `AllowRemote` | Use whatever is configured — no restrictions |
 
-> **Not enforced.** The field is validated and persisted, but nothing in the
-> runtime reads it: configuring a remote backend under `LocalOnly` is currently
-> allowed. Treat it as a stored preference, not a guardrail.
+Under `LocalOnly`, a remote transcription backend fails the pipeline build with
+an actionable message — there is no local fallback to silently substitute.
+Remote styling is optional, so it degrades to passthrough (the deterministic
+transcript) and logs the reason.
 
 ---
 
@@ -256,7 +259,7 @@ copy_to_clipboard = false
 | Mode | Behavior |
 |------|----------|
 | `TypeInPlace` | Types the text into the focused field, character by character, through a `uinput` virtual keyboard. Non-ASCII text (accents, CJK, emoji) is delivered via a clipboard paste instead, so nothing is dropped. **(default)** |
-| `Clipboard` | Delivers by setting the clipboard and sending a paste chord — `Ctrl+V`, or `Ctrl+Shift+V` when a terminal is focused. Uses an adaptive post-paste delay (EMA of clipboard round-trip) and falls back to per-key typing if `wl-copy` / `xclip` are missing. |
+| `Clipboard` | Delivers by setting the clipboard and sending a paste chord — `Ctrl+V`, or `Ctrl+Shift+V` when a terminal is focused. Uses an adaptive post-paste delay (EMA of clipboard round-trip) and falls back to per-key typing if `wl-copy` / `xclip` are missing. Text that cannot be typed safely per key — anything multi-line — is dropped with a warning rather than delivered, since a newline would press Enter into the focused app. |
 
 > When IBus is the active input method (common on GNOME/Wayland), both modes commit text directly through IBus and never touch the clipboard. See [Architecture → Text Delivery](ARCHITECTURE.md#5-text-delivery).
 
@@ -414,7 +417,7 @@ Each entry has:
 |-------|------|-------------|
 | `phrase` | string | The spoken/misheard form |
 | `replacement` | string | The correct written form |
-| `priority` | int | Higher priority entries are matched first |
+| `priority` | u8 | Higher priority entries are matched first |
 
 Dictionary entries are not sent to the styling LLM — the substitution happens before the call, so the model only ever sees the corrected text.
 
@@ -425,12 +428,12 @@ Dictionary entries are not sent to the styling LLM — the substitution happens 
 Completed dictation sessions are stored in a SQLite database.
 
 ```toml
-session_history_days = 30    # number of days to retain, or null to disable
+session_history_days = 30    # days to retain, or null to keep history forever
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `session_history_days` | u32 or null | Days to retain session history. `null` disables persistence entirely |
+| `session_history_days` | u32 (1–3650) or null | Days to retain session history; older sessions are pruned when the workspace loads. `null` keeps everything |
 
 Each session record contains:
 
@@ -441,7 +444,7 @@ Each session record contains:
 | `ended_at` | datetime | Session end timestamp (null if crashed) |
 | `style` | string | Style preset ID used |
 | `backend` | enum | ASR backend type (`WhisperCpp` / `OpenAiCompatible`) |
-| `status` | enum | Completed / Failed(reason) |
+| `status` | enum | `Active`, `Completed`, `Failed(reason)`, or `Cancelled` |
 | `transcript` | string | Final styled transcript (null if empty) |
 
 Database location: `~/.local/share/lune-voice/lune.db`.
@@ -508,4 +511,6 @@ max_tokens = 512
 | `RUST_LOG` | Tracing filter (e.g., `lune_asr=debug,lune_llm=info`) |
 | `LUNE_LOG_TRANSCRIPTS` | Set to `1` to include transcript text in logs. Redacted by default — leave it unset outside recognition debugging |
 | `LUNE_DISABLE_IBUS` | Set to any value to skip the IBus delivery path and always type through `uinput` |
+| `HF_TOKEN` | HuggingFace token for model downloads; only needed for gated or private repos |
+| `LUNE_UPDATER_ENDPOINT` | Override the release manifest URL used by the update check |
 | `LIBCLANG_PATH` | Required at build time for bindgen (e.g., `/lib/x86_64-linux-gnu`); not a runtime variable |

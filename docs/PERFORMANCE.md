@@ -86,7 +86,7 @@ Model-backed targets compile whisper.cpp and need a model on disk. Numbers are n
 | Technique | Location | Impact |
 |-----------|----------|--------|
 | **Shared softmax for HWCE** | `crates/lune-core/src/hwce/features.rs` | Computes softmax once per token and feeds the probability slice to entropy/Tsallis/margin instead of three independent passes |
-| **O(1) risk lookup in corrector** | `crates/lune-dict/src/corrector.rs` | Risk positions indexed in a `HashMap`, replacing a per-word linear scan that was O(words²) overall |
+| **O(1) risk lookup in corrector** | `crates/lune-dict/src/corrector.rs` | Risk positions are indexed in a `HashMap`, so each word costs an O(1) lookup instead of a linear scan over the risk list |
 | **PCEN AGC frontend** | `crates/lune-audio/src/pcen.rs`, `crates/lune-voice/src/capture.rs` | Adaptive gain normalization applied to every captured frame through `MicAgc`, gated by the `vad_pcen` setting (default on); lifts a quiet mic toward a target RMS before the recognizer sees it |
 
 ### Concurrency
