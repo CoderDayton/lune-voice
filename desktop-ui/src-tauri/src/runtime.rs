@@ -1138,8 +1138,10 @@ fn resolve_paths() -> Result<AppPaths, String> {
 }
 
 fn load_settings(paths: &AppPaths) -> Result<UserSettings, String> {
+    // Quarantine rather than propagate: this runs on the startup path, where
+    // an error exits the process before the user has any way to fix the file.
     let mut settings = SettingsStore::new(paths.settings_file())
-        .load()
+        .load_or_quarantine()
         .map_err(|e| format!("load settings: {e}"))?;
     settings.migrate_pipeline_fields();
     Ok(settings)

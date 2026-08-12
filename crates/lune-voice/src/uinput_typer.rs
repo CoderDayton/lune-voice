@@ -11,6 +11,7 @@
 //! After that, access is permanent — no further prompts.
 
 use std::{
+    borrow::Cow,
     fs::OpenOptions,
     process::{Command, Output, Stdio},
     time::{Duration, Instant},
@@ -261,7 +262,7 @@ fn focused_window_class() -> Option<String> {
     None
 }
 
-fn focused_is_terminal() -> bool {
+pub(crate) fn focused_is_terminal() -> bool {
     let Some(class) = focused_window_class() else {
         info!("focused window: unknown (defaulting to Ctrl+V)");
         return false;
@@ -951,8 +952,11 @@ fn char_to_key(ch: char) -> Option<(KeyCode, bool)> {
 
         ' ' => (KeyCode::KEY_SPACE, false),
         '\n' => (KeyCode::KEY_ENTER, false),
-        '\t' => (KeyCode::KEY_TAB, false),
-
+        // No `'\t' => KEY_TAB`. Pressing Tab is an action, not a character:
+        // in a GUI it moves focus to the next widget, so the rest of the
+        // transcript lands in a different control, and at a shell prompt it
+        // requests completion. A tab therefore has no keystroke and routes
+        // the whole text to a clipboard paste, where it stays literal.
         _ => return None,
     };
     Some(pair)
@@ -968,9 +972,10 @@ fn is_keystroke_typeable(text: &str) -> bool {
 /// True when per-key typing is unsafe or impossible for `text`, so delivery
 /// must go through a clipboard paste instead.
 ///
-/// Two reasons: a character with no US-QWERTY keystroke (would be dropped), or
-/// a newline — `char_to_key` turns that into KEY_ENTER, which submits the form
-/// or runs the shell line being typed into instead of inserting a line break.
+/// Two reasons: a character with no US-QWERTY keystroke — which now includes
+/// tab, see `char_to_key` — so it would be dropped, or a newline, which
+/// `char_to_key` turns into KEY_ENTER and which submits the form or runs the
+/// shell line being typed into instead of inserting a line break.
 fn needs_paste_delivery(text: &str) -> bool {
     !is_keystroke_typeable(text) || text.contains('\n')
 }
@@ -983,6 +988,20 @@ fn needs_paste_delivery(text: &str) -> bool {
 /// Enter submitting the form or running the shell line.
 fn keystroke_fallback_allowed(text: &str) -> bool {
     !needs_paste_delivery(text)
+}
+
+/// Substitute spaces for tabs so the per-key fallback can still run.
+///
+/// A tab has no keystroke by design (see `char_to_key`), which routes text
+/// containing one to a clipboard paste. When the clipboard is what failed,
+/// that same rule would refuse to type the text at all and drop the whole
+/// utterance over one whitespace character.
+fn tabs_to_spaces(text: &str) -> Cow<'_, str> {
+    if text.contains('\t') {
+        Cow::Owned(text.replace('\t', " "))
+    } else {
+        Cow::Borrowed(text)
+    }
 }
 
 // ─── Adaptive paste timing ───────────────────────────────────────────────────
@@ -1210,6 +1229,34 @@ impl UinputTyper {
         label: &str,
         keep_clipboard: bool,
     ) -> TypeOutcome {
+        // A terminal runs what it receives: every newline in a paste is a line
+        // the shell executes and every tab is a completion request. Collapse
+        // both to spaces so the target gets one inert line and nothing happens
+        // until the user presses Enter themselves. Only the terminal path is
+        // affected; ordinary text fields keep their line breaks.
+        //
+        // This assumes everything arriving here is transcript content. A future
+        // caller that wants to press a real Enter (a "new line" voice command,
+        // say) must not route through the paste path — it would get a space.
+        //
+        // The clipboard below carries the flattened text too, so what the user
+        // keeps (`copy_to_clipboard`) is what was actually pasted.
+        let flattened = if is_terminal {
+            crate::sanitize::flatten_for_terminal(text)
+        } else {
+            Cow::Borrowed(text)
+        };
+        if flattened != text {
+            warn!("collapsed line breaks and tabs in text pasted into a terminal");
+        }
+        let text: &str = &flattened;
+        // Flattening a transcript that was nothing but line breaks leaves
+        // nothing to paste. `delivery.rs` screens empty text, but it does so
+        // before this step.
+        if text.is_empty() {
+            return TypeOutcome::DROPPED;
+        }
+
         // The clipboard is only a transport for the paste chord. Unless the user
         // opted to keep the dictated text (copy_to_clipboard), preserve whatever
         // they had on the clipboard so we can put it back after the paste —
@@ -1218,9 +1265,8 @@ impl UinputTyper {
         // `prime_clipboard`) to keep its wl-paste cost off this hot path.
         //
         // Prefer that primed snapshot; always `take()` so a primed-but-unused
-        // one (when keeping our text) can't leak into a later structural
-        // injection's restore. Fall back to a synchronous read only when this
-        // paste wasn't primed (e.g. newline/bullet injections).
+        // one (when keeping our text) can't leak into a later paste's restore.
+        // Fall back to a synchronous read only when this paste wasn't primed.
         let primed = self.primed_clipboard.take();
         let prior = if keep_clipboard {
             Ok(None)
@@ -1340,16 +1386,22 @@ impl UinputTyper {
     /// strictly safer than that. The refusal is reported through the returned
     /// [`TypeOutcome`] so `delivery.rs` can warn the user rather than let a
     /// dropped dictation look like a successful one.
+    ///
+    /// Tabs are the one exception. A tab has no keystroke by design (see
+    /// `char_to_key`) but is only whitespace, so it becomes a space here
+    /// instead of costing the user the whole utterance over one character.
     fn fallback_to_keys(&mut self, text: &str) -> TypeOutcome {
-        if !keystroke_fallback_allowed(text) {
+        let text = tabs_to_spaces(text);
+        if !keystroke_fallback_allowed(&text) {
             error!(
                 multi_line = text.contains('\n'),
+                untypeable = !is_keystroke_typeable(&text),
                 "clipboard unavailable and text cannot be typed per-key safely; \
                  dictation not delivered"
             );
             return TypeOutcome::DROPPED;
         }
-        self.type_keys_raw(text);
+        self.type_keys_raw(&text);
         TypeOutcome::delivered(false)
     }
 
@@ -1391,8 +1443,9 @@ impl UinputTyper {
 mod tests {
     use super::{
         is_safe_mime, is_terminal_class, keystroke_fallback_allowed, needs_paste_delivery,
-        pipe_text_to_command,
+        pipe_text_to_command, tabs_to_spaces,
     };
+    use std::borrow::Cow;
     use std::time::{Duration, Instant};
 
     /// A clipboard failure must not reopen the Enter hazard: the fallback
@@ -1424,7 +1477,26 @@ mod tests {
     #[test]
     fn single_line_ascii_is_typed_per_key() {
         assert!(!needs_paste_delivery("Best regards, Dayton"));
-        assert!(!needs_paste_delivery("tabs\tare fine"));
+        // A tab has no keystroke: pressing Tab would move focus mid-transcript.
+        assert!(needs_paste_delivery("tabs\tgo through the clipboard"));
+    }
+
+    /// Routing a tab to the clipboard must not mean losing the dictation when
+    /// the clipboard is the thing that failed. `fallback_to_keys` substitutes
+    /// spaces first, so only the genuinely untypeable cases are refused.
+    #[test]
+    fn a_tab_does_not_cost_the_whole_utterance_when_the_clipboard_is_down() {
+        assert!(
+            keystroke_fallback_allowed(&tabs_to_spaces("review\tthis")),
+            "a tab is whitespace; it must degrade to a space, not drop the text"
+        );
+        assert_eq!(tabs_to_spaces("review\tthis"), "review this");
+        assert!(matches!(tabs_to_spaces("no tabs here"), Cow::Borrowed(_)));
+
+        // The two refusals that must survive: Enter is an action, and a
+        // character with no keystroke would be silently swallowed.
+        assert!(!keystroke_fallback_allowed(&tabs_to_spaces("a\tb\nc")));
+        assert!(!keystroke_fallback_allowed(&tabs_to_spaces("café\tx")));
         assert!(!needs_paste_delivery(""));
     }
 

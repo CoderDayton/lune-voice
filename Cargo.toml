@@ -34,10 +34,16 @@ unimplemented = "warn"
 [profile.release]
 # thin LTO: ~80% of fat's benefit at fraction of link time; cross-crate inlining
 # unlocked across all 9 crates. codegen-units=1 removes parallelism barriers so
-# LLVM sees the full call graph. panic=abort removes unwind tables (~5% binary size).
+# LLVM sees the full call graph.
+#
+# Unwinding (the default), deliberately, despite `panic = "abort"` being worth
+# ~5% of binary size: the session task has a supervisor that catches a panicked
+# dictation, reports it, releases the mic and closes the history row
+# (`lune-voice/src/session.rs`). Aborting turns one bad utterance into the app
+# vanishing mid-sentence, and that supervisor into dead code. A panic crossing
+# an `extern "C"` boundary still aborts, which is what the ggml callbacks need.
 lto = "thin"
 codegen-units = 1
-panic = "abort"
 opt-level = 3
 strip = "debuginfo"
 

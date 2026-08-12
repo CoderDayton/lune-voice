@@ -162,7 +162,17 @@ if [ -n "${PORTABLE:-}" ]; then
   # artifact. `cgs dev` + `cgs stage-runtime` exercise the plugin path.
   GGML_FLAGS="GGML_NATIVE=OFF GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON"
   BUNDLE_ARGS=""
-  echo "Building PORTABLE $BACKEND release: --features \"$FEATURES\""
+  # The GGML flags above make only the C++ half portable. `.cargo/config.toml`
+  # pins `-C target-cpu=native` for every build in this repo, so without this
+  # override the Rust half still targets the build machine's exact CPU and the
+  # "portable" artifact SIGILLs on an older one. RUSTFLAGS takes precedence
+  # over `build.rustflags`. x86-64-v3 is AVX2 + FMA + F16C — the same baseline
+  # the GGML flags ask for.
+  case "$(uname -m)" in
+    x86_64) export RUSTFLAGS="-C target-cpu=x86-64-v3" ;;
+    *)      export RUSTFLAGS="" ;;
+  esac
+  echo "Building PORTABLE $BACKEND release: --features \"$FEATURES\" RUSTFLAGS=\"$RUSTFLAGS\""
 else
   # Local (default): native to this machine — ggml targets only the build host's
   # CPU and GPU arch, so the CUDA compile stays small and won't exhaust RAM.

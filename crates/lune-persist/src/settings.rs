@@ -1,10 +1,13 @@
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use lune_core::config::{AsrBackendConfig, LlmBackendConfig, RedactedString, UserSettings};
+use tracing::warn;
 
-use crate::error::PersistResult;
+use crate::error::{PersistError, PersistResult};
 use crate::secrets::{KeyringVault, SecretSlot, SecretVault};
 
 static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -83,6 +86,38 @@ impl SettingsStore {
         if dictation_mode_was_both(&content) {
             settings.copy_to_clipboard = true;
         }
+        self.restore_secrets(&mut settings);
+        Ok(settings)
+    }
+
+    /// Load settings, moving aside a file that cannot be parsed.
+    ///
+    /// For the startup path, where propagating the error means the process
+    /// exits and the user has no way to repair the file from the UI. A
+    /// malformed file is renamed to `settings.toml.bad-<unix seconds>` and
+    /// defaults are returned, so the app starts and writes a valid file on the
+    /// next save while the original stays on disk for recovery. API keys are
+    /// unaffected — they live in the keyring, not the file.
+    ///
+    /// Only a parse failure is recovered. An I/O error still propagates: the
+    /// file's contents are probably intact, and silently replacing a
+    /// configuration we merely failed to read would be worse than failing.
+    pub fn load_or_quarantine(&self) -> PersistResult<UserSettings> {
+        let parse_error = match self.load() {
+            Err(PersistError::TomlDeserialize(e)) => e,
+            other => return other,
+        };
+        let backup = quarantine_path(&self.path);
+        if let Err(e) = fs::rename(&self.path, &backup) {
+            warn!(error = %e, "could not move the malformed settings file aside");
+            return Err(PersistError::TomlDeserialize(parse_error));
+        }
+        warn!(
+            error = %parse_error,
+            backup = %backup.display(),
+            "settings file is malformed; moved aside and started from defaults"
+        );
+        let mut settings = UserSettings::default();
         self.restore_secrets(&mut settings);
         Ok(settings)
     }
@@ -302,6 +337,21 @@ impl SettingsStore {
 }
 
 /// Write bytes atomically: write to a sibling temp file, then rename.
+/// Where a malformed settings file is moved so it is kept but no longer read.
+/// The timestamp keeps repeated failures from overwriting each other.
+fn quarantine_path(path: &Path) -> PathBuf {
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let mut name = path
+        .file_name()
+        .unwrap_or_else(|| OsStr::new("settings.toml"))
+        .to_os_string();
+    name.push(format!(".bad-{stamp}"));
+    path.with_file_name(name)
+}
+
 fn atomic_write(target: &Path, data: &[u8]) -> std::io::Result<()> {
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent)?;
@@ -571,6 +621,50 @@ mod tests {
             matches!(err, crate::error::PersistError::TomlDeserialize(_)),
             "expected TomlDeserialize, got {err:?}",
         );
+    }
+
+    #[test]
+    fn quarantine_moves_a_malformed_file_aside_and_starts_from_defaults() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        std::fs::write(&path, b"= not valid = toml ===\n").unwrap();
+
+        let settings = SettingsStore::new(&path)
+            .load_or_quarantine()
+            .expect("a malformed file must not stop startup");
+        assert_eq!(settings.language, UserSettings::default().language);
+
+        assert!(!path.exists(), "the malformed file must not be read again");
+        let kept: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                e.file_name()
+                    .to_string_lossy()
+                    .starts_with("settings.toml.bad-")
+            })
+            .collect();
+        assert_eq!(kept.len(), 1, "the original must be kept for recovery");
+        assert_eq!(
+            std::fs::read(kept[0].path()).unwrap(),
+            b"= not valid = toml ===\n",
+            "the quarantined copy must be the user's original bytes",
+        );
+    }
+
+    #[test]
+    fn quarantine_leaves_a_valid_file_alone() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        let want = UserSettings {
+            language: "en-GB".into(),
+            ..Default::default()
+        };
+        std::fs::write(&path, toml::to_string_pretty(&want).unwrap()).unwrap();
+
+        let settings = SettingsStore::new(&path).load_or_quarantine().unwrap();
+        assert_eq!(settings.language, "en-GB");
+        assert!(path.exists(), "a readable file must not be moved");
     }
 
     #[test]

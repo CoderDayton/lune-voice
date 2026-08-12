@@ -2,6 +2,7 @@ mod capture;
 pub mod delivery;
 pub mod events;
 mod redact;
+mod sanitize;
 pub mod session;
 pub mod sound;
 #[cfg(unix)]

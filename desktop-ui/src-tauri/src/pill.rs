@@ -100,13 +100,16 @@ static PILL_CFG: Mutex<PillOverlayConfig> = Mutex::new(PillOverlayConfig {
 });
 
 pub(crate) fn pill_cfg() -> PillOverlayConfig {
-    PILL_CFG.lock().expect("pill config lock").clone()
+    // Recover from poisoning rather than propagating it: the release profile
+    // unwinds, so a panic elsewhere must not turn the pill config into a
+    // second panic on every later read. Matches `hotkey_linux.rs`.
+    PILL_CFG.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
 /// Seed the live config from settings at startup, before the pill window is
 /// created, so the first window is built with the user's geometry.
 pub fn seed_pill_config(cfg: PillOverlayConfig) {
-    *PILL_CFG.lock().expect("pill config lock") = cfg;
+    *PILL_CFG.lock().unwrap_or_else(|e| e.into_inner()) = cfg;
 }
 
 /// Live pill position (logical px from the monitor's top-left). `i32::MIN` =
@@ -498,7 +501,7 @@ pub fn apply_pill_settings(app: &AppHandle, settings: &UserSettings, show_after:
     let new = PillOverlayConfig::from_settings(settings);
     let saved = settings.pill_position;
     let old = {
-        let mut g = PILL_CFG.lock().expect("pill config lock");
+        let mut g = PILL_CFG.lock().unwrap_or_else(|e| e.into_inner());
         std::mem::replace(&mut *g, new.clone())
     };
     // Never = no window to update; set_pill_enabled destroys it separately and

@@ -604,6 +604,9 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|e| {
+            // Both sinks: stderr for a terminal launch, tracing so a desktop
+            // launch leaves the reason in the log file (see `main.rs`).
+            tracing::error!(error = %e, "fatal: tauri application failed to start");
             eprintln!("fatal: tauri application exited with error: {e}");
             std::process::exit(1);
         })

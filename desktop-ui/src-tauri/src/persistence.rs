@@ -563,7 +563,11 @@ fn resolve_paths() -> Result<AppPaths, String> {
 
 fn load_settings(paths: &AppPaths) -> Result<UserSettings, String> {
     let store = SettingsStore::new(paths.settings_file());
-    let mut settings = store.load().map_err(|e| format!("load settings: {e}"))?;
+    // Same recovery as the startup path: a malformed file must not make every
+    // settings-touching command fail with no way out.
+    let mut settings = store
+        .load_or_quarantine()
+        .map_err(|e| format!("load settings: {e}"))?;
     settings.migrate_pipeline_fields();
     Ok(settings)
 }

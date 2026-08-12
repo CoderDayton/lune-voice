@@ -21,7 +21,7 @@ use lune_core::config::PipelineConfig;
 use lune_core::session::{SessionEvent, SessionStatus};
 
 use crate::redact::Transcript;
-use crate::session::{SessionAudio, SessionControl};
+use crate::session::{SessionAudio, SessionControl, send_bounded};
 
 const MAX_SEGMENTS: usize = 500;
 
@@ -278,7 +278,7 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
         audio_source,
         asr_session,
     } = init_session_runtime(asr, asr_config, audio_override, input_device).await?;
-    let _ = event_tx.send(SessionEvent::Started).await;
+    let _ = send_bounded(event_tx, SessionEvent::Started).await;
 
     let mut segments = Vec::with_capacity(segment_capacity_hint);
     let mut raw_text = String::with_capacity(256);
@@ -393,7 +393,11 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
                     && last_audio_at.elapsed() > audio_starvation_limit
                 {
                     warn!(%session_id, "no audio received for 5s — mic may have disconnected");
-                    let _ = event_tx.send(SessionEvent::Error("audio device stopped responding".into())).await;
+                    let _ = send_bounded(
+                        event_tx,
+                        SessionEvent::Error("audio device stopped responding".into()),
+                    )
+                    .await;
                     status = SessionStatus::Failed("audio starvation".into());
                     break 'capture;
                 }
@@ -432,7 +436,7 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
     }
 
     if !cancelled {
-        let _ = event_tx.send(SessionEvent::Processing).await;
+        let _ = send_bounded(event_tx, SessionEvent::Processing).await;
     }
 
     if cancelled {

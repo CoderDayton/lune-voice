@@ -258,6 +258,10 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
                 .await;
         }
 
+        // Only a Dictate session inserted a row above, so only that one has a
+        // row the panic supervisor needs to close.
+        let panicked_row_to_close =
+            (kind == SessionKind::Dictate).then(|| Arc::clone(&self.persist));
         let asr = Arc::clone(&self.asr);
         let active_arc = Arc::clone(&self.active);
         let idle_notify = Arc::clone(&self.idle_notify);
@@ -288,14 +292,17 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         tokio::task::spawn(async move {
             if handle.await.is_err() {
                 tracing::error!(%session_id, "session task panicked — forcing cleanup");
-                let error_dropped = !send_terminal(
+                let error_dropped = !send_bounded(
                     &event_tx_guard,
                     SessionEvent::Error("internal session panic".into()),
                 )
                 .await;
                 let _ =
-                    send_terminal(&event_tx_guard, SessionEvent::Stopped { error_dropped }).await;
+                    send_bounded(&event_tx_guard, SessionEvent::Stopped { error_dropped }).await;
                 clear_active(&active_arc_guard, &idle_notify_guard).await;
+                if let Some(persist) = panicked_row_to_close {
+                    finalize_panicked_session(session_id, persist).await;
+                }
             }
         });
 
@@ -385,29 +392,63 @@ async fn clear_active(active_arc: &Arc<Mutex<Option<ActiveHandle>>>, idle_notify
     idle_notify.notify_waiters();
 }
 
-/// Upper bound on a terminal event send. The channel is generously sized
+/// Upper bound on a session event send. The channel is generously sized
 /// (`mpsc::channel(256)`) and a session emits a handful of events, so this
 /// only fires if the consumer stopped polling entirely.
-const TERMINAL_EVENT_SEND_TIMEOUT: Duration = Duration::from_secs(5);
+const EVENT_SEND_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// Send an event that precedes `clear_active`, bounded in time.
+/// Variant name for logging.
 ///
-/// These sends are on a bounded channel: a stuck/panicked consumer that lets
-/// the buffer fill would otherwise block the send *and* `clear_active`
-/// forever, permanently wedging the "one session at a time" invariant. Giving
-/// up on the event is strictly better than never clearing the session.
+/// Deliberately not `Debug`: `FinalizedText`, `CorrectedText`, `Warning`,
+/// `Error` and `CommandDetected` all carry text that is redacted by default
+/// (see `redact.rs`), and a dropped-event log line must not be the one place
+/// a transcript leaks.
+fn event_name(event: &SessionEvent) -> &'static str {
+    match event {
+        SessionEvent::Started => "Started",
+        SessionEvent::PartialText => "PartialText",
+        SessionEvent::FinalizedText { .. } => "FinalizedText",
+        SessionEvent::CorrectedText(_) => "CorrectedText",
+        SessionEvent::Processing => "Processing",
+        SessionEvent::AudioLevel(_) => "AudioLevel",
+        SessionEvent::CommandDetected { .. } => "CommandDetected",
+        SessionEvent::GateDecision { .. } => "GateDecision",
+        SessionEvent::Error(_) => "Error",
+        SessionEvent::Warning(_) => "Warning",
+        SessionEvent::Stopped { .. } => "Stopped",
+        // `SessionEvent` is `#[non_exhaustive]`; a label is not worth a
+        // breaking match on every new variant.
+        _ => "other",
+    }
+}
+
+/// Send a session event, bounded in time. Every send from a session task
+/// must go through here.
+///
+/// The event channel is bounded. A stuck consumer that lets the buffer fill
+/// blocks the sender indefinitely, so the session task stops polling for
+/// cancellation and `clear_active` never runs — permanently wedging the "one
+/// session at a time" invariant, with the mic still open. Giving up on an
+/// event is strictly better than never clearing the session.
 ///
 /// Returns whether the event was delivered. A dropped `Error` must be
 /// reported on the following `Stopped` (`error_dropped: true`), or the
 /// listener sees only a clean stop and reports the failed session as success.
 #[must_use]
-async fn send_terminal(event_tx: &mpsc::Sender<SessionEvent>, event: SessionEvent) -> bool {
-    match tokio::time::timeout(TERMINAL_EVENT_SEND_TIMEOUT, event_tx.send(event)).await {
+pub(crate) async fn send_bounded(
+    event_tx: &mpsc::Sender<SessionEvent>,
+    event: SessionEvent,
+) -> bool {
+    let name = event_name(&event);
+    match tokio::time::timeout(EVENT_SEND_TIMEOUT, event_tx.send(event)).await {
         Ok(Ok(())) => true,
         // Listener gone (shutdown) — nothing to report to.
         Ok(Err(_)) => false,
         Err(_) => {
-            warn!("session event consumer stalled; terminal event dropped so teardown can proceed");
+            warn!(
+                event = name,
+                "session event consumer stalled; event dropped so the session can proceed"
+            );
             false
         }
     }
@@ -430,9 +471,7 @@ async fn notify_persist_failure<T>(
         Ok(v) => Some(v),
         Err(e) => {
             warn!(error = %e, label, "persist write failed");
-            let _ = event_tx
-                .send(SessionEvent::Warning(format!("{label}: {e}")))
-                .await;
+            let _ = send_bounded(event_tx, SessionEvent::Warning(format!("{label}: {e}"))).await;
             None
         }
     }
@@ -488,9 +527,8 @@ async fn run_session<A: AsrBackend + 'static>(
         Err(e) => {
             if kind == SessionKind::CaptureRaw {
                 // No DB row exists for a capture — end without finalize.
-                let error_dropped = !send_terminal(&deps.event_tx, SessionEvent::Error(e)).await;
-                let _ =
-                    send_terminal(&deps.event_tx, SessionEvent::Stopped { error_dropped }).await;
+                let error_dropped = !send_bounded(&deps.event_tx, SessionEvent::Error(e)).await;
+                let _ = send_bounded(&deps.event_tx, SessionEvent::Stopped { error_dropped }).await;
                 clear_active(&deps.active_arc, &deps.idle_notify).await;
                 return;
             }
@@ -518,7 +556,7 @@ async fn run_session<A: AsrBackend + 'static>(
 
     if cancelled {
         if kind == SessionKind::CaptureRaw {
-            let _ = send_terminal(&deps.event_tx, SessionEvent::stopped()).await;
+            let _ = send_bounded(&deps.event_tx, SessionEvent::stopped()).await;
             clear_active(&deps.active_arc, &deps.idle_notify).await;
             return;
         }
@@ -542,10 +580,10 @@ async fn run_session<A: AsrBackend + 'static>(
     if kind == SessionKind::CaptureRaw {
         let mut error_dropped = false;
         if let Some(error) = first_asr_error.take().filter(|_| !saw_asr_success) {
-            error_dropped = !send_terminal(&deps.event_tx, SessionEvent::Error(error)).await;
+            error_dropped = !send_bounded(&deps.event_tx, SessionEvent::Error(error)).await;
         } else {
             info!(%session_id, "capture session finished, raw len={}", raw_text.len());
-            let _ = send_terminal(
+            let _ = send_bounded(
                 &deps.event_tx,
                 SessionEvent::FinalizedText {
                     session_id,
@@ -554,7 +592,7 @@ async fn run_session<A: AsrBackend + 'static>(
             )
             .await;
         }
-        let _ = send_terminal(&deps.event_tx, SessionEvent::Stopped { error_dropped }).await;
+        let _ = send_bounded(&deps.event_tx, SessionEvent::Stopped { error_dropped }).await;
         clear_active(&deps.active_arc, &deps.idle_notify).await;
         return;
     }
@@ -562,7 +600,7 @@ async fn run_session<A: AsrBackend + 'static>(
     if segments.is_empty() || raw_text.is_empty() {
         if let Some(error) = first_asr_error.take().filter(|_| !saw_asr_success) {
             status = SessionStatus::Failed(error.clone());
-            let _ = deps.event_tx.send(SessionEvent::Error(error)).await;
+            let _ = send_bounded(&deps.event_tx, SessionEvent::Error(error)).await;
         } else {
             // whisper.cpp's VAD gates speech at decode time, so an empty result
             // means no speech was found (silence/noise) — a graceful no-op, not
@@ -856,7 +894,7 @@ async fn process_and_deliver(
             None,
         )
         .await;
-        let _ = send_terminal(&event_tx, SessionEvent::stopped()).await;
+        let _ = send_bounded(&event_tx, SessionEvent::stopped()).await;
         clear_active(&active_arc, &idle_notify).await;
         return;
     }
@@ -921,13 +959,15 @@ async fn process_and_deliver(
         "style gate"
     );
 
-    let _ = event_tx
-        .send(SessionEvent::GateDecision {
+    let _ = send_bounded(
+        &event_tx,
+        SessionEvent::GateDecision {
             used_llm: needs_llm,
             lang: detected_lang.to_owned(),
             unresolved: unresolved_words,
-        })
-        .await;
+        },
+    )
+    .await;
 
     drain_processing_controls(&mut control_rx, &mut cancelled);
     let post_llm_text = if cancelled {
@@ -1029,7 +1069,7 @@ async fn deliver_final_text(
     active_arc: &Arc<Mutex<Option<ActiveHandle>>>,
     idle_notify: &Arc<Notify>,
 ) {
-    let _ = send_terminal(
+    let _ = send_bounded(
         event_tx,
         SessionEvent::FinalizedText {
             session_id,
@@ -1059,7 +1099,7 @@ async fn deliver_final_text(
     let ended_at = Some(Utc::now());
     finalize_db(session_id, persist, status, ended_at, transcript).await;
 
-    let _ = send_terminal(event_tx, SessionEvent::stopped()).await;
+    let _ = send_bounded(event_tx, SessionEvent::stopped()).await;
     clear_active(active_arc, idle_notify).await;
     info!(%session_id, "session stopped");
 }
@@ -1100,6 +1140,37 @@ async fn read_clipboard_text() -> Option<String> {
     None
 }
 
+/// Close out the history row of a session whose task panicked.
+///
+/// The row was inserted `Active` with no `ended_at` at session start, and the
+/// panicking task never reached `finalize_db`. Without this it stays that way
+/// for good: invisible to the running app, and a permanently in-progress entry
+/// in the History tab. The transcript column is left alone — a panic after the
+/// transcript was stored must not erase it.
+///
+/// Only an unfinished row is touched. A panic can also land *after*
+/// `finalize_db` has run (both `deliver_final_text` and `stop_session` do more
+/// work afterwards), and downgrading a session that actually succeeded would
+/// rewrite real history.
+#[cold]
+async fn finalize_panicked_session(session_id: Uuid, persist: Arc<Mutex<Database>>) {
+    let mut db = persist.lock().await;
+    match db.get_session(session_id) {
+        Ok(Some(mut session)) if session.ended_at.is_none() => {
+            session.status = SessionStatus::Failed("internal session panic".into());
+            session.ended_at = Some(Utc::now());
+            if let Err(e) = db.update_session(&session) {
+                warn!(error = %e, %session_id, "could not close the panicked session's row");
+            }
+        }
+        // Already finalized — the session completed and the panic came later.
+        Ok(Some(_)) => {}
+        // The start-of-session insert failed too; nothing to close.
+        Ok(None) => {}
+        Err(e) => warn!(error = %e, %session_id, "DB error closing the panicked session's row"),
+    }
+}
+
 #[cold]
 async fn finalize_db(
     session_id: Uuid,
@@ -1133,7 +1204,7 @@ async fn fail_init(
     idle_notify: &Notify,
 ) {
     let msg = error.to_string();
-    let error_dropped = !send_terminal(event_tx, SessionEvent::Error(msg.clone())).await;
+    let error_dropped = !send_bounded(event_tx, SessionEvent::Error(msg.clone())).await;
     finalize_db(
         session_id,
         Arc::clone(persist),
@@ -1145,7 +1216,7 @@ async fn fail_init(
     // Every other terminal path emits `Stopped`; the init-failure path must
     // too, or runtime.rs never reaches its `SessionStopped` arm for a mic
     // that was busy or failed to open.
-    let _ = send_terminal(event_tx, SessionEvent::Stopped { error_dropped }).await;
+    let _ = send_bounded(event_tx, SessionEvent::Stopped { error_dropped }).await;
     clear_active(active_arc, idle_notify).await;
 }
 
@@ -1166,7 +1237,7 @@ async fn stop_session(
         None,
     )
     .await;
-    let _ = send_terminal(event_tx, SessionEvent::stopped()).await;
+    let _ = send_bounded(event_tx, SessionEvent::stopped()).await;
     clear_active(active_arc, idle_notify).await;
 }
 
@@ -1235,6 +1306,28 @@ mod tests {
                 .await
                 .pop_front()
                 .unwrap_or_else(|| Ok(vec![]))
+        }
+        async fn end_session(&self, _: ()) -> Result<()> {
+            Ok(())
+        }
+    }
+
+    /// Panics where a real backend would decode. Stands in for any bug that
+    /// unwinds the session task.
+    struct PanickingAsr;
+
+    #[async_trait::async_trait]
+    impl AsrBackend for PanickingAsr {
+        type SessionHandle = ();
+
+        async fn start_session(&self, _: AsrSessionConfig) -> Result<()> {
+            Ok(())
+        }
+        async fn push_audio(&self, _: &(), _: &[f32]) -> Result<()> {
+            Ok(())
+        }
+        async fn poll_final(&self, _: &()) -> Result<Vec<AsrSegment>> {
+            panic!("decode blew up");
         }
         async fn end_session(&self, _: ()) -> Result<()> {
             Ok(())
@@ -1373,17 +1466,17 @@ mod tests {
         tokio::task::LocalSet::new()
     }
 
-    /// A stalled listener that never drains loses the `Error`. `send_terminal`
+    /// A stalled listener that never drains loses the `Error`. `send_bounded`
     /// has to say so, or the following `Stopped` reads as a clean session.
     #[tokio::test(start_paused = true)]
     async fn stalled_listener_reports_a_dropped_terminal_error() {
         let (tx, _rx) = mpsc::channel::<SessionEvent>(1);
         assert!(
-            send_terminal(&tx, SessionEvent::Started).await,
+            send_bounded(&tx, SessionEvent::Started).await,
             "fills queue"
         );
 
-        let delivered = send_terminal(&tx, SessionEvent::Error("boom".into())).await;
+        let delivered = send_bounded(&tx, SessionEvent::Error("boom".into())).await;
         assert!(
             !delivered,
             "a dropped error must be reported as undelivered"
@@ -1444,6 +1537,61 @@ mod tests {
                 assert!(
                     processing_idx.unwrap() < final_idx.unwrap(),
                     "Processing must precede FinalizedText; events: {events:?}"
+                );
+            })
+            .await;
+    }
+
+    /// A panic in the session task must not strand the app. The supervisor has
+    /// to report it, release the "one session at a time" slot, and close the
+    /// history row that `start` opened — otherwise the user gets a dead hotkey
+    /// and a permanently in-progress History entry.
+    ///
+    /// This is the only test that exercises a real unwind, and it only means
+    /// anything because the release profile unwinds too (see `[profile.release]`
+    /// in the workspace `Cargo.toml`). The panic backtrace in the test output
+    /// is expected.
+    #[tokio::test]
+    async fn a_panicked_session_is_reported_and_its_row_closed() {
+        local_set()
+            .run_until(async {
+                let (mgr, db) = make_manager(PanickingAsr, Arc::new(EchoPostProcessor));
+                let (tx, rx) = mpsc::channel(16);
+                let id = mgr.start_with_audio(tx, speech_stream()).await.unwrap();
+                let events = collect_events(rx).await;
+
+                assert!(
+                    events.iter().any(|e| matches!(e, SessionEvent::Error(_))),
+                    "the panic must be reported, not swallowed; events: {events:?}"
+                );
+                assert!(
+                    events
+                        .iter()
+                        .any(|e| matches!(e, SessionEvent::Stopped { .. })),
+                    "the listener must still see a terminal event; events: {events:?}"
+                );
+
+                // Cleanup runs after the events are sent, so wait for it.
+                let closed = tokio::time::timeout(Duration::from_secs(5), async {
+                    loop {
+                        let row = db.lock().await.get_session(id).ok().flatten();
+                        if let Some(row) = row.filter(|r| r.ended_at.is_some()) {
+                            return row;
+                        }
+                        tokio::task::yield_now().await;
+                    }
+                })
+                .await
+                .expect("the panicked session's history row must be closed");
+
+                assert!(
+                    matches!(closed.status, SessionStatus::Failed(_)),
+                    "a panicked session must not be left Active; got {:?}",
+                    closed.status
+                );
+                assert!(
+                    mgr.active.lock().await.is_none(),
+                    "the session slot must be released so the next hotkey works"
                 );
             })
             .await;

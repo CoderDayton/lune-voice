@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
@@ -46,12 +47,13 @@ impl TypeOutcome {
 /// Message sent to the persistent delivery thread.
 struct DeliveryMsg {
     /// Dictation request this delivery belongs to, for end-to-end tracing.
-    /// `None` for ad-hoc injections (newline/bullet commands) and liveness probes.
+    /// `None` when a caller has no session to correlate against; every
+    /// delivery in the app today carries one.
     session_id: Option<Uuid>,
     text: Box<str>,
     mode: DictationMode,
     /// Leave the dictated text on the clipboard after delivery (orthogonal to
-    /// `mode`). Structural injections (newline/bullet) pass `false`.
+    /// `mode`).
     copy_to_clipboard: bool,
     #[cfg(unix)]
     target: Option<WindowTarget>,
@@ -69,7 +71,7 @@ enum DeliveryJob {
     Prime,
     /// Liveness probe — the thread drops it without registering as busy.
     Probe,
-    /// Deliver dictated (or structural) text.
+    /// Deliver dictated text.
     Deliver(DeliveryMsg),
 }
 
@@ -283,7 +285,15 @@ fn delivery_thread(
             }
             DeliveryJob::Deliver(msg) => msg,
         };
-        let text: &str = &msg.text;
+        // Untrusted input: the transcript has passed through the user
+        // dictionary and, when styling is enabled, a remote endpoint. Strip
+        // anything that would act rather than render before it becomes
+        // keystrokes or clipboard bytes. One filter here covers every backend
+        // and both transports — see `crate::sanitize`. Collapsing line breaks
+        // for a terminal is separate and happens per backend, since only the
+        // backend knows what it is delivering into.
+        let sanitized = crate::sanitize::sanitize_for_delivery(&msg.text);
+        let text: &str = &sanitized;
         // Defensive: empty text carries no output (probes no longer arrive here).
         if text.is_empty() {
             continue;
@@ -365,6 +375,10 @@ enum LinuxBackend {
 #[cfg(unix)]
 struct PlatformDriver {
     backend: LinuxBackend,
+    /// Kept at this level because the IBus backend needs it too: it commits
+    /// text straight into the focused context, so it has to answer the same
+    /// "is this a terminal" question the uinput path asks internally.
+    terminal_mode: TerminalMode,
 }
 
 #[cfg(unix)]
@@ -382,6 +396,7 @@ impl PlatformDriver {
                     info!("delivery: IBus engine active");
                     return Ok(Self {
                         backend: LinuxBackend::Ibus(typer),
+                        terminal_mode,
                     });
                 }
                 Err(e) => warn!(error = %e, "ibus init failed; falling back to uinput"),
@@ -393,6 +408,7 @@ impl PlatformDriver {
         debug!("delivery: uinput clipboard-paste active");
         Ok(Self {
             backend: LinuxBackend::Uinput(typer),
+            terminal_mode,
         })
     }
 
@@ -415,13 +431,51 @@ impl PlatformDriver {
         }
     }
 
+    /// Whether this delivery is aimed at a terminal, honoring `terminal_mode`.
+    ///
+    /// Only the IBus path calls this. The uinput path resolves the same
+    /// question internally to pick its paste chord, and asking again here
+    /// would cost a second compositor round-trip per delivery.
+    ///
+    /// Best effort under `Auto`: where the compositor will not name the
+    /// focused window — notably GNOME Wayland, which is why IBus is preferred
+    /// there at all — this answers `false` and the text commits unchanged.
+    #[cfg(target_os = "linux")]
+    fn ibus_targets_terminal(&self, target: Option<&crate::uinput_typer::WindowTarget>) -> bool {
+        match self.terminal_mode {
+            TerminalMode::Terminal => true,
+            TerminalMode::Normal => false,
+            _ => target.map_or_else(crate::uinput_typer::focused_is_terminal, |t| t.is_terminal),
+        }
+    }
+
+    /// Collapse line breaks and tabs when IBus is committing into a terminal.
+    ///
+    /// IBus commits the string straight into the focused input context, so a
+    /// newline arrives as a line the shell runs. Same hazard the uinput paste
+    /// path guards against in `do_clipboard_paste`, reached by another route.
+    #[cfg(target_os = "linux")]
+    fn ibus_text<'a>(
+        &self,
+        text: &'a str,
+        target: Option<&crate::uinput_typer::WindowTarget>,
+    ) -> Cow<'a, str> {
+        if self.ibus_targets_terminal(target) {
+            crate::sanitize::flatten_for_terminal(text)
+        } else {
+            Cow::Borrowed(text)
+        }
+    }
+
     fn type_text(&mut self, text: &str, keep_clipboard: bool) -> TypeOutcome {
+        #[cfg(target_os = "linux")]
+        let committed = self.ibus_text(text, None);
         match &mut self.backend {
             // IBus commits directly to the input context — no clipboard, so the
             // keep/restore flag is irrelevant and the text is never staged there.
             #[cfg(target_os = "linux")]
             LinuxBackend::Ibus(t) => {
-                t.commit_text(text);
+                t.commit_text(&committed);
                 TypeOutcome::delivered(false)
             }
             LinuxBackend::Uinput(t) => t.type_str(text, keep_clipboard),
@@ -434,12 +488,14 @@ impl PlatformDriver {
         target: &crate::uinput_typer::WindowTarget,
         keep_clipboard: bool,
     ) -> TypeOutcome {
+        #[cfg(target_os = "linux")]
+        let committed = self.ibus_text(text, Some(target));
         match &mut self.backend {
             // IBus commits to the focused input context directly; the captured
-            // WindowTarget (for focus restoration) is only needed by uinput.
+            // WindowTarget also carries whether that context is a terminal.
             #[cfg(target_os = "linux")]
             LinuxBackend::Ibus(t) => {
-                t.commit_text(text);
+                t.commit_text(&committed);
                 TypeOutcome::delivered(false)
             }
             LinuxBackend::Uinput(t) => t.type_str_to(text, target, keep_clipboard),
@@ -447,12 +503,14 @@ impl PlatformDriver {
     }
 
     fn type_keys(&mut self, text: &str, keep_clipboard: bool) -> TypeOutcome {
+        #[cfg(target_os = "linux")]
+        let committed = self.ibus_text(text, None);
         match &mut self.backend {
             // IBus commits Unicode directly — no US-QWERTY restriction, so
             // type-in-place of accented/CJK text "just works".
             #[cfg(target_os = "linux")]
             LinuxBackend::Ibus(t) => {
-                t.commit_text(text);
+                t.commit_text(&committed);
                 TypeOutcome::delivered(false)
             }
             LinuxBackend::Uinput(t) => t.type_str_keys(text, keep_clipboard),

@@ -92,7 +92,8 @@ Under the hood that runs, from `desktop-ui/`:
 GGML_NATIVE=ON bun tauri build --features "whisper-cuda"
 
 # Portable (PORTABLE=1): portable CPU baseline + all common CUDA archs
-GGML_NATIVE=OFF GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON \
+RUSTFLAGS="-C target-cpu=x86-64-v3" \
+  GGML_NATIVE=OFF GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON \
   bun tauri build --features "whisper-cuda"
 ```
 
@@ -100,6 +101,13 @@ For PORTABLE, `GGML_NATIVE=OFF` + the explicit AVX2/FMA/F16C flags force a
 portable CPU baseline instead of ggml's default `-march=native` (which would
 `SIGILL` on any user CPU older than the build host) and make ggml build all
 common CUDA archs. The native default skips both — one CPU target, one GPU arch.
+
+`RUSTFLAGS` covers the other half of the binary. `.cargo/config.toml` pins
+`-C target-cpu=native` for every build in this repo, which is right locally and
+wrong for a distributable artifact: the GGML flags do nothing for the Rust
+code, which would still `SIGILL` on an older CPU. `RUSTFLAGS` overrides
+`build.rustflags`, and `x86-64-v3` is the same AVX2 + FMA + F16C baseline the
+GGML flags request. On a non-x86_64 host `cgs build` sets it empty instead.
 
 ### Windows specifics
 
@@ -109,6 +117,7 @@ common CUDA archs. The native default skips both — one CPU target, one GPU arc
 On Windows, run the equivalent in PowerShell from `desktop-ui\`:
 
 ```powershell
+$env:RUSTFLAGS="-C target-cpu=x86-64-v3"
 $env:GGML_NATIVE="OFF"; $env:GGML_AVX2="ON"; $env:GGML_FMA="ON"; $env:GGML_F16C="ON"
 bun tauri build --features "whisper-cpp"     # CPU
 bun tauri build --features "whisper-cuda"    # CUDA (needs CUDA Toolkit)

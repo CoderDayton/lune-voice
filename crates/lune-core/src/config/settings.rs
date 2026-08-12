@@ -96,7 +96,14 @@ where
 ///
 /// When in doubt: if two backends would want different defaults, it
 /// belongs in `PipelineOverrides`.
+// `serde(default)` at the container level: a settings file written by a build
+// that predates a field keeps every value it does carry, instead of failing to
+// parse and costing the user every other setting. Writes are atomic
+// (`lune-persist::settings::atomic_write`), so a half-written file is not the
+// case this covers; a file that is malformed rather than merely incomplete
+// still fails to parse and is quarantined by `SettingsStore::load_or_quarantine`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct UserSettings {
     /// Compute device for local inference: `Cpu`, `Cuda`, or `Auto`.
     pub device: DevicePolicy,
