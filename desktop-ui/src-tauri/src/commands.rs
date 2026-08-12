@@ -192,7 +192,7 @@ pub async fn save_workspace_settings(
         crate::persistence::save_workspace_settings(input)
     })
     .await?;
-    runtime.mark_reload_required().await;
+    runtime.mark_settings_changed().await;
     // Hot-reload the evdev hotkey listener — trigger key, modifiers, cancel
     // key, and activation mode all apply immediately, no restart required.
     #[cfg(target_os = "linux")]
@@ -302,7 +302,7 @@ pub async fn create_dictionary_entry(
         crate::persistence::create_dictionary_entry(input)
     })
     .await?;
-    runtime.mark_reload_required().await;
+    runtime.mark_config_changed().await;
     snapshot.service_status = runtime.service_status().await;
     Ok(snapshot)
 }
@@ -347,7 +347,7 @@ pub async fn delete_dictionary_entry(
         crate::persistence::delete_dictionary_entry(entry_id)
     })
     .await?;
-    runtime.mark_reload_required().await;
+    runtime.mark_config_changed().await;
     snapshot.service_status = runtime.service_status().await;
     Ok(snapshot)
 }
@@ -395,7 +395,7 @@ pub async fn update_dictionary_entry(
         crate::persistence::update_dictionary_entry(input)
     })
     .await?;
-    runtime.mark_reload_required().await;
+    runtime.mark_config_changed().await;
     snapshot.service_status = runtime.service_status().await;
     Ok(snapshot)
 }
@@ -411,7 +411,7 @@ pub async fn create_custom_style(
         crate::persistence::create_custom_style(input)
     })
     .await?;
-    runtime.mark_reload_required().await;
+    runtime.mark_config_changed().await;
     snapshot.service_status = runtime.service_status().await;
     Ok(snapshot)
 }
@@ -427,7 +427,7 @@ pub async fn update_custom_style(
         crate::persistence::update_custom_style(input)
     })
     .await?;
-    runtime.mark_reload_required().await;
+    runtime.mark_config_changed().await;
     snapshot.service_status = runtime.service_status().await;
     Ok(snapshot)
 }
@@ -443,7 +443,7 @@ pub async fn delete_custom_style(
         crate::persistence::delete_custom_style(style_id)
     })
     .await?;
-    runtime.mark_reload_required().await;
+    runtime.mark_config_changed().await;
     snapshot.service_status = runtime.service_status().await;
     Ok(snapshot)
 }
@@ -482,7 +482,7 @@ pub async fn generate_style_examples(
         crate::persistence::save_style_few_shot_pairs(&style_id, pairs)
     })
     .await?;
-    runtime.mark_reload_required().await;
+    runtime.mark_config_changed().await;
     snapshot.service_status = runtime.service_status().await;
     Ok(snapshot)
 }

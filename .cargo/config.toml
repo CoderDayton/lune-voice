@@ -1,5 +1,8 @@
-[build]
-# Emit AVX2/AVX-512 instructions for the host CPU.
-# Vectorizes mel STFT inner loops and ASR preprocessing — 2-4x on eligible paths.
-# Not portable: binaries built here won't run on older CPUs.
-rustflags = ["-C", "target-cpu=native"]
+# Deliberately empty of `rustflags`.
+#
+# Host-tuned codegen (`-C target-cpu=native`) is opt-in, not the default: a
+# committed `build.rustflags` applies to every `cargo build` in this repo,
+# including a packager's plain `cargo build --release`, and the resulting binary
+# SIGILLs on any CPU older than the build host. `cgs dev` and the native branch
+# of `cgs build` export `RUSTFLAGS=-C target-cpu=native` for themselves; the
+# PORTABLE branch exports the `x86-64-v3` baseline instead.

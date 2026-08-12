@@ -96,8 +96,12 @@ impl OpenAiCompatibleAsrBackend {
         // Pre-format the auth header value once.
         let auth_header = RedactedString::new(format!("Bearer {}", config.api_key.expose()));
 
+        // Refuse redirects, for the same reason `lune-llm`'s client does: the
+        // HTTPS/locality check above inspects `base_url` only, so a 302 to a
+        // plaintext or third-party host would carry the recorded audio past it.
         let client = reqwest::Client::builder()
             .timeout(config.timeout)
+            .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|e| Error::asr(format!("build http client: {e}")))?;
 
@@ -275,13 +279,12 @@ impl OpenAiCompatibleAsrBackend {
                 }
                 Ok(r) if !r.status().is_success() => {
                     let status = r.status();
-                    let body = r.text().await.unwrap_or_default();
+                    let body = read_capped(r, MAX_ERROR_BODY).await;
                     return Err(Error::asr(format!("ASR API error {status}: {body}")));
                 }
                 Ok(r) => {
-                    let body: VerboseJsonResponse = r
-                        .json()
-                        .await
+                    let bytes = read_capped_bytes(r, MAX_RESPONSE_BODY).await?;
+                    let body: VerboseJsonResponse = serde_json::from_slice(&bytes)
                         .map_err(|e| Error::asr(format!("parse response: {e}")))?;
                     return Ok(body.into_segments(base_id));
                 }
@@ -292,6 +295,59 @@ impl OpenAiCompatibleAsrBackend {
             "ASR failed after {MAX_ATTEMPTS} attempts: {last_err}"
         )))
     }
+}
+
+/// Ceiling on a successful response body.
+///
+/// A transcript of a hotkey-bounded utterance is kilobytes; this is orders of
+/// magnitude above any legitimate one. It exists because the endpoint is
+/// user-configured and may be neither trusted nor healthy — without a cap, a
+/// misbehaving server can drive this process out of memory by answering.
+const MAX_RESPONSE_BODY: usize = 8 * 1024 * 1024;
+
+/// Ceiling on an error body. This one is interpolated into an error string that
+/// reaches the log, so it is capped far tighter.
+const MAX_ERROR_BODY: usize = 8 * 1024;
+
+/// Read at most `cap` bytes of a response body, stopping early rather than
+/// buffering whatever the server decides to send.
+async fn read_capped_bytes(response: reqwest::Response, cap: usize) -> Result<Vec<u8>> {
+    use futures_util::StreamExt;
+
+    let mut out = Vec::new();
+    let mut stream = response.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| Error::asr(format!("read response: {e}")))?;
+        if out.len() + chunk.len() > cap {
+            return Err(Error::asr(format!(
+                "the transcription endpoint sent more than {cap} bytes; refusing to buffer it"
+            )));
+        }
+        out.extend_from_slice(&chunk);
+    }
+    Ok(out)
+}
+
+/// Lossy-UTF-8 view of a capped body, for embedding in an error message.
+///
+/// Truncates rather than failing: the server's own message is the useful part
+/// of an API error, and replacing it with "the body was too long" would throw
+/// away the diagnostic this string exists to carry.
+async fn read_capped(response: reqwest::Response, cap: usize) -> String {
+    use futures_util::StreamExt;
+
+    let mut out = Vec::new();
+    let mut stream = response.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let Ok(chunk) = chunk else { break };
+        let room = cap - out.len();
+        if chunk.len() >= room {
+            out.extend_from_slice(&chunk[..room]);
+            break;
+        }
+        out.extend_from_slice(&chunk);
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// Attempts made before a transient failure becomes a hard error.

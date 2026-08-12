@@ -134,14 +134,6 @@ pub struct PipelineConfig {
     /// instead. A value of 0 disables the timeout. Default is 30 seconds.
     #[serde(default = "default_llm_timeout_secs")]
     pub llm_timeout_secs: u32,
-
-    // ── Word boosting ─────────────────────────────────────────────────
-    /// Boost dictionary replacement tokens in the ASR decoder logits.
-    #[serde(default = "default_word_boost_enabled")]
-    pub word_boost_enabled: bool,
-    /// Additive logit bias for boosted tokens (NVIDIA recommends 0.5–2.0).
-    #[serde(default = "default_word_boost_score")]
-    pub word_boost_score: f32,
 }
 
 fn default_speech_threshold_end() -> f32 {
@@ -154,14 +146,6 @@ fn default_itn_enabled() -> bool {
 
 fn default_llm_timeout_secs() -> u32 {
     30
-}
-
-fn default_word_boost_enabled() -> bool {
-    true
-}
-
-fn default_word_boost_score() -> f32 {
-    1.0
 }
 
 impl PipelineConfig {
@@ -187,8 +171,6 @@ impl PipelineConfig {
         apply!(min_speech_ms);
         apply!(adaptive_vad);
         apply!(llm_timeout_secs);
-        apply!(word_boost_enabled);
-        apply!(word_boost_score);
 
         // Target field is Option<f32>; wrap incoming value in Some.
         if let Some(v) = overrides.word_confidence_threshold {
@@ -278,8 +260,6 @@ impl Default for PipelineConfig {
             max_speech_samples: 60 * SAMPLE_RATE,
             itn_enabled: false,
             llm_timeout_secs: 30,
-            word_boost_enabled: true,
-            word_boost_score: 1.0,
         }
     }
 }
@@ -304,8 +284,6 @@ pub struct PipelineOverrides {
     pub max_speech_secs: Option<u32>,
     /// Override LLM timeout in seconds.
     pub llm_timeout_secs: Option<u32>,
-    pub word_boost_enabled: Option<bool>,
-    pub word_boost_score: Option<f32>,
 }
 
 #[cfg(test)]

@@ -166,7 +166,16 @@ and:
 - verifies SHA-256 against the pinned value before unpacking anything;
 - extracts only an allowlist of flat filenames (`libggml-cuda.so`,
   `libcudart.so.*`, `libcublas.so.*`, `libcublasLt.so.*`), so a tampered archive
-  cannot write outside the plugin directory via `../` or absolute paths.
+  cannot write outside the plugin directory via `../` or absolute paths;
+- records a per-file SHA-256 manifest (`.integrity.json`) before publishing any
+  of them.
+
+The manifest is what makes the pin mean something at load time. The archive
+digest proves what was *downloaded*; `lune_asr::gpu_backend` re-hashes every
+recorded file before `dlopen`, because these libraries run their constructors
+inside a process that holds an exclusive grab on every keyboard. A missing,
+unreadable or mismatched manifest means the directory is skipped and reported as
+not installed, which is the state that offers the download again.
 
 ## Troubleshooting
 

@@ -102,12 +102,15 @@ portable CPU baseline instead of ggml's default `-march=native` (which would
 `SIGILL` on any user CPU older than the build host) and make ggml build all
 common CUDA archs. The native default skips both — one CPU target, one GPU arch.
 
-`RUSTFLAGS` covers the other half of the binary. `.cargo/config.toml` pins
-`-C target-cpu=native` for every build in this repo, which is right locally and
-wrong for a distributable artifact: the GGML flags do nothing for the Rust
-code, which would still `SIGILL` on an older CPU. `RUSTFLAGS` overrides
-`build.rustflags`, and `x86-64-v3` is the same AVX2 + FMA + F16C baseline the
-GGML flags request. On a non-x86_64 host `cgs build` sets it empty instead.
+`RUSTFLAGS` covers the other half of the binary — the GGML flags do nothing for
+the Rust code. `x86-64-v3` is the same AVX2 + FMA + F16C baseline the GGML flags
+request; on a non-x86_64 host `cgs build` sets it empty instead.
+
+Host-tuned codegen is opt-in per build, not pinned in `.cargo/config.toml`: a
+committed `build.rustflags` would apply to a packager's plain `cargo build
+--release` too, and that binary would `SIGILL` on any CPU older than the build
+host. `cgs dev` and the native branch of `cgs build` export
+`-C target-cpu=native` for themselves.
 
 ### Windows specifics
 

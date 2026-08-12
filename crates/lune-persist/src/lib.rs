@@ -7,8 +7,8 @@ mod secrets;
 mod settings;
 
 pub use db::{
-    Database, EDIT_OBSERVATION_CAP, SessionStats, SnippetSaveMode, SnippetSaveOutcome,
-    StoredCustomStyle, StoredDictionaryEntry,
+    Database, SessionStats, SnippetSaveMode, SnippetSaveOutcome, StoredCustomStyle,
+    StoredDictionaryEntry,
 };
 pub use error::{PersistError, PersistResult};
 pub use hub::{

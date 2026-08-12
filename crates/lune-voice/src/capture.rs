@@ -117,6 +117,23 @@ fn rms_of(samples: &[f32]) -> f32 {
 /// error event, hotkey would feel broken until process restart.
 const ASR_START_TIMEOUT: Duration = Duration::from_secs(15);
 
+/// Hard ceiling on the final decode.
+///
+/// Deliberately generous: a long utterance on a large model genuinely takes
+/// tens of seconds on CPU, and cutting a real transcription short is worse than
+/// waiting. The point is that "forever" is not an option — the remote backend
+/// retries with backoff and would otherwise sit here indefinitely with the pill
+/// still up. Cancellation, not this ceiling, is what a user actually reaches
+/// for; the two are raced together.
+const POLL_FINAL_TIMEOUT: Duration = Duration::from_secs(180);
+
+/// How the final decode ended.
+enum PollOutcome {
+    Finished(lune_core::Result<Vec<AsrSegment>>),
+    TimedOut,
+    Cancelled,
+}
+
 /// Resolved per-session runtime objects built before the capture loop starts.
 struct SessionRuntime<H> {
     audio_source: Box<dyn AudioPull>,
@@ -435,6 +452,17 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
         }
     }
 
+    // Audio lost to a full ring is invisible downstream — the transcript simply
+    // starts mid-sentence — so say so here, where the cause is still known.
+    let dropped = audio_source.dropped_chunks();
+    if dropped > 0 {
+        warn!(
+            %session_id,
+            dropped,
+            "audio chunks were discarded during capture; the start of this dictation is missing"
+        );
+    }
+
     if !cancelled {
         let _ = send_bounded(event_tx, SessionEvent::Processing).await;
     }
@@ -445,19 +473,66 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
         }
     } else {
         let poll_final_t0 = tokio::time::Instant::now();
-        let poll_final_result = asr.poll_final(&asr_session).await;
+        // Race the decode against a cancel and a hard ceiling. Unraced, this is
+        // the one unbounded await in the session: the remote backend retries
+        // with backoff and can sit here for minutes with the pill up, and a
+        // Cancel arriving meanwhile would go unread until it returned.
+        //
+        // This only bites the remote backend, and only it can be interrupted.
+        // `WhisperCppBackend::poll_final` has no await points — it runs the
+        // whole decode inside `block_in_place` — so its first poll returns
+        // `Ready` and neither the ceiling nor a late Cancel ever gets a turn.
+        // Making a `!Send` whisper decode interruptible is a backend redesign,
+        // and the local decode is bounded by the utterance anyway; the remote
+        // one, which is genuinely unbounded, is the case that needed this.
+        let decode = asr.poll_final(&asr_session);
+        let ceiling = tokio::time::sleep(POLL_FINAL_TIMEOUT);
+        tokio::pin!(decode, ceiling);
+        let mut listening = true;
+        let outcome = loop {
+            tokio::select! {
+                biased;
+
+                control = control_rx.recv(), if listening => match control {
+                    Some(SessionControl::Cancel) => break PollOutcome::Cancelled,
+                    // A stop is what got us here; asking twice changes nothing.
+                    Some(SessionControl::Stop) => {}
+                    // The manager is gone. Nothing more will arrive, so stop
+                    // polling this branch instead of spinning on it.
+                    None => listening = false,
+                },
+
+                result = &mut decode => break PollOutcome::Finished(result),
+
+                () = &mut ceiling => break PollOutcome::TimedOut,
+            }
+        };
         let poll_final_ms = poll_final_t0.elapsed().as_millis() as u64;
         info!(%session_id, poll_final_ms, "asr: poll_final complete");
-        match poll_final_result {
-            Ok(new_segments) => {
+        match outcome {
+            PollOutcome::Finished(Ok(new_segments)) => {
                 if append_segments(&mut segments, &mut raw_text, new_segments) {
                     saw_asr_success = true;
                 }
             }
-            Err(e) => {
+            PollOutcome::Finished(Err(e)) => {
                 let msg = e.to_string();
                 warn!(error = %msg, "poll_final error");
                 first_asr_error.get_or_insert(msg);
+            }
+            PollOutcome::TimedOut => {
+                warn!(%session_id, poll_final_ms, "transcription timed out");
+                first_asr_error.get_or_insert(format!(
+                    "transcription did not finish within {}s",
+                    POLL_FINAL_TIMEOUT.as_secs()
+                ));
+            }
+            PollOutcome::Cancelled => {
+                debug!(%session_id, "cancel signal received while transcribing");
+                cancelled = true;
+                if let Err(e) = asr.reset_context(&asr_session).await {
+                    warn!(error = %e, "reset_context error during cancel");
+                }
             }
         }
     }

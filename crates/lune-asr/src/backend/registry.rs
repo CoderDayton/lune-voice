@@ -115,15 +115,21 @@ impl AsrBackend for AsrRegistry {
 impl AsrRegistry {
     /// Build the appropriate ASR backend from user configuration.
     ///
+    /// `cuda_available` must be the *runtime* answer — see
+    /// [`crate::gpu_backend::cuda_available`]. Passing a compile-time feature
+    /// flag here would make the downloadable CUDA plugin unreachable in the
+    /// builds it exists for.
+    ///
     /// Cold path: called once at startup.
     #[cold]
     pub fn from_config(
         config: &AsrBackendConfig,
         device: DevicePolicy,
         models_dir: &Path,
+        cuda_available: bool,
     ) -> Result<Self> {
-        // Per-backend GPU decision is computed inline below (whisper gates on
-        // the `whisper-cuda` feature); the remote backend ignores it.
+        // Per-backend GPU decision is computed inline below; the remote backend
+        // ignores it.
         match config {
             AsrBackendConfig::OpenAiCompatible {
                 base_url,
@@ -143,7 +149,7 @@ impl AsrRegistry {
             AsrBackendConfig::WhisperCpp { model } => {
                 let backend = WhisperCppBackend::new(WhisperCppConfig {
                     model_path: models_dir.join(model.dir()).join(model.ggml_file()),
-                    use_gpu: device.use_gpu(cfg!(feature = "whisper-cuda")),
+                    use_gpu: device.use_gpu(cuda_available),
                     vad_model_path: Some(
                         models_dir
                             .join(lune_core::models::DIR_WHISPER_VAD)
@@ -189,8 +195,6 @@ impl AsrRegistry {
                 min_speech_ms: 200,
                 adaptive_vad: false,
                 itn_enabled: true,
-                word_boost_enabled: false,
-                word_boost_score: 1.0,
                 // No per-token log-probs from remote API — disable all
                 // confidence-based gating.
                 word_confidence_threshold: None,
@@ -211,8 +215,6 @@ impl AsrRegistry {
                 min_speech_ms: 200,
                 adaptive_vad: false,
                 itn_enabled: true,
-                word_boost_enabled: false,
-                word_boost_score: 1.0,
                 // whisper token probs feed the gate, but they're uncalibrated
                 // (no per-backend isotonic file), so route a touch more eagerly
                 // rather than trust a hard cutoff.
@@ -224,15 +226,6 @@ impl AsrRegistry {
             },
             // Fallback for any future variants — start from PipelineConfig::default().
             _ => PipelineConfig::default(),
-        }
-    }
-
-    /// Set word boost phrases on the underlying ASR backend.
-    /// No-op for backends that don't support token-level boosting.
-    pub fn set_boost_phrases(&self, phrases: &[String], score: f32) {
-        let _ = (phrases, score);
-        match self {
-            Self::OpenAi(_) | Self::WhisperCpp(_) => {}
         }
     }
 }

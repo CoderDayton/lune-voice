@@ -1,8 +1,6 @@
 use diesel::prelude::*;
 
-use super::schema::{
-    correction_pairs, custom_styles, dictionary, edit_observations, sessions, snippets,
-};
+use super::schema::{correction_pairs, custom_styles, dictionary, sessions, snippets};
 
 // ── Custom styles ────────────────────────────────────────────────────────────
 
@@ -128,29 +126,5 @@ pub struct NewCorrectionPair<'a> {
     pub session_id: &'a str,
     pub raw: &'a str,
     pub final_text: &'a str,
-    pub created_at: &'a str,
-}
-
-// ── Edit observations (open-vocab LLM-edit calibration data) ─────────────────
-
-#[derive(Queryable, Selectable, Debug)]
-#[diesel(table_name = edit_observations)]
-#[allow(dead_code)]
-pub struct EditObservationRow {
-    pub id: i32,
-    pub session_id: String,
-    pub observed_correct: i32,
-    pub margin: Option<f32>,
-    pub flip_fixes: i32,
-    pub created_at: String,
-}
-
-#[derive(Insertable)]
-#[diesel(table_name = edit_observations)]
-pub struct NewEditObservation<'a> {
-    pub session_id: &'a str,
-    pub observed_correct: i32,
-    pub margin: Option<f32>,
-    pub flip_fixes: i32,
     pub created_at: &'a str,
 }

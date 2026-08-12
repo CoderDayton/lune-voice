@@ -179,7 +179,11 @@ pub struct UserSettings {
     /// Set `Terminal` on COSMIC or other compositors without focus detection.
     #[serde(default)]
     pub terminal_mode: TerminalMode,
-    /// None = session history disabled
+    /// How long a dictation stays in the history, in days.
+    ///
+    /// `None` disables history outright: nothing is written for a dictation —
+    /// no session row, no transcript, no correction pair — and anything already
+    /// stored is cleared when the setting changes. It is not "keep forever".
     pub session_history_days: Option<u32>,
     /// Per-word confidence threshold for LLM gating.
     /// **Deprecated**: use `pipeline.word_confidence_threshold` instead.
@@ -493,7 +497,8 @@ pub enum LlmBackendConfig {
 ///
 /// Loopback and the RFC 1918 / RFC 4193 private ranges count, as do `.local`
 /// and `.localhost` names: a box on the user's LAN is still theirs. Anything
-/// that resolves through DNS to the public internet does not.
+/// that resolves through DNS to the public internet does not, and neither does
+/// a link-local or unspecified address.
 ///
 /// # Tradeoff: this also gates TLS
 ///
@@ -514,17 +519,14 @@ pub fn is_local_endpoint(url: &Url) -> bool {
             let name = name.trim_end_matches('.').to_ascii_lowercase();
             name == "localhost" || name.ends_with(".localhost") || name.ends_with(".local")
         }
-        Some(Host::Ipv4(ip)) => {
-            ip.is_loopback() || ip.is_private() || ip.is_link_local() || ip.is_unspecified()
-        }
+        // Link-local is deliberately excluded: `169.254.0.0/16` carries the
+        // cloud metadata address `169.254.169.254`, and an autoconfigured
+        // address is not the deliberate "box on my LAN" this carve-out exists
+        // for. The unspecified address is not a destination at all.
+        Some(Host::Ipv4(ip)) => ip.is_loopback() || ip.is_private(),
         // `Ipv6Addr::is_unique_local` is still unstable, so match fc00::/7 by
-        // hand; `fe80::/10` is link-local.
-        Some(Host::Ipv6(ip)) => {
-            ip.is_loopback()
-                || ip.is_unspecified()
-                || (ip.segments()[0] & 0xfe00) == 0xfc00
-                || (ip.segments()[0] & 0xffc0) == 0xfe80
-        }
+        // hand. `fe80::/10` is excluded for the same reason as IPv4 link-local.
+        Some(Host::Ipv6(ip)) => ip.is_loopback() || (ip.segments()[0] & 0xfe00) == 0xfc00,
         None => false,
     }
 }
@@ -661,6 +663,35 @@ mod tests {
             "https://localhost.example.com/v1",
         ] {
             assert!(!local(url), "{url} should not be local");
+        }
+    }
+
+    #[test]
+    fn auto_device_follows_the_runtime_cuda_answer() {
+        // `Auto` is the default, and the argument it defers to must stay a
+        // runtime fact. Wiring a compile-time feature flag in here is what made
+        // the downloadable CUDA plugin unreachable in `whisper-cpp` builds.
+        assert!(DevicePolicy::Auto.use_gpu(true));
+        assert!(!DevicePolicy::Auto.use_gpu(false));
+        // The explicit choices ignore it in both directions.
+        assert!(DevicePolicy::Cuda.use_gpu(false));
+        assert!(!DevicePolicy::Cpu.use_gpu(true));
+    }
+
+    #[test]
+    fn link_local_and_unspecified_addresses_are_not_local() {
+        // These are the addresses the plaintext carve-out must not cover: an
+        // autoconfigured link-local address was never the deliberate "box on my
+        // LAN" it exists for, and `169.254.169.254` is the cloud metadata
+        // endpoint. The unspecified address is not a destination at all.
+        for url in [
+            "http://169.254.169.254/v1",
+            "http://169.254.1.1/v1",
+            "http://0.0.0.0:8080/v1",
+            "http://[fe80::1]:8080/v1",
+            "http://[::]:8080/v1",
+        ] {
+            assert!(!local(url), "{url} must not be treated as local");
         }
     }
 

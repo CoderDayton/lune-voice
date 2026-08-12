@@ -16,6 +16,7 @@
 //! will later `dlopen`. A tampered archive is arbitrary code execution, so the
 //! download is rejected unless its SHA-256 matches the pinned digest exactly.
 
+use std::collections::BTreeMap;
 use std::path::{Component, Path, PathBuf};
 
 use sha2::{Digest, Sha256};
@@ -314,7 +315,12 @@ where
             done: false,
         });
     }
-    file.sync_all()?;
+    // Flushing ~500 MB can take seconds of pure disk I/O. `stream_to_file` is
+    // awaited from a Tauri command, so doing it inline would park an async
+    // worker — and the download UI with it — for the whole flush.
+    tokio::task::spawn_blocking(move || file.sync_all())
+        .await
+        .map_err(|e| PersistError::Io(std::io::Error::other(format!("archive flush: {e}"))))??;
     Ok(hex(&hasher.finalize()))
 }
 
@@ -348,6 +354,25 @@ fn unpack(archive: &Path, dest_dir: &Path) -> PersistResult<Vec<PathBuf>> {
         )));
     }
 
+    // Record what was installed before anything is published. The pinned
+    // archive digest proves the download; this proves the files still on disk
+    // are the ones that came out of it, which is a different question and the
+    // one that matters at `dlopen` time — see `lune_asr::gpu_backend`.
+    let manifest = staged
+        .iter()
+        .map(|(part, out)| {
+            let name = out
+                .file_name()
+                .and_then(|n| n.to_str())
+                .ok_or_else(|| {
+                    PersistError::Io(std::io::Error::other("plugin file name is not UTF-8"))
+                })?
+                .to_owned();
+            Ok((name, sha256_of_file(part)?))
+        })
+        .collect::<PersistResult<BTreeMap<String, String>>>()?;
+    write_plugin_manifest(dest_dir, &manifest)?;
+
     // The plugin file is the installation marker, so publish it last.
     staged.sort_by_key(|(_, out)| out.file_name().is_some_and(|n| n == CUDA_PLUGIN_FILE));
 
@@ -357,6 +382,27 @@ fn unpack(archive: &Path, dest_dir: &Path) -> PersistResult<Vec<PathBuf>> {
         written.push(out);
     }
     Ok(written)
+}
+
+/// Name of the per-file digest manifest written beside the installed plugin.
+///
+/// Read back by `lune_asr::gpu_backend` before any of these libraries is
+/// `dlopen`ed — the two names must stay in step.
+pub const PLUGIN_MANIFEST: &str = ".integrity.json";
+
+/// Stream-hash a file with SHA-256; returns lowercase hex.
+fn sha256_of_file(path: &Path) -> PersistResult<String> {
+    let mut file = std::fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    std::io::copy(&mut file, &mut hasher)?;
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn write_plugin_manifest(dir: &Path, manifest: &BTreeMap<String, String>) -> PersistResult<()> {
+    let json = serde_json::to_vec_pretty(manifest)
+        .map_err(|e| PersistError::Io(std::io::Error::other(e)))?;
+    std::fs::write(dir.join(PLUGIN_MANIFEST), json)?;
+    Ok(())
 }
 
 /// Extract every permitted member to its `.lune-part` staging name, recording

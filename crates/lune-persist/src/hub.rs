@@ -120,6 +120,14 @@ impl ModelSpec {
     }
 
     /// Check if this model is fully present locally (no download needed).
+    ///
+    /// A file is only "present" if it matches the size the manifest recorded
+    /// when it was downloaded. Existence alone is not enough: a download
+    /// interrupted by a full disk or a crash leaves a short file behind, and
+    /// treating that as installed hands it straight to a loader that cannot
+    /// report the problem — whisper.cpp aborts the process on a malformed
+    /// model. Without a manifest entry (a hand-placed file) size is unknown and
+    /// only presence can be checked.
     pub fn is_ready(&self, models_dir: &Path) -> bool {
         let Self::Directory {
             required_files,
@@ -127,7 +135,20 @@ impl ModelSpec {
             ..
         } = self;
         let dir = models_dir.join(local_name);
-        dir.exists() && required_files.iter().all(|f| dir.join(f).is_file())
+        if !dir.exists() {
+            return false;
+        }
+        let manifest = load_integrity_manifest(&dir);
+        required_files.iter().all(|f| {
+            let path = dir.join(f);
+            match std::fs::metadata(&path) {
+                Ok(meta) if meta.is_file() => manifest
+                    .get(file_basename(f))
+                    .and_then(|m| m.size)
+                    .is_none_or(|expected| meta.len() == expected),
+                _ => false,
+            }
+        })
     }
 
     fn repo_id(&self) -> &str {

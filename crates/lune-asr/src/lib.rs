@@ -3,5 +3,5 @@ pub mod gpu_backend;
 
 pub use backend::{
     AsrRegistry, AsrSessionHandle, OpenAiAsrConfig, OpenAiCompatibleAsrBackend, WhisperCppBackend,
-    WhisperCppConfig, encode_wav_16bit,
+    WhisperCppConfig, check_ggml_file, encode_wav_16bit,
 };

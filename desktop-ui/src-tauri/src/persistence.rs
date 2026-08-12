@@ -35,17 +35,35 @@ fn is_wellformed_bcp47(tag: &str) -> bool {
     })
 }
 
+/// Apply the retention setting to what is already on disk.
+///
+/// `Some(days)` prunes past the window; `None` is "Don't save history" and
+/// removes everything, because turning the setting off has to clear what was
+/// collected before, not just stop adding to it. Writes are refused separately
+/// (`SessionManagerConfig::persist_history`) — this is the half that deals with
+/// rows that already exist.
+///
+/// Best-effort: a failure here is logged, never fatal.
+pub(crate) fn enforce_retention(database: &mut Database, settings: &UserSettings) {
+    match settings.session_history_days {
+        Some(days) => {
+            if let Err(e) = database.prune_sessions(days) {
+                tracing::warn!(error = %e, days, "history retention prune failed");
+            }
+        }
+        None => match database.purge_history() {
+            Ok(0) => {}
+            Ok(removed) => tracing::info!(removed, "history is off — cleared stored sessions"),
+            Err(e) => tracing::warn!(error = %e, "clearing stored history failed"),
+        },
+    }
+}
+
 pub fn load_workspace_snapshot() -> Result<WorkspaceSnapshot, String> {
     let paths = resolve_paths()?;
     let settings = load_settings(&paths)?;
     let mut database = open_database(&paths)?;
-    // Enforce history retention at load time. `None` keeps history forever;
-    // a prune failure is non-fatal — we still serve the snapshot.
-    if let Some(days) = settings.session_history_days
-        && let Err(e) = database.prune_sessions(days)
-    {
-        tracing::warn!(error = %e, days, "history retention prune failed");
-    }
+    enforce_retention(&mut database, &settings);
     build_snapshot(settings, &mut database)
 }
 
@@ -57,6 +75,10 @@ pub fn save_workspace_settings(
     let mut database = open_database(&paths)?;
     apply_settings_dto(&mut settings, input, &mut database)?;
     save_settings(&paths, &settings)?;
+    // Retention applies the moment it is changed. Switching to "Don't save
+    // history" must clear what is already stored rather than wait for the next
+    // window load.
+    enforce_retention(&mut database, &settings);
     build_snapshot(settings, &mut database)
 }
 

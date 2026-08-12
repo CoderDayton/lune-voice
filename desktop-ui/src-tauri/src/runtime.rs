@@ -9,7 +9,7 @@ use lune_audio::{AudioConfig, AudioStream};
 use lune_core::asr::AsrSessionConfig;
 use lune_core::command::VoiceCommand;
 use lune_core::config::{
-    AsrBackendConfig, DictationMode, LlmBackendConfig, PillVisibility, PrivacyMode, UserSettings,
+    AsrBackendConfig, LlmBackendConfig, PillVisibility, PrivacyMode, UserSettings,
 };
 use lune_core::llm::LlmService;
 use lune_core::session::SessionEvent;
@@ -62,14 +62,129 @@ struct RuntimeInner {
     prewarmed_audio: Mutex<Option<PrewarmedStream>>,
 }
 
+/// What the dictation pipeline is doing right now.
+///
+/// `Loading` exists because it is a real state with a real duration: building
+/// the pipeline loads the whisper model, which takes seconds on the larger
+/// ones. Collapsing it into `Idle` (as a single `active: bool` does) makes
+/// every stop and cancel arriving in that window a silent no-op — a
+/// push-to-talk release lands on nothing, and the session then starts with the
+/// key already back up and nothing left to end it.
+/// Whether moving from `current` to `next` invalidates the loaded ASR backend.
+///
+/// Compared by hand rather than with `PartialEq`: the remote variant carries an
+/// API key, and secrets are deliberately not comparable. The remote backend is
+/// rebuilt unconditionally — it loads no model, so nothing is saved by keeping
+/// it, and its key may have changed underneath us.
+fn asr_backend_needs_reload(current: &AsrBackendConfig, next: &AsrBackendConfig) -> bool {
+    match (current, next) {
+        (AsrBackendConfig::WhisperCpp { model: a }, AsrBackendConfig::WhisperCpp { model: b }) => {
+            a != b
+        }
+        _ => true,
+    }
+}
+
+/// A start refused because one is already running or loading.
+const ALREADY_ACTIVE: &str = "dictation session already active";
+
+/// A start that abandoned itself because a stop or cancel arrived while it was
+/// still loading. Not a failure — the user got what they asked for.
+const START_ABORTED: &str = "dictation start cancelled before it began";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PipelineState {
+    Idle,
+    /// A start is in flight. No `SessionManager` is running yet, so a stop or
+    /// cancel here cannot be forwarded — it is recorded as
+    /// [`LivePipeline::abort_pending_start`] instead and consumed by the start.
+    Loading,
+    Active,
+}
+
+/// How much of the pipeline a pending change actually invalidates.
+///
+/// Ordered: a heavier scope always wins when two changes queue up before the
+/// next rebuild.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum ReloadScope {
+    None,
+    /// Everything built *around* the ASR backend — dictionary, styles, styling
+    /// service, pipeline config. The loaded model is reused as-is, because
+    /// none of these reach into it.
+    Config,
+    /// The ASR backend itself. Only a change to the backend, the device policy
+    /// or the models directory needs this, and only this costs a model load.
+    Full,
+}
+
 struct LivePipeline {
     paths: AppPaths,
     manager: Option<Arc<SessionManager<AsrRegistry>>>,
-    active: bool,
+    /// The loaded ASR backend, kept so a `Config`-scope reload can hand the
+    /// same one to the new `SessionManager` instead of loading it again.
+    asr: Option<Arc<AsrRegistry>>,
+    state: PipelineState,
+    /// Set when a stop or cancel arrives during `Loading`. The in-flight start
+    /// consumes it and abandons itself rather than opening a mic nobody asked
+    /// to keep open.
+    abort_pending_start: bool,
     session_id: Option<String>,
-    reload_required: bool,
+    reload: ReloadScope,
     #[cfg(unix)]
     focus_target: Option<WindowTarget>,
+}
+
+impl LivePipeline {
+    /// Whether a start is in flight or a session is running. Both mean "do not
+    /// begin another one, and do not rebuild underneath it".
+    fn is_busy(&self) -> bool {
+        self.state != PipelineState::Idle
+    }
+
+    /// The loaded ASR backend, when the pending reload does not invalidate it.
+    /// `None` forces `build_pipeline` to load the model again.
+    fn reusable_asr(&self) -> Option<Arc<AsrRegistry>> {
+        match self.reload {
+            ReloadScope::Full => None,
+            ReloadScope::None | ReloadScope::Config => self.asr.clone(),
+        }
+    }
+
+    /// Claim the pipeline for a start. `false` means one is already running or
+    /// loading and the caller must not proceed.
+    fn begin_start(&mut self) -> bool {
+        if self.is_busy() {
+            return false;
+        }
+        self.state = PipelineState::Loading;
+        self.abort_pending_start = false;
+        true
+    }
+
+    /// Record a stop or cancel that arrived before the start finished loading.
+    /// `true` means it was recorded here, so there is no session to forward it
+    /// to; the start will abandon itself.
+    fn note_stop_during_start(&mut self) -> bool {
+        if self.state == PipelineState::Loading {
+            self.abort_pending_start = true;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Complete a start. `false` means a stop or cancel landed while loading,
+    /// so the pipeline returns to `Idle` and no session is opened.
+    fn finish_start(&mut self) -> bool {
+        if self.abort_pending_start {
+            self.abort_pending_start = false;
+            self.state = PipelineState::Idle;
+            return false;
+        }
+        self.state = PipelineState::Active;
+        true
+    }
 }
 
 struct SessionStreamSlot {
@@ -120,11 +235,31 @@ impl AppRuntime {
         }
         let settings = load_settings(&paths)?;
 
+        // Retention runs once per launch, not once per window load: with
+        // `start_minimized` and a hotkey-only workflow the main window may
+        // never open, and on Linux the pill is drawn natively rather than in a
+        // webview, so nothing else would ever trigger it.
+        match Database::open(&paths.database_file()) {
+            Ok(mut db) => {
+                crate::persistence::enforce_retention(&mut db, &settings);
+                // A previous run that was killed outright left its dictation
+                // row open; nothing in that process survived to close it.
+                match db.close_orphaned_sessions() {
+                    Ok(0) => {}
+                    Ok(closed) => {
+                        tracing::info!(closed, "closed dictations left open by a previous run");
+                    }
+                    Err(e) => tracing::warn!(error = %e, "closing orphaned sessions failed"),
+                }
+            }
+            Err(e) => tracing::warn!(error = %e, "open DB for startup maintenance failed"),
+        }
+
         let models_ready =
             lune_persist::has_required_models(&paths.models_dir(), &settings.asr_backend);
 
         let (pipeline, llm_service, settings) = if models_ready {
-            build_pipeline(paths.clone(), settings).await?
+            build_pipeline(paths.clone(), settings, None).await?
         } else {
             info!("models not yet downloaded — deferring pipeline build");
             let settings = Arc::new(RwLock::new(settings));
@@ -132,9 +267,11 @@ impl AppRuntime {
             let pipeline = LivePipeline {
                 paths,
                 manager: None,
-                active: false,
+                asr: None,
+                state: PipelineState::Idle,
+                abort_pending_start: false,
                 session_id: None,
-                reload_required: true,
+                reload: ReloadScope::Full,
                 #[cfg(unix)]
                 focus_target: None,
             };
@@ -194,7 +331,11 @@ impl AppRuntime {
         };
         let mut slot = self.inner.prewarmed_audio.lock().await;
         let open = slot.as_ref().map(|p| p.device.as_deref());
-        let action = reconcile_prewarm(open, want, input_device.as_deref());
+        let healthy = slot.as_ref().is_none_or(|p| !p.stream.has_failed());
+        if !healthy {
+            warn!("mic prewarm: the open capture stream reported an error; rebuilding it");
+        }
+        let action = reconcile_prewarm(open, want, input_device.as_deref(), healthy);
         match action {
             PrewarmAction::Keep => {}
             PrewarmAction::Close => {
@@ -330,27 +471,58 @@ impl AppRuntime {
         }
     }
 
-    pub async fn mark_reload_required(&self) {
-        {
-            let mut pipeline = self.inner.pipeline.lock().await;
-            pipeline.reload_required = true;
-        }
+    async fn request_reload(&self, scope: ReloadScope) {
+        let mut pipeline = self.inner.pipeline.lock().await;
+        pipeline.reload = pipeline.reload.max(scope);
+    }
+
+    /// A dictionary, snippet or style edit. None of these reach into the ASR
+    /// model, so the loaded backend is carried forward and the next dictation
+    /// starts without a model load.
+    pub async fn mark_config_changed(&self) {
+        self.request_reload(ReloadScope::Config).await;
+    }
+
+    /// A settings save. Only a change to the transcription backend or the
+    /// device policy invalidates the loaded model; everything else on the
+    /// settings page is config-scope.
+    pub async fn mark_settings_changed(&self) {
+        let paths = { self.inner.pipeline.lock().await.paths.clone() };
+        let scope = match load_settings(&paths) {
+            Ok(next) => {
+                let current = self.inner.settings.read().await;
+                if next.device != current.device
+                    || asr_backend_needs_reload(&current.asr_backend, &next.asr_backend)
+                {
+                    ReloadScope::Full
+                } else {
+                    ReloadScope::Config
+                }
+            }
+            // Can't tell what changed — reload everything rather than keep
+            // running against something that may now be wrong.
+            Err(error) => {
+                warn!(%error, "settings reload scope undecidable; rebuilding everything");
+                ReloadScope::Full
+            }
+        };
+        self.request_reload(scope).await;
     }
 
     pub async fn eager_rebuild(&self) -> Result<(), String> {
-        let paths = {
+        let (paths, reuse_asr) = {
             let pipeline = self.inner.pipeline.lock().await;
-            if pipeline.active {
+            if pipeline.is_busy() {
                 return Ok(());
             }
-            pipeline.paths.clone()
+            (pipeline.paths.clone(), pipeline.reusable_asr())
         };
         let settings = load_settings(&paths)?;
-        let (rebuilt, new_llm_service, new_settings) = build_pipeline(paths, settings)
+        let (rebuilt, new_llm_service, new_settings) = build_pipeline(paths, settings, reuse_asr)
             .await
             .map_err(|e| format!("eager rebuild: {e}"))?;
         let mut pipeline = self.inner.pipeline.lock().await;
-        if !pipeline.active {
+        if !pipeline.is_busy() {
             *pipeline = rebuilt;
             *self.inner.llm_service.write().await = new_llm_service;
             let new_settings_val = new_settings.read().await.clone();
@@ -411,25 +583,26 @@ impl AppRuntime {
         // Snapshot the clipboard now, off the paste hot path: on the uinput
         // paste backend the restore-after-paste read can block up to 2s on a
         // slow clipboard owner, so priming here overlaps it with recording +
-        // ASR (mirrors the focus capture above). Only the clipboard delivery
-        // path borrows the clipboard, so skip the wl-paste round trip for
-        // per-key typing that keeps no copy; the rare non-ASCII fallback there
-        // still snapshots synchronously. No-op anyway on backends that never
-        // touch the clipboard (IBus, macOS/Windows).
-        {
-            let (mode, copy) = {
-                let s = self.inner.settings.read().await;
-                (s.dictation_mode, s.copy_to_clipboard)
-            };
-            if copy || !matches!(mode, DictationMode::TypeInPlace) {
-                self.inner.delivery.prime_clipboard();
-            }
-        }
+        // ASR (mirrors the focus capture above). Unconditional, because every
+        // delivery mode can end up pasting — per-key typing routes anything
+        // long, non-ASCII or multi-line to the clipboard, and taking the
+        // snapshot at that point would put the stall right back on the
+        // delivery path. No-op on backends that never touch the clipboard
+        // (IBus, macOS/Windows).
+        self.inner.delivery.prime_clipboard();
 
         let manager = match self.prepare_manager_for_start().await {
             Ok(m) => m,
             Err(e) => {
-                self.publish_status("ready").await;
+                // Only walk the pill back when nothing is actually running.
+                // Losing the race to another start means a session *is* live,
+                // and publishing "ready" over it would make the UI lie.
+                if !self.inner.pipeline.lock().await.is_busy() {
+                    self.publish_status("ready").await;
+                }
+                if e == START_ABORTED {
+                    debug!("dictation start abandoned — stop arrived during the pipeline load");
+                }
                 return Err(e);
             }
         };
@@ -491,7 +664,15 @@ impl AppRuntime {
         let manager = match self.prepare_manager_for_start().await {
             Ok(m) => m,
             Err(e) => {
-                self.publish_status("ready").await;
+                // Only walk the pill back when nothing is actually running.
+                // Losing the race to another start means a session *is* live,
+                // and publishing "ready" over it would make the UI lie.
+                if !self.inner.pipeline.lock().await.is_busy() {
+                    self.publish_status("ready").await;
+                }
+                if e == START_ABORTED {
+                    debug!("dictation start abandoned — stop arrived during the pipeline load");
+                }
                 return Err(e);
             }
         };
@@ -522,6 +703,9 @@ impl AppRuntime {
     }
 
     pub async fn stop_dictation(&self) -> Result<(), String> {
+        if self.defer_stop_to_pending_start().await {
+            return Ok(());
+        }
         if let Some(manager) = self.active_manager().await {
             manager.stop().await;
         }
@@ -529,6 +713,9 @@ impl AppRuntime {
     }
 
     pub async fn stop_and_wait_dictation(&self) -> Result<(), String> {
+        if self.defer_stop_to_pending_start().await {
+            return Ok(());
+        }
         if let Some(manager) = self.active_manager().await {
             manager.stop_and_wait().await;
         }
@@ -536,7 +723,7 @@ impl AppRuntime {
     }
 
     pub async fn is_active(&self) -> bool {
-        self.inner.pipeline.lock().await.active
+        self.inner.pipeline.lock().await.state == PipelineState::Active
     }
 
     pub async fn cancel_dictation(&self) -> Result<(), String> {
@@ -547,6 +734,9 @@ impl AppRuntime {
                 return Ok(());
             }
             *last = Instant::now();
+        }
+        if self.defer_stop_to_pending_start().await {
+            return Ok(());
         }
         if let Some(manager) = self.active_manager().await {
             manager.cancel().await;
@@ -564,9 +754,11 @@ impl AppRuntime {
             *last = Instant::now();
         }
 
-        let is_active = self.inner.pipeline.lock().await.active;
+        // `Loading` counts as "on": a toggle press during the model load is
+        // the user turning it back off, not asking for a second session.
+        let is_on = self.inner.pipeline.lock().await.is_busy();
 
-        if is_active {
+        if is_on {
             self.stop_dictation().await?;
             Ok(None)
         } else {
@@ -868,7 +1060,7 @@ impl AppRuntime {
 
     async fn active_manager(&self) -> Option<Arc<SessionManager<AsrRegistry>>> {
         let pipeline = self.inner.pipeline.lock().await;
-        if pipeline.active {
+        if pipeline.state == PipelineState::Active {
             pipeline.manager.as_ref().map(Arc::clone)
         } else {
             None
@@ -885,58 +1077,93 @@ impl AppRuntime {
         // loser now waits here and takes the winner's freshly-built pipeline.
         let _start_guard = self.inner.start_gate.lock().await;
 
-        // Phase 1: Check if reload needed (short lock).
-        let reload_paths = {
-            let pipeline = self.inner.pipeline.lock().await;
-            if pipeline.active {
-                return Err("dictation session already active".into());
+        // Phase 1: claim the pipeline and decide whether a rebuild is needed
+        // (short lock). Entering `Loading` here is what makes a stop or cancel
+        // arriving during the rebuild land somewhere instead of on the floor.
+        let reload_plan = {
+            let mut pipeline = self.inner.pipeline.lock().await;
+            if !pipeline.begin_start() {
+                return Err(ALREADY_ACTIVE.into());
             }
-            // Rebuild when settings changed OR pipeline was never built (models were missing at boot)
-            if pipeline.reload_required || pipeline.manager.is_none() {
-                Some(pipeline.paths.clone())
-            } else {
-                None
-            }
+            let needs_rebuild = pipeline.reload != ReloadScope::None || pipeline.manager.is_none();
+            needs_rebuild.then(|| (pipeline.paths.clone(), pipeline.reusable_asr()))
         };
 
-        // Phase 2: If reload needed, rebuild pipeline outside lock, then
+        // Phase 2: If a rebuild is needed, do it outside the lock, then
         // re-acquire and atomically swap + activate in one critical section.
-        if let Some(paths) = reload_paths {
-            let settings = load_settings(&paths)?;
-            let (rebuilt, new_llm_service, new_settings) = build_pipeline(paths, settings)
-                .await
-                .map_err(|e| format!("Pipeline build failed: {e}"))?;
+        if let Some((paths, reuse_asr)) = reload_plan {
+            let settings = match load_settings(&paths) {
+                Ok(s) => s,
+                Err(e) => {
+                    self.abandon_pending_start().await;
+                    return Err(e);
+                }
+            };
+            let (rebuilt, new_llm_service, new_settings) =
+                match build_pipeline(paths, settings, reuse_asr).await {
+                    Ok(v) => v,
+                    Err(e) => {
+                        self.abandon_pending_start().await;
+                        return Err(format!("Pipeline build failed: {e}"));
+                    }
+                };
             let mut pipeline = self.inner.pipeline.lock().await;
-            if pipeline.active {
-                return Err("dictation session became active during reload".into());
-            }
+            // The freshly built pipeline is installed either way: the work is
+            // done, and the next start must not repeat it. `rebuilt` starts
+            // `Idle`, so carry the pending abort across the swap.
+            let aborted = pipeline.abort_pending_start;
             *pipeline = rebuilt;
-            pipeline.active = true;
+            pipeline.abort_pending_start = aborted;
             *self.inner.llm_service.write().await = new_llm_service;
             let new_settings_val = new_settings.read().await.clone();
-            let mut settings = self.inner.settings.write().await;
-            *settings = new_settings_val;
-            let mgr = pipeline
-                .manager
-                .as_ref()
-                .ok_or("build_pipeline succeeded but manager is None")?;
+            *self.inner.settings.write().await = new_settings_val;
+            // The user let go of the key (or cancelled) while the model was
+            // loading. Honour that rather than open a mic they already asked to
+            // close.
+            if !pipeline.finish_start() {
+                return Err(START_ABORTED.into());
+            }
+            // `finish_start` already moved to `Active`, so a bail-out here has
+            // to walk it back: a pipeline left `Active` with no manager refuses
+            // every later start and has nothing to forward a stop to.
+            let Some(mgr) = pipeline.manager.as_ref() else {
+                pipeline.state = PipelineState::Idle;
+                return Err("build_pipeline succeeded but manager is None".into());
+            };
             return Ok(Arc::clone(mgr));
         }
 
-        // Phase 3: No reload — just activate.
+        // Phase 3: No rebuild — activate the pipeline already in hand.
         let mut pipeline = self.inner.pipeline.lock().await;
-        if pipeline.active {
-            return Err("dictation session already active".into());
-        }
         if pipeline.manager.is_none() {
+            pipeline.state = PipelineState::Idle;
+            pipeline.abort_pending_start = false;
             return Err("Models not downloaded. Please complete model setup first.".into());
         }
-        pipeline.active = true;
-        let mgr = pipeline
-            .manager
-            .as_ref()
-            .ok_or("pipeline manager is None")?;
+        if !pipeline.finish_start() {
+            return Err(START_ABORTED.into());
+        }
+        let Some(mgr) = pipeline.manager.as_ref() else {
+            pipeline.state = PipelineState::Idle;
+            return Err("pipeline manager is None".into());
+        };
         Ok(Arc::clone(mgr))
+    }
+
+    /// Drop out of `Loading` after a start that never got off the ground.
+    async fn abandon_pending_start(&self) {
+        let mut pipeline = self.inner.pipeline.lock().await;
+        pipeline.state = PipelineState::Idle;
+        pipeline.abort_pending_start = false;
+    }
+
+    /// Record a stop or cancel that arrived while a start was still loading.
+    ///
+    /// Returns `true` when it was recorded, which tells the caller there is no
+    /// running session to forward the request to — the start will abandon
+    /// itself when it next looks.
+    async fn defer_stop_to_pending_start(&self) -> bool {
+        self.inner.pipeline.lock().await.note_stop_during_start()
     }
 
     /// Rebuild the pipeline now when a settings change is pending, so callers
@@ -953,18 +1180,18 @@ impl AppRuntime {
         // concurrent `build_pipeline` calls (two GPU model allocations).
         let _start_guard = self.inner.start_gate.lock().await;
 
-        let reload_paths = {
+        let reload_plan = {
             let pipeline = self.inner.pipeline.lock().await;
-            if pipeline.active {
+            if pipeline.is_busy() {
                 return;
             }
-            if pipeline.reload_required || pipeline.manager.is_none() {
-                Some(pipeline.paths.clone())
+            if pipeline.reload != ReloadScope::None || pipeline.manager.is_none() {
+                Some((pipeline.paths.clone(), pipeline.reusable_asr()))
             } else {
                 None
             }
         };
-        let Some(paths) = reload_paths else {
+        let Some((paths, reuse_asr)) = reload_plan else {
             return;
         };
         let settings = match load_settings(&paths) {
@@ -974,10 +1201,10 @@ impl AppRuntime {
                 return;
             }
         };
-        match build_pipeline(paths, settings).await {
+        match build_pipeline(paths, settings, reuse_asr).await {
             Ok((rebuilt, new_llm_service, new_settings)) => {
                 let mut pipeline = self.inner.pipeline.lock().await;
-                if pipeline.active {
+                if pipeline.is_busy() {
                     // A session started while we rebuilt; drop this rebuild and
                     // let the next dictation start redo it.
                     return;
@@ -1006,7 +1233,12 @@ impl AppRuntime {
     async fn set_pipeline_session(&self, session_id: Option<String>, active: bool) {
         let mut pipeline = self.inner.pipeline.lock().await;
         pipeline.session_id = session_id;
-        pipeline.active = active;
+        pipeline.state = if active {
+            PipelineState::Active
+        } else {
+            PipelineState::Idle
+        };
+        pipeline.abort_pending_start = false;
     }
 }
 
@@ -1018,9 +1250,15 @@ impl Clone for AppRuntime {
     }
 }
 
+/// Build a fresh pipeline.
+///
+/// `reuse_asr` carries the already-loaded backend forward for a
+/// [`ReloadScope::Config`] rebuild. Everything else here is cheap; the model
+/// load is not, so a dictionary or style edit must never trigger one.
 async fn build_pipeline(
     paths: AppPaths,
     settings: UserSettings,
+    reuse_asr: Option<Arc<AsrRegistry>>,
 ) -> Result<(LivePipeline, Arc<dyn LlmService>, Arc<RwLock<UserSettings>>), String> {
     // `LocalOnly` is the default, so refusing here is the difference between a
     // stated preference and an enforced one: a remote backend would ship every
@@ -1037,16 +1275,23 @@ async fn build_pipeline(
     }
     // Whisper model load takes seconds on the larger models; keep it off the
     // async workers so IPC and the UI stay responsive during startup/reload.
-    let asr = {
+    let asr: Arc<AsrRegistry> = if let Some(asr) = reuse_asr {
+        asr
+    } else {
         let backend_config = settings.asr_backend.clone();
         let device = settings.device;
         let models_dir = paths.models_dir();
-        tokio::task::spawn_blocking(move || {
-            AsrRegistry::from_config(&backend_config, device, &models_dir)
+        // Runtime, not `cfg!`: the CUDA backend is a downloadable ggml plugin,
+        // so a `whisper-cpp` build can still have a usable GPU by the time this
+        // runs. `lib.rs` loads the plugins before the first pipeline build.
+        let cuda_available = lune_asr::gpu_backend::cuda_available(paths.data_dir());
+        let built = tokio::task::spawn_blocking(move || {
+            AsrRegistry::from_config(&backend_config, device, &models_dir, cuda_available)
         })
         .await
         .map_err(|e| format!("asr build task: {e}"))?
-        .map_err(|e| format!("build asr backend: {e}"))?
+        .map_err(|e| format!("build asr backend: {e}"))?;
+        Arc::new(built)
     };
     let llm_service = build_llm_service(&settings).await?;
     let style_pipeline = Arc::new(lune_llm::StylePipeline::new(Arc::clone(&llm_service)));
@@ -1068,24 +1313,14 @@ async fn build_pipeline(
     for issue in pipeline_config.validate() {
         tracing::warn!(issue, "pipeline configuration violates invariant");
     }
-    // Wire dictionary replacement strings into the ASR decoder as boost phrases.
-    {
-        let pipeline = &pipeline_config;
-        if pipeline.word_boost_enabled {
-            let phrases: Vec<String> = dict
-                .lock()
-                .await
-                .entries()
-                .iter()
-                .map(|e| e.replacement.clone())
-                .collect();
-            asr.set_boost_phrases(&phrases, pipeline.word_boost_score);
-        }
-    }
-
+    // `None` is the "Don't save history" retention choice, and it has to mean
+    // "write nothing" rather than "prune nothing" — see
+    // `UserSettings::session_history_days`. Read before `settings` is wrapped.
+    let persist_history = settings.session_history_days.is_some();
     let settings = Arc::new(RwLock::new(settings.clone()));
 
     let config = SessionManagerConfig {
+        persist_history,
         asr_backend_kind: asr.kind(),
         asr_config: AsrSessionConfig {
             // dictation_language is the user-facing ASR language; "auto"
@@ -1106,7 +1341,7 @@ async fn build_pipeline(
     let heuristic = Arc::new(lune_dict::corrector::LexicalGate::new());
 
     let manager = SessionManager::new(
-        Arc::new(asr),
+        Arc::clone(&asr),
         router,
         post_processor,
         dict,
@@ -1119,9 +1354,11 @@ async fn build_pipeline(
     let pipeline = LivePipeline {
         paths,
         manager: Some(Arc::new(manager)),
-        active: false,
+        asr: Some(asr),
+        state: PipelineState::Idle,
+        abort_pending_start: false,
         session_id: None,
-        reload_required: false,
+        reload: ReloadScope::None,
         #[cfg(unix)]
         focus_target: None,
     };
@@ -1247,12 +1484,16 @@ fn reconcile_prewarm(
     open: Option<Option<&str>>,
     want: bool,
     desired: Option<&str>,
+    healthy: bool,
 ) -> PrewarmAction {
     match (want, open) {
         (false, Some(_)) => PrewarmAction::Close,
         (false, None) => PrewarmAction::Keep,
         (true, None) => PrewarmAction::Open,
-        (true, Some(current)) if current == desired => PrewarmAction::Keep,
+        // A stream on the right device is still useless if cpal has reported an
+        // error on it — the usual cause is the device being unplugged, and the
+        // name it was opened under does not change when that happens.
+        (true, Some(current)) if current == desired && healthy => PrewarmAction::Keep,
         (true, Some(_)) => PrewarmAction::Reopen,
     }
 }
@@ -1280,10 +1521,123 @@ fn cue_for_transition(prev: &str, status: &str) -> Option<lune_voice::sound::Cue
 #[cfg(test)]
 mod tests {
     use super::{
-        PrewarmAction, cue_for_transition, reconcile_prewarm, remote_backends_denied,
-        sanitize_error_for_frontend,
+        LivePipeline, PipelineState, PrewarmAction, ReloadScope, asr_backend_needs_reload,
+        cue_for_transition, reconcile_prewarm, remote_backends_denied, sanitize_error_for_frontend,
     };
-    use lune_core::config::PrivacyMode;
+    use lune_core::config::{AsrBackendConfig, PrivacyMode, WhisperModel};
+
+    /// A pipeline with no manager and no backend loaded — enough to drive the
+    /// start/stop state machine, which is the part that had the bug.
+    fn idle_pipeline() -> LivePipeline {
+        LivePipeline {
+            paths: lune_persist::AppPaths::resolve().expect("resolve XDG paths"),
+            manager: None,
+            asr: None,
+            state: PipelineState::Idle,
+            abort_pending_start: false,
+            session_id: None,
+            reload: ReloadScope::None,
+            #[cfg(unix)]
+            focus_target: None,
+        }
+    }
+
+    #[test]
+    fn a_stop_during_the_pipeline_load_abandons_the_start() {
+        // The push-to-talk case: key down begins a start that has to load a
+        // model, key up arrives seconds later, before any session exists.
+        // Dropping it there leaves the mic open with nothing left to close it.
+        let mut pipeline = idle_pipeline();
+        assert!(pipeline.begin_start());
+        assert_eq!(pipeline.state, PipelineState::Loading);
+
+        assert!(
+            pipeline.note_stop_during_start(),
+            "a stop while loading must be recorded, not discarded"
+        );
+        assert!(
+            !pipeline.finish_start(),
+            "the start must abandon itself rather than open a session"
+        );
+        assert_eq!(pipeline.state, PipelineState::Idle);
+        assert!(!pipeline.abort_pending_start, "the flag must not linger");
+    }
+
+    #[test]
+    fn an_undisturbed_start_becomes_active() {
+        let mut pipeline = idle_pipeline();
+        assert!(pipeline.begin_start());
+        assert!(pipeline.finish_start());
+        assert_eq!(pipeline.state, PipelineState::Active);
+    }
+
+    #[test]
+    fn a_second_start_is_refused_while_one_is_loading() {
+        let mut pipeline = idle_pipeline();
+        assert!(pipeline.begin_start());
+        assert!(
+            !pipeline.begin_start(),
+            "Loading is busy — a racing start must not claim the pipeline too"
+        );
+    }
+
+    #[test]
+    fn a_stop_outside_a_pending_start_is_not_swallowed() {
+        // With a session actually running the stop has somewhere to go, so it
+        // must be forwarded rather than absorbed as a pending-start abort.
+        let mut pipeline = idle_pipeline();
+        pipeline.begin_start();
+        pipeline.finish_start();
+        assert!(!pipeline.note_stop_during_start());
+        assert_eq!(pipeline.state, PipelineState::Active);
+
+        let mut idle = idle_pipeline();
+        assert!(!idle.note_stop_during_start());
+    }
+
+    #[test]
+    fn a_heavier_reload_scope_wins_when_changes_queue_up() {
+        assert_eq!(
+            ReloadScope::None.max(ReloadScope::Config),
+            ReloadScope::Config
+        );
+        assert_eq!(
+            ReloadScope::Config.max(ReloadScope::Full),
+            ReloadScope::Full
+        );
+        assert_eq!(
+            ReloadScope::Full.max(ReloadScope::Config),
+            ReloadScope::Full
+        );
+    }
+
+    #[test]
+    fn only_a_full_reload_drops_the_loaded_backend() {
+        let mut pipeline = idle_pipeline();
+        // Stand-in for a loaded backend: `reusable_asr` only inspects `reload`.
+        pipeline.reload = ReloadScope::Config;
+        assert!(pipeline.asr.is_none());
+
+        pipeline.reload = ReloadScope::Full;
+        assert!(
+            pipeline.reusable_asr().is_none(),
+            "a backend change must force a fresh model load"
+        );
+    }
+
+    #[test]
+    fn only_a_different_whisper_model_forces_a_reload() {
+        let small = AsrBackendConfig::WhisperCpp {
+            model: WhisperModel::Small,
+        };
+        let medium = AsrBackendConfig::WhisperCpp {
+            model: WhisperModel::Medium,
+        };
+        // A dictionary or style edit leaves the backend untouched — reloading
+        // ~874 MB of weights for it is the cost this check exists to avoid.
+        assert!(!asr_backend_needs_reload(&small, &small));
+        assert!(asr_backend_needs_reload(&small, &medium));
+    }
 
     #[test]
     fn only_local_only_denies_remote_backends() {
@@ -1339,20 +1693,44 @@ mod tests {
     /// stale device.
     #[test]
     fn reconcile_reopens_when_device_changes_while_enabled() {
-        let action =
-            reconcile_prewarm(Some(Some("Built-in Microphone")), true, Some("USB Headset"));
+        let action = reconcile_prewarm(
+            Some(Some("Built-in Microphone")),
+            true,
+            Some("USB Headset"),
+            true,
+        );
         assert_eq!(action, PrewarmAction::Reopen);
+    }
+
+    #[test]
+    fn reconcile_rebuilds_a_stream_the_device_died_under() {
+        // Unplug and replug: the device name is unchanged, so name comparison
+        // alone keeps the dead stream and every later dictation burns the 5 s
+        // starvation watchdog until an unrelated setting is touched.
+        assert_eq!(
+            reconcile_prewarm(Some(Some("USB Headset")), true, Some("USB Headset"), false),
+            PrewarmAction::Reopen
+        );
+        assert_eq!(
+            reconcile_prewarm(Some(None), true, None, false),
+            PrewarmAction::Reopen
+        );
+        // A failed stream nobody wants any more is still just closed.
+        assert_eq!(
+            reconcile_prewarm(Some(None), false, None, false),
+            PrewarmAction::Close
+        );
     }
 
     #[test]
     fn reconcile_keeps_when_device_unchanged() {
         assert_eq!(
-            reconcile_prewarm(Some(Some("USB Headset")), true, Some("USB Headset")),
+            reconcile_prewarm(Some(Some("USB Headset")), true, Some("USB Headset"), true),
             PrewarmAction::Keep
         );
         // Default ↔ default is also unchanged.
         assert_eq!(
-            reconcile_prewarm(Some(None), true, None),
+            reconcile_prewarm(Some(None), true, None, true),
             PrewarmAction::Keep
         );
     }
@@ -1360,7 +1738,7 @@ mod tests {
     #[test]
     fn reconcile_opens_when_enabled_and_nothing_open() {
         assert_eq!(
-            reconcile_prewarm(None, true, Some("USB Headset")),
+            reconcile_prewarm(None, true, Some("USB Headset"), true),
             PrewarmAction::Open
         );
     }
@@ -1368,14 +1746,17 @@ mod tests {
     #[test]
     fn reconcile_closes_when_disabled_with_stream_open() {
         assert_eq!(
-            reconcile_prewarm(Some(None), false, Some("USB Headset")),
+            reconcile_prewarm(Some(None), false, Some("USB Headset"), true),
             PrewarmAction::Close
         );
     }
 
     #[test]
     fn reconcile_keeps_when_disabled_and_nothing_open() {
-        assert_eq!(reconcile_prewarm(None, false, None), PrewarmAction::Keep);
+        assert_eq!(
+            reconcile_prewarm(None, false, None, true),
+            PrewarmAction::Keep
+        );
     }
 
     #[test]

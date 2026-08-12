@@ -77,7 +77,10 @@ export function mapWorkspaceSettings(snapshot: WorkspaceSnapshot): WorkspaceSett
     startMinimized: snapshot.settings.startMinimized ?? DEFAULT_SETTINGS.startMinimized,
     checkUpdatesOnLaunch:
       snapshot.settings.checkUpdatesOnLaunch ?? DEFAULT_SETTINGS.checkUpdatesOnLaunch,
-    sessionHistoryDays: snapshot.settings.sessionHistoryDays ?? DEFAULT_SETTINGS.sessionHistoryDays,
+    // No `??` fallback: `null` is the "Don't save history" choice, not a
+    // missing value. Coercing it to the default would show the retention
+    // select as "30 days" and silently re-enable history on the next save.
+    sessionHistoryDays: snapshot.settings.sessionHistoryDays,
     terminalMode: snapshot.settings.terminalMode ?? DEFAULT_SETTINGS.terminalMode,
     llmEnabled: snapshot.settings.llmEnabled ?? DEFAULT_SETTINGS.llmEnabled,
     openaiAsrBaseUrl: snapshot.settings.openaiAsrBaseUrl ?? DEFAULT_SETTINGS.openaiAsrBaseUrl,

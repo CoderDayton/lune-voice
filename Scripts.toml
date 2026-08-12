@@ -41,6 +41,9 @@ esac
 # incompatible with it (ggml needs ARCH_DEFINITIONS for the feature check), so
 # CPU dispatch comes from the per-microarchitecture variants instead.
 GGML_FLAGS="GGML_BACKEND_DL=ON GGML_NATIVE=OFF GGML_CPU_ALL_VARIANTS=ON"
+# Host-tuned Rust codegen for the dev build. Opt-in here rather than pinned in
+# `.cargo/config.toml`, so a plain `cargo build` stays portable.
+export RUSTFLAGS="${RUSTFLAGS:--C target-cpu=native}"
 echo "Dev ($BACKEND): --features \"$FEATURES\" ($GGML_FLAGS)"
 env $GGML_FLAGS bun tauri dev --features "$FEATURES"
 '''
@@ -162,12 +165,8 @@ if [ -n "${PORTABLE:-}" ]; then
   # artifact. `cgs dev` + `cgs stage-runtime` exercise the plugin path.
   GGML_FLAGS="GGML_NATIVE=OFF GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON"
   BUNDLE_ARGS=""
-  # The GGML flags above make only the C++ half portable. `.cargo/config.toml`
-  # pins `-C target-cpu=native` for every build in this repo, so without this
-  # override the Rust half still targets the build machine's exact CPU and the
-  # "portable" artifact SIGILLs on an older one. RUSTFLAGS takes precedence
-  # over `build.rustflags`. x86-64-v3 is AVX2 + FMA + F16C — the same baseline
-  # the GGML flags ask for.
+  # The GGML flags above make only the C++ half portable; this pins the Rust
+  # half to the same baseline. x86-64-v3 is AVX2 + FMA + F16C.
   case "$(uname -m)" in
     x86_64) export RUSTFLAGS="-C target-cpu=x86-64-v3" ;;
     *)      export RUSTFLAGS="" ;;
@@ -181,7 +180,11 @@ else
   # Static, for the same reason as the PORTABLE branch above.
   GGML_FLAGS="GGML_NATIVE=ON"
   BUNDLE_ARGS="--bundles ${BUNDLES:-deb appimage}"
-  echo "Building NATIVE $BACKEND build (this machine only): --features \"$FEATURES\""
+  # Host-tuned Rust codegen to match GGML_NATIVE. This is opt-in per build
+  # rather than pinned in `.cargo/config.toml`, so a plain `cargo build
+  # --release` stays portable.
+  export RUSTFLAGS="${RUSTFLAGS:--C target-cpu=native}"
+  echo "Building NATIVE $BACKEND build (this machine only): --features \"$FEATURES\" RUSTFLAGS=\"$RUSTFLAGS\""
 fi
 env $GGML_FLAGS APPIMAGE_EXTRACT_AND_RUN=1 bun tauri build --features "$FEATURES" $BUNDLE_ARGS
 '''

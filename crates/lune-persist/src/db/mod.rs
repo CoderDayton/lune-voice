@@ -47,11 +47,6 @@ fn restrict_db_files(path: &Path) {
 #[cfg(not(unix))]
 fn restrict_db_files(_path: &Path) {}
 
-/// Row cap for `edit_observations` (the CSC calibration history). Enforced at
-/// insert and used as the read window, so the trim and the read can't drift.
-/// One row per edit slot per dictation, so the retained dictation window scales
-/// inversely with utterance length.
-pub const EDIT_OBSERVATION_CAP: u32 = 20_000;
 use uuid::Uuid;
 
 use lune_core::asr::AsrBackendKind;
@@ -59,8 +54,7 @@ use lune_core::config::{FormatToggles, StylePreset};
 use lune_core::session::{DictationSession, SessionStatus};
 
 use self::models::{
-    CustomStyleRow, NewCorrectionPair, NewCustomStyle, NewDictionaryEntry, NewEditObservation,
-    NewSession, NewSnippet,
+    CustomStyleRow, NewCorrectionPair, NewCustomStyle, NewDictionaryEntry, NewSession, NewSnippet,
 };
 use self::schema::{custom_styles, dictionary, sessions, snippets};
 use crate::error::{PersistError, PersistResult};
@@ -285,9 +279,13 @@ impl Database {
         }
         let url = path.to_string_lossy();
         let mut conn = SqliteConnection::establish(&url)?;
+        // First, before anything that can itself block: `journal_mode=WAL`
+        // takes an exclusive lock, and at SQLite's default busy timeout of 0 a
+        // second connection opening concurrently would fail outright instead of
+        // waiting.
+        diesel::sql_query("PRAGMA busy_timeout=5000").execute(&mut conn)?;
         diesel::sql_query("PRAGMA journal_mode=WAL").execute(&mut conn)?;
         diesel::sql_query("PRAGMA synchronous=NORMAL").execute(&mut conn)?;
-        diesel::sql_query("PRAGMA busy_timeout=5000").execute(&mut conn)?;
         diesel::sql_query("PRAGMA cache_size=-16384").execute(&mut conn)?;
         diesel::sql_query("PRAGMA temp_store=MEMORY").execute(&mut conn)?;
         diesel::sql_query("PRAGMA mmap_size=268435456").execute(&mut conn)?;
@@ -1040,75 +1038,7 @@ impl Database {
         Ok(rows)
     }
 
-    /// Record per-edit observations `(observed_correct, margin, flip_fixes)` for
-    /// the open-vocab LLM-edit calibrator. Best-effort; the caller treats
-    /// failure as non-fatal. Capped at [`EDIT_OBSERVATION_CAP`] rows (one per
-    /// edit slot per dictation) so it can't grow without bound.
-    pub fn insert_edit_observations(
-        &mut self,
-        session_id: Uuid,
-        obs: &[(bool, Option<f32>, bool)],
-    ) -> PersistResult<()> {
-        if obs.is_empty() {
-            return Ok(());
-        }
-        use self::schema::edit_observations::dsl as eo;
-        let sid = session_id.to_string();
-        let now = Utc::now().to_rfc3339();
-        let rows: Vec<NewEditObservation<'_>> = obs
-            .iter()
-            .map(
-                |(observed_correct, margin, flip_fixes)| NewEditObservation {
-                    session_id: &sid,
-                    observed_correct: i32::from(*observed_correct),
-                    margin: *margin,
-                    flip_fixes: i32::from(*flip_fixes),
-                    created_at: &now,
-                },
-            )
-            .collect();
-        // Insert + cap-trim atomically: a failed trim can't leave the table
-        // over CAP.
-        self.conn.transaction(|conn| {
-            diesel::insert_into(eo::edit_observations)
-                .values(&rows)
-                .execute(conn)?;
-            diesel::sql_query(
-                "DELETE FROM edit_observations \
-                 WHERE id <= (SELECT MAX(id) FROM edit_observations) - ?",
-            )
-            .bind::<diesel::sql_types::BigInt, _>(i64::from(EDIT_OBSERVATION_CAP))
-            .execute(conn)?;
-            Ok(())
-        })
-    }
-
-    /// Most recent edit observations `(observed_correct, margin, flip_fixes)`,
-    /// newest first — the input to `edit_calib::calibrate_edits`.
-    pub fn list_edit_observations(
-        &mut self,
-        limit: u32,
-    ) -> PersistResult<Vec<(bool, Option<f32>, bool)>> {
-        use self::schema::edit_observations::dsl as eo;
-        let rows = eo::edit_observations
-            .select((eo::observed_correct, eo::margin, eo::flip_fixes))
-            .order(eo::id.desc())
-            .limit(i64::from(limit))
-            .load::<(i32, Option<f32>, i32)>(&mut self.conn)?;
-        Ok(rows
-            .into_iter()
-            .map(|(oc, m, ff)| (oc != 0, m, ff != 0))
-            .collect())
-    }
-
     pub fn delete_session(&mut self, session_id: &str) -> PersistResult<bool> {
-        // The nil UUID is the seed-calibration sentinel (see the seed_edit_calib
-        // example), not a real session — never cascade-delete its observations.
-        // Real sessions are always v4 UUIDs, so this rejects only the sentinel.
-        if session_id == "00000000-0000-0000-0000-000000000000" {
-            return Ok(false);
-        }
-
         // Cascade: drop the session's calibration pairs so deleting a session
         // leaves no transcript text behind. There is no SQL foreign key and the
         // connection doesn't enable `PRAGMA foreign_keys`, so delete explicitly.
@@ -1120,14 +1050,54 @@ impl Database {
                 diesel::delete(cp::correction_pairs.filter(cp::session_id.eq(session_id)))
                     .execute(conn)?;
             }
-            {
-                use self::schema::edit_observations::dsl as eo;
-                diesel::delete(eo::edit_observations.filter(eo::session_id.eq(session_id)))
-                    .execute(conn)?;
-            }
             use self::schema::sessions::dsl::*;
             let count = diesel::delete(sessions.filter(id.eq(session_id))).execute(conn)?;
             Ok(count > 0)
+        })
+    }
+
+    /// Close out sessions left open by a previous run.
+    ///
+    /// A row is inserted `Active` with no `ended_at` when a dictation starts,
+    /// and the session's own teardown closes it. A hard kill — SIGKILL, an
+    /// OOM-kill, a power cut — has no teardown, so the row stays `Active`
+    /// forever and shows up as a permanently in-progress entry in the history.
+    /// The in-process panic supervisor cannot reach these; only a sweep at
+    /// startup can. Returns the number of rows closed.
+    ///
+    /// Scoped to rows that are still `Active`, not merely rows with a null
+    /// `ended_at`: an init failure (mic busy, model missing) records its own
+    /// `Failed(reason)` without an end time, and overwriting that would replace
+    /// the real cause with a generic "interrupted".
+    pub fn close_orphaned_sessions(&mut self) -> PersistResult<usize> {
+        use self::schema::sessions::dsl::*;
+        let now = Utc::now().to_rfc3339();
+        let active = serde_json::to_string(&SessionStatus::Active)
+            .map_err(|e| PersistError::RowEncode(format!("status serialize: {e}")))?;
+        let failed = serde_json::to_string(&SessionStatus::Failed(
+            "interrupted — Lune Voice stopped before this dictation finished".into(),
+        ))
+        .map_err(|e| PersistError::RowEncode(format!("status serialize: {e}")))?;
+        let closed = diesel::update(sessions.filter(ended_at.is_null().and(status.eq(active))))
+            .set((status.eq(failed), ended_at.eq(now)))
+            .execute(&mut self.conn)?;
+        Ok(closed)
+    }
+
+    /// Delete every session and every correction pair.
+    ///
+    /// This is what switching retention to "Don't save history" runs: turning
+    /// the setting off has to remove what was already collected, not merely
+    /// stop adding to it. Returns the number of sessions deleted.
+    pub fn purge_history(&mut self) -> PersistResult<usize> {
+        self.conn.transaction(|conn| {
+            let count = {
+                use self::schema::sessions::dsl::*;
+                diesel::delete(sessions).execute(conn)?
+            };
+            use self::schema::correction_pairs::dsl as cp;
+            diesel::delete(cp::correction_pairs).execute(conn)?;
+            Ok(count)
         })
     }
 
@@ -1147,11 +1117,6 @@ impl Database {
             {
                 use self::schema::correction_pairs::dsl as cp;
                 diesel::delete(cp::correction_pairs.filter(cp::created_at.lt(&cutoff)))
-                    .execute(conn)?;
-            }
-            {
-                use self::schema::edit_observations::dsl as eo;
-                diesel::delete(eo::edit_observations.filter(eo::created_at.lt(&cutoff)))
                     .execute(conn)?;
             }
             Ok(count)
@@ -1748,30 +1713,72 @@ mod tests {
     }
 
     #[test]
-    fn edit_observations_roundtrip_order_and_cascade() {
+    fn the_startup_sweep_closes_active_rows_without_rewriting_failures() {
+        let mut db = Database::open_in_memory().unwrap();
+        let interrupted = Uuid::new_v4();
+        let failed_at_init = Uuid::new_v4();
+        let row = |id, status| DictationSession {
+            id,
+            started_at: Utc::now(),
+            // Both paths leave `ended_at` null: a hard kill never runs teardown,
+            // and an init failure records its reason without an end time.
+            ended_at: None,
+            style: None,
+            backend: AsrBackendKind::WhisperCpp,
+            status,
+            transcript: None,
+        };
+        db.insert_session(&row(interrupted, SessionStatus::Active))
+            .unwrap();
+        db.insert_session(&row(
+            failed_at_init,
+            SessionStatus::Failed("microphone is in use".into()),
+        ))
+        .unwrap();
+
+        assert_eq!(db.close_orphaned_sessions().unwrap(), 1);
+        assert!(
+            db.get_session(interrupted)
+                .unwrap()
+                .unwrap()
+                .ended_at
+                .is_some(),
+            "the abandoned dictation must stop showing as in progress"
+        );
+        assert!(
+            matches!(
+                db.get_session(failed_at_init).unwrap().unwrap().status,
+                SessionStatus::Failed(reason) if reason == "microphone is in use"
+            ),
+            "the sweep must not replace a real failure reason with a generic one"
+        );
+    }
+
+    #[test]
+    fn purge_history_clears_sessions_and_their_correction_pairs() {
         let mut db = Database::open_in_memory().unwrap();
         let sid = Uuid::new_v4();
-        db.insert_edit_observations(sid, &[(true, None, false), (false, Some(2.5), true)])
+        db.insert_session(&DictationSession {
+            id: sid,
+            started_at: Utc::now(),
+            ended_at: None,
+            style: Some("casual".into()),
+            backend: AsrBackendKind::WhisperCpp,
+            status: SessionStatus::Active,
+            transcript: Some("a stored transcript".into()),
+        })
+        .unwrap();
+        db.insert_correction_pair(sid, "send there", "send their")
             .unwrap();
-        db.insert_edit_observations(sid, &[(true, Some(0.1), false)])
-            .unwrap();
 
-        let all = db.list_edit_observations(10).unwrap();
-        assert_eq!(all.len(), 3);
-        // Newest first.
-        assert_eq!(all[0], (true, Some(0.1), false));
-        assert_eq!(db.list_edit_observations(1).unwrap().len(), 1);
-
-        // Empty insert is a no-op.
-        db.insert_edit_observations(sid, &[]).unwrap();
-        assert_eq!(db.list_edit_observations(10).unwrap().len(), 3);
-
-        // delete_session cascades to the session's observations.
-        assert!(!db.delete_session(&sid.to_string()).unwrap());
+        assert_eq!(db.purge_history().unwrap(), 1);
+        assert!(db.get_session(sid).unwrap().is_none());
         assert!(
-            db.list_edit_observations(10).unwrap().is_empty(),
-            "deleting the session must remove its edit observations"
+            db.list_correction_pairs(10).unwrap().is_empty(),
+            "turning history off must clear the transcript pairs too"
         );
+        // Idempotent: purging an already-empty history is not an error.
+        assert_eq!(db.purge_history().unwrap(), 0);
     }
 
     #[test]

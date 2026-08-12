@@ -34,9 +34,64 @@ pub struct WhisperCppConfig {
     pub vad_model_path: Option<PathBuf>,
 }
 
+/// On-disk magic of a ggml model file: `0x67676d6c` ("ggml") stored
+/// little-endian, so the first four bytes read `l m g g`.
+const GGML_MAGIC: [u8; 4] = *b"lmgg";
+
+/// Smallest plausible ggml model. Well under any real whisper model, and only
+/// there to reject an empty or barely-started file with a clear message.
+const MIN_GGML_BYTES: u64 = 4096;
+
+/// Reject a model file whisper.cpp would die on rather than report.
+///
+/// Its loader raises a C++ exception or trips `GGML_ASSERT` on malformed input.
+/// Neither can be caught from Rust — an exception crossing the `extern "C"`
+/// boundary is undefined behaviour and the assert calls `abort()` — so the
+/// process disappears with no dialog and no error. Validating first is the only
+/// lever available.
+///
+/// This is a cheap sanity check, not an integrity check: the download path
+/// already verifies a SHA-256 (`lune-persist`'s hub). What it catches is a file
+/// truncated after that — a full disk, a crash mid-write, a hand-placed file.
+pub fn check_ggml_file(path: &std::path::Path) -> Result<()> {
+    use lune_core::error::Error;
+    use std::io::Read;
+
+    let meta = std::fs::metadata(path).map_err(|e| {
+        Error::asr(format!(
+            "cannot read the model file {}: {e}",
+            path.display()
+        ))
+    })?;
+    if meta.len() < MIN_GGML_BYTES {
+        return Err(Error::asr(format!(
+            "the model file {} is only {} bytes and cannot be a whisper model — \
+             it is most likely a partial download; delete it and download the model again",
+            path.display(),
+            meta.len()
+        )));
+    }
+    let mut head = [0u8; 4];
+    std::fs::File::open(path)
+        .and_then(|mut f| f.read_exact(&mut head))
+        .map_err(|e| {
+            Error::asr(format!(
+                "cannot read the model file {}: {e}",
+                path.display()
+            ))
+        })?;
+    if head != GGML_MAGIC {
+        return Err(Error::asr(format!(
+            "the model file {} is not in ggml format — delete it and download the model again",
+            path.display()
+        )));
+    }
+    Ok(())
+}
+
 #[cfg(feature = "whisper-cpp")]
 mod imp {
-    use super::{AsrSessionConfig, Result, WhisperCppConfig};
+    use super::{AsrSessionConfig, Result, WhisperCppConfig, check_ggml_file};
 
     use std::sync::Mutex;
 
@@ -60,6 +115,11 @@ mod imp {
 
     /// Sample rate of whisper input audio (16 kHz mono f32).
     const SAMPLE_RATE: usize = 16_000;
+
+    /// Temperature step for whisper's decode-fallback ladder. `0.5` allows one
+    /// retry (0.0 then 0.5) instead of the upstream default of five (0.2 steps
+    /// to 1.0), capping the worst case at two decodes rather than six.
+    const TEMPERATURE_FALLBACK_STEP: f32 = 0.5;
 
     /// Padding kept around the VAD speech span when endpoint-trimming, so soft
     /// onsets/offsets aren't clipped. Asymmetric on purpose: the onset gets more
@@ -187,6 +247,14 @@ mod imp {
             static LOG_HOOK: std::sync::Once = std::sync::Once::new();
             LOG_HOOK.call_once(whisper_rs::install_logging_hooks);
 
+            // Validate before handing the path to whisper.cpp. Its loader
+            // signals a malformed file by throwing a C++ exception or tripping
+            // `GGML_ASSERT`, neither of which Rust can catch — the process
+            // simply dies. A file left truncated by a full disk or a crash
+            // mid-write is a normal failure, so it has to be caught here, where
+            // it can still be reported.
+            check_ggml_file(&config.model_path)?;
+
             let mut params = WhisperContextParameters::default();
             params.use_gpu(config.use_gpu);
             let ctx = WhisperContext::new_with_params(&config.model_path, params).map_err(|e| {
@@ -201,8 +269,13 @@ mod imp {
             // Load the standalone silero VAD once for endpoint trimming. A
             // missing/failed model degrades to full-buffer decode (warn once).
             let vad = config.vad_model_path.and_then(|path| {
-                if !path.exists() {
-                    tracing::warn!(path = %path.display(), "whisper VAD model missing; decoding without endpoint trim");
+                // Same loader, same failure mode as the main model: a truncated
+                // silero file aborts the process rather than returning an
+                // error, so validate before handing over the path. Unlike the
+                // main model this degrades instead of failing — losing the
+                // endpoint trim is survivable.
+                if let Err(e) = check_ggml_file(&path) {
+                    tracing::warn!(error = %e, "whisper VAD model unusable; decoding without endpoint trim");
                     return None;
                 }
                 let mut vp = WhisperVadContextParams::default();
@@ -290,6 +363,15 @@ mod imp {
                 // Suppress non-speech tokens ("[music]", "(wind)") — pure hallucination
                 // residue on quiet/short clips. (`suppress_blank` is already default-true.)
                 params.set_suppress_nst(true);
+                // Bound the temperature-fallback ladder. whisper.cpp's default
+                // increment of 0.2 re-decodes the whole window at 0.0, 0.2 …
+                // 1.0 whenever the average log-prob or entropy check fails —
+                // up to six full decodes, on exactly the mumbled or noisy
+                // utterances that are already the slowest. Dictation is
+                // interactive and hotkey-bounded, so a bounded wait beats a
+                // marginally better transcript arriving six times later. One
+                // retry is kept: it recovers the common single-bad-decode case.
+                params.set_temperature_inc(TEMPERATURE_FALLBACK_STEP);
 
                 // Endpoint-trim with whisper's own (standalone) silero VAD: decode
                 // only [first speech onset .. last offset] + padding as ONE
@@ -306,7 +388,13 @@ mod imp {
                 let trim = self
                 .vad
                 .as_ref()
-                .and_then(|m| m.lock().ok())
+                // Recover from a poisoned lock rather than silently decoding
+                // without endpoint trimming for the rest of the process. The
+                // VAD context is reset on every use, so a panic in a previous
+                // decode leaves nothing behind worth protecting — and losing
+                // the trim quietly shows up as hallucinated leading silence,
+                // which is very hard to trace back to here.
+                .map(|m| m.lock().unwrap_or_else(|e| e.into_inner()))
                 .map(|mut vad| {
                     let mut vad_params = WhisperVadParams::default();
                     vad_params.set_threshold(VAD_THRESHOLD);
@@ -514,3 +602,57 @@ mod imp {
 }
 
 pub use imp::WhisperCppBackend;
+
+#[cfg(test)]
+mod tests {
+    use super::{GGML_MAGIC, MIN_GGML_BYTES, check_ggml_file};
+    use std::io::Write;
+
+    fn write_temp(name: &str, bytes: &[u8]) -> std::path::PathBuf {
+        let path = std::env::temp_dir().join(format!("lune-ggml-check-{name}"));
+        let mut f = std::fs::File::create(&path).expect("create temp model");
+        f.write_all(bytes).expect("write temp model");
+        path
+    }
+
+    #[test]
+    fn a_well_formed_model_passes() {
+        let mut bytes = GGML_MAGIC.to_vec();
+        bytes.resize(MIN_GGML_BYTES as usize + 1, 0);
+        let path = write_temp("ok.bin", &bytes);
+        assert!(check_ggml_file(&path).is_ok());
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn a_truncated_download_is_rejected_by_size() {
+        // What a full disk or a crash mid-write leaves behind. whisper.cpp
+        // would abort the process on this, so it must never reach the loader.
+        let path = write_temp("short.bin", &GGML_MAGIC);
+        let err = check_ggml_file(&path).expect_err("a 4-byte model must be refused");
+        assert!(
+            err.to_string().contains("partial download"),
+            "the message must tell the user what to do, got: {err}"
+        );
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn a_file_that_is_not_ggml_is_rejected_by_magic() {
+        // Right size, wrong contents — an HTML error page saved under the
+        // model's name is the realistic version of this.
+        let mut bytes = b"<!DOCTYPE html>".to_vec();
+        bytes.resize(MIN_GGML_BYTES as usize + 1, b' ');
+        let path = write_temp("html.bin", &bytes);
+        let err = check_ggml_file(&path).expect_err("a non-ggml file must be refused");
+        assert!(err.to_string().contains("not in ggml format"), "got: {err}");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn a_missing_model_is_reported_not_panicked() {
+        let path = std::env::temp_dir().join("lune-ggml-check-absent.bin");
+        let _ = std::fs::remove_file(&path);
+        assert!(check_ggml_file(&path).is_err());
+    }
+}

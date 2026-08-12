@@ -97,6 +97,12 @@ pub struct AudioStream {
     /// When set, the audio callback emits its sub-chunk tail as a final short
     /// chunk on its next invocation. See [`AudioStream::request_flush`].
     flush: Arc<AtomicBool>,
+    /// Set by cpal's error callback. A device that disappears (unplugged USB
+    /// headset, a suspended dock) stops delivering audio but leaves the stream
+    /// object alive and apparently fine, so without this flag a prewarmed
+    /// stream is kept forever and every later dictation dies on the starvation
+    /// watchdog until an unrelated setting is touched.
+    failed: Arc<AtomicBool>,
     /// Kept alive to keep the cpal callback running. `None` for file-backed streams.
     _stream: Option<cpal::Stream>,
 }
@@ -342,6 +348,8 @@ impl AudioStream {
             RingBuffer::new(config.buffer_capacity)
                 .map_err(|e| AudioError::StreamBuild(e.into()))?,
         );
+        let failed = Arc::new(AtomicBool::new(false));
+        let failed_cb = Arc::clone(&failed);
         let ring_clone = Arc::clone(&ring);
 
         let target_rate = config.target_sample_rate;
@@ -401,7 +409,13 @@ impl AudioStream {
                                 &flush_cb,
                             );
                         },
-                        |err| warn!("Audio stream error: {err}"),
+                        {
+                            let failed = Arc::clone(&failed_cb);
+                            move |err| {
+                                warn!("Audio stream error: {err}");
+                                failed.store(true, Ordering::Release);
+                            }
+                        },
                         None,
                     )
                     .map_err(|e| AudioError::StreamBuild(e.to_string()))?
@@ -428,7 +442,13 @@ impl AudioStream {
                                 &flush_cb,
                             );
                         },
-                        |err| warn!("Audio stream error: {err}"),
+                        {
+                            let failed = Arc::clone(&failed_cb);
+                            move |err| {
+                                warn!("Audio stream error: {err}");
+                                failed.store(true, Ordering::Release);
+                            }
+                        },
                         None,
                     )
                     .map_err(|e| AudioError::StreamBuild(e.to_string()))?
@@ -456,6 +476,7 @@ impl AudioStream {
             config,
             ring,
             flush,
+            failed,
             _stream: Some(stream),
         })
     }
@@ -485,6 +506,7 @@ impl AudioStream {
             config,
             ring,
             flush: Arc::new(AtomicBool::new(false)),
+            failed: Arc::new(AtomicBool::new(false)),
             _stream: None,
         })
     }
@@ -504,6 +526,20 @@ impl AudioStream {
     /// will ever arrive.
     pub fn is_offline(&self) -> bool {
         self._stream.is_none()
+    }
+
+    /// Chunks discarded because the ring buffer filled — see
+    /// [`crate::RingBuffer::evicted`].
+    pub fn dropped_chunks(&self) -> u64 {
+        self.ring.evicted()
+    }
+
+    /// Whether cpal has reported an error on this stream.
+    ///
+    /// Sticky: a device does not come back on its own, so once this is true the
+    /// stream has to be rebuilt rather than waited on.
+    pub fn has_failed(&self) -> bool {
+        self.failed.load(Ordering::Acquire)
     }
 
     /// Get current buffer fill percentage (0.0 to 1.0)
@@ -571,6 +607,11 @@ pub struct AudioStreamHandle {
 impl AudioStreamHandle {
     pub fn config(&self) -> &AudioConfig {
         &self.config
+    }
+
+    /// See [`AudioStream::dropped_chunks`].
+    pub fn dropped_chunks(&self) -> u64 {
+        self.ring.evicted()
     }
 
     /// See `AudioStream::request_flush`.

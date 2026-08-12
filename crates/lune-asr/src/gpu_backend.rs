@@ -51,11 +51,53 @@ pub fn downloaded_plugin_dir(data_dir: &Path) -> PathBuf {
     data_dir.join(DIR_GPU_BACKEND)
 }
 
-/// Whether the downloadable CUDA plugin is present.
+/// Whether the downloadable CUDA plugin is present *and* intact.
+///
+/// Presence alone is not enough: an interrupted download can leave a zero-byte
+/// `libggml-cuda.so` behind, which then reports as installed, fails to load,
+/// and gets misdiagnosed as an out-of-date driver. A failed check reads as "not
+/// installed", which is the state that offers the download again.
 pub fn plugin_installed(data_dir: &Path) -> bool {
-    downloaded_plugin_dir(data_dir)
-        .join(CUDA_PLUGIN_FILE)
-        .is_file()
+    let dir = downloaded_plugin_dir(data_dir);
+    dir.join(CUDA_PLUGIN_FILE).is_file() && installed_plugin_is_intact(&dir)
+}
+
+/// Name of the digest manifest `lune_persist::gpu_plugin` writes at install
+/// time. The two names must stay in step.
+const PLUGIN_MANIFEST: &str = ".integrity.json";
+
+/// Whether every file the installer recorded is still byte-for-byte what it
+/// installed.
+///
+/// The archive's pinned SHA-256 proves what was *downloaded*; this proves what
+/// is on disk now, which is the question that matters at `dlopen` time. These
+/// libraries execute their constructors inside a process that holds an
+/// exclusive grab on every keyboard, so anything that can drop a file into the
+/// plugin directory would otherwise get code execution here. A missing or
+/// unreadable manifest counts as a failure — the installer always writes one.
+fn installed_plugin_is_intact(dir: &Path) -> bool {
+    use sha2::{Digest, Sha256};
+
+    let Ok(bytes) = std::fs::read(dir.join(PLUGIN_MANIFEST)) else {
+        return false;
+    };
+    let Ok(manifest) = serde_json::from_slice::<std::collections::BTreeMap<String, String>>(&bytes)
+    else {
+        return false;
+    };
+    if manifest.is_empty() {
+        return false;
+    }
+    manifest.iter().all(|(name, expected)| {
+        let Ok(mut file) = std::fs::File::open(dir.join(name)) else {
+            return false;
+        };
+        let mut hasher = Sha256::new();
+        if std::io::copy(&mut file, &mut hasher).is_err() {
+            return false;
+        }
+        format!("{:x}", hasher.finalize()).eq_ignore_ascii_case(expected)
+    })
 }
 
 /// What GPU acceleration can do on this machine right now. Each variant maps to
@@ -146,19 +188,38 @@ mod imp {
     }
 
     fn loaded(data_dir: &Path) -> &'static Loaded {
-        LOADED.get_or_init(|| Loaded {
-            plugin_at_load: super::plugin_installed(data_dir),
-            devices: load_once(data_dir),
+        LOADED.get_or_init(|| {
+            // Verifying the downloaded plugin re-hashes every installed
+            // library — hundreds of megabytes. Do it once and share the answer
+            // with the load below, which asks the same question.
+            let plugin_at_load = super::plugin_installed(data_dir);
+            Loaded {
+                plugin_at_load,
+                devices: load_once(data_dir, plugin_at_load),
+            }
         })
     }
 
-    fn load_once(data_dir: &Path) -> Vec<String> {
+    fn load_once(data_dir: &Path, downloaded_is_intact: bool) -> Vec<String> {
+        let downloaded = downloaded_plugin_dir(data_dir);
         for dir in bundled_plugin_dir()
             .into_iter()
-            .chain(std::iter::once(downloaded_plugin_dir(data_dir)))
+            .chain(std::iter::once(downloaded.clone()))
         {
             if !dir.is_dir() {
                 debug!(dir = %dir.display(), "no plugin directory; skipping");
+                continue;
+            }
+            // The bundled directory ships inside the installed application and
+            // is only writable by whoever installed it. The downloaded one sits
+            // in the user's data directory, so its contents are re-verified
+            // against the manifest the installer wrote before anything here is
+            // `dlopen`ed into this process.
+            if dir == downloaded && !downloaded_is_intact {
+                warn!(
+                    dir = %dir.display(),
+                    "downloaded GPU backend does not match what was installed; refusing to load it"
+                );
                 continue;
             }
             let Ok(path) = CString::new(dir.as_os_str().as_encoded_bytes()) else {
@@ -264,6 +325,18 @@ mod imp {
 
 pub use imp::{load_plugins, state};
 
+/// Whether CUDA can actually be used for a decode right now.
+///
+/// This is a *runtime* question, and it has to stay one: the CUDA backend ships
+/// as a downloadable ggml plugin, so a binary built with only `whisper-cpp` can
+/// still acquire a working GPU after the user installs it. Gating on
+/// `cfg!(feature = "whisper-cuda")` instead would make the plugin unreachable
+/// in exactly the builds it exists for. [`state`] answers from ggml's registered
+/// device list, which covers both the plugin and a static `whisper-cuda` build.
+pub fn cuda_available(data_dir: &Path) -> bool {
+    matches!(state(data_dir), GpuPluginState::Ready { .. })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -285,18 +358,92 @@ mod tests {
     }
 
     #[test]
+    fn cuda_is_available_only_when_a_device_actually_registered() {
+        // `cuda_available` is the input to `AsrRegistry::from_config`'s GPU
+        // decision, so it must agree with `state` and nothing else — in
+        // particular it must never be answered by a build feature.
+        let dir = std::env::temp_dir().join("lune-gpu-availability-probe");
+        let expected = matches!(state(&dir), GpuPluginState::Ready { .. });
+        assert_eq!(cuda_available(&dir), expected);
+    }
+
+    #[test]
+    fn a_plugin_without_a_manifest_is_not_trusted() {
+        // Every install writes one. Its absence means these libraries did not
+        // come from the installer, and they are about to be dlopen'd into a
+        // process holding an exclusive grab on the keyboard.
+        let dir = std::env::temp_dir().join("lune-plugin-no-manifest");
+        std::fs::create_dir_all(&dir).expect("create temp plugin dir");
+        let _ = std::fs::remove_file(dir.join(PLUGIN_MANIFEST));
+        assert!(!installed_plugin_is_intact(&dir));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_modified_plugin_file_fails_verification() {
+        let dir = std::env::temp_dir().join("lune-plugin-tampered");
+        std::fs::create_dir_all(&dir).expect("create temp plugin dir");
+        std::fs::write(dir.join("libggml-cuda.so"), b"not what was installed")
+            .expect("write library");
+        // A digest that cannot match anything.
+        std::fs::write(
+            dir.join(PLUGIN_MANIFEST),
+            br#"{"libggml-cuda.so":"0000000000000000000000000000000000000000000000000000000000000000"}"#,
+        )
+        .expect("write manifest");
+        assert!(!installed_plugin_is_intact(&dir));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_file_matching_its_recorded_digest_verifies() {
+        use sha2::{Digest, Sha256};
+        let dir = std::env::temp_dir().join("lune-plugin-intact");
+        std::fs::create_dir_all(&dir).expect("create temp plugin dir");
+        let body = b"pretend shared object";
+        std::fs::write(dir.join("libggml-cuda.so"), body).expect("write library");
+        let digest = format!("{:x}", Sha256::digest(body));
+        std::fs::write(
+            dir.join(PLUGIN_MANIFEST),
+            format!(r#"{{"libggml-cuda.so":"{digest}"}}"#),
+        )
+        .expect("write manifest");
+        assert!(installed_plugin_is_intact(&dir));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn absent_plugin_file_reads_as_not_installed() {
         let tmp = tempfile::tempdir().expect("tempdir");
         assert!(!plugin_installed(tmp.path()));
     }
 
     #[test]
-    fn an_empty_backends_directory_is_not_an_installation() {
+    fn a_plugin_file_alone_is_not_an_installation() {
+        use sha2::{Digest, Sha256};
         let tmp = tempfile::tempdir().expect("tempdir");
         let dir = downloaded_plugin_dir(tmp.path());
         std::fs::create_dir_all(&dir).expect("create plugin dir");
-        assert!(!plugin_installed(tmp.path()));
+        assert!(!plugin_installed(tmp.path()), "an empty directory");
+
+        // A zero-byte file is what an interrupted download leaves behind. It
+        // used to read as installed, which turned into a bogus "your driver is
+        // too old" once the load inevitably failed.
         std::fs::write(dir.join(CUDA_PLUGIN_FILE), b"").expect("write plugin");
+        assert!(
+            !plugin_installed(tmp.path()),
+            "a truncated download is not an installation"
+        );
+
+        // With the installer's manifest beside it, the same file is installed.
+        let body = b"pretend shared object";
+        std::fs::write(dir.join(CUDA_PLUGIN_FILE), body).expect("write plugin");
+        let digest = format!("{:x}", Sha256::digest(body));
+        std::fs::write(
+            dir.join(PLUGIN_MANIFEST),
+            format!(r#"{{"{CUDA_PLUGIN_FILE}":"{digest}"}}"#),
+        )
+        .expect("write manifest");
         assert!(plugin_installed(tmp.path()));
     }
 }

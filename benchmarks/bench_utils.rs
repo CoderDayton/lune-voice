@@ -652,19 +652,26 @@ impl HarnessBuilder {
         }
 
         let has_gpu = detect_gpu();
-        // whisper.cpp decides CUDA from its own compile-time feature; `Auto`
-        // lets `from_config` honour `whisper-cuda` while staying safe on a
-        // CPU-only build.
+        // `Auto` defers to what ggml actually registered, so a CPU-only build
+        // (or a machine with no plugin installed) stays on the CPU path.
         let device = DevicePolicy::Auto;
 
         let models_dir = models_dir();
+        let cuda_available = AppPaths::resolve()
+            .map(|p| lune_asr::gpu_backend::cuda_available(p.data_dir()))
+            .unwrap_or(false);
 
         // ASR — whisper.cpp.
         let asr_entry = benchmark_asr_entry().unwrap_or_else(|msg| {
             panic!("BenchmarkHarness: cannot load ASR — {msg}");
         });
-        let asr = lune_asr::AsrRegistry::from_config(&asr_entry.config, device, &models_dir)
-            .unwrap_or_else(|e| panic!("BenchmarkHarness: ASR load failed — {e}"));
+        let asr = lune_asr::AsrRegistry::from_config(
+            &asr_entry.config,
+            device,
+            &models_dir,
+            cuda_available,
+        )
+        .unwrap_or_else(|e| panic!("BenchmarkHarness: ASR load failed — {e}"));
         let asr = Arc::new(asr);
 
         // LLM — remote OpenAI-compatible styling backend behind StylePipeline.

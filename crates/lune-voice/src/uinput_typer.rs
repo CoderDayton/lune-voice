@@ -1031,6 +1031,20 @@ const KEY_EVENT_GAP_MS: u64 = 2;
 /// that the compositor dropped keys (notably SPACE); this gives it headroom.
 const PER_CHAR_GAP_MS: u64 = 6;
 
+/// Above this many characters, per-key typing is routed to a clipboard paste
+/// instead.
+///
+/// At `PER_CHAR_GAP_MS` + `KEY_EVENT_GAP_MS` a character costs ~8 ms, so 80
+/// characters is roughly 0.6 s of visible typing — about where a paste (flat,
+/// ~100–360 ms including the clipboard restore) becomes the faster of the two.
+/// Below it, per-key wins and leaves the clipboard untouched.
+const PASTE_THRESHOLD_CHARS: usize = 80;
+
+/// Whether `text` is long enough that pasting beats typing it out.
+fn is_long_enough_to_paste(text: &str) -> bool {
+    text.chars().count() > PASTE_THRESHOLD_CHARS
+}
+
 /// Gap between the key events of the one-shot paste chord (`emit_paste`). Uses
 /// the same drop-safe headroom as `PER_CHAR_GAP_MS` rather than the tighter
 /// `KEY_EVENT_GAP_MS`: the chord fires once per dictation, so the few extra
@@ -1372,6 +1386,20 @@ impl UinputTyper {
             };
             return self.do_clipboard_paste(text, is_terminal, reason, keep_clipboard);
         }
+        // Per-key typing costs ~8 ms per character, all of it after the
+        // transcript is ready: a long paragraph types for seconds while the
+        // user watches. A paste is flat in length. Short text still goes
+        // per-key — it is faster than a clipboard round trip and leaves the
+        // clipboard alone, which is what people expect for a quick phrase.
+        if is_long_enough_to_paste(text) {
+            let is_terminal = self.resolve_terminal();
+            return self.do_clipboard_paste(
+                text,
+                is_terminal,
+                "long text — emitting paste (per-key typing would take seconds)",
+                keep_clipboard,
+            );
+        }
         // Per-key typing never touches the clipboard.
         self.type_keys_raw(text);
         TypeOutcome::delivered(false)
@@ -1442,9 +1470,33 @@ impl UinputTyper {
 #[cfg(test)]
 mod tests {
     use super::{
-        is_safe_mime, is_terminal_class, keystroke_fallback_allowed, needs_paste_delivery,
-        pipe_text_to_command, tabs_to_spaces,
+        PASTE_THRESHOLD_CHARS, is_long_enough_to_paste, is_safe_mime, is_terminal_class,
+        keystroke_fallback_allowed, needs_paste_delivery, pipe_text_to_command, tabs_to_spaces,
     };
+
+    /// A short phrase types faster than the clipboard round trip and leaves the
+    /// clipboard alone; a paragraph does not, and at ~8 ms per character it
+    /// spends seconds visibly typing after the transcript is already known.
+    #[test]
+    fn only_long_text_is_routed_to_a_paste() {
+        assert!(!is_long_enough_to_paste("send this"));
+        assert!(!is_long_enough_to_paste(&"a".repeat(PASTE_THRESHOLD_CHARS)));
+        assert!(is_long_enough_to_paste(
+            &"a".repeat(PASTE_THRESHOLD_CHARS + 1)
+        ));
+    }
+
+    /// The threshold counts characters, not bytes: a multi-byte transcript must
+    /// not be pushed over it by its encoding.
+    #[test]
+    fn the_paste_threshold_counts_characters_not_bytes() {
+        let text = "é".repeat(PASTE_THRESHOLD_CHARS);
+        assert!(
+            text.len() > PASTE_THRESHOLD_CHARS,
+            "multi-byte by construction"
+        );
+        assert!(!is_long_enough_to_paste(&text));
+    }
     use std::borrow::Cow;
     use std::time::{Duration, Instant};
 

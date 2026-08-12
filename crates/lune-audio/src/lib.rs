@@ -54,6 +54,13 @@ pub trait AudioPull: Send + Sync {
     /// short chunk. Default no-op for sources without producer-side
     /// buffering (file replay already delivers its tail).
     fn request_flush(&self) {}
+    /// Chunks the ring buffer discarded because the consumer fell behind.
+    ///
+    /// Non-zero means audio was lost from the *front* of the buffer, so the
+    /// transcript is missing its opening. The only other symptom is a
+    /// transcript that quietly starts mid-sentence, which is close to
+    /// undiagnosable without this number.
+    fn dropped_chunks(&self) -> u64;
 }
 
 impl AudioPull for AudioStream {
@@ -66,6 +73,9 @@ impl AudioPull for AudioStream {
     fn request_flush(&self) {
         AudioStream::request_flush(self)
     }
+    fn dropped_chunks(&self) -> u64 {
+        AudioStream::dropped_chunks(self)
+    }
 }
 
 impl AudioPull for AudioStreamHandle {
@@ -77,6 +87,9 @@ impl AudioPull for AudioStreamHandle {
     }
     fn is_offline(&self) -> bool {
         false
+    }
+    fn dropped_chunks(&self) -> u64 {
+        AudioStreamHandle::dropped_chunks(self)
     }
 }
 

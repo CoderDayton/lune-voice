@@ -31,7 +31,7 @@ After-speech wait = poll_final (Silero endpoint trim + whisper.cpp decode) + opt
 | whisper.cpp decode (`poll_final`) | **Primary fixed cost** | Batch decode of the full utterance; scales with audio length and model size |
 | Standalone Silero VAD | Separate endpoint-trim stage | Whisper's VAD trims leading/trailing silence before decode and keeps internal pauses (a punctuation cue); NOT the in-decode `enable_vad` |
 | LLM styling | Variable; skipped when no style preset is selected | One completion call to the configured remote OpenAI-compatible endpoint; plain async HTTP, so it does not stall the runtime |
-| Delivery | Small | Dominated by decode/styling |
+| Delivery | Flat for a paste; ~8 ms per character when typed | Text over 80 characters, non-ASCII text and multi-line text are pasted (flat, ~100–360 ms). Shorter ASCII text is typed per key, which is faster at that length and leaves the clipboard untouched |
 
 ### What Does NOT Add to After-Speech Wait
 

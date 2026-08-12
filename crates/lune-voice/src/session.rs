@@ -32,6 +32,13 @@ pub struct SessionManagerConfig {
     pub asr_backend_kind: AsrBackendKind,
     /// Fully resolved pipeline config (backend defaults + user overrides).
     pub pipeline: PipelineConfig,
+    /// Whether a dictation may leave anything behind on disk.
+    ///
+    /// `false` is what the "Don't save history" retention setting selects, and
+    /// it means exactly that: no `sessions` row, no transcript, no correction
+    /// pair. Retention that only prunes *later* would still write every
+    /// utterance first, which is not what the setting promises.
+    pub persist_history: bool,
 }
 
 impl Default for SessionManagerConfig {
@@ -40,6 +47,7 @@ impl Default for SessionManagerConfig {
             asr_config: AsrSessionConfig::default(),
             asr_backend_kind: AsrBackendKind::WhisperCpp,
             pipeline: PipelineConfig::default(),
+            persist_history: true,
         }
     }
 }
@@ -242,8 +250,10 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         let (control_tx, control_rx) = mpsc::unbounded_channel();
 
         // Capture-only sessions leave no history: no row at start, nothing to
-        // finalize at the end.
-        if kind == SessionKind::Dictate {
+        // finalize at the end. Neither does any session when the user turned
+        // history off.
+        let persists = kind == SessionKind::Dictate && self.config.persist_history;
+        if persists {
             let session = DictationSession {
                 id: session_id,
                 started_at: Utc::now(),
@@ -258,10 +268,9 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
                 .await;
         }
 
-        // Only a Dictate session inserted a row above, so only that one has a
-        // row the panic supervisor needs to close.
-        let panicked_row_to_close =
-            (kind == SessionKind::Dictate).then(|| Arc::clone(&self.persist));
+        // Only a session that inserted a row above has one the panic
+        // supervisor needs to close.
+        let panicked_row_to_close = persists.then(|| Arc::clone(&self.persist));
         let asr = Arc::clone(&self.asr);
         let active_arc = Arc::clone(&self.active);
         let idle_notify = Arc::clone(&self.idle_notify);
@@ -537,6 +546,7 @@ async fn run_session<A: AsrBackend + 'static>(
                 session_id,
                 &deps.event_tx,
                 &deps.persist,
+                deps.config.persist_history,
                 &deps.active_arc,
                 &deps.idle_notify,
             )
@@ -565,6 +575,7 @@ async fn run_session<A: AsrBackend + 'static>(
             SessionStatus::Cancelled,
             &deps.event_tx,
             &deps.persist,
+            deps.config.persist_history,
             &deps.active_arc,
             &deps.idle_notify,
         )
@@ -616,6 +627,7 @@ async fn run_session<A: AsrBackend + 'static>(
             status,
             &deps.event_tx,
             &deps.persist,
+            deps.config.persist_history,
             &deps.active_arc,
             &deps.idle_notify,
         )
@@ -857,6 +869,7 @@ async fn process_and_deliver(
                     SessionStatus::Cancelled,
                     &event_tx,
                     &persist,
+                    config.persist_history,
                     &active_arc,
                     &idle_notify,
                 )
@@ -870,6 +883,7 @@ async fn process_and_deliver(
                 status,
                 &event_tx,
                 persist,
+                config.persist_history,
                 &active_arc,
                 &idle_notify,
             )
@@ -889,6 +903,7 @@ async fn process_and_deliver(
         finalize_db(
             session_id,
             Arc::clone(&persist),
+            config.persist_history,
             status,
             Some(Utc::now()),
             None,
@@ -1033,6 +1048,7 @@ async fn process_and_deliver(
             SessionStatus::Cancelled,
             &event_tx,
             &persist,
+            config.persist_history,
             &active_arc,
             &idle_notify,
         )
@@ -1049,6 +1065,7 @@ async fn process_and_deliver(
         status,
         &event_tx,
         persist,
+        config.persist_history,
         &active_arc,
         &idle_notify,
     )
@@ -1066,6 +1083,7 @@ async fn deliver_final_text(
     status: SessionStatus,
     event_tx: &mpsc::Sender<SessionEvent>,
     persist: Arc<Mutex<Database>>,
+    persist_history: bool,
     active_arc: &Arc<Mutex<Option<ActiveHandle>>>,
     idle_notify: &Arc<Notify>,
 ) {
@@ -1085,8 +1103,9 @@ async fn deliver_final_text(
     };
 
     // Record (raw ASR, final delivered) as labelled data. Best-effort — a
-    // write failure never affects delivery.
-    if let Some(final_text) = transcript.as_deref() {
+    // write failure never affects delivery. Skipped entirely when history is
+    // off: this pair is the whole transcript twice over.
+    if let Some(final_text) = transcript.as_deref().filter(|_| persist_history) {
         let mut db = persist.lock().await;
         if let Err(e) = db.insert_correction_pair(session_id, raw_text, final_text) {
             warn!(error = %e, %session_id, "failed to persist correction pair");
@@ -1097,7 +1116,15 @@ async fn deliver_final_text(
     // the next tick can't drop the transcript. The lock is short-held and
     // sqlite writes are sync, so worst-case added latency is ~10ms.
     let ended_at = Some(Utc::now());
-    finalize_db(session_id, persist, status, ended_at, transcript).await;
+    finalize_db(
+        session_id,
+        persist,
+        persist_history,
+        status,
+        ended_at,
+        transcript,
+    )
+    .await;
 
     let _ = send_bounded(event_tx, SessionEvent::stopped()).await;
     clear_active(active_arc, idle_notify).await;
@@ -1175,10 +1202,16 @@ async fn finalize_panicked_session(session_id: Uuid, persist: Arc<Mutex<Database
 async fn finalize_db(
     session_id: Uuid,
     persist: Arc<Mutex<Database>>,
+    persist_history: bool,
     status: SessionStatus,
     ended_at: Option<chrono::DateTime<Utc>>,
     transcript: Option<String>,
 ) {
+    // No row was ever inserted for this session, so there is nothing to close
+    // — and re-creating one here would defeat the retention setting.
+    if !persist_history {
+        return;
+    }
     let mut db = persist.lock().await;
     match db.get_session(session_id) {
         Ok(Some(mut s)) => {
@@ -1200,6 +1233,7 @@ async fn fail_init(
     session_id: Uuid,
     event_tx: &mpsc::Sender<SessionEvent>,
     persist: &Arc<Mutex<Database>>,
+    persist_history: bool,
     active_arc: &Arc<Mutex<Option<ActiveHandle>>>,
     idle_notify: &Notify,
 ) {
@@ -1208,6 +1242,7 @@ async fn fail_init(
     finalize_db(
         session_id,
         Arc::clone(persist),
+        persist_history,
         SessionStatus::Failed(msg),
         None,
         None,
@@ -1226,12 +1261,14 @@ async fn stop_session(
     status: SessionStatus,
     event_tx: &mpsc::Sender<SessionEvent>,
     persist: &Arc<Mutex<Database>>,
+    persist_history: bool,
     active_arc: &Arc<Mutex<Option<ActiveHandle>>>,
     idle_notify: &Notify,
 ) {
     finalize_db(
         session_id,
         Arc::clone(persist),
+        persist_history,
         status,
         Some(Utc::now()),
         None,

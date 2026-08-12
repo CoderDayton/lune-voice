@@ -388,6 +388,11 @@ fn write_owner_only(path: &Path, data: &[u8]) -> std::io::Result<()> {
         .mode(0o600)
         .open(path)?;
     file.write_all(data)?;
+    // Flush before the caller renames this into place. The rename is what makes
+    // the new settings visible; without the flush a power loss between the two
+    // can publish a name pointing at nothing, which the quarantine path then
+    // has to clean up on the next boot.
+    file.sync_all()?;
     // `mode` is masked by the umask, so a restrictive umask could land us below
     // 0600; set it exactly once the bytes are down.
     restrict_to_owner(path)

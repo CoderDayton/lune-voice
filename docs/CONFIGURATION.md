@@ -44,9 +44,8 @@ Settings mutability tiers:
 | Tier | When Applied | Fields |
 |------|-------------|--------|
 | **Hot** | On save | `hotkey`, `activation_mode`, `mic_prewarm`, `input_device`, `sound_cues_enabled`, `sound_cue_volume`, every `pill_*` field |
-| **Warm** | Next session start, when the pipeline rebuilds | `asr_backend`, `llm_backend`, `device`, `privacy_mode`, `default_style`, `language`, `dictation_language`, `vad_pcen`, `dictation_mode`, `copy_to_clipboard` |
+| **Warm** | Next session start, when the pipeline rebuilds | `asr_backend`, `llm_backend`, `device`, `privacy_mode`, `default_style`, `language`, `dictation_language`, `vad_pcen`, `dictation_mode`, `copy_to_clipboard`, `session_history_days` (it decides whether a dictation is recorded at all) |
 | **Cold** | Next app start | `terminal_mode`, `start_minimized`, `check_updates_on_launch` |
-| **Stored** | Read on demand, never cached | `session_history_days` |
 
 All changes are persisted to disk immediately. The desktop app reloads a workspace snapshot after save, so the UI reflects the stored settings rather than a local guess.
 
@@ -428,12 +427,12 @@ Dictionary entries are not sent to the styling LLM — the substitution happens 
 Completed dictation sessions are stored in a SQLite database.
 
 ```toml
-session_history_days = 30    # days to retain, or null to keep history forever
+session_history_days = 30    # days to retain, or null to record nothing
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `session_history_days` | u32 (1–3650) or null | Days to retain session history; older sessions are pruned when the workspace loads. `null` keeps everything |
+| `session_history_days` | u32 (1–3650) or null | Days to retain session history. Older sessions are pruned at startup and whenever settings are saved. `null` disables history: no session row, transcript or correction pair is written, and anything already stored is cleared when the setting changes |
 
 Each session record contains:
 

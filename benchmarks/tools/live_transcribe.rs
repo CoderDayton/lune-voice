@@ -57,8 +57,17 @@ fn main() {
     eprint!("  Loading ASR ... ");
     let t = Instant::now();
     let models_dir = bench_utils::models_dir();
+    let cuda_available = lune_persist::AppPaths::resolve()
+        .map(|p| lune_asr::gpu_backend::cuda_available(p.data_dir()))
+        .unwrap_or(false);
     let asr = Arc::new(
-        AsrRegistry::from_config(&asr_entry.config, device_policy, &models_dir).expect("load ASR"),
+        AsrRegistry::from_config(
+            &asr_entry.config,
+            device_policy,
+            &models_dir,
+            cuda_available,
+        )
+        .expect("load ASR"),
     );
     let backend_kind = asr.kind();
     eprintln!("{:.1}s ({:?})", t.elapsed().as_secs_f64(), backend_kind);
