@@ -42,7 +42,7 @@ msgstr "{0} नियम"
 msgid "{onCount} of 4 formatting fixes on"
 msgstr "4 में से {onCount} फ़ॉर्मेटिंग सुधार चालू"
 
-#: src/features/history/components/history-table.tsx:186
+#: src/features/history/components/history-table.tsx:180
 msgid "{page} / {totalPages}"
 msgstr "{page} / {totalPages}"
 
@@ -50,15 +50,15 @@ msgstr "{page} / {totalPages}"
 msgid "{saved} (unavailable)"
 msgstr "{saved} (अनुपलब्ध)"
 
-#: src/features/history/components/history-table.tsx:170
+#: src/features/history/components/history-table.tsx:164
 msgid "{start}–{end} of {visibleCount}"
 msgstr "{visibleCount} में से {start}–{end}"
 
-#: src/features/history/components/history-table.tsx:114
+#: src/features/history/components/history-table.tsx:108
 msgid "{totalCount} sessions"
 msgstr "{totalCount} सत्र"
 
-#: src/features/history/components/history-table.tsx:114
+#: src/features/history/components/history-table.tsx:108
 msgid "{visibleCount} / {totalCount}"
 msgstr "{visibleCount} / {totalCount}"
 
@@ -126,11 +126,11 @@ msgstr "आपके डिवाइस पर संग्रहीत AI म�
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "सभी आवश्यक मॉडल पहले से इंस्टॉल हैं। तैयार होने पर जारी रखें।"
 
-#: src/features/overview/overview-page.tsx:123
+#: src/features/overview/overview-page.tsx:147
 msgid "all-time"
 msgstr "पूरे समय"
 
-#: src/features/overview/overview-page.tsx:155
+#: src/features/overview/overview-page.tsx:179
 msgid "all-time avg"
 msgstr "सर्वकालिक औसत"
 
@@ -151,7 +151,7 @@ msgstr "उपस्थिति"
 msgid "Application behavior and startup preferences."
 msgstr "एप्लिकेशन व्यवहार और स्टार्टअप प्राथमिकताएँ।"
 
-#: src/features/overview/overview-page.tsx:179
+#: src/features/overview/overview-page.tsx:203
 msgid "Audio"
 msgstr "ऑडियो"
 
@@ -198,10 +198,6 @@ msgstr "रद्द करें"
 #: src/features/settings/sections/dictation-section.tsx:67
 msgid "Cancel current recording"
 msgstr "वर्तमान रिकॉर्डिंग रद्द करें"
-
-#: src/features/dictation/dictation-pill.tsx:105
-msgid "Cancel dictation"
-msgstr "डिक्टेशन रद्द करें"
 
 #: src/features/snippets/snippets-page.tsx:133
 msgid "Cancel edit"
@@ -283,7 +279,7 @@ msgstr "अपना स्पीच इंजन चुनें। सब क�
 msgid "Clear filter"
 msgstr "फ़िल्टर साफ़ करें"
 
-#: src/features/history/components/history-table.tsx:106
+#: src/features/history/components/history-table.tsx:100
 msgid "Clear search"
 msgstr "खोज साफ़ करें"
 
@@ -291,7 +287,7 @@ msgstr "खोज साफ़ करें"
 msgid "close"
 msgstr "बंद करना"
 
-#: src/features/history/components/session-detail-modal.tsx:209
+#: src/features/history/components/session-detail-modal.tsx:210
 #: src/features/settings/sections/models-section.tsx:323
 #: src/features/styles/components/style-editor-modal.tsx:175
 msgid "Close"
@@ -305,11 +301,11 @@ msgstr "साइडबार बंद करें"
 msgid "Collapse sidebar"
 msgstr "साइडबार को संक्षिप्त करें"
 
-#: src/features/history/components/session-detail-modal.tsx:169
+#: src/features/history/components/session-detail-modal.tsx:170
 msgid "Completed"
 msgstr "पूर्ण"
 
-#: src/features/overview/overview-page.tsx:104
+#: src/features/overview/overview-page.tsx:128
 #: src/features/shell/components/app-shell.tsx:156
 #: src/features/shell/components/sidebar-widgets.tsx:45
 #: src/features/shell/components/sidebar.tsx:165
@@ -329,11 +325,11 @@ msgstr "जारी रखें"
 msgid "Control how your speech is turned into text."
 msgstr "नियंत्रित करें कि आपका भाषण पाठ में कैसे परिवर्तित होता है।"
 
-#: src/features/history/components/history-table.tsx:379
+#: src/features/history/components/history-table.tsx:373
 msgid "Copied"
 msgstr "कॉपी किया गया"
 
-#: src/features/history/components/history-table.tsx:379
+#: src/features/history/components/history-table.tsx:373
 msgid "Copy"
 msgstr "कॉपी करें"
 
@@ -342,7 +338,7 @@ msgstr "कॉपी करें"
 msgid "Copy to clipboard"
 msgstr "क्लिपबोर्ड पर कॉपी करें"
 
-#: src/features/history/components/session-detail-modal.tsx:132
+#: src/features/history/components/session-detail-modal.tsx:133
 msgid "Copy transcript"
 msgstr "प्रतिलेख कॉपी करें"
 
@@ -396,8 +392,8 @@ msgstr "डार्क"
 
 #: src/components/feedback/confirm-dialog.tsx:63
 #: src/features/dictionary/components/dictionary-table.tsx:146
-#: src/features/history/components/history-table.tsx:388
-#: src/features/history/components/session-detail-modal.tsx:202
+#: src/features/history/components/history-table.tsx:382
+#: src/features/history/components/session-detail-modal.tsx:203
 #: src/features/settings/sections/models-section.tsx:259
 #: src/features/snippets/snippets-page.tsx:293
 msgid "Delete"
@@ -417,8 +413,8 @@ msgstr "{0} हटाएँ?"
 msgid "Delete model"
 msgstr "मॉडल हटाएँ"
 
-#: src/features/history/components/history-table.tsx:386
-#: src/features/history/components/session-detail-modal.tsx:200
+#: src/features/history/components/history-table.tsx:380
+#: src/features/history/components/session-detail-modal.tsx:201
 msgid "Delete session?"
 msgstr "सत्र हटाएँ?"
 
@@ -467,11 +463,15 @@ msgstr "श्रुतलेख संकेतक दृश्यता"
 msgid "Didn't catch anything — try again, a little closer to the mic."
 msgstr "कुछ सुनाई नहीं दिया — माइक के थोड़ा पास आकर फिर कोशिश करें।"
 
+#: src/features/dictation/dictation-pill.tsx:114
+msgid "Discard dictation"
+msgstr "डिक्टेशन खारिज करें"
+
 #: src/features/settings/sections/dictation-section.tsx:68
 msgid "Discard the current draft and return to idle. Click the binding to change it."
 msgstr "वर्तमान ड्राफ्ट को त्यागें और निष्क्रिय स्थिति में लौटें। इसे बदलने के लिए बाइंडिंग पर क्लिक करें।"
 
-#: src/features/overview/overview-page.tsx:104
+#: src/features/overview/overview-page.tsx:128
 msgid "Disconnected"
 msgstr "डिस्कनेक्टेड"
 
@@ -483,7 +483,7 @@ msgstr "डिस्क उपयोग"
 msgid "Dismiss error"
 msgstr "त्रुटि ख़ारिज करें"
 
-#: src/features/history/components/history-table.tsx:382
+#: src/features/history/components/history-table.tsx:376
 #: src/features/settings/sections/models-section.tsx:273
 msgid "Download"
 msgstr "डाउनलोड"
@@ -520,7 +520,7 @@ msgstr "डाउनलोड बाधित"
 msgid "Download progress"
 msgstr "डाउनलोड प्रगति"
 
-#: src/features/history/components/session-detail-modal.tsx:124
+#: src/features/history/components/session-detail-modal.tsx:125
 msgid "Download transcript"
 msgstr "प्रतिलेख डाउनलोड करें"
 
@@ -539,7 +539,7 @@ msgstr "डाउनलोड हो रहा है..."
 msgid "Duplicate"
 msgstr "डुप्लिकेट"
 
-#: src/features/history/components/session-detail-modal.tsx:161
+#: src/features/history/components/session-detail-modal.tsx:162
 msgid "Duration"
 msgstr "अवधि"
 
@@ -575,8 +575,8 @@ msgstr "स्निपेट संपादित करें"
 msgid "Edit style"
 msgstr "शैली संपादित करें"
 
-#: src/features/history/components/history-table.tsx:339
-#: src/features/overview/overview-page.tsx:254
+#: src/features/history/components/history-table.tsx:333
+#: src/features/overview/overview-page.tsx:264
 msgid "Empty session"
 msgstr "ख़ाली सत्र"
 
@@ -584,8 +584,8 @@ msgstr "ख़ाली सत्र"
 msgid "Enable styling"
 msgstr "स्टाइलिंग सक्षम करें"
 
-#: src/features/history/components/history-table.tsx:143
-#: src/features/history/components/session-detail-modal.tsx:162
+#: src/features/history/components/history-table.tsx:137
+#: src/features/history/components/session-detail-modal.tsx:163
 #: src/features/settings/sections/styling-engine-section.tsx:42
 msgid "Engine"
 msgstr "इंजन"
@@ -661,15 +661,15 @@ msgstr "GitHub"
 msgid "GitHub"
 msgstr "GitHub"
 
-#: src/features/overview/overview-page.tsx:61
+#: src/features/overview/overview-page.tsx:85
 msgid "Good afternoon"
 msgstr "शुभ दोपहर"
 
-#: src/features/overview/overview-page.tsx:61
+#: src/features/overview/overview-page.tsx:85
 msgid "Good evening"
 msgstr "शुभ संध्या"
 
-#: src/features/overview/overview-page.tsx:61
+#: src/features/overview/overview-page.tsx:85
 msgid "Good morning"
 msgstr "शुभ प्रभात"
 
@@ -695,7 +695,7 @@ msgstr "GPU समर्थन स्थापित है, पर काम �
 msgid "History retention"
 msgstr "इतिहास प्रतिधारण"
 
-#: src/features/overview/overview-page.tsx:99
+#: src/features/overview/overview-page.tsx:123
 msgid "hold the hotkey and speak, your words land where your cursor is."
 msgstr "हॉटकी दबाकर बोलें; आपके शब्द वहीं आएँगे जहाँ कर्सर है।"
 
@@ -711,7 +711,7 @@ msgstr "डिक्टेशन की ध्वनियाँ कितनी
 msgid "How the pill bar looks. Changes apply immediately."
 msgstr "संकेतक पट्टी कैसी दिखती है। बदलाव तुरंत लागू होते हैं।"
 
-#: src/features/overview/overview-page.tsx:204
+#: src/features/overview/overview-page.tsx:214
 msgid "Idle"
 msgstr "निष्क्रिय"
 
@@ -762,7 +762,7 @@ msgstr "भाषा"
 msgid "Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login."
 msgstr "मुख्य विंडो खोलने के बजाय सिस्टम ट्रे में लॉन्च करें। जब Lune Voice लॉगिन पर स्वतः प्रारंभ हो जाता है तो यह उपयोगी है।"
 
-#: src/features/history/components/history-table.tsx:142
+#: src/features/history/components/history-table.tsx:136
 msgid "Length"
 msgstr "लंबाई"
 
@@ -784,7 +784,7 @@ msgstr "सुन रहे हैं — वाक्यांश बोले�
 msgid "Listening — say the phrase…"
 msgstr "सुन रहे हैं — वाक्यांश बोलें…"
 
-#: src/features/overview/overview-page.tsx:204
+#: src/features/overview/overview-page.tsx:214
 #: src/features/shell/components/sidebar-widgets.tsx:52
 msgid "Listening…"
 msgstr "सुन रहा है…"
@@ -824,15 +824,15 @@ msgstr "बैठक शीर्षक"
 msgid "Microphone"
 msgstr "माइक्रोफ़ोन"
 
-#: src/features/overview/overview-page.tsx:182
+#: src/features/overview/overview-page.tsx:206
 msgid "Microphone input level"
 msgstr "माइक्रोफ़ोन इनपुट स्तर"
 
-#: src/features/overview/overview-page.tsx:140
+#: src/features/overview/overview-page.tsx:164
 msgid "minute"
 msgstr "मिनट"
 
-#: src/features/overview/overview-page.tsx:140
+#: src/features/overview/overview-page.tsx:164
 msgid "minutes"
 msgstr "मिनट"
 
@@ -865,11 +865,11 @@ msgstr "बहुभाषी · एक आकार चुनें"
 msgid "Name"
 msgstr "नाम"
 
-#: src/features/history/components/history-table.tsx:195
+#: src/features/history/components/history-table.tsx:189
 msgid "Next"
 msgstr "अगला"
 
-#: src/features/history/components/history-table.tsx:193
+#: src/features/history/components/history-table.tsx:187
 msgid "Next page"
 msgstr "अगला पृष्ठ"
 
@@ -881,20 +881,20 @@ msgstr "नहीं"
 msgid "No rules match “{query}”."
 msgstr "कोई भी नियम \"{query}\" से मेल नहीं खाता।"
 
-#: src/features/history/components/history-table.tsx:130
+#: src/features/history/components/history-table.tsx:124
 msgid "No sessions found."
 msgstr "कोई सत्र नहीं मिला."
 
 #. placeholder {0}: search.trim()
-#: src/features/history/components/history-table.tsx:127
+#: src/features/history/components/history-table.tsx:121
 msgid "No sessions match \"{0}\"."
 msgstr "कोई भी सत्र \"{0}\" से मेल नहीं खाता।"
 
-#: src/features/overview/overview-page.tsx:228
+#: src/features/overview/overview-page.tsx:238
 msgid "No sessions yet"
 msgstr "अभी तक कोई सत्र नहीं"
 
-#: src/features/history/components/history-table.tsx:129
+#: src/features/history/components/history-table.tsx:123
 msgid "No sessions yet. Start dictating to see your transcripts here."
 msgstr "अभी तक कोई सत्र नहीं। यहाँ अपना टेक्स्ट देखने के लिए डिक्टेशन शुरू करें।"
 
@@ -902,13 +902,13 @@ msgstr "अभी तक कोई सत्र नहीं। यहाँ अ
 msgid "No snippets yet."
 msgstr "अभी कोई स्निपेट नहीं है।"
 
-#: src/features/history/components/history-table.tsx:360
-#: src/features/history/components/session-detail-modal.tsx:153
+#: src/features/history/components/history-table.tsx:354
+#: src/features/history/components/session-detail-modal.tsx:154
 msgid "No transcript"
 msgstr "कोई टेक्स्ट नहीं"
 
-#: src/features/history/components/history-table.tsx:372
-#: src/features/history/components/session-detail-modal.tsx:163
+#: src/features/history/components/history-table.tsx:366
+#: src/features/history/components/session-detail-modal.tsx:164
 msgid "None"
 msgstr "कोई नहीं"
 
@@ -932,7 +932,7 @@ msgstr "कुछ भी इंस्टॉल नहीं है"
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 msgstr "बंद रहने पर कच्चे ट्रांसक्रिप्ट दिए जाते हैं। कौन-सी शैली लागू हो, यह Styles टैब पर चुना जाता है।"
 
-#: src/features/overview/overview-page.tsx:204
+#: src/features/overview/overview-page.tsx:214
 #: src/features/shell/components/app-shell.tsx:163
 #: src/features/shell/components/sidebar.tsx:168
 msgid "Offline"
@@ -950,7 +950,7 @@ msgstr "कार्ड पर एक पंक्ति का सारां�
 msgid "Open menu"
 msgstr "मेनू खोलें"
 
-#: src/features/overview/overview-page.tsx:249
+#: src/features/overview/overview-page.tsx:259
 msgid "Open session from {time}"
 msgstr "{time} का सत्र खोलें"
 
@@ -962,7 +962,7 @@ msgstr "वैकल्पिक"
 msgid "Orientation"
 msgstr "दिशा"
 
-#: src/features/overview/overview-page.tsx:108
+#: src/features/overview/overview-page.tsx:132
 #: src/features/settings/settings-page.tsx:75
 msgid "Output"
 msgstr "आउटपुट"
@@ -975,7 +975,7 @@ msgstr "संकेतक पट्टी का कुल आकार।"
 msgid "Overall progress"
 msgstr "समग्र प्रगति"
 
-#: src/features/history/components/history-table.tsx:166
+#: src/features/history/components/history-table.tsx:160
 msgid "Pagination"
 msgstr "पृष्ठ पर अंक लगाना"
 
@@ -1042,11 +1042,11 @@ msgstr "प्री-वार्म माइक्रोफोन"
 msgid "Preset corner or edge the pill starts at."
 msgstr "वह पूर्वनिर्धारित कोना या किनारा जहाँ से संकेतक शुरू होता है।"
 
-#: src/features/overview/overview-page.tsx:230
+#: src/features/overview/overview-page.tsx:240
 msgid "Press"
 msgstr "दबाएँ"
 
-#: src/features/history/components/history-table.tsx:180
+#: src/features/history/components/history-table.tsx:174
 msgid "Prev"
 msgstr "पिछला"
 
@@ -1058,7 +1058,7 @@ msgstr "संकेतक को खींचकर हिलाने से �
 msgid "Preview"
 msgstr "पूर्व दर्शन"
 
-#: src/features/history/components/history-table.tsx:178
+#: src/features/history/components/history-table.tsx:172
 msgid "Previous page"
 msgstr "पिछला पृष्ठ"
 
@@ -1086,13 +1086,13 @@ msgstr "प्रोसेसिंग…"
 msgid "Quit Lune Voice"
 msgstr "Lune Voice से बाहर निकलें"
 
-#: src/features/overview/overview-page.tsx:104
+#: src/features/overview/overview-page.tsx:128
 #: src/features/shell/components/app-shell.tsx:162
 #: src/features/shell/components/sidebar.tsx:167
 msgid "Ready"
 msgstr "तैयार"
 
-#: src/features/overview/overview-page.tsx:212
+#: src/features/overview/overview-page.tsx:222
 msgid "Recent"
 msgstr "हाल ही का"
 
@@ -1156,7 +1156,7 @@ msgstr "CPU पर चल रहा है।"
 msgid "Running on the CPU. No NVIDIA driver was found — install the driver for your GPU and Lune Voice will offer GPU support here."
 msgstr "CPU पर चल रहा है। कोई NVIDIA ड्राइवर नहीं मिला — अपने GPU का ड्राइवर स्थापित करें, फिर Lune Voice यहाँ GPU समर्थन देगा।"
 
-#: src/features/overview/overview-page.tsx:262
+#: src/features/overview/overview-page.tsx:272
 msgid "s"
 msgstr "से"
 
@@ -1169,8 +1169,8 @@ msgstr "सहेजें"
 msgid "Save changes"
 msgstr "बदलाव सहेजें"
 
-#: src/features/history/components/history-table.tsx:311
-#: src/features/history/components/session-detail-modal.tsx:73
+#: src/features/history/components/history-table.tsx:305
+#: src/features/history/components/session-detail-modal.tsx:74
 msgid "Save Transcript"
 msgstr "प्रतिलेख सहेजें"
 
@@ -1186,11 +1186,11 @@ msgstr "सहेजे गए स्निपेट"
 msgid "Say <0>“{spokenTrigger}”</0> as the whole utterance — or <1>“insert {spokenTrigger}”</1> — to type this snippet."
 msgstr "इस स्निपेट को टाइप करने के लिए <0>“{spokenTrigger}”</0> को पूरे वाक्य के रूप में बोलें — या <1>“insert {spokenTrigger}”</1> कहें।"
 
-#: src/features/history/components/history-table.tsx:99
+#: src/features/history/components/history-table.tsx:93
 msgid "Search transcripts"
 msgstr "प्रतिलेख खोजें"
 
-#: src/features/history/components/history-table.tsx:97
+#: src/features/history/components/history-table.tsx:91
 msgid "Search transcripts…"
 msgstr "प्रतिलेख खोजें..."
 
@@ -1203,17 +1203,17 @@ msgstr "आवश्यक मॉडल चुनें"
 msgid "Send method"
 msgstr "भेजने की विधि"
 
-#: src/features/overview/overview-page.tsx:171
-#: src/features/overview/overview-page.tsx:214
+#: src/features/overview/overview-page.tsx:195
+#: src/features/overview/overview-page.tsx:224
 msgid "session"
 msgstr "सत्र"
 
-#: src/features/history/components/session-detail-modal.tsx:193
+#: src/features/history/components/session-detail-modal.tsx:194
 msgid "Session details"
 msgstr "सत्र विवरण"
 
-#: src/features/overview/overview-page.tsx:171
-#: src/features/overview/overview-page.tsx:214
+#: src/features/overview/overview-page.tsx:195
+#: src/features/overview/overview-page.tsx:224
 msgid "sessions"
 msgstr "सत्र"
 
@@ -1270,7 +1270,7 @@ msgstr "ध्वनि"
 msgid "Sound cues"
 msgstr "ध्वनि संकेत"
 
-#: src/features/overview/overview-page.tsx:132
+#: src/features/overview/overview-page.tsx:156
 msgid "Speaking Time"
 msgstr "बोलने का समय"
 
@@ -1309,6 +1309,10 @@ msgstr "अपना काम छोड़े बिना डिक्टे�
 msgid "Status"
 msgstr "स्थिति"
 
+#: src/features/dictation/dictation-pill.tsx:88
+msgid "Stop and transcribe"
+msgstr "रोकें और प्रतिलेख बनाएं"
+
 #: src/components/ui/voice-capture-field.tsx:148
 #: src/components/ui/voice-capture-field.tsx:153
 msgid "Stop capturing"
@@ -1324,7 +1328,7 @@ msgstr "डिक्टेशन रोकें"
 msgid "Stop dictation"
 msgstr "डिक्टेशन रोकें"
 
-#: src/features/history/components/session-detail-modal.tsx:163
+#: src/features/history/components/session-detail-modal.tsx:164
 msgid "Style"
 msgstr "शैली"
 
@@ -1394,12 +1398,12 @@ msgstr "यह मॉडल आपके मौजूदा कॉन्फ़�
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "ऐसा केवल एक बार होता है. इस बीच आप अपने कंप्यूटर का उपयोग जारी रख सकते हैं."
 
-#: src/features/history/components/history-table.tsx:387
-#: src/features/history/components/session-detail-modal.tsx:201
+#: src/features/history/components/history-table.tsx:381
+#: src/features/history/components/session-detail-modal.tsx:202
 msgid "This will permanently remove this dictation session and its transcript."
 msgstr "यह इस श्रुतलेख सत्र और इसकी प्रतिलेख को स्थायी रूप से हटा देगा।"
 
-#: src/features/history/components/history-table.tsx:139
+#: src/features/history/components/history-table.tsx:133
 msgid "Time"
 msgstr "समय"
 
@@ -1411,16 +1415,16 @@ msgstr "शीर्षक संक्षिप्ताक्षर (\"मि�
 msgid "Titles"
 msgstr "टाइटल"
 
-#: src/features/overview/overview-page.tsx:231
+#: src/features/overview/overview-page.tsx:241
 msgid "to start dictating"
 msgstr "डिक्टेशन शुरू करने के लिए"
 
-#: src/features/overview/overview-page.tsx:124
-#: src/features/overview/overview-page.tsx:156
+#: src/features/overview/overview-page.tsx:148
+#: src/features/overview/overview-page.tsx:180
 msgid "today"
 msgstr "आज"
 
-#: src/features/overview/overview-page.tsx:163
+#: src/features/overview/overview-page.tsx:187
 msgid "Today"
 msgstr "आज"
 
@@ -1436,7 +1440,7 @@ msgstr "लंबे समय तक श्रुतलेखन के लि�
 msgid "Toggle theme"
 msgstr "थीम टॉगल करें"
 
-#: src/features/overview/overview-page.tsx:116
+#: src/features/overview/overview-page.tsx:140
 msgid "Total Words"
 msgstr "कुल शब्द"
 
@@ -1448,7 +1452,7 @@ msgstr "आपने जो कहा उसका प्रतिलेख ब�
 msgid "Transcribing…"
 msgstr "प्रतिलेख बन रहा है…"
 
-#: src/features/history/components/history-table.tsx:140
+#: src/features/history/components/history-table.tsx:134
 msgid "Transcript"
 msgstr "टेक्स्ट"
 
@@ -1496,7 +1500,7 @@ msgstr "{0} शैली का प्रयोग करें"
 msgid "View"
 msgstr "देखना"
 
-#: src/features/overview/overview-page.tsx:219
+#: src/features/overview/overview-page.tsx:229
 msgid "View all"
 msgstr "सभी को देखें"
 
@@ -1559,17 +1563,17 @@ msgstr "Whisper मॉडल आकार"
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
 msgstr "whisper.cpp डिवाइस पर चल रहा है। गति और सटीकता के बीच संतुलन के लिए एक आकार चुनें।"
 
-#: src/features/history/components/history-table.tsx:365
-#: src/features/overview/overview-page.tsx:258
+#: src/features/history/components/history-table.tsx:359
+#: src/features/overview/overview-page.tsx:268
 msgid "words"
 msgstr "शब्द"
 
-#: src/features/history/components/history-table.tsx:141
-#: src/features/history/components/session-detail-modal.tsx:160
+#: src/features/history/components/history-table.tsx:135
+#: src/features/history/components/session-detail-modal.tsx:161
 msgid "Words"
 msgstr "शब्द"
 
-#: src/features/overview/overview-page.tsx:147
+#: src/features/overview/overview-page.tsx:171
 msgid "WPM"
 msgstr "WPM"
 
@@ -1601,7 +1605,7 @@ msgstr "आपका GPU तैयार है — तेज़ प्रति
 msgid "Your GPU qualifies. Keep this on, then finish the one-time setup in Settings."
 msgstr "आपका GPU उपयुक्त है। इसे चालू रहने दें, फिर सेटिंग्स में एक-बार का सेटअप पूरा करें।"
 
-#: src/features/overview/overview-page.tsx:230
+#: src/features/overview/overview-page.tsx:240
 msgid "your hotkey"
 msgstr "आपकी हॉटकी"
 

@@ -42,7 +42,7 @@ msgstr "{0} ルール"
 msgid "{onCount} of 4 formatting fixes on"
 msgstr "{onCount}/4 件のフォーマット修正"
 
-#: src/features/history/components/history-table.tsx:186
+#: src/features/history/components/history-table.tsx:180
 msgid "{page} / {totalPages}"
 msgstr "{page} / {totalPages}"
 
@@ -50,15 +50,15 @@ msgstr "{page} / {totalPages}"
 msgid "{saved} (unavailable)"
 msgstr "{saved}（利用不可）"
 
-#: src/features/history/components/history-table.tsx:170
+#: src/features/history/components/history-table.tsx:164
 msgid "{start}–{end} of {visibleCount}"
 msgstr "{start}–{end}/{visibleCount}"
 
-#: src/features/history/components/history-table.tsx:114
+#: src/features/history/components/history-table.tsx:108
 msgid "{totalCount} sessions"
 msgstr "{totalCount} セッション"
 
-#: src/features/history/components/history-table.tsx:114
+#: src/features/history/components/history-table.tsx:108
 msgid "{visibleCount} / {totalCount}"
 msgstr "{visibleCount} / {totalCount}"
 
@@ -126,11 +126,11 @@ msgstr "AI モデルはデバイスに保存されます。"
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "必要なモデルはすべてインストール済みです。準備ができたら続行してください。"
 
-#: src/features/overview/overview-page.tsx:123
+#: src/features/overview/overview-page.tsx:147
 msgid "all-time"
 msgstr "ずっと"
 
-#: src/features/overview/overview-page.tsx:155
+#: src/features/overview/overview-page.tsx:179
 msgid "all-time avg"
 msgstr "歴代平均"
 
@@ -151,7 +151,7 @@ msgstr "外観"
 msgid "Application behavior and startup preferences."
 msgstr "アプリケーションの動作と起動設定。"
 
-#: src/features/overview/overview-page.tsx:179
+#: src/features/overview/overview-page.tsx:203
 msgid "Audio"
 msgstr "オーディオ"
 
@@ -198,10 +198,6 @@ msgstr "キャンセル"
 #: src/features/settings/sections/dictation-section.tsx:67
 msgid "Cancel current recording"
 msgstr "現在の録音をキャンセル"
-
-#: src/features/dictation/dictation-pill.tsx:105
-msgid "Cancel dictation"
-msgstr "音声入力をキャンセル"
 
 #: src/features/snippets/snippets-page.tsx:133
 msgid "Cancel edit"
@@ -283,7 +279,7 @@ msgstr "音声エンジンを選択します。すべてがオフラインで実
 msgid "Clear filter"
 msgstr "フィルターをクリア"
 
-#: src/features/history/components/history-table.tsx:106
+#: src/features/history/components/history-table.tsx:100
 msgid "Clear search"
 msgstr "検索をクリア"
 
@@ -291,7 +287,7 @@ msgstr "検索をクリア"
 msgid "close"
 msgstr "閉じる"
 
-#: src/features/history/components/session-detail-modal.tsx:209
+#: src/features/history/components/session-detail-modal.tsx:210
 #: src/features/settings/sections/models-section.tsx:323
 #: src/features/styles/components/style-editor-modal.tsx:175
 msgid "Close"
@@ -305,11 +301,11 @@ msgstr "サイドバーを閉じる"
 msgid "Collapse sidebar"
 msgstr "サイドバーを折りたたむ"
 
-#: src/features/history/components/session-detail-modal.tsx:169
+#: src/features/history/components/session-detail-modal.tsx:170
 msgid "Completed"
 msgstr "完了"
 
-#: src/features/overview/overview-page.tsx:104
+#: src/features/overview/overview-page.tsx:128
 #: src/features/shell/components/app-shell.tsx:156
 #: src/features/shell/components/sidebar-widgets.tsx:45
 #: src/features/shell/components/sidebar.tsx:165
@@ -329,11 +325,11 @@ msgstr "続行"
 msgid "Control how your speech is turned into text."
 msgstr "音声をテキストに変換する方法を制御します。"
 
-#: src/features/history/components/history-table.tsx:379
+#: src/features/history/components/history-table.tsx:373
 msgid "Copied"
 msgstr "コピーされました"
 
-#: src/features/history/components/history-table.tsx:379
+#: src/features/history/components/history-table.tsx:373
 msgid "Copy"
 msgstr "コピー"
 
@@ -342,7 +338,7 @@ msgstr "コピー"
 msgid "Copy to clipboard"
 msgstr "クリッ���ボードにコピー"
 
-#: src/features/history/components/session-detail-modal.tsx:132
+#: src/features/history/components/session-detail-modal.tsx:133
 msgid "Copy transcript"
 msgstr "文字起こしをコピー"
 
@@ -396,8 +392,8 @@ msgstr "暗い"
 
 #: src/components/feedback/confirm-dialog.tsx:63
 #: src/features/dictionary/components/dictionary-table.tsx:146
-#: src/features/history/components/history-table.tsx:388
-#: src/features/history/components/session-detail-modal.tsx:202
+#: src/features/history/components/history-table.tsx:382
+#: src/features/history/components/session-detail-modal.tsx:203
 #: src/features/settings/sections/models-section.tsx:259
 #: src/features/snippets/snippets-page.tsx:293
 msgid "Delete"
@@ -417,8 +413,8 @@ msgstr "{0} を削除しますか?"
 msgid "Delete model"
 msgstr "モデルの削除"
 
-#: src/features/history/components/history-table.tsx:386
-#: src/features/history/components/session-detail-modal.tsx:200
+#: src/features/history/components/history-table.tsx:380
+#: src/features/history/components/session-detail-modal.tsx:201
 msgid "Delete session?"
 msgstr "セッションを削除しますか?"
 
@@ -467,11 +463,15 @@ msgstr "ディクテーションインジケーターの表示"
 msgid "Didn't catch anything — try again, a little closer to the mic."
 msgstr "何も聞き取れませんでした — マイクに少し近づいて、もう一度お試しください。"
 
+#: src/features/dictation/dictation-pill.tsx:114
+msgid "Discard dictation"
+msgstr "音声入力を破棄"
+
 #: src/features/settings/sections/dictation-section.tsx:68
 msgid "Discard the current draft and return to idle. Click the binding to change it."
 msgstr "現在のドラフトを破棄し、アイドル状態に戻ります。バインディングをクリックして変更します。"
 
-#: src/features/overview/overview-page.tsx:104
+#: src/features/overview/overview-page.tsx:128
 msgid "Disconnected"
 msgstr "切断されました"
 
@@ -483,7 +483,7 @@ msgstr "ディスク使用量"
 msgid "Dismiss error"
 msgstr "エラーを無視する"
 
-#: src/features/history/components/history-table.tsx:382
+#: src/features/history/components/history-table.tsx:376
 #: src/features/settings/sections/models-section.tsx:273
 msgid "Download"
 msgstr "ダウンロード"
@@ -520,7 +520,7 @@ msgstr "ダウンロードが中断されました"
 msgid "Download progress"
 msgstr "ダウンロード進行状況"
 
-#: src/features/history/components/session-detail-modal.tsx:124
+#: src/features/history/components/session-detail-modal.tsx:125
 msgid "Download transcript"
 msgstr "文字起こしをダウンロード"
 
@@ -539,7 +539,7 @@ msgstr "ダウンロード中…"
 msgid "Duplicate"
 msgstr "重複"
 
-#: src/features/history/components/session-detail-modal.tsx:161
+#: src/features/history/components/session-detail-modal.tsx:162
 msgid "Duration"
 msgstr "時間"
 
@@ -575,8 +575,8 @@ msgstr "スニペットを編集"
 msgid "Edit style"
 msgstr "スタイルの編集"
 
-#: src/features/history/components/history-table.tsx:339
-#: src/features/overview/overview-page.tsx:254
+#: src/features/history/components/history-table.tsx:333
+#: src/features/overview/overview-page.tsx:264
 msgid "Empty session"
 msgstr "空のセッ���ョン"
 
@@ -584,8 +584,8 @@ msgstr "空のセッ���ョン"
 msgid "Enable styling"
 msgstr "スタイル調整を有効にする"
 
-#: src/features/history/components/history-table.tsx:143
-#: src/features/history/components/session-detail-modal.tsx:162
+#: src/features/history/components/history-table.tsx:137
+#: src/features/history/components/session-detail-modal.tsx:163
 #: src/features/settings/sections/styling-engine-section.tsx:42
 msgid "Engine"
 msgstr "エンジン"
@@ -661,15 +661,15 @@ msgstr "github"
 msgid "GitHub"
 msgstr "GitHub"
 
-#: src/features/overview/overview-page.tsx:61
+#: src/features/overview/overview-page.tsx:85
 msgid "Good afternoon"
 msgstr "こんにちは"
 
-#: src/features/overview/overview-page.tsx:61
+#: src/features/overview/overview-page.tsx:85
 msgid "Good evening"
 msgstr "こんばんは"
 
-#: src/features/overview/overview-page.tsx:61
+#: src/features/overview/overview-page.tsx:85
 msgid "Good morning"
 msgstr "おはよう"
 
@@ -695,7 +695,7 @@ msgstr "GPU サポートはインストールされていますが、動作し�
 msgid "History retention"
 msgstr "履歴の保持"
 
-#: src/features/overview/overview-page.tsx:99
+#: src/features/overview/overview-page.tsx:123
 msgid "hold the hotkey and speak, your words land where your cursor is."
 msgstr "ホットキーを押しながら話すと、カーソル位置に入力されます。"
 
@@ -711,7 +711,7 @@ msgstr "音声入力の通知音を再生する音量。"
 msgid "How the pill bar looks. Changes apply immediately."
 msgstr "インジケーターバーの見た目です。変更はすぐに反映されます。"
 
-#: src/features/overview/overview-page.tsx:204
+#: src/features/overview/overview-page.tsx:214
 msgid "Idle"
 msgstr "アイドル状態"
 
@@ -762,7 +762,7 @@ msgstr "言語"
 msgid "Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login."
 msgstr "メイン ウィンドウを開く代わりに、システム トレイを起動します。ログイン時に Lune Voice が自動起動する場合に便利です。"
 
-#: src/features/history/components/history-table.tsx:142
+#: src/features/history/components/history-table.tsx:136
 msgid "Length"
 msgstr "長さ"
 
@@ -784,7 +784,7 @@ msgstr "聞き取り中 — フレーズを話し、もう一度クリックす�
 msgid "Listening — say the phrase…"
 msgstr "聞き取り中 — フレーズを話してください…"
 
-#: src/features/overview/overview-page.tsx:204
+#: src/features/overview/overview-page.tsx:214
 #: src/features/shell/components/sidebar-widgets.tsx:52
 msgid "Listening…"
 msgstr "リスニング…"
@@ -824,15 +824,15 @@ msgstr "会議ヘッダー"
 msgid "Microphone"
 msgstr "マイク"
 
-#: src/features/overview/overview-page.tsx:182
+#: src/features/overview/overview-page.tsx:206
 msgid "Microphone input level"
 msgstr "マイク入力レベル"
 
-#: src/features/overview/overview-page.tsx:140
+#: src/features/overview/overview-page.tsx:164
 msgid "minute"
 msgstr "分"
 
-#: src/features/overview/overview-page.tsx:140
+#: src/features/overview/overview-page.tsx:164
 msgid "minutes"
 msgstr "分"
 
@@ -865,11 +865,11 @@ msgstr "多言語対応 · サイズを選択"
 msgid "Name"
 msgstr "名前"
 
-#: src/features/history/components/history-table.tsx:195
+#: src/features/history/components/history-table.tsx:189
 msgid "Next"
 msgstr "次"
 
-#: src/features/history/components/history-table.tsx:193
+#: src/features/history/components/history-table.tsx:187
 msgid "Next page"
 msgstr "次のページ"
 
@@ -881,20 +881,20 @@ msgstr "いいえ"
 msgid "No rules match “{query}”."
 msgstr "「{query}」に一致するルールはありません。"
 
-#: src/features/history/components/history-table.tsx:130
+#: src/features/history/components/history-table.tsx:124
 msgid "No sessions found."
 msgstr "セッションが見つかりませんでした。"
 
 #. placeholder {0}: search.trim()
-#: src/features/history/components/history-table.tsx:127
+#: src/features/history/components/history-table.tsx:121
 msgid "No sessions match \"{0}\"."
 msgstr "「{0}」に一致するセッションはありません。"
 
-#: src/features/overview/overview-page.tsx:228
+#: src/features/overview/overview-page.tsx:238
 msgid "No sessions yet"
 msgstr "まだセッションはありません"
 
-#: src/features/history/components/history-table.tsx:129
+#: src/features/history/components/history-table.tsx:123
 msgid "No sessions yet. Start dictating to see your transcripts here."
 msgstr "まだセッ���ョンはありません。音声入力を開始すると、ここに文字起こしが表示されます。"
 
@@ -902,13 +902,13 @@ msgstr "まだセッ���ョンはありません。音声入力を開始す
 msgid "No snippets yet."
 msgstr "スニペットはまだありません。"
 
-#: src/features/history/components/history-table.tsx:360
-#: src/features/history/components/session-detail-modal.tsx:153
+#: src/features/history/components/history-table.tsx:354
+#: src/features/history/components/session-detail-modal.tsx:154
 msgid "No transcript"
 msgstr "文字起こしなし"
 
-#: src/features/history/components/history-table.tsx:372
-#: src/features/history/components/session-detail-modal.tsx:163
+#: src/features/history/components/history-table.tsx:366
+#: src/features/history/components/session-detail-modal.tsx:164
 msgid "None"
 msgstr "なし"
 
@@ -932,7 +932,7 @@ msgstr "何もインストールされていません"
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 msgstr "オフでは生の文字起こしがそのまま出力されます。どのスタイルを適用するかは「スタイル」タブで選択します。"
 
-#: src/features/overview/overview-page.tsx:204
+#: src/features/overview/overview-page.tsx:214
 #: src/features/shell/components/app-shell.tsx:163
 #: src/features/shell/components/sidebar.tsx:168
 msgid "Offline"
@@ -950,7 +950,7 @@ msgstr "カードに表示される 1 行の概要"
 msgid "Open menu"
 msgstr "メニューを開く"
 
-#: src/features/overview/overview-page.tsx:249
+#: src/features/overview/overview-page.tsx:259
 msgid "Open session from {time}"
 msgstr "{time} のセッションを開く"
 
@@ -962,7 +962,7 @@ msgstr "オプション"
 msgid "Orientation"
 msgstr "向き"
 
-#: src/features/overview/overview-page.tsx:108
+#: src/features/overview/overview-page.tsx:132
 #: src/features/settings/settings-page.tsx:75
 msgid "Output"
 msgstr "出力"
@@ -975,7 +975,7 @@ msgstr "インジケーターバー全体の大きさ。"
 msgid "Overall progress"
 msgstr "全体の進捗"
 
-#: src/features/history/components/history-table.tsx:166
+#: src/features/history/components/history-table.tsx:160
 msgid "Pagination"
 msgstr "ページネーション"
 
@@ -1042,11 +1042,11 @@ msgstr "マイクを事前に準備"
 msgid "Preset corner or edge the pill starts at."
 msgstr "インジケーターが最初に表示される既定の角または辺。"
 
-#: src/features/overview/overview-page.tsx:230
+#: src/features/overview/overview-page.tsx:240
 msgid "Press"
 msgstr "押す"
 
-#: src/features/history/components/history-table.tsx:180
+#: src/features/history/components/history-table.tsx:174
 msgid "Prev"
 msgstr "前へ"
 
@@ -1058,7 +1058,7 @@ msgstr "ドラッグによるインジケーターの移動を禁止します。
 msgid "Preview"
 msgstr "プレビュー"
 
-#: src/features/history/components/history-table.tsx:178
+#: src/features/history/components/history-table.tsx:172
 msgid "Previous page"
 msgstr "前のページへ"
 
@@ -1086,13 +1086,13 @@ msgstr "処理中…"
 msgid "Quit Lune Voice"
 msgstr "Lune Voice を終了"
 
-#: src/features/overview/overview-page.tsx:104
+#: src/features/overview/overview-page.tsx:128
 #: src/features/shell/components/app-shell.tsx:162
 #: src/features/shell/components/sidebar.tsx:167
 msgid "Ready"
 msgstr "準備完了"
 
-#: src/features/overview/overview-page.tsx:212
+#: src/features/overview/overview-page.tsx:222
 msgid "Recent"
 msgstr "最近の"
 
@@ -1156,7 +1156,7 @@ msgstr "CPU で実行中です。"
 msgid "Running on the CPU. No NVIDIA driver was found — install the driver for your GPU and Lune Voice will offer GPU support here."
 msgstr "CPU で実行中です。NVIDIA ドライバーが見つかりませんでした — お使いの GPU のドライバーをインストールすると、Lune Voice がここで GPU サポートを案内します。"
 
-#: src/features/overview/overview-page.tsx:262
+#: src/features/overview/overview-page.tsx:272
 msgid "s"
 msgstr "s"
 
@@ -1169,8 +1169,8 @@ msgstr "保存"
 msgid "Save changes"
 msgstr "変更を保存"
 
-#: src/features/history/components/history-table.tsx:311
-#: src/features/history/components/session-detail-modal.tsx:73
+#: src/features/history/components/history-table.tsx:305
+#: src/features/history/components/session-detail-modal.tsx:74
 msgid "Save Transcript"
 msgstr "文字起こしを保存"
 
@@ -1186,11 +1186,11 @@ msgstr "保存済みスニペット"
 msgid "Say <0>“{spokenTrigger}”</0> as the whole utterance — or <1>“insert {spokenTrigger}”</1> — to type this snippet."
 msgstr "<0>「{spokenTrigger}」</0> だけを発話する — または <1>「insert {spokenTrigger}」</1> — と、このスニペットが入力されます。"
 
-#: src/features/history/components/history-table.tsx:99
+#: src/features/history/components/history-table.tsx:93
 msgid "Search transcripts"
 msgstr "文字起こしを検索"
 
-#: src/features/history/components/history-table.tsx:97
+#: src/features/history/components/history-table.tsx:91
 msgid "Search transcripts…"
 msgstr "文字起こしを検索…"
 
@@ -1203,17 +1203,17 @@ msgstr "必要なモデルを選択"
 msgid "Send method"
 msgstr "送信方法"
 
-#: src/features/overview/overview-page.tsx:171
-#: src/features/overview/overview-page.tsx:214
+#: src/features/overview/overview-page.tsx:195
+#: src/features/overview/overview-page.tsx:224
 msgid "session"
 msgstr "セッ���ョン"
 
-#: src/features/history/components/session-detail-modal.tsx:193
+#: src/features/history/components/session-detail-modal.tsx:194
 msgid "Session details"
 msgstr "セッション詳細"
 
-#: src/features/overview/overview-page.tsx:171
-#: src/features/overview/overview-page.tsx:214
+#: src/features/overview/overview-page.tsx:195
+#: src/features/overview/overview-page.tsx:224
 msgid "sessions"
 msgstr "セッション"
 
@@ -1270,7 +1270,7 @@ msgstr "サウンド"
 msgid "Sound cues"
 msgstr "サウンドキュー"
 
-#: src/features/overview/overview-page.tsx:132
+#: src/features/overview/overview-page.tsx:156
 msgid "Speaking Time"
 msgstr "発話時間"
 
@@ -1309,6 +1309,10 @@ msgstr "作業を中断せずに、音声入力の開始・停止・キャンセ
 msgid "Status"
 msgstr "状態"
 
+#: src/features/dictation/dictation-pill.tsx:88
+msgid "Stop and transcribe"
+msgstr "停止して文字起こし"
+
 #: src/components/ui/voice-capture-field.tsx:148
 #: src/components/ui/voice-capture-field.tsx:153
 msgid "Stop capturing"
@@ -1324,7 +1328,7 @@ msgstr "音声入力を停止"
 msgid "Stop dictation"
 msgstr "音声入力を停止"
 
-#: src/features/history/components/session-detail-modal.tsx:163
+#: src/features/history/components/session-detail-modal.tsx:164
 msgid "Style"
 msgstr "スタイル"
 
@@ -1394,12 +1398,12 @@ msgstr "このモデルは現在の設定で使用中です。再インストー
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "これは一度だけ起こります。その間、コンピュータを使い続けることができます。"
 
-#: src/features/history/components/history-table.tsx:387
-#: src/features/history/components/session-detail-modal.tsx:201
+#: src/features/history/components/history-table.tsx:381
+#: src/features/history/components/session-detail-modal.tsx:202
 msgid "This will permanently remove this dictation session and its transcript."
 msgstr "この音声入力セッションと文字起こしを完全に削除します。"
 
-#: src/features/history/components/history-table.tsx:139
+#: src/features/history/components/history-table.tsx:133
 msgid "Time"
 msgstr "時間"
 
@@ -1411,16 +1415,16 @@ msgstr "敬称の略記（「Mister」→「Mr.」）"
 msgid "Titles"
 msgstr "敬称"
 
-#: src/features/overview/overview-page.tsx:231
+#: src/features/overview/overview-page.tsx:241
 msgid "to start dictating"
 msgstr "音声入力を始める"
 
-#: src/features/overview/overview-page.tsx:124
-#: src/features/overview/overview-page.tsx:156
+#: src/features/overview/overview-page.tsx:148
+#: src/features/overview/overview-page.tsx:180
 msgid "today"
 msgstr "今日"
 
-#: src/features/overview/overview-page.tsx:163
+#: src/features/overview/overview-page.tsx:187
 msgid "Today"
 msgstr "今日"
 
@@ -1436,7 +1440,7 @@ msgstr "長い音声入力には切り替えが便利です。短く話す場合
 msgid "Toggle theme"
 msgstr "テーマの切り替え"
 
-#: src/features/overview/overview-page.tsx:116
+#: src/features/overview/overview-page.tsx:140
 msgid "Total Words"
 msgstr "合計単語数"
 
@@ -1448,7 +1452,7 @@ msgstr "話した内容を文字起こししています…"
 msgid "Transcribing…"
 msgstr "文字起こし中…"
 
-#: src/features/history/components/history-table.tsx:140
+#: src/features/history/components/history-table.tsx:134
 msgid "Transcript"
 msgstr "文字起こし"
 
@@ -1496,7 +1500,7 @@ msgstr "{0} スタイルを使用する"
 msgid "View"
 msgstr "ビュー"
 
-#: src/features/overview/overview-page.tsx:219
+#: src/features/overview/overview-page.tsx:229
 msgid "View all"
 msgstr "すべて見る"
 
@@ -1559,17 +1563,17 @@ msgstr "Whisper モデルサイズ"
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
 msgstr "whisper.cpp をオンデバイスで実行します。速度と精度のバランスを取るサイズを選択してください。"
 
-#: src/features/history/components/history-table.tsx:365
-#: src/features/overview/overview-page.tsx:258
+#: src/features/history/components/history-table.tsx:359
+#: src/features/overview/overview-page.tsx:268
 msgid "words"
 msgstr "言葉"
 
-#: src/features/history/components/history-table.tsx:141
-#: src/features/history/components/session-detail-modal.tsx:160
+#: src/features/history/components/history-table.tsx:135
+#: src/features/history/components/session-detail-modal.tsx:161
 msgid "Words"
 msgstr "言葉"
 
-#: src/features/overview/overview-page.tsx:147
+#: src/features/overview/overview-page.tsx:171
 msgid "WPM"
 msgstr "WPM"
 
@@ -1601,7 +1605,7 @@ msgstr "GPU の準備ができています — より速い文字起こしに使
 msgid "Your GPU qualifies. Keep this on, then finish the one-time setup in Settings."
 msgstr "お使いの GPU は対応しています。これをオンのままにして、設定で一度だけのセットアップを完了してください。"
 
-#: src/features/overview/overview-page.tsx:230
+#: src/features/overview/overview-page.tsx:240
 msgid "your hotkey"
 msgstr "あなたのホットキー"
 
