@@ -6,7 +6,9 @@ use lune_core::config::{
     TerminalMode, UserSettings, builtin_registry,
 };
 use lune_core::session::SessionStatus;
-use lune_persist::{AppPaths, Database, SettingsStore, StoredDictionaryEntry};
+use lune_persist::{
+    AppPaths, Database, SettingsStore, SnippetSaveMode, SnippetSaveOutcome, StoredDictionaryEntry,
+};
 
 use crate::dto::{
     ActivationModeDto, AsrBackendTypeDto, CreateCustomStyleInput, CreateDictionaryEntryInput,
@@ -66,6 +68,23 @@ const SNIPPET_TRIGGER_MAX_LEN: usize = 256;
 /// Maximum length for a snippet body template.
 const SNIPPET_BODY_MAX_LEN: usize = 16_384;
 
+/// Whether `s` carries a Unicode format character that renders as nothing.
+///
+/// `char::is_control` does not cover these: bidi overrides (U+202E and the
+/// isolate family) and zero-width characters are invisible on screen but
+/// travel with the text into the user's document, so what a saved snippet or
+/// dictionary entry *looks* like can differ from what it actually types.
+fn has_invisible_format_char(s: &str) -> bool {
+    s.chars().any(|c| {
+        matches!(c,
+            '\u{200B}'..='\u{200F}'
+            | '\u{202A}'..='\u{202E}'
+            | '\u{2060}'..='\u{2064}'
+            | '\u{2066}'..='\u{2069}'
+            | '\u{FEFF}')
+    })
+}
+
 /// Create (`id: None`) or update (`id: Some`) a voice snippet.
 pub fn save_snippet(input: SaveSnippetInput) -> Result<WorkspaceSnapshot, String> {
     let paths = resolve_paths()?;
@@ -108,38 +127,32 @@ pub fn save_snippet(input: SaveSnippetInput) -> Result<WorkspaceSnapshot, String
     {
         return Err("snippets must not contain control characters".into());
     }
+    if has_invisible_format_char(trigger) || has_invisible_format_char(body) {
+        return Err("snippets must not contain invisible formatting characters".into());
+    }
 
     let mut database = open_database(&paths)?;
     // Spoken matching normalizes case, punctuation and whitespace, so the
     // collision test has to normalize too: comparing the stored strings would
     // let "Meeting, header." and "meeting header" both exist, and matching
-    // would then silently shadow one of them.
-    let existing = database
-        .list_snippets()
-        .map_err(|e| format!("list snippets: {e}"))?;
-    let clash = existing.iter().any(|s| {
-        input.id.as_deref() != Some(s.id.as_str())
-            && lune_dict::snippets::triggers_collide(&s.trigger_phrase, trigger)
-    });
-    if clash {
-        return Err("another snippet already uses this trigger phrase".into());
-    }
-
-    match input.id {
-        Some(id) => {
-            let updated = database
-                .update_snippet(&id, trigger, body)
-                .map_err(|e| format!("update snippet: {e}"))?;
-            if !updated {
-                return Err("snippet not found".into());
-            }
+    // would then silently shadow one of them. The check runs inside the write's
+    // transaction, so two saves racing cannot both pass it.
+    let new_id = uuid::Uuid::new_v4().to_string();
+    let mode = match input.id.as_deref() {
+        Some(id) => SnippetSaveMode::Update { id },
+        None => SnippetSaveMode::Insert { id: &new_id },
+    };
+    let outcome = database
+        .save_snippet_unique(mode, trigger, body, |stored, candidate| {
+            lune_dict::snippets::triggers_collide(stored, candidate)
+        })
+        .map_err(|e| format!("save snippet: {e}"))?;
+    match outcome {
+        SnippetSaveOutcome::Saved => {}
+        SnippetSaveOutcome::TriggerTaken => {
+            return Err("another snippet already uses this trigger phrase".into());
         }
-        None => {
-            let id = uuid::Uuid::new_v4().to_string();
-            database
-                .insert_snippet(&id, trigger, body)
-                .map_err(|e| format!("insert snippet: {e}"))?;
-        }
+        SnippetSaveOutcome::NotFound => return Err("snippet not found".into()),
     }
 
     let settings = load_settings(&paths)?;
@@ -183,11 +196,19 @@ pub fn create_dictionary_entry(
     {
         return Err("dictionary entries must not contain control characters".into());
     }
+    if has_invisible_format_char(phrase) || has_invisible_format_char(replacement) {
+        return Err("dictionary entries must not contain invisible formatting characters".into());
+    }
 
     let mut database = open_database(&paths)?;
-    database
-        .insert_dictionary_entry(phrase, replacement, input.priority)
+    let inserted = database
+        .insert_dictionary_entry_unique(phrase, replacement, input.priority, |stored, candidate| {
+            lune_dict::phrases_collide(stored, candidate)
+        })
         .map_err(|e| format!("insert dictionary entry: {e}"))?;
+    if inserted.is_none() {
+        return Err("a dictionary entry already uses this phrase".into());
+    }
 
     let settings = load_settings(&paths)?;
     build_snapshot(settings, &mut database)
@@ -291,6 +312,9 @@ pub fn update_dictionary_entry(
         .any(|c| c.is_control() && c != '\n' && c != '\t')
     {
         return Err("dictionary entries must not contain control characters".into());
+    }
+    if has_invisible_format_char(phrase) || has_invisible_format_char(replacement) {
+        return Err("dictionary entries must not contain invisible formatting characters".into());
     }
 
     let mut database = open_database(&paths)?;

@@ -64,6 +64,32 @@ use self::models::{
 };
 use self::schema::{custom_styles, dictionary, sessions, snippets};
 use crate::error::{PersistError, PersistResult};
+use diesel::result::Error as DieselError;
+
+/// Which write [`Database::save_snippet_unique`] should perform.
+#[derive(Debug, Clone, Copy)]
+pub enum SnippetSaveMode<'a> {
+    Insert { id: &'a str },
+    Update { id: &'a str },
+}
+
+impl SnippetSaveMode<'_> {
+    fn id(&self) -> &str {
+        match self {
+            Self::Insert { id } | Self::Update { id } => id,
+        }
+    }
+}
+
+/// Result of [`Database::save_snippet_unique`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SnippetSaveOutcome {
+    Saved,
+    /// Another snippet already answers to this trigger phrase.
+    TriggerTaken,
+    /// Update mode, but no snippet has that id.
+    NotFound,
+}
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SessionStats {
@@ -368,6 +394,40 @@ impl Database {
         Ok(id)
     }
 
+    /// Insert a dictionary entry unless one already answers to `new_phrase`.
+    ///
+    /// Returns `None` when a duplicate blocked the insert. Matching is
+    /// case-insensitive because correction is: storing both `github → GitHub`
+    /// and `GitHub → Git Hub` leaves which one applies down to row order, which
+    /// the user has no way to see or control. The check shares the insert's
+    /// transaction so two saves racing cannot both pass it.
+    pub fn insert_dictionary_entry_unique(
+        &mut self,
+        new_phrase: &str,
+        new_replacement: &str,
+        new_priority: u8,
+        phrases_collide: impl Fn(&str, &str) -> bool,
+    ) -> PersistResult<Option<i32>> {
+        use self::schema::dictionary::dsl::*;
+
+        let inserted = self.conn.transaction::<_, DieselError, _>(|conn| {
+            let existing = dictionary.select(phrase).load::<String>(conn)?;
+            if existing.iter().any(|p| phrases_collide(p, new_phrase)) {
+                return Ok(None);
+            }
+            let new_id = diesel::insert_into(dictionary)
+                .values(&NewDictionaryEntry {
+                    phrase: new_phrase,
+                    replacement: new_replacement,
+                    priority: i32::from(new_priority),
+                })
+                .returning(id)
+                .get_result::<i32>(conn)?;
+            Ok(Some(new_id))
+        })?;
+        Ok(inserted)
+    }
+
     pub fn list_dictionary_entries(
         &mut self,
     ) -> PersistResult<Vec<lune_core::dict::DictionaryEntry>> {
@@ -446,6 +506,62 @@ impl Database {
             .values(&new)
             .execute(&mut self.conn)?;
         Ok(())
+    }
+
+    /// Insert or update a snippet with its trigger-collision check inside the
+    /// same transaction as the write.
+    ///
+    /// Checking for a colliding trigger with `list_snippets` and *then* writing
+    /// leaves a window in which two concurrent saves both see no collision and
+    /// both land, producing two snippets that the same utterance matches —
+    /// spoken matching then picks whichever sorts first, not the one the user
+    /// meant. `collides` is supplied by the caller because the normalization
+    /// rule (case, punctuation, whitespace) lives with the matcher, not here.
+    pub fn save_snippet_unique(
+        &mut self,
+        mode: SnippetSaveMode<'_>,
+        new_trigger: &str,
+        new_body: &str,
+        collides: impl Fn(&str, &str) -> bool,
+    ) -> PersistResult<SnippetSaveOutcome> {
+        use self::schema::snippets::dsl::*;
+
+        let outcome = self.conn.transaction::<_, DieselError, _>(|conn| {
+            let existing = snippets
+                .select((id, trigger_phrase))
+                .load::<(String, String)>(conn)?;
+            let own_id = mode.id();
+            let taken = existing.iter().any(|(row_id, row_trigger)| {
+                (!matches!(mode, SnippetSaveMode::Update { .. }) || row_id != own_id)
+                    && collides(row_trigger, new_trigger)
+            });
+            if taken {
+                return Ok(SnippetSaveOutcome::TriggerTaken);
+            }
+            match mode {
+                SnippetSaveMode::Insert { id: new_id } => {
+                    diesel::insert_into(snippets)
+                        .values(&NewSnippet {
+                            id: new_id,
+                            trigger_phrase: new_trigger,
+                            body: new_body,
+                        })
+                        .execute(conn)?;
+                    Ok(SnippetSaveOutcome::Saved)
+                }
+                SnippetSaveMode::Update { id: target } => {
+                    let count = diesel::update(snippets.filter(id.eq(target)))
+                        .set((trigger_phrase.eq(new_trigger), body.eq(new_body)))
+                        .execute(conn)?;
+                    Ok(if count > 0 {
+                        SnippetSaveOutcome::Saved
+                    } else {
+                        SnippetSaveOutcome::NotFound
+                    })
+                }
+            }
+        })?;
+        Ok(outcome)
     }
 
     pub fn list_snippets(&mut self) -> PersistResult<Vec<lune_core::dict::Snippet>> {

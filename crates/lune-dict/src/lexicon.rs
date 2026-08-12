@@ -141,7 +141,7 @@ impl Lexicon {
                 if stripped[start..start + len].iter().any(|w| w.is_empty()) {
                     continue;
                 }
-                let window_lower = stripped[start..start + len].join(" ").to_ascii_lowercase();
+                let window_lower = crate::fold_ci(&stripped[start..start + len].join(" "));
                 if let Some(canonical) = VOCAB_INDEX.canonical_by_lower.get(window_lower.as_str()) {
                     let m = PhraseMatch {
                         start,
@@ -186,7 +186,9 @@ impl VocabIndex {
         let mut canonical_by_lower: HashMap<Box<str>, Box<str>> = HashMap::new();
         let mut all_lengths: std::collections::BTreeSet<usize> = std::collections::BTreeSet::new();
         for word in vocab::bundled().words.keys().map(String::as_str) {
-            let lower = word.to_ascii_lowercase();
+            // Must fold the same way the lookup above does, or an accented
+            // vocab term is indexed under a key no transcript can produce.
+            let lower = crate::fold_ci(word);
             let canonical = word.into();
             match canonical_by_lower.get(lower.as_str()) {
                 Some(existing) if existing.as_ref() != lower && word == lower => {}

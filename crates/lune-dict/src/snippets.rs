@@ -63,11 +63,7 @@ pub fn resolve_name<'a>(snippets: &'a [Snippet], name: &str) -> Option<&'a Snipp
 
     let mut fuzzy = snippets.iter().filter(|s| {
         let trigger = normalize_words(&s.trigger_phrase);
-        trigger.len() == words.len()
-            && trigger
-                .iter()
-                .zip(&words)
-                .all(|(t, w)| lev_le1_ci(t.as_bytes(), w.as_bytes()))
+        trigger.len() == words.len() && trigger.iter().zip(&words).all(|(t, w)| lev_le1_ci(t, w))
     });
     let first = fuzzy.next()?;
     fuzzy.next().is_none().then_some(first)
@@ -139,10 +135,22 @@ fn resolve_token<'a>(token: &str, values: &'a PlaceholderValues) -> Option<&'a s
 }
 
 /// Iterate the brace-delimited token names in `body`.
+///
+/// Mirrors [`render_body`]'s left-to-right scan exactly — first `{`, then the
+/// next `}` after it, then resume past that `}`. Splitting on every `{`
+/// independently would report tokens `render_body` never substitutes (a
+/// nested `{{clipboard}}` expands to nothing), making [`needs_clipboard`] read
+/// the clipboard for a body that does not use it.
 fn tokens(body: &str) -> impl Iterator<Item = &str> {
-    body.split('{')
-        .skip(1)
-        .filter_map(|chunk| chunk.split('}').next().filter(|_| chunk.contains('}')))
+    let mut rest = body;
+    std::iter::from_fn(move || {
+        let open = rest.find('{')?;
+        let after = &rest[open + 1..];
+        let close = after.find('}')?;
+        let token = &after[..close];
+        rest = &after[close + 1..];
+        Some(token)
+    })
 }
 
 #[cfg(test)]
@@ -277,5 +285,18 @@ mod tests {
         assert!(needs_clipboard("{CLIPBOARD}"));
         assert!(!needs_clipboard("just {date} here"));
         assert!(!needs_clipboard("brace { but no token"));
+    }
+
+    #[test]
+    fn needs_clipboard_agrees_with_render_body_on_nested_braces() {
+        // render_body leaves these verbatim, so no clipboard read is owed.
+        for body in ["{{clipboard}}", "{a{clipboard}", "fn f() { {clipboard"] {
+            assert!(!needs_clipboard(body), "should not need clipboard: {body}");
+            assert_eq!(
+                render_body(body, &values()),
+                body,
+                "body should render verbatim: {body}"
+            );
+        }
     }
 }

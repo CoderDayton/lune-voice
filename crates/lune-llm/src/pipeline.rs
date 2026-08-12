@@ -11,6 +11,24 @@ use lune_core::llm::{LlmService, PostProcessInput, PostProcessOutput, TextPostPr
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// How much longer than its input a styled result may be before it is refused.
+/// Styling rewrites an utterance; it never legitimately multiplies its length.
+const MAX_STYLED_GROWTH: usize = 4;
+
+/// Floor for that bound, in bytes, so a two-word utterance still leaves the
+/// model room to punctuate and expand contractions.
+const MAX_STYLED_FLOOR: usize = 4096;
+
+/// Upper bound on a styled result for a given seeded input.
+///
+/// `max_tokens` is only a request hint the endpoint is free to ignore, and the
+/// result is typed or pasted straight into whatever window has focus — so an
+/// endpoint that returns a megabyte of text must not turn into a megabyte of
+/// synthetic keystrokes.
+fn max_styled_len(seeded: &str) -> usize {
+    MAX_STYLED_FLOOR.max(seeded.len().saturating_mul(MAX_STYLED_GROWTH))
+}
+
 /// Styling pipeline.
 ///
 /// Delegates to a shared `LlmService` for the styling call, with graceful
@@ -34,11 +52,21 @@ impl TextPostProcessor for StylePipeline {
         // gated by the presence of a selection, not a per-preset flag), so the
         // styling LLM always runs here.
         let (system, user) = input.style_preset.build_styling_prompt(&text);
+        let max_len = max_styled_len(&text);
         match self.llm.complete(&system, &user).await {
             Ok(styled)
-                if !styled.is_empty() && !crate::prompt::contains_forbidden_output(&styled) =>
+                if !styled.is_empty()
+                    && styled.len() <= max_len
+                    && !crate::prompt::contains_forbidden_output(&styled) =>
             {
                 text = crate::prompt::fix_all_number_spaces(&styled);
+            }
+            Ok(styled) if styled.len() > max_len => {
+                tracing::warn!(
+                    styled_len = styled.len(),
+                    max_len,
+                    "styling pass produced oversized output, keeping seeded text"
+                )
             }
             Ok(_) => {
                 tracing::warn!(
@@ -235,6 +263,24 @@ mod tests {
     async fn forbidden_styling_output_keeps_seeded_text() {
         let mock = Arc::new(StylingLlm {
             styling_output: "Here is the styled text".to_string(),
+        });
+        let pipeline = StylePipeline::new(mock);
+        let input = PostProcessInput {
+            raw_text: "raw text".into(),
+            style_preset: Arc::new(StylePreset::casual()),
+            app_category: None,
+            dictionary: vec![],
+            language: "en".into(),
+        };
+
+        let output = pipeline.transform(&input).await.unwrap();
+        assert_eq!(output.cleaned_text, "raw text");
+    }
+
+    #[tokio::test]
+    async fn oversized_styling_output_keeps_seeded_text() {
+        let mock = Arc::new(StylingLlm {
+            styling_output: "x".repeat(MAX_STYLED_FLOOR + 1),
         });
         let pipeline = StylePipeline::new(mock);
         let input = PostProcessInput {

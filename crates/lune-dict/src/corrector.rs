@@ -106,11 +106,7 @@ fn process_single_word(
     // Dictionary replacements take priority. An empty dictionary (the common
     // case) skips the per-word lowercase + probe entirely.
     let dict_repl = (!dict_lookup.is_empty())
-        .then(|| {
-            dict_lookup
-                .get(stripped.to_ascii_lowercase().as_str())
-                .copied()
-        })
+        .then(|| dict_lookup.get(crate::fold_ci(stripped).as_str()).copied())
         .flatten();
     if let Some((repl, fuzzy, verbatim)) = dict_repl {
         // A FUZZY (edit-distance-1) match on a flagged/low-confidence word is
@@ -339,7 +335,7 @@ impl LexicalGate {
             .rev()
             .map(|m| {
                 (
-                    m.matched.to_ascii_lowercase(),
+                    crate::fold_ci(&m.matched),
                     // (replacement, fuzzy, verbatim) — user entries are not
                     // verbatim: their casing still goes through soften.
                     (m.replacement.as_str(), m.fuzzy, false),
@@ -647,18 +643,26 @@ fn locate_multi_word_dict_matches(
         if n < 2 || words.len() < n {
             continue;
         }
-        if let Some(start) = (0..=words.len() - n).find(|&start| {
-            words[start..start + n]
+        // Every non-overlapping occurrence, not just the first: a phrase
+        // repeated in one utterance ("loon voice … loon voice") must be
+        // corrected at each position, matching `vocab_phrase_matches`.
+        let mut start = 0;
+        while start + n <= words.len() {
+            let hit = words[start..start + n]
                 .iter()
                 .zip(&phrase_words)
-                .all(|(w, pw)| strip_punctuation(w).eq_ignore_ascii_case(pw))
-        }) {
-            out.push(PhraseMatch {
-                start,
-                len: n,
-                replacement: m.replacement.clone(),
-                fuzzy: m.fuzzy,
-            });
+                .all(|(w, pw)| crate::eq_ci(strip_punctuation(w), pw));
+            if hit {
+                out.push(PhraseMatch {
+                    start,
+                    len: n,
+                    replacement: m.replacement.clone(),
+                    fuzzy: m.fuzzy,
+                });
+                start += n;
+            } else {
+                start += 1;
+            }
         }
     }
     out
@@ -894,6 +898,22 @@ mod tests {
         }];
         let overridden = c.correct("hello Tayton", NO_RISKS, &dict, "en");
         assert_eq!(overridden.corrected_text, "hello Clayton");
+    }
+
+    #[test]
+    fn multi_word_entries_apply_to_every_occurrence() {
+        let c = LexicalGate::new();
+        // Built-in multi-word phrase repeated in one utterance.
+        let builtin = c.correct("loon voice hears loon voice", NO_RISKS, &[], "en");
+        assert_eq!(builtin.corrected_text, "Lune Voice hears Lune Voice");
+        // Same for a user-dictionary multi-word entry.
+        let dict = vec![crate::DictMatch {
+            matched: "new york".into(),
+            replacement: "New York".into(),
+            fuzzy: false,
+        }];
+        let user = c.correct("new york to new york", NO_RISKS, &dict, "en");
+        assert_eq!(user.corrected_text, "New York to New York");
     }
 
     #[test]

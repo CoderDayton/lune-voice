@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use lune_core::config::RedactedString;
 use lune_core::error::Error;
 
@@ -34,6 +36,32 @@ impl Default for OpenAiLlmConfig {
     }
 }
 
+/// Connect timeout for the styling endpoint. A host that accepts nothing must
+/// fail fast rather than sit on the dictation's latency budget.
+const HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Read timeout between response chunks. The pipeline's `llm_timeout_secs`
+/// bounds the call end to end; this bounds a single stalled read, so a server
+/// that accepts the connection and then dribbles bytes still terminates.
+const HTTP_READ_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Build the HTTP client the styling backend talks through.
+///
+/// reqwest's default client has no timeouts and follows up to 10 redirects.
+/// Both matter here: the request body is the user's transcript and the header
+/// carries the API key, and the HTTPS/locality check in [`OpenAiLlmBackend::new`]
+/// only ever sees `base_url`. A redirect would move both to a host that was
+/// never checked, so redirects are refused outright — an OpenAI-compatible
+/// chat-completions endpoint has no legitimate reason to redirect.
+fn http_client() -> Result<reqwest::Client, Error> {
+    reqwest::Client::builder()
+        .connect_timeout(HTTP_CONNECT_TIMEOUT)
+        .read_timeout(HTTP_READ_TIMEOUT)
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|e| Error::llm(format!("build HTTP client: {e}")))
+}
+
 /// OpenAI-compatible LLM backend for remote text post-processing.
 /// Gracefully degrades: API failures return the raw text with a warning.
 pub struct OpenAiLlmBackend {
@@ -62,7 +90,7 @@ impl OpenAiLlmBackend {
         let openai_config = OpenAIConfig::new()
             .with_api_key(config.api_key.expose())
             .with_api_base(&config.base_url);
-        let client = Client::with_config(openai_config);
+        let client = Client::with_config(openai_config).with_http_client(http_client()?);
 
         tracing::info!(
             base_url = %config.base_url,

@@ -96,7 +96,7 @@ impl DictionaryManager {
                 let window_match = text_words[i..i + n]
                     .iter()
                     .zip(&phrase_words)
-                    .all(|(tw, pw)| strip_trailing_punct(tw).eq_ignore_ascii_case(pw));
+                    .all(|(tw, pw)| eq_ci(strip_trailing_punct(tw), pw));
                 if window_match {
                     let matched: String = text_words[i..i + n].join(" ");
                     // Multi-word phrase matches are word-boundary-exact, never fuzzy.
@@ -124,14 +124,11 @@ impl DictionaryManager {
                 if span.is_empty() {
                     continue;
                 }
-                if let Some(entry) = single
-                    .iter()
-                    .find(|e| lev_le1_ci(span.as_bytes(), e.phrase.as_bytes()))
-                {
+                if let Some(entry) = single.iter().find(|e| lev_le1_ci(span, &e.phrase)) {
                     // Exact (case-insensitive) match is trusted; an off-by-one
                     // match is fuzzy and will be gated on low confidence by
                     // the corrector.
-                    let fuzzy = !span.eq_ignore_ascii_case(entry.phrase.as_str());
+                    let fuzzy = !eq_ci(span, entry.phrase.as_str());
                     replacements.push(DictMatch {
                         matched: (*span).to_owned(),
                         replacement: entry.replacement.clone(),
@@ -168,9 +165,7 @@ impl DictionaryManager {
                 }
                 // Fuzzy single-word match (no to_lowercase allocation).
                 if !e.phrase.contains(char::is_whitespace) {
-                    return spans
-                        .iter()
-                        .any(|w| lev_le1_ci(w.as_bytes(), e.phrase.as_bytes()));
+                    return spans.iter().any(|w| lev_le1_ci(w, &e.phrase));
                 }
                 false
             })
@@ -260,14 +255,70 @@ fn contains_ascii_ci(haystack: &str, needle: &str) -> bool {
     h.windows(n.len()).any(|w| w.eq_ignore_ascii_case(n))
 }
 
-/// O(n) Levenshtein distance ≤ 1 check (byte-level, ASCII, case-insensitive).
+/// Case-fold a word for use as a lookup key.
+///
+/// ASCII takes the allocation-cheap path; anything else folds with full
+/// Unicode `to_lowercase`, so a dictionary entry stored as `École` still keys
+/// the same as a transcript's `école`. `to_ascii_lowercase` alone leaves every
+/// non-ASCII byte untouched, which silently defeats the case-insensitive
+/// contract for accented entries.
+#[inline]
+pub(crate) fn fold_ci(s: &str) -> String {
+    if s.is_ascii() {
+        s.to_ascii_lowercase()
+    } else {
+        s.to_lowercase()
+    }
+}
+
+/// Case-insensitive equality with the same folding rule as [`fold_ci`].
+#[inline]
+pub(crate) fn eq_ci(a: &str, b: &str) -> bool {
+    if a.is_ascii() && b.is_ascii() {
+        a.eq_ignore_ascii_case(b)
+    } else {
+        a.to_lowercase() == b.to_lowercase()
+    }
+}
+
+/// Whether two dictionary phrases would be triggered by the same spoken words.
+///
+/// Correction matches case-insensitively on whitespace-delimited words, so
+/// `"GitHub"` and `"github"` are one phrase wearing two spellings. Storing both
+/// leaves which replacement wins down to row order — invisible to the user —
+/// so the save path uses this to reject the second.
+pub fn phrases_collide(a: &str, b: &str) -> bool {
+    let normalize = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
+    let a = normalize(a);
+    !a.is_empty() && eq_ci(&a, &normalize(b))
+}
+
+/// O(n) Levenshtein distance ≤ 1 check, case-insensitive.
 ///
 /// Replaces the `levenshtein(a.to_lowercase(), b.to_lowercase()) <= 1` pattern
-/// in hot paths: no allocation, no full DP table, early exit. Unconditional
-/// (not gated behind the `dictionary` feature) because `lexicon::Lexicon`
-/// also uses it to fuzzy-match the always-compiled bundled vocab.
+/// in hot paths: no full DP table, early exit. Unconditional (not gated behind
+/// the `dictionary` feature) because `lexicon::Lexicon` also uses it to
+/// fuzzy-match the always-compiled bundled vocab.
+///
+/// Pure-ASCII inputs — the overwhelming majority — take an allocation-free
+/// byte path. Anything else is compared by *character*, since a byte-level
+/// distance is wrong across multi-byte UTF-8: `café` is one character but two
+/// bytes away from `cafe`, and accented names are exactly what a personal
+/// dictionary is for.
 #[inline]
-pub(crate) fn lev_le1_ci(a: &[u8], b: &[u8]) -> bool {
+pub(crate) fn lev_le1_ci(a: &str, b: &str) -> bool {
+    if a.is_ascii() && b.is_ascii() {
+        return lev_le1_by(a.as_bytes(), b.as_bytes(), |x, y| {
+            x.eq_ignore_ascii_case(&y)
+        });
+    }
+    let a: Vec<char> = a.chars().flat_map(char::to_lowercase).collect();
+    let b: Vec<char> = b.chars().flat_map(char::to_lowercase).collect();
+    lev_le1_by(&a, &b, |x, y| x == y)
+}
+
+/// Distance-≤-1 check over any comparable unit (bytes or chars).
+fn lev_le1_by<T: Copy>(a: &[T], b: &[T], eq: impl Fn(T, T) -> bool) -> bool {
     // Orient so `short` ≤ `long_s`.
     let (short, long_s) = if a.len() <= b.len() { (a, b) } else { (b, a) };
     match long_s.len() - short.len() {
@@ -275,7 +326,7 @@ pub(crate) fn lev_le1_ci(a: &[u8], b: &[u8]) -> bool {
             // Same length: at most 1 substitution allowed.
             let mut diffs = 0u32;
             for (&x, &y) in short.iter().zip(long_s.iter()) {
-                if !x.eq_ignore_ascii_case(&y) {
+                if !eq(x, y) {
                     diffs += 1;
                     if diffs > 1 {
                         return false;
@@ -290,7 +341,7 @@ pub(crate) fn lev_le1_ci(a: &[u8], b: &[u8]) -> bool {
             let mut li = 0;
             let mut skipped = false;
             while si < short.len() && li < long_s.len() {
-                if short[si].eq_ignore_ascii_case(&long_s[li]) {
+                if eq(short[si], long_s[li]) {
                     si += 1;
                     li += 1;
                 } else if skipped {
@@ -383,33 +434,45 @@ mod tests {
 
     #[test]
     fn lev_le1_ci_identical() {
-        assert!(lev_le1_ci(b"rust", b"rust"));
+        assert!(lev_le1_ci("rust", "rust"));
     }
 
     #[test]
     fn lev_le1_ci_case_insensitive() {
-        assert!(lev_le1_ci(b"Rust", b"rust"));
-        assert!(lev_le1_ci(b"GITHUB", b"github"));
+        assert!(lev_le1_ci("Rust", "rust"));
+        assert!(lev_le1_ci("GITHUB", "github"));
     }
 
     #[test]
     fn lev_le1_ci_one_sub() {
-        assert!(lev_le1_ci(b"rast", b"rust"));
+        assert!(lev_le1_ci("rast", "rust"));
     }
 
     #[test]
     fn lev_le1_ci_one_insert() {
-        assert!(lev_le1_ci(b"rustt", b"rust"));
+        assert!(lev_le1_ci("rustt", "rust"));
     }
 
     #[test]
     fn lev_le1_ci_two_subs_rejected() {
-        assert!(!lev_le1_ci(b"raxt", b"rust"));
+        assert!(!lev_le1_ci("raxt", "rust"));
     }
 
     #[test]
     fn lev_le1_ci_length_diff_gt1_rejected() {
-        assert!(!lev_le1_ci(b"abc", b"abcde"));
+        assert!(!lev_le1_ci("abc", "abcde"));
+    }
+
+    #[test]
+    fn lev_le1_ci_counts_characters_not_bytes() {
+        // One character apart, two bytes apart: the byte-level check rejected
+        // this, so an accented dictionary entry never fuzzy-matched.
+        assert!(lev_le1_ci("cafe", "café"));
+        assert!(lev_le1_ci("café", "cafés"));
+        // Case folding is Unicode, not ASCII-only.
+        assert!(lev_le1_ci("ÉCOLE", "école"));
+        // Two characters apart is still rejected.
+        assert!(!lev_le1_ci("café", "cofé!"));
     }
 
     // ── scan / top_relevant: internal-punctuation tokenization ─────────────
