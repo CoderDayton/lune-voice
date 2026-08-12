@@ -711,7 +711,7 @@ fn spawn_evdev_hotkeys(app: &tauri::App) -> Result<(), Box<dyn std::error::Error
         s
     };
 
-    let (tx, mut rx) = tokio::sync::mpsc::channel(64);
+    let (sink, mut intents) = hotkey_linux::intent_channel();
 
     tracing::info!(
         toggle = ?settings.hotkey.toggle_dictation,
@@ -732,7 +732,7 @@ fn spawn_evdev_hotkeys(app: &tauri::App) -> Result<(), Box<dyn std::error::Error
     let live = std::sync::Arc::new(live);
     app.manage(std::sync::Arc::clone(&live));
 
-    match hotkey_linux::spawn(live, tx) {
+    match hotkey_linux::spawn(live, sink) {
         Some(_handle) => {
             // Thread handle intentionally leaked — runs for app lifetime.
             tracing::info!("evdev hotkey listener thread started");
@@ -745,7 +745,7 @@ fn spawn_evdev_hotkeys(app: &tauri::App) -> Result<(), Box<dyn std::error::Error
 
     let rt = app.state::<runtime::AppRuntime>().inner().clone();
     tauri::async_runtime::spawn(async move {
-        while let Some(action) = rx.recv().await {
+        while let Some(action) = intents.recv().await {
             match action {
                 hotkey_linux::HotkeyAction::Toggle => {
                     tracing::info!(action = "toggle", "hotkey pressed");
