@@ -4,6 +4,7 @@ import { Move, Pill, Shapes } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown';
 import { backendClient } from '../../../lib/backend/client';
+import { LIMITS } from '../../../lib/backend/generated/limits';
 import type { MonitorInfoDto } from '../../../lib/backend/types';
 import { saveWorkspaceSetting, workspaceStore } from '../../../store/workspace-store';
 import { SettingsRow, SettingsSection } from '../components/section';
@@ -127,13 +128,15 @@ export function PillSection() {
               <input
                 type="number"
                 min={0}
-                max={512}
+                max={LIMITS.pillEdgeMarginMax}
                 step={4}
                 value={edgeMargin}
                 onChange={(e) => {
                   const raw = Number(e.target.value);
                   setEdgeMargin(
-                    Number.isFinite(raw) ? Math.max(0, Math.min(512, Math.round(raw))) : 0,
+                    Number.isFinite(raw)
+                      ? Math.max(0, Math.min(LIMITS.pillEdgeMarginMax, Math.round(raw)))
+                      : 0,
                   );
                 }}
                 aria-label={t`Edge distance in pixels`}

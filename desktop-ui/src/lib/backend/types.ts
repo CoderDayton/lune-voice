@@ -101,6 +101,13 @@ export interface BackendClient {
   listMonitors(): Promise<MonitorInfoDto[]>;
   /** Runtime GPU state: driver present, plugin installed, device registered. */
   gpuBackendStatus(): Promise<GpuBackendStatusDto>;
+  /**
+   * Whether this app installed the `/dev/uinput` udev rule itself. False on a
+   * .deb/.rpm install, where the package manager owns the file.
+   */
+  uinputRuleInstalled(): Promise<boolean>;
+  /** Remove that rule. Raises a system password prompt. */
+  removeUinputRule(): Promise<boolean>;
 }
 
 export type SessionStreamEvent =

@@ -19,7 +19,21 @@ use crate::dto::{
     UpdateDictionaryEntryInput, WhisperModelDto, WorkspaceSettingsDto, WorkspaceSnapshot,
 };
 
+/// Page size ceiling for `list_history_page`, which is what the History tab
+/// reads.
 const HISTORY_LIMIT: u32 = 200;
+
+/// How many recent sessions ride along in the workspace snapshot.
+///
+/// Small on purpose. The snapshot is rebuilt after every dictation and every
+/// settings save, and its only consumer is the Overview card's "recent" list —
+/// the History tab pages the table separately and the totals are aggregated in
+/// SQL. Shipping 200 full transcripts meant re-serializing and re-parsing most
+/// of the database in the same milliseconds the delivery thread was typing.
+///
+/// Transcripts are still sent whole: the recent rows show a per-session word
+/// count and open a detail modal, both of which read the text they were given.
+const SNAPSHOT_HISTORY_LIMIT: u32 = 20;
 const DICTIONARY_LIMIT: usize = 10_000;
 const UNKNOWN_LABEL: &str = "Unknown";
 
@@ -82,13 +96,19 @@ pub fn save_workspace_settings(
     build_snapshot(settings, &mut database)
 }
 
+use crate::limits::{
+    CONFIDENCE_MAX, CONFIDENCE_MIN, DICT_ENTRY_MAX_BYTES, HISTORY_DAYS_MAX, HISTORY_DAYS_MIN,
+    PILL_EDGE_MARGIN_MAX, SNIPPET_BODY_MAX_BYTES, SNIPPET_TRIGGER_MAX_BYTES, STYLE_DESC_MAX_BYTES,
+    STYLE_INSTRUCTIONS_MAX_BYTES, STYLE_NAME_MAX_BYTES,
+};
+
 /// Maximum length for dictionary phrase/replacement strings.
-const DICT_ENTRY_MAX_LEN: usize = 1024;
+const DICT_ENTRY_MAX_LEN: usize = DICT_ENTRY_MAX_BYTES;
 
 /// Maximum length for a snippet trigger phrase.
-const SNIPPET_TRIGGER_MAX_LEN: usize = 256;
+const SNIPPET_TRIGGER_MAX_LEN: usize = SNIPPET_TRIGGER_MAX_BYTES;
 /// Maximum length for a snippet body template.
-const SNIPPET_BODY_MAX_LEN: usize = 16_384;
+const SNIPPET_BODY_MAX_LEN: usize = SNIPPET_BODY_MAX_BYTES;
 
 /// Whether `s` carries a Unicode format character that renders as nothing.
 ///
@@ -254,7 +274,7 @@ pub fn delete_session(session_id: String) -> Result<WorkspaceSnapshot, String> {
 }
 
 /// Fetch one page of session history from the database. Unlike the workspace
-/// snapshot (which caps history at `HISTORY_LIMIT` for aggregate stats), this
+/// snapshot (which carries only `SNAPSHOT_HISTORY_LIMIT` recent rows), this
 /// pages through the entire table so the History tab can reach every session.
 /// `page` is 1-based; `search`, when non-empty, filters by transcript substring.
 pub fn list_history_page(
@@ -354,9 +374,9 @@ pub fn update_dictionary_entry(
 // ── Custom style presets ─────────────────────────────────────────────────
 
 const CUSTOM_STYLE_MAX: usize = 50;
-const STYLE_NAME_MAX_LEN: usize = 64;
-const STYLE_DESC_MAX_LEN: usize = 256;
-const STYLE_INSTRUCTIONS_MAX_LEN: usize = 2048;
+const STYLE_NAME_MAX_LEN: usize = STYLE_NAME_MAX_BYTES;
+const STYLE_DESC_MAX_LEN: usize = STYLE_DESC_MAX_BYTES;
+const STYLE_INSTRUCTIONS_MAX_LEN: usize = STYLE_INSTRUCTIONS_MAX_BYTES;
 
 fn validate_style_fields(name: &str, description: &str, instructions: &str) -> Result<(), String> {
     if name.is_empty() || name.len() > STYLE_NAME_MAX_LEN {
@@ -490,7 +510,7 @@ fn build_snapshot(
     database: &mut Database,
 ) -> Result<WorkspaceSnapshot, String> {
     let history = database
-        .list_sessions(HISTORY_LIMIT)
+        .list_sessions(SNAPSHOT_HISTORY_LIMIT)
         .map_err(|e| format!("list sessions: {e}"))?
         .into_iter()
         .map(|session| HistoryItemDto {
@@ -554,12 +574,35 @@ fn build_snapshot(
         });
     }
 
+    // Local midnight, as UTC — "today" is the user's day, not the DB's.
+    let today_start = chrono::Local::now()
+        .date_naive()
+        .and_hms_opt(0, 0, 0)
+        .and_then(|midnight| {
+            midnight
+                .and_local_timezone(chrono::Local)
+                .single()
+                .map(|dt| dt.with_timezone(&chrono::Utc).to_rfc3339())
+        })
+        // A DST transition can leave local midnight ambiguous or non-existent.
+        // Falling back to UTC midnight keeps the stats close rather than wrong.
+        .unwrap_or_else(|| {
+            chrono::Utc::now()
+                .date_naive()
+                .and_time(Default::default())
+                .and_utc()
+                .to_rfc3339()
+        });
+
     let stats = database
-        .session_stats()
+        .session_stats(&today_start)
         .map(|s| SessionStatsDto {
             sessions: s.sessions,
             words: s.words,
             seconds: s.seconds,
+            sessions_today: s.sessions_today,
+            words_today: s.words_today,
+            seconds_today: s.seconds_today,
         })
         .unwrap_or_default();
 
@@ -695,7 +738,7 @@ fn apply_settings_dto(
     // A placement change (anchor / edge margin / pinned monitor) clears any
     // dragged position so the new placement is applied visibly, not shadowed
     // by the old drag. Size/orientation/corner keep the dragged spot.
-    let edge_margin = input.pill_edge_margin.min(512);
+    let edge_margin = input.pill_edge_margin.min(PILL_EDGE_MARGIN_MAX);
     let placement_changed = pill_anchor_from_dto(input.pill_anchor) != settings.pill_anchor
         || edge_margin != settings.pill_edge_margin
         || input.pill_monitor != settings.pill_monitor;
@@ -720,9 +763,11 @@ fn apply_settings_dto(
 
     // Validate numeric thresholds — reject NaN/Inf/out-of-range.
     if let Some(ct) = input.confidence_threshold
-        && (!ct.is_finite() || !(0.0..=1.0).contains(&ct))
+        && (!ct.is_finite() || !(CONFIDENCE_MIN..=CONFIDENCE_MAX).contains(&ct))
     {
-        return Err(format!("confidenceThreshold must be 0.0–1.0, got {ct}"));
+        return Err(format!(
+            "confidenceThreshold must be {CONFIDENCE_MIN}–{CONFIDENCE_MAX}, got {ct}"
+        ));
     }
     if let Some(threshold) = input.llm_skip_threshold
         && (!threshold.is_finite() || !(0.0..=1.0).contains(&threshold))
@@ -788,10 +833,10 @@ fn apply_settings_dto(
     settings.check_updates_on_launch = input.check_updates_on_launch;
     settings.terminal_mode = terminal_mode_from_dto(input.terminal_mode);
     if let Some(days) = input.session_history_days
-        && !(1..=3650).contains(&days)
+        && !(HISTORY_DAYS_MIN..=HISTORY_DAYS_MAX).contains(&days)
     {
         return Err(format!(
-            "sessionHistoryDays must be between 1 and 3650, got {days}"
+            "sessionHistoryDays must be between {HISTORY_DAYS_MIN} and {HISTORY_DAYS_MAX}, got {days}"
         ));
     }
     settings.session_history_days = input.session_history_days;

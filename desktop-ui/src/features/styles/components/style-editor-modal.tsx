@@ -1,7 +1,11 @@
 import { useLingui } from '@lingui/react/macro';
 import { Copy, RefreshCw } from 'lucide-react';
 import type { RefObject } from 'react';
+import { byteLength, LIMITS } from '../../../lib/backend/generated/limits';
 import type { FormatTogglesDto } from '../../../lib/backend/types';
+
+/** Fraction of the instructions budget at which the counter turns amber. */
+const INSTRUCTIONS_WARN_FRACTION = 0.93;
 
 interface StyleEditorModalProps {
   dialogRef: RefObject<HTMLDialogElement | null>;
@@ -57,9 +61,18 @@ export function StyleEditorModal({
   ];
   const isViewOnly = mode === 'view';
   const isEdit = mode === 'edit';
-  const instrLen = instructions.length;
+  // Measured in UTF-8 bytes, because that is the unit the backend rejects on.
+  // A DOM `maxLength` counts UTF-16 code units instead, so it used to let a
+  // 64-emoji name through the form and straight into a server-side rejection.
+  const nameBytes = byteLength(name);
+  const descBytes = byteLength(description);
+  const instrBytes = byteLength(instructions);
+  const tooLong =
+    nameBytes > LIMITS.styleNameMaxBytes ||
+    descBytes > LIMITS.styleDescMaxBytes ||
+    instrBytes > LIMITS.styleInstructionsMaxBytes;
   const busy = saving || generating || refreshing;
-  const canSave = !!name.trim() && !!instructions.trim() && !busy;
+  const canSave = !!name.trim() && !!instructions.trim() && !busy && !tooLong;
 
   return (
     <dialog ref={dialogRef} className="modal" onClose={onClose}>
@@ -73,39 +86,48 @@ export function StyleEditorModal({
             <input
               type="text"
               className="input w-full"
-              maxLength={64}
               placeholder={t`e.g. Meeting notes`}
               value={name}
               readOnly={isViewOnly}
               onChange={(e) => onNameChange(e.target.value)}
             />
+            {nameBytes > LIMITS.styleNameMaxBytes ? (
+              <span className="text-xs text-error">{t`Name is too long.`}</span>
+            ) : null}
           </label>
           <label className="flex flex-col gap-1.5">
             <span className="text-sm font-medium text-content-default">{t`Description`}</span>
             <input
               type="text"
               className="input w-full"
-              maxLength={256}
               placeholder={t`One-line summary shown on the card`}
               value={description}
               readOnly={isViewOnly}
               onChange={(e) => onDescriptionChange(e.target.value)}
             />
+            {descBytes > LIMITS.styleDescMaxBytes ? (
+              <span className="text-xs text-error">{t`Description is too long.`}</span>
+            ) : null}
           </label>
           <label className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-content-default">{t`Instructions`}</span>
               <span
-                className={`text-xs tabular-nums ${instrLen > 1900 ? 'text-warning' : 'text-content-subtle'}`}
+                className={`text-xs tabular-nums ${
+                  instrBytes > LIMITS.styleInstructionsMaxBytes
+                    ? 'text-error'
+                    : instrBytes > LIMITS.styleInstructionsMaxBytes * INSTRUCTIONS_WARN_FRACTION
+                      ? 'text-warning'
+                      : 'text-content-subtle'
+                }`}
               >
-                {instrLen}/2048
+                {instrBytes}/{LIMITS.styleInstructionsMaxBytes}
               </span>
             </div>
             <textarea
               className={`textarea w-full min-h-32 resize-y leading-relaxed ${
                 isViewOnly ? 'cursor-default bg-surface-inset/40 text-content-muted opacity-70' : ''
               }`}
-              maxLength={2048}
               placeholder={t`Describe how text should be formatted. E.g., "Use bullet points. Keep sentences short. Avoid jargon."`}
               value={instructions}
               readOnly={isViewOnly}

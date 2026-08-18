@@ -331,8 +331,11 @@ Blocking work is dispatched as follows:
   runtime (unit tests) it runs inline and warns once.
 - **LLM styling** is a plain async HTTP request (via `async-openai`), so it runs
   directly on the async runtime.
-- **Persistence** (settings, history DB) and the GPU-plugin unpack run through
-  `spawn_blocking` so they never stall the runtime.
+- **Persistence** never stalls the runtime. The Tauri command layer and the
+  GPU-plugin unpack use `spawn_blocking`. The session lifecycle cannot: its
+  `Database` lives behind a shared `tokio::sync::Mutex` whose guard cannot cross
+  into a spawned task, so it uses `block_in_place` instead — same handoff, no
+  `Send` bound, and no extra cancellation point in `start_inner`.
 
 The audio capture callback runs on cpal's own high-priority thread and pushes
 into a lock-free ring buffer; the session loop polls it, so the real-time path

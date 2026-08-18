@@ -76,7 +76,7 @@ msgstr "## Встреча — {date}\n"
 msgid "A block of text Lune Voice types for you when you speak its trigger phrase."
 msgstr "Блок текста, который Lune Voice печатает за вас, когда вы произносите ключевую фразу."
 
-#: src/features/settings/sections/pill-section.tsx:212
+#: src/features/settings/sections/pill-section.tsx:215
 msgid "A vertical pill hugs the side of the screen."
 msgstr "Вертикальный индикатор прижимается к краю экрана."
 
@@ -126,11 +126,11 @@ msgstr "Модели AI, хранящиеся на вашем устройств
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "Все необходимые модели уже установлены. Продолжайте, когда будете готовы."
 
-#: src/features/overview/overview-page.tsx:147
+#: src/features/overview/overview-page.tsx:136
 msgid "all-time"
 msgstr "все время"
 
-#: src/features/overview/overview-page.tsx:179
+#: src/features/overview/overview-page.tsx:168
 msgid "all-time avg"
 msgstr "среднее значение за все время"
 
@@ -151,7 +151,7 @@ msgstr "Появление"
 msgid "Application behavior and startup preferences."
 msgstr "Поведение приложения и настройки запуска."
 
-#: src/features/overview/overview-page.tsx:203
+#: src/features/overview/overview-page.tsx:192
 msgid "Audio"
 msgstr "Аудио"
 
@@ -159,19 +159,19 @@ msgstr "Аудио"
 msgid "Audio activity"
 msgstr "Аудио активность"
 
-#: src/features/settings/sections/output-section.tsx:72
+#: src/features/settings/sections/output-section.tsx:75
 msgid "Audio feedback played as dictation starts, finishes, or errors."
 msgstr "Звуковой отклик при запуске, завершении или ошибке диктовки."
 
-#: src/features/styles/components/style-editor-modal.tsx:55
+#: src/features/styles/components/style-editor-modal.tsx:59
 msgid "Auto-capitalize sentences"
 msgstr "Автоматически писать предложения с заглавной буквы"
 
-#: src/features/settings/sections/pill-section.tsx:50
+#: src/features/settings/sections/pill-section.tsx:51
 msgid "Automatic"
 msgstr "Автоматически"
 
-#: src/features/styles/components/style-editor-modal.tsx:56
+#: src/features/styles/components/style-editor-modal.tsx:60
 msgid "Brand casing (\"github\" → \"GitHub\")"
 msgstr "Оформление бренда («github» → «GitHub»)"
 
@@ -191,7 +191,7 @@ msgstr "Встроенный"
 #: src/components/feedback/confirm-dialog.tsx:52
 #: src/features/dictionary/components/dictionary-table.tsx:96
 #: src/features/settings/sections/models-section.tsx:311
-#: src/features/styles/components/style-editor-modal.tsx:184
+#: src/features/styles/components/style-editor-modal.tsx:206
 msgid "Cancel"
 msgstr "Отмена"
 
@@ -250,7 +250,7 @@ msgstr "Проверка…"
 msgid "Choose a theme"
 msgstr "Выберите тему"
 
-#: src/features/settings/sections/output-section.tsx:19
+#: src/features/settings/sections/output-section.tsx:20
 msgid "Choose how finished text is inserted into the app you are currently using."
 msgstr "Выберите, как готовый текст будет вставлен в приложение, которое вы сейчас используете."
 
@@ -267,7 +267,7 @@ msgstr "Выберите, как переоформляются расшифро
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "Выберите модели искусственного интеллекта для установки. Все работает в автономном режиме — ни облака, ни учетных записей."
 
-#: src/features/settings/sections/transcription-section.tsx:41
+#: src/features/settings/sections/transcription-section.tsx:42
 msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
 msgstr "Выберите движок, который превращает вашу речь в текст. Локальные движки работают полностью на устройстве; Whisper многоязычен и предлагает выбор размеров модели."
 
@@ -283,13 +283,13 @@ msgstr "Очистить фильтр"
 msgid "Clear search"
 msgstr "Очистить поиск"
 
-#: src/features/styles/components/style-editor-modal.tsx:201
+#: src/features/styles/components/style-editor-modal.tsx:223
 msgid "close"
 msgstr "закрывать"
 
 #: src/features/history/components/session-detail-modal.tsx:210
 #: src/features/settings/sections/models-section.tsx:323
-#: src/features/styles/components/style-editor-modal.tsx:175
+#: src/features/styles/components/style-editor-modal.tsx:197
 msgid "Close"
 msgstr "Закрывать"
 
@@ -305,7 +305,7 @@ msgstr "Свернуть боковую панель"
 msgid "Completed"
 msgstr "Завершенный"
 
-#: src/features/overview/overview-page.tsx:128
+#: src/features/overview/overview-page.tsx:117
 #: src/features/shell/components/app-shell.tsx:156
 #: src/features/shell/components/sidebar-widgets.tsx:45
 #: src/features/shell/components/sidebar.tsx:165
@@ -321,7 +321,7 @@ msgstr "Обращаться к серверу выпусков вскоре п�
 msgid "Continue"
 msgstr "Продолжать"
 
-#: src/features/settings/sections/transcription-section.tsx:36
+#: src/features/settings/sections/transcription-section.tsx:37
 msgid "Control how your speech is turned into text."
 msgstr "Контролируйте, как ваша речь превращается в текст."
 
@@ -333,8 +333,8 @@ msgstr "Скопировано"
 msgid "Copy"
 msgstr "Копировать"
 
-#: src/features/settings/sections/output-section.tsx:53
-#: src/features/settings/sections/output-section.tsx:63
+#: src/features/settings/sections/output-section.tsx:54
+#: src/features/settings/sections/output-section.tsx:64
 msgid "Copy to clipboard"
 msgstr "Копировать в буфер обмена"
 
@@ -342,20 +342,20 @@ msgstr "Копировать в буфер обмена"
 msgid "Copy transcript"
 msgstr "Копировать стенограмму"
 
-#: src/features/settings/sections/pill-section.tsx:229
+#: src/features/settings/sections/pill-section.tsx:232
 msgid "Corner rounding of the pill bar."
 msgstr "Скругление углов панели индикатора."
 
-#: src/features/settings/sections/pill-section.tsx:228
+#: src/features/settings/sections/pill-section.tsx:231
 msgid "Corners"
 msgstr "Углы"
 
-#: src/features/settings/sections/transcription-section.tsx:94
+#: src/features/settings/sections/transcription-section.tsx:95
 msgid "Correction"
 msgstr "Исправление"
 
-#: src/features/settings/sections/transcription-section.tsx:99
-#: src/features/settings/sections/transcription-section.tsx:111
+#: src/features/settings/sections/transcription-section.tsx:100
+#: src/features/settings/sections/transcription-section.tsx:115
 msgid "Correction sensitivity"
 msgstr "Чувствительность исправления"
 
@@ -376,12 +376,12 @@ msgstr "Создать фрагмент"
 msgid "Create new style"
 msgstr "Создать новый стиль"
 
-#: src/features/styles/components/style-editor-modal.tsx:68
+#: src/features/styles/components/style-editor-modal.tsx:81
 msgid "Create style"
 msgstr "Создать стиль"
 
-#: src/features/settings/sections/output-section.tsx:92
-#: src/features/settings/sections/output-section.tsx:104
+#: src/features/settings/sections/output-section.tsx:95
+#: src/features/settings/sections/output-section.tsx:107
 msgid "Cue volume"
 msgstr "Громкость сигналов"
 
@@ -430,15 +430,19 @@ msgstr "Удалить это слово, исправить?"
 msgid "Delete?"
 msgstr "Удалить?"
 
-#: src/features/styles/components/style-editor-modal.tsx:109
+#: src/features/styles/components/style-editor-modal.tsx:131
 msgid "Describe how text should be formatted. E.g., \"Use bullet points. Keep sentences short. Avoid jargon.\""
 msgstr "Опишите, как должен быть отформатирован текст. Например: «Используйте пункты списка. Делайте предложения короткими. Избегайте жаргона»."
 
-#: src/features/styles/components/style-editor-modal.tsx:84
+#: src/features/styles/components/style-editor-modal.tsx:99
 msgid "Description"
 msgstr "Описание"
 
-#: src/features/styles/components/style-editor-modal.tsx:118
+#: src/features/styles/components/style-editor-modal.tsx:109
+msgid "Description is too long."
+msgstr "Описание слишком длинное."
+
+#: src/features/styles/components/style-editor-modal.tsx:140
 msgid "Deterministic fixes applied before any AI styling."
 msgstr "Детерминированные исправления применяются перед любым стилем ИИ."
 
@@ -446,16 +450,16 @@ msgstr "Детерминированные исправления применя
 msgid "Dictation"
 msgstr "Диктовка"
 
-#: src/features/settings/sections/transcription-section.tsx:57
-#: src/features/settings/sections/transcription-section.tsx:63
+#: src/features/settings/sections/transcription-section.tsx:58
+#: src/features/settings/sections/transcription-section.tsx:64
 msgid "Dictation language"
 msgstr "Язык диктанта"
 
-#: src/features/settings/sections/pill-section.tsx:68
+#: src/features/settings/sections/pill-section.tsx:69
 msgid "Dictation pill"
 msgstr "Индикатор диктовки"
 
-#: src/features/settings/sections/pill-section.tsx:79
+#: src/features/settings/sections/pill-section.tsx:80
 msgid "Dictation pill visibility"
 msgstr "Видимость индикатора диктовки"
 
@@ -471,7 +475,7 @@ msgstr "Отменить диктовку"
 msgid "Discard the current draft and return to idle. Click the binding to change it."
 msgstr "Отмените текущий черновик и вернитесь в режим ожидания. Нажмите на привязку, чтобы изменить ее."
 
-#: src/features/overview/overview-page.tsx:128
+#: src/features/overview/overview-page.tsx:117
 msgid "Disconnected"
 msgstr "Отключено"
 
@@ -535,7 +539,7 @@ msgstr "Загрузка моделей"
 msgid "Downloading…"
 msgstr "Загрузка…"
 
-#: src/features/styles/components/style-editor-modal.tsx:178
+#: src/features/styles/components/style-editor-modal.tsx:200
 msgid "Duplicate"
 msgstr "Дублировать"
 
@@ -543,15 +547,15 @@ msgstr "Дублировать"
 msgid "Duration"
 msgstr "Продолжительность"
 
-#: src/features/styles/components/style-editor-modal.tsx:77
+#: src/features/styles/components/style-editor-modal.tsx:89
 msgid "e.g. Meeting notes"
 msgstr "например Заметки о встрече"
 
-#: src/features/settings/sections/pill-section.tsx:123
+#: src/features/settings/sections/pill-section.tsx:124
 msgid "Edge distance"
 msgstr "Отступ от края"
 
-#: src/features/settings/sections/pill-section.tsx:139
+#: src/features/settings/sections/pill-section.tsx:142
 msgid "Edge distance in pixels"
 msgstr "Отступ от края в пикселях"
 
@@ -571,12 +575,12 @@ msgstr "Изменить {0}"
 msgid "Edit snippet"
 msgstr "Изменить фрагмент"
 
-#: src/features/styles/components/style-editor-modal.tsx:68
+#: src/features/styles/components/style-editor-modal.tsx:81
 msgid "Edit style"
 msgstr "Изменить стиль"
 
 #: src/features/history/components/history-table.tsx:333
-#: src/features/overview/overview-page.tsx:264
+#: src/features/overview/overview-page.tsx:253
 msgid "Empty session"
 msgstr "Пустая сессия"
 
@@ -594,11 +598,11 @@ msgstr "Двигатель"
 msgid "Enter Lune Voice"
 msgstr "Введите Лунный Голос"
 
-#: src/features/styles/components/style-editor-modal.tsx:164
+#: src/features/styles/components/style-editor-modal.tsx:186
 msgid "Examples are out of date since you edited the prompt."
 msgstr "Примеры устарели после того, как вы изменили промпт."
 
-#: src/features/styles/components/style-editor-modal.tsx:141
+#: src/features/styles/components/style-editor-modal.tsx:163
 msgid "Examples teach the styling engine your style. Regenerate them after editing the prompt."
 msgstr "Примеры обучают движок стилизации вашему стилю. Сгенерируйте их заново после изменения промпта."
 
@@ -606,7 +610,7 @@ msgstr "Примеры обучают движок стилизации ваше
 msgid "Expand sidebar"
 msgstr "Развернуть боковую панель"
 
-#: src/features/styles/components/style-editor-modal.tsx:138
+#: src/features/styles/components/style-editor-modal.tsx:160
 msgid "Few-shot examples"
 msgstr "Few-shot примеры"
 
@@ -622,11 +626,11 @@ msgstr "Правила фильтрации"
 msgid "Filter rules…"
 msgstr "Правила фильтрации…"
 
-#: src/features/settings/sections/transcription-section.tsx:95
+#: src/features/settings/sections/transcription-section.tsx:96
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "Исправляет ошибки распознавания с помощью вашего словаря и известной лексики — прямо на устройстве. Использует пословную уверенность и статистические закономерности — без модели ИИ, и никогда не переписывает сказанное вами."
 
-#: src/features/settings/sections/pill-section.tsx:174
+#: src/features/settings/sections/pill-section.tsx:177
 msgid "Forget where you dragged the pill and return it to its preset spot."
 msgstr "Забыть, куда вы перетащили индикатор, и вернуть его на заданное место."
 
@@ -634,12 +638,12 @@ msgstr "Забыть, куда вы перетащили индикатор, и 
 msgid "formatting"
 msgstr "форматирование"
 
-#: src/features/styles/components/style-editor-modal.tsx:116
+#: src/features/styles/components/style-editor-modal.tsx:138
 #: src/features/styles/components/style-hero.tsx:54
 msgid "Formatting"
 msgstr "Форматирование"
 
-#: src/features/settings/sections/pill-section.tsx:124
+#: src/features/settings/sections/pill-section.tsx:125
 msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock."
 msgstr "Зазор между индикатором и краем экрана, чтобы он не перекрывал панель задач или док."
 
@@ -648,8 +652,8 @@ msgstr "Зазор между индикатором и краем экрана,
 msgid "General"
 msgstr "Общий"
 
-#: src/features/styles/components/style-editor-modal.tsx:159
-#: src/features/styles/components/style-editor-modal.tsx:193
+#: src/features/styles/components/style-editor-modal.tsx:181
+#: src/features/styles/components/style-editor-modal.tsx:215
 msgid "Generating examples…"
 msgstr "Создание примеров…"
 
@@ -661,15 +665,15 @@ msgstr "github"
 msgid "GitHub"
 msgstr "GitHub"
 
-#: src/features/overview/overview-page.tsx:85
+#: src/features/overview/overview-page.tsx:74
 msgid "Good afternoon"
 msgstr "Добрый день"
 
-#: src/features/overview/overview-page.tsx:85
+#: src/features/overview/overview-page.tsx:74
 msgid "Good evening"
 msgstr "Добрый вечер"
 
-#: src/features/overview/overview-page.tsx:85
+#: src/features/overview/overview-page.tsx:74
 msgid "Good morning"
 msgstr "Доброе утро"
 
@@ -695,7 +699,7 @@ msgstr "Поддержка GPU установлена, но не работае�
 msgid "History retention"
 msgstr "Хранение истории"
 
-#: src/features/overview/overview-page.tsx:123
+#: src/features/overview/overview-page.tsx:112
 msgid "hold the hotkey and speak, your words land where your cursor is."
 msgstr "удерживайте горячую клавишу и говорите, ваши слова попадут туда, где находится курсор."
 
@@ -703,15 +707,15 @@ msgstr "удерживайте горячую клавишу и говорите
 msgid "How long finished dictations are kept on this device."
 msgstr "Как долго завершённые диктовки хранятся на этом устройстве."
 
-#: src/features/settings/sections/output-section.tsx:93
+#: src/features/settings/sections/output-section.tsx:96
 msgid "How loud the dictation sounds play."
 msgstr "Насколько громко звучат сигналы диктовки."
 
-#: src/features/settings/sections/pill-section.tsx:193
+#: src/features/settings/sections/pill-section.tsx:196
 msgid "How the pill bar looks. Changes apply immediately."
 msgstr "Как выглядит панель индикатора. Изменения применяются сразу."
 
-#: src/features/overview/overview-page.tsx:214
+#: src/features/overview/overview-page.tsx:203
 msgid "Idle"
 msgstr "Праздный"
 
@@ -733,11 +737,11 @@ msgstr "Вставить заполнитель"
 msgid "Installed"
 msgstr "Установлено"
 
-#: src/features/styles/components/style-editor-modal.tsx:97
+#: src/features/styles/components/style-editor-modal.tsx:114
 msgid "Instructions"
 msgstr "Инструкции"
 
-#: src/features/settings/sections/output-section.tsx:54
+#: src/features/settings/sections/output-section.tsx:55
 msgid "Keep the dictated text on the clipboard after every dictation, so you can paste it again yourself."
 msgstr "Сохранять продиктованный текст в буфере обмена после каждой диктовки, чтобы вы могли вставить его снова сами."
 
@@ -745,11 +749,15 @@ msgstr "Сохранять продиктованный текст в буфер
 msgid "Keep the mic open in the background so dictation starts ~70ms sooner. The OS may show a recording indicator while Lune Voice is running."
 msgstr "Держите микрофон открытым в фоновом режиме, чтобы диктовка началась примерно на 70 мс раньше. ОС может отображать индикатор записи во время работы Lune Voice."
 
-#: src/features/settings/sections/pill-section.tsx:88
+#: src/features/settings/sections/pill-section.tsx:89
 msgid "Keep the pill with you when you switch workspaces or virtual desktops."
 msgstr "Держать индикатор при себе при переключении рабочих мест или виртуальных рабочих столов."
 
-#: src/features/styles/components/style-editor-modal.tsx:53
+#: src/features/settings/components/uinput-rule-row.tsx:59
+msgid "Keyboard access"
+msgstr "Доступ к клавиатуре"
+
+#: src/features/styles/components/style-editor-modal.tsx:57
 msgid "Keyboard shortcuts (\"Super H\" → \"Super+H\")"
 msgstr "Сочетания клавиш («Super H» → «Super+H»)"
 
@@ -784,7 +792,7 @@ msgstr "Слушаю — произнесите фразу, затем нажм�
 msgid "Listening — say the phrase…"
 msgstr "Слушаю — произнесите фразу…"
 
-#: src/features/overview/overview-page.tsx:214
+#: src/features/overview/overview-page.tsx:203
 #: src/features/shell/components/sidebar-widgets.tsx:52
 msgid "Listening…"
 msgstr "Слушаю…"
@@ -793,8 +801,8 @@ msgstr "Слушаю…"
 msgid "Local"
 msgstr "Местный"
 
-#: src/features/settings/sections/pill-section.tsx:160
-#: src/features/settings/sections/pill-section.tsx:168
+#: src/features/settings/sections/pill-section.tsx:163
+#: src/features/settings/sections/pill-section.tsx:171
 msgid "Lock position"
 msgstr "Закрепить положение"
 
@@ -805,6 +813,10 @@ msgstr "Лунь"
 #: src/features/shell/components/sidebar.tsx:212
 msgid "Lune Voice"
 msgstr "Lune Voice"
+
+#: src/features/settings/components/uinput-rule-row.tsx:60
+msgid "Lune Voice added a system rule so it can type into other apps. It also lets any other program you run send keystrokes. Removing it stops typed delivery from working until you allow it again."
+msgstr "Lune Voice добавил системное правило, чтобы вводить текст в другие приложения. Оно также позволяет любой другой запущенной вами программе отправлять нажатия клавиш. Если удалить его, ввод текста перестанет работать, пока вы снова его не разрешите."
 
 #: src/features/dictionary/components/dictionary-form.tsx:92
 msgid "Lune Voice writes"
@@ -824,15 +836,15 @@ msgstr "шапка встречи"
 msgid "Microphone"
 msgstr "Микрофон"
 
-#: src/features/overview/overview-page.tsx:206
+#: src/features/overview/overview-page.tsx:195
 msgid "Microphone input level"
 msgstr "Входной уровень микрофона"
 
-#: src/features/overview/overview-page.tsx:164
+#: src/features/overview/overview-page.tsx:153
 msgid "minute"
 msgstr "минута"
 
-#: src/features/overview/overview-page.tsx:164
+#: src/features/overview/overview-page.tsx:153
 msgid "minutes"
 msgstr "минуты"
 
@@ -849,7 +861,7 @@ msgstr "Модели"
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "Модели хранятся локально. Никакой телеметрии, никаких учетных записей."
 
-#: src/features/settings/sections/pill-section.tsx:146
+#: src/features/settings/sections/pill-section.tsx:149
 msgid "Monitor"
 msgstr "Экран"
 
@@ -861,9 +873,13 @@ msgstr "Большую часть загрузки составляют мате
 msgid "Multilingual · pick a size"
 msgstr "Многоязычный · выберите размер"
 
-#: src/features/styles/components/style-editor-modal.tsx:72
+#: src/features/styles/components/style-editor-modal.tsx:85
 msgid "Name"
 msgstr "Имя"
+
+#: src/features/styles/components/style-editor-modal.tsx:95
+msgid "Name is too long."
+msgstr "Название слишком длинное."
 
 #: src/features/history/components/history-table.tsx:189
 msgid "Next"
@@ -890,7 +906,7 @@ msgstr "Сеансы не найдены."
 msgid "No sessions match \"{0}\"."
 msgstr "Нет сеансов, соответствующих \"{0}\"."
 
-#: src/features/overview/overview-page.tsx:238
+#: src/features/overview/overview-page.tsx:227
 msgid "No sessions yet"
 msgstr "Сеансов пока нет"
 
@@ -916,7 +932,7 @@ msgstr "Нет"
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
 msgstr "Нормализует уровень микрофона перед обнаружением голоса. Помогает заглушить микрофоны и шумные комнаты. Рекомендуется."
 
-#: src/features/settings/sections/pill-section.tsx:61
+#: src/features/settings/sections/pill-section.tsx:62
 msgid "not connected"
 msgstr "нет подключения"
 
@@ -932,7 +948,7 @@ msgstr "Ничего не установлено"
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 msgstr "В положении «Выкл.» доставляются необработанные расшифровки. Применяемый стиль выбирается на вкладке «Стили»."
 
-#: src/features/overview/overview-page.tsx:214
+#: src/features/overview/overview-page.tsx:203
 #: src/features/shell/components/app-shell.tsx:163
 #: src/features/shell/components/sidebar.tsx:168
 msgid "Offline"
@@ -942,7 +958,7 @@ msgstr "Офлайн"
 msgid "Offline dictation"
 msgstr "Оффлайн диктант"
 
-#: src/features/styles/components/style-editor-modal.tsx:89
+#: src/features/styles/components/style-editor-modal.tsx:103
 msgid "One-line summary shown on the card"
 msgstr "Однострочное резюме, отображаемое на карточке"
 
@@ -950,7 +966,7 @@ msgstr "Однострочное резюме, отображаемое на к�
 msgid "Open menu"
 msgstr "Открыть меню"
 
-#: src/features/overview/overview-page.tsx:259
+#: src/features/overview/overview-page.tsx:248
 msgid "Open session from {time}"
 msgstr "Открытая сессия от {time}"
 
@@ -958,16 +974,16 @@ msgstr "Открытая сессия от {time}"
 msgid "Optional"
 msgstr "Необязательный"
 
-#: src/features/settings/sections/pill-section.tsx:211
+#: src/features/settings/sections/pill-section.tsx:214
 msgid "Orientation"
 msgstr "Ориентация"
 
-#: src/features/overview/overview-page.tsx:132
+#: src/features/overview/overview-page.tsx:121
 #: src/features/settings/settings-page.tsx:75
 msgid "Output"
 msgstr "Выход"
 
-#: src/features/settings/sections/pill-section.tsx:198
+#: src/features/settings/sections/pill-section.tsx:201
 msgid "Overall footprint of the pill bar."
 msgstr "Общий размер панели индикатора."
 
@@ -979,12 +995,12 @@ msgstr "Общий прогресс"
 msgid "Pagination"
 msgstr "Пагинация"
 
-#: src/features/settings/sections/output-section.tsx:38
-#: src/features/settings/sections/output-section.tsx:44
+#: src/features/settings/sections/output-section.tsx:39
+#: src/features/settings/sections/output-section.tsx:45
 msgid "Paste compatibility"
 msgstr "Совместимость вставки"
 
-#: src/features/settings/sections/output-section.tsx:24
+#: src/features/settings/sections/output-section.tsx:25
 msgid "Paste is simplest. Typing keystrokes can work better in some apps."
 msgstr "Паста самая простая. В некоторых приложениях ввод клавиш может работать лучше."
 
@@ -997,31 +1013,31 @@ msgstr "Фраза"
 msgid "Pill"
 msgstr "Индикатор"
 
-#: src/features/settings/sections/pill-section.tsx:234
+#: src/features/settings/sections/pill-section.tsx:237
 msgid "Pill corners"
 msgstr "Углы индикатора"
 
-#: src/features/settings/sections/pill-section.tsx:152
+#: src/features/settings/sections/pill-section.tsx:155
 msgid "Pill monitor"
 msgstr "Экран индикатора"
 
-#: src/features/settings/sections/pill-section.tsx:217
+#: src/features/settings/sections/pill-section.tsx:220
 msgid "Pill orientation"
 msgstr "Ориентация индикатора"
 
-#: src/features/settings/sections/pill-section.tsx:115
+#: src/features/settings/sections/pill-section.tsx:116
 msgid "Pill position preset"
 msgstr "Заданное положение индикатора"
 
-#: src/features/settings/sections/pill-section.tsx:203
+#: src/features/settings/sections/pill-section.tsx:206
 msgid "Pill size"
 msgstr "Размер индикатора"
 
-#: src/features/settings/sections/pill-section.tsx:104
+#: src/features/settings/sections/pill-section.tsx:105
 msgid "Placement"
 msgstr "Размещение"
 
-#: src/features/settings/sections/output-section.tsx:77
+#: src/features/settings/sections/output-section.tsx:80
 msgid "Play a short sound when dictation starts, finishes, or runs into an error."
 msgstr "Воспроизводить короткий звук при запуске, завершении или ошибке диктовки."
 
@@ -1029,7 +1045,7 @@ msgstr "Воспроизводить короткий звук при запус
 msgid "Please keep the app open until downloads finish"
 msgstr "Пожалуйста, оставьте приложение открытым до завершения загрузки."
 
-#: src/features/settings/sections/pill-section.tsx:109
+#: src/features/settings/sections/pill-section.tsx:110
 msgid "Position"
 msgstr "Положение"
 
@@ -1038,11 +1054,11 @@ msgstr "Положение"
 msgid "Pre-warm microphone"
 msgstr "Предварительный прогрев микрофона"
 
-#: src/features/settings/sections/pill-section.tsx:110
+#: src/features/settings/sections/pill-section.tsx:111
 msgid "Preset corner or edge the pill starts at."
 msgstr "Заданный угол или край, откуда начинается индикатор."
 
-#: src/features/overview/overview-page.tsx:240
+#: src/features/overview/overview-page.tsx:229
 msgid "Press"
 msgstr "Нажимать"
 
@@ -1050,7 +1066,7 @@ msgstr "Нажимать"
 msgid "Prev"
 msgstr "Предыдущий"
 
-#: src/features/settings/sections/pill-section.tsx:161
+#: src/features/settings/sections/pill-section.tsx:164
 msgid "Prevent moving the pill by dragging it."
 msgstr "Запретить перемещение индикатора перетаскиванием."
 
@@ -1062,7 +1078,7 @@ msgstr "Предварительный просмотр"
 msgid "Previous page"
 msgstr "Предыдущая страница"
 
-#: src/features/settings/sections/pill-section.tsx:53
+#: src/features/settings/sections/pill-section.tsx:54
 msgid "primary"
 msgstr "основной"
 
@@ -1086,13 +1102,13 @@ msgstr "Обработка…"
 msgid "Quit Lune Voice"
 msgstr "Выйти из Lune Voice"
 
-#: src/features/overview/overview-page.tsx:128
+#: src/features/overview/overview-page.tsx:117
 #: src/features/shell/components/app-shell.tsx:162
 #: src/features/shell/components/sidebar.tsx:167
 msgid "Ready"
 msgstr "Готовый"
 
-#: src/features/overview/overview-page.tsx:222
+#: src/features/overview/overview-page.tsx:211
 msgid "Recent"
 msgstr "Недавний"
 
@@ -1101,11 +1117,12 @@ msgstr "Недавний"
 msgid "Recording mode"
 msgstr "Режим записи"
 
-#: src/features/styles/components/style-editor-modal.tsx:159
+#: src/features/styles/components/style-editor-modal.tsx:181
 msgid "Refresh few-shot examples"
 msgstr "Обновить few-shot примеры"
 
 #: src/components/feedback/confirm-dialog.tsx:33
+#: src/features/settings/components/uinput-rule-row.tsx:68
 msgid "Remove"
 msgstr "Удалять"
 
@@ -1114,6 +1131,10 @@ msgstr "Удалять"
 #: src/features/dictionary/components/dictionary-table.tsx:145
 msgid "Remove the saved correction for \"{0}\" → \"{1}\"."
 msgstr "Удалите сохраненное исправление для «{0}» → «{1}»."
+
+#: src/features/settings/components/uinput-rule-row.tsx:68
+msgid "Removing…"
+msgstr "Удаление…"
 
 #: src/features/dictionary/components/dictionary-table.tsx:72
 #: src/features/dictionary/components/dictionary-table.tsx:73
@@ -1127,11 +1148,11 @@ msgstr "Замена"
 msgid "Required"
 msgstr "Необходимый"
 
-#: src/features/settings/sections/pill-section.tsx:185
+#: src/features/settings/sections/pill-section.tsx:188
 msgid "Reset"
 msgstr "Сбросить"
 
-#: src/features/settings/sections/pill-section.tsx:173
+#: src/features/settings/sections/pill-section.tsx:176
 msgid "Reset position"
 msgstr "Сбросить положение"
 
@@ -1156,12 +1177,12 @@ msgstr "Работает на процессоре."
 msgid "Running on the CPU. No NVIDIA driver was found — install the driver for your GPU and Lune Voice will offer GPU support here."
 msgstr "Работает на процессоре. Драйвер NVIDIA не найден — установите драйвер для вашей видеокарты, и Lune Voice предложит здесь поддержку GPU."
 
-#: src/features/overview/overview-page.tsx:272
+#: src/features/overview/overview-page.tsx:261
 msgid "s"
 msgstr "с"
 
 #: src/features/dictionary/components/dictionary-table.tsx:105
-#: src/features/styles/components/style-editor-modal.tsx:193
+#: src/features/styles/components/style-editor-modal.tsx:215
 msgid "Save"
 msgstr "Сохранять"
 
@@ -1198,13 +1219,13 @@ msgstr "Поиск стенограмм…"
 msgid "Select required models"
 msgstr "Выберите необходимые модели"
 
-#: src/features/settings/sections/output-section.tsx:23
-#: src/features/settings/sections/output-section.tsx:29
+#: src/features/settings/sections/output-section.tsx:24
+#: src/features/settings/sections/output-section.tsx:30
 msgid "Send method"
 msgstr "Метод отправки"
 
-#: src/features/overview/overview-page.tsx:195
-#: src/features/overview/overview-page.tsx:224
+#: src/features/overview/overview-page.tsx:184
+#: src/features/overview/overview-page.tsx:213
 msgid "session"
 msgstr "сессия"
 
@@ -1212,8 +1233,8 @@ msgstr "сессия"
 msgid "Session details"
 msgstr "Детали сеанса"
 
-#: src/features/overview/overview-page.tsx:195
-#: src/features/overview/overview-page.tsx:224
+#: src/features/overview/overview-page.tsx:184
+#: src/features/overview/overview-page.tsx:213
 msgid "sessions"
 msgstr "сессии"
 
@@ -1221,7 +1242,7 @@ msgstr "сессии"
 msgid "Set hotkey"
 msgstr "Установить горячую клавишу"
 
-#: src/features/settings/sections/transcription-section.tsx:58
+#: src/features/settings/sections/transcription-section.tsx:59
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "Установите язык, на котором вы говорите. Авто использует обнаружение по речи."
 
@@ -1234,16 +1255,16 @@ msgstr "Разделы настроек"
 msgid "Shortcuts"
 msgstr "Ярлыки"
 
-#: src/features/settings/sections/pill-section.tsx:87
-#: src/features/settings/sections/pill-section.tsx:97
+#: src/features/settings/sections/pill-section.tsx:88
+#: src/features/settings/sections/pill-section.tsx:98
 msgid "Show on all workspaces"
 msgstr "Показывать на всех рабочих местах"
 
-#: src/features/settings/sections/pill-section.tsx:197
+#: src/features/settings/sections/pill-section.tsx:200
 msgid "Size"
 msgstr "Размер"
 
-#: src/features/settings/sections/pill-section.tsx:192
+#: src/features/settings/sections/pill-section.tsx:195
 msgid "Size & shape"
 msgstr "Размер и форма"
 
@@ -1261,16 +1282,16 @@ msgstr "Перейти к основному содержанию"
 msgid "Snippet text"
 msgstr "Текст фрагмента"
 
-#: src/features/settings/sections/output-section.tsx:71
+#: src/features/settings/sections/output-section.tsx:74
 msgid "Sound"
 msgstr "Звук"
 
-#: src/features/settings/sections/output-section.tsx:76
-#: src/features/settings/sections/output-section.tsx:86
+#: src/features/settings/sections/output-section.tsx:79
+#: src/features/settings/sections/output-section.tsx:89
 msgid "Sound cues"
 msgstr "Звуковые сигналы"
 
-#: src/features/overview/overview-page.tsx:156
+#: src/features/overview/overview-page.tsx:145
 msgid "Speaking Time"
 msgstr "Время речи"
 
@@ -1362,11 +1383,11 @@ msgstr "Научите Lune Voice правильному написанию сл
 msgid "Teach Lune Voice your words"
 msgstr "Научите Луне озвучивать свои слова"
 
-#: src/features/settings/sections/output-section.tsx:18
+#: src/features/settings/sections/output-section.tsx:19
 msgid "Text delivery"
 msgstr "Доставка текста"
 
-#: src/features/settings/sections/pill-section.tsx:69
+#: src/features/settings/sections/pill-section.tsx:70
 msgid "The floating status pill you see while dictating."
 msgstr "Плавающий индикатор состояния, который виден во время диктовки."
 
@@ -1382,7 +1403,7 @@ msgstr "Микрофон занят"
 msgid "The snippet text appears here with placeholders filled in."
 msgstr "Здесь появляется текст фрагмента с заполненными заполнителями."
 
-#: src/features/settings/sections/transcription-section.tsx:100
+#: src/features/settings/sections/transcription-section.tsx:101
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
 msgstr "Слова, в которых распознаватель менее всего уверен, сверяются с вашим словарём и лексикой. Выше — проверяется больше слов; ниже — больше доверия исходной расшифровке."
 
@@ -1407,7 +1428,7 @@ msgstr "Этот сеанс диктовки и его стенограмма б
 msgid "Time"
 msgstr "Время"
 
-#: src/features/styles/components/style-editor-modal.tsx:54
+#: src/features/styles/components/style-editor-modal.tsx:58
 msgid "Title abbreviations (\"Mister\" → \"Mr.\")"
 msgstr "Сокращения названий («Мистер» → «Мистер»)"
 
@@ -1415,16 +1436,16 @@ msgstr "Сокращения названий («Мистер» → «Мисте
 msgid "Titles"
 msgstr "Титулы"
 
-#: src/features/overview/overview-page.tsx:241
+#: src/features/overview/overview-page.tsx:230
 msgid "to start dictating"
 msgstr "начать диктовать"
 
-#: src/features/overview/overview-page.tsx:148
-#: src/features/overview/overview-page.tsx:180
+#: src/features/overview/overview-page.tsx:137
+#: src/features/overview/overview-page.tsx:169
 msgid "today"
 msgstr "сегодня"
 
-#: src/features/overview/overview-page.tsx:187
+#: src/features/overview/overview-page.tsx:176
 msgid "Today"
 msgstr "Сегодня"
 
@@ -1440,7 +1461,7 @@ msgstr "Переключить проще всего для более прод�
 msgid "Toggle theme"
 msgstr "Переключить тему"
 
-#: src/features/overview/overview-page.tsx:140
+#: src/features/overview/overview-page.tsx:129
 msgid "Total Words"
 msgstr "Всего слов"
 
@@ -1456,7 +1477,7 @@ msgstr "Расшифровка…"
 msgid "Transcript"
 msgstr "Стенограмма"
 
-#: src/features/settings/sections/transcription-section.tsx:35
+#: src/features/settings/sections/transcription-section.tsx:36
 #: src/features/settings/settings-page.tsx:73
 msgid "Transcription"
 msgstr "Транскрипция"
@@ -1485,8 +1506,8 @@ msgstr "Обновления"
 msgid "Use GPU acceleration"
 msgstr "Использовать ускорение GPU"
 
-#: src/features/settings/sections/transcription-section.tsx:74
-#: src/features/settings/sections/transcription-section.tsx:82
+#: src/features/settings/sections/transcription-section.tsx:75
+#: src/features/settings/sections/transcription-section.tsx:83
 msgid "Use hardware acceleration"
 msgstr "Используйте аппаратное ускорение"
 
@@ -1500,19 +1521,19 @@ msgstr "Используйте стиль {0}"
 msgid "View"
 msgstr "Вид"
 
-#: src/features/overview/overview-page.tsx:229
+#: src/features/overview/overview-page.tsx:218
 msgid "View all"
 msgstr "Посмотреть все"
 
-#: src/features/styles/components/style-editor-modal.tsx:68
+#: src/features/styles/components/style-editor-modal.tsx:81
 msgid "View style"
 msgstr "Посмотреть стиль"
 
-#: src/features/settings/sections/pill-section.tsx:73
+#: src/features/settings/sections/pill-section.tsx:74
 msgid "Visibility"
 msgstr "Видимость"
 
-#: src/features/settings/sections/transcription-section.tsx:40
+#: src/features/settings/sections/transcription-section.tsx:41
 msgid "Voice model"
 msgstr "Модель голоса"
 
@@ -1526,15 +1547,15 @@ msgstr "Добро пожаловать"
 msgid "Welcome to Lune Voice"
 msgstr "Добро пожаловать в Lune Voice"
 
-#: src/features/settings/sections/transcription-section.tsx:75
+#: src/features/settings/sections/transcription-section.tsx:76
 msgid "When available, this can make transcription finish faster."
 msgstr "Если это возможно, это может ускорить завершение транскрипции."
 
-#: src/features/settings/sections/pill-section.tsx:74
+#: src/features/settings/sections/pill-section.tsx:75
 msgid "When the pill appears while you dictate."
 msgstr "Когда индикатор появляется во время диктовки."
 
-#: src/features/settings/sections/pill-section.tsx:105
+#: src/features/settings/sections/pill-section.tsx:106
 msgid "Where the pill sits on screen. Dragging it overrides the preset until you reset."
 msgstr "Где индикатор находится на экране. Перетаскивание отменяет заданное положение, пока вы его не сбросите."
 
@@ -1542,11 +1563,11 @@ msgstr "Где индикатор находится на экране. Пере
 msgid "Which input device dictation captures from. Changes apply right away."
 msgstr "С какого устройства ввода ведётся захват диктовки. Изменения применяются сразу."
 
-#: src/features/settings/sections/output-section.tsx:39
+#: src/features/settings/sections/output-section.tsx:40
 msgid "Which paste shortcut to send. Automatic detects terminals; override if paste lands in the wrong place."
 msgstr "Какое сочетание клавиш вставки отправлять. «Автоматически» определяет терминалы; переопределите, если вставка попадает не туда."
 
-#: src/features/settings/sections/pill-section.tsx:147
+#: src/features/settings/sections/pill-section.tsx:150
 msgid "Which screen the pill appears on."
 msgstr "На каком экране появляется индикатор."
 
@@ -1564,7 +1585,7 @@ msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy.
 msgstr "whisper.cpp работает на устройстве. Выберите размер, чтобы обменять скорость на точность."
 
 #: src/features/history/components/history-table.tsx:359
-#: src/features/overview/overview-page.tsx:268
+#: src/features/overview/overview-page.tsx:257
 msgid "words"
 msgstr "слова"
 
@@ -1573,7 +1594,7 @@ msgstr "слова"
 msgid "Words"
 msgstr "Слова"
 
-#: src/features/overview/overview-page.tsx:171
+#: src/features/overview/overview-page.tsx:160
 msgid "WPM"
 msgstr "WPM"
 
@@ -1605,7 +1626,7 @@ msgstr "Ваша видеокарта готова — используйте е
 msgid "Your GPU qualifies. Keep this on, then finish the one-time setup in Settings."
 msgstr "Ваша видеокарта подходит. Оставьте это включённым, затем завершите разовую настройку в параметрах."
 
-#: src/features/overview/overview-page.tsx:240
+#: src/features/overview/overview-page.tsx:229
 msgid "your hotkey"
 msgstr "твоя горячая клавиша"
 

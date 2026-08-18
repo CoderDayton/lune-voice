@@ -6,6 +6,7 @@ import {
   deliveryMethods,
   labelFor,
 } from '../features/settings/data/settings-data';
+import { LIMITS } from '../lib/backend/generated/limits';
 import type {
   DictionaryItemDto,
   HistoryItemDto,
@@ -134,7 +135,10 @@ export function settingsToSaveInput(settings: WorkspaceSettings): SaveWorkspaceS
     pillVisibility: settings.pillVisibility,
     pillAnchor: settings.pillAnchor,
     pillLocked: settings.pillLocked,
-    pillEdgeMargin: Math.max(0, Math.min(512, Math.round(settings.pillEdgeMargin) || 0)),
+    pillEdgeMargin: Math.max(
+      0,
+      Math.min(LIMITS.pillEdgeMarginMax, Math.round(settings.pillEdgeMargin) || 0),
+    ),
     pillMonitor: settings.pillMonitor,
     pillAllWorkspaces: settings.pillAllWorkspaces,
     pillSize: settings.pillSize,

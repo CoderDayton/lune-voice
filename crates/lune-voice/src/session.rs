@@ -216,20 +216,26 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
             None => None,
             Some(id) => match builtin_registry().get(&id) {
                 Some(preset) => Some(preset),
-                None => match self.persist.lock().await.get_custom_style(&id) {
-                    Ok(found) => found.map(|s| Arc::new(s.preset)),
-                    Err(e) => {
-                        // A genuine DB/deserialize error is not the same as a
-                        // missing style — surface it, then degrade to no styling
-                        // (optional) rather than failing the whole session.
-                        tracing::warn!(
-                            style = %id,
-                            error = %e,
-                            "failed to load custom style from database; delivering unstyled transcript"
-                        );
-                        None
+                None => {
+                    let loaded = {
+                        let mut db = self.persist.lock().await;
+                        blocking_db(|| db.get_custom_style(&id))
+                    };
+                    match loaded {
+                        Ok(found) => found.map(|s| Arc::new(s.preset)),
+                        Err(e) => {
+                            // A genuine DB/deserialize error is not the same as a
+                            // missing style — surface it, then degrade to no styling
+                            // (optional) rather than failing the whole session.
+                            tracing::warn!(
+                                style = %id,
+                                error = %e,
+                                "failed to load custom style from database; delivering unstyled transcript"
+                            );
+                            None
+                        }
                     }
-                },
+                }
             },
         };
 
@@ -263,7 +269,10 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
                 status: SessionStatus::Active,
                 transcript: None,
             };
-            let insert_result = self.persist.lock().await.insert_session(&session);
+            let insert_result = {
+                let mut db = self.persist.lock().await;
+                blocking_db(|| db.insert_session(&session))
+            };
             notify_persist_failure("failed to persist session start", insert_result, &event_tx)
                 .await;
         }
@@ -846,7 +855,11 @@ async fn process_and_deliver(
     // consuming the utterance and typing nothing.
     let mut snippet_fallback_raw = false;
     if snippet_name.is_some() || route.commands.is_empty() {
-        let snippets = persist.lock().await.list_snippets().unwrap_or_else(|e| {
+        let snippets = {
+            let mut db = persist.lock().await;
+            blocking_db(|| db.list_snippets())
+        }
+        .unwrap_or_else(|e| {
             warn!(error = %e, %session_id, "failed to load snippets");
             Vec::new()
         });
@@ -1107,7 +1120,8 @@ async fn deliver_final_text(
     // off: this pair is the whole transcript twice over.
     if let Some(final_text) = transcript.as_deref().filter(|_| persist_history) {
         let mut db = persist.lock().await;
-        if let Err(e) = db.insert_correction_pair(session_id, raw_text, final_text) {
+        if let Err(e) = blocking_db(|| db.insert_correction_pair(session_id, raw_text, final_text))
+        {
             warn!(error = %e, %session_id, "failed to persist correction pair");
         }
     }
@@ -1167,6 +1181,30 @@ async fn read_clipboard_text() -> Option<String> {
     None
 }
 
+/// Run a synchronous SQLite call without parking an async worker.
+///
+/// `ARCHITECTURE.md` states persistence never stalls the runtime, and the Tauri
+/// command layer keeps that promise with `spawn_blocking`. The session
+/// lifecycle cannot use the same tool: `Database` lives behind a shared
+/// `tokio::sync::Mutex`, and the guard cannot cross into a spawned task.
+///
+/// `block_in_place` fits instead. It needs no `Send` bound, spawns nothing, and
+/// — being synchronous — adds no cancellation point, so `start_inner`'s
+/// cancellation safety is exactly what it was. Writes are small (a session row
+/// is ~1.4 KB), but a WAL autocheckpoint can land on any of them and turn one
+/// into a multi-megabyte copy plus two fsyncs, which is not something to do on
+/// a worker thread while a dictation is starting.
+///
+/// A current-thread runtime has no worker to hand off to, so the closure runs
+/// inline — that is the test harness, where it is what we want anyway.
+fn blocking_db<T>(f: impl FnOnce() -> T) -> T {
+    use tokio::runtime::{Handle, RuntimeFlavor};
+    match Handle::try_current() {
+        Ok(h) if h.runtime_flavor() == RuntimeFlavor::MultiThread => tokio::task::block_in_place(f),
+        _ => f(),
+    }
+}
+
 /// Close out the history row of a session whose task panicked.
 ///
 /// The row was inserted `Active` with no `ended_at` at session start, and the
@@ -1182,11 +1220,11 @@ async fn read_clipboard_text() -> Option<String> {
 #[cold]
 async fn finalize_panicked_session(session_id: Uuid, persist: Arc<Mutex<Database>>) {
     let mut db = persist.lock().await;
-    match db.get_session(session_id) {
+    match blocking_db(|| db.get_session(session_id)) {
         Ok(Some(mut session)) if session.ended_at.is_none() => {
             session.status = SessionStatus::Failed("internal session panic".into());
             session.ended_at = Some(Utc::now());
-            if let Err(e) = db.update_session(&session) {
+            if let Err(e) = blocking_db(|| db.update_session(&session)) {
                 warn!(error = %e, %session_id, "could not close the panicked session's row");
             }
         }
@@ -1213,12 +1251,12 @@ async fn finalize_db(
         return;
     }
     let mut db = persist.lock().await;
-    match db.get_session(session_id) {
+    match blocking_db(|| db.get_session(session_id)) {
         Ok(Some(mut s)) => {
             s.status = status;
             s.ended_at = ended_at;
             s.transcript = transcript;
-            if let Err(e) = db.update_session(&s) {
+            if let Err(e) = blocking_db(|| db.update_session(&s)) {
                 warn!(error = %e, %session_id, "failed to update session in DB");
             }
         }

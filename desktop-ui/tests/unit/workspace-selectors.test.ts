@@ -61,27 +61,42 @@ function makeSnapshot(overrides: Partial<WorkspaceSnapshot> = {}): WorkspaceSnap
     ],
     dictionary: [],
     stylePresets: [],
-    stats: { sessions: 0, words: 0, seconds: 0 },
+    stats: { sessions: 0, words: 0, seconds: 0, sessionsToday: 0, wordsToday: 0, secondsToday: 0 },
     ...overrides,
   };
   if (overrides.stats) return base;
+  // Stands in for the backend's SQL aggregation, including the today-scoped
+  // half — the store reads those totals rather than re-deriving them from the
+  // (capped) history slice.
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayStartMs = todayStart.getTime();
   let words = 0;
   let seconds = 0;
   let count = 0;
+  let wordsToday = 0;
+  let secondsToday = 0;
+  let sessionsToday = 0;
   for (const h of base.history) {
     if (!h.transcript) continue;
     const w = h.transcript.trim().split(/\s+/).filter(Boolean).length;
     if (w === 0) continue;
+    const dt = h.endedAt
+      ? Math.max(
+          1,
+          Math.round((new Date(h.endedAt).getTime() - new Date(h.startedAt).getTime()) / 1000),
+        )
+      : 0;
     count++;
     words += w;
-    if (h.endedAt) {
-      seconds += Math.max(
-        1,
-        Math.round((new Date(h.endedAt).getTime() - new Date(h.startedAt).getTime()) / 1000),
-      );
+    seconds += dt;
+    if (new Date(h.startedAt).getTime() >= todayStartMs) {
+      sessionsToday++;
+      wordsToday += w;
+      secondsToday += dt;
     }
   }
-  base.stats = { sessions: count, words, seconds };
+  base.stats = { sessions: count, words, seconds, sessionsToday, wordsToday, secondsToday };
   return base;
 }
 
@@ -98,7 +113,14 @@ describe("workspace selectors", () => {
       historyPageItems: [],
       historyTotal: 0,
       historyLoading: false,
-      sessionTotals: { sessions: 0, words: 0, seconds: 0 },
+      sessionTotals: {
+        sessions: 0,
+        words: 0,
+        seconds: 0,
+        sessionsToday: 0,
+        wordsToday: 0,
+        secondsToday: 0,
+      },
       stylePresets: [],
       settings: { ...DEFAULT_SETTINGS },
       runtime: { ...DEFAULT_RUNTIME },

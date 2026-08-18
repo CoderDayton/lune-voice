@@ -48,10 +48,16 @@
           "libgtk-3-0",
           "libayatana-appindicator3-1"
         ],
-        "section": "utils"
+        "section": "utils",
+        "files": {
+          "/usr/lib/udev/rules.d/99-lune-voice-uinput.rules": "../../assets/udev/99-lune-voice-uinput.rules"
+        }
       },
       "rpm": {
-        "depends": ["webkit2gtk4.1", "gtk3", "libappindicator-gtk3"]
+        "depends": ["webkit2gtk4.1", "gtk3", "libappindicator-gtk3"],
+        "files": {
+          "/usr/lib/udev/rules.d/99-lune-voice-uinput.rules": "../../assets/udev/99-lune-voice-uinput.rules"
+        }
       },
       "appimage": {
         "bundleMediaFramework": false

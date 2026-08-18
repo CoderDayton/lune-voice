@@ -107,6 +107,12 @@ export interface SessionTotals {
   sessions: number;
   words: number;
   seconds: number;
+  // Today's share of the same totals. Aggregated by the backend over every
+  // row: `historySessions` is a capped recent slice, so deriving these from it
+  // silently under-reports a day with more dictations than the cap.
+  sessionsToday: number;
+  wordsToday: number;
+  secondsToday: number;
 }
 
 export interface WorkspaceState {

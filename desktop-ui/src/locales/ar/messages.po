@@ -76,7 +76,7 @@ msgstr "## اجتماع — {date}\n"
 msgid "A block of text Lune Voice types for you when you speak its trigger phrase."
 msgstr "كتلة نصية يكتبها Lune Voice نيابةً عنك عندما تنطق عبارة التشغيل الخاصة بها."
 
-#: src/features/settings/sections/pill-section.tsx:212
+#: src/features/settings/sections/pill-section.tsx:215
 msgid "A vertical pill hugs the side of the screen."
 msgstr "مؤشر رأسي يلتصق بحافة الشاشة."
 
@@ -126,11 +126,11 @@ msgstr "نماذج الذكاء الاصطناعي المخزنة على جها�
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "جميع النماذج المطلوبة مثبتة بالفعل. استمر عندما تكون جاهزًا."
 
-#: src/features/overview/overview-page.tsx:147
+#: src/features/overview/overview-page.tsx:136
 msgid "all-time"
 msgstr "في كل الأوقات"
 
-#: src/features/overview/overview-page.tsx:179
+#: src/features/overview/overview-page.tsx:168
 msgid "all-time avg"
 msgstr "المتوسط الكلي"
 
@@ -151,7 +151,7 @@ msgstr "مظهر"
 msgid "Application behavior and startup preferences."
 msgstr "سلوك التطبيق وتفضيلات بدء التشغيل."
 
-#: src/features/overview/overview-page.tsx:203
+#: src/features/overview/overview-page.tsx:192
 msgid "Audio"
 msgstr "صوت"
 
@@ -159,19 +159,19 @@ msgstr "صوت"
 msgid "Audio activity"
 msgstr "النشاط الصوتي"
 
-#: src/features/settings/sections/output-section.tsx:72
+#: src/features/settings/sections/output-section.tsx:75
 msgid "Audio feedback played as dictation starts, finishes, or errors."
 msgstr "تعليقات صوتية تُشغَّل عند بدء الإملاء أو انتهائه أو حدوث خطأ."
 
-#: src/features/styles/components/style-editor-modal.tsx:55
+#: src/features/styles/components/style-editor-modal.tsx:59
 msgid "Auto-capitalize sentences"
 msgstr "بدء الجمل بحرف كبير تلقائيًا"
 
-#: src/features/settings/sections/pill-section.tsx:50
+#: src/features/settings/sections/pill-section.tsx:51
 msgid "Automatic"
 msgstr "تلقائي"
 
-#: src/features/styles/components/style-editor-modal.tsx:56
+#: src/features/styles/components/style-editor-modal.tsx:60
 msgid "Brand casing (\"github\" → \"GitHub\")"
 msgstr "حالة أحرف العلامات التجارية (\"github\" → \"GitHub\")"
 
@@ -191,7 +191,7 @@ msgstr "مدمج"
 #: src/components/feedback/confirm-dialog.tsx:52
 #: src/features/dictionary/components/dictionary-table.tsx:96
 #: src/features/settings/sections/models-section.tsx:311
-#: src/features/styles/components/style-editor-modal.tsx:184
+#: src/features/styles/components/style-editor-modal.tsx:206
 msgid "Cancel"
 msgstr "إلغاء"
 
@@ -250,7 +250,7 @@ msgstr "جارٍ التحقق…"
 msgid "Choose a theme"
 msgstr "اختر سمة"
 
-#: src/features/settings/sections/output-section.tsx:19
+#: src/features/settings/sections/output-section.tsx:20
 msgid "Choose how finished text is inserted into the app you are currently using."
 msgstr "اختر كيفية إدراج النص النهائي في التطبيق الذي تستخدمه حاليًا."
 
@@ -267,7 +267,7 @@ msgstr "اختر طريقة إعادة صياغة النصوص المنسوخة 
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "اختر نماذج الذكاء الاصطناعي المراد تثبيتها. كل شيء يعمل دون الاتصال بالإنترنت - لا توجد سحابة ولا حسابات."
 
-#: src/features/settings/sections/transcription-section.tsx:41
+#: src/features/settings/sections/transcription-section.tsx:42
 msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
 msgstr "اختر المحرك الذي يحوّل كلامك إلى نص. تعمل المحركات المحلية بالكامل على جهازك؛ وWhisper متعدد اللغات مع أحجام نماذج قابلة للاختيار."
 
@@ -283,13 +283,13 @@ msgstr "مسح الفلتر"
 msgid "Clear search"
 msgstr "مسح البحث"
 
-#: src/features/styles/components/style-editor-modal.tsx:201
+#: src/features/styles/components/style-editor-modal.tsx:223
 msgid "close"
 msgstr "إغلاق"
 
 #: src/features/history/components/session-detail-modal.tsx:210
 #: src/features/settings/sections/models-section.tsx:323
-#: src/features/styles/components/style-editor-modal.tsx:175
+#: src/features/styles/components/style-editor-modal.tsx:197
 msgid "Close"
 msgstr "إغلاق"
 
@@ -305,7 +305,7 @@ msgstr "طي الشريط الجانبي"
 msgid "Completed"
 msgstr "مكتمل"
 
-#: src/features/overview/overview-page.tsx:128
+#: src/features/overview/overview-page.tsx:117
 #: src/features/shell/components/app-shell.tsx:156
 #: src/features/shell/components/sidebar-widgets.tsx:45
 #: src/features/shell/components/sidebar.tsx:165
@@ -321,7 +321,7 @@ msgstr "الاتصال بخادم الإصدارات بُعيد بدء التش�
 msgid "Continue"
 msgstr "متابعة"
 
-#: src/features/settings/sections/transcription-section.tsx:36
+#: src/features/settings/sections/transcription-section.tsx:37
 msgid "Control how your speech is turned into text."
 msgstr "تحكم في كيفية تحويل كلامك إلى نص."
 
@@ -333,8 +333,8 @@ msgstr "تم النسخ"
 msgid "Copy"
 msgstr "نسخ"
 
-#: src/features/settings/sections/output-section.tsx:53
-#: src/features/settings/sections/output-section.tsx:63
+#: src/features/settings/sections/output-section.tsx:54
+#: src/features/settings/sections/output-section.tsx:64
 msgid "Copy to clipboard"
 msgstr "نسخ إلى الحافظة"
 
@@ -342,20 +342,20 @@ msgstr "نسخ إلى الحافظة"
 msgid "Copy transcript"
 msgstr "نسخ النص"
 
-#: src/features/settings/sections/pill-section.tsx:229
+#: src/features/settings/sections/pill-section.tsx:232
 msgid "Corner rounding of the pill bar."
 msgstr "استدارة زوايا شريط المؤشر."
 
-#: src/features/settings/sections/pill-section.tsx:228
+#: src/features/settings/sections/pill-section.tsx:231
 msgid "Corners"
 msgstr "الزوايا"
 
-#: src/features/settings/sections/transcription-section.tsx:94
+#: src/features/settings/sections/transcription-section.tsx:95
 msgid "Correction"
 msgstr "التصحيح"
 
-#: src/features/settings/sections/transcription-section.tsx:99
-#: src/features/settings/sections/transcription-section.tsx:111
+#: src/features/settings/sections/transcription-section.tsx:100
+#: src/features/settings/sections/transcription-section.tsx:115
 msgid "Correction sensitivity"
 msgstr "حساسية التصحيح"
 
@@ -376,12 +376,12 @@ msgstr "إنشاء مقتطف"
 msgid "Create new style"
 msgstr "إنشاء نمط جديد"
 
-#: src/features/styles/components/style-editor-modal.tsx:68
+#: src/features/styles/components/style-editor-modal.tsx:81
 msgid "Create style"
 msgstr "إنشاء النمط"
 
-#: src/features/settings/sections/output-section.tsx:92
-#: src/features/settings/sections/output-section.tsx:104
+#: src/features/settings/sections/output-section.tsx:95
+#: src/features/settings/sections/output-section.tsx:107
 msgid "Cue volume"
 msgstr "مستوى صوت التنبيه"
 
@@ -430,15 +430,19 @@ msgstr "هل تريد حذف تصحيح هذه الكلمة؟"
 msgid "Delete?"
 msgstr "حذف؟"
 
-#: src/features/styles/components/style-editor-modal.tsx:109
+#: src/features/styles/components/style-editor-modal.tsx:131
 msgid "Describe how text should be formatted. E.g., \"Use bullet points. Keep sentences short. Avoid jargon.\""
 msgstr "وصف كيفية تنسيق النص. على سبيل المثال، \"استخدم النقاط النقطية. اجعل الجمل قصيرة. تجنب المصطلحات.\""
 
-#: src/features/styles/components/style-editor-modal.tsx:84
+#: src/features/styles/components/style-editor-modal.tsx:99
 msgid "Description"
 msgstr "وصف"
 
-#: src/features/styles/components/style-editor-modal.tsx:118
+#: src/features/styles/components/style-editor-modal.tsx:109
+msgid "Description is too long."
+msgstr "الوصف طويل جدًا."
+
+#: src/features/styles/components/style-editor-modal.tsx:140
 msgid "Deterministic fixes applied before any AI styling."
 msgstr "تم تطبيق الإصلاحات الحتمية قبل أي تصميم للذكاء الاصطناعي."
 
@@ -446,16 +450,16 @@ msgstr "تم تطبيق الإصلاحات الحتمية قبل أي تصميم
 msgid "Dictation"
 msgstr "الإملاء"
 
-#: src/features/settings/sections/transcription-section.tsx:57
-#: src/features/settings/sections/transcription-section.tsx:63
+#: src/features/settings/sections/transcription-section.tsx:58
+#: src/features/settings/sections/transcription-section.tsx:64
 msgid "Dictation language"
 msgstr "لغة الإملاء"
 
-#: src/features/settings/sections/pill-section.tsx:68
+#: src/features/settings/sections/pill-section.tsx:69
 msgid "Dictation pill"
 msgstr "مؤشر الإملاء"
 
-#: src/features/settings/sections/pill-section.tsx:79
+#: src/features/settings/sections/pill-section.tsx:80
 msgid "Dictation pill visibility"
 msgstr "ظهور مؤشر الإملاء"
 
@@ -471,7 +475,7 @@ msgstr "تجاهل الإملاء"
 msgid "Discard the current draft and return to idle. Click the binding to change it."
 msgstr "تجاهل المسودة الحالية والعودة إلى وضع الخمول. انقر فوق الرابط لتغييره."
 
-#: src/features/overview/overview-page.tsx:128
+#: src/features/overview/overview-page.tsx:117
 msgid "Disconnected"
 msgstr "غير متصل"
 
@@ -535,7 +539,7 @@ msgstr "تنزيل النماذج"
 msgid "Downloading…"
 msgstr "جارٍ التنزيل…"
 
-#: src/features/styles/components/style-editor-modal.tsx:178
+#: src/features/styles/components/style-editor-modal.tsx:200
 msgid "Duplicate"
 msgstr "تكرار"
 
@@ -543,15 +547,15 @@ msgstr "تكرار"
 msgid "Duration"
 msgstr "مدة"
 
-#: src/features/styles/components/style-editor-modal.tsx:77
+#: src/features/styles/components/style-editor-modal.tsx:89
 msgid "e.g. Meeting notes"
 msgstr "على سبيل المثال ملاحظات الاجتماع"
 
-#: src/features/settings/sections/pill-section.tsx:123
+#: src/features/settings/sections/pill-section.tsx:124
 msgid "Edge distance"
 msgstr "المسافة عن الحافة"
 
-#: src/features/settings/sections/pill-section.tsx:139
+#: src/features/settings/sections/pill-section.tsx:142
 msgid "Edge distance in pixels"
 msgstr "المسافة عن الحافة بالبكسل"
 
@@ -571,12 +575,12 @@ msgstr "تحرير {0}"
 msgid "Edit snippet"
 msgstr "تعديل المقتطف"
 
-#: src/features/styles/components/style-editor-modal.tsx:68
+#: src/features/styles/components/style-editor-modal.tsx:81
 msgid "Edit style"
 msgstr "تحرير النمط"
 
 #: src/features/history/components/history-table.tsx:333
-#: src/features/overview/overview-page.tsx:264
+#: src/features/overview/overview-page.tsx:253
 msgid "Empty session"
 msgstr "جلسة فارغة"
 
@@ -594,11 +598,11 @@ msgstr "محرك"
 msgid "Enter Lune Voice"
 msgstr "الدخول إلى Lune Voice"
 
-#: src/features/styles/components/style-editor-modal.tsx:164
+#: src/features/styles/components/style-editor-modal.tsx:186
 msgid "Examples are out of date since you edited the prompt."
 msgstr "الأمثلة قديمة منذ أن عدّلت المُوجّه."
 
-#: src/features/styles/components/style-editor-modal.tsx:141
+#: src/features/styles/components/style-editor-modal.tsx:163
 msgid "Examples teach the styling engine your style. Regenerate them after editing the prompt."
 msgstr "تُعلّم الأمثلة محرك التنسيق أسلوبك. أعد توليدها بعد تعديل المُوجّه."
 
@@ -606,7 +610,7 @@ msgstr "تُعلّم الأمثلة محرك التنسيق أسلوبك. أعد
 msgid "Expand sidebar"
 msgstr "قم بتوسيع الشريط الجانبي"
 
-#: src/features/styles/components/style-editor-modal.tsx:138
+#: src/features/styles/components/style-editor-modal.tsx:160
 msgid "Few-shot examples"
 msgstr "أمثلة إرشادية"
 
@@ -622,11 +626,11 @@ msgstr "قواعد التصفية"
 msgid "Filter rules…"
 msgstr "قواعد التصفية..."
 
-#: src/features/settings/sections/transcription-section.tsx:95
+#: src/features/settings/sections/transcription-section.tsx:96
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "صحّح أخطاء التعرّف باستخدام قاموسك والمفردات المعروفة، على جهازك. يعتمد على درجة الثقة لكل كلمة وأنماط إحصائية — بلا نموذج ذكاء اصطناعي، ولا يعيد صياغة ما قلته أبدًا."
 
-#: src/features/settings/sections/pill-section.tsx:174
+#: src/features/settings/sections/pill-section.tsx:177
 msgid "Forget where you dragged the pill and return it to its preset spot."
 msgstr "نسيان الموضع الذي سحبت إليه المؤشر وإعادته إلى موضعه المحدّد مسبقًا."
 
@@ -634,12 +638,12 @@ msgstr "نسيان الموضع الذي سحبت إليه المؤشر وإعا
 msgid "formatting"
 msgstr "التنسيق"
 
-#: src/features/styles/components/style-editor-modal.tsx:116
+#: src/features/styles/components/style-editor-modal.tsx:138
 #: src/features/styles/components/style-hero.tsx:54
 msgid "Formatting"
 msgstr "التنسيق"
 
-#: src/features/settings/sections/pill-section.tsx:124
+#: src/features/settings/sections/pill-section.tsx:125
 msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock."
 msgstr "الفجوة بين المؤشر وحافة الشاشة، حتى لا يحجب شريط المهام أو شريط التطبيقات."
 
@@ -648,8 +652,8 @@ msgstr "الفجوة بين المؤشر وحافة الشاشة، حتى لا �
 msgid "General"
 msgstr "عام"
 
-#: src/features/styles/components/style-editor-modal.tsx:159
-#: src/features/styles/components/style-editor-modal.tsx:193
+#: src/features/styles/components/style-editor-modal.tsx:181
+#: src/features/styles/components/style-editor-modal.tsx:215
 msgid "Generating examples…"
 msgstr "توليد الأمثلة..."
 
@@ -661,15 +665,15 @@ msgstr "github"
 msgid "GitHub"
 msgstr "GitHub"
 
-#: src/features/overview/overview-page.tsx:85
+#: src/features/overview/overview-page.tsx:74
 msgid "Good afternoon"
 msgstr "مساء الخير"
 
-#: src/features/overview/overview-page.tsx:85
+#: src/features/overview/overview-page.tsx:74
 msgid "Good evening"
 msgstr "مساء الخير"
 
-#: src/features/overview/overview-page.tsx:85
+#: src/features/overview/overview-page.tsx:74
 msgid "Good morning"
 msgstr "صباح الخير"
 
@@ -695,7 +699,7 @@ msgstr "دعم وحدة معالجة الرسوميات مثبَّت لكنه ل
 msgid "History retention"
 msgstr "الاحتفاظ بالسجل"
 
-#: src/features/overview/overview-page.tsx:123
+#: src/features/overview/overview-page.tsx:112
 msgid "hold the hotkey and speak, your words land where your cursor is."
 msgstr "اضغط مع الاستمرار على مفتاح التشغيل السريع وتحدث، وستهبط كلماتك حيث يوجد المؤشر."
 
@@ -703,15 +707,15 @@ msgstr "اضغط مع الاستمرار على مفتاح التشغيل الس
 msgid "How long finished dictations are kept on this device."
 msgstr "المدة التي تُحفظ فيها عمليات الإملاء المكتملة على هذا الجهاز."
 
-#: src/features/settings/sections/output-section.tsx:93
+#: src/features/settings/sections/output-section.tsx:96
 msgid "How loud the dictation sounds play."
 msgstr "مدى ارتفاع صوت تنبيهات الإملاء."
 
-#: src/features/settings/sections/pill-section.tsx:193
+#: src/features/settings/sections/pill-section.tsx:196
 msgid "How the pill bar looks. Changes apply immediately."
 msgstr "شكل شريط المؤشر. تُطبَّق التغييرات فورًا."
 
-#: src/features/overview/overview-page.tsx:214
+#: src/features/overview/overview-page.tsx:203
 msgid "Idle"
 msgstr "خامل"
 
@@ -733,11 +737,11 @@ msgstr "إدراج عنصر نائب"
 msgid "Installed"
 msgstr "تم التثبيت"
 
-#: src/features/styles/components/style-editor-modal.tsx:97
+#: src/features/styles/components/style-editor-modal.tsx:114
 msgid "Instructions"
 msgstr "تعليمات"
 
-#: src/features/settings/sections/output-section.tsx:54
+#: src/features/settings/sections/output-section.tsx:55
 msgid "Keep the dictated text on the clipboard after every dictation, so you can paste it again yourself."
 msgstr "الاحتفاظ بالنص المُملى في الحافظة بعد كل عملية إملاء، حتى تتمكن من لصقه بنفسك مرة أخرى."
 
@@ -745,11 +749,15 @@ msgstr "الاحتفاظ بالنص المُملى في الحافظة بعد ك
 msgid "Keep the mic open in the background so dictation starts ~70ms sooner. The OS may show a recording indicator while Lune Voice is running."
 msgstr "أبقِ الميكروفون مفتوحًا في الخلفية حتى يبدأ الإملاء بسرعة تصل إلى 70 مللي ثانية تقريبًا. قد يعرض نظام التشغيل مؤشر تسجيل أثناء تشغيل Lune Voice."
 
-#: src/features/settings/sections/pill-section.tsx:88
+#: src/features/settings/sections/pill-section.tsx:89
 msgid "Keep the pill with you when you switch workspaces or virtual desktops."
 msgstr "إبقاء المؤشر معك عند تبديل مساحات العمل أو أسطح المكتب الافتراضية."
 
-#: src/features/styles/components/style-editor-modal.tsx:53
+#: src/features/settings/components/uinput-rule-row.tsx:59
+msgid "Keyboard access"
+msgstr "وصول لوحة المفاتيح"
+
+#: src/features/styles/components/style-editor-modal.tsx:57
 msgid "Keyboard shortcuts (\"Super H\" → \"Super+H\")"
 msgstr "اختصارات لوحة المفاتيح (\"Super H\" → \"Super+H\")"
 
@@ -784,7 +792,7 @@ msgstr "جارٍ الإنصات — انطق العبارة، ثم انقر مر
 msgid "Listening — say the phrase…"
 msgstr "جارٍ الإنصات — انطق العبارة…"
 
-#: src/features/overview/overview-page.tsx:214
+#: src/features/overview/overview-page.tsx:203
 #: src/features/shell/components/sidebar-widgets.tsx:52
 msgid "Listening…"
 msgstr "جاري الاستماع…"
@@ -793,8 +801,8 @@ msgstr "جاري الاستماع…"
 msgid "Local"
 msgstr "محلي"
 
-#: src/features/settings/sections/pill-section.tsx:160
-#: src/features/settings/sections/pill-section.tsx:168
+#: src/features/settings/sections/pill-section.tsx:163
+#: src/features/settings/sections/pill-section.tsx:171
 msgid "Lock position"
 msgstr "تثبيت الموضع"
 
@@ -805,6 +813,10 @@ msgstr "Lune"
 #: src/features/shell/components/sidebar.tsx:212
 msgid "Lune Voice"
 msgstr "Lune Voice"
+
+#: src/features/settings/components/uinput-rule-row.tsx:60
+msgid "Lune Voice added a system rule so it can type into other apps. It also lets any other program you run send keystrokes. Removing it stops typed delivery from working until you allow it again."
+msgstr "أضاف Lune Voice قاعدة نظام لتتمكن من الكتابة في التطبيقات الأخرى. كما تسمح لأي برنامج آخر تشغّله بإرسال ضغطات المفاتيح. إزالتها توقف الإدخال بالكتابة حتى تسمح بها مرة أخرى."
 
 #: src/features/dictionary/components/dictionary-form.tsx:92
 msgid "Lune Voice writes"
@@ -824,15 +836,15 @@ msgstr "ترويسة اجتماع"
 msgid "Microphone"
 msgstr "الميكروفون"
 
-#: src/features/overview/overview-page.tsx:206
+#: src/features/overview/overview-page.tsx:195
 msgid "Microphone input level"
 msgstr "مستوى إدخال الميكروفون"
 
-#: src/features/overview/overview-page.tsx:164
+#: src/features/overview/overview-page.tsx:153
 msgid "minute"
 msgstr "دقيقة"
 
-#: src/features/overview/overview-page.tsx:164
+#: src/features/overview/overview-page.tsx:153
 msgid "minutes"
 msgstr "دقائق"
 
@@ -849,7 +861,7 @@ msgstr "نماذج"
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "تُخزن النماذج محليًا. لا قياسات عن بُعد ولا حسابات."
 
-#: src/features/settings/sections/pill-section.tsx:146
+#: src/features/settings/sections/pill-section.tsx:149
 msgid "Monitor"
 msgstr "الشاشة"
 
@@ -861,9 +873,13 @@ msgstr "معظم حجم التنزيل هو مكتبات CUDA الرياضية �
 msgid "Multilingual · pick a size"
 msgstr "متعدد اللغات · اختر حجمًا"
 
-#: src/features/styles/components/style-editor-modal.tsx:72
+#: src/features/styles/components/style-editor-modal.tsx:85
 msgid "Name"
 msgstr "اسم"
+
+#: src/features/styles/components/style-editor-modal.tsx:95
+msgid "Name is too long."
+msgstr "الاسم طويل جدًا."
 
 #: src/features/history/components/history-table.tsx:189
 msgid "Next"
@@ -890,7 +906,7 @@ msgstr "لم يتم العثور على جلسات."
 msgid "No sessions match \"{0}\"."
 msgstr "لا توجد جلسات تطابق \"{0}\"."
 
-#: src/features/overview/overview-page.tsx:238
+#: src/features/overview/overview-page.tsx:227
 msgid "No sessions yet"
 msgstr "لا توجد جلسات بعد"
 
@@ -916,7 +932,7 @@ msgstr "بلا"
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
 msgstr "يضبط مستوى الميكروفون قبل اكتشاف الصوت. يساعد مع الميكروفونات الهادئة والغرف الصاخبة. موصى به."
 
-#: src/features/settings/sections/pill-section.tsx:61
+#: src/features/settings/sections/pill-section.tsx:62
 msgid "not connected"
 msgstr "غير متصل"
 
@@ -932,7 +948,7 @@ msgstr "لا شيء مثبَّت"
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 msgstr "يُسلّم وضع الإيقاف النصوص الخام. يُختار الأسلوب المطبَّق من علامة تبويب الأنماط."
 
-#: src/features/overview/overview-page.tsx:214
+#: src/features/overview/overview-page.tsx:203
 #: src/features/shell/components/app-shell.tsx:163
 #: src/features/shell/components/sidebar.tsx:168
 msgid "Offline"
@@ -942,7 +958,7 @@ msgstr "غير متصل"
 msgid "Offline dictation"
 msgstr "الإملاء دون اتصال"
 
-#: src/features/styles/components/style-editor-modal.tsx:89
+#: src/features/styles/components/style-editor-modal.tsx:103
 msgid "One-line summary shown on the card"
 msgstr "ملخص من سطر واحد يظهر على البطاقة"
 
@@ -950,7 +966,7 @@ msgstr "ملخص من سطر واحد يظهر على البطاقة"
 msgid "Open menu"
 msgstr "فتح القائمة"
 
-#: src/features/overview/overview-page.tsx:259
+#: src/features/overview/overview-page.tsx:248
 msgid "Open session from {time}"
 msgstr "فتح جلسة {time}"
 
@@ -958,16 +974,16 @@ msgstr "فتح جلسة {time}"
 msgid "Optional"
 msgstr "خياري"
 
-#: src/features/settings/sections/pill-section.tsx:211
+#: src/features/settings/sections/pill-section.tsx:214
 msgid "Orientation"
 msgstr "الاتجاه"
 
-#: src/features/overview/overview-page.tsx:132
+#: src/features/overview/overview-page.tsx:121
 #: src/features/settings/settings-page.tsx:75
 msgid "Output"
 msgstr "الإخراج"
 
-#: src/features/settings/sections/pill-section.tsx:198
+#: src/features/settings/sections/pill-section.tsx:201
 msgid "Overall footprint of the pill bar."
 msgstr "الحجم الإجمالي لشريط المؤشر."
 
@@ -979,12 +995,12 @@ msgstr "التقدم الشامل"
 msgid "Pagination"
 msgstr "ترقيم الصفحات"
 
-#: src/features/settings/sections/output-section.tsx:38
-#: src/features/settings/sections/output-section.tsx:44
+#: src/features/settings/sections/output-section.tsx:39
+#: src/features/settings/sections/output-section.tsx:45
 msgid "Paste compatibility"
 msgstr "توافق اللصق"
 
-#: src/features/settings/sections/output-section.tsx:24
+#: src/features/settings/sections/output-section.tsx:25
 msgid "Paste is simplest. Typing keystrokes can work better in some apps."
 msgstr "اللصق هو أبسط. يمكن أن تعمل ضغطات المفاتيح بشكل أفضل في بعض التطبيقات."
 
@@ -997,31 +1013,31 @@ msgstr "عبارة"
 msgid "Pill"
 msgstr "المؤشر"
 
-#: src/features/settings/sections/pill-section.tsx:234
+#: src/features/settings/sections/pill-section.tsx:237
 msgid "Pill corners"
 msgstr "زوايا المؤشر"
 
-#: src/features/settings/sections/pill-section.tsx:152
+#: src/features/settings/sections/pill-section.tsx:155
 msgid "Pill monitor"
 msgstr "شاشة المؤشر"
 
-#: src/features/settings/sections/pill-section.tsx:217
+#: src/features/settings/sections/pill-section.tsx:220
 msgid "Pill orientation"
 msgstr "اتجاه المؤشر"
 
-#: src/features/settings/sections/pill-section.tsx:115
+#: src/features/settings/sections/pill-section.tsx:116
 msgid "Pill position preset"
 msgstr "الموضع المحدّد مسبقًا للمؤشر"
 
-#: src/features/settings/sections/pill-section.tsx:203
+#: src/features/settings/sections/pill-section.tsx:206
 msgid "Pill size"
 msgstr "حجم المؤشر"
 
-#: src/features/settings/sections/pill-section.tsx:104
+#: src/features/settings/sections/pill-section.tsx:105
 msgid "Placement"
 msgstr "التموضع"
 
-#: src/features/settings/sections/output-section.tsx:77
+#: src/features/settings/sections/output-section.tsx:80
 msgid "Play a short sound when dictation starts, finishes, or runs into an error."
 msgstr "تشغيل صوت قصير عند بدء الإملاء أو انتهائه أو حدوث خطأ."
 
@@ -1029,7 +1045,7 @@ msgstr "تشغيل صوت قصير عند بدء الإملاء أو انتها�
 msgid "Please keep the app open until downloads finish"
 msgstr "يرجى إبقاء التطبيق مفتوحًا حتى تنتهي التنزيلات"
 
-#: src/features/settings/sections/pill-section.tsx:109
+#: src/features/settings/sections/pill-section.tsx:110
 msgid "Position"
 msgstr "الموضع"
 
@@ -1038,11 +1054,11 @@ msgstr "الموضع"
 msgid "Pre-warm microphone"
 msgstr "تهيئة الميكروفون مسبقًا"
 
-#: src/features/settings/sections/pill-section.tsx:110
+#: src/features/settings/sections/pill-section.tsx:111
 msgid "Preset corner or edge the pill starts at."
 msgstr "الزاوية أو الحافة المحدّدة مسبقًا التي يبدأ منها المؤشر."
 
-#: src/features/overview/overview-page.tsx:240
+#: src/features/overview/overview-page.tsx:229
 msgid "Press"
 msgstr "اضغط"
 
@@ -1050,7 +1066,7 @@ msgstr "اضغط"
 msgid "Prev"
 msgstr "السابق"
 
-#: src/features/settings/sections/pill-section.tsx:161
+#: src/features/settings/sections/pill-section.tsx:164
 msgid "Prevent moving the pill by dragging it."
 msgstr "منع تحريك المؤشر بسحبه."
 
@@ -1062,7 +1078,7 @@ msgstr "معاينة"
 msgid "Previous page"
 msgstr "الصفحة السابقة"
 
-#: src/features/settings/sections/pill-section.tsx:53
+#: src/features/settings/sections/pill-section.tsx:54
 msgid "primary"
 msgstr "الرئيسية"
 
@@ -1086,13 +1102,13 @@ msgstr "جارٍ المعالجة…"
 msgid "Quit Lune Voice"
 msgstr "إنهاء Lune Voice"
 
-#: src/features/overview/overview-page.tsx:128
+#: src/features/overview/overview-page.tsx:117
 #: src/features/shell/components/app-shell.tsx:162
 #: src/features/shell/components/sidebar.tsx:167
 msgid "Ready"
 msgstr "مستعد"
 
-#: src/features/overview/overview-page.tsx:222
+#: src/features/overview/overview-page.tsx:211
 msgid "Recent"
 msgstr "مؤخرًا"
 
@@ -1101,11 +1117,12 @@ msgstr "مؤخرًا"
 msgid "Recording mode"
 msgstr "وضع التسجيل"
 
-#: src/features/styles/components/style-editor-modal.tsx:159
+#: src/features/styles/components/style-editor-modal.tsx:181
 msgid "Refresh few-shot examples"
 msgstr "تحديث الأمثلة الإرشادية"
 
 #: src/components/feedback/confirm-dialog.tsx:33
+#: src/features/settings/components/uinput-rule-row.tsx:68
 msgid "Remove"
 msgstr "إزالة"
 
@@ -1114,6 +1131,10 @@ msgstr "إزالة"
 #: src/features/dictionary/components/dictionary-table.tsx:145
 msgid "Remove the saved correction for \"{0}\" → \"{1}\"."
 msgstr "قم بإزالة التصحيح المحفوظ لـ \"{0}\" → \"{1}\"."
+
+#: src/features/settings/components/uinput-rule-row.tsx:68
+msgid "Removing…"
+msgstr "جارٍ الإزالة…"
 
 #: src/features/dictionary/components/dictionary-table.tsx:72
 #: src/features/dictionary/components/dictionary-table.tsx:73
@@ -1127,11 +1148,11 @@ msgstr "استبدال"
 msgid "Required"
 msgstr "مطلوب"
 
-#: src/features/settings/sections/pill-section.tsx:185
+#: src/features/settings/sections/pill-section.tsx:188
 msgid "Reset"
 msgstr "إعادة تعيين"
 
-#: src/features/settings/sections/pill-section.tsx:173
+#: src/features/settings/sections/pill-section.tsx:176
 msgid "Reset position"
 msgstr "إعادة تعيين الموضع"
 
@@ -1156,12 +1177,12 @@ msgstr "يعمل على المعالج."
 msgid "Running on the CPU. No NVIDIA driver was found — install the driver for your GPU and Lune Voice will offer GPU support here."
 msgstr "يعمل على المعالج. لم يُعثر على أي تعريف من NVIDIA — ثبّت تعريف وحدة معالجة الرسوميات لديك وسيعرض Lune Voice دعمها هنا."
 
-#: src/features/overview/overview-page.tsx:272
+#: src/features/overview/overview-page.tsx:261
 msgid "s"
 msgstr "ق"
 
 #: src/features/dictionary/components/dictionary-table.tsx:105
-#: src/features/styles/components/style-editor-modal.tsx:193
+#: src/features/styles/components/style-editor-modal.tsx:215
 msgid "Save"
 msgstr "حفظ"
 
@@ -1198,13 +1219,13 @@ msgstr "بحث في النصوص..."
 msgid "Select required models"
 msgstr "حدد النماذج المطلوبة"
 
-#: src/features/settings/sections/output-section.tsx:23
-#: src/features/settings/sections/output-section.tsx:29
+#: src/features/settings/sections/output-section.tsx:24
+#: src/features/settings/sections/output-section.tsx:30
 msgid "Send method"
 msgstr "طريقة الإرسال"
 
-#: src/features/overview/overview-page.tsx:195
-#: src/features/overview/overview-page.tsx:224
+#: src/features/overview/overview-page.tsx:184
+#: src/features/overview/overview-page.tsx:213
 msgid "session"
 msgstr "جلسة"
 
@@ -1212,8 +1233,8 @@ msgstr "جلسة"
 msgid "Session details"
 msgstr "تفاصيل الجلسة"
 
-#: src/features/overview/overview-page.tsx:195
-#: src/features/overview/overview-page.tsx:224
+#: src/features/overview/overview-page.tsx:184
+#: src/features/overview/overview-page.tsx:213
 msgid "sessions"
 msgstr "جلسات"
 
@@ -1221,7 +1242,7 @@ msgstr "جلسات"
 msgid "Set hotkey"
 msgstr "تعيين مفتاح التشغيل السريع"
 
-#: src/features/settings/sections/transcription-section.tsx:58
+#: src/features/settings/sections/transcription-section.tsx:59
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "حدد اللغة التي تتحدثها. يستخدم الوضع التلقائي اكتشاف اللغة من الكلام."
 
@@ -1234,16 +1255,16 @@ msgstr "أقسام الإعدادات"
 msgid "Shortcuts"
 msgstr "الاختصارات"
 
-#: src/features/settings/sections/pill-section.tsx:87
-#: src/features/settings/sections/pill-section.tsx:97
+#: src/features/settings/sections/pill-section.tsx:88
+#: src/features/settings/sections/pill-section.tsx:98
 msgid "Show on all workspaces"
 msgstr "الإظهار في جميع مساحات العمل"
 
-#: src/features/settings/sections/pill-section.tsx:197
+#: src/features/settings/sections/pill-section.tsx:200
 msgid "Size"
 msgstr "الحجم"
 
-#: src/features/settings/sections/pill-section.tsx:192
+#: src/features/settings/sections/pill-section.tsx:195
 msgid "Size & shape"
 msgstr "الحجم والشكل"
 
@@ -1261,16 +1282,16 @@ msgstr "انتقل إلى المحتوى الرئيسي"
 msgid "Snippet text"
 msgstr "نص المقتطف"
 
-#: src/features/settings/sections/output-section.tsx:71
+#: src/features/settings/sections/output-section.tsx:74
 msgid "Sound"
 msgstr "الصوت"
 
-#: src/features/settings/sections/output-section.tsx:76
-#: src/features/settings/sections/output-section.tsx:86
+#: src/features/settings/sections/output-section.tsx:79
+#: src/features/settings/sections/output-section.tsx:89
 msgid "Sound cues"
 msgstr "التنبيهات الصوتية"
 
-#: src/features/overview/overview-page.tsx:156
+#: src/features/overview/overview-page.tsx:145
 msgid "Speaking Time"
 msgstr "وقت التحدث"
 
@@ -1362,11 +1383,11 @@ msgstr "قم بتعليم Lune Voice التهجئة الصحيحة للكلمة 
 msgid "Teach Lune Voice your words"
 msgstr "علّم Lune Voice كلماتك"
 
-#: src/features/settings/sections/output-section.tsx:18
+#: src/features/settings/sections/output-section.tsx:19
 msgid "Text delivery"
 msgstr "تسليم النص"
 
-#: src/features/settings/sections/pill-section.tsx:69
+#: src/features/settings/sections/pill-section.tsx:70
 msgid "The floating status pill you see while dictating."
 msgstr "مؤشر الحالة العائم الذي يظهر أثناء الإملاء."
 
@@ -1382,7 +1403,7 @@ msgstr "الميكروفون قيد الاستخدام"
 msgid "The snippet text appears here with placeholders filled in."
 msgstr "يظهر نص المقتطف هنا بعد ملء العناصر النائبة."
 
-#: src/features/settings/sections/transcription-section.tsx:100
+#: src/features/settings/sections/transcription-section.tsx:101
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
 msgstr "تُقارَن الكلمات التي يقل تأكّد أداة التعرّف منها بقاموسك ومفرداتك. القيمة الأعلى تفحص كلمات أكثر؛ والأقل تثق بالنسخ الخام."
 
@@ -1407,7 +1428,7 @@ msgstr "سيؤدي هذا إلى إزالة جلسة الإملاء هذه ون�
 msgid "Time"
 msgstr "وقت"
 
-#: src/features/styles/components/style-editor-modal.tsx:54
+#: src/features/styles/components/style-editor-modal.tsx:58
 msgid "Title abbreviations (\"Mister\" → \"Mr.\")"
 msgstr "اختصارات الألقاب (\"Mister\" → \"Mr.\")"
 
@@ -1415,16 +1436,16 @@ msgstr "اختصارات الألقاب (\"Mister\" → \"Mr.\")"
 msgid "Titles"
 msgstr "العناوين"
 
-#: src/features/overview/overview-page.tsx:241
+#: src/features/overview/overview-page.tsx:230
 msgid "to start dictating"
 msgstr "لبدء الإملاء"
 
-#: src/features/overview/overview-page.tsx:148
-#: src/features/overview/overview-page.tsx:180
+#: src/features/overview/overview-page.tsx:137
+#: src/features/overview/overview-page.tsx:169
 msgid "today"
 msgstr "اليوم"
 
-#: src/features/overview/overview-page.tsx:187
+#: src/features/overview/overview-page.tsx:176
 msgid "Today"
 msgstr "اليوم"
 
@@ -1440,7 +1461,7 @@ msgstr "التبديل أسهل للإملاء الطويل. الضغط المس
 msgid "Toggle theme"
 msgstr "تبديل السمة"
 
-#: src/features/overview/overview-page.tsx:140
+#: src/features/overview/overview-page.tsx:129
 msgid "Total Words"
 msgstr "إجمالي الكلمات"
 
@@ -1456,7 +1477,7 @@ msgstr "جارٍ النسخ…"
 msgid "Transcript"
 msgstr "نص"
 
-#: src/features/settings/sections/transcription-section.tsx:35
+#: src/features/settings/sections/transcription-section.tsx:36
 #: src/features/settings/settings-page.tsx:73
 msgid "Transcription"
 msgstr "النسخ"
@@ -1485,8 +1506,8 @@ msgstr "التحديثات"
 msgid "Use GPU acceleration"
 msgstr "استخدام تسريع GPU"
 
-#: src/features/settings/sections/transcription-section.tsx:74
-#: src/features/settings/sections/transcription-section.tsx:82
+#: src/features/settings/sections/transcription-section.tsx:75
+#: src/features/settings/sections/transcription-section.tsx:83
 msgid "Use hardware acceleration"
 msgstr "استخدام تسريع الأجهزة"
 
@@ -1500,19 +1521,19 @@ msgstr "استخدم النمط {0}"
 msgid "View"
 msgstr "منظر"
 
-#: src/features/overview/overview-page.tsx:229
+#: src/features/overview/overview-page.tsx:218
 msgid "View all"
 msgstr "عرض الكل"
 
-#: src/features/styles/components/style-editor-modal.tsx:68
+#: src/features/styles/components/style-editor-modal.tsx:81
 msgid "View style"
 msgstr "عرض النمط"
 
-#: src/features/settings/sections/pill-section.tsx:73
+#: src/features/settings/sections/pill-section.tsx:74
 msgid "Visibility"
 msgstr "الظهور"
 
-#: src/features/settings/sections/transcription-section.tsx:40
+#: src/features/settings/sections/transcription-section.tsx:41
 msgid "Voice model"
 msgstr "نموذج صوتي"
 
@@ -1526,15 +1547,15 @@ msgstr "مرحبًا بعودتك"
 msgid "Welcome to Lune Voice"
 msgstr "مرحبًا بك في Lune Voice"
 
-#: src/features/settings/sections/transcription-section.tsx:75
+#: src/features/settings/sections/transcription-section.tsx:76
 msgid "When available, this can make transcription finish faster."
 msgstr "عندما يكون ذلك متاحًا، يمكن أن يؤدي ذلك إلى إنهاء عملية النسخ بشكل أسرع."
 
-#: src/features/settings/sections/pill-section.tsx:74
+#: src/features/settings/sections/pill-section.tsx:75
 msgid "When the pill appears while you dictate."
 msgstr "متى يظهر المؤشر أثناء الإملاء."
 
-#: src/features/settings/sections/pill-section.tsx:105
+#: src/features/settings/sections/pill-section.tsx:106
 msgid "Where the pill sits on screen. Dragging it overrides the preset until you reset."
 msgstr "موضع المؤشر على الشاشة. سحبه يتجاوز الموضع المحدّد مسبقًا إلى أن تعيد التعيين."
 
@@ -1542,11 +1563,11 @@ msgstr "موضع المؤشر على الشاشة. سحبه يتجاوز الم�
 msgid "Which input device dictation captures from. Changes apply right away."
 msgstr "جهاز الإدخال الذي يلتقط منه الإملاء. تُطبَّق التغييرات على الفور."
 
-#: src/features/settings/sections/output-section.tsx:39
+#: src/features/settings/sections/output-section.tsx:40
 msgid "Which paste shortcut to send. Automatic detects terminals; override if paste lands in the wrong place."
 msgstr "اختصار اللصق المراد إرساله. «تلقائي» يكتشف الأجهزة الطرفية؛ تجاوزه إذا ظهر اللصق في المكان الخطأ."
 
-#: src/features/settings/sections/pill-section.tsx:147
+#: src/features/settings/sections/pill-section.tsx:150
 msgid "Which screen the pill appears on."
 msgstr "الشاشة التي يظهر عليها المؤشر."
 
@@ -1564,7 +1585,7 @@ msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy.
 msgstr "whisper.cpp يعمل على جهازك. اختر حجمًا للمفاضلة بين السرعة والدقة."
 
 #: src/features/history/components/history-table.tsx:359
-#: src/features/overview/overview-page.tsx:268
+#: src/features/overview/overview-page.tsx:257
 msgid "words"
 msgstr "كلمات"
 
@@ -1573,7 +1594,7 @@ msgstr "كلمات"
 msgid "Words"
 msgstr "كلمات"
 
-#: src/features/overview/overview-page.tsx:171
+#: src/features/overview/overview-page.tsx:160
 msgid "WPM"
 msgstr "WPM"
 
@@ -1605,7 +1626,7 @@ msgstr "وحدة معالجة الرسوميات لديك جاهزة — است�
 msgid "Your GPU qualifies. Keep this on, then finish the one-time setup in Settings."
 msgstr "وحدة معالجة الرسوميات لديك مؤهَّلة. أبقِ هذا مُفعَّلًا، ثم أكمل الإعداد لمرة واحدة في الإعدادات."
 
-#: src/features/overview/overview-page.tsx:240
+#: src/features/overview/overview-page.tsx:229
 msgid "your hotkey"
 msgstr "مفتاح التشغيل السريع الخاص بك"
 

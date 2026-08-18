@@ -67,18 +67,7 @@ export function OverviewPage() {
   const wpmCount = useCountUp(wpm);
   // Today's speaking pace vs the all-time average — a quick trending-up/down
   // read on the hero card, mirroring the all-time/today split on the left.
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayStartMs = todayStart.getTime();
-  let wordsToday = 0;
-  let secondsToday = 0;
-  for (const s of historySessions) {
-    if (new Date(s.startedAt).getTime() >= todayStartMs) {
-      wordsToday += s.words;
-      secondsToday += s.seconds;
-    }
-  }
-  const wpmToday = secondsToday > 0 ? Math.round(wordsToday / (secondsToday / 60)) : null;
+  const wpmToday = today.seconds > 0 ? Math.round(today.words / (today.seconds / 60)) : null;
   const wpmDelta = wpmToday !== null && wpm > 0 ? wpmToday - wpm : null;
 
   const hour = new Date().getHours();

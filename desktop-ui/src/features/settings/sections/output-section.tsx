@@ -3,6 +3,7 @@ import { Send, Volume2 } from 'lucide-react';
 import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown';
 import { saveWorkspaceSetting } from '../../../store/workspace-store';
 import { type SettingsProps, SettingsRow, SettingsSection } from '../components/section';
+import { UinputRuleRow } from '../components/uinput-rule-row';
 import { deliveryMethods, terminalModes } from '../data/settings-data';
 import { useDebouncedSetting } from '../hooks/use-debounced-setting';
 
@@ -64,6 +65,8 @@ export function OutputSection({ settings }: SettingsProps) {
             />
           }
         />
+        {/* Only renders when this app installed the rule itself. */}
+        <UinputRuleRow />
       </SettingsSection>
 
       {/* Feedback — the sounds that signal dictation state. */}

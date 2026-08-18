@@ -1,6 +1,7 @@
 import { useLingui } from '@lingui/react/macro';
 import { AudioLines, SpellCheck } from 'lucide-react';
 import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown';
+import { LIMITS } from '../../../lib/backend/generated/limits';
 import { saveWorkspaceSetting } from '../../../store/workspace-store';
 import { AsrEngineCards } from '../components/asr-engine-cards';
 import { OpenAiFields } from '../components/openai-fields';
@@ -103,8 +104,11 @@ export function TranscriptionSection({
                 <input
                   type="range"
                   className="range range-primary range-sm w-28 sm:w-36"
-                  min={0.1}
-                  max={0.95}
+                  // A deliberately narrower range than the backend accepts
+                  // (`LIMITS.confidenceMin`/`Max`): the extremes are valid but
+                  // useless — 0 corrects nothing, 1 second-guesses every word.
+                  min={Math.max(LIMITS.confidenceMin, 0.1)}
+                  max={Math.min(LIMITS.confidenceMax, 0.95)}
                   step={0.05}
                   value={confidence}
                   onChange={(e) => setConfidence(e.target.value)}

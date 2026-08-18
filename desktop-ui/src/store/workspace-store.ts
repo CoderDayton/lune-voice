@@ -39,7 +39,14 @@ export const workspaceStore = new Store<WorkspaceState>({
   historyPageItems: [],
   historyTotal: 0,
   historyLoading: false,
-  sessionTotals: { sessions: 0, words: 0, seconds: 0 },
+  sessionTotals: {
+    sessions: 0,
+    words: 0,
+    seconds: 0,
+    sessionsToday: 0,
+    wordsToday: 0,
+    secondsToday: 0,
+  },
   stylePresets: [],
   settings: { ...DEFAULT_SETTINGS },
   runtime: { ...DEFAULT_RUNTIME },
@@ -127,6 +134,9 @@ export const workspaceActions = {
         sessions: snapshot.stats.sessions,
         words: snapshot.stats.words,
         seconds: snapshot.stats.seconds,
+        sessionsToday: snapshot.stats.sessionsToday,
+        wordsToday: snapshot.stats.wordsToday,
+        secondsToday: snapshot.stats.secondsToday,
       },
       settings: mapWorkspaceSettings(snapshot),
       runtime: {
@@ -585,29 +595,26 @@ export function getSessionStats(state: WorkspaceState): SessionStats {
   return result;
 }
 
-// Memoized today-stats — recomputed only when historySessions reference or date changes.
 export interface TodayStats {
   count: number;
   words: number;
+  seconds: number;
 }
 
-let _todayCache: { sessions: HistorySession[]; date: string; result: TodayStats } | null = null;
+let _todayCache: { totals: WorkspaceState['sessionTotals']; result: TodayStats } | null = null;
 
+// Read straight from the backend totals. These used to be summed here over
+// `historySessions`, which is a capped recent slice — so a day with more
+// dictations than the cap reported only part of itself.
 export function getTodayStats(state: WorkspaceState): TodayStats {
-  const sessions = state.historySessions;
-  const today = new Date().toDateString();
-  if (_todayCache && _todayCache.sessions === sessions && _todayCache.date === today)
-    return _todayCache.result;
-  let count = 0;
-  let words = 0;
-  for (const s of sessions) {
-    if (new Date(s.startedAt).toDateString() === today) {
-      count++;
-      words += s.words;
-    }
-  }
-  const result = { count, words };
-  _todayCache = { sessions, date: today, result };
+  const totals = state.sessionTotals;
+  if (_todayCache && _todayCache.totals === totals) return _todayCache.result;
+  const result = {
+    count: totals.sessionsToday,
+    words: totals.wordsToday,
+    seconds: totals.secondsToday,
+  };
+  _todayCache = { totals, result };
   return result;
 }
 

@@ -2,6 +2,7 @@ mod commands;
 mod dto;
 #[cfg(target_os = "linux")]
 mod hotkey_linux;
+mod limits;
 #[cfg(test)]
 mod notification_tests;
 mod persistence;
@@ -599,6 +600,8 @@ pub fn run() {
             commands::delete_model_cmd,
             commands::initialize_pipeline,
             commands::gpu_backend_status,
+            commands::uinput_rule_installed,
+            commands::remove_uinput_rule,
             commands::install_gpu_backend,
             quit_app
         ])

@@ -34,6 +34,8 @@ lune-dict = { path = "../../crates/lune-dict" }
 lune-llm = { path = "../../crates/lune-llm" }
 lune-persist = { path = "../../crates/lune-persist" }
 uuid.workspace = true
+# Resolving the user's local midnight for the today-scoped session stats.
+chrono.workspace = true
 tokio = { workspace = true }
 tracing.workspace = true
 tracing-subscriber.workspace = true

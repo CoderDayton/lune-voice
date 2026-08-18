@@ -124,6 +124,14 @@ const tauriBackendClient: BackendClient = {
   gpuBackendStatus() {
     return invoke<GpuBackendStatusDto>('gpu_backend_status');
   },
+
+  uinputRuleInstalled() {
+    return invoke<boolean>('uinput_rule_installed');
+  },
+
+  removeUinputRule() {
+    return invoke<boolean>('remove_uinput_rule');
+  },
 };
 
 // Resolved at module load — safe because Tauri injects __TAURI_INTERNALS__ before scripts execute.

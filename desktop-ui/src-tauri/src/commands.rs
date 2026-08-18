@@ -644,6 +644,45 @@ pub fn gpu_backend_status(window: WebviewWindow) -> Result<GpuBackendStatusDto, 
     current_gpu_status()
 }
 
+/// Whether this app installed the `/dev/uinput` udev rule itself.
+///
+/// False on a .deb/.rpm install, where the rule ships with the package and the
+/// package manager removes it — offering to delete it there would break `dpkg`'s
+/// view of its own files.
+#[tauri::command]
+pub fn uinput_rule_installed(window: WebviewWindow) -> Result<bool, String> {
+    require_window_access(&window, &["main"])?;
+    #[cfg(unix)]
+    {
+        Ok(lune_voice::uinput_rule_is_self_installed())
+    }
+    #[cfg(not(unix))]
+    {
+        Ok(false)
+    }
+}
+
+/// Remove the udev rule this app installed.
+///
+/// The rule grants every process running as the logged-in user permanent write
+/// access to `/dev/uinput` — enough to synthesise keystrokes into any
+/// application — so it needs a way out that does not involve the user hunting
+/// through `/etc` themselves. Raises a polkit prompt, hence `spawn_blocking`.
+#[tauri::command]
+pub async fn remove_uinput_rule(window: WebviewWindow) -> Result<bool, String> {
+    require_window_access(&window, &["main"])?;
+    #[cfg(unix)]
+    {
+        tauri::async_runtime::spawn_blocking(lune_voice::remove_uinput_rule)
+            .await
+            .map_err(|e| format!("remove udev rule task: {e}"))?
+    }
+    #[cfg(not(unix))]
+    {
+        Ok(false)
+    }
+}
+
 /// The one place a [`GpuBackendStatusDto`] is built, so a status read and the
 /// value returned by an install can never disagree about the same machine.
 fn current_gpu_status() -> Result<GpuBackendStatusDto, String> {

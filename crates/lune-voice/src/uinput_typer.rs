@@ -104,7 +104,73 @@ pub enum FocusToken {
 const UDEV_RULE: &str =
     r#"KERNEL=="uinput", SUBSYSTEM=="misc", OPTIONS+="static_node=uinput", TAG+="uaccess""#;
 
+/// Where the runtime installs the rule when nothing else has.
+///
+/// `/etc/udev/rules.d` is the local-administrator directory, which is what a
+/// self-installing rule belongs in — and, unlike the vendor directory, it is
+/// ours to remove again ([`remove_uinput_rule`]).
+///
+/// The .deb and .rpm ship the same rule to `/usr/lib/udev/rules.d` instead, so
+/// a packaged install never reaches this path and the package manager owns the
+/// file's whole life. Only AppImage and `cargo run` fall back to installing it
+/// here at runtime.
 const UDEV_RULE_PATH: &str = "/etc/udev/rules.d/99-lune-voice-uinput.rules";
+
+/// Whether the runtime-installed rule is present.
+///
+/// Only the copy this app wrote counts. A rule shipped by the package manager
+/// is not ours to report on or remove — `dpkg`/`rpm` owns it, and deleting it
+/// from under them would leave the package believing it is still installed.
+pub fn uinput_rule_is_self_installed() -> bool {
+    std::path::Path::new(UDEV_RULE_PATH).is_file()
+}
+
+/// Remove the rule this app installed, restoring the system to how it was.
+///
+/// Worth offering because the rule is not a private setting: `TAG+="uaccess"`
+/// grants **every** process running as the logged-in user permanent read/write
+/// on `/dev/uinput`, which is a keystroke-injection primitive into any
+/// application. Leaving that behind after someone stops using the app — or
+/// uninstalls it — is not a decision to make silently on their behalf.
+///
+/// Blocking: raises a polkit prompt. Returns `Ok(false)` when there was nothing
+/// to remove.
+pub fn remove_uinput_rule() -> Result<bool, String> {
+    if !uinput_rule_is_self_installed() {
+        return Ok(false);
+    }
+
+    let status = Command::new("pkexec")
+        .args(["rm", "-f", UDEV_RULE_PATH])
+        .status()
+        .map_err(|e| format!("pkexec spawn failed: {e}"))?;
+    if !status.success() {
+        return Err("pkexec authentication cancelled or failed".into());
+    }
+
+    reload_udev_rules();
+
+    if uinput_rule_is_self_installed() {
+        return Err("the udev rule is still present after removal".into());
+    }
+    info!("removed the uinput udev rule");
+    Ok(true)
+}
+
+/// Ask udevd to re-read its rules and re-apply them to existing devices.
+///
+/// Best-effort on purpose: both halves failing means the change lands on the
+/// next boot rather than now, which is worth a warning and nothing more.
+fn reload_udev_rules() {
+    let reload = Command::new("pkexec")
+        .args(["udevadm", "control", "--reload-rules"])
+        .status();
+    let trigger = Command::new("pkexec").args(["udevadm", "trigger"]).status();
+    if reload.map(|s| !s.success()).unwrap_or(true) || trigger.map(|s| !s.success()).unwrap_or(true)
+    {
+        warn!("udevadm reload/trigger may have failed — the change may require a reboot");
+    }
+}
 
 fn ensure_kernel_access() -> Result<(), String> {
     if OpenOptions::new().write(true).open("/dev/uinput").is_ok() {
@@ -120,8 +186,9 @@ fn ensure_kernel_access() -> Result<(), String> {
         .stdout(std::process::Stdio::null())
         .spawn()
         .map_err(|e| format!("pkexec spawn failed: {e}"))?;
+    let mut wrote = false;
     if let Some(ref mut stdin) = child.stdin {
-        let _ = stdin.write_all(UDEV_RULE.as_bytes());
+        wrote = stdin.write_all(UDEV_RULE.as_bytes()).is_ok();
     }
     let status = child
         .wait()
@@ -129,15 +196,16 @@ fn ensure_kernel_access() -> Result<(), String> {
     if !status.success() {
         return Err("pkexec authentication cancelled or failed".into());
     }
-
-    let reload = Command::new("pkexec")
-        .args(["udevadm", "control", "--reload-rules"])
-        .status();
-    let trigger = Command::new("pkexec").args(["udevadm", "trigger"]).status();
-    if reload.map(|s| !s.success()).unwrap_or(true) || trigger.map(|s| !s.success()).unwrap_or(true)
-    {
-        warn!("udevadm reload/trigger may have failed — rule may require reboot");
+    // `tee` exits 0 having written an empty file if the pipe broke, which would
+    // otherwise leave a silently useless root-owned rule in /etc.
+    if !wrote {
+        let _ = Command::new("pkexec")
+            .args(["rm", "-f", UDEV_RULE_PATH])
+            .status();
+        return Err("could not write the udev rule".into());
     }
+
+    reload_udev_rules();
 
     // Give udevd 500ms to apply the new ACL.
     std::thread::sleep(Duration::from_millis(500));

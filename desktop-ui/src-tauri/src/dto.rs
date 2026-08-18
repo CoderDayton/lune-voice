@@ -265,6 +265,12 @@ pub struct SessionStatsDto {
     pub sessions: u32,
     pub words: u32,
     pub seconds: u32,
+    /// The same totals for sessions started today, aggregated in SQL over every
+    /// row rather than over the capped `history` slice — which stops being the
+    /// whole day as soon as the day runs past the cap.
+    pub sessions_today: u32,
+    pub words_today: u32,
+    pub seconds_today: u32,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]

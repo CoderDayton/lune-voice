@@ -90,6 +90,15 @@ pub struct SessionStats {
     pub sessions: u32,
     pub words: u32,
     pub seconds: u32,
+    /// Same three totals, restricted to sessions at or after the `today_start`
+    /// given to [`Database::session_stats`].
+    ///
+    /// Aggregated here rather than by walking a slice of recent sessions on the
+    /// client: that slice is capped, so a busy day silently under-reports once
+    /// it runs past the cap.
+    pub sessions_today: u32,
+    pub words_today: u32,
+    pub seconds_today: u32,
 }
 
 type SessionRow7 = (
@@ -805,8 +814,14 @@ impl Database {
     /// pulling megabytes of text through the query layer for three integers.
     /// `word_count` is maintained on insert/update, so no transcript text
     /// crosses the query boundary here.
-    pub fn session_stats(&mut self) -> PersistResult<SessionStats> {
-        use diesel::sql_types::BigInt;
+    /// Aggregate session totals, all-time and since `today_start`.
+    ///
+    /// `today_start` is an RFC3339 timestamp — the caller's local midnight,
+    /// converted to UTC. Compared as a string, which is sound because every
+    /// `started_at` is written by `Utc::now().to_rfc3339()` and so shares one
+    /// offset; the same assumption `prune_sessions` runs on.
+    pub fn session_stats(&mut self, today_start: &str) -> PersistResult<SessionStats> {
+        use diesel::sql_types::{BigInt, Text};
 
         #[derive(diesel::QueryableByName)]
         struct Row {
@@ -816,7 +831,20 @@ impl Database {
             words: i64,
             #[diesel(sql_type = BigInt)]
             secs: i64,
+            #[diesel(sql_type = BigInt)]
+            sessions_today: i64,
+            #[diesel(sql_type = BigInt)]
+            words_today: i64,
+            #[diesel(sql_type = BigInt)]
+            secs_today: i64,
         }
+
+        // Duration of one row, in whole seconds. Repeated verbatim in the
+        // today-scoped sum below, so keep the two in step.
+        const SECS: &str = "CASE \
+                 WHEN ended_at IS NULL OR julianday(ended_at) IS NULL THEN 0 \
+                 ELSE CAST(MAX(1, (julianday(ended_at) - julianday(started_at)) * 86400) AS INTEGER) \
+             END";
 
         // COUNTABLE_WHERE already excludes malformed `started_at` and
         // whitespace-only transcripts, so this walks the exact same rows as
@@ -827,14 +855,15 @@ impl Database {
             "SELECT \
                  COUNT(*) AS sessions, \
                  COALESCE(SUM(word_count), 0) AS words, \
-                 COALESCE(SUM( \
-                     CASE \
-                         WHEN ended_at IS NULL OR julianday(ended_at) IS NULL THEN 0 \
-                         ELSE CAST(MAX(1, (julianday(ended_at) - julianday(started_at)) * 86400) AS INTEGER) \
-                     END \
-                 ), 0) AS secs \
+                 COALESCE(SUM({SECS}), 0) AS secs, \
+                 COALESCE(SUM(CASE WHEN started_at >= ? THEN 1 ELSE 0 END), 0) AS sessions_today, \
+                 COALESCE(SUM(CASE WHEN started_at >= ? THEN word_count ELSE 0 END), 0) AS words_today, \
+                 COALESCE(SUM(CASE WHEN started_at >= ? THEN {SECS} ELSE 0 END), 0) AS secs_today \
              FROM sessions WHERE {COUNTABLE_WHERE}"
         ))
+        .bind::<Text, _>(today_start)
+        .bind::<Text, _>(today_start)
+        .bind::<Text, _>(today_start)
         .get_result(&mut self.conn)?;
 
         let clamp_u32 = |v: i64| v.clamp(0, i64::from(u32::MAX)) as u32;
@@ -842,6 +871,9 @@ impl Database {
             sessions: clamp_u32(row.sessions),
             words: clamp_u32(row.words),
             seconds: clamp_u32(row.secs),
+            sessions_today: clamp_u32(row.sessions_today),
+            words_today: clamp_u32(row.words_today),
+            seconds_today: clamp_u32(row.secs_today),
         })
     }
 
@@ -1131,6 +1163,11 @@ mod tests {
     use lune_core::asr::AsrBackendKind;
     use lune_core::session::{DictationSession, SessionStatus};
     use uuid::Uuid;
+
+    /// A `today_start` far enough in the past that every row counts as "today",
+    /// so the all-time and today-scoped totals coincide and a test asserting on
+    /// one is really asserting on both.
+    const EPOCH: &str = "1970-01-01T00:00:00+00:00";
 
     /// Every migration ships a `down.sql`, but nothing exercised them — a
     /// `down` that does not actually reverse its `up` is only discovered during
@@ -1755,6 +1792,72 @@ mod tests {
     }
 
     #[test]
+    fn todays_totals_count_only_todays_sessions() {
+        let mut db = Database::open_in_memory().unwrap();
+        let recent = Utc::now();
+        let old = recent - chrono::Duration::days(3);
+        for (started, transcript) in [(old, "one two three"), (recent, "four five")] {
+            db.insert_session(&DictationSession {
+                id: Uuid::new_v4(),
+                started_at: started,
+                ended_at: Some(started + chrono::Duration::seconds(10)),
+                style: None,
+                backend: AsrBackendKind::WhisperCpp,
+                status: SessionStatus::Completed,
+                transcript: Some(transcript.into()),
+            })
+            .unwrap();
+        }
+
+        let cutoff = (recent - chrono::Duration::hours(1)).to_rfc3339();
+        let stats = db.session_stats(&cutoff).unwrap();
+
+        assert_eq!(stats.sessions, 2, "all-time counts both");
+        assert_eq!(stats.words, 5);
+        assert_eq!(stats.sessions_today, 1, "only the recent one is today");
+        assert_eq!(stats.words_today, 2);
+        // Durations come from a `julianday` subtraction cast to an integer, so
+        // each 10-second span can land a second short — and the all-time total
+        // sums two of them, so it can be two short. The point of the assertion
+        // is which rows were summed, not sub-second accuracy.
+        assert!(
+            (9..=10).contains(&stats.seconds_today),
+            "expected ~10s today, got {}",
+            stats.seconds_today
+        );
+        assert!(
+            (18..=20).contains(&stats.seconds),
+            "expected ~20s all-time, got {}",
+            stats.seconds
+        );
+    }
+
+    /// The whole point of aggregating in SQL: the client used to derive this
+    /// from a capped slice of recent sessions, so a day busier than the cap
+    /// under-reported itself.
+    #[test]
+    fn todays_totals_are_not_capped_by_the_snapshot_slice() {
+        let mut db = Database::open_in_memory().unwrap();
+        let now = Utc::now();
+        for _ in 0..50 {
+            db.insert_session(&DictationSession {
+                id: Uuid::new_v4(),
+                started_at: now,
+                ended_at: Some(now + chrono::Duration::seconds(2)),
+                style: None,
+                backend: AsrBackendKind::WhisperCpp,
+                status: SessionStatus::Completed,
+                transcript: Some("one two".into()),
+            })
+            .unwrap();
+        }
+
+        let stats = db.session_stats(EPOCH).unwrap();
+        assert_eq!(stats.sessions_today, 50);
+        assert_eq!(stats.words_today, 100);
+    }
+
+    #[test]
     fn purge_history_clears_sessions_and_their_correction_pairs() {
         let mut db = Database::open_in_memory().unwrap();
         let sid = Uuid::new_v4();
@@ -1807,7 +1910,7 @@ mod tests {
         .execute(&mut db.conn)
         .unwrap();
 
-        let stats = db.session_stats().unwrap();
+        let stats = db.session_stats(EPOCH).unwrap();
         // The malformed row must be skipped entirely — not counted in sessions, words, or seconds.
         assert_eq!(stats.sessions, 1, "only the well-formed session counts");
         assert_eq!(stats.words, 2, "words from malformed row must not be added");
@@ -1831,17 +1934,17 @@ mod tests {
         .execute(&mut db.conn)
         .unwrap();
 
-        let before = db.session_stats().unwrap();
+        let before = db.session_stats(EPOCH).unwrap();
         assert_eq!(before.sessions, 1, "the row still counts as a session");
         assert_eq!(before.words, 0, "NULL word_count contributes nothing");
 
         db.backfill_word_counts().unwrap();
-        let after = db.session_stats().unwrap();
+        let after = db.session_stats(EPOCH).unwrap();
         assert_eq!(after.words, 4, "backfill uses split_whitespace semantics");
 
         // Idempotent: a second pass finds no NULLs and changes nothing.
         db.backfill_word_counts().unwrap();
-        assert_eq!(db.session_stats().unwrap().words, 4);
+        assert_eq!(db.session_stats(EPOCH).unwrap().words, 4);
     }
 
     /// `word_count` is maintained, so it has to track a transcript rewrite —
@@ -1859,11 +1962,11 @@ mod tests {
             transcript: Some("one two three".into()),
         };
         db.insert_session(&session).unwrap();
-        assert_eq!(db.session_stats().unwrap().words, 3);
+        assert_eq!(db.session_stats(EPOCH).unwrap().words, 3);
 
         session.transcript = Some("only two".into());
         db.update_session(&session).unwrap();
-        assert_eq!(db.session_stats().unwrap().words, 2);
+        assert_eq!(db.session_stats(EPOCH).unwrap().words, 2);
     }
 
     #[test]
@@ -1912,7 +2015,7 @@ mod tests {
         // count_sessions and session_stats agree on the very same row set, so
         // the History total can never drift from the overview total.
         assert_eq!(db.count_sessions(None).unwrap(), 5);
-        assert_eq!(db.session_stats().unwrap().sessions, 5);
+        assert_eq!(db.session_stats(EPOCH).unwrap().sessions, 5);
 
         // Page 1 (limit 2) is the two newest, in DESC started_at order.
         let page1 = db.list_sessions_page(2, 0, None).unwrap();

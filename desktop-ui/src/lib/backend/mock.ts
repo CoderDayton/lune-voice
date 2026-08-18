@@ -115,7 +115,14 @@ function createMockSnapshot(): WorkspaceSnapshot {
         body: '## Meeting — {date}\n\nAttendees:\n- ',
       },
     ],
-    stats: { sessions: 0, words: 0, seconds: 0 },
+    stats: {
+      sessions: 0,
+      words: 0,
+      seconds: 0,
+      sessionsToday: 0,
+      wordsToday: 0,
+      secondsToday: 0,
+    },
     stylePresets: [
       {
         id: 'casual',
@@ -192,21 +199,37 @@ function createMockSnapshot(): WorkspaceSnapshot {
 }
 
 function computeStats(history: WorkspaceSnapshot['history']) {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayStartMs = todayStart.getTime();
+
   let words = 0;
   let seconds = 0;
   let sessions = 0;
+  let wordsToday = 0;
+  let secondsToday = 0;
+  let sessionsToday = 0;
   for (const h of history) {
     if (!h.transcript) continue;
     const w = h.transcript.trim().split(/\s+/).filter(Boolean).length;
     if (w === 0) continue;
+    let dt = 0;
+    if (h.endedAt) {
+      dt = Math.max(
+        1,
+        Math.round((new Date(h.endedAt).getTime() - new Date(h.startedAt).getTime()) / 1000),
+      );
+    }
     sessions++;
     words += w;
-    if (h.endedAt) {
-      const dt = (new Date(h.endedAt).getTime() - new Date(h.startedAt).getTime()) / 1000;
-      seconds += Math.max(1, Math.round(dt));
+    seconds += dt;
+    if (new Date(h.startedAt).getTime() >= todayStartMs) {
+      sessionsToday++;
+      wordsToday += w;
+      secondsToday += dt;
     }
   }
-  return { sessions, words, seconds };
+  return { sessions, words, seconds, sessionsToday, wordsToday, secondsToday };
 }
 
 function snapshotWithStats(s: WorkspaceSnapshot): WorkspaceSnapshot {
@@ -449,6 +472,16 @@ export const mockBackendClient: BackendClient = {
   },
 
   async startUpdateCheck() {},
+
+  async uinputRuleInstalled() {
+    // The browser/mock runtime installs nothing, so the removal affordance
+    // stays hidden rather than offering to undo something that never happened.
+    return false;
+  },
+
+  async removeUinputRule() {
+    return false;
+  },
 
   async gpuBackendStatus() {
     // The browser/mock runtime has no native backend at all, so the onboarding
