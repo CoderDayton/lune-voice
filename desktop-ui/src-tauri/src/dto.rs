@@ -413,6 +413,10 @@ pub enum GpuBackendStateDto {
     NotInstalled,
     /// Plugin loaded and a CUDA device registered.
     Ready,
+    /// Plugin installed, waiting for the next launch to register its device.
+    /// Not a failure, and told apart from one so the UI can ask for a restart
+    /// in the user's own language rather than relaying an English `reason`.
+    NeedsRestart,
     /// Plugin installed but no CUDA device appeared.
     Failed,
 }

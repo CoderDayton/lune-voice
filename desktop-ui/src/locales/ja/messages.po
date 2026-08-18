@@ -80,6 +80,10 @@ msgstr "トリガーフレーズを話すと Lune Voice が代わりに入力す
 msgid "A vertical pill hugs the side of the screen."
 msgstr "縦向きのインジケーターが画面の端に沿って表示されます。"
 
+#: src/features/settings/components/gpu-backend-card.tsx:47
+msgid "Acceleration"
+msgstr "アクセラレーション"
+
 #: src/features/shell/components/sidebar.tsx:190
 msgid "Account and status"
 msgstr "アカウントとステータス"
@@ -88,6 +92,7 @@ msgstr "アカウントとステータス"
 msgid "Action"
 msgstr "操作"
 
+#: src/features/settings/components/gpu-backend-card.tsx:122
 #: src/features/styles/components/style-preset-card.tsx:75
 msgid "Active"
 msgstr "アクティブ"
@@ -118,11 +123,11 @@ msgstr "修正を追加"
 msgid "Add snippet"
 msgstr "スニペットを追加"
 
-#: src/features/settings/sections/models-section.tsx:104
+#: src/features/settings/sections/models-section.tsx:98
 msgid "AI models stored on your device."
 msgstr "AI モデルはデバイスに保存されます。"
 
-#: src/features/welcome/welcome-page.tsx:164
+#: src/features/welcome/welcome-page.tsx:187
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "必要なモデルはすべてインストール済みです。準備ができたら続行してください。"
 
@@ -143,7 +148,7 @@ msgid "API key"
 msgstr "APIキー"
 
 #: src/features/settings/sections/appearance-section.tsx:35
-#: src/features/settings/settings-page.tsx:70
+#: src/features/settings/settings-page.tsx:69
 msgid "Appearance"
 msgstr "外観"
 
@@ -190,7 +195,7 @@ msgstr "組み込み"
 
 #: src/components/feedback/confirm-dialog.tsx:52
 #: src/features/dictionary/components/dictionary-table.tsx:96
-#: src/features/settings/sections/models-section.tsx:311
+#: src/features/settings/sections/models-section.tsx:310
 #: src/features/styles/components/style-editor-modal.tsx:206
 msgid "Cancel"
 msgstr "キャンセル"
@@ -216,7 +221,7 @@ msgstr "音声で登録"
 msgid "Capture device and how recording detects when you speak."
 msgstr "キャプチャデバイスと、録音があなたの発話を検出する方法。"
 
-#: src/features/welcome/welcome-page.tsx:307
+#: src/features/welcome/welcome-page.tsx:395
 msgid "Change engine"
 msgstr "エンジンを変更"
 
@@ -233,11 +238,11 @@ msgstr "起動時に更新を確認"
 msgid "Check whether a newer version has been released."
 msgstr "新しいバージョンが公開されているか確認します。"
 
-#: src/features/welcome/welcome-page.tsx:158
+#: src/features/welcome/welcome-page.tsx:181
 msgid "Check your network and we'll pick up where we left off."
 msgstr "ネットワークをチェックしてください。中断したところから再開します。"
 
-#: src/features/welcome/welcome-page.tsx:62
+#: src/features/welcome/welcome-page.tsx:70
 msgid "Checking installed models…"
 msgstr "インストールされているモデルを確認しています…"
 
@@ -262,8 +267,8 @@ msgstr "Lune Voiceの見た目を選択します。"
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
 msgstr "文字起こしの整形方法を選びます — 設定した OpenAI 互換エンドポイント（ローカルでもホスト型でも）に送信するか、まったく行わないかを選べます。"
 
-#: src/features/welcome/welcome-page.tsx:161
-#: src/features/welcome/welcome-page.tsx:167
+#: src/features/welcome/welcome-page.tsx:184
+#: src/features/welcome/welcome-page.tsx:190
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "インストールする AI モデルを選択します。すべてがオフラインで実行されます。クラウドもアカウントもありません。"
 
@@ -271,7 +276,7 @@ msgstr "インストールする AI モデルを選択します。すべてが�
 msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
 msgstr "音声をテキストに変換するエンジンを選択します。ローカルエンジンは完全にオンデバイスで実行され、Whisper は多言語対応でモデルサイズを選択できます。"
 
-#: src/features/welcome/welcome-page.tsx:149
+#: src/features/welcome/welcome-page.tsx:169
 msgid "Choose your speech engine. Everything runs offline — no cloud, no accounts."
 msgstr "音声エンジンを選択します。すべてがオフラインで実行されます — クラウドもアカウントもありません。"
 
@@ -288,7 +293,7 @@ msgid "close"
 msgstr "閉じる"
 
 #: src/features/history/components/session-detail-modal.tsx:210
-#: src/features/settings/sections/models-section.tsx:323
+#: src/features/settings/sections/models-section.tsx:322
 #: src/features/styles/components/style-editor-modal.tsx:197
 msgid "Close"
 msgstr "閉じる"
@@ -316,8 +321,8 @@ msgstr "接続中"
 msgid "Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network."
 msgstr "起動の少し後にリリースサーバーへ接続し、新しいバージョンがあるときだけ通知します。既定はオフです — 音声入力そのものにネットワークは不要です。"
 
-#: src/features/welcome/welcome-page.tsx:239
-#: src/features/welcome/welcome-page.tsx:301
+#: src/features/welcome/welcome-page.tsx:322
+#: src/features/welcome/welcome-page.tsx:389
 msgid "Continue"
 msgstr "続行"
 
@@ -359,6 +364,10 @@ msgstr "修正"
 msgid "Correction sensitivity"
 msgstr "修正の感度"
 
+#: src/features/welcome/welcome-page.tsx:255
+msgid "Could not download GPU support — transcription will run on the CPU. You can retry under Settings › Models."
+msgstr "GPU サポートをダウンロードできませんでした — 文字起こしは CPU で実行されます。設定 › モデル から再試行できます。"
+
 #: src/features/dictionary/components/dictionary-form.tsx:43
 msgid "Couldn't add that rule. Try again."
 msgstr "そのルールを追加できませんでした。もう一度やり直してください。"
@@ -394,7 +403,7 @@ msgstr "暗い"
 #: src/features/dictionary/components/dictionary-table.tsx:146
 #: src/features/history/components/history-table.tsx:382
 #: src/features/history/components/session-detail-modal.tsx:203
-#: src/features/settings/sections/models-section.tsx:259
+#: src/features/settings/sections/models-section.tsx:258
 #: src/features/snippets/snippets-page.tsx:293
 msgid "Delete"
 msgstr "削除"
@@ -405,11 +414,11 @@ msgid "Delete {0}"
 msgstr "{0}を削除"
 
 #. placeholder {0}: model.name
-#: src/features/settings/sections/models-section.tsx:296
+#: src/features/settings/sections/models-section.tsx:295
 msgid "Delete {0}?"
 msgstr "{0} を削除しますか?"
 
-#: src/features/settings/sections/models-section.tsx:314
+#: src/features/settings/sections/models-section.tsx:313
 msgid "Delete model"
 msgstr "モデルの削除"
 
@@ -446,7 +455,7 @@ msgstr "説明が長すぎます。"
 msgid "Deterministic fixes applied before any AI styling."
 msgstr "AI によるスタイル調整の前に、決定的な修正を適用します。"
 
-#: src/features/settings/settings-page.tsx:71
+#: src/features/settings/settings-page.tsx:70
 msgid "Dictation"
 msgstr "音声入力"
 
@@ -479,7 +488,7 @@ msgstr "現在のドラフトを破棄し、アイドル状態に戻ります。
 msgid "Disconnected"
 msgstr "切断されました"
 
-#: src/features/settings/sections/models-section.tsx:133
+#: src/features/settings/sections/models-section.tsx:132
 msgid "Disk usage"
 msgstr "ディスク使用量"
 
@@ -488,7 +497,8 @@ msgid "Dismiss error"
 msgstr "エラーを無視する"
 
 #: src/features/history/components/history-table.tsx:376
-#: src/features/settings/sections/models-section.tsx:273
+#: src/features/settings/components/gpu-backend-card.tsx:108
+#: src/features/settings/sections/models-section.tsx:272
 msgid "Download"
 msgstr "ダウンロード"
 
@@ -497,29 +507,30 @@ msgstr "ダウンロード"
 msgid "Download {0}"
 msgstr "{0} をダウンロード"
 
-#: src/features/welcome/welcome-page.tsx:293
+#: src/features/welcome/welcome-page.tsx:381
 msgid "Download {pendingCount} models"
 msgstr "{pendingCount} モデルをダウンロード"
 
-#: src/features/welcome/welcome-page.tsx:293
+#: src/features/welcome/welcome-page.tsx:380
 msgid "Download 1 model"
 msgstr "1 モデルをダウンロード"
 
-#: src/features/welcome/welcome-page.tsx:113
+#: src/features/welcome/welcome-page.tsx:132
 msgid "Download failed"
 msgstr "ダウンロードに失敗しました"
 
 #. placeholder {0}: formatBytes(status.downloadBytes)
 #: src/features/settings/sections/gpu-section.tsx:54
-msgid "Download GPU support ({0})"
-msgstr "GPU サポートをダウンロード（{0}）"
+#~ msgid "Download GPU support ({0})"
+#~ msgstr "GPU サポートをダウンロード（{0}）"
 
-#: src/features/welcome/welcome-page.tsx:157
+#: src/features/welcome/welcome-page.tsx:180
 msgid "Download interrupted"
 msgstr "ダウンロードが中断されました"
 
+#: src/components/ui/byte-progress.tsx:35
 #: src/features/settings/components/asr-engine-cards.tsx:149
-#: src/features/settings/sections/models-section.tsx:232
+#: src/features/settings/sections/models-section.tsx:231
 #: src/features/welcome/components/model-card.tsx:99
 msgid "Download progress"
 msgstr "ダウンロード進行状況"
@@ -528,14 +539,18 @@ msgstr "ダウンロード進行状況"
 msgid "Download transcript"
 msgstr "文字起こしをダウンロード"
 
-#: src/features/welcome/welcome-page.tsx:154
+#: src/features/welcome/welcome-page.tsx:174
 msgid "Downloading models"
 msgstr "モデルをダウンロード中"
 
+#: src/features/welcome/welcome-page.tsx:252
+msgid "Downloading NVIDIA's CUDA runtime."
+msgstr "NVIDIA の CUDA ランタイムをダウンロードしています。"
+
 #: src/features/settings/components/asr-engine-cards.tsx:152
-#: src/features/settings/sections/gpu-section.tsx:53
-#: src/features/settings/sections/models-section.tsx:273
-#: src/features/welcome/welcome-page.tsx:254
+#: src/features/settings/components/gpu-backend-card.tsx:108
+#: src/features/settings/sections/models-section.tsx:272
+#: src/features/welcome/welcome-page.tsx:337
 msgid "Downloading…"
 msgstr "ダウンロード中…"
 
@@ -594,7 +609,7 @@ msgstr "スタイル調整を有効にする"
 msgid "Engine"
 msgstr "エンジン"
 
-#: src/features/welcome/welcome-page.tsx:280
+#: src/features/welcome/welcome-page.tsx:363
 msgid "Enter Lune Voice"
 msgstr "Lune Voice を開く"
 
@@ -609,6 +624,10 @@ msgstr "サンプルはスタイル調整エンジンにあなたのスタイル
 #: src/features/shell/components/sidebar.tsx:37
 msgid "Expand sidebar"
 msgstr "サイドバーを展開する"
+
+#: src/features/welcome/welcome-page.tsx:178
+msgid "Fetching the NVIDIA runtime. This is the last step, and it only happens once."
+msgstr "NVIDIA ランタイムを取得しています。これが最後のステップで、一度だけ行われます。"
 
 #: src/features/styles/components/style-editor-modal.tsx:160
 msgid "Few-shot examples"
@@ -648,7 +667,7 @@ msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock.
 msgstr "インジケーターと画面端との間隔です。タスクバーやドックを避けるために使います。"
 
 #: src/features/settings/sections/general-section.tsx:52
-#: src/features/settings/settings-page.tsx:69
+#: src/features/settings/settings-page.tsx:68
 msgid "General"
 msgstr "一般"
 
@@ -677,20 +696,21 @@ msgstr "こんばんは"
 msgid "Good morning"
 msgstr "おはよう"
 
-#: src/features/settings/sections/gpu-section.tsx:29
-#: src/features/welcome/components/engine-step.tsx:119
+#: src/features/settings/components/gpu-backend-card.tsx:66
+#: src/features/welcome/components/engine-step.tsx:123
+#: src/features/welcome/welcome-page.tsx:249
 msgid "GPU acceleration"
 msgstr "GPU アクセラレーション"
 
 #: src/features/settings/sections/gpu-section.tsx:92
-msgid "GPU acceleration is active."
-msgstr "GPU アクセラレーションが有効です。"
+#~ msgid "GPU acceleration is active."
+#~ msgstr "GPU アクセラレーションが有効です。"
 
 #: src/features/settings/sections/gpu-section.tsx:43
-msgid "GPU support"
-msgstr "GPU サポート"
+#~ msgid "GPU support"
+#~ msgstr "GPU サポート"
 
-#: src/features/settings/sections/gpu-section.tsx:108
+#: src/features/settings/components/gpu-backend-card.tsx:170
 msgid "GPU support is installed but not working."
 msgstr "GPU サポートはインストールされていますが、動作していません。"
 
@@ -719,7 +739,7 @@ msgstr "インジケーターバーの見た目です。変更はすぐに反映
 msgid "Idle"
 msgstr "アイドル状態"
 
-#: src/features/settings/sections/models-section.tsx:216
+#: src/features/settings/sections/models-section.tsx:215
 msgid "In use"
 msgstr "使用中"
 
@@ -732,10 +752,16 @@ msgid "Insert placeholder"
 msgstr "プレースホルダーを挿入"
 
 #: src/features/settings/components/asr-engine-cards.tsx:228
-#: src/features/settings/sections/models-section.tsx:219
+#: src/features/settings/sections/models-section.tsx:218
 #: src/features/welcome/components/model-card.tsx:89
 msgid "Installed"
 msgstr "インストール済み"
+
+#: src/features/settings/components/gpu-backend-card.tsx:148
+#: src/features/welcome/components/engine-step.tsx:133
+#: src/features/welcome/welcome-page.tsx:254
+msgid "Installed. Restart Lune Voice to start using your GPU."
+msgstr "インストールしました。GPU の使用を開始するには Lune Voice を再起動してください。"
 
 #: src/features/styles/components/style-editor-modal.tsx:114
 msgid "Instructions"
@@ -852,12 +878,12 @@ msgstr "分"
 msgid "Mode"
 msgstr "モード"
 
-#: src/features/settings/sections/models-section.tsx:103
-#: src/features/settings/settings-page.tsx:76
+#: src/features/settings/sections/models-section.tsx:97
+#: src/features/settings/settings-page.tsx:75
 msgid "Models"
 msgstr "モデル"
 
-#: src/features/welcome/welcome-page.tsx:322
+#: src/features/welcome/welcome-page.tsx:410
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "モデルはローカルに保存されます。テレメトリもアカウントもありません。"
 
@@ -866,10 +892,10 @@ msgid "Monitor"
 msgstr "モニター"
 
 #: src/features/settings/sections/gpu-section.tsx:44
-msgid "Most of the download is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
-msgstr "ダウンロードの大部分は NVIDIA の CUDA 数値計算ライブラリで、これ以上小さい形では再配布できません。"
+#~ msgid "Most of the download is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
+#~ msgstr "ダウンロードの大部分は NVIDIA の CUDA 数値計算ライブラリで、これ以上小さい形では再配布できません。"
 
-#: src/features/welcome/components/engine-step.tsx:49
+#: src/features/welcome/components/engine-step.tsx:53
 msgid "Multilingual · pick a size"
 msgstr "多言語対応 · サイズを選択"
 
@@ -892,6 +918,10 @@ msgstr "次のページ"
 #: src/features/styles/components/style-preset-card.tsx:99
 msgid "No"
 msgstr "いいえ"
+
+#: src/features/settings/components/gpu-backend-card.tsx:157
+msgid "No NVIDIA driver was found. Install the driver for your GPU and the download will appear here."
+msgstr "NVIDIA ドライバーが見つかりません。GPU のドライバーをインストールすると、ここにダウンロードが表示されます。"
 
 #: src/features/dictionary/components/dictionary-table.tsx:249
 msgid "No rules match “{query}”."
@@ -936,11 +966,12 @@ msgstr "音声検出前にマイクレベルを正規化します。小さい音
 msgid "not connected"
 msgstr "未接続"
 
-#: src/features/settings/sections/models-section.tsx:222
+#: src/features/settings/components/gpu-backend-card.tsx:129
+#: src/features/settings/sections/models-section.tsx:221
 msgid "Not installed"
 msgstr "インストールされていません"
 
-#: src/features/settings/sections/models-section.tsx:135
+#: src/features/settings/sections/models-section.tsx:134
 msgid "Nothing installed"
 msgstr "何もインストールされていません"
 
@@ -979,7 +1010,7 @@ msgid "Orientation"
 msgstr "向き"
 
 #: src/features/overview/overview-page.tsx:121
-#: src/features/settings/settings-page.tsx:75
+#: src/features/settings/settings-page.tsx:74
 msgid "Output"
 msgstr "出力"
 
@@ -987,7 +1018,7 @@ msgstr "出力"
 msgid "Overall footprint of the pill bar."
 msgstr "インジケーターバー全体の大きさ。"
 
-#: src/features/welcome/welcome-page.tsx:202
+#: src/features/welcome/welcome-page.tsx:282
 msgid "Overall progress"
 msgstr "全体の進捗"
 
@@ -1009,7 +1040,7 @@ msgstr "貼り付けが最も簡単です。一部のアプリでは、キース
 msgid "Phrase"
 msgstr "フレーズ"
 
-#: src/features/settings/settings-page.tsx:72
+#: src/features/settings/settings-page.tsx:71
 msgid "Pill"
 msgstr "インジケーター"
 
@@ -1041,7 +1072,7 @@ msgstr "配置"
 msgid "Play a short sound when dictation starts, finishes, or runs into an error."
 msgstr "音声入力の開始時・完了時・エラー時に短い音を再生します。"
 
-#: src/features/welcome/welcome-page.tsx:257
+#: src/features/welcome/welcome-page.tsx:340
 msgid "Please keep the app open until downloads finish"
 msgstr "ダウンロードが完了するまでアプリを開いたままにしてください"
 
@@ -1156,7 +1187,11 @@ msgstr "リセット"
 msgid "Reset position"
 msgstr "位置をリセット"
 
-#: src/features/welcome/welcome-page.tsx:268
+#: src/features/settings/components/gpu-backend-card.tsx:125
+msgid "Restart needed"
+msgstr "再起動が必要"
+
+#: src/features/welcome/welcome-page.tsx:351
 msgid "Retry download"
 msgstr "ダウンロードを再試行"
 
@@ -1166,16 +1201,20 @@ msgstr "各文字起こしを選択したスタイルで書き換えます。オ
 
 #. placeholder {0}: status.devices.join(', ')
 #: src/features/settings/sections/gpu-section.tsx:91
-msgid "Running on {0}."
-msgstr "{0} で実行中です。"
+#~ msgid "Running on {0}."
+#~ msgstr "{0} で実行中です。"
+
+#: src/features/settings/components/gpu-backend-card.tsx:132
+msgid "Running on CPU"
+msgstr "CPU で実行中"
 
 #: src/features/settings/sections/gpu-section.tsx:118
-msgid "Running on the CPU."
-msgstr "CPU で実行中です。"
+#~ msgid "Running on the CPU."
+#~ msgstr "CPU で実行中です。"
 
 #: src/features/settings/sections/gpu-section.tsx:100
-msgid "Running on the CPU. No NVIDIA driver was found — install the driver for your GPU and Lune Voice will offer GPU support here."
-msgstr "CPU で実行中です。NVIDIA ドライバーが見つかりませんでした — お使いの GPU のドライバーをインストールすると、Lune Voice がここで GPU サポートを案内します。"
+#~ msgid "Running on the CPU. No NVIDIA driver was found — install the driver for your GPU and Lune Voice will offer GPU support here."
+#~ msgstr "CPU で実行中です。NVIDIA ドライバーが見つかりませんでした — お使いの GPU のドライバーをインストールすると、Lune Voice がここで GPU サポートを案内します。"
 
 #: src/features/overview/overview-page.tsx:261
 msgid "s"
@@ -1215,7 +1254,7 @@ msgstr "文字起こしを検索"
 msgid "Search transcripts…"
 msgstr "文字起こしを検索…"
 
-#: src/features/welcome/welcome-page.tsx:297
+#: src/features/welcome/welcome-page.tsx:385
 msgid "Select required models"
 msgstr "必要なモデルを選択"
 
@@ -1246,7 +1285,15 @@ msgstr "ホットキーを設定する"
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "話す言語を設定します。自動では音声からの検出を使用します。"
 
-#: src/features/settings/settings-page.tsx:102
+#: src/features/welcome/welcome-page.tsx:378
+msgid "Set up GPU acceleration"
+msgstr "GPU アクセラレーションを設定"
+
+#: src/features/welcome/welcome-page.tsx:177
+msgid "Setting up your GPU"
+msgstr "GPU をセットアップしています"
+
+#: src/features/settings/settings-page.tsx:95
 msgid "Settings sections"
 msgstr "設定セクション"
 
@@ -1268,9 +1315,9 @@ msgstr "サイズ"
 msgid "Size & shape"
 msgstr "サイズと形状"
 
-#: src/features/welcome/welcome-page.tsx:243
-#: src/features/welcome/welcome-page.tsx:271
-#: src/features/welcome/welcome-page.tsx:310
+#: src/features/welcome/welcome-page.tsx:326
+#: src/features/welcome/welcome-page.tsx:354
+#: src/features/welcome/welcome-page.tsx:398
 msgid "Skip for now"
 msgstr "今はスキップ"
 
@@ -1295,7 +1342,7 @@ msgstr "サウンドキュー"
 msgid "Speaking Time"
 msgstr "発話時間"
 
-#: src/features/settings/sections/models-section.tsx:75
+#: src/features/settings/sections/models-section.tsx:69
 msgid "Speech-to-text"
 msgstr "音声認識"
 
@@ -1327,8 +1374,8 @@ msgid "Start, stop, and cancel dictation without leaving your work."
 msgstr "作業を中断せずに、音声入力の開始・停止・キャンセルを行えます。"
 
 #: src/features/settings/sections/gpu-section.tsx:33
-msgid "Status"
-msgstr "状態"
+#~ msgid "Status"
+#~ msgstr "状態"
 
 #: src/features/dictation/dictation-pill.tsx:88
 msgid "Stop and transcribe"
@@ -1353,7 +1400,7 @@ msgstr "音声入力を停止"
 msgid "Style"
 msgstr "スタイル"
 
-#: src/features/settings/settings-page.tsx:74
+#: src/features/settings/settings-page.tsx:73
 msgid "Styling"
 msgstr "スタイル調整"
 
@@ -1411,11 +1458,11 @@ msgstr "認識エンジンが最も自信のない単語を、辞書と語彙と
 msgid "Theme"
 msgstr "テーマ"
 
-#: src/features/settings/sections/models-section.tsx:306
+#: src/features/settings/sections/models-section.tsx:305
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "このモデルは現在の設定で使用中です。再インストールするか別のモデルを選択するまで、音声入力が機能しない場合があります。"
 
-#: src/features/welcome/welcome-page.tsx:155
+#: src/features/welcome/welcome-page.tsx:175
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "これは一度だけ起こります。その間、コンピュータを使い続けることができます。"
 
@@ -1478,13 +1525,30 @@ msgid "Transcript"
 msgstr "文字起こし"
 
 #: src/features/settings/sections/transcription-section.tsx:36
-#: src/features/settings/settings-page.tsx:73
+#: src/features/settings/settings-page.tsx:72
 msgid "Transcription"
 msgstr "文字起こし"
 
+#. placeholder {0}: status.devices.join(', ')
+#: src/features/settings/components/gpu-backend-card.tsx:140
+msgid "Transcription is running on {0}."
+msgstr "文字起こしは {0} で実行されています。"
+
+#: src/features/settings/components/gpu-backend-card.tsx:141
+msgid "Transcription is running on your GPU."
+msgstr "文字起こしは GPU で実行されています。"
+
 #: src/features/settings/sections/gpu-section.tsx:30
-msgid "Transcription runs on the CPU by default. If you have an NVIDIA GPU, an optional download moves it to the GPU for noticeably lower latency."
-msgstr "文字起こしは既定では CPU で実行されます。NVIDIA の GPU があれば、任意のダウンロードで GPU に切り替えられ、遅延が目に見えて小さくなります。"
+#~ msgid "Transcription runs on the CPU by default. If you have an NVIDIA GPU, an optional download moves it to the GPU for noticeably lower latency."
+#~ msgstr "文字起こしは既定では CPU で実行されます。NVIDIA の GPU があれば、任意のダウンロードで GPU に切り替えられ、遅延が目に見えて小さくなります。"
+
+#: src/features/settings/components/gpu-backend-card.tsx:164
+msgid "Transcription runs on the CPU. An optional download moves it to your NVIDIA GPU for noticeably lower latency — most of it is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
+msgstr "文字起こしは CPU で実行されます。任意のダウンロードで NVIDIA GPU に移すと、遅延が目に見えて小さくなります — その大半は NVIDIA の CUDA 数学ライブラリで、これ以上小さな形では再配布できません。"
+
+#: src/features/settings/components/gpu-backend-card.tsx:165
+msgid "Transcription runs on the CPU. No GPU download has been published for this build yet."
+msgstr "文字起こしは CPU で実行されます。このビルド向けの GPU ダウンロードはまだ公開されていません。"
 
 #: src/features/snippets/snippets-page.tsx:145
 msgid "Trigger phrase"
@@ -1502,7 +1566,7 @@ msgstr "入力される内容"
 msgid "Updates"
 msgstr "更新"
 
-#: src/features/welcome/components/engine-step.tsx:136
+#: src/features/welcome/components/engine-step.tsx:143
 msgid "Use GPU acceleration"
 msgstr "GPU アクセラレーションを使用する"
 
@@ -1537,13 +1601,13 @@ msgstr "表示"
 msgid "Voice model"
 msgstr "音声モデル"
 
-#: src/features/welcome/welcome-page.tsx:163
+#: src/features/welcome/welcome-page.tsx:186
 msgid "Welcome back"
 msgstr "おかえり"
 
-#: src/features/welcome/welcome-page.tsx:148
-#: src/features/welcome/welcome-page.tsx:160
-#: src/features/welcome/welcome-page.tsx:166
+#: src/features/welcome/welcome-page.tsx:168
+#: src/features/welcome/welcome-page.tsx:183
+#: src/features/welcome/welcome-page.tsx:189
 msgid "Welcome to Lune Voice"
 msgstr "Lune Voice へようこそ"
 
@@ -1571,16 +1635,16 @@ msgstr "送信する貼り付けショートカッ���。「自動」はタ
 msgid "Which screen the pill appears on."
 msgstr "インジケーターを表示するモニター。"
 
-#: src/features/welcome/components/engine-step.tsx:48
+#: src/features/welcome/components/engine-step.tsx:52
 msgid "Whisper"
 msgstr "Whisper"
 
 #: src/features/settings/components/asr-engine-cards.tsx:122
-#: src/features/welcome/components/engine-step.tsx:71
+#: src/features/welcome/components/engine-step.tsx:75
 msgid "Whisper model size"
 msgstr "Whisper モデルサイズ"
 
-#: src/features/welcome/components/engine-step.tsx:50
+#: src/features/welcome/components/engine-step.tsx:54
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
 msgstr "whisper.cpp をオンデバイスで実行します。速度と精度のバランスを取るサイズを選択してください。"
 
@@ -1610,7 +1674,7 @@ msgstr "現在のバージョンは {version} です。"
 msgid "You say"
 msgstr "話す内容"
 
-#: src/features/welcome/welcome-page.tsx:151
+#: src/features/welcome/welcome-page.tsx:171
 msgid "You're all set"
 msgstr "準備は完了です"
 
@@ -1618,19 +1682,28 @@ msgstr "準備は完了です"
 msgid "Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none."
 msgstr "API キーです。保存済みのキーをそのまま使う場合、またはエンドポイントが自分のマシンやネットワーク上にあってキーが不要な場合は、空欄のままにしてください。"
 
-#: src/features/welcome/components/engine-step.tsx:126
+#: src/features/welcome/components/engine-step.tsx:131
 msgid "Your GPU is ready — use it for faster transcription."
 msgstr "GPU の準備ができています — より速い文字起こしに使いましょう。"
 
+#: src/features/welcome/components/engine-step.tsx:137
+#~ msgid "Your GPU qualifies. Keep this on and the runtime download will be offered under Settings › Models."
+#~ msgstr "お使いの GPU は条件を満たしています。これをオンのままにすると、ランタイムのダウンロードが 設定 › モデル に表示されます。"
+
 #: src/features/welcome/components/engine-step.tsx:127
-msgid "Your GPU qualifies. Keep this on, then finish the one-time setup in Settings."
-msgstr "お使いの GPU は対応しています。これをオンのままにして、設定で一度だけのセットアップを完了してください。"
+#~ msgid "Your GPU qualifies. Keep this on, then finish the one-time setup in Settings."
+#~ msgstr "お使いの GPU は対応しています。これをオンのままにして、設定で一度だけのセットアップを完了してください。"
+
+#. placeholder {0}: formatBytes(gpuDownloadBytes)
+#: src/features/welcome/components/engine-step.tsx:134
+msgid "Your GPU qualifies. Setup will download the {0} NVIDIA runtime, then a restart turns it on."
+msgstr "お使いの GPU は条件を満たしています。セットアップで {0} の NVIDIA ランタイムをダウンロードし、再起動で有効になります。"
 
 #: src/features/overview/overview-page.tsx:229
 msgid "your hotkey"
 msgstr "あなたのホットキー"
 
-#: src/features/welcome/welcome-page.tsx:152
+#: src/features/welcome/welcome-page.tsx:172
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "モデルの準備ができました。すべてがこのマシン上に残ります。"
 

@@ -217,7 +217,7 @@ device = "auto"
 | `"cuda"` | Require CUDA. Runtime falls back to CPU if CUDA is unavailable even when explicitly requested. |
 | `"cpu"` | Force CPU-only inference. |
 
-**GPU support is a runtime capability.** The CUDA backend is a plugin the app downloads on request, so `device = "cuda"` can start working on a binary that was never built with CUDA linked in. What it needs is an NVIDIA driver, which is not redistributable and so has to be installed by you. Query the current state with the `gpu_backend_status` command, or read it in Settings under Transcription; the onboarding acceleration card appears whenever that state is anything other than `unsupported` or `driver-missing`.
+**GPU support is a runtime capability.** The CUDA backend is a plugin the app downloads on request, so `device = "cuda"` can start working on a binary that was never built with CUDA linked in. What it needs is an NVIDIA driver, which is not redistributable and so has to be installed by you. Query the current state with the `gpu_backend_status` command, or read it in Settings under Models, where the plugin is also downloaded. The onboarding acceleration card appears only when accepting it can change something: the state is `ready`, `needs-restart`, or `not-installed` with a published plugin archive for this build. Setup downloads the plugin itself when the card is accepted and the state is `not-installed`.
 
 The plugin installs into `~/.local/share/lune-voice/backends/`, so removing that directory reverts to CPU. Because ggml builds its device registry once per process, a freshly installed plugin only takes effect after a restart — the UI says so rather than silently doing nothing.
 

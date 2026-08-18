@@ -6,6 +6,7 @@ import {
   isSetupSatisfiable,
   type ModelStatus,
   relevantSetupModels,
+  shouldInstallGpuDuringSetup,
 } from '../../src/features/welcome/setup-logic';
 
 const model = (localName: string, opts: Partial<ModelStatus> = {}): ModelStatus => ({
@@ -65,20 +66,51 @@ describe('gpuAccelerationOffer', () => {
 
   test('promises setup rather than speed while the plugin is missing', () => {
     expect(gpuAccelerationOffer('not-installed', true)).toBe('after-download');
-    // Usually a plugin installed this session that needs a restart.
-    expect(gpuAccelerationOffer('failed', true)).toBe('after-download');
+  });
+
+  test('asks for a restart instead of a download once the plugin is on disk', () => {
+    expect(gpuAccelerationOffer('needs-restart', true)).toBe('needs-restart');
+    // Nothing left to fetch, so an unpublished archive changes nothing.
+    expect(gpuAccelerationOffer('needs-restart', false)).toBe('needs-restart');
   });
 
   test('hides the card when no download could make the GPU work', () => {
     expect(gpuAccelerationOffer('unsupported', true)).toBeNull();
     expect(gpuAccelerationOffer('driver-missing', true)).toBeNull();
+    // `failed` is a driver too old for the runtime; re-downloading the plugin
+    // does not fix it, and promising setup that cannot finish is worse than
+    // saying nothing.
+    expect(gpuAccelerationOffer('failed', true)).toBeNull();
   });
 
   test('hides the card when the plugin archive is not published', () => {
     // Settings hides the download button in the same state, so pointing the
     // user there would be a dead end.
     expect(gpuAccelerationOffer('not-installed', false)).toBeNull();
-    expect(gpuAccelerationOffer('failed', false)).toBeNull();
+  });
+});
+
+describe('shouldInstallGpuDuringSetup', () => {
+  test('downloads only when the plugin is genuinely absent', () => {
+    expect(shouldInstallGpuDuringSetup('not-installed', true, true)).toBe(true);
+  });
+
+  test('never downloads over a declined GPU', () => {
+    expect(shouldInstallGpuDuringSetup('not-installed', true, false)).toBe(false);
+  });
+
+  test('never downloads an archive this build has not published', () => {
+    expect(shouldInstallGpuDuringSetup('not-installed', false, true)).toBe(false);
+  });
+
+  test('re-downloads nothing for a state a download cannot fix', () => {
+    // The plugin is already on disk in both: waiting for a restart, or facing
+    // a driver too old for it. Fetching it again helps with neither.
+    expect(shouldInstallGpuDuringSetup('needs-restart', true, true)).toBe(false);
+    expect(shouldInstallGpuDuringSetup('failed', true, true)).toBe(false);
+    expect(shouldInstallGpuDuringSetup('ready', true, true)).toBe(false);
+    expect(shouldInstallGpuDuringSetup('driver-missing', true, true)).toBe(false);
+    expect(shouldInstallGpuDuringSetup('unsupported', true, true)).toBe(false);
   });
 });
 

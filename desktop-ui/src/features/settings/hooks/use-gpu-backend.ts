@@ -1,7 +1,8 @@
-import { Channel, invoke } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
 import { useCallback, useEffect, useState } from 'react';
 import type { GpuBackendStatusDto } from '../../../lib/backend/generated/GpuBackendStatusDto';
 import type { GpuInstallProgressDto } from '../../../lib/backend/generated/GpuInstallProgressDto';
+import { installGpuBackend } from '../../../lib/backend/gpu-install';
 import { isTauriRuntime } from '../../../lib/backend/runtime';
 
 export interface GpuBackendState {
@@ -19,11 +20,10 @@ export interface GpuBackendState {
  * GPU backend lifecycle: reports what acceleration can do on this machine and
  * downloads the CUDA plugin when the user opts in.
  *
- * Unlike the model downloads, a finished install does not become usable
- * immediately — ggml builds its backend registry once at startup and cannot
- * unload it, so the new device only appears after a restart. The backend
- * reflects that by not returning a `ready` status here, and the UI says so
- * rather than implying the GPU is already in use.
+ * A finished install reports `needs-restart` rather than `ready` — ggml builds
+ * its backend registry once at startup and has no unload — so the status the
+ * install resolves with is the whole answer, and nothing here has to remember
+ * that an install happened.
  */
 export function useGpuBackend(): GpuBackendState {
   const [status, setStatus] = useState<GpuBackendStatusDto | null>(null);
@@ -48,10 +48,7 @@ export function useGpuBackend(): GpuBackendState {
     setError(null);
     setProgress(null);
 
-    const channel = new Channel<GpuInstallProgressDto>();
-    channel.onmessage = setProgress;
-
-    invoke<GpuBackendStatusDto>('install_gpu_backend', { onProgress: channel })
+    installGpuBackend(setProgress)
       .then(setStatus)
       .catch((e) => setError(String(e)))
       .finally(() => {

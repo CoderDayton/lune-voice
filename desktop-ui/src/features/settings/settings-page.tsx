@@ -16,7 +16,6 @@ import { workspaceStore } from '../../store/workspace-store';
 import { AppearanceSection } from './sections/appearance-section';
 import { DictationSection } from './sections/dictation-section';
 import { GeneralSection } from './sections/general-section';
-import { GpuSection } from './sections/gpu-section';
 import { ModelsSection } from './sections/models-section';
 import { OutputSection } from './sections/output-section';
 import { PillSection } from './sections/pill-section';
@@ -82,13 +81,7 @@ export function SettingsPage() {
     dictation: <DictationSection settings={settings} />,
     pill: <PillSection />,
     transcription: (
-      // GPU acceleration sits here rather than under Models: it is about how
-      // transcription runs, not something installed per model, and it renders
-      // nothing at all on a build without the native backend.
-      <>
-        <TranscriptionSection settings={settings} onManageModels={() => setActive('models')} />
-        <GpuSection />
-      </>
+      <TranscriptionSection settings={settings} onManageModels={() => setActive('models')} />
     ),
     styling: <StylingEngineSection settings={settings} />,
     output: <OutputSection settings={settings} />,

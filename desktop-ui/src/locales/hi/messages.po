@@ -80,6 +80,10 @@ msgstr "पाठ का एक हिस्सा, जिसे आपका �
 msgid "A vertical pill hugs the side of the screen."
 msgstr "एक ऊर्ध्वाधर संकेतक स्क्रीन के किनारे से सटकर रहता है।"
 
+#: src/features/settings/components/gpu-backend-card.tsx:47
+msgid "Acceleration"
+msgstr "त्वरण"
+
 #: src/features/shell/components/sidebar.tsx:190
 msgid "Account and status"
 msgstr "खाता और स्थिति"
@@ -88,6 +92,7 @@ msgstr "खाता और स्थिति"
 msgid "Action"
 msgstr "कार्रवाई"
 
+#: src/features/settings/components/gpu-backend-card.tsx:122
 #: src/features/styles/components/style-preset-card.tsx:75
 msgid "Active"
 msgstr "सक्रिय"
@@ -118,11 +123,11 @@ msgstr "सुधार जोड़ें"
 msgid "Add snippet"
 msgstr "स्निपेट जोड़ें"
 
-#: src/features/settings/sections/models-section.tsx:104
+#: src/features/settings/sections/models-section.tsx:98
 msgid "AI models stored on your device."
 msgstr "आपके डिवाइस पर संग्रहीत AI मॉडल।"
 
-#: src/features/welcome/welcome-page.tsx:164
+#: src/features/welcome/welcome-page.tsx:187
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "सभी आवश्यक मॉडल पहले से इंस्टॉल हैं। तैयार होने पर जारी रखें।"
 
@@ -143,7 +148,7 @@ msgid "API key"
 msgstr "API कुंजी"
 
 #: src/features/settings/sections/appearance-section.tsx:35
-#: src/features/settings/settings-page.tsx:70
+#: src/features/settings/settings-page.tsx:69
 msgid "Appearance"
 msgstr "उपस्थिति"
 
@@ -190,7 +195,7 @@ msgstr "अंतर्निहित"
 
 #: src/components/feedback/confirm-dialog.tsx:52
 #: src/features/dictionary/components/dictionary-table.tsx:96
-#: src/features/settings/sections/models-section.tsx:311
+#: src/features/settings/sections/models-section.tsx:310
 #: src/features/styles/components/style-editor-modal.tsx:206
 msgid "Cancel"
 msgstr "रद्द करें"
@@ -216,7 +221,7 @@ msgstr "आवाज़ से रिकॉर्ड करें"
 msgid "Capture device and how recording detects when you speak."
 msgstr "कैप्चर डिवाइस और रिकॉर्डिंग यह कैसे पहचानती है कि आप कब बोल रहे हैं।"
 
-#: src/features/welcome/welcome-page.tsx:307
+#: src/features/welcome/welcome-page.tsx:395
 msgid "Change engine"
 msgstr "इंजन बदलें"
 
@@ -233,11 +238,11 @@ msgstr "शुरू होने पर अपडेट देखें"
 msgid "Check whether a newer version has been released."
 msgstr "जाँचें कि कोई नया संस्करण जारी हुआ है या नहीं।"
 
-#: src/features/welcome/welcome-page.tsx:158
+#: src/features/welcome/welcome-page.tsx:181
 msgid "Check your network and we'll pick up where we left off."
 msgstr "अपना नेटवर्क जांचें और हम वहीं से शुरू करेंगे जहां हमने छोड़ा था।"
 
-#: src/features/welcome/welcome-page.tsx:62
+#: src/features/welcome/welcome-page.tsx:70
 msgid "Checking installed models…"
 msgstr "स्थापित मॉडलों की जाँच की जा रही है..."
 
@@ -262,8 +267,8 @@ msgstr "चुनें कि Lune Voice कैसा दिखता है।
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
 msgstr "चुनें कि प्रतिलेखों को कैसे संवारा जाए — अपने द्वारा कॉन्फ़िगर किए गए OpenAI-संगत एंडपॉइंट को भेजकर, चाहे वह स्थानीय हो या होस्ट किया हुआ, या इसे पूरी तरह बंद रखकर।"
 
-#: src/features/welcome/welcome-page.tsx:161
-#: src/features/welcome/welcome-page.tsx:167
+#: src/features/welcome/welcome-page.tsx:184
+#: src/features/welcome/welcome-page.tsx:190
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "इंस्टॉल करने के लिए AI मॉडल चुनें. सब कुछ ऑफ़लाइन चलता है - कोई क्लाउड नहीं, कोई खाता नहीं।"
 
@@ -271,7 +276,7 @@ msgstr "इंस्टॉल करने के लिए AI मॉडल च�
 msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
 msgstr "वह इंजन चुनें जो आपकी बोली को टेक्स्ट में बदलता है। लोकल इंजन पूरी तरह डिवाइस पर चलते हैं; Whisper बहुभाषी है और इसमें चुनने योग्य मॉडल आकार हैं।"
 
-#: src/features/welcome/welcome-page.tsx:149
+#: src/features/welcome/welcome-page.tsx:169
 msgid "Choose your speech engine. Everything runs offline — no cloud, no accounts."
 msgstr "अपना स्पीच इंजन चुनें। सब कुछ ऑफ़लाइन चलता है — न कोई क्लाउड, न कोई अकाउंट।"
 
@@ -288,7 +293,7 @@ msgid "close"
 msgstr "बंद करना"
 
 #: src/features/history/components/session-detail-modal.tsx:210
-#: src/features/settings/sections/models-section.tsx:323
+#: src/features/settings/sections/models-section.tsx:322
 #: src/features/styles/components/style-editor-modal.tsx:197
 msgid "Close"
 msgstr "बंद करना"
@@ -316,8 +321,8 @@ msgstr "कनेक्ट हो रहा है"
 msgid "Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network."
 msgstr "शुरू होने के थोड़ी देर बाद रिलीज़ सर्वर से संपर्क करता है और तभी बताता है जब कोई नया संस्करण मौजूद हो। डिफ़ॉल्ट रूप से बंद — डिक्टेशन को स्वयं कभी नेटवर्क की ज़रूरत नहीं होती।"
 
-#: src/features/welcome/welcome-page.tsx:239
-#: src/features/welcome/welcome-page.tsx:301
+#: src/features/welcome/welcome-page.tsx:322
+#: src/features/welcome/welcome-page.tsx:389
 msgid "Continue"
 msgstr "जारी रखें"
 
@@ -359,6 +364,10 @@ msgstr "सुधार"
 msgid "Correction sensitivity"
 msgstr "सुधार संवेदनशीलता"
 
+#: src/features/welcome/welcome-page.tsx:255
+msgid "Could not download GPU support — transcription will run on the CPU. You can retry under Settings › Models."
+msgstr "GPU समर्थन डाउनलोड नहीं हो सका — ट्रांसक्रिप्शन CPU पर चलेगा। आप सेटिंग्स › मॉडल में फिर से कोशिश कर सकते हैं।"
+
 #: src/features/dictionary/components/dictionary-form.tsx:43
 msgid "Couldn't add that rule. Try again."
 msgstr "वह नियम नहीं जोड़ा जा सका. पुनः प्रयास करें।"
@@ -394,7 +403,7 @@ msgstr "डार्क"
 #: src/features/dictionary/components/dictionary-table.tsx:146
 #: src/features/history/components/history-table.tsx:382
 #: src/features/history/components/session-detail-modal.tsx:203
-#: src/features/settings/sections/models-section.tsx:259
+#: src/features/settings/sections/models-section.tsx:258
 #: src/features/snippets/snippets-page.tsx:293
 msgid "Delete"
 msgstr "हटाएँ"
@@ -405,11 +414,11 @@ msgid "Delete {0}"
 msgstr "{0} हटाएँ"
 
 #. placeholder {0}: model.name
-#: src/features/settings/sections/models-section.tsx:296
+#: src/features/settings/sections/models-section.tsx:295
 msgid "Delete {0}?"
 msgstr "{0} हटाएँ?"
 
-#: src/features/settings/sections/models-section.tsx:314
+#: src/features/settings/sections/models-section.tsx:313
 msgid "Delete model"
 msgstr "मॉडल हटाएँ"
 
@@ -446,7 +455,7 @@ msgstr "विवरण बहुत लंबा है।"
 msgid "Deterministic fixes applied before any AI styling."
 msgstr "किसी भी एआई स्टाइलिंग से पहले नियतात्मक सुधार लागू किए जाते हैं।"
 
-#: src/features/settings/settings-page.tsx:71
+#: src/features/settings/settings-page.tsx:70
 msgid "Dictation"
 msgstr "डिक्टेशन"
 
@@ -479,7 +488,7 @@ msgstr "वर्तमान ड्राफ्ट को त्यागें
 msgid "Disconnected"
 msgstr "डिस्कनेक्टेड"
 
-#: src/features/settings/sections/models-section.tsx:133
+#: src/features/settings/sections/models-section.tsx:132
 msgid "Disk usage"
 msgstr "डिस्क उपयोग"
 
@@ -488,7 +497,8 @@ msgid "Dismiss error"
 msgstr "त्रुटि ख़ारिज करें"
 
 #: src/features/history/components/history-table.tsx:376
-#: src/features/settings/sections/models-section.tsx:273
+#: src/features/settings/components/gpu-backend-card.tsx:108
+#: src/features/settings/sections/models-section.tsx:272
 msgid "Download"
 msgstr "डाउनलोड"
 
@@ -497,29 +507,30 @@ msgstr "डाउनलोड"
 msgid "Download {0}"
 msgstr "{0} डाउनलोड करें"
 
-#: src/features/welcome/welcome-page.tsx:293
+#: src/features/welcome/welcome-page.tsx:381
 msgid "Download {pendingCount} models"
 msgstr "{pendingCount} मॉडल डाउनलोड करें"
 
-#: src/features/welcome/welcome-page.tsx:293
+#: src/features/welcome/welcome-page.tsx:380
 msgid "Download 1 model"
 msgstr "1 मॉडल डाउनलोड करें"
 
-#: src/features/welcome/welcome-page.tsx:113
+#: src/features/welcome/welcome-page.tsx:132
 msgid "Download failed"
 msgstr "डाउनलोड विफल रहा"
 
 #. placeholder {0}: formatBytes(status.downloadBytes)
 #: src/features/settings/sections/gpu-section.tsx:54
-msgid "Download GPU support ({0})"
-msgstr "GPU समर्थन डाउनलोड करें ({0})"
+#~ msgid "Download GPU support ({0})"
+#~ msgstr "GPU समर्थन डाउनलोड करें ({0})"
 
-#: src/features/welcome/welcome-page.tsx:157
+#: src/features/welcome/welcome-page.tsx:180
 msgid "Download interrupted"
 msgstr "डाउनलोड बाधित"
 
+#: src/components/ui/byte-progress.tsx:35
 #: src/features/settings/components/asr-engine-cards.tsx:149
-#: src/features/settings/sections/models-section.tsx:232
+#: src/features/settings/sections/models-section.tsx:231
 #: src/features/welcome/components/model-card.tsx:99
 msgid "Download progress"
 msgstr "डाउनलोड प्रगति"
@@ -528,14 +539,18 @@ msgstr "डाउनलोड प्रगति"
 msgid "Download transcript"
 msgstr "प्रतिलेख डाउनलोड करें"
 
-#: src/features/welcome/welcome-page.tsx:154
+#: src/features/welcome/welcome-page.tsx:174
 msgid "Downloading models"
 msgstr "मॉडल डाउनलोड हो रहे हैं"
 
+#: src/features/welcome/welcome-page.tsx:252
+msgid "Downloading NVIDIA's CUDA runtime."
+msgstr "NVIDIA का CUDA रनटाइम डाउनलोड हो रहा है।"
+
 #: src/features/settings/components/asr-engine-cards.tsx:152
-#: src/features/settings/sections/gpu-section.tsx:53
-#: src/features/settings/sections/models-section.tsx:273
-#: src/features/welcome/welcome-page.tsx:254
+#: src/features/settings/components/gpu-backend-card.tsx:108
+#: src/features/settings/sections/models-section.tsx:272
+#: src/features/welcome/welcome-page.tsx:337
 msgid "Downloading…"
 msgstr "डाउनलोड हो रहा है..."
 
@@ -594,7 +609,7 @@ msgstr "स्टाइलिंग सक्षम करें"
 msgid "Engine"
 msgstr "इंजन"
 
-#: src/features/welcome/welcome-page.tsx:280
+#: src/features/welcome/welcome-page.tsx:363
 msgid "Enter Lune Voice"
 msgstr "Lune Voice खोलें"
 
@@ -609,6 +624,10 @@ msgstr "उदाहरण स्टाइलिंग इंजन को आ�
 #: src/features/shell/components/sidebar.tsx:37
 msgid "Expand sidebar"
 msgstr "साइडबार का विस्तार करें"
+
+#: src/features/welcome/welcome-page.tsx:178
+msgid "Fetching the NVIDIA runtime. This is the last step, and it only happens once."
+msgstr "NVIDIA रनटाइम प्राप्त किया जा रहा है। यह आख़िरी चरण है और सिर्फ़ एक बार होता है।"
 
 #: src/features/styles/components/style-editor-modal.tsx:160
 msgid "Few-shot examples"
@@ -648,7 +667,7 @@ msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock.
 msgstr "संकेतक और स्क्रीन के किनारे के बीच का अंतर, ताकि वह टास्कबार या डॉक को न ढके।"
 
 #: src/features/settings/sections/general-section.tsx:52
-#: src/features/settings/settings-page.tsx:69
+#: src/features/settings/settings-page.tsx:68
 msgid "General"
 msgstr "सामान्य"
 
@@ -677,20 +696,21 @@ msgstr "शुभ संध्या"
 msgid "Good morning"
 msgstr "शुभ प्रभात"
 
-#: src/features/settings/sections/gpu-section.tsx:29
-#: src/features/welcome/components/engine-step.tsx:119
+#: src/features/settings/components/gpu-backend-card.tsx:66
+#: src/features/welcome/components/engine-step.tsx:123
+#: src/features/welcome/welcome-page.tsx:249
 msgid "GPU acceleration"
 msgstr "GPU त्वरण"
 
 #: src/features/settings/sections/gpu-section.tsx:92
-msgid "GPU acceleration is active."
-msgstr "GPU त्वरण सक्रिय है।"
+#~ msgid "GPU acceleration is active."
+#~ msgstr "GPU त्वरण सक्रिय है।"
 
 #: src/features/settings/sections/gpu-section.tsx:43
-msgid "GPU support"
-msgstr "GPU समर्थन"
+#~ msgid "GPU support"
+#~ msgstr "GPU समर्थन"
 
-#: src/features/settings/sections/gpu-section.tsx:108
+#: src/features/settings/components/gpu-backend-card.tsx:170
 msgid "GPU support is installed but not working."
 msgstr "GPU समर्थन स्थापित है, पर काम नहीं कर रहा।"
 
@@ -719,7 +739,7 @@ msgstr "संकेतक पट्टी कैसी दिखती है�
 msgid "Idle"
 msgstr "निष्क्रिय"
 
-#: src/features/settings/sections/models-section.tsx:216
+#: src/features/settings/sections/models-section.tsx:215
 msgid "In use"
 msgstr "उपयोग में"
 
@@ -732,10 +752,16 @@ msgid "Insert placeholder"
 msgstr "प्लेसहोल्डर डालें"
 
 #: src/features/settings/components/asr-engine-cards.tsx:228
-#: src/features/settings/sections/models-section.tsx:219
+#: src/features/settings/sections/models-section.tsx:218
 #: src/features/welcome/components/model-card.tsx:89
 msgid "Installed"
 msgstr "स्थापित"
+
+#: src/features/settings/components/gpu-backend-card.tsx:148
+#: src/features/welcome/components/engine-step.tsx:133
+#: src/features/welcome/welcome-page.tsx:254
+msgid "Installed. Restart Lune Voice to start using your GPU."
+msgstr "स्थापित। अपने GPU का उपयोग शुरू करने के लिए Lune Voice को पुनरारंभ करें।"
 
 #: src/features/styles/components/style-editor-modal.tsx:114
 msgid "Instructions"
@@ -852,12 +878,12 @@ msgstr "मिनट"
 msgid "Mode"
 msgstr "तरीका"
 
-#: src/features/settings/sections/models-section.tsx:103
-#: src/features/settings/settings-page.tsx:76
+#: src/features/settings/sections/models-section.tsx:97
+#: src/features/settings/settings-page.tsx:75
 msgid "Models"
 msgstr "मॉडल"
 
-#: src/features/welcome/welcome-page.tsx:322
+#: src/features/welcome/welcome-page.tsx:410
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "मॉडल स्थानीय रूप से सहेजे जाते हैं। कोई टेलीमेट्री नहीं, कोई खाते नहीं।"
 
@@ -866,10 +892,10 @@ msgid "Monitor"
 msgstr "मॉनिटर"
 
 #: src/features/settings/sections/gpu-section.tsx:44
-msgid "Most of the download is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
-msgstr "डाउनलोड का ज़्यादातर हिस्सा NVIDIA की CUDA गणित लाइब्रेरी है, जिसे इससे छोटे रूप में पुनर्वितरित नहीं किया जा सकता।"
+#~ msgid "Most of the download is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
+#~ msgstr "डाउनलोड का ज़्यादातर हिस्सा NVIDIA की CUDA गणित लाइब्रेरी है, जिसे इससे छोटे रूप में पुनर्वितरित नहीं किया जा सकता।"
 
-#: src/features/welcome/components/engine-step.tsx:49
+#: src/features/welcome/components/engine-step.tsx:53
 msgid "Multilingual · pick a size"
 msgstr "बहुभाषी · एक आकार चुनें"
 
@@ -892,6 +918,10 @@ msgstr "अगला पृष्ठ"
 #: src/features/styles/components/style-preset-card.tsx:99
 msgid "No"
 msgstr "नहीं"
+
+#: src/features/settings/components/gpu-backend-card.tsx:157
+msgid "No NVIDIA driver was found. Install the driver for your GPU and the download will appear here."
+msgstr "कोई NVIDIA ड्राइवर नहीं मिला। अपने GPU का ड्राइवर इंस्टॉल करें और डाउनलोड यहाँ दिखाई देगा।"
 
 #: src/features/dictionary/components/dictionary-table.tsx:249
 msgid "No rules match “{query}”."
@@ -936,11 +966,12 @@ msgstr "आवाज का पता लगाने से पहले मा
 msgid "not connected"
 msgstr "जुड़ा नहीं है"
 
-#: src/features/settings/sections/models-section.tsx:222
+#: src/features/settings/components/gpu-backend-card.tsx:129
+#: src/features/settings/sections/models-section.tsx:221
 msgid "Not installed"
 msgstr "इंस्टॉल नहीं है"
 
-#: src/features/settings/sections/models-section.tsx:135
+#: src/features/settings/sections/models-section.tsx:134
 msgid "Nothing installed"
 msgstr "कुछ भी इंस्टॉल नहीं है"
 
@@ -979,7 +1010,7 @@ msgid "Orientation"
 msgstr "दिशा"
 
 #: src/features/overview/overview-page.tsx:121
-#: src/features/settings/settings-page.tsx:75
+#: src/features/settings/settings-page.tsx:74
 msgid "Output"
 msgstr "आउटपुट"
 
@@ -987,7 +1018,7 @@ msgstr "आउटपुट"
 msgid "Overall footprint of the pill bar."
 msgstr "संकेतक पट्टी का कुल आकार।"
 
-#: src/features/welcome/welcome-page.tsx:202
+#: src/features/welcome/welcome-page.tsx:282
 msgid "Overall progress"
 msgstr "समग्र प्रगति"
 
@@ -1009,7 +1040,7 @@ msgstr "पेस्ट सबसे सरल है. कुछ ऐप्स �
 msgid "Phrase"
 msgstr "वाक्यांश"
 
-#: src/features/settings/settings-page.tsx:72
+#: src/features/settings/settings-page.tsx:71
 msgid "Pill"
 msgstr "संकेतक"
 
@@ -1041,7 +1072,7 @@ msgstr "स्थान-निर्धारण"
 msgid "Play a short sound when dictation starts, finishes, or runs into an error."
 msgstr "डिक्टेशन शुरू होने, पूरा होने या किसी त्रुटि में आने पर एक छोटी ध्वनि बजाएँ।"
 
-#: src/features/welcome/welcome-page.tsx:257
+#: src/features/welcome/welcome-page.tsx:340
 msgid "Please keep the app open until downloads finish"
 msgstr "कृपया डाउनलोड समाप्त होने तक ऐप को खुला रखें"
 
@@ -1156,7 +1187,11 @@ msgstr "रीसेट करें"
 msgid "Reset position"
 msgstr "स्थिति रीसेट करें"
 
-#: src/features/welcome/welcome-page.tsx:268
+#: src/features/settings/components/gpu-backend-card.tsx:125
+msgid "Restart needed"
+msgstr "पुनरारंभ आवश्यक"
+
+#: src/features/welcome/welcome-page.tsx:351
 msgid "Retry download"
 msgstr "पुनः डाउनलोड करने का प्रयास करें"
 
@@ -1166,16 +1201,20 @@ msgstr "प्रत्येक ट्रांसक्रिप्ट को 
 
 #. placeholder {0}: status.devices.join(', ')
 #: src/features/settings/sections/gpu-section.tsx:91
-msgid "Running on {0}."
-msgstr "{0} पर चल रहा है।"
+#~ msgid "Running on {0}."
+#~ msgstr "{0} पर चल रहा है।"
+
+#: src/features/settings/components/gpu-backend-card.tsx:132
+msgid "Running on CPU"
+msgstr "CPU पर चल रहा है"
 
 #: src/features/settings/sections/gpu-section.tsx:118
-msgid "Running on the CPU."
-msgstr "CPU पर चल रहा है।"
+#~ msgid "Running on the CPU."
+#~ msgstr "CPU पर चल रहा है।"
 
 #: src/features/settings/sections/gpu-section.tsx:100
-msgid "Running on the CPU. No NVIDIA driver was found — install the driver for your GPU and Lune Voice will offer GPU support here."
-msgstr "CPU पर चल रहा है। कोई NVIDIA ड्राइवर नहीं मिला — अपने GPU का ड्राइवर स्थापित करें, फिर Lune Voice यहाँ GPU समर्थन देगा।"
+#~ msgid "Running on the CPU. No NVIDIA driver was found — install the driver for your GPU and Lune Voice will offer GPU support here."
+#~ msgstr "CPU पर चल रहा है। कोई NVIDIA ड्राइवर नहीं मिला — अपने GPU का ड्राइवर स्थापित करें, फिर Lune Voice यहाँ GPU समर्थन देगा।"
 
 #: src/features/overview/overview-page.tsx:261
 msgid "s"
@@ -1215,7 +1254,7 @@ msgstr "प्रतिलेख खोजें"
 msgid "Search transcripts…"
 msgstr "प्रतिलेख खोजें..."
 
-#: src/features/welcome/welcome-page.tsx:297
+#: src/features/welcome/welcome-page.tsx:385
 msgid "Select required models"
 msgstr "आवश्यक मॉडल चुनें"
 
@@ -1246,7 +1285,15 @@ msgstr "हॉटकी सेट करें"
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "आप जो भाषा बोलते हैं उसे सेट करें. स्वतः वाणी से पता लगाने का उपयोग करता है।"
 
-#: src/features/settings/settings-page.tsx:102
+#: src/features/welcome/welcome-page.tsx:378
+msgid "Set up GPU acceleration"
+msgstr "GPU त्वरण सेट करें"
+
+#: src/features/welcome/welcome-page.tsx:177
+msgid "Setting up your GPU"
+msgstr "आपका GPU सेट किया जा रहा है"
+
+#: src/features/settings/settings-page.tsx:95
 msgid "Settings sections"
 msgstr "सेटिंग्स अनुभाग"
 
@@ -1268,9 +1315,9 @@ msgstr "आकार"
 msgid "Size & shape"
 msgstr "आकार और रूप"
 
-#: src/features/welcome/welcome-page.tsx:243
-#: src/features/welcome/welcome-page.tsx:271
-#: src/features/welcome/welcome-page.tsx:310
+#: src/features/welcome/welcome-page.tsx:326
+#: src/features/welcome/welcome-page.tsx:354
+#: src/features/welcome/welcome-page.tsx:398
 msgid "Skip for now"
 msgstr "अभी के लिए छोड़ दे"
 
@@ -1295,7 +1342,7 @@ msgstr "ध्वनि संकेत"
 msgid "Speaking Time"
 msgstr "बोलने का समय"
 
-#: src/features/settings/sections/models-section.tsx:75
+#: src/features/settings/sections/models-section.tsx:69
 msgid "Speech-to-text"
 msgstr "स्पीच-टू-टेक्स्ट"
 
@@ -1327,8 +1374,8 @@ msgid "Start, stop, and cancel dictation without leaving your work."
 msgstr "अपना काम छोड़े बिना डिक्टेशन शुरू करें, रोकें और रद्द करें।"
 
 #: src/features/settings/sections/gpu-section.tsx:33
-msgid "Status"
-msgstr "स्थिति"
+#~ msgid "Status"
+#~ msgstr "स्थिति"
 
 #: src/features/dictation/dictation-pill.tsx:88
 msgid "Stop and transcribe"
@@ -1353,7 +1400,7 @@ msgstr "डिक्टेशन रोकें"
 msgid "Style"
 msgstr "शैली"
 
-#: src/features/settings/settings-page.tsx:74
+#: src/features/settings/settings-page.tsx:73
 msgid "Styling"
 msgstr "स्टाइलिंग"
 
@@ -1411,11 +1458,11 @@ msgstr "जिन शब्दों को लेकर रिकग्ना�
 msgid "Theme"
 msgstr "विषय"
 
-#: src/features/settings/sections/models-section.tsx:306
+#: src/features/settings/sections/models-section.tsx:305
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "यह मॉडल आपके मौजूदा कॉन्फ़िगरेशन द्वारा उपयोग में है। जब तक आप इसे दोबारा इंस्टॉल न करें या कोई दूसरा न चुनें, तब तक डिक्टेशन काम नहीं कर सकता।"
 
-#: src/features/welcome/welcome-page.tsx:155
+#: src/features/welcome/welcome-page.tsx:175
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "ऐसा केवल एक बार होता है. इस बीच आप अपने कंप्यूटर का उपयोग जारी रख सकते हैं."
 
@@ -1478,13 +1525,30 @@ msgid "Transcript"
 msgstr "टेक्स्ट"
 
 #: src/features/settings/sections/transcription-section.tsx:36
-#: src/features/settings/settings-page.tsx:73
+#: src/features/settings/settings-page.tsx:72
 msgid "Transcription"
 msgstr "ट्रांसक्रिप्शन"
 
+#. placeholder {0}: status.devices.join(', ')
+#: src/features/settings/components/gpu-backend-card.tsx:140
+msgid "Transcription is running on {0}."
+msgstr "ट्रांसक्रिप्शन {0} पर चल रहा है।"
+
+#: src/features/settings/components/gpu-backend-card.tsx:141
+msgid "Transcription is running on your GPU."
+msgstr "ट्रांसक्रिप्शन आपके GPU पर चल रहा है।"
+
 #: src/features/settings/sections/gpu-section.tsx:30
-msgid "Transcription runs on the CPU by default. If you have an NVIDIA GPU, an optional download moves it to the GPU for noticeably lower latency."
-msgstr "प्रतिलेखन डिफ़ॉल्ट रूप से CPU पर चलता है। यदि आपके पास NVIDIA GPU है, तो एक वैकल्पिक डाउनलोड इसे GPU पर ले जाता है और विलंब काफ़ी घट जाता है।"
+#~ msgid "Transcription runs on the CPU by default. If you have an NVIDIA GPU, an optional download moves it to the GPU for noticeably lower latency."
+#~ msgstr "प्रतिलेखन डिफ़ॉल्ट रूप से CPU पर चलता है। यदि आपके पास NVIDIA GPU है, तो एक वैकल्पिक डाउनलोड इसे GPU पर ले जाता है और विलंब काफ़ी घट जाता है।"
+
+#: src/features/settings/components/gpu-backend-card.tsx:164
+msgid "Transcription runs on the CPU. An optional download moves it to your NVIDIA GPU for noticeably lower latency — most of it is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
+msgstr "ट्रांसक्रिप्शन CPU पर चलता है। एक वैकल्पिक डाउनलोड इसे आपके NVIDIA GPU पर ले जाता है, जिससे विलंब स्पष्ट रूप से कम होता है — इसका अधिकांश हिस्सा NVIDIA की CUDA गणित लाइब्रेरी है, जिन्हें छोटे रूप में पुनर्वितरित नहीं किया जा सकता।"
+
+#: src/features/settings/components/gpu-backend-card.tsx:165
+msgid "Transcription runs on the CPU. No GPU download has been published for this build yet."
+msgstr "ट्रांसक्रिप्शन CPU पर चलता है। इस बिल्ड के लिए अभी कोई GPU डाउनलोड प्रकाशित नहीं हुआ है।"
 
 #: src/features/snippets/snippets-page.tsx:145
 msgid "Trigger phrase"
@@ -1502,7 +1566,7 @@ msgstr "ऐसे टाइप होता है"
 msgid "Updates"
 msgstr "अपडेट"
 
-#: src/features/welcome/components/engine-step.tsx:136
+#: src/features/welcome/components/engine-step.tsx:143
 msgid "Use GPU acceleration"
 msgstr "GPU त्वरण का उपयोग करें"
 
@@ -1537,13 +1601,13 @@ msgstr "दृश्यता"
 msgid "Voice model"
 msgstr "आवाज मॉडल"
 
-#: src/features/welcome/welcome-page.tsx:163
+#: src/features/welcome/welcome-page.tsx:186
 msgid "Welcome back"
 msgstr "वापसी पर स्वागत है"
 
-#: src/features/welcome/welcome-page.tsx:148
-#: src/features/welcome/welcome-page.tsx:160
-#: src/features/welcome/welcome-page.tsx:166
+#: src/features/welcome/welcome-page.tsx:168
+#: src/features/welcome/welcome-page.tsx:183
+#: src/features/welcome/welcome-page.tsx:189
 msgid "Welcome to Lune Voice"
 msgstr "Lune Voice में आपका स्वागत है"
 
@@ -1571,16 +1635,16 @@ msgstr "कौन सा पेस्ट शॉर्टकट भेजना �
 msgid "Which screen the pill appears on."
 msgstr "संकेतक किस स्क्रीन पर दिखाई देता है।"
 
-#: src/features/welcome/components/engine-step.tsx:48
+#: src/features/welcome/components/engine-step.tsx:52
 msgid "Whisper"
 msgstr "Whisper"
 
 #: src/features/settings/components/asr-engine-cards.tsx:122
-#: src/features/welcome/components/engine-step.tsx:71
+#: src/features/welcome/components/engine-step.tsx:75
 msgid "Whisper model size"
 msgstr "Whisper मॉडल आकार"
 
-#: src/features/welcome/components/engine-step.tsx:50
+#: src/features/welcome/components/engine-step.tsx:54
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
 msgstr "whisper.cpp डिवाइस पर चल रहा है। गति और सटीकता के बीच संतुलन के लिए एक आकार चुनें।"
 
@@ -1610,7 +1674,7 @@ msgstr "आप संस्करण {version} चला रहे हैं।"
 msgid "You say"
 msgstr "आप बताओ"
 
-#: src/features/welcome/welcome-page.tsx:151
+#: src/features/welcome/welcome-page.tsx:171
 msgid "You're all set"
 msgstr "सब तैयार है"
 
@@ -1618,19 +1682,28 @@ msgstr "सब तैयार है"
 msgid "Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none."
 msgstr "आपकी API कुंजी। सहेजी गई कुंजी बनाए रखने के लिए इसे खाली छोड़ें — या तब भी, जब एंडपॉइंट आपकी अपनी मशीन या नेटवर्क पर चलता हो और उसे कोई कुंजी न चाहिए।"
 
-#: src/features/welcome/components/engine-step.tsx:126
+#: src/features/welcome/components/engine-step.tsx:131
 msgid "Your GPU is ready — use it for faster transcription."
 msgstr "आपका GPU तैयार है — तेज़ प्रतिलेखन के लिए इसका उपयोग करें।"
 
+#: src/features/welcome/components/engine-step.tsx:137
+#~ msgid "Your GPU qualifies. Keep this on and the runtime download will be offered under Settings › Models."
+#~ msgstr "आपका GPU योग्य है। इसे चालू रखें और रनटाइम डाउनलोड सेटिंग्स › मॉडल में मिलेगा।"
+
 #: src/features/welcome/components/engine-step.tsx:127
-msgid "Your GPU qualifies. Keep this on, then finish the one-time setup in Settings."
-msgstr "आपका GPU उपयुक्त है। इसे चालू रहने दें, फिर सेटिंग्स में एक-बार का सेटअप पूरा करें।"
+#~ msgid "Your GPU qualifies. Keep this on, then finish the one-time setup in Settings."
+#~ msgstr "आपका GPU उपयुक्त है। इसे चालू रहने दें, फिर सेटिंग्स में एक-बार का सेटअप पूरा करें।"
+
+#. placeholder {0}: formatBytes(gpuDownloadBytes)
+#: src/features/welcome/components/engine-step.tsx:134
+msgid "Your GPU qualifies. Setup will download the {0} NVIDIA runtime, then a restart turns it on."
+msgstr "आपका GPU योग्य है। सेटअप {0} का NVIDIA रनटाइम डाउनलोड करेगा, फिर पुनरारंभ करने पर यह चालू हो जाएगा।"
 
 #: src/features/overview/overview-page.tsx:229
 msgid "your hotkey"
 msgstr "आपकी हॉटकी"
 
-#: src/features/welcome/welcome-page.tsx:152
+#: src/features/welcome/welcome-page.tsx:172
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "आपके मॉडल तैयार हैं. सब कुछ इस मशीन पर रहता है."
 

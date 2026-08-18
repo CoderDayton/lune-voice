@@ -9,7 +9,10 @@ import {
   ShieldCheck,
   Sparkles,
   Wand2,
+  Zap,
 } from 'lucide-react';
+import { ByteProgress } from '../../components/ui/byte-progress';
+import type { GpuInstallProgressDto } from '../../lib/backend/generated/GpuInstallProgressDto';
 import { EngineStep } from './components/engine-step';
 import { ModelCard } from './components/model-card';
 import { isSetupSatisfiable } from './setup-logic';
@@ -42,6 +45,11 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
     gpuOffer,
     useGpu,
     setUseGpu,
+    willInstallGpu,
+    gpuProgress,
+    gpuDownloadBytes,
+    gpuInstalled,
+    gpuError,
     setEngineBackend,
     setEngineWhisper,
     confirmEngine,
@@ -79,6 +87,7 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
           error={error}
           gpuOffer={gpuOffer}
           useGpu={useGpu}
+          gpuDownloadBytes={gpuDownloadBytes}
           onSelectEngine={setEngineBackend}
           onSelectWhisper={setEngineWhisper}
           onToggleGpu={setUseGpu}
@@ -106,6 +115,16 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
         </div>
       )}
 
+      {(phase === 'gpu' || gpuInstalled || gpuError) && (
+        <GpuSetupCard
+          installing={phase === 'gpu'}
+          progress={gpuProgress}
+          totalBytes={gpuDownloadBytes}
+          installed={gpuInstalled}
+          error={gpuError}
+        />
+      )}
+
       {phase === 'error' && error && (
         <div className="alert alert-error gap-2 text-sm" role="alert">
           <CircleAlert size={18} className="shrink-0" />
@@ -120,6 +139,7 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
         phase={phase}
         requiredOk={requiredOk}
         pendingCount={pending.length}
+        willInstallGpu={willInstallGpu}
         onStart={startDownload}
         onRetry={retry}
         onFinish={onFinish}
@@ -153,6 +173,9 @@ function Header({ phase, requiredOk, pendingCount, error: _error }: HeaderProps)
   } else if (phase === 'downloading') {
     title = t`Downloading models`;
     subtitle = t`This only happens once. You can keep using your computer in the meantime.`;
+  } else if (phase === 'gpu') {
+    title = t`Setting up your GPU`;
+    subtitle = t`Fetching the NVIDIA runtime. This is the last step, and it only happens once.`;
   } else if (phase === 'error') {
     title = t`Download interrupted`;
     subtitle = t`Check your network and we'll pick up where we left off.`;
@@ -188,6 +211,63 @@ function Header({ phase, requiredOk, pendingCount, error: _error }: HeaderProps)
   );
 }
 
+interface GpuSetupCardProps {
+  installing: boolean;
+  progress: GpuInstallProgressDto | null;
+  totalBytes: number;
+  installed: boolean;
+  error: string | null;
+}
+
+/**
+ * The CUDA plugin step: its own card rather than a row in the model list,
+ * because it is not a model and — unlike every model here — finishing it does
+ * not make the GPU usable until the app restarts.
+ */
+function GpuSetupCard({ installing, progress, totalBytes, installed, error }: GpuSetupCardProps) {
+  const { t } = useLingui();
+
+  const tone = error
+    ? 'border-warning/40 bg-warning/5'
+    : installed
+      ? 'border-success/40 bg-success/5'
+      : 'border-primary/50 bg-primary/8';
+
+  return (
+    <div className={`rounded-box border p-4 ${tone}`}>
+      <div className="flex items-start gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-field bg-primary/15 text-primary">
+          {installing ? (
+            <Loader2 size={18} className="animate-spin" />
+          ) : installed ? (
+            <RefreshCw size={18} strokeWidth={1.8} />
+          ) : (
+            <Zap size={18} strokeWidth={1.8} />
+          )}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-content-strong">{t`GPU acceleration`}</p>
+          <p className="mt-0.5 text-xs text-content-subtle">
+            {installing
+              ? t`Downloading NVIDIA's CUDA runtime.`
+              : installed
+                ? t`Installed. Restart Lune Voice to start using your GPU.`
+                : t`Could not download GPU support — transcription will run on the CPU. You can retry under Settings › Models.`}
+          </p>
+          {installing && (
+            <ByteProgress
+              downloadedBytes={progress?.downloadedBytes ?? 0}
+              totalBytes={progress?.totalBytes ?? 0}
+              fallbackTotalBytes={totalBytes}
+            />
+          )}
+          {error && <p className="mt-2 break-words text-xs opacity-80">{error}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface OverallProgressProps {
   completed: number;
   total: number;
@@ -213,6 +293,8 @@ interface ActionsProps {
   phase: SetupPhase;
   requiredOk: boolean;
   pendingCount: number;
+  /** Whether starting the download step also fetches the CUDA plugin. */
+  willInstallGpu: boolean;
   onStart: () => void;
   onRetry: () => void;
   onFinish: () => void;
@@ -224,6 +306,7 @@ function Actions({
   phase,
   requiredOk,
   pendingCount,
+  willInstallGpu,
   onStart,
   onRetry,
   onFinish,
@@ -246,7 +329,7 @@ function Actions({
     );
   }
 
-  if (phase === 'downloading') {
+  if (phase === 'downloading' || phase === 'gpu') {
     return (
       <div className="flex flex-col items-center gap-2">
         <button type="button" className="btn btn-primary btn-wide" disabled>
@@ -283,14 +366,19 @@ function Actions({
     );
   }
 
-  // choose
-  const canStart = requiredOk && pendingCount > 0;
+  // choose — the GPU plugin is downloaded by the same step, so it alone is
+  // enough to have something to start even when every model is already here.
+  const canStart = requiredOk && (pendingCount > 0 || willInstallGpu);
   return (
     <div className="flex flex-col items-center gap-2">
       {canStart ? (
         <button type="button" className="btn btn-primary btn-wide" onClick={onStart}>
           <Download size={16} />
-          {pendingCount === 1 ? t`Download 1 model` : t`Download ${pendingCount} models`}
+          {pendingCount === 0
+            ? t`Set up GPU acceleration`
+            : pendingCount === 1
+              ? t`Download 1 model`
+              : t`Download ${pendingCount} models`}
         </button>
       ) : !requiredOk ? (
         <button type="button" className="btn btn-primary btn-wide" disabled>

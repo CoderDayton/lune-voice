@@ -49,6 +49,9 @@ wayland-backend = { workspace = true }
 # use the arboard+enigo path and must not pull D-Bus.
 [target.'cfg(target_os = "linux")'.dependencies]
 zbus = { workspace = true }
+# X11 reachability probe (src/compositor.rs). Pure Rust, and it performs the
+# full setup exchange — including the Xauthority handshake GDK would do.
+x11rb = "0.13"
 
 [dev-dependencies]
 tempfile = "3.27.0"

@@ -138,7 +138,8 @@ single thing the UI can say or offer:
 | `DriverMissing` | No NVIDIA driver. A download would not help | Explains, offers nothing |
 | `NotInstalled` | Driver present, plugin not downloaded | The offer, with size |
 | `Ready` | A CUDA device is registered | Names the device |
-| `Failed` | Plugin present, no device appeared | Says restart, or driver too old |
+| `NeedsRestart` | Plugin installed after the registry was built | Asks for a restart |
+| `Failed` | Plugin present at startup, no device appeared | Blames the driver, with the reason |
 
 Driver detection `dlopen`s `libcuda.so.1` and lets the dynamic linker search its
 normal paths. Scanning `/usr/local/cuda` would both miss distro packages that
@@ -149,10 +150,16 @@ is the right test for both shapes of build: the downloaded plugin, and a
 statically linked `whisper-cuda` binary that has no plugin file on disk yet
 needs no download either.
 
-The `Failed` distinction matters. If the plugin was not on disk when the
-registry was built, the cause is simply that ggml cannot load it mid-process, so
-the message says to restart. Only when it *was* present at load time and still
-registered nothing does the message blame the driver.
+`NeedsRestart` and `Failed` both mean "installed, but no device", and the split
+matters. If the plugin was not on disk when the registry was built, the cause is
+simply that ggml cannot load it mid-process, so the state is `NeedsRestart` and
+carries no `reason` — nothing is wrong. Only when the plugin *was* present at
+load time and still registered nothing is it `Failed`, whose `reason` blames the
+driver.
+
+Because the registry is built once at startup, `NeedsRestart` can only be the
+result of an install made by this process — a fresh launch answers `Ready` or
+`Failed`.
 
 IPC surface: `gpu_backend_status` and `install_gpu_backend`, the latter
 streaming progress over a Tauri `Channel`.

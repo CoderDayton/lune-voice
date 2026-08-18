@@ -3381,6 +3381,7 @@ dependencies = [
  "wayland-protocols",
  "wayland-protocols-wlr",
  "wayland-scanner",
+ "x11rb",
  "zbus 5.14.0",
 ]
 

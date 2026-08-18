@@ -80,6 +80,10 @@ msgstr "트리거 문구를 말하면 Lune Voice가 대신 입력해 주는 텍�
 msgid "A vertical pill hugs the side of the screen."
 msgstr "세로 표시기가 화면 가장자리에 붙습니다."
 
+#: src/features/settings/components/gpu-backend-card.tsx:47
+msgid "Acceleration"
+msgstr "가속"
+
 #: src/features/shell/components/sidebar.tsx:190
 msgid "Account and status"
 msgstr "계정 및 상태"
@@ -88,6 +92,7 @@ msgstr "계정 및 상태"
 msgid "Action"
 msgstr "작업"
 
+#: src/features/settings/components/gpu-backend-card.tsx:122
 #: src/features/styles/components/style-preset-card.tsx:75
 msgid "Active"
 msgstr "활성"
@@ -118,11 +123,11 @@ msgstr "수정 추가"
 msgid "Add snippet"
 msgstr "스니펫 추가"
 
-#: src/features/settings/sections/models-section.tsx:104
+#: src/features/settings/sections/models-section.tsx:98
 msgid "AI models stored on your device."
 msgstr "기기에 저장된 AI 모델입니다."
 
-#: src/features/welcome/welcome-page.tsx:164
+#: src/features/welcome/welcome-page.tsx:187
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "필요한 모든 모델이 이미 설치되어 있습니다. 준비가 되면 계속하세요."
 
@@ -143,7 +148,7 @@ msgid "API key"
 msgstr "API 키"
 
 #: src/features/settings/sections/appearance-section.tsx:35
-#: src/features/settings/settings-page.tsx:70
+#: src/features/settings/settings-page.tsx:69
 msgid "Appearance"
 msgstr "모양"
 
@@ -190,7 +195,7 @@ msgstr "내장"
 
 #: src/components/feedback/confirm-dialog.tsx:52
 #: src/features/dictionary/components/dictionary-table.tsx:96
-#: src/features/settings/sections/models-section.tsx:311
+#: src/features/settings/sections/models-section.tsx:310
 #: src/features/styles/components/style-editor-modal.tsx:206
 msgid "Cancel"
 msgstr "취소"
@@ -216,7 +221,7 @@ msgstr "음성으로 등록"
 msgid "Capture device and how recording detects when you speak."
 msgstr "캡처 장치와 녹음이 말하는 시점을 감지하는 방식입니다."
 
-#: src/features/welcome/welcome-page.tsx:307
+#: src/features/welcome/welcome-page.tsx:395
 msgid "Change engine"
 msgstr "엔진 변경"
 
@@ -233,11 +238,11 @@ msgstr "시작할 때 업데이트 확인"
 msgid "Check whether a newer version has been released."
 msgstr "더 새로운 버전이 나왔는지 확인합니다."
 
-#: src/features/welcome/welcome-page.tsx:158
+#: src/features/welcome/welcome-page.tsx:181
 msgid "Check your network and we'll pick up where we left off."
 msgstr "네트워크를 확인하면 중단한 부분부터 다시 시작하겠습니다."
 
-#: src/features/welcome/welcome-page.tsx:62
+#: src/features/welcome/welcome-page.tsx:70
 msgid "Checking installed models…"
 msgstr "설치된 모델을 확인하는 중…"
 
@@ -262,8 +267,8 @@ msgstr "Lune Voice의 모양을 선택하세요."
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
 msgstr "전사본을 다듬는 방식을 선택하세요 — 직접 설정한 OpenAI 호환 엔드포인트(로컬이든 호스팅이든)로 보내거나, 전혀 사용하지 않을 수 있습니다."
 
-#: src/features/welcome/welcome-page.tsx:161
-#: src/features/welcome/welcome-page.tsx:167
+#: src/features/welcome/welcome-page.tsx:184
+#: src/features/welcome/welcome-page.tsx:190
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "설치할 AI 모델을 선택하세요. 모든 것이 오프라인으로 실행됩니다. 클라우드나 계정이 없습니다."
 
@@ -271,7 +276,7 @@ msgstr "설치할 AI 모델을 선택하세요. 모든 것이 오프라인으로
 msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
 msgstr "음성을 텍스트로 변환하는 엔진을 선택하세요. 로컬 엔진은 완전히 온디바이스로 실행되며, Whisper는 다국어를 지원하고 모델 크기를 선택할 수 있습니다."
 
-#: src/features/welcome/welcome-page.tsx:149
+#: src/features/welcome/welcome-page.tsx:169
 msgid "Choose your speech engine. Everything runs offline — no cloud, no accounts."
 msgstr "음성 엔진을 선택하세요. 모든 것이 오프라인으로 실행됩니다 — 클라우드도 계정도 없습니다."
 
@@ -288,7 +293,7 @@ msgid "close"
 msgstr "닫기"
 
 #: src/features/history/components/session-detail-modal.tsx:210
-#: src/features/settings/sections/models-section.tsx:323
+#: src/features/settings/sections/models-section.tsx:322
 #: src/features/styles/components/style-editor-modal.tsx:197
 msgid "Close"
 msgstr "닫기"
@@ -316,8 +321,8 @@ msgstr "연결 중"
 msgid "Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network."
 msgstr "시작 직후 릴리스 서버에 접속해 더 새로운 버전이 있을 때만 알려 줍니다. 기본값은 꺼짐입니다 — 받아쓰기 자체는 네트워크가 필요 없습니다."
 
-#: src/features/welcome/welcome-page.tsx:239
-#: src/features/welcome/welcome-page.tsx:301
+#: src/features/welcome/welcome-page.tsx:322
+#: src/features/welcome/welcome-page.tsx:389
 msgid "Continue"
 msgstr "계속"
 
@@ -359,6 +364,10 @@ msgstr "교정"
 msgid "Correction sensitivity"
 msgstr "교정 민감도"
 
+#: src/features/welcome/welcome-page.tsx:255
+msgid "Could not download GPU support — transcription will run on the CPU. You can retry under Settings › Models."
+msgstr "GPU 지원을 다운로드하지 못했습니다 — 전사는 CPU에서 실행됩니다. 설정 › 모델에서 다시 시도할 수 있습니다."
+
 #: src/features/dictionary/components/dictionary-form.tsx:43
 msgid "Couldn't add that rule. Try again."
 msgstr "해당 규칙을 추가할 수 없습니다. 다시 시도해 보세요."
@@ -394,7 +403,7 @@ msgstr "어둡게"
 #: src/features/dictionary/components/dictionary-table.tsx:146
 #: src/features/history/components/history-table.tsx:382
 #: src/features/history/components/session-detail-modal.tsx:203
-#: src/features/settings/sections/models-section.tsx:259
+#: src/features/settings/sections/models-section.tsx:258
 #: src/features/snippets/snippets-page.tsx:293
 msgid "Delete"
 msgstr "삭제"
@@ -405,11 +414,11 @@ msgid "Delete {0}"
 msgstr "{0} 삭제"
 
 #. placeholder {0}: model.name
-#: src/features/settings/sections/models-section.tsx:296
+#: src/features/settings/sections/models-section.tsx:295
 msgid "Delete {0}?"
 msgstr "{0}을(를) 삭제하시겠습니까?"
 
-#: src/features/settings/sections/models-section.tsx:314
+#: src/features/settings/sections/models-section.tsx:313
 msgid "Delete model"
 msgstr "모델 삭제"
 
@@ -446,7 +455,7 @@ msgstr "설명이 너무 깁니다."
 msgid "Deterministic fixes applied before any AI styling."
 msgstr "AI 스타일 지정 이전에 결정적 수정 사항이 적용되었습니다."
 
-#: src/features/settings/settings-page.tsx:71
+#: src/features/settings/settings-page.tsx:70
 msgid "Dictation"
 msgstr "받아쓰기"
 
@@ -479,7 +488,7 @@ msgstr "현재 초안을 삭제하고 유휴 상태로 돌아갑니다. 바인�
 msgid "Disconnected"
 msgstr "연결이 끊김"
 
-#: src/features/settings/sections/models-section.tsx:133
+#: src/features/settings/sections/models-section.tsx:132
 msgid "Disk usage"
 msgstr "디스크 사용량"
 
@@ -488,7 +497,8 @@ msgid "Dismiss error"
 msgstr "오류 무시"
 
 #: src/features/history/components/history-table.tsx:376
-#: src/features/settings/sections/models-section.tsx:273
+#: src/features/settings/components/gpu-backend-card.tsx:108
+#: src/features/settings/sections/models-section.tsx:272
 msgid "Download"
 msgstr "다운로드"
 
@@ -497,29 +507,30 @@ msgstr "다운로드"
 msgid "Download {0}"
 msgstr "{0} 다운로드"
 
-#: src/features/welcome/welcome-page.tsx:293
+#: src/features/welcome/welcome-page.tsx:381
 msgid "Download {pendingCount} models"
 msgstr "{pendingCount} 모델 다운로드"
 
-#: src/features/welcome/welcome-page.tsx:293
+#: src/features/welcome/welcome-page.tsx:380
 msgid "Download 1 model"
 msgstr "모델 1개 다운로드"
 
-#: src/features/welcome/welcome-page.tsx:113
+#: src/features/welcome/welcome-page.tsx:132
 msgid "Download failed"
 msgstr "다운로드 실패"
 
 #. placeholder {0}: formatBytes(status.downloadBytes)
 #: src/features/settings/sections/gpu-section.tsx:54
-msgid "Download GPU support ({0})"
-msgstr "GPU 지원 다운로드({0})"
+#~ msgid "Download GPU support ({0})"
+#~ msgstr "GPU 지원 다운로드({0})"
 
-#: src/features/welcome/welcome-page.tsx:157
+#: src/features/welcome/welcome-page.tsx:180
 msgid "Download interrupted"
 msgstr "다운로드가 중단되었습니다."
 
+#: src/components/ui/byte-progress.tsx:35
 #: src/features/settings/components/asr-engine-cards.tsx:149
-#: src/features/settings/sections/models-section.tsx:232
+#: src/features/settings/sections/models-section.tsx:231
 #: src/features/welcome/components/model-card.tsx:99
 msgid "Download progress"
 msgstr "다운로드 진행 상황"
@@ -528,14 +539,18 @@ msgstr "다운로드 진행 상황"
 msgid "Download transcript"
 msgstr "받아쓰기 텍스트 다운로드"
 
-#: src/features/welcome/welcome-page.tsx:154
+#: src/features/welcome/welcome-page.tsx:174
 msgid "Downloading models"
 msgstr "모델 다운로드 중"
 
+#: src/features/welcome/welcome-page.tsx:252
+msgid "Downloading NVIDIA's CUDA runtime."
+msgstr "NVIDIA의 CUDA 런타임을 다운로드하는 중입니다."
+
 #: src/features/settings/components/asr-engine-cards.tsx:152
-#: src/features/settings/sections/gpu-section.tsx:53
-#: src/features/settings/sections/models-section.tsx:273
-#: src/features/welcome/welcome-page.tsx:254
+#: src/features/settings/components/gpu-backend-card.tsx:108
+#: src/features/settings/sections/models-section.tsx:272
+#: src/features/welcome/welcome-page.tsx:337
 msgid "Downloading…"
 msgstr "다운로드 중…"
 
@@ -594,7 +609,7 @@ msgstr "스타일 지정 사용"
 msgid "Engine"
 msgstr "엔진"
 
-#: src/features/welcome/welcome-page.tsx:280
+#: src/features/welcome/welcome-page.tsx:363
 msgid "Enter Lune Voice"
 msgstr "Lune Voice 열기"
 
@@ -609,6 +624,10 @@ msgstr "예시는 스타일 지정 엔진에 사용자의 스타일을 학습시
 #: src/features/shell/components/sidebar.tsx:37
 msgid "Expand sidebar"
 msgstr "사이드바 확장"
+
+#: src/features/welcome/welcome-page.tsx:178
+msgid "Fetching the NVIDIA runtime. This is the last step, and it only happens once."
+msgstr "NVIDIA 런타임을 가져오는 중입니다. 마지막 단계이며 한 번만 진행됩니다."
 
 #: src/features/styles/components/style-editor-modal.tsx:160
 msgid "Few-shot examples"
@@ -648,7 +667,7 @@ msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock.
 msgstr "표시기와 화면 가장자리 사이의 간격입니다. 작업 표시줄이나 독을 가리지 않게 해 줍니다."
 
 #: src/features/settings/sections/general-section.tsx:52
-#: src/features/settings/settings-page.tsx:69
+#: src/features/settings/settings-page.tsx:68
 msgid "General"
 msgstr "일반"
 
@@ -677,20 +696,21 @@ msgstr "좋은 저녁이에요"
 msgid "Good morning"
 msgstr "좋은 아침이에요"
 
-#: src/features/settings/sections/gpu-section.tsx:29
-#: src/features/welcome/components/engine-step.tsx:119
+#: src/features/settings/components/gpu-backend-card.tsx:66
+#: src/features/welcome/components/engine-step.tsx:123
+#: src/features/welcome/welcome-page.tsx:249
 msgid "GPU acceleration"
 msgstr "GPU 가속"
 
 #: src/features/settings/sections/gpu-section.tsx:92
-msgid "GPU acceleration is active."
-msgstr "GPU 가속이 활성화되어 있습니다."
+#~ msgid "GPU acceleration is active."
+#~ msgstr "GPU 가속이 활성화되어 있습니다."
 
 #: src/features/settings/sections/gpu-section.tsx:43
-msgid "GPU support"
-msgstr "GPU 지원"
+#~ msgid "GPU support"
+#~ msgstr "GPU 지원"
 
-#: src/features/settings/sections/gpu-section.tsx:108
+#: src/features/settings/components/gpu-backend-card.tsx:170
 msgid "GPU support is installed but not working."
 msgstr "GPU 지원이 설치되어 있지만 작동하지 않습니다."
 
@@ -719,7 +739,7 @@ msgstr "표시기 막대의 모양입니다. 변경 사항은 즉시 적용됩�
 msgid "Idle"
 msgstr "대기"
 
-#: src/features/settings/sections/models-section.tsx:216
+#: src/features/settings/sections/models-section.tsx:215
 msgid "In use"
 msgstr "사용 중"
 
@@ -732,10 +752,16 @@ msgid "Insert placeholder"
 msgstr "자리 표시자 삽입"
 
 #: src/features/settings/components/asr-engine-cards.tsx:228
-#: src/features/settings/sections/models-section.tsx:219
+#: src/features/settings/sections/models-section.tsx:218
 #: src/features/welcome/components/model-card.tsx:89
 msgid "Installed"
 msgstr "설치됨"
+
+#: src/features/settings/components/gpu-backend-card.tsx:148
+#: src/features/welcome/components/engine-step.tsx:133
+#: src/features/welcome/welcome-page.tsx:254
+msgid "Installed. Restart Lune Voice to start using your GPU."
+msgstr "설치되었습니다. GPU를 사용하려면 Lune Voice를 다시 시작하세요."
 
 #: src/features/styles/components/style-editor-modal.tsx:114
 msgid "Instructions"
@@ -852,12 +878,12 @@ msgstr "분"
 msgid "Mode"
 msgstr "모드"
 
-#: src/features/settings/sections/models-section.tsx:103
-#: src/features/settings/settings-page.tsx:76
+#: src/features/settings/sections/models-section.tsx:97
+#: src/features/settings/settings-page.tsx:75
 msgid "Models"
 msgstr "모델"
 
-#: src/features/welcome/welcome-page.tsx:322
+#: src/features/welcome/welcome-page.tsx:410
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "모델은 로컬에 저장됩니다. 원격 측정도 없고 계정도 없습니다."
 
@@ -866,10 +892,10 @@ msgid "Monitor"
 msgstr "모니터"
 
 #: src/features/settings/sections/gpu-section.tsx:44
-msgid "Most of the download is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
-msgstr "다운로드의 대부분은 NVIDIA의 CUDA 수학 라이브러리이며, 더 작은 형태로는 재배포할 수 없습니다."
+#~ msgid "Most of the download is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
+#~ msgstr "다운로드의 대부분은 NVIDIA의 CUDA 수학 라이브러리이며, 더 작은 형태로는 재배포할 수 없습니다."
 
-#: src/features/welcome/components/engine-step.tsx:49
+#: src/features/welcome/components/engine-step.tsx:53
 msgid "Multilingual · pick a size"
 msgstr "다국어 · 크기 선택"
 
@@ -892,6 +918,10 @@ msgstr "다음 페이지"
 #: src/features/styles/components/style-preset-card.tsx:99
 msgid "No"
 msgstr "아니요"
+
+#: src/features/settings/components/gpu-backend-card.tsx:157
+msgid "No NVIDIA driver was found. Install the driver for your GPU and the download will appear here."
+msgstr "NVIDIA 드라이버를 찾을 수 없습니다. GPU 드라이버를 설치하면 여기에 다운로드가 표시됩니다."
 
 #: src/features/dictionary/components/dictionary-table.tsx:249
 msgid "No rules match “{query}”."
@@ -936,11 +966,12 @@ msgstr "음성 감지 전에 마이크 레벨을 표준화합니다. 조용한 �
 msgid "not connected"
 msgstr "연결되지 않음"
 
-#: src/features/settings/sections/models-section.tsx:222
+#: src/features/settings/components/gpu-backend-card.tsx:129
+#: src/features/settings/sections/models-section.tsx:221
 msgid "Not installed"
 msgstr "설치되지 않음"
 
-#: src/features/settings/sections/models-section.tsx:135
+#: src/features/settings/sections/models-section.tsx:134
 msgid "Nothing installed"
 msgstr "설치된 항목 없음"
 
@@ -979,7 +1010,7 @@ msgid "Orientation"
 msgstr "방향"
 
 #: src/features/overview/overview-page.tsx:121
-#: src/features/settings/settings-page.tsx:75
+#: src/features/settings/settings-page.tsx:74
 msgid "Output"
 msgstr "산출"
 
@@ -987,7 +1018,7 @@ msgstr "산출"
 msgid "Overall footprint of the pill bar."
 msgstr "표시기 막대의 전체 크기입니다."
 
-#: src/features/welcome/welcome-page.tsx:202
+#: src/features/welcome/welcome-page.tsx:282
 msgid "Overall progress"
 msgstr "전반적인 진행 상황"
 
@@ -1009,7 +1040,7 @@ msgstr "붙여넣기가 가장 간단합니다. 일부 앱에서는 키 입력�
 msgid "Phrase"
 msgstr "구절"
 
-#: src/features/settings/settings-page.tsx:72
+#: src/features/settings/settings-page.tsx:71
 msgid "Pill"
 msgstr "표시기"
 
@@ -1041,7 +1072,7 @@ msgstr "배치"
 msgid "Play a short sound when dictation starts, finishes, or runs into an error."
 msgstr "받아쓰기가 시작, 완료되거나 오류가 발생할 때 짧은 소리를 재생합니다."
 
-#: src/features/welcome/welcome-page.tsx:257
+#: src/features/welcome/welcome-page.tsx:340
 msgid "Please keep the app open until downloads finish"
 msgstr "다운로드가 완료될 때까지 앱을 열어두세요."
 
@@ -1156,7 +1187,11 @@ msgstr "초기화"
 msgid "Reset position"
 msgstr "위치 초기화"
 
-#: src/features/welcome/welcome-page.tsx:268
+#: src/features/settings/components/gpu-backend-card.tsx:125
+msgid "Restart needed"
+msgstr "재시작 필요"
+
+#: src/features/welcome/welcome-page.tsx:351
 msgid "Retry download"
 msgstr "다운로드 다시 시도"
 
@@ -1166,16 +1201,20 @@ msgstr "각 받아쓰기 텍스트를 선택한 스타일로 다시 씁니다. �
 
 #. placeholder {0}: status.devices.join(', ')
 #: src/features/settings/sections/gpu-section.tsx:91
-msgid "Running on {0}."
-msgstr "{0}에서 실행 중입니다."
+#~ msgid "Running on {0}."
+#~ msgstr "{0}에서 실행 중입니다."
+
+#: src/features/settings/components/gpu-backend-card.tsx:132
+msgid "Running on CPU"
+msgstr "CPU에서 실행 중"
 
 #: src/features/settings/sections/gpu-section.tsx:118
-msgid "Running on the CPU."
-msgstr "CPU에서 실행 중입니다."
+#~ msgid "Running on the CPU."
+#~ msgstr "CPU에서 실행 중입니다."
 
 #: src/features/settings/sections/gpu-section.tsx:100
-msgid "Running on the CPU. No NVIDIA driver was found — install the driver for your GPU and Lune Voice will offer GPU support here."
-msgstr "CPU에서 실행 중입니다. NVIDIA 드라이버를 찾지 못했습니다 — GPU 드라이버를 설치하면 Lune Voice가 여기에서 GPU 지원을 안내합니다."
+#~ msgid "Running on the CPU. No NVIDIA driver was found — install the driver for your GPU and Lune Voice will offer GPU support here."
+#~ msgstr "CPU에서 실행 중입니다. NVIDIA 드라이버를 찾지 못했습니다 — GPU 드라이버를 설치하면 Lune Voice가 여기에서 GPU 지원을 안내합니다."
 
 #: src/features/overview/overview-page.tsx:261
 msgid "s"
@@ -1215,7 +1254,7 @@ msgstr "받아쓰기 텍스트 검색"
 msgid "Search transcripts…"
 msgstr "받아쓰기 텍스트 검색…"
 
-#: src/features/welcome/welcome-page.tsx:297
+#: src/features/welcome/welcome-page.tsx:385
 msgid "Select required models"
 msgstr "필수 모델 선택"
 
@@ -1246,7 +1285,15 @@ msgstr "단축키 설정"
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "사용하는 언어를 설정하세요. 자동은 음성 감지를 사용합니다."
 
-#: src/features/settings/settings-page.tsx:102
+#: src/features/welcome/welcome-page.tsx:378
+msgid "Set up GPU acceleration"
+msgstr "GPU 가속 설정"
+
+#: src/features/welcome/welcome-page.tsx:177
+msgid "Setting up your GPU"
+msgstr "GPU를 설정하는 중"
+
+#: src/features/settings/settings-page.tsx:95
 msgid "Settings sections"
 msgstr "설정 섹션"
 
@@ -1268,9 +1315,9 @@ msgstr "크기"
 msgid "Size & shape"
 msgstr "크기 및 모양"
 
-#: src/features/welcome/welcome-page.tsx:243
-#: src/features/welcome/welcome-page.tsx:271
-#: src/features/welcome/welcome-page.tsx:310
+#: src/features/welcome/welcome-page.tsx:326
+#: src/features/welcome/welcome-page.tsx:354
+#: src/features/welcome/welcome-page.tsx:398
 msgid "Skip for now"
 msgstr "지금은 건너뛰기"
 
@@ -1295,7 +1342,7 @@ msgstr "소리 신호"
 msgid "Speaking Time"
 msgstr "발화 시간"
 
-#: src/features/settings/sections/models-section.tsx:75
+#: src/features/settings/sections/models-section.tsx:69
 msgid "Speech-to-text"
 msgstr "음성 텍스트 변환"
 
@@ -1327,8 +1374,8 @@ msgid "Start, stop, and cancel dictation without leaving your work."
 msgstr "작업을 벗어나지 않고 받아쓰기를 시작, 중지, 취소하세요."
 
 #: src/features/settings/sections/gpu-section.tsx:33
-msgid "Status"
-msgstr "상태"
+#~ msgid "Status"
+#~ msgstr "상태"
 
 #: src/features/dictation/dictation-pill.tsx:88
 msgid "Stop and transcribe"
@@ -1353,7 +1400,7 @@ msgstr "받아쓰기 중지"
 msgid "Style"
 msgstr "스타일"
 
-#: src/features/settings/settings-page.tsx:74
+#: src/features/settings/settings-page.tsx:73
 msgid "Styling"
 msgstr "스타일 지정"
 
@@ -1411,11 +1458,11 @@ msgstr "인식기가 가장 확신하지 못하는 단어를 사전과 어휘에
 msgid "Theme"
 msgstr "테마"
 
-#: src/features/settings/sections/models-section.tsx:306
+#: src/features/settings/sections/models-section.tsx:305
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "이 모델은 현재 구성에서 사용 중입니다. 다시 설치하거나 다른 모델을 선택하기 전까지 받아쓰기가 작동하지 않을 수 있습니다."
 
-#: src/features/welcome/welcome-page.tsx:155
+#: src/features/welcome/welcome-page.tsx:175
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "이것은 한 번만 발생합니다. 그동안 컴퓨터를 계속 사용할 수 있습니다."
 
@@ -1478,13 +1525,30 @@ msgid "Transcript"
 msgstr "받아쓰기 텍스트"
 
 #: src/features/settings/sections/transcription-section.tsx:36
-#: src/features/settings/settings-page.tsx:73
+#: src/features/settings/settings-page.tsx:72
 msgid "Transcription"
 msgstr "전사"
 
+#. placeholder {0}: status.devices.join(', ')
+#: src/features/settings/components/gpu-backend-card.tsx:140
+msgid "Transcription is running on {0}."
+msgstr "전사가 {0}에서 실행 중입니다."
+
+#: src/features/settings/components/gpu-backend-card.tsx:141
+msgid "Transcription is running on your GPU."
+msgstr "전사가 GPU에서 실행 중입니다."
+
 #: src/features/settings/sections/gpu-section.tsx:30
-msgid "Transcription runs on the CPU by default. If you have an NVIDIA GPU, an optional download moves it to the GPU for noticeably lower latency."
-msgstr "전사는 기본적으로 CPU에서 실행됩니다. NVIDIA GPU가 있다면 선택적 다운로드로 GPU로 옮겨 지연 시간을 눈에 띄게 줄일 수 있습니다."
+#~ msgid "Transcription runs on the CPU by default. If you have an NVIDIA GPU, an optional download moves it to the GPU for noticeably lower latency."
+#~ msgstr "전사는 기본적으로 CPU에서 실행됩니다. NVIDIA GPU가 있다면 선택적 다운로드로 GPU로 옮겨 지연 시간을 눈에 띄게 줄일 수 있습니다."
+
+#: src/features/settings/components/gpu-backend-card.tsx:164
+msgid "Transcription runs on the CPU. An optional download moves it to your NVIDIA GPU for noticeably lower latency — most of it is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
+msgstr "전사는 CPU에서 실행됩니다. 선택적 다운로드를 받으면 NVIDIA GPU로 옮겨져 지연 시간이 눈에 띄게 줄어듭니다 — 대부분은 NVIDIA의 CUDA 수학 라이브러리이며, 더 작은 형태로는 재배포할 수 없습니다."
+
+#: src/features/settings/components/gpu-backend-card.tsx:165
+msgid "Transcription runs on the CPU. No GPU download has been published for this build yet."
+msgstr "전사는 CPU에서 실행됩니다. 이 빌드용 GPU 다운로드는 아직 공개되지 않았습니다."
 
 #: src/features/snippets/snippets-page.tsx:145
 msgid "Trigger phrase"
@@ -1502,7 +1566,7 @@ msgstr "입력되는 내용"
 msgid "Updates"
 msgstr "업데이트"
 
-#: src/features/welcome/components/engine-step.tsx:136
+#: src/features/welcome/components/engine-step.tsx:143
 msgid "Use GPU acceleration"
 msgstr "GPU 가속 사용"
 
@@ -1537,13 +1601,13 @@ msgstr "표시"
 msgid "Voice model"
 msgstr "음성 모델"
 
-#: src/features/welcome/welcome-page.tsx:163
+#: src/features/welcome/welcome-page.tsx:186
 msgid "Welcome back"
 msgstr "돌아온 것을 환영합니다"
 
-#: src/features/welcome/welcome-page.tsx:148
-#: src/features/welcome/welcome-page.tsx:160
-#: src/features/welcome/welcome-page.tsx:166
+#: src/features/welcome/welcome-page.tsx:168
+#: src/features/welcome/welcome-page.tsx:183
+#: src/features/welcome/welcome-page.tsx:189
 msgid "Welcome to Lune Voice"
 msgstr "Lune Voice에 오신 것을 환영합니다"
 
@@ -1571,16 +1635,16 @@ msgstr "보낼 붙여넣기 단축키. '자동'은 터미널을 감지합니다.
 msgid "Which screen the pill appears on."
 msgstr "표시기가 나타나는 화면입니다."
 
-#: src/features/welcome/components/engine-step.tsx:48
+#: src/features/welcome/components/engine-step.tsx:52
 msgid "Whisper"
 msgstr "Whisper"
 
 #: src/features/settings/components/asr-engine-cards.tsx:122
-#: src/features/welcome/components/engine-step.tsx:71
+#: src/features/welcome/components/engine-step.tsx:75
 msgid "Whisper model size"
 msgstr "Whisper 모델 크기"
 
-#: src/features/welcome/components/engine-step.tsx:50
+#: src/features/welcome/components/engine-step.tsx:54
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
 msgstr "기기에서 실행되는 whisper.cpp입니다. 속도와 정확도를 절충할 크기를 선택하세요."
 
@@ -1610,7 +1674,7 @@ msgstr "현재 버전은 {version}입니다."
 msgid "You say"
 msgstr "말할 내용"
 
-#: src/features/welcome/welcome-page.tsx:151
+#: src/features/welcome/welcome-page.tsx:171
 msgid "You're all set"
 msgstr "모든 준비가 완료되었습니다."
 
@@ -1618,19 +1682,28 @@ msgstr "모든 준비가 완료되었습니다."
 msgid "Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none."
 msgstr "API 키입니다. 저장된 키를 그대로 쓰려면, 또는 엔드포인트가 내 컴퓨터나 네트워크에서 실행되어 키가 필요 없다면 비워 두세요."
 
-#: src/features/welcome/components/engine-step.tsx:126
+#: src/features/welcome/components/engine-step.tsx:131
 msgid "Your GPU is ready — use it for faster transcription."
 msgstr "GPU를 사용할 준비가 되었습니다 — 더 빠른 전사에 활용하세요."
 
+#: src/features/welcome/components/engine-step.tsx:137
+#~ msgid "Your GPU qualifies. Keep this on and the runtime download will be offered under Settings › Models."
+#~ msgstr "GPU가 조건을 충족합니다. 이 옵션을 켜 두면 설정 › 모델에서 런타임 다운로드가 제공됩니다."
+
 #: src/features/welcome/components/engine-step.tsx:127
-msgid "Your GPU qualifies. Keep this on, then finish the one-time setup in Settings."
-msgstr "GPU가 조건을 충족합니다. 이 설정을 켠 채로 두고, 설정에서 최초 설치를 완료하세요."
+#~ msgid "Your GPU qualifies. Keep this on, then finish the one-time setup in Settings."
+#~ msgstr "GPU가 조건을 충족합니다. 이 설정을 켠 채로 두고, 설정에서 최초 설치를 완료하세요."
+
+#. placeholder {0}: formatBytes(gpuDownloadBytes)
+#: src/features/welcome/components/engine-step.tsx:134
+msgid "Your GPU qualifies. Setup will download the {0} NVIDIA runtime, then a restart turns it on."
+msgstr "GPU가 조건을 충족합니다. 설정 과정에서 {0} 크기의 NVIDIA 런타임을 내려받고, 다시 시작하면 켜집니다."
 
 #: src/features/overview/overview-page.tsx:229
 msgid "your hotkey"
 msgstr "단축키"
 
-#: src/features/welcome/welcome-page.tsx:152
+#: src/features/welcome/welcome-page.tsx:172
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "모델이 준비되었습니다. 모든 것이 이 컴퓨터에 유지됩니다."
 

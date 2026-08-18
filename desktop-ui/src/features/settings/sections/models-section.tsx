@@ -12,21 +12,15 @@ import {
   Wand2,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { formatBytes } from '../../../lib/format-bytes';
 import { workspaceStore } from '../../../store/workspace-store';
+import { GpuBackendCard } from '../components/gpu-backend-card';
 import { SettingsSection } from '../components/section';
 import { modelDownloadSizes } from '../data/settings-data';
 import { type DownloadProgress, type ModelStatus, useModelStatus } from '../hooks/use-model-status';
 
 function modelIcon(localName: string): LucideIcon {
   return localName.includes('asr') || localName.includes('whisper') ? Mic : Wand2;
-}
-
-/** Human-readable byte size, e.g. `192 MB` / `1.2 GB`. */
-function formatBytes(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  const mb = bytes / (1024 * 1024);
-  if (mb < 1024) return `${Math.round(mb)} MB`;
-  return `${(mb / 1024).toFixed(1)} GB`;
 }
 
 /** Size label for a row: actual on-disk size when installed, else the download estimate. */
@@ -129,6 +123,11 @@ export function ModelsSection() {
                   {group.items.map(renderCard)}
                 </div>
               ))}
+            {/* Acceleration is not a model, but it is the same kind of thing
+                to manage: a large optional download that lands on disk and
+                changes how transcription runs. Keeping it here means one
+                screen owns every download the app can make. */}
+            <GpuBackendCard />
             <div className="flex items-center justify-between border-t border-surface-border pt-3 text-sm">
               <span className="text-content-subtle">{t`Disk usage`}</span>
               <span className="font-medium tabular-nums text-content">

@@ -415,8 +415,13 @@ pub fn run() {
     // Must happen before the Tauri builder touches GTK/GDK.
     #[cfg(target_os = "linux")]
     if std::env::var_os("GDK_BACKEND").is_none() && lune_voice::should_use_xwayland_fallback() {
-        // SAFETY: single-threaded here — main() has only initialised tracing
-        // before calling run(); no other thread reads the environment yet.
+        // SAFETY: nothing else reads the environment at this point. main() has
+        // only initialised tracing before calling run(), and the X probe inside
+        // the call above is the sole other thread this process has started — it
+        // finishes its `DISPLAY`/`XAUTHORITY` reads before answering, and only
+        // an answer of `true` reaches this line. Any future `set_var` here must
+        // re-check that, because the probe thread is deliberately abandoned
+        // when it stalls.
         unsafe { std::env::set_var("GDK_BACKEND", "x11") };
         tracing::info!(
             "Wayland without layer-shell detected — running under XWayland \

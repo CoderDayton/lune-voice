@@ -1,5 +1,6 @@
 import { useLingui } from '@lingui/react/macro';
 import { Check, CircleAlert, type LucideIcon, Mic, Zap } from 'lucide-react';
+import { formatBytes } from '../../../lib/format-bytes';
 import type { AsrBackendValue, WhisperModelValue } from '../../settings/data/settings-data';
 import { whisperModels } from '../../settings/data/settings-data';
 import type { GpuAccelerationOffer } from '../setup-logic';
@@ -12,6 +13,8 @@ interface EngineStepProps {
   gpuOffer: GpuAccelerationOffer | null;
   /** Whether GPU acceleration is currently accepted (mirrors `useGpu`). */
   useGpu: boolean;
+  /** Size of the CUDA plugin download setup will make, when it will make one. */
+  gpuDownloadBytes: number;
   onSelectEngine: (backend: AsrBackendValue) => void;
   onSelectWhisper: (model: WhisperModelValue) => void;
   onToggleGpu: (next: boolean) => void;
@@ -36,6 +39,7 @@ export function EngineStep({
   error,
   gpuOffer,
   useGpu,
+  gpuDownloadBytes,
   onSelectEngine,
   onSelectWhisper,
   onToggleGpu,
@@ -119,12 +123,15 @@ export function EngineStep({
                 {t`GPU acceleration`}
               </span>
               <span className="mt-0.5 block text-xs text-content-subtle">
-                {/* Onboarding never installs the plugin, so promising speed the
-                    user does not have yet would be a lie the first dictation
-                    exposes. Say which of the two situations this is. */}
+                {/* Promising speed the user does not have yet would be a lie
+                    the first dictation exposes, so say which of the three
+                    situations this is: already accelerated, one restart away,
+                    or a download setup is about to make. */}
                 {gpuOffer === 'active'
                   ? t`Your GPU is ready — use it for faster transcription.`
-                  : t`Your GPU qualifies. Keep this on, then finish the one-time setup in Settings.`}
+                  : gpuOffer === 'needs-restart'
+                    ? t`Installed. Restart Lune Voice to start using your GPU.`
+                    : t`Your GPU qualifies. Setup will download the ${formatBytes(gpuDownloadBytes)} NVIDIA runtime, then a restart turns it on.`}
               </span>
             </span>
           </span>

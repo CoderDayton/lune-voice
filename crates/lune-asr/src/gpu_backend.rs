@@ -114,9 +114,13 @@ pub enum GpuPluginState {
     /// Plugin loaded, carrying the compute devices ggml registered so the UI
     /// can name the GPU instead of claiming success generically.
     Ready { devices: Vec<String> },
-    /// Plugin present but no usable device appeared. Either it was installed
-    /// after this process built its backend registry (restart needed), or the
-    /// driver is older than the plugin's CUDA runtime. `reason` says which.
+    /// Plugin installed after this process built its backend registry. ggml has
+    /// no unload, so the device can only appear on the next launch. Nothing is
+    /// wrong — kept apart from [`Self::Failed`] so the UI can say "restart" in
+    /// the user's own language instead of surfacing a failure they don't have.
+    NeedsRestart,
+    /// Plugin present at startup but no usable device appeared — in practice a
+    /// driver older than the plugin's CUDA runtime. `reason` explains it.
     Failed { reason: String },
 }
 
@@ -296,9 +300,7 @@ mod imp {
         // unload, so it can only appear on the next launch. Reporting the
         // driver-too-old guess here would be a false alarm.
         if !loaded.plugin_at_load {
-            return GpuPluginState::Failed {
-                reason: "Installed. Restart Lune Voice to start using your GPU.".to_owned(),
-            };
+            return GpuPluginState::NeedsRestart;
         }
         GpuPluginState::Failed {
             reason: format!(

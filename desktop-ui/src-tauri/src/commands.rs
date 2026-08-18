@@ -701,6 +701,9 @@ fn current_gpu_status() -> Result<GpuBackendStatusDto, String> {
         lune_asr::gpu_backend::GpuPluginState::Ready { devices } => {
             (GpuBackendStateDto::Ready, devices, None)
         }
+        lune_asr::gpu_backend::GpuPluginState::NeedsRestart => {
+            (GpuBackendStateDto::NeedsRestart, Vec::new(), None)
+        }
         lune_asr::gpu_backend::GpuPluginState::Failed { reason } => {
             (GpuBackendStateDto::Failed, Vec::new(), Some(reason))
         }

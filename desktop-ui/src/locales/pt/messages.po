@@ -80,6 +80,10 @@ msgstr "Um bloco de texto que o Lune Voice digita por você quando você fala a 
 msgid "A vertical pill hugs the side of the screen."
 msgstr "Um indicador vertical fica junto à lateral da tela."
 
+#: src/features/settings/components/gpu-backend-card.tsx:47
+msgid "Acceleration"
+msgstr "Aceleração"
+
 #: src/features/shell/components/sidebar.tsx:190
 msgid "Account and status"
 msgstr "Conta e status"
@@ -88,6 +92,7 @@ msgstr "Conta e status"
 msgid "Action"
 msgstr "Ação"
 
+#: src/features/settings/components/gpu-backend-card.tsx:122
 #: src/features/styles/components/style-preset-card.tsx:75
 msgid "Active"
 msgstr "Ativo"
@@ -118,11 +123,11 @@ msgstr "Adicionar correção"
 msgid "Add snippet"
 msgstr "Adicionar trecho"
 
-#: src/features/settings/sections/models-section.tsx:104
+#: src/features/settings/sections/models-section.tsx:98
 msgid "AI models stored on your device."
 msgstr "Modelos de IA armazenados no seu dispositivo."
 
-#: src/features/welcome/welcome-page.tsx:164
+#: src/features/welcome/welcome-page.tsx:187
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "Todos os modelos necessários já estão instalados. Continue quando estiver pronto."
 
@@ -143,7 +148,7 @@ msgid "API key"
 msgstr "Chave de API"
 
 #: src/features/settings/sections/appearance-section.tsx:35
-#: src/features/settings/settings-page.tsx:70
+#: src/features/settings/settings-page.tsx:69
 msgid "Appearance"
 msgstr "Aparência"
 
@@ -190,7 +195,7 @@ msgstr "Integrado"
 
 #: src/components/feedback/confirm-dialog.tsx:52
 #: src/features/dictionary/components/dictionary-table.tsx:96
-#: src/features/settings/sections/models-section.tsx:311
+#: src/features/settings/sections/models-section.tsx:310
 #: src/features/styles/components/style-editor-modal.tsx:206
 msgid "Cancel"
 msgstr "Cancelar"
@@ -216,7 +221,7 @@ msgstr "Capturar por voz"
 msgid "Capture device and how recording detects when you speak."
 msgstr "Dispositivo de captura e como a gravação detecta quando você fala."
 
-#: src/features/welcome/welcome-page.tsx:307
+#: src/features/welcome/welcome-page.tsx:395
 msgid "Change engine"
 msgstr "Alterar motor"
 
@@ -233,11 +238,11 @@ msgstr "Verificar atualizações ao iniciar"
 msgid "Check whether a newer version has been released."
 msgstr "Verificar se uma versão mais recente foi publicada."
 
-#: src/features/welcome/welcome-page.tsx:158
+#: src/features/welcome/welcome-page.tsx:181
 msgid "Check your network and we'll pick up where we left off."
 msgstr "Verifique sua rede e continuaremos de onde paramos."
 
-#: src/features/welcome/welcome-page.tsx:62
+#: src/features/welcome/welcome-page.tsx:70
 msgid "Checking installed models…"
 msgstr "Verificando modelos instalados…"
 
@@ -262,8 +267,8 @@ msgstr "Escolha a aparência do Lune Voice."
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
 msgstr "Escolha como as transcrições são reescritas: enviadas a um endpoint compatível com OpenAI que você configurar, local ou hospedado, ou desativado por completo."
 
-#: src/features/welcome/welcome-page.tsx:161
-#: src/features/welcome/welcome-page.tsx:167
+#: src/features/welcome/welcome-page.tsx:184
+#: src/features/welcome/welcome-page.tsx:190
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "Escolha os modelos de IA a serem instalados. Tudo funciona offline – sem nuvem, sem contas."
 
@@ -271,7 +276,7 @@ msgstr "Escolha os modelos de IA a serem instalados. Tudo funciona offline – s
 msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
 msgstr "Escolha o motor que transforma sua fala em texto. Os motores locais funcionam totalmente no dispositivo; o Whisper é multilíngue com tamanhos de modelo selecionáveis."
 
-#: src/features/welcome/welcome-page.tsx:149
+#: src/features/welcome/welcome-page.tsx:169
 msgid "Choose your speech engine. Everything runs offline — no cloud, no accounts."
 msgstr "Escolha seu motor de fala. Tudo funciona offline — sem nuvem, sem contas."
 
@@ -288,7 +293,7 @@ msgid "close"
 msgstr "fechar"
 
 #: src/features/history/components/session-detail-modal.tsx:210
-#: src/features/settings/sections/models-section.tsx:323
+#: src/features/settings/sections/models-section.tsx:322
 #: src/features/styles/components/style-editor-modal.tsx:197
 msgid "Close"
 msgstr "Fechar"
@@ -316,8 +321,8 @@ msgstr "Conectando"
 msgid "Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network."
 msgstr "Contata o servidor de versões pouco depois da inicialização e avisa apenas se existir uma versão mais recente. Desativado por padrão: o ditado em si nunca precisa da rede."
 
-#: src/features/welcome/welcome-page.tsx:239
-#: src/features/welcome/welcome-page.tsx:301
+#: src/features/welcome/welcome-page.tsx:322
+#: src/features/welcome/welcome-page.tsx:389
 msgid "Continue"
 msgstr "Continuar"
 
@@ -359,6 +364,10 @@ msgstr "Correção"
 msgid "Correction sensitivity"
 msgstr "Sensibilidade de correção"
 
+#: src/features/welcome/welcome-page.tsx:255
+msgid "Could not download GPU support — transcription will run on the CPU. You can retry under Settings › Models."
+msgstr "Não foi possível baixar o suporte a GPU: a transcrição será executada na CPU. Você pode tentar de novo em Configurações › Modelos."
+
 #: src/features/dictionary/components/dictionary-form.tsx:43
 msgid "Couldn't add that rule. Try again."
 msgstr "Não foi possível adicionar essa regra. Tente novamente."
@@ -394,7 +403,7 @@ msgstr "Escuro"
 #: src/features/dictionary/components/dictionary-table.tsx:146
 #: src/features/history/components/history-table.tsx:382
 #: src/features/history/components/session-detail-modal.tsx:203
-#: src/features/settings/sections/models-section.tsx:259
+#: src/features/settings/sections/models-section.tsx:258
 #: src/features/snippets/snippets-page.tsx:293
 msgid "Delete"
 msgstr "Excluir"
@@ -405,11 +414,11 @@ msgid "Delete {0}"
 msgstr "Excluir {0}"
 
 #. placeholder {0}: model.name
-#: src/features/settings/sections/models-section.tsx:296
+#: src/features/settings/sections/models-section.tsx:295
 msgid "Delete {0}?"
 msgstr "Excluir {0}?"
 
-#: src/features/settings/sections/models-section.tsx:314
+#: src/features/settings/sections/models-section.tsx:313
 msgid "Delete model"
 msgstr "Excluir modelo"
 
@@ -446,7 +455,7 @@ msgstr "A descrição é muito longa."
 msgid "Deterministic fixes applied before any AI styling."
 msgstr "Correções determinísticas aplicadas antes de qualquer estilo de IA."
 
-#: src/features/settings/settings-page.tsx:71
+#: src/features/settings/settings-page.tsx:70
 msgid "Dictation"
 msgstr "Ditado"
 
@@ -479,7 +488,7 @@ msgstr "Descarte o rascunho atual e volte ao modo inativo. Clique na ligação p
 msgid "Disconnected"
 msgstr "Desconectado"
 
-#: src/features/settings/sections/models-section.tsx:133
+#: src/features/settings/sections/models-section.tsx:132
 msgid "Disk usage"
 msgstr "Uso do disco"
 
@@ -488,7 +497,8 @@ msgid "Dismiss error"
 msgstr "Ignorar erro"
 
 #: src/features/history/components/history-table.tsx:376
-#: src/features/settings/sections/models-section.tsx:273
+#: src/features/settings/components/gpu-backend-card.tsx:108
+#: src/features/settings/sections/models-section.tsx:272
 msgid "Download"
 msgstr "Download"
 
@@ -497,29 +507,30 @@ msgstr "Download"
 msgid "Download {0}"
 msgstr "Baixar {0}"
 
-#: src/features/welcome/welcome-page.tsx:293
+#: src/features/welcome/welcome-page.tsx:381
 msgid "Download {pendingCount} models"
 msgstr "Baixar modelos {pendingCount}"
 
-#: src/features/welcome/welcome-page.tsx:293
+#: src/features/welcome/welcome-page.tsx:380
 msgid "Download 1 model"
 msgstr "Baixe 1 modelo"
 
-#: src/features/welcome/welcome-page.tsx:113
+#: src/features/welcome/welcome-page.tsx:132
 msgid "Download failed"
 msgstr "Falha no download"
 
 #. placeholder {0}: formatBytes(status.downloadBytes)
 #: src/features/settings/sections/gpu-section.tsx:54
-msgid "Download GPU support ({0})"
-msgstr "Baixar suporte a GPU ({0})"
+#~ msgid "Download GPU support ({0})"
+#~ msgstr "Baixar suporte a GPU ({0})"
 
-#: src/features/welcome/welcome-page.tsx:157
+#: src/features/welcome/welcome-page.tsx:180
 msgid "Download interrupted"
 msgstr "Download interrompido"
 
+#: src/components/ui/byte-progress.tsx:35
 #: src/features/settings/components/asr-engine-cards.tsx:149
-#: src/features/settings/sections/models-section.tsx:232
+#: src/features/settings/sections/models-section.tsx:231
 #: src/features/welcome/components/model-card.tsx:99
 msgid "Download progress"
 msgstr "Progresso do download"
@@ -528,14 +539,18 @@ msgstr "Progresso do download"
 msgid "Download transcript"
 msgstr "Baixar transcrição"
 
-#: src/features/welcome/welcome-page.tsx:154
+#: src/features/welcome/welcome-page.tsx:174
 msgid "Downloading models"
 msgstr "Baixando modelos"
 
+#: src/features/welcome/welcome-page.tsx:252
+msgid "Downloading NVIDIA's CUDA runtime."
+msgstr "Baixando o runtime CUDA da NVIDIA."
+
 #: src/features/settings/components/asr-engine-cards.tsx:152
-#: src/features/settings/sections/gpu-section.tsx:53
-#: src/features/settings/sections/models-section.tsx:273
-#: src/features/welcome/welcome-page.tsx:254
+#: src/features/settings/components/gpu-backend-card.tsx:108
+#: src/features/settings/sections/models-section.tsx:272
+#: src/features/welcome/welcome-page.tsx:337
 msgid "Downloading…"
 msgstr "Baixando…"
 
@@ -594,7 +609,7 @@ msgstr "Ativar estilização"
 msgid "Engine"
 msgstr "Motor"
 
-#: src/features/welcome/welcome-page.tsx:280
+#: src/features/welcome/welcome-page.tsx:363
 msgid "Enter Lune Voice"
 msgstr "Entre na voz de Lune"
 
@@ -609,6 +624,10 @@ msgstr "Os exemplos ensinam seu estilo ao motor de estilização. Gere-os novame
 #: src/features/shell/components/sidebar.tsx:37
 msgid "Expand sidebar"
 msgstr "Expandir barra lateral"
+
+#: src/features/welcome/welcome-page.tsx:178
+msgid "Fetching the NVIDIA runtime. This is the last step, and it only happens once."
+msgstr "Obtendo o runtime da NVIDIA. Este é o último passo e acontece apenas uma vez."
 
 #: src/features/styles/components/style-editor-modal.tsx:160
 msgid "Few-shot examples"
@@ -648,7 +667,7 @@ msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock.
 msgstr "Espaço entre o indicador e a borda da tela, para que ele não cubra uma barra de tarefas ou dock."
 
 #: src/features/settings/sections/general-section.tsx:52
-#: src/features/settings/settings-page.tsx:69
+#: src/features/settings/settings-page.tsx:68
 msgid "General"
 msgstr "Em geral"
 
@@ -677,20 +696,21 @@ msgstr "Boa noite"
 msgid "Good morning"
 msgstr "Bom dia"
 
-#: src/features/settings/sections/gpu-section.tsx:29
-#: src/features/welcome/components/engine-step.tsx:119
+#: src/features/settings/components/gpu-backend-card.tsx:66
+#: src/features/welcome/components/engine-step.tsx:123
+#: src/features/welcome/welcome-page.tsx:249
 msgid "GPU acceleration"
 msgstr "Aceleração por GPU"
 
 #: src/features/settings/sections/gpu-section.tsx:92
-msgid "GPU acceleration is active."
-msgstr "A aceleração por GPU está ativa."
+#~ msgid "GPU acceleration is active."
+#~ msgstr "A aceleração por GPU está ativa."
 
 #: src/features/settings/sections/gpu-section.tsx:43
-msgid "GPU support"
-msgstr "Suporte a GPU"
+#~ msgid "GPU support"
+#~ msgstr "Suporte a GPU"
 
-#: src/features/settings/sections/gpu-section.tsx:108
+#: src/features/settings/components/gpu-backend-card.tsx:170
 msgid "GPU support is installed but not working."
 msgstr "O suporte a GPU está instalado, mas não está funcionando."
 
@@ -719,7 +739,7 @@ msgstr "Aparência da barra indicadora. As alterações são aplicadas imediatam
 msgid "Idle"
 msgstr "Parado"
 
-#: src/features/settings/sections/models-section.tsx:216
+#: src/features/settings/sections/models-section.tsx:215
 msgid "In use"
 msgstr "Em uso"
 
@@ -732,10 +752,16 @@ msgid "Insert placeholder"
 msgstr "Inserir marcador"
 
 #: src/features/settings/components/asr-engine-cards.tsx:228
-#: src/features/settings/sections/models-section.tsx:219
+#: src/features/settings/sections/models-section.tsx:218
 #: src/features/welcome/components/model-card.tsx:89
 msgid "Installed"
 msgstr "Instalado"
+
+#: src/features/settings/components/gpu-backend-card.tsx:148
+#: src/features/welcome/components/engine-step.tsx:133
+#: src/features/welcome/welcome-page.tsx:254
+msgid "Installed. Restart Lune Voice to start using your GPU."
+msgstr "Instalado. Reinicie o Lune Voice para começar a usar sua GPU."
 
 #: src/features/styles/components/style-editor-modal.tsx:114
 msgid "Instructions"
@@ -852,12 +878,12 @@ msgstr "minutos"
 msgid "Mode"
 msgstr "Modo"
 
-#: src/features/settings/sections/models-section.tsx:103
-#: src/features/settings/settings-page.tsx:76
+#: src/features/settings/sections/models-section.tsx:97
+#: src/features/settings/settings-page.tsx:75
 msgid "Models"
 msgstr "Modelos"
 
-#: src/features/welcome/welcome-page.tsx:322
+#: src/features/welcome/welcome-page.tsx:410
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "Os modelos são armazenados localmente. Sem telemetria, sem contas."
 
@@ -866,10 +892,10 @@ msgid "Monitor"
 msgstr "Tela"
 
 #: src/features/settings/sections/gpu-section.tsx:44
-msgid "Most of the download is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
-msgstr "A maior parte do download são as bibliotecas matemáticas CUDA da NVIDIA, que não podem ser redistribuídas de forma menor."
+#~ msgid "Most of the download is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
+#~ msgstr "A maior parte do download são as bibliotecas matemáticas CUDA da NVIDIA, que não podem ser redistribuídas de forma menor."
 
-#: src/features/welcome/components/engine-step.tsx:49
+#: src/features/welcome/components/engine-step.tsx:53
 msgid "Multilingual · pick a size"
 msgstr "Multilíngue · escolha um tamanho"
 
@@ -892,6 +918,10 @@ msgstr "Próxima página"
 #: src/features/styles/components/style-preset-card.tsx:99
 msgid "No"
 msgstr "Não"
+
+#: src/features/settings/components/gpu-backend-card.tsx:157
+msgid "No NVIDIA driver was found. Install the driver for your GPU and the download will appear here."
+msgstr "Nenhum driver NVIDIA foi encontrado. Instale o driver da sua GPU e o download aparecerá aqui."
 
 #: src/features/dictionary/components/dictionary-table.tsx:249
 msgid "No rules match “{query}”."
@@ -936,11 +966,12 @@ msgstr "Normaliza o nível do microfone antes da detecção de voz. Ajuda a sile
 msgid "not connected"
 msgstr "não conectado"
 
-#: src/features/settings/sections/models-section.tsx:222
+#: src/features/settings/components/gpu-backend-card.tsx:129
+#: src/features/settings/sections/models-section.tsx:221
 msgid "Not installed"
 msgstr "Não instalado"
 
-#: src/features/settings/sections/models-section.tsx:135
+#: src/features/settings/sections/models-section.tsx:134
 msgid "Nothing installed"
 msgstr "Nada instalado"
 
@@ -979,7 +1010,7 @@ msgid "Orientation"
 msgstr "Orientação"
 
 #: src/features/overview/overview-page.tsx:121
-#: src/features/settings/settings-page.tsx:75
+#: src/features/settings/settings-page.tsx:74
 msgid "Output"
 msgstr "Saída"
 
@@ -987,7 +1018,7 @@ msgstr "Saída"
 msgid "Overall footprint of the pill bar."
 msgstr "Tamanho total da barra indicadora."
 
-#: src/features/welcome/welcome-page.tsx:202
+#: src/features/welcome/welcome-page.tsx:282
 msgid "Overall progress"
 msgstr "Progresso geral"
 
@@ -1009,7 +1040,7 @@ msgstr "Colar é mais simples. Digitar as teclas pode funcionar melhor em alguns
 msgid "Phrase"
 msgstr "Frase"
 
-#: src/features/settings/settings-page.tsx:72
+#: src/features/settings/settings-page.tsx:71
 msgid "Pill"
 msgstr "Indicador"
 
@@ -1041,7 +1072,7 @@ msgstr "Colocação"
 msgid "Play a short sound when dictation starts, finishes, or runs into an error."
 msgstr "Reproduz um som curto quando o ditado começa, termina ou encontra um erro."
 
-#: src/features/welcome/welcome-page.tsx:257
+#: src/features/welcome/welcome-page.tsx:340
 msgid "Please keep the app open until downloads finish"
 msgstr "Por favor, mantenha o aplicativo aberto até que os downloads terminem"
 
@@ -1156,7 +1187,11 @@ msgstr "Redefinir"
 msgid "Reset position"
 msgstr "Redefinir posição"
 
-#: src/features/welcome/welcome-page.tsx:268
+#: src/features/settings/components/gpu-backend-card.tsx:125
+msgid "Restart needed"
+msgstr "Reinício necessário"
+
+#: src/features/welcome/welcome-page.tsx:351
 msgid "Retry download"
 msgstr "Tentar baixar novamente"
 
@@ -1166,16 +1201,20 @@ msgstr "Reescreve cada transcrição em um estilo escolhido. Quando desativado, 
 
 #. placeholder {0}: status.devices.join(', ')
 #: src/features/settings/sections/gpu-section.tsx:91
-msgid "Running on {0}."
-msgstr "Executando em {0}."
+#~ msgid "Running on {0}."
+#~ msgstr "Executando em {0}."
+
+#: src/features/settings/components/gpu-backend-card.tsx:132
+msgid "Running on CPU"
+msgstr "Executando na CPU"
 
 #: src/features/settings/sections/gpu-section.tsx:118
-msgid "Running on the CPU."
-msgstr "Executando na CPU."
+#~ msgid "Running on the CPU."
+#~ msgstr "Executando na CPU."
 
 #: src/features/settings/sections/gpu-section.tsx:100
-msgid "Running on the CPU. No NVIDIA driver was found — install the driver for your GPU and Lune Voice will offer GPU support here."
-msgstr "Executando na CPU. Nenhum driver NVIDIA foi encontrado: instale o driver da sua GPU e o Lune Voice oferecerá suporte a GPU aqui."
+#~ msgid "Running on the CPU. No NVIDIA driver was found — install the driver for your GPU and Lune Voice will offer GPU support here."
+#~ msgstr "Executando na CPU. Nenhum driver NVIDIA foi encontrado: instale o driver da sua GPU e o Lune Voice oferecerá suporte a GPU aqui."
 
 #: src/features/overview/overview-page.tsx:261
 msgid "s"
@@ -1215,7 +1254,7 @@ msgstr "Pesquisar transcrições"
 msgid "Search transcripts…"
 msgstr "Pesquisar transcrições…"
 
-#: src/features/welcome/welcome-page.tsx:297
+#: src/features/welcome/welcome-page.tsx:385
 msgid "Select required models"
 msgstr "Selecione os modelos necessários"
 
@@ -1246,7 +1285,15 @@ msgstr "Definir tecla de atalho"
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "Defina o idioma que você fala. Auto usa detecção de fala."
 
-#: src/features/settings/settings-page.tsx:102
+#: src/features/welcome/welcome-page.tsx:378
+msgid "Set up GPU acceleration"
+msgstr "Configurar a aceleração por GPU"
+
+#: src/features/welcome/welcome-page.tsx:177
+msgid "Setting up your GPU"
+msgstr "Configurando sua GPU"
+
+#: src/features/settings/settings-page.tsx:95
 msgid "Settings sections"
 msgstr "Seções de configurações"
 
@@ -1268,9 +1315,9 @@ msgstr "Tamanho"
 msgid "Size & shape"
 msgstr "Tamanho e forma"
 
-#: src/features/welcome/welcome-page.tsx:243
-#: src/features/welcome/welcome-page.tsx:271
-#: src/features/welcome/welcome-page.tsx:310
+#: src/features/welcome/welcome-page.tsx:326
+#: src/features/welcome/welcome-page.tsx:354
+#: src/features/welcome/welcome-page.tsx:398
 msgid "Skip for now"
 msgstr "Pular por enquanto"
 
@@ -1295,7 +1342,7 @@ msgstr "Avisos sonoros"
 msgid "Speaking Time"
 msgstr "Tempo de fala"
 
-#: src/features/settings/sections/models-section.tsx:75
+#: src/features/settings/sections/models-section.tsx:69
 msgid "Speech-to-text"
 msgstr "Fala para texto"
 
@@ -1327,8 +1374,8 @@ msgid "Start, stop, and cancel dictation without leaving your work."
 msgstr "Inicie, pare e cancele o ditado sem sair do seu trabalho."
 
 #: src/features/settings/sections/gpu-section.tsx:33
-msgid "Status"
-msgstr "Status"
+#~ msgid "Status"
+#~ msgstr "Status"
 
 #: src/features/dictation/dictation-pill.tsx:88
 msgid "Stop and transcribe"
@@ -1353,7 +1400,7 @@ msgstr "Parar ditado"
 msgid "Style"
 msgstr "Estilo"
 
-#: src/features/settings/settings-page.tsx:74
+#: src/features/settings/settings-page.tsx:73
 msgid "Styling"
 msgstr "Estilização"
 
@@ -1411,11 +1458,11 @@ msgstr "As palavras sobre as quais o reconhecedor tem menos certeza são verific
 msgid "Theme"
 msgstr "Tema"
 
-#: src/features/settings/sections/models-section.tsx:306
+#: src/features/settings/sections/models-section.tsx:305
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "Este modelo está em uso pela sua configuração atual. O ditado pode não funcionar até que você o reinstale ou escolha outro."
 
-#: src/features/welcome/welcome-page.tsx:155
+#: src/features/welcome/welcome-page.tsx:175
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "Isso só acontece uma vez. Você pode continuar usando seu computador enquanto isso."
 
@@ -1478,13 +1525,30 @@ msgid "Transcript"
 msgstr "Transcrição"
 
 #: src/features/settings/sections/transcription-section.tsx:36
-#: src/features/settings/settings-page.tsx:73
+#: src/features/settings/settings-page.tsx:72
 msgid "Transcription"
 msgstr "Transcrição"
 
+#. placeholder {0}: status.devices.join(', ')
+#: src/features/settings/components/gpu-backend-card.tsx:140
+msgid "Transcription is running on {0}."
+msgstr "A transcrição está sendo executada em {0}."
+
+#: src/features/settings/components/gpu-backend-card.tsx:141
+msgid "Transcription is running on your GPU."
+msgstr "A transcrição está sendo executada na sua GPU."
+
 #: src/features/settings/sections/gpu-section.tsx:30
-msgid "Transcription runs on the CPU by default. If you have an NVIDIA GPU, an optional download moves it to the GPU for noticeably lower latency."
-msgstr "A transcrição é executada na CPU por padrão. Se você tiver uma GPU NVIDIA, um download opcional a move para a GPU, com latência bem menor."
+#~ msgid "Transcription runs on the CPU by default. If you have an NVIDIA GPU, an optional download moves it to the GPU for noticeably lower latency."
+#~ msgstr "A transcrição é executada na CPU por padrão. Se você tiver uma GPU NVIDIA, um download opcional a move para a GPU, com latência bem menor."
+
+#: src/features/settings/components/gpu-backend-card.tsx:164
+msgid "Transcription runs on the CPU. An optional download moves it to your NVIDIA GPU for noticeably lower latency — most of it is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
+msgstr "A transcrição é executada na CPU. Um download opcional a move para sua GPU NVIDIA e reduz a latência de forma perceptível: a maior parte são as bibliotecas matemáticas CUDA da NVIDIA, que não podem ser redistribuídas de forma menor."
+
+#: src/features/settings/components/gpu-backend-card.tsx:165
+msgid "Transcription runs on the CPU. No GPU download has been published for this build yet."
+msgstr "A transcrição é executada na CPU. Ainda não foi publicado nenhum download de GPU para esta versão."
 
 #: src/features/snippets/snippets-page.tsx:145
 msgid "Trigger phrase"
@@ -1502,7 +1566,7 @@ msgstr "Digita como"
 msgid "Updates"
 msgstr "Atualizações"
 
-#: src/features/welcome/components/engine-step.tsx:136
+#: src/features/welcome/components/engine-step.tsx:143
 msgid "Use GPU acceleration"
 msgstr "Usar aceleração por GPU"
 
@@ -1537,13 +1601,13 @@ msgstr "Visibilidade"
 msgid "Voice model"
 msgstr "Modelo de voz"
 
-#: src/features/welcome/welcome-page.tsx:163
+#: src/features/welcome/welcome-page.tsx:186
 msgid "Welcome back"
 msgstr "bem vindo de volta"
 
-#: src/features/welcome/welcome-page.tsx:148
-#: src/features/welcome/welcome-page.tsx:160
-#: src/features/welcome/welcome-page.tsx:166
+#: src/features/welcome/welcome-page.tsx:168
+#: src/features/welcome/welcome-page.tsx:183
+#: src/features/welcome/welcome-page.tsx:189
 msgid "Welcome to Lune Voice"
 msgstr "Bem-vindo ao Lune Voice"
 
@@ -1571,16 +1635,16 @@ msgstr "Qual atalho de colagem enviar. «Automático» detecta terminais; substi
 msgid "Which screen the pill appears on."
 msgstr "Em qual tela o indicador aparece."
 
-#: src/features/welcome/components/engine-step.tsx:48
+#: src/features/welcome/components/engine-step.tsx:52
 msgid "Whisper"
 msgstr "Whisper"
 
 #: src/features/settings/components/asr-engine-cards.tsx:122
-#: src/features/welcome/components/engine-step.tsx:71
+#: src/features/welcome/components/engine-step.tsx:75
 msgid "Whisper model size"
 msgstr "Tamanho do modelo Whisper"
 
-#: src/features/welcome/components/engine-step.tsx:50
+#: src/features/welcome/components/engine-step.tsx:54
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
 msgstr "whisper.cpp em execução no dispositivo. Escolha um tamanho para equilibrar velocidade e precisão."
 
@@ -1610,7 +1674,7 @@ msgstr "Você está usando a versão {version}."
 msgid "You say"
 msgstr "Você diz"
 
-#: src/features/welcome/welcome-page.tsx:151
+#: src/features/welcome/welcome-page.tsx:171
 msgid "You're all set"
 msgstr "Você está pronto"
 
@@ -1618,19 +1682,28 @@ msgstr "Você está pronto"
 msgid "Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none."
 msgstr "Sua chave de API. Deixe em branco para manter a chave salva — ou se o endpoint roda na sua própria máquina ou rede e não exige nenhuma."
 
-#: src/features/welcome/components/engine-step.tsx:126
+#: src/features/welcome/components/engine-step.tsx:131
 msgid "Your GPU is ready — use it for faster transcription."
 msgstr "Sua GPU está pronta: use-a para transcrever mais rápido."
 
+#: src/features/welcome/components/engine-step.tsx:137
+#~ msgid "Your GPU qualifies. Keep this on and the runtime download will be offered under Settings › Models."
+#~ msgstr "Sua GPU é compatível. Mantenha isto ativado e o download do runtime será oferecido em Configurações › Modelos."
+
 #: src/features/welcome/components/engine-step.tsx:127
-msgid "Your GPU qualifies. Keep this on, then finish the one-time setup in Settings."
-msgstr "Sua GPU é compatível. Deixe isto ativado e conclua a configuração inicial nas Configurações."
+#~ msgid "Your GPU qualifies. Keep this on, then finish the one-time setup in Settings."
+#~ msgstr "Sua GPU é compatível. Deixe isto ativado e conclua a configuração inicial nas Configurações."
+
+#. placeholder {0}: formatBytes(gpuDownloadBytes)
+#: src/features/welcome/components/engine-step.tsx:134
+msgid "Your GPU qualifies. Setup will download the {0} NVIDIA runtime, then a restart turns it on."
+msgstr "Sua GPU é compatível. A configuração vai baixar o runtime NVIDIA de {0} e um reinício o ativará."
 
 #: src/features/overview/overview-page.tsx:229
 msgid "your hotkey"
 msgstr "sua tecla de atalho"
 
-#: src/features/welcome/welcome-page.tsx:152
+#: src/features/welcome/welcome-page.tsx:172
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "Seus modelos estão prontos. Tudo fica nesta máquina."
 

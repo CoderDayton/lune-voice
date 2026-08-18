@@ -2,6 +2,9 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { backendClient } from '../../lib/backend/client';
+import type { GpuBackendStatusDto } from '../../lib/backend/generated/GpuBackendStatusDto';
+import type { GpuInstallProgressDto } from '../../lib/backend/generated/GpuInstallProgressDto';
+import { installGpuBackend } from '../../lib/backend/gpu-install';
 import { isTauriRuntime } from '../../lib/backend/runtime';
 import {
   loadWorkspaceSnapshot,
@@ -17,6 +20,7 @@ import {
   gpuAccelerationOffer,
   type ModelStatus,
   relevantSetupModels,
+  shouldInstallGpuDuringSetup,
 } from './setup-logic';
 
 export type { ModelStatus };
@@ -29,7 +33,15 @@ export interface DownloadProgress {
   done: boolean;
 }
 
-export type SetupPhase = 'loading' | 'engine' | 'choose' | 'downloading' | 'error' | 'done';
+export type SetupPhase =
+  | 'loading'
+  | 'engine'
+  | 'choose'
+  | 'downloading'
+  /** Fetching the CUDA plugin, after the models and before finishing. */
+  | 'gpu'
+  | 'error'
+  | 'done';
 
 const STORAGE_KEY = 'lune-setup-complete';
 
@@ -110,6 +122,19 @@ interface ModelSetup {
   useGpu: boolean;
   /** Accept/decline GPU acceleration; persists via the shared settings path. */
   setUseGpu: (next: boolean) => void;
+  /** Whether finishing setup will also download the CUDA plugin. */
+  willInstallGpu: boolean;
+  /** Byte progress of the CUDA plugin download, while the `gpu` phase runs. */
+  gpuProgress: GpuInstallProgressDto | null;
+  /** Published size of the CUDA plugin archive, for the download prompt. */
+  gpuDownloadBytes: number;
+  /** The plugin was fetched during this run, so the GPU needs a restart. */
+  gpuInstalled: boolean;
+  /**
+   * Why the plugin download failed, if it did. Never blocks setup: the app
+   * runs on the CPU without it, and Settings can retry.
+   */
+  gpuError: string | null;
   setEngineBackend: (backend: AsrBackendValue) => void;
   setEngineWhisper: (model: WhisperModelValue) => void;
   confirmEngine: () => void;
@@ -139,9 +164,19 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
   );
   const [gpuOffer, setGpuOffer] = useState<GpuAccelerationOffer | null>(null);
   const [useGpu, setUseGpuState] = useState(true);
+  const [gpuStatus, setGpuStatus] = useState<Pick<
+    GpuBackendStatusDto,
+    'state' | 'downloadAvailable' | 'downloadBytes'
+  > | null>(null);
+  const [gpuProgress, setGpuProgress] = useState<GpuInstallProgressDto | null>(null);
+  const [gpuInstalled, setGpuInstalled] = useState(false);
+  const [gpuError, setGpuError] = useState<string | null>(null);
 
   const queueRef = useRef<string[]>([]);
   const currentRef = useRef<string | null>(null);
+  // Latched when the download starts, so a model failure and its retry cannot
+  // lose the pending GPU step, and a second pass cannot repeat it.
+  const wantsGpuRef = useRef(false);
 
   useEffect(() => {
     currentRef.current = currentModel;
@@ -177,16 +212,28 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
         setUseGpuState(cur.useGpu);
         // Runtime GPU state gates the acceptance card; treat a probe failure as
         // "no GPU" so a transient error never wrongly offers acceleration.
-        const gpu = await backendClient
-          .gpuBackendStatus()
-          .catch(() => ({ state: 'unsupported' as const, downloadAvailable: false }));
+        const gpu = await backendClient.gpuBackendStatus().catch(() => ({
+          state: 'unsupported' as const,
+          downloadAvailable: false,
+          downloadBytes: 0,
+        }));
         if (cancelled) return;
         setGpuOffer(gpuAccelerationOffer(gpu.state, gpu.downloadAvailable));
+        setGpuStatus(gpu);
         const s = relevantSetupModels(await invoke<ModelStatus[]>('check_model_status'));
         if (cancelled) return;
         setModels(s);
         setSelected(buildInitialSelection(asrName, s));
-        setPhase(s.length > 0 && s.every((m) => m.ready) ? 'done' : 'engine');
+        // Models already on disk normally mean there is nothing to set up. A
+        // pending GPU plugin is the exception: skipping to `done` would be the
+        // user's only chance at the offer, spent silently.
+        const gpuStepPending = shouldInstallGpuDuringSetup(
+          gpu.state,
+          gpu.downloadAvailable,
+          cur.useGpu,
+        );
+        const nothingLeftToDo = s.length > 0 && s.every((m) => m.ready) && !gpuStepPending;
+        setPhase(nothingLeftToDo ? 'done' : 'engine');
       } catch (err) {
         if (cancelled) return;
         console.warn('[use-model-setup] bootstrap failed', err);
@@ -198,6 +245,35 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
     };
   }, [onFinish]);
 
+  // Fetch the CUDA plugin as the last setup step. Deliberately after the
+  // models: those are what dictation cannot start without, and this download
+  // is the largest of the lot.
+  //
+  // A failure here never fails setup. The app transcribes on the CPU without
+  // the plugin, so the honest outcome is a finished setup that says the GPU
+  // part did not happen — not a dead end in front of a first-run user.
+  const runGpuInstall = useEffectEvent(() => {
+    setPhase('gpu');
+    setGpuError(null);
+    setGpuProgress(null);
+    installGpuBackend(setGpuProgress)
+      .then((next) => {
+        // Keep the status the rest of the flow reads in step with the install,
+        // so nothing downstream still believes a download is pending.
+        setGpuStatus(next);
+        setGpuOffer(gpuAccelerationOffer(next.state, next.downloadAvailable));
+        setGpuInstalled(true);
+      })
+      .catch((err) => {
+        console.warn('[use-model-setup] GPU plugin install failed', err);
+        setGpuError(String(err));
+      })
+      .finally(() => {
+        setGpuProgress(null);
+        setPhase('done');
+      });
+  });
+
   // Advance to next item in queue (or finish). Stable ref so the listener
   // below can call it without restarting subscriptions.
   const advance = useEffectEvent(() => {
@@ -205,6 +281,11 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
     if (!next) {
       setCurrentModel(null);
       setProgress(null);
+      if (wantsGpuRef.current) {
+        wantsGpuRef.current = false;
+        runGpuInstall();
+        return;
+      }
       setPhase('done');
       return;
     }
@@ -297,9 +378,23 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
     void saveWorkspaceSetting('useGpu', next);
   }, []);
 
+  // Whether setup *has* a plugin to fetch, independent of the toggle. The
+  // acceptance copy describes what accepting would do, so flipping the toggle
+  // off must not rewrite it into a different situation.
+  const gpuDownloadOffered = gpuStatus
+    ? shouldInstallGpuDuringSetup(gpuStatus.state, gpuStatus.downloadAvailable, true)
+    : false;
+  const willInstallGpu = gpuDownloadOffered && useGpu;
+
   const startDownload = useCallback(() => {
     const pending = models.filter((m) => selected.has(m.localName) && !m.ready);
+    wantsGpuRef.current = willInstallGpu;
     if (pending.length === 0) {
+      if (wantsGpuRef.current) {
+        wantsGpuRef.current = false;
+        runGpuInstall();
+        return;
+      }
       setPhase('done');
       return;
     }
@@ -309,7 +404,7 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
     setError(null);
     setPhase('downloading');
     advance();
-  }, [models, selected]);
+  }, [models, selected, willInstallGpu]);
 
   const retry = useCallback(() => {
     if (currentRef.current) {
@@ -336,6 +431,11 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
     gpuOffer,
     useGpu,
     setUseGpu,
+    willInstallGpu,
+    gpuProgress,
+    gpuDownloadBytes: gpuStatus?.downloadBytes ?? 0,
+    gpuInstalled,
+    gpuError,
     setEngineBackend,
     setEngineWhisper,
     confirmEngine,
