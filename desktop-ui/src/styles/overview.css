@@ -1,0 +1,192 @@
+/* ── Overview instrument panel ─────────────────────────────────────────
+   Home is one enclosed pane, not a stack of cards: a hairline-divided stat
+   strip sits directly on top of a tabular session list inside a single
+   border box. Every band (strip / section bar / list / footer) is separated
+   by a hairline only, so the eye reads one instrument. */
+
+/* Status meta line beside the greeting — plain text separated by rules,
+   deliberately quieter than a row of badges. */
+@utility ov-meta {
+  @apply flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-content-subtle;
+}
+
+@utility ov-sep {
+  @apply inline-block h-3 w-px shrink-0 bg-surface-border-strong;
+}
+
+/* Page root — a flex column that hands its height to the pane. */
+@utility ov-page {
+  @apply flex min-h-0 flex-1 flex-col gap-3.5;
+}
+
+@utility ov-panel {
+  @apply flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-box border border-surface-border bg-surface-panel;
+  box-shadow: var(--elev-soft);
+}
+
+/* Runtime-unreachable banner — pinned to the top of the pane so the stale
+   figures below it are read in context. */
+@utility ov-alert {
+  @apply flex shrink-0 flex-wrap items-center gap-3 border-b border-surface-border px-5 py-3 text-sm;
+  color: var(--color-content-DEFAULT);
+  background: var(--surface-error-tint);
+}
+
+/* Stat strip. The hairlines are the grid gap showing the border colour
+   through, which keeps them exact at every column count and at the row
+   wrap, with no first-child arithmetic. */
+@utility ov-stats {
+  @apply grid shrink-0;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1px;
+  background: var(--surface-border);
+}
+
+/* Figures the runtime can no longer refresh recede, so the banner above them
+   is read as covering everything in the strip. */
+.ov-stats[data-stale='true'] {
+  opacity: 0.6;
+}
+
+/* Three fixed bands: label, value, note. The label and note rows are the
+   same height in every cell, so the 1fr between them is too — which puts
+   every read-out on one centre line however tall its numeral is. */
+@utility ov-stat {
+  @apply grid min-w-0 gap-2 bg-surface-card px-5 py-5;
+  grid-template-rows: auto 1fr auto;
+}
+
+@utility ov-value {
+  @apply flex min-w-0 items-center;
+}
+
+@media (min-width: 48rem) {
+  .ov-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 64rem) {
+  .ov-stats {
+    /* The hero keeps a wider track than the read-outs, but only by enough to
+       clear a six-figure count — beyond that it is just trailing space. */
+    grid-template-columns: 1.25fr 1fr 1fr 1fr 1.05fr;
+  }
+}
+
+/* Tall enough to read as a meter rather than a row of dashes, and centred on
+   the same line as the numerals beside it. */
+.ov-stat .audio-meter {
+  height: 2.5rem;
+}
+
+@utility ov-eyebrow {
+  @apply text-xs font-semibold uppercase tracking-uppercase select-none;
+}
+
+@utility ov-label {
+  @apply flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-uppercase text-content-subtle select-none;
+}
+
+@utility ov-metric {
+  @apply text-3xl leading-none font-semibold tracking-heading tabular-nums text-content-strong;
+}
+
+@utility ov-metric-hero {
+  @apply font-display text-5xl leading-none font-semibold tracking-display tabular-nums text-content-strong;
+}
+
+@utility ov-note {
+  @apply text-sm text-content-subtle;
+}
+
+/* Section bar between the strip and the list. */
+@utility ov-bar {
+  @apply flex shrink-0 items-center justify-between gap-4 border-y border-surface-border bg-surface-recessed px-5 py-3;
+}
+
+/* Session table. Head and rows share one track definition so the columns
+   stay locked together; the narrow layout drops the two numeric columns
+   rather than crushing the transcript. */
+@utility ov-table {
+  @apply flex min-h-0 flex-1 flex-col;
+  --ov-cols: 4.5rem minmax(0, 1fr);
+}
+
+@utility ov-row {
+  @apply grid w-full items-center gap-2 px-5 text-left;
+  grid-template-columns: var(--ov-cols);
+}
+
+.ov-row > .ov-num {
+  @apply hidden;
+}
+
+@media (min-width: 40rem) {
+  .ov-table {
+    --ov-cols: 5.25rem minmax(0, 1fr) 5.25rem 4.5rem;
+  }
+
+  .ov-row > .ov-num {
+    @apply block;
+  }
+}
+
+@utility ov-row-head {
+  @apply shrink-0 border-b border-surface-border py-2 text-xs font-semibold uppercase tracking-uppercase text-content-subtle select-none;
+}
+
+/* The list recedes as it descends, so the newest session sits at the bright
+   end of the pane and the fold into the footer reads as depth, not an edge. */
+@utility ov-list {
+  @apply min-h-0 flex-1 overflow-y-auto;
+  background: linear-gradient(
+    180deg,
+    var(--surface-card) 0%,
+    var(--surface-panel) 72%,
+    var(--surface-recessed) 100%
+  );
+}
+
+@utility ov-row-session {
+  @apply py-4;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+  border-bottom: 1px solid var(--surface-border);
+}
+
+/* The footer draws its own top rule, so the closing row must not draw one
+   too — two hairlines a pixel apart read as a seam. `:last-of-type` rather
+   than `:last-child`: every row is followed by its detail <dialog> sibling. */
+.ov-list > button.ov-row-session:last-of-type {
+  border-bottom-color: transparent;
+}
+
+.ov-row-session:hover {
+  background: var(--surface-hover);
+}
+
+/* No outline on a row — it boxed the full-bleed strip and read as a stuck
+   selection. Keyboard focus lands on the same wash hover uses, so the row is
+   still locatable without the ring. */
+.ov-row-session:focus-visible {
+  outline: none;
+  background: var(--surface-hover);
+}
+
+/* Inline actions in the bar and footer. They read as text, so hover and
+   focus have to supply the affordance a button's box would have given. */
+@utility ov-link {
+  @apply inline-flex items-center gap-1.5 rounded-field text-primary;
+}
+
+.ov-link:hover {
+  text-decoration: underline;
+}
+
+.ov-link:focus-visible {
+  @apply outline-2 outline-offset-2 outline-primary;
+}
+
+@utility ov-foot {
+  @apply flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-surface-border bg-surface-card px-5 py-2.5 text-sm text-content-subtle;
+}

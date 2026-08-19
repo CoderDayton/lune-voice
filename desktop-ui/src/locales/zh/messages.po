@@ -54,9 +54,17 @@ msgstr "{saved}（不可用）"
 msgid "{start}–{end} of {visibleCount}"
 msgstr "{start}–{end} 或 {visibleCount}"
 
+#: src/features/overview/overview-page.tsx:108
+msgid "{todayMinutes} min today"
+msgstr ""
+
 #: src/features/history/components/history-table.tsx:108
 msgid "{totalCount} sessions"
 msgstr "{totalCount} 会话"
+
+#: src/features/overview/overview-page.tsx:325
+msgid "{totalSessions} total"
+msgstr ""
 
 #: src/features/history/components/history-table.tsx:108
 msgid "{visibleCount} / {totalCount}"
@@ -92,7 +100,7 @@ msgstr "账户及状态"
 msgid "Action"
 msgstr "操作"
 
-#: src/features/settings/components/gpu-backend-card.tsx:122
+#: src/features/settings/components/gpu-backend-card.tsx:126
 #: src/features/styles/components/style-preset-card.tsx:75
 msgid "Active"
 msgstr "积极的"
@@ -131,13 +139,9 @@ msgstr "AI 模型存储在您的设备上。"
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "所有必需的模型均已安装。准备好后继续。"
 
-#: src/features/overview/overview-page.tsx:136
-msgid "all-time"
-msgstr "历史上的"
-
-#: src/features/overview/overview-page.tsx:168
-msgid "all-time avg"
-msgstr "历史平均"
+#: src/features/overview/overview-page.tsx:96
+msgid "all-time · today"
+msgstr ""
 
 #: src/features/settings/components/openai-fields.tsx:35
 msgid "API endpoint"
@@ -156,7 +160,7 @@ msgstr "外貌"
 msgid "Application behavior and startup preferences."
 msgstr "应用程序行为和启动首选项。"
 
-#: src/features/overview/overview-page.tsx:192
+#: src/features/overview/overview-page.tsx:138
 msgid "Audio"
 msgstr "声音的"
 
@@ -310,7 +314,7 @@ msgstr "折叠侧边栏"
 msgid "Completed"
 msgstr "完全的"
 
-#: src/features/overview/overview-page.tsx:117
+#: src/features/overview/overview-page.tsx:273
 #: src/features/shell/components/app-shell.tsx:156
 #: src/features/shell/components/sidebar-widgets.tsx:45
 #: src/features/shell/components/sidebar.tsx:165
@@ -484,7 +488,7 @@ msgstr "放弃听写"
 msgid "Discard the current draft and return to idle. Click the binding to change it."
 msgstr "放弃当前草稿并返回空闲状态。单击绑定以更改它。"
 
-#: src/features/overview/overview-page.tsx:117
+#: src/features/overview/overview-page.tsx:273
 msgid "Disconnected"
 msgstr "已断开连接"
 
@@ -497,7 +501,7 @@ msgid "Dismiss error"
 msgstr "消除错误"
 
 #: src/features/history/components/history-table.tsx:376
-#: src/features/settings/components/gpu-backend-card.tsx:108
+#: src/features/settings/components/gpu-backend-card.tsx:112
 #: src/features/settings/sections/models-section.tsx:272
 msgid "Download"
 msgstr "下载"
@@ -518,11 +522,6 @@ msgstr "下载 1 个模型"
 #: src/features/welcome/welcome-page.tsx:132
 msgid "Download failed"
 msgstr "下载失败"
-
-#. placeholder {0}: formatBytes(status.downloadBytes)
-#: src/features/settings/sections/gpu-section.tsx:54
-#~ msgid "Download GPU support ({0})"
-#~ msgstr "下载 GPU 支持（{0}）"
 
 #: src/features/welcome/welcome-page.tsx:180
 msgid "Download interrupted"
@@ -548,7 +547,7 @@ msgid "Downloading NVIDIA's CUDA runtime."
 msgstr "正在下载 NVIDIA 的 CUDA 运行时。"
 
 #: src/features/settings/components/asr-engine-cards.tsx:152
-#: src/features/settings/components/gpu-backend-card.tsx:108
+#: src/features/settings/components/gpu-backend-card.tsx:112
 #: src/features/settings/sections/models-section.tsx:272
 #: src/features/welcome/welcome-page.tsx:337
 msgid "Downloading…"
@@ -595,7 +594,7 @@ msgid "Edit style"
 msgstr "编辑样式"
 
 #: src/features/history/components/history-table.tsx:333
-#: src/features/overview/overview-page.tsx:253
+#: src/features/overview/overview-page.tsx:169
 msgid "Empty session"
 msgstr "空会话"
 
@@ -684,17 +683,17 @@ msgstr "github"
 msgid "GitHub"
 msgstr "GitHub"
 
-#: src/features/overview/overview-page.tsx:74
-msgid "Good afternoon"
-msgstr "下午好"
+#: src/features/overview/overview-page.tsx:271
+msgid "Good afternoon."
+msgstr ""
 
-#: src/features/overview/overview-page.tsx:74
-msgid "Good evening"
-msgstr "晚上好"
+#: src/features/overview/overview-page.tsx:271
+msgid "Good evening."
+msgstr ""
 
-#: src/features/overview/overview-page.tsx:74
-msgid "Good morning"
-msgstr "早上好"
+#: src/features/overview/overview-page.tsx:271
+msgid "Good morning."
+msgstr ""
 
 #: src/features/settings/components/gpu-backend-card.tsx:66
 #: src/features/welcome/components/engine-step.tsx:123
@@ -702,26 +701,26 @@ msgstr "早上好"
 msgid "GPU acceleration"
 msgstr "GPU 加速"
 
-#: src/features/settings/sections/gpu-section.tsx:92
-#~ msgid "GPU acceleration is active."
-#~ msgstr "GPU 加速已启用。"
-
-#: src/features/settings/sections/gpu-section.tsx:43
-#~ msgid "GPU support"
-#~ msgstr "GPU 支持"
-
-#: src/features/settings/components/gpu-backend-card.tsx:170
+#: src/features/settings/components/gpu-backend-card.tsx:174
 msgid "GPU support is installed but not working."
 msgstr "GPU 支持已安装，但无法正常工作。"
+
+#: src/features/overview/overview-page.tsx:347
+msgid "History isn't saved"
+msgstr ""
+
+#: src/features/overview/overview-page.tsx:347
+msgid "History kept {historyDays} days"
+msgstr ""
 
 #: src/features/settings/sections/general-section.tsx:86
 #: src/features/settings/sections/general-section.tsx:96
 msgid "History retention"
 msgstr "历史记录保留"
 
-#: src/features/overview/overview-page.tsx:112
-msgid "hold the hotkey and speak, your words land where your cursor is."
-msgstr "按住热键并说话，您的话语就会落在光标所在的位置。"
+#: src/features/overview/overview-page.tsx:284
+msgid "Hold the hotkey and speak, and your words land wherever your cursor is."
+msgstr ""
 
 #: src/features/settings/sections/general-section.tsx:87
 msgid "How long finished dictations are kept on this device."
@@ -735,9 +734,9 @@ msgstr "听写提示音的播放音量。"
 msgid "How the pill bar looks. Changes apply immediately."
 msgstr "指示器条的外观。更改会立即生效。"
 
-#: src/features/overview/overview-page.tsx:203
-msgid "Idle"
-msgstr "闲置的"
+#: src/features/overview/overview-page.tsx:143
+msgid "Idle · mic ready"
+msgstr ""
 
 #: src/features/settings/sections/models-section.tsx:215
 msgid "In use"
@@ -757,7 +756,7 @@ msgstr "插入占位符"
 msgid "Installed"
 msgstr "已安装"
 
-#: src/features/settings/components/gpu-backend-card.tsx:148
+#: src/features/settings/components/gpu-backend-card.tsx:152
 #: src/features/welcome/components/engine-step.tsx:133
 #: src/features/welcome/welcome-page.tsx:254
 msgid "Installed. Restart Lune Voice to start using your GPU."
@@ -797,6 +796,7 @@ msgid "Launch into the system tray instead of opening the main window. Useful wh
 msgstr "启动到系统托盘而不是打开主窗口。当 Lune Voice 在登录时自动启动时很有用。"
 
 #: src/features/history/components/history-table.tsx:136
+#: src/features/overview/overview-page.tsx:209
 msgid "Length"
 msgstr "长度"
 
@@ -818,7 +818,7 @@ msgstr "正在聆听 — 说出该短语，然后再次点击停止。"
 msgid "Listening — say the phrase…"
 msgstr "正在聆听 — 请说出该短语…"
 
-#: src/features/overview/overview-page.tsx:203
+#: src/features/overview/overview-page.tsx:143
 #: src/features/shell/components/sidebar-widgets.tsx:52
 msgid "Listening…"
 msgstr "正在听……"
@@ -862,17 +862,13 @@ msgstr "会议抬头"
 msgid "Microphone"
 msgstr "麦克风"
 
-#: src/features/overview/overview-page.tsx:195
+#: src/features/overview/overview-page.tsx:141
 msgid "Microphone input level"
 msgstr "麦克风输入电平"
 
-#: src/features/overview/overview-page.tsx:153
-msgid "minute"
-msgstr "分钟"
-
-#: src/features/overview/overview-page.tsx:153
-msgid "minutes"
-msgstr "分钟"
+#: src/features/overview/overview-page.tsx:106
+msgid "min"
+msgstr ""
 
 #: src/features/settings/sections/appearance-section.tsx:41
 msgid "Mode"
@@ -890,10 +886,6 @@ msgstr "模型存储在本地。没有遥测，没有账户。"
 #: src/features/settings/sections/pill-section.tsx:149
 msgid "Monitor"
 msgstr "显示器"
-
-#: src/features/settings/sections/gpu-section.tsx:44
-#~ msgid "Most of the download is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
-#~ msgstr "下载内容主要是 NVIDIA 的 CUDA 数学库，无法以更小的形式重新分发。"
 
 #: src/features/welcome/components/engine-step.tsx:53
 msgid "Multilingual · pick a size"
@@ -919,7 +911,7 @@ msgstr "下一页"
 msgid "No"
 msgstr "不"
 
-#: src/features/settings/components/gpu-backend-card.tsx:157
+#: src/features/settings/components/gpu-backend-card.tsx:161
 msgid "No NVIDIA driver was found. Install the driver for your GPU and the download will appear here."
 msgstr "未找到 NVIDIA 驱动。安装你的 GPU 驱动后，下载会出现在这里。"
 
@@ -936,7 +928,7 @@ msgstr "未找到会话。"
 msgid "No sessions match \"{0}\"."
 msgstr "没有会话匹配“{0}”。"
 
-#: src/features/overview/overview-page.tsx:227
+#: src/features/overview/overview-page.tsx:194
 msgid "No sessions yet"
 msgstr "还没有会议"
 
@@ -966,7 +958,7 @@ msgstr "在语音检测之前标准化麦克风电平。有助于安静的麦克
 msgid "not connected"
 msgstr "未连接"
 
-#: src/features/settings/components/gpu-backend-card.tsx:129
+#: src/features/settings/components/gpu-backend-card.tsx:133
 #: src/features/settings/sections/models-section.tsx:221
 msgid "Not installed"
 msgstr "未安装"
@@ -979,7 +971,7 @@ msgstr "未安装任何内容"
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 msgstr "关闭时传递原始转录文本。应用哪种风格在“风格”标签页中选择。"
 
-#: src/features/overview/overview-page.tsx:203
+#: src/features/overview/overview-page.tsx:143
 #: src/features/shell/components/app-shell.tsx:163
 #: src/features/shell/components/sidebar.tsx:168
 msgid "Offline"
@@ -997,7 +989,7 @@ msgstr "卡片上显示一行摘要"
 msgid "Open menu"
 msgstr "打开菜单"
 
-#: src/features/overview/overview-page.tsx:248
+#: src/features/overview/overview-page.tsx:165
 msgid "Open session from {time}"
 msgstr "{time} 开始的会议"
 
@@ -1009,7 +1001,6 @@ msgstr "选修的"
 msgid "Orientation"
 msgstr "方向"
 
-#: src/features/overview/overview-page.tsx:121
 #: src/features/settings/settings-page.tsx:74
 msgid "Output"
 msgstr "输出"
@@ -1089,7 +1080,7 @@ msgstr "预热麦克风"
 msgid "Preset corner or edge the pill starts at."
 msgstr "指示器起始的预设边角或边缘。"
 
-#: src/features/overview/overview-page.tsx:229
+#: src/features/overview/overview-page.tsx:196
 msgid "Press"
 msgstr "按"
 
@@ -1133,15 +1124,15 @@ msgstr "加工…"
 msgid "Quit Lune Voice"
 msgstr "退出 Lune Voice"
 
-#: src/features/overview/overview-page.tsx:117
+#: src/features/overview/overview-page.tsx:273
 #: src/features/shell/components/app-shell.tsx:162
 #: src/features/shell/components/sidebar.tsx:167
 msgid "Ready"
 msgstr "准备好"
 
-#: src/features/overview/overview-page.tsx:211
-msgid "Recent"
-msgstr "最近的"
+#: src/features/overview/overview-page.tsx:324
+msgid "Recent sessions"
+msgstr ""
 
 #: src/features/settings/sections/dictation-section.tsx:77
 #: src/features/settings/sections/dictation-section.tsx:83
@@ -1187,9 +1178,13 @@ msgstr "重置"
 msgid "Reset position"
 msgstr "重置位置"
 
-#: src/features/settings/components/gpu-backend-card.tsx:125
+#: src/features/settings/components/gpu-backend-card.tsx:129
 msgid "Restart needed"
 msgstr "需要重启"
+
+#: src/features/overview/overview-page.tsx:315
+msgid "Retry"
+msgstr ""
 
 #: src/features/welcome/welcome-page.tsx:351
 msgid "Retry download"
@@ -1199,24 +1194,11 @@ msgstr "重试下载"
 msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
 msgstr "以选定的风格改写每份转录文本。关闭时，原始转录文本将按原样传递。"
 
-#. placeholder {0}: status.devices.join(', ')
-#: src/features/settings/sections/gpu-section.tsx:91
-#~ msgid "Running on {0}."
-#~ msgstr "正在 {0} 上运行。"
-
-#: src/features/settings/components/gpu-backend-card.tsx:132
+#: src/features/settings/components/gpu-backend-card.tsx:136
 msgid "Running on CPU"
 msgstr "正在使用 CPU"
 
-#: src/features/settings/sections/gpu-section.tsx:118
-#~ msgid "Running on the CPU."
-#~ msgstr "正在 CPU 上运行。"
-
-#: src/features/settings/sections/gpu-section.tsx:100
-#~ msgid "Running on the CPU. No NVIDIA driver was found — install the driver for your GPU and Lune Voice will offer GPU support here."
-#~ msgstr "正在 CPU 上运行。未找到 NVIDIA 驱动 — 安装你的 GPU 驱动后，Lune Voice 会在此处提供 GPU 支持。"
-
-#: src/features/overview/overview-page.tsx:261
+#: src/features/overview/overview-page.tsx:176
 msgid "s"
 msgstr "s"
 
@@ -1246,6 +1228,10 @@ msgstr "已保存的片段"
 msgid "Say <0>“{spokenTrigger}”</0> as the whole utterance — or <1>“insert {spokenTrigger}”</1> — to type this snippet."
 msgstr "将 <0>“{spokenTrigger}”</0> 作为整句说出 — 或说 <1>“insert {spokenTrigger}”</1> — 即可输入此片段。"
 
+#: src/features/overview/overview-page.tsx:356
+msgid "Search sessions"
+msgstr ""
+
 #: src/features/history/components/history-table.tsx:93
 msgid "Search transcripts"
 msgstr "搜索成绩单"
@@ -1263,8 +1249,7 @@ msgstr "选择需要的型号"
 msgid "Send method"
 msgstr "发送方式"
 
-#: src/features/overview/overview-page.tsx:184
-#: src/features/overview/overview-page.tsx:213
+#: src/features/overview/overview-page.tsx:133
 msgid "session"
 msgstr "会议"
 
@@ -1272,8 +1257,7 @@ msgstr "会议"
 msgid "Session details"
 msgstr "会议详情"
 
-#: src/features/overview/overview-page.tsx:184
-#: src/features/overview/overview-page.tsx:213
+#: src/features/overview/overview-page.tsx:133
 msgid "sessions"
 msgstr "会议"
 
@@ -1307,6 +1291,11 @@ msgstr "快捷方式"
 msgid "Show on all workspaces"
 msgstr "在所有工作区显示"
 
+#. placeholder {0}: recentSessions.length
+#: src/features/overview/overview-page.tsx:341
+msgid "Showing {0} of {totalSessions} sessions"
+msgstr ""
+
 #: src/features/settings/sections/pill-section.tsx:200
 msgid "Size"
 msgstr "大小"
@@ -1338,9 +1327,9 @@ msgstr "声音"
 msgid "Sound cues"
 msgstr "提示音"
 
-#: src/features/overview/overview-page.tsx:145
-msgid "Speaking Time"
-msgstr "说话时长"
+#: src/features/overview/overview-page.tsx:101
+msgid "Speaking time"
+msgstr ""
 
 #: src/features/settings/sections/models-section.tsx:69
 msgid "Speech-to-text"
@@ -1373,10 +1362,6 @@ msgstr "开始或停止录音"
 msgid "Start, stop, and cancel dictation without leaving your work."
 msgstr "无需离开当前工作即可开始、停止和取消听写。"
 
-#: src/features/settings/sections/gpu-section.tsx:33
-#~ msgid "Status"
-#~ msgstr "状态"
-
 #: src/features/dictation/dictation-pill.tsx:88
 msgid "Stop and transcribe"
 msgstr "停止并转写"
@@ -1395,6 +1380,10 @@ msgstr "停止口授"
 #: src/features/dictation/dictation-pill.tsx:62
 msgid "Stop dictation"
 msgstr "停止听写"
+
+#: src/features/overview/overview-page.tsx:352
+msgid "Stored on this device"
+msgstr ""
 
 #: src/features/history/components/session-detail-modal.tsx:164
 msgid "Style"
@@ -1438,6 +1427,10 @@ msgstr "文本传递"
 msgid "The floating status pill you see while dictating."
 msgstr "听写时显示的浮动状态指示器。"
 
+#: src/features/overview/overview-page.tsx:308
+msgid "The local runtime isn't responding. The figures below are the last known values."
+msgstr ""
+
 #: src/features/settings/sections/dictation-section.tsx:58
 msgid "The main shortcut used for voice typing. Click the binding to change it."
 msgstr "用于语音输入的主要快捷方式。单击绑定以更改它。"
@@ -1472,6 +1465,7 @@ msgid "This will permanently remove this dictation session and its transcript."
 msgstr "这将永久删除该听写会话及其记录。"
 
 #: src/features/history/components/history-table.tsx:133
+#: src/features/overview/overview-page.tsx:206
 msgid "Time"
 msgstr "时间"
 
@@ -1483,16 +1477,11 @@ msgstr "头衔缩写（“先生”→“先生”）"
 msgid "Titles"
 msgstr "标题"
 
-#: src/features/overview/overview-page.tsx:230
+#: src/features/overview/overview-page.tsx:197
 msgid "to start dictating"
 msgstr "开始听写"
 
-#: src/features/overview/overview-page.tsx:137
-#: src/features/overview/overview-page.tsx:169
-msgid "today"
-msgstr "今天"
-
-#: src/features/overview/overview-page.tsx:176
+#: src/features/overview/overview-page.tsx:129
 msgid "Today"
 msgstr "今天"
 
@@ -1508,9 +1497,9 @@ msgstr "对于较长的听写来说，切换是最简单的。保持更适合快
 msgid "Toggle theme"
 msgstr "切换主题"
 
-#: src/features/overview/overview-page.tsx:129
-msgid "Total Words"
-msgstr "总字数"
+#: src/features/overview/overview-page.tsx:87
+msgid "Total words"
+msgstr ""
 
 #: src/components/ui/voice-capture-field.tsx:189
 msgid "Transcribing what you said…"
@@ -1521,6 +1510,7 @@ msgid "Transcribing…"
 msgstr "正在转写…"
 
 #: src/features/history/components/history-table.tsx:134
+#: src/features/overview/overview-page.tsx:207
 msgid "Transcript"
 msgstr "成绩单"
 
@@ -1530,23 +1520,19 @@ msgid "Transcription"
 msgstr "转录"
 
 #. placeholder {0}: status.devices.join(', ')
-#: src/features/settings/components/gpu-backend-card.tsx:140
+#: src/features/settings/components/gpu-backend-card.tsx:144
 msgid "Transcription is running on {0}."
 msgstr "转录正在 {0} 上运行。"
 
-#: src/features/settings/components/gpu-backend-card.tsx:141
+#: src/features/settings/components/gpu-backend-card.tsx:145
 msgid "Transcription is running on your GPU."
 msgstr "转录正在你的 GPU 上运行。"
 
-#: src/features/settings/sections/gpu-section.tsx:30
-#~ msgid "Transcription runs on the CPU by default. If you have an NVIDIA GPU, an optional download moves it to the GPU for noticeably lower latency."
-#~ msgstr "转写默认在 CPU 上运行。如果你有 NVIDIA GPU，可选下载会将其转移到 GPU，明显降低延迟。"
-
-#: src/features/settings/components/gpu-backend-card.tsx:164
+#: src/features/settings/components/gpu-backend-card.tsx:168
 msgid "Transcription runs on the CPU. An optional download moves it to your NVIDIA GPU for noticeably lower latency — most of it is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
 msgstr "转录在 CPU 上运行。可选下载会把它转到你的 NVIDIA GPU 上，延迟明显更低 — 其中大部分是 NVIDIA 的 CUDA 数学库，无法以更小的形式再分发。"
 
-#: src/features/settings/components/gpu-backend-card.tsx:165
+#: src/features/settings/components/gpu-backend-card.tsx:169
 msgid "Transcription runs on the CPU. No GPU download has been published for this build yet."
 msgstr "转录在 CPU 上运行。此版本尚未发布 GPU 下载。"
 
@@ -1585,7 +1571,7 @@ msgstr "使用 {0} 样式"
 msgid "View"
 msgstr "看法"
 
-#: src/features/overview/overview-page.tsx:218
+#: src/features/overview/overview-page.tsx:329
 msgid "View all"
 msgstr "查看全部"
 
@@ -1600,6 +1586,10 @@ msgstr "显示"
 #: src/features/settings/sections/transcription-section.tsx:41
 msgid "Voice model"
 msgstr "语音模型"
+
+#: src/features/overview/overview-page.tsx:123
+msgid "vs all-time avg"
+msgstr ""
 
 #: src/features/welcome/welcome-page.tsx:186
 msgid "Welcome back"
@@ -1649,16 +1639,16 @@ msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy.
 msgstr "whisper.cpp 在设备端运行。选择一个大小以在速度与准确性之间权衡。"
 
 #: src/features/history/components/history-table.tsx:359
-#: src/features/overview/overview-page.tsx:257
 msgid "words"
 msgstr "字"
 
 #: src/features/history/components/history-table.tsx:135
 #: src/features/history/components/session-detail-modal.tsx:161
+#: src/features/overview/overview-page.tsx:208
 msgid "Words"
 msgstr "字"
 
-#: src/features/overview/overview-page.tsx:160
+#: src/features/overview/overview-page.tsx:113
 msgid "WPM"
 msgstr "WPM"
 
@@ -1686,20 +1676,12 @@ msgstr "你的 API 密钥。留空可沿用已保存的密钥 — 或者当端�
 msgid "Your GPU is ready — use it for faster transcription."
 msgstr "你的 GPU 已就绪 — 用它来更快地转写。"
 
-#: src/features/welcome/components/engine-step.tsx:137
-#~ msgid "Your GPU qualifies. Keep this on and the runtime download will be offered under Settings › Models."
-#~ msgstr "你的 GPU 符合条件。保持开启，运行时下载会出现在“设置 › 型号”中。"
-
-#: src/features/welcome/components/engine-step.tsx:127
-#~ msgid "Your GPU qualifies. Keep this on, then finish the one-time setup in Settings."
-#~ msgstr "你的 GPU 符合条件。保持此项开启，然后在设置中完成一次性安装。"
-
 #. placeholder {0}: formatBytes(gpuDownloadBytes)
 #: src/features/welcome/components/engine-step.tsx:134
 msgid "Your GPU qualifies. Setup will download the {0} NVIDIA runtime, then a restart turns it on."
 msgstr "你的 GPU 符合条件。安装程序会下载 {0} 的 NVIDIA 运行时，重启后即可启用。"
 
-#: src/features/overview/overview-page.tsx:229
+#: src/features/overview/overview-page.tsx:196
 msgid "your hotkey"
 msgstr "你的热键"
 

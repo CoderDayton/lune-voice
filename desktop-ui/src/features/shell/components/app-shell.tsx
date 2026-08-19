@@ -113,8 +113,8 @@ export function AppShell() {
         </div>
 
         <main id="main-content" className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="app-scroll">
-            <div className="app-frame">
+          <div className={page.to === '/' ? 'app-scroll app-scroll-fixed' : 'app-scroll'}>
+            <div className={page.to === '/' ? 'app-frame app-frame-fill' : 'app-frame'}>
               {/* Page hero — Home leads with its bento board; every other
                   page gets its title + description back as an in-page header. */}
               {page.to !== '/' && (

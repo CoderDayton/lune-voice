@@ -275,23 +275,21 @@
   --space-page-y: 1.75rem;
   --space-page-bottom: 3.5rem;
 
+  /* Flat ground with one soft highlight thrown from above the viewport, so
+     panels read as objects lit from the top rather than tiles on a texture. */
   --surface-body:
-    linear-gradient(170deg, oklch(0.135 0 0), oklch(0.105 0 0));
+    linear-gradient(oklch(0.115 0 0), oklch(0.115 0 0));
   --surface-backdrop:
-    linear-gradient(135deg, oklch(0.74 0.14 295 / 0.05), transparent 42%),
-    linear-gradient(320deg, oklch(0.74 0.10 185 / 0.03), transparent 48%);
-  --surface-grid:
-    radial-gradient(circle, oklch(1 0 0 / 0.055) 1px, transparent 1px);
+    radial-gradient(90% 60% at 50% -20%, oklch(1 0 0 / 0.035), transparent 70%);
+  --surface-grid: none;
   --surface-brand:
     linear-gradient(135deg, oklch(0.74 0.14 295), oklch(0.50 0.18 295));
 }
 
 [data-color-scheme="light"] {
   --surface-body:
-    linear-gradient(170deg, oklch(0.97 0 0), oklch(0.93 0 0));
+    linear-gradient(oklch(0.945 0 0), oklch(0.945 0 0));
   --surface-backdrop:
-    linear-gradient(135deg, oklch(0.50 0.18 295 / 0.05), transparent 42%),
-    linear-gradient(320deg, oklch(0.50 0.13 185 / 0.03), transparent 48%);
-  --surface-grid:
-    radial-gradient(circle, oklch(0 0 0 / 0.04) 1px, transparent 1px);
+    radial-gradient(90% 60% at 50% -20%, oklch(1 0 0 / 0.55), transparent 70%);
+  --surface-grid: none;
 }

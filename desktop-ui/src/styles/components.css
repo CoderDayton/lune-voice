@@ -37,6 +37,34 @@
   margin-inline: auto;
 }
 
+/* Home is a single instrument pane rather than a stack of sections: from the
+   width where its stat strip goes horizontal, the page itself never scrolls,
+   the frame fills the region exactly, and the pane distributes that height
+   (its session list is the only scroller). The percentage resolves because
+   `.app-scroll` is a flex item with a definite height.
+
+   Below that width the strip stacks into five bands taller than the viewport,
+   so the page falls back to ordinary scrolling and the pane grows instead. */
+@utility app-scroll-fixed {
+  @apply overflow-y-auto;
+}
+
+@utility app-frame-fill {
+  @apply flex flex-col;
+  min-height: 100%;
+}
+
+@media (min-width: 64rem) {
+  .app-scroll-fixed {
+    @apply overflow-hidden;
+  }
+
+  .app-frame-fill {
+    height: 100%;
+    min-height: 0;
+  }
+}
+
 @utility page-stack {
   @apply flex flex-col;
   gap: var(--space-page-stack);
