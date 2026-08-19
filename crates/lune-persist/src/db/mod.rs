@@ -476,24 +476,48 @@ impl Database {
         Ok(count > 0)
     }
 
-    pub fn update_dictionary_entry(
+    /// Update a dictionary entry unless another one already answers to
+    /// `new_phrase`.
+    ///
+    /// The counterpart to [`Self::insert_dictionary_entry_unique`]: without it
+    /// the uniqueness rule holds only for new rows, and editing an existing
+    /// entry's phrase to collide with another re-creates exactly the
+    /// row-order-decides-the-winner situation that rule exists to prevent.
+    ///
+    /// Returns `None` when a collision blocked the write, `Some(false)` when no
+    /// entry has that id. The check shares the update's transaction, so two
+    /// saves racing cannot both pass it.
+    pub fn update_dictionary_entry_unique(
         &mut self,
         entry_id: i32,
-        phrase: &str,
-        replacement: &str,
-        priority: u8,
-    ) -> PersistResult<bool> {
-        use self::schema::dictionary;
-        let priority_val = i32::from(priority);
-        let count = diesel::update(dictionary::table.filter(dictionary::id.eq(entry_id)))
-            .set((
-                dictionary::phrase.eq(phrase),
-                dictionary::replacement.eq(replacement),
-                dictionary::priority.eq(priority_val),
-                dictionary::updated_at.eq(Utc::now().to_rfc3339()),
-            ))
-            .execute(&mut self.conn)?;
-        Ok(count > 0)
+        new_phrase: &str,
+        new_replacement: &str,
+        new_priority: u8,
+        phrases_collide: impl Fn(&str, &str) -> bool,
+    ) -> PersistResult<Option<bool>> {
+        use self::schema::dictionary::dsl::*;
+
+        let outcome = self.conn.transaction::<_, DieselError, _>(|conn| {
+            let existing = dictionary
+                .select((id, phrase))
+                .load::<(i32, String)>(conn)?;
+            if existing
+                .iter()
+                .any(|(row_id, p)| *row_id != entry_id && phrases_collide(p, new_phrase))
+            {
+                return Ok(None);
+            }
+            let count = diesel::update(dictionary.filter(id.eq(entry_id)))
+                .set((
+                    phrase.eq(new_phrase),
+                    replacement.eq(new_replacement),
+                    priority.eq(i32::from(new_priority)),
+                    updated_at.eq(Utc::now().to_rfc3339()),
+                ))
+                .execute(conn)?;
+            Ok(Some(count > 0))
+        })?;
+        Ok(outcome)
     }
 
     // ── Snippet CRUD ─────────────────────────────────────────────────────
@@ -1855,6 +1879,48 @@ mod tests {
         let stats = db.session_stats(EPOCH).unwrap();
         assert_eq!(stats.sessions_today, 50);
         assert_eq!(stats.words_today, 100);
+    }
+
+    /// The uniqueness rule has to hold on the edit path too. Correction matches
+    /// case-insensitively, so two entries spelling the same phrase differently
+    /// leave which replacement applies down to row order — invisible to the
+    /// user, and reachable by editing rather than adding if only the insert is
+    /// guarded.
+    #[test]
+    fn editing_an_entry_onto_another_phrase_is_refused() {
+        let collide = |a: &str, b: &str| a.eq_ignore_ascii_case(b);
+        let mut db = Database::open_in_memory().unwrap();
+        db.insert_dictionary_entry_unique("github", "GitHub", 0, collide)
+            .unwrap()
+            .expect("first entry");
+        let second = db
+            .insert_dictionary_entry_unique("gitlab", "GitLab", 0, collide)
+            .unwrap()
+            .expect("second entry");
+
+        assert_eq!(
+            db.update_dictionary_entry_unique(second, "GitHub", "Git Hub", 0, collide)
+                .unwrap(),
+            None,
+            "an edit must not be the way around the uniqueness rule"
+        );
+        // Its own phrase is not a collision with itself.
+        assert_eq!(
+            db.update_dictionary_entry_unique(second, "GitLab", "GitLab Inc", 0, collide)
+                .unwrap(),
+            Some(true)
+        );
+        // A phrase nothing else uses still saves; a missing id still reports so.
+        assert_eq!(
+            db.update_dictionary_entry_unique(second, "sourcehut", "SourceHut", 0, collide)
+                .unwrap(),
+            Some(true)
+        );
+        assert_eq!(
+            db.update_dictionary_entry_unique(9999, "codeberg", "Codeberg", 0, collide)
+                .unwrap(),
+            Some(false)
+        );
     }
 
     #[test]

@@ -62,6 +62,35 @@ pub fn plugin_installed(data_dir: &Path) -> bool {
     dir.join(CUDA_PLUGIN_FILE).is_file() && installed_plugin_is_intact(&dir)
 }
 
+/// Latched once the downloaded plugin has verified. Verification re-hashes
+/// every installed library — hundreds of megabytes — and [`state`] is answered
+/// on every status poll and every pipeline build, so paying it per call turns
+/// opening the Models screen after an install into a multi-second stall.
+///
+/// Latching only the `true` answer is what makes this sound: within one process
+/// an installed plugin cannot become uninstalled by anything but the user
+/// deleting the directory, and even then the reported state is already
+/// [`GpuPluginState::NeedsRestart`] until the next launch. A `false` answer is
+/// never cached, so a plugin installed *after* startup is still noticed.
+// Only the native backend has a `state` to answer; the stub build reports
+// `Unsupported` without ever asking.
+#[cfg(feature = "whisper-cpp")]
+static PLUGIN_VERIFIED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// [`plugin_installed`], paid at most once per process.
+#[cfg(feature = "whisper-cpp")]
+fn plugin_installed_cached(data_dir: &Path) -> bool {
+    use std::sync::atomic::Ordering;
+    if PLUGIN_VERIFIED.load(Ordering::Relaxed) {
+        return true;
+    }
+    let installed = plugin_installed(data_dir);
+    if installed {
+        PLUGIN_VERIFIED.store(true, Ordering::Relaxed);
+    }
+    installed
+}
+
 /// Name of the digest manifest `lune_persist::gpu_plugin` writes at install
 /// time. The two names must stay in step.
 const PLUGIN_MANIFEST: &str = ".integrity.json";
@@ -196,7 +225,7 @@ mod imp {
             // Verifying the downloaded plugin re-hashes every installed
             // library — hundreds of megabytes. Do it once and share the answer
             // with the load below, which asks the same question.
-            let plugin_at_load = super::plugin_installed(data_dir);
+            let plugin_at_load = super::plugin_installed_cached(data_dir);
             Loaded {
                 plugin_at_load,
                 devices: load_once(data_dir, plugin_at_load),
@@ -287,7 +316,7 @@ mod imp {
             return GpuPluginState::Ready { devices: cuda };
         }
 
-        if !super::plugin_installed(data_dir) {
+        if !super::plugin_installed_cached(data_dir) {
             return if nvidia_driver_present() {
                 GpuPluginState::NotInstalled
             } else {

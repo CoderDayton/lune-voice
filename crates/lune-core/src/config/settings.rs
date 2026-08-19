@@ -184,6 +184,12 @@ pub struct UserSettings {
     /// `None` disables history outright: nothing is written for a dictation —
     /// no session row, no transcript, no correction pair — and anything already
     /// stored is cleared when the setting changes. It is not "keep forever".
+    ///
+    /// Field-level `default` on purpose, overriding the container's: TOML has
+    /// no null, so `None` is written as an *absent* key. Falling back to
+    /// `UserSettings::default()` there would read that absence back as
+    /// `Some(30)` and silently re-enable history on the next launch.
+    #[serde(default)]
     pub session_history_days: Option<u32>,
     /// Per-word confidence threshold for LLM gating.
     /// **Deprecated**: use `pipeline.word_confidence_threshold` instead.
@@ -693,6 +699,36 @@ mod tests {
         ] {
             assert!(!local(url), "{url} must not be treated as local");
         }
+    }
+
+    #[test]
+    fn history_off_survives_a_settings_round_trip() {
+        // TOML omits a `None` field entirely, so "Don't save history" is
+        // written as an absent key. The container-level `serde(default)` would
+        // read that back as the 30-day default and silently start recording
+        // transcripts again on the next launch.
+        let off = UserSettings {
+            session_history_days: None,
+            ..Default::default()
+        };
+        let text = toml::to_string_pretty(&off).expect("serialize settings");
+        let back: UserSettings = toml::from_str(&text).expect("deserialize settings");
+        assert_eq!(back.session_history_days, None, "history must stay off");
+
+        // A value still round-trips, and a file that predates the field still
+        // gets the default rather than failing to parse.
+        let kept = UserSettings {
+            session_history_days: Some(7),
+            ..Default::default()
+        };
+        let text = toml::to_string_pretty(&kept).expect("serialize settings");
+        let back: UserSettings = toml::from_str(&text).expect("deserialize settings");
+        assert_eq!(back.session_history_days, Some(7));
+        assert_eq!(
+            UserSettings::default().session_history_days,
+            Some(30),
+            "an unset install still keeps a month of history"
+        );
     }
 
     #[test]

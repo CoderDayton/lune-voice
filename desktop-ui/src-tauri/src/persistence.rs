@@ -360,11 +360,21 @@ pub fn update_dictionary_entry(
     }
 
     let mut database = open_database(&paths)?;
+    // Same uniqueness rule as the create path — an edit must not be the way
+    // around it. `None` means another entry already answers to this phrase.
     let updated = database
-        .update_dictionary_entry(input.id, phrase, replacement, input.priority)
+        .update_dictionary_entry_unique(
+            input.id,
+            phrase,
+            replacement,
+            input.priority,
+            lune_dict::phrases_collide,
+        )
         .map_err(|e| format!("update dictionary entry: {e}"))?;
-    if !updated {
-        return Err(format!("dictionary entry not found: {}", input.id));
+    match updated {
+        Some(true) => {}
+        Some(false) => return Err(format!("dictionary entry not found: {}", input.id)),
+        None => return Err("a dictionary entry already uses this phrase".into()),
     }
 
     let settings = load_settings(&paths)?;

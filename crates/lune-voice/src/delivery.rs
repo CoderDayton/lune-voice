@@ -433,16 +433,21 @@ impl PlatformDriver {
 
     /// Whether this delivery is aimed at a terminal, honoring `terminal_mode`.
     ///
-    /// Only the IBus path calls this. The uinput path resolves the same
-    /// question internally to pick its paste chord, and asking again here
-    /// would cost a second compositor round-trip per delivery.
+    /// Only the IBus path calls this, and only from inside its own match arm:
+    /// under `Auto` with no captured target it queries the compositor for the
+    /// focused window, which the uinput path already resolves internally.
+    /// Calling it before the backend is known would put that round-trip on
+    /// every uinput delivery and throw the answer away.
     ///
     /// Best effort under `Auto`: where the compositor will not name the
     /// focused window — notably GNOME Wayland, which is why IBus is preferred
     /// there at all — this answers `false` and the text commits unchanged.
     #[cfg(target_os = "linux")]
-    fn ibus_targets_terminal(&self, target: Option<&crate::uinput_typer::WindowTarget>) -> bool {
-        match self.terminal_mode {
+    fn targets_terminal(
+        terminal_mode: TerminalMode,
+        target: Option<&crate::uinput_typer::WindowTarget>,
+    ) -> bool {
+        match terminal_mode {
             TerminalMode::Terminal => true,
             TerminalMode::Normal => false,
             _ => target.map_or_else(crate::uinput_typer::focused_is_terminal, |t| t.is_terminal),
@@ -455,12 +460,12 @@ impl PlatformDriver {
     /// newline arrives as a line the shell runs. Same hazard the uinput paste
     /// path guards against in `do_clipboard_paste`, reached by another route.
     #[cfg(target_os = "linux")]
-    fn ibus_text<'a>(
-        &self,
+    fn ibus_text_with<'a>(
+        terminal_mode: TerminalMode,
         text: &'a str,
         target: Option<&crate::uinput_typer::WindowTarget>,
     ) -> Cow<'a, str> {
-        if self.ibus_targets_terminal(target) {
+        if Self::targets_terminal(terminal_mode, target) {
             crate::sanitize::flatten_for_terminal(text)
         } else {
             Cow::Borrowed(text)
@@ -468,13 +473,14 @@ impl PlatformDriver {
     }
 
     fn type_text(&mut self, text: &str, keep_clipboard: bool) -> TypeOutcome {
-        #[cfg(target_os = "linux")]
-        let committed = self.ibus_text(text, None);
         match &mut self.backend {
             // IBus commits directly to the input context — no clipboard, so the
             // keep/restore flag is irrelevant and the text is never staged there.
+            // The terminal check lives inside this arm: it costs a compositor
+            // round-trip, and the uinput arm below resolves it internally.
             #[cfg(target_os = "linux")]
             LinuxBackend::Ibus(t) => {
+                let committed = Self::ibus_text_with(self.terminal_mode, text, None);
                 t.commit_text(&committed);
                 TypeOutcome::delivered(false)
             }
@@ -488,13 +494,12 @@ impl PlatformDriver {
         target: &crate::uinput_typer::WindowTarget,
         keep_clipboard: bool,
     ) -> TypeOutcome {
-        #[cfg(target_os = "linux")]
-        let committed = self.ibus_text(text, Some(target));
         match &mut self.backend {
             // IBus commits to the focused input context directly; the captured
             // WindowTarget also carries whether that context is a terminal.
             #[cfg(target_os = "linux")]
             LinuxBackend::Ibus(t) => {
+                let committed = Self::ibus_text_with(self.terminal_mode, text, Some(target));
                 t.commit_text(&committed);
                 TypeOutcome::delivered(false)
             }
@@ -503,13 +508,12 @@ impl PlatformDriver {
     }
 
     fn type_keys(&mut self, text: &str, keep_clipboard: bool) -> TypeOutcome {
-        #[cfg(target_os = "linux")]
-        let committed = self.ibus_text(text, None);
         match &mut self.backend {
             // IBus commits Unicode directly — no US-QWERTY restriction, so
             // type-in-place of accented/CJK text "just works".
             #[cfg(target_os = "linux")]
             LinuxBackend::Ibus(t) => {
+                let committed = Self::ibus_text_with(self.terminal_mode, text, None);
                 t.commit_text(&committed);
                 TypeOutcome::delivered(false)
             }
