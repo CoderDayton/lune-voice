@@ -9,12 +9,11 @@ import { workspaceActions, workspaceStore } from '../../../store/workspace-store
 import { useFirstRunGate } from '../../welcome/use-model-setup';
 import { WelcomeLayout } from '../../welcome/welcome-layout';
 import { WelcomePage } from '../../welcome/welcome-page';
+import { DRAWER_ID } from '../config/drawer';
 import { findNavigationItem } from '../config/navigation';
 import { useAppShortcuts } from '../hooks/use-app-shortcuts';
 import { startWorkspaceBridge } from '../workspace-bridge';
 import { SidebarContent } from './sidebar';
-
-export const DRAWER_ID = 'app-drawer';
 
 export function AppShell() {
   const { t } = useLingui();

@@ -1,5 +1,6 @@
 mod commands;
 mod dto;
+mod feedback;
 #[cfg(target_os = "linux")]
 mod hotkey_linux;
 mod limits;
@@ -608,6 +609,9 @@ pub fn run() {
             commands::uinput_rule_installed,
             commands::remove_uinput_rule,
             commands::install_gpu_backend,
+            feedback::feedback_available,
+            feedback::feedback_cooldown_remaining,
+            feedback::submit_feedback,
             quit_app
         ])
         .build(tauri::generate_context!())

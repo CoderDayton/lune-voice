@@ -1,5 +1,7 @@
 /** Theme management — supports custom Lune themes + all 35 DaisyUI built-in themes. */
 
+import { useSyncExternalStore } from 'react';
+
 export type ThemePreference = 'system' | string; // "system" or any theme name
 
 const STORAGE_KEY = 'lune-theme';
@@ -71,6 +73,25 @@ export function getThemePreference(): ThemePreference {
 export function setThemePreference(pref: ThemePreference) {
   localStorage.setItem(STORAGE_KEY, pref);
   applyTheme(pref);
+  for (const listener of listeners) listener();
+}
+
+/* The preference lives in localStorage, which fires no event for same-document
+   writes. Several surfaces now set it (Settings' Appearance, the picker dialog,
+   the sidebar's Quick actions), so they need one shared notification or their
+   local copies drift apart from each other and from the applied theme. */
+const listeners = new Set<() => void>();
+
+function subscribeTheme(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+/** The current preference, re-read whenever any surface changes it. */
+export function useThemePreference(): ThemePreference {
+  return useSyncExternalStore(subscribeTheme, getThemePreference);
 }
 
 export function applyTheme(pref: ThemePreference) {
@@ -88,12 +109,13 @@ function getSystemTheme(): string {
   return 'lune';
 }
 
-export function watchSystemTheme(onUpdate: () => void): () => void {
+export function watchSystemTheme(onUpdate?: () => void): () => void {
   const mq = window.matchMedia('(prefers-color-scheme: dark)');
   const handler = () => {
     if (getThemePreference() === 'system') {
       applyTheme('system');
-      onUpdate();
+      for (const listener of listeners) listener();
+      onUpdate?.();
     }
   };
   mq.addEventListener('change', handler);

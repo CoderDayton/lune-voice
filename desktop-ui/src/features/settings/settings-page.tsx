@@ -1,4 +1,5 @@
 import { useLingui } from '@lingui/react/macro';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import {
   AudioLines,
@@ -11,8 +12,9 @@ import {
   SlidersHorizontal,
   Wand2,
 } from 'lucide-react';
-import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { workspaceStore } from '../../store/workspace-store';
+import type { SettingsSectionId } from './sections';
 import { AppearanceSection } from './sections/appearance-section';
 import { DictationSection } from './sections/dictation-section';
 import { GeneralSection } from './sections/general-section';
@@ -22,21 +24,23 @@ import { PillSection } from './sections/pill-section';
 import { StylingEngineSection } from './sections/styling-engine-section';
 import { TranscriptionSection } from './sections/transcription-section';
 
-type SectionId =
-  | 'general'
-  | 'appearance'
-  | 'dictation'
-  | 'pill'
-  | 'transcription'
-  | 'styling'
-  | 'output'
-  | 'models';
+type SectionId = SettingsSectionId;
 
 export function SettingsPage() {
   const { t } = useLingui();
   const settings = useStore(workspaceStore, (s) => s.settings);
   const loaded = useStore(workspaceStore, (s) => s.runtime.loaded);
-  const [active, setActive] = useState<SectionId>('general');
+  const { tab } = useSearch({ from: '/settings' });
+  const navigate = useNavigate({ from: '/settings' });
+
+  // `?tab=` is the single source of truth. Mirroring it into local state would
+  // desync the moment the user clicks a tab: a repeat deep-link (the sidebar's
+  // Quick actions while Settings is already open) then navigates to a search
+  // value the URL already holds, and nothing re-renders.
+  const active: SectionId = tab ?? 'general';
+  const setActive = (id: SectionId) => {
+    void navigate({ search: { tab: id }, replace: true });
+  };
 
   if (!loaded) {
     return (
@@ -75,7 +79,7 @@ export function SettingsPage() {
     { id: 'models', label: t`Models`, icon: HardDrive },
   ];
 
-  const content: Record<SectionId, React.ReactNode> = {
+  const content: Record<SectionId, ReactNode> = {
     general: <GeneralSection settings={settings} />,
     appearance: <AppearanceSection />,
     dictation: <DictationSection settings={settings} />,

@@ -19,6 +19,22 @@ const tauriBackendClient: BackendClient = {
     return invoke<void>('start_update_check');
   },
 
+  quitApp() {
+    return invoke<void>('quit_app');
+  },
+
+  feedbackAvailable() {
+    return invoke<boolean>('feedback_available');
+  },
+
+  feedbackCooldownRemaining() {
+    return invoke<number>('feedback_cooldown_remaining');
+  },
+
+  submitFeedback(category, message) {
+    return invoke<void>('submit_feedback', { category, message });
+  },
+
   loadWorkspaceSnapshot() {
     return invoke<WorkspaceSnapshot>('load_workspace_snapshot');
   },

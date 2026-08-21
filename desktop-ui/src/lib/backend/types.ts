@@ -49,6 +49,14 @@ export interface BackendClient {
   appVersion(): Promise<string>;
   /** Fire the update check. Resolves immediately; the outcome is a native dialog. */
   startUpdateCheck(): Promise<void>;
+  /** Quit the app for real, bypassing the close-to-tray behaviour. */
+  quitApp(): Promise<void>;
+  /** Whether this build was compiled with a feedback proxy endpoint. */
+  feedbackAvailable(): Promise<boolean>;
+  /** Seconds left before another report is accepted; 0 when ready. */
+  feedbackCooldownRemaining(): Promise<number>;
+  /** Send one report. Rejects with a user-facing message on failure. */
+  submitFeedback(category: string, message: string): Promise<void>;
   loadWorkspaceSnapshot(): Promise<WorkspaceSnapshot>;
   loadPillSnapshot(): Promise<PillSnapshotDto>;
   saveWorkspaceSettings(input: SaveWorkspaceSettingsInput): Promise<WorkspaceSnapshot>;

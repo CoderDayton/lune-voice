@@ -1,23 +1,24 @@
 import { useLingui } from '@lingui/react/macro';
 import { Monitor, Moon, Palette, Sun } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import { ThemePicker } from '../../../components/ui/theme-picker';
 import {
-  getThemePreference,
   isDarkTheme,
   setThemePreference,
   themeLabel,
+  useThemePreference,
   watchSystemTheme,
 } from '../../../lib/theme';
 import { SettingsSection } from '../components/section';
-import { ThemePicker } from '../components/theme-picker';
 
 export function AppearanceSection() {
   const { t } = useLingui();
-  const [theme, setTheme] = useState(getThemePreference);
+  // Shared subscription, not local state: the sidebar's Quick actions can
+  // change the theme while this section is mounted, and a private copy would
+  // keep showing the old one.
+  const theme = useThemePreference();
 
-  useEffect(() => {
-    return watchSystemTheme(() => setTheme(getThemePreference()));
-  }, []);
+  useEffect(() => watchSystemTheme(), []);
 
   const currentLabel = theme === 'system' ? t`System` : themeLabel(theme);
   const dark = isDarkTheme(theme) || theme === 'system';
@@ -25,7 +26,6 @@ export function AppearanceSection() {
   function selectMode(mode: 'dark' | 'light' | 'system') {
     const next = mode === 'dark' ? 'lune' : mode === 'light' ? 'lune-light' : 'system';
     setThemePreference(next);
-    setTheme(next);
   }
 
   const activeMode = theme === 'system' ? 'system' : dark ? 'dark' : 'light';

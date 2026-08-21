@@ -11,7 +11,7 @@ export function SidebarQuickStart() {
   const isConnecting = serviceStatus === 'Connecting';
 
   return (
-    <div className="px-3 pb-3 sm:px-3.5 is-drawer-close:px-0">
+    <div className="border-t border-surface-border bg-base-200">
       <button
         type="button"
         onClick={(e) => {
@@ -23,40 +23,39 @@ export function SidebarQuickStart() {
         disabled={isConnecting}
         title={isActive ? t`Stop dictating` : t`Start dictating`}
         aria-label={isActive ? t`Stop dictating` : t`Start dictating`}
-        className={`group flex w-full cursor-pointer items-center gap-4 rounded-field border px-4 py-3.5 shadow-card transition-all sm:gap-4 sm:px-4 sm:py-3.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary is-drawer-close:mx-auto is-drawer-close:size-10 is-drawer-close:justify-center is-drawer-close:gap-0 is-drawer-close:px-0 is-drawer-close:py-0 is-drawer-close:shadow-none ${
-          isActive
-            ? 'border-error/30 bg-error/[0.08] hover:bg-error/[0.12] hover:border-error/40'
-            : 'border-primary/15 bg-primary/[0.06] hover:bg-primary/[0.1] hover:border-primary/25 disabled:cursor-not-allowed disabled:opacity-60'
-        }`}
+        className="flex w-full cursor-pointer items-center gap-3.5 px-4 py-5 text-left transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60 is-drawer-close:justify-center is-drawer-close:px-0"
       >
-        <div
-          className={`flex size-9 shrink-0 items-center justify-center rounded-field is-drawer-close:size-full ${
+        <span
+          className={`flex size-11 shrink-0 items-center justify-center rounded-field is-drawer-close:size-11 ${
             isActive ? 'bg-error/15' : 'bg-primary/15'
           }`}
         >
           {isActive ? (
-            <Square size={16} strokeWidth={2.5} className="text-error" />
+            <Square size={18} strokeWidth={2.5} className="text-error" />
           ) : (
-            <Mic size={18} strokeWidth={2} className="text-primary" />
+            <Mic size={20} strokeWidth={2} className="text-primary" />
           )}
-        </div>
-        <div className="min-w-0 text-left is-drawer-close:hidden">
+        </span>
+        <span className="min-w-0 flex-1 is-drawer-close:hidden">
           <span className={`block text-sm font-medium ${isActive ? 'text-error' : 'text-content'}`}>
             {isActive ? t`Stop dictating` : isConnecting ? t`Connecting` : t`Start dictating`}
           </span>
           {isActive ? (
             // Live level metering lives in the Home "Audio" card — this stays
             // a status line so there's exactly one voice meter on screen.
-            <span className="mt-1.5 flex items-center gap-1.5 text-xs text-content-subtle">
+            <span className="mt-0.5 flex items-center gap-1.5 text-xs text-content-subtle">
               <span className="status status-error animate-pulse" />
               {serviceStatus === 'processing' ? t`Processing…` : t`Listening…`}
             </span>
           ) : (
-            <span className="flex min-w-0 items-center gap-1 text-xs text-content-subtle">
-              <kbd className="kbd kbd-xs truncate">{hotkeyToggle || t`Set hotkey`}</kbd>
-            </span>
+            <span className="mt-0.5 block text-xs text-content-subtle">{t`Press to talk`}</span>
           )}
-        </div>
+        </span>
+        {isActive ? null : (
+          <kbd className="kbd kbd-sm ml-auto shrink-0 font-mono text-xs is-drawer-close:hidden">
+            {hotkeyToggle || t`Set hotkey`}
+          </kbd>
+        )}
       </button>
     </div>
   );

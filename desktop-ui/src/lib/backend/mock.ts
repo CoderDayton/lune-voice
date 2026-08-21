@@ -473,6 +473,25 @@ export const mockBackendClient: BackendClient = {
 
   async startUpdateCheck() {},
 
+  // No process to kill in a browser tab, and closing the tab from script is
+  // blocked anyway — so this is a no-op rather than a misleading failure.
+  async quitApp() {},
+
+  // The proxy endpoint is baked into the desktop build only, so the browser
+  // mock reports the same "not configured" state a proxyless build would:
+  // the dialog then shows its links and hides the form.
+  async feedbackAvailable() {
+    return false;
+  },
+
+  async feedbackCooldownRemaining() {
+    return 0;
+  },
+
+  async submitFeedback() {
+    throw new Error("Feedback sending isn't configured in this build.");
+  },
+
   async uinputRuleInstalled() {
     // The browser/mock runtime installs nothing, so the removal affordance
     // stays hidden rather than offering to undo something that never happened.
