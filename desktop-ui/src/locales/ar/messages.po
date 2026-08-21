@@ -196,10 +196,6 @@ msgstr ""
 msgid "Browse themes"
 msgstr "تصفح السمات"
 
-#: src/components/feedback/help-feedback-dialog.tsx:51
-#~ msgid "Bug"
-#~ msgstr ""
-
 #: src/components/feedback/help-feedback-dialog.tsx:56
 msgid "Bug report"
 msgstr ""
@@ -657,14 +653,6 @@ msgstr "قم بتوسيع الشريط الجانبي"
 msgid "Feature request"
 msgstr ""
 
-#: src/components/feedback/help-feedback-dialog.tsx:53
-#~ msgid "Feedback"
-#~ msgstr ""
-
-#: src/components/feedback/help-feedback-dialog.tsx:61
-#~ msgid "Feedback category"
-#~ msgstr ""
-
 #: src/features/welcome/welcome-page.tsx:178
 msgid "Fetching the NVIDIA runtime. This is the last step, and it only happens once."
 msgstr "جارٍ جلب بيئة تشغيل NVIDIA. هذه هي الخطوة الأخيرة وتحدث مرة واحدة فقط."
@@ -783,10 +771,6 @@ msgstr "مدى ارتفاع صوت تنبيهات الإملاء."
 #: src/features/settings/sections/pill-section.tsx:196
 msgid "How the pill bar looks. Changes apply immediately."
 msgstr "شكل شريط المؤشر. تُطبَّق التغييرات فورًا."
-
-#: src/components/feedback/help-feedback-dialog.tsx:52
-#~ msgid "Idea"
-#~ msgstr ""
 
 #: src/features/overview/overview-page.tsx:153
 msgid "Idle · mic ready"

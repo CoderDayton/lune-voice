@@ -13,6 +13,13 @@
   --content-dim: oklch(0.41 0 0);
   /* Solid surfaces — no alpha, no glass */
   --surface-card: oklch(0.18 0 0);
+  /* Whole-card hover fill (`.card:has(a:hover, button:hover):hover` in
+     base.css). Solid rather than a wash because the card *is* the hover
+     target: the state has to land on the same colour on every card, whatever
+     is layered beneath it. For rows, menu items, and buttons sitting on a
+     card, use --surface-hover instead — it tints what it sits on, so it can
+     never come out the same colour as its own background. */
+  --surface-card-hover: oklch(0.22 0 0);
   --surface-elevated: oklch(0.22 0 0);
   --surface-glass: oklch(0.155 0 0);
   --surface-panel: oklch(0.16 0 0);
@@ -21,7 +28,6 @@
   --surface-wash: oklch(1 0 0 / 0.06);
   --surface-nav-active: oklch(1 0 0 / 0.08);
   --surface-hover: oklch(1 0 0 / 0.04);
-  --surface-card-hover: oklch(0.22 0 0);
   --surface-border: oklch(1 0 0 / 0.08);
   --surface-border-strong: oklch(1 0 0 / 0.16);
   --surface-inset: oklch(0.10 0 0);
@@ -74,6 +80,8 @@
   --content-dim: oklch(0.70 0 0);
   /* Solid surfaces */
   --surface-card: oklch(1 0 0);
+  /* Steps down here, not up: white cards have no lighter shade to move to. */
+  --surface-card-hover: oklch(0.97 0 0);
   --surface-elevated: oklch(1 0 0);
   --surface-glass: oklch(0.99 0 0);
   --surface-panel: oklch(1 0 0);
@@ -81,7 +89,6 @@
   --surface-wash: oklch(0 0 0 / 0.06);
   --surface-nav-active: oklch(0 0 0 / 0.08);
   --surface-hover: oklch(0 0 0 / 0.05);
-  --surface-card-hover: oklch(0.97 0 0);
   --surface-border: oklch(0 0 0 / 0.10);
   --surface-border-strong: oklch(0 0 0 / 0.20);
   --surface-inset: oklch(0.94 0 0);
@@ -176,6 +183,7 @@
   --color-content-subtle: var(--content-subtle);
   --color-content-dim: var(--content-dim);
   --color-surface-card: var(--surface-card);
+  --color-surface-card-hover: var(--surface-card-hover);
   --color-surface-elevated: var(--surface-elevated);
   --color-surface-glass: var(--surface-glass);
   --color-surface-panel: var(--surface-panel);

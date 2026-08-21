@@ -37,7 +37,7 @@ export function StylePresetCard({
       className={`group relative flex min-h-[9.75rem] flex-col rounded-box border p-4 transition-[transform,box-shadow,border-color,background-color] duration-fast ease-standard sm:p-5 ${
         isActive
           ? 'border-primary/55 bg-linear-to-br from-primary/12 via-surface-card to-surface-card shadow-glow'
-          : 'border-surface-border bg-surface-card shadow-card hover:-translate-y-0.5 hover:border-primary/40 hover:bg-surface-card-hover hover:shadow-elevated'
+          : 'border-surface-border bg-surface-card shadow-card hover:-translate-y-0.5 hover:border-primary/40 hover:bg-surface-hover hover:shadow-elevated'
       }`}
     >
       <button

@@ -196,10 +196,6 @@ msgstr ""
 msgid "Browse themes"
 msgstr "테마 찾아보기"
 
-#: src/components/feedback/help-feedback-dialog.tsx:51
-#~ msgid "Bug"
-#~ msgstr ""
-
 #: src/components/feedback/help-feedback-dialog.tsx:56
 msgid "Bug report"
 msgstr ""
@@ -657,14 +653,6 @@ msgstr "사이드바 확장"
 msgid "Feature request"
 msgstr ""
 
-#: src/components/feedback/help-feedback-dialog.tsx:53
-#~ msgid "Feedback"
-#~ msgstr ""
-
-#: src/components/feedback/help-feedback-dialog.tsx:61
-#~ msgid "Feedback category"
-#~ msgstr ""
-
 #: src/features/welcome/welcome-page.tsx:178
 msgid "Fetching the NVIDIA runtime. This is the last step, and it only happens once."
 msgstr "NVIDIA 런타임을 가져오는 중입니다. 마지막 단계이며 한 번만 진행됩니다."
@@ -783,10 +771,6 @@ msgstr "받아쓰기 소리가 재생되는 크기입니다."
 #: src/features/settings/sections/pill-section.tsx:196
 msgid "How the pill bar looks. Changes apply immediately."
 msgstr "표시기 막대의 모양입니다. 변경 사항은 즉시 적용됩니다."
-
-#: src/components/feedback/help-feedback-dialog.tsx:52
-#~ msgid "Idea"
-#~ msgstr ""
 
 #: src/features/overview/overview-page.tsx:153
 msgid "Idle · mic ready"

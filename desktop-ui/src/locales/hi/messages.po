@@ -196,10 +196,6 @@ msgstr ""
 msgid "Browse themes"
 msgstr "थीम ब्राउज़ करें"
 
-#: src/components/feedback/help-feedback-dialog.tsx:51
-#~ msgid "Bug"
-#~ msgstr ""
-
 #: src/components/feedback/help-feedback-dialog.tsx:56
 msgid "Bug report"
 msgstr ""
@@ -657,14 +653,6 @@ msgstr "साइडबार का विस्तार करें"
 msgid "Feature request"
 msgstr ""
 
-#: src/components/feedback/help-feedback-dialog.tsx:53
-#~ msgid "Feedback"
-#~ msgstr ""
-
-#: src/components/feedback/help-feedback-dialog.tsx:61
-#~ msgid "Feedback category"
-#~ msgstr ""
-
 #: src/features/welcome/welcome-page.tsx:178
 msgid "Fetching the NVIDIA runtime. This is the last step, and it only happens once."
 msgstr "NVIDIA रनटाइम प्राप्त किया जा रहा है। यह आख़िरी चरण है और सिर्फ़ एक बार होता है।"
@@ -783,10 +771,6 @@ msgstr "डिक्टेशन की ध्वनियाँ कितनी
 #: src/features/settings/sections/pill-section.tsx:196
 msgid "How the pill bar looks. Changes apply immediately."
 msgstr "संकेतक पट्टी कैसी दिखती है। बदलाव तुरंत लागू होते हैं।"
-
-#: src/components/feedback/help-feedback-dialog.tsx:52
-#~ msgid "Idea"
-#~ msgstr ""
 
 #: src/features/overview/overview-page.tsx:153
 msgid "Idle · mic ready"

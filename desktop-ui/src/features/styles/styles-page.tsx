@@ -289,7 +289,7 @@ export function StylesPage() {
 
             <button
               type="button"
-              className="group flex min-h-[9.75rem] flex-col items-center justify-center gap-3 rounded-box border border-dashed border-surface-border bg-surface-inset/50 p-4 transition-[transform,border-color,background-color,box-shadow] duration-fast ease-standard hover:-translate-y-0.5 hover:border-primary/50 hover:bg-surface-card-hover hover:shadow-elevated focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:p-5"
+              className="group flex min-h-[9.75rem] flex-col items-center justify-center gap-3 rounded-box border border-dashed border-surface-border bg-surface-inset/50 p-4 transition-[transform,border-color,background-color,box-shadow] duration-fast ease-standard hover:-translate-y-0.5 hover:border-primary/50 hover:bg-surface-hover hover:shadow-elevated focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:p-5"
               onClick={() => openModal('create')}
             >
               <div className="flex size-10 items-center justify-center rounded-xl border border-dashed border-current text-content-subtle transition-colors group-hover:border-primary group-hover:text-primary">

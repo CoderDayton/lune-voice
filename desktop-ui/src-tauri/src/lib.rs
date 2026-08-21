@@ -17,6 +17,8 @@ mod runtime;
 mod tauri_integration_tests;
 #[cfg(test)]
 mod updater_tests;
+#[cfg(test)]
+mod window_tests;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
@@ -100,16 +102,45 @@ const MAX_WINDOW_H: f64 = 1100.0;
 /// desired 60–75% range).
 const WINDOW_SCREEN_FRACTION: f64 = 0.70;
 
-/// Adaptive default window size: ~70% of the primary monitor's logical size,
-/// clamped to `[MIN, MAX]` per axis. The width cap keeps ultrawides from
-/// opening an absurdly wide window; the floor keeps small laptops at the UI's
-/// designed minimum. Falls back to the min size if the monitor can't be read.
+/// Adaptive default window size: ~70% of a monitor's logical size, clamped to
+/// `[MIN, MAX]` per axis. The width cap keeps ultrawides from opening an
+/// absurdly wide window; the floor keeps small laptops at the UI's designed
+/// minimum.
+///
+/// Prefers the primary monitor, then falls back to the largest one available.
+/// That second step is not a corner case: GDK only has a notion of a primary
+/// monitor on its X11 backend, so under native Wayland `primary_monitor()` is
+/// *always* empty and going straight to the floor would open a 1280x720 window
+/// on a 3440x1440 display. Only a machine that reports no monitors at all gets
+/// the minimum.
 fn adaptive_window_size(app: &tauri::AppHandle) -> (f64, f64) {
-    let Ok(Some(monitor)) = app.primary_monitor() else {
+    let Some(monitor) = app
+        .primary_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| largest_monitor(app))
+    else {
         return (MIN_WINDOW_W, MIN_WINDOW_H);
     };
-    // Guard against a bogus scale (0 / NaN / inf) so the division can't yield a
-    // non-finite size the builder would choke on.
+    let (logical_w, logical_h) = monitor_logical_size(&monitor);
+    window_size_for(logical_w, logical_h)
+}
+
+/// The monitor with the most logical area, or `None` when none can be read.
+/// Area rather than width so a tall secondary display can't win over a wider
+/// primary one just by being listed first.
+fn largest_monitor(app: &tauri::AppHandle) -> Option<tauri::Monitor> {
+    app.available_monitors().ok()?.into_iter().max_by(|a, b| {
+        let (aw, ah) = monitor_logical_size(a);
+        let (bw, bh) = monitor_logical_size(b);
+        (aw * ah).total_cmp(&(bw * bh))
+    })
+}
+
+/// A monitor's logical (scale-corrected) size. Guards against a bogus scale
+/// (0 / NaN / inf) so the division can't yield a non-finite size the window
+/// builder would choke on.
+fn monitor_logical_size(monitor: &tauri::Monitor) -> (f64, f64) {
     let raw_scale = monitor.scale_factor();
     let scale = if raw_scale.is_finite() && raw_scale > 0.0 {
         raw_scale
@@ -117,11 +148,25 @@ fn adaptive_window_size(app: &tauri::AppHandle) -> (f64, f64) {
         1.0
     };
     let size = monitor.size();
-    let logical_w = size.width as f64 / scale;
-    let logical_h = size.height as f64 / scale;
-    let width = (logical_w * WINDOW_SCREEN_FRACTION).clamp(MIN_WINDOW_W, MAX_WINDOW_W);
-    let height = (logical_h * WINDOW_SCREEN_FRACTION).clamp(MIN_WINDOW_H, MAX_WINDOW_H);
-    (width, height)
+    (size.width as f64 / scale, size.height as f64 / scale)
+}
+
+/// The clamping itself, split out so it can be checked without a monitor.
+///
+/// `f64::clamp` propagates NaN, and this result goes straight into the window
+/// builder, so a non-finite axis is folded onto the floor instead of passed on.
+fn window_size_for(logical_w: f64, logical_h: f64) -> (f64, f64) {
+    let axis = |logical: f64, min: f64, max: f64| {
+        if logical.is_finite() {
+            (logical * WINDOW_SCREEN_FRACTION).clamp(min, max)
+        } else {
+            min
+        }
+    };
+    (
+        axis(logical_w, MIN_WINDOW_W, MAX_WINDOW_W),
+        axis(logical_h, MIN_WINDOW_H, MAX_WINDOW_H),
+    )
 }
 
 /// At most one update check at a time: the menu item stays clickable while a

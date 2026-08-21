@@ -196,10 +196,6 @@ msgstr ""
 msgid "Browse themes"
 msgstr "Durchsuchen Sie Themen"
 
-#: src/components/feedback/help-feedback-dialog.tsx:51
-#~ msgid "Bug"
-#~ msgstr ""
-
 #: src/components/feedback/help-feedback-dialog.tsx:56
 msgid "Bug report"
 msgstr ""
@@ -657,14 +653,6 @@ msgstr "Seitenleiste erweitern"
 msgid "Feature request"
 msgstr ""
 
-#: src/components/feedback/help-feedback-dialog.tsx:53
-#~ msgid "Feedback"
-#~ msgstr ""
-
-#: src/components/feedback/help-feedback-dialog.tsx:61
-#~ msgid "Feedback category"
-#~ msgstr ""
-
 #: src/features/welcome/welcome-page.tsx:178
 msgid "Fetching the NVIDIA runtime. This is the last step, and it only happens once."
 msgstr "Die NVIDIA-Laufzeitumgebung wird geholt. Das ist der letzte Schritt und passiert nur einmal."
@@ -783,10 +771,6 @@ msgstr "Wie laut die Diktattöne abgespielt werden."
 #: src/features/settings/sections/pill-section.tsx:196
 msgid "How the pill bar looks. Changes apply immediately."
 msgstr "Wie die Anzeigeleiste aussieht. Änderungen werden sofort übernommen."
-
-#: src/components/feedback/help-feedback-dialog.tsx:52
-#~ msgid "Idea"
-#~ msgstr ""
 
 #: src/features/overview/overview-page.tsx:153
 msgid "Idle · mic ready"

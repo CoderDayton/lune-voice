@@ -135,7 +135,7 @@ export function KeyCaptureInput({
           'sm:min-w-36',
           listening
             ? 'animate-pulse border-primary/55 bg-primary/18 text-content-strong shadow-glow'
-            : 'border-surface-border-strong bg-surface-elevated text-content shadow-soft hover:border-surface-border-strong hover:bg-surface-card-hover active:translate-y-px',
+            : 'border-surface-border-strong bg-surface-elevated text-content shadow-soft hover:border-surface-border-strong hover:bg-surface-hover active:translate-y-px',
           disabled && 'cursor-not-allowed opacity-50',
         )}
       >
