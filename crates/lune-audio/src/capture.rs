@@ -51,20 +51,105 @@ pub struct DeviceSelection {
     pub fell_back: bool,
 }
 
-/// Names of the input devices cpal currently reports on the default host, in
-/// enumeration order. Empty if enumeration fails (the default device is still
-/// usable). Used to populate the device picker and to validate a saved choice.
-pub fn list_input_devices() -> Vec<String> {
+/// Whether an ALSA PCM id names a real capture device rather than a software
+/// route or a speaker-only output.
+///
+/// `CARD=` is the marker for "this PCM belongs to a specific sound card". The
+/// ids without it are the server and conversion plugins — `null` (which
+/// generates zero samples), `pipewire`, `default`, `pulse`, `jack` — none of
+/// which is a microphone, and all of which the picker's own "System default"
+/// entry already covers. `hdmi:` and `surround*:` are card-backed but are
+/// speaker routes that never carry an input.
+fn is_microphone_route(pcm_id: &str) -> bool {
+    pcm_id.contains("CARD=") && !pcm_id.starts_with("hdmi:") && !pcm_id.starts_with("surround")
+}
+
+/// Which of `described` to show — one entry per microphone, in enumeration
+/// order. Each item is `(display name, PCM id)` as cpal reports it.
+///
+/// ALSA lists one PCM per *route*, not per microphone: a single USB mic appears
+/// as `hw:`, `plughw:`, `sysdefault:`, `front:` and `dsnoop:` entries that all
+/// carry the same description, and each card is listed twice more under its
+/// index as well as its name (`CARD=MV6` and `CARD=3`). Unfiltered, a machine
+/// with three sound cards reports 29 indistinguishable entries for 4 actual
+/// microphones.
+///
+/// Keeping the *first* route for a name is deliberate: it is the one
+/// [`AudioStream::new`] already opens when matching a saved device by name, so
+/// the picker now shows what capture will actually use rather than a different
+/// route with the same label.
+///
+/// Takes its input as data so it can be tested without a sound card.
+fn usable_device_indices(described: &[(String, Option<String>)]) -> Vec<usize> {
+    fn first_of_each_name<'a>(
+        it: impl Iterator<Item = (usize, &'a (String, Option<String>))>,
+    ) -> Vec<usize> {
+        let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        it.filter(|(_, (name, _))| seen.insert(name.as_str()))
+            .map(|(idx, _)| idx)
+            .collect()
+    }
+
+    let microphones = first_of_each_name(
+        described
+            .iter()
+            .enumerate()
+            .filter(|(_, (_, pcm))| pcm.as_deref().is_some_and(is_microphone_route)),
+    );
+    if !microphones.is_empty() {
+        return microphones;
+    }
+    // Nothing matched the card-backed ALSA shape: either this is not ALSA
+    // (macOS and Windows report driver names that look nothing like a PCM id),
+    // or a software route really is the only way in — a container, or a
+    // PipeWire-only session with no direct access to the cards. Showing the
+    // whole list beats showing an empty picker to someone with a working mic.
+    first_of_each_name(described.iter().enumerate())
+}
+
+/// Every input cpal reports on the default host, paired with its display name,
+/// reduced to one entry per microphone.
+///
+/// Both the picker and [`AudioStream::new`] go through here, so the list the
+/// user chooses from and the device that gets opened cannot disagree.
+fn enumerate_input_devices() -> Vec<(cpal::Device, String)> {
     let host = cpal::default_host();
-    match host.input_devices() {
-        Ok(devices) => devices
-            .filter_map(|d| d.description().ok().map(|desc| desc.name().to_owned()))
-            .collect(),
+    let devices: Vec<cpal::Device> = match host.input_devices() {
+        Ok(devices) => devices.collect(),
         Err(e) => {
             warn!("enumerating input devices failed: {e}");
-            Vec::new()
+            return Vec::new();
         }
-    }
+    };
+    // A device whose description cannot be read has no name to show and no name
+    // to match a saved setting against, so it is dropped here rather than listed
+    // as something unselectable.
+    let (devices, described): (Vec<cpal::Device>, Vec<(String, Option<String>)>) = devices
+        .into_iter()
+        .filter_map(|d| {
+            let desc = d.description().ok()?;
+            let entry = (desc.name().to_owned(), desc.driver().map(str::to_owned));
+            Some((d, entry))
+        })
+        .unzip();
+
+    let mut devices: Vec<Option<cpal::Device>> = devices.into_iter().map(Some).collect();
+    usable_device_indices(&described)
+        .into_iter()
+        .filter_map(|idx| devices[idx].take().map(|d| (d, described[idx].0.clone())))
+        .collect()
+}
+
+/// Names of the input devices cpal currently reports on the default host, in
+/// enumeration order, with software routes and duplicate plugin entries removed
+/// (see [`usable_device_indices`]). Empty if enumeration fails (the default
+/// device is still usable). Used to populate the device picker and to validate a
+/// saved choice.
+pub fn list_input_devices() -> Vec<String> {
+    enumerate_input_devices()
+        .into_iter()
+        .map(|(_, name)| name)
+        .collect()
 }
 
 /// Resolve a persisted input-device preference against the devices currently
@@ -286,14 +371,8 @@ impl AudioStream {
         // Enumerate inputs once and keep the device handles, so the saved-device
         // resolution and the actual selection are derived from the same list —
         // they can't disagree, and we avoid enumerating twice.
-        let devices = host
-            .input_devices()
-            .map(|it| it.collect::<Vec<_>>())
-            .unwrap_or_default();
-        let available: Vec<String> = devices
-            .iter()
-            .filter_map(|d| d.description().ok().map(|desc| desc.name().to_owned()))
-            .collect();
+        let devices = enumerate_input_devices();
+        let available: Vec<String> = devices.iter().map(|(_, name)| name.clone()).collect();
 
         // Honor the saved device preference, falling back to the host default
         // when it's absent (unplugged/renamed) — never fatal.
@@ -307,11 +386,8 @@ impl AudioStream {
         let device = match &selection.device {
             Some(name) => devices
                 .into_iter()
-                .find(|d| {
-                    d.description()
-                        .map(|desc| desc.name() == name)
-                        .unwrap_or(false)
-                })
+                .find(|(_, device_name)| device_name == name)
+                .map(|(device, _)| device)
                 .or_else(|| host.default_input_device())
                 .ok_or(AudioError::NoDevice)?,
             None => host.default_input_device().ok_or(AudioError::NoDevice)?,
@@ -865,6 +941,137 @@ mod tests {
                 device: None,
                 fell_back: false,
             }
+        );
+    }
+
+    /// Turn `(pcm id, display name)` literals into what cpal hands the filter.
+    fn described(entries: &[(&str, &str)]) -> Vec<(String, Option<String>)> {
+        entries
+            .iter()
+            .map(|(pcm, name)| ((*name).to_string(), Some((*pcm).to_string())))
+            .collect()
+    }
+
+    fn kept(entries: &[(&str, &str)]) -> Vec<String> {
+        usable_device_indices(&described(entries))
+            .into_iter()
+            .map(|idx| entries[idx].1.to_string())
+            .collect()
+    }
+
+    /// A real `cpal::input_devices()` enumeration, captured verbatim from a
+    /// machine with three sound cards. 29 entries; 4 microphones. Every card is
+    /// also listed a second time under its index (`CARD=0`) rather than its name
+    /// (`CARD=PCH`), which is why plain PCM-id deduplication is not enough.
+    const REAL_ALSA_ENUMERATION: &[(&str, &str)] = &[
+        (
+            "null",
+            "Discard all samples (playback) or generate zero samples (capture)",
+        ),
+        ("pipewire", "PipeWire Sound Server"),
+        (
+            "default",
+            "Default ALSA Output (currently PipeWire Media Server)",
+        ),
+        ("hw:CARD=PCH,DEV=0", "HDA Intel PCH, ALC1220 Analog"),
+        ("hw:CARD=PCH,DEV=2", "HDA Intel PCH, ALC1220 Alt Analog"),
+        ("plughw:CARD=PCH,DEV=0", "HDA Intel PCH, ALC1220 Analog"),
+        ("plughw:CARD=PCH,DEV=2", "HDA Intel PCH, ALC1220 Alt Analog"),
+        ("sysdefault:CARD=PCH", "HDA Intel PCH, ALC1220 Analog"),
+        ("front:CARD=PCH,DEV=0", "HDA Intel PCH, ALC1220 Analog"),
+        ("dsnoop:CARD=PCH,DEV=0", "HDA Intel PCH, ALC1220 Analog"),
+        ("dsnoop:CARD=PCH,DEV=2", "HDA Intel PCH, ALC1220 Alt Analog"),
+        ("hw:CARD=Audio,DEV=0", "DigiHug USB Audio, USB Audio"),
+        ("plughw:CARD=Audio,DEV=0", "DigiHug USB Audio, USB Audio"),
+        ("sysdefault:CARD=Audio", "DigiHug USB Audio, USB Audio"),
+        ("front:CARD=Audio,DEV=0", "DigiHug USB Audio, USB Audio"),
+        ("dsnoop:CARD=Audio,DEV=0", "DigiHug USB Audio, USB Audio"),
+        ("hw:CARD=MV6,DEV=0", "Shure MV6, USB Audio"),
+        ("plughw:CARD=MV6,DEV=0", "Shure MV6, USB Audio"),
+        ("sysdefault:CARD=MV6", "Shure MV6, USB Audio"),
+        ("front:CARD=MV6,DEV=0", "Shure MV6, USB Audio"),
+        ("dsnoop:CARD=MV6,DEV=0", "Shure MV6, USB Audio"),
+        ("hw:CARD=0,DEV=0", "HDA Intel PCH, ALC1220 Analog"),
+        ("plughw:CARD=0,DEV=0", "HDA Intel PCH, ALC1220 Analog"),
+        ("hw:CARD=0,DEV=2", "HDA Intel PCH, ALC1220 Alt Analog"),
+        ("plughw:CARD=0,DEV=2", "HDA Intel PCH, ALC1220 Alt Analog"),
+        ("hw:CARD=1,DEV=0", "DigiHug USB Audio, USB Audio"),
+        ("plughw:CARD=1,DEV=0", "DigiHug USB Audio, USB Audio"),
+        ("hw:CARD=3,DEV=0", "Shure MV6, USB Audio"),
+        ("plughw:CARD=3,DEV=0", "Shure MV6, USB Audio"),
+    ];
+
+    #[test]
+    fn usable_devices_reduces_real_alsa_enumeration_to_one_entry_per_mic() {
+        assert_eq!(REAL_ALSA_ENUMERATION.len(), 29);
+        assert_eq!(
+            kept(REAL_ALSA_ENUMERATION),
+            [
+                "HDA Intel PCH, ALC1220 Analog",
+                "HDA Intel PCH, ALC1220 Alt Analog",
+                "DigiHug USB Audio, USB Audio",
+                "Shure MV6, USB Audio",
+            ]
+        );
+    }
+
+    /// The surviving entry must be the route `AudioStream::new` opens when it
+    /// matches a saved name — the first in enumeration order — or the picker
+    /// would label one route and capture would use another.
+    #[test]
+    fn usable_devices_keeps_the_first_route_for_a_name() {
+        let indices = usable_device_indices(&described(REAL_ALSA_ENUMERATION));
+        assert_eq!(
+            indices
+                .iter()
+                .map(|&i| REAL_ALSA_ENUMERATION[i].0)
+                .collect::<Vec<_>>(),
+            [
+                "hw:CARD=PCH,DEV=0",
+                "hw:CARD=PCH,DEV=2",
+                "hw:CARD=Audio,DEV=0",
+                "hw:CARD=MV6,DEV=0",
+            ]
+        );
+    }
+
+    #[test]
+    fn usable_devices_drops_speaker_only_routes() {
+        assert_eq!(
+            kept(&[
+                ("hdmi:CARD=PCH,DEV=0", "HDA Intel PCH, HDMI 0"),
+                ("surround51:CARD=PCH,DEV=0", "HDA Intel PCH, ALC1220 Analog"),
+                ("hw:CARD=MV6,DEV=0", "Shure MV6, USB Audio"),
+            ]),
+            ["Shure MV6, USB Audio"]
+        );
+    }
+
+    /// A container or a PipeWire-only session reaches the cards through a
+    /// software route or not at all. An empty picker there would tell someone
+    /// with a working microphone that they have none, so the filter stands down.
+    #[test]
+    fn usable_devices_fall_back_when_no_card_backed_route_exists() {
+        assert_eq!(
+            kept(&[
+                ("pipewire", "PipeWire Sound Server"),
+                ("default", "Default ALSA Output"),
+                ("pipewire", "PipeWire Sound Server"),
+            ]),
+            ["PipeWire Sound Server", "Default ALSA Output"]
+        );
+    }
+
+    /// macOS and Windows report driver strings that look nothing like a PCM id,
+    /// so the ALSA-shaped filter must not empty their lists either.
+    #[test]
+    fn usable_devices_keep_non_alsa_hosts_intact() {
+        assert_eq!(
+            kept(&[
+                ("CoreAudio", "MacBook Pro Microphone"),
+                ("CoreAudio", "Shure MV6"),
+            ]),
+            ["MacBook Pro Microphone", "Shure MV6"]
         );
     }
 
