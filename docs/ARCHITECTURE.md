@@ -65,7 +65,7 @@ Each crate has a single responsibility. `lune-core` defines shared types and tra
 **Crate:** `lune-audio` | **File:** `crates/lune-audio/src/lib.rs`  
 **Orchestration:** `crates/lune-voice/src/capture.rs`
 
-- Uses `cpal` for microphone access (ALSA/PipeWire)
+- Uses `cpal` for microphone access (ALSA/PipeWire). ALSA enumerates one PCM per *route*, so the picker and the device opened both go through `enumerate_input_devices`, which keeps one card-backed capture route per display name — otherwise 4 microphones list as 29 indistinguishable entries alongside `null` and `pipewire`
 - Delivers 16 kHz mono PCM in 80 ms chunks (1280 samples). Most hardware captures at 44.1 or 48 kHz, so a `rubato` async resampler converts to 16 kHz in the capture path whenever the device's native rate differs
 - `MicAgc` (PCEN) normalizes each frame toward a target RMS before it leaves the capture loop, gated by the `vad_pcen` setting (default on). The volume meter reads the **post-AGC** signal, so it reflects what the recognizer hears
 - Chunks are pushed to the ASR backend via `push_audio` as they arrive; there is no online VAD gate at this stage
@@ -250,8 +250,11 @@ The desktop app does not scrape logs or poll for session state. It uses typed Ta
 | `list_audio_input_devices` | `main` | Input device picker |
 | `start_trigger_capture` | `main` | Capture-only session for the snippet voice-trigger recorder (transcript streamed back, nothing typed, no history row) |
 | `check_model_status` / `download_model_cmd` / `delete_model_cmd` | `main` | Model management |
+| `required_models_ready` | `main` | Whether the configured ASR backend has what it needs on disk — the same check the pipeline builds against, so setup and runtime cannot drift |
+| `active_model_download` / `cancel_model_download` | `main` | The download slot is global, so a transfer survives the window closing and a reopened window re-attaches to it instead of restarting setup. A second `download_model_cmd` for the same model joins the running transfer and reports its outcome |
+| `uinput_access_ready` / `grant_uinput_access` / `uinput_rule_installed` / `remove_uinput_rule` | `main` | The `/dev/uinput` udev rule, asked for during setup rather than mid-dictation. `grant_uinput_access` returns `false` when the rule is installed but needs a reboot to take effect; `Err` means the install itself failed. Removal is offered only for a rule this app wrote (a .deb/.rpm ships its own) |
 | `export_transcript` | `main` | Write a session transcript to a file |
-| `app_version` / `start_update_check` | `main` | Version string and on-demand update check |
+| `app_version` / `start_update_check` / `update_state` / `install_pending_update` / `dismiss_update` | `main` | Version string and the in-app update flow. State is held in the backend, so an offer survives the window closing |
 | `initialize_pipeline` / `quit_app` | `main` | Runtime lifecycle |
 
 ### Session Stream

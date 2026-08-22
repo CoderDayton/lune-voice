@@ -69,7 +69,9 @@ Work down this list:
    for the body.
 2. **Mic not captured.** `RUST_LOG=info` and look for capture logs; check the
    input device in Settings. The level meter reads *post-AGC*, so a silent meter
-   means no audio is arriving at all.
+   means no audio is arriving at all. The picker lists one entry per card, not
+   per ALSA route, so a mic that never appears is either not a capture device or
+   shares its reported name with one already listed.
 3. **Everything dropped as non-speech.** Look for `dropping non-speech segment` /
    `dropping garbage segment` at WARN. Usually a mic gain problem.
 4. **Backend not compiled in.** An error containing `not compiled in` means the
