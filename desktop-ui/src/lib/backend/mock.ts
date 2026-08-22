@@ -3,6 +3,7 @@ import type {
   BackendClient,
   PillSnapshotDto,
   SaveWorkspaceSettingsInput,
+  UpdateStateDto,
   WorkspaceSnapshot,
 } from './types';
 
@@ -471,7 +472,28 @@ export const mockBackendClient: BackendClient = {
     return '0.0.0-mock';
   },
 
-  async startUpdateCheck() {},
+  // There is no updater in a browser tab, so the check reports "started" and
+  // the state stays idle — the modal then never opens, which is the honest
+  // answer for a build that cannot replace itself.
+  async startUpdateCheck() {
+    return true;
+  },
+
+  async updateState(): Promise<UpdateStateDto> {
+    return {
+      phase: 'idle',
+      currentVersion: '0.0.0-mock',
+      availableVersion: null,
+      notes: null,
+      message: null,
+      downloadedBytes: 0,
+      totalBytes: 0,
+    };
+  },
+
+  async installPendingUpdate() {},
+
+  async dismissUpdate() {},
 
   // No process to kill in a browser tab, and closing the tab from script is
   // blocked anyway — so this is a no-op rather than a misleading failure.
@@ -501,6 +523,27 @@ export const mockBackendClient: BackendClient = {
   async removeUinputRule() {
     return false;
   },
+
+  // A browser tab cannot type into other applications and cannot be granted
+  // permission to. Reporting "ready" keeps the setup readiness card out of the
+  // way rather than offering a prompt that could never be answered.
+  async uinputAccessReady() {
+    return true;
+  },
+
+  async grantUinputAccess() {
+    return true;
+  },
+
+  async listAudioInputDevices() {
+    return ['Mock microphone'];
+  },
+
+  async activeModelDownload(): Promise<string | null> {
+    return null;
+  },
+
+  async cancelModelDownload() {},
 
   async gpuBackendStatus() {
     // The browser/mock runtime has no native backend at all, so the onboarding

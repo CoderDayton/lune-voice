@@ -96,6 +96,20 @@ export function shouldInstallGpuDuringSetup(
 }
 
 /**
+ * Whether the download step has a real choice in it — at least one model the
+ * user could decline.
+ *
+ * The engine's own model is required to finish, and anything flagged `required`
+ * cannot be turned off either, so with one engine and one Whisper size the list
+ * is a single locked card. Presenting that under "Choose the AI models to
+ * install" costs every first run a click and offers nothing back, so the step is
+ * skipped when this is false.
+ */
+export function hasOptionalModels(asrLocalName: string, models: ModelStatus[]): boolean {
+  return models.some((m) => m.localName !== asrLocalName && !m.required);
+}
+
+/**
  * Setup can proceed once the engine's model and every backend-required model
  * are selected (or already present).
  */

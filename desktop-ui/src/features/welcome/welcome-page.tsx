@@ -1,20 +1,25 @@
 import { useLingui } from '@lingui/react/macro';
+import { useStore } from '@tanstack/react-store';
 import {
   ArrowRight,
   CircleAlert,
   Download,
+  Keyboard,
   Loader2,
   Mic,
   RefreshCw,
   ShieldCheck,
   Sparkles,
   Wand2,
+  X,
   Zap,
 } from 'lucide-react';
 import { ByteProgress } from '../../components/ui/byte-progress';
 import type { GpuInstallProgressDto } from '../../lib/backend/generated/GpuInstallProgressDto';
+import { workspaceStore } from '../../store/workspace-store';
 import { EngineStep } from './components/engine-step';
 import { ModelCard } from './components/model-card';
+import { ReadyChecks } from './components/ready-checks';
 import { isSetupSatisfiable } from './setup-logic';
 import { type SetupPhase, useModelSetup } from './use-model-setup';
 
@@ -56,6 +61,7 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
     backToEngine,
     toggleModel,
     startDownload,
+    cancelDownload,
     retry,
   } = setup;
 
@@ -125,6 +131,13 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
         />
       )}
 
+      {phase === 'done' && (
+        <>
+          <ReadyChecks />
+          <ReadyHint />
+        </>
+      )}
+
       {phase === 'error' && error && (
         <div className="alert alert-error gap-2 text-sm" role="alert">
           <CircleAlert size={18} className="shrink-0" />
@@ -141,6 +154,7 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
         pendingCount={pending.length}
         willInstallGpu={willInstallGpu}
         onStart={startDownload}
+        onCancel={cancelDownload}
         onRetry={retry}
         onFinish={onFinish}
         onConfirmEngine={confirmEngine}
@@ -296,6 +310,7 @@ interface ActionsProps {
   /** Whether starting the download step also fetches the CUDA plugin. */
   willInstallGpu: boolean;
   onStart: () => void;
+  onCancel: () => void;
   onRetry: () => void;
   onFinish: () => void;
   onConfirmEngine: () => void;
@@ -308,6 +323,7 @@ function Actions({
   pendingCount,
   willInstallGpu,
   onStart,
+  onCancel,
   onRetry,
   onFinish,
   onConfirmEngine,
@@ -336,9 +352,19 @@ function Actions({
           <Loader2 size={16} className="animate-spin" />
           {t`Downloading…`}
         </button>
-        <p className="text-xs text-content-subtle">
-          {t`Please keep the app open until downloads finish`}
-        </p>
+        {/* Only the model queue can be stopped. The GPU plugin install is a
+            single archive fetch with no cancel path, and offering a button that
+            did nothing would be worse than not offering one. */}
+        {phase === 'downloading' ? (
+          <button type="button" className="btn btn-ghost btn-sm gap-1.5" onClick={onCancel}>
+            <X size={14} strokeWidth={2} />
+            {t`Cancel download`}
+          </button>
+        ) : (
+          <p className="text-xs text-content-subtle">
+            {t`Please keep the app open until downloads finish`}
+          </p>
+        )}
       </div>
     );
   }
@@ -397,6 +423,45 @@ function Actions({
         <button type="button" className="btn btn-ghost btn-sm" onClick={onFinish}>
           {t`Skip for now`}
         </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The one thing setup never told anyone: how to actually dictate.
+ *
+ * Everything before this is downloads. Without the hotkey, finishing setup
+ * leaves the user in an app whose entire purpose is triggered by a key
+ * combination they have not been shown — the most common way a first run ends
+ * in "nothing happens".
+ *
+ * Reads the live setting rather than hardcoding the default, so it stays true
+ * for anyone who has already rebound it.
+ */
+function ReadyHint() {
+  const { t } = useLingui();
+  const hotkey = useStore(workspaceStore, (s) => s.settings.hotkeyToggle);
+  const activation = useStore(workspaceStore, (s) => s.settings.activationMode);
+
+  return (
+    <div className="rounded-box border border-surface-border bg-surface-panel p-4">
+      <div className="flex items-start gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-field bg-primary/15 text-primary">
+          <Keyboard size={18} strokeWidth={1.8} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-content-strong">{t`How to dictate`}</p>
+          <p className="mt-1 text-xs text-content-subtle">
+            {activation === 'Hold'
+              ? t`Hold your hotkey, speak, then let go. The text is typed into whatever app you were using.`
+              : t`Press your hotkey, speak, then press it again. The text is typed into whatever app you were using.`}
+          </p>
+          <p className="mt-2 flex items-center gap-2 text-xs text-content-subtle">
+            <kbd className="kbd kbd-sm">{hotkey || t`Ctrl+Space`}</kbd>
+            <span>{t`— change it any time in Settings › Dictation.`}</span>
+          </p>
+        </div>
       </div>
     </div>
   );

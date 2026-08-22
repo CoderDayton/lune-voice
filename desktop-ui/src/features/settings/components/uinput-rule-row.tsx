@@ -4,48 +4,79 @@ import { backendClient } from '../../../lib/backend/client';
 import { SettingsRow } from './section';
 
 /**
- * Offer to remove the `/dev/uinput` udev rule this app installed at first run.
+ * Manage the `/dev/uinput` permission that lets Lune Voice type into other apps.
  *
- * The rule is not a private preference. `TAG+="uaccess"` gives every process
- * running as the logged-in user permanent write access to `/dev/uinput`, which
- * is enough to synthesise keystrokes into any application. Granting that is the
- * price of typing text without a compositor's cooperation; leaving it behind
- * with no way to undo it is not.
+ * Two states, one row. When access is missing, offer to grant it — otherwise the
+ * only way to get it is to trigger the lazy request by dictating, which puts a
+ * password prompt in the middle of an utterance. When this app installed the
+ * rule itself, offer to take it back.
  *
- * Renders nothing unless this app is the one that installed it. A .deb or .rpm
- * ships the same rule and removes it on uninstall — deleting the package's own
- * file from under it would leave dpkg or rpm with a broken view of itself.
+ * The permission is not a private preference: `TAG+="uaccess"` gives every
+ * process running as the logged-in user permanent write access to
+ * `/dev/uinput`, which is enough to synthesise keystrokes into any application.
+ * Granting that is the price of typing text without a compositor's cooperation;
+ * leaving it behind with no way to undo it is not.
+ *
+ * The removal half stays hidden unless this app is the one that installed it. A
+ * .deb or .rpm ships the same rule and removes it on uninstall — deleting the
+ * package's own file from under it would leave dpkg or rpm with a broken view of
+ * itself.
  */
 export function UinputRuleRow() {
   const { t } = useLingui();
-  const [installed, setInstalled] = useState(false);
+  const [accessReady, setAccessReady] = useState<boolean | null>(null);
+  const [selfInstalled, setSelfInstalled] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void backendClient
-      .uinputRuleInstalled()
-      .then((present) => {
-        if (!cancelled) setInstalled(present);
+    void Promise.all([backendClient.uinputAccessReady(), backendClient.uinputRuleInstalled()])
+      .then(([ready, installed]) => {
+        if (cancelled) return;
+        setAccessReady(ready);
+        setSelfInstalled(installed);
       })
       .catch(() => {
-        // A failed probe means we cannot say the rule is there, so say nothing.
-        if (!cancelled) setInstalled(false);
+        // A failed probe means we cannot say what the state is, so say nothing
+        // rather than offering to change something we could not read.
+        if (cancelled) return;
+        setAccessReady(null);
+        setSelfInstalled(false);
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  if (!installed) return null;
+  // Still probing, or access works and this app did not arrange it — nothing to
+  // offer either way.
+  if (accessReady === null || (accessReady && !selfInstalled)) return null;
+
+  const grant = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const ready = await backendClient.grantUinputAccess();
+      setAccessReady(ready);
+      setSelfInstalled(await backendClient.uinputRuleInstalled().catch(() => false));
+      if (!ready) {
+        setError(t`Access still isn't available. A reboot may be needed for it to take effect.`);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const remove = async () => {
     setBusy(true);
     setError(null);
     try {
       const removed = await backendClient.removeUinputRule();
-      setInstalled(!removed);
+      setSelfInstalled(!removed);
+      if (removed) setAccessReady(await backendClient.uinputAccessReady().catch(() => false));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -57,16 +88,31 @@ export function UinputRuleRow() {
     <>
       <SettingsRow
         label={t`Keyboard access`}
-        description={t`Lune Voice added a system rule so it can type into other apps. It also lets any other program you run send keystrokes. Removing it stops typed delivery from working until you allow it again.`}
+        description={
+          accessReady
+            ? t`Lune Voice added a system rule so it can type into other apps. It also lets any other program you run send keystrokes. Removing it stops typed delivery from working until you allow it again.`
+            : t`Lune Voice needs permission to type into other apps. Allowing it also lets any other program you run send keystrokes. Your system will ask for your password.`
+        }
         control={
-          <button
-            type="button"
-            className="btn btn-outline btn-sm"
-            onClick={() => void remove()}
-            disabled={busy}
-          >
-            {busy ? t`Removing…` : t`Remove`}
-          </button>
+          accessReady ? (
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => void remove()}
+              disabled={busy}
+            >
+              {busy ? t`Removing…` : t`Remove`}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => void grant()}
+              disabled={busy}
+            >
+              {busy ? t`Asking…` : t`Allow`}
+            </button>
+          )
         }
       />
       {error ? (

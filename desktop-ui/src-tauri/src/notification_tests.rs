@@ -8,7 +8,7 @@
 
 use tauri::test::{MockRuntime, mock_builder, mock_context, noop_assets};
 
-use crate::{CheckMode, notify_update_available, update_notification_text};
+use crate::update::{CheckMode, notify_update_available, update_notification_text};
 
 const NEW: &str = "1.4.0";
 const CURRENT: &str = "1.3.2";
@@ -51,7 +51,7 @@ fn posting_an_update_notification_is_accepted_by_the_plugin() {
 }
 
 #[test]
-fn a_requested_check_answers_in_a_dialog_and_reports_non_events() {
+fn a_requested_check_answers_in_the_app_and_reports_non_events() {
     // The user is waiting on an answer, so every outcome gets one — a control
     // that silently does nothing is indistinguishable from a broken one.
     assert!(CheckMode::Requested.reports_non_events());

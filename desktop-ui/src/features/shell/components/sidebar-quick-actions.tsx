@@ -75,6 +75,8 @@ export function SidebarQuickActions() {
       id: 'updates',
       label: t`Check for updates`,
       icon: RefreshCw,
+      // The outcome — up to date, an offer, or a failure — arrives in the
+      // shell's update modal. Only a check that never started is reported here.
       onSelect: () => {
         void backendClient.startUpdateCheck().catch(reportFailure);
       },

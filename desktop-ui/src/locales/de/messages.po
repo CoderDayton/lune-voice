@@ -13,6 +13,10 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#: src/features/welcome/welcome-page.tsx:462
+msgid "— change it any time in Settings › Dictation."
+msgstr "— jederzeit unter Einstellungen › Diktat änderbar."
+
 #. placeholder {0}: snippet.triggerPhrase
 #: src/features/snippets/snippets-page.tsx:292
 msgid "“{0}” will stop expanding. The template text is not recoverable."
@@ -92,6 +96,11 @@ msgstr "Eine senkrechte Anzeige schmiegt sich an den Bildschirmrand."
 msgid "Acceleration"
 msgstr "Beschleunigung"
 
+#: src/features/settings/components/uinput-rule-row.tsx:64
+#: src/features/welcome/components/ready-checks.tsx:57
+msgid "Access still isn't available. A reboot may be needed for it to take effect."
+msgstr "Der Zugriff funktioniert noch nicht. Möglicherweise ist ein Neustart nötig, damit die Änderung wirksam wird."
+
 #: src/features/dictionary/components/dictionary-table.tsx:266
 msgid "Action"
 msgstr "Aktion"
@@ -131,13 +140,18 @@ msgstr "Textbaustein hinzufügen"
 msgid "AI models stored on your device."
 msgstr "Auf Ihrem Gerät gespeicherte KI-Modelle."
 
-#: src/features/welcome/welcome-page.tsx:187
+#: src/features/welcome/welcome-page.tsx:201
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "Alle benötigten Modelle sind bereits installiert. Fahren Sie fort, wenn Sie bereit sind."
 
 #: src/features/overview/overview-page.tsx:98
 msgid "all-time · today"
 msgstr "gesamt · heute"
+
+#: src/features/settings/components/uinput-rule-row.tsx:113
+#: src/features/welcome/components/ready-checks.tsx:125
+msgid "Allow"
+msgstr "Erlauben"
 
 #: src/features/settings/components/openai-fields.tsx:35
 msgid "API endpoint"
@@ -156,9 +170,22 @@ msgstr "Aussehen"
 msgid "Application behavior and startup preferences."
 msgstr "Anwendungsverhalten und Starteinstellungen."
 
+#: src/features/updates/update-dialog.tsx:151
+msgid "Applying Lune Voice {version}. Your system may ask for your password, and the app will restart on its own."
+msgstr "Lune Voice {version} wird installiert. Ihr System fragt möglicherweise nach Ihrem Passwort, und die App startet von selbst neu."
+
+#: src/features/updates/update-dialog.tsx:116
+msgid "Asking the release server whether anything newer than {currentVersion} exists."
+msgstr "Der Release-Server wird gefragt, ob es etwas Neueres als {currentVersion} gibt."
+
+#: src/features/settings/components/uinput-rule-row.tsx:113
+#: src/features/welcome/components/ready-checks.tsx:125
+msgid "Asking…"
+msgstr "Wird angefragt …"
+
 #: src/components/feedback/help-feedback-dialog.tsx:98
 msgid "At least {MIN_MESSAGE_CHARS} characters."
-msgstr ""
+msgstr "Mindestens {MIN_MESSAGE_CHARS} Zeichen."
 
 #: src/features/overview/overview-page.tsx:146
 msgid "Audio"
@@ -180,6 +207,10 @@ msgstr "Sätze automatisch großschreiben"
 msgid "Automatic"
 msgstr "Automatisch"
 
+#: src/features/welcome/components/ready-checks.tsx:83
+msgid "Before you start"
+msgstr "Bevor Sie loslegen"
+
 #: src/features/styles/components/style-editor-modal.tsx:60
 msgid "Brand casing (\"github\" → \"GitHub\")"
 msgstr "Markengehäuse („github“ → „GitHub“)"
@@ -190,7 +221,7 @@ msgstr "Marken"
 
 #: src/components/feedback/help-feedback-dialog.tsx:246
 msgid "Browse open issues"
-msgstr ""
+msgstr "Offene Issues durchsuchen"
 
 #: src/components/ui/theme-picker.tsx:218
 msgid "Browse themes"
@@ -198,7 +229,7 @@ msgstr "Durchsuchen Sie Themen"
 
 #: src/components/feedback/help-feedback-dialog.tsx:56
 msgid "Bug report"
-msgstr ""
+msgstr "Fehlerbericht"
 
 #: src/features/styles/components/style-hero.tsx:33
 #: src/features/styles/components/style-preset-card.tsx:66
@@ -215,6 +246,10 @@ msgstr "Stornieren"
 #: src/features/settings/sections/dictation-section.tsx:67
 msgid "Cancel current recording"
 msgstr "Aktuelle Aufnahme abbrechen"
+
+#: src/features/welcome/welcome-page.tsx:361
+msgid "Cancel download"
+msgstr "Download abbrechen"
 
 #: src/features/snippets/snippets-page.tsx:133
 msgid "Cancel edit"
@@ -233,13 +268,13 @@ msgstr "Per Sprache aufnehmen"
 msgid "Capture device and how recording detects when you speak."
 msgstr "Aufnahmegerät und wie die Aufnahme erkennt, wenn Sie sprechen."
 
-#: src/features/welcome/welcome-page.tsx:395
+#: src/features/welcome/welcome-page.tsx:421
 msgid "Change engine"
 msgstr "Engine wechseln"
 
 #: src/features/shell/components/sidebar-quick-actions.tsx:60
 msgid "Change theme"
-msgstr ""
+msgstr "Design wechseln"
 
 #: src/features/settings/sections/general-section.tsx:134
 #: src/features/shell/components/sidebar-quick-actions.tsx:76
@@ -255,16 +290,21 @@ msgstr "Beim Start nach Updates suchen"
 msgid "Check whether a newer version has been released."
 msgstr "Prüfen, ob eine neuere Version veröffentlicht wurde."
 
-#: src/features/welcome/welcome-page.tsx:181
+#: src/features/welcome/welcome-page.tsx:195
 msgid "Check your network and we'll pick up where we left off."
 msgstr "Überprüfen Sie Ihr Netzwerk und wir machen dort weiter, wo wir aufgehört haben."
 
-#: src/features/welcome/welcome-page.tsx:70
+#: src/features/updates/update-dialog.tsx:96
+msgid "Checking for updates"
+msgstr "Nach Updates suchen"
+
+#: src/features/welcome/welcome-page.tsx:76
 msgid "Checking installed models…"
 msgstr "Installierte Modelle prüfen…"
 
 #: src/features/settings/components/asr-engine-cards.tsx:224
 #: src/features/settings/sections/general-section.tsx:134
+#: src/features/welcome/components/ready-checks.tsx:112
 msgid "Checking…"
 msgstr "Wird geprüft…"
 
@@ -284,8 +324,8 @@ msgstr "Wählen Sie, wie Lune Voice aussehen soll."
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
 msgstr "Wählen Sie, wie Transkripte umformuliert werden — an einen von Ihnen konfigurierten OpenAI-kompatiblen Endpunkt gesendet, lokal oder gehostet, oder ganz abgeschaltet."
 
-#: src/features/welcome/welcome-page.tsx:184
-#: src/features/welcome/welcome-page.tsx:190
+#: src/features/welcome/welcome-page.tsx:198
+#: src/features/welcome/welcome-page.tsx:204
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "Wählen Sie die zu installierenden KI-Modelle aus. Alles läuft offline – keine Cloud, keine Konten."
 
@@ -293,7 +333,7 @@ msgstr "Wählen Sie die zu installierenden KI-Modelle aus. Alles läuft offline 
 msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
 msgstr "Wählen Sie die Engine, die Ihre Sprache in Text umwandelt. Lokale Engines laufen vollständig auf dem Gerät; Whisper ist mehrsprachig mit wählbaren Modellgrößen."
 
-#: src/features/welcome/welcome-page.tsx:169
+#: src/features/welcome/welcome-page.tsx:183
 msgid "Choose your speech engine. Everything runs offline — no cloud, no accounts."
 msgstr "Wählen Sie Ihre Sprach-Engine. Alles läuft offline — keine Cloud, keine Konten."
 
@@ -313,10 +353,12 @@ msgstr "schließen"
 #: src/features/history/components/session-detail-modal.tsx:210
 #: src/features/settings/sections/models-section.tsx:322
 #: src/features/styles/components/style-editor-modal.tsx:197
+#: src/features/updates/update-dialog.tsx:241
+#: src/features/updates/update-dialog.tsx:253
 msgid "Close"
 msgstr "Schließen"
 
-#: src/features/shell/components/app-shell.tsx:135
+#: src/features/shell/components/app-shell.tsx:141
 msgid "Close sidebar"
 msgstr "Seitenleiste schließen"
 
@@ -329,7 +371,7 @@ msgid "Completed"
 msgstr "Vollendet"
 
 #: src/features/overview/overview-page.tsx:284
-#: src/features/shell/components/app-shell.tsx:155
+#: src/features/shell/components/app-shell.tsx:161
 #: src/features/shell/components/sidebar-widgets.tsx:41
 msgid "Connecting"
 msgstr "Verbinden"
@@ -338,8 +380,8 @@ msgstr "Verbinden"
 msgid "Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network."
 msgstr "Kurz nach dem Start den Release-Server kontaktieren und Sie nur benachrichtigen, wenn eine neuere Version vorliegt. Standardmäßig aus — das Diktat selbst braucht nie das Netzwerk."
 
-#: src/features/welcome/welcome-page.tsx:322
-#: src/features/welcome/welcome-page.tsx:389
+#: src/features/welcome/welcome-page.tsx:338
+#: src/features/welcome/welcome-page.tsx:415
 msgid "Continue"
 msgstr "Weitermachen"
 
@@ -381,7 +423,7 @@ msgstr "Korrektur"
 msgid "Correction sensitivity"
 msgstr "Korrekturempfindlichkeit"
 
-#: src/features/welcome/welcome-page.tsx:255
+#: src/features/welcome/welcome-page.tsx:269
 msgid "Could not download GPU support — transcription will run on the CPU. You can retry under Settings › Models."
 msgstr "GPU-Unterstützung konnte nicht heruntergeladen werden — die Transkription läuft auf der CPU. Sie können es unter Einstellungen › Modelle erneut versuchen."
 
@@ -389,13 +431,17 @@ msgstr "GPU-Unterstützung konnte nicht heruntergeladen werden — die Transkrip
 msgid "Couldn't add that rule. Try again."
 msgstr "Diese Regel konnte nicht hinzugefügt werden. Versuchen Sie es erneut."
 
+#: src/features/welcome/components/ready-checks.tsx:100
+msgid "Couldn't check your input devices."
+msgstr "Ihre Eingabegeräte konnten nicht geprüft werden."
+
 #: src/components/feedback/help-feedback-dialog.tsx:193
 msgid "Couldn't open your browser. Visit {url} directly."
-msgstr ""
+msgstr "Ihr Browser konnte nicht geöffnet werden. Rufen Sie {url} direkt auf."
 
 #: src/components/feedback/help-feedback-dialog.tsx:267
 msgid "Couldn't reach the feedback service. Use the links above, or reopen this dialog to retry."
-msgstr ""
+msgstr "Der Feedback-Dienst war nicht erreichbar. Nutzen Sie die Links oben oder öffnen Sie diesen Dialog erneut."
 
 #: src/features/snippets/snippets-page.tsx:95
 msgid "Couldn't save that snippet. Try again."
@@ -403,7 +449,7 @@ msgstr "Dieser Textbaustein konnte nicht gespeichert werden. Bitte erneut versuc
 
 #: src/components/feedback/help-feedback-dialog.tsx:57
 msgid "Crash or freeze"
-msgstr ""
+msgstr "Absturz oder Einfrieren"
 
 #: src/features/snippets/snippets-page.tsx:123
 #: src/features/snippets/snippets-page.tsx:127
@@ -417,6 +463,10 @@ msgstr "Erstellen Sie einen neuen Stil"
 #: src/features/styles/components/style-editor-modal.tsx:81
 msgid "Create style"
 msgstr "Stil kreieren"
+
+#: src/features/welcome/welcome-page.tsx:461
+msgid "Ctrl+Space"
+msgstr "Ctrl+Space"
 
 #: src/features/settings/sections/output-section.tsx:95
 #: src/features/settings/sections/output-section.tsx:107
@@ -536,19 +586,19 @@ msgstr "Herunterladen"
 msgid "Download {0}"
 msgstr "{0} herunterladen"
 
-#: src/features/welcome/welcome-page.tsx:381
+#: src/features/welcome/welcome-page.tsx:407
 msgid "Download {pendingCount} models"
 msgstr "Laden Sie {pendingCount}-Modelle herunter"
 
-#: src/features/welcome/welcome-page.tsx:380
+#: src/features/welcome/welcome-page.tsx:406
 msgid "Download 1 model"
 msgstr "Laden Sie 1 Modell herunter"
 
-#: src/features/welcome/welcome-page.tsx:132
+#: src/features/welcome/welcome-page.tsx:145
 msgid "Download failed"
 msgstr "Der Download ist fehlgeschlagen"
 
-#: src/features/welcome/welcome-page.tsx:180
+#: src/features/welcome/welcome-page.tsx:194
 msgid "Download interrupted"
 msgstr "Download unterbrochen"
 
@@ -563,18 +613,22 @@ msgstr "Download-Fortschritt"
 msgid "Download transcript"
 msgstr "Transkript herunterladen"
 
-#: src/features/welcome/welcome-page.tsx:174
+#: src/features/welcome/welcome-page.tsx:188
 msgid "Downloading models"
 msgstr "Modelle herunterladen"
 
-#: src/features/welcome/welcome-page.tsx:252
+#: src/features/welcome/welcome-page.tsx:266
 msgid "Downloading NVIDIA's CUDA runtime."
 msgstr "NVIDIAs CUDA-Laufzeitumgebung wird heruntergeladen."
+
+#: src/features/updates/update-dialog.tsx:99
+msgid "Downloading update"
+msgstr "Update wird heruntergeladen"
 
 #: src/features/settings/components/asr-engine-cards.tsx:152
 #: src/features/settings/components/gpu-backend-card.tsx:112
 #: src/features/settings/sections/models-section.tsx:272
-#: src/features/welcome/welcome-page.tsx:337
+#: src/features/welcome/welcome-page.tsx:353
 msgid "Downloading…"
 msgstr "Herunterladen…"
 
@@ -633,7 +687,7 @@ msgstr "Styling aktivieren"
 msgid "Engine"
 msgstr "Motor"
 
-#: src/features/welcome/welcome-page.tsx:363
+#: src/features/welcome/welcome-page.tsx:389
 msgid "Enter Lune Voice"
 msgstr "Geben Sie Lune Voice ein"
 
@@ -651,9 +705,13 @@ msgstr "Seitenleiste erweitern"
 
 #: src/components/feedback/help-feedback-dialog.tsx:60
 msgid "Feature request"
-msgstr ""
+msgstr "Funktionswunsch"
 
-#: src/features/welcome/welcome-page.tsx:178
+#: src/features/updates/update-dialog.tsx:141
+msgid "Fetching Lune Voice {version}. Keep the app open until it finishes."
+msgstr "Lune Voice {version} wird geladen. Lassen Sie die App geöffnet, bis der Vorgang abgeschlossen ist."
+
+#: src/features/welcome/welcome-page.tsx:192
 msgid "Fetching the NVIDIA runtime. This is the last step, and it only happens once."
 msgstr "Die NVIDIA-Laufzeitumgebung wird geholt. Das ist der letzte Schritt und passiert nur einmal."
 
@@ -701,7 +759,7 @@ msgstr "Allgemein"
 
 #: src/components/feedback/help-feedback-dialog.tsx:62
 msgid "General feedback"
-msgstr ""
+msgstr "Allgemeines Feedback"
 
 #: src/features/styles/components/style-editor-modal.tsx:181
 #: src/features/styles/components/style-editor-modal.tsx:215
@@ -730,7 +788,7 @@ msgstr "Guten Morgen."
 
 #: src/features/settings/components/gpu-backend-card.tsx:66
 #: src/features/welcome/components/engine-step.tsx:123
-#: src/features/welcome/welcome-page.tsx:249
+#: src/features/welcome/welcome-page.tsx:263
 msgid "GPU acceleration"
 msgstr "GPU-Beschleunigung"
 
@@ -739,9 +797,9 @@ msgid "GPU support is installed but not working."
 msgstr "GPU-Unterstützung ist installiert, funktioniert aber nicht."
 
 #: src/components/feedback/help-feedback-dialog.tsx:238
-#: src/features/shell/components/sidebar-quick-actions.tsx:84
+#: src/features/shell/components/sidebar-quick-actions.tsx:86
 msgid "Help & feedback"
-msgstr ""
+msgstr "Hilfe & Feedback"
 
 #: src/features/overview/overview-page.tsx:358
 msgid "History isn't saved"
@@ -760,6 +818,10 @@ msgstr "Verlaufsaufbewahrung"
 msgid "Hold the hotkey and speak, and your words land wherever your cursor is."
 msgstr "Halte die Taste gedrückt und sprich – deine Worte landen dort, wo der Cursor steht."
 
+#: src/features/welcome/welcome-page.tsx:457
+msgid "Hold your hotkey, speak, then let go. The text is typed into whatever app you were using."
+msgstr "Halten Sie Ihr Tastenkürzel gedrückt, sprechen Sie und lassen Sie los. Der Text wird in die App geschrieben, die Sie gerade nutzen."
+
 #: src/features/settings/sections/general-section.tsx:87
 msgid "How long finished dictations are kept on this device."
 msgstr "Wie lange fertige Diktate auf diesem Gerät aufbewahrt werden."
@@ -771,6 +833,10 @@ msgstr "Wie laut die Diktattöne abgespielt werden."
 #: src/features/settings/sections/pill-section.tsx:196
 msgid "How the pill bar looks. Changes apply immediately."
 msgstr "Wie die Anzeigeleiste aussieht. Änderungen werden sofort übernommen."
+
+#: src/features/welcome/welcome-page.tsx:454
+msgid "How to dictate"
+msgstr "So diktieren Sie"
 
 #: src/features/overview/overview-page.tsx:153
 msgid "Idle · mic ready"
@@ -788,6 +854,10 @@ msgstr "An der Cursorposition einfügen"
 msgid "Insert placeholder"
 msgstr "Platzhalter einfügen"
 
+#: src/features/updates/update-dialog.tsx:228
+msgid "Install and restart"
+msgstr "Installieren und neu starten"
+
 #: src/features/settings/components/asr-engine-cards.tsx:228
 #: src/features/settings/sections/models-section.tsx:218
 #: src/features/welcome/components/model-card.tsx:89
@@ -796,9 +866,17 @@ msgstr "Installiert"
 
 #: src/features/settings/components/gpu-backend-card.tsx:152
 #: src/features/welcome/components/engine-step.tsx:133
-#: src/features/welcome/welcome-page.tsx:254
+#: src/features/welcome/welcome-page.tsx:268
 msgid "Installed. Restart Lune Voice to start using your GPU."
 msgstr "Installiert. Starten Sie Lune Voice neu, um Ihre GPU zu nutzen."
+
+#: src/features/updates/update-dialog.tsx:132
+msgid "Installing replaces the app and restarts it. Your settings, history and models are untouched."
+msgstr "Beim Installieren wird die App ersetzt und neu gestartet. Ihre Einstellungen, Ihr Verlauf und Ihre Modelle bleiben unberührt."
+
+#: src/features/updates/update-dialog.tsx:100
+msgid "Installing update"
+msgstr "Update wird installiert"
 
 #: src/features/styles/components/style-editor-modal.tsx:114
 msgid "Instructions"
@@ -806,7 +884,7 @@ msgstr "Anweisungen"
 
 #: src/components/feedback/help-feedback-dialog.tsx:250
 msgid "Join the discussions"
-msgstr ""
+msgstr "An den Diskussionen teilnehmen"
 
 #: src/features/settings/sections/output-section.tsx:55
 msgid "Keep the dictated text on the clipboard after every dictation, so you can paste it again yourself."
@@ -820,13 +898,14 @@ msgstr "Halten Sie das Mikrofon im Hintergrund geöffnet, damit das Diktat ca. 7
 msgid "Keep the pill with you when you switch workspaces or virtual desktops."
 msgstr "Die Anzeige mitnehmen, wenn Sie Arbeitsflächen oder virtuelle Desktops wechseln."
 
-#: src/features/settings/components/uinput-rule-row.tsx:59
+#: src/features/settings/components/uinput-rule-row.tsx:90
+#: src/features/welcome/components/ready-checks.tsx:107
 msgid "Keyboard access"
 msgstr "Tastaturzugriff"
 
 #: src/features/shell/components/sidebar-quick-actions.tsx:67
 msgid "Keyboard shortcuts"
-msgstr ""
+msgstr "Tastenkürzel"
 
 #: src/features/styles/components/style-editor-modal.tsx:57
 msgid "Keyboard shortcuts (\"Super H\" → \"Super+H\")"
@@ -836,6 +915,10 @@ msgstr "Tastaturkürzel („Super H“ → „Super+H“)"
 #: src/features/settings/sections/general-section.tsx:62
 msgid "Language"
 msgstr "Sprache"
+
+#: src/features/updates/update-dialog.tsx:224
+msgid "Later"
+msgstr "Später"
 
 #: src/features/settings/sections/general-section.tsx:73
 msgid "Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login."
@@ -851,7 +934,7 @@ msgstr "Länge"
 msgid "Light"
 msgstr "Licht"
 
-#: src/features/shell/components/app-shell.tsx:159
+#: src/features/shell/components/app-shell.tsx:165
 msgid "Listening"
 msgstr "Hören"
 
@@ -873,13 +956,37 @@ msgstr "Hören…"
 msgid "Lock position"
 msgstr "Position sperren"
 
+#: src/features/welcome/components/ready-checks.tsx:93
+msgid "Looking for input devices…"
+msgstr "Eingabegeräte werden gesucht …"
+
 #: src/components/ui/theme-picker.tsx:130
 msgid "Lune"
 msgstr "Lune"
 
-#: src/features/settings/components/uinput-rule-row.tsx:60
+#: src/features/updates/update-dialog.tsx:122
+msgid "Lune Voice {currentVersion} is the latest version."
+msgstr "Lune Voice {currentVersion} ist die neueste Version."
+
+#: src/features/updates/update-dialog.tsx:129
+msgid "Lune Voice {version} is available. You have {currentVersion}."
+msgstr "Lune Voice {version} ist verfügbar. Sie haben {currentVersion}."
+
+#: src/features/settings/components/uinput-rule-row.tsx:93
 msgid "Lune Voice added a system rule so it can type into other apps. It also lets any other program you run send keystrokes. Removing it stops typed delivery from working until you allow it again."
 msgstr "Lune Voice hat eine Systemregel hinzugefügt, damit die App in andere Programme tippen kann. Sie erlaubt es außerdem jedem anderen Programm, das Sie ausführen, Tastenanschläge zu senden. Wenn Sie sie entfernen, funktioniert die Eingabe per Tastendruck nicht mehr, bis Sie sie erneut erlauben."
+
+#: src/features/welcome/components/ready-checks.tsx:114
+msgid "Lune Voice can type into your other apps."
+msgstr "Lune Voice kann in Ihre anderen Apps schreiben."
+
+#: src/features/settings/components/uinput-rule-row.tsx:94
+msgid "Lune Voice needs permission to type into other apps. Allowing it also lets any other program you run send keystrokes. Your system will ask for your password."
+msgstr "Lune Voice braucht die Berechtigung, in andere Apps zu schreiben. Damit dürfen auch alle anderen Programme, die Sie ausführen, Tastendrücke senden. Ihr System fragt nach Ihrem Passwort."
+
+#: src/features/welcome/components/ready-checks.tsx:115
+msgid "Lune Voice needs permission to type into other apps. Your system will ask for your password."
+msgstr "Lune Voice braucht die Berechtigung, in andere Apps zu schreiben. Ihr System fragt nach Ihrem Passwort."
 
 #: src/features/dictionary/components/dictionary-form.tsx:92
 msgid "Lune Voice writes"
@@ -896,6 +1003,7 @@ msgstr "Besprechungskopf"
 #: src/features/settings/sections/dictation-section.tsx:104
 #: src/features/settings/sections/dictation-section.tsx:109
 #: src/features/settings/sections/dictation-section.tsx:115
+#: src/features/welcome/components/ready-checks.tsx:88
 msgid "Microphone"
 msgstr "Mikrofon"
 
@@ -916,7 +1024,7 @@ msgstr "Modus"
 msgid "Models"
 msgstr "Modelle"
 
-#: src/features/welcome/welcome-page.tsx:410
+#: src/features/welcome/welcome-page.tsx:475
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "Modelle werden lokal gespeichert. Keine Telemetrie, keine Konten."
 
@@ -947,6 +1055,10 @@ msgstr "Nächste Seite"
 #: src/features/styles/components/style-preset-card.tsx:99
 msgid "No"
 msgstr "NEIN"
+
+#: src/features/welcome/components/ready-checks.tsx:101
+msgid "No microphone found. Plug one in, then pick it in Settings › Dictation."
+msgstr "Kein Mikrofon gefunden. Schließen Sie eines an und wählen Sie es unter Einstellungen › Diktat aus."
 
 #: src/features/settings/components/gpu-backend-card.tsx:161
 msgid "No NVIDIA driver was found. Install the driver for your GPU and the download will appear here."
@@ -1009,7 +1121,7 @@ msgid "Off delivers raw transcripts. Which style is applied is chosen on the Sty
 msgstr "„Aus“ liefert Rohtranskripte. Welcher Stil angewendet wird, legen Sie im Tab „Stile“ fest."
 
 #: src/features/overview/overview-page.tsx:153
-#: src/features/shell/components/app-shell.tsx:162
+#: src/features/shell/components/app-shell.tsx:168
 msgid "Offline"
 msgstr "Offline"
 
@@ -1017,7 +1129,7 @@ msgstr "Offline"
 msgid "One-line summary shown on the card"
 msgstr "Einzeilige Zusammenfassung auf der Karte"
 
-#: src/features/shell/components/app-shell.tsx:103
+#: src/features/shell/components/app-shell.tsx:109
 msgid "Open menu"
 msgstr "Menü öffnen"
 
@@ -1031,7 +1143,7 @@ msgstr "Optional"
 
 #: src/components/feedback/help-feedback-dialog.tsx:67
 msgid "or send directly"
-msgstr ""
+msgstr "oder direkt senden"
 
 #: src/features/settings/sections/pill-section.tsx:214
 msgid "Orientation"
@@ -1045,7 +1157,7 @@ msgstr "Ausgabe"
 msgid "Overall footprint of the pill bar."
 msgstr "Gesamtgröße der Anzeigeleiste."
 
-#: src/features/welcome/welcome-page.tsx:282
+#: src/features/welcome/welcome-page.tsx:296
 msgid "Overall progress"
 msgstr "Gesamtfortschritt"
 
@@ -1064,7 +1176,7 @@ msgstr "Einfügen ist am einfachsten. In manchen Apps funktioniert die Eingabe v
 
 #: src/components/feedback/help-feedback-dialog.tsx:59
 msgid "Performance or speed"
-msgstr ""
+msgstr "Leistung oder Geschwindigkeit"
 
 #: src/features/dictionary/components/dictionary-table.tsx:61
 #: src/features/dictionary/components/dictionary-table.tsx:257
@@ -1103,7 +1215,7 @@ msgstr "Platzierung"
 msgid "Play a short sound when dictation starts, finishes, or runs into an error."
 msgstr "Spielt einen kurzen Ton ab, wenn das Diktat startet, endet oder auf einen Fehler stößt."
 
-#: src/features/welcome/welcome-page.tsx:340
+#: src/features/welcome/welcome-page.tsx:365
 msgid "Please keep the app open until downloads finish"
 msgstr "Bitte lassen Sie die App geöffnet, bis der Download abgeschlossen ist"
 
@@ -1127,6 +1239,10 @@ msgstr "Drücken"
 #: src/features/shell/components/sidebar-widgets.tsx:51
 msgid "Press to talk"
 msgstr "Zum Sprechen drücken"
+
+#: src/features/welcome/welcome-page.tsx:458
+msgid "Press your hotkey, speak, then press it again. The text is typed into whatever app you were using."
+msgstr "Drücken Sie Ihr Tastenkürzel, sprechen Sie und drücken Sie es erneut. Der Text wird in die App geschrieben, die Sie gerade nutzen."
 
 #: src/features/history/components/history-table.tsx:174
 msgid "Prev"
@@ -1156,7 +1272,7 @@ msgstr "Priorität"
 
 #: src/features/dictation/dictation-pill.tsx:61
 #: src/features/dictation/dictation-pill.tsx:67
-#: src/features/shell/components/app-shell.tsx:157
+#: src/features/shell/components/app-shell.tsx:163
 msgid "Processing"
 msgstr "Verarbeitung"
 
@@ -1166,21 +1282,21 @@ msgstr "Verarbeitung…"
 
 #: src/components/feedback/help-feedback-dialog.tsx:61
 msgid "Question or help"
-msgstr ""
+msgstr "Frage oder Hilfe"
 
-#: src/features/shell/components/sidebar-quick-actions.tsx:109
-#: src/features/shell/components/sidebar-quick-actions.tsx:110
-#: src/features/shell/components/sidebar-quick-actions.tsx:117
-#: src/features/shell/components/sidebar-quick-actions.tsx:133
+#: src/features/shell/components/sidebar-quick-actions.tsx:111
+#: src/features/shell/components/sidebar-quick-actions.tsx:112
+#: src/features/shell/components/sidebar-quick-actions.tsx:119
+#: src/features/shell/components/sidebar-quick-actions.tsx:135
 msgid "Quick actions"
-msgstr ""
+msgstr "Schnellaktionen"
 
-#: src/features/shell/components/sidebar-quick-actions.tsx:90
+#: src/features/shell/components/sidebar-quick-actions.tsx:92
 msgid "Quit Lune Voice"
-msgstr ""
+msgstr "Lune Voice beenden"
 
 #: src/features/overview/overview-page.tsx:284
-#: src/features/shell/components/app-shell.tsx:161
+#: src/features/shell/components/app-shell.tsx:167
 msgid "Ready"
 msgstr "Bereit"
 
@@ -1198,7 +1314,7 @@ msgid "Refresh few-shot examples"
 msgstr "Few-Shot-Beispiele aktualisieren"
 
 #: src/components/feedback/confirm-dialog.tsx:33
-#: src/features/settings/components/uinput-rule-row.tsx:68
+#: src/features/settings/components/uinput-rule-row.tsx:104
 msgid "Remove"
 msgstr "Entfernen"
 
@@ -1208,7 +1324,7 @@ msgstr "Entfernen"
 msgid "Remove the saved correction for \"{0}\" → \"{1}\"."
 msgstr "Entfernen Sie die gespeicherte Korrektur für „{0}“ → „{1}“."
 
-#: src/features/settings/components/uinput-rule-row.tsx:68
+#: src/features/settings/components/uinput-rule-row.tsx:104
 msgid "Removing…"
 msgstr "Wird entfernt…"
 
@@ -1222,7 +1338,7 @@ msgstr "Ersetzung"
 
 #: src/components/feedback/help-feedback-dialog.tsx:241
 msgid "Report a problem, suggest an idea, or just tell us how it's going."
-msgstr ""
+msgstr "Melden Sie ein Problem, schlagen Sie etwas vor oder sagen Sie uns einfach, wie es läuft."
 
 #: src/features/welcome/components/model-card.tsx:83
 msgid "Required"
@@ -1244,7 +1360,7 @@ msgstr "Neustart erforderlich"
 msgid "Retry"
 msgstr "Erneut versuchen"
 
-#: src/features/welcome/welcome-page.tsx:351
+#: src/features/welcome/welcome-page.tsx:377
 msgid "Retry download"
 msgstr "Versuchen Sie den Download erneut"
 
@@ -1298,13 +1414,13 @@ msgstr "Transkripte durchsuchen"
 msgid "Search transcripts…"
 msgstr "Transkripte durchsuchen…"
 
-#: src/features/welcome/welcome-page.tsx:385
+#: src/features/welcome/welcome-page.tsx:411
 msgid "Select required models"
 msgstr "Wählen Sie die gewünschten Modelle aus"
 
 #: src/components/feedback/help-feedback-dialog.tsx:294
 msgid "Send"
-msgstr ""
+msgstr "Senden"
 
 #: src/features/settings/sections/output-section.tsx:24
 #: src/features/settings/sections/output-section.tsx:30
@@ -1331,11 +1447,11 @@ msgstr "Hotkey festlegen"
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "Legen Sie die Sprache fest, die Sie sprechen. Auto nutzt die Spracherkennung."
 
-#: src/features/welcome/welcome-page.tsx:378
+#: src/features/welcome/welcome-page.tsx:404
 msgid "Set up GPU acceleration"
 msgstr "GPU-Beschleunigung einrichten"
 
-#: src/features/welcome/welcome-page.tsx:177
+#: src/features/welcome/welcome-page.tsx:191
 msgid "Setting up your GPU"
 msgstr "Ihre GPU wird eingerichtet"
 
@@ -1366,13 +1482,13 @@ msgstr "Größe"
 msgid "Size & shape"
 msgstr "Größe & Form"
 
-#: src/features/welcome/welcome-page.tsx:326
-#: src/features/welcome/welcome-page.tsx:354
-#: src/features/welcome/welcome-page.tsx:398
+#: src/features/welcome/welcome-page.tsx:342
+#: src/features/welcome/welcome-page.tsx:380
+#: src/features/welcome/welcome-page.tsx:424
 msgid "Skip for now"
 msgstr "Überspringen Sie es vorerst"
 
-#: src/features/shell/components/app-shell.tsx:96
+#: src/features/shell/components/app-shell.tsx:97
 msgid "Skip to main content"
 msgstr "Zum Hauptinhalt springen"
 
@@ -1488,7 +1604,7 @@ msgstr "Textübergabe"
 
 #: src/components/feedback/help-feedback-dialog.tsx:113
 msgid "Thanks — your feedback was sent."
-msgstr ""
+msgstr "Danke — Ihr Feedback wurde gesendet."
 
 #: src/features/settings/sections/pill-section.tsx:70
 msgid "The floating status pill you see while dictating."
@@ -1518,17 +1634,21 @@ msgstr "Die Wörter, bei denen die Erkennung am unsichersten ist, werden mit Ihr
 msgid "Theme"
 msgstr "Thema"
 
-#: src/features/shell/components/sidebar-quick-actions.tsx:119
+#: src/features/shell/components/sidebar-quick-actions.tsx:121
 msgid "Theme, shortcuts, quit"
-msgstr ""
+msgstr "Design, Tastenkürzel, Beenden"
 
 #: src/features/settings/sections/models-section.tsx:305
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "Dieses Modell wird von Ihrer aktuellen Konfiguration verwendet. Das Diktat funktioniert möglicherweise erst wieder, wenn Sie es neu installieren oder ein anderes wählen."
 
-#: src/features/welcome/welcome-page.tsx:175
+#: src/features/welcome/welcome-page.tsx:189
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "Dies geschieht nur einmal. Sie können Ihren Computer in der Zwischenzeit weiterhin verwenden."
+
+#: src/features/updates/update-dialog.tsx:217
+msgid "This only takes a moment."
+msgstr "Das dauert nur einen Moment."
 
 #: src/features/history/components/history-table.tsx:381
 #: src/features/history/components/session-detail-modal.tsx:202
@@ -1588,7 +1708,7 @@ msgstr "Transkription"
 
 #: src/components/feedback/help-feedback-dialog.tsx:58
 msgid "Transcription accuracy"
-msgstr ""
+msgstr "Transkriptionsgenauigkeit"
 
 #. placeholder {0}: status.devices.join(', ')
 #: src/features/settings/components/gpu-backend-card.tsx:144
@@ -1611,6 +1731,10 @@ msgstr "Die Transkription läuft auf der CPU. Für diese Version wurde noch kein
 msgid "Trigger phrase"
 msgstr "Auslösesatz"
 
+#: src/features/updates/update-dialog.tsx:245
+msgid "Try again"
+msgstr "Erneut versuchen"
+
 #: src/features/snippets/snippets-page.tsx:163
 msgid "Type a phrase, or tap the mic to capture it exactly as Lune Voice hears it."
 msgstr "Geben Sie einen Satz ein oder tippen Sie auf das Mikrofon, um ihn genau so aufzunehmen, wie Lune Voice ihn hört."
@@ -1618,6 +1742,18 @@ msgstr "Geben Sie einen Satz ein oder tippen Sie auf das Mikrofon, um ihn genau 
 #: src/features/snippets/snippets-page.tsx:215
 msgid "Types as"
 msgstr "Tippt als"
+
+#: src/features/updates/update-dialog.tsx:98
+msgid "Update available"
+msgstr "Update verfügbar"
+
+#: src/features/updates/update-dialog.tsx:101
+msgid "Update check failed"
+msgstr "Update-Prüfung fehlgeschlagen"
+
+#: src/features/updates/update-dialog.tsx:102
+msgid "Update failed"
+msgstr "Update fehlgeschlagen"
 
 #: src/features/settings/sections/general-section.tsx:121
 msgid "Updates"
@@ -1636,6 +1772,15 @@ msgstr "Hardwarebeschleunigung verwenden"
 #: src/features/styles/components/style-preset-card.tsx:46
 msgid "Use the {0} style"
 msgstr "Verwenden Sie den {0}-Stil"
+
+#. placeholder {0}: micDevices[0]
+#: src/features/welcome/components/ready-checks.tsx:91
+#~ msgid "Using {0}. Change it in Settings › Dictation."
+#~ msgstr "{0} wird verwendet. Ändern Sie das unter Einstellungen › Diktat."
+
+#: src/features/welcome/components/ready-checks.tsx:98
+msgid "Using {activeDevice}. Change it in Settings › Dictation."
+msgstr "{activeDevice} wird verwendet. Ändern Sie das unter Einstellungen › Diktat."
 
 #: src/features/styles/components/style-hero.tsx:43
 #: src/features/styles/components/style-preset-card.tsx:108
@@ -1664,25 +1809,29 @@ msgstr "vs. Gesamtdurchschnitt"
 
 #: src/components/feedback/help-feedback-dialog.tsx:294
 msgid "Wait {cooldown}s"
-msgstr ""
+msgstr "Noch {cooldown} s"
 
-#: src/features/welcome/welcome-page.tsx:186
+#: src/features/welcome/welcome-page.tsx:200
 msgid "Welcome back"
 msgstr "Willkommen zurück"
 
-#: src/features/welcome/welcome-page.tsx:168
-#: src/features/welcome/welcome-page.tsx:183
-#: src/features/welcome/welcome-page.tsx:189
+#: src/features/welcome/welcome-page.tsx:182
+#: src/features/welcome/welcome-page.tsx:197
+#: src/features/welcome/welcome-page.tsx:203
 msgid "Welcome to Lune Voice"
 msgstr "Willkommen bei Lune Voice"
 
 #: src/components/feedback/help-feedback-dialog.tsx:91
 msgid "What happened, or what would you like to see?"
-msgstr ""
+msgstr "Was ist passiert, oder was würden Sie sich wünschen?"
 
 #: src/components/feedback/help-feedback-dialog.tsx:70
 msgid "What is this about?"
-msgstr ""
+msgstr "Worum geht es?"
+
+#: src/features/updates/update-dialog.tsx:198
+msgid "What's new"
+msgstr "Was ist neu"
 
 #: src/features/settings/sections/transcription-section.tsx:76
 msgid "When available, this can make transcription finish faster."
@@ -1747,9 +1896,13 @@ msgstr "Sie verwenden Version {version}."
 msgid "You say"
 msgstr "Du sagst"
 
-#: src/features/welcome/welcome-page.tsx:171
+#: src/features/welcome/welcome-page.tsx:185
 msgid "You're all set"
 msgstr "Sie sind bereit"
+
+#: src/features/updates/update-dialog.tsx:97
+msgid "You're up to date"
+msgstr "Sie sind auf dem neuesten Stand"
 
 #: src/features/settings/components/openai-fields.tsx:48
 msgid "Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none."
@@ -1757,7 +1910,7 @@ msgstr "Ihr API-Schlüssel. Lassen Sie ihn leer, um den gespeicherten Schlüssel
 
 #: src/components/feedback/help-feedback-dialog.tsx:90
 msgid "Your feedback"
-msgstr ""
+msgstr "Ihr Feedback"
 
 #: src/features/welcome/components/engine-step.tsx:131
 msgid "Your GPU is ready — use it for faster transcription."
@@ -1772,10 +1925,14 @@ msgstr "Ihre GPU ist geeignet. Die Einrichtung lädt die {0} große NVIDIA-Laufz
 msgid "your hotkey"
 msgstr "Ihr Hotkey"
 
-#: src/features/welcome/welcome-page.tsx:172
+#: src/features/welcome/welcome-page.tsx:186
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "Ihre Modelle sind fertig. Alles bleibt auf dieser Maschine."
 
 #: src/features/styles/styles-page.tsx:302
 msgid "Your own formatting preset"
 msgstr "Ihre eigene Formatierungsvoreinstellung"
+
+#: src/features/welcome/components/ready-checks.tsx:77
+msgid "your system default mic"
+msgstr "Ihr Standardmikrofon des Systems"

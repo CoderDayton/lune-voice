@@ -116,6 +116,41 @@ const UDEV_RULE: &str =
 /// here at runtime.
 const UDEV_RULE_PATH: &str = "/etc/udev/rules.d/99-lune-voice-uinput.rules";
 
+/// Whether this session can already write to `/dev/uinput`.
+///
+/// The question the setup screen has to ask, and deliberately not the same as
+/// [`uinput_rule_is_self_installed`]: a .deb/.rpm ships the rule, and a user may
+/// have granted access some other way entirely (a distro rule, group
+/// membership). What matters is whether typing will work, not who arranged it.
+pub fn uinput_access_ready() -> bool {
+    OpenOptions::new().write(true).open("/dev/uinput").is_ok()
+}
+
+/// Install the udev rule so this user can synthesise keystrokes.
+///
+/// Blocking: raises a polkit password prompt. Exposed so setup can ask *before*
+/// the first dictation — the same request arriving mid-sentence, after the user
+/// has already spoken, reads as a malfunction, and cancelling it loses the
+/// utterance. A no-op when access already works.
+///
+/// Returns whether typing works *now*: `Ok(false)` means the rule was installed
+/// but the kernel has not applied it to the existing device, which a reboot
+/// fixes. That is a different thing to tell the user than a failed install, so
+/// only a failure of the installation itself is an `Err`.
+pub fn grant_uinput_access() -> Result<bool, String> {
+    match ensure_kernel_access() {
+        Ok(()) => Ok(true),
+        Err(e) if e == REBOOT_REQUIRED => Ok(false),
+        Err(e) => Err(e),
+    }
+}
+
+/// Returned by [`ensure_kernel_access`] when the rule is in place but the ACL
+/// has not taken effect yet. Matched rather than reported verbatim by
+/// [`grant_uinput_access`], so the two cannot drift apart.
+const REBOOT_REQUIRED: &str =
+    "udev rule installed but /dev/uinput still inaccessible — reboot may be required";
+
 /// Whether the runtime-installed rule is present.
 ///
 /// Only the copy this app wrote counts. A rule shipped by the package manager
@@ -211,10 +246,7 @@ fn ensure_kernel_access() -> Result<(), String> {
     std::thread::sleep(Duration::from_millis(500));
 
     if OpenOptions::new().write(true).open("/dev/uinput").is_err() {
-        return Err(
-            "udev rule installed but /dev/uinput still inaccessible — reboot may be required"
-                .into(),
-        );
+        return Err(REBOOT_REQUIRED.into());
     }
 
     info!("uinput access granted permanently via uaccess rule");

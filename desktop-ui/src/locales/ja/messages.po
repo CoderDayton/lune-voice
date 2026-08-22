@@ -13,6 +13,10 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#: src/features/welcome/welcome-page.tsx:462
+msgid "— change it any time in Settings › Dictation."
+msgstr "— 設定 › 音声入力 でいつでも変更できます。"
+
 #. placeholder {0}: snippet.triggerPhrase
 #: src/features/snippets/snippets-page.tsx:292
 msgid "“{0}” will stop expanding. The template text is not recoverable."
@@ -92,6 +96,11 @@ msgstr "縦向きのインジケーターが画面の端に沿って表示され
 msgid "Acceleration"
 msgstr "アクセラレーション"
 
+#: src/features/settings/components/uinput-rule-row.tsx:64
+#: src/features/welcome/components/ready-checks.tsx:57
+msgid "Access still isn't available. A reboot may be needed for it to take effect."
+msgstr "まだアクセスできません。反映するには再起動が必要な場合があります。"
+
 #: src/features/dictionary/components/dictionary-table.tsx:266
 msgid "Action"
 msgstr "操作"
@@ -131,13 +140,18 @@ msgstr "スニペッ���を追加"
 msgid "AI models stored on your device."
 msgstr "AI モデルはデバイスに保存されます。"
 
-#: src/features/welcome/welcome-page.tsx:187
+#: src/features/welcome/welcome-page.tsx:201
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "必要なモデルはすべてインストール済みです。準備ができたら続行してください。"
 
 #: src/features/overview/overview-page.tsx:98
 msgid "all-time · today"
 msgstr "累計 · 本日"
+
+#: src/features/settings/components/uinput-rule-row.tsx:113
+#: src/features/welcome/components/ready-checks.tsx:125
+msgid "Allow"
+msgstr "許可"
 
 #: src/features/settings/components/openai-fields.tsx:35
 msgid "API endpoint"
@@ -156,9 +170,22 @@ msgstr "外観"
 msgid "Application behavior and startup preferences."
 msgstr "アプリケーションの動作と起動設定。"
 
+#: src/features/updates/update-dialog.tsx:151
+msgid "Applying Lune Voice {version}. Your system may ask for your password, and the app will restart on its own."
+msgstr "Lune Voice {version} を適用しています。システムがパスワードを求めることがあります。アプリは自動的に再起動します。"
+
+#: src/features/updates/update-dialog.tsx:116
+msgid "Asking the release server whether anything newer than {currentVersion} exists."
+msgstr "{currentVersion} より新しいバージョンがあるかリリースサーバーに確認しています。"
+
+#: src/features/settings/components/uinput-rule-row.tsx:113
+#: src/features/welcome/components/ready-checks.tsx:125
+msgid "Asking…"
+msgstr "確認中…"
+
 #: src/components/feedback/help-feedback-dialog.tsx:98
 msgid "At least {MIN_MESSAGE_CHARS} characters."
-msgstr ""
+msgstr "{MIN_MESSAGE_CHARS} 文字以上入力してください。"
 
 #: src/features/overview/overview-page.tsx:146
 msgid "Audio"
@@ -180,6 +207,10 @@ msgstr "文頭を自動的に大文字にする"
 msgid "Automatic"
 msgstr "自動"
 
+#: src/features/welcome/components/ready-checks.tsx:83
+msgid "Before you start"
+msgstr "始める前に"
+
 #: src/features/styles/components/style-editor-modal.tsx:60
 msgid "Brand casing (\"github\" → \"GitHub\")"
 msgstr "ブランド表記（「github」→「GitHub」）"
@@ -190,7 +221,7 @@ msgstr "ブランド"
 
 #: src/components/feedback/help-feedback-dialog.tsx:246
 msgid "Browse open issues"
-msgstr ""
+msgstr "未解決の issue を見る"
 
 #: src/components/ui/theme-picker.tsx:218
 msgid "Browse themes"
@@ -198,7 +229,7 @@ msgstr "テーマを参照する"
 
 #: src/components/feedback/help-feedback-dialog.tsx:56
 msgid "Bug report"
-msgstr ""
+msgstr "バグ報告"
 
 #: src/features/styles/components/style-hero.tsx:33
 #: src/features/styles/components/style-preset-card.tsx:66
@@ -215,6 +246,10 @@ msgstr "キャンセル"
 #: src/features/settings/sections/dictation-section.tsx:67
 msgid "Cancel current recording"
 msgstr "現在の録音をキャンセル"
+
+#: src/features/welcome/welcome-page.tsx:361
+msgid "Cancel download"
+msgstr "ダウンロードを中止"
 
 #: src/features/snippets/snippets-page.tsx:133
 msgid "Cancel edit"
@@ -233,13 +268,13 @@ msgstr "音声で登録"
 msgid "Capture device and how recording detects when you speak."
 msgstr "キャプチャデバイスと、録音があなたの発話を検出する方法。"
 
-#: src/features/welcome/welcome-page.tsx:395
+#: src/features/welcome/welcome-page.tsx:421
 msgid "Change engine"
 msgstr "エンジンを変更"
 
 #: src/features/shell/components/sidebar-quick-actions.tsx:60
 msgid "Change theme"
-msgstr ""
+msgstr "テーマを変更"
 
 #: src/features/settings/sections/general-section.tsx:134
 #: src/features/shell/components/sidebar-quick-actions.tsx:76
@@ -255,16 +290,21 @@ msgstr "起動時に更新を確認"
 msgid "Check whether a newer version has been released."
 msgstr "新しいバージョンが公開されているか確認します。"
 
-#: src/features/welcome/welcome-page.tsx:181
+#: src/features/welcome/welcome-page.tsx:195
 msgid "Check your network and we'll pick up where we left off."
 msgstr "ネットワークをチェックしてください。中断したところから再開します。"
 
-#: src/features/welcome/welcome-page.tsx:70
+#: src/features/updates/update-dialog.tsx:96
+msgid "Checking for updates"
+msgstr "更新を確認中"
+
+#: src/features/welcome/welcome-page.tsx:76
 msgid "Checking installed models…"
 msgstr "インストールされているモデルを確認しています…"
 
 #: src/features/settings/components/asr-engine-cards.tsx:224
 #: src/features/settings/sections/general-section.tsx:134
+#: src/features/welcome/components/ready-checks.tsx:112
 msgid "Checking…"
 msgstr "確認中…"
 
@@ -284,8 +324,8 @@ msgstr "Lune Voiceの見た目を選択します。"
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
 msgstr "文字起こしの整形方法を選びます — 設定した OpenAI 互換エンドポイント（ローカルでも���スト型でも）に送信するか、まったく行わないかを選べます。"
 
-#: src/features/welcome/welcome-page.tsx:184
-#: src/features/welcome/welcome-page.tsx:190
+#: src/features/welcome/welcome-page.tsx:198
+#: src/features/welcome/welcome-page.tsx:204
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "インストールする AI モデルを選択します。すべてがオフラインで実行されます。クラウドもアカウントもありません。"
 
@@ -293,7 +333,7 @@ msgstr "インストールする AI モデルを選択します。すべてが�
 msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
 msgstr "音声をテキストに変換するエンジンを選択します。ローカルエンジンは完全にオンデバイスで実行され、Whisper は多言語対応でモデルサイズを選択できます。"
 
-#: src/features/welcome/welcome-page.tsx:169
+#: src/features/welcome/welcome-page.tsx:183
 msgid "Choose your speech engine. Everything runs offline — no cloud, no accounts."
 msgstr "音声エンジンを選択します。すべてがオフラインで実行されます — クラウドもアカウントもありません。"
 
@@ -313,10 +353,12 @@ msgstr "閉じる"
 #: src/features/history/components/session-detail-modal.tsx:210
 #: src/features/settings/sections/models-section.tsx:322
 #: src/features/styles/components/style-editor-modal.tsx:197
+#: src/features/updates/update-dialog.tsx:241
+#: src/features/updates/update-dialog.tsx:253
 msgid "Close"
 msgstr "閉じる"
 
-#: src/features/shell/components/app-shell.tsx:135
+#: src/features/shell/components/app-shell.tsx:141
 msgid "Close sidebar"
 msgstr "サイドバーを閉じる"
 
@@ -329,7 +371,7 @@ msgid "Completed"
 msgstr "完了"
 
 #: src/features/overview/overview-page.tsx:284
-#: src/features/shell/components/app-shell.tsx:155
+#: src/features/shell/components/app-shell.tsx:161
 #: src/features/shell/components/sidebar-widgets.tsx:41
 msgid "Connecting"
 msgstr "接続中"
@@ -338,8 +380,8 @@ msgstr "接続中"
 msgid "Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network."
 msgstr "起動の少し後にリリースサーバーへ接続し、新しいバージョンがあるときだけ通知します。既定はオフです — 音声入力そのも���にネットワークは不要です。"
 
-#: src/features/welcome/welcome-page.tsx:322
-#: src/features/welcome/welcome-page.tsx:389
+#: src/features/welcome/welcome-page.tsx:338
+#: src/features/welcome/welcome-page.tsx:415
 msgid "Continue"
 msgstr "続行"
 
@@ -381,7 +423,7 @@ msgstr "修正"
 msgid "Correction sensitivity"
 msgstr "修正の感度"
 
-#: src/features/welcome/welcome-page.tsx:255
+#: src/features/welcome/welcome-page.tsx:269
 msgid "Could not download GPU support — transcription will run on the CPU. You can retry under Settings › Models."
 msgstr "GPU サポートをダウンロードできませんでした — 文字起こしは CPU で実行されます。設定 › モデル から再試行できます。"
 
@@ -389,13 +431,17 @@ msgstr "GPU サポートをダウンロードできませんでした — 文字
 msgid "Couldn't add that rule. Try again."
 msgstr "そのルールを追加できませんでした。もう一度やり直してください。"
 
+#: src/features/welcome/components/ready-checks.tsx:100
+msgid "Couldn't check your input devices."
+msgstr "入力デバイスを確認できませんでした。"
+
 #: src/components/feedback/help-feedback-dialog.tsx:193
 msgid "Couldn't open your browser. Visit {url} directly."
-msgstr ""
+msgstr "ブラウザーを開けませんでした。{url} に直接アクセスしてください。"
 
 #: src/components/feedback/help-feedback-dialog.tsx:267
 msgid "Couldn't reach the feedback service. Use the links above, or reopen this dialog to retry."
-msgstr ""
+msgstr "フィードバックサービスに接続できませんでした。上のリンクを使うか、このダイアログを開き直してやり直してください。"
 
 #: src/features/snippets/snippets-page.tsx:95
 msgid "Couldn't save that snippet. Try again."
@@ -403,7 +449,7 @@ msgstr "そのスニペッ���を保存できませんでした。もう一
 
 #: src/components/feedback/help-feedback-dialog.tsx:57
 msgid "Crash or freeze"
-msgstr ""
+msgstr "クラッシュまたはフリーズ"
 
 #: src/features/snippets/snippets-page.tsx:123
 #: src/features/snippets/snippets-page.tsx:127
@@ -417,6 +463,10 @@ msgstr "新しいスタイルを作成する"
 #: src/features/styles/components/style-editor-modal.tsx:81
 msgid "Create style"
 msgstr "スタイルの作成"
+
+#: src/features/welcome/welcome-page.tsx:461
+msgid "Ctrl+Space"
+msgstr "Ctrl+Space"
 
 #: src/features/settings/sections/output-section.tsx:95
 #: src/features/settings/sections/output-section.tsx:107
@@ -536,19 +586,19 @@ msgstr "ダウンロード"
 msgid "Download {0}"
 msgstr "{0} をダウンロード"
 
-#: src/features/welcome/welcome-page.tsx:381
+#: src/features/welcome/welcome-page.tsx:407
 msgid "Download {pendingCount} models"
 msgstr "{pendingCount} モデルをダウンロード"
 
-#: src/features/welcome/welcome-page.tsx:380
+#: src/features/welcome/welcome-page.tsx:406
 msgid "Download 1 model"
 msgstr "1 モデルをダウンロード"
 
-#: src/features/welcome/welcome-page.tsx:132
+#: src/features/welcome/welcome-page.tsx:145
 msgid "Download failed"
 msgstr "ダウンロードに失敗しました"
 
-#: src/features/welcome/welcome-page.tsx:180
+#: src/features/welcome/welcome-page.tsx:194
 msgid "Download interrupted"
 msgstr "ダウンロードが中断されました"
 
@@ -563,18 +613,22 @@ msgstr "ダウンロード進行状況"
 msgid "Download transcript"
 msgstr "文字起こしをダウンロード"
 
-#: src/features/welcome/welcome-page.tsx:174
+#: src/features/welcome/welcome-page.tsx:188
 msgid "Downloading models"
 msgstr "モデルをダウンロード中"
 
-#: src/features/welcome/welcome-page.tsx:252
+#: src/features/welcome/welcome-page.tsx:266
 msgid "Downloading NVIDIA's CUDA runtime."
 msgstr "NVIDIA の CUDA ランタイムをダウンロードしています。"
+
+#: src/features/updates/update-dialog.tsx:99
+msgid "Downloading update"
+msgstr "更新をダウンロード中"
 
 #: src/features/settings/components/asr-engine-cards.tsx:152
 #: src/features/settings/components/gpu-backend-card.tsx:112
 #: src/features/settings/sections/models-section.tsx:272
-#: src/features/welcome/welcome-page.tsx:337
+#: src/features/welcome/welcome-page.tsx:353
 msgid "Downloading…"
 msgstr "ダウンロード中…"
 
@@ -633,7 +687,7 @@ msgstr "スタイル調整を有効にする"
 msgid "Engine"
 msgstr "エンジン"
 
-#: src/features/welcome/welcome-page.tsx:363
+#: src/features/welcome/welcome-page.tsx:389
 msgid "Enter Lune Voice"
 msgstr "Lune Voice を開く"
 
@@ -651,9 +705,13 @@ msgstr "サイドバーを展開する"
 
 #: src/components/feedback/help-feedback-dialog.tsx:60
 msgid "Feature request"
-msgstr ""
+msgstr "機能のリクエスト"
 
-#: src/features/welcome/welcome-page.tsx:178
+#: src/features/updates/update-dialog.tsx:141
+msgid "Fetching Lune Voice {version}. Keep the app open until it finishes."
+msgstr "Lune Voice {version} をダウンロードしています。完了するまでアプリを開いたままにしてください。"
+
+#: src/features/welcome/welcome-page.tsx:192
 msgid "Fetching the NVIDIA runtime. This is the last step, and it only happens once."
 msgstr "NVIDIA ランタイムを取得しています。これが最後のステッ���で、一度だけ行われます。"
 
@@ -701,7 +759,7 @@ msgstr "一般"
 
 #: src/components/feedback/help-feedback-dialog.tsx:62
 msgid "General feedback"
-msgstr ""
+msgstr "全般的なご意見"
 
 #: src/features/styles/components/style-editor-modal.tsx:181
 #: src/features/styles/components/style-editor-modal.tsx:215
@@ -730,7 +788,7 @@ msgstr "おはようございます。"
 
 #: src/features/settings/components/gpu-backend-card.tsx:66
 #: src/features/welcome/components/engine-step.tsx:123
-#: src/features/welcome/welcome-page.tsx:249
+#: src/features/welcome/welcome-page.tsx:263
 msgid "GPU acceleration"
 msgstr "GPU アクセラレーション"
 
@@ -739,9 +797,9 @@ msgid "GPU support is installed but not working."
 msgstr "GPU サポートはインストールされていますが、動作していません。"
 
 #: src/components/feedback/help-feedback-dialog.tsx:238
-#: src/features/shell/components/sidebar-quick-actions.tsx:84
+#: src/features/shell/components/sidebar-quick-actions.tsx:86
 msgid "Help & feedback"
-msgstr ""
+msgstr "ヘルプとフィードバック"
 
 #: src/features/overview/overview-page.tsx:358
 msgid "History isn't saved"
@@ -760,6 +818,10 @@ msgstr "履歴の保持"
 msgid "Hold the hotkey and speak, and your words land wherever your cursor is."
 msgstr "ホットキーを押しながら話すと、カーソルのある場所に文字が入力されます。"
 
+#: src/features/welcome/welcome-page.tsx:457
+msgid "Hold your hotkey, speak, then let go. The text is typed into whatever app you were using."
+msgstr "ホットキーを押したまま話し、離してください。テキストは使用中のアプリに入力されます。"
+
 #: src/features/settings/sections/general-section.tsx:87
 msgid "How long finished dictations are kept on this device."
 msgstr "完了したディクテーションをこのデバイスに保持する期間。"
@@ -771,6 +833,10 @@ msgstr "音声入力の通知音を再生する音量。"
 #: src/features/settings/sections/pill-section.tsx:196
 msgid "How the pill bar looks. Changes apply immediately."
 msgstr "インジケーターバーの見た目です。変更はすぐに反映されます。"
+
+#: src/features/welcome/welcome-page.tsx:454
+msgid "How to dictate"
+msgstr "音声入力の使い方"
 
 #: src/features/overview/overview-page.tsx:153
 msgid "Idle · mic ready"
@@ -788,6 +854,10 @@ msgstr "カーソル位置に挿入"
 msgid "Insert placeholder"
 msgstr "プレースホルダーを挿入"
 
+#: src/features/updates/update-dialog.tsx:228
+msgid "Install and restart"
+msgstr "インストールして再起動"
+
 #: src/features/settings/components/asr-engine-cards.tsx:228
 #: src/features/settings/sections/models-section.tsx:218
 #: src/features/welcome/components/model-card.tsx:89
@@ -796,9 +866,17 @@ msgstr "インストール済み"
 
 #: src/features/settings/components/gpu-backend-card.tsx:152
 #: src/features/welcome/components/engine-step.tsx:133
-#: src/features/welcome/welcome-page.tsx:254
+#: src/features/welcome/welcome-page.tsx:268
 msgid "Installed. Restart Lune Voice to start using your GPU."
 msgstr "インストールしました。GPU の使用を開始するには Lune Voice を再起動してください。"
+
+#: src/features/updates/update-dialog.tsx:132
+msgid "Installing replaces the app and restarts it. Your settings, history and models are untouched."
+msgstr "インストールするとアプリが置き換えられて再起動します。設定・履歴・モデルはそのまま残ります。"
+
+#: src/features/updates/update-dialog.tsx:100
+msgid "Installing update"
+msgstr "更新をインストール中"
 
 #: src/features/styles/components/style-editor-modal.tsx:114
 msgid "Instructions"
@@ -806,7 +884,7 @@ msgstr "指示"
 
 #: src/components/feedback/help-feedback-dialog.tsx:250
 msgid "Join the discussions"
-msgstr ""
+msgstr "ディスカッションに参加"
 
 #: src/features/settings/sections/output-section.tsx:55
 msgid "Keep the dictated text on the clipboard after every dictation, so you can paste it again yourself."
@@ -820,13 +898,14 @@ msgstr "バックグラウンドでマイクを開いたままにして、音声
 msgid "Keep the pill with you when you switch workspaces or virtual desktops."
 msgstr "ワークスペースや仮想デスクトップを切り替えてもインジケーターを表示し続けます。"
 
-#: src/features/settings/components/uinput-rule-row.tsx:59
+#: src/features/settings/components/uinput-rule-row.tsx:90
+#: src/features/welcome/components/ready-checks.tsx:107
 msgid "Keyboard access"
 msgstr "キーボードアクセス"
 
 #: src/features/shell/components/sidebar-quick-actions.tsx:67
 msgid "Keyboard shortcuts"
-msgstr ""
+msgstr "キーボードショートカット"
 
 #: src/features/styles/components/style-editor-modal.tsx:57
 msgid "Keyboard shortcuts (\"Super H\" → \"Super+H\")"
@@ -836,6 +915,10 @@ msgstr "キーボードショートカット（「Super H」→「Super+H」）"
 #: src/features/settings/sections/general-section.tsx:62
 msgid "Language"
 msgstr "言語"
+
+#: src/features/updates/update-dialog.tsx:224
+msgid "Later"
+msgstr "後で"
 
 #: src/features/settings/sections/general-section.tsx:73
 msgid "Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login."
@@ -851,7 +934,7 @@ msgstr "長さ"
 msgid "Light"
 msgstr "ライト"
 
-#: src/features/shell/components/app-shell.tsx:159
+#: src/features/shell/components/app-shell.tsx:165
 msgid "Listening"
 msgstr "リスニング"
 
@@ -873,13 +956,37 @@ msgstr "リスニング…"
 msgid "Lock position"
 msgstr "位置を固定"
 
+#: src/features/welcome/components/ready-checks.tsx:93
+msgid "Looking for input devices…"
+msgstr "入力デバイスを探しています…"
+
 #: src/components/ui/theme-picker.tsx:130
 msgid "Lune"
 msgstr "Lune"
 
-#: src/features/settings/components/uinput-rule-row.tsx:60
+#: src/features/updates/update-dialog.tsx:122
+msgid "Lune Voice {currentVersion} is the latest version."
+msgstr "Lune Voice {currentVersion} が最新バージョンです。"
+
+#: src/features/updates/update-dialog.tsx:129
+msgid "Lune Voice {version} is available. You have {currentVersion}."
+msgstr "Lune Voice {version} が利用できます。現在は {currentVersion} です。"
+
+#: src/features/settings/components/uinput-rule-row.tsx:93
 msgid "Lune Voice added a system rule so it can type into other apps. It also lets any other program you run send keystrokes. Removing it stops typed delivery from working until you allow it again."
 msgstr "Lune Voice は他のアプリに入力するためにシステムルールを追加しました。このルールは、実行中の他のプログラムにも���ー入力の送信を許可します。削除すると、再び許可するまでキー入力による貼り付けは機能しなくなります。"
+
+#: src/features/welcome/components/ready-checks.tsx:114
+msgid "Lune Voice can type into your other apps."
+msgstr "Lune Voice は他のアプリに入力できます。"
+
+#: src/features/settings/components/uinput-rule-row.tsx:94
+msgid "Lune Voice needs permission to type into other apps. Allowing it also lets any other program you run send keystrokes. Your system will ask for your password."
+msgstr "Lune Voice が他のアプリに入力するには権限が必要です。許可すると、実行中の他のプログラムもキー入力を送れるようになります。システムがパスワードを求めます。"
+
+#: src/features/welcome/components/ready-checks.tsx:115
+msgid "Lune Voice needs permission to type into other apps. Your system will ask for your password."
+msgstr "Lune Voice が他のアプリに入力するには権限が必要です。システムがパスワードを求めます。"
 
 #: src/features/dictionary/components/dictionary-form.tsx:92
 msgid "Lune Voice writes"
@@ -896,6 +1003,7 @@ msgstr "会議ヘッダー"
 #: src/features/settings/sections/dictation-section.tsx:104
 #: src/features/settings/sections/dictation-section.tsx:109
 #: src/features/settings/sections/dictation-section.tsx:115
+#: src/features/welcome/components/ready-checks.tsx:88
 msgid "Microphone"
 msgstr "マイク"
 
@@ -916,7 +1024,7 @@ msgstr "モード"
 msgid "Models"
 msgstr "モデル"
 
-#: src/features/welcome/welcome-page.tsx:410
+#: src/features/welcome/welcome-page.tsx:475
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "モデルはローカルに保存されます。テレメトリもアカウントもありません。"
 
@@ -947,6 +1055,10 @@ msgstr "次のページ"
 #: src/features/styles/components/style-preset-card.tsx:99
 msgid "No"
 msgstr "いいえ"
+
+#: src/features/welcome/components/ready-checks.tsx:101
+msgid "No microphone found. Plug one in, then pick it in Settings › Dictation."
+msgstr "マイクが見つかりません。接続してから 設定 › 音声入力 で選択してください。"
 
 #: src/features/settings/components/gpu-backend-card.tsx:161
 msgid "No NVIDIA driver was found. Install the driver for your GPU and the download will appear here."
@@ -1009,7 +1121,7 @@ msgid "Off delivers raw transcripts. Which style is applied is chosen on the Sty
 msgstr "オフでは生の文字起こしがそのまま出力されます。どのスタイルを適用するかは「スタイル」タブで選択します。"
 
 #: src/features/overview/overview-page.tsx:153
-#: src/features/shell/components/app-shell.tsx:162
+#: src/features/shell/components/app-shell.tsx:168
 msgid "Offline"
 msgstr "オフライン"
 
@@ -1017,7 +1129,7 @@ msgstr "オフライン"
 msgid "One-line summary shown on the card"
 msgstr "カードに表示される 1 行の概要"
 
-#: src/features/shell/components/app-shell.tsx:103
+#: src/features/shell/components/app-shell.tsx:109
 msgid "Open menu"
 msgstr "メニューを開く"
 
@@ -1031,7 +1143,7 @@ msgstr "オプション"
 
 #: src/components/feedback/help-feedback-dialog.tsx:67
 msgid "or send directly"
-msgstr ""
+msgstr "または直接送る"
 
 #: src/features/settings/sections/pill-section.tsx:214
 msgid "Orientation"
@@ -1045,7 +1157,7 @@ msgstr "出力"
 msgid "Overall footprint of the pill bar."
 msgstr "インジケーターバー全体の大きさ。"
 
-#: src/features/welcome/welcome-page.tsx:282
+#: src/features/welcome/welcome-page.tsx:296
 msgid "Overall progress"
 msgstr "全体の進捗"
 
@@ -1064,7 +1176,7 @@ msgstr "貼り付けが最も簡単です。一部のアプリでは、キース
 
 #: src/components/feedback/help-feedback-dialog.tsx:59
 msgid "Performance or speed"
-msgstr ""
+msgstr "パフォーマンスや速度"
 
 #: src/features/dictionary/components/dictionary-table.tsx:61
 #: src/features/dictionary/components/dictionary-table.tsx:257
@@ -1103,7 +1215,7 @@ msgstr "配置"
 msgid "Play a short sound when dictation starts, finishes, or runs into an error."
 msgstr "音声入力の開始時・完了時・エラー時に短い音を再生します。"
 
-#: src/features/welcome/welcome-page.tsx:340
+#: src/features/welcome/welcome-page.tsx:365
 msgid "Please keep the app open until downloads finish"
 msgstr "ダウンロードが完了するまでアプリを開いたままにしてください"
 
@@ -1127,6 +1239,10 @@ msgstr "押す"
 #: src/features/shell/components/sidebar-widgets.tsx:51
 msgid "Press to talk"
 msgstr "押して話す"
+
+#: src/features/welcome/welcome-page.tsx:458
+msgid "Press your hotkey, speak, then press it again. The text is typed into whatever app you were using."
+msgstr "ホットキーを押して話し、もう一度押してください。テキストは使用中のアプリに入力されます。"
 
 #: src/features/history/components/history-table.tsx:174
 msgid "Prev"
@@ -1156,7 +1272,7 @@ msgstr "優先度"
 
 #: src/features/dictation/dictation-pill.tsx:61
 #: src/features/dictation/dictation-pill.tsx:67
-#: src/features/shell/components/app-shell.tsx:157
+#: src/features/shell/components/app-shell.tsx:163
 msgid "Processing"
 msgstr "処理中"
 
@@ -1166,21 +1282,21 @@ msgstr "処理中…"
 
 #: src/components/feedback/help-feedback-dialog.tsx:61
 msgid "Question or help"
-msgstr ""
+msgstr "質問・ヘルプ"
 
-#: src/features/shell/components/sidebar-quick-actions.tsx:109
-#: src/features/shell/components/sidebar-quick-actions.tsx:110
-#: src/features/shell/components/sidebar-quick-actions.tsx:117
-#: src/features/shell/components/sidebar-quick-actions.tsx:133
+#: src/features/shell/components/sidebar-quick-actions.tsx:111
+#: src/features/shell/components/sidebar-quick-actions.tsx:112
+#: src/features/shell/components/sidebar-quick-actions.tsx:119
+#: src/features/shell/components/sidebar-quick-actions.tsx:135
 msgid "Quick actions"
-msgstr ""
+msgstr "クイック操作"
 
-#: src/features/shell/components/sidebar-quick-actions.tsx:90
+#: src/features/shell/components/sidebar-quick-actions.tsx:92
 msgid "Quit Lune Voice"
-msgstr ""
+msgstr "Lune Voice を終了"
 
 #: src/features/overview/overview-page.tsx:284
-#: src/features/shell/components/app-shell.tsx:161
+#: src/features/shell/components/app-shell.tsx:167
 msgid "Ready"
 msgstr "準備完了"
 
@@ -1198,7 +1314,7 @@ msgid "Refresh few-shot examples"
 msgstr "Few-shot サンプルを更新"
 
 #: src/components/feedback/confirm-dialog.tsx:33
-#: src/features/settings/components/uinput-rule-row.tsx:68
+#: src/features/settings/components/uinput-rule-row.tsx:104
 msgid "Remove"
 msgstr "削除"
 
@@ -1208,7 +1324,7 @@ msgstr "削除"
 msgid "Remove the saved correction for \"{0}\" → \"{1}\"."
 msgstr "保存された「{0}」→「{1}」の修正を削除します。"
 
-#: src/features/settings/components/uinput-rule-row.tsx:68
+#: src/features/settings/components/uinput-rule-row.tsx:104
 msgid "Removing…"
 msgstr "削除中…"
 
@@ -1222,7 +1338,7 @@ msgstr "置換"
 
 #: src/components/feedback/help-feedback-dialog.tsx:241
 msgid "Report a problem, suggest an idea, or just tell us how it's going."
-msgstr ""
+msgstr "問題の報告、アイデアの提案、使い心地の感想などをお寄せください。"
 
 #: src/features/welcome/components/model-card.tsx:83
 msgid "Required"
@@ -1244,7 +1360,7 @@ msgstr "再起動が必要"
 msgid "Retry"
 msgstr "再試行"
 
-#: src/features/welcome/welcome-page.tsx:351
+#: src/features/welcome/welcome-page.tsx:377
 msgid "Retry download"
 msgstr "ダウンロードを再試行"
 
@@ -1298,13 +1414,13 @@ msgstr "文字起こしを検索"
 msgid "Search transcripts…"
 msgstr "文字起こしを検索…"
 
-#: src/features/welcome/welcome-page.tsx:385
+#: src/features/welcome/welcome-page.tsx:411
 msgid "Select required models"
 msgstr "必要なモデルを選択"
 
 #: src/components/feedback/help-feedback-dialog.tsx:294
 msgid "Send"
-msgstr ""
+msgstr "送信"
 
 #: src/features/settings/sections/output-section.tsx:24
 #: src/features/settings/sections/output-section.tsx:30
@@ -1331,11 +1447,11 @@ msgstr "ホットキーを設定する"
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "話す言語を設定します。自動では音声からの検出を使用します。"
 
-#: src/features/welcome/welcome-page.tsx:378
+#: src/features/welcome/welcome-page.tsx:404
 msgid "Set up GPU acceleration"
 msgstr "GPU アクセラレーションを設定"
 
-#: src/features/welcome/welcome-page.tsx:177
+#: src/features/welcome/welcome-page.tsx:191
 msgid "Setting up your GPU"
 msgstr "GPU をセットアップしています"
 
@@ -1366,13 +1482,13 @@ msgstr "サイズ"
 msgid "Size & shape"
 msgstr "サイズと形状"
 
-#: src/features/welcome/welcome-page.tsx:326
-#: src/features/welcome/welcome-page.tsx:354
-#: src/features/welcome/welcome-page.tsx:398
+#: src/features/welcome/welcome-page.tsx:342
+#: src/features/welcome/welcome-page.tsx:380
+#: src/features/welcome/welcome-page.tsx:424
 msgid "Skip for now"
 msgstr "今はスキップ"
 
-#: src/features/shell/components/app-shell.tsx:96
+#: src/features/shell/components/app-shell.tsx:97
 msgid "Skip to main content"
 msgstr "メインコンテンツにスキップ"
 
@@ -1488,7 +1604,7 @@ msgstr "テキストの送信"
 
 #: src/components/feedback/help-feedback-dialog.tsx:113
 msgid "Thanks — your feedback was sent."
-msgstr ""
+msgstr "ありがとうございます。フィードバックを送信しました。"
 
 #: src/features/settings/sections/pill-section.tsx:70
 msgid "The floating status pill you see while dictating."
@@ -1518,17 +1634,21 @@ msgstr "認識エンジンが最も自信のない単語を、辞書と語彙と
 msgid "Theme"
 msgstr "テーマ"
 
-#: src/features/shell/components/sidebar-quick-actions.tsx:119
+#: src/features/shell/components/sidebar-quick-actions.tsx:121
 msgid "Theme, shortcuts, quit"
-msgstr ""
+msgstr "テーマ、ショートカット、終了"
 
 #: src/features/settings/sections/models-section.tsx:305
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "このモデルは現在の設定で使用中です。再インストールするか別のモデルを選択するまで、音声入力が機能しない場合があります。"
 
-#: src/features/welcome/welcome-page.tsx:175
+#: src/features/welcome/welcome-page.tsx:189
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "これは一度だけ起こります。その間、コンピュータを使い続けることができます。"
+
+#: src/features/updates/update-dialog.tsx:217
+msgid "This only takes a moment."
+msgstr "少しだけお待ちください。"
 
 #: src/features/history/components/history-table.tsx:381
 #: src/features/history/components/session-detail-modal.tsx:202
@@ -1588,7 +1708,7 @@ msgstr "文字起こし"
 
 #: src/components/feedback/help-feedback-dialog.tsx:58
 msgid "Transcription accuracy"
-msgstr ""
+msgstr "文字起こしの精度"
 
 #. placeholder {0}: status.devices.join(', ')
 #: src/features/settings/components/gpu-backend-card.tsx:144
@@ -1611,6 +1731,10 @@ msgstr "文字起こしは CPU で実行されます。このビルド向けの 
 msgid "Trigger phrase"
 msgstr "トリガーフレーズ"
 
+#: src/features/updates/update-dialog.tsx:245
+msgid "Try again"
+msgstr "再試行"
+
 #: src/features/snippets/snippets-page.tsx:163
 msgid "Type a phrase, or tap the mic to capture it exactly as Lune Voice hears it."
 msgstr "フレーズを入力するか、マイクをタッ���して Lune Voice が聞き取ったとおりに登録してください。"
@@ -1618,6 +1742,18 @@ msgstr "フレーズを入力するか、マイクをタッ���して Lune 
 #: src/features/snippets/snippets-page.tsx:215
 msgid "Types as"
 msgstr "入力される内容"
+
+#: src/features/updates/update-dialog.tsx:98
+msgid "Update available"
+msgstr "更新があります"
+
+#: src/features/updates/update-dialog.tsx:101
+msgid "Update check failed"
+msgstr "更新の確認に失敗しました"
+
+#: src/features/updates/update-dialog.tsx:102
+msgid "Update failed"
+msgstr "更新に失敗しました"
 
 #: src/features/settings/sections/general-section.tsx:121
 msgid "Updates"
@@ -1636,6 +1772,15 @@ msgstr "ハードウェアアクセラレーションを使用"
 #: src/features/styles/components/style-preset-card.tsx:46
 msgid "Use the {0} style"
 msgstr "{0} スタイルを使用する"
+
+#. placeholder {0}: micDevices[0]
+#: src/features/welcome/components/ready-checks.tsx:91
+#~ msgid "Using {0}. Change it in Settings › Dictation."
+#~ msgstr "{0} を使用中です。設定 › 音声入力 で変更できます。"
+
+#: src/features/welcome/components/ready-checks.tsx:98
+msgid "Using {activeDevice}. Change it in Settings › Dictation."
+msgstr "{activeDevice} を使用中です。設定 › 音声入力 で変更できます。"
 
 #: src/features/styles/components/style-hero.tsx:43
 #: src/features/styles/components/style-preset-card.tsx:108
@@ -1664,25 +1809,29 @@ msgstr "累計平均との比較"
 
 #: src/components/feedback/help-feedback-dialog.tsx:294
 msgid "Wait {cooldown}s"
-msgstr ""
+msgstr "あと {cooldown} 秒"
 
-#: src/features/welcome/welcome-page.tsx:186
+#: src/features/welcome/welcome-page.tsx:200
 msgid "Welcome back"
 msgstr "おかえり"
 
-#: src/features/welcome/welcome-page.tsx:168
-#: src/features/welcome/welcome-page.tsx:183
-#: src/features/welcome/welcome-page.tsx:189
+#: src/features/welcome/welcome-page.tsx:182
+#: src/features/welcome/welcome-page.tsx:197
+#: src/features/welcome/welcome-page.tsx:203
 msgid "Welcome to Lune Voice"
 msgstr "Lune Voice へようこそ"
 
 #: src/components/feedback/help-feedback-dialog.tsx:91
 msgid "What happened, or what would you like to see?"
-msgstr ""
+msgstr "何が起きましたか。あるいは、どんな機能が欲しいですか。"
 
 #: src/components/feedback/help-feedback-dialog.tsx:70
 msgid "What is this about?"
-msgstr ""
+msgstr "内容の種類"
+
+#: src/features/updates/update-dialog.tsx:198
+msgid "What's new"
+msgstr "変更点"
 
 #: src/features/settings/sections/transcription-section.tsx:76
 msgid "When available, this can make transcription finish faster."
@@ -1747,9 +1896,13 @@ msgstr "現在のバージョンは {version} です。"
 msgid "You say"
 msgstr "話す内容"
 
-#: src/features/welcome/welcome-page.tsx:171
+#: src/features/welcome/welcome-page.tsx:185
 msgid "You're all set"
 msgstr "準備は完了です"
+
+#: src/features/updates/update-dialog.tsx:97
+msgid "You're up to date"
+msgstr "最新の状態です"
 
 #: src/features/settings/components/openai-fields.tsx:48
 msgid "Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none."
@@ -1757,7 +1910,7 @@ msgstr "API キーです。保存済みのキーをそのまま使う場合、�
 
 #: src/components/feedback/help-feedback-dialog.tsx:90
 msgid "Your feedback"
-msgstr ""
+msgstr "ご意見"
 
 #: src/features/welcome/components/engine-step.tsx:131
 msgid "Your GPU is ready — use it for faster transcription."
@@ -1772,10 +1925,14 @@ msgstr "お使いの GPU は条件を満たしています。セットアップ�
 msgid "your hotkey"
 msgstr "あなたのホットキー"
 
-#: src/features/welcome/welcome-page.tsx:172
+#: src/features/welcome/welcome-page.tsx:186
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "モデルの準備ができました。すべてがこのマシン上に残ります。"
 
 #: src/features/styles/styles-page.tsx:302
 msgid "Your own formatting preset"
 msgstr "独自の書式設定プリセット"
+
+#: src/features/welcome/components/ready-checks.tsx:77
+msgid "your system default mic"
+msgstr "システムの既定のマイク"

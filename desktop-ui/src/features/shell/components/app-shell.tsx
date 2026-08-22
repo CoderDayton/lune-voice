@@ -6,6 +6,7 @@ import { useEffect, useEffectEvent, useRef } from 'react';
 import { ErrorToast } from '../../../components/feedback';
 import type { SessionStreamEvent } from '../../../lib/backend/types';
 import { workspaceActions, workspaceStore } from '../../../store/workspace-store';
+import { UpdateDialog } from '../../updates/update-dialog';
 import { useFirstRunGate } from '../../welcome/use-model-setup';
 import { WelcomeLayout } from '../../welcome/welcome-layout';
 import { WelcomePage } from '../../welcome/welcome-page';
@@ -97,6 +98,11 @@ export function AppShell() {
         </a>
         <div className="app-shell-backdrop" />
         <ErrorToast />
+        {/* Mounted once, at the shell, so the tray item, the Settings button
+            and the sidebar quick action all report into the same modal — and
+            so an update found while the window was closed is still waiting
+            here when it opens. */}
+        <UpdateDialog />
 
         {/* Mobile topbar */}
         <div className="flex items-center gap-2 px-3 py-2 lg:hidden border-b border-surface-border bg-surface-glass backdrop-blur-sm">

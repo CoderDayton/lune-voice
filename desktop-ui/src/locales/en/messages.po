@@ -13,6 +13,10 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#: src/features/welcome/welcome-page.tsx:462
+msgid "— change it any time in Settings › Dictation."
+msgstr "— change it any time in Settings › Dictation."
+
 #. placeholder {0}: snippet.triggerPhrase
 #: src/features/snippets/snippets-page.tsx:292
 msgid "“{0}” will stop expanding. The template text is not recoverable."
@@ -92,6 +96,11 @@ msgstr "A vertical pill hugs the side of the screen."
 msgid "Acceleration"
 msgstr "Acceleration"
 
+#: src/features/settings/components/uinput-rule-row.tsx:64
+#: src/features/welcome/components/ready-checks.tsx:57
+msgid "Access still isn't available. A reboot may be needed for it to take effect."
+msgstr "Access still isn't available. A reboot may be needed for it to take effect."
+
 #: src/features/dictionary/components/dictionary-table.tsx:266
 msgid "Action"
 msgstr "Action"
@@ -131,13 +140,18 @@ msgstr "Add snippet"
 msgid "AI models stored on your device."
 msgstr "AI models stored on your device."
 
-#: src/features/welcome/welcome-page.tsx:187
+#: src/features/welcome/welcome-page.tsx:201
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "All required models are already installed. Continue when you're ready."
 
 #: src/features/overview/overview-page.tsx:98
 msgid "all-time · today"
 msgstr "all-time · today"
+
+#: src/features/settings/components/uinput-rule-row.tsx:113
+#: src/features/welcome/components/ready-checks.tsx:125
+msgid "Allow"
+msgstr "Allow"
 
 #: src/features/settings/components/openai-fields.tsx:35
 msgid "API endpoint"
@@ -155,6 +169,19 @@ msgstr "Appearance"
 #: src/features/settings/sections/general-section.tsx:53
 msgid "Application behavior and startup preferences."
 msgstr "Application behavior and startup preferences."
+
+#: src/features/updates/update-dialog.tsx:151
+msgid "Applying Lune Voice {version}. Your system may ask for your password, and the app will restart on its own."
+msgstr "Applying Lune Voice {version}. Your system may ask for your password, and the app will restart on its own."
+
+#: src/features/updates/update-dialog.tsx:116
+msgid "Asking the release server whether anything newer than {currentVersion} exists."
+msgstr "Asking the release server whether anything newer than {currentVersion} exists."
+
+#: src/features/settings/components/uinput-rule-row.tsx:113
+#: src/features/welcome/components/ready-checks.tsx:125
+msgid "Asking…"
+msgstr "Asking…"
 
 #: src/components/feedback/help-feedback-dialog.tsx:98
 msgid "At least {MIN_MESSAGE_CHARS} characters."
@@ -179,6 +206,10 @@ msgstr "Auto-capitalize sentences"
 #: src/features/settings/sections/pill-section.tsx:51
 msgid "Automatic"
 msgstr "Automatic"
+
+#: src/features/welcome/components/ready-checks.tsx:83
+msgid "Before you start"
+msgstr "Before you start"
 
 #: src/features/styles/components/style-editor-modal.tsx:60
 msgid "Brand casing (\"github\" → \"GitHub\")"
@@ -216,6 +247,10 @@ msgstr "Cancel"
 msgid "Cancel current recording"
 msgstr "Cancel current recording"
 
+#: src/features/welcome/welcome-page.tsx:361
+msgid "Cancel download"
+msgstr "Cancel download"
+
 #: src/features/snippets/snippets-page.tsx:133
 msgid "Cancel edit"
 msgstr "Cancel edit"
@@ -233,7 +268,7 @@ msgstr "Capture by voice"
 msgid "Capture device and how recording detects when you speak."
 msgstr "Capture device and how recording detects when you speak."
 
-#: src/features/welcome/welcome-page.tsx:395
+#: src/features/welcome/welcome-page.tsx:421
 msgid "Change engine"
 msgstr "Change engine"
 
@@ -255,16 +290,21 @@ msgstr "Check for updates on launch"
 msgid "Check whether a newer version has been released."
 msgstr "Check whether a newer version has been released."
 
-#: src/features/welcome/welcome-page.tsx:181
+#: src/features/welcome/welcome-page.tsx:195
 msgid "Check your network and we'll pick up where we left off."
 msgstr "Check your network and we'll pick up where we left off."
 
-#: src/features/welcome/welcome-page.tsx:70
+#: src/features/updates/update-dialog.tsx:96
+msgid "Checking for updates"
+msgstr "Checking for updates"
+
+#: src/features/welcome/welcome-page.tsx:76
 msgid "Checking installed models…"
 msgstr "Checking installed models…"
 
 #: src/features/settings/components/asr-engine-cards.tsx:224
 #: src/features/settings/sections/general-section.tsx:134
+#: src/features/welcome/components/ready-checks.tsx:112
 msgid "Checking…"
 msgstr "Checking…"
 
@@ -284,8 +324,8 @@ msgstr "Choose how Lune Voice looks."
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
 msgstr "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
 
-#: src/features/welcome/welcome-page.tsx:184
-#: src/features/welcome/welcome-page.tsx:190
+#: src/features/welcome/welcome-page.tsx:198
+#: src/features/welcome/welcome-page.tsx:204
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 
@@ -293,7 +333,7 @@ msgstr "Choose the AI models to install. Everything runs offline — no cloud, n
 msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
 msgstr "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
 
-#: src/features/welcome/welcome-page.tsx:169
+#: src/features/welcome/welcome-page.tsx:183
 msgid "Choose your speech engine. Everything runs offline — no cloud, no accounts."
 msgstr "Choose your speech engine. Everything runs offline — no cloud, no accounts."
 
@@ -313,10 +353,12 @@ msgstr "close"
 #: src/features/history/components/session-detail-modal.tsx:210
 #: src/features/settings/sections/models-section.tsx:322
 #: src/features/styles/components/style-editor-modal.tsx:197
+#: src/features/updates/update-dialog.tsx:241
+#: src/features/updates/update-dialog.tsx:253
 msgid "Close"
 msgstr "Close"
 
-#: src/features/shell/components/app-shell.tsx:135
+#: src/features/shell/components/app-shell.tsx:141
 msgid "Close sidebar"
 msgstr "Close sidebar"
 
@@ -329,7 +371,7 @@ msgid "Completed"
 msgstr "Completed"
 
 #: src/features/overview/overview-page.tsx:284
-#: src/features/shell/components/app-shell.tsx:155
+#: src/features/shell/components/app-shell.tsx:161
 #: src/features/shell/components/sidebar-widgets.tsx:41
 msgid "Connecting"
 msgstr "Connecting"
@@ -338,8 +380,8 @@ msgstr "Connecting"
 msgid "Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network."
 msgstr "Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network."
 
-#: src/features/welcome/welcome-page.tsx:322
-#: src/features/welcome/welcome-page.tsx:389
+#: src/features/welcome/welcome-page.tsx:338
+#: src/features/welcome/welcome-page.tsx:415
 msgid "Continue"
 msgstr "Continue"
 
@@ -381,13 +423,17 @@ msgstr "Correction"
 msgid "Correction sensitivity"
 msgstr "Correction sensitivity"
 
-#: src/features/welcome/welcome-page.tsx:255
+#: src/features/welcome/welcome-page.tsx:269
 msgid "Could not download GPU support — transcription will run on the CPU. You can retry under Settings › Models."
 msgstr "Could not download GPU support — transcription will run on the CPU. You can retry under Settings › Models."
 
 #: src/features/dictionary/components/dictionary-form.tsx:43
 msgid "Couldn't add that rule. Try again."
 msgstr "Couldn't add that rule. Try again."
+
+#: src/features/welcome/components/ready-checks.tsx:100
+msgid "Couldn't check your input devices."
+msgstr "Couldn't check your input devices."
 
 #: src/components/feedback/help-feedback-dialog.tsx:193
 msgid "Couldn't open your browser. Visit {url} directly."
@@ -417,6 +463,10 @@ msgstr "Create new style"
 #: src/features/styles/components/style-editor-modal.tsx:81
 msgid "Create style"
 msgstr "Create style"
+
+#: src/features/welcome/welcome-page.tsx:461
+msgid "Ctrl+Space"
+msgstr "Ctrl+Space"
 
 #: src/features/settings/sections/output-section.tsx:95
 #: src/features/settings/sections/output-section.tsx:107
@@ -536,19 +586,19 @@ msgstr "Download"
 msgid "Download {0}"
 msgstr "Download {0}"
 
-#: src/features/welcome/welcome-page.tsx:381
+#: src/features/welcome/welcome-page.tsx:407
 msgid "Download {pendingCount} models"
 msgstr "Download {pendingCount} models"
 
-#: src/features/welcome/welcome-page.tsx:380
+#: src/features/welcome/welcome-page.tsx:406
 msgid "Download 1 model"
 msgstr "Download 1 model"
 
-#: src/features/welcome/welcome-page.tsx:132
+#: src/features/welcome/welcome-page.tsx:145
 msgid "Download failed"
 msgstr "Download failed"
 
-#: src/features/welcome/welcome-page.tsx:180
+#: src/features/welcome/welcome-page.tsx:194
 msgid "Download interrupted"
 msgstr "Download interrupted"
 
@@ -563,18 +613,22 @@ msgstr "Download progress"
 msgid "Download transcript"
 msgstr "Download transcript"
 
-#: src/features/welcome/welcome-page.tsx:174
+#: src/features/welcome/welcome-page.tsx:188
 msgid "Downloading models"
 msgstr "Downloading models"
 
-#: src/features/welcome/welcome-page.tsx:252
+#: src/features/welcome/welcome-page.tsx:266
 msgid "Downloading NVIDIA's CUDA runtime."
 msgstr "Downloading NVIDIA's CUDA runtime."
+
+#: src/features/updates/update-dialog.tsx:99
+msgid "Downloading update"
+msgstr "Downloading update"
 
 #: src/features/settings/components/asr-engine-cards.tsx:152
 #: src/features/settings/components/gpu-backend-card.tsx:112
 #: src/features/settings/sections/models-section.tsx:272
-#: src/features/welcome/welcome-page.tsx:337
+#: src/features/welcome/welcome-page.tsx:353
 msgid "Downloading…"
 msgstr "Downloading…"
 
@@ -633,7 +687,7 @@ msgstr "Enable styling"
 msgid "Engine"
 msgstr "Engine"
 
-#: src/features/welcome/welcome-page.tsx:363
+#: src/features/welcome/welcome-page.tsx:389
 msgid "Enter Lune Voice"
 msgstr "Enter Lune Voice"
 
@@ -653,7 +707,11 @@ msgstr "Expand sidebar"
 msgid "Feature request"
 msgstr "Feature request"
 
-#: src/features/welcome/welcome-page.tsx:178
+#: src/features/updates/update-dialog.tsx:141
+msgid "Fetching Lune Voice {version}. Keep the app open until it finishes."
+msgstr "Fetching Lune Voice {version}. Keep the app open until it finishes."
+
+#: src/features/welcome/welcome-page.tsx:192
 msgid "Fetching the NVIDIA runtime. This is the last step, and it only happens once."
 msgstr "Fetching the NVIDIA runtime. This is the last step, and it only happens once."
 
@@ -730,7 +788,7 @@ msgstr "Good morning."
 
 #: src/features/settings/components/gpu-backend-card.tsx:66
 #: src/features/welcome/components/engine-step.tsx:123
-#: src/features/welcome/welcome-page.tsx:249
+#: src/features/welcome/welcome-page.tsx:263
 msgid "GPU acceleration"
 msgstr "GPU acceleration"
 
@@ -739,7 +797,7 @@ msgid "GPU support is installed but not working."
 msgstr "GPU support is installed but not working."
 
 #: src/components/feedback/help-feedback-dialog.tsx:238
-#: src/features/shell/components/sidebar-quick-actions.tsx:84
+#: src/features/shell/components/sidebar-quick-actions.tsx:86
 msgid "Help & feedback"
 msgstr "Help & feedback"
 
@@ -760,6 +818,10 @@ msgstr "History retention"
 msgid "Hold the hotkey and speak, and your words land wherever your cursor is."
 msgstr "Hold the hotkey and speak, and your words land wherever your cursor is."
 
+#: src/features/welcome/welcome-page.tsx:457
+msgid "Hold your hotkey, speak, then let go. The text is typed into whatever app you were using."
+msgstr "Hold your hotkey, speak, then let go. The text is typed into whatever app you were using."
+
 #: src/features/settings/sections/general-section.tsx:87
 msgid "How long finished dictations are kept on this device."
 msgstr "How long finished dictations are kept on this device."
@@ -771,6 +833,10 @@ msgstr "How loud the dictation sounds play."
 #: src/features/settings/sections/pill-section.tsx:196
 msgid "How the pill bar looks. Changes apply immediately."
 msgstr "How the pill bar looks. Changes apply immediately."
+
+#: src/features/welcome/welcome-page.tsx:454
+msgid "How to dictate"
+msgstr "How to dictate"
 
 #: src/features/overview/overview-page.tsx:153
 msgid "Idle · mic ready"
@@ -788,6 +854,10 @@ msgstr "Insert at cursor"
 msgid "Insert placeholder"
 msgstr "Insert placeholder"
 
+#: src/features/updates/update-dialog.tsx:228
+msgid "Install and restart"
+msgstr "Install and restart"
+
 #: src/features/settings/components/asr-engine-cards.tsx:228
 #: src/features/settings/sections/models-section.tsx:218
 #: src/features/welcome/components/model-card.tsx:89
@@ -796,9 +866,17 @@ msgstr "Installed"
 
 #: src/features/settings/components/gpu-backend-card.tsx:152
 #: src/features/welcome/components/engine-step.tsx:133
-#: src/features/welcome/welcome-page.tsx:254
+#: src/features/welcome/welcome-page.tsx:268
 msgid "Installed. Restart Lune Voice to start using your GPU."
 msgstr "Installed. Restart Lune Voice to start using your GPU."
+
+#: src/features/updates/update-dialog.tsx:132
+msgid "Installing replaces the app and restarts it. Your settings, history and models are untouched."
+msgstr "Installing replaces the app and restarts it. Your settings, history and models are untouched."
+
+#: src/features/updates/update-dialog.tsx:100
+msgid "Installing update"
+msgstr "Installing update"
 
 #: src/features/styles/components/style-editor-modal.tsx:114
 msgid "Instructions"
@@ -820,7 +898,8 @@ msgstr "Keep the mic open in the background so dictation starts ~70ms sooner. Th
 msgid "Keep the pill with you when you switch workspaces or virtual desktops."
 msgstr "Keep the pill with you when you switch workspaces or virtual desktops."
 
-#: src/features/settings/components/uinput-rule-row.tsx:59
+#: src/features/settings/components/uinput-rule-row.tsx:90
+#: src/features/welcome/components/ready-checks.tsx:107
 msgid "Keyboard access"
 msgstr "Keyboard access"
 
@@ -837,6 +916,10 @@ msgstr "Keyboard shortcuts (\"Super H\" → \"Super+H\")"
 msgid "Language"
 msgstr "Language"
 
+#: src/features/updates/update-dialog.tsx:224
+msgid "Later"
+msgstr "Later"
+
 #: src/features/settings/sections/general-section.tsx:73
 msgid "Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login."
 msgstr "Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login."
@@ -851,7 +934,7 @@ msgstr "Length"
 msgid "Light"
 msgstr "Light"
 
-#: src/features/shell/components/app-shell.tsx:159
+#: src/features/shell/components/app-shell.tsx:165
 msgid "Listening"
 msgstr "Listening"
 
@@ -873,13 +956,37 @@ msgstr "Listening…"
 msgid "Lock position"
 msgstr "Lock position"
 
+#: src/features/welcome/components/ready-checks.tsx:93
+msgid "Looking for input devices…"
+msgstr "Looking for input devices…"
+
 #: src/components/ui/theme-picker.tsx:130
 msgid "Lune"
 msgstr "Lune"
 
-#: src/features/settings/components/uinput-rule-row.tsx:60
+#: src/features/updates/update-dialog.tsx:122
+msgid "Lune Voice {currentVersion} is the latest version."
+msgstr "Lune Voice {currentVersion} is the latest version."
+
+#: src/features/updates/update-dialog.tsx:129
+msgid "Lune Voice {version} is available. You have {currentVersion}."
+msgstr "Lune Voice {version} is available. You have {currentVersion}."
+
+#: src/features/settings/components/uinput-rule-row.tsx:93
 msgid "Lune Voice added a system rule so it can type into other apps. It also lets any other program you run send keystrokes. Removing it stops typed delivery from working until you allow it again."
 msgstr "Lune Voice added a system rule so it can type into other apps. It also lets any other program you run send keystrokes. Removing it stops typed delivery from working until you allow it again."
+
+#: src/features/welcome/components/ready-checks.tsx:114
+msgid "Lune Voice can type into your other apps."
+msgstr "Lune Voice can type into your other apps."
+
+#: src/features/settings/components/uinput-rule-row.tsx:94
+msgid "Lune Voice needs permission to type into other apps. Allowing it also lets any other program you run send keystrokes. Your system will ask for your password."
+msgstr "Lune Voice needs permission to type into other apps. Allowing it also lets any other program you run send keystrokes. Your system will ask for your password."
+
+#: src/features/welcome/components/ready-checks.tsx:115
+msgid "Lune Voice needs permission to type into other apps. Your system will ask for your password."
+msgstr "Lune Voice needs permission to type into other apps. Your system will ask for your password."
 
 #: src/features/dictionary/components/dictionary-form.tsx:92
 msgid "Lune Voice writes"
@@ -896,6 +1003,7 @@ msgstr "meeting header"
 #: src/features/settings/sections/dictation-section.tsx:104
 #: src/features/settings/sections/dictation-section.tsx:109
 #: src/features/settings/sections/dictation-section.tsx:115
+#: src/features/welcome/components/ready-checks.tsx:88
 msgid "Microphone"
 msgstr "Microphone"
 
@@ -916,7 +1024,7 @@ msgstr "Mode"
 msgid "Models"
 msgstr "Models"
 
-#: src/features/welcome/welcome-page.tsx:410
+#: src/features/welcome/welcome-page.tsx:475
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "Models are stored locally. No telemetry, no accounts."
 
@@ -947,6 +1055,10 @@ msgstr "Next page"
 #: src/features/styles/components/style-preset-card.tsx:99
 msgid "No"
 msgstr "No"
+
+#: src/features/welcome/components/ready-checks.tsx:101
+msgid "No microphone found. Plug one in, then pick it in Settings › Dictation."
+msgstr "No microphone found. Plug one in, then pick it in Settings › Dictation."
 
 #: src/features/settings/components/gpu-backend-card.tsx:161
 msgid "No NVIDIA driver was found. Install the driver for your GPU and the download will appear here."
@@ -1009,7 +1121,7 @@ msgid "Off delivers raw transcripts. Which style is applied is chosen on the Sty
 msgstr "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 
 #: src/features/overview/overview-page.tsx:153
-#: src/features/shell/components/app-shell.tsx:162
+#: src/features/shell/components/app-shell.tsx:168
 msgid "Offline"
 msgstr "Offline"
 
@@ -1017,7 +1129,7 @@ msgstr "Offline"
 msgid "One-line summary shown on the card"
 msgstr "One-line summary shown on the card"
 
-#: src/features/shell/components/app-shell.tsx:103
+#: src/features/shell/components/app-shell.tsx:109
 msgid "Open menu"
 msgstr "Open menu"
 
@@ -1045,7 +1157,7 @@ msgstr "Output"
 msgid "Overall footprint of the pill bar."
 msgstr "Overall footprint of the pill bar."
 
-#: src/features/welcome/welcome-page.tsx:282
+#: src/features/welcome/welcome-page.tsx:296
 msgid "Overall progress"
 msgstr "Overall progress"
 
@@ -1103,7 +1215,7 @@ msgstr "Placement"
 msgid "Play a short sound when dictation starts, finishes, or runs into an error."
 msgstr "Play a short sound when dictation starts, finishes, or runs into an error."
 
-#: src/features/welcome/welcome-page.tsx:340
+#: src/features/welcome/welcome-page.tsx:365
 msgid "Please keep the app open until downloads finish"
 msgstr "Please keep the app open until downloads finish"
 
@@ -1127,6 +1239,10 @@ msgstr "Press"
 #: src/features/shell/components/sidebar-widgets.tsx:51
 msgid "Press to talk"
 msgstr "Press to talk"
+
+#: src/features/welcome/welcome-page.tsx:458
+msgid "Press your hotkey, speak, then press it again. The text is typed into whatever app you were using."
+msgstr "Press your hotkey, speak, then press it again. The text is typed into whatever app you were using."
 
 #: src/features/history/components/history-table.tsx:174
 msgid "Prev"
@@ -1156,7 +1272,7 @@ msgstr "Priority"
 
 #: src/features/dictation/dictation-pill.tsx:61
 #: src/features/dictation/dictation-pill.tsx:67
-#: src/features/shell/components/app-shell.tsx:157
+#: src/features/shell/components/app-shell.tsx:163
 msgid "Processing"
 msgstr "Processing"
 
@@ -1168,19 +1284,19 @@ msgstr "Processing…"
 msgid "Question or help"
 msgstr "Question or help"
 
-#: src/features/shell/components/sidebar-quick-actions.tsx:109
-#: src/features/shell/components/sidebar-quick-actions.tsx:110
-#: src/features/shell/components/sidebar-quick-actions.tsx:117
-#: src/features/shell/components/sidebar-quick-actions.tsx:133
+#: src/features/shell/components/sidebar-quick-actions.tsx:111
+#: src/features/shell/components/sidebar-quick-actions.tsx:112
+#: src/features/shell/components/sidebar-quick-actions.tsx:119
+#: src/features/shell/components/sidebar-quick-actions.tsx:135
 msgid "Quick actions"
 msgstr "Quick actions"
 
-#: src/features/shell/components/sidebar-quick-actions.tsx:90
+#: src/features/shell/components/sidebar-quick-actions.tsx:92
 msgid "Quit Lune Voice"
 msgstr "Quit Lune Voice"
 
 #: src/features/overview/overview-page.tsx:284
-#: src/features/shell/components/app-shell.tsx:161
+#: src/features/shell/components/app-shell.tsx:167
 msgid "Ready"
 msgstr "Ready"
 
@@ -1198,7 +1314,7 @@ msgid "Refresh few-shot examples"
 msgstr "Refresh few-shot examples"
 
 #: src/components/feedback/confirm-dialog.tsx:33
-#: src/features/settings/components/uinput-rule-row.tsx:68
+#: src/features/settings/components/uinput-rule-row.tsx:104
 msgid "Remove"
 msgstr "Remove"
 
@@ -1208,7 +1324,7 @@ msgstr "Remove"
 msgid "Remove the saved correction for \"{0}\" → \"{1}\"."
 msgstr "Remove the saved correction for \"{0}\" → \"{1}\"."
 
-#: src/features/settings/components/uinput-rule-row.tsx:68
+#: src/features/settings/components/uinput-rule-row.tsx:104
 msgid "Removing…"
 msgstr "Removing…"
 
@@ -1244,7 +1360,7 @@ msgstr "Restart needed"
 msgid "Retry"
 msgstr "Retry"
 
-#: src/features/welcome/welcome-page.tsx:351
+#: src/features/welcome/welcome-page.tsx:377
 msgid "Retry download"
 msgstr "Retry download"
 
@@ -1298,7 +1414,7 @@ msgstr "Search transcripts"
 msgid "Search transcripts…"
 msgstr "Search transcripts…"
 
-#: src/features/welcome/welcome-page.tsx:385
+#: src/features/welcome/welcome-page.tsx:411
 msgid "Select required models"
 msgstr "Select required models"
 
@@ -1331,11 +1447,11 @@ msgstr "Set hotkey"
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "Set the language you speak. Auto uses detection from speech."
 
-#: src/features/welcome/welcome-page.tsx:378
+#: src/features/welcome/welcome-page.tsx:404
 msgid "Set up GPU acceleration"
 msgstr "Set up GPU acceleration"
 
-#: src/features/welcome/welcome-page.tsx:177
+#: src/features/welcome/welcome-page.tsx:191
 msgid "Setting up your GPU"
 msgstr "Setting up your GPU"
 
@@ -1366,13 +1482,13 @@ msgstr "Size"
 msgid "Size & shape"
 msgstr "Size & shape"
 
-#: src/features/welcome/welcome-page.tsx:326
-#: src/features/welcome/welcome-page.tsx:354
-#: src/features/welcome/welcome-page.tsx:398
+#: src/features/welcome/welcome-page.tsx:342
+#: src/features/welcome/welcome-page.tsx:380
+#: src/features/welcome/welcome-page.tsx:424
 msgid "Skip for now"
 msgstr "Skip for now"
 
-#: src/features/shell/components/app-shell.tsx:96
+#: src/features/shell/components/app-shell.tsx:97
 msgid "Skip to main content"
 msgstr "Skip to main content"
 
@@ -1518,7 +1634,7 @@ msgstr "The words the recognizer is least sure about are checked against your di
 msgid "Theme"
 msgstr "Theme"
 
-#: src/features/shell/components/sidebar-quick-actions.tsx:119
+#: src/features/shell/components/sidebar-quick-actions.tsx:121
 msgid "Theme, shortcuts, quit"
 msgstr "Theme, shortcuts, quit"
 
@@ -1526,9 +1642,13 @@ msgstr "Theme, shortcuts, quit"
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 
-#: src/features/welcome/welcome-page.tsx:175
+#: src/features/welcome/welcome-page.tsx:189
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "This only happens once. You can keep using your computer in the meantime."
+
+#: src/features/updates/update-dialog.tsx:217
+msgid "This only takes a moment."
+msgstr "This only takes a moment."
 
 #: src/features/history/components/history-table.tsx:381
 #: src/features/history/components/session-detail-modal.tsx:202
@@ -1611,6 +1731,10 @@ msgstr "Transcription runs on the CPU. No GPU download has been published for th
 msgid "Trigger phrase"
 msgstr "Trigger phrase"
 
+#: src/features/updates/update-dialog.tsx:245
+msgid "Try again"
+msgstr "Try again"
+
 #: src/features/snippets/snippets-page.tsx:163
 msgid "Type a phrase, or tap the mic to capture it exactly as Lune Voice hears it."
 msgstr "Type a phrase, or tap the mic to capture it exactly as Lune Voice hears it."
@@ -1618,6 +1742,18 @@ msgstr "Type a phrase, or tap the mic to capture it exactly as Lune Voice hears 
 #: src/features/snippets/snippets-page.tsx:215
 msgid "Types as"
 msgstr "Types as"
+
+#: src/features/updates/update-dialog.tsx:98
+msgid "Update available"
+msgstr "Update available"
+
+#: src/features/updates/update-dialog.tsx:101
+msgid "Update check failed"
+msgstr "Update check failed"
+
+#: src/features/updates/update-dialog.tsx:102
+msgid "Update failed"
+msgstr "Update failed"
 
 #: src/features/settings/sections/general-section.tsx:121
 msgid "Updates"
@@ -1636,6 +1772,15 @@ msgstr "Use hardware acceleration"
 #: src/features/styles/components/style-preset-card.tsx:46
 msgid "Use the {0} style"
 msgstr "Use the {0} style"
+
+#. placeholder {0}: micDevices[0]
+#: src/features/welcome/components/ready-checks.tsx:91
+#~ msgid "Using {0}. Change it in Settings › Dictation."
+#~ msgstr "Using {0}. Change it in Settings › Dictation."
+
+#: src/features/welcome/components/ready-checks.tsx:98
+msgid "Using {activeDevice}. Change it in Settings › Dictation."
+msgstr "Using {activeDevice}. Change it in Settings › Dictation."
 
 #: src/features/styles/components/style-hero.tsx:43
 #: src/features/styles/components/style-preset-card.tsx:108
@@ -1666,13 +1811,13 @@ msgstr "vs all-time avg"
 msgid "Wait {cooldown}s"
 msgstr "Wait {cooldown}s"
 
-#: src/features/welcome/welcome-page.tsx:186
+#: src/features/welcome/welcome-page.tsx:200
 msgid "Welcome back"
 msgstr "Welcome back"
 
-#: src/features/welcome/welcome-page.tsx:168
-#: src/features/welcome/welcome-page.tsx:183
-#: src/features/welcome/welcome-page.tsx:189
+#: src/features/welcome/welcome-page.tsx:182
+#: src/features/welcome/welcome-page.tsx:197
+#: src/features/welcome/welcome-page.tsx:203
 msgid "Welcome to Lune Voice"
 msgstr "Welcome to Lune Voice"
 
@@ -1683,6 +1828,10 @@ msgstr "What happened, or what would you like to see?"
 #: src/components/feedback/help-feedback-dialog.tsx:70
 msgid "What is this about?"
 msgstr "What is this about?"
+
+#: src/features/updates/update-dialog.tsx:198
+msgid "What's new"
+msgstr "What's new"
 
 #: src/features/settings/sections/transcription-section.tsx:76
 msgid "When available, this can make transcription finish faster."
@@ -1747,9 +1896,13 @@ msgstr "You are running version {version}."
 msgid "You say"
 msgstr "You say"
 
-#: src/features/welcome/welcome-page.tsx:171
+#: src/features/welcome/welcome-page.tsx:185
 msgid "You're all set"
 msgstr "You're all set"
+
+#: src/features/updates/update-dialog.tsx:97
+msgid "You're up to date"
+msgstr "You're up to date"
 
 #: src/features/settings/components/openai-fields.tsx:48
 msgid "Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none."
@@ -1772,10 +1925,14 @@ msgstr "Your GPU qualifies. Setup will download the {0} NVIDIA runtime, then a r
 msgid "your hotkey"
 msgstr "your hotkey"
 
-#: src/features/welcome/welcome-page.tsx:172
+#: src/features/welcome/welcome-page.tsx:186
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "Your models are ready. Everything stays on this machine."
 
 #: src/features/styles/styles-page.tsx:302
 msgid "Your own formatting preset"
 msgstr "Your own formatting preset"
+
+#: src/features/welcome/components/ready-checks.tsx:77
+msgid "your system default mic"
+msgstr "your system default mic"

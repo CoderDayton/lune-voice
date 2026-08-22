@@ -13,6 +13,7 @@ import type {
   MonitorInfoDto,
   PillSnapshotDto,
   SaveWorkspaceSettingsInput,
+  UpdateStateDto,
   WorkspaceSnapshot,
 } from './generated';
 
@@ -40,6 +41,8 @@ export type {
   SnippetItemDto,
   StylePresetDto,
   TerminalModeDto,
+  UpdatePhaseDto,
+  UpdateStateDto,
   WorkspaceSettingsDto,
   WorkspaceSnapshot,
 } from './generated';
@@ -47,8 +50,23 @@ export type {
 export interface BackendClient {
   /** Version of the running build, as the updater compares it. */
   appVersion(): Promise<string>;
-  /** Fire the update check. Resolves immediately; the outcome is a native dialog. */
-  startUpdateCheck(): Promise<void>;
+  /**
+   * Fire the update check. Resolves as soon as it has started; the outcome
+   * arrives on the `lune://update` event and in {@link updateState}.
+   *
+   * `false` means a check was already running, so nothing new was started —
+   * the difference between "still working" and "this button did nothing".
+   */
+  startUpdateCheck(): Promise<boolean>;
+  /**
+   * The current update state. Read on mount: a launch check can find an update
+   * while the window is closed, and the event announcing it would be lost.
+   */
+  updateState(): Promise<UpdateStateDto>;
+  /** Download and apply the waiting update, then restart. */
+  installPendingUpdate(): Promise<void>;
+  /** Forget the waiting update and go quiet until the next check. */
+  dismissUpdate(): Promise<void>;
   /** Quit the app for real, bypassing the close-to-tray behaviour. */
   quitApp(): Promise<void>;
   /** Whether this build was compiled with a feedback proxy endpoint. */
@@ -116,6 +134,22 @@ export interface BackendClient {
   uinputRuleInstalled(): Promise<boolean>;
   /** Remove that rule. Raises a system password prompt. */
   removeUinputRule(): Promise<boolean>;
+  /** Whether this session can already type into other applications. */
+  uinputAccessReady(): Promise<boolean>;
+  /**
+   * Ask for keyboard access. Raises a system password prompt and resolves with
+   * whether typing works afterwards.
+   */
+  grantUinputAccess(): Promise<boolean>;
+  /** Input devices the machine reports, for the setup readiness check. */
+  listAudioInputDevices(): Promise<string[]>;
+  /**
+   * The model downloading right now, or `null`. A window that was closed and
+   * reopened uses this to re-attach instead of restarting setup.
+   */
+  activeModelDownload(): Promise<string | null>;
+  /** Ask the in-flight model download to stop. */
+  cancelModelDownload(): Promise<void>;
 }
 
 export type SessionStreamEvent =

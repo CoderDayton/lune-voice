@@ -30,6 +30,12 @@ pub enum PersistError {
     #[error("model download: {0}")]
     ModelDownload(String),
 
+    /// The caller asked for the transfer to stop. Distinct from
+    /// [`Self::ModelDownload`] so a user who pressed *Cancel* is not shown a
+    /// failure for the thing they just asked for.
+    #[error("model download cancelled")]
+    ModelDownloadCancelled,
+
     #[error("not found: {0}")]
     NotFound(String),
 }

@@ -7,6 +7,7 @@ import type {
   HistoryPageDto,
   MonitorInfoDto,
   PillSnapshotDto,
+  UpdateStateDto,
   WorkspaceSnapshot,
 } from './types';
 
@@ -16,7 +17,39 @@ const tauriBackendClient: BackendClient = {
   },
 
   startUpdateCheck() {
-    return invoke<void>('start_update_check');
+    return invoke<boolean>('start_update_check');
+  },
+
+  updateState() {
+    return invoke<UpdateStateDto>('update_state');
+  },
+
+  uinputAccessReady() {
+    return invoke<boolean>('uinput_access_ready');
+  },
+
+  grantUinputAccess() {
+    return invoke<boolean>('grant_uinput_access');
+  },
+
+  listAudioInputDevices() {
+    return invoke<string[]>('list_audio_input_devices');
+  },
+
+  activeModelDownload() {
+    return invoke<string | null>('active_model_download');
+  },
+
+  cancelModelDownload() {
+    return invoke<void>('cancel_model_download');
+  },
+
+  installPendingUpdate() {
+    return invoke<void>('install_pending_update');
+  },
+
+  dismissUpdate() {
+    return invoke<void>('dismiss_update');
   },
 
   quitApp() {

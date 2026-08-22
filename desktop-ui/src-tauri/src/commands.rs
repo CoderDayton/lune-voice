@@ -135,19 +135,6 @@ pub async fn app_version(window: WebviewWindow, app: tauri::AppHandle) -> Result
     Ok(app.package_info().version.to_string())
 }
 
-/// Settings' **Check for updates**. Runs the same flow as the tray item,
-/// dialogs and all, and returns immediately — the single-flight guard around
-/// that flow means the button and the tray menu cannot race each other.
-#[tauri::command]
-pub async fn start_update_check(
-    window: WebviewWindow,
-    app: tauri::AppHandle,
-) -> Result<(), String> {
-    require_window_access(&window, &["main"])?;
-    tauri::async_runtime::spawn(crate::check_for_updates(app));
-    Ok(())
-}
-
 #[tauri::command]
 pub async fn load_workspace_snapshot(
     window: WebviewWindow,
@@ -580,6 +567,147 @@ pub async fn check_model_status(
     })
     .await
 }
+/// Whether every local model the *active* configuration needs is on disk.
+///
+/// This is the question first-run has to answer, and it is not the same as
+/// "does any model exist": a remote ASR backend needs no local files at all,
+/// while the local one needs exactly the Whisper size that is selected. The
+/// welcome screen used to approximate it by looking for models flagged
+/// `required` in [`check_model_status`] — a flag no spec sets, so the test was
+/// vacuously true and setup could be skipped into an app that cannot transcribe.
+///
+/// Shares [`lune_persist::has_required_models`] with the runtime's own
+/// readiness check, so the screen and the pipeline cannot disagree.
+#[tauri::command]
+pub async fn required_models_ready(window: WebviewWindow) -> Result<bool, String> {
+    require_window_access(&window, &["main"])?;
+    run_persist("check required models", || {
+        let paths = lune_persist::AppPaths::resolve().ok_or("resolve application paths")?;
+        let store = lune_persist::SettingsStore::new(paths.settings_file());
+        let settings = store.load().map_err(|e| format!("load settings: {e}"))?;
+        Ok(lune_persist::has_required_models(
+            &paths.models_dir(),
+            &settings.asr_backend,
+        ))
+    })
+    .await
+}
+
+/// The model download in flight, or `None`.
+///
+/// Global rather than per-window on purpose. The main webview is destroyed when
+/// the window is closed and rebuilt when it reopens, so a download started by
+/// one instance of the UI has to be visible to the next — otherwise closing the
+/// window mid-setup looks like the download vanished, and reopening would start
+/// a second copy of a transfer that is still running.
+static ACTIVE_DOWNLOAD: std::sync::Mutex<Option<ActiveDownload>> = std::sync::Mutex::new(None);
+
+/// The transfer in flight, plus a way to learn how it ends.
+struct ActiveDownload {
+    local_name: String,
+    /// Terminal outcome, published once by [`release_download`].
+    ///
+    /// A second call for the same model waits on this instead of resolving
+    /// straight away. The window that started the transfer may be gone — that is
+    /// the whole point of the global slot — so its rejection goes nowhere, and a
+    /// re-attached window that assumed success would sit in `downloading`
+    /// forever waiting for a `done` event a failed transfer never emits.
+    outcome: tokio::sync::broadcast::Sender<Result<(), String>>,
+}
+
+/// Set to ask the in-flight download to stop. Cleared when a download is claimed
+/// so a cancel can never carry over into the next one.
+static DOWNLOAD_CANCEL: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// A poisoned lock means a previous holder panicked while swapping a name. The
+/// value is one `Option<ActiveDownload>` with no invariant across it, so
+/// recovering it beats turning someone else's panic into ours.
+fn active_download_slot() -> std::sync::MutexGuard<'static, Option<ActiveDownload>> {
+    ACTIVE_DOWNLOAD
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// The result of asking for the download slot.
+enum DownloadClaim {
+    /// This call owns the transfer and must release it when it ends.
+    Owned,
+    /// The same model is already downloading. Starting a second transfer of the
+    /// same files would only fight the first over one temp path, so this call
+    /// waits on the receiver and reports whatever the running one does.
+    Joined(tokio::sync::broadcast::Receiver<Result<(), String>>),
+}
+
+/// Claim the download slot for `local_name`, or attach to the transfer already
+/// running for it.
+fn claim_download(local_name: &str) -> Result<DownloadClaim, String> {
+    let mut slot = active_download_slot();
+    match slot.as_ref() {
+        Some(active) if active.local_name == local_name => {
+            // A pending cancel belongs to a request this call has just
+            // superseded — the user pressed Cancel and then asked for the same
+            // download again. Clearing it is what makes that work: otherwise the
+            // transfer being attached to aborts on a flag nobody is waiting on
+            // any more, and nothing is left downloading.
+            DOWNLOAD_CANCEL.store(false, std::sync::atomic::Ordering::SeqCst);
+            Ok(DownloadClaim::Joined(active.outcome.subscribe()))
+        }
+        Some(active) => Err(format!(
+            "{} is already downloading — wait for it to finish",
+            active.local_name
+        )),
+        None => {
+            DOWNLOAD_CANCEL.store(false, std::sync::atomic::Ordering::SeqCst);
+            let (outcome, _) = tokio::sync::broadcast::channel(1);
+            *slot = Some(ActiveDownload {
+                local_name: local_name.to_string(),
+                outcome,
+            });
+            Ok(DownloadClaim::Owned)
+        }
+    }
+}
+
+/// Exact error text a cancelled download rejects with.
+///
+/// The frontend matches on it to tell "you pressed Cancel" apart from "the
+/// download broke" — the two look identical from a rejected promise otherwise,
+/// and showing a failure for something the user just asked for is wrong.
+pub const DOWNLOAD_CANCELLED: &str = "model download cancelled";
+
+/// Free the slot and tell anyone who attached how the transfer ended.
+fn release_download(outcome: Result<(), String>) {
+    let previous = active_download_slot().take();
+    DOWNLOAD_CANCEL.store(false, std::sync::atomic::Ordering::SeqCst);
+    if let Some(active) = previous {
+        // A send with no receivers is the ordinary case — nobody re-attached —
+        // and there is nothing to do about it either way.
+        let _ = active.outcome.send(outcome);
+    }
+}
+
+/// Which model is downloading right now, so a freshly-opened window can
+/// re-attach to it instead of restarting setup from the first step.
+#[tauri::command]
+pub fn active_model_download(window: WebviewWindow) -> Result<Option<String>, String> {
+    require_window_access(&window, &["main"])?;
+    Ok(active_download_slot()
+        .as_ref()
+        .map(|active| active.local_name.clone()))
+}
+
+/// Ask the in-flight download to stop. Returns immediately; the transfer notices
+/// within a chunk and its command call fails with a cancellation error.
+///
+/// A no-op when nothing is downloading, which is the honest answer for a button
+/// the user pressed just as the last file finished.
+#[tauri::command]
+pub fn cancel_model_download(window: WebviewWindow) -> Result<(), String> {
+    require_window_access(&window, &["main"])?;
+    DOWNLOAD_CANCEL.store(true, std::sync::atomic::Ordering::SeqCst);
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn download_model_cmd(
     window: WebviewWindow,
@@ -589,20 +717,41 @@ pub async fn download_model_cmd(
 ) -> Result<(), String> {
     require_window_access(&window, &["main"])?;
     validate_local_name(&local_name)?;
+    loop {
+        match claim_download(&local_name)? {
+            DownloadClaim::Owned => break,
+            DownloadClaim::Joined(mut outcome) => match outcome.recv().await {
+                // The transfer this call attached to was stopped by a cancel the
+                // same call has already withdrawn (see `claim_download`). The
+                // user asked for the download, so start it rather than reporting
+                // their own superseded cancel back at them.
+                Ok(Err(e)) if e == DOWNLOAD_CANCELLED => continue,
+                Ok(result) => return result,
+                // The owner released the slot between the claim and the send.
+                // The transfer is over either way, and the caller settles it
+                // from the model's state on disk.
+                Err(_) => return Ok(()),
+            },
+        }
+    }
     let app_handle = app.clone();
-    let (models_dir, asr_backend) = run_persist("download model", move || {
+    let result = run_persist("download model", move || {
         let paths = lune_persist::AppPaths::resolve().ok_or("resolve application paths")?;
         let models_dir = paths.models_dir();
         let settings = lune_persist::SettingsStore::new(paths.settings_file())
             .load()
             .map_err(|e| format!("load settings: {e}"))?;
         tracing::info!(local_name, "starting model download");
-        match lune_persist::download_model(&models_dir, &local_name, |progress| {
+        match lune_persist::download_model(&models_dir, &local_name, &DOWNLOAD_CANCEL, |progress| {
             let _ = app_handle.emit("lune://download-progress", &progress);
         }) {
             Ok(_) => {
                 tracing::info!(local_name, "download complete");
                 Ok((models_dir, settings.asr_backend))
+            }
+            Err(lune_persist::PersistError::ModelDownloadCancelled) => {
+                tracing::info!(local_name, "download cancelled");
+                Err(DOWNLOAD_CANCELLED.to_string())
             }
             Err(e) => {
                 tracing::error!(local_name, error = %e, "download failed");
@@ -610,8 +759,14 @@ pub async fn download_model_cmd(
             }
         }
     })
-    .await?;
+    .await;
 
+    // Released whichever way the transfer ended, so a failure or a cancel never
+    // leaves the slot claimed and every later download refused — and the same
+    // outcome reaches any window that re-attached to this transfer.
+    release_download(result.as_ref().map(|_| ()).map_err(String::clone));
+
+    let (models_dir, asr_backend) = result?;
     if lune_persist::has_required_models(&models_dir, &asr_backend) {
         runtime.eager_rebuild().await.ok();
     }
@@ -642,6 +797,46 @@ pub async fn delete_model_cmd(window: WebviewWindow, local_name: String) -> Resu
 pub fn gpu_backend_status(window: WebviewWindow) -> Result<GpuBackendStatusDto, String> {
     require_window_access(&window, &["main"])?;
     current_gpu_status()
+}
+
+/// Whether this session can already type into other applications.
+///
+/// Setup asks this so it can request the permission up front. Left to itself the
+/// runtime installs the udev rule lazily, on the first delivered keystroke —
+/// which puts a polkit password prompt in the middle of the user's first
+/// dictation, where it reads as a malfunction and where cancelling it loses the
+/// utterance they just spoke.
+#[tauri::command]
+pub fn uinput_access_ready(window: WebviewWindow) -> Result<bool, String> {
+    require_window_access(&window, &["main"])?;
+    #[cfg(unix)]
+    {
+        Ok(lune_voice::uinput_access_ready())
+    }
+    #[cfg(not(unix))]
+    {
+        Ok(true)
+    }
+}
+
+/// Install the udev rule that lets this user synthesise keystrokes.
+///
+/// Raises a polkit prompt, hence `spawn_blocking`. Returns whether access works
+/// afterwards rather than only whether the write succeeded, because udev takes a
+/// moment to apply the new ACL and "the file exists" is not the question.
+#[tauri::command]
+pub async fn grant_uinput_access(window: WebviewWindow) -> Result<bool, String> {
+    require_window_access(&window, &["main"])?;
+    #[cfg(unix)]
+    {
+        tauri::async_runtime::spawn_blocking(lune_voice::grant_uinput_access)
+            .await
+            .map_err(|e| format!("grant uinput access task: {e}"))?
+    }
+    #[cfg(not(unix))]
+    {
+        Ok(true)
+    }
 }
 
 /// Whether this app installed the `/dev/uinput` udev rule itself.

@@ -3,6 +3,7 @@ import {
   asrModelLocalName,
   buildInitialSelection,
   gpuAccelerationOffer,
+  hasOptionalModels,
   isSetupSatisfiable,
   type ModelStatus,
   relevantSetupModels,
@@ -25,6 +26,29 @@ describe('asrModelLocalName', () => {
     expect(asrModelLocalName('WhisperCpp', 'Small')).toBe('whisper-small-q5_1');
     expect(asrModelLocalName('WhisperCpp', 'Medium')).toBe('whisper-medium-q5_0');
     expect(asrModelLocalName('WhisperCpp', 'LargeV3Turbo')).toBe('whisper-large-v3-turbo-q8_0');
+  });
+});
+
+describe('hasOptionalModels', () => {
+  test('one required engine model is not a choice', () => {
+    // The list the setup step actually gets today. Showing it under "choose the
+    // models to install" costs a click and offers nothing back, so this is what
+    // decides the step is skipped.
+    const models = [model('whisper-medium-q5_0', { inUse: true })];
+
+    expect(hasOptionalModels('whisper-medium-q5_0', models)).toBe(false);
+  });
+
+  test('a model that is neither the engine nor required is a choice', () => {
+    const models = [model('whisper-medium-q5_0', { inUse: true }), model('extra')];
+
+    expect(hasOptionalModels('whisper-medium-q5_0', models)).toBe(true);
+  });
+
+  test('a model flagged required cannot be declined, so it is not a choice', () => {
+    const models = [model('whisper-medium-q5_0', { inUse: true }), model('vad', { required: true })];
+
+    expect(hasOptionalModels('whisper-medium-q5_0', models)).toBe(false);
   });
 });
 

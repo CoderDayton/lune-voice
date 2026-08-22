@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use hf_hub::api::sync::{Api, ApiBuilder, ApiRepo};
@@ -335,9 +336,16 @@ pub fn delete_model(models_dir: &Path, local_name: &str) -> PersistResult<bool> 
 
 /// Download a single model by local_name. Calls `on_progress` for each file.
 /// Blocking — run on a background thread.
+///
+/// `cancel` is polled between files and between read chunks, so a user who
+/// changes their mind about a multi-gigabyte transfer stops paying for it
+/// within a chunk rather than at the end of the file. A cancelled download
+/// leaves nothing behind: the partial file is a `.dl.tmp` that is removed on
+/// the way out, and the model is simply still absent.
 pub fn download_model(
     models_dir: &Path,
     local_name: &str,
+    cancel: &AtomicBool,
     on_progress: impl Fn(DownloadProgress),
 ) -> PersistResult<PathBuf> {
     let spec = ModelSpec::all()
@@ -356,15 +364,21 @@ pub fn download_model(
         let vad = ModelSpec::vad_model();
         if !vad.is_ready(models_dir) {
             let vad_name = vad.display_name().to_string();
-            ensure_directory_model_with_progress(&hub, &vad, models_dir, |file, idx, total| {
-                on_progress(DownloadProgress {
-                    model_name: vad_name.clone(),
-                    file_name: file.to_string(),
-                    file_index: idx,
-                    file_count: total,
-                    done: false,
-                });
-            })?;
+            ensure_directory_model_with_progress(
+                &hub,
+                &vad,
+                models_dir,
+                cancel,
+                |file, idx, total| {
+                    on_progress(DownloadProgress {
+                        model_name: vad_name.clone(),
+                        file_name: file.to_string(),
+                        file_index: idx,
+                        file_count: total,
+                        done: false,
+                    });
+                },
+            )?;
         }
     }
 
@@ -377,8 +391,12 @@ pub fn download_model(
         done: false,
     });
 
-    let path =
-        ensure_directory_model_with_progress(&hub, &spec, models_dir, |file, idx, total| {
+    let path = ensure_directory_model_with_progress(
+        &hub,
+        &spec,
+        models_dir,
+        cancel,
+        |file, idx, total| {
             on_progress(DownloadProgress {
                 model_name: name.clone(),
                 file_name: file.to_string(),
@@ -386,7 +404,8 @@ pub fn download_model(
                 file_count: total,
                 done: false,
             });
-        })?;
+        },
+    )?;
 
     on_progress(DownloadProgress {
         model_name: name,
@@ -695,7 +714,12 @@ struct TreeEntryLfs {
 /// short response) is rejected here even when the HF tree metadata was
 /// unavailable; the observed values are returned for the caller's integrity
 /// manifest. Reads `HF_TOKEN` from env for gated/private repos.
-fn download_file_direct(repo_id: &str, filename: &str, dst: &Path) -> PersistResult<FileMetadata> {
+fn download_file_direct(
+    repo_id: &str,
+    filename: &str,
+    dst: &Path,
+    cancel: &AtomicBool,
+) -> PersistResult<FileMetadata> {
     let url = format!("https://huggingface.co/{repo_id}/resolve/main/{filename}");
     let mut req = http_agent().get(&url);
     if let Ok(token) = std::env::var("HF_TOKEN") {
@@ -724,15 +748,33 @@ fn download_file_direct(repo_id: &str, filename: &str, dst: &Path) -> PersistRes
     };
 
     let tmp = dst.with_extension("dl.tmp");
-    let (written, sha256) = {
+    let copied = {
         let file = std::fs::File::create(&tmp)
             .map_err(|e| PersistError::ModelDownload(format!("create tmp: {e}")))?;
         let mut writer = HashingWriter::new(file);
-        std::io::copy(&mut resp.into_body().as_reader(), &mut writer).map_err(|e| {
+        // A hand-rolled copy rather than `std::io::copy`, purely so `cancel`
+        // can be read between chunks. Model blobs run to gigabytes, and a
+        // cancel that only takes effect at the end of the transfer is not a
+        // cancel. 256 KiB is large enough that the check costs nothing and
+        // small enough to stop within a few milliseconds of the click.
+        let result = copy_cancellable(
+            &mut resp.into_body().as_reader(),
+            &mut writer,
+            cancel,
+            filename,
+        );
+        let (written, sha256) = writer.finish();
+        result.map(|()| (written, sha256))
+    };
+    let (written, sha256) = match copied {
+        Ok(pair) => pair,
+        Err(e) => {
+            // The tmp file is only ever a partial transfer, so nothing is lost
+            // by removing it — and leaving it would strand bytes under a name
+            // no later run looks at.
             let _ = std::fs::remove_file(&tmp);
-            PersistError::ModelDownload(format!("{filename}: stream: {e}"))
-        })?;
-        writer.finish()
+            return Err(e);
+        }
     };
     if let Some(expected) = expected_len {
         if written != expected {
@@ -762,6 +804,7 @@ fn ensure_directory_model_with_progress(
     hub: &ModelHub,
     spec: &ModelSpec,
     models_dir: &Path,
+    cancel: &AtomicBool,
     on_file: impl Fn(&str, usize, usize),
 ) -> PersistResult<PathBuf> {
     let ModelSpec::Directory {
@@ -821,6 +864,12 @@ fn ensure_directory_model_with_progress(
         .map_err(|e| PersistError::ModelDownload(format!("create dir: {e}")))?;
 
     for (idx, filename) in files_to_download.iter().enumerate() {
+        if cancel.load(Ordering::Relaxed) {
+            // Whatever is already verified stays on disk and is recorded, so a
+            // later run resumes at file granularity instead of starting over.
+            save_integrity_manifest(&local_dir, &manifest);
+            return Err(PersistError::ModelDownloadCancelled);
+        }
         // Flatten nested paths: "onnx/model.onnx" → "model.onnx" locally.
         let basename = file_basename(filename);
         let dst = local_dir.join(basename);
@@ -840,7 +889,21 @@ fn ensure_directory_model_with_progress(
         // goes silent hung this thread forever with no way to cancel, on the
         // multi-hundred-MB model transfers. `http_agent()` bounds it, and this
         // path was already the Xet-repo fallback, so it is well exercised.
-        let observed = Some(download_file_direct(repo_id, filename, &dst)?);
+        let observed = match download_file_direct(repo_id, filename, &dst, cancel) {
+            Ok(hash) => Some(hash),
+            Err(e @ PersistError::ModelDownloadCancelled) => {
+                // Same reason as the between-files check above, and this is the
+                // path that actually runs: the flag is polled every 256 KiB, so
+                // a cancel lands mid-file far more often than between files.
+                // Falling through to the `?` would drop the manifest entries for
+                // the files this run already verified, and a later offline run
+                // would have nothing but the size-less fallback to check them
+                // against.
+                save_integrity_manifest(&local_dir, &manifest);
+                return Err(e);
+            }
+            Err(e) => return Err(e),
+        };
 
         // Post-download verification — if we have expected metadata, the final
         // file must match. Mismatch indicates a corrupted CDN response or a
@@ -875,6 +938,36 @@ fn ensure_directory_model_with_progress(
 
     info!(path = %local_dir.display(), "model directory ready");
     Ok(local_dir)
+}
+
+/// Stream `reader` into `writer`, giving up as soon as `cancel` is set.
+///
+/// Chunk size is a compromise the two failure modes pick out between them: too
+/// small and a multi-gigabyte transfer pays for millions of atomic loads, too
+/// large and *Cancel* visibly lags the click. 256 KiB is a few milliseconds of
+/// a fast connection either way.
+fn copy_cancellable(
+    reader: &mut impl std::io::Read,
+    writer: &mut impl std::io::Write,
+    cancel: &AtomicBool,
+    filename: &str,
+) -> PersistResult<()> {
+    const CHUNK: usize = 256 * 1024;
+    let mut buf = vec![0u8; CHUNK];
+    loop {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(PersistError::ModelDownloadCancelled);
+        }
+        let read = reader
+            .read(&mut buf)
+            .map_err(|e| PersistError::ModelDownload(format!("{filename}: stream: {e}")))?;
+        if read == 0 {
+            return Ok(());
+        }
+        writer
+            .write_all(&buf[..read])
+            .map_err(|e| PersistError::ModelDownload(format!("{filename}: write: {e}")))?;
+    }
 }
 
 /// Flatten a possibly-nested HF repo path (`onnx/model.onnx`) to the last segment.
@@ -1237,6 +1330,36 @@ mod tests {
         assert_eq!(manifest["a.bin"].sha256, None);
     }
 
+    #[test]
+    fn a_cancelled_copy_writes_nothing_and_says_it_was_cancelled() {
+        // Cancelling is the user's own request, so it must not surface as a
+        // download failure — and it must not leave a partial file behind that a
+        // later run could mistake for progress.
+        let cancel = AtomicBool::new(true);
+        let mut source = &b"payload"[..];
+        let mut sink: Vec<u8> = Vec::new();
+
+        let error = copy_cancellable(&mut source, &mut sink, &cancel, "ggml.bin").unwrap_err();
+
+        assert!(matches!(error, PersistError::ModelDownloadCancelled));
+        assert!(sink.is_empty(), "a cancelled copy must write nothing");
+    }
+
+    #[test]
+    fn an_uncancelled_copy_moves_every_byte_across_chunk_boundaries() {
+        // The loop replaced `std::io::copy`, so the thing worth pinning is that
+        // it still copies exactly: a payload spanning several 256 KiB reads
+        // catches an off-by-one at the boundary that a small one would not.
+        let cancel = AtomicBool::new(false);
+        let payload: Vec<u8> = (0..700 * 1024).map(|i| (i % 251) as u8).collect();
+        let mut source = payload.as_slice();
+        let mut sink: Vec<u8> = Vec::new();
+
+        copy_cancellable(&mut source, &mut sink, &cancel, "ggml.bin").unwrap();
+
+        assert_eq!(sink, payload);
+    }
+
     /// Real-network end-to-end: `download_model` writes the integrity
     /// manifest, and a truncated model file is detected and re-downloaded on
     /// the next run. Opt-in (network + ~1 MB):
@@ -1247,7 +1370,14 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let models_dir = tmp.path();
 
-        let path = download_model(models_dir, lune_core::models::DIR_WHISPER_VAD, |_| {}).unwrap();
+        let never = AtomicBool::new(false);
+        let path = download_model(
+            models_dir,
+            lune_core::models::DIR_WHISPER_VAD,
+            &never,
+            |_| {},
+        )
+        .unwrap();
         let file = path.join(lune_core::models::WHISPER_VAD_GGML);
         let full_len = file.metadata().unwrap().len();
         assert!(full_len > 100_000, "real model expected, got {full_len}B");
@@ -1262,7 +1392,13 @@ mod tests {
         // Truncate → the next ensure must reject the file and re-download it.
         let half = std::fs::read(&file).unwrap()[..(full_len / 2) as usize].to_vec();
         std::fs::write(&file, half).unwrap();
-        download_model(models_dir, lune_core::models::DIR_WHISPER_VAD, |_| {}).unwrap();
+        download_model(
+            models_dir,
+            lune_core::models::DIR_WHISPER_VAD,
+            &never,
+            |_| {},
+        )
+        .unwrap();
         assert_eq!(
             file.metadata().unwrap().len(),
             full_len,

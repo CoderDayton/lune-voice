@@ -27,9 +27,9 @@ export function GeneralSection({ settings }: { settings: WorkspaceSettings }) {
     };
   }, []);
 
-  // The result arrives as a native dialog, so the button only has to report
-  // that the check started — and re-enable itself so a failed check can be
-  // retried without reopening Settings.
+  // The result arrives in the app's own update modal (mounted by the shell), so
+  // the button only has to report that the check started — and re-enable itself
+  // so a failed check can be retried without reopening Settings.
   async function checkForUpdates() {
     setChecking(true);
     try {

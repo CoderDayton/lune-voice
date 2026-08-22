@@ -27,7 +27,8 @@ mod compositor;
 pub use compositor::should_use_xwayland_fallback;
 #[cfg(unix)]
 pub use uinput_typer::{
-    WindowTarget, capture_focus_target, remove_uinput_rule, uinput_rule_is_self_installed,
+    WindowTarget, capture_focus_target, grant_uinput_access, remove_uinput_rule,
+    uinput_access_ready, uinput_rule_is_self_installed,
 };
 
 pub use delivery::DeliveryService;

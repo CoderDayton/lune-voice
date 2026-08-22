@@ -456,6 +456,77 @@ pub struct GpuBackendStatusDto {
     pub download_available: bool,
 }
 
+/// Where the update flow is right now, as the in-app modal renders it.
+///
+/// Every outcome the user can be told about is a variant here rather than a
+/// native message box: a system dialog is drawn by the desktop environment,
+/// looks nothing like the rest of the app, and on Linux can land behind the
+/// window that asked for it. Reporting through the app's own modal keeps the
+/// answer where the click was.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+#[serde(rename_all = "kebab-case")]
+pub enum UpdatePhaseDto {
+    /// Nothing to show: no check running and nothing waiting on an answer.
+    Idle,
+    /// A check the user asked for is in flight.
+    Checking,
+    /// The check finished and this build is current.
+    UpToDate,
+    /// A newer version exists and is waiting for the user to accept it.
+    Available,
+    /// The accepted update is downloading.
+    Downloading,
+    /// Download finished; the package is being applied. The app restarts next.
+    Installing,
+    /// The check itself could not complete (offline, bad endpoint, bad config).
+    CheckFailed,
+    /// The download or install failed. The offer survives so it can be retried.
+    InstallFailed,
+}
+
+/// Everything the update modal needs to render, in one snapshot.
+///
+/// Also the *stored* state, not just an event payload: a launch check can find
+/// an update while the main window is closed, and an event emitted at a window
+/// that does not exist is simply lost. The frontend reads this snapshot on
+/// mount, so the offer survives until it is answered.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateStateDto {
+    pub phase: UpdatePhaseDto,
+    /// Version this build reports — the same string the check compares.
+    pub current_version: String,
+    /// Version the release server offers, once a check has found one.
+    pub available_version: Option<String>,
+    /// Release notes from the manifest, when it carried any.
+    pub notes: Option<String>,
+    /// User-facing failure text for the two failure phases; `None` otherwise.
+    pub message: Option<String>,
+    /// `u32` for the same reason as [`GpuInstallProgressDto`]: `number`, not
+    /// `bigint`, on the TypeScript side.
+    pub downloaded_bytes: u32,
+    /// `0` until the server sends a `Content-Length`.
+    pub total_bytes: u32,
+}
+
+impl UpdateStateDto {
+    /// A state carrying nothing but a phase and the running version — the shape
+    /// every transition except the two progress-bearing ones needs.
+    pub fn phase(phase: UpdatePhaseDto, current_version: &str) -> Self {
+        Self {
+            phase,
+            current_version: current_version.to_string(),
+            available_version: None,
+            notes: None,
+            message: None,
+            downloaded_bytes: 0,
+            total_bytes: 0,
+        }
+    }
+}
+
 // ── Write DTOs (Deserialize ← frontend) ──────────────────────────────────
 
 #[derive(Debug, Clone, Deserialize, TS)]
