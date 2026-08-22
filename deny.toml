@@ -31,6 +31,17 @@ ignore = [
     { id = "RUSTSEC-2025-0098", reason = "Tauri transitive dep" },
     { id = "RUSTSEC-2025-0100", reason = "Tauri transitive dep" },
     { id = "RUSTSEC-2025-0119", reason = "Tauri transitive dep" },
+    { id = "RUSTSEC-2024-0422", reason = "GTK3 upstream — gtk-layer-shell, needed for the native pill" },
+    { id = "RUSTSEC-2024-0423", reason = "GTK3 upstream — gtk-layer-shell-sys" },
+    # Unmaintained, not vulnerable. bincode 2 is a direct dep of lune-dict's
+    # build script (the compiled vocab tables); the advisory offers no successor.
+    { id = "RUSTSEC-2025-0141", reason = "bincode unmaintained — no safe upgrade exists" },
+    # XML-parser DoS, unreachable from a lockfile bump: 0.41 is required, but
+    # `plist` (via tauri) pins ^0.38 and `wayland-scanner` pins ^0.39. Neither
+    # parses attacker-controlled XML — plist runs at macOS bundling time and
+    # wayland-scanner generates protocol code at build time.
+    { id = "RUSTSEC-2026-0194", reason = "quick-xml — upstream version pins block the fix" },
+    { id = "RUSTSEC-2026-0195", reason = "quick-xml — upstream version pins block the fix" },
 ]
 
 [licenses]

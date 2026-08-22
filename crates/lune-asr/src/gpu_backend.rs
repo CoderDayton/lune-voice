@@ -37,6 +37,11 @@ pub const CUDA_PLUGIN_FILE: &str = "libggml-cuda.so";
 /// The NVIDIA driver library. Ships with the driver, not the CUDA toolkit, and
 /// is deliberately not redistributable — so its presence is the one
 /// precondition a download cannot satisfy on the user's behalf.
+///
+/// Unix-only, like its single caller: on Windows the driver is a `.dll` looked
+/// up by a different mechanism, and an unconditional const is dead code there —
+/// which CI's `-D warnings` turns into a build failure.
+#[cfg(unix)]
 const NVIDIA_DRIVER_SONAME: &str = "libcuda.so.1";
 
 /// Plugin directory shipped inside the application bundle, resolved relative to
