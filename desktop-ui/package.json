@@ -19,7 +19,7 @@
     "@fontsource/ibm-plex-sans": "^5.3.0",
     "@lingui/core": "^6.6.0",
     "@lingui/react": "^6.6.0",
-    "@tanstack/react-hotkeys": "^0.9.1",
+    "@tanstack/react-hotkeys": "^0.10.0",
     "@tanstack/react-router": "^1.170.32",
     "@tanstack/react-store": "^0.11.1",
     "@tanstack/store": "^0.11.1",
@@ -30,25 +30,23 @@
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@babel/core": "^8.0.1",
     "@biomejs/biome": "^2.5.10",
     "@lingui/babel-plugin-lingui-macro": "^6.6.0",
     "@lingui/cli": "^6.6.0",
     "@lingui/vite-plugin": "^6.6.0",
+    "@rolldown/plugin-babel": "^0.2.3",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/router-plugin": "^1.168.35",
     "@tauri-apps/cli": "^2.11.4",
+    "@types/babel__core": "^7.20.5",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
-    "@vitejs/plugin-react": "^5.2.0",
+    "@vitejs/plugin-react": "^6.1.0",
     "babel-plugin-react-compiler": "^1.0.0",
     "daisyui": "^5.7.20",
     "tailwindcss": "^4.3.3",
-    "typescript": "^6.0.3",
-    "vite": "^7.3.6"
-  },
-  "_comment_overrides": "postcss: vite still resolves <=8.5.11, which carries two high sourceMappingURL file-disclosure advisories (GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849). Same-major pin, satisfies every consumer's range. Drop this once vite ships a fixed postcss range. Verified by the frontend-audit CI job.",
-  "overrides": {
-    "postcss": "^8.5.25",
-    "nanoid": "^3.3.18"
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
   }
 }
