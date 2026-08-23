@@ -20,9 +20,10 @@ chrono.workspace = true
 uuid.workspace = true
 thiserror.workspace = true
 hf-hub.workspace = true
-libsqlite3-sys = { version = "0.35", features = ["bundled"] }
+libsqlite3-sys = { version = "0.37", features = ["bundled"] }
 ureq = { version = "3.3.0", features = ["json"] }
-sha2 = "0.10"
+sha2 = "0.11"
+hex = "0.4"
 # Fetching + unpacking the optional GPU backend archive (src/gpu_plugin.rs).
 reqwest = { workspace = true }
 futures-util = { workspace = true }

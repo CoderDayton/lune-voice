@@ -17,6 +17,7 @@
 //! download is rejected unless its SHA-256 matches the pinned digest exactly.
 
 use std::collections::BTreeMap;
+use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 
 use sha2::{Digest, Sha256};
@@ -394,8 +395,15 @@ pub const PLUGIN_MANIFEST: &str = ".integrity.json";
 fn sha256_of_file(path: &Path) -> PersistResult<String> {
     let mut file = std::fs::File::open(path)?;
     let mut hasher = Sha256::new();
-    std::io::copy(&mut file, &mut hasher)?;
-    Ok(format!("{:x}", hasher.finalize()))
+    let mut buf = [0u8; 64 * 1024];
+    loop {
+        let n = file.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    Ok(hex::encode(hasher.finalize()))
 }
 
 fn write_plugin_manifest(dir: &Path, manifest: &BTreeMap<String, String>) -> PersistResult<()> {

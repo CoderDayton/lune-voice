@@ -38,7 +38,8 @@ serde.workspace = true
 serde_json.workspace = true
 # Re-verifying the downloaded GPU backend before it is dlopen'd
 # (`gpu_backend::installed_plugin_is_intact`).
-sha2 = "0.10"
+sha2 = "0.11"
+hex = "0.4"
 base64 = "0.22"
 # Already in the tree via reqwest; declared directly so the retry loop can
 # clone the encoded WAV as an Arc bump instead of a multi-MB deep copy.

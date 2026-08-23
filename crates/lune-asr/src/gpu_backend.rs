@@ -111,6 +111,7 @@ const PLUGIN_MANIFEST: &str = ".integrity.json";
 /// unreadable manifest counts as a failure — the installer always writes one.
 fn installed_plugin_is_intact(dir: &Path) -> bool {
     use sha2::{Digest, Sha256};
+    use std::io::Read;
 
     let Ok(bytes) = std::fs::read(dir.join(PLUGIN_MANIFEST)) else {
         return false;
@@ -127,10 +128,15 @@ fn installed_plugin_is_intact(dir: &Path) -> bool {
             return false;
         };
         let mut hasher = Sha256::new();
-        if std::io::copy(&mut file, &mut hasher).is_err() {
-            return false;
+        let mut buf = [0u8; 64 * 1024];
+        loop {
+            match file.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => hasher.update(&buf[..n]),
+                Err(_) => return false,
+            }
         }
-        format!("{:x}", hasher.finalize()).eq_ignore_ascii_case(expected)
+        hex::encode(hasher.finalize()).eq_ignore_ascii_case(expected)
     })
 }
 
@@ -438,7 +444,7 @@ mod tests {
         std::fs::create_dir_all(&dir).expect("create temp plugin dir");
         let body = b"pretend shared object";
         std::fs::write(dir.join("libggml-cuda.so"), body).expect("write library");
-        let digest = format!("{:x}", Sha256::digest(body));
+        let digest = hex::encode(Sha256::digest(body));
         std::fs::write(
             dir.join(PLUGIN_MANIFEST),
             format!(r#"{{"libggml-cuda.so":"{digest}"}}"#),
@@ -474,7 +480,7 @@ mod tests {
         // With the installer's manifest beside it, the same file is installed.
         let body = b"pretend shared object";
         std::fs::write(dir.join(CUDA_PLUGIN_FILE), body).expect("write plugin");
-        let digest = format!("{:x}", Sha256::digest(body));
+        let digest = hex::encode(Sha256::digest(body));
         std::fs::write(
             dir.join(PLUGIN_MANIFEST),
             format!(r#"{{"{CUDA_PLUGIN_FILE}":"{digest}"}}"#),

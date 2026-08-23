@@ -13,11 +13,11 @@ tokio = { workspace = true, features = ["sync", "time"] }
 tracing.workspace = true
 
 # Audio capture
-cpal = "0.17"
+cpal = "0.18"
 
 # Resampling (adaptive rate conversion)
-rubato = "1.0"
-audioadapter-buffers = "2.0"
+rubato = "5.0"
+audioadapter-buffers = "5.0"
 
 # Lock-free ring buffer
 crossbeam-channel = "0.5"

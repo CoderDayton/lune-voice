@@ -496,7 +496,7 @@ fn sha256_of_file(path: &Path) -> std::io::Result<String> {
         }
         hasher.update(&buf[..n]);
     }
-    Ok(format!("{:x}", hasher.finalize()))
+    Ok(hex::encode(hasher.finalize()))
 }
 
 /// `Write` adapter that counts bytes and sha256-hashes them on the way to the
@@ -519,7 +519,7 @@ impl<W: std::io::Write> HashingWriter<W> {
 
     /// Total bytes written and their lowercase-hex sha256.
     fn finish(self) -> (u64, String) {
-        (self.written, format!("{:x}", self.hasher.finalize()))
+        (self.written, hex::encode(self.hasher.finalize()))
     }
 }
 

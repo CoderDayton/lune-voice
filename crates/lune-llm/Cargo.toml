@@ -16,17 +16,14 @@ lune-core.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 async-openai.workspace = true
-# Pinned to async-openai's reqwest major (NOT the workspace's 0.13) because the
-# client we build here is handed to `Client::with_http_client` — a version
-# mismatch would be a type mismatch. Features come from the rest of the graph;
-# building a client needs none of them.
-reqwest = { version = "0.12", default-features = false }
+# Must stay on async-openai's reqwest major, because the client we build here is
+# handed to `Client::with_http_client` — a version mismatch would be a type
+# mismatch. As of async-openai 0.41 that is the workspace's 0.13.
+reqwest = { workspace = true }
 url.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 regex = "1.11"
-text-processing-rs = "0.1.0"
-rand = "0.9"
 
 [dev-dependencies]
 tracing-subscriber = "0.3"

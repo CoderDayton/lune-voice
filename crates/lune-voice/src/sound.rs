@@ -258,7 +258,7 @@ where
     let mut pos = 0usize;
     device
         .build_output_stream(
-            config,
+            *config,
             move |out: &mut [T], _: &cpal::OutputCallbackInfo| {
                 for frame in out.chunks_mut(channels.max(1)) {
                     let s = if pos < len {

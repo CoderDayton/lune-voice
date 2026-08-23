@@ -469,7 +469,7 @@ impl AudioStream {
             (f32) => {
                 device
                     .build_input_stream(
-                        &stream_config,
+                        stream_config,
                         move |data: &[f32], _: &_| {
                             process_audio_callback(
                                 data,
@@ -501,7 +501,7 @@ impl AudioStream {
                 let mut sample_buf = Vec::<f32>::with_capacity(chunk_samples * 4);
                 device
                     .build_input_stream(
-                        &stream_config,
+                        stream_config,
                         move |data: &[$sample_type], _: &_| {
                             $convert_fn(data, &mut sample_buf);
                             process_audio_callback(
@@ -771,7 +771,7 @@ fn process_audio_callback(
                 warn!("SequentialSlice construction failed; skipping {frames} frames");
                 continue;
             };
-            match r.process(&adapter, 0, None) {
+            match r.process(&adapter, None) {
                 Ok(output) => output_buf.extend_from_slice(&output.take_data()),
                 Err(e) => {
                     warn!("Resampling error: {e}");
@@ -817,7 +817,7 @@ fn process_audio_callback(
             input_resample_buf.resize(required_input, 0.0);
             let frames = input_resample_buf.len();
             match SequentialSlice::new(input_resample_buf.as_slice(), 1, frames) {
-                Ok(adapter) => match r.process(&adapter, 0, None) {
+                Ok(adapter) => match r.process(&adapter, None) {
                     Ok(output) => output_buf.extend_from_slice(&output.take_data()),
                     Err(e) => warn!("Flush resampling error: {e}"),
                 },
