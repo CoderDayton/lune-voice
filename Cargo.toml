@@ -109,7 +109,6 @@ audioadapter-buffers = "5"
 mimalloc = { version = "0.1", default-features = false }
 ndarray = "0.17"
 rustfft = "6.4"
-hf-hub = "0.5"
 tokenizers = { version = "0.22", default-features = false, features = ["onig"] }
 async-openai = { version = "0.41", features = ["chat-completion"] }
 reqwest = { version = "0.13", features = ["json", "multipart", "stream"] }

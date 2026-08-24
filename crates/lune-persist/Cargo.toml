@@ -19,7 +19,6 @@ dirs.workspace = true
 chrono.workspace = true
 uuid.workspace = true
 thiserror.workspace = true
-hf-hub.workspace = true
 libsqlite3-sys = { version = "0.38", features = ["bundled"] }
 ureq = { version = "3.3.0", features = ["json"] }
 sha2 = "0.11"

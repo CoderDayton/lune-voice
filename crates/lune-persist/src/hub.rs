@@ -5,7 +5,6 @@ use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-use hf_hub::api::sync::{Api, ApiBuilder, ApiRepo};
 use lune_core::config::{AsrBackendConfig, WhisperModel};
 use sha2::{Digest, Sha256};
 use tracing::{info, warn};
@@ -353,9 +352,6 @@ pub fn download_model(
         .find(|s| s.local_name() == local_name)
         .ok_or_else(|| PersistError::ModelDownload(format!("unknown model: {local_name}")))?;
 
-    let hub_cache = models_dir.join(".hub-cache");
-    let hub = ModelHub::new(&hub_cache)?;
-
     // Bundle the VAD model with any Whisper size: the local whisper backend
     // gates speech with it, but it's never offered as its own library entry.
     // Fetched first (when absent) so the final `done` event below belongs to the
@@ -364,21 +360,15 @@ pub fn download_model(
         let vad = ModelSpec::vad_model();
         if !vad.is_ready(models_dir) {
             let vad_name = vad.display_name().to_string();
-            ensure_directory_model_with_progress(
-                &hub,
-                &vad,
-                models_dir,
-                cancel,
-                |file, idx, total| {
-                    on_progress(DownloadProgress {
-                        model_name: vad_name.clone(),
-                        file_name: file.to_string(),
-                        file_index: idx,
-                        file_count: total,
-                        done: false,
-                    });
-                },
-            )?;
+            ensure_directory_model_with_progress(&vad, models_dir, cancel, |file, idx, total| {
+                on_progress(DownloadProgress {
+                    model_name: vad_name.clone(),
+                    file_name: file.to_string(),
+                    file_index: idx,
+                    file_count: total,
+                    done: false,
+                });
+            })?;
         }
     }
 
@@ -391,12 +381,8 @@ pub fn download_model(
         done: false,
     });
 
-    let path = ensure_directory_model_with_progress(
-        &hub,
-        &spec,
-        models_dir,
-        cancel,
-        |file, idx, total| {
+    let path =
+        ensure_directory_model_with_progress(&spec, models_dir, cancel, |file, idx, total| {
             on_progress(DownloadProgress {
                 model_name: name.clone(),
                 file_name: file.to_string(),
@@ -404,8 +390,7 @@ pub fn download_model(
                 file_count: total,
                 done: false,
             });
-        },
-    )?;
+        })?;
 
     on_progress(DownloadProgress {
         model_name: name,
@@ -418,35 +403,35 @@ pub fn download_model(
     Ok(path)
 }
 
-/// Thin wrapper around `hf_hub::api::sync::Api` with a hidden cache directory.
+/// Flat list of every file path in a repo, from the repo-info endpoint.
 ///
-/// Files are downloaded via hf_hub into `.hub-cache/`, then copied into a
-/// flat local directory under `models/`. We prefer `hard_link` first (zero
-/// copy, same inode) and fall back to `fs::copy` only on cross-device moves.
-struct ModelHub {
-    api: Api,
+/// This is the fallback for when `fetch_repo_file_metadata` came back empty,
+/// so it deliberately calls a *different* endpoint than that function's
+/// `/tree`: retrying the same URL would just fail the same way. `siblings`
+/// carries repo-relative paths, matching `/tree`'s `path` field, so callers
+/// can match either against `required_files` interchangeably.
+fn list_repo_files(repo_id: &str) -> PersistResult<Vec<String>> {
+    let url = format!("https://huggingface.co/api/models/{repo_id}");
+    let mut req = http_agent().get(&url);
+    if let Ok(token) = std::env::var("HF_TOKEN") {
+        req = req.header("Authorization", &format!("Bearer {token}"));
+    }
+    let info: RepoInfo = req
+        .call()
+        .and_then(|mut r| r.body_mut().read_json())
+        .map_err(|e| PersistError::ModelDownload(format!("{repo_id}: repo info: {e}")))?;
+    Ok(info.siblings.into_iter().map(|s| s.rfilename).collect())
 }
 
-impl ModelHub {
-    fn new(hub_cache_dir: &Path) -> PersistResult<Self> {
-        std::fs::create_dir_all(hub_cache_dir)?;
-        let api = ApiBuilder::new()
-            .with_cache_dir(hub_cache_dir.to_path_buf())
-            .with_progress(true)
-            .build()
-            .map_err(|e| PersistError::ModelDownload(format!("init hub api: {e}")))?;
-        Ok(Self { api })
-    }
+#[derive(serde::Deserialize)]
+struct RepoInfo {
+    #[serde(default)]
+    siblings: Vec<RepoSibling>,
+}
 
-    fn list_repo_files(&self, repo: &ApiRepo, repo_id: &str) -> PersistResult<Vec<String>> {
-        let info = repo
-            .info()
-            .map_err(|e| PersistError::ModelDownload(format!("{repo_id}: repo info: {e}")))?;
-        let siblings = info.siblings;
-        let mut files = Vec::with_capacity(siblings.len());
-        files.extend(siblings.into_iter().map(|s| s.rfilename));
-        Ok(files)
-    }
+#[derive(serde::Deserialize)]
+struct RepoSibling {
+    rfilename: String,
 }
 
 /// What we know about a remote file before/after download. `size` is the
@@ -801,7 +786,6 @@ fn download_file_direct(
 /// Ensure a directory-type model is present at `models_dir/<local_name>/`,
 /// downloading any missing files and reporting per-file progress.
 fn ensure_directory_model_with_progress(
-    hub: &ModelHub,
     spec: &ModelSpec,
     models_dir: &Path,
     cancel: &AtomicBool,
@@ -842,11 +826,10 @@ fn ensure_directory_model_with_progress(
     }
 
     // Determine which files to download. The tree call above already listed
-    // them and ran through `http_agent()`, so prefer its keys; hf_hub's
-    // `repo.info()` is only the fallback for when that call failed.
+    // them, so prefer its keys; the repo-info endpoint is only the fallback for
+    // when that call failed.
     let all_files: Vec<String> = if remote_meta.is_empty() {
-        let repo = hub.api.repo(hf_hub::Repo::model(repo_id.clone()));
-        hub.list_repo_files(&repo, repo_id)?
+        list_repo_files(repo_id)?
     } else {
         remote_meta.keys().cloned().collect()
     };
@@ -883,12 +866,11 @@ fn ensure_directory_model_with_progress(
         let _ = std::fs::remove_file(&dst);
         on_file(filename, idx, total);
 
-        // Always fetch through `download_file_direct`. hf_hub's `repo.get()`
-        // used to be tried first, but it runs on hf_hub's own agent, which has
-        // no timeouts at all — a server that accepts the connection and then
-        // goes silent hung this thread forever with no way to cancel, on the
-        // multi-hundred-MB model transfers. `http_agent()` bounds it, and this
-        // path was already the Xet-repo fallback, so it is well exercised.
+        // Every transfer goes through `download_file_direct`, so it carries
+        // `http_agent()`'s timeouts. That bound is the point: on an untimed
+        // client, a server that accepted the connection and then went silent
+        // hung this thread forever with no way to cancel, on the
+        // multi-hundred-MB model transfers.
         let observed = match download_file_direct(repo_id, filename, &dst, cancel) {
             Ok(hash) => Some(hash),
             Err(e @ PersistError::ModelDownloadCancelled) => {
@@ -1407,10 +1389,12 @@ mod tests {
     }
 
     #[test]
-    fn hub_constructs_with_valid_dir() {
-        let tmp = tempfile::tempdir().unwrap();
-        let hub_cache = tmp.path().join(".hub-cache");
-        let hub = ModelHub::new(&hub_cache);
-        assert!(hub.is_ok());
+    fn repo_siblings_parse_into_file_names() {
+        let parsed: RepoInfo = serde_json::from_str(
+            r#"{"siblings":[{"rfilename":"README.md"},{"rfilename":"ggml/model.bin"}]}"#,
+        )
+        .unwrap();
+        let files: Vec<String> = parsed.siblings.into_iter().map(|s| s.rfilename).collect();
+        assert_eq!(files, ["README.md", "ggml/model.bin"]);
     }
 }
