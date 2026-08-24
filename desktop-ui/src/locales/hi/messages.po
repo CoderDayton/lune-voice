@@ -1773,11 +1773,6 @@ msgstr "हार्डवेयर त्वरण का प्रयोग �
 msgid "Use the {0} style"
 msgstr "{0} शैली का प्रयोग करें"
 
-#. placeholder {0}: micDevices[0]
-#: src/features/welcome/components/ready-checks.tsx:91
-#~ msgid "Using {0}. Change it in Settings › Dictation."
-#~ msgstr "{0} इस्तेमाल हो रहा है। इसे सेटिंग्स › डिक्टेशन में बदलें।"
-
 #: src/features/welcome/components/ready-checks.tsx:98
 msgid "Using {activeDevice}. Change it in Settings › Dictation."
 msgstr "{activeDevice} इस्तेमाल हो रहा है। इसे सेटिंग्स › डिक्टेशन में बदलें।"

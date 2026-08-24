@@ -1773,11 +1773,6 @@ msgstr "使用硬件加速"
 msgid "Use the {0} style"
 msgstr "使用 {0} 样式"
 
-#. placeholder {0}: micDevices[0]
-#: src/features/welcome/components/ready-checks.tsx:91
-#~ msgid "Using {0}. Change it in Settings › Dictation."
-#~ msgstr "正在使用 {0}。可在“设置 › 听写”中更改。"
-
 #: src/features/welcome/components/ready-checks.tsx:98
 msgid "Using {activeDevice}. Change it in Settings › Dictation."
 msgstr "正在使用 {activeDevice}。可在“设置 › 听写”中更改。"

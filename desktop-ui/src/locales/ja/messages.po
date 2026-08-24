@@ -1773,11 +1773,6 @@ msgstr "ハードウェアアクセラレーションを使用"
 msgid "Use the {0} style"
 msgstr "{0} スタイルを使用する"
 
-#. placeholder {0}: micDevices[0]
-#: src/features/welcome/components/ready-checks.tsx:91
-#~ msgid "Using {0}. Change it in Settings › Dictation."
-#~ msgstr "{0} を使用中です。設定 › 音声入力 で変更できます。"
-
 #: src/features/welcome/components/ready-checks.tsx:98
 msgid "Using {activeDevice}. Change it in Settings › Dictation."
 msgstr "{activeDevice} を使用中です。設定 › 音声入力 で変更できます。"

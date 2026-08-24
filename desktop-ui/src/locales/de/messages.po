@@ -1773,11 +1773,6 @@ msgstr "Hardwarebeschleunigung verwenden"
 msgid "Use the {0} style"
 msgstr "Verwenden Sie den {0}-Stil"
 
-#. placeholder {0}: micDevices[0]
-#: src/features/welcome/components/ready-checks.tsx:91
-#~ msgid "Using {0}. Change it in Settings › Dictation."
-#~ msgstr "{0} wird verwendet. Ändern Sie das unter Einstellungen › Diktat."
-
 #: src/features/welcome/components/ready-checks.tsx:98
 msgid "Using {activeDevice}. Change it in Settings › Dictation."
 msgstr "{activeDevice} wird verwendet. Ändern Sie das unter Einstellungen › Diktat."

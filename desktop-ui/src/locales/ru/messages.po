@@ -1773,11 +1773,6 @@ msgstr "Используйте аппаратное ускорение"
 msgid "Use the {0} style"
 msgstr "Используйте стиль {0}"
 
-#. placeholder {0}: micDevices[0]
-#: src/features/welcome/components/ready-checks.tsx:91
-#~ msgid "Using {0}. Change it in Settings › Dictation."
-#~ msgstr "Используется {0}. Изменить можно в Настройки › Диктовка."
-
 #: src/features/welcome/components/ready-checks.tsx:98
 msgid "Using {activeDevice}. Change it in Settings › Dictation."
 msgstr "Используется {activeDevice}. Изменить можно в Настройки › Диктовка."
