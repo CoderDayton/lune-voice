@@ -34,6 +34,18 @@ confusion_bank.json
 # Scratch dictation recordings dumped at the repo root
 /recording_*.wav
 
+# Personal voice fixtures. `fixtures/audio/` otherwise tracks the public
+# LibriSpeech/MLS clips the benches and tests need, so this can't be a blanket
+# *.wav rule. Anything recorded from a real mic — `cgs record` output, the
+# `live_transcribe` capture, and the custom_recording noisify inputs — stays
+# local.
+/fixtures/audio/recording*.wav
+/fixtures/audio/recording*.txt
+/fixtures/audio/live_recording.wav
+/fixtures/audio/live_recording.txt
+/fixtures/audio/custom_recording*.wav
+/fixtures/audio/custom_recording*.txt
+
 # Sound-cue preview files (not the real assets under crates/lune-voice/assets/)
 /sound-previews/
 

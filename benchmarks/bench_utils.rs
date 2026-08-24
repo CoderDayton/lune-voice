@@ -174,8 +174,7 @@ pub fn benchmark_asr_entry() -> Result<BenchmarkAsrEntry, String> {
 /// Names that must come first when present, in this order. Everything else
 /// is appended alphabetically so the noisified variants cluster under their
 /// clean source (`librispeech_clean`, `librispeech_clean_noise_snr10`, …).
-const PRIORITY_FIXTURE_NAMES: &[&str] =
-    &["librispeech_clean", "librispeech_40744", "custom_recording"];
+const PRIORITY_FIXTURE_NAMES: &[&str] = &["librispeech_clean", "librispeech_40744"];
 
 pub fn load_fixtures(root: &std::path::Path) -> Vec<Fixture> {
     let fixtures_dir = root.join("fixtures/audio");

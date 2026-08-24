@@ -251,7 +251,7 @@ fn main() {
                 .parent()
                 .unwrap()
                 .to_path_buf();
-            root.join("fixtures/audio/custom_recording.wav")
+            root.join("fixtures/audio/librispeech_clean.wav")
         });
     let pcen_on = std::env::var("PCEN").map(|v| v != "0").unwrap_or(true);
     let quiet = std::env::var("QUIET").map(|v| v != "0").unwrap_or(false);

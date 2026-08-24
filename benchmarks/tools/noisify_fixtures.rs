@@ -1,9 +1,9 @@
 //! Generate noisy variants of the clean fixtures for LLM-correction
 //! stress-testing.
 //!
-//! Reads `fixtures/audio/librispeech_clean.wav` and
-//! `fixtures/audio/custom_recording.wav`, adds reproducible Gaussian noise
-//! at multiple SNR levels, and writes `<name>_noise_snr<db>.wav` + a
+//! Reads each fixture named in `BASE_FIXTURES` from `fixtures/audio/`, adds
+//! reproducible Gaussian noise at multiple SNR levels, and writes
+//! `<name>_noise_snr<db>.wav` + a
 //! matching `.txt` reference (identical to the source transcript, since
 //! noise doesn't change the ground truth).
 //!
@@ -31,8 +31,10 @@ use bench_utils::workspace_root;
 const SNR_LEVELS_DB: &[i32] = &[10, 5, 0];
 
 /// Base fixtures to noisify. Each must exist in `fixtures/audio/` as both
-/// `<name>.wav` and `<name>.txt`.
-const BASE_FIXTURES: &[&str] = &["librispeech_clean", "custom_recording"];
+/// `<name>.wav` and `<name>.txt`. Personal recordings are deliberately absent:
+/// they are gitignored, so a name listed here would be missing on a fresh
+/// clone. Add one locally to noisify your own voice.
+const BASE_FIXTURES: &[&str] = &["librispeech_clean"];
 
 fn main() {
     println!();

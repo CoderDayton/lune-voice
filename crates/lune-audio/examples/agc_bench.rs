@@ -112,10 +112,7 @@ fn default_panel() -> Vec<&'static str> {
         "librispeech_clean_noise_snr10.wav",
         "librispeech_clean_noise_snr5.wav",
         "librispeech_clean_noise_snr0.wav",
-        "custom_recording.wav",
-        "custom_recording_noise_snr5.wav",
-        "custom_recording_noise_snr0.wav",
-        "recording_1777575145.wav",
+        "librispeech_40744.wav",
     ]
 }
 
