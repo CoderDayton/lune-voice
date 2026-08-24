@@ -5,6 +5,18 @@
 //! hermitdave/FrequencyWords (MIT License, Copyright (c) 2016 Hermit Dave).
 //! Input accepts either CSV (`word,freq`) or the raw whitespace-separated
 //! upstream format (`word freq`).
+//!
+//! `corpora/` is gitignored — the compiled `data/{lang}_freq.bin` are what
+//! ship, so the ~9 MB of inputs are not carried in the repo. Re-fetch them
+//! only when regenerating, one file per language, from
+//! <https://github.com/hermitdave/FrequencyWords>:
+//!
+//! ```text
+//! content/2018/{lang}/{lang}_full.txt  ->  corpora/{lang}.csv
+//! ```
+//!
+//! A missing language is skipped with a warning rather than failing the run,
+//! so you can regenerate a single language without fetching the rest.
 
 use std::collections::HashMap;
 use std::path::PathBuf;

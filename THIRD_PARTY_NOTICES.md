@@ -56,6 +56,37 @@ https://huggingface.co/ggml-org/whisper-vad is a conversion of the Silero VAD
 model (MIT License, Copyright (c) Silero Team). Downloaded by the user at
 runtime; not bundled with the binary.
 
+## Word frequency lists (hermitdave/FrequencyWords)
+
+The bundled `{lang}_freq.bin` artifacts are compiled from the
+OpenSubtitles-derived word frequency lists at
+https://github.com/hermitdave/FrequencyWords. Unlike the models above, these
+are **compiled into the binary**, so the notice below is reproduced in full.
+
+```
+MIT License
+
+Copyright (c) 2016 Hermit Dave
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ## NVIDIA CUDA runtime libraries
 
 The optional GPU plugin archive
