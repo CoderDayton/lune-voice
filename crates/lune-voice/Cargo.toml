@@ -51,7 +51,7 @@ wayland-backend = { workspace = true }
 zbus = { workspace = true }
 # X11 reachability probe (src/compositor.rs). Pure Rust, and it performs the
 # full setup exchange — including the Xauthority handshake GDK would do.
-x11rb = "0.13"
+x11rb = "0.14"
 
 [dev-dependencies]
 tempfile = "3.27.0"
