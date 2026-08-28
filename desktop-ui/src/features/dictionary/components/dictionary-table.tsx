@@ -1,8 +1,19 @@
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';
-import { ArrowRight, Check, Pencil, Search, Sparkles, X } from 'lucide-react';
+import { ArrowRight, Check, CheckCheck, Pencil, Sparkles, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ConfirmDialog } from '../../../components/feedback';
+import {
+  LIST_HEAD_CELL,
+  LIST_ROW,
+  LIST_ROW_ACTION,
+  ListCard,
+  ListEmpty,
+  ListFooter,
+  ListScroll,
+  ListSearchRail,
+  useListFilterHotkey,
+} from '../../../components/ui/list-card';
 import {
   addDictionaryEntry,
   removeDictionaryEntry,
@@ -50,8 +61,11 @@ function EditRow({ entry, onDone }: { entry: DictionaryEntry; onDone: () => void
   );
 
   return (
-    <tr className="bg-surface-nav-active align-top" onKeyDown={handleKeyDown}>
-      <td className="py-3">
+    <tr
+      className="border-b border-surface-border/60 bg-surface-nav-active align-top"
+      onKeyDown={handleKeyDown}
+    >
+      <td className="px-3 py-3">
         <input
           ref={phraseRef}
           type="text"
@@ -62,7 +76,7 @@ function EditRow({ entry, onDone }: { entry: DictionaryEntry; onDone: () => void
           aria-label={t`Spoken phrase`}
         />
       </td>
-      <td colSpan={2} className="hidden py-3 sm:table-cell">
+      <td colSpan={2} className="hidden px-2 py-3 sm:table-cell">
         <div className="flex items-center gap-3">
           <input
             type="text"
@@ -75,7 +89,7 @@ function EditRow({ entry, onDone }: { entry: DictionaryEntry; onDone: () => void
           <PriorityPicker value={priority} onChange={setPriority} />
         </div>
       </td>
-      <td className="py-3">
+      <td className="py-3 pr-3">
         <div className="mb-2 space-y-2 sm:hidden">
           <input
             type="text"
@@ -116,25 +130,27 @@ function ViewRow({ entry, onEdit }: { entry: DictionaryEntry; onEdit: () => void
   const { t } = useLingui();
 
   return (
-    <tr className="group hover:bg-surface-hover">
-      <td className="py-3">
-        <div className="font-medium text-content">{entry.phrase}</div>
+    <tr className={`${LIST_ROW} group`}>
+      <td className="px-3 py-3">
+        <div className="text-sm font-medium text-content">{entry.phrase}</div>
         <div className="mt-0.5 flex items-center gap-1 text-xs text-content-subtle sm:hidden">
           <ArrowRight size={11} strokeWidth={2} /> {entry.replacement}
         </div>
       </td>
-      <td className="hidden py-3 text-content-muted sm:table-cell">{entry.replacement}</td>
-      <td className="hidden py-3 sm:table-cell">
+      <td className="hidden px-2 py-3 font-mono text-sm text-content-muted sm:table-cell">
+        {entry.replacement}
+      </td>
+      <td className="hidden px-2 py-3 sm:table-cell">
         <PriorityBadge value={entry.priority} />
       </td>
-      <td className="py-3 text-right">
+      <td className="py-3 pr-3 text-right">
         <div className="flex items-center justify-end gap-1">
           <span className="sm:hidden">
             <PriorityBadge value={entry.priority} />
           </span>
           <button
             type="button"
-            className="btn btn-soft btn-sm btn-square opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+            className={`${LIST_ROW_ACTION} btn-soft`}
             onClick={onEdit}
             aria-label={t`Edit ${entry.phrase}`}
           >
@@ -143,7 +159,9 @@ function ViewRow({ entry, onEdit }: { entry: DictionaryEntry; onEdit: () => void
           <ConfirmDialog
             title={t`Delete this word fix?`}
             description={t`Remove the saved correction for "${entry.phrase}" → "${entry.replacement}".`}
-            triggerLabel={t`Delete`}
+            triggerLabel={t`Delete ${entry.phrase}`}
+            triggerIcon={<Trash2 size={14} />}
+            triggerClassName={`${LIST_ROW_ACTION} btn-soft btn-error`}
             onConfirm={() => void removeDictionaryEntry(entry.id)}
           />
         </div>
@@ -157,7 +175,7 @@ function EmptyState() {
   const [seeding, setSeeding] = useState<string | null>(null);
 
   return (
-    <div className="panel-surface flex flex-col items-center px-6 py-12 text-center sm:py-16">
+    <div className="panel-surface flex min-h-0 flex-1 flex-col items-center justify-center px-6 py-12 text-center sm:py-16">
       <div className="token-icon mb-4 size-14 rounded-full">
         <Sparkles className="size-7" strokeWidth={1.4} />
       </div>
@@ -206,64 +224,57 @@ export function VocabularyList() {
   const entries = useStore(workspaceStore, (state) => state.dictionaryEntries);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [query, setQuery] = useState('');
+  const queryRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(
     () => entries.filter((entry) => entryMatchesQuery(entry, query)),
     [entries, query],
   );
 
+  useListFilterHotkey(queryRef);
+
   if (entries.length === 0) return <EmptyState />;
 
   return (
-    <div className="flex flex-col gap-3">
-      {/* Toolbar: filter + live count */}
-      <div className="flex items-center gap-2">
-        <div className="flex h-10 flex-1 items-center gap-2.5 rounded-field border border-surface-border bg-surface-field px-3 transition-colors focus-within:border-surface-border-strong focus-within:outline-2 focus-within:outline-offset-[-2px] focus-within:outline-primary/60">
-          <Search size={16} strokeWidth={2} className="shrink-0 text-content-subtle" />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t`Filter rules…`}
-            aria-label={t`Filter rules`}
-            className="h-full min-w-0 grow bg-transparent text-sm text-content outline-none placeholder:text-content-subtle"
-          />
-          {query && (
-            <button
-              type="button"
-              onClick={() => setQuery('')}
-              className="btn btn-soft btn-circle btn-xs"
-              aria-label={t`Clear filter`}
-            >
-              <X size={13} />
-            </button>
-          )}
-        </div>
-        <span className="hidden shrink-0 px-1 text-sm tabular-nums text-content-subtle sm:inline">
-          {query.trim() ? t`${filtered.length} of ${entries.length}` : t`${entries.length} rules`}
-        </span>
-      </div>
+    // Same card, rail, and table chrome as Sessions (`components/ui/list-card`).
+    // The filter belongs *to* the table, so it stays put when a query matches
+    // nothing instead of vanishing along with the results.
+    <ListCard>
+      <ListSearchRail
+        inputRef={queryRef}
+        value={query}
+        onValueChange={setQuery}
+        placeholder={t`Filter rules…`}
+        label={t`Filter rules`}
+        count={
+          query.trim() ? t`${filtered.length} / ${entries.length}` : t`${entries.length} rules`
+        }
+      />
 
-      {filtered.length === 0 ? (
-        <div role="status" className="px-6 py-12 text-center text-sm text-content-muted">
-          <Trans>No rules match “{query}”.</Trans>
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-box border border-surface-border bg-surface-card">
-          <table className="table">
+      <ListScroll>
+        {filtered.length === 0 ? (
+          <ListEmpty>
+            <p role="status" className="text-sm text-content-muted">
+              <Trans>No rules match “{query}”.</Trans>
+            </p>
+          </ListEmpty>
+        ) : (
+          <table className="w-full border-collapse text-sm">
             <thead>
-              <tr className="text-content-subtle">
-                <th>
+              <tr>
+                <th className={`${LIST_HEAD_CELL} px-3`}>
                   <Trans>Phrase</Trans>
                 </th>
-                <th className="hidden sm:table-cell">
+                <th className={`${LIST_HEAD_CELL} hidden px-2 sm:table-cell`}>
                   <Trans>Replacement</Trans>
                 </th>
-                <th className="hidden w-28 sm:table-cell">
+                <th className={`${LIST_HEAD_CELL} hidden w-28 px-2 sm:table-cell`}>
                   <Trans>Priority</Trans>
                 </th>
-                <th className="w-20 text-right sm:w-28">
-                  <Trans>Action</Trans>
+                <th className={`${LIST_HEAD_CELL} w-20 pr-3 sm:w-24`}>
+                  <span className="sr-only">
+                    <Trans>Action</Trans>
+                  </span>
                 </th>
               </tr>
             </thead>
@@ -277,8 +288,15 @@ export function VocabularyList() {
               )}
             </tbody>
           </table>
-        </div>
-      )}
-    </div>
+        )}
+      </ListScroll>
+
+      <ListFooter>
+        <span className="flex items-center gap-2 text-sm text-content-subtle">
+          <CheckCheck size={14} strokeWidth={1.9} className="text-success" aria-hidden="true" />
+          <Trans>Applied on every dictation · highest priority first</Trans>
+        </span>
+      </ListFooter>
+    </ListCard>
   );
 }

@@ -118,19 +118,27 @@ export function AppShell() {
         </div>
 
         <main id="main-content" className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className={page.to === '/' ? 'app-scroll app-scroll-fixed' : 'app-scroll'}>
-            <div className={page.to === '/' ? 'app-frame app-frame-fill' : 'app-frame'}>
+          <div className={page.fill ? 'app-scroll app-scroll-fixed' : 'app-scroll'}>
+            <div className={page.fill ? 'app-frame app-frame-fill' : 'app-frame'}>
               {/* Page hero — Home leads with its bento board; every other
                   page gets its title + description back as an in-page header. */}
               {page.to !== '/' && (
-                <header className="mb-7 select-none">
+                <header className="mb-7 shrink-0 select-none">
                   <h1 className="font-display text-display-lg font-semibold tracking-display text-content-strong">
                     {page.label}
                   </h1>
                   <p className="mt-1.5 text-sm text-content-subtle">{page.description}</p>
                 </header>
               )}
-              <Outlet />
+              {/* A filling page gets a growable box to distribute; the header
+                  above it stays at its natural height. */}
+              {page.fill ? (
+                <div className="flex min-h-0 flex-1 flex-col">
+                  <Outlet />
+                </div>
+              ) : (
+                <Outlet />
+              )}
             </div>
           </div>
         </main>

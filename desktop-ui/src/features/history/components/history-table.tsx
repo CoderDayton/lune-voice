@@ -1,18 +1,19 @@
 import { useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';
 import { invoke } from '@tauri-apps/api/core';
-import {
-  Check,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Copy,
-  Download,
-  Search,
-  X,
-} from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Download } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ConfirmDialog } from '../../../components/feedback/confirm-dialog';
+import {
+  LIST_HEAD_CELL,
+  LIST_ROW,
+  ListCard,
+  ListEmpty,
+  ListFooter,
+  ListScroll,
+  ListSearchRail,
+  useListFilterHotkey,
+} from '../../../components/ui/list-card';
 import { formatBackend } from '../../../store/workspace-mappers';
 import {
   fetchHistoryPage,
@@ -34,6 +35,9 @@ function formatDuration(seconds: number): string {
  * a sticky-header data table whose rows expand in place to reveal the full
  * transcript and actions, and pinned pagination. Fills its parent's height;
  * only the table body scrolls.
+ *
+ * Shares its card, search rail, and table chrome with Vocabulary via
+ * `components/ui/list-card`, so the two lists stay identical.
  */
 export function HistoryTable() {
   const { t } = useLingui();
@@ -57,62 +61,26 @@ export function HistoryTable() {
     void fetchHistoryPage();
   }, []);
 
-  // "/" focuses the search field, matching the rest of the app.
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      const typing =
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        (target?.isContentEditable ?? false);
-      if (e.key === '/' && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        e.preventDefault();
-        searchRef.current?.focus();
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
+  useListFilterHotkey(searchRef);
 
   const hasSearch = search.trim().length > 0;
   const start = visibleCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, visibleCount);
 
   return (
-    <div className="panel-surface flex h-full min-h-0 flex-col overflow-hidden">
-      {/* Search row */}
-      <div className="flex shrink-0 items-center gap-3 border-b border-surface-border px-3 py-2.5 sm:px-4">
-        <Search size={17} strokeWidth={2} className="shrink-0 text-content-subtle" />
-        <input
-          ref={searchRef}
-          type="search"
-          value={search}
-          onChange={(e) => workspaceActions.setHistorySearch(e.target.value)}
-          placeholder={t`Search transcripts…`}
-          className="h-9 min-w-0 grow bg-transparent text-sm text-content placeholder:text-content-subtle"
-          aria-label={t`Search transcripts`}
-        />
-        {hasSearch ? (
-          <button
-            type="button"
-            onClick={() => workspaceActions.setHistorySearch('')}
-            className="btn btn-soft btn-circle btn-xs"
-            aria-label={t`Clear search`}
-          >
-            <X size={14} />
-          </button>
-        ) : (
-          <kbd className="kbd kbd-sm hidden text-content-subtle sm:inline-flex">/</kbd>
-        )}
-        <span className="hidden shrink-0 text-sm tabular-nums text-content-subtle sm:inline">
-          {hasSearch ? t`${visibleCount} / ${totalCount}` : t`${totalCount} sessions`}
-        </span>
-      </div>
+    <ListCard>
+      <ListSearchRail
+        inputRef={searchRef}
+        value={search}
+        onValueChange={(v) => workspaceActions.setHistorySearch(v)}
+        placeholder={t`Search transcripts…`}
+        label={t`Search transcripts`}
+        count={hasSearch ? t`${visibleCount} / ${totalCount}` : t`${totalCount} sessions`}
+      />
 
-      {/* Table body — the only scroll region */}
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <ListScroll>
         {sessions.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center px-6 py-16 text-center">
+          <ListEmpty>
             {loading ? (
               <span className="loading loading-spinner loading-md text-content-subtle" />
             ) : (
@@ -124,18 +92,22 @@ export function HistoryTable() {
                     : t`No sessions found.`}
               </p>
             )}
-          </div>
+          </ListEmpty>
         ) : (
           <table className="w-full border-collapse text-sm">
-            <thead className="sticky top-0 z-10 bg-surface-panel">
-              <tr className="border-b border-surface-border text-left text-xs uppercase tracking-wider text-content-subtle">
-                <th className="w-px py-2 pl-3" />
-                <th className="px-2 py-2 font-medium">{t`Time`}</th>
-                <th className="px-2 py-2 font-medium">{t`Transcript`}</th>
-                <th className="hidden px-2 py-2 text-right font-medium sm:table-cell">{t`Words`}</th>
-                <th className="hidden px-2 py-2 text-right font-medium sm:table-cell">{t`Length`}</th>
-                <th className="hidden px-2 py-2 font-medium lg:table-cell">{t`Engine`}</th>
-                <th className="w-px py-2 pr-3" />
+            <thead>
+              <tr>
+                <th className={`${LIST_HEAD_CELL} w-px pl-3`} />
+                <th className={`${LIST_HEAD_CELL} px-2`}>{t`Time`}</th>
+                <th className={`${LIST_HEAD_CELL} px-2`}>{t`Transcript`}</th>
+                <th className={`${LIST_HEAD_CELL} hidden px-2 text-right sm:table-cell`}>
+                  {t`Words`}
+                </th>
+                <th className={`${LIST_HEAD_CELL} hidden px-2 text-right sm:table-cell`}>
+                  {t`Length`}
+                </th>
+                <th className={`${LIST_HEAD_CELL} hidden px-2 lg:table-cell`}>{t`Engine`}</th>
+                <th className={`${LIST_HEAD_CELL} w-px pr-3`} />
               </tr>
             </thead>
             <tbody>
@@ -152,46 +124,47 @@ export function HistoryTable() {
             </tbody>
           </table>
         )}
-      </div>
+      </ListScroll>
 
-      {/* Pagination */}
       {totalPages > 1 && (
-        <nav
-          aria-label={t`Pagination`}
-          className="flex shrink-0 items-center justify-between gap-3 border-t border-surface-border px-3 py-2.5 sm:px-4"
-        >
-          <span className="text-sm tabular-nums text-content-subtle">
-            {t`${start}–${end} of ${visibleCount}`}
-          </span>
-          <div className="join">
-            <button
-              type="button"
-              className="btn btn-soft btn-sm join-item gap-1"
-              disabled={page <= 1}
-              onClick={() => workspaceActions.setHistoryPage(page - 1)}
-              aria-label={t`Previous page`}
-            >
-              <ChevronLeft size={14} /> {t`Prev`}
-            </button>
-            <span
-              className="btn btn-soft btn-sm join-item pointer-events-none no-animation tabular-nums"
-              aria-current="page"
-            >
-              {t`${page} / ${totalPages}`}
+        <ListFooter>
+          <nav
+            aria-label={t`Pagination`}
+            className="flex w-full items-center justify-between gap-3"
+          >
+            <span className="text-sm tabular-nums text-content-subtle">
+              {t`${start}–${end} of ${visibleCount}`}
             </span>
-            <button
-              type="button"
-              className="btn btn-soft btn-sm join-item gap-1"
-              disabled={page >= totalPages}
-              onClick={() => workspaceActions.setHistoryPage(page + 1)}
-              aria-label={t`Next page`}
-            >
-              {t`Next`} <ChevronRight size={14} />
-            </button>
-          </div>
-        </nav>
+            <div className="join">
+              <button
+                type="button"
+                className="btn btn-soft btn-sm join-item gap-1"
+                disabled={page <= 1}
+                onClick={() => workspaceActions.setHistoryPage(page - 1)}
+                aria-label={t`Previous page`}
+              >
+                <ChevronLeft size={14} /> {t`Prev`}
+              </button>
+              <span
+                className="btn btn-soft btn-sm join-item pointer-events-none no-animation tabular-nums"
+                aria-current="page"
+              >
+                {t`${page} / ${totalPages}`}
+              </span>
+              <button
+                type="button"
+                className="btn btn-soft btn-sm join-item gap-1"
+                disabled={page >= totalPages}
+                onClick={() => workspaceActions.setHistoryPage(page + 1)}
+                aria-label={t`Next page`}
+              >
+                {t`Next`} <ChevronRight size={14} />
+              </button>
+            </div>
+          </nav>
+        </ListFooter>
       )}
-    </div>
+    </ListCard>
   );
 }
 
@@ -314,7 +287,7 @@ function SessionRows({ session, expanded, onToggle }: SessionRowsProps) {
       <tr
         onClick={onToggle}
         aria-expanded={expanded}
-        className={`cursor-pointer border-b border-surface-border/60 align-top transition-colors hover:bg-surface-hover ${
+        className={`${LIST_ROW} cursor-pointer align-top ${
           expanded ? 'bg-surface-nav-active' : ''
         }`}
       >

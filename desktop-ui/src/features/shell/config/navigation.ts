@@ -41,6 +41,10 @@ export interface NavigationItem {
   group: NavigationGroupLabel;
   shortcut: RegisterableHotkey;
   icon: LucideIcon;
+  /** Page owns the viewport height instead of growing with its content: the
+   *  frame fills the region and the page's own list is the only scroller.
+   *  Falls back to ordinary page scrolling below the `lg` breakpoint. */
+  fill?: boolean;
 }
 
 export const navigationItems: NavigationItem[] = [
@@ -51,6 +55,7 @@ export const navigationItems: NavigationItem[] = [
     group: 'Workspace',
     shortcut: navigationShortcuts['/'],
     icon: House,
+    fill: true,
   },
   {
     to: '/history',
@@ -59,22 +64,25 @@ export const navigationItems: NavigationItem[] = [
     group: 'Workspace',
     shortcut: navigationShortcuts['/history'],
     icon: Clock,
+    fill: true,
   },
   {
     to: '/dictionary',
     label: 'Vocabulary',
-    description: 'Custom phrases and corrections',
+    description: 'Corrections Lune Voice applies every time you dictate',
     group: 'Workspace',
     shortcut: navigationShortcuts['/dictionary'],
     icon: BookText,
+    fill: true,
   },
   {
     to: '/snippets',
     label: 'Snippets',
-    description: 'Templates you expand by voice',
+    description: 'Blocks of text Lune Voice types when you speak their trigger phrase',
     group: 'Workspace',
     shortcut: navigationShortcuts['/snippets'],
     icon: ScrollText,
+    fill: true,
   },
   {
     to: '/styles',

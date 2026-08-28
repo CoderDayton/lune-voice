@@ -22,6 +22,8 @@ interface VoiceCaptureFieldProps {
   lowercase?: boolean;
   inputRef?: Ref<HTMLInputElement>;
   required?: boolean;
+  /** Single-row height, to sit level with a compact composer's other fields. */
+  compact?: boolean;
 }
 
 /**
@@ -44,6 +46,7 @@ export function VoiceCaptureField({
   lowercase,
   inputRef,
   required,
+  compact,
 }: VoiceCaptureFieldProps) {
   const { t } = useLingui();
   const captureSessionId = useStore(workspaceStore, (s) => s.runtime.captureSessionId);
@@ -125,7 +128,9 @@ export function VoiceCaptureField({
             }
           }}
           readOnly={capturing}
-          className="input input-lg w-full pr-14 text-base"
+          className={
+            compact ? 'input w-full pr-10 text-sm' : 'input input-lg w-full pr-14 text-base'
+          }
           placeholder={
             capturePhase === 'listening'
               ? t`Listening — say the phrase…`
@@ -143,7 +148,9 @@ export function VoiceCaptureField({
           type="button"
           onClick={toggleCapture}
           disabled={micBusy}
-          className={`capture-btn ${capturePhase === 'listening' ? 'capture-btn-listening' : ''}`}
+          className={`capture-btn ${compact ? 'capture-btn-sm' : ''} ${
+            capturePhase === 'listening' ? 'capture-btn-listening' : ''
+          }`}
           aria-pressed={capturing}
           aria-label={capturing ? t`Stop capturing` : t`Capture by voice`}
           title={

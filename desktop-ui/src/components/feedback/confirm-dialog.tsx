@@ -1,10 +1,14 @@
 import { useLingui } from '@lingui/react/macro';
-import { useId, useState } from 'react';
+import { type ReactNode, useId, useState } from 'react';
 
 interface ConfirmDialogProps {
   title: string;
   description: string;
   triggerLabel?: string;
+  /** Render the trigger as an icon button; `triggerLabel` becomes its
+   *  accessible name instead of visible text. */
+  triggerIcon?: ReactNode;
+  triggerClassName?: string;
   confirmLabel?: string;
   cancelLabel?: string;
   onConfirm: () => void;
@@ -14,6 +18,8 @@ export function ConfirmDialog({
   title,
   description,
   triggerLabel,
+  triggerIcon,
+  triggerClassName,
   confirmLabel,
   cancelLabel,
   onConfirm,
@@ -26,11 +32,12 @@ export function ConfirmDialog({
     <>
       <button
         type="button"
-        className="btn btn-soft btn-sm"
+        className={triggerClassName ?? 'btn btn-soft btn-sm'}
         aria-haspopup="dialog"
+        aria-label={triggerIcon ? (triggerLabel ?? t`Remove`) : undefined}
         onClick={() => dialog?.showModal()}
       >
-        {triggerLabel ?? t`Remove`}
+        {triggerIcon ?? triggerLabel ?? t`Remove`}
       </button>
 
       <dialog

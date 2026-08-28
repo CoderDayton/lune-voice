@@ -1,16 +1,14 @@
 import { Trans, useLingui } from '@lingui/react/macro';
-import { ArrowRight, Plus, Wand2 } from 'lucide-react';
+import { ArrowRight, Plus } from 'lucide-react';
 import { type FormEvent, useId, useRef, useState } from 'react';
-import { PanelHeader } from '../../../components/ui/panel-header';
 import { VoiceCaptureField } from '../../../components/ui/voice-capture-field';
 import { addDictionaryEntry } from '../../../store/workspace-store';
 import { PriorityPicker } from './priority-picker';
 
 /**
- * Add-a-correction composer. The two inputs read as a single mapping —
- * "you say X → Lune Voice writes Y" — joined by an arrow node, and a live preview
- * shows the misheard word being rewritten so the abstract rule feels concrete
- * before it's saved. Controlled fields drive that preview.
+ * Add-a-correction composer. Collapses to a single row — "you say X → Lune
+ * Voice writes Y" is itself the preview, so there's no separate confirmation
+ * text; the saved-rules table below is the page's hero, not this form.
  */
 export function QuickAddRule() {
   const { t } = useLingui();
@@ -24,8 +22,7 @@ export function QuickAddRule() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const ready = phrase.trim().length > 0 && replacement.trim().length > 0;
-  const canSubmit = ready && !pending;
+  const canSubmit = phrase.trim().length > 0 && replacement.trim().length > 0 && !pending;
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -45,114 +42,83 @@ export function QuickAddRule() {
   }
 
   return (
-    <section className="panel-surface p-5 sm:p-6" aria-label={t`Add a correction`}>
-      <PanelHeader
-        icon={Wand2}
-        title={t`Add a correction`}
-        description={t`Teach Lune Voice the right spelling for a word it mishears.`}
-      />
-
-      <form onSubmit={handleSubmit} className="mt-5 flex flex-col gap-4">
-        {/* Mapping: you say → Lune Voice writes */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-3">
-          <div className="flex flex-1 flex-col gap-1.5">
-            <label
-              htmlFor={phraseId}
-              className="text-xs font-medium uppercase tracking-wider text-content-subtle"
-            >
-              <Trans>You say</Trans>
-            </label>
-            {/* Voice capture stores the phrase exactly as the ASR hears it —
-                the misheard form is precisely what this field wants. */}
-            <VoiceCaptureField
-              id={phraseId}
-              value={phrase}
-              onValueChange={setPhrase}
-              placeholder={t`github`}
-              inputRef={phraseRef}
-              lowercase
-              required
-            />
-          </div>
-
-          <div
-            className="flex shrink-0 items-center justify-center self-center pb-0 sm:mb-1.5 sm:self-end"
-            aria-hidden="true"
+    <section className="panel-surface shrink-0 p-4 sm:p-5" aria-label={t`Add a correction`}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex flex-1 flex-col gap-1.5">
+          <label
+            htmlFor={phraseId}
+            className="text-xs font-medium uppercase tracking-wider text-content-subtle"
           >
-            <span className="grid size-8 place-items-center rounded-full border border-surface-border bg-surface-panel text-content-subtle">
-              <ArrowRight size={15} strokeWidth={2.2} className="rotate-90 sm:rotate-0" />
-            </span>
-          </div>
-
-          <div className="flex flex-1 flex-col gap-1.5">
-            <label
-              htmlFor={replacementId}
-              className="text-xs font-medium uppercase tracking-wider text-content-subtle"
-            >
-              <Trans>Lune Voice writes</Trans>
-            </label>
-            <input
-              id={replacementId}
-              type="text"
-              value={replacement}
-              onChange={(e) => setReplacement(e.target.value)}
-              className="input input-lg w-full text-base"
-              placeholder={t`GitHub`}
-              autoComplete="off"
-              spellCheck={false}
-              required
-              aria-required="true"
-            />
-          </div>
+            <Trans>You say</Trans>
+          </label>
+          {/* Voice capture stores the phrase exactly as the ASR hears it —
+              the misheard form is precisely what this field wants. */}
+          <VoiceCaptureField
+            id={phraseId}
+            value={phrase}
+            onValueChange={setPhrase}
+            placeholder={t`github`}
+            inputRef={phraseRef}
+            lowercase
+            required
+            compact
+          />
         </div>
 
-        {/* Live preview — the misheard word rewritten to the correction */}
-        <div
-          aria-live="polite"
-          className="rounded-field border border-surface-border bg-surface-inset/60 px-4 py-2.5 text-sm"
+        <span
+          className="hidden shrink-0 items-center justify-center pb-2.5 text-content-subtle sm:flex"
+          aria-hidden="true"
         >
-          {ready ? (
-            <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-content-muted">
-              <span className="text-xs uppercase tracking-wider text-content-subtle">
-                <Trans>Preview</Trans>
-              </span>
-              <span className="text-content-subtle line-through decoration-content-dim/60">
-                {phrase}
-              </span>
-              <ArrowRight size={13} strokeWidth={2} className="text-content-subtle" />
-              <span className="font-medium text-primary">{replacement}</span>
-            </span>
+          <ArrowRight size={15} strokeWidth={2.2} />
+        </span>
+
+        <div className="flex flex-1 flex-col gap-1.5">
+          <label
+            htmlFor={replacementId}
+            className="text-xs font-medium uppercase tracking-wider text-content-subtle"
+          >
+            <Trans>Lune Voice writes</Trans>
+          </label>
+          <input
+            id={replacementId}
+            type="text"
+            value={replacement}
+            onChange={(e) => setReplacement(e.target.value)}
+            className="input w-full text-sm"
+            placeholder={t`GitHub`}
+            autoComplete="off"
+            spellCheck={false}
+            required
+            aria-required="true"
+          />
+        </div>
+
+        <div className="flex shrink-0 flex-col gap-1.5">
+          <span className="text-xs font-medium uppercase tracking-wider text-content-subtle">
+            <Trans>Priority</Trans>
+          </span>
+          <PriorityPicker value={priority} onChange={setPriority} size="md" />
+        </div>
+
+        <button
+          type="submit"
+          className="btn btn-primary h-10 min-h-10 shrink-0 sm:min-w-24"
+          disabled={!canSubmit}
+        >
+          {pending ? (
+            <span className="loading loading-spinner loading-sm" />
           ) : (
-            <span className="text-content-subtle">
-              <Trans>Fill both fields to see the correction.</Trans>
-            </span>
+            <>
+              <Plus size={16} strokeWidth={2.5} />
+              <Trans>Add</Trans>
+            </>
           )}
-        </div>
-
-        {/* Priority + submit */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium uppercase tracking-wider text-content-subtle">
-              <Trans>Priority</Trans>
-            </span>
-            <PriorityPicker value={priority} onChange={setPriority} size="sm" />
-          </div>
-          <button type="submit" className="btn btn-primary sm:min-w-36" disabled={!canSubmit}>
-            {pending ? (
-              <span className="loading loading-spinner loading-sm" />
-            ) : (
-              <>
-                <Plus size={16} strokeWidth={2.5} />
-                <Trans>Add correction</Trans>
-              </>
-            )}
-          </button>
-        </div>
-
-        <p role="alert" className="text-sm text-error empty:hidden">
-          {error}
-        </p>
+        </button>
       </form>
+
+      <p role="alert" className="mt-2 text-sm text-error empty:hidden">
+        {error}
+      </p>
     </section>
   );
 }

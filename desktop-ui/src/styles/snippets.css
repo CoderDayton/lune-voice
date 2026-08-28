@@ -38,6 +38,11 @@
     transform var(--duration-instant) var(--ease-standard);
 }
 
+/* Compact variant for the single-row composers (Vocabulary, Snippets). */
+@utility capture-btn-sm {
+  @apply right-1.5 size-7;
+}
+
 .capture-btn:hover:not(:disabled) {
   background: color-mix(in oklab, var(--color-primary) 16%, transparent);
   border-color: var(--color-primary);
