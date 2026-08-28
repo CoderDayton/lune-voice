@@ -610,6 +610,15 @@ impl AudioStream {
         self.ring.evicted()
     }
 
+    /// Mark this stream as actively read for as long as the guard lives.
+    ///
+    /// A pre-warmed stream outlives every session, so between dictations its
+    /// ring is a rolling pre-roll window and evicting the oldest chunk is
+    /// expected. Only inside a guard does an eviction mean a reader lost audio.
+    pub fn consume(&self) -> ConsumerGuard {
+        ConsumerGuard::new(Arc::clone(&self.ring))
+    }
+
     /// Whether cpal has reported an error on this stream.
     ///
     /// Sticky: a device does not come back on its own, so once this is true the
@@ -690,6 +699,11 @@ impl AudioStreamHandle {
         self.ring.evicted()
     }
 
+    /// See [`AudioStream::consume`].
+    pub fn consume(&self) -> ConsumerGuard {
+        ConsumerGuard::new(Arc::clone(&self.ring))
+    }
+
     /// See `AudioStream::request_flush`.
     pub fn request_flush(&self) {
         self.flush.store(true, Ordering::Release);
@@ -719,6 +733,30 @@ impl AudioStreamHandle {
 
     pub fn buffer_fill(&self) -> f32 {
         self.ring.len() as f32 / self.config.buffer_capacity as f32
+    }
+}
+
+/// Registers an active reader on a ring buffer, deregistering on drop.
+///
+/// Holding one switches the ring from "idle pre-roll window" (evictions are
+/// the design) to "someone is reading" (evictions are lost audio, counted and
+/// warned about). Tie its lifetime to the capture loop, not to the handle:
+/// the runtime keeps a pre-warmed handle alive the whole time the app runs.
+#[must_use = "evictions stop counting as data loss as soon as this is dropped"]
+pub struct ConsumerGuard {
+    ring: Arc<RingBuffer<AudioChunk>>,
+}
+
+impl ConsumerGuard {
+    fn new(ring: Arc<RingBuffer<AudioChunk>>) -> Self {
+        ring.attach_consumer();
+        Self { ring }
+    }
+}
+
+impl Drop for ConsumerGuard {
+    fn drop(&mut self) {
+        self.ring.detach_consumer();
     }
 }
 

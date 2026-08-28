@@ -31,8 +31,8 @@ mod vad;
 
 pub use calibrate::{CalibrationError, CalibrationInput, CalibrationResult};
 pub use capture::{
-    AudioConfig, AudioStream, AudioStreamHandle, DeviceSelection, list_input_devices,
-    resolve_input_device,
+    AudioConfig, AudioStream, AudioStreamHandle, ConsumerGuard, DeviceSelection,
+    list_input_devices, resolve_input_device,
 };
 pub use pcen::{
     DEFAULT_NOISE_CEILING_RMS, EXPECTED_OUTPUT_RMS, PcenAgc, PcenAgcConfig, PcenFrameStats,
@@ -61,6 +61,12 @@ pub trait AudioPull: Send + Sync {
     /// transcript that quietly starts mid-sentence, which is close to
     /// undiagnosable without this number.
     fn dropped_chunks(&self) -> u64;
+    /// Announce that this source is being read, until the guard is dropped.
+    ///
+    /// [`Self::dropped_chunks`] only counts — and the ring only warns — while
+    /// a guard is held. A pre-warmed stream outlives every session, so without
+    /// this its idle ring would report a permanent stall.
+    fn consume(&self) -> ConsumerGuard;
 }
 
 impl AudioPull for AudioStream {
@@ -76,6 +82,9 @@ impl AudioPull for AudioStream {
     fn dropped_chunks(&self) -> u64 {
         AudioStream::dropped_chunks(self)
     }
+    fn consume(&self) -> ConsumerGuard {
+        AudioStream::consume(self)
+    }
 }
 
 impl AudioPull for AudioStreamHandle {
@@ -90,6 +99,9 @@ impl AudioPull for AudioStreamHandle {
     }
     fn dropped_chunks(&self) -> u64 {
         AudioStreamHandle::dropped_chunks(self)
+    }
+    fn consume(&self) -> ConsumerGuard {
+        AudioStreamHandle::consume(self)
     }
 }
 

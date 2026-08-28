@@ -6,8 +6,15 @@
 //! guarantee. A consumer that keeps up sees none of this; a stalled one
 //! silently loses the front of the utterance, which is exactly the failure a
 //! counter has to make visible ([`RingBuffer::evicted`]).
+//!
+//! Eviction only means data loss *while someone is reading*. The pre-warmed
+//! capture stream keeps producing between dictations, and with no session
+//! attached the ring is a rolling pre-roll window whose oldest chunk aging out
+//! is the whole point. So evictions are counted and logged only while a
+//! consumer is attached ([`RingBuffer::attach_consumer`]); otherwise an idle
+//! app would warn forever and bury the stall this counter exists to catch.
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use crossbeam_channel::{Receiver, Sender, TryRecvError, TrySendError, bounded};
 use tokio::sync::Notify;
@@ -24,8 +31,14 @@ pub struct RingBuffer<T> {
     /// exponential-backoff sleep loop that added up to 10 ms of latency
     /// on the first miss.
     notify: Notify,
-    /// Chunks dropped to make room, for the lifetime of this buffer.
+    /// Chunks dropped to make room while a consumer was attached — i.e. audio
+    /// a reader actually lost. Reset when the first consumer of a new run
+    /// attaches, so it reads per-session rather than per-process.
     evicted: AtomicU64,
+    /// Consumers currently draining the ring. Zero means the buffer is acting
+    /// as an idle pre-roll window, where overwriting the oldest chunk is the
+    /// design rather than a stall.
+    consumers: AtomicUsize,
 }
 
 impl<T> RingBuffer<T> {
@@ -39,20 +52,44 @@ impl<T> RingBuffer<T> {
             rx,
             notify: Notify::new(),
             evicted: AtomicU64::new(0),
+            consumers: AtomicUsize::new(0),
         })
     }
 
-    /// How many chunks have been evicted to make room for newer ones.
+    /// How many chunks have been evicted to make room for newer ones *while a
+    /// consumer was attached*.
     ///
     /// Non-zero means the consumer fell behind and audio was lost from the
     /// front of the buffer — the transcript will be missing its opening.
+    /// Evictions from the idle pre-roll window are not counted here.
     pub fn evicted(&self) -> u64 {
         self.evicted.load(Ordering::Relaxed)
     }
 
+    /// Register a consumer. Evictions count and warn only while at least one is
+    /// attached; the first of a run also zeroes [`Self::evicted`] so the count
+    /// describes this run's loss and not the idle time before it.
+    ///
+    /// Pair with [`Self::detach_consumer`] — callers should prefer the RAII
+    /// guard from `AudioStream::consume` over calling these directly.
+    pub fn attach_consumer(&self) {
+        if self.consumers.fetch_add(1, Ordering::AcqRel) == 0 {
+            self.evicted.store(0, Ordering::Relaxed);
+        }
+    }
+
+    /// Deregister a consumer attached by [`Self::attach_consumer`].
+    pub fn detach_consumer(&self) {
+        self.consumers.fetch_sub(1, Ordering::AcqRel);
+    }
+
     /// Count a dropped chunk, logging the first and then every
-    /// `EVICTION_LOG_INTERVAL`-th one.
-    fn note_eviction(&self) {
+    /// `EVICTION_LOG_INTERVAL`-th one. Returns whether the eviction counted as
+    /// data loss — `false` when no consumer was attached to lose it.
+    fn note_eviction(&self) -> bool {
+        if self.consumers.load(Ordering::Acquire) == 0 {
+            return false;
+        }
         let n = self.evicted.fetch_add(1, Ordering::Relaxed) + 1;
         if n == 1 || n % EVICTION_LOG_INTERVAL == 0 {
             tracing::warn!(
@@ -60,6 +97,7 @@ impl<T> RingBuffer<T> {
                 "ring buffer full — dropping the oldest audio; the consumer is not keeping up"
             );
         }
+        true
     }
 
     /// Push an item, evicting the oldest to make room when full.
@@ -95,11 +133,12 @@ impl<T> RingBuffer<T> {
             }
         }
         // The incoming chunk itself was lost, not just the oldest one.
-        self.note_eviction();
-        tracing::warn!(
-            retries = MAX_EVICT_RETRIES,
-            "ring buffer push dropped a chunk after repeated eviction races"
-        );
+        if self.note_eviction() {
+            tracing::warn!(
+                retries = MAX_EVICT_RETRIES,
+                "ring buffer push dropped a chunk after repeated eviction races"
+            );
+        }
         // Wake one parked consumer (if any). `notify_one` is non-blocking
         // and safe to call from a non-async producer thread.
         self.notify.notify_one();
@@ -159,6 +198,7 @@ mod tests {
         // the utterance does not — and that has to be visible, because the only
         // other symptom is a transcript quietly missing its opening words.
         let ring = RingBuffer::new(2).expect("capacity > 0");
+        ring.attach_consumer();
         ring.push(1);
         ring.push(2);
         ring.push(3);
@@ -172,11 +212,62 @@ mod tests {
     #[test]
     fn the_eviction_count_accumulates() {
         let ring = RingBuffer::new(1).expect("capacity > 0");
+        ring.attach_consumer();
         for i in 0..5 {
             ring.push(i);
         }
         assert_eq!(ring.evicted(), 4);
         assert_eq!(ring.try_pop(), Some(4), "only the newest survives");
+    }
+
+    #[test]
+    fn idle_overflow_is_not_counted_as_loss() {
+        // A pre-warmed capture stream keeps producing between dictations. With
+        // nobody reading, the ring is a rolling pre-roll window: the oldest
+        // chunk aging out is the design, so it must neither count nor warn —
+        // otherwise an idle app logs forever and buries a real stall.
+        let ring = RingBuffer::new(2).expect("capacity > 0");
+        for i in 0..50 {
+            ring.push(i);
+        }
+        assert_eq!(ring.evicted(), 0, "no consumer was there to lose anything");
+        assert_eq!(ring.try_pop(), Some(48), "the newest chunks still survive");
+    }
+
+    #[test]
+    fn attaching_rebaselines_the_count_after_idle() {
+        // The count feeds a per-session "the transcript lost its opening"
+        // diagnostic, so a session must not inherit the previous one's total.
+        let ring = RingBuffer::new(1).expect("capacity > 0");
+        ring.attach_consumer();
+        ring.push(1);
+        ring.push(2);
+        assert_eq!(ring.evicted(), 1);
+
+        ring.detach_consumer();
+        for i in 0..20 {
+            ring.push(i);
+        }
+        assert_eq!(ring.evicted(), 1, "idle pushes leave the count alone");
+
+        ring.attach_consumer();
+        assert_eq!(ring.evicted(), 0, "a new run starts from zero");
+    }
+
+    #[test]
+    fn a_second_consumer_does_not_rebaseline() {
+        let ring = RingBuffer::new(1).expect("capacity > 0");
+        ring.attach_consumer();
+        ring.push(1);
+        ring.push(2);
+        assert_eq!(ring.evicted(), 1);
+
+        ring.attach_consumer();
+        assert_eq!(ring.evicted(), 1, "only the first attach of a run resets");
+
+        ring.detach_consumer();
+        ring.push(3);
+        assert_eq!(ring.evicted(), 2, "still counted while one consumer holds");
     }
 
     #[tokio::test]

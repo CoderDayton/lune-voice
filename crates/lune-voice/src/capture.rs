@@ -295,6 +295,10 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
         audio_source,
         asr_session,
     } = init_session_runtime(asr, asr_config, audio_override, input_device).await?;
+    // From here until this function returns, evictions in the ring mean *we*
+    // fell behind. Outside the guard a pre-warmed stream's ring is just a
+    // rolling pre-roll window, and its evictions are expected, not a stall.
+    let _consuming = audio_source.consume();
     let _ = send_bounded(event_tx, SessionEvent::Started).await;
 
     let mut segments = Vec::with_capacity(segment_capacity_hint);
