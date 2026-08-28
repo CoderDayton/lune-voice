@@ -247,7 +247,7 @@ fn start_recording(pcm: Arc<StdMutex<Vec<f32>>>) -> Result<cpal::Stream, String>
 
     let stream = device
         .build_input_stream(
-            &config,
+            config,
             move |data: &[f32], _: &cpal::InputCallbackInfo| {
                 if let Ok(mut buf) = pcm.lock() {
                     buf.extend_from_slice(data);

@@ -70,8 +70,17 @@ info = "Check formatting (--env FIX=1 to apply)"
 # ── Testing ──────────────────────────────────────────────────────────────────
 
 [scripts.test]
-command = "cargo test --workspace"
-info = "Run unit tests (no real models)"
+interpreter = "bash"
+# `cargo test --workspace` builds example targets but does NOT run the tests
+# inside them, so the benchmark metric and baseline-gate tests in
+# benchmarks/bench_utils.rs need the explicit `--examples` pass. Examples with
+# `required-features` are skipped there, so this stays toolchain-light.
+command = '''
+set -e
+cargo test --workspace
+cargo test -p lune-voice --examples
+'''
+info = "Run unit tests, including the benchmark helpers (no real models)"
 
 [scripts.test-e2e]
 interpreter = "bash"
@@ -111,10 +120,13 @@ case "$TYPE" in
   styling)     run styling_capability ;;
   rulecmp)     run styling_rulecmp ;;
   live)        run live_transcribe ;;
-  *) echo "TYPE must be: agc | transcribe(WAV=) | domain | pipeline | stages | latency | punctuation | dict | snippets | styling | rulecmp | live"; exit 1 ;;
+  confusion)   run confusion_mine ;;
+  noisify)     run noisify_fixtures ;;
+  livewer)     run live_bench ;;
+  *) echo "TYPE must be: agc | transcribe(WAV=) | domain | pipeline | stages | latency | punctuation | dict | snippets | styling | rulecmp | live | livewer | confusion | noisify"; exit 1 ;;
 esac
 '''
-info = "Benchmarks (--env TYPE=agc|transcribe|domain|pipeline|stages|latency|punctuation|dict|snippets|styling|live; transcribe needs WAV=)"
+info = "Benchmarks (--env TYPE=agc|transcribe|domain|pipeline|stages|latency|punctuation|dict|snippets|styling|rulecmp|live|livewer|confusion|noisify; transcribe needs WAV=). Pin the model with --env WHISPER_MODEL=small|medium|large. TYPE=domain gates on a baseline: --env LUNE_BENCH_JSON=out.json to record, --env LUNE_BENCH_BASELINE=base.json to fail on regression (--env LUNE_BENCH_TOLERANCE=pts, default 1.0)"
 
 # ── Build ────────────────────────────────────────────────────────────────────
 

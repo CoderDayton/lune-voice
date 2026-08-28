@@ -14,8 +14,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use bench_utils::{
-    BenchmarkHarness, char_error_rate, load_wav_f32, process_memory_usage, word_error_rate,
-    wrap_print,
+    BenchReport, BenchmarkHarness, MetricRecord, char_error_rate, finish_report, load_wav_f32,
+    process_memory_usage, word_error_rate, wrap_print,
 };
 use lune_core::command::VoiceCommand;
 use lune_core::session::SessionEvent;
@@ -124,6 +124,11 @@ fn load_domain_fixtures(root: &Path) -> Vec<DomainFixture> {
 }
 
 fn main() {
+    std::process::exit(run());
+}
+
+/// Returns the process exit code: non-zero when the baseline gate fails.
+fn run() -> i32 {
     println!();
     println!("╔══════════════════════════════════════════════════════════════════╗");
     println!("║             DOMAIN BENCHMARK (categorized fixtures)            ║");
@@ -146,7 +151,13 @@ fn main() {
         println!("  [skip] No domain fixtures found in fixtures/bench/");
         println!("         Record WAVs and add .txt references per manifest.json");
         println!();
-        return;
+        // A gated run must not pass just because the corpus never loaded.
+        return if std::env::var(bench_utils::LUNE_BENCH_BASELINE).is_ok() {
+            eprintln!("  [FAIL] A baseline was set but no fixtures ran.");
+            1
+        } else {
+            0
+        };
     }
 
     println!("  Loaded {} fixtures", fixtures.len());
@@ -157,14 +168,10 @@ fn main() {
     for fix in &fixtures {
         print!("  {:8} {:20}", fix.entry.category, fix.entry.id);
 
-        if fix.entry.category == "commands" {
-            harness
-                .asr
-                .set_boost_phrases(std::slice::from_ref(&fix.reference), 4.0);
-        } else {
-            harness.asr.set_boost_phrases(&[], 0.0);
-        }
-
+        // The `commands` category used to boost the reference phrase via
+        // `AsrRegistry::set_boost_phrases`. That API was removed in 2f653ad
+        // along with whisper.cpp token-level boosting, so every category now
+        // decodes unboosted — command recognition is measured as shipped.
         let start = Instant::now();
         let outcome = harness
             .rt
@@ -368,7 +375,27 @@ fn main() {
         );
     }
 
+    // ── Machine-readable report + baseline gate ──────────────────────
     println!();
+    let report = BenchReport {
+        bench: "domain".to_string(),
+        model: harness.asr_entry.model.display_name().to_string(),
+        model_source: harness.asr_entry.model_source,
+        fixtures: results
+            .iter()
+            .map(|r| MetricRecord {
+                id: r.id.clone(),
+                category: r.category.clone(),
+                wer: r.wer,
+                cer: r.cer,
+                exact_match: r.exact_match,
+            })
+            .collect(),
+    };
+    let code = finish_report(&report);
+
+    println!();
+    code
 }
 
 #[derive(Default)]

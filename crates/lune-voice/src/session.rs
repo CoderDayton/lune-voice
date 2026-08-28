@@ -1196,13 +1196,49 @@ async fn read_clipboard_text() -> Option<String> {
 /// a worker thread while a dictation is starting.
 ///
 /// A current-thread runtime has no worker to hand off to, so the closure runs
-/// inline — that is the test harness, where it is what we want anyway.
+/// inline — that is the test harness, where it is what we want anyway. The same
+/// applies inside a `LocalSet`; see [`block_in_place_allowed`].
 fn blocking_db<T>(f: impl FnOnce() -> T) -> T {
     use tokio::runtime::{Handle, RuntimeFlavor};
-    match Handle::try_current() {
-        Ok(h) if h.runtime_flavor() == RuntimeFlavor::MultiThread => tokio::task::block_in_place(f),
-        _ => f(),
+    let multi_thread = matches!(
+        Handle::try_current().map(|h| h.runtime_flavor()),
+        Ok(RuntimeFlavor::MultiThread)
+    );
+    if multi_thread && block_in_place_allowed() {
+        tokio::task::block_in_place(f)
+    } else {
+        f()
     }
+}
+
+/// Whether `tokio::task::block_in_place` can be called from this thread.
+///
+/// `RuntimeFlavor::MultiThread` is necessary but not sufficient: a `LocalSet`
+/// driven by a multi-threaded runtime still reports `MultiThread`, yet
+/// `block_in_place` panics there — tokio pins `LocalSet` tasks to their thread,
+/// so there is no core to hand back. Tokio names both cases in one place
+/// (`multi_thread/worker.rs`: "the current_thread runtime or in a LocalSet")
+/// and exposes no predicate for either, so the only way to ask is to try.
+///
+/// The probe runs an empty closure, so a refusal costs nothing and a genuine
+/// panic from the caller's closure is never caught here. The answer is cached
+/// per thread: a runtime's worker threads are reused, and a `LocalSet` stays on
+/// the thread that drives it, so this settles after one call. A refusal prints
+/// one caught panic message per thread — expected, and cheaper than installing
+/// a process-wide panic hook from library code to hide it.
+fn block_in_place_allowed() -> bool {
+    use std::cell::Cell;
+    thread_local! {
+        static ALLOWED: Cell<Option<bool>> = const { Cell::new(None) };
+    }
+    ALLOWED.with(|cached| {
+        if let Some(known) = cached.get() {
+            return known;
+        }
+        let allowed = std::panic::catch_unwind(|| tokio::task::block_in_place(|| ())).is_ok();
+        cached.set(Some(allowed));
+        allowed
+    })
 }
 
 /// Close out the history row of a session whose task panicked.
@@ -1314,6 +1350,65 @@ async fn stop_session(
     .await;
     let _ = send_bounded(event_tx, SessionEvent::stopped()).await;
     clear_active(active_arc, idle_notify).await;
+}
+
+#[cfg(test)]
+mod blocking_db_tests {
+    use super::blocking_db;
+
+    /// The plain multi-threaded case: `block_in_place` is allowed and used.
+    #[test]
+    fn runs_on_a_multi_thread_runtime() {
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .build()
+            .expect("runtime");
+        assert_eq!(rt.block_on(async { blocking_db(|| 42) }), 42);
+    }
+
+    /// A current-thread runtime has no worker to hand off to, so the closure
+    /// runs inline.
+    #[test]
+    fn runs_on_a_current_thread_runtime() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("runtime");
+        assert_eq!(rt.block_on(async { blocking_db(|| 42) }), 42);
+    }
+
+    /// The regression: a `LocalSet` on a multi-threaded runtime reports
+    /// `RuntimeFlavor::MultiThread`, but `block_in_place` still panics there
+    /// (tokio's own note: "the current_thread runtime or in a LocalSet").
+    /// Sessions driven inside a `LocalSet` — every benchmark does — must fall
+    /// back to running inline instead of taking down the process.
+    #[test]
+    fn runs_inside_a_local_set() {
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .build()
+            .expect("runtime");
+        let out = rt.block_on(async {
+            tokio::task::LocalSet::new()
+                .run_until(async { blocking_db(|| 42) })
+                .await
+        });
+        assert_eq!(out, 42);
+    }
+
+    /// The fallback must not swallow a genuine panic from the closure itself.
+    #[test]
+    #[should_panic(expected = "closure blew up")]
+    fn a_panic_from_the_closure_still_propagates() {
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .build()
+            .expect("runtime");
+        rt.block_on(async {
+            tokio::task::LocalSet::new()
+                .run_until(async { blocking_db(|| panic!("closure blew up")) })
+                .await
+        });
+    }
 }
 
 #[cfg(test)]

@@ -1080,11 +1080,16 @@ impl Database {
         })
     }
 
-    /// Most recent `(raw, final)` correction pairs, newest first. Test-only:
-    /// `correction_pairs` is still written for retention/cascade but has no
-    /// production reader since the homophone calibrator was removed.
-    #[cfg(test)]
-    fn list_correction_pairs(&mut self, limit: u32) -> PersistResult<Vec<(String, String)>> {
+    /// Most recent `(raw, final)` correction pairs, newest first.
+    ///
+    /// Nothing in the app reads these — they are written for retention and
+    /// cascade-delete only. The reader exists so benchmarks and offline
+    /// analysis can mine real `raw → final` deltas (what the corrector actually
+    /// did to your dictation) without going around the crate with raw SQL.
+    ///
+    /// Contains verbatim transcript text: never log the result, and honour the
+    /// same redaction rules as the rest of the pipeline.
+    pub fn list_correction_pairs(&mut self, limit: u32) -> PersistResult<Vec<(String, String)>> {
         use self::schema::correction_pairs::dsl as cp;
         let rows = cp::correction_pairs
             .select((cp::raw, cp::final_text))
