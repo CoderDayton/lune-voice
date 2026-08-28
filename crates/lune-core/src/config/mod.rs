@@ -11,8 +11,8 @@ pub use modes::{ActivationMode, DictationMode, PillVisibility, PrivacyMode, Term
 pub use pipeline::{PipelineConfig, PipelineOverrides};
 pub use redacted::RedactedString;
 pub use settings::{
-    AsrBackendConfig, DevicePolicy, LlmBackendConfig, OpenAiLlmProvider, StreamingMode,
-    UserSettings, WhisperModel, is_local_endpoint,
+    AsrBackendConfig, DevicePolicy, HistoryRetention, LlmBackendConfig, OpenAiLlmProvider,
+    StreamingMode, UserSettings, WhisperModel, is_local_endpoint,
 };
 pub use settings::{PillAnchor, PillCorner, PillOrientation, PillPosition, PillSize};
 pub use style_llm::{

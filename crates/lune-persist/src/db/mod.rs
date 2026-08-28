@@ -1117,6 +1117,28 @@ impl Database {
         })
     }
 
+    /// Delete several sessions at once, cascading to their correction pairs.
+    ///
+    /// One transaction for the whole batch, so the History tab's bulk delete
+    /// either removes every selected row or none — a partial commit would leave
+    /// the user re-selecting whatever survived. Returns how many `sessions`
+    /// rows actually existed; ids that were already gone simply don't count.
+    pub fn delete_sessions(&mut self, session_ids: &[String]) -> PersistResult<usize> {
+        if session_ids.is_empty() {
+            return Ok(0);
+        }
+        self.conn.transaction(|conn| {
+            {
+                use self::schema::correction_pairs::dsl as cp;
+                diesel::delete(cp::correction_pairs.filter(cp::session_id.eq_any(session_ids)))
+                    .execute(conn)?;
+            }
+            use self::schema::sessions::dsl::*;
+            let count = diesel::delete(sessions.filter(id.eq_any(session_ids))).execute(conn)?;
+            Ok(count)
+        })
+    }
+
     /// Close out sessions left open by a previous run.
     ///
     /// A row is inserted `Active` with no `ended_at` when a dictation starts,
@@ -1724,6 +1746,44 @@ mod tests {
 
         // Verify it's really gone
         assert!(db.get_session(s1.id).unwrap().is_none());
+    }
+
+    #[test]
+    fn session_delete_many_removes_only_the_listed_rows_and_their_pairs() {
+        let mut db = Database::open_in_memory().unwrap();
+        let row = |transcript: &str| DictationSession {
+            id: Uuid::new_v4(),
+            started_at: Utc::now(),
+            ended_at: Some(Utc::now()),
+            style: None,
+            backend: AsrBackendKind::WhisperCpp,
+            status: SessionStatus::Completed,
+            transcript: Some(transcript.into()),
+        };
+        let (a, b, keep) = (row("one"), row("two"), row("three"));
+        for s in [&a, &b, &keep] {
+            db.insert_session(s).unwrap();
+            db.insert_correction_pair(s.id, "raw", "final").unwrap();
+        }
+
+        let ids = [a.id.to_string(), b.id.to_string()];
+        assert_eq!(db.delete_sessions(&ids).unwrap(), 2);
+
+        let remaining = db.list_sessions(10).unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].id, keep.id);
+        // The cascade is per-id, not a purge: the untouched session keeps its pair.
+        assert_eq!(db.list_correction_pairs(10).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn session_delete_many_counts_only_rows_that_existed() {
+        let mut db = Database::open_in_memory().unwrap();
+        assert_eq!(db.delete_sessions(&[]).unwrap(), 0);
+        assert_eq!(
+            db.delete_sessions(&[Uuid::new_v4().to_string()]).unwrap(),
+            0
+        );
     }
 
     #[test]

@@ -427,12 +427,20 @@ Dictionary entries are not sent to the styling LLM — the substitution happens 
 Completed dictation sessions are stored in a SQLite database.
 
 ```toml
-session_history_days = 30    # days to retain, or null to record nothing
+session_history_days = 30    # days to retain, 0 to keep forever, or null to record nothing
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `session_history_days` | u32 (1–3650) or null | Days to retain session history. Older sessions are pruned at startup and whenever settings are saved. `null` disables history: no session row, transcript or correction pair is written, and anything already stored is cleared when the setting changes |
+| `session_history_days` | u32 (0, or 1–3650) or null | Days to retain session history. Older sessions are pruned at startup and whenever settings are saved. `0` means **keep forever** — sessions are recorded and never pruned. `null` disables history: no session row, transcript or correction pair is written, and anything already stored is cleared when the setting changes |
+
+The three choices are decoded once by `UserSettings::history_retention()`
+(`Off` / `Forever` / `Days(n)`); never read the raw field as a prune window, or
+`0` would delete everything.
+
+Sessions can also be removed by hand from the Sessions page — one row at a
+time, or by ticking several and using **Delete selected** (up to 1000 per call,
+`HISTORY_BULK_DELETE_MAX`).
 
 Each session record contains:
 

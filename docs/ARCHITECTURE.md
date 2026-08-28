@@ -243,7 +243,7 @@ The desktop app does not scrape logs or poll for session state. It uses typed Ta
 | `list_monitors` | `main` | Connected displays for the pill's monitor picker |
 | `gpu_backend_status` | `main` | Runtime GPU state: `unsupported`, `driver-missing`, `not-installed`, `ready`, `failed` |
 | `install_gpu_backend` | `main` | Downloads and verifies the CUDA plugin, streaming progress over a channel |
-| `list_history_page` / `delete_session` | `main` | History paging and deletion |
+| `list_history_page` / `delete_session` / `delete_sessions` | `main` | History paging, single and bulk deletion |
 | `update_dictionary_entry` | `main` | Edit a dictionary entry in place |
 | `save_snippet` / `delete_snippet` | `main` | Snippet management |
 | `create_custom_style` / `update_custom_style` / `delete_custom_style` / `generate_style_examples` | `main` | Custom style presets |

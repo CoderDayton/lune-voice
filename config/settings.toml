@@ -59,6 +59,7 @@ pill_visibility = "Always"
 terminal_mode = "Auto"
 
 # Days to retain session history in the database.
+# 0 keeps every session forever (no pruning).
 # Remove this key (or comment it out) to disable history entirely.
 session_history_days = 30
 

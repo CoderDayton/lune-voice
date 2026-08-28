@@ -384,6 +384,15 @@ export const mockBackendClient: BackendClient = {
     return structuredClone(mockSnapshot);
   },
 
+  async deleteSessions(sessionIds) {
+    const doomed = new Set(sessionIds);
+    mockSnapshot = snapshotWithStats({
+      ...mockSnapshot,
+      history: mockSnapshot.history.filter((entry) => !doomed.has(entry.id)),
+    });
+    return structuredClone(mockSnapshot);
+  },
+
   async listHistoryPage(page, pageSize, search) {
     const q = search.trim().toLowerCase();
     const matched = mockSnapshot.history

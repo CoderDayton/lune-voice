@@ -381,6 +381,7 @@ pub fn run() {
             commands::save_workspace_settings,
             commands::create_dictionary_entry,
             commands::delete_session,
+            commands::delete_sessions,
             commands::list_history_page,
             commands::delete_dictionary_entry,
             commands::update_dictionary_entry,

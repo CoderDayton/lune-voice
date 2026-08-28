@@ -310,6 +310,21 @@ pub async fn delete_session(
 }
 
 #[tauri::command]
+pub async fn delete_sessions(
+    window: WebviewWindow,
+    runtime: State<'_, AppRuntime>,
+    session_ids: Vec<String>,
+) -> Result<WorkspaceSnapshot, String> {
+    require_window_access(&window, &["main"])?;
+    let mut snapshot = run_persist("delete sessions", move || {
+        crate::persistence::delete_sessions(session_ids)
+    })
+    .await?;
+    snapshot.service_status = runtime.service_status().await;
+    Ok(snapshot)
+}
+
+#[tauri::command]
 pub async fn list_history_page(
     window: WebviewWindow,
     page: u32,

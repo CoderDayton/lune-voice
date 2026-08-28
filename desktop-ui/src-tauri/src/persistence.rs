@@ -1,7 +1,7 @@
 use lune_asr::AsrRegistry;
 use lune_core::config::{
-    ActivationMode, AsrBackendConfig, DevicePolicy, DictationMode, FormatToggles, HotkeyConfig,
-    KeyCombo, LlmBackendConfig, Modifier, OpenAiLlmProvider, PillAnchor, PillCorner,
+    ActivationMode, AsrBackendConfig, DevicePolicy, DictationMode, FormatToggles, HistoryRetention,
+    HotkeyConfig, KeyCombo, LlmBackendConfig, Modifier, OpenAiLlmProvider, PillAnchor, PillCorner,
     PillOrientation, PillSize, PillVisibility, RedactedString, StreamingMode, StylePreset,
     TerminalMode, UserSettings, builtin_registry,
 };
@@ -51,21 +51,23 @@ fn is_wellformed_bcp47(tag: &str) -> bool {
 
 /// Apply the retention setting to what is already on disk.
 ///
-/// `Some(days)` prunes past the window; `None` is "Don't save history" and
-/// removes everything, because turning the setting off has to clear what was
-/// collected before, not just stop adding to it. Writes are refused separately
-/// (`SessionManagerConfig::persist_history`) — this is the half that deals with
-/// rows that already exist.
+/// `Days(n)` prunes past the window; `Forever` leaves everything alone; `Off`
+/// is "Don't save history" and removes everything, because turning the setting
+/// off has to clear what was collected before, not just stop adding to it.
+/// Writes are refused separately (`SessionManagerConfig::persist_history`) —
+/// this is the half that deals with rows that already exist.
 ///
 /// Best-effort: a failure here is logged, never fatal.
 pub(crate) fn enforce_retention(database: &mut Database, settings: &UserSettings) {
-    match settings.session_history_days {
-        Some(days) => {
+    match settings.history_retention() {
+        HistoryRetention::Days(days) => {
             if let Err(e) = database.prune_sessions(days) {
                 tracing::warn!(error = %e, days, "history retention prune failed");
             }
         }
-        None => match database.purge_history() {
+        // Nothing to do — that is the whole point of the setting.
+        HistoryRetention::Forever => {}
+        HistoryRetention::Off => match database.purge_history() {
             Ok(0) => {}
             Ok(removed) => tracing::info!(removed, "history is off — cleared stored sessions"),
             Err(e) => tracing::warn!(error = %e, "clearing stored history failed"),
@@ -97,8 +99,9 @@ pub fn save_workspace_settings(
 }
 
 use crate::limits::{
-    CONFIDENCE_MAX, CONFIDENCE_MIN, DICT_ENTRY_MAX_BYTES, HISTORY_DAYS_MAX, HISTORY_DAYS_MIN,
-    PILL_EDGE_MARGIN_MAX, SNIPPET_BODY_MAX_BYTES, SNIPPET_TRIGGER_MAX_BYTES, STYLE_DESC_MAX_BYTES,
+    CONFIDENCE_MAX, CONFIDENCE_MIN, DICT_ENTRY_MAX_BYTES, HISTORY_BULK_DELETE_MAX,
+    HISTORY_DAYS_FOREVER, HISTORY_DAYS_MAX, HISTORY_DAYS_MIN, PILL_EDGE_MARGIN_MAX,
+    SNIPPET_BODY_MAX_BYTES, SNIPPET_TRIGGER_MAX_BYTES, STYLE_DESC_MAX_BYTES,
     STYLE_INSTRUCTIONS_MAX_BYTES, STYLE_NAME_MAX_BYTES,
 };
 
@@ -268,6 +271,60 @@ pub fn delete_session(session_id: String) -> Result<WorkspaceSnapshot, String> {
     if !deleted {
         return Err(format!("session not found: {session_id}"));
     }
+
+    let settings = load_settings(&paths)?;
+    build_snapshot(settings, &mut database)
+}
+
+/// Reject a retention window the backend cannot honour.
+///
+/// Three choices live in one nullable number: `None` is off, `0` is
+/// `HISTORY_DAYS_FOREVER`, and anything else is a real window. The sentinel
+/// sits outside the range check on purpose — it is not a zero-day window.
+fn validate_history_days(days: Option<u32>) -> Result<(), String> {
+    match days {
+        None => Ok(()),
+        Some(d)
+            if d == HISTORY_DAYS_FOREVER || (HISTORY_DAYS_MIN..=HISTORY_DAYS_MAX).contains(&d) =>
+        {
+            Ok(())
+        }
+        Some(d) => Err(format!(
+            "sessionHistoryDays must be {HISTORY_DAYS_FOREVER} (keep forever) or between \
+             {HISTORY_DAYS_MIN} and {HISTORY_DAYS_MAX}, got {d}"
+        )),
+    }
+}
+
+/// Delete several sessions in one call, for the History tab's bulk selection.
+///
+/// Unlike [`delete_session`], ids that no longer exist are **not** an error:
+/// a multi-row selection can easily include something a second window already
+/// removed, and failing the whole batch over that would leave the user with no
+/// way to clear the rest. An empty list is still a caller bug.
+pub fn delete_sessions(session_ids: Vec<String>) -> Result<WorkspaceSnapshot, String> {
+    if session_ids.is_empty() {
+        return Err("session_ids must not be empty".into());
+    }
+    if session_ids.len() > HISTORY_BULK_DELETE_MAX {
+        return Err(format!(
+            "at most {HISTORY_BULK_DELETE_MAX} sessions can be deleted at once, got {}",
+            session_ids.len()
+        ));
+    }
+    if session_ids.iter().any(|id| id.is_empty()) {
+        return Err("session_ids must not contain an empty id".into());
+    }
+    let paths = resolve_paths()?;
+    let mut database = open_database(&paths)?;
+    let removed = database
+        .delete_sessions(&session_ids)
+        .map_err(|e| format!("delete sessions: {e}"))?;
+    tracing::info!(
+        removed,
+        requested = session_ids.len(),
+        "bulk session delete"
+    );
 
     let settings = load_settings(&paths)?;
     build_snapshot(settings, &mut database)
@@ -842,13 +899,7 @@ fn apply_settings_dto(
     settings.start_minimized = input.start_minimized;
     settings.check_updates_on_launch = input.check_updates_on_launch;
     settings.terminal_mode = terminal_mode_from_dto(input.terminal_mode);
-    if let Some(days) = input.session_history_days
-        && !(HISTORY_DAYS_MIN..=HISTORY_DAYS_MAX).contains(&days)
-    {
-        return Err(format!(
-            "sessionHistoryDays must be between {HISTORY_DAYS_MIN} and {HISTORY_DAYS_MAX}, got {days}"
-        ));
-    }
+    validate_history_days(input.session_history_days)?;
     settings.session_history_days = input.session_history_days;
     // Persist the remote provider config independently of the active backend so
     // it survives Off / switching engines. A blank incoming field keeps the saved
@@ -1426,5 +1477,36 @@ mod tests {
         let result = delete_session(String::new());
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("must not be empty"));
+    }
+
+    #[test]
+    fn delete_sessions_rejects_an_empty_or_oversized_list() {
+        assert!(
+            delete_sessions(Vec::new())
+                .unwrap_err()
+                .contains("must not be empty")
+        );
+        let too_many = vec!["id".to_string(); HISTORY_BULK_DELETE_MAX + 1];
+        assert!(delete_sessions(too_many).unwrap_err().contains("at most"));
+        assert!(
+            delete_sessions(vec![String::new()])
+                .unwrap_err()
+                .contains("empty id")
+        );
+    }
+
+    /// The retention setting carries three choices in one nullable number, and
+    /// only the last is a prune window. A range check that forgot the sentinel
+    /// would reject "keep forever" outright.
+    #[test]
+    fn history_days_accepts_the_forever_sentinel_but_not_an_out_of_range_window() {
+        assert!(validate_history_days(None).is_ok(), "off");
+        assert!(
+            validate_history_days(Some(HISTORY_DAYS_FOREVER)).is_ok(),
+            "keep forever"
+        );
+        assert!(validate_history_days(Some(HISTORY_DAYS_MIN)).is_ok());
+        assert!(validate_history_days(Some(HISTORY_DAYS_MAX)).is_ok());
+        assert!(validate_history_days(Some(HISTORY_DAYS_MAX + 1)).is_err());
     }
 }

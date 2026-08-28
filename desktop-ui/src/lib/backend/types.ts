@@ -94,6 +94,8 @@ export interface BackendClient {
   saveSnippet(id: string | null, triggerPhrase: string, body: string): Promise<WorkspaceSnapshot>;
   deleteSnippet(id: string): Promise<WorkspaceSnapshot>;
   deleteSession(sessionId: string): Promise<WorkspaceSnapshot>;
+  /** Bulk delete. Ids that are already gone are skipped, not an error. */
+  deleteSessions(sessionIds: string[]): Promise<WorkspaceSnapshot>;
   listHistoryPage(page: number, pageSize: number, search: string): Promise<HistoryPageDto>;
   createCustomStyle(
     name: string,

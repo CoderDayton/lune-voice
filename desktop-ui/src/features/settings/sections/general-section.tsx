@@ -8,8 +8,9 @@ import { saveWorkspaceSetting, type WorkspaceSettings } from '../../../store/wor
 import { SettingsRow, SettingsSection } from '../components/section';
 import {
   type DescriptiveOptionData,
-  type HistoryRetentionValue,
+  historyRetentionDays,
   historyRetentionOptions,
+  historyRetentionValue,
 } from '../data/settings-data';
 
 export function GeneralSection({ settings }: { settings: WorkspaceSettings }) {
@@ -87,15 +88,11 @@ export function GeneralSection({ settings }: { settings: WorkspaceSettings }) {
         description={t`How long finished dictations are kept on this device.`}
         control={
           <DescriptiveDropdown
-            value={
-              (settings.sessionHistoryDays == null
-                ? 'off'
-                : String(settings.sessionHistoryDays)) as HistoryRetentionValue
-            }
+            value={historyRetentionValue(settings.sessionHistoryDays)}
             options={historyRetentionOptions}
             ariaLabel={t`History retention`}
             onChange={(next) =>
-              void saveWorkspaceSetting('sessionHistoryDays', next === 'off' ? null : Number(next))
+              void saveWorkspaceSetting('sessionHistoryDays', historyRetentionDays(next))
             }
           />
         }

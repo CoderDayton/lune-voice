@@ -16,6 +16,8 @@ export const LIMITS = {
   confidenceMax: 1.0,
   historyDaysMin: 1,
   historyDaysMax: 3650,
+  historyDaysForever: 0,
+  historyBulkDeleteMax: 1000,
 } as const;
 
 /** UTF-8 byte length of `value`, the unit every `*MaxBytes` limit is in. */

@@ -1,3 +1,4 @@
+import { plural } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';
 import { invoke } from '@tauri-apps/api/core';
@@ -20,6 +21,7 @@ import {
   getHistoryServerPageCount,
   type HistorySession,
   removeHistorySession,
+  removeHistorySessions,
   workspaceActions,
   workspaceStore,
 } from '../../../store/workspace-store';
@@ -53,6 +55,11 @@ export function HistoryTable() {
   const pageSize = useStore(workspaceStore, (s) => s.historyPageSize);
   const totalPages = useStore(workspaceStore, getHistoryServerPageCount);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Selected ids, not selected rows: the set survives paging and searching, so
+  // a sweep across several pages can be deleted in one go. Ids that have
+  // scrolled out of view are still valid — the backend skips any that are
+  // already gone.
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Load the first page on mount; page/search changes refetch via their store
@@ -67,6 +74,41 @@ export function HistoryTable() {
   const start = visibleCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, visibleCount);
 
+  const pageIds = sessions.map((s) => s.id);
+  const selectedOnPage = pageIds.filter((id) => selected.has(id)).length;
+  const allOnPageSelected = pageIds.length > 0 && selectedOnPage === pageIds.length;
+
+  function toggleSelected(id: string) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }
+
+  // Select-all covers the current page only — it is the visible list, and a
+  // button that silently claimed thousands of unseen rows would be a trap.
+  function toggleSelectPage() {
+    setSelected((current) => {
+      const next = new Set(current);
+      for (const id of pageIds) {
+        if (allOnPageSelected) next.delete(id);
+        else next.add(id);
+      }
+      return next;
+    });
+  }
+
+  async function deleteSelected() {
+    // Clear only once the delete lands. A failed delete leaves the rows in
+    // place, so dropping the selection early would make the user re-tick every
+    // box before retrying.
+    if (await removeHistorySessions([...selected])) {
+      setSelected(new Set());
+      setExpandedId(null);
+    }
+  }
+
   return (
     <ListCard>
       <ListSearchRail
@@ -77,6 +119,14 @@ export function HistoryTable() {
         label={t`Search transcripts`}
         count={hasSearch ? t`${visibleCount} / ${totalCount}` : t`${totalCount} sessions`}
       />
+
+      {selected.size > 0 && (
+        <SelectionBar
+          count={selected.size}
+          onClear={() => setSelected(new Set())}
+          onDelete={() => void deleteSelected()}
+        />
+      )}
 
       <ListScroll>
         {sessions.length === 0 ? (
@@ -97,7 +147,20 @@ export function HistoryTable() {
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr>
-                <th className={`${LIST_HEAD_CELL} w-px pl-3`} />
+                <th className={`${LIST_HEAD_CELL} w-px pl-3`}>
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-sm align-middle"
+                    checked={allOnPageSelected}
+                    ref={(el) => {
+                      // Partial page selection reads as "some", not "none".
+                      if (el) el.indeterminate = selectedOnPage > 0 && !allOnPageSelected;
+                    }}
+                    onChange={toggleSelectPage}
+                    aria-label={t`Select all sessions on this page`}
+                  />
+                </th>
+                <th className={`${LIST_HEAD_CELL} w-px`} />
                 <th className={`${LIST_HEAD_CELL} px-2`}>{t`Time`}</th>
                 <th className={`${LIST_HEAD_CELL} px-2`}>{t`Transcript`}</th>
                 <th className={`${LIST_HEAD_CELL} hidden px-2 text-right sm:table-cell`}>
@@ -116,6 +179,8 @@ export function HistoryTable() {
                   key={session.id}
                   session={session}
                   expanded={expandedId === session.id}
+                  selected={selected.has(session.id)}
+                  onSelect={() => toggleSelected(session.id)}
                   onToggle={() =>
                     setExpandedId((current) => (current === session.id ? null : session.id))
                   }
@@ -168,13 +233,50 @@ export function HistoryTable() {
   );
 }
 
+/**
+ * Bulk-action bar, shown only while something is selected.
+ *
+ * Sits between the search rail and the scroll region rather than floating over
+ * the rows, so it never covers the transcripts you are picking from.
+ */
+function SelectionBar({
+  count,
+  onClear,
+  onDelete,
+}: {
+  count: number;
+  onClear: () => void;
+  onDelete: () => void;
+}) {
+  const { t } = useLingui();
+  return (
+    <div className="flex shrink-0 items-center gap-3 border-b border-surface-border bg-surface-nav-active px-3 py-2 sm:px-4">
+      <span className="text-sm tabular-nums text-content">{t`${count} selected`}</span>
+      <div className="ml-auto flex items-center gap-2">
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onClear}>
+          {t`Clear selection`}
+        </button>
+        <ConfirmDialog
+          title={t`Delete ${plural(count, { one: '# session', other: '# sessions' })}?`}
+          description={t`This will permanently remove the selected dictation sessions and their transcripts.`}
+          triggerLabel={t`Delete selected`}
+          triggerClassName="btn btn-soft btn-error btn-sm gap-1.5"
+          onConfirm={onDelete}
+        />
+      </div>
+    </div>
+  );
+}
+
 interface SessionRowsProps {
   session: HistorySession;
   expanded: boolean;
+  selected: boolean;
+  onSelect: () => void;
   onToggle: () => void;
 }
 
-function SessionRows({ session, expanded, onToggle }: SessionRowsProps) {
+function SessionRows({ session, expanded, selected, onSelect, onToggle }: SessionRowsProps) {
   const { t } = useLingui();
   const [copied, setCopied] = useState(false);
   // Keeps the detail row mounted through the fold-up animation, so closing can
@@ -288,10 +390,22 @@ function SessionRows({ session, expanded, onToggle }: SessionRowsProps) {
         onClick={onToggle}
         aria-expanded={expanded}
         className={`${LIST_ROW} cursor-pointer align-top ${
-          expanded ? 'bg-surface-nav-active' : ''
+          expanded || selected ? 'bg-surface-nav-active' : ''
         }`}
       >
         <td className="py-3 pl-3">
+          <input
+            type="checkbox"
+            className="checkbox checkbox-sm align-middle"
+            checked={selected}
+            onChange={onSelect}
+            // The row itself toggles the transcript fold; ticking the box must
+            // not also expand the row it belongs to.
+            onClick={(e) => e.stopPropagation()}
+            aria-label={t`Select session`}
+          />
+        </td>
+        <td className="py-3">
           <ChevronDown
             size={15}
             className={`text-content-subtle transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
@@ -319,7 +433,7 @@ function SessionRows({ session, expanded, onToggle }: SessionRowsProps) {
       </tr>
       {shown && (
         <tr ref={detailRef} className="border-b border-surface-border bg-surface-inset/40">
-          <td colSpan={7} className="p-0">
+          <td colSpan={8} className="p-0">
             <div ref={foldRef} className="overflow-hidden">
               <div className="px-4 py-4 sm:px-6">
                 <div className="rounded-field border border-surface-border bg-surface-inset p-4">

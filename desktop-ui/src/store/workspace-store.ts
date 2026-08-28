@@ -1,5 +1,6 @@
 import { Store } from '@tanstack/store';
 import { backendClient } from '../lib/backend/client';
+import { LIMITS } from '../lib/backend/generated/limits';
 import type { FormatTogglesDto, SessionStreamEvent, WorkspaceSnapshot } from '../lib/backend/types';
 import {
   mapDictionaryEntry,
@@ -341,6 +342,37 @@ export async function removeHistorySession(sessionId: string) {
     void fetchHistoryPage();
   } catch (error) {
     workspaceActions.setError(formatError(error));
+  }
+}
+
+/**
+ * Delete a whole selection in one round trip.
+ *
+ * One backend call rather than a loop over `removeHistorySession`: the History
+ * tab lets you select across pages, and N sequential calls would each rebuild
+ * and re-hydrate the workspace snapshot. Returns whether the delete landed, so
+ * the caller knows whether to clear its selection.
+ *
+ * The backend caps one call at `LIMITS.historyBulkDeleteMax` ids (it bounds the
+ * SQL `IN (…)`), and selection survives paging, so a long sweep is split into
+ * chunks rather than rejected. Only the last snapshot is hydrated — the
+ * intermediate ones are superseded immediately.
+ */
+export async function removeHistorySessions(sessionIds: string[]): Promise<boolean> {
+  if (sessionIds.length === 0) return false;
+  try {
+    let snapshot: WorkspaceSnapshot | null = null;
+    for (let i = 0; i < sessionIds.length; i += LIMITS.historyBulkDeleteMax) {
+      snapshot = await backendClient.deleteSessions(
+        sessionIds.slice(i, i + LIMITS.historyBulkDeleteMax),
+      );
+    }
+    if (snapshot) workspaceActions.hydrate(snapshot);
+    void fetchHistoryPage();
+    return true;
+  } catch (error) {
+    workspaceActions.setError(formatError(error));
+    return false;
   }
 }
 

@@ -229,7 +229,7 @@ export const terminalModes: DescriptiveOptionData<TerminalModeValue>[] = [
   },
 ];
 
-export type HistoryRetentionValue = 'off' | '7' | '30' | '90' | '365';
+export type HistoryRetentionValue = 'off' | '7' | '30' | '90' | '365' | 'forever';
 
 export const historyRetentionOptions: Option<HistoryRetentionValue>[] = [
   { value: 'off', label: "Don't save history" },
@@ -237,7 +237,27 @@ export const historyRetentionOptions: Option<HistoryRetentionValue>[] = [
   { value: '30', label: '30 days' },
   { value: '90', label: '90 days' },
   { value: '365', label: '1 year' },
+  { value: 'forever', label: 'Keep forever' },
 ];
+
+/**
+ * The dropdown value for a stored `sessionHistoryDays`.
+ *
+ * Three choices ride in one nullable number: `null` is off and `0` is the
+ * "keep forever" sentinel (`LIMITS.historyDaysForever`) — neither is a window.
+ */
+export function historyRetentionValue(days: number | null): HistoryRetentionValue {
+  if (days == null) return 'off';
+  if (days === 0) return 'forever';
+  return String(days) as HistoryRetentionValue;
+}
+
+/** Inverse of {@link historyRetentionValue}: the number to persist. */
+export function historyRetentionDays(value: HistoryRetentionValue): number | null {
+  if (value === 'off') return null;
+  if (value === 'forever') return 0;
+  return Number(value);
+}
 
 export function labelFor<V extends string>(options: Option<V>[], value: V): string {
   return options.find((o) => o.value === value)?.label ?? value;

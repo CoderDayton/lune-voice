@@ -183,7 +183,9 @@ pub struct UserSettings {
     ///
     /// `None` disables history outright: nothing is written for a dictation —
     /// no session row, no transcript, no correction pair — and anything already
-    /// stored is cleared when the setting changes. It is not "keep forever".
+    /// stored is cleared when the setting changes. It is not "keep forever";
+    /// `Some(0)` is. Decode it with [`UserSettings::history_retention`] rather
+    /// than matching on the raw field.
     ///
     /// Field-level `default` on purpose, overriding the container's: TOML has
     /// no null, so `None` is written as an *absent* key. Falling back to
@@ -238,7 +240,44 @@ fn default_true() -> bool {
     true
 }
 
+/// What `session_history_days` actually means, decoded once so no caller has
+/// to re-interpret the raw field.
+///
+/// The stored field stays `Option<u32>` for wire and file compatibility, but it
+/// carries three choices, and two of them are *not* a prune window. Reading it
+/// through this enum is what keeps `Forever` from being handed to
+/// `prune_sessions` as "0 days", which would delete everything.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HistoryRetention {
+    /// Don't save history: nothing is written, and anything stored is cleared.
+    Off,
+    /// Keep every session, never prune.
+    Forever,
+    /// Keep sessions younger than this many days.
+    Days(u32),
+}
+
+impl HistoryRetention {
+    /// Whether finished dictations are recorded at all.
+    pub fn records(self) -> bool {
+        !matches!(self, Self::Off)
+    }
+}
+
 impl UserSettings {
+    /// Decode `session_history_days` into the choice the user actually made.
+    ///
+    /// `None` = off, `Some(0)` = keep forever, `Some(n)` = an `n`-day window.
+    /// Zero is the sentinel because TOML has no null and the field predates the
+    /// third choice; a zero-day window would be meaningless anyway.
+    pub fn history_retention(&self) -> HistoryRetention {
+        match self.session_history_days {
+            None => HistoryRetention::Off,
+            Some(0) => HistoryRetention::Forever,
+            Some(days) => HistoryRetention::Days(days),
+        }
+    }
+
     /// Migrate legacy top-level pipeline fields into `PipelineOverrides`.
     ///
     /// Called once after deserialization. If the `[pipeline]` section is
@@ -729,6 +768,34 @@ mod tests {
             Some(30),
             "an unset install still keeps a month of history"
         );
+    }
+
+    #[test]
+    fn retention_reads_the_three_choices_out_of_one_field() {
+        let with = |days| UserSettings {
+            session_history_days: days,
+            ..Default::default()
+        };
+        assert_eq!(with(None).history_retention(), HistoryRetention::Off);
+        assert_eq!(with(Some(0)).history_retention(), HistoryRetention::Forever);
+        assert_eq!(
+            with(Some(30)).history_retention(),
+            HistoryRetention::Days(30)
+        );
+        // "Keep forever" still records dictations — only `None` stops writes.
+        assert!(with(Some(0)).history_retention().records());
+        assert!(!with(None).history_retention().records());
+    }
+
+    #[test]
+    fn keep_forever_survives_a_settings_round_trip() {
+        let forever = UserSettings {
+            session_history_days: Some(0),
+            ..Default::default()
+        };
+        let text = toml::to_string_pretty(&forever).expect("serialize settings");
+        let back: UserSettings = toml::from_str(&text).expect("deserialize settings");
+        assert_eq!(back.history_retention(), HistoryRetention::Forever);
     }
 
     #[test]

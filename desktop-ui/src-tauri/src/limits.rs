@@ -50,6 +50,17 @@ const _: () = assert!(HISTORY_DAYS_MIN < HISTORY_DAYS_MAX);
 pub const HISTORY_DAYS_MIN: u32 = 1;
 pub const HISTORY_DAYS_MAX: u32 = 3650;
 
+/// The "keep forever" sentinel for the retention window. Zero is free to mean
+/// this because a zero-day window would delete every session the moment it was
+/// written — see `UserSettings::history_retention`.
+pub const HISTORY_DAYS_FOREVER: u32 = 0;
+
+/// Session ids accepted by one `delete_sessions` call.
+///
+/// The History tab selects across pages, so the list is user-controlled; the
+/// cap keeps a runaway selection from building an unbounded SQL `IN (…)`.
+pub const HISTORY_BULK_DELETE_MAX: usize = 1000;
+
 /// Render the generated TypeScript module.
 #[cfg(test)]
 fn typescript_module() -> String {
@@ -72,6 +83,8 @@ fn typescript_module() -> String {
          \x20 confidenceMax: {CONFIDENCE_MAX:?},\n\
          \x20 historyDaysMin: {HISTORY_DAYS_MIN},\n\
          \x20 historyDaysMax: {HISTORY_DAYS_MAX},\n\
+         \x20 historyDaysForever: {HISTORY_DAYS_FOREVER},\n\
+         \x20 historyBulkDeleteMax: {HISTORY_BULK_DELETE_MAX},\n\
          }} as const;\n\
          \n\
          /** UTF-8 byte length of `value`, the unit every `*MaxBytes` limit is in. */\n\

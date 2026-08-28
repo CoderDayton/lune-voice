@@ -1313,10 +1313,10 @@ async fn build_pipeline(
     for issue in pipeline_config.validate() {
         tracing::warn!(issue, "pipeline configuration violates invariant");
     }
-    // `None` is the "Don't save history" retention choice, and it has to mean
-    // "write nothing" rather than "prune nothing" — see
-    // `UserSettings::session_history_days`. Read before `settings` is wrapped.
-    let persist_history = settings.session_history_days.is_some();
+    // "Don't save history" has to mean "write nothing" rather than "prune
+    // nothing", and "keep forever" still records — see
+    // `UserSettings::history_retention`. Read before `settings` is wrapped.
+    let persist_history = settings.history_retention().records();
     let settings = Arc::new(RwLock::new(settings.clone()));
 
     let config = SessionManagerConfig {

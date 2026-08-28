@@ -3,6 +3,9 @@ import {
   activationModes,
   asrBackends,
   deliveryMethods,
+  historyRetentionDays,
+  historyRetentionOptions,
+  historyRetentionValue,
   labelFor,
   pillVisibilityOptions,
 } from "../../src/features/settings/data/settings-data";
@@ -33,6 +36,32 @@ describe("settings data", () => {
     expect(values).toContain("Always");
     expect(values).toContain("WhenDictating");
     expect(values).toContain("Never");
+  });
+
+  test("history retention offers off, windows, and keep-forever", () => {
+    const values = historyRetentionOptions.map((o) => o.value);
+    expect(values).toContain("off");
+    expect(values).toContain("30");
+    expect(values).toContain("forever");
+  });
+
+  // Three choices ride in one nullable number, and two of them are not a
+  // window: null is off, 0 is keep-forever. Confusing 0 with a zero-day window
+  // would prune every session on the next save.
+  test("history retention maps the stored number both ways", () => {
+    expect(historyRetentionValue(null)).toBe("off");
+    expect(historyRetentionValue(0)).toBe("forever");
+    expect(historyRetentionValue(30)).toBe("30");
+
+    expect(historyRetentionDays("off")).toBeNull();
+    expect(historyRetentionDays("forever")).toBe(0);
+    expect(historyRetentionDays("90")).toBe(90);
+  });
+
+  test("every history retention option round-trips through the stored value", () => {
+    for (const option of historyRetentionOptions) {
+      expect(historyRetentionValue(historyRetentionDays(option.value))).toBe(option.value);
+    }
   });
 
   test("labelFor returns the label for a known value", () => {

@@ -12,6 +12,7 @@ import {
   PlugZap,
   Search,
 } from 'lucide-react';
+import { LIMITS } from '../../lib/backend/generated/limits';
 import {
   getSessionStats,
   getTodayStats,
@@ -355,7 +356,11 @@ export function OverviewPage() {
             </>
           )}
           <span className="tabular-nums">
-            {historyDays == null ? t`History isn't saved` : t`History kept ${historyDays} days`}
+            {historyDays == null
+              ? t`History isn't saved`
+              : historyDays === LIMITS.historyDaysForever
+                ? t`History kept forever`
+                : t`History kept ${historyDays} days`}
           </span>
           <span className="ov-sep" aria-hidden="true" />
           <span className="inline-flex items-center gap-1.5">

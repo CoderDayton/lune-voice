@@ -114,6 +114,10 @@ const tauriBackendClient: BackendClient = {
     return invoke<WorkspaceSnapshot>('delete_session', { sessionId });
   },
 
+  deleteSessions(sessionIds) {
+    return invoke<WorkspaceSnapshot>('delete_sessions', { sessionIds });
+  },
+
   listHistoryPage(page, pageSize, search) {
     return invoke<HistoryPageDto>('list_history_page', { page, pageSize, search });
   },
