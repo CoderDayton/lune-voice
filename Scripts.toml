@@ -114,6 +114,7 @@ case "$TYPE" in
   pipeline)    run pipeline_real ;;
   stages)      run pipeline_stages ;;
   latency)     run session_latency ;;
+  vram)        run vram_probe ;;
   punctuation) run punctuation_ab ;;
   dict)        run dict_carrier_ab ;;
   snippets)    cargo run --release --example snippet_bench -p lune-voice ;;
@@ -123,10 +124,10 @@ case "$TYPE" in
   confusion)   run confusion_mine ;;
   noisify)     run noisify_fixtures ;;
   livewer)     run live_bench ;;
-  *) echo "TYPE must be: agc | transcribe(WAV=) | domain | pipeline | stages | latency | punctuation | dict | snippets | styling | rulecmp | live | livewer | confusion | noisify"; exit 1 ;;
+  *) echo "TYPE must be: agc | transcribe(WAV=) | domain | pipeline | stages | latency | vram | punctuation | dict | snippets | styling | rulecmp | live | livewer | confusion | noisify"; exit 1 ;;
 esac
 '''
-info = "Benchmarks (--env TYPE=agc|transcribe|domain|pipeline|stages|latency|punctuation|dict|snippets|styling|rulecmp|live|livewer|confusion|noisify; transcribe needs WAV=). Pin the model with --env WHISPER_MODEL=small|medium|large. TYPE=domain gates on a baseline: --env LUNE_BENCH_JSON=out.json to record, --env LUNE_BENCH_BASELINE=base.json to fail on regression (--env LUNE_BENCH_TOLERANCE=pts, default 1.0)"
+info = "Benchmarks (--env TYPE=agc|transcribe|domain|pipeline|stages|latency|vram|punctuation|dict|snippets|styling|rulecmp|live|livewer|confusion|noisify; transcribe needs WAV=). TYPE=vram measures device memory across dictation toggles and a model swap (NVIDIA only; --env CYCLES=n). Pin the model with --env WHISPER_MODEL=small|medium|large. TYPE=domain gates on a baseline: --env LUNE_BENCH_JSON=out.json to record, --env LUNE_BENCH_BASELINE=base.json to fail on regression (--env LUNE_BENCH_TOLERANCE=pts, default 1.0)"
 
 # ── Build ────────────────────────────────────────────────────────────────────
 

@@ -112,6 +112,11 @@ path = "../../benchmarks/pipeline/session_latency.rs"
 required-features = ["whisper-cpp"]
 
 [[example]]
+name = "vram_probe"
+path = "../../benchmarks/pipeline/vram_probe.rs"
+required-features = ["whisper-cpp"]
+
+[[example]]
 name = "punctuation_ab"
 path = "../../benchmarks/tuning/punctuation_ab.rs"
 required-features = ["whisper-cpp"]

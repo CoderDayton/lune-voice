@@ -142,12 +142,34 @@ impl LivePipeline {
         self.state != PipelineState::Idle
     }
 
-    /// The loaded ASR backend, when the pending reload does not invalidate it.
-    /// `None` forces `build_pipeline` to load the model again.
-    fn reusable_asr(&self) -> Option<Arc<AsrRegistry>> {
+    /// Plan the next rebuild: the backend to carry forward into it, and
+    /// whatever the pending reload invalidated.
+    ///
+    /// A [`ReloadScope::Full`] takes the loaded model *out of the pipeline
+    /// here*, before the caller loads its replacement. Leaving it in place
+    /// keeps it resident across the load — two whole models in device memory
+    /// at the peak, which OOMs a card sized for exactly one, and reports as
+    /// "the new model failed to load" rather than "you ran out".
+    ///
+    /// Both fields have to go: `manager` holds a second `Arc` to the same
+    /// backend, so taking `asr` alone frees nothing. `is_busy()` is the
+    /// caller's guarantee that no running session holds a third.
+    ///
+    /// This is why a failed rebuild has no old model to fall back on. Keeping
+    /// one in reserve is exactly the double residency being fixed; the pending
+    /// scope survives, so the next start retries the rebuild.
+    fn take_reload_plan(&mut self) -> (Option<Arc<AsrRegistry>>, ReleasedBackend) {
         match self.reload {
-            ReloadScope::Full => None,
-            ReloadScope::None | ReloadScope::Config => self.asr.clone(),
+            ReloadScope::Full => (
+                None,
+                ReleasedBackend {
+                    manager: self.manager.take(),
+                    asr: self.asr.take(),
+                },
+            ),
+            ReloadScope::None | ReloadScope::Config => {
+                (self.asr.clone(), ReleasedBackend::default())
+            }
         }
     }
 
@@ -184,6 +206,55 @@ impl LivePipeline {
         }
         self.state = PipelineState::Active;
         true
+    }
+}
+
+/// Pipeline handles that a rebuild took out of service, on their way to being
+/// dropped. Holding the last `Arc` to an [`AsrRegistry`] means holding the
+/// model's device memory, so this exists to make the release an explicit step
+/// rather than an incidental drop.
+#[derive(Default)]
+#[must_use = "dropping this inline stalls the async worker — pass it to `release_backend`"]
+struct ReleasedBackend {
+    manager: Option<Arc<SessionManager<AsrRegistry>>>,
+    asr: Option<Arc<AsrRegistry>>,
+}
+
+impl ReleasedBackend {
+    /// Strip a built-but-unwanted pipeline down to the parts worth releasing.
+    /// A rebuild that loses a race is discarded whole, and the model it just
+    /// loaded goes with it.
+    fn from_discarded(pipeline: &mut LivePipeline) -> Self {
+        Self {
+            manager: pipeline.manager.take(),
+            asr: pipeline.asr.take(),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.manager.is_none() && self.asr.is_none()
+    }
+}
+
+/// Drop released pipeline handles off the async workers, and wait for it.
+///
+/// `WhisperContext`'s destructor frees the model's weights. On CUDA that is a
+/// `cudaFree` of gigabytes and it blocks — the same reason the matching *load*
+/// runs on `spawn_blocking` rather than inline.
+///
+/// Awaited rather than detached because [`LivePipeline::take_reload_plan`]
+/// depends on it: releasing the old model before loading the new one only
+/// avoids double residency if the free has finished by the time the load
+/// starts.
+async fn release_backend(released: ReleasedBackend) {
+    if released.is_empty() {
+        return;
+    }
+    if tokio::task::spawn_blocking(move || drop(released))
+        .await
+        .is_err()
+    {
+        warn!("backend release task failed; device memory may not have been reclaimed");
     }
 }
 
@@ -510,25 +581,34 @@ impl AppRuntime {
     }
 
     pub async fn eager_rebuild(&self) -> Result<(), String> {
-        let (paths, reuse_asr) = {
-            let pipeline = self.inner.pipeline.lock().await;
+        let (paths, reuse_asr, released) = {
+            let mut pipeline = self.inner.pipeline.lock().await;
             if pipeline.is_busy() {
                 return Ok(());
             }
-            (pipeline.paths.clone(), pipeline.reusable_asr())
+            let (reuse_asr, released) = pipeline.take_reload_plan();
+            (pipeline.paths.clone(), reuse_asr, released)
         };
+        release_backend(released).await;
         let settings = load_settings(&paths)?;
-        let (rebuilt, new_llm_service, new_settings) = build_pipeline(paths, settings, reuse_asr)
-            .await
-            .map_err(|e| format!("eager rebuild: {e}"))?;
+        let (mut rebuilt, new_llm_service, new_settings) =
+            build_pipeline(paths, settings, reuse_asr)
+                .await
+                .map_err(|e| format!("eager rebuild: {e}"))?;
         let mut pipeline = self.inner.pipeline.lock().await;
-        if !pipeline.is_busy() {
-            *pipeline = rebuilt;
-            *self.inner.llm_service.write().await = new_llm_service;
-            let new_settings_val = new_settings.read().await.clone();
-            *self.inner.settings.write().await = new_settings_val;
-            tracing::info!("pipeline pre-warmed");
+        if pipeline.is_busy() {
+            // A session claimed the pipeline while we built. This rebuild is
+            // dead, and it is holding a freshly loaded model.
+            let discarded = ReleasedBackend::from_discarded(&mut rebuilt);
+            drop(pipeline);
+            release_backend(discarded).await;
+            return Ok(());
         }
+        *pipeline = rebuilt;
+        *self.inner.llm_service.write().await = new_llm_service;
+        let new_settings_val = new_settings.read().await.clone();
+        *self.inner.settings.write().await = new_settings_val;
+        tracing::info!("pipeline pre-warmed");
         Ok(())
     }
 
@@ -1086,12 +1166,19 @@ impl AppRuntime {
                 return Err(ALREADY_ACTIVE.into());
             }
             let needs_rebuild = pipeline.reload != ReloadScope::None || pipeline.manager.is_none();
-            needs_rebuild.then(|| (pipeline.paths.clone(), pipeline.reusable_asr()))
+            needs_rebuild.then(|| {
+                let (reuse_asr, released) = pipeline.take_reload_plan();
+                (pipeline.paths.clone(), reuse_asr, released)
+            })
         };
 
         // Phase 2: If a rebuild is needed, do it outside the lock, then
         // re-acquire and atomically swap + activate in one critical section.
-        if let Some((paths, reuse_asr)) = reload_plan {
+        if let Some((paths, reuse_asr, released)) = reload_plan {
+            // Before the load, not after: a model change would otherwise hold
+            // the outgoing model's device memory for the whole of the new
+            // model's allocation.
+            release_backend(released).await;
             let settings = match load_settings(&paths) {
                 Ok(s) => s,
                 Err(e) => {
@@ -1181,19 +1268,21 @@ impl AppRuntime {
         let _start_guard = self.inner.start_gate.lock().await;
 
         let reload_plan = {
-            let pipeline = self.inner.pipeline.lock().await;
+            let mut pipeline = self.inner.pipeline.lock().await;
             if pipeline.is_busy() {
                 return;
             }
             if pipeline.reload != ReloadScope::None || pipeline.manager.is_none() {
-                Some((pipeline.paths.clone(), pipeline.reusable_asr()))
+                let (reuse_asr, released) = pipeline.take_reload_plan();
+                Some((pipeline.paths.clone(), reuse_asr, released))
             } else {
                 None
             }
         };
-        let Some((paths, reuse_asr)) = reload_plan else {
+        let Some((paths, reuse_asr, released)) = reload_plan else {
             return;
         };
+        release_backend(released).await;
         let settings = match load_settings(&paths) {
             Ok(s) => s,
             Err(error) => {
@@ -1202,11 +1291,15 @@ impl AppRuntime {
             }
         };
         match build_pipeline(paths, settings, reuse_asr).await {
-            Ok((rebuilt, new_llm_service, new_settings)) => {
+            Ok((mut rebuilt, new_llm_service, new_settings)) => {
                 let mut pipeline = self.inner.pipeline.lock().await;
                 if pipeline.is_busy() {
                     // A session started while we rebuilt; drop this rebuild and
-                    // let the next dictation start redo it.
+                    // let the next dictation start redo it. It is holding a
+                    // freshly loaded model, so release it off the workers.
+                    let discarded = ReleasedBackend::from_discarded(&mut rebuilt);
+                    drop(pipeline);
+                    release_backend(discarded).await;
                     return;
                 }
                 *pipeline = rebuilt;
@@ -1521,9 +1614,11 @@ fn cue_for_transition(prev: &str, status: &str) -> Option<lune_voice::sound::Cue
 #[cfg(test)]
 mod tests {
     use super::{
-        LivePipeline, PipelineState, PrewarmAction, ReloadScope, asr_backend_needs_reload,
-        cue_for_transition, reconcile_prewarm, remote_backends_denied, sanitize_error_for_frontend,
+        Arc, AsrRegistry, LivePipeline, PipelineState, PrewarmAction, ReloadScope,
+        asr_backend_needs_reload, cue_for_transition, reconcile_prewarm, release_backend,
+        remote_backends_denied, sanitize_error_for_frontend,
     };
+    use lune_asr::{OpenAiAsrConfig, OpenAiCompatibleAsrBackend};
     use lune_core::config::{AsrBackendConfig, PrivacyMode, WhisperModel};
 
     /// A pipeline with no manager and no backend loaded — enough to drive the
@@ -1611,17 +1706,76 @@ mod tests {
         );
     }
 
-    #[test]
-    fn only_a_full_reload_drops_the_loaded_backend() {
-        let mut pipeline = idle_pipeline();
-        // Stand-in for a loaded backend: `reusable_asr` only inspects `reload`.
-        pipeline.reload = ReloadScope::Config;
-        assert!(pipeline.asr.is_none());
+    /// A loaded backend that costs nothing to build. The remote variant has no
+    /// model behind it, but `take_reload_plan` and `release_backend` only ever
+    /// move the `Arc` around — which variant it wraps is immaterial to them.
+    fn loaded_backend() -> Arc<AsrRegistry> {
+        let backend = OpenAiCompatibleAsrBackend::new(OpenAiAsrConfig::default())
+            .expect("the default remote config builds an HTTP client, no network");
+        Arc::new(AsrRegistry::OpenAi(backend))
+    }
 
+    #[test]
+    fn a_full_reload_takes_the_loaded_backend_out_of_the_pipeline() {
+        let mut pipeline = idle_pipeline();
+        let probe = loaded_backend();
+        pipeline.asr = Some(Arc::clone(&probe));
         pipeline.reload = ReloadScope::Full;
+
+        let (reuse, released) = pipeline.take_reload_plan();
         assert!(
-            pipeline.reusable_asr().is_none(),
+            reuse.is_none(),
             "a backend change must force a fresh model load"
+        );
+        assert!(
+            pipeline.asr.is_none(),
+            "the old model must leave the pipeline before the replacement is \
+             loaded — holding it across the load puts two whole models in VRAM"
+        );
+
+        drop(released);
+        assert_eq!(
+            Arc::strong_count(&probe),
+            1,
+            "the released handle must be the last reference, or nothing is freed"
+        );
+    }
+
+    #[test]
+    fn a_config_reload_keeps_the_loaded_backend_in_place() {
+        let mut pipeline = idle_pipeline();
+        let probe = loaded_backend();
+        pipeline.asr = Some(Arc::clone(&probe));
+        pipeline.reload = ReloadScope::Config;
+
+        let (reuse, released) = pipeline.take_reload_plan();
+        assert!(
+            reuse.is_some(),
+            "a dictionary or style edit must reuse the loaded model, not reload it"
+        );
+        assert!(pipeline.asr.is_some(), "and must leave it in the pipeline");
+        assert!(
+            released.is_empty(),
+            "nothing was invalidated, so nothing may be released"
+        );
+    }
+
+    #[tokio::test]
+    async fn release_backend_frees_the_model_before_it_returns() {
+        // `take_reload_plan` releases the old model so the *next* load has the
+        // memory back. That only holds if the free has actually completed by
+        // the time this returns — a detached drop would race the new load.
+        let probe = loaded_backend();
+        let mut pipeline = idle_pipeline();
+        pipeline.asr = Some(Arc::clone(&probe));
+        pipeline.reload = ReloadScope::Full;
+        let (_, released) = pipeline.take_reload_plan();
+
+        release_backend(released).await;
+        assert_eq!(
+            Arc::strong_count(&probe),
+            1,
+            "the model must be freed before the caller loads its replacement"
         );
     }
 
