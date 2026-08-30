@@ -12,7 +12,8 @@ with a single modified file (`build.rs`) that adds `GGML_BACKEND_DL` support.
 
 ## Distribution model
 
-Releases ship as finished Tauri bundles (`.deb`, `.rpm`, `.AppImage`), so **end
+Releases ship as finished Tauri bundles (`.deb`, `.rpm`, `.AppImage`, and a
+Windows `-setup.exe`), so **end
 users never compile** anything.
 
 GPU support is **not** a separate artifact on Linux. The CUDA backend is a
@@ -20,10 +21,12 @@ GPU support is **not** a separate artifact on Linux. The CUDA backend is a
 every Linux user and a machine with an NVIDIA driver opts in at runtime. See
 [GPU_PLUGIN.md](GPU_PLUGIN.md) for how that works and how to publish the archive.
 
-Only Linux is built and tested. Audio capture and text delivery are Linux-only
-(ALSA/PipeWire, `uinput`, IBus, evdev hotkeys), which is why CI's Windows job
-excludes `lune-audio`, `lune-voice` and `lune-ui`, and why there is no macOS job
-at all. A bare local `cgs build` auto-detects the build host; see Build commands.
+Linux and Windows are both built and tested; there is no macOS job yet. Each
+OS-specific subsystem — audio capture, text delivery, the global hotkey, the
+focused-window probe, the pill overlay — sits behind an interface with a half
+per platform (see the platform-split table in `CLAUDE.md`), so CI runs the
+**whole** workspace on `ubuntu-latest` and `windows-latest` alike. A bare local
+`cgs build` auto-detects the build host; see Build commands.
 
 Whisper models are **external assets**: GGML files are downloaded at runtime
 into the application models directory (`~/.local/share/lune-voice/models/` on
@@ -36,8 +39,8 @@ bundle.
 |---|---|---|---|---|
 | Linux | Linux x86_64 | CPU (AVX2 baseline) | `whisper-cpp` | **Supported** |
 | Linux GPU plugin | Linux x86_64 + NVIDIA | CUDA, downloaded at runtime | — (built by `cgs gpu-plugin`) | **Supported** |
-| Windows CPU | Windows x86_64 | CPU (AVX2 baseline) | `whisper-cpp` | **Not built** |
-| Windows CUDA | Windows x86_64 + NVIDIA | CUDA | `whisper-cuda` | **Not built** |
+| Windows CPU | Windows x86_64 | CPU (AVX2 baseline) | `whisper-cpp` | **Supported** (NSIS installer) |
+| Windows GPU plugin | Windows x86_64 + NVIDIA | CUDA, downloaded at runtime | — (built by `cgs gpu-plugin-windows`) | **Wired; archive not published yet** |
 | macOS Metal | macOS arm64 (Apple Silicon) | Metal | `whisper-metal` | **Planned** (see below) |
 
 The `whisper-cuda` feature forwards to `whisper-rs/cuda`; the CPU feature just
@@ -114,9 +117,6 @@ host. `cgs dev` and the native branch of `cgs build` export
 
 ### Windows specifics
 
-> Not buildable end to end today (see the matrix note above). Kept for when the
-> Linux-only capture and delivery layers grow a Windows path.
-
 On Windows, run the equivalent in PowerShell from `desktop-ui\`:
 
 ```powershell
@@ -169,20 +169,23 @@ and failed at release time instead.
 
 **`.github/workflows/release.yml`** runs on a `v*` tag. It first fails fast if
 the tag disagrees with the version in `tauri.conf.json`, `Cargo.toml` and
-`desktop-ui/package.json`, then builds the Linux bundles, writes `SHA256SUMS`,
-and opens a **draft** GitHub release with them attached.
+`desktop-ui/package.json`, then builds the Linux bundles and the Windows
+installer, writes checksums, and opens a **draft** GitHub release with them
+attached. The Windows leg runs after the Linux one so only one job creates the
+draft; it attaches to the release the Linux job made.
 
 It stops at draft on purpose: the updater's private key never enters CI, so
 `latest.json` does not exist yet. Finish by hand — see [In-app
 updater](#in-app-updater) below. A release published without `latest.json` is a
 release the updater cannot see.
 
-> Status: only the **Linux CPU** artifact is built. The Windows CPU/CUDA Cargo
-> features exist, but the Linux-only audio and delivery crates do not compile
-> there, so no Windows artifact is produced and `dmg`/`nsis` are not in
-> `bundle.targets`. GPU reaches users as the downloadable CUDA plugin, not as a
-> second bundle. The macOS-Metal wiring remains to be implemented; adding it
-> means a `macos-14` leg in `release.yml` plus the feature work above.
+> Status: **Linux CPU** and **Windows CPU** artifacts are both built. GPU
+> reaches users as the downloadable CUDA plugin rather than a second bundle,
+> and Windows has its own plugin build (`cgs gpu-plugin-windows`) whose archive
+> is not published yet.
+> `dmg` is not in `bundle.targets`: the macOS-Metal wiring remains to be
+> implemented, and adding it means a `macos-14` leg in `release.yml` plus the
+> feature work above.
 
 ## GPU plugin
 
@@ -243,6 +246,7 @@ app's own version, so a release built with a stale version is invisible.
 The manifest carries one key per package format —
 `linux-x86_64-{appimage,deb,rpm}` — because the plugin rejects bytes that do
 not match how the app was installed, so a single URL cannot serve all three.
+Windows has a single installer and so a single key, `windows-x86_64`.
 Those are the keys the plugin looks up on its own: it tries
 `{os}-{arch}-{installer}` for the format this install was packaged as and then
 falls back to the bare `{os}-{arch}` key, so the app pins no target of its own.

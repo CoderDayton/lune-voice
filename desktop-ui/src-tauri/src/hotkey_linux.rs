@@ -3,172 +3,17 @@
 //! Grabs physical keyboards exclusively and re-injects non-hotkey events
 //! through a uinput passthrough device. This works on both X11 and Wayland.
 
-use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock, mpsc as std_mpsc};
 
 use evdev::{
     AttributeSet, Device, EventType, InputEvent, KeyCode, RelativeAxisCode, uinput::VirtualDevice,
 };
-use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
 use lune_core::config::{ActivationMode, HotkeyConfig, Modifier};
 
-// ─── Public types ────────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Copy)]
-pub enum HotkeyAction {
-    Toggle,
-    Start,
-    Stop,
-    Cancel,
-}
-
-// ─── Intent channel ──────────────────────────────────────────────────────────
-//
-// The listener thread carries two obligations with very different weights.
-//
-// Forwarding is absolute: while the keyboards are grabbed the kernel routes
-// their events to this process alone, so every non-hotkey keystroke reaches
-// the user's desktop only because this thread re-injects it. Miss that
-// deadline and the whole machine appears frozen, not just this app.
-//
-// Publishing intent is best-effort: the runtime that consumes it applies
-// actions serially against one state machine, and a single start can take
-// seconds while a model loads. Miss that deadline and one dictation is lost.
-//
-// So the channel between them is built to make the second incapable of
-// delaying the first — not merely unlikely to.
-
-/// Priority-lane codes for the actions that *end* a session. Ordered so
-/// `fetch_max` merges two overflows into the stronger of the pair: someone who
-/// reached for cancel gets cancel, not stop.
-const SAFETY_NONE: u8 = 0;
-const SAFETY_STOP: u8 = 1;
-const SAFETY_CANCEL: u8 = 2;
-
-/// How many intents may be in flight before the sink starts shedding.
-///
-/// Depth buys latency here, not reliability: the consumer is serial and one
-/// action can take seconds, so anything queued behind it is stale before it
-/// runs. Sized for a burst of double-taps and nothing more.
-const INTENT_CAPACITY: usize = 16;
-
-impl HotkeyAction {
-    /// Which lane this action travels in when the channel is full.
-    ///
-    /// The two directions fail differently, so they cannot share a shedding
-    /// policy. `Start`/`Toggle` begin work: losing one means nothing happens
-    /// and the next press still works. `Stop`/`Cancel` end it: losing one
-    /// leaves a live microphone the user believes they already closed.
-    const fn safety_code(self) -> u8 {
-        match self {
-            Self::Stop => SAFETY_STOP,
-            Self::Cancel => SAFETY_CANCEL,
-            Self::Start | Self::Toggle => SAFETY_NONE,
-        }
-    }
-}
-
-/// The listener's end of the intent channel. Cannot block, by construction.
-///
-/// Handing the listener thread a bare `Sender` left `blocking_send` one edit
-/// away, and that call is what turns a slow runtime into a system-wide
-/// keyboard freeze. This type exposes no blocking operation to reach for.
-pub struct HotkeySink {
-    tx: mpsc::Sender<HotkeyAction>,
-    deferred_stop: Arc<AtomicU8>,
-}
-
-impl HotkeySink {
-    /// Publish an intent. Returns immediately, always.
-    pub fn emit(&self, action: HotkeyAction) {
-        info!(?action, "hotkey dispatched");
-        match self.tx.try_send(action) {
-            Ok(()) => {}
-            Err(mpsc::error::TrySendError::Full(action)) => self.shed(action),
-            Err(mpsc::error::TrySendError::Closed(_)) => {
-                warn!("hotkey consumer is gone; intent discarded");
-            }
-        }
-    }
-
-    /// A full queue means the consumer has not run in a long time. What that
-    /// costs depends entirely on which direction the action was going.
-    fn shed(&self, action: HotkeyAction) {
-        let code = action.safety_code();
-        if code == SAFETY_NONE {
-            warn!(?action, "hotkey queue full; intent dropped");
-            return;
-        }
-        self.deferred_stop.fetch_max(code, Ordering::Release);
-        warn!(
-            ?action,
-            "hotkey queue full; stop moved to the priority lane"
-        );
-    }
-}
-
-/// The consumer's end of the intent channel.
-pub struct HotkeyIntents {
-    rx: mpsc::Receiver<HotkeyAction>,
-    deferred_stop: Arc<AtomicU8>,
-}
-
-impl HotkeyIntents {
-    /// The next intent to act on, or `None` once the listener is gone.
-    ///
-    /// A deferred stop preempts the queue. It was pressed *after* everything
-    /// waiting there, and asking to stop makes those older intents moot —
-    /// replaying them would restart exactly what the user just ended.
-    ///
-    /// No wakeup can be lost, and the channel needs no side-band notification
-    /// to prove it: `deferred_stop` is only ever set when `try_send` reported
-    /// the channel full, a full channel holds at least one item, and a
-    /// non-empty channel makes the `recv` below ready immediately. A consumer
-    /// parked on an empty channel is therefore a consumer no sender is
-    /// shedding into, so checking before awaiting is sufficient.
-    pub async fn recv(&mut self) -> Option<HotkeyAction> {
-        if let Some(action) = self.take_deferred_stop() {
-            let discarded = self.drain();
-            if discarded > 0 {
-                warn!(discarded, "deferred stop preempted stale hotkey intents");
-            }
-            return Some(action);
-        }
-        self.rx.recv().await
-    }
-
-    fn take_deferred_stop(&self) -> Option<HotkeyAction> {
-        match self.deferred_stop.swap(SAFETY_NONE, Ordering::Acquire) {
-            SAFETY_STOP => Some(HotkeyAction::Stop),
-            SAFETY_CANCEL => Some(HotkeyAction::Cancel),
-            _ => None,
-        }
-    }
-
-    fn drain(&mut self) -> usize {
-        let mut discarded = 0;
-        while self.rx.try_recv().is_ok() {
-            discarded += 1;
-        }
-        discarded
-    }
-}
-
-/// Build the listener/consumer pair. Keeping both ends and the shedding policy
-/// in one place is deliberate: neither side can misuse the channel on its own.
-pub fn intent_channel() -> (HotkeySink, HotkeyIntents) {
-    let (tx, rx) = mpsc::channel(INTENT_CAPACITY);
-    let deferred_stop = Arc::new(AtomicU8::new(SAFETY_NONE));
-    (
-        HotkeySink {
-            tx,
-            deferred_stop: Arc::clone(&deferred_stop),
-        },
-        HotkeyIntents { rx, deferred_stop },
-    )
-}
+use crate::hotkey::{HotkeyAction, HotkeyBackend, HotkeySink};
 
 /// Live-updatable hotkey configuration shared between the settings-save
 /// path and the evdev listener thread. The listener polls `generation` per
@@ -243,11 +88,36 @@ impl LiveHotkeyConfig {
     }
 }
 
+impl HotkeyBackend for LiveHotkeyConfig {
+    fn update(&self, config: &HotkeyConfig, mode: ActivationMode) -> Result<(), String> {
+        LiveHotkeyConfig::update(self, config, mode)
+    }
+
+    fn name(&self) -> &'static str {
+        "evdev"
+    }
+}
+
+/// Start the evdev listener. The `hotkey::start` entry point for Linux.
+///
+/// The listener thread runs for the process lifetime, so its join handle is
+/// deliberately dropped: there is no shutdown path that could use it, and the
+/// grab must outlive every caller.
+pub fn start(
+    config: &HotkeyConfig,
+    mode: ActivationMode,
+    sink: HotkeySink,
+) -> Option<Arc<dyn HotkeyBackend>> {
+    let live = Arc::new(LiveHotkeyConfig::new(config, mode)?);
+    spawn(Arc::clone(&live), sink)?;
+    Some(live)
+}
+
 /// Spawn the evdev hotkey listener on a background OS thread.
 ///
 /// Returns `None` if the hotkey config references unknown key names or no
 /// keyboards are accessible.
-pub fn spawn(live: Arc<LiveHotkeyConfig>, sink: HotkeySink) -> Option<std::thread::JoinHandle<()>> {
+fn spawn(live: Arc<LiveHotkeyConfig>, sink: HotkeySink) -> Option<std::thread::JoinHandle<()>> {
     let handle = std::thread::Builder::new()
         .name("hotkey-evdev".into())
         .spawn(move || {
@@ -1132,104 +1002,5 @@ mod tests {
                 .any(|&(c, v)| c == KeyCode::KEY_LEFTCTRL.code() && v == 0),
             "expected a synthetic Ctrl release"
         );
-    }
-
-    // ─── Intent channel ──────────────────────────────────────────────────────
-
-    /// Fill the channel without consuming anything, leaving the sink in the
-    /// state that used to freeze the keyboard.
-    fn saturated() -> (HotkeySink, HotkeyIntents) {
-        let (sink, intents) = intent_channel();
-        for _ in 0..INTENT_CAPACITY {
-            sink.emit(HotkeyAction::Toggle);
-        }
-        (sink, intents)
-    }
-
-    /// The defect this channel exists to prevent: the listener thread also
-    /// re-injects every non-hotkey keystroke, so a send that waits on the
-    /// runtime freezes the user's keyboard system-wide. If `emit` ever waits
-    /// again, this test stops finishing — hence the timeout, which turns a
-    /// hang into a failure instead of a stuck CI job.
-    #[tokio::test]
-    async fn emit_returns_while_the_queue_is_full() {
-        let (sink, _intents) = saturated();
-        tokio::time::timeout(std::time::Duration::from_secs(5), async {
-            tokio::task::spawn_blocking(move || {
-                for _ in 0..1000 {
-                    sink.emit(HotkeyAction::Toggle);
-                    sink.emit(HotkeyAction::Start);
-                }
-            })
-            .await
-            .expect("emit must never block the listener thread");
-        })
-        .await
-        .expect("emit blocked on a full queue");
-    }
-
-    #[tokio::test]
-    async fn a_dropped_start_costs_only_that_press() {
-        let (sink, mut intents) = saturated();
-        sink.emit(HotkeyAction::Start);
-        // Nothing was promoted, so the queue still holds only what fit.
-        for _ in 0..INTENT_CAPACITY {
-            assert!(matches!(intents.recv().await, Some(HotkeyAction::Toggle)));
-        }
-        assert!(
-            intents.rx.try_recv().is_err(),
-            "the Start was shed, not kept"
-        );
-    }
-
-    /// Losing a stop leaves the microphone open on a session the user believes
-    /// they closed, so it must survive a full queue.
-    #[tokio::test]
-    async fn a_stop_survives_a_full_queue_and_preempts_it() {
-        let (sink, mut intents) = saturated();
-        sink.emit(HotkeyAction::Stop);
-
-        assert!(
-            matches!(intents.recv().await, Some(HotkeyAction::Stop)),
-            "the stop must arrive before the backlog it was pressed after"
-        );
-        assert!(
-            intents.rx.try_recv().is_err(),
-            "intents older than the stop must not replay and restart it"
-        );
-    }
-
-    #[tokio::test]
-    async fn cancel_wins_over_stop_when_both_overflow() {
-        let (sink, mut intents) = saturated();
-        sink.emit(HotkeyAction::Stop);
-        sink.emit(HotkeyAction::Cancel);
-        assert!(matches!(intents.recv().await, Some(HotkeyAction::Cancel)));
-
-        // Order of arrival must not change the answer.
-        let (sink, mut intents) = saturated();
-        sink.emit(HotkeyAction::Cancel);
-        sink.emit(HotkeyAction::Stop);
-        assert!(matches!(intents.recv().await, Some(HotkeyAction::Cancel)));
-    }
-
-    #[tokio::test]
-    async fn an_uncontended_channel_is_plain_fifo() {
-        let (sink, mut intents) = intent_channel();
-        sink.emit(HotkeyAction::Start);
-        sink.emit(HotkeyAction::Toggle);
-        sink.emit(HotkeyAction::Stop);
-        assert!(matches!(intents.recv().await, Some(HotkeyAction::Start)));
-        assert!(matches!(intents.recv().await, Some(HotkeyAction::Toggle)));
-        assert!(matches!(intents.recv().await, Some(HotkeyAction::Stop)));
-    }
-
-    #[tokio::test]
-    async fn recv_ends_when_the_listener_is_gone() {
-        let (sink, mut intents) = intent_channel();
-        sink.emit(HotkeyAction::Start);
-        drop(sink);
-        assert!(matches!(intents.recv().await, Some(HotkeyAction::Start)));
-        assert!(intents.recv().await.is_none());
     }
 }

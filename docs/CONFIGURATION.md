@@ -53,8 +53,8 @@ All changes are persisted to disk immediately. The desktop app reloads a workspa
 
 ## Settings File
 
-Lune Voice is Linux-only. Settings are persisted as TOML at
-`~/.config/lune-voice/settings.toml`.
+Settings are persisted as TOML at `~/.config/lune-voice/settings.toml` on Linux
+and `%APPDATA%\lune-voice\settings.toml` on Windows.
 
 If the file doesn't exist or fails to parse, defaults are used and a warning is logged. The daemon never crashes on invalid settings — it falls back gracefully.
 

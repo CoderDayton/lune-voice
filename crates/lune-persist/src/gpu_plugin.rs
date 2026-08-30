@@ -46,10 +46,17 @@ impl GpuPluginRelease {
     }
 }
 
-/// Shared-object name of the CUDA compute backend. Mirrors
+/// File name of the CUDA compute backend. Mirrors
 /// `lune_asr::gpu_backend::CUDA_PLUGIN_FILE` — this crate cannot depend on
 /// `lune-asr`, and it is the file whose presence means "installed", so the
 /// install publishes it last.
+///
+/// ggml derives this name itself (`backend_filename_prefix` /
+/// `backend_filename_extension` in `ggml-backend-reg.cpp`), which is why the
+/// `lib` prefix is absent on Windows rather than merely conventional.
+#[cfg(target_os = "windows")]
+const CUDA_PLUGIN_FILE: &str = "ggml-cuda.dll";
+#[cfg(not(target_os = "windows"))]
 const CUDA_PLUGIN_FILE: &str = "libggml-cuda.so";
 
 /// Digest placeholder for a release that has not been published yet. Kept as a
@@ -77,6 +84,45 @@ pub const CUDA_LINUX_X86_64: GpuPluginRelease = GpuPluginRelease {
     // dispatcher reaches every kernel object, so nothing is prunable.
     download_bytes: 493_568_081,
     cuda_major: 13,
+};
+
+/// The CUDA backend for Windows x86-64.
+///
+/// Same archive shape as Linux — a `.tar.gz` holding the plugin beside the
+/// redistributable CUDA runtime — because the extractor and its allowlist are
+/// shared. Only the member *names* differ (`ggml-cuda.dll`, `cudart64_13.dll`,
+/// …), which is what [`is_permitted_member`] switches on.
+///
+/// Unpublished until someone builds it: `cgs gpu-plugin-windows` needs a
+/// Windows host with MSVC and the CUDA toolkit, and there is no cross-compile
+/// for CUDA device code. Publishing means running that script, uploading both
+/// files to the release named in `url`, and pasting the digest and byte size
+/// here — the same loop the Linux archive went through.
+pub const CUDA_WINDOWS_X86_64: GpuPluginRelease = GpuPluginRelease {
+    url: "https://github.com/CoderDayton/lune-voice/releases/download/gpu-cuda13-v1/\
+          lune-voice-gpu-cuda13-windows-x86_64.tar.gz",
+    sha256: UNPUBLISHED,
+    download_bytes: 0,
+    cuda_major: 13,
+};
+
+/// The release this build can install, if the platform has one.
+///
+/// `None` on macOS: there is no CUDA there and never will be, so the UI hides
+/// the download rather than offering one that cannot resolve.
+pub const CURRENT: Option<&GpuPluginRelease> = {
+    #[cfg(target_os = "linux")]
+    {
+        Some(&CUDA_LINUX_X86_64)
+    }
+    #[cfg(target_os = "windows")]
+    {
+        Some(&CUDA_WINDOWS_X86_64)
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+    {
+        None
+    }
 };
 
 /// Progress of a GPU plugin install, emitted as the download streams.
@@ -108,10 +154,48 @@ fn is_permitted_member(name: &Path) -> bool {
     let Some(file) = file.to_str() else {
         return false;
     };
-    is_versioned_soname(file, CUDA_PLUGIN_FILE)
-        || is_versioned_soname(file, "libcudart.so")
-        || is_versioned_soname(file, "libcublas.so")
-        || is_versioned_soname(file, "libcublasLt.so")
+    permitted_file_name(file)
+}
+
+/// The per-platform half of the allowlist.
+///
+/// Only the dispatch is `cfg`-gated; both matchers are compiled everywhere so
+/// each is unit-tested on whichever host runs CI.
+fn permitted_file_name(file: &str) -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        file == CUDA_PLUGIN_FILE
+            || is_cuda_dll(file, "cudart")
+            || is_cuda_dll(file, "cublas")
+            || is_cuda_dll(file, "cublasLt")
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        is_versioned_soname(file, CUDA_PLUGIN_FILE)
+            || is_versioned_soname(file, "libcudart.so")
+            || is_versioned_soname(file, "libcublas.so")
+            || is_versioned_soname(file, "libcublasLt.so")
+    }
+}
+
+/// Whether `file` is NVIDIA's Windows DLL for `stem`: `cudart64_13.dll`.
+///
+/// Windows CUDA carries the version *inside* the file name rather than as a
+/// dotted suffix, so the `.so` matcher cannot be reused. The `64_` is the
+/// architecture tag NVIDIA ships on every x64 redistributable, and requiring
+/// it is what stops `cublas` from also matching `cublasLt64_13.dll`.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn is_cuda_dll(file: &str, stem: &str) -> bool {
+    let Some(rest) = file.strip_prefix(stem) else {
+        return false;
+    };
+    let Some(rest) = rest.strip_prefix("64_") else {
+        return false;
+    };
+    let Some(version) = rest.strip_suffix(".dll") else {
+        return false;
+    };
+    !version.is_empty() && version.chars().all(|c| c.is_ascii_digit())
 }
 
 /// Whether `file` is exactly `soname`, or `soname` followed by nothing but a
@@ -122,6 +206,7 @@ fn is_permitted_member(name: &Path) -> bool {
 /// The SHA-256 pin already gates the archive's contents, so this is the second
 /// lock rather than the first — but the cost of holding the shape exactly is a
 /// dozen lines.
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 fn is_versioned_soname(file: &str, soname: &str) -> bool {
     let Some(rest) = file.strip_prefix(soname) else {
         return false;
@@ -527,7 +612,8 @@ mod tests {
 
     #[test]
     fn permitted_members_are_the_cuda_libraries_only() {
-        for ok in [
+        #[cfg(not(target_os = "windows"))]
+        let names = [
             "libggml-cuda.so",
             // How GNU tar names members of an archive built with `-C dir .`.
             "./libggml-cuda.so",
@@ -535,14 +621,53 @@ mod tests {
             "libcudart.so.13",
             "libcublas.so.13",
             "libcublasLt.so.13",
-        ] {
+        ];
+        #[cfg(target_os = "windows")]
+        let names = [
+            "ggml-cuda.dll",
+            "./ggml-cuda.dll",
+            "./cublasLt64_13.dll",
+            "cudart64_13.dll",
+            "cublas64_13.dll",
+            "cublasLt64_13.dll",
+        ];
+        for ok in names {
             assert!(is_permitted_member(Path::new(ok)), "{ok} should be allowed");
+        }
+    }
+
+    /// The Windows matcher, exercised on every platform so a Linux CI run
+    /// still covers it.
+    #[test]
+    fn windows_cuda_dlls_match_only_their_exact_versioned_shape() {
+        for ok in ["cudart64_13.dll", "cublas64_13.dll", "cublasLt64_12.dll"] {
+            assert!(
+                is_cuda_dll(ok, ok.split("64_").next().unwrap()),
+                "{ok} should match"
+            );
+        }
+        // `cublas` must not swallow `cublasLt`: the `64_` tag is what separates
+        // them, and matching the wrong one would admit an unlisted library.
+        assert!(!is_cuda_dll("cublasLt64_13.dll", "cublas"));
+        for bad in [
+            "cudart64_.dll",
+            "cudart64_13.dll.evil",
+            "cudart64_13a.dll",
+            "cudart_13.dll",
+            "cudart64_13.so",
+            "nvcuda64_13.dll",
+        ] {
+            assert!(!is_cuda_dll(bad, "cudart"), "{bad} should be refused");
         }
     }
 
     #[test]
     fn unrelated_or_nested_members_are_refused() {
-        for bad in [
+        // Shape violations are platform-independent: a nested or escaping
+        // path is refused before any name matcher sees it. The trailing
+        // entries are this platform's "permitted name plus junk" cases.
+        #[cfg(not(target_os = "windows"))]
+        let names = [
             "evil.so",
             "run.sh",
             "nested/libggml-cuda.so",
@@ -556,7 +681,22 @@ mod tests {
             "libcublas.so.evil",
             "libcublas.so.",
             "libcublas.so-13",
-        ] {
+        ];
+        #[cfg(target_os = "windows")]
+        let names = [
+            "evil.dll",
+            "run.bat",
+            "nested/ggml-cuda.dll",
+            "./nested/ggml-cuda.dll",
+            "../ggml-cuda.dll",
+            "/ggml-cuda.dll",
+            // The driver library: present on the machine, never in the archive.
+            "nvcuda.dll",
+            "ggml-cuda.dllevil",
+            "cublas64_.dll",
+            "cublas64_13.dll.bak",
+        ];
+        for bad in names {
             assert!(
                 !is_permitted_member(Path::new(bad)),
                 "{bad} should be refused"
@@ -725,6 +865,42 @@ mod tests {
                 .all(|c| c.is_ascii_hexdigit()),
             "digest must be lowercase hex"
         );
+    }
+
+    /// The Windows archive is not built yet, and the app must keep saying so
+    /// rather than offering a download it cannot verify. When it is published,
+    /// this test is what fails and tells you to flip the expectation.
+    #[test]
+    fn the_cuda_windows_release_is_still_unpublished() {
+        assert!(
+            !CUDA_WINDOWS_X86_64.is_published(),
+            "pin the digest and byte size from `cgs gpu-plugin-windows`, then \
+             update this test"
+        );
+        assert_eq!(CUDA_WINDOWS_X86_64.download_bytes, 0);
+    }
+
+    /// The platform selector must agree with the platform this test runs on;
+    /// a mismatch would offer Linux bytes to a Windows install.
+    #[test]
+    fn the_current_release_matches_the_build_target() {
+        let want = if cfg!(target_os = "linux") {
+            Some("linux")
+        } else if cfg!(target_os = "windows") {
+            Some("windows")
+        } else {
+            None
+        };
+        match (CURRENT, want) {
+            (Some(r), Some(os)) => assert!(
+                r.url.contains(os),
+                "selected a {os} build but got {}",
+                r.url
+            ),
+            (None, None) => {}
+            (Some(r), None) => panic!("no CUDA plugin exists here, yet {} was offered", r.url),
+            (None, Some(os)) => panic!("{os} has a CUDA plugin but none was selected"),
+        }
     }
 
     /// Every download failure is rendered verbatim under the GPU card in

@@ -193,14 +193,15 @@ pub fn notify_update_available<R: tauri::Runtime>(
 ///
 /// All three Linux bundles are supported — the plugin swaps an AppImage in
 /// place and installs a .deb/.rpm through `pkexec` (a graphical password
-/// prompt). A binary run straight out of `target/` has no package to replace,
-/// so the install step fails and says so rather than pretending to work.
+/// prompt) — as is the Windows NSIS installer, which the plugin runs directly.
+/// A binary run straight out of `target/` has no package to replace, so the
+/// install step fails and says so rather than pretending to work.
 ///
 /// The manifest key is left to the plugin: it asks for
 /// `linux-x86_64-{deb,rpm,appimage}` matching how this install was packaged and
-/// falls back to the bare `linux-x86_64` key — exactly the per-format scheme
-/// `scripts/release/updater-manifest.sh` publishes, but without losing the
-/// fallback that pinning an explicit target would remove.
+/// falls back to the bare `{os}-x86_64` key — which is what Windows uses, and
+/// exactly the scheme `scripts/release/updater-manifest.sh` publishes, without
+/// losing the fallback that pinning an explicit target would remove.
 /// Point the check at a local manifest to exercise download + install for real
 /// (`cgs updater-test`, which builds `--debug`).
 ///

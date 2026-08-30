@@ -5,8 +5,8 @@ name: Release
 #   # bump `version` in tauri.conf.json, Cargo.toml and desktop-ui/package.json first
 #   git tag v0.1.0 && git push origin v0.1.0
 #
-# This workflow builds the Linux bundles and opens a DRAFT release with them
-# attached. It deliberately does NOT sign anything: the updater's private key
+# This workflow builds the Linux and Windows bundles and opens a DRAFT release
+# with them attached. It deliberately does NOT sign anything: the updater's private key
 # is the trust root and lives only at ~/.tauri/lune-voice-updater.key, never in
 # CI (docs/RELEASE.md, "In-app updater"). Finish the release by hand:
 #
@@ -177,4 +177,70 @@ jobs:
               --title "$GITHUB_REF_NAME" \
               --notes-file "$notes"
           fi
+          gh release upload "$GITHUB_REF_NAME" release-artifacts/* --clobber
+
+  # ── Windows bundle (CPU; the CUDA plugin is Linux-only for now) ───────────
+  build-windows:
+    name: Windows bundle
+    # Serialised behind the Linux job so only one of them can create the draft
+    # release; this one only ever uploads into a release that already exists.
+    needs: [verify-version, build-linux]
+    runs-on: windows-latest
+    env:
+      # Same portability floor as the Linux bundle: without it the Rust half is
+      # built for the runner's CPU and faults on older user hardware.
+      RUSTFLAGS: "-C target-cpu=x86-64-v3"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: release-windows-cpu
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.10'
+
+      - name: Install frontend dependencies
+        working-directory: desktop-ui
+        run: bun install --frozen-lockfile
+
+      # whisper.cpp needs cmake plus libclang for bindgen. Both ship on the
+      # runner image; bindgen only needs to be told where clang lives.
+      - name: Build bundle
+        working-directory: desktop-ui
+        shell: bash
+        env:
+          LIBCLANG_PATH: "C:\\Program Files\\LLVM\\bin"
+          GGML_NATIVE: "OFF"
+          GGML_AVX2: "ON"
+          GGML_FMA: "ON"
+          GGML_F16C: "ON"
+        run: bun tauri build --features whisper-cpp
+
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-artifacts
+          cp target/release/bundle/nsis/*-setup.exe release-artifacts/
+          (cd release-artifacts && sha256sum ./* > SHA256SUMS-windows)
+          ls -la release-artifacts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lune-voice-windows-x86_64
+          path: release-artifacts/*
+          if-no-files-found: error
+
+      # The draft already exists (see `needs`), so this only attaches to it.
+      - name: Attach to draft release
+        if: github.ref_type == 'tag'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
           gh release upload "$GITHUB_REF_NAME" release-artifacts/* --clobber

@@ -65,6 +65,30 @@ has no unload, so loading twice would register duplicate devices.
 the toolkit, and is not redistributable — which is why a missing driver is the
 one failure a download cannot fix.
 
+The Windows archive, `lune-voice-gpu-cuda13-windows-x86_64.tar.gz`, holds the
+same four libraries under NVIDIA's Windows names — `ggml-cuda.dll`,
+`cublasLt64_13.dll`, `cublas64_13.dll`, `cudart64_13.dll` — and omits the driver
+(`nvcuda.dll`) for the same reason. It stays a `.tar.gz` rather than a `.zip` so
+both platforms share one verified extractor; only the member names differ, and
+that is what the allowlist in `gpu_plugin.rs` switches on.
+
+### How a plugin finds its CUDA runtime
+
+The two platforms solve this differently, and neither the obvious way:
+
+- **Linux** bakes `RUNPATH=$ORIGIN` into `libggml-cuda.so` at link time, so it
+  resolves its siblings from its own directory. `LD_LIBRARY_PATH` cannot be used
+  — glibc caches the search list at process start, before the app could set it.
+- **Windows** has no `$ORIGIN`. ggml loads plugins with a plain `LoadLibraryW`
+  (`ggml-backend-reg.cpp`), and a DLL loaded by full path resolves *its* imports
+  from the executable's directory, System32 and `PATH` — never from its own
+  folder. So the app pre-loads `cudart`, `cublasLt` and `cublas` by full path
+  before ggml scans the directory (`preload_sibling_libraries` in
+  `crates/lune-asr/src/gpu_backend.rs`): a module already resident satisfies the
+  import by name. Widening the search order with `SetDefaultDllDirectories`
+  would have reached every other `LoadLibrary` in the process, WebView2's
+  included.
+
 ### On the size
 
 cuBLASLt is roughly three quarters of the unpacked payload (503 MB of 664 MB)
@@ -108,20 +132,34 @@ Two things to know:
 ## Building and publishing
 
 ```bash
-cgs gpu-plugin                              # default arch set
+cgs gpu-plugin                              # Linux, default arch set
 cgs gpu-plugin --env CUDA_ARCHS="89-real"   # narrow, for a local test
+cgs gpu-plugin-windows                      # Windows — run ON Windows
 ```
 
-The script builds `libggml-cuda.so`, stages it with the three NVIDIA
+The Linux script builds `libggml-cuda.so`, stages it with the three NVIDIA
 redistributables, strips it, asserts `RUNPATH=$ORIGIN` is present, verifies the
 architectures against the binary, then writes the tarball and its `.sha256` into
 `release-artifacts/`.
 
-To publish:
+`cgs gpu-plugin-windows` is the same shape with the platform's differences: run
+it from Git Bash in a shell where MSVC and the CUDA toolkit are on `PATH`
+(`CUDA_PATH` must be set). There is no `$ORIGIN` to assert, so it checks the
+staged file set against the app's allowlist instead — a stray file there would
+otherwise become a failed install for every user. **CUDA device code cannot be
+cross-compiled**: nvcc targets the host toolchain, so this artifact can only be
+produced on a Windows machine with an NVIDIA toolkit. Neither script runs in
+CI for that reason.
 
-1. Upload both files to the GitHub release named in `CUDA_LINUX_X86_64.url`.
-2. Record the digest and byte size in `CUDA_LINUX_X86_64`
+To publish, for either platform:
+
+1. Upload both files to the GitHub release named in the release constant's
+   `url` (`CUDA_LINUX_X86_64` or `CUDA_WINDOWS_X86_64`).
+2. Record the digest and byte size in that constant
    (`crates/lune-persist/src/gpu_plugin.rs`).
+3. For Windows, also update `the_cuda_windows_release_is_still_unpublished` in
+   that file — it fails on purpose once the digest is pinned, so the test tells
+   you what to change rather than silently passing.
 
 Until the digest is filled in it stays at the `UNPUBLISHED` sentinel and
 `install` refuses with an actionable message rather than downloading something

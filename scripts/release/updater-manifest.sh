@@ -6,9 +6,11 @@
 #
 # The plugin refuses bytes that don't match how the app was installed, so a
 # single URL per platform cannot serve deb, rpm and AppImage users. This emits
-# one key per format — matching `updater_target()` in desktop-ui/src-tauri/src
-# /lib.rs — and signs the deb and rpm, which tauri-bundler does NOT sign itself
-# (it only produces updater artifacts for AppImage on Linux).
+# one key per Linux format and signs the deb and rpm, which tauri-bundler does
+# NOT sign itself (it only produces updater artifacts for AppImage on Linux).
+#
+# Windows has one installer and so one key, `windows-x86_64` — the bare key the
+# plugin falls back to when no per-format variant matches.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -91,13 +93,17 @@ RAW_APPIMAGE=("$ARTIFACTS_DIR"/*.AppImage)
 APPIMAGE=("$ARTIFACTS_DIR"/*.AppImage.tar.gz)
 DEB=("$ARTIFACTS_DIR"/*.deb)
 RPM=("$ARTIFACTS_DIR"/*.rpm)
+# `*-setup.exe` is the NSIS bundle; the pattern excludes any other .exe that
+# happens to be lying in the directory.
+NSIS=("$ARTIFACTS_DIR"/*-setup.exe)
 shopt -u nullglob
 
 if [ ${#APPIMAGE[@]} -eq 0 ] && [ ${#RAW_APPIMAGE[@]} -gt 0 ]; then
     APPIMAGE=("$(pack_appimage "${RAW_APPIMAGE[0]}")")
 fi
 
-if [ ${#APPIMAGE[@]} -eq 0 ] && [ ${#DEB[@]} -eq 0 ] && [ ${#RPM[@]} -eq 0 ]; then
+if [ ${#APPIMAGE[@]} -eq 0 ] && [ ${#DEB[@]} -eq 0 ] && [ ${#RPM[@]} -eq 0 ] \
+    && [ ${#NSIS[@]} -eq 0 ]; then
     echo "no artifacts in $ARTIFACTS_DIR — run \`cgs package\` first" >&2
     exit 1
 fi
@@ -116,6 +122,7 @@ trap 'rm -f "$MANIFEST_TMP"' EXIT
     [ ${#APPIMAGE[@]} -gt 0 ] && entries+=("linux-x86_64-appimage:${APPIMAGE[0]}")
     [ ${#DEB[@]} -gt 0 ]      && entries+=("linux-x86_64-deb:${DEB[0]}")
     [ ${#RPM[@]} -gt 0 ]      && entries+=("linux-x86_64-rpm:${RPM[0]}")
+    [ ${#NSIS[@]} -gt 0 ]     && entries+=("windows-x86_64:${NSIS[0]}")
 
     for i in "${!entries[@]}"; do
         entry="${entries[$i]}"
@@ -133,7 +140,7 @@ python3 -m json.tool "$MANIFEST_TMP" >/dev/null
 mv "$MANIFEST_TMP" "$MANIFEST"
 echo "wrote $MANIFEST"
 echo "valid JSON"
-grep -o '"linux-x86_64-[a-z]*"' "$MANIFEST" | tr -d '"' | sed 's/^/  platform: /'
+grep -oE '"(linux|windows)-x86_64(-[a-z]*)?"' "$MANIFEST" | tr -d '"' | sed 's/^/  platform: /'
 echo
 echo "Upload latest.json together with the artifacts, e.g.:"
-echo "  gh release upload $TAG $ARTIFACTS_DIR/latest.json $ARTIFACTS_DIR/*.{deb,rpm,AppImage,tar.gz}"
+echo "  gh release upload $TAG $ARTIFACTS_DIR/latest.json $ARTIFACTS_DIR/*.{deb,rpm,AppImage,tar.gz,exe}"

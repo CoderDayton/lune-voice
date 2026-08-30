@@ -18,7 +18,6 @@ use lune_dict::commands::VoiceCommandRouter;
 use lune_llm::{NullPostProcessor, OpenAiLlmBackend, OpenAiLlmConfig};
 use lune_persist::{AppPaths, Database, SettingsStore};
 use lune_voice::{DeliveryService, SessionManager, SessionManagerConfig};
-#[cfg(unix)]
 use lune_voice::{WindowTarget, capture_focus_target};
 use tauri::{AppHandle, Emitter, Manager, ipc::Channel};
 use tokio::sync::{Mutex, RwLock, mpsc};
@@ -131,7 +130,8 @@ struct LivePipeline {
     abort_pending_start: bool,
     session_id: Option<String>,
     reload: ReloadScope,
-    #[cfg(unix)]
+    /// The window focused when this dictation started, captured off the start
+    /// path and consumed at delivery.
     focus_target: Option<WindowTarget>,
 }
 
@@ -343,7 +343,6 @@ impl AppRuntime {
                 abort_pending_start: false,
                 session_id: None,
                 reload: ReloadScope::Full,
-                #[cfg(unix)]
                 focus_target: None,
             };
             (pipeline, null_svc, settings)
@@ -657,7 +656,6 @@ impl AppRuntime {
         // subprocess probes are synchronous and block the tokio worker for
         // ~400–500 ms on COSMIC. Letting them race the audio bring-up
         // unblocks the first VAD chunk by the same amount.
-        #[cfg(unix)]
         let focus_capture = tokio::task::spawn_blocking(capture_focus_target);
 
         // Snapshot the clipboard now, off the paste hot path: on the uinput
@@ -708,12 +706,9 @@ impl AppRuntime {
             session_id: session_id.clone(),
         })
         .await;
-        #[cfg(unix)]
-        {
-            let focus_target = focus_capture.await.ok();
-            debug!(?focus_target, "captured focus target for session");
-            self.inner.pipeline.lock().await.focus_target = focus_target;
-        }
+        let focus_target = focus_capture.await.ok();
+        debug!(?focus_target, "captured focus target for session");
+        self.inner.pipeline.lock().await.focus_target = focus_target;
 
         self.spawn_event_forwarder(event_rx, false);
 
@@ -888,36 +883,22 @@ impl AppRuntime {
                             let s = runtime.inner.settings.read().await;
                             (s.dictation_mode, s.copy_to_clipboard)
                         };
-                        let outcome_rx;
-                        #[cfg(unix)]
-                        {
-                            let target = runtime.inner.pipeline.lock().await.focus_target.clone();
-                            outcome_rx = if let Some(ref t) = target {
-                                runtime.inner.delivery.deliver_to_tracked(
-                                    Some(session_id),
-                                    &text,
-                                    mode,
-                                    copy,
-                                    t,
-                                )
-                            } else {
-                                runtime.inner.delivery.deliver_tracked(
-                                    Some(session_id),
-                                    &text,
-                                    mode,
-                                    copy,
-                                )
-                            };
-                        }
-                        #[cfg(not(unix))]
-                        {
-                            outcome_rx = runtime.inner.delivery.deliver_tracked(
+                        let target = runtime.inner.pipeline.lock().await.focus_target.clone();
+                        let outcome_rx = match target {
+                            Some(ref t) => runtime.inner.delivery.deliver_to_tracked(
                                 Some(session_id),
                                 &text,
                                 mode,
                                 copy,
-                            );
-                        }
+                                t,
+                            ),
+                            None => runtime.inner.delivery.deliver_tracked(
+                                Some(session_id),
+                                &text,
+                                mode,
+                                copy,
+                            ),
+                        };
                         match outcome_rx {
                             // Enqueue failed — the delivery thread is gone, so
                             // nothing will ever be typed.
@@ -1452,7 +1433,6 @@ async fn build_pipeline(
         abort_pending_start: false,
         session_id: None,
         reload: ReloadScope::None,
-        #[cfg(unix)]
         focus_target: None,
     };
 
@@ -1632,7 +1612,6 @@ mod tests {
             abort_pending_start: false,
             session_id: None,
             reload: ReloadScope::None,
-            #[cfg(unix)]
             focus_target: None,
         }
     }

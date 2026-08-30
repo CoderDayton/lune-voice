@@ -27,9 +27,14 @@ mod compositor;
 pub use compositor::should_use_xwayland_fallback;
 #[cfg(unix)]
 pub use uinput_typer::{
-    WindowTarget, capture_focus_target, grant_uinput_access, remove_uinput_rule,
-    uinput_access_ready, uinput_rule_is_self_installed,
+    grant_uinput_access, remove_uinput_rule, uinput_access_ready, uinput_rule_is_self_installed,
 };
+
+// Focused-window capture. Available on every platform: the type and its
+// terminal classification are shared, and only the capture behind them is
+// platform-specific.
+mod focus;
+pub use focus::{FocusToken, WindowTarget, capture_focus_target};
 
 pub use delivery::DeliveryService;
 pub use session::{SessionManager, SessionManagerConfig};

@@ -22,6 +22,7 @@ use lune_core::config::TerminalMode;
 use tracing::{debug, error, info, warn};
 
 use crate::delivery::TypeOutcome;
+use crate::focus::{FocusToken, WindowTarget, is_terminal_class};
 
 // Hard ceiling on every compositor / IPC subprocess we spawn during delivery.
 // These tools normally return in single-digit ms; anything beyond means the
@@ -81,22 +82,6 @@ fn status_with_timeout(
     timeout: Duration,
 ) -> Option<std::process::ExitStatus> {
     output_with_timeout(cmd, args, timeout).map(|o| o.status)
-}
-
-// ─── Window target (focus lock) ──────────────────────────────────────────────
-
-#[derive(Debug, Clone)]
-pub struct WindowTarget {
-    pub class: Option<String>,
-    pub is_terminal: bool,
-    pub focus_token: Option<FocusToken>,
-}
-
-#[derive(Debug, Clone)]
-pub enum FocusToken {
-    HyprlandAddress(String),
-    SwayConId(i64),
-    X11WindowId(String),
 }
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
@@ -255,56 +240,6 @@ fn ensure_kernel_access() -> Result<(), String> {
 
 // ─── Terminal detection ──────────────────────────────────────────────────────
 
-/// Known terminal emulator WM_CLASS / app_id values (lowercase).
-const KNOWN_TERMINALS: &[&str] = &[
-    "alacritty",
-    "com.raggesilver.blackbox",
-    "contour",
-    "cool-retro-term",
-    "cosmic-term",
-    "deepin-terminal",
-    "eterm",
-    "foot",
-    "footclient",
-    "ghostty",
-    "gnome-terminal",
-    "gnome-terminal-server",
-    "guake",
-    "havoc",
-    "hyper",
-    "io.elementary.terminal",
-    "kgx",
-    "kitty",
-    "konsole",
-    "lxterminal",
-    "mate-terminal",
-    "mlterm",
-    "org.codeberg.dnkl.foot",
-    "org.gnome.console",
-    "org.gnome.terminal",
-    "org.kde.konsole",
-    "org.wezfurlong.wezterm",
-    "qterminal",
-    "rio",
-    "roxterm",
-    "sakura",
-    "st",
-    "tabby",
-    "terminator",
-    "terminology",
-    "termite",
-    "tilix",
-    "urxvt",
-    "warp",
-    "wezterm",
-    "wezterm-gui",
-    "xfce4-terminal",
-    "xterm",
-    "yakuake",
-    "zellij",
-    "zutty",
-];
-
 /// Query the focused window's app_id / WM_CLASS from the compositor.
 ///
 /// Detection chain: Hyprland → Sway → wlr-foreign-toplevel (COSMIC, KDE-Wayland,
@@ -370,37 +305,6 @@ pub(crate) fn focused_is_terminal() -> bool {
     let is_term = is_terminal_class(&class);
     info!(class = %class, is_term, "focused window detected");
     is_term
-}
-
-/// Match a window class / app_id against `KNOWN_TERMINALS`.
-///
-/// Compositors report classes in three shapes that all need to map to the
-/// same logical terminal name:
-///
-/// - bare token: `kitty`, `konsole`
-/// - reverse-DNS app_id: `dev.warp.Warp`, `org.gnome.Console`
-/// - hyphenated bare: `cosmic-term`, `gnome-terminal`
-///
-/// We normalize by taking the last `.`-separated segment, lowercasing, and
-/// stripping non-alphanumeric chars on both sides of the comparison. So
-/// `com.system76.CosmicTerm` and `cosmic-term` both reduce to `cosmicterm`,
-/// `dev.warp.Warp` and `warp` both reduce to `warp`.
-fn is_terminal_class(class: &str) -> bool {
-    let key = terminal_key(class);
-    if key.is_empty() {
-        return false;
-    }
-    KNOWN_TERMINALS.iter().any(|t| terminal_key(t) == key)
-}
-
-fn terminal_key(s: &str) -> String {
-    s.rsplit('.')
-        .next()
-        .unwrap_or(s)
-        .chars()
-        .filter(|c| c.is_ascii_alphanumeric())
-        .map(|c| c.to_ascii_lowercase())
-        .collect()
 }
 
 pub fn capture_focus_target() -> WindowTarget {
@@ -547,6 +451,8 @@ fn restore_focus(token: &FocusToken) -> bool {
             SUBPROCESS_TIMEOUT,
         )
         .is_some_and(|s| s.success()),
+        // A Win32 handle cannot reach this backend: nothing on Unix mints one.
+        FocusToken::Win32Window(_) => false,
     }
 }
 

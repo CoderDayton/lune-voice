@@ -198,7 +198,7 @@ pub async fn save_workspace_settings(
                 Ok(s) => {
                     if let Some(live) = runtime
                         .app_handle()
-                        .try_state::<std::sync::Arc<crate::hotkey_linux::LiveHotkeyConfig>>()
+                        .try_state::<std::sync::Arc<dyn crate::hotkey::HotkeyBackend>>()
                     {
                         if let Err(e) = live.update(&s.hotkey, s.activation_mode) {
                             tracing::warn!(error = %e, "hotkey hot-reload rejected");
@@ -924,7 +924,8 @@ fn current_gpu_status() -> Result<GpuBackendStatusDto, String> {
         devices,
         reason,
         download_bytes: archive_bytes(),
-        download_available: lune_persist::gpu_plugin::CUDA_LINUX_X86_64.is_published(),
+        download_available: lune_persist::gpu_plugin::CURRENT
+            .is_some_and(lune_persist::gpu_plugin::GpuPluginRelease::is_published),
     })
 }
 
@@ -932,7 +933,8 @@ fn current_gpu_status() -> Result<GpuBackendStatusDto, String> {
 /// a wrong-but-large number degrades the progress bar, a wrapped one would show
 /// a nonsensical download size.
 fn archive_bytes() -> u32 {
-    u32::try_from(lune_persist::gpu_plugin::CUDA_LINUX_X86_64.download_bytes).unwrap_or(u32::MAX)
+    let bytes = lune_persist::gpu_plugin::CURRENT.map_or(0, |r| r.download_bytes);
+    u32::try_from(bytes).unwrap_or(u32::MAX)
 }
 
 /// Download and install the CUDA backend plugin.
@@ -953,10 +955,14 @@ pub async fn install_gpu_backend(
                 .to_owned(),
         );
     }
+    // No release for this platform at all (macOS). Distinct from an unpublished
+    // one, which `install` itself reports.
+    let release =
+        lune_persist::gpu_plugin::CURRENT.ok_or("There is no GPU backend for this platform.")?;
     let paths = lune_persist::AppPaths::resolve().ok_or("failed to resolve application paths")?;
     let dest = lune_asr::gpu_backend::downloaded_plugin_dir(paths.data_dir());
 
-    lune_persist::gpu_plugin::install(&lune_persist::gpu_plugin::CUDA_LINUX_X86_64, &dest, |p| {
+    lune_persist::gpu_plugin::install(release, &dest, |p| {
         let _ = on_progress.send(GpuInstallProgressDto {
             downloaded_bytes: u32::try_from(p.downloaded_bytes).unwrap_or(u32::MAX),
             total_bytes: u32::try_from(p.total_bytes).unwrap_or(u32::MAX),

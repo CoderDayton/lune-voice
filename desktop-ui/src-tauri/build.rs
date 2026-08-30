@@ -6,8 +6,11 @@ fn main() {
     // build tree. `$ORIGIN` is expanded by the loader, so the literal dollar
     // sign has to survive both make and the shell: `-Wl,-z,origin` marks the
     // object as needing that expansion.
-    #[cfg(target_os = "linux")]
-    {
+    //
+    // Keyed off `CARGO_CFG_TARGET_OS`, not `cfg!(target_os = ..)`: inside a
+    // build script the `cfg` macro describes the *host*, so cross-building for
+    // Windows from Linux would otherwise feed ELF rpath flags to a PE link.
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("linux") {
         println!("cargo:rustc-link-arg=-Wl,-z,origin");
         println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN");
         println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN/lib");

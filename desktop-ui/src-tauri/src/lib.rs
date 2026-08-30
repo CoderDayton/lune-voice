@@ -1,8 +1,15 @@
 mod commands;
 mod dto;
 mod feedback;
+mod hotkey;
 #[cfg(target_os = "linux")]
 mod hotkey_linux;
+// Compiled everywhere: the activation-mode state machine inside is portable,
+// and building it on Linux is what keeps its tests running in CI. Off Windows
+// nothing but those tests calls into it, which is not dead code — it is the
+// point.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+mod hotkey_windows;
 mod limits;
 #[cfg(test)]
 mod notification_tests;
@@ -25,7 +32,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
-#[cfg(not(target_os = "linux"))]
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 /// Set when the user explicitly requested a quit (tray "Quit" menu).
@@ -302,12 +308,7 @@ pub fn run() {
             }
 
             // ── Global hotkeys ─────────────────────────────────────────────
-            // Linux: evdev grab works on both X11 and Wayland.
-            // Other platforms: tauri-plugin-global-shortcut.
-            #[cfg(target_os = "linux")]
-            spawn_evdev_hotkeys(app)?;
-            #[cfg(not(target_os = "linux"))]
-            register_hotkeys(app)?;
+            spawn_hotkeys(app)?;
 
             // ── System tray ──────────────────────────────────────────────
             let show_i = MenuItem::with_id(app, "show", "Open Lune Voice", true, None::<&str>)?;
@@ -445,22 +446,93 @@ pub fn run() {
         });
 }
 
-#[cfg(not(target_os = "linux"))]
-fn register_hotkeys(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    // Read hotkey config directly — can't use block_on here since we're
-    // already inside one from setup(). Just use the defaults; the runtime
-    // has the same settings loaded but we can't await inside setup.
-    let settings = lune_core::config::UserSettings::default();
-    if let Some(paths) = lune_persist::AppPaths::resolve() {
-        let store = lune_persist::SettingsStore::new(paths.settings_file());
-        if let Ok(s) = store.load() {
-            return register_hotkeys_with(app, &s);
-        }
-    }
-    register_hotkeys_with(app, &settings)
+/// Load the persisted settings, or fall back to defaults.
+///
+/// Read directly rather than through the runtime: `setup` is already inside a
+/// `block_on`, so there is nothing here that can await.
+fn hotkey_settings() -> lune_core::config::UserSettings {
+    lune_persist::AppPaths::resolve()
+        .and_then(|paths| {
+            lune_persist::SettingsStore::new(paths.settings_file())
+                .load()
+                .ok()
+        })
+        .unwrap_or_default()
 }
 
-#[cfg(not(target_os = "linux"))]
+/// Start global hotkeys on whichever backend this platform has.
+///
+/// A native backend (`hotkey::start`) is preferred everywhere it exists: it is
+/// the only kind that can see a key *release*, and so the only kind that can
+/// serve push-to-talk. `None` means this platform has none, and the
+/// global-shortcut plugin takes over with toggle-only semantics.
+fn spawn_hotkeys(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let settings = hotkey_settings();
+    let (sink, mut intents) = hotkey::intent_channel();
+
+    tracing::info!(
+        toggle = ?settings.hotkey.toggle_dictation,
+        cancel = ?settings.hotkey.cancel_dictation,
+        mode = ?settings.activation_mode,
+        "starting global hotkey listener"
+    );
+
+    let Some(backend) = hotkey::start(&settings.hotkey, settings.activation_mode, sink) else {
+        // Either this platform has no native backend, or the configured key
+        // name did not resolve. Neither is fatal: an app that refuses to start
+        // because a hotkey is misspelled leaves the user no way in to fix it.
+        tracing::info!("no native hotkey backend; using the global-shortcut plugin");
+        if let Err(e) = register_hotkeys_with(app, &settings) {
+            tracing::warn!(error = %e, "global shortcut registration failed; hotkeys are off");
+        }
+        return Ok(());
+    };
+    tracing::info!(backend = backend.name(), "native hotkey listener started");
+
+    // Managed so a settings save can hot-reload the binding, the modifiers and
+    // the activation mode without restarting the listener.
+    app.manage(std::sync::Arc::clone(&backend));
+
+    let rt = app.state::<runtime::AppRuntime>().inner().clone();
+    tauri::async_runtime::spawn(async move {
+        while let Some(action) = intents.recv().await {
+            dispatch_hotkey(&rt, action).await;
+        }
+        tracing::error!("hotkey channel closed — the listener has exited, hotkeys are dead");
+    });
+
+    Ok(())
+}
+
+/// Apply one hotkey intent to the runtime. Serial by construction: the caller
+/// awaits each action before reading the next.
+async fn dispatch_hotkey(rt: &runtime::AppRuntime, action: hotkey::HotkeyAction) {
+    match action {
+        hotkey::HotkeyAction::Toggle => {
+            tracing::info!(action = "toggle", "hotkey pressed");
+            let _ = rt.toggle_dictation().await;
+        }
+        hotkey::HotkeyAction::Start => {
+            tracing::info!(action = "start", "hotkey pressed");
+            let _ = rt.start_dictation().await;
+        }
+        hotkey::HotkeyAction::Stop => {
+            tracing::info!(action = "stop", "hotkey pressed");
+            let _ = rt.stop_and_wait_dictation().await;
+        }
+        // Harmless when idle, but logging every idle Escape is noise.
+        hotkey::HotkeyAction::Cancel if rt.is_active().await => {
+            tracing::info!(action = "cancel", "hotkey pressed");
+            let _ = rt.cancel_dictation().await;
+        }
+        hotkey::HotkeyAction::Cancel => {}
+    }
+}
+
+/// Toggle-only fallback for platforms with no native backend.
+///
+/// The plugin reports a single "activated" callback with no matching release,
+/// so `ActivationMode::Hold` cannot be honoured here and is not attempted.
 fn register_hotkeys_with(
     app: &tauri::App,
     settings: &lune_core::config::UserSettings,
@@ -501,7 +573,6 @@ fn register_hotkeys_with(
     Ok(())
 }
 
-#[cfg(not(target_os = "linux"))]
 fn format_hotkey(combo: &lune_core::config::KeyCombo) -> String {
     let mut parts: Vec<&str> = combo
         .modifiers
@@ -516,80 +587,4 @@ fn format_hotkey(combo: &lune_core::config::KeyCombo) -> String {
         .collect();
     parts.push(&combo.key);
     parts.join("+")
-}
-
-#[cfg(target_os = "linux")]
-fn spawn_evdev_hotkeys(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    let settings = {
-        let mut s = lune_core::config::UserSettings::default();
-        if let Some(paths) = lune_persist::AppPaths::resolve() {
-            let store = lune_persist::SettingsStore::new(paths.settings_file());
-            if let Ok(loaded) = store.load() {
-                s = loaded;
-            }
-        }
-        s
-    };
-
-    let (sink, mut intents) = hotkey_linux::intent_channel();
-
-    tracing::info!(
-        toggle = ?settings.hotkey.toggle_dictation,
-        cancel = ?settings.hotkey.cancel_dictation,
-        mode = ?settings.activation_mode,
-        "spawning evdev hotkey listener"
-    );
-
-    // Live config — managed in Tauri state so settings saves can hot-reload
-    // every hotkey setting (trigger, modifiers, cancel, activation mode)
-    // without restarting the listener thread.
-    let Some(live) =
-        hotkey_linux::LiveHotkeyConfig::new(&settings.hotkey, settings.activation_mode)
-    else {
-        tracing::warn!("evdev hotkey listener not started (unknown key name in config)");
-        return Ok(());
-    };
-    let live = std::sync::Arc::new(live);
-    app.manage(std::sync::Arc::clone(&live));
-
-    match hotkey_linux::spawn(live, sink) {
-        Some(_handle) => {
-            // Thread handle intentionally leaked — runs for app lifetime.
-            tracing::info!("evdev hotkey listener thread started");
-        }
-        None => {
-            tracing::warn!("evdev hotkey listener thread failed to spawn");
-            return Ok(());
-        }
-    }
-
-    let rt = app.state::<runtime::AppRuntime>().inner().clone();
-    tauri::async_runtime::spawn(async move {
-        while let Some(action) = intents.recv().await {
-            match action {
-                hotkey_linux::HotkeyAction::Toggle => {
-                    tracing::info!(action = "toggle", "hotkey pressed");
-                    let _ = rt.toggle_dictation().await;
-                }
-                hotkey_linux::HotkeyAction::Start => {
-                    tracing::info!(action = "start", "hotkey pressed");
-                    let _ = rt.start_dictation().await;
-                }
-                hotkey_linux::HotkeyAction::Stop => {
-                    tracing::info!(action = "stop", "hotkey pressed");
-                    let _ = rt.stop_and_wait_dictation().await;
-                }
-                hotkey_linux::HotkeyAction::Cancel => {
-                    if rt.is_active().await {
-                        tracing::info!(action = "cancel", "hotkey pressed");
-                        let _ = rt.cancel_dictation().await;
-                    }
-                }
-            }
-        }
-        tracing::error!("hotkey channel closed — evdev listener has exited, hotkeys are dead");
-    });
-
-    tracing::info!("evdev hotkey listener spawned");
-    Ok(())
 }

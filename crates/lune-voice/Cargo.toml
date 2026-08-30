@@ -37,6 +37,14 @@ enigo.workspace = true
 hound = "3.5"
 cpal.workspace = true
 
+# Foreground-window capture (src/focus/windows.rs).
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_System_Threading",
+  "Win32_UI_WindowsAndMessaging",
+] }
+
 [target.'cfg(unix)'.dependencies]
 evdev = "0.13"
 wayland-client = { workspace = true }

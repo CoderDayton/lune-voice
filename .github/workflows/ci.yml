@@ -75,11 +75,14 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: cargo clippy --workspace --all-targets --no-default-features -- -D warnings
 
-      # Windows has no ALSA/uinput/IBus, so the audio + Linux delivery crates
-      # genuinely cannot build there — unlike on Linux, this exclusion is real.
-      - name: Clippy (core crates, no desktop UI or audio)
+      # The whole workspace on Windows too. The Linux-only backends are
+      # target-gated in Cargo.toml, so what builds here is the Windows half:
+      # WASAPI capture, the arboard+enigo delivery driver, and the
+      # WH_KEYBOARD_LL hotkey hook. Excluding these crates is what let the
+      # Windows build rot unnoticed.
+      - name: Clippy (all crates)
         if: matrix.os == 'windows-latest'
-        run: cargo clippy --workspace --exclude lune-ui --exclude lune-audio --exclude lune-voice --lib --tests --no-default-features -- -D warnings
+        run: cargo clippy --workspace --all-targets --no-default-features -- -D warnings
 
   # ── Tests ─────────────────────────────────────────────────────────────────
   test:
@@ -124,9 +127,9 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: cargo test --workspace --no-default-features
 
-      - name: Test (core crates, no desktop UI or audio)
+      - name: Test (all crates, unit + integration)
         if: matrix.os == 'windows-latest'
-        run: cargo test --workspace --exclude lune-ui --exclude lune-audio --exclude lune-voice --no-default-features
+        run: cargo test --workspace --no-default-features
 
   # ── DTO drift guard ───────────────────────────────────────────────────────
   # Ensure ts-rs-generated TypeScript bindings stay in sync with their Rust

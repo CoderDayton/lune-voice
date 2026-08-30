@@ -51,6 +51,14 @@ ts-rs = { version = "12", features = ["serde-compat"] }
 mimalloc.workspace = true
 tauri-plugin-notification = "2.3.3"
 
+# Low-level keyboard hook for the global hotkey (src/hotkey_windows/hook.rs).
+# `windows-sys` is already in the tree transitively, so this adds no new crate.
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_UI_WindowsAndMessaging",
+] }
+
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = "0.18"
 gtk-layer-shell = { version = "0.8", features = ["v0_6"] }

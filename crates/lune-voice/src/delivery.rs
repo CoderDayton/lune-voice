@@ -1,3 +1,6 @@
+// Only the IBus arm below borrows-or-flattens; every other driver takes the
+// text as it comes.
+#[cfg(target_os = "linux")]
 use std::borrow::Cow;
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
@@ -6,8 +9,7 @@ use lune_core::config::{DictationMode, TerminalMode};
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-#[cfg(unix)]
-use crate::uinput_typer::WindowTarget;
+use crate::focus::WindowTarget;
 
 #[cfg(unix)]
 use crate::uinput_typer::UinputTyper;
@@ -55,7 +57,8 @@ struct DeliveryMsg {
     /// Leave the dictated text on the clipboard after delivery (orthogonal to
     /// `mode`).
     copy_to_clipboard: bool,
-    #[cfg(unix)]
+    /// The window focused when the dictation started, when the caller
+    /// captured one. Drivers that can act on it do; the rest ignore it.
     target: Option<WindowTarget>,
     /// Reports what the driver managed to do, once it has run. `None` for
     /// callers that don't care (structural injections).
@@ -114,7 +117,6 @@ impl DeliveryService {
             text: text.into(),
             mode,
             copy_to_clipboard,
-            #[cfg(unix)]
             target: None,
             outcome: None,
         })
@@ -139,7 +141,6 @@ impl DeliveryService {
             text: text.into(),
             mode,
             copy_to_clipboard,
-            #[cfg(unix)]
             target: None,
             outcome: Some(tx),
         })
@@ -168,7 +169,6 @@ impl DeliveryService {
         }
     }
 
-    #[cfg(unix)]
     pub fn deliver_to(
         &self,
         session_id: Option<Uuid>,
@@ -198,7 +198,6 @@ impl DeliveryService {
 
     /// [`deliver_to`](Self::deliver_to) with the outcome receiver of
     /// [`deliver_tracked`](Self::deliver_tracked).
-    #[cfg(unix)]
     pub fn deliver_to_tracked(
         &self,
         session_id: Option<Uuid>,
@@ -316,20 +315,10 @@ fn delivery_thread(
         // path with copy_to_clipboard on already leaves it there).
         let outcome = match msg.mode {
             DictationMode::TypeInPlace => driver.type_keys(text, keep_clipboard),
-            _ => {
-                #[cfg(unix)]
-                {
-                    if let Some(ref target) = msg.target {
-                        driver.type_text_to(text, target, keep_clipboard)
-                    } else {
-                        driver.type_text(text, keep_clipboard)
-                    }
-                }
-                #[cfg(not(unix))]
-                {
-                    driver.type_text(text, keep_clipboard)
-                }
-            }
+            _ => match msg.target {
+                Some(ref target) => driver.type_text_to(text, target, keep_clipboard),
+                None => driver.type_text(text, keep_clipboard),
+            },
         };
         if !outcome.delivered {
             warn!(
@@ -443,14 +432,11 @@ impl PlatformDriver {
     /// focused window — notably GNOME Wayland, which is why IBus is preferred
     /// there at all — this answers `false` and the text commits unchanged.
     #[cfg(target_os = "linux")]
-    fn targets_terminal(
-        terminal_mode: TerminalMode,
-        target: Option<&crate::uinput_typer::WindowTarget>,
-    ) -> bool {
+    fn targets_terminal(terminal_mode: TerminalMode, target: Option<&WindowTarget>) -> bool {
         match terminal_mode {
             TerminalMode::Terminal => true,
             TerminalMode::Normal => false,
-            _ => target.map_or_else(crate::uinput_typer::focused_is_terminal, |t| t.is_terminal),
+            _ => target.map_or_else(crate::focus::focused_is_terminal, |t| t.is_terminal),
         }
     }
 
@@ -463,7 +449,7 @@ impl PlatformDriver {
     fn ibus_text_with<'a>(
         terminal_mode: TerminalMode,
         text: &'a str,
-        target: Option<&crate::uinput_typer::WindowTarget>,
+        target: Option<&WindowTarget>,
     ) -> Cow<'a, str> {
         if Self::targets_terminal(terminal_mode, target) {
             crate::sanitize::flatten_for_terminal(text)
@@ -491,7 +477,7 @@ impl PlatformDriver {
     fn type_text_to(
         &mut self,
         text: &str,
-        target: &crate::uinput_typer::WindowTarget,
+        target: &WindowTarget,
         keep_clipboard: bool,
     ) -> TypeOutcome {
         match &mut self.backend {
@@ -571,6 +557,25 @@ impl PlatformDriver {
         self.emit_paste();
         // The dictated text remains on the clipboard as the paste source.
         TypeOutcome::delivered(true)
+    }
+
+    /// Same as [`type_text`](Self::type_text): nothing here acts on the
+    /// target yet.
+    ///
+    /// Not an oversight. The captured target exists to answer two questions,
+    /// and on Windows both already have fixed answers: Ctrl+V is the paste
+    /// chord in `WindowsTerminal` and `conhost` alike, so `is_terminal` cannot
+    /// change the keystroke; and `enigo` types into whatever is focused, with
+    /// no focus-stealing step in between to undo. The target is captured and
+    /// logged so a future driver that *does* need it has it.
+    fn type_text_to(
+        &mut self,
+        text: &str,
+        target: &WindowTarget,
+        keep_clipboard: bool,
+    ) -> TypeOutcome {
+        debug!(class = ?target.class, is_terminal = target.is_terminal, "delivering to window");
+        self.type_text(text, keep_clipboard)
     }
 
     fn emit_paste(&mut self) {

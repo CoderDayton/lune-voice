@@ -83,8 +83,10 @@ pub(crate) fn sanitize_for_delivery(text: &str) -> Cow<'_, str> {
 /// replaces it, and the result is trimmed, so a transcript that ends in a
 /// newline does not leave a trailing space to be executed.
 ///
-/// Only the terminal path calls this. Delivery into an ordinary text field
-/// keeps its newlines and tabs.
+/// Only the terminal path calls this — in practice the IBus delivery arm,
+/// which is Linux-only. Delivery into an ordinary text field keeps its
+/// newlines and tabs.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub(crate) fn flatten_for_terminal(text: &str) -> Cow<'_, str> {
     if !text.contains(['\n', '\t']) {
         return Cow::Borrowed(text);

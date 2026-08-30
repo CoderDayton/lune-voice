@@ -15,12 +15,23 @@
 //! all and GPU support becomes an optional download rather than a separate
 //! build of the whole application.
 //!
-//! Why not the obvious approach: setting `LD_LIBRARY_PATH` from inside the
-//! process does not work. glibc's loader reads it once at startup into a cached
-//! search list, so a later `setenv` changes nothing for subsequent `dlopen`
-//! calls. Each plugin instead carries `RUNPATH=$ORIGIN`, applied when it is
-//! built or packaged, so it resolves its own dependencies from its own
-//! directory.
+//! Each platform resolves a plugin's own CUDA runtime differently, and neither
+//! answer is the obvious one:
+//!
+//! - **Linux**: setting `LD_LIBRARY_PATH` from inside the process does not
+//!   work. glibc's loader reads it once at startup into a cached search list,
+//!   so a later `setenv` changes nothing for subsequent `dlopen` calls. Each
+//!   plugin instead carries `RUNPATH=$ORIGIN`, applied when it is built or
+//!   packaged, so it resolves its dependencies from its own directory.
+//! - **Windows**: there is no `$ORIGIN`. ggml loads plugins with a plain
+//!   `LoadLibraryW` (`ggml-backend-reg.cpp`), and a DLL loaded by full path
+//!   resolves *its* imports from the executable's directory, System32 and
+//!   `PATH` — never from its own folder. So [`preload_sibling_libraries`]
+//!   loads the CUDA runtime by full path first: a module already in the
+//!   process satisfies the import by name, and nothing about the global search
+//!   order has to change. Widening it with `SetDefaultDllDirectories` would
+//!   have reached every other `LoadLibrary` in the process, WebView2's
+//!   included.
 //!
 //! Ordering matters: [`load_plugins`] must run before the first
 //! [`whisper_rs::WhisperContext`] is created, because ggml selects a device
@@ -30,19 +41,28 @@ use std::path::{Path, PathBuf};
 
 use lune_core::models::DIR_GPU_BACKEND;
 
-/// Shared-object name of the CUDA compute backend, as emitted by ggml's build.
-/// Used to detect an installed plugin and to validate a downloaded archive.
+/// File name of the CUDA compute backend, as emitted by ggml's build. Used to
+/// detect an installed plugin and to validate a downloaded archive.
+///
+/// ggml derives the name itself (`backend_filename_prefix` /
+/// `backend_filename_extension`), which is why Windows drops the `lib` prefix.
+/// Mirrored by `lune_persist::gpu_plugin::CUDA_PLUGIN_FILE`.
+#[cfg(target_os = "windows")]
+pub const CUDA_PLUGIN_FILE: &str = "ggml-cuda.dll";
+#[cfg(not(target_os = "windows"))]
 pub const CUDA_PLUGIN_FILE: &str = "libggml-cuda.so";
 
 /// The NVIDIA driver library. Ships with the driver, not the CUDA toolkit, and
 /// is deliberately not redistributable — so its presence is the one
 /// precondition a download cannot satisfy on the user's behalf.
 ///
-/// Unix-only, like its single caller: on Windows the driver is a `.dll` looked
-/// up by a different mechanism, and an unconditional const is dead code there —
-/// which CI's `-D warnings` turns into a build failure.
+/// One name per platform, each looked up by the loader's own search rules.
 #[cfg(unix)]
 const NVIDIA_DRIVER_SONAME: &str = "libcuda.so.1";
+/// The Windows driver library. Installed into System32 by the NVIDIA driver
+/// package, so a bare name is the right thing to hand `LoadLibraryW`.
+#[cfg(target_os = "windows")]
+const NVIDIA_DRIVER_DLL: &str = "nvcuda.dll";
 
 /// Plugin directory shipped inside the application bundle, resolved relative to
 /// the running executable. `None` when the executable path is unavailable.
@@ -187,10 +207,105 @@ pub fn nvidia_driver_present() -> bool {
     }
 }
 
-#[cfg(not(unix))]
+/// Whether an NVIDIA driver is installed, tested the way the loader will test
+/// it: ask for the driver DLL by bare name and let the standard search order
+/// find it in System32. Probing the file system directly would miss a driver
+/// installed outside the usual directory.
+#[cfg(target_os = "windows")]
+pub fn nvidia_driver_present() -> bool {
+    use windows_sys::Win32::Foundation::FreeLibrary;
+    use windows_sys::Win32::System::LibraryLoader::LoadLibraryW;
+
+    let name: Vec<u16> = NVIDIA_DRIVER_DLL
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect();
+    // SAFETY: `name` is a NUL-terminated wide string that outlives the call,
+    // and the handle is released on success.
+    unsafe {
+        let handle = LoadLibraryW(name.as_ptr());
+        if handle.is_null() {
+            return false;
+        }
+        FreeLibrary(handle);
+        true
+    }
+}
+
+#[cfg(not(any(unix, target_os = "windows")))]
 pub fn nvidia_driver_present() -> bool {
     false
 }
+
+/// The CUDA runtime a plugin in `dir` imports, in dependency order.
+///
+/// `cublas` links against `cublasLt`, so loading it first means the second load
+/// is already satisfied and the order is not merely cosmetic. The plugin itself
+/// is absent: ggml loads that, and doing it here would register nothing.
+#[cfg(target_os = "windows")]
+const SIBLING_LIBRARY_STEMS: [&str; 3] = ["cudart", "cublasLt", "cublas"];
+
+/// Load a plugin's CUDA runtime by full path, so its imports resolve.
+///
+/// See the module docs: on Windows a plugin cannot find libraries sitting
+/// beside it, and pre-loading them is the fix that touches no global state. A
+/// failure here is not reported as an error — the directory may hold only CPU
+/// backends, which import nothing extra, and ggml reports a plugin it cannot
+/// load either way.
+#[cfg(target_os = "windows")]
+#[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
+fn preload_sibling_libraries(dir: &Path) {
+    use std::os::windows::ffi::OsStrExt;
+
+    use windows_sys::Win32::System::LibraryLoader::LoadLibraryW;
+
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    // One pass over the directory: the file names carry a version this code
+    // does not know (`cudart64_13.dll`), so they are matched by stem.
+    let mut found: Vec<(usize, PathBuf)> = Vec::new();
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { continue };
+        if !name.ends_with(".dll") {
+            continue;
+        }
+        // Matched without allocating: this runs once per file in the plugin
+        // directory, and `format!` per stem per file buys nothing.
+        if let Some(rank) = SIBLING_LIBRARY_STEMS.iter().position(|stem| {
+            name.strip_prefix(stem)
+                .is_some_and(|rest| rest.starts_with("64_"))
+        }) {
+            found.push((rank, entry.path()));
+        }
+    }
+    found.sort_by_key(|(rank, _)| *rank);
+
+    for (_, path) in found {
+        let wide: Vec<u16> = path
+            .as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+        // SAFETY: `wide` is a NUL-terminated wide string that outlives the
+        // call. The handle is deliberately leaked — the module must stay
+        // resident for the plugin that imports it, which lives for the
+        // process.
+        let handle = unsafe { LoadLibraryW(wide.as_ptr()) };
+        if handle.is_null() {
+            tracing::warn!(path = %path.display(), "could not preload a CUDA runtime library");
+        } else {
+            tracing::debug!(path = %path.display(), "preloaded CUDA runtime library");
+        }
+    }
+}
+
+/// No-op off Windows: every other platform's plugin resolves its own
+/// dependencies through `RUNPATH=$ORIGIN`.
+#[cfg(not(target_os = "windows"))]
+#[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
+fn preload_sibling_libraries(_dir: &Path) {}
 
 #[cfg(feature = "whisper-cpp")]
 mod imp {
@@ -266,6 +381,7 @@ mod imp {
                 );
                 continue;
             }
+            super::preload_sibling_libraries(&dir);
             let Ok(path) = CString::new(dir.as_os_str().as_encoded_bytes()) else {
                 warn!(dir = %dir.display(), "plugin path is not representable as a C string");
                 continue;

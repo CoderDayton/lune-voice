@@ -18,7 +18,11 @@ fn restrict_to_owner(path: &Path) -> std::io::Result<()> {
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
 }
 
+/// No-op off Unix: file mode bits are the Unix mechanism, and the caller that
+/// would use this (`restrict_db_files`) is itself Unix-only. Kept so the call
+/// sites need no `cfg` of their own.
 #[cfg(not(unix))]
+#[allow(dead_code)]
 fn restrict_to_owner(_path: &Path) -> std::io::Result<()> {
     Ok(())
 }
