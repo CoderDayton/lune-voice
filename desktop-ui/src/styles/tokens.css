@@ -12,27 +12,36 @@
      Too low-contrast for text — text usages were migrated to content-subtle. */
   --content-dim: oklch(0.41 0 0);
   /* Solid surfaces — no alpha, no glass */
-  --surface-card: oklch(0.18 0 0);
+  /* The shell's ground. Nothing is painted at this level except the window
+     itself and the sidebar, so every panel above it reads as raised. Anything
+     that has to blend back into the ground — the status ring punched through
+     the sidebar avatar — uses this rather than guessing a near-match. */
+  --surface-ground: oklch(0.135 0 0);
+  /* The content region — one raised slab inset from the window edges, holding
+     every page. It sits between the ground and the panels a page paints on
+     it, so the eye gets shell → region → panel rather than one flat plane. */
+  --surface-shell: oklch(0.17 0 0);
+  --surface-card: oklch(0.215 0 0);
   /* Whole-card hover fill (`.card:has(a:hover, button:hover):hover` in
      base.css). Solid rather than a wash because the card *is* the hover
      target: the state has to land on the same colour on every card, whatever
      is layered beneath it. For rows, menu items, and buttons sitting on a
      card, use --surface-hover instead — it tints what it sits on, so it can
      never come out the same colour as its own background. */
-  --surface-card-hover: oklch(0.22 0 0);
-  --surface-elevated: oklch(0.22 0 0);
-  --surface-glass: oklch(0.155 0 0);
-  --surface-panel: oklch(0.16 0 0);
-  --surface-field: oklch(0.14 0 0);
+  --surface-card-hover: oklch(0.255 0 0);
+  --surface-elevated: oklch(0.255 0 0);
+  --surface-glass: oklch(0.19 0 0);
+  --surface-panel: oklch(0.195 0 0);
+  --surface-field: oklch(0.175 0 0);
   /* Hover/wash/border kept as alpha overlays — they layer on solid surfaces */
   --surface-wash: oklch(1 0 0 / 0.06);
   --surface-nav-active: oklch(1 0 0 / 0.08);
   --surface-hover: oklch(1 0 0 / 0.04);
   --surface-border: oklch(1 0 0 / 0.08);
   --surface-border-strong: oklch(1 0 0 / 0.16);
-  --surface-inset: oklch(0.10 0 0);
-  /* Recessed band — darker than panel (0.16), lighter than inset (0.10). */
-  --surface-recessed: oklch(0.13 0 0);
+  --surface-inset: oklch(0.135 0 0);
+  /* Recessed band — darker than panel (0.195), lighter than inset (0.135). */
+  --surface-recessed: oklch(0.165 0 0);
   --ring-focus: oklch(0.74 0.14 295 / 0.50);
   --surface-success-tint: oklch(0.72 0.14 165 / 0.14);
   --surface-warning-tint: oklch(0.80 0.13 72 / 0.14);
@@ -79,6 +88,10 @@
   --content-subtle: oklch(0.52 0 0);
   --content-dim: oklch(0.70 0 0);
   /* Solid surfaces */
+  /* Light mode already gets its raised step from white-on-grey, so the ground
+     only has to be the page grey the panels sit on. */
+  --surface-ground: oklch(0.945 0 0);
+  --surface-shell: oklch(0.98 0 0);
   --surface-card: oklch(1 0 0);
   /* Steps down here, not up: white cards have no lighter shade to move to. */
   --surface-card-hover: oklch(0.97 0 0);
@@ -182,6 +195,8 @@
   --color-content-muted: var(--content-muted);
   --color-content-subtle: var(--content-subtle);
   --color-content-dim: var(--content-dim);
+  --color-surface-ground: var(--surface-ground);
+  --color-surface-shell: var(--surface-shell);
   --color-surface-card: var(--surface-card);
   --color-surface-card-hover: var(--surface-card-hover);
   --color-surface-elevated: var(--surface-elevated);
@@ -277,6 +292,9 @@
   --size-sidebar-collapsed: 5rem;
   --size-nav-icon: 1.125rem;
 
+  /* Gutter between the content region and the window edge / the sidebar. */
+  --space-region: 1.25rem;
+
   --space-page-stack: 2rem;
   --space-page-x-mobile: 1.75rem;
   --space-page-x-desktop: 3rem;
@@ -284,9 +302,11 @@
   --space-page-bottom: 3.5rem;
 
   /* Flat ground with one soft highlight thrown from above the viewport, so
-     panels read as objects lit from the top rather than tiles on a texture. */
+     panels read as objects lit from the top rather than tiles on a texture.
+     Resolved per element, so each scheme's `--surface-ground` feeds it and
+     the light block only has to restate the highlight. */
   --surface-body:
-    linear-gradient(oklch(0.115 0 0), oklch(0.115 0 0));
+    linear-gradient(var(--surface-ground), var(--surface-ground));
   --surface-backdrop:
     radial-gradient(90% 60% at 50% -20%, oklch(1 0 0 / 0.035), transparent 70%);
   --surface-grid: none;
@@ -295,8 +315,6 @@
 }
 
 [data-color-scheme="light"] {
-  --surface-body:
-    linear-gradient(oklch(0.945 0 0), oklch(0.945 0 0));
   --surface-backdrop:
     radial-gradient(90% 60% at 50% -20%, oklch(1 0 0 / 0.55), transparent 70%);
   --surface-grid: none;

@@ -39,7 +39,7 @@ export function SnippetsPage() {
           <div className="skeleton-shimmer h-12 w-full rounded-field" />
           <div className="skeleton-shimmer h-24 w-full rounded-field" />
         </div>
-        <div className="panel-surface min-h-0 flex-1 divide-y divide-surface-border overflow-hidden">
+        <div className="min-h-0 flex-1 divide-y divide-surface-border overflow-hidden">
           {[0, 1, 2].map((i) => (
             <div key={i} className="flex items-center gap-3 px-5 py-4">
               <div className="skeleton-shimmer h-4 w-32" />
@@ -483,7 +483,7 @@ function SnippetList({
  *  composer folded away, this carries the only call to action. */
 function SnippetsEmptyState({ onNew }: { onNew: () => void }) {
   return (
-    <div className="panel-surface flex min-h-0 flex-1 flex-col items-center justify-center px-6 py-12 text-center">
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 py-12 text-center">
       <div className="token-icon mb-4 size-14 rounded-full">
         <ScrollText className="size-7" strokeWidth={1.4} />
       </div>

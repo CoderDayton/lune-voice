@@ -12,13 +12,15 @@ import { type ReactNode, type Ref, type RefObject, useEffect } from 'react';
  *
  * The card fills a flex parent — the page must be marked `fill` in
  * `navigation.ts` for the height to resolve.
+ *
+ * It draws no frame of its own. It fills the shell's content region, which is
+ * already a bordered raised slab, and a card inside that card read as a double
+ * edge with a dead gutter between the two. A panel earns a frame here only
+ * when it is one of several objects sharing the region — a composer above a
+ * list, say — not when it *is* the page.
  */
 export function ListCard({ children }: { children: ReactNode }) {
-  return (
-    <div className="panel-surface flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      {children}
-    </div>
-  );
+  return <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">{children}</div>;
 }
 
 /**
@@ -125,9 +127,13 @@ export function ListFooter({ children }: { children: ReactNode }) {
  * Tauri renders with on Linux — only honours `position: sticky` on the cells,
  * and a border on a non-sticky ancestor scrolls away from the labels it sits
  * under. Callers add their own horizontal padding per column.
+ *
+ * Filled with the region's own colour, not a panel's: the list no longer draws
+ * a card, so a panel fill here would slide a lighter strip over the region as
+ * rows scroll beneath it.
  */
 export const LIST_HEAD_CELL =
-  'sticky top-0 z-10 border-b border-surface-border bg-surface-panel py-2 text-left text-xs font-semibold uppercase tracking-wider text-content-subtle';
+  'sticky top-0 z-10 border-b border-surface-border bg-surface-shell py-2 text-left text-xs font-semibold uppercase tracking-wider text-content-subtle';
 
 /** A body row: hairline rule below, hover tint, no jumping on hover. */
 export const LIST_ROW =
@@ -138,7 +144,7 @@ export const LIST_ROW =
  * rule as `LIST_HEAD_CELL`, so a `<ul>`-based list still reads as one family.
  */
 export const LIST_HEAD_BAR =
-  'flex items-center gap-4 border-b border-surface-border bg-surface-panel px-3 py-2 text-xs font-semibold uppercase tracking-wider text-content-subtle sm:px-4';
+  'flex items-center gap-4 border-b border-surface-border bg-surface-shell px-3 py-2 text-xs font-semibold uppercase tracking-wider text-content-subtle sm:px-4';
 
 /**
  * Row action button. Hidden until the row is hovered or focused, so the eye

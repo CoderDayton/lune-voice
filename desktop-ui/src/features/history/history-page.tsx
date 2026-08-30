@@ -13,7 +13,7 @@ export function HistoryPage() {
 
   if (!loaded) {
     return (
-      <div className="panel-surface flex min-h-0 flex-1 flex-col gap-3 p-4 sm:p-5">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 p-4 sm:p-5">
         <div className="skeleton-shimmer h-9 w-full shrink-0 rounded-field" />
         {[0, 1, 2, 3, 4, 5, 6].map((i) => (
           <div key={i} className="skeleton-shimmer h-10 w-full shrink-0 rounded-field" />

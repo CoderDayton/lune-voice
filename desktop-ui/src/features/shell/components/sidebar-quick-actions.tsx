@@ -101,7 +101,7 @@ export function SidebarQuickActions() {
   ];
 
   return (
-    <div className="border-t border-surface-border bg-base-200">
+    <div className="border-t border-surface-border">
       <button
         ref={triggerRef}
         type="button"

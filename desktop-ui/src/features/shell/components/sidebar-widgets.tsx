@@ -10,8 +10,11 @@ export function SidebarQuickStart() {
   const isActive = serviceStatus === 'listening' || serviceStatus === 'processing';
   const isConnecting = serviceStatus === 'Connecting';
 
+  // No fill: the sidebar is the shell's ground, so a slab here read as a
+  // leftover panel once the sidebar itself stopped being one. The rule alone
+  // separates it.
   return (
-    <div className="border-t border-surface-border bg-base-200">
+    <div className="border-t border-surface-border">
       <button
         type="button"
         onClick={(e) => {

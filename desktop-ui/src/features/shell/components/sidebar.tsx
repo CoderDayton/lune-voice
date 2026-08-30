@@ -44,7 +44,7 @@ export function SidebarContent() {
             <PanelLeftOpen size={22} strokeWidth={2} />
           </span>
           <span
-            className={`absolute -right-px -bottom-px block size-2.5 rounded-full ring-2 ring-surface-glass ${isActive ? 'bg-success status-pulse' : isConnecting ? 'bg-warning' : isConnected ? 'bg-success/70' : 'bg-content-dim'}`}
+            className={`absolute -right-px -bottom-px block size-2.5 rounded-full ring-2 ring-surface-ground ${isActive ? 'bg-success status-pulse' : isConnecting ? 'bg-warning' : isConnected ? 'bg-success/70' : 'bg-content-dim'}`}
             aria-hidden="true"
           />
         </label>

@@ -91,7 +91,7 @@ fn mix(base: Oklch, tint: Oklch, t: f64) -> Rgba {
     lab_to_rgba(lerp(bl, tl), lerp(ba, ta), lerp(bb, tb), 1.0)
 }
 
-const SURFACE_ELEVATED: Oklch = Oklch::new(0.22, 0.0, 0.0, 1.0);
+const SURFACE_ELEVATED: Oklch = Oklch::new(0.255, 0.0, 0.0, 1.0);
 const SURFACE_BORDER_STRONG: Oklch = Oklch::new(1.0, 0.0, 0.0, 0.16);
 const BASE_CONTENT: Oklch = Oklch::new(0.94, 0.0, 0.0, 1.0);
 const PRIMARY: Oklch = Oklch::new(0.74, 0.14, 295.0, 1.0);

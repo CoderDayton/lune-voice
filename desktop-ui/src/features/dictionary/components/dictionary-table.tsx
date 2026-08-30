@@ -175,7 +175,7 @@ function EmptyState() {
   const [seeding, setSeeding] = useState<string | null>(null);
 
   return (
-    <div className="panel-surface flex min-h-0 flex-1 flex-col items-center justify-center px-6 py-12 text-center sm:py-16">
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 py-12 text-center sm:py-16">
       <div className="token-icon mb-4 size-14 rounded-full">
         <Sparkles className="size-7" strokeWidth={1.4} />
       </div>

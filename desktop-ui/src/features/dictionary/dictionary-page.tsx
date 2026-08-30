@@ -32,7 +32,7 @@ export function DictionaryPage() {
           </div>
           <div className="skeleton-shimmer h-10 w-full rounded-field" />
         </div>
-        <div className="panel-surface min-h-0 flex-1 divide-y divide-surface-border overflow-hidden">
+        <div className="min-h-0 flex-1 divide-y divide-surface-border overflow-hidden">
           {[0, 1, 2, 3].map((i) => (
             <div key={i} className="flex items-center gap-3 px-5 py-4">
               <div className="skeleton-shimmer h-4 w-24 sm:w-32" />

@@ -117,7 +117,7 @@ export function AppShell() {
           </div>
         </div>
 
-        <main id="main-content" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <main id="main-content" className="app-region">
           <div className={page.fill ? 'app-scroll app-scroll-fixed' : 'app-scroll'}>
             <div className={page.fill ? 'app-frame app-frame-fill' : 'app-frame'}>
               {/* Page hero — Home leads with its bento board; every other

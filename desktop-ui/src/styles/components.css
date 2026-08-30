@@ -13,6 +13,23 @@
   @apply relative z-0 flex min-w-0 flex-1 flex-col overflow-hidden;
 }
 
+/* The content region: one raised slab holding every page, inset from the
+   window edges on all four sides so it floats on the shell instead of
+   bleeding into it. The sidebar sits outside it on the ground, which is what
+   makes collapsing the sidebar read as this slab growing.
+   Only from `lg`: below it the sidebar is an overlay and the content needs
+   the full width, so the region goes edge to edge and drops its frame. */
+@utility app-region {
+  @apply flex min-h-0 flex-1 flex-col overflow-hidden;
+}
+
+@media (min-width: 64rem) {
+  .app-region {
+    @apply rounded-box border border-surface-border bg-surface-shell;
+    margin: var(--space-region);
+  }
+}
+
 @utility app-scroll {
   @apply flex-1 overflow-y-auto;
   padding:
@@ -79,11 +96,36 @@
   }
 }
 
+/* An even gutter on the pages that fill the region. The deep bottom pad above
+   is run-out room for a page that scrolls; these never do, so there it only
+   pushed the content off-centre — measured 30px of top gutter against 59px of
+   bottom. Declared after the block above so it wins at equal specificity. */
+@media (min-width: 64rem) {
+  .app-scroll-fixed {
+    padding: var(--space-page-x-desktop);
+  }
+}
+
 /* ── Sidebar ───────────────────────────────────────────────────────── */
 
+/* The sidebar is ground, not a panel: it shares the shell's background and
+   carries no edge, so the content beside it is the only raised thing on
+   screen and reads as floating rather than as a second card butted against
+   the first. It is also what makes collapsing the sidebar look like the
+   content growing — with a bordered sidebar, one card was merely shrinking
+   next to another. */
 @utility sidebar-surface {
-  @apply border-r border-surface-border bg-surface-glass;
-  box-shadow: inset -1px 0 0 oklch(1 0 0 / 0.025);
+  @apply bg-transparent;
+}
+
+/* Below `lg` the sidebar stops being a column beside the content and becomes
+   an overlay drawer sliding *over* it, so there it still needs its own fill
+   and edge to stay readable. */
+@media (max-width: 63.999rem) {
+  .sidebar-surface {
+    @apply border-r border-surface-border bg-surface-glass;
+    box-shadow: inset -1px 0 0 oklch(1 0 0 / 0.025);
+  }
 }
 
 @utility brand-title {

@@ -13,16 +13,16 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/features/welcome/welcome-page.tsx:462
+#: src/features/welcome/welcome-page.tsx:465
 msgid "— change it any time in Settings › Dictation."
 msgstr "— 可随时在“设置 › 听写”中更改。"
 
 #. placeholder {0}: snippet.triggerPhrase
-#: src/features/snippets/snippets-page.tsx:452
+#: src/features/snippets/snippets-page.tsx:459
 msgid "“{0}” will stop expanding. The template text is not recoverable."
 msgstr "“{0}”将不再展开。模板文本无法恢复。"
 
-#: src/features/snippets/snippets-page.tsx:329
+#: src/features/snippets/snippets-page.tsx:333
 msgid "(clipboard contents)"
 msgstr "（剪贴板内容）"
 
@@ -30,7 +30,7 @@ msgstr "（剪贴板内容）"
 #. placeholder {1}: entries.length
 #. placeholder {1}: snippets.length
 #: src/features/dictionary/components/dictionary-table.tsx:250
-#: src/features/snippets/snippets-page.tsx:402
+#: src/features/snippets/snippets-page.tsx:406
 msgid "{0} / {1}"
 msgstr "{0} / {1}"
 
@@ -45,7 +45,7 @@ msgid "{0} rules"
 msgstr "{0} 规则"
 
 #. placeholder {0}: snippets.length
-#: src/features/snippets/snippets-page.tsx:402
+#: src/features/snippets/snippets-page.tsx:406
 msgid "{0} snippets"
 msgstr "{0} 个片段"
 
@@ -85,7 +85,7 @@ msgstr "共 {totalSessions} 条"
 msgid "{visibleCount} / {totalCount}"
 msgstr "{visibleCount} / {totalCount}"
 
-#: src/features/snippets/snippets-page.tsx:310
+#: src/features/snippets/snippets-page.tsx:314
 msgid "## Meeting — {date}\n"
 "\n"
 "Attendees:\n"
@@ -138,7 +138,7 @@ msgstr "添加更正"
 msgid "Add a fix and Lune Voice applies it every time you dictate. Try a starter below or add your own above."
 msgstr "添加修复后，Lune Voice 会在您每次听写时应用它。尝试下面的启动器或在上面添加您自己的启动器。"
 
-#: src/features/snippets/snippets-page.tsx:350
+#: src/features/snippets/snippets-page.tsx:354
 msgid "Add snippet"
 msgstr "添加片段"
 
@@ -249,7 +249,7 @@ msgstr "内置"
 #: src/components/feedback/confirm-dialog.tsx:59
 #: src/features/dictionary/components/dictionary-table.tsx:110
 #: src/features/settings/sections/models-section.tsx:310
-#: src/features/snippets/snippets-page.tsx:242
+#: src/features/snippets/snippets-page.tsx:246
 #: src/features/styles/components/style-editor-modal.tsx:206
 msgid "Cancel"
 msgstr "取消"
@@ -258,7 +258,7 @@ msgstr "取消"
 msgid "Cancel current recording"
 msgstr "取消当前录音"
 
-#: src/features/welcome/welcome-page.tsx:361
+#: src/features/welcome/welcome-page.tsx:364
 msgid "Cancel download"
 msgstr "取消下载"
 
@@ -275,7 +275,7 @@ msgstr "用语音录制"
 msgid "Capture device and how recording detects when you speak."
 msgstr "采���设备以及录音如何检测您何时说话。"
 
-#: src/features/welcome/welcome-page.tsx:421
+#: src/features/welcome/welcome-page.tsx:424
 msgid "Change engine"
 msgstr "更换引擎"
 
@@ -344,7 +344,7 @@ msgstr "选择将您的语音转换为文本的引擎。本地引擎完全在设
 msgid "Choose your speech engine. Everything runs offline — no cloud, no accounts."
 msgstr "选择您的语音引擎。一切都离线运行——没有云，没有账户。"
 
-#: src/components/ui/list-card.tsx:84
+#: src/components/ui/list-card.tsx:86
 msgid "Clear {label}"
 msgstr "清除{label}"
 
@@ -379,7 +379,7 @@ msgstr "完全的"
 
 #: src/features/overview/overview-page.tsx:285
 #: src/features/shell/components/app-shell.tsx:169
-#: src/features/shell/components/sidebar-widgets.tsx:41
+#: src/features/shell/components/sidebar-widgets.tsx:44
 msgid "Connecting"
 msgstr "正在连接"
 
@@ -387,8 +387,8 @@ msgstr "正在连接"
 msgid "Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network."
 msgstr "启动后不久联系发布服务器，仅在存在更新版本时才提示你。默认关闭 — 听写本身从不需要联网。"
 
-#: src/features/welcome/welcome-page.tsx:338
-#: src/features/welcome/welcome-page.tsx:415
+#: src/features/welcome/welcome-page.tsx:341
+#: src/features/welcome/welcome-page.tsx:418
 msgid "Continue"
 msgstr "继续"
 
@@ -396,11 +396,11 @@ msgstr "继续"
 msgid "Control how your speech is turned into text."
 msgstr "控制如何将语音转换为文本。"
 
-#: src/features/history/components/history-table.tsx:460
+#: src/features/history/components/history-table.tsx:466
 msgid "Copied"
 msgstr "已复制"
 
-#: src/features/history/components/history-table.tsx:460
+#: src/features/history/components/history-table.tsx:466
 msgid "Copy"
 msgstr "复制"
 
@@ -430,7 +430,7 @@ msgstr "校正"
 msgid "Correction sensitivity"
 msgstr "校正灵敏度"
 
-#: src/features/welcome/welcome-page.tsx:269
+#: src/features/welcome/welcome-page.tsx:273
 msgid "Could not download GPU support — transcription will run on the CPU. You can retry under Settings › Models."
 msgstr "无法下载 GPU 支持 — 转录将在 CPU 上运行。你可以在“设置 › 型号”中重试。"
 
@@ -450,7 +450,7 @@ msgstr "无法打开浏览器。请直接访问 {url}。"
 msgid "Couldn't reach the feedback service. Use the links above, or reopen this dialog to retry."
 msgstr "无法连接反馈服务。请使用上方的链接，或重新打开此对话框再试一次。"
 
-#: src/features/snippets/snippets-page.tsx:100
+#: src/features/snippets/snippets-page.tsx:101
 msgid "Couldn't save that snippet. Try again."
 msgstr "无法保存该片段。请重试。"
 
@@ -458,7 +458,7 @@ msgstr "无法保存该片段。请重试。"
 msgid "Crash or freeze"
 msgstr "崩溃或卡死"
 
-#: src/features/snippets/snippets-page.tsx:226
+#: src/features/snippets/snippets-page.tsx:230
 msgid "Create a snippet"
 msgstr "新建片段"
 
@@ -470,7 +470,7 @@ msgstr "创造新风格"
 msgid "Create style"
 msgstr "创造风格"
 
-#: src/features/welcome/welcome-page.tsx:461
+#: src/features/welcome/welcome-page.tsx:464
 msgid "Ctrl+Space"
 msgstr "Ctrl+Space"
 
@@ -485,7 +485,7 @@ msgid "Dark"
 msgstr "深色"
 
 #: src/components/feedback/confirm-dialog.tsx:70
-#: src/features/history/components/history-table.tsx:469
+#: src/features/history/components/history-table.tsx:475
 #: src/features/history/components/session-detail-modal.tsx:203
 #: src/features/settings/sections/models-section.tsx:258
 msgid "Delete"
@@ -495,7 +495,7 @@ msgstr "删除"
 #. placeholder {0}: preset.name
 #. placeholder {0}: snippet.triggerPhrase
 #: src/features/dictionary/components/dictionary-table.tsx:162
-#: src/features/snippets/snippets-page.tsx:453
+#: src/features/snippets/snippets-page.tsx:460
 #: src/features/styles/components/style-preset-card.tsx:119
 msgid "Delete {0}"
 msgstr "删除 {0}"
@@ -509,10 +509,6 @@ msgstr "删除{0}？"
 msgid "Delete {count, plural, one {# session} other {# sessions}}?"
 msgstr "删除 {count, plural, other {# 个会话}}？"
 
-#: src/features/history/components/history-table.tsx:258
-#~ msgid "Delete {count} sessions?"
-#~ msgstr "删除 {count} 个会话？"
-
 #: src/features/settings/sections/models-section.tsx:313
 msgid "Delete model"
 msgstr "删除模型"
@@ -521,12 +517,12 @@ msgstr "删除模型"
 msgid "Delete selected"
 msgstr "删除所选"
 
-#: src/features/history/components/history-table.tsx:467
+#: src/features/history/components/history-table.tsx:473
 #: src/features/history/components/session-detail-modal.tsx:201
 msgid "Delete session?"
 msgstr "删除会话？"
 
-#: src/features/snippets/snippets-page.tsx:451
+#: src/features/snippets/snippets-page.tsx:458
 msgid "Delete snippet?"
 msgstr "要删除该片段吗？"
 
@@ -595,7 +591,7 @@ msgstr "磁盘使用情况"
 msgid "Dismiss error"
 msgstr "消除错误"
 
-#: src/features/history/components/history-table.tsx:463
+#: src/features/history/components/history-table.tsx:469
 #: src/features/settings/components/gpu-backend-card.tsx:112
 #: src/features/settings/sections/models-section.tsx:272
 msgid "Download"
@@ -606,11 +602,11 @@ msgstr "下载"
 msgid "Download {0}"
 msgstr "下载 {0}"
 
-#: src/features/welcome/welcome-page.tsx:407
+#: src/features/welcome/welcome-page.tsx:410
 msgid "Download {pendingCount} models"
 msgstr "下载 {pendingCount} 模型"
 
-#: src/features/welcome/welcome-page.tsx:406
+#: src/features/welcome/welcome-page.tsx:409
 msgid "Download 1 model"
 msgstr "下载 1 个模型"
 
@@ -648,7 +644,7 @@ msgstr "正在下载更新"
 #: src/features/settings/components/asr-engine-cards.tsx:152
 #: src/features/settings/components/gpu-backend-card.tsx:112
 #: src/features/settings/sections/models-section.tsx:272
-#: src/features/welcome/welcome-page.tsx:353
+#: src/features/welcome/welcome-page.tsx:356
 msgid "Downloading…"
 msgstr "正在下载..."
 
@@ -680,11 +676,11 @@ msgstr "编辑"
 #. placeholder {0}: entry.phrase
 #. placeholder {0}: snippet.triggerPhrase
 #: src/features/dictionary/components/dictionary-table.tsx:155
-#: src/features/snippets/snippets-page.tsx:446
+#: src/features/snippets/snippets-page.tsx:453
 msgid "Edit {0}"
 msgstr "编辑 {0}"
 
-#: src/features/snippets/snippets-page.tsx:226
+#: src/features/snippets/snippets-page.tsx:230
 msgid "Edit snippet"
 msgstr "编辑片段"
 
@@ -692,11 +688,11 @@ msgstr "编辑片段"
 msgid "Edit style"
 msgstr "编辑样式"
 
-#: src/features/snippets/snippets-page.tsx:238
+#: src/features/snippets/snippets-page.tsx:242
 msgid "Editing “{spokenTrigger}”"
 msgstr "正在编辑“{spokenTrigger}”"
 
-#: src/features/history/components/history-table.tsx:420
+#: src/features/history/components/history-table.tsx:426
 #: src/features/overview/overview-page.tsx:180
 msgid "Empty session"
 msgstr "空会话"
@@ -711,7 +707,7 @@ msgstr "启用润色"
 msgid "Engine"
 msgstr "引擎"
 
-#: src/features/welcome/welcome-page.tsx:389
+#: src/features/welcome/welcome-page.tsx:392
 msgid "Enter Lune Voice"
 msgstr "输入 Lune 语音"
 
@@ -751,11 +747,11 @@ msgstr "过滤规则"
 msgid "Filter rules…"
 msgstr "过滤规则..."
 
-#: src/features/snippets/snippets-page.tsx:400
+#: src/features/snippets/snippets-page.tsx:404
 msgid "Filter snippets"
 msgstr "筛选片段"
 
-#: src/features/snippets/snippets-page.tsx:399
+#: src/features/snippets/snippets-page.tsx:403
 msgid "Filter snippets…"
 msgstr "筛选片段…"
 
@@ -850,7 +846,7 @@ msgstr "历史记录保留"
 msgid "Hold the hotkey and speak, and your words land wherever your cursor is."
 msgstr "按住快捷键说话，文字会输入到光标所在的位置。"
 
-#: src/features/welcome/welcome-page.tsx:457
+#: src/features/welcome/welcome-page.tsx:460
 msgid "Hold your hotkey, speak, then let go. The text is typed into whatever app you were using."
 msgstr "按住快捷键说话，然后松开。文字会输入到你当时使用的应用中。"
 
@@ -866,7 +862,7 @@ msgstr "听写提示音的播放音量。"
 msgid "How the pill bar looks. Changes apply immediately."
 msgstr "指示器条的外观。更改会立即生效。"
 
-#: src/features/welcome/welcome-page.tsx:454
+#: src/features/welcome/welcome-page.tsx:457
 msgid "How to dictate"
 msgstr "如何听写"
 
@@ -878,11 +874,11 @@ msgstr "空闲 · 麦克风就绪"
 msgid "In use"
 msgstr "使用中"
 
-#: src/features/snippets/snippets-page.tsx:296
+#: src/features/snippets/snippets-page.tsx:300
 msgid "Insert at cursor"
 msgstr "在光标处插入"
 
-#: src/features/snippets/snippets-page.tsx:289
+#: src/features/snippets/snippets-page.tsx:293
 msgid "Insert placeholder"
 msgstr "插入占位符"
 
@@ -979,7 +975,7 @@ msgid "Listening — say the phrase…"
 msgstr "正在聆听 — 请说出该短语…"
 
 #: src/features/overview/overview-page.tsx:154
-#: src/features/shell/components/sidebar-widgets.tsx:48
+#: src/features/shell/components/sidebar-widgets.tsx:51
 msgid "Listening…"
 msgstr "正在听……"
 
@@ -1028,7 +1024,7 @@ msgstr "月光之声写道"
 msgid "Manage in Models"
 msgstr "在“型号”中管理"
 
-#: src/features/snippets/snippets-page.tsx:258
+#: src/features/snippets/snippets-page.tsx:262
 msgid "meeting header"
 msgstr "会议抬头"
 
@@ -1056,7 +1052,7 @@ msgstr "模式"
 msgid "Models"
 msgstr "型号"
 
-#: src/features/welcome/welcome-page.tsx:475
+#: src/features/welcome/welcome-page.tsx:478
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "模型存储在本地。没有遥测，没有账户。"
 
@@ -1076,9 +1072,9 @@ msgstr "姓名"
 msgid "Name is too long."
 msgstr "名称过长。"
 
-#: src/features/snippets/snippets-page.tsx:200
-#: src/features/snippets/snippets-page.tsx:238
-#: src/features/snippets/snippets-page.tsx:494
+#: src/features/snippets/snippets-page.tsx:204
+#: src/features/snippets/snippets-page.tsx:242
+#: src/features/snippets/snippets-page.tsx:501
 msgid "New snippet"
 msgstr "新建片段"
 
@@ -1123,20 +1119,20 @@ msgstr "还没有会议"
 msgid "No sessions yet. Start dictating to see your transcripts here."
 msgstr "还没有会议。开始听写并在此处查看您的成绩单。"
 
-#: src/features/snippets/snippets-page.tsx:419
+#: src/features/snippets/snippets-page.tsx:426
 msgid "No snippets match “{query}”."
 msgstr "没有匹配“{query}”的片段。"
 
-#: src/features/snippets/snippets-page.tsx:484
+#: src/features/snippets/snippets-page.tsx:491
 msgid "No snippets yet"
 msgstr "还没有片段"
 
-#: src/features/history/components/history-table.tsx:441
+#: src/features/history/components/history-table.tsx:447
 #: src/features/history/components/session-detail-modal.tsx:154
 msgid "No transcript"
 msgstr "没有成绩单"
 
-#: src/features/history/components/history-table.tsx:453
+#: src/features/history/components/history-table.tsx:459
 #: src/features/history/components/session-detail-modal.tsx:164
 msgid "None"
 msgstr "无"
@@ -1199,7 +1195,7 @@ msgstr "输出"
 msgid "Overall footprint of the pill bar."
 msgstr "指示器条的整体尺寸。"
 
-#: src/features/welcome/welcome-page.tsx:296
+#: src/features/welcome/welcome-page.tsx:299
 msgid "Overall progress"
 msgstr "总体进展"
 
@@ -1257,7 +1253,7 @@ msgstr "放置"
 msgid "Play a short sound when dictation starts, finishes, or runs into an error."
 msgstr "听写开始、完成或遇到错误时播放一小段声音。"
 
-#: src/features/welcome/welcome-page.tsx:365
+#: src/features/welcome/welcome-page.tsx:368
 msgid "Please keep the app open until downloads finish"
 msgstr "请保持应用程序打开直至下载完成"
 
@@ -1278,11 +1274,11 @@ msgstr "指示器起始的预设边角或边缘。"
 msgid "Press"
 msgstr "按"
 
-#: src/features/shell/components/sidebar-widgets.tsx:51
+#: src/features/shell/components/sidebar-widgets.tsx:54
 msgid "Press to talk"
 msgstr "按下说话"
 
-#: src/features/welcome/welcome-page.tsx:458
+#: src/features/welcome/welcome-page.tsx:461
 msgid "Press your hotkey, speak, then press it again. The text is typed into whatever app you were using."
 msgstr "按下快捷键说话，然后再按一次。文字会输入到你当时使用的应用中。"
 
@@ -1314,7 +1310,7 @@ msgstr "优先事项"
 msgid "Processing"
 msgstr "处理中"
 
-#: src/features/shell/components/sidebar-widgets.tsx:48
+#: src/features/shell/components/sidebar-widgets.tsx:51
 msgid "Processing…"
 msgstr "加工…"
 
@@ -1399,7 +1395,7 @@ msgstr "需要重启"
 msgid "Retry"
 msgstr "重试"
 
-#: src/features/welcome/welcome-page.tsx:377
+#: src/features/welcome/welcome-page.tsx:380
 msgid "Retry download"
 msgstr "重试下载"
 
@@ -1420,7 +1416,7 @@ msgstr "s"
 msgid "Save"
 msgstr "保存"
 
-#: src/features/snippets/snippets-page.tsx:346
+#: src/features/snippets/snippets-page.tsx:350
 msgid "Save changes"
 msgstr "保存更改"
 
@@ -1429,19 +1425,19 @@ msgstr "保存更改"
 msgid "Save Transcript"
 msgstr "保存成绩单"
 
-#: src/features/snippets/snippets-page.tsx:487
+#: src/features/snippets/snippets-page.tsx:494
 msgid "Save your signature, a meeting header, or anything you type often — then speak its trigger to drop it into any app."
 msgstr "保存你的签名、会议抬头，或任何你经常输入的内容 — 然后说出它的触发词，即可将其插入任意应用。"
 
-#: src/features/snippets/snippets-page.tsx:183
+#: src/features/snippets/snippets-page.tsx:187
 msgid "Saved snippets"
 msgstr "已保存的片段"
 
-#: src/features/snippets/snippets-page.tsx:264
+#: src/features/snippets/snippets-page.tsx:268
 msgid "Say <0>“{spokenTrigger}”</0> as the whole utterance — or <1>“insert {spokenTrigger}”</1> — to type this snippet."
 msgstr "将 <0>“{spokenTrigger}”</0> 作为整句说出 — 或说 <1>“insert {spokenTrigger}”</1> — 即可输入此片段。"
 
-#: src/features/snippets/snippets-page.tsx:468
+#: src/features/snippets/snippets-page.tsx:475
 msgid "Say a trigger as your whole utterance to expand it"
 msgstr "将触发词作为整句说出即可展开"
 
@@ -1461,11 +1457,11 @@ msgstr "搜索成绩单..."
 msgid "Select all sessions on this page"
 msgstr "选择本页所有会话"
 
-#: src/features/welcome/welcome-page.tsx:411
+#: src/features/welcome/welcome-page.tsx:414
 msgid "Select required models"
 msgstr "选择需要的型号"
 
-#: src/features/history/components/history-table.tsx:405
+#: src/features/history/components/history-table.tsx:408
 msgid "Select session"
 msgstr "选择会话"
 
@@ -1490,7 +1486,7 @@ msgstr "会议���情"
 msgid "sessions"
 msgstr "会议"
 
-#: src/features/shell/components/sidebar-widgets.tsx:56
+#: src/features/shell/components/sidebar-widgets.tsx:59
 msgid "Set hotkey"
 msgstr "设置热键"
 
@@ -1498,7 +1494,7 @@ msgstr "设置热键"
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "设置您所说的语言。 Auto 使用语音检测。"
 
-#: src/features/welcome/welcome-page.tsx:404
+#: src/features/welcome/welcome-page.tsx:407
 msgid "Set up GPU acceleration"
 msgstr "设置 GPU 加速"
 
@@ -1533,9 +1529,9 @@ msgstr "大小"
 msgid "Size & shape"
 msgstr "大小与形状"
 
-#: src/features/welcome/welcome-page.tsx:342
-#: src/features/welcome/welcome-page.tsx:380
-#: src/features/welcome/welcome-page.tsx:424
+#: src/features/welcome/welcome-page.tsx:345
+#: src/features/welcome/welcome-page.tsx:383
+#: src/features/welcome/welcome-page.tsx:427
 msgid "Skip for now"
 msgstr "暂时跳过"
 
@@ -1543,8 +1539,8 @@ msgstr "暂时跳过"
 msgid "Skip to main content"
 msgstr "跳至主要内容"
 
-#: src/features/snippets/snippets-page.tsx:285
-#: src/features/snippets/snippets-page.tsx:411
+#: src/features/snippets/snippets-page.tsx:289
+#: src/features/snippets/snippets-page.tsx:418
 msgid "Snippet text"
 msgstr "片段文本"
 
@@ -1569,9 +1565,9 @@ msgstr "语音转文字"
 msgid "Spoken phrase"
 msgstr "口语短语"
 
-#: src/features/shell/components/sidebar-widgets.tsx:24
-#: src/features/shell/components/sidebar-widgets.tsx:25
-#: src/features/shell/components/sidebar-widgets.tsx:41
+#: src/features/shell/components/sidebar-widgets.tsx:27
+#: src/features/shell/components/sidebar-widgets.tsx:28
+#: src/features/shell/components/sidebar-widgets.tsx:44
 msgid "Start dictating"
 msgstr "开始听写"
 
@@ -1601,9 +1597,9 @@ msgstr "停止并转写"
 msgid "Stop capturing"
 msgstr "停止录制"
 
-#: src/features/shell/components/sidebar-widgets.tsx:24
-#: src/features/shell/components/sidebar-widgets.tsx:25
-#: src/features/shell/components/sidebar-widgets.tsx:41
+#: src/features/shell/components/sidebar-widgets.tsx:27
+#: src/features/shell/components/sidebar-widgets.tsx:28
+#: src/features/shell/components/sidebar-widgets.tsx:44
 msgid "Stop dictating"
 msgstr "停止口授"
 
@@ -1698,7 +1694,7 @@ msgstr "只需片刻。"
 msgid "This will permanently remove the selected dictation sessions and their transcripts."
 msgstr "这将永久删除所选的听写会话及其转录文本。"
 
-#: src/features/history/components/history-table.tsx:468
+#: src/features/history/components/history-table.tsx:474
 #: src/features/history/components/session-detail-modal.tsx:202
 msgid "This will permanently remove this dictation session and its transcript."
 msgstr "这将永久删除该听写会话及其记录。"
@@ -1775,11 +1771,11 @@ msgstr "转录在 CPU 上运行。可选下载会把它转到你的 NVIDIA GPU �
 msgid "Transcription runs on the CPU. No GPU download has been published for this build yet."
 msgstr "转录在 CPU 上运行。此版本尚未发布 GPU 下载。"
 
-#: src/features/snippets/snippets-page.tsx:408
+#: src/features/snippets/snippets-page.tsx:415
 msgid "Trigger"
 msgstr "触发词"
 
-#: src/features/snippets/snippets-page.tsx:252
+#: src/features/snippets/snippets-page.tsx:256
 msgid "Trigger phrase"
 msgstr "触发短语"
 
@@ -1787,11 +1783,11 @@ msgstr "触发短语"
 msgid "Try again"
 msgstr "重试"
 
-#: src/features/snippets/snippets-page.tsx:271
+#: src/features/snippets/snippets-page.tsx:275
 msgid "Type a phrase, or tap the mic to capture it exactly as Lune Voice hears it."
 msgstr "输入一个短语，或点按麦克风，按 Lune Voice 听到的原样录制。"
 
-#: src/features/snippets/snippets-page.tsx:326
+#: src/features/snippets/snippets-page.tsx:330
 msgid "Types as"
 msgstr "输入为"
 
@@ -1917,7 +1913,7 @@ msgstr "Whisper 模型大小"
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
 msgstr "whisper.cpp 在设备端运行。选择一个大小以在速度与准确性之间权衡。"
 
-#: src/features/history/components/history-table.tsx:446
+#: src/features/history/components/history-table.tsx:452
 msgid "words"
 msgstr "字"
 
