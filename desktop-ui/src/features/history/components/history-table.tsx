@@ -160,7 +160,7 @@ export function HistoryTable() {
                     aria-label={t`Select all sessions on this page`}
                   />
                 </th>
-                <th className={`${LIST_HEAD_CELL} w-px`} />
+                <th className={`${LIST_HEAD_CELL} w-px pl-2 pr-1`} />
                 <th className={`${LIST_HEAD_CELL} px-2`}>{t`Time`}</th>
                 <th className={`${LIST_HEAD_CELL} px-2`}>{t`Transcript`}</th>
                 <th className={`${LIST_HEAD_CELL} hidden px-2 text-right sm:table-cell`}>
@@ -394,22 +394,28 @@ function SessionRows({ session, expanded, selected, onSelect, onToggle }: Sessio
         }`}
       >
         <td className="py-3 pl-3">
-          <input
-            type="checkbox"
-            className="checkbox checkbox-sm align-middle"
-            checked={selected}
-            onChange={onSelect}
-            // The row itself toggles the transcript fold; ticking the box must
-            // not also expand the row it belongs to.
-            onClick={(e) => e.stopPropagation()}
-            aria-label={t`Select session`}
-          />
+          {/* `h-5` is the first text line's line-height, so both controls centre
+              on the time rather than hanging off the top of an `align-top` cell. */}
+          <div className="flex h-5 items-center">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-sm"
+              checked={selected}
+              onChange={onSelect}
+              // The row itself toggles the transcript fold; ticking the box must
+              // not also expand the row it belongs to.
+              onClick={(e) => e.stopPropagation()}
+              aria-label={t`Select session`}
+            />
+          </div>
         </td>
-        <td className="py-3">
-          <ChevronDown
-            size={15}
-            className={`text-content-subtle transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
-          />
+        <td className="py-3 pl-2 pr-1">
+          <div className="flex h-5 items-center">
+            <ChevronDown
+              size={15}
+              className={`text-content-subtle transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+            />
+          </div>
         </td>
         <td className="whitespace-nowrap px-2 py-3 tabular-nums">
           <div className="text-content">{time}</div>
