@@ -38,6 +38,15 @@ pub enum PersistError {
 
     #[error("not found: {0}")]
     NotFound(String),
+
+    /// A GPU backend install failure, already phrased for the user.
+    ///
+    /// Rendered with no prefix, unlike every other variant: both frontends
+    /// print this string verbatim under the GPU card, so `io error: GPU
+    /// backend fetch: HTTP status client error (404 Not Found) for url (…)` is
+    /// what the user used to read. The technical detail is logged instead.
+    #[error("{0}")]
+    GpuPlugin(String),
 }
 
 #[cfg(test)]

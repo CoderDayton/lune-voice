@@ -169,11 +169,17 @@ where
 
     if !digest.eq_ignore_ascii_case(release.sha256) {
         let _ = std::fs::remove_file(&archive);
-        return Err(PersistError::Io(std::io::Error::other(format!(
-            "GPU backend archive failed verification (expected {}, got {digest}); refusing to \
-             install shared libraries that will be loaded into this process",
-            release.sha256
-        ))));
+        tracing::warn!(
+            url = release.url,
+            expected = release.sha256,
+            got = %digest,
+            "GPU backend archive failed digest verification; refusing to install"
+        );
+        return Err(PersistError::GpuPlugin(
+            "The GPU download did not match what was expected and has been discarded. \
+             This usually means the transfer was corrupted — please try again."
+                .to_string(),
+        ));
     }
 
     // Decompressing ~660 MB of shared objects is seconds of pure CPU and
@@ -194,6 +200,36 @@ where
         done: true,
     });
     Ok(written)
+}
+
+/// Turn a failed archive fetch into copy the user can act on.
+///
+/// Both frontends render this verbatim — Settings › Models and the onboarding
+/// GPU step — so it carries no reqwest wording, no status line and no URL; the
+/// technical detail goes to the log instead. `None` means the request never
+/// got far enough to have a status (DNS, TLS, connect timeout).
+///
+/// Every branch says transcription still works, because it does: the GPU is an
+/// optional accelerator and a failure here is not a broken install.
+fn download_failure_message(status: Option<reqwest::StatusCode>) -> String {
+    match status {
+        None => "Could not connect to the download server. Check your internet \
+                 connection and try again — transcription keeps running on the CPU."
+            .to_string(),
+        // The archive for this version was never uploaded. Nothing the user can
+        // retry their way out of, so do not invite one.
+        Some(s) if s == reqwest::StatusCode::NOT_FOUND || s == reqwest::StatusCode::GONE => {
+            "GPU support is not available to download yet — the package for this \
+             version has not been published. Transcription keeps running on the CPU."
+                .to_string()
+        }
+        Some(s) if s.is_server_error() => "The download server is having trouble right now. \
+             Please try again later — transcription keeps running on the CPU."
+            .to_string(),
+        Some(_) => "The download server refused the request. Please try again later — \
+             transcription keeps running on the CPU."
+            .to_string(),
+    }
 }
 
 /// How long to wait for the TCP/TLS handshake before giving up.
@@ -259,9 +295,15 @@ where
         .get(release.url)
         .send()
         .await
-        .map_err(|e| PersistError::Io(std::io::Error::other(format!("GPU backend fetch: {e}"))))?
+        .map_err(|e| {
+            tracing::warn!(url = release.url, error = %e, "GPU backend fetch failed");
+            PersistError::GpuPlugin(download_failure_message(e.status()))
+        })?
         .error_for_status()
-        .map_err(|e| PersistError::Io(std::io::Error::other(format!("GPU backend fetch: {e}"))))?;
+        .map_err(|e| {
+            tracing::warn!(url = release.url, error = %e, "GPU backend fetch rejected");
+            PersistError::GpuPlugin(download_failure_message(e.status()))
+        })?;
 
     let declared = response.content_length();
     let total = declared.unwrap_or(release.download_bytes);
@@ -284,7 +326,12 @@ where
 
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.map_err(|e| {
-            PersistError::Io(std::io::Error::other(format!("GPU backend download: {e}")))
+            tracing::warn!(url = release.url, error = %e, "GPU backend download interrupted");
+            PersistError::GpuPlugin(
+                "The GPU download stopped before it finished. Check your internet \
+                 connection and try again — transcription keeps running on the CPU."
+                    .to_string(),
+            )
         })?;
         downloaded += chunk.len() as u64;
         // The digest is only checked once the whole body has arrived, so
@@ -678,5 +725,80 @@ mod tests {
                 .all(|c| c.is_ascii_hexdigit()),
             "digest must be lowercase hex"
         );
+    }
+
+    /// Every download failure is rendered verbatim under the GPU card in
+    /// Settings and in onboarding, so none of them may leak reqwest's wording,
+    /// the `io error:` prefix or the release URL at the user.
+    fn assert_user_facing(msg: &str) {
+        for leak in [
+            "io error",
+            "HTTP status",
+            "github.com",
+            "reqwest",
+            "error sending request",
+        ] {
+            assert!(
+                !msg.to_ascii_lowercase()
+                    .contains(&leak.to_ascii_lowercase()),
+                "developer detail {leak:?} leaked into user copy: {msg}"
+            );
+        }
+        assert!(
+            msg.chars().next().is_some_and(char::is_uppercase),
+            "user copy should read as a sentence: {msg}"
+        );
+    }
+
+    #[test]
+    fn a_missing_archive_reads_as_not_yet_available() {
+        let msg = download_failure_message(Some(reqwest::StatusCode::NOT_FOUND));
+        assert_user_facing(&msg);
+        assert!(
+            msg.contains("not") && msg.to_ascii_lowercase().contains("available"),
+            "a 404 means the archive was never published, not that the user did \
+             something wrong: {msg}"
+        );
+        assert!(
+            msg.to_ascii_lowercase().contains("cpu"),
+            "the user should be told transcription still works: {msg}"
+        );
+    }
+
+    #[test]
+    fn a_server_error_invites_a_retry() {
+        let msg = download_failure_message(Some(reqwest::StatusCode::SERVICE_UNAVAILABLE));
+        assert_user_facing(&msg);
+        assert!(
+            msg.to_ascii_lowercase().contains("again"),
+            "a 5xx is transient — say so: {msg}"
+        );
+    }
+
+    /// A 404 and an outage are the same `PersistError` variant today and are
+    /// told apart only by prose, so they must not read alike.
+    #[test]
+    fn an_unreachable_server_is_distinct_from_a_missing_archive() {
+        let offline = download_failure_message(None);
+        let missing = download_failure_message(Some(reqwest::StatusCode::NOT_FOUND));
+        assert_user_facing(&offline);
+        assert!(
+            offline.to_ascii_lowercase().contains("connect")
+                || offline.to_ascii_lowercase().contains("connection"),
+            "an unreachable server should point at the network: {offline}"
+        );
+        assert_ne!(
+            offline, missing,
+            "an outage and an unpublished archive need different advice"
+        );
+    }
+
+    /// `PersistError::Io` renders with an `io error:` prefix, which is why the
+    /// raw download failures read like a stack trace. The GPU variant must
+    /// render bare so the copy above survives the trip to the UI.
+    #[test]
+    fn the_gpu_error_variant_renders_without_a_prefix() {
+        let e = PersistError::GpuPlugin("Something the user can act on.".into());
+        assert_eq!(e.to_string(), "Something the user can act on.");
     }
 }

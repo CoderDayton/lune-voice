@@ -266,7 +266,11 @@ function GpuSetupCard({ installing, progress, totalBytes, installed, error }: Gp
               ? t`Downloading NVIDIA's CUDA runtime.`
               : installed
                 ? t`Installed. Restart Lune Voice to start using your GPU.`
-                : t`Could not download GPU support — transcription will run on the CPU. You can retry under Settings › Models.`}
+                : // The backend phrases its own failures for the user and each
+                  // one already says transcription continues on the CPU, so
+                  // rendering this line *and* the error stated it twice.
+                  (error ??
+                  t`Could not download GPU support — transcription will run on the CPU. You can retry under Settings › Models.`)}
           </p>
           {installing && (
             <ByteProgress
@@ -275,7 +279,6 @@ function GpuSetupCard({ installing, progress, totalBytes, installed, error }: Gp
               fallbackTotalBytes={totalBytes}
             />
           )}
-          {error && <p className="mt-2 break-words text-xs opacity-80">{error}</p>}
         </div>
       </div>
     </div>
