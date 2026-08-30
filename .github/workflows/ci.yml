@@ -202,6 +202,122 @@ jobs:
       - name: Clippy (whisper-cpp real impl)
         run: cargo clippy -p lune-asr --no-default-features --features whisper-cpp --lib -- -D warnings
 
+  # ── Linux bundle (the artifact users actually install) ────────────────────
+  # Every other job compiles the whisper stub, and the `whisper-cpp` job above
+  # only clippies `lune-asr --lib`. Nothing exercised the real backend linked
+  # into `lune-voice` + the Tauri crate, or the bundler itself — so a feature
+  # passthrough typo, a bad `resources`/`linux.files` path or a missing icon
+  # passed CI green and failed at release time, by hand. This job builds the
+  # same PORTABLE CPU artifact `cgs build --env PORTABLE=1 --env BACKEND=cpu`
+  # produces (docs/RELEASE.md) and fails the PR instead.
+  bundle:
+    name: Linux bundle (whisper-cpp)
+    # Oldest supported runner: bundles link against the build host's glibc, so
+    # building on -latest would silently raise the floor for every user.
+    runs-on: ubuntu-22.04
+    # Only gate on fmt — a 30+ min compile should not queue behind the full
+    # clippy/test matrix, but it should not burn a runner on unformatted code.
+    needs: [fmt]
+    if: github.event_name != 'schedule'
+    env:
+      # Portable baseline (AVX2 + FMA + F16C), matching the GGML_* flags below.
+      # Overrides the workspace-wide empty RUSTFLAGS at the top of this file.
+      RUSTFLAGS: "-C target-cpu=x86-64-v3"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: bundle-cpu
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.10'
+
+      - name: Install system deps (Tauri + whisper.cpp/bindgen)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            cmake clang libclang-dev \
+            libasound2-dev \
+            libdbus-1-dev \
+            libglib2.0-dev \
+            libssl-dev \
+            libxkbcommon-dev \
+            libgtk-3-dev \
+            libgtk-layer-shell-dev \
+            libwebkit2gtk-4.1-dev \
+            libjavascriptcoregtk-4.1-dev \
+            libsoup-3.0-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            rpm \
+            pkg-config
+
+      - name: Install frontend dependencies
+        working-directory: desktop-ui
+        run: bun install --frozen-lockfile
+
+      # Mirrors the PORTABLE branch of `[scripts.build]` in Scripts.toml.
+      # GGML_NATIVE=OFF + the explicit ISA flags stop ggml defaulting to
+      # `-march=native`, which would SIGILL on any user CPU older than the
+      # runner. Bundles come from tauri.conf.json: deb, rpm, appimage.
+      - name: Build bundle
+        working-directory: desktop-ui
+        env:
+          GGML_NATIVE: "OFF"
+          GGML_AVX2: "ON"
+          GGML_FMA: "ON"
+          GGML_F16C: "ON"
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: bun tauri build --features whisper-cpp
+
+      # A bundle that built but produced no installable file is still a broken
+      # release; assert each configured target actually landed.
+      - name: Verify bundle artifacts exist
+        run: |
+          set -euo pipefail
+          fail=0
+          for glob in \
+            'target/release/bundle/deb/*.deb' \
+            'target/release/bundle/rpm/*.rpm' \
+            'target/release/bundle/appimage/*.AppImage'; do
+            # shellcheck disable=SC2086
+            if ! compgen -G "$glob" > /dev/null; then
+              echo "::error::no artifact matched $glob"
+              fail=1
+            else
+              echo "ok: $(compgen -G "$glob" | tr '\n' ' ')"
+            fi
+          done
+          exit $fail
+
+      # The udev rule is installed via `bundle.linux.deb.files`; a wrong path
+      # there fails silently at bundle time and only shows up as "typing does
+      # not work" on a user's machine.
+      - name: Verify udev rule is packaged in the .deb
+        run: |
+          set -euo pipefail
+          deb=$(compgen -G 'target/release/bundle/deb/*.deb' | head -1)
+          if ! dpkg-deb -c "$deb" | grep -q '99-lune-voice-uinput.rules'; then
+            echo "::error::udev rule missing from $deb"
+            dpkg-deb -c "$deb"
+            exit 1
+          fi
+          echo "ok: udev rule present in $deb"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lune-voice-linux-x86_64-cpu
+          path: |
+            target/release/bundle/deb/*.deb
+            target/release/bundle/rpm/*.rpm
+            target/release/bundle/appimage/*.AppImage
+          retention-days: 7
+          if-no-files-found: error
+
   # ── Security audit (push/PR + weekly schedule) ────────────────────────────
   audit:
     name: Security Audit

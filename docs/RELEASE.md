@@ -154,32 +154,35 @@ To add the macOS Apple-Silicon artifact:
 the passthrough wiring above. (`coreml` for whisper and `vulkan`/`rocm` are
 available too, but are out of scope unless an explicit product requirement.)
 
-## CI release matrix (planned)
+## CI
 
-A GitHub Actions release workflow (e.g. `.github/workflows/release.yml`,
-triggered on a `v*` tag) should fan out across a matrix that pins each artifact
-to its backend. Sketch:
+Two workflows cover the build.
 
-```yaml
-strategy:
-  matrix:
-    include:
-      - { name: linux-cpu,    os: ubuntu-22.04,  features: "whisper-cpp",    cuda: false }
-      - { name: linux-cuda,   os: ubuntu-22.04,  features: "whisper-cuda",   cuda: true  }
-      - { name: windows-cpu,  os: windows-2022,  features: "whisper-cpp",    cuda: false }
-      - { name: windows-cuda, os: windows-2022,  features: "whisper-cuda",   cuda: true  }
-      - { name: macos-metal,  os: macos-14,      features: "whisper-metal",  cuda: false }
-```
+**`.github/workflows/ci.yml`** gates every push and PR. Alongside fmt, clippy,
+tests, DTO drift, the frontend and the dependency audits, a **`bundle`** job
+builds the real Linux artifact on `ubuntu-22.04` — the same PORTABLE CPU build
+`cgs build --env PORTABLE=1 --env BACKEND=cpu` produces — then asserts a `.deb`,
+`.rpm` and `.AppImage` all landed and that the udev rule is actually inside the
+`.deb`. Every other job compiles the whisper *stub*, so without this job a
+feature-passthrough typo, a broken `resources` path or a missing icon passed CI
+and failed at release time instead.
 
-Each leg: install Rust + CMake + LLVM (+ Bun + platform WebView deps), install the
-CUDA Toolkit on `cuda: true` legs, then run the per-target build above and upload
-the bundle from `target/release/bundle/` (and `release-artifacts/` for the Linux
-containerized bundles) as a release asset.
+**`.github/workflows/release.yml`** runs on a `v*` tag. It first fails fast if
+the tag disagrees with the version in `tauri.conf.json`, `Cargo.toml` and
+`desktop-ui/package.json`, then builds the Linux bundles, writes `SHA256SUMS`,
+and opens a **draft** GitHub release with them attached.
 
-> Status: only the **Linux** build is exercised today. The Windows CPU/CUDA Cargo
+It stops at draft on purpose: the updater's private key never enters CI, so
+`latest.json` does not exist yet. Finish by hand — see [In-app
+updater](#in-app-updater) below. A release published without `latest.json` is a
+release the updater cannot see.
+
+> Status: only the **Linux CPU** artifact is built. The Windows CPU/CUDA Cargo
 > features exist, but the Linux-only audio and delivery crates do not compile
-> there, so no Windows artifact is produced. The macOS-Metal wiring and the
-> release workflow above remain to be implemented.
+> there, so no Windows artifact is produced and `dmg`/`nsis` are not in
+> `bundle.targets`. GPU reaches users as the downloadable CUDA plugin, not as a
+> second bundle. The macOS-Metal wiring remains to be implemented; adding it
+> means a `macos-14` leg in `release.yml` plus the feature work above.
 
 ## GPU plugin
 
@@ -217,13 +220,20 @@ does not hold it. So nothing is signed during bundling; `cgs updater-manifest`
 packs the AppImage into the `.tar.gz` the plugin expects and signs all three
 formats afterwards, in one place.
 
-Per release:
+Per release. Bump the version in `tauri.conf.json`, `Cargo.toml` and
+`desktop-ui/package.json`, then push the tag — `release.yml` builds the bundles
+and opens the draft release. Sign and finish it locally:
 
 ```bash
-cgs package                                   # deb + AppImage + rpm
+git tag v0.2.0 && git push origin v0.2.0      # CI builds + drafts the release
+gh release download v0.2.0 -D release-artifacts
 cgs updater-manifest --env TAG=v0.2.0         # signs, writes release-artifacts/latest.json
-gh release upload v0.2.0 release-artifacts/latest.json release-artifacts/*.{deb,rpm,AppImage,tar.gz}
+gh release upload v0.2.0 release-artifacts/latest.json
+gh release edit v0.2.0 --draft=false
 ```
+
+To build the bundles locally instead of on CI, `cgs package` replaces the first
+two steps.
 
 `latest.json` must be uploaded to the release whose tag the endpoint resolves
 to, or clients keep seeing the previous version. Bump `version` in
