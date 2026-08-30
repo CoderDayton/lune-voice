@@ -157,13 +157,26 @@ To publish, for either platform:
    `url` (`CUDA_LINUX_X86_64` or `CUDA_WINDOWS_X86_64`).
 2. Record the digest and byte size in that constant
    (`crates/lune-persist/src/gpu_plugin.rs`).
-3. For Windows, also update `the_cuda_windows_release_is_still_unpublished` in
-   that file — it fails on purpose once the digest is pinned, so the test tells
-   you what to change rather than silently passing.
+3. Update `no_release_is_published_while_the_assets_are_unreachable` in that
+   file — it fails on purpose once a digest is pinned, so the test tells you
+   what to change rather than silently passing.
 
 Until the digest is filled in it stays at the `UNPUBLISHED` sentinel and
 `install` refuses with an actionable message rather than downloading something
 it cannot verify.
+
+**Both platforms are currently unpublished**, Linux included, and the in-app
+download is therefore not offered anywhere. The repository is private, so
+GitHub answers the unauthenticated GET `install` makes with a 404 — a pinned
+digest would only turn a hidden button into a failing one. The measured Linux
+digest and byte size are parked in `CUDA_LINUX_X86_64_SHA256` /
+`CUDA_LINUX_X86_64_BYTES` next to the constant; restoring them is a two-line
+edit once the assets are anonymously reachable, whether by making the repo
+public or by moving the archives to a host that serves them. The pinning is
+what makes an untrusted host safe, so the host does not have to be GitHub.
+
+Building the plugin locally with `cgs gpu-plugin` and `cgs stage-runtime` is
+unaffected — that path never downloads anything.
 
 ## Runtime states
 

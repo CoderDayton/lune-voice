@@ -203,6 +203,19 @@ cannot verify. Full details in [GPU_PLUGIN.md](GPU_PLUGIN.md).
 
 ## In-app updater
 
+> **Currently off.** `UPDATES_ENABLED` in `desktop-ui/src-tauri/src/update.rs`
+> is `false`. The endpoint in `tauri.conf.json` is a release asset on a private
+> repository, and the updater plugin sends no credentials, so GitHub answers
+> every check with a 404 — an update flow that always fails reads to a user as
+> a broken app rather than an absent feature. **Check for Updates…** says so
+> instead; the launch check stays silent, as it already does when offline.
+>
+> Everything below still describes how the flow works and how to publish for
+> it. Flip the constant back once the release assets are anonymously
+> reachable — the same condition the GPU plugin pin waits on
+> ([GPU_PLUGIN.md](GPU_PLUGIN.md)). The signature verification is independent
+> of all this and is still tested (`cargo test -p lune-ui --lib updater`).
+
 The tray's **Check for Updates…** fetches `latest.json` from the latest GitHub
 release, verifies the signature against the public key pinned in
 `tauri.conf.json`, and installs: an AppImage is swapped in place, a `.deb`/`.rpm`

@@ -21,6 +21,20 @@ use tauri_plugin_updater::{Update, UpdaterExt};
 use crate::commands::require_window_access;
 use crate::dto::{UpdatePhaseDto, UpdateStateDto};
 
+/// Whether this build checks for updates at all.
+///
+/// Off while the release assets are unreachable: the configured endpoint is a
+/// release asset on a private repo, and GitHub answers the plugin's
+/// unauthenticated GET with a 404. Every check would therefore end in
+/// [`UpdatePhaseDto::CheckFailed`], which reads to the user as a broken app
+/// rather than as an absent feature. Turn this back on together with the GPU
+/// plugin pin in `lune_persist::gpu_plugin` — both wait on the same thing.
+const UPDATES_ENABLED: bool = false;
+
+/// Shown when the user asks for a check while [`UPDATES_ENABLED`] is off.
+const DISABLED_MESSAGE: &str =
+    "Automatic updates are turned off in this build. Install new versions manually.";
+
 /// Event the main window listens on for every transition of this flow.
 const UPDATE_EVENT: &str = "lune://update";
 
@@ -229,8 +243,33 @@ fn apply_endpoint_override(
         })
 }
 
+/// Answer a check made while [`UPDATES_ENABLED`] is off.
+///
+/// A launch check nobody asked for stays silent, exactly as it does when the
+/// network is down at login; a check the user clicked still gets an answer, in
+/// the window that answer has to land in.
+fn report_updates_disabled(app: &AppHandle, mode: CheckMode, current: &str) {
+    if !mode.reports_non_events() {
+        return;
+    }
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || crate::create_or_focus_main_window(&handle));
+    publish(
+        app,
+        UpdateStateDto {
+            message: Some(DISABLED_MESSAGE.to_string()),
+            ..UpdateStateDto::phase(UpdatePhaseDto::CheckFailed, current)
+        },
+    );
+}
+
 pub async fn run_update_check(app: &AppHandle, mode: CheckMode) {
     let current = app.package_info().version.to_string();
+
+    if !UPDATES_ENABLED {
+        report_updates_disabled(app, mode, &current);
+        return;
+    }
 
     if mode.reports_non_events() {
         // The user asked, so give the answer somewhere to land: the tray item
@@ -497,6 +536,40 @@ pub async fn dismiss_update(
     let current = app.package_info().version.to_string();
     *lock(&flow.state) = UpdateStateDto::phase(UpdatePhaseDto::Idle, &current);
     Ok(())
+}
+
+#[cfg(test)]
+mod gate_tests {
+    use super::*;
+
+    /// The configured endpoint is a release asset on a private repo, which
+    /// GitHub serves as a 404 to the unauthenticated request the plugin makes.
+    /// Until that changes, every check would end in `CheckFailed`, so the flow
+    /// is off rather than reliably broken.
+    // Pinning a constant is the whole point here: this test is the thing that
+    // fails, with the reason attached, when someone flips the flag back on.
+    #[allow(clippy::assertions_on_constants)]
+    #[test]
+    fn update_checks_are_disabled() {
+        assert!(
+            !UPDATES_ENABLED,
+            "re-enable only once the release assets are anonymously reachable"
+        );
+    }
+
+    /// The disabled notice lands verbatim in the update modal, so it must read
+    /// as a sentence to a user and name no endpoint, repo or HTTP status.
+    #[test]
+    fn the_disabled_notice_is_user_facing() {
+        let msg = DISABLED_MESSAGE;
+        assert!(msg.ends_with('.'), "should be a sentence: {msg}");
+        for leak in ["http", "github", "404", "endpoint", "repo"] {
+            assert!(
+                !msg.to_ascii_lowercase().contains(leak),
+                "leaks {leak:?} at the user: {msg}"
+            );
+        }
+    }
 }
 
 #[cfg(test)]

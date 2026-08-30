@@ -64,16 +64,31 @@ const CUDA_PLUGIN_FILE: &str = "libggml-cuda.so";
 /// instead of downloading something it cannot verify.
 pub const UNPUBLISHED: &str = "UNPUBLISHED";
 
+/// Digest of the `gpu-cuda13-v1` Linux archive, measured from the local build
+/// artifact via the generated `.sha256` file.
+///
+/// Parked rather than pinned: the release lives on a private repo, where
+/// GitHub answers anonymous asset requests with a 404 and [`install`] sends no
+/// credentials, so a download offered here could never succeed. Once the
+/// assets are anonymously reachable — the repo goes public, or the archives
+/// move to a host that serves them — set `CUDA_LINUX_X86_64.sha256` back to
+/// this and restore `download_bytes`.
+pub const CUDA_LINUX_X86_64_SHA256: &str =
+    "c4fd2a60bd392a5d08a9f92fcf011880609bc40bf1ffd1654b60255036d57883";
+
+/// Compressed size of that same archive, parked alongside its digest.
+pub const CUDA_LINUX_X86_64_BYTES: u64 = 493_568_081;
+
 /// The CUDA backend for Linux x86-64.
 ///
-/// `sha256` is the digest of the published `gpu-cuda13-v1` archive (from the
-/// generated `.sha256` file), verified against the local build artifact. Keep
-/// it in sync with whatever is uploaded to the GitHub release — a tampered or
-/// mismatched archive is refused at install.
+/// Unpublished while the release assets are unreachable — see
+/// [`CUDA_LINUX_X86_64_SHA256`] for the pin to restore and why it is parked.
+/// The digest is what makes a download safe on an untrusted host, so it is
+/// kept intact rather than deleted.
 pub const CUDA_LINUX_X86_64: GpuPluginRelease = GpuPluginRelease {
     url: "https://github.com/CoderDayton/lune-voice/releases/download/gpu-cuda13-v1/\
           lune-voice-gpu-cuda13-linux-x86_64.tar.gz",
-    sha256: "c4fd2a60bd392a5d08a9f92fcf011880609bc40bf1ffd1654b60255036d57883",
+    sha256: UNPUBLISHED,
     // Measured from `cgs gpu-plugin` on CUDA 13.1, covering sm_75/86/89/120a
     // with compute_75 PTX. Unpacked it is 664 MB, three quarters of which is
     // NVIDIA's cuBLASLt, and that part is irreducible: ggml calls no cuBLASLt symbol
@@ -82,7 +97,7 @@ pub const CUDA_LINUX_X86_64: GpuPluginRelease = GpuPluginRelease {
     // relocatable device code, and static linking with --gc-sections was
     // measured at 541 MB for the ten cuBLAS entry points ggml uses — the
     // dispatcher reaches every kernel object, so nothing is prunable.
-    download_bytes: 493_568_081,
+    download_bytes: 0,
     cuda_major: 13,
 };
 
@@ -842,25 +857,32 @@ mod tests {
         );
     }
 
-    /// The shipped Linux CUDA release must carry a real, well-formed digest —
-    /// a reversion to [`UNPUBLISHED`] (or a truncated paste) would silently
-    /// disable the GPU install that release advertises. Guards the release
-    /// process: when a new `gpu-cuda*` archive is published, update the pin
-    /// and this test keeps it honest.
+    /// No release is downloadable while the repo is private: GitHub serves a
+    /// 404 for release assets to anonymous requests, and [`install`] sends no
+    /// credentials. Offering the download would be a button that always fails,
+    /// so both platforms stay [`UNPUBLISHED`] until the assets are reachable.
+    ///
+    /// When they are, flip the digests back on and this test with them.
     #[test]
-    fn the_cuda_linux_release_has_a_pinned_digest() {
+    fn no_release_is_published_while_the_assets_are_unreachable() {
         assert!(
-            CUDA_LINUX_X86_64.is_published(),
-            "the CUDA Linux release must be published (digest pinned)"
+            !CUDA_LINUX_X86_64.is_published(),
+            "the release assets are not anonymously downloadable yet"
         );
+        assert!(!CUDA_WINDOWS_X86_64.is_published());
+    }
+
+    /// The digest parked for republication must stay a well-formed SHA-256, so
+    /// restoring it is a one-line edit rather than a re-measurement.
+    #[test]
+    fn the_parked_linux_digest_is_still_well_formed() {
         assert_eq!(
-            CUDA_LINUX_X86_64.sha256.len(),
+            CUDA_LINUX_X86_64_SHA256.len(),
             64,
             "expected a 64-char lowercase hex SHA-256"
         );
         assert!(
-            CUDA_LINUX_X86_64
-                .sha256
+            CUDA_LINUX_X86_64_SHA256
                 .chars()
                 .all(|c| c.is_ascii_hexdigit()),
             "digest must be lowercase hex"
