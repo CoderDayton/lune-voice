@@ -3,6 +3,7 @@ import { useStore } from '@tanstack/react-store';
 import { CheckCheck, Mic, Pencil, Plus, ScrollText, Trash2, X } from 'lucide-react';
 import { type FormEvent, type Ref, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ConfirmDialog } from '../../components/feedback/confirm-dialog';
+import { Fold } from '../../components/ui/fold';
 import {
   LIST_HEAD_BAR,
   LIST_ROW,
@@ -175,11 +176,14 @@ function SnippetsContent() {
 
   return (
     <div className="page-stack min-h-0 flex-1">
-      {!collapsed ? (
+      {/* The bar and the composer occupy the same slot, so the composer grows
+          out of the row that was clicked instead of appearing above it. The
+          bar is only hidden once the unfold has started, which is why it keys
+          off `open` rather than waiting for `collapsed`. */}
+      <Fold open={!collapsed} className="shrink-0">
         <SnippetComposer composer={composer} onClose={close} />
-      ) : (
-        hasSnippets && <NewSnippetBar ref={barRef} onClick={() => setOpen(true)} />
-      )}
+      </Fold>
+      {collapsed && hasSnippets && <NewSnippetBar ref={barRef} onClick={() => setOpen(true)} />}
       <section aria-label={t`Saved snippets`} className="flex min-h-0 flex-1 flex-col">
         <SnippetList onEdit={composer.startEdit} onNew={() => setOpen(true)} />
       </section>
@@ -404,7 +408,10 @@ function SnippetList({
       />
 
       <div className={LIST_HEAD_BAR}>
-        <span className="w-40 shrink-0 sm:w-56">
+        {/* The rows lead with a mic glyph, so the label has to clear the same
+            width or the column reads as two columns that missed each other. */}
+        <span className="flex w-40 shrink-0 items-center gap-1.5 sm:w-56">
+          <Mic size={13} strokeWidth={2} className="invisible shrink-0" aria-hidden="true" />
           <Trans>Trigger</Trans>
         </span>
         <span className="min-w-0 flex-1">
