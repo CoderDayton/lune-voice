@@ -180,11 +180,11 @@ msgstr "Comportamento do aplicativo e preferências de inicialização."
 msgid "Applied on every dictation · highest priority first"
 msgstr "Aplicado em cada ditado · maior prioridade primeiro"
 
-#: src/features/updates/update-dialog.tsx:151
+#: src/features/updates/update-dialog.tsx:152
 msgid "Applying Lune Voice {version}. Your system may ask for your password, and the app will restart on its own."
 msgstr "Instalando o Lune Voice {version}. O sistema pode pedir sua senha, e o aplicativo será reiniciado sozinho."
 
-#: src/features/updates/update-dialog.tsx:116
+#: src/features/updates/update-dialog.tsx:117
 msgid "Asking the release server whether anything newer than {currentVersion} exists."
 msgstr "Perguntando ao servidor de versões se existe algo mais recente que a {currentVersion}."
 
@@ -216,6 +216,10 @@ msgstr "Auto-capitalizar frases"
 #: src/features/settings/sections/pill-section.tsx:51
 msgid "Automatic"
 msgstr "Automático"
+
+#: src/features/updates/update-dialog.tsx:102
+msgid "Automatic updates are off"
+msgstr ""
 
 #: src/features/welcome/components/ready-checks.tsx:83
 msgid "Before you start"
@@ -336,7 +340,7 @@ msgstr "Escolha como as transcrições são reescritas: enviadas a um endpoint c
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "Escolha os modelos de IA a serem instalados. Tudo funciona offline – sem nuvem, sem contas."
 
-#: src/features/settings/sections/transcription-section.tsx:42
+#: src/features/settings/sections/transcription-section.tsx:47
 msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
 msgstr "Escolha o motor que transforma sua fala em texto. Os motores locais funcionam totalmente no dispositivo; o Whisper é multilíngue com tamanhos de modelo selecionáveis."
 
@@ -360,8 +364,8 @@ msgstr "fechar"
 #: src/features/history/components/session-detail-modal.tsx:210
 #: src/features/settings/sections/models-section.tsx:322
 #: src/features/styles/components/style-editor-modal.tsx:197
-#: src/features/updates/update-dialog.tsx:241
-#: src/features/updates/update-dialog.tsx:253
+#: src/features/updates/update-dialog.tsx:251
+#: src/features/updates/update-dialog.tsx:263
 msgid "Close"
 msgstr "Fechar"
 
@@ -392,7 +396,7 @@ msgstr "Contata o servidor de versões pouco depois da inicialização e avisa a
 msgid "Continue"
 msgstr "Continuar"
 
-#: src/features/settings/sections/transcription-section.tsx:37
+#: src/features/settings/sections/transcription-section.tsx:42
 msgid "Control how your speech is turned into text."
 msgstr "Controle como sua fala é transformada em texto."
 
@@ -421,12 +425,12 @@ msgstr "Arredondamento dos cantos da barra indicadora."
 msgid "Corners"
 msgstr "Cantos"
 
-#: src/features/settings/sections/transcription-section.tsx:95
+#: src/features/settings/sections/transcription-section.tsx:114
 msgid "Correction"
 msgstr "Correção"
 
-#: src/features/settings/sections/transcription-section.tsx:100
-#: src/features/settings/sections/transcription-section.tsx:115
+#: src/features/settings/sections/transcription-section.tsx:119
+#: src/features/settings/sections/transcription-section.tsx:134
 msgid "Correction sensitivity"
 msgstr "Sensibilidade de correção"
 
@@ -554,8 +558,8 @@ msgstr "Correções determinísticas aplicadas antes de qualquer estilo de IA."
 msgid "Dictation"
 msgstr "Ditado"
 
-#: src/features/settings/sections/transcription-section.tsx:58
-#: src/features/settings/sections/transcription-section.tsx:64
+#: src/features/settings/sections/transcription-section.tsx:63
+#: src/features/settings/sections/transcription-section.tsx:69
 msgid "Dictation language"
 msgstr "Linguagem de ditado"
 
@@ -727,7 +731,7 @@ msgstr "Expandir barra lateral"
 msgid "Feature request"
 msgstr "Pedido de recurso"
 
-#: src/features/updates/update-dialog.tsx:141
+#: src/features/updates/update-dialog.tsx:142
 msgid "Fetching Lune Voice {version}. Keep the app open until it finishes."
 msgstr "Baixando o Lune Voice {version}. Mantenha o aplicativo aberto até terminar."
 
@@ -755,7 +759,7 @@ msgstr "Filtrar trechos"
 msgid "Filter snippets…"
 msgstr "Filtrar trechos…"
 
-#: src/features/settings/sections/transcription-section.tsx:96
+#: src/features/settings/sections/transcription-section.tsx:115
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "Corrige os erros do reconhecedor com seu dicionário e vocabulário conhecido, no seu dispositivo. Ele usa a confiança por palavra e padrões estatísticos — sem modelo de IA, e nunca reescreve o que você disse."
 
@@ -771,6 +775,11 @@ msgstr "formatação"
 #: src/features/styles/components/style-hero.tsx:54
 msgid "Formatting"
 msgstr "Formatação"
+
+#: src/features/settings/sections/transcription-section.tsx:93
+#: src/features/settings/sections/transcription-section.tsx:99
+msgid "Free the model when idle"
+msgstr ""
 
 #: src/features/settings/sections/pill-section.tsx:125
 msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock."
@@ -797,6 +806,10 @@ msgstr "GitHub"
 #: src/features/dictionary/components/dictionary-form.tsx:88
 msgid "GitHub"
 msgstr "GitHub"
+
+#: src/features/settings/sections/transcription-section.tsx:94
+msgid "Give the memory back after a quiet spell. The next dictation reloads the model, which adds up to a second before it starts listening — your speech is recorded during the wait, so nothing is lost."
+msgstr ""
 
 #: src/features/overview/overview-page.tsx:283
 msgid "Good afternoon."
@@ -882,7 +895,7 @@ msgstr "Inserir no cursor"
 msgid "Insert placeholder"
 msgstr "Inserir marcador"
 
-#: src/features/updates/update-dialog.tsx:228
+#: src/features/updates/update-dialog.tsx:238
 msgid "Install and restart"
 msgstr "Instalar e reiniciar"
 
@@ -898,7 +911,7 @@ msgstr "Instalado"
 msgid "Installed. Restart Lune Voice to start using your GPU."
 msgstr "Instalado. Reinicie o Lune Voice para começar a usar sua GPU."
 
-#: src/features/updates/update-dialog.tsx:132
+#: src/features/updates/update-dialog.tsx:133
 msgid "Installing replaces the app and restarts it. Your settings, history and models are untouched."
 msgstr "A instalação substitui o aplicativo e o reinicia. Suas configurações, seu histórico e seus modelos não são alterados."
 
@@ -917,10 +930,6 @@ msgstr "Participar das discussões"
 #: src/features/settings/sections/output-section.tsx:55
 msgid "Keep the dictated text on the clipboard after every dictation, so you can paste it again yourself."
 msgstr "Mantém o texto ditado na área de transferência após cada ditado, para que você possa colá-lo novamente por conta própria."
-
-#: src/features/settings/sections/dictation-section.tsx:139
-msgid "Keep the mic open in the background so dictation starts ~70ms sooner. The OS may show a recording indicator while Lune Voice is running."
-msgstr "Mantenha o microfone aberto em segundo plano para que o ditado comece cerca de 70 ms antes. O sistema operacional pode mostrar um indicador de gravação enquanto o Lune Voice está em execução."
 
 #: src/features/settings/sections/pill-section.tsx:89
 msgid "Keep the pill with you when you switch workspaces or virtual desktops."
@@ -944,7 +953,7 @@ msgstr "Atalhos de teclado (\"Super H\" → \"Super+H\")"
 msgid "Language"
 msgstr "Linguagem"
 
-#: src/features/updates/update-dialog.tsx:224
+#: src/features/updates/update-dialog.tsx:234
 msgid "Later"
 msgstr "Mais tarde"
 
@@ -992,11 +1001,11 @@ msgstr "Procurando dispositivos de entrada…"
 msgid "Lune"
 msgstr "Lua"
 
-#: src/features/updates/update-dialog.tsx:122
+#: src/features/updates/update-dialog.tsx:123
 msgid "Lune Voice {currentVersion} is the latest version."
 msgstr "O Lune Voice {currentVersion} é a versão mais recente."
 
-#: src/features/updates/update-dialog.tsx:129
+#: src/features/updates/update-dialog.tsx:130
 msgid "Lune Voice {version} is available. You have {currentVersion}."
 msgstr "O Lune Voice {version} está disponível. Você tem a {currentVersion}."
 
@@ -1261,11 +1270,6 @@ msgstr "Por favor, mantenha o aplicativo aberto até que os downloads terminem"
 msgid "Position"
 msgstr "Posição"
 
-#: src/features/settings/sections/dictation-section.tsx:138
-#: src/features/settings/sections/dictation-section.tsx:146
-msgid "Pre-warm microphone"
-msgstr "Microfone pré-aquecido"
-
 #: src/features/settings/sections/pill-section.tsx:111
 msgid "Preset corner or edge the pill starts at."
 msgstr "Canto ou borda predefinida onde o indicador começa."
@@ -1490,7 +1494,7 @@ msgstr "sessões"
 msgid "Set hotkey"
 msgstr "Definir tecla de atalho"
 
-#: src/features/settings/sections/transcription-section.tsx:59
+#: src/features/settings/sections/transcription-section.tsx:64
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "Defina o idioma que você fala. Auto usa detecção de fala."
 
@@ -1666,7 +1670,7 @@ msgstr "O principal atalho usado para digitação por voz. Clique na ligação p
 msgid "The microphone is in use"
 msgstr "O microfone está em uso"
 
-#: src/features/settings/sections/transcription-section.tsx:101
+#: src/features/settings/sections/transcription-section.tsx:120
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
 msgstr "As palavras sobre as quais o reconhecedor tem menos certeza são verificadas em relação ao seu dicionário e vocabulário. Um valor mais alto verifica mais palavras; mais baixo confia na transcrição bruta."
 
@@ -1686,7 +1690,7 @@ msgstr "Este modelo está em uso pela sua configuração atual. O ditado pode n�
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "Isso só acontece uma vez. Você pode continuar usando seu computador enquanto isso."
 
-#: src/features/updates/update-dialog.tsx:217
+#: src/features/updates/update-dialog.tsx:227
 msgid "This only takes a moment."
 msgstr "Isso leva só um instante."
 
@@ -1745,7 +1749,7 @@ msgstr "Transcrevendo…"
 msgid "Transcript"
 msgstr "Transcrição"
 
-#: src/features/settings/sections/transcription-section.tsx:36
+#: src/features/settings/sections/transcription-section.tsx:41
 #: src/features/settings/settings-page.tsx:76
 msgid "Transcription"
 msgstr "Transcrição"
@@ -1779,7 +1783,7 @@ msgstr "Ativador"
 msgid "Trigger phrase"
 msgstr "Frase de ativação"
 
-#: src/features/updates/update-dialog.tsx:245
+#: src/features/updates/update-dialog.tsx:255
 msgid "Try again"
 msgstr "Tentar novamente"
 
@@ -1799,7 +1803,7 @@ msgstr "Atualização disponível"
 msgid "Update check failed"
 msgstr "Falha ao procurar atualizações"
 
-#: src/features/updates/update-dialog.tsx:102
+#: src/features/updates/update-dialog.tsx:103
 msgid "Update failed"
 msgstr "Falha na atualização"
 
@@ -1811,8 +1815,8 @@ msgstr "Atualizações"
 msgid "Use GPU acceleration"
 msgstr "Usar aceleração por GPU"
 
-#: src/features/settings/sections/transcription-section.tsx:75
-#: src/features/settings/sections/transcription-section.tsx:83
+#: src/features/settings/sections/transcription-section.tsx:80
+#: src/features/settings/sections/transcription-section.tsx:88
 msgid "Use hardware acceleration"
 msgstr "Usar aceleração de hardware"
 
@@ -1842,7 +1846,7 @@ msgstr "Ver estilo"
 msgid "Visibility"
 msgstr "Visibilidade"
 
-#: src/features/settings/sections/transcription-section.tsx:41
+#: src/features/settings/sections/transcription-section.tsx:46
 msgid "Voice model"
 msgstr "Modelo de voz"
 
@@ -1872,11 +1876,11 @@ msgstr "O que aconteceu, ou o que você gostaria de ver?"
 msgid "What is this about?"
 msgstr "Sobre o que é isto?"
 
-#: src/features/updates/update-dialog.tsx:198
+#: src/features/updates/update-dialog.tsx:208
 msgid "What's new"
 msgstr "Novidades"
 
-#: src/features/settings/sections/transcription-section.tsx:76
+#: src/features/settings/sections/transcription-section.tsx:81
 msgid "When available, this can make transcription finish faster."
 msgstr "Quando disponível, isso pode acelerar a conclusão da transcrição."
 

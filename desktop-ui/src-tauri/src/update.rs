@@ -258,7 +258,11 @@ fn report_updates_disabled(app: &AppHandle, mode: CheckMode, current: &str) {
         app,
         UpdateStateDto {
             message: Some(DISABLED_MESSAGE.to_string()),
-            ..UpdateStateDto::phase(UpdatePhaseDto::CheckFailed, current)
+            // `Disabled`, not `CheckFailed`: nothing failed. The failure phase
+            // heads the modal "Update check failed", paints the notice as an
+            // error and offers "Try again" — which is exactly the "broken app"
+            // impression this whole gate exists to avoid.
+            ..UpdateStateDto::phase(UpdatePhaseDto::Disabled, current)
         },
     );
 }

@@ -21,9 +21,7 @@ use lune_voice::{DeliveryService, SessionManager, SessionManagerConfig};
 use lune_voice::{WindowTarget, capture_focus_target};
 use tauri::{AppHandle, Emitter, Manager, ipc::Channel};
 use tokio::sync::{Mutex, RwLock, mpsc};
-#[cfg(unix)]
-use tracing::info;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 use crate::dto::SessionStreamEvent;
 
@@ -451,15 +449,23 @@ impl AppRuntime {
     }
 
     async fn prewarmed_handle(&self) -> Option<lune_audio::AudioStreamHandle> {
-        let slot = self.inner.prewarmed_audio.lock().await;
+        let mut slot = self.inner.prewarmed_audio.lock().await;
         // A stream cpal has reported an error on still hands out handles, but
         // they never produce a chunk — and nothing rebuilds the stream until
-        // the next settings save. Report it as absent so the start path falls
-        // back to `open_capture_for_start` and the dictation actually records,
-        // instead of running the 5 s starvation watchdog on a dead ring.
-        slot.as_ref()
-            .filter(|p| !p.stream.has_failed())
-            .map(|p| p.stream.handle())
+        // the next settings save. Drop it here so the start path falls back to
+        // `open_capture_for_start` and the dictation actually records, instead
+        // of running the 5 s starvation watchdog on a dead ring.
+        //
+        // Dropped rather than merely skipped: a dead stream still owns its
+        // device handle and capture thread, and the fallback is about to open
+        // the same device. Leaving it in place would keep that handle for the
+        // life of the process (nothing rebuilds it until a settings save) and
+        // make every later start race it for an exclusive capture device.
+        if slot.as_ref().is_some_and(|p| p.stream.has_failed()) {
+            warn!("mic prewarm: the open capture stream reported an error; dropping it");
+            *slot = None;
+        }
+        slot.as_ref().map(|p| p.stream.handle())
     }
 
     /// Open a capture stream for one session, for the case where the
@@ -1409,6 +1415,12 @@ impl AppRuntime {
                     .read()
                     .await
                     .model_idle_unload_minutes
+                    // Zero means off, not "unload the moment a dictation ends".
+                    // `apply_settings_dto` normalizes it on the save path, but a
+                    // hand-edited settings.toml never passes through that — and
+                    // a zero timeout here would free the model after every
+                    // utterance and pay a reload on the next one.
+                    .filter(|&m| m > 0)
                     .map(|m| Duration::from_secs(u64::from(m) * 60));
 
                 let (busy, loaded) = {

@@ -180,11 +180,11 @@ msgstr "एप्लिकेशन व्यवहार और स्टार
 msgid "Applied on every dictation · highest priority first"
 msgstr "हर डिक्टेशन पर लागू · सर्वोच्च प्राथमिकता पहले"
 
-#: src/features/updates/update-dialog.tsx:151
+#: src/features/updates/update-dialog.tsx:152
 msgid "Applying Lune Voice {version}. Your system may ask for your password, and the app will restart on its own."
 msgstr "Lune Voice {version} इंस्टॉल किया जा रहा है। सिस्टम आपका पासवर्ड माँग सकता है, और ऐप अपने आप दोबारा चालू हो जाएगा।"
 
-#: src/features/updates/update-dialog.tsx:116
+#: src/features/updates/update-dialog.tsx:117
 msgid "Asking the release server whether anything newer than {currentVersion} exists."
 msgstr "रिलीज़ सर्वर से पूछा जा रहा है कि {currentVersion} से नया कुछ है या नहीं।"
 
@@ -216,6 +216,10 @@ msgstr "वाक्यों की शुरुआत अपने-आप ब�
 #: src/features/settings/sections/pill-section.tsx:51
 msgid "Automatic"
 msgstr "स्वतः"
+
+#: src/features/updates/update-dialog.tsx:102
+msgid "Automatic updates are off"
+msgstr ""
 
 #: src/features/welcome/components/ready-checks.tsx:83
 msgid "Before you start"
@@ -336,7 +340,7 @@ msgstr "चुनें कि प्रतिलेखों को कैस�
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "इंस्टॉल करने के लिए AI मॉडल चुनें. सब कुछ ऑफ़लाइन चलता है - कोई क्लाउड नहीं, कोई खाता नहीं।"
 
-#: src/features/settings/sections/transcription-section.tsx:42
+#: src/features/settings/sections/transcription-section.tsx:47
 msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
 msgstr "वह इंजन चुनें जो आपकी बोली को टेक्स्ट में बदलता है। लोकल इंजन पूरी तरह डिवाइस पर चलते हैं; Whisper बहुभाषी है और इसमें चुनने योग्य मॉडल आकार हैं।"
 
@@ -360,8 +364,8 @@ msgstr "बंद करना"
 #: src/features/history/components/session-detail-modal.tsx:210
 #: src/features/settings/sections/models-section.tsx:322
 #: src/features/styles/components/style-editor-modal.tsx:197
-#: src/features/updates/update-dialog.tsx:241
-#: src/features/updates/update-dialog.tsx:253
+#: src/features/updates/update-dialog.tsx:251
+#: src/features/updates/update-dialog.tsx:263
 msgid "Close"
 msgstr "बंद करें"
 
@@ -392,7 +396,7 @@ msgstr "शुरू होने के थोड़ी देर बाद र
 msgid "Continue"
 msgstr "जारी रखें"
 
-#: src/features/settings/sections/transcription-section.tsx:37
+#: src/features/settings/sections/transcription-section.tsx:42
 msgid "Control how your speech is turned into text."
 msgstr "नियंत���रित करें कि आपका भाषण पाठ में कैसे परिवर्तित होता है।"
 
@@ -421,12 +425,12 @@ msgstr "संकेतक पट्टी के कोनों की गो�
 msgid "Corners"
 msgstr "कोने"
 
-#: src/features/settings/sections/transcription-section.tsx:95
+#: src/features/settings/sections/transcription-section.tsx:114
 msgid "Correction"
 msgstr "सुधार"
 
-#: src/features/settings/sections/transcription-section.tsx:100
-#: src/features/settings/sections/transcription-section.tsx:115
+#: src/features/settings/sections/transcription-section.tsx:119
+#: src/features/settings/sections/transcription-section.tsx:134
 msgid "Correction sensitivity"
 msgstr "सुधार संवेदनशीलता"
 
@@ -554,8 +558,8 @@ msgstr "किसी भी एआई स्टाइलिंग से पह�
 msgid "Dictation"
 msgstr "डिक्टेशन"
 
-#: src/features/settings/sections/transcription-section.tsx:58
-#: src/features/settings/sections/transcription-section.tsx:64
+#: src/features/settings/sections/transcription-section.tsx:63
+#: src/features/settings/sections/transcription-section.tsx:69
 msgid "Dictation language"
 msgstr "श्रुतलेख भाषा"
 
@@ -727,7 +731,7 @@ msgstr "साइडबार का विस्तार करें"
 msgid "Feature request"
 msgstr "फ़ीचर का अनुरोध"
 
-#: src/features/updates/update-dialog.tsx:141
+#: src/features/updates/update-dialog.tsx:142
 msgid "Fetching Lune Voice {version}. Keep the app open until it finishes."
 msgstr "Lune Voice {version} डाउनलोड हो रहा है। पूरा होने त��� ऐप खुला रखें।"
 
@@ -755,7 +759,7 @@ msgstr "स्निपेट फ़िल्टर करें"
 msgid "Filter snippets…"
 msgstr "स्निपेट फ़िल्टर करें…"
 
-#: src/features/settings/sections/transcription-section.tsx:96
+#: src/features/settings/sections/transcription-section.tsx:115
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "अपने डिवाइस पर, अपनी डिक्शनरी और ज्ञात शब्दावली से रिकग्नाइज़र की त���रुटियाँ ठीक करें। यह प्रति-शब्द कॉन्फ़िडेंस और सांख्यिकीय पैटर्न का उपयोग करता है — कोई AI मॉडल नहीं, और यह आपकी कही बात को कभी दोबारा नहीं लिखता।"
 
@@ -771,6 +775,11 @@ msgstr "फ़ॉर्मेटिंग"
 #: src/features/styles/components/style-hero.tsx:54
 msgid "Formatting"
 msgstr "फ़ॉर्मेटिंग"
+
+#: src/features/settings/sections/transcription-section.tsx:93
+#: src/features/settings/sections/transcription-section.tsx:99
+msgid "Free the model when idle"
+msgstr ""
 
 #: src/features/settings/sections/pill-section.tsx:125
 msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock."
@@ -797,6 +806,10 @@ msgstr "GitHub"
 #: src/features/dictionary/components/dictionary-form.tsx:88
 msgid "GitHub"
 msgstr "GitHub"
+
+#: src/features/settings/sections/transcription-section.tsx:94
+msgid "Give the memory back after a quiet spell. The next dictation reloads the model, which adds up to a second before it starts listening — your speech is recorded during the wait, so nothing is lost."
+msgstr ""
 
 #: src/features/overview/overview-page.tsx:283
 msgid "Good afternoon."
@@ -882,7 +895,7 @@ msgstr "कर्सर पर डालें"
 msgid "Insert placeholder"
 msgstr "प्लेसहोल्डर डालें"
 
-#: src/features/updates/update-dialog.tsx:228
+#: src/features/updates/update-dialog.tsx:238
 msgid "Install and restart"
 msgstr "इंस्टॉल करें और दोबारा चालू करें"
 
@@ -898,7 +911,7 @@ msgstr "स्थापित"
 msgid "Installed. Restart Lune Voice to start using your GPU."
 msgstr "स्थापित��� अपने GPU का उपयोग शुरू करने के लिए Lune Voice को पुनरारंभ करें।"
 
-#: src/features/updates/update-dialog.tsx:132
+#: src/features/updates/update-dialog.tsx:133
 msgid "Installing replaces the app and restarts it. Your settings, history and models are untouched."
 msgstr "इंस्टॉल करने पर ऐप बदल जाता है और दोबारा चालू होता है। आपकी सेटिंग्स, इत���हास और मॉडल जैसे थे वैसे ही रहते हैं।"
 
@@ -917,10 +930,6 @@ msgstr "चर्चाओं में शामिल हों"
 #: src/features/settings/sections/output-section.tsx:55
 msgid "Keep the dictated text on the clipboard after every dictation, so you can paste it again yourself."
 msgstr "हर श्रुतलेख के बाद बोले गए पाठ को क्लिपबोर्ड पर रखें, ताकि आप उसे स्वयं फिर से चिपका सकें।"
-
-#: src/features/settings/sections/dictation-section.tsx:139
-msgid "Keep the mic open in the background so dictation starts ~70ms sooner. The OS may show a recording indicator while Lune Voice is running."
-msgstr "माइक को बैकग्राउंड में खुला रखें ताकि डिक्टेशन ~70 एमएस पहले शुरू हो जाए। Lune Voice चलते समय OS रिकॉर्डिंग संकेतक दिखा सकता है।"
 
 #: src/features/settings/sections/pill-section.tsx:89
 msgid "Keep the pill with you when you switch workspaces or virtual desktops."
@@ -944,7 +953,7 @@ msgstr "कीबोर्ड शॉर्टकट (\"सुपर एच\" →
 msgid "Language"
 msgstr "भाषा"
 
-#: src/features/updates/update-dialog.tsx:224
+#: src/features/updates/update-dialog.tsx:234
 msgid "Later"
 msgstr "बाद में"
 
@@ -992,11 +1001,11 @@ msgstr "इनपुट डिवाइस खोजे जा रहे है�
 msgid "Lune"
 msgstr "Lune"
 
-#: src/features/updates/update-dialog.tsx:122
+#: src/features/updates/update-dialog.tsx:123
 msgid "Lune Voice {currentVersion} is the latest version."
 msgstr "Lune Voice {currentVersion} ही नवीनतम संस्करण है।"
 
-#: src/features/updates/update-dialog.tsx:129
+#: src/features/updates/update-dialog.tsx:130
 msgid "Lune Voice {version} is available. You have {currentVersion}."
 msgstr "Lune Voice {version} उपलब्ध है। आपके पास {currentVersion} है।"
 
@@ -1261,11 +1270,6 @@ msgstr "कृपया डाउनलोड समाप्त होने �
 msgid "Position"
 msgstr "स्थिति"
 
-#: src/features/settings/sections/dictation-section.tsx:138
-#: src/features/settings/sections/dictation-section.tsx:146
-msgid "Pre-warm microphone"
-msgstr "प्री-वार्म माइक्रोफोन"
-
 #: src/features/settings/sections/pill-section.tsx:111
 msgid "Preset corner or edge the pill starts at."
 msgstr "वह पूर्वनिर्धारित कोना या किनारा जहाँ से संकेत��� शुरू होता है।"
@@ -1490,7 +1494,7 @@ msgstr "सत���र"
 msgid "Set hotkey"
 msgstr "हॉटकी सेट करें"
 
-#: src/features/settings/sections/transcription-section.tsx:59
+#: src/features/settings/sections/transcription-section.tsx:64
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "आप जो भाषा बोलत��� हैं उसे सेट करें. स्वतः वाणी से पता लगाने का उपयोग करता है।"
 
@@ -1666,7 +1670,7 @@ msgstr "ध्वनि टाइपिंग के लिए उपयोग �
 msgid "The microphone is in use"
 msgstr "माइक्रोफ़ोन उपयोग में है"
 
-#: src/features/settings/sections/transcription-section.tsx:101
+#: src/features/settings/sections/transcription-section.tsx:120
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
 msgstr "जिन शब्दों को लेकर रिकग्नाइज़र सबसे कम आश्वस्त होता है, उन्हें आपकी डिक्शनरी और शब्दावली से मिलाया जाता है। अधिक सेटिंग ज़्यादा शब्द जाँचती है; कम सेटिंग कच्चे ट्रांसक्रिप्शन पर भरोसा करती है।"
 
@@ -1686,7 +1690,7 @@ msgstr "यह मॉडल आपके मौजूदा कॉन्फ़�
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "ऐसा केवल एक बार होता है. इस बीच आप अपने कंप्यूटर का उपयोग जारी रख सकते हैं."
 
-#: src/features/updates/update-dialog.tsx:217
+#: src/features/updates/update-dialog.tsx:227
 msgid "This only takes a moment."
 msgstr "इसमें बस एक पल लगता है।"
 
@@ -1745,7 +1749,7 @@ msgstr "प्रतिलेख बन रहा है…"
 msgid "Transcript"
 msgstr "टेक्स्ट"
 
-#: src/features/settings/sections/transcription-section.tsx:36
+#: src/features/settings/sections/transcription-section.tsx:41
 #: src/features/settings/settings-page.tsx:76
 msgid "Transcription"
 msgstr "ट्रांसक्रिप्शन"
@@ -1779,7 +1783,7 @@ msgstr "ट्रिगर"
 msgid "Trigger phrase"
 msgstr "ट्रिगर वाक्यांश"
 
-#: src/features/updates/update-dialog.tsx:245
+#: src/features/updates/update-dialog.tsx:255
 msgid "Try again"
 msgstr "फिर कोशिश करें"
 
@@ -1799,7 +1803,7 @@ msgstr "अपडेट उपलब्ध है"
 msgid "Update check failed"
 msgstr "अपडेट की जाँच विफल रही"
 
-#: src/features/updates/update-dialog.tsx:102
+#: src/features/updates/update-dialog.tsx:103
 msgid "Update failed"
 msgstr "अपडेट विफल रहा"
 
@@ -1811,8 +1815,8 @@ msgstr "अपडेट"
 msgid "Use GPU acceleration"
 msgstr "GPU त���वरण का उपयोग करें"
 
-#: src/features/settings/sections/transcription-section.tsx:75
-#: src/features/settings/sections/transcription-section.tsx:83
+#: src/features/settings/sections/transcription-section.tsx:80
+#: src/features/settings/sections/transcription-section.tsx:88
 msgid "Use hardware acceleration"
 msgstr "हार्डवेयर त्वरण का प्रयोग करें"
 
@@ -1842,7 +1846,7 @@ msgstr "शैली देखें"
 msgid "Visibility"
 msgstr "दृश्यता"
 
-#: src/features/settings/sections/transcription-section.tsx:41
+#: src/features/settings/sections/transcription-section.tsx:46
 msgid "Voice model"
 msgstr "आवाज मॉडल"
 
@@ -1872,11 +1876,11 @@ msgstr "क्या हुआ, या आप क्या देखना च�
 msgid "What is this about?"
 msgstr "यह किस बारे में है?"
 
-#: src/features/updates/update-dialog.tsx:198
+#: src/features/updates/update-dialog.tsx:208
 msgid "What's new"
 msgstr "नया क्या है"
 
-#: src/features/settings/sections/transcription-section.tsx:76
+#: src/features/settings/sections/transcription-section.tsx:81
 msgid "When available, this can make transcription finish faster."
 msgstr "उपलब्ध होने पर, यह प्रत���लेखन को तेजी से पूरा कर सकता है।"
 

@@ -874,6 +874,9 @@ mod tests {
 
     /// The digest parked for republication must stay a well-formed SHA-256, so
     /// restoring it is a one-line edit rather than a re-measurement.
+    // Pinning constants is the whole point: this test is what fails, with the
+    // reason attached, if a parked value is emptied instead of restored.
+    #[allow(clippy::assertions_on_constants)]
     #[test]
     fn the_parked_linux_digest_is_still_well_formed() {
         assert_eq!(
@@ -887,6 +890,27 @@ mod tests {
                 .all(|c| c.is_ascii_hexdigit()),
             "digest must be lowercase hex"
         );
+        assert!(
+            CUDA_LINUX_X86_64_BYTES > 0,
+            "the parked size is half of what republishing restores"
+        );
+    }
+
+    /// Restoring a digest without its byte size is a silent footgun:
+    /// [`max_download_bytes`] scales `download_bytes`, so a published release
+    /// left at `0` caps the transfer at zero and refuses every legitimate byte
+    /// with a size complaint. Both halves go back together or neither does.
+    #[test]
+    fn a_published_release_must_declare_its_size() {
+        for release in [CUDA_LINUX_X86_64, CUDA_WINDOWS_X86_64] {
+            if release.is_published() {
+                assert!(
+                    release.download_bytes > 0,
+                    "{} pins a digest but no size — restore both",
+                    release.url
+                );
+            }
+        }
     }
 
     /// The Windows archive is not built yet, and the app must keep saying so

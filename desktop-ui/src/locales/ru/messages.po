@@ -180,11 +180,11 @@ msgstr "Поведение приложения и настройки запус
 msgid "Applied on every dictation · highest priority first"
 msgstr "Применяется при каждой диктовке · сначала с наивысшим приоритетом"
 
-#: src/features/updates/update-dialog.tsx:151
+#: src/features/updates/update-dialog.tsx:152
 msgid "Applying Lune Voice {version}. Your system may ask for your password, and the app will restart on its own."
 msgstr "Устанавливается Lune Voice {version}. Система может запросить пароль, а приложение перезапустится само."
 
-#: src/features/updates/update-dialog.tsx:116
+#: src/features/updates/update-dialog.tsx:117
 msgid "Asking the release server whether anything newer than {currentVersion} exists."
 msgstr "Запрос к серверу выпусков: есть ли что-то новее, чем {currentVersion}."
 
@@ -216,6 +216,10 @@ msgstr "Автоматически писать предложения с заг
 #: src/features/settings/sections/pill-section.tsx:51
 msgid "Automatic"
 msgstr "Автоматически"
+
+#: src/features/updates/update-dialog.tsx:102
+msgid "Automatic updates are off"
+msgstr ""
 
 #: src/features/welcome/components/ready-checks.tsx:83
 msgid "Before you start"
@@ -336,7 +340,7 @@ msgstr "Выберите, как переоформляются расшифро
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "Выберите модели искусственного интеллекта для установки. Все работает в автономном режиме — ни облака, ни учетных записей."
 
-#: src/features/settings/sections/transcription-section.tsx:42
+#: src/features/settings/sections/transcription-section.tsx:47
 msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
 msgstr "Выберите движок, который превращает вашу речь в текст. Локальные движки работают полностью на устройстве; Whisper многоязычен и предлагает выбор размеров модели."
 
@@ -360,8 +364,8 @@ msgstr "закрывать"
 #: src/features/history/components/session-detail-modal.tsx:210
 #: src/features/settings/sections/models-section.tsx:322
 #: src/features/styles/components/style-editor-modal.tsx:197
-#: src/features/updates/update-dialog.tsx:241
-#: src/features/updates/update-dialog.tsx:253
+#: src/features/updates/update-dialog.tsx:251
+#: src/features/updates/update-dialog.tsx:263
 msgid "Close"
 msgstr "Закрыть"
 
@@ -392,7 +396,7 @@ msgstr "Обращаться к серверу выпусков вскоре п�
 msgid "Continue"
 msgstr "Продолжить"
 
-#: src/features/settings/sections/transcription-section.tsx:37
+#: src/features/settings/sections/transcription-section.tsx:42
 msgid "Control how your speech is turned into text."
 msgstr "Контролируйте, как ваша речь превращается в текст."
 
@@ -421,12 +425,12 @@ msgstr "Скругление углов панели индикатора."
 msgid "Corners"
 msgstr "Углы"
 
-#: src/features/settings/sections/transcription-section.tsx:95
+#: src/features/settings/sections/transcription-section.tsx:114
 msgid "Correction"
 msgstr "Исправление"
 
-#: src/features/settings/sections/transcription-section.tsx:100
-#: src/features/settings/sections/transcription-section.tsx:115
+#: src/features/settings/sections/transcription-section.tsx:119
+#: src/features/settings/sections/transcription-section.tsx:134
 msgid "Correction sensitivity"
 msgstr "Чувствительность исправления"
 
@@ -554,8 +558,8 @@ msgstr "Детерминированные исправления применя
 msgid "Dictation"
 msgstr "Диктовка"
 
-#: src/features/settings/sections/transcription-section.tsx:58
-#: src/features/settings/sections/transcription-section.tsx:64
+#: src/features/settings/sections/transcription-section.tsx:63
+#: src/features/settings/sections/transcription-section.tsx:69
 msgid "Dictation language"
 msgstr "Язык диктанта"
 
@@ -727,7 +731,7 @@ msgstr "Развернуть боковую панель"
 msgid "Feature request"
 msgstr "Пожелание к функциям"
 
-#: src/features/updates/update-dialog.tsx:141
+#: src/features/updates/update-dialog.tsx:142
 msgid "Fetching Lune Voice {version}. Keep the app open until it finishes."
 msgstr "Загружается Lune Voice {version}. Не закрывайте приложение до завершения."
 
@@ -755,7 +759,7 @@ msgstr "Фильтр фрагментов"
 msgid "Filter snippets…"
 msgstr "Фильтр фрагментов…"
 
-#: src/features/settings/sections/transcription-section.tsx:96
+#: src/features/settings/sections/transcription-section.tsx:115
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "Исправляет ошибки распознавания с помощью вашего словаря и известной лексики — прямо на устройстве. Использует пословную уверенность и статистические закономерности — без модели ИИ, и никогда не переписывает сказанное вами."
 
@@ -771,6 +775,11 @@ msgstr "форматирование"
 #: src/features/styles/components/style-hero.tsx:54
 msgid "Formatting"
 msgstr "Форматирование"
+
+#: src/features/settings/sections/transcription-section.tsx:93
+#: src/features/settings/sections/transcription-section.tsx:99
+msgid "Free the model when idle"
+msgstr ""
 
 #: src/features/settings/sections/pill-section.tsx:125
 msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock."
@@ -797,6 +806,10 @@ msgstr "github"
 #: src/features/dictionary/components/dictionary-form.tsx:88
 msgid "GitHub"
 msgstr "GitHub"
+
+#: src/features/settings/sections/transcription-section.tsx:94
+msgid "Give the memory back after a quiet spell. The next dictation reloads the model, which adds up to a second before it starts listening — your speech is recorded during the wait, so nothing is lost."
+msgstr ""
 
 #: src/features/overview/overview-page.tsx:283
 msgid "Good afternoon."
@@ -882,7 +895,7 @@ msgstr "Вставить в позицию курсора"
 msgid "Insert placeholder"
 msgstr "Вставить заполнитель"
 
-#: src/features/updates/update-dialog.tsx:228
+#: src/features/updates/update-dialog.tsx:238
 msgid "Install and restart"
 msgstr "Установить и перезапустить"
 
@@ -898,7 +911,7 @@ msgstr "Установлено"
 msgid "Installed. Restart Lune Voice to start using your GPU."
 msgstr "Установлено. Перезапустите Lune Voice, чтобы начать использовать видеокарту."
 
-#: src/features/updates/update-dialog.tsx:132
+#: src/features/updates/update-dialog.tsx:133
 msgid "Installing replaces the app and restarts it. Your settings, history and models are untouched."
 msgstr "При установке приложение заменяется и перезапускается. Настройки, история и модели остаются нетронутыми."
 
@@ -917,10 +930,6 @@ msgstr "Присоединиться к обсуждениям"
 #: src/features/settings/sections/output-section.tsx:55
 msgid "Keep the dictated text on the clipboard after every dictation, so you can paste it again yourself."
 msgstr "Сохранять продиктованный текст в буфере обмена после каждой диктовки, чтобы вы могли вставить его снова сами."
-
-#: src/features/settings/sections/dictation-section.tsx:139
-msgid "Keep the mic open in the background so dictation starts ~70ms sooner. The OS may show a recording indicator while Lune Voice is running."
-msgstr "Держите микрофон открытым в фоновом режиме, чтобы диктовка началась примерно на 70 мс раньше. ОС может отображать индикатор записи во время работы Lune Voice."
 
 #: src/features/settings/sections/pill-section.tsx:89
 msgid "Keep the pill with you when you switch workspaces or virtual desktops."
@@ -944,7 +953,7 @@ msgstr "Сочетания клавиш («Super H» → «Super+H»)"
 msgid "Language"
 msgstr "Язык"
 
-#: src/features/updates/update-dialog.tsx:224
+#: src/features/updates/update-dialog.tsx:234
 msgid "Later"
 msgstr "Позже"
 
@@ -992,11 +1001,11 @@ msgstr "Поиск устройств ввода…"
 msgid "Lune"
 msgstr "Лунь"
 
-#: src/features/updates/update-dialog.tsx:122
+#: src/features/updates/update-dialog.tsx:123
 msgid "Lune Voice {currentVersion} is the latest version."
 msgstr "Lune Voice {currentVersion} — последняя версия."
 
-#: src/features/updates/update-dialog.tsx:129
+#: src/features/updates/update-dialog.tsx:130
 msgid "Lune Voice {version} is available. You have {currentVersion}."
 msgstr "Доступна версия Lune Voice {version}. У вас {currentVersion}."
 
@@ -1261,11 +1270,6 @@ msgstr "Пожалуйста, оставьте приложение открыт
 msgid "Position"
 msgstr "Положение"
 
-#: src/features/settings/sections/dictation-section.tsx:138
-#: src/features/settings/sections/dictation-section.tsx:146
-msgid "Pre-warm microphone"
-msgstr "Предварительный прогрев микрофона"
-
 #: src/features/settings/sections/pill-section.tsx:111
 msgid "Preset corner or edge the pill starts at."
 msgstr "Заданный угол или край, откуда начинается индикатор."
@@ -1490,7 +1494,7 @@ msgstr "сессии"
 msgid "Set hotkey"
 msgstr "Установить горячую клавишу"
 
-#: src/features/settings/sections/transcription-section.tsx:59
+#: src/features/settings/sections/transcription-section.tsx:64
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "Установите язык, на котором вы говорите. Авто использует обнаружение по речи."
 
@@ -1666,7 +1670,7 @@ msgstr "Основной ярлык, используемый для голос�
 msgid "The microphone is in use"
 msgstr "Микрофон занят"
 
-#: src/features/settings/sections/transcription-section.tsx:101
+#: src/features/settings/sections/transcription-section.tsx:120
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
 msgstr "Слова, в которых распознаватель менее всего уверен, сверяются с вашим словарём и лексикой. Выше — проверяется больше слов; ниже — больше доверия исходной расшифровке."
 
@@ -1686,7 +1690,7 @@ msgstr "Эта модель используется в вашей текуще�
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "Это происходит только один раз. Тем временем вы можете продолжать пользоваться компьютером."
 
-#: src/features/updates/update-dialog.tsx:217
+#: src/features/updates/update-dialog.tsx:227
 msgid "This only takes a moment."
 msgstr "Это займёт всего мгновение."
 
@@ -1745,7 +1749,7 @@ msgstr "Расшифровка…"
 msgid "Transcript"
 msgstr "Стенограмма"
 
-#: src/features/settings/sections/transcription-section.tsx:36
+#: src/features/settings/sections/transcription-section.tsx:41
 #: src/features/settings/settings-page.tsx:76
 msgid "Transcription"
 msgstr "Транскрипция"
@@ -1779,7 +1783,7 @@ msgstr "Триггер"
 msgid "Trigger phrase"
 msgstr "Ключевая фраза"
 
-#: src/features/updates/update-dialog.tsx:245
+#: src/features/updates/update-dialog.tsx:255
 msgid "Try again"
 msgstr "Повторить"
 
@@ -1799,7 +1803,7 @@ msgstr "Доступно обновление"
 msgid "Update check failed"
 msgstr "Не удалось проверить обновления"
 
-#: src/features/updates/update-dialog.tsx:102
+#: src/features/updates/update-dialog.tsx:103
 msgid "Update failed"
 msgstr "Не удалось обновить"
 
@@ -1811,8 +1815,8 @@ msgstr "Обновления"
 msgid "Use GPU acceleration"
 msgstr "Использовать ускорение GPU"
 
-#: src/features/settings/sections/transcription-section.tsx:75
-#: src/features/settings/sections/transcription-section.tsx:83
+#: src/features/settings/sections/transcription-section.tsx:80
+#: src/features/settings/sections/transcription-section.tsx:88
 msgid "Use hardware acceleration"
 msgstr "Используйте аппаратное ускорение"
 
@@ -1842,7 +1846,7 @@ msgstr "Посмотреть стиль"
 msgid "Visibility"
 msgstr "Видимость"
 
-#: src/features/settings/sections/transcription-section.tsx:41
+#: src/features/settings/sections/transcription-section.tsx:46
 msgid "Voice model"
 msgstr "Модель голоса"
 
@@ -1872,11 +1876,11 @@ msgstr "Что случилось или что вы хотели бы увид�
 msgid "What is this about?"
 msgstr "О чём речь?"
 
-#: src/features/updates/update-dialog.tsx:198
+#: src/features/updates/update-dialog.tsx:208
 msgid "What's new"
 msgstr "Что нового"
 
-#: src/features/settings/sections/transcription-section.tsx:76
+#: src/features/settings/sections/transcription-section.tsx:81
 msgid "When available, this can make transcription finish faster."
 msgstr "Если это возможно, это может ускорить завершение транскрипции."
 

@@ -180,11 +180,11 @@ msgstr "应用程序行为和启动首选项。"
 msgid "Applied on every dictation · highest priority first"
 msgstr "每次听写都会应用 · 优先级高的在前"
 
-#: src/features/updates/update-dialog.tsx:151
+#: src/features/updates/update-dialog.tsx:152
 msgid "Applying Lune Voice {version}. Your system may ask for your password, and the app will restart on its own."
 msgstr "正在安装 Lune Voice {version}。系统可能会要求输入密码，应用会自动重启。"
 
-#: src/features/updates/update-dialog.tsx:116
+#: src/features/updates/update-dialog.tsx:117
 msgid "Asking the release server whether anything newer than {currentVersion} exists."
 msgstr "正在向发布服务器查询是否有比 {currentVersion} 更新的版本。"
 
@@ -216,6 +216,10 @@ msgstr "自动大写句子"
 #: src/features/settings/sections/pill-section.tsx:51
 msgid "Automatic"
 msgstr "自动"
+
+#: src/features/updates/update-dialog.tsx:102
+msgid "Automatic updates are off"
+msgstr ""
 
 #: src/features/welcome/components/ready-checks.tsx:83
 msgid "Before you start"
@@ -336,7 +340,7 @@ msgstr "选择如何润色转写结果 — 发送到你配置的 OpenAI 兼容�
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "选择要安装的 AI 模型。一切都离线运行——没有云，没有账户。"
 
-#: src/features/settings/sections/transcription-section.tsx:42
+#: src/features/settings/sections/transcription-section.tsx:47
 msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
 msgstr "选择将您的语音转换为文本的引擎。本地引擎完全在设备端运行；Whisper 支持多语言，并可选择模型大小。"
 
@@ -360,8 +364,8 @@ msgstr "关闭"
 #: src/features/history/components/session-detail-modal.tsx:210
 #: src/features/settings/sections/models-section.tsx:322
 #: src/features/styles/components/style-editor-modal.tsx:197
-#: src/features/updates/update-dialog.tsx:241
-#: src/features/updates/update-dialog.tsx:253
+#: src/features/updates/update-dialog.tsx:251
+#: src/features/updates/update-dialog.tsx:263
 msgid "Close"
 msgstr "关闭"
 
@@ -392,7 +396,7 @@ msgstr "启动后不久联系发布服务器，仅在存在更新版本时才提
 msgid "Continue"
 msgstr "继续"
 
-#: src/features/settings/sections/transcription-section.tsx:37
+#: src/features/settings/sections/transcription-section.tsx:42
 msgid "Control how your speech is turned into text."
 msgstr "控制如何将语音转换为文本。"
 
@@ -421,12 +425,12 @@ msgstr "指示器条的圆角程度。"
 msgid "Corners"
 msgstr "圆角"
 
-#: src/features/settings/sections/transcription-section.tsx:95
+#: src/features/settings/sections/transcription-section.tsx:114
 msgid "Correction"
 msgstr "校正"
 
-#: src/features/settings/sections/transcription-section.tsx:100
-#: src/features/settings/sections/transcription-section.tsx:115
+#: src/features/settings/sections/transcription-section.tsx:119
+#: src/features/settings/sections/transcription-section.tsx:134
 msgid "Correction sensitivity"
 msgstr "校正灵敏度"
 
@@ -554,8 +558,8 @@ msgstr "在任何 AI 样式之前应用确定性修复。"
 msgid "Dictation"
 msgstr "听写"
 
-#: src/features/settings/sections/transcription-section.tsx:58
-#: src/features/settings/sections/transcription-section.tsx:64
+#: src/features/settings/sections/transcription-section.tsx:63
+#: src/features/settings/sections/transcription-section.tsx:69
 msgid "Dictation language"
 msgstr "听写语言"
 
@@ -727,7 +731,7 @@ msgstr "展开侧边栏"
 msgid "Feature request"
 msgstr "功能建议"
 
-#: src/features/updates/update-dialog.tsx:141
+#: src/features/updates/update-dialog.tsx:142
 msgid "Fetching Lune Voice {version}. Keep the app open until it finishes."
 msgstr "正在下载 Lune Voice {version}。请在完成前保持应用打开。"
 
@@ -755,7 +759,7 @@ msgstr "筛选片段"
 msgid "Filter snippets…"
 msgstr "筛选片段…"
 
-#: src/features/settings/sections/transcription-section.tsx:96
+#: src/features/settings/sections/transcription-section.tsx:115
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "在您的设备上，用您的词典和已知词汇修正识别错误。它使用逐词置信度和统计模式——无 AI 模型，也绝不会改写您所说的内容。"
 
@@ -771,6 +775,11 @@ msgstr "格式化"
 #: src/features/styles/components/style-hero.tsx:54
 msgid "Formatting"
 msgstr "格式化"
+
+#: src/features/settings/sections/transcription-section.tsx:93
+#: src/features/settings/sections/transcription-section.tsx:99
+msgid "Free the model when idle"
+msgstr ""
 
 #: src/features/settings/sections/pill-section.tsx:125
 msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock."
@@ -797,6 +806,10 @@ msgstr "github"
 #: src/features/dictionary/components/dictionary-form.tsx:88
 msgid "GitHub"
 msgstr "GitHub"
+
+#: src/features/settings/sections/transcription-section.tsx:94
+msgid "Give the memory back after a quiet spell. The next dictation reloads the model, which adds up to a second before it starts listening — your speech is recorded during the wait, so nothing is lost."
+msgstr ""
 
 #: src/features/overview/overview-page.tsx:283
 msgid "Good afternoon."
@@ -882,7 +895,7 @@ msgstr "在光标处插入"
 msgid "Insert placeholder"
 msgstr "插入占位符"
 
-#: src/features/updates/update-dialog.tsx:228
+#: src/features/updates/update-dialog.tsx:238
 msgid "Install and restart"
 msgstr "安装并重启"
 
@@ -898,7 +911,7 @@ msgstr "已安装"
 msgid "Installed. Restart Lune Voice to start using your GPU."
 msgstr "已安装。重启 Lune Voice 即可开始使用你的 GPU。"
 
-#: src/features/updates/update-dialog.tsx:132
+#: src/features/updates/update-dialog.tsx:133
 msgid "Installing replaces the app and restarts it. Your settings, history and models are untouched."
 msgstr "安装会替换应用并重启。你的设置、历史记录和模型不会被改动。"
 
@@ -917,10 +930,6 @@ msgstr "参与讨论"
 #: src/features/settings/sections/output-section.tsx:55
 msgid "Keep the dictated text on the clipboard after every dictation, so you can paste it again yourself."
 msgstr "每次听写后将听写的文本保留在剪贴板中，以便您自己再次粘贴。"
-
-#: src/features/settings/sections/dictation-section.tsx:139
-msgid "Keep the mic open in the background so dictation starts ~70ms sooner. The OS may show a recording indicator while Lune Voice is running."
-msgstr "让麦克风在后台保持打开状态，以便听写可以更快开始约 70 毫秒。 Lune Voice 运行时，操作系统可能会显示录音指示符。"
 
 #: src/features/settings/sections/pill-section.tsx:89
 msgid "Keep the pill with you when you switch workspaces or virtual desktops."
@@ -944,7 +953,7 @@ msgstr "键盘快捷键（“Super H”→“Super+H”）"
 msgid "Language"
 msgstr "语言"
 
-#: src/features/updates/update-dialog.tsx:224
+#: src/features/updates/update-dialog.tsx:234
 msgid "Later"
 msgstr "稍后"
 
@@ -992,11 +1001,11 @@ msgstr "正在查找输入设备…"
 msgid "Lune"
 msgstr "月形"
 
-#: src/features/updates/update-dialog.tsx:122
+#: src/features/updates/update-dialog.tsx:123
 msgid "Lune Voice {currentVersion} is the latest version."
 msgstr "Lune Voice {currentVersion} 已是最新版本。"
 
-#: src/features/updates/update-dialog.tsx:129
+#: src/features/updates/update-dialog.tsx:130
 msgid "Lune Voice {version} is available. You have {currentVersion}."
 msgstr "Lune Voice {version} 已发布。你当前使用的是 {currentVersion}。"
 
@@ -1261,11 +1270,6 @@ msgstr "请保持应用程序打开直至下载完成"
 msgid "Position"
 msgstr "位置"
 
-#: src/features/settings/sections/dictation-section.tsx:138
-#: src/features/settings/sections/dictation-section.tsx:146
-msgid "Pre-warm microphone"
-msgstr "预热麦克风"
-
 #: src/features/settings/sections/pill-section.tsx:111
 msgid "Preset corner or edge the pill starts at."
 msgstr "指示器起始的预设边角或边缘。"
@@ -1490,7 +1494,7 @@ msgstr "会议"
 msgid "Set hotkey"
 msgstr "设置热键"
 
-#: src/features/settings/sections/transcription-section.tsx:59
+#: src/features/settings/sections/transcription-section.tsx:64
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "设置您所说的语言。 Auto 使用语音检测。"
 
@@ -1666,7 +1670,7 @@ msgstr "用于语音输入的主要快捷方式。单击绑定以更改它。"
 msgid "The microphone is in use"
 msgstr "麦克风正在使用中"
 
-#: src/features/settings/sections/transcription-section.tsx:101
+#: src/features/settings/sections/transcription-section.tsx:120
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
 msgstr "识别器最不确定的词语会与您的词典和词汇进行核对。数值越高核对的词越多；越低则越信任原始转录��"
 
@@ -1686,7 +1690,7 @@ msgstr "此模型正被您当前的配置使用。在您重新安装它或选择
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "这只会发生一次。在此期间您可以继续使用您的计算机。"
 
-#: src/features/updates/update-dialog.tsx:217
+#: src/features/updates/update-dialog.tsx:227
 msgid "This only takes a moment."
 msgstr "只需片刻。"
 
@@ -1745,7 +1749,7 @@ msgstr "正在转写…"
 msgid "Transcript"
 msgstr "成绩单"
 
-#: src/features/settings/sections/transcription-section.tsx:36
+#: src/features/settings/sections/transcription-section.tsx:41
 #: src/features/settings/settings-page.tsx:76
 msgid "Transcription"
 msgstr "转录"
@@ -1779,7 +1783,7 @@ msgstr "触发词"
 msgid "Trigger phrase"
 msgstr "触发短语"
 
-#: src/features/updates/update-dialog.tsx:245
+#: src/features/updates/update-dialog.tsx:255
 msgid "Try again"
 msgstr "重试"
 
@@ -1799,7 +1803,7 @@ msgstr "有可用更新"
 msgid "Update check failed"
 msgstr "检查更新失败"
 
-#: src/features/updates/update-dialog.tsx:102
+#: src/features/updates/update-dialog.tsx:103
 msgid "Update failed"
 msgstr "更新失败"
 
@@ -1811,8 +1815,8 @@ msgstr "更新"
 msgid "Use GPU acceleration"
 msgstr "使用 GPU 加速"
 
-#: src/features/settings/sections/transcription-section.tsx:75
-#: src/features/settings/sections/transcription-section.tsx:83
+#: src/features/settings/sections/transcription-section.tsx:80
+#: src/features/settings/sections/transcription-section.tsx:88
 msgid "Use hardware acceleration"
 msgstr "使用硬件加速"
 
@@ -1842,7 +1846,7 @@ msgstr "查看样式"
 msgid "Visibility"
 msgstr "显示"
 
-#: src/features/settings/sections/transcription-section.tsx:41
+#: src/features/settings/sections/transcription-section.tsx:46
 msgid "Voice model"
 msgstr "语音模型"
 
@@ -1872,11 +1876,11 @@ msgstr "发生了什么，或者你希望看到什么？"
 msgid "What is this about?"
 msgstr "这是关于什么的？"
 
-#: src/features/updates/update-dialog.tsx:198
+#: src/features/updates/update-dialog.tsx:208
 msgid "What's new"
 msgstr "更新内容"
 
-#: src/features/settings/sections/transcription-section.tsx:76
+#: src/features/settings/sections/transcription-section.tsx:81
 msgid "When available, this can make transcription finish faster."
 msgstr "如果可用，这可以使转录更快完成。"
 

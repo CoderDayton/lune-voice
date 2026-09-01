@@ -9,4 +9,4 @@
  * window that asked for it. Reporting through the app's own modal keeps the
  * answer where the click was.
  */
-export type UpdatePhaseDto = "idle" | "checking" | "up-to-date" | "available" | "downloading" | "installing" | "check-failed" | "install-failed";
+export type UpdatePhaseDto = "idle" | "checking" | "up-to-date" | "available" | "downloading" | "installing" | "check-failed" | "disabled" | "install-failed";

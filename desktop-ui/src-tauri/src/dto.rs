@@ -482,6 +482,9 @@ pub enum UpdatePhaseDto {
     Installing,
     /// The check itself could not complete (offline, bad endpoint, bad config).
     CheckFailed,
+    /// This build does not check for updates at all. Not a failure — there is
+    /// nothing to retry — so it must not render as one.
+    Disabled,
     /// The download or install failed. The offer survives so it can be retried.
     InstallFailed,
 }

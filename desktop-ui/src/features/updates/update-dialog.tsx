@@ -1,5 +1,5 @@
 import { useLingui } from '@lingui/react/macro';
-import { CircleAlert, CircleCheck, Download, Loader2, RefreshCw } from 'lucide-react';
+import { CircleAlert, CircleCheck, Download, Info, Loader2, RefreshCw } from 'lucide-react';
 import { useEffect, useId, useRef } from 'react';
 import { ByteProgress } from '../../components/ui/byte-progress';
 import type { UpdatePhaseDto, UpdateStateDto } from '../../lib/backend/types';
@@ -99,6 +99,7 @@ function UpdateBody({ state, titleId, onInstall, onDismiss, onRetryCheck }: Upda
     downloading: t`Downloading update`,
     installing: t`Installing update`,
     'check-failed': t`Update check failed`,
+    disabled: t`Automatic updates are off`,
     'install-failed': t`Update failed`,
   };
 
@@ -152,6 +153,12 @@ function UpdateBody({ state, titleId, onInstall, onDismiss, onRetryCheck }: Upda
         </p>
       )}
 
+      {phase === 'disabled' && message && (
+        // Deliberately not an error alert: the feature is absent, not broken,
+        // and the only action left is the Close button below.
+        <p className="mt-2 text-sm text-content-muted">{message}</p>
+      )}
+
       {(phase === 'check-failed' || phase === 'install-failed') && message && (
         <div role="alert" className="alert alert-error mt-3 py-2 text-sm">
           {/* The backend messages are already user-facing; showing them verbatim
@@ -182,6 +189,9 @@ function PhaseIcon({ phase }: { phase: UpdatePhaseDto }) {
   }
   if (phase === 'check-failed' || phase === 'install-failed') {
     return <CircleAlert size={18} strokeWidth={1.8} className="shrink-0 text-error" />;
+  }
+  if (phase === 'disabled') {
+    return <Info size={18} strokeWidth={1.8} className="shrink-0 text-content-subtle" />;
   }
   return <Download size={18} strokeWidth={1.8} className="shrink-0 text-primary" />;
 }
