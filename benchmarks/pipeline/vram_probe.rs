@@ -19,12 +19,14 @@
 //! toggle-loop model, `--env CYCLES=n` for a longer loop). Needs an NVIDIA GPU
 //! and a CUDA-enabled build; on CPU it says so and exits.
 
+// `bench_utils` is shared by every benchmark, so most of it is unused here.
 #[path = "../bench_utils.rs"]
+#[allow(dead_code)]
 mod bench_utils;
 
 use std::path::Path;
 
-use bench_utils::{load_fixtures, models_dir, workspace_root};
+use bench_utils::{load_fixtures, models_dir, vram_mb, vram_str, workspace_root};
 use lune_asr::AsrRegistry;
 use lune_core::asr::{AsrBackend, AsrSessionConfig};
 use lune_core::config::{AsrBackendConfig, DevicePolicy, WhisperModel};
@@ -32,40 +34,6 @@ use lune_core::config::{AsrBackendConfig, DevicePolicy, WhisperModel};
 /// Toggle cycles in the leak loop. Enough that a per-toggle leak of even a few
 /// MB clears the sampling noise, short enough to finish in a couple of minutes.
 const DEFAULT_CYCLES: usize = 20;
-
-/// Device memory this process holds, in MiB.
-///
-/// Per-process rather than per-GPU: a desktop has a compositor and a browser on
-/// the same card, and their allocations would swamp the signal. `nvidia-smi` is
-/// the only source for this that does not require linking NVML.
-///
-/// `None` means the question could not be answered — no `nvidia-smi`, or no
-/// compute context yet (before the first CUDA allocation the process is not
-/// listed at all, which is not zero and must not be reported as zero).
-fn vram_mb() -> Option<f64> {
-    let out = std::process::Command::new("nvidia-smi")
-        .args([
-            "--query-compute-apps=pid,used_memory",
-            "--format=csv,noheader,nounits",
-        ])
-        .output()
-        .ok()?;
-    let pid = std::process::id().to_string();
-    String::from_utf8_lossy(&out.stdout)
-        .lines()
-        .find_map(|line| {
-            let (p, used) = line.split_once(',')?;
-            (p.trim() == pid).then(|| used.trim().parse::<f64>().ok())?
-        })
-}
-
-/// `vram_mb` or a dash, so a CPU run still prints a readable table.
-fn vram_str() -> String {
-    match vram_mb() {
-        Some(mb) => format!("{mb:>7.0} MB"),
-        None => "      — MB".to_string(),
-    }
-}
 
 fn load(model: WhisperModel, cuda: bool) -> AsrRegistry {
     AsrRegistry::from_config(
@@ -103,7 +71,7 @@ async fn one_toggle(asr: &AsrRegistry, audio: &[f32]) {
 async fn main() {
     let root = workspace_root();
     let cuda = lune_asr::gpu_backend::cuda_available(
-        &lune_persist::AppPaths::resolve()
+        lune_persist::AppPaths::resolve()
             .expect("resolve XDG paths")
             .data_dir(),
     );

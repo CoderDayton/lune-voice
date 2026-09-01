@@ -74,6 +74,42 @@ pub fn process_memory_usage() -> Option<MemoryUsage> {
     })
 }
 
+// ─── Device memory ──────────────────────────────────────────────────────────
+
+/// Device memory this process holds, in MiB.
+///
+/// Per-process rather than per-GPU: a desktop has a compositor and a browser on
+/// the same card, and their allocations would swamp the signal. `nvidia-smi` is
+/// the only source for this that does not require linking NVML.
+///
+/// `None` means the question could not be answered — no `nvidia-smi`, or no
+/// compute context yet (before the first CUDA allocation the process is not
+/// listed at all, which is not zero and must not be reported as zero).
+pub fn vram_mb() -> Option<f64> {
+    let out = std::process::Command::new("nvidia-smi")
+        .args([
+            "--query-compute-apps=pid,used_memory",
+            "--format=csv,noheader,nounits",
+        ])
+        .output()
+        .ok()?;
+    let pid = std::process::id().to_string();
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .find_map(|line| {
+            let (p, used) = line.split_once(',')?;
+            (p.trim() == pid).then(|| used.trim().parse::<f64>().ok())?
+        })
+}
+
+/// [`vram_mb`] or a dash, so a CPU run still prints a readable table.
+pub fn vram_str() -> String {
+    match vram_mb() {
+        Some(mb) => format!("{mb:>7.0} MB"),
+        None => "      — MB".to_string(),
+    }
+}
+
 // ─── GPU detection ───────────────────────────────────────────────────────────
 
 /// Whether this build can offload to CUDA. There is no ORT runtime probe
@@ -730,101 +766,6 @@ pub fn percentile(data: &[f64], p: f64) -> f64 {
         let frac = rank - lo as f64;
         sorted[lo] * (1.0 - frac) + sorted[hi] * frac
     }
-}
-
-// ─── Brent's method — 1D minimizer ─────────────────────────────────────────
-
-/// Brent's method — 1D minimizer.
-/// Converges at ~1.32 order near optimum vs golden section's linear.
-/// Falls back to golden section when parabola is unreliable.
-pub fn brent_minimize<F>(f: F, mut a: f64, mut b: f64, tol: f64) -> f64
-where
-    F: Fn(f64) -> f64,
-{
-    const GOLDEN: f64 = 0.3819660112501051; // 1 - 1/φ
-    let mut x = a + GOLDEN * (b - a);
-    let mut w = x;
-    let mut v = x;
-    let mut fx = f(x);
-    let mut fw = fx;
-    let mut fv = fx;
-    let mut d = 0.0f64;
-    let mut e = 0.0f64;
-
-    for _ in 0..100 {
-        let mid = 0.5 * (a + b);
-        let tol1 = tol * x.abs() + 1e-10;
-        let tol2 = 2.0 * tol1;
-
-        if (x - mid).abs() <= tol2 - 0.5 * (b - a) {
-            return x;
-        }
-
-        let mut use_golden = true;
-
-        if e.abs() > tol1 {
-            let r = (x - w) * (fx - fv);
-            let q = (x - v) * (fx - fw);
-            let p = (x - v) * q - (x - w) * r;
-            let mut q2 = 2.0 * (q - r);
-
-            if q2 > 0.0 {
-            } else {
-                q2 = -q2;
-            }
-            let p2 = if q2 > 0.0 { -p } else { p };
-
-            if p2.abs() < (0.5 * q2 * e).abs() && p2 > q2 * (a - x) && p2 < q2 * (b - x) {
-                d = p2 / q2;
-                use_golden = false;
-                if (x + d - a) < tol2 || (b - x - d) < tol2 {
-                    d = if mid > x { tol1 } else { -tol1 };
-                }
-            }
-        }
-
-        if use_golden {
-            e = if x >= mid { a - x } else { b - x };
-            d = GOLDEN * e;
-        }
-
-        let u = x + if d.abs() >= tol1 {
-            d
-        } else {
-            tol1 * d.signum()
-        };
-        let fu = f(u);
-
-        if fu <= fx {
-            if u < x {
-                b = x;
-            } else {
-                a = x;
-            }
-            v = w;
-            fv = fw;
-            w = x;
-            fw = fx;
-            x = u;
-            fx = fu;
-        } else {
-            if u < x {
-                a = u;
-            } else {
-                b = u;
-            }
-            if fu <= fw || w == x {
-                v = w;
-                fv = fw;
-                w = u;
-                fw = fu;
-            } else if fu <= fv || v == x || v == w {
-                v = u;
-                fv = fu;
-            }
-        }
-    }
-    x
 }
 
 // ─── BenchmarkHarness ────────────────────────────────────────────────────────

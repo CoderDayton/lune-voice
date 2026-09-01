@@ -67,6 +67,11 @@ tempfile = "3.27.0"
 # exercised without a real 5 s wait.
 tokio = { workspace = true, features = ["test-util"] }
 
+# `posix_fadvise(DONTNEED)` in the model_load benchmark: evicts a model file
+# from the page cache without root, so a cold load can actually be timed.
+[target.'cfg(unix)'.dev-dependencies]
+libc.workspace = true
+
 # ── Benchmarks (benchmarks/*.rs, restored for the whisper.cpp stack) ──
 # Each needs `whisper-cpp` for the real ASR. Build/run with, e.g.:
 #   cargo run --release --example asr_probe -p lune-voice --features "whisper-cpp" -- <wav>
@@ -122,6 +127,11 @@ required-features = ["whisper-cpp"]
 [[example]]
 name = "vram_probe"
 path = "../../benchmarks/pipeline/vram_probe.rs"
+required-features = ["whisper-cpp"]
+
+[[example]]
+name = "model_load"
+path = "../../benchmarks/pipeline/model_load.rs"
 required-features = ["whisper-cpp"]
 
 [[example]]
