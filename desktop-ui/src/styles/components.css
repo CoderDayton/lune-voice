@@ -104,6 +104,12 @@
   .app-scroll-fixed {
     padding: var(--space-page-x-desktop);
   }
+
+  /* Scrolling pages share the same top gutter, so the page title sits at one
+     height whichever page is open instead of jumping between the two kinds. */
+  .app-scroll {
+    padding-top: var(--space-page-x-desktop);
+  }
 }
 
 /* ── Sidebar ───────────────────────────────────────────────────────── */
@@ -124,7 +130,7 @@
 @media (max-width: 63.999rem) {
   .sidebar-surface {
     @apply border-r border-surface-border bg-surface-glass;
-    box-shadow: inset -1px 0 0 oklch(1 0 0 / 0.025);
+    box-shadow: inset -1px 0 0 var(--surface-border);
   }
 }
 

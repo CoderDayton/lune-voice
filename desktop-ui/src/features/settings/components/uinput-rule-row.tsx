@@ -97,7 +97,7 @@ export function UinputRuleRow() {
           accessReady ? (
             <button
               type="button"
-              className="btn btn-outline btn-sm"
+              className="btn btn-outline"
               onClick={() => void remove()}
               disabled={busy}
             >
@@ -106,7 +106,7 @@ export function UinputRuleRow() {
           ) : (
             <button
               type="button"
-              className="btn btn-primary btn-sm"
+              className="btn btn-primary"
               onClick={() => void grant()}
               disabled={busy}
             >

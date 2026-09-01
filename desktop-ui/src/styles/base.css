@@ -74,12 +74,12 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: oklch(0.5 0 0 / 0.15);
+    background: var(--surface-border);
     border-radius: 999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: oklch(0.5 0 0 / 0.25);
+    background: var(--surface-border-strong);
   }
 
   /* Default cards are defined by border + bg, not by drop shadow. Shadows are

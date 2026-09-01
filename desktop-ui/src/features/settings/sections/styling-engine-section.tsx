@@ -103,10 +103,10 @@ function EngineCard({ label, description, icon: Icon, active, onSelect }: Engine
         </span>
         {active && <Check size={16} strokeWidth={2.5} className="text-primary" />}
       </div>
-      <div>
-        <div className="font-medium text-content-strong text-sm">{label}</div>
-        <div className="mt-0.5 text-content-muted text-xs">{description}</div>
-      </div>
+      <span className={`text-sm font-medium ${active ? 'text-content-strong' : 'text-content'}`}>
+        {label}
+      </span>
+      <span className="text-xs leading-snug text-content-subtle">{description}</span>
     </button>
   );
 }

@@ -222,10 +222,10 @@ export function StylesPage() {
     <div className="page-stack">
       {loading && presets.length === 0 ? (
         <>
-          <div className="skeleton h-32 w-full rounded-box" />
+          <div className="skeleton-shimmer h-32 w-full rounded-box" />
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="skeleton h-[9.75rem] w-full rounded-box" />
+              <div key={i} className="skeleton-shimmer h-[9.75rem] w-full rounded-box" />
             ))}
           </div>
         </>

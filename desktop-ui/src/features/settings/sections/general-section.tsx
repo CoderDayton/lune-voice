@@ -124,7 +124,7 @@ export function GeneralSection({ settings }: { settings: WorkspaceSettings }) {
         control={
           <button
             type="button"
-            className="btn btn-sm"
+            className="btn"
             disabled={checking}
             onClick={() => void checkForUpdates()}
           >

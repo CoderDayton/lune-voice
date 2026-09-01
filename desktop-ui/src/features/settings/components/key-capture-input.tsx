@@ -130,7 +130,7 @@ export function KeyCaptureInput({
         aria-invalid={validationError ? 'true' : undefined}
         aria-describedby={validationError ? 'key-capture-error' : undefined}
         className={cn(
-          'inline-flex h-9 min-w-28 select-none items-center justify-center gap-2 rounded-field border px-4 font-mono text-sm font-semibold tracking-[0.02em] transition-[background,border-color,box-shadow,color,transform]',
+          'inline-flex h-10 min-w-28 select-none items-center justify-center gap-2 rounded-field border px-4 font-mono text-sm font-semibold tracking-[0.02em] transition-[background,border-color,box-shadow,color,transform]',
           'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
           'sm:min-w-36',
           listening

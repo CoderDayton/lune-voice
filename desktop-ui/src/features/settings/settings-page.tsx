@@ -46,20 +46,17 @@ export function SettingsPage() {
     return (
       <div className="page-stack">
         {[0, 1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className="card border rounded-box p-6 border-surface-border bg-surface-card"
-          >
-            <div className="skeleton h-5 w-32 mb-3" />
-            <div className="skeleton h-3 w-48 mb-4" />
+          <div key={i} className="panel-surface p-5 sm:p-6">
+            <div className="skeleton-shimmer h-5 w-32 mb-3" />
+            <div className="skeleton-shimmer h-3 w-48 mb-4" />
             <div className="space-y-4">
               <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
-                <div className="skeleton h-4 w-24" />
-                <div className="skeleton h-8 w-36" />
+                <div className="skeleton-shimmer h-4 w-24" />
+                <div className="skeleton-shimmer h-8 w-36" />
               </div>
               <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
-                <div className="skeleton h-4 w-32" />
-                <div className="skeleton h-8 w-28" />
+                <div className="skeleton-shimmer h-4 w-32" />
+                <div className="skeleton-shimmer h-8 w-28" />
               </div>
             </div>
           </div>
@@ -107,7 +104,7 @@ export function SettingsPage() {
               type="button"
               onClick={() => setActive(id)}
               aria-current={isActive ? 'page' : undefined}
-              className={`relative flex shrink-0 items-center gap-3 rounded-field py-2.5 pl-2.5 pr-3.5 text-left text-[0.95rem] transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary md:w-full ${
+              className={`relative flex shrink-0 items-center gap-3 rounded-field py-2.5 pl-2.5 pr-3.5 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary md:w-full ${
                 isActive
                   ? 'bg-surface-nav-active font-medium text-content-strong'
                   : 'text-content-muted hover:bg-surface-hover hover:text-content'

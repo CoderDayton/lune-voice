@@ -64,7 +64,7 @@ export function PillSection() {
   }
 
   return (
-    <div className="page-stack">
+    <div className="flex flex-col gap-space-md">
       <SettingsSection
         title={t`Dictation pill`}
         description={t`The floating status pill you see while dictating.`}
@@ -124,7 +124,7 @@ export function PillSection() {
           label={t`Edge distance`}
           description={t`Gap between the pill and the screen edge, so it clears a taskbar or dock.`}
           control={
-            <label className="input input-sm w-28">
+            <label className="input w-28">
               <input
                 type="number"
                 min={0}
@@ -178,7 +178,7 @@ export function PillSection() {
           control={
             <button
               type="button"
-              className="btn btn-sm"
+              className="btn"
               onClick={() =>
                 void backendClient
                   .resetPillPosition()

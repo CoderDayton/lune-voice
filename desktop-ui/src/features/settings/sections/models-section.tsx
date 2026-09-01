@@ -103,12 +103,12 @@ export function ModelsSection() {
               key={i}
               className="rounded-box border border-surface-border bg-surface-inset p-4 flex items-center gap-3"
             >
-              <div className="skeleton size-10 rounded-field shrink-0" />
+              <div className="skeleton-shimmer size-10 rounded-field shrink-0" />
               <div className="flex-1 space-y-2">
-                <div className="skeleton h-4 w-32" />
-                <div className="skeleton h-3 w-56" />
+                <div className="skeleton-shimmer h-4 w-32" />
+                <div className="skeleton-shimmer h-3 w-56" />
               </div>
-              <div className="skeleton h-8 w-24 rounded-field" />
+              <div className="skeleton-shimmer h-8 w-24 rounded-field" />
             </div>
           ))
         ) : (

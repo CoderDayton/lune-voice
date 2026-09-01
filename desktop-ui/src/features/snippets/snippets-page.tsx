@@ -35,7 +35,7 @@ export function SnippetsPage() {
   if (!loaded) {
     return (
       <div className="page-stack min-h-0 flex-1">
-        <div className="panel-surface shrink-0 space-y-4 p-5 sm:p-6">
+        <div className="panel-surface shrink-0 space-y-4 p-4 sm:p-5">
           <div className="skeleton-shimmer h-12 w-full rounded-field" />
           <div className="skeleton-shimmer h-24 w-full rounded-field" />
         </div>
