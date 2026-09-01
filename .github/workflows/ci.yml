@@ -304,9 +304,13 @@ jobs:
         run: |
           set -euo pipefail
           deb=$(compgen -G 'target/release/bundle/deb/*.deb' | head -1)
-          if ! dpkg-deb -c "$deb" | grep -q '99-lune-voice-uinput.rules'; then
+          # Capture first, then grep. `dpkg-deb | grep -q` under pipefail is a
+          # race: grep exits on the first hit, dpkg-deb dies of SIGPIPE, and the
+          # pipeline reports failure for a rule that is present.
+          listing=$(dpkg-deb -c "$deb")
+          if ! grep -F '99-lune-voice-uinput.rules' <<<"$listing" > /dev/null; then
             echo "::error::udev rule missing from $deb"
-            dpkg-deb -c "$deb"
+            printf '%s\n' "$listing"
             exit 1
           fi
           echo "ok: udev rule present in $deb"
