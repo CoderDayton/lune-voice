@@ -73,10 +73,11 @@ cargo install cargo-script   # provides the `cgs` command
 git clone https://github.com/CoderDayton/lune-voice
 cd lune-voice
 cgs dev      # run the app with hot reload
-cgs build    # build a desktop bundle
+cgs build    # compile the desktop app
+cgs package  # build the .deb / .rpm / .AppImage / .tar.gz installers
 ```
 
-Both commands detect CUDA automatically and fall back to CPU. You can force either path with `--env BACKEND=cpu` or `--env BACKEND=cuda`. See [docs/RELEASE.md](docs/RELEASE.md) for the full build matrix, and run `cgs show` to list every available script.
+`cgs dev` and `cgs build` detect CUDA automatically and fall back to CPU. You can force either path with `--env BACKEND=cpu` or `--env BACKEND=cuda`. See [docs/RELEASE.md](docs/RELEASE.md) for the full build matrix, and run `cgs show` to list every available script.
 
 | | |
 |---|---|

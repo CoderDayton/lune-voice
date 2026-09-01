@@ -1,11 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build .deb / .AppImage / .rpm bundles via containerized cross-distro builds.
+# Build the shippable Linux artifacts in one container: .deb, .AppImage, .rpm
+# and a portable .tar.gz.
+#
 # Usage:
-#   bash scripts/release/package-all.sh                 # all targets
-#   bash scripts/release/package-all.sh deb-appimage    # Ubuntu 22.04 only
-#   bash scripts/release/package-all.sh rpm             # Fedora 40 only
+#   bash scripts/release/package-all.sh            # bundles + tarball
+#   bash scripts/release/package-all.sh bundles    # deb + AppImage + rpm only
+#   bash scripts/release/package-all.sh tarball    # repack an existing .deb
+#
+# One image, not one per package format: tauri writes RPMs with the pure-Rust
+# `rpm` crate, so it needs no rpmbuild and no Fedora. Ubuntu 22.04 is the right
+# single host because it has the OLDEST glibc of the distros we target — a
+# binary built on Fedora would not run on Ubuntu 22.04, but this one runs on
+# both. The rpm's Requires come from tauri.conf.json, not from the build host,
+# so they stay correct regardless.
 #
 # Honors $CONTAINER_ENGINE (docker|podman). Auto-detects if unset.
 # Caches Rust toolchains, cargo registry, target/, and Bun across runs in
@@ -14,10 +23,10 @@ set -euo pipefail
 # Caveat: depends on `libwebkit2gtk-4.1-dev` being available on Ubuntu 22.04
 # (jammy-updates pocket, default in the official ubuntu:22.04 image). If the
 # apt step fails with "Unable to locate package", add the Tauri webkit-4.1
-# PPA as a preflight step before the install line in build_deb_appimage().
+# PPA as a preflight step before the install line in build_bundles().
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 ARTIFACTS_DIR="$REPO_ROOT/release-artifacts"
 mkdir -p "$ARTIFACTS_DIR"
 
@@ -26,9 +35,7 @@ CARGO_HOME_CACHE="$CACHE_ROOT/cargo"
 RUSTUP_HOME_CACHE="$CACHE_ROOT/rustup"
 BUN_HOME_CACHE="$CACHE_ROOT/bun"
 TARGET_UBUNTU="$CACHE_ROOT/target-ubuntu22"
-TARGET_FEDORA="$CACHE_ROOT/target-fedora40"
-mkdir -p "$CARGO_HOME_CACHE" "$RUSTUP_HOME_CACHE" "$BUN_HOME_CACHE" \
-         "$TARGET_UBUNTU" "$TARGET_FEDORA"
+mkdir -p "$CARGO_HOME_CACHE" "$RUSTUP_HOME_CACHE" "$BUN_HOME_CACHE" "$TARGET_UBUNTU"
 
 ENGINE="${CONTAINER_ENGINE:-}"
 if [[ -z "$ENGINE" ]]; then
@@ -47,29 +54,28 @@ red()   { printf '\033[31m%s\033[0m\n' "$*"; }
 green() { printf '\033[32m%s\033[0m\n' "$*"; }
 bold()  { printf '\033[1m%s\033[0m\n' "$*"; }
 
-WANT_DEB_APPIMAGE=1
-WANT_RPM=1
+WANT_BUNDLES=1
+WANT_TARBALL=1
 case "${1:-all}" in
-    all)                          ;;
-    deb-appimage|deb|appimage)    WANT_RPM=0 ;;
-    rpm)                          WANT_DEB_APPIMAGE=0 ;;
-    *) echo "Usage: $0 [all|deb-appimage|rpm]" >&2; exit 1 ;;
+    all)                                  ;;
+    bundles|deb|appimage|rpm)  WANT_TARBALL=0 ;;
+    # Repacks whatever .deb is already in release-artifacts/ — no container run.
+    tarball|tar.gz)            WANT_BUNDLES=0 ;;
+    *) echo "Usage: $0 [all|bundles|tarball]" >&2; exit 1 ;;
 esac
 
-# Populate the named bash array with common docker run flags. Using a nameref
-# keeps each path quoted as a single argv element — robust to spaces in paths.
-populate_run_flags() {
-    local -n out=$1
-    local target_cache=$2
-    # shellcheck disable=SC2034  # `out` is a nameref to caller's array
-    out=(
+build_bundles() {
+    bold "==> DEB + AppImage + RPM (Ubuntu 22.04 container)"
+    # A nameref-free array keeps each path quoted as one argv element, so paths
+    # with spaces survive.
+    local flags=(
         --rm
         -i
         -v "$REPO_ROOT:/work"
         -v "$CARGO_HOME_CACHE:/root/.cargo"
         -v "$RUSTUP_HOME_CACHE:/root/.rustup"
         -v "$BUN_HOME_CACHE:/root/.bun"
-        -v "$target_cache:/cache/target"
+        -v "$TARGET_UBUNTU:/cache/target"
         -e CARGO_TARGET_DIR=/cache/target
         -e CARGO_INCREMENTAL=0
         -e RUSTFLAGS=
@@ -78,13 +84,19 @@ populate_run_flags() {
         -e "HOST_GID=$HOST_GID"
         -w /work
     )
-}
 
-# Inner build script — emitted to the container's stdin, which means $PATH /
-# $BUNDLES / $HOST_UID etc. are resolved by the *container's* shell, not the
-# host's. `$BUNDLES` is injected via `docker run -e BUNDLES=...` by the caller.
-build_inner() {
-    cat <<'INNER'
+    # The inner script goes to the container's stdin, so $PATH / $HOST_UID are
+    # resolved by the container's shell, not the host's.
+    "$ENGINE" run "${flags[@]}" ubuntu:22.04 bash -euo pipefail <<'INNER'
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq
+apt-get install -y --no-install-recommends \
+    build-essential cmake libclang-dev pkg-config curl ca-certificates file desktop-file-utils unzip \
+    libasound2-dev libdbus-1-dev libglib2.0-dev libssl-dev \
+    libxkbcommon-dev libgtk-3-dev libgtk-layer-shell-dev \
+    libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev \
+    libsoup-3.0-dev librsvg2-dev libayatana-appindicator3-dev
+
 export PATH="/root/.bun/bin:/root/.cargo/bin:$PATH"
 
 if [[ ! -x /root/.cargo/bin/cargo ]]; then
@@ -120,93 +132,108 @@ bun install --frozen-lockfile
 # caches start clean for whisper (correct on first build); if you change these
 # flags later, wipe the cached target dirs first.
 GGML_NATIVE=OFF GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON \
-    bun tauri build --bundles "$BUNDLES" --features whisper-cpp
+    bun tauri build --bundles deb,appimage,rpm --features whisper-cpp
 INNER
-}
 
-# Copy artifacts into release-artifacts/ and emit count via stdout.
-collect_artifacts() {
-    local count=0
-    local f
+    local count=0 f dest
     shopt -s nullglob
-    for f in "$@"; do
-        cp "$f" "$ARTIFACTS_DIR/"
+    for f in "$TARGET_UBUNTU/release/bundle/deb/"*.deb \
+             "$TARGET_UBUNTU/release/bundle/appimage/"*.AppImage \
+             "$TARGET_UBUNTU/release/bundle/rpm/"*.rpm; do
+        # Tauri names bundles after `productName`, which is "Lune Voice" — a
+        # space in a download URL becomes %20 and breaks naive installers and
+        # shell one-liners. The name inside the package is already `lune-voice`,
+        # so this only fixes the file name.
+        dest="$(basename "$f")"
+        dest="${dest//Lune Voice/lune-voice}"
+        cp "$f" "$ARTIFACTS_DIR/$dest"
         count=$((count + 1))
     done
     shopt -u nullglob
-    printf '%d\n' "$count"
-}
 
-build_deb_appimage() {
-    bold "==> DEB + AppImage (Ubuntu 22.04 container)"
-    local flags
-    populate_run_flags flags "$TARGET_UBUNTU"
-    {
-        cat <<'PRE'
-export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq
-apt-get install -y --no-install-recommends \
-    build-essential cmake libclang-dev pkg-config curl ca-certificates file desktop-file-utils unzip \
-    libasound2-dev libdbus-1-dev libglib2.0-dev libssl-dev \
-    libxkbcommon-dev libgtk-3-dev libgtk-layer-shell-dev \
-    libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev \
-    libsoup-3.0-dev librsvg2-dev libayatana-appindicator3-dev
-PRE
-        build_inner
-    } | "$ENGINE" run "${flags[@]}" \
-        -e BUNDLES=deb,appimage \
-        ubuntu:22.04 \
-        bash -euo pipefail
-
-    local n
-    shopt -s nullglob
-    local files=(
-        "$TARGET_UBUNTU/release/bundle/deb/"*.deb
-        "$TARGET_UBUNTU/release/bundle/appimage/"*.AppImage
-    )
-    shopt -u nullglob
-    n=$(collect_artifacts "${files[@]}")
-    if [[ $n -eq 0 ]]; then
-        red "WARN: no .deb/.AppImage produced in $TARGET_UBUNTU/release/bundle/"
+    if [[ $count -eq 0 ]]; then
+        red "WARN: no bundles produced in $TARGET_UBUNTU/release/bundle/"
     else
-        green "DEB + AppImage: $n artifact(s)."
+        green "Bundles: $count artifact(s)."
     fi
 }
 
-build_rpm() {
-    bold "==> RPM (Fedora 40 container)"
-    local flags
-    populate_run_flags flags "$TARGET_FEDORA"
-    {
-        cat <<'PRE'
-dnf install -y \
-    gcc gcc-c++ make cmake clang-devel pkgconf-pkg-config curl file \
-    openssl-devel alsa-lib-devel dbus-devel glib2-devel \
-    libxkbcommon-devel gtk3-devel \
-    webkit2gtk4.1-devel javascriptcoregtk4.1-devel \
-    libsoup3-devel librsvg2-devel libappindicator-gtk3-devel \
-    rpm-build
-PRE
-        build_inner
-    } | "$ENGINE" run "${flags[@]}" \
-        -e BUNDLES=rpm \
-        fedora:40 \
-        bash -euo pipefail
-
-    local n
+# The portable archive is the .deb payload, not a second compile: same binary,
+# same old-glibc baseline, minus dpkg. Tauri resolves its resource directory
+# relative to the executable's prefix (`<prefix>/bin/lune-voice` ->
+# `<prefix>/lib/Lune Voice`), so keeping the deb's `usr/` tree intact is what
+# lets an extracted copy find its resources with no install step.
+build_tarball() {
     shopt -s nullglob
-    local files=("$TARGET_FEDORA/release/bundle/rpm/"*.rpm)
+    local debs=("$ARTIFACTS_DIR"/*.deb)
     shopt -u nullglob
-    n=$(collect_artifacts "${files[@]}")
-    if [[ $n -eq 0 ]]; then
-        red "WARN: no .rpm produced in $TARGET_FEDORA/release/bundle/rpm/"
-    else
-        green "RPM: $n artifact(s)."
+    if [[ ${#debs[@]} -eq 0 ]]; then
+        red "WARN: no .deb in $ARTIFACTS_DIR to repack — skipping tar.gz"
+        return
     fi
+    if ! command -v dpkg-deb &>/dev/null; then
+        red "WARN: dpkg-deb not installed — skipping tar.gz"
+        return
+    fi
+
+    # Newest .deb wins, so a stale one from an earlier version is not repacked.
+    local deb
+    deb="$(ls -t "${debs[@]}" | head -1)"
+    bold "==> Portable tar.gz (from $(basename "$deb"))"
+
+    local version arch name stage
+    version="$(dpkg-deb -f "$deb" Version)"
+    arch="$(dpkg-deb -f "$deb" Architecture)"
+    name="lune-voice-${version}-linux-${arch}"
+
+    stage="$(mktemp -d)"
+    dpkg-deb -x "$deb" "$stage/$name"
+
+    if [[ ! -x "$stage/$name/usr/bin/lune-voice" ]]; then
+        red "WARN: no usr/bin/lune-voice inside the .deb — skipping tar.gz"
+        rm -rf "$stage"
+        return
+    fi
+
+    # Top-level launcher: resolves its own directory, so the archive runs from
+    # wherever it was extracted.
+    cat > "$stage/$name/lune-voice" <<'LAUNCHER'
+#!/usr/bin/env sh
+here="$(cd "$(dirname "$0")" && pwd)"
+exec "$here/usr/bin/lune-voice" "$@"
+LAUNCHER
+    chmod +x "$stage/$name/lune-voice"
+
+    # The udev rule is the one thing extraction cannot do for the user: without
+    # it /dev/uinput is root-only and keystroke delivery silently fails.
+    cat > "$stage/$name/README.txt" <<README
+Lune Voice $version — portable Linux build ($arch)
+
+Run it:
+
+    ./lune-voice
+
+Text delivery needs write access to /dev/uinput. The .deb and .rpm set this up;
+for this archive, install the rule once and log back in:
+
+    sudo cp usr/lib/udev/rules.d/99-lune-voice-uinput.rules /etc/udev/rules.d/
+    sudo udevadm control --reload-rules && sudo udevadm trigger
+
+Speech models are downloaded by the app on first run into
+~/.local/share/lune-voice/models/ and are not part of this archive.
+
+Licences: usr/lib/Lune Voice/THIRD_PARTY_NOTICES.md
+README
+
+    tar -czf "$ARTIFACTS_DIR/$name.tar.gz" -C "$stage" "$name"
+    ( cd "$ARTIFACTS_DIR" && sha256sum "$name.tar.gz" > "$name.tar.gz.sha256" )
+    rm -rf "$stage"
+
+    green "tar.gz: $name.tar.gz ($(du -h "$ARTIFACTS_DIR/$name.tar.gz" | cut -f1))"
 }
 
-[[ "$WANT_DEB_APPIMAGE" == 1 ]] && build_deb_appimage
-[[ "$WANT_RPM" == 1 ]]          && build_rpm
+[[ "$WANT_BUNDLES" == 1 ]] && build_bundles
+[[ "$WANT_TARBALL" == 1 ]] && build_tarball
 
 bold "==> Artifacts:"
 ls -lh "$ARTIFACTS_DIR" || true

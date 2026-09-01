@@ -68,9 +68,15 @@ build and the platform's Tauri/WebView prerequisites.
 
 ## Build commands
 
-`cgs build` has two profiles. The default is a **native** build tuned to the
-build host (fast, low memory); **release artifacts** must add `--env PORTABLE=1`.
-Backend (CPU vs CUDA) auto-detects unless pinned with `--env BACKEND`.
+`cgs build` **compiles only** — it produces the executable, not installers.
+Shippable `.deb`/`.rpm`/`.AppImage`/`.tar.gz` come from `cgs package`, which
+builds them in a container against an old glibc; a bundle made on the dev box
+links that box's libraries and is not distributable. `--env BUNDLE=1` bundles
+locally anyway, for testing the package layout itself.
+
+It has two profiles. The default is a **native** build tuned to the build host
+(fast, low memory); **release artifacts** must add `--env PORTABLE=1`. Backend
+(CPU vs CUDA) auto-detects unless pinned with `--env BACKEND`.
 
 ```bash
 # Local build (default): NATIVE — ggml targets only this machine's CPU + GPU
@@ -81,6 +87,9 @@ cgs build
 # AVX2 CPU baseline + every common NVIDIA CUDA arch (heavy; needs lots of RAM).
 cgs build --env PORTABLE=1 --env BACKEND=cpu
 cgs build --env PORTABLE=1 --env BACKEND=cuda
+
+# Installers, in a container (see Linux bundles below).
+cgs package
 ```
 
 > **Why two profiles:** with `GGML_NATIVE=OFF` (PORTABLE) ggml compiles ~8 CUDA
@@ -131,10 +140,29 @@ Tauri produces the `.msi`/`.exe` (NSIS) installers configured in
 
 ### Linux bundles
 
-`scripts/release/package-all.sh` builds `.deb` / `.AppImage` / `.rpm` via
-containerized cross-distro builds (honors `$CONTAINER_ENGINE`). It builds the
-CPU backend (`--features whisper-cpp`); GPU support reaches those bundles as the
+`cgs package` (`scripts/release/package-all.sh`) builds `.deb`, `.AppImage`,
+`.rpm` and a portable `.tar.gz` into `release-artifacts/`, in a single
+`ubuntu:22.04` container (honors `$CONTAINER_ENGINE`). It builds the CPU backend
+(`--features whisper-cpp`); GPU support reaches those bundles as the
 downloadable CUDA plugin, not as a second artifact.
+
+One image covers all three package formats because tauri writes RPMs with the
+pure-Rust `rpm` crate — no `rpmbuild`, no Fedora. Ubuntu 22.04 is the right
+single host because it has the oldest glibc of the distros targeted, so its
+binary runs on the newer ones too. The `.rpm`'s `Requires` come from
+`tauri.conf.json`, not from the build host.
+
+The `.tar.gz` is the `.deb` payload repacked, not a second compile: the deb's
+`usr/` tree is kept intact (tauri resolves resources as
+`<prefix>/bin/lune-voice` -> `<prefix>/lib/Lune Voice`) with a top-level
+`lune-voice` launcher and a `README.txt` covering the udev rule. Bundle file
+names are normalized from `Lune Voice_...` to `lune-voice_...`.
+
+| `--env TYPE=` | Produces |
+|---|---|
+| `all` (default) | bundles + tarball |
+| `bundles` | `.deb`, `.AppImage`, `.rpm` |
+| `tarball` | repacks the newest `.deb` already in `release-artifacts/` |
 
 ## macOS Metal (planned, not yet wired)
 

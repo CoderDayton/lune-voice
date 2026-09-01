@@ -170,7 +170,6 @@ case "$BACKEND" in
 esac
 if [ -n "${PORTABLE:-}" ]; then
   # Distributable: portable AVX2 CPU baseline + every common NVIDIA CUDA arch (~8).
-  # Bundles per tauri.conf.json (deb, rpm, appimage).
   # NOTE: deliberately still a static build. The GGML_BACKEND_DL layout needs
   # the ggml shared objects and backend plugins staged into the bundle next to
   # the executable ($ORIGIN), which tauri's `resources` does not do — it stages
@@ -178,7 +177,6 @@ if [ -n "${PORTABLE:-}" ]; then
   # verified end to end, `cgs build` keeps producing the known-good static
   # artifact. `cgs dev` + `cgs stage-runtime` exercise the plugin path.
   GGML_FLAGS="GGML_NATIVE=OFF GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON"
-  BUNDLE_ARGS=""
   # The GGML flags above make only the C++ half portable; this pins the Rust
   # half to the same baseline. x86-64-v3 is AVX2 + FMA + F16C.
   case "$(uname -m)" in
@@ -189,20 +187,26 @@ if [ -n "${PORTABLE:-}" ]; then
 else
   # Local (default): native to this machine — ggml targets only the build host's
   # CPU and GPU arch, so the CUDA compile stays small and won't exhaust RAM.
-  # Only deb + appimage: rpm bundling xz-compresses the (large) CUDA binary and
-  # is slow + useless on Debian/Pop!_OS. Override with `--env BUNDLES="deb"` etc.
   # Static, for the same reason as the PORTABLE branch above.
   GGML_FLAGS="GGML_NATIVE=ON"
-  BUNDLE_ARGS="--bundles ${BUNDLES:-deb appimage}"
   # Host-tuned Rust codegen to match GGML_NATIVE. This is opt-in per build
   # rather than pinned in `.cargo/config.toml`, so a plain `cargo build
   # --release` stays portable.
   export RUSTFLAGS="${RUSTFLAGS:--C target-cpu=native}"
   echo "Building NATIVE $BACKEND build (this machine only): --features \"$FEATURES\" RUSTFLAGS=\"$RUSTFLAGS\""
 fi
+# Compile only. The shippable installers are `cgs package`, which builds them in
+# containers against an old glibc so they install on other distros — a bundle
+# made here links this machine's libraries and is not distributable. Pass
+# --env BUNDLE=1 to bundle locally anyway, for testing the .deb layout itself.
+if [ -n "${BUNDLE:-}" ]; then
+  BUNDLE_ARGS="--bundles ${BUNDLES:-deb appimage}"
+else
+  BUNDLE_ARGS="--no-bundle"
+fi
 env $GGML_FLAGS APPIMAGE_EXTRACT_AND_RUN=1 bun tauri build --features "$FEATURES" $BUNDLE_ARGS
 '''
-info = "Desktop app — native to this machine (CUDA auto-detected). --env PORTABLE=1 for a distributable build; --env BACKEND=cpu|cuda to force. See docs/RELEASE.md"
+info = "Compile the desktop app, no installers — native to this machine (CUDA auto-detected). --env PORTABLE=1 for portable codegen; --env BACKEND=cpu|cuda to force; --env BUNDLE=1 to also bundle locally. Installers: cgs package. See docs/RELEASE.md"
 requires = ["bun"]
 
 [scripts.stage-runtime]
@@ -546,7 +550,7 @@ interpreter = "bash"
 command = '''
 bash scripts/release/package-all.sh "${TYPE:-all}"
 '''
-info = "Build .deb/.AppImage/.rpm via Docker (--env TYPE=all|deb-appimage|rpm)"
+info = "Build the distributable Linux artifacts in one Ubuntu 22.04 container into release-artifacts/: .deb, .AppImage, .rpm and a portable .tar.gz (--env TYPE=all|bundles|tarball)"
 
 # ── CI / composite ──────────────────────────────────────────────────────────
 
