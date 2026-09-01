@@ -42,7 +42,8 @@ export interface WorkspaceSettings {
   pillCorner: PillCornerValue;
   language: string;
   dictationLanguage: string;
-  micPrewarm: boolean;
+  /** Minutes idle before the ASR model is freed; null = keep it loaded. */
+  modelIdleUnloadMinutes: number | null;
   /** Preferred microphone device name; null = system default. */
   inputDevice: string | null;
   vadPcen: boolean;
@@ -161,7 +162,7 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   pillCorner: 'Rounded',
   language: 'en',
   dictationLanguage: 'auto',
-  micPrewarm: true,
+  modelIdleUnloadMinutes: null,
   inputDevice: null,
   vadPcen: true,
   startMinimized: false,

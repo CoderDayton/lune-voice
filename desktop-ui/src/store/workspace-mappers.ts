@@ -72,7 +72,8 @@ export function mapWorkspaceSettings(snapshot: WorkspaceSnapshot): WorkspaceSett
     pillCorner: snapshot.settings.pillCorner ?? DEFAULT_SETTINGS.pillCorner,
     language: snapshot.settings.language ?? 'en',
     dictationLanguage: snapshot.settings.dictationLanguage ?? 'auto',
-    micPrewarm: snapshot.settings.micPrewarm ?? DEFAULT_SETTINGS.micPrewarm,
+    modelIdleUnloadMinutes:
+      snapshot.settings.modelIdleUnloadMinutes ?? DEFAULT_SETTINGS.modelIdleUnloadMinutes,
     inputDevice: snapshot.settings.inputDevice ?? DEFAULT_SETTINGS.inputDevice,
     vadPcen: snapshot.settings.vadPcen ?? DEFAULT_SETTINGS.vadPcen,
     startMinimized: snapshot.settings.startMinimized ?? DEFAULT_SETTINGS.startMinimized,
@@ -146,7 +147,7 @@ export function settingsToSaveInput(settings: WorkspaceSettings): SaveWorkspaceS
     pillCorner: settings.pillCorner,
     language: settings.language,
     dictationLanguage: settings.dictationLanguage,
-    micPrewarm: settings.micPrewarm,
+    modelIdleUnloadMinutes: settings.modelIdleUnloadMinutes,
     inputDevice: settings.inputDevice,
     vadPcen: settings.vadPcen,
     startMinimized: settings.startMinimized,

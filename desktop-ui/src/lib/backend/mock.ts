@@ -47,7 +47,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
       pillCorner: 'Rounded',
       language: 'en',
       dictationLanguage: 'auto',
-      micPrewarm: true,
+      modelIdleUnloadMinutes: null,
       inputDevice: null,
       vadPcen: true,
       startMinimized: false,

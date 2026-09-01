@@ -127,13 +127,26 @@ mod tests {
         assert_eq!(parsed.default_style, None);
         assert_eq!(parsed.language, "auto");
         assert_eq!(parsed.dictation_language, "auto");
-        assert!(parsed.mic_prewarm);
         assert!(parsed.vad_pcen);
         assert!(matches!(
             parsed.asr_backend,
             AsrBackendConfig::WhisperCpp { .. }
         ));
         assert!(matches!(parsed.llm_backend, LlmBackendConfig::Disabled));
+    }
+
+    /// `mic_prewarm` was removed — the capture stream is always kept open — so
+    /// every settings.toml written before that still carries the key. Parsing
+    /// has to ignore it rather than fail, or an existing install is quarantined
+    /// on upgrade and silently loses every other setting in the file.
+    #[test]
+    fn a_settings_file_with_the_removed_mic_prewarm_key_still_parses() {
+        for value in ["true", "false"] {
+            let parsed: UserSettings =
+                toml::from_str(&format!("mic_prewarm = {value}\nlanguage = \"en\"\n"))
+                    .expect("a removed key must be ignored, not rejected");
+            assert_eq!(parsed.language, "en");
+        }
     }
 
     #[test]

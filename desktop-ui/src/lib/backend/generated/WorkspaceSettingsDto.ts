@@ -32,7 +32,11 @@ llmSkipThreshold: number | null, stylePreset: string | null, hotkeyToggle: strin
 /**
  * Monitor connector name the pill is pinned to; null = automatic.
  */
-pillMonitor: string | null, pillAllWorkspaces: boolean, pillSize: PillSizeDto, pillOrientation: PillOrientationDto, pillCorner: PillCornerDto, language: string, dictationLanguage: string, micPrewarm: boolean, 
+pillMonitor: string | null, pillAllWorkspaces: boolean, pillSize: PillSizeDto, pillOrientation: PillOrientationDto, pillCorner: PillCornerDto, language: string, dictationLanguage: string, 
+/**
+ * Minutes without a dictation before the ASR model is freed; null = never.
+ */
+modelIdleUnloadMinutes: number | null, 
 /**
  * Preferred microphone input device by name; null = system default.
  */

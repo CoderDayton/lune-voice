@@ -259,6 +259,43 @@ export function historyRetentionDays(value: HistoryRetentionValue): number | nul
   return Number(value);
 }
 
+export type ModelIdleUnloadValue = 'never' | '5' | '15' | '30' | '60' | '120';
+
+export const modelIdleUnloadOptions: DescriptiveOptionData<ModelIdleUnloadValue>[] = [
+  {
+    value: 'never',
+    label: 'Keep loaded',
+    description: 'The model stays in memory. Every dictation starts instantly.',
+  },
+  { value: '5', label: 'After 5 minutes' },
+  { value: '15', label: 'After 15 minutes' },
+  { value: '30', label: 'After 30 minutes' },
+  { value: '60', label: 'After 1 hour' },
+  { value: '120', label: 'After 2 hours' },
+];
+
+/** The dropdown value for a stored `modelIdleUnloadMinutes`; `null` is off. */
+export function modelIdleUnloadValue(minutes: number | null): ModelIdleUnloadValue {
+  if (minutes == null) return 'never';
+  const exact = String(minutes) as ModelIdleUnloadValue;
+  if (modelIdleUnloadOptions.some((o) => o.value === exact)) return exact;
+  // A hand-edited settings.toml can hold a timeout that isn't on the list.
+  // Snap it to the nearest listed one: the dropdown falls back to its *first*
+  // option for an unknown value, which would read "Keep loaded" for a setting
+  // that does in fact unload.
+  const timed = modelIdleUnloadOptions
+    .map((o) => o.value)
+    .filter((v): v is Exclude<ModelIdleUnloadValue, 'never'> => v !== 'never');
+  return timed.reduce((best, v) =>
+    Math.abs(Number(v) - minutes) < Math.abs(Number(best) - minutes) ? v : best,
+  );
+}
+
+/** Inverse of {@link modelIdleUnloadValue}: the number of minutes to persist. */
+export function modelIdleUnloadMinutes(value: ModelIdleUnloadValue): number | null {
+  return value === 'never' ? null : Number(value);
+}
+
 export function labelFor<V extends string>(options: Option<V>[], value: V): string {
   return options.find((o) => o.value === value)?.label ?? value;
 }

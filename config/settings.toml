@@ -63,12 +63,13 @@ terminal_mode = "Auto"
 # Remove this key (or comment it out) to disable history entirely.
 session_history_days = 30
 
-# Keep the microphone input stream open across sessions so the first audio
-# chunk arrives immediately after a hotkey press (eliminates ~100–500 ms of
-# cold cpal/alsa init latency). The mic remains powered/visible to the OS
-# while the app runs; set to false if you prefer the indicator only
-# appearing during dictation.
-mic_prewarm = true
+# Free the loaded ASR model after this many minutes without a dictation, and
+# reload it on the next hotkey press. Omit (the default) to keep it loaded for
+# the life of the process. The model is nearly the whole memory footprint
+# (514 MB on the default Medium); a reload costs ~160 ms when the model file is
+# still in the OS page cache and ~750 ms when it is not. Microphone audio is
+# buffered across the reload, so nothing you say during it is lost.
+# model_idle_unload_minutes = 30
 
 # Enable the PCEN-style adaptive AGC frontend before the VAD.
 # Improves robustness on quiet mics and noisy environments.

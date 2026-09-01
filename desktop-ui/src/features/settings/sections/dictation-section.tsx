@@ -133,20 +133,6 @@ export function DictationSection({ settings }: SettingsProps) {
             />
           }
         />
-
-        <SettingsRow
-          label={t`Pre-warm microphone`}
-          description={t`Keep the mic open in the background so dictation starts ~70ms sooner. The OS may show a recording indicator while Lune Voice is running.`}
-          control={
-            <input
-              type="checkbox"
-              className="toggle toggle-primary"
-              checked={settings.micPrewarm}
-              onChange={() => void saveWorkspaceSetting('micPrewarm', !settings.micPrewarm)}
-              aria-label={t`Pre-warm microphone`}
-            />
-          }
-        />
       </SettingsSection>
     </div>
   );

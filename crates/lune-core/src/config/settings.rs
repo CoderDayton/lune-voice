@@ -90,7 +90,8 @@ where
 /// A new setting belongs **here at top level** when it is a *binary
 /// feature toggle or session-level preference* that the session reads
 /// directly at start time and that has no per-backend default —
-/// e.g. `mic_prewarm`, `vad_pcen`, hotkey config, language. These bypass
+/// e.g. `vad_pcen`, `model_idle_unload_minutes`, hotkey config, language.
+/// These bypass
 /// the pipeline merge and are read straight from `UserSettings` in
 /// `SessionManager` / `AppRuntime`.
 ///
@@ -210,12 +211,19 @@ pub struct UserSettings {
     /// `None` inherits the active backend's recommended default.
     #[serde(default)]
     pub pipeline: PipelineOverrides,
-    /// Keep the microphone input stream open across sessions so the first
-    /// chunk arrives ~70 ms sooner after a hotkey press. The mic remains
-    /// powered/visible to the OS while the app runs; turn this off if you
-    /// prefer the indicator only appearing during dictation.
-    #[serde(default = "default_true")]
-    pub mic_prewarm: bool,
+    /// Free the loaded ASR model after this many minutes without a dictation,
+    /// reloading it on the next hotkey press. `None` (the default) keeps it
+    /// resident for the life of the process.
+    ///
+    /// The model is the process's whole memory footprint — 514 MB for the
+    /// default Medium — so unloading gives nearly all of it back, in single-digit
+    /// milliseconds. What it costs is on the way back in: a reload is ~160 ms
+    /// when the model file is still in the OS page cache and ~750 ms when it is
+    /// not (measured on Medium; `cgs bench --env TYPE=modelload`). That is paid
+    /// on the next hotkey press, which is why the start path buffers microphone
+    /// audio across the reload instead of opening the mic after it.
+    #[serde(default)]
+    pub model_idle_unload_minutes: Option<u32>,
     /// Preferred microphone input device, by name. `None` (default) uses the
     /// system default input. A saved device that is no longer present falls
     /// back to the default at capture-open time — never fatal.
@@ -355,7 +363,7 @@ impl Default for UserSettings {
             max_speech_secs: default_max_speech_secs(),
             adaptive_vad: false,
             pipeline: PipelineOverrides::default(),
-            mic_prewarm: true,
+            model_idle_unload_minutes: None,
             input_device: None,
             vad_pcen: true,
             start_minimized: false,

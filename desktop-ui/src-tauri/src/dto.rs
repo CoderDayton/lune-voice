@@ -307,7 +307,8 @@ pub struct WorkspaceSettingsDto {
     pub pill_corner: PillCornerDto,
     pub language: String,
     pub dictation_language: String,
-    pub mic_prewarm: bool,
+    /// Minutes without a dictation before the ASR model is freed; null = never.
+    pub model_idle_unload_minutes: Option<u32>,
     /// Preferred microphone input device by name; null = system default.
     pub input_device: Option<String>,
     pub vad_pcen: bool,
@@ -571,7 +572,9 @@ pub struct SaveWorkspaceSettingsInput {
     pub pill_corner: PillCornerDto,
     pub language: String,
     pub dictation_language: String,
-    pub mic_prewarm: bool,
+    /// Minutes without a dictation before the ASR model is freed; null = never.
+    #[serde(default)]
+    pub model_idle_unload_minutes: Option<u32>,
     /// Preferred microphone input device by name; null = system default.
     #[serde(default)]
     pub input_device: Option<String>,

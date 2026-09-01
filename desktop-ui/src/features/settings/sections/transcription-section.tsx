@@ -11,7 +11,12 @@ import {
   SettingsRow,
   SettingsSection,
 } from '../components/section';
-import { dictationLanguages } from '../data/settings-data';
+import {
+  dictationLanguages,
+  modelIdleUnloadMinutes,
+  modelIdleUnloadOptions,
+  modelIdleUnloadValue,
+} from '../data/settings-data';
 import { useDebouncedSetting } from '../hooks/use-debounced-setting';
 
 export function TranscriptionSection({
@@ -81,6 +86,20 @@ export function TranscriptionSection({
               checked={settings.useGpu}
               onChange={() => void saveWorkspaceSetting('useGpu', !settings.useGpu)}
               aria-label={t`Use hardware acceleration`}
+            />
+          }
+        />
+        <SettingsRow
+          label={t`Free the model when idle`}
+          description={t`Give the memory back after a quiet spell. The next dictation reloads the model, which adds up to a second before it starts listening — your speech is recorded during the wait, so nothing is lost.`}
+          control={
+            <DescriptiveDropdown
+              value={modelIdleUnloadValue(settings.modelIdleUnloadMinutes)}
+              options={modelIdleUnloadOptions}
+              ariaLabel={t`Free the model when idle`}
+              onChange={(next) =>
+                void saveWorkspaceSetting('modelIdleUnloadMinutes', modelIdleUnloadMinutes(next))
+              }
             />
           }
         />

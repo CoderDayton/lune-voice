@@ -55,7 +55,11 @@ struct RuntimeInner {
     last_toggle_at: Mutex<Instant>,
     /// Separate debounce for cancel so it isn't blocked by a recent toggle.
     last_cancel_at: Mutex<Instant>,
-    /// Long-lived microphone capture stream when `mic_prewarm` is enabled.
+    /// When a dictation last started or ended — the clock the idle model-unload
+    /// watchdog measures against. Reset in `set_pipeline_session`, which every
+    /// session transition passes through.
+    last_activity: Mutex<Instant>,
+    /// Long-lived microphone capture stream, always open while the app runs.
     /// Sessions consume via `AudioStreamHandle` so the cpal::Stream stays
     /// open across hotkey presses and the first chunk arrives ~70 ms sooner.
     prewarmed_audio: Mutex<Option<PrewarmedStream>>,
@@ -364,11 +368,13 @@ impl AppRuntime {
                 delivery,
                 last_toggle_at: Mutex::new(Instant::now() - TOGGLE_DEBOUNCE),
                 last_cancel_at: Mutex::new(Instant::now() - CANCEL_DEBOUNCE),
+                last_activity: Mutex::new(Instant::now()),
                 prewarmed_audio: Mutex::new(None),
             }),
         };
 
-        runtime.sync_mic_prewarm(None, None).await;
+        runtime.sync_capture_device(None).await;
+        runtime.spawn_idle_unload_watchdog();
 
         Ok(runtime)
     }
@@ -384,20 +390,31 @@ impl AppRuntime {
         settings.sound_cue_volume = volume.clamp(0.0, 1.0);
     }
 
-    /// Reconcile the long-lived audio stream with the desired `mic_prewarm`
-    /// state and input device. For each argument, `None` reads the current
-    /// in-memory setting (suitable for startup); a `Some(_)` override is used
-    /// after a settings save, when `inner.settings` is stale until the next
-    /// pipeline rebuild. `device` is `Option<Option<String>>`: the outer
-    /// `None` reads the setting, `Some(d)` overrides with device `d` (where
-    /// the inner `None` means the system default).
-    pub async fn sync_mic_prewarm(&self, want: Option<bool>, device: Option<Option<String>>) {
-        let (want, input_device) = {
-            let settings = self.inner.settings.read().await;
-            (
-                want.unwrap_or(settings.mic_prewarm),
-                device.unwrap_or_else(|| settings.input_device.clone()),
-            )
+    /// Push the saved idle-unload timeout into `inner.settings` immediately.
+    ///
+    /// The watchdog reads it from there on every tick, and `inner.settings` is
+    /// otherwise stale until the next pipeline rebuild — so without this,
+    /// switching the feature on would not take effect until the dictation
+    /// after next. Same reason and same shape as [`Self::sync_sound_cues`].
+    pub async fn sync_idle_unload(&self, minutes: Option<u32>) {
+        self.inner.settings.write().await.model_idle_unload_minutes = minutes;
+    }
+
+    /// Reconcile the long-lived capture stream with the desired input device.
+    ///
+    /// The stream itself is unconditional — it is what makes the start path
+    /// record from the instant the hotkey is pressed, across a model reload
+    /// included — so this only ever opens or rebuilds one, never closes it.
+    ///
+    /// `device` is `Option<Option<String>>`: the outer `None` reads the current
+    /// setting (suitable for startup), `Some(d)` overrides with device `d`
+    /// (where the inner `None` means the system default). The override exists
+    /// because `inner.settings` is stale after a save until the next pipeline
+    /// rebuild.
+    pub async fn sync_capture_device(&self, device: Option<Option<String>>) {
+        let input_device = match device {
+            Some(d) => d,
+            None => self.inner.settings.read().await.input_device.clone(),
         };
         let mut slot = self.inner.prewarmed_audio.lock().await;
         let open = slot.as_ref().map(|p| p.device.as_deref());
@@ -405,13 +422,9 @@ impl AppRuntime {
         if !healthy {
             warn!("mic prewarm: the open capture stream reported an error; rebuilding it");
         }
-        let action = reconcile_prewarm(open, want, input_device.as_deref(), healthy);
+        let action = reconcile_prewarm(open, input_device.as_deref(), healthy);
         match action {
             PrewarmAction::Keep => {}
-            PrewarmAction::Close => {
-                debug!("mic prewarm: closing capture stream");
-                *slot = None;
-            }
             PrewarmAction::Open | PrewarmAction::Reopen => {
                 if action == PrewarmAction::Reopen {
                     debug!("mic prewarm: input device changed, rebuilding capture stream");
@@ -439,7 +452,41 @@ impl AppRuntime {
 
     async fn prewarmed_handle(&self) -> Option<lune_audio::AudioStreamHandle> {
         let slot = self.inner.prewarmed_audio.lock().await;
-        slot.as_ref().map(|p| p.stream.handle())
+        // A stream cpal has reported an error on still hands out handles, but
+        // they never produce a chunk — and nothing rebuilds the stream until
+        // the next settings save. Report it as absent so the start path falls
+        // back to `open_capture_for_start` and the dictation actually records,
+        // instead of running the 5 s starvation watchdog on a dead ring.
+        slot.as_ref()
+            .filter(|p| !p.stream.has_failed())
+            .map(|p| p.stream.handle())
+    }
+
+    /// Open a capture stream for one session, for the case where the
+    /// long-lived stream is missing — its device failed to open, or was
+    /// unplugged and has not been rebuilt yet.
+    ///
+    /// Called on the start path *before* the pipeline is prepared, so its ring
+    /// (≈10 s) is already filling while a model loads. The session would
+    /// otherwise open the mic itself inside `run_capture` — after the load —
+    /// and everything said in the meantime would be gone.
+    ///
+    /// `None` on failure, which restores the old behaviour exactly: the
+    /// session opens its own stream and reports the error the same way it
+    /// always did. Nothing here is worth failing a dictation over.
+    async fn open_capture_for_start(&self) -> Option<AudioStream> {
+        let input_device = self.inner.settings.read().await.input_device.clone();
+        let config = AudioConfig {
+            input_device,
+            ..AudioConfig::default()
+        };
+        match AudioStream::new(config) {
+            Ok(stream) => Some(stream),
+            Err(e) => {
+                debug!("start: could not pre-open capture stream ({e}); session will open its own");
+                None
+            }
+        }
     }
 
     /// Return the persisted `start_minimized` preference. Read at app
@@ -580,6 +627,13 @@ impl AppRuntime {
     }
 
     pub async fn eager_rebuild(&self) -> Result<(), String> {
+        // Same gate as `prepare_manager_for_start` and `reload_pipeline_if_required`:
+        // this is the third path that rebuilds outside the `pipeline` lock, so
+        // without it a post-download rebuild can run concurrently with a start's
+        // build (two model loads) or with an idle unload — which would then be
+        // silently undone when this installs its freshly built pipeline.
+        let _start_guard = self.inner.start_gate.lock().await;
+
         let (paths, reuse_asr, released) = {
             let mut pipeline = self.inner.pipeline.lock().await;
             if pipeline.is_busy() {
@@ -650,6 +704,15 @@ impl AppRuntime {
         if let Some(handle) = &prewarmed {
             handle.drain_keep_last(6);
         }
+        // Nothing prewarmed: open the mic *here*, ahead of the model load,
+        // rather than letting the session open it afterwards. Both paths then
+        // buffer into a ring from the moment the key was pressed, so a reload
+        // — an idle unload's especially, at ~160 ms warm and ~750 ms cold — is
+        // spent recording rather than deaf.
+        let fallback_stream = match prewarmed {
+            Some(_) => None,
+            None => self.open_capture_for_start().await,
+        };
 
         // Capture focus off the start path: the value is only consumed at
         // delivery time (many seconds later), but the underlying Wayland /
@@ -685,9 +748,10 @@ impl AppRuntime {
             }
         };
         let (event_tx, event_rx) = mpsc::channel(256);
-        let start_result = match prewarmed {
-            Some(handle) => manager.start_with_handle(event_tx, handle).await,
-            None => manager.start(event_tx).await,
+        let start_result = match (prewarmed, fallback_stream) {
+            (Some(handle), _) => manager.start_with_handle(event_tx, handle).await,
+            (None, Some(stream)) => manager.start_with_audio(event_tx, stream).await,
+            (None, None) => manager.start(event_tx).await,
         };
         let session_id = match start_result {
             Ok(session_id) => session_id,
@@ -735,6 +799,12 @@ impl AppRuntime {
         if let Some(handle) = &prewarmed {
             handle.drain_keep_last(6);
         }
+        // Same reason as `start_dictation`: get a ring filling before the
+        // (possibly reloading) pipeline prep, not after it.
+        let fallback_stream = match prewarmed {
+            Some(_) => None,
+            None => self.open_capture_for_start().await,
+        };
 
         let manager = match self.prepare_manager_for_start().await {
             Ok(m) => m,
@@ -752,9 +822,10 @@ impl AppRuntime {
             }
         };
         let (event_tx, event_rx) = mpsc::channel(256);
-        let start_result = match prewarmed {
-            Some(handle) => manager.start_capture_with_handle(event_tx, handle).await,
-            None => manager.start_capture(event_tx).await,
+        let start_result = match (prewarmed, fallback_stream) {
+            (Some(handle), _) => manager.start_capture_with_handle(event_tx, handle).await,
+            (None, Some(stream)) => manager.start_capture_with_audio(event_tx, stream).await,
+            (None, None) => manager.start_capture(event_tx).await,
         };
         let session_id = match start_result {
             Ok(session_id) => session_id,
@@ -1313,6 +1384,80 @@ impl AppRuntime {
             PipelineState::Idle
         };
         pipeline.abort_pending_start = false;
+        // Every session start and end passes through here, so this is the one
+        // place the idle clock has to be reset — no call site can forget it.
+        *self.inner.last_activity.lock().await = Instant::now();
+    }
+
+    /// Free the loaded ASR model after a long enough gap between dictations,
+    /// giving back the process's whole model footprint (514 MB on the default
+    /// Medium) until the next hotkey press reloads it.
+    ///
+    /// A polling watchdog rather than a timer armed at each session end: the
+    /// timeout can be changed in the settings UI and the model can be loaded or
+    /// released by half a dozen other paths, and re-reading that state on a
+    /// tick is simpler — and has fewer ways to be wrong — than keeping a timer
+    /// in sync with all of them. [`idle_unload_decision`] holds the policy and
+    /// picks each sleep, so the loop below is only a clock.
+    fn spawn_idle_unload_watchdog(&self) {
+        let runtime = self.clone();
+        tauri::async_runtime::spawn(async move {
+            loop {
+                let timeout = runtime
+                    .inner
+                    .settings
+                    .read()
+                    .await
+                    .model_idle_unload_minutes
+                    .map(|m| Duration::from_secs(u64::from(m) * 60));
+
+                let (busy, loaded) = {
+                    let pipeline = runtime.inner.pipeline.lock().await;
+                    (pipeline.is_busy(), pipeline.asr.is_some())
+                };
+                // Belt and braces alongside the reset in `set_pipeline_session`:
+                // that one is exact, this one guarantees a long dictation can
+                // never age into its own unload deadline.
+                if busy {
+                    *runtime.inner.last_activity.lock().await = Instant::now();
+                }
+                let idle_for = runtime.inner.last_activity.lock().await.elapsed();
+
+                match idle_unload_decision(timeout, idle_for, busy, loaded) {
+                    IdleAction::Wait(d) => tokio::time::sleep(d).await,
+                    IdleAction::Unload => runtime.unload_idle_model().await,
+                }
+            }
+        });
+    }
+
+    /// Take the loaded model out of the pipeline and free it.
+    ///
+    /// Reuses the reload machinery rather than adding a second teardown path:
+    /// a [`ReloadScope::Full`] is exactly "the loaded backend is no longer
+    /// valid", which is what an idle unload means. Leaving the scope set is
+    /// what makes the next `prepare_manager_for_start` rebuild — and it is
+    /// deliberately not cleared here, so a start that races this unload
+    /// reloads rather than running against a half-torn-down pipeline.
+    ///
+    /// The busy re-check under the lock is the race that matters: the watchdog
+    /// samples `busy` before sleeping, and a dictation can start in between.
+    async fn unload_idle_model(&self) {
+        // Same gate the rebuild paths take, so this cannot interleave with a
+        // `build_pipeline` and free a model that is being installed.
+        let _start_guard = self.inner.start_gate.lock().await;
+
+        let released = {
+            let mut pipeline = self.inner.pipeline.lock().await;
+            if pipeline.is_busy() || pipeline.asr.is_none() {
+                return;
+            }
+            pipeline.reload = pipeline.reload.max(ReloadScope::Full);
+            let (_, released) = pipeline.take_reload_plan();
+            released
+        };
+        release_backend(released).await;
+        info!("ASR model unloaded after idle timeout; the next dictation reloads it");
     }
 }
 
@@ -1543,8 +1688,6 @@ enum PrewarmAction {
     Keep,
     /// Open a fresh stream on the desired device.
     Open,
-    /// Tear down the open stream.
-    Close,
     /// Close and reopen on the desired device — the device changed under us.
     Reopen,
 }
@@ -1553,21 +1696,68 @@ enum PrewarmAction {
 /// stream: `None` = nothing open; `Some(dev)` = open on `dev`, where `dev` is
 /// `None` for the system default. Comparing the open device against `desired`
 /// is what makes a device change rebuild the stream live (no restart needed).
+///
+/// There is no "close" outcome: the capture stream is always wanted. It is what
+/// lets the start path record from the moment the hotkey is pressed, including
+/// across a model reload, so tearing it down would only reintroduce the lost
+/// first words it exists to prevent.
 fn reconcile_prewarm(
     open: Option<Option<&str>>,
-    want: bool,
     desired: Option<&str>,
     healthy: bool,
 ) -> PrewarmAction {
-    match (want, open) {
-        (false, Some(_)) => PrewarmAction::Close,
-        (false, None) => PrewarmAction::Keep,
-        (true, None) => PrewarmAction::Open,
+    match open {
+        None => PrewarmAction::Open,
         // A stream on the right device is still useless if cpal has reported an
         // error on it — the usual cause is the device being unplugged, and the
         // name it was opened under does not change when that happens.
-        (true, Some(current)) if current == desired && healthy => PrewarmAction::Keep,
-        (true, Some(_)) => PrewarmAction::Reopen,
+        Some(current) if current == desired && healthy => PrewarmAction::Keep,
+        Some(_) => PrewarmAction::Reopen,
+    }
+}
+
+/// What the idle-unload watchdog should do on this tick.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum IdleAction {
+    /// Free the loaded model now.
+    Unload,
+    /// Nothing to do yet; look again after this long. Never zero, so a caller
+    /// looping on it cannot spin.
+    Wait(Duration),
+}
+
+/// Longest a watchdog tick will sleep before re-reading its inputs. The timeout
+/// and the loaded/busy state can all change while it waits, so even a 12-hour
+/// setting is re-examined on this cadence rather than committing to one long
+/// sleep it would have to be woken out of.
+const IDLE_POLL_CEILING: Duration = Duration::from_secs(60);
+
+/// Decide whether the idle model-unload should fire.
+///
+/// Pure, so the policy is testable without a Tauri app handle, a model, or a
+/// real clock — the watchdog around it only sleeps and calls the unload.
+///
+/// `timeout` is `None` when the feature is off. `loaded` is false when there is
+/// nothing to free, which is both the already-unloaded case and the
+/// never-built one. `busy` covers a dictation that is running *or* still
+/// loading: unloading under either would free a model in active use.
+fn idle_unload_decision(
+    timeout: Option<Duration>,
+    idle_for: Duration,
+    busy: bool,
+    loaded: bool,
+) -> IdleAction {
+    // A disabled or already-satisfied watchdog still ticks, because the setting
+    // can be switched on and a model can be loaded between two ticks.
+    let Some(timeout) = timeout.filter(|_| loaded && !busy) else {
+        return IdleAction::Wait(IDLE_POLL_CEILING);
+    };
+    match timeout.checked_sub(idle_for) {
+        // `checked_sub` yields `Some(0)` exactly at the deadline, which is due.
+        Some(remaining) if !remaining.is_zero() => {
+            IdleAction::Wait(remaining.min(IDLE_POLL_CEILING))
+        }
+        _ => IdleAction::Unload,
     }
 }
 
@@ -1588,6 +1778,105 @@ fn cue_for_transition(prev: &str, status: &str) -> Option<lune_voice::sound::Cue
         "processing" if prev == "listening" => Some(Cue::Stop),
         "error" if prev != "error" => Some(Cue::Error),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod idle_unload_tests {
+    use super::{IDLE_POLL_CEILING, IdleAction, idle_unload_decision};
+    use std::time::Duration;
+
+    const HALF_HOUR: Duration = Duration::from_secs(30 * 60);
+
+    /// Loaded, idle, and past the deadline — the case the feature exists for.
+    #[test]
+    fn fires_once_the_timeout_has_elapsed() {
+        assert_eq!(
+            idle_unload_decision(
+                Some(HALF_HOUR),
+                HALF_HOUR + Duration::from_secs(1),
+                false,
+                true
+            ),
+            IdleAction::Unload
+        );
+    }
+
+    /// Exactly at the deadline counts as elapsed, not as "one more tick".
+    #[test]
+    fn fires_exactly_on_the_deadline() {
+        assert_eq!(
+            idle_unload_decision(Some(HALF_HOUR), HALF_HOUR, false, true),
+            IdleAction::Unload
+        );
+    }
+
+    /// Short of the deadline the watchdog waits precisely the remainder, so a
+    /// 5-minute timeout does not have to wait out a 60-second poll interval.
+    #[test]
+    fn waits_the_exact_remainder_when_it_fits_under_the_ceiling() {
+        let timeout = Duration::from_secs(90);
+        assert_eq!(
+            idle_unload_decision(Some(timeout), Duration::from_secs(45), false, true),
+            IdleAction::Wait(Duration::from_secs(45))
+        );
+    }
+
+    /// A long remainder is capped, so the timeout and the loaded/busy state are
+    /// re-read regularly instead of being committed to for half an hour.
+    #[test]
+    fn caps_a_long_wait_at_the_poll_ceiling() {
+        assert_eq!(
+            idle_unload_decision(Some(HALF_HOUR), Duration::ZERO, false, true),
+            IdleAction::Wait(IDLE_POLL_CEILING)
+        );
+    }
+
+    /// Off means off, however long the machine has been idle.
+    #[test]
+    fn never_unloads_when_the_setting_is_off() {
+        assert_eq!(
+            idle_unload_decision(None, Duration::from_secs(86_400), false, true),
+            IdleAction::Wait(IDLE_POLL_CEILING)
+        );
+    }
+
+    /// The important safety property: a dictation that is running or still
+    /// loading must never have its model freed underneath it, no matter how
+    /// stale `idle_for` looks.
+    #[test]
+    fn never_unloads_while_busy() {
+        assert_eq!(
+            idle_unload_decision(Some(HALF_HOUR), HALF_HOUR * 10, true, true),
+            IdleAction::Wait(IDLE_POLL_CEILING)
+        );
+    }
+
+    /// Nothing loaded means nothing to free — and re-firing would keep
+    /// re-entering the unload path forever.
+    #[test]
+    fn does_not_fire_when_no_model_is_loaded() {
+        assert_eq!(
+            idle_unload_decision(Some(HALF_HOUR), HALF_HOUR * 10, false, false),
+            IdleAction::Wait(IDLE_POLL_CEILING)
+        );
+    }
+
+    /// A zero timeout is degenerate but must not produce a zero-length wait —
+    /// a caller looping on `Wait` would spin the CPU.
+    #[test]
+    fn a_wait_is_never_zero_length() {
+        for idle in [Duration::ZERO, Duration::from_secs(1), HALF_HOUR] {
+            for timeout in [Duration::ZERO, Duration::from_secs(1), HALF_HOUR] {
+                if let IdleAction::Wait(d) = idle_unload_decision(Some(timeout), idle, false, true)
+                {
+                    assert!(
+                        !d.is_zero(),
+                        "zero wait for timeout={timeout:?} idle={idle:?}"
+                    );
+                }
+            }
+        }
     }
 }
 
@@ -1821,17 +2110,12 @@ mod tests {
         assert_eq!(cue_for_transition("ready", "processing"), None);
     }
 
-    /// The follow-up behavior: when the chosen device changes while prewarm
-    /// stays enabled, the open stream must be rebuilt (Reopen), not left on the
-    /// stale device.
+    /// The follow-up behavior: when the chosen device changes, the open stream
+    /// must be rebuilt (Reopen), not left on the stale device.
     #[test]
-    fn reconcile_reopens_when_device_changes_while_enabled() {
-        let action = reconcile_prewarm(
-            Some(Some("Built-in Microphone")),
-            true,
-            Some("USB Headset"),
-            true,
-        );
+    fn reconcile_reopens_when_device_changes() {
+        let action =
+            reconcile_prewarm(Some(Some("Built-in Microphone")), Some("USB Headset"), true);
         assert_eq!(action, PrewarmAction::Reopen);
     }
 
@@ -1841,55 +2125,37 @@ mod tests {
         // alone keeps the dead stream and every later dictation burns the 5 s
         // starvation watchdog until an unrelated setting is touched.
         assert_eq!(
-            reconcile_prewarm(Some(Some("USB Headset")), true, Some("USB Headset"), false),
+            reconcile_prewarm(Some(Some("USB Headset")), Some("USB Headset"), false),
             PrewarmAction::Reopen
         );
         assert_eq!(
-            reconcile_prewarm(Some(None), true, None, false),
+            reconcile_prewarm(Some(None), None, false),
             PrewarmAction::Reopen
-        );
-        // A failed stream nobody wants any more is still just closed.
-        assert_eq!(
-            reconcile_prewarm(Some(None), false, None, false),
-            PrewarmAction::Close
         );
     }
 
     #[test]
     fn reconcile_keeps_when_device_unchanged() {
         assert_eq!(
-            reconcile_prewarm(Some(Some("USB Headset")), true, Some("USB Headset"), true),
+            reconcile_prewarm(Some(Some("USB Headset")), Some("USB Headset"), true),
             PrewarmAction::Keep
         );
         // Default ↔ default is also unchanged.
         assert_eq!(
-            reconcile_prewarm(Some(None), true, None, true),
+            reconcile_prewarm(Some(None), None, true),
             PrewarmAction::Keep
         );
     }
 
+    /// The capture stream is unconditional, so "nothing open" always means
+    /// open one — there is no longer a state in which it stays closed.
     #[test]
-    fn reconcile_opens_when_enabled_and_nothing_open() {
+    fn reconcile_always_opens_when_nothing_is_open() {
         assert_eq!(
-            reconcile_prewarm(None, true, Some("USB Headset"), true),
+            reconcile_prewarm(None, Some("USB Headset"), true),
             PrewarmAction::Open
         );
-    }
-
-    #[test]
-    fn reconcile_closes_when_disabled_with_stream_open() {
-        assert_eq!(
-            reconcile_prewarm(Some(None), false, Some("USB Headset"), true),
-            PrewarmAction::Close
-        );
-    }
-
-    #[test]
-    fn reconcile_keeps_when_disabled_and_nothing_open() {
-        assert_eq!(
-            reconcile_prewarm(None, false, None, true),
-            PrewarmAction::Keep
-        );
+        assert_eq!(reconcile_prewarm(None, None, true), PrewarmAction::Open);
     }
 
     #[test]

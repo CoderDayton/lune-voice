@@ -773,7 +773,7 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
         pill_corner: pill_corner_to_dto(settings.pill_corner),
         language: settings.language.clone(),
         dictation_language: settings.dictation_language.clone(),
-        mic_prewarm: settings.mic_prewarm,
+        model_idle_unload_minutes: settings.model_idle_unload_minutes,
         input_device: settings.input_device.clone(),
         vad_pcen: settings.vad_pcen,
         start_minimized: settings.start_minimized,
@@ -893,7 +893,10 @@ fn apply_settings_dto(
         );
     }
     settings.dictation_language = dictation_language.to_owned();
-    settings.mic_prewarm = input.mic_prewarm;
+    // Zero is normalized to "off" rather than "unload the moment a dictation
+    // ends": a zero-minute timeout would free the model after every utterance
+    // and pay a reload on the next one, which no user means to ask for.
+    settings.model_idle_unload_minutes = input.model_idle_unload_minutes.filter(|&m| m > 0);
     settings.input_device = input.input_device.clone();
     settings.vad_pcen = input.vad_pcen;
     settings.start_minimized = input.start_minimized;
@@ -1327,7 +1330,7 @@ mod tests {
             pill_corner: dto.pill_corner,
             language: dto.language,
             dictation_language: dto.dictation_language,
-            mic_prewarm: dto.mic_prewarm,
+            model_idle_unload_minutes: dto.model_idle_unload_minutes,
             input_device: dto.input_device,
             vad_pcen: dto.vad_pcen,
             start_minimized: dto.start_minimized,

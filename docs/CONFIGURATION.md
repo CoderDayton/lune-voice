@@ -43,7 +43,7 @@ Settings mutability tiers:
 
 | Tier | When Applied | Fields |
 |------|-------------|--------|
-| **Hot** | On save | `hotkey`, `activation_mode`, `mic_prewarm`, `input_device`, `sound_cues_enabled`, `sound_cue_volume`, every `pill_*` field |
+| **Hot** | On save | `hotkey`, `activation_mode`, `model_idle_unload_minutes`, `input_device`, `sound_cues_enabled`, `sound_cue_volume`, every `pill_*` field |
 | **Warm** | Next session start, when the pipeline rebuilds | `asr_backend`, `llm_backend`, `device`, `privacy_mode`, `default_style`, `language`, `dictation_language`, `vad_pcen`, `dictation_mode`, `copy_to_clipboard`, `session_history_days` (it decides whether a dictation is recorded at all) |
 | **Cold** | Next app start | `terminal_mode`, `start_minimized`, `check_updates_on_launch` |
 
@@ -85,7 +85,7 @@ terminal_mode = "Auto"
 sound_cues_enabled = true
 sound_cue_volume = 1.0
 session_history_days = 30
-mic_prewarm = true
+# model_idle_unload_minutes is optional — omit to keep the model loaded.
 # input_device is optional — omit to follow the system default input.
 vad_pcen = true
 start_minimized = false

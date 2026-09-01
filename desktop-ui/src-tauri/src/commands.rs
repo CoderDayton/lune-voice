@@ -209,14 +209,17 @@ pub async fn save_workspace_settings(
             }
         }
     }
-    // Reconcile long-lived audio capture with the freshly-saved mic_prewarm and
-    // input-device settings. Both are taken from the returned snapshot rather
-    // than `inner.settings`, which stays stale until the next pipeline rebuild.
+    // Reconcile long-lived audio capture with the freshly-saved input device,
+    // taken from the returned snapshot rather than `inner.settings`, which
+    // stays stale until the next pipeline rebuild.
     runtime
-        .sync_mic_prewarm(
-            Some(snapshot.settings.mic_prewarm),
-            Some(snapshot.settings.input_device.clone()),
-        )
+        .sync_capture_device(Some(snapshot.settings.input_device.clone()))
+        .await;
+    // Same staleness reason as the mic reconcile above: the idle-unload
+    // watchdog reads `inner.settings`, so hand it the freshly-saved value
+    // instead of leaving the change to take effect a dictation late.
+    runtime
+        .sync_idle_unload(snapshot.settings.model_idle_unload_minutes)
         .await;
     // Apply sound-cue settings live — they're played from the backend and must
     // not lag a dictation behind a toggle/volume change.
