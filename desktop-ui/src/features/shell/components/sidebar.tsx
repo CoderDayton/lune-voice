@@ -122,8 +122,8 @@ function NavRow({ item, pathname }: { item: NavigationItem; pathname: string }) 
         <span className="truncate is-drawer-close:hidden">{label}</span>
         <span
           aria-hidden="true"
-          className={`ml-auto font-mono text-xs is-drawer-close:hidden ${
-            active ? 'text-primary' : 'text-content-subtle group-hover:text-content-muted'
+          className={`ml-auto font-mono text-xs transition-colors is-drawer-close:hidden ${
+            active ? 'text-primary/70' : 'text-content-dim group-hover:text-content-subtle'
           }`}
         >
           {hint}

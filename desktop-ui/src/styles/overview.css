@@ -103,8 +103,10 @@
   @apply text-3xl leading-none font-semibold tracking-heading tabular-nums text-content-strong;
 }
 
+/* Same size as the read-outs beside it — the display face and the wider
+   track are what set it apart, not a larger numeral. */
 @utility ov-metric-hero {
-  @apply font-display text-5xl leading-none font-semibold tracking-display tabular-nums text-content-strong;
+  @apply font-display text-3xl leading-none font-semibold tracking-display tabular-nums text-content-strong;
 }
 
 @utility ov-note {
@@ -154,7 +156,7 @@
    inside the shell's region it reads as a slab laid on top, and the rules
    above and below already mark where the list starts and ends. */
 @utility ov-list {
-  @apply min-h-0 flex-1 overflow-y-auto;
+  @apply min-h-0 flex-1 overflow-y-auto overscroll-contain;
 }
 
 @utility ov-row-session {

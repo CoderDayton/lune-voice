@@ -2,7 +2,15 @@ import { plural } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';
 import { invoke } from '@tauri-apps/api/core';
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Download } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Download,
+  HardDrive,
+} from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ConfirmDialog } from '../../../components/feedback/confirm-dialog';
 import {
@@ -15,6 +23,7 @@ import {
   ListSearchRail,
   useListFilterHotkey,
 } from '../../../components/ui/list-card';
+import { LIMITS } from '../../../lib/backend/generated/limits';
 import { formatBackend } from '../../../store/workspace-mappers';
 import {
   fetchHistoryPage,
@@ -54,6 +63,7 @@ export function HistoryTable() {
   const page = useStore(workspaceStore, (s) => s.historyPage);
   const pageSize = useStore(workspaceStore, (s) => s.historyPageSize);
   const totalPages = useStore(workspaceStore, getHistoryServerPageCount);
+  const historyDays = useStore(workspaceStore, (s) => s.settings.sessionHistoryDays);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   // Selected ids, not selected rows: the set survives paging and searching, so
   // a sweep across several pages can be deleted in one go. Ids that have
@@ -191,16 +201,36 @@ export function HistoryTable() {
         )}
       </ListScroll>
 
-      {totalPages > 1 && (
-        <ListFooter>
-          <nav
-            aria-label={t`Pagination`}
-            className="flex w-full items-center justify-between gap-3"
-          >
-            <span className="text-sm tabular-nums text-content-subtle">
-              {t`${start}–${end} of ${visibleCount}`}
-            </span>
-            <div className="join">
+      {/* Always present, like Home's footer: the count and retention note
+          answer "is this everything?" whether or not there is a second page. */}
+      <ListFooter>
+        <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-content-subtle">
+          <span className="tabular-nums">
+            {visibleCount === 0
+              ? t`No sessions`
+              : t`Showing ${start}–${end} of ${visibleCount} sessions`}
+          </span>
+          <span
+            className="inline-block h-3 w-px shrink-0 bg-surface-border-strong"
+            aria-hidden="true"
+          />
+          <span className="tabular-nums">
+            {historyDays == null
+              ? t`History isn't saved`
+              : historyDays === LIMITS.historyDaysForever
+                ? t`History kept forever`
+                : t`History kept ${historyDays} days`}
+          </span>
+          <span
+            className="inline-block h-3 w-px shrink-0 bg-surface-border-strong"
+            aria-hidden="true"
+          />
+          <span className="inline-flex items-center gap-1.5">
+            <HardDrive size={13} strokeWidth={1.7} />
+            {t`Stored on this device`}
+          </span>
+          {totalPages > 1 && (
+            <nav aria-label={t`Pagination`} className="ml-auto join">
               <button
                 type="button"
                 className="btn btn-soft btn-sm join-item gap-1"
@@ -225,10 +255,10 @@ export function HistoryTable() {
               >
                 {t`Next`} <ChevronRight size={14} />
               </button>
-            </div>
-          </nav>
-        </ListFooter>
-      )}
+            </nav>
+          )}
+        </div>
+      </ListFooter>
     </ListCard>
   );
 }

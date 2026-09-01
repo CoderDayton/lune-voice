@@ -36,7 +36,8 @@
   /* Hover/wash/border kept as alpha overlays — they layer on solid surfaces */
   --surface-wash: oklch(1 0 0 / 0.06);
   --surface-nav-active: oklch(1 0 0 / 0.08);
-  --surface-hover: oklch(1 0 0 / 0.04);
+  /* 0.04 vanished on the dark panel fill; a settings row hover was invisible. */
+  --surface-hover: oklch(1 0 0 / 0.06);
   --surface-border: oklch(1 0 0 / 0.08);
   --surface-border-strong: oklch(1 0 0 / 0.16);
   --surface-inset: oklch(0.135 0 0);

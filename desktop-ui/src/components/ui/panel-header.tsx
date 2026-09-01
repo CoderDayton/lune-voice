@@ -1,7 +1,7 @@
 import type { ComponentType, ReactNode } from 'react';
 
 interface PanelHeaderProps {
-  /** Leading icon, rendered inside the primary-tinted glow tile. */
+  /** Leading icon, rendered inside the primary-tinted tile. */
   icon?: ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
   /** Optional eyebrow above the title (label, badges). */
   eyebrow?: ReactNode;
@@ -12,7 +12,7 @@ interface PanelHeaderProps {
 }
 
 /**
- * The hero-style panel header: a glowing primary icon tile beside a display
+ * The hero-style panel header: a primary-tinted icon tile beside a display
  * title and muted description. Shared by the styles hero card and every
  * settings section so headers read identically across the app.
  */
@@ -27,8 +27,8 @@ export function PanelHeader({
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="flex min-w-0 items-start gap-4">
         {Icon && (
-          <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/20 text-primary shadow-glow">
-            <Icon size={22} strokeWidth={1.75} />
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-field bg-primary/15 text-primary">
+            <Icon size={19} strokeWidth={1.75} />
           </div>
         )}
         <div className="min-w-0">

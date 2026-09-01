@@ -110,10 +110,11 @@ export function SidebarQuickActions() {
         aria-expanded={open}
         title={t`Quick actions`}
         aria-label={t`Quick actions`}
-        className="flex w-full cursor-pointer items-center gap-3.5 px-4 py-4 text-left transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary is-drawer-close:justify-center is-drawer-close:px-0"
+        className="group flex w-full cursor-pointer items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary is-drawer-close:justify-center is-drawer-close:px-0"
       >
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-field bg-surface-elevated ring-1 ring-surface-border is-drawer-close:size-11">
-          <SlidersHorizontal size={18} strokeWidth={1.8} className="text-content-subtle" />
+        {/* Plain row, no tile: the mic block above is the sidebar's one accent. */}
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-field text-content-subtle transition-colors group-hover:text-content-muted">
+          <SlidersHorizontal size={18} strokeWidth={1.8} />
         </span>
         <span className="min-w-0 flex-1 is-drawer-close:hidden">
           <span className="block text-sm font-medium text-content">{t`Quick actions`}</span>

@@ -198,7 +198,7 @@ function NewSnippetBar({ ref, onClick }: { ref?: Ref<HTMLButtonElement>; onClick
       ref={ref}
       type="button"
       onClick={onClick}
-      className="panel-surface flex shrink-0 items-center gap-2.5 px-4 py-3 text-sm font-medium text-content-muted transition-colors hover:border-surface-border-strong hover:text-content"
+      className="panel-surface flex shrink-0 items-center gap-2.5 px-4 py-3.5 text-sm font-medium text-content-muted transition-colors hover:border-surface-border-strong hover:bg-surface-hover hover:text-content sm:px-5"
     >
       <Plus size={16} strokeWidth={2.5} className="text-primary" />
       <Trans>New snippet</Trans>

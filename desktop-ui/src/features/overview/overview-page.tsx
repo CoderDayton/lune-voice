@@ -89,7 +89,8 @@ function StatStrip({ isActive, isConnected, stale }: StatStripProps) {
         <div className="ov-value">
           <div className="flex min-w-0 flex-wrap items-baseline gap-2.5">
             <span className="ov-metric-hero">{wordsCount.toLocaleString()}</span>
-            {today.words > 0 && (
+            {/* Hidden when today is everything: "↑ 120" beside "120" says nothing. */}
+            {today.words > 0 && today.words < stats.totalWords && (
               <span className="text-sm tabular-nums text-success">
                 ↑ {todayWords.toLocaleString()}
               </span>

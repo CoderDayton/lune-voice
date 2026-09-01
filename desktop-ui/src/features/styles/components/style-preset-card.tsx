@@ -28,13 +28,10 @@ export function StylePresetCard({
 }: StylePresetCardProps) {
   const { t } = useLingui();
   const Icon = styleIcon(preset);
-  const fmt = preset.formatting;
-  const enabled = [fmt.keybinds, fmt.autoCapitalization, fmt.titleAbbreviations, fmt.brandCasing];
-  const onCount = enabled.filter(Boolean).length;
 
   return (
     <div
-      className={`group relative flex min-h-[9.75rem] flex-col rounded-box border p-4 transition-[transform,box-shadow,border-color,background-color] duration-fast ease-standard sm:p-5 ${
+      className={`group relative flex flex-col rounded-box border p-4 transition-[transform,box-shadow,border-color,background-color] duration-fast ease-standard sm:p-5 ${
         isActive
           ? 'border-primary/55 bg-linear-to-br from-primary/12 via-surface-card to-surface-card shadow-glow'
           : 'border-surface-border bg-surface-card shadow-card hover:-translate-y-0.5 hover:border-primary/40 hover:bg-surface-hover hover:shadow-elevated'
@@ -49,7 +46,7 @@ export function StylePresetCard({
 
       <div className="pointer-events-none relative z-10 flex items-start gap-3">
         <div
-          className={`flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
+          className={`flex size-9 shrink-0 items-center justify-center rounded-field transition-colors ${
             isActive
               ? 'bg-primary/20 text-primary'
               : 'bg-surface-inset text-content-muted group-hover:text-content-default'
@@ -77,18 +74,9 @@ export function StylePresetCard({
         )}
       </div>
 
-      <div className="pointer-events-none relative z-10 mt-auto flex items-center justify-between pt-4">
-        <div className="flex items-center gap-1.5" title={t`${onCount} of 4 formatting fixes on`}>
-          {enabled.map((on, i) => (
-            <span
-              // biome-ignore lint/suspicious/noArrayIndexKey: fixed 4-slot status row
-              key={i}
-              className={`size-1.5 rounded-full ${on ? 'bg-primary/70' : 'bg-surface-border-strong'}`}
-            />
-          ))}
-          <span className="ml-1 text-[0.6875rem] text-content-subtle">{t`formatting`}</span>
-        </div>
-
+      {/* Actions only. A fixed-height card with a status footer left every
+          card mostly empty; now the text sets the height. */}
+      <div className="pointer-events-none relative z-10 mt-3 flex min-h-6 items-center justify-end">
         {isConfirmingDelete ? (
           <div className="pointer-events-auto flex items-center gap-1.5">
             <span className="text-xs text-content-muted">{t`Delete?`}</span>

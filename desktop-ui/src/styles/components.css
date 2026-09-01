@@ -30,8 +30,15 @@
   }
 }
 
+/* `scrollbar-gutter: stable` reserves the bar's width whether or not the page
+   scrolls, so content does not shift sideways between a short page and a
+   long one. `overscroll-behavior: contain` stops a nested list's scroll from
+   spilling into the page once it hits its end. */
 @utility app-scroll {
   @apply flex-1 overflow-y-auto;
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
   padding:
     var(--space-page-y)
     var(--space-page-x-mobile)
