@@ -79,89 +79,101 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    /* Explicit rhythm rather than one uniform gap. Everything used to sit
+       `gap-6` apart, which spaced the primary action exactly as far from the
+       last card as the cards were from each other — so the stack had no
+       shape and nothing marked where the reading ended and the decision
+       began. Now: header, a 32px break, the body as one tight list, a 32px
+       break, the action. */
+    <div className="flex flex-col">
       <Header phase={phase} requiredOk={requiredOk} pendingCount={pending.length} error={error} />
 
-      {phase === 'downloading' && (
-        <OverallProgress completed={completed} total={totalToDownload} pct={overallPct} />
-      )}
+      <div className="mt-8 flex flex-col gap-4">
+        {phase === 'downloading' && (
+          <OverallProgress completed={completed} total={totalToDownload} pct={overallPct} />
+        )}
 
-      {phase === 'engine' ? (
-        <EngineStep
-          engineBackend={engineBackend}
-          engineWhisper={engineWhisper}
-          error={error}
-          gpuOffer={gpuOffer}
-          useGpu={useGpu}
-          gpuDownloadBytes={gpuDownloadBytes}
-          onSelectEngine={setEngineBackend}
-          onSelectWhisper={setEngineWhisper}
-          onToggleGpu={setUseGpu}
-        />
-      ) : (
-        <div className="flex flex-col gap-3">
-          {models.map((m) => {
-            const essential = m.required || m.localName === asrLocalName;
-            return (
-              <ModelCard
-                key={m.localName}
-                name={m.name}
-                description={m.description}
-                required={essential}
-                icon={modelIcon(m.localName)}
-                ready={m.ready}
-                selected={selected.has(m.localName)}
-                active={currentModel === m.localName}
-                canToggle={!essential && phase === 'choose'}
-                progress={currentModel === m.localName ? progress : null}
-                onToggle={() => toggleModel(m.localName)}
-              />
-            );
-          })}
-        </div>
-      )}
-
-      {(phase === 'gpu' || gpuInstalled || gpuError) && (
-        <GpuSetupCard
-          installing={phase === 'gpu'}
-          progress={gpuProgress}
-          totalBytes={gpuDownloadBytes}
-          installed={gpuInstalled}
-          error={gpuError}
-        />
-      )}
-
-      {phase === 'done' && (
-        <>
-          <ReadyChecks />
-          <ReadyHint />
-        </>
-      )}
-
-      {phase === 'error' && error && (
-        <div className="alert alert-error gap-2 text-sm" role="alert">
-          <CircleAlert size={18} className="shrink-0" />
-          <div className="min-w-0 flex-1">
-            <p className="font-medium">{t`Download failed`}</p>
-            <p className="text-xs opacity-80 break-words">{error}</p>
+        {phase === 'engine' ? (
+          <EngineStep
+            engineBackend={engineBackend}
+            engineWhisper={engineWhisper}
+            error={error}
+            gpuOffer={gpuOffer}
+            useGpu={useGpu}
+            gpuDownloadBytes={gpuDownloadBytes}
+            onSelectEngine={setEngineBackend}
+            onSelectWhisper={setEngineWhisper}
+            onToggleGpu={setUseGpu}
+          />
+        ) : (
+          <div className="flex flex-col gap-3">
+            {models.map((m) => {
+              const essential = m.required || m.localName === asrLocalName;
+              return (
+                <ModelCard
+                  key={m.localName}
+                  name={m.name}
+                  description={m.description}
+                  required={essential}
+                  icon={modelIcon(m.localName)}
+                  ready={m.ready}
+                  selected={selected.has(m.localName)}
+                  active={currentModel === m.localName}
+                  canToggle={!essential && phase === 'choose'}
+                  progress={currentModel === m.localName ? progress : null}
+                  onToggle={() => toggleModel(m.localName)}
+                />
+              );
+            })}
           </div>
-        </div>
-      )}
+        )}
 
-      <Actions
-        phase={phase}
-        requiredOk={requiredOk}
-        pendingCount={pending.length}
-        willInstallGpu={willInstallGpu}
-        onStart={startDownload}
-        onCancel={cancelDownload}
-        onRetry={retry}
-        onFinish={onFinish}
-        onConfirmEngine={confirmEngine}
-        onBack={backToEngine}
-      />
+        {(phase === 'gpu' || gpuInstalled || gpuError) && (
+          <GpuSetupCard
+            installing={phase === 'gpu'}
+            progress={gpuProgress}
+            totalBytes={gpuDownloadBytes}
+            installed={gpuInstalled}
+            error={gpuError}
+          />
+        )}
 
-      <Footer />
+        {phase === 'done' && (
+          <>
+            <ReadyChecks />
+            <ReadyHint />
+          </>
+        )}
+
+        {phase === 'error' && error && (
+          <div className="alert alert-error gap-2 text-sm" role="alert">
+            <CircleAlert size={18} className="shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">{t`Download failed`}</p>
+              <p className="text-xs opacity-80 break-words">{error}</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-8">
+        <Actions
+          phase={phase}
+          requiredOk={requiredOk}
+          pendingCount={pending.length}
+          willInstallGpu={willInstallGpu}
+          onStart={startDownload}
+          onCancel={cancelDownload}
+          onRetry={retry}
+          onFinish={onFinish}
+          onConfirmEngine={confirmEngine}
+          onBack={backToEngine}
+        />
+      </div>
+
+      <div className="mt-6">
+        <Footer />
+      </div>
     </div>
   );
 }
@@ -205,19 +217,24 @@ function Header({ phase, requiredOk, pendingCount, error: _error }: HeaderProps)
   }
 
   return (
-    <header className="flex flex-col items-center gap-3 text-center">
-      <div className="token-icon size-14 sm:size-16">
+    <header className="flex flex-col items-center gap-4 text-center">
+      {/* Was size-14 growing to size-16 around a 26px glyph — a large empty
+          box with a small mark adrift in it. One size, tighter ratio. */}
+      <div className="token-icon size-14">
         {phase === 'done' ? (
-          <Sparkles size={26} strokeWidth={1.6} className="text-primary" />
+          <Sparkles size={24} strokeWidth={1.7} className="text-primary" />
         ) : (
-          <Mic size={26} strokeWidth={1.6} className="text-primary" />
+          <Mic size={24} strokeWidth={1.7} className="text-primary" />
         )}
       </div>
       <div>
         <h1 className="font-display tracking-heading text-2xl sm:text-3xl font-semibold text-balance">
           {title}
         </h1>
-        <p className="mt-2 text-sm sm:text-base text-content-subtle text-balance max-w-md mx-auto">
+        {/* `max-w-md` inside a 36rem frame broke every two-clause subtitle
+            across two ragged lines mid-thought. Widened so `text-balance`
+            has room to find an even break. */}
+        <p className="mx-auto mt-2 max-w-lg text-balance text-sm text-content-subtle sm:text-base">
           {subtitle}
         </p>
       </div>
@@ -241,16 +258,23 @@ interface GpuSetupCardProps {
 function GpuSetupCard({ installing, progress, totalBytes, installed, error }: GpuSetupCardProps) {
   const { t } = useLingui();
 
-  const tone = error
-    ? 'border-warning/40 bg-warning/5'
+  // Only the in-flight state tints the card. A finished install is a plain
+  // card with a coloured tile and a badge — the same treatment an installed
+  // model gets, so the two sit in one stack without one shouting.
+  const tone = installing
+    ? 'border-primary/50 bg-primary/8'
+    : 'border-surface-border bg-surface-panel';
+
+  const tile = error
+    ? 'bg-warning/15 text-warning'
     : installed
-      ? 'border-success/40 bg-success/5'
-      : 'border-primary/50 bg-primary/8';
+      ? 'bg-success/15 text-success'
+      : 'bg-primary/15 text-primary';
 
   return (
     <div className={`rounded-box border p-4 ${tone}`}>
       <div className="flex items-start gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-field bg-primary/15 text-primary">
+        <span className={`setup-tile ${tile}`}>
           {installing ? (
             <Loader2 size={18} className="animate-spin" />
           ) : installed ? (
@@ -260,12 +284,19 @@ function GpuSetupCard({ installing, progress, totalBytes, installed, error }: Gp
           )}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-content-strong">{t`GPU acceleration`}</p>
-          <p className="mt-0.5 text-xs text-content-subtle">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-medium text-content-strong">{t`GPU acceleration`}</p>
+            {installed && !installing && (
+              <span className="badge badge-xs badge-soft badge-success">{t`Installed`}</span>
+            )}
+          </div>
+          <p className="mt-0.5 text-xs leading-snug text-content-subtle">
             {installing
               ? t`Downloading NVIDIA's CUDA runtime.`
               : installed
-                ? t`Installed. Restart Lune Voice to start using your GPU.`
+                ? // The badge beside the title already says "Installed", so
+                  // the sentence only has to carry the part the badge cannot.
+                  t`Restart Lune Voice to start using your GPU.`
                 : // The backend phrases its own failures for the user and each
                   // one already says transcription continues on the CPU, so
                   // rendering this line *and* the error stated it twice.
@@ -294,7 +325,7 @@ interface OverallProgressProps {
 function OverallProgress({ completed, total, pct }: OverallProgressProps) {
   const { t } = useLingui();
   return (
-    <div className="rounded-box border border-surface-border bg-surface-panel p-4">
+    <div className="setup-card p-4">
       <div className="mb-2 flex items-center justify-between text-xs text-content-subtle">
         <span className="font-medium uppercase tracking-wider">{t`Overall progress`}</span>
         <span className="tabular-nums">
@@ -388,10 +419,12 @@ function Actions({
 
   if (phase === 'done') {
     return (
-      <button type="button" className="btn btn-primary btn-wide self-center" onClick={onFinish}>
-        {t`Enter Lune Voice`}
-        <ArrowRight size={16} />
-      </button>
+      <div className="flex flex-col items-center">
+        <button type="button" className="btn btn-primary btn-wide" onClick={onFinish}>
+          {t`Enter Lune Voice`}
+          <ArrowRight size={16} />
+        </button>
+      </div>
     );
   }
 
@@ -448,14 +481,14 @@ function ReadyHint() {
   const activation = useStore(workspaceStore, (s) => s.settings.activationMode);
 
   return (
-    <div className="rounded-box border border-surface-border bg-surface-panel p-4">
+    <div className="setup-card p-4">
       <div className="flex items-start gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-field bg-primary/15 text-primary">
+        <span className="setup-tile bg-primary/15 text-primary">
           <Keyboard size={18} strokeWidth={1.8} />
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-content-strong">{t`How to dictate`}</p>
-          <p className="mt-1 text-xs text-content-subtle">
+          <p className="mt-1 text-xs leading-snug text-content-subtle">
             {activation === 'Hold'
               ? t`Hold your hotkey, speak, then let go. The text is typed into whatever app you were using.`
               : t`Press your hotkey, speak, then press it again. The text is typed into whatever app you were using.`}

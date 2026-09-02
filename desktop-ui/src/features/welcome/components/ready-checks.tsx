@@ -1,5 +1,5 @@
 import { useLingui } from '@lingui/react/macro';
-import { Check, CircleAlert, Keyboard, Loader2, Mic } from 'lucide-react';
+import { Check, CircleAlert, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { backendClient } from '../../../lib/backend/client';
 import { workspaceStore } from '../../../store/workspace-store';
@@ -78,67 +78,69 @@ export function ReadyChecks() {
   const keyboardOk = keyboard.state === 'ok' && keyboard.value;
 
   return (
-    <div className="rounded-box border border-surface-border bg-surface-panel">
-      <p className="border-b border-surface-border px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-content-subtle">
-        {t`Before you start`}
-      </p>
+    <section>
+      {/* The caption sits outside the box. Inside, it was a header bar — a
+          container style used nowhere else on either screen, which made this
+          block read as a different kind of thing from the cards above it. */}
+      <span className="setup-label">{t`Before you start`}</span>
+      <div className="setup-group">
+        <CheckRow
+          label={t`Microphone`}
+          pending={mic.state === 'checking'}
+          ok={micOk}
+          detail={
+            mic.state === 'checking'
+              ? t`Looking for input devices…`
+              : micOk
+                ? // Naming the device is the difference between "a mic exists"
+                  // and "the right mic is picked" — the second is what actually
+                  // goes wrong on a machine with a webcam and a headset.
+                  t`Using ${activeDevice}. Change it in Settings › Dictation.`
+                : mic.state === 'failed'
+                  ? t`Couldn't check your input devices.`
+                  : t`No microphone found. Plug one in, then pick it in Settings › Dictation.`
+          }
+        />
 
-      <CheckRow
-        icon={Mic}
-        label={t`Microphone`}
-        pending={mic.state === 'checking'}
-        ok={micOk}
-        detail={
-          mic.state === 'checking'
-            ? t`Looking for input devices…`
-            : micOk
-              ? // Naming the device is the difference between "a mic exists"
-                // and "the right mic is picked" — the second is what actually
-                // goes wrong on a machine with a webcam and a headset.
-                t`Using ${activeDevice}. Change it in Settings › Dictation.`
-              : mic.state === 'failed'
-                ? t`Couldn't check your input devices.`
-                : t`No microphone found. Plug one in, then pick it in Settings › Dictation.`
-        }
-      />
+        <CheckRow
+          label={t`Keyboard access`}
+          pending={keyboard.state === 'checking' || granting}
+          ok={keyboardOk}
+          detail={
+            keyboard.state === 'checking'
+              ? t`Checking…`
+              : keyboardOk
+                ? t`Lune Voice can type into your other apps.`
+                : t`Lune Voice needs permission to type into other apps. Your system will ask for your password.`
+          }
+          action={
+            keyboard.state !== 'checking' && !keyboardOk ? (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                disabled={granting}
+                onClick={() => void grant()}
+              >
+                {granting ? t`Asking…` : t`Allow`}
+              </button>
+            ) : null
+          }
+        />
 
-      <CheckRow
-        icon={Keyboard}
-        label={t`Keyboard access`}
-        pending={keyboard.state === 'checking' || granting}
-        ok={keyboardOk}
-        detail={
-          keyboard.state === 'checking'
-            ? t`Checking…`
-            : keyboardOk
-              ? t`Lune Voice can type into your other apps.`
-              : t`Lune Voice needs permission to type into other apps. Your system will ask for your password.`
-        }
-        action={
-          keyboard.state !== 'checking' && !keyboardOk ? (
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              disabled={granting}
-              onClick={() => void grant()}
-            >
-              {granting ? t`Asking…` : t`Allow`}
-            </button>
-          ) : null
-        }
-      />
-
-      {grantError && (
-        <p role="alert" className="px-4 pb-3 text-xs break-words text-error">
-          {grantError}
-        </p>
-      )}
-    </div>
+        {grantError && (
+          <p
+            role="alert"
+            className="border-t border-surface-border px-4 py-3 text-xs break-words text-error"
+          >
+            {grantError}
+          </p>
+        )}
+      </div>
+    </section>
   );
 }
 
 interface CheckRowProps {
-  icon: typeof Mic;
   label: string;
   pending: boolean;
   ok: boolean;
@@ -146,7 +148,7 @@ interface CheckRowProps {
   action?: React.ReactNode;
 }
 
-function CheckRow({ icon: Icon, label, pending, ok, detail, action }: CheckRowProps) {
+function CheckRow({ label, pending, ok, detail, action }: CheckRowProps) {
   const tone = pending
     ? 'bg-base-300 text-content-subtle'
     : ok
@@ -154,27 +156,25 @@ function CheckRow({ icon: Icon, label, pending, ok, detail, action }: CheckRowPr
       : 'bg-warning/15 text-warning';
 
   return (
-    <div className="flex items-start gap-3 border-b border-surface-border p-4 last:border-b-0">
-      <span
-        className={`flex size-9 shrink-0 items-center justify-center rounded-field ${tone}`}
-        aria-hidden="true"
-      >
+    <div className="setup-row-divider flex items-start gap-3 p-4">
+      {/* The tile carries the status, not the subject. It used to show a
+          green check while a second, smaller mic glyph sat next to the word
+          "Microphone" — two icons for one row, and the label already says
+          which check this is. */}
+      <span className={`setup-tile ${tone}`} aria-hidden="true">
         {pending ? (
-          <Loader2 size={16} className="animate-spin" />
+          <Loader2 size={17} className="animate-spin" />
         ) : ok ? (
-          <Check size={16} strokeWidth={2.5} />
+          <Check size={17} strokeWidth={2.5} />
         ) : (
-          <CircleAlert size={16} strokeWidth={1.9} />
+          <CircleAlert size={17} strokeWidth={1.9} />
         )}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="flex items-center gap-2 text-sm font-medium text-content-strong">
-          <Icon size={14} strokeWidth={1.8} className="shrink-0 text-content-subtle" />
-          {label}
-        </p>
+        <p className="text-sm font-medium text-content-strong">{label}</p>
         <p className="mt-0.5 text-xs leading-snug text-content-subtle">{detail}</p>
       </div>
-      {action && <div className="shrink-0">{action}</div>}
+      {action && <div className="shrink-0 self-center">{action}</div>}
     </div>
   );
 }

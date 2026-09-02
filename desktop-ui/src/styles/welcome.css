@@ -1,0 +1,64 @@
+/* Vite compiles this file on its own when an `@utility` body changes, and on
+   that path it has no Tailwind context — `@apply gap-x-4` then fails with
+   "unknown utility class". The import into app.css is what makes the
+   production build work; this makes the dev server work too. */
+@reference "tailwindcss";
+@reference "./daisyui.css";
+@reference "./tokens.css";
+
+/* ── First-run setup ───────────────────────────────────────────────────
+   Both setup screens are stacks of blocks, and previously each block
+   invented its own chrome — a green-tinted model card above a neutral GPU
+   card above a panel with its own header bar. Four containers, four rules,
+   read as four unrelated things rather than one list.
+
+   Everything here is one primitive at one width. Cards never set their own
+   measure: the frame decides it, and every block fills it, so the stack has
+   a single left and right edge down the whole screen. */
+
+/* The container every setup block uses. Status is carried by the icon tile
+   and a badge, never by tinting the whole card — a tinted card among plain
+   ones reads as a different *kind* of thing, not as a different state. */
+@utility setup-card {
+  @apply rounded-box border border-surface-border bg-surface-panel;
+}
+
+/* A bordered box whose children are hairline-divided rows: the shape used
+   for the model sizes and the readiness checks, so a list of options and a
+   list of results are visibly the same construct.
+
+   `overflow-hidden` is what keeps the first and last row inside the
+   rounded corners; interactive rows inside pull their focus ring inward
+   (`-outline-offset-2`) so the clip cannot eat it. */
+@utility setup-group {
+  @apply overflow-hidden rounded-box border border-surface-border bg-surface-panel;
+}
+
+/* Divider between rows in a group. Drawn on the top edge so the first row
+   sits flush against the group's own border instead of doubling it. */
+@utility setup-row-divider {
+  @apply border-t border-surface-border first:border-t-0;
+}
+
+/* Section caption above a group, outside the box. A group carries no header
+   bar of its own — the bar was a fifth container style, and the label reads
+   better against the ground than inside a panel. */
+@utility setup-label {
+  @apply mb-2 block px-1 text-xs font-medium uppercase text-content-subtle;
+  letter-spacing: var(--tracking-uppercase);
+}
+
+/* One icon size for every block on both screens. The old mix of size-9 and
+   size-10 tiles put the text columns of adjacent cards a few pixels apart,
+   which is exactly the kind of misalignment that reads as "unfinished"
+   without being nameable. */
+@utility setup-tile {
+  @apply flex size-10 shrink-0 items-center justify-center rounded-field;
+}
+
+/* Radio marker for the model-size rows. Every option carries one, selected
+   or not: previously only the chosen row showed a check and the other two
+   showed nothing, so the list did not look like a set of choices at all. */
+@utility setup-radio {
+  @apply mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-full border-2 transition-colors;
+}

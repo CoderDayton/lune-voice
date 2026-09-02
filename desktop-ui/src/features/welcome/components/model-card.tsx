@@ -33,14 +33,17 @@ export function ModelCard({
       ? Math.round(((progress.fileIndex + 1) / progress.fileCount) * 100)
       : 0;
 
-  // Card chrome — colored frame conveys current state
-  const stateClass = ready
-    ? 'border-success/40 bg-success/5'
-    : active
-      ? 'border-primary/50 bg-primary/8 shadow-sm'
-      : selected
-        ? 'border-primary/35 bg-primary/5'
-        : 'border-surface-border bg-base-200/60';
+  // Card chrome. Only the two *transient* states tint the card — a download
+  // in flight, and a pending selection. "Installed" does not: a green card
+  // sitting in a stack of plain ones reads as a different kind of object
+  // rather than as a finished one, and on the final screen every card is
+  // installed, so the tint carried no information at all. The green moved to
+  // the icon tile and the badge, where it still scans instantly.
+  const stateClass = active
+    ? 'border-primary/50 bg-primary/8 shadow-sm'
+    : selected && !ready
+      ? 'border-primary/35 bg-primary/5'
+      : 'border-surface-border bg-surface-panel';
 
   const iconBg = ready
     ? 'bg-success/15 text-success'
@@ -48,7 +51,7 @@ export function ModelCard({
       ? 'bg-primary/15 text-primary'
       : selected
         ? 'bg-primary/10 text-primary'
-        : 'bg-base-300 text-content-subtle';
+        : 'bg-surface-wash text-content-subtle';
 
   return (
     <button
@@ -61,10 +64,8 @@ export function ModelCard({
         canToggle ? 'hover:border-primary/45 hover:bg-primary/8 cursor-pointer' : 'cursor-default'
       }`}
     >
-      <div className="flex items-start gap-3 p-4 sm:gap-4">
-        <div
-          className={`flex size-10 shrink-0 items-center justify-center rounded-field transition-colors ${iconBg}`}
-        >
+      <div className="flex items-start gap-3 p-4">
+        <div className={`setup-tile transition-colors ${iconBg}`}>
           {ready ? (
             <Check size={18} strokeWidth={2.5} />
           ) : active ? (
@@ -76,17 +77,20 @@ export function ModelCard({
 
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-medium text-sm sm:text-base text-content-default">{name}</p>
-            {required ? (
+            <p className="text-sm font-medium text-content-strong">{name}</p>
+            {/* Once a model is installed, whether it *was* required is a
+                fact about a decision already made. Showing "Required" and
+                "Installed" side by side spent two badges saying one thing:
+                this model is here and staying. */}
+            {ready && !active ? (
+              <span className="badge badge-xs badge-soft badge-success">{t`Installed`}</span>
+            ) : required ? (
               <span className="badge badge-xs badge-soft gap-1 text-content-subtle">
                 <Lock size={9} strokeWidth={2.2} />
                 {t`Required`}
               </span>
             ) : (
               <span className="badge badge-xs badge-soft text-content-subtle">{t`Optional`}</span>
-            )}
-            {ready && !active && (
-              <span className="badge badge-xs badge-soft badge-success">{t`Installed`}</span>
             )}
           </div>
 
@@ -104,24 +108,20 @@ export function ModelCard({
               </div>
             </div>
           ) : (
-            <p className="mt-1 text-xs sm:text-sm text-content-subtle leading-snug">
-              {description}
-            </p>
+            <p className="mt-1 text-xs leading-snug text-content-subtle">{description}</p>
           )}
         </div>
 
         {!ready && !active && canToggle && (
           <div
-            className={`mt-1 size-5 shrink-0 rounded border-2 transition-colors ${
+            className={`mt-1 flex size-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${
               selected
                 ? 'border-primary bg-primary'
-                : 'border-surface-border group-hover:border-primary/60'
+                : 'border-surface-border-strong group-hover:border-primary/60'
             }`}
             aria-hidden="true"
           >
-            {selected && (
-              <Check size={14} strokeWidth={3} className="text-primary-content m-auto" />
-            )}
+            {selected && <Check size={13} strokeWidth={3} className="text-primary-content" />}
           </div>
         )}
       </div>

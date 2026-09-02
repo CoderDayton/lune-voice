@@ -1,5 +1,6 @@
 import { useLingui } from '@lingui/react/macro';
 import { Check, CircleAlert, type LucideIcon, Mic, Zap } from 'lucide-react';
+import { useId } from 'react';
 import { formatBytes } from '../../../lib/format-bytes';
 import type { AsrBackendValue, WhisperModelValue } from '../../settings/data/settings-data';
 import { whisperModels } from '../../settings/data/settings-data';
@@ -29,7 +30,7 @@ interface EngineOption {
 }
 
 /**
- * First-run engine picker: the two on-device speech engines. The cloud backend
+ * First-run engine picker: the on-device speech engines. The cloud backend
  * is intentionally omitted here — onboarding is about getting a local model on
  * disk; the remote option lives in Settings.
  */
@@ -50,99 +51,48 @@ export function EngineStep({
     {
       value: 'WhisperCpp',
       label: t`Whisper`,
-      tagline: t`Multilingual · pick a size`,
+      tagline: t`Multilingual · runs on-device`,
       detail: t`whisper.cpp running on-device. Choose a size to trade speed for accuracy.`,
       icon: Mic,
     },
   ];
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="grid gap-3 sm:grid-cols-2">
-        {engines.map((engine) => (
-          <EngineCard
-            key={engine.value}
-            option={engine}
-            active={engineBackend === engine.value}
-            onSelect={() => onSelectEngine(engine.value)}
-          />
-        ))}
-      </div>
+    <div className="flex flex-col gap-5">
+      {/* A picker needs something to pick between. With one engine the grid
+          left a half-width card marooned beside empty space and asked the
+          user to select the only option there was, so a single engine is
+          stated instead — same card, no false choice. The grid returns on
+          its own the moment a second engine does. */}
+      {engines.length > 1 ? (
+        <section>
+          <span className="setup-label">{t`Speech engine`}</span>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {engines.map((engine) => (
+              <EngineCard
+                key={engine.value}
+                option={engine}
+                active={engineBackend === engine.value}
+                onSelect={() => onSelectEngine(engine.value)}
+              />
+            ))}
+          </div>
+        </section>
+      ) : (
+        engines[0] && <EngineSummary option={engines[0]} />
+      )}
 
       {engineBackend === 'WhisperCpp' && (
-        <fieldset className="rounded-box border border-surface-border bg-surface-panel p-4">
-          <legend className="px-1 text-xs font-medium uppercase tracking-wider text-content-subtle">
-            {t`Whisper model size`}
-          </legend>
-          <div className="mt-1 flex flex-col gap-2">
-            {whisperModels.map((m) => {
-              const active = engineWhisper === m.value;
-              return (
-                <button
-                  key={m.value}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => onSelectWhisper(m.value)}
-                  className={`flex items-center justify-between gap-3 rounded-field border px-3 py-2.5 text-left transition-colors ${
-                    active
-                      ? 'border-primary/50 bg-primary/8'
-                      : 'border-surface-border bg-surface-elevated hover:border-primary/40 hover:bg-primary/5'
-                  }`}
-                >
-                  <span className="min-w-0">
-                    <span className="flex items-center gap-2">
-                      <span
-                        className={`text-sm font-medium ${active ? 'text-content-strong' : 'text-content'}`}
-                      >
-                        {m.label}
-                      </span>
-                      <span className="text-xs tabular-nums text-content-subtle">{m.size}</span>
-                    </span>
-                    <span className="mt-0.5 block text-xs text-content-subtle">
-                      {m.description}
-                    </span>
-                  </span>
-                  {active && (
-                    <Check size={16} strokeWidth={2.5} className="shrink-0 text-primary" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </fieldset>
+        <WhisperSizeStep selected={engineWhisper} onSelect={onSelectWhisper} />
       )}
 
       {gpuOffer && (
-        <label className="flex items-center justify-between gap-3 rounded-box border border-surface-border bg-surface-panel p-4">
-          <span className="flex min-w-0 items-start gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-field bg-primary/15 text-primary">
-              <Zap size={18} strokeWidth={1.8} />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-sm font-medium text-content-strong">
-                {t`GPU acceleration`}
-              </span>
-              <span className="mt-0.5 block text-xs text-content-subtle">
-                {/* Promising speed the user does not have yet would be a lie
-                    the first dictation exposes, so say which of the three
-                    situations this is: already accelerated, one restart away,
-                    or a download setup is about to make. */}
-                {gpuOffer === 'active'
-                  ? t`Your GPU is ready — use it for faster transcription.`
-                  : gpuOffer === 'needs-restart'
-                    ? t`Installed. Restart Lune Voice to start using your GPU.`
-                    : t`Your GPU qualifies. Setup will download the ${formatBytes(gpuDownloadBytes)} NVIDIA runtime, then a restart turns it on.`}
-              </span>
-            </span>
-          </span>
-          <input
-            type="checkbox"
-            className="toggle toggle-primary shrink-0"
-            checked={useGpu}
-            onChange={(e) => onToggleGpu(e.target.checked)}
-            aria-label={t`Use GPU acceleration`}
-          />
-        </label>
+        <GpuOfferCard
+          offer={gpuOffer}
+          useGpu={useGpu}
+          downloadBytes={gpuDownloadBytes}
+          onToggle={onToggleGpu}
+        />
       )}
 
       {error && (
@@ -152,6 +102,171 @@ export function EngineStep({
         </div>
       )}
     </div>
+  );
+}
+
+interface WhisperSizeStepProps {
+  selected: WhisperModelValue;
+  onSelect: (model: WhisperModelValue) => void;
+}
+
+/**
+ * The Whisper size choice.
+ *
+ * Was a `<fieldset>`/`<legend>`, which punched the caption through the top
+ * border at a different inset than the rows below it and nested a bordered box
+ * inside a bordered box. One box, hairline rows, caption outside it — the same
+ * construct the readiness checks use, so a list of options and a list of
+ * results read as the same kind of thing.
+ */
+function WhisperSizeStep({ selected, onSelect }: WhisperSizeStepProps) {
+  const { t } = useLingui();
+  const groupName = useId();
+
+  return (
+    <fieldset>
+      <legend className="setup-label">{t`Model size`}</legend>
+      <div className="setup-group">
+        {whisperModels.map((m) => (
+          <SizeRow
+            key={m.value}
+            option={m}
+            groupName={groupName}
+            active={selected === m.value}
+            onSelect={() => onSelect(m.value)}
+          />
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+interface SizeRowProps {
+  option: (typeof whisperModels)[number];
+  groupName: string;
+  active: boolean;
+  onSelect: () => void;
+}
+
+function SizeRow({ option, groupName, active, onSelect }: SizeRowProps) {
+  return (
+    <label
+      className={`setup-row-divider group flex cursor-pointer items-start gap-3 px-4 py-3 transition-colors has-focus-visible:outline has-focus-visible:-outline-offset-2 has-focus-visible:outline-primary ${
+        active ? 'bg-primary/8' : 'hover:bg-surface-hover'
+      }`}
+    >
+      <input
+        type="radio"
+        name={groupName}
+        className="sr-only"
+        checked={active}
+        onChange={onSelect}
+      />
+      {/* Every option carries a marker, selected or not: previously only the
+          chosen row showed a check and the other two showed nothing, so the
+          list did not look like a set of choices at all. */}
+      <span
+        className={`setup-radio ${
+          active
+            ? 'border-primary bg-primary'
+            : 'border-surface-border-strong group-hover:border-primary/60'
+        }`}
+        aria-hidden="true"
+      >
+        {active && <Check size={11} strokeWidth={3.5} className="text-primary-content" />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-baseline justify-between gap-3">
+          <span
+            className={`text-sm font-medium ${
+              active ? 'text-content-strong' : 'text-content-default'
+            }`}
+          >
+            {option.label}
+          </span>
+          {/* Right-aligned so the three sizes form a column the eye can
+              compare. Inline after the label they sat at three different x
+              positions — the thing the user is actually weighing was the
+              hardest thing on the card to read. */}
+          <span className="shrink-0 text-xs tabular-nums text-content-subtle">{option.size}</span>
+        </span>
+        <span className="mt-0.5 block text-xs leading-snug text-content-subtle">
+          {option.description}
+        </span>
+      </span>
+    </label>
+  );
+}
+
+/**
+ * The chosen engine, stated rather than offered, for when there is only one.
+ */
+function EngineSummary({ option }: { option: EngineOption }) {
+  const Icon = option.icon;
+  return (
+    <div className="setup-card flex items-start gap-3 p-4">
+      <span className="setup-tile bg-primary/15 text-primary">
+        <Icon size={18} strokeWidth={1.8} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-sm font-medium text-content-strong">{option.label}</span>
+          <span className="text-xs text-content-subtle">{option.tagline}</span>
+        </p>
+        <p className="mt-1 text-xs leading-snug text-content-subtle">{option.detail}</p>
+      </div>
+    </div>
+  );
+}
+
+interface GpuOfferCardProps {
+  offer: GpuAccelerationOffer;
+  useGpu: boolean;
+  downloadBytes: number;
+  onToggle: (next: boolean) => void;
+}
+
+function GpuOfferCard({ offer, useGpu, downloadBytes, onToggle }: GpuOfferCardProps) {
+  const { t } = useLingui();
+
+  // Promising speed the user does not have yet would be a lie the first
+  // dictation exposes, so say which of the three situations this is: already
+  // accelerated, one restart away, or a download setup is about to make.
+  const detail =
+    offer === 'active'
+      ? t`Your GPU is ready — use it for faster transcription.`
+      : offer === 'needs-restart'
+        ? t`Installed. Restart Lune Voice to start using your GPU.`
+        : t`Your GPU qualifies. Setup downloads the NVIDIA runtime, then a restart turns it on.`;
+
+  return (
+    <label className="setup-card flex cursor-pointer items-start gap-3 p-4">
+      <span className="setup-tile bg-primary/15 text-primary">
+        <Zap size={18} strokeWidth={1.8} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-content-strong">{t`GPU acceleration`}</span>
+          {/* The download size is the one number worth weighing here, and
+              buried mid-sentence it was the least visible word in the card.
+              As a badge it sits beside the title, where a size belongs on
+              every other card on this screen. */}
+          {offer === 'after-download' && downloadBytes > 0 && (
+            <span className="badge badge-xs badge-soft tabular-nums text-content-subtle">
+              +{formatBytes(downloadBytes)}
+            </span>
+          )}
+        </span>
+        <span className="mt-0.5 block text-xs leading-snug text-content-subtle">{detail}</span>
+      </span>
+      <input
+        type="checkbox"
+        className="toggle toggle-primary mt-0.5 shrink-0"
+        checked={useGpu}
+        onChange={(e) => onToggle(e.target.checked)}
+        aria-label={t`Use GPU acceleration`}
+      />
+    </label>
   );
 }
 
@@ -173,22 +288,22 @@ function EngineCard({
       className={`group flex flex-col gap-3 rounded-box border p-4 text-left transition-all duration-150 ${
         active
           ? 'border-primary/50 bg-primary/8 shadow-sm'
-          : 'border-surface-border bg-base-200/60 hover:border-primary/45 hover:bg-primary/8'
+          : 'border-surface-border bg-surface-panel hover:border-primary/45 hover:bg-primary/8'
       }`}
     >
       <div className="flex items-center justify-between">
         <span
-          className={`flex size-11 items-center justify-center rounded-field transition-colors ${
+          className={`setup-tile transition-colors ${
             active
               ? 'bg-primary/15 text-primary'
-              : 'bg-base-300 text-content-subtle group-hover:text-primary'
+              : 'bg-surface-wash text-content-subtle group-hover:text-primary'
           }`}
         >
-          <Icon size={20} strokeWidth={1.7} />
+          <Icon size={18} strokeWidth={1.8} />
         </span>
         <span
           className={`flex size-5 items-center justify-center rounded-full border-2 transition-colors ${
-            active ? 'border-primary bg-primary' : 'border-surface-border'
+            active ? 'border-primary bg-primary' : 'border-surface-border-strong'
           }`}
           aria-hidden="true"
         >
@@ -196,14 +311,12 @@ function EngineCard({
         </span>
       </div>
       <div>
-        <div className="flex items-baseline gap-2">
-          <span
-            className={`font-medium ${active ? 'text-content-strong' : 'text-content-default'}`}
-          >
-            {option.label}
-          </span>
-        </div>
-        <p className="mt-0.5 text-xs font-medium text-primary/80">{option.tagline}</p>
+        <span
+          className={`text-sm font-medium ${active ? 'text-content-strong' : 'text-content-default'}`}
+        >
+          {option.label}
+        </span>
+        <p className="mt-0.5 text-xs text-content-subtle">{option.tagline}</p>
         <p className="mt-1.5 text-xs leading-snug text-content-subtle">{option.detail}</p>
       </div>
     </button>
