@@ -3,8 +3,10 @@
 //! Grabs physical keyboards exclusively and re-injects non-hotkey events
 //! through a uinput passthrough device. This works on both X11 and Wayland.
 
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock, mpsc as std_mpsc};
+use std::time::Duration;
 
 use evdev::{
     AttributeSet, Device, EventType, InputEvent, KeyCode, RelativeAxisCode, uinput::VirtualDevice,
@@ -141,39 +143,139 @@ fn build_combo_mods(mods: &[Modifier]) -> PressedCodes {
     combo
 }
 
-fn run_listener(live: Arc<LiveHotkeyConfig>, sink: HotkeySink) {
-    let keyboards = enumerate_keyboards();
-    if keyboards.is_empty() {
-        warn!("no accessible keyboard devices found; hotkey detection disabled");
-        return;
-    }
-    info!(
-        count = keyboards.len(),
-        "keyboard devices opened for hotkey detection"
-    );
+/// How long the key stream must be quiet before a withheld modifier press is
+/// released to apps.
+///
+/// A deferred modifier is a bet that the next event completes the hotkey. The
+/// bet has to expire: reaching for the mouse with Ctrl held produces no key
+/// event at all, so an unbounded defer means Ctrl+click and Ctrl+scroll simply
+/// never receive their modifier. Long enough that a real chord still resolves
+/// through the fast path, short enough to feel instant.
+const IDLE_TICK: Duration = Duration::from_millis(90);
 
+/// Idle ticks between kernel-truth sweeps — roughly half a second of quiet.
+const SWEEP_EVERY: u32 = 5;
+
+/// Idle ticks that must pass before the listener looks for new keyboards —
+/// roughly two seconds. It also rate-limits respawning: a node that dies the
+/// moment it is opened can cost at most one reader thread per interval.
+const RESCAN_COOLDOWN_TICKS: u32 = 22;
+
+/// What a reader thread can tell the listener.
+enum DeviceEvent {
+    /// A raw event, and whether its device was successfully grabbed.
+    Input(InputEvent, bool),
+    /// This node is no longer being read. The listener drops it so a rescan
+    /// will grab it again if it comes back — without this a keyboard that
+    /// sleeps, or a receiver that re-enumerates, is ignored until restart.
+    Gone(PathBuf),
+}
+
+/// Everything the listener loop needs from the OS.
+struct ListenerIo {
+    /// Nodes that currently have a reader thread.
+    watched: std::collections::HashSet<PathBuf>,
+    /// Second, ungrabbed handles on the watched nodes. They are never read
+    /// from — they exist only to answer `EVIOCGKEY`, the kernel's record of
+    /// which keys are physically held. That is the one source of truth the
+    /// event stream cannot lie about, and `sweep` repairs drift against it.
+    probes: Vec<(PathBuf, Device)>,
+    fwd: Forwarder<VirtualDevice>,
+    /// Kept alive by the listener so the channel outlives every reader: with
+    /// no keyboard attached the loop must keep ticking, not exit.
+    tx: std_mpsc::Sender<DeviceEvent>,
+    rx: std_mpsc::Receiver<DeviceEvent>,
+}
+
+fn open_devices() -> Option<ListenerIo> {
     let passthrough = match build_passthrough_device() {
         Ok(dev) => dev,
         Err(e) => {
             warn!(error = %e, "failed to create passthrough device; hotkey grab disabled");
-            return;
+            return None;
         }
     };
-    let mut fwd = Forwarder::new(passthrough);
 
-    let (event_tx, event_rx) = std_mpsc::channel::<(InputEvent, bool)>();
+    let (tx, rx) = std_mpsc::channel::<DeviceEvent>();
+    let mut io = ListenerIo {
+        watched: std::collections::HashSet::new(),
+        probes: Vec::new(),
+        fwd: Forwarder::new(passthrough),
+        tx,
+        rx,
+    };
+    if attach_new_keyboards(&mut io) == 0 {
+        // Not fatal any more: a Bluetooth keyboard that pairs later, or one
+        // plugged in after launch, is picked up by the rescan.
+        warn!("no accessible keyboard devices found; waiting for one to appear");
+    }
+    Some(io)
+}
 
-    for dev in keyboards {
-        let tx = event_tx.clone();
+/// Grab every keyboard that has no reader thread yet. Returns how many were
+/// added. Used for the initial attach and for every rescan, so a keyboard
+/// present at launch and one plugged in later take the same path.
+fn attach_new_keyboards(io: &mut ListenerIo) -> usize {
+    let mut added = 0;
+    for (path, dev) in enumerate_keyboards() {
+        if !io.watched.insert(path.clone()) {
+            continue;
+        }
+        if let Ok(probe) = Device::open(&path) {
+            io.probes.push((path.clone(), probe));
+        }
         let name = dev.name().unwrap_or("unknown").to_string();
-        if let Err(e) = std::thread::Builder::new()
+        let tx = io.tx.clone();
+        let reader_path = path.clone();
+        match std::thread::Builder::new()
             .name(format!("evdev-{name}"))
-            .spawn(move || read_device(dev, tx))
+            .spawn(move || read_device(reader_path, dev, tx))
         {
-            warn!(error = %e, device = %name, "failed to spawn evdev reader thread");
+            Ok(_) => added += 1,
+            Err(e) => {
+                warn!(error = %e, device = %name, "failed to spawn evdev reader thread");
+                io.watched.remove(&path);
+                io.probes.retain(|(p, _)| p != &path);
+            }
         }
     }
-    drop(event_tx);
+    if added > 0 {
+        info!(added, watched = io.watched.len(), "keyboards attached");
+    }
+    added
+}
+
+/// Whether to go looking for keyboards again.
+///
+/// Never more often than the cooldown, and then only when something actually
+/// changed: a reader thread reported its device gone, or the set of nodes in
+/// `/dev/input` moved. A device removed and re-added under the same node name
+/// leaves the directory looking identical, which is why the dead reader is a
+/// signal in its own right.
+fn rescan_due(ticks_since_rescan: u32, reader_lost: bool, nodes_changed: bool) -> bool {
+    ticks_since_rescan >= RESCAN_COOLDOWN_TICKS && (reader_lost || nodes_changed)
+}
+
+/// A cheap fingerprint of `/dev/input`: the sorted event-node names. Comparing
+/// it costs one directory read, against re-opening and interrogating every
+/// device, and it changes exactly when a node appears or disappears.
+fn input_node_signature() -> Vec<String> {
+    let Ok(entries) = std::fs::read_dir("/dev/input") else {
+        return Vec::new();
+    };
+    let mut names: Vec<String> = entries
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .filter(|name| name.starts_with("event"))
+        .collect();
+    names.sort_unstable();
+    names
+}
+
+fn run_listener(live: Arc<LiveHotkeyConfig>, sink: HotkeySink) {
+    let Some(mut io) = open_devices() else {
+        return;
+    };
 
     let mut config_gen = live.generation();
     let mut snap = live.snapshot();
@@ -188,26 +290,68 @@ fn run_listener(live: Arc<LiveHotkeyConfig>, sink: HotkeySink) {
     let mut consumed = PressedCodes::default();
     let mut deferred: Vec<InputEvent> = Vec::new();
 
-    for (raw, grabbed) in event_rx {
-        if raw.event_type() != EventType::KEY {
-            if grabbed {
-                fwd.forward(raw);
+    let mut idle_ticks: u32 = 0;
+    let mut ticks_since_rescan: u32 = 0;
+    let mut reader_lost = false;
+    let mut sweep_soon = false;
+    let mut node_sig = input_node_signature();
+
+    loop {
+        let (raw, grabbed) = match io.rx.recv_timeout(IDLE_TICK) {
+            Ok(DeviceEvent::Input(raw, grabbed)) => {
+                idle_ticks = 0;
+                (raw, grabbed)
             }
-            continue;
-        }
-
-        let code = KeyCode(raw.code());
-        let value = raw.value();
-
-        // Auto-repeat
-        if value == 2 {
-            if grabbed && !consumed.contains(code) && !combo_mod_codes.contains(code) {
-                fwd.forward(raw);
+            Ok(DeviceEvent::Gone(path)) => {
+                info!(path = %path.display(), "keyboard detached");
+                io.watched.remove(&path);
+                io.probes.retain(|(p, _)| p != &path);
+                // Whatever it was holding will never send a release, and its
+                // probe can no longer vouch for anything. Sweep at the next
+                // opportunity rather than waiting out the usual interval.
+                sweep_soon = true;
+                reader_lost = true;
+                continue;
             }
-            continue;
-        }
+            Err(std_mpsc::RecvTimeoutError::Timeout) => {
+                idle_ticks += 1;
+                ticks_since_rescan = ticks_since_rescan.saturating_add(1);
 
-        let pressed = value == 1;
+                let due = sweep_soon || idle_ticks >= SWEEP_EVERY;
+                if due {
+                    idle_ticks = 0;
+                    sweep_soon = false;
+                }
+                if let Some(action) = on_idle(
+                    &mut io.fwd,
+                    &mut state,
+                    &mut consumed,
+                    &mut deferred,
+                    &io.probes,
+                    snap.mode,
+                    due,
+                ) {
+                    sink.emit(action);
+                }
+
+                // Cheap gate: only touch the filesystem once the cooldown has
+                // elapsed, and only re-enumerate when something moved.
+                if ticks_since_rescan >= RESCAN_COOLDOWN_TICKS {
+                    let sig = input_node_signature();
+                    if rescan_due(ticks_since_rescan, reader_lost, sig != node_sig) {
+                        reader_lost = false;
+                        attach_new_keyboards(&mut io);
+                    }
+                    node_sig = sig;
+                    ticks_since_rescan = 0;
+                }
+                continue;
+            }
+            // Unreachable while `io.tx` is alive, and it lives as long as this
+            // loop — a keyboardless machine must keep waiting, not give up.
+            Err(std_mpsc::RecvTimeoutError::Disconnected) => break,
+        };
+
         // Hot-reload: one atomic load per event; rebuild targeting only when
         // a settings save bumped the generation. Pressed-key tracking is
         // preserved so a mid-combo reload can't wedge the state machine.
@@ -223,32 +367,139 @@ fn run_listener(live: Arc<LiveHotkeyConfig>, sink: HotkeySink) {
                 snap.cancel_mods.clone(),
             );
         }
-        let activation_mode = snap.mode;
 
-        if !grabbed {
-            let action = state.handle(code, pressed, activation_mode);
-            if let Some(a) = action {
-                sink.emit(a);
-            }
-            continue;
-        }
-
-        if let Some(action) = process_grabbed_key(
+        if let Some(action) = handle_event(
             raw,
-            code,
-            pressed,
+            grabbed,
             &mut state,
-            &mut fwd,
+            &mut io.fwd,
             &mut consumed,
             &mut deferred,
             &combo_mod_codes,
-            activation_mode,
+            snap.mode,
         ) {
             sink.emit(action);
         }
     }
-    fwd.release_all();
-    info!("all keyboard devices disconnected; hotkey listener exiting");
+    io.fwd.release_all();
+    info!("hotkey listener exiting");
+}
+
+/// Route one raw event from a keyboard: forward what apps must still see, and
+/// return the hotkey action it produced, if any.
+#[allow(clippy::too_many_arguments)]
+fn handle_event<S: KeySink>(
+    raw: InputEvent,
+    grabbed: bool,
+    state: &mut HotkeyState,
+    fwd: &mut Forwarder<S>,
+    consumed: &mut PressedCodes,
+    deferred: &mut Vec<InputEvent>,
+    combo_mod_codes: &PressedCodes,
+    mode: ActivationMode,
+) -> Option<HotkeyAction> {
+    if raw.event_type() != EventType::KEY {
+        if grabbed {
+            fwd.forward(raw);
+        }
+        return None;
+    }
+
+    let code = KeyCode(raw.code());
+    let value = raw.value();
+
+    // Auto-repeat
+    if value == 2 {
+        if grabbed && !consumed.contains(code) && !combo_mod_codes.contains(code) {
+            fwd.forward(raw);
+        }
+        return None;
+    }
+
+    let pressed = value == 1;
+
+    // A device we could not grab still reaches its apps through the kernel, so
+    // it drives the state machine and nothing else.
+    if !grabbed {
+        return state.handle(code, pressed, mode);
+    }
+
+    process_grabbed_key(
+        raw,
+        code,
+        pressed,
+        state,
+        fwd,
+        consumed,
+        deferred,
+        combo_mod_codes,
+        mode,
+    )
+}
+/// Work done when the key stream falls quiet: resolve any withheld modifier
+/// press, and — once every `SWEEP_EVERY` ticks — repair drift against the
+/// kernel. Split out of the listener loop because both halves are only ever
+/// correct in the absence of pending events.
+fn on_idle<S: KeySink>(
+    fwd: &mut Forwarder<S>,
+    state: &mut HotkeyState,
+    consumed: &mut PressedCodes,
+    deferred: &mut Vec<InputEvent>,
+    probes: &[(PathBuf, Device)],
+    mode: ActivationMode,
+    sweep_due: bool,
+) -> Option<HotkeyAction> {
+    // Nothing more is coming to complete a chord, so a withheld modifier press
+    // has to be delivered now rather than wait for a key event that may never
+    // arrive.
+    fwd.flush(deferred);
+    if !sweep_due {
+        return None;
+    }
+    sweep(fwd, state, consumed, probes, mode)
+}
+
+/// Reconcile what apps believe against what the kernel reports.
+///
+/// A key release can go missing for reasons this process never observes: a
+/// wireless keyboard that sleeps and re-enumerates mid-press, a uinput write
+/// that fails, a device node replaced underneath a reader thread. The cost is
+/// not a lost keystroke but a key wedged *down* in every application until the
+/// user restarts — and, on the state-machine side, a phantom pressed key that
+/// `extra_mods` reads as an unwanted modifier, so the hotkey silently stops
+/// matching. `EVIOCGKEY` knows the truth in both cases, which turns permanent
+/// corruption into drift that heals itself within half a second of quiet.
+fn sweep<S: KeySink>(
+    fwd: &mut Forwarder<S>,
+    state: &mut HotkeyState,
+    consumed: &mut PressedCodes,
+    probes: &[(PathBuf, Device)],
+    mode: ActivationMode,
+) -> Option<HotkeyAction> {
+    let physical = physical_keys(probes);
+    let stray = fwd.reconcile(&physical);
+    if !stray.is_empty() {
+        warn!(?stray, "released keys the kernel reports as up");
+    }
+    consumed.retain(&physical);
+    state.sync_pressed(&physical, mode)
+}
+
+/// Which keys the kernel currently reports as physically held, across every
+/// keyboard this listener watches. A device that has gone away answers with an
+/// error and contributes nothing — exactly right, since nobody is holding its
+/// keys any more.
+fn physical_keys(probes: &[(PathBuf, Device)]) -> PressedCodes {
+    let mut set = PressedCodes::default();
+    for (_, dev) in probes {
+        let Ok(keys) = dev.get_key_state() else {
+            continue;
+        };
+        for code in keys.iter() {
+            set.insert(code);
+        }
+    }
+    set
 }
 
 /// A destination for re-injected key events: the real uinput `VirtualDevice`
@@ -259,7 +510,16 @@ trait KeySink {
 
 impl KeySink for VirtualDevice {
     fn send_event(&mut self, event: InputEvent) {
-        let _ = self.emit(&[event, InputEvent::new(EventType::SYNCHRONIZATION.0, 0, 0)]);
+        if let Err(e) = self.emit(&[event, InputEvent::new(EventType::SYNCHRONIZATION.0, 0, 0)]) {
+            // A dropped release is a key left down in every app. The idle sweep
+            // repairs it; this line is how we learn it happened at all.
+            warn!(
+                error = %e,
+                code = event.code(),
+                value = event.value(),
+                "passthrough write failed"
+            );
+        }
     }
 }
 
@@ -304,6 +564,21 @@ impl<S: KeySink> Forwarder<S> {
     /// Whether a press for `code` was forwarded without a matching release.
     fn is_down(&self, code: KeyCode) -> bool {
         self.down.contains(code)
+    }
+
+    /// Release every key we told apps was down that the kernel says is up, and
+    /// report which ones. See `sweep` for why the two can disagree.
+    fn reconcile(&mut self, physical: &PressedCodes) -> Vec<KeyCode> {
+        let stray: Vec<KeyCode> = self
+            .down
+            .codes()
+            .into_iter()
+            .filter(|code| !physical.contains(*code))
+            .collect();
+        for code in &stray {
+            self.forward(InputEvent::new(EventType::KEY.0, code.code(), 0));
+        }
+        stray
     }
 
     /// Emit a synthetic release for every still-down forwarded key. Called on
@@ -390,46 +665,97 @@ fn process_grabbed_key<S: KeySink>(
 
 const SELF_PREFIX: &str = "lune-voice";
 
-fn enumerate_keyboards() -> Vec<Device> {
-    evdev::enumerate()
-        .filter_map(|(path, dev)| {
-            if dev.name().is_some_and(|n| n.starts_with(SELF_PREFIX)) {
+/// USB vendor/product pair. Every event node a physical device exposes carries
+/// the same one, which is how a mouse's keyboard interface can be told from a
+/// keyboard: the pointer node sitting beside it shares its id.
+type DeviceIdent = (u16, u16);
+
+fn device_ident(dev: &Device) -> DeviceIdent {
+    let id = dev.input_id();
+    (id.vendor(), id.product())
+}
+
+/// Whether this node is a pointer. Gate on pointer *movement* (REL_X) or mouse
+/// buttons — NOT any relative axis, or a keyboard's rotary knob / volume wheel
+/// (REL_WHEEL / REL_DIAL) would wrongly mark the keyboard a pointer.
+fn is_pointer_node(dev: &Device) -> bool {
+    dev.supported_keys()
+        .is_some_and(|k| k.contains(KeyCode::BTN_LEFT))
+        || dev
+            .supported_relative_axes()
+            .is_some_and(|a| a.contains(RelativeAxisCode::REL_X))
+}
+
+fn enumerate_keyboards() -> Vec<(PathBuf, Device)> {
+    let all: Vec<(PathBuf, Device)> = evdev::enumerate()
+        .filter(|(path, dev)| {
+            let is_self = dev.name().is_some_and(|n| n.starts_with(SELF_PREFIX));
+            if is_self {
                 debug!(path = %path.display(), "skipping self device");
-                return None;
             }
-            let keys = dev.supported_keys()?;
-            // A pointer (mouse) is never a typing keyboard, even when it
-            // advertises a macro keyboard interface. Gate on pointer *movement*
-            // (REL_X) or mouse buttons — NOT any relative axis, or a keyboard's
-            // rotary knob / volume wheel (REL_WHEEL / REL_DIAL) would wrongly
-            // mark the keyboard a pointer and we'd drop it.
-            let is_pointer = keys.contains(KeyCode::BTN_LEFT)
-                || dev
-                    .supported_relative_axes()
-                    .is_some_and(|a| a.contains(RelativeAxisCode::REL_X));
-            if !is_typing_keyboard_caps(
+            !is_self
+        })
+        .collect();
+
+    let pointer_idents: Vec<DeviceIdent> = all
+        .iter()
+        .filter(|(_, dev)| is_pointer_node(dev))
+        .map(|(_, dev)| device_ident(dev))
+        .collect();
+
+    all.into_iter()
+        .filter(|(path, dev)| {
+            let Some(keys) = dev.supported_keys() else {
+                return false;
+            };
+            let typing = is_typing_keyboard_caps(
                 keys.contains(KeyCode::KEY_A),
                 keys.contains(KeyCode::KEY_SPACE),
                 keys.contains(KeyCode::KEY_LEFTSHIFT) || keys.contains(KeyCode::KEY_RIGHTSHIFT),
                 keys.contains(KeyCode::KEY_ENTER),
-                is_pointer,
-            ) {
+                is_pointer_node(dev),
+            );
+            if !node_is_grabbable(typing, device_ident(dev), &pointer_idents) {
                 debug!(name = ?dev.name(), path = %path.display(), "skipping non-typing-keyboard node");
-                return None;
+                return false;
             }
             info!(name = ?dev.name(), path = %path.display(), "found keyboard");
-            Some(dev)
+            true
         })
         .collect()
+}
+
+/// Whether a node that looks like a typing keyboard should actually be grabbed.
+///
+/// A gaming mouse's keyboard interface advertises a full keyboard key map and
+/// carries no pointer bits of its own, so capabilities alone cannot tell the
+/// two apart — but its sibling pointer node can, because both nodes report the
+/// same vendor/product. Grabbing one is how a wireless mouse's own sleep/wake
+/// cycle ends up tearing down a keyboard grab at random.
+fn node_is_grabbable(
+    is_typing_keyboard: bool,
+    ident: DeviceIdent,
+    pointer_idents: &[DeviceIdent],
+) -> bool {
+    if !is_typing_keyboard {
+        return false;
+    }
+    // `(0, 0)` is the unset id shared by unrelated virtual devices. It
+    // identifies nothing, so it must not drag a real keyboard down with a
+    // stranger's mouse.
+    ident == (0, 0) || !pointer_idents.contains(&ident)
 }
 
 /// Whether a device's capabilities mark it a real typing keyboard: letters,
 /// space, a Shift, and Enter, and not a pointer. Pure so the rule is
 /// unit-tested. The old filter accepted any device exposing `A`+`Space`, which
-/// also matched a QMK board's secondary consumer-control node and a gaming
-/// mouse's macro interface — so a single keyboard got grabbed twice and a mouse
-/// got grabbed at all. Requiring Shift+Enter (and rejecting pointers) leaves
-/// exactly the real keyboard nodes, each grabbed once.
+/// also matched a QMK board's consumer-control node; requiring Shift+Enter
+/// rejects that. It cannot reject a gaming mouse's keyboard interface, which
+/// advertises the full key map — `node_is_grabbable` does that instead.
+///
+/// A board that exposes two genuine typing nodes (a QMK keyboard's 6KRO and
+/// NKRO interfaces, say) is still grabbed on both, deliberately: the firmware
+/// chooses between them at runtime, so watching only one drops keys.
 fn is_typing_keyboard_caps(
     has_a: bool,
     has_space: bool,
@@ -440,7 +766,7 @@ fn is_typing_keyboard_caps(
     has_a && has_space && has_shift && has_enter && !is_pointer
 }
 
-fn read_device(mut dev: Device, tx: std_mpsc::Sender<(InputEvent, bool)>) {
+fn read_device(path: PathBuf, mut dev: Device, tx: std_mpsc::Sender<DeviceEvent>) {
     let name = dev.name().unwrap_or("unknown").to_string();
     let grabbed = match dev.grab() {
         Ok(()) => {
@@ -456,17 +782,21 @@ fn read_device(mut dev: Device, tx: std_mpsc::Sender<(InputEvent, bool)>) {
         match dev.fetch_events() {
             Ok(events) => {
                 for ev in events {
-                    if tx.send((ev, grabbed)).is_err() {
+                    if tx.send(DeviceEvent::Input(ev, grabbed)).is_err() {
+                        // The listener is gone; there is nobody left to tell.
                         return;
                     }
                 }
             }
             Err(e) => {
                 debug!(error = %e, name, "device disconnected");
-                return;
+                break;
             }
         }
     }
+    // Hand the node back, so the same keyboard returning — or a replacement on
+    // the same path — is grabbed again instead of ignored until restart.
+    let _ = tx.send(DeviceEvent::Gone(path));
 }
 
 fn build_passthrough_device() -> Result<VirtualDevice, String> {
@@ -529,6 +859,28 @@ impl HotkeyState {
         self.cancel_trigger = cancel_trigger;
         self.cancel_mods = cancel_mods;
         self.hold_active = false;
+    }
+
+    /// Replace the tracked pressed-key set with the kernel's ground truth.
+    ///
+    /// Returns `Stop` when a hold's keys are no longer held: without it a lost
+    /// release keeps the microphone open on a session the user believes they
+    /// ended. A stale key is equally damaging when idle — `extra_mods` counts
+    /// it as an unwanted modifier, so the hotkey stops matching entirely.
+    fn sync_pressed(
+        &mut self,
+        physical: &PressedCodes,
+        mode: ActivationMode,
+    ) -> Option<HotkeyAction> {
+        self.pressed = physical.clone();
+        if mode != ActivationMode::Hold {
+            return None;
+        }
+        let was_hold = self.hold_active;
+        self.hold_active = self.pressed.contains(self.main_trigger)
+            && self.mods_down(&self.main_mods)
+            && !self.extra_mods(&self.main_mods);
+        (was_hold && !self.hold_active).then_some(HotkeyAction::Stop)
     }
 
     fn handle(
@@ -714,6 +1066,7 @@ fn key_name_to_code(name: &str) -> Option<KeyCode> {
 const LIMIT: usize = 1024;
 const WORDS: usize = LIMIT / 64;
 
+#[derive(Clone)]
 struct PressedCodes {
     w: [u64; WORDS],
 }
@@ -741,19 +1094,30 @@ impl PressedCodes {
         let i = c.code() as usize;
         i < LIMIT && (self.w[i / 64] >> (i % 64)) & 1 != 0
     }
-    /// Drain all set codes, clearing the set. Used to release every key still
-    /// marked down on listener exit.
-    fn drain_codes(&mut self) -> Vec<KeyCode> {
+    /// Keep only the codes also set in `keep`.
+    fn retain(&mut self, keep: &PressedCodes) {
+        for (word, mask) in self.w.iter_mut().zip(keep.w.iter()) {
+            *word &= *mask;
+        }
+    }
+    /// Every code currently set, in ascending order.
+    fn codes(&self) -> Vec<KeyCode> {
         let mut codes = Vec::new();
-        for (wi, word) in self.w.iter_mut().enumerate() {
+        for (wi, word) in self.w.iter().enumerate() {
             let mut bits = *word;
             while bits != 0 {
                 let b = bits.trailing_zeros() as usize;
                 bits &= bits - 1;
                 codes.push(KeyCode((wi * 64 + b) as u16));
             }
-            *word = 0;
         }
+        codes
+    }
+    /// Drain all set codes, clearing the set. Used to release every key still
+    /// marked down on listener exit.
+    fn drain_codes(&mut self) -> Vec<KeyCode> {
+        let codes = self.codes();
+        self.w = [0; WORDS];
         codes
     }
 }
@@ -981,6 +1345,163 @@ mod tests {
             !fwd.is_down(ctrl),
             "Ctrl release was swallowed by Stop — Ctrl is stuck down"
         );
+    }
+
+    fn codes(set: &[KeyCode]) -> PressedCodes {
+        let mut p = PressedCodes::default();
+        for c in set {
+            p.insert(*c);
+        }
+        p
+    }
+
+    /// The stuck-key cure. Whatever ate a release — a keyboard that vanished
+    /// mid-press, a uinput write that failed, a device node replaced under us —
+    /// the kernel still knows which keys are physically down. Anything we told
+    /// apps was down that the kernel says is up must be released.
+    #[test]
+    fn reconcile_releases_keys_the_kernel_says_are_up() {
+        let mut fwd = Forwarder::new(Recorder::default());
+        fwd.forward(ev(KeyCode::KEY_W, true));
+        fwd.forward(ev(KeyCode::KEY_S, true));
+        fwd.sink.events.clear();
+
+        // The kernel reports only W still held: S's release was lost.
+        let stray = fwd.reconcile(&codes(&[KeyCode::KEY_W]));
+
+        assert_eq!(stray, vec![KeyCode::KEY_S]);
+        assert!(fwd.is_down(KeyCode::KEY_W), "a held key must stay held");
+        assert!(!fwd.is_down(KeyCode::KEY_S));
+        assert_eq!(fwd.sink.events, vec![(KeyCode::KEY_S.code(), 0)]);
+    }
+
+    #[test]
+    fn reconcile_is_silent_when_nothing_drifted() {
+        let mut fwd = Forwarder::new(Recorder::default());
+        fwd.forward(ev(KeyCode::KEY_A, true));
+        fwd.sink.events.clear();
+        assert!(fwd.reconcile(&codes(&[KeyCode::KEY_A])).is_empty());
+        assert!(fwd.sink.events.is_empty());
+    }
+
+    /// A stale key in the state machine's pressed set reads as an extra
+    /// modifier, and `extra_mods` then blocks the hotkey forever — the
+    /// "it just stops activating" half of the bug.
+    #[test]
+    fn sync_pressed_unblocks_a_hotkey_wedged_by_a_stale_key() {
+        let mut s = ctrl_space_state();
+        let m = ActivationMode::Toggle;
+        // A Shift press whose release never arrived.
+        s.handle(KeyCode::KEY_LEFTSHIFT, true, m);
+        s.handle(KeyCode::KEY_LEFTCTRL, true, m);
+        assert!(
+            s.handle(KeyCode::KEY_SPACE, true, m).is_none(),
+            "stale Shift should block the combo before the sweep"
+        );
+        s.handle(KeyCode::KEY_SPACE, false, m);
+
+        // The kernel says only Ctrl is really down.
+        assert!(
+            s.sync_pressed(&codes(&[KeyCode::KEY_LEFTCTRL]), m)
+                .is_none()
+        );
+
+        assert!(matches!(
+            s.handle(KeyCode::KEY_SPACE, true, m),
+            Some(HotkeyAction::Toggle)
+        ));
+    }
+
+    /// A hold whose keys vanished must end the session, not leave the mic open.
+    #[test]
+    fn sync_pressed_stops_a_hold_whose_keys_vanished() {
+        let mut s = ctrl_space_state();
+        let m = ActivationMode::Hold;
+        s.handle(KeyCode::KEY_LEFTCTRL, true, m);
+        assert!(matches!(
+            s.handle(KeyCode::KEY_SPACE, true, m),
+            Some(HotkeyAction::Start)
+        ));
+        assert!(matches!(
+            s.sync_pressed(&PressedCodes::default(), m),
+            Some(HotkeyAction::Stop)
+        ));
+        // Idempotent: a second sweep must not re-emit.
+        assert!(s.sync_pressed(&PressedCodes::default(), m).is_none());
+    }
+
+    /// A withheld modifier press must never outlive the chord it belongs to.
+    /// Before this, holding Ctrl and then reaching for the mouse (Ctrl+click,
+    /// Ctrl+scroll) delivered no Ctrl at all — the press sat in `deferred`
+    /// waiting for a key event that never came.
+    #[test]
+    fn an_idle_flush_delivers_a_withheld_modifier() {
+        let m = ActivationMode::Hold;
+        let combo = build_combo_mods(&[Modifier::Ctrl]);
+        let mut state = ctrl_space_state();
+        let mut fwd = Forwarder::new(Recorder::default());
+        let mut consumed = PressedCodes::default();
+        let mut deferred: Vec<InputEvent> = Vec::new();
+
+        let ctrl = KeyCode::KEY_LEFTCTRL;
+        process_grabbed_key(
+            ev(ctrl, true),
+            ctrl,
+            true,
+            &mut state,
+            &mut fwd,
+            &mut consumed,
+            &mut deferred,
+            &combo,
+            m,
+        );
+        assert!(!fwd.is_down(ctrl), "the press is deferred, as designed");
+
+        // No further key event arrives; the idle tick resolves it.
+        fwd.flush(&mut deferred);
+
+        assert!(
+            fwd.is_down(ctrl),
+            "Ctrl must reach apps once the chord ends"
+        );
+        assert!(deferred.is_empty());
+    }
+
+    /// A gaming mouse's keyboard interface has a full keyboard key map and no
+    /// pointer bits of its own, so capability alone cannot tell it apart from a
+    /// real keyboard. Its sibling pointer node can. Grabbing one was the flaky
+    /// half of this bug: a wireless mouse sleeps and re-enumerates on its own,
+    /// and the grab dies with it.
+    #[test]
+    fn a_keyboard_node_sharing_an_id_with_a_pointer_is_not_grabbed() {
+        let mouse = (0x1038u16, 0x1842u16);
+        let keychron = (0x3434u16, 0x0151u16);
+        let pointers = [mouse];
+
+        assert!(!node_is_grabbable(true, mouse, &pointers));
+        assert!(node_is_grabbable(true, keychron, &pointers));
+        assert!(!node_is_grabbable(false, keychron, &pointers));
+    }
+
+    /// Rescans are rate-limited so a device that fails to open cannot spin the
+    /// listener respawning a reader thread for it.
+    #[test]
+    fn rescan_waits_for_the_cooldown_even_after_a_reader_dies() {
+        assert!(!rescan_due(RESCAN_COOLDOWN_TICKS - 1, true, true));
+    }
+
+    #[test]
+    fn a_lost_reader_or_a_new_node_triggers_a_rescan() {
+        // A keyboard that vanished and came back on the same node name: the
+        // directory looks unchanged, so the dead reader is the only signal.
+        assert!(rescan_due(RESCAN_COOLDOWN_TICKS, true, false));
+        // A node appeared while every reader is still healthy.
+        assert!(rescan_due(RESCAN_COOLDOWN_TICKS, false, true));
+    }
+
+    #[test]
+    fn a_quiet_unchanged_system_is_not_rescanned() {
+        assert!(!rescan_due(RESCAN_COOLDOWN_TICKS * 10, false, false));
     }
 
     #[test]
