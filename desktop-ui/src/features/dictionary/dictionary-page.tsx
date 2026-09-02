@@ -1,3 +1,4 @@
+import { useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';
 import { workspaceStore } from '../../store/workspace-store';
 import { QuickAddRule } from './components/dictionary-form';
@@ -13,6 +14,7 @@ import { VocabularyList } from './components/dictionary-table';
  * scrolls inside the card instead of scrolling the page.
  */
 export function DictionaryPage() {
+  const { t } = useLingui();
   const loaded = useStore(workspaceStore, (s) => s.runtime.loaded);
 
   if (!loaded) {
@@ -48,7 +50,7 @@ export function DictionaryPage() {
   return (
     <div className="page-stack min-h-0 flex-1">
       <QuickAddRule />
-      <section aria-label="Saved rules" className="flex min-h-0 flex-1 flex-col">
+      <section aria-label={t`Saved rules`} className="flex min-h-0 flex-1 flex-col">
         <VocabularyList />
       </section>
     </div>

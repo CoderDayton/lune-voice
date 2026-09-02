@@ -1,3 +1,4 @@
+import type { MessageDescriptor } from '@lingui/core';
 import { useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';
 import { Plus } from 'lucide-react';
@@ -32,7 +33,7 @@ interface ModalState {
   refreshing: boolean;
   fewShotDirty: boolean;
   llmReady: boolean;
-  llmReason: string | null;
+  llmReason: MessageDescriptor | null;
 }
 
 const DEFAULT_FORMATTING: FormatTogglesDto = {

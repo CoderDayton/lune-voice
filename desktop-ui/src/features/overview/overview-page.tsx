@@ -264,7 +264,7 @@ function OverviewSkeleton() {
 }
 
 export function OverviewPage() {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const serviceStatus = useStore(workspaceStore, (s) => s.runtime.serviceStatus);
   const loading = useStore(workspaceStore, (s) => s.runtime.loading);
   const asrBackend = useStore(workspaceStore, (s) => s.settings.asrBackend);
@@ -307,9 +307,9 @@ export function OverviewPage() {
             {statusLabel}
           </span>
           <span className="ov-sep" aria-hidden="true" />
-          <span>{summarizeAsrBackend(asrBackend)}</span>
+          <span>{summarizeAsrBackend(i18n, asrBackend)}</span>
           <span className="ov-sep" aria-hidden="true" />
-          <span>{summarizeDictationMode(dictationMode)}</span>
+          <span>{summarizeDictationMode(i18n, dictationMode)}</span>
         </div>
       </div>
 

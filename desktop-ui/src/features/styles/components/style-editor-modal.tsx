@@ -1,3 +1,4 @@
+import type { MessageDescriptor } from '@lingui/core';
 import { useLingui } from '@lingui/react/macro';
 import { Copy, RefreshCw } from 'lucide-react';
 import type { RefObject } from 'react';
@@ -18,7 +19,7 @@ interface StyleEditorModalProps {
   refreshing: boolean;
   fewShotDirty: boolean;
   llmReady: boolean;
-  llmReason: string | null;
+  llmReason: MessageDescriptor | null;
   onNameChange: (v: string) => void;
   onDescriptionChange: (v: string) => void;
   onInstructionsChange: (v: string) => void;
@@ -52,7 +53,7 @@ export function StyleEditorModal({
   onRefreshExamples,
   onDuplicate,
 }: StyleEditorModalProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const formatToggleRows: { key: keyof FormatTogglesDto; label: string }[] = [
     { key: 'keybinds', label: t`Keyboard shortcuts ("Super H" → "Super+H")` },
     { key: 'titleAbbreviations', label: t`Title abbreviations ("Mister" → "Mr.")` },
@@ -186,7 +187,9 @@ export function StyleEditorModal({
                   {t`Examples are out of date since you edited the prompt.`}
                 </span>
               )}
-              {!llmReady && llmReason && <span className="text-xs text-warning">{llmReason}</span>}
+              {!llmReady && llmReason && (
+                <span className="text-xs text-warning">{i18n._(llmReason)}</span>
+              )}
             </div>
           )}
         </div>

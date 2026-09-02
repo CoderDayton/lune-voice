@@ -3,7 +3,7 @@ import { Check, CircleAlert, type LucideIcon, Mic, Zap } from 'lucide-react';
 import { useId } from 'react';
 import { formatBytes } from '../../../lib/format-bytes';
 import type { AsrBackendValue, WhisperModelValue } from '../../settings/data/settings-data';
-import { whisperModels } from '../../settings/data/settings-data';
+import { localizeText, whisperModels } from '../../settings/data/settings-data';
 import type { GpuAccelerationOffer } from '../setup-logic';
 
 interface EngineStepProps {
@@ -120,7 +120,7 @@ interface WhisperSizeStepProps {
  * results read as the same kind of thing.
  */
 function WhisperSizeStep({ selected, onSelect }: WhisperSizeStepProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const groupName = useId();
 
   return (
@@ -130,7 +130,9 @@ function WhisperSizeStep({ selected, onSelect }: WhisperSizeStepProps) {
         {whisperModels.map((m) => (
           <SizeRow
             key={m.value}
-            option={m}
+            label={localizeText(i18n, m.label)}
+            description={m.description === undefined ? '' : localizeText(i18n, m.description)}
+            size={m.size}
             groupName={groupName}
             active={selected === m.value}
             onSelect={() => onSelect(m.value)}
@@ -142,13 +144,15 @@ function WhisperSizeStep({ selected, onSelect }: WhisperSizeStepProps) {
 }
 
 interface SizeRowProps {
-  option: (typeof whisperModels)[number];
+  label: string;
+  description: string;
+  size: string;
   groupName: string;
   active: boolean;
   onSelect: () => void;
 }
 
-function SizeRow({ option, groupName, active, onSelect }: SizeRowProps) {
+function SizeRow({ label, description, size, groupName, active, onSelect }: SizeRowProps) {
   return (
     <label
       className={`setup-row-divider group flex cursor-pointer items-start gap-3 px-4 py-3 transition-colors has-focus-visible:outline has-focus-visible:-outline-offset-2 has-focus-visible:outline-primary ${
@@ -182,17 +186,15 @@ function SizeRow({ option, groupName, active, onSelect }: SizeRowProps) {
               active ? 'text-content-strong' : 'text-content-default'
             }`}
           >
-            {option.label}
+            {label}
           </span>
           {/* Right-aligned so the three sizes form a column the eye can
               compare. Inline after the label they sat at three different x
               positions — the thing the user is actually weighing was the
               hardest thing on the card to read. */}
-          <span className="shrink-0 text-xs tabular-nums text-content-subtle">{option.size}</span>
+          <span className="shrink-0 text-xs tabular-nums text-content-subtle">{size}</span>
         </span>
-        <span className="mt-0.5 block text-xs leading-snug text-content-subtle">
-          {option.description}
-        </span>
+        <span className="mt-0.5 block text-xs leading-snug text-content-subtle">{description}</span>
       </span>
     </label>
   );

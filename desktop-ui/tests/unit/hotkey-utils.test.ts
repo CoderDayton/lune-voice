@@ -96,12 +96,12 @@ describe("validateCombo", () => {
 
   test("rejects single letter without modifier", () => {
     const error = validateCombo("a");
-    expect(error).toContain("modifier");
+    expect(error?.message).toContain("modifier");
   });
 
   test("rejects unsupported keys", () => {
     const error = validateCombo("Ctrl+AudioVolumeMute");
-    expect(error).toContain("isn't supported");
+    expect(error?.message).toContain("isn't supported");
   });
 
   test("rejects modifier-only combos", () => {
@@ -110,7 +110,7 @@ describe("validateCombo", () => {
     // Actually "Ctrl" alone wouldn't be passed since it's all modifiers with no trigger
     // Let's test the edge case where parts = ["Ctrl"] — the key "Ctrl" is in modifierSet
     const error = validateCombo("Ctrl");
-    expect(error).toContain("non-modifier key");
+    expect(error?.message).toContain("non-modifier key");
   });
 
   test("accepts number keys with modifier", () => {

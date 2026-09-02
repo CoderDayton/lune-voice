@@ -1,20 +1,23 @@
 import { useLingui } from '@lingui/react/macro';
 import { SlidersHorizontal } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown';
+import {
+  DescriptiveDropdown,
+  type DescriptiveOption,
+} from '../../../components/ui/descriptive-dropdown';
 import { activateLocale, type LocaleKey, locales } from '../../../i18n';
 import { backendClient } from '../../../lib/backend/client';
 import { saveWorkspaceSetting, type WorkspaceSettings } from '../../../store/workspace-store';
 import { SettingsRow, SettingsSection } from '../components/section';
 import {
-  type DescriptiveOptionData,
   historyRetentionDays,
   historyRetentionOptions,
   historyRetentionValue,
+  localizeOptions,
 } from '../data/settings-data';
 
 export function GeneralSection({ settings }: { settings: WorkspaceSettings }) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const [version, setVersion] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
 
@@ -39,7 +42,9 @@ export function GeneralSection({ settings }: { settings: WorkspaceSettings }) {
       setChecking(false);
     }
   }
-  const localeOptions = useMemo<DescriptiveOptionData<LocaleKey>[]>(
+  // Locale names stay in their own language, so these are plain labels rather
+  // than messages to translate.
+  const localeOptions = useMemo<DescriptiveOption<LocaleKey>[]>(
     () =>
       (Object.entries(locales) as [LocaleKey, string][]).map(([key, label]) => ({
         value: key,
@@ -89,7 +94,7 @@ export function GeneralSection({ settings }: { settings: WorkspaceSettings }) {
         control={
           <DescriptiveDropdown
             value={historyRetentionValue(settings.sessionHistoryDays)}
-            options={historyRetentionOptions}
+            options={localizeOptions(i18n, historyRetentionOptions)}
             ariaLabel={t`History retention`}
             onChange={(next) =>
               void saveWorkspaceSetting('sessionHistoryDays', historyRetentionDays(next))

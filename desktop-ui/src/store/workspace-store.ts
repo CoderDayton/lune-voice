@@ -1,3 +1,5 @@
+import { i18n } from '@lingui/core';
+import { msg } from '@lingui/core/macro';
 import { Store } from '@tanstack/store';
 import { backendClient } from '../lib/backend/client';
 import { LIMITS } from '../lib/backend/generated/limits';
@@ -200,7 +202,7 @@ function startSessionTimeoutWatchdog() {
           activeSessionId: null,
           serviceStatus: 'ready',
           audioLevel: 0,
-          error: 'Session timed out — backend may be unresponsive',
+          error: i18n._(msg`Session timed out — backend may be unresponsive`),
         },
       }));
     }
@@ -657,7 +659,7 @@ function formatError(error: unknown) {
   // surface those directly instead of masking them with the generic fallback.
   if (error instanceof Error) return error.message;
   if (typeof error === 'string' && error.trim().length > 0) return error;
-  return 'Unable to reach the desktop backend.';
+  return i18n._(msg`Unable to reach the desktop backend.`);
 }
 
 function reduceSessionEvent(

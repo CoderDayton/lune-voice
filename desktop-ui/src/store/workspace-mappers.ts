@@ -1,10 +1,10 @@
+import type { I18n } from '@lingui/core';
 import type { DictionaryEntry } from '../features/dictionary/data/dictionary-data';
 import {
   type AsrBackendValue,
-  asrBackends,
+  asrBackendShortLabels,
   type DictationModeValue,
-  deliveryMethods,
-  labelFor,
+  dictationModeShortLabels,
 } from '../features/settings/data/settings-data';
 import { LIMITS } from '../lib/backend/generated/limits';
 import type {
@@ -101,12 +101,14 @@ export function mapWorkspaceSettings(snapshot: WorkspaceSnapshot): WorkspaceSett
   };
 }
 
-export function summarizeAsrBackend(value: AsrBackendValue) {
-  return labelFor(asrBackends, value).replace(' (recommended)', '').replace(' (fast)', '');
+export function summarizeAsrBackend(i18n: I18n, value: AsrBackendValue) {
+  const label = asrBackendShortLabels[value];
+  return label ? i18n._(label) : value;
 }
 
-export function summarizeDictationMode(value: DictationModeValue) {
-  return labelFor(deliveryMethods, value).replace(' into app', '');
+export function summarizeDictationMode(i18n: I18n, value: DictationModeValue) {
+  const label = dictationModeShortLabels[value];
+  return label ? i18n._(label) : value;
 }
 
 function countWords(text: string) {

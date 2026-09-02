@@ -1,8 +1,12 @@
+import type { MessageDescriptor } from '@lingui/core';
+import { msg } from '@lingui/core/macro';
+
 export interface LlmReadiness {
   /** Whether the styling LLM can serve a request right now. */
   ready: boolean;
-  /** User-facing reason to show when not ready; `null` when ready. */
-  reason: string | null;
+  /** User-facing reason to show when not ready; `null` when ready. Translated
+   *  where it is rendered, so this stays a pure, React-free check. */
+  reason: MessageDescriptor | null;
 }
 
 /** The subset of settings needed to judge styling-LLM readiness. */
@@ -15,13 +19,12 @@ export interface LlmSettings {
 
 const STYLING_OFF: LlmReadiness = {
   ready: false,
-  reason: 'Styling is turned off. Enable a styling engine in Settings before generating examples.',
+  reason: msg`Styling is turned off. Enable a styling engine in Settings before generating examples.`,
 };
 
 const PROVIDER_NOT_CONFIGURED: LlmReadiness = {
   ready: false,
-  reason:
-    'Your styling provider isn’t fully configured. Add its API key and model in Settings before generating examples.',
+  reason: msg`Your styling provider isn’t fully configured. Add its API key and model in Settings before generating examples.`,
 };
 
 /**

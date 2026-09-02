@@ -1,0 +1,4 @@
+[test]
+# The Lingui macros are compiled by Vite for the app build; tests need their own
+# pass or every module that uses them throws on import.
+preload = ["./tests/lingui-macro-preload.ts"]

@@ -1,3 +1,4 @@
+import { setupI18n } from "@lingui/core";
 import { describe, expect, test } from "bun:test";
 import {
   activationModes,
@@ -7,8 +8,13 @@ import {
   historyRetentionOptions,
   historyRetentionValue,
   labelFor,
+  localizeText,
   pillVisibilityOptions,
 } from "../../src/features/settings/data/settings-data";
+
+// No catalog loaded, so every descriptor resolves to its own source message —
+// which is what these assertions are about.
+const i18n = setupI18n({ locale: "en", messages: { en: {} } });
 
 describe("settings data", () => {
   test("activationModes has Toggle and Hold", () => {
@@ -65,13 +71,13 @@ describe("settings data", () => {
   });
 
   test("labelFor returns the label for a known value", () => {
-    expect(labelFor(activationModes, "Toggle")).toContain("Toggle");
-    expect(labelFor(asrBackends, "WhisperCpp")).toContain("Whisper");
-    expect(labelFor(deliveryMethods, "Clipboard")).toContain("Paste");
+    expect(labelFor(i18n, activationModes, "Toggle")).toContain("Toggle");
+    expect(labelFor(i18n, asrBackends, "WhisperCpp")).toContain("Whisper");
+    expect(labelFor(i18n, deliveryMethods, "Clipboard")).toContain("Paste");
   });
 
   test("labelFor returns the value itself for unknown values", () => {
-    expect(labelFor(activationModes, "UnknownMode" as any)).toBe("UnknownMode");
+    expect(labelFor(i18n, activationModes, "UnknownMode" as any)).toBe("UnknownMode");
   });
 
   test("all options have non-empty labels", () => {
@@ -82,7 +88,7 @@ describe("settings data", () => {
       ...pillVisibilityOptions,
     ];
     for (const opt of allOptions) {
-      expect(opt.label.length).toBeGreaterThan(0);
+      expect(localizeText(i18n, opt.label).length).toBeGreaterThan(0);
     }
   });
 

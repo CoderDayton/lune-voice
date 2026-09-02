@@ -49,13 +49,15 @@ async function bootstrap() {
 
 function App() {
   return (
-    <ErrorBoundary>
-      <I18nProvider i18n={i18n}>
+    // The provider wraps the boundary, not the other way round: the fallback
+    // is translated too, and it can only reach the catalog from inside.
+    <I18nProvider i18n={i18n}>
+      <ErrorBoundary>
         <HotkeysProvider>
           <RouterProvider router={router} />
         </HotkeysProvider>
-      </I18nProvider>
-    </ErrorBoundary>
+      </ErrorBoundary>
+    </I18nProvider>
   );
 }
 

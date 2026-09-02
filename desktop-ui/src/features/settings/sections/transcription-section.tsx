@@ -13,6 +13,7 @@ import {
 } from '../components/section';
 import {
   dictationLanguages,
+  localizeOptions,
   modelIdleUnloadMinutes,
   modelIdleUnloadOptions,
   modelIdleUnloadValue,
@@ -23,7 +24,7 @@ export function TranscriptionSection({
   settings,
   onManageModels,
 }: SettingsProps & { onManageModels?: () => void }) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const [confidence, setConfidence] = useDebouncedSetting(
     'confidenceThreshold',
     settings.confidenceThreshold,
@@ -65,7 +66,7 @@ export function TranscriptionSection({
           control={
             <DescriptiveDropdown
               value={settings.dictationLanguage}
-              options={dictationLanguages}
+              options={localizeOptions(i18n, dictationLanguages)}
               ariaLabel={t`Dictation language`}
               onChange={(next) =>
                 void saveWorkspaceSetting(
@@ -95,7 +96,7 @@ export function TranscriptionSection({
           control={
             <DescriptiveDropdown
               value={modelIdleUnloadValue(settings.modelIdleUnloadMinutes)}
-              options={modelIdleUnloadOptions}
+              options={localizeOptions(i18n, modelIdleUnloadOptions)}
               ariaLabel={t`Free the model when idle`}
               onChange={(next) =>
                 void saveWorkspaceSetting('modelIdleUnloadMinutes', modelIdleUnloadMinutes(next))

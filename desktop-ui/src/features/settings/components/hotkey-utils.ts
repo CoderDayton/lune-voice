@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from '@lingui/core';
+import { msg } from '@lingui/core/macro';
+
 /** Build a combo string from a KeyboardEvent (e.g. "Ctrl+Shift+F5"). */
 export function buildCombo(event: KeyboardEvent): string | null {
   const modifierKeys = new Set(['Control', 'Shift', 'Alt', 'Meta']);
@@ -140,25 +143,29 @@ const SUPPORTED_KEYS = new Set([
   'slash',
 ]);
 
-/** Validate combo: non-modifier required, single letters need modifier, key must be backend-supported. */
-export function validateCombo(combo: string): string | null {
+/**
+ * Validate combo: non-modifier required, single letters need modifier, key must
+ * be backend-supported. Returns the failure as a message to translate at the
+ * point it is shown, so the rule stays usable outside React.
+ */
+export function validateCombo(combo: string): MessageDescriptor | null {
   const parts = combo.split('+');
   const modifierSet = new Set(['Ctrl', 'Shift', 'Alt', 'Meta']);
   const nonModifiers = parts.filter((p) => !modifierSet.has(p));
 
   if (nonModifiers.length === 0) {
-    return 'Combo must include a non-modifier key.';
+    return msg`Combo must include a non-modifier key.`;
   }
 
   const triggerKey = nonModifiers[nonModifiers.length - 1];
   const hasModifier = parts.length > nonModifiers.length;
 
   if (triggerKey.length === 1 && !hasModifier) {
-    return 'Single letter keys require at least one modifier (Ctrl, Shift, Alt, or Meta).';
+    return msg`Single letter keys require at least one modifier (Ctrl, Shift, Alt, or Meta).`;
   }
 
   if (!SUPPORTED_KEYS.has(triggerKey.toLowerCase())) {
-    return `"${triggerKey}" isn't supported as a hotkey.`;
+    return msg`"${triggerKey}" isn't supported as a hotkey.`;
   }
 
   return null;

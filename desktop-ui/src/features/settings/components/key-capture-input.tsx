@@ -1,3 +1,5 @@
+import type { MessageDescriptor } from '@lingui/core';
+import { Trans, useLingui } from '@lingui/react/macro';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '../../../lib/cn';
 import { buildCombo, validateCombo } from './hotkey-utils';
@@ -18,9 +20,10 @@ export function KeyCaptureInput({
   className,
   disabled = false,
 }: KeyCaptureInputProps) {
+  const { t, i18n } = useLingui();
   const [listening, setListening] = useState(false);
   const [pendingCombo, setPendingCombo] = useState<string | null>(null);
-  const [validationError, setValidationError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<MessageDescriptor | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const cancelHoldRef = useRef<number | null>(null);
@@ -124,8 +127,8 @@ export function KeyCaptureInput({
         disabled={disabled}
         aria-label={
           listening
-            ? 'Press keys to set hotkey. Hold Escape to cancel, or click again to keep the current one'
-            : `Current binding: ${value}. Click to change.`
+            ? t`Press keys to set hotkey. Hold Escape to cancel, or click again to keep the current one`
+            : t`Current binding: ${value}. Click to change.`
         }
         aria-invalid={validationError ? 'true' : undefined}
         aria-describedby={validationError ? 'key-capture-error' : undefined}
@@ -142,7 +145,7 @@ export function KeyCaptureInput({
         {listening ? (
           <>
             <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
-            <span>{pendingCombo ? pendingCombo.replace(/\+/g, ' + ') : 'Press keys…'}</span>
+            <span>{pendingCombo ? pendingCombo.replace(/\+/g, ' + ') : t`Press keys…`}</span>
           </>
         ) : (
           <span>{displayValue.replace(/\+/g, ' + ')}</span>
@@ -151,13 +154,13 @@ export function KeyCaptureInput({
 
       {listening && !validationError && (
         <p className="text-sm text-content-subtle">
-          Press your combo — hold Esc or click away to cancel
+          <Trans>Press your combo — hold Esc or click away to cancel</Trans>
         </p>
       )}
 
       {validationError && (
         <p id="key-capture-error" className="text-sm text-error max-w-52 sm:max-w-64 text-right">
-          {validationError}
+          {i18n._(validationError)}
         </p>
       )}
     </div>

@@ -9,6 +9,7 @@ import type { MonitorInfoDto } from '../../../lib/backend/types';
 import { saveWorkspaceSetting, workspaceStore } from '../../../store/workspace-store';
 import { SettingsRow, SettingsSection } from '../components/section';
 import {
+  localizeOptions,
   pillAnchorOptions,
   pillCornerOptions,
   pillOrientationOptions,
@@ -26,7 +27,7 @@ const AUTO_MONITOR = '';
  * while dictating. Visibility and behaviour, placement, and size & shape.
  */
 export function PillSection() {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const settings = useStore(workspaceStore, (s) => s.settings);
   const [monitors, setMonitors] = useState<MonitorInfoDto[]>([]);
   const [edgeMargin, setEdgeMargin] = useDebouncedSetting(
@@ -76,7 +77,7 @@ export function PillSection() {
           control={
             <DescriptiveDropdown
               value={settings.pillVisibility}
-              options={pillVisibilityOptions}
+              options={localizeOptions(i18n, pillVisibilityOptions)}
               ariaLabel={t`Dictation pill visibility`}
               onChange={(next) =>
                 void saveWorkspaceSetting('pillVisibility', next as typeof settings.pillVisibility)
@@ -112,7 +113,7 @@ export function PillSection() {
           control={
             <DescriptiveDropdown
               value={settings.pillAnchor}
-              options={pillAnchorOptions}
+              options={localizeOptions(i18n, pillAnchorOptions)}
               ariaLabel={t`Pill position preset`}
               onChange={(next) =>
                 void saveWorkspaceSetting('pillAnchor', next as typeof settings.pillAnchor)
@@ -202,7 +203,7 @@ export function PillSection() {
           control={
             <DescriptiveDropdown
               value={settings.pillSize}
-              options={pillSizeOptions}
+              options={localizeOptions(i18n, pillSizeOptions)}
               ariaLabel={t`Pill size`}
               onChange={(next) =>
                 void saveWorkspaceSetting('pillSize', next as typeof settings.pillSize)
@@ -216,7 +217,7 @@ export function PillSection() {
           control={
             <DescriptiveDropdown
               value={settings.pillOrientation}
-              options={pillOrientationOptions}
+              options={localizeOptions(i18n, pillOrientationOptions)}
               ariaLabel={t`Pill orientation`}
               onChange={(next) =>
                 void saveWorkspaceSetting(
@@ -233,7 +234,7 @@ export function PillSection() {
           control={
             <DescriptiveDropdown
               value={settings.pillCorner}
-              options={pillCornerOptions}
+              options={localizeOptions(i18n, pillCornerOptions)}
               ariaLabel={t`Pill corners`}
               onChange={(next) =>
                 void saveWorkspaceSetting('pillCorner', next as typeof settings.pillCorner)

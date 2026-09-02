@@ -2,7 +2,7 @@ import { useLingui } from '@lingui/react/macro';
 import { ArrowRight, Check, Cpu, Download, type LucideIcon, Mic, Server } from 'lucide-react';
 import { useEffect } from 'react';
 import { saveWorkspaceSetting, type WorkspaceSettings } from '../../../store/workspace-store';
-import { asrBackends, whisperModels } from '../data/settings-data';
+import { asrBackends, localizeOptions, localizeText, whisperModels } from '../data/settings-data';
 import { type ModelStatusApi, useModelStatus } from '../hooks/use-model-status';
 
 /** Per-engine icon — Whisper gets a mic, cloud a cloud, everything else a chip. */
@@ -26,6 +26,7 @@ interface AsrEngineCardsProps {
  * Models tab — here we only offer an inline download for the active size.
  */
 export function AsrEngineCards({ settings, onManageModels }: AsrEngineCardsProps) {
+  const { i18n } = useLingui();
   const status = useModelStatus();
   const isWhisper = settings.asrBackend === 'WhisperCpp';
 
@@ -39,7 +40,7 @@ export function AsrEngineCards({ settings, onManageModels }: AsrEngineCardsProps
   return (
     <div className="flex flex-col gap-3">
       <div className="grid gap-2 sm:grid-cols-3">
-        {asrBackends.map((engine) => (
+        {localizeOptions(i18n, asrBackends).map((engine) => (
           <EngineCard
             key={engine.value}
             label={engine.label}
@@ -105,7 +106,7 @@ interface WhisperPickerProps {
 }
 
 function WhisperModelPicker({ settings, status, onManageModels }: WhisperPickerProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const selected = whisperModels.find((m) => m.value === settings.whisperModel);
   const selectedStatus = selected ? status.byName.get(selected.localName) : undefined;
   const selectedReady = selectedStatus?.ready ?? false;
@@ -125,9 +126,9 @@ function WhisperModelPicker({ settings, status, onManageModels }: WhisperPickerP
         {whisperModels.map((m) => (
           <WhisperSizeCard
             key={m.value}
-            label={m.label}
+            label={localizeText(i18n, m.label)}
             size={m.size}
-            description={m.description ?? ''}
+            description={m.description === undefined ? '' : localizeText(i18n, m.description)}
             localName={m.localName}
             active={settings.whisperModel === m.value}
             status={status}
@@ -161,7 +162,7 @@ function WhisperModelPicker({ settings, status, onManageModels }: WhisperPickerP
                 disabled={!!status.downloading}
               >
                 <Download size={13} />
-                {t`Download ${selected.label}`}
+                {t`Download ${localizeText(i18n, selected.label)}`}
               </button>
               {onManageModels && (
                 <button

@@ -9,13 +9,13 @@ import {
 import { saveWorkspaceSetting } from '../../../store/workspace-store';
 import { KeyCaptureInput } from '../components/key-capture-input';
 import { type SettingsProps, SettingsRow, SettingsSection } from '../components/section';
-import { activationModes } from '../data/settings-data';
+import { activationModes, localizeOptions } from '../data/settings-data';
 
 /** Empty string is the picker's sentinel for "use the system default input". */
 const DEFAULT_DEVICE = '';
 
 export function DictationSection({ settings }: SettingsProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
 
   const toggleCancelConflict =
     settings.hotkeyToggle.trim().toLowerCase() === settings.hotkeyCancel.trim().toLowerCase();
@@ -79,7 +79,7 @@ export function DictationSection({ settings }: SettingsProps) {
           control={
             <DescriptiveDropdown
               value={settings.activationMode}
-              options={activationModes}
+              options={localizeOptions(i18n, activationModes)}
               ariaLabel={t`Recording mode`}
               onChange={(next) =>
                 void saveWorkspaceSetting('activationMode', next as typeof settings.activationMode)

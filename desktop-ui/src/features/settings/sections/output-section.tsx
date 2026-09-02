@@ -4,11 +4,11 @@ import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown
 import { saveWorkspaceSetting } from '../../../store/workspace-store';
 import { type SettingsProps, SettingsRow, SettingsSection } from '../components/section';
 import { UinputRuleRow } from '../components/uinput-rule-row';
-import { deliveryMethods, terminalModes } from '../data/settings-data';
+import { deliveryMethods, localizeOptions, terminalModes } from '../data/settings-data';
 import { useDebouncedSetting } from '../hooks/use-debounced-setting';
 
 export function OutputSection({ settings }: SettingsProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const [cueVolume, setCueVolume] = useDebouncedSetting('soundCueVolume', settings.soundCueVolume);
   const pastes = settings.dictationMode !== 'TypeInPlace';
 
@@ -26,7 +26,7 @@ export function OutputSection({ settings }: SettingsProps) {
           control={
             <DescriptiveDropdown
               value={settings.dictationMode}
-              options={deliveryMethods}
+              options={localizeOptions(i18n, deliveryMethods)}
               ariaLabel={t`Send method`}
               onChange={(next) =>
                 void saveWorkspaceSetting('dictationMode', next as typeof settings.dictationMode)
@@ -41,7 +41,7 @@ export function OutputSection({ settings }: SettingsProps) {
             control={
               <DescriptiveDropdown
                 value={settings.terminalMode}
-                options={terminalModes}
+                options={localizeOptions(i18n, terminalModes)}
                 ariaLabel={t`Paste compatibility`}
                 onChange={(next) =>
                   void saveWorkspaceSetting('terminalMode', next as typeof settings.terminalMode)

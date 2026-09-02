@@ -1,3 +1,4 @@
+import { Trans } from '@lingui/react/macro';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 interface Props {
@@ -30,7 +31,7 @@ export class ErrorBoundary extends Component<Props, State> {
               className="card bg-base-200 border border-error/20 max-w-sm sm:max-w-md w-full p-4 sm:p-6"
             >
               <h2 className="text-base sm:text-lg font-semibold text-error">
-                Something went wrong
+                <Trans>Something went wrong</Trans>
               </h2>
               <p className="text-sm text-content-muted mt-2">{this.state.error.message}</p>
               <button
@@ -38,7 +39,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 className="btn btn-sm btn-soft mt-4"
                 onClick={() => this.setState({ error: null })}
               >
-                Try again
+                <Trans>Try again</Trans>
               </button>
             </div>
           </div>

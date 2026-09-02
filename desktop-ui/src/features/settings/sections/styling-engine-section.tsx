@@ -3,7 +3,7 @@ import { Check, type LucideIcon, PowerOff, Server, Wand2 } from 'lucide-react';
 import { saveWorkspaceSettings } from '../../../store/workspace-store';
 import { OpenAiFields } from '../components/openai-fields';
 import { SettingsBlock, type SettingsProps, SettingsSection } from '../components/section';
-import { type LlmEngineValue, llmEngines } from '../data/settings-data';
+import { type LlmEngineValue, llmEngines, localizeOptions } from '../data/settings-data';
 
 function engineIcon(value: LlmEngineValue): LucideIcon {
   // A server, not a cloud: the endpoint may well be on localhost.
@@ -18,7 +18,7 @@ function engineIcon(value: LlmEngineValue): LucideIcon {
  * shortcut that maps onto the same settings.
  */
 export function StylingEngineSection({ settings }: SettingsProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const current: LlmEngineValue = !settings.llmEnabled ? 'Disabled' : settings.llmBackend;
 
   function selectEngine(value: LlmEngineValue) {
@@ -43,7 +43,7 @@ export function StylingEngineSection({ settings }: SettingsProps) {
           description={t`Off delivers raw transcripts. Which style is applied is chosen on the Styles tab.`}
         >
           <div className="grid gap-2 sm:grid-cols-2">
-            {llmEngines.map((engine) => (
+            {localizeOptions(i18n, llmEngines).map((engine) => (
               <EngineCard
                 key={engine.value}
                 label={engine.label}

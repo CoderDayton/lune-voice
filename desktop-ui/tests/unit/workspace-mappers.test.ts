@@ -1,3 +1,4 @@
+import { setupI18n } from "@lingui/core";
 import { describe, expect, test } from "bun:test";
 import {
   mapDictionaryEntry,
@@ -241,15 +242,15 @@ describe("workspace mappers", () => {
 
   // ── summarize helpers ───────────────────────────────────────────────
 
-  test("summarizeAsrBackend strips suffixes", () => {
-    const result = summarizeAsrBackend("Qwen3Asr");
-    expect(result).not.toContain("(recommended)");
-    expect(result.length).toBeGreaterThan(0);
+  test("summarizeAsrBackend gives a short label", () => {
+    const i18n = setupI18n({ locale: "en", messages: { en: {} } });
+    expect(summarizeAsrBackend(i18n, "WhisperCpp")).toBe("Whisper");
+    expect(summarizeAsrBackend(i18n, "OpenAiCompatible")).toBe("OpenAI-compatible");
   });
 
-  test("summarizeDictationMode strips suffix", () => {
-    const result = summarizeDictationMode("Clipboard");
-    expect(result).not.toContain("into app");
-    expect(result.length).toBeGreaterThan(0);
+  test("summarizeDictationMode gives a short label", () => {
+    const i18n = setupI18n({ locale: "en", messages: { en: {} } });
+    expect(summarizeDictationMode(i18n, "Clipboard")).toBe("Paste");
+    expect(summarizeDictationMode(i18n, "TypeInPlace")).toBe("Type");
   });
 });
