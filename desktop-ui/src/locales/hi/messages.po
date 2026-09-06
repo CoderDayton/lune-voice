@@ -13,7 +13,7 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/features/welcome/welcome-page.tsx:498
+#: src/features/welcome/welcome-page.tsx:511
 msgid "— change it any time in Settings › Dictation."
 msgstr "— इसे कभी भी सेटिंग्स › डिक्टेशन में बदलें।"
 
@@ -178,7 +178,7 @@ msgstr "5 मिनट बाद"
 msgid "AI models stored on your device."
 msgstr "आपके डिवाइस पर संग्रहीत AI मॉडल।"
 
-#: src/features/welcome/welcome-page.tsx:213
+#: src/features/welcome/welcome-page.tsx:215
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "सभी आवश्यक मॉडल पहले से इंस्टॉल हैं। त���यार होने पर जारी रखें।"
 
@@ -331,7 +331,7 @@ msgstr "रद्द करें"
 msgid "Cancel current recording"
 msgstr "वर्त���ान रिकॉर्डिंग रद्द करें"
 
-#: src/features/welcome/welcome-page.tsx:395
+#: src/features/welcome/welcome-page.tsx:408
 msgid "Cancel download"
 msgstr "डाउनलोड रद्द करें"
 
@@ -348,7 +348,7 @@ msgstr "आवाज़ से रिकॉर्ड करें"
 msgid "Capture device and how recording detects when you speak."
 msgstr "कैप्चर डिवाइस और रिकॉर्डिंग यह कैसे पहचानती है कि आप कब बोल रहे हैं।"
 
-#: src/features/welcome/welcome-page.tsx:457
+#: src/features/welcome/welcome-page.tsx:470
 msgid "Change engine"
 msgstr "इंजन बदलें"
 
@@ -370,7 +370,7 @@ msgstr "शुरू होने पर अपडेट देखें"
 msgid "Check whether a newer version has been released."
 msgstr "जाँचें कि कोई नया संस्करण जारी हुआ है या नहीं।"
 
-#: src/features/welcome/welcome-page.tsx:207
+#: src/features/welcome/welcome-page.tsx:209
 msgid "Check your network and we'll pick up where we left off."
 msgstr "अपना नेटवर्क जांचें और हम वहीं से शुरू करेंगे जहां हमने छोड़ा था।"
 
@@ -404,8 +404,8 @@ msgstr "चुनें कि Lune Voice कैसा दिखत��� ह
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
 msgstr "चुनें कि प्रतिलेखों को कैसे संवारा जाए — अपने द्वारा कॉन्फ़िगर किए गए OpenAI-संगत एंडपॉइंट को भेजकर, चाहे वह स्थानीय हो या होस्ट किया हुआ, या इसे पूरी तरह बंद रखकर।"
 
-#: src/features/welcome/welcome-page.tsx:210
-#: src/features/welcome/welcome-page.tsx:216
+#: src/features/welcome/welcome-page.tsx:212
+#: src/features/welcome/welcome-page.tsx:218
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "इंस्टॉल करने के लिए AI मॉडल चुनें. सब कुछ ऑफ़लाइन चलता है - कोई क्लाउड नहीं, कोई खाता नहीं।"
 
@@ -413,7 +413,7 @@ msgstr "इंस्टॉल करने के लिए AI मॉडल च�
 msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
 msgstr "वह इंजन चुनें जो आपकी बोली को टेक्स्ट में बदलता है। लोकल इंजन पूरी तरह डिवाइस पर चलते हैं; Whisper बहुभाषी है और इसमें चुनने योग्य मॉडल आकार हैं।"
 
-#: src/features/welcome/welcome-page.tsx:195
+#: src/features/welcome/welcome-page.tsx:197
 msgid "Choose your speech engine. Everything runs offline — no cloud, no accounts."
 msgstr "अपना स्पीच इंजन चुनें। सब कुछ ऑफ़लाइन चलत��� है — न कोई क्लाउड, न कोई अकाउंट।"
 
@@ -468,8 +468,8 @@ msgstr "कनेक्ट हो रहा है"
 msgid "Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network."
 msgstr "शुरू होने के थोड़ी देर बाद रिलीज़ सर्वर से संपर्क करता है और तभी बताता है जब कोई नया संस्करण मौजूद हो। डिफ़ॉल्ट रूप से बंद — डिक्टेशन को स्वयं कभी नेटवर्क की ज़रूरत नहीं होती।"
 
-#: src/features/welcome/welcome-page.tsx:372
-#: src/features/welcome/welcome-page.tsx:451
+#: src/features/welcome/welcome-page.tsx:385
+#: src/features/welcome/welcome-page.tsx:464
 msgid "Continue"
 msgstr "जारी रखें"
 
@@ -511,7 +511,7 @@ msgstr "सुधार"
 msgid "Correction sensitivity"
 msgstr "सुधार संवेदनशीलता"
 
-#: src/features/welcome/welcome-page.tsx:304
+#: src/features/welcome/welcome-page.tsx:317
 msgid "Could not download GPU support — transcription will run on the CPU. You can retry under Settings › Models."
 msgstr "GPU समर्थन डाउनलोड नहीं हो सका — ट्रांसक्रिप्शन CPU पर चलेगा। आप सेटिंग्स › मॉडल में फिर से कोशिश कर सकते हैं।"
 
@@ -551,7 +551,7 @@ msgstr "नई शैली बनाएं"
 msgid "Create style"
 msgstr "शैली बनाएं"
 
-#: src/features/welcome/welcome-page.tsx:497
+#: src/features/welcome/welcome-page.tsx:510
 msgid "Ctrl+Space"
 msgstr "Ctrl+Space"
 
@@ -699,11 +699,11 @@ msgstr "डाउनलोड"
 msgid "Download {0}"
 msgstr "{0} डाउनलोड करें"
 
-#: src/features/welcome/welcome-page.tsx:443
+#: src/features/welcome/welcome-page.tsx:456
 msgid "Download {pendingCount} models"
 msgstr "{pendingCount} मॉडल डाउनलोड करें"
 
-#: src/features/welcome/welcome-page.tsx:442
+#: src/features/welcome/welcome-page.tsx:455
 msgid "Download 1 model"
 msgstr "1 मॉडल डाउनलोड करें"
 
@@ -711,7 +711,7 @@ msgstr "1 मॉडल डाउनलोड करें"
 msgid "Download failed"
 msgstr "डाउनलोड विफल रहा"
 
-#: src/features/welcome/welcome-page.tsx:206
+#: src/features/welcome/welcome-page.tsx:208
 msgid "Download interrupted"
 msgstr "डाउनलोड बाधित"
 
@@ -726,11 +726,11 @@ msgstr "डाउनलोड प्रगत���"
 msgid "Download transcript"
 msgstr "प्रतिलेख डाउनलोड करें"
 
-#: src/features/welcome/welcome-page.tsx:200
+#: src/features/welcome/welcome-page.tsx:202
 msgid "Downloading models"
 msgstr "मॉडल डाउनलोड हो रहे हैं"
 
-#: src/features/welcome/welcome-page.tsx:295
+#: src/features/welcome/welcome-page.tsx:308
 msgid "Downloading NVIDIA's CUDA runtime."
 msgstr "NVIDIA का CUDA रनटाइम डाउनलोड हो रहा है।"
 
@@ -741,7 +741,7 @@ msgstr "अपडेट डाउनलोड हो रहा है"
 #: src/features/settings/components/asr-engine-cards.tsx:153
 #: src/features/settings/components/gpu-backend-card.tsx:112
 #: src/features/settings/sections/models-section.tsx:272
-#: src/features/welcome/welcome-page.tsx:387
+#: src/features/welcome/welcome-page.tsx:400
 msgid "Downloading…"
 msgstr "डाउनलोड हो रहा है..."
 
@@ -804,7 +804,7 @@ msgstr "स्टाइलिंग सक्षम करें"
 msgid "Engine"
 msgstr "इंजन"
 
-#: src/features/welcome/welcome-page.tsx:424
+#: src/features/welcome/welcome-page.tsx:437
 msgid "Enter Lune Voice"
 msgstr "Lune Voice खोलें"
 
@@ -832,7 +832,7 @@ msgstr "फ़ीचर का अनुरोध"
 msgid "Fetching Lune Voice {version}. Keep the app open until it finishes."
 msgstr "Lune Voice {version} डाउनलोड हो रहा है। पूरा होने त��� ऐप खुला रखें।"
 
-#: src/features/welcome/welcome-page.tsx:204
+#: src/features/welcome/welcome-page.tsx:206
 msgid "Fetching the NVIDIA runtime. This is the last step, and it only happens once."
 msgstr "NVIDIA रनटाइम प्राप्त किया जा रहा है। यह आख़िरी चरण है और सिर्फ़ एक बार होता है।"
 
@@ -930,7 +930,7 @@ msgstr "सुप्रभात।"
 
 #: src/features/settings/components/gpu-backend-card.tsx:66
 #: src/features/welcome/components/engine-step.tsx:251
-#: src/features/welcome/welcome-page.tsx:288
+#: src/features/welcome/welcome-page.tsx:299
 msgid "GPU acceleration"
 msgstr "GPU त���वरण"
 
@@ -975,7 +975,7 @@ msgstr "बोलते समय हॉटकी दबाए रखें औ�
 msgid "Hold while speaking"
 msgstr "बोलते समय दबाए रखें"
 
-#: src/features/welcome/welcome-page.tsx:493
+#: src/features/welcome/welcome-page.tsx:506
 msgid "Hold your hotkey, speak, then let go. The text is typed into whatever app you were using."
 msgstr "अपनी हॉटकी दबाए रखें, बोलें, फिर छोड़ दें। टेक्स्ट उसी ऐप में टाइप होता है जिसे आप इस्तेमाल कर रहे थे।"
 
@@ -995,7 +995,7 @@ msgstr "डिक्टेशन की ध्वनियाँ कित��
 msgid "How the pill bar looks. Changes apply immediately."
 msgstr "संकेतक पट्टी कैसी दिखती है। बदलाव तुरंत लागू होते हैं।"
 
-#: src/features/welcome/welcome-page.tsx:490
+#: src/features/welcome/welcome-page.tsx:503
 msgid "How to dictate"
 msgstr "डिक्टेशन कैसे करें"
 
@@ -1022,7 +1022,7 @@ msgstr "इंस्टॉल करें और दोबारा चाल�
 #: src/features/settings/components/asr-engine-cards.tsx:229
 #: src/features/settings/sections/models-section.tsx:218
 #: src/features/welcome/components/model-card.tsx:86
-#: src/features/welcome/welcome-page.tsx:290
+#: src/features/welcome/welcome-page.tsx:301
 msgid "Installed"
 msgstr "स्थापित"
 
@@ -1201,7 +1201,7 @@ msgstr "मॉडल का आकार"
 msgid "Models"
 msgstr "मॉडल"
 
-#: src/features/welcome/welcome-page.tsx:511
+#: src/features/welcome/welcome-page.tsx:524
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "मॉडल स्थानीय रूप से सहेजे जात��� हैं। कोई टेलीमेट्री नहीं, कोई खाते नहीं।"
 
@@ -1369,7 +1369,7 @@ msgstr "आउटपुट"
 msgid "Overall footprint of the pill bar."
 msgstr "संकेतक पट्टी का कुल आकार।"
 
-#: src/features/welcome/welcome-page.tsx:330
+#: src/features/welcome/welcome-page.tsx:343
 msgid "Overall progress"
 msgstr "समग्र प्रगति"
 
@@ -1435,7 +1435,7 @@ msgstr "स्थान-निर्धारण"
 msgid "Play a short sound when dictation starts, finishes, or runs into an error."
 msgstr "डिक्टेशन शुरू होने, पूरा होने या किसी त्रुटि में आने पर एक छोटी ध्वनि बजाएँ।"
 
-#: src/features/welcome/welcome-page.tsx:399
+#: src/features/welcome/welcome-page.tsx:412
 msgid "Please keep the app open until downloads finish"
 msgstr "कृपया डाउनलोड समाप्त होने तक ऐप को खुला रखें"
 
@@ -1471,7 +1471,7 @@ msgstr "बोलने के लिए दबाएँ"
 msgid "Press your combo — hold Esc or click away to cancel"
 msgstr "अपना संयोजन दबाएँ — रद्द करने के लिए Esc दबाए रखें या बाहर क्लिक करें"
 
-#: src/features/welcome/welcome-page.tsx:494
+#: src/features/welcome/welcome-page.tsx:507
 msgid "Press your hotkey, speak, then press it again. The text is typed into whatever app you were using."
 msgstr "अपनी हॉटकी दबाएँ, बोलें, फिर उसे दोबारा दबाएँ। टेक्स्ट उसी ऐप में टाइप होता है जिसे आप इस्तेमाल कर रहे थे।"
 
@@ -1580,7 +1580,7 @@ msgstr "रीसेट करें"
 msgid "Reset position"
 msgstr "स्थिति रीसेट करें"
 
-#: src/features/welcome/welcome-page.tsx:299
+#: src/features/welcome/welcome-page.tsx:312
 msgid "Restart Lune Voice to start using your GPU."
 msgstr "अपना GPU इस्तेमाल करने के लिए Lune Voice फिर से चालू करें।"
 
@@ -1592,7 +1592,7 @@ msgstr "पुनरारंभ आवश्यक"
 msgid "Retry"
 msgstr "पुनः प्रयास करें"
 
-#: src/features/welcome/welcome-page.tsx:411
+#: src/features/welcome/welcome-page.tsx:424
 msgid "Retry download"
 msgstr "पुनः डाउनलोड करने का प्रयास करें"
 
@@ -1666,7 +1666,7 @@ msgstr "प्रतिलेख खोजें..."
 msgid "Select all sessions on this page"
 msgstr "इस पृष्ठ के सभी सत्र चुनें"
 
-#: src/features/welcome/welcome-page.tsx:447
+#: src/features/welcome/welcome-page.tsx:460
 msgid "Select required models"
 msgstr "आवश्यक मॉडल चुनें"
 
@@ -1719,11 +1719,11 @@ msgstr "हॉटकी सेट करें"
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "आप जो भाषा बोलत��� हैं उसे सेट करें. स्वतः वाणी से पता लगाने का उपयोग करता है।"
 
-#: src/features/welcome/welcome-page.tsx:440
+#: src/features/welcome/welcome-page.tsx:453
 msgid "Set up GPU acceleration"
 msgstr "GPU त्वरण सेट करें"
 
-#: src/features/welcome/welcome-page.tsx:203
+#: src/features/welcome/welcome-page.tsx:205
 msgid "Setting up your GPU"
 msgstr "आपका GPU सेट किया जा रहा है"
 
@@ -1766,9 +1766,9 @@ msgstr "आकार"
 msgid "Size & shape"
 msgstr "आकार और रूप"
 
-#: src/features/welcome/welcome-page.tsx:376
-#: src/features/welcome/welcome-page.tsx:414
-#: src/features/welcome/welcome-page.tsx:460
+#: src/features/welcome/welcome-page.tsx:389
+#: src/features/welcome/welcome-page.tsx:427
+#: src/features/welcome/welcome-page.tsx:473
 msgid "Skip for now"
 msgstr "अभी के लिए छोड़ दे"
 
@@ -1948,7 +1948,7 @@ msgstr "थीम, शॉर्टकट, बंद करें"
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "यह मॉडल आपके मौजूदा कॉन्फ़िगरेशन द्वारा उपयोग में है। जब तक आप इसे दोबारा इंस्टॉल न करें या कोई दूसरा न चुनें, तब तक डिक्टेशन काम नहीं कर सकता।"
 
-#: src/features/welcome/welcome-page.tsx:201
+#: src/features/welcome/welcome-page.tsx:203
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "ऐसा केवल एक बार होता है. इस बीच आप अपने कंप्यूटर का उपयोग जारी रख सकते हैं."
 
@@ -2153,13 +2153,13 @@ msgstr "सर्वकालिक औसत की तुलना में"
 msgid "Wait {cooldown}s"
 msgstr "{cooldown} सेकंड रुकें"
 
-#: src/features/welcome/welcome-page.tsx:212
+#: src/features/welcome/welcome-page.tsx:214
 msgid "Welcome back"
 msgstr "वापसी पर स्वागत है"
 
-#: src/features/welcome/welcome-page.tsx:194
-#: src/features/welcome/welcome-page.tsx:209
-#: src/features/welcome/welcome-page.tsx:215
+#: src/features/welcome/welcome-page.tsx:196
+#: src/features/welcome/welcome-page.tsx:211
+#: src/features/welcome/welcome-page.tsx:217
 msgid "Welcome to Lune Voice"
 msgstr "Lune Voice में आपका स्वागत है"
 
@@ -2246,7 +2246,7 @@ msgstr "आप संस्करण {version} चला रहे हैं।"
 msgid "You say"
 msgstr "आप बताओ"
 
-#: src/features/welcome/welcome-page.tsx:197
+#: src/features/welcome/welcome-page.tsx:199
 msgid "You're all set"
 msgstr "सब तैयार है"
 
@@ -2274,7 +2274,7 @@ msgstr "आपका GPU योग्य है। सेटअप NVIDIA रन
 msgid "your hotkey"
 msgstr "आपकी हॉटकी"
 
-#: src/features/welcome/welcome-page.tsx:198
+#: src/features/welcome/welcome-page.tsx:200
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "आपके मॉडल त���यार हैं. सब कुछ इस मशीन पर रहता है."
 

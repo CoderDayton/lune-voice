@@ -13,7 +13,7 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/features/welcome/welcome-page.tsx:498
+#: src/features/welcome/welcome-page.tsx:511
 msgid "— change it any time in Settings › Dictation."
 msgstr "— jederzeit unter Einstellungen › Diktat änderbar."
 
@@ -178,7 +178,7 @@ msgstr "Nach 5 Minuten"
 msgid "AI models stored on your device."
 msgstr "Auf Ihrem Gerät gespeicherte KI-Modelle."
 
-#: src/features/welcome/welcome-page.tsx:213
+#: src/features/welcome/welcome-page.tsx:215
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "Alle benötigten Modelle sind bereits installiert. Fahren Sie fort, wenn Sie bereit sind."
 
@@ -331,7 +331,7 @@ msgstr "Abbrechen"
 msgid "Cancel current recording"
 msgstr "Aktuelle Aufnahme abbrechen"
 
-#: src/features/welcome/welcome-page.tsx:395
+#: src/features/welcome/welcome-page.tsx:408
 msgid "Cancel download"
 msgstr "Download abbrechen"
 
@@ -348,7 +348,7 @@ msgstr "Per Sprache aufnehmen"
 msgid "Capture device and how recording detects when you speak."
 msgstr "Aufnahmegerät und wie die Aufnahme erkennt, wenn Sie sprechen."
 
-#: src/features/welcome/welcome-page.tsx:457
+#: src/features/welcome/welcome-page.tsx:470
 msgid "Change engine"
 msgstr "Engine wechseln"
 
@@ -370,7 +370,7 @@ msgstr "Beim Start nach Updates suchen"
 msgid "Check whether a newer version has been released."
 msgstr "Prüfen, ob eine neuere Version veröffentlicht wurde."
 
-#: src/features/welcome/welcome-page.tsx:207
+#: src/features/welcome/welcome-page.tsx:209
 msgid "Check your network and we'll pick up where we left off."
 msgstr "Überprüfen Sie Ihr Netzwerk und wir machen dort weiter, wo wir aufgehört haben."
 
@@ -404,8 +404,8 @@ msgstr "Wählen Sie, wie Lune Voice aussehen soll."
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
 msgstr "Wählen Sie, wie Transkripte umformuliert werden — an einen von Ihnen konfigurierten OpenAI-kompatiblen Endpunkt gesendet, lokal oder gehostet, oder ganz abgeschaltet."
 
-#: src/features/welcome/welcome-page.tsx:210
-#: src/features/welcome/welcome-page.tsx:216
+#: src/features/welcome/welcome-page.tsx:212
+#: src/features/welcome/welcome-page.tsx:218
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "Wählen Sie die zu installierenden KI-Modelle aus. Alles läuft offline – keine Cloud, keine Konten."
 
@@ -413,7 +413,7 @@ msgstr "Wählen Sie die zu installierenden KI-Modelle aus. Alles läuft offline 
 msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
 msgstr "Wählen Sie die Engine, die Ihre Sprache in Text umwandelt. Lokale Engines laufen vollständig auf dem Gerät; Whisper ist mehrsprachig mit wählbaren Modellgrößen."
 
-#: src/features/welcome/welcome-page.tsx:195
+#: src/features/welcome/welcome-page.tsx:197
 msgid "Choose your speech engine. Everything runs offline — no cloud, no accounts."
 msgstr "Wählen Sie Ihre Sprach-Engine. Alles läuft offline — keine Cloud, keine Konten."
 
@@ -468,8 +468,8 @@ msgstr "Verbinden"
 msgid "Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network."
 msgstr "Kurz nach dem Start den Release-Server kontaktieren und Sie nur benachrichtigen, wenn eine neuere Version vorliegt. Standardmäßig aus — das Diktat selbst braucht nie das Netzwerk."
 
-#: src/features/welcome/welcome-page.tsx:372
-#: src/features/welcome/welcome-page.tsx:451
+#: src/features/welcome/welcome-page.tsx:385
+#: src/features/welcome/welcome-page.tsx:464
 msgid "Continue"
 msgstr "Weitermachen"
 
@@ -511,7 +511,7 @@ msgstr "Korrektur"
 msgid "Correction sensitivity"
 msgstr "Korrekturempfindlichkeit"
 
-#: src/features/welcome/welcome-page.tsx:304
+#: src/features/welcome/welcome-page.tsx:317
 msgid "Could not download GPU support — transcription will run on the CPU. You can retry under Settings › Models."
 msgstr "GPU-Unterstützung konnte nicht heruntergeladen werden — die Transkription läuft auf der CPU. Sie können es unter Einstellungen › Modelle erneut versuchen."
 
@@ -551,7 +551,7 @@ msgstr "Erstellen Sie einen neuen Stil"
 msgid "Create style"
 msgstr "Stil kreieren"
 
-#: src/features/welcome/welcome-page.tsx:497
+#: src/features/welcome/welcome-page.tsx:510
 msgid "Ctrl+Space"
 msgstr "Ctrl+Space"
 
@@ -699,11 +699,11 @@ msgstr "Herunterladen"
 msgid "Download {0}"
 msgstr "{0} herunterladen"
 
-#: src/features/welcome/welcome-page.tsx:443
+#: src/features/welcome/welcome-page.tsx:456
 msgid "Download {pendingCount} models"
 msgstr "Laden Sie {pendingCount}-Modelle herunter"
 
-#: src/features/welcome/welcome-page.tsx:442
+#: src/features/welcome/welcome-page.tsx:455
 msgid "Download 1 model"
 msgstr "Laden Sie 1 Modell herunter"
 
@@ -711,7 +711,7 @@ msgstr "Laden Sie 1 Modell herunter"
 msgid "Download failed"
 msgstr "Der Download ist fehlgeschlagen"
 
-#: src/features/welcome/welcome-page.tsx:206
+#: src/features/welcome/welcome-page.tsx:208
 msgid "Download interrupted"
 msgstr "Download unterbrochen"
 
@@ -726,11 +726,11 @@ msgstr "Download-Fortschritt"
 msgid "Download transcript"
 msgstr "Transkript herunterladen"
 
-#: src/features/welcome/welcome-page.tsx:200
+#: src/features/welcome/welcome-page.tsx:202
 msgid "Downloading models"
 msgstr "Modelle herunterladen"
 
-#: src/features/welcome/welcome-page.tsx:295
+#: src/features/welcome/welcome-page.tsx:308
 msgid "Downloading NVIDIA's CUDA runtime."
 msgstr "NVIDIAs CUDA-Laufzeitumgebung wird heruntergeladen."
 
@@ -741,7 +741,7 @@ msgstr "Update wird heruntergeladen"
 #: src/features/settings/components/asr-engine-cards.tsx:153
 #: src/features/settings/components/gpu-backend-card.tsx:112
 #: src/features/settings/sections/models-section.tsx:272
-#: src/features/welcome/welcome-page.tsx:387
+#: src/features/welcome/welcome-page.tsx:400
 msgid "Downloading…"
 msgstr "Herunterladen…"
 
@@ -804,7 +804,7 @@ msgstr "Styling aktivieren"
 msgid "Engine"
 msgstr "Motor"
 
-#: src/features/welcome/welcome-page.tsx:424
+#: src/features/welcome/welcome-page.tsx:437
 msgid "Enter Lune Voice"
 msgstr "Geben Sie Lune Voice ein"
 
@@ -832,7 +832,7 @@ msgstr "Funktionswunsch"
 msgid "Fetching Lune Voice {version}. Keep the app open until it finishes."
 msgstr "Lune Voice {version} wird geladen. Lassen Sie die App geöffnet, bis der Vorgang abgeschlossen ist."
 
-#: src/features/welcome/welcome-page.tsx:204
+#: src/features/welcome/welcome-page.tsx:206
 msgid "Fetching the NVIDIA runtime. This is the last step, and it only happens once."
 msgstr "Die NVIDIA-Laufzeitumgebung wird geholt. Das ist der letzte Schritt und passiert nur einmal."
 
@@ -930,7 +930,7 @@ msgstr "Guten Morgen."
 
 #: src/features/settings/components/gpu-backend-card.tsx:66
 #: src/features/welcome/components/engine-step.tsx:251
-#: src/features/welcome/welcome-page.tsx:288
+#: src/features/welcome/welcome-page.tsx:299
 msgid "GPU acceleration"
 msgstr "GPU-Beschleunigung"
 
@@ -975,7 +975,7 @@ msgstr "Halten Sie das Tastenkürzel beim Sprechen gedrückt und lassen Sie es z
 msgid "Hold while speaking"
 msgstr "Beim Sprechen gedrückt halten"
 
-#: src/features/welcome/welcome-page.tsx:493
+#: src/features/welcome/welcome-page.tsx:506
 msgid "Hold your hotkey, speak, then let go. The text is typed into whatever app you were using."
 msgstr "Halten Sie Ihr Tastenkürzel gedrückt, sprechen Sie und lassen Sie los. Der Text wird in die App geschrieben, die Sie gerade nutzen."
 
@@ -995,7 +995,7 @@ msgstr "Wie laut die Diktattöne abgespielt werden."
 msgid "How the pill bar looks. Changes apply immediately."
 msgstr "Wie die Anzeigeleiste aussieht. Änderungen werden sofort übernommen."
 
-#: src/features/welcome/welcome-page.tsx:490
+#: src/features/welcome/welcome-page.tsx:503
 msgid "How to dictate"
 msgstr "So diktieren Sie"
 
@@ -1022,7 +1022,7 @@ msgstr "Installieren und neu starten"
 #: src/features/settings/components/asr-engine-cards.tsx:229
 #: src/features/settings/sections/models-section.tsx:218
 #: src/features/welcome/components/model-card.tsx:86
-#: src/features/welcome/welcome-page.tsx:290
+#: src/features/welcome/welcome-page.tsx:301
 msgid "Installed"
 msgstr "Installiert"
 
@@ -1201,7 +1201,7 @@ msgstr "Modellgröße"
 msgid "Models"
 msgstr "Modelle"
 
-#: src/features/welcome/welcome-page.tsx:511
+#: src/features/welcome/welcome-page.tsx:524
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "Modelle werden lokal gespeichert. Keine Telemetrie, keine Konten."
 
@@ -1369,7 +1369,7 @@ msgstr "Ausgabe"
 msgid "Overall footprint of the pill bar."
 msgstr "Gesamtgröße der Anzeigeleiste."
 
-#: src/features/welcome/welcome-page.tsx:330
+#: src/features/welcome/welcome-page.tsx:343
 msgid "Overall progress"
 msgstr "Gesamtfortschritt"
 
@@ -1435,7 +1435,7 @@ msgstr "Platzierung"
 msgid "Play a short sound when dictation starts, finishes, or runs into an error."
 msgstr "Spielt einen kurzen Ton ab, wenn das Diktat startet, endet oder auf einen Fehler stößt."
 
-#: src/features/welcome/welcome-page.tsx:399
+#: src/features/welcome/welcome-page.tsx:412
 msgid "Please keep the app open until downloads finish"
 msgstr "Bitte lassen Sie die App geöffnet, bis der Download abgeschlossen ist"
 
@@ -1471,7 +1471,7 @@ msgstr "Zum Sprechen drücken"
 msgid "Press your combo — hold Esc or click away to cancel"
 msgstr "Ihre Kombination drücken — Esc halten oder danebenklicken zum Abbrechen"
 
-#: src/features/welcome/welcome-page.tsx:494
+#: src/features/welcome/welcome-page.tsx:507
 msgid "Press your hotkey, speak, then press it again. The text is typed into whatever app you were using."
 msgstr "Drücken Sie Ihr Tastenkürzel, sprechen Sie und drücken Sie es erneut. Der Text wird in die App geschrieben, die Sie gerade nutzen."
 
@@ -1580,7 +1580,7 @@ msgstr "Zurücksetzen"
 msgid "Reset position"
 msgstr "Position zurücksetzen"
 
-#: src/features/welcome/welcome-page.tsx:299
+#: src/features/welcome/welcome-page.tsx:312
 msgid "Restart Lune Voice to start using your GPU."
 msgstr "Starten Sie Lune Voice neu, um Ihre GPU zu nutzen."
 
@@ -1592,7 +1592,7 @@ msgstr "Neustart erforderlich"
 msgid "Retry"
 msgstr "Erneut versuchen"
 
-#: src/features/welcome/welcome-page.tsx:411
+#: src/features/welcome/welcome-page.tsx:424
 msgid "Retry download"
 msgstr "Versuchen Sie den Download erneut"
 
@@ -1666,7 +1666,7 @@ msgstr "Transkripte durchsuchen…"
 msgid "Select all sessions on this page"
 msgstr "Alle Sitzungen auf dieser Seite auswählen"
 
-#: src/features/welcome/welcome-page.tsx:447
+#: src/features/welcome/welcome-page.tsx:460
 msgid "Select required models"
 msgstr "Wählen Sie die gewünschten Modelle aus"
 
@@ -1719,11 +1719,11 @@ msgstr "Hotkey festlegen"
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "Legen Sie die Sprache fest, die Sie sprechen. Auto nutzt die Spracherkennung."
 
-#: src/features/welcome/welcome-page.tsx:440
+#: src/features/welcome/welcome-page.tsx:453
 msgid "Set up GPU acceleration"
 msgstr "GPU-Beschleunigung einrichten"
 
-#: src/features/welcome/welcome-page.tsx:203
+#: src/features/welcome/welcome-page.tsx:205
 msgid "Setting up your GPU"
 msgstr "Ihre GPU wird eingerichtet"
 
@@ -1766,9 +1766,9 @@ msgstr "Größe"
 msgid "Size & shape"
 msgstr "Größe & Form"
 
-#: src/features/welcome/welcome-page.tsx:376
-#: src/features/welcome/welcome-page.tsx:414
-#: src/features/welcome/welcome-page.tsx:460
+#: src/features/welcome/welcome-page.tsx:389
+#: src/features/welcome/welcome-page.tsx:427
+#: src/features/welcome/welcome-page.tsx:473
 msgid "Skip for now"
 msgstr "Überspringen Sie es vorerst"
 
@@ -1948,7 +1948,7 @@ msgstr "Design, Tastenkürzel, Beenden"
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "Dieses Modell wird von Ihrer aktuellen Konfiguration verwendet. Das Diktat funktioniert möglicherweise erst wieder, wenn Sie es neu installieren oder ein anderes wählen."
 
-#: src/features/welcome/welcome-page.tsx:201
+#: src/features/welcome/welcome-page.tsx:203
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "Dies geschieht nur einmal. Sie können Ihren Computer in der Zwischenzeit weiterhin verwenden."
 
@@ -2153,13 +2153,13 @@ msgstr "vs. Gesamtdurchschnitt"
 msgid "Wait {cooldown}s"
 msgstr "Noch {cooldown} s"
 
-#: src/features/welcome/welcome-page.tsx:212
+#: src/features/welcome/welcome-page.tsx:214
 msgid "Welcome back"
 msgstr "Willkommen zurück"
 
-#: src/features/welcome/welcome-page.tsx:194
-#: src/features/welcome/welcome-page.tsx:209
-#: src/features/welcome/welcome-page.tsx:215
+#: src/features/welcome/welcome-page.tsx:196
+#: src/features/welcome/welcome-page.tsx:211
+#: src/features/welcome/welcome-page.tsx:217
 msgid "Welcome to Lune Voice"
 msgstr "Willkommen bei Lune Voice"
 
@@ -2246,7 +2246,7 @@ msgstr "Sie verwenden Version {version}."
 msgid "You say"
 msgstr "Du sagst"
 
-#: src/features/welcome/welcome-page.tsx:197
+#: src/features/welcome/welcome-page.tsx:199
 msgid "You're all set"
 msgstr "Sie sind bereit"
 
@@ -2274,7 +2274,7 @@ msgstr "Ihre GPU ist geeignet. Die Einrichtung lädt die NVIDIA-Laufzeitumgebung
 msgid "your hotkey"
 msgstr "Ihr Hotkey"
 
-#: src/features/welcome/welcome-page.tsx:198
+#: src/features/welcome/welcome-page.tsx:200
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "Ihre Modelle sind fertig. Alles bleibt auf dieser Maschine."
 

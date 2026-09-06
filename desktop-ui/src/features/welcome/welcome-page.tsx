@@ -9,11 +9,11 @@ import {
   Mic,
   RefreshCw,
   ShieldCheck,
-  Sparkles,
   Wand2,
   X,
   Zap,
 } from 'lucide-react';
+import luneLogo from '../../assets/lune-voice-logo.png';
 import { ByteProgress } from '../../components/ui/byte-progress';
 import type { GpuInstallProgressDto } from '../../lib/backend/generated/GpuInstallProgressDto';
 import { workspaceStore } from '../../store/workspace-store';
@@ -150,7 +150,9 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
             <CircleAlert size={18} className="shrink-0" />
             <div className="min-w-0 flex-1">
               <p className="font-medium">{t`Download failed`}</p>
-              <p className="text-xs opacity-80 break-words">{error}</p>
+              {/* The shell is `select-none`; the backend's own error string is
+                  the one thing here a user needs to copy to report a failure. */}
+              <p className="text-xs opacity-80 break-words select-text">{error}</p>
             </div>
           </div>
         )}
@@ -220,13 +222,22 @@ function Header({ phase, requiredOk, pendingCount, error: _error }: HeaderProps)
     <header className="flex flex-col items-center gap-4 text-center">
       {/* Was size-14 growing to size-16 around a 26px glyph — a large empty
           box with a small mark adrift in it. One size, tighter ratio. */}
-      <div className="token-icon size-14">
-        {phase === 'done' ? (
-          <Sparkles size={24} strokeWidth={1.7} className="text-primary" />
-        ) : (
+      {phase === 'done' ? (
+        // The finish line is the one place the app can introduce itself, so it
+        // shows the product mark rather than one more generic glyph.
+        <div className="size-14 overflow-hidden rounded-field ring-1 ring-surface-border-strong">
+          <img
+            src={luneLogo}
+            alt=""
+            className="pointer-events-none size-full object-cover"
+            draggable={false}
+          />
+        </div>
+      ) : (
+        <div className="token-icon size-14">
           <Mic size={24} strokeWidth={1.7} className="text-primary" />
-        )}
-      </div>
+        </div>
+      )}
       <div>
         <h1 className="font-display tracking-heading text-2xl sm:text-3xl font-semibold text-balance">
           {title}
@@ -290,7 +301,9 @@ function GpuSetupCard({ installing, progress, totalBytes, installed, error }: Gp
               <span className="badge badge-xs badge-soft badge-success">{t`Installed`}</span>
             )}
           </div>
-          <p className="mt-0.5 text-xs leading-snug text-content-subtle">
+          {/* `select-text` because this line can carry the backend's raw error
+              string, and the shell is `select-none`. */}
+          <p className="mt-0.5 text-xs leading-snug text-content-subtle select-text">
             {installing
               ? t`Downloading NVIDIA's CUDA runtime.`
               : installed
