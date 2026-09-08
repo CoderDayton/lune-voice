@@ -649,8 +649,16 @@ fn process_grabbed_key<S: KeySink>(
             None
         }
         None if !pressed && combo_mod_codes.contains(code) => {
+            // Flush first: a press still sitting in `deferred` is this
+            // modifier's own (a bare tap), and apps need it before the release.
             fwd.flush(deferred);
-            fwd.forward(raw);
+            // A press that was dropped rather than forwarded — the combo
+            // completed on the trigger key and cleared the queue — left apps
+            // never seeing this modifier go down. Sending the release anyway
+            // cancels a modifier the focused app is legitimately holding.
+            if fwd.is_down(code) {
+                fwd.forward(raw);
+            }
             None
         }
         None => {
@@ -1344,6 +1352,49 @@ mod tests {
         assert!(
             !fwd.is_down(ctrl),
             "Ctrl release was swallowed by Stop — Ctrl is stuck down"
+        );
+    }
+
+    /// Toggle mode, Ctrl+Space, pressed in the ordinary order: Ctrl, then
+    /// Space. The Ctrl press is deferred and then dropped when Space completes
+    /// the hotkey, so apps never saw Ctrl go down — and must never be told it
+    /// came back up. A phantom Ctrl release lands in whatever app has focus and
+    /// cancels a modifier it is legitimately holding.
+    #[test]
+    fn a_swallowed_combo_modifier_is_not_phantom_released() {
+        let m = ActivationMode::Toggle;
+        let combo = build_combo_mods(&[Modifier::Ctrl]);
+        let mut state = ctrl_space_state();
+        let mut fwd = Forwarder::new(Recorder::default());
+        let mut consumed = PressedCodes::default();
+        let mut deferred: Vec<InputEvent> = Vec::new();
+
+        let ctrl = KeyCode::KEY_LEFTCTRL;
+        let space = KeyCode::KEY_SPACE;
+
+        let mut step = |code: KeyCode, pressed: bool| {
+            process_grabbed_key(
+                ev(code, pressed),
+                code,
+                pressed,
+                &mut state,
+                &mut fwd,
+                &mut consumed,
+                &mut deferred,
+                &combo,
+                m,
+            )
+        };
+
+        step(ctrl, true);
+        assert!(matches!(step(space, true), Some(HotkeyAction::Toggle)));
+        step(space, false);
+        step(ctrl, false);
+
+        assert!(
+            !fwd.sink.events.contains(&(ctrl.code(), 0)),
+            "apps never saw Ctrl go down, so they must not be told it went up: {:?}",
+            fwd.sink.events
         );
     }
 
