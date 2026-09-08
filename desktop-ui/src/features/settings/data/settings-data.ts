@@ -186,7 +186,7 @@ export const whisperModels: WhisperModelOption[] = [
   },
   {
     value: 'LargeV3Turbo',
-    label: 'Large v3 Turbo',
+    label: msg`Large v3 Turbo`,
     description: msg`Best accuracy; turbo decoder keeps it fast.`,
     localName: 'whisper-large-v3-turbo-q8_0',
     size: '874 MB',
