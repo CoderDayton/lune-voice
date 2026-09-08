@@ -22,6 +22,8 @@ mod cosmic_toplevel;
 #[cfg(unix)]
 mod probe;
 #[cfg(unix)]
+mod toplevel;
+#[cfg(unix)]
 mod wayland_toplevel;
 // XWayland-fallback decision for the pill overlay (Wayland-without-layer-shell).
 #[cfg(target_os = "linux")]

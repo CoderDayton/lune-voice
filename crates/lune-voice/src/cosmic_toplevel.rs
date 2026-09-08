@@ -18,54 +18,30 @@
 //! its work by a hard time budget — see `wayland_toplevel.rs` for the
 //! "why per-call" discussion.
 
-use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use crate::cosmic_protocol::toplevel_info::client::{
     zcosmic_toplevel_handle_v1::{self, ZcosmicToplevelHandleV1},
     zcosmic_toplevel_info_v1::{self, ZcosmicToplevelInfoV1},
 };
-use tracing::{debug, trace};
+use tracing::debug;
 
-use crate::probe;
+use crate::toplevel::{QUERY_BUDGET, Toplevels};
 use wayland_client::{
-    Connection, Dispatch, Proxy, QueueHandle, event_created_child,
-    globals::{GlobalListContents, registry_queue_init},
-    protocol::wl_registry::WlRegistry,
+    Connection, Dispatch, Proxy, QueueHandle, event_created_child, globals::registry_queue_init,
 };
-
-/// `state` array enum value for an activated toplevel
-/// (cosmic-toplevel-info v1 protocol — same numbering as xdg-toplevel).
-const STATE_ACTIVATED: u32 = 2;
-
-/// Soft budget, checked between roundtrips.
-const QUERY_BUDGET: Duration = Duration::from_millis(150);
-
-/// Hard ceiling, enforced from outside the query — `roundtrip` blocks on the
-/// socket with no deadline, so a compositor that stops answering mid-roundtrip
-/// never reaches the budget check. See `wayland_toplevel.rs`.
-const QUERY_DEADLINE: Duration = Duration::from_millis(500);
 
 /// Returns the `app_id` of the activated toplevel via cosmic-toplevel-info,
 /// or `None` if the protocol is not advertised, no toplevel is activated,
 /// the session is not Wayland, or any wayland error occurs.
 pub fn cosmic_active_app_id() -> Option<String> {
-    std::env::var_os("WAYLAND_DISPLAY")?;
-
-    let started = Instant::now();
-    let result = probe::bounded(QUERY_DEADLINE, "the cosmic toplevel manager", None, query);
-    trace!(
-        elapsed_ms = started.elapsed().as_millis() as u64,
-        ?result,
-        "cosmic-toplevel query done"
-    );
-    result
+    crate::toplevel::active_app_id("the cosmic toplevel manager", query)
 }
 
 fn query() -> Option<String> {
     let started = Instant::now();
     let conn = Connection::connect_to_env().ok()?;
-    let (globals, mut queue) = registry_queue_init::<State>(&conn).ok()?;
+    let (globals, mut queue) = registry_queue_init::<Toplevels>(&conn).ok()?;
     let qh = queue.handle();
 
     let info: ZcosmicToplevelInfoV1 = match globals.bind(&qh, 1..=1, ()) {
@@ -76,7 +52,7 @@ fn query() -> Option<String> {
         }
     };
 
-    let mut state = State::default();
+    let mut state = Toplevels::default();
 
     // Roundtrip until we observe an activated toplevel with an app_id, or
     // exhaust the budget. Each roundtrip drains a layer of the protocol:
@@ -89,11 +65,7 @@ fn query() -> Option<String> {
             break;
         }
         queue.roundtrip(&mut state).ok()?;
-        if state
-            .toplevels
-            .values()
-            .any(|t| t.activated && t.app_id.is_some())
-        {
+        if state.found_activated() {
             // One extra roundtrip to absorb any final state events that
             // might overwrite the activated flag (e.g., minimized=false
             // arriving after activated=true on the same window).
@@ -105,41 +77,12 @@ fn query() -> Option<String> {
     info.stop();
     let _ = queue.flush();
 
-    state
-        .toplevels
-        .into_values()
-        .find(|t| t.activated)
-        .and_then(|t| t.app_id)
-}
-
-#[derive(Default)]
-struct ToplevelInfo {
-    app_id: Option<String>,
-    activated: bool,
-}
-
-#[derive(Default)]
-struct State {
-    toplevels: HashMap<u32, ToplevelInfo>,
-}
-
-// ─── Dispatch: registry (no-op; registry_queue_init handles bookkeeping) ─────
-
-impl Dispatch<WlRegistry, GlobalListContents> for State {
-    fn event(
-        _: &mut Self,
-        _: &WlRegistry,
-        _: <WlRegistry as Proxy>::Event,
-        _: &GlobalListContents,
-        _: &Connection,
-        _: &QueueHandle<Self>,
-    ) {
-    }
+    state.activated_app_id()
 }
 
 // ─── Dispatch: manager ───────────────────────────────────────────────────────
 
-impl Dispatch<ZcosmicToplevelInfoV1, ()> for State {
+impl Dispatch<ZcosmicToplevelInfoV1, ()> for Toplevels {
     fn event(
         s: &mut Self,
         _: &ZcosmicToplevelInfoV1,
@@ -149,13 +92,12 @@ impl Dispatch<ZcosmicToplevelInfoV1, ()> for State {
         _: &QueueHandle<Self>,
     ) {
         if let zcosmic_toplevel_info_v1::Event::Toplevel { toplevel } = event {
-            s.toplevels
-                .insert(toplevel.id().protocol_id(), ToplevelInfo::default());
+            s.track(toplevel.id().protocol_id());
         }
     }
 
     event_created_child!(
-        State,
+        Toplevels,
         ZcosmicToplevelInfoV1,
         [
             zcosmic_toplevel_info_v1::EVT_TOPLEVEL_OPCODE => (ZcosmicToplevelHandleV1, ()),
@@ -165,7 +107,7 @@ impl Dispatch<ZcosmicToplevelInfoV1, ()> for State {
 
 // ─── Dispatch: per-toplevel handle ───────────────────────────────────────────
 
-impl Dispatch<ZcosmicToplevelHandleV1, ()> for State {
+impl Dispatch<ZcosmicToplevelHandleV1, ()> for Toplevels {
     fn event(
         s: &mut Self,
         handle: &ZcosmicToplevelHandleV1,
@@ -175,19 +117,10 @@ impl Dispatch<ZcosmicToplevelHandleV1, ()> for State {
         _: &QueueHandle<Self>,
     ) {
         let id = handle.id().protocol_id();
-        let entry = s.toplevels.entry(id).or_default();
         match event {
-            zcosmic_toplevel_handle_v1::Event::AppId { app_id } => {
-                entry.app_id = Some(app_id);
-            }
-            zcosmic_toplevel_handle_v1::Event::State { state } => {
-                entry.activated = state
-                    .chunks_exact(4)
-                    .any(|c| u32::from_ne_bytes([c[0], c[1], c[2], c[3]]) == STATE_ACTIVATED);
-            }
-            zcosmic_toplevel_handle_v1::Event::Closed => {
-                s.toplevels.remove(&id);
-            }
+            zcosmic_toplevel_handle_v1::Event::AppId { app_id } => s.set_app_id(id, app_id),
+            zcosmic_toplevel_handle_v1::Event::State { state } => s.set_state(id, &state),
+            zcosmic_toplevel_handle_v1::Event::Closed => s.forget(id),
             // Title / OutputEnter / OutputLeave / WorkspaceEnter /
             // WorkspaceLeave / Done / Geometry: ignored.
             _ => {}
