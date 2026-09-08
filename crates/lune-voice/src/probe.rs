@@ -6,8 +6,9 @@
 //! blocks the caller forever, so every probe in this crate runs on a thread
 //! the caller is willing to abandon.
 
+use std::process::{Command, ExitStatus, Output, Stdio};
 use std::sync::mpsc::{self, RecvTimeoutError};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// Run `probe` on a thread we are willing to abandon, answering `on_no_answer`
 /// if it has not reported back within `timeout`.
@@ -47,6 +48,51 @@ pub(crate) fn bounded<T: Send + 'static>(
             on_no_answer
         }
     }
+}
+
+/// Spawn `cmd` with `args`, collect stdout/stderr, kill if it doesn't finish
+/// within `timeout`. Returns `None` on spawn failure or timeout.
+///
+/// `try_wait` polling at 10ms; the upper bound on overshoot is ~10ms. Stdin is
+/// closed (`Stdio::null`) so children that read stdin don't block.
+pub(crate) fn output_with_timeout(cmd: &str, args: &[&str], timeout: Duration) -> Option<Output> {
+    let mut child = Command::new(cmd)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .ok()?;
+
+    let deadline = Instant::now() + timeout;
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => return child.wait_with_output().ok(),
+            Ok(None) => {
+                if Instant::now() >= deadline {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    tracing::debug!(
+                        cmd,
+                        timeout_ms = timeout.as_millis() as u64,
+                        "subprocess timeout"
+                    );
+                    return None;
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err(_) => return None,
+        }
+    }
+}
+
+/// Status-only variant of [`output_with_timeout`] for fire-and-forget commands.
+pub(crate) fn status_with_timeout(
+    cmd: &str,
+    args: &[&str],
+    timeout: Duration,
+) -> Option<ExitStatus> {
+    output_with_timeout(cmd, args, timeout).map(|o| o.status)
 }
 
 #[cfg(test)]

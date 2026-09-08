@@ -172,8 +172,13 @@ fn windows_image_stem(path: &str) -> Option<String> {
 
 // ─── Capture ─────────────────────────────────────────────────────────────────
 
+#[cfg(unix)]
+mod unix;
 #[cfg(target_os = "windows")]
 mod windows;
+
+#[cfg(unix)]
+pub(crate) use unix::{focused_window_class, restore_focus};
 
 /// Snapshot the focused window.
 ///
@@ -183,7 +188,7 @@ mod windows;
 pub fn capture_focus_target() -> WindowTarget {
     #[cfg(unix)]
     {
-        crate::uinput_typer::capture_focus_target()
+        unix::capture()
     }
     #[cfg(target_os = "windows")]
     {
@@ -205,7 +210,7 @@ pub fn capture_focus_target() -> WindowTarget {
 pub fn focused_is_terminal() -> bool {
     #[cfg(unix)]
     {
-        crate::uinput_typer::focused_is_terminal()
+        unix::focused_is_terminal()
     }
     #[cfg(not(unix))]
     {
@@ -238,9 +243,16 @@ mod tests {
     #[test]
     fn the_three_class_shapes_all_reduce_to_the_same_terminal() {
         assert!(is_terminal_class("kitty"));
+        assert!(is_terminal_class("alacritty"));
+        assert!(is_terminal_class("Konsole")); // case-insensitive
         assert!(is_terminal_class("org.kde.konsole"));
+        assert!(is_terminal_class("org.gnome.Console"));
+        assert!(is_terminal_class("com.raggesilver.BlackBox"));
         assert!(is_terminal_class("cosmic-term"));
+        // `cosmic-term` (list) and `com.system76.CosmicTerm` (compositor)
+        // both reduce to `cosmicterm`; likewise `gnome-terminal`.
         assert!(is_terminal_class("com.system76.CosmicTerm"));
+        assert!(is_terminal_class("org.gnome.Terminal"));
         assert!(is_terminal_class("dev.warp.Warp"));
     }
 
@@ -260,6 +272,9 @@ mod tests {
         assert!(!is_terminal_class("firefox"));
         assert!(!is_terminal_class("org.mozilla.firefox"));
         assert!(!is_terminal_class("Code"));
+        assert!(!is_terminal_class("code-oss"));
+        assert!(!is_terminal_class("discord"));
+        assert!(!is_terminal_class("google-chrome"));
         assert!(!is_terminal_class(""));
         assert!(!is_terminal_class("..."));
     }
