@@ -513,6 +513,36 @@ struct SessionDeps {
     settings: Arc<RwLock<UserSettings>>,
 }
 
+impl SessionDeps {
+    fn teardown(&self) -> Teardown {
+        Teardown {
+            session_id: self.session_id,
+            event_tx: self.event_tx.clone(),
+            persist: Arc::clone(&self.persist),
+            persist_history: self.config.persist_history,
+            active_arc: Arc::clone(&self.active_arc),
+            idle_notify: Arc::clone(&self.idle_notify),
+        }
+    }
+}
+
+/// The handles every way out of a session needs.
+///
+/// A session has many exits — init failure, cancellation at four different
+/// points, silence, all-commands, delivery — and each one has to close the DB
+/// row, emit `Stopped` and release the active slot in that order. Bundled
+/// here, an exit is one call instead of a seven-argument block repeated at
+/// every `return`. Cloning is cheap: the fields are `Arc`s and a channel
+/// sender.
+struct Teardown {
+    session_id: Uuid,
+    event_tx: mpsc::Sender<SessionEvent>,
+    persist: Arc<Mutex<Database>>,
+    persist_history: bool,
+    active_arc: Arc<Mutex<Option<ActiveHandle>>>,
+    idle_notify: Arc<Notify>,
+}
+
 async fn run_session<A: AsrBackend + 'static>(
     deps: SessionDeps,
     asr: Arc<A>,
@@ -522,6 +552,7 @@ async fn run_session<A: AsrBackend + 'static>(
     kind: SessionKind,
 ) {
     let session_id = deps.session_id;
+    let td = deps.teardown();
     let (input_device, vad_pcen) = {
         let settings = deps.settings.read().await;
         (settings.input_device.clone(), settings.vad_pcen)
@@ -545,21 +576,10 @@ async fn run_session<A: AsrBackend + 'static>(
         Err(e) => {
             if kind == SessionKind::CaptureRaw {
                 // No DB row exists for a capture — end without finalize.
-                let error_dropped = !send_bounded(&deps.event_tx, SessionEvent::Error(e)).await;
-                let _ = send_bounded(&deps.event_tx, SessionEvent::Stopped { error_dropped }).await;
-                clear_active(&deps.active_arc, &deps.idle_notify).await;
-                return;
+                td.end_capture(Some(e)).await;
+            } else {
+                td.fail_init(&e).await;
             }
-            fail_init(
-                &e,
-                session_id,
-                &deps.event_tx,
-                &deps.persist,
-                deps.config.persist_history,
-                &deps.active_arc,
-                &deps.idle_notify,
-            )
-            .await;
             return;
         }
     };
@@ -575,20 +595,10 @@ async fn run_session<A: AsrBackend + 'static>(
 
     if cancelled {
         if kind == SessionKind::CaptureRaw {
-            let _ = send_bounded(&deps.event_tx, SessionEvent::stopped()).await;
-            clear_active(&deps.active_arc, &deps.idle_notify).await;
-            return;
+            td.end_capture(None).await;
+        } else {
+            td.stop(SessionStatus::Cancelled).await;
         }
-        stop_session(
-            session_id,
-            SessionStatus::Cancelled,
-            &deps.event_tx,
-            &deps.persist,
-            deps.config.persist_history,
-            &deps.active_arc,
-            &deps.idle_notify,
-        )
-        .await;
         return;
     }
 
@@ -598,10 +608,8 @@ async fn run_session<A: AsrBackend + 'static>(
     // no correction, no commands/snippet expansion, and no history. Empty
     // text (silence) is emitted too so the UI can say "didn't catch that".
     if kind == SessionKind::CaptureRaw {
-        let mut error_dropped = false;
-        if let Some(error) = first_asr_error.take().filter(|_| !saw_asr_success) {
-            error_dropped = !send_bounded(&deps.event_tx, SessionEvent::Error(error)).await;
-        } else {
+        let error = first_asr_error.take().filter(|_| !saw_asr_success);
+        if error.is_none() {
             info!(%session_id, "capture session finished, raw len={}", raw_text.len());
             let _ = send_bounded(
                 &deps.event_tx,
@@ -612,8 +620,7 @@ async fn run_session<A: AsrBackend + 'static>(
             )
             .await;
         }
-        let _ = send_bounded(&deps.event_tx, SessionEvent::Stopped { error_dropped }).await;
-        clear_active(&deps.active_arc, &deps.idle_notify).await;
+        td.end_capture(error).await;
         return;
     }
 
@@ -631,16 +638,7 @@ async fn run_session<A: AsrBackend + 'static>(
                 "no speech detected, ending session"
             );
         }
-        stop_session(
-            session_id,
-            status,
-            &deps.event_tx,
-            &deps.persist,
-            deps.config.persist_history,
-            &deps.active_arc,
-            &deps.idle_notify,
-        )
-        .await;
+        td.stop(status).await;
         return;
     }
 
@@ -776,6 +774,9 @@ async fn process_and_deliver(
     mut control_rx: mpsc::UnboundedReceiver<SessionControl>,
     mut cancelled: bool,
 ) {
+    // Owns the handles every exit path needs, so the destructuring below can
+    // drop them.
+    let td = deps.teardown();
     let SessionDeps {
         session_id,
         router,
@@ -785,8 +786,8 @@ async fn process_and_deliver(
         heuristic,
         config,
         event_tx,
-        active_arc,
-        idle_notify,
+        active_arc: _,
+        idle_notify: _,
         // Style presets always resolve from `persist`, so `settings` is unused
         // on this path.
         settings: _,
@@ -801,107 +802,33 @@ async fn process_and_deliver(
         lune_core::command::VoiceCommand::InsertSnippet(name) => Some(name.clone()),
         _ => None,
     });
-    for cmd in &route.commands {
-        if matches!(cmd, lune_core::command::VoiceCommand::InsertSnippet(_)) {
-            continue;
-        }
-        if let lune_core::command::VoiceCommand::SwitchStyle(style_id) = cmd {
-            let next_preset = match builtin_registry().get(style_id) {
-                Some(preset) => Some(preset),
-                None => {
-                    let loaded = {
-                        let mut db = persist.lock().await;
-                        blocking_db(|| db.get_custom_style(style_id))
-                    };
-                    match loaded {
-                        Ok(found) => found.map(|cs| Arc::new(cs.preset)),
-                        Err(e) => {
-                            tracing::warn!(
-                                %session_id,
-                                style = %style_id,
-                                error = %e,
-                                "failed to load custom style during voice-command style switch"
-                            );
-                            None
-                        }
-                    }
-                }
-            };
-            if let Some(next_preset) = next_preset {
-                info!(
-                    %session_id,
-                    style = %next_preset.id,
-                    "switched style preset via voice command"
-                );
-                style_preset = Some(next_preset);
-            }
-        }
-        let payload = serde_json::to_string(cmd).unwrap_or_else(|_| format!("{cmd:?}"));
-        let _ = send_bounded(
-            &event_tx,
-            SessionEvent::CommandDetected {
-                session_id,
-                payload,
-            },
-        )
-        .await;
-    }
-    // ── Voice snippets ──────────────────────────────────────────────────
-    // Two spoken forms expand a user-defined template: the parametric
-    // `insert <name>` command, or the bare trigger phrase as the whole
-    // utterance. The rendered body is delivered verbatim — no correction, no
-    // styling — because the template already is exactly the text the user
-    // wants typed. An `insert <name>` that names no snippet is put back as
-    // ordinary dictation ("insert the disk…" must still type) instead of
-    // consuming the utterance and typing nothing.
+    apply_voice_commands(
+        &route.commands,
+        session_id,
+        &persist,
+        &event_tx,
+        &mut style_preset,
+    )
+    .await;
+
+    // A snippet is delivered verbatim — no correction, no styling — because
+    // the template already is exactly the text the user wants typed.
     let mut snippet_fallback_raw = false;
     if snippet_name.is_some() || route.commands.is_empty() {
-        let snippets = {
-            let mut db = persist.lock().await;
-            blocking_db(|| db.list_snippets())
-        }
-        .unwrap_or_else(|e| {
-            warn!(error = %e, %session_id, "failed to load snippets");
-            Vec::new()
-        });
-        let matched = match &snippet_name {
-            Some(name) => lune_dict::snippets::resolve_name(&snippets, name),
-            None => lune_dict::snippets::match_utterance(&snippets, route.remaining.trim()),
-        };
-        if let Some(snippet) = matched {
-            info!(
-                %session_id,
-                snippet = %snippet.id,
-                trigger = %snippet.trigger_phrase,
-                "expanding voice snippet"
-            );
-            let rendered = render_snippet_body(&snippet.body).await;
+        if let Some(rendered) = expand_snippet(
+            session_id,
+            &persist,
+            snippet_name.as_deref(),
+            route.remaining.trim(),
+        )
+        .await
+        {
             drain_processing_controls(&mut control_rx, &mut cancelled);
             if cancelled {
-                stop_session(
-                    session_id,
-                    SessionStatus::Cancelled,
-                    &event_tx,
-                    &persist,
-                    config.persist_history,
-                    &active_arc,
-                    &idle_notify,
-                )
-                .await;
+                td.stop(SessionStatus::Cancelled).await;
                 return;
             }
-            deliver_final_text(
-                session_id,
-                &raw_text,
-                rendered,
-                status,
-                &event_tx,
-                persist,
-                config.persist_history,
-                &active_arc,
-                &idle_notify,
-            )
-            .await;
+            td.deliver(&raw_text, rendered, status).await;
             return;
         }
         snippet_fallback_raw = snippet_name.is_some();
@@ -916,32 +843,13 @@ async fn process_and_deliver(
     // user's last word on this utterance, so it decides the recorded status.
     drain_processing_controls(&mut control_rx, &mut cancelled);
     if cancelled {
-        stop_session(
-            session_id,
-            SessionStatus::Cancelled,
-            &event_tx,
-            &persist,
-            config.persist_history,
-            &active_arc,
-            &idle_notify,
-        )
-        .await;
+        td.stop(SessionStatus::Cancelled).await;
         return;
     }
 
     if text_after_commands.is_empty() {
         info!(%session_id, "all text was voice commands");
-        finalize_db(
-            session_id,
-            Arc::clone(&persist),
-            config.persist_history,
-            status,
-            Some(Utc::now()),
-            None,
-        )
-        .await;
-        let _ = send_bounded(&event_tx, SessionEvent::stopped()).await;
-        clear_active(&active_arc, &idle_notify).await;
+        td.stop(status).await;
         return;
     }
 
@@ -1021,146 +929,194 @@ async fn process_and_deliver(
         String::new()
     } else if !needs_llm {
         info!(%session_id, "no style selected — skipping styling LLM");
-        text_after_heuristic.clone()
+        text_after_heuristic
     } else {
-        info!(%session_id, input = %Transcript::new(&text_after_heuristic), "[LLM] input");
-        let llm_t0 = tokio::time::Instant::now();
-        let timeout_secs = config.pipeline.llm_timeout_secs;
-        let input = lune_core::llm::PostProcessInput {
-            raw_text: text_after_heuristic.clone(),
-            style_preset: Arc::clone(
-                style_preset
-                    .as_ref()
-                    .expect("needs_llm implies a selected style preset"),
-            ),
-            app_category: None,
-            dictionary: dictionary_entries.clone(),
-            language: detected_lang.into(),
-        };
-        let llm_result = if timeout_secs > 0 {
-            tokio::time::timeout(
-                Duration::from_secs(timeout_secs as u64),
-                post_processor.transform(&input),
-            )
-            .await
-        } else {
-            Ok(post_processor.transform(&input).await)
-        };
-        match llm_result {
-            Ok(Ok(output)) => {
-                debug!(%session_id, llm_ms = llm_t0.elapsed().as_millis() as u64, "[LLM] output ready, len={}", output.cleaned_text.len());
-                // Deterministic backstop: any sentence the model left
-                // uncapitalized (or that the merge reverted to input casing)
-                // still gets its sentence-initial capital (when the style enables it).
-                if fmt.auto_capitalization {
-                    lune_dict::formatting::capitalize_sentence_starts(&output.cleaned_text)
-                } else {
-                    output.cleaned_text
-                }
-            }
-            Ok(Err(e)) => {
-                warn!(error = %e, llm_ms = llm_t0.elapsed().as_millis() as u64, "LLM styling failed, using text as-is");
-                text_after_heuristic
-            }
-            Err(_) => {
-                warn!(
-                    llm_ms = llm_t0.elapsed().as_millis() as u64,
-                    timeout_secs, "LLM timeout ({timeout_secs}s) exceeded, using text as-is"
-                );
-                text_after_heuristic
-            }
-        }
+        style_with_llm(
+            session_id,
+            text_after_heuristic,
+            style_preset
+                .as_ref()
+                .expect("needs_llm implies a selected style preset"),
+            &*post_processor,
+            &config.pipeline,
+            dictionary_entries,
+            detected_lang,
+            &fmt,
+        )
+        .await
     };
 
     drain_processing_controls(&mut control_rx, &mut cancelled);
     if cancelled {
-        stop_session(
-            session_id,
-            SessionStatus::Cancelled,
-            &event_tx,
-            &persist,
-            config.persist_history,
-            &active_arc,
-            &idle_notify,
-        )
-        .await;
+        td.stop(SessionStatus::Cancelled).await;
         return;
     }
 
     info!(%session_id, pipeline_ms = pipeline_t0.elapsed().as_millis() as u64, "post-processing complete");
 
-    deliver_final_text(
-        session_id,
-        &raw_text,
-        post_llm_text,
-        status,
-        &event_tx,
-        persist,
-        config.persist_history,
-        &active_arc,
-        &idle_notify,
-    )
-    .await;
+    td.deliver(&raw_text, post_llm_text, status).await;
 }
 
-/// Emit the finalized text, persist the (raw → final) pair and transcript,
-/// and close the session — shared by the normal pipeline exit and the voice
-/// snippet fast path (which skips correction and styling entirely).
-#[allow(clippy::too_many_arguments)] // the session-teardown bundle plus the two texts
-async fn deliver_final_text(
+/// Report each routed voice command, and apply the ones that change this
+/// session's own state.
+///
+/// `InsertSnippet` is skipped: the snippet expander below owns it, and puts the
+/// utterance back as dictation when no snippet matches — reporting it here
+/// would announce a command that may never apply.
+async fn apply_voice_commands(
+    commands: &[lune_core::command::VoiceCommand],
     session_id: Uuid,
-    raw_text: &str,
-    final_text: String,
-    status: SessionStatus,
+    persist: &Arc<Mutex<Database>>,
     event_tx: &mpsc::Sender<SessionEvent>,
-    persist: Arc<Mutex<Database>>,
-    persist_history: bool,
-    active_arc: &Arc<Mutex<Option<ActiveHandle>>>,
-    idle_notify: &Arc<Notify>,
+    style_preset: &mut Option<Arc<StylePreset>>,
 ) {
-    let _ = send_bounded(
-        event_tx,
-        SessionEvent::FinalizedText {
-            session_id,
-            text: final_text.clone(),
-        },
-    )
-    .await;
-
-    let transcript = if final_text.is_empty() {
-        None
-    } else {
-        Some(final_text)
-    };
-
-    // Record (raw ASR, final delivered) as labelled data. Best-effort — a
-    // write failure never affects delivery. Skipped entirely when history is
-    // off: this pair is the whole transcript twice over.
-    if let Some(final_text) = transcript.as_deref().filter(|_| persist_history) {
-        let mut db = persist.lock().await;
-        if let Err(e) = blocking_db(|| db.insert_correction_pair(session_id, raw_text, final_text))
+    for cmd in commands {
+        if matches!(cmd, lune_core::command::VoiceCommand::InsertSnippet(_)) {
+            continue;
+        }
+        if let lune_core::command::VoiceCommand::SwitchStyle(style_id) = cmd
+            && let Some(next_preset) = resolve_style(session_id, persist, style_id).await
         {
-            warn!(error = %e, %session_id, "failed to persist correction pair");
+            info!(
+                %session_id,
+                style = %next_preset.id,
+                "switched style preset via voice command"
+            );
+            *style_preset = Some(next_preset);
+        }
+        let payload = serde_json::to_string(cmd).unwrap_or_else(|_| format!("{cmd:?}"));
+        let _ = send_bounded(
+            event_tx,
+            SessionEvent::CommandDetected {
+                session_id,
+                payload,
+            },
+        )
+        .await;
+    }
+}
+
+/// A style preset by id: the built-in registry first, then the user's custom
+/// styles. `None` when the id names neither, or the lookup failed — the
+/// session keeps the style it already had.
+async fn resolve_style(
+    session_id: Uuid,
+    persist: &Arc<Mutex<Database>>,
+    style_id: &str,
+) -> Option<Arc<StylePreset>> {
+    if let Some(preset) = builtin_registry().get(style_id) {
+        return Some(preset);
+    }
+    let loaded = {
+        let mut db = persist.lock().await;
+        blocking_db(|| db.get_custom_style(style_id))
+    };
+    match loaded {
+        Ok(found) => found.map(|cs| Arc::new(cs.preset)),
+        Err(e) => {
+            warn!(
+                %session_id,
+                style = %style_id,
+                error = %e,
+                "failed to load custom style during voice-command style switch"
+            );
+            None
         }
     }
+}
 
-    // Await the DB finalize inline so a runtime shutdown between here and
-    // the next tick can't drop the transcript. The lock is short-held and
-    // sqlite writes are sync, so worst-case added latency is ~10ms.
-    let ended_at = Some(Utc::now());
-    finalize_db(
-        session_id,
-        persist,
-        persist_history,
-        status,
-        ended_at,
-        transcript,
-    )
-    .await;
+/// Render the snippet this utterance asks for, if any.
+///
+/// Two spoken forms expand a user-defined template: the parametric
+/// `insert <name>` command (`snippet_name`), or the bare trigger phrase as the
+/// whole `utterance`. `None` means nothing matched, and the caller falls back
+/// to ordinary dictation — "insert the disk…" must still type.
+async fn expand_snippet(
+    session_id: Uuid,
+    persist: &Arc<Mutex<Database>>,
+    snippet_name: Option<&str>,
+    utterance: &str,
+) -> Option<String> {
+    let snippets = {
+        let mut db = persist.lock().await;
+        blocking_db(|| db.list_snippets())
+    }
+    .unwrap_or_else(|e| {
+        warn!(error = %e, %session_id, "failed to load snippets");
+        Vec::new()
+    });
+    let snippet = match snippet_name {
+        Some(name) => lune_dict::snippets::resolve_name(&snippets, name),
+        None => lune_dict::snippets::match_utterance(&snippets, utterance),
+    }?;
+    info!(
+        %session_id,
+        snippet = %snippet.id,
+        trigger = %snippet.trigger_phrase,
+        "expanding voice snippet"
+    );
+    Some(render_snippet_body(&snippet.body).await)
+}
 
-    let _ = send_bounded(event_tx, SessionEvent::stopped()).await;
-    clear_active(active_arc, idle_notify).await;
-    info!(%session_id, "session stopped");
+/// Style `text` with the remote LLM.
+///
+/// Every failure — transport error, or the configured timeout — answers with
+/// `text` unchanged. A styling pass that cannot run must not cost the user
+/// their words.
+#[allow(clippy::too_many_arguments)] // the LLM input's own fields, mostly
+async fn style_with_llm(
+    session_id: Uuid,
+    text: String,
+    style_preset: &Arc<StylePreset>,
+    post_processor: &dyn TextPostProcessor,
+    pipeline: &PipelineConfig,
+    dictionary: Vec<lune_core::dict::DictionaryEntry>,
+    language: &str,
+    fmt: &lune_core::config::FormatToggles,
+) -> String {
+    info!(%session_id, input = %Transcript::new(&text), "[LLM] input");
+    let llm_t0 = tokio::time::Instant::now();
+    let timeout_secs = pipeline.llm_timeout_secs;
+    let input = lune_core::llm::PostProcessInput {
+        raw_text: text.clone(),
+        style_preset: Arc::clone(style_preset),
+        app_category: None,
+        dictionary,
+        language: language.into(),
+    };
+    let llm_result = if timeout_secs > 0 {
+        tokio::time::timeout(
+            Duration::from_secs(timeout_secs as u64),
+            post_processor.transform(&input),
+        )
+        .await
+    } else {
+        Ok(post_processor.transform(&input).await)
+    };
+    match llm_result {
+        Ok(Ok(output)) => {
+            debug!(%session_id, llm_ms = llm_t0.elapsed().as_millis() as u64, "[LLM] output ready, len={}", output.cleaned_text.len());
+            // Deterministic backstop: any sentence the model left
+            // uncapitalized (or that the merge reverted to input casing)
+            // still gets its sentence-initial capital (when the style enables it).
+            if fmt.auto_capitalization {
+                lune_dict::formatting::capitalize_sentence_starts(&output.cleaned_text)
+            } else {
+                output.cleaned_text
+            }
+        }
+        Ok(Err(e)) => {
+            warn!(error = %e, llm_ms = llm_t0.elapsed().as_millis() as u64, "LLM styling failed, using text as-is");
+            text
+        }
+        Err(_) => {
+            warn!(
+                llm_ms = llm_t0.elapsed().as_millis() as u64,
+                timeout_secs, "LLM timeout ({timeout_secs}s) exceeded, using text as-is"
+            );
+            text
+        }
+    }
 }
 
 /// Resolve placeholder values and render a snippet body. Date and time come
@@ -1319,55 +1275,105 @@ async fn finalize_db(
     }
 }
 
-#[cold]
-async fn fail_init(
-    error: impl std::fmt::Display,
-    session_id: Uuid,
-    event_tx: &mpsc::Sender<SessionEvent>,
-    persist: &Arc<Mutex<Database>>,
-    persist_history: bool,
-    active_arc: &Arc<Mutex<Option<ActiveHandle>>>,
-    idle_notify: &Notify,
-) {
-    let msg = error.to_string();
-    let error_dropped = !send_bounded(event_tx, SessionEvent::Error(msg.clone())).await;
-    finalize_db(
-        session_id,
-        Arc::clone(persist),
-        persist_history,
-        SessionStatus::Failed(msg),
-        None,
-        None,
-    )
-    .await;
-    // Every other terminal path emits `Stopped`; the init-failure path must
-    // too, or runtime.rs never reaches its `SessionStopped` arm for a mic
-    // that was busy or failed to open.
-    let _ = send_bounded(event_tx, SessionEvent::Stopped { error_dropped }).await;
-    clear_active(active_arc, idle_notify).await;
-}
+impl Teardown {
+    /// End a session that never opened a DB row — a capture-only session.
+    ///
+    /// `error` is reported first when the capture failed, and `Stopped` carries
+    /// whether that report was dropped, so a stalled listener never reads a
+    /// failure as a clean stop.
+    async fn end_capture(&self, error: Option<String>) {
+        let mut error_dropped = false;
+        if let Some(error) = error {
+            error_dropped = !send_bounded(&self.event_tx, SessionEvent::Error(error)).await;
+        }
+        let _ = send_bounded(&self.event_tx, SessionEvent::Stopped { error_dropped }).await;
+        self.clear().await;
+    }
 
-#[cold]
-async fn stop_session(
-    session_id: Uuid,
-    status: SessionStatus,
-    event_tx: &mpsc::Sender<SessionEvent>,
-    persist: &Arc<Mutex<Database>>,
-    persist_history: bool,
-    active_arc: &Arc<Mutex<Option<ActiveHandle>>>,
-    idle_notify: &Notify,
-) {
-    finalize_db(
-        session_id,
-        Arc::clone(persist),
-        persist_history,
-        status,
-        Some(Utc::now()),
-        None,
-    )
-    .await;
-    let _ = send_bounded(event_tx, SessionEvent::stopped()).await;
-    clear_active(active_arc, idle_notify).await;
+    /// End a session that failed before capture began.
+    #[cold]
+    async fn fail_init(&self, error: impl std::fmt::Display) {
+        let msg = error.to_string();
+        let error_dropped = !send_bounded(&self.event_tx, SessionEvent::Error(msg.clone())).await;
+        self.finalize(SessionStatus::Failed(msg), None, None).await;
+        // Every other terminal path emits `Stopped`; the init-failure path must
+        // too, or runtime.rs never reaches its `SessionStopped` arm for a mic
+        // that was busy or failed to open.
+        let _ = send_bounded(&self.event_tx, SessionEvent::Stopped { error_dropped }).await;
+        self.clear().await;
+    }
+
+    /// End a session with no text to deliver — cancelled, silent, or entirely
+    /// voice commands.
+    #[cold]
+    async fn stop(&self, status: SessionStatus) {
+        self.finalize(status, Some(Utc::now()), None).await;
+        let _ = send_bounded(&self.event_tx, SessionEvent::stopped()).await;
+        self.clear().await;
+    }
+
+    /// Emit the finalized text, persist the (raw → final) pair and transcript,
+    /// and close the session — shared by the normal pipeline exit and the voice
+    /// snippet fast path (which skips correction and styling entirely).
+    async fn deliver(&self, raw_text: &str, final_text: String, status: SessionStatus) {
+        let session_id = self.session_id;
+        let _ = send_bounded(
+            &self.event_tx,
+            SessionEvent::FinalizedText {
+                session_id,
+                text: final_text.clone(),
+            },
+        )
+        .await;
+
+        let transcript = if final_text.is_empty() {
+            None
+        } else {
+            Some(final_text)
+        };
+
+        // Record (raw ASR, final delivered) as labelled data. Best-effort — a
+        // write failure never affects delivery. Skipped entirely when history is
+        // off: this pair is the whole transcript twice over.
+        if let Some(final_text) = transcript.as_deref().filter(|_| self.persist_history) {
+            let mut db = self.persist.lock().await;
+            if let Err(e) =
+                blocking_db(|| db.insert_correction_pair(session_id, raw_text, final_text))
+            {
+                warn!(error = %e, %session_id, "failed to persist correction pair");
+            }
+        }
+
+        // Await the DB finalize inline so a runtime shutdown between here and
+        // the next tick can't drop the transcript. The lock is short-held and
+        // sqlite writes are sync, so worst-case added latency is ~10ms.
+        self.finalize(status, Some(Utc::now()), transcript).await;
+
+        let _ = send_bounded(&self.event_tx, SessionEvent::stopped()).await;
+        self.clear().await;
+        info!(%session_id, "session stopped");
+    }
+
+    async fn finalize(
+        &self,
+        status: SessionStatus,
+        ended_at: Option<chrono::DateTime<Utc>>,
+        transcript: Option<String>,
+    ) {
+        finalize_db(
+            self.session_id,
+            Arc::clone(&self.persist),
+            self.persist_history,
+            status,
+            ended_at,
+            transcript,
+        )
+        .await;
+    }
+
+    async fn clear(&self) {
+        clear_active(&self.active_arc, &self.idle_notify).await;
+    }
 }
 
 #[cfg(test)]
