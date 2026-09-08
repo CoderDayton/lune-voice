@@ -6,8 +6,10 @@
 //! blocks the caller forever, so every probe in this crate runs on a thread
 //! the caller is willing to abandon.
 
+use std::io::Read;
 use std::process::{Command, ExitStatus, Output, Stdio};
 use std::sync::mpsc::{self, RecvTimeoutError};
+use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 /// Run `probe` on a thread we are willing to abandon, answering `on_no_answer`
@@ -55,6 +57,12 @@ pub(crate) fn bounded<T: Send + 'static>(
 ///
 /// `try_wait` polling at 10ms; the upper bound on overshoot is ~10ms. Stdin is
 /// closed (`Stdio::null`) so children that read stdin don't block.
+///
+/// Both pipes are drained by their own thread for the whole wait. A pipe holds
+/// about 64 KiB before the writer blocks, and waiting for exit without reading
+/// would deadlock every child with more to say than that — `wl-paste` on a
+/// clipboard holding an image, `swaymsg -t get_tree` on a busy session — until
+/// the timeout killed a process that was working fine.
 pub(crate) fn output_with_timeout(cmd: &str, args: &[&str], timeout: Duration) -> Option<Output> {
     let mut child = Command::new(cmd)
         .args(args)
@@ -64,10 +72,21 @@ pub(crate) fn output_with_timeout(cmd: &str, args: &[&str], timeout: Duration) -
         .spawn()
         .ok()?;
 
+    let stdout = drain(child.stdout.take());
+    let stderr = drain(child.stderr.take());
+
     let deadline = Instant::now() + timeout;
     loop {
         match child.try_wait() {
-            Ok(Some(_)) => return child.wait_with_output().ok(),
+            Ok(Some(status)) => {
+                // The child is gone, so both pipes are at EOF and these joins
+                // return as soon as the readers finish their last chunk.
+                return Some(Output {
+                    status,
+                    stdout: stdout.join().unwrap_or_default(),
+                    stderr: stderr.join().unwrap_or_default(),
+                });
+            }
             Ok(None) => {
                 if Instant::now() >= deadline {
                     let _ = child.kill();
@@ -86,6 +105,17 @@ pub(crate) fn output_with_timeout(cmd: &str, args: &[&str], timeout: Duration) -
     }
 }
 
+/// Read one of the child's pipes to EOF on its own thread.
+fn drain<R: Read + Send + 'static>(pipe: Option<R>) -> JoinHandle<Vec<u8>> {
+    std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        if let Some(mut pipe) = pipe {
+            let _ = pipe.read_to_end(&mut buf);
+        }
+        buf
+    })
+}
+
 /// Status-only variant of [`output_with_timeout`] for fire-and-forget commands.
 pub(crate) fn status_with_timeout(
     cmd: &str,
@@ -97,8 +127,32 @@ pub(crate) fn status_with_timeout(
 
 #[cfg(test)]
 mod tests {
-    use super::bounded;
+    use super::{bounded, output_with_timeout};
     use std::time::Duration;
+
+    /// A pipe holds ~64 KiB before the writer blocks. Waiting for exit without
+    /// reading deadlocks any child with more than that to say — a clipboard
+    /// holding an image, a sway tree with many windows — and the timeout then
+    /// kills a process that was working fine.
+    #[test]
+    fn a_child_that_outruns_the_pipe_buffer_is_still_read() {
+        let bytes = 512 * 1024;
+        let out = output_with_timeout(
+            "sh",
+            &["-c", &format!("head -c {bytes} /dev/zero")],
+            Duration::from_secs(10),
+        )
+        .expect("a fast, chatty child must not read as a timeout");
+        assert!(out.status.success());
+        assert_eq!(out.stdout.len(), bytes);
+    }
+
+    #[test]
+    fn a_child_that_never_exits_is_killed() {
+        let started = std::time::Instant::now();
+        assert!(output_with_timeout("sleep", &["30"], Duration::from_millis(50)).is_none());
+        assert!(started.elapsed() < Duration::from_secs(5));
+    }
 
     #[test]
     fn a_probe_that_answers_is_believed() {
