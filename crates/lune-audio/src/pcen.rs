@@ -25,6 +25,13 @@ pub const EXPECTED_OUTPUT_RMS: f32 = 0.10;
 /// Default noise ceiling: amplified background noise will not exceed this RMS.
 pub const DEFAULT_NOISE_CEILING_RMS: f32 = 0.02;
 
+/// Analysis hop the gain envelope is tuned for: 256 samples = 16 ms at 16 kHz.
+///
+/// [`PcenAgc::new`] takes the hop as a parameter, so every caller that re-frames
+/// audio for it must agree on one value or the envelope's time constants no
+/// longer mean what they were tuned to mean.
+pub const PCEN_HOP_SIZE: usize = 256;
+
 /// Tunables for [`PcenAgc`].
 #[derive(Debug, Clone)]
 pub struct PcenAgcConfig {

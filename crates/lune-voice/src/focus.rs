@@ -11,6 +11,8 @@
 //! string matching — is shared, so a new platform implements one function and
 //! inherits the rest.
 
+use lune_core::config::TerminalMode;
+
 /// The focused window at the moment a dictation started.
 #[derive(Debug, Clone, Default)]
 pub struct WindowTarget {
@@ -208,6 +210,24 @@ pub fn focused_is_terminal() -> bool {
     #[cfg(not(unix))]
     {
         capture_focus_target().is_terminal
+    }
+}
+
+/// Whether delivery should treat the focused window as a terminal.
+///
+/// Under `Auto` the captured target answers when there is one, and the
+/// compositor is asked when there is not. Both delivery backends decide this
+/// the same way, so the rule lives here rather than once per backend.
+///
+/// Best effort under `Auto`: where the compositor will not name the focused
+/// window — notably GNOME Wayland — this answers `false` and the text is
+/// delivered unchanged.
+#[cfg_attr(not(unix), allow(dead_code))]
+pub(crate) fn targets_terminal(mode: TerminalMode, target: Option<&WindowTarget>) -> bool {
+    match mode {
+        TerminalMode::Terminal => true,
+        TerminalMode::Normal => false,
+        _ => target.map_or_else(focused_is_terminal, |t| t.is_terminal),
     }
 }
 

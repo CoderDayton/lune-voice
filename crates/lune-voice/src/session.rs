@@ -787,7 +787,8 @@ async fn process_and_deliver(
         event_tx,
         active_arc,
         idle_notify,
-        // Custom styles now resolve from the DB (`persist`), not settings.
+        // Style presets always resolve from `persist`, so `settings` is unused
+        // on this path.
         settings: _,
     } = deps;
     debug!(%session_id, "[ASR] output ready, len={}", raw_text.len());
@@ -807,8 +808,12 @@ async fn process_and_deliver(
         if let lune_core::command::VoiceCommand::SwitchStyle(style_id) = cmd {
             let next_preset = match builtin_registry().get(style_id) {
                 Some(preset) => Some(preset),
-                None => match persist.try_lock() {
-                    Ok(mut db) => match db.get_custom_style(style_id) {
+                None => {
+                    let loaded = {
+                        let mut db = persist.lock().await;
+                        blocking_db(|| db.get_custom_style(style_id))
+                    };
+                    match loaded {
                         Ok(found) => found.map(|cs| Arc::new(cs.preset)),
                         Err(e) => {
                             tracing::warn!(
@@ -819,16 +824,8 @@ async fn process_and_deliver(
                             );
                             None
                         }
-                    },
-                    Err(_) => {
-                        tracing::warn!(
-                            %session_id,
-                            style = %style_id,
-                            "database busy during style switch, skipping custom lookup"
-                        );
-                        None
                     }
-                },
+                }
             };
             if let Some(next_preset) = next_preset {
                 info!(
@@ -840,10 +837,14 @@ async fn process_and_deliver(
             }
         }
         let payload = serde_json::to_string(cmd).unwrap_or_else(|_| format!("{cmd:?}"));
-        let _ = event_tx.try_send(SessionEvent::CommandDetected {
-            session_id,
-            payload,
-        });
+        let _ = send_bounded(
+            &event_tx,
+            SessionEvent::CommandDetected {
+                session_id,
+                payload,
+            },
+        )
+        .await;
     }
     // ── Voice snippets ──────────────────────────────────────────────────
     // Two spoken forms expand a user-defined template: the parametric
@@ -911,6 +912,23 @@ async fn process_and_deliver(
     } else {
         route.remaining.trim().to_owned()
     };
+    // A cancel that lands while the commands above were routing is still the
+    // user's last word on this utterance, so it decides the recorded status.
+    drain_processing_controls(&mut control_rx, &mut cancelled);
+    if cancelled {
+        stop_session(
+            session_id,
+            SessionStatus::Cancelled,
+            &event_tx,
+            &persist,
+            config.persist_history,
+            &active_arc,
+            &idle_notify,
+        )
+        .await;
+        return;
+    }
+
     if text_after_commands.is_empty() {
         info!(%session_id, "all text was voice commands");
         finalize_db(

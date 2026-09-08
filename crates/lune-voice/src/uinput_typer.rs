@@ -852,21 +852,31 @@ fn pipe_bytes_to_command(
         .spawn()
         .map_err(|e| format!("{cmd} spawn failed: {e}"))?;
 
-    // Take ownership of stdin so dropping it closes the pipe and signals
-    // EOF — without this, wl-copy/xclip read forever and we always time out.
+    // Feed stdin from a thread so the deadline below covers the write too:
+    // `write_all` blocks once the payload outgrows the pipe buffer (~64 KB)
+    // and the child stops draining it, which is the wedged-helper case the
+    // deadline exists for. The thread owns stdin, so finishing closes the pipe
+    // and signals EOF — without that, wl-copy/xclip read forever and we always
+    // time out.
     use std::io::Write;
-    if let Some(mut stdin) = child.stdin.take() {
-        if let Err(e) = stdin.write_all(bytes) {
-            // Reap the child explicitly: `Child` does not kill on drop,
-            // so without this a misbehaving wl-copy/xclip keeps running.
+    let mut writer = child.stdin.take().map(|mut stdin| {
+        let payload = bytes.to_vec();
+        std::thread::spawn(move || stdin.write_all(&payload))
+    });
+
+    let deadline = Instant::now() + timeout;
+    loop {
+        // A writer that has finished and failed means the child is not taking
+        // our payload; kill it now instead of waiting out the whole deadline.
+        // `Child` does not kill on drop, so a misbehaving wl-copy/xclip would
+        // otherwise keep running.
+        if let Some(handle) = writer.take_if(|h| h.is_finished())
+            && let Ok(Err(e)) = handle.join()
+        {
             let _ = child.kill();
             let _ = child.wait();
             return Err(format!("{cmd} write failed: {e}"));
         }
-    }
-
-    let deadline = Instant::now() + timeout;
-    loop {
         match child.try_wait() {
             Ok(Some(status)) => {
                 if !status.success() {
@@ -1060,7 +1070,8 @@ const CHORD_GAP_MS: u64 = 6;
 
 /// Tracks clipboard operation latency and adapts the post-paste delay.
 struct AdaptivePasteDelay {
-    /// EMA of clipboard set+get round-trip in ms.
+    /// EMA of how long staging the clipboard takes, in ms. The snapshot read is
+    /// normally primed ahead of the paste, so only the set is on this path.
     rtt_ema_ms: f64,
     /// Current computed delay.
     current_ms: u64,
@@ -1202,12 +1213,7 @@ impl UinputTyper {
     /// Resolve whether the focused window should receive a terminal-style
     /// paste chord, honoring the configured `terminal_mode`.
     fn resolve_terminal(&self) -> bool {
-        match self.terminal_mode {
-            TerminalMode::Auto => focused_is_terminal(),
-            TerminalMode::Terminal => true,
-            TerminalMode::Normal => false,
-            _ => focused_is_terminal(),
-        }
+        crate::focus::targets_terminal(self.terminal_mode, None)
     }
 
     pub fn type_str(&mut self, text: &str, keep_clipboard: bool) -> TypeOutcome {
@@ -1672,6 +1678,23 @@ mod tests {
     /// write), then sleeps and touches a sentinel file. If the child
     /// was killed on the write-failure path, the sentinel never
     /// appears; without the fix, it shows up within ~400ms.
+    /// The deadline covers the write, not just the wait: a child that never
+    /// drains stdin blocks `write_all` once the payload outgrows the pipe
+    /// buffer, which would park the delivery thread for as long as the child
+    /// lives.
+    #[test]
+    fn pipe_text_to_command_bounds_a_write_that_never_drains() {
+        let big = "x".repeat(1_000_000);
+        let started = Instant::now();
+        let result = pipe_text_to_command("sleep", &["5"], &big, Duration::from_millis(200));
+        let elapsed = started.elapsed();
+        assert!(result.is_err(), "expected timeout Err; got {result:?}");
+        assert!(
+            elapsed < Duration::from_secs(2),
+            "the write blocked past the deadline; elapsed: {elapsed:?}"
+        );
+    }
+
     #[test]
     fn pipe_text_to_command_kills_child_on_write_failure() {
         let dir = tempfile::tempdir().expect("tempdir");

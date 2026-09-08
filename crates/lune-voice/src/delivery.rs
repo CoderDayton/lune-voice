@@ -428,16 +428,9 @@ impl PlatformDriver {
     /// Calling it before the backend is known would put that round-trip on
     /// every uinput delivery and throw the answer away.
     ///
-    /// Best effort under `Auto`: where the compositor will not name the
-    /// focused window — notably GNOME Wayland, which is why IBus is preferred
-    /// there at all — this answers `false` and the text commits unchanged.
     #[cfg(target_os = "linux")]
     fn targets_terminal(terminal_mode: TerminalMode, target: Option<&WindowTarget>) -> bool {
-        match terminal_mode {
-            TerminalMode::Terminal => true,
-            TerminalMode::Normal => false,
-            _ => target.map_or_else(crate::focus::focused_is_terminal, |t| t.is_terminal),
-        }
+        crate::focus::targets_terminal(terminal_mode, target)
     }
 
     /// Collapse line breaks and tabs when IBus is committing into a terminal.
@@ -515,6 +508,16 @@ impl PlatformDriver {
 
 // ─── macOS / Windows: arboard + enigo ────────────────────────────────────────
 
+/// How long the clipboard is given to settle before the paste chord.
+#[cfg(not(unix))]
+const CLIPBOARD_SETTLE: std::time::Duration = std::time::Duration::from_millis(30);
+
+/// How long the target app is given to read the pasted clipboard before the
+/// user's own content goes back. Matches the Linux path's starting post-paste
+/// delay, which adapts from the same figure.
+#[cfg(not(unix))]
+const PASTE_READ_WINDOW: std::time::Duration = std::time::Duration::from_millis(100);
+
 #[cfg(not(unix))]
 struct PlatformDriver {
     clipboard: arboard::Clipboard,
@@ -539,24 +542,42 @@ impl PlatformDriver {
         }
     }
 
-    /// No-op: macOS/Windows leave the dictated text on the clipboard and never
-    /// restore the prior contents, so there is nothing to snapshot ahead.
+    /// No-op: `arboard` reads the clipboard in-process, so the snapshot below
+    /// costs nothing worth moving off the delivery path.
     fn prime_clipboard(&mut self) {}
 
     fn type_text(&mut self, text: &str, keep_clipboard: bool) -> TypeOutcome {
-        // Set clipboard, then emit paste keystroke. (macOS/Windows keep the
-        // dictated text on the clipboard regardless; restore is Linux-only.)
+        // Snapshot before staging ours so the user's own clipboard can go back.
+        // `arboard` reads text only: an image or an app-specific format reads as
+        // an error, indistinguishable from an empty clipboard, and restoring
+        // over that would destroy content we could not capture. Leave the
+        // dictated text in that case, the same call the Linux path makes.
+        let prior = if keep_clipboard {
+            None
+        } else {
+            self.clipboard.get_text().ok()
+        };
+
         if let Err(e) = self.clipboard.set_text(text) {
             warn!(error = %e, "clipboard set failed, falling back to per-key typing");
             return self.type_keys(text, keep_clipboard);
         }
 
-        // Small delay for clipboard to settle
-        std::thread::sleep(std::time::Duration::from_millis(30));
-
+        std::thread::sleep(CLIPBOARD_SETTLE);
         self.emit_paste();
-        // The dictated text remains on the clipboard as the paste source.
-        TypeOutcome::delivered(true)
+
+        let Some(prior) = prior else {
+            // Nothing to put back — the dictated text stays as the paste source.
+            return TypeOutcome::delivered(true);
+        };
+        // The target app needs its post-paste window to read our text before
+        // the user's content replaces it.
+        std::thread::sleep(PASTE_READ_WINDOW);
+        if let Err(e) = self.clipboard.set_text(prior) {
+            warn!(error = %e, "clipboard restore failed; dictated text left on clipboard");
+            return TypeOutcome::delivered(true);
+        }
+        TypeOutcome::delivered(false)
     }
 
     /// Same as [`type_text`](Self::type_text): nothing here acts on the

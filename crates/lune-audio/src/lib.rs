@@ -35,7 +35,8 @@ pub use capture::{
     list_input_devices, resolve_input_device,
 };
 pub use pcen::{
-    DEFAULT_NOISE_CEILING_RMS, EXPECTED_OUTPUT_RMS, PcenAgc, PcenAgcConfig, PcenFrameStats,
+    DEFAULT_NOISE_CEILING_RMS, EXPECTED_OUTPUT_RMS, PCEN_HOP_SIZE, PcenAgc, PcenAgcConfig,
+    PcenFrameStats,
 };
 pub use vad::{Vad, VadConfig, VadResult};
 

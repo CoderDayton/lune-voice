@@ -27,8 +27,9 @@ const MAX_SEGMENTS: usize = 500;
 
 const GARBAGE_DROP_THRESHOLD: f32 = 0.25;
 
-/// Hop size for the adaptive-gain frontend: 256 samples = 16 ms at 16 kHz.
-const AGC_HOP: usize = 256;
+/// Hop size for the adaptive-gain frontend, shared with the VAD's own PCEN pass
+/// so both re-frame audio the way the gain envelope was tuned for.
+const AGC_HOP: usize = lune_audio::PCEN_HOP_SIZE;
 
 /// Minimum fraction of "speech-like" characters (letters, digits, and the
 /// punctuation that occurs in real speech) a segment must contain to be kept.
@@ -442,7 +443,9 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
             framed.clear();
             agc.push(&chunk.samples, &mut framed);
             if let Err(e) = asr.push_audio(&asr_session, &framed).await {
-                first_asr_error.get_or_insert(e.to_string());
+                let msg = e.to_string();
+                warn!(error = %msg, "push_audio error during tail flush");
+                first_asr_error.get_or_insert(msg);
             }
             speech_samples += chunk.samples.len();
         }
@@ -452,7 +455,9 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
         if !framed.is_empty()
             && let Err(e) = asr.push_audio(&asr_session, &framed).await
         {
-            first_asr_error.get_or_insert(e.to_string());
+            let msg = e.to_string();
+            warn!(error = %msg, "push_audio error during agc tail flush");
+            first_asr_error.get_or_insert(msg);
         }
     }
 

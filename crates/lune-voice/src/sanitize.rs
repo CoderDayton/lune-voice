@@ -88,14 +88,17 @@ pub(crate) fn sanitize_for_delivery(text: &str) -> Cow<'_, str> {
 /// newlines and tabs.
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub(crate) fn flatten_for_terminal(text: &str) -> Cow<'_, str> {
-    if !text.contains(['\n', '\t']) {
+    if !text.contains(['\n', '\r', '\t']) {
         return Cow::Borrowed(text);
     }
     let mut out = String::with_capacity(text.len());
     let mut pending_break = false;
     for c in text.chars() {
         match c {
-            '\n' | '\t' => pending_break = true,
+            // A bare `\r` submits a line to a terminal just as `\n` does.
+            // `sanitize_for_delivery` already folds it into `\n` upstream, but
+            // this function must hold that line on its own.
+            '\n' | '\r' | '\t' => pending_break = true,
             c if c.is_whitespace() && pending_break => {}
             c => {
                 if pending_break && !out.is_empty() && !out.ends_with(' ') {

@@ -9,7 +9,7 @@ use earshot::Detector;
 use lune_audio::{PcenAgc, PcenAgcConfig};
 use std::path::PathBuf;
 
-const HOP_SIZE: usize = 256;
+const HOP_SIZE: usize = lune_audio::PCEN_HOP_SIZE;
 const SAMPLE_RATE: u32 = 16_000;
 const SPEECH_THRESHOLD: f32 = 0.5;
 

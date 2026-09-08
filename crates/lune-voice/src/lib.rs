@@ -1,6 +1,5 @@
 mod capture;
 pub mod delivery;
-pub mod events;
 mod redact;
 mod sanitize;
 pub mod session;
@@ -14,10 +13,14 @@ mod ibus;
 #[cfg(target_os = "linux")]
 pub use ibus::restore_displaced_engine_now;
 
+// Bounded display-server probing, shared by the compositor and toplevel
+// queries.
 #[cfg(unix)]
 mod cosmic_protocol;
 #[cfg(unix)]
 mod cosmic_toplevel;
+#[cfg(unix)]
+mod probe;
 #[cfg(unix)]
 mod wayland_toplevel;
 // XWayland-fallback decision for the pill overlay (Wayland-without-layer-shell).

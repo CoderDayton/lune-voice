@@ -441,34 +441,8 @@ impl IbusTyper {
     /// machinery works with a startup activate→restore handshake. `Err` on any
     /// failure so the caller falls back to the uinput path.
     pub fn try_new() -> Result<Self, String> {
-        let address = discover_ibus_address()?;
         let state = Arc::new(EngineState::default());
-
-        let conn = connection::Builder::address(address.as_str())
-            .map_err(|e| format!("ibus address parse: {e}"))?
-            .serve_at(FACTORY_PATH, LuneFactory)
-            .map_err(|e| format!("serve factory: {e}"))?
-            .serve_at(
-                ENGINE_PATH,
-                LuneEngine {
-                    state: Arc::clone(&state),
-                },
-            )
-            .map_err(|e| format!("serve engine: {e}"))?
-            .build()
-            .map_err(|e| format!("connect ibus bus: {e}"))?;
-
-        // Tell the daemon about our engine so SetGlobalEngine("lune-voice")
-        // resolves to our in-process factory.
-        conn.call_method(
-            Some(IBUS_SERVICE),
-            IBUS_PATH,
-            Some(IBUS_IFACE),
-            "RegisterComponent",
-            // A `Value` arg is serialized as `v` automatically; don't double-wrap.
-            &(ibus_component(),),
-        )
-        .map_err(|e| format!("RegisterComponent: {e}"))?;
+        let conn = connect_and_register(&state)?;
 
         let mut typer = Self {
             conn,
@@ -567,7 +541,7 @@ impl IbusTyper {
         }
 
         self.state.reset();
-        if let Err(e) = self.set_global_engine(ENGINE_NAME) {
+        if let Err(e) = self.activate() {
             warn!(error = %e, "ibus: SetGlobalEngine failed; commit skipped");
             clear_displaced_engine();
             return;
@@ -607,6 +581,30 @@ impl IbusTyper {
         }
     }
 
+    /// Activate our engine, rebuilding a dead connection once before giving up.
+    ///
+    /// The connection is opened once and reused for the life of the process.
+    /// An `ibus-daemon` that restarts — a session change, a crash, `ibus
+    /// restart` — leaves it talking to a peer that is gone, and every later
+    /// call fails. Without a rebuild, one daemon hiccup silently drops every
+    /// remaining dictation until the app itself is restarted.
+    fn activate(&mut self) -> zbus::Result<()> {
+        let Err(first) = self.set_global_engine(ENGINE_NAME) else {
+            return Ok(());
+        };
+        warn!(error = %first, "ibus: activation failed; rebuilding the bus connection");
+        match connect_and_register(&self.state) {
+            Ok(conn) => {
+                self.conn = conn;
+                self.set_global_engine(ENGINE_NAME)
+            }
+            Err(e) => {
+                warn!(error = %e, "ibus: reconnect failed");
+                Err(first)
+            }
+        }
+    }
+
     fn set_global_engine(&self, name: &str) -> zbus::Result<()> {
         self.conn
             .call_method(
@@ -637,6 +635,38 @@ impl IbusTyper {
         let desc: Value = body.deserialize().ok()?;
         engine_name_from_desc(&desc)
     }
+}
+
+/// Open the IBus private bus, serve our factory and engine on it, and register
+/// the component so `SetGlobalEngine("lune-voice")` resolves to our
+/// in-process factory.
+fn connect_and_register(state: &Arc<EngineState>) -> Result<Connection, String> {
+    let address = discover_ibus_address()?;
+    let conn = connection::Builder::address(address.as_str())
+        .map_err(|e| format!("ibus address parse: {e}"))?
+        .serve_at(FACTORY_PATH, LuneFactory)
+        .map_err(|e| format!("serve factory: {e}"))?
+        .serve_at(
+            ENGINE_PATH,
+            LuneEngine {
+                state: Arc::clone(state),
+            },
+        )
+        .map_err(|e| format!("serve engine: {e}"))?
+        .build()
+        .map_err(|e| format!("connect ibus bus: {e}"))?;
+
+    conn.call_method(
+        Some(IBUS_SERVICE),
+        IBUS_PATH,
+        Some(IBUS_IFACE),
+        "RegisterComponent",
+        // A `Value` arg is serialized as `v` automatically; don't double-wrap.
+        &(ibus_component(),),
+    )
+    .map_err(|e| format!("RegisterComponent: {e}"))?;
+
+    Ok(conn)
 }
 
 /// Restore the displaced engine now, outside the normal `Drop` path.

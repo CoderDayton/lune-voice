@@ -11,8 +11,9 @@
 //! The probe is a one-shot Wayland registry query — no GTK, so it can run
 //! before GDK is initialised (which is exactly when the backend must be chosen).
 
-use std::sync::mpsc::{self, RecvTimeoutError};
 use std::time::Duration;
+
+use crate::probe;
 use wayland_client::{
     Connection, Dispatch, Proxy, QueueHandle,
     globals::{GlobalListContents, registry_queue_init},
@@ -67,16 +68,23 @@ fn xwayland_fallback_decision(
 
 /// `Some(true)`/`Some(false)` once we positively know layer-shell is
 /// present/absent; `None` if the Wayland compositor couldn't be queried.
+///
+/// `registry_queue_init`'s roundtrip has no deadline, and this runs before the
+/// first window exists, so a compositor that accepts the socket and then
+/// stalls would hang startup outright. A silent compositor reads as
+/// unprobeable, which keeps the app on native Wayland.
 fn layer_shell_advertised() -> Option<bool> {
-    let conn = Connection::connect_to_env().ok()?;
-    // `registry_queue_init` performs the initial roundtrip, so the returned
-    // global list already reflects everything the compositor advertises.
-    let (globals, _queue) = registry_queue_init::<Probe>(&conn).ok()?;
-    Some(
-        globals
-            .contents()
-            .with_list(|list| list.iter().any(|g| g.interface == LAYER_SHELL_INTERFACE)),
-    )
+    probe::bounded(PROBE_TIMEOUT, "the wayland compositor", None, || {
+        let conn = Connection::connect_to_env().ok()?;
+        // `registry_queue_init` performs the initial roundtrip, so the returned
+        // global list already reflects everything the compositor advertises.
+        let (globals, _queue) = registry_queue_init::<Probe>(&conn).ok()?;
+        Some(
+            globals
+                .contents()
+                .with_list(|list| list.iter().any(|g| g.interface == LAYER_SHELL_INTERFACE)),
+        )
+    })
 }
 
 /// The probe holds no state — `registry_queue_init` collects the global list
@@ -105,56 +113,21 @@ impl Dispatch<WlRegistry, GlobalListContents> for Probe {
 /// reading `DISPLAY` and `XAUTHORITY` the same way, so it fails exactly where
 /// GDK fails.
 fn x11_display_usable() -> bool {
-    probe_with_timeout(X11_PROBE_TIMEOUT, || {
+    probe::bounded(PROBE_TIMEOUT, "the x display", false, || {
         x11rb::rust_connection::RustConnection::connect(None).is_ok()
     })
 }
 
-/// How long the X probe waits before giving up on an answer.
+/// How long a startup probe waits before giving up on an answer.
 ///
-/// A live X server completes the setup exchange over a local socket in
-/// microseconds, so this is only ever spent on one that has stopped answering.
-const X11_PROBE_TIMEOUT: Duration = Duration::from_secs(2);
-
-/// Run `probe` on a thread we are willing to abandon, answering `false` if it
-/// does not report back in time.
-///
-/// `RustConnection::connect` has no deadline of its own, and neither does the
-/// X handshake: a server that accepts the socket and then stalls — a wedged
-/// XWayland, a display forwarded over a dead SSH connection — would block
-/// startup on the main thread before any window exists. That is the same class
-/// of failure the probe was added to prevent, just silent instead of loud, so
-/// a slow answer is treated as no answer and the app stays on Wayland.
-fn probe_with_timeout(timeout: Duration, probe: impl FnOnce() -> bool + Send + 'static) -> bool {
-    let (tx, rx) = mpsc::channel();
-    // The receiver going away is the timeout case; the send failing there is
-    // expected, not an error.
-    std::thread::spawn(move || {
-        let _ = tx.send(probe());
-    });
-    match rx.recv_timeout(timeout) {
-        Ok(usable) => usable,
-        Err(RecvTimeoutError::Timeout) => {
-            tracing::warn!(
-                timeout_secs = timeout.as_secs(),
-                "the X display did not answer in time; treating it as unreachable"
-            );
-            false
-        }
-        // The sender was dropped without a value, so the probe panicked.
-        // Reporting it as a timeout would send debugging after a hang that
-        // never happened.
-        Err(RecvTimeoutError::Disconnected) => {
-            tracing::warn!("the X display probe panicked; treating the display as unreachable");
-            false
-        }
-    }
-}
+/// A live X server or compositor completes its setup exchange over a local
+/// socket in microseconds, so this is only ever spent on one that has stopped
+/// answering.
+const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
 
 #[cfg(test)]
 mod tests {
-    use super::{probe_with_timeout, xwayland_fallback_decision};
-    use std::time::Duration;
+    use super::xwayland_fallback_decision;
 
     #[test]
     fn x11_session_keeps_its_native_backend() {
@@ -183,29 +156,5 @@ mod tests {
         // aborts the app at gtk::init. A pill that can't position itself is
         // worth far more than that.
         assert!(!xwayland_fallback_decision(true, Some(false), || false));
-    }
-
-    #[test]
-    fn a_probe_that_answers_is_believed() {
-        assert!(probe_with_timeout(Duration::from_secs(30), || true));
-        assert!(!probe_with_timeout(Duration::from_secs(30), || false));
-    }
-
-    #[test]
-    fn a_stalled_probe_gives_up_instead_of_blocking_startup() {
-        let started = std::time::Instant::now();
-        let answered = probe_with_timeout(Duration::from_millis(50), || {
-            std::thread::sleep(Duration::from_secs(30));
-            true
-        });
-        assert!(
-            !answered,
-            "a probe that never answers must not report success"
-        );
-        assert!(
-            started.elapsed() < Duration::from_secs(5),
-            "the probe blocked for {:?} instead of timing out",
-            started.elapsed()
-        );
     }
 }

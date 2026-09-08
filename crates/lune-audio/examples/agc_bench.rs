@@ -17,7 +17,7 @@ use std::time::Instant;
 
 use lune_audio::{PcenAgcConfig, Vad, VadConfig};
 
-const HOP_SIZE: usize = 256;
+const HOP_SIZE: usize = lune_audio::PCEN_HOP_SIZE;
 const SAMPLE_RATE: u32 = 16_000;
 const SPEECH_START: f32 = 0.5;
 

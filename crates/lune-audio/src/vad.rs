@@ -2,10 +2,11 @@
 
 use earshot::Detector;
 
-use crate::pcen::{PcenAgc, PcenAgcConfig};
+use crate::pcen::{PCEN_HOP_SIZE, PcenAgc, PcenAgcConfig};
 
-/// Earshot hop size: 256 samples = 16ms at 16kHz.
-const HOP_SIZE: usize = 256;
+/// Earshot hop size, shared with the PCEN frontend so both frame audio
+/// identically: 256 samples = 16ms at 16kHz.
+const HOP_SIZE: usize = PCEN_HOP_SIZE;
 
 /// Result of single VAD chunk evaluation.
 #[derive(Debug, Clone, Copy)]

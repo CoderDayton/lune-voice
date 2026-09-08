@@ -20,6 +20,8 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use tracing::{debug, trace};
+
+use crate::probe;
 use wayland_client::{
     Connection, Dispatch, Proxy, QueueHandle,
     globals::{GlobalListContents, registry_queue_init},
@@ -33,10 +35,19 @@ use wayland_protocols_wlr::foreign_toplevel::v1::client::{
 /// `state` array enum value for an activated (focused) toplevel.
 const STATE_ACTIVATED: u32 = 2;
 
-/// Hard ceiling on total query time. Compositor IPC should finish in single
-/// digit ms; anything beyond this means something is wrong and we'd rather
-/// fall through than block delivery.
+/// Soft budget, checked between roundtrips. Compositor IPC should finish in
+/// single digit ms; anything beyond this means something is wrong and we'd
+/// rather fall through than block delivery.
 const QUERY_BUDGET: Duration = Duration::from_millis(150);
+
+/// Hard ceiling, enforced from outside the query.
+///
+/// `roundtrip` blocks on the socket with no deadline, so a compositor that
+/// stops answering *mid*-roundtrip never reaches the budget check above. Only
+/// a bound the query cannot influence keeps a wedged compositor from freezing
+/// delivery. Set above the soft budget so a healthy-but-slow query still gets
+/// to finish on its own terms.
+const QUERY_DEADLINE: Duration = Duration::from_millis(500);
 
 /// Maximum protocol version we negotiate with. Bumping is safe — newer
 /// versions stay backward compatible at the wire level.
@@ -52,7 +63,7 @@ pub fn wlr_active_app_id() -> Option<String> {
     std::env::var_os("WAYLAND_DISPLAY")?;
 
     let started = Instant::now();
-    let result = query(started);
+    let result = probe::bounded(QUERY_DEADLINE, "the wlr toplevel manager", None, query);
     trace!(
         elapsed_ms = started.elapsed().as_millis() as u64,
         ?result,
@@ -61,7 +72,8 @@ pub fn wlr_active_app_id() -> Option<String> {
     result
 }
 
-fn query(started: Instant) -> Option<String> {
+fn query() -> Option<String> {
+    let started = Instant::now();
     let conn = Connection::connect_to_env().ok()?;
     let (globals, mut queue) = registry_queue_init::<State>(&conn).ok()?;
     let qh = queue.handle();

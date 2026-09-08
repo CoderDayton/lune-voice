@@ -26,6 +26,8 @@ use crate::cosmic_protocol::toplevel_info::client::{
     zcosmic_toplevel_info_v1::{self, ZcosmicToplevelInfoV1},
 };
 use tracing::{debug, trace};
+
+use crate::probe;
 use wayland_client::{
     Connection, Dispatch, Proxy, QueueHandle, event_created_child,
     globals::{GlobalListContents, registry_queue_init},
@@ -36,7 +38,13 @@ use wayland_client::{
 /// (cosmic-toplevel-info v1 protocol — same numbering as xdg-toplevel).
 const STATE_ACTIVATED: u32 = 2;
 
+/// Soft budget, checked between roundtrips.
 const QUERY_BUDGET: Duration = Duration::from_millis(150);
+
+/// Hard ceiling, enforced from outside the query — `roundtrip` blocks on the
+/// socket with no deadline, so a compositor that stops answering mid-roundtrip
+/// never reaches the budget check. See `wayland_toplevel.rs`.
+const QUERY_DEADLINE: Duration = Duration::from_millis(500);
 
 /// Returns the `app_id` of the activated toplevel via cosmic-toplevel-info,
 /// or `None` if the protocol is not advertised, no toplevel is activated,
@@ -45,7 +53,7 @@ pub fn cosmic_active_app_id() -> Option<String> {
     std::env::var_os("WAYLAND_DISPLAY")?;
 
     let started = Instant::now();
-    let result = query(started);
+    let result = probe::bounded(QUERY_DEADLINE, "the cosmic toplevel manager", None, query);
     trace!(
         elapsed_ms = started.elapsed().as_millis() as u64,
         ?result,
@@ -54,7 +62,8 @@ pub fn cosmic_active_app_id() -> Option<String> {
     result
 }
 
-fn query(started: Instant) -> Option<String> {
+fn query() -> Option<String> {
+    let started = Instant::now();
     let conn = Connection::connect_to_env().ok()?;
     let (globals, mut queue) = registry_queue_init::<State>(&conn).ok()?;
     let qh = queue.handle();
