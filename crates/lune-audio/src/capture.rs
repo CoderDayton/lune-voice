@@ -43,12 +43,12 @@ impl Default for AudioConfig {
 /// Outcome of matching a saved input-device preference against the devices
 /// actually present on the host.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DeviceSelection {
+struct DeviceSelection {
     /// The device name to open, or `None` to fall back to the host default.
-    pub device: Option<String>,
+    device: Option<String>,
     /// `true` when a specific device was requested but is no longer present —
     /// the caller should surface a non-fatal warning and use the default.
-    pub fell_back: bool,
+    fell_back: bool,
 }
 
 /// Whether an ALSA PCM id names a real capture device rather than a software
@@ -142,7 +142,7 @@ fn enumerate_input_devices() -> Vec<(cpal::Device, String)> {
 
 /// Names of the input devices cpal currently reports on the default host, in
 /// enumeration order, with software routes and duplicate plugin entries removed
-/// (see [`usable_device_indices`]). Empty if enumeration fails (the default
+/// — one entry per microphone. Empty if enumeration fails (the default
 /// device is still usable). Used to populate the device picker and to validate a
 /// saved choice.
 pub fn list_input_devices() -> Vec<String> {
@@ -158,7 +158,7 @@ pub fn list_input_devices() -> Vec<String> {
 ///
 /// Device identity on Linux is by name (cpal exposes no portable persistent
 /// id), so a renamed or unplugged device won't match and we fall back.
-pub fn resolve_input_device(requested: Option<&str>, available: &[String]) -> DeviceSelection {
+fn resolve_input_device(requested: Option<&str>, available: &[String]) -> DeviceSelection {
     match requested {
         None => DeviceSelection {
             device: None,
@@ -177,7 +177,6 @@ pub fn resolve_input_device(requested: Option<&str>, available: &[String]) -> De
 
 /// Audio capture stream with automatic resampling
 pub struct AudioStream {
-    config: AudioConfig,
     ring: Arc<RingBuffer<AudioChunk>>,
     /// When set, the audio callback emits its sub-chunk tail as a final short
     /// chunk on its next invocation. See [`AudioStream::request_flush`].
@@ -549,7 +548,6 @@ impl AudioStream {
         debug!("Audio stream started successfully");
 
         Ok(Self {
-            config,
             ring,
             flush,
             failed,
@@ -579,7 +577,6 @@ impl AudioStream {
             offset_ms += u64::from(config.chunk_duration_ms);
         }
         Ok(Self {
-            config,
             ring,
             flush: Arc::new(AtomicBool::new(false)),
             failed: Arc::new(AtomicBool::new(false)),
@@ -604,8 +601,8 @@ impl AudioStream {
         self._stream.is_none()
     }
 
-    /// Chunks discarded because the ring buffer filled — see
-    /// [`crate::RingBuffer::evicted`].
+    /// Chunks discarded because the ring buffer filled: audio a reader lost
+    /// because it fell behind.
     pub fn dropped_chunks(&self) -> u64 {
         self.ring.evicted()
     }
@@ -627,17 +624,10 @@ impl AudioStream {
         self.failed.load(Ordering::Acquire)
     }
 
-    /// Get current buffer fill percentage (0.0 to 1.0)
-    /// Values near 1.0 indicate backpressure (consumer is slow)
+    /// Current buffer fill fraction (0.0 to 1.0). Values near 1.0 indicate
+    /// backpressure — the consumer is slow.
     pub fn buffer_fill(&self) -> f32 {
-        self.ring.len() as f32 / self.config.buffer_capacity as f32
-    }
-
-    /// Discard every chunk currently buffered in the ring. Call before a
-    /// new consumer starts on a long-lived stream so stale audio captured
-    /// during the idle period isn't transcribed.
-    pub fn drain(&self) {
-        while self.ring.try_pop().is_some() {}
+        self.ring.len() as f32 / self.ring.capacity() as f32
     }
 
     /// Drop chunks older than the most recent `keep` chunks. Use on
@@ -670,7 +660,6 @@ impl AudioStream {
     /// time.
     pub fn handle(&self) -> AudioStreamHandle {
         AudioStreamHandle {
-            config: self.config.clone(),
             ring: Arc::clone(&self.ring),
             flush: Arc::clone(&self.flush),
         }
@@ -684,16 +673,11 @@ impl AudioStream {
 /// queued chunks remain consumable until drained).
 #[derive(Clone)]
 pub struct AudioStreamHandle {
-    config: AudioConfig,
     ring: Arc<RingBuffer<AudioChunk>>,
     flush: Arc<AtomicBool>,
 }
 
 impl AudioStreamHandle {
-    pub fn config(&self) -> &AudioConfig {
-        &self.config
-    }
-
     /// See [`AudioStream::dropped_chunks`].
     pub fn dropped_chunks(&self) -> u64 {
         self.ring.evicted()
@@ -709,16 +693,8 @@ impl AudioStreamHandle {
         self.flush.store(true, Ordering::Release);
     }
 
-    pub async fn next_chunk(&self) -> Option<AudioChunk> {
-        self.ring.pop().await
-    }
-
     pub fn try_next_chunk(&self) -> Option<AudioChunk> {
         self.ring.try_pop()
-    }
-
-    pub fn drain(&self) {
-        while self.ring.try_pop().is_some() {}
     }
 
     /// See `AudioStream::drain_keep_last`.
@@ -731,8 +707,9 @@ impl AudioStreamHandle {
         }
     }
 
+    /// See [`AudioStream::buffer_fill`].
     pub fn buffer_fill(&self) -> f32 {
-        self.ring.len() as f32 / self.config.buffer_capacity as f32
+        self.ring.len() as f32 / self.ring.capacity() as f32
     }
 }
 
@@ -877,6 +854,21 @@ fn process_audio_callback(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `from_samples` grows the ring past `buffer_capacity` when the clip needs
+    /// it, so the fill fraction has to be measured against the ring's real
+    /// capacity or it reports well over 1.0.
+    #[test]
+    fn buffer_fill_stays_within_range_for_an_oversized_clip() {
+        let config = AudioConfig {
+            buffer_capacity: 2,
+            ..AudioConfig::default()
+        };
+        let chunk_samples = computed_chunk_samples(&config).unwrap();
+        let stream = AudioStream::from_samples(&vec![0.0f32; chunk_samples * 20], config).unwrap();
+        let fill = stream.buffer_fill();
+        assert!((0.0..=1.0).contains(&fill), "fill out of range: {fill}");
+    }
 
     #[test]
     fn from_samples_rejects_zero_chunk_duration() {

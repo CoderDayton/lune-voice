@@ -9,15 +9,15 @@ workspace = true
 
 [dependencies]
 # Core
-tokio = { workspace = true, features = ["sync", "time"] }
+tokio = { workspace = true, features = ["sync"] }
 tracing.workspace = true
 
 # Audio capture
-cpal = "0.18"
+cpal.workspace = true
 
 # Resampling (adaptive rate conversion)
-rubato = "5.0"
-audioadapter-buffers = "5.0"
+rubato.workspace = true
+audioadapter-buffers.workspace = true
 
 # Lock-free ring buffer
 crossbeam-channel = "0.5"
@@ -25,22 +25,10 @@ crossbeam-channel = "0.5"
 # Voice activity detection (pure Rust)
 earshot = "1.1"
 
-# Serialization (adaptive VAD state persistence)
-serde = { workspace = true, features = ["derive"] }
-
 # Error handling
 thiserror.workspace = true
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-tracing-subscriber = "0.3"
-hound = "3.5"
-serde_json.workspace = true
-
-[[example]]
-name = "live_capture"
-path = "examples/live_capture.rs"
-
-[[example]]
-name = "vad_inspect"
-path = "examples/vad_inspect.rs"
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+tracing-subscriber.workspace = true
+hound.workspace = true

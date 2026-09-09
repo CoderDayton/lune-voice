@@ -3099,16 +3099,13 @@ name = "lune-asr"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "base64 0.23.1",
  "bytes",
  "futures-util",
  "hex",
  "hound",
  "libc",
  "lune-core",
- "lune-llm",
  "reqwest",
- "rustfft",
  "serde",
  "serde_json",
  "sha2 0.11.0",
@@ -3130,8 +3127,6 @@ dependencies = [
  "earshot",
  "hound",
  "rubato",
- "serde",
- "serde_json",
  "thiserror 2.0.20",
  "tokio",
  "tracing",
@@ -3162,7 +3157,6 @@ dependencies = [
  "lune-core",
  "lune-persist",
  "serde",
- "strsim",
  "tracing",
  "wordnik_list",
 ]
@@ -3175,13 +3169,11 @@ dependencies = [
  "async-trait",
  "lune-core",
  "lune-dict",
- "regex",
  "reqwest",
  "serde",
  "serde_json",
  "tokio",
  "tracing",
- "tracing-subscriber",
  "url",
 ]
 
@@ -3218,7 +3210,6 @@ dependencies = [
 name = "lune-ui"
 version = "0.1.0"
 dependencies = [
- "async-trait",
  "chrono",
  "evdev",
  "gtk",

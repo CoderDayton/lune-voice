@@ -1,12 +1,13 @@
 //! # lune-audio
 //!
-//! Professional audio capture for streaming ASR.
+//! Microphone capture for the dictation pipeline: cpal input → mono downmix →
+//! resample to 16 kHz → a bounded ring buffer the session drains.
 //!
-//! ## Features
-//! - Adaptive resampling (any mic rate → 16kHz)
-//! - Zero-copy ring buffer (lock-free SPSC)
-//! - Backpressure handling (drops stale audio if consumer lags)
-//! - Works on X11, Wayland, headless servers
+//! The ring never blocks the audio callback; when it fills, the oldest chunk is
+//! evicted and counted ([`AudioPull::dropped_chunks`]).
+//!
+//! Also here: the PCEN adaptive AGC ([`pcen`]) the capture loop applies, and an
+//! Earshot-backed [`Vad`] used by the offline inspection examples.
 //!
 //! ## Example
 //! ```no_run
@@ -14,26 +15,20 @@
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     let config = AudioConfig::default();
-//!     let mut stream = AudioStream::new(config).unwrap();
-//!     
+//!     let stream = AudioStream::new(AudioConfig::default()).unwrap();
+//!
 //!     while let Some(chunk) = stream.next_chunk().await {
 //!         println!("Audio: {} samples", chunk.samples.len());
 //!     }
 //! }
 //! ```
 
-pub mod calibrate;
 mod capture;
 pub mod pcen;
 mod ring;
 mod vad;
 
-pub use calibrate::{CalibrationError, CalibrationInput, CalibrationResult};
-pub use capture::{
-    AudioConfig, AudioStream, AudioStreamHandle, ConsumerGuard, DeviceSelection,
-    list_input_devices, resolve_input_device,
-};
+pub use capture::{AudioConfig, AudioStream, AudioStreamHandle, ConsumerGuard, list_input_devices};
 pub use pcen::{
     DEFAULT_NOISE_CEILING_RMS, EXPECTED_OUTPUT_RMS, PCEN_HOP_SIZE, PcenAgc, PcenAgcConfig,
     PcenFrameStats,

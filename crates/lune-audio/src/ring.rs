@@ -27,6 +27,8 @@ const EVICTION_LOG_INTERVAL: u64 = 100;
 pub struct RingBuffer<T> {
     tx: Sender<T>,
     rx: Receiver<T>,
+    /// Slots the channel was built with. Fixed for the buffer's lifetime.
+    capacity: usize,
     /// Wakes a waiting `pop().await` when a producer pushes. Replaces an
     /// exponential-backoff sleep loop that added up to 10 ms of latency
     /// on the first miss.
@@ -50,6 +52,7 @@ impl<T> RingBuffer<T> {
         Ok(Self {
             tx,
             rx,
+            capacity,
             notify: Notify::new(),
             evicted: AtomicU64::new(0),
             consumers: AtomicUsize::new(0),
@@ -166,6 +169,11 @@ impl<T> RingBuffer<T> {
     /// Current buffer length.
     pub fn len(&self) -> usize {
         self.rx.len()
+    }
+
+    /// Slots this buffer holds when full.
+    pub fn capacity(&self) -> usize {
+        self.capacity
     }
 }
 

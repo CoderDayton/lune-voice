@@ -21,11 +21,10 @@ gpu = ["lune-voice/gpu"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-async-trait.workspace = true
 tauri = { version = "2", features = ["macos-private-api", "test", "tray-icon"] }
 tauri-plugin-opener = "2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde.workspace = true
+serde_json.workspace = true
 lune-voice = { path = "../../crates/lune-voice" }
 lune-asr = { path = "../../crates/lune-asr" }
 lune-audio = { path = "../../crates/lune-audio" }
@@ -41,7 +40,7 @@ tokio = { workspace = true }
 reqwest = { workspace = true }
 tracing.workspace = true
 tracing-subscriber.workspace = true
-regex = "1.12.3"
+regex.workspace = true
 url.workspace = true
 tauri-plugin-dialog = "2"
 tauri-plugin-single-instance = "2.4.1"
@@ -54,7 +53,7 @@ tauri-plugin-notification = "2.3.3"
 # Low-level keyboard hook for the global hotkey (src/hotkey_windows/hook.rs).
 # `windows-sys` is already in the tree transitively, so this adds no new crate.
 [target.'cfg(target_os = "windows")'.dependencies]
-windows-sys = { version = "0.61", features = [
+windows-sys = { workspace = true, features = [
   "Win32_Foundation",
   "Win32_UI_WindowsAndMessaging",
 ] }
@@ -62,13 +61,13 @@ windows-sys = { version = "0.61", features = [
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = "0.18"
 gtk-layer-shell = { version = "0.8", features = ["v0_6"] }
-evdev = "0.13"
+evdev.workspace = true
 # `umask` for process-wide file-permission hardening (main.rs).
-libc = "0.2"
+libc.workspace = true
 
 [[bin]]
 name = "lune-voice"
 path = "src/main.rs"
 
 [dev-dependencies]
-tempfile = "3.27.0"
+tempfile.workspace = true

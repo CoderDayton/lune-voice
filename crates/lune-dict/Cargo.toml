@@ -16,8 +16,7 @@ dictionary = ["dep:lune-persist"]
 bincode = { version = "2", features = ["serde"] }
 lune-core.workspace = true
 lune-persist = { workspace = true, optional = true }
-serde = { version = "1", features = ["derive"] }
-strsim = "0.11"
+serde.workspace = true
 tracing.workspace = true
 # Core dependency: the corrector and lexicon call wordnik_list::word_exists on
 # the always-compiled path (not training-only), so it stays unconditional.
@@ -25,10 +24,8 @@ wordnik_list = "0.2"
 
 [build-dependencies]
 bincode = { version = "2", features = ["serde"] }
-serde = { version = "1", features = ["derive"] }
+serde.workspace = true
 
 [[bench]]
 name = "corrector_bench"
 harness = false
-
-

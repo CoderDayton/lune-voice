@@ -35,7 +35,7 @@ unimplemented = "warn"
 
 [profile.release]
 # thin LTO: ~80% of fat's benefit at fraction of link time; cross-crate inlining
-# unlocked across all 9 crates. codegen-units=1 removes parallelism barriers so
+# unlocked across all 8 members. codegen-units=1 removes parallelism barriers so
 # LLVM sees the full call graph.
 #
 # Unwinding (the default), deliberately, despite `panic = "abort"` being worth
@@ -57,9 +57,9 @@ debug = true
 
 # Optimize dependencies even in dev builds. The workspace's own crates stay at
 # opt-level 0 for fast incremental builds and clean backtraces, while heavy
-# dependencies (ONNX Runtime wrapper, ndarray, audio, sampler math) compile
-# optimized — closing most of the dev-vs-release speed gap so local inference
-# doesn't trip the LLM timeout fallback.
+# dependencies (whisper.cpp bindings, audio capture and resampling, SQLite)
+# compile optimized — closing most of the dev-vs-release speed gap so local
+# inference doesn't trip the LLM timeout fallback.
 [profile.dev.package."*"]
 opt-level = 3
 
@@ -83,7 +83,6 @@ toml = "1.0"
 
 # Error handling
 thiserror = "2"
-anyhow = "1"
 
 # Observability
 tracing = "0.1"
@@ -91,6 +90,11 @@ tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 
 # Data types
 uuid = { version = "1", features = ["v4", "serde"] }
+regex = "1.12"
+
+# Hashing / encoding (model + GPU-plugin archive verification)
+sha2 = "0.11"
+hex = "0.4"
 
 # Cross-platform I/O
 # `wayland-data-control` (Linux-only, target-gated dep) lets arboard advertise
@@ -109,9 +113,7 @@ cpal = "0.18"
 rubato = "5.0"
 audioadapter-buffers = "5"
 mimalloc = { version = "0.1", default-features = false }
-ndarray = "0.17"
-rustfft = "6.4"
-tokenizers = { version = "0.22", default-features = false, features = ["onig"] }
+hound = "3.5"
 async-openai = { version = "0.41", features = ["chat-completion"] }
 reqwest = { version = "0.13", features = ["json", "multipart", "stream"] }
 # Streaming + unpacking the downloadable GPU backend archive
@@ -121,9 +123,11 @@ flate2 = "1.1"
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 zbus = "5"
 evdev = "0.13"
-smallvec = { version = "1", features = ["union"] }
 # `dlopen` for NVIDIA-driver detection (crates/lune-asr/src/gpu_backend.rs).
 libc = "0.2"
+# Win32 shells of the platform-split subsystems. Each crate adds only the
+# feature modules it calls; cargo unions them.
+windows-sys = "0.61"
 wayland-client = "0.31"
 wayland-protocols-wlr = { version = "0.3", features = ["client"] }
 # `staging` supplies the `ext_foreign_toplevel_list` / `ext_workspace`
@@ -133,3 +137,6 @@ wayland-protocols = { version = "0.32", features = ["client", "staging"] }
 wayland-scanner = "0.31"
 # Referenced by the code `wayland-scanner` emits.
 wayland-backend = "0.3"
+
+# Test-only
+tempfile = "3"

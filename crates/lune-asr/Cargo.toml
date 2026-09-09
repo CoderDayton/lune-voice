@@ -13,12 +13,11 @@ workspace = true
 # into the shipped binary by `cgs build`, which passes `--features whisper-cpp`.
 default = []
 # Local whisper.cpp backend. Compiles whisper.cpp (C++) via whisper-rs-sys —
-# needs cmake + a C++ toolchain + libclang at build time. Disable with
-# --no-default-features for a fast ONNX-only build.
+# needs cmake + a C++ toolchain + libclang at build time. Without it the
+# backend links a stub that errors "… not compiled in".
 whisper-cpp = ["dep:whisper-rs"]
-# GPU whisper.cpp. Source-compiles whisper.cpp with CUDA, which additionally
-# needs the CUDA toolkit (nvcc). Deliberately separate from `cuda` (which only
-# toggles ONNX Runtime's prebuilt CUDA execution provider, no compiler needed).
+# GPU whisper.cpp: source-compiles the CUDA kernels, so it additionally needs
+# the CUDA toolkit (nvcc) on the build host.
 whisper-cuda = ["whisper-cpp", "whisper-rs/cuda"]
 
 [dependencies]
@@ -33,14 +32,12 @@ whisper-rs = { version = "0.16", optional = true, default-features = false, feat
     "tracing_backend",
     "raw-api",
 ] }
-rustfft.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 # Re-verifying the downloaded GPU backend before it is dlopen'd
 # (`gpu_backend::installed_plugin_is_intact`).
-sha2 = "0.11"
-hex = "0.4"
-base64 = "0.23"
+sha2.workspace = true
+hex.workspace = true
 # Already in the tree via reqwest; declared directly so the retry loop can
 # clone the encoded WAV as an Arc bump instead of a multi-MB deep copy.
 bytes = "1"
@@ -52,7 +49,7 @@ url.workspace = true
 
 # Driver probe + CUDA runtime preload for the GPU plugin (src/gpu_backend.rs).
 [target.'cfg(target_os = "windows")'.dependencies]
-windows-sys = { version = "0.61", features = [
+windows-sys = { workspace = true, features = [
   "Win32_Foundation",
   "Win32_System_LibraryLoader",
 ] }
@@ -62,6 +59,5 @@ libc = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-hound = "3.5"
-tempfile = "3.27.0"
-lune-llm = { path = "../lune-llm" }
+hound.workspace = true
+tempfile.workspace = true
