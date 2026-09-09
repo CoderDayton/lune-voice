@@ -177,8 +177,13 @@ build_tarball() {
     fi
 
     # Newest .deb wins, so a stale one from an earlier version is not repacked.
-    local deb
-    deb="$(ls -t "${debs[@]}" | head -1)"
+    # Capture the listing, then take its first line: `ls -t | head -1` under
+    # `pipefail` is the same SIGPIPE race the CI udev check hit — head exits on
+    # line one, ls dies of SIGPIPE, and the substitution fails a step that was
+    # working.
+    local deb listing
+    listing="$(ls -t "${debs[@]}")"
+    deb="${listing%%$'\n'*}"
     bold "==> Portable tar.gz (from $(basename "$deb"))"
 
     local version arch name stage
