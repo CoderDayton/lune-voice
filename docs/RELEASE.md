@@ -138,6 +138,14 @@ bun tauri build --features "whisper-cuda"    # CUDA (needs CUDA Toolkit)
 Tauri produces the `.msi`/`.exe` (NSIS) installers configured in
 `desktop-ui/src-tauri/tauri.conf.json`.
 
+From a Linux box, `cgs check-windows` type-checks every crate under `crates/`
+for `x86_64-pc-windows-gnu`, so the `cfg(target_os = "windows")` halves of the
+platform split cannot rot between pushes. It needs `zig` (wired in as the C
+cross-compiler by `.cargo/config.toml`) and is **check-only** — linking would
+also need MinGW's `dlltool`. `lune-ui` is left out on purpose: `tauri-winres`
+wants a MinGW `windres`, so the CI job on `windows-latest` is what covers the
+Tauri crate.
+
 ### Linux bundles
 
 `cgs package` (`scripts/release/package-all.sh`) builds `.deb`, `.AppImage`,

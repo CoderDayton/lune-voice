@@ -164,17 +164,21 @@ The LLM backend (`OpenAiLlmBackend`) wraps an `async-openai` `Client` and makes 
 
 ### 5. Text Delivery
 
-**Crate:** `lune-voice` | **Files:** `crates/lune-voice/src/delivery.rs`, `uinput_typer.rs`, `ibus.rs`
+**Crate:** `lune-voice` | **Files:** `crates/lune-voice/src/delivery.rs`, `uinput_typer.rs`, `ibus.rs`, `focus.rs` + `focus/unix.rs`, `probe.rs`
+
+`delivery.rs` defines one `PlatformDriver` trait with a half per platform. `focus.rs` owns focused-window detection and terminal classification — the compositor probes live in `focus/unix.rs`, the Win32 `GetForegroundWindow` path in `focus/windows.rs` — and every external probe (compositor sockets, `wl-paste`, `swaymsg`, `xdotool`) runs through `probe.rs`, which time-bounds it and drains both child pipes for the whole wait so a chatty child is not killed mid-answer.
 
 The session emits two `SessionEvent` variants directly on the event channel:
 
 - `PartialText` — in-progress signal for live preview
 - `FinalizedText { session_id, text }` — styled text for delivery
 
-Delivery runs on a dedicated thread and picks a backend once at startup:
+Delivery runs on a dedicated thread and picks a backend once at startup. On Linux there are two:
 
 - **IBus** — used when IBus is the active input method (e.g. GNOME/Wayland; detected via `GTK_IM_MODULE` / `QT_IM_MODULE` / `XMODIFIERS`). Commits Unicode straight into the focused input context — no terminal detection, paste chord, or clipboard.
 - **uinput** — the universal fallback. Drives a virtual keyboard through `/dev/uinput`.
+
+On Windows (and macOS) there is one: **arboard + enigo** — `arboard` for the clipboard, `enigo` for the paste chord and for per-key Unicode typing. `arboard` reads and writes the clipboard in-process, so there is no child process to bound; it reads text only, so a non-text clipboard is snapshotted as "nothing to restore" rather than as bytes.
 
 `dictation_mode` selects the delivery method; `copy_to_clipboard` is an orthogonal toggle for whether a copy is *kept*:
 
