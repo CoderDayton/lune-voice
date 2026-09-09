@@ -106,7 +106,12 @@ pub(crate) fn output_with_timeout(cmd: &str, args: &[&str], timeout: Duration) -
 }
 
 /// Read one of the child's pipes to EOF on its own thread.
-fn drain<R: Read + Send + 'static>(pipe: Option<R>) -> JoinHandle<Vec<u8>> {
+///
+/// Every path that spawns a child with a piped stdout or stderr needs this: a
+/// pipe holds about 64 KiB before the writer blocks, so an unread pipe wedges a
+/// chatty child short of exit and the caller's deadline then kills a process
+/// that was working.
+pub(crate) fn drain<R: Read + Send + 'static>(pipe: Option<R>) -> JoinHandle<Vec<u8>> {
     std::thread::spawn(move || {
         let mut buf = Vec::new();
         if let Some(mut pipe) = pipe {

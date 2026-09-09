@@ -23,7 +23,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::delivery::TypeOutcome;
 use crate::focus::{WindowTarget, restore_focus};
-use crate::probe::{output_with_timeout, status_with_timeout};
+use crate::probe::{drain, output_with_timeout, status_with_timeout};
 
 // Hard ceiling on the clipboard subprocesses delivery spawns. Looser than an
 // ordinary probe's budget because wl-copy/xclip have to round-trip through the
@@ -416,6 +416,12 @@ fn pipe_bytes_to_command(
         .spawn()
         .map_err(|e| format!("{cmd} spawn failed: {e}"))?;
 
+    // Drain stderr for the whole wait. The pipe holds about 64 KiB before the
+    // writer blocks, so an unread one wedges a chatty helper short of exit and
+    // the deadline below then kills a `wl-copy`/`xclip` that was working.
+    // Draining also gives the failure messages something to say.
+    let mut errors = Some(drain(child.stderr.take()));
+
     // Feed stdin from a thread so the deadline below covers the write too:
     // `write_all` blocks once the payload outgrows the pipe buffer (~64 KB)
     // and the child stops draining it, which is the wedged-helper case the
@@ -439,12 +445,18 @@ fn pipe_bytes_to_command(
         {
             let _ = child.kill();
             let _ = child.wait();
-            return Err(format!("{cmd} write failed: {e}"));
+            return Err(format!(
+                "{cmd} write failed: {e}{}",
+                stderr_note(errors.take())
+            ));
         }
         match child.try_wait() {
             Ok(Some(status)) => {
                 if !status.success() {
-                    return Err(format!("{cmd} exited with {status}"));
+                    return Err(format!(
+                        "{cmd} exited with {status}{}",
+                        stderr_note(errors.take())
+                    ));
                 }
                 return Ok(());
             }
@@ -452,12 +464,53 @@ fn pipe_bytes_to_command(
                 if Instant::now() >= deadline {
                     let _ = child.kill();
                     let _ = child.wait();
-                    return Err(format!("{cmd} timed out after {timeout:?}"));
+                    return Err(format!(
+                        "{cmd} timed out after {timeout:?}{}",
+                        stderr_note(errors.take())
+                    ));
                 }
                 std::thread::sleep(Duration::from_millis(10));
             }
             Err(e) => return Err(format!("{cmd} wait failed: {e}")),
         }
+    }
+}
+
+/// Render what the child said on stderr as a suffix for a failure message.
+///
+/// Empty when it said nothing, so the caller's message reads unchanged in the
+/// common case. Bounded in length, because a helper that failed loudly should
+/// not put a megabyte of its own output into a log line — and bounded in time,
+/// because the drain thread only finishes when *every* writer closes the pipe.
+/// `wl-copy` and `xclip` fork a selection-owner that inherits stderr and
+/// outlives the process we spawned, so an unconditional `join` would block for
+/// as long as that owner holds the clipboard, defeating the very deadline this
+/// message is reporting. Past the grace period we report the failure without
+/// the child's words rather than hang delivery.
+fn stderr_note(drained: Option<std::thread::JoinHandle<Vec<u8>>>) -> String {
+    const MAX: usize = 400;
+    const GRACE: Duration = Duration::from_millis(50);
+    let Some(handle) = drained else {
+        return String::new();
+    };
+    let deadline = Instant::now() + GRACE;
+    while !handle.is_finished() {
+        if Instant::now() >= deadline {
+            return String::new();
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    let Ok(bytes) = handle.join() else {
+        return String::new();
+    };
+    let text = String::from_utf8_lossy(&bytes);
+    let text = text.trim();
+    if text.is_empty() {
+        return String::new();
+    }
+    match text.char_indices().nth(MAX) {
+        Some((cut, _)) => format!(": {}…", &text[..cut]),
+        None => format!(": {text}"),
     }
 }
 
@@ -1221,6 +1274,50 @@ mod tests {
         assert!(
             elapsed < Duration::from_secs(2),
             "the write blocked past the deadline; elapsed: {elapsed:?}"
+        );
+    }
+
+    /// A helper that says a lot on stderr must not deadlock on its own pipe.
+    /// The pipe holds ~64 KiB before the writer blocks, so with nothing reading
+    /// it a chatty `wl-copy`/`xclip` never reaches exit and the deadline kills a
+    /// process that was working. `probe::output_with_timeout` drains both pipes
+    /// for exactly this reason; this path has to as well.
+    #[test]
+    fn pipe_text_to_command_reads_a_child_that_floods_stderr() {
+        let result = pipe_text_to_command(
+            "sh",
+            &["-c", "cat > /dev/null; head -c 262144 /dev/zero >&2"],
+            "clipboard payload",
+            Duration::from_secs(10),
+        );
+        assert!(
+            result.is_ok(),
+            "a chatty child must not read as a timeout: {result:?}"
+        );
+    }
+
+    /// `wl-copy` and `xclip` fork a selection-owner process that inherits our
+    /// stderr pipe and outlives the process we spawned, so the pipe never
+    /// reaches EOF. Reading what the helper said must therefore be bounded:
+    /// joining the drain thread outright would block for as long as that owner
+    /// holds the clipboard, defeating the deadline the message is reporting.
+    #[test]
+    fn pipe_text_to_command_reports_failure_when_the_helper_detaches() {
+        let started = Instant::now();
+        let result = pipe_text_to_command(
+            "sh",
+            &["-c", "cat > /dev/null; sleep 30 & exit 3"],
+            "clipboard payload",
+            Duration::from_secs(2),
+        );
+        let elapsed = started.elapsed();
+        assert!(
+            result.is_err(),
+            "expected the non-zero exit; got {result:?}"
+        );
+        assert!(
+            elapsed < Duration::from_secs(5),
+            "reading the helper's stderr blocked on a detached grandchild; elapsed: {elapsed:?}"
         );
     }
 
