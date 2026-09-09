@@ -221,9 +221,7 @@ fn attach_new_keyboards(io: &mut ListenerIo) -> usize {
         if !io.watched.insert(path.clone()) {
             continue;
         }
-        if let Ok(probe) = Device::open(&path) {
-            io.probes.push((path.clone(), probe));
-        }
+        open_probe(io, &path);
         let name = dev.name().unwrap_or("unknown").to_string();
         let tx = io.tx.clone();
         let reader_path = path.clone();
@@ -243,6 +241,38 @@ fn attach_new_keyboards(io: &mut ListenerIo) -> usize {
         info!(added, watched = io.watched.len(), "keyboards attached");
     }
     added
+}
+
+/// Open the second, ungrabbed handle a node needs to answer `EVIOCGKEY`.
+///
+/// Worth reporting when it fails: without one, `physical_keys` has no truth to
+/// compare against and the sweep stands down entirely, so the drift repair is
+/// off until the handle opens.
+fn open_probe(io: &mut ListenerIo, path: &PathBuf) {
+    match Device::open(path) {
+        Ok(probe) => io.probes.push((path.clone(), probe)),
+        Err(e) => warn!(
+            path = %path.display(),
+            error = %e,
+            "no probe handle for this keyboard; drift repair is off until it opens"
+        ),
+    }
+}
+
+/// Retry the probe handles that never opened. The reader can win the race with
+/// udev's ACL on a freshly plugged keyboard, leaving a watched node with no
+/// probe; the node is already in `watched`, so only this reopens it — otherwise
+/// the sweep stays disabled until the device is physically reconnected.
+fn retry_missing_probes(io: &mut ListenerIo) {
+    let missing: Vec<PathBuf> = io
+        .watched
+        .iter()
+        .filter(|path| !io.probes.iter().any(|(probed, _)| probed == *path))
+        .cloned()
+        .collect();
+    for path in missing {
+        open_probe(io, &path);
+    }
 }
 
 /// Whether to go looking for keyboards again.
@@ -327,7 +357,10 @@ fn run_listener(live: Arc<LiveHotkeyConfig>, sink: HotkeySink) {
                     &mut state,
                     &mut consumed,
                     &mut deferred,
-                    &io.probes,
+                    Probes {
+                        handles: &io.probes,
+                        watched: io.watched.len(),
+                    },
                     snap.mode,
                     due,
                 ) {
@@ -337,6 +370,10 @@ fn run_listener(live: Arc<LiveHotkeyConfig>, sink: HotkeySink) {
                 // Cheap gate: only touch the filesystem once the cooldown has
                 // elapsed, and only re-enumerate when something moved.
                 if ticks_since_rescan >= RESCAN_COOLDOWN_TICKS {
+                    // A watched node whose probe never opened is checked every
+                    // cooldown, not just when the device set moves: the ACL it
+                    // lost the race to is granted without any node changing.
+                    retry_missing_probes(&mut io);
                     let sig = input_node_signature();
                     if rescan_due(ticks_since_rescan, reader_lost, sig != node_sig) {
                         reader_lost = false;
@@ -445,7 +482,7 @@ fn on_idle<S: KeySink>(
     state: &mut HotkeyState,
     consumed: &mut PressedCodes,
     deferred: &mut Vec<InputEvent>,
-    probes: &[(PathBuf, Device)],
+    probes: Probes<'_>,
     mode: ActivationMode,
     sweep_due: bool,
 ) -> Option<HotkeyAction> {
@@ -473,10 +510,17 @@ fn sweep<S: KeySink>(
     fwd: &mut Forwarder<S>,
     state: &mut HotkeyState,
     consumed: &mut PressedCodes,
-    probes: &[(PathBuf, Device)],
+    probes: Probes<'_>,
     mode: ActivationMode,
 ) -> Option<HotkeyAction> {
-    let physical = physical_keys(probes);
+    // No kernel truth means no repair. `reconcile` cannot tell "the kernel says
+    // this key is up" from "nobody answered", so acting on a partial answer
+    // would release keys the user is still holding — the very damage the sweep
+    // exists to undo.
+    let Some(physical) = probes.physical_keys() else {
+        debug!("kernel key state unavailable; skipping this sweep");
+        return None;
+    };
     let stray = fwd.reconcile(&physical);
     if !stray.is_empty() {
         warn!(?stray, "released keys the kernel reports as up");
@@ -485,21 +529,36 @@ fn sweep<S: KeySink>(
     state.sync_pressed(&physical, mode)
 }
 
-/// Which keys the kernel currently reports as physically held, across every
-/// keyboard this listener watches. A device that has gone away answers with an
-/// error and contributes nothing — exactly right, since nobody is holding its
-/// keys any more.
-fn physical_keys(probes: &[(PathBuf, Device)]) -> PressedCodes {
-    let mut set = PressedCodes::default();
-    for (_, dev) in probes {
-        let Ok(keys) = dev.get_key_state() else {
-            continue;
-        };
-        for code in keys.iter() {
-            set.insert(code);
+/// The ungrabbed handles the sweep reads kernel truth from, carried together
+/// with the number of keyboards they are supposed to cover. The two travel as
+/// one because an answer from only some of them is not an answer.
+#[derive(Clone, Copy)]
+struct Probes<'a> {
+    handles: &'a [(PathBuf, Device)],
+    watched: usize,
+}
+
+impl Probes<'_> {
+    /// Which keys the kernel currently reports as physically held, across every
+    /// keyboard this listener watches.
+    ///
+    /// `None` when the answer would be incomplete — a watched node with no
+    /// probe handle, or an `EVIOCGKEY` that failed. An incomplete answer is not
+    /// the same as "no keys are held": the caller synthesizes a release for
+    /// every key missing from this set, so a keyboard that silently contributes
+    /// nothing would have its held keys released under the user's fingers.
+    fn physical_keys(&self) -> Option<PressedCodes> {
+        if self.handles.len() < self.watched {
+            return None;
         }
+        let mut set = PressedCodes::default();
+        for (_, dev) in self.handles {
+            for code in dev.get_key_state().ok()?.iter() {
+                set.insert(code);
+            }
+        }
+        Some(set)
     }
-    set
 }
 
 /// A destination for re-injected key events: the real uinput `VirtualDevice`
@@ -1516,6 +1575,43 @@ mod tests {
             "Ctrl must reach apps once the chord ends"
         );
         assert!(deferred.is_empty());
+    }
+
+    /// A sweep only knows what the probes tell it, and a probe that never
+    /// opened — a keyboard whose udev ACL landed after the reader's own open —
+    /// tells it nothing. Treating that silence as "the kernel says every key is
+    /// up" would have the repair mechanism release keys the user is holding,
+    /// which is the failure it exists to prevent. Without kernel truth the
+    /// sweep must do nothing.
+    #[test]
+    fn a_sweep_without_kernel_truth_releases_nothing() {
+        let mut fwd = Forwarder::new(Recorder::default());
+        let mut state = ctrl_space_state();
+        let mut consumed = PressedCodes::default();
+
+        let shift = KeyCode::KEY_LEFTSHIFT;
+        fwd.forward(ev(shift, true));
+        fwd.sink.events.clear();
+
+        // One watched keyboard, no probe handle for it.
+        let probes = Probes {
+            handles: &[],
+            watched: 1,
+        };
+        sweep(
+            &mut fwd,
+            &mut state,
+            &mut consumed,
+            probes,
+            ActivationMode::Hold,
+        );
+
+        assert!(
+            fwd.is_down(shift),
+            "a held key was released on a sweep with no kernel truth: {:?}",
+            fwd.sink.events
+        );
+        assert!(fwd.sink.events.is_empty(), "{:?}", fwd.sink.events);
     }
 
     /// A gaming mouse's keyboard interface has a full keyboard key map and no
