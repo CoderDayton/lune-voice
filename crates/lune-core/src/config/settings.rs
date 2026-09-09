@@ -377,8 +377,8 @@ impl Default for UserSettings {
 /// This is the single source of truth tying a user-facing selection to its
 /// on-disk directory, its HuggingFace filename, and its display name; both the
 /// downloader (`lune-persist`) and the backend loader (`lune-asr`) read it so
-/// the mapping never drifts. All three are the multilingual q8_0 quantizations
-/// from `ggerganov/whisper.cpp`.
+/// the mapping never drifts. All three are multilingual quantizations from
+/// `ggerganov/whisper.cpp`: q5 for Small and Medium, q8_0 for Large v3 Turbo.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[non_exhaustive]
 pub enum WhisperModel {
@@ -666,14 +666,6 @@ impl DevicePolicy {
             Self::Cuda => true,
             Self::Auto => cuda_available,
         }
-    }
-
-    /// True when the user explicitly chose CUDA. ORT EP registration should
-    /// fail loudly in this case instead of silently falling back to CPU —
-    /// the surrounding code is expected to forward this to
-    /// `ep::CUDA::default().build().error_on_failure()`.
-    pub fn strict_cuda(self) -> bool {
-        matches!(self, Self::Cuda)
     }
 }
 

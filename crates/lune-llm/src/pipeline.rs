@@ -75,10 +75,7 @@ impl TextPostProcessor for StylePipeline {
             }
             Err(e) => tracing::warn!(error = %e, "styling pass failed, keeping seeded text"),
         }
-        Ok(PostProcessOutput {
-            cleaned_text: text,
-            metadata: None,
-        })
+        Ok(PostProcessOutput { cleaned_text: text })
     }
 }
 
@@ -250,7 +247,6 @@ mod tests {
         let input = PostProcessInput {
             raw_text: "raw text".into(),
             style_preset: Arc::new(StylePreset::casual()),
-            app_category: None,
             dictionary: vec![],
             language: "en".into(),
         };
@@ -268,7 +264,6 @@ mod tests {
         let input = PostProcessInput {
             raw_text: "raw text".into(),
             style_preset: Arc::new(StylePreset::casual()),
-            app_category: None,
             dictionary: vec![],
             language: "en".into(),
         };
@@ -286,7 +281,6 @@ mod tests {
         let input = PostProcessInput {
             raw_text: "raw text".into(),
             style_preset: Arc::new(StylePreset::casual()),
-            app_category: None,
             dictionary: vec![],
             language: "en".into(),
         };
@@ -311,7 +305,6 @@ mod tests {
         let input = PostProcessInput {
             raw_text: "raw text".into(),
             style_preset: Arc::new(StylePreset::casual()),
-            app_category: None,
             dictionary: vec![],
             language: "en".into(),
         };

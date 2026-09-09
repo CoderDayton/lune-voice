@@ -216,7 +216,6 @@ fn run_llm(
     let input = PostProcessInput {
         raw_text: text.to_owned(),
         style_preset: Arc::clone(preset),
-        app_category: None,
         dictionary: vec![],
         language: lang.into(),
     };

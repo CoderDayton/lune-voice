@@ -12,16 +12,12 @@ pub struct WordConfidence {
     pub word_error_risk: f32,
     /// MEAN (not min) token confidence across the same tokens — the same
     /// mean-vs-min pairing [`AsrSegment::is_confident_gated`] uses at the
-    /// segment level (arXiv:2407.21414: a sentence-mean threshold plus a
-    /// min-token threshold catches one bad token dragging down an otherwise
-    /// confident span), here at word granularity. Lets a downstream consumer
-    /// corroborate a high `word_error_risk` (which is MIN-derived): if the
-    /// mean is comfortably confident while the min is risky, a single
-    /// outlier token (e.g. ASR gluing a punctuation token onto the word with
-    /// no surrounding whitespace) likely caused the dip, not the word's own
-    /// content. Defaults to `0.0` (maximally risky) for older
-    /// callers/fixtures that never set it, which safely degrades any
-    /// mean-vs-min comparison back to min-only behavior.
+    /// segment level, here at word granularity. It lets a consumer corroborate
+    /// a high `word_error_risk` (which is MIN-derived): a comfortably
+    /// confident mean next to a risky min means one outlier token caused the
+    /// dip, not the word's own content. Absent in serialized input it defaults
+    /// to `0.0` (maximally risky), which degrades any mean-vs-min comparison
+    /// back to min-only behavior.
     #[serde(default)]
     pub mean_confidence: f32,
 }
@@ -77,17 +73,6 @@ impl AsrSegment {
             && self
                 .min_token_confidence
                 .is_none_or(|m| m >= min_token_threshold)
-    }
-
-    /// Returns `true` when the segment's minimum token confidence falls
-    /// below `broken_threshold`, signalling that the audio was too degraded
-    /// for the LLM corrector to help — invoking it on broken transcripts
-    /// triggers the overcorrection failure mode (arXiv:2509.25048 Fig 3).
-    ///
-    /// Returns `false` when `min_token_confidence` is absent.
-    pub fn is_broken_for_llm(&self, broken_threshold: f32) -> bool {
-        self.min_token_confidence
-            .is_some_and(|m| m < broken_threshold)
     }
 
     /// Duration of the segment in milliseconds, if both timestamps are known.
@@ -262,13 +247,5 @@ mod tests {
         let mut seg = make_segment();
         seg.min_token_confidence = None; // backend doesn't expose per-token
         assert!(seg.is_confident_gated(0.90, 0.7));
-    }
-
-    #[test]
-    fn is_broken_for_llm_uses_min_token_confidence_when_present() {
-        let mut seg = make_segment();
-        seg.min_token_confidence = Some(0.20);
-        assert!(seg.is_broken_for_llm(0.30));
-        assert!(!seg.is_broken_for_llm(0.15));
     }
 }

@@ -12,8 +12,6 @@ use crate::dict::DictionaryEntry;
 pub struct PostProcessInput {
     pub raw_text: String,
     pub style_preset: Arc<StylePreset>,
-    /// Target application category hint.
-    pub app_category: Option<AppCategory>,
     pub dictionary: Vec<DictionaryEntry>,
     /// BCP-47 language code from ASR detection (e.g. "en", "eng", "fr").
     /// Defaults to "en" if not set by pipeline.
@@ -24,25 +22,6 @@ pub struct PostProcessInput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PostProcessOutput {
     pub cleaned_text: String,
-    pub metadata: Option<OutputMetadata>,
-}
-
-/// Hints about output formatting.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OutputMetadata {
-    pub has_bullets: bool,
-    pub has_headings: bool,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[non_exhaustive]
-pub enum AppCategory {
-    Email,
-    Ide,
-    Chat,
-    Notes,
-    Browser,
-    Terminal,
 }
 
 /// Simple completion service: system prompt + user message → response text.
@@ -84,12 +63,10 @@ mod tests {
         let input = PostProcessInput {
             raw_text: "hello um world".into(),
             style_preset: Arc::new(StylePreset::casual()),
-            app_category: Some(AppCategory::Email),
             dictionary: vec![],
             language: "en".into(),
         };
         assert_eq!(input.raw_text, "hello um world");
-        assert_eq!(input.app_category, Some(AppCategory::Email));
         assert_eq!(input.style_preset.id, "casual");
     }
 
@@ -97,14 +74,9 @@ mod tests {
     fn post_process_output_round_trip() {
         let output = PostProcessOutput {
             cleaned_text: "Hello, world.".into(),
-            metadata: Some(OutputMetadata {
-                has_bullets: false,
-                has_headings: false,
-            }),
         };
         let json = serde_json::to_string(&output).unwrap();
         let parsed: PostProcessOutput = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.cleaned_text, "Hello, world.");
-        assert!(!parsed.metadata.unwrap().has_bullets);
     }
 }

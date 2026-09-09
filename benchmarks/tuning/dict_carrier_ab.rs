@@ -137,7 +137,7 @@ fn main() {
 
     let dict = dictionary();
     let carriers = carriers(&dict);
-    let system = BASE_SYSTEM_PROMPT.replace("{lang}", "English");
+    let system = BASE_SYSTEM_PROMPT.to_owned();
     let cases = cases();
 
     println!();

@@ -21,7 +21,6 @@ impl TextPostProcessor for NullPostProcessor {
     async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput> {
         Ok(PostProcessOutput {
             cleaned_text: input.raw_text.clone(),
-            metadata: None,
         })
     }
 }
@@ -45,7 +44,6 @@ mod tests {
         let input = PostProcessInput {
             raw_text: "hello world".into(),
             style_preset: Arc::new(StylePreset::casual()),
-            app_category: None,
             dictionary: vec![],
             language: "en".into(),
         };

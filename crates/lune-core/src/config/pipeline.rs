@@ -70,8 +70,8 @@ pub struct PipelineConfig {
     /// OpenAI-compatible).
     pub word_confidence_threshold: Option<f32>,
 
-    /// Skip-when-clean LLM bypass threshold (HWCE confidence scale,
-    /// `1 − word_error_risk`).
+    /// Skip-when-clean LLM bypass threshold, on the per-word confidence scale
+    /// (`1 − word_error_risk`).
     ///
     /// The LLM correction pass enters its "attention band" when at least TWO
     /// words in a segment fall below this confidence, protecting clean segments
@@ -80,17 +80,16 @@ pub struct PipelineConfig {
     /// rare word (a proper noun or brand), not an error the text-only corrector
     /// could fix — so one dipping word no longer escalates; two do.
     ///
-    /// The scale is HWCE's sigmoid output: a perfectly confident word floors
-    /// at risk ≈ 0.226 (confidence ≈ 0.774), so thresholds near 1.0 can never
-    /// bypass. Default `Some(0.40)` — empirically the point that matched oracle
-    /// routing on the domain corpus (benchmarks/tuning/gate_sweep.rs).
+    /// Default `Some(0.40)` — the point that matched oracle routing on the
+    /// domain corpus.
     ///
     /// `None` disables the band gate — the LLM then runs only for unresolved
     /// words or ambiguous punctuation.
     #[serde(default)]
     pub llm_skip_threshold: Option<f32>,
 
-    /// Skip-when-broken LLM bypass threshold (HWCE confidence scale).
+    /// Skip-when-broken LLM bypass threshold, on the same per-word confidence
+    /// scale.
     ///
     /// Lower bound of `llm_skip_threshold`, evaluated on the SEGMENT-AVERAGE
     /// confidence: when the mean word confidence falls below this value, the

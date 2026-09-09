@@ -82,7 +82,7 @@ mod tests {
 
     #[test]
     fn model_not_found_renders_path() {
-        let err = Error::model_not_found("/tmp/missing.onnx");
-        assert!(err.to_string().contains("/tmp/missing.onnx"));
+        let err = Error::model_not_found("/tmp/missing.bin");
+        assert!(err.to_string().contains("/tmp/missing.bin"));
     }
 }

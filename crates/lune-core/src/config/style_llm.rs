@@ -8,11 +8,9 @@ pub type StyleId = String;
 /// System prompt for the ASR correction pass.
 ///
 /// Language-agnostic: the policy is "smallest edits to a natural written form
-/// in the same language as the input." The `{lang}` placeholder used by older
-/// versions has been removed because the value piped through from the ASR was
-/// inconsistent (sometimes a BCP-47 code, sometimes a full English language
-/// name), which produced ungrammatical headers and a strong English bias.
-/// Existing `.replace("{lang}", ..)` call sites become no-ops and remain safe.
+/// in the same language as the input." The prompt carries no language
+/// placeholder — the tag the ASR reports is not reliably a BCP-47 code, and
+/// naming it in the prompt biased the rewrite toward English.
 pub const BASE_SYSTEM_PROMPT: &str = "\
 You are an ASR transcript corrector.\n\
 Output only the corrected transcript, in the same language as the input. \
@@ -149,18 +147,17 @@ pub fn builtin_registry() -> &'static StyleRegistry {
 }
 
 impl StylePreset {
-    /// Backward-compat shim: returns all builtin presets as a static slice of Arcs.
+    /// All builtin presets, as a static slice of `Arc`s.
     pub fn all_builtin() -> &'static [Arc<StylePreset>] {
         builtin_registry().all()
     }
 
     /// Build the `(system, user)` prompt pair for the styling pass.
     ///
-    /// Format matches the fine-tune training schema: the style **instruction and
-    /// rules go in the system role**, the **transcript alone in the user role**,
-    /// and the model's rewrite is the assistant turn (loss is masked there at
-    /// train time). Keeping the transcript isolated in the user turn is what
-    /// makes train == inference.
+    /// The style instruction and rules go in the system role, the transcript
+    /// alone in the user role. Keeping the transcript isolated from the
+    /// instructions is what stops a dictated sentence from being read as a
+    /// directive.
     pub fn build_styling_prompt(&self, corrected_text: &str) -> (String, String) {
         use std::fmt::Write;
         let mut system = String::with_capacity(512);

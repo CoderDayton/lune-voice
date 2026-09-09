@@ -44,7 +44,6 @@ impl TextPostProcessor for EchoPostProcessor {
     async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput> {
         Ok(PostProcessOutput {
             cleaned_text: input.raw_text.clone(),
-            metadata: None,
         })
     }
 }

@@ -1080,7 +1080,6 @@ async fn style_with_llm(
     let input = lune_core::llm::PostProcessInput {
         raw_text: text.clone(),
         style_preset: Arc::clone(style_preset),
-        app_category: None,
         dictionary,
         language: language.into(),
     };
@@ -1535,7 +1534,6 @@ mod tests {
         async fn transform(&self, input: &PostProcessInput) -> Result<PostProcessOutput> {
             Ok(PostProcessOutput {
                 cleaned_text: input.raw_text.clone(),
-                metadata: None,
             })
         }
     }
@@ -1552,7 +1550,6 @@ mod tests {
             self.release.notified().await;
             Ok(PostProcessOutput {
                 cleaned_text: input.raw_text.clone(),
-                metadata: None,
             })
         }
     }

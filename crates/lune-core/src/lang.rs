@@ -1,17 +1,16 @@
 //! Language-tag normalization shared across the pipeline.
 //!
-//! The runtime mixes BCP-47 codes (`en`, `en-US`) and the English language
-//! names emitted by Qwen3-ASR's language head (`English`, `Dutch`). Anything
-//! that surfaces the language to a user prompt, log, or event should run it
-//! through [`display_name`] so the rest of the code sees a single canonical
-//! form.
+//! The runtime mixes BCP-47 codes (`en`, `en-US`) with full English language
+//! names (`English`, `Dutch`). Anything that surfaces the language to a user
+//! prompt, log, or event should run it through [`display_name`] so the rest of
+//! the code sees a single canonical form.
 
 /// Convert a language hint to its English display name (e.g. `"English"`).
 ///
-/// Accepts BCP-47 codes (`"en"`, `"en-US"`, `"en_GB"`) and the full English
-/// names emitted by Qwen3-ASR. Returns `None` for empty input, `"auto"`, or
-/// any tag we don't have a label for, so callers can drop the language tag
-/// rather than emit ungrammatical text like "the following en transcript".
+/// Accepts BCP-47 codes (`"en"`, `"en-US"`, `"en_GB"`) and full English
+/// language names. Returns `None` for empty input, `"auto"`, or any tag we
+/// don't have a label for, so callers can drop the language tag rather than
+/// emit ungrammatical text like "the following en transcript".
 pub fn display_name(raw: &str) -> Option<&'static str> {
     let lang = raw.trim();
     if lang.is_empty() || lang.eq_ignore_ascii_case("auto") {
@@ -20,7 +19,7 @@ pub fn display_name(raw: &str) -> Option<&'static str> {
     let primary = lang.split(['-', '_']).next().unwrap_or(lang);
     // `(alias, display name)` pairs matched case-insensitively, so the primary
     // subtag never has to be lowercased into a heap `String`. One table is the
-    // canonical mapping for both BCP-47 codes and Qwen3-ASR's English names.
+    // canonical mapping for both BCP-47 codes and English language names.
     const TABLE: &[(&str, &str)] = &[
         ("en", "English"),
         ("english", "English"),
@@ -68,16 +67,6 @@ pub fn display_name(raw: &str) -> Option<&'static str> {
         .map(|(_, name)| *name)
 }
 
-/// Same as [`display_name`] but returns the original input verbatim when no
-/// label is known. Useful at boundaries where we'd rather propagate the raw
-/// tag than discard it (logs, telemetry, fallback paths).
-pub fn display_name_or_raw(raw: &str) -> &str {
-    match display_name(raw) {
-        Some(name) => name,
-        None => raw,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -104,12 +93,5 @@ mod tests {
         assert_eq!(display_name("auto"), None);
         assert_eq!(display_name("AUTO"), None);
         assert_eq!(display_name("klingon"), None);
-    }
-
-    #[test]
-    fn or_raw_falls_back() {
-        assert_eq!(display_name_or_raw("en"), "English");
-        assert_eq!(display_name_or_raw("klingon"), "klingon");
-        assert_eq!(display_name_or_raw("auto"), "auto");
     }
 }

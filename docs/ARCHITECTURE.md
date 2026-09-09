@@ -44,7 +44,7 @@ Backend selection is centralized through registries and DTO mappers. The desktop
 ## Crate Dependency Graph
 
 ```
-lune-core (types, config, errors, hwce confidence)
+lune-core (types, config, errors)
 ├─ lune-audio (mic, resample, ringbuf, vad, pcen)
 ├─ lune-asr (whisper.cpp, openai remote, registry)
 ├─ lune-llm (openai remote, null passthrough, style pipeline, prompt, few-shot)
@@ -149,7 +149,6 @@ The session calls `StylePipeline::transform()` for LLM post-processing.
 | `raw_text` | ASR transcript after dictionary substitution |
 | `dictionary` | Entries for the pre-LLM seed substitution; never sent to the model |
 | `style_preset` | Output style contract |
-| `app_category` | Focused-application hint |
 | `language` | BCP-47 code from ASR detection, `"en"` when unset |
 
 `StylePipeline` runs two steps:
@@ -353,7 +352,7 @@ does no allocation and takes no locks.
 
 lune-audio (cpal)
   |
-  | AudioFrame over mpsc (PCM, 16 kHz mono f32, post-AGC)
+  | AudioChunk polled via AudioPull::try_next_chunk (PCM, 16 kHz mono f32, post-AGC)
   v
 Session task (capture.rs)
   |
