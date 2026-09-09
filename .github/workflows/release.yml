@@ -43,7 +43,7 @@ jobs:
     name: Verify version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Tag matches tauri.conf.json / Cargo.toml / package.json
         run: |
@@ -83,7 +83,7 @@ jobs:
       # older user hardware.
       RUSTFLAGS: "-C target-cpu=x86-64-v3"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -191,7 +191,7 @@ jobs:
       # built for the runner's CPU and faults on older user hardware.
       RUSTFLAGS: "-C target-cpu=x86-64-v3"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: dtolnay/rust-toolchain@stable
 
