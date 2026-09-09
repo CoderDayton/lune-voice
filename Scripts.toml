@@ -60,6 +60,30 @@ info = "Type-check all crates"
 command = "cargo clippy --workspace -- -D warnings"
 info = "Lint with clippy (deny warnings)"
 
+# Every crate under `crates/` type-checked for Windows from this Linux box, so
+# the `cfg(target_os = "windows")` halves of the platform split cannot rot
+# between pushes. `lune-ui` is absent on purpose: `tauri-winres` needs a MinGW
+# `windres`, so CI on `windows-latest` is what covers the Tauri crate.
+#
+# Check only, never build: the C toolchain comes from `zig cc` via
+# `.cargo/config.toml`, and linking would additionally need MinGW's `dlltool`.
+[scripts.check-windows]
+interpreter = "bash"
+command = '''
+if ! command -v zig >/dev/null 2>&1; then
+  echo "zig not found — install it (the C cross-compiler for this check)"; exit 1
+fi
+if ! rustup target list --installed | grep -qx x86_64-pc-windows-gnu; then
+  echo "adding the x86_64-pc-windows-gnu rust target"
+  rustup target add x86_64-pc-windows-gnu
+fi
+cargo check --target x86_64-pc-windows-gnu --all-targets \
+  -p lune-core -p lune-audio -p lune-asr -p lune-llm \
+  -p lune-dict -p lune-persist -p lune-voice
+'''
+info = "Cross-check every crate under crates/ for Windows (needs zig)"
+requires = ["zig", "rustup"]
+
 [scripts.fmt]
 interpreter = "bash"
 command = '''

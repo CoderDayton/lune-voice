@@ -6,3 +6,17 @@
 # SIGILLs on any CPU older than the build host. `cgs dev` and the native branch
 # of `cgs build` export `RUSTFLAGS=-C target-cpu=native` for themselves; the
 # PORTABLE branch exports the `x86-64-v3` baseline instead.
+
+# C toolchain for the Windows cross-check (`cgs check-windows`), so the crates
+# under `crates/` can be type-checked for Windows from a Linux box. `zig cc`
+# stands in for MinGW; the shims translate the target triple cc-rs passes.
+# Read only when `--target x86_64-pc-windows-gnu` is in play, and overridable
+# from the environment, so a machine with a real MinGW toolchain can use it.
+#
+# `cargo check` only. Linking that target additionally needs
+# `x86_64-w64-mingw32-dlltool`, which zig does not provide, so no `linker` is
+# configured here — building a Windows binary is CI's job (`windows-latest`).
+[env]
+CC_x86_64_pc_windows_gnu = { value = "scripts/dev/zig-cc-windows.sh", relative = true, force = false }
+CXX_x86_64_pc_windows_gnu = { value = "scripts/dev/zig-cc-windows.sh", relative = true, force = false }
+AR_x86_64_pc_windows_gnu = { value = "scripts/dev/zig-ar-windows.sh", relative = true, force = false }
