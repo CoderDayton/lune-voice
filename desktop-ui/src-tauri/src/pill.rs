@@ -12,6 +12,11 @@ use lune_core::config::{
 };
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicI32, Ordering};
+// `emit_to` lives on this trait. Only the webview pill emits — the native
+// Linux pill takes its state by direct call — so importing it there would be
+// an unused import.
+#[cfg(not(target_os = "linux"))]
+use tauri::Emitter;
 use tauri::{AppHandle, Manager, WebviewWindow};
 
 use crate::commands::require_window_access;
