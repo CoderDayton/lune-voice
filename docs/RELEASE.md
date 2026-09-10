@@ -138,13 +138,18 @@ bun tauri build --features "whisper-cuda"    # CUDA (needs CUDA Toolkit)
 Tauri produces the `.msi`/`.exe` (NSIS) installers configured in
 `desktop-ui/src-tauri/tauri.conf.json`.
 
-From a Linux box, `cgs check-windows` type-checks every crate under `crates/`
-for `x86_64-pc-windows-gnu`, so the `cfg(target_os = "windows")` halves of the
-platform split cannot rot between pushes. It needs `zig` (wired in as the C
-cross-compiler by `.cargo/config.toml`) and is **check-only** — linking would
-also need MinGW's `dlltool`. `lune-ui` is left out on purpose: `tauri-winres`
-wants a MinGW `windres`, so the CI job on `windows-latest` is what covers the
-Tauri crate.
+From a Linux box, `cgs check-windows` type-checks the whole workspace —
+`lune-ui` included — for `x86_64-pc-windows-gnu`, so the
+`cfg(target_os = "windows")` halves of the platform split cannot rot between
+pushes. It needs two things, both wired in by `.cargo/config.toml`: `zig` as the
+C cross-compiler, and `binutils-mingw-w64-x86-64` for
+`x86_64-w64-mingw32-windres`, which compiles `lune-ui`'s icon and manifest
+resource with `zig cc` as its preprocessor. `lune-ui`'s build script reads
+`desktop-ui/dist`, so build the frontend once on a fresh clone.
+
+It is **check-only** — linking `x86_64-pc-windows-gnu` also needs a MinGW `gcc`
+as the linker driver, so producing an actual Windows binary stays the CI job on
+`windows-latest`.
 
 ### Linux bundles
 

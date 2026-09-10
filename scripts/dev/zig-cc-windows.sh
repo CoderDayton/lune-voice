@@ -41,4 +41,8 @@ if [ "$first" -eq 1 ]; then
     set --
 fi
 
-exec zig cc -target x86_64-windows-gnu "$@"
+# `zig cc` promotes `-Wdate-time` to an error for reproducible builds. mimalloc
+# stamps `__DATE__` into its version banner, so the allocator `lune-ui` pulls in
+# will not compile without demoting it. Placed before `"$@"` so a caller's own
+# warning flags still win.
+exec zig cc -target x86_64-windows-gnu -Wno-error=date-time "$@"
