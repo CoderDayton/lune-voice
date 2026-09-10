@@ -83,6 +83,7 @@ impl HotkeyAction {
 /// Handing the listener thread a bare `Sender` left `blocking_send` one edit
 /// away, and that call is what turns a slow runtime into a system-wide
 /// keyboard freeze. This type exposes no blocking operation to reach for.
+#[derive(Clone)]
 pub struct HotkeySink {
     tx: mpsc::Sender<HotkeyAction>,
     deferred_stop: Arc<AtomicU8>,
@@ -224,6 +225,92 @@ pub fn start(
     }
 }
 
+// ─── Controller ──────────────────────────────────────────────────────────────
+
+/// The toggle-only `tauri-plugin-global-shortcut` binding, seen from here.
+///
+/// Implemented over the app handle in `lib.rs`. It exists as a trait so the
+/// controller can retire the plugin the moment a native listener takes over —
+/// leaving both bound means one keypress fires two toggles.
+pub trait PluginHotkeys: Send + Sync + 'static {
+    /// Bind toggle and cancel, replacing whatever pair was bound before.
+    fn rebind(&self, config: &HotkeyConfig) -> Result<(), String>;
+
+    /// Unbind everything this app registered with the plugin.
+    fn clear(&self);
+}
+
+type Starter = Box<
+    dyn Fn(&HotkeyConfig, ActivationMode, HotkeySink) -> Option<Arc<dyn HotkeyBackend>>
+        + Send
+        + Sync,
+>;
+
+/// Whichever hotkey listener is live, and the way back to a working one.
+///
+/// A native backend is not guaranteed to exist at startup: `start` also returns
+/// `None` when the configured key name does not resolve, which leaves the
+/// plugin holding a binding the user is about to repair. So `update` is not a
+/// simple delegation — it starts the native listener late when one becomes
+/// startable, and otherwise re-registers the plugin. Without that, a binding
+/// fixed in the UI would not take effect until the next launch.
+pub struct HotkeyController {
+    state: std::sync::Mutex<ControllerState>,
+    plugin: Box<dyn PluginHotkeys>,
+    starter: Starter,
+}
+
+struct ControllerState {
+    native: Option<Arc<dyn HotkeyBackend>>,
+    /// Kept for a late start. Holding a clone also keeps the intent channel
+    /// open, so the consumer task survives a startup with no native listener.
+    sink: HotkeySink,
+}
+
+impl HotkeyController {
+    pub fn new(
+        native: Option<Arc<dyn HotkeyBackend>>,
+        sink: HotkeySink,
+        plugin: Box<dyn PluginHotkeys>,
+    ) -> Self {
+        Self::with_starter(native, sink, plugin, Box::new(start))
+    }
+
+    fn with_starter(
+        native: Option<Arc<dyn HotkeyBackend>>,
+        sink: HotkeySink,
+        plugin: Box<dyn PluginHotkeys>,
+        starter: Starter,
+    ) -> Self {
+        Self {
+            state: std::sync::Mutex::new(ControllerState { native, sink }),
+            plugin,
+            starter,
+        }
+    }
+
+    /// Apply a new binding and activation mode to whatever is listening.
+    pub fn update(&self, config: &HotkeyConfig, mode: ActivationMode) -> Result<(), String> {
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+
+        if let Some(native) = state.native.as_ref() {
+            return native.update(config, mode);
+        }
+
+        if let Some(backend) = (self.starter)(config, mode, state.sink.clone()) {
+            info!(
+                backend = backend.name(),
+                "native hotkey listener started from a settings save"
+            );
+            self.plugin.clear();
+            state.native = Some(backend);
+            return Ok(());
+        }
+
+        self.plugin.rebind(config)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -323,5 +410,163 @@ mod tests {
         drop(sink);
         assert!(matches!(intents.recv().await, Some(HotkeyAction::Start)));
         assert!(intents.recv().await.is_none());
+    }
+
+    // ── Controller ──────────────────────────────────────────────────────────
+
+    use std::sync::atomic::AtomicUsize;
+
+    fn combo(key: &str) -> lune_core::config::KeyCombo {
+        lune_core::config::KeyCombo {
+            key: key.to_string(),
+            modifiers: Vec::new(),
+        }
+    }
+
+    fn config(key: &str) -> HotkeyConfig {
+        HotkeyConfig {
+            toggle_dictation: combo(key),
+            cancel_dictation: combo("escape"),
+        }
+    }
+
+    #[derive(Default)]
+    struct FakeBackend {
+        updates: AtomicUsize,
+        reject: bool,
+    }
+
+    impl HotkeyBackend for FakeBackend {
+        fn update(&self, _config: &HotkeyConfig, _mode: ActivationMode) -> Result<(), String> {
+            self.updates.fetch_add(1, Ordering::SeqCst);
+            if self.reject {
+                return Err("unknown key".into());
+            }
+            Ok(())
+        }
+        fn name(&self) -> &'static str {
+            "fake"
+        }
+    }
+
+    #[derive(Default)]
+    struct FakePlugin {
+        rebinds: AtomicUsize,
+        clears: AtomicUsize,
+    }
+
+    impl PluginHotkeys for Arc<FakePlugin> {
+        fn rebind(&self, _config: &HotkeyConfig) -> Result<(), String> {
+            self.rebinds.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }
+        fn clear(&self) {
+            self.clears.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    /// Number of times the injected starter was asked to start a listener.
+    type Starts = Arc<AtomicUsize>;
+
+    fn controller(
+        native: Option<Arc<dyn HotkeyBackend>>,
+        started_by_retry: Option<Arc<dyn HotkeyBackend>>,
+    ) -> (HotkeyController, Arc<FakePlugin>, Starts) {
+        let (sink, _intents) = intent_channel();
+        // The receiver is dropped here; nothing in these tests reads intents,
+        // and the controller never sends.
+        let plugin = Arc::new(FakePlugin::default());
+        let starts: Starts = Arc::new(AtomicUsize::new(0));
+        let seen = Arc::clone(&starts);
+        let controller = HotkeyController::with_starter(
+            native,
+            sink,
+            Box::new(Arc::clone(&plugin)),
+            Box::new(move |_c, _m, _s| {
+                seen.fetch_add(1, Ordering::SeqCst);
+                started_by_retry.clone()
+            }),
+        );
+        (controller, plugin, starts)
+    }
+
+    #[test]
+    fn a_live_native_listener_is_retargeted_in_place() {
+        let backend = Arc::new(FakeBackend::default());
+        let (controller, plugin, starts) = controller(Some(backend.clone()), None);
+
+        assert!(
+            controller
+                .update(&config("f9"), ActivationMode::Toggle)
+                .is_ok()
+        );
+        assert_eq!(backend.updates.load(Ordering::SeqCst), 1);
+        assert_eq!(starts.load(Ordering::SeqCst), 0, "no restart was needed");
+        assert_eq!(plugin.rebinds.load(Ordering::SeqCst), 0);
+    }
+
+    /// The repair path: a key name that did not resolve at startup left the
+    /// plugin in charge, and the user has just fixed it in the UI.
+    #[test]
+    fn a_repaired_binding_starts_the_native_listener_and_retires_the_plugin() {
+        let started = Arc::new(FakeBackend::default());
+        let (controller, plugin, starts) = controller(None, Some(started.clone()));
+
+        assert!(
+            controller
+                .update(&config("f9"), ActivationMode::Hold)
+                .is_ok()
+        );
+        assert_eq!(starts.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            plugin.clears.load(Ordering::SeqCst),
+            1,
+            "the plugin binding must go, or both fire on one press"
+        );
+        assert_eq!(plugin.rebinds.load(Ordering::SeqCst), 0);
+
+        // Now adopted: a second save re-targets it rather than starting again.
+        assert!(
+            controller
+                .update(&config("f10"), ActivationMode::Hold)
+                .is_ok()
+        );
+        assert_eq!(starts.load(Ordering::SeqCst), 1);
+        assert_eq!(started.updates.load(Ordering::SeqCst), 1);
+    }
+
+    /// No native backend on this platform, or the new binding is broken too:
+    /// the plugin must still pick up the change instead of staying stale.
+    #[test]
+    fn without_a_native_listener_the_plugin_binding_is_re_registered() {
+        let (controller, plugin, starts) = controller(None, None);
+
+        assert!(
+            controller
+                .update(&config("f9"), ActivationMode::Toggle)
+                .is_ok()
+        );
+        assert_eq!(starts.load(Ordering::SeqCst), 1);
+        assert_eq!(plugin.rebinds.load(Ordering::SeqCst), 1);
+        assert_eq!(plugin.clears.load(Ordering::SeqCst), 0);
+    }
+
+    /// A backend that refuses the new binding keeps the old one, and the
+    /// rejection has to reach the caller rather than being papered over with a
+    /// plugin registration on top of a live native listener.
+    #[test]
+    fn a_rejected_binding_surfaces_and_does_not_fall_back() {
+        let backend = Arc::new(FakeBackend {
+            updates: AtomicUsize::new(0),
+            reject: true,
+        });
+        let (controller, plugin, _) = controller(Some(backend.clone()), None);
+
+        assert!(
+            controller
+                .update(&config("nonsense"), ActivationMode::Toggle)
+                .is_err()
+        );
+        assert_eq!(plugin.rebinds.load(Ordering::SeqCst), 0);
     }
 }

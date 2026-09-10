@@ -477,21 +477,34 @@ fn spawn_hotkeys(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         "starting global hotkey listener"
     );
 
-    let Some(backend) = hotkey::start(&settings.hotkey, settings.activation_mode, sink) else {
-        // Either this platform has no native backend, or the configured key
-        // name did not resolve. Neither is fatal: an app that refuses to start
-        // because a hotkey is misspelled leaves the user no way in to fix it.
-        tracing::info!("no native hotkey backend; using the global-shortcut plugin");
-        if let Err(e) = register_hotkeys_with(app, &settings) {
-            tracing::warn!(error = %e, "global shortcut registration failed; hotkeys are off");
+    let native = hotkey::start(&settings.hotkey, settings.activation_mode, sink.clone());
+    match &native {
+        Some(backend) => {
+            tracing::info!(backend = backend.name(), "native hotkey listener started")
         }
-        return Ok(());
-    };
-    tracing::info!(backend = backend.name(), "native hotkey listener started");
+        None => {
+            // Either this platform has no native backend, or the configured key
+            // name did not resolve. Neither is fatal: an app that refuses to
+            // start because a hotkey is misspelled leaves the user no way in to
+            // fix it, and the controller retries the native start on the next
+            // settings save.
+            tracing::info!("no native hotkey backend; using the global-shortcut plugin");
+            if let Err(e) = register_hotkeys_with(app.handle(), &settings.hotkey) {
+                tracing::warn!(error = %e, "global shortcut registration failed; hotkeys are off");
+            }
+        }
+    }
 
     // Managed so a settings save can hot-reload the binding, the modifiers and
-    // the activation mode without restarting the listener.
-    app.manage(std::sync::Arc::clone(&backend));
+    // the activation mode without restarting the app — whichever listener is
+    // live, and even when none is yet.
+    app.manage(std::sync::Arc::new(hotkey::HotkeyController::new(
+        native,
+        sink,
+        Box::new(PluginShortcuts {
+            app: app.handle().clone(),
+        }),
+    )));
 
     let rt = app.state::<runtime::AppRuntime>().inner().clone();
     tauri::async_runtime::spawn(async move {
@@ -529,16 +542,36 @@ async fn dispatch_hotkey(rt: &runtime::AppRuntime, action: hotkey::HotkeyAction)
     }
 }
 
+/// The global-shortcut plugin as the hotkey controller sees it.
+struct PluginShortcuts {
+    app: tauri::AppHandle,
+}
+
+impl hotkey::PluginHotkeys for PluginShortcuts {
+    fn rebind(&self, config: &lune_core::config::HotkeyConfig) -> Result<(), String> {
+        register_hotkeys_with(&self.app, config).map_err(|e| e.to_string())
+    }
+
+    fn clear(&self) {
+        if let Err(e) = self.app.global_shortcut().unregister_all() {
+            tracing::warn!(error = %e, "could not release the global-shortcut hotkeys");
+        }
+    }
+}
+
 /// Toggle-only fallback for platforms with no native backend.
 ///
 /// The plugin reports a single "activated" callback with no matching release,
 /// so `ActivationMode::Hold` cannot be honoured here and is not attempted.
+///
+/// Both combos are parsed before anything is unbound, so a rejected binding
+/// leaves the previous pair working rather than nothing at all.
 fn register_hotkeys_with(
-    app: &tauri::App,
-    settings: &lune_core::config::UserSettings,
+    app: &tauri::AppHandle,
+    config: &lune_core::config::HotkeyConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let toggle_str = format_hotkey(&settings.hotkey.toggle_dictation);
-    let cancel_str = format_hotkey(&settings.hotkey.cancel_dictation);
+    let toggle_str = format_hotkey(&config.toggle_dictation);
+    let cancel_str = format_hotkey(&config.cancel_dictation);
 
     let toggle: Shortcut = toggle_str
         .parse()
@@ -546,6 +579,10 @@ fn register_hotkeys_with(
     let cancel: Shortcut = cancel_str
         .parse()
         .map_err(|e| format!("parse cancel hotkey: {e}"))?;
+
+    // The plugin rejects a shortcut that is already registered, so a rebind has
+    // to drop the previous pair first. Nothing else in this app registers one.
+    app.global_shortcut().unregister_all()?;
 
     app.global_shortcut()
         .on_shortcut(toggle, move |app, _shortcut, event| {

@@ -180,9 +180,11 @@ pub async fn save_workspace_settings(
     })
     .await?;
     runtime.mark_settings_changed().await;
-    // Hot-reload the evdev hotkey listener — trigger key, modifiers, cancel
-    // key, and activation mode all apply immediately, no restart required.
-    #[cfg(target_os = "linux")]
+    // Hot-reload the hotkey listener — trigger key, modifiers, cancel key, and
+    // activation mode all apply immediately, no restart required. The
+    // controller covers every case: a live native backend re-targets in place,
+    // and a startup with no native listener (unresolvable key name) retries the
+    // start here, so a binding repaired in the UI takes effect at once.
     {
         use tauri::Manager;
         if let Some(paths) = lune_persist::AppPaths::resolve() {
@@ -198,7 +200,7 @@ pub async fn save_workspace_settings(
                 Ok(s) => {
                     if let Some(live) = runtime
                         .app_handle()
-                        .try_state::<std::sync::Arc<dyn crate::hotkey::HotkeyBackend>>()
+                        .try_state::<std::sync::Arc<crate::hotkey::HotkeyController>>()
                     {
                         if let Err(e) = live.update(&s.hotkey, s.activation_mode) {
                             tracing::warn!(error = %e, "hotkey hot-reload rejected");
