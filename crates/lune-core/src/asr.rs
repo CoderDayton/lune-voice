@@ -10,9 +10,8 @@ pub struct WordConfidence {
     pub confidence: f32,
     #[serde(default)]
     pub word_error_risk: f32,
-    /// MEAN (not min) token confidence across the same tokens — the same
-    /// mean-vs-min pairing [`AsrSegment::is_confident_gated`] uses at the
-    /// segment level, here at word granularity. It lets a consumer corroborate
+    /// MEAN (not min) token confidence across the same tokens, the
+    /// counterpart to the MIN in `confidence`. It lets a consumer corroborate
     /// a high `word_error_risk` (which is MIN-derived): a comfortably
     /// confident mean next to a risky min means one outlier token caused the
     /// dip, not the word's own content. Absent in serialized input it defaults
@@ -60,21 +59,6 @@ impl AsrSegment {
         self.confidence.is_none_or(|c| c >= threshold)
     }
 
-    /// Two-level confidence gate: sentence-level mean AND min-token check.
-    /// Per arXiv:2407.21414, sentence threshold=0.95 + word threshold=0.7
-    /// catches segments where one bad token drags overall quality down.
-    ///
-    /// Both `mean_threshold` and `min_token_threshold` are compared against
-    /// calibrated `P(correct)` values once `SessionManager` has run the
-    /// isotonic calibrator — update tuned thresholds accordingly.
-    #[inline(always)]
-    pub fn is_confident_gated(&self, mean_threshold: f32, min_token_threshold: f32) -> bool {
-        self.is_confident(mean_threshold)
-            && self
-                .min_token_confidence
-                .is_none_or(|m| m >= min_token_threshold)
-    }
-
     /// Duration of the segment in milliseconds, if both timestamps are known.
     pub fn duration_ms(&self) -> Option<u64> {
         self.end_ms?.checked_sub(self.start_ms?)
@@ -85,20 +69,15 @@ impl AsrSegment {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AsrSessionConfig {
     pub sample_rate: u32,
-    pub frame_size: usize,
     /// BCP-47 tag or None for auto-detect.
     pub language: Option<String>,
-    /// Model name override for remote backends.
-    pub model_hint: Option<String>,
 }
 
 impl Default for AsrSessionConfig {
     fn default() -> Self {
         Self {
             sample_rate: 16_000,
-            frame_size: 480,
             language: None,
-            model_hint: None,
         }
     }
 }
@@ -108,21 +87,6 @@ impl Default for AsrSessionConfig {
 pub enum AsrBackendKind {
     OpenAiCompatible,
     WhisperCpp,
-}
-
-impl AsrBackendKind {
-    /// Short stable identifier used for per-backend filenames like
-    /// `calibrator_{slug}.json`. Must stay lowercase, ASCII, no spaces.
-    ///
-    /// These strings are part of the on-disk layout — renaming them will
-    /// orphan existing calibrator files. Add new variants rather than
-    /// changing existing slugs.
-    pub fn slug(&self) -> &'static str {
-        match self {
-            Self::OpenAiCompatible => "openai",
-            Self::WhisperCpp => "whispercpp",
-        }
-    }
 }
 
 /// Trait for ASR backend implementations.
@@ -189,7 +153,6 @@ mod tests {
     fn asr_session_config_defaults() {
         let config = AsrSessionConfig::default();
         assert_eq!(config.sample_rate, 16000);
-        assert_eq!(config.frame_size, 480);
         assert_eq!(config.language, None);
     }
 
@@ -226,26 +189,5 @@ mod tests {
         let mut seg = make_segment();
         seg.start_ms = None;
         assert_eq!(seg.duration_ms(), None);
-    }
-
-    #[test]
-    fn is_confident_gated_passes_both_thresholds() {
-        let seg = make_segment(); // confidence=0.95, min_token=0.80
-        assert!(seg.is_confident_gated(0.90, 0.7));
-    }
-
-    #[test]
-    fn is_confident_gated_fails_on_low_min_token() {
-        let mut seg = make_segment();
-        seg.confidence = Some(0.98); // mean is high
-        seg.min_token_confidence = Some(0.5); // but one token is bad
-        assert!(!seg.is_confident_gated(0.95, 0.7));
-    }
-
-    #[test]
-    fn is_confident_gated_none_min_token_passes() {
-        let mut seg = make_segment();
-        seg.min_token_confidence = None; // backend doesn't expose per-token
-        assert!(seg.is_confident_gated(0.90, 0.7));
     }
 }

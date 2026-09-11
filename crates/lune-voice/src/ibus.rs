@@ -517,9 +517,6 @@ impl IbusTyper {
         Ok(typer)
     }
 
-    /// Symmetry with `UinputTyper::warm_up`; the connection is already live.
-    pub fn warm_up(&self) {}
-
     /// Commit Unicode `text` into the focused input context. Infallible from the
     /// caller's view — logs and returns on any D-Bus error so one failed commit
     /// never poisons the connection.

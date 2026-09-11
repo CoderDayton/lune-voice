@@ -19,7 +19,6 @@ function makeBackendSettings() {
     devicePolicy: "Auto" as const,
     asrBackendType: "Qwen3Asr" as const,
     confidenceThreshold: 0.75,
-    llmSkipThreshold: 0.8,
     stylePreset: "professional",
     hotkeyToggle: "Ctrl+Space",
     hotkeyCancel: "Escape",
@@ -147,7 +146,6 @@ describe("workspace mappers", () => {
     expect(result.activationMode).toBe("Toggle");
     expect(result.asrBackend).toBe("Qwen3Asr");
     expect(result.confidenceThreshold).toBe("0.75");
-    expect(result.llmSkipThreshold).toBe("0.80");
     expect(result.pillVisibility).toBe("WhenDictating");
   });
 
@@ -194,15 +192,6 @@ describe("workspace mappers", () => {
     expect(result.confidenceThreshold).toBe("0.55");
   });
 
-  test("null llmSkipThreshold defaults to 0.40", () => {
-    const snapshot = {
-      settings: { ...makeBackendSettings(), llmSkipThreshold: null },
-    } as WorkspaceSnapshot;
-
-    const result = mapWorkspaceSettings(snapshot);
-    expect(result.llmSkipThreshold).toBe("0.40");
-  });
-
   // ── settingsToSaveInput ─────────────────────────────────────────────
 
   test("converts workspace settings to save input", () => {
@@ -211,14 +200,7 @@ describe("workspace mappers", () => {
 
     expect(input.activationMode).toBe("Toggle");
     expect(input.confidenceThreshold).toBe(0.55);
-    expect(input.llmSkipThreshold).toBe(0.4);
     expect(input.openaiAsrApiKey).toBeNull();
-  });
-
-  test("preserves llmSkipThreshold below confidenceThreshold on save", () => {
-    const settings = { ...DEFAULT_SETTINGS, confidenceThreshold: "0.75", llmSkipThreshold: "0.40" };
-    const input = settingsToSaveInput(settings);
-    expect(input.llmSkipThreshold).toBe(0.4);
   });
 
   test("does not send masked API key back to backend", () => {

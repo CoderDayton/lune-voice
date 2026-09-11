@@ -158,10 +158,8 @@ export interface BackendClient {
 export type SessionStreamEvent =
   | { type: 'serviceStatus'; status: string }
   | { type: 'sessionStarted'; sessionId: string }
-  | { type: 'partialText' }
   | { type: 'processing' }
   | { type: 'finalizedText'; text: string }
-  | { type: 'correctedText'; text: string }
   | { type: 'captureText'; text: string }
   | { type: 'audioLevel'; level: number }
   | { type: 'commandDetected'; payload: string }

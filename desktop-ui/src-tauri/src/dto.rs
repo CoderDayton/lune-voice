@@ -309,8 +309,6 @@ pub struct WorkspaceSettingsDto {
     pub device_policy: DevicePolicyDto,
     pub asr_backend_type: AsrBackendTypeDto,
     pub confidence_threshold: Option<f32>,
-    /// Clean-segment confidence bound for bypassing the correction LLM.
-    pub llm_skip_threshold: Option<f32>,
     pub style_preset: Option<String>,
     pub hotkey_toggle: String,
     pub hotkey_cancel: String,
@@ -571,8 +569,6 @@ pub struct SaveWorkspaceSettingsInput {
     pub device_policy: DevicePolicyDto,
     pub asr_backend_type: AsrBackendTypeDto,
     pub confidence_threshold: Option<f32>,
-    /// Clean-segment confidence bound for bypassing the correction LLM.
-    pub llm_skip_threshold: Option<f32>,
     pub style_preset: Option<String>,
     pub hotkey_toggle: String,
     pub hotkey_cancel: String,
@@ -699,12 +695,8 @@ pub enum SessionStreamEvent {
         #[serde(rename = "sessionId")]
         session_id: String,
     },
-    PartialText,
     Processing,
     FinalizedText {
-        text: String,
-    },
-    CorrectedText {
         text: String,
     },
     /// Raw transcript from a capture-only session (snippet trigger recorder).

@@ -168,10 +168,8 @@ The LLM backend (`OpenAiLlmBackend`) wraps an `async-openai` `Client` and makes 
 
 `delivery.rs` defines one `PlatformDriver` trait with a half per platform. `focus.rs` owns focused-window detection and terminal classification — the compositor probes live in `focus/unix.rs`, the Win32 `GetForegroundWindow` path in `focus/windows.rs` — and every external probe (compositor sockets, `wl-paste`, `swaymsg`, `xdotool`) runs through `probe.rs`, which time-bounds it and drains both child pipes for the whole wait so a chatty child is not killed mid-answer.
 
-The session emits two `SessionEvent` variants directly on the event channel:
-
-- `PartialText` — in-progress signal for live preview
-- `FinalizedText { session_id, text }` — styled text for delivery
+The session emits the delivery payload directly on the event channel as
+`FinalizedText { session_id, text }` — styled text for delivery.
 
 Delivery runs on a dedicated thread and picks a backend once at startup. On Linux there are two:
 
@@ -258,7 +256,7 @@ The desktop app does not scrape logs or poll for session state. It uses typed Ta
 | `uinput_access_ready` / `grant_uinput_access` / `uinput_rule_installed` / `remove_uinput_rule` | `main` | The `/dev/uinput` udev rule, asked for during setup rather than mid-dictation. `grant_uinput_access` returns `false` when the rule is installed but needs a reboot to take effect; `Err` means the install itself failed. Removal is offered only for a rule this app wrote (a .deb/.rpm ships its own) |
 | `export_transcript` | `main` | Write a session transcript to a file |
 | `app_version` / `start_update_check` / `update_state` / `install_pending_update` / `dismiss_update` | `main` | Version string and the in-app update flow. State is held in the backend, so an offer survives the window closing |
-| `initialize_pipeline` / `quit_app` | `main` | Runtime lifecycle |
+| `quit_app` | `main` | Runtime lifecycle |
 
 ### Session Stream
 

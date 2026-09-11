@@ -1,28 +1,20 @@
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
 
+/// The bundled vocabulary, compiled from `data/vocab/*.txt` by `build.rs`.
+///
+/// Words are stored both lowercased and in their source casing, so a lookup
+/// is an exact match against whichever form the caller holds.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SupplementalVocab {
-    pub categories: Vec<String>,
-    pub words: HashMap<String, u8>,
+    pub words: HashSet<String>,
 }
 
 impl SupplementalVocab {
     pub fn is_known(&self, word: &str) -> bool {
-        self.words.contains_key(word)
-    }
-
-    pub fn category_of(&self, word: &str) -> Option<&str> {
-        self.words
-            .get(word)
-            .and_then(|&id| self.categories.get(id as usize))
-            .map(|s| s.as_str())
-    }
-
-    pub fn category_count(&self) -> usize {
-        self.categories.len()
+        self.words.contains(word)
     }
 
     pub fn word_count(&self) -> usize {
@@ -34,8 +26,7 @@ static BUNDLED: LazyLock<SupplementalVocab> = LazyLock::new(|| {
     let bytes = include_bytes!(concat!(env!("OUT_DIR"), "/supplemental_vocab.bin"));
     if bytes.is_empty() {
         return SupplementalVocab {
-            categories: Vec::new(),
-            words: HashMap::new(),
+            words: HashSet::new(),
         };
     }
     let (vocab, _): (SupplementalVocab, usize) =
@@ -56,15 +47,13 @@ mod tests {
     fn bundled_vocab_loads() {
         let v = bundled();
         assert!(v.word_count() > 100);
-        assert!(v.category_count() >= 4);
     }
 
     #[test]
-    fn lookup_by_category() {
+    fn known_and_unknown_words() {
         let v = bundled();
         assert!(v.is_known("WebSocket") || v.is_known("websocket"));
         assert!(v.is_known("Roblox") || v.is_known("roblox"));
-        assert!(v.category_of("websocket").is_some());
         assert!(!v.is_known("xyznonexistent"));
     }
 }

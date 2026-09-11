@@ -22,9 +22,6 @@ audioadapter-buffers.workspace = true
 # Lock-free ring buffer
 crossbeam-channel = "0.5"
 
-# Voice activity detection (pure Rust)
-earshot = "1.1"
-
 # Error handling
 thiserror.workspace = true
 
@@ -32,3 +29,7 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
 tracing-subscriber.workspace = true
 hound.workspace = true
+# Per-frame speech probability, used by the `agc_bench` and `vad_inspect`
+# examples as a measuring probe. The shipped pipeline uses whisper's Silero
+# VAD, which reports segments rather than a per-frame score.
+earshot = "1.1"

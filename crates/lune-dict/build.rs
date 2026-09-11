@@ -1,18 +1,19 @@
 //! Compiles the supplemental vocabulary at build time.
 //!
-//! Each `data/vocab/*.txt` file is a category (one word per line; `#` comments
-//! and `a|b` alternate forms are supported). The compiled bincode blob is
+//! Each `data/vocab/*.txt` file is one category of words (one word per line;
+//! `#` comments and `a|b` alternate forms are supported). Categories are a
+//! source-file grouping only — they are not carried into the compiled set.
+//! The compiled bincode blob is
 //! written to `$OUT_DIR/supplemental_vocab.bin` and embedded by `vocab.rs` via
 //! `include_bytes!`. The `.txt` files are the single source of truth — there is
 //! no committed binary artifact to keep in sync.
 
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::path::Path;
 
 #[derive(serde::Serialize)]
 struct SupplementalVocab {
-    categories: Vec<String>,
-    words: HashMap<String, u8>,
+    words: HashSet<String>,
 }
 
 fn main() {
@@ -25,8 +26,7 @@ fn main() {
     println!("cargo:rerun-if-changed=data/vocab");
 
     let mut vocab = SupplementalVocab {
-        categories: Vec::new(),
-        words: HashMap::new(),
+        words: HashSet::new(),
     };
 
     let mut entries: Vec<_> = std::fs::read_dir(&data_dir)
@@ -39,10 +39,6 @@ fn main() {
     for entry in entries {
         let path = entry.path();
         println!("cargo:rerun-if-changed={}", path.display());
-        let category = path.file_stem().unwrap().to_string_lossy().to_string();
-        let cat_id = u8::try_from(vocab.categories.len()).expect("at most 256 vocab categories");
-        vocab.categories.push(category);
-
         let content = std::fs::read_to_string(&path).expect("read vocab file");
         for line in content.lines() {
             let line = line.trim();
@@ -51,12 +47,11 @@ fn main() {
             }
             for word in line.split('|').map(str::trim).filter(|w| !w.is_empty()) {
                 let lower = word.to_ascii_lowercase();
-                // First category to claim a word wins (case-insensitive).
-                vocab.words.entry(lower.clone()).or_insert(cat_id);
-                // Preserve the original casing as a separate key when it differs.
+                // Preserve the original casing as a separate entry when it differs.
                 if word != lower {
-                    vocab.words.entry(word.to_string()).or_insert(cat_id);
+                    vocab.words.insert(word.to_string());
                 }
+                vocab.words.insert(lower);
             }
         }
     }

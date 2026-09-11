@@ -123,10 +123,6 @@ pub fn remove_uinput_rule() -> Result<bool, String> {
     Ok(true)
 }
 
-/// Ask udevd to re-read its rules and re-apply them to existing devices.
-///
-/// Best-effort on purpose: both halves failing means the change lands on the
-/// next boot rather than now, which is worth a warning and nothing more.
 /// The two independent decisions the paste path needs about its target.
 ///
 /// Separate fields because they fail in opposite directions — see
@@ -145,6 +141,10 @@ struct PasteTarget {
 /// is a bound on "no agent ever answers", not on human speed.
 const PKEXEC_TIMEOUT: Duration = Duration::from_secs(120);
 
+/// Ask udevd to re-read its rules and re-apply them to existing devices.
+///
+/// Best-effort on purpose: both halves failing means the change lands on the
+/// next boot rather than now, which is worth a warning and nothing more.
 fn reload_udev_rules() {
     let reload = crate::probe::status_with_timeout(
         "pkexec",
@@ -807,15 +807,6 @@ impl UinputTyper {
             "clipboard primed at dictation start"
         );
         self.primed_clipboard = Some(snap);
-    }
-
-    /// Pre-warm compositor detection so the first `type_str()` call has no
-    /// cold-start latency from spawning detection subprocesses.
-    pub fn warm_up(&self) {
-        // Fire-and-forget: prime the detection chain (subprocess caches, D-Bus
-        // connections) so subsequent calls are near-instant.
-        let _ = crate::focus::focused_window_class();
-        debug!("warm_up: compositor detection primed");
     }
 
     #[inline]

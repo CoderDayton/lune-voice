@@ -51,9 +51,6 @@ export function mapWorkspaceSettings(snapshot: WorkspaceSnapshot): WorkspaceSett
     confidenceThreshold: formatThreshold(
       snapshot.settings.confidenceThreshold ?? Number(DEFAULT_SETTINGS.confidenceThreshold),
     ),
-    llmSkipThreshold: formatThreshold(
-      snapshot.settings.llmSkipThreshold ?? Number(DEFAULT_SETTINGS.llmSkipThreshold),
-    ),
     dictationMode: snapshot.settings.dictationMode,
     copyToClipboard: snapshot.settings.copyToClipboard ?? DEFAULT_SETTINGS.copyToClipboard,
     soundCuesEnabled: snapshot.settings.soundCuesEnabled ?? DEFAULT_SETTINGS.soundCuesEnabled,
@@ -132,7 +129,6 @@ export function settingsToSaveInput(settings: WorkspaceSettings): SaveWorkspaceS
     asrBackendType: settings.asrBackend,
     whisperModel: settings.whisperModel,
     confidenceThreshold: Number(settings.confidenceThreshold),
-    llmSkipThreshold: Number(settings.llmSkipThreshold),
     stylePreset: settings.stylePreset,
     hotkeyToggle: settings.hotkeyToggle,
     hotkeyCancel: settings.hotkeyCancel,

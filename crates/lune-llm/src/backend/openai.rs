@@ -74,18 +74,11 @@ impl OpenAiLlmBackend {
         // Reject plaintext (non-TLS) unless targeting a local endpoint. The
         // styling LLM sends the API key and every dictated transcript to this
         // endpoint, so it must never cross a public-network cleartext link.
-        // `is_local_endpoint` (the same test the readiness check uses) allows
-        // loopback, private LAN, and `.local`/`.localhost` — a LAN Ollama or
-        // llama-server is "local" and plaintext-safe, mirroring the ASR guard.
+        // The gate allows loopback, private LAN, and `.local`/`.localhost` —
+        // a LAN Ollama or llama-server is "local" and plaintext-safe.
         let url = url::Url::parse(&config.base_url)
             .map_err(|e| Error::llm(format!("invalid base_url: {e}")))?;
-        if url.scheme() != "https" && !lune_core::config::is_local_endpoint(&url) {
-            return Err(Error::llm(format!(
-                "OpenAI LLM base_url must use HTTPS (got {}://); \
-                 plaintext only allowed for loopback and private local addresses",
-                url.scheme()
-            )));
-        }
+        lune_core::config::require_tls_or_local(&url, "LLM").map_err(Error::llm)?;
 
         let openai_config = OpenAIConfig::new()
             .with_api_key(config.api_key.expose())
@@ -195,58 +188,22 @@ mod tests {
         assert!(result.is_err());
     }
 
-    /// The styling LLM sends the API key and dictated text to `base_url`, so a
-    /// non-loopback plaintext endpoint must be refused — the ASR backend has the
-    /// same guard (`crates/lune-asr/src/backend/openai.rs`), and the LLM path
-    /// must not be the one that ships the key over cleartext HTTP.
+    /// The styling LLM sends the API key and dictated text to `base_url`, so
+    /// the constructor must apply `require_tls_or_local`. The full
+    /// accept/reject matrix is tested once in `lune-core`; these two cases
+    /// prove this backend is wired to it.
     #[test]
-    fn rejects_plaintext_remote_endpoint() {
-        let config = OpenAiLlmConfig {
+    fn constructor_applies_the_tls_gate() {
+        let remote_plaintext = OpenAiLlmConfig {
             base_url: "http://api.example.com/v1".into(),
             ..Default::default()
         };
-        assert!(OpenAiLlmBackend::new(config).is_err());
-    }
+        assert!(OpenAiLlmBackend::new(remote_plaintext).is_err());
 
-    #[test]
-    fn accepts_https_remote_endpoint() {
-        let config = OpenAiLlmConfig {
-            base_url: "https://api.example.com/v1".into(),
-            ..Default::default()
-        };
-        assert!(OpenAiLlmBackend::new(config).is_ok());
-    }
-
-    /// Plaintext is only acceptable for loopback-hosted local servers (Ollama,
-    /// llama-server, LM Studio) — the same carve-out the ASR backend grants.
-    #[test]
-    fn accepts_plaintext_loopback_endpoint() {
-        for base in [
-            "http://127.0.0.1:11434/v1",
-            "http://localhost:1234/v1",
-            "http://[::1]:8080/v1",
-        ] {
-            let config = OpenAiLlmConfig {
-                base_url: base.into(),
-                ..Default::default()
-            };
-            assert!(
-                OpenAiLlmBackend::new(config).is_ok(),
-                "{base} should be allowed as loopback"
-            );
-        }
-    }
-
-    /// A private-LAN server (e.g. Ollama on 192.168.x.x) is "local" by the
-    /// app's own `is_local_endpoint` semantics — the readiness check even
-    /// allows it keyless — so plaintext there must still be accepted, or a
-    /// user with a LAN model would get a startup crash.
-    #[test]
-    fn accepts_plaintext_private_lan_endpoint() {
-        let config = OpenAiLlmConfig {
+        let lan_plaintext = OpenAiLlmConfig {
             base_url: "http://192.168.1.50:11434/v1".into(),
             ..Default::default()
         };
-        assert!(OpenAiLlmBackend::new(config).is_ok());
+        assert!(OpenAiLlmBackend::new(lan_plaintext).is_ok());
     }
 }

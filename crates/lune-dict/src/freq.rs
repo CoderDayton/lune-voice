@@ -1,12 +1,8 @@
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
-const MAX_WORD_LEN: usize = 32;
-
 pub struct FreqDict {
     freq: HashMap<Box<str>, u32>,
-    by_len: [Vec<u32>; MAX_WORD_LEN],
-    words: Vec<Box<str>>,
 }
 
 impl FreqDict {
@@ -14,8 +10,6 @@ impl FreqDict {
         if bytes.is_empty() {
             return Self {
                 freq: HashMap::new(),
-                by_len: std::array::from_fn(|_| Vec::new()),
-                words: Vec::new(),
             };
         }
         let (entries, _): (Vec<(String, u32)>, _) =
@@ -23,23 +17,11 @@ impl FreqDict {
                 .expect("decode freq bin");
 
         let mut freq = HashMap::with_capacity(entries.len());
-        let mut words = Vec::with_capacity(entries.len());
-        let mut by_len: [Vec<u32>; MAX_WORD_LEN] = std::array::from_fn(|_| Vec::new());
-
         for (word, f) in entries {
-            let len = word.len().min(MAX_WORD_LEN - 1);
-            let idx = words.len() as u32;
-            let boxed: Box<str> = word.into_boxed_str();
-            freq.insert(boxed.clone(), f);
-            words.push(boxed);
-            by_len[len].push(idx);
+            freq.insert(word.into_boxed_str(), f);
         }
 
-        Self {
-            freq,
-            by_len,
-            words,
-        }
+        Self { freq }
     }
 
     #[inline]
@@ -60,42 +42,6 @@ impl FreqDict {
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.freq.is_empty()
-    }
-
-    pub fn candidates_iter(&self, lo: usize, hi: usize) -> CandidateIter<'_> {
-        CandidateIter {
-            dict: self,
-            hi,
-            bucket: lo,
-            pos: 0,
-        }
-    }
-}
-
-pub struct CandidateIter<'a> {
-    dict: &'a FreqDict,
-    hi: usize,
-    bucket: usize,
-    pos: usize,
-}
-
-impl<'a> Iterator for CandidateIter<'a> {
-    type Item = &'a str;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            if self.bucket >= self.hi || self.bucket >= MAX_WORD_LEN {
-                return None;
-            }
-            let bucket = &self.dict.by_len[self.bucket];
-            if self.pos < bucket.len() {
-                let idx = bucket[self.pos] as usize;
-                self.pos += 1;
-                return Some(&self.dict.words[idx]);
-            }
-            self.bucket += 1;
-            self.pos = 0;
-        }
     }
 }
 

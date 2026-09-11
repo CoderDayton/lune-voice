@@ -26,14 +26,12 @@
 mod capture;
 pub mod pcen;
 mod ring;
-mod vad;
 
 pub use capture::{AudioConfig, AudioStream, AudioStreamHandle, ConsumerGuard, list_input_devices};
 pub use pcen::{
     DEFAULT_NOISE_CEILING_RMS, EXPECTED_OUTPUT_RMS, PCEN_HOP_SIZE, PcenAgc, PcenAgcConfig,
     PcenFrameStats,
 };
-pub use vad::{Vad, VadConfig, VadResult};
 
 /// Polling source for downstream consumers (sessions, tests).
 ///

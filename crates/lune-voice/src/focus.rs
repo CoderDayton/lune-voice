@@ -199,6 +199,19 @@ pub fn capture_focus_target() -> WindowTarget {
     target
 }
 
+/// Prime the compositor-detection chain (subprocess caches, D-Bus
+/// connections) so the first real probe pays no cold-start cost.
+///
+/// Fire-and-forget; the result is discarded. Called once when the delivery
+/// driver is built.
+pub(crate) fn warm_probes() {
+    #[cfg(unix)]
+    {
+        let _ = focused_window_class();
+        tracing::debug!("focus: compositor detection primed");
+    }
+}
+
 /// Whether any focus probe has named a window in this process.
 static FOCUS_EVER_NAMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 

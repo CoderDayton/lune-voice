@@ -78,17 +78,10 @@ pub struct OpenAiCompatibleAsrBackend {
 impl OpenAiCompatibleAsrBackend {
     pub fn new(config: OpenAiAsrConfig) -> Result<Self> {
         // Reject plaintext (non-TLS) unless targeting a local endpoint
-        // (loopback, private LAN, `.local`/`.localhost`). The ASR key
-        // requirement and the LLM backend use the same `is_local_endpoint`
-        // test, so a LAN Ollama/llama-server is plaintext-safe and a public
-        // host must use HTTPS.
-        let scheme = config.base_url.scheme();
-        if scheme != "https" && !lune_core::config::is_local_endpoint(&config.base_url) {
-            return Err(Error::asr(format!(
-                "OpenAI ASR base_url must use HTTPS (got {scheme}://); \
-                 plaintext only allowed for loopback and private local addresses"
-            )));
-        }
+        // (loopback, private LAN, `.local`/`.localhost`), so a LAN
+        // Ollama/llama-server is plaintext-safe and a public host must use
+        // HTTPS. The LLM backend applies the same gate.
+        lune_core::config::require_tls_or_local(&config.base_url, "ASR").map_err(Error::asr)?;
 
         // Pre-build the transcription URL once; avoids per-request parse+alloc.
         let transcription_url = build_transcription_url(&config.base_url)?;
@@ -414,7 +407,7 @@ fn build_transcription_url(base_url: &Url) -> Result<Url> {
 ///
 /// The output buffer is sized exactly once; each sample is converted via
 /// a branchless clamp+scale and written as little-endian i16.
-pub fn encode_wav_16bit(pcm: &[f32], sample_rate: u32) -> Vec<u8> {
+fn encode_wav_16bit(pcm: &[f32], sample_rate: u32) -> Vec<u8> {
     let num_samples = pcm.len();
     let data_bytes = num_samples * 2; // 2 bytes per 16-bit sample
     let file_size = 36 + data_bytes;
@@ -649,42 +642,24 @@ mod tests {
         assert_eq!(segs[0].text, "Fallback text.");
     }
 
+    /// The constructor must apply `require_tls_or_local`. The full
+    /// accept/reject matrix is tested once in `lune-core`; these two cases
+    /// prove this backend is wired to it.
     #[test]
-    fn rejects_plaintext_non_loopback() {
-        let config = OpenAiAsrConfig {
+    fn constructor_applies_the_tls_gate() {
+        let remote_plaintext = OpenAiAsrConfig {
             base_url: "http://example.com/v1".parse().unwrap(),
             ..Default::default()
         };
-        let result = OpenAiCompatibleAsrBackend::new(config);
+        let result = OpenAiCompatibleAsrBackend::new(remote_plaintext);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("HTTPS"));
-    }
 
-    #[test]
-    fn allows_plaintext_loopback() {
-        let config = OpenAiAsrConfig {
-            base_url: "http://127.0.0.1:8080/v1".parse().unwrap(),
-            ..Default::default()
-        };
-        assert!(OpenAiCompatibleAsrBackend::new(config).is_ok());
-        // IPv6 loopback must also be recognized (host_str returns `[::1]`).
-        let config = OpenAiAsrConfig {
-            base_url: "http://[::1]:8080/v1".parse().unwrap(),
-            ..Default::default()
-        };
-        assert!(OpenAiCompatibleAsrBackend::new(config).is_ok());
-    }
-
-    /// A private-LAN server is "local" by `is_local_endpoint` (the same test
-    /// the LLM backend uses), so plaintext there must be accepted — matching
-    /// the LLM guard and the keyless-readiness logic.
-    #[test]
-    fn allows_plaintext_private_lan() {
-        let config = OpenAiAsrConfig {
+        let lan_plaintext = OpenAiAsrConfig {
             base_url: "http://192.168.1.50:8000/v1".parse().unwrap(),
             ..Default::default()
         };
-        assert!(OpenAiCompatibleAsrBackend::new(config).is_ok());
+        assert!(OpenAiCompatibleAsrBackend::new(lan_plaintext).is_ok());
     }
 
     #[test]

@@ -19,25 +19,6 @@ pub struct DictationSession {
     pub transcript: Option<String>,
 }
 
-impl DictationSession {
-    pub fn is_active(&self) -> bool {
-        matches!(self.status, SessionStatus::Active)
-    }
-
-    pub fn is_terminal(&self) -> bool {
-        matches!(
-            self.status,
-            SessionStatus::Completed | SessionStatus::Failed(_) | SessionStatus::Cancelled
-        )
-    }
-
-    /// Duration in milliseconds, if ended.
-    pub fn duration_ms(&self) -> Option<i64> {
-        self.ended_at
-            .map(|end| (end - self.started_at).num_milliseconds())
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum SessionStatus {
@@ -52,16 +33,12 @@ pub enum SessionStatus {
 #[non_exhaustive]
 pub enum SessionEvent {
     Started,
-    /// Partial in-flight transcription notification.
-    PartialText,
     /// Final delivered transcript for a dictation request. Carries the
     /// session id so the delivery path stays correlated end-to-end.
     FinalizedText {
         session_id: Uuid,
         text: String,
     },
-    /// Async LLM correction for a previously-delivered low-confidence utterance.
-    CorrectedText(String),
     /// Pipeline is processing accumulated audio (batch ASR + LLM).
     Processing,
     /// RMS audio energy level, normalized to [0.0, 1.0]. Emitted at ~15 fps
@@ -94,31 +71,11 @@ pub enum SessionEvent {
 }
 
 impl SessionEvent {
-    /// Returns the text payload if this event carries one, avoiding a match at call sites.
-    pub fn text(&self) -> Option<&str> {
-        match self {
-            Self::FinalizedText { text, .. } => Some(text.as_str()),
-            Self::CommandDetected { payload, .. } => Some(payload.as_str()),
-            Self::CorrectedText(s) | Self::Error(s) | Self::Warning(s) => Some(s.as_str()),
-            Self::Started
-            | Self::PartialText
-            | Self::Processing
-            | Self::AudioLevel(_)
-            | Self::GateDecision { .. }
-            | Self::Stopped { .. } => None,
-        }
-    }
-
     /// A clean `Stopped`: no terminal error was lost on the way out.
     pub const fn stopped() -> Self {
         Self::Stopped {
             error_dropped: false,
         }
-    }
-
-    /// True iff this event marks the logical end of a session.
-    pub fn is_terminal(&self) -> bool {
-        matches!(self, Self::Stopped { .. } | Self::Error(_))
     }
 }
 
@@ -155,79 +112,12 @@ mod tests {
     }
 
     #[test]
-    fn session_active_and_terminal_predicates() {
-        let mut s = DictationSession {
-            id: Uuid::new_v4(),
-            started_at: Utc::now(),
-            ended_at: None,
-            style: Some("casual".into()),
-            backend: AsrBackendKind::WhisperCpp,
-            status: SessionStatus::Active,
-            transcript: None,
-        };
-        assert!(s.is_active());
-        assert!(!s.is_terminal());
-
-        s.status = SessionStatus::Completed;
-        assert!(!s.is_active());
-        assert!(s.is_terminal());
-    }
-
-    #[test]
-    fn session_duration_none_when_open() {
-        let s = DictationSession {
-            id: Uuid::new_v4(),
-            started_at: Utc::now(),
-            ended_at: None,
-            style: Some("casual".into()),
-            backend: AsrBackendKind::WhisperCpp,
-            status: SessionStatus::Active,
-            transcript: None,
-        };
-        assert!(s.duration_ms().is_none());
-    }
-
-    #[test]
-    fn session_event_text_accessor() {
-        assert_eq!(
-            (SessionEvent::FinalizedText {
-                session_id: Uuid::nil(),
-                text: "hello".into(),
-            })
-            .text(),
-            Some("hello")
-        );
-        assert_eq!(SessionEvent::Started.text(), None);
-        assert_eq!(SessionEvent::stopped().text(), None);
-    }
-
-    #[test]
-    fn session_event_warning_carries_text_and_is_not_terminal() {
-        let evt = SessionEvent::Warning("persist offline".into());
-        assert_eq!(evt.text(), Some("persist offline"));
-        assert!(
-            !evt.is_terminal(),
-            "Warning is informational; session must keep running",
-        );
-    }
-
-    #[test]
-    fn session_event_terminal_predicate() {
-        assert!(SessionEvent::stopped().is_terminal());
-        assert!(
+    fn stopped_is_a_clean_stop() {
+        assert!(matches!(
+            SessionEvent::stopped(),
             SessionEvent::Stopped {
-                error_dropped: true
+                error_dropped: false
             }
-            .is_terminal()
-        );
-        assert!(SessionEvent::Error("oops".into()).is_terminal());
-        assert!(
-            !(SessionEvent::FinalizedText {
-                session_id: Uuid::nil(),
-                text: "hi".into(),
-            })
-            .is_terminal()
-        );
-        assert!(!SessionEvent::Started.is_terminal());
+        ));
     }
 }

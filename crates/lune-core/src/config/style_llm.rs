@@ -111,16 +111,6 @@ impl StyleRegistry {
     pub fn all(&self) -> &[Arc<StylePreset>] {
         &self.ordered
     }
-
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.ordered.len()
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.ordered.is_empty()
-    }
 }
 
 static REGISTRY: LazyLock<StyleRegistry> = LazyLock::new(|| {

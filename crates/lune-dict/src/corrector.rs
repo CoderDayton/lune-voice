@@ -467,9 +467,8 @@ impl LexicalGate {
             // its baseline — whisper's own word-confidence grouping reported
             // one value for this glued unit, so that is the primary honest
             // signal. It is corroborated (never independently overridden) by
-            // the group's MEAN confidence: the same mean-vs-min two-level
-            // check `AsrSegment::is_confident_gated` already applies at the
-            // segment level (arXiv:2407.21414), here at word-group
+            // the group's MEAN confidence — the mean-vs-min two-level check
+            // (arXiv:2407.21414), applied at word-group
             // granularity. Taking the min of (risk, mean-derived risk) means
             // the mean can only LOWER the effective risk, and only down to
             // what the mean itself would justify — it confirms a borderline

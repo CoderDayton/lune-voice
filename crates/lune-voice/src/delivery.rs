@@ -218,35 +218,8 @@ impl DeliveryService {
         }
     }
 
-    pub fn deliver_to(
-        &self,
-        session_id: Option<Uuid>,
-        text: &str,
-        mode: DictationMode,
-        copy_to_clipboard: bool,
-        target: &WindowTarget,
-    ) -> bool {
-        if text.is_empty() {
-            return true;
-        }
-        debug!(
-            ?session_id,
-            ?mode,
-            text_len = text.len(),
-            "delivering text to target"
-        );
-        self.enqueue(DeliveryMsg {
-            session_id,
-            text: text.into(),
-            mode,
-            copy_to_clipboard,
-            target: Some(target.clone()),
-            outcome: None,
-        })
-    }
-
-    /// [`deliver_to`](Self::deliver_to) with the outcome receiver of
-    /// [`deliver_tracked`](Self::deliver_tracked).
+    /// [`deliver_tracked`](Self::deliver_tracked), aimed at an explicit
+    /// window target instead of whatever holds focus at delivery time.
     pub fn deliver_to_tracked(
         &self,
         session_id: Option<Uuid>,
@@ -273,16 +246,6 @@ impl DeliveryService {
         .then_some(rx)
     }
 
-    pub fn deliver_owned(
-        &self,
-        session_id: Option<Uuid>,
-        text: String,
-        mode: DictationMode,
-        copy_to_clipboard: bool,
-    ) -> bool {
-        self.deliver(session_id, &text, mode, copy_to_clipboard)
-    }
-
     /// True while queued text is being typed/pasted, plus a short settle
     /// tail. Dictation starts are suppressed during this window: our own
     /// synthetic keystrokes landing on a focused UI control (e.g. the toggle
@@ -293,13 +256,6 @@ impl DeliveryService {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .is_some_and(|t| Instant::now() < t)
-    }
-
-    /// True only when the thread is in its loop. A thread still building its
-    /// driver is not alive for this purpose: its channel accepts sends and
-    /// nothing comes out the other end.
-    pub fn is_alive(&self) -> bool {
-        self.health() == DeliveryHealth::Ready
     }
 }
 
@@ -426,6 +382,8 @@ struct PlatformDriver {
 #[cfg(unix)]
 impl PlatformDriver {
     fn new(terminal_mode: TerminalMode) -> Result<Self, String> {
+        crate::focus::warm_probes();
+
         // Prefer IBus when it's the active input method. On GNOME Wayland the
         // uinput path can't detect terminals (so it can't pick Ctrl+Shift+V),
         // but IBus commits directly to the focused input context. Fall back to
@@ -434,7 +392,6 @@ impl PlatformDriver {
         if crate::ibus::is_active_im() {
             match crate::ibus::IbusTyper::try_new() {
                 Ok(typer) => {
-                    typer.warm_up();
                     info!("delivery: IBus engine active");
                     return Ok(Self {
                         backend: LinuxBackend::Ibus(typer),
@@ -446,7 +403,6 @@ impl PlatformDriver {
         }
 
         let typer = UinputTyper::with_terminal_mode(terminal_mode)?;
-        typer.warm_up();
         debug!("delivery: uinput clipboard-paste active");
         Ok(Self {
             backend: LinuxBackend::Uinput(typer),

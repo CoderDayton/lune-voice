@@ -12,7 +12,7 @@ pub use pipeline::{PipelineConfig, PipelineOverrides};
 pub use redacted::RedactedString;
 pub use settings::{
     AsrBackendConfig, DevicePolicy, HistoryRetention, LlmBackendConfig, OpenAiLlmProvider,
-    StreamingMode, UserSettings, WhisperModel, is_local_endpoint,
+    StreamingMode, UserSettings, WhisperModel, is_local_endpoint, require_tls_or_local,
 };
 pub use settings::{PillAnchor, PillCorner, PillOrientation, PillPosition, PillSize};
 pub use style_llm::{
@@ -102,9 +102,7 @@ mod tests {
 
     #[test]
     fn registry_len() {
-        let reg = builtin_registry();
-        assert_eq!(reg.len(), 5);
-        assert!(!reg.is_empty());
+        assert_eq!(builtin_registry().all().len(), 5);
     }
 
     #[test]

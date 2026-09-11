@@ -417,16 +417,14 @@ const EVENT_SEND_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Variant name for logging.
 ///
-/// Deliberately not `Debug`: `FinalizedText`, `CorrectedText`, `Warning`,
+/// Deliberately not `Debug`: `FinalizedText`, `Warning`,
 /// `Error` and `CommandDetected` all carry text that is redacted by default
 /// (see `redact.rs`), and a dropped-event log line must not be the one place
 /// a transcript leaks.
 fn event_name(event: &SessionEvent) -> &'static str {
     match event {
         SessionEvent::Started => "Started",
-        SessionEvent::PartialText => "PartialText",
         SessionEvent::FinalizedText { .. } => "FinalizedText",
-        SessionEvent::CorrectedText(_) => "CorrectedText",
         SessionEvent::Processing => "Processing",
         SessionEvent::AudioLevel(_) => "AudioLevel",
         SessionEvent::CommandDetected { .. } => "CommandDetected",

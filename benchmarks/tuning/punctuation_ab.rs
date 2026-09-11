@@ -33,7 +33,7 @@ use bench_utils::{
 };
 use lune_asr::AsrRegistry;
 use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
-use lune_core::config::{PipelineConfig, StylePreset};
+use lune_core::config::StylePreset;
 use lune_core::llm::PostProcessInput;
 use lune_dict::corrector::{HWCE_FLAG_THRESHOLD, LexicalGate};
 use lune_dict::formatting::{
@@ -231,7 +231,6 @@ fn run_llm(
 
 fn main() {
     let harness = BenchmarkHarness::builder().with_llm().build();
-    let cfg = PipelineConfig::default();
     let corrector = LexicalGate::new();
     // Styling is now optional and OFF by default (production default_style =
     // None), and the LLM pass is styling-only — there is no correction mode.
@@ -303,18 +302,23 @@ fn main() {
             punct.text.clone()
         };
 
-        // Gate decision — inlined because gate::decide is crate-private. This is
-        // byte-for-byte the production arithmetic (wants_styling = false).
+        // Confidence band used by this benchmark's `full` arm to decide
+        // whether to route through the LLM. The production pipeline has no
+        // such gate (`needs_llm` follows the selected style alone), so these
+        // bounds live here rather than in `PipelineConfig`.
+        const SKIP_CLEAN_CONF: f32 = 0.40;
+        const SKIP_BROKEN_CONF: f32 = 0.30;
+
         let max_risk = word_risk_scores
             .iter()
             .map(|(_, r, _)| *r)
             .fold(0.0_f32, f32::max);
         let min_conf = 1.0 - max_risk;
-        let conf_attention = cfg.llm_skip_threshold.is_some_and(|t| min_conf < t);
+        let conf_attention = min_conf < SKIP_CLEAN_CONF;
         let wc = raw_text.split_whitespace().count().max(1);
         let mean_risk = hc.word_risk_positions.iter().map(|(_, r)| *r).sum::<f32>() / wc as f32;
         let avg_conf = 1.0 - mean_risk;
-        let too_broken = cfg.llm_skip_noisy_threshold.is_some_and(|t| avg_conf < t);
+        let too_broken = avg_conf < SKIP_BROKEN_CONF;
         let needs_correction = !hc.all_resolved || punct.needs_llm || conf_attention;
         let needs_llm = needs_correction && !too_broken;
 

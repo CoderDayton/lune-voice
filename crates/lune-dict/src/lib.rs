@@ -7,22 +7,18 @@ pub mod lexicon;
 pub mod snippets;
 pub mod vocab;
 
-#[cfg(feature = "dictionary")]
 use lune_core::dict::DictionaryEntry;
-#[cfg(feature = "dictionary")]
 use lune_persist::{Database, PersistResult};
 
 /// Manages the user dictionary: in-memory cache + DB persistence.
 ///
 /// Applies corrections to ASR text (multi-word exact match, single-word fuzzy
 /// with Levenshtein distance ≤ 1) and selects relevant entries for LLM prompts.
-#[cfg(feature = "dictionary")]
 pub struct DictionaryManager {
     db: Database,
     cache: Vec<DictionaryEntry>,
 }
 
-#[cfg(feature = "dictionary")]
 impl DictionaryManager {
     /// Create a manager and load the initial cache from the database.
     pub fn new(mut db: Database) -> PersistResult<Self> {
@@ -182,46 +178,6 @@ impl DictionaryManager {
         relevant.truncate(limit);
         relevant
     }
-
-    // ── Import / export ──────────────────────────────────────────────────
-
-    /// Import entries from plain text (one per line: `spoken → replacement`).
-    ///
-    /// Lines that don't contain ` → ` are silently skipped.
-    /// Returns the number of entries inserted.
-    pub fn import_text(&mut self, text: &str) -> PersistResult<usize> {
-        let mut count = 0;
-        for line in text.lines() {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with('#') {
-                continue;
-            }
-            if let Some((phrase, replacement)) = line.split_once(" → ") {
-                self.insert(phrase.trim(), replacement.trim(), 5)?;
-                count += 1;
-            }
-        }
-        Ok(count)
-    }
-
-    /// Export all entries as plain text (`spoken → replacement` per line).
-    pub fn export_text(&self) -> String {
-        let capacity = self
-            .cache
-            .iter()
-            .map(|e| e.phrase.len() + e.replacement.len() + 5)
-            .sum();
-        let mut out = String::with_capacity(capacity);
-        for (i, e) in self.cache.iter().enumerate() {
-            if i > 0 {
-                out.push('\n');
-            }
-            out.push_str(&e.phrase);
-            out.push_str(" → ");
-            out.push_str(&e.replacement);
-        }
-        out
-    }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -241,14 +197,12 @@ pub struct DictMatch {
 }
 
 /// Strip trailing ASCII punctuation for comparison purposes.
-#[cfg(feature = "dictionary")]
 #[inline]
 fn strip_trailing_punct(s: &str) -> &str {
     s.trim_end_matches(['.', ',', '!', '?', ';', ':'])
 }
 
 /// ASCII case-insensitive substring search with no heap allocation.
-#[cfg(feature = "dictionary")]
 #[inline]
 fn contains_ascii_ci(haystack: &str, needle: &str) -> bool {
     let h = haystack.as_bytes();
@@ -303,9 +257,7 @@ pub fn phrases_collide(a: &str, b: &str) -> bool {
 /// O(n) Levenshtein distance ≤ 1 check, case-insensitive.
 ///
 /// Replaces the `levenshtein(a.to_lowercase(), b.to_lowercase()) <= 1` pattern
-/// in hot paths: no full DP table, early exit. Unconditional (not gated behind
-/// the `dictionary` feature) because `lexicon::Lexicon` also uses it to
-/// fuzzy-match the always-compiled bundled vocab.
+/// in hot paths: no full DP table, early exit.
 ///
 /// Pure-ASCII inputs — the overwhelming majority — take an allocation-free
 /// byte path. Anything else is compared by *character*, since a byte-level
@@ -364,41 +316,7 @@ fn lev_le1_by<T: Copy>(a: &[T], b: &[T], eq: impl Fn(T, T) -> bool) -> bool {
     }
 }
 
-/// Wagner-Fischer Levenshtein distance (byte-level; fine for ASCII ASR text).
-/// Only the dictionary path uses it, so it is gated with its sole caller.
-#[cfg(feature = "dictionary")]
-pub fn levenshtein(a: &str, b: &str) -> usize {
-    // Operate on bytes — avoids char collection, valid for ASCII input.
-    let a = a.as_bytes();
-    let b = b.as_bytes();
-    let m = a.len();
-    let n = b.len();
-    if m == 0 {
-        return n;
-    }
-    if n == 0 {
-        return m;
-    }
-
-    let mut prev: Vec<usize> = (0..=n).collect();
-    let mut curr = vec![0usize; n + 1];
-
-    for i in 1..=m {
-        curr[0] = i;
-        let mut row_min = i;
-        for j in 1..=n {
-            let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
-            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
-            if curr[j] < row_min {
-                row_min = curr[j];
-            }
-        }
-        std::mem::swap(&mut prev, &mut curr);
-    }
-    prev[n]
-}
-
-#[cfg(all(test, feature = "dictionary"))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use lune_persist::Database;
@@ -418,35 +336,6 @@ mod tests {
         m.insert("\t", "boom", 100).unwrap();
         assert!(m.scan("hello there").is_empty());
         assert!(m.scan("").is_empty());
-    }
-
-    // ── levenshtein ───────────────────────────────────────────────────────
-
-    #[test]
-    fn levenshtein_identical() {
-        assert_eq!(levenshtein("rust", "rust"), 0);
-    }
-
-    #[test]
-    fn levenshtein_one_deletion() {
-        assert_eq!(levenshtein("rustt", "rust"), 1);
-    }
-
-    #[test]
-    fn levenshtein_one_substitution() {
-        assert_eq!(levenshtein("rast", "rust"), 1);
-    }
-
-    #[test]
-    fn levenshtein_two_edits() {
-        assert_eq!(levenshtein("kitten", "sitting"), 3);
-    }
-
-    #[test]
-    fn levenshtein_empty() {
-        assert_eq!(levenshtein("", "abc"), 3);
-        assert_eq!(levenshtein("abc", ""), 3);
-        assert_eq!(levenshtein("", ""), 0);
     }
 
     // ── lev_le1_ci ───────────────────────────────────────────────────────
@@ -551,20 +440,5 @@ mod tests {
             .join(" ");
         let relevant = mgr.top_relevant(&text, 10);
         assert_eq!(relevant.len(), 10);
-    }
-
-    // ── import / export ───────────────────────────────────────────────────
-
-    #[test]
-    fn import_export_roundtrip() {
-        let mut mgr = manager();
-        let text = "github → GitHub\nrust lang → Rust\n# comment\n\nbad line";
-        let count = mgr.import_text(text).unwrap();
-        assert_eq!(count, 2);
-
-        let exported = mgr.export_text();
-        assert!(exported.contains("github → GitHub") || exported.contains("rust lang → Rust"));
-        assert!(!exported.contains("# comment"));
-        assert!(!exported.contains("bad line"));
     }
 }

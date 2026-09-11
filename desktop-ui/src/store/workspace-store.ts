@@ -688,8 +688,6 @@ function reduceSessionEvent(
           ? `${runtime.liveTranscript} ${event.text}`
           : event.text,
       };
-    case 'correctedText':
-      return { ...runtime, liveTranscript: event.text };
     case 'captureText':
       return {
         ...runtime,
@@ -721,7 +719,6 @@ function reduceSessionEvent(
       return { ...runtime, error: event.message };
     case 'audioLevel':
       return { ...runtime, audioLevel: Math.max(0, Math.min(1, event.level)) };
-    case 'partialText':
     case 'commandDetected':
       return runtime;
   }

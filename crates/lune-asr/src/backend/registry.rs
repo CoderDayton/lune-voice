@@ -187,40 +187,17 @@ impl AsrRegistry {
     pub fn default_pipeline_config(kind: AsrBackendKind) -> PipelineConfig {
         match kind {
             AsrBackendKind::OpenAiCompatible => PipelineConfig {
-                max_segment_ms: 30_000,
-                sentence_close_ms: 800,
-                hard_close_ms: 2_000,
-                speech_threshold: 0.5,
-                speech_threshold_end: 0.3,
-                min_speech_ms: 200,
-                adaptive_vad: false,
-                itn_enabled: true,
                 // No per-token log-probs from remote API — disable all
                 // confidence-based gating.
                 word_confidence_threshold: None,
-                llm_skip_threshold: None,
-                llm_skip_noisy_threshold: None,
                 max_speech_samples: 120 * 16_000,
                 llm_timeout_secs: 30,
             },
             AsrBackendKind::WhisperCpp => PipelineConfig {
-                // Batch decoder — one full utterance per decode, flushed by the
-                // dictation toggle/hold release, not by silence. Keep the silence
-                // windows huge so the VAD never cuts mid-utterance.
-                max_segment_ms: 300_000,
-                sentence_close_ms: 300_000,
-                hard_close_ms: 300_000,
-                speech_threshold: 0.5,
-                speech_threshold_end: 0.3,
-                min_speech_ms: 200,
-                adaptive_vad: false,
-                itn_enabled: true,
                 // whisper token probs feed the gate, but they're uncalibrated
                 // (no per-backend isotonic file), so route a touch more eagerly
                 // rather than trust a hard cutoff.
                 word_confidence_threshold: Some(0.50),
-                llm_skip_threshold: Some(0.40),
-                llm_skip_noisy_threshold: Some(0.30),
                 max_speech_samples: 300 * 16_000,
                 llm_timeout_secs: 30,
             },

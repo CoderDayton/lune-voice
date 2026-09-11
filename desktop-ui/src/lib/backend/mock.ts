@@ -32,7 +32,6 @@ function createMockSnapshot(): WorkspaceSnapshot {
       whisperModel: 'Medium',
       llmEnabled: true,
       confidenceThreshold: 0.55,
-      llmSkipThreshold: 0.4,
       stylePreset: null,
       hotkeyToggle: 'Ctrl+Space',
       hotkeyCancel: 'Escape',

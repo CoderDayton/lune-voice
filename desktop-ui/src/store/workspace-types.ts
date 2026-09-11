@@ -22,7 +22,6 @@ export interface WorkspaceSettings {
   useGpu: boolean;
   devicePolicy: 'Cpu' | 'Cuda' | 'Auto';
   confidenceThreshold: string;
-  llmSkipThreshold: string;
   dictationMode: DictationModeValue;
   copyToClipboard: boolean;
   soundCuesEnabled: boolean;
@@ -145,7 +144,6 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   useGpu: true,
   devicePolicy: 'Auto',
   confidenceThreshold: '0.55',
-  llmSkipThreshold: '0.40',
   dictationMode: 'Clipboard',
   copyToClipboard: false,
   soundCuesEnabled: true,

@@ -632,36 +632,6 @@ impl Database {
         Ok(rows.into_iter().map(row_to_snippet).collect())
     }
 
-    pub fn get_snippet_by_trigger(
-        &mut self,
-        trigger: &str,
-    ) -> PersistResult<Option<lune_core::dict::Snippet>> {
-        use self::schema::snippets::dsl::*;
-
-        let row = snippets
-            .select((id, trigger_phrase, body))
-            .filter(trigger_phrase.eq(trigger))
-            .first::<(String, String, String)>(&mut self.conn)
-            .optional()?;
-
-        Ok(row.map(row_to_snippet))
-    }
-
-    /// Update an existing snippet's trigger and body. Returns `false` when no
-    /// snippet has that id.
-    pub fn update_snippet(
-        &mut self,
-        snippet_id: &str,
-        new_trigger: &str,
-        new_body: &str,
-    ) -> PersistResult<bool> {
-        use self::schema::snippets::dsl::*;
-        let count = diesel::update(snippets.filter(id.eq(snippet_id)))
-            .set((trigger_phrase.eq(new_trigger), body.eq(new_body)))
-            .execute(&mut self.conn)?;
-        Ok(count > 0)
-    }
-
     pub fn delete_snippet(&mut self, snippet_id: &str) -> PersistResult<bool> {
         let count = diesel::delete(snippets::table.filter(snippets::id.eq(snippet_id)))
             .execute(&mut self.conn)?;
@@ -1109,12 +1079,12 @@ impl Database {
     /// Most recent `(raw, final)` correction pairs, newest first.
     ///
     /// Nothing in the app reads these — they are written for retention and
-    /// cascade-delete only. The reader exists so benchmarks and offline
-    /// analysis can mine real `raw → final` deltas (what the corrector actually
-    /// did to your dictation) without going around the crate with raw SQL.
+    /// cascade-delete only. This reader is the in-crate probe those retention
+    /// and cascade tests assert against; offline analysis reads the
+    /// `correction_pairs` table with the sqlite CLI instead.
     ///
-    /// Contains verbatim transcript text: never log the result, and honour the
-    /// same redaction rules as the rest of the pipeline.
+    /// Contains verbatim transcript text: never log the result.
+    #[cfg(test)]
     pub fn list_correction_pairs(&mut self, limit: u32) -> PersistResult<Vec<(String, String)>> {
         use self::schema::correction_pairs::dsl as cp;
         let rows = cp::correction_pairs
@@ -1682,12 +1652,7 @@ mod tests {
         assert_eq!(snippets.len(), 1);
         assert_eq!(snippets[0].id, "greet");
 
-        let found = db.get_snippet_by_trigger("insert greeting").unwrap();
-        assert!(found.is_some());
-        assert_eq!(found.unwrap().body, "Hello {name}!");
-
-        let not_found = db.get_snippet_by_trigger("nonexistent").unwrap();
-        assert!(not_found.is_none());
+        assert_eq!(snippets[0].body, "Hello {name}!");
 
         let deleted = db.delete_snippet("greet").unwrap();
         assert!(deleted);

@@ -26,11 +26,7 @@ soundCuesEnabled: boolean,
 /**
  * Sound cue playback volume in [0.0, 1.0].
  */
-soundCueVolume: number, useGpu: boolean, devicePolicy: DevicePolicyDto, asrBackendType: AsrBackendTypeDto, confidenceThreshold: number | null, 
-/**
- * Clean-segment confidence bound for bypassing the correction LLM.
- */
-llmSkipThreshold: number | null, stylePreset: string | null, hotkeyToggle: string, hotkeyCancel: string, pillVisibility: PillVisibilityDto, pillAnchor: PillAnchorDto, pillLocked: boolean, pillEdgeMargin: number, 
+soundCueVolume: number, useGpu: boolean, devicePolicy: DevicePolicyDto, asrBackendType: AsrBackendTypeDto, confidenceThreshold: number | null, stylePreset: string | null, hotkeyToggle: string, hotkeyCancel: string, pillVisibility: PillVisibilityDto, pillAnchor: PillAnchorDto, pillLocked: boolean, pillEdgeMargin: number, 
 /**
  * Monitor connector name to pin the pill to; null = automatic.
  */

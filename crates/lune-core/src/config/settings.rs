@@ -224,19 +224,6 @@ pub struct UserSettings {
     /// `Some(30)` and silently re-enable history on the next launch.
     #[serde(default)]
     pub session_history_days: Option<u32>,
-    /// Per-word confidence threshold for LLM gating.
-    /// **Deprecated**: use `pipeline.word_confidence_threshold` instead.
-    /// Migrated automatically when `[pipeline]` section is absent.
-    #[serde(default = "default_word_confidence_threshold")]
-    pub word_confidence_threshold: f32,
-    /// Max speech duration in seconds before auto-ending session.
-    /// **Deprecated**: use `pipeline.max_speech_secs` instead.
-    #[serde(default = "default_max_speech_secs")]
-    pub max_speech_secs: u32,
-    /// Enable adaptive VAD silence thresholds.
-    /// **Deprecated**: use `pipeline.adaptive_vad` instead.
-    #[serde(default)]
-    pub adaptive_vad: bool,
     /// Per-backend pipeline overrides. All fields are optional;
     /// `None` inherits the active backend's recommended default.
     #[serde(default)]
@@ -316,24 +303,8 @@ impl UserSettings {
         }
     }
 
-    /// Migrate legacy top-level pipeline fields into `PipelineOverrides`.
-    ///
-    /// Called once after deserialization. If the `[pipeline]` section is
-    /// empty (all `None`), legacy fields are promoted into it. If the
-    /// user has already set `[pipeline]` fields, legacy fields are ignored.
+    /// Migrate legacy field spellings after deserialization.
     pub fn migrate_pipeline_fields(&mut self) {
-        if self.pipeline != PipelineOverrides::default() {
-            return; // User has explicit [pipeline] section — don't overwrite.
-        }
-        if self.word_confidence_threshold != default_word_confidence_threshold() {
-            self.pipeline.word_confidence_threshold = Some(self.word_confidence_threshold);
-        }
-        if self.max_speech_secs != default_max_speech_secs() {
-            self.pipeline.max_speech_secs = Some(self.max_speech_secs);
-        }
-        if self.adaptive_vad {
-            self.pipeline.adaptive_vad = Some(true);
-        }
         // The "minimal" preset (a styling-off sentinel) was removed; "off" is now
         // the absence of a selection. Map the legacy value to `None`.
         if self.default_style.as_deref() == Some("minimal") {
@@ -389,9 +360,6 @@ impl Default for UserSettings {
             pill_corner: PillCorner::default(),
             terminal_mode: TerminalMode::default(),
             session_history_days: Some(30),
-            word_confidence_threshold: default_word_confidence_threshold(),
-            max_speech_secs: default_max_speech_secs(),
-            adaptive_vad: false,
             pipeline: PipelineOverrides::default(),
             model_idle_unload_minutes: None,
             input_device: None,
@@ -614,6 +582,23 @@ pub fn is_local_endpoint(url: &Url) -> bool {
     }
 }
 
+/// Gate a user-configured remote endpoint on TLS, with the local carve-out of
+/// [`is_local_endpoint`].
+///
+/// `what` names the caller in the message (`"ASR"`, `"LLM"`). Returns the
+/// rejection message rather than an [`Error`](crate::Error) so each backend
+/// keeps its own error variant.
+pub fn require_tls_or_local(url: &Url, what: &str) -> Result<(), String> {
+    let scheme = url.scheme();
+    if scheme == "https" || is_local_endpoint(url) {
+        return Ok(());
+    }
+    Err(format!(
+        "OpenAI {what} base_url must use HTTPS (got {scheme}://); \
+         plaintext only allowed for loopback and private local addresses"
+    ))
+}
+
 /// Remote OpenAI-compatible styling-LLM provider settings, persisted
 /// independently of the active `llm_backend` so the endpoint/key/model survive
 /// turning styling off.
@@ -648,14 +633,6 @@ fn default_pill_edge_margin() -> u32 {
 
 fn default_sound_cue_volume() -> f32 {
     1.0
-}
-
-fn default_word_confidence_threshold() -> f32 {
-    0.65
-}
-
-fn default_max_speech_secs() -> u32 {
-    60
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -705,6 +682,34 @@ mod tests {
 
     fn local(url: &str) -> bool {
         is_local_endpoint(&Url::parse(url).expect("valid url"))
+    }
+
+    /// The accept/reject matrix both remote backends share. Each backend keeps
+    /// only a wiring test against its own constructor.
+    #[test]
+    fn tls_gate_accepts_https_and_local_plaintext_only() {
+        let gate = |url: &str| require_tls_or_local(&Url::parse(url).expect("valid url"), "ASR");
+
+        for url in [
+            "https://api.example.com/v1",
+            "http://127.0.0.1:11434/v1",
+            "http://[::1]:8080/v1",
+            "http://localhost:1234/v1",
+            "http://box.local/v1",
+            "http://192.168.1.50:11434/v1",
+            "http://10.0.0.7/v1",
+        ] {
+            assert!(gate(url).is_ok(), "{url} should be allowed");
+        }
+
+        for url in [
+            "http://api.example.com/v1",
+            // Link-local carries the cloud metadata address; not a LAN box.
+            "http://169.254.169.254/v1",
+        ] {
+            let err = gate(url).expect_err("{url} should be refused");
+            assert!(err.contains("HTTPS"), "{url}: {err}");
+        }
     }
 
     /// A file written by a newer build names enum variants this build has

@@ -15,7 +15,8 @@
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use lune_audio::{PcenAgcConfig, Vad, VadConfig};
+use earshot::Detector;
+use lune_audio::{PcenAgc, PcenAgcConfig};
 
 const HOP_SIZE: usize = lune_audio::PCEN_HOP_SIZE;
 const SAMPLE_RATE: u32 = 16_000;
@@ -56,11 +57,9 @@ impl BranchResult {
 }
 
 fn run_branch(samples: &[f32], pcen: Option<PcenAgcConfig>) -> BranchResult {
-    let cfg = VadConfig {
-        pcen,
-        ..Default::default()
-    };
-    let mut vad = Vad::new(cfg, SAMPLE_RATE).expect("build Vad");
+    let mut agc = pcen.map(|cfg| PcenAgc::new(cfg, SAMPLE_RATE, HOP_SIZE).expect("build agc"));
+    let mut detector = Detector::default();
+    let mut work = vec![0.0f32; HOP_SIZE];
     let mut out = BranchResult::default();
     out.frames.reserve(samples.len() / HOP_SIZE + 1);
 
@@ -69,10 +68,15 @@ fn run_branch(samples: &[f32], pcen: Option<PcenAgcConfig>) -> BranchResult {
         if chunk.len() < HOP_SIZE {
             break;
         }
-        let r = vad.process_chunk(chunk);
+        work.clear();
+        work.extend_from_slice(chunk);
+        if let Some(a) = agc.as_mut() {
+            a.process_frame(&mut work);
+        }
+        let score = detector.predict_f32(&work);
         out.frames.push(FrameStat {
-            score: r.vad_score,
-            is_speech_decision: r.is_speech,
+            score,
+            is_speech_decision: score >= SPEECH_START,
         });
     }
     out.elapsed_us = t0.elapsed().as_micros();

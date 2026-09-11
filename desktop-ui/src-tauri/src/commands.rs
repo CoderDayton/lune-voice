@@ -1043,15 +1043,6 @@ pub async fn install_gpu_backend(
     current_gpu_status()
 }
 
-#[tauri::command]
-pub async fn initialize_pipeline(
-    window: WebviewWindow,
-    runtime: State<'_, AppRuntime>,
-) -> Result<(), String> {
-    require_window_access(&window, &["main"])?;
-    runtime.eager_rebuild().await
-}
-
 #[cfg(test)]
 mod tests {
     use super::{require_window_access_for_label, validate_local_name};

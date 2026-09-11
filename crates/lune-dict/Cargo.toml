@@ -7,15 +7,10 @@ license.workspace = true
 [lints]
 workspace = true
 
-[features]
-default = ["dictionary"]
-# User dictionary (DictionaryManager) — pulls lune-persist (SQLite). On by
-# default; lune-llm opts out, needing only the lexical tables, not the DB.
-dictionary = ["dep:lune-persist"]
 [dependencies]
 bincode = { version = "2", features = ["serde"] }
 lune-core.workspace = true
-lune-persist = { workspace = true, optional = true }
+lune-persist.workspace = true
 serde.workspace = true
 tracing.workspace = true
 # Core dependency: the corrector and lexicon call wordnik_list::word_exists on

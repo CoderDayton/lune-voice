@@ -131,14 +131,6 @@ pub fn en_p_cap_lower(lower: &str) -> Option<f32> {
     EN_CAPRATE.get(&key)
 }
 
-/// True when `word` is capitalized often enough mid-sentence that an
-/// LLM-introduced (or ASR-introduced) capital should be trusted as a proper
-/// noun. Unknown words return `false` (revert), sparing the ~29k known proper
-/// nouns while keeping the prior conservative default for everything else.
-pub fn en_is_proper_cap(word: &str) -> bool {
-    en_p_cap(word).is_some_and(|p| p >= CAP_KEEP_THRESHOLD)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -148,7 +140,6 @@ mod tests {
         for w in ["john", "John", "paris", "Paris.", "monday", "England"] {
             let p = en_p_cap(w).unwrap_or(0.0);
             assert!(p >= CAP_KEEP_THRESHOLD, "{w} p_cap={p} should be >= keep");
-            assert!(en_is_proper_cap(w), "{w} should be proper");
         }
     }
 
@@ -159,14 +150,12 @@ mod tests {
         ] {
             let p = en_p_cap(w).unwrap_or(0.0);
             assert!(p < CAP_KEEP_THRESHOLD, "{w} p_cap={p} should be < keep");
-            assert!(!en_is_proper_cap(w), "{w} should NOT be proper");
         }
     }
 
     #[test]
-    fn unknown_word_is_not_proper() {
+    fn unknown_word_has_no_caprate() {
         assert_eq!(en_p_cap("zzqwxnonsense"), None);
-        assert!(!en_is_proper_cap("zzqwxnonsense"));
     }
 
     #[test]
@@ -185,7 +174,6 @@ mod tests {
         for w in ["I'm", "I'll", "I'd", "I've"] {
             let p = en_p_cap(w).unwrap_or(0.0);
             assert!(p >= CAP_KEEP_THRESHOLD, "{w} p_cap={p} should be >= keep");
-            assert!(en_is_proper_cap(w), "{w} should stay capitalized");
         }
     }
 

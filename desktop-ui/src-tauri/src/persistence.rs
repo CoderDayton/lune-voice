@@ -797,10 +797,6 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
             .pipeline
             .word_confidence_threshold
             .or(backend_defaults.word_confidence_threshold),
-        llm_skip_threshold: settings
-            .pipeline
-            .llm_skip_threshold
-            .or(backend_defaults.llm_skip_threshold),
         style_preset: settings.default_style.clone(),
         hotkey_toggle: format_key_combo(&settings.hotkey.toggle_dictation),
         hotkey_cancel: format_key_combo(&settings.hotkey.cancel_dictation),
@@ -879,14 +875,7 @@ fn apply_settings_dto(
             "confidenceThreshold must be {CONFIDENCE_MIN}–{CONFIDENCE_MAX}, got {ct}"
         ));
     }
-    if let Some(threshold) = input.llm_skip_threshold
-        && (!threshold.is_finite() || !(0.0..=1.0).contains(&threshold))
-    {
-        return Err(format!("llmSkipThreshold must be 0.0–1.0, got {threshold}"));
-    }
     settings.pipeline.word_confidence_threshold = input.confidence_threshold;
-    settings.pipeline.llm_skip_threshold = input.llm_skip_threshold;
-    settings.word_confidence_threshold = input.confidence_threshold.unwrap_or(0.5);
 
     // Validate style_preset — `None`/empty means no styling (raw transcript);
     // any present value must be a known builtin or custom style.
@@ -1378,26 +1367,6 @@ mod tests {
         assert!(db.list_sessions(10).unwrap().is_empty());
     }
 
-    #[test]
-    fn load_settings_migrates_legacy_pipeline_fields() {
-        let dir = tempfile::tempdir().unwrap();
-        let paths = AppPaths::from_dirs(dir.path().join("config"), dir.path().join("data"));
-
-        let legacy = UserSettings {
-            pipeline: Default::default(),
-            word_confidence_threshold: 0.77,
-            max_speech_secs: 42,
-            adaptive_vad: true,
-            ..UserSettings::default()
-        };
-        save_settings(&paths, &legacy).unwrap();
-
-        let loaded = load_settings(&paths).unwrap();
-        assert_eq!(loaded.pipeline.word_confidence_threshold, Some(0.77));
-        assert_eq!(loaded.pipeline.max_speech_secs, Some(42));
-        assert_eq!(loaded.pipeline.adaptive_vad, Some(true));
-    }
-
     /// Build a `SaveWorkspaceSettingsInput` from defaults for test convenience.
     fn default_save_input() -> SaveWorkspaceSettingsInput {
         let dto = settings_to_dto(&UserSettings::default());
@@ -1411,7 +1380,6 @@ mod tests {
             device_policy: dto.device_policy,
             asr_backend_type: dto.asr_backend_type,
             confidence_threshold: dto.confidence_threshold,
-            llm_skip_threshold: dto.llm_skip_threshold,
             style_preset: dto.style_preset,
             hotkey_toggle: dto.hotkey_toggle,
             hotkey_cancel: dto.hotkey_cancel,
@@ -1461,27 +1429,18 @@ mod tests {
     }
 
     #[test]
-    fn apply_settings_persists_llm_skip_threshold() {
+    fn apply_settings_persists_confidence_threshold() {
         let mut settings = UserSettings::default();
         let mut db = Database::open_in_memory().expect("db");
 
         let mut input = default_save_input();
         input.confidence_threshold = Some(0.55);
-        input.llm_skip_threshold = Some(0.75);
         apply_settings_dto(&mut settings, input, &mut db).unwrap();
-        assert_eq!(settings.pipeline.llm_skip_threshold, Some(0.75));
+        assert_eq!(settings.pipeline.word_confidence_threshold, Some(0.55));
 
-        // A skip threshold below the marking threshold is valid: the gate's
-        // attention band fires on >=2 low-confidence words, not on ordering.
+        // Out-of-range is rejected.
         let mut input = default_save_input();
-        input.confidence_threshold = Some(0.55);
-        input.llm_skip_threshold = Some(0.40);
-        apply_settings_dto(&mut settings, input, &mut db).unwrap();
-        assert_eq!(settings.pipeline.llm_skip_threshold, Some(0.40));
-
-        // Out-of-range is still rejected.
-        let mut input = default_save_input();
-        input.llm_skip_threshold = Some(1.5);
+        input.confidence_threshold = Some(1.5);
         assert!(apply_settings_dto(&mut settings, input, &mut db).is_err());
     }
 

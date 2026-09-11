@@ -35,10 +35,7 @@ fn main() {
 
         let audio_stream = AudioStream::from_samples(&fixture.pcm, AudioConfig::default()).unwrap();
 
-        let mut pipeline = harness.asr.pipeline_config();
-        pipeline.itn_enabled = false;
-
-        let mgr = harness.session_manager(pipeline);
+        let mgr = harness.session_manager(harness.asr.pipeline_config());
 
         let (event_tx, mut event_rx) = mpsc::channel::<SessionEvent>(256);
 

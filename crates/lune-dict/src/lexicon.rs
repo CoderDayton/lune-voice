@@ -185,7 +185,7 @@ impl VocabIndex {
     fn build() -> Self {
         let mut canonical_by_lower: HashMap<Box<str>, Box<str>> = HashMap::new();
         let mut all_lengths: std::collections::BTreeSet<usize> = std::collections::BTreeSet::new();
-        for word in vocab::bundled().words.keys().map(String::as_str) {
+        for word in vocab::bundled().words.iter().map(String::as_str) {
             // Must fold the same way the lookup above does, or an accented
             // vocab term is indexed under a key no transcript can produce.
             let lower = crate::fold_ci(word);

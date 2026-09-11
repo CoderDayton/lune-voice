@@ -429,7 +429,6 @@ pub fn run() {
             commands::required_models_ready,
             commands::download_model_cmd,
             commands::delete_model_cmd,
-            commands::initialize_pipeline,
             commands::gpu_backend_status,
             commands::uinput_access_ready,
             commands::grant_uinput_access,

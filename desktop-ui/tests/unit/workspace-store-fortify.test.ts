@@ -164,20 +164,9 @@ describe("workspace store fortification", () => {
     expect(workspaceStore.state.runtime.audioLevel).toBe(0);
   });
 
-  test("correctedText replaces the live transcript entirely", () => {
-    workspaceActions.applySessionEvent({ type: "sessionStarted", sessionId: "s1" });
-    workspaceActions.applySessionEvent({ type: "finalizedText", text: "hello world" });
-    workspaceActions.applySessionEvent({ type: "correctedText", text: "Hello, World!" });
-
-    expect(workspaceStore.state.runtime.liveTranscript).toBe("Hello, World!");
-  });
-
-  test("partialText and commandDetected are no-ops (state unchanged)", () => {
+  test("commandDetected is a no-op (state unchanged)", () => {
     workspaceActions.applySessionEvent({ type: "sessionStarted", sessionId: "s1" });
     const before = workspaceStore.state.runtime;
-
-    workspaceActions.applySessionEvent({ type: "partialText" });
-    expect(workspaceStore.state.runtime).toBe(before);
 
     workspaceActions.applySessionEvent({ type: "commandDetected", payload: "{}" });
     expect(workspaceStore.state.runtime).toBe(before);

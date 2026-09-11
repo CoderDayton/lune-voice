@@ -1041,11 +1041,6 @@ impl AppRuntime {
                     SessionEvent::Started => {
                         runtime.publish_status("listening").await;
                     }
-                    SessionEvent::PartialText => {
-                        runtime
-                            .push_session_event(SessionStreamEvent::PartialText)
-                            .await;
-                    }
                     SessionEvent::Processing => {
                         runtime.publish_status("processing").await;
                         runtime
@@ -1136,13 +1131,6 @@ impl AppRuntime {
                         }
                         runtime
                             .push_session_event(SessionStreamEvent::FinalizedText { text })
-                            .await;
-                    }
-                    SessionEvent::CorrectedText(text) => {
-                        // Corrected text is a UI signal; the finalized text event
-                        // remains the authoritative delivery payload.
-                        runtime
-                            .push_session_event(SessionStreamEvent::CorrectedText { text })
                             .await;
                     }
                     SessionEvent::AudioLevel(level) => {
