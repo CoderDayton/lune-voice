@@ -279,9 +279,18 @@ fn row_to_custom_style(row: CustomStyleRow) -> PersistResult<StoredCustomStyle> 
     })
 }
 
+/// `PRAGMA user_version` once the pre-`secure_delete` freelist has been
+/// vacuumed away. Durable, because every command opens its own [`Database`]:
+/// an in-process flag would make the one-off reclaim run once per connection,
+/// i.e. on every history delete and every settings save.
+const RECLAIMED_USER_VERSION: i32 = 1;
+
 /// SQLite database for dictionary, snippets, session history.
 pub struct Database {
     conn: SqliteConnection,
+    /// Whether the one-off `VACUUM` that clears a pre-`secure_delete`
+    /// freelist has already run on this database file.
+    legacy_pages_reclaimed: bool,
 }
 
 impl Database {
@@ -303,7 +312,17 @@ impl Database {
         diesel::sql_query("PRAGMA temp_store=MEMORY").execute(&mut conn)?;
         diesel::sql_query("PRAGMA mmap_size=268435456").execute(&mut conn)?;
         diesel::sql_query("PRAGMA wal_autocheckpoint=1000").execute(&mut conn)?;
-        let mut db = Self { conn };
+        // Zero a page's content when it is freed. Deleting a row otherwise only
+        // unlinks its page, leaving the transcript readable in the file for
+        // anyone with `strings` — and `delete_session` / `purge_history` are
+        // presented to the user as removing it. The write amplification is
+        // irrelevant here: this database grows by about 11-15 MB a year.
+        diesel::sql_query("PRAGMA secure_delete=ON").execute(&mut conn)?;
+        let reclaimed = read_user_version(&mut conn) >= RECLAIMED_USER_VERSION;
+        let mut db = Self {
+            conn,
+            legacy_pages_reclaimed: reclaimed,
+        };
         db.run_migrations()?;
         // Migrations may have created the WAL/SHM sidecars; harden everything
         // now that the schema is in place.
@@ -316,7 +335,10 @@ impl Database {
         let mut conn = SqliteConnection::establish(":memory:")?;
         diesel::sql_query("PRAGMA temp_store=MEMORY").execute(&mut conn)?;
         diesel::sql_query("PRAGMA busy_timeout=5000").execute(&mut conn)?;
-        let mut db = Self { conn };
+        let mut db = Self {
+            conn,
+            legacy_pages_reclaimed: false,
+        };
         db.run_migrations()?;
         Ok(db)
     }
@@ -1104,6 +1126,7 @@ impl Database {
     }
 
     pub fn delete_session(&mut self, session_id: &str) -> PersistResult<bool> {
+        let deleted =
         // Cascade: drop the session's calibration pairs so deleting a session
         // leaves no transcript text behind. There is no SQL foreign key and the
         // connection doesn't enable `PRAGMA foreign_keys`, so delete explicitly.
@@ -1117,8 +1140,46 @@ impl Database {
             }
             use self::schema::sessions::dsl::*;
             let count = diesel::delete(sessions.filter(id.eq(session_id))).execute(conn)?;
-            Ok(count > 0)
-        })
+            Ok::<_, diesel::result::Error>(count > 0)
+        })?;
+        if deleted {
+            self.reclaim_freed_pages();
+        }
+        Ok(deleted)
+    }
+
+    /// Rewrite the file so pages freed before `secure_delete` was set are gone.
+    ///
+    /// `secure_delete` zeroes pages freed from now on, but a database written
+    /// by an older build carries a freelist full of readable transcripts, and
+    /// nothing else ever reclaims it. Runs after the deleting transaction —
+    /// `VACUUM` cannot run inside one — and is best-effort: a failure leaves
+    /// the rows deleted, which is what the caller asked for.
+    ///
+    /// Once per database file, not once per delete: the legacy freelist is a
+    /// one-time inheritance, while `VACUUM` rewrites the whole file. Running
+    /// it on every row the History tab deletes would rebuild the database
+    /// once per click, holding the lock the live pipeline writes through —
+    /// and every command here opens its own connection, so the marker has to
+    /// outlive the process rather than sit in a field.
+    fn reclaim_freed_pages(&mut self) {
+        if self.legacy_pages_reclaimed {
+            return;
+        }
+        match diesel::sql_query("VACUUM").execute(&mut self.conn) {
+            Ok(_) => {
+                self.legacy_pages_reclaimed = true;
+                // `VACUUM` preserves `user_version`, so the mark has to be
+                // written after it rather than before.
+                if let Err(e) =
+                    diesel::sql_query(format!("PRAGMA user_version={RECLAIMED_USER_VERSION}"))
+                        .execute(&mut self.conn)
+                {
+                    tracing::warn!(error = %e, "could not mark the database as reclaimed");
+                }
+            }
+            Err(e) => tracing::warn!(error = %e, "could not reclaim freed database pages"),
+        }
     }
 
     /// Delete several sessions at once, cascading to their correction pairs.
@@ -1131,7 +1192,7 @@ impl Database {
         if session_ids.is_empty() {
             return Ok(0);
         }
-        self.conn.transaction(|conn| {
+        let count = self.conn.transaction(|conn| {
             {
                 use self::schema::correction_pairs::dsl as cp;
                 diesel::delete(cp::correction_pairs.filter(cp::session_id.eq_any(session_ids)))
@@ -1139,8 +1200,12 @@ impl Database {
             }
             use self::schema::sessions::dsl::*;
             let count = diesel::delete(sessions.filter(id.eq_any(session_ids))).execute(conn)?;
-            Ok(count)
-        })
+            Ok::<_, diesel::result::Error>(count)
+        })?;
+        if count > 0 {
+            self.reclaim_freed_pages();
+        }
+        Ok(count)
     }
 
     /// Close out sessions left open by a previous run.
@@ -1177,15 +1242,19 @@ impl Database {
     /// the setting off has to remove what was already collected, not merely
     /// stop adding to it. Returns the number of sessions deleted.
     pub fn purge_history(&mut self) -> PersistResult<usize> {
-        self.conn.transaction(|conn| {
+        let count = self.conn.transaction(|conn| {
             let count = {
                 use self::schema::sessions::dsl::*;
                 diesel::delete(sessions).execute(conn)?
             };
             use self::schema::correction_pairs::dsl as cp;
             diesel::delete(cp::correction_pairs).execute(conn)?;
-            Ok(count)
-        })
+            Ok::<_, diesel::result::Error>(count)
+        })?;
+        if count > 0 {
+            self.reclaim_freed_pages();
+        }
+        Ok(count)
     }
 
     /// Delete sessions whose `started_at` is older than `days` days ago.
@@ -1195,7 +1264,7 @@ impl Database {
         let cutoff = (Utc::now() - chrono::Duration::days(i64::from(days))).to_rfc3339();
         // Same atomicity discipline as `delete_session`: the retention sweep is
         // one cascade, so it commits or rolls back as one.
-        self.conn.transaction(|conn| {
+        let count = self.conn.transaction(|conn| {
             let count = {
                 use self::schema::sessions::dsl::*;
                 diesel::delete(sessions.filter(started_at.lt(&cutoff))).execute(conn)?
@@ -1206,9 +1275,27 @@ impl Database {
                 diesel::delete(cp::correction_pairs.filter(cp::created_at.lt(&cutoff)))
                     .execute(conn)?;
             }
-            Ok(count)
-        })
+            Ok::<_, diesel::result::Error>(count)
+        })?;
+        if count > 0 {
+            self.reclaim_freed_pages();
+        }
+        Ok(count)
     }
+}
+
+/// Read `PRAGMA user_version`, treating any failure as "never marked".
+fn read_user_version(conn: &mut SqliteConnection) -> i32 {
+    #[derive(diesel::QueryableByName)]
+    struct UserVersion {
+        #[diesel(sql_type = diesel::sql_types::Integer)]
+        user_version: i32,
+    }
+
+    diesel::sql_query("PRAGMA user_version")
+        .get_result::<UserVersion>(conn)
+        .map(|v| v.user_version)
+        .unwrap_or(0)
 }
 
 #[cfg(test)]
@@ -1989,6 +2076,80 @@ mod tests {
             db.update_dictionary_entry_unique(9999, "codeberg", "Codeberg", 0, collide)
                 .unwrap(),
             Some(false)
+        );
+    }
+
+    /// `delete_session` and `purge_history` are presented to the user as
+    /// removing the transcript. Deleting a row only unlinks its page, so
+    /// without `secure_delete` the text stays readable in the file.
+    #[test]
+    fn a_deleted_transcript_is_not_left_readable_in_the_file() {
+        const SECRET: &str = "zqx-canary-transcript-never-to-be-found-again";
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("lune.db");
+
+        let mut db = Database::open(&path).unwrap();
+        let sid = Uuid::new_v4();
+        db.insert_session(&DictationSession {
+            id: sid,
+            started_at: Utc::now(),
+            ended_at: None,
+            style: None,
+            backend: AsrBackendKind::WhisperCpp,
+            status: SessionStatus::Active,
+            transcript: Some(SECRET.into()),
+        })
+        .unwrap();
+        db.insert_correction_pair(sid, SECRET, SECRET).unwrap();
+        assert!(db.delete_session(&sid.to_string()).unwrap());
+        drop(db);
+
+        for suffix in ["", "-wal", "-shm"] {
+            let mut p = path.clone().into_os_string();
+            p.push(suffix);
+            let Ok(bytes) = std::fs::read(&p) else {
+                continue;
+            };
+            assert!(
+                !bytes.windows(SECRET.len()).any(|w| w == SECRET.as_bytes()),
+                "the deleted transcript is still readable in {p:?}"
+            );
+        }
+    }
+
+    /// Every history command opens its own connection, so an in-process flag
+    /// would make the one-off reclaim a full `VACUUM` per deleted row and per
+    /// settings save. The mark has to survive the reopen.
+    #[test]
+    fn the_legacy_reclaim_runs_once_per_file_not_once_per_connection() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("lune.db");
+
+        let mut db = Database::open(&path).unwrap();
+        assert!(!db.legacy_pages_reclaimed);
+        // A prune that deleted nothing must not rewrite the file either.
+        assert_eq!(db.prune_sessions(30).unwrap(), 0);
+        assert!(!db.legacy_pages_reclaimed);
+
+        let sid = Uuid::new_v4();
+        db.insert_session(&DictationSession {
+            id: sid,
+            started_at: Utc::now(),
+            ended_at: None,
+            style: None,
+            backend: AsrBackendKind::WhisperCpp,
+            status: SessionStatus::Active,
+            transcript: Some("gone".into()),
+        })
+        .unwrap();
+        assert!(db.delete_session(&sid.to_string()).unwrap());
+        assert!(db.legacy_pages_reclaimed);
+        drop(db);
+
+        let db = Database::open(&path).unwrap();
+        assert!(
+            db.legacy_pages_reclaimed,
+            "a fresh connection must not vacuum the file again"
         );
     }
 

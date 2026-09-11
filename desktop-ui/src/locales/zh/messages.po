@@ -91,19 +91,19 @@ msgstr "## 会议 — {date}\n"
 "与会者：\n"
 "- "
 
-#: src/features/settings/data/settings-data.ts:278
+#: src/features/settings/data/settings-data.ts:298
 msgid "1 year"
 msgstr "1 年"
 
-#: src/features/settings/data/settings-data.ts:276
+#: src/features/settings/data/settings-data.ts:296
 msgid "30 days"
 msgstr "30 天"
 
-#: src/features/settings/data/settings-data.ts:275
+#: src/features/settings/data/settings-data.ts:295
 msgid "7 days"
 msgstr "7 天"
 
-#: src/features/settings/data/settings-data.ts:277
+#: src/features/settings/data/settings-data.ts:297
 msgid "90 days"
 msgstr "90 天"
 
@@ -154,23 +154,23 @@ msgstr "添加修复后，Lune Voice 会在您每次听写时应用它。尝试�
 msgid "Add snippet"
 msgstr "添加片段"
 
-#: src/features/settings/data/settings-data.ts:312
+#: src/features/settings/data/settings-data.ts:332
 msgid "After 1 hour"
 msgstr "1 小时后"
 
-#: src/features/settings/data/settings-data.ts:310
+#: src/features/settings/data/settings-data.ts:330
 msgid "After 15 minutes"
 msgstr "15 分钟后"
 
-#: src/features/settings/data/settings-data.ts:313
+#: src/features/settings/data/settings-data.ts:333
 msgid "After 2 hours"
 msgstr "2 小时后"
 
-#: src/features/settings/data/settings-data.ts:311
+#: src/features/settings/data/settings-data.ts:331
 msgid "After 30 minutes"
 msgstr "30 分钟后"
 
-#: src/features/settings/data/settings-data.ts:309
+#: src/features/settings/data/settings-data.ts:329
 msgid "After 5 minutes"
 msgstr "5 分钟后"
 
@@ -190,6 +190,14 @@ msgstr "全部 · 今天"
 #: src/features/welcome/components/ready-checks.tsx:124
 msgid "Allow"
 msgstr "允许"
+
+#: src/features/settings/data/settings-data.ts:286
+msgid "Allow remote"
+msgstr ""
+
+#: src/features/settings/data/settings-data.ts:287
+msgid "Allow remote transcription and styling wherever you have configured them."
+msgstr ""
 
 #: src/features/settings/data/settings-data.ts:95
 msgid "Always"
@@ -400,7 +408,7 @@ msgstr "选择如何将完成的文本插入到您当前使用的应用程序中
 msgid "Choose how Lune Voice looks."
 msgstr "选择 Lune Voice 的外观。"
 
-#: src/features/settings/sections/styling-engine-section.tsx:38
+#: src/features/settings/sections/styling-engine-section.tsx:49
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
 msgstr "选择如何润色转写结果 — 发送到你配置的 OpenAI 兼容端点（本地或托管均可），或者完全关闭。"
 
@@ -684,7 +692,7 @@ msgstr "磁盘使用情况"
 msgid "Dismiss error"
 msgstr "消除错误"
 
-#: src/features/settings/data/settings-data.ts:274
+#: src/features/settings/data/settings-data.ts:294
 msgid "Don't save history"
 msgstr "不保存历史"
 
@@ -800,7 +808,7 @@ msgstr "启用润色"
 
 #: src/features/history/components/history-table.tsx:182
 #: src/features/history/components/session-detail-modal.tsx:163
-#: src/features/settings/sections/styling-engine-section.tsx:42
+#: src/features/settings/sections/styling-engine-section.tsx:67
 msgid "Engine"
 msgstr "引擎"
 
@@ -1047,11 +1055,11 @@ msgstr "指示"
 msgid "Join the discussions"
 msgstr "参与讨论"
 
-#: src/features/settings/data/settings-data.ts:279
+#: src/features/settings/data/settings-data.ts:299
 msgid "Keep forever"
 msgstr "永久保留"
 
-#: src/features/settings/data/settings-data.ts:306
+#: src/features/settings/data/settings-data.ts:326
 msgid "Keep loaded"
 msgstr "保持加载"
 
@@ -1084,6 +1092,10 @@ msgstr "语言"
 #: src/features/settings/data/settings-data.ts:112
 msgid "Large"
 msgstr "大"
+
+#: src/features/settings/data/settings-data.ts:189
+msgid "Large v3 Turbo"
+msgstr ""
 
 #: src/features/updates/update-dialog.tsx:234
 msgid "Later"
@@ -1119,6 +1131,18 @@ msgstr "正在聆听 — 请说出该短语…"
 #: src/features/shell/components/sidebar-widgets.tsx:51
 msgid "Listening…"
 msgstr "正在听……"
+
+#: src/features/settings/data/settings-data.ts:276
+msgid "Local only"
+msgstr ""
+
+#: src/features/settings/sections/styling-engine-section.tsx:54
+msgid "Local only disables styling even if an engine is selected below — the transcript is delivered raw instead."
+msgstr ""
+
+#: src/features/settings/data/settings-data.ts:281
+msgid "Local preferred"
+msgstr ""
 
 #: src/features/settings/sections/pill-section.tsx:164
 #: src/features/settings/sections/pill-section.tsx:172
@@ -1225,6 +1249,10 @@ msgstr "名称过长。"
 msgid "Never"
 msgstr "从不显示"
 
+#: src/features/settings/data/settings-data.ts:277
+msgid "Never send audio or text to a remote service. Remote transcription and styling are disabled."
+msgstr ""
+
 #: src/features/snippets/snippets-page.tsx:204
 #: src/features/snippets/snippets-page.tsx:242
 #: src/features/snippets/snippets-page.tsx:501
@@ -1319,7 +1347,7 @@ msgstr "未安装任���内容"
 msgid "Off"
 msgstr "关闭"
 
-#: src/features/settings/sections/styling-engine-section.tsx:43
+#: src/features/settings/sections/styling-engine-section.tsx:68
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 msgstr "关闭时传递原始转录文本。应用哪种风格在“风格”标签页中选择。"
 
@@ -1340,7 +1368,7 @@ msgstr "打开菜单"
 msgid "Open session from {time}"
 msgstr "{time} 开始的会议"
 
-#: src/features/settings/data/settings-data.ts:350
+#: src/features/settings/data/settings-data.ts:370
 msgid "OpenAI-compatible"
 msgstr "OpenAI 兼容"
 
@@ -1377,7 +1405,7 @@ msgstr "总体进展"
 msgid "Pagination"
 msgstr "分页"
 
-#: src/features/settings/data/settings-data.ts:354
+#: src/features/settings/data/settings-data.ts:374
 msgid "Paste"
 msgstr "粘贴"
 
@@ -1443,6 +1471,10 @@ msgstr "请保持应用程序打开直至下载完成"
 msgid "Position"
 msgstr "位置"
 
+#: src/features/settings/data/settings-data.ts:282
+msgid "Prefer on-device processing, but allow a remote service where you have configured one."
+msgstr ""
+
 #: src/features/settings/sections/pill-section.tsx:112
 msgid "Preset corner or edge the pill starts at."
 msgstr "指示器起始的预设边角或边缘。"
@@ -1496,6 +1528,11 @@ msgstr "主显示器"
 #: src/features/dictionary/components/priority-picker.tsx:54
 msgid "Priority"
 msgstr "优先事项"
+
+#: src/features/settings/sections/styling-engine-section.tsx:53
+#: src/features/settings/sections/styling-engine-section.tsx:59
+msgid "Privacy"
+msgstr ""
 
 #: src/features/dictation/dictation-pill.tsx:61
 #: src/features/dictation/dictation-pill.tsx:67
@@ -1877,7 +1914,7 @@ msgstr "风格"
 msgid "Styling"
 msgstr "润色"
 
-#: src/features/settings/sections/styling-engine-section.tsx:37
+#: src/features/settings/sections/styling-engine-section.tsx:48
 msgid "Styling engine"
 msgstr "润色引擎"
 
@@ -1928,7 +1965,7 @@ msgstr "用于语音输入的主要快捷方式。单击绑定以更改它。"
 msgid "The microphone is in use"
 msgstr "麦克风正在使用中"
 
-#: src/features/settings/data/settings-data.ts:307
+#: src/features/settings/data/settings-data.ts:327
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "模型常驻内存。每次听写都能立即开始。"
 
@@ -2066,7 +2103,7 @@ msgstr "触发短语"
 msgid "Try again"
 msgstr "重试"
 
-#: src/features/settings/data/settings-data.ts:355
+#: src/features/settings/data/settings-data.ts:375
 msgid "Type"
 msgstr "输入"
 
@@ -2203,7 +2240,7 @@ msgstr "发送哪个粘贴快捷键。「自动」会检测终端；如果粘贴
 msgid "Which screen the pill appears on."
 msgstr "指示器显示在哪个屏幕上。"
 
-#: src/features/settings/data/settings-data.ts:349
+#: src/features/settings/data/settings-data.ts:369
 #: src/features/welcome/components/engine-step.tsx:53
 msgid "Whisper"
 msgstr "Whisper"

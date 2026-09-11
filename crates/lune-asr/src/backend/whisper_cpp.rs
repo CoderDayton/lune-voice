@@ -89,6 +89,23 @@ pub fn check_ggml_file(path: &std::path::Path) -> Result<()> {
     Ok(())
 }
 
+/// Route whisper.cpp + ggml native logs into `tracing` instead of raw stderr,
+/// so they obey the global log filter.
+///
+/// Idempotent, and must run before anything that can make ggml talk —
+/// `gpu_backend::load_plugins` above all, whose `dlopen` failures are the only
+/// account of why a GPU plugin did not load. On a GUI launch raw stderr goes
+/// nowhere, so a diagnostic emitted before this call is lost outright.
+#[cfg(feature = "whisper-cpp")]
+pub fn install_logging_hooks() {
+    static LOG_HOOK: std::sync::Once = std::sync::Once::new();
+    LOG_HOOK.call_once(whisper_rs::install_logging_hooks);
+}
+
+/// No-op: the stub build links no whisper.cpp, so there is nothing to route.
+#[cfg(not(feature = "whisper-cpp"))]
+pub fn install_logging_hooks() {}
+
 #[cfg(feature = "whisper-cpp")]
 mod imp {
     use super::{AsrSessionConfig, Result, WhisperCppConfig, check_ggml_file};
@@ -241,11 +258,10 @@ mod imp {
     impl WhisperCppBackend {
         #[cold]
         pub fn new(config: WhisperCppConfig) -> Result<Self> {
-            // Route whisper.cpp + ggml native logs into `tracing` (whisper-rs
-            // `tracing_backend`) instead of raw stderr, so they obey the global
-            // log filter (quiet by default). Idempotent; runs once per process.
-            static LOG_HOOK: std::sync::Once = std::sync::Once::new();
-            LOG_HOOK.call_once(whisper_rs::install_logging_hooks);
+            // Normally already done at startup, before the plugin load. Kept
+            // here so a caller that builds a backend without going through
+            // that path still gets whisper's logs.
+            super::install_logging_hooks();
 
             // Validate before handing the path to whisper.cpp. Its loader
             // signals a malformed file by throwing a C++ exception or tripping

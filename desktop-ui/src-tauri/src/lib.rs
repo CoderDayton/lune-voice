@@ -31,7 +31,7 @@ mod window_tests;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Manager, WebviewWindowBuilder};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 /// Set when the user explicitly requested a quit (tray "Quit" menu).
@@ -190,17 +190,28 @@ fn create_or_focus_main_window(app: &tauri::AppHandle) {
         let _ = w.set_focus();
         return;
     }
+    // The window's properties live in `tauri.conf.json` under `app.windows`,
+    // declared with `"create": false` so Tauri does not build it at startup.
+    // Only the size is decided here, because it adapts to the monitor.
+    let Some(config) = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|w| w.label == "main")
+        .cloned()
+    else {
+        tracing::error!("no `main` window is declared in tauri.conf.json");
+        return;
+    };
     let (width, height) = adaptive_window_size(app);
-    if let Err(e) = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-        .title("Lune Voice")
-        .inner_size(width, height)
-        .min_inner_size(MIN_WINDOW_W, MIN_WINDOW_H)
-        .resizable(true)
-        .decorations(true)
-        .center()
-        .build()
-    {
-        tracing::error!(error = %e, "failed to create main window");
+    match WebviewWindowBuilder::from_config(app, &config) {
+        Ok(builder) => {
+            if let Err(e) = builder.inner_size(width, height).build() {
+                tracing::error!(error = %e, "failed to create main window");
+            }
+        }
+        Err(e) => tracing::error!(error = %e, "failed to read the main window config"),
     }
 }
 
@@ -232,6 +243,11 @@ pub fn run() {
     // context-creation time, so a late load would silently leave the app on
     // the CPU. Bundled CPU plugins and the optional downloaded CUDA plugin are
     // both picked up here.
+    // Before the load, not after: ggml reports a failed plugin `dlopen` through
+    // its own log callback, and until this is installed that goes to raw
+    // stderr — invisible on a GUI launch, and unrecoverable even with
+    // `RUST_LOG=info`.
+    lune_asr::install_logging_hooks();
     if let Some(paths) = lune_persist::AppPaths::resolve() {
         let devices = lune_asr::gpu_backend::load_plugins(paths.data_dir());
         tracing::info!(?devices, "ggml compute backends available");
@@ -288,7 +304,11 @@ pub fn run() {
             // minimized the webview isn't created at all — the tray icon
             // (registered below) is the way to bring it up, which lazily
             // builds it via create_or_focus_main_window.
-            if !start_minimized {
+            // Under WebDriver automation there is no tray for a test to click,
+            // and a session attaches to a webview — so the window has to exist
+            // regardless of the preference. `tauri-driver` sets this.
+            let automated = std::env::var("TAURI_WEBVIEW_AUTOMATION").as_deref() == Ok("true");
+            if !start_minimized || automated {
                 create_or_focus_main_window(app.handle());
             }
 
@@ -527,7 +547,11 @@ async fn dispatch_hotkey(rt: &runtime::AppRuntime, action: hotkey::HotkeyAction)
         }
         hotkey::HotkeyAction::Start => {
             tracing::info!(action = "start", "hotkey pressed");
-            let _ = rt.start_dictation().await;
+            // The runtime surfaces this to the UI itself; log it here so the
+            // unsanitized cause is in the trace too.
+            if let Err(e) = rt.start_dictation().await {
+                tracing::warn!(error = %e, "hotkey start failed");
+            }
         }
         hotkey::HotkeyAction::Stop => {
             tracing::info!(action = "stop", "hotkey pressed");

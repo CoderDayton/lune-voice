@@ -91,19 +91,19 @@ msgstr "## 회의 — {date}\n"
 "참석자:\n"
 "- "
 
-#: src/features/settings/data/settings-data.ts:278
+#: src/features/settings/data/settings-data.ts:298
 msgid "1 year"
 msgstr "1년"
 
-#: src/features/settings/data/settings-data.ts:276
+#: src/features/settings/data/settings-data.ts:296
 msgid "30 days"
 msgstr "30일"
 
-#: src/features/settings/data/settings-data.ts:275
+#: src/features/settings/data/settings-data.ts:295
 msgid "7 days"
 msgstr "7일"
 
-#: src/features/settings/data/settings-data.ts:277
+#: src/features/settings/data/settings-data.ts:297
 msgid "90 days"
 msgstr "90일"
 
@@ -154,23 +154,23 @@ msgstr "수정 규칙을 추가하면 Lune Voice가 받아쓰기할 때마다 �
 msgid "Add snippet"
 msgstr "스니펫 추가"
 
-#: src/features/settings/data/settings-data.ts:312
+#: src/features/settings/data/settings-data.ts:332
 msgid "After 1 hour"
 msgstr "1시간 후"
 
-#: src/features/settings/data/settings-data.ts:310
+#: src/features/settings/data/settings-data.ts:330
 msgid "After 15 minutes"
 msgstr "15분 후"
 
-#: src/features/settings/data/settings-data.ts:313
+#: src/features/settings/data/settings-data.ts:333
 msgid "After 2 hours"
 msgstr "2시간 후"
 
-#: src/features/settings/data/settings-data.ts:311
+#: src/features/settings/data/settings-data.ts:331
 msgid "After 30 minutes"
 msgstr "30분 후"
 
-#: src/features/settings/data/settings-data.ts:309
+#: src/features/settings/data/settings-data.ts:329
 msgid "After 5 minutes"
 msgstr "5분 후"
 
@@ -190,6 +190,14 @@ msgstr "전체 · 오늘"
 #: src/features/welcome/components/ready-checks.tsx:124
 msgid "Allow"
 msgstr "허용"
+
+#: src/features/settings/data/settings-data.ts:286
+msgid "Allow remote"
+msgstr ""
+
+#: src/features/settings/data/settings-data.ts:287
+msgid "Allow remote transcription and styling wherever you have configured them."
+msgstr ""
 
 #: src/features/settings/data/settings-data.ts:95
 msgid "Always"
@@ -400,7 +408,7 @@ msgstr "현재 사용 중인 앱에 완성된 텍스트를 삽입하는 방법�
 msgid "Choose how Lune Voice looks."
 msgstr "Lune Voice의 모양을 선택하세요."
 
-#: src/features/settings/sections/styling-engine-section.tsx:38
+#: src/features/settings/sections/styling-engine-section.tsx:49
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
 msgstr "전사본을 다듬는 방식을 선택하세요 — 직접 설정한 OpenAI 호환 엔드포인트(로컬이든 호스팅이든)로 보내거나, 전혀 사용하지 않을 수 있습니다."
 
@@ -684,7 +692,7 @@ msgstr "디스크 사용량"
 msgid "Dismiss error"
 msgstr "오류 무시"
 
-#: src/features/settings/data/settings-data.ts:274
+#: src/features/settings/data/settings-data.ts:294
 msgid "Don't save history"
 msgstr "기록을 저장하지 않음"
 
@@ -800,7 +808,7 @@ msgstr "스타일 지정 사용"
 
 #: src/features/history/components/history-table.tsx:182
 #: src/features/history/components/session-detail-modal.tsx:163
-#: src/features/settings/sections/styling-engine-section.tsx:42
+#: src/features/settings/sections/styling-engine-section.tsx:67
 msgid "Engine"
 msgstr "엔진"
 
@@ -1047,11 +1055,11 @@ msgstr "지침"
 msgid "Join the discussions"
 msgstr "토론에 참여하기"
 
-#: src/features/settings/data/settings-data.ts:279
+#: src/features/settings/data/settings-data.ts:299
 msgid "Keep forever"
 msgstr "계속 보관"
 
-#: src/features/settings/data/settings-data.ts:306
+#: src/features/settings/data/settings-data.ts:326
 msgid "Keep loaded"
 msgstr "계속 불러둠"
 
@@ -1084,6 +1092,10 @@ msgstr "언어"
 #: src/features/settings/data/settings-data.ts:112
 msgid "Large"
 msgstr "크게"
+
+#: src/features/settings/data/settings-data.ts:189
+msgid "Large v3 Turbo"
+msgstr ""
 
 #: src/features/updates/update-dialog.tsx:234
 msgid "Later"
@@ -1119,6 +1131,18 @@ msgstr "듣는 중 — 문구를 말하세요…"
 #: src/features/shell/components/sidebar-widgets.tsx:51
 msgid "Listening…"
 msgstr "듣는 중…"
+
+#: src/features/settings/data/settings-data.ts:276
+msgid "Local only"
+msgstr ""
+
+#: src/features/settings/sections/styling-engine-section.tsx:54
+msgid "Local only disables styling even if an engine is selected below — the transcript is delivered raw instead."
+msgstr ""
+
+#: src/features/settings/data/settings-data.ts:281
+msgid "Local preferred"
+msgstr ""
 
 #: src/features/settings/sections/pill-section.tsx:164
 #: src/features/settings/sections/pill-section.tsx:172
@@ -1225,6 +1249,10 @@ msgstr "이름이 너무 깁니다."
 msgid "Never"
 msgstr "표시 안 함"
 
+#: src/features/settings/data/settings-data.ts:277
+msgid "Never send audio or text to a remote service. Remote transcription and styling are disabled."
+msgstr ""
+
 #: src/features/snippets/snippets-page.tsx:204
 #: src/features/snippets/snippets-page.tsx:242
 #: src/features/snippets/snippets-page.tsx:501
@@ -1319,7 +1347,7 @@ msgstr "설치된 항목 없음"
 msgid "Off"
 msgstr "끄기"
 
-#: src/features/settings/sections/styling-engine-section.tsx:43
+#: src/features/settings/sections/styling-engine-section.tsx:68
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 msgstr "끄면 원본 텍스트가 전달됩니다. 적용할 스타일은 스타일 탭에서 선택합니다."
 
@@ -1340,7 +1368,7 @@ msgstr "메뉴 열기"
 msgid "Open session from {time}"
 msgstr "{time}에서 세션 열기"
 
-#: src/features/settings/data/settings-data.ts:350
+#: src/features/settings/data/settings-data.ts:370
 msgid "OpenAI-compatible"
 msgstr "OpenAI 호환"
 
@@ -1377,7 +1405,7 @@ msgstr "전반적인 진행 상황"
 msgid "Pagination"
 msgstr "쪽수 매기기"
 
-#: src/features/settings/data/settings-data.ts:354
+#: src/features/settings/data/settings-data.ts:374
 msgid "Paste"
 msgstr "붙여넣기"
 
@@ -1443,6 +1471,10 @@ msgstr "다운로드가 완료될 때까지 앱을 열어두세요."
 msgid "Position"
 msgstr "위치"
 
+#: src/features/settings/data/settings-data.ts:282
+msgid "Prefer on-device processing, but allow a remote service where you have configured one."
+msgstr ""
+
 #: src/features/settings/sections/pill-section.tsx:112
 msgid "Preset corner or edge the pill starts at."
 msgstr "표시기가 처음 나타나는 기본 모서리 또는 가장자리입니다."
@@ -1496,6 +1528,11 @@ msgstr "주 모니터"
 #: src/features/dictionary/components/priority-picker.tsx:54
 msgid "Priority"
 msgstr "우선순위"
+
+#: src/features/settings/sections/styling-engine-section.tsx:53
+#: src/features/settings/sections/styling-engine-section.tsx:59
+msgid "Privacy"
+msgstr ""
 
 #: src/features/dictation/dictation-pill.tsx:61
 #: src/features/dictation/dictation-pill.tsx:67
@@ -1877,7 +1914,7 @@ msgstr "스타일"
 msgid "Styling"
 msgstr "스타일 지정"
 
-#: src/features/settings/sections/styling-engine-section.tsx:37
+#: src/features/settings/sections/styling-engine-section.tsx:48
 msgid "Styling engine"
 msgstr "스타일 지정 엔진"
 
@@ -1928,7 +1965,7 @@ msgstr "음성 입력에 사용되는 주요 단축키입니다. 바인딩을 �
 msgid "The microphone is in use"
 msgstr "마이크가 사용 중입니다"
 
-#: src/features/settings/data/settings-data.ts:307
+#: src/features/settings/data/settings-data.ts:327
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "모델이 메모리에 남습니다. 매번 바로 받아쓰기가 시작됩니다."
 
@@ -2066,7 +2103,7 @@ msgstr "트리거 문구"
 msgid "Try again"
 msgstr "다시 시도"
 
-#: src/features/settings/data/settings-data.ts:355
+#: src/features/settings/data/settings-data.ts:375
 msgid "Type"
 msgstr "입력"
 
@@ -2203,7 +2240,7 @@ msgstr "보낼 붙여넣기 단축키. '자동'은 터미널을 감지합니다.
 msgid "Which screen the pill appears on."
 msgstr "표시기가 나타나는 화면입니다."
 
-#: src/features/settings/data/settings-data.ts:349
+#: src/features/settings/data/settings-data.ts:369
 #: src/features/welcome/components/engine-step.tsx:53
 msgid "Whisper"
 msgstr "Whisper"

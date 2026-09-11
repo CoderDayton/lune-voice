@@ -198,6 +198,16 @@ pub trait HotkeyBackend: Send + Sync + 'static {
 
     /// Short identifier for logs, e.g. `"evdev"` or `"win-hook"`.
     fn name(&self) -> &'static str;
+
+    /// Whether this listener is still reading the keyboard.
+    ///
+    /// A backend whose listener has exited answers `false`, so the controller
+    /// can drop it and re-register the plugin fallback instead of re-targeting
+    /// something that can never fire again. Backends that cannot die on their
+    /// own keep the default.
+    fn is_live(&self) -> bool {
+        true
+    }
 }
 
 /// Start the listener this platform uses, if it has one.
@@ -289,9 +299,27 @@ impl HotkeyController {
         }
     }
 
+    /// Forget a native listener that has stopped reading the keyboard.
+    ///
+    /// Leaving it in place makes `update` re-target a dead backend and report
+    /// success, so the UI keeps showing a hotkey that can never fire. Dropping
+    /// it lets the callers fall through to a fresh start, then the plugin.
+    fn retire_dead_native(state: &mut ControllerState) {
+        if let Some(native) = state.native.as_ref()
+            && !native.is_live()
+        {
+            warn!(
+                backend = native.name(),
+                "native hotkey listener has stopped; falling back"
+            );
+            state.native = None;
+        }
+    }
+
     /// Apply a new binding and activation mode to whatever is listening.
     pub fn update(&self, config: &HotkeyConfig, mode: ActivationMode) -> Result<(), String> {
         let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        Self::retire_dead_native(&mut state);
 
         if let Some(native) = state.native.as_ref() {
             return native.update(config, mode);
@@ -308,6 +336,36 @@ impl HotkeyController {
         }
 
         self.plugin.rebind(config)
+    }
+
+    /// Try to start the native listener now, if one is not already running.
+    ///
+    /// For the case where the *environment* changed rather than the config:
+    /// granting `/dev/uinput` access makes a previously impossible evdev grab
+    /// possible, and nothing in [`update`](Self::update)'s path would run
+    /// until the user happened to save a setting. Returns whether a native
+    /// listener is live afterwards.
+    ///
+    /// Only the uinput permission grant calls this, and that is Linux-only.
+    #[cfg_attr(not(unix), allow(dead_code))]
+    pub fn retry_native(&self, config: &HotkeyConfig, mode: ActivationMode) -> bool {
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        Self::retire_dead_native(&mut state);
+        if state.native.is_some() {
+            return true;
+        }
+        match (self.starter)(config, mode, state.sink.clone()) {
+            Some(backend) => {
+                info!(
+                    backend = backend.name(),
+                    "native hotkey listener started after a permission grant"
+                );
+                self.plugin.clear();
+                state.native = Some(backend);
+                true
+            }
+            None => false,
+        }
     }
 }
 
@@ -414,7 +472,7 @@ mod tests {
 
     // ── Controller ──────────────────────────────────────────────────────────
 
-    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::{AtomicBool, AtomicUsize};
 
     fn combo(key: &str) -> lune_core::config::KeyCombo {
         lune_core::config::KeyCombo {
@@ -434,6 +492,7 @@ mod tests {
     struct FakeBackend {
         updates: AtomicUsize,
         reject: bool,
+        dead: AtomicBool,
     }
 
     impl HotkeyBackend for FakeBackend {
@@ -446,6 +505,9 @@ mod tests {
         }
         fn name(&self) -> &'static str {
             "fake"
+        }
+        fn is_live(&self) -> bool {
+            !self.dead.load(Ordering::SeqCst)
         }
     }
 
@@ -505,6 +567,46 @@ mod tests {
         assert_eq!(plugin.rebinds.load(Ordering::SeqCst), 0);
     }
 
+    /// A listener that has stopped — its uinput sink went away after a
+    /// suspend, say — must not keep absorbing updates. The user gets the
+    /// toggle-only plugin back instead of a hotkey that silently never fires.
+    #[test]
+    fn a_stopped_native_listener_is_retired_and_the_plugin_takes_over() {
+        let backend = Arc::new(FakeBackend::default());
+        let (controller, plugin, starts) = controller(Some(backend.clone()), None);
+        backend.dead.store(true, Ordering::SeqCst);
+
+        assert!(
+            controller
+                .update(&config("f9"), ActivationMode::Toggle)
+                .is_ok()
+        );
+        assert_eq!(
+            backend.updates.load(Ordering::SeqCst),
+            0,
+            "a dead listener must not be re-targeted"
+        );
+        assert_eq!(starts.load(Ordering::SeqCst), 1, "a restart was attempted");
+        assert_eq!(
+            plugin.rebinds.load(Ordering::SeqCst),
+            1,
+            "the plugin fallback must be re-registered"
+        );
+    }
+
+    /// The same retirement lets a permission grant restart a dead listener,
+    /// rather than reporting the stale one as already live.
+    #[test]
+    fn retry_native_restarts_a_stopped_listener() {
+        let dead = Arc::new(FakeBackend::default());
+        dead.dead.store(true, Ordering::SeqCst);
+        let started = Arc::new(FakeBackend::default());
+        let (controller, _plugin, starts) = controller(Some(dead), Some(started));
+
+        assert!(controller.retry_native(&config("f9"), ActivationMode::Hold));
+        assert_eq!(starts.load(Ordering::SeqCst), 1);
+    }
+
     /// The repair path: a key name that did not resolve at startup left the
     /// plugin in charge, and the user has just fixed it in the UI.
     #[test]
@@ -551,14 +653,41 @@ mod tests {
         assert_eq!(plugin.clears.load(Ordering::SeqCst), 0);
     }
 
+    /// Granting `/dev/uinput` access changes the environment, not the
+    /// config, so nothing in `update`'s path would ever run. Without a retry
+    /// hook the user grants access, sees "granted", and still has no hotkey
+    /// until they restart or happen to save a setting.
+    #[test]
+    fn a_permission_grant_can_start_the_native_listener() {
+        let started = Arc::new(FakeBackend::default());
+        let (controller, plugin, starts) = controller(None, Some(started.clone()));
+
+        assert!(controller.retry_native(&config("f9"), ActivationMode::Hold));
+        assert_eq!(starts.load(Ordering::SeqCst), 1);
+        assert_eq!(plugin.clears.load(Ordering::SeqCst), 1);
+
+        // Already adopted: a second grant must not start a second listener.
+        assert!(controller.retry_native(&config("f9"), ActivationMode::Hold));
+        assert_eq!(starts.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn a_grant_that_does_not_help_leaves_the_plugin_in_charge() {
+        let (controller, plugin, starts) = controller(None, None);
+
+        assert!(!controller.retry_native(&config("f9"), ActivationMode::Toggle));
+        assert_eq!(starts.load(Ordering::SeqCst), 1);
+        assert_eq!(plugin.clears.load(Ordering::SeqCst), 0);
+    }
+
     /// A backend that refuses the new binding keeps the old one, and the
     /// rejection has to reach the caller rather than being papered over with a
     /// plugin registration on top of a live native listener.
     #[test]
     fn a_rejected_binding_surfaces_and_does_not_fall_back() {
         let backend = Arc::new(FakeBackend {
-            updates: AtomicUsize::new(0),
             reject: true,
+            ..Default::default()
         });
         let (controller, plugin, _) = controller(Some(backend.clone()), None);
 

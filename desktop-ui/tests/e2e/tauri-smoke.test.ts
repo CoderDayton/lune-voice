@@ -6,10 +6,12 @@ import { homedir } from "node:os";
 import { setTimeout as sleep } from "node:timers/promises";
 
 const ROOT_DIR = resolve(import.meta.dir, "../../..");
+// `lune-voice` is the `[[bin]]` name in `src-tauri/Cargo.toml`; the crate
+// itself is `lune-ui`.
 const APP_BINARY = resolve(
   ROOT_DIR,
   "target/debug",
-  `lune-ui${process.platform === "win32" ? ".exe" : ""}`,
+  `lune-voice${process.platform === "win32" ? ".exe" : ""}`,
 );
 const DRIVER_URL = "http://127.0.0.1:4444";
 const DEFAULT_DRIVER_BIN = process.platform === "win32" ? "tauri-driver.exe" : "tauri-driver";
@@ -32,6 +34,12 @@ describe("tauri smoke", () => {
   beforeAll(async () => {
     assertNativeWebDriverAvailable();
     expect(existsSync(APP_BINARY), `missing built Tauri app binary at ${APP_BINARY}`).toBe(true);
+
+    // The app registers a single instance: a second launch hands its arguments
+    // to the first and exits. A copy left behind by an earlier run therefore
+    // makes the driver's launch exit immediately, and session creation blocks
+    // until the hook times out. Only the debug binary under test is killed.
+    killLeftoverApp();
 
     driverProcess = spawn(resolveDriverBinary(), [], {
       stdio: ["ignore", "inherit", "inherit"],
@@ -60,21 +68,44 @@ describe("tauri smoke", () => {
       driverProcess.kill();
       driverProcess = null;
     }
+
+    // The driver spawned the app, so killing the driver does not reap it.
+    // Leaving it running would block the next run's launch.
+    killLeftoverApp();
   });
 
   test("launches the main window and renders the shell", async () => {
     expect(sessionId).not.toBeNull();
 
-    const title = await webdriverGet<string>(`/session/${sessionId}/title`);
-    expect(title).toBe("Lune Voice");
+    // Automation runs on a fresh webview profile, so `localStorage` is empty
+    // and the first-run gate renders the welcome flow rather than the shell.
+    // Mark setup complete and reload, so this asserts the shell it names.
+    await waitForElement(sessionId!, "css selector", "body");
+    await executeScript(sessionId!, "window.localStorage.setItem('lune-setup-complete', '1')");
+    // Refresh takes no parameters, but the endpoint still requires a body.
+    await webdriverRequest("POST", `/session/${sessionId}/refresh`, {});
 
+    // The session is ready before the document is. Wait for the shell to mount
+    // first, or the title reads back as "" from a still-loading webview.
     const appShell = await waitForElement(sessionId!, "css selector", ".app-shell-root");
     expect(appShell).not.toBeNull();
+
+    const title = await webdriverGet<string>(`/session/${sessionId}/title`);
+    expect(title).toBe("Lune Voice");
 
     const mainContent = await webdriverFindElement(sessionId!, "css selector", "main#main-content");
     expect(mainContent).not.toBeNull();
   });
 });
+
+function killLeftoverApp() {
+  if (process.platform === "win32") {
+    spawnSync("taskkill", ["/f", "/im", "lune-voice.exe"], { stdio: "ignore" });
+    return;
+  }
+
+  spawnSync("pkill", ["-9", "-f", APP_BINARY], { stdio: "ignore" });
+}
 
 function resolveDriverBinary() {
   const envPath = process.env.TAURI_DRIVER_BIN?.trim();
@@ -103,7 +134,8 @@ function assertNativeWebDriverAvailable() {
   throw new Error(
     [
       "Linux Tauri smoke tests require `WebKitWebDriver` in PATH.",
-      "Install the `webkit2gtk-driver` package, or set `WEBKIT_WEBDRIVER_BIN` to the binary path.",
+      "Install `webkitgtk-webdriver` (`webkit2gtk-driver` on releases before Ubuntu 26.04),",
+      "or set `WEBKIT_WEBDRIVER_BIN` to the binary path.",
     ].join(" "),
   );
 }
@@ -161,6 +193,14 @@ async function createSession() {
   }
 
   return id;
+}
+
+async function executeScript<T = unknown>(session: string, script: string, args: unknown[] = []) {
+  const payload = await webdriverRequest<T>("POST", `/session/${session}/execute/sync`, {
+    script,
+    args,
+  });
+  return payload.value;
 }
 
 async function webdriverGet<T>(path: string): Promise<T> {

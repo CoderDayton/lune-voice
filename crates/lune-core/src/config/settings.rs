@@ -67,13 +67,40 @@ pub enum PillCorner {
 /// (the old "type and copy" mode) by mapping it to `TypeInPlace` via `FromStr`.
 /// The copy behaviour is restored separately by the `copy_to_clipboard`
 /// migration in `lune-persist`, so old configs neither break nor silently lose
-/// their intent.
+/// their intent. Any other unrecognised value falls back to the default, for
+/// the same reason [`lenient`] exists.
 fn deserialize_dictation_mode<'de, D>(d: D) -> Result<DictationMode, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
     let s = String::deserialize(d)?;
-    s.parse().map_err(serde::de::Error::custom)
+    Ok(s.parse().unwrap_or_default())
+}
+
+/// Deserialize `T`, falling back to `T::default()` for a value this build does
+/// not recognise.
+///
+/// A settings file written by a newer version can name an enum variant that
+/// does not exist here. Serde treats that as a parse failure for the whole
+/// file, which costs the user every other setting in it — and, downstream, the
+/// history that the restored default retention window then prunes. One unknown
+/// field is worth one default, not the file.
+fn lenient<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de> + Default,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Lenient<T> {
+        Known(T),
+        Unknown(serde::de::IgnoredAny),
+    }
+
+    Ok(match Lenient::<T>::deserialize(deserializer)? {
+        Lenient::Known(value) => value,
+        Lenient::Unknown(_) => T::default(),
+    })
 }
 
 /// Top-level user settings, persisted as TOML.
@@ -107,6 +134,7 @@ where
 #[serde(default)]
 pub struct UserSettings {
     /// Compute device for local inference: `Cpu`, `Cuda`, or `Auto`.
+    #[serde(deserialize_with = "lenient")]
     pub device: DevicePolicy,
     pub asr_backend: AsrBackendConfig,
     #[serde(default)]
@@ -126,6 +154,7 @@ pub struct UserSettings {
     /// Dictation language for ASR/correction. "auto" = detect from speech.
     #[serde(default = "default_dictation_language")]
     pub dictation_language: String,
+    #[serde(deserialize_with = "lenient")]
     pub privacy_mode: PrivacyMode,
     #[serde(deserialize_with = "deserialize_dictation_mode")]
     pub dictation_mode: DictationMode,
@@ -139,9 +168,10 @@ pub struct UserSettings {
     /// Sound cue playback volume in [0.0, 1.0].
     #[serde(default = "default_sound_cue_volume")]
     pub sound_cue_volume: f32,
+    #[serde(deserialize_with = "lenient")]
     pub activation_mode: ActivationMode,
     /// When to show the floating dictation pill overlay.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "lenient")]
     pub pill_visibility: PillVisibility,
     /// Persisted pill overlay position (logical px from the monitor's
     /// top-left). `None` = default anchor placement; set when the user
@@ -149,7 +179,7 @@ pub struct UserSettings {
     #[serde(default)]
     pub pill_position: Option<PillPosition>,
     /// Default placement anchor for the pill when it hasn't been dragged.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "lenient")]
     pub pill_anchor: PillAnchor,
     /// Prevent repositioning the pill by dragging.
     #[serde(default)]
@@ -167,18 +197,18 @@ pub struct UserSettings {
     #[serde(default = "default_true")]
     pub pill_all_workspaces: bool,
     /// Footprint of the pill bar.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "lenient")]
     pub pill_size: PillSize,
     /// Long-axis direction of the pill bar.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "lenient")]
     pub pill_orientation: PillOrientation,
     /// Corner rounding of the pill bar.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "lenient")]
     pub pill_corner: PillCorner,
     /// How to detect terminal windows for paste chord selection.
     /// `Auto` probes the compositor (works on Hyprland, Sway, KDE, GNOME).
     /// Set `Terminal` on COSMIC or other compositors without focus detection.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "lenient")]
     pub terminal_mode: TerminalMode,
     /// How long a dictation stays in the history, in days.
     ///
@@ -486,7 +516,7 @@ impl<'de> Deserialize<'de> for AsrBackendConfig {
                 streaming: StreamingMode,
             },
             WhisperCpp {
-                #[serde(default)]
+                #[serde(default, deserialize_with = "lenient")]
                 model: WhisperModel,
             },
             #[serde(other)]
@@ -675,6 +705,53 @@ mod tests {
 
     fn local(url: &str) -> bool {
         is_local_endpoint(&Url::parse(url).expect("valid url"))
+    }
+
+    /// A file written by a newer build names enum variants this build has
+    /// never heard of. Each such field falls back to its own default; every
+    /// other value in the file survives.
+    #[test]
+    fn unknown_enum_values_fall_back_instead_of_failing_the_load() {
+        let raw = r#"
+language = "en-GB"
+session_history_days = 90
+device = "npu"
+privacy_mode = "FutureMode"
+terminal_mode = "FutureMode"
+activation_mode = "FutureMode"
+pill_visibility = "FutureMode"
+pill_anchor = "FutureMode"
+pill_size = "Gigantic"
+pill_orientation = "Diagonal"
+pill_corner = "FutureMode"
+dictation_mode = "FutureMode"
+
+[asr_backend]
+type = "WhisperCpp"
+model = "LargeV4"
+"#;
+        let settings: UserSettings = toml::from_str(raw).expect("a newer file must still load");
+
+        assert_eq!(settings.language, "en-GB");
+        assert_eq!(settings.session_history_days, Some(90));
+
+        let d = UserSettings::default();
+        assert_eq!(settings.device, d.device);
+        assert_eq!(settings.privacy_mode, d.privacy_mode);
+        assert_eq!(settings.terminal_mode, d.terminal_mode);
+        assert_eq!(settings.activation_mode, d.activation_mode);
+        assert_eq!(settings.pill_visibility, d.pill_visibility);
+        assert_eq!(settings.pill_anchor, d.pill_anchor);
+        assert_eq!(settings.pill_size, d.pill_size);
+        assert_eq!(settings.pill_orientation, d.pill_orientation);
+        assert_eq!(settings.pill_corner, d.pill_corner);
+        assert_eq!(settings.dictation_mode, d.dictation_mode);
+        assert!(matches!(
+            settings.asr_backend,
+            AsrBackendConfig::WhisperCpp {
+                model: WhisperModel::Medium
+            }
+        ));
     }
 
     #[test]

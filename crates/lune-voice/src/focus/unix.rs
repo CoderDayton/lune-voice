@@ -10,8 +10,6 @@
 
 use std::time::Duration;
 
-use tracing::info;
-
 use crate::focus::{FocusToken, WindowTarget, is_terminal_class};
 use crate::probe::{output_with_timeout, status_with_timeout};
 
@@ -81,16 +79,6 @@ pub(crate) fn focused_window_class() -> Option<String> {
     }
 
     None
-}
-
-pub(crate) fn focused_is_terminal() -> bool {
-    let Some(class) = focused_window_class() else {
-        info!("focused window: unknown (defaulting to Ctrl+V)");
-        return false;
-    };
-    let is_term = is_terminal_class(&class);
-    info!(class = %class, is_term, "focused window detected");
-    is_term
 }
 
 pub(crate) fn capture() -> WindowTarget {

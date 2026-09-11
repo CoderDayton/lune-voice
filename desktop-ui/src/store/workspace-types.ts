@@ -9,6 +9,7 @@ import type {
   PillOrientationValue,
   PillSizeValue,
   PillVisibilityValue,
+  PrivacyModeValue,
   TerminalModeValue,
   WhisperModelValue,
 } from '../features/settings/data/settings-data';
@@ -52,6 +53,7 @@ export interface WorkspaceSettings {
   checkUpdatesOnLaunch: boolean;
   sessionHistoryDays: number | null;
   terminalMode: TerminalModeValue;
+  privacyMode: PrivacyModeValue;
   llmEnabled: boolean;
   openaiAsrBaseUrl: string;
   openaiAsrApiKey: string;
@@ -169,6 +171,7 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   checkUpdatesOnLaunch: false,
   sessionHistoryDays: 30,
   terminalMode: 'Auto',
+  privacyMode: 'LocalOnly',
   llmEnabled: true,
   openaiAsrBaseUrl: 'https://api.openai.com/v1',
   openaiAsrApiKey: '',

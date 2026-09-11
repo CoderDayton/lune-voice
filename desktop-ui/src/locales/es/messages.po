@@ -91,19 +91,19 @@ msgstr "## Reunión — {date}\n"
 "Asistentes:\n"
 "- "
 
-#: src/features/settings/data/settings-data.ts:278
+#: src/features/settings/data/settings-data.ts:298
 msgid "1 year"
 msgstr "1 año"
 
-#: src/features/settings/data/settings-data.ts:276
+#: src/features/settings/data/settings-data.ts:296
 msgid "30 days"
 msgstr "30 días"
 
-#: src/features/settings/data/settings-data.ts:275
+#: src/features/settings/data/settings-data.ts:295
 msgid "7 days"
 msgstr "7 días"
 
-#: src/features/settings/data/settings-data.ts:277
+#: src/features/settings/data/settings-data.ts:297
 msgid "90 days"
 msgstr "90 días"
 
@@ -154,23 +154,23 @@ msgstr "Agregue una solución y Lune Voice la aplicará cada vez que dicte. Prue
 msgid "Add snippet"
 msgstr "Añadir fragmento"
 
-#: src/features/settings/data/settings-data.ts:312
+#: src/features/settings/data/settings-data.ts:332
 msgid "After 1 hour"
 msgstr "Tras 1 hora"
 
-#: src/features/settings/data/settings-data.ts:310
+#: src/features/settings/data/settings-data.ts:330
 msgid "After 15 minutes"
 msgstr "Tras 15 minutos"
 
-#: src/features/settings/data/settings-data.ts:313
+#: src/features/settings/data/settings-data.ts:333
 msgid "After 2 hours"
 msgstr "Tras 2 horas"
 
-#: src/features/settings/data/settings-data.ts:311
+#: src/features/settings/data/settings-data.ts:331
 msgid "After 30 minutes"
 msgstr "Tras 30 minutos"
 
-#: src/features/settings/data/settings-data.ts:309
+#: src/features/settings/data/settings-data.ts:329
 msgid "After 5 minutes"
 msgstr "Tras 5 minutos"
 
@@ -190,6 +190,14 @@ msgstr "histórico · hoy"
 #: src/features/welcome/components/ready-checks.tsx:124
 msgid "Allow"
 msgstr "Permitir"
+
+#: src/features/settings/data/settings-data.ts:286
+msgid "Allow remote"
+msgstr ""
+
+#: src/features/settings/data/settings-data.ts:287
+msgid "Allow remote transcription and styling wherever you have configured them."
+msgstr ""
 
 #: src/features/settings/data/settings-data.ts:95
 msgid "Always"
@@ -400,7 +408,7 @@ msgstr "Elija cómo se inserta el texto terminado en la aplicación que está ut
 msgid "Choose how Lune Voice looks."
 msgstr "Elige cómo se ve Lune Voice."
 
-#: src/features/settings/sections/styling-engine-section.tsx:38
+#: src/features/settings/sections/styling-engine-section.tsx:49
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
 msgstr "Elige cómo se reescriben las transcripciones: enviadas a un endpoint compatible con OpenAI que configures tú, local o alojado, o desactivado por completo."
 
@@ -684,7 +692,7 @@ msgstr "Uso del disco"
 msgid "Dismiss error"
 msgstr "Descartar error"
 
-#: src/features/settings/data/settings-data.ts:274
+#: src/features/settings/data/settings-data.ts:294
 msgid "Don't save history"
 msgstr "No guardar el historial"
 
@@ -800,7 +808,7 @@ msgstr "Activar estilizado"
 
 #: src/features/history/components/history-table.tsx:182
 #: src/features/history/components/session-detail-modal.tsx:163
-#: src/features/settings/sections/styling-engine-section.tsx:42
+#: src/features/settings/sections/styling-engine-section.tsx:67
 msgid "Engine"
 msgstr "Motor"
 
@@ -1047,11 +1055,11 @@ msgstr "Instrucciones"
 msgid "Join the discussions"
 msgstr "Unirse a las discusiones"
 
-#: src/features/settings/data/settings-data.ts:279
+#: src/features/settings/data/settings-data.ts:299
 msgid "Keep forever"
 msgstr "Conservar siempre"
 
-#: src/features/settings/data/settings-data.ts:306
+#: src/features/settings/data/settings-data.ts:326
 msgid "Keep loaded"
 msgstr "Mantener cargado"
 
@@ -1084,6 +1092,10 @@ msgstr "Idioma"
 #: src/features/settings/data/settings-data.ts:112
 msgid "Large"
 msgstr "Grande"
+
+#: src/features/settings/data/settings-data.ts:189
+msgid "Large v3 Turbo"
+msgstr ""
 
 #: src/features/updates/update-dialog.tsx:234
 msgid "Later"
@@ -1119,6 +1131,18 @@ msgstr "Escuchando: di la frase…"
 #: src/features/shell/components/sidebar-widgets.tsx:51
 msgid "Listening…"
 msgstr "Escuchando…"
+
+#: src/features/settings/data/settings-data.ts:276
+msgid "Local only"
+msgstr ""
+
+#: src/features/settings/sections/styling-engine-section.tsx:54
+msgid "Local only disables styling even if an engine is selected below — the transcript is delivered raw instead."
+msgstr ""
+
+#: src/features/settings/data/settings-data.ts:281
+msgid "Local preferred"
+msgstr ""
 
 #: src/features/settings/sections/pill-section.tsx:164
 #: src/features/settings/sections/pill-section.tsx:172
@@ -1225,6 +1249,10 @@ msgstr "El nombre es demasiado largo."
 msgid "Never"
 msgstr "Nunca"
 
+#: src/features/settings/data/settings-data.ts:277
+msgid "Never send audio or text to a remote service. Remote transcription and styling are disabled."
+msgstr ""
+
 #: src/features/snippets/snippets-page.tsx:204
 #: src/features/snippets/snippets-page.tsx:242
 #: src/features/snippets/snippets-page.tsx:501
@@ -1319,7 +1347,7 @@ msgstr "Nada instalado"
 msgid "Off"
 msgstr "Desactivado"
 
-#: src/features/settings/sections/styling-engine-section.tsx:43
+#: src/features/settings/sections/styling-engine-section.tsx:68
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 msgstr "Desactivado entrega las transcripciones sin procesar. El estilo que se aplica se elige en la pestaña Estilos."
 
@@ -1340,7 +1368,7 @@ msgstr "abrir menú"
 msgid "Open session from {time}"
 msgstr "Sesión abierta desde {time}"
 
-#: src/features/settings/data/settings-data.ts:350
+#: src/features/settings/data/settings-data.ts:370
 msgid "OpenAI-compatible"
 msgstr "Compatible con OpenAI"
 
@@ -1377,7 +1405,7 @@ msgstr "Progreso general"
 msgid "Pagination"
 msgstr "Paginación"
 
-#: src/features/settings/data/settings-data.ts:354
+#: src/features/settings/data/settings-data.ts:374
 msgid "Paste"
 msgstr "Pegar"
 
@@ -1443,6 +1471,10 @@ msgstr "Mantenga la aplicación abierta hasta que finalicen las descargas."
 msgid "Position"
 msgstr "Posición"
 
+#: src/features/settings/data/settings-data.ts:282
+msgid "Prefer on-device processing, but allow a remote service where you have configured one."
+msgstr ""
+
 #: src/features/settings/sections/pill-section.tsx:112
 msgid "Preset corner or edge the pill starts at."
 msgstr "Esquina o borde predefinido donde aparece el indicador."
@@ -1496,6 +1528,11 @@ msgstr "principal"
 #: src/features/dictionary/components/priority-picker.tsx:54
 msgid "Priority"
 msgstr "Prioridad"
+
+#: src/features/settings/sections/styling-engine-section.tsx:53
+#: src/features/settings/sections/styling-engine-section.tsx:59
+msgid "Privacy"
+msgstr ""
 
 #: src/features/dictation/dictation-pill.tsx:61
 #: src/features/dictation/dictation-pill.tsx:67
@@ -1877,7 +1914,7 @@ msgstr "Estilo"
 msgid "Styling"
 msgstr "Estilizado"
 
-#: src/features/settings/sections/styling-engine-section.tsx:37
+#: src/features/settings/sections/styling-engine-section.tsx:48
 msgid "Styling engine"
 msgstr "Motor de estilizado"
 
@@ -1928,7 +1965,7 @@ msgstr "El atajo principal utilizado para escribir por voz. Haga clic en el enla
 msgid "The microphone is in use"
 msgstr "El micrófono está en uso"
 
-#: src/features/settings/data/settings-data.ts:307
+#: src/features/settings/data/settings-data.ts:327
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "El modelo permanece en memoria. Cada dictado empieza al instante."
 
@@ -2066,7 +2103,7 @@ msgstr "Frase de activación"
 msgid "Try again"
 msgstr "Reintentar"
 
-#: src/features/settings/data/settings-data.ts:355
+#: src/features/settings/data/settings-data.ts:375
 msgid "Type"
 msgstr "Escribir"
 
@@ -2203,7 +2240,7 @@ msgstr "Qué atajo de pegado enviar. «Automático» detecta terminales; anúlel
 msgid "Which screen the pill appears on."
 msgstr "En qué pantalla aparece el indicador."
 
-#: src/features/settings/data/settings-data.ts:349
+#: src/features/settings/data/settings-data.ts:369
 #: src/features/welcome/components/engine-step.tsx:53
 msgid "Whisper"
 msgstr "Whisper"

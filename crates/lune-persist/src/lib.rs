@@ -16,4 +16,4 @@ pub use hub::{
     delete_model, download_model, has_required_models, styling_llm_readiness,
 };
 pub use paths::AppPaths;
-pub use settings::SettingsStore;
+pub use settings::{LoadedSettings, SettingsStore};

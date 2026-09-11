@@ -41,5 +41,5 @@ pub use uinput_typer::{
 mod focus;
 pub use focus::{FocusToken, WindowTarget, capture_focus_target};
 
-pub use delivery::DeliveryService;
+pub use delivery::{DeliveryHealth, DeliveryService};
 pub use session::{SessionManager, SessionManagerConfig};

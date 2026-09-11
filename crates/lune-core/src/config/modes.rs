@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[non_exhaustive]
 pub enum PrivacyMode {
     /// Reject any remote backend usage.
+    #[default]
     LocalOnly,
     /// Use remote only if explicitly configured + consented.
     LocalPreferred,

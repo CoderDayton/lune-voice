@@ -130,7 +130,9 @@ pub struct PipelineConfig {
     /// Timeout for LLM post-processing (seconds).
     ///
     /// If the LLM call exceeds this timeout, the raw ASR text is used
-    /// instead. A value of 0 disables the timeout. Default is 30 seconds.
+    /// instead. Default is 30 seconds. Bounded to
+    /// [`MAX_LLM_TIMEOUT_SECS`] by [`PipelineConfig::clamp`], which is also
+    /// what `0` resolves to — there is no way to run the call unbounded.
     #[serde(default = "default_llm_timeout_secs")]
     pub llm_timeout_secs: u32,
 }
@@ -146,6 +148,19 @@ fn default_itn_enabled() -> bool {
 fn default_llm_timeout_secs() -> u32 {
     30
 }
+
+/// Shortest utterance buffer that still records a usable dictation (1 s).
+pub const MIN_SPEECH_SAMPLES: usize = SAMPLE_RATE;
+
+/// Longest utterance buffer (10 min). The buffer is `f32` at 16 kHz, so this
+/// is about 38 MB — the ceiling exists because the value is a user override
+/// and nothing else bounds the allocation.
+pub const MAX_SPEECH_SAMPLES: usize = 600 * SAMPLE_RATE;
+
+/// Longest styling-LLM timeout. Also what a `0` ("no timeout") resolves to:
+/// the styling call is the only unbounded step between the hotkey and the
+/// text appearing, so it always gets an end-to-end bound.
+pub const MAX_LLM_TIMEOUT_SECS: u32 = 300;
 
 impl PipelineConfig {
     /// Merge user overrides on top of backend defaults.
@@ -189,6 +204,120 @@ impl PipelineConfig {
 
         self
     }
+}
+
+/// Bring a unit-interval override into range, replacing a non-number with
+/// `fallback`.
+///
+/// `f32::clamp` returns NaN for NaN and every comparison against NaN is false,
+/// so clamping alone would leave `speech_threshold = nan` — which TOML spells
+/// literally — in place, and the segmenter would never enter speech.
+fn into_unit_interval(value: f32, fallback: f32) -> f32 {
+    if value.is_nan() {
+        fallback
+    } else {
+        value.clamp(0.0, 1.0)
+    }
+}
+
+impl PipelineConfig {
+    /// Repair every invariant violation, reporting what was changed.
+    ///
+    /// [`validate`](Self::validate) only describes, and the caller used the
+    /// values anyway — so a single bad override cost the user their
+    /// dictations rather than that one setting. This is the half that acts:
+    /// after it, `validate` is empty by construction.
+    #[must_use]
+    pub fn clamp(mut self) -> (Self, Vec<&'static str>) {
+        let mut repairs = Vec::new();
+        let d = Self::default();
+        macro_rules! fix {
+            ($cond:expr, $field:ident = $value:expr, $note:literal) => {
+                if $cond {
+                    self.$field = $value;
+                    repairs.push($note);
+                }
+            };
+        }
+
+        fix!(
+            !(0.0..=1.0).contains(&self.speech_threshold),
+            speech_threshold = into_unit_interval(self.speech_threshold, d.speech_threshold),
+            "speech_threshold clamped into 0.0..=1.0"
+        );
+        fix!(
+            !(0.0..=1.0).contains(&self.speech_threshold_end),
+            speech_threshold_end =
+                into_unit_interval(self.speech_threshold_end, d.speech_threshold_end),
+            "speech_threshold_end clamped into 0.0..=1.0"
+        );
+        // Hysteresis: leaving speech must not need a higher score than
+        // entering it, or the segmenter can never close a segment.
+        fix!(
+            self.speech_threshold_end > self.speech_threshold,
+            speech_threshold_end = self.speech_threshold,
+            "speech_threshold_end lowered to speech_threshold"
+        );
+        fix!(
+            self.hard_close_ms < self.sentence_close_ms,
+            hard_close_ms = self.sentence_close_ms,
+            "hard_close_ms raised to sentence_close_ms"
+        );
+        fix!(
+            self.max_segment_ms < self.hard_close_ms,
+            max_segment_ms = self.hard_close_ms,
+            "max_segment_ms raised to hard_close_ms"
+        );
+        fix!(
+            self.word_confidence_threshold
+                .is_some_and(|t| !(0.0..=1.0).contains(&t)),
+            word_confidence_threshold = self
+                .word_confidence_threshold
+                .map(|t| into_unit_interval(t, d.word_confidence_threshold.unwrap_or(0.5))),
+            "word_confidence_threshold clamped into 0.0..=1.0"
+        );
+        fix!(
+            self.llm_skip_threshold
+                .is_some_and(|t| !(0.0..=1.0).contains(&t)),
+            llm_skip_threshold = self
+                .llm_skip_threshold
+                .map(|t| into_unit_interval(t, d.llm_skip_threshold.unwrap_or(0.85))),
+            "llm_skip_threshold clamped into 0.0..=1.0"
+        );
+        fix!(
+            self.llm_skip_noisy_threshold
+                .is_some_and(|t| !(0.0..=1.0).contains(&t)),
+            llm_skip_noisy_threshold = self
+                .llm_skip_noisy_threshold
+                .map(|t| into_unit_interval(t, d.llm_skip_noisy_threshold.unwrap_or(0.6))),
+            "llm_skip_noisy_threshold clamped into 0.0..=1.0"
+        );
+        // The noisy gate has to sit strictly below the clean one; three
+        // quarters keeps the two apart without inventing an epsilon. At
+        // `clean == 0.0` no fraction of it is strictly below, so the gate is
+        // dropped rather than left violating the invariant it was repaired for.
+        if let (Some(clean), Some(noisy)) = (self.llm_skip_threshold, self.llm_skip_noisy_threshold)
+            && noisy >= clean
+        {
+            let lowered = clean * 0.75;
+            self.llm_skip_noisy_threshold = (lowered < clean).then_some(lowered);
+            repairs.push("llm_skip_noisy_threshold lowered below llm_skip_threshold");
+        }
+        fix!(
+            !(MIN_SPEECH_SAMPLES..=MAX_SPEECH_SAMPLES).contains(&self.max_speech_samples),
+            max_speech_samples = self
+                .max_speech_samples
+                .clamp(MIN_SPEECH_SAMPLES, MAX_SPEECH_SAMPLES),
+            "max_speech_samples clamped to the supported utterance length"
+        );
+        fix!(
+            self.llm_timeout_secs == 0 || self.llm_timeout_secs > MAX_LLM_TIMEOUT_SECS,
+            llm_timeout_secs = MAX_LLM_TIMEOUT_SECS,
+            "llm_timeout_secs bounded to the ceiling (0 is not 'no timeout')"
+        );
+
+        (self, repairs)
+    }
 
     /// Validate invariants. Returns a list of violations (empty = valid).
     pub fn validate(&self) -> Vec<&'static str> {
@@ -229,11 +358,11 @@ impl PipelineConfig {
         {
             issues.push("llm_skip_noisy_threshold must be < llm_skip_threshold");
         }
-        if self.max_speech_samples == 0 {
-            issues.push("max_speech_samples must be > 0");
+        if !(MIN_SPEECH_SAMPLES..=MAX_SPEECH_SAMPLES).contains(&self.max_speech_samples) {
+            issues.push("max_speech_samples is outside the supported utterance length");
         }
-        if self.llm_timeout_secs > 300 {
-            issues.push("llm_timeout_secs must be <= 300");
+        if self.llm_timeout_secs == 0 || self.llm_timeout_secs > MAX_LLM_TIMEOUT_SECS {
+            issues.push("llm_timeout_secs must be in 1..=300");
         }
         issues
     }
@@ -359,6 +488,100 @@ mod tests {
         assert_eq!(cfg.llm_skip_threshold, Some(0.40));
         assert_eq!(cfg.word_confidence_threshold, Some(0.55));
         assert!(cfg.validate().is_empty(), "default must validate");
+    }
+
+    /// `validate` only describes. A config that violates an invariant is
+    /// still used, so every violation has to be repaired to something usable
+    /// before the pipeline is built.
+    #[test]
+    fn clamp_repairs_every_invariant_validate_reports() {
+        let cfg = PipelineConfig {
+            sentence_close_ms: 2_000,
+            hard_close_ms: 100,
+            max_segment_ms: 50,
+            speech_threshold: 1.5,
+            speech_threshold_end: -0.2,
+            word_confidence_threshold: Some(2.0),
+            llm_skip_threshold: Some(0.2),
+            llm_skip_noisy_threshold: Some(0.9),
+            max_speech_samples: 0,
+            llm_timeout_secs: 100_000,
+            ..PipelineConfig::default()
+        };
+        let (fixed, repairs) = cfg.clamp();
+        assert!(!repairs.is_empty());
+        assert!(
+            fixed.validate().is_empty(),
+            "clamp must leave a valid config, got {:?}",
+            fixed.validate()
+        );
+    }
+
+    /// Zero means "one syllable per dictation" and 10 hours means a 2.3 GB
+    /// buffer. Neither is a choice worth honouring.
+    #[test]
+    fn clamp_bounds_the_speech_buffer_at_both_ends() {
+        let too_small = PipelineConfig {
+            max_speech_samples: 0,
+            ..PipelineConfig::default()
+        }
+        .clamp()
+        .0;
+        assert_eq!(too_small.max_speech_samples, MIN_SPEECH_SAMPLES);
+
+        let too_big = PipelineConfig {
+            max_speech_samples: 36_000 * SAMPLE_RATE,
+            ..PipelineConfig::default()
+        }
+        .clamp()
+        .0;
+        assert_eq!(too_big.max_speech_samples, MAX_SPEECH_SAMPLES);
+    }
+
+    /// Zero used to mean "no timeout", which left the styling call with no
+    /// end-to-end bound at all.
+    #[test]
+    fn clamp_turns_a_disabled_llm_timeout_into_the_ceiling() {
+        let (fixed, repairs) = PipelineConfig {
+            llm_timeout_secs: 0,
+            ..PipelineConfig::default()
+        }
+        .clamp();
+        assert_eq!(fixed.llm_timeout_secs, MAX_LLM_TIMEOUT_SECS);
+        assert!(repairs.iter().any(|r| r.contains("llm_timeout_secs")));
+    }
+
+    /// `clamp`'s contract is that `validate` is empty afterwards. Two inputs
+    /// used to escape it: a `llm_skip_threshold` of zero, where no fraction of
+    /// it is strictly below itself, and a NaN — which TOML spells `nan` and
+    /// which `f32::clamp` passes straight through.
+    #[test]
+    fn clamp_repairs_the_inputs_that_a_plain_clamp_cannot() {
+        let (fixed, _) = PipelineConfig {
+            llm_skip_threshold: Some(0.0),
+            llm_skip_noisy_threshold: Some(0.0),
+            ..PipelineConfig::default()
+        }
+        .clamp();
+        assert!(fixed.validate().is_empty(), "got {:?}", fixed.validate());
+
+        let (fixed, _) = PipelineConfig {
+            speech_threshold: f32::NAN,
+            speech_threshold_end: f32::NAN,
+            word_confidence_threshold: Some(f32::NAN),
+            ..PipelineConfig::default()
+        }
+        .clamp();
+        assert!(fixed.validate().is_empty(), "got {:?}", fixed.validate());
+        assert!(fixed.speech_threshold.is_finite());
+    }
+
+    #[test]
+    fn clamp_leaves_a_valid_config_alone() {
+        let cfg = PipelineConfig::default();
+        let (fixed, repairs) = cfg.clone().clamp();
+        assert_eq!(cfg, fixed);
+        assert!(repairs.is_empty());
     }
 
     #[test]

@@ -4,14 +4,14 @@
 //! through a uinput passthrough device. This works on both X11 and Wayland.
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, RwLock, mpsc as std_mpsc};
 use std::time::Duration;
 
 use evdev::{
     AttributeSet, Device, EventType, InputEvent, KeyCode, RelativeAxisCode, uinput::VirtualDevice,
 };
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 use lune_core::config::{ActivationMode, HotkeyConfig, Modifier};
 
@@ -25,6 +25,9 @@ use crate::hotkey::{HotkeyAction, HotkeyBackend, HotkeySink};
 pub struct LiveHotkeyConfig {
     inner: RwLock<HotkeySnapshot>,
     generation: AtomicU64,
+    /// Cleared when the listener thread exits, so the controller can stop
+    /// re-targeting a backend that no longer reads the keyboard.
+    alive: Arc<AtomicBool>,
 }
 
 #[derive(Clone)]
@@ -62,6 +65,7 @@ impl LiveHotkeyConfig {
         Some(Self {
             inner: RwLock::new(HotkeySnapshot::from_config(config, mode)?),
             generation: AtomicU64::new(0),
+            alive: Arc::new(AtomicBool::new(true)),
         })
     }
 
@@ -98,6 +102,10 @@ impl HotkeyBackend for LiveHotkeyConfig {
     fn name(&self) -> &'static str {
         "evdev"
     }
+
+    fn is_live(&self) -> bool {
+        self.alive.load(Ordering::Acquire)
+    }
 }
 
 /// Start the evdev listener. The `hotkey::start` entry point for Linux.
@@ -115,20 +123,65 @@ pub fn start(
     Some(live)
 }
 
+/// How long to wait for the listener to say whether it opened any keyboards.
+///
+/// Enumeration is a directory read and a few ioctls, so this is far more than
+/// it needs. Being wrong costs one launch falling back to the toggle-only
+/// plugin, which the next settings save repairs.
+const LISTENER_READY_TIMEOUT: Duration = Duration::from_secs(2);
+
 /// Spawn the evdev hotkey listener on a background OS thread.
 ///
 /// Returns `None` if the hotkey config references unknown key names or no
 /// keyboards are accessible.
+///
+/// Waits for the listener to confirm it has devices rather than reporting
+/// success the moment the thread exists. A thread that spawns and then finds
+/// nothing to grab — the usual AppImage/tarball case before a reboot — would
+/// otherwise be indistinguishable from a working one: the caller skips the
+/// global-shortcut fallback, `HotkeyController::update` re-targets a listener
+/// that is not there and returns `Ok(())`, and every UI affordance reports a
+/// hotkey that can never fire.
 fn spawn(live: Arc<LiveHotkeyConfig>, sink: HotkeySink) -> Option<std::thread::JoinHandle<()>> {
+    let (ready_tx, ready_rx) = std_mpsc::sync_channel::<bool>(1);
+    let alive = Arc::clone(&live.alive);
     let handle = std::thread::Builder::new()
         .name("hotkey-evdev".into())
         .spawn(move || {
-            run_listener(live, sink);
+            run_listener(live, sink, ready_tx);
+            // However the loop ended — a dead sink, no devices — this backend
+            // no longer reads the keyboard, and the controller has to know.
+            alive.store(false, Ordering::Release);
+            warn!("evdev hotkey listener stopped");
         })
         .map_err(|e| warn!(error = %e, "failed to spawn hotkey listener thread"))
         .ok()?;
 
-    Some(handle)
+    match ready_rx.recv_timeout(LISTENER_READY_TIMEOUT) {
+        Ok(true) => Some(handle),
+        Ok(false) => {
+            warn!("evdev listener found no grabbable keyboard; falling back to global shortcuts");
+            None
+        }
+        Err(std_mpsc::RecvTimeoutError::Disconnected) => {
+            warn!(
+                "evdev listener thread ended before reporting readiness; falling back to global shortcuts"
+            );
+            None
+        }
+        // The thread is still inside `open_devices`, which grabs as it goes.
+        // Reporting failure here would register the global-shortcut fallback
+        // on top of a listener that is about to own every keyboard: one press
+        // would fire twice, and nothing can stop the orphan. A slow
+        // enumeration is the lesser problem, so adopt it.
+        Err(std_mpsc::RecvTimeoutError::Timeout) => {
+            warn!(
+                timeout_s = LISTENER_READY_TIMEOUT.as_secs(),
+                "evdev listener is still enumerating; adopting it rather than racing a fallback"
+            );
+            Some(handle)
+        }
+    }
 }
 
 // ─── Listener core ───────────────────────────────────────────────────────────
@@ -302,9 +355,16 @@ fn input_node_signature() -> Vec<String> {
     names
 }
 
-fn run_listener(live: Arc<LiveHotkeyConfig>, sink: HotkeySink) {
-    let Some(mut io) = open_devices() else {
-        return;
+fn run_listener(live: Arc<LiveHotkeyConfig>, sink: HotkeySink, ready: std_mpsc::SyncSender<bool>) {
+    let mut io = match open_devices() {
+        Some(io) => {
+            let _ = ready.send(true);
+            io
+        }
+        None => {
+            let _ = ready.send(false);
+            return;
+        }
     };
 
     let mut config_gen = live.generation();
@@ -366,6 +426,9 @@ fn run_listener(live: Arc<LiveHotkeyConfig>, sink: HotkeySink) {
                 ) {
                     sink.emit(action);
                 }
+                if io.fwd.sink_failed() {
+                    break;
+                }
 
                 // Cheap gate: only touch the filesystem once the cooldown has
                 // elapsed, and only re-enumerate when something moved.
@@ -417,6 +480,19 @@ fn run_listener(live: Arc<LiveHotkeyConfig>, sink: HotkeySink) {
         ) {
             sink.emit(action);
         }
+        if io.fwd.sink_failed() {
+            break;
+        }
+    }
+    if io.fwd.sink_failed() {
+        // Nothing can be written any more, so the synthetic releases below are
+        // a formality. What matters is dropping `io`: the reader threads lose
+        // their channel, return, and drop the `Device` handles — and closing
+        // those fds is what releases the grabs and gives the user a keyboard
+        // back.
+        error!(
+            "uinput passthrough is dead; releasing the keyboard grabs and stopping the listener"
+        );
     }
     io.fwd.release_all();
     info!("hotkey listener exiting");
@@ -562,13 +638,14 @@ impl Probes<'_> {
 }
 
 /// A destination for re-injected key events: the real uinput `VirtualDevice`
-/// in production, a recorder in tests.
+/// in production, a recorder in tests. `false` means the event was not
+/// written.
 trait KeySink {
-    fn send_event(&mut self, event: InputEvent);
+    fn send_event(&mut self, event: InputEvent) -> bool;
 }
 
 impl KeySink for VirtualDevice {
-    fn send_event(&mut self, event: InputEvent) {
+    fn send_event(&mut self, event: InputEvent) -> bool {
         if let Err(e) = self.emit(&[event, InputEvent::new(EventType::SYNCHRONIZATION.0, 0, 0)]) {
             // A dropped release is a key left down in every app. The idle sweep
             // repairs it; this line is how we learn it happened at all.
@@ -578,9 +655,15 @@ impl KeySink for VirtualDevice {
                 value = event.value(),
                 "passthrough write failed"
             );
+            return false;
         }
+        true
     }
 }
+
+/// Consecutive failed passthrough writes that mean the uinput node itself is
+/// gone (ENODEV/EIO) rather than one event being dropped under load.
+const SINK_FAILURE_LIMIT: u32 = 10;
 
 /// Wraps the passthrough sink and tracks which key codes were forwarded as
 /// currently-down. This guards two invariants:
@@ -588,9 +671,16 @@ impl KeySink for VirtualDevice {
 ///      would strand the key down in apps (a stuck modifier).
 ///   2. On listener exit, every still-down forwarded key gets a synthetic
 ///      release, so a teardown mid-hold can't leave a key wedged.
+///   3. A sink that has stopped accepting writes is reported, so the listener
+///      can exit and let the reader threads drop their grabs. Grabbed
+///      keyboards deliver here alone: with the passthrough dead every key is
+///      swallowed in every app, and there is no keyboard left to kill the
+///      process with.
 struct Forwarder<S: KeySink> {
     sink: S,
     down: PressedCodes,
+    /// Failed writes since the last successful one.
+    failures: u32,
 }
 
 impl<S: KeySink> Forwarder<S> {
@@ -598,7 +688,22 @@ impl<S: KeySink> Forwarder<S> {
         Self {
             sink,
             down: PressedCodes::default(),
+            failures: 0,
         }
+    }
+
+    /// Send through the sink, tracking the run of failures.
+    fn emit(&mut self, event: InputEvent) {
+        if self.sink.send_event(event) {
+            self.failures = 0;
+        } else {
+            self.failures = self.failures.saturating_add(1);
+        }
+    }
+
+    /// Whether the sink has failed often enough in a row to call it dead.
+    fn sink_failed(&self) -> bool {
+        self.failures >= SINK_FAILURE_LIMIT
     }
 
     /// Forward an event, recording key press/release in the forwarded-down set.
@@ -611,7 +716,7 @@ impl<S: KeySink> Forwarder<S> {
                 _ => {}
             }
         }
-        self.sink.send_event(event);
+        self.emit(event);
     }
 
     fn flush(&mut self, deferred: &mut Vec<InputEvent>) {
@@ -644,8 +749,7 @@ impl<S: KeySink> Forwarder<S> {
     /// listener exit so a teardown while keys are held can't strand them.
     fn release_all(&mut self) {
         for code in self.down.drain_codes() {
-            self.sink
-                .send_event(InputEvent::new(EventType::KEY.0, code.code(), 0));
+            self.emit(InputEvent::new(EventType::KEY.0, code.code(), 0));
         }
     }
 }
@@ -1204,9 +1308,59 @@ mod tests {
     }
 
     impl KeySink for Recorder {
-        fn send_event(&mut self, event: InputEvent) {
+        fn send_event(&mut self, event: InputEvent) -> bool {
             self.events.push((event.code(), event.value()));
+            true
         }
+    }
+
+    /// A sink whose writes fail, as a uinput node that has gone ENODEV does.
+    #[derive(Default)]
+    struct BrokenSink {
+        fail: bool,
+    }
+
+    impl KeySink for BrokenSink {
+        fn send_event(&mut self, _event: InputEvent) -> bool {
+            !self.fail
+        }
+    }
+
+    /// Grabbed keyboards deliver to this process alone, so a sink that stops
+    /// writing drops every key in every app — with no keyboard left to kill
+    /// the app with. Past a run of failures the listener has to give the
+    /// keyboards back.
+    #[test]
+    fn a_run_of_failed_writes_marks_the_sink_broken() {
+        let mut fwd = Forwarder::new(BrokenSink::default());
+        assert!(!fwd.sink_failed());
+
+        fwd.sink.fail = true;
+        for _ in 0..SINK_FAILURE_LIMIT - 1 {
+            fwd.forward(ev(KeyCode::KEY_A, true));
+            assert!(!fwd.sink_failed(), "one short of the limit is not broken");
+        }
+        fwd.forward(ev(KeyCode::KEY_A, true));
+        assert!(fwd.sink_failed());
+    }
+
+    /// A single dropped event is normal under load. Only an unbroken run
+    /// means the node itself is gone.
+    #[test]
+    fn one_successful_write_clears_the_failure_run() {
+        let mut fwd = Forwarder::new(BrokenSink::default());
+        fwd.sink.fail = true;
+        for _ in 0..SINK_FAILURE_LIMIT - 1 {
+            fwd.forward(ev(KeyCode::KEY_A, true));
+        }
+        fwd.sink.fail = false;
+        fwd.forward(ev(KeyCode::KEY_A, true));
+
+        fwd.sink.fail = true;
+        for _ in 0..SINK_FAILURE_LIMIT - 1 {
+            fwd.forward(ev(KeyCode::KEY_A, true));
+        }
+        assert!(!fwd.sink_failed(), "the run restarted after the success");
     }
 
     fn ctrl_space_state() -> HotkeyState {

@@ -91,19 +91,19 @@ msgstr "## 会議 — {date}\n"
 "出席者:\n"
 "- "
 
-#: src/features/settings/data/settings-data.ts:278
+#: src/features/settings/data/settings-data.ts:298
 msgid "1 year"
 msgstr "1 年"
 
-#: src/features/settings/data/settings-data.ts:276
+#: src/features/settings/data/settings-data.ts:296
 msgid "30 days"
 msgstr "30 日"
 
-#: src/features/settings/data/settings-data.ts:275
+#: src/features/settings/data/settings-data.ts:295
 msgid "7 days"
 msgstr "7 日"
 
-#: src/features/settings/data/settings-data.ts:277
+#: src/features/settings/data/settings-data.ts:297
 msgid "90 days"
 msgstr "90 日"
 
@@ -154,23 +154,23 @@ msgstr "修正を追加すると、音声入力のたびに Lune Voice が適用
 msgid "Add snippet"
 msgstr "スニペッ���を追加"
 
-#: src/features/settings/data/settings-data.ts:312
+#: src/features/settings/data/settings-data.ts:332
 msgid "After 1 hour"
 msgstr "1 時間後"
 
-#: src/features/settings/data/settings-data.ts:310
+#: src/features/settings/data/settings-data.ts:330
 msgid "After 15 minutes"
 msgstr "15 分後"
 
-#: src/features/settings/data/settings-data.ts:313
+#: src/features/settings/data/settings-data.ts:333
 msgid "After 2 hours"
 msgstr "2 時間後"
 
-#: src/features/settings/data/settings-data.ts:311
+#: src/features/settings/data/settings-data.ts:331
 msgid "After 30 minutes"
 msgstr "30 分後"
 
-#: src/features/settings/data/settings-data.ts:309
+#: src/features/settings/data/settings-data.ts:329
 msgid "After 5 minutes"
 msgstr "5 分後"
 
@@ -190,6 +190,14 @@ msgstr "累計 · 本日"
 #: src/features/welcome/components/ready-checks.tsx:124
 msgid "Allow"
 msgstr "許可"
+
+#: src/features/settings/data/settings-data.ts:286
+msgid "Allow remote"
+msgstr ""
+
+#: src/features/settings/data/settings-data.ts:287
+msgid "Allow remote transcription and styling wherever you have configured them."
+msgstr ""
 
 #: src/features/settings/data/settings-data.ts:95
 msgid "Always"
@@ -400,7 +408,7 @@ msgstr "完成したテキストを現在使用しているアプリに挿入す
 msgid "Choose how Lune Voice looks."
 msgstr "Lune Voiceの見た目を選択します。"
 
-#: src/features/settings/sections/styling-engine-section.tsx:38
+#: src/features/settings/sections/styling-engine-section.tsx:49
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
 msgstr "文字起こしの整形方法を選びます — 設定した OpenAI 互換エンドポイント（ローカルでも���スト型でも）に送信するか、まったく行わないかを選べます。"
 
@@ -684,7 +692,7 @@ msgstr "ディスク使用量"
 msgid "Dismiss error"
 msgstr "エラーを無視する"
 
-#: src/features/settings/data/settings-data.ts:274
+#: src/features/settings/data/settings-data.ts:294
 msgid "Don't save history"
 msgstr "履歴を保存しない"
 
@@ -800,7 +808,7 @@ msgstr "スタイル調整を有効にする"
 
 #: src/features/history/components/history-table.tsx:182
 #: src/features/history/components/session-detail-modal.tsx:163
-#: src/features/settings/sections/styling-engine-section.tsx:42
+#: src/features/settings/sections/styling-engine-section.tsx:67
 msgid "Engine"
 msgstr "エンジン"
 
@@ -1047,11 +1055,11 @@ msgstr "指示"
 msgid "Join the discussions"
 msgstr "ディスカッションに参加"
 
-#: src/features/settings/data/settings-data.ts:279
+#: src/features/settings/data/settings-data.ts:299
 msgid "Keep forever"
 msgstr "ずっと保存"
 
-#: src/features/settings/data/settings-data.ts:306
+#: src/features/settings/data/settings-data.ts:326
 msgid "Keep loaded"
 msgstr "読み込んだままにする"
 
@@ -1084,6 +1092,10 @@ msgstr "言語"
 #: src/features/settings/data/settings-data.ts:112
 msgid "Large"
 msgstr "大"
+
+#: src/features/settings/data/settings-data.ts:189
+msgid "Large v3 Turbo"
+msgstr ""
 
 #: src/features/updates/update-dialog.tsx:234
 msgid "Later"
@@ -1119,6 +1131,18 @@ msgstr "聞き取り中 — フレーズを話してください…"
 #: src/features/shell/components/sidebar-widgets.tsx:51
 msgid "Listening…"
 msgstr "リスニング…"
+
+#: src/features/settings/data/settings-data.ts:276
+msgid "Local only"
+msgstr ""
+
+#: src/features/settings/sections/styling-engine-section.tsx:54
+msgid "Local only disables styling even if an engine is selected below — the transcript is delivered raw instead."
+msgstr ""
+
+#: src/features/settings/data/settings-data.ts:281
+msgid "Local preferred"
+msgstr ""
 
 #: src/features/settings/sections/pill-section.tsx:164
 #: src/features/settings/sections/pill-section.tsx:172
@@ -1225,6 +1249,10 @@ msgstr "名前が長すぎます。"
 msgid "Never"
 msgstr "表示しない"
 
+#: src/features/settings/data/settings-data.ts:277
+msgid "Never send audio or text to a remote service. Remote transcription and styling are disabled."
+msgstr ""
+
 #: src/features/snippets/snippets-page.tsx:204
 #: src/features/snippets/snippets-page.tsx:242
 #: src/features/snippets/snippets-page.tsx:501
@@ -1319,7 +1347,7 @@ msgstr "何も���ンストールされていません"
 msgid "Off"
 msgstr "オフ"
 
-#: src/features/settings/sections/styling-engine-section.tsx:43
+#: src/features/settings/sections/styling-engine-section.tsx:68
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 msgstr "オフでは生の文字起こしがそのまま出力されます。どのスタイルを適用するかは「スタイル」タブで選択します。"
 
@@ -1340,7 +1368,7 @@ msgstr "メニューを開く"
 msgid "Open session from {time}"
 msgstr "{time} のセッションを開く"
 
-#: src/features/settings/data/settings-data.ts:350
+#: src/features/settings/data/settings-data.ts:370
 msgid "OpenAI-compatible"
 msgstr "OpenAI 互換"
 
@@ -1377,7 +1405,7 @@ msgstr "全体の進捗"
 msgid "Pagination"
 msgstr "ページネーション"
 
-#: src/features/settings/data/settings-data.ts:354
+#: src/features/settings/data/settings-data.ts:374
 msgid "Paste"
 msgstr "貼り付け"
 
@@ -1443,6 +1471,10 @@ msgstr "ダウンロードが完了するまでアプリを開いたままにし
 msgid "Position"
 msgstr "位置"
 
+#: src/features/settings/data/settings-data.ts:282
+msgid "Prefer on-device processing, but allow a remote service where you have configured one."
+msgstr ""
+
 #: src/features/settings/sections/pill-section.tsx:112
 msgid "Preset corner or edge the pill starts at."
 msgstr "インジケーターが最初に表示される既定の角または辺。"
@@ -1496,6 +1528,11 @@ msgstr "メイン"
 #: src/features/dictionary/components/priority-picker.tsx:54
 msgid "Priority"
 msgstr "優先度"
+
+#: src/features/settings/sections/styling-engine-section.tsx:53
+#: src/features/settings/sections/styling-engine-section.tsx:59
+msgid "Privacy"
+msgstr ""
 
 #: src/features/dictation/dictation-pill.tsx:61
 #: src/features/dictation/dictation-pill.tsx:67
@@ -1877,7 +1914,7 @@ msgstr "スタイル"
 msgid "Styling"
 msgstr "スタイル調整"
 
-#: src/features/settings/sections/styling-engine-section.tsx:37
+#: src/features/settings/sections/styling-engine-section.tsx:48
 msgid "Styling engine"
 msgstr "スタイル調整エンジン"
 
@@ -1928,7 +1965,7 @@ msgstr "音声入力に使用される主なショートカット。バインデ
 msgid "The microphone is in use"
 msgstr "マイクは使用中です"
 
-#: src/features/settings/data/settings-data.ts:307
+#: src/features/settings/data/settings-data.ts:327
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "モデルはメモリに残ります。毎回すぐに音声入力を始められます。"
 
@@ -2066,7 +2103,7 @@ msgstr "トリガーフレーズ"
 msgid "Try again"
 msgstr "再試行"
 
-#: src/features/settings/data/settings-data.ts:355
+#: src/features/settings/data/settings-data.ts:375
 msgid "Type"
 msgstr "入力"
 
@@ -2203,7 +2240,7 @@ msgstr "送信する貼り付けショートカッ���。「自動」はタ
 msgid "Which screen the pill appears on."
 msgstr "インジケーターを表示するモニター。"
 
-#: src/features/settings/data/settings-data.ts:349
+#: src/features/settings/data/settings-data.ts:369
 #: src/features/welcome/components/engine-step.tsx:53
 msgid "Whisper"
 msgstr "Whisper"

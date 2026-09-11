@@ -103,8 +103,9 @@ Styling is a remote call, so it inherits your endpoint's latency.
 
 - Timeout is `pipeline.llm_timeout_secs` (default 30, max 300). On timeout the
   raw transcript is used — dictation degrades, it does not fail.
-- **`llm_timeout_secs = 0` disables the timeout entirely.** A hung endpoint then
-  hangs the pipeline with no bound. Do not set it to 0 unless you are debugging.
+- There is no way to run the call unbounded: `0`, or anything above 300, is
+  corrected to 300 at pipeline build and logged. The styling call is the only
+  unbounded step between the hotkey and the text appearing.
 - To rule styling out completely, set the style to "off" (no styling) in
   Settings. That skips the LLM call.
 

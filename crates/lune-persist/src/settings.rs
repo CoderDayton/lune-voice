@@ -40,6 +40,18 @@ fn raw_has_legacy_custom_styles(raw: &str) -> bool {
     raw.contains("[[custom_styles]]") || raw.contains("few_shot_dirty")
 }
 
+/// What [`SettingsStore::load_or_quarantine`] recovered, and whether it is the
+/// user's own configuration.
+///
+/// `quarantined` means the file on disk could not be parsed and was moved
+/// aside, so `settings` are defaults. Callers that act destructively on a
+/// setting — history retention is the one that cannot be undone — must not
+/// treat those defaults as a choice the user made.
+pub struct LoadedSettings {
+    pub settings: UserSettings,
+    pub quarantined: bool,
+}
+
 /// Read/write `UserSettings` as TOML with atomic writes.
 ///
 /// API keys are kept out of the plaintext TOML: on `save` they are written to
@@ -102,10 +114,15 @@ impl SettingsStore {
     /// Only a parse failure is recovered. An I/O error still propagates: the
     /// file's contents are probably intact, and silently replacing a
     /// configuration we merely failed to read would be worse than failing.
-    pub fn load_or_quarantine(&self) -> PersistResult<UserSettings> {
+    pub fn load_or_quarantine(&self) -> PersistResult<LoadedSettings> {
         let parse_error = match self.load() {
             Err(PersistError::TomlDeserialize(e)) => e,
-            other => return other,
+            other => {
+                return other.map(|settings| LoadedSettings {
+                    settings,
+                    quarantined: false,
+                });
+            }
         };
         let backup = quarantine_path(&self.path);
         if let Err(e) = fs::rename(&self.path, &backup) {
@@ -119,7 +136,10 @@ impl SettingsStore {
         );
         let mut settings = UserSettings::default();
         self.restore_secrets(&mut settings);
-        Ok(settings)
+        Ok(LoadedSettings {
+            settings,
+            quarantined: true,
+        })
     }
 
     /// Save settings atomically (write to temp, then rename).
@@ -634,10 +654,14 @@ mod tests {
         let path = dir.path().join("settings.toml");
         std::fs::write(&path, b"= not valid = toml ===\n").unwrap();
 
-        let settings = SettingsStore::new(&path)
+        let loaded = SettingsStore::new(&path)
             .load_or_quarantine()
             .expect("a malformed file must not stop startup");
-        assert_eq!(settings.language, UserSettings::default().language);
+        assert_eq!(loaded.settings.language, UserSettings::default().language);
+        assert!(
+            loaded.quarantined,
+            "the caller has to be able to tell these defaults from a real load"
+        );
 
         assert!(!path.exists(), "the malformed file must not be read again");
         let kept: Vec<_> = std::fs::read_dir(dir.path())
@@ -667,8 +691,9 @@ mod tests {
         };
         std::fs::write(&path, toml::to_string_pretty(&want).unwrap()).unwrap();
 
-        let settings = SettingsStore::new(&path).load_or_quarantine().unwrap();
-        assert_eq!(settings.language, "en-GB");
+        let loaded = SettingsStore::new(&path).load_or_quarantine().unwrap();
+        assert_eq!(loaded.settings.language, "en-GB");
+        assert!(!loaded.quarantined);
         assert!(path.exists(), "a readable file must not be moved");
     }
 

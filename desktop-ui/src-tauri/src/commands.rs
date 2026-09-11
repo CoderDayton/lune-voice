@@ -1,3 +1,4 @@
+use lune_core::config::PrivacyMode;
 use tauri::{AppHandle, Emitter, Runtime, State, WebviewWindow, ipc::Channel};
 use tauri_plugin_dialog::DialogExt;
 
@@ -99,16 +100,27 @@ pub async fn export_transcript(
     Ok(true)
 }
 
-/// Configuration-level styling preflight: a remote provider is selected and
-/// set up (endpoint key + model present). Returns the user-facing reason when
-/// not. Applying a pending pipeline reload is handled separately by
-/// `AppRuntime::ensure_styling_llm_ready`.
+/// Configuration-level styling preflight: remote processing is permitted, and
+/// a remote provider is selected and set up (endpoint key + model present).
+/// Returns the user-facing reason when not. Applying a pending pipeline reload
+/// is handled separately by `AppRuntime::ensure_styling_llm_ready`.
 async fn check_styling_llm_configured() -> Result<(), String> {
     run_persist("check styling llm readiness", || {
         let paths = lune_persist::AppPaths::resolve().ok_or("resolve application paths")?;
         let settings = lune_persist::SettingsStore::new(paths.settings_file())
             .load()
             .map_err(|e| format!("load settings: {e}"))?;
+        // Checked first: `LocalOnly` overrides a fully configured provider, so
+        // reporting "ready" here and then degrading to the raw transcript at
+        // dictation time is the one failure the user cannot diagnose. Styling
+        // is remote-only, so this setting alone decides whether it can run.
+        if matches!(settings.privacy_mode, PrivacyMode::LocalOnly) {
+            return Err(
+                "Privacy mode is set to local-only, so styling cannot send text to \
+                        a remote service. Allow remote processing in Settings → Privacy."
+                    .to_string(),
+            );
+        }
         lune_persist::styling_llm_readiness(&settings.llm_backend)
             .map_err(|u| u.user_message().to_string())
     })
@@ -849,13 +861,59 @@ pub async fn grant_uinput_access(window: WebviewWindow) -> Result<bool, String> 
     require_window_access(&window, &["main"])?;
     #[cfg(unix)]
     {
-        tauri::async_runtime::spawn_blocking(lune_voice::grant_uinput_access)
+        let granted = tauri::async_runtime::spawn_blocking(lune_voice::grant_uinput_access)
             .await
-            .map_err(|e| format!("grant uinput access task: {e}"))?
+            .map_err(|e| format!("grant uinput access task: {e}"))?;
+        // The grab that failed at startup is possible now. Retry it here:
+        // nothing else would, and the user has no reason to expect that
+        // saving an unrelated setting is what makes their hotkey work.
+        if matches!(granted, Ok(true)) {
+            retry_native_hotkeys(&window);
+        }
+        granted
     }
     #[cfg(not(unix))]
     {
         Ok(true)
+    }
+}
+
+/// Ask the hotkey controller to start the native listener now.
+///
+/// Called after a permission grant, which changes what the evdev backend can
+/// do without changing any setting.
+#[cfg(unix)]
+fn retry_native_hotkeys(window: &WebviewWindow) {
+    use tauri::Manager;
+
+    let Some(controller) = window
+        .app_handle()
+        .try_state::<std::sync::Arc<crate::hotkey::HotkeyController>>()
+    else {
+        return;
+    };
+    // No defaults here: the listener is being started *with* this binding, so
+    // falling back to `UserSettings::default()` would silently re-bind the
+    // hotkey to the stock key and activation mode instead of the user's.
+    // Leaving the global-shortcut fallback in place is the honest outcome.
+    let Some(settings) = lune_persist::AppPaths::resolve().and_then(|paths| {
+        lune_persist::SettingsStore::new(paths.settings_file())
+            .load()
+            .ok()
+    }) else {
+        tracing::warn!(
+            "uinput access was granted but the settings could not be read; \
+             not starting the native listener on default bindings"
+        );
+        return;
+    };
+    if controller.retry_native(&settings.hotkey, settings.activation_mode) {
+        tracing::info!("native hotkey listener is live after the uinput grant");
+    } else {
+        tracing::warn!(
+            "uinput access was granted but no keyboard could be grabbed; \
+             global shortcuts remain in use"
+        );
     }
 }
 

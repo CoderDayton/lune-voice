@@ -54,6 +54,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
       checkUpdatesOnLaunch: false,
       sessionHistoryDays: 30,
       terminalMode: 'Auto',
+      privacyMode: 'LocalOnly',
       openaiAsrBaseUrl: null,
       openaiAsrModel: null,
       openaiAsrApiKeySet: false,

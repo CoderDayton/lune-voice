@@ -84,6 +84,7 @@ export function mapWorkspaceSettings(snapshot: WorkspaceSnapshot): WorkspaceSett
     // select as "30 days" and silently re-enable history on the next save.
     sessionHistoryDays: snapshot.settings.sessionHistoryDays,
     terminalMode: snapshot.settings.terminalMode ?? DEFAULT_SETTINGS.terminalMode,
+    privacyMode: snapshot.settings.privacyMode ?? DEFAULT_SETTINGS.privacyMode,
     llmEnabled: snapshot.settings.llmEnabled ?? DEFAULT_SETTINGS.llmEnabled,
     openaiAsrBaseUrl: snapshot.settings.openaiAsrBaseUrl ?? DEFAULT_SETTINGS.openaiAsrBaseUrl,
     openaiAsrApiKey: snapshot.settings.openaiAsrApiKeySet
@@ -156,6 +157,7 @@ export function settingsToSaveInput(settings: WorkspaceSettings): SaveWorkspaceS
     checkUpdatesOnLaunch: settings.checkUpdatesOnLaunch,
     sessionHistoryDays: settings.sessionHistoryDays,
     terminalMode: settings.terminalMode,
+    privacyMode: settings.privacyMode,
     llmEnabled: settings.llmEnabled,
     openaiAsrBaseUrl: settings.openaiAsrBaseUrl || null,
     openaiAsrApiKey:

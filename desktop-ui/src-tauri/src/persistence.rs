@@ -2,8 +2,8 @@ use lune_asr::AsrRegistry;
 use lune_core::config::{
     ActivationMode, AsrBackendConfig, DevicePolicy, DictationMode, FormatToggles, HistoryRetention,
     HotkeyConfig, KeyCombo, LlmBackendConfig, Modifier, OpenAiLlmProvider, PillAnchor, PillCorner,
-    PillOrientation, PillSize, PillVisibility, RedactedString, StreamingMode, StylePreset,
-    TerminalMode, UserSettings, builtin_registry,
+    PillOrientation, PillSize, PillVisibility, PrivacyMode, RedactedString, StreamingMode,
+    StylePreset, TerminalMode, UserSettings, builtin_registry,
 };
 use lune_core::session::SessionStatus;
 use lune_persist::{
@@ -14,8 +14,8 @@ use crate::dto::{
     ActivationModeDto, AsrBackendTypeDto, CreateCustomStyleInput, CreateDictionaryEntryInput,
     DevicePolicyDto, DictationModeDto, DictionaryItemDto, HistoryItemDto, HistoryPageDto,
     LlmBackendTypeDto, PillAnchorDto, PillCornerDto, PillOrientationDto, PillSizeDto,
-    PillVisibilityDto, SaveSnippetInput, SaveWorkspaceSettingsInput, SessionStatsDto,
-    SnippetItemDto, StylePresetDto, TerminalModeDto, UpdateCustomStyleInput,
+    PillVisibilityDto, PrivacyModeDto, SaveSnippetInput, SaveWorkspaceSettingsInput,
+    SessionStatsDto, SnippetItemDto, StylePresetDto, TerminalModeDto, UpdateCustomStyleInput,
     UpdateDictionaryEntryInput, WhisperModelDto, WorkspaceSettingsDto, WorkspaceSnapshot,
 };
 
@@ -49,6 +49,15 @@ fn is_wellformed_bcp47(tag: &str) -> bool {
     })
 }
 
+/// Whether the settings driving a destructive action are the user's own.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SettingsTrust {
+    /// Parsed from the file the user's own saves wrote.
+    AsWritten,
+    /// The file could not be parsed and was moved aside; these are defaults.
+    Quarantined,
+}
+
 /// Apply the retention setting to what is already on disk.
 ///
 /// `Days(n)` prunes past the window; `Forever` leaves everything alone; `Off`
@@ -57,8 +66,23 @@ fn is_wellformed_bcp47(tag: &str) -> bool {
 /// Writes are refused separately (`SessionManagerConfig::persist_history`) —
 /// this is the half that deals with rows that already exist.
 ///
+/// `SettingsTrust::Quarantined` makes this a no-op. The defaults that a
+/// quarantine hands back carry a 30-day window and `Off` is one unknown enum
+/// value away, so pruning on them deletes history the user chose to keep, and
+/// unlike the settings file itself nothing keeps a copy.
+///
 /// Best-effort: a failure here is logged, never fatal.
-pub(crate) fn enforce_retention(database: &mut Database, settings: &UserSettings) {
+pub(crate) fn enforce_retention(
+    database: &mut Database,
+    settings: &UserSettings,
+    trust: SettingsTrust,
+) {
+    if trust == SettingsTrust::Quarantined {
+        tracing::warn!(
+            "settings were quarantined; skipping history retention so the defaults cannot prune it"
+        );
+        return;
+    }
     match settings.history_retention() {
         HistoryRetention::Days(days) => {
             if let Err(e) = database.prune_sessions(days) {
@@ -77,10 +101,10 @@ pub(crate) fn enforce_retention(database: &mut Database, settings: &UserSettings
 
 pub fn load_workspace_snapshot() -> Result<WorkspaceSnapshot, String> {
     let paths = resolve_paths()?;
-    let settings = load_settings(&paths)?;
+    let loaded = load_settings_checked(&paths)?;
     let mut database = open_database(&paths)?;
-    enforce_retention(&mut database, &settings);
-    build_snapshot(settings, &mut database)
+    enforce_retention(&mut database, &loaded.settings, loaded.trust);
+    build_snapshot(loaded.settings, &mut database)
 }
 
 pub fn save_workspace_settings(
@@ -94,7 +118,7 @@ pub fn save_workspace_settings(
     // Retention applies the moment it is changed. Switching to "Don't save
     // history" must clear what is already stored rather than wait for the next
     // window load.
-    enforce_retention(&mut database, &settings);
+    enforce_retention(&mut database, &settings, SettingsTrust::AsWritten);
     build_snapshot(settings, &mut database)
 }
 
@@ -693,15 +717,33 @@ fn resolve_paths() -> Result<AppPaths, String> {
     Ok(paths)
 }
 
+/// Settings plus whether they came from a file that parsed.
+pub(crate) struct CheckedSettings {
+    pub settings: UserSettings,
+    pub trust: SettingsTrust,
+}
+
 fn load_settings(paths: &AppPaths) -> Result<UserSettings, String> {
+    Ok(load_settings_checked(paths)?.settings)
+}
+
+pub(crate) fn load_settings_checked(paths: &AppPaths) -> Result<CheckedSettings, String> {
     let store = SettingsStore::new(paths.settings_file());
     // Same recovery as the startup path: a malformed file must not make every
     // settings-touching command fail with no way out.
-    let mut settings = store
+    let loaded = store
         .load_or_quarantine()
         .map_err(|e| format!("load settings: {e}"))?;
+    let mut settings = loaded.settings;
     settings.migrate_pipeline_fields();
-    Ok(settings)
+    Ok(CheckedSettings {
+        settings,
+        trust: if loaded.quarantined {
+            SettingsTrust::Quarantined
+        } else {
+            SettingsTrust::AsWritten
+        },
+    })
 }
 
 fn save_settings(paths: &AppPaths, settings: &UserSettings) -> Result<(), String> {
@@ -780,6 +822,7 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
         check_updates_on_launch: settings.check_updates_on_launch,
         session_history_days: settings.session_history_days,
         terminal_mode: terminal_mode_to_dto(settings.terminal_mode),
+        privacy_mode: privacy_mode_to_dto(settings.privacy_mode),
         llm_enabled: !matches!(settings.llm_backend, LlmBackendConfig::Disabled),
         openai_asr_base_url,
         openai_asr_model,
@@ -902,6 +945,7 @@ fn apply_settings_dto(
     settings.start_minimized = input.start_minimized;
     settings.check_updates_on_launch = input.check_updates_on_launch;
     settings.terminal_mode = terminal_mode_from_dto(input.terminal_mode);
+    settings.privacy_mode = privacy_mode_from_dto(input.privacy_mode);
     validate_history_days(input.session_history_days)?;
     settings.session_history_days = input.session_history_days;
     // Persist the remote provider config independently of the active backend so
@@ -1086,6 +1130,25 @@ fn terminal_mode_from_dto(dto: TerminalModeDto) -> TerminalMode {
         TerminalModeDto::Auto => TerminalMode::Auto,
         TerminalModeDto::Terminal => TerminalMode::Terminal,
         TerminalModeDto::Normal => TerminalMode::Normal,
+    }
+}
+
+fn privacy_mode_to_dto(mode: PrivacyMode) -> PrivacyModeDto {
+    match mode {
+        PrivacyMode::LocalOnly => PrivacyModeDto::LocalOnly,
+        PrivacyMode::LocalPreferred => PrivacyModeDto::LocalPreferred,
+        PrivacyMode::AllowRemote => PrivacyModeDto::AllowRemote,
+        // `PrivacyMode` is `#[non_exhaustive]`; the strictest option is the
+        // only safe thing to show for a variant this build does not know.
+        _ => PrivacyModeDto::LocalOnly,
+    }
+}
+
+fn privacy_mode_from_dto(dto: PrivacyModeDto) -> PrivacyMode {
+    match dto {
+        PrivacyModeDto::LocalOnly => PrivacyMode::LocalOnly,
+        PrivacyModeDto::LocalPreferred => PrivacyMode::LocalPreferred,
+        PrivacyModeDto::AllowRemote => PrivacyMode::AllowRemote,
     }
 }
 
@@ -1282,6 +1345,39 @@ fn session_status_label(status: &SessionStatus) -> String {
 mod tests {
     use super::*;
 
+    /// A quarantined settings file leaves us holding defaults, not the user's
+    /// choices. Acting on them destroys history the user asked to keep, and
+    /// nothing restores it.
+    #[test]
+    fn retention_does_not_run_on_quarantined_settings() {
+        use lune_core::asr::AsrBackendKind;
+        use lune_core::session::DictationSession;
+
+        let mut db = Database::open_in_memory().unwrap();
+        db.insert_session(&DictationSession {
+            id: uuid::Uuid::new_v4(),
+            started_at: chrono::Utc::now(),
+            ended_at: None,
+            style: None,
+            backend: AsrBackendKind::WhisperCpp,
+            status: SessionStatus::Active,
+            transcript: Some("a stored transcript".into()),
+        })
+        .unwrap();
+
+        // Defaults say "history off" only because the real file could not be
+        // read; `Off` would otherwise purge everything.
+        let defaults = UserSettings {
+            session_history_days: None,
+            ..UserSettings::default()
+        };
+        enforce_retention(&mut db, &defaults, SettingsTrust::Quarantined);
+        assert_eq!(db.list_sessions(10).unwrap().len(), 1);
+
+        enforce_retention(&mut db, &defaults, SettingsTrust::AsWritten);
+        assert!(db.list_sessions(10).unwrap().is_empty());
+    }
+
     #[test]
     fn load_settings_migrates_legacy_pipeline_fields() {
         let dir = tempfile::tempdir().unwrap();
@@ -1337,6 +1433,7 @@ mod tests {
             check_updates_on_launch: dto.check_updates_on_launch,
             session_history_days: dto.session_history_days,
             terminal_mode: dto.terminal_mode,
+            privacy_mode: dto.privacy_mode,
             llm_enabled: dto.llm_enabled,
             llm_backend_type: LlmBackendTypeDto::OpenAiCompatible,
             whisper_model: Some(dto.whisper_model),

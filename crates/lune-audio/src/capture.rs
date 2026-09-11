@@ -187,6 +187,10 @@ pub struct AudioStream {
     /// stream is kept forever and every later dictation dies on the starvation
     /// watchdog until an unrelated setting is touched.
     failed: Arc<AtomicBool>,
+    /// The configured input device was not present, so this stream is on the
+    /// system default instead. Transcripts are degraded rather than absent,
+    /// which is exactly why it has to be reported rather than inferred.
+    fell_back: bool,
     /// Kept alive to keep the cpal callback running. `None` for file-backed streams.
     _stream: Option<cpal::Stream>,
 }
@@ -551,6 +555,7 @@ impl AudioStream {
             ring,
             flush,
             failed,
+            fell_back: selection.fell_back,
             _stream: Some(stream),
         })
     }
@@ -580,6 +585,7 @@ impl AudioStream {
             ring,
             flush: Arc::new(AtomicBool::new(false)),
             failed: Arc::new(AtomicBool::new(false)),
+            fell_back: false,
             _stream: None,
         })
     }
@@ -614,6 +620,12 @@ impl AudioStream {
     /// expected. Only inside a guard does an eviction mean a reader lost audio.
     pub fn consume(&self) -> ConsumerGuard {
         ConsumerGuard::new(Arc::clone(&self.ring))
+    }
+
+    /// Whether the configured input device was missing and the system default
+    /// was used in its place.
+    pub fn fell_back(&self) -> bool {
+        self.fell_back
     }
 
     /// Whether cpal has reported an error on this stream.

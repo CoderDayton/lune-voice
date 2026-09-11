@@ -187,58 +187,195 @@ pub(crate) use unix::{focused_window_class, restore_focus};
 /// hot path.
 pub fn capture_focus_target() -> WindowTarget {
     #[cfg(unix)]
-    {
-        unix::capture()
-    }
+    let target = unix::capture();
     #[cfg(target_os = "windows")]
-    {
-        windows::capture()
-    }
+    let target = windows::capture();
     #[cfg(not(any(unix, target_os = "windows")))]
-    {
-        WindowTarget::unknown()
+    let target = WindowTarget::unknown();
+
+    if target.class.is_some() {
+        note_window_named();
     }
+    target
 }
 
-/// Whether the window focused *right now* is a terminal.
+/// Whether any focus probe has named a window in this process.
+static FOCUS_EVER_NAMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+fn note_window_named() {
+    FOCUS_EVER_NAMED.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Whether this desktop has ever identified a focused window.
 ///
-/// The live counterpart to a captured `WindowTarget`, for delivery paths that
-/// never captured one.
-/// Only the Linux paste-chord decision needs the live answer; every other
-/// driver reads `is_terminal` off a captured target.
-#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
-pub fn focused_is_terminal() -> bool {
-    #[cfg(unix)]
-    {
-        unix::focused_is_terminal()
-    }
-    #[cfg(not(unix))]
-    {
-        capture_focus_target().is_terminal
-    }
+/// Separates a desktop that cannot name windows at all — GNOME Wayland, whose
+/// `Shell.Eval` endpoint is disabled and whose native windows `xdotool` cannot
+/// see — from one that normally names them and simply failed on this window.
+/// Only the second case makes an unnamed window unusual enough to be worth
+/// treating as a possible shell.
+fn focus_is_identifiable() -> bool {
+    FOCUS_EVER_NAMED.load(std::sync::atomic::Ordering::Relaxed)
 }
 
-/// Whether delivery should treat the focused window as a terminal.
+/// Whether delivery should treat the focused window as a terminal (the paste
+/// chord), and whether it must collapse newlines and tabs first (safety).
+///
+/// Both answers come from one focus probe. Resolving them separately would
+/// put two compositor round-trips on the delivery hot path and let them
+/// disagree when focus moves in between — Ctrl+Shift+V into what is no longer
+/// a terminal.
 ///
 /// Under `Auto` the captured target answers when there is one, and the
-/// compositor is asked when there is not. Both delivery backends decide this
-/// the same way, so the rule lives here rather than once per backend.
-///
-/// Best effort under `Auto`: where the compositor will not name the focused
-/// window — notably GNOME Wayland — this answers `false` and the text is
-/// delivered unchanged.
+/// compositor is asked when there is not. Best effort: where the compositor
+/// will not name the focused window — notably GNOME Wayland — the chord stays
+/// Ctrl+V (Ctrl+Shift+V in an ordinary text field is wrong) while flattening
+/// still applies, because an unnameable window might be a shell and every
+/// newline pasted into a shell is a line it runs.
 #[cfg_attr(not(unix), allow(dead_code))]
-pub(crate) fn targets_terminal(mode: TerminalMode, target: Option<&WindowTarget>) -> bool {
+pub(crate) fn paste_decisions(mode: TerminalMode, target: Option<&WindowTarget>) -> (bool, bool) {
+    match mode {
+        TerminalMode::Terminal => (true, true),
+        TerminalMode::Normal => (false, false),
+        _ => match target {
+            Some(t) => decide_from_target(t, focus_is_identifiable()),
+            None => decide_from_kind(focused_kind(), focus_is_identifiable()),
+        },
+    }
+}
+
+/// A captured target with no class is the unknown case; one that was named has
+/// already been classified. An unnamed window only counts as a possible shell
+/// where this desktop names windows at all.
+fn decide_from_target(target: &WindowTarget, identifiable: bool) -> (bool, bool) {
+    (
+        target.is_terminal,
+        target.is_terminal || (target.class.is_none() && identifiable),
+    )
+}
+
+fn decide_from_kind(kind: FocusKind, identifiable: bool) -> (bool, bool) {
+    match kind {
+        FocusKind::Terminal => (true, true),
+        FocusKind::NotTerminal => (false, false),
+        FocusKind::Unknown => (false, identifiable),
+    }
+}
+
+/// Whether delivery must collapse newlines and tabs before it emits the text.
+///
+/// Deliberately **not** the same question as the paste chord. The chord
+/// is a convenience and errs towards Ctrl+V, because Ctrl+Shift+V in an
+/// ordinary text field is wrong. Flattening is a safety measure and errs the
+/// other way: on a desktop that names windows, one it would not name might be
+/// a shell, and every newline pasted into a shell is a line it runs.
+///
+/// Where nothing can be named at all the caution buys nothing and costs every
+/// line break, so it does not apply — see [`focus_is_identifiable`]. Users who
+/// dictate into terminals there can force it with `TerminalMode::Terminal`.
+#[cfg_attr(not(unix), allow(dead_code))]
+pub(crate) fn must_flatten(mode: TerminalMode, target: Option<&WindowTarget>) -> bool {
     match mode {
         TerminalMode::Terminal => true,
         TerminalMode::Normal => false,
-        _ => target.map_or_else(focused_is_terminal, |t| t.is_terminal),
+        _ => paste_decisions(mode, target).1,
+    }
+}
+
+/// What delivery could learn about the window focused right now.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(not(unix), allow(dead_code))]
+pub(crate) enum FocusKind {
+    Terminal,
+    NotTerminal,
+    /// The desktop would not name the focused window — GNOME Wayland with no
+    /// xdotool, a compositor with no focus API.
+    Unknown,
+}
+
+#[cfg_attr(not(unix), allow(dead_code))]
+pub(crate) fn focused_kind() -> FocusKind {
+    #[cfg(unix)]
+    {
+        match unix::focused_window_class() {
+            Some(class) => {
+                note_window_named();
+                let is_term = is_terminal_class(&class);
+                tracing::info!(class = %class, is_term, "focused window detected");
+                if is_term {
+                    FocusKind::Terminal
+                } else {
+                    FocusKind::NotTerminal
+                }
+            }
+            None => {
+                tracing::info!(
+                    identifiable = focus_is_identifiable(),
+                    "focused window: unknown (Ctrl+V; flattened only where windows are nameable)"
+                );
+                FocusKind::Unknown
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let target = capture_focus_target();
+        match (target.is_terminal, target.class.is_some()) {
+            (true, _) => FocusKind::Terminal,
+            (false, true) => FocusKind::NotTerminal,
+            (false, false) => FocusKind::Unknown,
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn target(class: Option<&str>) -> WindowTarget {
+        match class {
+            Some(c) => WindowTarget::from_class(c.to_owned(), None),
+            None => WindowTarget::unknown(),
+        }
+    }
+
+    /// The paste chord is a convenience: Ctrl+Shift+V in an ordinary text
+    /// field is wrong, so only a window known to be a terminal gets it.
+    #[test]
+    fn only_a_known_terminal_gets_the_terminal_chord() {
+        let chord = |mode, t: &WindowTarget| paste_decisions(mode, Some(t)).0;
+        assert!(chord(TerminalMode::Auto, &target(Some("kitty"))));
+        assert!(!chord(TerminalMode::Auto, &target(Some("firefox"))));
+        assert!(!chord(TerminalMode::Auto, &target(None)));
+        assert!(chord(TerminalMode::Terminal, &target(None)));
+        assert!(!chord(TerminalMode::Normal, &target(Some("kitty"))));
+    }
+
+    /// Flattening is a safety measure, so it goes the other way: on a desktop
+    /// that names windows, one it would not name might be a shell, and every
+    /// newline in a paste into a shell is a line it runs.
+    #[test]
+    fn an_unnameable_window_is_flattened_even_though_it_gets_ctrl_v() {
+        let flatten = |t: &WindowTarget| decide_from_target(t, true).1;
+        assert!(flatten(&target(None)));
+        assert!(flatten(&target(Some("kitty"))));
+        assert!(!flatten(&target(Some("firefox"))));
+        // `Normal` is the explicit opt-out, and it still means what it says.
+        assert!(!must_flatten(TerminalMode::Normal, Some(&target(None))));
+        assert!(must_flatten(TerminalMode::Terminal, Some(&target(None))));
+    }
+
+    /// Where nothing can ever be named — GNOME Wayland — the same caution
+    /// would strip the line breaks out of every dictation, so it does not
+    /// apply. A named terminal is still flattened there.
+    #[test]
+    fn an_unnameable_window_keeps_its_line_breaks_where_nothing_is_nameable() {
+        assert!(!decide_from_target(&target(None), false).1);
+        assert!(!decide_from_kind(FocusKind::Unknown, false).1);
+        assert!(decide_from_kind(FocusKind::Unknown, true).1);
+        // Positive identification still decides on its own either way.
+        assert!(decide_from_target(&target(Some("kitty")), false).1);
+        assert!(!decide_from_target(&target(Some("firefox")), true).1);
+    }
 
     #[test]
     fn the_three_class_shapes_all_reduce_to_the_same_terminal() {

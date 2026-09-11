@@ -127,11 +127,32 @@ pub fn remove_uinput_rule() -> Result<bool, String> {
 ///
 /// Best-effort on purpose: both halves failing means the change lands on the
 /// next boot rather than now, which is worth a warning and nothing more.
+/// The two independent decisions the paste path needs about its target.
+///
+/// Separate fields because they fail in opposite directions — see
+/// [`crate::focus::must_flatten`].
+#[derive(Debug, Clone, Copy)]
+struct PasteTarget {
+    /// Send Ctrl+Shift+V rather than Ctrl+V.
+    terminal_chord: bool,
+    /// Collapse newlines and tabs before emitting anything.
+    flatten: bool,
+}
+
+/// How long to wait on a `pkexec` call before giving up on it.
+///
+/// Generous because the user is typing a password into the polkit prompt. It
+/// is a bound on "no agent ever answers", not on human speed.
+const PKEXEC_TIMEOUT: Duration = Duration::from_secs(120);
+
 fn reload_udev_rules() {
-    let reload = Command::new("pkexec")
-        .args(["udevadm", "control", "--reload-rules"])
-        .status();
-    let trigger = Command::new("pkexec").args(["udevadm", "trigger"]).status();
+    let reload = crate::probe::status_with_timeout(
+        "pkexec",
+        &["udevadm", "control", "--reload-rules"],
+        PKEXEC_TIMEOUT,
+    );
+    let trigger =
+        crate::probe::status_with_timeout("pkexec", &["udevadm", "trigger"], PKEXEC_TIMEOUT);
     if reload.map(|s| !s.success()).unwrap_or(true) || trigger.map(|s| !s.success()).unwrap_or(true)
     {
         warn!("udevadm reload/trigger may have failed — the change may require a reboot");
@@ -156,18 +177,31 @@ fn ensure_kernel_access() -> Result<(), String> {
     if let Some(ref mut stdin) = child.stdin {
         wrote = stdin.write_all(UDEV_RULE.as_bytes()).is_ok();
     }
-    let status = child
-        .wait()
-        .map_err(|e| format!("pkexec wait failed: {e}"))?;
+    // `tee` only sees EOF once every write end is closed, and the `Child`
+    // holds one.
+    child.stdin.take();
+    // Bounded: with no polkit agent running — bare Sway or Hyprland without
+    // `polkit-gnome` autostarted — `pkexec` never returns, and this runs on
+    // the delivery thread before it reaches its receive loop. An unbounded
+    // wait here means every dictation is silently dropped for the life of the
+    // process.
+    let Some(status) = crate::probe::wait_with_timeout(&mut child, PKEXEC_TIMEOUT) else {
+        return Err(format!(
+            "no answer from pkexec within {}s — is a polkit agent running?",
+            PKEXEC_TIMEOUT.as_secs()
+        ));
+    };
     if !status.success() {
         return Err("pkexec authentication cancelled or failed".into());
     }
     // `tee` exits 0 having written an empty file if the pipe broke, which would
     // otherwise leave a silently useless root-owned rule in /etc.
     if !wrote {
-        let _ = Command::new("pkexec")
-            .args(["rm", "-f", UDEV_RULE_PATH])
-            .status();
+        let _ = crate::probe::status_with_timeout(
+            "pkexec",
+            &["rm", "-f", UDEV_RULE_PATH],
+            PKEXEC_TIMEOUT,
+        );
         return Err("could not write the udev rule".into());
     }
 
@@ -827,15 +861,23 @@ impl UinputTyper {
         self.emit_raw(EventType::KEY, KeyCode::KEY_LEFTCTRL.0, 0);
     }
 
-    /// Resolve whether the focused window should receive a terminal-style
-    /// paste chord, honoring the configured `terminal_mode`.
-    fn resolve_terminal(&self) -> bool {
-        crate::focus::targets_terminal(self.terminal_mode, None)
+    /// Resolve both target decisions at once, honoring `terminal_mode`.
+    /// `target` is the window captured at dictation start, when there was one.
+    fn resolve_paste_target(&self, target: Option<&WindowTarget>) -> PasteTarget {
+        // One probe, not two: without a captured target each question would
+        // otherwise ask the compositor separately, doubling a subprocess
+        // round-trip on the delivery hot path and letting the two answers
+        // disagree if focus moves between them.
+        let (terminal_chord, flatten) = crate::focus::paste_decisions(self.terminal_mode, target);
+        PasteTarget {
+            terminal_chord,
+            flatten,
+        }
     }
 
     pub fn type_str(&mut self, text: &str, keep_clipboard: bool) -> TypeOutcome {
-        let is_terminal = self.resolve_terminal();
-        self.do_clipboard_paste(text, is_terminal, "emitting paste", keep_clipboard)
+        let target = self.resolve_paste_target(None);
+        self.do_clipboard_paste(text, target, "emitting paste", keep_clipboard)
     }
 
     pub fn type_str_to(
@@ -850,12 +892,8 @@ impl UinputTyper {
             }
             std::thread::sleep(Duration::from_millis(50));
         }
-        self.do_clipboard_paste(
-            text,
-            target.is_terminal,
-            "emitting paste to target",
-            keep_clipboard,
-        )
+        let paste = self.resolve_paste_target(Some(target));
+        self.do_clipboard_paste(text, paste, "emitting paste to target", keep_clipboard)
     }
 
     /// Set clipboard, emit the appropriate paste chord, and wait for the
@@ -868,7 +906,7 @@ impl UinputTyper {
     fn do_clipboard_paste(
         &mut self,
         text: &str,
-        is_terminal: bool,
+        target: PasteTarget,
         label: &str,
         keep_clipboard: bool,
     ) -> TypeOutcome {
@@ -884,7 +922,7 @@ impl UinputTyper {
         //
         // The clipboard below carries the flattened text too, so what the user
         // keeps (`copy_to_clipboard`) is what was actually pasted.
-        let flattened = if is_terminal {
+        let flattened = if target.flatten {
             crate::sanitize::flatten_for_terminal(text)
         } else {
             Cow::Borrowed(text)
@@ -958,7 +996,7 @@ impl UinputTyper {
         };
         self.paste_delay.record_rtt(rtt_start.elapsed());
 
-        let chord = if is_terminal {
+        let chord = if target.terminal_chord {
             "Ctrl+Shift+V"
         } else {
             "Ctrl+V"
@@ -968,7 +1006,7 @@ impl UinputTyper {
             post_paste_ms = self.paste_delay.current_ms,
             "{label}"
         );
-        self.emit_paste(is_terminal);
+        self.emit_paste(target.terminal_chord);
         std::thread::sleep(self.paste_delay.delay());
 
         // Restore the user's clipboard now that the target app has had the
@@ -1007,13 +1045,13 @@ impl UinputTyper {
         // Multi-line snippet bodies are the normal source of newlines here;
         // see `needs_paste_delivery` for why they must not be typed per-key.
         if needs_paste_delivery(text) {
-            let is_terminal = self.resolve_terminal();
+            let target = self.resolve_paste_target(None);
             let reason = if text.contains('\n') {
                 "multi-line text — emitting paste (Enter would submit)"
             } else {
                 "non-ASCII text — emitting paste"
             };
-            return self.do_clipboard_paste(text, is_terminal, reason, keep_clipboard);
+            return self.do_clipboard_paste(text, target, reason, keep_clipboard);
         }
         // Per-key typing costs ~8 ms per character, all of it after the
         // transcript is ready: a long paragraph types for seconds while the
@@ -1021,10 +1059,10 @@ impl UinputTyper {
         // per-key — it is faster than a clipboard round trip and leaves the
         // clipboard alone, which is what people expect for a quick phrase.
         if is_long_enough_to_paste(text) {
-            let is_terminal = self.resolve_terminal();
+            let target = self.resolve_paste_target(None);
             return self.do_clipboard_paste(
                 text,
-                is_terminal,
+                target,
                 "long text — emitting paste (per-key typing would take seconds)",
                 keep_clipboard,
             );

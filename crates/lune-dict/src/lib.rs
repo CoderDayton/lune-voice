@@ -91,6 +91,13 @@ impl DictionaryManager {
         for entry in &multi {
             let phrase_words: Vec<&str> = entry.phrase.split_whitespace().collect();
             let n = phrase_words.len();
+            // A phrase that is whitespace but not empty lands in `multi` (it
+            // contains whitespace) yet tokenizes to nothing. A zero-width
+            // window matches vacuously and `i += n` advances by zero, so the
+            // loop below would never terminate.
+            if n == 0 {
+                continue;
+            }
             let mut i = 0;
             while i + n <= text_words.len() {
                 let window_match = text_words[i..i + n]
@@ -399,6 +406,18 @@ mod tests {
     fn manager() -> DictionaryManager {
         let db = Database::open_in_memory().unwrap();
         DictionaryManager::new(db).unwrap()
+    }
+
+    /// A phrase that is whitespace but not empty passes the multi-word
+    /// partition and tokenizes to zero words. A zero-width window matches
+    /// vacuously and advances `i` by zero, so the scan never terminates —
+    /// on *any* dictation, including an empty transcript.
+    #[test]
+    fn a_whitespace_only_phrase_does_not_loop_forever() {
+        let mut m = manager();
+        m.insert("\t", "boom", 100).unwrap();
+        assert!(m.scan("hello there").is_empty());
+        assert!(m.scan("").is_empty());
     }
 
     // ── levenshtein ───────────────────────────────────────────────────────

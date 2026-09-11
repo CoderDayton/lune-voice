@@ -21,6 +21,7 @@ export type { PillOrientationDto } from './PillOrientationDto';
 export type { PillSizeDto } from './PillSizeDto';
 export type { PillSnapshotDto } from './PillSnapshotDto';
 export type { PillVisibilityDto } from './PillVisibilityDto';
+export type { PrivacyModeDto } from './PrivacyModeDto';
 export type { SaveWorkspaceSettingsInput } from './SaveWorkspaceSettingsInput';
 export type { SessionStatsDto } from './SessionStatsDto';
 export type { SnippetItemDto } from './SnippetItemDto';

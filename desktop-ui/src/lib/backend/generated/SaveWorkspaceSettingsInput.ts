@@ -9,6 +9,7 @@ import type { PillCornerDto } from "./PillCornerDto";
 import type { PillOrientationDto } from "./PillOrientationDto";
 import type { PillSizeDto } from "./PillSizeDto";
 import type { PillVisibilityDto } from "./PillVisibilityDto";
+import type { PrivacyModeDto } from "./PrivacyModeDto";
 import type { TerminalModeDto } from "./TerminalModeDto";
 import type { WhisperModelDto } from "./WhisperModelDto";
 
@@ -54,6 +55,10 @@ sessionHistoryDays: number | null,
  * Paste-shortcut selection strategy for the output stage.
  */
 terminalMode: TerminalModeDto, 
+/**
+ * Whether remote services may be used at all.
+ */
+privacyMode: PrivacyModeDto, 
 /**
  * Whether the correction LLM backend should be enabled.
  */

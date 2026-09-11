@@ -17,13 +17,14 @@ use lune_dict::DictionaryManager;
 use lune_dict::commands::VoiceCommandRouter;
 use lune_llm::{NullPostProcessor, OpenAiLlmBackend, OpenAiLlmConfig};
 use lune_persist::{AppPaths, Database, SettingsStore};
-use lune_voice::{DeliveryService, SessionManager, SessionManagerConfig};
+use lune_voice::{DeliveryHealth, DeliveryService, SessionManager, SessionManagerConfig};
 use lune_voice::{WindowTarget, capture_focus_target};
 use tauri::{AppHandle, Emitter, Manager, ipc::Channel};
 use tokio::sync::{Mutex, RwLock, mpsc};
 use tracing::{debug, info, warn};
 
 use crate::dto::SessionStreamEvent;
+use crate::persistence::load_settings_checked;
 
 const TOGGLE_DEBOUNCE: Duration = Duration::from_millis(150);
 const CANCEL_DEBOUNCE: Duration = Duration::from_millis(80);
@@ -61,6 +62,17 @@ struct RuntimeInner {
     /// Sessions consume via `AudioStreamHandle` so the cpal::Stream stays
     /// open across hotkey presses and the first chunk arrives ~70 ms sooner.
     prewarmed_audio: Mutex<Option<PrewarmedStream>>,
+    /// Serializes `sync_capture_device`'s decide-clear-open-install sequence.
+    /// Separate from `prewarmed_audio` so the slot stays readable while an
+    /// open is in flight: two concurrent syncs (two quick settings saves)
+    /// would otherwise each decide to open and hold the same exclusive
+    /// capture device at once, and one of them fails.
+    capture_open: Mutex<()>,
+    /// Set when a capture stream opened on the system default because the
+    /// configured microphone was missing, and cleared by the next dictation
+    /// that reports it. One toast per fallback, not one per dictation: the
+    /// condition persists until the device comes back.
+    capture_fallback_unreported: std::sync::atomic::AtomicBool,
 }
 
 /// What the dictation pipeline is doing right now.
@@ -92,6 +104,26 @@ const ALREADY_ACTIVE: &str = "dictation session already active";
 /// A start that abandoned itself because a stop or cancel arrived while it was
 /// still loading. Not a failure — the user got what they asked for.
 const START_ABORTED: &str = "dictation start cancelled before it began";
+
+/// How a start failure that happened before any session existed is reported.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StartFailureReport {
+    /// A stop or cancel arrived during the load. Walk the pill back to
+    /// "ready" and say nothing else.
+    Abandoned,
+    /// Prep failed. The hotkey already played the start cue, so without an
+    /// error status and a toast the user gets a beep, silence, and no way to
+    /// learn the cause.
+    Error,
+}
+
+fn classify_start_failure(error: &str) -> StartFailureReport {
+    if error == START_ABORTED {
+        StartFailureReport::Abandoned
+    } else {
+        StartFailureReport::Error
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PipelineState {
@@ -265,6 +297,50 @@ struct SessionStreamSlot {
     channel: Channel<SessionStreamEvent>,
 }
 
+/// How long to wait for a microphone to open before giving up on it.
+///
+/// `AudioStream::new` is synchronous all the way down to ALSA/PipeWire and has
+/// no bound of its own: a hung sound server, or a USB mic that enumerates but
+/// never answers, blocks its caller forever. On the startup path that caller
+/// is `AppRuntime::new`, which Tauri's `setup()` runs inside `block_on` before
+/// the event loop exists — so an unbounded open means no window, no tray and
+/// no hotkey, ever.
+const CAPTURE_OPEN_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// How long to wait for the delivery thread to report what it typed.
+///
+/// Typing is paced per key and long text legitimately takes seconds, so this
+/// is generous. It bounds a driver that never answers at all, not slow typing.
+const DELIVERY_OUTCOME_TIMEOUT: Duration = Duration::from_secs(120);
+
+/// How long a dictation start waits for delivery to finish starting.
+///
+/// Covers the hotkey being pressed in the moments after launch, where the
+/// driver is a few milliseconds from ready. Deliberately short: a start that
+/// is still pending after this is waiting on something the user has to act on
+/// — the polkit prompt for uinput access — and an error that says so beats a
+/// hotkey that appears to do nothing.
+const DELIVERY_START_GRACE: Duration = Duration::from_secs(2);
+
+/// Open a capture stream without blocking the async runtime, and without
+/// waiting on the driver indefinitely.
+///
+/// A timed-out open leaves its blocking-pool thread parked in the driver until
+/// the driver returns. That costs one pool thread; the alternative costs the
+/// caller, which on the startup path is the whole app.
+async fn open_capture_bounded(config: AudioConfig) -> Result<AudioStream, String> {
+    let open = tokio::task::spawn_blocking(move || AudioStream::new(config));
+    match tokio::time::timeout(CAPTURE_OPEN_TIMEOUT, open).await {
+        Ok(Ok(Ok(stream))) => Ok(stream),
+        Ok(Ok(Err(e))) => Err(e.to_string()),
+        Ok(Err(e)) => Err(format!("capture open task failed: {e}")),
+        Err(_) => Err(format!(
+            "the microphone did not open within {}s",
+            CAPTURE_OPEN_TIMEOUT.as_secs()
+        )),
+    }
+}
+
 /// A prewarmed capture stream paired with the device it was opened on, so a
 /// later device-preference change can be detected and the stream rebuilt live.
 struct PrewarmedStream {
@@ -306,7 +382,8 @@ impl AppRuntime {
                 }
             }
         }
-        let settings = load_settings(&paths)?;
+        let loaded = load_settings_checked(&paths)?;
+        let settings = loaded.settings.clone();
 
         // Retention runs once per launch, not once per window load: with
         // `start_minimized` and a hotkey-only workflow the main window may
@@ -314,7 +391,7 @@ impl AppRuntime {
         // webview, so nothing else would ever trigger it.
         match Database::open(&paths.database_file()) {
             Ok(mut db) => {
-                crate::persistence::enforce_retention(&mut db, &settings);
+                crate::persistence::enforce_retention(&mut db, &settings, loaded.trust);
                 // A previous run that was killed outright left its dictation
                 // row open; nothing in that process survived to close it.
                 match db.close_orphaned_sessions() {
@@ -368,6 +445,8 @@ impl AppRuntime {
                 last_cancel_at: Mutex::new(Instant::now() - CANCEL_DEBOUNCE),
                 last_activity: Mutex::new(Instant::now()),
                 prewarmed_audio: Mutex::new(None),
+                capture_open: Mutex::new(()),
+                capture_fallback_unreported: std::sync::atomic::AtomicBool::new(false),
             }),
         };
 
@@ -414,37 +493,51 @@ impl AppRuntime {
             Some(d) => d,
             None => self.inner.settings.read().await.input_device.clone(),
         };
-        let mut slot = self.inner.prewarmed_audio.lock().await;
-        let open = slot.as_ref().map(|p| p.device.as_deref());
-        let healthy = slot.as_ref().is_none_or(|p| !p.stream.has_failed());
-        if !healthy {
-            warn!("mic prewarm: the open capture stream reported an error; rebuilding it");
-        }
-        let action = reconcile_prewarm(open, input_device.as_deref(), healthy);
-        match action {
-            PrewarmAction::Keep => {}
-            PrewarmAction::Open | PrewarmAction::Reopen => {
-                if action == PrewarmAction::Reopen {
-                    debug!("mic prewarm: input device changed, rebuilding capture stream");
-                }
-                // Drop any existing stream first so its device handle is freed
-                // before we open the new one.
-                *slot = None;
-                let config = AudioConfig {
-                    input_device: input_device.clone(),
-                    ..AudioConfig::default()
-                };
-                match AudioStream::new(config) {
-                    Ok(stream) => {
-                        debug!("mic prewarm: capture stream opened");
-                        *slot = Some(PrewarmedStream {
-                            stream,
-                            device: input_device,
-                        });
-                    }
-                    Err(e) => warn!("mic prewarm: failed to open capture stream: {e}"),
-                }
+        // One sync at a time. The open itself is serialized here rather than
+        // under `prewarmed_audio`, which is deliberately released across it:
+        // holding *that* mutex over the open makes every later
+        // `prewarmed_handle()` await forever — every future dictation, plus
+        // the settings-save IPC that reaches here.
+        let _opening = self.inner.capture_open.lock().await;
+        // Decide under the slot lock, open outside it.
+        let action = {
+            let slot = self.inner.prewarmed_audio.lock().await;
+            let open = slot.as_ref().map(|p| p.device.as_deref());
+            let healthy = slot.as_ref().is_none_or(|p| !p.stream.has_failed());
+            if !healthy {
+                warn!("mic prewarm: the open capture stream reported an error; rebuilding it");
             }
+            reconcile_prewarm(open, input_device.as_deref(), healthy)
+        };
+        match action {
+            PrewarmAction::Keep => return,
+            PrewarmAction::Reopen => {
+                debug!("mic prewarm: input device changed, rebuilding capture stream");
+            }
+            PrewarmAction::Open => {}
+        }
+
+        // Drop any existing stream first so its device handle is freed before
+        // we open the new one. Until the new one lands, the start path falls
+        // back to `open_capture_for_start`.
+        *self.inner.prewarmed_audio.lock().await = None;
+
+        let config = AudioConfig {
+            input_device: input_device.clone(),
+            ..AudioConfig::default()
+        };
+        match open_capture_bounded(config).await {
+            Ok(stream) => {
+                debug!("mic prewarm: capture stream opened");
+                self.note_capture_fallback(stream.fell_back());
+                // `capture_open` is still held, so no other sync can have
+                // installed a stream between the clear above and this store.
+                *self.inner.prewarmed_audio.lock().await = Some(PrewarmedStream {
+                    stream,
+                    device: input_device,
+                });
+            }
+            Err(e) => warn!("mic prewarm: failed to open capture stream: {e}"),
         }
     }
 
@@ -486,8 +579,11 @@ impl AppRuntime {
             input_device,
             ..AudioConfig::default()
         };
-        match AudioStream::new(config) {
-            Ok(stream) => Some(stream),
+        match open_capture_bounded(config).await {
+            Ok(stream) => {
+                self.note_capture_fallback(stream.fell_back());
+                Some(stream)
+            }
             Err(e) => {
                 debug!("start: could not pre-open capture stream ({e}); session will open its own");
                 None
@@ -671,9 +767,31 @@ impl AppRuntime {
         Ok(())
     }
 
+    /// The delivery health, giving a still-starting thread a moment to settle.
+    async fn delivery_health_settled(&self) -> DeliveryHealth {
+        let deadline = Instant::now() + DELIVERY_START_GRACE;
+        loop {
+            let health = self.inner.delivery.health();
+            if health != DeliveryHealth::Starting || Instant::now() >= deadline {
+                return health;
+            }
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        }
+    }
+
     pub async fn start_dictation(&self) -> Result<String, String> {
-        if !self.inner.delivery.is_alive() {
-            return Err("text delivery service is unavailable — cannot start dictation".into());
+        match self.delivery_health_settled().await {
+            DeliveryHealth::Ready => {}
+            DeliveryHealth::Starting => {
+                return Err(
+                    "Text delivery is still starting. If a permission prompt is \
+                            open, finish it and press the hotkey again."
+                        .into(),
+                );
+            }
+            DeliveryHealth::Stopped => {
+                return Err("text delivery service is unavailable — cannot start dictation".into());
+            }
         }
 
         // Our own typed/pasted output may still be in flight; starting now
@@ -741,15 +859,7 @@ impl AppRuntime {
         let manager = match self.prepare_manager_for_start().await {
             Ok(m) => m,
             Err(e) => {
-                // Only walk the pill back when nothing is actually running.
-                // Losing the race to another start means a session *is* live,
-                // and publishing "ready" over it would make the UI lie.
-                if !self.inner.pipeline.lock().await.is_busy() {
-                    self.publish_status("ready").await;
-                }
-                if e == START_ABORTED {
-                    debug!("dictation start abandoned — stop arrived during the pipeline load");
-                }
+                self.report_start_failure(&e).await;
                 return Err(e);
             }
         };
@@ -772,6 +882,7 @@ impl AppRuntime {
         self.set_pipeline_session(Some(session_id.clone()), true)
             .await;
 
+        self.report_capture_fallback().await;
         self.push_session_event(SessionStreamEvent::SessionStarted {
             session_id: session_id.clone(),
         })
@@ -815,15 +926,7 @@ impl AppRuntime {
         let manager = match self.prepare_manager_for_start().await {
             Ok(m) => m,
             Err(e) => {
-                // Only walk the pill back when nothing is actually running.
-                // Losing the race to another start means a session *is* live,
-                // and publishing "ready" over it would make the UI lie.
-                if !self.inner.pipeline.lock().await.is_busy() {
-                    self.publish_status("ready").await;
-                }
-                if e == START_ABORTED {
-                    debug!("dictation start abandoned — stop arrived during the pipeline load");
-                }
+                self.report_start_failure(&e).await;
                 return Err(e);
             }
         };
@@ -845,6 +948,7 @@ impl AppRuntime {
         let session_id = session_id.to_string();
         self.set_pipeline_session(Some(session_id.clone()), true)
             .await;
+        self.report_capture_fallback().await;
         self.push_session_event(SessionStreamEvent::SessionStarted {
             session_id: session_id.clone(),
         })
@@ -1002,7 +1106,13 @@ impl AppRuntime {
                                 let runtime = runtime.clone();
                                 tauri::async_runtime::spawn(async move {
                                     let outcome = tauri::async_runtime::spawn_blocking(move || {
-                                        rx.recv().ok()
+                                        // Bounded: a driver wedged in the
+                                        // kernel or on the clipboard never
+                                        // sends, and an unbounded recv leaks
+                                        // one blocking-pool thread per
+                                        // dictation until the pool's 512-thread
+                                        // cap stalls all blocking work.
+                                        rx.recv_timeout(DELIVERY_OUTCOME_TIMEOUT).ok()
                                     })
                                     .await
                                     .ok()
@@ -1138,6 +1248,62 @@ impl AppRuntime {
         };
         if enabled {
             lune_voice::sound::play(cue, volume);
+        }
+    }
+
+    /// Record whether the capture stream we just opened is on the configured
+    /// microphone. A fallback arms one toast; a clean open disarms it, so the
+    /// device coming back is not reported as a problem.
+    fn note_capture_fallback(&self, fell_back: bool) {
+        self.inner
+            .capture_fallback_unreported
+            .store(fell_back, Ordering::Release);
+    }
+
+    /// Tell the user once that the dictation is running on the wrong mic.
+    ///
+    /// Without this the configured USB headset can be unplugged and every
+    /// later dictation comes from the laptop mic — degraded transcripts,
+    /// permanently, with nothing on screen saying why.
+    async fn report_capture_fallback(&self) {
+        if self
+            .inner
+            .capture_fallback_unreported
+            .swap(false, Ordering::AcqRel)
+        {
+            self.push_session_event(SessionStreamEvent::SessionWarning {
+                message: "Your selected microphone was not found — recording from the system \
+                          default instead."
+                    .into(),
+            })
+            .await;
+        }
+    }
+
+    /// Undo the optimistic "listening" after prep failed, and tell the user
+    /// when it was a failure rather than their own stop.
+    ///
+    /// Only touches the pill when nothing is actually running: losing the race
+    /// to another start means a session *is* live, and publishing over it
+    /// would make the UI lie.
+    async fn report_start_failure(&self, error: &str) {
+        let report = classify_start_failure(error);
+        if report == StartFailureReport::Abandoned {
+            debug!("dictation start abandoned — stop arrived during the pipeline load");
+        }
+        if self.inner.pipeline.lock().await.is_busy() {
+            return;
+        }
+        match report {
+            StartFailureReport::Abandoned => self.publish_status("ready").await,
+            StartFailureReport::Error => {
+                warn!(error = %error, "dictation start failed");
+                self.publish_status("error").await;
+                self.push_session_event(SessionStreamEvent::SessionError {
+                    message: sanitize_error_for_frontend(error),
+                })
+                .await;
+            }
         }
     }
 
@@ -1537,12 +1703,16 @@ async fn build_pipeline(
     let db = Arc::new(Mutex::new(
         Database::open(&paths.database_file()).map_err(|e| format!("open session db: {e}"))?,
     ));
-    // Resolve backend defaults + user TOML overrides once, and surface any
-    // invariant violations — a bad override otherwise degrades sessions
-    // silently (e.g. an instant wall-clock deadline).
-    let pipeline_config = asr.pipeline_config().with_overrides(&settings.pipeline);
-    for issue in pipeline_config.validate() {
-        tracing::warn!(issue, "pipeline configuration violates invariant");
+    // Resolve backend defaults + user TOML overrides once, then repair any
+    // invariant violation rather than running on it. An out-of-range override
+    // otherwise degrades every session silently — an instant wall-clock
+    // deadline, one syllable per dictation, a multi-gigabyte audio buffer.
+    let (pipeline_config, repairs) = asr
+        .pipeline_config()
+        .with_overrides(&settings.pipeline)
+        .clamp();
+    for repair in repairs {
+        tracing::warn!(repair, "pipeline override was out of range; corrected");
     }
     // "Don't save history" has to mean "write nothing" rather than "prune
     // nothing", and "keep forever" still records — see
@@ -1605,13 +1775,7 @@ fn resolve_paths() -> Result<AppPaths, String> {
 }
 
 fn load_settings(paths: &AppPaths) -> Result<UserSettings, String> {
-    // Quarantine rather than propagate: this runs on the startup path, where
-    // an error exits the process before the user has any way to fix the file.
-    let mut settings = SettingsStore::new(paths.settings_file())
-        .load_or_quarantine()
-        .map_err(|e| format!("load settings: {e}"))?;
-    settings.migrate_pipeline_fields();
-    Ok(settings)
+    Ok(load_settings_checked(paths)?.settings)
 }
 
 /// Whether `privacy_mode` forbids sending audio or text to a remote service.
@@ -1895,10 +2059,32 @@ mod idle_unload_tests {
 #[cfg(test)]
 mod tests {
     use super::{
-        Arc, AsrRegistry, LivePipeline, PipelineState, PrewarmAction, ReloadScope,
-        asr_backend_needs_reload, cue_for_transition, reconcile_prewarm, release_backend,
-        remote_backends_denied, sanitize_error_for_frontend,
+        Arc, AsrRegistry, LivePipeline, PipelineState, PrewarmAction, ReloadScope, START_ABORTED,
+        StartFailureReport, asr_backend_needs_reload, classify_start_failure, cue_for_transition,
+        reconcile_prewarm, release_backend, remote_backends_denied, sanitize_error_for_frontend,
     };
+
+    /// The hotkey has already played the start cue by the time prep runs. A
+    /// real prep failure has to reach the user; an abort is what they asked
+    /// for and must stay silent.
+    #[test]
+    fn a_failed_start_is_reported_and_an_aborted_one_is_not() {
+        assert_eq!(
+            classify_start_failure(START_ABORTED),
+            StartFailureReport::Abandoned
+        );
+        assert_eq!(
+            classify_start_failure(
+                "whisper model file is too small: most likely a partial download; \
+                 delete it and download the model again"
+            ),
+            StartFailureReport::Error
+        );
+        assert_eq!(
+            classify_start_failure("Models not downloaded. Please complete model setup first."),
+            StartFailureReport::Error
+        );
+    }
     use lune_asr::{OpenAiAsrConfig, OpenAiCompatibleAsrBackend};
     use lune_core::config::{AsrBackendConfig, PrivacyMode, WhisperModel};
 

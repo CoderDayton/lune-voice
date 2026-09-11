@@ -11,7 +11,7 @@
     "extract": "lingui extract",
     "preview": "vite preview",
     "test": "bun test tests/unit src",
-    "test:e2e:tauri": "bun run tauri build --debug --no-bundle && bun test tests/e2e/tauri-smoke.test.ts",
+    "test:e2e:tauri": "bun run tauri build --debug --no-bundle --features whisper-cpp && bun test tests/e2e/tauri-smoke.test.ts",
     "tauri": "tauri"
   },
   "dependencies": {

@@ -187,6 +187,25 @@ pub enum TerminalModeDto {
     Normal,
 }
 
+/// Whether remote services may be used at all. Mirrors
+/// [`lune_core::config::PrivacyMode`].
+///
+/// `LocalOnly` is the default and it *overrides* a configured remote backend:
+/// styling silently degrades to the raw transcript and remote transcription
+/// is refused outright. That makes it the one setting that can make a
+/// correctly-configured API key do nothing, so it has to be visible.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+pub enum PrivacyModeDto {
+    /// Never contact a remote service.
+    #[default]
+    LocalOnly,
+    /// Use a remote service only where one was explicitly configured.
+    LocalPreferred,
+    /// Use whatever is configured.
+    AllowRemote,
+}
+
 // ── Read DTOs (Serialize → frontend) ─────────────────────────────────────
 
 /// Per-style deterministic formatting toggles, surfaced to the styles page.
@@ -319,6 +338,8 @@ pub struct WorkspaceSettingsDto {
     pub session_history_days: Option<u32>,
     /// Paste-shortcut selection strategy for the output stage.
     pub terminal_mode: TerminalModeDto,
+    /// Whether remote services may be used at all.
+    pub privacy_mode: PrivacyModeDto,
     /// Whether the remote styling LLM backend is enabled.
     pub llm_enabled: bool,
     // OpenAI ASR fields (populated when asr_backend_type == OpenAiCompatible)
@@ -590,6 +611,9 @@ pub struct SaveWorkspaceSettingsInput {
     pub session_history_days: Option<u32>,
     /// Paste-shortcut selection strategy for the output stage.
     pub terminal_mode: TerminalModeDto,
+    /// Whether remote services may be used at all.
+    #[serde(default)]
+    pub privacy_mode: PrivacyModeDto,
     /// Whether the correction LLM backend should be enabled.
     pub llm_enabled: bool,
     /// Which styling engine to use when enabled (local vs remote).

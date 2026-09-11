@@ -1,7 +1,7 @@
-// Only the IBus arm below borrows-or-flattens; every other driver takes the
-// text as it comes.
-#[cfg(target_os = "linux")]
+// The IBus arm and the Windows/macOS driver both borrow-or-flatten.
+#[cfg(any(target_os = "linux", not(unix)))]
 use std::borrow::Cow;
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
@@ -82,11 +82,43 @@ enum DeliveryJob {
 /// in-flight synthetic key events drain out of the compositor and app queues.
 const DELIVERY_SETTLE: Duration = Duration::from_millis(300);
 
+/// Whether the delivery thread can actually type anything yet.
+///
+/// Three states, not two, because building the platform driver can take
+/// arbitrarily long: on Linux it may be sitting behind a polkit prompt for
+/// `/dev/uinput` access. A thread stuck there has an open channel, so sends
+/// still succeed and nothing is ever typed — which is why liveness is what
+/// the thread reports about itself, not what its channel implies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeliveryHealth {
+    /// Building the platform driver. Queued text waits; it is not lost.
+    Starting,
+    /// In the receive loop, typing what it is given.
+    Ready,
+    /// Exited, or never reached the loop. Nothing queued will ever be typed.
+    Stopped,
+}
+
+impl DeliveryHealth {
+    const STARTING: u8 = 0;
+    const READY: u8 = 1;
+    const STOPPED: u8 = 2;
+
+    fn from_code(code: u8) -> Self {
+        match code {
+            Self::READY => Self::Ready,
+            Self::STOPPED => Self::Stopped,
+            _ => Self::Starting,
+        }
+    }
+}
+
 /// Handle to the background delivery thread.
 #[derive(Clone)]
 pub struct DeliveryService {
     tx: mpsc::Sender<DeliveryJob>,
     busy_until: Arc<Mutex<Option<Instant>>>,
+    health: Arc<AtomicU8>,
 }
 
 impl DeliveryService {
@@ -94,11 +126,28 @@ impl DeliveryService {
         let (tx, rx) = mpsc::channel::<DeliveryJob>();
         let busy_until = Arc::new(Mutex::new(None));
         let busy = Arc::clone(&busy_until);
+        let health = Arc::new(AtomicU8::new(DeliveryHealth::STARTING));
+        let thread_health = Arc::clone(&health);
         std::thread::Builder::new()
             .name("delivery".into())
-            .spawn(move || delivery_thread(rx, terminal_mode, busy))
+            .spawn(move || delivery_thread(rx, terminal_mode, busy, thread_health))
             .map_err(|e| format!("spawn delivery thread: {e}"))?;
-        Ok(Self { tx, busy_until })
+        Ok(Self {
+            tx,
+            busy_until,
+            health,
+        })
+    }
+
+    /// What the delivery thread reports about itself.
+    ///
+    /// A closed channel outranks the report: it means the thread is gone
+    /// whatever it last said.
+    pub fn health(&self) -> DeliveryHealth {
+        if self.tx.send(DeliveryJob::Probe).is_err() {
+            return DeliveryHealth::Stopped;
+        }
+        DeliveryHealth::from_code(self.health.load(Ordering::Acquire))
     }
 
     pub fn deliver(
@@ -246,11 +295,11 @@ impl DeliveryService {
             .is_some_and(|t| Instant::now() < t)
     }
 
+    /// True only when the thread is in its loop. A thread still building its
+    /// driver is not alive for this purpose: its channel accepts sends and
+    /// nothing comes out the other end.
     pub fn is_alive(&self) -> bool {
-        // Liveness probe: if the delivery thread (the receiver) has exited,
-        // `send` returns Err. The empty text means the thread harmlessly
-        // skips it (the loop `continue`s on empty text) if it does arrive.
-        self.tx.send(DeliveryJob::Probe).is_ok()
+        self.health() == DeliveryHealth::Ready
     }
 }
 
@@ -260,16 +309,19 @@ fn delivery_thread(
     rx: mpsc::Receiver<DeliveryJob>,
     terminal_mode: TerminalMode,
     busy_until: Arc<Mutex<Option<Instant>>>,
+    health: Arc<AtomicU8>,
 ) {
     let mut driver = match PlatformDriver::new(terminal_mode) {
         Ok(d) => d,
         Err(e) => {
             warn!(error = %e, "text delivery unavailable on this platform");
+            health.store(DeliveryHealth::STOPPED, Ordering::Release);
             return;
         }
     };
 
     info!(platform = driver.platform_name(), "delivery thread ready");
+    health.store(DeliveryHealth::READY, Ordering::Release);
 
     while let Ok(job) = rx.recv() {
         let msg = match job {
@@ -344,6 +396,7 @@ fn delivery_thread(
             Some(Instant::now() + DELIVERY_SETTLE);
     }
 
+    health.store(DeliveryHealth::STOPPED, Ordering::Release);
     debug!("delivery thread exiting");
 }
 
@@ -420,31 +473,22 @@ impl PlatformDriver {
         }
     }
 
-    /// Whether this delivery is aimed at a terminal, honoring `terminal_mode`.
-    ///
-    /// Only the IBus path calls this, and only from inside its own match arm:
-    /// under `Auto` with no captured target it queries the compositor for the
-    /// focused window, which the uinput path already resolves internally.
-    /// Calling it before the backend is known would put that round-trip on
-    /// every uinput delivery and throw the answer away.
-    ///
-    #[cfg(target_os = "linux")]
-    fn targets_terminal(terminal_mode: TerminalMode, target: Option<&WindowTarget>) -> bool {
-        crate::focus::targets_terminal(terminal_mode, target)
-    }
-
     /// Collapse line breaks and tabs when IBus is committing into a terminal.
     ///
     /// IBus commits the string straight into the focused input context, so a
     /// newline arrives as a line the shell runs. Same hazard the uinput paste
     /// path guards against in `do_clipboard_paste`, reached by another route.
+    ///
+    /// Keyed on [`crate::focus::must_flatten`], not on the paste-chord
+    /// question: a window the desktop would not name is treated as one that
+    /// might run what it receives.
     #[cfg(target_os = "linux")]
     fn ibus_text_with<'a>(
         terminal_mode: TerminalMode,
         text: &'a str,
         target: Option<&WindowTarget>,
     ) -> Cow<'a, str> {
-        if Self::targets_terminal(terminal_mode, target) {
+        if crate::focus::must_flatten(terminal_mode, target) {
             crate::sanitize::flatten_for_terminal(text)
         } else {
             Cow::Borrowed(text)
@@ -522,16 +566,21 @@ const PASTE_READ_WINDOW: std::time::Duration = std::time::Duration::from_millis(
 struct PlatformDriver {
     clipboard: arboard::Clipboard,
     enigo: enigo::Enigo,
+    terminal_mode: TerminalMode,
 }
 
 #[cfg(not(unix))]
 impl PlatformDriver {
-    fn new(_terminal_mode: TerminalMode) -> Result<Self, String> {
+    fn new(terminal_mode: TerminalMode) -> Result<Self, String> {
         let clipboard =
             arboard::Clipboard::new().map_err(|e| format!("clipboard init failed: {e}"))?;
         let enigo = enigo::Enigo::new(&enigo::Settings::default())
             .map_err(|e| format!("enigo init failed: {e}"))?;
-        Ok(Self { clipboard, enigo })
+        Ok(Self {
+            clipboard,
+            enigo,
+            terminal_mode,
+        })
     }
 
     fn platform_name(&self) -> &'static str {
@@ -547,6 +596,12 @@ impl PlatformDriver {
     fn prime_clipboard(&mut self) {}
 
     fn type_text(&mut self, text: &str, keep_clipboard: bool) -> TypeOutcome {
+        let flattened = self.flattened(text, None);
+        self.type_text_flattened(&flattened, keep_clipboard)
+    }
+
+    /// The paste itself. Callers flatten first; this never does.
+    fn type_text_flattened(&mut self, text: &str, keep_clipboard: bool) -> TypeOutcome {
         // Snapshot before staging ours so the user's own clipboard can go back.
         // `arboard` reads text only: an image or an app-specific format reads as
         // an error, indistinguishable from an empty clipboard, and restoring
@@ -580,15 +635,31 @@ impl PlatformDriver {
         TypeOutcome::delivered(false)
     }
 
-    /// Same as [`type_text`](Self::type_text): nothing here acts on the
-    /// target yet.
+    /// Collapse newlines and tabs when the target might run what it receives.
     ///
-    /// Not an oversight. The captured target exists to answer two questions,
-    /// and on Windows both already have fixed answers: Ctrl+V is the paste
-    /// chord in `WindowsTerminal` and `conhost` alike, so `is_terminal` cannot
-    /// change the keystroke; and `enigo` types into whatever is focused, with
-    /// no focus-stealing step in between to undo. The target is captured and
-    /// logged so a future driver that *does* need it has it.
+    /// The paste *chord* genuinely does not vary here — Ctrl+V pastes in
+    /// `WindowsTerminal` and `conhost` alike — but the text does. A styled
+    /// response from a hostile or prompt-injected endpoint, pasted into cmd,
+    /// runs line by line. `contains_forbidden_output` upstream is an
+    /// anti-preamble heuristic, not a security control.
+    fn flattened<'a>(&self, text: &'a str, target: Option<&WindowTarget>) -> Cow<'a, str> {
+        if crate::focus::must_flatten(self.terminal_mode, target) {
+            let flattened = crate::sanitize::flatten_for_terminal(text);
+            if flattened != text {
+                warn!("collapsed line breaks and tabs in text delivered to a terminal");
+            }
+            flattened
+        } else {
+            Cow::Borrowed(text)
+        }
+    }
+
+    /// As [`type_text`](Self::type_text), plus the target's own terminal
+    /// classification.
+    ///
+    /// The chord is the same either way — Ctrl+V pastes in every Windows
+    /// console — but the captured target is what says whether the text has to
+    /// be flattened first.
     fn type_text_to(
         &mut self,
         text: &str,
@@ -596,7 +667,8 @@ impl PlatformDriver {
         keep_clipboard: bool,
     ) -> TypeOutcome {
         debug!(class = ?target.class, is_terminal = target.is_terminal, "delivering to window");
-        self.type_text(text, keep_clipboard)
+        let text: &str = &self.flattened(text, Some(target));
+        self.type_text_flattened(text, keep_clipboard)
     }
 
     fn emit_paste(&mut self) {
@@ -614,14 +686,14 @@ impl PlatformDriver {
         let _ = self.enigo.key(modifier, Direction::Release);
     }
 
-    /// Per-key typing never touches the clipboard. enigo types Unicode text
-    /// directly (no US-QWERTY keycode mapping), so there is no newline hazard
-    /// to guard against here — a failure is reported, not silently dropped.
+    /// Per-key typing maps `'\n'` to Enter, which submits the form or runs
+    /// the shell line. Flattened for the same reason the paste path is.
     fn type_keys(&mut self, text: &str, _keep_clipboard: bool) -> TypeOutcome {
         use enigo::Keyboard;
 
+        let flattened = self.flattened(text, None);
         // Fallback: type each character directly
-        if let Err(e) = self.enigo.text(text) {
+        if let Err(e) = self.enigo.text(&flattened) {
             warn!(error = %e, "per-key typing failed");
             return TypeOutcome::DROPPED;
         }

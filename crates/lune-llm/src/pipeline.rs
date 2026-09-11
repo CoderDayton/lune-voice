@@ -17,7 +17,16 @@ const MAX_STYLED_GROWTH: usize = 4;
 
 /// Floor for that bound, in bytes, so a two-word utterance still leaves the
 /// model room to punctuate and expand contractions.
-const MAX_STYLED_FLOOR: usize = 4096;
+///
+/// Kept small on purpose: the floor is what a *short* utterance is allowed to
+/// grow to, and the result is typed straight into the focused window. A
+/// generous floor means a two-word dictation can deliver kilobytes of
+/// endpoint-controlled text. Anything longer is covered by the growth
+/// multiple above, which scales with what the user actually said.
+///
+/// Sub-kilobyte still bounds that paste, while leaving a short utterance room
+/// for a style that reformats it into a list. A refusal is logged, not silent.
+const MAX_STYLED_FLOOR: usize = 1024;
 
 /// Upper bound on a styled result for a given seeded input.
 ///
